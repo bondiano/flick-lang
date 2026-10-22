@@ -63,7 +63,8 @@
 | `flick-wasm/` | wasm-bindgen API для демо: `check` и compile preview |
 | `runtime/` | npm-пакет runtime adapter на TS поверх Effect 4.0.5 (owners, scopes, concurrency, FFI adapters, Cause, entry runner, UI bridge, SQL driver adapter) |
 | `stdlib/` | Стандартная библиотека: `.fl` модули + JS/TS adapters к Effect |
-| `tools/dts-importer/` | Node helper на `typescript`, который читает `.d.ts` для `flick ffi import` |
+| `tools/dts-importer/` | Node helper на `typescript`, который читает `.d.ts` для `flick ffi import` и снимает поверхность Effect для линтера покрытия (M20) |
+| `stdlib/Effect/surface.toml` | Манифест покрытия: каждый export закреплённого Effect с классификацией (M20) |
 | `tests/` | fixtures checker (pass/fail), e2e-программы на Node, differential debug/release |
 | `docs/` | Language reference, грамматика, каталог диагностик, руководства |
 
@@ -107,6 +108,8 @@ flowchart LR
 | Node host | Node.js 24.18.0 (минимальная поддерживаемая версия), проверка в `doctor` | M8 |
 | pnpm | Закреплённая версия через `packageManager` в шаблоне | M16 |
 | Effect | Ровно 4.0.5, commit `81fc8d9c…` (§7, §11) | M8 |
+| Покрытие Effect API | Каждый export `effect`, `effect/cli`, `effect/http`, `effect/http-api` классифицирован в манифесте; линтер в `just check` падает на неклассифицированном, устаревшем или изменившем сигнатуру export | M20 |
+| Node-платформа Effect | Серверный HTTP, `Terminal`/`FileSystem` для CLI — через пакет platform-node, закреплённый на версии, совместимой с Effect 4.0.5; входит в capability check M8 | M21, M22 |
 | PostgreSQL driver | `pg` (node-postgres) через FFI-binding в `stdlib` | M13 |
 | React | React 19 + `react-dom/client` | M14 |
 | `.d.ts` разрешение | npm-пакет `typescript` в Node helper, протокол JSON по stdio | M12 |
@@ -130,6 +133,8 @@ flowchart LR
 | SQL table metadata | Блок `sql table Name "table" { col : sql_type [not null] [primary key] [default] [generated always] as T [via codec] }`; elaborates в библиотечные `Sql.table`/`Sql.column`, доступные и напрямую; генератор из миграций выдаёт тот же блок | M13 |
 | FFI overrides | Importer пишет только `<Pkg>/Generated.fl`; пользовательский модуль `<Pkg>.fl` содержит обычные `foreign`-декларации с `reviewed "<pkg>@<ver> sha256:…"` и re-export; `ffi check` сверяет fingerprint | M12 |
 | Shadowing и неоднозначность | Локальные связывания затеняют всё без диагностики. Top-level определение с именем из `import … exposing (name)` — ошибка `FLICK-R009`; имена из `exposing (..)` top-level затеняет молча. Два импорта по имени с разными сущностями — `FLICK-R010` сразу; конфликт между `(..)`-импортами — `FLICK-R010` только в месте использования. Re-export той же сущности не конфликт. Порядок `import` ни на что не влияет | M2 |
+| HTTP | Без синтаксиса (спека §7 «Граница языкового ядра»): `Http.*` и `HttpApi.*` — библиотечные combinators; схемы endpoint'ов — `Schema a` из M11 | M21 |
+| CLI eDSL | Спека §10 «CLI eDSL», грамматика в `docs/reference/grammar.md`. Блок `cli "name" { … }` с clauses `description`, `flag`, `arg`, `subcommand`, `handle`; elaborates в библиотечные `Cli.*` поверх `effect/cli`, доступные и напрямую. Parser блока уже разбирает форму clauses | M22 |
 | Пакеты с модулями Flick | Пакет объявляет в своём `package.json` поле `"flick": { "iface-dir": "<dir>" }`; модуль `A.B` описан файлом `<dir>/A/B.iface`. Поле и файлы пишет `flick build`/`pack`, не пользователь. Установка — только pnpm (`flick install`/`add`), Flick читает установленное дерево; M2 смотрит прямые зависимости проекта | M2, M7, M16 |
 
 ---
@@ -165,9 +170,18 @@ flowchart TD
   M16 --> M19
   M17 --> M18["M18 wasm demo"]
   M18 --> M19
+  M12 --> M20["M20 Покрытие Effect API"]
+  M20 --> M21["M21 HTTP и HttpApi"]
+  M11 --> M21
+  M20 --> M22["M22 CLI eDSL"]
+  M11 --> M22
+  M20 --> M19
+  M21 --> M19
+  M22 --> M19
 ```
 
-Параллельно можно вести: M5 с M4, M12 с M11, M13 с M14, M15/M16/M17 после M9.
+Параллельно можно вести: M5 с M4, M12 с M11, M13 с M14, M15/M16/M17 после M9,
+M21 с M22 после M20. Номера M20–M22 добавлены позже остальных и идут до релиза M19.
 
 ---
 
@@ -906,7 +920,8 @@ Schema и SQL».
   `run -- args` (`--entry`), `dev`, `test`, `fmt`, `clean` (`--cache`).
 - Зависимости через pnpm: `install` (`--locked` → `--frozen-lockfile`,
   `--offline`), `add [--dev]`, `remove`, `update`, `deps [--why]`, `pack --out-dir`.
-- Инструменты: `ffi import|check`, `schema export`, `doc --out-dir`,
+- Инструменты: `ffi import|check`, `schema export` (`json-schema-2020-12`,
+  `openapi-3.1` после M21), `doc --out-dir`,
   `lsp --stdio`, `explain`, `doctor`, `inspect <module> --emit ast|typed-ir|js|ts|iface|mapping`.
 - Общие флаги: `--project`, `--diagnostics human|json`, `--warnings-as-errors`,
   `--color`, `--quiet`/`--verbose`, `--help`, `help <command>`, `--version`.
@@ -1002,6 +1017,148 @@ Schema и SQL».
 
 ---
 
+## M20. Покрытие Effect API и линтер
+
+**Объём.** §7 «Граница языкового ядра»: retry, schedules, streams, queues,
+cache, tracing — типизированная stdlib. Цель — обёртка или явное решение для
+каждого публичного export закреплённого Effect, и проверка, что после
+обновления Effect ничего не потеряно.
+
+- Снимок поверхности: helper M12 читает `.d.ts` entrypoints `effect`,
+  `effect/cli`, `effect/http`, `effect/http-api` и выдаёт список
+  `Module.name` + нормализованный fingerprint сигнатуры.
+- Манифест `stdlib/Effect/surface.toml`: каждый export ровно в одном статусе:
+  - `wrapped "<Flick.Name>"` — типизированная обёртка в stdlib;
+  - `language "<конструкция>"` — покрыт языком (`Effect.gen` → прямые вызовы,
+    `Context.Tag` → сервисы, `Data.TaggedError` → `type error`,
+    `Layer.provide` → `provide`, `Match` → `match`);
+  - `excluded "<причина>"` — TS-only (`HKT`, `Types`, `Unify`, `Pipeable`,
+    `Effectable`) или противоречит инвариантам (`unsafe*`, `Mutable*`,
+    daemon fork без owner, `runSync` вне entry);
+  - `pending "<этап>"` — временно, только с этапом-владельцем (M21, M22).
+- Остальные entrypoints Effect (`ai`, `cluster`, `rpc`, `sql`, `workflow`, …)
+  в 0.1.0 не оборачиваются: манифест помечает их модулями `excluded` целиком,
+  чтобы новые entrypoints тоже требовали решения.
+- Обёртки core по группам: `Effect` (комбинаторы, не заменённые языком),
+  `Schedule`/retry/repeat, `Stream`/`Sink`/`Channel`, `Queue`/`PubSub`/
+  `Deferred`/`Latch`/`Semaphore`, `Cache`/`ScopedCache`/`RcRef`/`Pool`,
+  `Config`/`ConfigProvider`, `Clock`/`Random`/`DateTime`/`Cron`,
+  `Logger`/`Metric`/`Tracer`, `FileSystem`/`Path`/`Terminal`/`Stdio`, `Tx*`,
+  `Fiber*` (только через owner/supervisor), данные (`Array`, `Record`, `Order`,
+  `Equivalence`, …). Уже сделанное в M8/M9 классифицируется, не переписывается.
+- Обёртки соблюдают общие инварианты: captures в callbacks `Stream`/`Queue`
+  не стираются (M6), нет скрытой memoization, typed failure/defect не смешиваются.
+- `just effect-bump <version>`: новый снимок, отчёт added/removed/changed,
+  обновление pin в runtime и capability check M8.
+
+**Артефакты.** `tools/dts-importer` (режим `surface`), `stdlib/Effect/surface.toml`,
+`stdlib/**` обёртки, тест-линтер в `just check`, отчёт покрытия в CI.
+
+**AC**
+
+- [ ] Линтер падает (fixture с подменённым снимком) на: неклассифицированном
+      export; записи для несуществующего export; изменившемся fingerprint
+      сигнатуры `wrapped`-записи; `wrapped`, указывающем на отсутствующий
+      символ stdlib `.iface`; `pending` без этапа-владельца. Сообщение называет
+      `Module.name` и причину.
+- [ ] Для `effect` (core) ноль `pending`; новый entrypoint Effect без записи — ошибка.
+- [ ] Каждый `wrapped` используется хотя бы в одном тесте stdlib (проверка
+      статически по resolved-именам из `.iface` тестов).
+- [ ] Foreign-binding каждой обёртки несёт provenance `effect@<ver>`; линтер
+      сверяет его с закреплённой версией.
+- [ ] `just effect-bump` на fixture-версии с добавленным, удалённым и
+      изменённым export выдаёт ожидаемый отчёт и красный линтер до ревью.
+- [ ] `Stream`, захвативший scoped-handle, не выходит из scope; `Schedule.retry`
+      повторяет только typed failure, не defect (e2e).
+- [ ] CI публикует счётчики по статусам и модулям.
+
+---
+
+## M21. HTTP и HttpApi
+
+**Объём.** `effect/http` и `effect/http-api` как библиотека без синтаксиса.
+
+- `effect/http`: `Headers`, `Cookies`, `Url`/`UrlParams`, `HttpMethod`,
+  `HttpStatus`, `HttpBody`, `Multipart`, `Mime`, `Etag`; клиент (`HttpClient`,
+  `HttpClientRequest`/`Response`, `FetchHttpClient` как Layer); сервер
+  (`HttpServer`, `HttpRouter`, `HttpMiddleware`, `HttpServerRequest`/`Response`,
+  `HttpStaticServer`) с Node-платформой.
+- `Cookies`: typed `CookiesError` при parse/set, атрибуты (`secure`,
+  `httpOnly`, `sameSite`, `maxAge` через checked `Duration`) — record с exact
+  полями; значение `Redacted String` маскируется в `Show`/логах.
+- `effect/http-api`: `HttpApi`, `HttpApiGroup`, `HttpApiEndpoint`,
+  `HttpApiBuilder`, `HttpApiClient`, `HttpApiError`, `HttpApiMiddleware`,
+  `HttpApiSecurity`, `OpenApi`, `HttpApiSwagger`/`HttpApiScalar` как Layers.
+- Strict OpenAPI 3.1 export (§9 «Schema exporters»): схемы endpoint'ов идут
+  через strict JSON Schema 2020-12 exporter M11, без best-effort приближения
+  Effect; CLI `schema export <Module.api> --target openapi-3.1`.
+  Схемы path/query/headers/body/success/error — `Schema a` из M11.
+- Полнота handlers проверяется checker'ом: builder группы требует record с
+  handler на каждый endpoint (row primitives M5), а не runtime-ошибкой.
+- Клиент выводится из того же определения API, что и сервер.
+
+**Артефакты.** `stdlib/Http/*`, `stdlib/HttpApi/*`, `runtime/src/http/*`;
+`pending "M21"` в манифесте M20 закрыты.
+
+**AC**
+
+- [ ] Отсутствующий или лишний handler endpoint'а — ошибка компиляции с именем
+      endpoint'а и группы.
+- [ ] Неверное тело запроса → `HttpApiError` 400 с `SchemaError` без живого
+      input; typed ошибка handler'а → объявленный статус (e2e на реальном Node-сервере).
+- [ ] Клиент и сервер из одного `HttpApi` проходят round-trip каждого endpoint'а.
+- [ ] Cookies: set → parse round-trip; невалидное имя/значение → `CookiesError`;
+      `Redacted` cookie не печатается в логах.
+- [ ] Остановка сервера закрывает приём, ждёт активные запросы и finalizers (§7
+      протокол owner).
+- [ ] OpenAPI 3.1 для примера API совпадает со snapshot и валиден по
+      мета-схеме OpenAPI 3.1; нет `{}`/`any`; endpoint со scoped/opaque полем
+      без wire codec → `ExportError` с путём `группа.endpoint -> поле`.
+- [ ] Swagger и Scalar Layers отдают тот же документ, что `schema export`.
+- [ ] Для `effect/http` и `effect/http-api` в манифесте ноль `pending`.
+
+---
+
+## M22. CLI eDSL
+
+**Объём.** §10 «CLI eDSL»: `effect/cli` как библиотека `Cli.*` плюс блок
+`cli "name" { … }`. Сахар — только форма записи: без него доступны те же
+combinators. Parser блока уже есть; этап добавляет elaboration и runtime.
+
+- Обёртки: `Command`, `Flag`, `Argument`, `Param`, `Primitive`, `Prompt`,
+  `HelpDoc`, `Completions`, `CliConfig`, `GlobalFlag`, `CliError`, `CliOutput`.
+- Блок: clauses `description e`, `flag name "alias"… : T [= default]`,
+  `arg name : T [= default]`, `subcommand e`, `handle f`; help-текст — `///`
+  над clause. Elaboration выводит exact record опций; handler — функция от
+  этого record'а с собственными rows.
+- Кратность по типу: `Bool`, `T`, `Option T`, `List T`, `NonEmpty T`; разбор
+  через класс `Cli.Value` (instances stdlib, `deriving Cli.Value` для
+  enum-ADT и refined types).
+- Подкоманда видит только свои опции; rows команды — объединение rows handler
+  и подкоманд.
+- `Cli.run : Cli.Command r e -> List String ->{Platform | r; CliError | e} Unit`
+  поверх `Platform.args` (M9); help, version и completions генерируются из того же описания.
+- Prompt-режим через `Terminal` Node-платформы; отмена (SIGINT) по протоколу entry M8.
+
+**Артефакты.** `flick-core::dsl::cli`, `stdlib/Cli/*`, `runtime/src/cli/*`,
+`docs/reference/cli-dsl.md`; `pending "M22"` в манифесте M20 закрыты.
+
+**AC**
+
+- [ ] Примеры `greet`, `tool` и `main` из §10 (сахар и combinators) компилируются
+      в одинаковый IR.
+- [ ] Ошибки компиляции по списку §10: повтор имени, конфликт alias (включая
+      `--help`/`-h`/`--version`/`--completions`), `Option` с default, `List` у
+      `arg` не последним, тип без `Cli.Value`, default не того типа, команда без
+      `handle` и подкоманд, `arg` рядом с `subcommand`, опечатка в поле record'а опций.
+- [ ] Неверный ввод (`--times abc`, неизвестный флаг, нет обязательного arg) →
+      `CliError` с текстом Effect CLI и кодом выхода `1` после cleanup (e2e).
+- [ ] `--help` и completions (bash, zsh, fish) совпадают со snapshot.
+- [ ] Handler, захвативший scoped-ресурс, не выходит из scope (M6).
+- [ ] Для `effect/cli` в манифесте ноль `pending`.
+
+---
+
 ## M19. Релиз 0.1.0
 
 **Объём.** Сквозные примеры, производительность, документация, упаковка.
@@ -1021,7 +1178,9 @@ Schema и SQL».
       на эталонном проекте, solver budget не достигается на stdlib, LSP latency,
       размер wasm, накладные расходы release vs debug.
 - [ ] `docs/`: language reference (по разделам спеки), grammar, каталог
-      диагностик, руководства «первое приложение», FFI, Schema, SQL, UI, CLI.
+      диагностик, руководства «первое приложение», FFI, Schema, SQL, UI, CLI,
+      HTTP/HttpApi, CLI eDSL.
+- [ ] Линтер покрытия Effect зелёный: ноль `pending`, отчёт покрытия приложен к релизу.
 - [ ] Бинарники `flick` для linux-x64, linux-arm64, macOS-arm64, windows-x64;
       npm-пакеты runtime и stdlib опубликованы с версиями, закреплёнными в шаблоне.
 - [ ] `flick new my-app && cd my-app && flick install && flick run` работает на
@@ -1056,6 +1215,7 @@ Schema и SQL».
 | `.d.ts` importer без неявного any/pure/cancellation | M12 |
 | Оптимизации сохраняют currying, Number, ABI; debug ≡ release | M15 |
 | Strict schema export vs AOT fallback | M11 |
+| Strict OpenAPI 3.1 из `HttpApi` | M21, M16 |
 | Schema политики missing/null/undefined/defaults/extra; PureCodec | M11 |
 | SQL отрицательные примеры; LEFT JOIN nullability; pure build | M13 |
 | UI: render, escaping handler, policies, supervisor, cleanup | M14 |
@@ -1078,4 +1238,6 @@ Schema и SQL».
 | Двухфазный scope и quiescence поверх Effect 4.0.5 | Тонкие гонки в runtime | Детерминированные тесты порядка событий; capability matrix; никакой wildcard-совместимости с Effect |
 | Объём SQL subset и качество диагностик в DSL | Длинные непонятные ошибки | Diagnostic constraints с span в DSL-блоке; snapshot-тесты на тексты ошибок |
 | Пробелы спеки (§1 этого документа) | Переделки синтаксиса | Закрывать дополнением в `docs/reference/` до начала этапа-владельца |
+| Поверхность Effect ~5 500 exports (core ~4 500, cli/http/http-api ~1 000) | M20 растягивается, обёртки пишутся вручную | Генерация черновиков биндингов importer'ом M12; ручная работа только над сигнатурами; статусы `language`/`excluded` закрывают TS-only и небезопасное |
+| Обновление Effect меняет API (особенно cli/http/http-api) | Тихо устаревшие обёртки | Линтер по fingerprint сигнатур; обновление только через `just effect-bump` с отчётом diff |
 | Один релиз без промежуточных | Поздняя обратная связь | Внутренние dogfood-проекты на каждом этапе после M9 (сквозной пример §13 собирается с M9) |

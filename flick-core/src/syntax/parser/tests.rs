@@ -168,3 +168,23 @@ fn deep_nesting_is_an_error_not_a_stack_overflow() {
     assert!(found[0].starts_with("FLICK-S007"), "{found:?}");
     assert_eq!(parse_str(&src).tree.text(&src), src);
 }
+
+#[test]
+fn cli_block_clauses() {
+    let src = "let c =\n  cli \"greet\" {\n    description \"Say hi\"\n    /// loud\n    flag times \"n\" \"t\" : Option Number = 1\n    arg name : String\n    subcommand other\n    handle fun { times; name } -> run times name\n  }\n";
+    assert_eq!(
+        sexp(src),
+        "(LetDecl let (VarPat c) = (Block (CliExpr cli \"greet\" { (Block \
+         (CliClause description (Literal \"Say hi\")) \
+         (CliClause flag times \"n\" \"t\" : (AppType (NameType Option) (NameType Number)) = (Literal 1)) \
+         (CliClause arg name : (NameType String)) \
+         (CliClause subcommand (NameExpr other)) \
+         (CliClause handle (FunExpr fun (RecordPat { (RecordPatField times) ; (RecordPatField name) }) -> \
+         (Block (AppExpr (NameExpr run) (NameExpr times) (NameExpr name)))))) })))"
+    );
+    // a broken clause is reported once and the next clause still parses
+    assert_eq!(
+        errors("let c = cli \"x\" { flag : Bool; bogus 1; arg y : T }"),
+        ["FLICK-S007 :", "FLICK-S007 bogus"]
+    );
+}

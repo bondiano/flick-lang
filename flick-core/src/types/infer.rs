@@ -122,8 +122,8 @@ impl Checker<'_> {
                 ty
             }
             K::ProvideExpr => self.provide(node, None),
-            // shortcut: SQL, UI and Schema blocks are typed by their elaboration
-            K::SqlExpr | K::UiExpr | K::CodecExpr | K::SchemaExpr => self.fresh(),
+            // shortcut: SQL, UI, CLI and Schema blocks are typed by their elaboration
+            K::SqlExpr | K::UiExpr | K::CliExpr | K::CodecExpr | K::SchemaExpr => self.fresh(),
             _ => Type::Error,
         }
     }

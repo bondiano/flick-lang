@@ -56,3 +56,6 @@ f288d88532aaff1e  spec:2179  type alias SaveButtonProps c =
 34bef7a114a0a77c  spec:2247  type alias SelectProps a r e c =
 4f1eda6ee144286a  spec:2345  module App.Users exposing (User, load_user)
 6ab2908136691e1a  spec:2567  opaque type alias UserId = String
+0ea7549614206500  spec:2292  greet : Cli.Command {Platform} none
+616df64b98d90310  spec:2340  tool : Cli.Command {Platform} none
+d1b5737127172507  spec:2360  main : Unit ->{none; AppError} Unit

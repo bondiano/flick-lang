@@ -37,7 +37,7 @@ Qualified names are written without spaces around `.`: `Users.get`,
 module exposing import as let rec fun match with try if then else task await
 scope provide ignore type opaque refined where kind error service class
 instance val deriving foreign from forall not none true false schema codec
-sql ui in when do
+sql ui cli in when do
 ```
 
 `do` is reserved only so that its use gets a precise diagnostic
@@ -52,7 +52,9 @@ Contextual words are ordinary names everywhere except in one position:
   `having`, `order_by`, `limit`, `offset`, `select`, `union`, `union_all`,
   `insert_into`, `values`, `update`, `set`, `delete_from`, `returning` (plus the
   keywords `from` and `where`). Inside a SQL block such a word ends a function
-  application, so a clause may continue on the next line.
+  application, so a clause may continue on the next line;
+- CLI clause words at the start of a clause inside `cli { … }`: `description`,
+  `flag`, `arg`, `subcommand`, `handle`.
 
 ### Number literals
 
@@ -140,7 +142,7 @@ There are no user-defined operators. From weakest to strongest:
 Function bodies, match arms and the members of `class`, `instance` and
 `service` are delimited by indentation; there is no `in` and the last
 expression of a block is its value (§3). Braces delimit records and the
-blocks of `task`, `scope`, `provide`, `sql`, `ui`, `codec` and `rec`.
+blocks of `task`, `scope`, `provide`, `sql`, `ui`, `cli`, `codec` and `rec`.
 
 1. Top-level declarations start at column 1. A line indented further continues
    the current declaration.
@@ -363,14 +365,21 @@ atom        = name | Con { "." Con } ["." name] | Number | BigInt | String
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
             | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
+            | "cli" String "{" cli_clause { cli_clause } "}"
 clause      = ("from" | "join" | "left_join") name "in" expr
             | clause_word expr { "," expr }
+cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
+            | ("description" | "subcommand" | "handle") expr
 ```
 
 `if` is an expression and always has `else`. `ignore e` discards a non-`Unit`
 result of an intermediate statement (§3). `await e` runs a stored `Eff` once in
 the current fiber; `task { … }` builds a cold computation (§4). In
 `provide e { … }` and `codec e { … }` the `{` ends the head expression.
+In `cli "name" { … }` the parser fixes only the clause shapes; aliases on an
+`arg`, duplicate names and the option types are checked by CLI elaboration
+(spec §10, "CLI eDSL"). A `///` comment right above a `flag`, `arg` or
+`subcommand` clause is its help text.
 
 ```flick
 load_twice : UserId ->{Users; NotFound} (User, User)
@@ -402,6 +411,17 @@ let balances =
       on account.user_id == user.id
     where user.id == params.user_id
     select { name = user.name; balance = account.balance }
+  }
+
+deploy : Cli.Command {Platform} none
+let deploy =
+  cli "deploy" {
+    description "Deploy the current build"
+    /// Print the plan without applying it
+    flag dry_run "d" : Bool
+    flag region : Option String
+    arg targets : NonEmpty String
+    handle fun { dry_run; region; targets } -> Deploy.run dry_run region targets
   }
 ```
 

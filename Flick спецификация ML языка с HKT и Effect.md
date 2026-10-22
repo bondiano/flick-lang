@@ -2,7 +2,7 @@
 
 Цель — спроектировать функциональный язык **Flick** с ML-подобным синтаксисом, HKT, классами типов и единственным backend на Effect. Стандартная библиотека и runtime-контракты опираются на Effect. Чистые участки компилируются в обычный JS/TS в составе того же backend.
 
-Flick — ML-подобный язык с HKT, классами типов и одним Effect backend. Прямые runtime-вызовы используют обычный let; `task` строит холодный Eff, await выполняет его в текущем fiber. Полная сигнатура стоит над каждой именованной функцией. Для первой версии выбраны MPTC/FD, higher-rank callbacks, pure generalization, точные records и List поверх JS array, fresh regions/captures, явный FFI с `.d.ts` importer, полный deriving Schema, PostgreSQL eDSL и `ui { ... }` поверх React. Ниже зафиксированы контракты и цена решений. Это спецификация ещё не реализованного языка Flick; флажки решений не обозначают готовность compiler.
+Flick — ML-подобный язык с HKT, классами типов и одним Effect backend. Прямые runtime-вызовы используют обычный let; `task` строит холодный Eff, await выполняет его в текущем fiber. Полная сигнатура стоит над каждой именованной функцией. Для первой версии выбраны MPTC/FD, higher-rank callbacks, pure generalization, точные records и List поверх JS array, fresh regions/captures, явный FFI с `.d.ts` importer, полный deriving Schema, PostgreSQL eDSL, `ui { ... }` поверх React и `cli { ... }` поверх Effect CLI. Ниже зафиксированы контракты и цена решений. Это спецификация ещё не реализованного языка Flick; флажки решений не обозначают готовность compiler.
 
 Документ можно комментировать и править по абзацам и примерам. Раздел «Что требуется решить до реализации» теперь содержит принятые ответы. Сравнения с альтернативами объясняют tradeoffs; явно исключённые из первой версии возможности не остаются открытыми блокерами. Раздел «Критерии проверки реализации» сохраняет незакрытые проверки будущего compiler/runtime.
 
@@ -29,7 +29,7 @@ Flick — ML-подобный язык с HKT, классами типов и о
 | Schema-интеграции | Расширяемые компиляторы/экспортёры; неподдерживаемый wire-контракт даёт явную диагностику |
 | Проверка type-level выразительности | SQL и типизированный UI eDSL как реальные задачи для rows, классов, callbacks и lifetime |
 
-Generic do, let\* и единый effect-polymorphic map не входят в первую версию. Блоки функций основаны на отступах, специальные task/scope/sql/ui — на фигурных скобках; последняя expression возвращает результат. Имена task, await и явный entry point зафиксированы.
+Generic do, let\* и единый effect-polymorphic map не входят в первую версию. Блоки функций основаны на отступах, специальные task/scope/sql/ui/cli — на фигурных скобках; последняя expression возвращает результат. Имена task, await и явный entry point зафиксированы.
 
 Frontend Flick проверяет программу, единый Effect backend генерирует исполняемый JS/TS, а Content Mapper обслуживает TS-проекцию и интеграцию с инструментами. Чистые вызовы и вызовы Effect проходят через один типизированный IR. Исходная система типов развивается независимо от выразительности TypeScript.
 
@@ -53,6 +53,7 @@ Frontend Flick проверяет программу, единый Effect backen
 | Schema | Full deriving, explicit codecs, strict exporters | Не всякая schema выражается во внешнем формате |
 | SQL | Pure DSL, PostgreSQL, Query/Template | Зафиксирован ограниченный SQL subset |
 | UI | ui-блок, React adapter, explicit event policy | Без JSX, собственного renderer, SSR и полной hooks-модели |
+| CLI-приложения | cli-блок поверх Effect CLI, точный record опций, `Cli.Value` для разбора | Подкоманда не видит опции родителя; без собственного парсера аргументов |
 | Compiler | Rust core Flick, typed IR, source LSP, versioned JSON iface | Собственный checker, Mapper — слой интеграции |
 | Optimization | Debug baseline и typed release passes из подходов ReScript | Нужны доказательства сохранения observable contracts |
 | CLI | `flick`, `.fl`, `flick.toml`, один pnpm lockfile; check/build/run/dev/test/fmt и инструменты FFI/Schema | Команды разделяют один checker; версии runtime и интерфейсов проверяются явно |
@@ -1860,7 +1861,8 @@ Effect предоставляет [ленивые recursive и mutually recursiv
 | Standard Schema V1 | Sync или Promise adapter после удовлетворения decoding services | Owner/cancellation и JS input import остаются явными |
 | Arbitrary | Structural generator | Неподдержанный refinement требует явного generator |
 | Diagnostic formatter | Structured issues, пути и redaction | Не раскрывает Redacted или arbitrary opaque payload |
-| OpenAPI и другие targets | Плагины после первой версии | Отдельные версии и capability matrix |
+| OpenAPI 3.1 | Строгий export значения `HttpApi`: пути, методы, параметры, тела, ответы, ошибки и security; схемы — тот же strict JSON Schema 2020-12 | Непредставимая schema endpoint'а даёт ExportError с путём `группа.endpoint -> поле` |
+| Другие targets | Плагины после первой версии | Отдельные версии и capability matrix |
 
 Native [JSON Schema generation](https://effect.website/docs/v4/schema/json-schema) допускает best-effort approximation. Strict exporter Flick проверяет точную выразимость выбранного wire-контракта: unsupported predicate, opaque формат, effectful acceptance или невыразимая рекурсия дают ExportError с node/path. Молчаливые `{}` и `any` запрещены. Явный override привязан к конкретному узлу. Более простой wire-shape witness можно экспортировать отдельно, но его нельзя назвать полным validation contract effectful codec.
 
@@ -2018,7 +2020,7 @@ Duration — native неотрицательная длительность, в�
 
 # 10 Типовое программирование и eDSL
 
-**Принято для первой версии:** библиотечные SQL/UI DSL с выбранным ML-синтаксисом `sql params { ... }` и `ui { ... }`; PostgreSQL backend и React adapter. Типовое ядро общее: rows, labels, finite indices, HKT и MPTC/FD. Примеры ниже — синтаксис Flick, не Selda или Droplet.
+**Принято для первой версии:** библиотечные SQL/UI/CLI DSL с выбранным ML-синтаксисом `sql params { ... }`, `ui { ... }` и `cli "name" { ... }`; PostgreSQL backend, React adapter и Effect CLI. Типовое ядро общее: rows, labels, finite indices, HKT и MPTC/FD. Примеры ниже — синтаксис Flick, не Selda или Droplet.
 
 ## Что показывают Selda и Droplet
 
@@ -2283,6 +2285,91 @@ React cleanup синхронно закрывает приём событий и
 
 `.d.ts` может дать shape props foreign component, но не доказывает purity, retention и cancellation. Foreign component хранится как opaque renderer component; pure source builder его не исполняет. Adapter задаёт callback/lifetime policy и owner. Импортируемая поддержанная часть React-экосистемы проходит тот же FFI pipeline; непредставимые гарантии не стираются.
 
+## CLI eDSL: флаги, аргументы и подкоманды
+
+Приложение командной строки описывается значением `Cli.Command r e`: чистым описанием флагов, позиционных аргументов, подкоманд и отложенного handler, которому нужны сервисы r и который может завершиться ошибками e. Построение команды ничего не разбирает и не запускает. Runtime-часть — [Effect CLI](https://effect.website/docs/v4/api/effect/cli/Command); help, автодополнение и разбор берутся из неё, а типы опций, полнота и captures — контракт Flick.
+
+```flick
+greet : Cli.Command {Platform} none
+let greet =
+  cli "greet" {
+    description "Печатает приветствие"
+    /// Печатать заглавными буквами
+    flag loud : Bool
+    /// Сколько раз повторить
+    flag times "n" : Number = 1
+    /// Кому адресовано приветствие
+    arg name : String
+    handle fun { loud; times; name } ->
+      let text = "Hello, " ++ name
+      let line = if loud then String.to_upper text else text
+      Platform.print_line (String.join "\n" (List.repeat times line))
+  }
+```
+
+`cli "name" { … }` — сахар над функциями `Cli.command`, `Cli.flag`, `Cli.arg`, `Cli.description`, `Cli.subcommands` и `Cli.handle`; без сахара доступны те же combinators, и обе формы строят одно представление. Блок состоит из clauses — по одной на строку или через `;`:
+
+| Clause | Смысл |
+| - | - |
+| `description e` | Текст help команды, `e : String`; не больше одной |
+| `flag name "alias"… : T [= default]` | Именованный параметр `--name`; строки после имени — дополнительные имена |
+| `arg name : T [= default]` | Позиционный аргумент; порядок clauses — порядок на командной строке |
+| `subcommand e` | Вложенная команда, `e : Cli.Command r e` |
+| `handle f` | Обработчик, `f : Options ->{r; e} Unit` |
+
+Слова clauses контекстные: они особые только в начале clause внутри `cli { … }`. Doc-comment `///` непосредственно над `flag`, `arg` или `subcommand` становится его текстом в help; тот же текст показывает `flick doc`.
+
+### Опции как точный record
+
+Elaboration выводит точный record опций: по полю на каждый `flag` и `arg` в порядке объявления, имя поля — имя clause. В примере handler получает `{ loud : Bool; times : Number; name : String }`; опечатка в record pattern или обращение к несуществующему полю — обычная ошибка типов. Имя на командной строке получается из имени поля заменой `_` на `-`: `dry_run` → `--dry-run`. Дополнительное имя из одного символа даёт короткую форму `-n`, более длинное — `--name`; дефисы в строке не пишутся.
+
+Тип значения задаёт и разбор, и кратность:
+
+| Тип в clause | Поведение |
+| - | - |
+| `Bool` | Флаг-переключатель; без `= default` равен `false` |
+| `T` | Обязательный параметр, если нет `= default` |
+| `Option T` | Необязательный; `= default` запрещён |
+| `List T` | Повторяемый флаг (0 и больше); у `arg` — хвост переменной длины, только последним |
+| `NonEmpty T` | Как `List T`, но хотя бы одно значение |
+
+Для `T` нужен instance класса `Cli.Value T`, который разбирает строку в typed ошибку. Библиотека даёт instances для `String`, `Number` (отвергает NaN и пустую строку), `BigInt`, `Path`, `Duration` и `Redacted String`; значение `Redacted` не печатается в help, ошибках и логах. `deriving Cli.Value` строит instance для ADT из нульарных constructors — выбор из имён constructors в kebab-case, — и для refined type, если instance есть у базового типа: разбор вызывает `T.parse`. Default — чистое выражение типа `T`; в help он показывается через `Show T`, если такой instance есть.
+
+### Подкоманды и handler
+
+```flick
+tool : Cli.Command {Platform} none
+let tool =
+  cli "tool" {
+    description "Утилиты проекта"
+    /// Подробный вывод
+    flag verbose "v" : Bool
+    subcommand greet
+    subcommand version
+  }
+```
+
+Сервисы и ошибки команды — объединение rows её handler и подкоманд, как у любого составного выражения. Handler подкоманды получает только собственный record опций; флаги родителя разбираются до имени подкоманды и видны только handler родителя. Общая конфигурация для всех подкоманд передаётся сервисом, предоставленным в `main`. Команда без `handle` обязана иметь подкоманды; её вызов без подкоманды печатает help и завершается `CliError`. Команда с подкомандами не объявляет `arg`, иначе позиционный аргумент неотличим от имени подкоманды.
+
+Ошибки компиляции: повтор имени поля, флага или подкоманды, совпадение длинного или короткого имени, в том числе с зарезервированными `--help`, `-h`, `--version` и `--completions`; `= default` у `Option`; `List`/`NonEmpty` у `arg` не последним; тип без `Cli.Value`; default не того типа; `handle` или `description` дважды; команда без `handle` и без подкоманд; `arg` рядом с `subcommand`.
+
+### Запуск
+
+`Cli.run : Cli.Command r e -> List String ->{Platform | r; CliError | e} Unit` разбирает аргументы чистой функцией и только после успешного разбора выполняет handler в текущем fiber. `--help`, `--version` и `--completions bash|zsh|fish` печатают результат в stdout и завершаются без вызова handler. Неверный ввод — неизвестный флаг, отсутствующий обязательный аргумент, значение, которое `Cli.Value` не разобрал, — даёт `type error CliError = CliError String` с текстом для пользователя; handler не запускается.
+
+```flick
+main : Unit ->{none; AppError} Unit
+let main () =
+  provide Platform.live {
+    try
+      Cli.run tool (Platform.args ())
+    with
+    | CliError message -> App.fail message
+  }
+```
+
+Команда остаётся обычным значением: entry point по-прежнему один `main : Unit ->{none; AppError} Unit`, коды выхода и порядок cleanup — общие правила раздела 12. Отмена по SIGINT прерывает handler, и его ресурсы закрываются по контракту owner из раздела 7. Captures проходят через handler так же, как через callbacks UI: команду, handler которой захватил ресурс закрытого scope, нельзя вернуть из этого scope. Интерактивные запросы (`Cli.Prompt`) — обычные эффектные функции внутри handler, а не clauses блока.
+
 ## Что SQL и UI добавляют к проверке дизайна
 
 Принятый дизайн проверяют два обязательных сквозных прототипа; их результат может выявить дефект спецификации, но выбор механизмов уже сделан:
@@ -2470,6 +2557,7 @@ SIGINT/SIGTERM запускают тот же протокол завершен�
 | `flick ffi import <package> --out <directory>` | Прочитать установленные `.d.ts`, сгенерировать поддерживаемые bindings и отчёт покрытия; `--select <names>` ограничивает поверхность. |
 | `flick ffi check` | Проверить generated bindings, отдельно хранимые reviewed overrides, fingerprints и обязательные adapter policies после изменений зависимостей. |
 | `flick schema export <Module.codec> --target json-schema-2020-12 --out <file>` | Строго экспортировать статически представимый JSON wire-codec, с диагностикой node/path для неподдержанного контракта. |
+| `flick schema export <Module.api> --target openapi-3.1 --out <file>` | Строго экспортировать OpenAPI 3.1 для значения `HttpApi`, с диагностикой endpoint/path для неподдержанной schema. |
 | `flick doc --out-dir docs` | Сформировать документацию public API: типы Flick, kinds, constraints, эффекты, captures и сигнатуры экспортируемых значений. |
 | `flick lsp --stdio` | Запустить исходный language server с тем же Rust core и проектной конфигурацией. |
 | `flick explain <diagnostic-code>` | Объяснить диагностику Flick и показать небольшие примеры исправлений. |
@@ -2478,7 +2566,7 @@ SIGINT/SIGTERM запускают тот же протокол завершен�
 
 `ffi import` разделяет supported exports, exports с недостающей policy и unsupported exports. Обязательные правила purity, execution, retention, cancellation и ownership не выводятся автоматически из `.d.ts`. Reviewed overrides не перезаписываются регенерацией. Заблокированные экспорты остаются именованными; их запрос или использование даёт ошибку, при этом независимые поддержанные exports сохраняются.
 
-`schema export` использует тот strict wire-контракт, который задан в разделе 9. Команда не исполняет application main и произвольные пользовательские runtime-преобразования ради экспорта. Динамически построенные schemas экспортируются через явное runtime API. Standard Schema V1 и Arbitrary остаются библиотечными adapters/generators; они не выдаются за статические JSON-файлы. OpenAPI exporter относится к расширениям после первой версии.
+`schema export` использует тот strict wire-контракт, который задан в разделе 9. Команда не исполняет application main и произвольные пользовательские runtime-преобразования ради экспорта. Динамически построенные schemas экспортируются через явное runtime API. Standard Schema V1 и Arbitrary остаются библиотечными adapters/generators; они не выдаются за статические JSON-файлы. OpenAPI 3.1 экспортируется из статически известного значения `HttpApi` тем же strict-контрактом (`--target openapi-3.1`): документ не содержит `{}`/`any`, а неподдержанная schema endpoint'а даёт ExportError с путём. Swagger UI и Scalar — библиотечные Layers, которые отдают этот же документ, а не строят собственное приближение.
 
 `lsp` обслуживает source diagnostics, hover, definition, completion, rename и formatting. Его stdout целиком принадлежит протоколу; логи идут в stderr. Content Mapper остаётся отдельной версионированной интеграцией и не является условием работы source checker. Отсутствие необязательного Mapper adapter в `doctor` само по себе не блокирует компиляцию.
 
@@ -2670,6 +2758,8 @@ let load_two first_id second_id =
 
 - [ ] Strict schema export отвергает непредставимый wire-контракт; это отделено от допустимого AOT interpreter fallback.
 
+- [ ] OpenAPI 3.1 export `HttpApi` валиден по спецификации OpenAPI 3.1, не содержит `{}`/`any` и отвергает непредставимую schema endpoint'а с путём.
+
 - [ ] Schema независимо проверяет missing/null/undefined/defaults/extra keys; effectful codec не получает PureCodec сертификат.
 
 - [ ] SQL отвергает неверные поля, GROUP BY, alias scope, параметры и generated INSERT columns; LEFT JOIN меняет nullability, pure build не выполняет I/O.
@@ -2687,6 +2777,8 @@ let load_two first_id second_id =
 - [ ] `install --locked` отвергает отсутствующий или устаревший lockfile; фактическая версия pnpm проверяется до изменения зависимостей, а несовместимые compiler/runtime/Effect блокируют компиляцию и запуск.
 
 - [ ] JSON diagnostics остаются валидным versioned NDJSON при выводе приложения, тестов и package manager; stdout LSP и JSON test reporter сохраняют свой протокол, а коды завершения учитывают результат cleanup.
+
+- [ ] CLI eDSL: сахар и combinators дают одно представление; повтор имён, `Option` с default и тип без `Cli.Value` отвергаются при компиляции; неверный ввод даёт `CliError` без запуска handler.
 
 - [ ] `ffi import` сохраняет reviewed overrides и сообщает coverage; `ffi check`, strict `schema export`, `.d.ts` façade и `pack` отклоняют непредставимые или несовместимые контракты без тихого `any`.
 
@@ -2756,7 +2848,7 @@ let load_two first_id second_id =
 
   - Выбраны refined type, deriving Schema, schema T, codec witness-блок; каждое field задано ровно один раз. Extra keys reject, projection explicit; null/missing/defaults раздельны.
 
-  - Targets: strict JSON Schema 2020-12, Standard Schema V1, Arbitrary с overrides и redaction-aware formatter. OpenAPI и другие targets — плагины после первой версии. Interpreter baseline, opt-in AOT, без implicit JIT.
+  - Targets: strict JSON Schema 2020-12, Standard Schema V1, Arbitrary с overrides и redaction-aware formatter. Strict OpenAPI 3.1 из `HttpApi`; другие targets — плагины после первой версии. Interpreter baseline, opt-in AOT, без implicit JIT.
 
   - JsValue импортируется runtime-операцией в inert Unknown с provenance; pure codec не обходит arbitrary getters/proxies. Отдельного DataValue нет.
 
@@ -2770,11 +2862,13 @@ let load_two first_id second_id =
 
 - [x] Данные и FFI: List = dense immutable JS array; exact structural records; canonical Eq/Hash и total Number Ord; fixed ADT layout; четыре callback families; source iface и ограниченный TS façade. Модули — explicit exports, acyclic file graph, ESM; compiler Flick — Rust core, iface — versioned JSON.
 
-**За пределами первой версии:** generic do/let\*, effect-polymorphic map, associated types и user type families, overlap/local implicits, variance-generalization, linear ownership/early close, nursery и detached scoped timeout, полный TS importer, decimal/duration literals, cyclic-graph codecs, OpenAPI exporter, дополнительные SQL dialects и сложные SQL extensions, JSX, собственный UI renderer, SSR/hydration/RSC и полная hooks-модель. Это граница объёма, а не список вопросов без ответа.
+**За пределами первой версии:** generic do/let\*, effect-polymorphic map, associated types и user type families, overlap/local implicits, variance-generalization, linear ownership/early close, nursery и detached scoped timeout, полный TS importer, decimal/duration literals, cyclic-graph codecs, дополнительные SQL dialects и сложные SQL extensions, JSX, собственный UI renderer, SSR/hydration/RSC и полная hooks-модель. Это граница объёма, а не список вопросов без ответа.
 
 - [x] Type-level минимум: FieldRow/Symbol/Constraint, finite kinds, HasField/Lacks/Project/Remove/UnionDisjoint/Map/canonical labels, MPTC/FD, opaque indices, higher-rank и captures. SQL/UI prototypes проверяют принятый набор.
 
 - [x] SQL: PostgreSQL, explicit table metadata, Template/Query, pure codecs, EncodeError/DbError/DecodeError. UI: ui-блок поверх React, exact props, typed children, pure render, explicit Exhaust/Latest/Queue/Concurrent, обязательный supervisor и app-owned cleanup bridge.
+
+- [x] CLI: `cli "name" { … }` поверх Effect CLI, clauses `description`/`flag`/`arg`/`subcommand`/`handle`, точный record опций, `Cli.Value` с deriving, `CliError` до запуска handler, общий `main` и cleanup.
 
 # 14 Источники
 
