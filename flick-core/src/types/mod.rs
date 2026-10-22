@@ -16,6 +16,7 @@ mod bindings;
 mod builtins;
 mod calls;
 mod classes;
+mod codecs;
 mod convert;
 mod decls;
 mod display;
@@ -33,6 +34,7 @@ mod patterns;
 mod regions;
 mod report;
 mod rows;
+mod schemas;
 mod services;
 mod toplevel;
 mod ty;
@@ -47,15 +49,17 @@ pub use decls::class_defaults;
 pub use env::{Form, Fundep, Instance, Operation, TypeDef};
 pub use kinds::Kind;
 pub use patterns::is_pattern;
+pub use schemas::{companion_name, witness_entity};
 pub use ty::{Binder, Effects, PRELUDE, Row, Type};
 pub use typing::{
-    Constructor, ForeignInfo, InstanceInfo, Lift, Owner, Range, Ref, Typing, default_method,
-    passes_dictionary,
+    CodecBlock, Constructor, ForeignInfo, InstanceInfo, Lift, Owner, Range, Ref, SchemaItem,
+    SchemaPlan, Typing, default_method, passes_dictionary,
 };
 
 use convert::TyVar;
 use env::Env;
 use kinds::KindStore;
+use std::collections::HashMap;
 use unify::Store;
 
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
@@ -156,6 +160,7 @@ fn run(
         classes: classes::State::default(),
         regions: regions::State::default(),
         typing: Typing::default(),
+        predicates: HashMap::new(),
     };
     checker.module(module.tree);
     checker.fill(interface);
@@ -219,6 +224,8 @@ struct Checker<'a> {
     classes: classes::State,
     regions: regions::State,
     typing: Typing,
+    /// The predicate of each refined type of the module, by type name.
+    predicates: HashMap<String, &'a Node>,
 }
 
 impl Checker<'_> {

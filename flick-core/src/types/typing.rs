@@ -44,6 +44,10 @@ pub struct Typing {
     pub foreigns: HashMap<Range, ForeignInfo>,
     /// Instances declared or derived in this module.
     pub instances: Vec<InstanceInfo>,
+    /// Witnesses of the types that derive `Schema`.
+    pub schemas: Vec<SchemaItem>,
+    /// `codec` blocks: the fields' labels in the order written.
+    pub codecs: HashMap<Range, CodecBlock>,
     /// Runtime calls inside a `scope` that acquire into the owner of another
     /// region than the innermost scope's.
     pub owners: HashMap<Range, Owner>,
@@ -106,6 +110,63 @@ pub struct ForeignInfo {
     /// For each JS argument: the number of arguments of the JS function a
     /// callback is adapted to.
     pub callbacks: Vec<Option<usize>>,
+}
+
+/// The witness `T$schema` of a type that derives `Schema`.
+#[derive(Debug, Clone)]
+pub struct SchemaItem {
+    pub ty: String,
+    /// The type declaration.
+    pub decl: Range,
+    /// How many witnesses of its parameters it takes.
+    pub witnesses: usize,
+    pub plan: SchemaPlan,
+}
+
+/// How a witness is built from the witnesses of its parts.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SchemaPlan {
+    /// `Number`, `String`, `Bool`, `BigInt`, `Unit`, `Never`, `Unknown`.
+    Prim(String),
+    List(Box<SchemaPlan>),
+    Option(Box<SchemaPlan>),
+    Result(Box<SchemaPlan>, Box<SchemaPlan>),
+    Redacted(Box<SchemaPlan>),
+    Tuple(Vec<SchemaPlan>),
+    /// Fields in label order.
+    Record(Vec<(String, SchemaPlan)>),
+    /// The constructors of a variant type or an error, with their fields.
+    Adt {
+        name: String,
+        variants: Vec<(String, Vec<SchemaPlan>)>,
+    },
+    /// The witness of the `i`-th parameter.
+    Param(usize),
+    /// The polymorphic witness of the `i`-th parameter applied to a schema.
+    Applied(usize, Box<SchemaPlan>),
+    /// A built-in witness over type constructors: `List`, `Option`, `Redacted`.
+    Constructor(String),
+    /// The witness of a type with one, given the witnesses of its arguments;
+    /// `lazy` within the module's group, which may be recursive.
+    Named {
+        module: String,
+        ty: String,
+        args: Vec<SchemaPlan>,
+        lazy: bool,
+    },
+    /// A refined type: its base and the check exporters know, if any.
+    Refined {
+        name: String,
+        base: Box<SchemaPlan>,
+        known: Option<String>,
+    },
+}
+
+/// A `codec` block: the name of what it decodes, for issue paths, and its
+/// fields as written.
+#[derive(Debug, Clone, Default)]
+pub struct CodecBlock {
+    pub name: String,
 }
 
 /// How the JS result of a foreign call becomes a Flick value.

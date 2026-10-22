@@ -3,7 +3,7 @@
 use super::Checker;
 use super::env::{Form, Operation};
 use super::ty::Type;
-use crate::iface::{Decl, Interface, Namespace};
+use crate::iface::{Decl, Export, Interface, Namespace};
 
 impl Checker<'_> {
     /// Stores the types and kinds of this module's exports.
@@ -16,6 +16,7 @@ impl Checker<'_> {
             .filter(|i| !self.env.builtin.contains(&i.module))
             .cloned()
             .collect();
+        self.export_companions(interface);
         for export in &mut interface.exports {
             let entity = &export.entity;
             if entity.module != self.env.module {
@@ -49,6 +50,35 @@ impl Checker<'_> {
                             form => form,
                         };
                         d
+                    });
+                }
+            }
+        }
+    }
+
+    /// The companions of each exported type of this module, `T$schema`,
+    /// `T$parse`, `T$value`, `T$json`, as values beside it.
+    fn export_companions(&self, interface: &mut Interface) {
+        let types: Vec<String> = interface
+            .exports
+            .iter()
+            .filter(|e| e.entity.namespace == Namespace::Type && e.entity.module == self.env.module)
+            .map(|e| e.entity.name.clone())
+            .collect();
+        for ty in types {
+            for member in ["schema", "parse", "value", "json"] {
+                let entity = self
+                    .env
+                    .entity(Namespace::Value, &super::companion_name(&ty, member));
+                if self.env.value(&entity).is_some()
+                    && !interface.exports.iter().any(|e| e.entity == entity)
+                {
+                    interface.exports.push(Export {
+                        entity,
+                        decl: Decl::Let,
+                        parent: None,
+                        scheme: None,
+                        definition: None,
                     });
                 }
             }

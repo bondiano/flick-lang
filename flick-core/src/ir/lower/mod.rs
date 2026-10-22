@@ -180,39 +180,7 @@ impl Lower<'_> {
                     });
                 }
             }
-            K::TypeDecl | K::ErrorDecl => {
-                let Some(ty) = self.token_text(decl, K::Con) else {
-                    return;
-                };
-                for variant in decl.nodes().filter(|n| n.kind == K::Variant) {
-                    let Some(name) = self.token_text(variant, K::Con) else {
-                        continue;
-                    };
-                    let constructor = Constructor {
-                        module: self.module.to_owned(),
-                        ty: ty.clone(),
-                        name,
-                        arity: variant.nodes().filter(|n| is_type(n.kind)).count(),
-                    };
-                    items.push(Item {
-                        kind: ItemKind::Constructor(constructor),
-                        span: self.span(variant),
-                    });
-                }
-                // `type error E` without fields still has its constructor
-                if decl.kind == K::ErrorDecl && !decl.nodes().any(|n| n.kind == K::Variant) {
-                    let constructor = Constructor {
-                        module: self.module.to_owned(),
-                        ty: ty.clone(),
-                        name: ty,
-                        arity: 0,
-                    };
-                    items.push(Item {
-                        kind: ItemKind::Constructor(constructor),
-                        span,
-                    });
-                }
-            }
+            K::TypeDecl | K::ErrorDecl => self.type_items(decl, span, items),
             K::ClassDecl => {
                 let Some(class) = self.token_text(decl, K::Con) else {
                     return;
@@ -240,6 +208,61 @@ impl Lower<'_> {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// The constructors of a type or error, its refinement check and its
+    /// schema witness.
+    fn type_items(&mut self, decl: &Node, span: Span, items: &mut Vec<Item>) {
+        let Some(ty) = self.token_text(decl, K::Con) else {
+            return;
+        };
+        if let Some(predicate) = decl.nodes().find(|n| n.kind == K::Refinement)
+            && let Some(check) = predicate.nodes().next()
+        {
+            self.fresh_definition();
+            let check = self.expr(check);
+            items.push(Item {
+                kind: ItemKind::Refined {
+                    name: ty.clone(),
+                    check,
+                },
+                span,
+            });
+        }
+        if let Some(schema) = self.typing.schemas.iter().find(|s| s.decl == decl.range()) {
+            items.push(Item {
+                kind: ItemKind::Schema(schema.clone()),
+                span,
+            });
+        }
+        for variant in decl.nodes().filter(|n| n.kind == K::Variant) {
+            let Some(name) = self.token_text(variant, K::Con) else {
+                continue;
+            };
+            let constructor = Constructor {
+                module: self.module.to_owned(),
+                ty: ty.clone(),
+                name,
+                arity: variant.nodes().filter(|n| is_type(n.kind)).count(),
+            };
+            items.push(Item {
+                kind: ItemKind::Constructor(constructor),
+                span: self.span(variant),
+            });
+        }
+        // `type error E` without fields still has its constructor
+        if decl.kind == K::ErrorDecl && !decl.nodes().any(|n| n.kind == K::Variant) {
+            let constructor = Constructor {
+                module: self.module.to_owned(),
+                ty: ty.clone(),
+                name: ty,
+                arity: 0,
+            };
+            items.push(Item {
+                kind: ItemKind::Constructor(constructor),
+                span,
+            });
         }
     }
 
@@ -364,7 +387,6 @@ impl Lower<'_> {
             K::SqlExpr => "`sql` blocks",
             K::UiExpr => "`ui` blocks",
             K::CliExpr => "`cli` blocks",
-            K::CodecExpr => "`codec` blocks",
             _ => "`schema` expressions",
         };
         self.diagnostics.push(Diagnostic::error(

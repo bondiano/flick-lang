@@ -1,0 +1,52 @@
+/// Schemas: runtime witnesses of the values of a type. `deriving Schema`
+/// writes them from a declaration and `schema T` names them; these
+/// combinators build them by hand.
+module Schema exposing (..)
+
+number : Schema Number
+foreign pure number from "@flick-lang/runtime" "schemaNumber"
+
+string : Schema String
+foreign pure string from "@flick-lang/runtime" "schemaString"
+
+bool : Schema Bool
+foreign pure bool from "@flick-lang/runtime" "schemaBool"
+
+bigint : Schema BigInt
+foreign pure bigint from "@flick-lang/runtime" "schemaBigint"
+
+unit : Schema Unit
+foreign pure unit from "@flick-lang/runtime" "schemaUnit"
+
+never : Schema Never
+foreign pure never from "@flick-lang/runtime" "schemaNever"
+
+list : Schema a -> Schema (List a)
+foreign pure list from "@flick-lang/runtime" "schemaList"
+
+option : Schema a -> Schema (Option a)
+foreign pure option from "@flick-lang/runtime" "schemaOption"
+
+result : Schema e -> Schema a -> Schema (Result e a)
+foreign pure result from "@flick-lang/runtime" "schemaResult"
+
+redacted : Schema a -> Schema (Redacted a)
+foreign pure redacted from "@flick-lang/runtime" "schemaRedacted"
+
+/// A witness of a type with no wire form, as a scoped resource: checking a
+/// value passes, a JSON codec or export of it is refused with `reason`.
+opaque : String -> String -> Schema a
+foreign pure opaque from "@flick-lang/runtime" "schemaOpaque"
+
+/// A schema with an explicit generator for `Schema.arbitrary`.
+with_generator : Gen.Gen a -> Schema a -> Schema a
+foreign pure with_generator from "@flick-lang/runtime" "schemaWithGenerator"
+
+/// `input` as a value of the type, if it is one.
+validate : Schema a -> Unknown -> Result SchemaError a
+foreign pure validate from "@flick-lang/runtime" "schemaValidate"
+
+/// Values of the schema for property tests; a refinement needs
+/// `with_generator`.
+arbitrary : Schema a -> Gen.Gen a
+foreign pure arbitrary from "@flick-lang/runtime" "schemaArbitrary"

@@ -35,6 +35,8 @@ pub struct Settings<'a> {
     /// The entry module of an app.
     pub entry: Option<&'a str>,
     pub typescript: bool,
+    /// What else the build writes.
+    pub extras: Extras,
     /// How a source map refers to a source file.
     pub source_path: &'a dyn Fn(FileId) -> String,
     /// The directory of a module's source, which a relative foreign module
@@ -42,10 +44,17 @@ pub struct Settings<'a> {
     pub source_dir: &'a dyn Fn(&str) -> Option<PathBuf>,
     /// The absolute output directory.
     pub out_dir: &'a Path,
+}
+
+/// The opt-in outputs of a build.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Extras {
     /// Write `A/B.d.ts`, the public TypeScript interface of each module.
     pub dts: bool,
     /// Write `A/B.promise.js`: Promise façades of runtime functions.
     pub promise_facade: bool,
+    /// The runner of an app compiles pure codecs ahead of use.
+    pub schema_aot: bool,
 }
 
 /// The output of a compilation, and what it could not write: exports
@@ -120,7 +129,7 @@ pub fn emit(
             path: path(&module.name),
             contents: codegen::js(module, &options).code,
         });
-        if settings.dts
+        if settings.extras.dts
             && let Some((text, _)) = decls(&module.name)
         {
             out.push(Artifact {
@@ -142,7 +151,11 @@ pub fn emit(
         compiled_module(&ctx, module, &mut out, &mut diagnostics);
     }
     if let Some(entry) = settings.entry {
-        out.push(runner(&format!("main.{ext}"), &path(entry)));
+        out.push(runner(
+            &format!("main.{ext}"),
+            &path(entry),
+            settings.extras.schema_aot,
+        ));
     }
     (out, diagnostics)
 }
@@ -185,7 +198,7 @@ fn compiled_module(
         &module.imports,
         ctx.interface_of,
     );
-    if ctx.settings.dts
+    if ctx.settings.extras.dts
         && let Some((text, refused)) =
             declarations(&module.name, ctx.any_interface, ctx.package, ctx.path)
     {
@@ -201,7 +214,7 @@ fn compiled_module(
             ));
         }
     }
-    if ctx.settings.promise_facade {
+    if ctx.settings.extras.promise_facade {
         out.extend(facade(
             module,
             &built,
@@ -216,12 +229,18 @@ fn compiled_module(
     });
 }
 
-/// The runner of an app: starts `main` of the entry module at `entry`.
-fn runner(file: &str, entry: &str) -> Artifact {
+/// The runner of an app: starts `main` of the entry module at `entry`,
+/// after turning on compiled codecs with `schema_aot`.
+fn runner(file: &str, entry: &str, schema_aot: bool) -> Artifact {
+    let (import, init) = if schema_aot {
+        (", enableSchemaAot", "enableSchemaAot();\n")
+    } else {
+        ("", "")
+    };
     Artifact {
         path: file.to_owned(),
         contents: format!(
-            "import {{ runMain }} from \"@flick-lang/runtime\";\nimport {{ main }} from \"./{entry}\";\n\nawait runMain(main);\n"
+            "import {{ runMain{import} }} from \"@flick-lang/runtime\";\nimport {{ main }} from \"./{entry}\";\n\n{init}await runMain(main);\n"
         ),
     }
 }

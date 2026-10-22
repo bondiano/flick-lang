@@ -1,7 +1,7 @@
 /// Values kept out of logs and output: `show` prints `<redacted>`, and so
 /// does the report of a cause. Creating and reading are runtime: the
 /// content may be wiped.
-module Redacted exposing (make, reveal)
+module Redacted exposing (make, reveal, json_reveal, json_masked)
 
 make : a ->{} Redacted a
 foreign sync make from "@flick-lang/runtime" "redactedMake"
@@ -12,3 +12,11 @@ foreign sync reveal from "@flick-lang/runtime" "redactedReveal"
 instance Show (Redacted a) =
   show : Redacted a -> String
   let show x = "<redacted>"
+
+/// The content's own wire form: an explicit decision to let the secret out.
+json_reveal : PureCodec Json a -> PureCodec Json (Redacted a)
+foreign pure json_reveal from "@flick-lang/runtime" "codecRedactedReveal"
+
+/// Written as `"<redacted>"`, and never decoded: a one-way projection.
+json_masked : PureCodec Json (Redacted a)
+foreign pure json_masked from "@flick-lang/runtime" "codecRedactedMasked"

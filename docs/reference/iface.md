@@ -9,11 +9,11 @@ Until 0.1.0 the schema grows with the compiler: every change bumps
 `iface-version`, and a compiler rejects any version but its own with
 `FLICK-P010`. Release 0.1.0 freezes the version it ships with.
 
-## Version 4
+## Version 5
 
 ```json
 {
-  "iface-version": 4,
+  "iface-version": 5,
   "language": "0.7",
   "module": "App.Shapes",
   "exports": [
@@ -69,6 +69,12 @@ re-exported from `App.Domain`).
 | `constructor` | a constructor | its type |
 
 `T(..)` in an import exposes the exports whose `parent` is `T`.
+
+An exported type also exports its companion values as `value` entities named
+`T$member`, which no source name can spell: `T$schema` of a type deriving
+`Schema`, `T$parse` and `T$value` of a refined type, and `T$json` of a
+refined type with a schema. `schema T` and `T.parse` name them. A class's
+`definition` lists in `defaults` the methods with a default definition.
 
 ### Types and kinds
 

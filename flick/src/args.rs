@@ -79,6 +79,10 @@ pub struct BuildArguments {
     /// Also write `A/B.promise.js`: Promise façades of runtime functions.
     #[arg(long)]
     pub promise_facade: bool,
+
+    /// Compile pure codecs ahead of use in the app's runner.
+    #[arg(long)]
+    pub schema_aot: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]

@@ -1,0 +1,95 @@
+["_0[0]: a cycle in the input"]
+ok
+["(root): expected a finite number, got NaN"]
+["(root): NaN has no JSON form"]
+ok
+["secret: a Redacted value has no JSON form without an explicit policy"]
+ok
+["session: scoped resource has no wire codec"]
+ExportError: Profile.session -> JSON Schema: scoped resource has no wire codec
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "_tag": {
+          "const": "Leaf"
+        },
+        "_0": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "_tag",
+        "_0"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "_tag": {
+          "const": "Branch"
+        },
+        "_0": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Tree"
+          }
+        }
+      },
+      "required": [
+        "_tag",
+        "_0"
+      ],
+      "additionalProperties": false
+    }
+  ],
+  "$defs": {
+    "Tree": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "_tag": {
+              "const": "Leaf"
+            },
+            "_0": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "_tag",
+            "_0"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "_tag": {
+              "const": "Branch"
+            },
+            "_0": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Tree"
+              }
+            }
+          },
+          "required": [
+            "_tag",
+            "_0"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
+Err SchemaError [{ message = "not a valid Email", path = "(root)" }]
+ada@example.com
+value: {"_tag":"App.Main.Tree.Branch","_0":[{"_tag":"App.Main.Tree.Leaf","_0":1},{"_tag":"App.Main.Tree.Leaf","_0":1}]}
+issues: the scope of this validator has closed
+issues: a cycle in the input

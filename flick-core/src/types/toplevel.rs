@@ -55,6 +55,17 @@ impl<'a> Checker<'a> {
         let refined = self.declare_types(&decls);
         self.declare_classes(&decls);
         let declared = self.declare_instances(&decls, &refined);
+        self.declare_schemas(&decls, &refined);
+        for decl in &decls {
+            if decl.has_token(K::RefinedKw)
+                && let (Some(name), Some(predicate)) = (
+                    self.con_token(decl),
+                    decl.nodes().find(|n| n.kind == K::Refinement),
+                )
+            {
+                self.predicates.insert(name, predicate);
+            }
+        }
         self.collect(&decls);
         for i in 0..self.top.items.len() {
             self.check_item(i);

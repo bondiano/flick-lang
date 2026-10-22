@@ -151,6 +151,10 @@ const report = (results, seed, reporter, write) => {
  */
 export const runTests = async (modules, options = parseTestArgs(process.argv.slice(2))) => {
   const write = options.write ?? ((text) => process.stdout.write(text));
+  // a watcher that went away closes the pipe: nothing is left to report to
+  process.stdout.on("error", (error) => {
+    if (error.code !== "EPIPE") throw error;
+  });
   const seed = Number.isInteger(options.seed) ? options.seed : Math.floor(Math.random() * 2 ** 31);
   const jobs = Number.isInteger(options.jobs) && options.jobs > 0 ? options.jobs : 1;
   const selected = modules

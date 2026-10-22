@@ -106,6 +106,10 @@ fn stdlib_declares_the_spec_signatures_word_for_word() {
         "from_result",
         "bind",
         "bind_eff",
+        "Codec.decode",
+        "Codec.encode",
+        "Codec.decode_result",
+        "Codec.encode_result",
     ] {
         assert!(
             checked.iter().any(|c| c == expected),

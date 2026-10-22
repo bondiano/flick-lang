@@ -146,6 +146,19 @@ impl Checker<'_> {
             }
             return ty;
         }
+        // `Email.parse`: a companion of a type
+        if let super::env::Found::Entity(e) = self.env.find(Namespace::Type, qualifier) {
+            let entity = Entity {
+                module: e.module.clone(),
+                namespace: Namespace::Value,
+                name: super::companion_name(&e.name, name),
+            };
+            if let Some(scheme) = self.env.value(&entity).cloned() {
+                let ty = self.instantiate(&scheme, span);
+                self.record_entity(&entity, &ty, span);
+                return ty;
+            }
+        }
         let service = match self.env.find(Namespace::Type, qualifier) {
             super::env::Found::Entity(e) => self
                 .env
@@ -208,6 +221,9 @@ impl Checker<'_> {
                 } => {
                     let calls = self.stage.calls;
                     self.check(arg, &param);
+                    if i == 0 {
+                        self.refined_constant(head, arg);
+                    }
                     if self.stage.calls > calls && self.eff_parts(&param).is_some() {
                         self.early_argument(head, arg);
                     }

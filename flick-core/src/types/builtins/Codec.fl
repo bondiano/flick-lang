@@ -1,0 +1,98 @@
+/// Codecs: a schema with a wire form. Decoding fails with `SchemaError`;
+/// a `PureCodec` decodes without the runtime.
+module Codec exposing (..)
+
+/// A codec contract that strict JSON Schema export cannot state, with the
+/// path of the node: `Profile.session -> JSON Schema: …`.
+type error ExportError = ExportError String
+  deriving Eq, Show
+
+/// A Standard Schema V1 object for JS libraries.
+type StandardSchema i a
+
+decode :
+  forall c ci rd re i a.
+  (Codec rd re i a)^c ->
+  (Unknown^ci ->{rd; SchemaError} a)^c
+foreign effect decode from "@flick-lang/runtime" "codecDecode"
+  retention call
+
+encode :
+  forall c rd re i a.
+  (Codec rd re i a)^c -> (a ->{re; SchemaError} i)^c
+foreign effect encode from "@flick-lang/runtime" "codecEncode"
+  retention call
+
+decode_result :
+  forall c ci i a.
+  (PureCodec i a)^c ->
+  (Unknown^ci -> Result SchemaError a)^c
+foreign pure decode_result from "@flick-lang/runtime" "codecDecodeResult"
+  retention call
+
+encode_result :
+  forall c i a.
+  (PureCodec i a)^c -> (a -> Result SchemaError i)^c
+foreign pure encode_result from "@flick-lang/runtime" "codecEncodeResult"
+  retention call
+
+/// A pure codec used where a general one is expected.
+general : PureCodec i a -> Codec none none i a
+foreign pure general from "@flick-lang/runtime" "identity"
+
+/// The canonical JSON form of a schema: records as objects, variants as
+/// `{"_tag": "Name", "_0": …}`, `Option` as the value or `null`. A
+/// `Redacted` value has none without an explicit policy.
+json : Schema a -> PureCodec Json a
+foreign pure json from "@flick-lang/runtime" "schemaJsonCodec"
+
+list : PureCodec Json a -> PureCodec Json (List a)
+foreign pure list from "@flick-lang/runtime" "codecList"
+
+bool : PureCodec Json Bool
+foreign pure bool from "@flick-lang/runtime" "codecBool"
+
+/// `Option` as `{"_tag": "None"}` or `{"_tag": "Some", "value": …}`.
+tagged_option : PureCodec Json a -> PureCodec Json (Option a)
+foreign pure tagged_option from "@flick-lang/runtime" "codecTaggedOption"
+
+/// A pure transformation both ways.
+transform : forall c a b. (a -> b)^c -> (b -> a)^c -> (PureCodec Json a -> PureCodec Json b)^c
+foreign pure transform from "@flick-lang/runtime" "codecTransformPure"
+  arity 3
+  retention call
+
+/// A decoding that may fail, and its encoding.
+transform_result :
+  forall c a b.
+  (a -> Result SchemaError b)^c -> (b -> a)^c -> (PureCodec Json a -> PureCodec Json b)^c
+foreign pure transform_result from "@flick-lang/runtime" "codecTransformResult"
+  arity 3
+  retention call
+
+/// A runtime decoding, whose services decoding needs: no `PureCodec`.
+transform_effect :
+  forall c r a b.
+  (a ->{r; SchemaError} b)^c -> (b -> a)^c -> (PureCodec Json a -> Codec r none Json b)^c
+foreign pure transform_effect from "@flick-lang/runtime" "codecTransformEffect"
+  arity 3
+  retention call
+
+/// A check of the whole decoded value.
+check : forall c a. (a -> Bool)^c -> String -> (PureCodec Json a -> PureCodec Json a)^c
+foreign pure check from "@flick-lang/runtime" "codecCheckWhole"
+  arity 3
+  retention call
+
+/// The JSON Schema 2020-12 of the codec's wire form, exactly, or why not.
+json_schema : String -> PureCodec Json a -> Result ExportError String
+foreign pure json_schema from "@flick-lang/runtime" "codecJsonSchema"
+
+/// A Standard Schema V1 that validates synchronously.
+standard : PureCodec i a -> StandardSchema i a
+foreign pure standard from "@flick-lang/runtime" "codecStandard"
+
+/// A Standard Schema V1 with a Promise `validate`, run with the services
+/// and the scope of where it was made.
+standard_async : Codec rd re i a ->{rd;} StandardSchema i a
+foreign effect standard_async from "@flick-lang/runtime" "codecStandardAsync"

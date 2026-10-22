@@ -167,6 +167,13 @@ codes! {
     F002 = Ffi 2, "foreign parameter may hold a scope without a retention contract";
     F003 = Ffi 3, "catch mapping does not make an error of the signature";
     F004 = Ffi 4, "export has no TypeScript form";
+    D001 = Schema 1, "type has no Schema witness";
+    D002 = Schema 2, "codec misses a field";
+    D003 = Schema 3, "codec gives a field twice";
+    D004 = Schema 4, "codec gives a field the record does not have";
+    D005 = Schema 5, "two codec fields share a wire name";
+    D006 = Schema 6, "constant fails the check of its refined type";
+    D007 = Schema 7, "codec block over a schema that is not a record";
     P001 = Project 1, "cannot read source file";
     P002 = Project 2, "file is not formatted";
     P003 = Project 3, "internal formatter error";

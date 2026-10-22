@@ -1,10 +1,9 @@
 ---
 source: flick-core/src/iface.rs
-assertion_line: 303
 expression: json
 ---
 {
-  "iface-version": 4,
+  "iface-version": 5,
   "language": "0.7",
   "module": "App.Shapes",
   "exports": [
@@ -650,6 +649,70 @@ expression: json
                   }
                 }
               }
+            }
+          }
+        }
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "value",
+      "name": "Port$parse",
+      "decl": "let",
+      "type": {
+        "fun": {
+          "param": {
+            "con": {
+              "module": "Prelude",
+              "name": "Number"
+            }
+          },
+          "result": {
+            "app": {
+              "head": {
+                "app": {
+                  "head": {
+                    "con": {
+                      "module": "Prelude",
+                      "name": "Result"
+                    }
+                  },
+                  "arg": {
+                    "con": {
+                      "module": "Prelude",
+                      "name": "SchemaError"
+                    }
+                  }
+                }
+              },
+              "arg": {
+                "con": {
+                  "module": "App.Shapes",
+                  "name": "Port"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "value",
+      "name": "Port$value",
+      "decl": "let",
+      "type": {
+        "fun": {
+          "param": {
+            "con": {
+              "module": "App.Shapes",
+              "name": "Port"
+            }
+          },
+          "result": {
+            "con": {
+              "module": "Prelude",
+              "name": "Number"
             }
           }
         }

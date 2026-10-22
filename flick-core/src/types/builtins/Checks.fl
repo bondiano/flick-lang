@@ -1,0 +1,14 @@
+/// Checks for refined types, which the compiler can also apply to a constant
+/// and exporters can state: `refined type Email = String where Checks.email`.
+module Checks exposing (..)
+
+/// One `@` with text on both sides and a dot in the domain; not every rule
+/// of email addresses.
+email : String -> Bool
+foreign pure email from "@flick-lang/runtime" "checkEmail"
+
+non_empty : String -> Bool
+foreign pure non_empty from "@flick-lang/runtime" "checkNonEmpty"
+
+positive : Number -> Bool
+foreign pure positive from "@flick-lang/runtime" "checkPositive"

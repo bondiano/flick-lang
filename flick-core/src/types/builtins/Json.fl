@@ -1,0 +1,13 @@
+/// JSON text: parsing it gives inert data a codec can decode.
+module Json exposing (parse, stringify, to_unknown)
+
+/// The value of JSON text, or the reason it is not JSON.
+parse : String -> Result SchemaError Unknown
+foreign pure parse from "@flick-lang/runtime" "jsonParse"
+
+stringify : Json -> String
+foreign pure stringify from "@flick-lang/runtime" "jsonStringify"
+
+/// A JSON value as input for decoding.
+to_unknown : Json -> Unknown
+foreign pure to_unknown from "@flick-lang/runtime" "identity"

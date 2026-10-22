@@ -57,3 +57,7 @@ foreign pure from_number from "@flick-lang/runtime" "stringFromNumber"
 /// The number a whole string spells in JS syntax, if any.
 to_number : String -> Option Number
 foreign pure to_number from "@flick-lang/runtime" "stringToNumber"
+
+/// A JSON string.
+json : PureCodec Json String
+foreign pure json from "@flick-lang/runtime" "codecString"

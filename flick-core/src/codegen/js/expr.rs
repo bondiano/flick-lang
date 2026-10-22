@@ -148,6 +148,7 @@ impl Gen<'_> {
                 self.expr(call)
             }
             ExprKind::Provide(layer, body) => self.provide(layer, body),
+            ExprKind::CodecBlock(name, fields) => self.codec_block(name, fields),
             ExprKind::Lift(inner, lift) => {
                 let v = self.expr(inner);
                 let f = self.lift(lift);

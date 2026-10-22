@@ -15,7 +15,7 @@ pub use lower::lower;
 pub use print::print;
 
 use crate::source::Span;
-use crate::types::{Constructor, Dict, ForeignInfo, InstanceInfo, Lift};
+use crate::types::{Constructor, Dict, ForeignInfo, InstanceInfo, Lift, SchemaItem};
 
 #[derive(Debug, Clone)]
 pub struct Module {
@@ -53,6 +53,14 @@ pub enum ItemKind {
         name: String,
         key: String,
     },
+    /// A refined type `name`: its check `T$check`, and `T$parse`, `T$value`.
+    Refined {
+        name: String,
+        check: Expr,
+    },
+    /// The witness `T$schema` of a type deriving `Schema`, a function of
+    /// `witnesses` witnesses; a refined type also gets `T$json`.
+    Schema(SchemaItem),
     /// An instance with its methods; with a context, a function of the
     /// context's dictionaries.
     Instance {
@@ -173,6 +181,8 @@ pub enum ExprKind {
     Provide(Box<Expr>, Box<Expr>),
     /// A pure function value used where a runtime one is expected.
     Lift(Box<Expr>, Lift),
+    /// A `codec` block: the name it decodes, and each label with its field.
+    CodecBlock(String, Vec<(String, Expr)>),
 }
 
 impl Expr {
@@ -232,7 +242,7 @@ impl Expr {
                     f(item);
                 }
             }
-            ExprKind::Record(fields) => {
+            ExprKind::Record(fields) | ExprKind::CodecBlock(_, fields) => {
                 for (_, v) in fields {
                     f(v);
                 }

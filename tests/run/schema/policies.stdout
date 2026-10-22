@@ -1,0 +1,11 @@
+ok { missing = None, nullable = None, nullish = None, quota = 101, required = "r", tagged = None }
+1
+error ["required: a missing key"]
+error ["nullable: a missing key"]
+ok { missing = Some "here", nullable = None, nullish = None, quota = 5, required = "r", tagged = None }
+error ["missing: expected a string, got number"]
+ok { missing = None, nullable = None, nullish = None, quota = 102, required = "r", tagged = Some 2 }
+error ["quota: expected a finite number, got null"]
+error ["extra: an unknown key"]
+ok { missing = None, nullable = None, nullish = None, quota = 103, required = "r", tagged = None }
+{"required":"r","nullable":null,"nullish":null,"tagged":{"_tag":"Some","value":1},"quota":2}

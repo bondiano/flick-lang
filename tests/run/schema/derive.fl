@@ -1,0 +1,60 @@
+// `deriving Schema` for generic, higher-kinded, recursive and mutually
+// recursive types; JSON round trips through the canonical codec.
+module App.Main exposing (main)
+
+type Tree a =
+  | Leaf a
+  | Branch (List (Tree a))
+  deriving Schema
+
+type alias PairOf f = {
+  count : f Number
+  label : f String
+} deriving Schema
+
+type Expr =
+  | Num Number
+  | Neg Expr
+  | Block Statements
+  deriving Schema
+
+type Statements = Statements (List Expr)
+  deriving Schema
+
+tree_schema : Schema a -> Schema (Tree a)
+let tree_schema item_schema =
+  schema Tree item_schema
+
+pair_of_schema : (forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)
+let pair_of_schema make_schema =
+  schema PairOf make_schema
+
+round_trip : Schema a -> a -> String
+let round_trip s value =
+  let wire = Codec.json s
+  match Codec.encode_result wire value with
+  | Err _ -> "encode failed"
+  | Ok json ->
+    let text = Json.stringify json
+    match Codec.decode_result wire (Json.to_unknown json) with
+    | Ok _ -> text
+    | Err (SchemaError issues) -> "decode failed: " ++ show issues
+
+decode : String -> Schema a -> String
+let decode text s =
+  match Json.parse text with
+  | Err _ -> "not JSON"
+  | Ok input ->
+    match Codec.decode_result (Codec.json s) input with
+    | Ok _ -> "ok"
+    | Err (SchemaError issues) -> show (List.map (fun i -> i.path ++ ": " ++ i.message) issues)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let numbers = tree_schema Schema.number
+  Platform.stdout_line (round_trip numbers (Branch [Leaf 1, Branch [Leaf 2, Leaf 3]]))
+  let optional = pair_of_schema Schema.option
+  Platform.stdout_line (round_trip optional { count = Some 2; label = None })
+  Platform.stdout_line (round_trip (schema Expr) (Neg (Block (Statements [Num 1, Neg (Num 2)]))))
+  Platform.stdout_line (decode "{\"_tag\": \"Branch\", \"_0\": [{\"_tag\": \"Leaf\", \"_0\": \"x\"}]}" numbers)
+  Platform.stdout_line (decode "{\"_tag\": \"Twig\"}" numbers)

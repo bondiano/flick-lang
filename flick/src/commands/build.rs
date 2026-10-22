@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
-use flick_core::build::{self, Settings};
+use flick_core::build::{self, Extras, Settings};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Emit, Kind};
 use flick_core::project::{self, Compilation, Compiled, Project};
@@ -81,8 +81,12 @@ impl Command for BuildCommand {
             out_dir: &out_dir,
             entry: entry.as_deref(),
             typescript,
-            dts: self.options.emit_dts || config.is_some_and(|b| b.emit_dts),
-            promise_facade: self.options.promise_facade || config.is_some_and(|b| b.promise_facade),
+            extras: Extras {
+                dts: self.options.emit_dts || config.is_some_and(|b| b.emit_dts),
+                promise_facade: self.options.promise_facade
+                    || config.is_some_and(|b| b.promise_facade),
+                schema_aot: self.options.schema_aot || config.is_some_and(|b| b.schema_aot),
+            },
         };
         diagnostics.extend(emit(
             &host,
@@ -103,8 +107,7 @@ pub struct Output<'a> {
     pub out_dir: &'a Path,
     pub entry: Option<&'a str>,
     pub typescript: bool,
-    pub dts: bool,
-    pub promise_facade: bool,
+    pub extras: Extras,
 }
 
 /// Writes the build of `compilation`; what could not be written or has no
@@ -147,8 +150,7 @@ pub fn emit(
         entry: output.entry,
         typescript: output.typescript,
         source_path: &source_path,
-        dts: output.dts,
-        promise_facade: output.promise_facade,
+        extras: output.extras,
     };
     let (artifacts, mut diagnostics) = build::emit(compilation, sources, &settings);
     if diagnostics.iter().any(|d| d.severity == Severity::Error) {

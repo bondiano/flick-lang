@@ -18,6 +18,7 @@ use super::check::select;
 use crate::args::{GlobalArguments, Reporter, TestArguments};
 use crate::report;
 use crate::sources::FsHost;
+use flick_core::build::Extras;
 
 /// Where the test build goes, inside the project.
 const OUT_DIR: &str = ".flick/test";
@@ -72,8 +73,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         out_dir: &out,
         entry: None,
         typescript: false,
-        dts: false,
-        promise_facade: false,
+        extras: Extras::default(),
     };
     let problems = emit(&host, &sources, Some(&project), &compilation, &output);
     if !problems.is_empty() {

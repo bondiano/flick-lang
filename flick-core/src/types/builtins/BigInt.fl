@@ -25,3 +25,7 @@ foreign pure divide from "@flick-lang/runtime" "bigintDivide"
 
 remainder : BigInt -> BigInt -> Result Number.ArithmeticError BigInt
 foreign pure remainder from "@flick-lang/runtime" "bigintRemainder"
+
+/// A BigInt as a JSON string of digits.
+json : PureCodec Json BigInt
+foreign pure json from "@flick-lang/runtime" "codecBigint"

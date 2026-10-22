@@ -337,3 +337,15 @@ instance Monad (Eff r e) =
   flat_map :
     forall c d a b. (a -> (Eff r e b)^d)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
   let flat_map f eff = flat_map_eff f eff
+
+instance Eq SchemaError =
+  eq : SchemaError -> SchemaError -> Bool
+  let eq x y =
+    match (x, y) with
+    | (SchemaError a, SchemaError b) -> eq a b
+
+instance Show SchemaError =
+  show : SchemaError -> String
+  let show x =
+    match x with
+    | SchemaError issues -> "SchemaError " ++ show issues

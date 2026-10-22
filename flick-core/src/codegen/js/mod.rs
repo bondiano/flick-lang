@@ -7,6 +7,7 @@ mod expr;
 mod function;
 mod items;
 mod pattern;
+mod schema;
 
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write;

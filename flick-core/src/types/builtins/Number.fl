@@ -106,3 +106,13 @@ foreign pure shift_right from "@flick-lang/runtime" "shiftRight"
 
 shift_right_unsigned : Number -> Number -> Number
 foreign pure shift_right_unsigned from "@flick-lang/runtime" "shiftRightUnsigned"
+
+/// A finite JSON number: `NaN` and the infinities are refused when decoding
+/// and when encoding.
+json_finite : PureCodec Json Number
+foreign pure json_finite from "@flick-lang/runtime" "codecNumberFinite"
+
+/// Every number: non-finite values and `-0` as the strings `"NaN"`,
+/// `"Infinity"`, `"-Infinity"` and `"-0"`.
+json : PureCodec Json Number
+foreign pure json from "@flick-lang/runtime" "codecNumberLossless"

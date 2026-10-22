@@ -1,0 +1,94 @@
+// What codecs promise at their edges: a cycle on the decoding path is an
+// error while shared subtrees are fine, finite numbers stay finite both
+// ways, a Redacted value needs an explicit policy, strict JSON Schema export
+// refuses what it cannot state, a refined type checks its values, and a
+// Standard Schema adapter stops with the scope it was made in.
+module App.Main exposing (main)
+
+type Tree = Leaf Number | Branch (List Tree)
+  deriving Schema
+
+refined type Email = String where Checks.email
+  deriving Eq, Show, Schema
+
+type alias Session = { token : String }
+  deriving Schema
+
+type alias Profile = {
+  email : Email
+  secret : Redacted String
+  session : Session
+} deriving Schema
+
+cyclic : Unit -> Unknown
+foreign pure cyclic from "./inputs.mjs" "cyclic"
+  arity 0
+
+shared : Unit -> Unknown
+foreign pure shared from "./inputs.mjs" "shared"
+  arity 0
+
+not_a_number : Unit -> Unknown
+foreign pure not_a_number from "./inputs.mjs" "notANumber"
+  arity 0
+
+validate : Codec.StandardSchema Json Tree -> Unknown ->{} String
+foreign async validate from "./inputs.mjs" "validate"
+
+profile_json : PureCodec Json Profile
+let profile_json =
+  codec (schema Profile) {
+    email = field "email" Email.json
+    secret = field "secret" (Redacted.json_reveal String.json)
+    session = field "session" (Codec.json (schema Session))
+  }
+
+scoped_session : PureCodec Json Profile
+let scoped_session =
+  codec (schema Profile) {
+    email = field "email" Email.json
+    secret = field "secret" Redacted.json_masked
+    session = field "session" (Codec.json (Schema.opaque "Session" "scoped resource has no wire codec"))
+  }
+
+outcome : Result SchemaError a -> String
+let outcome result =
+  match result with
+  | Ok _ -> "ok"
+  | Err (SchemaError issues) -> show (List.map (fun i -> i.path ++ ": " ++ i.message) issues)
+
+exported : Result Codec.ExportError String -> String
+let exported result =
+  match result with
+  | Ok text -> text
+  | Err (Codec.ExportError reason) -> "ExportError: " ++ reason
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let trees = Codec.json (schema Tree)
+  Platform.stdout_line (outcome (Codec.decode_result trees (cyclic ())))
+  Platform.stdout_line (outcome (Codec.decode_result trees (shared ())))
+  Platform.stdout_line (outcome (Codec.decode_result Number.json_finite (not_a_number ())))
+  Platform.stdout_line (outcome (Codec.encode_result Number.json_finite Number.nan))
+  Platform.stdout_line (outcome (Codec.encode_result Number.json Number.nan))
+  let secret = Redacted.make "hunter2"
+  let session = { token = "t" }
+  let email =
+    match Email.parse "ada@example.com" with
+    | Ok e -> e
+    | Err _ -> App.fail "not an email"
+  let profile = { email = email; secret = secret; session = session }
+  Platform.stdout_line (outcome (Codec.encode_result (Codec.json (schema Profile)) profile))
+  Platform.stdout_line (outcome (Codec.encode_result profile_json profile))
+  Platform.stdout_line (outcome (Codec.encode_result scoped_session profile))
+  Platform.stdout_line (exported (Codec.json_schema "Profile" scoped_session))
+  Platform.stdout_line (exported (Codec.json_schema "Tree" trees))
+  Platform.stdout_line (show (Email.parse (String.trim " not an email ")))
+  Platform.stdout_line (Email.value email)
+  let late = scope {
+    let standard = Codec.standard_async (Codec.general trees)
+    Platform.stdout_line (validate standard (shared ()))
+    standard
+  }
+  Platform.stdout_line (validate late (shared ()))
+  Platform.stdout_line (validate (Codec.standard trees) (cyclic ()))

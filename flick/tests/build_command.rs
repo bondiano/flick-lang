@@ -132,3 +132,29 @@ fn a_package_module_is_imported_next_to_its_interface() {
     );
     assert!(installed.join("dist/Text/Shout.js").exists());
 }
+
+#[test]
+fn schema_aot_turns_on_compiled_codecs_in_the_runner() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("build_schema_aot");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("dir");
+    fs::write(
+        dir.join("Main.fl"),
+        "module Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n",
+    )
+    .expect("write");
+    let out = flick_in(
+        &dir,
+        &["build", "Main.fl", "--out-dir", "out", "--schema-aot"],
+    );
+    assert!(out.status.success(), "{out:?}");
+    let runner = fs::read_to_string(dir.join("out/main.js")).expect("runner");
+    assert!(
+        runner.contains("enableSchemaAot();\nawait runMain(main);"),
+        "{runner}"
+    );
+    let plain = flick_in(&dir, &["build", "Main.fl", "--out-dir", "plain"]);
+    assert!(plain.status.success(), "{plain:?}");
+    let runner = fs::read_to_string(dir.join("plain/main.js")).expect("runner");
+    assert!(!runner.contains("enableSchemaAot"), "{runner}");
+}

@@ -257,6 +257,7 @@ impl Totality<'_> {
             | ExprKind::Try(..)
             | ExprKind::Scope { .. }
             | ExprKind::Within(..)
+            | ExprKind::CodecBlock(..)
             | ExprKind::Provide(..) => true,
         }
     }

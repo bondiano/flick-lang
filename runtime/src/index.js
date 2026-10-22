@@ -12,6 +12,8 @@ export * from "./entry.js";
 export * from "./layer.js";
 export * from "./owner.js";
 export * from "./race.js";
+export * from "./schema/arbitrary.js";
+export * from "./schema/index.js";
 export * from "./stdlib/callbacks.js";
 export * from "./stdlib/decimal.js";
 export * from "./stdlib/file.js";

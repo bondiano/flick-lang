@@ -33,10 +33,13 @@ impl<'n> Checker<'_> {
         let Some(def) = self.env.type_def(&module, &name).cloned() else {
             return Vec::new();
         };
+        let classes = self.derived_classes(clause);
+        if classes.is_empty() {
+            return Vec::new();
+        }
         let Some(fields) = self.fields_of(decl, &name, &def.form, refined) else {
             return Vec::new();
         };
-        let classes = self.derived_classes(clause);
         let has_eq = classes.iter().any(|c| c == "Eq");
         let mut kinds = Vec::new();
         let mut kind = def.kind.clone();
@@ -164,6 +167,8 @@ impl<'n> Checker<'_> {
                 {
                     out.push((*last).to_owned());
                 }
+                // a schema witness, not a class: see `types::schemas`
+                Some((module, _)) if module == PRELUDE && *last == "Schema" => {}
                 None => {}
                 Some(_) => self.error(
                     codes::C013,
@@ -178,7 +183,7 @@ impl<'n> Checker<'_> {
     }
 
     /// The field types of a constructor of this module, over the type's parameters.
-    pub(super) fn constructor_fields(&self, constructor: &str) -> Vec<Type> {
+    pub(crate) fn constructor_fields(&self, constructor: &str) -> Vec<Type> {
         let entity = self.env.entity(Namespace::Constructor, constructor);
         let mut ty = match self.env.value(&entity) {
             Some(Type::Forall { body, .. }) => (**body).clone(),

@@ -4,9 +4,10 @@
 use std::collections::{BTreeSet, HashMap};
 
 use super::expr::arrow_body;
+use super::schema::{plan_uses, schema_names};
 use super::{Gen, Target, indent, names};
 use crate::ir::{Expr, ExprKind, Foreign, ForeignMode, Item, ItemKind};
-use crate::types::{Constructor, Dict, InstanceInfo, default_method};
+use crate::types::{Constructor, Dict, InstanceInfo, companion_name, default_method};
 
 impl Gen<'_> {
     pub(super) fn items(&mut self, items: &[Item]) -> String {
@@ -55,6 +56,8 @@ impl Gen<'_> {
                 )
             }
             ItemKind::Instance { info, methods } => self.instance(info, methods),
+            ItemKind::Refined { name, check } => self.refined(name, check),
+            ItemKind::Schema(item) => self.schema(item),
         }
     }
 
@@ -323,6 +326,11 @@ fn defined(item: &Item) -> Vec<String> {
         ItemKind::Constructor(c) => vec![names::ident(&c.name)],
         ItemKind::Service { name, .. } => vec![names::service(name)],
         ItemKind::Instance { info, .. } => vec![names::instance(&info.name)],
+        ItemKind::Refined { name, .. } => ["check", "parse", "value"]
+            .iter()
+            .map(|m| companion_name(name, m))
+            .collect(),
+        ItemKind::Schema(item) => schema_names(item),
     }
 }
 
@@ -343,6 +351,12 @@ fn item_uses(item: &Item, module: &str, out: &mut BTreeSet<String>) {
             for (_, m) in methods {
                 expr_uses(m, module, out);
             }
+        }
+        ItemKind::Refined { check, .. } => expr_uses(check, module, out),
+        ItemKind::Schema(item) => {
+            let mut uses = Vec::new();
+            plan_uses(&item.plan, module, &mut uses);
+            out.extend(uses);
         }
         ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
     }

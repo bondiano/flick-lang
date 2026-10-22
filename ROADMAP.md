@@ -725,33 +725,38 @@ callbacks», «Подписки», «Higher-rank callback на FFI», «Публ
 - Interpreter baseline; `--schema-aot` / `schema-aot = true` opt-in; без JIT;
   registry инициализируется в entry point.
 
-**Артефакты.** `flick-core::schema::{derive, codec_dsl, export}`,
-`stdlib/Schema/*`, `runtime/src/schema/*`.
+**Артефакты.** `flick-core::types::{schemas, codecs}` (deriving, `schema T`,
+codec DSL, refined companions), модули `Schema`, `Codec`, `Checks`, `Json`,
+`runtime/src/schema/*` (интерпретатор, strict exporter, компилируемые
+декодеры, Standard Schema, Arbitrary), справка — `docs/reference/schema.md`.
+Runtime-представление — собственное инертное дерево узлов, а не объект
+Effect Schema; AOT — компиляция в замыкания при первом использовании,
+включаемая runner'ом приложения. CLI `flick schema export` — в M16.
 
 **AC**
 
-- [ ] Deriving работает для generic (`Tree a`), higher-kinded (`PairOf f`),
+- [x] Deriving работает для generic (`Tree a`), higher-kinded (`PairOf f`),
       recursive и mutually recursive данных (§13).
-- [ ] Неподдерживаемое поле (функция, `Ref`, ресурс) без witness даёт точную
+- [x] Неподдерживаемое поле (функция, `Ref`, ресурс) без witness даёт точную
       диагностику с путём поля (§13).
-- [ ] Codec DSL: пропущенное поле, повтор поля, неизвестное поле, конфликт wire-имён —
+- [x] Codec DSL: пропущенное поле, повтор поля, неизвестное поле, конфликт wire-имён —
       ошибки компиляции.
-- [ ] Missing / null / undefined / defaults / extra keys проверяются независимо —
+- [x] Missing / null / undefined / defaults / extra keys проверяются независимо —
       по тесту на каждую строку таблицы политик §9 (§13).
-- [ ] `on_missing` вызывает factory ровно один раз на decode; null не
+- [x] `on_missing` вызывает factory ровно один раз на decode; null не
       заменяется default.
-- [ ] Effectful codec (`on_missing_effect`, effectful transformation) не получает
+- [x] Effectful codec (`on_missing_effect`, effectful transformation) не получает
       `PureCodec`; попытка использовать его как `PureCodec` — ошибка типов (§13).
-- [ ] Цикл в активном пути decoding → `SchemaError`, не зависание; shared поддеревья OK.
-- [ ] `Number.json_finite` отвергает NaN/Infinity при decode и encode.
-- [ ] `Redacted` поле без явной политики не получает раскрывающий JSON codec.
-- [ ] Strict JSON Schema export отвергает непредставимый контракт с
+- [x] Цикл в активном пути decoding → `SchemaError`, не зависание; shared поддеревья OK.
+- [x] `Number.json_finite` отвергает NaN/Infinity при decode и encode.
+- [x] `Redacted` поле без явной политики не получает раскрывающий JSON codec.
+- [x] Strict JSON Schema export отвергает непредставимый контракт с
       `ExportError` и путём (`Profile.session -> JSON Schema: scoped resource has no wire codec`);
       нет `{}`/`any` в выводе; результат валиден по мета-схеме 2020-12 (§13).
-- [ ] AOT: unsupported node остаётся на interpreter с той же семантикой
+- [x] AOT: unsupported node остаётся на interpreter с той же семантикой
       (differential-тест AOT vs interpreter); это отдельно от strict export (§13).
-- [ ] Standard Schema V1 adapter: late validate после закрытия owner — контролируемая ошибка.
-- [ ] `Email.parse` / `Email.value` работают; константа, нарушающая
+- [x] Standard Schema V1 adapter: late validate после закрытия owner — контролируемая ошибка.
+- [x] `Email.parse` / `Email.value` работают; константа, нарушающая
       поддерживаемую проверку, отвергается при компиляции.
 
 ---
