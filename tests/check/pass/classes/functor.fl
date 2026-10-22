@@ -3,10 +3,10 @@
 module App.Functor exposing (Functor(..), twice, double_all, later)
 
 class Functor (f : Type -> Type) =
-  val map : (a -> b) -> f a -> f b
+  map : (a -> b) -> f a -> f b
 
+// Without a signature the method takes the class one.
 instance Functor Option =
-  map : (a -> b) -> Option a -> Option b
   let map f value =
     match value with
     | None -> None

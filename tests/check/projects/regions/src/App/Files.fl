@@ -1,0 +1,18 @@
+module App.Files exposing (File, OpenError(..), ReadError(..), FileSystem, read_later, reader)
+
+type File (s : Region)
+
+type error OpenError = OpenError String
+
+type error ReadError = ReadError String
+
+service FileSystem =
+  open_scoped : forall s. String ->{Scope s; OpenError} File s
+  read_all : forall s. File s ->{none; ReadError} String
+
+read_later : forall s. File s -> (Eff {FileSystem} {ReadError} String)^{s}
+let read_later file =
+  task { FileSystem.read_all file }
+
+reader : forall s. File s -> (Unit ->{FileSystem; ReadError} String)^{s}
+let reader file = fun () -> FileSystem.read_all file

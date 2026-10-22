@@ -103,6 +103,7 @@ fn kind_of(ty: &Type, m: u32) -> Kind {
         Type::Record(row) if row.tail.as_deref().is_some_and(is) => {
             kind = Kind::Row(Box::new(Kind::Type));
         }
+        Type::Captured { captures, .. } if is(captures) => kind = Kind::CaptureRow,
         Type::Fun {
             effects: Some(e), ..
         } => {

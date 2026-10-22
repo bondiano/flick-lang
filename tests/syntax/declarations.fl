@@ -41,17 +41,17 @@ service Users =
   list : Unit ->{} List User
 
 class Show a =
-  val show : a -> String
+  show : a -> String
 
 class Eq a => Hash a =
-  val hash : a -> Number
+  hash : a -> Number
 
 class Collection c a | c -> a, a c -> a =
   type Item c
-  val empty : c
+  empty : c
 
 class Functor (f : Type -> Type) =
-  val map : (a -> b) -> f a -> f b
+  map : (a -> b) -> f a -> f b
 
 instance Show Shape =
   show : Shape -> String

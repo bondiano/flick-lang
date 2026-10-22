@@ -1,0 +1,55 @@
+// Capture qualifiers in signatures: a qualifier is an upper bound, partial
+// application holds what was applied, and generic code keeps the captures
+// of its callbacks and containers.
+module App.Captures exposing (..)
+
+type Handle (s : Region)
+
+type error ReadError = ReadError String
+
+read_all : forall s. Handle s ->{none; ReadError} String
+foreign sync read_all from "./files.js" "readAll"
+
+class Functor (f : Type -> Type) =
+  map : forall c d a b. (a -> b)^c -> ((f a)^d -> (f b)^(c + d))^c
+
+instance Functor Option =
+  map : forall c d a b. (a -> b)^c -> ((Option a)^d -> (Option b)^(c + d))^c
+  let map f value =
+    match value with
+    | None -> None
+    | Some x -> Some (f x)
+
+map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
+foreign sync map_effect from "./list.js" "mapEffect"
+
+read_later : forall s. Handle s -> (Unit ->{none; ReadError} String)^{s}
+let read_later file = fun () -> read_all file
+
+task_later : forall s. Handle s -> (Eff none {ReadError} String)^{s}
+let task_later file =
+  task { read_all file }
+
+wider : forall s t. Handle s -> (Unit ->{none; ReadError} String)^{s, t}
+let wider file = fun () -> read_all file
+
+shown : forall s. Handle s -> Unit -> Handle s
+let shown file () = file
+
+reader : forall s. Handle s -> (List Number ->{none; ReadError} List String)^{s}
+let reader file = map_effect (fun n -> read_all file)
+
+labels : forall s. Handle s -> (Option Number -> Option (Handle s))^{s}
+let labels file = map (fun n -> file)
+
+// A stage holds the parameters before it without a written qualifier.
+curried : forall s. Handle s -> String -> String
+let curried file label =
+  ignore file
+  label
+
+held_later : forall s. Handle s -> (String -> String)^{s}
+let held_later file = curried file
+
+compose : (b -> c) -> (a -> b) -> a -> c
+let compose f g x = f (g x)

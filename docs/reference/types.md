@@ -15,6 +15,7 @@ import, and a local definition of the same name hides them.
 | `List`, `Option`, `Ref`, `Redacted`, `Schema` | `Type -> Type` |
 | `Result`, `PureCodec` | `Type -> Type -> Type` |
 | `ServiceTag`, `ServiceImpl` | `ServiceRow -> Type` |
+| `Scope` (a service) | `Region -> Service` |
 | `Eff` | `ServiceRow -> ErrorRow -> Type -> Type` |
 | `Layer` | `ServiceRow -> ErrorRow -> ServiceRow -> Type` |
 | `Codec` | `ServiceRow -> ServiceRow -> Type -> Type -> Type` |
@@ -26,8 +27,9 @@ ordinary declarations; `identity : a -> a` is a function. `from_result` turns a
 `Result` into an expected error ([effects.md](effects.md)). Built-in modules
 are used qualified without an import: `Ref.make`, `Ref.get`, `Ref.set`,
 `Ref.modify`, `String.trim`, `Platform.stdout_line`, `Platform.stderr_line`,
-`App.fail`, `Layer.succeed`, `Layer.merge`, `Layer.override`, and the row
-primitives of `Record`. The classes `Eq`, `Ord`, `Hash` and `Show` are in
+`App.fail`, `Layer.succeed`, `Layer.merge`, `Layer.override`, the row
+primitives of `Record`, and `Fiber.spawn` with the types `Fiber.Owner`,
+`Fiber.Fiber` and `Fiber.Failure` ([regions.md](regions.md)). The classes `Eq`, `Ord`, `Hash` and `Show` are in
 `Prelude` too ([classes.md](classes.md)).
 
 ## Kinds
@@ -189,6 +191,4 @@ Classes and instances: [classes.md](classes.md).
 
 | Construct | Today |
 | - | - |
-| capture qualifiers `T^c` | kind-checked, then dropped |
 | `sql`, `ui`, `codec`, `schema` blocks | any type |
-| `scope s` handle | any type |

@@ -7,8 +7,8 @@ type User = User String
 type UserSet = UserSet (List User)
 
 class Collection c a | c -> a =
-  val empty : c
-  val insert : a -> c -> c
+  empty : c
+  insert : a -> c -> c
 
 instance Collection UserSet User =
   empty : UserSet

@@ -41,8 +41,18 @@ pub fn is_pattern(kind: K) -> bool {
 }
 
 impl Checker<'_> {
-    /// Checks `node` against `ty` and brings its names into scope.
+    /// Checks `node` against `ty` and brings its names into scope. A
+    /// constructor's fields were checked against their types when it was
+    /// built, so the parts of a qualified value have their own types.
     pub fn bind_pattern(&mut self, node: &Node, ty: &Type) -> Pat {
+        if let (bare, Some(_)) = self.whnf_captured(ty)
+            && !matches!(
+                node.kind,
+                K::VarPat | K::WildcardPat | K::ParenPat | K::AnnotPat | K::OrPat
+            )
+        {
+            return self.bind_pattern(node, &bare);
+        }
         let children: Vec<&Node> = node.nodes().collect();
         let span = self.span(node);
         match node.kind {

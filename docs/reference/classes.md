@@ -8,17 +8,17 @@ can see. Service operations are not class methods ([effects.md](effects.md)).
 
 ```flick
 class Show a =
-  val show : a -> String
+  show : a -> String
 
 class Eq a => Hash a =
-  val hash : a -> Number
+  hash : a -> Number
 
 class Collection c a | c -> a =
-  val empty : c
-  val insert : a -> c -> c
+  empty : c
+  insert : a -> c -> c
 
 class Functor (f : Type -> Type) =
-  val map : (a -> b) -> f a -> f b
+  map : (a -> b) -> f a -> f b
 ```
 
 A class has one or more parameters of any kind, superclasses before `=>`
@@ -37,14 +37,14 @@ cell) but no `Hash`.
 
 ```flick
 instance Show a => Show (List a) =
-  show : List a -> String
   let show items = "[" ++ show_items items ++ "]"
 ```
 
 Each method of the class is defined once with the class signature, the
-instance's types in place of the class parameters; it may be more
-polymorphic, but may not require a constraint the class signature does not
-(`FLICK-C010`). A missing or unknown method is `FLICK-C011`. The superclasses
+instance's types in place of the class parameters. Its own signature is
+optional: without one the method has exactly that type; a written one may be
+more polymorphic, but may not require a constraint the class signature does
+not (`FLICK-C010`). A missing or unknown method is `FLICK-C011`. The superclasses
 must hold for the instance's types, given its context (`FLICK-C001`).
 
 Instances are canonical. The checker rejects an instance when:
@@ -66,7 +66,6 @@ alias or a record does not give ownership; a nominal wrapper does:
 type LocalExternalId = LocalExternalId ExternalId
 
 instance Hash LocalExternalId =
-  hash : LocalExternalId -> Number
   let hash id =
     match id with
     | LocalExternalId raw -> hash_external raw

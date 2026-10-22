@@ -170,13 +170,16 @@ impl Checker<'_> {
                 rec
             });
             let mark = self.locals.len();
-            let runtime = self.check_signed(decl, &parts, &scheme, rec.flatten());
+            // what a local holds is inferred: its signature need not name the regions
+            let captures = self.fresh();
+            let runtime = self.check_signed(decl, &parts, &scheme, rec.flatten(), Some(&captures));
             self.locals.truncate(mark - usize::from(rec.is_some()));
             if let Some(Some(rec)) = rec {
                 self.finish_rec(rec);
             }
             self.polymorphic_runtime(&name, &scheme, runtime, decl);
-            self.push_local(&name, scheme);
+            let ty = self.inferred_captures(scheme, captures, self.span(decl));
+            self.push_local(&name, ty);
         } else {
             if parts.rec {
                 let ty = self.fresh();
@@ -253,11 +256,19 @@ impl Checker<'_> {
         parts: &LetParts,
         scheme: &Type,
         rec: Option<usize>,
+        captures: Option<&Type>,
     ) -> bool {
         self.header_types(decl, parts, true);
         self.store.level += 1;
         let kinds = binders(scheme);
         let (body, skolems, givens) = self.skolemize(scheme);
+        let body = match captures {
+            Some(c) => Type::Captured {
+                ty: Box::new(body),
+                captures: Box::new(c.clone()),
+            },
+            None => body,
+        };
         let assumed = self.classes.givens.len();
         self.classes.givens.extend(givens);
         let mark = self.tyvars.len();

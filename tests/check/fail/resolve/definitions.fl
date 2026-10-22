@@ -30,4 +30,4 @@ let trim s = s
 //  ^^^^ FLICK-R009 `trim` shadows the name imported from `App.Text`
 
 class Show a =
-  val show : a -> String
+  show : a -> String

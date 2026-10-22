@@ -3,13 +3,13 @@
 module App.Classes exposing (Show(..), render, Repo)
 
 class Show a =
-  val show : a -> String
+  show : a -> String
 
 class Show a => Pretty a =
-  val pretty : a -> String
+  pretty : a -> String
 
 class Functor (f : Type -> Type) =
-  val map : (a -> b) -> f a -> f b
+  map : (a -> b) -> f a -> f b
 
 type Shape = Circle Number | Empty
 

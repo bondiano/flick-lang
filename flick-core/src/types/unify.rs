@@ -42,8 +42,9 @@ pub enum Mismatch {
     },
     /// Binding the variable would make the type infinite.
     Occurs(Type),
-    /// A rigid type variable would leave the scope of its `forall`.
-    Escape(String),
+    /// A rigid type variable, by skolem, would leave the scope of its
+    /// `forall` or the region of its `scope`.
+    Escape(u32),
     /// A type variable cannot stand for a polymorphic type (instantiation is predicative).
     Polymorphic(Type),
 }
@@ -57,6 +58,13 @@ fn id(n: usize) -> u32 {
 impl Store {
     pub fn fresh(&mut self) -> Type {
         self.metas.push(MetaState::Open { level: self.level });
+        Type::Meta(id(self.metas.len() - 1))
+    }
+
+    /// A variable of the level of `m`, to extend what `m` stands for.
+    pub fn fresh_beside(&mut self, m: u32) -> Type {
+        let level = self.meta_level(m).unwrap_or(self.level);
+        self.metas.push(MetaState::Open { level });
         Type::Meta(id(self.metas.len() - 1))
     }
 
@@ -118,6 +126,14 @@ impl Store {
                     Type::Row(row)
                 }
             }
+            // a qualifier that came out empty is no qualifier
+            Type::Captured { ty, captures } => match self.zonk(captures) {
+                Type::Row(row) if row.entries.is_empty() && row.tail.is_none() => self.zonk(ty),
+                captures => Type::Captured {
+                    ty: Box::new(self.zonk(ty)),
+                    captures: Box::new(captures),
+                },
+            },
             _ => t.map_children(&mut |c| self.zonk(c)),
         }
     }
@@ -127,7 +143,10 @@ impl Store {
         let mut entries: Vec<(String, Type)> = row
             .entries
             .iter()
-            .map(|(l, t)| (l.clone(), self.zonk(t)))
+            .map(|(l, t)| {
+                let t = self.zonk(t);
+                (relabel(l, &t), t)
+            })
             .collect();
         let mut tail = row.tail.as_ref().map(|t| self.zonk(t));
         while let Some(Type::Row(inner)) = tail {
@@ -135,6 +154,7 @@ impl Store {
             tail = inner.tail.map(|t| *t);
         }
         entries.sort_by(|a, b| a.0.cmp(&b.0));
+        entries.dedup_by(|a, b| a.0 == b.0);
         Row {
             entries,
             tail: tail.map(Box::new),
@@ -155,7 +175,10 @@ impl Store {
     fn collect_row(&self, t: &Type, out: &mut Norm) {
         match self.resolve(t) {
             Type::Row(row) => {
-                out.entries.extend(row.entries);
+                out.entries.extend(row.entries.into_iter().map(|(l, t)| {
+                    let t = self.resolve(&t);
+                    (relabel(&l, &t), t)
+                }));
                 if let Some(tail) = row.tail {
                     self.collect_row(&tail, out);
                 }
@@ -172,20 +195,20 @@ impl Store {
         }
     }
 
-    /// Lowers the levels of the variables in `t` to `level`; `Err` names a
+    /// Lowers the levels of the variables in `t` to `level`; `Err` is a
     /// skolem of a deeper level.
-    fn adjust(&mut self, t: &Type, level: u32) -> Result<(), String> {
+    fn adjust(&mut self, t: &Type, level: u32) -> Result<(), u32> {
         let mut escaped = None;
         let mut lower = Vec::new();
         t.visit(&mut |t| match t {
             Type::Meta(m) => lower.push(*m),
             Type::Skolem(s) if self.skolems[*s as usize].level > level => {
-                escaped = Some(self.skolems[*s as usize].name.clone());
+                escaped = Some(*s);
             }
             _ => {}
         });
-        if let Some(name) = escaped {
-            return Err(name);
+        if let Some(s) = escaped {
+            return Err(s);
         }
         for m in lower {
             if let MetaState::Open { level: l } = &mut self.metas[m as usize] {
@@ -209,11 +232,26 @@ impl Store {
         out
     }
 
+    /// Moves `t` to the current level, as a value that leaves a scope: `Err`
+    /// is a rigid variable of the scope that it would take along.
+    pub fn leave(&mut self, t: &Type) -> Result<(), u32> {
+        let level = self.level;
+        self.adjust(&self.zonk(t), level)
+    }
+
     /// Keeps the variables of a binding that is not generalized from being
     /// generalized by an enclosing one.
     pub fn lower(&mut self, t: &Type) {
         let level = self.level;
         let _ = self.adjust(&self.zonk(t), level);
+    }
+}
+
+/// The current label of a row entry: a capture row entry follows its element.
+fn relabel(label: &str, t: &Type) -> String {
+    match label.starts_with('^').then(|| super::ty::capture_label(t)) {
+        Some(Some(label)) => label,
+        _ => label.to_owned(),
     }
 }
 
@@ -226,10 +264,25 @@ impl Checker<'_> {
         self.store.zonk(t)
     }
 
-    /// `t` with bound variables followed and aliases at its head expanded.
+    /// `t` with bound variables followed and aliases at its head expanded,
+    /// without its capture qualifier.
     pub fn whnf(&self, t: &Type) -> Type {
+        self.whnf_captured(t).0
+    }
+
+    /// [`Self::whnf`], and the capture row of the qualifiers taken off.
+    pub fn whnf_captured(&self, t: &Type) -> (Type, Option<Type>) {
         let mut t = self.store.resolve(t);
+        let mut captures: Option<Type> = None;
         for _ in 0..64 {
+            if let Type::Captured { ty, captures: c } = t {
+                captures = Some(match captures {
+                    Some(outer) => Type::Union(Box::new(outer), c),
+                    None => *c,
+                });
+                t = self.store.resolve(&ty);
+                continue;
+            }
             if let Some(reduced) = self.project(&t) {
                 t = self.store.resolve(&reduced);
                 continue;
@@ -257,7 +310,7 @@ impl Checker<'_> {
             );
             t = self.store.resolve(&expanded);
         }
-        t
+        (t, captures)
     }
 
     /// The fixed projections of a row into a type, once the row is known
@@ -325,7 +378,10 @@ impl Checker<'_> {
         if self.same_application(a, b) {
             return Ok(());
         }
-        let (a, b) = (self.whnf(a), self.whnf(b));
+        let ((a, ca), (b, cb)) = (self.whnf_captured(a), self.whnf_captured(b));
+        if ca.is_some() || cb.is_some() {
+            return self.unify_captured((a, ca), (b, cb));
+        }
         if let Some(result) = self
             .unify_errors(&a, &b)
             .or_else(|| self.unify_errors(&b, &a))
@@ -438,6 +494,10 @@ impl Checker<'_> {
     /// class constraints become constraints to solve, required at `span`.
     pub fn instantiate(&mut self, t: &Type, span: Span) -> Type {
         match self.store.resolve(t) {
+            Type::Captured { ty, captures } => Type::Captured {
+                ty: Box::new(self.instantiate(&ty, span)),
+                captures,
+            },
             Type::Forall {
                 vars,
                 constraints,

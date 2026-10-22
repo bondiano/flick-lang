@@ -159,6 +159,10 @@ codes! {
     C011 = Classes 11, "missing or unknown instance method";
     C012 = Classes 12, "instance of a compiler-owned constraint";
     C013 = Classes 13, "cannot derive an instance";
+    G001 = Regions 1, "value holds more than its capture qualifier allows";
+    G002 = Regions 2, "scoped value leaves its scope";
+    G003 = Regions 3, "child may outlive what it holds";
+    G004 = Regions 4, "resource acquired outside a scope";
     P001 = Project 1, "cannot read source file";
     P002 = Project 2, "file is not formatted";
     P003 = Project 3, "internal formatter error";

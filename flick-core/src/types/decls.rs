@@ -322,7 +322,7 @@ impl Checker<'_> {
             .filter(|n| n.kind == K::Members)
             .flat_map(Node::nodes);
         let mut out = Vec::new();
-        for member in members.filter(|m| matches!(m.kind, K::Signature | K::ValDecl)) {
+        for member in members.filter(|m| m.kind == K::Signature) {
             let (Some(name), Some(ty)) = (
                 member.child_tokens().find(|t| t.kind == K::Ident),
                 member.nodes().find(|n| is_type(n.kind)),

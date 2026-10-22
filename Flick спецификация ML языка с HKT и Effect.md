@@ -264,7 +264,7 @@ Eff r e : Type -> Type
 
 ```flick
 class Functor (f : Type -> Type) =
-  val map :
+  map :
     forall c d a b.
     (a -> b)^c -> ((f a)^d -> (f b)^(c + d))^c
 
@@ -287,7 +287,7 @@ Frontend проверяет kinds, выводит типы и ограничен
 
 ```flick
 class Show a =
-  val show : a -> String
+  show : a -> String
 
 render : Show a => a -> String
 let render value =
@@ -413,7 +413,7 @@ let project_name value =
 
 ```flick
 class Show a =
-  val show : a -> String
+  show : a -> String
 
 type PrintableUser =
   | PrintableUser User
@@ -437,7 +437,7 @@ PrintableUser — nominal wrapper, которым владеет пакет inst
 
 ```flick
 class Convert input output =
-  val convert : input -> Result ConversionError output
+  convert : input -> Result ConversionError output
 ```
 
 Здесь полезны и `Convert String Email`, и `Convert String UserId`. В однопараметрическом ядре это выражается отдельными функциями либо явными converter/codec-значениями. Наш `Codec rd re i a` уже позволяет передать нужное преобразование напрямую; ему не требуется единственный глобальный instance.
@@ -462,8 +462,8 @@ Associated types, общие type families и relaxed value restriction по var
 
 ```flick
 class Collection c a | c -> a =
-  val empty : c
-  val insert : forall captures. a^captures -> (c -> c)^captures
+  empty : c
+  insert : forall captures. a^captures -> (c -> c)^captures
 ```
 
 Qualifier у insert сохраняет значение a в частично применённой функции; конкретный тип коллекции также сохраняет captures своих элементов.
@@ -492,7 +492,7 @@ Associated types исключены из первой версии. Для ср�
 class Collection c =
   type Item c
 
-  val insert : Item c -> c -> c
+  insert : Item c -> c -> c
 ```
 
 Instance для `UserSet` объявляет `Item UserSet = User`. Полная сигнатура общего метода имеет вид `Collection c => Item c -> c -> c`.
@@ -1927,7 +1927,7 @@ Canonical Eq/Hash по содержимому Ref в первой версии �
 
 ```flick
 class Eq a => Hash a =
-  val hash : a -> Number
+  hash : a -> Number
 ```
 
 Закон: если `eq x y`, то hashes совпадают. Обратное неверно: коллизии допустимы. Derived `Eq` и `Hash` должны использовать одну семантику полей. Типизация пользовательского instance не доказывает этот закон. [Effect Hash](https://effect.website/docs/v4/trait/hash).

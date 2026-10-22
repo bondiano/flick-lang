@@ -80,7 +80,8 @@ impl Checker<'_> {
                 body: Box::new(body),
             },
         };
-        (self.default_kinds(&ty), explicit)
+        let ty = self.default_kinds(&ty);
+        (self.implicit_captures(&ty), explicit)
     }
 
     /// A local type annotation; its unknown variables are inferred.
@@ -185,11 +186,17 @@ impl Checker<'_> {
             }
             K::CaptureType => {
                 let base = self.ty(children[0], expected, free);
-                // shortcut: captures are kind-checked and dropped; regions track them
-                if let Some(capture) = children.get(1) {
-                    let _ = self.capture(capture, free);
+                let Some(capture) = children.get(1) else {
+                    return base;
+                };
+                let captures = self.capture(capture, free);
+                if matches!(&captures, Type::Row(r) if r.entries.is_empty() && r.tail.is_none()) {
+                    return base;
                 }
-                return base;
+                return Type::Captured {
+                    ty: Box::new(base),
+                    captures: Box::new(captures),
+                };
             }
             K::ForallType => return self.forall(node, &children, expected, free),
             K::ConstrainedType => {

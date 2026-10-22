@@ -135,6 +135,7 @@ flowchart LR
 | Shadowing и неоднозначность | Локальные связывания затеняют всё без диагностики. Top-level определение с именем из `import … exposing (name)` — ошибка `FLICK-R009`; имена из `exposing (..)` top-level затеняет молча. Два импорта по имени с разными сущностями — `FLICK-R010` сразу; конфликт между `(..)`-импортами — `FLICK-R010` только в месте использования. Re-export той же сущности не конфликт. Порядок `import` ни на что не влияет | M2 |
 | HTTP | Без синтаксиса (спека §7 «Граница языкового ядра»): `Http.*` и `HttpApi.*` — библиотечные combinators; схемы endpoint'ов — `Schema a` из M11 | M21 |
 | CLI eDSL | Спека §10 «CLI eDSL», грамматика в `docs/reference/grammar.md`. Блок `cli "name" { … }` с clauses `description`, `flag`, `arg`, `subcommand`, `handle`; elaborates в библиотечные `Cli.*` поверх `effect/cli`, доступные и напрямую. Parser блока уже разбирает форму clauses | M22 |
+| Методы класса | Метод объявляется обычной сигнатурой `name : T` (ключевого слова `val` нет, старая запись — `FLICK-S010`). Метод по умолчанию: сигнатура и `let name … =` прямо под ней в теле класса; instance может его не определять. Сигнатура без `let` — абстрактный метод, instance обязан его определить | M9 |
 | Пакеты с модулями Flick | Пакет объявляет в своём `package.json` поле `"flick": { "iface-dir": "<dir>" }`; модуль `A.B` описан файлом `<dir>/A/B.iface`. Поле и файлы пишет `flick build`/`pack`, не пользователь. Установка — только pnpm (`flick install`/`add`), Flick читает установленное дерево; M2 смотрит прямые зависимости проекта | M2, M7, M16 |
 
 ---
@@ -470,20 +471,20 @@ c metadata (`arity`, `this`, `catch`, `cancel signal`, nullable/retention),
 
 **AC**
 
-- [ ] `bad_deferred` и `bad_callback` (§7) отвергаются с указанием захваченного
+- [x] `bad_deferred` и `bad_callback` (§7) отвергаются с указанием захваченного
       значения и границы scope.
-- [ ] `deferred_read` и `read_config` проходят.
-- [ ] Scoped-handle не выходит через результат, callback, task, контейнер, error
+- [x] `deferred_read` и `read_config` проходят.
+- [x] Scoped-handle не выходит через результат, callback, task, контейнер, error
       payload или запись во внешний Ref — по fixture на каждый путь (§13).
-- [ ] Opaque/nominal wrapper вокруг `File s` не стирает зависимость от `s`.
-- [ ] `type error Leak = Leak (File s)` отвергается по `NoCapture` даже при перехвате
+- [x] Opaque/nominal wrapper вокруг `File s` не стирает зависимость от `s`.
+- [x] `type error Leak = Leak (File s)` отвергается по `NoCapture` даже при перехвате
       внутри того же scope.
-- [ ] Curried `List.map_effect f` удерживает captures `f`; `Functor.map`
+- [x] Curried `List.map_effect f` удерживает captures `f`; `Functor.map`
       сохраняет `c + d` (§5, §6) — проверено на сигнатурах stdlib (§13).
-- [ ] Явный qualifier уже фактических captures отвергается; шире — принимается.
-- [ ] `spawn` с task, захватывающей ресурс внутреннего scope, при owner внешнего —
+- [x] Явный qualifier уже фактических captures отвергается; шире — принимается.
+- [x] `spawn` с task, захватывающей ресурс внутреннего scope, при owner внешнего —
       ошибка.
-- [ ] Captures публичной функции сохраняются в `.iface` и проверяются у
+- [x] Captures публичной функции сохраняются в `.iface` и проверяются у
       импортирующего модуля (cross-module fixture).
 
 ---
@@ -624,6 +625,9 @@ backend; специальные literals — только Number/BigInt.
 - [ ] Все сигнатуры stdlib из спеки (`List.map`, `List.map_effect`, `Ref.*`,
       `Codec.*`, `Failure.*`, `Redacted.*`, `from_result`, …) совпадают текстуально
       (тест сверяет `.iface` stdlib со списком сигнатур из спеки).
+- [ ] Метод класса по умолчанию (сигнатура + `let` в теле класса) используется
+      instance без своего определения и переопределяется своим; отсутствие
+      абстрактного метода в instance по-прежнему `FLICK-C011`.
 - [ ] `List.map` с runtime-callback отвергается; `List.map_effect` выполняет
       callback последовательно слева направо (e2e).
 - [ ] `requests_for` не запускает запросы; `parallel_all 8` ограничивает

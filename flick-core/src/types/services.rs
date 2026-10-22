@@ -177,7 +177,8 @@ impl Checker<'_> {
     }
 
     /// The fields of an error carry data, not live values: no cell,
-    /// computation, layer, runtime function or `Unknown`.
+    /// computation, layer, runtime function, `Unknown`, nor anything that
+    /// holds a region.
     pub fn check_error_payload(&mut self, name: &str, span: Span) {
         let entity = self.env.entity(Namespace::Constructor, name);
         let Some(mut ty) = self.env.value(&entity).cloned() else {
@@ -206,7 +207,8 @@ impl Checker<'_> {
     fn live_part(&self, ty: &Type, seen: &mut Vec<(String, String)>) -> Option<Type> {
         if let Type::Fun {
             effects: Some(_), ..
-        } = ty
+        }
+        | Type::Captured { .. } = ty
         {
             return Some(ty.clone());
         }
@@ -217,6 +219,16 @@ impl Checker<'_> {
                 .any(|n| head.is_prim(n))
             {
                 return Some(ty.clone());
+            }
+            let mut kind = self.env.type_def(module, name).map(|d| &d.kind);
+            for _ in &args {
+                let Some(Kind::Arrow(param, rest)) = kind else {
+                    break;
+                };
+                if matches!(**param, Kind::Region | Kind::CaptureRow) {
+                    return Some(ty.clone());
+                }
+                kind = Some(rest);
             }
             let key = (module.clone(), name.clone());
             if !seen.contains(&key) {

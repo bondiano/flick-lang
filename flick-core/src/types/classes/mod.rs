@@ -88,6 +88,18 @@ pub fn split(c: &Type) -> Option<((&str, &str), Vec<&Type>)> {
 impl Checker<'_> {
     /// Requires `constraint` at `span`.
     pub fn want(&mut self, constraint: Type, span: Span) {
+        if let Some((("Fiber", "Outlives"), args)) = split(&constraint)
+            && let [captures, owner] = args[..]
+        {
+            let outlives = crate::types::regions::Outlives {
+                captures: captures.clone(),
+                owner: owner.clone(),
+                givens: self.classes.givens.clone(),
+                span,
+            };
+            self.regions.outlives.push(outlives);
+            return;
+        }
         self.classes.wanted.push(Wanted {
             constraint,
             span,

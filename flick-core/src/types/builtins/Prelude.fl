@@ -22,6 +22,11 @@ type Errors (e : ErrorRow)
 /// A service named as a value, as in `Layer.succeed Clock clock_impl`.
 type ServiceTag (r : ServiceRow)
 
+/// The owner of what a `scope` acquires: an operation that acquires a
+/// resource of region `s` needs `Scope s`, which the innermost `scope`
+/// provides. It has no operations of its own.
+service Scope (s : Region)
+
 /// The implementation record of the one service of `r`:
 /// `ServiceImpl {Clock}` is `Clock.Impl`.
 type ServiceImpl (r : ServiceRow)
@@ -34,18 +39,18 @@ type Ordering = LT | EQ | GT
 
 /// Canonical equality; `Eq Number` is SameValueZero, like `==`.
 class Eq a =
-  val eq : a -> a -> Bool
+  eq : a -> a -> Bool
 
 /// A total order that agrees with `Eq`.
 class Eq a => Ord a =
-  val compare : a -> a -> Ordering
+  compare : a -> a -> Ordering
 
 /// Equal values have equal hashes.
 class Eq a => Hash a =
-  val hash : a -> Number
+  hash : a -> Number
 
 class Show a =
-  val show : a -> String
+  show : a -> String
 
 /// The error an application fails with through `App.fail`.
 type error AppError = AppError { message : String; details : Option String }

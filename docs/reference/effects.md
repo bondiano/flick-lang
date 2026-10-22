@@ -182,6 +182,5 @@ lets `b` replace what `a` builds.
 
 | Construct | Today |
 | - | - |
-| captures of `task`, callbacks and implementation records | kind-checked, then dropped; error payloads are checked without them |
 | `Layer.merge` used other than applied to both layers | conflicts are not reported |
 | a service named as a value with a module qualifier | not accepted; name it unqualified |

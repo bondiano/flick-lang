@@ -30,13 +30,17 @@ fn member(p: &mut Parser) {
     match p.current() {
         K::LetKw => let_decl(p),
         K::TypeKw | K::OpaqueKw | K::RefinedKw => type_decl(p),
-        K::ValKw => {
+        K::Ident if p.at_word("val") && p.nth(1) == K::Ident && p.nth(2) == K::Colon => {
+            let val = p.raw();
+            p.error_at(
+                codes::S010,
+                p.span(val.start, val.end),
+                "Flick has no `val`: a class method is a plain signature `name : T`".into(),
+            );
             let m = p.start();
             p.bump();
-            if p.expect(K::Ident) && p.expect(K::Colon) {
-                types::type_(p);
-            }
-            p.complete(m, K::ValDecl);
+            p.complete(m, K::Error);
+            signature(p);
         }
         K::Ident if p.nth(1) == K::Colon => signature(p),
         _ => {
@@ -303,7 +307,7 @@ fn service_decl(p: &mut Parser) {
     p.bump();
     if p.expect(K::Con) {
         type_params(p);
-        if p.expect(K::Eq) {
+        if p.eat(K::Eq) {
             p.body(K::Members, member);
         }
     }

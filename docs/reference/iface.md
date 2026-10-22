@@ -9,11 +9,11 @@ Until 0.1.0 the schema grows with the compiler: every change bumps
 `iface-version`, and a compiler rejects any version but its own with
 `FLICK-P010`. Release 0.1.0 freezes the version it ships with.
 
-## Version 2
+## Version 3
 
 ```json
 {
-  "iface-version": 2,
+  "iface-version": 3,
   "language": "0.7",
   "module": "App.Shapes",
   "exports": [
@@ -53,7 +53,7 @@ re-exported from `App.Domain`).
 | - | - | - |
 | `let` | `let`, or a signature whose definition is checked later | — |
 | `foreign` | `foreign` | — |
-| `method` | `val` of a class | the class |
+| `method` | a method signature of a class | the class |
 | `adt` | `type T = A \| B` | — |
 | `alias` | `type alias T = …` | — |
 | `opaque` | `opaque type` | — |
@@ -92,7 +92,8 @@ its exports carry no types, and importers accept any use of them.
 
 Types are tagged objects; a row lists `entries` sorted by label and an
 optional `tail`. Entries of a record row are labeled with field names, those
-of a service or error row with the element's `Module.Name`.
+of a service or error row with the element's `Module.Name`, those of a
+capture row with `^` and the region variable.
 
 | Type | JSON |
 | - | - |
@@ -105,6 +106,7 @@ of a service or error row with the element's `Module.Name`.
 | `{ x : T \| r }` | `{ "record": { "entries": [["x", T]], "tail": r } }` |
 | `{Users \| r}`, `none` | `{ "row": { "entries": [["App.Users.Users", …]], "tail": r } }`, `{ "row": { "entries": [] } }` |
 | `r1 + r2` | `{ "union": [r1, r2] }` |
+| `T^{s}` | `{ "captured": { "ty": T, "captures": { "row": { "entries": [["^s", { "var": "s" }]] } } } }` |
 | `forall a. C a => T` | `{ "forall": { "vars": [{ "name": "a", "kind": K }], "constraints": [C a], "body": T } }` |
 
 Kinds are `"type"`, `"service-row"`, `"error-row"`, `"capture-row"`,
@@ -160,6 +162,5 @@ information:
 
 | Addition | Contents |
 | - | - |
-| captures | capture and region constraints of public functions, never erased |
 | ABI and summaries | data ABI of each type, arity, purity and partiality for cross-module optimization |
 | fingerprints | a fingerprint of the interface and of each dependency's interface, for incremental builds and `pack` |

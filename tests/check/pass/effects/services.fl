@@ -75,7 +75,7 @@ let read_clock implementation () =
 
 // service operations are not class methods: `show` needs no service
 class Show a =
-  val show : a -> String
+  show : a -> String
 
 instance Show User =
   show : User -> String

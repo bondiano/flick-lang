@@ -34,6 +34,7 @@ fn check_exit_codes_and_json_stream() {
             "FLICK-S010",
             "FLICK-S010",
             "FLICK-S010",
+            "FLICK-S010",
             "FLICK-P001"
         ]
     );

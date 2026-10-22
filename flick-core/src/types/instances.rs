@@ -1,7 +1,8 @@
 //! Methods of an instance: each one has the signature of its class method
 //! with the instance's types in place of the class parameters, and no
 //! constraint the class signature lacks; bodies are checked against it with
-//! the instance's context assumed.
+//! the instance's context assumed. A written signature is optional and, when
+//! present, must match.
 
 use super::Checker;
 use super::bindings::let_parts;
@@ -66,17 +67,20 @@ impl Checker<'_> {
                         .map(|k| members[k])
                         .filter(|s| s.kind == K::Signature && self.pairs(s, member))
                         .and_then(|s| s.nodes().find(|n| is_type(n.kind)));
-                    match sig {
-                        Some(sig) => {
+                    let expected = self.method_type(&cm, &name, &info.params, &args);
+                    match (sig, expected) {
+                        (Some(sig), expected) => {
                             let (scheme, _) = self.signature(sig);
-                            if let Some(expected) =
-                                self.method_type(&cm, &name, &info.params, &args)
-                            {
+                            if let Some(expected) = expected {
                                 self.compare_method(&name, &scheme, &expected, self.span(sig));
                             }
-                            self.check_signed(member, &parts, &scheme, None);
+                            self.check_signed(member, &parts, &scheme, None, None);
                         }
-                        None => {
+                        // The class signature already fixes the method's type.
+                        (None, Some(expected)) => {
+                            self.check_signed(member, &parts, &expected, None, None);
+                        }
+                        (None, None) => {
                             self.unsigned(member, &parts, &name);
                         }
                     }

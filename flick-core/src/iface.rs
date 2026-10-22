@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::types::{Instance, Type, TypeDef};
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 2;
+pub const IFACE_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -35,7 +35,7 @@ pub enum Decl {
     /// `let`, or a signature whose definition is checked later
     Let,
     Foreign,
-    /// `val` of a class
+    /// a method signature of a class
     Method,
     /// `type T = A | B`
     Adt,
@@ -202,13 +202,13 @@ mod tests {
     #[test]
     fn schema_is_pinned_and_round_trips() {
         let interface = interface_of(
-            "module App.Shapes exposing (Shape(..), Id, Size, Mode(..), Show(..), Collection(..), area, now, Pair, Clock, NotFound(..), Port, Box, wrap)\n\
+            "module App.Shapes exposing (Shape(..), Id, Size, Mode(..), Show(..), Collection(..), area, now, Pair, Clock, NotFound(..), Port, Box, wrap, later)\n\
              type Shape = Circle Number | Square Number\n  deriving Eq\n\
              opaque type Id = Id String\n\
              type alias Size = Number\n\
              kind Mode = Small | Big\n\
-             class Show a =\n  val show : a -> String\n\
-             class Eq a => Collection c a | c -> a =\n  val empty : c\n\
+             class Show a =\n  show : a -> String\n\
+             class Eq a => Collection c a | c -> a =\n  empty : c\n\
              instance Show Shape =\n  show : Shape -> String\n  let show s = \"shape\"\n\
              area : Shape -> Number\nlet area s = 0\n\
              now : Unit ->{} Number\nforeign sync now from global \"Date.now\"\n\
@@ -217,7 +217,9 @@ mod tests {
              type error NotFound = NotFound String\n\
              refined type Port = Number where fun n -> n > 0\n\
              type alias Box (f : Type -> Type) a = { value : f a; size : Size }\n\
-             wrap : f a -> Box f a\nlet wrap value = { value = value; size = 1 }\n",
+             wrap : f a -> Box f a\nlet wrap value = { value = value; size = 1 }\n\
+             later : forall s. Handle s -> (Unit -> Handle s)^{s}\nlet later h = fun () -> h\n\
+             type Handle (s : Region)\n",
         );
         let json = write(&interface);
         insta::assert_snapshot!(json);
@@ -236,7 +238,7 @@ mod tests {
                 .expect_err("rejected")
                 .contains("describes `A`")
         );
-        let future = json.replace("\"iface-version\": 2", "\"iface-version\": 7");
+        let future = json.replace("\"iface-version\": 3", "\"iface-version\": 7");
         assert!(
             read(future.as_bytes(), "A")
                 .expect_err("rejected")

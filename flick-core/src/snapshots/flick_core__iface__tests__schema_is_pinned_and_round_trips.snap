@@ -3,7 +3,7 @@ source: flick-core/src/iface.rs
 expression: json
 ---
 {
-  "iface-version": 2,
+  "iface-version": 3,
   "language": "0.7",
   "module": "App.Shapes",
   "exports": [
@@ -575,6 +575,78 @@ expression: json
                       }
                     ]
                   ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "value",
+      "name": "later",
+      "decl": "let",
+      "type": {
+        "forall": {
+          "vars": [
+            {
+              "name": "s",
+              "kind": "region"
+            }
+          ],
+          "body": {
+            "fun": {
+              "param": {
+                "app": {
+                  "head": {
+                    "con": {
+                      "module": "App.Shapes",
+                      "name": "Handle"
+                    }
+                  },
+                  "arg": {
+                    "var": "s"
+                  }
+                }
+              },
+              "result": {
+                "captured": {
+                  "ty": {
+                    "fun": {
+                      "param": {
+                        "con": {
+                          "module": "Prelude",
+                          "name": "Unit"
+                        }
+                      },
+                      "result": {
+                        "app": {
+                          "head": {
+                            "con": {
+                              "module": "App.Shapes",
+                              "name": "Handle"
+                            }
+                          },
+                          "arg": {
+                            "var": "s"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "captures": {
+                    "row": {
+                      "entries": [
+                        [
+                          "^s",
+                          {
+                            "var": "s"
+                          }
+                        ]
+                      ]
+                    }
+                  }
                 }
               }
             }

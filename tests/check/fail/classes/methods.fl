@@ -3,8 +3,8 @@
 module App.Methods exposing (..)
 
 class Render a =
-  val render : a -> String
-  val width : a -> Number
+  render : a -> String
+  width : a -> Number
 
 type Shape = Circle Number | Empty
 

@@ -113,8 +113,8 @@ fn declaration(decl: &Node, text: &str, file: FileId, defs: &mut Vec<Def>) {
                 .nodes()
                 .filter(|n| n.kind == K::Members)
                 .flat_map(Node::nodes);
-            for val in methods.filter(|n| decl.kind == K::ClassDecl && n.kind == K::ValDecl) {
-                let method = val.child_tokens().find(|t| t.kind == K::Ident);
+            for sig in methods.filter(|n| decl.kind == K::ClassDecl && n.kind == K::Signature) {
+                let method = sig.child_tokens().find(|t| t.kind == K::Ident);
                 defs.extend(method.map(|t| def(Namespace::Value, t, Some(parent), Decl::Method)));
             }
         }

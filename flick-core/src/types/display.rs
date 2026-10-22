@@ -71,7 +71,12 @@ impl Checker<'_> {
                 }
                 out.push(')');
             }
-            Type::Row(row) if row.entries.iter().all(|(l, _)| l.contains('.')) => {
+            Type::Row(row)
+                if row
+                    .entries
+                    .iter()
+                    .all(|(l, _)| l.contains('.') || l.starts_with('^')) =>
+            {
                 if row.entries.is_empty() && row.tail.is_none() {
                     out.push_str("none");
                 } else {
@@ -86,6 +91,7 @@ impl Checker<'_> {
                 out.push_str(" + ");
                 self.print(b, Prec::App, out);
             }),
+            Type::Captured { ty, captures } => self.print_captured(ty, captures, prec, out),
             Type::Forall {
                 vars,
                 constraints,
@@ -93,6 +99,29 @@ impl Checker<'_> {
             } => parens(prec > Prec::Top, out, &mut |out| {
                 self.print_forall(vars, constraints, body, out);
             }),
+        }
+    }
+
+    /// `T^{s}`, `T^c`, `T^(c + d)`; a qualifier still being inferred tells
+    /// nothing yet and is left out.
+    fn print_captured(&self, ty: &Type, captures: &Type, prec: Prec, out: &mut String) {
+        let norm = self.store.normalize(captures);
+        if norm.entries.is_empty() && norm.tails.iter().all(|t| matches!(t, Type::Meta(_))) {
+            self.print(ty, prec, out);
+            return;
+        }
+        self.print(ty, Prec::Arg, out);
+        out.push('^');
+        match captures {
+            Type::Row(row) if row.entries.is_empty() && row.tail.is_some() => {
+                self.print(captures, Prec::Arg, out);
+            }
+            Type::Row(_) => {
+                out.push('{');
+                self.print_row_items(captures, out);
+                out.push('}');
+            }
+            other => self.print(other, Prec::Arg, out),
         }
     }
 

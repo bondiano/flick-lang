@@ -18,8 +18,12 @@ use crate::syntax::kind::SyntaxKind as K;
 impl Checker<'_> {
     /// `task { body }`: the body runs when the `Eff` is awaited, so its calls
     /// count against the rows of the `Eff`, not against the enclosing stage.
-    pub fn task(&mut self, body: &Node, expected: Option<&Type>) -> Type {
+    pub fn task(&mut self, node: &Node, expected: Option<&Type>) -> Type {
+        let Some(body) = node.nodes().next() else {
+            return Type::Error;
+        };
         let saved = mem::take(&mut self.runtime);
+        let (uses, locals) = (self.uses_mark(), self.locals.len());
         let parts = expected.and_then(|t| Some((t.clone(), self.eff_parts(t)?)));
         let (stage, result) = match parts {
             Some((expected, (services, errors, result))) => (
@@ -38,7 +42,10 @@ impl Checker<'_> {
         };
         let inner = mem::replace(&mut self.stage, outer);
         self.runtime = saved;
-        eff(inner.services, inner.errors, result)
+        let held = self.held_since(uses, locals);
+        let ty = eff(inner.services, inner.errors, result);
+        let span = self.span(node);
+        self.close_over(ty, held, expected.cloned(), "task", span)
     }
 
     /// `try body with | E p -> handler …`. An error leaves the row only when
@@ -119,7 +126,7 @@ impl Checker<'_> {
             Type::prim("Layer"),
             [inputs.clone(), errors.clone(), outputs.clone()],
         );
-        if self.unify(&actual, &shape).is_err() {
+        if self.unify(&self.whnf(&actual), &shape).is_err() {
             let shown = self.show(&actual);
             self.error(
                 codes::T003,

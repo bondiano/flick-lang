@@ -78,6 +78,7 @@ impl Checker<'_> {
     }
 
     pub fn use_local(&mut self, index: usize, span: Span) -> Type {
+        self.regions.uses.push(index);
         let Local { ty, rec, .. } = self.locals[index].clone();
         let ty = self.instantiate(&ty, span);
         if let Some(rec) = rec {
@@ -341,7 +342,7 @@ impl Checker<'_> {
                 let ty = self.infer(operand);
                 let (services, errors, result) = (self.fresh(), self.fresh(), self.fresh());
                 let shape = super::infer::eff(services.clone(), errors.clone(), result.clone());
-                if self.unify(&ty, &shape).is_err() {
+                if self.unify(&self.whnf(&ty), &shape).is_err() {
                     let shown = self.show(&ty);
                     self.error(
                         codes::T003,

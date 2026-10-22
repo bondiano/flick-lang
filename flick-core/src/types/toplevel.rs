@@ -245,6 +245,7 @@ impl<'a> Checker<'a> {
             mem::take(&mut self.classes.wanted),
             mem::take(&mut self.classes.givens),
             mem::take(&mut self.classes.steps),
+            mem::take(&mut self.regions),
         );
         for &j in &members {
             self.top.items[j].state = State::Checking;
@@ -279,6 +280,7 @@ impl<'a> Checker<'a> {
             self.classes.wanted,
             self.classes.givens,
             self.classes.steps,
+            self.regions,
         ) = saved;
     }
 
@@ -302,7 +304,7 @@ impl<'a> Checker<'a> {
         };
         let entity = self.env.entity(Namespace::Value, &name);
         if let Some((scheme, _)) = scheme {
-            let runtime = self.check_signed(decl, &parts, &scheme, rec);
+            let runtime = self.check_signed(decl, &parts, &scheme, rec, None);
             self.polymorphic_runtime(&name, &scheme, runtime, decl);
         } else {
             let ty = self.unsigned(decl, &parts, &name);

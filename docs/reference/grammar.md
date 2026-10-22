@@ -36,7 +36,7 @@ Qualified names are written without spaces around `.`: `Users.get`,
 ```text
 module exposing import as let rec fun match with try if then else task await
 scope provide ignore type opaque refined where kind error service class
-instance val deriving foreign from forall not none true false schema codec
+instance deriving foreign from forall not none true false schema codec
 sql ui cli in when do
 ```
 
@@ -225,11 +225,11 @@ param       = name | "(" name ":" kind ")"
 deriving    = "deriving" Con { "," Con }
 kind_decl   = "kind" Con "=" ["|"] Con { "|" Con }
 error_decl  = "type" "error" Con { param } ["=" variant] [deriving]
-service     = "service" Con { param } "=" members
+service     = "service" Con { param } [ "=" members ]
 class       = "class" [context "=>"] Con { param } ["|" fundep { "," fundep }] ["=" members]
 fundep      = { name } "->" { name }
 instance    = "instance" [context "=>"] type ["=" members]
-members     = block of: signature | "val" name ":" type | let | type_decl
+members     = block of: signature | let | type_decl
 foreign     = "foreign" mode name "from" ("global" String | String String) [metadata]
 mode        = "pure" | "sync" | "async" | "effect"
 metadata    = indented lines: meta_name { atom }
@@ -246,7 +246,8 @@ two. Writing `of` before the fields is `FLICK-S010`.
 `type error E` declares an error; its one constructor is named `E` too, and an
 error with fields is `type error E = E T …`. A constructor named otherwise is
 `FLICK-S007`.
-Every named function has its full signature right above its `let` (§3); the
+Every named function has its full signature right above its `let` (§3),
+except an instance method, whose signature comes from its class; the
 parser accepts a signature without a definition, and later phases check the
 pairing.
 
@@ -275,13 +276,12 @@ service Clock =
   now : Unit ->{} Number
 
 class Eq a => Hash a =
-  val hash : a -> Number
+  hash : a -> Number
 
 class Collection c a | c -> a =
-  val empty : c
+  empty : c
 
 instance Show Shape =
-  show : Shape -> String
   let show shape =
     match shape with
     | Circle _ _ -> "circle"

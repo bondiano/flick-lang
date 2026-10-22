@@ -146,6 +146,7 @@ impl Checker<'_> {
                 }
                 Some(format!("{module}.{name}"))
             }
+            _ if *kind == Kind::CaptureRow => crate::types::ty::capture_label(ty),
             Type::Var(name) => Some(name.clone()),
             Type::Skolem(s) => Some(self.store.skolem_name(*s).to_owned()),
             _ => None,

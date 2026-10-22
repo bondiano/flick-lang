@@ -3,9 +3,10 @@
 //! every named function, higher-rank `forall` with predicative instantiation,
 //! exact records with row polymorphism, exhaustive `match`, and generalization
 //! of provably pure bindings only; effects, expected errors, services and
-//! layers; classes, instances, row primitives and `deriving`. Rules:
+//! layers; classes, instances, row primitives and `deriving`; regions and
+//! the captures of closures. Rules:
 //! `docs/reference/types.md`, `docs/reference/effects.md`,
-//! `docs/reference/classes.md`.
+//! `docs/reference/classes.md`, `docs/reference/regions.md`.
 //!
 //! The checker reads the concrete tree after name resolution; other modules
 //! are known only through their [`Interface`], which this phase fills with
@@ -28,6 +29,7 @@ mod infer;
 mod instances;
 mod kinds;
 mod patterns;
+mod regions;
 mod report;
 mod rows;
 mod services;
@@ -119,6 +121,7 @@ pub fn check_with_evidence(
         top: toplevel::TopLevel::default(),
         options,
         classes: classes::State::default(),
+        regions: regions::State::default(),
     };
     checker.module(module.tree);
     checker.fill(interface);
@@ -179,6 +182,7 @@ struct Checker<'a> {
     top: toplevel::TopLevel<'a>,
     options: Options<'a>,
     classes: classes::State,
+    regions: regions::State,
 }
 
 impl Checker<'_> {

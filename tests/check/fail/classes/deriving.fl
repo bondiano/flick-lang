@@ -15,7 +15,7 @@ type Handler = Handler (Number -> Number)
   deriving Show
 
 class Pretty a =
-  val pretty : a -> String
+  pretty : a -> String
 
 type Label = Label String
   deriving Pretty

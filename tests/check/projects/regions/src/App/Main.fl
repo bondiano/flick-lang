@@ -1,0 +1,27 @@
+module App.Main exposing (inside, leaked, stored)
+
+import App.Files exposing (FileSystem, OpenError, ReadError, read_later, reader)
+
+inside : String ->{FileSystem; OpenError, ReadError} String
+let inside path =
+  scope {
+    let file = FileSystem.open_scoped path
+    await (read_later file)
+  }
+
+leaked : String ->{FileSystem; OpenError} Eff {FileSystem} {ReadError} String
+let leaked path =
+  scope {
+    let file = FileSystem.open_scoped path
+    read_later file
+  }
+
+stored : String ->{FileSystem; OpenError} Unit
+let stored path =
+  let cell = Ref.make None
+  scope {
+    let file = FileSystem.open_scoped path
+    Ref.set cell (Some (reader file))
+  }
+//~ FLICK-G001 @16:5-16:20 this value holds region `s`, but the expected type
+//~ FLICK-G002 @24:19-24:37 region `s` ends with its `scope`

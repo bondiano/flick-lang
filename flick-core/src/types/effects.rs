@@ -95,6 +95,8 @@ impl Checker<'_> {
 
     /// Records a runtime call needing `effects` at the current stage.
     pub fn perform(&mut self, services: &Type, errors: &Type, span: Span) {
+        self.lexical_owner(services);
+        self.regions.raised.push((errors.clone(), span));
         self.runtime = true;
         self.stage.runtime = true;
         self.stage.calls += 1;
@@ -138,7 +140,11 @@ impl Checker<'_> {
     /// its position allows: runtime arrows and `Eff` are covariant in their
     /// rows and results, and a pure function passes for a runtime one.
     pub fn subsume(&mut self, actual: &Type, expected: &Type, span: Span) -> super::unify::Unified {
-        let (a, e) = (self.whnf(actual), self.whnf(expected));
+        let (a, e) = (self.whnf_captured(actual), self.whnf_captured(expected));
+        if a.1.is_some() || e.1.is_some() {
+            return self.subsume_captured((actual, a), (expected, e), span);
+        }
+        let (a, e) = (a.0, e.0);
         match (&a, &e) {
             (
                 Type::Fun {

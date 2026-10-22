@@ -19,6 +19,24 @@ impl Checker<'_> {
         }
     }
 
+    /// Qualifiers that must be equal, as in mutable storage, differ.
+    fn capture_mismatch(&mut self, head: &str, label: &str, left: bool, span: Span) {
+        let region = match label.strip_prefix("^'").and_then(|n| n.parse().ok()) {
+            Some(skolem) => self.store.skolem_name(skolem).to_owned(),
+            None => label.trim_start_matches(['^', '?']).to_owned(),
+        };
+        let detail = if left {
+            "the value holds it, but the expected type does not allow it"
+        } else {
+            "the expected type holds it, and mutable storage keeps its captures exactly"
+        };
+        self.error(
+            codes::T003,
+            span,
+            format!("{head}: region `{region}` differs: {detail}"),
+        );
+    }
+
     pub fn mismatch(&mut self, mismatch: &Mismatch, actual: &Type, expected: &Type, span: Span) {
         let (expected, actual) = (self.show(expected), self.show(actual));
         let head = format!("expected `{expected}`, found `{actual}`");
@@ -63,6 +81,9 @@ impl Checker<'_> {
                 };
                 self.error(codes::T003, span, format!("{head}{detail}"));
             }
+            Mismatch::Label { label, left } if label.starts_with('^') => {
+                self.capture_mismatch(&head, label, *left, span);
+            }
             Mismatch::Label { label, left } => {
                 let detail = match (label.rsplit_once('.'), *left) {
                     (Some((_, name)), true) => {
@@ -84,13 +105,18 @@ impl Checker<'_> {
                     format!("{head}: the type would contain itself (`{t}`)"),
                 );
             }
-            Mismatch::Escape(name) => self.error(
-                codes::T007,
-                span,
-                format!(
-                    "{head}: the type variable `{name}` would escape the scope of its `forall`"
-                ),
-            ),
+            Mismatch::Escape(skolem) => {
+                if !self.region_escape(*skolem, &head, span) {
+                    let name = self.store.skolem_name(*skolem).to_owned();
+                    self.error(
+                        codes::T007,
+                        span,
+                        format!(
+                            "{head}: the type variable `{name}` would escape the scope of its `forall`"
+                        ),
+                    );
+                }
+            }
             Mismatch::Polymorphic(t) => {
                 let t = self.show(t);
                 self.error(

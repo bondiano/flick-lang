@@ -6,16 +6,16 @@ cfd4deeeb00ff9b0  spec:67  load_name : UserId ->{Users, Log; NotFound} String
 6c70dbf125707c4a  spec:153  load_user : UserId ->{Users; NotFound} User
 1f4fb3d7472f358e  spec:173  load_twice :
 5490665b39c55003  spec:213  load_name_pair : UserId -> UserId ->{Users; NotFound} (String, String)
-1f2ae7a4782d6276  spec:265  class Functor (f : Type -> Type) =
-05343b19316b5976  spec:288  class Show a =
+7250ff6a1fbd12e3  spec:266  class Functor (f : Type -> Type) =
+351c17a8bae37ce1  spec:289  class Show a =
 872c8247235efbb4  spec:344  apply_twice :
 74a14e74a12990e3  spec:358  decode_pair :
 9bdd6c03c6da66f8  spec:384  name :
-2d2d50d21367a598  spec:414  class Show a =
-7108583611b7322d  spec:438  class Convert input output =
-635518d6366fa451  spec:463  class Collection c a | c -> a =
+e5f66d0cf1cb88c9  spec:415  class Show a =
+59ea26d822a0c2ae  spec:439  class Convert input output =
+ecba8ed13060594d  spec:464  class Collection c a | c -> a =
 c18064c876fe3adf  spec:473  empty_users : UserSet
-06204ee7821953f9  spec:491  class Collection c =
+d2e8d6c7d9e16954  spec:492  class Collection c =
 4ec7dc6ae7ac5c84  spec:549  type LocalExternalId =
 1336bb8a8a86841e  spec:570  invalid : Unit ->{} String
 8e5624e4a3c33f25  spec:591  make_empty : forall a. Unit ->{} Ref (Option a)
@@ -48,7 +48,7 @@ c7457701e10aa513  spec:1581  add : Number -> Number -> Number
 002c4c46c829649b  spec:1774  type alias Preferences = {
 62b3490f7ac7e56f  spec:1817  type Tree a =
 70265bd42f7414d7  spec:1912  increment : Ref Number ->{} Number
-14a51fdac9a1f205  spec:1927  class Eq a => Hash a =
+d72679edd15d953e  spec:1929  class Eq a => Hash a =
 e28dd24856e76943  spec:2085  type alias BalanceRow =
 1838791670c05b74  spec:2119  deferred_balances :
 f288d88532aaff1e  spec:2179  type alias SaveButtonProps c =

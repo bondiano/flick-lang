@@ -52,7 +52,7 @@ const PRETTY: (&str, &str) = (
     "App.Pretty",
     "module App.Pretty exposing (Pretty(..))\n\
      import App.Shapes exposing (Shape(..))\n\
-     class Show a => Pretty a =\n  val pretty : a -> String\n\
+     class Show a => Pretty a =\n  pretty : a -> String\n\
      instance Pretty Shape =\n  pretty : Shape -> String\n  let pretty s = show s\n",
 );
 

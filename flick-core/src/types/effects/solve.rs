@@ -31,7 +31,13 @@ struct Excess {
 impl Checker<'_> {
     /// Grows unknown declared rows until nothing changes.
     fn grow(&mut self) {
-        while (0..self.subrows.len()).fold(false, |changed, i| self.grow_one(i) || changed) {}
+        loop {
+            let rows =
+                (0..self.subrows.len()).fold(false, |changed, i| self.grow_one(i) || changed);
+            if !(self.grow_holds() || rows) {
+                break;
+            }
+        }
     }
 
     /// Adds to the declared row of constraint `i` one label or row variable
@@ -51,7 +57,7 @@ impl Checker<'_> {
                 }
                 None => {
                     if let Some(m) = open {
-                        let rest = self.fresh();
+                        let rest = self.store.fresh_beside(m);
                         let row = Type::Row(Row {
                             entries: vec![(label.clone(), ty.clone())],
                             tail: Some(Box::new(rest)),
@@ -66,7 +72,7 @@ impl Checker<'_> {
                 continue;
             }
             if let Some(m) = open {
-                let rest = self.fresh();
+                let rest = self.store.fresh_beside(m);
                 let union = Type::Union(Box::new(tail.clone()), Box::new(rest));
                 return self.bind(m, &union).is_ok();
             }
@@ -95,6 +101,7 @@ impl Checker<'_> {
                 self.store.set(m, Type::empty_row());
             }
         }
+        self.close_holds(Some(level));
     }
 
     /// At the end of a declaration: solves its constraints, makes what is
@@ -102,6 +109,7 @@ impl Checker<'_> {
     pub fn solve_rows(&mut self) {
         self.close_rows();
         self.report_rows();
+        self.report_regions();
     }
 
     /// Solves the constraints so far and makes every row they leave unknown
@@ -123,6 +131,7 @@ impl Checker<'_> {
                 self.store.set(m, Type::empty_row());
             }
         }
+        self.close_holds(None);
     }
 
     fn report_rows(&mut self) {
@@ -138,6 +147,7 @@ impl Checker<'_> {
                             self.mismatch(&m, ty, bound, c.span);
                         }
                     }
+                    None if label == crate::types::regions::SCOPE => self.no_owner(c.span),
                     None => lacking.push(self.show(ty)),
                 }
             }
@@ -175,6 +185,21 @@ impl Checker<'_> {
         for e in excess {
             self.report_excess(&e);
         }
+    }
+
+    /// A resource acquired where no `scope` owns it.
+    fn no_owner(&mut self, span: Span) {
+        self.diagnostics.push(
+            Diagnostic::error(
+                codes::G004,
+                "this acquires a resource, which needs `Scope`: only `scope { … }` provides an owner",
+                span,
+            )
+            .with_fix(
+                "call it inside `scope { … }`, or add `Scope s` to the services of the signature",
+                Vec::new(),
+            ),
+        );
     }
 
     fn report_excess(&mut self, e: &Excess) {

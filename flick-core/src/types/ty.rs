@@ -39,6 +39,12 @@ pub enum Type {
     Row(Row),
     /// `r1 + r2`.
     Union(Box<Type>, Box<Type>),
+    /// `T^c`: a value of `T` that may also hold the regions of the capture
+    /// row `c`; a bare type holds none beyond what its own type shows.
+    Captured {
+        ty: Box<Type>,
+        captures: Box<Type>,
+    },
     Forall {
         vars: Vec<Binder>,
         /// Class constraints, kept for class resolution.
@@ -129,6 +135,18 @@ impl Norm {
     }
 }
 
+/// The label of a region, or of a type variable whose captures are meant, in
+/// a capture row. It follows the element, which unification may still
+/// change, so rows relabel such entries whenever they are taken apart.
+pub fn capture_label(t: &Type) -> Option<String> {
+    match t {
+        Type::Var(name) => Some(format!("^{name}")),
+        Type::Skolem(s) => Some(format!("^'{s}")),
+        Type::Meta(m) => Some(format!("^?{m}")),
+        _ => None,
+    }
+}
+
 impl Type {
     pub fn con(module: &str, name: &str) -> Type {
         Type::Con {
@@ -207,6 +225,10 @@ impl Type {
             Type::Record(r) => Type::Record(row(r, f)),
             Type::Row(r) => Type::Row(row(r, f)),
             Type::Union(a, b) => Type::Union(Box::new(f(a)), Box::new(f(b))),
+            Type::Captured { ty, captures } => Type::Captured {
+                ty: Box::new(f(ty)),
+                captures: Box::new(f(captures)),
+            },
             Type::Forall {
                 vars,
                 constraints,
@@ -250,7 +272,7 @@ impl Type {
             }
             Type::Tuple(items) => items.iter().for_each(f),
             Type::Record(r) | Type::Row(r) => row(r, f),
-            Type::Union(a, b) => {
+            Type::Union(a, b) | Type::Captured { ty: a, captures: b } => {
                 f(a);
                 f(b);
             }

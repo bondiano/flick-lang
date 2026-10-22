@@ -7,6 +7,7 @@ use std::mem;
 use super::Checker;
 use super::convert::is_type;
 use super::effects::{Site, Stage};
+use super::regions::Held;
 use super::ty::{Row, Type};
 use crate::diagnostics::codes;
 use crate::syntax::cst::Node;
@@ -44,6 +45,9 @@ impl Checker<'_> {
             (K::ProvideExpr, _) => {
                 self.provide(node, Some(expected));
             }
+            (K::ScopeExpr, _) => {
+                self.scope_expr(node, Some(expected));
+            }
             (K::TupleExpr, Type::Tuple(items)) if items.len() == children.len() => {
                 for (child, item) in children.iter().zip(items) {
                     self.check(child, item);
@@ -61,7 +65,7 @@ impl Checker<'_> {
                 self.expect(&actual, expected, self.span(node));
             }
             (K::TaskExpr, _) if self.eff_parts(&target).is_some() => {
-                self.task(children[0], Some(&target));
+                self.task(node, Some(expected));
             }
             _ => {
                 let actual = self.infer(node);
@@ -120,18 +124,8 @@ impl Checker<'_> {
                 self.if_expr(node, &ty);
                 ty
             }
-            K::TaskExpr => self.task(children[0], None),
-            K::ScopeExpr => {
-                let mark = self.locals.len();
-                if let Some(name) = node.child_tokens().find(|t| t.kind == K::Ident) {
-                    // shortcut: the scope handle is untyped until regions exist
-                    let ty = self.fresh();
-                    self.push_local(name.text(self.text), ty);
-                }
-                let ty = children.first().map_or(Type::Error, |b| self.infer(b));
-                self.locals.truncate(mark);
-                ty
-            }
+            K::TaskExpr => self.task(node, None),
+            K::ScopeExpr => self.scope_expr(node, None),
             K::ProvideExpr => self.provide(node, None),
             // shortcut: SQL, UI, CLI and Schema blocks are typed by their elaboration
             K::SqlExpr | K::UiExpr | K::CliExpr | K::CodecExpr | K::SchemaExpr => self.fresh(),
@@ -209,7 +203,7 @@ impl Checker<'_> {
             entries: vec![(label.clone(), field.clone())],
             tail: Some(Box::new(rest)),
         });
-        if self.unify(&record, &shape).is_err() {
+        if self.unify(&self.whnf(&record), &shape).is_err() {
             let shown = self.show(&record);
             self.error(
                 codes::T003,
@@ -268,7 +262,7 @@ impl Checker<'_> {
                 entries: vec![(name.clone(), ty.clone())],
                 tail: Some(Box::new(rest)),
             });
-            if self.unify(&record, &shape).is_err() {
+            if self.unify(&self.whnf(&record), &shape).is_err() {
                 let shown = self.show(&record);
                 self.error(
                     codes::T003,
@@ -310,14 +304,22 @@ impl Checker<'_> {
         let saved = mem::take(&mut self.runtime);
         let mark = self.locals.len();
         let givens = self.classes.givens.len();
+        let uses = self.uses_mark();
         let mut rest = expected.cloned();
         let mut stages = Vec::new();
+        // per stage: the locals below it, which it may close over, and its
+        // expected type unless that is unknown
+        let mut closures: Vec<(usize, Option<Type>)> = Vec::new();
         // the first stage whose expected type was unknown, and that type
         let mut unknown: Option<(usize, Type)> = None;
         // the arrow the expected type gives the last stage
         let mut last = None;
         for param in params {
             let target = rest.as_ref().map(|t| self.whnf(t));
+            let known = rest
+                .clone()
+                .filter(|_| !matches!(target, Some(Type::Meta(_))));
+            closures.push((self.locals.len(), known));
             let target = match target {
                 Some(t @ Type::Forall { .. }) => Some(self.assume(&t)),
                 other => other,
@@ -389,17 +391,38 @@ impl Checker<'_> {
         if inferred && let Some(stage) = stages.last_mut() {
             stage.1 = Self::stage_effects(&inner);
         }
+        let closures: Vec<_> = closures
+            .into_iter()
+            .map(|(locals, expected)| (self.held_since(uses, locals), expected))
+            .collect();
         self.locals.truncate(mark);
         self.classes.givens.truncate(givens);
         self.runtime = saved;
+        let span = self.span(node);
+        self.curry(stages, closures, unknown.as_ref(), result, span)
+    }
+
+    /// The arrows of a function's stages around its result; each stage is a
+    /// closure over the locals it uses.
+    fn curry(
+        &mut self,
+        stages: Vec<(Type, Option<Box<super::ty::Effects>>)>,
+        closures: Vec<(Held, Option<Type>)>,
+        unknown: Option<&(usize, Type)>,
+        result: Type,
+        span: crate::source::Span,
+    ) -> Type {
         let mut ty = result;
-        for (i, (param, effects)) in stages.into_iter().enumerate().rev() {
+        for (i, ((param, effects), (held, expected))) in
+            stages.into_iter().zip(closures).enumerate().rev()
+        {
             ty = Type::Fun {
                 param: Box::new(param),
                 effects,
                 result: Box::new(ty),
             };
-            if let Some((j, meta)) = &unknown
+            ty = self.close_over(ty, held, expected, "function", span);
+            if let Some((j, meta)) = unknown
                 && *j == i
             {
                 let meta = meta.clone();

@@ -1,0 +1,24 @@
+/// Children of a `scope`: a child runs until its owner's scope closes, and
+/// its supervisor observes how it failed.
+module Fiber exposing (Owner, Fiber, Failure, Outlives, spawn)
+
+/// The owner of a `scope`; `scope s { … }` names it `s`.
+type Owner (s : Region)
+
+/// A running child that fails with an error of `e` or succeeds with `a`.
+type Fiber (e : ErrorRow) a
+
+/// How a child failed, as its supervisor sees it.
+type Failure (e : ErrorRow)
+
+/// The captures `c` end no earlier than the region `s`. The compiler
+/// decides it from the scopes; a program cannot declare instances of it.
+class Outlives (c : CaptureRow) (s : Region)
+
+/// Starts `task` as a child of `owner`; `supervisor` observes its failure.
+/// Both may hold only what outlives the owner.
+spawn :
+  forall s c r e a.
+  Outlives c s =>
+  Owner s -> (Failure e ->{r; none} Unit)^c -> (Eff r e a)^c ->{r; none} Fiber e a
+foreign sync spawn from "@flick-lang/runtime" "fiberSpawn"

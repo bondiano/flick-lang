@@ -7,7 +7,7 @@ type User = User String
 type UserSet = UserSet (List User)
 
 class Collection c a | c -> a =
-  val empty : c
+  empty : c
 
 instance Collection UserSet User =
   empty : UserSet
@@ -22,7 +22,7 @@ instance Collection (List a) b =
   let empty = []
 
 class Describe a =
-  val describe : a -> String
+  describe : a -> String
 
 instance Describe a => Describe (List a) =
   describe : List a -> String
@@ -58,7 +58,7 @@ instance Eq Point =
   let eq p q = true
 
 class Show a => Pretty a =
-  val pretty : a -> String
+  pretty : a -> String
 
 type Secret = Secret String
 
