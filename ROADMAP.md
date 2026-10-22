@@ -517,26 +517,26 @@ c metadata (`arity`, `this`, `catch`, `cancel signal`, nullable/retention),
 
 **AC**
 
-- [ ] Pure функции компилируются в JS без `Effect` импортов и обёрток (snapshot +
+- [x] Pure функции компилируются в JS без `Effect` импортов и обёрток (snapshot +
       grep-тест на сгенерированном коде) (§13).
-- [ ] `load_name` генерирует `Effect.gen` с `yield*` только на эффектных вызовах.
-- [ ] `task` не выполняет тело при построении; два `await` выполняют его дважды
+- [x] `load_name` генерирует `Effect.gen` с `yield*` только на эффектных вызовах.
+- [x] `task` не выполняет тело при построении; два `await` выполняют его дважды
       (e2e со счётчиком) (§13).
-- [ ] Сохранение task в переменную или `identity request` её не запускает (§13).
-- [ ] `f x y` с runtime первой стадией: эффект `f x` наблюдается до вычисления `y`
+- [x] Сохранение task в переменную или `identity request` её не запускает (§13).
+- [x] `f x y` с runtime первой стадией: эффект `f x` наблюдается до вычисления `y`
       (e2e с логированием порядка).
-- [ ] Аргументы и поля records вычисляются слева направо (e2e).
-- [ ] Constructor id в `_tag` квалифицирован пакетом/модулем/типом; пользовательский
+- [x] Аргументы и поля records вычисляются слева направо (e2e).
+- [x] Constructor id в `_tag` квалифицирован пакетом/модулем/типом; пользовательский
       ADT с тегом `"Some"` не совпадает с `Option`.
-- [ ] Хвостовая self-recursion на 10⁶ итераций не переполняет стек.
-- [ ] Number: NaN, ±Infinity, −0 и округление совпадают с эталонными JS-значениями
+- [x] Хвостовая self-recursion на 10⁶ итераций не переполняет стек.
+- [x] Number: NaN, ±Infinity, −0 и округление совпадают с эталонными JS-значениями
       (property-тест на случайных выражениях: Flick vs прямой JS) (§13).
-- [ ] `==` на NaN даёт `true`, `+0 == -0` — `true`; `Number.strict_equal`,
+- [x] `==` на NaN даёт `true`, `+0 == -0` — `true`; `Number.strict_equal`,
       `Number.same_value` ведут себя как `===` и `Object.is`.
-- [ ] Source map сопоставляет runtime-ошибку с `.fl` строкой (e2e со stack trace).
-- [ ] `.iface` round-trip: write → read → write даёт идентичный JSON; несовместимая
+- [x] Source map сопоставляет runtime-ошибку с `.fl` строкой (e2e со stack trace).
+- [x] `.iface` round-trip: write → read → write даёт идентичный JSON; несовместимая
       версия или изменённый data ABI зависимости → диагностика.
-- [ ] `--emit ts` проходит `tsc --noEmit` на всём e2e-корпусе.
+- [x] `--emit ts` проходит `tsc --noEmit` на всём e2e-корпусе.
 
 ---
 
@@ -568,30 +568,30 @@ c metadata (`arity`, `this`, `catch`, `cancel signal`, nullable/retention),
 
 **AC**
 
-- [ ] Typed handler выбирает recoverable ошибку ровно по таблице §7 «Сложный Cause»
+- [x] Typed handler выбирает recoverable ошибку ровно по таблице §7 «Сложный Cause»
       (6 случаев — 6 тестов), включая `[Fail(B), Fail(A)]` с handler только `A`.
-- [ ] `Failure.rethrow` сохраняет исходный Cause (тест по identity/структуре).
-- [ ] `RawCause.inspect` на payload с getter/`toString`/Proxy не вызывает их
+- [x] `Failure.rethrow` сохраняет исходный Cause (тест по identity/структуре).
+- [x] `RawCause.inspect` на payload с getter/`toString`/Proxy не вызывает их
       (тест со шпионом) и даёт placeholder.
-- [ ] Typed failure, defect и interruption различаются в Exit и в коде выхода (§13).
-- [ ] Scope освобождает ресурс при успехе, typed error, defect и interruption (§13).
-- [ ] Ресурс, зарегистрированный **после** запуска ребёнка, освобождается только
+- [x] Typed failure, defect и interruption различаются в Exit и в коде выхода (§13).
+- [x] Scope освобождает ресурс при успехе, typed error, defect и interruption (§13).
+- [x] Ресурс, зарегистрированный **после** запуска ребёнка, освобождается только
       после join этого ребёнка (тест на порядок событий).
-- [ ] Uninterruptible ребёнок задерживает закрытие; ресурс не освобождается раньше (§13).
-- [ ] Async FFI, чей Promise игнорирует отмену: release ждёт фактического окончания
+- [x] Uninterruptible ребёнок задерживает закрытие; ресурс не освобождается раньше (§13).
+- [x] Async FFI, чей Promise игнорирует отмену: release ждёт фактического окончания
       Promise (quiescence) (§13).
-- [ ] `parallel`: при сбое одной ветки остальные отменены и дождались cleanup;
+- [x] `parallel`: при сбое одной ветки остальные отменены и дождались cleanup;
       результаты в порядке входа; `parallel_all 0` и `parallel_all 1.5` отвергаются (§13).
-- [ ] `parallel_results` возвращает `Result` по веткам, defect не маскируется.
-- [ ] `spawn` без supervisor не компилируется; потерянный handle не теряет
+- [x] `parallel_results` возвращает `Result` по веткам, defect не маскируется.
+- [x] `spawn` без supervisor не компилируется; потерянный handle не теряет
       ошибку — supervisor её получает.
-- [ ] `race_first`/`timeout` прерывают и ждут losers; loser failures не
+- [x] `race_first`/`timeout` прерывают и ждут losers; loser failures не
       добавляются к результату.
-- [ ] Ошибка построения Layer: тело не запускается; одна Layer identity
+- [x] Ошибка построения Layer: тело не запускается; одна Layer identity
       строится один раз внутри одной сборки и дважды — в двух `provide`.
-- [ ] Entry: `main`, завершившийся `AppError`, даёт код `1` после cleanup; SIGINT
+- [x] Entry: `main`, завершившийся `AppError`, даёт код `1` после cleanup; SIGINT
       при успешном cleanup даёт `130`, при сбое cleanup — `1`.
-- [ ] Тест-матрица фиксирует Effect 4.0.5; запуск с другой версией Effect
+- [x] Тест-матрица фиксирует Effect 4.0.5; запуск с другой версией Effect
       отвергается с диагностикой (capability check).
 
 ---
