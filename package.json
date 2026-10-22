@@ -1,0 +1,11 @@
+{
+  "name": "flick-lang",
+  "private": true,
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=24.18.0"
+  },
+  "devDependencies": {
+    "@flick-lang/runtime": "workspace:*"
+  }
+}

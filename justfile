@@ -17,6 +17,12 @@ fmt:
 test:
     cargo test --workspace
 
+# Install the JS runtime, check its pinned Effect, run compiled programs on Node
+e2e:
+    pnpm install --frozen-lockfile
+    pnpm -r test
+    cargo test -p flick --test e2e -- --ignored
+
 # Build the wasm module the in-browser demo loads
 wasm:
     cargo build -p flick-wasm --target wasm32-unknown-unknown --release

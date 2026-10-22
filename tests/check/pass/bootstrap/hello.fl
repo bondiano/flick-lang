@@ -1,0 +1,8 @@
+// Every statement form the bootstrap front-end accepts.
+module App.Main exposing (main)
+
+main : Unit ->{none; AppError} Unit
+let main () =
+  Platform.stdout_line "hello, \u{1F30D}"
+  Platform.stderr_line "tab\there"
+  App.fail "done"

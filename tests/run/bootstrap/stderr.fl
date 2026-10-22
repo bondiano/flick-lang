@@ -1,0 +1,7 @@
+module App.Main exposing (main)
+
+main : Unit ->{none; AppError} Unit
+let main () =
+  Platform.stdout_line "out 1"
+  Platform.stderr_line "err\t1"
+  Platform.stdout_line "out 2"

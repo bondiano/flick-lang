@@ -1,0 +1,17 @@
+---
+source: flick/tests/cli.rs
+expression: "stdout(&[\"help\", \"check\"])"
+---
+Check Flick source files and report diagnostics
+
+Usage: flick check [OPTIONS] <PATHS>...
+
+Arguments:
+  <PATHS>...  Source files to check
+
+Options:
+      --diagnostics <DIAGNOSTICS>  Format of diagnostics on stderr [default: human] [possible values: human, json]
+      --color <COLOR>              Colorize human-readable output [default: auto] [possible values: auto, always, never]
+      --quiet                      Print less service output
+      --verbose                    Print more service output
+  -h, --help                       Print help

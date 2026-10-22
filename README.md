@@ -17,10 +17,12 @@ The language is fully specified but not yet implemented:
 
 ## Development
 
-Requires Rust 1.94 (pinned in `rust-toolchain.toml`) and `just`.
+Requires Rust 1.94 (pinned in `rust-toolchain.toml`) and `just`; the e2e suite
+also needs Node.js >= 24.18.0 and pnpm (pinned via `packageManager`).
 
 ```sh
 just lint   # fmt --check + clippy -D warnings
 just test
 just check  # lint + test
+just e2e    # runtime tests + compiled programs on Node
 ```
