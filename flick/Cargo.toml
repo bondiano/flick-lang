@@ -1,0 +1,15 @@
+[package]
+name = "flick"
+description = "CLI for the Flick language"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+flick-core = { path = "../flick-core" }

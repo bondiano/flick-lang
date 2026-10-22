@@ -1,0 +1,12 @@
+[package]
+name = "flick-core"
+description = "Shared Rust core for the Flick compiler and LSP"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
