@@ -1,14 +1,14 @@
-// Expected errors (§7 "Ожидаемые ошибки", "Ошибка как данные"): `try` removes
+// Expected errors: `try` removes
 // an error only when an arm without a guard covers all of it.
 module App.Errors exposing (..)
 
-type UserId = Number
+type alias UserId = Number
 
-type User = { id : UserId; name : String }
+type alias User = { id : UserId; name : String }
 
-error NotFound of UserId
+type error NotFound = NotFound UserId
 
-error DbUnavailable of String
+type error DbUnavailable = DbUnavailable String
 
 service Users =
   get : UserId ->{none; NotFound} User
@@ -70,3 +70,28 @@ let single value =
 nothing : Errors none -> Never
 let nothing value =
   value
+
+// an error with parameters or several fields; a row holds one element per name
+type error Failed e = Failed e
+
+type error Conflict = Conflict UserId Number
+
+type error Timeout
+
+service Jobs =
+  run : Number ->{none; Failed String, Timeout} Number
+
+run_twice : Number ->{Jobs; Failed String, Timeout} Number
+let run_twice n =
+  Jobs.run n + Jobs.run n
+
+recover : Number ->{Jobs; Timeout} Number
+let recover n =
+  try
+    Jobs.run n
+  with
+  | Failed reason -> String.length reason
+
+conflict : UserId -> Number ->{none; Conflict} Unit
+let conflict id version =
+  from_result (Err (Conflict id version))

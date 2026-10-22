@@ -1,4 +1,4 @@
-/// Mutable cells (§9 "Ref и обобщение типов"). Every operation runs through
+/// Mutable cells. Every operation runs through
 /// the runtime, so a fresh cell is never generalized.
 module Ref exposing (make, get, set, modify)
 

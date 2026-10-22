@@ -1,12 +1,12 @@
-// Direct runtime calls (§3, §4): `let` binds the result of a call, and the
+// Direct runtime calls: `let` binds the result of a call, and the
 // rows a body needs are inferred and bounded by its signature.
 module App.Direct exposing (..)
 
-type UserId = Number
+type alias UserId = Number
 
-type User = { id : UserId; name : String }
+type alias User = { id : UserId; name : String }
 
-error NotFound of UserId
+type error NotFound = NotFound UserId
 
 service Users =
   get : UserId ->{none; NotFound} User

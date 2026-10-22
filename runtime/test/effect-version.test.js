@@ -4,7 +4,7 @@ import { test } from "node:test";
 import effectPackage from "effect/package.json" with { type: "json" };
 import runtimePackage from "../package.json" with { type: "json" };
 
-// The adapter's contracts were verified against exactly this Effect release (§7, §11).
+// The adapter's contracts were verified against exactly this Effect release.
 const PINNED_EFFECT = "4.0.5";
 
 test("runtime declares Effect as an exact version", () => {

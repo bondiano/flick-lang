@@ -388,7 +388,7 @@ impl Loader<'_> {
         visiting[i] = false;
     }
 
-    /// The entry of an app is a source module that exports `main` (§11).
+    /// The entry of an app is a source module that exports `main`.
     fn check_entry(&mut self, interfaces: &[Option<Interface>]) {
         let Some(project) = self.project.filter(|p| p.config.kind == Kind::App) else {
             return;

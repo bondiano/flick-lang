@@ -1,4 +1,4 @@
-//! Generalization (§5 "Generalization при наличии Ref"): a binding built
+//! Generalization: a binding built
 //! purely becomes polymorphic over the variables that are not free in its
 //! environment; the result of a runtime call stays monomorphic, even of `->{}`.
 

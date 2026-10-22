@@ -1,5 +1,5 @@
 // Intermediate statements of a block are `Unit`; anything else is dropped
-// only with `ignore` (§3).
+// only with `ignore`.
 module App.Blocks exposing (run)
 
 service Log =

@@ -1,4 +1,4 @@
-// A typed AppError stops main and exits with code 1 (§12).
+// A typed AppError stops main and exits with code 1.
 module App.Main exposing (main)
 
 main : Unit ->{none; AppError} Unit

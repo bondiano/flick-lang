@@ -1,5 +1,4 @@
-/// Layers build services from their dependencies (§7 "Предоставление
-/// окружения"): `Layer inputs errors outputs`.
+/// Layers build services from their dependencies: `Layer inputs errors outputs`.
 module Layer exposing (succeed, merge, override)
 
 succeed : ServiceTag r -> ServiceImpl r -> Layer none none r

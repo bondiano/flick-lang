@@ -1,8 +1,7 @@
 //! Constructs that move code to another stage or change what its calls
-//! need: `task` defers its body (§4), `try … with` removes the errors its
-//! handlers cover completely (§7 "Ожидаемые ошибки"), and `provide` removes
-//! the services a layer builds while adding what building it needs (§7
-//! "Предоставление окружения").
+//! need: `task` defers its body, `try … with` removes the errors its handlers
+//! cover completely, and `provide` removes the services a layer builds while
+//! adding what building it needs.
 
 use std::mem;
 
@@ -87,7 +86,7 @@ impl Checker<'_> {
                         codes::E007,
                         span,
                         format!(
-                            "a handler matches errors declared with `error`, but this pattern has type `{shown}`"
+                            "a handler matches errors declared with `type error`, but this pattern has type `{shown}`"
                         ),
                     );
                 }
@@ -156,9 +155,9 @@ impl Checker<'_> {
         ty
     }
 
-    /// The row label of a type declared with `error`.
+    /// The row label of a type declared with `type error`.
     pub fn error_label(&self, ty: &Type) -> Option<String> {
-        match ty {
+        match ty.spine().0 {
             Type::Con { module, name }
                 if matches!(
                     self.env.type_def(module, name).map(|d| &d.form),

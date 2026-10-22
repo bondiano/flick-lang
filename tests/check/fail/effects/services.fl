@@ -9,17 +9,17 @@ service Clock =
 service Bad =
   value : Number
 
-error Broken of Ref Number
+type error Broken = Broken (Ref Number)
 
-error Hidden of { value : Unknown }
+type error Hidden = Hidden { value : Unknown }
 
-error Thunk of Unit ->{} Number
+type error Thunk = Thunk (Unit ->{} Number)
 
-type Job = Job of Eff none none Unit
+type Job = Job (Eff none none Unit)
 
-error Failed of Job
+type error Failed = Failed Job
 
-error Fine of { path : String; parse : String -> Number }
+type error Fine = Fine { path : String; parse : String -> Number }
 
 js_now : Unit ->{} Number
 let js_now () = 0
@@ -48,11 +48,14 @@ let prepare id =
 run_early : Number ->{Users; none} String
 let run_early id = with_users users_layer (prepare id)
 
+type error Late = Late String (Ref Number)
+
 //~ FLICK-E006 @10:3-10:17 service operation `value` must be a runtime function: running it looks the servi
-//~ FLICK-E005 @12:17-12:27 the payload of error `Broken` holds `Ref Number`, a live value; an error carries
-//~ FLICK-E005 @14:17-14:36 the payload of error `Hidden` holds `Unknown`, a live value; an error carries da
-//~ FLICK-E005 @16:16-16:32 the payload of error `Thunk` holds `Unit ->{} Number`, a live value; an error ca
-//~ FLICK-E005 @20:17-20:20 the payload of error `Failed` holds `Eff none none Unit`, a live value; an error
+//~ FLICK-E005 @12:21-12:40 the payload of error `Broken` holds `Ref Number`, a live value; an error carries
+//~ FLICK-E005 @14:21-14:47 the payload of error `Hidden` holds `Unknown`, a live value; an error carries da
+//~ FLICK-E005 @16:20-16:44 the payload of error `Thunk` holds `Unit ->{} Number`, a live value; an error ca
+//~ FLICK-E005 @20:21-20:31 the payload of error `Failed` holds `Eff none none Unit`, a live value; an error
 //~ FLICK-E004 @31:16-31:51 both layers build `Clock`: a merged environment has one implementation of each s
 //~ FLICK-T003 @34:46-34:47 expected `Unit ->{} Number`, found `Number`
 //~ FLICK-E003 @49:43-49:55 this argument runs a runtime call before `with_users` is applied, although `with
+//~ FLICK-E005 @51:19-51:43 the payload of error `Late` holds `Ref Number`, a live value; an error carries d

@@ -1,6 +1,6 @@
 //! Compile-time evaluation of expressions built only from literals, as
 //! `ReScript` does: `60 * 60 * 24`, `"a" ++ "b"`, `not false`. The result is the
-//! value the expression has at run time, with JS semantics bit for bit (§9):
+//! value the expression has at run time, with JS semantics bit for bit:
 //! IEEE 754 arithmetic and remainder, `SameValueZero` for `==` on `Number`,
 //! UTF-16 order for `<` on `String`.
 //!

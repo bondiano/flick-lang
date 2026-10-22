@@ -1,4 +1,4 @@
-//! Project model (§12 "Имена файлов и конфигурация проекта"): `flick.toml`,
+//! Project model: `flick.toml`,
 //! source and test roots, the module ↔ path mapping and installed packages.
 //! File access goes through [`Host`], so the core stays free of I/O.
 

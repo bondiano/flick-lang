@@ -370,7 +370,7 @@ let decode_pair decode user_input settings_input =
 
 ## Структурность records
 
-Выбраны **точные закрытые structural records и полиморфизм строк полей**. `type User = { ... }` — прозрачный alias формы; номинальность вводится отдельным opaque/newtype объявлением. ADT номинальны. Неявного width subtyping нет: дополнительные поля принимаются только через явно открытый хвост строки либо удаляются явной проекцией.
+Выбраны **точные закрытые structural records и полиморфизм строк полей**. `type alias User = { ... }` — прозрачный alias формы; номинальность вводится отдельным opaque/newtype объявлением. ADT номинальны. Неявного width subtyping нет: дополнительные поля принимаются только через явно открытый хвост строки либо удаляются явной проекцией.
 
 | Модель | Что удобно | Цена |
 | - | - | - |
@@ -415,7 +415,7 @@ class Show a =
   val show : a -> String
 
 type PrintableUser =
-  | PrintableUser of User
+  | PrintableUser User
 
 instance Show PrintableUser =
   show : PrintableUser -> String
@@ -547,10 +547,10 @@ Show (List Number)
 
 ```flick
 type LocalExternalId =
-  | LocalExternalId of ExternalId
+  | LocalExternalId ExternalId
 ```
 
-Теперь адаптер владеет номинальным типом и может дать ему canonical instances. Прозрачный alias `type LocalExternalId = ExternalId` новой идентичности не создаёт. Другие пути — instance у владельца класса/типа или переданный явно dictionary.
+Теперь адаптер владеет номинальным типом и может дать ему canonical instances. Прозрачный alias `type alias LocalExternalId = ExternalId` новой идентичности не создаёт. Другие пути — instance у владельца класса/типа или переданный явно dictionary.
 
 Владение определяется **пакетом**: объявить instance может пакет класса либо пакет внешнего номинального конструктора **первого параметра head**. Прозрачный alias и structural record владельца не создают. Для MPTC владение только более поздним параметром недостаточно: пакет `LocalEmail` не получает право объявить чужой `Convert String LocalEmail`. Для этого нужен explicit codec/dictionary, wrapper первого параметра либо instance у владельца класса. Такой ограничительный anchor исключает конкурирующих владельцев разных параметров; цена — дополнительные wrappers в интеграциях. Binding не меняет идентичность foreign-типа.
 
@@ -763,8 +763,10 @@ Generic `do` и `let*` в первую версию не входят. Прям�
 
 Ошибки имеют номинальную идентичность и payload. `try ... with` обрабатывает выбранную ожидаемую ошибку по нативной семантике Effect. В первой версии payload каждого error-конструктора обязан удовлетворять `NoCapture`: в нём нельзя сохранить scoped-handle, захватывающий регион callback/task, ячейку с таким значением или скрыть capability через existential/Unknown. Проверка действует даже для локально перехватываемой ошибки. Цена ограничения — в ошибку передают путь, id или копию данных, а не живой ресурс.
 
+Ошибка объявляется `type error`. Её единственный constructor называется так же, как сама ошибка, и перечисляет поля как вариант ADT: `type error NotFound = NotFound UserId`. Ошибка без полей пишется `type error Timeout`.
+
 ```flick
-error NotFound of UserId
+type error NotFound = NotFound UserId
 
 load_optional : UserId ->{Users; none} Option User
 let load_optional id =
@@ -775,6 +777,14 @@ let load_optional id =
 ```
 
 При типе `Users.get : UserId ->{Users; NotFound} User` результатом `load_optional` становится `Option User`, требованиями остаются `{Users}`, а строка выбранных recoverable ошибок становится пустой. Полный native Cause может хранить дополнительные диагностические failures; его payloads не выдаются за остаточную `e`.
+
+Ошибка может иметь параметры. `type error RetryExhausted e = RetryExhausted e Number` хранит последнюю причину после исчерпания попыток, `type error SendFailed a = SendFailed a` возвращает значение, которое не удалось отправить. Строка ошибок различает элементы по номинальному имени `Module.Name`, а не по аргументам, поэтому в одной строке не больше одного элемента с данным именем: аргументы двух `RetryExhausted` одной строки унифицируются, и `RetryExhausted DbError` вместе с `RetryExhausted String` — ошибка типов. TS-проекция устроена так же: `_tag` не зависит от аргументов, `RetryExhausted<E>` встречается в объединении ошибок `Effect` не более одного раза, и `catchTag` сужает тип однозначно. Java и OCaml по той же причине запрещают параметризованные исключения; здесь параметры допустимы, потому что строка хранит один элемент на имя.
+
+```flick
+type error RetryExhausted e = RetryExhausted e Number
+
+retry : Number -> Eff r e a ->{r; RetryExhausted (Errors e)} a
+```
 
 Удаление ошибки из строки разрешено только при полном покрытии её номинального варианта в выбранном typed recovery. Guard или частичный pattern по payload оставляет ошибку возможной. Requirements/errors обработчика добавляются к результату. Вычитание строки относится к выбранной recoverable ошибке, а не доказывает отсутствие такого tag среди вторичных raw failures.
 
@@ -895,8 +905,8 @@ from_result : Result (Errors e) a ->{none; e} a
 Для `Result NotFound User` используется singleton-строка `{NotFound}`. `Result String a` требует сначала преобразовать строку в объявленную номинальную ошибку. Операция не перехватывает defects или interruption. Обычный `try ... with` обрабатывает expected failures, отдельный API `Exit`/`Cause` — полный исход. [Разделение ошибок Effect](https://effect.website/docs/v4/error-management/two-error-types).
 
 ```flick
-error NotFound of UserId
-error DbUnavailable of String
+type error NotFound = NotFound UserId
+type error DbUnavailable = DbUnavailable String
 
 find_user :
   UserId ->{Users; NotFound, DbUnavailable} User
@@ -1191,12 +1201,14 @@ const withDefault =
 
 ### Варианты, guards и or-patterns
 
-Constructor несёт ноль, одно или несколько полей. Несколько полей перечисляются через запятую: `| Circle of Point, Number`. Запись `of (Point, Number)` — одно поле-tuple, а не два поля. В ABI поля занимают `_0`, `_1` и далее в порядке объявления.
+Constructor несёт ноль, одно или несколько полей. Поля перечисляются после имени constructor так же, как аргументы при его применении и в pattern: `| Circle Point Number`. Поле — атомарный тип, поэтому применение типа и стрелку берут в скобки: `| Branch (List (Tree a))`, `| Handler (a -> b)`. `Circle (Point, Number)` — одно поле-tuple, а не два поля. В ABI поля занимают `_0`, `_1` и далее в порядке объявления.
+
+Правая часть `type` всегда перечисляет варианты, ведущий `|` необязателен: `type Wrapper = Wrap Number` — ADT с одним constructor. Прозрачный alias, в том числе record-тип, объявляется `type alias`: `type alias UserId = Number`. `opaque type alias` скрывает представление за пределами модуля, `opaque type` с вариантами скрывает constructors. `alias` — ключевое слово только сразу после `type`.
 
 ```flick
 type Shape =
-  | Circle of Point, Number
-  | Rect of Number, Number
+  | Circle Point Number
+  | Rect Number Number
   | Empty
 
 area : Shape -> Number
@@ -1719,7 +1731,7 @@ Captures codec сохраняются у частично применённой
 refined type Email = String where Checks.email
   deriving Eq, Hash, Schema
 
-type Profile = {
+type alias Profile = {
   email : Email
   nickname : Option String
 } deriving Eq, Hash, Schema
@@ -1759,7 +1771,7 @@ let parse_profile input =
 Если приложение различает missing и null, нужен отдельный ADT или иная явно более богатая модель, а не свёртка обоих в один `None`.
 
 ```flick
-type Preferences = {
+type alias Preferences = {
   nickname : Option String
   quota : Number
 } deriving Schema
@@ -1803,15 +1815,15 @@ Effect поддерживает [effectful schema transformations](https://effec
 
 ```flick
 type Tree a =
-  | Leaf of a
-  | Branch of List (Tree a)
+  | Leaf a
+  | Branch (List (Tree a))
   deriving Schema
 
 tree_schema : Schema a -> Schema (Tree a)
 let tree_schema item_schema =
   schema Tree item_schema
 
-type PairOf f = {
+type alias PairOf f = {
   count : f Number
   label : f String
 } deriving Schema
@@ -2070,7 +2082,7 @@ Public API использует разные opaque-типы:
 Допустим, описаны таблицы Users и Accounts. `Users.id` и `Accounts.user_id` имеют тип UserId, `Users.name` — String, исходный `Accounts.balance` — non-null BigDecimal.
 
 ```flick
-type BalanceRow =
+type alias BalanceRow =
   {
     name : String
     balance : Option BigDecimal
@@ -2164,7 +2176,7 @@ SQL bigint отображается в BigInt, decimal — BigDecimal; Number д
 Базовая модель — `Ui r e`: чистое описание интерфейса с отложенными обработчиками, которым нужны сервисы r и которые могут завершиться ошибками e. Построение UI не выполняет эти обработчики.
 
 ```flick
-type SaveButtonProps c =
+type alias SaveButtonProps c =
   {
     label : String
     disabled : Bool
@@ -2232,7 +2244,7 @@ Props — точный structural record. Отсутствующее обяза�
 Обычный generic-компонент не требует общих type families:
 
 ```flick
-type SelectProps a r e c =
+type alias SelectProps a r e c =
   {
     items : List a
     selected : Option a
@@ -2552,14 +2564,14 @@ flick build --profile release
 ## Сквозной пример
 
 ```flick
-opaque type UserId = String
+opaque type alias UserId = String
 
-type User = {
+type alias User = {
   id : UserId
   name : String
 }
 
-type UserView = {
+type alias UserView = {
   id : UserId
   title : String
 }

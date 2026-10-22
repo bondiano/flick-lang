@@ -1,4 +1,4 @@
-// Higher-rank callbacks (§5 "Полиморфные callbacks").
+// Higher-rank callbacks.
 module App.HigherRank exposing (apply_twice, render_twice, use_both)
 
 class Show a =

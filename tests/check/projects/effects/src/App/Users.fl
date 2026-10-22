@@ -1,11 +1,11 @@
 // Services and errors other modules see only through this module's interface.
 module App.Users exposing (User, UserId, Users, NotFound(..), users_layer)
 
-type UserId = Number
+type alias UserId = Number
 
-type User = { id : UserId; name : String }
+type alias User = { id : UserId; name : String }
 
-error NotFound of UserId
+type error NotFound = NotFound UserId
 
 service Users =
   get : UserId ->{none; NotFound} User

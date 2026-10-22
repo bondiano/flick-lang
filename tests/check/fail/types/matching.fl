@@ -1,6 +1,6 @@
 module App.Matching exposing (..)
 
-type Shape = Circle of Number | Rect of Number, Number | Empty
+type Shape = Circle Number | Rect Number Number | Empty
 
 partial : Option Number -> Number
 let partial value =

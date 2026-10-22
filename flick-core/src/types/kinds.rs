@@ -1,4 +1,4 @@
-//! Kinds (§5 "Вычисления и kinds"): `Type`, the three effect-row kinds,
+//! Kinds: `Type`, the three effect-row kinds,
 //! `Row k` for record fields, labels, regions, constraints, finite kinds a
 //! `kind` declaration introduces, and arrows between them. Kinds of type
 //! variables are inferred from their positions; what stays open becomes `Type`.

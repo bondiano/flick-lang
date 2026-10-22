@@ -1,4 +1,4 @@
-// Methods of instances have full signatures too (§3); class constraints are
+// Methods of instances have full signatures too; class constraints are
 // kind-checked here and resolved by the class solver.
 module App.Classes exposing (Show(..), render, Repo)
 
@@ -11,7 +11,7 @@ class Show a => Pretty a =
 class Functor (f : Type -> Type) =
   val map : (a -> b) -> f a -> f b
 
-type Shape = Circle of Number | Empty
+type Shape = Circle Number | Empty
 
 instance Show Shape =
   show : Shape -> String

@@ -1,4 +1,4 @@
-//! Names and modules (§11 "Модули и entry point"): top-level definitions,
+//! Names and modules: top-level definitions,
 //! export lists, imports and the names they bring into scope. Rules:
 //! `docs/reference/modules.md`.
 

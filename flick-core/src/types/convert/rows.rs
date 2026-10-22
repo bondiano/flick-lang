@@ -68,8 +68,20 @@ impl Checker<'_> {
             let Some(label) = self.element_label(&ty, &kind, item) else {
                 continue;
             };
-            if !entries.iter().any(|(l, _)| *l == label) {
-                entries.push((label, ty));
+            // a row tells its elements apart by name, not by arguments
+            match entries.iter().find(|(l, _)| *l == label) {
+                Some((_, held)) if *held != ty => {
+                    let (held, ty) = (self.show(held), self.show(&ty));
+                    self.error(
+                        codes::T003,
+                        self.span(item),
+                        format!(
+                            "the row already holds `{held}`, so it cannot hold `{ty}` too: a row has one element of each name"
+                        ),
+                    );
+                }
+                Some(_) => {}
+                None => entries.push((label, ty)),
             }
         }
         let tail = tail
@@ -127,7 +139,7 @@ impl Checker<'_> {
                         codes::T002,
                         self.span(node),
                         format!(
-                            "`{name}` is not an error: an error row holds types declared with `error`"
+                            "`{name}` is not an error: an error row holds types declared with `type error`"
                         ),
                     );
                     return None;

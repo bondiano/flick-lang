@@ -1,7 +1,6 @@
 //! Expressions, checked bidirectionally: [`Checker::check`] pushes an expected
 //! type into lambdas, branches and literals, so a higher-rank parameter type
-//! from a signature reaches the callback that must satisfy it (§5
-//! "Полиморфные callbacks"); [`Checker::infer`] synthesizes a type otherwise.
+//! from a signature reaches the callback that must satisfy it; [`Checker::infer`] synthesizes a type otherwise.
 
 use std::mem;
 
@@ -289,7 +288,7 @@ impl Checker<'_> {
     /// writes it. Every parameter is a stage of a curried arrow; the expected
     /// type decides each stage's arrow. The body runs at the last stage, so
     /// its runtime calls must fit the last arrow; without an expected type
-    /// that arrow is runtime exactly when the body makes a runtime call (§3).
+    /// that arrow is runtime exactly when the body makes a runtime call.
     pub fn function(
         &mut self,
         params: &[&Node],

@@ -1,5 +1,5 @@
-//! Source files, UTF-8 byte spans and line index (§12: diagnostics carry UTF-8
-//! byte ranges; editors convert them to their own position encoding).
+//! Source files, UTF-8 byte spans and line index: diagnostics carry UTF-8 byte
+//! ranges; editors convert them to their own position encoding.
 
 use crate::diagnostics::{Diagnostic, codes};
 

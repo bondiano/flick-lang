@@ -126,7 +126,7 @@ flowchart LR
 | Числовые литералы | Грамматика JS `NumericLiteral`: decimal, экспонента `1e-3`, `0x`/`0o`/`0b`, разделитель `_` по правилам JS (не в начале/конце, не двойной, не рядом с `.`/`e`/префиксом), BigInt-суффикс `n` (без дроби и экспоненты), legacy octal `010` запрещён. Отличие от JS: формы `.5` и `5.` запрещены — конфликт с доступом `.field` | M1 |
 | Тесты | Без нового синтаксиса: модуль из test root экспортирует `tests : List Test`; `Test.test`, `Test.property`, `Test.group`, generators `Gen.*` — функции библиотеки | M9 |
 | API платформы | `Platform.args`, env, stdout/stderr — модуль stdlib | M9 |
-| `AppError` | Тип stdlib: `error AppError of { message : String; details : Option String }`; `App.fail : String ->{none; AppError} a`; runner безопасно печатает и выходит с кодом `1` | M8 |
+| `AppError` | Тип stdlib: `type error AppError = AppError { message : String; details : Option String }`; `App.fail : String ->{none; AppError} a`; runner безопасно печатает и выходит с кодом `1` | M8 |
 | SQL table metadata | Блок `sql table Name "table" { col : sql_type [not null] [primary key] [default] [generated always] as T [via codec] }`; elaborates в библиотечные `Sql.table`/`Sql.column`, доступные и напрямую; генератор из миграций выдаёт тот же блок | M13 |
 | FFI overrides | Importer пишет только `<Pkg>/Generated.fl`; пользовательский модуль `<Pkg>.fl` содержит обычные `foreign`-декларации с `reviewed "<pkg>@<ver> sha256:…"` и re-export; `ffi check` сверяет fingerprint | M12 |
 | Shadowing и неоднозначность | Локальные связывания затеняют всё без диагностики. Top-level определение с именем из `import … exposing (name)` — ошибка `FLICK-R009`; имена из `exposing (..)` top-level затеняет молча. Два импорта по имени с разными сущностями — `FLICK-R010` сразу; конфликт между `(..)`-импортами — `FLICK-R010` только в месте использования. Re-export той же сущности не конфликт. Порядок `import` ни на что не влияет | M2 |
@@ -211,8 +211,8 @@ CI workflow.
 row-хвосты `| r`, union `r1 + r2`, `none`, capture qualifiers `T^{s}`, `T^c`,
 `T^(c + d)`; `let`, `let rec`, `rec { … }`, `fun x -> …`, `match … with`,
 `try … with`, `task { }`, `await`, `scope s { }`, `provide layer { }`, `ignore`;
-`type` (alias, record, ADT, параметры), `opaque type`, `refined type … where`,
-`kind K = A | B`, `error E of T`, `service S = …`, `class … | c -> a =`,
+`type` (ADT, параметры), `type alias` (в том числе record), `opaque type`,
+`opaque type alias`, `refined type … where`, `kind K = A | B`, `type error E = E T`, `service S = …`, `class … | c -> a =`,
 `instance`, `deriving …`, `schema T …`, `codec s { … }`, `foreign pure|sync|async|effect … from …`
 c metadata (`arity`, `this`, `catch`, `cancel signal`, nullable/retention),
 `sql params { … }`, `ui { … }`. Литералы: Number, BigInt (`n`), String, Unit
@@ -346,7 +346,7 @@ c metadata (`arity`, `this`, `catch`, `cancel signal`, nullable/retention),
 - `task { }` → `Eff r e a`, `await` снимает ровно один слой.
 - Номинальные service/error identities с квалификацией пакета и модуля;
   нормализация повторов; `r1 + r2`.
-- `error E of T` с проверкой `NoCapture` payload (финальная проверка — M6).
+- `type error E = E T` с проверкой `NoCapture` payload (финальная проверка — M6).
 - `try … with`: вычитание ошибки только при полном покрытии варианта; guard или
   частичный pattern ошибку не снимают; rows handler добавляются.
 - `Errors e` проекция; `from_result`.
@@ -462,7 +462,7 @@ c metadata (`arity`, `this`, `catch`, `cancel signal`, nullable/retention),
 - [ ] Scoped-handle не выходит через результат, callback, task, контейнер, error
       payload или запись во внешний Ref — по fixture на каждый путь (§13).
 - [ ] Opaque/nominal wrapper вокруг `File s` не стирает зависимость от `s`.
-- [ ] `error Leak of (File s)` отвергается по `NoCapture` даже при перехвате
+- [ ] `type error Leak = Leak (File s)` отвергается по `NoCapture` даже при перехвате
       внутри того же scope.
 - [ ] Curried `List.map_effect f` удерживает captures `f`; `Functor.map`
       сохраняет `c + d` (§5, §6) — проверено на сигнатурах stdlib (§13).

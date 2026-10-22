@@ -1,4 +1,4 @@
-//! Names, application and operators. Operators are fixed (§9): arithmetic on
+//! Names, application and operators. Operators are fixed: arithmetic on
 //! `Number` or `BigInt`, `++` on `String` or `List`, comparisons on the
 //! three primitive domains; operands never mix types or coerce.
 

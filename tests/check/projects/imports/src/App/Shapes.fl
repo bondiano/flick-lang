@@ -1,14 +1,14 @@
 module App.Shapes exposing (Shape, Id, Kind(..), circle, Alias)
 
 type Shape =
-  | Circle of Number
-  | Square of Number
+  | Circle Number
+  | Square Number
 
-opaque type Id = Id of String
+opaque type Id = Id String
 
 kind Kind = Small | Big
 
-type Alias = Number
+type alias Alias = Number
 
 circle : Number -> Shape
 let circle r = Circle r

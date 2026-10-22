@@ -1,4 +1,4 @@
-//! Unification of rows: record fields (§5 "Структурность records") and the
+//! Unification of rows: record fields and the
 //! service and error rows of runtime arrows. Labels are unique and their order
 //! does not matter; a row without a tail is closed, so a record with extra
 //! fields never passes for a smaller one (no width subtyping). A row may

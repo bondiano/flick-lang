@@ -20,8 +20,8 @@ import, and a local definition of the same name hides them.
 | `Codec` | `ServiceRow -> ServiceRow -> Type -> Type -> Type` |
 | `Errors` | `ErrorRow -> Type` |
 
-`Option a = None | Some of a`, `Result e a = Err of e | Ok of a` and
-`error AppError of { message : String; details : Option String }` are
+`Option a = None | Some a`, `Result e a = Err e | Ok a` and
+`type error AppError = AppError { message : String; details : Option String }` are
 ordinary declarations; `identity : a -> a` is a function. `from_result` turns a
 `Result` into an expected error ([effects.md](effects.md)). Built-in modules
 are used qualified without an import: `Ref.make`, `Ref.get`, `Ref.set`,
@@ -38,7 +38,7 @@ nothing determines is `Type`. The parameters of a module's declarations are
 inferred together, so declarations may use each other in any order.
 
 ```flick
-type Box (f : Type -> Type) a = { value : f a }
+type alias Box (f : Type -> Type) a = { value : f a }
 
 kind Nullability = NonNull | Nullable
 
@@ -97,7 +97,7 @@ being stored in a cell created outside the callback (`FLICK-T007`).
 
 ## Records
 
-Records are exact and structural (§5). `type User = { … }` is a transparent
+Records are exact and structural (§5). `type alias User = { … }` is a transparent
 alias, and the order of fields does not matter. A record with extra fields
 does not pass for a closed record type; a signature accepts more fields with
 an open row:
@@ -153,7 +153,7 @@ signature starts with a `forall` that binds all its variables; otherwise
 that call is `FLICK-T015`.
 
 ```flick
-type Nested a = Flat of a | Nest of Nested (List a)
+type Nested a = Flat a | Nest (Nested (List a))
 
 depth : forall a. Nested a -> Number
 let rec depth value =

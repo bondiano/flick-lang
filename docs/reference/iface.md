@@ -54,11 +54,11 @@ re-exported from `App.Domain`).
 | `foreign` | `foreign` | — |
 | `method` | `val` of a class | the class |
 | `adt` | `type T = A \| B` | — |
-| `alias` | transparent `type T = …` | — |
+| `alias` | `type alias T = …` | — |
 | `opaque` | `opaque type` | — |
 | `refined` | `refined type` | — |
 | `abstract` | `type T` without a definition | — |
-| `error` | `error E of …` | — |
+| `error` | `type error E …` | — |
 | `kind` | `kind K = …` | — |
 | `kind-member` | a member of a `kind` | the kind |
 | `service` | `service` | — |
@@ -115,7 +115,7 @@ declaration and `{ "arrow": [K1, K2] }`.
 | - | - | - |
 | `nominal` | — | built-in, `type T`, `opaque type`, `refined type`; also an opaque ADT, whose constructors stay hidden |
 | `adt` | `constructors` | variants, every constructor including unexported ones (for exhaustiveness) |
-| `error` | — | `error E of …`; its constructor is `E` |
+| `error` | — | `type error E …`; its constructor is `E` |
 | `alias` | `params`, `body` | transparent alias |
 | `service` | `params`, `operations` (`name`, `type`) | `service`; `operations` hold the types as declared, without the service itself, and an importer derives `S.Impl` from them |
 | `class` | — | `class`; methods are `value` exports |

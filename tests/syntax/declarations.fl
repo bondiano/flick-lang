@@ -6,34 +6,34 @@ import Effect.Log as Log
 import Effect.Platform
 
 /* block comments /* nest */ too */
-type Point = { x : Number; y : Number }
+type alias Point = { x : Number; y : Number }
 
-type Pair a b = (a, b)
+type alias Pair a b = (a, b)
 
 type Shape =
-  | Circle of Point, Number
-  | Rect of { origin : Point; size : Point }
+  | Circle Point Number
+  | Rect { origin : Point; size : Point }
   | Empty
   deriving Eq, Show
 
-type Option a = None | Some of a
+type Option a = None | Some a
 
-type Wrapped (f : Type -> Type) a = {
+type alias Wrapped (f : Type -> Type) a = {
   value : f a
 } deriving Schema
 
-opaque type UserId = String
+opaque type alias UserId = String
 
 refined type Port = Number where fun n -> n > 0 && n < 65536
   deriving Eq, Hash
 
 kind Nullability = NonNull | Nullable
 
-error NotFound of UserId
+type error NotFound = NotFound UserId
 
-error Timeout
+type error Timeout
 
-error AppError of { message : String; details : Option String }
+type error AppError = AppError { message : String; details : Option String }
   deriving Show
 
 service Users =

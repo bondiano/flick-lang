@@ -25,7 +25,7 @@ multiline :
   SaveButtonProps c ->
   (Ui {Users} {SaveError})^c
 
-type Props c = {
+type alias Props c = {
   on_save : (Unit ->{Users; SaveError} Unit)^c
   render : (a -> (Ui r e)^c)^c
 }

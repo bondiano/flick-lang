@@ -1,5 +1,5 @@
 //! A command produces diagnostics; `run_command` reports them on stderr and
-//! turns them into the exit code (§12).
+//! turns them into the exit code.
 
 use std::process::ExitCode;
 

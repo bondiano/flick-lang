@@ -120,6 +120,28 @@ fn effect_arrow_needs_adjacent_brace() {
 }
 
 #[test]
+fn type_lists_variants_and_alias_names_a_type() {
+    assert_eq!(
+        sexp("type W a = Wrap (List a) a^c"),
+        "(TypeDecl type W (TypeParam a) = (Variant Wrap (ParenType ( (AppType (NameType List) \
+         (NameType a)) )) (CaptureType (NameType a) ^ (NameType c))))"
+    );
+    assert_eq!(
+        sexp("type alias Pair a = (a, a)"),
+        "(TypeDecl type alias Pair (TypeParam a) = (TupleType ( (NameType a) , (NameType a) )))"
+    );
+    assert_eq!(
+        sexp("type error Failed e = Failed e Number\ntype error Timeout"),
+        "(ErrorDecl type error Failed (TypeParam e) = (Variant Failed (NameType e) \
+         (NameType Number)))\n(ErrorDecl type error Timeout)"
+    );
+    assert_eq!(
+        errors("type T = Some of a\ntype error E = F\n"),
+        ["FLICK-S010 of", "FLICK-S007 F"]
+    );
+}
+
+#[test]
 fn dedented_closers_close_their_bracket() {
     let src = "let f =\n  g (fun x ->\n    x\n)\n";
     assert!(sexp(src).contains("(ParenExpr ( (FunExpr fun (VarPat x) -> (Block (NameExpr x))) ))"));

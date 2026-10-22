@@ -1,6 +1,6 @@
-//! `let` bindings, signatures and blocks (§3): every named function has its
+//! `let` bindings, signatures and blocks: every named function has its
 //! full signature right above it; a signature is checked, not trusted, and
-//! does not lift the generalization rules (§5 "Generalization при наличии Ref").
+//! does not lift the generalization rules.
 
 use std::mem;
 
@@ -214,7 +214,7 @@ impl Checker<'_> {
     }
 
     /// Recursive uses of a function without an explicit `forall` must have
-    /// the very type its body is checked against (§3).
+    /// the very type its body is checked against.
     pub fn finish_rec(&mut self, rec: usize) {
         let Rec { name, target, uses } = mem::replace(
             &mut self.recs[rec],
@@ -284,7 +284,7 @@ impl Checker<'_> {
     }
 
     /// A polymorphic signature over a value computed by a runtime call is
-    /// rejected: each use would share one result at different types (§5).
+    /// rejected: each use would share one result at different types.
     pub fn polymorphic_runtime(&mut self, name: &str, scheme: &Type, runtime: bool, decl: &Node) {
         if runtime && matches!(scheme, Type::Forall { vars, .. } if !vars.is_empty()) {
             let shown = self.show(scheme);

@@ -1,5 +1,4 @@
-// Generalization of provably pure constructions only (§5 "Generalization
-// при наличии Ref").
+// Generalization of provably pure constructions only.
 module App.Generalization exposing (make_empty, use_separate_cells, identity_again, fresh_cell, use_tasks)
 
 make_empty : forall a. Unit ->{} Ref (Option a)

@@ -1,5 +1,5 @@
-//! Package graph over the installed `node_modules` (§12 "Зависимости и
-//! упаковка"): pnpm installs, Flick only reads. A package with Flick modules
+//! Package graph over the installed `node_modules`: pnpm installs, Flick only
+//! reads. A package with Flick modules
 //! names its interface directory in `package.json`:
 //! `"flick": { "iface-dir": "iface" }`, and module `A.B` is `iface/A/B.iface`.
 

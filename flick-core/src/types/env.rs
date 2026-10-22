@@ -29,7 +29,7 @@ pub enum Form {
     Adt {
         constructors: Vec<String>,
     },
-    /// `error E of T`: a nominal type with the constructor `E`.
+    /// `type error E = E T …`: a nominal type with the one constructor `E`.
     Error,
     /// A transparent alias. An opaque alias is one only inside its module.
     Alias {

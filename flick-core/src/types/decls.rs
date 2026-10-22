@@ -42,8 +42,8 @@ impl Checker<'_> {
             self.finish(p, body);
         }
         for p in pending.iter().filter(|p| p.node.kind == K::ErrorDecl) {
-            if let Some(payload) = p.node.nodes().find(|n| is_type(n.kind)) {
-                self.check_error_payload(&p.name, self.span(payload));
+            if let Some(variant) = p.node.nodes().find(|n| n.kind == K::Variant) {
+                self.check_error_payload(&p.name, self.span(variant));
             }
         }
         self.break_alias_cycles(&pending);
@@ -244,9 +244,10 @@ impl Checker<'_> {
             K::ErrorDecl => {
                 let payload = decl
                     .nodes()
-                    .find(|n| is_type(n.kind))
-                    .map(|t| self.ty(t, &Kind::Type, Free::Reject));
-                Body::Variants(vec![(p.name.clone(), payload.into_iter().collect())])
+                    .find(|n| n.kind == K::Variant)
+                    .map(|v| self.payload(v))
+                    .unwrap_or_default();
+                Body::Variants(vec![(p.name.clone(), payload)])
             }
             K::ServiceDecl => Body::Members(self.members(decl, &[])),
             K::ClassDecl => {

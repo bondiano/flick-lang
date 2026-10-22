@@ -37,7 +37,7 @@ fn keeps_comments_layout_and_mid_line_blocks() {
 
 #[test]
 fn is_idempotent_on_its_output() {
-    let src = "type T a = {\n    x : a\n} deriving Eq\nlet g = fun () -> task { 1 }\n";
+    let src = "type alias T a = {\n    x : a\n} deriving Eq\nlet g = fun () -> task { 1 }\n";
     let once = fmt(src);
     assert_eq!(fmt(&once), once);
 }

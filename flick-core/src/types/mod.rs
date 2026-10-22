@@ -1,9 +1,9 @@
-//! Kinds and the type core (§4, §5 without classes, §9 "Числовая модель"):
+//! Kinds and the type core, without classes:
 //! kind checking, bidirectional type checking against the full signature of
 //! every named function, higher-rank `forall` with predicative instantiation,
 //! exact records with row polymorphism, exhaustive `match`, and generalization
 //! of provably pure bindings only; effects, expected errors, services and
-//! layers (§3, §7). Rules: `docs/reference/types.md`, `docs/reference/effects.md`.
+//! layers. Rules: `docs/reference/types.md`, `docs/reference/effects.md`.
 //!
 //! The checker reads the concrete tree after name resolution; other modules
 //! are known only through their [`Interface`], which this phase fills with
@@ -91,7 +91,7 @@ struct Local {
 }
 
 /// A recursive function whose signature has no explicit `forall`: its
-/// recursive uses must have exactly the type being checked (§3).
+/// recursive uses must have exactly the type being checked.
 #[derive(Debug, Clone)]
 struct Rec {
     name: String,

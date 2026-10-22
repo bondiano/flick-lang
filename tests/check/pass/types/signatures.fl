@@ -1,4 +1,4 @@
-// Every named function has a full signature right above it (§3), also
+// Every named function has a full signature right above it, also
 // locally and when it is a partial application.
 module App.Signatures exposing (hello, render, compose)
 

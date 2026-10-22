@@ -1,4 +1,4 @@
-/// Built-in types and constructors (§5 "Вычисления и kinds"); every module
+/// Built-in types and constructors; every module
 /// sees them without an import.
 module Prelude exposing (..)
 
@@ -26,17 +26,17 @@ type ServiceTag (r : ServiceRow)
 /// `ServiceImpl {Clock}` is `Clock.Impl`.
 type ServiceImpl (r : ServiceRow)
 
-type Option a = None | Some of a
+type Option a = None | Some a
 
-type Result e a = Err of e | Ok of a
+type Result e a = Err e | Ok a
 
 /// The error an application fails with through `App.fail`.
-error AppError of { message : String; details : Option String }
+type error AppError = AppError { message : String; details : Option String }
 
 identity : a -> a
 let identity value = value
 
 /// Fails with the error of an `Err`: `Result NotFound a` has the error row
-/// `{NotFound}` (§7 "Ошибка как данные").
+/// `{NotFound}`.
 from_result : Result (Errors e) a ->{none; e} a
 foreign sync from_result from "@flick-lang/runtime" "fromResult"

@@ -1,4 +1,4 @@
-//! `.iface`, the native interface of a module (§11): versioned JSON that an
+//! `.iface`, the native interface of a module: versioned JSON that an
 //! importer reads instead of the module's source. Schema:
 //! `docs/reference/iface.md`. Version 1 holds names, their identity, and the
 //! types and kinds of exports; classes, captures and ABI join it with the
@@ -20,7 +20,7 @@ pub enum Namespace {
 }
 
 /// Identity of a top-level entity: the module that defines it, not the one a
-/// name is imported from, so a re-export stays the same entity (§11).
+/// name is imported from, so a re-export stays the same entity.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Entity {
     pub module: String,
@@ -193,18 +193,18 @@ mod tests {
     fn schema_is_pinned_and_round_trips() {
         let interface = interface_of(
             "module App.Shapes exposing (Shape(..), Id, Size, Mode(..), Show(..), area, now, Pair, Clock, NotFound(..), Port, Box, wrap)\n\
-             type Shape = Circle of Number | Square of Number\n\
-             opaque type Id = Id of String\n\
-             type Size = Number\n\
+             type Shape = Circle Number | Square Number\n\
+             opaque type Id = Id String\n\
+             type alias Size = Number\n\
              kind Mode = Small | Big\n\
              class Show a =\n  val show : a -> String\n\
              area : Shape -> Number\nlet area s = 0\n\
              now : Unit ->{} Number\nforeign sync now from global \"Date.now\"\n\
              type Pair\n\
              service Clock =\n  tick : Unit ->{} Number\n\
-             error NotFound of String\n\
+             type error NotFound = NotFound String\n\
              refined type Port = Number where fun n -> n > 0\n\
-             type Box (f : Type -> Type) a = { value : f a; size : Size }\n\
+             type alias Box (f : Type -> Type) a = { value : f a; size : Size }\n\
              wrap : f a -> Box f a\nlet wrap value = { value = value; size = 1 }\n",
         );
         let json = write(&interface);

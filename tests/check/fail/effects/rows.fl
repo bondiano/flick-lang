@@ -1,12 +1,12 @@
 module App.Rows exposing (..)
 
-type UserId = Number
+type alias UserId = Number
 
-type User = { id : UserId; name : String }
+type alias User = { id : UserId; name : String }
 
-error NotFound of UserId
+type error NotFound = NotFound UserId
 
-error ConnectError of String
+type error ConnectError = ConnectError String
 
 service Config =
   url : Unit ->{} String
@@ -68,11 +68,27 @@ let not_an_error () =
 no_layer : Unit ->{} Number
 let no_layer () = provide 1 { 2 }
 
+type error Failed e = Failed e
+
+service Jobs =
+  count : Number ->{none; Failed Number} Number
+  label : Number ->{none; Failed String} String
+
+mixed : Number ->{Jobs; Failed Number} Number
+let mixed n =
+  let _ = Jobs.label n
+  Jobs.count n
+
+both : Number ->{Jobs; Failed Number, Failed String} Number
+let both n = Jobs.count n
+
 //~ FLICK-E002 @22:14-22:26 the signature of `narrow` does not allow service `Log` and error `NotFound`, whi
 //~ FLICK-E002 @37:3-37:10 the signature of `application` does not allow service `Config` and error `Connec
 //~ FLICK-E002 @43:3-43:6 the signature of `load_guarded` does not allow error `NotFound`, which its body 
 //~ FLICK-E002 @50:3-50:6 the signature of `load_partial` does not allow error `NotFound`, which its body 
 //~ FLICK-E002 @56:29-56:41 the expected type `Eff none none User` does not allow service `Users` and error 
 //~ FLICK-T003 @59:34-59:40 expected `Result (Errors _) _`, found `Result String Number`: `String` is not an
-//~ FLICK-E007 @66:5-66:11 a handler matches errors declared with `error`, but this pattern has type `Optio
 //~ FLICK-T003 @69:27-69:28 `provide` takes a `Layer`, but this has type `Number`
+//~ FLICK-E007 @66:5-66:11 a handler matches errors declared with `type error`, but this pattern has type `
+//~ FLICK-T003 @79:11-79:23 expected `Failed Number`, found `Failed String`: `String` is not `Number`
+//~ FLICK-T003 @82:39-82:52 the row already holds `Failed Number`, so it cannot hold `Failed String` too: a

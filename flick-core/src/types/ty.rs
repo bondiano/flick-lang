@@ -23,7 +23,7 @@ pub enum Type {
         arg: Box<Type>,
     },
     /// `a -> b` when `effects` is `None`, `a ->{r; e} b` otherwise; an empty
-    /// row never makes a runtime arrow pure (§4).
+    /// row never makes a runtime arrow pure.
     Fun {
         param: Box<Type>,
         #[serde(default, skip_serializing_if = "Option::is_none")]

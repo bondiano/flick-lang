@@ -96,9 +96,7 @@ fn declaration(decl: &Node, text: &str, file: FileId, defs: &mut Vec<Def>) {
                 K::KindDecl => (Namespace::Type, Decl::KindMember),
                 _ => (Namespace::Constructor, Decl::Constructor),
             };
-            for variant in variants {
-                defs.push(def(member_space, variant, Some(parent), member));
-            }
+            // the constructor of an error is the error's own name, with or without fields
             if decl.kind == K::ErrorDecl {
                 defs.push(def(
                     Namespace::Constructor,
@@ -106,6 +104,10 @@ fn declaration(decl: &Node, text: &str, file: FileId, defs: &mut Vec<Def>) {
                     Some(parent),
                     Decl::Constructor,
                 ));
+            } else {
+                for variant in variants {
+                    defs.push(def(member_space, variant, Some(parent), member));
+                }
             }
             let methods = decl
                 .nodes()
@@ -180,7 +182,7 @@ pub(super) fn defined(defs: Vec<Def>) -> Vec<Def> {
         .collect()
 }
 
-/// Transparent aliases must be acyclic (§11): `type A = List A` needs a nominal type.
+/// Transparent aliases must be acyclic: `type alias A = List A` needs a nominal type.
 pub(super) fn alias_cycles(tree: &Node, text: &str, file: FileId) -> Vec<Diagnostic> {
     let mut aliases: Vec<(String, Span, Vec<String>)> = Vec::new();
     for decl in tree.nodes().filter(|n| n.kind == K::TypeDecl) {

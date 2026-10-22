@@ -1,4 +1,4 @@
-// Exact structural records with row polymorphism (§5 "Структурность records").
+// Exact structural records with row polymorphism.
 module App.Records exposing (name, project_name, rename, origin)
 
 name :
@@ -11,13 +11,13 @@ project_name :
 let project_name value =
   { name = value.name }
 
-type User = { id : Number; name : String; email : String }
+type alias User = { id : Number; name : String; email : String }
 
 rename : User -> User
 let rename user = { user with name = "Ada" }
 
 // field order is not part of the type
-type Point = { x : Number; y : Number }
+type alias Point = { x : Number; y : Number }
 
 origin : Point
 let origin = { y = 0; x = 0 }

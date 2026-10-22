@@ -1,4 +1,4 @@
-//! Services and errors (§7 "Сервисы и классы типов", "Ожидаемые ошибки").
+//! Services and errors.
 //! A `service` lists operations with full signatures; `S.op` needs `S` at
 //! every runtime arrow of the operation, and `S.Impl` is the record of the
 //! operations as declared, which `Layer.succeed S impl` turns into a layer.
@@ -175,23 +175,30 @@ impl Checker<'_> {
         }
     }
 
-    /// The payload of an error carries data, not live values: no cell,
-    /// computation, layer, runtime function or `Unknown` (§7 `NoCapture`).
+    /// The fields of an error carry data, not live values: no cell,
+    /// computation, layer, runtime function or `Unknown`.
     pub fn check_error_payload(&mut self, name: &str, span: Span) {
         let entity = self.env.entity(Namespace::Constructor, name);
-        let Some(Type::Fun { param, .. }) = self.env.value(&entity).cloned() else {
+        let Some(mut ty) = self.env.value(&entity).cloned() else {
             return;
         };
+        if let Type::Forall { body, .. } = ty {
+            ty = *body;
+        }
         let mut seen = Vec::new();
-        if let Some(live) = self.live_part(&param, &mut seen) {
-            let shown = self.show(&live);
-            self.error(
-                codes::E005,
-                span,
-                format!(
-                    "the payload of error `{name}` holds `{shown}`, a live value; an error carries data such as a path, an id or a copy"
-                ),
-            );
+        while let Type::Fun { param, result, .. } = ty {
+            if let Some(live) = self.live_part(&param, &mut seen) {
+                let shown = self.show(&live);
+                self.error(
+                    codes::E005,
+                    span,
+                    format!(
+                        "the payload of error `{name}` holds `{shown}`, a live value; an error carries data such as a path, an id or a copy"
+                    ),
+                );
+                return;
+            }
+            ty = *result;
         }
     }
 

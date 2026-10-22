@@ -87,13 +87,13 @@ errors, kinds and their members, services, classes) and constructors. A
 signature and its `let` are one definition; a second definition is
 `FLICK-R008`.
 
-Transparent aliases must be acyclic: `type A = List A`, or a cycle through
+Transparent aliases must be acyclic: `type alias A = List A`, or a cycle through
 several aliases, is `FLICK-R007`. Recursion goes through a nominal type, which
 may refer to itself and to other types of the file:
 
 ```flick
-type Tree a = Leaf | Node of a, Forest a
-type Forest a = List (Tree a)
+type Tree a = Leaf | Node a (Forest a)
+type alias Forest a = List (Tree a)
 ```
 
 ## Shadowing and ambiguity

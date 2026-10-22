@@ -1,4 +1,4 @@
-// Number, BigInt and String do not mix (§9); operators keep JS semantics.
+// Number, BigInt and String do not mix; operators keep JS semantics.
 module App.Numbers exposing (big, mixed, text, compare)
 
 big : BigInt

@@ -1,5 +1,5 @@
 //! From the syntax of types, rows and kinds to [`Type`] and [`Kind`], checking
-//! kinds on the way (§5): every position decides the kind it expects, and the
+//! kinds on the way: every position decides the kind it expects, and the
 //! kinds of type variables follow from where they are used.
 
 use super::Checker;
@@ -17,7 +17,7 @@ mod rows;
 /// What a type variable that is not in scope means.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Free {
-    /// A signature: quantified over the whole signature (§3).
+    /// A signature: quantified over the whole signature.
     Quantify,
     /// A local annotation: a type yet to be inferred.
     Fresh,

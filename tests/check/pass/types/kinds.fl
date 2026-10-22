@@ -1,10 +1,10 @@
-// Kinds follow from positions (§5): `f` below is `Type -> Type`, rows keep
+// Kinds follow from positions: `f` below is `Type -> Type`, rows keep
 // their own kinds, and a finite kind indexes a type.
 module App.Kinds exposing (..)
 
-type Box (f : Type -> Type) a = { value : f a }
+type alias Box (f : Type -> Type) a = { value : f a }
 
-type Pair f a = Pair of f a, f a
+type Pair f a = Pair (f a) (f a)
 
 kind Nullability = NonNull | Nullable
 
@@ -13,7 +13,7 @@ type Js (n : Nullability) a
 service Clock =
   now : Unit ->{} Number
 
-error Timeout
+type error Timeout
 
 unwrap : Box f a -> f a
 let unwrap box = box.value

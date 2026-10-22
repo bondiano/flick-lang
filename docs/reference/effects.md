@@ -88,10 +88,20 @@ as its argument has already run when the function starts: the warning
 
 ## Expected errors
 
-`error E of T` declares an error with a nominal identity, its module and
-name, and a payload. The payload is data that outlives the code that raised
-it: a cell (`Ref`), a computation (`Eff`), a layer, a runtime function or an
-`Unknown` in it is `FLICK-E005`, also through the types it uses.
+`type error E = E T …` declares an error with a nominal identity, its module
+and name, and the fields of its one constructor `E`; `type error E` has no
+fields. The fields are data that outlive the code that raised the error: a
+cell (`Ref`), a computation (`Eff`), a layer, a runtime function or an
+`Unknown` in them is `FLICK-E005`, also through the types they use.
+
+An error may take type parameters: `type error RetryExhausted e =
+RetryExhausted e Number` keeps the last cause, `type error SendFailed a =
+SendFailed a` hands back the value that was not sent. A row tells its errors
+apart by name, not by arguments, so it holds at most one `RetryExhausted`:
+two of them in one row must have the same arguments (`FLICK-T003`). The
+TypeScript projection has the same shape, since the `_tag` of an error does
+not depend on its arguments: a union of errors holds each tag once and
+`catchTag` narrows it to one type.
 
 `try … with` handles the errors of its body. An error leaves the row only
 when an arm without a `when` guard matches every value of it; a guarded arm

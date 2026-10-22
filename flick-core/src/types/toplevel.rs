@@ -1,6 +1,6 @@
 //! The top level of a module: declarations are order-independent, so a value
 //! without a signature is inferred when it is first used. Recursion must be
-//! explicit (§3): a function that uses itself is `let rec`, functions that
+//! explicit: a function that uses itself is `let rec`, functions that
 //! use each other share a `rec { … }` group, and values never recurse.
 
 use std::collections::HashMap;

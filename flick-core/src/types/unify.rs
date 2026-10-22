@@ -43,7 +43,7 @@ pub enum Mismatch {
     Occurs(Type),
     /// A rigid type variable would leave the scope of its `forall`.
     Escape(String),
-    /// A type variable cannot stand for a polymorphic type (§5: predicative).
+    /// A type variable cannot stand for a polymorphic type (instantiation is predicative).
     Polymorphic(Type),
 }
 
@@ -140,7 +140,7 @@ impl Store {
 
     /// A row as its labelled entries and the row variables it extends:
     /// `{A | r} + {B | s}` is `A, B` and `r, s`. Repeated labels and tails
-    /// count once (§5 "Запись и объединение строк").
+    /// count once.
     pub fn normalize(&self, t: &Type) -> Norm {
         let mut norm = Norm::default();
         self.collect_row(t, &mut norm);
@@ -258,7 +258,7 @@ impl Checker<'_> {
     }
 
     /// The fixed projections of a row into a type, once the row is known
-    /// well enough: `Errors none` is `Never`, `Errors {E}` is `E` (§5), and
+    /// well enough: `Errors none` is `Never`, `Errors {E}` is `E`, and
     /// `ServiceImpl {S}` is `S.Impl`.
     fn project(&self, t: &Type) -> Option<Type> {
         let (head, args) = t.spine();

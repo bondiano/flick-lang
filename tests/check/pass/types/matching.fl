@@ -1,9 +1,9 @@
-// Exhaustive `match` (§5): every value of the scrutinee has an arm.
+// Exhaustive `match`: every value of the scrutinee has an arm.
 module App.Matching exposing (describe, area, flags, pairs, lists)
 
 type Shape =
-  | Circle of Number
-  | Rect of Number, Number
+  | Circle Number
+  | Rect Number Number
   | Empty
 
 describe : Option Number -> String

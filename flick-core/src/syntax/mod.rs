@@ -1,4 +1,4 @@
-//! Lexical and surface syntax (§3–§12): lexer, layout-aware parser, lossless
+//! Lexical and surface syntax: lexer, layout-aware parser, lossless
 //! concrete tree and its trivia-free AST view. Grammar: `docs/reference/grammar.md`.
 
 pub mod ast;

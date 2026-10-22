@@ -36,7 +36,7 @@ Qualified names are written without spaces around `.`: `Users.get`,
 ```text
 module exposing import as let rec fun match with try if then else task await
 scope provide ignore type opaque refined where kind error service class
-instance val deriving foreign from forall of not none true false schema codec
+instance val deriving foreign from forall not none true false schema codec
 sql ui in when do
 ```
 
@@ -214,14 +214,15 @@ decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
 rec_group   = "rec" "{" { signature | let } "}"
-type_decl   = ["opaque"] "type" Con { param } ["=" (variants | type)] [deriving]
+type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
+            | ["opaque"] "type" "alias" Con { param } "=" type [deriving]
             | "refined" "type" Con { param } "=" type "where" expr [deriving]
 variants    = ["|"] variant { "|" variant }
-variant     = Con ["of" type { "," type }]
+variant     = Con { capture }                   // fields are atomic types
 param       = name | "(" name ":" kind ")"
 deriving    = "deriving" Con { "," Con }
 kind_decl   = "kind" Con "=" ["|"] Con { "|" Con }
-error_decl  = "error" Con { param } ["of" type] [deriving]
+error_decl  = "type" "error" Con { param } ["=" variant] [deriving]
 service     = "service" Con { param } "=" members
 class       = "class" [context "=>"] Con { param } ["|" fundep { "," fundep }] "=" members
 fundep      = { name } "->" { name }
@@ -232,8 +233,17 @@ mode        = "pure" | "sync" | "async" | "effect"
 metadata    = indented lines: meta_name { atom }
 ```
 
-A right-hand side of `type` is a list of variants when `|` or `of` appears in
-it outside brackets; otherwise it is an alias (including a record type).
+The right-hand side of `type` is always a list of variants, so
+`type Wrapper = Wrap Number` is an ADT with one constructor; a transparent
+alias, a record type included, is written `type alias`. `alias` is a keyword
+only right after `type`. A field of a variant is an atomic type, as in a
+constructor pattern: `Some (List a)`, `Handler (a -> b)`, and
+`Circle (Point, Number)` has one tuple field where `Circle Point Number` has
+two. Writing `of` before the fields is `FLICK-S010`.
+
+`type error E` declares an error; its one constructor is named `E` too, and an
+error with fields is `type error E = E T …`. A constructor named otherwise is
+`FLICK-S007`.
 Every named function has its full signature right above its `let` (§3); the
 parser accepts a signature without a definition, and later phases check the
 pairing.
@@ -245,19 +255,19 @@ import App.Geometry exposing (Point)
 import Effect.Log as Log
 
 type Shape =
-  | Circle of Point, Number
-  | Rect of { origin : Point; size : Point }
+  | Circle Point Number
+  | Rect { origin : Point; size : Point }
   | Empty
   deriving Eq, Show
 
-opaque type UserId = String
+opaque type alias UserId = String
 
 refined type Port = Number where fun n -> n > 0 && n < 65536
   deriving Eq, Hash
 
 kind Nullability = NonNull | Nullable
 
-error NotFound of UserId
+type error NotFound = NotFound UserId
 
 service Clock =
   now : Unit ->{} Number

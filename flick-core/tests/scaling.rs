@@ -10,7 +10,7 @@ use flick_core::source::SourceMap;
 
 fn record_module(fields: usize) -> String {
     let names: Vec<String> = (0..fields).map(|i| format!("f{i}")).collect();
-    let mut out = String::from("module App.Big exposing (total)\n\ntype Big = {\n");
+    let mut out = String::from("module App.Big exposing (total)\n\ntype alias Big = {\n");
     for name in &names {
         let _ = writeln!(out, "  {name} : Number");
     }

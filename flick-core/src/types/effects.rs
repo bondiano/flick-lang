@@ -1,4 +1,4 @@
-//! Effects (§3, §4): every expression is checked at a *stage*, the part of
+//! Effects: every expression is checked at a *stage*, the part of
 //! the program that runs when one runtime arrow (or one `Eff`) is applied.
 //! A runtime call adds its service and error rows to the stage it runs at;
 //! a pure stage takes none, not even `->{}` (an empty row is not purity).
@@ -192,7 +192,7 @@ mod tests {
     fn suggestion(definition: &str) -> String {
         let text = format!(
             "module Probe exposing (..)\n\
-             error NotFound of Number\n\
+             type error NotFound = NotFound Number\n\
              service Users =\n  get : Number ->{{none; NotFound}} String\n\
              {definition}\n"
         );

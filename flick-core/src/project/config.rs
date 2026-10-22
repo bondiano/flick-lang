@@ -1,4 +1,4 @@
-//! `flick.toml` (§12): the schema version, `[project]` and `[build]`. Unknown
+//! `flick.toml`: the schema version, `[project]` and `[build]`. Unknown
 //! keys are errors so that a typo never silently means a default.
 
 use serde::Deserialize;

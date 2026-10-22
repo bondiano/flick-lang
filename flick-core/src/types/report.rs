@@ -49,7 +49,7 @@ impl Checker<'_> {
                     (x, y) if errors(x) || errors(y) => {
                         let other = self.show(if errors(x) { y } else { x });
                         format!(
-                            ": `{other}` is not an error; an error row holds types declared with `error`, so convert the value into one first"
+                            ": `{other}` is not an error; an error row holds types declared with `type error`, so convert the value into one first"
                         )
                     }
                     _ => {

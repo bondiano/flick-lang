@@ -1,14 +1,13 @@
-// Services and layers (§7 "Сервисы и классы типов", "Предоставление
-// окружения").
+// Services and layers.
 module App.Services exposing (..)
 
-type UserId = Number
+type alias UserId = Number
 
-type User = { id : UserId; name : String }
+type alias User = { id : UserId; name : String }
 
-error NotFound of UserId
+type error NotFound = NotFound UserId
 
-error ConnectError of String
+type error ConnectError = ConnectError String
 
 service Config =
   url : Unit ->{} String

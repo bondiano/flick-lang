@@ -3,7 +3,7 @@ use serde::Serialize;
 use crate::diagnostics::{Diagnostic, Severity};
 use crate::source::{SourceMap, Span};
 
-/// Version of the NDJSON event schema on stderr (`--diagnostics json`, §12).
+/// Version of the NDJSON event schema on stderr (`--diagnostics json`).
 pub const SCHEMA_VERSION: u32 = 1;
 
 /// One JSON object per line. Other event types (`log`, `application-stderr`,

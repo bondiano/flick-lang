@@ -6,15 +6,15 @@ type Status = Active | Disabled
 type Mode = Active | Off
 //          ^^^^^^ FLICK-R008 `Active` is defined more than once
 
-opaque type Id = Id of String
+opaque type Id = Id String
 //~ FLICK-R011 @1:46-1:52 opaque type `Id` cannot export its constructors
 
-type Name = String
+type alias Name = String
 //~ FLICK-R011 @1:54-1:62 `Name` has no constructors to export
 //~ FLICK-R011 @1:64-1:71 cannot export `missing`
 //~ FLICK-R011 @1:73-1:77 cannot export `Gone`
 
-type Alias = Number
+type alias Alias = Number
 //~ FLICK-R011 @1:79-1:88 `Alias` has no constructors
 
 load : Number -> Number

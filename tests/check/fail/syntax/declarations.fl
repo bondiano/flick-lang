@@ -1,0 +1,13 @@
+module App.Declarations exposing (..)
+
+// the one constructor of an error is named like the error
+type error Missing = NotFound String
+
+// an alias needs its definition
+type alias Size
+
+// the right-hand side of `type` lists variants: `alias` is not a constructor here
+type Wrapper = Wrap Number
+
+//~ FLICK-S007 @4:22-4:30 the constructor of an error is named like the error: `Missing`
+//~ FLICK-S007 @7:16-7:16 expected `=`, found the end of the line

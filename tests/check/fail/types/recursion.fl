@@ -1,6 +1,6 @@
 module App.Recursion exposing (..)
 
-type Nested a = Flat of a | Nest of Nested (List a)
+type Nested a = Flat a | Nest (Nested (List a))
 
 depth : Nested a -> Number
 let rec depth value =

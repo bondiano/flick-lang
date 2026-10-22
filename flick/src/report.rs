@@ -27,7 +27,7 @@ pub fn render(global: &GlobalArguments, sources: &SourceMap, diagnostics: &[Diag
 }
 
 /// Errors that mean a wrong invocation, configuration or missing dependency
-/// rather than a problem in the code: exit code `2` (§12).
+/// rather than a problem in the code: exit code `2`.
 const USAGE: [codes::Code; 7] = [
     codes::P005,
     codes::P006,

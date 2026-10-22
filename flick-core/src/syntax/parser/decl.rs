@@ -15,7 +15,7 @@ fn top_decl(p: &mut Parser) {
         K::ImportKw => import(p),
         K::RecKw => rec_group(p),
         K::KindKw => kind_decl(p),
-        K::ErrorKw => error_decl(p),
+        K::TypeKw if p.nth(1) == K::ErrorKw => error_decl(p),
         K::ServiceKw => service_decl(p),
         K::ClassKw => class_decl(p),
         K::InstanceKw => instance_decl(p),
@@ -183,62 +183,67 @@ fn type_params(p: &mut Parser) {
     }
 }
 
-/// Whether `|` or `of` appears at nesting depth 0 before the declaration ends.
-fn variants_ahead(p: &Parser) -> bool {
-    let mut depth = 0u32;
-    for i in p.pos..p.toks.len() {
-        if p.sep_at(i).is_some() {
-            break;
-        }
-        match p.toks[i].kind {
-            K::LParen | K::LBracket | K::LBrace => depth += 1,
-            K::RParen | K::RBracket | K::RBrace => depth = depth.saturating_sub(1),
-            K::Pipe | K::OfKw if depth == 0 => return true,
-            K::DerivingKw | K::WhereKw if depth == 0 => break,
-            _ => {}
-        }
-    }
-    false
-}
-
+/// `type Name params = variants`, `type alias Name params = T`, the nominal
+/// `opaque` and `refined` forms, or an abstract `type Name params`.
 fn type_decl(p: &mut Parser) {
     let m = p.start();
     let refined = p.at(K::RefinedKw);
     if !p.eat(K::OpaqueKw) {
         p.eat(K::RefinedKw);
     }
-    if p.expect(K::TypeKw) && p.expect(K::Con) {
-        type_params(p);
-        if p.eat(K::Eq) {
-            if refined {
-                types::type_(p);
-                let r = p.start();
-                if p.expect(K::WhereKw) {
-                    expr::expr(p);
-                }
-                p.complete(r, K::Refinement);
-            } else if variants_ahead(p) {
-                p.eat(K::Pipe);
-                variant(p);
-                while p.eat(K::Pipe) {
-                    variant(p);
-                }
-            } else {
-                types::type_(p);
-            }
+    if p.expect(K::TypeKw) {
+        // `alias` is a word only here: a type name is capitalized
+        let alias = !refined && p.at_word("alias") && p.nth(1) == K::Con;
+        if alias {
+            p.bump();
         }
-        deriving(p);
+        if p.expect(K::Con) {
+            type_params(p);
+            if alias {
+                if p.expect(K::Eq) {
+                    types::type_(p);
+                }
+            } else if p.eat(K::Eq) {
+                if refined {
+                    types::type_(p);
+                    let r = p.start();
+                    if p.expect(K::WhereKw) {
+                        expr::expr(p);
+                    }
+                    p.complete(r, K::Refinement);
+                } else {
+                    variants(p);
+                }
+            }
+            deriving(p);
+        }
     }
     p.complete(m, K::TypeDecl);
 }
 
-/// `Con [of T, …]`.
+fn variants(p: &mut Parser) {
+    p.eat(K::Pipe);
+    variant(p);
+    while p.eat(K::Pipe) {
+        variant(p);
+    }
+}
+
+/// `Con field…`; a field is an atomic type, so `Some (List a)` needs the parentheses.
 fn variant(p: &mut Parser) {
     let m = p.start();
-    if p.expect(K::Con) && p.eat(K::OfKw) {
-        types::type_(p);
-        while p.eat(K::Comma) {
-            types::type_(p);
+    if p.expect(K::Con) {
+        if p.at_word("of") {
+            let of = p.raw();
+            p.error_at(
+                codes::S010,
+                p.span(of.start, of.end),
+                "Flick has no `of` before constructor fields: write `Circle Number`, `Rect Number Number`".into(),
+            );
+            p.bump();
+        }
+        while types::at_atom_start(p) {
+            types::capture(p);
         }
     }
     p.complete(m, K::Variant);
@@ -261,22 +266,32 @@ fn kind_decl(p: &mut Parser) {
     let m = p.start();
     p.bump();
     if p.expect(K::Con) && p.expect(K::Eq) {
-        p.eat(K::Pipe);
-        variant(p);
-        while p.eat(K::Pipe) {
-            variant(p);
-        }
+        variants(p);
     }
     p.complete(m, K::KindDecl);
 }
 
+/// `type error Name params [= Name field…]`: the one constructor is named like the error.
 fn error_decl(p: &mut Parser) {
     let m = p.start();
     p.bump();
+    p.bump();
+    let name = p.at(K::Con).then(|| p.text_of(p.raw()));
     if p.expect(K::Con) {
         type_params(p);
-        if p.eat(K::OfKw) {
-            types::type_(p);
+        if p.eat(K::Eq) {
+            let con = p.raw();
+            if con.kind == K::Con && Some(p.text_of(con)) != name {
+                p.error_at(
+                    codes::S007,
+                    p.span(con.start, con.end),
+                    format!(
+                        "the constructor of an error is named like the error: `{}`",
+                        name.unwrap_or_default()
+                    ),
+                );
+            }
+            variant(p);
         }
         deriving(p);
     }

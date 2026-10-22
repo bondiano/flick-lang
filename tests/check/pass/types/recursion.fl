@@ -1,7 +1,7 @@
-// Recursion is explicit (§3); polymorphic recursion needs a full `forall`.
+// Recursion is explicit; polymorphic recursion needs a full `forall`.
 module App.Recursion exposing (depth, countdown, is_even, sum)
 
-type Nested a = Flat of a | Nest of Nested (List a)
+type Nested a = Flat a | Nest (Nested (List a))
 
 depth : forall a. Nested a -> Number
 let rec depth value =
