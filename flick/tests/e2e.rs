@@ -6,6 +6,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use flick_core::bootstrap;
+use flick_core::diagnostics::render;
 use flick_core::source::SourceMap;
 
 fn cases(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -36,11 +38,10 @@ fn run_case(case: &Path, out_dir: &Path) -> Option<String> {
         fs::read_to_string(case).expect("UTF-8 case"),
     );
     // shortcut: calls the bootstrap codegen directly; switch to `flick build` once it emits ESM
-    let js = match flick_core::bootstrap::compile(&sources, file) {
+    let js = match bootstrap::compile(&sources, file) {
         Ok(js) => js,
         Err(diagnostics) => {
-            let rendered =
-                flick_core::diagnostics::render::render_human(&sources, &diagnostics, false);
+            let rendered = render::render_human(&sources, &diagnostics, false);
             return Some(format!("  compile failed:\n{rendered}"));
         }
     };

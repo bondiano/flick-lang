@@ -4,6 +4,7 @@
 //! against the interfaces of its imports.
 
 use std::collections::BTreeMap;
+use std::io;
 use std::path::{Path, PathBuf};
 
 use super::config::Kind;
@@ -107,7 +108,7 @@ impl Loader<'_> {
     }
 
     /// Loads and registers a module file once; `Ok(None)` if it is already loaded.
-    fn load(&mut self, path: &Path) -> std::io::Result<Option<usize>> {
+    fn load(&mut self, path: &Path) -> io::Result<Option<usize>> {
         if self.modules.iter().any(|m| m.path == path) {
             return Ok(None);
         }

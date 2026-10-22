@@ -8,7 +8,7 @@ use std::mem;
 
 use super::matching::{Match, Subst, match_type};
 use super::{Dict, RECORD, Wanted, has_metas, split, vars};
-use crate::diagnostics::{Diagnostic, codes};
+use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::source::Span;
 use crate::types::Checker;
 use crate::types::env::Instance;
@@ -381,7 +381,7 @@ impl Checker<'_> {
     /// An error inside or around `span` already explains a failure there.
     fn explained(&self, span: Span) -> bool {
         self.diagnostics.iter().any(|d| {
-            d.severity == crate::diagnostics::Severity::Error
+            d.severity == Severity::Error
                 && d.span.is_some_and(|s| {
                     s.file == span.file && s.start <= span.end && span.start <= s.end
                 })

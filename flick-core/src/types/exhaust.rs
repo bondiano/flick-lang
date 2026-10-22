@@ -4,10 +4,13 @@
 //! leave no value unmatched (the diagnostic shows one); an arm that is not
 //! useful can never run. Guarded arms cover nothing, since the guard may fail.
 
+use std::{iter, slice};
+
 use super::Checker;
 use super::env::Form;
 use super::patterns::{Ctor, Pat};
 use super::ty::Type;
+use crate::diagnostics;
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
@@ -17,7 +20,7 @@ impl Checker<'_> {
     pub fn exhaustive(&mut self, node: &Node, arms: &[(Pat, bool, Span)]) {
         let mut rows: Vec<Vec<Pat>> = Vec::new();
         for (pat, guarded, span) in arms {
-            if self.useful(&rows, std::slice::from_ref(pat)).is_none() {
+            if self.useful(&rows, slice::from_ref(pat)).is_none() {
                 self.warning(
                     codes::T010,
                     *span,
@@ -34,7 +37,7 @@ impl Checker<'_> {
             let end = node.nodes().next().map_or(start, |s| s.range().1);
             let span = Span::new(self.file, start, end);
             self.diagnostics.push(
-                crate::diagnostics::Diagnostic::error(
+                diagnostics::Diagnostic::error(
                     codes::T009,
                     format!("`match` does not cover every value: `{shown}` is not matched"),
                     span,
@@ -72,7 +75,7 @@ impl Checker<'_> {
         let rows: Vec<Vec<Pat>> = rows.iter().flat_map(|r| expand(r)).collect();
         match first {
             Pat::Or(alternatives) => alternatives.iter().find_map(|alt| {
-                let v: Vec<Pat> = std::iter::once(alt.clone())
+                let v: Vec<Pat> = iter::once(alt.clone())
                     .chain(rest.iter().cloned())
                     .collect();
                 self.useful(&rows, &v)
@@ -124,7 +127,7 @@ impl Checker<'_> {
         {
             return all.iter().find_map(|(ctor, arity)| {
                 let specialized = specialize(rows, ctor, *arity);
-                let v: Vec<Pat> = std::iter::repeat_n(Pat::Wild, *arity)
+                let v: Vec<Pat> = iter::repeat_n(Pat::Wild, *arity)
                     .chain(rest.iter().cloned())
                     .collect();
                 let witness = self.useful(&specialized, &v)?;
@@ -152,7 +155,7 @@ impl Checker<'_> {
             }
             _ => Pat::Wild,
         };
-        Some(std::iter::once(missing).chain(witness).collect())
+        Some(iter::once(missing).chain(witness).collect())
     }
 
     /// Every constructor of the type `ctor` belongs to, with arities; `None`
@@ -251,7 +254,7 @@ fn expand(row: &[Pat]) -> Vec<Vec<Pat>> {
         Pat::Or(alternatives) => alternatives
             .iter()
             .flat_map(|alt| {
-                let r: Vec<Pat> = std::iter::once(alt.clone())
+                let r: Vec<Pat> = iter::once(alt.clone())
                     .chain(row[1..].iter().cloned())
                     .collect();
                 expand(&r)
@@ -316,7 +319,7 @@ fn specialize_record(rows: &[Vec<Pat>], labels: &[String]) -> Vec<Vec<Pat>> {
 
 fn rebuild(ctor: &Ctor, mut witness: Vec<Pat>, arity: usize) -> Vec<Pat> {
     let rest = witness.split_off(arity);
-    std::iter::once(Pat::Ctor(ctor.clone(), witness))
+    iter::once(Pat::Ctor(ctor.clone(), witness))
         .chain(rest)
         .collect()
 }
@@ -324,5 +327,5 @@ fn rebuild(ctor: &Ctor, mut witness: Vec<Pat>, arity: usize) -> Vec<Pat> {
 fn rebuild_record(labels: &[String], mut witness: Vec<Pat>) -> Vec<Pat> {
     let rest = witness.split_off(labels.len());
     let fields = labels.iter().cloned().zip(witness).collect();
-    std::iter::once(Pat::Record(fields)).chain(rest).collect()
+    iter::once(Pat::Record(fields)).chain(rest).collect()
 }

@@ -12,6 +12,7 @@ use super::ty::{Binder, Row, Type};
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
+use crate::{diagnostics, source};
 
 /// The definition of `S.Impl` for the service definition `def`.
 pub fn impl_def(def: &TypeDef) -> Option<TypeDef> {
@@ -102,7 +103,7 @@ impl Checker<'_> {
         name: &str,
         params: usize,
         scheme: &Type,
-        span: crate::source::Span,
+        span: source::Span,
     ) -> Type {
         let (vars, body) = match scheme {
             Type::Forall { vars, body, .. } => (vars.as_slice(), (**body).clone()),
@@ -160,7 +161,7 @@ impl Checker<'_> {
             .collect();
         if !both.is_empty() {
             self.diagnostics.push(
-                crate::diagnostics::Diagnostic::error(
+                diagnostics::Diagnostic::error(
                     codes::E004,
                     format!(
                         "both layers build {}: a merged environment has one implementation of each service",

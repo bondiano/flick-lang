@@ -21,6 +21,8 @@ use super::Checker;
 use super::convert::TyVar;
 use super::kinds::Kind;
 use super::ty::{Norm, Row, Type, capture_label};
+use crate::diagnostics;
+use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -483,8 +485,8 @@ impl Checker<'_> {
         };
         let name = self.store.skolem_name(skolem).to_owned();
         self.diagnostics.push(
-            crate::diagnostics::Diagnostic::error(
-                crate::diagnostics::codes::G002,
+            diagnostics::Diagnostic::error(
+                codes::G002,
                 format!(
                     "{head}: region `{name}` ends with its `scope`, so the value cannot leave it"
                 ),

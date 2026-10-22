@@ -1,11 +1,14 @@
 //! `flick.toml`: the schema version, `[project]` and `[build]`. Unknown
 //! keys are errors so that a typo never silently means a default.
 
-use serde::Deserialize;
-use toml::Spanned;
+use std::ops;
 
-use crate::diagnostics::{Diagnostic, codes};
+use serde::Deserialize;
+use toml::{Spanned, de};
+
+use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::source::{FileId, Span};
+use crate::types;
 
 pub const SCHEMA_VERSION: i64 = 1;
 
@@ -47,8 +50,8 @@ impl Default for Build {
             emit: Emit::Js,
             emit_dts: false,
             schema_aot: false,
-            solver_steps: crate::types::Limits::default().steps,
-            solver_depth: crate::types::Limits::default().depth,
+            solver_steps: types::Limits::default().steps,
+            solver_depth: types::Limits::default().depth,
         }
     }
 }
@@ -105,11 +108,10 @@ fn test_dir() -> String {
 /// Parses `flick.toml`; reports the first problem. The schema version is
 /// checked first: a file of another version is not judged by this schema.
 pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
-    let span =
-        |range: std::ops::Range<usize>| Span::new(file, offset(range.start), offset(range.end));
-    let invalid = |err: toml::de::Error| {
+    let span = |range: ops::Range<usize>| Span::new(file, offset(range.start), offset(range.end));
+    let invalid = |err: de::Error| {
         let message = format!("invalid `flick.toml`: {}", err.message().trim_end());
-        let diagnostic = Diagnostic::new(codes::P005, crate::diagnostics::Severity::Error, message);
+        let diagnostic = Diagnostic::new(codes::P005, Severity::Error, message);
         match err.span() {
             Some(range) => diagnostic.with_span(span(range)),
             None => diagnostic,

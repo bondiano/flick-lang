@@ -1,4 +1,6 @@
 use std::collections::BTreeMap;
+use std::io;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use super::{Host, Project, check, discover, is_module_name, module_name, module_path, normalize};
@@ -7,11 +9,11 @@ use crate::source::SourceMap;
 struct Memory(BTreeMap<PathBuf, String>);
 
 impl Host for Memory {
-    fn read(&self, path: &Path) -> std::io::Result<Vec<u8>> {
+    fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
         self.0
             .get(path)
             .map(|text| text.clone().into_bytes())
-            .ok_or_else(|| std::io::ErrorKind::NotFound.into())
+            .ok_or_else(|| ErrorKind::NotFound.into())
     }
 
     fn display(&self, path: &Path) -> String {

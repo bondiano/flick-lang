@@ -1,5 +1,7 @@
 //! Parser events and their conversion into the lossless tree.
 
+use std::mem;
+
 use super::super::cst::{Element, Node, Token};
 use super::super::kind::SyntaxKind;
 use super::super::lexer::RawToken;
@@ -34,7 +36,7 @@ pub(super) fn build(raw: &[RawToken], mut events: Vec<Event>) -> Node {
     };
     let mut kinds = Vec::new();
     for i in 0..events.len() {
-        match std::mem::replace(
+        match mem::replace(
             &mut events[i],
             Event::Start {
                 kind: None,
@@ -49,7 +51,7 @@ pub(super) fn build(raw: &[RawToken], mut events: Vec<Event>) -> Node {
                 kinds.extend(kind);
                 let mut parent = forward_parent;
                 while let Some(at) = parent {
-                    match std::mem::replace(
+                    match mem::replace(
                         &mut events[at],
                         Event::Start {
                             kind: None,

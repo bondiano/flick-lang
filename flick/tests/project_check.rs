@@ -2,12 +2,14 @@
 
 mod common;
 
+use std::{env, process};
+
 use common::{flick, flick_in};
 
 const PROJECTS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/check/projects");
 
 /// Exit code and the diagnostic codes of a JSON run.
-fn codes(out: &std::process::Output) -> (Option<i32>, Vec<String>) {
+fn codes(out: &process::Output) -> (Option<i32>, Vec<String>) {
     let stderr = String::from_utf8_lossy(&out.stderr);
     let codes = stderr
         .lines()
@@ -106,7 +108,7 @@ fn configuration_and_missing_dependencies_exit_with_2() {
 
 #[test]
 fn without_a_project_check_needs_paths() {
-    let dir = std::env::temp_dir();
+    let dir = env::temp_dir();
     let out = flick_in(&dir, &["check", "--diagnostics", "json"]);
     assert_eq!(codes(&out), (Some(2), vec!["FLICK-P008".to_owned()]));
     let out = flick(&["check", "--project", "tests/check/projects/nowhere"]);

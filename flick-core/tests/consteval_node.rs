@@ -10,7 +10,7 @@ use std::process::{Command, Stdio};
 use flick_core::consteval::{Const, eval};
 use flick_core::source::SourceMap;
 use flick_core::syntax::kind::SyntaxKind;
-use flick_core::syntax::parse;
+use flick_core::syntax::{literal, parse};
 
 struct Rng(u64);
 
@@ -102,7 +102,7 @@ fn gen_expr(rng: &mut Rng, ty: Ty, depth: u32) -> (String, String) {
                 r#""é""#,
                 r#"r"\x""#,
             ]);
-            let value = flick_core::syntax::literal::string_value(s);
+            let value = literal::string_value(s);
             (s.to_owned(), serde_json::to_string(&value).expect("json"))
         }
         Ty::String => bin(rng, "++", "+", Ty::String, Ty::String),

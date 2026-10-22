@@ -5,12 +5,12 @@
 //! any of its files, `#` comments in `flick.toml`, are its expectations.
 //! Reports a diff per file.
 
-use std::fmt;
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{fmt, fs, io};
 
 use flick_core::diagnostics::{Diagnostic, codes};
 use flick_core::project::{self, Host};
+use flick_core::source;
 use flick_core::source::{SourceFile, SourceMap};
 
 /// 1-based `line:col-line:col`, columns in characters, end exclusive.
@@ -249,7 +249,7 @@ fn diff_reports_missing_and_unexpected() {
     let actual = [Diagnostic::error(
         codes::S002,
         "boom",
-        flick_core::source::Span::new(file, 5, 7),
+        source::Span::new(file, 5, 7),
     )];
     let ok = parse_annotations("ab\nцde\n//~ FLICK-S002 @2:2-2:4 bo\n").expect("valid");
     let actual: Vec<_> = actual.iter().collect();
@@ -269,7 +269,7 @@ struct FixtureHost {
 }
 
 impl Host for FixtureHost {
-    fn read(&self, path: &Path) -> std::io::Result<Vec<u8>> {
+    fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
         fs::read(path)
     }
 

@@ -4,6 +4,7 @@ use super::Dict;
 use crate::iface::Interface;
 use crate::resolve::{self, Module};
 use crate::source::SourceMap;
+use crate::syntax;
 use crate::types::{Limits, Options, builtins, check_with_evidence};
 
 /// Checks `modules` in order, each seeing the interfaces of those before;
@@ -14,7 +15,7 @@ fn check_all(modules: &[(&str, &str)]) -> (Vec<String>, Vec<Dict>) {
     for (name, text) in modules {
         let mut sources = SourceMap::default();
         let file = sources.add(format!("{name}.fl"), *text);
-        let parse = crate::syntax::parse(text, file);
+        let parse = syntax::parse(text, file);
         let syntax = resolve::module_syntax(&parse.tree, text, file);
         let module = Module {
             name,

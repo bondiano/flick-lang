@@ -3,6 +3,7 @@
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::{env, fs, io};
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::Host;
@@ -16,14 +17,14 @@ pub struct FsHost {
 impl FsHost {
     pub fn new() -> Self {
         FsHost {
-            cwd: std::env::current_dir().unwrap_or_default(),
+            cwd: env::current_dir().unwrap_or_default(),
         }
     }
 }
 
 impl Host for FsHost {
-    fn read(&self, path: &Path) -> std::io::Result<Vec<u8>> {
-        std::fs::read(path)
+    fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
+        fs::read(path)
     }
 
     fn display(&self, path: &Path) -> String {
@@ -35,7 +36,7 @@ impl Host for FsHost {
 }
 
 pub fn load(sources: &mut SourceMap, path: &str) -> Result<FileId, Diagnostic> {
-    let bytes = std::fs::read(path).map_err(|err| {
+    let bytes = fs::read(path).map_err(|err| {
         Diagnostic::new(
             codes::P001,
             Severity::Error,
@@ -48,7 +49,7 @@ pub fn load(sources: &mut SourceMap, path: &str) -> Result<FileId, Diagnostic> {
 /// Reads stdin, shown in diagnostics as `path`.
 pub fn load_stdin(sources: &mut SourceMap, path: &str) -> Result<FileId, Diagnostic> {
     let mut bytes = Vec::new();
-    std::io::stdin().read_to_end(&mut bytes).map_err(|err| {
+    io::stdin().read_to_end(&mut bytes).map_err(|err| {
         Diagnostic::new(
             codes::P001,
             Severity::Error,
@@ -64,7 +65,7 @@ fn added((file, utf8): (FileId, Option<Diagnostic>)) -> Result<FileId, Diagnosti
 
 /// `.fl` files under `path` in a stable order; a file path is kept as given.
 pub fn source_files(path: &str, out: &mut Vec<String>) {
-    let Ok(entries) = std::fs::read_dir(path) else {
+    let Ok(entries) = fs::read_dir(path) else {
         out.push(path.to_owned());
         return;
     };

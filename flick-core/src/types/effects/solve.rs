@@ -3,11 +3,13 @@
 //! unknown at the end is the empty row, the least solution. Then every
 //! constraint either holds or names what its bound lacks.
 
+use std::mem;
+
 use super::Site;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
-use crate::types::Checker;
 use crate::types::ty::{Row, Type};
+use crate::types::{Checker, regions};
 
 /// The row `actual` of a call must be part of `declared`.
 #[derive(Debug, Clone)]
@@ -136,7 +138,7 @@ impl Checker<'_> {
 
     fn report_rows(&mut self) {
         let mut excess: Vec<Excess> = Vec::new();
-        for c in std::mem::take(&mut self.subrows) {
+        for c in mem::take(&mut self.subrows) {
             let actual = self.store.normalize(&c.actual);
             let declared = self.store.normalize(&c.declared);
             let mut lacking = Vec::new();
@@ -147,7 +149,7 @@ impl Checker<'_> {
                             self.mismatch(&m, ty, bound, c.span);
                         }
                     }
-                    None if label == crate::types::regions::SCOPE => self.no_owner(c.span),
+                    None if label == regions::SCOPE => self.no_owner(c.span),
                     None => lacking.push(self.show(ty)),
                 }
             }

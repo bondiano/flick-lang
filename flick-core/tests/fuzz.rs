@@ -4,8 +4,8 @@
 //! format idempotently and type-check without panicking. `FLICK_FUZZ_ITERATIONS` sets the number of mutated
 //! inputs (default 20 000; the nightly CI job runs 1 000 000 in release).
 
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{env, fs, panic};
 
 use flick_core::source::SourceMap;
 use flick_core::syntax::parse;
@@ -119,7 +119,7 @@ fn mutate(rng: &mut Rng, text: &str) -> String {
 
 #[test]
 fn front_end_survives_mutated_corpus() {
-    let iterations: usize = std::env::var("FLICK_FUZZ_ITERATIONS")
+    let iterations: usize = env::var("FLICK_FUZZ_ITERATIONS")
         .ok()
         .and_then(|n| n.parse().ok())
         .unwrap_or(20_000);
@@ -134,7 +134,7 @@ fn front_end_survives_mutated_corpus() {
         let input = mutate(&mut rng, &seeds[i % seeds.len()]);
         let mut sources = SourceMap::default();
         let file = sources.add("fuzz.fl", input.as_str());
-        let parsed = std::panic::catch_unwind(|| parse(&input, file))
+        let parsed = panic::catch_unwind(|| parse(&input, file))
             .unwrap_or_else(|_| panic!("parser panicked on iteration {i}:\n{input}"));
         assert_eq!(
             parsed.tree.text(&input),
@@ -150,7 +150,7 @@ fn front_end_survives_mutated_corpus() {
         }
         // the checker runs on what parses cleanly
         if parsed.diagnostics.is_empty() {
-            std::panic::catch_unwind(|| flick_core::check(&sources, file))
+            panic::catch_unwind(|| flick_core::check(&sources, file))
                 .unwrap_or_else(|_| panic!("checker panicked on iteration {i}:\n{input}"));
         }
     }

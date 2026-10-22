@@ -10,6 +10,7 @@ use crate::diagnostics::codes;
 use crate::iface::Namespace;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::literal;
 
 mod kinds;
 mod rows;
@@ -367,7 +368,7 @@ impl Checker<'_> {
         match first.kind {
             K::NoneKw => return Some((Type::empty_row(), self.kinds.fresh())),
             K::String => {
-                let label = crate::syntax::literal::string_value(first.text(self.text));
+                let label = literal::string_value(first.text(self.text));
                 return Some((Type::Symbol(label), Kind::Symbol));
             }
             K::Ident => {

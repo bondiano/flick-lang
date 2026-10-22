@@ -10,6 +10,7 @@ use super::effects::{Site, Stage};
 use super::regions::Held;
 use super::ty::{Row, Type};
 use crate::diagnostics::codes;
+use crate::source;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -410,7 +411,7 @@ impl Checker<'_> {
         closures: Vec<(Held, Option<Type>)>,
         unknown: Option<&(usize, Type)>,
         result: Type,
-        span: crate::source::Span,
+        span: source::Span,
     ) -> Type {
         let mut ty = result;
         for (i, ((param, effects), (held, expected))) in
@@ -453,7 +454,7 @@ impl Checker<'_> {
         arm: &Node,
         scrutinee: &Type,
         result: &Type,
-    ) -> (super::patterns::Pat, bool, crate::source::Span) {
+    ) -> (super::patterns::Pat, bool, source::Span) {
         let mark = self.locals.len();
         let mut pat = super::patterns::Pat::Wild;
         let mut guarded = false;

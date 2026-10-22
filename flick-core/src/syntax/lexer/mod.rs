@@ -2,6 +2,8 @@
 //! included), so the tree built over them is lossless. Malformed literals still
 //! become one token plus a diagnostic, so the parser sees no cascade.
 
+use std::iter;
+
 use super::kind::{SyntaxKind, keyword};
 use crate::diagnostics::{Code, Diagnostic, codes};
 use crate::source::{FileId, Span};
@@ -244,9 +246,7 @@ impl Lexer<'_> {
         let start = self.pos;
         let hashes = self.raw_string_start().expect("raw string start");
         self.pos += 2 + hashes;
-        let close: String = std::iter::once('"')
-            .chain(std::iter::repeat_n('#', hashes))
-            .collect();
+        let close: String = iter::once('"').chain(iter::repeat_n('#', hashes)).collect();
         if let Some(at) = self.rest().find(&close) {
             self.pos += at + close.len();
         } else {

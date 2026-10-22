@@ -2,7 +2,7 @@
 //! area letter is the code's range. Codes are never reused: a code that stops
 //! being emitted stays registered and is marked retired in its explanation.
 
-use std::fmt;
+use std::{fmt, str};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Area {
@@ -63,7 +63,7 @@ impl fmt::Display for Code {
     }
 }
 
-impl std::str::FromStr for Code {
+impl str::FromStr for Code {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, ()> {

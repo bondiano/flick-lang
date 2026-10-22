@@ -9,8 +9,8 @@ use std::mem;
 use super::{Hold, Visible};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
-use crate::types::Checker;
 use crate::types::ty::{Norm, Row, Type};
+use crate::types::{Checker, ty};
 
 /// `Outlives c s`: the captures `c` live at least as long as the region `s`.
 #[derive(Debug, Clone)]
@@ -150,7 +150,7 @@ impl Checker<'_> {
     /// An inferred qualifier lacks only what its value takes out of a scope;
     /// a written one lacks what it does not allow.
     fn report_hold(&mut self, hold: &Hold, atom: &Type, bound: &Norm) {
-        let label = crate::types::ty::capture_label(atom).unwrap_or_default();
+        let label = ty::capture_label(atom).unwrap_or_default();
         let holder = hold
             .held
             .iter()

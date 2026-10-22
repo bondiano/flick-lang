@@ -169,11 +169,12 @@ mod tests {
     use super::*;
     use crate::resolve::{self, Module};
     use crate::source::SourceMap;
+    use crate::{syntax, types};
 
     fn interface_of(text: &str) -> Interface {
         let mut sources = SourceMap::default();
         let file = sources.add("t.fl", text);
-        let parse = crate::syntax::parse(text, file);
+        let parse = syntax::parse(text, file);
         let syntax = resolve::module_syntax(&parse.tree, text, file);
         let module = Module {
             name: "App.Shapes",
@@ -186,12 +187,12 @@ mod tests {
         let local = |name: &str| name == "App.Shapes";
         let options = crate::types::Options {
             local: &local,
-            limits: crate::types::Limits::default(),
+            limits: types::Limits::default(),
         };
-        diagnostics.extend(crate::types::check(
+        diagnostics.extend(types::check(
             &module,
             &|_| None,
-            crate::types::builtins(),
+            types::builtins(),
             options,
             &mut interface,
         ));

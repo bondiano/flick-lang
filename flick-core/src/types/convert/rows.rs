@@ -6,10 +6,10 @@ use crate::diagnostics::codes;
 use crate::iface::Namespace;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::Checker;
 use crate::types::env::{Form, Found};
 use crate::types::kinds::Kind;
 use crate::types::ty::{Effects, Row, Type};
+use crate::types::{Checker, ty};
 
 impl Checker<'_> {
     /// `{r; e}` of a runtime arrow; `{}` leaves both rows empty.
@@ -146,7 +146,7 @@ impl Checker<'_> {
                 }
                 Some(format!("{module}.{name}"))
             }
-            _ if *kind == Kind::CaptureRow => crate::types::ty::capture_label(ty),
+            _ if *kind == Kind::CaptureRow => ty::capture_label(ty),
             Type::Var(name) => Some(name.clone()),
             Type::Skolem(s) => Some(self.store.skolem_name(*s).to_owned()),
             _ => None,

@@ -2,6 +2,7 @@
 
 use std::io::{IsTerminal, Write};
 use std::process::ExitCode;
+use std::{env, io};
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes, render as renderers};
 use flick_core::source::SourceMap;
@@ -15,15 +16,13 @@ pub fn render(global: &GlobalArguments, sources: &SourceMap, diagnostics: &[Diag
             let color = match global.color {
                 Color::Always => true,
                 Color::Never => false,
-                Color::Auto => {
-                    std::io::stderr().is_terminal() && std::env::var_os("NO_COLOR").is_none()
-                }
+                Color::Auto => io::stderr().is_terminal() && env::var_os("NO_COLOR").is_none(),
             };
             renderers::render_human(sources, diagnostics, color)
         }
     };
     // stderr closed: nothing useful left to do with the error
-    let _ = std::io::stderr().lock().write_all(out.as_bytes());
+    let _ = io::stderr().lock().write_all(out.as_bytes());
 }
 
 /// Errors that mean a wrong invocation, configuration or missing dependency

@@ -1,6 +1,7 @@
 //! Runs the built `flick` binary from the repository root.
 
 use std::io::Write;
+use std::path;
 use std::process::{Command, Output, Stdio};
 
 pub fn flick(args: &[&str]) -> Output {
@@ -8,7 +9,7 @@ pub fn flick(args: &[&str]) -> Output {
 }
 
 /// Runs `flick` with the working directory `dir`.
-pub fn flick_in(dir: impl AsRef<std::path::Path>, args: &[&str]) -> Output {
+pub fn flick_in(dir: impl AsRef<path::Path>, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_flick"))
         .args(args)
         .current_dir(dir)

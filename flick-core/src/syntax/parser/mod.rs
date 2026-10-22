@@ -15,14 +15,16 @@ mod expr;
 mod pattern;
 mod types;
 
+use std::{iter, mem};
+
+use SyntaxKind as K;
+use build::{Event, build};
+
 use super::cst::Node;
 use super::kind::{SyntaxKind, describe};
 use super::lexer::{RawToken, lex};
 use crate::diagnostics::{Code, Diagnostic, codes};
 use crate::source::{FileId, Span};
-use build::{Event, build};
-
-use SyntaxKind as K;
 
 pub struct Parse {
     pub tree: Node,
@@ -432,7 +434,7 @@ impl<'t> Parser<'t> {
                 "unexpected indentation: column {} continues nothing here; \
                  statements of the enclosing blocks start at column {}",
                 t.col + 1,
-                std::iter::once("1".to_owned())
+                iter::once("1".to_owned())
                     .chain(cols)
                     .collect::<Vec<_>>()
                     .join(", ")
@@ -488,7 +490,7 @@ impl<'t> Parser<'t> {
                 }
             }
             let before = self.pos;
-            let outer = std::mem::replace(&mut self.failed, false);
+            let outer = mem::replace(&mut self.failed, false);
             item(self);
             item_failed = self.failed;
             self.failed = outer || item_failed;

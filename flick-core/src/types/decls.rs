@@ -10,6 +10,7 @@ use super::kinds::Kind;
 use super::ty::{Binder, Type};
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
+use crate::resolve;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -85,7 +86,7 @@ impl Checker<'_> {
             })
             .collect();
         let cyclic: Vec<String> = (0..aliases.len())
-            .filter(|&i| crate::resolve::shortest_cycle(i, &edges).is_some())
+            .filter(|&i| resolve::shortest_cycle(i, &edges).is_some())
             .map(|i| aliases[i].to_owned())
             .collect();
         for name in cyclic {

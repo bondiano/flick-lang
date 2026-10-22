@@ -1,9 +1,12 @@
 //! Patterns: their types, the names they bind, and their shape for the
 //! exhaustiveness check.
 
+use std::iter;
+
 use super::ty::{Row, Type};
 use super::{Checker, Local};
 use crate::diagnostics::codes;
+use crate::iface;
 use crate::iface::Namespace;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -256,7 +259,7 @@ impl Checker<'_> {
         let mut args_pats = Vec::new();
         for (arg, param) in args
             .iter()
-            .zip(params.iter().chain(std::iter::repeat(&Type::Error)))
+            .zip(params.iter().chain(iter::repeat(&Type::Error)))
         {
             args_pats.push(self.bind_pattern(arg, param));
         }
@@ -275,12 +278,7 @@ impl Checker<'_> {
 
     /// The entity of a constructor; `None` after a diagnostic or when its
     /// module could not be checked.
-    fn constructor(
-        &mut self,
-        qualifier: &str,
-        name: &str,
-        node: &Node,
-    ) -> Option<crate::iface::Entity> {
+    fn constructor(&mut self, qualifier: &str, name: &str, node: &Node) -> Option<iface::Entity> {
         if !qualifier.is_empty() {
             let found = self.env.qualified_module(qualifier).map(|(_, interface)| {
                 interface

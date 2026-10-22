@@ -10,6 +10,7 @@ use std::path::{Component, Path, PathBuf};
 
 pub use config::Config;
 pub use load::check;
+use std::io;
 
 #[cfg(test)]
 mod tests;
@@ -21,7 +22,7 @@ pub const CONFIG_FILE: &str = "flick.toml";
 
 /// File access for the project model; paths are absolute.
 pub trait Host {
-    fn read(&self, path: &Path) -> std::io::Result<Vec<u8>>;
+    fn read(&self, path: &Path) -> io::Result<Vec<u8>>;
     /// The path as diagnostics show it.
     fn display(&self, path: &Path) -> String;
 }

@@ -4,9 +4,10 @@
 //! idempotently without changing the AST. `tests/syntax/*.fl` must parse
 //! without diagnostics.
 
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{env, fs, panic};
 
+use flick_core::fmt;
 use flick_core::source::SourceMap;
 use flick_core::syntax::parse;
 
@@ -107,7 +108,7 @@ fn spec_examples_parse_and_are_pinned() {
 #[test]
 #[ignore = "debug helper"]
 fn dump() {
-    let blocks = match std::env::var("DUMP_FILE") {
+    let blocks = match env::var("DUMP_FILE") {
         Ok(path) => vec![(1, fs::read_to_string(path).expect("DUMP_FILE"))],
         Err(_) => flick_blocks(&fs::read_to_string(root().join(SPEC)).expect("spec")),
     };
@@ -118,7 +119,7 @@ fn dump() {
         let tree = parse(&text, file).tree.debug_dump(&text);
         out.extend(["=== ", &line.to_string(), "\n", &text, &tree]);
     }
-    fs::write(std::env::var("DUMP").expect("DUMP"), out).expect("write");
+    fs::write(env::var("DUMP").expect("DUMP"), out).expect("write");
 }
 
 fn fl_files(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -209,7 +210,7 @@ fn checker_survives_the_corpus() {
     for (name, text) in corpus() {
         let mut sources = SourceMap::default();
         let file = sources.add(name.as_str(), text.as_str());
-        let result = std::panic::catch_unwind(|| flick_core::check(&sources, file));
+        let result = panic::catch_unwind(|| flick_core::check(&sources, file));
         assert!(result.is_ok(), "{name}: the checker panicked");
     }
 }
@@ -229,8 +230,8 @@ fn corpus_is_lossless_and_formats_stably() {
             continue;
         }
         // `format` itself rejects output whose AST differs from the input's
-        match flick_core::fmt::format(&text, file) {
-            Ok(once) => match flick_core::fmt::format(&once, file) {
+        match fmt::format(&text, file) {
+            Ok(once) => match fmt::format(&once, file) {
                 Ok(twice) if twice == once => formatted += 1,
                 Ok(twice) => problems.push(format!(
                     "{name}: not idempotent\n--- once\n{once}--- twice\n{twice}"

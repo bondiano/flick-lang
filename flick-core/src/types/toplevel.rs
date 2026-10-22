@@ -12,6 +12,7 @@ use super::convert::is_type;
 use super::ty::Type;
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
+use crate::resolve;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -349,7 +350,7 @@ impl<'a> Checker<'a> {
             if reported[start] {
                 continue;
             }
-            let Some(cycle) = crate::resolve::shortest_cycle(start, &next) else {
+            let Some(cycle) = resolve::shortest_cycle(start, &next) else {
                 continue;
             };
             let items = &self.top.items;

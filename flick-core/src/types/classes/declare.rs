@@ -9,14 +9,15 @@ use super::prims::PRIMITIVES;
 use super::solve::Outcome;
 use super::{ClassInfo, RECORD, split, vars};
 use crate::diagnostics::{Diagnostic, codes};
+use crate::resolve;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::Checker;
 use crate::types::convert::{Free, is_type};
 use crate::types::env::Instance;
 use crate::types::kinds::Kind;
 use crate::types::ty::{Binder, Type};
+use crate::types::{Checker, env};
 
 /// An instance this module declares, written or derived.
 pub struct Declared<'n> {
@@ -55,7 +56,7 @@ impl<'n> Checker<'_> {
             if reported[start] {
                 continue;
             }
-            let Some(cycle) = crate::resolve::shortest_cycle(start, &edges) else {
+            let Some(cycle) = resolve::shortest_cycle(start, &edges) else {
                 continue;
             };
             let names: Vec<&str> = cycle
@@ -411,7 +412,7 @@ impl<'n> Checker<'_> {
 }
 
 /// `a b -> c` with the class's parameter names.
-fn fundep_text(params: &[String], fd: &crate::types::env::Fundep) -> String {
+fn fundep_text(params: &[String], fd: &env::Fundep) -> String {
     let names = |is: &[usize]| {
         is.iter()
             .map(|&i| params.get(i).map_or("?", String::as_str))

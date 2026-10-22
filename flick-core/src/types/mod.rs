@@ -48,7 +48,7 @@ use env::Env;
 use kinds::KindStore;
 use unify::Store;
 
-use crate::diagnostics::{Code, Diagnostic, Severity};
+use crate::diagnostics::{Code, Diagnostic, Severity, codes};
 use crate::iface::Interface;
 use crate::resolve::Module;
 use crate::source::{FileId, Span};
@@ -216,7 +216,7 @@ impl Checker<'_> {
 
     fn duplicate_label(&mut self, label: &str, span: Span) {
         self.error(
-            crate::diagnostics::codes::T014,
+            codes::T014,
             span,
             format!("field `{label}` is given more than once; labels of a record are unique"),
         );

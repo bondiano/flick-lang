@@ -2,6 +2,8 @@
 //! `Number` or `BigInt`, `++` on `String` or `List`, comparisons on the
 //! three primitive domains; operands never mix types or coerce.
 
+use std::mem;
+
 use super::ty::Type;
 use super::{Checker, Local, Operator};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
@@ -371,7 +373,7 @@ impl Checker<'_> {
     /// inferred; an operand type nothing determined becomes the first
     /// allowed type (`Number`, or `String` for `++`).
     pub fn settle_operators(&mut self) {
-        for op in std::mem::take(&mut self.operators) {
+        for op in mem::take(&mut self.operators) {
             let ty = self.whnf(&op.ty);
             let (head, _) = ty.spine();
             let fits = match head {

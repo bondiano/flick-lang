@@ -13,6 +13,8 @@
 //! wrapped line is kept only if the whole file still parses to the same AST;
 //! otherwise it stays long.
 
+use std::mem;
+
 use super::{K, Line, Tok, join, space};
 
 pub const WIDTH: usize = 100;
@@ -42,7 +44,7 @@ pub(super) fn wrap_long_lines(
             continue;
         }
         let wrapped: Vec<String> = pieces.iter().map(|(n, t)| join(text, *n, t)).collect();
-        let long = std::mem::replace(&mut rendered[i], wrapped.join("\n"));
+        let long = mem::replace(&mut rendered[i], wrapped.join("\n"));
         if !same_program(&assemble(&rendered)) {
             rendered[i] = long;
         }

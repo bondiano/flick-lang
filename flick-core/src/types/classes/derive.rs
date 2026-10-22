@@ -2,6 +2,8 @@
 //! constructor, requiring the class of each type parameter. `Hash` and `Ord`
 //! are derived only together with `Eq`, so all of them use the same fields.
 
+use std::ptr;
+
 use super::declare::Declared;
 use super::solve::Outcome;
 use super::{STRUCTURAL, has_metas};
@@ -125,7 +127,7 @@ impl<'n> Checker<'_> {
             Form::Nominal if decl.has_token(K::RefinedKw) => {
                 let base = refined
                     .iter()
-                    .find(|(predicate, _)| decl.nodes().any(|n| std::ptr::eq(n, *predicate)));
+                    .find(|(predicate, _)| decl.nodes().any(|n| ptr::eq(n, *predicate)));
                 return Some(base.map(|(_, b)| vec![b.clone()]).unwrap_or_default());
             }
             Form::Alias { .. } => format!(

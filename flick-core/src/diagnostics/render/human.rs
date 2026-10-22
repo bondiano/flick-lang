@@ -1,3 +1,5 @@
+use std::{iter, mem};
+
 use annotate_snippets::{AnnotationKind, Group, Level, Patch, Renderer, Snippet};
 
 use crate::diagnostics::{Diagnostic, Fix, Severity};
@@ -42,7 +44,7 @@ fn report<'a>(sources: &'a SourceMap, d: &'a Diagnostic) -> Vec<Group<'a>> {
             .span(related.span.range())
             .label(related.message.as_str());
         match snippets.iter_mut().find(|(f, _)| *f == related.span.file) {
-            Some((_, s)) => *s = std::mem::replace(s, Snippet::source("")).annotation(annotation),
+            Some((_, s)) => *s = mem::replace(s, Snippet::source("")).annotation(annotation),
             None => snippets.push((
                 related.span.file,
                 snippet(sources, related.span.file).annotation(annotation),
@@ -50,7 +52,7 @@ fn report<'a>(sources: &'a SourceMap, d: &'a Diagnostic) -> Vec<Group<'a>> {
         }
     }
     let main = title.elements(snippets.into_iter().map(|(_, s)| s));
-    std::iter::once(main)
+    iter::once(main)
         .chain(d.fixes.iter().map(|fix| fix_group(sources, fix)))
         .collect()
 }
@@ -60,7 +62,7 @@ fn fix_group<'a>(sources: &'a SourceMap, fix: &'a Fix) -> Group<'a> {
     for edit in &fix.edits {
         let patch = Patch::new(edit.span.range(), edit.replacement.as_str());
         match snippets.iter_mut().find(|(f, _)| *f == edit.span.file) {
-            Some((_, s)) => *s = std::mem::replace(s, Snippet::source("")).patch(patch),
+            Some((_, s)) => *s = mem::replace(s, Snippet::source("")).patch(patch),
             None => snippets.push((
                 edit.span.file,
                 snippet(sources, edit.span.file).patch(patch),

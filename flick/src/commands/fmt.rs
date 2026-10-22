@@ -1,7 +1,10 @@
 use std::io::Write;
+use std::{fs, io};
 
 use clap::CommandFactory;
+use clap::error::ErrorKind;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
+use flick_core::fmt;
 use flick_core::source::{FileId, SourceMap, Span};
 
 use crate::args::{CommandArguments, FmtArguments};
@@ -19,7 +22,7 @@ impl FmtCommand {
         if options.stdin_filepath.is_some() && !options.stdin {
             CommandArguments::command()
                 .error(
-                    clap::error::ErrorKind::MissingRequiredArgument,
+                    ErrorKind::MissingRequiredArgument,
                     "`--stdin-filepath` requires `--stdin`",
                 )
                 .exit();
@@ -42,14 +45,14 @@ impl FmtCommand {
                 }
             };
             let text = &outcome.sources.get(file).text;
-            match flick_core::fmt::format(text, file) {
+            match fmt::format(text, file) {
                 Ok(out) if out == *text => {}
                 Ok(out) if self.options.check => {
                     let unformatted = not_formatted(&outcome.sources, file, &out);
                     outcome.diagnostics.push(unformatted);
                 }
                 Ok(out) => {
-                    if let Err(err) = std::fs::write(&path, out) {
+                    if let Err(err) = fs::write(&path, out) {
                         outcome.diagnostics.push(Diagnostic::new(
                             codes::P004,
                             Severity::Error,
@@ -74,7 +77,7 @@ impl FmtCommand {
             }
         };
         let text = &outcome.sources.get(file).text;
-        match flick_core::fmt::format(text, file) {
+        match fmt::format(text, file) {
             Ok(out) if self.options.check => {
                 if out != *text {
                     let unformatted = not_formatted(&outcome.sources, file, &out);
@@ -83,7 +86,7 @@ impl FmtCommand {
             }
             Ok(out) => {
                 // stdout closed by the editor: nothing useful left to do
-                let _ = std::io::stdout().lock().write_all(out.as_bytes());
+                let _ = io::stdout().lock().write_all(out.as_bytes());
             }
             Err(errors) => outcome.diagnostics = errors,
         }

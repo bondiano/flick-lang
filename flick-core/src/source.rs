@@ -1,6 +1,8 @@
 //! Source files, UTF-8 byte spans and line index: diagnostics carry UTF-8 byte
 //! ranges; editors convert them to their own position encoding.
 
+use std::{iter, ops};
+
 use crate::diagnostics::{Diagnostic, codes};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -20,7 +22,7 @@ impl Span {
         Span { file, start, end }
     }
 
-    pub fn range(self) -> std::ops::Range<usize> {
+    pub fn range(self) -> ops::Range<usize> {
         self.start as usize..self.end as usize
     }
 }
@@ -35,7 +37,7 @@ pub struct SourceFile {
 
 impl SourceFile {
     fn new(path: String, text: String) -> Self {
-        let line_starts = std::iter::once(0)
+        let line_starts = iter::once(0)
             .chain(text.match_indices('\n').map(|(i, _)| offset(i + 1)))
             .collect();
         SourceFile {

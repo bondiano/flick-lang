@@ -16,7 +16,7 @@ use super::Checker;
 use super::env::{Form, Fundep};
 use super::ty::{PRELUDE, Type};
 use crate::source::Span;
-
+use crate::types::regions;
 pub use solve::Outcome;
 
 /// The module of the row primitives.
@@ -91,7 +91,7 @@ impl Checker<'_> {
         if let Some((("Fiber", "Outlives"), args)) = split(&constraint)
             && let [captures, owner] = args[..]
         {
-            let outlives = crate::types::regions::Outlives {
+            let outlives = regions::Outlives {
                 captures: captures.clone(),
                 owner: owner.clone(),
                 givens: self.classes.givens.clone(),

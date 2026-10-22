@@ -4,6 +4,8 @@
 //! fields never passes for a smaller one (no width subtyping). A row may
 //! extend several row variables, `r1 + r2`; equal ones cancel out.
 
+use std::cmp::Ordering;
+
 use super::Checker;
 use super::ty::{Norm, Row, Type};
 use super::unify::{Mismatch, Unified};
@@ -23,20 +25,20 @@ impl Checker<'_> {
         while i < left.entries.len() || j < right.entries.len() {
             let order = match (left.entries.get(i), right.entries.get(j)) {
                 (Some(l), Some(r)) => l.0.cmp(&r.0),
-                (Some(_), None) => std::cmp::Ordering::Less,
-                (None, _) => std::cmp::Ordering::Greater,
+                (Some(_), None) => Ordering::Less,
+                (None, _) => Ordering::Greater,
             };
             match order {
-                std::cmp::Ordering::Equal => {
+                Ordering::Equal => {
                     self.unify(&left.entries[i].1, &right.entries[j].1)?;
                     i += 1;
                     j += 1;
                 }
-                std::cmp::Ordering::Less => {
+                Ordering::Less => {
                     only_left.push(left.entries[i].clone());
                     i += 1;
                 }
-                std::cmp::Ordering::Greater => {
+                Ordering::Greater => {
                     only_right.push(right.entries[j].clone());
                     j += 1;
                 }

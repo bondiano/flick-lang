@@ -1,5 +1,7 @@
 mod common;
 
+use std::{fs, path};
+
 use common::{flick, flick_stdin};
 
 const MESSY: &str = "let  f x   =\n    x+1\n";
@@ -44,13 +46,13 @@ fn fmt_stdin_for_editors() {
 
 #[test]
 fn fmt_files_in_place_and_check() {
-    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("fmt_files");
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(dir.join("nested")).expect("tmp dir");
+    let dir = path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("fmt_files");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("nested")).expect("tmp dir");
     let messy = dir.join("nested/messy.fl");
     let tidy = dir.join("tidy.fl");
-    std::fs::write(&messy, MESSY).expect("write");
-    std::fs::write(&tidy, TIDY).expect("write");
+    fs::write(&messy, MESSY).expect("write");
+    fs::write(&tidy, TIDY).expect("write");
     let dir_arg = dir.to_str().expect("utf-8 path");
 
     let check = flick(&["fmt", "--check", "--diagnostics", "json", dir_arg]);
@@ -62,13 +64,13 @@ fn fmt_files_in_place_and_check() {
         "{stderr}"
     );
     assert_eq!(
-        std::fs::read_to_string(&messy).expect("read"),
+        fs::read_to_string(&messy).expect("read"),
         MESSY,
         "--check writes nothing"
     );
 
     assert_eq!(flick(&["fmt", dir_arg]).status.code(), Some(0));
-    assert_eq!(std::fs::read_to_string(&messy).expect("read"), TIDY);
+    assert_eq!(fs::read_to_string(&messy).expect("read"), TIDY);
     assert_eq!(flick(&["fmt", "--check", dir_arg]).status.code(), Some(0));
 }
 
