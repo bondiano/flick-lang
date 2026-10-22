@@ -2,7 +2,8 @@
 //! kind checking, bidirectional type checking against the full signature of
 //! every named function, higher-rank `forall` with predicative instantiation,
 //! exact records with row polymorphism, exhaustive `match`, and generalization
-//! of provably pure bindings only. Rules: `docs/reference/types.md`.
+//! of provably pure bindings only; effects, expected errors, services and
+//! layers (§3, §7). Rules: `docs/reference/types.md`, `docs/reference/effects.md`.
 //!
 //! The checker reads the concrete tree after name resolution; other modules
 //! are known only through their [`Interface`], which this phase fills with
@@ -14,16 +15,19 @@ mod calls;
 mod convert;
 mod decls;
 mod display;
+mod effects;
 mod env;
 mod exhaust;
 mod exports;
 mod generalize;
+mod handlers;
 mod infer;
 mod instances;
 mod kinds;
 mod patterns;
 mod report;
 mod rows;
+mod services;
 mod toplevel;
 mod ty;
 mod unify;
@@ -64,6 +68,9 @@ pub fn check(
         locals: Vec::new(),
         tyvars: Vec::new(),
         runtime: false,
+        stage: effects::Stage::default(),
+        sites: Vec::new(),
+        subrows: Vec::new(),
         operators: Vec::new(),
         recs: Vec::new(),
         top: toplevel::TopLevel::default(),
@@ -115,6 +122,11 @@ struct Checker<'a> {
     /// Whether the expression being inferred runs a runtime call at this
     /// stage; lambdas and `task` bodies are deferred and do not count.
     runtime: bool,
+    /// The stage being checked: what its runtime calls may need.
+    stage: effects::Stage,
+    sites: Vec<effects::Site>,
+    /// Row constraints of the declaration being checked.
+    subrows: Vec<effects::SubRow>,
     operators: Vec<Operator>,
     recs: Vec<Rec>,
     top: toplevel::TopLevel<'a>,

@@ -1,0 +1,58 @@
+module App.Services exposing (..)
+
+service Users =
+  get : Number ->{} String
+
+service Clock =
+  now : Unit ->{} Number
+
+service Bad =
+  value : Number
+
+error Broken of Ref Number
+
+error Hidden of { value : Unknown }
+
+error Thunk of Unit ->{} Number
+
+type Job = Job of Eff none none Unit
+
+error Failed of Job
+
+error Fine of { path : String; parse : String -> Number }
+
+js_now : Unit ->{} Number
+let js_now () = 0
+
+clock_layer : Layer none none {Clock}
+let clock_layer = Layer.succeed Clock { now = js_now }
+
+conflict : Layer none none {Clock}
+let conflict = Layer.merge clock_layer clock_layer
+
+wrong_impl : Layer none none {Clock}
+let wrong_impl = Layer.succeed Clock { now = 1 }
+
+users_layer : Layer none none {Users}
+let users_layer = Layer.succeed Users { get = fun id -> "user" }
+
+with_users : Layer none none {Users} -> Eff {Users} none String ->{} String
+let with_users layer action =
+  provide layer { await action }
+
+prepare : Number ->{Users; none} Eff {Users} none String
+let prepare id =
+  let name = Users.get id
+  task { name }
+
+run_early : Number ->{Users; none} String
+let run_early id = with_users users_layer (prepare id)
+
+//~ FLICK-E006 @10:3-10:17 service operation `value` must be a runtime function: running it looks the servi
+//~ FLICK-E005 @12:17-12:27 the payload of error `Broken` holds `Ref Number`, a live value; an error carries
+//~ FLICK-E005 @14:17-14:36 the payload of error `Hidden` holds `Unknown`, a live value; an error carries da
+//~ FLICK-E005 @16:16-16:32 the payload of error `Thunk` holds `Unit ->{} Number`, a live value; an error ca
+//~ FLICK-E005 @20:17-20:20 the payload of error `Failed` holds `Eff none none Unit`, a live value; an error
+//~ FLICK-E004 @31:16-31:51 both layers build `Clock`: a merged environment has one implementation of each s
+//~ FLICK-T003 @34:46-34:47 expected `Unit ->{} Number`, found `Number`
+//~ FLICK-E003 @49:43-49:55 this argument runs a runtime call before `with_users` is applied, although `with

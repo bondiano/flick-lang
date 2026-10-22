@@ -139,6 +139,13 @@ codes! {
     T017 = Types 17, "recursion without rec";
     T018 = Types 18, "wrong number of constructor arguments in a pattern";
     T019 = Types 19, "block without a result expression";
+    E001 = Effects 1, "runtime call in a pure position";
+    E002 = Effects 2, "services or errors not allowed by the bound";
+    E003 = Effects 3, "argument runs before the function that takes an Eff";
+    E004 = Effects 4, "two layers build the same service";
+    E005 = Effects 5, "error payload holds a live value";
+    E006 = Effects 6, "service operation is not a runtime function";
+    E007 = Effects 7, "handler pattern is not an error";
     P001 = Project 1, "cannot read source file";
     P002 = Project 2, "file is not formatted";
     P003 = Project 3, "internal formatter error";

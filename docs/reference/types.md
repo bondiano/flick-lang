@@ -14,6 +14,7 @@ import, and a local definition of the same name hides them.
 | `Unit`, `Never`, `Bool`, `Number`, `BigInt`, `String`, `Unknown` | `Type` |
 | `List`, `Option`, `Ref`, `Redacted`, `Schema` | `Type -> Type` |
 | `Result`, `PureCodec` | `Type -> Type -> Type` |
+| `ServiceTag`, `ServiceImpl` | `ServiceRow -> Type` |
 | `Eff` | `ServiceRow -> ErrorRow -> Type -> Type` |
 | `Layer` | `ServiceRow -> ErrorRow -> ServiceRow -> Type` |
 | `Codec` | `ServiceRow -> ServiceRow -> Type -> Type -> Type` |
@@ -21,10 +22,11 @@ import, and a local definition of the same name hides them.
 
 `Option a = None | Some of a`, `Result e a = Err of e | Ok of a` and
 `error AppError of { message : String; details : Option String }` are
-ordinary declarations; `identity : a -> a` is a function. Built-in modules
+ordinary declarations; `identity : a -> a` is a function. `from_result` turns a
+`Result` into an expected error ([effects.md](effects.md)). Built-in modules
 are used qualified without an import: `Ref.make`, `Ref.get`, `Ref.set`,
 `Ref.modify`, `String.trim`, `Platform.stdout_line`, `Platform.stderr_line`,
-`App.fail`.
+`App.fail`, `Layer.succeed`, `Layer.merge`, `Layer.override`.
 
 ## Kinds
 
@@ -76,9 +78,8 @@ caller may choose (`FLICK-T008` when it needs one concrete type).
 
 `a -> b`, `a ->{r; e} b` and `a ->{} b` are three different types; an empty
 row never makes a runtime arrow pure (§4). A lambda takes each arrow of the
-type it is checked against. Rows of arrows are compared as written; which
-rows a body's calls need is decided by the effect checker, which is not
-implemented yet.
+type it is checked against. Which rows a body's calls need, and where a
+runtime call may run at all, is the subject of [effects.md](effects.md).
 
 A `forall` may appear inside a signature's type. Checking then flows from the
 signature into the argument, so one callback can be used at several types:
@@ -185,7 +186,6 @@ let fresh_cell =
 | Construct | Today |
 | - | - |
 | class constraints `C a =>` | kind-checked, not resolved; instance methods are checked against their own signatures |
-| rows a body needs, `try` handlers, services in `provide` | rows of arrows unify as written |
 | capture qualifiers `T^c` | kind-checked, then dropped |
 | `sql`, `ui`, `codec`, `schema` blocks | any type |
 | `scope s` handle | any type |

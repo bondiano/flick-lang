@@ -9,6 +9,7 @@ use super::ty::{Binder, Type};
 impl Checker<'_> {
     /// Quantifies the variables of `ty` that are deeper than the current level.
     pub fn generalize(&mut self, ty: &Type) -> Type {
+        self.settle_rows();
         let ty = self.zonk(ty);
         let metas = self.store.deep_metas(&ty);
         if metas.is_empty() {
@@ -83,11 +84,15 @@ fn replace_metas(t: &Type, subst: &[(u32, Type)]) -> Type {
 /// The kind of a variable by where it occurs: a record tail is a field row,
 /// the rows of a runtime arrow are service and error rows.
 fn kind_of(ty: &Type, m: u32) -> Kind {
-    let is = |t: &Type| match t {
-        Type::Meta(x) => *x == m,
-        Type::Row(row) => row.tail.as_deref() == Some(&Type::Meta(m)),
-        _ => false,
-    };
+    fn is(t: &Type, m: u32) -> bool {
+        match t {
+            Type::Meta(x) => *x == m,
+            Type::Row(row) => row.tail.as_deref().is_some_and(|t| is(t, m)),
+            Type::Union(a, b) => is(a, m) || is(b, m),
+            _ => false,
+        }
+    }
+    let is = |t: &Type| is(t, m);
     let mut kind = Kind::Type;
     ty.visit(&mut |t| match t {
         Type::Record(row) if row.tail.as_deref().is_some_and(is) => {
@@ -100,6 +105,21 @@ fn kind_of(ty: &Type, m: u32) -> Kind {
                 kind = Kind::ServiceRow;
             } else if is(&e.errors) {
                 kind = Kind::ErrorRow;
+            }
+        }
+        Type::App { .. } => {
+            let (head, args) = t.spine();
+            let rows: &[Kind] = if head.is_prim("Eff") {
+                &[Kind::ServiceRow, Kind::ErrorRow]
+            } else if head.is_prim("Layer") {
+                &[Kind::ServiceRow, Kind::ErrorRow, Kind::ServiceRow]
+            } else {
+                &[]
+            };
+            for (arg, row) in args.iter().zip(rows) {
+                if is(arg) {
+                    kind = row.clone();
+                }
             }
         }
         _ => {}

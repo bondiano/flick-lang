@@ -1,0 +1,78 @@
+module App.Rows exposing (..)
+
+type UserId = Number
+
+type User = { id : UserId; name : String }
+
+error NotFound of UserId
+
+error ConnectError of String
+
+service Config =
+  url : Unit ->{} String
+
+service Log =
+  info : String ->{} Unit
+
+service Users =
+  get : UserId ->{none; NotFound} User
+
+narrow : UserId ->{Users; none} String
+let narrow id =
+  let user = Users.get id
+  Log.info user.name
+  user.name
+
+users_live : Layer {Config} {ConnectError} {Users}
+foreign pure users_live from "./users.js" "usersLive"
+
+load_name : UserId ->{Users, Log; NotFound} String
+let load_name id =
+  let user = Users.get id
+  Log.info user.name
+  user.name
+
+application : UserId ->{Log; NotFound} String
+let application id =
+  provide users_live {
+    load_name id
+  }
+
+load_guarded : UserId ->{Users; none} Option User
+let load_guarded id =
+  try
+    Some (Users.get id)
+  with
+  | NotFound missing when missing > 0 -> None
+
+load_partial : UserId ->{Users; none} Option User
+let load_partial id =
+  try
+    Some (Users.get id)
+  with
+  | NotFound 0 -> None
+
+narrow_task : UserId -> Eff none none User
+let narrow_task id = task { Users.get id }
+
+lenient : Result String Number ->{} Number
+let lenient result = from_result result
+
+not_an_error : Unit ->{} Number
+let not_an_error () =
+  try
+    1
+  with
+  | Some x -> x
+
+no_layer : Unit ->{} Number
+let no_layer () = provide 1 { 2 }
+
+//~ FLICK-E002 @22:14-22:26 the signature of `narrow` does not allow service `Log` and error `NotFound`, whi
+//~ FLICK-E002 @37:3-37:10 the signature of `application` does not allow service `Config` and error `Connec
+//~ FLICK-E002 @43:3-43:6 the signature of `load_guarded` does not allow error `NotFound`, which its body 
+//~ FLICK-E002 @50:3-50:6 the signature of `load_partial` does not allow error `NotFound`, which its body 
+//~ FLICK-E002 @56:29-56:41 the expected type `Eff none none User` does not allow service `Users` and error 
+//~ FLICK-T003 @59:34-59:40 expected `Result (Errors _) _`, found `Result String Number`: `String` is not an
+//~ FLICK-E007 @66:5-66:11 a handler matches errors declared with `error`, but this pattern has type `Optio
+//~ FLICK-T003 @69:27-69:28 `provide` takes a `Layer`, but this has type `Number`

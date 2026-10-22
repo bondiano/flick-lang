@@ -388,8 +388,13 @@ impl Checker<'_> {
         }
         let parts: Vec<&str> = tokens.iter().map(|t| t.text(self.text)).collect();
         let (name, qualifier) = parts.split_last()?;
-        let (module, def) = self.find_type(node, &qualifier.join("."), name)?;
-        let ty = Type::con(&module, name);
+        let qualifier = qualifier.join(".");
+        let (module, def) = self.find_type(node, &qualifier, name)?;
+        let ty = if self.service_module(&qualifier, name).is_some() {
+            Type::con(&module, &format!("{qualifier}.{name}"))
+        } else {
+            Type::con(&module, name)
+        };
         match def.form {
             Form::Kind => {
                 self.error(
@@ -424,6 +429,8 @@ impl Checker<'_> {
                     return None;
                 }
             }
+        } else if let Some(module) = self.service_module(qualifier, name) {
+            module
         } else {
             let Some((_, interface)) = self.env.qualified_module(qualifier) else {
                 self.error(
@@ -439,8 +446,31 @@ impl Checker<'_> {
                 .module
                 .clone()
         };
-        let def = self.env.type_def(&module, name)?.clone();
+        let def = match self.env.type_def(&module, name) {
+            Some(def) => def.clone(),
+            None => self
+                .env
+                .type_def(&module, &format!("{qualifier}.{name}"))?
+                .clone(),
+        };
         Some((module, def))
+    }
+
+    /// The module of the service `S` in `S.Impl`, when `S` is not a module.
+    fn service_module(&self, qualifier: &str, name: &str) -> Option<String> {
+        if name != "Impl" || self.env.qualified_module(qualifier).is_some() {
+            return None;
+        }
+        let Found::Entity(entity) = self.env.find(Namespace::Type, qualifier) else {
+            return None;
+        };
+        matches!(
+            self.env
+                .type_def(&entity.module, qualifier)
+                .map(|d| &d.form),
+            Some(Form::Service { .. })
+        )
+        .then_some(entity.module)
     }
 }
 

@@ -358,26 +358,26 @@ c metadata (`arity`, `this`, `catch`, `cancel signal`, nullable/retention),
 
 **AC**
 
-- [ ] `let user = Users.get id` даёт `User`, а не `Eff` (§13).
-- [ ] Runtime-вызов с пустыми rows (`->{}`) не принимается в позиции pure `->`.
-- [ ] `fun x -> normalize_name x` выводится pure, `fun x -> task { … }` — pure
+- [x] `let user = Users.get id` даёт `User`, а не `Eff` (§13).
+- [x] Runtime-вызов с пустыми rows (`->{}`) не принимается в позиции pure `->`.
+- [x] `fun x -> normalize_name x` выводится pure, `fun x -> task { … }` — pure
       builder `Eff`, `fun x -> Users.get x` — runtime (§3).
-- [ ] `A -> B ->{R; E} C` и `A ->{R; E} (B -> C)` различаются; эффект первой
+- [x] `A -> B ->{R; E} C` и `A ->{R; E} (B -> C)` различаются; эффект первой
       стадии учитывается до вычисления второго аргумента.
-- [ ] Сигнатура уже, чем фактические rows тела → ошибка с перечислением лишних
+- [x] Сигнатура уже, чем фактические rows тела → ошибка с перечислением лишних
       сервисов/ошибок; шире → проходит.
-- [ ] `await` от не-`Eff` — ошибка; `await` от `Eff r e (Eff r2 e2 a)` даёт
+- [x] `await` от не-`Eff` — ошибка; `await` от `Eff r e (Eff r2 e2 a)` даёт
       `Eff r2 e2 a` (нет recursive flatten).
-- [ ] `load_optional`, `find_optional` (§7): итоговые rows совпадают со спекой;
+- [x] `load_optional`, `find_optional` (§7): итоговые rows совпадают со спекой;
       handler с guard не вычитает `NotFound`.
-- [ ] `from_result` с `Result String a` отвергается; с `Result NotFound a`
+- [x] `from_result` с `Result String a` отвергается; с `Result NotFound a`
       проходит с singleton-строкой.
-- [ ] `application` (§7): после `provide UsersLive` остаются `{Config, Log}` и
+- [x] `application` (§7): после `provide UsersLive` остаются `{Config, Log}` и
       `{NotFound, ConnectError}`.
-- [ ] Передача обычного runtime-вызова как аргумента «provide-подобной» функции
+- [x] Передача обычного runtime-вызова как аргумента «provide-подобной» функции
       без `task` диагностируется как вычисленный до установки окружения
       (предупреждение с fix).
-- [ ] Service methods не являются class instances; `show user` не требует
+- [x] Service methods не являются class instances; `show user` не требует
       Context.
 
 ---

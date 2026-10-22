@@ -1,0 +1,16 @@
+/// Layers build services from their dependencies (§7 "Предоставление
+/// окружения"): `Layer inputs errors outputs`.
+module Layer exposing (succeed, merge, override)
+
+succeed : ServiceTag r -> ServiceImpl r -> Layer none none r
+foreign pure succeed from "@flick-lang/runtime" "layerSucceed"
+
+/// Both layers' services; they must not build the same service.
+merge :
+  Layer i1 e1 o1 -> Layer i2 e2 o2 -> Layer (i1 + i2) (e1 + e2) (o1 + o2)
+foreign pure merge from "@flick-lang/runtime" "layerMerge"
+
+/// Both layers' services; the second replaces what the first builds too.
+override :
+  Layer i1 e1 o1 -> Layer i2 e2 o2 -> Layer (i1 + i2) (e1 + e2) (o1 + o2)
+foreign pure override from "@flick-lang/runtime" "layerOverride"

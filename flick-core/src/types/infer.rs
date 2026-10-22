@@ -7,6 +7,7 @@ use std::mem;
 
 use super::Checker;
 use super::convert::is_type;
+use super::effects::{Site, Stage};
 use super::ty::{Row, Type};
 use crate::diagnostics::codes;
 use crate::syntax::cst::Node;
@@ -38,6 +39,9 @@ impl Checker<'_> {
             (K::TryExpr, _) => {
                 self.try_expr(node, Some(expected));
             }
+            (K::ProvideExpr, _) => {
+                self.provide(node, Some(expected));
+            }
             (K::TupleExpr, Type::Tuple(items)) if items.len() == children.len() => {
                 for (child, item) in children.iter().zip(items) {
                     self.check(child, item);
@@ -55,10 +59,7 @@ impl Checker<'_> {
                 self.expect(&actual, expected, self.span(node));
             }
             (K::TaskExpr, _) if self.eff_parts(&target).is_some() => {
-                let (_, _, result) = self.eff_parts(&target).expect("checked");
-                let saved = mem::take(&mut self.runtime);
-                self.check(children[0], &result);
-                self.runtime = saved;
+                self.task(children[0], Some(&target));
             }
             _ => {
                 let actual = self.infer(node);
@@ -109,13 +110,7 @@ impl Checker<'_> {
                 self.if_expr(node, &ty);
                 ty
             }
-            K::TaskExpr => {
-                let saved = mem::take(&mut self.runtime);
-                let result = self.infer(children[0]);
-                self.runtime = saved;
-                let (services, errors) = (self.fresh(), self.fresh());
-                eff(services, errors, result)
-            }
+            K::TaskExpr => self.task(children[0], None),
             K::ScopeExpr => {
                 let mark = self.locals.len();
                 if let Some(name) = node.child_tokens().find(|t| t.kind == K::Ident) {
@@ -127,10 +122,7 @@ impl Checker<'_> {
                 self.locals.truncate(mark);
                 ty
             }
-            K::ProvideExpr => {
-                self.infer(children[0]);
-                children.get(1).map_or(Type::Error, |b| self.infer(b))
-            }
+            K::ProvideExpr => self.provide(node, None),
             // shortcut: SQL, UI and Schema blocks are typed by their elaboration
             K::SqlExpr | K::UiExpr | K::CodecExpr | K::SchemaExpr => self.fresh(),
             _ => Type::Error,
@@ -190,20 +182,6 @@ impl Checker<'_> {
         for branch in children.iter().skip(1) {
             self.check(branch, expected);
         }
-    }
-
-    fn try_expr(&mut self, node: &Node, expected: Option<&Type>) -> Type {
-        let ty = expected.cloned().unwrap_or_else(|| self.fresh());
-        let mut nodes = node.nodes();
-        if let Some(body) = nodes.next() {
-            self.check(body, &ty);
-        }
-        for arm in nodes.filter(|n| n.kind == K::MatchArm) {
-            // shortcut: handled error types come with error rows; any error pattern goes
-            let error = self.fresh();
-            self.arm(arm, &error, &ty);
-        }
-        ty
     }
 
     fn field(&mut self, node: &Node, target: &Node) -> Type {
@@ -309,7 +287,9 @@ impl Checker<'_> {
 
     /// A function from its parameters, as `fun` or a `let` with parameters
     /// writes it. Every parameter is a stage of a curried arrow; the expected
-    /// type decides each stage's arrow.
+    /// type decides each stage's arrow. The body runs at the last stage, so
+    /// its runtime calls must fit the last arrow; without an expected type
+    /// that arrow is runtime exactly when the body makes a runtime call (§3).
     pub fn function(
         &mut self,
         params: &[&Node],
@@ -321,12 +301,17 @@ impl Checker<'_> {
         let mark = self.locals.len();
         let mut rest = expected.cloned();
         let mut stages = Vec::new();
+        // the first stage whose expected type was unknown, and that type
+        let mut unknown: Option<(usize, Type)> = None;
+        // the arrow the expected type gives the last stage
+        let mut last = None;
         for param in params {
             let target = rest.as_ref().map(|t| self.whnf(t));
             let target = match target {
                 Some(t @ Type::Forall { .. }) => Some(self.skolemize(&t).0),
                 other => other,
             };
+            last = None;
             let (ty, effects) = match target {
                 Some(Type::Fun {
                     param: ty,
@@ -334,9 +319,16 @@ impl Checker<'_> {
                     result,
                 }) => {
                     rest = Some(*result);
+                    last = Some(effects.clone());
                     (*ty, effects)
                 }
-                Some(other) if !matches!(other, Type::Meta(_) | Type::Error) => {
+                Some(Type::Error) => (Type::Error, None),
+                Some(meta @ Type::Meta(_)) => {
+                    unknown.get_or_insert((stages.len(), meta));
+                    rest = None;
+                    (self.fresh(), None)
+                }
+                Some(other) => {
                     let shown = self.show(&other);
                     self.error(
                         codes::T003,
@@ -346,20 +338,34 @@ impl Checker<'_> {
                     rest = Some(Type::Error);
                     (Type::Error, None)
                 }
-                other => {
-                    let ty = self.fresh();
-                    if let Some(meta) = other {
-                        let result = self.fresh();
-                        let _ = self.unify(&meta, &Type::pure_fun(ty.clone(), result.clone()));
-                        rest = Some(result);
-                    }
-                    (ty, None)
-                }
+                None => (self.fresh(), None),
             };
             let pat = self.bind_pattern(param, &ty);
             self.irrefutable(&pat, param);
             stages.push((ty, effects));
         }
+        let name = (node.kind == K::LetDecl)
+            .then(|| super::bindings::let_parts(node, self.text).name)
+            .flatten();
+        let inferred = last.is_none();
+        let stage = match last {
+            Some(None) => Stage::pure(match &name {
+                Some(name) => format!("`{name}` is pure: its signature has `->`, not `->{{…}}`"),
+                None => {
+                    "this function must be pure: the expected type has `->`, not `->{…}`".to_owned()
+                }
+            }),
+            Some(Some(effects)) => {
+                let site = match (name, expected) {
+                    (Some(name), _) => Site::Signature(name),
+                    (None, Some(expected)) => Site::Expected(expected.clone()),
+                    (None, None) => Site::Inferred,
+                };
+                self.bounded_stage(effects.services, effects.errors, site)
+            }
+            None => self.open_stage(),
+        };
+        let outer = mem::replace(&mut self.stage, stage);
         let result = match (rest, body) {
             (Some(rest), Some(body)) => {
                 self.check(body, &rest);
@@ -368,16 +374,27 @@ impl Checker<'_> {
             (None, Some(body)) => self.infer(body),
             (_, None) => Type::Error,
         };
+        let inner = mem::replace(&mut self.stage, outer);
+        if inferred && let Some(stage) = stages.last_mut() {
+            stage.1 = Self::stage_effects(&inner);
+        }
         self.locals.truncate(mark);
         self.runtime = saved;
-        stages
-            .into_iter()
-            .rev()
-            .fold(result, |acc, (param, effects)| Type::Fun {
+        let mut ty = result;
+        for (i, (param, effects)) in stages.into_iter().enumerate().rev() {
+            ty = Type::Fun {
                 param: Box::new(param),
                 effects,
-                result: Box::new(acc),
-            })
+                result: Box::new(ty),
+            };
+            if let Some((j, meta)) = &unknown
+                && *j == i
+            {
+                let meta = meta.clone();
+                let _ = self.unify(&meta, &ty);
+            }
+        }
+        ty
     }
 
     fn match_expr(&mut self, node: &Node, expected: Option<&Type>) -> Type {
@@ -396,7 +413,7 @@ impl Checker<'_> {
     }
 
     /// One `| pattern [when guard] -> body`; its pattern and whether it is guarded.
-    fn arm(
+    pub fn arm(
         &mut self,
         arm: &Node,
         scrutinee: &Type,

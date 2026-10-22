@@ -176,6 +176,11 @@ impl Env {
         for export in &interface.exports {
             let entity = &export.entity;
             if let Some(def) = &export.definition {
+                if let Some(implementation) = super::services::impl_def(def) {
+                    let name = format!("{}.Impl", entity.name);
+                    self.types
+                        .insert((entity.module.clone(), name), implementation);
+                }
                 self.types
                     .insert((entity.module.clone(), entity.name.clone()), def.clone());
             }

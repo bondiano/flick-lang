@@ -65,6 +65,7 @@ impl<'a> Checker<'a> {
         for decl in decls.iter().filter(|d| d.kind == K::InstanceDecl) {
             self.instance(decl);
         }
+        self.solve_rows();
         self.recursion();
         self.unknown_types();
     }
@@ -235,6 +236,8 @@ impl<'a> Checker<'a> {
             mem::take(&mut self.locals),
             mem::take(&mut self.tyvars),
             mem::take(&mut self.runtime),
+            mem::take(&mut self.stage),
+            mem::take(&mut self.subrows),
             mem::take(&mut self.operators),
             mem::replace(&mut self.store.level, 0),
             self.top.current,
@@ -252,6 +255,7 @@ impl<'a> Checker<'a> {
             self.check_definition(j);
             self.settle_operators();
         }
+        self.solve_rows();
         for &j in &members {
             if let Some(rec) = self.top.items[j].rec.take() {
                 self.finish_rec(rec);
@@ -262,6 +266,8 @@ impl<'a> Checker<'a> {
             self.locals,
             self.tyvars,
             self.runtime,
+            self.stage,
+            self.subrows,
             self.operators,
             self.store.level,
             self.top.current,

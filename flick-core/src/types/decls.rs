@@ -8,6 +8,7 @@ use super::convert::{Free, TyVar, is_type};
 use super::env::{Form, Operation, TypeDef};
 use super::kinds::Kind;
 use super::ty::{Binder, Type};
+use crate::diagnostics::codes;
 use crate::iface::Namespace;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -39,6 +40,11 @@ impl Checker<'_> {
         }
         for (p, body) in pending.iter().zip(bodies) {
             self.finish(p, body);
+        }
+        for p in pending.iter().filter(|p| p.node.kind == K::ErrorDecl) {
+            if let Some(payload) = p.node.nodes().find(|n| is_type(n.kind)) {
+                self.check_error_payload(&p.name, self.span(payload));
+            }
         }
         self.break_alias_cycles(&pending);
         refined
@@ -282,6 +288,16 @@ impl Checker<'_> {
                 continue;
             };
             let (scheme, _) = self.signature(ty);
+            if decl.kind == K::ServiceDecl && !super::services::has_runtime_arrow(&scheme) {
+                let name = name.text(self.text);
+                self.error(
+                    codes::E006,
+                    self.span(member),
+                    format!(
+                        "service operation `{name}` must be a runtime function: running it looks the service up, so at least one arrow is `->{{…}}`"
+                    ),
+                );
+            }
             let scheme = match scheme {
                 Type::Forall {
                     vars,
@@ -386,6 +402,14 @@ impl Checker<'_> {
                 }) = self.env.type_def_mut(&p.name)
                 {
                     *ops = operations;
+                }
+                let implementation = self
+                    .env
+                    .type_def(&module, &p.name)
+                    .and_then(super::services::impl_def);
+                if let Some(implementation) = implementation {
+                    self.env
+                        .define_type(&format!("{}.Impl", p.name), implementation);
                 }
             }
         }

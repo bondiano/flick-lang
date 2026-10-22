@@ -10,7 +10,7 @@ impl Checker<'_> {
     /// Unifies the type an expression has with the one its position expects;
     /// reports a mismatch at `span`. `false` after a diagnostic.
     pub fn expect(&mut self, actual: &Type, expected: &Type, span: Span) -> bool {
-        match self.unify(actual, expected) {
+        match self.subsume(actual, expected, span) {
             Ok(()) => true,
             Err(mismatch) => {
                 self.mismatch(&mismatch, actual, expected, span);
@@ -38,12 +38,19 @@ impl Checker<'_> {
                     );
                     return;
                 }
+                let errors = |t: &Type| t.spine().0.is_prim("Errors");
                 let detail = match (&a, &b) {
                     (Type::Fun { effects: e1, .. }, Type::Fun { effects: e2, .. })
                         if e1.is_some() != e2.is_some() =>
                     {
                         ": a pure function `->` and a runtime function `->{…}` are different types"
                             .to_owned()
+                    }
+                    (x, y) if errors(x) || errors(y) => {
+                        let other = self.show(if errors(x) { y } else { x });
+                        format!(
+                            ": `{other}` is not an error; an error row holds types declared with `error`, so convert the value into one first"
+                        )
                     }
                     _ => {
                         let (sa, sb) = (self.show(&a), self.show(&b));
@@ -57,10 +64,15 @@ impl Checker<'_> {
                 self.error(codes::T003, span, format!("{head}{detail}"));
             }
             Mismatch::Label { label, left } => {
-                let detail = if *left {
-                    format!("the value has field `{label}`, which the expected type does not")
-                } else {
-                    format!("field `{label}` is missing")
+                let detail = match (label.rsplit_once('.'), *left) {
+                    (Some((_, name)), true) => {
+                        format!("`{name}` is in the row, which the expected type does not allow")
+                    }
+                    (Some((_, name)), false) => format!("`{name}` is missing from the row"),
+                    (None, true) => {
+                        format!("the value has field `{label}`, which the expected type does not")
+                    }
+                    (None, false) => format!("field `{label}` is missing"),
                 };
                 self.error(codes::T003, span, format!("{head}: {detail}"));
             }

@@ -1,16 +1,23 @@
 //! Unification of rows: record fields (§5 "Структурность records") and the
 //! service and error rows of runtime arrows. Labels are unique and their order
 //! does not matter; a row without a tail is closed, so a record with extra
-//! fields never passes for a smaller one (no width subtyping).
+//! fields never passes for a smaller one (no width subtyping). A row may
+//! extend several row variables, `r1 + r2`; equal ones cancel out.
 
 use super::Checker;
-use super::ty::{Row, Type};
+use super::ty::{Norm, Row, Type};
 use super::unify::{Mismatch, Unified};
 
 impl Checker<'_> {
     pub fn unify_rows(&mut self, left: &Row, right: &Row) -> Unified {
-        let left = self.flatten(left);
-        let right = self.flatten(right);
+        let (left, right) = (Type::Row(left.clone()), Type::Row(right.clone()));
+        self.unify_row_types(&left, &right)
+    }
+
+    /// Unifies two types of a row kind: rows, unions and row variables.
+    pub fn unify_row_types(&mut self, left: &Type, right: &Type) -> Unified {
+        let left = self.store.normalize(left);
+        let right = self.store.normalize(right);
         let (mut only_left, mut only_right) = (Vec::new(), Vec::new());
         let (mut i, mut j) = (0, 0);
         while i < left.entries.len() || j < right.entries.len() {
@@ -35,6 +42,21 @@ impl Checker<'_> {
                 }
             }
         }
+        let tails_left: Vec<Type> = left
+            .tails
+            .iter()
+            .filter(|t| !right.tails.contains(t))
+            .cloned()
+            .collect();
+        let tails_right: Vec<Type> = right
+            .tails
+            .iter()
+            .filter(|t| !left.tails.contains(t))
+            .cloned()
+            .collect();
+        if tails_left.contains(&Type::Error) || tails_right.contains(&Type::Error) {
+            return Ok(());
+        }
         let missing = |only: &[(String, Type)], left| {
             only.first().map_or(Ok(()), |(label, _)| {
                 Err(Mismatch::Label {
@@ -43,67 +65,39 @@ impl Checker<'_> {
                 })
             })
         };
-        let tails = (left.tail.as_deref(), right.tail.as_deref());
-        match tails {
-            (Some(Type::Error), _) | (_, Some(Type::Error)) => Ok(()),
-            (None, None) => {
+        match (&tails_left[..], &tails_right[..]) {
+            ([], []) => {
                 missing(&only_left, true)?;
                 missing(&only_right, false)
             }
-            (Some(Type::Meta(a)), Some(Type::Meta(b))) if a == b => {
-                missing(&only_left, true)?;
-                missing(&only_right, false)
-            }
-            (Some(Type::Meta(a)), Some(Type::Meta(b))) => {
+            ([Type::Meta(a)], [Type::Meta(b)]) => {
                 let rest = self.fresh();
-                self.bind(*a, &extended(only_right, Some(rest.clone())))?;
-                self.bind(*b, &extended(only_left, Some(rest)))
+                self.bind(*a, &extended(only_right, vec![rest.clone()]))?;
+                self.bind(*b, &extended(only_left, vec![rest]))
             }
-            (Some(Type::Meta(m)), other) => {
+            ([Type::Meta(m)], _) => {
                 missing(&only_left, true)?;
-                self.bind(*m, &extended(only_right, other.cloned()))
+                self.bind(*m, &extended(only_right, tails_right))
             }
-            (other, Some(Type::Meta(m))) => {
+            (_, [Type::Meta(m)]) => {
                 missing(&only_right, false)?;
-                self.bind(*m, &extended(only_left, other.cloned()))
+                self.bind(*m, &extended(only_left, tails_left))
             }
-            (Some(a), Some(b)) => {
+            ([a], [b]) => {
                 missing(&only_left, true)?;
                 missing(&only_right, false)?;
                 let (a, b) = (a.clone(), b.clone());
                 self.unify(&a, &b)
             }
-            (Some(_), None) | (None, Some(_)) => {
+            _ => {
                 missing(&only_left, true)?;
                 missing(&only_right, false)?;
-                let (a, b) = (Type::Row(left), Type::Row(right));
-                Err(Mismatch::Types(a, b))
+                Err(Mismatch::Types(left.into_type(), right.into_type()))
             }
-        }
-    }
-
-    /// The row with solved tails merged in and its final tail resolved.
-    fn flatten(&self, row: &Row) -> Row {
-        let mut entries = row.entries.clone();
-        let mut tail = row.tail.as_ref().map(|t| self.store.resolve(t));
-        while let Some(Type::Row(inner)) = tail {
-            entries.extend(inner.entries);
-            tail = inner.tail.map(|t| self.store.resolve(&t));
-        }
-        entries.sort_by(|a, b| a.0.cmp(&b.0));
-        Row {
-            entries,
-            tail: tail.map(Box::new),
         }
     }
 }
 
-fn extended(entries: Vec<(String, Type)>, tail: Option<Type>) -> Type {
-    match tail {
-        Some(tail) if entries.is_empty() => tail,
-        tail => Type::Row(Row {
-            entries,
-            tail: tail.map(Box::new),
-        }),
-    }
+fn extended(entries: Vec<(String, Type)>, tails: Vec<Type>) -> Type {
+    Norm { entries, tails }.into_type()
 }

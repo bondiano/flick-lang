@@ -94,6 +94,39 @@ impl Row {
     }
 }
 
+/// A row taken apart by [`Store::normalize`](super::unify::Store::normalize).
+#[derive(Debug, Clone, Default)]
+pub struct Norm {
+    /// Sorted by label, each label once.
+    pub entries: Vec<(String, Type)>,
+    /// Row variables, unknown rows and error markers the row extends.
+    pub tails: Vec<Type>,
+}
+
+impl Norm {
+    pub fn get(&self, label: &str) -> Option<&Type> {
+        self.entries
+            .binary_search_by(|(l, _)| l.as_str().cmp(label))
+            .ok()
+            .map(|i| &self.entries[i].1)
+    }
+
+    /// The row as one type: `{A, B | r + s}`, or just `r` without entries.
+    pub fn into_type(self) -> Type {
+        let tail = self
+            .tails
+            .into_iter()
+            .reduce(|a, b| Type::Union(Box::new(a), Box::new(b)));
+        match tail {
+            Some(tail) if self.entries.is_empty() => tail,
+            tail => Type::Row(Row {
+                entries: self.entries,
+                tail: tail.map(Box::new),
+            }),
+        }
+    }
+}
+
 impl Type {
     pub fn con(module: &str, name: &str) -> Type {
         Type::Con {

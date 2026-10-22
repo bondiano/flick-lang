@@ -1,6 +1,6 @@
 //! Built-in modules, written in Flick and checked by this checker: `Prelude`
 //! (the built-in types every module sees) and small modules a program may
-//! qualify without an import (`Ref.make`, `String.trim`, …).
+//! qualify without an import (`Ref.make`, `String.trim`, `Layer.succeed`, …).
 
 use std::sync::OnceLock;
 
@@ -10,12 +10,13 @@ use crate::source::SourceMap;
 use crate::syntax;
 
 /// In dependency order: each module sees the ones before it.
-const SOURCES: [(&str, &str); 5] = [
+const SOURCES: [(&str, &str); 6] = [
     ("Prelude", include_str!("builtins/Prelude.fl")),
     ("Ref", include_str!("builtins/Ref.fl")),
     ("String", include_str!("builtins/String.fl")),
     ("Platform", include_str!("builtins/Platform.fl")),
     ("App", include_str!("builtins/App.fl")),
+    ("Layer", include_str!("builtins/Layer.fl")),
 ];
 
 /// Interfaces of the built-in modules.
@@ -57,6 +58,9 @@ mod tests {
             .iter()
             .map(|i| i.module.as_str())
             .collect();
-        assert_eq!(names, ["Prelude", "Ref", "String", "Platform", "App"]);
+        assert_eq!(
+            names,
+            ["Prelude", "Ref", "String", "Platform", "App", "Layer"]
+        );
     }
 }

@@ -34,3 +34,4 @@ let shared = Ref.make None
 //~ FLICK-T008 @17:51-17:57 expected `Eff none none (Ref (Option Number))`, found `Eff
 //~ FLICK-T003 @28:11-28:16 expected `Option String`, found `Option Number`: `Number`
 //~ FLICK-T013 @31:1-31:27 `shared` is computed by a runtime call, so its value cannot
+//~ FLICK-E001 @31:14-31:27 this is a runtime call, but module initialization is pure

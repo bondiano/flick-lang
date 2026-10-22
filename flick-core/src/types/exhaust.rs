@@ -59,6 +59,11 @@ impl Checker<'_> {
         }
     }
 
+    /// Whether `pat` matches every value of its type.
+    pub fn covers_all(&self, pat: &Pat) -> bool {
+        self.useful(&[vec![pat.clone()]], &[Pat::Wild]).is_none()
+    }
+
     /// A value vector that matches `v` but no row; `None` if there is none.
     fn useful(&self, rows: &[Vec<Pat>], v: &[Pat]) -> Option<Vec<Pat>> {
         let Some((first, rest)) = v.split_first() else {

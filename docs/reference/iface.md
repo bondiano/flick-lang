@@ -117,7 +117,7 @@ declaration and `{ "arrow": [K1, K2] }`.
 | `adt` | `constructors` | variants, every constructor including unexported ones (for exhaustiveness) |
 | `error` | — | `error E of …`; its constructor is `E` |
 | `alias` | `params`, `body` | transparent alias |
-| `service` | `params`, `operations` (`name`, `type`) | `service` |
+| `service` | `params`, `operations` (`name`, `type`) | `service`; `operations` hold the types as declared, without the service itself, and an importer derives `S.Impl` from them |
 | `class` | — | `class`; methods are `value` exports |
 | `kind` | — | `kind K = …`; `kind` is the kind it names |
 | `kind-member` | — | a member of a `kind` |

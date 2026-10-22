@@ -45,3 +45,4 @@ let phantom_value = []
 //~ FLICK-T003 @28:22-28:25 this is not a function: it has type `Number`, so it cannot
 //~ FLICK-T003 @31:23-31:24 `await` runs an `Eff` value, but this has type `Number`
 //~ FLICK-T008 @34:18-34:31 expected `a`, found `List _`: `a` stands for any type the
+//~ FLICK-E001 @25:20-25:33 this is a runtime call, but module initialization is pure

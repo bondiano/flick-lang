@@ -1,0 +1,19 @@
+// Services and errors other modules see only through this module's interface.
+module App.Users exposing (User, UserId, Users, NotFound(..), users_layer)
+
+type UserId = Number
+
+type User = { id : UserId; name : String }
+
+error NotFound of UserId
+
+service Users =
+  get : UserId ->{none; NotFound} User
+
+find : UserId ->{} User
+let find id =
+  { id = id; name = "Ada" }
+
+users_layer : Layer none none {Users}
+let users_layer =
+  Layer.succeed Users { get = find }

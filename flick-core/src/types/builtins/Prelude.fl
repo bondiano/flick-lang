@@ -19,6 +19,13 @@ type Layer (ri : ServiceRow) (e : ErrorRow) (ro : ServiceRow)
 type Codec (rd : ServiceRow) (re : ServiceRow) i a
 type Errors (e : ErrorRow)
 
+/// A service named as a value, as in `Layer.succeed Clock clock_impl`.
+type ServiceTag (r : ServiceRow)
+
+/// The implementation record of the one service of `r`:
+/// `ServiceImpl {Clock}` is `Clock.Impl`.
+type ServiceImpl (r : ServiceRow)
+
 type Option a = None | Some of a
 
 type Result e a = Err of e | Ok of a
@@ -28,3 +35,8 @@ error AppError of { message : String; details : Option String }
 
 identity : a -> a
 let identity value = value
+
+/// Fails with the error of an `Err`: `Result NotFound a` has the error row
+/// `{NotFound}` (§7 "Ошибка как данные").
+from_result : Result (Errors e) a ->{none; e} a
+foreign sync from_result from "@flick-lang/runtime" "fromResult"

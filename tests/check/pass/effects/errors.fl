@@ -1,0 +1,72 @@
+// Expected errors (§7 "Ожидаемые ошибки", "Ошибка как данные"): `try` removes
+// an error only when an arm without a guard covers all of it.
+module App.Errors exposing (..)
+
+type UserId = Number
+
+type User = { id : UserId; name : String }
+
+error NotFound of UserId
+
+error DbUnavailable of String
+
+service Users =
+  get : UserId ->{none; NotFound} User
+
+load_optional : UserId ->{Users; none} Option User
+let load_optional id =
+  try
+    Some (Users.get id)
+  with
+  | NotFound _ -> None
+
+find_user : UserId ->{Users; NotFound, DbUnavailable} User
+let find_user id =
+  Users.get id
+
+find_optional : UserId ->{Users; DbUnavailable} Option User
+let find_optional id =
+  try
+    Some (find_user id)
+  with
+  | NotFound _ -> None
+
+// a variable or `_` handles every error, as a value of `Errors e`
+any_error : UserId ->{Users; none} String
+let any_error id =
+  try
+    (find_user id).name
+  with
+  | _ -> "unknown"
+
+db_down : Unit ->{none; DbUnavailable} User
+let db_down () =
+  from_result (Err (DbUnavailable "down"))
+
+// what a handler needs is added
+fallback : UserId ->{Users; DbUnavailable} User
+let fallback id =
+  try
+    Users.get id
+  with
+  | NotFound _ -> db_down ()
+
+// a guarded arm handles some of the error; the rest flows on
+guarded : UserId ->{Users; NotFound} Option User
+let guarded id =
+  try
+    Some (Users.get id)
+  with
+  | NotFound missing when missing > 0 -> None
+
+checked : Result NotFound User ->{none; NotFound} User
+let checked result =
+  from_result result
+
+single : Errors {NotFound} -> NotFound
+let single value =
+  value
+
+nothing : Errors none -> Never
+let nothing value =
+  value

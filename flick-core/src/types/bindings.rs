@@ -338,6 +338,8 @@ impl Checker<'_> {
                 ),
             );
         } else if (function || is_fun) && !header {
+            // the suggestion shows the rows the body needs, not their unknowns
+            self.close_rows();
             let suggestion = self.generalize_copy(&ty);
             let shown = self.show(&suggestion);
             self.diagnostics.push(

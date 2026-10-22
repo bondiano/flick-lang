@@ -1,0 +1,126 @@
+// Direct runtime calls (§3, §4): `let` binds the result of a call, and the
+// rows a body needs are inferred and bounded by its signature.
+module App.Direct exposing (..)
+
+type UserId = Number
+
+type User = { id : UserId; name : String }
+
+error NotFound of UserId
+
+service Users =
+  get : UserId ->{none; NotFound} User
+
+service Log =
+  info : String ->{} Unit
+
+normalize_name : String -> String
+let normalize_name name =
+  String.trim name
+
+load_name : UserId ->{Users, Log; NotFound} String
+let load_name id =
+  let user = Users.get id
+  let name = normalize_name user.name
+
+  Log.info name
+
+  name
+
+// the result of `Users.get` is a `User`, not an `Eff`
+user_name : UserId ->{Users; NotFound} String
+let user_name id =
+  let user = Users.get id
+  user.name
+
+// a signature is an upper bound
+wide : UserId ->{Users, Log; NotFound} String
+let wide id =
+  user_name id
+
+ticks : Unit ->{} Number
+let ticks () =
+  0
+
+apply_pure : (String -> String) -> String
+let apply_pure f =
+  f "x"
+
+apply_runtime :
+  (UserId ->{Users; NotFound} User) -> UserId ->{Users; NotFound} User
+let apply_runtime f id =
+  f id
+
+builder :
+  (UserId -> Eff {Users} {NotFound} User) -> UserId -> Eff {Users} {NotFound} User
+let builder f id =
+  f id
+
+lambdas : UserId ->{Users; NotFound} String
+let lambdas id =
+  let pure = apply_pure (fun x -> normalize_name x)
+  let built = builder (fun x -> task { Users.get x }) id
+  let direct = apply_runtime (fun x -> Users.get x) id
+  // a pure callback is lifted where a runtime one is expected
+  let lifted = apply_runtime (fun x -> { id = x; name = pure }) id
+  let awaited = await built
+  direct.name ++ lifted.name ++ awaited.name
+
+// only the second stage runs through the runtime
+greet : String -> String ->{Log; none} String
+let greet prefix name =
+  Log.info name
+  prefix ++ name
+
+hello : String ->{Log; none} String
+let hello =
+  greet "Hello"
+
+// a task is cold; storing or passing it runs nothing
+load_twice : UserId ->{Users; NotFound} (User, User)
+let load_twice id =
+  let request = task { Users.get id }
+  let same_request = identity request
+  let first = await request
+  let second = await same_request
+  (first, second)
+
+// `await` takes exactly one layer off
+one_layer :
+  Eff none none (Eff {Users} {NotFound} User) ->{} Eff {Users} {NotFound} User
+let one_layer outer =
+  await outer
+
+// the rows of a callback become the rows of the call
+each : forall r e. (Number ->{r; e} Unit) -> List Number ->{r; e} Unit
+let rec each f numbers =
+  match numbers with
+  | [] -> ()
+  | [n] -> f n
+  | _ -> ()
+
+log_all : List Number ->{Log; none} Unit
+let log_all numbers =
+  each (fun n -> Log.info "number") numbers
+
+both : Eff r1 e1 a -> Eff r2 e2 b ->{r1 + r2; e1 + e2} (a, b)
+let both left right =
+  (await left, await right)
+
+load_and_log : UserId ->{Users, Log; NotFound} (User, Unit)
+let load_and_log id =
+  both (task { Users.get id }) (task { Log.info "loading" })
+
+// a stored task with inferred rows widens where it is used
+tasks : UserId ->{Users, Log; NotFound} Unit
+let tasks id =
+  let get = task { Users.get id }
+  let log = task { Log.info "log" }
+  let pair = both get log
+  let all = [task { ignore (Users.get id) }, log]
+  ignore pair
+
+// a top-level `task` defers its body, so module initialization stays pure
+startup : Eff {Log} none Unit
+let startup =
+  task { Log.info "start" }

@@ -8,7 +8,7 @@
 
 use super::Checker;
 use super::env::Form;
-use super::ty::{Row, Type};
+use super::ty::{Norm, Row, Type};
 
 #[derive(Debug, Clone)]
 enum MetaState {
@@ -102,6 +102,9 @@ impl Store {
                 MetaState::Open { .. } => t.clone(),
             },
             Type::Con { .. } | Type::Var(_) | Type::Skolem(_) | Type::Error => t.clone(),
+            Type::Union(a, b) => self
+                .normalize(&Type::Union(Box::new(self.zonk(a)), Box::new(self.zonk(b))))
+                .into_type(),
             Type::Record(row) | Type::Row(row) => {
                 let row = self.zonk_row(row);
                 if matches!(t, Type::Record(_)) {
@@ -132,6 +135,37 @@ impl Store {
         Row {
             entries,
             tail: tail.map(Box::new),
+        }
+    }
+
+    /// A row as its labelled entries and the row variables it extends:
+    /// `{A | r} + {B | s}` is `A, B` and `r, s`. Repeated labels and tails
+    /// count once (§5 "Запись и объединение строк").
+    pub fn normalize(&self, t: &Type) -> Norm {
+        let mut norm = Norm::default();
+        self.collect_row(t, &mut norm);
+        norm.entries.sort_by(|a, b| a.0.cmp(&b.0));
+        norm.entries.dedup_by(|a, b| a.0 == b.0);
+        norm
+    }
+
+    fn collect_row(&self, t: &Type, out: &mut Norm) {
+        match self.resolve(t) {
+            Type::Row(row) => {
+                out.entries.extend(row.entries);
+                if let Some(tail) = row.tail {
+                    self.collect_row(&tail, out);
+                }
+            }
+            Type::Union(a, b) => {
+                self.collect_row(&a, out);
+                self.collect_row(&b, out);
+            }
+            other => {
+                if !out.tails.contains(&other) {
+                    out.tails.push(other);
+                }
+            }
         }
     }
 
@@ -193,6 +227,10 @@ impl Checker<'_> {
     pub fn whnf(&self, t: &Type) -> Type {
         let mut t = self.store.resolve(t);
         for _ in 0..64 {
+            if let Some(reduced) = self.project(&t) {
+                t = self.store.resolve(&reduced);
+                continue;
+            }
             let (head, args) = t.spine();
             let Type::Con { module, name } = head else {
                 break;
@@ -219,11 +257,71 @@ impl Checker<'_> {
         t
     }
 
+    /// The fixed projections of a row into a type, once the row is known
+    /// well enough: `Errors none` is `Never`, `Errors {E}` is `E` (§5), and
+    /// `ServiceImpl {S}` is `S.Impl`.
+    fn project(&self, t: &Type) -> Option<Type> {
+        let (head, args) = t.spine();
+        let [row] = args[..] else { return None };
+        if !head.is_prim("Errors") && !head.is_prim("ServiceImpl") {
+            return None;
+        }
+        let norm = self.store.normalize(row);
+        if !norm.tails.is_empty() || norm.entries.len() > 1 {
+            return None;
+        }
+        let entry = norm.entries.into_iter().next().map(|(_, ty)| ty);
+        if head.is_prim("Errors") {
+            return Some(entry.unwrap_or_else(|| Type::prim("Never")));
+        }
+        if head.is_prim("ServiceImpl") {
+            let service = entry?;
+            let (head, args) = service.spine();
+            let Type::Con { module, name } = head else {
+                return None;
+            };
+            let implementation = Type::con(module, &format!("{name}.Impl"));
+            return Some(Type::apps(implementation, args.into_iter().cloned()));
+        }
+        None
+    }
+
+    /// `Errors e` against a single error type or `Never`, with `e` unknown:
+    /// `e` becomes the singleton row of that error, or the empty row.
+    fn unify_errors(&mut self, projection: &Type, other: &Type) -> Option<Unified> {
+        let (head, args) = projection.spine();
+        let [row] = args[..] else { return None };
+        if !head.is_prim("Errors") {
+            return None;
+        }
+        let norm = self.store.normalize(row);
+        let ([Type::Meta(m)], true) = (&norm.tails[..], norm.entries.is_empty()) else {
+            return None;
+        };
+        let m = *m;
+        if matches!(other, Type::Meta(_) | Type::Error) {
+            return None;
+        }
+        if other.is_prim("Never") {
+            return Some(self.bind(m, &Type::empty_row()));
+        }
+        Some(match self.error_label(other) {
+            Some(label) => self.bind(m, &Type::Row(Row::closed(vec![(label, other.clone())]))),
+            None => Err(Mismatch::Types(projection.clone(), other.clone())),
+        })
+    }
+
     pub fn unify(&mut self, a: &Type, b: &Type) -> Unified {
         if self.same_application(a, b) {
             return Ok(());
         }
         let (a, b) = (self.whnf(a), self.whnf(b));
+        if let Some(result) = self
+            .unify_errors(&a, &b)
+            .or_else(|| self.unify_errors(&b, &a))
+        {
+            return result;
+        }
         match (&a, &b) {
             (Type::Error, _) | (_, Type::Error) => Ok(()),
             (Type::Meta(x), Type::Meta(y)) if x == y => Ok(()),
@@ -232,8 +330,15 @@ impl Checker<'_> {
             (Type::Var(x), Type::Var(y)) if x == y => Ok(()),
             (Type::Con { .. }, Type::Con { .. }) if a == b => Ok(()),
             (Type::App { head: h1, arg: a1 }, Type::App { head: h2, arg: a2 }) => {
-                self.unify(h1, h2)
-                    .map_err(|_| Mismatch::Types(a.clone(), b.clone()))?;
+                // an argument that is no error explains itself better than the application
+                self.unify(h1, h2).map_err(|m| match m {
+                    Mismatch::Types(x, y)
+                        if x.spine().0.is_prim("Errors") || y.spine().0.is_prim("Errors") =>
+                    {
+                        Mismatch::Types(x, y)
+                    }
+                    _ => Mismatch::Types(a.clone(), b.clone()),
+                })?;
                 self.unify(a1, a2)
             }
             (
@@ -263,20 +368,8 @@ impl Checker<'_> {
                 x.iter().zip(y).try_for_each(|(x, y)| self.unify(x, y))
             }
             (Type::Record(r1), Type::Record(r2)) => self.unify_rows(r1, r2),
-            (Type::Row(_), _) | (_, Type::Row(_)) => {
-                let as_row = |t: &Type| match t {
-                    Type::Row(r) => r.clone(),
-                    other => Row {
-                        entries: Vec::new(),
-                        tail: Some(Box::new(other.clone())),
-                    },
-                };
-                self.unify_rows(&as_row(&a), &as_row(&b))
-            }
-            // shortcut: unions compare part by part; the effect row solver normalizes them
-            (Type::Union(a1, b1), Type::Union(a2, b2)) => {
-                self.unify(a1, a2)?;
-                self.unify(b1, b2)
+            (Type::Row(_) | Type::Union(..), _) | (_, Type::Row(_) | Type::Union(..)) => {
+                self.unify_row_types(&a, &b)
             }
             (
                 Type::Forall {

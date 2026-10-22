@@ -4,7 +4,7 @@
 
 use super::ty::Type;
 use super::{Checker, Local, Operator};
-use crate::diagnostics::codes;
+use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::iface::Namespace;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -56,6 +56,16 @@ impl Checker<'_> {
                 scheme.map_or(Type::Error, |s| self.instantiate(&s))
             }
             super::env::Found::Unknown => Type::Error,
+            super::env::Found::Missing if namespace == Namespace::Constructor => {
+                self.service_tag(name).unwrap_or_else(|| {
+                    self.error(
+                        codes::T001,
+                        span,
+                        format!("cannot find constructor `{name}`"),
+                    );
+                    Type::Error
+                })
+            }
             super::env::Found::Missing => {
                 let what = match namespace {
                     Namespace::Constructor => "constructor",
@@ -87,15 +97,18 @@ impl Checker<'_> {
             return scheme.map_or(Type::Error, |s| self.instantiate(&s));
         }
         let service = match self.env.find(Namespace::Type, qualifier) {
-            super::env::Found::Entity(e) => self.env.type_def(&e.module, &e.name).cloned(),
+            super::env::Found::Entity(e) => self
+                .env
+                .type_def(&e.module, &e.name)
+                .cloned()
+                .map(|d| (e.module, d)),
             super::env::Found::Unknown => return Type::Error,
             super::env::Found::Missing => None,
         };
-        match service.map(|d| d.form) {
-            Some(super::env::Form::Service { operations, .. }) => {
+        match service.map(|(module, d)| (module, d.form)) {
+            Some((module, super::env::Form::Service { params, operations })) => {
                 if let Some(op) = operations.iter().find(|o| o.name == name) {
-                    let ty = op.ty.clone();
-                    self.instantiate(&ty)
+                    self.operation_type(&module, qualifier, params.len(), &op.ty)
                 } else {
                     self.error(
                         codes::T001,
@@ -124,15 +137,24 @@ impl Checker<'_> {
     /// at a stage makes the application a runtime call.
     pub fn apply(&mut self, head: &Node, args: &[&Node]) -> Type {
         let mut ty = self.infer(head);
+        let mut params = Vec::new();
         for (i, arg) in args.iter().enumerate() {
+            let span = Span::new(self.file, head.range().0, arg.range().1);
             match self.whnf(&ty) {
                 Type::Fun {
                     param,
                     effects,
                     result,
                 } => {
+                    let calls = self.stage.calls;
                     self.check(arg, &param);
-                    self.runtime |= effects.is_some();
+                    if self.stage.calls > calls && self.eff_parts(&param).is_some() {
+                        self.early_argument(head, arg);
+                    }
+                    if let Some(e) = effects {
+                        self.perform(&e.services, &e.errors, span);
+                    }
+                    params.push(*param);
                     ty = self.instantiate(&result);
                 }
                 Type::Error => {
@@ -146,11 +168,9 @@ impl Checker<'_> {
                 }
                 other => {
                     let shown = self.show(&other);
-                    let (start, _) = head.range();
-                    let (_, end) = arg.range();
                     self.error(
                         codes::T003,
-                        Span::new(self.file, start, end),
+                        span,
                         format!("this is not a function: it has type `{shown}`, so it cannot take another argument"),
                     );
                     for rest in &args[i..] {
@@ -160,7 +180,59 @@ impl Checker<'_> {
                 }
             }
         }
+        if let [first, second] = &params[..]
+            && self.is_builtin(head, "Layer", "merge")
+        {
+            let span = Span::new(self.file, head.range().0, args[1].range().1);
+            self.merge_conflicts(first, second, span);
+        }
         ty
+    }
+
+    /// A runtime call in an argument runs before the function it is passed
+    /// to; a function that takes an `Eff` wants the computation unstarted.
+    fn early_argument(&mut self, head: &Node, arg: &Node) {
+        let span = self.span(arg);
+        let name = self.text_of(head);
+        self.diagnostics.push(
+            Diagnostic::new(
+                codes::E003,
+                Severity::Warning,
+                format!(
+                    "this argument runs a runtime call before `{name}` is applied, although `{name}` takes an `Eff` to run itself"
+                ),
+            )
+            .with_span(span)
+            .with_fix(
+                "pass the computation unstarted with `task { … }`",
+                vec![
+                    Edit {
+                        span: Span::new(span.file, span.start, span.start),
+                        replacement: "task { ".to_owned(),
+                    },
+                    Edit {
+                        span: Span::new(span.file, span.end, span.end),
+                        replacement: " }".to_owned(),
+                    },
+                ],
+            ),
+        );
+    }
+
+    /// `head` names the value `name` of the built-in module `module`.
+    fn is_builtin(&self, head: &Node, module: &str, name: &str) -> bool {
+        let parts: Vec<&str> = head
+            .child_tokens()
+            .filter(|t| t.kind != K::Dot)
+            .map(|t| t.text(self.text))
+            .collect();
+        head.kind == K::NameExpr
+            && parts.len() == 2
+            && parts[1] == name
+            && self
+                .env
+                .qualified_module(parts[0])
+                .is_some_and(|(m, _)| m == module)
     }
 
     pub fn binary(&mut self, node: &Node, children: &[&Node]) -> Type {
@@ -222,7 +294,11 @@ impl Checker<'_> {
                 result,
             } => {
                 self.expect(&arg, &param, self.span(lhs));
-                self.runtime |= effects.is_some();
+                if let Some(e) = effects {
+                    let (start, _) = lhs.range();
+                    let (_, end) = rhs.range();
+                    self.perform(&e.services, &e.errors, Span::new(self.file, start, end));
+                }
                 self.instantiate(&result)
             }
             Type::Error => Type::Error,
@@ -263,7 +339,7 @@ impl Checker<'_> {
             K::AwaitKw => {
                 let ty = self.infer(operand);
                 let (services, errors, result) = (self.fresh(), self.fresh(), self.fresh());
-                let shape = super::infer::eff(services, errors, result.clone());
+                let shape = super::infer::eff(services.clone(), errors.clone(), result.clone());
                 if self.unify(&ty, &shape).is_err() {
                     let shown = self.show(&ty);
                     self.error(
@@ -273,7 +349,7 @@ impl Checker<'_> {
                     );
                     return Type::Error;
                 }
-                self.runtime = true;
+                self.perform(&services, &errors, self.span(node));
                 result
             }
             _ => {
