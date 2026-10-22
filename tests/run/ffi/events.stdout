@@ -1,0 +1,11 @@
+listening (1)
+emitted 1 to 1
+emitted 2 to 1
+supervisor: die error event queue full: 2 events are waiting
+emitted 3 to 1
+handled 1
+handled 2
+emitted 4 to 1
+handled 4
+removed the registered function: true
+emitted 5 to 0

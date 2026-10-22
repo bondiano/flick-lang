@@ -8,7 +8,7 @@ mod names;
 pub mod sourcemap;
 pub mod ts;
 
-pub use js::js;
+pub use js::{js, relative};
 pub use names::{instance as instance_export, tag};
 
 use crate::iface::Interface;

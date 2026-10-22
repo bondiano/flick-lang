@@ -36,6 +36,8 @@ pub struct Build {
     pub profile: Profile,
     pub emit: Emit,
     pub emit_dts: bool,
+    /// Write Promise façades of runtime functions beside the modules.
+    pub promise_facade: bool,
     pub schema_aot: bool,
     /// Instance resolution budget per definition.
     pub solver_steps: u32,
@@ -49,6 +51,7 @@ impl Default for Build {
             profile: Profile::Debug,
             emit: Emit::Js,
             emit_dts: false,
+            promise_facade: false,
             schema_aot: false,
             solver_steps: types::Limits::default().steps,
             solver_depth: types::Limits::default().depth,

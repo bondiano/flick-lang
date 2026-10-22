@@ -27,6 +27,7 @@ foreign pure get from "@flick-lang/runtime" "chunkGet"
 map : forall c a b. (a -> b)^c -> (Chunk a -> Chunk b)^c
 foreign pure map from "@flick-lang/runtime" "chunkMap"
   arity 2
+  retention call
 
 instance Eq a => Eq (Chunk a) =
   eq : Chunk a -> Chunk a -> Bool

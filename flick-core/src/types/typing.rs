@@ -40,9 +40,8 @@ pub struct Typing {
     pub givens: HashMap<Range, Vec<String>>,
     /// The label of each use of `Record.label`.
     pub labels: HashMap<Range, String>,
-    /// Each `foreign`: the arrows of its signature and how many
-    /// dictionaries it takes.
-    pub foreigns: HashMap<Range, (Vec<bool>, usize)>,
+    /// Each `foreign`: its calling convention.
+    pub foreigns: HashMap<Range, ForeignInfo>,
     /// Instances declared or derived in this module.
     pub instances: Vec<InstanceInfo>,
     /// Runtime calls inside a `scope` that acquire into the owner of another
@@ -87,6 +86,35 @@ pub struct Constructor {
     pub ty: String,
     pub name: String,
     pub arity: usize,
+}
+
+/// How a `foreign` is called: its arrows, the dictionaries it takes and
+/// what its metadata says.
+#[derive(Debug, Clone, Default)]
+pub struct ForeignInfo {
+    pub stages: Vec<bool>,
+    pub dicts: usize,
+    /// `arity n`, when written.
+    pub arity: Option<usize>,
+    pub this: bool,
+    /// The `catch` mapping expression.
+    pub catch: Option<Range>,
+    pub cancel: bool,
+    pub optional: Vec<usize>,
+    pub variadic: bool,
+    pub result: ResultAdapter,
+    /// For each JS argument: the number of arguments of the JS function a
+    /// callback is adapted to.
+    pub callbacks: Vec<Option<usize>>,
+}
+
+/// How the JS result of a foreign call becomes a Flick value.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ResultAdapter {
+    /// `nullable`: `null` and `undefined` are `None`.
+    pub nullable: bool,
+    /// The result is `Unit`: whatever JS returns becomes `()`.
+    pub unit: bool,
 }
 
 /// The scopes around a call, as their regions and `scope` expressions,

@@ -1,0 +1,67 @@
+module App.Ffi exposing (..)
+
+type error FsError = FsError String
+
+type error Other = Other String
+
+type File (s : Region)
+
+from_js : JsValue -> FsError
+let from_js value = FsError "failed"
+
+to_other : JsValue -> Other
+let to_other value = Other "failed"
+
+now : Number ->{} Number
+foreign sync now from global "Date.now"
+  arity 0
+//~ FLICK-F001 @16:1-17:10 `arity 0` drops the first argument, which must be `()`
+
+parse : String -> Number
+foreign pure parse from global "Number.parseFloat"
+  catch from_js
+//^^^^^^^^^^^^^ FLICK-F001 a `foreign pure` call cannot throw
+
+read : String ->{; FsError} String
+foreign async read from "./fs.js" "read"
+  catch to_other
+//      ^^^^^^^^ FLICK-F003 `catch` makes `Other`
+
+tick : String ->{} Unit
+foreign sync tick from "./tick.js" "tick"
+  cancel signal
+//^^^^^^^^^^^^^ FLICK-F001 `cancel signal` is for `foreign async`
+
+first : List String -> String
+foreign pure first from "./first.js" "first"
+  nullable
+//~ FLICK-F001 @36:1-37:11 `nullable` makes the result an `Option a`
+
+/// A callback that may hold a scope, kept for who knows how long.
+every : forall c. Number -> (Unit ->{} Unit)^c ->{} Unit
+foreign sync every from global "setInterval"
+//~ FLICK-F002 @42:1-42:45 may hold the capabilities of a scope
+
+keep : forall s. File s ->{} Unit
+foreign sync keep from "./keep.js" "keep"
+//~ FLICK-F002 @46:1-46:42 `File s` may hold the capabilities of a scope
+
+/// A bare callback parameter takes no closure over a scoped value.
+later : (Unit ->{} String) ->{} Unit
+foreign sync later from "./later.js" "later"
+
+open_file : forall s. String ->{Scope s;} File s
+foreign effect open_file from "./files.js" "open"
+  retention call
+
+read_file : forall s. File s ->{} String
+foreign sync read_file from "./files.js" "read"
+  retention call
+
+leak : Unit ->{} Unit
+let leak () =
+  scope {
+    let file = open_file "a"
+    later (fun () -> read_file file)
+//         ^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-G001 holds region
+  }

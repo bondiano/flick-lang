@@ -9,9 +9,12 @@ pub use abi::interface;
 use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 
+use crate::codegen::ts::{Facade, Projection, declaration_file, facade_files};
 use crate::codegen::{self, Options, sourcemap};
+use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface;
-use crate::project::{Compilation, normalize};
+use crate::iface::{Interface, Namespace};
+use crate::project::{Compilation, Compiled, normalize};
 use crate::resolve::{self, Module};
 use crate::source::{FileId, SourceMap};
 use crate::{ir, syntax, types};
@@ -39,10 +42,20 @@ pub struct Settings<'a> {
     pub source_dir: &'a dyn Fn(&str) -> Option<PathBuf>,
     /// The absolute output directory.
     pub out_dir: &'a Path,
+    /// Write `A/B.d.ts`, the public TypeScript interface of each module.
+    pub dts: bool,
+    /// Write `A/B.promise.js`: Promise façades of runtime functions.
+    pub promise_facade: bool,
 }
 
-/// The output of a compilation.
-pub fn emit(compilation: &Compilation, sources: &SourceMap, settings: &Settings) -> Vec<Artifact> {
+/// The output of a compilation, and what it could not write: exports
+/// without a TypeScript form under `--emit-dts`.
+pub fn emit(
+    compilation: &Compilation,
+    sources: &SourceMap,
+    settings: &Settings,
+) -> (Vec<Artifact>, Vec<Diagnostic>) {
+    let mut diagnostics = Vec::new();
     let modules = &compilation.modules;
     let provider = |m: &str| {
         compilation
@@ -101,48 +114,195 @@ pub fn emit(compilation: &Compilation, sources: &SourceMap, settings: &Settings)
         path: "package.json".to_owned(),
         contents: "{ \"type\": \"module\" }\n".to_owned(),
     }];
+    let decls = |name: &str| declarations(name, &any_interface, &package, &path);
     for module in builtin_modules() {
-        let output = codegen::js(module, &options);
         out.push(Artifact {
             path: path(&module.name),
-            contents: output.code,
+            contents: codegen::js(module, &options).code,
         });
+        if settings.dts
+            && let Some((text, _)) = decls(&module.name)
+        {
+            out.push(Artifact {
+                path: dts_path(&path(&module.name)),
+                contents: text,
+            });
+        }
     }
+    let ctx = Context {
+        settings,
+        sources,
+        options: &options,
+        path: &path,
+        package: &package,
+        interface_of: &interface_of,
+        any_interface: &any_interface,
+    };
     for module in modules {
-        let output = codegen::js(&module.ir, &options);
-        let file = path(&module.name);
-        let base = file.rsplit('/').next().unwrap_or(&file).to_owned();
-        let map = sourcemap::source_map(&base, &output, sources, settings.source_path);
-        out.push(Artifact {
-            path: file.clone(),
-            contents: format!("{}//# sourceMappingURL={base}.map\n", output.code),
-        });
-        out.push(Artifact {
-            path: format!("{file}.map"),
-            contents: map,
-        });
-        let built = interface(
-            &module.ir,
-            &module.interface,
-            package(&module.name).as_deref(),
-            &module.imports,
-            &interface_of,
-        );
-        out.push(Artifact {
-            path: format!("{}.iface", module.name.replace('.', "/")),
-            contents: iface::write(&built),
-        });
+        compiled_module(&ctx, module, &mut out, &mut diagnostics);
     }
     if let Some(entry) = settings.entry {
-        out.push(Artifact {
-            path: format!("main.{ext}"),
-            contents: format!(
-                "import {{ runMain }} from \"@flick-lang/runtime\";\nimport {{ main }} from \"./{}\";\n\nawait runMain(main);\n",
-                path(entry)
-            ),
-        });
+        out.push(runner(&format!("main.{ext}"), &path(entry)));
     }
-    out
+    (out, diagnostics)
+}
+
+/// What the compilation of every module shares.
+struct Context<'a> {
+    settings: &'a Settings<'a>,
+    sources: &'a SourceMap,
+    options: &'a Options<'a>,
+    path: &'a dyn Fn(&str) -> String,
+    package: &'a dyn Fn(&str) -> Option<String>,
+    interface_of: &'a dyn Fn(&str) -> Option<Interface>,
+    any_interface: &'a dyn Fn(&str) -> Option<Interface>,
+}
+
+/// The JS, source map, interface and, when asked, `.d.ts` and Promise
+/// façade of one module of the build.
+fn compiled_module(
+    ctx: &Context,
+    module: &Compiled,
+    out: &mut Vec<Artifact>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let output = codegen::js(&module.ir, ctx.options);
+    let file = (ctx.path)(&module.name);
+    let base = file.rsplit('/').next().unwrap_or(&file).to_owned();
+    let map = sourcemap::source_map(&base, &output, ctx.sources, ctx.settings.source_path);
+    out.push(Artifact {
+        path: file.clone(),
+        contents: format!("{}//# sourceMappingURL={base}.map\n", output.code),
+    });
+    out.push(Artifact {
+        path: format!("{file}.map"),
+        contents: map,
+    });
+    let built = interface(
+        &module.ir,
+        &module.interface,
+        (ctx.package)(&module.name).as_deref(),
+        &module.imports,
+        ctx.interface_of,
+    );
+    if ctx.settings.dts
+        && let Some((text, refused)) =
+            declarations(&module.name, ctx.any_interface, ctx.package, ctx.path)
+    {
+        out.push(Artifact {
+            path: dts_path(&file),
+            contents: text,
+        });
+        for (name, reason) in refused {
+            diagnostics.push(Diagnostic::new(
+                codes::F004,
+                Severity::Error,
+                format!("`{}.{name}` has no TypeScript form: {reason}", module.name),
+            ));
+        }
+    }
+    if ctx.settings.promise_facade {
+        out.extend(facade(
+            module,
+            &built,
+            ctx.any_interface,
+            ctx.package,
+            ctx.path,
+        ));
+    }
+    out.push(Artifact {
+        path: format!("{}.iface", module.name.replace('.', "/")),
+        contents: iface::write(&built),
+    });
+}
+
+/// The runner of an app: starts `main` of the entry module at `entry`.
+fn runner(file: &str, entry: &str) -> Artifact {
+    Artifact {
+        path: file.to_owned(),
+        contents: format!(
+            "import {{ runMain }} from \"@flick-lang/runtime\";\nimport {{ main }} from \"./{entry}\";\n\nawait runMain(main);\n"
+        ),
+    }
+}
+
+/// The `.d.ts` of module `name`, and the exports it refused with why.
+fn declarations(
+    name: &str,
+    interfaces: &dyn Fn(&str) -> Option<Interface>,
+    package: &dyn Fn(&str) -> Option<String>,
+    path: &dyn Fn(&str) -> String,
+) -> Option<(String, Vec<(String, String)>)> {
+    let projection = Projection::new(name, interfaces, package);
+    let interface = interfaces(name)?;
+    let here = path(name);
+    let import = |m: &str| codegen::relative(&here, &path(m));
+    Some(declaration_file(&projection, &interface, &import))
+}
+
+/// `A/B.d.ts` beside `A/B.js` (or `A/B.ts`).
+fn dts_path(file: &str) -> String {
+    let stem = file.rsplit_once('.').map_or(file, |(s, _)| s);
+    format!("{stem}.d.ts")
+}
+
+/// The Promise façade of `module`: each exported runtime function that
+/// needs no service and whose earlier stages only make closures.
+fn facade(
+    module: &Compiled,
+    built: &Interface,
+    interfaces: &dyn Fn(&str) -> Option<Interface>,
+    package: &dyn Fn(&str) -> Option<String>,
+    path: &dyn Fn(&str) -> String,
+) -> Vec<Artifact> {
+    // the façade module names the module's own types through an import
+    let facade_module = format!("{}.promise", module.name);
+    let projection = Projection::new(&facade_module, interfaces, package);
+    let summaries = built
+        .abi
+        .as_ref()
+        .map(|a| a.values.clone())
+        .unwrap_or_default();
+    let facades: Vec<Facade> = built
+        .exports
+        .iter()
+        .filter(|e| e.entity.namespace == Namespace::Value && e.entity.module == module.name)
+        .filter_map(|e| {
+            let closures = summaries
+                .iter()
+                .find(|s| s.name == e.entity.name)?
+                .stages
+                .len();
+            let (arity, ty) = projection.facade(e.scheme.as_ref()?, closures).ok()?;
+            Some(Facade {
+                name: e.entity.name.clone(),
+                arity,
+                ty,
+            })
+        })
+        .collect();
+    if facades.is_empty() {
+        return Vec::new();
+    }
+    let file = path(&module.name);
+    let stem = file
+        .rsplit_once('.')
+        .map_or(file.as_str(), |(s, _)| s)
+        .to_owned();
+    let base = file.rsplit('/').next().unwrap_or(&file).to_owned();
+    let here = format!("{stem}.promise.js");
+    let import = |m: &str| codegen::relative(&here, &path(m));
+    let (js, dts) = facade_files(&projection, &format!("./{base}"), &facades, &import);
+    vec![
+        Artifact {
+            path: here,
+            contents: js,
+        },
+        Artifact {
+            path: format!("{stem}.promise.d.ts"),
+            contents: dts,
+        },
+    ]
 }
 
 /// The relative import specifier of `target` from the directory `from`.

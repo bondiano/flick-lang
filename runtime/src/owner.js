@@ -22,6 +22,8 @@ export class Owner {
     this.watchers = new Set();
     /** Foreign promises still running. */
     this.pending = new Set();
+    /** Effects run first when closing begins: listeners stop taking events. */
+    this.closing = new Set();
   }
 
   track(promise) {
@@ -48,6 +50,7 @@ const settle = async (owner) => {
 export const close = (owner, exit) =>
   Effect.gen(function* () {
     owner.open = false;
+    for (const hook of owner.closing) yield* Effect.exit(hook());
     yield* Fiber.interruptAll([...owner.children]);
     while (owner.watchers.size > 0) {
       yield* Fiber.await([...owner.watchers][0]);
@@ -151,26 +154,40 @@ export const fiberSpawn = (owner, supervisor, task) =>
 export const fiberJoin = (fiber) => Fiber.join(fiber.fiber);
 
 /**
- * A foreign `async` call. Its promise may ignore interruption, so the
- * innermost owner waits for it to settle before releasing resources.
+ * A foreign `async` call: `start(signal)` creates the promise when the call
+ * runs. An interruption aborts `signal`; the promise may still ignore it, so
+ * the innermost owner waits for it to settle before releasing resources. A
+ * throw or rejection is a defect, or with `mapping` (`catch`) a typed error.
  */
-export const foreignAsync = (start) =>
+export const foreignAsync = (start, mapping) =>
   Effect.flatMap(Effect.service(CurrentOwner), (owner) =>
-    Effect.callback((resume) => {
+    Effect.callback((resume, signal) => {
+      const fail = (error) => resume(mapping ? Effect.fail(mapping(error)) : Effect.die(error));
       let promise;
       try {
-        promise = Promise.resolve(start());
+        promise = Promise.resolve(start(signal));
       } catch (error) {
-        resume(Effect.die(error));
+        fail(error);
         return;
       }
       owner?.track(promise);
-      promise.then(
-        (value) => resume(Effect.succeed(value)),
-        (error) => resume(Effect.die(error)),
-      );
+      promise.then((value) => resume(Effect.succeed(value)), fail);
     }),
   );
+
+/** A foreign `sync` call with `catch`: a throw becomes the mapped error. */
+export const foreignSync = (run, mapping) =>
+  Effect.try({ try: run, catch: (error) => mapping(error) });
+
+/** A foreign `effect` with `catch`: a throw of the factory becomes the mapped error. */
+export const foreignEffect = (make, mapping) =>
+  Effect.suspend(() => {
+    try {
+      return make();
+    } catch (error) {
+      return Effect.fail(mapping(error));
+    }
+  });
 
 /**
  * A resource released when the owner the call runs in closes (the compiler

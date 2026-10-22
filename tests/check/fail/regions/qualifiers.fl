@@ -20,6 +20,7 @@ service FileSystem =
 with_first :
   forall s. File s -> (Unit ->{FileSystem; ReadError} String)^{s} ->{FileSystem; ReadError} String
 foreign sync with_first from "./files.js" "withFirst"
+  retention call
 
 narrow : forall s t. File s -> File t ->{FileSystem; ReadError} String
 let narrow first second =
@@ -51,8 +52,8 @@ spawn_given :
 let spawn_given owner work =
   ignore (Fiber.spawn owner report work)
 //~ FLICK-E005 @14:32-14:45 the payload of error `Leak` holds `File s`, a live value; an
-//~ FLICK-G001 @26:21-26:57 this function uses `second`, which holds `t`, but the expect
-//~ FLICK-G001 @29:20-29:42 this function uses `value`, which holds `a`, but the expecte
-//~ FLICK-T003 @33:22-33:26 expected `Ref (Unit ->{} String)`, found `Ref (Unit ->{} Str
-//~ FLICK-G003 @44:15-44:26 the child holds region `inner`, which may end before its own
-//~ FLICK-G003 @52:11-52:22 the child holds `c`, which may end before its owner `s`: a c
+//~ FLICK-G001 @27:21-27:57 this function uses `second`, which holds `t`, but the expect
+//~ FLICK-G001 @30:20-30:42 this function uses `value`, which holds `a`, but the expecte
+//~ FLICK-T003 @34:22-34:26 expected `Ref (Unit ->{} String)`, found `Ref (Unit ->{} Str
+//~ FLICK-G003 @45:15-45:26 the child holds region `inner`, which may end before its own
+//~ FLICK-G003 @53:11-53:22 the child holds `c`, which may end before its owner `s`: a c

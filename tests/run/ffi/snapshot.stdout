@@ -1,0 +1,7 @@
+refused: .secret: an accessor
+refused: .f: a function is not data
+refused: .self: a cycle
+copied
+refused: reading the value threw: trap
+copied
+refused: .v.v.v.v.v.v.v.v: deeper than 8

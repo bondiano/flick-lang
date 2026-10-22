@@ -19,6 +19,7 @@ spawn :
   Outlives c s =>
   Owner s -> (Failure e ->{r; none} Unit)^c -> (Eff r e a)^c ->{r; none} Fiber e a
 foreign effect spawn from "@flick-lang/runtime" "fiberSpawn"
+  retention owner
 
 /// Waits for the child: its result, or its failure with the original cause.
 join : Fiber e a ->{none; e} a

@@ -1,0 +1,140 @@
+// Foreign calls in each mode: a factory or a promise is made only when the
+// call runs, a throw is a defect unless `catch` maps it, and metadata adapt
+// arity, `this`, `null`, optional and variadic arguments and callbacks.
+module App.Main exposing (main)
+
+import File exposing (Path)
+
+type alias UserId = Number
+
+type alias User = { id : Number; name : String }
+
+type error FsError = FsError String
+  deriving Show
+
+type error HttpError = HttpError String
+
+service Http =
+  get : String ->{} String
+
+from_js : JsValue -> FsError
+let from_js value = FsError "the file system failed"
+
+counted : Number ->{} Number
+foreign effect counted from "./bindings.mjs" "counted"
+
+later : Number ->{} Number
+foreign async later from "./bindings.mjs" "later"
+
+fail_sync : String ->{; FsError} Unit
+foreign sync fail_sync from "./bindings.mjs" "fail"
+  catch from_js
+
+fail_async : String ->{; FsError} Unit
+foreign async fail_async from "./bindings.mjs" "reject"
+  catch from_js
+
+log : String ->{} Unit
+foreign sync log from "./bindings.mjs" "log"
+
+hypot : Number -> Number -> Number
+foreign pure hypot from global "Math.hypot"
+  arity 2
+
+now_millis : Unit ->{} Number
+foreign sync now_millis from global "Date.now"
+  arity 0
+
+read_text : Path ->{; FsError} String
+foreign async read_text from "./bindings.mjs" "readText"
+  arity 1
+  catch from_js
+  cancel signal
+
+fetch_user : UserId ->{Http; HttpError} User
+foreign effect fetch_user from "./bindings.mjs" "fetchUser"
+  arity 1
+
+lookup : String -> Option String
+foreign pure lookup from "./bindings.mjs" "lookup"
+  nullable
+
+greet : String -> Option String -> String
+foreign pure greet from "./bindings.mjs" "greet"
+  optional 1
+
+sum : List Number -> Number
+foreign pure sum from "./bindings.mjs" "sum"
+  variadic
+
+to_upper : String -> String
+foreign pure to_upper from global "String.prototype.toUpperCase"
+  this
+
+combine : (Number -> Number -> Number) -> Number -> Number -> Number
+foreign pure combine from "./bindings.mjs" "combine"
+
+twice : (Number ->{} Number) ->{} Number
+foreign effect twice from "./bindings.mjs" "twice"
+
+await_both : Js.PromiseCallback Number Number ->{} Number
+foreign async await_both from "./bindings.mjs" "awaitBoth"
+
+sync_outcome : Unit ->{} String
+let sync_outcome () =
+  try
+    fail_sync "boom"
+    "no error"
+  with
+  | FsError reason -> "sync: " ++ reason
+
+async_outcome : Unit ->{} String
+let async_outcome () =
+  try
+    fail_async "boom"
+    "no error"
+  with
+  | FsError reason -> "async: " ++ reason
+
+user_name : Layer none none {Http} ->{} String
+let user_name http =
+  let user =
+    try
+      provide http {
+        fetch_user 7
+      }
+    with
+    | HttpError reason -> { id = 0; name = reason }
+  user.name
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let request = task { counted 21 }
+  let same = identity request
+  Platform.stdout_line "built the task"
+  Platform.stdout_line (show (await same + await request))
+  let pending = task { later 1 }
+  Platform.stdout_line "built the async task"
+  Platform.stdout_line (show (await pending))
+  Platform.stdout_line (sync_outcome ())
+  Platform.stdout_line (async_outcome ())
+  Platform.stdout_line (show (log "void"))
+  Platform.stdout_line (show (hypot 3 4))
+  let stamp = now_millis (log "first")
+  Platform.stdout_line (show (stamp > 0))
+  let config = try read_text "config" with
+    | FsError reason -> reason
+  Platform.stdout_line config
+  let missing = try read_text "missing" with
+    | FsError reason -> reason
+  Platform.stdout_line missing
+  let http = Layer.succeed Http { get = fun url -> url }
+  Platform.stdout_line (user_name http)
+  Platform.stdout_line (show (lookup "known", lookup "other"))
+  Platform.stdout_line (greet "ada" None ++ "; " ++ greet "bob" (Some "hi"))
+  Platform.stdout_line (show (sum [1, 2, 3]))
+  Platform.stdout_line (to_upper "loud")
+  Platform.stdout_line (show (combine (fun a b -> a * 10 + b) 4 2))
+  Platform.stdout_line (show (twice (fun n -> n * 100)))
+  let callback = Js.promise_callback (fun n -> n + later n)
+  Platform.stdout_line (show (await_both callback))

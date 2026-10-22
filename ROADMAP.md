@@ -670,31 +670,34 @@ callbacks», «Подписки», «Higher-rank callback на FFI», «Публ
   (`Promise<Result<A, Errors<E>>>` + `RuntimeFailure`); scoped exports только через
   owner adapter; непредставимый export — диагностика.
 
-**Артефакты.** `flick-core::ffi`, `flick-core::codegen::dts`,
-`runtime/src/ffi/{callbacks, snapshot, promise_facade}.ts`.
+**Артефакты.** `flick-core::types::ffi` (метаданные `foreign`),
+`flick-core::codegen::ts` (TS-проекция, `.d.ts`, Promise façade),
+`runtime/src/stdlib/{callbacks, snapshot}.js`, модуль `Js`, справка —
+`docs/reference/ffi.md`. Metadata `retention` принимает `call` и `owner`
+(`scope` — ключевое слово).
 
 **AC**
 
-- [ ] `foreign effect` откладывает вызов JS-фабрики до запуска (e2e со счётчиком) (§13).
-- [ ] `foreign async`: Promise создаётся при выполнении, не при построении `task`.
-- [ ] `throw`/rejection без `catch` → defect; с `catch` → typed error; mapping,
+- [x] `foreign effect` откладывает вызов JS-фабрики до запуска (e2e со счётчиком) (§13).
+- [x] `foreign async`: Promise создаётся при выполнении, не при построении `task`.
+- [x] `throw`/rejection без `catch` → defect; с `catch` → typed error; mapping,
       кладущий scoped capability в payload, отвергается.
-- [ ] `arity 0` принимает `()`; `now_millis (Log.info m)` сначала логирует.
-- [ ] `hypot`, `now_millis`, `read_text`, `fetch_user` (§8) компилируются и работают.
-- [ ] Callback adapters соблюдают результат, arity/`this`, reentrancy,
+- [x] `arity 0` принимает `()`; `now_millis (Log.info m)` сначала логирует.
+- [x] `hypot`, `now_millis`, `read_text`, `fetch_user` (§8) компилируются и работают.
+- [x] Callback adapters соблюдают результат, arity/`this`, reentrancy,
       окружение, отмену и lifetime своего семейства — по набору тестов на каждое
       семейство (§13).
-- [ ] Scoped event: переполнение очереди отвергает событие и сообщает supervisor;
+- [x] Scoped event: переполнение очереди отвергает событие и сообщает supervisor;
       late callback после начала закрытия не запускает задачу; снимается именно
       зарегистрированная функция.
-- [ ] Callback с неизвестным retention не принимает scoped-handle (ошибка компиляции).
-- [ ] Snapshot отвергает getter, функцию, цикл, Proxy-trap исключение (через
+- [x] Callback с неизвестным retention не принимает scoped-handle (ошибка компиляции).
+- [x] Snapshot отвергает getter, функцию, цикл, Proxy-trap исключение (через
       mapping) и превышение лимитов; shared поддеревья принимает.
-- [ ] `--emit-dts`: результат проходит `tsc --strict`; не содержит `any`;
+- [x] `--emit-dts`: результат проходит `tsc --strict`; не содержит `any`;
       абстрактный HKT export без façade даёт диагностику.
-- [ ] Promise façade: expected failure → `Result`, defect → rejection
+- [x] Promise façade: expected failure → `Result`, defect → rejection
       `RuntimeFailure` с безопасным report; импорт библиотеки ничего не запускает.
-- [ ] Hover/диагностика не путают `Unit`, `Never` и пустые rows; TS ABI: `Unit` →
+- [x] Hover/диагностика не путают `Unit`, `Never` и пустые rows; TS ABI: `Unit` →
       `undefined`, пустые rows → `never`, foreign `void` нормализуется в `()` (§13).
 
 ---

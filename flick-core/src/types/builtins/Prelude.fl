@@ -9,6 +9,10 @@ type Number
 type BigInt
 type String
 type Unknown
+
+/// Any JS value, as it comes from foreign code: getters, proxies, cycles
+/// and all. `Js.snapshot` turns supported data into an `Unknown`.
+type JsValue
 type List a
 type Ref a
 type Redacted a
@@ -105,38 +109,46 @@ foreign effect from_result from "@flick-lang/runtime" "fromResult"
 parallel :
   forall c r e a b. (Eff r e a)^c -> ((Eff r e b)^c ->{r; e} (a, b))^c
 foreign effect parallel from "@flick-lang/runtime" "parallel"
+  retention call
 
 /// Runs every task, at most `limit` at a time; `limit` must be a positive
 /// finite integer. The results keep the order of the input.
 parallel_all : forall c r e a. Number -> List ((Eff r e a)^c) ->{r; e} List a
 foreign effect parallel_all from "@flick-lang/runtime" "parallelAll"
+  retention call
 
 /// Each task's typed failure as an `Err`; a defect or an interruption still
 /// stops the group.
 parallel_results :
   forall c r e a. List ((Eff r e a)^c) ->{r; none} List (Result (Errors e) a)
 foreign effect parallel_results from "@flick-lang/runtime" "parallelResults"
+  retention call
 
 /// The opaque exit of every task.
 parallel_exits : forall c r e a. List ((Eff r e a)^c) ->{r; none} List (Exit e a)
 foreign effect parallel_exits from "@flick-lang/runtime" "parallelExits"
+  retention call
 
 /// The first task to succeed; the loser is interrupted and awaited.
 race_success :
   forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
 foreign effect race_success from "@flick-lang/runtime" "raceSuccess"
+  retention call
 
 /// The first task to end, however it ends.
 race_first : forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
 foreign effect race_first from "@flick-lang/runtime" "raceFirst"
+  retention call
 
 /// Fails with `TimeoutError` when `millis` pass before the task ends.
 timeout : forall c r e a. Number -> (Eff r e a)^c ->{r; TimeoutError | e} a
 foreign effect timeout from "@flick-lang/runtime" "timeout"
+  retention call
 
 /// `None` when `millis` pass before the task ends; other failures stay.
 timeout_option : forall c r e a. Number -> (Eff r e a)^c ->{r; e} Option a
 foreign effect timeout_option from "@flick-lang/runtime" "timeoutOption"
+  retention call
 
 /// `ma` followed by `f` of its value, for any monad.
 bind :
@@ -153,3 +165,4 @@ bind_eff :
     (Eff (r1 + r2) (e1 + e2) b)^(c + d))^c
 foreign pure bind_eff from "@flick-lang/runtime" "bindEff"
   arity 2
+  retention call

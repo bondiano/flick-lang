@@ -1,0 +1,47 @@
+// A scoped event listener: events queue for the handler, which runs them
+// one at a time as a child of the scope; a full queue drops an event and
+// tells the supervisor; when the scope closes, the very function that was
+// registered is removed.
+module App.Main exposing (main)
+
+type Emitter
+
+emitter : Unit ->{} Emitter
+foreign sync emitter from "./bindings.mjs" "emitter"
+  arity 0
+
+on : forall s. Emitter -> Events.Listener s Number ->{} Unit
+foreign sync on from "./bindings.mjs" "on"
+  retention owner
+
+off : forall s. Emitter -> Events.Listener s Number ->{} Unit
+foreign sync off from "./bindings.mjs" "off"
+  retention call
+
+emit : Emitter -> Number ->{} Unit
+foreign sync emit from "./bindings.mjs" "emit"
+
+sleep : Number ->{} Unit
+foreign async sleep from "../runtime/timers.mjs" "sleep"
+
+report : Failure none ->{} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+handle : Number -> Eff none none Unit
+let handle n = task { Platform.stdout_line ("handled " ++ show n) }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let source = emitter ()
+  scope s {
+    let listener = Events.listen s (Events.queue 2) report handle
+    Events.attach listener (on source) (off source)
+    emit source 1
+    emit source 2
+    emit source 3
+    sleep 20
+    emit source 4
+    sleep 20
+  }
+  emit source 5

@@ -13,7 +13,7 @@ use flick_core::diagnostics::{Diagnostic, Severity};
 use flick_core::project;
 use flick_core::source::SourceMap;
 
-use super::build::{emit, write};
+use super::build::{Output, emit, write};
 use super::check::select;
 use crate::args::{GlobalArguments, Reporter, TestArguments};
 use crate::report;
@@ -68,15 +68,14 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     }
     let out = project.root.join(OUT_DIR);
     let _ = fs::remove_dir_all(&out);
-    let problems = emit(
-        &host,
-        &sources,
-        Some(&project),
-        &compilation,
-        &out,
-        None,
-        false,
-    );
+    let output = Output {
+        out_dir: &out,
+        entry: None,
+        typescript: false,
+        dts: false,
+        promise_facade: false,
+    };
+    let problems = emit(&host, &sources, Some(&project), &compilation, &output);
     if !problems.is_empty() {
         return fail(&sources, problems);
     }

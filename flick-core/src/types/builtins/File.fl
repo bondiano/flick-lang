@@ -36,9 +36,11 @@ let write_text path text = FileSystem.write_file path text
 
 node_open : forall s. Path ->{Scope s; OpenError} File s
 foreign effect node_open from "@flick-lang/runtime" "fileOpen"
+  retention call
 
 node_read_handle : forall s. File s ->{; ReadError} String
 foreign effect node_read_handle from "@flick-lang/runtime" "fileReadHandle"
+  retention call
 
 node_read_file : Path ->{; ReadError} String
 foreign effect node_read_file from "@flick-lang/runtime" "fileRead"

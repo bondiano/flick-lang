@@ -1,0 +1,47 @@
+// `Js.snapshot` copies plain data and refuses what is not: getters, which
+// it never runs, functions, cycles, throwing proxies and values past the
+// limits. A subtree shared by two places is fine.
+module App.Main exposing (main)
+
+import Js exposing (SnapshotError(..))
+
+getter : Unit ->{} JsValue
+foreign sync getter from "./bindings.mjs" "getter"
+  arity 0
+
+with_function : Unit ->{} JsValue
+foreign sync with_function from "./bindings.mjs" "withFunction"
+  arity 0
+
+cyclic : Unit ->{} JsValue
+foreign sync cyclic from "./bindings.mjs" "cyclic"
+  arity 0
+
+shared : Unit ->{} JsValue
+foreign sync shared from "./bindings.mjs" "shared"
+  arity 0
+
+trap : Unit ->{} JsValue
+foreign sync trap from "./bindings.mjs" "trap"
+  arity 0
+
+deep : Number ->{} JsValue
+foreign sync deep from "./bindings.mjs" "deep"
+
+outcome : JsValue ->{} String
+let outcome value =
+  try
+    ignore (Js.snapshot_with 8 50 value)
+    "copied"
+  with
+  | SnapshotError reason -> "refused: " ++ reason
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (outcome (getter ()))
+  Platform.stdout_line (outcome (with_function ()))
+  Platform.stdout_line (outcome (cyclic ()))
+  Platform.stdout_line (outcome (shared ()))
+  Platform.stdout_line (outcome (trap ()))
+  Platform.stdout_line (outcome (deep 5))
+  Platform.stdout_line (outcome (deep 20))

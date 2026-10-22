@@ -23,6 +23,7 @@ mod effects;
 mod env;
 mod exhaust;
 mod exports;
+mod ffi;
 mod generalize;
 mod handlers;
 mod infer;
@@ -48,7 +49,8 @@ pub use kinds::Kind;
 pub use patterns::is_pattern;
 pub use ty::{Binder, Effects, PRELUDE, Row, Type};
 pub use typing::{
-    Constructor, InstanceInfo, Lift, Owner, Range, Ref, Typing, default_method, passes_dictionary,
+    Constructor, ForeignInfo, InstanceInfo, Lift, Owner, Range, Ref, Typing, default_method,
+    passes_dictionary,
 };
 
 use convert::TyVar;

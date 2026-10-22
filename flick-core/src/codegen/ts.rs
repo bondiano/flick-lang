@@ -393,5 +393,8 @@ fn key(label: &str) -> String {
 }
 
 mod declare;
+mod dts;
+
+pub use dts::{Facade, declaration_file, facade_files};
 #[cfg(test)]
 mod tests;

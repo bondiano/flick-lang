@@ -20,6 +20,7 @@ out-dir = "dist"
 profile = "debug"
 emit = "js"
 emit-dts = false
+promise-facade = false
 schema-aot = false
 ```
 
@@ -34,6 +35,7 @@ schema-aot = false
 | `build.profile` | `"debug"` or `"release"` | `"debug"` |
 | `build.emit` | `"js"` or `"ts"` | `"js"` |
 | `build.emit-dts` | boolean | `false` |
+| `build.promise-facade` | boolean | `false` |
 | `build.schema-aot` | boolean | `false` |
 | `build.solver-steps` | instance resolution steps per definition | `100000` |
 | `build.solver-depth` | depth of nested class constraints | `256` |

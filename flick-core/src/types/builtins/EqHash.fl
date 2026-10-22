@@ -14,6 +14,7 @@ with :
   forall c a b.
   (a -> a -> Bool) -> (a -> Number) -> (forall w. EqHash w a -> b)^c -> b
 foreign pure with from "@flick-lang/runtime" "eqHashWith"
+  retention call
 
 canonical : Hash a => EqHash Canonical a
 foreign pure canonical from "@flick-lang/runtime" "eqHashCanonical"

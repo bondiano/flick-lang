@@ -76,14 +76,20 @@ impl Command for BuildCommand {
             (None, Some(p)) => p.config.build.emit == Emit::Ts,
             (None, None) => false,
         };
+        let config = project.as_ref().map(|p| &p.config.build);
+        let output = Output {
+            out_dir: &out_dir,
+            entry: entry.as_deref(),
+            typescript,
+            dts: self.options.emit_dts || config.is_some_and(|b| b.emit_dts),
+            promise_facade: self.options.promise_facade || config.is_some_and(|b| b.promise_facade),
+        };
         diagnostics.extend(emit(
             &host,
             &sources,
             project.as_ref(),
             &compilation,
-            &out_dir,
-            entry.as_deref(),
-            typescript,
+            &output,
         ));
         Outcome {
             sources,
@@ -92,17 +98,25 @@ impl Command for BuildCommand {
     }
 }
 
-/// Writes the build of `compilation` into `out_dir`; what could not be
-/// written is reported.
+/// Where and what a build writes.
+pub struct Output<'a> {
+    pub out_dir: &'a Path,
+    pub entry: Option<&'a str>,
+    pub typescript: bool,
+    pub dts: bool,
+    pub promise_facade: bool,
+}
+
+/// Writes the build of `compilation`; what could not be written or has no
+/// TypeScript form is reported.
 pub fn emit(
     host: &FsHost,
     sources: &SourceMap,
     project: Option<&Project>,
     compilation: &Compilation,
-    out_dir: &Path,
-    entry: Option<&str>,
-    typescript: bool,
+    output: &Output,
 ) -> Vec<Diagnostic> {
+    let out_dir = output.out_dir;
     let modules = &compilation.modules;
     let package = project.and_then(|p| project::project_name(host, &p.root));
     let paths: Vec<(FileId, PathBuf)> = modules.iter().map(|m| (m.file, m.path.clone())).collect();
@@ -130,21 +144,28 @@ pub fn emit(
         source_dir: &source_dir,
         out_dir,
         package: package.as_deref(),
-        entry,
-        typescript,
+        entry: output.entry,
+        typescript: output.typescript,
         source_path: &source_path,
+        dts: output.dts,
+        promise_facade: output.promise_facade,
     };
-    for artifact in build::emit(compilation, sources, &settings) {
+    let (artifacts, mut diagnostics) = build::emit(compilation, sources, &settings);
+    if diagnostics.iter().any(|d| d.severity == Severity::Error) {
+        return diagnostics;
+    }
+    for artifact in artifacts {
         let path = out_dir.join(&artifact.path);
         if let Err(err) = write(&path, &artifact.contents) {
-            return vec![Diagnostic::new(
+            diagnostics.push(Diagnostic::new(
                 codes::P013,
                 Severity::Error,
                 format!("cannot write `{}`: {err}", path.display()),
-            )];
+            ));
+            break;
         }
     }
-    Vec::new()
+    diagnostics
 }
 
 pub fn write(path: &Path, contents: &str) -> io::Result<()> {

@@ -12,7 +12,7 @@ class Key {
     Object.freeze(this);
   }
   [Equal.symbol](that) {
-    return that instanceof Key && this.witness.eq(this.value)(that.value);
+    return that instanceof Key && this.witness.eq(this.value, that.value);
   }
   [Hash.symbol]() {
     return this.witness.hash(this.value);
@@ -24,7 +24,7 @@ const witness = (eq, hash) => Object.freeze({ eq, hash });
 /** `EqHash.with eq hash body`: `body` receives a witness of a fresh identity. */
 export const eqHashWith = (eq, hash, body) => body(witness(eq, hash));
 
-export const eqHashCanonical = (dHash) => witness(dHash.$Eq.eq, dHash.hash);
+export const eqHashCanonical = (dHash) => witness((a, b) => dHash.$Eq.eq(a)(b), dHash.hash);
 
 const set = (w, native) => Object.freeze({ witness: w, native });
 

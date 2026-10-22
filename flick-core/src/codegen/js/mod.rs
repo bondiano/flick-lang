@@ -100,7 +100,7 @@ pub fn js(module: &Module, options: &Options) -> Output {
 
 /// The import specifier of `to` from `from`, both relative to the output
 /// root; `npm:` marks a module of a package.
-fn relative(from: &str, to: &str) -> String {
+pub fn relative(from: &str, to: &str) -> String {
     if let Some(bare) = to.strip_prefix("npm:") {
         return bare.to_owned();
     }

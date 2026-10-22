@@ -70,6 +70,15 @@ pub struct BuildArguments {
     /// Emit JavaScript or TypeScript; by default `build.emit` of the project.
     #[arg(long, value_enum)]
     pub emit: Option<EmitArgument>,
+
+    /// Also write `.d.ts` files, the public TypeScript interface; an export
+    /// without a TypeScript form is an error.
+    #[arg(long)]
+    pub emit_dts: bool,
+
+    /// Also write `A/B.promise.js`: Promise façades of runtime functions.
+    #[arg(long)]
+    pub promise_facade: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]

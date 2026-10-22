@@ -14,7 +14,9 @@ Options:
       --out-dir <DIR>              Directory of the output; by default `build.out-dir` of the project
       --color <COLOR>              Colorize human-readable output [default: auto] [possible values: auto, always, never]
       --emit <EMIT>                Emit JavaScript or TypeScript; by default `build.emit` of the project [possible values: js, ts]
+      --emit-dts                   Also write `.d.ts` files, the public TypeScript interface; an export without a TypeScript form is an error
       --quiet                      Print less service output
+      --promise-facade             Also write `A/B.promise.js`: Promise façades of runtime functions
       --verbose                    Print more service output
       --project <PATH>             Project directory or its `flick.toml`; by default the nearest `flick.toml` from the working directory upwards
   -h, --help                       Print help

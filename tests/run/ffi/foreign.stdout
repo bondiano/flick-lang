@@ -1,0 +1,28 @@
+built the task
+factory called (1)
+factory called (2)
+84
+built the async task
+promise made (1)
+2
+sync: the file system failed
+async: the file system failed
+log void
+()
+5
+log first
+true
+readText got a signal: true
+text of config
+readText got a signal: true
+the file system failed
+user 7
+(Some "found", None)
+hello, ada; hi, bob
+6
+LOUD
+42
+300
+promise made (2)
+promise made (3)
+8

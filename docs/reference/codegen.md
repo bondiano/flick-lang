@@ -139,6 +139,21 @@ exported values with their projected types (§8 "Публичные TypeScript
 | a class over types | the interface of its dictionary; a constrained value takes it first |
 | `forall a.` | a generic `<A>`; a polymorphic constant uses `never` |
 
+`--emit-dts` (or `emit-dts = true`) writes `A/B.d.ts` beside each module: the
+same declarations, `export declare const` for every exported value and
+constructor, and the dictionary of each instance without a context. An export
+whose type has no TypeScript form is `FLICK-F004`; the declarations never
+contain `any`.
+
+`--promise-facade` (or `promise-facade = true`) writes `A/B.promise.js` and
+its `.d.ts` for each exported runtime function that needs no service and
+whose earlier stages only make closures: `f(a, b, options?)` runs `f a b`
+under an owner of its own and returns `Promise<Result<A, E>>`. An expected
+failure resolves to `Result.fail`; a defect or an interruption rejects with a
+`RuntimeFailure` whose message is the inert report of the cause;
+`options.signal` interrupts the run, and the promise settles after cleanup.
+Importing either file runs nothing.
+
 A type TypeScript cannot state faithfully — a higher-kinded variable, a
 region or a value holding one, an open record — has no projection: the export
 stays `any` in `--emit ts`, and `--emit-dts` reports it. Code inside a module

@@ -1,0 +1,26 @@
+/// The boundary with JS values: copying foreign data into checked values,
+/// and functions handed to JS that run Flick tasks.
+module Js exposing (..)
+
+type error SnapshotError = SnapshotError String
+  deriving Eq, Show
+
+/// A JS function `(a) => Promise<b>` that runs a task in the scope it was
+/// made in, with the services around it then. Calls after that scope began
+/// to close are rejected; the scope waits for the calls still running.
+type PromiseCallback a b
+
+/// A copy of supported data: primitives, plain objects and dense arrays, at
+/// most 64 deep and 100000 values. A getter, a function, a cycle, another
+/// prototype or a throwing proxy is a `SnapshotError` naming the path; a
+/// subtree shared by two places is copied once.
+snapshot : JsValue ->{; SnapshotError} Unknown
+foreign effect snapshot from "@flick-lang/runtime" "snapshotDefault"
+
+/// `snapshot` with the depth and value limits given.
+snapshot_with : Number -> Number -> JsValue ->{; SnapshotError} Unknown
+foreign effect snapshot_with from "@flick-lang/runtime" "snapshot"
+
+promise_callback : forall c r e a b. (a ->{r; e} b)^c ->{r;} (PromiseCallback a b)^c
+foreign effect promise_callback from "@flick-lang/runtime" "promiseCallback"
+  retention owner

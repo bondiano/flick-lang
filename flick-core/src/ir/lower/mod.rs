@@ -331,33 +331,31 @@ impl Lower<'_> {
             [module, export] => (Some(module.clone()), export.clone()),
             _ => return None,
         };
-        let (stages, dicts) = self
+        let info = self
             .typing
             .foreigns
             .get(&decl.range())
             .cloned()
             .unwrap_or_default();
-        let declared = decl
-            .nodes()
-            .filter(|n| n.kind == K::ForeignMeta)
-            .flat_map(Node::nodes)
-            .find(|m| self.token_text(m, K::Ident).as_deref() == Some("arity"))
-            .and_then(|m| m.nodes().next().map(|n| n.text(self.text)))
-            .and_then(|n| n.trim().parse().ok());
-        let arity = declared.unwrap_or_else(|| {
-            stages
-                .iter()
-                .position(|&runtime| runtime)
-                .map_or(stages.len(), |i| i + 1)
+        let catch = info.catch.and_then(|at| {
+            let node = decl
+                .nodes()
+                .filter(|n| n.kind == K::ForeignMeta)
+                .flat_map(Node::nodes)
+                .flat_map(Node::nodes)
+                .find(|n| n.range() == at)?;
+            Some(self.expr(node))
         });
         Some(Foreign {
             name,
             mode,
             module,
             export,
-            stages,
-            dicts,
-            arity,
+            stages: info.stages.clone(),
+            dicts: info.dicts,
+            arity: info.js_arity(),
+            info,
+            catch,
         })
     }
 

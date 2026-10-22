@@ -48,12 +48,12 @@ export const show = (a) => {
 };
 
 export const listEquals = (eq, xs, ys) =>
-  xs.length === ys.length && xs.every((x, i) => eq(x)(ys[i]));
+  xs.length === ys.length && xs.every((x, i) => eq(x, ys[i]));
 
 export const listCompare = (cmp, xs, ys) => {
   const n = Math.min(xs.length, ys.length);
   for (let i = 0; i < n; i++) {
-    const o = cmp(xs[i])(ys[i]);
+    const o = cmp(xs[i], ys[i]);
     if (o._tag !== EQ._tag) return o;
   }
   return compare(xs.length, ys.length);
@@ -165,3 +165,9 @@ export const derive = (name, fields, constructors, supers) => {
   }
   return self;
 };
+
+/** `nullable`: `null` and `undefined` are `None`. */
+export const fromNullable = (value) => (value === null || value === undefined ? none : some(value));
+
+/** `optional i`: `None` is passed as `undefined`. */
+export const optionalArg = (option) => (option._tag === "Some" ? option.value : undefined);

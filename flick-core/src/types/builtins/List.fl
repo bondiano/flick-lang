@@ -8,6 +8,7 @@ map :
   (a -> b)^c -> (List a -> List b)^c
 foreign pure map from "@flick-lang/runtime" "listMap"
   arity 2
+  retention call
 
 /// Runs a runtime function on each element, one after another from the
 /// first.
@@ -16,66 +17,81 @@ map_effect :
   (a ->{r; e} b)^c ->
   (List a ->{r; e} List b)^c
 foreign effect map_effect from "@flick-lang/runtime" "listMapEffect"
+  retention call
 
 /// `map` with each element's index.
 map_indexed : forall c a b. (Number -> a -> b)^c -> (List a -> List b)^c
 foreign pure map_indexed from "@flick-lang/runtime" "listMapIndexed"
   arity 2
+  retention call
 
 /// Runs a runtime function on each element in order, for what it does.
 each_effect : forall c a r e. (a ->{r; e} Unit)^c -> (List a ->{r; e} Unit)^c
 foreign effect each_effect from "@flick-lang/runtime" "listEachEffect"
+  retention call
 
 /// Folds from the first element: `fold_left f init [a, b]` is `f (f init a) b`.
 fold_left : forall c a b. (b -> a -> b)^c -> (b -> (List a -> b)^c)^c
 foreign pure fold_left from "@flick-lang/runtime" "listFold"
   arity 3
+  retention call
 
 /// Folds from the last element: `fold_right f init [a, b]` is `f a (f b init)`.
 fold_right : forall c a b. (a -> b -> b)^c -> (b -> (List a -> b)^c)^c
 foreign pure fold_right from "@flick-lang/runtime" "listFoldRight"
   arity 3
+  retention call
 
 /// `fold_left` with a runtime step, run in order.
 fold_effect : forall c a b r e. (b -> a ->{r; e} b)^c -> (b -> (List a ->{r; e} b)^c)^c
 foreign effect fold_effect from "@flick-lang/runtime" "listFoldEffect"
+  retention call
 
 filter : forall c a. (a -> Bool)^c -> (List a -> List a)^c
 foreign pure filter from "@flick-lang/runtime" "listFilter"
   arity 2
+  retention call
 
 filter_map : forall c a b. (a -> Option b)^c -> (List a -> List b)^c
 foreign pure filter_map from "@flick-lang/runtime" "listFilterMap"
   arity 2
+  retention call
 
 flat_map : forall c a b. (a -> List b)^c -> (List a -> List b)^c
 foreign pure flat_map from "@flick-lang/runtime" "listFlatMap"
   arity 2
+  retention call
 
 find : forall c a. (a -> Bool)^c -> (List a -> Option a)^c
 foreign pure find from "@flick-lang/runtime" "listFind"
   arity 2
+  retention call
 
 find_index : forall c a. (a -> Bool)^c -> (List a -> Option Number)^c
 foreign pure find_index from "@flick-lang/runtime" "listFindIndex"
   arity 2
+  retention call
 
 any : forall c a. (a -> Bool)^c -> (List a -> Bool)^c
 foreign pure any from "@flick-lang/runtime" "listAny"
   arity 2
+  retention call
 
 all : forall c a. (a -> Bool)^c -> (List a -> Bool)^c
 foreign pure all from "@flick-lang/runtime" "listAll"
   arity 2
+  retention call
 
 partition : forall c a. (a -> Bool)^c -> (List a -> (List a, List a))^c
 foreign pure partition from "@flick-lang/runtime" "listPartition"
   arity 2
+  retention call
 
 /// Sorts by `compare`, keeping equal elements in their order.
 sort_by : forall c a. (a -> a -> Ordering)^c -> (List a -> List a)^c
 foreign pure sort_by from "@flick-lang/runtime" "listSortBy"
   arity 2
+  retention call
 
 /// Sorts by the total order of `Ord`, keeping equal elements in their order:
 /// numbers ascend with NaN last.
@@ -139,6 +155,7 @@ foreign pure range from "@flick-lang/runtime" "listRange"
 /// The list of `f 0`, …, `f (n - 1)`.
 initialize : forall c a. Number -> (Number -> a)^c -> List a
 foreign pure initialize from "@flick-lang/runtime" "listInitialize"
+  retention call
 
 reverse : List a -> List a
 foreign pure reverse from "@flick-lang/runtime" "listReverse"

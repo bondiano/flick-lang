@@ -15,7 +15,7 @@ pub use lower::lower;
 pub use print::print;
 
 use crate::source::Span;
-use crate::types::{Constructor, Dict, InstanceInfo, Lift};
+use crate::types::{Constructor, Dict, ForeignInfo, InstanceInfo, Lift};
 
 #[derive(Debug, Clone)]
 pub struct Module {
@@ -75,6 +75,10 @@ pub struct Foreign {
     pub dicts: usize,
     /// `arity n`, else the stages up to the first runtime one.
     pub arity: usize,
+    /// The rest of its calling convention.
+    pub info: ForeignInfo,
+    /// The `catch` mapping, a function of the thrown value.
+    pub catch: Option<Expr>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

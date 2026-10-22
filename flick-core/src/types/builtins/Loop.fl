@@ -7,6 +7,7 @@ type Step s a = Continue s | Done a
 loop : forall c s a. (s -> Step s a)^c -> (s -> a)^c
 foreign pure loop from "@flick-lang/runtime" "loop"
   arity 2
+  retention call
 
 /// A computation run step by step: mutual recursion without stack growth.
 type Trampoline a
@@ -16,6 +17,7 @@ foreign pure done from "@flick-lang/runtime" "trampolineDone"
 
 suspend : forall c a. (Unit -> Trampoline a)^c -> (Trampoline a)^c
 foreign pure suspend from "@flick-lang/runtime" "trampolineSuspend"
+  retention call
 
 run : Trampoline a -> a
 foreign pure run from "@flick-lang/runtime" "trampolineRun"

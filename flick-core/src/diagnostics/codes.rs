@@ -163,6 +163,10 @@ codes! {
     G002 = Regions 2, "scoped value leaves its scope";
     G003 = Regions 3, "child may outlive what it holds";
     G004 = Regions 4, "resource acquired outside a scope";
+    F001 = Ffi 1, "invalid foreign metadata";
+    F002 = Ffi 2, "foreign parameter may hold a scope without a retention contract";
+    F003 = Ffi 3, "catch mapping does not make an error of the signature";
+    F004 = Ffi 4, "export has no TypeScript form";
     P001 = Project 1, "cannot read source file";
     P002 = Project 2, "file is not formatted";
     P003 = Project 3, "internal formatter error";

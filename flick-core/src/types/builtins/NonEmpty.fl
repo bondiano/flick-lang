@@ -25,6 +25,7 @@ foreign pure length from "@flick-lang/runtime" "listLength"
 map : forall c a b. (a -> b)^c -> (NonEmpty a -> NonEmpty b)^c
 foreign pure map from "@flick-lang/runtime" "listMap"
   arity 2
+  retention call
 
 instance Eq a => Eq (NonEmpty a) =
   eq : NonEmpty a -> NonEmpty a -> Bool

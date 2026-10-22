@@ -1,6 +1,5 @@
-// Lists, non-empty lists, mutable JS arrays and chunks. A Flick function is
-// curried: a callback of two arguments is called `f(a)(b)`, and a runtime
-// callback returns an `Effect`.
+// Lists, non-empty lists, mutable JS arrays and chunks. A callback comes
+// adapted to its JS arity, `f(a, b)`; a runtime callback returns an `Effect`.
 import { Chunk, Effect } from "effect";
 
 import { EQ, LT, none, some } from "../data.js";
@@ -8,23 +7,23 @@ import { EQ, LT, none, some } from "../data.js";
 export const identity = (x) => x;
 
 export const listMap = (f, xs) => xs.map((x) => f(x));
-export const listMapIndexed = (f, xs) => xs.map((x, i) => f(i)(x));
+export const listMapIndexed = (f, xs) => xs.map((x, i) => f(i, x));
 export const listMapEffect = (f, xs) => Effect.forEach(xs, (x) => f(x));
 export const listEachEffect = (f, xs) => Effect.forEach(xs, (x) => f(x), { discard: true });
 
 export const listFold = (f, init, xs) => {
   let acc = init;
-  for (const x of xs) acc = f(acc)(x);
+  for (const x of xs) acc = f(acc, x);
   return acc;
 };
 
 export const listFoldRight = (f, init, xs) => {
   let acc = init;
-  for (let i = xs.length - 1; i >= 0; i--) acc = f(xs[i])(acc);
+  for (let i = xs.length - 1; i >= 0; i--) acc = f(xs[i], acc);
   return acc;
 };
 
-export const listFoldEffect = (f, init, xs) => Effect.reduce(xs, init, (acc, x) => f(acc)(x));
+export const listFoldEffect = (f, init, xs) => Effect.reduce(xs, init, (acc, x) => f(acc, x));
 
 export const listFilter = (p, xs) => xs.filter((x) => p(x));
 
@@ -62,7 +61,7 @@ export const listPartition = (p, xs) => {
 const order = (o) => (o._tag === LT._tag ? -1 : o._tag === EQ._tag ? 0 : 1);
 
 /** A stable sort: `Array.prototype.sort` is stable, on a copy. */
-export const listSortBy = (cmp, xs) => [...xs].sort((a, b) => order(cmp(a)(b)));
+export const listSortBy = (cmp, xs) => [...xs].sort((a, b) => order(cmp(a, b)));
 
 export const listLength = (xs) => xs.length;
 

@@ -59,6 +59,15 @@ impl<'a> Checker<'a> {
         for i in 0..self.top.items.len() {
             self.check_item(i);
         }
+        for i in 0..self.top.items.len() {
+            let (decl, scheme) = (self.top.items[i].decl, self.top.items[i].scheme.clone());
+            if decl.kind == K::ForeignDecl
+                && let Some((scheme, _)) = scheme
+            {
+                self.foreign_info(decl, &scheme);
+                self.settle_operators();
+            }
+        }
         for (predicate, base) in refined {
             if let Some(expr) = predicate.nodes().next() {
                 self.check(expr, &Type::pure_fun(base, Type::prim("Bool")));
@@ -203,20 +212,6 @@ impl<'a> Checker<'a> {
         let scheme = sig
             .and_then(|s| s.nodes().find(|n| is_type(n.kind)))
             .map(|t| self.signature(t));
-        if decl.kind == K::ForeignDecl
-            && let Some((scheme, _)) = &scheme
-        {
-            let dicts = match scheme {
-                Type::Forall { constraints, .. } => constraints
-                    .iter()
-                    .filter(|c| super::typing::passes_dictionary(c))
-                    .count(),
-                _ => 0,
-            };
-            let stages = self.arrow_stages(scheme);
-            let span = super::typing::range(self.span(decl));
-            self.typing.foreigns.insert(span, (stages, dicts));
-        }
         let index = self.top.items.len();
         for name in &names {
             self.env.declare(Namespace::Value, name);

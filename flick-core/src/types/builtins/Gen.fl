@@ -36,3 +36,4 @@ foreign pure pair from "@flick-lang/runtime" "genPair"
 map : forall c a b. (a -> b)^c -> (Gen a -> Gen b)^c
 foreign pure map from "@flick-lang/runtime" "genMap"
   arity 2
+  retention call

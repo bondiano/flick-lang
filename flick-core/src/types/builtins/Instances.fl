@@ -210,17 +210,21 @@ let rank o =
 map_list : forall c d a b. (a -> b)^c -> ((List a)^d -> (List b)^(c + d))^c
 foreign pure map_list from "@flick-lang/runtime" "listMap"
   arity 2
+  retention call
 
 fold_list : forall c a b. (b -> a -> b)^c -> (b -> (List a -> b)^c)^c
 foreign pure fold_list from "@flick-lang/runtime" "listFold"
   arity 3
+  retention call
 
 traverse_list : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
 foreign effect traverse_list from "@flick-lang/runtime" "listMapEffect"
+  retention call
 
 flat_map_list : forall c d a b. (a -> (List b)^d)^c -> ((List a)^d -> (List b)^(c + d))^c
 foreign pure flat_map_list from "@flick-lang/runtime" "listFlatMap"
   arity 2
+  retention call
 
 pure_eff : a -> Eff r e a
 foreign pure pure_eff from "@flick-lang/runtime" "succeed"
@@ -229,10 +233,12 @@ flat_map_eff :
   forall c d r e a b. (a -> (Eff r e b)^d)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
 foreign pure flat_map_eff from "@flick-lang/runtime" "flatMapEff"
   arity 2
+  retention call
 
 map_eff : forall c d r e a b. (a -> b)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
 foreign pure map_eff from "@flick-lang/runtime" "mapEff"
   arity 2
+  retention call
 
 instance Functor Option =
   map : forall c d a b. (a -> b)^c -> ((Option a)^d -> (Option b)^(c + d))^c

@@ -1,6 +1,7 @@
-/// Policies of event subscriptions: how events queue for their handler, and
-/// a supervisor that logs the failures of handlers.
-module Events exposing (QueuePolicy, queue, log_failures)
+/// Event subscriptions owned by a scope: each event becomes a task of the
+/// handler, queued and run one at a time by the scope's owner; failures go
+/// to a supervisor.
+module Events exposing (..)
 
 /// How events wait for their handler.
 type QueuePolicy
@@ -15,3 +16,26 @@ log_failures : Failure e ->{Log.Log; none} Unit
 let log_failures failure =
   let report = Failure.inspect failure
   Log.error ("event handler failed: " ++ RawCause.describe report)
+
+/// A JS function for an event source: each call queues an event for
+/// `handler`. Made by `listen`, registered with `attach`.
+type Listener (s : Region) a
+
+/// A listener whose events run `handler` one after another as a child of
+/// `owner`. An event that finds the queue full is dropped and reported to
+/// `supervisor`, and so is every failure of the handler.
+listen :
+  forall c s r e a.
+  Fiber.Owner s ->
+  QueuePolicy -> (Failure e ->{r;} Unit)^c -> (a -> Eff r e Unit)^c ->{r;} Listener s a
+foreign effect listen from "@flick-lang/runtime" "eventsListen"
+  retention owner
+
+/// Registers `listener` with `add`. When the owner of `s` begins to close,
+/// later events are ignored at once and `remove` gets the very function
+/// `add` got; then the handler's tasks end and resources are released.
+attach :
+  forall s a.
+  Listener s a -> (Listener s a ->{} Unit) -> (Listener s a ->{} Unit) ->{Scope s;} Unit
+foreign effect attach from "@flick-lang/runtime" "eventsAttach"
+  retention owner

@@ -1,0 +1,13 @@
+// A throw of foreign code without `catch` is a defect: no handler of a
+// typed error sees it, and main fails with code 1.
+module App.Main exposing (main)
+
+type error FsError = FsError String
+
+fail_sync : String ->{} Unit
+foreign sync fail_sync from "./bindings.mjs" "fail"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  fail_sync "unmapped"
+  Platform.stdout_line "not reached"

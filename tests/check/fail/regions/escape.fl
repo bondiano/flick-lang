@@ -104,6 +104,7 @@ let raised path =
 
 map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
 foreign sync map_effect from "./list.js" "mapEffect"
+  retention call
 
 partial : Path ->{FileSystem; OpenError} Unit
 let partial path =
@@ -127,5 +128,5 @@ let no_owner path =
 //~ FLICK-G002 @84:19-84:28 expected `Option _`, found `Option (File s)`: region `s` end
 //~ FLICK-G001 @92:19-92:52 this task uses `file`, which holds region `s`, but the expec
 //~ FLICK-E005 @100:7-100:39 the error `Wrapped (File s)` would carry region `s`; an erro
-//~ FLICK-G002 @113:26-113:59 this function uses `file`, which holds region `s`, so it can
-//~ FLICK-G004 @119:11-119:38 this acquires a resource, which needs `Scope`: only `scope {
+//~ FLICK-G002 @114:26-114:59 this function uses `file`, which holds region `s`, so it can
+//~ FLICK-G004 @120:11-120:38 this acquires a resource, which needs `Scope`: only `scope {
