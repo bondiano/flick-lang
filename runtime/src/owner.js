@@ -62,7 +62,13 @@ export const close = (owner, exit) =>
 
 const resume = (exit) => (Exit.isSuccess(exit) ? Effect.succeed(exit.value) : Effect.failCause(exit.cause));
 
-/** Runs `body(owner)` as the owner of a fresh scope, then closes it. */
+/**
+ * Runs `body(owner)` as the owner of a fresh scope, then closes it.
+ *
+ * shortcut: an acquisition finds its owner as the innermost scope in the
+ * context, not the region its `Scope s` names; pass owners explicitly once
+ * resource APIs can need an outer named scope.
+ */
 export const withOwner = (body) =>
   Effect.uninterruptibleMask((restore) =>
     Effect.gen(function* () {
