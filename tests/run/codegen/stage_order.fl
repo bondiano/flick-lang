@@ -1,0 +1,18 @@
+// `f x y` is `(f x) y`: a runtime first stage finishes before the second
+// argument is evaluated.
+module App.Main exposing (main)
+
+stage : Number ->{} (Number -> Number)
+let stage x =
+  Platform.stdout_line "stage 1"
+  fun y -> x + y
+
+argument : Number ->{} Number
+let argument n =
+  Platform.stdout_line "argument"
+  n
+
+main : Unit ->{none; AppError} Unit
+let main () =
+  let result = stage 1 (argument 2)
+  Platform.stdout_line (show result)

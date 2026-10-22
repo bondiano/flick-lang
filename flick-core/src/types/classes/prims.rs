@@ -61,7 +61,7 @@ impl Checker<'_> {
                 Some(format!("{what}, and its other fields are not known")),
             ),
         };
-        let solved = |this: &Self| Outcome::Solved(Dict::Primitive(this.show(c)));
+        let solved = |this: &Self| primitive(this.show(c), Vec::new());
         match (name, args) {
             ("HasField", [Type::Symbol(label), Type::Record(row), field]) => match row.get(label) {
                 Some(t) if self.unify(field, t).is_ok() => solved(self),
@@ -115,7 +115,9 @@ impl Checker<'_> {
                         }
                     }
                 }
-                solved(self)
+                // shortcut: an open `out` keeps only its known fields at run time
+                let labels = out.entries.iter().map(|(l, _)| l.clone());
+                primitive(self.show(c), labels.collect())
             }
             ("UnionDisjoint", [Type::Record(a), Type::Record(b), out]) => {
                 self.union_disjoint(c, (a, b), out, givens, chain)
@@ -211,9 +213,13 @@ impl Checker<'_> {
     /// The determined record of a primitive must be `computed`.
     fn result(&mut self, c: &Type, out: &Type, computed: &Type) -> Outcome {
         if self.unify(out, computed).is_ok() {
-            return Outcome::Solved(Dict::Primitive(self.show(c)));
+            return primitive(self.show(c), Vec::new());
         }
         let shown = self.show(computed);
         Outcome::Missing(c.clone(), Some(format!("the result is `{shown}`")))
     }
+}
+
+fn primitive(constraint: String, labels: Vec<String>) -> Outcome {
+    Outcome::Solved(Dict::Primitive { constraint, labels })
 }

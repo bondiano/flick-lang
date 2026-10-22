@@ -7,7 +7,7 @@ use crate::source::SourceMap;
 use crate::{syntax, types};
 
 /// Checks one self-contained module and lowers it.
-pub fn lower_text(name: &str, text: &str) -> Result<super::Module, Vec<Diagnostic>> {
+pub(crate) fn lower_text(name: &str, text: &str) -> Result<super::Module, Vec<Diagnostic>> {
     let mut sources = SourceMap::default();
     let file = sources.add(format!("{name}.fl"), text);
     let parse = syntax::parse(text, file);

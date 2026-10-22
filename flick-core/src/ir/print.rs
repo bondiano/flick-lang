@@ -83,7 +83,7 @@ pub fn dict(d: &Dict) -> String {
             let fields: Vec<String> = fields.iter().map(dict).collect();
             format!("{class}{{{}}}", fields.join(", "))
         }
-        Dict::Primitive(p) => format!("#{p}"),
+        Dict::Primitive { constraint, .. } => format!("#{constraint}"),
         Dict::Error => "error".to_owned(),
     }
 }

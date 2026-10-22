@@ -1,0 +1,19 @@
+---
+source: flick-core/src/codegen/tests.rs
+expression: js
+---
+export const identity = (value) => value;
+
+export const greet = (prefix) => (name) => (prefix + (", " + name));
+
+export const hello = greet("Hello");
+
+export const with_default = (fallback) => (value) => {
+  if (value._tag === "None") {
+    return fallback;
+  }
+  if (value._tag === "Some") {
+    const x = value.value;
+    return x;
+  }
+};

@@ -19,6 +19,11 @@ fn help_check() {
 }
 
 #[test]
+fn help_build() {
+    insta::assert_snapshot!(stdout(&["help", "build"]));
+}
+
+#[test]
 fn bad_invocation_exits_2() {
     assert_eq!(flick(&["frobnicate"]).status.code(), Some(2));
     assert_eq!(flick(&["check"]).status.code(), Some(2));

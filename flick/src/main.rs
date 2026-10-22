@@ -4,7 +4,7 @@ use clap::Parser;
 
 use crate::args::{CommandArguments, Commands};
 use crate::command::run_command;
-use crate::commands::{CheckCommand, FmtCommand};
+use crate::commands::{BuildCommand, CheckCommand, FmtCommand};
 
 mod args;
 mod command;
@@ -17,6 +17,10 @@ fn main() -> ExitCode {
     match args.cmd {
         Commands::Check(options) => run_command(
             &CheckCommand::new(options, args.global.project.clone()),
+            &args.global,
+        ),
+        Commands::Build(options) => run_command(
+            &BuildCommand::new(options, args.global.project.clone()),
             &args.global,
         ),
         Commands::Fmt(options) => run_command(&FmtCommand::new(options), &args.global),

@@ -1,0 +1,9 @@
+Node (Node Leaf 1 Leaf) 2 Leaf
+true
+true
+GT
+warm, many, nothing
+{ age = 36, name = "ada" }
+(1, "x", [Some 2, None])
+<1> <"two">
+true

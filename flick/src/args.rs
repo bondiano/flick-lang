@@ -18,6 +18,8 @@ pub struct CommandArguments {
 pub enum Commands {
     /// Check Flick source files and report diagnostics.
     Check(CheckArguments),
+    /// Compile the project, or the given files, to ES modules.
+    Build(BuildArguments),
     /// Format Flick source files in place.
     Fmt(FmtArguments),
 }
@@ -51,6 +53,27 @@ pub struct CheckArguments {
     /// Files or directories to check, with everything they import; by
     /// default the project's source and test roots.
     pub paths: Vec<String>,
+}
+
+#[derive(Args)]
+pub struct BuildArguments {
+    /// Files or directories to compile, with everything they import; by
+    /// default the project's source root.
+    pub paths: Vec<String>,
+
+    /// Directory of the output; by default `build.out-dir` of the project.
+    #[arg(long, value_name = "DIR")]
+    pub out_dir: Option<String>,
+
+    /// Emit JavaScript or TypeScript; by default `build.emit` of the project.
+    #[arg(long, value_enum)]
+    pub emit: Option<EmitArgument>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum EmitArgument {
+    Js,
+    Ts,
 }
 
 #[derive(Args)]

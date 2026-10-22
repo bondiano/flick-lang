@@ -45,18 +45,22 @@ substring of the diagnostic message. Codes must be registered in
 
 ## E2E programs — `tests/run/`
 
-Each `<name>.fl` is compiled to ESM and run with `node`. Expected results sit
-next to it:
+Each `<name>.fl` is built with `flick build <name>.fl --out-dir …` and its
+runner is run with `node --enable-source-maps`. Expected results sit next
+to it:
 
 | File | Default when absent |
 | - | - |
 | `<name>.stdout` | required |
 | `<name>.stderr` | empty |
+| `<name>.stderr.contains` | instead of `<name>.stderr`: lines stderr must contain |
 | `<name>.exit` | `0` |
 
-Compiled modules go to `target/tmp/e2e/` and import `@flick-lang/runtime`
-from the workspace. Until code generation from the typed IR exists the cases use the bootstrap
-subset described in `flick-core/src/bootstrap.rs`.
+Output goes to `target/tmp/e2e/` and imports `@flick-lang/runtime` from the
+workspace. A foreign module next to a case (`./tags.mjs`) is imported from
+there. `just e2e` also builds every `tests/check/pass/**` fixture and runs
+`node --check` on the output, and `e2e_numbers.rs` compares random `Number`
+arithmetic, compiled from Flick, with the same expressions in JS.
 
 ## Syntax corpus and fuzzing — `flick-core/tests/{corpus,fuzz}.rs`
 

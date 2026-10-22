@@ -11,6 +11,7 @@ use super::config::Kind;
 use super::packages::Packages;
 use super::{Host, Project, module_name, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
+use crate::ir;
 use crate::resolve::{self, Interface, ModuleSyntax};
 use crate::source::{FileId, SourceMap, Span};
 use crate::syntax::{self, Parse};
@@ -44,6 +45,19 @@ struct Loader<'a> {
     by_name: BTreeMap<String, usize>,
     from_packages: BTreeMap<String, Interface>,
     diagnostics: Vec<Diagnostic>,
+    /// With `Some`, the IR of each module that checks without errors.
+    lowered: Option<Vec<Option<ir::Module>>>,
+}
+
+/// A module that checked cleanly, lowered to the IR.
+pub struct Compiled {
+    pub name: String,
+    pub path: PathBuf,
+    pub file: FileId,
+    /// Whether it is in the test root.
+    pub test: bool,
+    pub ir: ir::Module,
+    pub interface: Interface,
 }
 
 /// Checks `roots` (absolute `.fl` paths) and their transitive imports.
@@ -53,6 +67,26 @@ pub fn check(
     project: Option<&Project>,
     roots: &[PathBuf],
 ) -> Vec<Diagnostic> {
+    run(host, sources, project, roots, false).0
+}
+
+/// [`check`], also lowering every module to the IR when nothing has errors.
+pub fn compile(
+    host: &dyn Host,
+    sources: &mut SourceMap,
+    project: Option<&Project>,
+    roots: &[PathBuf],
+) -> (Vec<Diagnostic>, Vec<Compiled>) {
+    run(host, sources, project, roots, true)
+}
+
+fn run(
+    host: &dyn Host,
+    sources: &mut SourceMap,
+    project: Option<&Project>,
+    roots: &[PathBuf],
+    lower: bool,
+) -> (Vec<Diagnostic>, Vec<Compiled>) {
     let mut diagnostics = Vec::new();
     let packages = project.map_or_else(Packages::default, |p| {
         Packages::load(host, &p.root, &mut diagnostics)
@@ -66,6 +100,7 @@ pub fn check(
         by_name: BTreeMap::new(),
         from_packages: BTreeMap::new(),
         diagnostics,
+        lowered: lower.then(Vec::new),
     };
     let mut roots: Vec<(Root, PathBuf)> = roots
         .iter()
@@ -83,8 +118,33 @@ pub fn check(
     }
     let edges = loader.load_imports();
     loader.import_cycles(&edges);
+    if let Some(lowered) = &mut loader.lowered {
+        lowered.resize_with(loader.modules.len(), || None);
+    }
     let interfaces = loader.resolve_all(&edges);
     loader.check_entry(&interfaces);
+    let failed = loader
+        .diagnostics
+        .iter()
+        .any(|d| d.severity == Severity::Error);
+    let compiled = match loader.lowered.take() {
+        Some(lowered) if !failed => lowered
+            .into_iter()
+            .zip(interfaces)
+            .zip(&loader.modules)
+            .filter_map(|((ir, interface), m)| {
+                Some(Compiled {
+                    name: m.name.clone(),
+                    path: m.path.clone(),
+                    file: m.file,
+                    test: m.root == Root::Test,
+                    ir: ir?,
+                    interface: interface?,
+                })
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
     let mut diagnostics = loader.diagnostics;
     // by path, not by load order, which follows the order of imports
     let sources = &*loader.sources;
@@ -95,7 +155,7 @@ pub fn check(
                 .map(|s| (sources.get(s.file).path.clone(), s.start, s.end)),
         )
     });
-    diagnostics
+    (diagnostics, compiled)
 }
 
 impl Loader<'_> {
@@ -387,13 +447,16 @@ impl Loader<'_> {
         self.diagnostics.extend(diagnostics);
         // a module with syntax errors keeps untyped exports: importers trust them
         if loaded.parse.diagnostics.is_empty() {
-            self.diagnostics.extend(types::check(
-                &module,
-                &lookup,
-                types::builtins(),
-                options,
-                &mut interface,
-            ));
+            let (checked, typing) =
+                types::check_typed(&module, &lookup, types::builtins(), options, &mut interface);
+            let clean = !checked.iter().any(|d| d.severity == Severity::Error);
+            self.diagnostics.extend(checked);
+            if clean && let Some(lowered) = &mut self.lowered {
+                match ir::lower(&module, &typing) {
+                    Ok(ir) => lowered[i] = Some(ir),
+                    Err(d) => self.diagnostics.extend(d),
+                }
+            }
         }
         interfaces[i] = Some(interface);
         visiting[i] = false;

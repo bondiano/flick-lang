@@ -1,0 +1,13 @@
+// A constructor id names its module and type: a user `Some` is not the
+// native `Option`.
+module App.Main exposing (main)
+
+type Choice = Some Number | Empty
+
+tag_of : a -> String
+foreign pure tag_of from "./tags.mjs" "tagOf"
+
+main : Unit ->{none; AppError} Unit
+let main () =
+  Platform.stdout_line (tag_of (Some 1))
+  Platform.stdout_line (tag_of Empty)

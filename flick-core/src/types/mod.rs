@@ -39,7 +39,7 @@ mod typing;
 mod unify;
 
 pub use bindings::{LetParts, let_parts, signature_name};
-pub use builtins::builtins;
+pub use builtins::{builtin_sources, builtins};
 pub use classes::Dict;
 pub use convert::is_type;
 pub use env::{Form, Fundep, Instance, Operation, TypeDef};

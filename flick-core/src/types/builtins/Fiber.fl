@@ -21,4 +21,4 @@ spawn :
   forall s c r e a.
   Outlives c s =>
   Owner s -> (Failure e ->{r; none} Unit)^c -> (Eff r e a)^c ->{r; none} Fiber e a
-foreign sync spawn from "@flick-lang/runtime" "fiberSpawn"
+foreign effect spawn from "@flick-lang/runtime" "fiberSpawn"

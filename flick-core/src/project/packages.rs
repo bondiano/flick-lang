@@ -27,6 +27,7 @@ struct Package {
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct Manifest {
+    name: Option<String>,
     #[serde(default)]
     dependencies: serde_json::Map<String, serde_json::Value>,
     #[serde(default)]
@@ -38,6 +39,11 @@ struct Manifest {
 #[serde(rename_all = "kebab-case")]
 struct FlickField {
     iface_dir: String,
+}
+
+/// The `name` in the project's `package.json`, which owns its modules.
+pub fn project_name(host: &dyn Host, root: &Path) -> Option<String> {
+    manifest(host, &root.join("package.json"), &mut Vec::new())?.name
 }
 
 impl Packages {

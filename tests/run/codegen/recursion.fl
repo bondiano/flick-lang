@@ -1,0 +1,20 @@
+// Pure self tail recursion is a loop; runtime recursion runs through the
+// runtime without growing the JS stack.
+module App.Main exposing (main)
+
+sum_to : Number -> Number -> Number
+let rec sum_to acc n =
+  if n == 0 then acc else sum_to (acc + n) (n - 1)
+
+count_down : Ref Number -> Number ->{} Unit
+let rec count_down cell n =
+  if n == 0 then () else
+    Ref.set cell n
+    count_down cell (n - 1)
+
+main : Unit ->{none; AppError} Unit
+let main () =
+  Platform.stdout_line (show (sum_to 0 1000000))
+  let cell = Ref.make 0
+  count_down cell 100000
+  Platform.stdout_line (show (Ref.get cell))

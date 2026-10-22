@@ -1,0 +1,18 @@
+// Arguments, tuple items and record fields are evaluated left to right,
+// fields in the order written.
+module App.Main exposing (main)
+
+trace : String -> Number ->{} Number
+let trace label n =
+  Platform.stdout_line label
+  n
+
+pair : Number -> Number -> Number
+let pair a b = a * 10 + b
+
+main : Unit ->{none; AppError} Unit
+let main () =
+  let (x, y) = (trace "t1" 1, trace "t2" 2)
+  let r = { b = trace "rb" 3; a = trace "ra" 4 }
+  let p = pair (trace "p1" 1) (trace "p2" 2)
+  Platform.stdout_line (show (x + y + r.a + r.b + p))

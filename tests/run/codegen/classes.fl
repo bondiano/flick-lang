@@ -1,0 +1,51 @@
+// Dictionaries: instances with contexts and superclasses, derived and
+// structural instances, constrained and higher-rank functions.
+module App.Main exposing (main)
+
+type Tree a = Leaf | Node (Tree a) a (Tree a)
+  deriving Eq, Ord, Show
+
+type Color = Red | Green
+  deriving Eq, Ord, Show, Hash
+
+class Describe a =
+  describe : a -> String
+
+instance Describe Color =
+  let describe c =
+    match c with
+    | Red -> "warm"
+    | Green -> "cool"
+
+instance Describe a => Describe (List a) =
+  let describe xs =
+    match xs with
+    | [] -> "nothing"
+    | [x] -> describe x
+    | _ -> "many"
+
+largest : Ord a => a -> a -> a
+let largest x y =
+  match compare x y with
+  | LT -> y
+  | _ -> x
+
+same : Ord a => a -> a -> Bool
+let same x y = eq x y
+
+both : (forall a. Show a => a -> String) -> String
+let both render = render 1 ++ " " ++ render "two"
+
+main : Unit ->{none; AppError} Unit
+let main () =
+  let small = Node Leaf 1 Leaf
+  let big = Node small 2 Leaf
+  Platform.stdout_line (show big)
+  Platform.stdout_line (show (largest small big == big))
+  Platform.stdout_line (show (same Red Red && not (same Red Green)))
+  Platform.stdout_line (show (compare Green Red))
+  Platform.stdout_line (describe [Red] ++ ", " ++ describe [Red, Green] ++ ", " ++ describe ([] : List Color))
+  Platform.stdout_line (show { name = "ada"; age = 36 })
+  Platform.stdout_line (show (1, "x", [Some 2, None]))
+  Platform.stdout_line (both (fun v -> "<" ++ show v ++ ">"))
+  Platform.stdout_line (show (hash Red == hash Red))

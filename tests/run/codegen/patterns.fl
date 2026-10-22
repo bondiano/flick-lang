@@ -1,0 +1,36 @@
+// Patterns: literals, tuples, lists, records, nested constructors,
+// or-patterns with bindings and guards.
+module App.Main exposing (main)
+
+type Shape = Circle Number | Rect Number Number | Empty
+
+classify : Shape -> String
+let classify shape =
+  match shape with
+  | Circle r | Rect r _ when r > 10 -> "large"
+  | Rect w h when w == h -> "square"
+  | Circle _ | Rect _ _ -> "shape"
+  | Empty -> "empty"
+
+first : List (Option Number) -> Number
+let first xs =
+  match xs with
+  | [Some n, _] | [Some n] -> n
+  | [None, Some (1 | 2)] -> -1
+  | _ -> 0
+
+area : { w : Number; h : Number } -> Number
+let area { w; h = height } = w * height
+
+main : Unit ->{none; AppError} Unit
+let main () =
+  Platform.stdout_line (classify (Circle 20) ++ " " ++ classify (Rect 11 1) ++ " " ++ classify (Rect 2 2) ++ " " ++ classify (Circle 1) ++ " " ++ classify Empty)
+  Platform.stdout_line (show [first [Some 5], first [Some 6, None], first [None, Some 2], first []])
+  Platform.stdout_line (show (area { w = 3; h = 4 }))
+  let (a, (b, c)) = (1, (2, 3))
+  Platform.stdout_line (show (a + b + c))
+  let words = ["a"] ++ ["b", "c"]
+  Platform.stdout_line (show words)
+  let r = { x = 1; y = 2 }
+  let moved = { r with x = 10 }
+  Platform.stdout_line (show (moved.x + moved.y + r.x))

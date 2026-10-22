@@ -1,0 +1,19 @@
+// `task` defers its body: building, storing and passing it on run nothing,
+// and each `await` runs the body again.
+module App.Main exposing (main)
+
+main : Unit ->{none; AppError} Unit
+let main () =
+  let cell = Ref.make 0
+  let request = task {
+    Platform.stdout_line "body"
+    Ref.modify cell (fun n -> (n + 1, n + 1))
+  }
+  Platform.stdout_line "built"
+  let same = identity request
+  let kept = [request, same]
+  Platform.stdout_line (show (Ref.get cell))
+  let first = await same
+  let second = await request
+  Platform.stdout_line (show first)
+  Platform.stdout_line (show second)

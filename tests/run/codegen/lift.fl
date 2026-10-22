@@ -1,0 +1,20 @@
+// A pure function passed where a runtime one is expected is lifted.
+module App.Main exposing (main)
+
+apply_twice : (Number ->{} Number) -> Number ->{} Number
+let apply_twice f x = f (f x)
+
+logged : Number ->{} Number
+let logged n =
+  Platform.stdout_line ("saw " ++ show n)
+  n + 1
+
+double : Number -> Number
+let double n = n * 2
+
+main : Unit ->{none; AppError} Unit
+let main () =
+  Platform.stdout_line (show (apply_twice double 3))
+  Platform.stdout_line (show (apply_twice logged 3))
+  Platform.stdout_line (show (apply_twice (fun n -> n - 1) 3))
+  Platform.stdout_line (3 |> double |> show)

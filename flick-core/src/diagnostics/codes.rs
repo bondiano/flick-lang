@@ -175,6 +175,7 @@ codes! {
     P010 = Project 10, "invalid package interface";
     P011 = Project 11, "invalid entry module";
     P012 = Project 12, "construct is not compiled yet";
+    P013 = Project 13, "cannot write build output";
 }
 
 #[cfg(test)]

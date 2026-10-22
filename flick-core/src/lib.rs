@@ -5,6 +5,8 @@
 //! modules, the project model, kinds and types, and classes.
 
 pub mod bootstrap;
+pub mod build;
+pub mod codegen;
 pub mod consteval;
 pub mod diagnostics;
 pub mod fmt;

@@ -40,8 +40,12 @@ pub enum Dict {
     Super { dict: Box<Dict>, class: String },
     /// The compiler-owned instance of a record or tuple, by field.
     Structural { class: String, fields: Vec<Dict> },
-    /// A row primitive, solved by the compiler.
-    Primitive(String),
+    /// A row primitive, solved by the compiler: the constraint as shown, and
+    /// the labels its operation needs at run time (those `Project` keeps).
+    Primitive {
+        constraint: String,
+        labels: Vec<String>,
+    },
     /// A constraint on a type that already produced a diagnostic.
     Error,
 }

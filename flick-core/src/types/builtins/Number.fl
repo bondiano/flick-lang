@@ -1,0 +1,11 @@
+/// Operations on numbers beyond the operators. `==` is canonical equality:
+/// `NaN == NaN` and `0 == -0`.
+module Number exposing (strict_equal, same_value)
+
+/// JS `===`: `NaN` differs from itself, `0` equals `-0`.
+strict_equal : Number -> Number -> Bool
+foreign pure strict_equal from "@flick-lang/runtime" "numberStrictEqual"
+
+/// JS `Object.is`: `NaN` equals itself, `0` differs from `-0`.
+same_value : Number -> Number -> Bool
+foreign pure same_value from "@flick-lang/runtime" "numberSameValue"
