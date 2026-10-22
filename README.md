@@ -13,6 +13,7 @@ The language is fully specified but not yet implemented:
 | - | - |
 | `flick-core` | Shared Rust core for the compiler and the LSP |
 | `flick` | The `flick` CLI |
+| `flick-wasm` | wasm-bindgen interface for the in-browser demo (compile preview, REPL) |
 
 ## Development
 
