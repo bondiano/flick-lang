@@ -26,10 +26,25 @@ pub fn render(global: &GlobalArguments, sources: &SourceMap, diagnostics: &[Diag
     let _ = std::io::stderr().lock().write_all(out.as_bytes());
 }
 
-/// `3` for an internal tooling error, `1` for any other error, else `0`.
+/// Errors that mean a wrong invocation, configuration or missing dependency
+/// rather than a problem in the code: exit code `2` (§12).
+const USAGE: [codes::Code; 7] = [
+    codes::P005,
+    codes::P006,
+    codes::P007,
+    codes::P008,
+    codes::P009,
+    codes::P010,
+    codes::P011,
+];
+
+/// `3` for an internal tooling error, `2` for a usage error, `1` for any
+/// other error, else `0`.
 pub fn exit_code(diagnostics: &[Diagnostic]) -> ExitCode {
     if diagnostics.iter().any(|d| d.code == codes::P003) {
         ExitCode::from(3)
+    } else if diagnostics.iter().any(|d| USAGE.contains(&d.code)) {
+        ExitCode::from(2)
     } else if diagnostics.iter().any(|d| d.severity == Severity::Error) {
         ExitCode::FAILURE
     } else {

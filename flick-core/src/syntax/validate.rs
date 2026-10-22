@@ -3,7 +3,7 @@
 //! binds the same names, and no name is bound twice by one pattern or by the
 //! parameters of one function.
 
-use super::cst::{Element, Node, Token};
+use super::cst::{Node, Token};
 use super::kind::SyntaxKind as K;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
@@ -77,7 +77,7 @@ impl Validator<'_> {
         match node.kind {
             K::VarPat => idents(node).take(1).collect(),
             // `{ field }` binds `field`; `{ field = p }` binds what `p` binds
-            K::RecordPatField if !has_token(node, K::Eq) => idents(node).take(1).collect(),
+            K::RecordPatField if !node.has_token(K::Eq) => idents(node).take(1).collect(),
             K::OrPat => self.alternatives(node),
             _ => node
                 .nodes()
@@ -103,7 +103,7 @@ impl Validator<'_> {
                 .map(|t| t.text(self.src))
                 .find(|name| !first.iter().any(|t| t.text(self.src) == *name));
             if let Some(name) = missing.first().copied().or(extra) {
-                let (start, end) = range(alternative);
+                let (start, end) = alternative.range();
                 self.error(
                     start,
                     end,
@@ -127,23 +127,5 @@ impl Validator<'_> {
 }
 
 fn idents(node: &Node) -> impl Iterator<Item = Token> + '_ {
-    node.children.iter().filter_map(|c| match c {
-        Element::Token(t) if t.kind == K::Ident => Some(*t),
-        _ => None,
-    })
-}
-
-fn has_token(node: &Node, kind: K) -> bool {
-    node.children
-        .iter()
-        .any(|c| matches!(c, Element::Token(t) if t.kind == kind))
-}
-
-/// Byte range of a node's non-trivia tokens.
-fn range(node: &Node) -> (u32, u32) {
-    let tokens = node.tokens();
-    let mut code = tokens.iter().filter(|t| !t.kind.is_trivia());
-    let first = code.next();
-    let last = code.next_back().or(first);
-    (first.map_or(0, |t| t.start), last.map_or(0, |t| t.end))
+    node.child_tokens().filter(|t| t.kind == K::Ident)
 }

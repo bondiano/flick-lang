@@ -1,0 +1,2 @@
+module App.Lower.Thing
+//     ^^^^^^^^^^^^^^^ FLICK-R001 is not at a module path

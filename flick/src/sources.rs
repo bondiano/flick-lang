@@ -2,9 +2,37 @@
 //! diagnostics.
 
 use std::io::Read;
+use std::path::{Path, PathBuf};
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
+use flick_core::project::Host;
 use flick_core::source::{FileId, SourceMap};
+
+/// The file system, with paths shown relative to the working directory.
+pub struct FsHost {
+    pub cwd: PathBuf,
+}
+
+impl FsHost {
+    pub fn new() -> Self {
+        FsHost {
+            cwd: std::env::current_dir().unwrap_or_default(),
+        }
+    }
+}
+
+impl Host for FsHost {
+    fn read(&self, path: &Path) -> std::io::Result<Vec<u8>> {
+        std::fs::read(path)
+    }
+
+    fn display(&self, path: &Path) -> String {
+        path.strip_prefix(&self.cwd)
+            .unwrap_or(path)
+            .display()
+            .to_string()
+    }
+}
 
 pub fn load(sources: &mut SourceMap, path: &str) -> Result<FileId, Diagnostic> {
     let bytes = std::fs::read(path).map_err(|err| {

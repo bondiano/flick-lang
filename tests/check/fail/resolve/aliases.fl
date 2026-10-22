@@ -1,0 +1,16 @@
+module App.Aliases exposing (Tree, Forest)
+
+// recursive nominal data is allowed
+type Tree a = Leaf | Node of a, Forest a
+type Forest a = List (Tree a)
+
+type Loop = Loop
+//   ^^^^ FLICK-R007 type alias `Loop` is cyclic: Loop -> Loop
+
+type A = { next : Option B }
+//   ^ FLICK-R007 type alias `A` is cyclic: A -> B -> C -> A
+type B = (Number, C)
+type C = List A
+
+// an opaque type is nominal: it may refer to itself
+opaque type Stream = Option (Number, Stream)

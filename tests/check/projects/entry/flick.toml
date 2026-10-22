@@ -1,0 +1,6 @@
+schema-version = 1
+
+[project]
+kind = "app"
+entry = "App.Main"
+#       ^^^^^^^^^^ FLICK-P011 entry module `App.Main` does not export `main`

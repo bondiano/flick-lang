@@ -1,0 +1,6 @@
+schema-version = 1
+
+[project]
+kind = "lib"
+sources = "src"
+#~ FLICK-P005 @5:1-5:8 unknown field `sources`, expected one of

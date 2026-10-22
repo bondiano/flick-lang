@@ -1,0 +1,5 @@
+{
+  "name": "app",
+  "private": true,
+  "dependencies": { "@acme/text": "1.0.0" }
+}

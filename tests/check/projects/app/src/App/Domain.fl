@@ -1,0 +1,20 @@
+/// Types shared by the other modules.
+module App.Domain exposing (User, UserId, Shape(..), Tree(..), Nullability(..), new_id)
+
+opaque type UserId = String
+
+new_id : String -> UserId
+let new_id raw = raw
+
+type User = { id : UserId; name : String }
+
+type Shape =
+  | Circle of Number
+  | Square of Number
+
+// recursive nominal data is fine; only transparent aliases must be acyclic
+type Tree a = Leaf | Node of a, List (Tree a)
+
+kind Nullability = NonNull | Nullable
+
+type Users = List User

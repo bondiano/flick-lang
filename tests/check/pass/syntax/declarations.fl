@@ -1,7 +1,7 @@
 /// Every declaration form of the first version.
 module App.Shapes exposing (Shape(..), area, Nullability, ..)
 
-import App.Domain exposing (User, UserId, Shape(..))
+import App.Domain exposing (User, Role(..))
 import Effect.Log as Log
 import Effect.Platform
 

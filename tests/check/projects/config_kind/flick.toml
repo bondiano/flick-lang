@@ -1,0 +1,5 @@
+schema-version = 1
+
+[project]
+kind = "tool"
+#      ^^^^^^ FLICK-P005 unknown variant `tool`, expected `app` or `lib`

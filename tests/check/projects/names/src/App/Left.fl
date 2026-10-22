@@ -1,0 +1,9 @@
+module App.Left exposing (find, size, Mode(..))
+
+type Mode = On | Off
+
+find : Number
+let find = 1
+
+size : Number
+let size = 1

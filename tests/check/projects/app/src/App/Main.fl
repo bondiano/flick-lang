@@ -1,0 +1,14 @@
+module App.Main exposing (main)
+
+import App.Domain exposing (..)
+import App.Users exposing (..)
+import App.Domain as D
+
+main : Unit ->{none; AppError} Unit
+let main () =
+  // `User` comes from both imports, but it is one entity
+  let user : User = load_user (new_id "1")
+  let shape = D.Circle 1
+  // a local `find` shadows nothing ambiguous
+  let find = 1
+  ignore (find, user, shape)

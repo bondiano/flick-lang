@@ -1,0 +1,17 @@
+module App.Shapes exposing (Shape, Id, Kind(..), circle, Alias)
+
+type Shape =
+  | Circle of Number
+  | Square of Number
+
+opaque type Id = Id of String
+
+kind Kind = Small | Big
+
+type Alias = Number
+
+circle : Number -> Shape
+let circle r = Circle r
+
+hidden : Number
+let hidden = 1

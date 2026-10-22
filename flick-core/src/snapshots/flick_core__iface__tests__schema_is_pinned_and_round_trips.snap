@@ -1,0 +1,125 @@
+---
+source: flick-core/src/iface.rs
+expression: json
+---
+{
+  "iface-version": 0,
+  "language": "0.7",
+  "module": "App.Shapes",
+  "exports": [
+    {
+      "module": "App.Shapes",
+      "namespace": "type",
+      "name": "Shape",
+      "decl": "adt"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "constructor",
+      "name": "Circle",
+      "decl": "constructor",
+      "parent": "Shape"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "constructor",
+      "name": "Square",
+      "decl": "constructor",
+      "parent": "Shape"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "type",
+      "name": "Id",
+      "decl": "opaque"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "type",
+      "name": "Size",
+      "decl": "alias"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "type",
+      "name": "Mode",
+      "decl": "kind"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "type",
+      "name": "Small",
+      "decl": "kind-member",
+      "parent": "Mode"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "type",
+      "name": "Big",
+      "decl": "kind-member",
+      "parent": "Mode"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "type",
+      "name": "Show",
+      "decl": "class"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "value",
+      "name": "show",
+      "decl": "method",
+      "parent": "Show"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "value",
+      "name": "area",
+      "decl": "let"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "value",
+      "name": "now",
+      "decl": "foreign"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "type",
+      "name": "Pair",
+      "decl": "abstract"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "type",
+      "name": "Clock",
+      "decl": "service"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "type",
+      "name": "NotFound",
+      "decl": "error"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "constructor",
+      "name": "NotFound",
+      "decl": "constructor",
+      "parent": "NotFound"
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "type",
+      "name": "Port",
+      "decl": "refined"
+    }
+  ],
+  "hidden": [
+    {
+      "name": "Id",
+      "parent": "Id"
+    }
+  ]
+}

@@ -16,5 +16,6 @@ Options:
       --color <COLOR>              Colorize human-readable output [default: auto] [possible values: auto, always, never]
       --quiet                      Print less service output
       --verbose                    Print more service output
+      --project <PATH>             Project directory or its `flick.toml`; by default the nearest `flick.toml` from the working directory upwards
   -h, --help                       Print help
   -V, --version                    Print version

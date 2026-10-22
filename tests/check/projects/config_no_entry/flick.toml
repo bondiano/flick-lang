@@ -1,0 +1,5 @@
+schema-version = 1
+
+[project]
+kind = "app"
+#~ FLICK-P007 @3:1-3:10 `kind = "app"` needs `entry`

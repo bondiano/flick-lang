@@ -31,6 +31,13 @@ let x : Number = "hi"
   columns 1–2, which the `//` of a caret line covers.
 - **No span** `//~ CODE text` matches a diagnostic without a source location.
 
+Each directory of `tests/check/projects/` is a whole project, checked like
+`flick check` without paths: `flick.toml`, the source and test roots, and a
+`package.json` with a fake `node_modules/` when a case needs packages. Any of
+its files may carry annotations, `flick.toml` with `#` instead of `//`;
+diagnostics without a span are annotated in `flick.toml`. A project without
+annotations must check cleanly.
+
 Columns count characters, not bytes. `text` is optional and must be a
 substring of the diagnostic message. Codes must be registered in
 `flick-core/src/diagnostics/codes.rs`.

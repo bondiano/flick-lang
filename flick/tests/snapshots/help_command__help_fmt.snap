@@ -17,4 +17,5 @@ Options:
       --quiet                      Print less service output
       --stdin-filepath <FILE>      Path of the `--stdin` source, used in diagnostics. Requires `--stdin`
       --verbose                    Print more service output
+      --project <PATH>             Project directory or its `flick.toml`; by default the nearest `flick.toml` from the working directory upwards
   -h, --help                       Print help

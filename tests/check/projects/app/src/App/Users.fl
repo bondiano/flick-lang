@@ -1,0 +1,17 @@
+// Re-exports `User` from App.Domain: the same entity, so importing it from both is not ambiguous.
+module App.Users exposing (User, load_user, Shape, find)
+
+import App.Domain exposing (User, UserId, Shape(..))
+import Acme.Text as Text
+
+load_user : UserId -> User
+let load_user id = { id = id; name = Text.trim "Ada" }
+
+find : List User -> Option User
+let find users = None
+
+area : Shape -> Number
+let area shape =
+  match shape with
+  | Circle r -> r * r
+  | Square side -> side * side

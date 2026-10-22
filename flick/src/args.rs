@@ -39,12 +39,17 @@ pub struct GlobalArguments {
     /// Print more service output.
     #[arg(long, global = true)]
     pub verbose: bool,
+
+    /// Project directory or its `flick.toml`; by default the nearest
+    /// `flick.toml` from the working directory upwards.
+    #[arg(long, global = true, value_name = "PATH")]
+    pub project: Option<String>,
 }
 
 #[derive(Args)]
 pub struct CheckArguments {
-    /// Source files to check.
-    #[arg(required = true)]
+    /// Files or directories to check, with everything they import; by
+    /// default the project's source and test roots.
     pub paths: Vec<String>,
 }
 

@@ -1,0 +1,6 @@
+schema-version = 2
+#                ^ FLICK-P006 unsupported `schema-version = 2`
+
+[project]
+kind = "lib"
+future-key = true

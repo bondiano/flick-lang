@@ -1,0 +1,10 @@
+module App.Open exposing (go)
+
+import App.Right exposing (..)
+import App.Left exposing (..)
+
+go : Number
+let go =
+  let size = 0
+  find + size
+//^^^^ FLICK-R010 `find` is ambiguous: it is exposed by `App.Left`, `App.Right`

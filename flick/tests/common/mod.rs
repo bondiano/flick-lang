@@ -4,9 +4,14 @@ use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
 pub fn flick(args: &[&str]) -> Output {
+    flick_in(concat!(env!("CARGO_MANIFEST_DIR"), "/.."), args)
+}
+
+/// Runs `flick` with the working directory `dir`.
+pub fn flick_in(dir: impl AsRef<std::path::Path>, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_flick"))
         .args(args)
-        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/.."))
+        .current_dir(dir)
         .env_remove("NO_COLOR")
         .output()
         .expect("flick runs")

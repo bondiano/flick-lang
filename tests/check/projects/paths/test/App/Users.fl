@@ -1,0 +1,6 @@
+// a test module may not reuse the name of a source module
+module App.Users exposing (tests)
+//     ^^^^^^^^^ FLICK-R002 module `App.Users` is also declared by `src/App/Users.fl`
+
+tests : List Test
+let tests = []

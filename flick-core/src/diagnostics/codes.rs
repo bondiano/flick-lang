@@ -109,10 +109,28 @@ codes! {
     S010 = Syntax 10, "construct from another language that Flick does not have";
     S011 = Syntax 11, "unknown foreign metadata";
     S012 = Syntax 12, "inconsistent pattern bindings";
+    R001 = Resolve 1, "module name does not match the file path";
+    R002 = Resolve 2, "two files declare the same module";
+    R003 = Resolve 3, "unknown module";
+    R004 = Resolve 4, "name is not exported";
+    R005 = Resolve 5, "constructor is not exported";
+    R006 = Resolve 6, "import cycle";
+    R007 = Resolve 7, "cyclic type alias";
+    R008 = Resolve 8, "name defined more than once";
+    R009 = Resolve 9, "definition shadows an imported name";
+    R010 = Resolve 10, "ambiguous name";
+    R011 = Resolve 11, "invalid export";
     P001 = Project 1, "cannot read source file";
     P002 = Project 2, "file is not formatted";
     P003 = Project 3, "internal formatter error";
     P004 = Project 4, "cannot write source file";
+    P005 = Project 5, "invalid project configuration";
+    P006 = Project 6, "unsupported configuration schema version";
+    P007 = Project 7, "application without an entry module";
+    P008 = Project 8, "no project found";
+    P009 = Project 9, "dependency is not installed";
+    P010 = Project 10, "invalid package interface";
+    P011 = Project 11, "invalid entry module";
 }
 
 #[cfg(test)]

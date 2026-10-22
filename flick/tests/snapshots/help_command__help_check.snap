@@ -4,14 +4,15 @@ expression: "stdout(&[\"help\", \"check\"])"
 ---
 Check Flick source files and report diagnostics
 
-Usage: flick check [OPTIONS] <PATHS>...
+Usage: flick check [OPTIONS] [PATHS]...
 
 Arguments:
-  <PATHS>...  Source files to check
+  [PATHS]...  Files or directories to check, with everything they import; by default the project's source and test roots
 
 Options:
       --diagnostics <DIAGNOSTICS>  Format of diagnostics on stderr [default: human] [possible values: human, json]
       --color <COLOR>              Colorize human-readable output [default: auto] [possible values: auto, always, never]
       --quiet                      Print less service output
       --verbose                    Print more service output
+      --project <PATH>             Project directory or its `flick.toml`; by default the nearest `flick.toml` from the working directory upwards
   -h, --help                       Print help

@@ -50,6 +50,27 @@ impl Node {
         self.tokens().iter().map(|t| t.text(src)).collect()
     }
 
+    /// Direct child tokens that are not trivia.
+    pub fn child_tokens(&self) -> impl Iterator<Item = Token> + '_ {
+        self.children.iter().filter_map(|c| match c {
+            Element::Token(t) if !t.kind.is_trivia() => Some(*t),
+            _ => None,
+        })
+    }
+
+    pub fn has_token(&self, kind: SyntaxKind) -> bool {
+        self.child_tokens().any(|t| t.kind == kind)
+    }
+
+    /// Byte range of the non-trivia tokens; `0..0` for a node without any.
+    pub fn range(&self) -> (u32, u32) {
+        let tokens = self.tokens();
+        let mut code = tokens.iter().filter(|t| !t.kind.is_trivia());
+        let first = code.next();
+        let last = code.next_back().or(first);
+        (first.map_or(0, |t| t.start), last.map_or(0, |t| t.end))
+    }
+
     pub fn nodes(&self) -> impl Iterator<Item = &Node> {
         self.children.iter().filter_map(|c| match c {
             Element::Node(n) => Some(n),

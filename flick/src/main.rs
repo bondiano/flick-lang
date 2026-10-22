@@ -15,7 +15,10 @@ mod sources;
 fn main() -> ExitCode {
     let args = CommandArguments::parse();
     match args.cmd {
-        Commands::Check(options) => run_command(&CheckCommand::new(options), &args.global),
+        Commands::Check(options) => run_command(
+            &CheckCommand::new(options, args.global.project.clone()),
+            &args.global,
+        ),
         Commands::Fmt(options) => run_command(&FmtCommand::new(options), &args.global),
     }
 }

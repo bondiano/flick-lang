@@ -1,0 +1,6 @@
+module App.B exposing (b)
+
+import App.C exposing (c)
+
+b : Number
+let b = c

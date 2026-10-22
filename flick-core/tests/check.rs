@@ -1,12 +1,16 @@
 //! Checker fixture harness: `tests/check/pass/**/*.fl` must produce no
 //! diagnostics; `tests/check/fail/**/*.fl` declares its expected diagnostics in
-//! annotation comments (format in `docs/testing.md`). Reports a diff per file.
+//! annotation comments (format in `docs/testing.md`). Each directory of
+//! `tests/check/projects/` is one project checked as a whole; annotations in
+//! any of its files, `#` comments in `flick.toml`, are its expectations.
+//! Reports a diff per file.
 
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use flick_core::diagnostics::{Diagnostic, codes};
+use flick_core::project::{self, Host};
 use flick_core::source::{SourceFile, SourceMap};
 
 /// 1-based `line:col-line:col`, columns in characters, end exclusive.
@@ -36,12 +40,16 @@ impl fmt::Display for Expected {
 
 /// Parses annotations; `Err` carries a 1-based line and a reason.
 fn parse_annotations(text: &str) -> Result<Vec<Expected>, String> {
+    annotations(text, "//")
+}
+
+fn annotations(text: &str, comment_prefix: &str) -> Result<Vec<Expected>, String> {
     let mut expected = Vec::new();
     let mut target_line = None;
     for (index, line) in text.lines().enumerate() {
         let number = index + 1;
         let err = |reason: &str| format!("line {number}: {reason}");
-        let Some(comment) = line.trim_start().strip_prefix("//") else {
+        let Some(comment) = line.trim_start().strip_prefix(comment_prefix) else {
             target_line = Some(number);
             continue;
         };
@@ -119,7 +127,7 @@ fn to_pos(file: &SourceFile, start: u32, end: u32) -> Pos {
 }
 
 /// Matches diagnostics against expectations; returns the diff lines.
-fn diff(sources: &SourceMap, actual: &[Diagnostic], expected: Vec<Expected>) -> Vec<String> {
+fn diff(sources: &SourceMap, actual: &[&Diagnostic], expected: Vec<Expected>) -> Vec<String> {
     let mut missing = expected;
     let mut unexpected = Vec::new();
     for d in actual {
@@ -175,7 +183,7 @@ fn check_fixture(path: &Path, should_fail: bool) -> Vec<String> {
     match (should_fail, expected.is_empty()) {
         (true, true) => vec!["  fail fixture declares no expected diagnostics".into()],
         (false, false) => vec!["  pass fixture must not contain annotations".into()],
-        _ => diff(&sources, &actual, expected),
+        _ => diff(&sources, &actual.iter().collect::<Vec<_>>(), expected),
     }
 }
 
@@ -244,6 +252,7 @@ fn diff_reports_missing_and_unexpected() {
         flick_core::source::Span::new(file, 5, 7),
     )];
     let ok = parse_annotations("ab\nцde\n//~ FLICK-S002 @2:2-2:4 bo\n").expect("valid");
+    let actual: Vec<_> = actual.iter().collect();
     assert_eq!(diff(&sources, &actual, ok), Vec::<String>::new());
     let wrong = parse_annotations("ab\nцde\n//  ^ FLICK-S002\n").expect("valid");
     assert_eq!(
@@ -252,5 +261,112 @@ fn diff_reports_missing_and_unexpected() {
             "  missing:    FLICK-S002 @2:5-2:6 \"\"",
             "  unexpected: FLICK-S002 @2:2-2:4 \"boom\""
         ]
+    );
+}
+
+struct FixtureHost {
+    root: PathBuf,
+}
+
+impl Host for FixtureHost {
+    fn read(&self, path: &Path) -> std::io::Result<Vec<u8>> {
+        fs::read(path)
+    }
+
+    fn display(&self, path: &Path) -> String {
+        path.strip_prefix(&self.root)
+            .unwrap_or(path)
+            .display()
+            .to_string()
+    }
+}
+
+/// Checks one fixture project the way `flick check` without paths does.
+fn check_project(dir: &Path) -> Vec<String> {
+    let host = FixtureHost {
+        root: dir.to_path_buf(),
+    };
+    let mut sources = SourceMap::default();
+    let diagnostics = match project::discover(&host, &mut sources, dir, Some(Path::new("."))) {
+        Ok(Some(project)) => {
+            let mut roots = Vec::new();
+            fixtures(&project.source_root(), &mut roots);
+            fixtures(&project.test_root(), &mut roots);
+            project::check(&host, &mut sources, Some(&project), &roots)
+        }
+        Ok(None) => vec![],
+        Err(diagnostic) => vec![diagnostic],
+    };
+    let mut files: Vec<PathBuf> = Vec::new();
+    fixtures(dir, &mut files);
+    files.push(dir.join("flick.toml"));
+    files.sort();
+    let mut report = Vec::new();
+    let mut expected_any = false;
+    let mut accounted = vec![false; diagnostics.len()];
+    for path in files {
+        let shown = host.display(&path);
+        let text = fs::read_to_string(&path).unwrap_or_default();
+        let prefix = if path.extension().is_some_and(|e| e == "toml") {
+            "#"
+        } else {
+            "//"
+        };
+        let expected = match annotations(&text, prefix) {
+            Ok(expected) => expected,
+            Err(e) => {
+                report.push(format!("{shown}: bad annotation: {e}"));
+                continue;
+            }
+        };
+        expected_any |= !expected.is_empty();
+        let mut actual = Vec::new();
+        for (i, d) in diagnostics.iter().enumerate() {
+            // spanless diagnostics are annotated in `flick.toml`
+            let file = d.span.map(|s| sources.get(s.file).path.clone());
+            if file.as_deref().unwrap_or("flick.toml") == shown {
+                accounted[i] = true;
+                actual.push(d);
+            }
+        }
+        let problems = diff(&sources, &actual, expected);
+        if !problems.is_empty() {
+            report.push(format!("{shown}:\n{}", problems.join("\n")));
+        }
+    }
+    for (d, _) in diagnostics.iter().zip(&accounted).filter(|(_, a)| !**a) {
+        report.push(format!(
+            "  unexpected in an unannotated file: {} {}",
+            d.code, d.message
+        ));
+    }
+    if !expected_any && report.is_empty() && !diagnostics.is_empty() {
+        report.push("  project has diagnostics but no annotations".into());
+    }
+    report
+}
+
+#[test]
+fn project_fixtures() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/check/projects");
+    let mut cases: Vec<PathBuf> = fs::read_dir(&root)
+        .expect("tests/check/projects exists")
+        .map(|e| e.expect("readable").path())
+        .filter(|p| p.is_dir())
+        .collect();
+    cases.sort();
+    assert!(!cases.is_empty());
+    let report: Vec<String> = cases
+        .iter()
+        .filter_map(|case| {
+            let problems = check_project(&project::normalize(case));
+            let name = case.file_name().expect("named").to_string_lossy();
+            (!problems.is_empty()).then(|| format!("{name}:\n{}", problems.join("\n")))
+        })
+        .collect();
+    assert!(
+        report.is_empty(),
+        "project fixture mismatches:\n{}",
+        report.join("\n")
     );
 }

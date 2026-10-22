@@ -1,0 +1,18 @@
+module App.Main exposing (total)
+
+// imports in reverse alphabetical order: diagnostics do not depend on it
+import App.Right as L exposing (..)
+//     ^^^^^^^^^ FLICK-R010 qualifier `L` is ambiguous: it names both `App.Left` and `App.Right`
+import App.Left as L exposing (size, Mode)
+import App.Right exposing (size)
+//                         ^^^^ FLICK-R010 `size` is ambiguous: it is imported from both `App.Left` and `App.Right`
+
+type Mode = Auto
+//   ^^^^ FLICK-R009 `Mode` shadows the name imported from `App.Left`
+
+// `find` comes only from App.Right's `(..)`: not ambiguous
+total : Number
+let total = find + size
+
+local : Number -> Number
+let local find = find + 1

@@ -1,0 +1,9 @@
+module App.Right exposing (find, size, Mode(..))
+
+type Mode = Up | Down
+
+find : Number
+let find = 2
+
+size : Number
+let size = 2

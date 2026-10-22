@@ -1,0 +1,4 @@
+module App.Users exposing (name)
+
+name : String
+let name = "users"

@@ -1,0 +1,19 @@
+module App.Main exposing (use)
+
+import App.Missing exposing (thing)
+//     ^^^^^^^^^^^ FLICK-R003 unknown module `App.Missing`
+import App.Shapes as S exposing (hidden, Shape(..), Circle, Id(..), Kind(..), Alias(..), Nope)
+//                               ^^^^^^ FLICK-R004 `App.Shapes` does not export `hidden`
+//                                       ^^^^^^^^^ FLICK-R005 `App.Shapes` exports `Shape` without its constructors
+//                                                  ^^^^^^ FLICK-R005 constructor `Circle` is not exported: `App.Shapes` exports `Shape` without `(..)`
+//                                                          ^^^^^^ FLICK-R005 `Id` is opaque
+//                                                                            ^^^^^^^^^ FLICK-R005 `Alias` from `App.Shapes` has no constructors
+//                                                                                       ^^^^ FLICK-R004 does not export `Nope`
+
+use : Number -> S.Shape
+let use n =
+  let a = S.circle n
+  let b = S.Square n
+//        ^^^^^^^^ FLICK-R005 constructor `Square` is not exported
+  S.radius b
+//^^^^^^^^ FLICK-R004 `App.Shapes` does not export `radius`

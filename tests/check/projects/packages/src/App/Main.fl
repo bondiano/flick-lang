@@ -1,0 +1,9 @@
+module App.Main exposing (x)
+
+import Old.Api
+//     ^^^^^^^ FLICK-P009 are not installed: `not-installed`
+import Web.Fetch
+//     ^^^^^^^^^ FLICK-P009 cannot find module `Web.Fetch`
+
+x : Number
+let x = 1
