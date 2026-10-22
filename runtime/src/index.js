@@ -3,7 +3,12 @@
 export { Effect } from "effect";
 
 export * from "./builtins.js";
+export * from "./capabilities.js";
+export * from "./cause.js";
+export * from "./concurrency.js";
 export * from "./data.js";
 export * from "./effects.js";
 export * from "./entry.js";
-export * from "./scope.js";
+export * from "./layer.js";
+export * from "./owner.js";
+export * from "./race.js";

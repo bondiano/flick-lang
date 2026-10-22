@@ -79,7 +79,7 @@ constants first.
 | a pure function where a runtime one is expected | wrapped: each lifted stage runs in `Effect.sync` |
 | `try body with arms` | `$rt.tryWith(body, handler)`: the arms see the first typed failure of the cause |
 | `provide layer { body }` | `$rt.provide(layer, body)`: the layer is built before the body |
-| `scope [s] { body }` | `$rt.scope((s) => body)` |
+| `scope [s] { body }` | `$rt.scope((s) => body)`: a lexical owner with a two-phase close, see [runtime.md](runtime.md) |
 | pure self tail call | a loop over the parameters |
 | runtime recursion | through `yield*`, without growing the JS stack |
 
@@ -106,8 +106,9 @@ with a constraint is a function of its dictionaries.
 `foreign mode name from "module" "export"` imports the export; the curried
 Flick function calls it with all arguments of its stages up to the first
 runtime one (or `arity n`), dictionaries first. `pure` is a direct call,
-`sync` runs in `Effect.sync`, `async` awaits the returned `Promise`
-(`Effect.promise`) and `effect` returns an `Effect`. A relative module is
+`sync` runs in `Effect.sync`, `async` awaits the returned `Promise` — the
+innermost owner waits for it to settle even after an interruption (see
+[runtime.md](runtime.md)) — and `effect` returns an `Effect`. A relative module is
 resolved against the source file. `global` names a global, as in
 `foreign sync now from global "Date.now"`.
 

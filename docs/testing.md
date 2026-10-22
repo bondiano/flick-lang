@@ -3,7 +3,7 @@
 | Command | What runs |
 | - | - |
 | `just check` | fmt, clippy (`-D warnings`, also for `wasm32`), `cargo test --workspace` |
-| `just e2e` | `pnpm install --frozen-lockfile`, runtime tests (incl. the Effect `4.0.5` pin), `tests/run/**` on Node |
+| `just e2e` | `pnpm install --frozen-lockfile`, runtime tests, `tests/run/**` on Node |
 
 Snapshot tests use [`insta`](https://insta.rs); review changes with
 `cargo insta review` or accept them with `INSTA_UPDATE=always cargo test`.
@@ -63,6 +63,15 @@ workspace. A foreign module next to a case (`./tags.mjs`) is imported from
 there. `just e2e` also builds every `tests/check/pass/**` fixture and runs
 `node --check` on the output, and `e2e_numbers.rs` compares random `Number`
 arithmetic, compiled from Flick, with the same expressions in JS.
+
+## Runtime tests — `runtime/test/`
+
+`node --test` in `runtime/` (part of `just e2e`) checks the adapter's
+contracts directly on Effect: the recovery table of `try … with`, inert cause
+reports, the two-phase close of owners, children and supervisors,
+concurrency, races and layers, the Effect `4.0.5` pin and its capability
+matrix. Entry runner tests start `runtime/fixtures/entry.mjs` in a child
+process and send it signals.
 
 ## Syntax corpus and fuzzing — `flick-core/tests/{corpus,fuzz}.rs`
 

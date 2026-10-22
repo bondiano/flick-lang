@@ -1,0 +1,10 @@
+// A child always has a supervisor: without one, `Fiber.spawn` does not
+// take the task where the supervisor goes.
+module App.Spawn exposing (..)
+
+lost : Unit ->{} Unit
+let lost () =
+  scope owner {
+    ignore (Fiber.spawn owner (task { () }))
+//                             ^^^^^^^^^^^ FLICK-T003 expected `Failure _ ->{_; none} Unit`, found `Eff _ _ Unit`
+  }

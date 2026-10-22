@@ -84,7 +84,9 @@ impl Gen<'_> {
             _ if f.arity == 0 && f.dicts == 0 && f.mode == ForeignMode::Pure => target.clone(),
             (ForeignMode::Pure, _) | (_, false) => call,
             (ForeignMode::Sync, true) => format!("{}(() => {call})", self.effect("sync")),
-            (ForeignMode::Async, true) => format!("{}(() => {call})", self.effect("promise")),
+            (ForeignMode::Async, true) => {
+                format!("{}(() => {call})", self.rt("foreignAsync"))
+            }
             (ForeignMode::Effect, true) => format!("{}(() => {call})", self.effect("suspend")),
         };
         for arg in args.iter().rev() {

@@ -1,0 +1,38 @@
+// Scopes close in two phases: children are interrupted and end (their
+// supervisors see how), foreign work they left running settles, and only
+// then resources are released, last first.
+module App.Main exposing (main)
+
+open_raw : String ->{} String
+foreign effect open_raw from "./resources.mjs" "open"
+
+slow_write : String -> Number ->{} Unit
+foreign async slow_write from "./resources.mjs" "slowWrite"
+
+type error Oops = Oops String
+
+report : Fiber.Failure {Oops} ->{} Unit
+let report failure = Platform.stdout_line "supervisor saw a failure"
+
+unexpected : Fiber.Failure none ->{} Unit
+let unexpected failure = Platform.stdout_line "unexpected failure"
+
+worker : Unit ->{none; Oops} Unit
+let worker () =
+  slow_write "log" 80
+  from_result (Err (Oops "late"))
+
+main : Unit ->{none; AppError} Unit
+let main () =
+  scope owner {
+    let first = open_raw "first"
+    let child = Fiber.spawn owner report (task { worker () })
+    slow_write "body" 10
+    let second = open_raw "second"
+    Platform.stdout_line "body done"
+  }
+  let joined = scope owner {
+    let child = Fiber.spawn owner unexpected (task { 41 + 1 })
+    Fiber.join child
+  }
+  Platform.stdout_line (show joined)

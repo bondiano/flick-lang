@@ -52,6 +52,9 @@ class Eq a => Hash a =
 class Show a =
   show : a -> String
 
+/// The error of a computation that ran out of time.
+type error TimeoutError
+
 /// The error an application fails with through `App.fail`.
 type error AppError = AppError { message : String; details : Option String }
 

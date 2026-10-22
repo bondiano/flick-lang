@@ -1,6 +1,6 @@
 /// Children of a `scope`: a child runs until its owner's scope closes, and
 /// its supervisor observes how it failed.
-module Fiber exposing (Owner, Fiber, Failure, Outlives, spawn)
+module Fiber exposing (Owner, Fiber, Failure, Outlives, spawn, join)
 
 /// The owner of a `scope`; `scope s { … }` names it `s`.
 type Owner (s : Region)
@@ -22,3 +22,7 @@ spawn :
   Outlives c s =>
   Owner s -> (Failure e ->{r; none} Unit)^c -> (Eff r e a)^c ->{r; none} Fiber e a
 foreign effect spawn from "@flick-lang/runtime" "fiberSpawn"
+
+/// Waits for the child: its result, or its failure with the original cause.
+join : Fiber e a ->{none; e} a
+foreign effect join from "@flick-lang/runtime" "fiberJoin"

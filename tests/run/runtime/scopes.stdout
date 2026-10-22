@@ -1,0 +1,9 @@
+open first
+body written
+open second
+body done
+supervisor saw a failure
+log written
+close second
+close first
+42
