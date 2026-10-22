@@ -105,11 +105,11 @@ impl Gen<'_> {
         let mut t = Test::default();
         self.test(pat, subject, &mut t);
         if !t.lets.is_empty() {
-            self.buf.push(format!("let {};", t.lets.join(", ")));
+            self.buf.push(self.declare(&t.lets.join(", ")));
             self.buf.push(format!("{};", t.conds.join(" && ")));
         }
         for (name, path) in t.binds {
-            self.buf.push(format!("const {name} = {path};"));
+            self.buf.push(self.constant(&name, &path));
         }
     }
 
@@ -157,7 +157,8 @@ impl Gen<'_> {
         self.test(&arm.pat, subject, &mut t);
         let (inner, ()) = self.block(|g| {
             for (name, path) in &t.binds {
-                g.buf.push(format!("const {name} = {path};"));
+                let c = g.constant(name, path);
+                g.buf.push(c);
             }
             match &arm.guard {
                 Some(guard) => {
@@ -184,7 +185,7 @@ impl Gen<'_> {
         if t.lets.is_empty() {
             self.buf.extend(block);
         } else {
-            block.insert(0, format!("let {};", t.lets.join(", ")));
+            block.insert(0, self.declare(&t.lets.join(", ")));
             self.buf.push(format!("{{\n{}}}", indent(&block)));
         }
     }

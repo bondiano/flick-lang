@@ -117,6 +117,17 @@ Each module has a version 3 source map. Definitions, statements, calls,
 operators and returns map to the start of their Flick node, so a stack trace
 under `node --enable-source-maps` points at `.fl` lines.
 
+## TypeScript
+
+`flick build --emit ts` (or `emit = "ts"` in `flick.toml`) writes the same
+modules as `.ts` files, importing each other with the `.ts` extension. Every
+parameter, result and constant is annotated `any`: the source types live in
+the Flick checker and its `.iface`, not in the generated code, and the typed
+projection for editors is a separate artifact. The output runs as it is on
+Node (type stripping) and passes `tsc --noEmit` with `strict`,
+`allowImportingTsExtensions` and `module: nodenext`. `@flick-lang/runtime`
+ships `index.d.ts` for it.
+
 ## Not compiled yet
 
 `sql`, `ui`, `cli`, `codec` and `schema` blocks are checked but not compiled:

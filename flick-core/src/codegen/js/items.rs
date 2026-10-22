@@ -33,13 +33,16 @@ impl Gen<'_> {
             ItemKind::Value { name, dicts, body } => {
                 let target = Target::Global(format!("{}.{name}", self.module));
                 let (mut stmts, value) = self.block(|g| g.function(dicts, body, Some(target)));
-                stmts.push(format!("export const {} = {value};", names::ident(name)));
+                stmts.push(format!(
+                    "export {}",
+                    self.constant(&names::ident(name), &value)
+                ));
                 stmts.join("\n")
             }
             ItemKind::Destructure { pattern, body } => {
                 let (mut stmts, value) = self.block(|g| g.expr(body));
                 let t = self.temp();
-                stmts.push(format!("const {t} = {value};"));
+                stmts.push(self.constant(&t, &value));
                 let (binds, ()) = self.block(|g| g.destructure(pattern, &t));
                 stmts.extend(binds.into_iter().map(|b| format!("export {b}")));
                 stmts.join("\n")
@@ -85,19 +88,19 @@ impl Gen<'_> {
             (ForeignMode::Effect, true) => format!("{}(() => {call})", self.effect("suspend")),
         };
         for arg in args.iter().rev() {
-            body = format!("({arg}) => {body}");
+            body = format!("{} {body}", self.arrow(arg));
         }
         if !dicts.is_empty() {
-            body = format!("({}) => {body}", dicts.join(", "));
+            body = format!("{} {body}", self.arrow(&dicts.join(", ")));
         }
-        format!("export const {} = {body};", names::ident(&f.name))
+        format!("export {}", self.constant(&names::ident(&f.name), &body))
     }
 
     fn constructor_item(&mut self, c: &Constructor) -> String {
         let name = names::ident(&c.name);
         if names::native(c).is_some() {
             let native = self.constructor(c);
-            return format!("export const {name} = {native};");
+            return format!("export {}", self.constant(&name, &native));
         }
         let package = (self.options.package)(&c.module);
         let tag = names::string(&names::tag(c, package.as_deref()));
@@ -108,9 +111,9 @@ impl Gen<'_> {
             format!("({{ _tag: {tag}, {} }})", fields.join(", "))
         };
         for field in fields.iter().rev() {
-            value = format!("({field}) => {value}");
+            value = format!("{} {value}", self.arrow(field));
         }
-        format!("export const {name} = {value};")
+        format!("export {}", self.constant(&name, &value))
     }
 
     fn instance(&mut self, info: &InstanceInfo, methods: &[(String, Expr)]) -> String {
@@ -130,7 +133,7 @@ impl Gen<'_> {
                     let v = if stmts.is_empty() {
                         v
                     } else {
-                        format!("(() => {})()", arrow_body(&stmts, &v))
+                        format!("({} {})()", self.arrow(""), arrow_body(&stmts, &v))
                     };
                     entries.push(format!("{name}: {v}"));
                 }
@@ -141,9 +144,10 @@ impl Gen<'_> {
         self.givens.truncate(mark);
         let id = names::instance(&info.name);
         if info.context.is_empty() {
-            format!("export const {id} = {body};")
+            format!("export {}", self.constant(&id, &body))
         } else {
-            format!("export const {id} = ({params}) => {body};")
+            let value = format!("{} {body}", self.arrow(&params));
+            format!("export {}", self.constant(&id, &value))
         }
     }
 

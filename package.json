@@ -6,6 +6,7 @@
     "node": ">=24.18.0"
   },
   "devDependencies": {
-    "@flick-lang/runtime": "workspace:*"
+    "@flick-lang/runtime": "workspace:*",
+    "typescript": "5.9.3"
   }
 }

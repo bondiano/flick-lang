@@ -36,7 +36,7 @@ impl Gen<'_> {
                 for prev in &mut out {
                     if !atomic(prev) {
                         let t = self.temp();
-                        spills.push(format!("const {t} = {prev};"));
+                        spills.push(self.constant(&t, prev));
                         *prev = t;
                     }
                 }
@@ -53,7 +53,8 @@ impl Gen<'_> {
             return js;
         }
         let t = self.temp();
-        self.buf.push(format!("const {t} = {js};"));
+        let c = self.constant(&t, &js);
+        self.buf.push(c);
         t
     }
 
@@ -103,7 +104,7 @@ impl Gen<'_> {
                 let s = self.expr(scrutinee);
                 let s = self.spill(s);
                 let r = self.temp();
-                self.buf.push(format!("let {r};"));
+                self.buf.push(self.declare(&r));
                 self.arms(&s, arms, Some(&r));
                 r
             }
@@ -142,7 +143,7 @@ impl Gen<'_> {
                 let owner = owner.as_deref().map_or("$_".to_owned(), names::ident);
                 let body = self.gen_block(body);
                 let scope = self.rt("scope");
-                format!("(yield* {scope}(({owner}) => {body}))")
+                format!("(yield* {scope}({} {body}))", self.arrow(&owner))
             }
             ExprKind::Provide(layer, body) => {
                 let layer = self.expr(layer);
@@ -191,7 +192,7 @@ impl Gen<'_> {
         let (stmts, value) = self.block(|g| g.expr(inner));
         self.generator = saved;
         self.givens.truncate(mark);
-        format!("({params}) => {}", arrow_body(&stmts, &value))
+        format!("{} {}", self.arrow(&params), arrow_body(&stmts, &value))
     }
 
     fn if_expr(&mut self, c: &Expr, t: &Expr, f: &Expr) -> String {
@@ -202,8 +203,9 @@ impl Gen<'_> {
             return format!("({c} ? {tv} : {fv})");
         }
         let r = self.temp();
+        let declare = self.declare(&r);
         self.buf.push(format!(
-            "let {r};\nif ({c}) {{\n{}  {r} = {tv};\n}} else {{\n{}  {r} = {fv};\n}}",
+            "{declare}\nif ({c}) {{\n{}  {r} = {tv};\n}} else {{\n{}  {r} = {fv};\n}}",
             indent(&ts),
             indent(&fs)
         ));
@@ -219,7 +221,8 @@ impl Gen<'_> {
         let (stmts, ()) = self.block(|g| g.handlers(&error, arms));
         let try_with = self.rt("tryWith");
         format!(
-            "(yield* {try_with}({body}, ({error}) => {{\n{}}}))",
+            "(yield* {try_with}({body}, {} {{\n{}}}))",
+            self.arrow(&error),
             indent(&stmts)
         )
     }
@@ -289,8 +292,7 @@ impl Gen<'_> {
         match stmt {
             Stmt::Let(Pat::Bind(name), value) => {
                 let v = self.expr(value);
-                self.buf
-                    .push(format!("const {} = {v};", names::ident(name)));
+                self.buf.push(self.constant(&names::ident(name), &v));
             }
             Stmt::Let(pat, value) => {
                 let v = self.expr(value);
@@ -305,8 +307,7 @@ impl Gen<'_> {
             } => {
                 let target = rec.then(|| Target::Local(name.clone()));
                 let f = self.function(dicts, value, target);
-                self.buf
-                    .push(format!("const {} = {f};", names::ident(name)));
+                self.buf.push(self.constant(&names::ident(name), &f));
             }
             Stmt::Expr(e) => {
                 let v = self.expr(e);
@@ -344,11 +345,12 @@ impl Gen<'_> {
                     (false, Some(r)) => format!("{}({call}, {r})", self.effect("map")),
                     (false, None) => call.to_owned(),
                 };
-                format!("($f) => ($x) => {body}")
+                format!("{} {} {body}", self.arrow("$f"), self.arrow("$x"))
             }
             Lift::Eff(inner) => {
                 let inner = self.lift(inner);
-                format!("($e) => {}($e, {inner})", self.effect("map"))
+                let map = self.effect("map");
+                format!("{} {map}($e, {inner})", self.arrow("$e"))
             }
         }
     }

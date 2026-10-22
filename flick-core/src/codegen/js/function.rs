@@ -36,7 +36,7 @@ impl Gen<'_> {
         if dicts.is_empty() {
             body
         } else {
-            format!("({params}) => {body}")
+            format!("{} {body}", self.arrow(&params))
         }
     }
 
@@ -70,7 +70,8 @@ impl Gen<'_> {
             let vars: Vec<String> = (0..heads.len()).map(|i| format!("$l{i}")).collect();
             let (inner, ()) = self.block(|g| {
                 for (head, var) in heads.iter().zip(&vars) {
-                    g.buf.push(format!("const {head} = {var};"));
+                    let c = g.constant(head, var);
+                    g.buf.push(c);
                 }
                 for (pat, t) in &destructure {
                     g.destructure(pat, t);
@@ -126,7 +127,7 @@ impl Gen<'_> {
             if i + 1 < params.len() && params[i].runtime {
                 text = format!("{}({text})", self.effect("succeed"));
             }
-            text = format!("({head}) => {text}");
+            text = format!("{} {text}", self.arrow(head));
         }
         (self.buf, self.generator, self.tail) = saved;
         text

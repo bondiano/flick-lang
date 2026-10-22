@@ -28,14 +28,17 @@ fn compare(what: &str, expected: &str, actual: &str) -> Option<String> {
         .then(|| format!("  {what}:\n    expected: {expected:?}\n    actual:   {actual:?}"))
 }
 
-/// Builds and runs one case; returns the mismatch report, if any.
-fn run_case(case: &Path, out_dir: &Path) -> Option<String> {
+/// Builds and runs one case, as JS or as TypeScript; returns the mismatch
+/// report, if any.
+fn run_case(case: &Path, out_dir: &Path, emit: &str) -> Option<String> {
     let _ = fs::remove_dir_all(out_dir);
     let build = Command::new(env!("CARGO_BIN_EXE_flick"))
         .arg("build")
         .arg(case)
         .arg("--out-dir")
         .arg(out_dir)
+        .arg("--emit")
+        .arg(emit)
         .output()
         .expect("flick runs");
     if !build.status.success() {
@@ -46,7 +49,7 @@ fn run_case(case: &Path, out_dir: &Path) -> Option<String> {
     }
     let output = Command::new("node")
         .arg("--enable-source-maps")
-        .arg(out_dir.join("main.js"))
+        .arg(out_dir.join(format!("main.{emit}")))
         .output()
         .expect("`node` is on PATH (Node.js >= 24.18.0)");
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -100,15 +103,44 @@ fn run_cases() {
     // Under target/, so `@flick-lang/runtime` resolves from the repository root
     // node_modules exactly as it would in a project.
     let out_root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("e2e");
-    let report: Vec<_> = paths
-        .iter()
-        .filter_map(|case| {
+    let mut report = Vec::new();
+    for emit in ["js", "ts"] {
+        for case in &paths {
             let rel = case.strip_prefix(&root).expect("case under root");
-            let out_dir = out_root.join(rel.with_extension(""));
-            run_case(case, &out_dir).map(|p| format!("{}:\n{p}", rel.display()))
-        })
-        .collect();
+            let out_dir = out_root.join(emit).join(rel.with_extension(""));
+            if let Some(p) = run_case(case, &out_dir, emit) {
+                report.push(format!("{} ({emit}):\n{p}", rel.display()));
+            }
+        }
+    }
+    report.extend(typecheck(&repo, &out_root.join("ts")));
     assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));
+}
+
+/// `tsc --noEmit` over everything `--emit ts` wrote under `dir`.
+fn typecheck(repo: &Path, dir: &Path) -> Option<String> {
+    let config = r#"{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": ["**/*.ts"]
+}
+"#;
+    fs::write(dir.join("tsconfig.json"), config).expect("write tsconfig");
+    let tsc = Command::new(repo.join("node_modules/.bin/tsc"))
+        .arg("-p")
+        .arg(dir)
+        .output()
+        .expect("`tsc` is installed: run `pnpm install`");
+    (!tsc.status.success())
+        .then(|| format!("tsc --noEmit:\n{}", String::from_utf8_lossy(&tsc.stdout)))
 }
 
 /// Every module the checker accepts compiles to JS that Node can parse.

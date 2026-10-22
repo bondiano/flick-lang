@@ -163,6 +163,35 @@ impl Gen<'_> {
         format!("$t{}", self.temps)
     }
 
+    /// An arrow's parameter list: in TypeScript every parameter and result is `any`.
+    fn arrow(&self, params: &str) -> String {
+        if !self.options.typescript {
+            return format!("({params}) =>");
+        }
+        let typed: Vec<String> = params
+            .split(", ")
+            .filter(|p| !p.is_empty())
+            .map(|p| format!("{p}: any"))
+            .collect();
+        format!("({}): any =>", typed.join(", "))
+    }
+
+    /// `const name = value;`, `any` in TypeScript.
+    fn constant(&self, name: &str, value: &str) -> String {
+        let ty = if self.options.typescript { ": any" } else { "" };
+        format!("const {name}{ty} = {value};")
+    }
+
+    /// `let` of variables assigned later.
+    fn declare(&self, names: &str) -> String {
+        if self.options.typescript {
+            let typed: Vec<String> = names.split(", ").map(|n| format!("{n}: any")).collect();
+            format!("let {};", typed.join(", "))
+        } else {
+            format!("let {names};")
+        }
+    }
+
     fn rt(&mut self, name: &str) -> String {
         self.runtime = true;
         format!("$rt.{name}")

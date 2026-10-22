@@ -1,0 +1,53 @@
+// Types of the runtime adapter as generated TypeScript (`--emit ts`) sees
+// them: `Effect` with its real types, everything else untyped. Every export
+// of index.js is declared here (test/types.test.js checks it).
+export { Effect } from "effect";
+
+export declare const APP_ERROR: any;
+export declare const EQ: any;
+export declare const GT: any;
+export declare const LT: any;
+export declare const appFail: any;
+export declare const compare: any;
+export declare const derive: any;
+export declare const equals: any;
+export declare const err: any;
+export declare const fiberSpawn: any;
+export declare const fromResult: any;
+export declare const hash: any;
+export declare const layerMerge: any;
+export declare const layerOverride: any;
+export declare const layerSucceed: any;
+export declare const listCompare: any;
+export declare const listEquals: any;
+export declare const listHash: any;
+export declare const listShow: any;
+export declare const none: any;
+export declare const numberSameValue: any;
+export declare const numberStrictEqual: any;
+export declare const ok: any;
+export declare const operation: any;
+export declare const provide: any;
+export declare const recordExtend: any;
+export declare const recordGet: any;
+export declare const recordLabel: any;
+export declare const recordLabels: any;
+export declare const recordMergeDisjoint: any;
+export declare const recordProject: any;
+export declare const recordRemove: any;
+export declare const refGet: any;
+export declare const refMake: any;
+export declare const refModify: any;
+export declare const refSame: any;
+export declare const refSet: any;
+export declare const runMain: any;
+export declare const scope: any;
+export declare const service: any;
+export declare const show: any;
+export declare const some: any;
+export declare const stderrLine: any;
+export declare const stdoutLine: any;
+export declare const stringLength: any;
+export declare const stringTrim: any;
+export declare const structural: any;
+export declare const tryWith: any;
