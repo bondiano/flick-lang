@@ -1,12 +1,15 @@
 //! `.iface`, the native interface of a module (§11): versioned JSON that an
 //! importer reads instead of the module's source. Schema:
-//! `docs/reference/iface.md`. Version 0 holds names and their identity; types,
-//! classes, captures and ABI join it with the phases that produce them.
+//! `docs/reference/iface.md`. Version 1 holds names, their identity, and the
+//! types and kinds of exports; classes, captures and ABI join it with the
+//! phases that produce them.
 
 use serde::{Deserialize, Serialize};
 
-/// Bumped on every change of the schema until 0.1.0 fixes version 1.
-pub const IFACE_VERSION: u32 = 0;
+use crate::types::{Type, TypeDef};
+
+/// Bumped on every change of the schema.
+pub const IFACE_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -67,6 +70,13 @@ pub struct Export {
     /// `T(..)` exposes the members of `T`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent: Option<String>,
+    /// Type of a value or constructor; absent while the module has not been
+    /// type-checked (e.g. it has syntax errors).
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    pub scheme: Option<Type>,
+    /// Kind and definition of a type, service, class or kind.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub definition: Option<TypeDef>,
 }
 
 /// A constructor of an exported type that is itself not exported; kept only
@@ -168,7 +178,13 @@ mod tests {
             tree: &parse.tree,
             syntax: &syntax,
         };
-        let (interface, diagnostics) = resolve::resolve(&module, &|_| None);
+        let (mut interface, mut diagnostics) = resolve::resolve(&module, &|_| None);
+        diagnostics.extend(crate::types::check(
+            &module,
+            &|_| None,
+            crate::types::builtins(),
+            &mut interface,
+        ));
         assert!(diagnostics.is_empty(), "{diagnostics:?}");
         interface
     }
@@ -176,7 +192,7 @@ mod tests {
     #[test]
     fn schema_is_pinned_and_round_trips() {
         let interface = interface_of(
-            "module App.Shapes exposing (Shape(..), Id, Size, Mode(..), Show(..), area, now, Pair, Clock, NotFound(..), Port)\n\
+            "module App.Shapes exposing (Shape(..), Id, Size, Mode(..), Show(..), area, now, Pair, Clock, NotFound(..), Port, Box, wrap)\n\
              type Shape = Circle of Number | Square of Number\n\
              opaque type Id = Id of String\n\
              type Size = Number\n\
@@ -187,7 +203,9 @@ mod tests {
              type Pair\n\
              service Clock =\n  tick : Unit ->{} Number\n\
              error NotFound of String\n\
-             refined type Port = Number where fun n -> n > 0\n",
+             refined type Port = Number where fun n -> n > 0\n\
+             type Box (f : Type -> Type) a = { value : f a; size : Size }\n\
+             wrap : f a -> Box f a\nlet wrap value = { value = value; size = 1 }\n",
         );
         let json = write(&interface);
         insta::assert_snapshot!(json);
@@ -206,7 +224,7 @@ mod tests {
                 .expect_err("rejected")
                 .contains("describes `A`")
         );
-        let future = json.replace("\"iface-version\": 0", "\"iface-version\": 7");
+        let future = json.replace("\"iface-version\": 1", "\"iface-version\": 7");
         assert!(
             read(future.as_bytes(), "A")
                 .expect_err("rejected")

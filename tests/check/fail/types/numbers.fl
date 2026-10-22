@@ -1,0 +1,18 @@
+module App.Numbers exposing (..)
+
+mixed : Number
+let mixed = 1 + 1n
+
+concat : String
+let concat = "a" ++ 1
+
+bools : Bool -> Bool
+let bools b = b + b
+
+compare : Bool
+let compare = true < false
+
+//~ FLICK-T003 @4:17-4:19 expected `Number`, found `BigInt`
+//~ FLICK-T003 @7:21-7:22 expected `String`, found `Number`
+//~ FLICK-T003 @10:15-10:20 `+` works on `Number` or `BigInt`, not on `Bool`
+//~ FLICK-T003 @13:15-13:27 `<` works on `Number` or `BigInt` or `String`, not on `Bool`

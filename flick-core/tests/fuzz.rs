@@ -1,7 +1,7 @@
 //! Mutation fuzzing of the parser and formatter over the syntax corpus: the
 //! parser must not panic or hang, the tree must stay lossless, every
 //! diagnostic span must lie inside the input, and inputs without errors must
-//! format idempotently. `FLICK_FUZZ_ITERATIONS` sets the number of mutated
+//! format idempotently and type-check without panicking. `FLICK_FUZZ_ITERATIONS` sets the number of mutated
 //! inputs (default 20 000; the nightly CI job runs 1 000 000 in release).
 
 use std::fs;
@@ -118,7 +118,7 @@ fn mutate(rng: &mut Rng, text: &str) -> String {
 }
 
 #[test]
-fn parser_survives_mutated_corpus() {
+fn front_end_survives_mutated_corpus() {
     let iterations: usize = std::env::var("FLICK_FUZZ_ITERATIONS")
         .ok()
         .and_then(|n| n.parse().ok())
@@ -147,6 +147,11 @@ fn parser_survives_mutated_corpus() {
                 span.end as usize <= input.len(),
                 "span out of bounds on {i}:\n{input}"
             );
+        }
+        // the checker runs on what parses cleanly
+        if parsed.diagnostics.is_empty() {
+            std::panic::catch_unwind(|| flick_core::check(&sources, file))
+                .unwrap_or_else(|_| panic!("checker panicked on iteration {i}:\n{input}"));
         }
     }
 }

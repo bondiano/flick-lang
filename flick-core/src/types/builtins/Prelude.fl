@@ -1,0 +1,30 @@
+/// Built-in types and constructors (§5 "Вычисления и kinds"); every module
+/// sees them without an import.
+module Prelude exposing (..)
+
+type Unit
+type Never
+type Bool
+type Number
+type BigInt
+type String
+type Unknown
+type List a
+type Ref a
+type Redacted a
+type Schema a
+type PureCodec i a
+type Eff (r : ServiceRow) (e : ErrorRow) a
+type Layer (ri : ServiceRow) (e : ErrorRow) (ro : ServiceRow)
+type Codec (rd : ServiceRow) (re : ServiceRow) i a
+type Errors (e : ErrorRow)
+
+type Option a = None | Some of a
+
+type Result e a = Err of e | Ok of a
+
+/// The error an application fails with through `App.fail`.
+error AppError of { message : String; details : Option String }
+
+identity : a -> a
+let identity value = value

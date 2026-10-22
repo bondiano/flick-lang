@@ -1,0 +1,42 @@
+// Kinds follow from positions (§5): `f` below is `Type -> Type`, rows keep
+// their own kinds, and a finite kind indexes a type.
+module App.Kinds exposing (..)
+
+type Box (f : Type -> Type) a = { value : f a }
+
+type Pair f a = Pair of f a, f a
+
+kind Nullability = NonNull | Nullable
+
+type Js (n : Nullability) a
+
+service Clock =
+  now : Unit ->{} Number
+
+error Timeout
+
+unwrap : Box f a -> f a
+let unwrap box = box.value
+
+first : Pair Option a -> Option a
+let first pair =
+  match pair with
+  | Pair x _ -> x
+
+described : Eff none none a -> Eff r e a -> Layer none none {Clock}
+foreign pure described from "./kinds.js" "described"
+
+open_rows : (a ->{Clock | r; Timeout | e} b) -> Eff r e b
+foreign pure open_rows from "./kinds.js" "openRows"
+
+nullable : Js Nullable String -> Js NonNull String
+foreign pure nullable from "./kinds.js" "nullable"
+
+errors : Errors {Timeout} -> Unit
+foreign pure errors from "./kinds.js" "errors"
+
+higher : m Number -> (m Number)^c
+foreign pure higher from "./kinds.js" "higher"
+
+fields : { name : String | rest } -> String
+let fields record = record.name

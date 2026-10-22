@@ -11,7 +11,8 @@ Snapshot tests use [`insta`](https://insta.rs); review changes with
 ## Checker fixtures — `tests/check/`
 
 - `tests/check/pass/**/*.fl` must check without any diagnostics and must not
-  contain annotations.
+  contain annotations. Each file is checked on its own, so it declares the
+  types and services it uses.
 - `tests/check/fail/**/*.fl` declare every expected diagnostic in annotation
   comments. Missing and unexpected diagnostics are reported per file.
 
@@ -66,9 +67,18 @@ subset described in `flick-core/src/bootstrap.rs`.
 - Every `.fl` file under `tests/` and every doc block must round-trip through
   the lossless tree byte for byte; those without diagnostics must format
   idempotently, and the formatter re-checks that the AST is unchanged.
+- `tests/syntax/*.fl` exercise the grammar only: they must parse without
+  diagnostics, but their names need not resolve.
 - `fuzz.rs` mutates the corpus and asserts that the parser does not panic or
-  hang, stays lossless and keeps spans in bounds. `FLICK_FUZZ_ITERATIONS`
+  hang, stays lossless and keeps spans in bounds, and that the checker does
+  not panic on inputs that parse. `FLICK_FUZZ_ITERATIONS`
   sets the number of inputs: 20 000 in `just check`, 1 000 000 in the nightly
   CI job (`just fuzz`).
 - `DUMP=out.txt [DUMP_FILE=x.fl] cargo test -p flick-core --test corpus dump -- --ignored`
   writes the trees of the spec examples (or of one file) for inspection.
+
+## Checking time — `flick-core/tests/scaling.rs`
+
+Checks a record of 200 fields read field by field and a function of 2000
+lines, each also at a quarter of the size: the full size must stay within a
+time budget, and the ratio between the sizes must stay linear.

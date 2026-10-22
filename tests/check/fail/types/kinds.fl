@@ -1,0 +1,40 @@
+module App.Kinds exposing (..)
+
+service Users =
+  get : Number ->{} String
+
+error NotFound
+
+applied : Option -> Number
+foreign pure applied from "./k.js" "applied"
+
+too_many : Number String -> Number
+foreign pure too_many from "./k.js" "tooMany"
+
+eff_units : Eff Unit Unit a -> a
+foreign pure eff_units from "./k.js" "effUnits"
+
+swapped : Unit ->{NotFound; Users} Unit
+foreign sync swapped from "./k.js" "swapped"
+
+not_error : Unit ->{none; String} Unit
+foreign sync not_error from "./k.js" "notError"
+
+mixed : (a ->{c; none} b)^c -> Unit
+foreign pure mixed from "./k.js" "mixed"
+
+none_type : none -> Unit
+foreign pure none_type from "./k.js" "noneType"
+
+type Box (f : Type -> Type) = { value : f }
+
+//~ FLICK-T002 @8:11-8:17 `Option` has kind Type -> Type, but a Type is expected here
+//~ FLICK-T002 @11:19-11:25 `Number` has kind Type and takes no more type arguments
+//~ FLICK-T002 @14:17-14:21 `Unit` has kind Type, but a ServiceRow is expected here
+//~ FLICK-T002 @14:22-14:26 `Unit` has kind Type, but an ErrorRow is expected here
+//~ FLICK-T002 @17:19-17:27 `NotFound` has kind Type, but a Service is expected here
+//~ FLICK-T002 @17:29-17:34 `Users` has kind Service, but a Type is expected here
+//~ FLICK-T002 @20:27-20:33 `String` is not an error: an error row holds types declared
+//~ FLICK-T002 @23:27-23:28 `c` has kind ServiceRow, but a CaptureRow is expected here
+//~ FLICK-T002 @26:13-26:17 `none` is an empty row, but a Type is expected here
+//~ FLICK-T002 @29:41-29:42 `f` has kind Type -> Type, but a Type is expected here

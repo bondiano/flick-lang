@@ -2,5 +2,5 @@ module App.UsersTest exposing (tests)
 
 import App.Users exposing (load_user)
 
-tests : List Test
+tests : List Number
 let tests = []

@@ -1,0 +1,17 @@
+// Intermediate statements of a block are `Unit`; anything else is dropped
+// only with `ignore` (§3).
+module App.Blocks exposing (run)
+
+service Log =
+  info : String ->{} Unit
+
+service Users =
+  get : Number ->{} String
+
+run : Number ->{Users, Log; none} String
+let run id =
+  let name = Users.get id
+  Log.info name
+  ignore (Users.get id)
+  ignore (name ++ "!")
+  name

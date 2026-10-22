@@ -1,0 +1,46 @@
+// Generalization of provably pure constructions only (§5 "Generalization
+// при наличии Ref").
+module App.Generalization exposing (make_empty, use_separate_cells, identity_again, fresh_cell, use_tasks)
+
+make_empty : forall a. Unit ->{} Ref (Option a)
+let make_empty () =
+  Ref.make None
+
+use_separate_cells : Unit ->{} Unit
+let use_separate_cells () =
+  let numbers = make_empty ()
+  let names = make_empty ()
+  Ref.set numbers (Some 42)
+  Ref.set names (Some "Ada")
+
+make_identity : Unit -> (a -> a)
+let make_identity () =
+  fun value -> value
+
+identity_again : forall a. a -> a
+let identity_again =
+  make_identity ()
+
+fresh_cell : forall a. Eff none none (Ref (Option a))
+let fresh_cell =
+  task { Ref.make None }
+
+use_tasks : Unit ->{} Unit
+let use_tasks () =
+  let numbers = await fresh_cell
+  let names = await fresh_cell
+  Ref.set numbers (Some 42)
+  Ref.set names (Some "Ada")
+
+increment : Ref Number ->{} Number
+let increment counter =
+  Ref.modify counter (fun current ->
+    let next = current + 1
+    (next, next)
+  )
+
+// a pure value is generalized without a signature
+empty_pair : (List Number, List String)
+let empty_pair =
+  let empty = []
+  (empty, empty)

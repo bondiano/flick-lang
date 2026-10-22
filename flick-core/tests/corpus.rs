@@ -1,7 +1,8 @@
 //! Syntax corpus: every ```` ```flick ```` block of the spec (pinned by
 //! `tests/syntax/spec_examples.txt`) and of `docs/`, plus every `.fl` file under
 //! `tests/`. All must round-trip losslessly; error-free ones must also format
-//! idempotently without changing the AST.
+//! idempotently without changing the AST. `tests/syntax/*.fl` must parse
+//! without diagnostics.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -179,6 +180,38 @@ fn docs_examples_parse() {
         "docs examples fail to parse:\n{}",
         errors.join("\n")
     );
+}
+
+/// Syntax fixtures exercise the grammar only; their names need not resolve.
+#[test]
+fn syntax_fixtures_parse() {
+    let mut files = Vec::new();
+    fl_files(&root().join("tests/syntax"), &mut files);
+    assert!(!files.is_empty(), "no syntax fixtures");
+    let errors: Vec<String> = files
+        .iter()
+        .flat_map(|path| {
+            let text = fs::read_to_string(path).expect("UTF-8 fixture");
+            parse_errors(&path.display().to_string(), &text)
+        })
+        .collect();
+    assert!(
+        errors.is_empty(),
+        "syntax fixtures fail to parse:\n{}",
+        errors.join("\n")
+    );
+}
+
+/// The checker reports what it does not understand instead of panicking,
+/// also on examples whose names are defined elsewhere.
+#[test]
+fn checker_survives_the_corpus() {
+    for (name, text) in corpus() {
+        let mut sources = SourceMap::default();
+        let file = sources.add(name.as_str(), text.as_str());
+        let result = std::panic::catch_unwind(|| flick_core::check(&sources, file));
+        assert!(result.is_ok(), "{name}: the checker panicked");
+    }
 }
 
 #[test]

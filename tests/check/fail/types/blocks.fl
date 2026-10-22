@@ -1,0 +1,17 @@
+module App.Blocks exposing (..)
+
+service Users =
+  get : Number ->{} String
+
+run : Number ->{Users; none} String
+let run id =
+  Users.get id
+  let name = Users.get id
+  name
+
+empty : Number -> Number
+let empty n =
+  let x = n
+
+//~ FLICK-T011 @8:3-8:15 the result of this expression has type `String` and would
+//~ FLICK-T019 @14:12-14:12 a block must end with an expression: its value is the value

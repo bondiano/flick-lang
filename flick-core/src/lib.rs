@@ -2,7 +2,7 @@
 //!
 //! Source of truth: `Flick спецификация ML языка с HKT и Effect.md` in the
 //! repository root. Implemented so far: diagnostics, syntax, `fmt`, names and
-//! modules, and the project model.
+//! modules, the project model, and kinds and types.
 
 pub mod bootstrap;
 pub mod consteval;
@@ -13,13 +13,14 @@ pub mod project;
 pub mod resolve;
 pub mod source;
 pub mod syntax;
+pub mod types;
 
 /// Version of the Flick language this core targets (spec header: "Flick 0.7").
 pub const LANGUAGE_VERSION: &str = "0.7";
 
-/// Checks one source file on its own: syntax, and the names it defines and
-/// exports; its imports are not loaded. A whole program goes through
-/// [`project::check`].
+/// Checks one source file on its own: syntax, names and types; its imports
+/// are not loaded, so names from them are taken on trust. A whole program goes
+/// through [`project::check`].
 pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnostics::Diagnostic> {
     let text = &sources.get(file).text;
     let parse = syntax::parse(text, file);
@@ -31,9 +32,20 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
         tree: &parse.tree,
         syntax: &syntax,
     };
-    let (_, resolved) = resolve::resolve(&module, &|_| None);
+    let (mut interface, resolved) = resolve::resolve(&module, &|_| None);
     let mut diagnostics = parse.diagnostics;
     diagnostics.extend(resolved);
+    if !diagnostics
+        .iter()
+        .any(|d| d.code.area == diagnostics::codes::Area::Syntax)
+    {
+        diagnostics.extend(types::check(
+            &module,
+            &|_| None,
+            types::builtins(),
+            &mut interface,
+        ));
+    }
     diagnostics.sort_by_key(|d| d.span.map(|s| (s.start, s.end)));
     diagnostics
 }

@@ -1,0 +1,45 @@
+// Methods of instances have full signatures too (§3); class constraints are
+// kind-checked here and resolved by the class solver.
+module App.Classes exposing (Show(..), render, Repo)
+
+class Show a =
+  val show : a -> String
+
+class Show a => Pretty a =
+  val pretty : a -> String
+
+class Functor (f : Type -> Type) =
+  val map : (a -> b) -> f a -> f b
+
+type Shape = Circle of Number | Empty
+
+instance Show Shape =
+  show : Shape -> String
+  let show shape =
+    match shape with
+    | Circle _ -> "circle"
+    | Empty -> "empty"
+
+instance Show a => Show (List a) =
+  show : List a -> String
+  let show items =
+    match items with
+    | [] -> "[]"
+    | _ -> "[…]"
+
+instance Functor Option =
+  map : (a -> b) -> Option a -> Option b
+  let map f value =
+    match value with
+    | None -> None
+    | Some x -> Some (f x)
+
+render : Show a => a -> String
+let render value =
+  show value
+
+service Repo a =
+  find : Number ->{} Option a
+
+lookup : Number ->{Repo String; none} Option String
+let lookup id = Repo.find id

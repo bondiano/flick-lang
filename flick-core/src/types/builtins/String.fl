@@ -1,0 +1,5 @@
+/// Operations on strings.
+module String exposing (trim)
+
+trim : String -> String
+foreign pure trim from "@flick-lang/runtime" "stringTrim"

@@ -55,8 +55,9 @@ fn run(host: &Memory, roots: &[&str]) -> Vec<String> {
 fn diagnostics_do_not_depend_on_import_order() {
     let left = "module A.Left exposing (..)\nfind : Number\nlet find = 1\ntype T = | T\n";
     let right = "module A.Right exposing (..)\nfind : Number\nlet find = 2\ntype T = | T\n";
-    let main =
-        |imports: &str| format!("module A.Main exposing (x)\n{imports}\nx : T\nlet x = find\n");
+    let main = |imports: &str| {
+        format!("module A.Main exposing (x)\n{imports}\nx : Number\nlet x = find\n")
+    };
     let orders = [
         "import A.Left exposing (..)\nimport A.Right exposing (..)\nimport A.Left as Q\nimport A.Right as Q exposing (T)\nimport A.Left exposing (T)",
         "import A.Right as Q exposing (T)\nimport A.Left exposing (T)\nimport A.Right exposing (..)\nimport A.Left as Q\nimport A.Left exposing (..)",

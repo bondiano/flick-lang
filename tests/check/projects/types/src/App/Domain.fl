@@ -1,0 +1,29 @@
+// Types other modules see only through this module's interface.
+module App.Domain exposing (User, UserId, Shape(..), Box, new_id, first, wrap, Users)
+
+opaque type UserId = String
+
+// inside its module an opaque alias is its representation
+new_id : String -> UserId
+let new_id raw = raw
+
+type User = { id : UserId; name : String }
+
+type Shape =
+  | Circle of Number
+  | Square of Number
+
+type Box (f : Type -> Type) a = { value : f a }
+
+first : List a -> Option a
+let first items =
+  match items with
+  | [] -> None
+  | [x] -> Some x
+  | _ -> None
+
+wrap : f a -> Box f a
+let wrap value = { value = value }
+
+service Users =
+  get : UserId ->{} User

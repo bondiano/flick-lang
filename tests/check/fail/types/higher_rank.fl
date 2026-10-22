@@ -1,0 +1,31 @@
+module App.HigherRank exposing (..)
+
+apply_twice : (forall a. a -> a) -> (Number, String)
+let apply_twice transform =
+  (transform 42, transform "hello")
+
+wrong : forall a. a -> a
+let wrong x = x + 1
+
+use_mono : Unit -> (Number, String)
+let use_mono () =
+  apply_twice (fun x -> x + 1)
+
+trim_only : Unit -> (Number, String)
+let trim_only () =
+  apply_twice String.trim
+
+each : (forall a. a ->{} Unit) ->{} Unit
+let each log =
+  log 1
+  log "text"
+
+escape : Unit ->{} Unit
+let escape () =
+  let cell = Ref.make None
+  each (fun x -> Ref.set cell (Some x))
+
+//~ FLICK-T008 @8:19-8:20 expected `a`, found `Number`: `a` stands for any type the
+//~ FLICK-T008 @12:29-12:30 expected `a`, found `Number`: `a` stands for any type the
+//~ FLICK-T008 @16:15-16:26 expected `a -> a`, found `String -> String`: `a` stands for
+//~ FLICK-T007 @26:32-26:38 expected `Option _`, found `Option a`: the type variable

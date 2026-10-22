@@ -7,7 +7,7 @@ import App.Left as L exposing (size, Mode)
 import App.Right exposing (size)
 //                         ^^^^ FLICK-R010 `size` is ambiguous: it is imported from both `App.Left` and `App.Right`
 
-type Mode = Auto
+type Mode = | Auto
 //   ^^^^ FLICK-R009 `Mode` shadows the name imported from `App.Left`
 
 // `find` comes only from App.Right's `(..)`: not ambiguous

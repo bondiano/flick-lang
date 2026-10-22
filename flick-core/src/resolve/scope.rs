@@ -289,6 +289,8 @@ impl<'a> Scope<'a> {
             },
             decl: def.decl,
             parent: def.parent.clone(),
+            scheme: None,
+            definition: None,
         }
     }
 

@@ -3,7 +3,7 @@ source: flick-core/src/iface.rs
 expression: json
 ---
 {
-  "iface-version": 0,
+  "iface-version": 1,
   "language": "0.7",
   "module": "App.Shapes",
   "exports": [
@@ -11,109 +11,472 @@ expression: json
       "module": "App.Shapes",
       "namespace": "type",
       "name": "Shape",
-      "decl": "adt"
+      "decl": "adt",
+      "definition": {
+        "kind": "type",
+        "form": "adt",
+        "constructors": [
+          "Circle",
+          "Square"
+        ]
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "constructor",
       "name": "Circle",
       "decl": "constructor",
-      "parent": "Shape"
+      "parent": "Shape",
+      "type": {
+        "fun": {
+          "param": {
+            "con": {
+              "module": "Prelude",
+              "name": "Number"
+            }
+          },
+          "result": {
+            "con": {
+              "module": "App.Shapes",
+              "name": "Shape"
+            }
+          }
+        }
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "constructor",
       "name": "Square",
       "decl": "constructor",
-      "parent": "Shape"
+      "parent": "Shape",
+      "type": {
+        "fun": {
+          "param": {
+            "con": {
+              "module": "Prelude",
+              "name": "Number"
+            }
+          },
+          "result": {
+            "con": {
+              "module": "App.Shapes",
+              "name": "Shape"
+            }
+          }
+        }
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "type",
       "name": "Id",
-      "decl": "opaque"
+      "decl": "opaque",
+      "definition": {
+        "kind": "type",
+        "form": "nominal"
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "type",
       "name": "Size",
-      "decl": "alias"
+      "decl": "alias",
+      "definition": {
+        "kind": "type",
+        "form": "alias",
+        "params": [],
+        "body": {
+          "con": {
+            "module": "Prelude",
+            "name": "Number"
+          }
+        }
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "type",
       "name": "Mode",
-      "decl": "kind"
+      "decl": "kind",
+      "definition": {
+        "kind": {
+          "named": {
+            "module": "App.Shapes",
+            "name": "Mode"
+          }
+        },
+        "form": "kind"
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "type",
       "name": "Small",
       "decl": "kind-member",
-      "parent": "Mode"
+      "parent": "Mode",
+      "definition": {
+        "kind": {
+          "named": {
+            "module": "App.Shapes",
+            "name": "Mode"
+          }
+        },
+        "form": "kind-member"
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "type",
       "name": "Big",
       "decl": "kind-member",
-      "parent": "Mode"
+      "parent": "Mode",
+      "definition": {
+        "kind": {
+          "named": {
+            "module": "App.Shapes",
+            "name": "Mode"
+          }
+        },
+        "form": "kind-member"
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "type",
       "name": "Show",
-      "decl": "class"
+      "decl": "class",
+      "definition": {
+        "kind": {
+          "arrow": [
+            "type",
+            "constraint"
+          ]
+        },
+        "form": "class"
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "value",
       "name": "show",
       "decl": "method",
-      "parent": "Show"
+      "parent": "Show",
+      "type": {
+        "forall": {
+          "vars": [
+            {
+              "name": "a",
+              "kind": "type"
+            }
+          ],
+          "constraints": [
+            {
+              "app": {
+                "head": {
+                  "con": {
+                    "module": "App.Shapes",
+                    "name": "Show"
+                  }
+                },
+                "arg": {
+                  "var": "a"
+                }
+              }
+            }
+          ],
+          "body": {
+            "fun": {
+              "param": {
+                "var": "a"
+              },
+              "result": {
+                "con": {
+                  "module": "Prelude",
+                  "name": "String"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "value",
       "name": "area",
-      "decl": "let"
+      "decl": "let",
+      "type": {
+        "fun": {
+          "param": {
+            "con": {
+              "module": "App.Shapes",
+              "name": "Shape"
+            }
+          },
+          "result": {
+            "con": {
+              "module": "Prelude",
+              "name": "Number"
+            }
+          }
+        }
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "value",
       "name": "now",
-      "decl": "foreign"
+      "decl": "foreign",
+      "type": {
+        "fun": {
+          "param": {
+            "con": {
+              "module": "Prelude",
+              "name": "Unit"
+            }
+          },
+          "effects": {
+            "services": {
+              "row": {
+                "entries": []
+              }
+            },
+            "errors": {
+              "row": {
+                "entries": []
+              }
+            }
+          },
+          "result": {
+            "con": {
+              "module": "Prelude",
+              "name": "Number"
+            }
+          }
+        }
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "type",
       "name": "Pair",
-      "decl": "abstract"
+      "decl": "abstract",
+      "definition": {
+        "kind": "type",
+        "form": "nominal"
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "type",
       "name": "Clock",
-      "decl": "service"
+      "decl": "service",
+      "definition": {
+        "kind": "service",
+        "form": "service",
+        "params": [],
+        "operations": [
+          {
+            "name": "tick",
+            "type": {
+              "fun": {
+                "param": {
+                  "con": {
+                    "module": "Prelude",
+                    "name": "Unit"
+                  }
+                },
+                "effects": {
+                  "services": {
+                    "row": {
+                      "entries": []
+                    }
+                  },
+                  "errors": {
+                    "row": {
+                      "entries": []
+                    }
+                  }
+                },
+                "result": {
+                  "con": {
+                    "module": "Prelude",
+                    "name": "Number"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "type",
       "name": "NotFound",
-      "decl": "error"
+      "decl": "error",
+      "definition": {
+        "kind": "type",
+        "form": "error"
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "constructor",
       "name": "NotFound",
       "decl": "constructor",
-      "parent": "NotFound"
+      "parent": "NotFound",
+      "type": {
+        "fun": {
+          "param": {
+            "con": {
+              "module": "Prelude",
+              "name": "String"
+            }
+          },
+          "result": {
+            "con": {
+              "module": "App.Shapes",
+              "name": "NotFound"
+            }
+          }
+        }
+      }
     },
     {
       "module": "App.Shapes",
       "namespace": "type",
       "name": "Port",
-      "decl": "refined"
+      "decl": "refined",
+      "definition": {
+        "kind": "type",
+        "form": "nominal"
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "type",
+      "name": "Box",
+      "decl": "alias",
+      "definition": {
+        "kind": {
+          "arrow": [
+            {
+              "arrow": [
+                "type",
+                "type"
+              ]
+            },
+            {
+              "arrow": [
+                "type",
+                "type"
+              ]
+            }
+          ]
+        },
+        "form": "alias",
+        "params": [
+          "f",
+          "a"
+        ],
+        "body": {
+          "record": {
+            "entries": [
+              [
+                "size",
+                {
+                  "con": {
+                    "module": "Prelude",
+                    "name": "Number"
+                  }
+                }
+              ],
+              [
+                "value",
+                {
+                  "app": {
+                    "head": {
+                      "var": "f"
+                    },
+                    "arg": {
+                      "var": "a"
+                    }
+                  }
+                }
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "value",
+      "name": "wrap",
+      "decl": "let",
+      "type": {
+        "forall": {
+          "vars": [
+            {
+              "name": "f",
+              "kind": {
+                "arrow": [
+                  "type",
+                  "type"
+                ]
+              }
+            },
+            {
+              "name": "a",
+              "kind": "type"
+            }
+          ],
+          "body": {
+            "fun": {
+              "param": {
+                "app": {
+                  "head": {
+                    "var": "f"
+                  },
+                  "arg": {
+                    "var": "a"
+                  }
+                }
+              },
+              "result": {
+                "record": {
+                  "entries": [
+                    [
+                      "size",
+                      {
+                        "con": {
+                          "module": "Prelude",
+                          "name": "Number"
+                        }
+                      }
+                    ],
+                    [
+                      "value",
+                      {
+                        "app": {
+                          "head": {
+                            "var": "f"
+                          },
+                          "arg": {
+                            "var": "a"
+                          }
+                        }
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "hidden": [

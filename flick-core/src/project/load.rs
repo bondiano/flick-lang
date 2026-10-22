@@ -13,6 +13,7 @@ use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::resolve::{self, Interface, ModuleSyntax};
 use crate::source::{FileId, SourceMap, Span};
 use crate::syntax::{self, Parse};
+use crate::types;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum Root {
@@ -257,7 +258,12 @@ impl Loader<'_> {
             }
         }
         if local.is_none() && !self.from_packages.contains_key(name) {
-            self.diagnostics.push(self.unknown_module(name, span));
+            match types::builtins().iter().find(|i| i.module == name) {
+                Some(builtin) => {
+                    self.from_packages.insert(name.to_owned(), builtin.clone());
+                }
+                None => self.diagnostics.push(self.unknown_module(name, span)),
+            }
         }
         local
     }
@@ -365,10 +371,19 @@ impl Loader<'_> {
             Some(&j) => interfaces[j].clone(),
             None => self.from_packages.get(name).cloned(),
         };
-        let (interface, diagnostics) = resolve::resolve(&module, &lookup);
+        let (mut interface, diagnostics) = resolve::resolve(&module, &lookup);
         self.diagnostics
             .extend(loaded.parse.diagnostics.iter().cloned());
         self.diagnostics.extend(diagnostics);
+        // a module with syntax errors keeps untyped exports: importers trust them
+        if loaded.parse.diagnostics.is_empty() {
+            self.diagnostics.extend(types::check(
+                &module,
+                &lookup,
+                types::builtins(),
+                &mut interface,
+            ));
+        }
         interfaces[i] = Some(interface);
         visiting[i] = false;
     }

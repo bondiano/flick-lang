@@ -1,0 +1,32 @@
+// Recursion is explicit (§3); polymorphic recursion needs a full `forall`.
+module App.Recursion exposing (depth, countdown, is_even, sum)
+
+type Nested a = Flat of a | Nest of Nested (List a)
+
+depth : forall a. Nested a -> Number
+let rec depth value =
+  match value with
+  | Flat _ -> 0
+  | Nest inner -> 1 + depth inner
+
+countdown : Number -> List Number
+let rec countdown n =
+  if n <= 0 then [] else [n] ++ countdown (n - 1)
+
+rec {
+  is_even : Number -> Bool
+  let is_even n = if n == 0 then true else is_odd (n - 1)
+
+  is_odd : Number -> Bool
+  let is_odd n = if n == 0 then false else is_even (n - 1)
+}
+
+sum : List Number -> Number
+let sum items =
+  go : List Number -> Number -> Number
+  let rec go rest acc =
+    match rest with
+    | [] -> acc
+    | [x] -> acc + x
+    | _ -> acc
+  go items 0

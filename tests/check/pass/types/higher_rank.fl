@@ -1,0 +1,24 @@
+// Higher-rank callbacks (§5 "Полиморфные callbacks").
+module App.HigherRank exposing (apply_twice, render_twice, use_both)
+
+class Show a =
+  val show : a -> String
+
+apply_twice :
+  (forall a. a -> a) -> (Number, String)
+let apply_twice transform =
+  (transform 42, transform "hello")
+
+render_twice :
+  (forall a. Show a => a -> String) -> (String, String)
+let render_twice render =
+  (render 42, render "hello")
+
+keep : a -> a
+let keep value = value
+
+use_both : Unit -> (Number, String)
+let use_both () =
+  let pair = apply_twice keep
+  let lambda = apply_twice (fun x -> x)
+  pair

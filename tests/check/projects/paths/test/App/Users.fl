@@ -2,5 +2,5 @@
 module App.Users exposing (tests)
 //     ^^^^^^^^^ FLICK-R002 module `App.Users` is also declared by `src/App/Users.fl`
 
-tests : List Test
+tests : List Number
 let tests = []

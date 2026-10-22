@@ -1,0 +1,34 @@
+module App.Records exposing (..)
+
+type Named = { name : String }
+
+strict : Named -> String
+let strict value = value.name
+
+extra : Unit -> String
+let extra () = strict { name = "a"; age = 1 }
+
+missing : Unit -> String
+let missing () = strict {}
+
+type Twice = { a : Number; a : String }
+
+dup : Unit -> { x : Number }
+let dup () = { x = 1; x = 2 }
+
+no_field : Named -> Number
+let no_field value = value.age
+
+update : Named -> Named
+let update value = { value with age = 1 }
+
+wrong_type : Named -> Named
+let wrong_type value = { value with name = 1 }
+
+//~ FLICK-T003 @9:23-9:46 expected `Named`, found `{ age : Number; name : String }`:
+//~ FLICK-T003 @12:25-12:27 expected `Named`, found `{}`: field `name` is missing
+//~ FLICK-T014 @14:28-14:29 field `a` is given more than once; labels of a record are
+//~ FLICK-T014 @17:23-17:24 field `x` is given more than once; labels of a record are
+//~ FLICK-T003 @20:22-20:31 `Named` has no field `age`
+//~ FLICK-T003 @23:33-23:36 `Named` has no field `age`; `with` only replaces existing
+//~ FLICK-T003 @26:44-26:45 expected `String`, found `Number`

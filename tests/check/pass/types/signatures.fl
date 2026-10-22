@@ -1,0 +1,35 @@
+// Every named function has a full signature right above it (§3), also
+// locally and when it is a partial application.
+module App.Signatures exposing (hello, render, compose)
+
+greet : String -> String -> String
+let greet prefix name =
+  prefix ++ ", " ++ name
+
+hello : String -> String
+let hello =
+  greet "Hello"
+
+render : List String -> String
+let render items =
+  join : String -> String -> String
+  let join a b = a ++ ", " ++ b
+  match items with
+  | [] -> ""
+  | [one] -> one
+  | [a, b] -> join a b
+  | _ -> "many"
+
+// a variable of the outer signature means the same type inside
+compose : (b -> c) -> (a -> b) -> a -> c
+let compose f g x =
+  apply : (a -> b) -> b
+  let apply h = h x
+  f (apply g)
+
+// values need no signature; local type hints stay available
+total : Number
+let total =
+  let base = 40
+  let extra : Number = 2
+  base + extra

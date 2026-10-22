@@ -1,0 +1,36 @@
+module App.Main exposing (describe, load)
+
+import App.Domain exposing (User, UserId, Shape(..), Box, new_id, first, wrap, Users)
+import Acme.Text as Text
+
+describe : Shape -> String
+let describe shape =
+  match shape with
+  | Circle _ -> Text.trim " circle "
+  | Square _ -> "square"
+
+load : UserId ->{Users; none} String
+let load id =
+  let user : User = Users.get id
+  let boxed : Box Option Number = wrap (Some 1)
+  let one = first [user]
+  user.name
+
+// outside its module an opaque type is not its representation
+leak : String -> UserId
+let leak raw = raw
+//             ^^^ FLICK-T003 expected `UserId`, found `String`
+
+partial : Shape -> Number
+let partial shape =
+  match shape with
+//^^^^^^^^^^^ FLICK-T009 `Square _` is not matched
+  | Circle r -> r
+
+wrong_arg : Unit -> String
+let wrong_arg () = Text.trim 1
+//                           ^ FLICK-T003 expected `String`, found `Number`
+
+no_field : User -> Number
+let no_field user = user.age
+//                  ^^^^^^^^ FLICK-T003 has no field `age`

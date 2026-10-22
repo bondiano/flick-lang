@@ -1,0 +1,36 @@
+module App.Generalization exposing (..)
+
+service Log =
+  info : String ->{} Unit
+
+invalid : Unit ->{} String
+let invalid () =
+  let cell = Ref.make None
+  Ref.set cell (Some 42)
+  match Ref.get cell with
+  | Some value -> String.trim value
+  | None -> ""
+
+capture_cell : Ref (Option a) -> Eff none none (Ref (Option a))
+let capture_cell cell =
+  let shared = task { cell }
+  let use : Eff none none (Ref (Option Number)) = shared
+  shared
+
+logged_none : Unit ->{Log; none} Option a
+let logged_none () =
+  Log.info "created an empty result"
+  None
+
+use_logged_none : Unit ->{Log; none} (Option Number, Option String)
+let use_logged_none () =
+  let empty = logged_none ()
+  (empty, empty)
+
+shared : forall a. Ref (Option a)
+let shared = Ref.make None
+
+//~ FLICK-T003 @11:31-11:36 expected `String`, found `Number`
+//~ FLICK-T008 @17:51-17:57 expected `Eff none none (Ref (Option Number))`, found `Eff
+//~ FLICK-T003 @28:11-28:16 expected `Option String`, found `Option Number`: `Number`
+//~ FLICK-T013 @31:1-31:27 `shared` is computed by a runtime call, so its value cannot

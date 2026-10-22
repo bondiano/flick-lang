@@ -1,0 +1,29 @@
+// Exact structural records with row polymorphism (§5 "Структурность records").
+module App.Records exposing (name, project_name, rename, origin)
+
+name :
+  forall fields. { name : String | fields } -> String
+let name value =
+  value.name
+
+project_name :
+  forall fields. { name : String | fields } -> { name : String }
+let project_name value =
+  { name = value.name }
+
+type User = { id : Number; name : String; email : String }
+
+rename : User -> User
+let rename user = { user with name = "Ada" }
+
+// field order is not part of the type
+type Point = { x : Number; y : Number }
+
+origin : Point
+let origin = { y = 0; x = 0 }
+
+uses : User -> (String, String, { name : String })
+let uses user = (name user, name { name = "x"; extra = 1 }, project_name user)
+
+pick : { first : a; second : a } -> a
+let pick { first; second = _ } = first

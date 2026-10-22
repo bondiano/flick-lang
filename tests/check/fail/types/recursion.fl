@@ -1,0 +1,30 @@
+module App.Recursion exposing (..)
+
+type Nested a = Flat of a | Nest of Nested (List a)
+
+depth : Nested a -> Number
+let rec depth value =
+  match value with
+  | Flat _ -> 0
+  | Nest inner -> 1 + depth inner
+
+loop : Number -> Number
+let loop n = loop n
+
+ping : Number -> Number
+let ping n = pong n
+
+pong : Number -> Number
+let pong n = ping n
+
+let rec xs = [1] ++ xs
+
+let a = b + 1
+
+let b = a + 1
+
+//~ FLICK-T015 @9:23-9:28 `depth` is used at type `Nested (List a) -> Number` inside
+//~ FLICK-T017 @12:14-12:18 `loop` uses itself: write `let rec` for a recursive function
+//~ FLICK-T017 @15:14-15:18 `ping`, `pong` use each other: define mutually recursive
+//~ FLICK-T012 @20:1-20:23 `xs` would be evaluated while it is being defined; only
+//~ FLICK-T012 @22:9-22:10 `a` and `b` would be evaluated while being defined; only

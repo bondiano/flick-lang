@@ -1,0 +1,58 @@
+module App.Matching exposing (..)
+
+type Shape = Circle of Number | Rect of Number, Number | Empty
+
+partial : Option Number -> Number
+let partial value =
+  match value with
+  | Some n -> n
+
+shapes : Shape -> Number
+let shapes shape =
+  match shape with
+  | Circle r -> r
+  | Rect w h when w == h -> w
+
+nested : Option (Option Bool) -> Number
+let nested value =
+  match value with
+  | Some (Some true) -> 1
+  | None -> 0
+
+numbers : Number -> String
+let numbers n =
+  match n with
+  | 0 -> "zero"
+  | 1 -> "one"
+
+lists : List Number -> Number
+let lists items =
+  match items with
+  | [] -> 0
+  | [x] -> x
+
+redundant : Bool -> Number
+let redundant b =
+  match b with
+  | _ -> 0
+  | true -> 1
+
+arity : Shape -> Number
+let arity shape =
+  match shape with
+  | Rect w -> w
+  | _ -> 0
+
+refutable : Option Number -> Number
+let refutable value =
+  let Some n = value
+  n
+
+//~ FLICK-T009 @7:3-7:14 `match` does not cover every value: `None` is not matched
+//~ FLICK-T009 @12:3-12:14 `match` does not cover every value: `Rect _ _` is not
+//~ FLICK-T009 @18:3-18:14 `match` does not cover every value: `Some None` is not
+//~ FLICK-T009 @24:3-24:10 `match` does not cover every value: `_` is not matched
+//~ FLICK-T009 @30:3-30:14 `match` does not cover every value: `[_, _]` is not matched
+//~ FLICK-T010 @38:5-38:9 this arm is never reached: the arms above match every value
+//~ FLICK-T018 @43:5-43:11 constructor `Rect` takes 2 argument(s), but the pattern
+//~ FLICK-T009 @48:7-48:13 this pattern does not match `None`; use `match` to handle

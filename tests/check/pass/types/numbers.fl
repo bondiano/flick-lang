@@ -1,0 +1,17 @@
+// Number, BigInt and String do not mix (§9); operators keep JS semantics.
+module App.Numbers exposing (big, mixed, text, compare)
+
+big : BigInt
+let big = 2n ** 64n + 1n
+
+mixed : Number
+let mixed = 1 / 0 - 2 % 3
+
+text : String
+let text = "a" ++ "b"
+
+compare : (Bool, Bool, Bool)
+let compare = (1 < 2, 1n >= 2n, "a" <= "b")
+
+negate : BigInt -> BigInt
+let negate n = -n

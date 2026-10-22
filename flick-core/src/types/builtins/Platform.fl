@@ -1,0 +1,8 @@
+/// The process the program runs in.
+module Platform exposing (stdout_line, stderr_line)
+
+stdout_line : String ->{} Unit
+foreign sync stdout_line from "@flick-lang/runtime" "stdoutLine"
+
+stderr_line : String ->{} Unit
+foreign sync stderr_line from "@flick-lang/runtime" "stderrLine"
