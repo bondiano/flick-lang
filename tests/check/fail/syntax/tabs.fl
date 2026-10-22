@@ -1,0 +1,4 @@
+let tabbed x =
+	x
+
+//~ FLICK-S009 @2:1-2:2 tab character

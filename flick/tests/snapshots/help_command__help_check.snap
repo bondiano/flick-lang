@@ -1,5 +1,5 @@
 ---
-source: flick/tests/cli.rs
+source: flick/tests/help_command.rs
 expression: "stdout(&[\"help\", \"check\"])"
 ---
 Check Flick source files and report diagnostics

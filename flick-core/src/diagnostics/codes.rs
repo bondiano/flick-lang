@@ -99,7 +99,20 @@ macro_rules! codes {
 codes! {
     S001 = Syntax 1, "source file is not valid UTF-8";
     S002 = Syntax 2, "construct not supported by the bootstrap front-end";
+    S003 = Syntax 3, "unexpected character";
+    S004 = Syntax 4, "unterminated literal or comment";
+    S005 = Syntax 5, "invalid string literal";
+    S006 = Syntax 6, "invalid numeric literal";
+    S007 = Syntax 7, "syntax error";
+    S008 = Syntax 8, "unclosed delimiter";
+    S009 = Syntax 9, "indentation error";
+    S010 = Syntax 10, "construct from another language that Flick does not have";
+    S011 = Syntax 11, "unknown foreign metadata";
+    S012 = Syntax 12, "inconsistent pattern bindings";
     P001 = Project 1, "cannot read source file";
+    P002 = Project 2, "file is not formatted";
+    P003 = Project 3, "internal formatter error";
+    P004 = Project 4, "cannot write source file";
 }
 
 #[cfg(test)]

@@ -2,7 +2,7 @@
 // imports only this package; Effect stays behind it (§11 "Runtime adapter").
 //
 // shortcut: entry runner and Platform calls for the bootstrap codegen only,
-// replaced by the full owner/scope runner and stdlib adapters in M8/M9.
+// extend to the owner/scope runner and stdlib adapters when codegen needs them.
 import { Cause, Effect, Exit } from "effect";
 
 const writeLine = (stream, text) => Effect.sync(() => void stream.write(`${text}\n`));

@@ -1,7 +1,8 @@
 //! Bootstrap front-end and codegen for a tiny entry-module subset, so the e2e
 //! pipeline `.fl -> ESM -> Node` exists before the real compiler.
 //!
-//! shortcut: bootstrap subset only, replaced by the M1 parser and M7 codegen.
+//! shortcut: bootstrap subset only; replace with codegen from the typed IR once
+//! it exists. `flick check` already uses the real parser.
 //!
 //! Accepted shape (blank lines and `//` comment lines are skipped anywhere):
 //!

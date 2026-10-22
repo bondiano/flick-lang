@@ -1,0 +1,146 @@
+module App.Expressions exposing (main)
+
+numbers : List Number
+let numbers = [0, 42, 1_000_000, 1.5, 1e-3, 2E+10, 0x1F, 0o17, 0b1010, -7]
+
+big : BigInt
+let big = 9007199254740993n
+
+strings : List String
+let strings =
+  [
+    "tab\t, quote \" and \u{1F600}",
+    r"raw \n stays",
+    r#"raw with "quotes""#,
+    """
+    multi-line text
+      keeps relative indentation
+    """,
+  ]
+
+precedence : Number -> Bool
+let precedence x =
+  -x ** 2 + 3 * x - 1 > 0 && not (x == 1) || x >= 10
+
+pipeline : List Number -> Number
+let pipeline xs =
+  xs
+  |> List.map (fun x -> x * 2)
+  |> List.sum
+
+classify : Number -> String
+let classify n =
+  if n < 0 then
+    "negative"
+  else if n == 0 then
+    "zero"
+  else
+    let big = n > 1000
+    if big then "big" else "positive"
+
+describe : Option (Number, String) -> String
+let describe value =
+  match value with
+  | None -> "none"
+  | Some (0, label) -> label
+  | Some (n, _) ->
+    match n with
+    | 1 -> "one"
+    | -1 -> "minus one"
+    | _ -> "many"
+
+pick : List a -> Option a
+let pick items =
+  match items with
+  | [] -> None
+  | [single] -> Some single
+  | _ -> None
+
+let rec countdown n =
+  if n <= 0 then [] else [n] ++ countdown (n - 1)
+
+load : UserId ->{Users, Log; NotFound} (User, User)
+let load id =
+  helper : User -> String
+  let helper user = user.name
+  let user : User = Users.get id
+  Log.info (helper user)
+  ignore (Users.get id)
+  let request = task { Users.get id }
+  let again = await request
+  let renamed = { user with name = "Ada"; age = 36 }
+  let point = { x = 1; y = 2 }
+  let total = (point.x + point.y : Number)
+  (user, again)
+
+safe : UserId ->{Users; none} Option User
+let safe id =
+  try
+    Some (Users.get id)
+  with
+  | NotFound _ -> None
+
+read : Path ->{FileSystem; OpenError, ReadError} String
+let read path =
+  scope s {
+    let file = File.open_scoped path
+    File.read_all file
+  }
+
+run : UserId ->{Config, Log; NotFound, ConnectError} String
+let run id =
+  provide (Layer.merge UsersLive LogLive) { load_name id; "done" }
+
+query : Sql.Template Pg { user_id : UserId } Row
+let query =
+  sql params {
+    from user in Users
+    left_join account in Accounts
+      on account.user_id == user.id
+    where user.id == params.user_id && is_not_null account.balance
+    group_by user.id, user.name
+    order_by desc user.name
+    limit 10
+    select { name = user.name; balance = account.balance }
+  }
+
+view : Props -> Ui {Users} {SaveError}
+let view props =
+  ui {
+    button
+      { disabled = props.disabled; on_click = Ui.Event.exhaust (fun _ -> task { props.save () }) }
+      [text props.label]
+  }
+
+json : PureCodec Json Profile
+let json =
+  codec (schema Profile) {
+    email = field "email" Email.json
+    nickname =
+      optional_field "nickname" String.json
+      |> on_missing (fun () -> None)
+  }
+
+tree : Schema a -> Schema (Tree a)
+let tree item = schema Tree item
+
+callback : Ref Number ->{} Number
+let callback counter =
+  Ref.modify counter (fun current ->
+    let next = current + 1
+    (next, next)
+  )
+
+unit : Unit -> Unit
+let unit () = ()
+
+area : Shape -> Number
+let area shape =
+  match shape with
+  | Square side | Circle side -> side * side
+  | Rect w h when w == h -> w * w
+  | Rect w h -> w * h
+  | Pair (Some 0 | None) _ -> 0
+  | Line
+  | Point -> 0
+  | Labeled { name = "origin" | "zero" } -> 0

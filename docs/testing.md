@@ -47,5 +47,21 @@ next to it:
 | `<name>.exit` | `0` |
 
 Compiled modules go to `target/tmp/e2e/` and import `@flick-lang/runtime`
-from the workspace. Until the real codegen (M7) the cases use the bootstrap
+from the workspace. Until code generation from the typed IR exists the cases use the bootstrap
 subset described in `flick-core/src/bootstrap.rs`.
+
+## Syntax corpus and fuzzing — `flick-core/tests/{corpus,fuzz}.rs`
+
+- Every ```` ```flick ```` block of the specification and of `docs/` must parse
+  without diagnostics. Spec examples are pinned by fingerprint in
+  `tests/syntax/spec_examples.txt`: a new or edited example fails the test
+  until its parse is reviewed and the printed line is added there.
+- Every `.fl` file under `tests/` and every doc block must round-trip through
+  the lossless tree byte for byte; those without diagnostics must format
+  idempotently, and the formatter re-checks that the AST is unchanged.
+- `fuzz.rs` mutates the corpus and asserts that the parser does not panic or
+  hang, stays lossless and keeps spans in bounds. `FLICK_FUZZ_ITERATIONS`
+  sets the number of inputs: 20 000 in `just check`, 1 000 000 in the nightly
+  CI job (`just fuzz`).
+- `DUMP=out.txt [DUMP_FILE=x.fl] cargo test -p flick-core --test corpus dump -- --ignored`
+  writes the trees of the spec examples (or of one file) for inspection.

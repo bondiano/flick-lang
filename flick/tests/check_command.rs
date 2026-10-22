@@ -1,47 +1,6 @@
-use std::process::{Command, Output};
+mod common;
 
-fn flick(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_flick"))
-        .args(args)
-        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/.."))
-        .env_remove("NO_COLOR")
-        .output()
-        .expect("flick runs")
-}
-
-fn stdout(args: &[&str]) -> String {
-    let out = flick(args);
-    assert!(out.status.success(), "{args:?} failed: {out:?}");
-    String::from_utf8(out.stdout).expect("utf-8 stdout")
-}
-
-#[test]
-fn version() {
-    insta::assert_snapshot!(stdout(&["--version"]), @"flick 0.1.0 (Flick 0.7)");
-}
-
-#[test]
-fn help() {
-    insta::assert_snapshot!(stdout(&["help"]));
-    assert_eq!(stdout(&["--help"]), stdout(&["help"]));
-}
-
-#[test]
-fn help_check() {
-    insta::assert_snapshot!(stdout(&["help", "check"]));
-}
-
-#[test]
-fn bad_invocation_exits_2() {
-    assert_eq!(flick(&["frobnicate"]).status.code(), Some(2));
-    assert_eq!(flick(&["check"]).status.code(), Some(2));
-    assert_eq!(
-        flick(&["--color", "sometimes", "check", "x.fl"])
-            .status
-            .code(),
-        Some(2)
-    );
-}
+use common::flick;
 
 #[test]
 fn check_exit_codes_and_json_stream() {
@@ -53,7 +12,7 @@ fn check_exit_codes_and_json_stream() {
         "check",
         "--diagnostics",
         "json",
-        "tests/check/fail/bootstrap/unsupported_expr.fl",
+        "tests/check/fail/syntax/other_languages.fl",
         "missing.fl",
     ]);
     assert_eq!(out.status.code(), Some(1));
@@ -70,13 +29,13 @@ fn check_exit_codes_and_json_stream() {
         .collect();
     assert_eq!(
         codes,
-        ["FLICK-S002", "FLICK-S002", "FLICK-S002", "FLICK-P001"]
+        ["FLICK-S010", "FLICK-S010", "FLICK-S010", "FLICK-P001"]
     );
 }
 
 #[test]
 fn color_flag_controls_ansi() {
-    let path = "tests/check/fail/bootstrap/bad_signature.fl";
+    let path = "tests/check/fail/syntax/recovery.fl";
     let always = flick(&["check", "--color", "always", path]).stderr;
     let never = flick(&["check", "--color", "never", path]).stderr;
     // piped stderr is not a terminal, so `auto` means no color

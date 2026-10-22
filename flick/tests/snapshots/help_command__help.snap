@@ -1,5 +1,5 @@
 ---
-source: flick/tests/cli.rs
+source: flick/tests/help_command.rs
 expression: "stdout(&[\"help\"])"
 ---
 The Flick compiler and toolchain
@@ -8,6 +8,7 @@ Usage: flick [OPTIONS] <COMMAND>
 
 Commands:
   check  Check Flick source files and report diagnostics
+  fmt    Format Flick source files in place
   help   Print this message or the help of the given subcommand(s)
 
 Options:

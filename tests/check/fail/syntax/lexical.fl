@@ -1,0 +1,27 @@
+module App.Lexical exposing (..)
+
+let at = user@name
+
+let escape = "bad \q escape"
+
+let surrogate = "\u{D800}"
+
+let octal = 010
+
+let separator = 1__000
+
+let trailing_dot = 5.
+
+let leading_dot = .5
+
+let open_string = "no closing quote
+let after = 1
+
+//~ FLICK-S003 @3:14-3:15 unexpected character `@`
+//~ FLICK-S005 @5:19-5:21 unknown escape sequence
+//~ FLICK-S005 @7:18-7:26 `\u{…}` must be a Unicode scalar value (no surrogates, at most 10FFFF)
+//~ FLICK-S006 @9:13-9:16 a decimal number cannot have a leading zero (legacy octal is not supported
+//~ FLICK-S006 @11:18-11:19 `_` separates two digits
+//~ FLICK-S006 @13:20-13:22 a number cannot end with `.`
+//~ FLICK-S006 @15:19-15:21 a number cannot start with `.`
+//~ FLICK-S004 @17:19-17:20 unterminated string

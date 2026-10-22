@@ -1,0 +1,12 @@
+module App.Ffi exposing (..)
+
+read_text : Path ->{none; FsError} String
+foreign async read_text from "./fs.js" "readText"
+  arity 1
+  retry 3
+
+parse : String -> Number
+foreign quick parse from global "Number.parseFloat"
+
+//~ FLICK-S011 @6:3-6:8 unknown foreign metadata `retry`
+//~ FLICK-S007 @9:9-9:14 expected a foreign mode

@@ -35,7 +35,7 @@ fn run_case(case: &Path, out_dir: &Path) -> Option<String> {
         case.display().to_string(),
         fs::read_to_string(case).expect("UTF-8 case"),
     );
-    // shortcut: calls the bootstrap codegen directly; switch to `flick build` in M7
+    // shortcut: calls the bootstrap codegen directly; switch to `flick build` once it emits ESM
     let js = match flick_core::bootstrap::compile(&sources, file) {
         Ok(js) => js,
         Err(diagnostics) => {

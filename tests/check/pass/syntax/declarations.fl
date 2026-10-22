@@ -1,0 +1,109 @@
+/// Every declaration form of the first version.
+module App.Shapes exposing (Shape(..), area, Nullability, ..)
+
+import App.Domain exposing (User, UserId, Shape(..))
+import Effect.Log as Log
+import Effect.Platform
+
+/* block comments /* nest */ too */
+type Point = { x : Number; y : Number }
+
+type Pair a b = (a, b)
+
+type Shape =
+  | Circle of Point, Number
+  | Rect of { origin : Point; size : Point }
+  | Empty
+  deriving Eq, Show
+
+type Option a = None | Some of a
+
+type Wrapped (f : Type -> Type) a = {
+  value : f a
+} deriving Schema
+
+opaque type UserId = String
+
+refined type Port = Number where fun n -> n > 0 && n < 65536
+  deriving Eq, Hash
+
+kind Nullability = NonNull | Nullable
+
+error NotFound of UserId
+
+error Timeout
+
+error AppError of { message : String; details : Option String }
+  deriving Show
+
+service Users =
+  get : UserId ->{none; NotFound} User
+  list : Unit ->{} List User
+
+class Show a =
+  val show : a -> String
+
+class Eq a => Hash a =
+  val hash : a -> Number
+
+class Collection c a | c -> a, a c -> a =
+  type Item c
+  val empty : c
+
+class Functor (f : Type -> Type) =
+  val map : (a -> b) -> f a -> f b
+
+instance Show Shape =
+  show : Shape -> String
+  let show shape =
+    match shape with
+    | Circle _ r -> "circle " ++ Number.to_string r
+    | Rect _ -> "rect"
+    | Empty -> "empty"
+
+instance Show a => Show (List a) =
+  show : List a -> String
+  let show items = String.join ", " (List.map show items)
+
+instance Functor (Eff r e) =
+  map : (a -> b) -> Eff r e a -> Eff r e b
+  let map f eff = Eff.map f eff
+
+hypot : Number -> Number -> Number
+foreign pure hypot from global "Math.hypot"
+  arity 2
+
+now : Unit ->{} Number
+foreign sync now from global "Date.now"
+  arity 0
+
+read_text : Path ->{none; FsError} String
+foreign async read_text from "./fs.js" "readText"
+  arity 1
+  catch FsError.from_js
+  cancel signal
+
+push : Array a -> a ->{} Unit
+foreign sync push from "./array.js" "push"
+  this
+  arity 1
+  nullable result
+  retention call
+
+fetch_user : UserId ->{Http; HttpError} User
+foreign effect fetch_user from "./users.js" "fetchUser"
+
+rec {
+  is_even : Number -> Bool
+  let is_even n = if n == 0 then true else is_odd (n - 1)
+
+  is_odd : Number -> Bool
+  let is_odd n = if n == 0 then false else is_even (n - 1)
+}
+
+area : Shape -> Number
+let area shape =
+  match shape with
+  | Circle _ r -> Number.pi * r ** 2
+  | Rect { origin = _; size } -> size.x * size.y
+  | Empty -> 0

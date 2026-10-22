@@ -1,0 +1,23 @@
+module App.Layout exposing (..)
+
+let over_indented x =
+  let a = 1
+    let b = 2
+  a
+
+let between_columns x =
+  match x with
+  | A ->
+      foo
+     bar
+  | B -> 0
+
+let missing_body x =
+x
+
+let still_checked = (1, 2
+
+//~ FLICK-S009 @5:5-5:8 unexpected indentation
+//~ FLICK-S009 @12:6-12:9 unexpected indentation
+//~ FLICK-S009 @15:21-15:21 expected an indented block on the next line
+//~ FLICK-S008 @18:26-18:26 expected `)` to close `(`, found end of file

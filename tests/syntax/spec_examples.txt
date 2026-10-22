@@ -1,0 +1,56 @@
+# Fingerprints of the ```flick blocks of the spec, checked by flick-core/tests/corpus.rs.
+# A new or edited example fails the test until its parse is reviewed and its line added.
+cfd4deeeb00ff9b0  spec:67  load_name : UserId ->{Users, Log; NotFound} String
+593814cb393c3a84  spec:102  render : Show a => a -> String
+0e0762aff3749216  spec:124  greet : String -> String -> String
+6c70dbf125707c4a  spec:153  load_user : UserId ->{Users; NotFound} User
+1f4fb3d7472f358e  spec:173  load_twice :
+5490665b39c55003  spec:213  load_name_pair : UserId -> UserId ->{Users; NotFound} (String, String)
+1f2ae7a4782d6276  spec:265  class Functor (f : Type -> Type) =
+05343b19316b5976  spec:288  class Show a =
+872c8247235efbb4  spec:344  apply_twice :
+74a14e74a12990e3  spec:358  decode_pair :
+9bdd6c03c6da66f8  spec:384  name :
+225a7931d4dfe725  spec:414  class Show a =
+7108583611b7322d  spec:438  class Convert input output =
+635518d6366fa451  spec:463  class Collection c a | c -> a =
+c18064c876fe3adf  spec:473  empty_users : UserSet
+06204ee7821953f9  spec:491  class Collection c =
+96521dc43251fb41  spec:549  type LocalExternalId =
+1336bb8a8a86841e  spec:570  invalid : Unit ->{} String
+8e5624e4a3c33f25  spec:591  make_empty : forall a. Unit ->{} Ref (Option a)
+ac73e7b4530d3617  spec:610  make_identity : Unit -> (a -> a)
+ce831b060f823d82  spec:624  fresh_cell : forall a. Eff none none (Ref (Option a))
+659dd5e1c7324273  spec:639  capture_cell : Ref (Option a) -> Eff none none (Ref (Option a))
+f42159967b1e64b5  spec:649  logged_none : Unit ->{Log; none} Option a
+5e483a0a0ce484e8  spec:705  normalize_names : List String -> List String
+7644f905482ebdd8  spec:744  pair_optional : Option a -> Option b -> Option (a, b)
+80b4ce47ff663b32  spec:767  error NotFound of UserId
+234a19d9938bb3aa  spec:800  service Clock =
+db871b0a6a9f20ec  spec:826  application : UserId ->{Config, Log; NotFound, ConnectError} String
+1ffbc35b17ddd5b2  spec:898  error NotFound of UserId
+3731ef4320e94d37  spec:978  read_config :
+b7a55d14d7cfb20d  spec:998  bad_deferred :
+49320955ffe530fe  spec:1012  deferred_read :
+f4218d50c7d041df  spec:1028  bad_callback :
+e8bd3190545a729d  spec:1092  load_pair : UserId -> UserId ->{Users; NotFound} (User, User)
+24f2c1693e734bbf  spec:1138  identity : a -> a
+1d4de52c15fcfbac  spec:1168  with_default : a -> Option a -> a
+31412b59616c9236  spec:1197  type Shape =
+8a5df87e791803f1  spec:1323  lookup : String ->{none; JsError} Option String
+5e67dc2cc65ea215  spec:1356  hypot : Number -> Number -> Number
+410efc85cb82fc5a  spec:1445  on_message : Message ->{Log; none} Unit
+c7457701e10aa513  spec:1569  add : Number -> Number -> Number
+390b567318ca1210  spec:1591  sum_pair : Number -> Number -> Number
+cae11287c7f08577  spec:1719  refined type Email = String where Checks.email
+778a106cf19f87ef  spec:1762  type Preferences = {
+ab61861b5b10fcba  spec:1805  type Tree a =
+70265bd42f7414d7  spec:1900  increment : Ref Number ->{} Number
+14a51fdac9a1f205  spec:1915  class Eq a => Hash a =
+6acf6a9e2a62fec7  spec:2073  type BalanceRow =
+1838791670c05b74  spec:2107  deferred_balances :
+b420c8fcae0853d2  spec:2167  type SaveButtonProps c =
+241cd523f0895a4c  spec:2197  save_button :
+fa6a82c9a0c29820  spec:2235  type SelectProps a r e c =
+4f1eda6ee144286a  spec:2333  module App.Users exposing (User, load_user)
+afa477aca8499142  spec:2555  opaque type UserId = String

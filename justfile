@@ -22,6 +22,11 @@ e2e:
     pnpm install --frozen-lockfile
     pnpm -r test
     cargo test -p flick --test e2e -- --ignored
+    cargo test -p flick-core --test consteval_node -- --ignored
+
+# Mutation-fuzz the parser (the nightly CI job runs 1 000 000 inputs)
+fuzz iterations="1000000":
+    FLICK_FUZZ_ITERATIONS={{iterations}} cargo test --release -p flick-core --test fuzz
 
 # Build the wasm module the in-browser demo loads
 wasm:

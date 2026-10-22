@@ -1,0 +1,20 @@
+---
+source: flick/tests/help_command.rs
+expression: "stdout(&[\"help\", \"fmt\"])"
+---
+Format Flick source files in place
+
+Usage: flick fmt [OPTIONS] [PATHS]...
+
+Arguments:
+  [PATHS]...  Files, or directories to search for `.fl` files
+
+Options:
+      --check                      Only check: exit with 1 if a file is not formatted, write nothing
+      --diagnostics <DIAGNOSTICS>  Format of diagnostics on stderr [default: human] [possible values: human, json]
+      --color <COLOR>              Colorize human-readable output [default: auto] [possible values: auto, always, never]
+      --stdin                      Format source from stdin to stdout (for editors)
+      --quiet                      Print less service output
+      --stdin-filepath <FILE>      Path of the `--stdin` source, used in diagnostics. Requires `--stdin`
+      --verbose                    Print more service output
+  -h, --help                       Print help

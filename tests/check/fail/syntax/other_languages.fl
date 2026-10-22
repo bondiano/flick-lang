@@ -1,0 +1,19 @@
+module App.Legacy exposing (..)
+
+let with_do x =
+  do
+    y <- load x
+    y
+
+let starred x =
+  let* y = load x
+  y
+
+let markup x =
+  <div class="x">x</div>
+
+let fine = 1
+
+//~ FLICK-S010 @4:3-4:5 Flick has no `do` notation
+//~ FLICK-S010 @9:3-9:7 Flick has no `let*` binding operators
+//~ FLICK-S010 @13:3-13:4 Flick has no JSX `<…>`

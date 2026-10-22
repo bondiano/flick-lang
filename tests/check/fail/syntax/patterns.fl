@@ -1,0 +1,19 @@
+module App.Patterns exposing (..)
+
+let f shape =
+  match shape with
+  | Square side | Circle radius -> side
+  | Rect w w -> w
+  | Pair (Some x | None) _ -> x
+  | _ when -> 0
+
+let g x x = x
+
+let h = fun (a, a) -> a
+
+//~ FLICK-S012 @5:19-5:32 every alternative of an or-pattern must bind the same names
+//~ FLICK-S012 @6:12-6:13 `w` is bound more than once in the same pattern
+//~ FLICK-S012 @7:20-7:24 every alternative of an or-pattern must bind the same names
+//~ FLICK-S007 @8:12-8:14 expected an expression, found `->`
+//~ FLICK-S012 @10:9-10:10 `x` is bound more than once in the same pattern
+//~ FLICK-S012 @12:17-12:18 `a` is bound more than once in the same pattern
