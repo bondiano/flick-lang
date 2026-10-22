@@ -56,8 +56,10 @@ struct Loader<'a> {
 #[derive(Default)]
 pub struct Compilation {
     pub modules: Vec<Compiled>,
-    /// Modules from installed packages: the module, its package and interface.
-    pub packages: Vec<(String, String, Interface)>,
+    /// Modules from installed packages: the module, its package, its
+    /// interface and the import specifier of its compiled JS without the
+    /// extension.
+    pub packages: Vec<(String, String, Interface, String)>,
 }
 
 /// A module that checked cleanly, lowered to the IR.
@@ -165,7 +167,11 @@ fn run(
     let packages = loader
         .owners
         .iter()
-        .filter_map(|(m, p)| Some((m.clone(), p.clone(), loader.from_packages.get(m)?.clone())))
+        .filter_map(|(m, p)| {
+            let interface = loader.from_packages.get(m)?.clone();
+            let js = loader.packages.js_specifier(p, &m.replace('.', "/"));
+            Some((m.clone(), p.clone(), interface, js))
+        })
         .collect();
     let compilation = Compilation {
         modules: compiled,

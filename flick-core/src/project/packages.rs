@@ -22,6 +22,8 @@ pub(super) struct Packages {
 struct Package {
     name: String,
     installed: bool,
+    /// The `iface-dir` as written, and resolved.
+    layout: Option<String>,
     iface_dir: Option<PathBuf>,
 }
 
@@ -61,14 +63,39 @@ impl Packages {
             .map(|name| {
                 let dir = root.join("node_modules").join(name);
                 let installed = manifest(host, &dir.join("package.json"), diagnostics);
+                let layout = installed
+                    .as_ref()
+                    .and_then(|m| Some(m.flick.as_ref()?.iface_dir.clone()));
                 Package {
                     name: name.clone(),
                     installed: installed.is_some(),
-                    iface_dir: installed.and_then(|m| Some(dir.join(m.flick?.iface_dir))),
+                    iface_dir: layout.as_ref().map(|l| dir.join(l)),
+                    layout,
                 }
             })
             .collect();
         Packages { packages }
+    }
+
+    /// The import specifier of the compiled JS of module `A.B` of `package`:
+    /// it sits next to its interface, `<package>/<iface-dir>/A/B.js`.
+    pub fn js_specifier(&self, package: &str, file: &str) -> String {
+        let dir = self
+            .packages
+            .iter()
+            .find(|p| p.name == package)
+            .and_then(|p| p.layout.as_deref())
+            .unwrap_or(".");
+        let dir: Vec<&str> = dir
+            .split('/')
+            .filter(|part| !part.is_empty() && *part != ".")
+            .collect();
+        [package]
+            .into_iter()
+            .chain(dir)
+            .chain([file])
+            .collect::<Vec<_>>()
+            .join("/")
     }
 
     /// Declared dependencies missing from `node_modules`.

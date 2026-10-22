@@ -164,11 +164,15 @@ pub fn expr(e: &Expr) -> String {
         ExprKind::Ignore(e) => format!("(ignore {})", expr(e)),
         ExprKind::Await(e) => format!("(await {})", expr(e)),
         ExprKind::Task(e) => format!("(task {})", expr(e)),
-        ExprKind::Scope(owner, e) => format!(
-            "(scope{} {})",
+        ExprKind::Scope { owner, outer, body } => format!(
+            "(scope{}{} {})",
             owner.as_ref().map_or(String::new(), |o| format!(" {o}")),
-            expr(e)
+            outer
+                .as_ref()
+                .map_or(String::new(), |o| format!(" outer {o}")),
+            expr(body)
         ),
+        ExprKind::Within(owner, e) => format!("(within {owner} {})", expr(e)),
         ExprKind::Provide(l, e) => format!("(provide {} {})", expr(l), expr(e)),
         ExprKind::Lift(e, l) => format!("(lift{} {})", lift(l), expr(e)),
     }

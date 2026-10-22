@@ -1,0 +1,158 @@
+//! `scope` expressions and the calls that acquire into their owners.
+
+use std::mem;
+
+use super::{Need, SCOPE, Scope};
+use crate::source::Span;
+use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
+use crate::types::Checker;
+use crate::types::convert::TyVar;
+use crate::types::kinds::Kind;
+use crate::types::ty::{Row, Type};
+use crate::types::typing::range;
+
+impl Checker<'_> {
+    /// `scope [s] { body }`: the body runs with a fresh region as the owner
+    /// of what it acquires, which is released when the body ends. A named
+    /// scope binds `s` as the region in types and as its owner in values.
+    pub fn scope_expr(&mut self, node: &Node, expected: Option<&Type>) -> Type {
+        let span = node
+            .child_tokens()
+            .find(|t| t.kind == K::ScopeKw)
+            .map_or_else(|| self.span(node), |t| self.token_span(t));
+        let empty = Type::empty_row();
+        self.perform(&empty, &empty, span);
+        let name = node.child_tokens().find(|t| t.kind == K::Ident);
+        self.store.level += 1;
+        let region = self.store.skolem(name.map_or("s", |n| n.text(self.text)));
+        let Type::Skolem(id) = region else {
+            unreachable!("a skolem")
+        };
+        self.regions.scopes.push(Scope {
+            region: id,
+            span,
+            node: node.range(),
+            outer: self.stage.services.clone(),
+            parent: self.regions.open.last().copied(),
+        });
+        let index = self.regions.scopes.len() - 1;
+        self.regions.open.push(index);
+        let (locals, tyvars) = (self.locals.len(), self.tyvars.len());
+        if let Some(name) = name {
+            let name = name.text(self.text);
+            self.tyvars.push(TyVar {
+                name: name.to_owned(),
+                ty: region.clone(),
+                kind: Kind::Region,
+            });
+            let owner = Type::app(Type::con("Fiber", "Owner"), region.clone());
+            self.push_local(name, owner);
+        }
+        let needed = self.fresh();
+        let mut stage = self.stage.clone();
+        stage.services = needed.clone();
+        let outer = mem::replace(&mut self.stage, stage);
+        let body = node.nodes().next();
+        let ty = match (body, expected) {
+            (Some(body), Some(expected)) => {
+                self.check(body, expected);
+                expected.clone()
+            }
+            (Some(body), None) => self.infer(body),
+            (None, _) => Type::Error,
+        };
+        let inner = mem::replace(&mut self.stage, outer);
+        self.stage.calls = inner.calls;
+        if self.stage.pure.is_none() {
+            let outer = self.stage.services.clone();
+            self.scope_row(&needed, &outer, &region, span);
+        }
+        self.settle_needs(index);
+        self.locals.truncate(locals);
+        self.tyvars.truncate(tyvars);
+        self.regions.open.pop();
+        self.store.level -= 1;
+        if let Err(skolem) = self.store.leave(&ty) {
+            let shown = self.show(&ty);
+            let span = body.map_or(span, |b| self.span(b));
+            let head = format!("the value of this `scope` has type `{shown}`");
+            self.region_escape(skolem, &head, span);
+        }
+        ty
+    }
+
+    /// A call needing `Scope r` inside a `scope`: `r` not known yet is the
+    /// region of the innermost scope. The services the call needs from its stage are the
+    /// result: without `Scope` when a scope of the stage provides it, since
+    /// each scope provides `Scope` of its own region only.
+    pub fn lexical_owner(&mut self, services: &Type, span: Span) -> Type {
+        let Some(&inner) = self.regions.open.last() else {
+            return services.clone();
+        };
+        let mut norm = self.store.normalize(services);
+        let Some(needed) = norm.get(SCOPE).cloned() else {
+            return services.clone();
+        };
+        let open = self
+            .regions
+            .open
+            .iter()
+            .map(|&i| (self.regions.scopes[i].region, self.regions.scopes[i].node))
+            .collect();
+        self.typing
+            .pending_owners
+            .push((range(span), needed.clone(), open));
+        let [region] = needed.spine().1[..] else {
+            return services.clone();
+        };
+        if let Type::Meta(_) = self.store.resolve(region) {
+            let owner = Type::Skolem(self.regions.scopes[inner].region);
+            let _ = self.unify(region, &owner);
+        }
+        let own = self.regions.open[self.stage.scopes.min(self.regions.open.len())..].to_vec();
+        let keep = own.is_empty();
+        self.regions.needs.push(Need {
+            region: region.clone(),
+            inner,
+            own,
+            span,
+            site: self.stage.site,
+        });
+        if keep {
+            return services.clone();
+        }
+        norm.entries.retain(|(label, _)| label != SCOPE);
+        norm.into_type()
+    }
+
+    /// At the end of scope `index`: the needs it is the innermost scope of
+    /// that no scope of their stage provides go to the services around
+    /// those scopes.
+    fn settle_needs(&mut self, index: usize) {
+        let needs: Vec<Need> = self
+            .regions
+            .needs
+            .extract_if(.., |n| n.inner == index)
+            .collect();
+        for need in needs {
+            let Some(&first) = need.own.first() else {
+                continue;
+            };
+            let provided = need.own.iter().any(|&i| {
+                self.store.resolve(&need.region) == Type::Skolem(self.regions.scopes[i].region)
+            });
+            if !provided {
+                let row = Type::Row(Row {
+                    entries: vec![(
+                        SCOPE.to_owned(),
+                        Type::app(Type::prim("Scope"), need.region.clone()),
+                    )],
+                    tail: None,
+                });
+                let outer = self.regions.scopes[first].outer.clone();
+                self.sub_row(&row, &outer, need.site, need.span, false);
+            }
+        }
+    }
+}

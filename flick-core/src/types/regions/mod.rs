@@ -11,21 +11,18 @@
 //! allows none. These constraints are solved with the effect rows, once the
 //! declaration is inferred (see [`solve`]).
 
+mod scopes;
 mod solve;
 
 pub use solve::Outlives;
 
-use std::mem;
-
 use super::Checker;
-use super::convert::TyVar;
 use super::kinds::Kind;
 use super::ty::{Norm, Row, Type, capture_label};
+use super::typing::Range;
 use crate::diagnostics;
 use crate::diagnostics::codes;
 use crate::source::Span;
-use crate::syntax::cst::Node;
-use crate::syntax::kind::SyntaxKind as K;
 
 /// The service a `scope` provides to the operations that acquire resources.
 pub const SCOPE: &str = "Prelude.Scope";
@@ -42,6 +39,20 @@ pub struct State {
     pub outlives: Vec<solve::Outlives>,
     /// Error rows raised, whose payloads must hold no region.
     pub raised: Vec<(Type, Span)>,
+    /// Calls inside a `scope` that need `Scope`, until their innermost
+    /// scope ends.
+    pub needs: Vec<Need>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Need {
+    pub region: Type,
+    /// The innermost scope around the call.
+    pub inner: usize,
+    /// The scopes around the call opened in its stage, outermost first.
+    pub own: Vec<usize>,
+    pub span: Span,
+    pub site: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +60,10 @@ pub struct Scope {
     pub region: u32,
     /// The `scope` keyword.
     pub span: Span,
+    /// The whole `scope` expression.
+    pub node: Range,
+    /// The services of the stage around the scope.
+    pub outer: Type,
     pub parent: Option<usize>,
 }
 
@@ -376,100 +391,6 @@ impl Checker<'_> {
             span,
         });
         self.subsume(&a, &e, span)
-    }
-
-    /// `scope [s] { body }`: the body runs with a fresh region as the owner
-    /// of what it acquires, which is released when the body ends. A named
-    /// scope binds `s` as the region in types and as its owner in values.
-    pub fn scope_expr(&mut self, node: &Node, expected: Option<&Type>) -> Type {
-        let span = node
-            .child_tokens()
-            .find(|t| t.kind == K::ScopeKw)
-            .map_or_else(|| self.span(node), |t| self.token_span(t));
-        let empty = Type::empty_row();
-        self.perform(&empty, &empty, span);
-        let name = node.child_tokens().find(|t| t.kind == K::Ident);
-        self.store.level += 1;
-        let region = self.store.skolem(name.map_or("s", |n| n.text(self.text)));
-        let Type::Skolem(id) = region else {
-            unreachable!("a skolem")
-        };
-        self.regions.scopes.push(Scope {
-            region: id,
-            span,
-            parent: self.regions.open.last().copied(),
-        });
-        self.regions.open.push(self.regions.scopes.len() - 1);
-        let (locals, tyvars) = (self.locals.len(), self.tyvars.len());
-        if let Some(name) = name {
-            let name = name.text(self.text);
-            self.tyvars.push(TyVar {
-                name: name.to_owned(),
-                ty: region.clone(),
-                kind: Kind::Region,
-            });
-            let owner = Type::app(Type::con("Fiber", "Owner"), region.clone());
-            self.push_local(name, owner);
-        }
-        let needed = self.fresh();
-        let mut stage = self.stage.clone();
-        stage.services = needed.clone();
-        let outer = mem::replace(&mut self.stage, stage);
-        let body = node.nodes().next();
-        let ty = match (body, expected) {
-            (Some(body), Some(expected)) => {
-                self.check(body, expected);
-                expected.clone()
-            }
-            (Some(body), None) => self.infer(body),
-            (None, _) => Type::Error,
-        };
-        let inner = mem::replace(&mut self.stage, outer);
-        self.stage.calls = inner.calls;
-        if self.stage.pure.is_none() {
-            let rest = Type::Row(Row {
-                entries: vec![(SCOPE.to_owned(), Type::app(Type::prim("Scope"), region))],
-                tail: Some(Box::new(self.stage.services.clone())),
-            });
-            let site = self.stage.site;
-            self.sub_row(&needed, &rest, site, span, false);
-        }
-        self.locals.truncate(locals);
-        self.tyvars.truncate(tyvars);
-        self.regions.open.pop();
-        self.store.level -= 1;
-        if let Err(skolem) = self.store.leave(&ty) {
-            let shown = self.show(&ty);
-            let span = body.map_or(span, |b| self.span(b));
-            let head = format!("the value of this `scope` has type `{shown}`");
-            self.region_escape(skolem, &head, span);
-        }
-        ty
-    }
-
-    /// A call that needs `Scope r` with `r` unknown gets the region of the
-    /// innermost `scope`, unless the stage itself names one.
-    pub fn lexical_owner(&mut self, services: &Type) {
-        let Some(&inner) = self.regions.open.last() else {
-            return;
-        };
-        let Some(needed) = self.store.normalize(services).get(SCOPE).cloned() else {
-            return;
-        };
-        if self
-            .store
-            .normalize(&self.stage.services)
-            .get(SCOPE)
-            .is_some()
-        {
-            return;
-        }
-        if let [region] = needed.spine().1[..]
-            && let Type::Meta(_) = self.store.resolve(region)
-        {
-            let owner = Type::Skolem(self.regions.scopes[inner].region);
-            let _ = self.unify(region, &owner);
-        }
     }
 
     /// The scope whose region is the skolem `s`.

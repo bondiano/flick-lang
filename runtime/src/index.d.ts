@@ -2,6 +2,7 @@
 // them: `Effect` with its real types, everything else untyped. Every export
 // of index.js is declared here (test/types.test.js checks it).
 export { Effect } from "effect";
+export type { Layer, Option, Result } from "effect";
 
 export declare const APP_ERROR: any;
 export declare const CurrentOwner: any;
@@ -85,3 +86,4 @@ export declare const timeout: any;
 export declare const timeoutOption: any;
 export declare const tryWith: any;
 export declare const withOwner: any;
+export declare const within: any;

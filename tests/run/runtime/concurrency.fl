@@ -1,0 +1,53 @@
+// The concurrency combinators and outcomes of the standard library, as
+// Flick declares them over the runtime.
+module App.Main exposing (main)
+
+sleep : Number ->{} Unit
+foreign async sleep from "./timers.mjs" "sleep"
+
+type error Oops = Oops String
+
+after : Number -> String -> Eff none none String
+let after millis text =
+  task {
+    sleep millis
+    text
+  }
+
+failing : String -> Eff none {Oops} Number
+let failing text = task { from_result (Err (Oops text)) }
+
+describe : Result Oops Number -> String
+let describe result =
+  match result with
+  | Ok n -> show n
+  | Err (Oops text) -> "oops " ++ text
+
+outcome : Exit {Oops} Number -> String
+let outcome exit =
+  match (Exit.value exit, Exit.failure exit) with
+  | (Some n, _) -> show n
+  | (_, Some failure) ->
+    match Failure.primary failure with
+    | Some (Oops text) -> "failed " ++ text
+    | None -> "no typed error"
+  | _ -> "?"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let (a, b) = parallel (after 20 "slow") (after 1 "fast")
+  Platform.stdout_line (a ++ " " ++ b)
+  let all = parallel_all 2 [after 5 "x", after 1 "y", after 3 "z"]
+  Platform.stdout_line (show all)
+  let results = parallel_results [task { 1 }, failing "two", task { 3 }]
+  match results with
+  | [a, b, c] -> Platform.stdout_line (describe a ++ ", " ++ describe b ++ ", " ++ describe c)
+  | _ -> ()
+  match parallel_exits [task { 1 }, failing "exit"] with
+  | [first, second] -> Platform.stdout_line (outcome first ++ ", " ++ outcome second)
+  | _ -> ()
+  Platform.stdout_line (race_first (after 30 "late") (after 1 "early"))
+  let timed = try timeout 5 (after 50 "never") with
+    | TimeoutError -> "timed out"
+  Platform.stdout_line timed
+  Platform.stdout_line (show (timeout_option 50 (after 1 "in time")))

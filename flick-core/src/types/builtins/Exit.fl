@@ -1,0 +1,8 @@
+/// How a computation ended, as `parallel_exits` gives it.
+module Exit exposing (value, failure)
+
+value : Exit e a -> Option a
+foreign pure value from "@flick-lang/runtime" "exitValue"
+
+failure : Exit e a -> Option (Fiber.Failure e)
+foreign pure failure from "@flick-lang/runtime" "exitFailure"

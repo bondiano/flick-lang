@@ -1,0 +1,60 @@
+// Every export of this module has a TypeScript type in `--emit ts`, which
+// `tsc --strict` checks against the generated code.
+module App.Main exposing (..)
+
+type Shape = Circle Number | Rect Number Number
+
+type Tree a = Leaf | Node (Tree a) a (Tree a)
+
+type alias Point = { x : Number; y : Number }
+
+opaque type Token = Token String
+
+type error NotFound = NotFound String
+
+service Users =
+  get : String ->{; NotFound} Point
+
+identity : a -> a
+let identity x = x
+
+area : Shape -> Number
+let area shape =
+  match shape with
+  | Circle r -> r * r
+  | Rect w h -> w * h
+
+origin : Point
+let origin = { x = 0; y = 1 }
+
+empty : List a
+let empty = []
+
+pair : a -> b -> (a, b)
+let pair a b = (a, b)
+
+size : Tree a -> Number
+let rec size tree =
+  match tree with
+  | Leaf -> 0
+  | Node l _ r -> size l + 1 + size r
+
+token : String -> Token
+let token text = Token text
+
+first : List a -> Option a
+let first xs =
+  match xs with
+  | [x] -> Some x
+  | _ -> None
+
+parse : String -> Result NotFound Number
+let parse text = if text == "one" then Ok 1 else Err (NotFound text)
+
+load : String ->{Users; NotFound} Point
+let load id = Users.get id
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (show (area (Rect 2 3) + size (Node Leaf 1 Leaf)))
+  Platform.stdout_line (show (first [origin.y]))

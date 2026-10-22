@@ -184,6 +184,10 @@ A package names the directory of its interfaces in `package.json`, and module
 { "name": "@acme/text", "flick": { "iface-dir": "iface" } }
 ```
 
-`flick build` writes `A/B.iface` next to `A/B.js` in the output directory, so
-the output directory can serve as `iface-dir`; `flick pack` writes the
-`package.json` field. Nobody edits them by hand.
+The compiled module sits next to its interface, and code importing it
+imports `<package>/<iface-dir>/A/B.js`: with the field above, module
+`Text.Shout` of `@acme/text` is `@acme/text/iface/Text/Shout.js`. A package
+that declares `exports` must export that path. `flick build` writes
+`A/B.iface` next to `A/B.js` in the output directory, so the output directory
+serves as `iface-dir`; `flick pack` writes the `package.json` field. Nobody
+edits them by hand.

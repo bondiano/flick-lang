@@ -35,8 +35,10 @@ phases:
 Children and resources are separate groups: a resource acquired after a
 child started is still released after that child ended.
 
-`acquireRelease` registers a finalizer without typed errors with the
-innermost owner; `bracket` releases right after its use and may fail with a
+`acquireRelease` registers a finalizer without typed errors with the owner
+the call runs in: the innermost one, or the owner of an outer `scope` the
+compiler passes with `within` when the call acquires into that scope's
+region; `bracket` releases right after its use and may fail with a
 typed error of its own.
 
 ## Children
@@ -57,6 +59,31 @@ a defect.
 | `parallel_all limit effects` | at most `limit` branches at a time; `limit` must be a positive finite integer, otherwise a defect |
 | `parallel_results effects` | each branch's typed failure as an `Err`; a defect or an interruption stops the group |
 | `parallel_exits effects` | the opaque `Exit` of every branch |
+
+Programs reach them through the Prelude, and outcomes through the modules
+`Exit`, `Failure` and `RawCause`:
+
+```text
+parallel : (Eff r e a)^c -> ((Eff r e b)^c ->{r; e} (a, b))^c
+parallel_all : Number -> List ((Eff r e a)^c) ->{r; e} List a
+parallel_results : List ((Eff r e a)^c) ->{r; none} List (Result (Errors e) a)
+parallel_exits : List ((Eff r e a)^c) ->{r; none} List (Exit e a)
+race_success : (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
+race_first : (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
+timeout : Number -> (Eff r e a)^c ->{r; TimeoutError | e} a
+timeout_option : Number -> (Eff r e a)^c ->{r; e} Option a
+
+Exit.value : Exit e a -> Option a
+Exit.failure : Exit e a -> Option (Fiber.Failure e)
+Failure.primary : Fiber.Failure e -> Option (Errors e)
+Failure.raw_cause : Fiber.Failure e -> RawCause
+Failure.inspect : Fiber.Failure e ->{} CauseReport
+Failure.rethrow : Fiber.Failure e ->{; e} a
+RawCause.inspect : RawCause ->{} CauseReport
+```
+
+A task may hold what the caller's scopes own (`^c`): the combinators run it
+before they return.
 
 On a failure no new branch starts, the running branches are interrupted and
 awaited, and the result keeps the failures observed so far.

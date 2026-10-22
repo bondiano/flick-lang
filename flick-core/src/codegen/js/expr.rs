@@ -135,23 +135,19 @@ impl Gen<'_> {
                 "undefined".to_owned()
             }
             ExprKind::Await(inner) => {
+                let owner = self.owner.take();
                 let v = self.expr(inner);
-                format!("(yield* {v})")
+                self.run(owner, &v)
             }
             ExprKind::Task(body) => self.gen_block(body),
-            ExprKind::Scope(owner, body) => {
-                let owner = owner.as_deref().map_or("$_".to_owned(), names::ident);
-                let body = self.gen_block(body);
-                let scope = self.rt("scope");
-                format!("(yield* {scope}({} {body}))", self.arrow(&owner))
+            ExprKind::Scope { owner, outer, body } => {
+                self.scope(owner.as_deref(), outer.as_deref(), body)
             }
-            ExprKind::Provide(layer, body) => {
-                let layer = self.expr(layer);
-                let layer = self.spill(layer);
-                let body = self.gen_block(body);
-                let provide = self.rt("provide");
-                format!("(yield* {provide}({layer}, {body}))")
+            ExprKind::Within(owner, call) => {
+                self.owner = Some(names::ident(owner));
+                self.expr(call)
             }
+            ExprKind::Provide(layer, body) => self.provide(layer, body),
             ExprKind::Lift(inner, lift) => {
                 let v = self.expr(inner);
                 let f = self.lift(lift);
@@ -161,6 +157,7 @@ impl Gen<'_> {
     }
 
     fn app(&mut self, e: &Expr, func: &Expr, arg: &Expr, runtime: bool, arg_first: bool) -> String {
+        let owner = self.owner.take();
         let (f, a) = if arg_first {
             let a = self.expr(arg);
             let a = self.spill(a);
@@ -178,10 +175,37 @@ impl Gen<'_> {
         let call = format!("{}{f}({a})", self.mark(e.span));
         if runtime {
             assert!(self.generator, "a runtime call runs inside a runtime stage");
-            format!("(yield* {call})")
+            self.run(owner, &call)
         } else {
             call
         }
+    }
+
+    /// `yield*` of the effect `js`, in `owner` when a `Within` gave one.
+    fn run(&mut self, owner: Option<String>, js: &str) -> String {
+        match owner {
+            Some(owner) => format!("(yield* {}({owner}, {js}))", self.rt("within")),
+            None => format!("(yield* {js})"),
+        }
+    }
+
+    fn provide(&mut self, layer: &Expr, body: &Expr) -> String {
+        let layer = self.expr(layer);
+        let layer = self.spill(layer);
+        let body = self.gen_block(body);
+        let provide = self.rt("provide");
+        format!("(yield* {provide}({layer}, {body}))")
+    }
+
+    fn scope(&mut self, owner: Option<&str>, outer: Option<&str>, body: &Expr) -> String {
+        let owner = owner.map_or("$_".to_owned(), names::ident);
+        let params = match outer {
+            Some(outer) => format!("{owner}, {}", names::ident(outer)),
+            None => owner,
+        };
+        let body = self.gen_block(body);
+        let scope = self.rt("scope");
+        format!("(yield* {scope}({} {body}))", self.arrow(&params))
     }
 
     /// A value that takes the dictionaries `shown` before it is computed.

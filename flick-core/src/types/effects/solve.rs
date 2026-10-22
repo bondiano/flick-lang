@@ -3,12 +3,10 @@
 //! unknown at the end is the empty row, the least solution. Then every
 //! constraint either holds or names what its bound lacks.
 
-use std::mem;
-
 use super::Site;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
-use crate::types::ty::{Row, Type};
+use crate::types::ty::{Norm, Row, Type};
 use crate::types::{Checker, regions};
 
 /// The row `actual` of a call must be part of `declared`.
@@ -20,6 +18,11 @@ pub struct SubRow {
     pub span: Span,
     /// An error row; a service row otherwise.
     pub errors: bool,
+    /// For the body of a `scope`: its region, whose `Scope` the scope
+    /// provides. `Scope` of another region passes on to `declared`, the
+    /// services around the scope; one of a region not known yet is the
+    /// scope's own.
+    pub provides: Option<Type>,
 }
 
 /// What one bound lacks.
@@ -42,10 +45,31 @@ impl Checker<'_> {
         }
     }
 
+    /// The actual row of constraint `i` without what its scope provides.
+    fn actual(&mut self, i: usize) -> Norm {
+        let mut actual = self.store.normalize(&self.subrows[i].actual);
+        let Some(region) = self.subrows[i].provides.clone() else {
+            return actual;
+        };
+        let Some(scope) = actual.get(regions::SCOPE).cloned() else {
+            return actual;
+        };
+        if let [owner] = scope.spine().1[..] {
+            let owner = owner.clone();
+            if let Type::Meta(_) = self.store.resolve(&owner) {
+                let _ = self.unify(&owner, &region);
+            }
+            if self.store.resolve(&owner) == self.store.resolve(&region) {
+                actual.entries.retain(|(label, _)| label != regions::SCOPE);
+            }
+        }
+        actual
+    }
+
     /// Adds to the declared row of constraint `i` one label or row variable
     /// it lacks, if that row is open; `true` when it did.
     fn grow_one(&mut self, i: usize) -> bool {
-        let actual = self.store.normalize(&self.subrows[i].actual);
+        let actual = self.actual(i);
         let declared = self.store.normalize(&self.subrows[i].declared);
         let open = declared.tails.iter().find_map(|t| match t {
             Type::Meta(m) => Some(*m),
@@ -138,8 +162,9 @@ impl Checker<'_> {
 
     fn report_rows(&mut self) {
         let mut excess: Vec<Excess> = Vec::new();
-        for c in mem::take(&mut self.subrows) {
-            let actual = self.store.normalize(&c.actual);
+        for i in 0..self.subrows.len() {
+            let actual = self.actual(i);
+            let c = self.subrows[i].clone();
             let declared = self.store.normalize(&c.declared);
             let mut lacking = Vec::new();
             for (label, ty) in &actual.entries {
@@ -184,6 +209,7 @@ impl Checker<'_> {
                 }
             }
         }
+        self.subrows.clear();
         for e in excess {
             self.report_excess(&e);
         }

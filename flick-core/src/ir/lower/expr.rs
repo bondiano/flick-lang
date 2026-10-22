@@ -6,7 +6,7 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
-use crate::types::{Dict, Ref, is_pattern, let_parts};
+use crate::types::{Dict, Range, Ref, is_pattern, let_parts};
 
 impl Lower<'_> {
     /// An expression with the lift and the dictionaries its position gives it.
@@ -63,7 +63,11 @@ impl Lower<'_> {
                 match node.child_tokens().next().map(|t| t.kind) {
                     Some(K::NotKw) => ExprKind::Not(operand),
                     Some(K::IgnoreKw) => ExprKind::Ignore(operand),
-                    Some(K::AwaitKw) => ExprKind::Await(operand),
+                    Some(K::AwaitKw) => {
+                        let span = self.span(node);
+                        let wait = Expr::new(ExprKind::Await(operand), span);
+                        return self.within(node.range(), wait);
+                    }
                     _ => ExprKind::Neg(operand),
                 }
             }
@@ -96,10 +100,23 @@ impl Lower<'_> {
             K::TaskExpr => ExprKind::Task(self.boxed(children[0])),
             K::ScopeExpr => {
                 let mark = self.scope.len();
-                let owner = self.token_text(node, K::Ident).map(|name| self.bind(&name));
+                let key = node.range();
+                let uses = |outside| {
+                    self.typing
+                        .owners
+                        .values()
+                        .any(|o| o.scope == key && o.outside == outside)
+                };
+                let (inner, outside) = (uses(false), uses(true));
+                let owner = match self.token_text(node, K::Ident) {
+                    Some(name) => Some(self.bind(&name)),
+                    None => inner.then(|| self.hidden("$owner")),
+                };
+                let outer = outside.then(|| self.hidden("$outer"));
+                self.owners.insert(key, (owner.clone(), outer.clone()));
                 let body = self.boxed(children[0]);
                 self.scope.truncate(mark);
-                ExprKind::Scope(owner, body)
+                ExprKind::Scope { owner, outer, body }
             }
             K::ProvideExpr => ExprKind::Provide(self.boxed(children[0]), self.boxed(children[1])),
             _ => {
@@ -191,9 +208,23 @@ impl Lower<'_> {
                 arg_first: false,
             };
             let dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();
-            func = with_dicts(Expr::new(app, span), dicts);
+            func = with_dicts(self.within(key, Expr::new(app, span)), dicts);
         }
         func
+    }
+
+    /// `call`, acquiring into the owner the checker chose for it.
+    fn within(&self, key: Range, call: Expr) -> Expr {
+        let Some(owner) = self.typing.owners.get(&key) else {
+            return call;
+        };
+        let names = &self.owners[&owner.scope];
+        let name = if owner.outside { &names.1 } else { &names.0 };
+        let name = name
+            .clone()
+            .expect("the scope binds the owner a call needs");
+        let span = call.span;
+        Expr::new(ExprKind::Within(name, Box::new(call)), span)
     }
 
     fn binary(&mut self, node: &Node, children: &[&Node]) -> Expr {
@@ -214,7 +245,7 @@ impl Lower<'_> {
                     arg_first: true,
                 };
                 let dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();
-                return with_dicts(Expr::new(app, span), dicts);
+                return with_dicts(self.within(key, Expr::new(app, span)), dicts);
             }
             Some(K::OrOr) => BinOp::Or,
             Some(K::AndAnd) => BinOp::And,

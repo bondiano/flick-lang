@@ -1,0 +1,11 @@
+open inner
+open outer
+open local
+open kept
+keep done
+close local
+inner done
+close kept
+close inner
+outer done
+close outer

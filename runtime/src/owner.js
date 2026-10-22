@@ -62,32 +62,36 @@ export const close = (owner, exit) =>
 
 const resume = (exit) => (Exit.isSuccess(exit) ? Effect.succeed(exit.value) : Effect.failCause(exit.cause));
 
+/** Runs `effect` with `owner` as the owner of what it acquires and spawns. */
+const inside = (owner, effect) =>
+  effect.pipe(
+    Effect.provideService(Scope.Scope, owner.resources),
+    Effect.provideService(CurrentOwner, owner),
+  );
+
 /**
- * Runs `body(owner)` as the owner of a fresh scope, then closes it.
- *
- * shortcut: an acquisition finds its owner as the innermost scope in the
- * context, not the region its `Scope s` names; pass owners explicitly once
- * resource APIs can need an outer named scope.
+ * Runs `body(owner, outer)` as the owner of a fresh scope, then closes it;
+ * `outer` is the owner around it.
  */
 export const withOwner = (body) =>
   Effect.uninterruptibleMask((restore) =>
     Effect.gen(function* () {
+      const outer = yield* Effect.service(CurrentOwner);
       const resources = yield* Scope.make();
       const owner = new Owner(resources);
-      const exit = yield* Effect.exit(
-        restore(
-          body(owner).pipe(
-            Effect.provideService(Scope.Scope, resources),
-            Effect.provideService(CurrentOwner, owner),
-          ),
-        ),
-      );
+      const exit = yield* Effect.exit(restore(inside(owner, body(owner, outer))));
       return yield* resume(yield* close(owner, exit));
     }),
   );
 
-/** `scope [s] { body }`: `body` receives the owner `s`. */
+/** `scope [s] { body }`: `body` receives the owner `s` and the one around it. */
 export const scope = (body) => withOwner(body);
+
+/**
+ * A call that acquires into the owner of a region the compiler chose
+ * lexically: an outer `scope`'s, not the innermost one's.
+ */
+export const within = (owner, effect) => inside(owner, effect);
 
 /** `Fiber e a`: a child spawned into an owner. */
 export class FlickFiber {
@@ -108,12 +112,7 @@ export const fiberSpawn = (owner, supervisor, task) =>
     if (!owner.open) {
       return yield* Effect.die(new Error("the owner is closing: it admits no new children"));
     }
-    const child = yield* Effect.forkDetach(
-      task.pipe(
-        Effect.provideService(Scope.Scope, owner.resources),
-        Effect.provideService(CurrentOwner, owner),
-      ),
-    );
+    const child = yield* Effect.forkDetach(inside(owner, task));
     owner.children.add(child);
     const watcher = yield* Effect.forkDetach(
       Effect.uninterruptible(
@@ -158,7 +157,10 @@ export const foreignAsync = (start) =>
     }),
   );
 
-/** A resource released when its owner closes; `release` has no typed errors. */
+/**
+ * A resource released when the owner the call runs in closes (the compiler
+ * picks it by region); `release` has no typed errors.
+ */
 export const acquireRelease = (acquire, release) =>
   Effect.acquireRelease(acquire, (resource) => release(resource));
 

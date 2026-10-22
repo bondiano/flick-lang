@@ -48,23 +48,23 @@ pub fn emit(compilation: &Compilation, sources: &SourceMap, settings: &Settings)
         compilation
             .packages
             .iter()
-            .find(|(module, _, _)| module == m)
-            .map(|(_, package, interface)| (package.clone(), interface.clone()))
+            .find(|(module, ..)| module == m)
+            .map(|(_, package, interface, js)| (package.clone(), interface.clone(), js.clone()))
     };
     let ext = if settings.typescript { "ts" } else { "js" };
     let is_builtin = |m: &str| types::builtin_sources().iter().any(|(n, _)| *n == m);
     let path = |m: &str| {
         let file = format!("{}.{ext}", m.replace('.', "/"));
         match provider(m) {
-            // shortcut: a package exports its modules at `<package>/<A>/<B>.js`; `flick pack` fixes the layout
-            Some((package, _)) => format!("npm:{package}/{file}"),
+            // a package's module sits next to its interface in `iface-dir`
+            Some((_, _, js)) => format!("npm:{js}.js"),
             None if is_builtin(m) => format!("{BUILTIN_DIR}/{file}"),
             None => file,
         }
     };
     let own = |m: &str| modules.iter().any(|c| c.name == m);
     let package = |m: &str| match provider(m) {
-        Some((package, _)) => Some(package),
+        Some((package, ..)) => Some(package),
         None => own(m)
             .then(|| settings.package.map(str::to_owned))
             .flatten(),
@@ -74,7 +74,7 @@ pub fn emit(compilation: &Compilation, sources: &SourceMap, settings: &Settings)
             .iter()
             .find(|c| c.name == m)
             .map(|c| c.interface.clone())
-            .or_else(|| provider(m).map(|(_, i)| i))
+            .or_else(|| provider(m).map(|(_, i, _)| i))
     };
     let foreign = |module: &str, spec: &str| {
         let relative = spec.starts_with("./") || spec.starts_with("../");
@@ -87,11 +87,15 @@ pub fn emit(compilation: &Compilation, sources: &SourceMap, settings: &Settings)
             _ => spec.to_owned(),
         }
     };
+    let any_interface = |m: &str| {
+        interface_of(m).or_else(|| types::builtins().iter().find(|i| i.module == m).cloned())
+    };
     let options = Options {
         path: &path,
         package: &package,
         foreign: &foreign,
         typescript: settings.typescript,
+        interface: &any_interface,
     };
     let mut out = vec![Artifact {
         path: "package.json".to_owned(),
@@ -235,5 +239,44 @@ mod tests {
         assert_eq!(iface::write(&back), json);
         assert_eq!(iface::fingerprint(&back), iface::fingerprint(&built));
         assert_eq!(built.dependencies["Geo"], iface::fingerprint(&dependency));
+    }
+
+    #[test]
+    fn summaries_see_through_calls_of_total_values() {
+        let (ir, interface) = check_text(
+            "Calc",
+            "module Calc exposing (..)\n\
+             double : Number -> Number\nlet double x = x + x\n\
+             quad : Number -> Number\nlet quad x = double (double x)\n\
+             adder : Number -> Number -> Number\nlet adder a b = a + b\n\
+             add_one : Number -> Number\nlet add_one = adder 1\n\
+             loop : Number -> Number\nlet rec loop x = loop x\n\
+             via_loop : Number -> Number\nlet via_loop x = double (loop x)\n\
+             ratio : Number -> Number\nlet ratio x = x / 2\n",
+        )
+        .expect("checks");
+        let built = super::interface(&ir, &interface, None, &[], &|_| None);
+        let partial: Vec<(String, bool)> = built
+            .abi
+            .expect("abi")
+            .values
+            .into_iter()
+            .map(|s| (s.name, s.partial))
+            .collect();
+        let expected = [
+            ("double", false),
+            ("quad", false),
+            ("adder", false),
+            ("add_one", false),
+            ("loop", true),
+            ("via_loop", true),
+            ("ratio", true),
+        ];
+        for (name, p) in expected {
+            assert!(
+                partial.contains(&(name.to_owned(), p)),
+                "{name}: {partial:?}"
+            );
+        }
     }
 }

@@ -6,10 +6,12 @@
 mod js;
 mod names;
 pub mod sourcemap;
+pub mod ts;
 
 pub use js::js;
 pub use names::{instance as instance_export, tag};
 
+use crate::iface::Interface;
 use crate::source::Span;
 
 /// Where modules are and who owns them, as the build lays them out.
@@ -24,6 +26,9 @@ pub struct Options<'a> {
     pub foreign: &'a dyn Fn(&str, &str) -> String,
     /// Emit TypeScript (`--emit ts`) instead of JavaScript.
     pub typescript: bool,
+    /// The interface of a module, this one included: TypeScript output
+    /// declares the exported types and annotates the exported values.
+    pub interface: &'a dyn Fn(&str) -> Option<Interface>,
 }
 
 /// A compiled module.

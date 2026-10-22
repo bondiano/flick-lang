@@ -45,8 +45,14 @@ pub struct Typing {
     pub foreigns: HashMap<Range, (Vec<bool>, usize)>,
     /// Instances declared or derived in this module.
     pub instances: Vec<InstanceInfo>,
+    /// Runtime calls inside a `scope` that acquire into the owner of another
+    /// region than the innermost scope's.
+    pub owners: HashMap<Range, Owner>,
     /// Pending: uses whose types are known once the module is solved.
     pending_labels: Vec<(Range, Type)>,
+    /// A call needing `Scope r`, with the scopes open around it as regions
+    /// and `scope` expressions, innermost last.
+    pub(super) pending_owners: Vec<(Range, Type, OpenScopes)>,
     pending_dicts: Vec<(Range, u32, Dict)>,
 }
 
@@ -81,6 +87,18 @@ pub struct Constructor {
     pub ty: String,
     pub name: String,
     pub arity: usize,
+}
+
+/// The scopes around a call, as their regions and `scope` expressions,
+/// innermost last.
+pub(super) type OpenScopes = Vec<(u32, Range)>;
+
+/// The owner a call acquires into: that of the `scope` expression `scope`,
+/// or with `outside`, the one around it (a region of the signature).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Owner {
+    pub scope: Range,
+    pub outside: bool,
 }
 
 /// How a pure value becomes the runtime one its position expects.
@@ -202,6 +220,26 @@ impl Checker<'_> {
                 && let Type::Symbol(label) = *arg
             {
                 typing.labels.insert(at, label);
+            }
+        }
+        for (at, needed, open) in mem::take(&mut typing.pending_owners) {
+            let region = match self.zonk(&needed).spine().1[..] {
+                [Type::Skolem(id)] => Some(*id),
+                _ => None,
+            };
+            let owner = match open.iter().position(|(r, _)| Some(*r) == region) {
+                Some(i) if i + 1 == open.len() => None,
+                Some(i) => Some(Owner {
+                    scope: open[i].1,
+                    outside: false,
+                }),
+                None => open.first().map(|(_, scope)| Owner {
+                    scope: *scope,
+                    outside: true,
+                }),
+            };
+            if let Some(owner) = owner {
+                typing.owners.insert(at, owner);
             }
         }
         let mut dicts = mem::take(&mut typing.pending_dicts);

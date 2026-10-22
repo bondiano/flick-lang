@@ -31,6 +31,9 @@ pub struct Stage {
     pub runtime: bool,
     /// Runtime calls so far, to tell whether an argument ran one.
     pub calls: usize,
+    /// How many `scope`s were open when the stage began: those opened
+    /// after it provide `Scope` to its calls.
+    pub scopes: usize,
 }
 
 /// Where the upper bound of a stage comes from, for diagnostics.
@@ -53,6 +56,7 @@ impl Stage {
             site: 0,
             runtime: false,
             calls: 0,
+            scopes: 0,
         }
     }
 }
@@ -74,6 +78,7 @@ impl Checker<'_> {
             site: self.sites.len() - 1,
             runtime: false,
             calls: 0,
+            scopes: self.regions.open.len(),
         }
     }
 
@@ -95,7 +100,7 @@ impl Checker<'_> {
 
     /// Records a runtime call needing `effects` at the current stage.
     pub fn perform(&mut self, services: &Type, errors: &Type, span: Span) {
-        self.lexical_owner(services);
+        let services = &self.lexical_owner(services, span);
         self.regions.raised.push((errors.clone(), span));
         self.runtime = true;
         self.stage.runtime = true;
@@ -133,6 +138,21 @@ impl Checker<'_> {
             site,
             span,
             errors,
+            provides: None,
+        });
+    }
+
+    /// The services `needed` by the body of a `scope` of `region` must be
+    /// `outer`, the services around it, besides `Scope region`.
+    pub fn scope_row(&mut self, needed: &Type, outer: &Type, region: &Type, span: Span) {
+        let site = self.stage.site;
+        self.subrows.push(SubRow {
+            actual: needed.clone(),
+            declared: outer.clone(),
+            site,
+            span,
+            errors: false,
+            provides: Some(region.clone()),
         });
     }
 

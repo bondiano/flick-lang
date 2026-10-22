@@ -46,7 +46,7 @@ pub use env::{Form, Fundep, Instance, Operation, TypeDef};
 pub use kinds::Kind;
 pub use patterns::is_pattern;
 pub use ty::{Binder, Effects, PRELUDE, Row, Type};
-pub use typing::{Constructor, InstanceInfo, Lift, Range, Ref, Typing, passes_dictionary};
+pub use typing::{Constructor, InstanceInfo, Lift, Owner, Range, Ref, Typing, passes_dictionary};
 
 use convert::TyVar;
 use env::Env;

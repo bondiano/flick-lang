@@ -1,0 +1,34 @@
+// A resource is released by the owner of the region its `Scope s` names,
+// which need not be the innermost scope around the call.
+module App.Main exposing (main)
+
+type Res (s : Region)
+
+open_res : forall s. String ->{Scope s;} Res s
+foreign effect open_res from "./resources.mjs" "open"
+
+/// Acquires into the caller's region from inside a scope of its own.
+keep : forall s. String ->{Scope s;} Res s
+let keep name =
+  acquire : Unit ->{Scope s;} Res s
+  let acquire () = open_res name
+  scope {
+    let local = open_res "local"
+    let kept = acquire ()
+    Platform.stdout_line "keep done"
+    kept
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  scope outer {
+    acquire : Unit ->{Scope outer;} Res outer
+    let acquire () = open_res "outer"
+    scope inner {
+      let first = open_res "inner"
+      let second = acquire ()
+      let third = keep "kept"
+      Platform.stdout_line "inner done"
+    }
+    Platform.stdout_line "outer done"
+  }

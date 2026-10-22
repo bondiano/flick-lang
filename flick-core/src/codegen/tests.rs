@@ -11,6 +11,7 @@ fn compile(text: &str) -> String {
         package: &package,
         foreign: &foreign,
         typescript: false,
+        interface: &|_| None,
     };
     js(&ir, &options).code
 }

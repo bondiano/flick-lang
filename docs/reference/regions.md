@@ -20,9 +20,10 @@ let read_config path =
 Each `scope { … }` makes a fresh region, a rigid type that no type outside
 the scope may mention, and the owner of what is acquired inside. An
 operation that acquires a resource of region `s` needs the service
-`Scope s` of `Prelude`; the innermost `scope` provides it, the way `provide`
-provides a service. A function may pass the requirement on to its caller's
-scope by naming it in its signature:
+`Scope s` of `Prelude`, and each `scope` provides `Scope` of its own region
+only, the way `provide` provides a service. A call whose region is not known
+otherwise acquires into the innermost `scope`. A function may pass the
+requirement on to its caller's scope by naming it in its signature:
 
 ```flick
 open_two : forall s. Path ->{FileSystem, Scope s; OpenError} (File s, File s)
@@ -34,6 +35,26 @@ let open_two path =
 owner `s : Fiber.Owner s` in its values. A `scope` is a runtime construct: a
 pure function cannot open one (`FLICK-E001`). A call that needs `Scope s`
 outside every scope and without it in the signature is `FLICK-G004`.
+
+A call needing `Scope s` of an outer region passes through the inner scopes
+to the one that owns `s`, and the resource is released when that scope
+closes. The compiler hands the call its owner lexically: the owner of a
+region is never looked up by whatever scope happens to be innermost when
+the call runs.
+
+```flick
+keep : forall s. Path ->{FileSystem, Scope s; OpenError} File s
+let keep path =
+  acquire : Unit ->{FileSystem, Scope s; OpenError} File s
+  let acquire () = File.open_scoped path
+  scope {
+    let local = File.open_scoped path
+    acquire ()
+  }
+```
+
+Here `local` is released when the inner `scope` ends, and the file `keep`
+returns when the caller's scope does.
 
 ## Captures
 

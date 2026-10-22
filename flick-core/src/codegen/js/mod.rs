@@ -8,11 +8,13 @@ mod function;
 mod items;
 mod pattern;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write;
 use std::mem;
 
+use super::ts::Projection;
 use super::{Options, Output, names};
+use crate::iface::{Interface, Namespace};
 use crate::ir::Module;
 use crate::source::Span;
 use crate::types::Dict;
@@ -35,10 +37,25 @@ pub fn js(module: &Module, options: &Options) -> Output {
         spans: Vec::new(),
         buf: Vec::new(),
         generator: false,
+        owner: None,
         tail: None,
+        annotations: HashMap::new(),
     };
+    let projection = Projection::new(&module.name, options.interface, options.package);
+    let mut declarations = Vec::new();
+    if options.typescript
+        && let Some(interface) = (options.interface)(&module.name)
+    {
+        declarations = projection.declarations(&interface).0;
+        g.annotations = annotations(&projection, &interface);
+    }
     let body = g.items(&module.items);
     let mut code = String::new();
+    if options.typescript {
+        let here = (options.path)(&module.name);
+        let path = |m: &str| relative(&here, &(options.path)(m));
+        code.push_str(&projection.imports(&path));
+    }
     if g.effect {
         let _ = writeln!(code, "import {{ Effect }} from \"{RUNTIME}\";");
     }
@@ -69,6 +86,10 @@ pub fn js(module: &Module, options: &Options) -> Output {
     }
     if !code.is_empty() {
         code.push('\n');
+    }
+    for d in &declarations {
+        code.push_str(d);
+        code.push_str("\n\n");
     }
     code.push_str(&body);
     finish(&code, &g.spans)
@@ -158,7 +179,31 @@ struct Gen<'a> {
     buf: Vec<String>,
     /// Inside the generator of a runtime stage, where `yield*` runs a call.
     generator: bool,
+    /// The owner the next runtime call acquires into, from `Within`.
+    owner: Option<String>,
     tail: Option<Tail>,
+    /// TypeScript types of the exported values, by their JS name.
+    annotations: HashMap<String, String>,
+}
+
+/// The TypeScript type of each exported value and constructor that has
+/// one; the others stay `any`.
+fn annotations(projection: &Projection, interface: &Interface) -> HashMap<String, String> {
+    interface
+        .exports
+        .iter()
+        .filter(|e| {
+            e.entity.module == projection.module
+                && matches!(
+                    e.entity.namespace,
+                    Namespace::Value | Namespace::Constructor
+                )
+        })
+        .filter_map(|e| {
+            let ty = projection.value(e.scheme.as_ref()?).ok()?;
+            Some((names::ident(&e.entity.name), ty))
+        })
+        .collect()
 }
 
 impl Gen<'_> {
@@ -184,6 +229,14 @@ impl Gen<'_> {
     fn constant(&self, name: &str, value: &str) -> String {
         let ty = if self.options.typescript { ": any" } else { "" };
         format!("const {name}{ty} = {value};")
+    }
+
+    /// An exported `const`: in TypeScript with its projected type.
+    fn export(&self, name: &str, value: &str) -> String {
+        match self.annotations.get(name) {
+            Some(ty) => format!("export const {name}: {ty} = {value};"),
+            None => format!("export {}", self.constant(name, value)),
+        }
     }
 
     /// `let` of variables assigned later.

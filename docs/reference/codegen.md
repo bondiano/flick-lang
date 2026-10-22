@@ -80,6 +80,7 @@ constants first.
 | `try body with arms` | `$rt.tryWith(body, handler)`: the arms see the first typed failure of the cause |
 | `provide layer { body }` | `$rt.provide(layer, body)`: the layer is built before the body |
 | `scope [s] { body }` | `$rt.scope((s) => body)`: a lexical owner with a two-phase close, see [runtime.md](runtime.md) |
+| a call acquiring into an outer `scope` | `$rt.within(owner, call)`, the owner of that scope's region |
 | pure self tail call | a loop over the parameters |
 | runtime recursion | through `yield*`, without growing the JS stack |
 
@@ -121,13 +122,30 @@ under `node --enable-source-maps` points at `.fl` lines.
 ## TypeScript
 
 `flick build --emit ts` (or `emit = "ts"` in `flick.toml`) writes the same
-modules as `.ts` files, importing each other with the `.ts` extension. Every
-parameter, result and constant is annotated `any`: the source types live in
-the Flick checker and its `.iface`, not in the generated code, and the typed
-projection for editors is a separate artifact. The output runs as it is on
-Node (type stripping) and passes `tsc --noEmit` with `strict`,
-`allowImportingTsExtensions` and `module: nodenext`. `@flick-lang/runtime`
-ships `index.d.ts` for it.
+modules as `.ts` files, importing each other with the `.ts` extension. Each
+module declares the TypeScript form of the types it exports and annotates its
+exported values with their projected types (§8 "Публичные TypeScript
+интерфейсы"):
+
+| Flick | TypeScript |
+| - | - |
+| `Number`, `String`, `Bool`, `BigInt`, `Unit`, `Never`, `Unknown` | `number`, `string`, `boolean`, `bigint`, `undefined`, `never`, `unknown` |
+| `List a`, `(a, b)`, `{ x : a }` | `ReadonlyArray<A>`, `readonly [A, B]`, `{ readonly x: A }` |
+| `Option a`, `Result e a` | Effect `Option.Option<A>`, `Result.Result<A, E>` |
+| `a -> b` | `(arg: A) => B`, one arrow per stage |
+| `a ->{r; e} b`, `Eff r e a` | `(arg: A) => Effect.Effect<B, E, R>`, `Effect.Effect<A, E, R>`; an empty row is `never` |
+| a variant type, an error | a union of `{ readonly _tag: "<constructor id>"; readonly _0: … }` |
+| an opaque, abstract or built-in nominal type, a service | an interface branded with its qualified name |
+| a class over types | the interface of its dictionary; a constrained value takes it first |
+| `forall a.` | a generic `<A>`; a polymorphic constant uses `never` |
+
+A type TypeScript cannot state faithfully — a higher-kinded variable, a
+region or a value holding one, an open record — has no projection: the export
+stays `any` in `--emit ts`, and `--emit-dts` reports it. Code inside a module
+is annotated `any`: the source types live in the Flick checker and its
+`.iface`. The output runs as it is on Node (type stripping) and passes
+`tsc --noEmit` with `strict`, `allowImportingTsExtensions` and
+`module: nodenext`. `@flick-lang/runtime` ships `index.d.ts` for it.
 
 ## Not compiled yet
 

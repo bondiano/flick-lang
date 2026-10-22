@@ -71,3 +71,64 @@ fn build_reports_what_it_cannot_write() {
     assert_eq!(out.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&out.stderr).contains("FLICK-P013"));
 }
+
+#[test]
+fn a_package_module_is_imported_next_to_its_interface() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("build_package");
+    let _ = fs::remove_dir_all(&dir);
+    let lib = dir.join("lib");
+    fs::create_dir_all(lib.join("src/Text")).expect("dir");
+    fs::write(
+        lib.join("flick.toml"),
+        "schema-version = 1\n\n[project]\nkind = \"lib\"\n",
+    )
+    .expect("write");
+    fs::write(lib.join("package.json"), "{ \"name\": \"@acme/text\" }\n").expect("write");
+    fs::write(
+        lib.join("src/Text/Shout.fl"),
+        "module Text.Shout exposing (shout)\n\nshout : String -> String\nlet shout s = s ++ \"!\"\n",
+    )
+    .expect("write");
+    let out = flick_in(&lib, &["build"]);
+    assert!(out.status.success(), "{out:?}");
+    // the library as installed: its build output is its `iface-dir`
+    let installed = dir.join("app/node_modules/@acme/text");
+    fs::create_dir_all(installed.join("dist/Text")).expect("dir");
+    for file in ["Shout.js", "Shout.iface"] {
+        fs::copy(
+            lib.join("dist/Text").join(file),
+            installed.join("dist/Text").join(file),
+        )
+        .expect("copy");
+    }
+    fs::write(
+        installed.join("package.json"),
+        "{ \"name\": \"@acme/text\", \"flick\": { \"iface-dir\": \"./dist/\" } }\n",
+    )
+    .expect("write");
+    let app = dir.join("app");
+    fs::create_dir_all(app.join("src/App")).expect("dir");
+    fs::write(
+        app.join("flick.toml"),
+        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n",
+    )
+    .expect("write");
+    fs::write(
+        app.join("package.json"),
+        "{ \"name\": \"@acme/app\", \"dependencies\": { \"@acme/text\": \"1.0.0\" } }\n",
+    )
+    .expect("write");
+    fs::write(
+        app.join("src/App/Main.fl"),
+        "module App.Main exposing (main)\n\nimport Text.Shout exposing (shout)\n\nmain : Unit ->{; AppError} Unit\nlet main () =\n  Platform.stdout_line (shout \"hi\")\n",
+    )
+    .expect("write");
+    let out = flick_in(&app, &["build"]);
+    assert!(out.status.success(), "{out:?}");
+    let main = fs::read_to_string(app.join("dist/App/Main.js")).expect("module");
+    assert!(
+        main.contains("from \"@acme/text/dist/Text/Shout.js\""),
+        "{main}"
+    );
+    assert!(installed.join("dist/Text/Shout.js").exists());
+}

@@ -1,0 +1,5 @@
+/// The whole native cause of a failure, which only an inert report shows.
+module RawCause exposing (inspect)
+
+inspect : RawCause ->{} CauseReport
+foreign effect inspect from "@flick-lang/runtime" "rawCauseInspect"

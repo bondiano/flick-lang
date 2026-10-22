@@ -29,6 +29,7 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
         used: HashMap::new(),
         consumed: HashSet::new(),
         reuse: None,
+        owners: HashMap::new(),
         diagnostics: Vec::new(),
     };
     let mut items = Vec::new();
@@ -79,6 +80,9 @@ struct Lower<'a> {
     /// While a later alternative of an or-pattern is lowered: the names
     /// the first one bound.
     reuse: Option<Vec<(String, String)>>,
+    /// Each `scope` some call acquires through: the locals of its owner and
+    /// of the owner around it.
+    owners: HashMap<Range, (Option<String>, Option<String>)>,
     diagnostics: Vec<Diagnostic>,
 }
 
@@ -104,6 +108,13 @@ impl Lower<'_> {
         };
         *count += 1;
         self.scope.push((name.to_owned(), unique.clone()));
+        unique
+    }
+
+    /// A fresh unique name no source name refers to.
+    fn hidden(&mut self, name: &str) -> String {
+        let unique = self.bind(name);
+        self.scope.pop();
         unique
     }
 

@@ -5,7 +5,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use super::expr::arrow_body;
 use super::{Gen, Target, indent, names};
-use crate::ir::{Expr, ExprKind, Foreign, ForeignMode, Item, ItemKind, Stmt};
+use crate::ir::{Expr, ExprKind, Foreign, ForeignMode, Item, ItemKind};
 use crate::types::{Constructor, Dict, InstanceInfo};
 
 impl Gen<'_> {
@@ -33,10 +33,7 @@ impl Gen<'_> {
             ItemKind::Value { name, dicts, body } => {
                 let target = Target::Global(format!("{}.{name}", self.module));
                 let (mut stmts, value) = self.block(|g| g.function(dicts, body, Some(target)));
-                stmts.push(format!(
-                    "export {}",
-                    self.constant(&names::ident(name), &value)
-                ));
+                stmts.push(self.export(&names::ident(name), &value));
                 stmts.join("\n")
             }
             ItemKind::Destructure { pattern, body } => {
@@ -95,14 +92,14 @@ impl Gen<'_> {
         if !dicts.is_empty() {
             body = format!("{} {body}", self.arrow(&dicts.join(", ")));
         }
-        format!("export {}", self.constant(&names::ident(&f.name), &body))
+        self.export(&names::ident(&f.name), &body)
     }
 
     fn constructor_item(&mut self, c: &Constructor) -> String {
         let name = names::ident(&c.name);
         if names::native(c).is_some() {
             let native = self.constructor(c);
-            return format!("export {}", self.constant(&name, &native));
+            return self.export(&name, &native);
         }
         let package = (self.options.package)(&c.module);
         let tag = names::string(&names::tag(c, package.as_deref()));
@@ -115,7 +112,7 @@ impl Gen<'_> {
         for field in fields.iter().rev() {
             value = format!("{} {value}", self.arrow(field));
         }
-        format!("export {}", self.constant(&name, &value))
+        self.export(&name, &value)
     }
 
     fn instance(&mut self, info: &InstanceInfo, methods: &[(String, Expr)]) -> String {
@@ -299,7 +296,6 @@ fn dict_uses(d: &Dict, module: &str, out: &mut BTreeSet<String>) {
 }
 
 fn expr_uses(e: &Expr, module: &str, out: &mut BTreeSet<String>) {
-    let mut each = |e: &Expr| expr_uses(e, module, out);
     match &e.kind {
         ExprKind::Global { module: m, name } if m == module => {
             out.insert(names::ident(name));
@@ -315,60 +311,12 @@ fn expr_uses(e: &Expr, module: &str, out: &mut BTreeSet<String>) {
             }
         }
         ExprKind::Method { dict, .. } => dict_uses(dict, module, out),
-        ExprKind::Dicts(inner, dicts) => {
-            each(inner);
+        ExprKind::Dicts(_, dicts) => {
             for d in dicts {
                 dict_uses(d, module, out);
             }
         }
-        ExprKind::Abstract(_, inner)
-        | ExprKind::Field(inner, _)
-        | ExprKind::Not(inner)
-        | ExprKind::Neg(inner)
-        | ExprKind::Ignore(inner)
-        | ExprKind::Await(inner)
-        | ExprKind::Task(inner)
-        | ExprKind::Scope(_, inner)
-        | ExprKind::Lift(inner, _) => each(inner),
-        ExprKind::App { func, arg, .. } => {
-            each(func);
-            each(arg);
-        }
-        ExprKind::Lambda { body, .. } => each(body),
-        ExprKind::Block(stmts, result) => {
-            for stmt in stmts {
-                match stmt {
-                    Stmt::Let(_, v) | Stmt::Expr(v) | Stmt::Fun { value: v, .. } => each(v),
-                }
-            }
-            each(result);
-        }
-        ExprKind::If(c, t, f) => {
-            each(c);
-            each(t);
-            each(f);
-        }
-        ExprKind::Match(s, arms) | ExprKind::Try(s, arms) => {
-            each(s);
-            for arm in arms {
-                if let Some(g) = &arm.guard {
-                    each(g);
-                }
-                each(&arm.body);
-            }
-        }
-        ExprKind::Tuple(items) | ExprKind::List(items) => items.iter().for_each(each),
-        ExprKind::Record(fields) => fields.iter().for_each(|(_, v)| each(v)),
-        ExprKind::Update(r, fields) => {
-            each(r);
-            for (_, v) in fields {
-                expr_uses(v, module, out);
-            }
-        }
-        ExprKind::Binary(_, l, r) | ExprKind::Provide(l, r) => {
-            each(l);
-            each(r);
-        }
         _ => {}
     }
+    e.each_child(&mut |c| expr_uses(c, module, out));
 }
