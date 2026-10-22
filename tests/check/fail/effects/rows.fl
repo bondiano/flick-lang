@@ -15,7 +15,7 @@ service Log =
   info : String ->{} Unit
 
 service Users =
-  get : UserId ->{none; NotFound} User
+  get : UserId ->{; NotFound} User
 
 narrow : UserId ->{Users; none} String
 let narrow id =
@@ -71,8 +71,8 @@ let no_layer () = provide 1 { 2 }
 type error Failed e = Failed e
 
 service Jobs =
-  count : Number ->{none; Failed Number} Number
-  label : Number ->{none; Failed String} String
+  count : Number ->{; Failed Number} Number
+  label : Number ->{; Failed String} String
 
 mixed : Number ->{Jobs; Failed Number} Number
 let mixed n =

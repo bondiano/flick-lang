@@ -8,7 +8,7 @@ type error ReadError = ReadError String
 
 service FileSystem =
   open_scoped : forall s. String ->{Scope s; OpenError} File s
-  read_all : forall s. File s ->{none; ReadError} String
+  read_all : forall s. File s ->{; ReadError} String
 
 read_later : forall s. File s -> (Eff {FileSystem} {ReadError} String)^{s}
 let read_later file =

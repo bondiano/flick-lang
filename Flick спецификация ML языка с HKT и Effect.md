@@ -200,9 +200,10 @@ let load_twice id =
 | `Unit ->{} a` | Принимает `()`, выполняется через runtime, не требует сервисов и не имеет typed errors |
 | `a ->{Users; none} Unit` | Runtime-вызов требует `Users`, не имеет typed errors и возвращает `()` |
 | `a ->{none; FsError} b` | Runtime-вызов без сервисов с ошибкой `FsError` |
+| `a ->{; FsError} b` | То же: пропущенная сторона стрелки — пустая строка |
 | `Eff none none a` | Сохранённое runtime-вычисление с двумя пустыми строками |
 
-`->{}` — сокращение runtime-стрелки с двумя пустыми строками; оно не сокращается до чистой `->`. `Eff Unit Unit a` отвергается по kinds. Во внутреннем JS/TS-представлении `Unit` соответствует `undefined`, а пустые `E` и `R` — `never`. Публичный TS API может использовать `void` для игнорируемого результата; при входе в язык адаптер нормализует такой результат в `()`.
+В стрелке любую сторону можно не писать: `->{; E}` равно `->{none; E}`, `->{R;}` равно `->{R; none}`. Разделитель `;` обязателен, поэтому `->{E}` — синтаксическая ошибка, а не догадка о том, к какой строке относится `E`. `->{}` — сокращение runtime-стрелки с двумя пустыми строками; оно не сокращается до чистой `->`. `Eff Unit Unit a` отвергается по kinds. Во внутреннем JS/TS-представлении `Unit` соответствует `undefined`, а пустые `E` и `R` — `never`. Публичный TS API может использовать `void` для игнорируемого результата; при входе в язык адаптер нормализует такой результат в `()`.
 
 В [TypeScript](https://www.typescriptlang.org/docs/handbook/2/functions.html) `void` и `undefined` различаются. В [Effect](https://effect.website/docs/v4/getting-started/the-effect-type) отсутствие ожидаемых ошибок и требований обозначается `never` в соответствующих параметрах.
 
@@ -900,7 +901,7 @@ fetch_config :
 Перевод `Result` в typed failure — явная операция библиотеки:
 
 ```text
-from_result : Result (Errors e) a ->{none; e} a
+from_result : Result (Errors e) a ->{; e} a
 ```
 
 Для `Result NotFound User` используется singleton-строка `{NotFound}`. `Result String a` требует сначала преобразовать строку в объявленную номинальную ошибку. Операция не перехватывает defects или interruption. Обычный `try ... with` обрабатывает expected failures, отдельный API `Exit`/`Cause` — полный исход. [Разделение ошибок Effect](https://effect.website/docs/v4/error-management/two-error-types).
@@ -962,7 +963,7 @@ RawCause.inspect :
   RawCause ->{} CauseReport
 
 Failure.rethrow :
-  Failure e ->{none; e} a
+  Failure e ->{; e} a
 ```
 
 Успешный `Exit` содержит `a` и сохраняет captures этого `a`. `Failure.primary` выдаёт только выбранную typed error; `rethrow` восстанавливает исходный Cause с той же `e` либо с её допустимым расширением. Безопасного `RawCause -> Exit e a` для произвольной `e` нет. Операции не могут стирать известные captures. Typed error payloads проверены как region-free; произвольные foreign defects остаются запечатанными.
@@ -1037,7 +1038,7 @@ let deferred_read path =
 
 ```flick
 bad_callback :
-  Path ->{FileSystem; OpenError} (Unit ->{none; ReadError} String)
+  Path ->{FileSystem; OpenError} (Unit ->{; ReadError} String)
 let bad_callback path =
   scope {
     let file = File.open_scoped path
@@ -1065,7 +1066,7 @@ read_later :
 
 scoped_callback :
   forall s.
-  File s -> (Unit ->{none; ReadError} String)^{s}
+  File s -> (Unit ->{; ReadError} String)^{s}
 ```
 
 Это интерфейсные сигнатуры. Локальные captures выводятся; публичные сигнатуры и `.iface` сохраняют их. Захваты проходят через partial application, records, opaque/existential types, dictionaries и `Unknown^{s}`. Передача callback через generic higher-order API требует capture-polymorphic контракта, как у `List.map_effect`. В коротких scoped-примерах имя region опущено в синтаксисе, но сохраняется checker. Mutable storage инвариантно; более долгоживущий Ref/cache не может получить более короткую capability.
@@ -1333,7 +1334,7 @@ export declare function lookup(
 При явно выбранной политике `undefined -> None` и rejection `-> JsError` importer может создать:
 
 ```flick
-lookup : String ->{none; JsError} Option String
+lookup : String ->{; JsError} Option String
 foreign async lookup from "package" "lookup"
   arity 1
   catch JsError.from_js
@@ -1374,7 +1375,7 @@ now_millis : Unit ->{} Number
 foreign sync now_millis from global "Date.now"
   arity 0
 
-read_text : Path ->{none; FsError} String
+read_text : Path ->{; FsError} String
 foreign async read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js
@@ -2358,7 +2359,7 @@ let tool =
 `Cli.run : Cli.Command r e -> List String ->{Platform | r; CliError | e} Unit` разбирает аргументы чистой функцией и только после успешного разбора выполняет handler в текущем fiber. `--help`, `--version` и `--completions bash|zsh|fish` печатают результат в stdout и завершаются без вызова handler. Неверный ввод — неизвестный флаг, отсутствующий обязательный аргумент, значение, которое `Cli.Value` не разобрал, — даёт `type error CliError = CliError String` с текстом для пользователя; handler не запускается.
 
 ```flick
-main : Unit ->{none; AppError} Unit
+main : Unit ->{; AppError} Unit
 let main () =
   provide Platform.live {
     try
@@ -2368,7 +2369,7 @@ let main () =
   }
 ```
 
-Команда остаётся обычным значением: entry point по-прежнему один `main : Unit ->{none; AppError} Unit`, коды выхода и порядок cleanup — общие правила раздела 12. Отмена по SIGINT прерывает handler, и его ресурсы закрываются по контракту owner из раздела 7. Captures проходят через handler так же, как через callbacks UI: команду, handler которой захватил ресурс закрытого scope, нельзя вернуть из этого scope. Интерактивные запросы (`Cli.Prompt`) — обычные эффектные функции внутри handler, а не clauses блока.
+Команда остаётся обычным значением: entry point по-прежнему один `main : Unit ->{; AppError} Unit`, коды выхода и порядок cleanup — общие правила раздела 12. Отмена по SIGINT прерывает handler, и его ресурсы закрываются по контракту owner из раздела 7. Captures проходят через handler так же, как через callbacks UI: команду, handler которой захватил ресурс закрытого scope, нельзя вернуть из этого scope. Интерактивные запросы (`Cli.Prompt`) — обычные эффектные функции внутри handler, а не clauses блока.
 
 ## Что SQL и UI добавляют к проверке дизайна
 
@@ -2437,7 +2438,7 @@ import Effect.Log as Log
 
 Экспорт типа не экспортирует его constructors автоматически; ADT constructors перечисляются явно либо через `Type(..)`. Opaque representation скрыта, re-export сохраняет nominal identity. Instances участвуют в canonical package graph независимо от import order. Межмодульные циклы и first-class/functor modules в первую версию не входят; внутри файла разрешены явно отмеченные recursive function groups и recursive nominal data. Transparent aliases должны быть ацикличны.
 
-Top-level source initialization чистая. ESM — основной output; эффектная загрузка foreign module оформляется runtime-binding, а trusted pure module требует явного контракта. Приложение указывает один `main : Unit ->{none; AppError} Unit`; нужные Layers предоставляются явно внутри него. Platform entry runner вызывает main и наблюдает итоговый Exit. Импорт библиотеки приложение не запускает.
+Top-level source initialization чистая. ESM — основной output; эффектная загрузка foreign module оформляется runtime-binding, а trusted pure module требует явного контракта. Приложение указывает один `main : Unit ->{; AppError} Unit`; нужные Layers предоставляются явно внутри него. Platform entry runner вызывает main и наблюдает итоговый Exit. Импорт библиотеки приложение не запускает.
 
 # 12 CLI Flick
 
@@ -2536,7 +2537,7 @@ schema-aot = false
 
 ## Запуск и безопасный перезапуск
 
-`run` вызывает один внешний platform runner. Тип входа остаётся `main : Unit ->{none; AppError} Unit`; зависимости и Layers предоставляются явно внутри `main`. CLI не превращает каждый прямой вызов или `await` в отдельный запуск runtime. Аргументы командной строки доступны через явное API платформы. Нормальный возврат `Unit`, typed `AppError`, defect и interruption завершают запуск через закрытие его корневого owner; результат команды известен только после cleanup. Тестовый runner соблюдает тот же порядок для каждого теста.
+`run` вызывает один внешний platform runner. Тип входа остаётся `main : Unit ->{; AppError} Unit`; зависимости и Layers предоставляются явно внутри `main`. CLI не превращает каждый прямой вызов или `await` в отдельный запуск runtime. Аргументы командной строки доступны через явное API платформы. Нормальный возврат `Unit`, typed `AppError`, defect и interruption завершают запуск через закрытие его корневого owner; результат команды известен только после cleanup. Тестовый runner соблюдает тот же порядок для каждого теста.
 
 `dev` может проверять и собирать следующую версию, пока работает текущая, сохраняя изоляцию генераций, описанную выше. При ошибке сборки текущая версия продолжает работать. После успешной сборки runner закрывает admission старой версии, запрашивает interruption, ждёт join дочерних fibers и quiescence зарегистрированной foreign work, затем завершает LIFO finalizers. Новая версия запускается только после подтверждённого завершения shutdown; ошибка cleanup останавливает автоматический перезапуск.
 

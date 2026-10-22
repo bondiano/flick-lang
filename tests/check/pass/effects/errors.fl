@@ -11,7 +11,7 @@ type error NotFound = NotFound UserId
 type error DbUnavailable = DbUnavailable String
 
 service Users =
-  get : UserId ->{none; NotFound} User
+  get : UserId ->{; NotFound} User
 
 load_optional : UserId ->{Users; none} Option User
 let load_optional id =
@@ -39,7 +39,7 @@ let any_error id =
   with
   | _ -> "unknown"
 
-db_down : Unit ->{none; DbUnavailable} User
+db_down : Unit ->{; DbUnavailable} User
 let db_down () =
   from_result (Err (DbUnavailable "down"))
 
@@ -59,7 +59,7 @@ let guarded id =
   with
   | NotFound missing when missing > 0 -> None
 
-checked : Result NotFound User ->{none; NotFound} User
+checked : Result NotFound User ->{; NotFound} User
 let checked result =
   from_result result
 
@@ -79,7 +79,7 @@ type error Conflict = Conflict UserId Number
 type error Timeout
 
 service Jobs =
-  run : Number ->{none; Failed String, Timeout} Number
+  run : Number ->{; Failed String, Timeout} Number
 
 run_twice : Number ->{Jobs; Failed String, Timeout} Number
 let run_twice n =
@@ -92,6 +92,15 @@ let recover n =
   with
   | Failed reason -> String.length reason
 
-conflict : UserId -> Number ->{none; Conflict} Unit
+conflict : UserId -> Number ->{; Conflict} Unit
 let conflict id version =
   from_result (Err (Conflict id version))
+
+// an omitted row is empty, so the explicit `none` is the same type
+conflict_again : UserId -> Number ->{none; Conflict} Unit
+let conflict_again id version =
+  conflict id version
+
+load_quietly : UserId ->{Users;} Option User
+let load_quietly id =
+  load_optional id

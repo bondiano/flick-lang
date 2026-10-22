@@ -13,7 +13,7 @@ type error ReadError = ReadError Path
 
 service FileSystem =
   open_scoped : forall s. Path ->{Scope s; OpenError} File s
-  read_all : forall s. File s ->{none; ReadError} String
+  read_all : forall s. File s ->{; ReadError} String
 
 read_config : Path ->{FileSystem; OpenError, ReadError} String
 let read_config path =

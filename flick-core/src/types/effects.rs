@@ -199,7 +199,7 @@ mod tests {
         let text = format!(
             "module Probe exposing (..)\n\
              type error NotFound = NotFound Number\n\
-             service Users =\n  get : Number ->{{none; NotFound}} String\n\
+             service Users =\n  get : Number ->{{; NotFound}} String\n\
              {definition}\n"
         );
         let mut sources = SourceMap::default();

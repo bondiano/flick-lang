@@ -18,7 +18,7 @@ type error Wrapped a = Wrapped a
 
 service FileSystem =
   open_scoped : forall s. Path ->{Scope s; OpenError} File s
-  read_all : forall s. File s ->{none; ReadError} String
+  read_all : forall s. File s ->{; ReadError} String
 
 bad_deferred : Path ->{FileSystem; OpenError} Eff {FileSystem} {ReadError} String
 let bad_deferred path =

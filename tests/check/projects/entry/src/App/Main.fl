@@ -1,4 +1,4 @@
 module App.Main exposing (start)
 
-start : Unit ->{none; AppError} Unit
+start : Unit ->{; AppError} Unit
 let start () = ()

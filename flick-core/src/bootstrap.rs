@@ -9,7 +9,7 @@
 //! ```text
 //! module App.Main exposing (main)
 //!
-//! main : Unit ->{none; AppError} Unit
+//! main : Unit ->{; AppError} Unit
 //! let main () =
 //!   Platform.stdout_line "…"
 //!   Platform.stderr_line "…"
@@ -21,7 +21,7 @@ use crate::source::{FileId, SourceMap, Span};
 
 const HEADER: [&str; 3] = [
     "module App.Main exposing (main)",
-    "main : Unit ->{none; AppError} Unit",
+    "main : Unit ->{; AppError} Unit",
     "let main () =",
 ];
 
@@ -181,7 +181,8 @@ mod tests {
         compile(&sources, file)
     }
 
-    const HEAD: &str = "module App.Main exposing (main)\n\n// c\nmain : Unit ->{none; AppError} Unit\nlet main () =\n";
+    const HEAD: &str =
+        "module App.Main exposing (main)\n\n// c\nmain : Unit ->{; AppError} Unit\nlet main () =\n";
 
     #[test]
     fn compiles_calls_with_escapes() {

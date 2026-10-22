@@ -1,6 +1,6 @@
 module App.Ffi exposing (..)
 
-read_text : Path ->{none; FsError} String
+read_text : Path ->{; FsError} String
 foreign async read_text from "./fs.js" "readText"
   arity 1
   retry 3

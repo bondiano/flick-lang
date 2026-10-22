@@ -104,3 +104,16 @@ fn wraps_nested_pieces_further_and_keeps_unbreakable_lines() {
     );
     assert_eq!(fmt(&once), once);
 }
+
+#[test]
+fn drops_empty_arrow_rows() {
+    let src = "f : A ->{none; E} B\ng : A ->{none /* why */; E} B\nh : A ->{Log; none} B\ni : Eff none none A\nj : A ->{none; none} B\nk : A ->{; none} B\n";
+    insta::assert_snapshot!(fmt(src), @r"
+    f : A ->{; E} B
+    g : A ->{ /* why */ ; E} B
+    h : A ->{Log; none} B
+    i : Eff none none A
+    j : A ->{} B
+    k : A ->{} B
+    ");
+}

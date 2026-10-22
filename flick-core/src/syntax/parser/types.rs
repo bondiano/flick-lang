@@ -66,10 +66,13 @@ fn effect_annot(p: &mut Parser) {
     p.complete(m, K::EffectAnnot);
 }
 
-/// One side of an effect annotation: `none`, `r`, `A, B | r`, `r1 + r2`.
+/// One side of an effect annotation: `none`, `r`, `A, B | r`, `r1 + r2`, or
+/// nothing for an empty row, as in `->{; E}`.
 fn row(p: &mut Parser) {
     let m = p.start();
-    row_items(p);
+    if !matches!(p.current(), K::Semi | K::RBrace) {
+        row_items(p);
+    }
     p.complete(m, K::Row);
 }
 

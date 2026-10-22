@@ -15,7 +15,7 @@ type error Leak (s : Region) = Leak (File s)
 
 service FileSystem =
   open_scoped : forall s. Path ->{Scope s; OpenError} File s
-  read_all : forall s. File s ->{none; ReadError} String
+  read_all : forall s. File s ->{; ReadError} String
 
 with_first :
   forall s. File s -> (Unit ->{FileSystem; ReadError} String)^{s} ->{FileSystem; ReadError} String

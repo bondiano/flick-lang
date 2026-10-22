@@ -8,7 +8,7 @@ type alias User = { id : UserId; name : String }
 type error NotFound = NotFound UserId
 
 service Users =
-  get : UserId ->{none; NotFound} User
+  get : UserId ->{; NotFound} User
 
 find : UserId ->{} User
 let find id =

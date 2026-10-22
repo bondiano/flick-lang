@@ -113,6 +113,11 @@ fn effect_arrow_needs_adjacent_brace() {
          (Row (NameType e)) }) (NameType B)))"
     );
     assert_eq!(
+        sexp("f : A ->{; e} B"),
+        "(Signature f : (ArrowType (NameType A) -> (EffectAnnot { (Row ) ; (Row (NameType e)) }) \
+         (NameType B)))"
+    );
+    assert_eq!(
         sexp("f : A -> { x : B }"),
         "(Signature f : (ArrowType (NameType A) -> (RecordType { (RecordTypeField x : \
          (NameType B)) })))"

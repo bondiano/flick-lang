@@ -1,5 +1,5 @@
 /// Failing an application with a message the entry runner prints.
 module App exposing (fail)
 
-fail : String ->{none; AppError} a
+fail : String ->{; AppError} a
 foreign effect fail from "@flick-lang/runtime" "appFail"

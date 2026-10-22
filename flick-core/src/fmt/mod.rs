@@ -1,7 +1,8 @@
 //! `flick fmt`: rewrites whitespace only — tokens, comments and their order are
-//! kept, so the AST cannot change. Indentation is renormalized to two spaces
-//! per level while preserving how each line's column compares with the
-//! columns before it (that comparison is what layout means), spacing inside a
+//! kept, so the AST cannot change, except that empty rows of an arrow are
+//! dropped: `->{none; E}` becomes `->{; E}` and `->{none; none}` becomes
+//! `->{}`. Indentation is renormalized to two spaces per level while
+//! preserving how each line's column compares with the columns before it (that comparison is what layout means), spacing inside a
 //! line follows fixed rules, and blank-line runs collapse to one. The result is
 //! re-parsed and compared with the input AST before it is returned.
 
@@ -15,10 +16,11 @@ mod wrap;
 
 /// Formats a file; syntax errors are returned instead of output.
 pub fn format(text: &str, file: FileId) -> Result<String, Vec<Diagnostic>> {
-    let parsed = parse(text, file);
+    let mut parsed = parse(text, file);
     if !parsed.diagnostics.is_empty() {
         return Err(parsed.diagnostics);
     }
+    drop_empty_rows(&mut parsed.tree);
     let expected = ast::lower(&parsed.tree, text);
     let same_program = |out: &str| {
         let again = parse(out, file);
@@ -34,6 +36,44 @@ pub fn format(text: &str, file: FileId) -> Result<String, Vec<Diagnostic>> {
         )]);
     }
     Ok(out)
+}
+
+/// Drops empty rows of an arrow: `->{none; E}` becomes `->{; E}` and
+/// `->{none; none}` becomes `->{}`; a row holding a comment is kept.
+fn drop_empty_rows(node: &mut Node) {
+    if node.kind == K::EffectAnnot {
+        let empty = |n: &Node| is_bare_none(n) || n.children.iter().all(is_whitespace);
+        let rows: Vec<&Node> = node.nodes().filter(|n| n.kind == K::Row).collect();
+        if rows.len() == 2 && rows.iter().all(|r| empty(r)) {
+            node.children
+                .retain(|c| matches!(c, Element::Token(t) if t.kind != K::Semi));
+        } else if let Some(Element::Node(services)) = node
+            .children
+            .iter_mut()
+            .find(|c| matches!(c, Element::Node(n) if n.kind == K::Row))
+            && is_bare_none(services)
+        {
+            services.children.clear();
+        }
+    }
+    for child in &mut node.children {
+        if let Element::Node(n) = child {
+            drop_empty_rows(n);
+        }
+    }
+}
+
+fn is_whitespace(element: &Element) -> bool {
+    matches!(element, Element::Token(t) if t.kind == K::Whitespace)
+}
+
+fn is_bare_none(row: &Node) -> bool {
+    let solid = |n: &Node| n.children.iter().filter(|c| !is_whitespace(c)).count() == 1;
+    solid(row)
+        && row
+            .nodes()
+            .next()
+            .is_some_and(|n| n.kind == K::NameType && solid(n) && n.has_token(K::NoneKw))
 }
 
 #[derive(Clone, Copy)]

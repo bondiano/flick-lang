@@ -37,7 +37,7 @@ type error AppError = AppError { message : String; details : Option String }
   deriving Show
 
 service Users =
-  get : UserId ->{none; NotFound} User
+  get : UserId ->{; NotFound} User
   list : Unit ->{} List User
 
 class Show a =
@@ -77,7 +77,7 @@ now : Unit ->{} Number
 foreign sync now from global "Date.now"
   arity 0
 
-read_text : Path ->{none; FsError} String
+read_text : Path ->{; FsError} String
 foreign async read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js

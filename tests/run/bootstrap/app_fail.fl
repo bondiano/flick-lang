@@ -1,7 +1,7 @@
 // A typed AppError stops main and exits with code 1.
 module App.Main exposing (main)
 
-main : Unit ->{none; AppError} Unit
+main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line "before"
   App.fail "config \"port\" is missing"

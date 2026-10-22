@@ -85,7 +85,7 @@ fn ir_makes_stages_dictionaries_and_lifts_explicit() {
         "App",
         "module App exposing (..)\n\
          type error NotFound = NotFound Number\n\
-         service Users =\n  get : Number ->{none; NotFound} String\n\
+         service Users =\n  get : Number ->{; NotFound} String\n\
          type Shape = Circle Number | Square Number\n  deriving Eq\n\
          render : Show a => a -> String\nlet render value = show value\n\
          load : Number ->{Users; none} String\n\

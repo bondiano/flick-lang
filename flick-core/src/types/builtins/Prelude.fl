@@ -63,5 +63,5 @@ let identity value = value
 
 /// Fails with the error of an `Err`: `Result NotFound a` has the error row
 /// `{NotFound}`.
-from_result : Result (Errors e) a ->{none; e} a
+from_result : Result (Errors e) a ->{; e} a
 foreign effect from_result from "@flick-lang/runtime" "fromResult"

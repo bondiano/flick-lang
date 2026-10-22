@@ -16,7 +16,7 @@ service Log =
   info : String ->{} Unit
 
 service Users =
-  get : UserId ->{none; NotFound} User
+  get : UserId ->{; NotFound} User
 
 service Clock =
   now : Unit ->{} Number

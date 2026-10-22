@@ -1,6 +1,6 @@
 module App.Main exposing (main)
 
-main : Unit ->{none; AppError} Unit
+main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line "out 1"
   Platform.stderr_line "err\t1"

@@ -287,7 +287,7 @@ instance Show Shape =
     | Circle _ _ -> "circle"
     | _ -> "other"
 
-read_text : Path ->{none; FsError} String
+read_text : Path ->{; FsError} String
 foreign async read_text from "./fs.js" "readText"
   arity 1
   catch FsError.from_js
@@ -308,7 +308,7 @@ rec {
 type        = "forall" name { name } "." type
             | union "=>" type                  // constraint(s): `Show a =>`, `(Show a, Eq a) =>`
             | union ["->" [effects] type]      // right associative
-effects     = "{" "}" | "{" row ";" row "}"    // written `->{` with no space
+effects     = "{" "}" | "{" [row] ";" [row] "}" // written `->{` with no space
 row         = union { "," union } ["|" union]  // `none`, `r`, `Users, Log | r`
 union       = app { "+" app }                  // row or capture union
 app         = capture { capture }
@@ -323,8 +323,10 @@ atom        = name | Con { "." Con } | "none" | "(" ")" | "(" type ")"
   failing with errors `e`; `a ->{} b` is a runtime call with both rows empty,
   never the same as `->` (§2, §4). `-> {` with a space is an arrow to a record
   type.
-- `none` is the empty row literal. `{Users, Log}` is a closed row, a trailing
-  `| r` opens it.
+- `none` is the empty row literal. An arrow side left out is empty too:
+  `->{; E}` is `->{none; E}`, `->{R;}` is `->{R; none}` (see
+  [effects.md](effects.md#empty-rows-none)). `{Users, Log}` is a closed row, a
+  trailing `| r` opens it.
 - `T^c`, `T^{s}`, `T^(c + d)` qualify a type with the captures it holds; `^`
   binds tighter than application, so `List a^c` is `List (a^c)`.
 - Kinds use the same grammar: `Type`, `Type -> Type`, `ServiceRow`.
@@ -471,7 +473,10 @@ cascade into others in the same statement.
 ## Formatting
 
 `flick fmt` changes only whitespace, so the AST is unchanged (it re-parses its
-output and refuses with `FLICK-P003` otherwise):
+output and refuses with `FLICK-P003` otherwise). It only drops empty
+rows of an arrow, which are the same type: `->{none; E}` becomes `->{; E}` and
+`->{none; none}` becomes `->{}`; `->{R; none}` and `Eff none none a` stay as
+written.
 
 - indentation becomes two spaces per level while keeping every line's column
   relation (shallower, equal, deeper) to the blocks above it;

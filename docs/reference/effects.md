@@ -75,6 +75,61 @@ A runtime arrow and an `Eff` accept a value that needs fewer services and
 errors, and a pure function is accepted where a runtime one is expected (the
 compiler lifts it). A runtime function never passes for a pure one.
 
+## Empty rows: `none`
+
+`none` is the literal of the empty row: no services, or no expected errors
+(§4 "Unit Never и пустые строки"). It fits every row kind, so the same
+`none` is a service row, an error row or a capture row by where it stands.
+Every spelling below is the same closed row with no elements and no tail:
+
+| Written | Where |
+| - | - |
+| `none` | any row position: `->{none; E}`, `Eff none none a`, `Layer none none {Clock}` |
+| nothing | one side of an arrow: `->{; E}` has no services, `->{R;}` no errors |
+| `->{}`, `->{;}` | an arrow with both rows empty |
+| `{}` | a braced row: `Eff {} {} a` |
+
+In an arrow the side before `;` is always the service row and the side after
+it the error row, so `->{; AppError}` and `->{none; AppError}` are one type,
+and `->{AppError}` without `;` is a syntax error, never a guess about which
+row `AppError` belongs to. `flick fmt` writes an empty service row of an
+arrow as nothing, `->{none; E}` becomes `->{; E}`, and an arrow with both rows
+empty as `->{}`. Elsewhere `none` stays, so `->{Log; none}` and
+`Eff none none a` are left as they are.
+
+```flick
+fail : String ->{; AppError} a
+
+log_line : String ->{Log;} Unit
+```
+
+An empty row does not make a call pure. `a ->{} b` is still a runtime arrow:
+it may do IO, keep state, die with a defect or be interrupted, it only asks
+for no services and declares no expected errors. It is not `a -> b`: calling
+it where only pure code runs is `FLICK-E001`, passing it where `a -> b` is
+expected is `FLICK-T003`. A pure arrow has no rows at all, which is not the
+same as two empty ones.
+
+`none` is not a type. It is neither `Unit` (one value), `Never` (no values)
+nor the `None` of `Option`: `x : none` and `none -> Number` are `FLICK-T002`,
+and so is `Eff Unit Unit a`, because `Unit` is a `Type` and not a row. Inside
+a row `none` stands for the whole row, like a row variable: `{Log, none}` is
+`FLICK-T002`, write `{Log}`.
+
+The checker relates `none` to the rest as follows:
+
+- `Errors none` is `Never`; when `Errors e` with an unknown `e` meets
+  `Never`, `e` becomes `none`.
+- A signature is an upper bound, so a body that needs nothing fits any row,
+  and a function with `none` fits wherever more services or errors are
+  allowed.
+- A row the constraints leave unknown at the end of a declaration becomes
+  `none`: an inferred function that calls no service gets an empty service
+  row, not a free row variable.
+- In generated code an empty row is `never` in `Effect<A, E, R>`, as
+  [Effect](https://effect.website/docs/v4/getting-started/the-effect-type)
+  writes a missing requirement or error.
+
 ## `task` and `await`
 
 `task { body }` builds an `Eff r e a` without running it; the calls of the body
@@ -125,7 +180,7 @@ An arm that matches something other than an error is `FLICK-E007`.
 `Result String a` is rejected until the string becomes a declared error:
 
 ```flick
-checked : Result NotFound User ->{none; NotFound} User
+checked : Result NotFound User ->{; NotFound} User
 let checked result =
   from_result result
 ```
@@ -134,7 +189,7 @@ let checked result =
 
 A `service` lists operations with full signatures. Running an operation looks
 the service up, so every operation has a runtime arrow (`FLICK-E006`), and
-`S.op` needs `S` at each of them: with `get : UserId ->{none; NotFound} User`
+`S.op` needs `S` at each of them: with `get : UserId ->{; NotFound} User`
 declared in `Users`, `Users.get` is `UserId ->{Users; NotFound} User`.
 Operations are not class methods: a class method such as `show` needs no
 service.
