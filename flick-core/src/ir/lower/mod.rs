@@ -16,7 +16,9 @@ use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
-use crate::types::{Constructor, Range, Typing, is_type, let_parts};
+use crate::types::{
+    Constructor, Range, Typing, class_defaults, default_method, is_type, let_parts,
+};
 
 /// Lowers `module`, which checked without errors, with what its check recorded.
 pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Diagnostic>> {
@@ -208,6 +210,23 @@ impl Lower<'_> {
                     items.push(Item {
                         kind: ItemKind::Constructor(constructor),
                         span,
+                    });
+                }
+            }
+            K::ClassDecl => {
+                let Some(class) = self.token_text(decl, K::Con) else {
+                    return;
+                };
+                for (method, member) in class_defaults(decl, self.text) {
+                    self.fresh_definition();
+                    let kind = ItemKind::Value {
+                        name: default_method(&class, &method),
+                        dicts: self.givens(member),
+                        body: self.definition(member),
+                    };
+                    items.push(Item {
+                        kind,
+                        span: self.span(member),
                     });
                 }
             }

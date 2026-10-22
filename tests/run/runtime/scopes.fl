@@ -11,10 +11,10 @@ foreign async slow_write from "./resources.mjs" "slowWrite"
 
 type error Oops = Oops String
 
-report : Fiber.Failure {Oops} ->{} Unit
+report : Failure {Oops} ->{} Unit
 let report failure = Platform.stdout_line "supervisor saw a failure"
 
-unexpected : Fiber.Failure none ->{} Unit
+unexpected : Failure none ->{} Unit
 let unexpected failure = Platform.stdout_line "unexpected failure"
 
 worker : Unit ->{none; Oops} Unit

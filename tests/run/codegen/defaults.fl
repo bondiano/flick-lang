@@ -1,0 +1,26 @@
+// A default method in the class body serves instances that do not define
+// it; an instance's own definition replaces it.
+module App.Main exposing (main)
+
+class Pretty a =
+  pretty : a -> String
+  verbose : a -> String
+  let verbose x = "<" ++ pretty x ++ ">"
+  framed : Show b => (a, b) -> String
+  let framed (x, tag) = show tag ++ ": " ++ verbose x
+
+instance Pretty Number =
+  pretty : Number -> String
+  let pretty n = show n
+
+instance Pretty Bool =
+  pretty : Bool -> String
+  let pretty b = if b then "yes" else "no"
+  verbose : Bool -> String
+  let verbose b = "the answer is " ++ pretty b
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (verbose 1)
+  Platform.stdout_line (verbose true)
+  Platform.stdout_line (framed (2, "n"))

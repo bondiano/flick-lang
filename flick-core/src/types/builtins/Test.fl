@@ -1,0 +1,59 @@
+/// Tests. A module of the test root exports `tests : List Test`; `flick test`
+/// runs each test in a scope of its own and reports assertions, typed
+/// failures, defects and failed cleanup apart.
+module Test exposing (..)
+
+type Test
+
+/// The outcome of a check.
+type Assertion = Pass | Failed String
+
+/// An assertion that failed inside an effectful test.
+type error AssertionFailed = AssertionFailed String
+  deriving Eq, Show
+
+equal : (Eq a, Show a) => a -> a -> Assertion
+let equal expected actual =
+  if eq expected actual then
+    Pass
+  else
+    Failed ("expected " ++ show expected ++ ", got " ++ show actual)
+
+/// `Pass` when `condition` holds, otherwise `Failed message`.
+is_true : String -> Bool -> Assertion
+let is_true message condition = if condition then Pass else Failed message
+
+/// The first failed assertion, or `Pass`.
+all : List Assertion -> Assertion
+let all assertions =
+  List.fold_left
+    (fun outcome a ->
+      match outcome with
+      | Pass -> a
+      | Failed _ -> outcome)
+    Pass
+    assertions
+
+/// Fails the effectful test when the assertion failed.
+expect : Assertion ->{; AssertionFailed} Unit
+let expect assertion =
+  match assertion with
+  | Pass -> ()
+  | Failed message -> from_result (Err (AssertionFailed message))
+
+/// A pure test.
+test : String -> (Unit -> Assertion) -> Test
+foreign pure test from "@flick-lang/runtime" "testPure"
+
+/// An effectful test: it passes when the task succeeds and its scope, which
+/// owns what the task acquires, closes cleanly.
+effect_test : forall e. String -> (forall s. Eff {Scope s} e Unit) -> Test
+foreign pure effect_test from "@flick-lang/runtime" "testEffect"
+
+/// Checks `check` on 100 values of `gen`, from the run's seed.
+property : String -> Gen.Gen a -> (a -> Assertion) -> Test
+foreign pure property from "@flick-lang/runtime" "testProperty"
+
+/// Tests under a common name prefix.
+group : String -> List Test -> Test
+foreign pure group from "@flick-lang/runtime" "testGroup"

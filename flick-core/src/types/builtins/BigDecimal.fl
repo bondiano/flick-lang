@@ -1,0 +1,78 @@
+/// Decimal numbers: Effect's `BigDecimal`, an integer coefficient and a
+/// scale. No global precision: division names its scale and rounding.
+module BigDecimal exposing (..)
+
+type BigDecimal
+
+/// How `divide_to_scale` rounds a quotient that needs more digits.
+type RoundingMode =
+  | TowardZero
+  | Floor
+  | Ceiling
+  | HalfEven
+  | HalfAwayFromZero
+  | Exact
+
+type error DecimalError = DecimalError String
+  deriving Eq, Show
+
+/// A decimal written as `-12.345` or `1e-3`.
+from_string : String -> Result DecimalError BigDecimal
+foreign pure from_string from "@flick-lang/runtime" "decimalFromString"
+
+/// `coefficient × 10^-scale`; the scale must be a safe integer.
+from_bigint : BigInt -> Number -> Result DecimalError BigDecimal
+foreign pure from_bigint from "@flick-lang/runtime" "decimalFromBigInt"
+
+/// The integer as a decimal of scale 0.
+from_integer : BigInt -> BigDecimal
+foreign pure from_integer from "@flick-lang/runtime" "decimalFromInteger"
+
+/// The decimal a finite number holds after binary rounding.
+from_number : Number -> Result DecimalError BigDecimal
+foreign pure from_number from "@flick-lang/runtime" "decimalFromNumber"
+
+to_string : BigDecimal -> String
+foreign pure to_string from "@flick-lang/runtime" "decimalToString"
+
+scale : BigDecimal -> Number
+foreign pure scale from "@flick-lang/runtime" "decimalScale"
+
+add : BigDecimal -> BigDecimal -> BigDecimal
+foreign pure add from "@flick-lang/runtime" "decimalAdd"
+
+subtract : BigDecimal -> BigDecimal -> BigDecimal
+foreign pure subtract from "@flick-lang/runtime" "decimalSubtract"
+
+/// The exact product; a scale beyond the safe integers is an error.
+multiply : BigDecimal -> BigDecimal -> Result DecimalError BigDecimal
+foreign pure multiply from "@flick-lang/runtime" "decimalMultiply"
+
+/// `dividend / divisor` with `scale` digits after the point, rounded by
+/// `mode`; `Exact` fails when rounding is needed, and so does a zero
+/// divisor.
+divide_to_scale :
+  Number -> RoundingMode -> BigDecimal -> BigDecimal -> Result DecimalError BigDecimal
+foreign pure divide_to_scale from "@flick-lang/runtime" "decimalDivideToScale"
+
+compare_decimal : BigDecimal -> BigDecimal -> Ordering
+foreign pure compare_decimal from "@flick-lang/runtime" "decimalCompare"
+
+instance Eq BigDecimal =
+  eq : BigDecimal -> BigDecimal -> Bool
+  let eq x y = compare_decimal x y == EQ
+
+instance Ord BigDecimal =
+  compare : BigDecimal -> BigDecimal -> Ordering
+  let compare x y = compare_decimal x y
+
+instance Hash BigDecimal =
+  hash : BigDecimal -> Number
+  let hash x = hash (to_string_normal x)
+
+instance Show BigDecimal =
+  show : BigDecimal -> String
+  let show x = to_string x
+
+to_string_normal : BigDecimal -> String
+foreign pure to_string_normal from "@flick-lang/runtime" "decimalNormalString"

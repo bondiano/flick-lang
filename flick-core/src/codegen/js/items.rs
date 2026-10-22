@@ -6,7 +6,7 @@ use std::collections::{BTreeSet, HashMap};
 use super::expr::arrow_body;
 use super::{Gen, Target, indent, names};
 use crate::ir::{Expr, ExprKind, Foreign, ForeignMode, Item, ItemKind};
-use crate::types::{Constructor, Dict, InstanceInfo};
+use crate::types::{Constructor, Dict, InstanceInfo, default_method};
 
 impl Gen<'_> {
     pub(super) fn items(&mut self, items: &[Item]) -> String {
@@ -135,6 +135,18 @@ impl Gen<'_> {
                         format!("({} {})()", self.arrow(""), arrow_body(&stmts, &v))
                     };
                     entries.push(format!("{name}: {v}"));
+                }
+                for (name, own) in &info.defaults {
+                    let (module, class) = &info.class;
+                    let value = self.global(module, &default_method(class, name));
+                    let own: Vec<String> = (0..*own).map(|i| format!("$o{i}")).collect();
+                    let call = if own.is_empty() {
+                        format!("{value}(this)")
+                    } else {
+                        let list = own.join(", ");
+                        format!("{} {value}(this, {list})", self.arrow(&list))
+                    };
+                    entries.push(format!("get {name}() {{\n  return {call};\n}}"));
                 }
                 let entries: Vec<String> = entries.into_iter().map(|e| format!("{e},")).collect();
                 format!("({{\n{}}})", indent(&entries))

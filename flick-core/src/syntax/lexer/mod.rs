@@ -132,6 +132,8 @@ impl Lexer<'_> {
                     K::Underscore
                 } else if b.is_ascii_uppercase() {
                     K::Con
+                } else if self.member_name(start) {
+                    K::Ident
                 } else {
                     keyword(text).unwrap_or(K::Ident)
                 }
@@ -162,6 +164,33 @@ impl Lexer<'_> {
                 K::Unknown
             }
         }
+    }
+
+    /// Whether the word at `start` names a value even if it spells a
+    /// keyword, as `HashSet.with` does: right after `Qualifier.`, as the
+    /// name of a top-level signature (`with : …` at the start of a line), of
+    /// a `let` or of a `foreign` declaration.
+    fn member_name(&self, start: usize) -> bool {
+        let bytes = self.text.as_bytes();
+        if start >= 2 && bytes[start - 1] == b'.' && is_ident_byte(bytes[start - 2]) {
+            return true;
+        }
+        let line_start = start == 0 || bytes[start - 1] == b'\n';
+        if line_start {
+            let rest = self.text[self.pos..].trim_start_matches(' ');
+            return rest.starts_with(':') && !rest.starts_with("::");
+        }
+        let before: Vec<&str> = self.text[..start]
+            .rsplit('\n')
+            .next()
+            .unwrap_or_default()
+            .split_whitespace()
+            .collect();
+        let word = &self.text[start..self.pos];
+        matches!(
+            before[..],
+            [.., "foreign", "pure" | "sync" | "async" | "effect"]
+        ) || (matches!(before[..], ["let"] | ["let", "rec"]) && word != "rec")
     }
 
     /// Length and kind of the operator or delimiter at `pos`, if any.

@@ -1,0 +1,172 @@
+/// Lists: dense immutable arrays. Traversals are index loops, so none of
+/// them is quadratic; prepending, `tail` and concatenation copy.
+module List exposing (..)
+
+/// Applies a pure function to each element.
+map :
+  forall c a b.
+  (a -> b)^c -> (List a -> List b)^c
+foreign pure map from "@flick-lang/runtime" "listMap"
+  arity 2
+
+/// Runs a runtime function on each element, one after another from the
+/// first.
+map_effect :
+  forall c a b r e.
+  (a ->{r; e} b)^c ->
+  (List a ->{r; e} List b)^c
+foreign effect map_effect from "@flick-lang/runtime" "listMapEffect"
+
+/// `map` with each element's index.
+map_indexed : forall c a b. (Number -> a -> b)^c -> (List a -> List b)^c
+foreign pure map_indexed from "@flick-lang/runtime" "listMapIndexed"
+  arity 2
+
+/// Runs a runtime function on each element in order, for what it does.
+each_effect : forall c a r e. (a ->{r; e} Unit)^c -> (List a ->{r; e} Unit)^c
+foreign effect each_effect from "@flick-lang/runtime" "listEachEffect"
+
+/// Folds from the first element: `fold_left f init [a, b]` is `f (f init a) b`.
+fold_left : forall c a b. (b -> a -> b)^c -> (b -> (List a -> b)^c)^c
+foreign pure fold_left from "@flick-lang/runtime" "listFold"
+  arity 3
+
+/// Folds from the last element: `fold_right f init [a, b]` is `f a (f b init)`.
+fold_right : forall c a b. (a -> b -> b)^c -> (b -> (List a -> b)^c)^c
+foreign pure fold_right from "@flick-lang/runtime" "listFoldRight"
+  arity 3
+
+/// `fold_left` with a runtime step, run in order.
+fold_effect : forall c a b r e. (b -> a ->{r; e} b)^c -> (b -> (List a ->{r; e} b)^c)^c
+foreign effect fold_effect from "@flick-lang/runtime" "listFoldEffect"
+
+filter : forall c a. (a -> Bool)^c -> (List a -> List a)^c
+foreign pure filter from "@flick-lang/runtime" "listFilter"
+  arity 2
+
+filter_map : forall c a b. (a -> Option b)^c -> (List a -> List b)^c
+foreign pure filter_map from "@flick-lang/runtime" "listFilterMap"
+  arity 2
+
+flat_map : forall c a b. (a -> List b)^c -> (List a -> List b)^c
+foreign pure flat_map from "@flick-lang/runtime" "listFlatMap"
+  arity 2
+
+find : forall c a. (a -> Bool)^c -> (List a -> Option a)^c
+foreign pure find from "@flick-lang/runtime" "listFind"
+  arity 2
+
+find_index : forall c a. (a -> Bool)^c -> (List a -> Option Number)^c
+foreign pure find_index from "@flick-lang/runtime" "listFindIndex"
+  arity 2
+
+any : forall c a. (a -> Bool)^c -> (List a -> Bool)^c
+foreign pure any from "@flick-lang/runtime" "listAny"
+  arity 2
+
+all : forall c a. (a -> Bool)^c -> (List a -> Bool)^c
+foreign pure all from "@flick-lang/runtime" "listAll"
+  arity 2
+
+partition : forall c a. (a -> Bool)^c -> (List a -> (List a, List a))^c
+foreign pure partition from "@flick-lang/runtime" "listPartition"
+  arity 2
+
+/// Sorts by `compare`, keeping equal elements in their order.
+sort_by : forall c a. (a -> a -> Ordering)^c -> (List a -> List a)^c
+foreign pure sort_by from "@flick-lang/runtime" "listSortBy"
+  arity 2
+
+/// Sorts by the total order of `Ord`, keeping equal elements in their order:
+/// numbers ascend with NaN last.
+sort : Ord a => List a -> List a
+let sort xs = sort_by compare xs
+
+contains : Eq a => a -> List a -> Bool
+let contains x xs = any (fun y -> eq x y) xs
+
+maximum : Ord a => List a -> Option a
+let maximum xs =
+  fold_left
+    (fun best x ->
+      match best with
+      | None -> Some x
+      | Some b -> if compare x b == GT then Some x else best)
+    None
+    xs
+
+minimum : Ord a => List a -> Option a
+let minimum xs =
+  fold_left
+    (fun best x ->
+      match best with
+      | None -> Some x
+      | Some b -> if compare x b == LT then Some x else best)
+    None
+    xs
+
+length : List a -> Number
+foreign pure length from "@flick-lang/runtime" "listLength"
+
+is_empty : List a -> Bool
+let is_empty xs = length xs == 0
+
+/// The element at `index`, counting from 0.
+get : Number -> List a -> Option a
+foreign pure get from "@flick-lang/runtime" "listGet"
+
+/// The list with the element at `index` replaced; out of range, unchanged.
+set : Number -> a -> List a -> List a
+foreign pure set from "@flick-lang/runtime" "listSet"
+
+head : List a -> Option a
+let head xs = get 0 xs
+
+last : List a -> Option a
+let last xs = get (length xs - 1) xs
+
+singleton : a -> List a
+let singleton x = [x]
+
+/// `n` copies of `x`.
+repeat : Number -> a -> List a
+foreign pure repeat from "@flick-lang/runtime" "listRepeat"
+
+/// `[from, from + 1, …]` below `until`.
+range : Number -> Number -> List Number
+foreign pure range from "@flick-lang/runtime" "listRange"
+
+/// The list of `f 0`, …, `f (n - 1)`.
+initialize : forall c a. Number -> (Number -> a)^c -> List a
+foreign pure initialize from "@flick-lang/runtime" "listInitialize"
+
+reverse : List a -> List a
+foreign pure reverse from "@flick-lang/runtime" "listReverse"
+
+append : List a -> List a -> List a
+let append xs ys = xs ++ ys
+
+concat : List (List a) -> List a
+foreign pure concat from "@flick-lang/runtime" "listConcat"
+
+take : Number -> List a -> List a
+foreign pure take from "@flick-lang/runtime" "listTake"
+
+drop : Number -> List a -> List a
+foreign pure drop from "@flick-lang/runtime" "listDrop"
+
+/// The elements from `start` up to `end`, as JS `slice`: it copies only them.
+slice : Number -> Number -> List a -> List a
+foreign pure slice from "@flick-lang/runtime" "listSlice"
+
+zip : List a -> List b -> List (a, b)
+foreign pure zip from "@flick-lang/runtime" "listZip"
+
+unzip : List (a, b) -> (List a, List b)
+foreign pure unzip from "@flick-lang/runtime" "listUnzip"
+
+sum : List Number -> Number
+let sum xs = fold_left (fun total x -> total + x) 0 xs
+
+product : List Number -> Number
+let product xs = fold_left (fun total x -> total * x) 1 xs

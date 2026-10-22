@@ -3,7 +3,7 @@
 | Command | What runs |
 | - | - |
 | `just check` | fmt, clippy (`-D warnings`, also for `wasm32`), `cargo test --workspace` |
-| `just e2e` | `pnpm install --frozen-lockfile`, runtime tests, `tests/run/**` on Node |
+| `just e2e` | `pnpm install --frozen-lockfile`, runtime tests, `tests/run/**` on Node, `flick test` on sample projects |
 
 Snapshot tests use [`insta`](https://insta.rs); review changes with
 `cargo insta review` or accept them with `INSTA_UPDATE=always cargo test`.
@@ -63,6 +63,18 @@ workspace. A foreign module next to a case (`./tags.mjs`) is imported from
 there. `just e2e` also builds every `tests/check/pass/**` fixture and runs
 `node --check` on the output, and `e2e_numbers.rs` compares random `Number`
 arithmetic, compiled from Flick, with the same expressions in JS.
+
+## `flick test` — `flick/tests/test_command.rs`
+
+Builds sample projects in `target/tmp/test_command/` and runs `flick test` on
+them: each kind of outcome (assertion, typed failure, defect, failed cleanup)
+is reported apart, a seed draws the same values again, `--filter` and
+`--jobs` apply, and under `--watch` the next run starts only after the
+previous one released its resources.
+
+The standard library declares every signature the specification gives for
+it word for word: `flick-core/tests/stdlib_signatures.rs` reads them from the
+spec's `text` blocks.
 
 ## Runtime tests — `runtime/test/`
 

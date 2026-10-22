@@ -1,0 +1,21 @@
+// A class method with a definition in the class body is a default: an
+// instance without its own definition takes it, one with its own keeps it.
+module App.Defaults exposing (..)
+
+class Pretty a =
+  pretty : a -> String
+  verbose : a -> String
+  let verbose x = "<" ++ pretty x ++ ">"
+
+instance Pretty Number =
+  pretty : Number -> String
+  let pretty n = show n
+
+instance Pretty Bool =
+  pretty : Bool -> String
+  let pretty b = if b then "yes" else "no"
+  verbose : Bool -> String
+  let verbose b = "the answer is " ++ pretty b
+
+both : (String, String)
+let both = (verbose 1, verbose true)

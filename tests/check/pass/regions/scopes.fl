@@ -61,7 +61,7 @@ let named path =
     }
   }
 
-report : Fiber.Failure {ReadError} ->{FileSystem; none} Unit
+report : Failure {ReadError} ->{FileSystem; none} Unit
 let report failure = ()
 
 children : Path ->{FileSystem; OpenError} Unit

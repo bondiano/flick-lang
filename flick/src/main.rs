@@ -24,5 +24,6 @@ fn main() -> ExitCode {
             &args.global,
         ),
         Commands::Fmt(options) => run_command(&FmtCommand::new(options), &args.global),
+        Commands::Test(options) => commands::test(&options, &args.global),
     }
 }

@@ -52,9 +52,33 @@ class Eq a => Hash a =
 class Show a =
   show : a -> String
 
+/// Containers whose elements a pure function maps. A container may apply
+/// the function later, so the result keeps the captures of both.
+class Functor (f : Type -> Type) =
+  map : forall c d a b. (a -> b)^c -> ((f a)^d -> (f b)^(c + d))^c
+
+/// Containers folded from the first element to the last.
+class Foldable (f : Type -> Type) =
+  fold : forall c a b. (b -> a -> b)^c -> (b -> (f a -> b)^c)^c
+
+/// Containers whose elements a runtime function maps, one after another
+/// from the first.
+class Functor f => Traversable (f : Type -> Type) =
+  traverse : forall c a b r e. (a ->{r; e} b)^c -> (f a ->{r; e} f b)^c
+
+class Functor f => Applicative (f : Type -> Type) =
+  pure : forall a. a -> f a
+
+class Applicative m => Monad (m : Type -> Type) =
+  flat_map : forall c d a b. (a -> (m b)^d)^c -> ((m a)^d -> (m b)^(c + d))^c
+
 /// How a computation ended: its value, or how it failed (`Exit.value`,
 /// `Exit.failure`).
 type Exit (e : ErrorRow) a
+
+/// How a computation failed, as a supervisor or `Exit.failure` sees it:
+/// opaque, read through `Failure.primary` and `Failure.inspect`.
+type Failure (e : ErrorRow)
 
 /// The whole native cause of a failure, for diagnostics only.
 type RawCause
@@ -113,3 +137,19 @@ foreign effect timeout from "@flick-lang/runtime" "timeout"
 /// `None` when `millis` pass before the task ends; other failures stay.
 timeout_option : forall c r e a. Number -> (Eff r e a)^c ->{r; e} Option a
 foreign effect timeout_option from "@flick-lang/runtime" "timeoutOption"
+
+/// `ma` followed by `f` of its value, for any monad.
+bind :
+  forall c d m a b.
+  Monad m => (m a)^c ->
+  ((a -> (m b)^d)^d -> (m b)^(c + d))^c
+let bind ma f = flat_map f ma
+
+/// A task followed by `f` of its value; the rows of both join.
+bind_eff :
+  forall c d r1 r2 e1 e2 a b.
+  (Eff r1 e1 a)^c ->
+  ((a -> (Eff r2 e2 b)^d)^d ->
+    (Eff (r1 + r2) (e1 + e2) b)^(c + d))^c
+foreign pure bind_eff from "@flick-lang/runtime" "bindEff"
+  arity 2

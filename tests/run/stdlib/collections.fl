@@ -1,0 +1,28 @@
+// Hash collections keep their witness; `Redacted` never shows its content.
+module App.Main exposing (main)
+
+/// Strings equal when they agree ignoring case.
+folded : String -> Number
+let folded s = String.length s
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let names = HashSet.insert "b" (HashSet.insert "a" HashSet.empty)
+  Platform.stdout_line (show (HashSet.member "a" names, HashSet.member "c" names, HashSet.size names))
+  let counted =
+    EqHash.with
+      (fun a b -> String.to_lower a == String.to_lower b)
+      (fun s -> hash (String.to_lower s))
+      (fun witness ->
+        let set = HashSet.insert "ADA" (HashSet.insert "ada" (HashSet.with witness))
+        let more = HashSet.union set (HashSet.insert "Bob" (HashSet.with witness))
+        let plain = HashSet.rehash EqHash.canonical more
+        (HashSet.size set, HashSet.member "aDa" set, HashSet.size more, HashSet.size plain))
+  Platform.stdout_line (show counted)
+  let ages = HashMap.insert "ada" 36 (HashMap.insert "bob" 41 HashMap.empty)
+  Platform.stdout_line (show (HashMap.get "ada" ages, HashMap.get "eve" ages))
+  let secret = Redacted.make "hunter2"
+  Platform.stdout_line ("password: " ++ show secret)
+  Platform.stdout_line (show (String.length (Redacted.reveal secret)))
+  Platform.stdout_line (show (Option.map (fun x -> x + 1) (Some 1), Result.with_default 0 (Err "no")))
+  Platform.stdout_line (show (Loop.loop (fun n -> if n > 1000000 then Loop.Done n else Loop.Continue (n + 1)) 0))

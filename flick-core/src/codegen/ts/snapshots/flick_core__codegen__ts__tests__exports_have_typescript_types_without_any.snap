@@ -9,7 +9,7 @@ export interface Token { readonly "~flick/brand": "@acme/shapes/App.Shapes.Token
 export type NotFound = { readonly _tag: "@acme/shapes/App.Shapes.NotFound.NotFound"; readonly _0: string };
 export interface Users { readonly "~flick/brand": "@acme/shapes/App.Shapes.Users" }
 export interface Describe<A> { readonly describe: (arg: A) => string }
-describe: <A>(dictionary: Describe<A>) => (arg: A) => string
+describe: <A>(dictionary0: Describe<A>) => (arg: A) => string
 identity: <A>(arg: A) => A
 area: (arg: Shape) => number
 origin: { readonly x: number; readonly y: number }
@@ -19,5 +19,5 @@ load: (arg: string) => $Effect.Effect<{ readonly x: number; readonly y: number }
 later: (arg: string) => $Effect.Effect<{ readonly x: number; readonly y: number }, NotFound, Users>
 first: <A>(arg: ReadonlyArray<A>) => $Option.Option<A>
 parse: (arg: string) => $Result.Result<number, NotFound>
-shown: <A>(dictionary: Describe<A>) => (arg: A) => string
+shown: <A>(dictionary0: Describe<A>) => (arg: A) => string
 apply_all: ! type variable `f` of kind `Type -> Type` has no TypeScript form; export a concrete façade

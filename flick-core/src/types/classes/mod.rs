@@ -82,6 +82,7 @@ pub struct ClassInfo {
     pub supers: Vec<Type>,
     pub fundeps: Vec<Fundep>,
     pub methods: Vec<String>,
+    pub defaults: Vec<String>,
 }
 
 /// The class and the arguments of a constraint `C t1 … tn`.
@@ -124,11 +125,13 @@ impl Checker<'_> {
                 supers,
                 fundeps,
                 methods,
+                defaults,
             } => Some(ClassInfo {
                 params: params.clone(),
                 supers: supers.clone(),
                 fundeps: fundeps.clone(),
                 methods: methods.clone(),
+                defaults: defaults.clone(),
             }),
             _ => None,
         }

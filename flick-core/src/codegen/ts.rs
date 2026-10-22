@@ -1,8 +1,8 @@
-//! The TypeScript projection of Flick types (§8 "Публичные TypeScript
-//! интерфейсы"): what generated TypeScript and `.d.ts` files say about the
-//! exports of a module. The projection is checked and limited: a type
-//! TypeScript cannot state faithfully (a higher-kinded variable, a region, an
-//! open record) is refused with the reason, never written as `any`.
+//! The TypeScript projection of Flick types: what generated TypeScript and
+//! `.d.ts` files say about the exports of a module. The projection is
+//! checked and limited: a type TypeScript cannot state faithfully (a
+//! higher-kinded variable, a region, an open record) is refused with the
+//! reason, never written as `any`.
 
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
@@ -109,12 +109,20 @@ impl Projection<'_> {
             generics.clear();
         }
         let mut ty = self.ty(body, &scope)?;
-        for constraint in constraints.iter().rev() {
-            if !passes_dictionary(constraint) {
-                continue;
+        // all dictionaries come at once, before the first parameter
+        let mut dicts = Vec::new();
+        for constraint in constraints {
+            if passes_dictionary(constraint) {
+                dicts.push(self.ty(constraint, &scope)?);
             }
-            let dict = self.ty(constraint, &scope)?;
-            ty = format!("(dictionary: {dict}) => {ty}");
+        }
+        if !dicts.is_empty() {
+            let params: Vec<String> = dicts
+                .iter()
+                .enumerate()
+                .map(|(i, d)| format!("dictionary{i}: {d}"))
+                .collect();
+            ty = format!("({}) => {ty}", params.join(", "));
         }
         if generics.is_empty() {
             Ok(ty)

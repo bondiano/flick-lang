@@ -1,0 +1,14 @@
+/// Values kept out of logs and output: `show` prints `<redacted>`, and so
+/// does the report of a cause. Creating and reading are runtime: the
+/// content may be wiped.
+module Redacted exposing (make, reveal)
+
+make : a ->{} Redacted a
+foreign sync make from "@flick-lang/runtime" "redactedMake"
+
+reveal : Redacted a ->{} a
+foreign sync reveal from "@flick-lang/runtime" "redactedReveal"
+
+instance Show (Redacted a) =
+  show : Redacted a -> String
+  let show x = "<redacted>"

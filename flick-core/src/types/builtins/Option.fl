@@ -1,0 +1,48 @@
+/// Optional values: `Some x` or `None`.
+module Option exposing (map, bind, with_default, is_some, is_none, or_else, to_result, to_list)
+
+map : forall c a b. (a -> b)^c -> (Option a -> Option b)^c
+let map f value =
+  match value with
+  | None -> None
+  | Some x -> Some (f x)
+
+bind : forall c a b. (a -> Option b)^c -> (Option a -> Option b)^c
+let bind f value =
+  match value with
+  | None -> None
+  | Some x -> f x
+
+with_default : a -> Option a -> a
+let with_default fallback value =
+  match value with
+  | None -> fallback
+  | Some x -> x
+
+is_some : Option a -> Bool
+let is_some value =
+  match value with
+  | None -> false
+  | Some _ -> true
+
+is_none : Option a -> Bool
+let is_none value = not (is_some value)
+
+/// The first of the two that is `Some`.
+or_else : Option a -> Option a -> Option a
+let or_else fallback value =
+  match value with
+  | None -> fallback
+  | Some _ -> value
+
+to_result : e -> Option a -> Result e a
+let to_result failure value =
+  match value with
+  | None -> Err failure
+  | Some x -> Ok x
+
+to_list : Option a -> List a
+let to_list value =
+  match value with
+  | None -> []
+  | Some x -> [x]

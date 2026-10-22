@@ -29,7 +29,7 @@ are used qualified without an import: `Ref.make`, `Ref.get`, `Ref.set`,
 `Ref.modify`, `String.trim`, `Platform.stdout_line`, `Platform.stderr_line`,
 `App.fail`, `Layer.succeed`, `Layer.merge`, `Layer.override`, the row
 primitives of `Record`, and `Fiber.spawn` with the types `Fiber.Owner`,
-`Fiber.Fiber` and `Fiber.Failure` ([regions.md](regions.md)). The classes `Eq`, `Ord`, `Hash` and `Show` are in
+`Fiber.Fiber` and `Failure` ([regions.md](regions.md)). The classes `Eq`, `Ord`, `Hash` and `Show` are in
 `Prelude` too ([classes.md](classes.md)).
 
 ## Kinds

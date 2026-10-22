@@ -1,0 +1,54 @@
+/// Non-negative lengths of time: Effect's `Duration`. Constructors are
+/// checked; `infinity` is explicit.
+module Duration exposing (..)
+
+type Duration
+
+type error DurationError = DurationError String
+  deriving Eq, Show
+
+nanos : BigInt -> Result DurationError Duration
+foreign pure nanos from "@flick-lang/runtime" "durationNanos"
+
+millis : Number -> Result DurationError Duration
+foreign pure millis from "@flick-lang/runtime" "durationMillis"
+
+seconds : Number -> Result DurationError Duration
+foreign pure seconds from "@flick-lang/runtime" "durationSeconds"
+
+minutes : Number -> Result DurationError Duration
+foreign pure minutes from "@flick-lang/runtime" "durationMinutes"
+
+zero : Duration
+foreign pure zero from "@flick-lang/runtime" "durationZero"
+
+infinity : Duration
+foreign pure infinity from "@flick-lang/runtime" "durationInfinity"
+
+is_finite : Duration -> Bool
+foreign pure is_finite from "@flick-lang/runtime" "durationIsFinite"
+
+/// The milliseconds, rounded as a number; `None` for `infinity`.
+to_millis : Duration -> Option Number
+foreign pure to_millis from "@flick-lang/runtime" "durationToMillis"
+
+add : Duration -> Duration -> Duration
+foreign pure add from "@flick-lang/runtime" "durationAdd"
+
+compare_duration : Duration -> Duration -> Ordering
+foreign pure compare_duration from "@flick-lang/runtime" "durationCompare"
+
+format : Duration -> String
+foreign pure format from "@flick-lang/runtime" "durationFormat"
+
+instance Eq Duration =
+  eq : Duration -> Duration -> Bool
+  let eq x y = compare_duration x y == EQ
+
+instance Ord Duration =
+  compare : Duration -> Duration -> Ordering
+  let compare x y = compare_duration x y
+
+instance Show Duration =
+  show : Duration -> String
+  let show x = format x

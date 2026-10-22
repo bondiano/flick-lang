@@ -22,6 +22,8 @@ pub enum Commands {
     Build(BuildArguments),
     /// Format Flick source files in place.
     Fmt(FmtArguments),
+    /// Run the tests of the project's test root.
+    Test(TestArguments),
 }
 
 #[derive(Args)]
@@ -93,6 +95,39 @@ pub struct FmtArguments {
     /// Path of the `--stdin` source, used in diagnostics. Requires `--stdin`.
     #[arg(long, value_name = "FILE")]
     pub stdin_filepath: Option<String>,
+}
+
+#[derive(Args)]
+pub struct TestArguments {
+    /// Test files to run; by default every module of the test root.
+    pub paths: Vec<String>,
+
+    /// Run only the tests whose full name contains this text.
+    #[arg(long, value_name = "TEXT")]
+    pub filter: Option<String>,
+
+    /// How many tests run at a time.
+    #[arg(long, default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
+    pub jobs: u32,
+
+    /// Seed of the generators of property tests; printed when a test fails.
+    #[arg(long)]
+    pub seed: Option<u32>,
+
+    /// How results are written.
+    #[arg(long, value_enum, default_value_t = Reporter::Human)]
+    pub reporter: Reporter,
+
+    /// Run again whenever a source file changes, once the previous run has
+    /// closed its scopes.
+    #[arg(long)]
+    pub watch: bool,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+pub enum Reporter {
+    Human,
+    Json,
 }
 
 #[derive(Clone, Copy, ValueEnum)]

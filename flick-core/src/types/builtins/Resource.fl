@@ -1,0 +1,15 @@
+/// Resources owned by a `scope`.
+module Resource exposing (acquire_release, bracket)
+
+/// Runs `acquire` and registers `release` with the owner of region `s`,
+/// which runs it when that scope closes; `release` has no typed errors.
+acquire_release :
+  forall c s r e a. (Eff r e a)^c -> ((a ->{r;} Unit)^c ->{Scope s | r; e} a)^c
+foreign effect acquire_release from "@flick-lang/runtime" "acquireRelease"
+
+/// Runs `acquire`, `use` and then `release`, even when `use` fails;
+/// `release` may fail with a typed error of its own.
+bracket :
+  forall c r e a b.
+  (Eff r e a)^c -> ((a ->{r; e} b)^c -> ((a ->{r; e} Unit)^c ->{r; e} b)^c)^c
+foreign effect bracket from "@flick-lang/runtime" "bracket"

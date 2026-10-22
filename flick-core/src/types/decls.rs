@@ -187,6 +187,7 @@ impl Checker<'_> {
                     supers: Vec::new(),
                     fundeps: Vec::new(),
                     methods: Vec::new(),
+                    defaults: Vec::new(),
                 },
                 result,
             ),
@@ -424,11 +425,13 @@ impl Checker<'_> {
                 }
             }
             Body::Class(supers, fundeps, members) => {
+                let (methods, defaults) = method_names(p.node, self.text, &members);
                 def.form = Form::Class {
                     params: params.iter().map(|b| b.name.clone()).collect(),
                     supers,
                     fundeps,
-                    methods: members.iter().map(|(name, _)| name.clone()).collect(),
+                    methods,
+                    defaults,
                 };
                 let members = members.into_iter().map(|(n, t)| (n, quantify(t))).collect();
                 self.declare_methods(&p.name, members);
@@ -491,4 +494,24 @@ impl Checker<'_> {
             self.env.declare(Namespace::Value, &name);
         }
     }
+}
+
+/// The methods of a class, and those with a default in its body.
+fn method_names(decl: &Node, text: &str, members: &[(String, Type)]) -> (Vec<String>, Vec<String>) {
+    let methods: Vec<String> = members.iter().map(|(name, _)| name.clone()).collect();
+    let defaults = class_defaults(decl, text)
+        .into_iter()
+        .filter_map(|(name, _)| methods.contains(&name).then_some(name))
+        .collect();
+    (methods, defaults)
+}
+
+/// The `let` definitions in the body of class `decl`, by name.
+pub fn class_defaults<'n>(decl: &'n Node, text: &str) -> Vec<(String, &'n Node)> {
+    decl.nodes()
+        .filter(|n| n.kind == K::Members)
+        .flat_map(Node::nodes)
+        .filter(|n| n.kind == K::LetDecl)
+        .filter_map(|n| Some((super::let_parts(n, text).name?, n)))
+        .collect()
 }

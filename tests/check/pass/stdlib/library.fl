@@ -1,0 +1,32 @@
+// The standard library as a program sees it: modules named without an
+// import, classes over type constructors, `bind` for any monad.
+module App.Library exposing (..)
+
+increment : Ref Number ->{} Number
+let increment counter =
+  Ref.modify counter (fun current ->
+    let next = current + 1
+    (next, next)
+  )
+
+pair_optional : Option a -> Option b -> Option (a, b)
+let pair_optional left right =
+  bind left (fun x -> Option.map (fun y -> (x, y)) right)
+
+doubled : Functor f => f Number -> f Number
+let doubled values = map (fun n -> n * 2) values
+
+total : List Number -> Number
+let total xs = fold (fun acc x -> acc + x) 0 xs
+
+halves : List Number ->{; Number.ArithmeticError} List Number
+let halves xs = traverse (fun x -> from_result (Number.div_int x 2)) xs
+
+chained : Eff none none Number -> Eff none {Number.ArithmeticError} Number
+let chained eff = bind_eff eff (fun n -> task { from_result (Number.div_int n 2) })
+
+sorted : List String
+let sorted = List.sort ["b", "a"]
+
+ages : HashMap.HashMap EqHash.Canonical String Number
+let ages = HashMap.insert "ada" 36 HashMap.empty

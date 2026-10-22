@@ -1,0 +1,45 @@
+// `BigDecimal.divide_to_scale` under every rounding mode, division by
+// zero and `Exact`; checked `Duration` constructors.
+module App.Main exposing (main)
+
+import BigDecimal exposing (RoundingMode(..), DecimalError(..))
+import Duration exposing (DurationError(..))
+
+decimal : String -> BigDecimal.BigDecimal
+let decimal text = Result.with_default (BigDecimal.from_integer 0n) (BigDecimal.from_string text)
+
+divided : RoundingMode -> String -> String -> String
+let divided mode a b =
+  match BigDecimal.divide_to_scale 0 mode (decimal a) (decimal b) with
+  | Ok d -> BigDecimal.to_string d
+  | Err (DecimalError reason) -> "error: " ++ reason
+
+row : String -> RoundingMode -> String
+let row name mode =
+  name ++ " " ++ String.join " " (List.map (fun (a, b) -> divided mode a b) cases)
+
+cases : List (String, String)
+let cases = [("5", "2"), ("-5", "2"), ("7", "2"), ("4", "2"), ("11", "4"), ("-11", "4")]
+
+duration : Result DurationError Duration.Duration -> String
+let duration result =
+  match result with
+  | Ok d -> show d
+  | Err (DurationError reason) -> "error: " ++ reason
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (row "TowardZero" TowardZero)
+  Platform.stdout_line (row "Floor" Floor)
+  Platform.stdout_line (row "Ceiling" Ceiling)
+  Platform.stdout_line (row "HalfEven" HalfEven)
+  Platform.stdout_line (row "HalfAwayFromZero" HalfAwayFromZero)
+  Platform.stdout_line (row "Exact" Exact)
+  Platform.stdout_line (divided HalfEven "1" "0")
+  let third = BigDecimal.divide_to_scale 4 HalfEven (decimal "1") (decimal "3")
+  Platform.stdout_line (show third)
+  Platform.stdout_line (duration (Duration.millis 1500))
+  Platform.stdout_line (duration (Duration.millis (-1)))
+  Platform.stdout_line (duration (Duration.millis Number.nan))
+  Platform.stdout_line (duration (Duration.minutes 1e308))
+  Platform.stdout_line (show (Duration.to_millis Duration.infinity))

@@ -1,0 +1,21 @@
+/// Stack-safe loops for pure code that is not self tail recursive.
+module Loop exposing (Step(..), loop, Trampoline, done, suspend, run)
+
+type Step s a = Continue s | Done a
+
+/// Runs `step` from `state` until it is `Done`, without growing the stack.
+loop : forall c s a. (s -> Step s a)^c -> (s -> a)^c
+foreign pure loop from "@flick-lang/runtime" "loop"
+  arity 2
+
+/// A computation run step by step: mutual recursion without stack growth.
+type Trampoline a
+
+done : a -> Trampoline a
+foreign pure done from "@flick-lang/runtime" "trampolineDone"
+
+suspend : forall c a. (Unit -> Trampoline a)^c -> (Trampoline a)^c
+foreign pure suspend from "@flick-lang/runtime" "trampolineSuspend"
+
+run : Trampoline a -> a
+foreign pure run from "@flick-lang/runtime" "trampolineRun"

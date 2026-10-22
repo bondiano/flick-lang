@@ -150,3 +150,16 @@ const report = (cause) =>
 
 export const failureInspect = (failure) => Effect.sync(() => report(causes.get(failure)));
 export const rawCauseInspect = (raw) => Effect.sync(() => report(causes.get(raw)));
+
+/** One line of a `CauseReport`: the reasons, with what can be said of each. */
+export const describeReport = (r) =>
+  r.reasons
+    .map((reason) => {
+      if (reason.kind === "interrupt") return "interrupt";
+      const what = reason.error ? `error ${reason.message}` : (reason.tag ?? reason.value);
+      return `${reason.kind} ${what}`;
+    })
+    .join("; ");
+
+/** `describeReport` of a native cause, for test results and reporters. */
+export const describeCause = (cause) => describeReport(report(cause));

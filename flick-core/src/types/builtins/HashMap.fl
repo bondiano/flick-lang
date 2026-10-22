@@ -1,0 +1,33 @@
+/// Immutable hash maps over Effect's `HashMap`; each map keeps the witness
+/// of its keys.
+module HashMap exposing (..)
+
+type HashMap w k v
+
+with : EqHash.EqHash w k -> HashMap w k v
+foreign pure with from "@flick-lang/runtime" "hashMapWith"
+
+empty : Hash k => HashMap EqHash.Canonical k v
+foreign pure empty from "@flick-lang/runtime" "hashMapEmpty"
+
+insert : k -> v -> HashMap w k v -> HashMap w k v
+foreign pure insert from "@flick-lang/runtime" "hashMapInsert"
+
+remove : k -> HashMap w k v -> HashMap w k v
+foreign pure remove from "@flick-lang/runtime" "hashMapRemove"
+
+get : k -> HashMap w k v -> Option v
+foreign pure get from "@flick-lang/runtime" "hashMapGet"
+
+size : HashMap w k v -> Number
+foreign pure size from "@flick-lang/runtime" "hashMapSize"
+
+/// The entries, in no particular order.
+to_list : HashMap w k v -> List (k, v)
+foreign pure to_list from "@flick-lang/runtime" "hashMapToList"
+
+union : HashMap w k v -> HashMap w k v -> HashMap w k v
+foreign pure union from "@flick-lang/runtime" "hashMapUnion"
+
+rehash : EqHash.EqHash x k -> HashMap w k v -> HashMap x k v
+foreign pure rehash from "@flick-lang/runtime" "hashMapRehash"

@@ -1,0 +1,27 @@
+/// Operations on `BigInt`. Division and remainder by zero throw in JS, a
+/// defect; the checked forms return the error instead.
+module BigInt exposing (..)
+
+/// The integer a number holds exactly, if it is one.
+from_number : Number -> Option BigInt
+foreign pure from_number from "@flick-lang/runtime" "bigintFromNumber"
+
+/// The nearest number: a lossy conversion.
+to_number : BigInt -> Number
+foreign pure to_number from global "Number"
+
+to_string : BigInt -> String
+foreign pure to_string from global "String"
+
+parse : String -> Option BigInt
+foreign pure parse from "@flick-lang/runtime" "bigintParse"
+
+abs : BigInt -> BigInt
+foreign pure abs from "@flick-lang/runtime" "bigintAbs"
+
+/// Division rounding toward zero.
+divide : BigInt -> BigInt -> Result Number.ArithmeticError BigInt
+foreign pure divide from "@flick-lang/runtime" "bigintDivide"
+
+remainder : BigInt -> BigInt -> Result Number.ArithmeticError BigInt
+foreign pure remainder from "@flick-lang/runtime" "bigintRemainder"

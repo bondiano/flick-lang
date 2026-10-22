@@ -113,3 +113,17 @@ fn stray_characters_and_tabs() {
     assert_eq!(kinds("\tx").1, ["FLICK-S009 \t"]);
     assert_eq!(kinds("Foo _ _x").0[1].0, K::Underscore);
 }
+
+#[test]
+fn keywords_name_members_after_a_qualifier_and_in_declarations() {
+    fn ident(text: &str, i: usize) -> (K, &str) {
+        kinds(text).0[i]
+    }
+    assert_eq!(ident("HashSet.with w", 2), (K::Ident, "with"));
+    assert_eq!(ident("with : Number", 0), (K::Ident, "with"));
+    assert_eq!(ident("foreign pure with from", 2), (K::Ident, "with"));
+    assert_eq!(ident("let error message =", 1), (K::Ident, "error"));
+    assert_eq!(ident("let rec x", 1), (K::RecKw, "rec"));
+    assert_eq!(ident("try x with", 2), (K::WithKw, "with"));
+    assert_eq!(ident("x . with", 2), (K::WithKw, "with"));
+}

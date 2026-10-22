@@ -48,6 +48,9 @@ pub enum Form {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         fundeps: Vec<Fundep>,
         methods: Vec<String>,
+        /// Methods with a default definition in the class body.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        defaults: Vec<String>,
     },
     /// `kind K = …`
     Kind,

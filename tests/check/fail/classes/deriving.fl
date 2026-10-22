@@ -20,6 +20,7 @@ class Pretty a =
 type Label = Label String
   deriving Pretty
 
+//~ FLICK-C013 @6:3-6:20 cannot derive `Eq Key`: a field of type `Ref String` has no `Eq` instance
 //~ FLICK-C013 @6:3-6:20 cannot derive `Hash Key`: a field of type `Ref String` has no `Hash` instance
 //~ FLICK-C013 @9:3-9:16 derive `Eq` together with `Hash`
 //~ FLICK-C013 @12:3-12:14 `Point` is a transparent alias

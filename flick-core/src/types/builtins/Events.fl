@@ -1,0 +1,17 @@
+/// Policies of event subscriptions: how events queue for their handler, and
+/// a supervisor that logs the failures of handlers.
+module Events exposing (QueuePolicy, queue, log_failures)
+
+/// How events wait for their handler.
+type QueuePolicy
+
+/// A bounded FIFO of `capacity` events; an event that finds it full is
+/// rejected and reported to the supervisor.
+queue : Number -> QueuePolicy
+foreign pure queue from "@flick-lang/runtime" "eventsQueue"
+
+/// A supervisor that logs how a handler failed.
+log_failures : Failure e ->{Log.Log; none} Unit
+let log_failures failure =
+  let report = Failure.inspect failure
+  Log.error ("event handler failed: " ++ RawCause.describe report)

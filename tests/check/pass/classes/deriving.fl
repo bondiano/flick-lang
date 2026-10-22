@@ -20,7 +20,7 @@ refined type Port = Number where fun n -> n > 0
 opaque type alias UserId = String
   deriving Eq, Ord, Hash, Show
 
-type Cell = Cell (Ref Number)
+type Cell = Cell (Option Number)
   deriving Eq
 
 same_shape : Shape -> Shape -> Bool

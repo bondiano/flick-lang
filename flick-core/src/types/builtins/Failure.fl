@@ -3,16 +3,16 @@
 module Failure exposing (primary, raw_cause, inspect, rethrow)
 
 /// The typed error `try … with` would handle, if any.
-primary : Fiber.Failure e -> Option (Errors e)
+primary : Failure e -> Option (Errors e)
 foreign pure primary from "@flick-lang/runtime" "failurePrimary"
 
-raw_cause : Fiber.Failure e -> RawCause
+raw_cause : Failure e -> RawCause
 foreign pure raw_cause from "@flick-lang/runtime" "failureRawCause"
 
 /// An inert report; building it runs no code of a payload.
-inspect : Fiber.Failure e ->{} CauseReport
+inspect : Failure e ->{} CauseReport
 foreign effect inspect from "@flick-lang/runtime" "failureInspect"
 
 /// Fails with the original cause, unchanged.
-rethrow : Fiber.Failure e ->{; e} a
+rethrow : Failure e ->{; e} a
 foreign effect rethrow from "@flick-lang/runtime" "failureRethrow"

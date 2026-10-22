@@ -77,12 +77,15 @@ pub fn js(module: &Module, options: &Options) -> Output {
     let here = (options.path)(&module.name);
     for imported in &g.imports {
         let target = (options.path)(imported);
-        let _ = writeln!(
-            code,
-            "import * as {} from {};",
-            names::module_alias(imported),
-            names::string(&relative(&here, &target))
-        );
+        let alias = names::module_alias(imported);
+        let from = names::string(&relative(&here, &target));
+        if options.typescript {
+            // code inside a module is untyped: only exports carry types
+            let _ = writeln!(code, "import * as {alias}$ from {from};");
+            let _ = writeln!(code, "const {alias}: any = {alias}$;");
+        } else {
+            let _ = writeln!(code, "import * as {alias} from {from};");
+        }
     }
     if !code.is_empty() {
         code.push('\n');

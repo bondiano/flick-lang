@@ -127,7 +127,14 @@ impl Checker<'_> {
 
     /// `Module.name`, `Module.Con`, or `Service.operation`.
     fn qualified(&mut self, qualifier: &str, namespace: Namespace, name: &str, span: Span) -> Type {
-        if let Some((_, interface)) = self.env.qualified_module(qualifier) {
+        // a service in scope with this operation wins over a module of its name
+        let operation = match self.env.find(Namespace::Type, qualifier) {
+            super::env::Found::Entity(e) => self.env.type_def(&e.module, &e.name).is_some_and(
+                |d| matches!(&d.form, super::env::Form::Service { operations, .. } if operations.iter().any(|o| o.name == name)),
+            ),
+            _ => false,
+        };
+        if !operation && let Some((_, interface)) = self.env.qualified_module(qualifier) {
             // a name the module does not export is reported by name resolution
             let entity = interface
                 .and_then(|i| i.find(namespace, name))

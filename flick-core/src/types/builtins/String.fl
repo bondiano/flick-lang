@@ -1,5 +1,6 @@
-/// Operations on strings.
-module String exposing (trim, length)
+/// Operations on strings. Lengths and indices count UTF-16 code units, as
+/// in JS.
+module String exposing (..)
 
 trim : String -> String
 foreign pure trim from "@flick-lang/runtime" "stringTrim"
@@ -7,3 +8,52 @@ foreign pure trim from "@flick-lang/runtime" "stringTrim"
 /// The number of UTF-16 code units, as JS `length`.
 length : String -> Number
 foreign pure length from "@flick-lang/runtime" "stringLength"
+
+is_empty : String -> Bool
+let is_empty s = length s == 0
+
+split : String -> String -> List String
+foreign pure split from "@flick-lang/runtime" "stringSplit"
+
+join : String -> List String -> String
+foreign pure join from "@flick-lang/runtime" "stringJoin"
+
+contains : String -> String -> Bool
+foreign pure contains from "@flick-lang/runtime" "stringContains"
+
+starts_with : String -> String -> Bool
+foreign pure starts_with from "@flick-lang/runtime" "stringStartsWith"
+
+ends_with : String -> String -> Bool
+foreign pure ends_with from "@flick-lang/runtime" "stringEndsWith"
+
+/// The position of the first occurrence of `part`.
+index_of : String -> String -> Option Number
+foreign pure index_of from "@flick-lang/runtime" "stringIndexOf"
+
+to_upper : String -> String
+foreign pure to_upper from "@flick-lang/runtime" "stringToUpper"
+
+to_lower : String -> String
+foreign pure to_lower from "@flick-lang/runtime" "stringToLower"
+
+/// The code units from `start` up to `end`, as JS `slice`.
+slice : Number -> Number -> String -> String
+foreign pure slice from "@flick-lang/runtime" "stringSlice"
+
+replace_all : String -> String -> String -> String
+foreign pure replace_all from "@flick-lang/runtime" "stringReplaceAll"
+
+repeat : Number -> String -> String
+foreign pure repeat from "@flick-lang/runtime" "stringRepeat"
+
+/// The code points, each as a string.
+chars : String -> List String
+foreign pure chars from "@flick-lang/runtime" "stringChars"
+
+from_number : Number -> String
+foreign pure from_number from "@flick-lang/runtime" "stringFromNumber"
+
+/// The number a whole string spells in JS syntax, if any.
+to_number : String -> Option Number
+foreign pure to_number from "@flick-lang/runtime" "stringToNumber"

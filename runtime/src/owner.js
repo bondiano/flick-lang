@@ -84,6 +84,21 @@ export const withOwner = (body) =>
     }),
   );
 
+/**
+ * Runs `body(owner)` as the owner of a fresh scope and closes it; the exit
+ * of the body and that of the cleanup apart, for the test runner.
+ */
+export const ownedExits = (body) =>
+  Effect.uninterruptibleMask((restore) =>
+    Effect.gen(function* () {
+      const resources = yield* Scope.make();
+      const owner = new Owner(resources);
+      const exit = yield* Effect.exit(restore(inside(owner, body(owner))));
+      const cleanup = yield* close(owner, Exit.void);
+      return { exit, cleanup };
+    }),
+  );
+
 /** `scope [s] { body }`: `body` receives the owner `s` and the one around it. */
 export const scope = (body) => withOwner(body);
 

@@ -74,11 +74,11 @@ timeout : Number -> (Eff r e a)^c ->{r; TimeoutError | e} a
 timeout_option : Number -> (Eff r e a)^c ->{r; e} Option a
 
 Exit.value : Exit e a -> Option a
-Exit.failure : Exit e a -> Option (Fiber.Failure e)
-Failure.primary : Fiber.Failure e -> Option (Errors e)
-Failure.raw_cause : Fiber.Failure e -> RawCause
-Failure.inspect : Fiber.Failure e ->{} CauseReport
-Failure.rethrow : Fiber.Failure e ->{; e} a
+Exit.failure : Exit e a -> Option (Failure e)
+Failure.primary : Failure e -> Option (Errors e)
+Failure.raw_cause : Failure e -> RawCause
+Failure.inspect : Failure e ->{} CauseReport
+Failure.rethrow : Failure e ->{; e} a
 RawCause.inspect : RawCause ->{} CauseReport
 ```
 

@@ -618,31 +618,34 @@ backend; специальные literals — только Number/BigInt.
   cleanup failure; каждый тест — собственный scoped owner.
 - Синтаксис объявления тестов (закрывает пробел из §1).
 
-**Артефакты.** `stdlib/`, `runtime/src/test/`, `flick test` (базовый).
+**Артефакты.** Модули stdlib — встроенные в компилятор `.fl`
+(`flick-core/src/types/builtins/`), JS-адаптеры — `runtime/src/stdlib/`,
+`flick test` (`flick/src/commands/test.rs`), справка — `docs/reference/stdlib.md`.
 
 **AC**
 
-- [ ] Все сигнатуры stdlib из спеки (`List.map`, `List.map_effect`, `Ref.*`,
+- [x] Все сигнатуры stdlib из спеки (`List.map`, `List.map_effect`, `Ref.*`,
       `Codec.*`, `Failure.*`, `Redacted.*`, `from_result`, …) совпадают текстуально
-      (тест сверяет `.iface` stdlib со списком сигнатур из спеки).
-- [ ] Метод класса по умолчанию (сигнатура + `let` в теле класса) используется
+      (тест сверяет `.iface` stdlib со списком сигнатур из спеки). `Codec.*`
+      появляются и сверяются в M11.
+- [x] Метод класса по умолчанию (сигнатура + `let` в теле класса) используется
       instance без своего определения и переопределяется своим; отсутствие
       абстрактного метода в instance по-прежнему `FLICK-C011`.
-- [ ] `List.map` с runtime-callback отвергается; `List.map_effect` выполняет
+- [x] `List.map` с runtime-callback отвергается; `List.map_effect` выполняет
       callback последовательно слева направо (e2e).
-- [ ] `requests_for` не запускает запросы; `parallel_all 8` ограничивает
+- [x] `requests_for` не запускает запросы; `parallel_all 8` ограничивает
       одновременно активные ветки до 8 (e2e со счётчиком).
-- [ ] `Ord Number.compare`: −Infinity < конечные < +Infinity < NaN; `-0` EQ `+0`;
+- [x] `Ord Number.compare`: −Infinity < конечные < +Infinity < NaN; `-0` EQ `+0`;
       sort стабилен на массиве с NaN.
-- [ ] `HashSet.with witness`: вставка и поиск используют один witness; union с
+- [x] `HashSet.with witness`: вставка и поиск используют один witness; union с
       другим witness требует явного rehash (иначе ошибка типов).
-- [ ] `BigDecimal.divide_to_scale` для каждой rounding policy и деления на ноль —
+- [x] `BigDecimal.divide_to_scale` для каждой rounding policy и деления на ноль —
       таблица тестов; `Exact` отвергает округление.
-- [ ] `Duration.millis (-1)` / NaN / overflow → `Result DurationError`.
-- [ ] `Redacted` в `Show`/логах маскируется.
-- [ ] `flick test`: `--filter`, `--jobs N` (по умолчанию 1), `--seed` (выводится при
+- [x] `Duration.millis (-1)` / NaN / overflow → `Result DurationError`.
+- [x] `Redacted` в `Show`/логах маскируется.
+- [x] `flick test`: `--filter`, `--jobs N` (по умолчанию 1), `--seed` (выводится при
       провале), `--reporter human|json`; cleanup failure теста — провал теста.
-- [ ] Отмена теста не пропускает cleanup; следующий запуск в `--watch` начинается
+- [x] Отмена теста не пропускает cleanup; следующий запуск в `--watch` начинается
       после закрытия owners предыдущего.
 
 ---

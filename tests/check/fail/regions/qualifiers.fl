@@ -33,7 +33,7 @@ let invariant plain held =
   let both = [plain, held]
   ()
 
-report : Fiber.Failure {ReadError} ->{FileSystem; none} Unit
+report : Failure {ReadError} ->{FileSystem; none} Unit
 let report failure = ()
 
 spawn_outer : Path ->{FileSystem; OpenError} Unit

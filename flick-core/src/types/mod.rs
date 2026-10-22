@@ -42,11 +42,14 @@ pub use bindings::{LetParts, let_parts, signature_name};
 pub use builtins::{builtin_sources, builtins};
 pub use classes::Dict;
 pub use convert::is_type;
+pub use decls::class_defaults;
 pub use env::{Form, Fundep, Instance, Operation, TypeDef};
 pub use kinds::Kind;
 pub use patterns::is_pattern;
 pub use ty::{Binder, Effects, PRELUDE, Row, Type};
-pub use typing::{Constructor, InstanceInfo, Lift, Owner, Range, Ref, Typing, passes_dictionary};
+pub use typing::{
+    Constructor, InstanceInfo, Lift, Owner, Range, Ref, Typing, default_method, passes_dictionary,
+};
 
 use convert::TyVar;
 use env::Env;

@@ -1,0 +1,39 @@
+/// Immutable hash sets over Effect's `HashSet`; each set keeps its witness.
+module HashSet exposing (..)
+
+type HashSet w a
+
+/// The empty set of the witness.
+with : EqHash.EqHash w a -> HashSet w a
+foreign pure with from "@flick-lang/runtime" "hashSetWith"
+
+/// The empty set of the canonical instances.
+empty : Hash a => HashSet EqHash.Canonical a
+foreign pure empty from "@flick-lang/runtime" "hashSetEmpty"
+
+from_list : EqHash.EqHash w a -> List a -> HashSet w a
+foreign pure from_list from "@flick-lang/runtime" "hashSetFromList"
+
+insert : a -> HashSet w a -> HashSet w a
+foreign pure insert from "@flick-lang/runtime" "hashSetInsert"
+
+remove : a -> HashSet w a -> HashSet w a
+foreign pure remove from "@flick-lang/runtime" "hashSetRemove"
+
+member : a -> HashSet w a -> Bool
+foreign pure member from "@flick-lang/runtime" "hashSetMember"
+
+size : HashSet w a -> Number
+foreign pure size from "@flick-lang/runtime" "hashSetSize"
+
+/// The elements, in no particular order.
+to_list : HashSet w a -> List a
+foreign pure to_list from "@flick-lang/runtime" "hashSetToList"
+
+/// Both sets: their witness must be the same.
+union : HashSet w a -> HashSet w a -> HashSet w a
+foreign pure union from "@flick-lang/runtime" "hashSetUnion"
+
+/// The same elements under another witness.
+rehash : EqHash.EqHash v a -> HashSet w a -> HashSet v a
+foreign pure rehash from "@flick-lang/runtime" "hashSetRehash"

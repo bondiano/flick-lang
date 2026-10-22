@@ -1,0 +1,19 @@
+/// Equality and hashing as a value: the witness a `HashSet` or `HashMap`
+/// keeps. The witness's identity is a type, `w`: two collections can be
+/// joined only when they share it.
+module EqHash exposing (..)
+
+type EqHash w a
+
+/// The witness of the canonical `Eq` and `Hash` instances.
+type Canonical
+
+/// Calls `body` with a witness of a fresh identity made of `eq` and `hash`,
+/// which must agree: equal values have equal hashes.
+with :
+  forall c a b.
+  (a -> a -> Bool) -> (a -> Number) -> (forall w. EqHash w a -> b)^c -> b
+foreign pure with from "@flick-lang/runtime" "eqHashWith"
+
+canonical : Hash a => EqHash Canonical a
+foreign pure canonical from "@flick-lang/runtime" "eqHashCanonical"

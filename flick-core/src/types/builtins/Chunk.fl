@@ -1,0 +1,37 @@
+/// Effect's immutable `Chunk`, for repeated concatenation.
+module Chunk exposing (Chunk, empty, from_list, to_list, append, concat, size, get, map)
+
+type Chunk a
+
+empty : Chunk a
+foreign pure empty from "@flick-lang/runtime" "chunkEmpty"
+
+from_list : List a -> Chunk a
+foreign pure from_list from "@flick-lang/runtime" "chunkFromList"
+
+to_list : Chunk a -> List a
+foreign pure to_list from "@flick-lang/runtime" "chunkToList"
+
+append : a -> Chunk a -> Chunk a
+foreign pure append from "@flick-lang/runtime" "chunkAppend"
+
+concat : Chunk a -> Chunk a -> Chunk a
+foreign pure concat from "@flick-lang/runtime" "chunkConcat"
+
+size : Chunk a -> Number
+foreign pure size from "@flick-lang/runtime" "chunkSize"
+
+get : Number -> Chunk a -> Option a
+foreign pure get from "@flick-lang/runtime" "chunkGet"
+
+map : forall c a b. (a -> b)^c -> (Chunk a -> Chunk b)^c
+foreign pure map from "@flick-lang/runtime" "chunkMap"
+  arity 2
+
+instance Eq a => Eq (Chunk a) =
+  eq : Chunk a -> Chunk a -> Bool
+  let eq x y = eq (to_list x) (to_list y)
+
+instance Show a => Show (Chunk a) =
+  show : Chunk a -> String
+  let show x = "Chunk " ++ show (to_list x)

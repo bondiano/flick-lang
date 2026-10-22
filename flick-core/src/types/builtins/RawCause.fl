@@ -1,5 +1,9 @@
 /// The whole native cause of a failure, which only an inert report shows.
-module RawCause exposing (inspect)
+module RawCause exposing (inspect, describe)
 
 inspect : RawCause ->{} CauseReport
 foreign effect inspect from "@flick-lang/runtime" "rawCauseInspect"
+
+/// One line per reason of the report, `fail NotFound` or `die <object>`.
+describe : CauseReport -> String
+foreign pure describe from "@flick-lang/runtime" "describeReport"

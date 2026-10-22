@@ -132,7 +132,7 @@ spawn :
   forall s c r e a.
   Fiber.Outlives c s =>
   Fiber.Owner s ->
-  (Fiber.Failure e ->{r; none} Unit)^c ->
+  (Failure e ->{r; none} Unit)^c ->
   (Eff r e a)^c ->{r; none} Fiber.Fiber e a
 ```
 

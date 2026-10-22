@@ -10,6 +10,7 @@ Commands:
   check  Check Flick source files and report diagnostics
   build  Compile the project, or the given files, to ES modules
   fmt    Format Flick source files in place
+  test   Run the tests of the project's test root
   help   Print this message or the help of the given subcommand(s)
 
 Options:

@@ -4,7 +4,7 @@ use std::{fs, io};
 use flick_core::build::{self, Settings};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Emit, Kind};
-use flick_core::project::{self, Compiled};
+use flick_core::project::{self, Compilation, Compiled, Project};
 use flick_core::source::{FileId, SourceMap};
 
 use super::check::select;
@@ -76,50 +76,15 @@ impl Command for BuildCommand {
             (None, Some(p)) => p.config.build.emit == Emit::Ts,
             (None, None) => false,
         };
-        let package = project
-            .as_ref()
-            .and_then(|p| project::project_name(&host, &p.root));
-        let paths: Vec<(FileId, PathBuf)> =
-            modules.iter().map(|m| (m.file, m.path.clone())).collect();
-        let source_path = |file: FileId| {
-            paths
-                .iter()
-                .find(|(f, _)| *f == file)
-                .map_or_else(String::new, |(_, p)| format!("file://{}", p.display()))
-        };
-        let dirs: Vec<(String, PathBuf)> = modules
-            .iter()
-            .map(|m| {
-                (
-                    m.name.clone(),
-                    m.path.parent().map(Path::to_path_buf).unwrap_or_default(),
-                )
-            })
-            .collect();
-        let source_dir = |module: &str| {
-            dirs.iter()
-                .find(|(name, _)| name == module)
-                .map(|(_, dir)| dir.clone())
-        };
-        let settings = Settings {
-            source_dir: &source_dir,
-            out_dir: &out_dir,
-            package: package.as_deref(),
-            entry: entry.as_deref(),
+        diagnostics.extend(emit(
+            &host,
+            &sources,
+            project.as_ref(),
+            &compilation,
+            &out_dir,
+            entry.as_deref(),
             typescript,
-            source_path: &source_path,
-        };
-        for artifact in build::emit(&compilation, &sources, &settings) {
-            let path = out_dir.join(&artifact.path);
-            if let Err(err) = write(&path, &artifact.contents) {
-                diagnostics.push(Diagnostic::new(
-                    codes::P013,
-                    Severity::Error,
-                    format!("cannot write `{}`: {err}", path.display()),
-                ));
-                break;
-            }
-        }
+        ));
         Outcome {
             sources,
             diagnostics,
@@ -127,7 +92,62 @@ impl Command for BuildCommand {
     }
 }
 
-fn write(path: &Path, contents: &str) -> io::Result<()> {
+/// Writes the build of `compilation` into `out_dir`; what could not be
+/// written is reported.
+pub fn emit(
+    host: &FsHost,
+    sources: &SourceMap,
+    project: Option<&Project>,
+    compilation: &Compilation,
+    out_dir: &Path,
+    entry: Option<&str>,
+    typescript: bool,
+) -> Vec<Diagnostic> {
+    let modules = &compilation.modules;
+    let package = project.and_then(|p| project::project_name(host, &p.root));
+    let paths: Vec<(FileId, PathBuf)> = modules.iter().map(|m| (m.file, m.path.clone())).collect();
+    let source_path = |file: FileId| {
+        paths
+            .iter()
+            .find(|(f, _)| *f == file)
+            .map_or_else(String::new, |(_, p)| format!("file://{}", p.display()))
+    };
+    let dirs: Vec<(String, PathBuf)> = modules
+        .iter()
+        .map(|m| {
+            (
+                m.name.clone(),
+                m.path.parent().map(Path::to_path_buf).unwrap_or_default(),
+            )
+        })
+        .collect();
+    let source_dir = |module: &str| {
+        dirs.iter()
+            .find(|(name, _)| name == module)
+            .map(|(_, dir)| dir.clone())
+    };
+    let settings = Settings {
+        source_dir: &source_dir,
+        out_dir,
+        package: package.as_deref(),
+        entry,
+        typescript,
+        source_path: &source_path,
+    };
+    for artifact in build::emit(compilation, sources, &settings) {
+        let path = out_dir.join(&artifact.path);
+        if let Err(err) = write(&path, &artifact.contents) {
+            return vec![Diagnostic::new(
+                codes::P013,
+                Severity::Error,
+                format!("cannot write `{}`: {err}", path.display()),
+            )];
+        }
+    }
+    Vec::new()
+}
+
+pub fn write(path: &Path, contents: &str) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }

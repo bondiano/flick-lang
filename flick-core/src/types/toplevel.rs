@@ -65,6 +65,7 @@ impl<'a> Checker<'a> {
             }
             self.settle_operators();
         }
+        self.class_defaults(&decls);
         self.solve_classes(true);
         self.check_instances(&declared);
         self.solve_rows();

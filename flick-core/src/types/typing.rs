@@ -128,6 +128,15 @@ pub struct InstanceInfo {
     /// constructor, and the constructors (`None` for a type without variants,
     /// whose one field is its representation).
     pub derived: Option<(Vec<Dict>, Option<Vec<Constructor>>)>,
+    /// Methods taken from the class's defaults, with how many dictionaries
+    /// of their own each takes.
+    pub defaults: Vec<(String, usize)>,
+}
+
+/// The top-level value a class's default definition of `method` compiles
+/// to, in the class's module; it takes the class's dictionary first.
+pub fn default_method(class: &str, method: &str) -> String {
+    format!("$default_{class}_{method}")
 }
 
 /// Constraints that are solved by the region checker and pass no dictionary.

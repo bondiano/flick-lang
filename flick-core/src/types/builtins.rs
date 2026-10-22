@@ -10,7 +10,7 @@ use crate::source::SourceMap;
 use crate::syntax;
 
 /// In dependency order: each module sees the ones before it.
-const SOURCES: [(&str, &str); 13] = [
+const SOURCES: [(&str, &str); 33] = [
     ("Prelude", include_str!("builtins/Prelude.fl")),
     ("Instances", include_str!("builtins/Instances.fl")),
     ("Record", include_str!("builtins/Record.fl")),
@@ -24,6 +24,26 @@ const SOURCES: [(&str, &str); 13] = [
     ("RawCause", include_str!("builtins/RawCause.fl")),
     ("Failure", include_str!("builtins/Failure.fl")),
     ("Exit", include_str!("builtins/Exit.fl")),
+    ("Option", include_str!("builtins/Option.fl")),
+    ("Result", include_str!("builtins/Result.fl")),
+    ("List", include_str!("builtins/List.fl")),
+    ("NonEmpty", include_str!("builtins/NonEmpty.fl")),
+    ("Chunk", include_str!("builtins/Chunk.fl")),
+    ("Js.Array", include_str!("builtins/Js/Array.fl")),
+    ("BigInt", include_str!("builtins/BigInt.fl")),
+    ("Redacted", include_str!("builtins/Redacted.fl")),
+    ("BigDecimal", include_str!("builtins/BigDecimal.fl")),
+    ("Duration", include_str!("builtins/Duration.fl")),
+    ("EqHash", include_str!("builtins/EqHash.fl")),
+    ("HashSet", include_str!("builtins/HashSet.fl")),
+    ("HashMap", include_str!("builtins/HashMap.fl")),
+    ("Loop", include_str!("builtins/Loop.fl")),
+    ("Log", include_str!("builtins/Log.fl")),
+    ("File", include_str!("builtins/File.fl")),
+    ("Resource", include_str!("builtins/Resource.fl")),
+    ("Events", include_str!("builtins/Events.fl")),
+    ("Gen", include_str!("builtins/Gen.fl")),
+    ("Test", include_str!("builtins/Test.fl")),
 ];
 
 /// Names and sources of the built-in modules, in dependency order.
@@ -97,7 +117,27 @@ mod tests {
                 "Fiber",
                 "RawCause",
                 "Failure",
-                "Exit"
+                "Exit",
+                "Option",
+                "Result",
+                "List",
+                "NonEmpty",
+                "Chunk",
+                "Js.Array",
+                "BigInt",
+                "Redacted",
+                "BigDecimal",
+                "Duration",
+                "EqHash",
+                "HashSet",
+                "HashMap",
+                "Loop",
+                "Log",
+                "File",
+                "Resource",
+                "Events",
+                "Gen",
+                "Test"
             ]
         );
     }

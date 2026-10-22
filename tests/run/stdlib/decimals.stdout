@@ -1,0 +1,13 @@
+TowardZero 2 -2 3 2 2 -2
+Floor 2 -3 3 2 2 -3
+Ceiling 3 -2 4 2 3 -2
+HalfEven 2 -2 4 2 3 -3
+HalfAwayFromZero 3 -3 4 2 3 -3
+Exact error: the quotient needs rounding, and the mode is Exact error: the quotient needs rounding, and the mode is Exact error: the quotient needs rounding, and the mode is Exact 2 error: the quotient needs rounding, and the mode is Exact error: the quotient needs rounding, and the mode is Exact
+error: division by zero
+Ok 0.3333
+1s 500ms
+error: millis: -1 is negative
+error: millis: NaN is not a duration
+error: minutes: 1e+308 overflows; use Duration.infinity for an unbounded duration
+None

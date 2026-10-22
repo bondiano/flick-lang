@@ -1,6 +1,11 @@
 /// Operations on numbers beyond the operators. `==` is canonical equality:
-/// `NaN == NaN` and `0 == -0`.
-module Number exposing (strict_equal, same_value)
+/// `NaN == NaN` and `0 == -0`. Integer operations are checked: they fail
+/// rather than leave the safe integers.
+module Number exposing (..)
+
+/// The error of a checked integer operation.
+type error ArithmeticError = ArithmeticError String
+  deriving Eq, Show
 
 /// JS `===`: `NaN` differs from itself, `0` equals `-0`.
 strict_equal : Number -> Number -> Bool
@@ -9,3 +14,95 @@ foreign pure strict_equal from "@flick-lang/runtime" "numberStrictEqual"
 /// JS `Object.is`: `NaN` equals itself, `0` differs from `-0`.
 same_value : Number -> Number -> Bool
 foreign pure same_value from "@flick-lang/runtime" "numberSameValue"
+
+pi : Number
+foreign pure pi from global "Math.PI"
+
+infinity : Number
+foreign pure infinity from global "Infinity"
+
+nan : Number
+foreign pure nan from global "NaN"
+
+is_nan : Number -> Bool
+foreign pure is_nan from global "Number.isNaN"
+
+is_finite : Number -> Bool
+foreign pure is_finite from global "Number.isFinite"
+
+is_integer : Number -> Bool
+foreign pure is_integer from global "Number.isInteger"
+
+is_safe_integer : Number -> Bool
+foreign pure is_safe_integer from global "Number.isSafeInteger"
+
+abs : Number -> Number
+foreign pure abs from global "Math.abs"
+
+floor : Number -> Number
+foreign pure floor from global "Math.floor"
+
+ceil : Number -> Number
+foreign pure ceil from global "Math.ceil"
+
+round : Number -> Number
+foreign pure round from global "Math.round"
+
+trunc : Number -> Number
+foreign pure trunc from global "Math.trunc"
+
+sqrt : Number -> Number
+foreign pure sqrt from global "Math.sqrt"
+
+min : Number -> Number -> Number
+foreign pure min from global "Math.min"
+
+max : Number -> Number -> Number
+foreign pure max from global "Math.max"
+
+to_string : Number -> String
+foreign pure to_string from "@flick-lang/runtime" "stringFromNumber"
+
+parse : String -> Option Number
+foreign pure parse from "@flick-lang/runtime" "stringToNumber"
+
+/// `n` itself when it is a safe integer.
+safe_integer : Number -> Option Number
+foreign pure safe_integer from "@flick-lang/runtime" "numberSafeInteger"
+
+add_int : Number -> Number -> Result ArithmeticError Number
+foreign pure add_int from "@flick-lang/runtime" "intAdd"
+
+sub_int : Number -> Number -> Result ArithmeticError Number
+foreign pure sub_int from "@flick-lang/runtime" "intSub"
+
+mul_int : Number -> Number -> Result ArithmeticError Number
+foreign pure mul_int from "@flick-lang/runtime" "intMul"
+
+/// Integer division rounding toward zero; division by zero is an error.
+div_int : Number -> Number -> Result ArithmeticError Number
+foreign pure div_int from "@flick-lang/runtime" "intDiv"
+
+rem_int : Number -> Number -> Result ArithmeticError Number
+foreign pure rem_int from "@flick-lang/runtime" "intRem"
+
+bit_and : Number -> Number -> Number
+foreign pure bit_and from "@flick-lang/runtime" "bitAnd"
+
+bit_or : Number -> Number -> Number
+foreign pure bit_or from "@flick-lang/runtime" "bitOr"
+
+bit_xor : Number -> Number -> Number
+foreign pure bit_xor from "@flick-lang/runtime" "bitXor"
+
+bit_not : Number -> Number
+foreign pure bit_not from "@flick-lang/runtime" "bitNot"
+
+shift_left : Number -> Number -> Number
+foreign pure shift_left from "@flick-lang/runtime" "shiftLeft"
+
+shift_right : Number -> Number -> Number
+foreign pure shift_right from "@flick-lang/runtime" "shiftRight"
+
+shift_right_unsigned : Number -> Number -> Number
+foreign pure shift_right_unsigned from "@flick-lang/runtime" "shiftRightUnsigned"

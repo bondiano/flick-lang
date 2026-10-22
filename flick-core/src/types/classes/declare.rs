@@ -408,13 +408,12 @@ impl<'n> Checker<'_> {
                     ),
                 }
             }
-            let derived = if let Some(fields) = &d.fields {
-                Some(self.derived_fields(d, fields))
+            let (derived, defaults) = if let Some(fields) = &d.fields {
+                (Some(self.derived_fields(d, fields)), Vec::new())
             } else {
-                self.instance_methods(d.decl, &d.instance);
-                None
+                (None, self.instance_methods(d.decl, &d.instance))
             };
-            self.record_instance(d, supers, derived);
+            self.record_instance(d, supers, derived, defaults);
         }
     }
 }
@@ -437,6 +436,7 @@ impl Checker<'_> {
         d: &Declared,
         supers: Vec<(String, Dict)>,
         fields: Option<Vec<Dict>>,
+        defaults: Vec<(String, usize)>,
     ) {
         let Some(((cm, cn), _)) = split(&d.instance.head) else {
             return;
@@ -462,6 +462,7 @@ impl Checker<'_> {
             context,
             supers,
             derived,
+            defaults,
         };
         self.typing.instances.push(info);
     }

@@ -47,6 +47,24 @@ more polymorphic, but may not require a constraint the class signature does
 not (`FLICK-C010`). A missing or unknown method is `FLICK-C011`. The superclasses
 must hold for the instance's types, given its context (`FLICK-C001`).
 
+A method may have a default: its signature and a `let` right below it in
+the class body. An instance that does not define the method takes the
+default, which sees the instance's dictionary like any function constrained
+by the class; an instance's own definition replaces it. A method without a
+default is abstract, and an instance without it is `FLICK-C011`, as is a
+`let` in a class body whose name is not a method of the class.
+
+```flick
+class Pretty a =
+  pretty : a -> String
+  verbose : a -> String
+  let verbose x = "<" ++ pretty x ++ ">"
+
+instance Pretty Number =
+  pretty : Number -> String
+  let pretty n = show n
+```
+
 Instances are canonical. The checker rejects an instance when:
 
 | Rule | Code |

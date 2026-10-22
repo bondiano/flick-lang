@@ -1,0 +1,13 @@
+module App.Defaults exposing (..)
+
+class Pretty a =
+  pretty : a -> String
+  verbose : a -> String
+  let verbose x = "<" ++ pretty x ++ ">"
+  let extra x = "?"
+//~ FLICK-C011 @7:3-7:20 `extra` is not a method of class `Pretty`
+
+instance Pretty Number =
+//       ^^^^^^^^^^^^^ FLICK-C011 `Pretty Number` lacks method `pretty`
+  verbose : Number -> String
+  let verbose n = "number"

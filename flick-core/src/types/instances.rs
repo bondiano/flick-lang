@@ -9,6 +9,7 @@ use super::bindings::let_parts;
 use super::classes::{Wanted, split};
 use super::convert::{TyVar, is_type};
 use super::env::Instance;
+use super::passes_dictionary;
 use super::ty::Type;
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
@@ -17,13 +18,19 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
 impl Checker<'_> {
-    pub(super) fn instance_methods(&mut self, decl: &Node, instance: &Instance) {
+    /// Checks the methods of `instance`; the methods it takes from the
+    /// class's defaults, with how many dictionaries of their own each takes.
+    pub(super) fn instance_methods(
+        &mut self,
+        decl: &Node,
+        instance: &Instance,
+    ) -> Vec<(String, usize)> {
         let Some(((cm, cn), args)) = split(&instance.head) else {
-            return;
+            return Vec::new();
         };
         let (cm, cn) = (cm.to_owned(), cn.to_owned());
         let Some(info) = self.class_info(&cm, &cn) else {
-            return;
+            return Vec::new();
         };
         let mark = self.tyvars.len();
         let skolems: Vec<(String, Type)> = instance
@@ -95,8 +102,14 @@ impl Checker<'_> {
         let missing: Vec<String> = info
             .methods
             .iter()
-            .filter(|m| !defined.contains(m))
+            .filter(|m| !defined.contains(m) && !info.defaults.contains(m))
             .map(|m| format!("`{m}`"))
+            .collect();
+        let defaulted = info
+            .defaults
+            .iter()
+            .filter(|m| !defined.contains(m))
+            .map(|m| (m.clone(), self.own_dictionaries(&cm, m)))
             .collect();
         if !missing.is_empty() {
             let head = decl
@@ -112,6 +125,57 @@ impl Checker<'_> {
         self.solve_classes(true);
         self.classes.givens.truncate(assumed);
         self.tyvars.truncate(mark);
+        defaulted
+    }
+
+    /// How many dictionaries a class method takes besides its class's.
+    fn own_dictionaries(&self, class_module: &str, method: &str) -> usize {
+        let entity = Entity {
+            module: class_module.to_owned(),
+            namespace: Namespace::Value,
+            name: method.to_owned(),
+        };
+        match self.env.value(&entity) {
+            Some(Type::Forall { constraints, .. }) => constraints
+                .iter()
+                .skip(1)
+                .filter(|c| passes_dictionary(c))
+                .count(),
+            _ => 0,
+        }
+    }
+
+    /// The default definitions in the bodies of the module's classes: each is
+    /// checked against its method's signature, the class constraint given.
+    pub(super) fn class_defaults(&mut self, decls: &[&Node]) {
+        let module = self.env.module.clone();
+        for decl in decls.iter().filter(|d| d.kind == K::ClassDecl) {
+            let Some(class) = self.con_token(decl) else {
+                continue;
+            };
+            let methods = self.class_info(&module, &class).map(|i| i.methods);
+            for (name, member) in super::decls::class_defaults(decl, self.text) {
+                if !methods.as_ref().is_some_and(|m| m.contains(&name)) {
+                    self.error(
+                        codes::C011,
+                        self.span(member),
+                        format!("`{name}` is not a method of class `{class}`: a default needs its signature in the class"),
+                    );
+                    continue;
+                }
+                let entity = Entity {
+                    module: module.clone(),
+                    namespace: Namespace::Value,
+                    name: name.clone(),
+                };
+                let Some(scheme) = self.env.value(&entity).cloned() else {
+                    continue;
+                };
+                let parts = let_parts(member, self.text);
+                self.check_signed(member, &parts, &scheme, None, None);
+                self.settle_operators();
+            }
+        }
     }
 
     /// The class signature of `method` with `args` for the class parameters,

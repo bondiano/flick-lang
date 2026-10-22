@@ -1,0 +1,38 @@
+/// Generators of random values for property tests, driven by the seed of
+/// the test run.
+module Gen exposing (..)
+
+type Gen a
+
+constant : a -> Gen a
+foreign pure constant from "@flick-lang/runtime" "genConstant"
+
+/// A number in `[low, high)`.
+number : Number -> Number -> Gen Number
+foreign pure number from "@flick-lang/runtime" "genNumber"
+
+/// An integer in `[low, high]`.
+int : Number -> Number -> Gen Number
+foreign pure int from "@flick-lang/runtime" "genInt"
+
+bool : Gen Bool
+foreign pure bool from "@flick-lang/runtime" "genBool"
+
+/// A string of printable ASCII, at most `max` long.
+string : Number -> Gen String
+foreign pure string from "@flick-lang/runtime" "genString"
+
+/// A list at most `max` long.
+list : Number -> Gen a -> Gen (List a)
+foreign pure list from "@flick-lang/runtime" "genList"
+
+/// One of the values; the list must not be empty.
+one_of : List a -> Gen a
+foreign pure one_of from "@flick-lang/runtime" "genOneOf"
+
+pair : Gen a -> Gen b -> Gen (a, b)
+foreign pure pair from "@flick-lang/runtime" "genPair"
+
+map : forall c a b. (a -> b)^c -> (Gen a -> Gen b)^c
+foreign pure map from "@flick-lang/runtime" "genMap"
+  arity 2

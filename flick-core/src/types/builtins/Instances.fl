@@ -175,3 +175,159 @@ instance (Show e, Show a) => Show (Result e a) =
     match x with
     | Ok a -> "Ok " ++ show a
     | Err e -> "Err " ++ show e
+
+instance (Ord e, Ord a) => Ord (Result e a) =
+  compare : Result e a -> Result e a -> Ordering
+  let compare x y =
+    match (x, y) with
+    | (Err a, Err b) -> compare a b
+    | (Ok a, Ok b) -> compare a b
+    | (Err _, _) -> LT
+    | _ -> GT
+
+instance (Hash e, Hash a) => Hash (Result e a) =
+  hash : Result e a -> Number
+  let hash x =
+    match x with
+    | Ok a -> hash a
+    | Err e -> 1 + hash e
+
+instance Hash Ordering =
+  hash : Ordering -> Number
+  let hash x = hash_prim x
+
+instance Ord Ordering =
+  compare : Ordering -> Ordering -> Ordering
+  let compare x y = compare_prim (rank x) (rank y)
+
+rank : Ordering -> Number
+let rank o =
+  match o with
+  | LT -> 0
+  | EQ -> 1
+  | GT -> 2
+
+map_list : forall c d a b. (a -> b)^c -> ((List a)^d -> (List b)^(c + d))^c
+foreign pure map_list from "@flick-lang/runtime" "listMap"
+  arity 2
+
+fold_list : forall c a b. (b -> a -> b)^c -> (b -> (List a -> b)^c)^c
+foreign pure fold_list from "@flick-lang/runtime" "listFold"
+  arity 3
+
+traverse_list : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
+foreign effect traverse_list from "@flick-lang/runtime" "listMapEffect"
+
+flat_map_list : forall c d a b. (a -> (List b)^d)^c -> ((List a)^d -> (List b)^(c + d))^c
+foreign pure flat_map_list from "@flick-lang/runtime" "listFlatMap"
+  arity 2
+
+pure_eff : a -> Eff r e a
+foreign pure pure_eff from "@flick-lang/runtime" "succeed"
+
+flat_map_eff :
+  forall c d r e a b. (a -> (Eff r e b)^d)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
+foreign pure flat_map_eff from "@flick-lang/runtime" "flatMapEff"
+  arity 2
+
+map_eff : forall c d r e a b. (a -> b)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
+foreign pure map_eff from "@flick-lang/runtime" "mapEff"
+  arity 2
+
+instance Functor Option =
+  map : forall c d a b. (a -> b)^c -> ((Option a)^d -> (Option b)^(c + d))^c
+  let map f value =
+    match value with
+    | None -> None
+    | Some x -> Some (f x)
+
+instance Foldable Option =
+  fold : forall c a b. (b -> a -> b)^c -> (b -> (Option a -> b)^c)^c
+  let fold f init value =
+    match value with
+    | None -> init
+    | Some x -> f init x
+
+instance Traversable Option =
+  traverse : forall c a b r e. (a ->{r; e} b)^c -> (Option a ->{r; e} Option b)^c
+  let traverse f value =
+    match value with
+    | None -> None
+    | Some x -> Some (f x)
+
+instance Applicative Option =
+  pure : forall a. a -> Option a
+  let pure x = Some x
+
+instance Monad Option =
+  flat_map : forall c d a b. (a -> (Option b)^d)^c -> ((Option a)^d -> (Option b)^(c + d))^c
+  let flat_map f value =
+    match value with
+    | None -> None
+    | Some x -> f x
+
+instance Functor (Result e) =
+  map : forall c d a b. (a -> b)^c -> ((Result e a)^d -> (Result e b)^(c + d))^c
+  let map f value =
+    match value with
+    | Err e -> Err e
+    | Ok x -> Ok (f x)
+
+instance Foldable (Result e) =
+  fold : forall c a b. (b -> a -> b)^c -> (b -> (Result e a -> b)^c)^c
+  let fold f init value =
+    match value with
+    | Err _ -> init
+    | Ok x -> f init x
+
+instance Traversable (Result e) =
+  traverse : forall c a b r x. (a ->{r; x} b)^c -> (Result e a ->{r; x} Result e b)^c
+  let traverse f value =
+    match value with
+    | Err e -> Err e
+    | Ok a -> Ok (f a)
+
+instance Applicative (Result e) =
+  pure : forall a. a -> Result e a
+  let pure x = Ok x
+
+instance Monad (Result e) =
+  flat_map :
+    forall c d a b. (a -> (Result e b)^d)^c -> ((Result e a)^d -> (Result e b)^(c + d))^c
+  let flat_map f value =
+    match value with
+    | Err e -> Err e
+    | Ok x -> f x
+
+instance Functor List =
+  map : forall c d a b. (a -> b)^c -> ((List a)^d -> (List b)^(c + d))^c
+  let map f xs = map_list f xs
+
+instance Foldable List =
+  fold : forall c a b. (b -> a -> b)^c -> (b -> (List a -> b)^c)^c
+  let fold f init xs = fold_list f init xs
+
+instance Traversable List =
+  traverse : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
+  let traverse f xs = traverse_list f xs
+
+instance Applicative List =
+  pure : forall a. a -> List a
+  let pure x = [x]
+
+instance Monad List =
+  flat_map : forall c d a b. (a -> (List b)^d)^c -> ((List a)^d -> (List b)^(c + d))^c
+  let flat_map f xs = flat_map_list f xs
+
+instance Functor (Eff r e) =
+  map : forall c d a b. (a -> b)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
+  let map f eff = map_eff f eff
+
+instance Applicative (Eff r e) =
+  pure : forall a. a -> Eff r e a
+  let pure x = pure_eff x
+
+instance Monad (Eff r e) =
+  flat_map :
+    forall c d a b. (a -> (Eff r e b)^d)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
+  let flat_map f eff = flat_map_eff f eff

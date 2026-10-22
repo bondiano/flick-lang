@@ -1,6 +1,6 @@
 /// Mutable cells. Every operation runs through
 /// the runtime, so a fresh cell is never generalized.
-module Ref exposing (make, get, set, modify)
+module Ref exposing (make, get, set, modify, same)
 
 make : a ->{} Ref a
 foreign sync make from "@flick-lang/runtime" "refMake"
@@ -8,13 +8,10 @@ foreign sync make from "@flick-lang/runtime" "refMake"
 get : Ref a ->{} a
 foreign sync get from "@flick-lang/runtime" "refGet"
 
-same_ref : Ref a -> Ref a -> Bool
-foreign pure same_ref from "@flick-lang/runtime" "refSame"
-
-/// Cells are equal when they are the same cell; they have no `Hash`.
-instance Eq (Ref a) =
-  eq : Ref a -> Ref a -> Bool
-  let eq x y = same_ref x y
+/// Whether both are the same cell. Cells have no `Eq` or `Hash`: a write
+/// would change what they compare by.
+same : Ref a -> Ref a -> Bool
+foreign pure same from "@flick-lang/runtime" "refSame"
 
 set : forall c a. (Ref a)^c -> (a ->{} Unit)^c
 foreign sync set from "@flick-lang/runtime" "refSet"

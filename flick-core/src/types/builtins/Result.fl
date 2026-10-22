@@ -1,0 +1,47 @@
+/// Outcomes as data: `Ok value` or `Err error`.
+module Result exposing (map, map_err, bind, with_default, is_ok, is_err, to_option, from_option)
+
+map : forall c e a b. (a -> b)^c -> (Result e a -> Result e b)^c
+let map f result =
+  match result with
+  | Err e -> Err e
+  | Ok x -> Ok (f x)
+
+map_err : forall c e x a. (e -> x)^c -> (Result e a -> Result x a)^c
+let map_err f result =
+  match result with
+  | Err e -> Err (f e)
+  | Ok x -> Ok x
+
+bind : forall c e a b. (a -> Result e b)^c -> (Result e a -> Result e b)^c
+let bind f result =
+  match result with
+  | Err e -> Err e
+  | Ok x -> f x
+
+with_default : a -> Result e a -> a
+let with_default fallback result =
+  match result with
+  | Err _ -> fallback
+  | Ok x -> x
+
+is_ok : Result e a -> Bool
+let is_ok result =
+  match result with
+  | Err _ -> false
+  | Ok _ -> true
+
+is_err : Result e a -> Bool
+let is_err result = not (is_ok result)
+
+to_option : Result e a -> Option a
+let to_option result =
+  match result with
+  | Err _ -> None
+  | Ok x -> Some x
+
+from_option : e -> Option a -> Result e a
+let from_option failure value =
+  match value with
+  | None -> Err failure
+  | Some x -> Ok x
