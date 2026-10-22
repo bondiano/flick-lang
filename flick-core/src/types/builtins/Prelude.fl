@@ -30,6 +30,23 @@ type Option a = None | Some a
 
 type Result e a = Err e | Ok a
 
+type Ordering = LT | EQ | GT
+
+/// Canonical equality; `Eq Number` is SameValueZero, like `==`.
+class Eq a =
+  val eq : a -> a -> Bool
+
+/// A total order that agrees with `Eq`.
+class Eq a => Ord a =
+  val compare : a -> a -> Ordering
+
+/// Equal values have equal hashes.
+class Eq a => Hash a =
+  val hash : a -> Number
+
+class Show a =
+  val show : a -> String
+
 /// The error an application fails with through `App.fail`.
 type error AppError = AppError { message : String; details : Option String }
 

@@ -372,6 +372,15 @@ impl Loader<'_> {
             None => self.from_packages.get(name).cloned(),
         };
         let (mut interface, diagnostics) = resolve::resolve(&module, &lookup);
+        let local = |name: &str| self.by_name.contains_key(name);
+        let build = self.project.map(|p| &p.config.build);
+        let options = types::Options {
+            local: &local,
+            limits: build.map_or_else(types::Limits::default, |b| types::Limits {
+                steps: b.solver_steps,
+                depth: b.solver_depth,
+            }),
+        };
         self.diagnostics
             .extend(loaded.parse.diagnostics.iter().cloned());
         self.diagnostics.extend(diagnostics);
@@ -381,6 +390,7 @@ impl Loader<'_> {
                 &module,
                 &lookup,
                 types::builtins(),
+                options,
                 &mut interface,
             ));
         }

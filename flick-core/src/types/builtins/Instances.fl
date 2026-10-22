@@ -1,0 +1,177 @@
+/// Instances of the built-in classes for the built-in types. Records and
+/// tuples have theirs from the compiler; every module sees all of them.
+module Instances
+
+eq_prim : a -> a -> Bool
+foreign pure eq_prim from "@flick-lang/runtime" "equals"
+
+compare_prim : a -> a -> Ordering
+foreign pure compare_prim from "@flick-lang/runtime" "compare"
+
+hash_prim : a -> Number
+foreign pure hash_prim from "@flick-lang/runtime" "hash"
+
+show_prim : a -> String
+foreign pure show_prim from "@flick-lang/runtime" "show"
+
+eq_list : (a -> a -> Bool) -> List a -> List a -> Bool
+foreign pure eq_list from "@flick-lang/runtime" "listEquals"
+
+compare_list : (a -> a -> Ordering) -> List a -> List a -> Ordering
+foreign pure compare_list from "@flick-lang/runtime" "listCompare"
+
+hash_list : (a -> Number) -> List a -> Number
+foreign pure hash_list from "@flick-lang/runtime" "listHash"
+
+show_list : (a -> String) -> List a -> String
+foreign pure show_list from "@flick-lang/runtime" "listShow"
+
+instance Eq Number =
+  eq : Number -> Number -> Bool
+  let eq x y = eq_prim x y
+
+instance Eq BigInt =
+  eq : BigInt -> BigInt -> Bool
+  let eq x y = eq_prim x y
+
+instance Eq String =
+  eq : String -> String -> Bool
+  let eq x y = eq_prim x y
+
+instance Eq Bool =
+  eq : Bool -> Bool -> Bool
+  let eq x y = eq_prim x y
+
+instance Eq Unit =
+  eq : Unit -> Unit -> Bool
+  let eq x y = true
+
+instance Eq Ordering =
+  eq : Ordering -> Ordering -> Bool
+  let eq x y = eq_prim x y
+
+instance Eq a => Eq (List a) =
+  eq : List a -> List a -> Bool
+  let eq xs ys = eq_list eq xs ys
+
+instance Eq a => Eq (Option a) =
+  eq : Option a -> Option a -> Bool
+  let eq x y =
+    match (x, y) with
+    | (Some a, Some b) -> eq a b
+    | (None, None) -> true
+    | _ -> false
+
+instance (Eq e, Eq a) => Eq (Result e a) =
+  eq : Result e a -> Result e a -> Bool
+  let eq x y =
+    match (x, y) with
+    | (Ok a, Ok b) -> eq a b
+    | (Err a, Err b) -> eq a b
+    | _ -> false
+
+instance Ord Number =
+  compare : Number -> Number -> Ordering
+  let compare x y = compare_prim x y
+
+instance Ord BigInt =
+  compare : BigInt -> BigInt -> Ordering
+  let compare x y = compare_prim x y
+
+instance Ord String =
+  compare : String -> String -> Ordering
+  let compare x y = compare_prim x y
+
+instance Ord Bool =
+  compare : Bool -> Bool -> Ordering
+  let compare x y = compare_prim x y
+
+instance Ord Unit =
+  compare : Unit -> Unit -> Ordering
+  let compare x y = EQ
+
+instance Ord a => Ord (List a) =
+  compare : List a -> List a -> Ordering
+  let compare xs ys = compare_list compare xs ys
+
+instance Ord a => Ord (Option a) =
+  compare : Option a -> Option a -> Ordering
+  let compare x y =
+    match (x, y) with
+    | (Some a, Some b) -> compare a b
+    | (None, None) -> EQ
+    | (None, _) -> LT
+    | _ -> GT
+
+instance Hash Number =
+  hash : Number -> Number
+  let hash x = hash_prim x
+
+instance Hash BigInt =
+  hash : BigInt -> Number
+  let hash x = hash_prim x
+
+instance Hash String =
+  hash : String -> Number
+  let hash x = hash_prim x
+
+instance Hash Bool =
+  hash : Bool -> Number
+  let hash x = hash_prim x
+
+instance Hash Unit =
+  hash : Unit -> Number
+  let hash x = 0
+
+instance Hash a => Hash (List a) =
+  hash : List a -> Number
+  let hash xs = hash_list hash xs
+
+instance Hash a => Hash (Option a) =
+  hash : Option a -> Number
+  let hash x =
+    match x with
+    | Some a -> hash a
+    | None -> 0
+
+instance Show Number =
+  show : Number -> String
+  let show x = show_prim x
+
+instance Show BigInt =
+  show : BigInt -> String
+  let show x = show_prim x
+
+instance Show String =
+  show : String -> String
+  let show x = show_prim x
+
+instance Show Bool =
+  show : Bool -> String
+  let show x = show_prim x
+
+instance Show Unit =
+  show : Unit -> String
+  let show x = "()"
+
+instance Show Ordering =
+  show : Ordering -> String
+  let show x = show_prim x
+
+instance Show a => Show (List a) =
+  show : List a -> String
+  let show xs = show_list show xs
+
+instance Show a => Show (Option a) =
+  show : Option a -> String
+  let show x =
+    match x with
+    | Some a -> "Some " ++ show a
+    | None -> "None"
+
+instance (Show e, Show a) => Show (Result e a) =
+  show : Result e a -> String
+  let show x =
+    match x with
+    | Ok a -> "Ok " ++ show a
+    | Err e -> "Err " ++ show e

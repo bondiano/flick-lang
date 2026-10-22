@@ -1,46 +1,66 @@
-//! Instances: the methods are checked against their own signatures, with
-//! the variables of the instance head in scope.
+//! Methods of an instance: each one has the signature of its class method
+//! with the instance's types in place of the class parameters, and no
+//! constraint the class signature lacks; bodies are checked against it with
+//! the instance's context assumed.
 
 use super::Checker;
 use super::bindings::let_parts;
-use super::convert::{Free, is_type};
-use super::kinds::Kind;
+use super::classes::{Wanted, split};
+use super::convert::{TyVar, is_type};
+use super::env::Instance;
+use super::ty::Type;
+use crate::diagnostics::codes;
+use crate::iface::{Entity, Namespace};
+use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
 impl Checker<'_> {
-    /// The methods of an instance are checked against their own signatures,
-    /// with the variables of the head in scope.
-    pub(super) fn instance(&mut self, decl: &Node) {
+    pub(super) fn instance_methods(&mut self, decl: &Node, instance: &Instance) {
+        let Some(((cm, cn), args)) = split(&instance.head) else {
+            return;
+        };
+        let (cm, cn) = (cm.to_owned(), cn.to_owned());
+        let Some(info) = self.class_info(&cm, &cn) else {
+            return;
+        };
         let mark = self.tyvars.len();
-        for part in decl.nodes() {
-            match part.kind {
-                K::Context => {
-                    for c in part.nodes() {
-                        self.ty(c, &Kind::Constraint, Free::Quantify);
-                    }
-                }
-                kind if is_type(kind) => {
-                    self.ty(part, &Kind::Constraint, Free::Quantify);
-                }
-                _ => {}
-            }
+        let skolems: Vec<(String, Type)> = instance
+            .vars
+            .iter()
+            .map(|v| (v.name.clone(), self.store.skolem(&v.name)))
+            .collect();
+        for (v, (name, ty)) in instance.vars.iter().zip(&skolems) {
+            self.tyvars.push(TyVar {
+                name: name.clone(),
+                ty: ty.clone(),
+                kind: v.kind.clone(),
+            });
         }
-        for i in mark..self.tyvars.len() {
-            let name = self.tyvars[i].name.clone();
-            self.tyvars[i].kind = self.kinds.zonk(&self.tyvars[i].kind, true);
-            self.tyvars[i].ty = self.store.skolem(&name);
-        }
+        let args: Vec<Type> = args.iter().map(|a| a.substitute(&skolems)).collect();
+        let assumed = self.classes.givens.len();
+        let context = instance.context.iter().map(|c| c.substitute(&skolems));
+        self.classes.givens.extend(context);
         let members: Vec<&Node> = decl
             .nodes()
             .filter(|n| n.kind == K::Members)
             .flat_map(Node::nodes)
             .collect();
+        let mut defined = Vec::new();
         for (j, member) in members.iter().enumerate() {
             match member.kind {
                 K::LetDecl => {
                     let parts = let_parts(member, self.text);
                     let name = parts.name.clone().unwrap_or_default();
+                    if !info.methods.contains(&name) {
+                        self.error(
+                            codes::C011,
+                            self.span(member),
+                            format!("`{name}` is not a method of class `{cn}`"),
+                        );
+                        continue;
+                    }
+                    defined.push(name.clone());
                     let sig = j
                         .checked_sub(1)
                         .map(|k| members[k])
@@ -49,6 +69,11 @@ impl Checker<'_> {
                     match sig {
                         Some(sig) => {
                             let (scheme, _) = self.signature(sig);
+                            if let Some(expected) =
+                                self.method_type(&cm, &name, &info.params, &args)
+                            {
+                                self.compare_method(&name, &scheme, &expected, self.span(sig));
+                            }
                             self.check_signed(member, &parts, &scheme, None);
                         }
                         None => {
@@ -63,6 +88,106 @@ impl Checker<'_> {
                 _ => {}
             }
         }
+        let missing: Vec<String> = info
+            .methods
+            .iter()
+            .filter(|m| !defined.contains(m))
+            .map(|m| format!("`{m}`"))
+            .collect();
+        if !missing.is_empty() {
+            let head = decl
+                .nodes()
+                .find(|n| is_type(n.kind))
+                .map_or_else(|| self.span(decl), |h| self.span(h));
+            self.error(
+                codes::C011,
+                head,
+                format!("`{}` lacks method {}", instance.name, missing.join(", ")),
+            );
+        }
+        self.solve_classes(true);
+        self.classes.givens.truncate(assumed);
         self.tyvars.truncate(mark);
+    }
+
+    /// The class signature of `method` with `args` for the class parameters,
+    /// without the class constraint itself.
+    fn method_type(
+        &self,
+        class_module: &str,
+        method: &str,
+        params: &[String],
+        args: &[Type],
+    ) -> Option<Type> {
+        let entity = Entity {
+            module: class_module.to_owned(),
+            namespace: Namespace::Value,
+            name: method.to_owned(),
+        };
+        let Type::Forall {
+            vars,
+            constraints,
+            body,
+        } = self.env.value(&entity)?
+        else {
+            return None;
+        };
+        let subst: Vec<(String, Type)> = params.iter().cloned().zip(args.iter().cloned()).collect();
+        let own = vars.get(params.len()..).unwrap_or_default().to_vec();
+        let constraints = constraints.get(1..).unwrap_or_default().to_vec();
+        let ty = if own.is_empty() && constraints.is_empty() {
+            (**body).clone()
+        } else {
+            Type::Forall {
+                vars: own,
+                constraints,
+                body: body.clone(),
+            }
+        };
+        Some(ty.substitute(&subst))
+    }
+
+    /// The signature of an instance method must be the class signature: as
+    /// polymorphic, and with no constraint the class signature does not imply.
+    fn compare_method(&mut self, name: &str, scheme: &Type, expected: &Type, span: Span) {
+        self.store.level += 1;
+        let mark = self.classes.wanted.len();
+        let (body, _, assumed) = self.skolemize(expected);
+        let own = self.instantiate(scheme, span);
+        let same = self.unify(&own, &body).is_ok();
+        let required: Vec<Wanted> = self.classes.wanted.drain(mark..).collect();
+        self.store.level -= 1;
+        if !same {
+            let shown = self.show(expected);
+            self.error(
+                codes::C010,
+                span,
+                format!(
+                    "method `{name}` must have the class signature for this instance: `{shown}`"
+                ),
+            );
+            return;
+        }
+        let mut givens = self.classes.givens.clone();
+        givens.extend(assumed);
+        let written = match scheme {
+            Type::Forall { constraints, .. } => constraints.clone(),
+            _ => Vec::new(),
+        };
+        for (i, w) in required.iter().enumerate() {
+            if !matches!(
+                self.entails(&w.constraint, &givens),
+                super::classes::Outcome::Solved(_)
+            ) {
+                let shown = self.show(written.get(i).unwrap_or(&w.constraint));
+                self.error(
+                    codes::C010,
+                    span,
+                    format!(
+                        "method `{name}` requires `{shown}`, which the class signature does not"
+                    ),
+                );
+            }
+        }
     }
 }

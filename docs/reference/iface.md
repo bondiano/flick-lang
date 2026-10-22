@@ -9,11 +9,11 @@ Until 0.1.0 the schema grows with the compiler: every change bumps
 `iface-version`, and a compiler rejects any version but its own with
 `FLICK-P010`. Release 0.1.0 freezes the version it ships with.
 
-## Version 1
+## Version 2
 
 ```json
 {
-  "iface-version": 1,
+  "iface-version": 2,
   "language": "0.7",
   "module": "App.Shapes",
   "exports": [
@@ -36,6 +36,7 @@ Until 0.1.0 the schema grows with the compiler: every change bumps
 | `module` | full name of the described module |
 | `exports` | the module's interface, in the order of its `exposing` list |
 | `hidden` | constructors of exported types that are not exported, so an import of one gets a precise `FLICK-R005`; omitted when empty |
+| `instances` | the instances of the module and of every module it depends on, except built-in ones; omitted when empty |
 
 Each export names an **entity** by `module`, `namespace` and `name`. `module`
 is where the entity is *defined*: a re-export keeps the defining module, which
@@ -118,13 +119,28 @@ declaration and `{ "arrow": [K1, K2] }`.
 | `error` | — | `type error E …`; its constructor is `E` |
 | `alias` | `params`, `body` | transparent alias |
 | `service` | `params`, `operations` (`name`, `type`) | `service`; `operations` hold the types as declared, without the service itself, and an importer derives `S.Impl` from them |
-| `class` | — | `class`; methods are `value` exports |
+| `class` | `params`, `supers`, `fundeps` (`from`, `to`: parameter positions), `methods` | `class`; methods are `value` exports, their type starting with the class constraint |
 | `kind` | — | `kind K = …`; `kind` is the kind it names |
 | `kind-member` | — | a member of a `kind` |
 
 Transparent aliases are expanded in every exported type, so an importer never
 needs the alias of a module it does not import. An opaque type is `nominal`
 outside its module: importers cannot see its representation.
+
+### Instances
+
+```json
+{ "module": "App.Shapes", "name": "Show (List a)",
+  "vars": [ { "name": "a", "kind": "type" } ],
+  "context": [ { "app": { "head": { "con": { "module": "App.Shapes", "name": "Show" } }, "arg": { "var": "a" } } } ],
+  "head": { "app": { "head": { "con": { "module": "App.Shapes", "name": "Show" } },
+                     "arg": { "app": { "head": { "con": { "module": "Prelude", "name": "List" } }, "arg": { "var": "a" } } } } } }
+```
+
+`module` declares the instance and `name` is its head as written; `head` and
+`context` are over `vars`, with transparent aliases expanded. An importer
+checks its own instances against these for overlap and functional
+dependencies, and resolves constraints with them.
 
 ## Location in a package
 
@@ -144,7 +160,6 @@ information:
 
 | Addition | Contents |
 | - | - |
-| classes | class heads, superclasses, functional dependencies, instance heads, the dictionaries an instance selects |
 | captures | capture and region constraints of public functions, never erased |
 | ABI and summaries | data ABI of each type, arity, purity and partiality for cross-module optimization |
 | fingerprints | a fingerprint of the interface and of each dependency's interface, for incremental builds and `pack` |

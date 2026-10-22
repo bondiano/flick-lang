@@ -1,0 +1,9 @@
+// The budget of instance resolution comes from `flick.toml`.
+module App.Budget exposing (small, large)
+
+small : List (Option Number) -> String
+let small value = show value
+
+large : List (List (List (List (List (List (List (List (List (List Number))))))))) -> String
+let large value = show value
+//                ^^^^ FLICK-C009 exceeds the budget of 10 steps

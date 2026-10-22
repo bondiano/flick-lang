@@ -1,0 +1,40 @@
+// Ownership goes by package: the package of the class, or of the nominal
+// type at the head of the first type of the instance.
+module App.Ids exposing (LocalExternalId(..), LocalEmail(..))
+
+import Acme.Ids exposing (ExternalId, Convert)
+
+instance Eq ExternalId =
+  eq : ExternalId -> ExternalId -> Bool
+  let eq a b = true
+
+instance Hash ExternalId =
+  hash : ExternalId -> Number
+  let hash id = 0
+
+// a nominal wrapper of this package may have them
+type LocalExternalId = LocalExternalId ExternalId
+
+instance Eq LocalExternalId =
+  eq : LocalExternalId -> LocalExternalId -> Bool
+  let eq a b = true
+
+instance Hash LocalExternalId =
+  hash : LocalExternalId -> Number
+  let hash id = 0
+
+type LocalEmail = LocalEmail String
+
+// owning a later parameter is not enough
+instance Convert String LocalEmail
+
+instance Convert LocalEmail String
+
+// the package's own instance is seen without naming it
+instance Convert String ExternalId
+
+//~ FLICK-C006 @7:1-9:20 orphan instance `Eq ExternalId`: only the package of class `Eq` or of type `ExternalId`
+//~ FLICK-C006 @11:1-13:18 orphan instance `Hash ExternalId`
+//~ FLICK-C006 @29:1-29:35 orphan instance `Convert String LocalEmail`: only the package of class `Convert` or of type `String`, its first type, may declare it
+//~ FLICK-C006 @34:1-34:35 orphan instance `Convert String ExternalId`
+//~ FLICK-C003 @34:1-34:35 overlaps `Convert String ExternalId` of module `Acme.Ids`

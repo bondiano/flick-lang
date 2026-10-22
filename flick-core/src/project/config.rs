@@ -34,6 +34,9 @@ pub struct Build {
     pub emit: Emit,
     pub emit_dts: bool,
     pub schema_aot: bool,
+    /// Instance resolution budget per definition.
+    pub solver_steps: u32,
+    pub solver_depth: u32,
 }
 
 impl Default for Build {
@@ -44,6 +47,8 @@ impl Default for Build {
             emit: Emit::Js,
             emit_dts: false,
             schema_aot: false,
+            solver_steps: crate::types::Limits::default().steps,
+            solver_depth: crate::types::Limits::default().depth,
         }
     }
 }

@@ -8,6 +8,14 @@ use crate::iface::{Decl, Interface, Namespace};
 impl Checker<'_> {
     /// Stores the types and kinds of this module's exports.
     pub fn fill(&self, interface: &mut Interface) {
+        // built-in instances are known to every module without an interface
+        interface.instances = self
+            .env
+            .instances
+            .iter()
+            .filter(|i| !self.env.builtin.contains(&i.module))
+            .cloned()
+            .collect();
         for export in &mut interface.exports {
             let entity = &export.entity;
             if entity.module != self.env.module {

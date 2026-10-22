@@ -1,0 +1,27 @@
+// `deriving` covers Eq, Ord, Hash and Show of nominal types; every field
+// needs the class, and Hash and Ord come with Eq.
+module App.Deriving exposing (..)
+
+type Key = Key (Ref String)
+  deriving Eq, Hash
+
+type Count = Count Number
+  deriving Hash
+
+type alias Point = { x : Number }
+  deriving Eq
+
+type Handler = Handler (Number -> Number)
+  deriving Show
+
+class Pretty a =
+  val pretty : a -> String
+
+type Label = Label String
+  deriving Pretty
+
+//~ FLICK-C013 @6:3-6:20 cannot derive `Hash Key`: a field of type `Ref String` has no `Hash` instance
+//~ FLICK-C013 @9:3-9:16 derive `Eq` together with `Hash`
+//~ FLICK-C013 @12:3-12:14 `Point` is a transparent alias
+//~ FLICK-C013 @15:3-15:16 a field of type `Number -> Number` has no `Show` instance
+//~ FLICK-C013 @21:3-21:18 `Pretty` cannot be derived

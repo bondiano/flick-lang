@@ -10,8 +10,10 @@ use crate::source::SourceMap;
 use crate::syntax;
 
 /// In dependency order: each module sees the ones before it.
-const SOURCES: [(&str, &str); 6] = [
+const SOURCES: [(&str, &str); 8] = [
     ("Prelude", include_str!("builtins/Prelude.fl")),
+    ("Instances", include_str!("builtins/Instances.fl")),
+    ("Record", include_str!("builtins/Record.fl")),
     ("Ref", include_str!("builtins/Ref.fl")),
     ("String", include_str!("builtins/String.fl")),
     ("Platform", include_str!("builtins/Platform.fl")),
@@ -39,7 +41,19 @@ pub fn builtins() -> &'static [Interface] {
             let imported = |_: &str| None;
             let (mut interface, mut diagnostics) = resolve::resolve(&module, &imported);
             diagnostics.extend(parse.diagnostics);
-            diagnostics.extend(super::check(&module, &imported, &done, &mut interface));
+            // the built-in modules are one package
+            let local = |name: &str| SOURCES.iter().any(|(n, _)| *n == name);
+            let options = super::Options {
+                local: &local,
+                limits: super::Limits::default(),
+            };
+            diagnostics.extend(super::check(
+                &module,
+                &imported,
+                &done,
+                options,
+                &mut interface,
+            ));
             assert!(
                 diagnostics.is_empty(),
                 "built-in module {name} does not check: {diagnostics:?}"
@@ -60,7 +74,16 @@ mod tests {
             .collect();
         assert_eq!(
             names,
-            ["Prelude", "Ref", "String", "Platform", "App", "Layer"]
+            [
+                "Prelude",
+                "Instances",
+                "Record",
+                "Ref",
+                "String",
+                "Platform",
+                "App",
+                "Layer"
+            ]
         );
     }
 }

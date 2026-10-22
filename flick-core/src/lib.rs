@@ -2,7 +2,7 @@
 //!
 //! Source of truth: `Flick спецификация ML языка с HKT и Effect.md` in the
 //! repository root. Implemented so far: diagnostics, syntax, `fmt`, names and
-//! modules, the project model, and kinds and types.
+//! modules, the project model, kinds and types, and classes.
 
 pub mod bootstrap;
 pub mod consteval;
@@ -33,6 +33,11 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
         syntax: &syntax,
     };
     let (mut interface, resolved) = resolve::resolve(&module, &|_| None);
+    let local = |name: &str| name == module.name;
+    let options = types::Options {
+        local: &local,
+        limits: types::Limits::default(),
+    };
     let mut diagnostics = parse.diagnostics;
     diagnostics.extend(resolved);
     if !diagnostics
@@ -43,6 +48,7 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
             &module,
             &|_| None,
             types::builtins(),
+            options,
             &mut interface,
         ));
     }

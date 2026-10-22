@@ -257,7 +257,9 @@ impl Checker<'_> {
         self.header_types(decl, parts, true);
         self.store.level += 1;
         let kinds = binders(scheme);
-        let (body, skolems) = self.skolemize(scheme);
+        let (body, skolems, givens) = self.skolemize(scheme);
+        let assumed = self.classes.givens.len();
+        self.classes.givens.extend(givens);
         let mark = self.tyvars.len();
         for (name, ty) in skolems {
             let kind = kinds
@@ -278,6 +280,7 @@ impl Checker<'_> {
             self.function(&parts.params, parts.body, Some(&body), decl);
         }
         let runtime = mem::replace(&mut self.runtime, saved);
+        self.classes.givens.truncate(assumed);
         self.tyvars.truncate(mark);
         self.store.level -= 1;
         runtime

@@ -109,7 +109,7 @@ pub(super) fn union(p: &mut Parser) -> Option<Done> {
 pub(super) fn at_atom_start(p: &Parser) -> bool {
     matches!(
         p.current(),
-        K::Ident | K::Con | K::NoneKw | K::LParen | K::LBrace
+        K::Ident | K::Con | K::NoneKw | K::String | K::LParen | K::LBrace
     )
 }
 
@@ -148,7 +148,8 @@ fn atom(p: &mut Parser) -> Option<Done> {
     }
     let m = p.start();
     let kind = match p.current() {
-        K::Ident | K::NoneKw => {
+        // a string is a label at the type level
+        K::Ident | K::NoneKw | K::String => {
             p.bump();
             K::NameType
         }

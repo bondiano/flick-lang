@@ -1,8 +1,6 @@
-// Higher-rank callbacks.
+// Higher-rank callbacks; a constraint inside the nested `forall` is
+// assumed by the callback and required where it is called.
 module App.HigherRank exposing (apply_twice, render_twice, use_both)
-
-class Show a =
-  val show : a -> String
 
 apply_twice :
   (forall a. a -> a) -> (Number, String)
@@ -21,4 +19,6 @@ use_both : Unit -> (Number, String)
 let use_both () =
   let pair = apply_twice keep
   let lambda = apply_twice (fun x -> x)
+  let shown = render_twice show
+  let quoted = render_twice (fun x -> "<" ++ show x ++ ">")
   pair

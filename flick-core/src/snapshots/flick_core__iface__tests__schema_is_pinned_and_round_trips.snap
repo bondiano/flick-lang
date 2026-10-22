@@ -3,7 +3,7 @@ source: flick-core/src/iface.rs
 expression: json
 ---
 {
-  "iface-version": 1,
+  "iface-version": 2,
   "language": "0.7",
   "module": "App.Shapes",
   "exports": [
@@ -153,7 +153,13 @@ expression: json
             "constraint"
           ]
         },
-        "form": "class"
+        "form": "class",
+        "params": [
+          "a"
+        ],
+        "methods": [
+          "show"
+        ]
       }
     },
     {
@@ -197,6 +203,104 @@ expression: json
                 }
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "type",
+      "name": "Collection",
+      "decl": "class",
+      "definition": {
+        "kind": {
+          "arrow": [
+            "type",
+            {
+              "arrow": [
+                "type",
+                "constraint"
+              ]
+            }
+          ]
+        },
+        "form": "class",
+        "params": [
+          "c",
+          "a"
+        ],
+        "supers": [
+          {
+            "app": {
+              "head": {
+                "con": {
+                  "module": "Prelude",
+                  "name": "Eq"
+                }
+              },
+              "arg": {
+                "var": "a"
+              }
+            }
+          }
+        ],
+        "fundeps": [
+          {
+            "from": [
+              0
+            ],
+            "to": [
+              1
+            ]
+          }
+        ],
+        "methods": [
+          "empty"
+        ]
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "value",
+      "name": "empty",
+      "decl": "method",
+      "parent": "Collection",
+      "type": {
+        "forall": {
+          "vars": [
+            {
+              "name": "c",
+              "kind": "type"
+            },
+            {
+              "name": "a",
+              "kind": "type"
+            }
+          ],
+          "constraints": [
+            {
+              "app": {
+                "head": {
+                  "app": {
+                    "head": {
+                      "con": {
+                        "module": "App.Shapes",
+                        "name": "Collection"
+                      }
+                    },
+                    "arg": {
+                      "var": "c"
+                    }
+                  }
+                },
+                "arg": {
+                  "var": "a"
+                }
+              }
+            }
+          ],
+          "body": {
+            "var": "c"
           }
         }
       }
@@ -483,6 +587,48 @@ expression: json
     {
       "name": "Id",
       "parent": "Id"
+    }
+  ],
+  "instances": [
+    {
+      "module": "App.Shapes",
+      "name": "Eq Shape",
+      "head": {
+        "app": {
+          "head": {
+            "con": {
+              "module": "Prelude",
+              "name": "Eq"
+            }
+          },
+          "arg": {
+            "con": {
+              "module": "App.Shapes",
+              "name": "Shape"
+            }
+          }
+        }
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "name": "Show Shape",
+      "head": {
+        "app": {
+          "head": {
+            "con": {
+              "module": "App.Shapes",
+              "name": "Show"
+            }
+          },
+          "arg": {
+            "con": {
+              "module": "App.Shapes",
+              "name": "Shape"
+            }
+          }
+        }
+      }
     }
   ]
 }

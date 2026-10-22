@@ -283,7 +283,7 @@ impl Checker<'_> {
         }
     }
 
-    fn constraints(&mut self, node: &Node, free: Free) -> Vec<Type> {
+    pub fn constraints(&mut self, node: &Node, free: Free) -> Vec<Type> {
         match node.kind {
             K::TupleType => node
                 .nodes()
@@ -359,6 +359,10 @@ impl Checker<'_> {
         let first = tokens.first()?;
         match first.kind {
             K::NoneKw => return Some((Type::empty_row(), self.kinds.fresh())),
+            K::String => {
+                let label = crate::syntax::literal::string_value(first.text(self.text));
+                return Some((Type::Symbol(label), Kind::Symbol));
+            }
             K::Ident => {
                 let name = first.text(self.text);
                 if let Some(v) = self.tyvars.iter().rev().find(|v| v.name == name) {

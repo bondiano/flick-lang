@@ -9,6 +9,7 @@
 use super::Checker;
 use super::env::Form;
 use super::ty::{Norm, Row, Type};
+use crate::source::Span;
 
 #[derive(Debug, Clone)]
 enum MetaState {
@@ -101,7 +102,9 @@ impl Store {
                 MetaState::Bound(next) => self.zonk(next),
                 MetaState::Open { .. } => t.clone(),
             },
-            Type::Con { .. } | Type::Var(_) | Type::Skolem(_) | Type::Error => t.clone(),
+            Type::Con { .. } | Type::Var(_) | Type::Symbol(_) | Type::Skolem(_) | Type::Error => {
+                t.clone()
+            }
             Type::Union(a, b) => self
                 .normalize(&Type::Union(Box::new(self.zonk(a)), Box::new(self.zonk(b))))
                 .into_type(),
@@ -259,9 +262,16 @@ impl Checker<'_> {
 
     /// The fixed projections of a row into a type, once the row is known
     /// well enough: `Errors none` is `Never`, `Errors {E}` is `E`, and
-    /// `ServiceImpl {S}` is `S.Impl`.
+    /// `ServiceImpl {S}` is `S.Impl`; `Record.Field "x" T` is `{ x : T }`.
     fn project(&self, t: &Type) -> Option<Type> {
         let (head, args) = t.spine();
+        if let ([label, field], Type::Con { module, name }) = (&args[..], head)
+            && module == super::classes::RECORD
+            && name == "Field"
+            && let Type::Symbol(label) = self.store.resolve(label)
+        {
+            return Some(Type::Record(Row::closed(vec![(label, (*field).clone())])));
+        }
         let [row] = args[..] else { return None };
         if !head.is_prim("Errors") && !head.is_prim("ServiceImpl") {
             return None;
@@ -327,7 +337,7 @@ impl Checker<'_> {
             (Type::Meta(x), Type::Meta(y)) if x == y => Ok(()),
             (Type::Meta(m), t) | (t, Type::Meta(m)) => self.bind(*m, t),
             (Type::Skolem(x), Type::Skolem(y)) if x == y => Ok(()),
-            (Type::Var(x), Type::Var(y)) if x == y => Ok(()),
+            (Type::Var(x), Type::Var(y)) | (Type::Symbol(x), Type::Symbol(y)) if x == y => Ok(()),
             (Type::Con { .. }, Type::Con { .. }) if a == b => Ok(()),
             (Type::App { head: h1, arg: a1 }, Type::App { head: h2, arg: a2 }) => {
                 // an argument that is no error explains itself better than the application
@@ -424,34 +434,47 @@ impl Checker<'_> {
         Ok(())
     }
 
-    /// The body of a polymorphic type with fresh variables for its own.
-    pub fn instantiate(&mut self, t: &Type) -> Type {
+    /// The body of a polymorphic type with fresh variables for its own; its
+    /// class constraints become constraints to solve, required at `span`.
+    pub fn instantiate(&mut self, t: &Type, span: Span) -> Type {
         match self.store.resolve(t) {
-            Type::Forall { vars, body, .. } => {
+            Type::Forall {
+                vars,
+                constraints,
+                body,
+            } => {
                 let subst: Vec<(String, Type)> = vars
                     .iter()
                     .map(|v| (v.name.clone(), self.fresh()))
                     .collect();
-                self.instantiate(&body.substitute(&subst))
+                for c in &constraints {
+                    self.want(c.substitute(&subst), span);
+                }
+                self.instantiate(&body.substitute(&subst), span)
             }
             other => other,
         }
     }
 
     /// The body of a polymorphic type with fresh skolems at the current
-    /// level, and the skolems by name.
-    pub fn skolemize(&mut self, t: &Type) -> (Type, Vec<(String, Type)>) {
+    /// level, the skolems by name, and its class constraints over them.
+    pub fn skolemize(&mut self, t: &Type) -> (Type, Vec<(String, Type)>, Vec<Type>) {
         match self.store.resolve(t) {
-            Type::Forall { vars, body, .. } => {
+            Type::Forall {
+                vars,
+                constraints,
+                body,
+            } => {
                 let subst: Vec<(String, Type)> = vars
                     .iter()
                     .map(|v| (v.name.clone(), self.store.skolem(&v.name)))
                     .collect();
-                let (body, mut more) = self.skolemize(&body.substitute(&subst));
-                more.splice(0..0, subst);
-                (body, more)
+                let (body, mut more, mut givens) = self.skolemize(&body.substitute(&subst));
+                more.splice(0..0, subst.iter().cloned());
+                givens.splice(0..0, constraints.iter().map(|c| c.substitute(&subst)));
+                (body, more, givens)
             }
-            other => (other, Vec::new()),
+            other => (other, Vec::new(), Vec::new()),
         }
     }
 }

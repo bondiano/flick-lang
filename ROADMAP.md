@@ -421,29 +421,29 @@ c metadata (`arity`, `this`, `catch`, `cancel signal`, nullable/retention),
 
 **AC**
 
-- [ ] Отсутствующий или неоднозначный instance даёт понятную диагностику с
+- [x] Отсутствующий или неоднозначный instance даёт понятную диагностику с
       местом требования и кандидатами (§13).
-- [ ] `Functor Option` и `Functor (Eff r e)` проверяются; `map` работает с обоими (§13).
-- [ ] `Collection UserSet User` + `Collection UserSet String` → нарушение FD.
-- [ ] `empty_users` выводит `User` через FD без аннотации.
-- [ ] Нарушение strict coverage (переменная определяемой части не в определяющей) → ошибка.
-- [ ] `Show a => Show (List a)` + `Show (List Number)` → overlap-ошибка.
-- [ ] Orphan instance (`Hash ExternalId` в чужом пакете) отвергается; nominal
+- [x] `Functor Option` и `Functor (Eff r e)` проверяются; `map` работает с обоими (§13).
+- [x] `Collection UserSet User` + `Collection UserSet String` → нарушение FD.
+- [x] `empty_users` выводит `User` через FD без аннотации.
+- [x] Нарушение strict coverage (переменная определяемой части не в определяющей) → ошибка.
+- [x] `Show a => Show (List a)` + `Show (List Number)` → overlap-ошибка.
+- [x] Orphan instance (`Hash ExternalId` в чужом пакете) отвергается; nominal
       wrapper `LocalExternalId` проходит.
-- [ ] `Convert String LocalEmail` из пакета `LocalEmail` отвергается (владение
+- [x] `Convert String LocalEmail` из пакета `LocalEmail` отвергается (владение
       только первым параметром).
-- [ ] Нестрого уменьшающийся recursive constraint отвергается; цикл superclasses
+- [x] Нестрого уменьшающийся recursive constraint отвергается; цикл superclasses
       отвергается.
-- [ ] Искусственно дорогая задача упирается в бюджет и даёт диагностику, а не
+- [x] Искусственно дорогая задача упирается в бюджет и даёт диагностику, а не
       зависание или успех.
-- [ ] Набор instances не зависит от порядка и формы `import` (тест с
+- [x] Набор instances не зависит от порядка и формы `import` (тест с
       перестановкой импортов даёт идентичный результат и dictionary choices).
-- [ ] Два transparent alias одной формы делят один structural `Eq`; попытка
+- [x] Два transparent alias одной формы делят один structural `Eq`; попытка
       объявить для alias отдельный instance отвергается.
-- [ ] `UnionDisjoint` отвергает повтор label; `Record.extend` требует `Lacks`;
+- [x] `UnionDisjoint` отвергает повтор label; `Record.extend` требует `Lacks`;
       пользовательский `instance HasField …` отвергается.
-- [ ] `deriving Hash` для record с `Ref` без witness → диагностика (§9).
-- [ ] Метод instance с дополнительным constraint сверх класса отвергается.
+- [x] `deriving Hash` для record с `Ref` без witness → диагностика (§9).
+- [x] Метод instance с дополнительным constraint сверх класса отвергается.
 
 ---
 

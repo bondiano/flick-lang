@@ -1,0 +1,48 @@
+// Constraints resolve through instances, the signature's assumptions and
+// their superclasses; a functional dependency fixes the element type.
+module App.Resolution exposing (..)
+
+type User = User String
+
+type UserSet = UserSet (List User)
+
+class Collection c a | c -> a =
+  val empty : c
+  val insert : a -> c -> c
+
+instance Collection UserSet User =
+  empty : UserSet
+  let empty = UserSet []
+
+  insert : User -> UserSet -> UserSet
+  let insert user set =
+    match set with
+    | UserSet users -> UserSet ([user] ++ users)
+
+empty_users : UserSet
+let empty_users =
+  empty
+
+one_user : User -> UserSet
+let one_user user = insert user empty
+
+render : Show a => a -> String
+let render value =
+  show value
+
+same : Ord a => a -> a -> Bool
+let same x y = eq x y
+
+texts : List String
+let texts = [render 1, render "a", render [Some 1n], show (Ok 1 : Result String Number)]
+
+/// Transparent aliases of one record form share its structural instances.
+type alias Point = { x : Number; y : Number }
+
+type alias Coords = { y : Number; x : Number }
+
+close : Point -> Coords -> Bool
+let close p q = eq p q
+
+pair_text : String
+let pair_text = show (1, "one", { name = "n" })

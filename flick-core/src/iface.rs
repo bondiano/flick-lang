@@ -1,15 +1,15 @@
 //! `.iface`, the native interface of a module: versioned JSON that an
 //! importer reads instead of the module's source. Schema:
-//! `docs/reference/iface.md`. Version 1 holds names, their identity, and the
-//! types and kinds of exports; classes, captures and ABI join it with the
-//! phases that produce them.
+//! `docs/reference/iface.md`. Version 2 holds names, their identity, the
+//! types and kinds of exports, classes and instances; captures and ABI join
+//! it with the phases that produce them.
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::{Type, TypeDef};
+use crate::types::{Instance, Type, TypeDef};
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 1;
+pub const IFACE_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -94,6 +94,10 @@ pub struct Interface {
     pub exports: Vec<Export>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden: Vec<Hidden>,
+    /// The instances of the module and of every module it depends on: an
+    /// importer sees them all, whatever it imports by name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub instances: Vec<Instance>,
 }
 
 impl Interface {
@@ -179,10 +183,16 @@ mod tests {
             syntax: &syntax,
         };
         let (mut interface, mut diagnostics) = resolve::resolve(&module, &|_| None);
+        let local = |name: &str| name == "App.Shapes";
+        let options = crate::types::Options {
+            local: &local,
+            limits: crate::types::Limits::default(),
+        };
         diagnostics.extend(crate::types::check(
             &module,
             &|_| None,
             crate::types::builtins(),
+            options,
             &mut interface,
         ));
         assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -192,12 +202,14 @@ mod tests {
     #[test]
     fn schema_is_pinned_and_round_trips() {
         let interface = interface_of(
-            "module App.Shapes exposing (Shape(..), Id, Size, Mode(..), Show(..), area, now, Pair, Clock, NotFound(..), Port, Box, wrap)\n\
-             type Shape = Circle Number | Square Number\n\
+            "module App.Shapes exposing (Shape(..), Id, Size, Mode(..), Show(..), Collection(..), area, now, Pair, Clock, NotFound(..), Port, Box, wrap)\n\
+             type Shape = Circle Number | Square Number\n  deriving Eq\n\
              opaque type Id = Id String\n\
              type alias Size = Number\n\
              kind Mode = Small | Big\n\
              class Show a =\n  val show : a -> String\n\
+             class Eq a => Collection c a | c -> a =\n  val empty : c\n\
+             instance Show Shape =\n  show : Shape -> String\n  let show s = \"shape\"\n\
              area : Shape -> Number\nlet area s = 0\n\
              now : Unit ->{} Number\nforeign sync now from global \"Date.now\"\n\
              type Pair\n\
@@ -224,7 +236,7 @@ mod tests {
                 .expect_err("rejected")
                 .contains("describes `A`")
         );
-        let future = json.replace("\"iface-version\": 1", "\"iface-version\": 7");
+        let future = json.replace("\"iface-version\": 2", "\"iface-version\": 7");
         assert!(
             read(future.as_bytes(), "A")
                 .expect_err("rejected")

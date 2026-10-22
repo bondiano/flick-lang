@@ -10,6 +10,11 @@ impl Checker<'_> {
     /// Quantifies the variables of `ty` that are deeper than the current level.
     pub fn generalize(&mut self, ty: &Type) -> Type {
         self.settle_rows();
+        // a variable that an unsolved class constraint mentions stays monomorphic
+        self.solve_classes(false);
+        for w in self.classes.wanted.clone() {
+            self.store.lower(&w.constraint);
+        }
         let ty = self.zonk(ty);
         let metas = self.store.deep_metas(&ty);
         if metas.is_empty() {

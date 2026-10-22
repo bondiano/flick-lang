@@ -1,0 +1,39 @@
+// Derived instances of nominal types, generic ones requiring the class of
+// each type parameter.
+module App.Deriving exposing (..)
+
+type Shape =
+  | Circle Number
+  | Rect { width : Number; height : Number }
+  | Empty
+  deriving Eq, Ord, Hash, Show
+
+type Tree a = Leaf | Node (Tree a) a (Tree a)
+  deriving Eq, Show
+
+type error NotFound = NotFound String
+  deriving Eq, Show
+
+refined type Port = Number where fun n -> n > 0
+  deriving Eq, Hash
+
+opaque type alias UserId = String
+  deriving Eq, Ord, Hash, Show
+
+type Cell = Cell (Ref Number)
+  deriving Eq
+
+same_shape : Shape -> Shape -> Bool
+let same_shape a b = eq a b
+
+order : Shape -> Shape -> Ordering
+let order a b = compare a b
+
+tree_text : Tree Number -> String
+let tree_text tree = show tree
+
+port_hash : Port -> Number
+let port_hash port = hash port
+
+ids : List UserId -> String
+let ids values = show values

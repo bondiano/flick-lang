@@ -221,7 +221,7 @@ impl Checker<'_> {
             return Pat::Wild;
         };
         let scheme = self.env.value(&entity).cloned().unwrap_or(Type::Error);
-        let mut current = self.instantiate(&scheme);
+        let mut current = self.instantiate(&scheme, self.span(node));
         let mut params = Vec::new();
         while let Type::Fun { param, result, .. } = self.whnf(&current) {
             params.push(*param);

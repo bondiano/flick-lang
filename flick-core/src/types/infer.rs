@@ -17,8 +17,11 @@ impl Checker<'_> {
         let target = self.whnf(expected);
         if let Type::Forall { .. } = target {
             self.store.level += 1;
-            let (body, _) = self.skolemize(&target);
+            let mark = self.classes.givens.len();
+            let (body, _, givens) = self.skolemize(&target);
+            self.classes.givens.extend(givens);
             self.check(node, &body);
+            self.classes.givens.truncate(mark);
             self.store.level -= 1;
             return;
         }
@@ -65,6 +68,14 @@ impl Checker<'_> {
                 self.expect(&actual, expected, self.span(node));
             }
         }
+    }
+
+    /// The body of a polymorphic type with rigid variables, its class
+    /// constraints assumed until the caller drops them.
+    fn assume(&mut self, t: &Type) -> Type {
+        let (body, _, givens) = self.skolemize(t);
+        self.classes.givens.extend(givens);
+        body
     }
 
     pub fn infer(&mut self, node: &Node) -> Type {
@@ -298,6 +309,7 @@ impl Checker<'_> {
     ) -> Type {
         let saved = mem::take(&mut self.runtime);
         let mark = self.locals.len();
+        let givens = self.classes.givens.len();
         let mut rest = expected.cloned();
         let mut stages = Vec::new();
         // the first stage whose expected type was unknown, and that type
@@ -307,7 +319,7 @@ impl Checker<'_> {
         for param in params {
             let target = rest.as_ref().map(|t| self.whnf(t));
             let target = match target {
-                Some(t @ Type::Forall { .. }) => Some(self.skolemize(&t).0),
+                Some(t @ Type::Forall { .. }) => Some(self.assume(&t)),
                 other => other,
             };
             last = None;
@@ -378,6 +390,7 @@ impl Checker<'_> {
             stage.1 = Self::stage_effects(&inner);
         }
         self.locals.truncate(mark);
+        self.classes.givens.truncate(givens);
         self.runtime = saved;
         let mut ty = result;
         for (i, (param, effects)) in stages.into_iter().enumerate().rev() {

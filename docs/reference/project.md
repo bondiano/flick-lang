@@ -35,6 +35,8 @@ schema-aot = false
 | `build.emit` | `"js"` or `"ts"` | `"js"` |
 | `build.emit-dts` | boolean | `false` |
 | `build.schema-aot` | boolean | `false` |
+| `build.solver-steps` | instance resolution steps per definition | `100000` |
+| `build.solver-depth` | depth of nested class constraints | `256` |
 
 Errors in the configuration exit with code `2`:
 

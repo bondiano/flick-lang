@@ -53,7 +53,7 @@ impl Checker<'_> {
                     return self.top_value(name, span);
                 }
                 let scheme = self.env.value(&entity).cloned();
-                scheme.map_or(Type::Error, |s| self.instantiate(&s))
+                scheme.map_or(Type::Error, |s| self.instantiate(&s, span))
             }
             super::env::Found::Unknown => Type::Error,
             super::env::Found::Missing if namespace == Namespace::Constructor => {
@@ -79,7 +79,7 @@ impl Checker<'_> {
 
     pub fn use_local(&mut self, index: usize, span: Span) -> Type {
         let Local { ty, rec, .. } = self.locals[index].clone();
-        let ty = self.instantiate(&ty);
+        let ty = self.instantiate(&ty, span);
         if let Some(rec) = rec {
             self.recs[rec].uses.push((ty.clone(), span));
         }
@@ -94,7 +94,7 @@ impl Checker<'_> {
                 .and_then(|i| i.find(namespace, name))
                 .map(|e| e.entity.clone());
             let scheme = entity.and_then(|e| self.env.value(&e).cloned());
-            return scheme.map_or(Type::Error, |s| self.instantiate(&s));
+            return scheme.map_or(Type::Error, |s| self.instantiate(&s, span));
         }
         let service = match self.env.find(Namespace::Type, qualifier) {
             super::env::Found::Entity(e) => self
@@ -108,7 +108,7 @@ impl Checker<'_> {
         match service.map(|(module, d)| (module, d.form)) {
             Some((module, super::env::Form::Service { params, operations })) => {
                 if let Some(op) = operations.iter().find(|o| o.name == name) {
-                    self.operation_type(&module, qualifier, params.len(), &op.ty)
+                    self.operation_type(&module, qualifier, params.len(), &op.ty, span)
                 } else {
                     self.error(
                         codes::T001,
@@ -155,7 +155,7 @@ impl Checker<'_> {
                         self.perform(&e.services, &e.errors, span);
                     }
                     params.push(*param);
-                    ty = self.instantiate(&result);
+                    ty = self.instantiate(&result, span);
                 }
                 Type::Error => {
                     self.infer(arg);
@@ -299,7 +299,8 @@ impl Checker<'_> {
                     let (_, end) = rhs.range();
                     self.perform(&e.services, &e.errors, Span::new(self.file, start, end));
                 }
-                self.instantiate(&result)
+                let span = Span::new(self.file, lhs.range().0, rhs.range().1);
+                self.instantiate(&result, span)
             }
             Type::Error => Type::Error,
             meta @ Type::Meta(_) => {

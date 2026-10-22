@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 use super::kinds::Kind;
-use super::ty::{PRELUDE, Type};
+use super::ty::{Binder, PRELUDE, Type};
 use crate::iface::{Entity, Export, Interface, Namespace};
 use crate::resolve::{ItemKind, ModuleSyntax};
 
@@ -26,9 +26,7 @@ pub enum Form {
     /// Equal only to itself: built-in, abstract, opaque or refined.
     Nominal,
     /// A variant type with every constructor, exported or not.
-    Adt {
-        constructors: Vec<String>,
-    },
+    Adt { constructors: Vec<String> },
     /// `type error E = E T …`: a nominal type with the one constructor `E`.
     Error,
     /// A transparent alias. An opaque alias is one only inside its module.
@@ -42,11 +40,43 @@ pub enum Form {
         params: Vec<String>,
         operations: Vec<Operation>,
     },
-    Class,
+    Class {
+        params: Vec<String>,
+        /// Superclass constraints over the parameters.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        supers: Vec<Type>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        fundeps: Vec<Fundep>,
+        methods: Vec<String>,
+    },
     /// `kind K = …`
     Kind,
     /// A member of a `kind` declaration.
     KindMember,
+}
+
+/// `a b -> c` of a class: the parameters at `from` determine those at `to`,
+/// by position.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Fundep {
+    pub from: Vec<usize>,
+    pub to: Vec<usize>,
+}
+
+/// An instance of a class. Its head and context are over the variables
+/// `vars`; transparent aliases in them are expanded.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Instance {
+    /// The module that declares it.
+    pub module: String,
+    /// The head as written, for diagnostics and dictionary names: `Show (List a)`.
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vars: Vec<Binder>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub context: Vec<Type>,
+    /// The class applied to the instance's types.
+    pub head: Type,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -86,6 +116,11 @@ pub struct Env {
     interfaces: HashMap<String, Option<Interface>>,
     /// Some open import could not be loaded, so a missing name may exist.
     open_unknown: bool,
+    /// Every instance this module sees: of the modules it depends on,
+    /// however they are imported, and its own.
+    pub instances: Vec<Instance>,
+    /// Names of the built-in modules.
+    pub builtin: Vec<String>,
 }
 
 impl Env {
@@ -101,6 +136,7 @@ impl Env {
             ..Env::default()
         };
         for interface in builtins {
+            env.builtin.push(interface.module.clone());
             env.qualifiers
                 .insert(interface.module.clone(), interface.module.clone());
             env.learn(interface);
@@ -171,8 +207,17 @@ impl Env {
         env
     }
 
-    /// Records the types an interface carries.
+    /// Records the types and instances an interface carries.
     fn learn(&mut self, interface: &Interface) {
+        for instance in &interface.instances {
+            if !self
+                .instances
+                .iter()
+                .any(|i| i.module == instance.module && i.name == instance.name)
+            {
+                self.instances.push(instance.clone());
+            }
+        }
         for export in &interface.exports {
             let entity = &export.entity;
             if let Some(def) = &export.definition {

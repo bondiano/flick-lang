@@ -1,0 +1,33 @@
+// The row primitives are solved by the compiler from the fields of known
+// records, and nobody declares instances of them.
+module App.Rows exposing (..)
+
+type Shape = Circle Number
+
+instance Record.HasField "radius" Shape Number
+
+repeated : { id : Number }
+let repeated = Record.merge_disjoint { id = 1 } { id = 2 }
+
+already : { id : Number }
+let already = Record.extend (Record.label : Record.Label "id") 2 { id = 1 }
+
+absent : Number
+let absent = Record.get (Record.label : Record.Label "age") { name = "n" }
+
+wrong_type : String
+let wrong_type = Record.get (Record.label : Record.Label "age") { age = 1 }
+
+not_a_part : { age : Number }
+let not_a_part = Record.project { name = "n" }
+
+open_extend : { id : Number | r } -> { id : Number; tag : String | r }
+let open_extend value = Record.extend (Record.label : Record.Label "tag") "t" value
+
+//~ FLICK-C012 @7:1-7:47 `HasField` is a row primitive
+//~ FLICK-C001 @10:16-10:37 both records have field `id`
+//~ FLICK-C001 @13:15-13:28 `Lacks "id" { id : Number }` does not hold: the record already has field `id`
+//~ FLICK-C001 @16:14-16:24 the record has no field `age`
+//~ FLICK-C001 @19:18-19:28 field `age` has type `Number`
+//~ FLICK-C001 @22:18-22:32 `Project { name : String } { age : Number }` does not hold
+//~ FLICK-C001 @25:25-25:38 `Lacks "tag" { id : Number | r }` does not hold

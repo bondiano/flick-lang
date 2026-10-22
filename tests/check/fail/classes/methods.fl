@@ -1,0 +1,39 @@
+// An instance defines each method of its class with the class signature,
+// the instance's types in place of the class parameters.
+module App.Methods exposing (..)
+
+class Render a =
+  val render : a -> String
+  val width : a -> Number
+
+type Shape = Circle Number | Empty
+
+type Box = Box Number
+
+type Tag = Tag String
+
+instance Render Shape =
+  render : Show b => Shape -> String
+  let render shape = "shape"
+
+  width : Shape -> Number
+  let width shape = 1
+
+instance Render Box =
+  render : Box -> Number
+  let render box = 1
+
+  width : Box -> Number
+  let width box = 2
+
+instance Render Tag =
+  render : Tag -> String
+  let render tag = "tag"
+
+  height : Tag -> Number
+  let height tag = 1
+
+//~ FLICK-C010 @16:12-16:37 method `render` requires `Show b`, which the class signature does not
+//~ FLICK-C010 @23:12-23:25 method `render` must have the class signature for this instance: `Box -> String`
+//~ FLICK-C011 @29:10-29:20 `Render Tag` lacks method `width`
+//~ FLICK-C011 @34:3-34:21 `height` is not a method of class `Render`

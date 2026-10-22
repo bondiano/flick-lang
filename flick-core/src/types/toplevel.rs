@@ -52,6 +52,8 @@ impl<'a> Checker<'a> {
             .filter(|n| !matches!(n.kind, K::ModuleHeader | K::ImportDecl))
             .collect();
         let refined = self.declare_types(&decls);
+        self.declare_classes(&decls);
+        let declared = self.declare_instances(&decls, &refined);
         self.collect(&decls);
         for i in 0..self.top.items.len() {
             self.check_item(i);
@@ -62,9 +64,8 @@ impl<'a> Checker<'a> {
             }
             self.settle_operators();
         }
-        for decl in decls.iter().filter(|d| d.kind == K::InstanceDecl) {
-            self.instance(decl);
-        }
+        self.solve_classes(true);
+        self.check_instances(&declared);
         self.solve_rows();
         self.recursion();
         self.unknown_types();
@@ -241,6 +242,9 @@ impl<'a> Checker<'a> {
             mem::take(&mut self.operators),
             mem::replace(&mut self.store.level, 0),
             self.top.current,
+            mem::take(&mut self.classes.wanted),
+            mem::take(&mut self.classes.givens),
+            mem::take(&mut self.classes.steps),
         );
         for &j in &members {
             self.top.items[j].state = State::Checking;
@@ -256,6 +260,7 @@ impl<'a> Checker<'a> {
             self.settle_operators();
         }
         self.solve_rows();
+        self.solve_classes(true);
         for &j in &members {
             if let Some(rec) = self.top.items[j].rec.take() {
                 self.finish_rec(rec);
@@ -271,6 +276,9 @@ impl<'a> Checker<'a> {
             self.operators,
             self.store.level,
             self.top.current,
+            self.classes.wanted,
+            self.classes.givens,
+            self.classes.steps,
         ) = saved;
     }
 
@@ -307,14 +315,14 @@ impl<'a> Checker<'a> {
         let entity = self.env.entity(Namespace::Value, name);
         let Some(&i) = self.top.by_name.get(name) else {
             let scheme = self.env.value(&entity).cloned();
-            return scheme.map_or(Type::Error, |s| self.instantiate(&s));
+            return scheme.map_or(Type::Error, |s| self.instantiate(&s, span));
         };
         if let Some(current) = self.top.current {
             self.top.edges.push((current, i, span));
         }
         if let Some(rec) = self.top.items[i].rec {
             let scheme = self.env.value(&entity).cloned().unwrap_or(Type::Error);
-            let ty = self.instantiate(&scheme);
+            let ty = self.instantiate(&scheme, span);
             self.recs[rec].uses.push((ty.clone(), span));
             return ty;
         }
@@ -322,7 +330,7 @@ impl<'a> Checker<'a> {
             self.check_item(i);
         }
         let scheme = self.env.value(&entity).cloned();
-        scheme.map_or(Type::Error, |s| self.instantiate(&s))
+        scheme.map_or(Type::Error, |s| self.instantiate(&s, span))
     }
 
     /// Reports recursion that is not declared with `rec`.

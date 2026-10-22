@@ -277,6 +277,7 @@ impl<'a> Scope<'a> {
             module: self.module.name.to_owned(),
             exports,
             hidden,
+            instances: Vec::new(),
         }
     }
 

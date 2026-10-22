@@ -11,7 +11,7 @@ import, and a local definition of the same name hides them.
 
 | Type | Kind |
 | - | - |
-| `Unit`, `Never`, `Bool`, `Number`, `BigInt`, `String`, `Unknown` | `Type` |
+| `Unit`, `Never`, `Bool`, `Number`, `BigInt`, `String`, `Unknown`, `Ordering` | `Type` |
 | `List`, `Option`, `Ref`, `Redacted`, `Schema` | `Type -> Type` |
 | `Result`, `PureCodec` | `Type -> Type -> Type` |
 | `ServiceTag`, `ServiceImpl` | `ServiceRow -> Type` |
@@ -26,7 +26,9 @@ ordinary declarations; `identity : a -> a` is a function. `from_result` turns a
 `Result` into an expected error ([effects.md](effects.md)). Built-in modules
 are used qualified without an import: `Ref.make`, `Ref.get`, `Ref.set`,
 `Ref.modify`, `String.trim`, `Platform.stdout_line`, `Platform.stderr_line`,
-`App.fail`, `Layer.succeed`, `Layer.merge`, `Layer.override`.
+`App.fail`, `Layer.succeed`, `Layer.merge`, `Layer.override`, and the row
+primitives of `Record`. The classes `Eq`, `Ord`, `Hash` and `Show` are in
+`Prelude` too ([classes.md](classes.md)).
 
 ## Kinds
 
@@ -181,11 +183,12 @@ let fresh_cell =
   task { Ref.make None }
 ```
 
+Classes and instances: [classes.md](classes.md).
+
 ## Not checked yet
 
 | Construct | Today |
 | - | - |
-| class constraints `C a =>` | kind-checked, not resolved; instance methods are checked against their own signatures |
 | capture qualifiers `T^c` | kind-checked, then dropped |
 | `sql`, `ui`, `codec`, `schema` blocks | any type |
 | `scope s` handle | any type |

@@ -1,0 +1,5 @@
+{
+  "name": "classes",
+  "private": true,
+  "dependencies": { "@acme/ids": "1.0.0" }
+}

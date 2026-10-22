@@ -24,6 +24,9 @@ impl Checker<'_> {
         };
         match t {
             Type::Con { name, .. } | Type::Var(name) => out.push_str(name),
+            Type::Symbol(label) => {
+                let _ = write!(out, "{label:?}");
+            }
             Type::Skolem(s) => out.push_str(self.store.skolem_name(*s)),
             Type::Meta(_) => out.push('_'),
             Type::Error => out.push('?'),

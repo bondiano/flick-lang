@@ -1,0 +1,26 @@
+// A class over a type constructor: `Option` and `Eff r e` are both
+// functors, and one `map` serves both.
+module App.Functor exposing (Functor(..), twice, double_all, later)
+
+class Functor (f : Type -> Type) =
+  val map : (a -> b) -> f a -> f b
+
+instance Functor Option =
+  map : (a -> b) -> Option a -> Option b
+  let map f value =
+    match value with
+    | None -> None
+    | Some x -> Some (f x)
+
+instance Functor (Eff r e) =
+  map : (a -> b) -> Eff r e a -> Eff r e b
+  let map f eff = task { f (await eff) }
+
+twice : Functor f => f Number -> f Number
+let twice values = map (fun n -> n * 2) values
+
+double_all : Option Number -> Option Number
+let double_all value = twice value
+
+later : Eff none none Number -> Eff none none String
+let later eff = map (fun n -> show (n + 1)) eff

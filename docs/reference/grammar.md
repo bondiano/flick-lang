@@ -226,9 +226,9 @@ deriving    = "deriving" Con { "," Con }
 kind_decl   = "kind" Con "=" ["|"] Con { "|" Con }
 error_decl  = "type" "error" Con { param } ["=" variant] [deriving]
 service     = "service" Con { param } "=" members
-class       = "class" [context "=>"] Con { param } ["|" fundep { "," fundep }] "=" members
+class       = "class" [context "=>"] Con { param } ["|" fundep { "," fundep }] ["=" members]
 fundep      = { name } "->" { name }
-instance    = "instance" [context "=>"] type "=" members
+instance    = "instance" [context "=>"] type ["=" members]
 members     = block of: signature | "val" name ":" type | let | type_decl
 foreign     = "foreign" mode name "from" ("global" String | String String) [metadata]
 mode        = "pure" | "sync" | "async" | "effect"

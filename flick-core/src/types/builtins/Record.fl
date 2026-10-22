@@ -1,0 +1,51 @@
+/// Row primitives: relations between records that the compiler solves from
+/// their fields. A program cannot declare instances of them.
+module Record exposing (..)
+
+/// A label as a value: `(Record.label : Label "name")`.
+type Label (l : Symbol)
+
+/// `Field "x" T` is `{ x : T }`.
+type Field (l : Symbol) a
+
+/// The record `r` has field `l` of type `a`.
+class HasField (l : Symbol) r a | l r -> a
+
+/// The record `r` has no field `l`.
+class Lacks (l : Symbol) r
+
+/// `out` is `r` without its field `l`.
+class Remove (l : Symbol) r out | l r -> out
+
+/// Every field of `out` is a field of `r` of the same type.
+class Project r out
+
+/// `a` and `b` have no label in common, and `out` has the fields of both.
+class UnionDisjoint a b out | a b -> out
+
+/// `out` has the labels of `r`, each field of type `t` becoming `f t`.
+class Map (f : Type -> Type) r out | f r -> out
+
+/// The labels of `r` are known: `labels` lists them in canonical order.
+class Labels r
+
+label : Label l
+foreign pure label from "@flick-lang/runtime" "recordLabel"
+
+get : HasField l r a => Label l -> r -> a
+foreign pure get from "@flick-lang/runtime" "recordGet"
+
+extend : (Lacks l r, UnionDisjoint r (Field l a) out) => Label l -> a -> r -> out
+foreign pure extend from "@flick-lang/runtime" "recordExtend"
+
+remove : Remove l r out => Label l -> r -> out
+foreign pure remove from "@flick-lang/runtime" "recordRemove"
+
+project : Project r out => r -> out
+foreign pure project from "@flick-lang/runtime" "recordProject"
+
+merge_disjoint : UnionDisjoint a b out => a -> b -> out
+foreign pure merge_disjoint from "@flick-lang/runtime" "recordMergeDisjoint"
+
+labels : Labels r => r -> List String
+foreign pure labels from "@flick-lang/runtime" "recordLabels"

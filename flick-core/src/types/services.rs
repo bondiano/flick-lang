@@ -102,6 +102,7 @@ impl Checker<'_> {
         name: &str,
         params: usize,
         scheme: &Type,
+        span: crate::source::Span,
     ) -> Type {
         let (vars, body) = match scheme {
             Type::Forall { vars, body, .. } => (vars.as_slice(), (**body).clone()),
@@ -115,7 +116,7 @@ impl Checker<'_> {
             Type::con(module, name),
             subst.iter().take(params).map(|(_, t)| t.clone()),
         );
-        let ty = self.instantiate(&body.substitute(&subst));
+        let ty = self.instantiate(&body.substitute(&subst), span);
         require(ty, &format!("{module}.{name}"), &service)
     }
 

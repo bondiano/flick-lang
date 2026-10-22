@@ -1,9 +1,11 @@
-//! Kinds and the type core, without classes:
+//! Kinds, the type core and classes:
 //! kind checking, bidirectional type checking against the full signature of
 //! every named function, higher-rank `forall` with predicative instantiation,
 //! exact records with row polymorphism, exhaustive `match`, and generalization
 //! of provably pure bindings only; effects, expected errors, services and
-//! layers. Rules: `docs/reference/types.md`, `docs/reference/effects.md`.
+//! layers; classes, instances, row primitives and `deriving`. Rules:
+//! `docs/reference/types.md`, `docs/reference/effects.md`,
+//! `docs/reference/classes.md`.
 //!
 //! The checker reads the concrete tree after name resolution; other modules
 //! are known only through their [`Interface`], which this phase fills with
@@ -12,6 +14,7 @@
 mod bindings;
 mod builtins;
 mod calls;
+mod classes;
 mod convert;
 mod decls;
 mod display;
@@ -33,7 +36,8 @@ mod ty;
 mod unify;
 
 pub use builtins::builtins;
-pub use env::{Form, Operation, TypeDef};
+pub use classes::Dict;
+pub use env::{Form, Fundep, Instance, Operation, TypeDef};
 pub use kinds::Kind;
 pub use ty::{Binder, Effects, PRELUDE, Row, Type};
 
@@ -48,6 +52,32 @@ use crate::resolve::Module;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token};
 
+/// Bounds of instance resolution for one definition; exceeding them is a
+/// diagnostic, never a success.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    pub steps: u32,
+    pub depth: u32,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits {
+            steps: 100_000,
+            depth: 256,
+        }
+    }
+}
+
+/// What checking a module needs beyond its imports.
+#[derive(Clone, Copy)]
+pub struct Options<'a> {
+    /// Whether a module belongs to the package being checked: only the
+    /// package of a class or of the type an instance is for may declare it.
+    pub local: &'a dyn Fn(&str) -> bool,
+    pub limits: Limits,
+}
+
 /// Type-checks `module` and stores the types of its exports in `interface`.
 /// `imported` gives the interfaces of its imports, `builtins` those of the
 /// built-in modules (see [`builtins`]).
@@ -55,8 +85,21 @@ pub fn check(
     module: &Module,
     imported: &dyn Fn(&str) -> Option<Interface>,
     builtins: &[Interface],
+    options: Options,
     interface: &mut Interface,
 ) -> Vec<Diagnostic> {
+    check_with_evidence(module, imported, builtins, options, interface).0
+}
+
+/// [`check`], also returning the dictionary each class constraint resolved
+/// to, by the span that required it.
+pub fn check_with_evidence(
+    module: &Module,
+    imported: &dyn Fn(&str) -> Option<Interface>,
+    builtins: &[Interface],
+    options: Options,
+    interface: &mut Interface,
+) -> (Vec<Diagnostic>, Vec<(Span, Dict)>) {
     let env = Env::new(module.name, module.syntax, imported, builtins);
     let mut checker = Checker {
         file: module.file,
@@ -74,10 +117,14 @@ pub fn check(
         operators: Vec::new(),
         recs: Vec::new(),
         top: toplevel::TopLevel::default(),
+        options,
+        classes: classes::State::default(),
     };
     checker.module(module.tree);
     checker.fill(interface);
-    checker.diagnostics
+    let mut evidence = checker.classes.evidence;
+    evidence.sort_by_key(|(span, _)| (span.start, span.end));
+    (checker.diagnostics, evidence)
 }
 
 /// A value in scope inside a declaration.
@@ -130,6 +177,8 @@ struct Checker<'a> {
     operators: Vec<Operator>,
     recs: Vec<Rec>,
     top: toplevel::TopLevel<'a>,
+    options: Options<'a>,
+    classes: classes::State,
 }
 
 impl Checker<'_> {

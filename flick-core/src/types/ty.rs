@@ -8,7 +8,7 @@ use super::kinds::Kind;
 /// Module of the built-in types and constructors every module sees.
 pub const PRELUDE: &str = "Prelude";
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Type {
     /// A named type constructor: `Number`, `Option`, a service or an error.
@@ -18,6 +18,8 @@ pub enum Type {
     },
     /// A variable bound by an enclosing `forall`.
     Var(String),
+    /// A label at the type level, of kind `Symbol`: `"name"`.
+    Symbol(String),
     App {
         head: Box<Type>,
         arg: Box<Type>,
@@ -55,14 +57,14 @@ pub enum Type {
     Error,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Binder {
     pub name: String,
     pub kind: Kind,
 }
 
 /// `{services; errors}` of a runtime arrow.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Effects {
     pub services: Type,
     pub errors: Type,
@@ -70,7 +72,7 @@ pub struct Effects {
 
 /// Entries sorted by label, each label once. A field row labels entries with
 /// field names; a service or error row with the element's qualified name.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Row {
     pub entries: Vec<(String, Type)>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -214,9 +216,12 @@ impl Type {
                 constraints: constraints.iter().map(&mut *f).collect(),
                 body: Box::new(f(body)),
             },
-            Type::Con { .. } | Type::Var(_) | Type::Meta(_) | Type::Skolem(_) | Type::Error => {
-                self.clone()
-            }
+            Type::Con { .. }
+            | Type::Var(_)
+            | Type::Symbol(_)
+            | Type::Meta(_)
+            | Type::Skolem(_)
+            | Type::Error => self.clone(),
         }
     }
 
@@ -255,7 +260,12 @@ impl Type {
                 constraints.iter().for_each(&mut *f);
                 f(body);
             }
-            Type::Con { .. } | Type::Var(_) | Type::Meta(_) | Type::Skolem(_) | Type::Error => {}
+            Type::Con { .. }
+            | Type::Var(_)
+            | Type::Symbol(_)
+            | Type::Meta(_)
+            | Type::Skolem(_)
+            | Type::Error => {}
         }
     }
 

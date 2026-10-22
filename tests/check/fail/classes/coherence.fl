@@ -1,0 +1,76 @@
+// Instances are canonical: no overlap, consistent functional dependencies,
+// strict coverage, a context that shrinks, acyclic superclasses.
+module App.Coherence exposing (..)
+
+type User = User String
+
+type UserSet = UserSet (List User)
+
+class Collection c a | c -> a =
+  val empty : c
+
+instance Collection UserSet User =
+  empty : UserSet
+  let empty = UserSet []
+
+instance Collection UserSet String =
+  empty : UserSet
+  let empty = UserSet []
+
+instance Collection (List a) b =
+  empty : List a
+  let empty = []
+
+class Describe a =
+  val describe : a -> String
+
+instance Describe a => Describe (List a) =
+  describe : List a -> String
+  let describe items = "list"
+
+instance Describe (List Number) =
+  describe : List Number -> String
+  let describe items = "numbers"
+
+type Wrap a = Wrap a
+
+instance Describe (List a) => Describe (Wrap a) =
+  describe : Wrap a -> String
+  let describe w = "wrap"
+
+type Pair a = Pair a a
+
+instance Describe b => Describe (Pair a) =
+  describe : Pair a -> String
+  let describe p = "pair"
+
+class Second a => First a
+
+class First a => Second a
+
+// two aliases of one form share the structural instance
+type alias Point = { x : Number; y : Number }
+
+type alias Coords = { y : Number; x : Number }
+
+instance Eq Point =
+  eq : Point -> Point -> Bool
+  let eq p q = true
+
+class Show a => Pretty a =
+  val pretty : a -> String
+
+type Secret = Secret String
+
+instance Pretty Secret =
+  pretty : Secret -> String
+  let pretty s = "***"
+
+//~ FLICK-C004 @16:1-18:25 break the functional dependency `c -> a`
+//~ FLICK-C005 @20:1-22:17 `b` in `Collection (List a) b` is determined by `c -> a`
+//~ FLICK-C003 @31:1-33:33 `Describe (List Number)` overlaps `Describe (List a)`
+//~ FLICK-C007 @37:1-39:26 the context `Describe (List a)` is not smaller than the head `Describe (Wrap a)`
+//~ FLICK-C007 @43:1-45:26 type variable `b` of the context `Describe b` is not in the head
+//~ FLICK-C008 @47:1-47:26 the superclasses of `First` lead back to it: First -> Second -> First
+//~ FLICK-C012 @56:1-58:20 records and tuples have structural `Eq`
+//~ FLICK-C001 @65:1-67:23 `Pretty Secret` needs an instance `Show Secret` of its superclass

@@ -5,7 +5,7 @@
 
 use super::Checker;
 use super::convert::{Free, TyVar, is_type};
-use super::env::{Form, Operation, TypeDef};
+use super::env::{Form, Fundep, Operation, TypeDef};
 use super::kinds::Kind;
 use super::ty::{Binder, Type};
 use crate::diagnostics::codes;
@@ -180,7 +180,15 @@ impl Checker<'_> {
                 },
                 result,
             ),
-            _ => (Form::Class, result),
+            _ => (
+                Form::Class {
+                    params: params.iter().map(|p| p.name.clone()).collect(),
+                    supers: Vec::new(),
+                    fundeps: Vec::new(),
+                    methods: Vec::new(),
+                },
+                result,
+            ),
         };
         let kind = Kind::arrows(params.iter().map(|p| p.kind.clone()), result);
         self.env.define_type(&name, TypeDef { kind, form });
@@ -251,19 +259,52 @@ impl Checker<'_> {
             }
             K::ServiceDecl => Body::Members(self.members(decl, &[])),
             K::ClassDecl => {
+                let mut supers = Vec::new();
                 for context in decl.nodes().filter(|n| n.kind == K::Context) {
                     for c in context.nodes() {
-                        self.ty(c, &Kind::Constraint, Free::Reject);
+                        supers.extend(self.constraints(c, Free::Reject));
                     }
                 }
+                let fundeps = decl
+                    .nodes()
+                    .filter(|n| n.kind == K::Fundep)
+                    .filter_map(|f| self.fundep(f, &p.params))
+                    .collect();
                 let head = Type::apps(
                     Type::con(&self.env.module, &p.name),
                     p.params.iter().map(|b| Type::Var(b.name.clone())),
                 );
-                Body::Members(self.members(decl, &[head]))
+                let members = self.members(decl, &[head]);
+                Body::Class(supers, fundeps, members)
             }
             _ => Body::None,
         }
+    }
+
+    /// `a b -> c` by parameter positions; `None` after a diagnostic.
+    fn fundep(&mut self, node: &Node, params: &[Binder]) -> Option<Fundep> {
+        let mut sides = [Vec::new(), Vec::new()];
+        let mut side = 0;
+        for t in node.child_tokens() {
+            match t.kind {
+                K::Arrow => side = 1,
+                K::Ident => {
+                    let name = t.text(self.text);
+                    let Some(i) = params.iter().position(|p| p.name == name) else {
+                        self.error(
+                            codes::T001,
+                            self.token_span(t),
+                            format!("`{name}` is not a parameter of the class"),
+                        );
+                        return None;
+                    };
+                    sides[side].push(i);
+                }
+                _ => {}
+            }
+        }
+        let [from, to] = sides;
+        Some(Fundep { from, to })
     }
 
     fn payload(&mut self, variant: &Node) -> Vec<Type> {
@@ -381,19 +422,28 @@ impl Checker<'_> {
                     self.env.declare(Namespace::Constructor, &name);
                 }
             }
-            Body::Members(members) => {
-                let class = matches!(def.form, Form::Class);
-                let mut operations = Vec::new();
+            Body::Class(supers, fundeps, members) => {
+                def.form = Form::Class {
+                    params: params.iter().map(|b| b.name.clone()).collect(),
+                    supers,
+                    fundeps,
+                    methods: members.iter().map(|(name, _)| name.clone()).collect(),
+                };
                 for (name, ty) in members {
                     let scheme = self.default_kinds(&quantify(ty));
-                    if class {
-                        let entity = self.env.entity(Namespace::Value, &name);
-                        self.env.set_value(entity, scheme);
-                        self.env.declare(Namespace::Value, &name);
-                    } else {
-                        operations.push(Operation { name, ty: scheme });
-                    }
+                    self.env
+                        .set_value(self.env.entity(Namespace::Value, &name), scheme);
+                    self.env.declare(Namespace::Value, &name);
                 }
+            }
+            Body::Members(members) => {
+                let operations = members
+                    .into_iter()
+                    .map(|(name, ty)| Operation {
+                        name,
+                        ty: self.default_kinds(&quantify(ty)),
+                    })
+                    .collect();
                 if let Some(TypeDef {
                     form:
                         Form::Service {
@@ -429,4 +479,6 @@ enum Body {
     /// Constructors with their payload types.
     Variants(Vec<(String, Vec<Type>)>),
     Members(Vec<(String, Type)>),
+    /// Superclasses, functional dependencies and methods.
+    Class(Vec<Type>, Vec<Fundep>, Vec<(String, Type)>),
 }

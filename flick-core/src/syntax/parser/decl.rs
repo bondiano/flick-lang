@@ -334,7 +334,8 @@ fn context(p: &mut Parser) {
     }
 }
 
-/// `class [C =>] Name params [| a -> b, …] = members`.
+/// `class [C =>] Name params [| a -> b, …] [= members]`; a class without
+/// methods only relates its parameters.
 fn class_decl(p: &mut Parser) {
     let m = p.start();
     p.bump();
@@ -347,7 +348,7 @@ fn class_decl(p: &mut Parser) {
                 fundep(p);
             }
         }
-        if p.expect(K::Eq) {
+        if p.eat(K::Eq) {
             p.body(K::Members, member);
         }
     }
@@ -371,7 +372,7 @@ fn instance_decl(p: &mut Parser) {
     p.bump();
     context(p);
     types::union(p);
-    if p.expect(K::Eq) {
+    if p.eat(K::Eq) {
         p.body(K::Members, member);
     }
     p.complete(m, K::InstanceDecl);
