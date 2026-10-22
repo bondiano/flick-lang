@@ -1,15 +1,17 @@
 //! `.iface`, the native interface of a module: versioned JSON that an
 //! importer reads instead of the module's source. Schema:
-//! `docs/reference/iface.md`. Version 2 holds names, their identity, the
-//! types and kinds of exports, classes and instances; captures and ABI join
-//! it with the phases that produce them.
+//! `docs/reference/iface.md`: names and their identity, the types and kinds
+//! of exports with their captures, classes and instances, and from a build
+//! the data and dictionary ABI, summaries of values and fingerprints.
+
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
 use crate::types::{Instance, Type, TypeDef};
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 3;
+pub const IFACE_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -98,6 +100,81 @@ pub struct Interface {
     /// importer sees them all, whatever it imports by name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub instances: Vec<Instance>,
+    /// How compiled code represents what the module defines; written by a build.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub abi: Option<Abi>,
+    /// The fingerprint of each interface this one was built against.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub dependencies: BTreeMap<String, String>,
+}
+
+/// The ABI of a compiled module.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Abi {
+    /// The constructors of each type and error the module declares.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub data: Vec<Data>,
+    /// The dictionary of each instance the module declares.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dictionaries: Vec<Dictionary>,
+    /// Summaries of the module's top-level values.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub values: Vec<Summary>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Data {
+    #[serde(rename = "type")]
+    pub ty: String,
+    pub constructors: Vec<ConstructorAbi>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConstructorAbi {
+    pub name: String,
+    /// The `_tag` of its values.
+    pub tag: String,
+    /// Fields `_0` … `_{arity - 1}`.
+    pub arity: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Dictionary {
+    /// The instance head, as `Dict::Instance` names it.
+    pub instance: String,
+    /// The JS export of the dictionary.
+    pub export: String,
+    /// Dictionaries of the context it takes.
+    pub context: usize,
+    pub methods: Vec<String>,
+    /// Superclasses it has a getter `$Class` for.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub supers: Vec<String>,
+}
+
+/// What an optimizing importer may rely on about a value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Summary {
+    pub name: String,
+    /// One character per parameter of its definition: `.` pure, `!` runtime.
+    pub stages: String,
+    /// Dictionaries it takes before its parameters.
+    pub dicts: usize,
+    /// Whether applying it to all its parameters may throw or not end;
+    /// `false` only when that is certain.
+    pub partial: bool,
+}
+
+/// A fingerprint of the interface: equal fingerprints mean importers
+/// compiled against one are valid against the other.
+pub fn fingerprint(interface: &Interface) -> String {
+    let mut bare = interface.clone();
+    bare.dependencies.clear();
+    let json = serde_json::to_string(&bare).expect("an interface serializes");
+    let hash = json.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+    });
+    format!("{hash:016x}")
 }
 
 impl Interface {
@@ -239,7 +316,8 @@ mod tests {
                 .expect_err("rejected")
                 .contains("describes `A`")
         );
-        let future = json.replace("\"iface-version\": 3", "\"iface-version\": 7");
+        let current = format!("\"iface-version\": {IFACE_VERSION}");
+        let future = json.replace(&current, "\"iface-version\": 7");
         assert!(
             read(future.as_bytes(), "A")
                 .expect_err("rejected")

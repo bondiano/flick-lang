@@ -2,12 +2,21 @@ use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 use crate::diagnostics::{Diagnostic, codes};
+use crate::iface::Interface;
 use crate::resolve::{self, Module};
 use crate::source::SourceMap;
 use crate::{syntax, types};
 
 /// Checks one self-contained module and lowers it.
 pub(crate) fn lower_text(name: &str, text: &str) -> Result<super::Module, Vec<Diagnostic>> {
+    check_text(name, text).map(|(ir, _)| ir)
+}
+
+/// [`lower_text`] with the module's interface.
+pub(crate) fn check_text(
+    name: &str,
+    text: &str,
+) -> Result<(super::Module, Interface), Vec<Diagnostic>> {
     let mut sources = SourceMap::default();
     let file = sources.add(format!("{name}.fl"), text);
     let parse = syntax::parse(text, file);
@@ -38,7 +47,7 @@ pub(crate) fn lower_text(name: &str, text: &str) -> Result<super::Module, Vec<Di
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }
-    super::lower(&module, &typing)
+    Ok((super::lower(&module, &typing)?, interface))
 }
 
 fn fixtures(dir: &Path, out: &mut Vec<PathBuf>) {

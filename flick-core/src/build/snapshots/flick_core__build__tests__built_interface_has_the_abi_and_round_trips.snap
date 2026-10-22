@@ -1,0 +1,299 @@
+---
+source: flick-core/src/build/mod.rs
+expression: json
+---
+{
+  "iface-version": 4,
+  "language": "0.7",
+  "module": "App.Shapes",
+  "exports": [
+    {
+      "module": "App.Shapes",
+      "namespace": "type",
+      "name": "Shape",
+      "decl": "adt",
+      "definition": {
+        "kind": "type",
+        "form": "adt",
+        "constructors": [
+          "Circle",
+          "Rect"
+        ]
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "constructor",
+      "name": "Circle",
+      "decl": "constructor",
+      "parent": "Shape",
+      "type": {
+        "fun": {
+          "param": {
+            "con": {
+              "module": "Prelude",
+              "name": "Number"
+            }
+          },
+          "result": {
+            "con": {
+              "module": "App.Shapes",
+              "name": "Shape"
+            }
+          }
+        }
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "constructor",
+      "name": "Rect",
+      "decl": "constructor",
+      "parent": "Shape",
+      "type": {
+        "fun": {
+          "param": {
+            "con": {
+              "module": "Prelude",
+              "name": "Number"
+            }
+          },
+          "result": {
+            "fun": {
+              "param": {
+                "con": {
+                  "module": "Prelude",
+                  "name": "Number"
+                }
+              },
+              "result": {
+                "con": {
+                  "module": "App.Shapes",
+                  "name": "Shape"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "value",
+      "name": "area",
+      "decl": "let",
+      "type": {
+        "fun": {
+          "param": {
+            "con": {
+              "module": "App.Shapes",
+              "name": "Shape"
+            }
+          },
+          "result": {
+            "con": {
+              "module": "Prelude",
+              "name": "Number"
+            }
+          }
+        }
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "value",
+      "name": "scale",
+      "decl": "let",
+      "type": {
+        "fun": {
+          "param": {
+            "con": {
+              "module": "Prelude",
+              "name": "Number"
+            }
+          },
+          "result": {
+            "fun": {
+              "param": {
+                "con": {
+                  "module": "App.Shapes",
+                  "name": "Shape"
+                }
+              },
+              "result": {
+                "con": {
+                  "module": "App.Shapes",
+                  "name": "Shape"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "namespace": "value",
+      "name": "now",
+      "decl": "foreign",
+      "type": {
+        "fun": {
+          "param": {
+            "con": {
+              "module": "Prelude",
+              "name": "Unit"
+            }
+          },
+          "effects": {
+            "services": {
+              "row": {
+                "entries": []
+              }
+            },
+            "errors": {
+              "row": {
+                "entries": []
+              }
+            }
+          },
+          "result": {
+            "con": {
+              "module": "Prelude",
+              "name": "Number"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "instances": [
+    {
+      "module": "App.Shapes",
+      "name": "Eq Shape",
+      "head": {
+        "app": {
+          "head": {
+            "con": {
+              "module": "Prelude",
+              "name": "Eq"
+            }
+          },
+          "arg": {
+            "con": {
+              "module": "App.Shapes",
+              "name": "Shape"
+            }
+          }
+        }
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "name": "Show Shape",
+      "head": {
+        "app": {
+          "head": {
+            "con": {
+              "module": "Prelude",
+              "name": "Show"
+            }
+          },
+          "arg": {
+            "con": {
+              "module": "App.Shapes",
+              "name": "Shape"
+            }
+          }
+        }
+      }
+    },
+    {
+      "module": "App.Shapes",
+      "name": "Describe Shape",
+      "head": {
+        "app": {
+          "head": {
+            "con": {
+              "module": "App.Shapes",
+              "name": "Describe"
+            }
+          },
+          "arg": {
+            "con": {
+              "module": "App.Shapes",
+              "name": "Shape"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "abi": {
+    "data": [
+      {
+        "type": "Shape",
+        "constructors": [
+          {
+            "name": "Circle",
+            "tag": "@acme/shapes/App.Shapes.Shape.Circle",
+            "arity": 1
+          },
+          {
+            "name": "Rect",
+            "tag": "@acme/shapes/App.Shapes.Shape.Rect",
+            "arity": 2
+          }
+        ]
+      }
+    ],
+    "dictionaries": [
+      {
+        "instance": "Eq Shape",
+        "export": "$i_Eq_Shape_e6febeea",
+        "context": 0,
+        "methods": [
+          "eq"
+        ]
+      },
+      {
+        "instance": "Show Shape",
+        "export": "$i_Show_Shape_1e6d3f49",
+        "context": 0,
+        "methods": [
+          "show"
+        ]
+      },
+      {
+        "instance": "Describe Shape",
+        "export": "$i_Describe_Shape_89d0562d",
+        "context": 0,
+        "methods": [
+          "describe"
+        ]
+      }
+    ],
+    "values": [
+      {
+        "name": "area",
+        "stages": ".",
+        "dicts": 0,
+        "partial": false
+      },
+      {
+        "name": "scale",
+        "stages": "..",
+        "dicts": 0,
+        "partial": false
+      },
+      {
+        "name": "now",
+        "stages": "!",
+        "dicts": 0,
+        "partial": true
+      }
+    ]
+  },
+  "dependencies": {
+    "Geo": "3508914fa267b24f"
+  }
+}

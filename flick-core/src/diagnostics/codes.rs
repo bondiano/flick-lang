@@ -176,6 +176,7 @@ codes! {
     P011 = Project 11, "invalid entry module";
     P012 = Project 12, "construct is not compiled yet";
     P013 = Project 13, "cannot write build output";
+    P014 = Project 14, "package built against another interface of a dependency";
 }
 
 #[cfg(test)]

@@ -42,7 +42,7 @@ impl Command for BuildCommand {
                 };
             }
         };
-        let (mut diagnostics, compiled) =
+        let (mut diagnostics, mut compilation) =
             project::compile(&host, &mut sources, project.as_ref(), &roots);
         if diagnostics.iter().any(|d| d.severity == Severity::Error) {
             return Outcome {
@@ -50,7 +50,8 @@ impl Command for BuildCommand {
                 diagnostics,
             };
         }
-        let modules: Vec<Compiled> = compiled.into_iter().filter(|c| !c.test).collect();
+        compilation.modules.retain(|c| !c.test);
+        let modules = &compilation.modules;
         let entry = match &project {
             Some(p) if p.config.kind == Kind::App => p.config.entry.as_ref().map(|e| e.0.clone()),
             Some(_) => None,
@@ -108,7 +109,7 @@ impl Command for BuildCommand {
             typescript,
             source_path: &source_path,
         };
-        for artifact in build::emit(&modules, &sources, &settings) {
+        for artifact in build::emit(&compilation, &sources, &settings) {
             let path = out_dir.join(&artifact.path);
             if let Err(err) = write(&path, &artifact.contents) {
                 diagnostics.push(Diagnostic::new(

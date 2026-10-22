@@ -1,12 +1,17 @@
 //! A build: the checked and lowered modules of a project, compiled to ESM
-//! with source maps, the built-in modules they use, and for an app the
-//! runner that starts `main`.
+//! with source maps and `.iface` files, the built-in modules they use, and
+//! for an app the runner that starts `main`.
+
+mod abi;
+
+pub use abi::interface;
 
 use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 
 use crate::codegen::{self, Options, sourcemap};
-use crate::project::{Compiled, normalize};
+use crate::iface;
+use crate::project::{Compilation, normalize};
 use crate::resolve::{self, Module};
 use crate::source::{FileId, SourceMap};
 use crate::{ir, syntax, types};
@@ -36,23 +41,40 @@ pub struct Settings<'a> {
     pub out_dir: &'a Path,
 }
 
-/// The output of `modules`.
-pub fn emit(modules: &[Compiled], sources: &SourceMap, settings: &Settings) -> Vec<Artifact> {
+/// The output of a compilation.
+pub fn emit(compilation: &Compilation, sources: &SourceMap, settings: &Settings) -> Vec<Artifact> {
+    let modules = &compilation.modules;
+    let provider = |m: &str| {
+        compilation
+            .packages
+            .iter()
+            .find(|(module, _, _)| module == m)
+            .map(|(_, package, interface)| (package.clone(), interface.clone()))
+    };
     let ext = if settings.typescript { "ts" } else { "js" };
     let is_builtin = |m: &str| types::builtin_sources().iter().any(|(n, _)| *n == m);
     let path = |m: &str| {
         let file = format!("{}.{ext}", m.replace('.', "/"));
-        if is_builtin(m) {
-            format!("{BUILTIN_DIR}/{file}")
-        } else {
-            file
+        match provider(m) {
+            // shortcut: a package exports its modules at `<package>/<A>/<B>.js`; `flick pack` fixes the layout
+            Some((package, _)) => format!("npm:{package}/{file}"),
+            None if is_builtin(m) => format!("{BUILTIN_DIR}/{file}"),
+            None => file,
         }
     };
     let own = |m: &str| modules.iter().any(|c| c.name == m);
-    let package = |m: &str| {
-        own(m)
+    let package = |m: &str| match provider(m) {
+        Some((package, _)) => Some(package),
+        None => own(m)
             .then(|| settings.package.map(str::to_owned))
-            .flatten()
+            .flatten(),
+    };
+    let interface_of = |m: &str| {
+        modules
+            .iter()
+            .find(|c| c.name == m)
+            .map(|c| c.interface.clone())
+            .or_else(|| provider(m).map(|(_, i)| i))
     };
     let foreign = |module: &str, spec: &str| {
         let relative = spec.starts_with("./") || spec.starts_with("../");
@@ -94,6 +116,17 @@ pub fn emit(modules: &[Compiled], sources: &SourceMap, settings: &Settings) -> V
         out.push(Artifact {
             path: format!("{file}.map"),
             contents: map,
+        });
+        let built = interface(
+            &module.ir,
+            &module.interface,
+            package(&module.name).as_deref(),
+            &module.imports,
+            &interface_of,
+        );
+        out.push(Artifact {
+            path: format!("{}.iface", module.name.replace('.', "/")),
+            contents: iface::write(&built),
         });
     }
     if let Some(entry) = settings.entry {
@@ -164,4 +197,43 @@ pub fn builtin_modules() -> &'static [ir::Module] {
             })
             .collect()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::iface::{self, Interface};
+    use crate::ir::tests::check_text;
+
+    #[test]
+    fn built_interface_has_the_abi_and_round_trips() {
+        let (ir, interface) = check_text(
+            "App.Shapes",
+            "module App.Shapes exposing (Shape(..), area, scale, now)\n\
+             type Shape = Circle Number | Rect Number Number\n  deriving Eq, Show\n\
+             class Describe a =\n  describe : a -> String\n\
+             instance Describe Shape =\n  let describe s = \"shape\"\n\
+             area : Shape -> Number\nlet area s =\n  match s with\n  | Circle r -> r * r\n  | Rect w h -> w * h\n\
+             scale : Number -> Shape -> Shape\nlet scale k s = Circle k\n\
+             now : Unit ->{} Number\nforeign sync now from global \"Date.now\"\n",
+        )
+        .expect("checks");
+        let dependency = Interface {
+            module: "Geo".into(),
+            ..Interface::default()
+        };
+        let lookup = |m: &str| (m == "Geo").then(|| dependency.clone());
+        let built = super::interface(
+            &ir,
+            &interface,
+            Some("@acme/shapes"),
+            &["Geo".into()],
+            &lookup,
+        );
+        let json = iface::write(&built);
+        insta::assert_snapshot!(json);
+        let back = iface::read(json.as_bytes(), "App.Shapes").expect("valid");
+        assert_eq!(iface::write(&back), json);
+        assert_eq!(iface::fingerprint(&back), iface::fingerprint(&built));
+        assert_eq!(built.dependencies["Geo"], iface::fingerprint(&dependency));
+    }
 }

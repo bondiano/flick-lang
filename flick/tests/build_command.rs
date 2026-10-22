@@ -4,6 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use common::flick_in;
+use flick_core::iface;
 
 #[test]
 fn build_writes_modules_maps_builtins_and_the_runner() {
@@ -39,6 +40,14 @@ fn build_writes_modules_maps_builtins_and_the_runner() {
             .is_some_and(|s| s.ends_with("src/App/Main.fl"))
     );
     assert!(dir.join("dist/_flick/Platform.js").exists());
+    let iface = fs::read(dir.join("dist/App/Main.iface")).expect("interface");
+    let interface = iface::read(&iface, "App.Main").expect("valid interface");
+    let abi = interface.abi.expect("a built interface has its ABI");
+    assert_eq!(
+        abi.data[0].constructors[0].tag,
+        "@acme/hello/App.Main.Greeting.Hello"
+    );
+    assert_eq!(abi.values[0].stages, "!");
     let runner = fs::read_to_string(dir.join("dist/main.js")).expect("runner");
     assert!(
         runner.contains("import { main } from \"./App/Main.js\""),

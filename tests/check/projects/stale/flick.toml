@@ -1,0 +1,5 @@
+schema-version = 1
+
+[project]
+kind = "lib"
+#~ FLICK-P014 `Maps.Route` of package `maps` was built against another interface of `Geo.Point` of `geo`: fingerprint 0123456789abcdef

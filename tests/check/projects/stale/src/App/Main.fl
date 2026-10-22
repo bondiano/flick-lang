@@ -1,0 +1,8 @@
+// A package compiled against an older `Geo.Point` than the installed one.
+module App.Main exposing (x)
+
+import Geo.Point
+import Maps.Route
+
+x : Number
+let x = 1

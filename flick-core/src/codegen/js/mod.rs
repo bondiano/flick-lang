@@ -74,8 +74,12 @@ pub fn js(module: &Module, options: &Options) -> Output {
     finish(&code, &g.spans)
 }
 
-/// The import specifier of `to` from `from`, both relative to the output root.
+/// The import specifier of `to` from `from`, both relative to the output
+/// root; `npm:` marks a module of a package.
 fn relative(from: &str, to: &str) -> String {
+    if let Some(bare) = to.strip_prefix("npm:") {
+        return bare.to_owned();
+    }
     let from_dir: Vec<&str> = from.split('/').collect();
     let from_dir = &from_dir[..from_dir.len() - 1];
     let to_parts: Vec<&str> = to.split('/').collect();

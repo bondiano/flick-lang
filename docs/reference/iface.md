@@ -9,11 +9,11 @@ Until 0.1.0 the schema grows with the compiler: every change bumps
 `iface-version`, and a compiler rejects any version but its own with
 `FLICK-P010`. Release 0.1.0 freezes the version it ships with.
 
-## Version 3
+## Version 4
 
 ```json
 {
-  "iface-version": 3,
+  "iface-version": 4,
   "language": "0.7",
   "module": "App.Shapes",
   "exports": [
@@ -37,6 +37,8 @@ Until 0.1.0 the schema grows with the compiler: every change bumps
 | `exports` | the module's interface, in the order of its `exposing` list |
 | `hidden` | constructors of exported types that are not exported, so an import of one gets a precise `FLICK-R005`; omitted when empty |
 | `instances` | the instances of the module and of every module it depends on, except built-in ones; omitted when empty |
+| `abi` | how the compiled code represents what the module defines, see [ABI](#abi); written by `flick build`, absent from `flick check` |
+| `dependencies` | the fingerprint of each imported module's interface the module was built against; omitted when empty |
 
 Each export names an **entity** by `module`, `namespace` and `name`. `module`
 is where the entity is *defined*: a re-export keeps the defining module, which
@@ -144,6 +146,35 @@ outside its module: importers cannot see its representation.
 checks its own instances against these for overlap and functional
 dependencies, and resolves constraints with them.
 
+### ABI
+
+```json
+"abi": {
+  "data": [ { "type": "Shape", "constructors": [
+    { "name": "Circle", "tag": "@acme/shapes/App.Shapes.Shape.Circle", "arity": 1 } ] } ],
+  "dictionaries": [ { "instance": "Show (List a)", "export": "$i_Show_List_a_19082212",
+    "context": 1, "methods": ["show"], "supers": [] } ],
+  "values": [ { "name": "area", "stages": ".", "dicts": 0, "partial": false } ]
+}
+```
+
+| Field | Contents |
+| - | - |
+| `data` | each type and error the module declares, with its constructors: `tag` is the `_tag` of their values (package, module, type, constructor), `arity` the fields `_0` … |
+| `dictionaries` | each instance the module declares: the JS `export` of its dictionary, how many context dictionaries it takes, its `methods` and the superclasses it has a `$Class` getter for |
+| `values` | each exported value: `stages` has one character per parameter of its definition, `.` for a pure and `!` for a runtime arrow; `dicts` counts the dictionaries it takes first; `partial` is `false` only when applying it to all its parameters certainly neither throws nor diverges |
+
+[codegen.md](codegen.md) describes the representation these fields name.
+
+### Fingerprints
+
+The fingerprint of an interface is a 64-bit FNV-1a hash, as 16 hex digits,
+of its JSON without `dependencies`. Equal fingerprints mean that code
+compiled against one interface is valid against the other. `dependencies`
+records the fingerprint of every imported module's interface at build time;
+when an installed package's module was built against an interface other than
+the installed one of its dependency, the importer reports `FLICK-P014`.
+
 ## Location in a package
 
 A package names the directory of its interfaces in `package.json`, and module
@@ -153,14 +184,6 @@ A package names the directory of its interfaces in `package.json`, and module
 { "name": "@acme/text", "flick": { "iface-dir": "iface" } }
 ```
 
-`flick build` and `flick pack` write both; nobody edits them by hand.
-
-## Planned additions
-
-Each addition is a new `iface-version`, added by the phase that produces the
-information:
-
-| Addition | Contents |
-| - | - |
-| ABI and summaries | data ABI of each type, arity, purity and partiality for cross-module optimization |
-| fingerprints | a fingerprint of the interface and of each dependency's interface, for incremental builds and `pack` |
+`flick build` writes `A/B.iface` next to `A/B.js` in the output directory, so
+the output directory can serve as `iface-dir`; `flick pack` writes the
+`package.json` field. Nobody edits them by hand.

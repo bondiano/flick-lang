@@ -7,7 +7,8 @@ use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use super::config::Kind;
+mod entry;
+
 use super::packages::Packages;
 use super::{Host, Project, module_name, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
@@ -44,9 +45,19 @@ struct Loader<'a> {
     modules: Vec<Loaded>,
     by_name: BTreeMap<String, usize>,
     from_packages: BTreeMap<String, Interface>,
+    /// The package that provides each module of `from_packages`.
+    owners: BTreeMap<String, String>,
     diagnostics: Vec<Diagnostic>,
     /// With `Some`, the IR of each module that checks without errors.
     lowered: Option<Vec<Option<ir::Module>>>,
+}
+
+/// The modules of a build and the package modules they use.
+#[derive(Default)]
+pub struct Compilation {
+    pub modules: Vec<Compiled>,
+    /// Modules from installed packages: the module, its package and interface.
+    pub packages: Vec<(String, String, Interface)>,
 }
 
 /// A module that checked cleanly, lowered to the IR.
@@ -56,6 +67,8 @@ pub struct Compiled {
     pub file: FileId,
     /// Whether it is in the test root.
     pub test: bool,
+    /// The modules it imports.
+    pub imports: Vec<String>,
     pub ir: ir::Module,
     pub interface: Interface,
 }
@@ -76,7 +89,7 @@ pub fn compile(
     sources: &mut SourceMap,
     project: Option<&Project>,
     roots: &[PathBuf],
-) -> (Vec<Diagnostic>, Vec<Compiled>) {
+) -> (Vec<Diagnostic>, Compilation) {
     run(host, sources, project, roots, true)
 }
 
@@ -86,7 +99,7 @@ fn run(
     project: Option<&Project>,
     roots: &[PathBuf],
     lower: bool,
-) -> (Vec<Diagnostic>, Vec<Compiled>) {
+) -> (Vec<Diagnostic>, Compilation) {
     let mut diagnostics = Vec::new();
     let packages = project.map_or_else(Packages::default, |p| {
         Packages::load(host, &p.root, &mut diagnostics)
@@ -99,6 +112,7 @@ fn run(
         modules: Vec::new(),
         by_name: BTreeMap::new(),
         from_packages: BTreeMap::new(),
+        owners: BTreeMap::new(),
         diagnostics,
         lowered: lower.then(Vec::new),
     };
@@ -118,6 +132,8 @@ fn run(
     }
     let edges = loader.load_imports();
     loader.import_cycles(&edges);
+    let stale = super::packages::stale(&loader.from_packages, &loader.owners);
+    loader.diagnostics.extend(stale);
     if let Some(lowered) = &mut loader.lowered {
         lowered.resize_with(loader.modules.len(), || None);
     }
@@ -138,12 +154,22 @@ fn run(
                     path: m.path.clone(),
                     file: m.file,
                     test: m.root == Root::Test,
+                    imports: m.syntax.imports.iter().map(|i| i.module.clone()).collect(),
                     ir: ir?,
                     interface: interface?,
                 })
             })
             .collect(),
         _ => Vec::new(),
+    };
+    let packages = loader
+        .owners
+        .iter()
+        .filter_map(|(m, p)| Some((m.clone(), p.clone(), loader.from_packages.get(m)?.clone())))
+        .collect();
+    let compilation = Compilation {
+        modules: compiled,
+        packages,
     };
     let mut diagnostics = loader.diagnostics;
     // by path, not by load order, which follows the order of imports
@@ -155,7 +181,7 @@ fn run(
                 .map(|s| (sources.get(s.file).path.clone(), s.start, s.end)),
         )
     });
-    (diagnostics, compiled)
+    (diagnostics, compilation)
 }
 
 impl Loader<'_> {
@@ -315,6 +341,7 @@ impl Loader<'_> {
                         span,
                     ));
                 }
+                self.owners.insert(name.to_owned(), package);
                 self.from_packages.insert(name.to_owned(), interface);
             }
         }
@@ -460,48 +487,5 @@ impl Loader<'_> {
         }
         interfaces[i] = Some(interface);
         visiting[i] = false;
-    }
-
-    /// The entry of an app is a source module that exports `main`.
-    fn check_entry(&mut self, interfaces: &[Option<Interface>]) {
-        let Some(project) = self.project.filter(|p| p.config.kind == Kind::App) else {
-            return;
-        };
-        let Some((entry, span)) = project.config.entry.clone() else {
-            return;
-        };
-        let error = |message: String| Diagnostic::error(codes::P011, message, span);
-        if !super::is_module_name(&entry) {
-            self.diagnostics
-                .push(error(format!("`{entry}` is not a module name")));
-            return;
-        }
-        let expected = project.source_root().join(module_path(&entry));
-        let shown = Path::new(&project.config.source_dir).join(module_path(&entry));
-        match self.by_name.get(&entry).copied() {
-            Some(i) if self.modules[i].root == Root::Source => {
-                if !interfaces[i]
-                    .as_ref()
-                    .is_some_and(|i| i.exports_value("main"))
-                {
-                    self.diagnostics.push(
-                        error(format!("entry module `{entry}` does not export `main`")).with_fix(
-                            format!("add `main` to `module {entry} exposing (main)`"),
-                            Vec::new(),
-                        ),
-                    );
-                }
-            }
-            Some(_) => self.diagnostics.push(error(format!(
-                "entry module `{entry}` is not in the source root: expected `{}`",
-                shown.display()
-            ))),
-            // exists, but not among the modules this check covers
-            None if self.host.read(&expected).is_ok() => {}
-            None => self.diagnostics.push(error(format!(
-                "entry module `{entry}` not found: expected `{}`",
-                shown.display()
-            ))),
-        }
     }
 }

@@ -3,6 +3,7 @@
 //! names its interface directory in `package.json`:
 //! `"flick": { "iface-dir": "iface" }`, and module `A.B` is `iface/A/B.iface`.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -129,4 +130,43 @@ fn manifest(host: &dyn Host, path: &Path, diagnostics: &mut Vec<Diagnostic>) -> 
             Some(Manifest::default())
         }
     }
+}
+
+/// A package module built against another interface of a module than the
+/// one installed: its compiled code may no longer fit.
+pub(super) fn stale(
+    interfaces: &BTreeMap<String, Interface>,
+    owners: &BTreeMap<String, String>,
+) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (module, package) in owners {
+        let Some(interface) = interfaces.get(module) else {
+            continue;
+        };
+        for (dependency, recorded) in &interface.dependencies {
+            let Some(installed) = interfaces.get(dependency) else {
+                continue;
+            };
+            let actual = iface::fingerprint(installed);
+            if actual != *recorded {
+                let from = owners
+                    .get(dependency)
+                    .map_or(String::new(), |p| format!(" of `{p}`"));
+                out.push(
+                    Diagnostic::new(
+                        codes::P014,
+                        Severity::Error,
+                        format!(
+                            "`{module}` of package `{package}` was built against another interface of `{dependency}`{from}: fingerprint {recorded}, installed {actual}"
+                        ),
+                    )
+                    .with_fix(
+                        format!("install the versions `{package}` was built with, or a release of `{package}` built against the installed one"),
+                        Vec::new(),
+                    ),
+                );
+            }
+        }
+    }
+    out
 }

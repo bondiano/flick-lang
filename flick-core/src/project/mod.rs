@@ -9,7 +9,7 @@ mod packages;
 use std::path::{Component, Path, PathBuf};
 
 pub use config::Config;
-pub use load::{Compiled, check, compile};
+pub use load::{Compilation, Compiled, check, compile};
 pub use packages::project_name;
 use std::io;
 

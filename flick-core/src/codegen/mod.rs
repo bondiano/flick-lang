@@ -8,7 +8,7 @@ mod names;
 pub mod sourcemap;
 
 pub use js::js;
-pub use names::tag;
+pub use names::{instance as instance_export, tag};
 
 use crate::source::Span;
 
