@@ -9,6 +9,7 @@ pub mod consteval;
 pub mod diagnostics;
 pub mod fmt;
 pub mod iface;
+pub mod ir;
 pub mod project;
 pub mod resolve;
 pub mod source;

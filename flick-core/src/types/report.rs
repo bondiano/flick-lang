@@ -11,7 +11,12 @@ impl Checker<'_> {
     /// reports a mismatch at `span`. `false` after a diagnostic.
     pub fn expect(&mut self, actual: &Type, expected: &Type, span: Span) -> bool {
         match self.subsume(actual, expected, span) {
-            Ok(()) => true,
+            Ok(()) => {
+                if let Some(lift) = self.lift(actual, expected) {
+                    self.typing.lifts.insert(super::typing::range(span), lift);
+                }
+                true
+            }
             Err(mismatch) => {
                 self.mismatch(&mismatch, actual, expected, span);
                 false

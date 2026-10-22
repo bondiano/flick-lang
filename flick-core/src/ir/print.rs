@@ -1,0 +1,239 @@
+//! A compact text form of the IR for tests: one item per line group, every
+//! runtime stage marked with `!`, lifts with `lift`, dictionaries in `[…]`.
+
+use std::fmt::Write;
+
+use super::{Arm, Expr, ExprKind, ForeignMode, ItemKind, Lit, Module, Pat, Stmt};
+use crate::types::{Dict, Lift};
+
+pub fn print(module: &Module) -> String {
+    let mut out = format!("module {}\n", module.name);
+    for item in &module.items {
+        let line = match &item.kind {
+            ItemKind::Value { name, dicts, body } => {
+                format!("let {name}{} = {}", given(dicts), expr(body))
+            }
+            ItemKind::Destructure { pattern, body } => {
+                format!("let {} = {}", pat(pattern), expr(body))
+            }
+            ItemKind::Foreign(f) => {
+                let mode = match f.mode {
+                    ForeignMode::Pure => "pure",
+                    ForeignMode::Sync => "sync",
+                    ForeignMode::Async => "async",
+                    ForeignMode::Effect => "effect",
+                };
+                format!(
+                    "foreign {mode} {} = {}:{} arity {} dicts {} stages {}",
+                    f.name,
+                    f.module.as_deref().unwrap_or("global"),
+                    f.export,
+                    f.arity,
+                    f.dicts,
+                    stages(&f.stages)
+                )
+            }
+            ItemKind::Constructor(c) => {
+                format!("constructor {}.{}.{}/{}", c.module, c.ty, c.name, c.arity)
+            }
+            ItemKind::Service { name, key } => format!("service {name} = {key}"),
+            ItemKind::Instance { info, methods } => {
+                let mut s = format!("instance {}{}", info.name, given(&info.context));
+                for (class, d) in &info.supers {
+                    let _ = write!(s, " super {class} = {}", dict(d));
+                }
+                if let Some((fields, _)) = &info.derived {
+                    let fields: Vec<String> = fields.iter().map(dict).collect();
+                    let _ = write!(s, " derived [{}]", fields.join(", "));
+                }
+                for (name, value) in methods {
+                    let _ = write!(s, "\n  {name} = {}", expr(value));
+                }
+                s
+            }
+        };
+        out.push_str(&line);
+        out.push('\n');
+    }
+    out
+}
+
+fn given(dicts: &[String]) -> String {
+    if dicts.is_empty() {
+        String::new()
+    } else {
+        format!(" [{}]", dicts.join(", "))
+    }
+}
+
+fn stages(stages: &[bool]) -> String {
+    stages.iter().map(|&r| if r { '!' } else { '.' }).collect()
+}
+
+pub fn dict(d: &Dict) -> String {
+    match d {
+        Dict::Instance { name, args, .. } if args.is_empty() => format!("<{name}>"),
+        Dict::Instance { name, args, .. } => {
+            let args: Vec<String> = args.iter().map(dict).collect();
+            format!("<{name}>({})", args.join(", "))
+        }
+        Dict::Given(g) => format!("?{g}"),
+        Dict::Super { dict: d, class } => format!("{}.{class}", dict(d)),
+        Dict::Structural { class, fields } => {
+            let fields: Vec<String> = fields.iter().map(dict).collect();
+            format!("{class}{{{}}}", fields.join(", "))
+        }
+        Dict::Primitive(p) => format!("#{p}"),
+        Dict::Error => "error".to_owned(),
+    }
+}
+
+fn lift(l: &Lift) -> String {
+    match l {
+        Lift::Stage { lift: here, result } => {
+            let inner = result.as_deref().map_or(String::new(), lift);
+            format!("({}{inner})", if *here { "!" } else { "." })
+        }
+        Lift::Eff(inner) => format!("eff{}", lift(inner)),
+    }
+}
+
+fn exprs(items: &[Expr]) -> String {
+    items.iter().map(expr).collect::<Vec<_>>().join(", ")
+}
+
+fn fields(fields: &[(String, Expr)]) -> String {
+    fields
+        .iter()
+        .map(|(l, e)| format!("{l} = {}", expr(e)))
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+pub fn expr(e: &Expr) -> String {
+    match &e.kind {
+        ExprKind::Lit(l) => lit(l),
+        ExprKind::Local(n) => n.clone(),
+        ExprKind::Global { module, name } => format!("{module}.{name}"),
+        ExprKind::Method { dict: d, name } => format!("{}.{name}", dict(d)),
+        ExprKind::Con(c) => c.name.clone(),
+        ExprKind::Operation { service, name, .. } => format!("{service}.{name}"),
+        ExprKind::ServiceTag(key) => format!("tag {key}"),
+        ExprKind::Label(l) => format!("label {l:?}"),
+        ExprKind::Dicts(e, dicts) => {
+            let dicts: Vec<String> = dicts.iter().map(dict).collect();
+            format!("{}[{}]", expr(e), dicts.join(", "))
+        }
+        ExprKind::Abstract(dicts, e) => format!("(\\[{}] {})", dicts.join(", "), expr(e)),
+        ExprKind::App {
+            func,
+            arg,
+            runtime,
+            arg_first,
+        } => {
+            let bang = if *runtime { "!" } else { "" };
+            if *arg_first {
+                format!("({} |>{bang} {})", expr(arg), expr(func))
+            } else {
+                format!("({} {}){bang}", expr(func), expr(arg))
+            }
+        }
+        ExprKind::Lambda { params, body } => {
+            let params: Vec<String> = params
+                .iter()
+                .map(|p| format!("{}{}", pat(&p.pat), if p.runtime { "!" } else { "" }))
+                .collect();
+            format!("(fun {} -> {})", params.join(" "), expr(body))
+        }
+        ExprKind::Block(stmts, result) => {
+            let mut parts: Vec<String> = stmts.iter().map(stmt).collect();
+            parts.push(expr(result));
+            format!("{{ {} }}", parts.join("; "))
+        }
+        ExprKind::If(c, t, f) => format!("(if {} then {} else {})", expr(c), expr(t), expr(f)),
+        ExprKind::Match(s, a) => format!("(match {} {})", expr(s), arms(a)),
+        ExprKind::Try(b, a) => format!("(try {} {})", expr(b), arms(a)),
+        ExprKind::Tuple(items) => format!("({})", exprs(items)),
+        ExprKind::List(items) => format!("[{}]", exprs(items)),
+        ExprKind::Record(f) => format!("{{{}}}", fields(f)),
+        ExprKind::Update(r, f) => format!("{{{} with {}}}", expr(r), fields(f)),
+        ExprKind::Field(r, l) => format!("{}.{l}", expr(r)),
+        ExprKind::Binary(op, l, r) => format!("({} {} {})", expr(l), op.symbol(), expr(r)),
+        ExprKind::Not(e) => format!("(not {})", expr(e)),
+        ExprKind::Neg(e) => format!("(-{})", expr(e)),
+        ExprKind::Ignore(e) => format!("(ignore {})", expr(e)),
+        ExprKind::Await(e) => format!("(await {})", expr(e)),
+        ExprKind::Task(e) => format!("(task {})", expr(e)),
+        ExprKind::Scope(owner, e) => format!(
+            "(scope{} {})",
+            owner.as_ref().map_or(String::new(), |o| format!(" {o}")),
+            expr(e)
+        ),
+        ExprKind::Provide(l, e) => format!("(provide {} {})", expr(l), expr(e)),
+        ExprKind::Lift(e, l) => format!("(lift{} {})", lift(l), expr(e)),
+    }
+}
+
+fn stmt(s: &Stmt) -> String {
+    match s {
+        Stmt::Let(p, e) => format!("let {} = {}", pat(p), expr(e)),
+        Stmt::Fun {
+            name,
+            rec,
+            dicts,
+            value,
+        } => format!(
+            "let {}{name}{} = {}",
+            if *rec { "rec " } else { "" },
+            given(dicts),
+            expr(value)
+        ),
+        Stmt::Expr(e) => expr(e),
+    }
+}
+
+fn arms(arms: &[Arm]) -> String {
+    arms.iter()
+        .map(|a| {
+            let guard = a
+                .guard
+                .as_ref()
+                .map_or(String::new(), |g| format!(" when {}", expr(g)));
+            format!("| {}{guard} -> {}", pat(&a.pat), expr(&a.body))
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn lit(l: &Lit) -> String {
+    match l {
+        Lit::Number(n) | Lit::BigInt(n) => n.clone(),
+        Lit::String(s) => format!("{s:?}"),
+        Lit::Bool(b) => b.to_string(),
+        Lit::Unit => "()".to_owned(),
+    }
+}
+
+pub fn pat(p: &Pat) -> String {
+    match p {
+        Pat::Wild => "_".to_owned(),
+        Pat::Bind(n) => n.clone(),
+        Pat::Lit(l) => lit(l),
+        Pat::Tuple(items) => format!("({})", pats(items, ", ")),
+        Pat::List(items) => format!("[{}]", pats(items, ", ")),
+        Pat::Record(fields) => {
+            let fields: Vec<String> = fields
+                .iter()
+                .map(|(l, p)| format!("{l} = {}", pat(p)))
+                .collect();
+            format!("{{{}}}", fields.join("; "))
+        }
+        Pat::Con(c, args) if args.is_empty() => c.name.clone(),
+        Pat::Con(c, args) => format!("({} {})", c.name, pats(args, " ")),
+        Pat::Or(alts) => format!("({})", pats(alts, " | ")),
+    }
+}
+
+fn pats(items: &[Pat], sep: &str) -> String {
+    items.iter().map(pat).collect::<Vec<_>>().join(sep)
+}

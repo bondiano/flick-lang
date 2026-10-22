@@ -1,0 +1,214 @@
+//! What code generation needs to know from type checking, recorded by the
+//! source range of the node it is about: what a name refers to, which
+//! application stages run through the runtime, where a pure function is lifted
+//! into a runtime position, and which dictionaries a use of a constrained
+//! value receives.
+
+use std::collections::{HashMap, HashSet};
+use std::mem;
+
+use super::Checker;
+use super::classes::Dict;
+use super::ty::Type;
+use crate::source::Span;
+
+/// A source range of the module being checked.
+pub type Range = (u32, u32);
+
+pub fn range(span: Span) -> Range {
+    (span.start, span.end)
+}
+
+#[derive(Debug, Default)]
+pub struct Typing {
+    /// Every name in an expression or a constructor pattern.
+    pub names: HashMap<Range, Ref>,
+    /// Applications `f a1 … ai` (from `f` to `ai`) and pipes `x |> f` whose
+    /// stage runs a runtime call.
+    pub runtime: HashSet<Range>,
+    /// Functions written with parameters, `fun` and `let`: whether the arrow
+    /// of each parameter is runtime.
+    pub stages: HashMap<Range, Vec<bool>>,
+    /// Pure functions accepted where a runtime one is expected.
+    pub lifts: HashMap<Range, Lift>,
+    /// `++` on lists rather than strings.
+    pub list_concat: HashSet<Range>,
+    /// Dictionaries a use receives, in the order of its constraints.
+    pub dicts: HashMap<Range, Vec<Dict>>,
+    /// The constraints a definition, a method or a higher-rank argument
+    /// assumes, as dictionaries name them (`Dict::Given`), in order.
+    pub givens: HashMap<Range, Vec<String>>,
+    /// The label of each use of `Record.label`.
+    pub labels: HashMap<Range, String>,
+    /// Each `foreign`: the arrows of its signature and how many
+    /// dictionaries it takes.
+    pub foreigns: HashMap<Range, (Vec<bool>, usize)>,
+    /// Instances declared or derived in this module.
+    pub instances: Vec<InstanceInfo>,
+    /// Pending: uses whose types are known once the module is solved.
+    pending_labels: Vec<(Range, Type)>,
+    pending_dicts: Vec<(Range, u32, Dict)>,
+}
+
+/// What a name refers to. Locals are known to the lowering by scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Ref {
+    Local,
+    /// A top-level `let` or `foreign` of `module`.
+    Value {
+        module: String,
+        name: String,
+    },
+    /// A class method: a field of the dictionary of the first constraint.
+    Method {
+        module: String,
+        name: String,
+    },
+    Constructor(Constructor),
+    /// `S.op`: the service is looked up at the first runtime stage.
+    Operation {
+        service: String,
+        name: String,
+        stages: Vec<bool>,
+    },
+    /// A service named as a value: `Layer.succeed Clock …`.
+    ServiceTag(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Constructor {
+    pub module: String,
+    pub ty: String,
+    pub name: String,
+    pub arity: usize,
+}
+
+/// How a pure value becomes the runtime one its position expects.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Lift {
+    /// A function: whether this stage turns runtime, and how its result lifts.
+    Stage {
+        lift: bool,
+        result: Option<Box<Lift>>,
+    },
+    /// The result of an `Eff`.
+    Eff(Box<Lift>),
+}
+
+#[derive(Debug, Clone)]
+pub struct InstanceInfo {
+    pub module: String,
+    /// The head as written: what `Dict::Instance` names it by.
+    pub name: String,
+    pub class: (String, String),
+    /// The `instance` declaration, or the `deriving` clause.
+    pub span: Range,
+    /// The context, as its dictionaries are named.
+    pub context: Vec<String>,
+    pub supers: Vec<(String, Dict)>,
+    /// For a derived instance: the dictionary of each field, constructor by
+    /// constructor, and the constructors (`None` for a type without variants,
+    /// whose one field is its representation).
+    pub derived: Option<(Vec<Dict>, Option<Vec<Constructor>>)>,
+}
+
+/// Constraints that are solved by the region checker and pass no dictionary.
+pub fn passes_dictionary(constraint: &Type) -> bool {
+    !matches!(
+        super::classes::split(constraint),
+        Some((("Fiber", "Outlives"), _))
+    )
+}
+
+impl Checker<'_> {
+    pub fn record_name(&mut self, span: Span, r: Ref) {
+        self.typing.names.insert(range(span), r);
+    }
+
+    /// Records the dictionaries of the constraints of a definition or
+    /// argument checked at `span`.
+    pub fn record_givens(&mut self, span: Span, givens: &[Type]) {
+        let shown: Vec<String> = givens
+            .iter()
+            .filter(|g| passes_dictionary(g))
+            .map(|g| self.show(&self.canon(g)))
+            .collect();
+        if !shown.is_empty() {
+            self.typing.givens.insert(range(span), shown);
+        }
+    }
+
+    pub fn record_dict(&mut self, span: Span, order: u32, dict: Dict) {
+        self.typing.pending_dicts.push((range(span), order, dict));
+    }
+
+    pub fn record_label(&mut self, span: Span, ty: Type) {
+        self.typing.pending_labels.push((range(span), ty));
+    }
+
+    /// The arrows of a function type with aliases expanded: whether each
+    /// stage is runtime.
+    pub fn arrow_stages(&self, ty: &Type) -> Vec<bool> {
+        let mut out = Vec::new();
+        let mut ty = match ty {
+            Type::Forall { body, .. } => (**body).clone(),
+            other => other.clone(),
+        };
+        while let Type::Fun {
+            effects, result, ..
+        } = self.whnf_captured(&ty).0
+        {
+            out.push(effects.is_some());
+            ty = *result;
+        }
+        out
+    }
+
+    /// How `actual` lifts into `expected`, if any stage needs it.
+    pub fn lift(&self, actual: &Type, expected: &Type) -> Option<Lift> {
+        let (a, e) = (self.whnf_captured(actual).0, self.whnf_captured(expected).0);
+        match (&a, &e) {
+            (
+                Type::Fun {
+                    effects: e1,
+                    result: r1,
+                    ..
+                },
+                Type::Fun {
+                    effects: e2,
+                    result: r2,
+                    ..
+                },
+            ) => {
+                let lift = e1.is_none() && e2.is_some();
+                let result = self.lift(r1, r2).map(Box::new);
+                (lift || result.is_some()).then_some(Lift::Stage { lift, result })
+            }
+            _ => match (self.eff_parts(&a), self.eff_parts(&e)) {
+                (Some((_, _, r1)), Some((_, _, r2))) => {
+                    self.lift(&r1, &r2).map(|l| Lift::Eff(Box::new(l)))
+                }
+                _ => None,
+            },
+        }
+    }
+
+    /// Settles what waited for the whole module to be solved.
+    pub fn finish_typing(&mut self) -> Typing {
+        let mut typing = mem::take(&mut self.typing);
+        for (at, ty) in mem::take(&mut typing.pending_labels) {
+            let ty = self.zonk(&ty);
+            if let Type::App { arg, .. } = ty
+                && let Type::Symbol(label) = *arg
+            {
+                typing.labels.insert(at, label);
+            }
+        }
+        let mut dicts = mem::take(&mut typing.pending_dicts);
+        dicts.sort_by_key(|(at, order, _)| (*at, *order));
+        for (at, _, dict) in dicts {
+            typing.dicts.entry(at).or_default().push(dict);
+        }
+        typing
+    }
+}

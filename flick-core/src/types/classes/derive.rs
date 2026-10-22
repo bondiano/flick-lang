@@ -6,7 +6,7 @@ use std::ptr;
 
 use super::declare::Declared;
 use super::solve::Outcome;
-use super::{STRUCTURAL, has_metas};
+use super::{Dict, STRUCTURAL, has_metas};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::iface::Namespace;
 use crate::syntax::cst::Node;
@@ -178,7 +178,7 @@ impl<'n> Checker<'_> {
     }
 
     /// The field types of a constructor of this module, over the type's parameters.
-    fn constructor_fields(&self, constructor: &str) -> Vec<Type> {
+    pub(super) fn constructor_fields(&self, constructor: &str) -> Vec<Type> {
         let entity = self.env.entity(Namespace::Constructor, constructor);
         let mut ty = match self.env.value(&entity) {
             Some(Type::Forall { body, .. }) => (**body).clone(),
@@ -193,15 +193,22 @@ impl<'n> Checker<'_> {
         fields
     }
 
-    /// Each field of a derived instance needs the class too.
-    pub(super) fn derived_fields(&mut self, d: &Declared, fields: &[Type]) {
+    /// Each field of a derived instance needs the class too; the dictionary
+    /// of each field.
+    pub(super) fn derived_fields(&mut self, d: &Declared, fields: &[Type]) -> Vec<Dict> {
         let (head, _) = d.instance.head.spine();
         let head = head.clone();
         let class = super::split(&d.instance.head).map(|((_, n), _)| n.to_owned());
+        let mut dicts = Vec::new();
         for field in fields {
             let c = Type::app(head.clone(), field.clone());
             let outcome = self.entails(&c, &d.instance.context);
-            if matches!(outcome, Outcome::Solved(_)) || has_metas(field) {
+            if let Outcome::Solved(dict) = outcome {
+                dicts.push(dict);
+                continue;
+            }
+            if has_metas(field) {
+                dicts.push(Dict::Error);
                 continue;
             }
             let (shown, class) = (self.show(field), class.clone().unwrap_or_default());
@@ -217,7 +224,8 @@ impl<'n> Checker<'_> {
                     Vec::new(),
                 ),
             );
-            return;
+            return dicts;
         }
+        dicts
     }
 }

@@ -202,6 +202,20 @@ impl<'a> Checker<'a> {
         let scheme = sig
             .and_then(|s| s.nodes().find(|n| is_type(n.kind)))
             .map(|t| self.signature(t));
+        if decl.kind == K::ForeignDecl
+            && let Some((scheme, _)) = &scheme
+        {
+            let dicts = match scheme {
+                Type::Forall { constraints, .. } => constraints
+                    .iter()
+                    .filter(|c| super::typing::passes_dictionary(c))
+                    .count(),
+                _ => 0,
+            };
+            let stages = self.arrow_stages(scheme);
+            let span = super::typing::range(self.span(decl));
+            self.typing.foreigns.insert(span, (stages, dicts));
+        }
         let index = self.top.items.len();
         for name in &names {
             self.env.declare(Namespace::Value, name);

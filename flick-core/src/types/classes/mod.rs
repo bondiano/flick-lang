@@ -52,6 +52,9 @@ pub struct Wanted {
     pub constraint: Type,
     pub span: Span,
     pub givens: Vec<Type>,
+    /// Position among the constraints required so far, which orders the
+    /// dictionaries of one use.
+    pub order: u32,
 }
 
 #[derive(Debug, Default)]
@@ -66,6 +69,7 @@ pub struct State {
     pub steps: u32,
     /// Dictionaries of constraints without unknowns or variables.
     cache: HashMap<Type, Dict>,
+    required: u32,
 }
 
 /// What a class declares, with the parameters it is written over.
@@ -100,10 +104,12 @@ impl Checker<'_> {
             self.regions.outlives.push(outlives);
             return;
         }
+        self.classes.required += 1;
         self.classes.wanted.push(Wanted {
             constraint,
             span,
             givens: self.classes.givens.clone(),
+            order: self.classes.required,
         });
     }
 

@@ -5,9 +5,10 @@
 use std::mem;
 
 use super::ty::Type;
+use super::typing::{Constructor, Ref};
 use super::{Checker, Local, Operator};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
-use crate::iface::Namespace;
+use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -47,18 +48,25 @@ impl Checker<'_> {
         if namespace == Namespace::Value
             && let Some(i) = self.locals.iter().rposition(|l| l.name == name)
         {
+            self.record_name(span, Ref::Local);
             return self.use_local(i, span);
         }
         match self.env.find(namespace, name) {
             super::env::Found::Entity(entity) => {
-                if entity.module == self.env.module && namespace == Namespace::Value {
-                    return self.top_value(name, span);
-                }
-                let scheme = self.env.value(&entity).cloned();
-                scheme.map_or(Type::Error, |s| self.instantiate(&s, span))
+                let ty = if entity.module == self.env.module && namespace == Namespace::Value {
+                    self.top_value(name, span)
+                } else {
+                    let scheme = self.env.value(&entity).cloned();
+                    scheme.map_or(Type::Error, |s| self.instantiate(&s, span))
+                };
+                self.record_entity(&entity, &ty, span);
+                ty
             }
             super::env::Found::Unknown => Type::Error,
             super::env::Found::Missing if namespace == Namespace::Constructor => {
+                if let super::env::Found::Entity(e) = self.env.find(Namespace::Type, name) {
+                    self.record_name(span, Ref::ServiceTag(format!("{}.{}", e.module, e.name)));
+                }
                 self.service_tag(name).unwrap_or_else(|| {
                     self.error(
                         codes::T001,
@@ -79,6 +87,34 @@ impl Checker<'_> {
         }
     }
 
+    /// Records what a top-level name refers to; `ty` is its type at the use.
+    fn record_entity(&mut self, entity: &Entity, ty: &Type, span: Span) {
+        let parent = self.env.parent(entity);
+        let r = match (entity.namespace, parent) {
+            (Namespace::Constructor, Some((module, ty_name))) => {
+                let arity = self.arrow_stages(ty).len();
+                Ref::Constructor(Constructor {
+                    module,
+                    ty: ty_name,
+                    name: entity.name.clone(),
+                    arity,
+                })
+            }
+            (Namespace::Value, Some(_)) => Ref::Method {
+                module: entity.module.clone(),
+                name: entity.name.clone(),
+            },
+            _ => Ref::Value {
+                module: entity.module.clone(),
+                name: entity.name.clone(),
+            },
+        };
+        if entity.module == super::classes::RECORD && entity.name == "label" {
+            self.record_label(span, ty.clone());
+        }
+        self.record_name(span, r);
+    }
+
     pub fn use_local(&mut self, index: usize, span: Span) -> Type {
         self.regions.uses.push(index);
         let Local { ty, rec, .. } = self.locals[index].clone();
@@ -96,8 +132,12 @@ impl Checker<'_> {
             let entity = interface
                 .and_then(|i| i.find(namespace, name))
                 .map(|e| e.entity.clone());
-            let scheme = entity.and_then(|e| self.env.value(&e).cloned());
-            return scheme.map_or(Type::Error, |s| self.instantiate(&s, span));
+            let scheme = entity.as_ref().and_then(|e| self.env.value(e).cloned());
+            let ty = scheme.map_or(Type::Error, |s| self.instantiate(&s, span));
+            if let Some(entity) = entity {
+                self.record_entity(&entity, &ty, span);
+            }
+            return ty;
         }
         let service = match self.env.find(Namespace::Type, qualifier) {
             super::env::Found::Entity(e) => self
@@ -111,7 +151,17 @@ impl Checker<'_> {
         match service.map(|(module, d)| (module, d.form)) {
             Some((module, super::env::Form::Service { params, operations })) => {
                 if let Some(op) = operations.iter().find(|o| o.name == name) {
-                    self.operation_type(&module, qualifier, params.len(), &op.ty, span)
+                    let ty = self.operation_type(&module, qualifier, params.len(), &op.ty, span);
+                    let stages = self.arrow_stages(&ty);
+                    self.record_name(
+                        span,
+                        Ref::Operation {
+                            service: format!("{module}.{qualifier}"),
+                            name: name.to_owned(),
+                            stages,
+                        },
+                    );
+                    ty
                 } else {
                     self.error(
                         codes::T001,
@@ -156,6 +206,7 @@ impl Checker<'_> {
                     }
                     if let Some(e) = effects {
                         self.perform(&e.services, &e.errors, span);
+                        self.typing.runtime.insert(super::typing::range(span));
                     }
                     params.push(*param);
                     ty = self.instantiate(&result, span);
@@ -301,6 +352,7 @@ impl Checker<'_> {
                     let (start, _) = lhs.range();
                     let (_, end) = rhs.range();
                     self.perform(&e.services, &e.errors, Span::new(self.file, start, end));
+                    self.typing.runtime.insert((start, end));
                 }
                 let span = Span::new(self.file, lhs.range().0, rhs.range().1);
                 self.instantiate(&result, span)
@@ -384,6 +436,11 @@ impl Checker<'_> {
                 }
                 head => op.allowed.iter().any(|name| head.is_prim(name)),
             };
+            if op.op == "++" && ty.spine().0.is_prim("List") {
+                self.typing
+                    .list_concat
+                    .insert(super::typing::range(op.span));
+            }
             // an operand already reported inside the operator explains it better
             let reported = || {
                 self.diagnostics.iter().any(|d| {

@@ -7,7 +7,7 @@
 use super::matching::{Subst, rename, resolve, unify_heads};
 use super::prims::PRIMITIVES;
 use super::solve::Outcome;
-use super::{ClassInfo, RECORD, split, vars};
+use super::{ClassInfo, Dict, RECORD, split, vars};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve;
 use crate::source::Span;
@@ -17,7 +17,8 @@ use crate::types::convert::{Free, is_type};
 use crate::types::env::Instance;
 use crate::types::kinds::Kind;
 use crate::types::ty::{Binder, Type};
-use crate::types::{Checker, env};
+use crate::types::typing::range;
+use crate::types::{Checker, Constructor, Form, InstanceInfo, env, passes_dictionary};
 
 /// An instance this module declares, written or derived.
 pub struct Declared<'n> {
@@ -384,10 +385,14 @@ impl<'n> Checker<'_> {
         for d in declared {
             self.classes.steps = 0;
             let name = d.instance.name.clone();
+            let mut supers = Vec::new();
             for s in self.supers_of(&d.instance.head) {
                 let shown = self.show(&s);
                 match self.entails(&s, &d.instance.context) {
-                    Outcome::Solved(_) => {}
+                    Outcome::Solved(dict) => {
+                        let class = super::split(&s).map(|((_, n), _)| n.to_owned());
+                        supers.push((class.unwrap_or_default(), dict));
+                    }
                     Outcome::Budget(_) => self.error(
                         codes::C009,
                         d.span,
@@ -403,10 +408,13 @@ impl<'n> Checker<'_> {
                     ),
                 }
             }
-            match &d.fields {
-                Some(fields) => self.derived_fields(d, fields),
-                None => self.instance_methods(d.decl, &d.instance),
-            }
+            let derived = if let Some(fields) = &d.fields {
+                Some(self.derived_fields(d, fields))
+            } else {
+                self.instance_methods(d.decl, &d.instance);
+                None
+            };
+            self.record_instance(d, supers, derived);
         }
     }
 }
@@ -420,4 +428,65 @@ fn fundep_text(params: &[String], fd: &env::Fundep) -> String {
             .join(" ")
     };
     format!("{} -> {}", names(&fd.from), names(&fd.to))
+}
+
+impl Checker<'_> {
+    /// What code generation needs to build the dictionary of an instance.
+    fn record_instance(
+        &mut self,
+        d: &Declared,
+        supers: Vec<(String, Dict)>,
+        fields: Option<Vec<Dict>>,
+    ) {
+        let Some(((cm, cn), _)) = split(&d.instance.head) else {
+            return;
+        };
+        let class = (cm.to_owned(), cn.to_owned());
+        let context = d
+            .instance
+            .context
+            .iter()
+            .filter(|c| passes_dictionary(c))
+            .map(|c| self.show(&self.canon(c)))
+            .collect();
+        let derived = fields.map(|fields| {
+            let target = d.instance.head.spine().1.first().map(|t| (*t).clone());
+            let constructors = target.and_then(|t| self.derived_constructors(&t));
+            (fields, constructors)
+        });
+        let info = InstanceInfo {
+            module: d.instance.module.clone(),
+            name: d.instance.name.clone(),
+            class,
+            span: range(d.span),
+            context,
+            supers,
+            derived,
+        };
+        self.typing.instances.push(info);
+    }
+
+    /// The constructors of the type a derived instance is for; `None` when
+    /// it has no variants.
+    fn derived_constructors(&self, target: &Type) -> Option<Vec<Constructor>> {
+        let Type::Con { module, name } = target.spine().0 else {
+            return None;
+        };
+        let names = match &self.env.type_def(module, name)?.form {
+            Form::Adt { constructors } => constructors.clone(),
+            Form::Error => vec![name.clone()],
+            _ => return None,
+        };
+        Some(
+            names
+                .into_iter()
+                .map(|c| Constructor {
+                    module: module.clone(),
+                    ty: name.clone(),
+                    arity: self.constructor_fields(&c).len(),
+                    name: c,
+                })
+                .collect(),
+        )
+    }
 }

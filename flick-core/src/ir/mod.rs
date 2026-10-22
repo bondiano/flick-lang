@@ -1,0 +1,307 @@
+//! Typed IR: a checked module with everything code generation must not
+//! guess made explicit: each application stage and whether it runs through
+//! the runtime, the dictionaries of class constraints, lifts of pure
+//! functions into runtime positions, what every name refers to, and the
+//! source range of every node. Evaluation order is the order of the nodes:
+//! children left to right, each application stage after its argument.
+//!
+//! Built from the syntax tree and the checker's [`Typing`](crate::types::Typing)
+//! by [`lower`]; printed for tests by [`print`].
+
+mod lower;
+mod print;
+
+pub use lower::lower;
+pub use print::print;
+
+use crate::source::Span;
+use crate::types::{Constructor, Dict, InstanceInfo, Lift};
+
+#[derive(Debug, Clone)]
+pub struct Module {
+    pub name: String,
+    /// Top-level definitions in source order; code generation orders them
+    /// by what each one uses.
+    pub items: Vec<Item>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Item {
+    pub kind: ItemKind,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub enum ItemKind {
+    /// `let name … = …`; a definition with class constraints takes their
+    /// dictionaries first.
+    Value {
+        name: String,
+        dicts: Vec<String>,
+        body: Expr,
+    },
+    /// `let (a, b) = …`.
+    Destructure {
+        pattern: Pat,
+        body: Expr,
+    },
+    Foreign(Foreign),
+    /// A constructor of a type or error declared here.
+    Constructor(Constructor),
+    /// `service S`: its key is `Module.S`.
+    Service {
+        name: String,
+        key: String,
+    },
+    /// An instance with its methods; with a context, a function of the
+    /// context's dictionaries.
+    Instance {
+        info: Box<InstanceInfo>,
+        methods: Vec<(String, Expr)>,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct Foreign {
+    pub name: String,
+    pub mode: ForeignMode,
+    /// `None` for `global`.
+    pub module: Option<String>,
+    /// The export, or the global path `Date.now`.
+    pub export: String,
+    /// Each arrow of the signature: whether it is runtime.
+    pub stages: Vec<bool>,
+    /// Dictionaries the JS function takes before its arguments.
+    pub dicts: usize,
+    /// `arity n`, else the stages up to the first runtime one.
+    pub arity: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ForeignMode {
+    /// A plain JS function.
+    Pure,
+    /// Synchronous JS run by the runtime; a throw is a defect.
+    Sync,
+    /// Returns a `Promise`; a rejection is a defect.
+    Async,
+    /// Returns an `Effect`.
+    Effect,
+}
+
+#[derive(Debug, Clone)]
+pub struct Expr {
+    pub kind: ExprKind,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub enum ExprKind {
+    Lit(Lit),
+    /// A local by its unique name in the enclosing top-level definition.
+    Local(String),
+    /// A top-level value of a module.
+    Global {
+        module: String,
+        name: String,
+    },
+    /// The method `name` of a class dictionary.
+    Method {
+        dict: Dict,
+        name: String,
+    },
+    /// A constructor as a function of its fields (a value without fields).
+    Con(Constructor),
+    /// `S.op`, looked up at its first runtime stage.
+    Operation {
+        service: String,
+        name: String,
+        stages: Vec<bool>,
+    },
+    /// A service named as a value.
+    ServiceTag(String),
+    /// `Record.label` at a known label.
+    Label(String),
+    /// A constrained value given its dictionaries.
+    Dicts(Box<Expr>, Vec<Dict>),
+    /// A value checked against a constrained type: takes the dictionaries.
+    Abstract(Vec<String>, Box<Expr>),
+    /// One stage: `func` applied to `arg`; `runtime` runs the call. With
+    /// `arg_first` (`arg |> func`) the argument is evaluated first.
+    App {
+        func: Box<Expr>,
+        arg: Box<Expr>,
+        runtime: bool,
+        arg_first: bool,
+    },
+    /// A function of one or more stages; the body runs at the last one.
+    Lambda {
+        params: Vec<Param>,
+        body: Box<Expr>,
+    },
+    Block(Vec<Stmt>, Box<Expr>),
+    If(Box<Expr>, Box<Expr>, Box<Expr>),
+    Match(Box<Expr>, Vec<Arm>),
+    /// `try body with arms`: the arms see the typed failure.
+    Try(Box<Expr>, Vec<Arm>),
+    Tuple(Vec<Expr>),
+    List(Vec<Expr>),
+    /// Fields in the order written, which is the order of evaluation.
+    Record(Vec<(String, Expr)>),
+    Update(Box<Expr>, Vec<(String, Expr)>),
+    Field(Box<Expr>, String),
+    Binary(BinOp, Box<Expr>, Box<Expr>),
+    Not(Box<Expr>),
+    Neg(Box<Expr>),
+    Ignore(Box<Expr>),
+    Await(Box<Expr>),
+    Task(Box<Expr>),
+    /// `scope [s] { … }`; `owner` binds the owner of a named scope.
+    Scope(Option<String>, Box<Expr>),
+    Provide(Box<Expr>, Box<Expr>),
+    /// A pure function value used where a runtime one is expected.
+    Lift(Box<Expr>, Lift),
+}
+
+#[derive(Debug, Clone)]
+pub struct Param {
+    pub pat: Pat,
+    /// Whether the arrow of this parameter is runtime.
+    pub runtime: bool,
+}
+
+#[derive(Debug, Clone)]
+pub enum Stmt {
+    Let(Pat, Expr),
+    /// A local function; `rec` when it may call itself.
+    Fun {
+        name: String,
+        rec: bool,
+        dicts: Vec<String>,
+        value: Expr,
+    },
+    Expr(Expr),
+}
+
+#[derive(Debug, Clone)]
+pub struct Arm {
+    pub pat: Pat,
+    pub guard: Option<Expr>,
+    pub body: Expr,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Lit {
+    /// Source text of a JS numeric literal.
+    Number(String),
+    BigInt(String),
+    String(String),
+    Bool(bool),
+    Unit,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Pat {
+    Wild,
+    Bind(String),
+    /// A literal; `Number` and `BigInt` may be negative.
+    Lit(Lit),
+    Tuple(Vec<Pat>),
+    List(Vec<Pat>),
+    /// Fields a record pattern mentions.
+    Record(Vec<(String, Pat)>),
+    Con(Constructor, Vec<Pat>),
+    Or(Vec<Pat>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinOp {
+    Or,
+    And,
+    /// Structural equality; `SameValueZero` on `Number`.
+    Eq,
+    NotEq,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    /// `++` on strings.
+    Concat,
+    /// `++` on lists.
+    ListConcat,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    Pow,
+}
+
+impl BinOp {
+    pub fn symbol(self) -> &'static str {
+        match self {
+            BinOp::Or => "||",
+            BinOp::And => "&&",
+            BinOp::Eq => "==",
+            BinOp::NotEq => "!=",
+            BinOp::Lt => "<",
+            BinOp::Le => "<=",
+            BinOp::Gt => ">",
+            BinOp::Ge => ">=",
+            BinOp::Concat => "++",
+            BinOp::ListConcat => "++list",
+            BinOp::Add => "+",
+            BinOp::Sub => "-",
+            BinOp::Mul => "*",
+            BinOp::Div => "/",
+            BinOp::Rem => "%",
+            BinOp::Pow => "**",
+        }
+    }
+}
+
+impl Expr {
+    pub fn new(kind: ExprKind, span: Span) -> Self {
+        Expr { kind, span }
+    }
+}
+
+impl Pat {
+    /// Names the pattern binds, in order.
+    pub fn binders<'a>(&'a self, out: &mut Vec<&'a str>) {
+        match self {
+            Pat::Bind(name) => out.push(name),
+            Pat::Wild | Pat::Lit(_) => {}
+            Pat::Tuple(items) | Pat::List(items) | Pat::Con(_, items) => {
+                for p in items {
+                    p.binders(out);
+                }
+            }
+            Pat::Record(fields) => {
+                for (_, p) in fields {
+                    p.binders(out);
+                }
+            }
+            // every alternative binds the same names
+            Pat::Or(alternatives) => {
+                if let Some(first) = alternatives.first() {
+                    first.binders(out);
+                }
+            }
+        }
+    }
+
+    /// Whether every value matches.
+    pub fn irrefutable(&self) -> bool {
+        match self {
+            Pat::Wild | Pat::Bind(_) | Pat::Lit(Lit::Unit) => true,
+            Pat::Tuple(items) => items.iter().all(Pat::irrefutable),
+            Pat::Record(fields) => fields.iter().all(|(_, p)| p.irrefutable()),
+            Pat::Or(alternatives) => alternatives.iter().any(Pat::irrefutable),
+            Pat::Lit(_) | Pat::List(_) | Pat::Con(..) => false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests;

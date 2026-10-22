@@ -263,6 +263,18 @@ impl Checker<'_> {
         {
             args_pats.push(self.bind_pattern(arg, param));
         }
+        if let Some((module, ty)) = self.env.parent(&entity) {
+            let constructor = super::typing::Constructor {
+                module,
+                ty,
+                name: name.to_owned(),
+                arity: params.len(),
+            };
+            self.record_name(
+                self.span(node),
+                super::typing::Ref::Constructor(constructor),
+            );
+        }
         match self.env.parent(&entity) {
             Some((module, ty)) => Pat::Ctor(
                 Ctor::Variant {

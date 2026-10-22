@@ -262,6 +262,7 @@ impl Checker<'_> {
         self.store.level += 1;
         let kinds = binders(scheme);
         let (body, skolems, givens) = self.skolemize(scheme);
+        self.record_givens(self.span(decl), &givens);
         let body = match captures {
             Some(c) => Type::Captured {
                 ty: Box::new(body),

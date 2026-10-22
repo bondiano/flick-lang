@@ -430,12 +430,8 @@ impl Checker<'_> {
                     fundeps,
                     methods: members.iter().map(|(name, _)| name.clone()).collect(),
                 };
-                for (name, ty) in members {
-                    let scheme = self.default_kinds(&quantify(ty));
-                    self.env
-                        .set_value(self.env.entity(Namespace::Value, &name), scheme);
-                    self.env.declare(Namespace::Value, &name);
-                }
+                let members = members.into_iter().map(|(n, t)| (n, quantify(t))).collect();
+                self.declare_methods(&p.name, members);
             }
             Body::Members(members) => {
                 let operations = members
@@ -482,4 +478,17 @@ enum Body {
     Members(Vec<(String, Type)>),
     /// Superclasses, functional dependencies and methods.
     Class(Vec<Type>, Vec<Fundep>, Vec<(String, Type)>),
+}
+
+impl Checker<'_> {
+    /// The methods of a class are values whose parent is the class.
+    fn declare_methods(&mut self, class: &str, members: Vec<(String, Type)>) {
+        for (name, ty) in members {
+            let scheme = self.default_kinds(&ty);
+            let entity = self.env.entity(Namespace::Value, &name);
+            self.env.set_value(entity.clone(), scheme);
+            self.env.set_parent(entity, class);
+            self.env.declare(Namespace::Value, &name);
+        }
+    }
 }

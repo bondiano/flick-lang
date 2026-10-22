@@ -43,6 +43,7 @@ impl Checker<'_> {
                 match self.entail(&c, &givens, &mut Vec::new()) {
                     Outcome::Solved(dict) => {
                         solved = true;
+                        self.record_dict(w.span, w.order, dict.clone());
                         self.classes.evidence.push((w.span, dict));
                     }
                     outcome => left.push((w, outcome)),

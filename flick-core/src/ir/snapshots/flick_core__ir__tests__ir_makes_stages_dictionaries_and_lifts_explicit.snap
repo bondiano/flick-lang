@@ -1,0 +1,17 @@
+---
+source: flick-core/src/ir/tests.rs
+assertion_line: 90
+expression: "super::print(&ir)"
+---
+module App
+constructor App.NotFound.NotFound/1
+service Users = App.Users
+constructor App.Shape.Circle/1
+constructor App.Shape.Square/1
+let render [Show a] = (fun value -> (?Show a.show value))
+let load = (fun id! -> { let name = (try (App.Users.get id)! | (NotFound _) -> "?"); (Platform.stdout_line ((App.render[<Show Number>] 1) ++ name))!; name })
+let twice = (fun f x! -> (f (f x)!)!)
+let inc = (fun x -> (x + 1))
+let run = (fun ()! -> ((App.twice (lift(!) App.inc)) 1)!)
+let pick = (fun o -> (match o | (Some (1 | 2)) -> 0 | (Some n) when (n > 3) -> n | _ -> (-1)))
+instance Eq Shape derived [<Eq Number>, <Eq Number>]

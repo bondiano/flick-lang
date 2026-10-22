@@ -21,6 +21,7 @@ impl Checker<'_> {
             self.store.level += 1;
             let mark = self.classes.givens.len();
             let (body, _, givens) = self.skolemize(&target);
+            self.record_givens(self.span(node), &givens);
             self.classes.givens.extend(givens);
             self.check(node, &body);
             self.classes.givens.truncate(mark);
@@ -413,6 +414,8 @@ impl Checker<'_> {
         result: Type,
         span: source::Span,
     ) -> Type {
+        let modes = stages.iter().map(|(_, e)| e.is_some()).collect();
+        self.typing.stages.insert(super::typing::range(span), modes);
         let mut ty = result;
         for (i, ((param, effects), (held, expected))) in
             stages.into_iter().zip(closures).enumerate().rev()

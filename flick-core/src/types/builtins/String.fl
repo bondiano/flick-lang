@@ -1,5 +1,9 @@
 /// Operations on strings.
-module String exposing (trim)
+module String exposing (trim, length)
 
 trim : String -> String
 foreign pure trim from "@flick-lang/runtime" "stringTrim"
+
+/// The number of UTF-16 code units, as JS `length`.
+length : String -> Number
+foreign pure length from "@flick-lang/runtime" "stringLength"

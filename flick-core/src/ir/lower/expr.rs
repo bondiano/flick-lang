@@ -1,0 +1,340 @@
+//! Expressions, blocks and match arms.
+
+use super::Lower;
+use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stmt};
+use crate::source::Span;
+use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::literal;
+use crate::types::{Dict, Ref, is_pattern, let_parts};
+
+impl Lower<'_> {
+    /// An expression with the lift and the dictionaries its position gives it.
+    pub(super) fn expr(&mut self, node: &Node) -> Expr {
+        let key = node.range();
+        let lift = self
+            .consumed
+            .insert((key, false))
+            .then(|| self.typing.lifts.get(&key).cloned())
+            .flatten();
+        let dicts = self
+            .consumed
+            .insert((key, true))
+            .then(|| self.typing.givens.get(&key).cloned())
+            .flatten();
+        let span = self.span(node);
+        let mut expr = self.expr_kind(node);
+        if let Some(lift) = lift {
+            expr = Expr::new(ExprKind::Lift(Box::new(expr), lift), span);
+        }
+        if let Some(dicts) = dicts {
+            expr = Expr::new(ExprKind::Abstract(dicts, Box::new(expr)), span);
+        }
+        expr
+    }
+
+    fn boxed(&mut self, node: &Node) -> Box<Expr> {
+        Box::new(self.expr(node))
+    }
+
+    fn expr_kind(&mut self, node: &Node) -> Expr {
+        let span = self.span(node);
+        let children: Vec<&Node> = node.nodes().collect();
+        let kind = match node.kind {
+            K::Literal => ExprKind::Lit(self.literal(node)),
+            K::UnitExpr => ExprKind::Lit(Lit::Unit),
+            K::NameExpr => return self.name(node),
+            K::ParenExpr | K::AnnotExpr => return self.expr(children[0]),
+            K::TupleExpr => ExprKind::Tuple(children.iter().map(|c| self.expr(c)).collect()),
+            K::ListExpr => ExprKind::List(children.iter().map(|c| self.expr(c)).collect()),
+            K::FieldExpr => {
+                let label = self.token_text(node, K::Ident).unwrap_or_default();
+                ExprKind::Field(self.boxed(children[0]), label)
+            }
+            K::RecordExpr => ExprKind::Record(self.fields(node)),
+            K::RecordUpdate => {
+                let record = self.boxed(children[0]);
+                ExprKind::Update(record, self.fields(node))
+            }
+            K::AppExpr => return self.apply(children[0], &children[1..]),
+            K::BinExpr => return self.binary(node, &children),
+            K::PrefixExpr => {
+                let operand = self.boxed(children[0]);
+                match node.child_tokens().next().map(|t| t.kind) {
+                    Some(K::NotKw) => ExprKind::Not(operand),
+                    Some(K::IgnoreKw) => ExprKind::Ignore(operand),
+                    Some(K::AwaitKw) => ExprKind::Await(operand),
+                    _ => ExprKind::Neg(operand),
+                }
+            }
+            K::FunExpr => {
+                let params: Vec<&Node> = children
+                    .iter()
+                    .copied()
+                    .filter(|n| is_pattern(n.kind))
+                    .collect();
+                let Some(body) = children.iter().find(|n| n.kind == K::Block) else {
+                    return Expr::new(ExprKind::Lit(Lit::Unit), span);
+                };
+                let stages = self.typing.stages.get(&node.range()).cloned();
+                return self.function(&params, body, stages, span);
+            }
+            K::Block => return self.block(node),
+            K::IfExpr => ExprKind::If(
+                self.boxed(children[0]),
+                self.boxed(children[1]),
+                self.boxed(children[2]),
+            ),
+            K::MatchExpr => {
+                let scrutinee = self.boxed(children[0]);
+                ExprKind::Match(scrutinee, self.arms(node))
+            }
+            K::TryExpr => {
+                let body = self.boxed(children[0]);
+                ExprKind::Try(body, self.arms(node))
+            }
+            K::TaskExpr => ExprKind::Task(self.boxed(children[0])),
+            K::ScopeExpr => {
+                let mark = self.scope.len();
+                let owner = self.token_text(node, K::Ident).map(|name| self.bind(&name));
+                let body = self.boxed(children[0]);
+                self.scope.truncate(mark);
+                ExprKind::Scope(owner, body)
+            }
+            K::ProvideExpr => ExprKind::Provide(self.boxed(children[0]), self.boxed(children[1])),
+            _ => {
+                self.unsupported(node);
+                ExprKind::Lit(Lit::Unit)
+            }
+        };
+        Expr::new(kind, span)
+    }
+
+    fn literal(&self, node: &Node) -> Lit {
+        let Some(token) = node.child_tokens().next() else {
+            return Lit::Unit;
+        };
+        let text = token.text(self.text);
+        match token.kind {
+            K::Number => Lit::Number(text.to_owned()),
+            K::BigInt => Lit::BigInt(text.to_owned()),
+            K::String => Lit::String(literal::string_value(text)),
+            K::TrueKw => Lit::Bool(true),
+            K::FalseKw => Lit::Bool(false),
+            _ => Lit::Unit,
+        }
+    }
+
+    fn name(&mut self, node: &Node) -> Expr {
+        let span = self.span(node);
+        let key = node.range();
+        let last = node
+            .child_tokens()
+            .filter(|t| matches!(t.kind, K::Ident | K::Con))
+            .last()
+            .map(|t| t.text(self.text).to_owned())
+            .unwrap_or_default();
+        let r = self
+            .typing
+            .names
+            .get(&key)
+            .unwrap_or_else(|| panic!("the checker resolved `{last}`"));
+        let mut dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();
+        let kind = match r {
+            Ref::Local => ExprKind::Local(
+                self.local(&last)
+                    .unwrap_or_else(|| panic!("`{last}` is a local in scope"))
+                    .to_owned(),
+            ),
+            Ref::Value { module, name } if module == "Record" && name == "label" => {
+                ExprKind::Label(self.typing.labels.get(&key).cloned().unwrap_or_default())
+            }
+            Ref::Value { module, name } => ExprKind::Global {
+                module: module.clone(),
+                name: name.clone(),
+            },
+            Ref::Method { name, .. } => {
+                let dict = dicts.remove(0);
+                ExprKind::Method {
+                    dict,
+                    name: name.clone(),
+                }
+            }
+            Ref::Constructor(c) => ExprKind::Con(c.clone()),
+            Ref::Operation {
+                service,
+                name,
+                stages,
+            } => ExprKind::Operation {
+                service: service.clone(),
+                name: name.clone(),
+                stages: stages.clone(),
+            },
+            Ref::ServiceTag(key) => ExprKind::ServiceTag(key.clone()),
+        };
+        let expr = Expr::new(kind, span);
+        with_dicts(expr, dicts)
+    }
+
+    /// `f a b` as `(f a) b`, each stage with its mode and dictionaries.
+    fn apply(&mut self, head: &Node, args: &[&Node]) -> Expr {
+        let start = head.range().0;
+        let mut func = self.expr(head);
+        for arg in args {
+            let key = (start, arg.range().1);
+            let span = Span::new(self.file, key.0, key.1);
+            let arg = self.expr(arg);
+            let app = ExprKind::App {
+                func: Box::new(func),
+                arg: Box::new(arg),
+                runtime: self.typing.runtime.contains(&key),
+                arg_first: false,
+            };
+            let dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();
+            func = with_dicts(Expr::new(app, span), dicts);
+        }
+        func
+    }
+
+    fn binary(&mut self, node: &Node, children: &[&Node]) -> Expr {
+        let span = self.span(node);
+        let key = node.range();
+        let op = node
+            .child_tokens()
+            .find(|t| t.kind.is_binary_op())
+            .map(|t| t.kind);
+        let lhs = self.boxed(children[0]);
+        let rhs = self.boxed(children[1]);
+        let op = match op {
+            Some(K::PipeGt) => {
+                let app = ExprKind::App {
+                    func: rhs,
+                    arg: lhs,
+                    runtime: self.typing.runtime.contains(&key),
+                    arg_first: true,
+                };
+                let dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();
+                return with_dicts(Expr::new(app, span), dicts);
+            }
+            Some(K::OrOr) => BinOp::Or,
+            Some(K::AndAnd) => BinOp::And,
+            Some(K::EqEq) => BinOp::Eq,
+            Some(K::NotEq) => BinOp::NotEq,
+            Some(K::Lt) => BinOp::Lt,
+            Some(K::Le) => BinOp::Le,
+            Some(K::Gt) => BinOp::Gt,
+            Some(K::Ge) => BinOp::Ge,
+            Some(K::PlusPlus) if self.typing.list_concat.contains(&key) => BinOp::ListConcat,
+            Some(K::PlusPlus) => BinOp::Concat,
+            Some(K::Plus) => BinOp::Add,
+            Some(K::Minus) => BinOp::Sub,
+            Some(K::Star) => BinOp::Mul,
+            Some(K::Slash) => BinOp::Div,
+            Some(K::Percent) => BinOp::Rem,
+            _ => BinOp::Pow,
+        };
+        Expr::new(ExprKind::Binary(op, lhs, rhs), span)
+    }
+
+    /// `label = value` fields of a record literal or update, in order.
+    fn fields(&mut self, node: &Node) -> Vec<(String, Expr)> {
+        node.nodes()
+            .filter(|n| n.kind == K::RecordField)
+            .filter_map(|field| {
+                let label = self.token_text(field, K::Ident)?;
+                let value = field.nodes().next()?;
+                Some((label, self.expr(value)))
+            })
+            .collect()
+    }
+
+    pub(super) fn block(&mut self, node: &Node) -> Expr {
+        let span = self.span(node);
+        let mark = self.scope.len();
+        let statements: Vec<&Node> = node.nodes().collect();
+        let mut stmts = Vec::new();
+        let mut result = None;
+        for (i, statement) in statements.iter().enumerate() {
+            let last = i + 1 == statements.len();
+            match statement.kind {
+                K::Signature => {}
+                K::LetDecl => stmts.push(self.local_let(statement)),
+                _ if last => result = Some(self.expr(statement)),
+                _ => stmts.push(Stmt::Expr(self.expr(statement))),
+            }
+        }
+        self.scope.truncate(mark);
+        let result = result.unwrap_or_else(|| Expr::new(ExprKind::Lit(Lit::Unit), span));
+        if stmts.is_empty() {
+            return result;
+        }
+        Expr::new(ExprKind::Block(stmts, Box::new(result)), span)
+    }
+
+    fn local_let(&mut self, decl: &Node) -> Stmt {
+        let parts = let_parts(decl, self.text);
+        let Some(name) = parts.name.clone() else {
+            let value = self.definition(decl);
+            let pat = parts.pattern.map_or(Pat::Wild, |p| self.pattern(p));
+            return Stmt::Let(pat, value);
+        };
+        let dicts = self.givens(decl);
+        if parts.rec {
+            let unique = self.bind(&name);
+            let value = self.definition(decl);
+            return Stmt::Fun {
+                name: unique,
+                rec: true,
+                dicts,
+                value,
+            };
+        }
+        let value = self.definition(decl);
+        let unique = self.bind(&name);
+        if parts.params.is_empty() && dicts.is_empty() {
+            Stmt::Let(Pat::Bind(unique), value)
+        } else {
+            Stmt::Fun {
+                name: unique,
+                rec: false,
+                dicts,
+                value,
+            }
+        }
+    }
+
+    fn arms(&mut self, node: &Node) -> Vec<Arm> {
+        node.nodes()
+            .filter(|n| n.kind == K::MatchArm)
+            .map(|arm| {
+                let mark = self.scope.len();
+                let mut pat = Pat::Wild;
+                let mut guard = None;
+                let mut body = None;
+                for child in arm.nodes() {
+                    match child.kind {
+                        K::Guard => guard = child.nodes().next().map(|g| self.expr(g)),
+                        K::Block => body = Some(self.expr(child)),
+                        kind if is_pattern(kind) => pat = self.pattern(child),
+                        _ => {}
+                    }
+                }
+                self.scope.truncate(mark);
+                let span = self.span(arm);
+                Arm {
+                    pat,
+                    guard,
+                    body: body.unwrap_or_else(|| Expr::new(ExprKind::Lit(Lit::Unit), span)),
+                }
+            })
+            .collect()
+    }
+}
+
+fn with_dicts(expr: Expr, dicts: Vec<Dict>) -> Expr {
+    if dicts.is_empty() {
+        return expr;
+    }
+    let span = expr.span;
+    Expr::new(ExprKind::Dicts(Box::new(expr), dicts), span)
+}

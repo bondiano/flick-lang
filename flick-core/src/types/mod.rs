@@ -35,13 +35,18 @@ mod rows;
 mod services;
 mod toplevel;
 mod ty;
+mod typing;
 mod unify;
 
+pub use bindings::{LetParts, let_parts, signature_name};
 pub use builtins::builtins;
 pub use classes::Dict;
+pub use convert::is_type;
 pub use env::{Form, Fundep, Instance, Operation, TypeDef};
 pub use kinds::Kind;
+pub use patterns::is_pattern;
 pub use ty::{Binder, Effects, PRELUDE, Row, Type};
+pub use typing::{Constructor, InstanceInfo, Lift, Range, Ref, Typing, passes_dictionary};
 
 use convert::TyVar;
 use env::Env;
@@ -90,7 +95,7 @@ pub fn check(
     options: Options,
     interface: &mut Interface,
 ) -> Vec<Diagnostic> {
-    check_with_evidence(module, imported, builtins, options, interface).0
+    check_typed(module, imported, builtins, options, interface).0
 }
 
 /// [`check`], also returning the dictionary each class constraint resolved
@@ -102,6 +107,29 @@ pub fn check_with_evidence(
     options: Options,
     interface: &mut Interface,
 ) -> (Vec<Diagnostic>, Vec<(Span, Dict)>) {
+    let (diagnostics, _, evidence) = run(module, imported, builtins, options, interface);
+    (diagnostics, evidence)
+}
+
+/// [`check`], also returning what code generation needs to know.
+pub fn check_typed(
+    module: &Module,
+    imported: &dyn Fn(&str) -> Option<Interface>,
+    builtins: &[Interface],
+    options: Options,
+    interface: &mut Interface,
+) -> (Vec<Diagnostic>, Typing) {
+    let (diagnostics, typing, _) = run(module, imported, builtins, options, interface);
+    (diagnostics, typing)
+}
+
+fn run(
+    module: &Module,
+    imported: &dyn Fn(&str) -> Option<Interface>,
+    builtins: &[Interface],
+    options: Options,
+    interface: &mut Interface,
+) -> (Vec<Diagnostic>, Typing, Vec<(Span, Dict)>) {
     let env = Env::new(module.name, module.syntax, imported, builtins);
     let mut checker = Checker {
         file: module.file,
@@ -122,12 +150,14 @@ pub fn check_with_evidence(
         options,
         classes: classes::State::default(),
         regions: regions::State::default(),
+        typing: Typing::default(),
     };
     checker.module(module.tree);
     checker.fill(interface);
+    let typing = checker.finish_typing();
     let mut evidence = checker.classes.evidence;
     evidence.sort_by_key(|(span, _)| (span.start, span.end));
-    (checker.diagnostics, evidence)
+    (checker.diagnostics, typing, evidence)
 }
 
 /// A value in scope inside a declaration.
@@ -183,6 +213,7 @@ struct Checker<'a> {
     options: Options<'a>,
     classes: classes::State,
     regions: regions::State,
+    typing: Typing,
 }
 
 impl Checker<'_> {
