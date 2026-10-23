@@ -1,13 +1,17 @@
-[pending]
-Fiber = "M20"
-await = "M20"
-awaitAll = "M20"
-getCurrent = "M20"
-interrupt = "M20"
-interruptAll = "M20"
-interruptAllAs = "M20"
-interruptAs = "M20"
-isFiber = "M20"
-join = "M20"
-joinAll = "M20"
-runIn = "M20"
+[wrapped]
+join = "Fiber.join 397c57c3ab8ccb72"
+joinAll = "Fiber.join_all 93cd83981814beab"
+interrupt = "Fiber.interrupt b4dea4597062574b"
+interruptAs = "Fiber.interrupt_as 463d52162c7cfb42"
+interruptAll = "Fiber.interrupt_all 1dcaa52c1653c261"
+interruptAllAs = "Fiber.interrupt_all_as 77c88f3e42b05419"
+awaitAll = "Fiber.await_all 4354c9187b891885"
+Fiber = "Fiber.Fiber 38732cf5f74b934c"
+await = "Fiber.await_ aa39e3b85d3974ab"
+
+[language]
+runIn = "a `Fiber.spawn` child already ends with its owner's scope"
+
+[excluded]
+isFiber = "TS-only: a type guard; Flick values are typed statically"
+getCurrent = "invariant: a handle to the running fiber, which no owner spawned; a Flick `Fiber` is a child of `Fiber.spawn`"

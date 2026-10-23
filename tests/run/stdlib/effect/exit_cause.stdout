@@ -1,0 +1,38 @@
+is_success: [true, false, false, false, false]
+is_failure: [false, true, true, true, true]
+has: [(false, false, false), (true, false, false), (false, true, false), (false, false, true), (true, false, false)]
+value: [Some 1, None, None, None, None]
+find_error_option: ["none", "Boom 2", "none", "none", "Boom 1"]
+find_defect: ["no defect", "no defect", "defect broken", "no defect", "no defect"]
+find_error: ["kept false", "error 2", "kept true", "kept true", "error 1"]
+filter_value: ["value 1", "failed true", "failed true", "failed true", "failed true"]
+filter_success: ["ok true", "err false", "err false", "err false", "err false"]
+filter_failure: ["err true", "ok false", "ok false", "ok false", "ok false"]
+filter_cause: ["success", "(true, false, false, false)", "(false, true, false, false)", "(false, false, true, true)", "(true, false, false, false)"]
+match_: ["got 1", "failure (true, false, false, false)", "failure (false, true, false, false)", "failure (false, false, true, true)", "failure (true, false, false, false)"]
+map: [Some 10, None, None, None, None]
+map_error: Other b2
+map_both: Some "1" Other b2
+as_void: (Some (), true)
+as_void_all: (true, false)
+failure: [false, true, true, true, true]
+flags: ["(true, false, false, false)", "(false, true, false, false)", "(false, false, true, true)", "(false, false, false, false)", "(true, true, false, false)"]
+kinds: ["fail", "die"]
+from_reasons: ["fail", "die", "interrupt"]
+find_error_option: Boom 4
+find_fail: ["fail fail", "rest false"]
+find_error: ["Boom 1", "rest true"]
+find_die: ["no die", "die"]
+find_defect: ["no defect", "broken"]
+find_interrupt: ["no interrupt", "interrupt"]
+interruptors: [3]
+filter_interruptors: ["[3]", "none"]
+map: Other b1 (true, true, false, false)
+pretty: true
+pretty_errors: 2
+stack_trace: (false, false)
+reason_stack_trace: [false]
+annotate: true
+frame: (false, true)
+errors: ["no such element: empty", "illegal argument: negative", "unknown: foreign", "timed out"]
+rethrow: Some "(true, true, false, false)"

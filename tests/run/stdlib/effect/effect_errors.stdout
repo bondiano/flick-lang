@@ -1,0 +1,18 @@
+catch_cause: ["(true, false, false)", "(false, true, false)", "fine"]
+catch_cause_if: ["failed (true, false, false)", "recovered (false, true, false)", "fine"]
+catch_cause_filter: ["failed (true, false, false)", "defect broken (false, true, false)", "fine"]
+catch_defect: ["failed (true, false, false)", "caught broken", "fine"]
+tap: ["cause (true, false, false)", "if dies", "filter broken", "defect broken"]
+match_cause: ["failure (true, false, false)", "failure (false, true, false)", "value fine"]
+match_cause_eager: ["failure (true, false, false)", "value fine"]
+match_cause_effect: ["failure (true, false, false)", "value fine"]
+match_cause_effect_eager: ["failure (false, true, false)", "value fine"]
+or_die: failed (false, true, false)
+ignore: done
+with_error_reporting: Boom 1
+finalizers: ["ensuring", "on_error (true, false, false)", "on_error_if", "on_error_filter broken", "on_exit true", "on_exit_if", "on_exit_filter fine", "primitive", "on_interrupt true", "scope body", "finalizer false"]
+interrupt: failed (false, false, true)
+uninterruptible: (None, ["uninterruptible done"])
+uninterruptible_mask: None
+interruptible_mask: free
+interruptible: None

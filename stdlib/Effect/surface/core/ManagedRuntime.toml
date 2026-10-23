@@ -1,4 +1,5 @@
-[pending]
-ManagedRuntime = "M20"
-isManagedRuntime = "M20"
-make = "M20"
+
+[excluded]
+ManagedRuntime = "invariant: runs effects outside the entry runner, which alone runs a Flick program"
+make = "invariant: runs effects outside the entry runner, which alone runs a Flick program"
+isManagedRuntime = "invariant: runs effects outside the entry runner, which alone runs a Flick program"

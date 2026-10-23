@@ -157,6 +157,13 @@ const describe = (payload: unknown): Described => {
   }
 };
 
+/** A defect as inert text: the message of an error, a primitive, or the constructor of a tagged value. */
+export const describeDefect = (defect: unknown): string => {
+  const d = describe(defect);
+  if (d.error) return d.message ?? "<error>";
+  return d.tag === undefined ? (d.value ?? "") : constructorName(d.tag);
+};
+
 /** One reason of a `CauseReport`. */
 export type ReasonReport =
   | (Described & { readonly kind: "fail" | "die" })

@@ -16,3 +16,4 @@ foreign effect inspect from "@flick-lang/runtime" "failureInspect"
 /// Fails with the original cause, unchanged.
 rethrow : Failure e ->{; e} a
 foreign effect rethrow from "@flick-lang/runtime" "failureRethrow"
+  reviewed "effect@4.0.5 sha256:352717014c3964f7"

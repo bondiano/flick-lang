@@ -8,41 +8,48 @@ import { tag } from "../tags.ts";
 
 export * from "effect/Tracer";
 
-interface FlickLink {
+export interface FlickLink {
   readonly span: Tracer.AnySpan;
   readonly attributes: ReadonlyArray<readonly [string, string]>;
 }
 
 const text = (value: unknown): string => (typeof value === "string" ? value : inspect(value));
 
+/** `Tracer.SpanOptions` as Flick holds it. */
+export interface FlickSpanOptions {
+  readonly attributes: ReadonlyArray<readonly [string, string]>;
+  readonly links: ReadonlyArray<FlickLink>;
+  readonly parent: Option.Option<Tracer.AnySpan>;
+  readonly root: boolean;
+  readonly kind_: Tracer.SpanKind;
+  readonly sampled: Option.Option<boolean>;
+  readonly level: Option.Option<LogLevel.LogLevel>;
+  readonly captureStackTrace: boolean;
+  readonly disablePropagation: boolean;
+}
+
+/** Effect's span options of a Flick `Tracer.SpanOptions`. */
+export const nativeSpanOptions = (options: FlickSpanOptions): Tracer.SpanOptions => ({
+  attributes: Object.fromEntries(options.attributes),
+  links: options.links.map((link) => ({ span: link.span, attributes: Object.fromEntries(link.attributes) })),
+  parent: Option.getOrUndefined(options.parent),
+  root: options.root,
+  kind: options.kind_,
+  sampled: Option.getOrUndefined(options.sampled),
+  level: Option.getOrUndefined(options.level),
+  captureStackTrace: options.captureStackTrace,
+  annotations: Context.make(Tracer.DisablePropagation, options.disablePropagation),
+});
+
 /** `Tracer.with_span`. */
 export const flickWithSpan =
-  (
-    name: string,
-    options: {
-      readonly attributes: ReadonlyArray<readonly [string, string]>;
-      readonly links: ReadonlyArray<FlickLink>;
-      readonly parent: Option.Option<Tracer.AnySpan>;
-      readonly root: boolean;
-      readonly kind_: Tracer.SpanKind;
-      readonly sampled: Option.Option<boolean>;
-      readonly level: Option.Option<LogLevel.LogLevel>;
-      readonly captureStackTrace: boolean;
-      readonly disablePropagation: boolean;
-    },
-  ) =>
+  (name: string, options: FlickSpanOptions) =>
   <A, E, R>(self: Effect.Effect<A, E, R>) =>
-    Effect.withSpan(self, name, {
-      attributes: Object.fromEntries(options.attributes),
-      links: options.links.map((link) => ({ span: link.span, attributes: Object.fromEntries(link.attributes) })),
-      parent: Option.getOrUndefined(options.parent),
-      root: options.root,
-      kind: options.kind_,
-      sampled: Option.getOrUndefined(options.sampled),
-      level: Option.getOrUndefined(options.level),
-      captureStackTrace: options.captureStackTrace,
-      annotations: Context.make(Tracer.DisablePropagation, options.disablePropagation),
-    });
+    Effect.withSpan(self, name, nativeSpanOptions(options));
+
+/** The links of spans as Flick holds them. */
+export const flickSpanLinks = (links: ReadonlyArray<Tracer.SpanLink>): Array<FlickLink> =>
+  links.map((link) => ({ span: link.span, attributes: Object.entries(link.attributes).map(([k, v]) => [k, text(v)] as const) }));
 
 /** `Tracer.parent_span`. */
 export const flickParentSpan = (): Effect.Effect<Option.Option<Tracer.AnySpan>> => Effect.serviceOption(Tracer.ParentSpan);

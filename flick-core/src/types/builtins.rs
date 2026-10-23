@@ -176,7 +176,25 @@ const SOURCES: &[(&str, &str)] = &[
     // end of Effect: context, layers and requests
     // Effect: effects, schedules and fibers
     ("Schedule", include_str!("builtins/Schedule.fl")),
+    ("Cause", include_str!("builtins/Cause.fl")),
+    ("Scheduler", include_str!("builtins/Scheduler.fl")),
+    ("References", include_str!("builtins/References.fl")),
+    ("ExecutionPlan", include_str!("builtins/ExecutionPlan.fl")),
+    ("Effect.Core", include_str!("builtins/Effect/Core.fl")),
+    (
+        "Effect.Collections",
+        include_str!("builtins/Effect/Collections.fl"),
+    ),
+    ("Effect.Errors", include_str!("builtins/Effect/Errors.fl")),
+    (
+        "Effect.Concurrency",
+        include_str!("builtins/Effect/Concurrency.fl"),
+    ),
+    ("Effect.Observe", include_str!("builtins/Effect/Observe.fl")),
     ("Effect", include_str!("builtins/Effect.fl")),
+    ("FiberHandle", include_str!("builtins/FiberHandle.fl")),
+    ("FiberMap", include_str!("builtins/FiberMap.fl")),
+    ("FiberSet", include_str!("builtins/FiberSet.fl")),
     // end of Effect: effects, schedules and fibers
     // Effect: streams, sinks and channels
     // end of Effect: streams, sinks and channels

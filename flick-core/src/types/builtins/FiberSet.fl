@@ -1,0 +1,60 @@
+/// Effect's `FiberSet`: children owned by a `scope`, interrupted when it
+/// closes. `join` waits for the first failure of any of them, so the set is
+/// the supervisor of the children it runs.
+module FiberSet exposing (..)
+
+/// Children of region `s` that fail with an error of `e` or succeed with `a`.
+type FiberSet (s : Region) (e : ErrorRow) a
+
+/// How `run` starts a child: `propagateInterruption` makes an interruption
+/// of the child fail `join`; `startImmediately` runs it before `run` returns.
+type alias RunOptions = { propagateInterruption : Bool; startImmediately : Bool }
+
+/// An empty set owned by the innermost `scope` (or the one of region `s`).
+make : forall s e a. Unit ->{Scope s;} FiberSet s e a
+foreign effect make from "@flick-lang/runtime/effect/FiberSet" "flickMake"
+  arity 0
+  reviewed "effect@4.0.5 sha256:0ccf473d77d74576"
+
+/// Runs `task` as a child of the set; it may hold only what outlives the
+/// set's region.
+run :
+  forall s c r e a.
+  Fiber.Outlives c s =>
+  RunOptions -> (Eff r e a)^c -> FiberSet s e a ->{r;} Fiber.Fiber e a
+foreign effect run from "@flick-lang/runtime/effect/FiberSet" "flickRun"
+  arity 1
+  retention owner
+  reviewed "effect@4.0.5 sha256:5574e79c6e88b3a4"
+
+/// Adds a child spawned elsewhere; with `propagate_interruption` its
+/// interruption fails `join`.
+add : Bool -> Fiber.Fiber e a -> FiberSet s e a ->{} Unit
+foreign effect add from "@flick-lang/runtime/effect/FiberSet" "flickAdd"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:598395337876f1d4"
+
+/// Interrupts every child and empties the set.
+clear : FiberSet s e a ->{} Unit
+foreign effect clear from "@flick-lang/runtime/effect/FiberSet" "clear"
+  retention call
+  reviewed "effect@4.0.5 sha256:84d569b250f4f0fa"
+
+/// How many children are running.
+size : FiberSet s e a ->{} Number
+foreign effect size from "@flick-lang/runtime/effect/FiberSet" "size"
+  retention call
+  reviewed "effect@4.0.5 sha256:39bcfa8eedf749bc"
+
+/// Waits until the scope closes or a child fails, and fails as it did.
+join : FiberSet s e a ->{; e} Unit
+foreign effect join from "@flick-lang/runtime/effect/FiberSet" "join"
+  retention call
+  reviewed "effect@4.0.5 sha256:2b481a2440fa00ef"
+
+/// Waits until no child is running.
+await_empty : FiberSet s e a ->{} Unit
+foreign effect await_empty from "@flick-lang/runtime/effect/FiberSet" "awaitEmpty"
+  retention call
+  reviewed "effect@4.0.5 sha256:82b27c89ddbba48c"

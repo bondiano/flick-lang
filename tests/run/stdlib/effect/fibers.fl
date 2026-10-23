@@ -1,0 +1,187 @@
+// Children of a scope through Effect's `Fiber`, `FiberSet`, `FiberMap` and
+// `FiberHandle`, races, caching, the scheduler and execution plans.
+module App.Main exposing (main)
+
+type error Boom = Boom Number
+  deriving Show
+
+service Greeter =
+  greet : String ->{} String
+
+ms1000 : Duration.Duration
+let ms1000 = Result.with_default Duration.zero (Duration.millis 1000)
+
+quiet : Failure e ->{} Unit
+let quiet failure = ()
+
+flags : Failure e -> String
+let flags f = show (Cause.has_fails f, Cause.has_dies f, Cause.has_interrupts f)
+
+ended : Exit {Boom} String -> String
+let ended exit = Exit.match_ (fun v -> v) (fun f -> "failed " ++ flags f) exit
+
+ms1 : Duration.Duration
+let ms1 = Result.with_default Duration.zero (Duration.millis 1)
+
+ms20 : Duration.Duration
+let ms20 = Result.with_default Duration.zero (Duration.millis 20)
+
+ms50 : Duration.Duration
+let ms50 = Result.with_default Duration.zero (Duration.millis 50)
+
+after : Duration.Duration -> String -> Eff none {Boom} String
+let after d value = task { Effect.sleep d; value }
+
+/// How joining ends.
+joined_by : forall c. (Eff none {Boom} Unit)^c ->{} String
+let joined_by t =
+  try
+    await t
+    "joined"
+  with
+  | Boom n -> "Boom " ++ show n
+
+fibers : Unit ->{} Unit
+let fibers () =
+  scope s {
+    let a : Fiber.Fiber {Boom} String = Fiber.spawn s quiet (after ms1 "a")
+    let b = Fiber.spawn s quiet (task { from_result (Err (Boom 2)) })
+    let c = Fiber.spawn s quiet (after ms1 "c")
+    Platform.stdout_line ("await_: " ++ ended (Fiber.await_ a))
+    Platform.stdout_line ("await_all: " ++ show (List.map ended (Fiber.await_all [a, b, c])))
+    let joined = try show (Fiber.join_all [a, c]) with | Boom n -> "Boom " ++ show n
+    Platform.stdout_line ("join_all: " ++ joined)
+    let d = Fiber.spawn s quiet (after ms50 "d")
+    Fiber.interrupt d
+    Platform.stdout_line ("interrupt: " ++ ended (Fiber.await_ d))
+    let e = Fiber.spawn s quiet (after ms50 "e")
+    Fiber.interrupt_as (Some 42) e
+    Platform.stdout_line ("interrupt_as: " ++ ended (Fiber.await_ e))
+    let f = Fiber.spawn s quiet (after ms50 "f")
+    let g = Fiber.spawn s quiet (after ms50 "g")
+    Fiber.interrupt_all [f, g]
+    let h = Fiber.spawn s quiet (after ms50 "h")
+    Fiber.interrupt_all_as 7 [h]
+    Platform.stdout_line ("interrupt_all: " ++ show (List.map ended (Fiber.await_all [f, g, h])))
+  }
+
+sets : Unit ->{} Unit
+let sets () =
+  let run_options = { propagateInterruption = false; startImmediately = false }
+  let joined = scope s {
+    let set : FiberSet.FiberSet s {Boom} String = FiberSet.make ()
+    let one = FiberSet.run run_options (after ms1 "one") set
+    let _ = FiberSet.run run_options (after ms1 "two") set
+    Platform.stdout_line ("set size: " ++ show (FiberSet.size set))
+    FiberSet.await_empty set
+    Platform.stdout_line ("set empty: " ++ show (FiberSet.size set) ++ " " ++ ended (Fiber.await_ one))
+    let other = Fiber.spawn s quiet (after ms50 "added")
+    FiberSet.add false other set
+    FiberSet.clear set
+    Platform.stdout_line ("set clear: " ++ ended (Fiber.await_ other))
+    let _ = FiberSet.run run_options (task { from_result (Err (Boom 3)) }) set
+    try
+      FiberSet.join set
+      "joined"
+    with
+    | Boom n -> "join failed with Boom " ++ show n
+  }
+  Platform.stdout_line ("set join: " ++ joined)
+  let map_options = { onlyIfMissing = false; propagateInterruption = false; startImmediately = false }
+  scope s {
+    let map : FiberMap.FiberMap s String {Boom} String = FiberMap.make ()
+    let first = FiberMap.run map_options "k" (after ms50 "first") map
+    let _ = FiberMap.run map_options "k" (after ms1 "second") map
+    Platform.stdout_line ("map replaced: " ++ ended (Fiber.await_ first))
+    Platform.stdout_line ("map has: " ++ show (FiberMap.has "k" map, FiberMap.has "x" map, FiberMap.size map))
+    Platform.stdout_line ("map get: " ++ show (Option.is_some (FiberMap.get "k" map)))
+    let kept = Fiber.spawn s quiet (after ms50 "kept")
+    FiberMap.set { onlyIfMissing = false; propagateInterruption = false } "j" kept map
+    FiberMap.remove "j" map
+    Platform.stdout_line ("map remove: " ++ ended (Fiber.await_ kept))
+    Platform.stdout_line ("map await_empty: " ++ joined_by (task { FiberMap.await_empty map }))
+    let _ = FiberMap.run map_options "z" (after ms50 "z") map
+    FiberMap.clear map
+    Platform.stdout_line ("map clear: " ++ show (FiberMap.size map))
+    let _ = FiberMap.run map_options "e" (task { from_result (Err (Boom 4)) }) map
+    let failed = joined_by (task { FiberMap.join map })
+    Platform.stdout_line ("map join: " ++ failed)
+  }
+  scope s {
+    let handle : FiberHandle.FiberHandle s {Boom} String = FiberHandle.make ()
+    let first = FiberHandle.run map_options (after ms50 "first") handle
+    let second = FiberHandle.run map_options (after ms1 "second") handle
+    Platform.stdout_line ("handle replaced: " ++ ended (Fiber.await_ first))
+    Platform.stdout_line ("handle get: " ++ show (Option.is_some (FiberHandle.get handle)))
+    FiberHandle.await_empty handle
+    Platform.stdout_line ("handle second: " ++ ended (Fiber.await_ second))
+    let other = Fiber.spawn s quiet (after ms50 "other")
+    FiberHandle.set { onlyIfMissing = false; propagateInterruption = false } other handle
+    FiberHandle.clear handle
+    Platform.stdout_line ("handle clear: " ++ ended (Fiber.await_ other))
+    let _ = FiberHandle.run map_options (task { from_result (Err (Boom 5)) }) handle
+    let failed = joined_by (task { FiberHandle.join handle })
+    Platform.stdout_line ("handle join: " ++ failed)
+  }
+
+races : Unit ->{; Boom} Unit
+let races () =
+  Platform.stdout_line ("race_all: " ++ show (Effect.race_all [after ms20 "slow", after ms1 "fast"]))
+  let first = try Effect.race_all_first [after ms20 "slow", task { from_result (Err (Boom 6)) }] with | Boom n -> "Boom " ++ show n
+  Platform.stdout_line ("race_all_first: " ++ first)
+  Platform.stdout_line ("fiber_id: " ++ show (Effect.fiber_id () >= 0))
+  let runs = Ref.make 0
+  let counted = task {
+    Ref.update runs (fun n -> n + 1)
+    Ref.get runs
+  }
+  let once = Effect.cached counted
+  Platform.stdout_line ("cached: " ++ show (await once, await once))
+  let ttl = Effect.cached_with_ttl ms1000 counted
+  Platform.stdout_line ("cached_with_ttl: " ++ show (await ttl, await ttl))
+  let (cached, invalidate) = Effect.cached_invalidate_with_ttl ms1000 counted
+  let before = await cached
+  await invalidate
+  Platform.stdout_line ("cached_invalidate_with_ttl: " ++ show (before, await cached))
+
+scheduling : Unit ->{} Unit
+let scheduling () =
+  let mine = Scheduler.make_mixed ()
+  let used : Scheduler.Scheduler = Scheduler.with_scheduler mine (task { Scheduler.current () })
+  Platform.stdout_line ("with_scheduler: " ++ show (Scheduler.max_ops_before_yield () > 0))
+  let _ = used
+  Platform.stdout_line ("with_max_ops_before_yield: " ++ show (Scheduler.with_max_ops_before_yield 5 (task { Scheduler.max_ops_before_yield () })))
+  Platform.stdout_line ("with_prevent_scheduler_yield: " ++ show (Scheduler.with_prevent_scheduler_yield true (task { 1 + 1 })))
+
+plans : Unit ->{; Boom} Unit
+let plans () =
+  let english = Layer.succeed Greeter { greet = fun n -> "hello " ++ n }
+  let failing = Layer.succeed Greeter { greet = fun n -> "" }
+  let first : ExecutionPlan.ExecutionPlan {Greeter} none none (Errors {Boom}) =
+    ExecutionPlan.make (NonEmpty.singleton (ExecutionPlan.with_attempts 2 (ExecutionPlan.step failing)))
+  let second =
+    ExecutionPlan.make (NonEmpty.singleton (ExecutionPlan.with_while (fun _ -> true) (ExecutionPlan.with_schedule Schedule.forever (ExecutionPlan.step english))))
+  let plan = ExecutionPlan.merge (NonEmpty.cons first [second])
+  let events = Ref.make []
+  record : ExecutionPlan.Event {Boom} ->{} Unit
+  let record event =
+    let text = match event with
+      | ExecutionPlan.AttemptStart a -> "start " ++ show a.attempt
+      | ExecutionPlan.AttemptSuccess a _ -> "success " ++ show a.stepIndex
+      | ExecutionPlan.AttemptFailure a _ f -> "failure " ++ show a.stepIndex
+    Ref.update events (fun xs -> xs ++ [text])
+  let greeted = Effect.with_execution_plan plan record (task {
+    let meta : ExecutionPlan.Metadata = ExecutionPlan.current_metadata ()
+    let text = Greeter.greet "ada"
+    if text == "" then from_result (Err (Boom meta.attempt)) else text ++ " at " ++ show meta.attempt
+  })
+  Platform.stdout_line ("with_execution_plan: " ++ greeted)
+  Platform.stdout_line ("events: " ++ show (Ref.get events))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  fibers ()
+  sets ()
+  try races () with | Boom n -> Platform.stdout_line ("races failed: " ++ show n)
+  scheduling ()
+  try plans () with | Boom n -> Platform.stdout_line ("plan failed: " ++ show n)

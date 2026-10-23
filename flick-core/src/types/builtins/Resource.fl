@@ -12,6 +12,7 @@ acquire_release :
   forall c s r e a. (Eff r e a)^c -> ((a ->{r;} Unit)^c ->{Scope s | r; e} a)^c
 foreign effect acquire_release from "@flick-lang/runtime" "acquireRelease"
   retention owner
+  reviewed "effect@4.0.5 sha256:8c69fda7dc943ca4"
 
 /// Runs `acquire`, `use` and then `release`, even when `use` fails;
 /// `release` may fail with a typed error of its own.
@@ -20,6 +21,7 @@ bracket :
   (Eff r e a)^c -> ((a ->{r; e} b)^c -> ((a ->{r; e} Unit)^c ->{r; e} b)^c)^c
 foreign effect bracket from "@flick-lang/runtime" "bracket"
   retention call
+  reviewed "effect@4.0.5 sha256:447feb1119a6d518"
 
 /// A resource owned by the innermost `scope` (or the one of region `s`),
 /// acquired now by `acquire`, which runs with the services of this call;
