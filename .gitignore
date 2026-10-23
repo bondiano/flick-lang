@@ -6,3 +6,4 @@ node_modules/
 /site/.vitepress/wasm/
 /site/.vitepress/cache/
 /site/.vitepress/dist/
+/editors/zed/target/

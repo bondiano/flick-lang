@@ -57,6 +57,10 @@ docs: docs-wasm
 # Everything CI runs
 check: lint test
 
+# Check that the Zed extension (and its language server launcher) compiles
+zed:
+    cd editors/zed && CARGO_TARGET_DIR=../../target/zed cargo build --release --target wasm32-wasip2
+
 # Regenerate the tree-sitter grammar Zed uses and run its corpus tests
 tree-sitter:
     cd editors/tree-sitter-flick && tree-sitter generate && tree-sitter test

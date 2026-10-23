@@ -36,6 +36,8 @@ completion, rename and formatting (see `docs/src/content/docs/reference/editor.m
   `npm install` inside `editors/vscode` once) and shows built-in modules
   (`flick-builtin:///List.fl`) as read-only documents. `flick.path` names
   the executable.
-- Zed: add `[language_servers.flick]` (`languages = ["Flick"]`) to
-  `extension.toml` and a Rust `src/lib.rs` implementing
-  `language_server_command` that finds `flick` on `PATH`.
+- Zed: `src/lib.rs` starts the `flick` it finds on the worktree's `PATH`
+  (`[language_servers.flick]` in `extension.toml`). Zed builds the
+  extension itself when installed as a dev extension; `just zed` checks
+  that it compiles. Definitions in built-in modules (`flick-builtin:`
+  documents) do not open in Zed, which has no virtual documents.

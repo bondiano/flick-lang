@@ -1,0 +1,16 @@
+[package]
+name = "zed_flick"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+# not a member of the compiler's workspace: Zed builds it on its own
+[workspace]
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+zed_extension_api = "0.7.0"
