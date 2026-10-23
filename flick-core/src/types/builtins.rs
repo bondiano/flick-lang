@@ -178,8 +178,10 @@ const SOURCES: &[(&str, &str)] = &[
     ("Schedule", include_str!("builtins/Schedule.fl")),
     ("Effect", include_str!("builtins/Effect.fl")),
     // end of Effect: effects, schedules and fibers
-    // Effect: streams
-    // end of Effect: streams
+    // Effect: streams, sinks and channels
+    // end of Effect: streams, sinks and channels
+    // Effect: streams, Stream
+    // end of Effect: streams, Stream
     // Effect: HTTP
     // end of Effect: HTTP
     // Effect: CLI
