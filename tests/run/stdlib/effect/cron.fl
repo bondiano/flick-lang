@@ -1,0 +1,114 @@
+// Effect's `Cron`: parsing with typed errors, matching, the next and
+// previous dates, and `Schedule.cron`, whose delays lead to the next match.
+module App.Main exposing (main)
+
+at : String ->{} DateTime.DateTime
+let at s =
+  match DateTime.make s with
+  | Ok t -> t
+  | Err _ -> DateTime.now ()
+
+parsed : Result Cron.CronParseError Cron.Cron -> String
+let parsed r =
+  match r with
+  | Ok c -> Cron.format { includeSeconds = None } c
+  | Err (Cron.CronParseError message) -> "error: " ++ message
+
+utc : DateTime.TimeZone
+let utc = DateTime.zone_make_offset 0
+
+dates : List DateTime.DateTime -> List String
+let dates ts = List.map DateTime.format_iso ts
+
+on : Option DateTime.DateTime -> String
+let on o =
+  match o with
+  | Some t -> DateTime.format_iso t
+  | None -> "none"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line
+    ("parse: "
+      ++ show
+        [
+          parsed (Cron.parse utc "0 9 * * 1-5"),
+          parsed (Cron.parse utc "*/15 0 1,15 * *"),
+          parsed (Cron.parse utc "0 9 * *"),
+          parsed (Cron.parse utc "0 99 * * *")
+        ])
+  let fields =
+    {
+      seconds = None;
+      minutes = [0, 30];
+      hours = [12];
+      days = [];
+      months = [];
+      weekdays = [6];
+      and = None;
+      tz = utc
+    }
+  Platform.stdout_line
+    ("make: "
+      ++ show
+        [
+          parsed (Cron.make fields),
+          parsed (Cron.make { fields with seconds = Some [5]; hours = [25] })
+        ])
+  match Cron.parse utc "0 9 * * 1-5" with
+  | Ok workdays -> with_workdays workdays
+  | Err (Cron.CronParseError message) -> Platform.stdout_line message
+
+with_workdays : Cron.Cron ->{} Unit
+let with_workdays workdays =
+  let monday = at "2024-03-11T09:00:00Z"
+  Platform.stdout_line
+    ("format: "
+      ++ show
+        (
+          Cron.format { includeSeconds = Some true } workdays,
+          Cron.format { includeSeconds = None } workdays
+        ))
+  Platform.stdout_line
+    ("match_: "
+      ++ show (Cron.match_ monday workdays, Cron.match_ (at "2024-03-10T09:00:00Z") workdays))
+  Platform.stdout_line ("next: " ++ on (Cron.next (at "2024-03-08T10:00:00Z") workdays))
+  Platform.stdout_line ("prev: " ++ on (Cron.prev monday workdays))
+  Platform.stdout_line
+    ("sequence: " ++ show (dates (Cron.sequence 3 (at "2024-03-08T10:00:00Z") workdays)))
+  let never = Cron.parse utc "0 0 30 2 *"
+  Platform.stdout_line
+    ("never: "
+      ++ show
+        (Result.map
+          (fun c -> (on (Cron.next monday c), List.length (Cron.sequence 2 monday c)))
+          never))
+  let paris = Result.with_default utc (DateTime.zone_make_named "Europe/Paris")
+  Platform.stdout_line
+    ("in a zone: "
+      ++ on (Result.to_option (Cron.parse paris "0 9 * * *") |> Option.bind (Cron.next monday)))
+  Platform.stdout_line
+    ("equal: "
+      ++ show
+        (
+          Cron.equals_cron workdays workdays,
+          Result.map (eq workdays) (Cron.parse utc "0 0 9 * * 1-5"),
+          Result.map (eq workdays) (Cron.parse utc "0 10 * * 1-5")
+        ))
+  let every_second = Result.with_default workdays (Cron.parse utc "* * * * * *")
+  let seen = Ref.make []
+  let traced =
+    Schedule.tap (fun m -> Ref.set seen (Ref.get seen ++ [m.output])) (Schedule.cron every_second)
+  let quick = Schedule.modify_delay (fun _ -> Duration.zero) traced
+  let _ = Effect.repeat (Schedule.up_to { duration = None; times = Some 2 } quick) (task { 0 })
+  let second = Result.with_default Duration.zero (Duration.seconds 1)
+  let delays = Ref.get seen
+  Platform.stdout_line
+    ("Schedule.cron: "
+      ++ show
+        (
+          List.length delays,
+          List.all
+            (fun d -> Duration.is_positive d && Duration.is_less_than_or_equal_to second d)
+            delays
+        ))

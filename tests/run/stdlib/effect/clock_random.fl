@@ -1,0 +1,60 @@
+// Effect's default `Clock` and `Random`: reads are runtime calls. The
+// clock is checked by properties; random draws under `with_seed` repeat.
+module App.Main exposing (main)
+
+draws : Unit ->{} (Number, Bool, Number, Number, Number, List Number, String)
+let draws () =
+  let x = Random.next ()
+  let b = Random.next_boolean ()
+  let i = Random.next_int ()
+  let between = Random.next_between 10 20
+  let die = Random.next_int_between { halfOpen = None } 1 6
+  let order = Random.shuffle [1, 2, 3, 4, 5]
+  let pick = Random.choice (NonEmpty.cons "a" ["b", "c"])
+  (x, b, i, between, die, order, pick)
+
+/// Whether the clock reads no earlier than the readings before.
+later : Clock.Clock -> Number -> BigInt -> BigInt ->{} Bool
+let later clock millis nanos mono =
+  Clock.millis_of clock >= millis
+    && Clock.nanos_of clock >= nanos
+    && Clock.monotonic_nanos_of clock >= mono
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let millis = Clock.current_time_millis ()
+  let nanos = Clock.current_time_nanos ()
+  let start = Clock.monotonic_time_nanos ()
+  Effect.sleep (Result.with_default Duration.zero (Duration.millis 2))
+  let stop = Clock.monotonic_time_nanos ()
+  Platform.stdout_line
+    ("clock: "
+      ++ show (millis > 1700000000000, nanos > 1700000000000000000n, stop - start >= 1000000n))
+  let same = Clock.clock_with (fun clock -> later clock millis nanos stop)
+  Platform.stdout_line ("clock_with: " ++ show same)
+  let first = Random.with_seed 42 (task { draws () })
+  let again = Random.with_seed 42 (task { draws () })
+  let other = Random.with_seed 7 (task { draws () })
+  Platform.stdout_line ("seeded repeats: " ++ show (first == again, first == other))
+  let (x, _, i, between, die, order, pick) = first
+  Platform.stdout_line
+    ("ranges: "
+      ++ show
+        (
+          x >= 0 && x < 1,
+          Number.is_safe_integer i,
+          between >= 10 && between < 20,
+          die >= 1 && die <= 6,
+          List.sort_by compare order,
+          List.any (fun s -> s == pick) ["a", "b", "c"]
+        ))
+  let open_die =
+    Random.with_seed
+      1
+      (task {
+        List.map_effect
+          (fun _ -> Random.next_int_between { halfOpen = Some true } 0 2)
+          [1, 2, 3, 4, 5, 6, 7, 8]
+      })
+  Platform.stdout_line ("half open: " ++ show (List.all (fun n -> n == 0 || n == 1) open_die))
+  Platform.stdout_line ("seeded: " ++ show first)

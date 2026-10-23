@@ -1,6 +1,6 @@
-[pending]
-Clock = "M20"
-clockWith = "M20"
-currentTimeMillis = "M20"
-currentTimeNanos = "M20"
-monotonicTimeNanos = "M20"
+[wrapped]
+Clock = "Clock.Clock ca9480ab0343e961"
+clockWith = "Clock.clock_with 744511f0e3b70f8b"
+currentTimeMillis = "Clock.current_time_millis fdc70b40c9ebcf9c"
+currentTimeNanos = "Clock.current_time_nanos 3eb5a8a567aaa6fa"
+monotonicTimeNanos = "Clock.monotonic_time_nanos 9291436410d9a58b"

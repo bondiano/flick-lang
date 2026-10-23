@@ -136,10 +136,10 @@ const DURATION = tag("Duration.DurationError.DurationError");
 /** `Duration.DurationError`. */
 export type DurationError = Tagged<typeof DURATION, string>;
 
-const durationError = (message: string): Result.Result<never, DurationError> => err({ _tag: DURATION, _0: message });
+export const durationError = (message: string): Result.Result<never, DurationError> => err({ _tag: DURATION, _0: message });
 
 /** A duration of `n` units of `millisPer` milliseconds: finite and not negative. */
-const checkedDuration = (unit: string, n: number, millisPer: number): Result.Result<Duration.Duration, DurationError> => {
+export const checkedDuration = (unit: string, n: number, millisPer: number): Result.Result<Duration.Duration, DurationError> => {
   if (Number.isNaN(n)) return durationError(`${unit}: NaN is not a duration`);
   if (n < 0) return durationError(`${unit}: ${n} is negative`);
   const millis = n * millisPer;

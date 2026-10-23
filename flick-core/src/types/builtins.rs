@@ -99,6 +99,10 @@ const SOURCES: &[(&str, &str)] = &[
     ("Graph", include_str!("builtins/Graph.fl")),
     // end of Effect: collections
     // Effect: time
+    ("DateTime", include_str!("builtins/DateTime.fl")),
+    ("Cron", include_str!("builtins/Cron.fl")),
+    ("Clock", include_str!("builtins/Clock.fl")),
+    ("Random", include_str!("builtins/Random.fl")),
     // end of Effect: time
     // Effect: concurrency
     // end of Effect: concurrency

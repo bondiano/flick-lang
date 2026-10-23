@@ -1,15 +1,19 @@
-[pending]
-Cron = "M20"
-CronParseError = "M20"
-Equivalence = "M20"
-equals = "M20"
-format = "M20"
-isCron = "M20"
-isCronParseError = "M20"
-make = "M20"
-match = "M20"
-next = "M20"
-parse = "M20"
-parseUnsafe = "M20"
-prev = "M20"
-sequence = "M20"
+[wrapped]
+Cron = "Cron.Cron ebfd8242a77bd69f"
+CronParseError = "Cron.CronParseError f669fc516ba71320"
+make = "Cron.make c2b4f0bb7afe1d9c"
+parse = "Cron.parse 35cf882bb2a2b136"
+format = "Cron.format ae886bf603f2efbc"
+match = "Cron.match_ 4e2f31859d4dd47c"
+next = "Cron.next a1f72ebb92f6c465"
+prev = "Cron.prev 918047eefaa443f0"
+sequence = "Cron.sequence b5ba16bdd3820ae7"
+Equivalence = "Cron.equals_cron 72a90d81cf191e92"
+
+[language]
+equals = "class Eq: `eq` of `instance Eq Cron`"
+
+[excluded]
+isCron = "TS-only: a type guard over `unknown`; Flick values are typed statically"
+isCronParseError = "TS-only: a type guard over `unknown`; `try … with Cron.CronParseError` matches the error"
+parseUnsafe = "invariant: unsafe: throws on an invalid expression; `Cron.parse` is checked"
