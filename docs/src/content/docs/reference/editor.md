@@ -19,6 +19,36 @@ protocol; logs go to stderr. It runs the same analysis as `flick check` and
 | `textDocument/completion` | after `x.` the fields of `x`'s record (open rows too), after `M.` a module's exports or a service's operations, otherwise locals in scope, the module's names, imported names and the Prelude's |
 | `textDocument/formatting` | `flick fmt` |
 
+## Zed
+
+The extension first uses `lsp.flick.binary.path`, if set, then `flick` on
+the worktree's `PATH`. Otherwise it downloads the GitHub release tagged
+`v<extension version>` for the current platform into its work directory.
+An installed copy is reused; if the release cannot be reached, the newest
+previously downloaded version is used.
+
+To use a local checkout, run `cargo build -p flick` there and add this to
+Zed's settings, replacing the path with your absolute checkout path:
+
+```json
+{
+  "lsp": {
+    "flick": {
+      "binary": {
+        "path": "/absolute/path/to/flick-lang/target/debug/flick",
+        "arguments": ["lsp", "--stdio"]
+      }
+    }
+  }
+}
+```
+
+An explicit path bypasses release lookup and download, including when the
+repository is private or no matching release exists. An invalid explicit
+path fails to start rather than silently falling back to another binary.
+`binary.arguments` replaces the default `["lsp", "--stdio"]`;
+`binary.env` overrides variables from the worktree's shell environment.
+
 ## TypeScript projection
 
 For editors of TypeScript the compiler projects each module to a virtual

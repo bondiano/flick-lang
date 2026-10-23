@@ -27,6 +27,11 @@ to `file:///path/to/flick-lang` while developing). Then run
 After changing `grammar.js` or `src/scanner.c`, run `just tree-sitter`
 (needs the `tree-sitter` CLI) and commit the regenerated `src/`.
 
+The `Release` workflow publishes `flick` archives for macOS, Linux and Windows
+(aarch64 and x86_64) when a `v*` tag is pushed. The tag must match the versions
+in `flick/Cargo.toml`, `zed/Cargo.toml` and `zed/extension.toml`: the extension
+downloads that exact release, not the latest one.
+
 ## Language server
 
 `flick lsp --stdio` serves diagnostics (errors and warnings, as `flick
@@ -41,8 +46,9 @@ with it: VS Code through the extension's defaults, Zed by its default
   by `pnpm install` at the repository root, as a workspace package) and shows built-in modules
   (`flick-builtin:///List.fl`) as read-only documents. `flick.path` names
   the executable.
-- Zed: `src/lib.rs` starts the `flick` it finds on the worktree's `PATH`
-  (`[language_servers.flick]` in `extension.toml`). Zed builds the
-  extension itself when installed as a dev extension; `just zed` checks
-  that it compiles. Definitions in built-in modules (`flick-builtin:`
-  documents) do not open in Zed, which has no virtual documents.
+- Zed: `src/lib.rs` uses an explicit `lsp.flick.binary.path`, then the
+  worktree's `PATH`, otherwise a matching release, with an offline cache.
+  See [local configuration](../docs/src/content/docs/reference/editor.md#zed).
+  Zed builds the extension itself when installed as a dev extension;
+  `just zed` checks that it compiles. Definitions in built-in modules
+  (`flick-builtin:` documents) do not open in Zed, which has no virtual documents.
