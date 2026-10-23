@@ -1,6 +1,6 @@
 //! `.iface`, the native interface of a module: versioned JSON that an
 //! importer reads instead of the module's source. Schema:
-//! `docs/reference/iface.md`: names and their identity, the types and kinds
+//! `docs/src/content/docs/reference/iface.md`: names and their identity, the types and kinds
 //! of exports with their captures, classes and instances, and from a build
 //! the data and dictionary ABI, summaries of values and fingerprints.
 

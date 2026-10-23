@@ -115,6 +115,18 @@ export const uiInput = (props: InputProps): Ui =>
     [],
   );
 
+/** A text area; like `input`, `value` is the initial text. */
+export const uiTextarea = (props: InputProps): Ui =>
+  element(
+    "textarea",
+    { defaultValue: props.value, placeholder: props.placeholder, spellCheck: false },
+    { onChange: { handler: props.on_input, snapshot: inputSnapshot } },
+    [],
+  );
+
+export const uiPre = (props: ClassProps, children: ReadonlyArray<Ui>): Ui =>
+  element("pre", { className: props.class_name }, {}, children);
+
 export const uiLink = (props: { readonly href: string }, children: ReadonlyArray<Ui>): Ui =>
   element("a", { href: props.href }, {}, children);
 

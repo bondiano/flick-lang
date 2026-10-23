@@ -44,3 +44,22 @@ fn the_demo_reports_diagnostics_as_json_events() {
     let fine: Value = serde_json::from_str(&flick_wasm::check(MODULE)).expect("json");
     assert_eq!(fine, Value::Array(Vec::new()));
 }
+
+#[test]
+fn the_demo_builds_everything_a_run_needs() {
+    let built: Value = serde_json::from_str(&flick_wasm::build(MODULE, "debug")).expect("json");
+    assert_eq!(built["entry"], "main.js");
+    let files = built["files"].as_object().expect("files");
+    assert!(files.contains_key("Main.js") && files.contains_key("_flick/Platform.js"));
+    assert!(
+        files["main.js"]
+            .as_str()
+            .is_some_and(|r| r.contains("runMain"))
+    );
+    let library = "module Lib exposing (one)\none : Number\nlet one = 1\n";
+    let built: Value = serde_json::from_str(&flick_wasm::build(library, "release")).expect("json");
+    assert_eq!(built["entry"], Value::Null);
+    let broken = "module Main exposing (x)\nx : Number\nlet x = \"no\"\n";
+    let built: Value = serde_json::from_str(&flick_wasm::build(broken, "debug")).expect("json");
+    assert_eq!(built["files"], Value::Null);
+}

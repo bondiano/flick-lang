@@ -30,7 +30,7 @@ After changing `grammar.js` or `src/scanner.c`, run `just tree-sitter`
 ## Language server
 
 `flick lsp --stdio` serves diagnostics, hover, definition, references,
-completion, rename and formatting (see `docs/reference/editor.md`).
+completion, rename and formatting (see `docs/src/content/docs/reference/editor.md`).
 
 - VS Code: `extension.js` starts it with `vscode-languageclient` (run
   `npm install` inside `editors/vscode` once) and shows built-in modules

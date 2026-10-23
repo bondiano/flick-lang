@@ -1,6 +1,6 @@
 //! Recursive-descent parser with Pratt operators over the lexer's tokens.
 //!
-//! Layout (`docs/reference/grammar.md`) is resolved here rather than by
+//! Layout (`docs/src/content/docs/reference/grammar.md`) is resolved here rather than by
 //! inserting tokens: a stack of contexts decides whether a token that starts a
 //! line separates statements ([`Sep::Next`]), closes the block ([`Sep::End`]) or
 //! continues the current construct. The parser sees a boundary as the virtual

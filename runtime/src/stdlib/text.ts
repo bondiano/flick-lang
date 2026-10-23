@@ -3,23 +3,22 @@
 import type { Option, Result } from "effect";
 
 import { type Tagged, err, none, ok, some } from "../data.ts";
+import { args, env, writeStderr, writeStdout } from "../host.ts";
 import { tag } from "../tags.ts";
 
-const writeStream = (stream: NodeJS.WriteStream, text: string): void => void stream.write(text);
+export const stdoutWrite = (text: string): void => writeStdout(text);
 
-export const stdoutWrite = (text: string): void => writeStream(process.stdout, text);
-
-export const platformArgs = (): Array<string> => process.argv.slice(2);
+export const platformArgs = (): Array<string> => args();
 
 export const platformEnv = (name: string): Option.Option<string> => {
-  const value = process.env[name];
+  const value = env(name);
   return value === undefined ? none : some(value);
 };
 
 /** `Log.console`: info and debug to stdout, warnings and errors to stderr. */
 export const logConsole = (level: string, message: string): void => {
-  const stream = level === "warn" || level === "error" ? process.stderr : process.stdout;
-  writeStream(stream, `${level}: ${message}\n`);
+  const write = level === "warn" || level === "error" ? writeStderr : writeStdout;
+  write(`${level}: ${message}\n`);
 };
 
 export const stringSplit = (separator: string, s: string): Array<string> => s.split(separator);

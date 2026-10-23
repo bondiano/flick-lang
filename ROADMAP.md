@@ -118,7 +118,7 @@ flowchart LR
 ### Решения по пробелам спеки
 
 Спека фиксирует семантику, но не задаёт ряд поверхностных деталей. Решения ниже
-приняты; этап-владелец оформляет их в `docs/reference/` до начала работ.
+приняты; этап-владелец оформляет их в `docs/src/content/docs/reference/` до начала работ.
 
 | Пробел | Решение | Владелец |
 | - | - | - |
@@ -134,7 +134,7 @@ flowchart LR
 | FFI overrides | Importer пишет только `<Pkg>/Generated.fl`; пользовательский модуль `<Pkg>.fl` содержит обычные `foreign`-декларации с `reviewed "<pkg>@<ver> sha256:…"` и re-export; `ffi check` сверяет fingerprint | M12 |
 | Shadowing и неоднозначность | Локальные связывания затеняют всё без диагностики. Top-level определение с именем из `import … exposing (name)` — ошибка `FLICK-R009`; имена из `exposing (..)` top-level затеняет молча. Два импорта по имени с разными сущностями — `FLICK-R010` сразу; конфликт между `(..)`-импортами — `FLICK-R010` только в месте использования. Re-export той же сущности не конфликт. Порядок `import` ни на что не влияет | M2 |
 | HTTP | Без синтаксиса (спека §7 «Граница языкового ядра»): `Http.*` и `HttpApi.*` — библиотечные combinators; схемы endpoint'ов — `Schema a` из M11 | M21 |
-| CLI eDSL | Спека §10 «CLI eDSL», грамматика в `docs/reference/grammar.md`. Блок `cli "name" { … }` с clauses `description`, `flag`, `arg`, `subcommand`, `handle`; elaborates в библиотечные `Cli.*` поверх `effect/cli`, доступные и напрямую. Parser блока уже разбирает форму clauses | M22 |
+| CLI eDSL | Спека §10 «CLI eDSL», грамматика в `docs/src/content/docs/reference/grammar.md`. Блок `cli "name" { … }` с clauses `description`, `flag`, `arg`, `subcommand`, `handle`; elaborates в библиотечные `Cli.*` поверх `effect/cli`, доступные и напрямую. Parser блока уже разбирает форму clauses | M22 |
 | Методы класса | Метод объявляется обычной сигнатурой `name : T` (ключевого слова `val` нет, старая запись — `FLICK-S010`). Метод по умолчанию: сигнатура и `let name … =` прямо под ней в теле класса; instance может его не определять. Сигнатура без `let` — абстрактный метод, instance обязан его определить | M9 |
 | Пакеты с модулями Flick | Пакет объявляет в своём `package.json` поле `"flick": { "iface-dir": "<dir>" }`; модуль `A.B` описан файлом `<dir>/A/B.iface`. Поле и файлы пишет `flick build`/`pack`, не пользователь. Установка — только pnpm (`flick install`/`add`), Flick читает установленное дерево; M2 смотрит прямые зависимости проекта | M2, M7, M16 |
 
@@ -234,11 +234,11 @@ c metadata (`arity`, `this`, `catch`, `cancel signal`, nullable/retention),
 `()`, tuples, List `[…]`, records `{ … }`, update `{ r with f = v }`.
 
 **Артефакты.** `flick-core::syntax::{lexer, layout, cst, parser, ast}`,
-`flick-core::fmt`, `docs/reference/grammar.md` (закрывает пробелы M1 из §1).
+`flick-core::fmt`, `docs/src/content/docs/reference/grammar.md` (закрывает пробелы M1 из §1).
 
 **AC**
 
-- [x] `docs/reference/grammar.md` описывает лексику, keywords, операторы с
+- [x] `docs/src/content/docs/reference/grammar.md` описывает лексику, keywords, операторы с
       приоритетами и всю грамматику; каждый пример спеки разобран как тест.
 - [x] **Все** блоки ```` ```flick ```` из спеки извлекаются скриптом и разбираются
       без синтаксических ошибок (тест держит список и падает при новом примере
@@ -317,7 +317,7 @@ c metadata (`arity`, `this`, `catch`, `cancel signal`, nullable/retention),
 - Generalization: только доказанно pure построения (§5 «Generalization при
   наличии Ref»); runtime-результаты мономорфны; mutable containers инвариантны.
 - `.iface`: следующая версия схемы с типами и kinds экспортов (раздел «types and
-  kinds» в `docs/reference/iface.md`); checker импортёра берёт типы зависимостей
+  kinds» в `docs/src/content/docs/reference/iface.md`); checker импортёра берёт типы зависимостей
   только из `.iface`.
 
 **Артефакты.** `flick-core::types::{kinds, ty, unify, rows, check, infer, generalize, exhaust}`.
@@ -507,7 +507,7 @@ c metadata (`arity`, `this`, `catch`, `cancel signal`, nullable/retention),
 - `==` → SameValueZero для Number; `Ord Number` total order; numeric
   `<`/`>` — JS-семантика.
 - Source maps; `--emit ts` (исполняемый TS).
-- `.iface` (versioned JSON, `docs/reference/iface.md`): к именам и identity
+- `.iface` (versioned JSON, `docs/src/content/docs/reference/iface.md`): к именам и identity
   (v0, M2), типам/kinds (M3), классам (M5) и captures (M6) добавляются data ABI,
   dictionary ABI, fingerprints и optimization summaries; запись в `dist/`.
   Версия 1 фиксируется в M19.
@@ -620,7 +620,7 @@ backend; специальные literals — только Number/BigInt.
 
 **Артефакты.** Модули stdlib — встроенные в компилятор `.fl`
 (`flick-core/src/types/builtins/`), JS-адаптеры — `runtime/src/stdlib/`,
-`flick test` (`flick/src/commands/test.rs`), справка — `docs/reference/stdlib.md`.
+`flick test` (`flick/src/commands/test.rs`), справка — `docs/src/content/docs/reference/stdlib.md`.
 
 **AC**
 
@@ -673,7 +673,7 @@ callbacks», «Подписки», «Higher-rank callback на FFI», «Публ
 **Артефакты.** `flick-core::types::ffi` (метаданные `foreign`),
 `flick-core::codegen::ts` (TS-проекция, `.d.ts`, Promise façade),
 `runtime/src/stdlib/{callbacks, snapshot}.js`, модуль `Js`, справка —
-`docs/reference/ffi.md`. Metadata `retention` принимает `call` и `owner`
+`docs/src/content/docs/reference/ffi.md`. Metadata `retention` принимает `call` и `owner`
 (`scope` — ключевое слово).
 
 **AC**
@@ -728,7 +728,7 @@ callbacks», «Подписки», «Higher-rank callback на FFI», «Публ
 **Артефакты.** `flick-core::types::{schemas, codecs}` (deriving, `schema T`,
 codec DSL, refined companions), модули `Schema`, `Codec`, `Checks`, `Json`,
 `runtime/src/schema/*` (интерпретатор, strict exporter, компилируемые
-декодеры, Standard Schema, Arbitrary), справка — `docs/reference/schema.md`.
+декодеры, Standard Schema, Arbitrary), справка — `docs/src/content/docs/reference/schema.md`.
 Runtime-представление — значения Effect Schema; строгий экспортёр работает
 поверх `SchemaAST`; `--schema-aot` пишет статический модуль
 `SchemaAOTCompiler` (`schemas.aot.js`), который runner устанавливает до
@@ -781,7 +781,7 @@ stdio, sha256-fingerprint каждого export), `flick-core::ffi::{import, che
 `flick ffi import` / `flick ffi check`, `foreign blocked name "reason"`
 (`FLICK-F005` при использовании, `Decl::Blocked` в `.iface`), metadata
 `reviewed`, модуль `JsError`, policies в `<out>/<Pkg>/policy.toml`, справка —
-`docs/reference/ffi.md`. Binding `lookup` из §8 получает ещё строку
+`docs/src/content/docs/reference/ffi.md`. Binding `lookup` из §8 получает ещё строку
 `nullable`: в ABI `Option` — значение Effect, а не `undefined`.
 
 **AC**
@@ -829,7 +829,7 @@ Schema и SQL».
 
 **Артефакты.** `flick-core::types::sql` (elaboration рядом с checker'ом, которому она
 отдаёт типы), встроенные модули `Sql` и `Database`, `runtime/src/sql/*`,
-`docs/reference/sql.md`; e2e против PostgreSQL — `just e2e-postgres`.
+`docs/src/content/docs/reference/sql.md`; e2e против PostgreSQL — `just e2e-postgres`.
 
 **AC**
 
@@ -877,7 +877,7 @@ Schema и SQL».
 `ui { … }` открывает имена `Ui` (`flick-core::types` — флаг `ui` при выводе
 имён; IR тот же, что у `Ui.*`), `FLICK-U001` для констант capacity/limit,
 `runtime/src/ui/react/*` (подпуть `@flick-lang/runtime/ui`, React 19 — peer
-dependency), справка — `docs/reference/ui.md`. `Ui.text` — `forall r e.
+dependency), справка — `docs/src/content/docs/reference/ui.md`. `Ui.text` — `forall r e.
 String -> Ui r e`, чтобы стоять среди детей любого элемента; `Ui.run` берёт
 модель как `Ref m` и перерисовывает после каждой задачи; `on_change` у
 `SelectProps` — `Ui.Handler a r e`, потому что policy обязательна.
@@ -977,7 +977,7 @@ derived `Eq`/`Ord`/`Hash`/`Show` и `Schema` (unboxed) следуют предс
 - Коды выхода `0/1/2/3/130/143` и потоки stdout/stderr по §12.
 
 **Артефакты.** `flick/src/commands/*`, `flick/src/{cache,child,toolchain}.rs`,
-`flick-core::project::{cache, pnpm}`, `flick-core::doc`, `docs/reference/cli.md`.
+`flick-core::project::{cache, pnpm}`, `flick-core::doc`, `docs/src/content/docs/reference/cli.md`.
 Не сделано: раскладка `dist/debug/` и `dist/release/` (артефакты пишутся прямо в
 `out-dir`), `schema export --target openapi-3.1` (после M21).
 
@@ -1032,7 +1032,7 @@ derived `Eq`/`Ord`/`Hash`/`Show` и `Schema` (unboxed) следуют предс
 
 **Артефакты.** `flick/src/lsp/*`, `flick-core::{ide, projection}`,
 `tools/content-mapper/` (адаптер к API TypeScript 7.0.2), `editors/vscode/extension.js`
-(минимальный клиент для ручной проверки), `docs/reference/editor.md`.
+(минимальный клиент для ручной проверки), `docs/src/content/docs/reference/editor.md`.
 
 **AC**
 
@@ -1203,7 +1203,7 @@ combinators. Parser блока уже есть; этап добавляет elab
 - Prompt-режим через `Terminal` Node-платформы; отмена (SIGINT) по протоколу entry M8.
 
 **Артефакты.** `flick-core::dsl::cli`, `stdlib/Cli/*`, `runtime/src/cli/*`,
-`docs/reference/cli-dsl.md`; `pending "M22"` в манифесте M20 закрыты.
+`docs/src/content/docs/reference/cli-dsl.md`; `pending "M22"` в манифесте M20 закрыты.
 
 **AC**
 
@@ -1299,7 +1299,7 @@ combinators. Parser блока уже есть; этап добавляет elab
 | Взаимодействие higher-rank + rows + captures + FD в одном solver | Сложность и время проверки | Начинать M6 только после стабилизации M3–M5; бенчмарки с M3; бюджет solver |
 | Двухфазный scope и quiescence поверх Effect 4.0.5 | Тонкие гонки в runtime | Детерминированные тесты порядка событий; capability matrix; никакой wildcard-совместимости с Effect |
 | Объём SQL subset и качество диагностик в DSL | Длинные непонятные ошибки | Diagnostic constraints с span в DSL-блоке; snapshot-тесты на тексты ошибок |
-| Пробелы спеки (§1 этого документа) | Переделки синтаксиса | Закрывать дополнением в `docs/reference/` до начала этапа-владельца |
+| Пробелы спеки (§1 этого документа) | Переделки синтаксиса | Закрывать дополнением в `docs/src/content/docs/reference/` до начала этапа-владельца |
 | Поверхность Effect ~5 500 exports (core ~4 500, cli/http/http-api ~1 000) | M20 растягивается, обёртки пишутся вручную | Генерация черновиков биндингов importer'ом M12; ручная работа только над сигнатурами; статусы `language`/`excluded` закрывают TS-only и небезопасное |
 | Обновление Effect меняет API (особенно cli/http/http-api) | Тихо устаревшие обёртки | Линтер по fingerprint сигнатур; обновление только через `just effect-bump` с отчётом diff |
 | Один релиз без промежуточных | Поздняя обратная связь | Внутренние dogfood-проекты на каждом этапе после M9 (сквозной пример §13 собирается с M9) |

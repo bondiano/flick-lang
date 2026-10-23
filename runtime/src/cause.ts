@@ -2,12 +2,19 @@
 // failure of a cause, and `Exit`, `Failure` and `RawCause` keep the native
 // cause opaque. A `CauseReport` is inert data: building it never runs code
 // of a payload (getters, `toString`, `toJSON`, Proxy traps).
-import { types } from "node:util";
+import type { types as NodeTypes } from "node:util";
 
 import { Cause, Effect, Exit, type Option, Result } from "effect";
 
 import { none, some } from "./data.ts";
+import { nodeUtil } from "./host.ts";
 import { constructorName } from "./tags.ts";
+
+// a Proxy is told apart only on Node.js; elsewhere a payload is read by its descriptors anyway
+const types: Pick<typeof NodeTypes, "isProxy" | "isNativeError"> = nodeUtil()?.types ?? {
+  isProxy: (_value: unknown): _value is never => false,
+  isNativeError: (value: unknown): value is Error => value instanceof Error,
+};
 
 const failsToDies = <E>(cause: Cause.Cause<E>): Cause.Cause<never> =>
   Cause.fromReasons(cause.reasons.map((r) => (Cause.isFailReason(r) ? Cause.makeDieReason(r.error) : r)).filter(

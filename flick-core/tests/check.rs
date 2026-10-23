@@ -1,6 +1,6 @@
 //! Checker fixture harness: `tests/check/pass/**/*.fl` must produce no
 //! diagnostics; `tests/check/fail/**/*.fl` declares its expected diagnostics in
-//! annotation comments (format in `docs/testing.md`). Each directory of
+//! annotation comments (format in `docs/src/content/docs/contributing/testing.md`). Each directory of
 //! `tests/check/projects/` is one project checked as a whole; annotations in
 //! any of its files, `#` comments in `flick.toml`, are its expectations.
 //! Reports a diff per file.

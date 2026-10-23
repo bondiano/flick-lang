@@ -1,0 +1,56 @@
+---
+title: Getting started
+description: Install the toolchain, create an application and run it.
+---
+
+Flick compiles to ES modules that run on Node.js 24.18 or later with the
+Flick runtime and Effect 4.0.5. Packages are installed with pnpm.
+
+```sh
+flick new my-app
+cd my-app
+flick install
+flick run
+```
+
+`flick new` writes `flick.toml`, `package.json` with the pinned runtime and
+Effect, and `src/App/Main.fl`:
+
+```flick
+module App.Main exposing (main)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line "Hello from Flick"
+```
+
+`flick check` type-checks without running anything, `flick build` writes the
+JavaScript to `dist/`, `flick test` runs the tests of the test root and
+`flick dev` rebuilds and restarts on every change. The [CLI reference](../../reference/cli/)
+has every command.
+
+## In a web page
+
+Astro and Vite import Flick modules directly with `@flick-lang/astro`: the
+plugin builds each imported `.fl` with `flick build`.
+
+```js
+// astro.config.mjs
+import flick from "@flick-lang/astro";
+
+export default defineConfig({ integrations: [flick()] });
+```
+
+```astro
+<div id="app"></div>
+<script>
+  import { runMain } from "@flick-lang/runtime";
+  import { main } from "../app/Main.fl";
+
+  runMain(main);
+</script>
+```
+
+The [playground](../../playground/) of this site is such a program: a Flick
+module with a `ui` view, compiling your code with Flick's compiler built to
+WebAssembly.

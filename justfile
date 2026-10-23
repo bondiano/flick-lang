@@ -39,6 +39,21 @@ wasm:
     cargo build -p flick-wasm --target wasm32-unknown-unknown --release
     test $(wc -c < target/wasm32-unknown-unknown/release/flick_wasm.wasm) -le 4194304
 
+# Build the playground's compiler: the wasm module and its JS bindings
+docs-wasm: wasm
+    cargo install wasm-bindgen-cli --version 0.2.129 --locked --root target/tools
+    target/tools/bin/wasm-bindgen --target web --out-dir docs/src/playground/wasm target/wasm32-unknown-unknown/release/flick_wasm.wasm
+
+# Serve the documentation site; its playground is a Flick program
+docs-dev: docs-wasm
+    cargo build -p flick
+    pnpm -C docs dev
+
+# Build the documentation site into docs/dist
+docs: docs-wasm
+    cargo build -p flick
+    pnpm -C docs build
+
 # Everything CI runs
 check: lint test
 

@@ -2,13 +2,12 @@
 import { Effect, type Option, Result } from "effect";
 
 import { type Tagged, none } from "./data.ts";
+import { writeStderr, writeStdout } from "./host.ts";
 import { tag } from "./tags.ts";
 
-const writeLine = (stream: NodeJS.WriteStream, text: string): void => void stream.write(`${text}\n`);
+export const stdoutLine = (text: string): void => writeStdout(`${text}\n`);
 
-export const stdoutLine = (text: string): void => writeLine(process.stdout, text);
-
-export const stderrLine = (text: string): void => writeLine(process.stderr, text);
+export const stderrLine = (text: string): void => writeStderr(`${text}\n`);
 
 export const APP_ERROR = tag("Prelude.AppError.AppError");
 

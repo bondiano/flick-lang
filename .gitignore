@@ -2,3 +2,7 @@
 node_modules/
 !/tests/check/projects/*/node_modules/
 /runtime/dist/
+# the playground's compiler, built by `just site-wasm`
+/site/.vitepress/wasm/
+/site/.vitepress/cache/
+/site/.vitepress/dist/

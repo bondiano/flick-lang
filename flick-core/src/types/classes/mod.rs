@@ -2,7 +2,7 @@
 //! class, coherence of instances (no overlap, no orphans, strict coverage,
 //! structural termination), the instance solver with its budget, the row
 //! primitives and the structural instances of records, and `deriving`.
-//! Rules: `docs/reference/classes.md`.
+//! Rules: `docs/src/content/docs/reference/classes.md`.
 
 mod declare;
 mod derive;

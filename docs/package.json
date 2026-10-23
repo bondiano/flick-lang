@@ -1,0 +1,22 @@
+{
+  "name": "@flick-lang/docs",
+  "version": "0.1.0",
+  "description": "The Flick documentation site, with a playground written in Flick",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.42.6",
+    "@flick-lang/astro": "workspace:*",
+    "@flick-lang/runtime": "workspace:*",
+    "astro": "7.4.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  }
+}

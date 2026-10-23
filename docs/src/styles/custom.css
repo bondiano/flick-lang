@@ -1,0 +1,11 @@
+/* Flick's accent over Starlight's palette, in both themes. */
+:root {
+  --sl-color-accent-low: #1d2b2a;
+  --sl-color-accent: #2f9e8f;
+  --sl-color-accent-high: #b7ebe2;
+}
+:root[data-theme="light"] {
+  --sl-color-accent-low: #d3f1ec;
+  --sl-color-accent: #1f7a6e;
+  --sl-color-accent-high: #0f3d37;
+}

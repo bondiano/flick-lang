@@ -1,0 +1,4 @@
+dist/
+.astro/
+# the playground's compiler, built by `just docs-wasm`
+src/playground/wasm/

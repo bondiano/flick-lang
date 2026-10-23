@@ -1,6 +1,6 @@
 //! Names and modules: top-level definitions,
 //! export lists, imports and the names they bring into scope. Rules:
-//! `docs/reference/modules.md`.
+//! `docs/src/content/docs/reference/modules.md`.
 
 mod defs;
 mod scope;

@@ -1,7 +1,7 @@
 //! The debug (reference) Effect backend: ESM from the typed IR, with source
 //! maps. Pure code is plain JS; a runtime stage is an `Effect.gen` whose
 //! runtime calls are `yield*`; data follows the ABI in
-//! `docs/reference/codegen.md`.
+//! `docs/src/content/docs/reference/codegen.md`.
 
 mod js;
 mod names;

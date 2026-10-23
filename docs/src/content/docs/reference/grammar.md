@@ -1,0 +1,511 @@
+---
+title: "Flick grammar"
+---
+
+This is the surface syntax accepted by `flick check` and `flick fmt`. Section
+references (§N) point to the language specification
+`Flick спецификация ML языка с HKT и Effect.md`. Every ```` ```flick ```` block
+in this file and in the specification is parsed by the test suite
+(`flick-core/tests/corpus.rs`); a block that stops parsing fails the build.
+
+## Lexical structure
+
+A source file is UTF-8 (`FLICK-S001` otherwise). Positions in diagnostics are
+UTF-8 byte ranges; layout columns count characters.
+
+### Whitespace and comments
+
+- Spaces separate tokens. Tabs are rejected anywhere outside strings and
+  comments (`FLICK-S009`), because layout depends on columns.
+- Line breaks are `\n` or `\r\n`.
+- `// …` is a line comment, `/// …` a doc comment (used by `flick doc`),
+  `/* … */` a block comment; block comments nest. The same comments work inside
+  `sql { … }`.
+
+### Names
+
+| Token | Form | Used for |
+| - | - | - |
+| name | `[a-z_][A-Za-z0-9_]*` | values, functions, fields, type variables |
+| capitalized name | `[A-Z][A-Za-z0-9_]*` | types, constructors, modules, classes, services, errors |
+| `_` | alone | wildcard pattern |
+
+Qualified names are written without spaces around `.`: `Users.get`,
+`Ui.Event.exhaust`, `Sql.Template`. `user.name` is field access.
+
+### Keywords
+
+```text
+module exposing import as let rec fun match with try if then else task await
+scope provide ignore type opaque refined where kind error service class
+instance deriving foreign from forall not none true false schema codec
+sql ui cli in when do
+```
+
+`do` is reserved only so that its use gets a precise diagnostic
+(`FLICK-S010`); Flick has no `do` notation.
+
+Contextual words are ordinary names everywhere except in one position:
+
+- `unboxed` and `untagged` right before `type` (see `codegen.md`);
+- foreign modes `pure`, `sync`, `async`, `effect`, `blocked` and the source
+  `global`;
+- foreign metadata `arity`, `this`, `catch`, `cancel`, `nullable`,
+  `retention`, `optional`, `variadic`, `reviewed` (unknown metadata is
+  `FLICK-S011`);
+- SQL clause words inside `sql { … }`: `join`, `left_join`, `on`, `group_by`,
+  `having`, `order_by`, `limit`, `offset`, `select`, `union`, `union_all`,
+  `insert_into`, `values`, `update`, `set`, `delete_from`, `returning` (plus the
+  keywords `from` and `where`). Inside a SQL block such a word ends a function
+  application, so a clause may continue on the next line;
+- `table` right after `sql` at the top level, and `via` after the type of a
+  column of a `sql table` (see [sql.md](../sql/));
+- CLI clause words at the start of a clause inside `cli { … }`: `description`,
+  `flag`, `arg`, `subcommand`, `handle`.
+
+### Number literals
+
+The grammar of JavaScript `NumericLiteral`, so a literal means exactly the JS
+number (§9):
+
+- decimal `0`, `42`, `1.5`, exponents `1e-3`, `2E+10`;
+- `0x1F`, `0o17`, `0b1010` (prefix letters in either case);
+- `_` separates two digits: `1_000_000`, `0xFF_FF`. It cannot start or end a
+  digit run, repeat, or touch `.`, `e` or a prefix;
+- a BigInt is an integer with suffix `n`: `10n`, `0x1Fn`, no fraction or
+  exponent;
+- a decimal number has no leading zero: `010` (legacy octal) and `09` are
+  errors; write `0o10`;
+- unlike JavaScript, `.5` and `5.` are errors: `.` is field access. Write
+  `0.5` and `5.0`.
+
+A malformed literal is one `FLICK-S006` diagnostic; it never splits into more
+tokens.
+
+### String literals
+
+There is no interpolation.
+
+- `"…"` on one line, with escapes `\n \t \r \\ \" \0` and `\u{…}` with 1 to 6
+  hex digits naming a Unicode scalar value (no surrogates, at most `10FFFF`).
+  `\0` cannot be followed by a digit. Any other escape is `FLICK-S005`.
+- Raw strings `r"…"`, `r#"…"#`, `r##"…"##`… contain no escapes, may span lines
+  and end at `"` followed by the same number of `#`.
+- Multi-line strings open with `"""` followed by a line break and end at the
+  next `"""`; escapes work as in `"…"`. The value drops the first line break,
+  drops the last line if it holds only spaces before the closing `"""`, and
+  removes the common indentation of the non-blank lines (the closing line
+  counts). Escapes are decoded after that, so `\u{20}` is content, not
+  indentation.
+
+Line breaks inside any string value are `\n`, also in `\r\n` sources.
+Expressions made only of literals are evaluated at compile time with JS
+semantics (spec §8, "Вычисление литеральных выражений"): `60 * 60 * 24`,
+`"a" ++ "b"`, `not false`.
+
+```flick
+let examples =
+  [
+    "tab\t and \u{1F600}",
+    r"C:\temp",
+    r#"say "hi""#,
+    """
+    first line
+      indented line
+    """,
+  ]
+```
+
+### Operators and punctuation
+
+```text
+( ) [ ] { } , ; : . .. = -> => | ^ _
+|> || && == != < <= > >= ++ + - * / % ** not
+```
+
+## Operator table
+
+There are no user-defined operators. From weakest to strongest:
+
+| Level | Operators | Associativity |
+| - | - | - |
+| 1 | `\|>` | left |
+| 2 | `\|\|` | right |
+| 3 | `&&` | right |
+| 4 | `==` `!=` `<` `<=` `>` `>=` | none: `a < b < c` is an error |
+| 5 | `++` | right |
+| 6 | `+` `-` | left |
+| 7 | `*` `/` `%` (`%` is the JS remainder) | left |
+| 8 | `**` | right |
+| 9 | prefix `-`, `not`, `await`, `ignore` | — |
+| 10 | function application `f x y` | left |
+| 11 | `.field`, `Module.name` | left |
+
+`-x ** 2` is `-(x ** 2)`; `-a * b` is `(-a) * b`; `await f x` is
+`await (f x)`. Bitwise operations are the functions `Number.bit_*`.
+
+## Layout
+
+Function bodies, match arms and the members of `class`, `instance` and
+`service` are delimited by indentation; there is no `in` and the last
+expression of a block is its value (§3). Braces delimit records and the
+blocks of `task`, `scope`, `provide`, `sql`, `ui`, `cli`, `codec` and `rec`.
+
+1. Top-level declarations start at column 1. A line indented further continues
+   the current declaration.
+2. A *block* opens after `=`, `->`, `then`, `else` and `try`:
+   - if the block starts on the next line, its column is the column of its
+     first token. A line at that column starts the next statement, a deeper
+     line continues the current statement, a shallower line ends the block;
+   - if the block starts on the same line, it holds one statement; it
+     continues on lines indented deeper than the line it started on (and
+     deeper than any enclosing brace block), and ends at any other line.
+3. A line that starts at the block column with an infix operator other than
+   `-`, with `|`, `then`, `else`, `with`, or with a closing delimiter continues
+   the statement instead of starting a new one. This is what lets `|>`
+   pipelines, `match` arms and `else` branches line up with their expression.
+4. Inside `{ … }` of a record, record type or brace block the items align on
+   the first item, which may follow `{` on the same line; items are separated
+   by line breaks or `;`. `;` separates statements only inside braces.
+5. Inside `( … )`, `[ … ]` and row braces line breaks do not matter, but a
+   line starting left of the enclosing block's column ends the bracket (so a
+   missing `)` does not swallow later declarations).
+6. A closing delimiter may be dedented below the block it closes.
+7. `else if` on one line continues the chain without opening a block.
+
+```flick
+load_view : UserId ->{Users, Log; NotFound} UserView
+let load_view id =
+  let user = Users.get id
+  let view = to_view user
+  Log.info view.title
+  view
+
+classify : Number -> String
+let classify n =
+  if n < 0 then
+    "negative"
+  else if n == 0 then
+    "zero"
+  else
+    "positive"
+
+total : List Number -> Number
+let total xs =
+  xs
+  |> List.filter (fun x -> x > 0)
+  |> List.sum
+```
+
+A line whose column matches no enclosing block, or a body expected on the next
+line that is not indented, is one `FLICK-S009` diagnostic at that line:
+
+```text
+let between x =
+  match x with
+  | A ->
+      foo
+     bar        // FLICK-S009: column 6 continues nothing here
+```
+
+## Declarations
+
+```text
+file        = [module_header] { import } { decl }
+module_header = "module" ModulePath ["exposing" exposing]
+import      = "import" ModulePath ["as" Con] ["exposing" exposing]
+exposing    = "(" item { "," item } [","] ")"
+item        = name | Con | Con "(..)" | ".."
+ModulePath  = Con { "." Con }
+
+decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
+            | service | class | instance | foreign | sql_table
+signature   = name ":" type
+let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
+rec_group   = "rec" "{" { signature | let } "}"
+type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
+            | ["opaque"] "type" "alias" Con { param } "=" type [deriving]
+            | "refined" "type" Con { param } "=" type "where" expr [deriving]
+            | ["opaque"] ("unboxed" | "untagged") "type" Con { param } "=" variants [deriving]
+variants    = ["|"] variant { "|" variant }
+variant     = Con { capture }                   // fields are atomic types
+param       = name | "(" name ":" kind ")"
+deriving    = "deriving" Con { "," Con }
+kind_decl   = "kind" Con "=" ["|"] Con { "|" Con }
+error_decl  = "type" "error" Con { param } ["=" variant] [deriving]
+service     = "service" Con { param } [ "=" members ]
+class       = "class" [context "=>"] Con { param } ["|" fundep { "," fundep }] ["=" members]
+fundep      = { name } "->" { name }
+instance    = "instance" [context "=>"] type ["=" members]
+members     = block of: signature | let | type_decl
+foreign     = "foreign" mode name "from" ("global" String | String String) [metadata]
+            | "foreign" "blocked" name String
+mode        = "pure" | "sync" | "async" | "effect"
+sql_table   = "sql" "table" Con String "{" column { column } "}"
+column      = name ":" { name | "not" } "as" type ["via" expr]
+metadata    = indented lines: meta_name { atom }
+```
+
+The right-hand side of `type` is always a list of variants, so
+`type Wrapper = Wrap Number` is an ADT with one constructor; a transparent
+alias, a record type included, is written `type alias`. `alias` is a keyword
+only right after `type`. A field of a variant is an atomic type, as in a
+constructor pattern: `Some (List a)`, `Handler (a -> b)`, and
+`Circle (Point, Number)` has one tuple field where `Circle Point Number` has
+two. Writing `of` before the fields is `FLICK-S010`.
+
+`type error E` declares an error; its one constructor is named `E` too, and an
+error with fields is `type error E = E T …`. A constructor named otherwise is
+`FLICK-S007`.
+Every named function has its full signature right above its `let` (§3),
+except an instance method, whose signature comes from its class; the
+parser accepts a signature without a definition, and later phases check the
+pairing.
+
+```flick
+module App.Shapes exposing (Shape(..), area)
+
+import App.Geometry exposing (Point)
+import Effect.Log as Log
+
+type Shape =
+  | Circle Point Number
+  | Rect { origin : Point; size : Point }
+  | Empty
+  deriving Eq, Show
+
+opaque type alias UserId = String
+
+refined type Port = Number where fun n -> n > 0 && n < 65536
+  deriving Eq, Hash
+
+kind Nullability = NonNull | Nullable
+
+type error NotFound = NotFound UserId
+
+service Clock =
+  now : Unit ->{} Number
+
+class Eq a => Hash a =
+  hash : a -> Number
+
+class Collection c a | c -> a =
+  empty : c
+
+instance Show Shape =
+  let show shape =
+    match shape with
+    | Circle _ _ -> "circle"
+    | _ -> "other"
+
+read_text : Path ->{; FsError} String
+foreign async read_text from "./fs.js" "readText"
+  arity 1
+  catch FsError.from_js
+  cancel signal
+
+rec {
+  is_even : Number -> Bool
+  let is_even n = if n == 0 then true else is_odd (n - 1)
+
+  is_odd : Number -> Bool
+  let is_odd n = if n == 0 then false else is_even (n - 1)
+}
+```
+
+## Types, rows and kinds
+
+```text
+type        = "forall" name { name } "." type
+            | union "=>" type                  // constraint(s): `Show a =>`, `(Show a, Eq a) =>`
+            | union ["->" [effects] type]      // right associative
+effects     = "{" "}" | "{" [row] ";" [row] "}" // written `->{` with no space
+row         = union { "," union } ["|" union]  // `none`, `r`, `Users, Log | r`
+union       = app { "+" app }                  // row or capture union
+app         = capture { capture }
+capture     = atom { "^" (name | "(" type ")" | "{" … "}") }
+atom        = name | Con { "." Con } | "none" | "(" ")" | "(" type ")"
+            | "(" type "," type { "," type } ")"
+            | "{" field ":" type { (";" | line break) field ":" type } ["|" union] "}"
+            | "{" [union { "," union }] ["|" union] "}"
+```
+
+- `a -> b` is pure; `a ->{r; e} b` is a runtime call needing services `r` and
+  failing with errors `e`; `a ->{} b` is a runtime call with both rows empty,
+  never the same as `->` (§2, §4). `-> {` with a space is an arrow to a record
+  type.
+- `none` is the empty row literal. An arrow side left out is empty too:
+  `->{; E}` is `->{none; E}`, `->{R;}` is `->{R; none}` (see
+  [effects.md](../effects/#empty-rows-none)). `{Users, Log}` is a closed row, a
+  trailing `| r` opens it.
+- `T^c`, `T^{s}`, `T^(c + d)` qualify a type with the captures it holds; `^`
+  binds tighter than application, so `List a^c` is `List (a^c)`.
+- Kinds use the same grammar: `Type`, `Type -> Type`, `ServiceRow`.
+
+```flick
+decode_pair :
+  (forall a. Schema a -> Unknown ->{r; SchemaError} a) ->
+  Unknown -> Unknown ->{r; SchemaError} (User, Settings)
+
+open_rows : a ->{Users, Log | r; NotFound | e} b
+
+fields : forall fields. { name : String | fields } -> { name : String }
+
+save_button :
+  SaveButtonProps c -> (Ui {Users} {SaveError})^c
+```
+
+## Expressions
+
+```text
+block       = statement { line break statement }
+statement   = "let" … | signature | expr
+expr        = "fun" atom_pattern { atom_pattern } "->" block
+            | "match" expr "with" arm { arm }
+            | "try" block "with" arm { arm }
+            | "if" expr "then" block "else" (if_expr | block)
+            | operator expression over application (see the operator table)
+arm         = "|" or_pattern ["when" expr] "->" block
+application = postfix { postfix }
+postfix     = atom { "." name }
+atom        = name | Con { "." Con } ["." name] | Number | BigInt | String
+            | "true" | "false" | "()" | "(" expr ")" | "(" expr ":" type ")"
+            | "(" expr "," expr { "," expr } ")" | "[" [expr { "," expr } [","]] "]"
+            | "{" "}" | "{" field "=" block { ";" | line break … } "}"
+            | "{" expr "with" field "=" block { … } "}"
+            | "task" "{" block "}" | "ui" "{" block "}"
+            | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
+            | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
+            | "sql" [name] "{" clause { clause } "}"
+            | "cli" String "{" cli_clause { cli_clause } "}"
+clause      = ("from" | "join" | "left_join") name "in" expr
+            | clause_word expr { "," expr }
+cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
+            | ("description" | "subcommand" | "handle") expr
+```
+
+`if` is an expression and always has `else`. `ignore e` discards a non-`Unit`
+result of an intermediate statement (§3). `await e` runs a stored `Eff` once in
+the current fiber; `task { … }` builds a cold computation (§4). In
+`provide e { … }` and `codec e { … }` the `{` ends the head expression.
+In `cli "name" { … }` the parser fixes only the clause shapes; aliases on an
+`arg`, duplicate names and the option types are checked by CLI elaboration
+(spec §10, "CLI eDSL"). A `///` comment right above a `flag`, `arg` or
+`subcommand` clause is its help text.
+
+```flick
+load_twice : UserId ->{Users; NotFound} (User, User)
+let load_twice id =
+  let request = task { Users.get id }
+  let first = await request
+  let renamed = { first with name = "Ada" }
+  (renamed, await request)
+
+find_optional : UserId ->{Users; DbUnavailable} Option User
+let find_optional id =
+  try
+    Some (find_user id)
+  with
+  | NotFound _ -> None
+
+read_config : Path ->{FileSystem; OpenError, ReadError} String
+let read_config path =
+  scope {
+    let file = File.open_scoped path
+    File.read_all file
+  }
+
+balances : Sql.Template Pg { user_id : UserId } BalanceRow
+let balances =
+  sql params {
+    from user in Users
+    left_join account in Accounts
+      on account.user_id == user.id
+    where user.id == params.user_id
+    select { name = user.name; balance = account.balance }
+  }
+
+deploy : Cli.Command {Platform} none
+let deploy =
+  cli "deploy" {
+    description "Deploy the current build"
+    /// Print the plan without applying it
+    flag dry_run "d" : Bool
+    flag region : Option String
+    arg targets : NonEmpty String
+    handle fun { dry_run; region; targets } -> Deploy.run dry_run region targets
+  }
+```
+
+## Patterns
+
+```text
+or_pattern   = pattern { "|" pattern }
+pattern      = Con { "." Con } { atom_pattern } | atom_pattern
+atom_pattern = "_" | name | Con | ["-"] Number | ["-"] BigInt | String | "true" | "false"
+             | "()" | "(" or_pattern ")" | "(" or_pattern ":" type ")"
+             | "(" or_pattern "," or_pattern { "," or_pattern } ")"
+             | "[" [or_pattern { "," or_pattern }] "]"
+             | "{" field ["=" or_pattern] { ";" | line break … } "}"
+```
+
+A record pattern field without `= pattern` binds a variable named like the
+field. Or-patterns and guards follow Rust's rules (spec §8, "Варианты, guards
+и or-patterns"): every alternative binds the same names, a name is bound at
+most once per pattern or per function's parameters (`FLICK-S012`), and a
+guard `when e` covers the whole arm. A `|` at the start of a line inside an
+arm's pattern continues the or-pattern; after `->` it starts the next arm.
+
+```flick
+describe : Shape -> String
+let describe shape =
+  match shape with
+  | Circle _ _ | Empty -> "round or nothing"
+  | Rect width height when width == height -> "square"
+  | Rect _ _ -> "rectangle"
+  | Labeled { name = "origin" | "zero" } -> "special"
+  | _ -> "other"
+```
+
+## Constructs Flick does not have
+
+Generic `do` notation, `let*` binding operators and JSX `<…>` each produce
+one `FLICK-S010` diagnostic naming the Flick replacement (direct calls with
+`let`, `task`/`await`, `ui { … }`), not a generic parse error.
+
+## Error recovery
+
+Each lexical problem is one diagnostic and one token. After a syntax error the
+parser skips the rest of the statement and resumes at the next statement or
+declaration, so independent errors are all reported and one error does not
+cascade into others in the same statement.
+
+## Formatting
+
+`flick fmt` changes only whitespace, so the AST is unchanged (it re-parses its
+output and refuses with `FLICK-P003` otherwise). It only drops empty
+rows of an arrow, which are the same type: `->{none; E}` becomes `->{; E}` and
+`->{none; none}` becomes `->{}`; `->{R; none}` and `Eff none none a` stay as
+written.
+
+- indentation becomes two spaces per level while keeping every line's column
+  relation (shallower, equal, deeper) to the blocks above it;
+- one space between tokens, none inside `( )`, `[ ]`, around `.`, `^` and in
+  `->{r; e}` and row braces `{Users, Log}`; one space inside other braces;
+- unary `-` binds to its operand; `forall a b.` keeps the space after `.`;
+- trailing whitespace is removed, runs of blank lines collapse to one, the file
+  ends with one line break; comments stay where they are, a comment-only line
+  is indented like code at its column;
+- multi-line strings and block comments are copied verbatim;
+- a line longer than 100 characters is split at its outermost structure: the
+  body after `=` or `->` moves to its own line, an `if` chain gets a line per
+  branch, then breaks go before the weakest operators (`|>` lines up with the
+  start of its block), after type arrows (keeping `->{r; e}` whole), before
+  application arguments, and finally one item per line inside the widest
+  bracket (a single expression in parentheses stays hugged by them). Each
+  continuation is two spaces deeper. A break is kept only if the file still
+  has the same AST; a single token longer than the limit stays as it is.
+
+`flick fmt --check` exits with `1` and reports `FLICK-P002` for each file that
+would change; `flick fmt --stdin --stdin-filepath <file>` reads the source
+from stdin and writes the result to stdout for editors.

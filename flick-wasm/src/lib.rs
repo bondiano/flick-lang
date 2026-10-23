@@ -35,18 +35,65 @@ pub fn check(source: &str) -> String {
 /// other than `"release"` is `"debug"`.
 #[wasm_bindgen]
 pub fn compile(source: &str, profile: &str) -> String {
+    let (output, diagnostics) = emit(source, profile);
+    let js = output.map_or(Value::Null, |(file, artifacts)| {
+        artifacts
+            .into_iter()
+            .find(|a| a.path == file)
+            .map_or(Value::Null, |a| Value::String(a.contents))
+    });
+    json!({ "js": js, "diagnostics": diagnostics }).to_string()
+}
+
+/// `{ "files": { path: contents } | null, "entry": path | null,
+/// "diagnostics": […] }`: everything `flick build` writes for the module —
+/// its JS, the built-in modules and, when it exports `main`, the runner
+/// `main.js`, which is the entry.
+#[wasm_bindgen]
+pub fn build(source: &str, profile: &str) -> String {
+    let (output, diagnostics) = emit(source, profile);
+    let (files, entry) = match output {
+        Some((_, artifacts)) => {
+            let entry = artifacts
+                .iter()
+                .any(|a| a.path == RUNNER)
+                .then(|| RUNNER.to_owned());
+            let files: serde_json::Map<String, Value> = artifacts
+                .into_iter()
+                .filter(|a| Path::new(&a.path).extension().is_some_and(|e| e == "js"))
+                .map(|a| (a.path, Value::String(a.contents)))
+                .collect();
+            (
+                Value::Object(files),
+                entry.map_or(Value::Null, Value::String),
+            )
+        }
+        None => (Value::Null, Value::Null),
+    };
+    json!({ "files": files, "entry": entry, "diagnostics": diagnostics }).to_string()
+}
+
+const RUNNER: &str = "main.js";
+
+/// The build of the demo's module, with the path of its JS, and the
+/// diagnostics as JSON; no build when there are errors.
+fn emit(source: &str, profile: &str) -> (Option<(String, Vec<build::Artifact>)>, Value) {
     let mut sources = SourceMap::default();
     let (mut diagnostics, compilation) =
         project::compile(&Demo(source), &mut sources, None, &[path()]);
-    let mut js = Value::Null;
+    let mut output = None;
     if !diagnostics.iter().any(|d| d.severity == Severity::Error) {
         let module = compilation.modules.iter().find(|m| m.path == path());
         let file = module.map(|m| format!("{}.js", m.name.replace('.', "/")));
+        // like `flick build` without a project: a module with `main` gets the runner
+        let entry = module
+            .filter(|m| m.interface.exports_value("main"))
+            .map(|m| m.name.clone());
         let source_path = |_: FileId| format!("file://{}", path().display());
         let source_dir = |_: &str| path().parent().map(Path::to_path_buf);
         let settings = Settings {
             package: None,
-            entry: None,
+            entry: entry.as_deref(),
             typescript: false,
             release: profile == "release",
             extras: Extras::default(),
@@ -56,12 +103,13 @@ pub fn compile(source: &str, profile: &str) -> String {
             root: None,
         };
         let (artifacts, problems) = build::emit(&compilation, &sources, &settings);
+        let failed = problems.iter().any(|d| d.severity == Severity::Error);
         diagnostics.extend(problems);
-        if let Some(artifact) = artifacts.iter().find(|a| Some(&a.path) == file.as_ref()) {
-            js = Value::String(artifact.contents.clone());
+        if let (Some(file), false) = (file, failed) {
+            output = Some((file, artifacts));
         }
     }
-    json!({ "js": js, "diagnostics": diagnostics_json(&sources, &diagnostics) }).to_string()
+    (output, diagnostics_json(&sources, &diagnostics))
 }
 
 /// The one file of the demo.

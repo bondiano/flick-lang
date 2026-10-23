@@ -1,0 +1,16 @@
+{
+  "name": "@flick-lang/astro",
+  "version": "0.1.0",
+  "description": "Flick modules in Astro and Vite: `import { main } from \"./App.fl\"` compiles with `flick build`",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.mjs",
+    "./vite": "./vite.mjs",
+    "./client": { "types": "./client.d.ts" }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

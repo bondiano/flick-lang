@@ -1,10 +1,11 @@
 // The Node.js file system behind `File.node`. Failures of the file system
 // are typed errors; an opened file is released by the owner of its scope.
-import { type FileHandle, open, readFile, writeFile } from "node:fs/promises";
+import type { FileHandle } from "node:fs/promises";
 
 import { Effect, type Scope } from "effect";
 
 import type { Tagged } from "../data.ts";
+import { nodeFsPromises as fs } from "../host.ts";
 import { acquireRelease } from "../owner.ts";
 
 type Kind = "OpenError" | "ReadError" | "WriteError";
@@ -20,7 +21,7 @@ const failure =
   });
 
 export const fileOpen = (path: string): Effect.Effect<FileHandle, FileError<"OpenError">, Scope.Scope> =>
-  acquireRelease(Effect.tryPromise({ try: () => open(path, "r"), catch: failure("OpenError") }), (handle) =>
+  acquireRelease(Effect.tryPromise({ try: () => fs().open(path, "r"), catch: failure("OpenError") }), (handle) =>
     Effect.promise(() => handle.close()),
   );
 
@@ -28,7 +29,7 @@ export const fileReadHandle = (handle: FileHandle): Effect.Effect<string, FileEr
   Effect.tryPromise({ try: () => handle.readFile({ encoding: "utf8" }), catch: failure("ReadError") });
 
 export const fileRead = (path: string): Effect.Effect<string, FileError<"ReadError">> =>
-  Effect.tryPromise({ try: () => readFile(path, "utf8"), catch: failure("ReadError") });
+  Effect.tryPromise({ try: () => fs().readFile(path, "utf8"), catch: failure("ReadError") });
 
 export const fileWrite = (path: string, text: string): Effect.Effect<void, FileError<"WriteError">> =>
-  Effect.tryPromise({ try: () => writeFile(path, text), catch: failure("WriteError") });
+  Effect.tryPromise({ try: () => fs().writeFile(path, text), catch: failure("WriteError") });

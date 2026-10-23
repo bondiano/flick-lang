@@ -5,6 +5,7 @@ import { Cause, Effect, Exit, Fiber } from "effect";
 
 import { APP_ERROR, type AppError } from "./builtins.ts";
 import { capabilities } from "./capabilities.ts";
+import { env, offSignal, onSignal, setExitCode, writeStderr } from "./host.ts";
 import { reportedDefects, withOwner } from "./owner.ts";
 
 const SIGNALS = { SIGINT: 130, SIGTERM: 143 } as const;
@@ -13,7 +14,7 @@ type Signal = keyof typeof SIGNALS;
 
 const SIGNAL_NAMES: ReadonlyArray<Signal> = ["SIGINT", "SIGTERM"];
 
-const write = (text: string): void => void process.stderr.write(text);
+const write = writeStderr;
 
 const isAppError = (error: unknown): error is AppError =>
   typeof error === "object" && error !== null && Reflect.get(error, "_tag") === APP_ERROR;
@@ -60,10 +61,10 @@ export const runMain = async (
   const problems = options.capabilities ?? capabilities();
   if (problems.length > 0) {
     for (const problem of problems) write(`error: ${problem}\n`);
-    process.exitCode = 2;
+    setExitCode(2);
     return;
   }
-  const notice = options.shutdownNotice ?? Number(process.env["FLICK_SHUTDOWN_NOTICE_MS"] ?? 2000);
+  const notice = options.shutdownNotice ?? Number(env("FLICK_SHUTDOWN_NOTICE_MS") ?? 2000);
   const run: { fiber?: Fiber.Fiber<unknown, unknown>; signal?: Signal; timer?: NodeJS.Timeout } = {};
   // installed before main starts: it may run up to a wait for the signal at once
   const handlers = SIGNAL_NAMES.map((name) => {
@@ -74,7 +75,7 @@ export const runMain = async (
       run.timer.unref();
       Effect.runFork(Fiber.interrupt(run.fiber));
     };
-    process.on(name, handler);
+    onSignal(name, handler);
     return [name, handler] as const;
   });
   // a fiber waiting on nothing but a signal must not let the process exit
@@ -84,6 +85,6 @@ export const runMain = async (
   const exit = await new Promise<Exit.Exit<unknown, unknown>>((resolve) => fiber.addObserver(resolve));
   clearTimeout(run.timer);
   clearInterval(keepAlive);
-  for (const [name, handler] of handlers) process.off(name, handler);
-  process.exitCode = conclude(exit, run.signal, reportedDefects());
+  for (const [name, handler] of handlers) offSignal(name, handler);
+  setExitCode(conclude(exit, run.signal, reportedDefects()));
 };

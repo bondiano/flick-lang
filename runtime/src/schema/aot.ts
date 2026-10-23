@@ -10,6 +10,7 @@ import * as compilerRuntime from "effect/schema/SchemaCompiler/runtime";
 
 import { notesOf } from "./notes.ts";
 import type { AnySchema } from "./schemas.ts";
+import { nodeFs, nodeUrl, writeStderr } from "../host.ts";
 
 /**
  * What the generated module imports in place of Effect's compiler runtime,
@@ -62,7 +63,7 @@ const isCompiledSchemas = (module: unknown): module is CompiledSchemas =>
 export const installSchemaAot = (aot: unknown): boolean => {
   const asts = stop();
   if (!isCompiledSchemas(aot) || aot.fingerprint !== fingerprint(asts)) {
-    process.stderr.write("warning: the compiled schemas are stale, decoding is interpreted; rebuild with --schema-aot\n");
+    writeStderr("warning: the compiled schemas are stale, decoding is interpreted; rebuild with --schema-aot\n");
     return false;
   }
   aot.install(asts);
@@ -71,7 +72,8 @@ export const installSchemaAot = (aot: unknown): boolean => {
 
 /** Imports the module at `entry`, a path or a `file:` URL, and writes the compiled decoders of its codecs to `out`. */
 export const writeSchemaAot = async (entry: string, out: string): Promise<void> => {
-  const [{ writeFileSync }, { pathToFileURL }] = await Promise.all([import("node:fs"), import("node:url")]);
+  const { writeFileSync } = nodeFs();
+  const { pathToFileURL } = nodeUrl();
   enableSchemaAot();
   await import(entry.startsWith("file:") ? entry : pathToFileURL(entry).href);
   const asts = stop();

@@ -5,8 +5,8 @@
 //! of provably pure bindings only; effects, expected errors, services and
 //! layers; classes, instances, row primitives and `deriving`; regions and
 //! the captures of closures. Rules:
-//! `docs/reference/types.md`, `docs/reference/effects.md`,
-//! `docs/reference/classes.md`, `docs/reference/regions.md`.
+//! `docs/src/content/docs/reference/types.md`, `docs/src/content/docs/reference/effects.md`,
+//! `docs/src/content/docs/reference/classes.md`, `docs/src/content/docs/reference/regions.md`.
 //!
 //! The checker reads the concrete tree after name resolution; other modules
 //! are known only through their [`Interface`], which this phase fills with

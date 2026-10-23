@@ -3,7 +3,7 @@
 //! declarations with TypeScript and describes each value export as a
 //! [`Surface`]; [`import::generate`] turns it into `Generated.fl` and a
 //! coverage report, and [`check`] compares reviewed bindings with the
-//! declarations they were reviewed against. Rules: `docs/reference/ffi.md`.
+//! declarations they were reviewed against. Rules: `docs/src/content/docs/reference/ffi.md`.
 
 pub mod check;
 mod convert;

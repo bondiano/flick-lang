@@ -1,6 +1,6 @@
 //! The release optimizer: typed IR passes that keep every observable
 //! contract of the debug lowering (spec §8, "Оптимизация единственного
-//! Effect backend"). Rules: `docs/reference/codegen.md`.
+//! Effect backend"). Rules: `docs/src/content/docs/reference/codegen.md`.
 //!
 //! - [`inline`]: known full applications of small pure functions of the
 //!   module, and beta reduction;

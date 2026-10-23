@@ -110,6 +110,16 @@ input : forall c r e. InputProps r e c -> (Ui r e)^c
 foreign pure input from "@flick-lang/runtime/ui" "uiInput"
   retention call
 
+/// A text area of several lines; like `input`, `value` is the initial text.
+textarea : forall c r e. InputProps r e c -> (Ui r e)^c
+foreign pure textarea from "@flick-lang/runtime/ui" "uiTextarea"
+  retention call
+
+/// Preformatted text: spaces and line breaks are kept.
+pre : forall c r e. { class_name : String } -> List ((Ui r e)^c) -> (Ui r e)^c
+foreign pure pre from "@flick-lang/runtime/ui" "uiPre"
+  retention call
+
 link : forall c r e. { href : SafeUrl } -> List ((Ui r e)^c) -> (Ui r e)^c
 foreign pure link from "@flick-lang/runtime/ui" "uiLink"
   retention call

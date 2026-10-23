@@ -1,0 +1,123 @@
+// The programs the playground starts from.
+module Examples exposing (Example, examples)
+
+type alias Example = { name : String; source : String }
+
+examples : List Example
+let examples =
+  [
+    {
+      name = "Hello"
+      source =
+        """
+      module Main exposing (main)
+
+      main : Unit ->{; AppError} Unit
+      let main () =
+        Platform.stdout_line "Hello from Flick"
+        """
+    },
+    {
+      name = "Data and patterns"
+      source =
+        """
+      module Main exposing (main)
+
+      type Shape = Circle Number | Rect Number Number
+        deriving Eq, Show
+
+      area : Shape -> Number
+      let area shape =
+        match shape with
+        | Circle r -> 3.14159 * r * r
+        | Rect w h -> w * h
+
+      main : Unit ->{; AppError} Unit
+      let main () =
+        let shapes = [Circle 1, Rect 2 3]
+        Platform.stdout_line (show shapes)
+        Platform.stdout_line (show (List.map area shapes))
+        """
+    },
+    {
+      name = "Typed errors"
+      source =
+        """
+      module Main exposing (main)
+
+      type error NotFound = NotFound String
+
+      find : String ->{; NotFound} Number
+      let find name =
+        if name == "ada" then 36 else from_result (Err (NotFound name))
+
+      main : Unit ->{; AppError} Unit
+      let main () =
+        let age = try find "ada" with
+          | NotFound _ -> 0
+        Platform.stdout_line ("ada is " ++ show age)
+        let other = try show (find "bob") with
+          | NotFound who -> "no " ++ who
+        Platform.stdout_line other
+        """
+    },
+    {
+      name = "Retry"
+      source =
+        """
+      module Main exposing (main)
+
+      type error Flaky = Flaky Number
+
+      flaky : Ref Number -> Eff none {Flaky} String
+      let flaky calls =
+        task {
+          let n = Ref.get calls + 1
+          Ref.set calls n
+          Platform.stdout_line ("attempt " ++ show n)
+          if n < 3 then from_result (Err (Flaky n)) else "done after " ++ show n
+        }
+
+      main : Unit ->{; AppError} Unit
+      let main () =
+        let calls = Ref.make 0
+        let result = try Effect.retry (Schedule.recurs 5) (flaky calls) with
+          | Flaky n -> "gave up at " ++ show n
+        Platform.stdout_line result
+        """
+    },
+    {
+      name = "Concurrency"
+      source =
+        """
+      module Main exposing (main)
+
+      after : Number -> String -> Eff none none String
+      let after millis text =
+        task {
+          Effect.sleep (Result.with_default Duration.zero (Duration.millis millis))
+          text
+        }
+
+      main : Unit ->{; AppError} Unit
+      let main () =
+        let (a, b) = parallel (after 20 "slow") (after 1 "fast")
+        Platform.stdout_line (a ++ " " ++ b)
+        Platform.stdout_line (race_first (after 30 "late") (after 1 "early"))
+        """
+    },
+    {
+      name = "A type error"
+      source =
+        """
+      module Main exposing (main)
+
+      total : List Number -> Number
+      let total xs = List.fold_left (fun acc x -> acc + x) 0 xs
+
+      main : Unit ->{; AppError} Unit
+      let main () =
+        Platform.stdout_line (total ["1", "2"])
+        """
+    }
+  ]

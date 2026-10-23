@@ -1,0 +1,235 @@
+// The playground of the documentation site, written in Flick: the model is a
+// `Ref`, the view a `ui` block that React renders again after each handler
+// task, and the compiler and the runner are reached through the FFI.
+module Playground exposing (main)
+
+import Examples exposing (Example, examples)
+import JsError exposing (JsError(..))
+
+type Profile = Debug | Release
+  deriving Eq, Show
+
+type Tab = Output | Js | Compare | Problems
+  deriving Eq, Show
+
+/// A diagnostic of the compiler, its position as `line:column`.
+type alias Diagnostic = { code : String; severity : String; message : String; at : String }
+
+/// Both profiles' JS of the module, and what the compiler reported.
+type alias Compiled = { debug : String; release : String; diagnostics : List Diagnostic }
+
+/// A piece of the program's output: `stdout`, `stderr` or `status`.
+type alias Line = { stream : String; text : String }
+
+type alias Model =
+  {
+    example : String
+    source : String
+    profile : Profile
+    tab : Tab
+    compiled : Compiled
+    output : List Line
+    running : Bool
+    version : String
+  }
+
+/// Loads the compiler; its language version.
+load : Unit ->{; JsError} String
+foreign async load from "./compiler.ts" "load"
+  arity 0
+  catch JsError.from_js
+
+/// Checks and compiles the module in both profiles.
+compile : String ->{} Compiled
+foreign sync compile from "./compiler.ts" "compile"
+  arity 1
+
+/// Builds the module in the profile and runs its `main` in a worker, until
+/// it ends or the call is interrupted; everything it printed.
+run_build : String -> String ->{} List Line
+foreign async run_build from "./compiler.ts" "run"
+  arity 2
+  cancel signal
+
+update : Ref Model -> (Model -> Model) ->{} Unit
+let update model f = Ref.modify model (fun m -> ((), f m))
+
+profile_name : Profile -> String
+let profile_name p =
+  match p with
+  | Debug -> "debug"
+  | Release -> "release"
+
+edit : Ref Model -> String ->{} Unit
+let edit model source =
+  let compiled = compile source
+  update model (fun m -> { m with source = source; compiled = compiled })
+
+choose : Ref Model -> Example ->{} Unit
+let choose model example =
+  let compiled = compile example.source
+  update model (fun m -> { m with example = example.name; source = example.source; compiled = compiled; output = [] })
+
+/// Runs the program, giving up after ten seconds.
+run_program : Ref Model ->{} Unit
+let run_program model =
+  let m = Ref.get model
+  update model (fun m -> { m with running = true; tab = Output; output = [] })
+  let output =
+    try timeout 10000 (task { run_build m.source (profile_name m.profile) }) with
+    | TimeoutError -> [{ stream = "status"; text = "stopped after 10 s" }]
+  update model (fun m -> { m with running = false; output = output })
+
+errors : Compiled -> Number
+let errors compiled = List.length (List.filter (fun d -> d.severity == "error") compiled.diagnostics)
+
+status : Model -> String
+let status m =
+  if m.version == "" then
+    "the compiler did not load"
+  else if errors m.compiled > 0 then
+    show (errors m.compiled) ++ " error(s)"
+  else
+    "Flick " ++ m.version ++ ": no errors"
+
+/// A button that is pressed when `on`.
+toggle : String -> Bool -> (Unit ->{} Unit) -> Ui none none
+let toggle label on act =
+  ui {
+    span
+      { class_name = if on then "fp-on" else "fp-off" }
+      [button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { act () }) } [text label]]
+  }
+
+code_pane : String -> String -> Ui none none
+let code_pane title code =
+  ui {
+    div
+      { class_name = "fp-code" }
+      [
+        span { class_name = "fp-title" } [text title],
+        pre { class_name = "fp-out" } [text (if code == "" then "no output: the module has errors" else code)]
+      ]
+  }
+
+output_pane : Model -> Ui none none
+let output_pane m =
+  let hint = if m.running then "running…" else "Press Run to build the module and run its `main`."
+  ui {
+    pre
+      { class_name = "fp-out" }
+      (match m.output with
+      | [] -> [span { class_name = "fp-status" } [text hint]]
+      | lines -> List.map (fun l -> span { class_name = "fp-" ++ l.stream } [text l.text]) lines)
+  }
+
+problem : Diagnostic -> Ui none none
+let problem d =
+  ui {
+    item [span { class_name = "fp-" ++ d.severity } [text d.code], text (" " ++ d.at ++ " " ++ d.message)]
+  }
+
+problems_pane : Compiled -> Ui none none
+let problems_pane compiled =
+  ui {
+    match compiled.diagnostics with
+    | [] -> paragraph [text "No diagnostics."]
+    | ds -> list (List.map problem ds)
+  }
+
+pane : Model -> Ui none none
+let pane m =
+  match m.tab with
+  | Output -> output_pane m
+  | Js -> code_pane ("JavaScript, " ++ profile_name m.profile) (if m.profile == Debug then m.compiled.debug else m.compiled.release)
+  | Compare ->
+    ui {
+      div { class_name = "fp-compare" } [code_pane "debug" m.compiled.debug, code_pane "release" m.compiled.release]
+    }
+  | Problems -> problems_pane m.compiled
+
+tab_label : Model -> Tab -> String
+let tab_label m t =
+  match t with
+  | Output -> "Output"
+  | Js -> "JS"
+  | Compare -> "debug vs release"
+  | Problems ->
+    match m.compiled.diagnostics with
+    | [] -> "Diagnostics"
+    | ds -> "Diagnostics (" ++ show (List.length ds) ++ ")"
+
+set_tab : Ref Model -> Model -> Tab -> Ui none none
+let set_tab model m t = toggle (tab_label m t) (m.tab == t) (fun () -> update model (fun m -> { m with tab = t }))
+
+set_profile : Ref Model -> Model -> Profile -> Ui none none
+let set_profile model m p =
+  toggle (profile_name p) (m.profile == p) (fun () -> update model (fun m -> { m with profile = p }))
+
+pick : Ref Model -> Model -> Example -> Ui none none
+let pick model m e = toggle e.name (m.example == e.name) (fun () -> choose model e)
+
+view : Ref Model -> Model -> Ui none none
+let view model m =
+  ui {
+    div
+      { class_name = "fp" }
+      [
+        div { class_name = "fp-bar" } (List.map (pick model m) examples),
+        div
+          { class_name = "fp-bar" }
+          [
+            set_profile model m Debug,
+            set_profile model m Release,
+            span
+              { class_name = "fp-run" }
+              [
+                button
+                  { disabled = m.version == ""; on_click = Ui.Event.latest (fun _ -> task { run_program model }) }
+                  [text (if m.running then "Running…" else "Run")]
+              ],
+            span { class_name = if errors m.compiled > 0 then "fp-bad" else "fp-status" } [text (status m)]
+          ],
+        div
+          { class_name = "fp-panes" }
+          [
+            keyed
+              m.example
+              (textarea
+                {
+                  value = m.source
+                  placeholder = "module Main exposing (main)"
+                  on_input = Ui.Event.latest (fun s -> task { edit model s.value })
+                }),
+            div
+              { class_name = "fp-result" }
+              [div { class_name = "fp-bar" } (List.map (set_tab model m) [Output, Js, Compare, Problems]), pane m]
+          ]
+      ]
+  }
+
+report : Failure e ->{} Unit
+let report failure = Platform.stderr_line (RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let version = try load () with
+    | JsError _ -> ""
+  let first = Option.with_default { name = ""; source = "" } (List.get 0 examples)
+  let compiled = if version == "" then { debug = ""; release = ""; diagnostics = [] } else compile first.source
+  let initial =
+    {
+      example = first.name
+      source = first.source
+      profile = Debug
+      tab = Output
+      compiled = compiled
+      output = []
+      running = false
+      version = version
+    }
+  match Ui.container "flick-playground" with
+  | None -> App.fail "the page has no element `flick-playground`"
+  | Some root ->
+    let model = Ref.make initial
+    ignore (Ui.run root report model (fun m -> view model m))

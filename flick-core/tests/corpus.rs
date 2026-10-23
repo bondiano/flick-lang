@@ -136,9 +136,15 @@ fn fl_files(dir: &Path, out: &mut Vec<PathBuf>) {
 fn md_files(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir).expect("readable dir") {
         let path = entry.expect("entry").path();
+        let skipped = path.file_name().is_some_and(|n| {
+            n == "node_modules" || n == "dist" || n.to_string_lossy().starts_with('.')
+        });
+        if skipped {
+            continue;
+        }
         if path.is_dir() {
             md_files(&path, out);
-        } else if path.extension().is_some_and(|e| e == "md") {
+        } else if path.extension().is_some_and(|e| e == "md" || e == "mdx") {
             out.push(path);
         }
     }
