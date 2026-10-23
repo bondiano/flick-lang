@@ -1,0 +1,20 @@
+succeed: (true, false) ok 1
+fail: (true, false) boom 2
+sync: (true, false) ok 3
+fail_sync: (true, false) boom 4
+complete: (true, false) ok 5
+complete_with: ok 1, ok 2
+done: (true, false) ok 6
+done: (true, false) boom 7
+fail_cause: (true, false) boom 7
+fail_cause_sync: (true, false) boom 7
+into: true ok 8
+poll: none, done false
+poll: some 9, done true
+interrupt: (true, true) [true, true]
+child got go
+latch: ["open false", "release true", "released", "opened true", "through", "closed true false"]
+with_permit: at most 2
+with_permits: None
+permits: (1, false, true, 1, 2) Some "three"
+partitioned: (2, 2, None, 2, 0, 1)

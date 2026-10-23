@@ -1,0 +1,149 @@
+// Effect's `Queue` and `PubSub`: the end of a queue is `None`, a failed
+// queue fails its takers with a typed error, and subscriptions belong to a
+// `scope`.
+module App.Main exposing (main)
+
+type error Broken = Broken String
+
+unexpected : Failure e ->{} Unit
+let unexpected failure = Platform.stdout_line "unexpected failure"
+
+ms : Number -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+queues : Unit ->{; Broken} Unit
+let queues () =
+  let q : Queue.Queue {Broken} Number = Queue.bounded 4
+  let offered = Queue.offer 1 q
+  let rest = Queue.offer_all [2, 3, 4] q
+  say ("offer: " ++ show (offered, rest, Queue.size q, Queue.is_full q))
+  say ("peek: " ++ show (Queue.peek q) ++ ", poll: " ++ show (Queue.poll q))
+  say ("take_n: " ++ show (Queue.take_n 1 q) ++ ", take_between: " ++ show (Queue.take_between 1 5 q))
+  let _ = Queue.offer_all [5, 6] q
+  say ("take_all: " ++ show (Option.map NonEmpty.to_list (Queue.take_all q)))
+  let _ = Queue.offer_all [7, 8] q
+  say ("clear: " ++ show (Queue.clear q) ++ ", size " ++ show (Queue.size q))
+  // ending: takes drain what is left, then give None
+  let _ = Queue.offer 9 q
+  let ended = Queue.end q
+  say ("end: " ++ show (ended, Queue.end q) ++ " " ++ show (Queue.take q, Queue.take q, Queue.take_n 2 q, Queue.peek q))
+  Queue.await_ q
+  // failing: takers fail with the typed error once it is drained
+  let failing : Queue.Queue {Broken} Number = Queue.unbounded ()
+  let _ = Queue.offer 1 failing
+  let _ = Queue.fail (Broken "pipe") failing
+  let first = Queue.take failing
+  let second =
+    try
+      show (Queue.take failing)
+    with
+    | Broken why -> "broken " ++ why
+  say ("fail: " ++ show first ++ " then " ++ second)
+  // a producer task feeds a queue it ends; a consumer collects it
+  let fed : Queue.Queue {Broken} Number = Queue.make { capacity = Some 1; strategy = None }
+  let collected = scope s {
+    let producer = Fiber.spawn s unexpected (task {
+      let fill = task { List.each_effect (fun n -> ignore (Queue.offer n fed)) [1, 2, 3] }
+      ignore (fill |> Queue.into fed)
+    })
+    Queue.collect fed
+  }
+  say ("into/collect: " ++ show collected)
+  let broken : Queue.Queue {Broken} Number = Queue.unbounded ()
+  let _ = task { from_result (Err (Broken "producer")) } |> Queue.into broken
+  let awaited =
+    try
+      Queue.await_ broken
+      "ended"
+    with
+    | Broken why -> "await failed: " ++ why
+  say awaited
+  // strategies of a full queue
+  let slide : Queue.Queue none Number = Queue.make { capacity = Some 2; strategy = Some Queue.Sliding }
+  let drop : Queue.Queue none Number = Queue.dropping 2
+  let slide2 : Queue.Queue none Number = Queue.sliding 2
+  let _ = Queue.offer_all [1, 2, 3] slide
+  let dropped = Queue.offer_all [1, 2, 3] drop
+  let _ = Queue.offer_all [1, 2, 3] slide2
+  say ("strategies: " ++ show (Queue.clear slide, Queue.clear drop, dropped, Queue.clear slide2))
+  let chosen : Queue.Queue none Number = Queue.make { capacity = Some 1; strategy = Some Queue.Dropping }
+  let suspend : Queue.Queue none Number = Queue.make { capacity = None; strategy = Some Queue.Suspend }
+  say ("make: " ++ show (Queue.offer_all [1, 2] chosen, Queue.offer_all [1, 2] suspend))
+  // a waiting taker is woken by flush; shutdown interrupts waiters
+  let waited = scope s {
+    let w : Queue.Queue none String = Queue.unbounded ()
+    let taker = Fiber.spawn s unexpected (task { Queue.take w })
+    Effect.sleep (ms 1)
+    let _ = Queue.offer "woken" w
+    Queue.flush w
+    Fiber.join taker
+  }
+  let stopped : Queue.Queue none Number = Queue.unbounded ()
+  let _ = Queue.offer 1 stopped
+  let gone = Queue.shutdown stopped
+  let interrupted : Queue.Queue none Number = Queue.unbounded ()
+  let _ = Queue.offer 2 interrupted
+  let graceful = Queue.interrupt interrupted
+  say ("flush: " ++ show waited ++ ", shutdown " ++ show (gone, Queue.size stopped) ++ ", interrupt " ++ show (graceful, Queue.poll interrupted))
+  let fails : Queue.Queue {Broken} Number = Queue.unbounded ()
+  let exits = parallel_exits [task { from_result (Err (Broken "cause")) }]
+  List.each_effect (fun failure -> ignore (Queue.fail_cause failure fails)) (List.filter_map Exit.failure exits)
+  let cause =
+    try
+      show (Queue.take fails)
+    with
+    | Broken why -> "fail_cause: " ++ why
+  say cause
+
+hubs : Unit ->{} Unit
+let hubs () =
+  let hub : PubSub.PubSub String = PubSub.bounded { capacity = 4; replay = None }
+  let got = scope s {
+    let a : PubSub.Subscription s String = PubSub.subscribe hub
+    let b = PubSub.subscribe hub
+    let _ = PubSub.publish "x" hub
+    let _ = PubSub.publish_all ["y", "z"] hub
+    let sizes = (PubSub.size hub, PubSub.is_full hub, PubSub.is_empty hub, PubSub.remaining a)
+    let first = PubSub.take a
+    let rest = PubSub.take_all a
+    let some = PubSub.take_up_to 2 b
+    let more = PubSub.take_between 1 1 b
+    show sizes ++ " " ++ show (first, NonEmpty.to_list rest, some, more)
+  }
+  say ("pubsub: " ++ got ++ ", capacity " ++ show (PubSub.capacity hub))
+  let replayed : PubSub.PubSub Number = PubSub.unbounded { replay = Some 2 }
+  let _ = PubSub.publish_all [1, 2, 3] replayed
+  let late = scope { PubSub.take_up_to 5 (PubSub.subscribe replayed) }
+  say ("replay: " ++ show late)
+  let ending : PubSub.PubSub String = PubSub.sliding { capacity = 2; replay = None }
+  let last = scope {
+    let sub = PubSub.subscribe ending
+    let _ = PubSub.publish "hello" ending
+    let ended = PubSub.end "bye" ending
+    let refused = PubSub.publish "late" ending
+    show (ended, refused, PubSub.take sub, PubSub.take sub)
+  }
+  say ("end: " ++ last)
+  let drops : PubSub.PubSub Number = PubSub.dropping { capacity = 1; replay = None }
+  let kept = scope {
+    let sub = PubSub.subscribe drops
+    let _ = PubSub.publish_all [1, 2] drops
+    PubSub.take_up_to 5 sub
+  }
+  say ("dropping: " ++ show kept)
+  let closing : PubSub.PubSub Number = PubSub.unbounded { replay = None }
+  let before = PubSub.is_shutdown closing
+  PubSub.shutdown closing
+  PubSub.await_shutdown closing
+  say ("shutdown: " ++ show (before, PubSub.is_shutdown closing))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try
+    queues ()
+  with
+  | Broken why -> say ("unexpected " ++ why)
+  hubs ()

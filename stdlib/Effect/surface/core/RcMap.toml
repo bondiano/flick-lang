@@ -1,10 +1,12 @@
-[pending]
-RcMap = "M20"
-State = "M20"
-get = "M20"
-getOption = "M20"
-has = "M20"
-invalidate = "M20"
-keys = "M20"
-make = "M20"
-touch = "M20"
+[wrapped]
+RcMap = "RcMap.RcMap 786e643e194d23d4"
+make = "RcMap.make a1751cbe903120cf"
+get = "RcMap.get 361e3835af8b8aab"
+getOption = "RcMap.get_option 1f853b27223bed36"
+keys = "RcMap.keys 415be2871c1c1181"
+invalidate = "RcMap.invalidate 7bef59e4b2678f52"
+has = "RcMap.has c83c9f79b2b36805"
+touch = "RcMap.touch 292a9ca3a7723ca2"
+
+[excluded]
+State = "TS-only: the internal state of the data structure, never handed to a caller"

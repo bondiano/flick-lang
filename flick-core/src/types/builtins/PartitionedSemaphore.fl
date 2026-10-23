@@ -1,0 +1,62 @@
+/// Effect's `PartitionedSemaphore`: one pool of permits shared fairly by
+/// partitions, so that no key starves the others. Keys are compared by
+/// `==`.
+module PartitionedSemaphore exposing (..)
+
+/// A pool of permits whose waiters are grouped by keys of `k`.
+type PartitionedSemaphore k
+
+/// Effect's other name for a partitioned semaphore.
+type alias Partitioned k = PartitionedSemaphore k
+
+/// A partitioned semaphore with `permits` permits in all.
+make : { permits : Number } ->{} PartitionedSemaphore k
+foreign effect make from "@flick-lang/runtime/effect/PartitionedSemaphore" "make"
+  reviewed "effect@4.0.5 sha256:de2761f586fcc95a"
+
+/// The permits free now.
+available : PartitionedSemaphore k ->{} Number
+foreign effect available from "@flick-lang/runtime/effect/PartitionedSemaphore" "available"
+  reviewed "effect@4.0.5 sha256:2af0d7d6a1e1144d"
+
+/// The permits in all.
+capacity : PartitionedSemaphore k -> Number
+foreign pure capacity from "@flick-lang/runtime/effect/PartitionedSemaphore" "capacity"
+  reviewed "effect@4.0.5 sha256:a91a340b46bf0b11"
+
+/// Takes `permits` permits for the partition `key`, waiting its turn.
+take : k -> Number -> PartitionedSemaphore k ->{} Unit
+foreign effect take from "@flick-lang/runtime/effect/PartitionedSemaphore" "take"
+  arity 2
+  reviewed "effect@4.0.5 sha256:a2d6d38910bbb44d"
+
+/// Gives back `permits` permits; the permits free after.
+release : Number -> PartitionedSemaphore k ->{} Number
+foreign effect release from "@flick-lang/runtime/effect/PartitionedSemaphore" "release"
+  arity 1
+  reviewed "effect@4.0.5 sha256:e14b14af31b562ac"
+
+/// Runs `task` holding `permits` permits for the partition `key`; they are
+/// given back however it ends.
+with_permits :
+  forall c r e a k. PartitionedSemaphore k -> k -> Number -> (Eff r e a)^c ->{r; e} a
+foreign effect with_permits from "@flick-lang/runtime/effect/PartitionedSemaphore" "withPermits"
+  arity 3
+  retention call
+  reviewed "effect@4.0.5 sha256:61f317963471330a"
+
+/// `with_permits` with one permit.
+with_permit : forall c r e a k. PartitionedSemaphore k -> k -> (Eff r e a)^c ->{r; e} a
+foreign effect with_permit from "@flick-lang/runtime/effect/PartitionedSemaphore" "withPermit"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:fb6978cb8133423a"
+
+/// Runs `task` with `permits` permits if they are free now, `None` without
+/// running it otherwise.
+with_permits_if_available :
+  forall c r e a k. PartitionedSemaphore k -> Number -> (Eff r e a)^c ->{r; e} Option a
+foreign effect with_permits_if_available from "@flick-lang/runtime/effect/PartitionedSemaphore" "withPermitsIfAvailable"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:341971dddf709c66"

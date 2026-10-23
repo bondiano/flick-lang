@@ -1,7 +1,9 @@
-[pending]
-ScopedRef = "M20"
-fromAcquire = "M20"
-get = "M20"
-getUnsafe = "M20"
-make = "M20"
-set = "M20"
+[wrapped]
+ScopedRef = "ScopedRef.ScopedRef dcbe6a2f18410e33"
+fromAcquire = "ScopedRef.from_acquire 1c33b94716042fb2"
+make = "ScopedRef.make 08ddb0a145dd95ab"
+get = "ScopedRef.get d7696b1c832538c0"
+set = "ScopedRef.set 317987717da02276"
+
+[excluded]
+getUnsafe = "invariant: `unsafe*`: a plain synchronous call outside the effect, unordered with the fiber's steps"

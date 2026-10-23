@@ -65,6 +65,29 @@ const SOURCES: &[(&str, &str)] = &[
     // Effect: time
     // end of Effect: time
     // Effect: concurrency
+    (
+        "SynchronizedRef",
+        include_str!("builtins/SynchronizedRef.fl"),
+    ),
+    (
+        "SubscriptionRef",
+        include_str!("builtins/SubscriptionRef.fl"),
+    ),
+    ("Deferred", include_str!("builtins/Deferred.fl")),
+    ("Latch", include_str!("builtins/Latch.fl")),
+    ("Semaphore", include_str!("builtins/Semaphore.fl")),
+    (
+        "PartitionedSemaphore",
+        include_str!("builtins/PartitionedSemaphore.fl"),
+    ),
+    ("Queue", include_str!("builtins/Queue.fl")),
+    ("PubSub", include_str!("builtins/PubSub.fl")),
+    ("Cache", include_str!("builtins/Cache.fl")),
+    ("ScopedCache", include_str!("builtins/ScopedCache.fl")),
+    ("ScopedRef", include_str!("builtins/ScopedRef.fl")),
+    ("RcRef", include_str!("builtins/RcRef.fl")),
+    ("RcMap", include_str!("builtins/RcMap.fl")),
+    ("Pool", include_str!("builtins/Pool.fl")),
     // end of Effect: concurrency
     // Effect: transactions
     // end of Effect: transactions

@@ -1,0 +1,60 @@
+get: (3, 3, 2) missing bad
+options: (Some 42, None, (Some 3, None), true)
+refresh: (3, 3, true, false, 1)
+contents: (["ab"], [3], [("ab", 3)])
+invalidate_all: 0
+make_with: (2, 4, 1, [2])
+acquire entry a
+acquire entry b
+release entry a
+scoped cache: ("entry a", "entry b", 2, false, ["b", "c"])
+values: (["entry b", "plain"], [("b", "entry b"), ("c", "plain")], Some "plain", Some "plain")
+acquire entry b
+release entry b
+refresh: entry b true
+release entry b
+acquire with x
+with x
+release with x
+scoped cache closed
+acquire first
+scoped ref: first
+acquire second
+release first
+scoped ref: second
+make: 7
+release second
+scoped ref closed
+acquire shared
+rc ref: shared, shared
+release shared
+holders closed
+acquire shared
+again: shared
+release shared
+acquire rc a
+rc map: rc a (true, ["a"], Some "rc a", None)
+acquire rc b
+release rc b
+release rc a
+rc map: exceeded capacity, then rc b
+acquire item 1
+acquire item 2
+release item 1
+acquire item 3
+pool: used item 1, got item 1
+release item 2
+release item 3
+acquire ttl
+ttl pool: ttl
+acquire usage
+usage pool: usage
+release usage
+release ttl
+acquire version 1
+resource: version 1
+acquire version 2
+release version 1
+resource: version 2
+refresh failed: third, still version 2
+release version 2

@@ -1,0 +1,31 @@
+/// Effect's `RcRef`: a resource shared by reference count. It is acquired
+/// on the first `get`, kept while some `scope` holds it, and released when
+/// the last one closes (after an idle time) or when the `scope` owning the
+/// reference does.
+module RcRef exposing (..)
+
+/// A shared resource of `a` of region `s`, whose acquisition fails with `e`.
+type RcRef (s : Region) (e : ErrorRow) a
+
+/// A reference owned by the innermost `scope` (or the one of region `s`);
+/// `acquire` runs with the services of this call, and the resource stays
+/// for `idleTimeToLive` after its last holder (`None`: no time).
+make :
+  forall s r e a.
+  { acquire : Eff r e a; idleTimeToLive : Option Duration.Duration } ->{Scope s | r;} RcRef s e a
+foreign effect make from "@flick-lang/runtime/effect/RcRef" "flickMake"
+  reviewed "effect@4.0.5 sha256:e19931a575c79b4b"
+
+/// The resource, acquiring it if no one holds it; the innermost `scope`
+/// (or the one of region `t`) holds it until it closes.
+get : forall s t e a. RcRef s e a ->{Scope t; e} a
+foreign effect get from "@flick-lang/runtime/effect/RcRef" "get"
+  retention call
+  reviewed "effect@4.0.5 sha256:bd017d10758c36d1"
+
+/// Releases the resource once its holders are done; the next `get`
+/// acquires it again.
+invalidate : forall s e a. RcRef s e a ->{} Unit
+foreign effect invalidate from "@flick-lang/runtime/effect/RcRef" "invalidate"
+  retention call
+  reviewed "effect@4.0.5 sha256:1c1dccd0aab9e2c0"

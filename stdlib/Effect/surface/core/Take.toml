@@ -1,3 +1,3 @@
-[pending]
-Take = "M20"
-toPull = "M20"
+[excluded]
+Take = "invariant: a take ends a stream with the `Exit` of a `Cause.Done` leftover, which `toPull` turns into control flow through the error channel; typed failures carry only errors"
+toPull = "invariant: a pull ends through the error channel (`Cause.Done` with its leftover); typed failures carry only errors, and a Flick queue ends with `None`"

@@ -1,0 +1,191 @@
+// Effect's `Cache` and the resources that belong to a `scope`:
+// `ScopedCache`, `ScopedRef`, `RcRef`, `RcMap`, `Pool` and `Resource`.
+// Each resource logs when it is acquired and released.
+module App.Main exposing (main)
+
+type error Missing = Missing String
+  deriving Show
+
+type alias Key = { name : String; n : Number }
+
+/// Longer than the test runs: nothing expires during it.
+hour : Duration.Duration
+let hour = Result.with_default Duration.zero (Duration.millis 3600000)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+/// A resource named `name`, released with a log line by its scope.
+acquire : forall s. String ->{Scope s;} String
+let acquire name =
+  Resource.acquire_release (task {
+    say ("acquire " ++ name)
+    name
+  }) (fun n -> say ("release " ++ n))
+
+caches : Unit ->{; Missing} Unit
+let caches () =
+  let lookups = Ref.make 0
+  lookup : Key ->{; Missing} Number
+  let lookup key =
+    Ref.update lookups (fun n -> n + 1)
+    if key.n < 0 then from_result (Err (Missing key.name)) else String.length key.name + key.n
+  let cache : Cache.Cache Key {Missing} Number = Cache.make { lookup = lookup; capacity = 10; timeToLive = None }
+  let a = Cache.get { name = "ab"; n = 1 } cache
+  // an equal record is the same key
+  let again = Cache.get { name = "ab"; n = 1 } cache
+  let failed =
+    try
+      show (Cache.get { name = "bad"; n = -1 } cache)
+    with
+    | Missing name -> "missing " ++ name
+  say ("get: " ++ show (a, again, Ref.get lookups) ++ " " ++ failed)
+  Cache.set { name = "set"; n = 0 } 42 cache
+  let opt = Cache.get_option { name = "set"; n = 0 } cache
+  let absent = Cache.get_option { name = "zz"; n = 0 } cache
+  let success = (Cache.get_success { name = "ab"; n = 1 } cache, Cache.get_success { name = "bad"; n = -1 } cache)
+  say ("options: " ++ show (opt, absent, success, Cache.has { name = "set"; n = 0 } cache))
+  let refreshed = Cache.refresh { name = "ab"; n = 1 } cache
+  let dropped = Cache.invalidate_when { name = "set"; n = 0 } (fun v -> v > 40) cache
+  let kept = Cache.invalidate_when { name = "ab"; n = 1 } (fun v -> v > 40) cache
+  Cache.invalidate { name = "bad"; n = -1 } cache
+  say ("refresh: " ++ show (refreshed, Ref.get lookups, dropped, kept, Cache.size cache))
+  say ("contents: " ++ show (List.map (fun k -> k.name) (Cache.keys cache), Cache.values cache, List.map (fun (k, v) -> (k.name, v)) (Cache.entries cache)))
+  Cache.invalidate_all cache
+  say ("invalidate_all: " ++ show (Cache.size cache))
+  let short = Cache.make_with (fun (n : Number) -> n * 2) {
+    capacity = 1;
+    timeToLive = Some (fun exit key -> if Option.is_some (Exit.value exit) then hour else Duration.zero)
+  }
+  let first = Cache.get 1 short
+  let second = Cache.get 2 short
+  say ("make_with: " ++ show (first, second, Cache.size short, Cache.keys short))
+
+scoped : Unit ->{; Missing} Unit
+let scoped () =
+  scope s {
+    let cache : ScopedCache.ScopedCache s String none String = ScopedCache.make { lookup = fun (key : String) -> acquire ("entry " ++ key); capacity = 2; timeToLive = None }
+    let a = ScopedCache.get "a" cache
+    let b = ScopedCache.get "b" cache
+    ScopedCache.invalidate "a" cache
+    ScopedCache.set "c" "plain" cache
+    say ("scoped cache: " ++ show (a, b, ScopedCache.size cache, ScopedCache.has "a" cache, ScopedCache.keys cache))
+    say ("values: " ++ show (ScopedCache.values cache, ScopedCache.entries cache, ScopedCache.get_option "c" cache, ScopedCache.get_success "c" cache))
+    let r = ScopedCache.refresh "b" cache
+    let gone = ScopedCache.invalidate_when "c" (fun v -> v == "plain") cache
+    say ("refresh: " ++ r ++ " " ++ show gone)
+    ScopedCache.invalidate_all cache
+    let timed = ScopedCache.make_with { lookup = fun (key : String) -> acquire ("with " ++ key); capacity = 1; timeToLive = Some (fun _ _ -> Duration.infinity) }
+    say (ScopedCache.get "x" timed)
+  }
+  say "scoped cache closed"
+  scope s {
+    let ref : ScopedRef.ScopedRef s String = ScopedRef.from_acquire (task { acquire "first" })
+    say ("scoped ref: " ++ ScopedRef.get ref)
+    ScopedRef.set (task { acquire "second" }) ref
+    say ("scoped ref: " ++ ScopedRef.get ref)
+    let plain = ScopedRef.make (fun () -> 7)
+    say ("make: " ++ show (ScopedRef.get plain))
+  }
+  say "scoped ref closed"
+
+counted : Unit ->{; RcMap.ExceededCapacity} Unit
+let counted () =
+  scope s {
+    let shared : RcRef.RcRef s none String = RcRef.make { acquire = task { acquire "shared" }; idleTimeToLive = None }
+    scope {
+      let a = RcRef.get shared
+      let b = RcRef.get shared
+      say ("rc ref: " ++ a ++ ", " ++ b)
+    }
+    say "holders closed"
+    scope { say ("again: " ++ RcRef.get shared) }
+    RcRef.invalidate shared
+  }
+  let full = scope s {
+    let map : RcMap.RcMap s String none String = RcMap.make { lookup = fun (key : String) -> acquire ("rc " ++ key); idleTimeToLive = Some (fun _ -> Duration.zero); capacity = Some 1 }
+    let first = RcMap.get "a" map
+    say ("rc map: " ++ first ++ " " ++ show (RcMap.has "a" map, RcMap.keys map, RcMap.get_option "a" map, RcMap.get_option "b" map))
+    RcMap.touch "a" map
+    let refused =
+      try
+        RcMap.get "b" map
+      with
+      | RcMap.ExceededCapacity _ -> "exceeded capacity"
+    RcMap.invalidate "a" map
+    refused ++ ", then " ++ RcMap.get "b" map
+  }
+  say ("rc map: " ++ full)
+
+pools : Unit ->{} Unit
+let pools () =
+  let made = Ref.make 0
+  let item = task {
+    Ref.update made (fun n -> n + 1)
+    acquire ("item " ++ show (Ref.get made))
+  }
+  scope s {
+    let pool : Pool.Pool s none String = Pool.make { acquire = item; size = 2; concurrency = None; targetUtilization = None }
+    let used = Pool.use (fun i -> "used " ++ i) pool
+    let got = scope {
+      let i = Pool.get pool
+      Pool.reserve i pool
+      i
+    }
+    Pool.invalidate got pool
+    say ("pool: " ++ used ++ ", got " ++ got)
+  }
+  scope {
+    let pool = Pool.make_with_ttl {
+      acquire = task { acquire "ttl" };
+      min = 0;
+      max = 1;
+      concurrency = Some 2;
+      targetUtilization = Some 1;
+      timeToLive = hour;
+      timeToLiveStrategy = Some Pool.Creation
+    }
+    say ("ttl pool: " ++ Pool.use (fun i -> i) pool)
+    let usage = Pool.make_with_ttl {
+      acquire = task { acquire "usage" };
+      min = 1;
+      max = 1;
+      concurrency = None;
+      targetUtilization = None;
+      timeToLive = hour;
+      timeToLiveStrategy = Some Pool.Usage
+    }
+    say ("usage pool: " ++ Pool.use (fun i -> i) usage)
+  }
+
+resources : Unit ->{; Missing} Unit
+let resources () =
+  let version = Ref.make 0
+  scope s {
+    let res : Resource.Resource s {Missing} String = Resource.manual (task {
+      Ref.update version (fun n -> n + 1)
+      if Ref.get version == 3 then from_result (Err (Missing "third")) else acquire ("version " ++ show (Ref.get version))
+    })
+    say ("resource: " ++ Resource.get res)
+    Resource.refresh res
+    say ("resource: " ++ Resource.get res)
+    let failed =
+      try
+        Resource.refresh res
+        "refreshed"
+      with
+      | Missing why -> "refresh failed: " ++ why
+    say (failed ++ ", still " ++ Resource.get res)
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try
+    caches ()
+    scoped ()
+    counted ()
+    pools ()
+    resources ()
+  with
+  | Missing why -> say ("unexpected " ++ why)
+  | RcMap.ExceededCapacity why -> say ("unexpected " ++ why)
