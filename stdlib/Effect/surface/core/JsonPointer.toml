@@ -1,5 +1,5 @@
-[pending]
-escapeToken = "M20"
-formatUriFragment = "M20"
-parseUriFragment = "M20"
-unescapeToken = "M20"
+[wrapped]
+escapeToken = "JsonPointer.escape_token ed8141d3518f4b75"
+unescapeToken = "JsonPointer.unescape_token a065ade494c3bf3f"
+parseUriFragment = "JsonPointer.parse_uri_fragment 4f4e124fe05d0ad7"
+formatUriFragment = "JsonPointer.format_uri_fragment 848c01ba2381c6b5"

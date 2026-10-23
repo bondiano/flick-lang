@@ -1,0 +1,99 @@
+// Optics from Effect's `Optic`, JSON patches and pointers from `JsonPatch`
+// and `JsonPointer`, and `Inspectable`, `Formatter` and `Version`.
+module App.Main exposing (main)
+
+type alias Point = {
+  x : Number
+  y : Number
+} deriving Schema
+
+type alias Shape = {
+  name : String
+  corner : Point
+} deriving Schema
+
+line : String -> String -> Unit ->{} Unit
+let line label value () = Platform.stdout_line (label ++ ": " ++ value)
+
+corner : Optic.Lens Shape Point
+let corner = Optic.make_lens (fun s -> s.corner) (fun p s -> { name = s.name; corner = p })
+
+x_of : Optic.Lens Point Number
+let x_of = Optic.make_lens (fun p -> p.x) (fun x p -> { x = x; y = p.y })
+
+positive : Optic.Prism Number Number
+let positive = Optic.make_prism (fun n -> if n > 0 then Ok n else Err "not positive") (fun n -> n)
+
+even_x : Optic.Optional Point Number
+let even_x =
+  Optic.make_optional
+    (fun p -> if p.x % 2 == 0 then Ok p.x else Err "odd x")
+    (fun x p -> if x % 2 == 0 then Ok { x = x; y = p.y } else Err "odd value")
+
+shape : Shape
+let shape = { name = "box"; corner = { x = 2; y = 5 } }
+
+result : Result SchemaError Number -> String
+let result r =
+  match r with
+  | Ok n -> show n
+  | Err (SchemaError issues) -> "error: " ++ String.join ", " (List.map (fun i -> i.message) issues)
+
+json : Shape -> Result SchemaError Json
+let json s = Codec.encode_result (Codec.json (schema Shape)) s
+
+describe : JsonPatch.Operation -> String
+let describe op =
+  match op with
+  | JsonPatch.Add path value -> "add " ++ path ++ " " ++ Json.stringify value
+  | JsonPatch.Remove path -> "remove " ++ path
+  | JsonPatch.Replace path value -> "replace " ++ path ++ " " ++ Json.stringify value
+
+patches : Json -> Json ->{} Unit
+let patches before after =
+  let patch : JsonPatch.JsonPatch = JsonPatch.get before after
+  line "patch" (String.join "; " (List.map describe patch)) ()
+  match JsonPatch.apply patch before with
+  | Ok j -> line "apply" (Json.stringify j) ()
+  | Err e -> line "apply" (show e) ()
+  match before |> JsonPatch.apply [JsonPatch.Remove "/nothing/here"] with
+  | Ok j -> line "bad patch" (Json.stringify j) ()
+  | Err (JsonPatch.PatchError message) -> line "bad patch" message ()
+  let data = Json.to_unknown before
+  line "inspect" (Inspectable.to_string_unknown 0 data ++ " | " ++ Formatter.format (Inspectable.to_json data)) ()
+  line "format_json" (Formatter.format_json 0 data ++ " " ++ show (String.contains "\n" (Formatter.format_json 2 data))) ()
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let corner_x = corner |> Optic.compose_lens x_of
+  line "get" (show (shape |> Optic.get corner_x)) ()
+  line "replace" (show ((shape |> Optic.replace (Optic.lens_optional corner_x) 7).corner)) ()
+  line "modify" (show ((shape |> Optic.modify (Optic.lens_optional corner_x) (fun x -> x * 10)).corner)) ()
+  line "prism" (result (Optic.get_result (Optic.prism_optional positive) 3) ++ " " ++ result (Optic.get_result (Optic.prism_optional positive) (-1)) ++ " " ++ show (Optic.set positive 4)) ()
+  line "optional" (result (Optic.get_result even_x { x = 4; y = 0 }) ++ " " ++ result (Optic.get_result even_x { x = 3; y = 0 })) ()
+  let replaced =
+    match Optic.replace_result even_x 5 { x = 4; y = 0 } with
+    | Ok p -> show p
+    | Err (SchemaError issues) -> "error: " ++ String.join ", " (List.map (fun i -> i.message) issues)
+  line "replace_result" replaced ()
+  line "compose" (result (Optic.get_result (Optic.lens_optional corner |> Optic.compose even_x) shape)) ()
+  let doubled : Optic.Iso Number Number = Optic.make_iso (fun n -> n * 2) (fun n -> n / 2)
+  line "iso" (show (Optic.get (Optic.iso_lens doubled) 3) ++ " " ++ show (Optic.set (Optic.iso_prism doubled) 8)) ()
+  line "id" (show (Optic.get (Optic.iso_lens (Optic.id ())) "same")) ()
+  let some_prism = Optic.some ()
+  line "some" (result (Optic.get_result (Optic.prism_optional some_prism) (Some 1)) ++ " " ++ show (Optic.set some_prism 2)) ()
+  let none_prism : Optic.Prism (Option Number) Unit = Optic.none ()
+  line "none" (show (Optic.set none_prism ())) ()
+  let ok_prism : Optic.Prism (Result String Number) Number = Optic.success ()
+  let err_prism : Optic.Prism (Result String Number) String = Optic.failure ()
+  line "result" (show (Optic.set ok_prism 1) ++ " " ++ show (Optic.set err_prism "e") ++ " " ++ show (Optic.get_result (Optic.prism_optional ok_prism) (Ok 5) == Ok 5)) ()
+  let small = Optic.from_check (fun n -> n < 10) "too big"
+  line "from_check" (result (Optic.get_result (Optic.prism_optional small) 3) ++ " " ++ result (Optic.get_result (Optic.prism_optional small) 30)) ()
+  let all : Optic.Traversal (List Number) Number = Optic.traversal (Optic.lens_optional (Optic.iso_lens (Optic.id ())))
+  line "traversal" (show (Optic.get_all all [1, 2]) ++ " " ++ show (Optic.modify_all all (fun n -> n + 1) [1, 2])) ()
+  match (json shape, json { name = "big box"; corner = { x = 2; y = 6 } }) with
+  | (Ok before, Ok after) -> patches before after
+  | _ -> line "encode" "failed" ()
+  line "pointer" (JsonPointer.escape_token "a/b~c" ++ " " ++ JsonPointer.unescape_token "a~1b~0c" ++ " " ++ JsonPointer.format_uri_fragment ["a b", "c"]) ()
+  line "fragment" (show (JsonPointer.parse_uri_fragment "#/a%20b/c") ++ " " ++ show (JsonPointer.parse_uri_fragment "nope")) ()
+  line "version" (Version.current ()) ()

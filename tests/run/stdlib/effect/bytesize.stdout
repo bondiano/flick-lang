@@ -1,0 +1,15 @@
+bytes: 512 B - -
+decimal: 1.46 KiB 1.91 MiB 953.67 MiB 931.32 GiB
+large decimal: 909.49 TiB 0 B 0 B 0 B 0 B 0 B
+binary: 1 KiB 1 MiB 1 GiB 1 TiB
+large binary: 1 PiB 0 B 0 B 0 B
+from_string: 1.46 KiB 2 MiB - -
+convert: 1024n Some 1000000 1.024 0.95367431640625
+zero: true false
+compare: true true false true
+equal: true false LT true
+bounds: true 1 KiB 1 KiB 976.56 KiB
+arith: 2 KiB 975.56 KiB -
+scale: 3 KiB - 341 B -
+format: 976.56 KiB | 1 MB | 1.024 kB | 1024.000 B
+reduce: 978.56 KiB 976.56 KiB 1 KiB

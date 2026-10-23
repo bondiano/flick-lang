@@ -1,0 +1,89 @@
+/// Effect's `Order`: a total order as a Flick function, `compare` for the
+/// types with an `Ord` instance. The combinators build orders from others.
+module Order exposing (..)
+
+/// An order: `LT` when `self` comes before `that`.
+type alias Order a = a -> a -> Ordering
+
+/// The order `compare` gives.
+make : (a -> a -> Ordering) -> Order a
+let make compare = compare
+
+/// The reverse order.
+flip : Order a -> Order a
+let flip order = fun self that -> order that self
+
+/// By `order`, then by `next` among the equal ones.
+combine : Order a -> Order a -> Order a
+let combine next order =
+  fun self that ->
+    match order self that with
+    | EQ -> next self that
+    | o -> o
+
+/// Every value equal to every other.
+always_equal : Unit -> Order a
+let always_equal () = fun _ _ -> EQ
+
+/// By each order of the list in turn.
+combine_all : List (Order a) -> Order a
+let combine_all orders =
+  fun self that -> List.fold_left (fun acc order -> if acc == EQ then order self that else acc) EQ orders
+
+/// Orders `b` by the `a` that `f` gives.
+map_input : (b -> a) -> Order a -> Order b
+let map_input f order = fun self that -> order (f self) (f that)
+
+/// Pairs by their first part, then their second.
+tuple : Order a -> Order b -> Order (a, b)
+let tuple first second =
+  fun self that ->
+    let (a1, b1) = self
+    let (a2, b2) = that
+    match first a1 a2 with
+    | EQ -> second b1 b2
+    | o -> o
+
+/// Lists element by element; a prefix comes first.
+list : Order a -> Order (List a)
+let list order =
+  fun self that ->
+    let first = List.fold_left (fun acc (x, y) -> if acc == EQ then order x y else acc) EQ (List.zip self that)
+    if first == EQ then compare (List.length self) (List.length that) else first
+
+/// `self < that` by the order: `x |> Order.is_less_than compare 3`.
+is_less_than : Order a -> a -> a -> Bool
+let is_less_than order that self = order self that == LT
+
+/// `self > that` by the order.
+is_greater_than : Order a -> a -> a -> Bool
+let is_greater_than order that self = order self that == GT
+
+/// `self <= that` by the order.
+is_less_than_or_equal_to : Order a -> a -> a -> Bool
+let is_less_than_or_equal_to order that self = order self that != GT
+
+/// `self >= that` by the order.
+is_greater_than_or_equal_to : Order a -> a -> a -> Bool
+let is_greater_than_or_equal_to order that self = order self that != LT
+
+/// The lesser of the two; `self` on a tie.
+min : Order a -> a -> a -> a
+let min order that self = if order self that == GT then that else self
+
+/// The greater of the two; `self` on a tie.
+max : Order a -> a -> a -> a
+let max order that self = if order self that == LT then that else self
+
+/// `self` kept within `minimum` and `maximum`.
+clamp : Order a -> { minimum : a; maximum : a } -> a -> a
+let clamp order bounds self = max order bounds.minimum (min order bounds.maximum self)
+
+/// Whether `self` lies within `minimum` and `maximum`, both included.
+is_between : Order a -> { minimum : a; maximum : a } -> a -> Bool
+let is_between order bounds self =
+  order self bounds.minimum != LT && order self bounds.maximum != GT
+
+/// Combines orders with `combine`, starting from `always_equal`.
+make_reducer : Unit -> Reducer.Reducer (Order a)
+let make_reducer () = Reducer.make (fun first next -> combine next first) (always_equal ())

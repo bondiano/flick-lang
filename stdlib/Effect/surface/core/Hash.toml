@@ -1,13 +1,17 @@
-[pending]
-Hash = "M20"
-array = "M20"
-combine = "M20"
-hash = "M20"
-isHash = "M20"
-number = "M20"
-optimize = "M20"
-random = "M20"
-string = "M20"
-structure = "M20"
-structureKeys = "M20"
-symbol = "M20"
+[wrapped]
+combine = "Hash.combine cf78c54becf09bc0"
+optimize = "Hash.optimize 469fa27ccc5de639"
+
+[language]
+Hash = "class `Hash`"
+hash = "class `Hash`: `hash`"
+number = "class `Hash`: `hash` on `Number`"
+string = "class `Hash`: `hash` on `String`"
+array = "class `Hash`: `hash` on `List a`"
+structure = "a record's `Hash` instance"
+structureKeys = "a record's `Hash` instance; `Hash.combine` of the hashes of chosen fields"
+
+[excluded]
+symbol = "TS-only: the method key of the `Hash` protocol of JS objects; Flick values get `Hash` instances"
+isHash = "TS-only: a type guard; Flick values are typed statically"
+random = "invariant: a hash of the object's identity, which Flick values do not have"

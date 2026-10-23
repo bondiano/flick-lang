@@ -1,7 +1,7 @@
-[pending]
-Class = "M20"
-Error = "M20"
-TaggedClass = "M20"
-TaggedEnum = "M20"
-TaggedError = "M20"
-taggedEnum = "M20"
+[language]
+Class = "records: a record value compares structurally (`Eq`, `Hash` from its fields)"
+TaggedClass = "ADTs: a constructor of a variant type"
+TaggedEnum = "ADTs: a variant type"
+taggedEnum = "ADTs: a variant type's constructors, and `match`"
+Error = "`type error`"
+TaggedError = "`type error`"

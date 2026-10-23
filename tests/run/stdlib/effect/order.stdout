@@ -1,0 +1,28 @@
+sorted: cy,al,bo
+flipped: bo,al,cy
+combine_all: cy,al,bo
+always_equal: bo,al,cy
+make_reducer: cy,al,bo
+tuple: GT
+list: LT GT
+is_less_than: true false
+or_equal: true false
+min/max: 2 5
+clamp: 10 false
+reverse: GT EQ
+ordering reducer: GT
+equivalence: true false
+combine: true false
+combine_all: false
+tuple/list: true false
+make_reducer: false
+combiner: abc y
+min/max: 1 3
+last/constant: y k
+intercalate: a-b
+bigint: 9n 3n
+reducer: >ab ba> > xy
+to_combiner: xy
+numbers: 6 6 7 2
+bigints: 3n 10n abc
+hash: true false true

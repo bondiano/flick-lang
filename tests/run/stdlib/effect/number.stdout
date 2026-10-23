@@ -1,0 +1,27 @@
+arith: 12 7 30 2.5 -
+remainder: 1 0 2 0
+all: 6 24 0
+compare: true true false true
+bounds: true 5 2 3
+sign: LT EQ GT
+misc: 32 3.14 1000 -
+bigint arith: 12n 7n 30n 2n 0n
+bigint div: Ok 3n Err ArithmeticError "division by zero" 4n
+bigint gcd: 6n 12n 4n -
+bigint all: 3n 6n 1n 2n
+bigint compare: true true false true
+bigint bounds: true 5n LT
+bigint convert: 5 - 3n - 31n -
+decimal: 1.5 1.5 error: scale 0.5 is not a safe integer
+decimal all: 1.75 0.375 6 -
+decimal remainder: 0.3 0.25 1.5
+decimal compare: false true true false
+decimal bounds: true 1.5
+decimal sign: LT 2.5 1.5e+3
+decimal tests: true true false true
+round: 2.34 2.34 2.35 error: rounding is needed, and the mode is Exact 2.345
+round modes: 3 2.34 2.35
+cut: 2.3 2.4 -2.4
+divide_to_scale: 3 3
+decimal ops: 0.5 1.25 0.375 1.25 1.75
+redacted: <redacted> pw true

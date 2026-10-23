@@ -1,6 +1,6 @@
 // Strings, numbers, BigInt and the process. Checked integer operations
 // return a `Result`: their failure is data, not a thrown exception.
-import type { Option, Result } from "effect";
+import { BigInt as BI, type Option, type Result } from "effect";
 
 import { type Tagged, err, none, ok, some } from "../data.ts";
 import { args, env, writeStderr, writeStdout } from "../host.ts";
@@ -96,7 +96,11 @@ export const bigintParse = (s: string): Option.Option<bigint> => {
 
 export const bigintAbs = (n: bigint): bigint => (n < 0n ? -n : n);
 
-export const bigintDivide = (a: bigint, b: bigint): Result.Result<bigint, ArithmeticError> =>
-  b === 0n ? arithmetic("division by zero") : ok(a / b);
+/** `BigInt.divide`: Effect's `BigInt.divide`, with the error of a zero divisor. */
+export const bigintDivide = (a: bigint, b: bigint): Result.Result<bigint, ArithmeticError> => {
+  const q = BI.divide(a, b);
+  return q._tag === "Some" ? ok(q.value) : arithmetic("division by zero");
+};
+/** `BigInt.remainder`: Effect's `BigInt.remainder`, checked for a zero divisor. */
 export const bigintRemainder = (a: bigint, b: bigint): Result.Result<bigint, ArithmeticError> =>
-  b === 0n ? arithmetic("division by zero") : ok(a % b);
+  b === 0n ? arithmetic("division by zero") : ok(BI.remainder(a, b));

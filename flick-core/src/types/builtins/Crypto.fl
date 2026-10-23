@@ -1,0 +1,144 @@
+/// Cryptographic randomness and digests as a service, over Effect's
+/// `Crypto`; `Crypto.system` provides it from the platform's Web Crypto.
+/// Bytes are lists of numbers from 0 to 255.
+module Crypto exposing
+  (
+    CryptoError(..),
+    DigestAlgorithm(..),
+    Crypto,
+    random_bytes,
+    digest,
+    random,
+    random_boolean,
+    random_int,
+    random_between,
+    random_int_between,
+    random_shuffle,
+    random_uuid_v4,
+    random_uuid_v7,
+    random_ulid,
+    system
+  )
+
+/// What the platform refused: a bad size or a failed digest.
+type error CryptoError = CryptoError String
+  deriving Eq, Show
+
+/// The hash functions of `digest`.
+type DigestAlgorithm = Sha1 | Sha256 | Sha384 | Sha512
+
+/// Cryptographically strong randomness and digests.
+service Crypto =
+  random_bytes : Number ->{; CryptoError} List Number
+  digest : DigestAlgorithm -> List Number ->{; CryptoError} List Number
+  random : Unit ->{} Number
+  random_boolean : Unit ->{} Bool
+  random_int : Unit ->{} Number
+  random_between : Number -> Number ->{} Number
+  random_int_between : Number -> Number ->{} Number
+  random_shuffle : forall a. List a ->{} List a
+  random_uuid_v4 : Unit ->{; CryptoError} String
+  random_uuid_v7 : Unit ->{; CryptoError} String
+  random_ulid : Unit ->{; CryptoError} String
+
+/// `size` random bytes; the size must be a non-negative safe integer.
+random_bytes : Number ->{Crypto; CryptoError} List Number
+let random_bytes size = Crypto.random_bytes size
+
+/// The digest of the bytes by the algorithm.
+digest : DigestAlgorithm -> List Number ->{Crypto; CryptoError} List Number
+let digest algorithm data = Crypto.digest algorithm data
+
+/// A random number from 0 up to 1.
+random : Unit ->{Crypto;} Number
+let random () = Crypto.random ()
+
+/// A random `Bool`.
+random_boolean : Unit ->{Crypto;} Bool
+let random_boolean () = Crypto.random_boolean ()
+
+/// A random safe integer.
+random_int : Unit ->{Crypto;} Number
+let random_int () = Crypto.random_int ()
+
+/// A random number from `min` up to `max`.
+random_between : Number -> Number ->{Crypto;} Number
+let random_between min max = Crypto.random_between min max
+
+/// A random integer from `min` to `max`, both included.
+random_int_between : Number -> Number ->{Crypto;} Number
+let random_int_between min max = Crypto.random_int_between min max
+
+/// The list in a random order.
+random_shuffle : List a ->{Crypto;} List a
+let random_shuffle xs = Crypto.random_shuffle xs
+
+/// A random version 4 UUID, in lower-case hex with dashes.
+random_uuid_v4 : Unit ->{Crypto; CryptoError} String
+let random_uuid_v4 () = Crypto.random_uuid_v4 ()
+
+/// A version 7 UUID: the current time, then random bits.
+random_uuid_v7 : Unit ->{Crypto; CryptoError} String
+let random_uuid_v7 () = Crypto.random_uuid_v7 ()
+
+/// A ULID: the current time, then random bits, in Crockford's base 32.
+random_ulid : Unit ->{Crypto; CryptoError} String
+let random_ulid () = Crypto.random_ulid ()
+
+system_random_bytes : Number ->{; CryptoError} List Number
+foreign effect system_random_bytes from "@flick-lang/runtime/effect/Crypto" "flickRandomBytes"
+
+system_digest : DigestAlgorithm -> List Number ->{; CryptoError} List Number
+foreign effect system_digest from "@flick-lang/runtime/effect/Crypto" "flickDigest"
+
+system_random : Unit ->{} Number
+foreign effect system_random from "@flick-lang/runtime/effect/Crypto" "flickRandom"
+  arity 0
+
+system_random_boolean : Unit ->{} Bool
+foreign effect system_random_boolean from "@flick-lang/runtime/effect/Crypto" "flickRandomBoolean"
+  arity 0
+
+system_random_int : Unit ->{} Number
+foreign effect system_random_int from "@flick-lang/runtime/effect/Crypto" "flickRandomInt"
+  arity 0
+
+system_random_between : Number -> Number ->{} Number
+foreign effect system_random_between from "@flick-lang/runtime/effect/Crypto" "flickRandomBetween"
+
+system_random_int_between : Number -> Number ->{} Number
+foreign effect system_random_int_between from "@flick-lang/runtime/effect/Crypto" "flickRandomIntBetween"
+
+system_random_shuffle : List a ->{} List a
+foreign effect system_random_shuffle from "@flick-lang/runtime/effect/Crypto" "flickRandomShuffle"
+
+system_random_uuid_v4 : Unit ->{; CryptoError} String
+foreign effect system_random_uuid_v4 from "@flick-lang/runtime/effect/Crypto" "flickRandomUuidV4"
+  arity 0
+
+system_random_uuid_v7 : Unit ->{; CryptoError} String
+foreign effect system_random_uuid_v7 from "@flick-lang/runtime/effect/Crypto" "flickRandomUuidV7"
+  arity 0
+
+system_random_ulid : Unit ->{; CryptoError} String
+foreign effect system_random_ulid from "@flick-lang/runtime/effect/Crypto" "flickRandomUlid"
+  arity 0
+
+/// Effect's `Crypto` over the platform's Web Crypto (`globalThis.crypto`).
+system : Layer none none {Crypto}
+let system =
+  Layer.succeed
+    Crypto
+    {
+      random_bytes = system_random_bytes;
+      digest = system_digest;
+      random = system_random;
+      random_boolean = system_random_boolean;
+      random_int = system_random_int;
+      random_between = system_random_between;
+      random_int_between = system_random_int_between;
+      random_shuffle = system_random_shuffle;
+      random_uuid_v4 = system_random_uuid_v4;
+      random_uuid_v7 = system_random_uuid_v7;
+      random_ulid = system_random_ulid
+    }

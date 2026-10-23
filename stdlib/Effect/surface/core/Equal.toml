@@ -1,8 +1,10 @@
-[pending]
-Equal = "M20"
-asEquivalence = "M20"
-byReference = "M20"
-byReferenceUnsafe = "M20"
-equals = "M20"
-isEqual = "M20"
-symbol = "M20"
+[language]
+Equal = "class `Eq`"
+equals = "`==`, canonical structural equality"
+asEquivalence = "class `Eq`: `eq` is the equivalence"
+
+[excluded]
+symbol = "TS-only: the method key of the `Equal` protocol of JS objects; Flick values get `Eq` instances"
+isEqual = "TS-only: a type guard; Flick values are typed statically"
+byReference = "invariant: makes equality observe object identity, which Flick values do not have"
+byReferenceUnsafe = "invariant: `unsafe*`; mutates the object so that equality observes its identity"

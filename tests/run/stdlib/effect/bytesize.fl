@@ -1,0 +1,37 @@
+// Sizes in bytes from Effect's `ByteSize`.
+module App.Main exposing (main)
+
+line : String -> String -> Unit ->{} Unit
+let line label value () = Platform.stdout_line (label ++ ": " ++ value)
+
+size : Option ByteSize.ByteSize -> String
+let size o =
+  match o with
+  | Some s -> show s
+  | None -> "-"
+
+or_zero : Option ByteSize.ByteSize -> ByteSize.ByteSize
+let or_zero o = Option.with_default ByteSize.zero o
+
+in_unit : ByteSize.ByteUnit -> ByteSize.FormatOptions
+let in_unit unit = { precision = Some 3; trailingZeros = Some true; binary = false; unit = Some unit }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  line "bytes" (size (ByteSize.bytes 512) ++ " " ++ size (ByteSize.bytes (-1)) ++ " " ++ size (ByteSize.bytes 1.5)) ()
+  line "decimal" (size (ByteSize.kilobytes 1.5) ++ " " ++ size (ByteSize.megabytes 2) ++ " " ++ size (ByteSize.gigabytes 1) ++ " " ++ size (ByteSize.terabytes 1)) ()
+  line "large decimal" (size (ByteSize.petabytes 1) ++ " " ++ size (ByteSize.exabytes 0) ++ " " ++ size (ByteSize.zettabytes 0) ++ " " ++ size (ByteSize.yottabytes 0) ++ " " ++ size (ByteSize.ronnabytes 0) ++ " " ++ size (ByteSize.quettabytes 0)) ()
+  line "binary" (size (ByteSize.kibibytes 1) ++ " " ++ size (ByteSize.mebibytes 1) ++ " " ++ size (ByteSize.gibibytes 1) ++ " " ++ size (ByteSize.tebibytes 1)) ()
+  line "large binary" (size (ByteSize.pebibytes 1) ++ " " ++ size (ByteSize.exbibytes 0) ++ " " ++ size (ByteSize.zebibytes 0) ++ " " ++ size (ByteSize.yobibytes 0)) ()
+  line "from_string" (size (ByteSize.from_string "1.5 kB") ++ " " ++ size (ByteSize.from_string "2 mebibytes") ++ " " ++ size (ByteSize.from_string "1.5 B") ++ " " ++ size (ByteSize.from_string "lots")) ()
+  let k = or_zero (ByteSize.kibibytes 1)
+  let m = or_zero (ByteSize.megabytes 1)
+  line "convert" (show (ByteSize.to_bigint k) ++ " " ++ show (ByteSize.to_number m) ++ " " ++ show (ByteSize.to_unit ByteSize.KB k) ++ " " ++ show (ByteSize.to_unit ByteSize.MiB m)) ()
+  line "zero" (show (ByteSize.is_zero ByteSize.zero) ++ " " ++ show (ByteSize.is_zero k)) ()
+  line "compare" (show (k |> ByteSize.is_less_than m) ++ " " ++ show (k |> ByteSize.is_less_than_or_equal_to k) ++ " " ++ show (k |> ByteSize.is_greater_than m) ++ " " ++ show (m |> ByteSize.is_greater_than_or_equal_to k)) ()
+  line "equal" (show (k |> ByteSize.equals k) ++ " " ++ show (k == m) ++ " " ++ show (compare k m) ++ " " ++ show (hash k == hash k)) ()
+  line "bounds" (show (ByteSize.between { minimum = k; maximum = m } k) ++ " " ++ show (ByteSize.clamp { minimum = k; maximum = m } ByteSize.zero) ++ " " ++ show (ByteSize.min k m) ++ " " ++ show (ByteSize.max k m)) ()
+  line "arith" (show (k |> ByteSize.sum k) ++ " " ++ size (m |> ByteSize.subtract k) ++ " " ++ size (k |> ByteSize.subtract m)) ()
+  line "scale" (size (k |> ByteSize.times 3) ++ " " ++ size (k |> ByteSize.times (-1)) ++ " " ++ size (k |> ByteSize.divide 3) ++ " " ++ size (k |> ByteSize.divide 0)) ()
+  line "format" (ByteSize.format ByteSize.default_format m ++ " | " ++ ByteSize.format { precision = Some 1; trailingZeros = None; binary = false; unit = None } m ++ " | " ++ ByteSize.format (in_unit ByteSize.KB) k ++ " | " ++ ByteSize.format (in_unit ByteSize.B) k) ()
+  line "reduce" (show (Reducer.combine_all ByteSize.reducer_sum [k, k, m]) ++ " " ++ show (Combiner.combine ByteSize.combiner_max k m) ++ " " ++ show (Combiner.combine ByteSize.combiner_min k m)) ()

@@ -1,2 +1,2 @@
-[pending]
-isSymbol = "M20"
+[excluded]
+isSymbol = "TS-only: a type guard; Flick values are typed statically"

@@ -1,5 +1,7 @@
-[pending]
-Ordering = "M20"
-Reducer = "M20"
-match = "M20"
-reverse = "M20"
+[wrapped]
+Ordering = "Prelude.Ordering bf50ab18bf00b9ff"
+reverse = "Ordering.reverse 96db97c1928cf26a"
+Reducer = "Ordering.reducer e14a7a1fdf7583dc"
+
+[language]
+match = "`match` on `LT`, `EQ` and `GT`"

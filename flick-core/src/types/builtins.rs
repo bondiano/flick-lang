@@ -57,6 +57,21 @@ const SOURCES: &[(&str, &str)] = &[
     ("Database", include_str!("builtins/Database.fl")),
     ("Test", include_str!("builtins/Test.fl")),
     // Effect: values and classes
+    ("RegExp", include_str!("builtins/RegExp.fl")),
+    ("Combiner", include_str!("builtins/Combiner.fl")),
+    ("Reducer", include_str!("builtins/Reducer.fl")),
+    ("Ordering", include_str!("builtins/Ordering.fl")),
+    ("Order", include_str!("builtins/Order.fl")),
+    ("Equivalence", include_str!("builtins/Equivalence.fl")),
+    ("Hash", include_str!("builtins/Hash.fl")),
+    ("Optic", include_str!("builtins/Optic.fl")),
+    ("JsonPointer", include_str!("builtins/JsonPointer.fl")),
+    ("JsonPatch", include_str!("builtins/JsonPatch.fl")),
+    ("Inspectable", include_str!("builtins/Inspectable.fl")),
+    ("Formatter", include_str!("builtins/Formatter.fl")),
+    ("Version", include_str!("builtins/Version.fl")),
+    ("ByteSize", include_str!("builtins/ByteSize.fl")),
+    ("Crypto", include_str!("builtins/Crypto.fl")),
     // end of Effect: values and classes
     // Effect: lists and records
     // end of Effect: lists and records

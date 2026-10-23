@@ -1,7 +1,11 @@
-[pending]
-BaseProto = "M20"
-Class = "M20"
-Inspectable = "M20"
-NodeInspectSymbol = "M20"
-toJson = "M20"
-toStringUnknown = "M20"
+[wrapped]
+toJson = "Inspectable.to_json ce435a1e920b496d"
+toStringUnknown = "Inspectable.to_string_unknown ea5d81bca700957a"
+
+[language]
+Inspectable = "class `Show`: a value's debugging text"
+
+[excluded]
+NodeInspectSymbol = "TS-only: the method key of Node's `util.inspect` protocol on JS objects"
+BaseProto = "TS-only: a JS prototype carrying the `Inspectable` methods"
+Class = "TS-only: a JS base class carrying the `Inspectable` methods"
