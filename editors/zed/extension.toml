@@ -1,0 +1,14 @@
+id = "flick"
+name = "Flick"
+version = "0.1.0"
+schema_version = 1
+authors = ["bondiano"]
+description = "Flick language support"
+repository = "https://github.com/bondiano/flick-lang"
+
+# Zed clones the grammar at `rev`: point it at a commit that contains
+# editors/tree-sitter-flick, or at `file:///…/flick-lang` while developing.
+[grammars.flick]
+repository = "https://github.com/bondiano/flick-lang"
+rev = "HEAD"
+path = "editors/tree-sitter-flick"

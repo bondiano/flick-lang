@@ -1,0 +1,58 @@
+==================
+Comments
+==================
+
+/// doc
+//// not doc
+// line
+/* outer /* inner */ still comment */
+
+---
+
+(source_file
+  (doc_comment)
+  (line_comment)
+  (line_comment)
+  (block_comment))
+
+==================
+Strings
+==================
+
+let s = [r"C:\temp", r#"say "hi""#, "a\"b", """
+  x "" y
+  """]
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (operator)
+  (brackets
+    (raw_string)
+    (operator)
+    (raw_string)
+    (operator)
+    (string)
+    (operator)
+    (multiline_string)))
+
+==================
+Keyword as member
+==================
+
+let rec go = HashSet.with 0x1Fn 1.5e-3 true
+
+---
+
+(source_file
+  (keyword)
+  (keyword)
+  (identifier)
+  (operator)
+  (constructor)
+  (member)
+  (number)
+  (number)
+  (boolean))

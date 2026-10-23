@@ -1,0 +1,18 @@
+{
+  "grammars": [
+    {
+      "name": "flick",
+      "camelcase": "Flick",
+      "scope": "source.flick",
+      "path": ".",
+      "file-types": ["fl"],
+      "highlights": "../zed/languages/flick/highlights.scm"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Flick grammar for tree-sitter",
+    "links": { "repository": "https://github.com/bondiano/flick-lang" }
+  }
+}

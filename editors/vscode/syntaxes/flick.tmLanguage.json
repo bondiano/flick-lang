@@ -1,0 +1,112 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Flick",
+  "scopeName": "source.flick",
+  "fileTypes": ["fl"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#definitions" },
+    { "include": "#keywords" },
+    { "include": "#names" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.documentation.flick", "match": "///(?!/).*$" },
+        { "name": "comment.line.double-slash.flick", "match": "//.*$" },
+        { "include": "#block-comment" }
+      ]
+    },
+    "block-comment": {
+      "name": "comment.block.flick",
+      "begin": "/\\*",
+      "end": "\\*/",
+      "patterns": [{ "include": "#block-comment" }]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.triple.flick",
+          "begin": "\"\"\"",
+          "end": "\"\"\"",
+          "patterns": [{ "include": "#escapes" }]
+        },
+        {
+          "name": "string.quoted.other.raw.flick",
+          "begin": "\\br(#*)\"",
+          "end": "\"\\1"
+        },
+        {
+          "name": "string.quoted.double.flick",
+          "begin": "\"",
+          "end": "\"|$",
+          "patterns": [{ "include": "#escapes" }]
+        }
+      ]
+    },
+    "escapes": {
+      "patterns": [
+        { "name": "constant.character.escape.flick", "match": "\\\\(?:[ntr\\\\\"0]|u\\{[0-9a-fA-F]{1,6}\\})" },
+        { "name": "invalid.illegal.escape.flick", "match": "\\\\." }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.flick",
+      "match": "\\b(?:0[xX][0-9a-fA-F_]+|0[oO][0-7_]+|0[bB][01_]+|[0-9][0-9_]*(?:\\.[0-9][0-9_]*)?(?:[eE][+-]?[0-9_]+)?)n?\\b"
+    },
+    "definitions": {
+      "patterns": [
+        {
+          "match": "(?<![.\\w])(let)\\s+(?:(rec)\\s+)?([a-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.flick" },
+            "2": { "name": "keyword.other.flick" },
+            "3": { "name": "entity.name.function.flick" }
+          }
+        },
+        {
+          "match": "^([a-z_][A-Za-z0-9_]*)\\s*(:)(?!:)",
+          "captures": {
+            "1": { "name": "entity.name.function.flick" },
+            "2": { "name": "keyword.operator.flick" }
+          }
+        },
+        {
+          "match": "(?<![.\\w])(foreign)\\s+(pure|sync|async|effect)\\s+([a-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.flick" },
+            "2": { "name": "storage.modifier.flick" },
+            "3": { "name": "entity.name.function.flick" }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        { "name": "constant.language.boolean.flick", "match": "(?<![.\\w])(?:true|false)\\b" },
+        { "name": "keyword.control.flick", "match": "(?<![.\\w])(?:match|with|try|if|then|else|when|await|in|do)\\b" },
+        { "name": "keyword.operator.word.flick", "match": "(?<![.\\w])not\\b" },
+        {
+          "name": "keyword.other.flick",
+          "match": "(?<![.\\w])(?:module|exposing|import|as|let|rec|fun|task|scope|provide|ignore|type|opaque|refined|where|kind|error|service|class|instance|deriving|foreign|from|forall|none|schema|codec|sql|ui|cli)\\b"
+        }
+      ]
+    },
+    "names": {
+      "patterns": [
+        { "name": "entity.name.type.flick", "match": "\\b[A-Z][A-Za-z0-9_]*\\b" },
+        { "name": "variable.other.member.flick", "match": "(?<=\\.)[a-z_][A-Za-z0-9_]*\\b" },
+        { "name": "variable.other.flick", "match": "\\b[a-z_][A-Za-z0-9_]*\\b" }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        { "name": "punctuation.separator.flick", "match": "[,;]" },
+        { "name": "keyword.operator.flick", "match": "\\.\\.|->|=>|==|\\|>|\\|\\||&&|!=|<=|>=|\\+\\+|\\*\\*|[:.=|<>+\\-*/%^]" }
+      ]
+    }
+  }
+}

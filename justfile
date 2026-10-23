@@ -36,3 +36,7 @@ wasm:
 
 # Everything CI runs
 check: lint test
+
+# Regenerate the tree-sitter grammar Zed uses and run its corpus tests
+tree-sitter:
+    cd editors/tree-sitter-flick && tree-sitter generate && tree-sitter test

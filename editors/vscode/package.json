@@ -1,0 +1,36 @@
+{
+  "name": "flick",
+  "displayName": "Flick",
+  "description": "Flick language support",
+  "version": "0.1.0",
+  "publisher": "bondiano",
+  "license": "MIT",
+  "private": true,
+  "repository": { "type": "git", "url": "https://github.com/bondiano/flick-lang" },
+  "engines": { "vscode": "^1.80.0" },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "flick",
+        "aliases": ["Flick", "flick"],
+        "extensions": [".fl"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "flick",
+        "scopeName": "source.flick",
+        "path": "./syntaxes/flick.tmLanguage.json"
+      }
+    ],
+    "configurationDefaults": {
+      "[flick]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.detectIndentation": false
+      }
+    }
+  }
+}
