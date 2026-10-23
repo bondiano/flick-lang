@@ -1,18 +1,24 @@
+[wrapped]
+Boolean = "Prelude.Bool 056208dd1facaaef"
+and = "Bool.and dcb09663081957a3"
+eqv = "Bool.eqv d9bef331f739b066"
+every = "Bool.every e2e8cc5e13bcc6ca"
+implies = "Bool.implies 4339c8290ee01c94"
+match = "Bool.match_ 4b014132f01259fa"
+nand = "Bool.nand f9548161f8e51ffa"
+nor = "Bool.nor 9ebd3bb0df9297cc"
+not = "Bool.not_ 92ca3f39b61d9d06"
+or = "Bool.or f6769cc0c2d7691e"
+some = "Bool.some 8d208581d86b345c"
+xor = "Bool.xor 283639866f91d605"
+
+[language]
+Equivalence = "the class `Eq`: the instance `Eq Bool`"
+Order = "the class `Ord`: the instance `Ord Bool`, `false` first"
+
+[excluded]
+isBoolean = "TS-only: a type guard over `unknown`; Flick values are typed statically"
+
 [pending]
-Boolean = "M20"
-Equivalence = "M20"
-Order = "M20"
 ReducerAnd = "M20"
 ReducerOr = "M20"
-and = "M20"
-eqv = "M20"
-every = "M20"
-implies = "M20"
-isBoolean = "M20"
-match = "M20"
-nand = "M20"
-nor = "M20"
-not = "M20"
-or = "M20"
-some = "M20"
-xor = "M20"

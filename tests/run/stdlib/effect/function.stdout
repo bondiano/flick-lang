@@ -1,0 +1,23 @@
+not: (false, true)
+and: ([true, false, false, false], [false, true, true, true])
+or: ([true, true, true, false], [false, false, false, true], [false, true, true, false])
+eqv: ([true, false, false, true], [true, false, true, true])
+every: (false, true, true, false)
+match: yes no
+predicate: ([false, true, false, true], [false, false, true, false], [true, false, true, true])
+predicate2: ([true, false, false, true], [false, true, true, false], [true, true, true, false])
+predicate3: ([true, true, false, true], [false, true, false, false])
+predicate4: ([false, false, true, false], [true, false, true, true], [true, false])
+filter: ([Ok 2, Err "odd 7", Ok 6, Err "odd 13"], [Ok 2, Err 5, Ok 6, Err 6])
+from: ([Ok 4, Err 7, Ok 12, Err 13], [Err 4, Err 7, Ok 24, Ok 26])
+to: ([true, false, true, false], [Some 2, None, Some 6, None])
+equals: ([Err 4, Ok 7, Err 12, Err 13], [Err 4, Err 7, Ok 12, Err 13])
+or: [Ok 2, Err "neither", Ok 6, Ok 13]
+zip: ([Ok (2, 4), Err "odd 7", Ok (6, 12), Err "odd 13"], [Ok 6, Err "odd 7", Ok 18, Err "odd 13"])
+and: ([Ok 2, Err "big 300"], [Ok 4, Err "big 300"])
+compose: ([Ok 1, Err "odd 7", Ok 3, Err "odd 13"], [Ok 1, Err 7, Ok 3, Err 13])
+effect filter: (Ok 5, Err "over")
+constants: ("k", true, false, ())
+compose: (12, 9)
+tupled: ("xy", 42, "second", 3)
+absurd: []

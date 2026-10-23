@@ -1,0 +1,66 @@
+/// Booleans: Effect's `Boolean` connectives as functions, for pipelines and
+/// for passing where `&&` and `||` cannot go.
+module Bool exposing (..)
+
+/// `not`, as a function.
+not_ : Bool -> Bool
+foreign pure not_ from "@flick-lang/runtime/effect/Boolean" "not"
+  reviewed "effect@4.0.5 sha256:92ca3f39b61d9d06"
+
+/// Both hold.
+and : Bool -> Bool -> Bool
+foreign pure and from "@flick-lang/runtime/effect/Boolean" "and"
+  arity 1
+  reviewed "effect@4.0.5 sha256:dcb09663081957a3"
+
+/// Not both hold.
+nand : Bool -> Bool -> Bool
+foreign pure nand from "@flick-lang/runtime/effect/Boolean" "nand"
+  arity 1
+  reviewed "effect@4.0.5 sha256:f9548161f8e51ffa"
+
+/// Either holds.
+or : Bool -> Bool -> Bool
+foreign pure or from "@flick-lang/runtime/effect/Boolean" "or"
+  arity 1
+  reviewed "effect@4.0.5 sha256:f6769cc0c2d7691e"
+
+/// Neither holds.
+nor : Bool -> Bool -> Bool
+foreign pure nor from "@flick-lang/runtime/effect/Boolean" "nor"
+  arity 1
+  reviewed "effect@4.0.5 sha256:9ebd3bb0df9297cc"
+
+/// Exactly one holds.
+xor : Bool -> Bool -> Bool
+foreign pure xor from "@flick-lang/runtime/effect/Boolean" "xor"
+  arity 1
+  reviewed "effect@4.0.5 sha256:283639866f91d605"
+
+/// Both are the same.
+eqv : Bool -> Bool -> Bool
+foreign pure eqv from "@flick-lang/runtime/effect/Boolean" "eqv"
+  arity 1
+  reviewed "effect@4.0.5 sha256:d9bef331f739b066"
+
+/// `self |> implies that`: `that` holds whenever `self` does.
+implies : Bool -> Bool -> Bool
+foreign pure implies from "@flick-lang/runtime/effect/Boolean" "implies"
+  arity 1
+  reviewed "effect@4.0.5 sha256:4339c8290ee01c94"
+
+/// Every element holds; `true` for the empty list.
+every : List Bool -> Bool
+foreign pure every from "@flick-lang/runtime/effect/Boolean" "every"
+  reviewed "effect@4.0.5 sha256:e2e8cc5e13bcc6ca"
+
+/// Some element holds; `false` for the empty list.
+some : List Bool -> Bool
+foreign pure some from "@flick-lang/runtime/effect/Boolean" "some"
+  reviewed "effect@4.0.5 sha256:8d208581d86b345c"
+
+/// `onTrue ()` or `onFalse ()`.
+match_ : { onFalse : Unit -> a; onTrue : Unit -> a } -> Bool -> a
+foreign pure match_ from "@flick-lang/runtime/effect/Boolean" "match"
+  arity 1
+  reviewed "effect@4.0.5 sha256:4b014132f01259fa"

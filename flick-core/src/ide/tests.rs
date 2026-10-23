@@ -199,11 +199,12 @@ fn definition_crosses_modules_and_reaches_builtins_and_instances() {
     assert_eq!(go("App.Main", "User ->", 0).1, "User");
     assert_eq!(go("App.Main", "total]", 0).1, "total");
     assert_eq!(go("App.Main", "put (", 0).1, "put");
-    // built-in modules: a function, a type and a constructor
+    // built-in modules: a function (in the part a facade re-exports), a
+    // type and a constructor
     let (target, text) = go("App.Main", "length", 0);
     assert_eq!(
         (target, text.as_str()),
-        (Target::Builtin("List".into()), "length")
+        (Target::Builtin("List.Core".into()), "length")
     );
     assert_eq!(go("App.Main", "String ->", 0).1, "String");
     assert_eq!(go("App.Domain", "Named User", 0).1, "Named");

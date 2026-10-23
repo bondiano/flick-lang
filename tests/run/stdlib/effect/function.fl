@@ -1,0 +1,146 @@
+// Booleans, predicates, filters and function helpers over Effect's
+// `Boolean`, `Predicate`, `Filter` and `Function`.
+module App.Main exposing (main)
+
+line : String -> String ->{} Unit
+let line label text = Platform.stdout_line (label ++ ": " ++ text)
+
+even : Predicate.Predicate Number
+let even n = n - 2 * Number.floor (n / 2) == 0
+
+big : Predicate.Predicate Number
+let big n = n > 10
+
+/// Passes even numbers, halved; fails with the odd ones as text.
+halve : Filter.Filter Number Number String
+let halve n = if even n then Ok (n / 2) else Err ("odd " ++ show n)
+
+/// Passes numbers below 100.
+small : Filter.Filter Number Number String
+let small n = if n < 100 then Ok n else Err ("big " ++ show n)
+
+/// A runtime filter: it may read a cell.
+checked : Ref Number -> Filter.FilterEffect none none Number Number String
+let checked limit = Filter.make_effect (fun n -> if n <= Ref.get limit then Ok n else Err "over")
+
+table : (Bool -> Bool -> Bool) -> List Bool
+let table op = [op true true, op true false, op false true, op false false]
+
+main : Unit ->{; AppError} Unit
+let main () =
+  line "not" (show (Bool.not_ true, Bool.not_ false))
+  line "and" (show (table Bool.and, table Bool.nand))
+  line "or" (show (table Bool.or, table Bool.nor, table Bool.xor))
+  line "eqv" (show (table Bool.eqv, table (fun a b -> a |> Bool.implies b)))
+  line
+    "every"
+    (show (Bool.every [true, false], Bool.every [], Bool.some [false, true], Bool.some []))
+  yes : Bool -> String
+  let yes = Bool.match_ { onFalse = fun () -> "no"; onTrue = fun () -> "yes" }
+  line "match" (yes true ++ " " ++ yes false)
+  let ns = [4, 7, 12, 13]
+  line
+    "predicate"
+    (show
+      (
+        List.map (Predicate.not_ even) ns,
+        List.map (Predicate.and big even) ns,
+        List.map (Predicate.or big even) ns
+      ))
+  line
+    "predicate2"
+    (show
+      (
+        List.map (Predicate.xor big even) ns,
+        List.map (Predicate.eqv big even) ns,
+        List.map (big |> Predicate.implies even) ns
+      ))
+  line
+    "predicate3"
+    (show (List.map (Predicate.nand big even) ns, List.map (Predicate.nor big even) ns))
+  line
+    "predicate4"
+    (show
+      (
+        List.map (Predicate.every [big, even]) ns,
+        List.map (Predicate.some [big, even]) ns,
+        List.map (Predicate.map_input String.length even) ["ab", "abc"]
+      ))
+  line
+    "filter"
+    (show
+      (
+        List.map (Filter.to_result (Filter.make halve)) ns,
+        List.map (Filter.to_result (Filter.map_fail String.length halve)) ns
+      ))
+  line
+    "from"
+    (show
+      (
+        List.map (Filter.to_result (Filter.from_predicate even)) ns,
+        List.map
+          (Filter.to_result
+            (Filter.from_predicate_option (fun n -> if n > 10 then Some (n * 2) else None)))
+          ns
+      ))
+  line "to" (show (List.map (Filter.to_predicate halve) ns, List.map (Filter.to_option halve) ns))
+  line
+    "equals"
+    (show
+      (
+        List.map (Filter.to_result (Filter.equals 7)) ns,
+        List.map (Filter.to_result (Filter.equals_strict 12)) ns
+      ))
+  line
+    "or"
+    (show
+      (List.map
+        (Filter.to_result (halve |> Filter.or (fun n -> if n > 10 then Ok n else Err "neither")))
+        ns))
+  line
+    "zip"
+    (show
+      (
+        List.map (Filter.to_result (halve |> Filter.zip small)) ns,
+        List.map (Filter.to_result (halve |> Filter.zip_with small (fun h s -> h + s))) ns
+      ))
+  line
+    "and"
+    (show
+      (
+        List.map (Filter.to_result (halve |> Filter.and_left small)) [4, 300],
+        List.map (Filter.to_result (halve |> Filter.and_right small)) [4, 300]
+      ))
+  line
+    "compose"
+    (show
+      (
+        List.map (Filter.to_result (halve |> Filter.compose halve)) ns,
+        List.map (Filter.to_result (halve |> Filter.compose_passthrough halve)) ns
+      ))
+  let limit = Ref.make 7
+  decide : Filter.FilterEffect none none Number Number String
+  let decide = checked limit
+  let first = decide 5
+  Ref.set limit 3
+  line "effect filter" (show (first, decide 5))
+  k : Function.LazyArg String
+  let k = Function.constant "k"
+  line
+    "constants"
+    (show (k (), Function.const_true (), Function.const_false (), Function.const_void ()))
+  line
+    "compose"
+    (show
+      (Function.compose (fun n -> n * 2) (fun n -> n + 1) 5, Function.flip (fun a b -> a - b) 1 10))
+  line
+    "tupled"
+    (show
+      (
+        Function.tupled (fun a b -> a ++ b) ("x", "y"),
+        Function.untupled (fun (a, b) -> a * b) 6 7,
+        Function.sk 1 "second",
+        identity 3
+      ))
+  let never : List Never = []
+  line "absurd" (show (List.map (fun n -> (Function.absurd n : Number)) never))
