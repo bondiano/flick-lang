@@ -179,6 +179,19 @@ const SOURCES: &[(&str, &str)] = &[
     ("Effect", include_str!("builtins/Effect.fl")),
     // end of Effect: effects, schedules and fibers
     // Effect: streams, sinks and channels
+    ("Channel.Core", include_str!("builtins/Channel/Core.fl")),
+    (
+        "Channel.Transform",
+        include_str!("builtins/Channel/Transform.fl"),
+    ),
+    (
+        "Channel.Control",
+        include_str!("builtins/Channel/Control.fl"),
+    ),
+    ("Channel.Run", include_str!("builtins/Channel/Run.fl")),
+    ("Channel", include_str!("builtins/Channel.fl")),
+    ("ChannelSchema", include_str!("builtins/ChannelSchema.fl")),
+    ("Sink", include_str!("builtins/Sink.fl")),
     // end of Effect: streams, sinks and channels
     // Effect: streams, Stream
     // end of Effect: streams, Stream

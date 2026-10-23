@@ -1,0 +1,198 @@
+// Effect's `Channel`: failures, finalizers, merging, schedules, services,
+// spans, and running a channel into queues and hubs.
+module App.Main exposing (main)
+
+type error Boom = Boom String
+
+type error Other = Other Number
+
+service Greeter =
+  greet : String ->{} String
+
+greeter : Greeter.Impl
+let greeter = { greet = fun name -> "hi " ++ name }
+
+written : Unit ->{} List String
+foreign sync written from "./channel_js.mjs" "writtenSoFar"
+  arity 0
+
+writable : Unit ->{} Channel.WritableStream String
+foreign sync writable from "./channel_js.mjs" "writable"
+  arity 0
+
+boom : JsValue -> Boom
+let boom value = Boom "js"
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+nums : Channel.Channel none none i Number Unit ie id
+let nums = Channel.from_list [1, 2, 3]
+
+broken : Channel.Channel none {Boom} i Number Unit ie id
+let broken = Channel.concat (Channel.fail (Boom "broken")) (Channel.from_list [1])
+
+/// What running the channel gives, or the error it fails with.
+outcome : Channel.Channel none {Boom} Unit Number Unit none Unit ->{} String
+let outcome channel =
+  try
+    show (Channel.run_collect channel)
+  with
+  | Boom why -> "failed " ++ why
+
+why_of : Boom -> String
+let why_of e =
+  match e with
+  | Boom why -> why
+
+note : Ref (List String) -> String ->{} Unit
+let note log line = Ref.set log (Ref.get log ++ [line])
+
+slow : Unit ->{} Number
+let slow () =
+  Effect.sleep (ms 5)
+  0
+
+ms : Number -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+options : Tracer.SpanOptions
+let options =
+  {
+    attributes = [];
+    links = [];
+    parent = None;
+    root = false;
+    kind_ = Tracer.internal;
+    sampled = None;
+    level = None;
+    captureStackTrace = false;
+    disablePropagation = false
+  }
+
+failures : Unit ->{; Boom} Unit
+let failures () =
+  say ("fail: " ++ outcome broken)
+  say ("fail_sync: " ++ outcome (Channel.fail_sync (fun () -> Boom "later")))
+  say ("catch: " ++ show (Channel.run_collect (Channel.catch (fun e -> match e with | Boom why -> Channel.from_list [String.length why]) broken)))
+  let caught = Ref.make None
+  let kept = Channel.catch_cause (fun f -> Channel.from_effect_drain (task { Ref.set caught (Some f) })) broken
+  say ("catch_cause: " ++ show (Channel.run_collect kept) ++ ", primary " ++ show (Option.map why_of (Option.bind Failure.primary (Ref.get caught))))
+  match Ref.get caught with
+  | Some failure ->
+    say ("fail_cause: " ++ outcome (Channel.fail_cause failure))
+    say ("fail_cause_sync: " ++ outcome (Channel.fail_cause_sync (fun () -> failure)))
+  | None -> say "no failure"
+  let log = Ref.make []
+  say ("tap_error: " ++ outcome (Channel.tap_error (fun e -> note log "tapped") broken) ++ " " ++ show (Ref.get log))
+  say ("tap_cause: " ++ outcome (Channel.tap_cause (fun f -> note log "cause") broken))
+  let mapped : Channel.Channel none {Other} Unit Number Unit none Unit = Channel.map_error (fun e -> Other 1) broken
+  let other =
+    try
+      show (Channel.run_collect mapped)
+    with
+    | Other n -> "other " ++ show n
+  say ("map_error: " ++ other)
+  say ("ignore: " ++ show (Channel.run_collect (Channel.ignore_ broken), Channel.run_collect (Channel.ignore_cause broken)))
+  let finished = Channel.ensuring (task { note log "ensuring" }) nums |> Channel.on_start (task { note log "start" }) |> Channel.on_end (task { note log "end" })
+  let firsts = Channel.on_first (fun n -> note log ("first " ++ show n)) finished
+  say ("ensuring, on_start, on_end, on_first: " ++ show (Channel.run_collect firsts))
+  let errored = Channel.on_error (fun f -> note log "on_error") broken |> Channel.on_exit (fun exit -> note log ("on_exit " ++ show (Option.is_some (Exit.failure exit))))
+  let ended =
+    try
+      show (Channel.run_collect errored)
+    with
+    | Boom why -> "failed " ++ why
+  say ("on_error, on_exit: " ++ ended)
+  say ("log: " ++ show (Ref.get log))
+  let retries = Ref.make 0
+  let flaky = Channel.from_effect (task {
+    Ref.set retries (Ref.get retries + 1)
+    if Ref.get retries < 3 then from_result (Err (Boom "flaky")) else Ref.get retries
+  })
+  say ("retry: " ++ outcome (Channel.retry (Schedule.recurs 5) flaky))
+  say ("repeat: " ++ show (Channel.run_collect (Channel.repeat (Schedule.recurs 2) (Channel.from_list [7]))))
+  let paced = Channel.schedule (Schedule.map (fun _ -> ()) (Schedule.recurs 1)) nums
+  say ("schedule: " ++ show (Channel.run_collect paced))
+
+merging : Unit ->{; Boom} Unit
+let merging () =
+  let both : Channel.HaltStrategy = Channel.halt_both
+  say ("merge both: " ++ show (List.sort (Channel.run_collect (Channel.merge both (Channel.from_list [10, 20]) nums))))
+  say ("merge left: " ++ show (Channel.run_collect (Channel.merge Channel.halt_left Channel.never nums)))
+  say ("merge right: " ++ show (Channel.run_collect (Channel.merge Channel.halt_right nums Channel.never)))
+  say ("merge either: " ++ show (Channel.run_collect (Channel.merge Channel.halt_either Channel.never nums)))
+  say ("interrupt_when: " ++ Channel.run_drain (Channel.interrupt_when (task { "interrupted" }) Channel.never))
+  say ("halt_when: " ++ show (Channel.run_collect (Channel.halt_when (task { Effect.sleep (ms 3600000) }) nums)))
+  let side = Ref.make 0
+  say ("merge_effect: " ++ show (Channel.run_collect (Channel.merge_effect (task { Ref.set side 1 }) (Channel.from_effect (task { slow () }))), Ref.get side))
+
+services : Unit ->{; Boom} Unit
+let services () =
+  let greeted = Channel.map_effect (fun n -> Greeter.greet n) (Channel.from_list ["ada"])
+  say ("provide_: " ++ show (Channel.run_collect (Channel.provide_ (Layer.succeed Greeter greeter) greeted)))
+  say ("provide_service: " ++ show (Channel.run_collect (Channel.provide_service Greeter greeter greeted)))
+  say ("provide_service_effect: " ++ show (Channel.run_collect (Channel.provide_service_effect Greeter (task { greeter }) greeted)))
+  let louder = Channel.update_service Greeter (fun impl -> { greet = fun name -> "HEY " ++ name }) greeted
+  say ("update_service: " ++ show (Channel.run_collect (Channel.provide_service Greeter greeter louder)))
+  let named = Channel.from_effect (task { Option.bind Tracer.span_name (Tracer.parent_span ()) })
+  say ("with_span: " ++ show (Channel.run_collect (Channel.with_span "pipeline" options named)))
+
+running : Unit ->{; Boom} Unit
+let running () =
+  say ("run_count, run_head, run_last: " ++ show (Channel.run_count nums, Channel.run_head nums, Channel.run_last nums))
+  say ("run_fold: " ++ show (Channel.run_fold (fun () -> 0) (fun total n -> total + n) nums))
+  say ("run_fold_effect: " ++ show (Channel.run_fold_effect (fun () -> 1) (fun total n -> total * (n + 1)) nums))
+  let seen = Ref.make []
+  Channel.run_for_each (fun n -> Ref.set seen (Ref.get seen ++ [n])) nums
+  say ("run_for_each: " ++ show (Ref.get seen))
+  let q : Queue.Queue none Number = Queue.unbounded ()
+  Channel.run_into_queue q nums
+  say ("run_into_queue: " ++ show (Queue.collect q))
+  let q2 : Queue.Queue none Number = Queue.unbounded ()
+  Channel.run_into_queue_array q2 (Channel.from_list_chunked 2 [4, 5, 6])
+  say ("run_into_queue_array: " ++ show (Queue.collect q2))
+  let failed : Queue.Queue {Boom} Number = Queue.unbounded ()
+  Channel.run_into_queue failed broken
+  let drained =
+    try
+      show (Queue.collect failed)
+    with
+    | Boom why -> "failed " ++ why
+  say ("run_into_queue failing: " ++ drained)
+  let queued = scope {
+    let out = Channel.to_queue { capacity = Some 2; strategy = None } nums
+    let chunked = Channel.to_queue_array { capacity = None; strategy = None } (Channel.from_list_chunked 2 [7, 8, 9])
+    (Queue.collect out, Queue.collect chunked)
+  }
+  say ("to_queue, to_queue_array: " ++ show queued)
+  let published = scope {
+    let hub = Channel.to_pubsub { capacity = None; strategy = None; replay = Some 3; shutdownOnEnd = false } nums
+    let sub = PubSub.subscribe hub
+    let chunked = Channel.to_pubsub_array { capacity = Some 4; strategy = Some Queue.Dropping; replay = Some 2; shutdownOnEnd = false } (Channel.from_list_chunked 2 [5, 6])
+    let sub2 = PubSub.subscribe chunked
+    (PubSub.take_between 3 3 sub, PubSub.take_between 2 2 sub2)
+  }
+  say ("to_pubsub, to_pubsub_array: " ++ show published)
+  let hub : PubSub.PubSub Number = PubSub.unbounded { replay = Some 5 }
+  Channel.run_into_pubsub { shutdownOnEnd = false } hub nums
+  let ended = Channel.run_into_pubsub_array { shutdownOnEnd = false } hub (Channel.from_list_chunked 1 [4] |> Channel.map_done (fun _ -> "array done"))
+  let replayed = scope {
+    let sub = PubSub.subscribe hub
+    PubSub.take_between 4 4 sub
+  }
+  say ("run_into_pubsub, run_into_pubsub_array: " ++ show (replayed, ended))
+  let stream = writable ()
+  let into = Channel.from_list_chunked 2 ["a", "b", "c"] |> Channel.pipe_to (Channel.from_writable_stream { evaluate = fun () -> stream; onError = boom; closeOnDone = true })
+  Channel.run_drain into
+  say ("from_writable_stream: " ++ show (written ()))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try
+    failures ()
+    merging ()
+    services ()
+    running ()
+  with
+  | Boom why -> say ("unexpected " ++ why)
