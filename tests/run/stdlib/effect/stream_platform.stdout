@@ -1,0 +1,13 @@
+decode_text: hé
+encode_text: [195, 169, 33]
+limit_bytes: [[1, 2], [0]]
+from_subscription: [10, 20, 30]
+read_file: "one\ntwo\nthree"
+read_file part: [[116, 119], [111]]
+split_lines: ["one", "two", "three"]
+read_file missing: missing
+watch_with: (2, [true, false])
+watch: 1
+scoped handles: [2, 2]
+done
+stdin: []

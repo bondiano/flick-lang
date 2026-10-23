@@ -1,4 +1,5 @@
 [wrapped]
+changesStream = "Stream.from_tx_subscription_ref 0656486945f6204f"
 TxSubscriptionRef = "TxSubscriptionRef.TxSubscriptionRef 32cfcf851e36f0ba"
 changes = "TxSubscriptionRef.changes 5d5df32fd724aaba"
 get = "TxSubscriptionRef.get 33c61c174f79caae"
@@ -12,6 +13,3 @@ updateAndGet = "TxSubscriptionRef.update_and_get 11210413b1a8356b"
 
 [excluded]
 isTxSubscriptionRef = "TS-only: a type guard over unknown; Flick values are typed statically"
-
-[pending]
-changesStream = "M20"

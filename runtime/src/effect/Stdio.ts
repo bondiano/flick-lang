@@ -19,6 +19,19 @@ const impl = (stdio: Stdio.Stdio) => ({
 
 type Impl = ReturnType<typeof impl>;
 
+/** The Effect `Stdio` behind each Flick one `node` built, for its stdin (`Stream.stdin`). */
+const natives = new WeakMap<object, Stdio.Stdio>();
+
+/** The Effect `Stdio` behind a Flick one, if `node` built it. */
+export const nativeStdio = (flick: object): Stdio.Stdio | undefined => natives.get(flick);
+
 /** `Stdio.node`. */
 export const flickNode = <I>(key: Context.Key<I, Impl>): Layer.Layer<I> =>
-  Layer.effect(key, Effect.map(Effect.service(Stdio.Stdio), impl)).pipe(Layer.provide(NodeStdio.layer));
+  Layer.effect(
+    key,
+    Effect.map(Effect.service(Stdio.Stdio), (stdio) => {
+      const record = impl(stdio);
+      natives.set(record, stdio);
+      return record;
+    }),
+  ).pipe(Layer.provide(NodeStdio.layer));

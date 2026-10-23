@@ -224,6 +224,19 @@ const SOURCES: &[(&str, &str)] = &[
     ("Sink", include_str!("builtins/Sink.fl")),
     // end of Effect: streams, sinks and channels
     // Effect: streams, Stream
+    ("Stream.Core", include_str!("builtins/Stream/Core.fl")),
+    (
+        "Stream.Transform",
+        include_str!("builtins/Stream/Transform.fl"),
+    ),
+    ("Stream.Combine", include_str!("builtins/Stream/Combine.fl")),
+    ("Stream.Errors", include_str!("builtins/Stream/Errors.fl")),
+    ("Stream.Run", include_str!("builtins/Stream/Run.fl")),
+    (
+        "Stream.Platform",
+        include_str!("builtins/Stream/Platform.fl"),
+    ),
+    ("Stream", include_str!("builtins/Stream.fl")),
     // end of Effect: streams, Stream
     // Effect: HTTP
     // end of Effect: HTTP
