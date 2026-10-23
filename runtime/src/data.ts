@@ -2,7 +2,7 @@
 // values, an ADT value is `{ _tag, _0, _1, … }` with a qualified tag, a
 // record is a plain object, a tuple or a list a dense array, Unit
 // `undefined`. Equality is canonical: structural, SameValueZero on numbers.
-import { Equal, Hash, Option, Result } from "effect";
+import { Effect, Equal, Hash, Option, Result } from "effect";
 
 import { item } from "./internal.ts";
 import { constructorName, tag } from "./tags.ts";
@@ -124,10 +124,14 @@ interface FieldDict {
   readonly compare: (a: unknown) => (b: unknown) => Ordering;
   readonly hash: (a: unknown) => number;
   readonly show: (a: unknown) => string;
+  readonly parse: (text: string) => Effect.Effect<Result.Result<unknown, string>>;
   readonly $Eq: FieldDict;
 }
 
-type Dict = Partial<Record<"eq" | "compare" | "hash" | "show" | "$Eq", unknown>>;
+type Dict = Partial<Record<"eq" | "compare" | "hash" | "show" | "parse" | "$Eq", unknown>>;
+
+/** `GreenLight` on the command line: `green-light`. */
+const kebab = (name: string): string => name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
 
 const isTuple = (value: Structure): value is ReadonlyArray<unknown> => Array.isArray(value);
 
@@ -212,13 +216,16 @@ const partsOf = (c: ConstructorInfo, value: unknown): Array<unknown> => {
  * A derived instance of class `name`. `fields` gives the dictionaries of the
  * fields of all constructors in order, lazily (a recursive type needs its own
  * instance); `constructors` lists `[tag, name, arity]`, or is `null` for a
- * type without variants whose one field is its representation.
+ * type without variants whose one field is its representation. `Cli.Value`
+ * of a refined type also gets its predicate and its name.
  */
 export const derive = (
   name: string,
   fields: () => ReadonlyArray<FieldDict>,
   constructors: ReadonlyArray<ConstructorInfo> | null,
   supers: object | null,
+  check?: (value: unknown) => boolean,
+  typeName?: string,
 ): Dict => {
   let cache: ReadonlyArray<FieldDict> | undefined;
   const dicts = (): ReadonlyArray<FieldDict> => (cache ??= fields());
@@ -264,6 +271,22 @@ export const derive = (
         if (constructors === null) return dict(0).hash(a);
         const { i, offset } = variant(constructors, a);
         return args(a).reduce<number>((h, x, k) => combine(h, dict(offset + k).hash(x)), i);
+      };
+      break;
+    case "Value":
+      self.parse = (text: string): Effect.Effect<Result.Result<unknown, string>> => {
+        if (constructors === null) {
+          return Effect.map(dict(0).parse(text), (parsed) =>
+            Result.isSuccess(parsed) && check !== undefined && !check(parsed.success)
+              ? Result.fail(`not a valid ${typeName ?? "value"}: ${text}`)
+              : parsed,
+          );
+        }
+        const choice = constructors.find((c) => kebab(c[1]) === text);
+        const names = constructors.map((c) => kebab(c[1])).join(", ");
+        return Effect.succeed(
+          choice === undefined ? Result.fail(`expected one of ${names}, got ${text}`) : Result.succeed({ _tag: choice[0] }),
+        );
       };
       break;
     default:

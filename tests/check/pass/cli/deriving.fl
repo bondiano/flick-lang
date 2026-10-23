@@ -1,0 +1,17 @@
+// `deriving Cli.Value` for a choice of constructors and for a refined type.
+module App.Choice exposing (paint)
+
+type Color = Red | GreenLight
+  deriving Cli.Value, Show
+
+refined type Port = Number
+  where fun n -> n > 0 && n < 65536
+  deriving Cli.Value
+
+paint : Cli.Command none none
+let paint =
+  cli "paint" {
+    flag color "c" : Color = Red
+    flag port : Option Port
+    handle fun { color; port } -> Platform.stdout_line (show color)
+  }

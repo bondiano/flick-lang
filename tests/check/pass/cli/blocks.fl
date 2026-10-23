@@ -1,0 +1,39 @@
+// `cli` blocks: flags, arguments of every multiplicity, subcommands.
+module App.Tool exposing (tool)
+
+greet : Cli.Command none none
+let greet =
+  cli "greet" {
+    description "Prints a greeting"
+    /// Print in capitals
+    flag loud : Bool
+    /// How many times
+    flag times "n" : Number = 1
+    flag greeting : Option String
+    flag tag "t" : List String
+    arg name : String
+    arg others : List String
+    handle fun { loud; times; greeting; tag; name; others } ->
+      let text = Option.with_default "Hello" greeting ++ ", " ++ name
+      let line = if loud then String.to_upper text else text
+      Platform.stdout_line (String.join "\n" (List.repeat times line))
+  }
+
+copy : Cli.Command none none
+let copy =
+  cli "copy" {
+    flag dry_run "d" : Bool
+    arg target : String
+    arg sources : NonEmpty.NonEmpty String
+    handle fun { dry_run; target; sources } -> Platform.stdout_line target
+  }
+
+tool : Cli.Command none none
+let tool =
+  cli "tool" {
+    description "Project tools"
+    /// Verbose output
+    flag verbose "v" : Bool
+    subcommand greet
+    subcommand copy
+  }

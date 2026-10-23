@@ -1,0 +1,44 @@
+// The shape of a command: defaults, many-valued arguments, clauses once,
+// a handler or subcommands, no arguments beside subcommands.
+module App.Shape exposing (defaults, many, twice, empty, mixed)
+
+defaults : Cli.Command none none
+let defaults =
+  cli "defaults" {
+    flag region : Option String = Some "eu"
+//                                ^^^^^^^^^ FLICK-L002 takes no `= default`
+    handle fun { region } -> ()
+  }
+
+many : Cli.Command none none
+let many =
+  cli "many" {
+    arg files : List String
+//              ^^^^^^^^^^^ FLICK-L003 only the last one can
+    arg target : String
+    handle fun { files; target } -> ()
+  }
+
+twice : Cli.Command none none
+let twice =
+  cli "twice" {
+    description "one"
+    description "two"
+//  ^^^^^^^^^^^ FLICK-L004 `description` is given twice
+    handle fun {} -> ()
+  }
+
+empty : Cli.Command none none
+let empty =
+  cli "empty" {
+    description "nothing to do"
+  }
+//~ FLICK-L005 @33:3-35:4 needs `handle` or at least one `subcommand`
+
+mixed : Cli.Command none none
+let mixed =
+  cli "mixed" {
+    arg name : String
+//  ^^^ FLICK-L006 takes no `arg`
+    subcommand twice
+  }

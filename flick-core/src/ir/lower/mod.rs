@@ -3,6 +3,7 @@
 //! renamed apart within each top-level definition, so a name never needs
 //! shadowing in the generated code.
 
+mod cli;
 mod expr;
 mod pattern;
 mod sql;
@@ -390,7 +391,6 @@ impl Lower<'_> {
     fn unsupported(&mut self, node: &Node) {
         let what = match node.kind {
             K::UiExpr => "`ui` blocks",
-            K::CliExpr => "`cli` blocks",
             _ => "`schema` expressions",
         };
         self.diagnostics.push(Diagnostic::error(

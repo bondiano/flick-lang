@@ -83,6 +83,7 @@ const SOURCES: &[(&str, &str)] = &[
     // Effect: HTTP
     // end of Effect: HTTP
     // Effect: CLI
+    ("Cli", include_str!("builtins/Cli.fl")),
     // end of Effect: CLI
 ];
 

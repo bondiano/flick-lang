@@ -1,0 +1,116 @@
+/// Command-line applications on Effect's CLI: a `Command r e` is a pure
+/// description of flags, positional arguments, subcommands and a handler
+/// that needs `r` and fails with `e`. `cli "name" { … }` is sugar for the
+/// combinators below; both build the same value.
+module Cli exposing (..)
+
+/// A command ready to run.
+type Command (r : ServiceRow) (e : ErrorRow)
+
+/// A command being described, whose options so far form the record `o`.
+type Spec (r : ServiceRow) (e : ErrorRow) o
+
+/// How the values of one parameter make its field: `Multi a t` reads
+/// values of `a` into a field of type `t`.
+type Multi a t
+
+/// Invalid input on the command line: the text Effect's CLI shows.
+type error CliError = CliError String
+  deriving Eq, Show
+
+/// Parsing a parameter's text into a value; the error is shown to the user.
+class Value a =
+  parse : String ->{} Result String a
+
+instance Value String =
+  parse : String ->{} Result String String
+  let parse text = Ok text
+
+instance Value Bool =
+  parse : String ->{} Result String Bool
+  let parse text =
+    match text with
+    | "true" -> Ok true
+    | "false" -> Ok false
+    | _ -> Err ("not true or false: " ++ text)
+
+instance Value Number =
+  parse : String ->{} Result String Number
+  let parse text =
+    match Number.parse text with
+    | Some n -> if Number.is_nan n then Err ("not a number: " ++ text) else Ok n
+    | None -> Err ("not a number: " ++ text)
+
+instance Value BigInt =
+  parse : String ->{} Result String BigInt
+  let parse text =
+    match BigInt.parse text with
+    | Some n -> Ok n
+    | None -> Err ("not an integer: " ++ text)
+
+instance Value (Redacted String) =
+  parse : String ->{} Result String (Redacted String)
+  let parse text = Ok (Redacted.make text)
+
+/// A flag without a value: present is `true`, absent `false`.
+switch : Multi Bool Bool
+foreign pure switch from "@flick-lang/runtime/cli" "multiSwitch"
+
+/// One value, required.
+required : Multi a a
+foreign pure required from "@flick-lang/runtime/cli" "multiRequired"
+
+/// One value, `value` when absent.
+default : a -> Multi a a
+foreign pure default from "@flick-lang/runtime/cli" "multiDefault"
+
+/// One value, or `None`.
+optional : Multi a (Option a)
+foreign pure optional from "@flick-lang/runtime/cli" "multiOptional"
+
+/// Any number of values: a repeated flag, or the rest of the arguments.
+many : Multi a (List a)
+foreign pure many from "@flick-lang/runtime/cli" "multiMany"
+
+/// At least one value.
+some : Multi a (NonEmpty.NonEmpty a)
+foreign pure some from "@flick-lang/runtime/cli" "multiSome"
+
+/// A command named `name` with no options yet.
+command : String -> Spec none none {}
+foreign pure command from "@flick-lang/runtime/cli" "specCommand"
+
+/// The help text of the command.
+description : String -> Spec r e o -> Spec r e o
+foreign pure description from "@flick-lang/runtime/cli" "specDescription"
+  arity 2
+
+/// The flag `--<label>` (underscores become dashes), with more names
+/// (`"n"` is `-n`), its help text and how its values make field `l`.
+flag :
+  (Value a, Record.Lacks l o, Record.UnionDisjoint o (Record.Field l t) out) =>
+  Record.Label l -> List String -> String -> Multi a t -> Spec r e o -> Spec r e out
+foreign pure flag from "@flick-lang/runtime/cli" "specFlag"
+  arity 5
+
+/// The next positional argument, with its help text.
+arg :
+  (Value a, Record.Lacks l o, Record.UnionDisjoint o (Record.Field l t) out) =>
+  Record.Label l -> String -> Multi a t -> Spec r e o -> Spec r e out
+foreign pure arg from "@flick-lang/runtime/cli" "specArg"
+  arity 4
+
+/// A nested command, with its help text.
+subcommand : Command r2 e2 -> String -> Spec r e o -> Spec (r + r2) (e + e2) o
+foreign pure subcommand from "@flick-lang/runtime/cli" "specSubcommand"
+  arity 3
+
+/// The command, running `handler` with the parsed options.
+handle : (o ->{r2; e2} Unit) -> Spec r e o -> Command (r + r2) (e + e2)
+foreign pure handle from "@flick-lang/runtime/cli" "specHandle"
+  arity 2
+
+/// The command without a handler of its own: it needs subcommands, and run
+/// without one it prints its help and fails with `CliError`.
+group : Spec r e o -> Command r e
+foreign pure group from "@flick-lang/runtime/cli" "specGroup"

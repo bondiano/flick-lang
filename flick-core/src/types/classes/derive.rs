@@ -1,6 +1,8 @@
 //! `deriving Eq, Ord, Hash, Show`: an instance over the fields of every
 //! constructor, requiring the class of each type parameter. `Hash` and `Ord`
 //! are derived only together with `Eq`, so all of them use the same fields.
+//! `deriving Cli.Value` parses a choice among nullary constructors, or the
+//! base of a refined type through its predicate.
 
 use std::ptr;
 
@@ -9,9 +11,11 @@ use super::solve::Outcome;
 use super::{Dict, STRUCTURAL, has_metas};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::iface::Namespace;
+use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
+use crate::types::cli::CLI;
 use crate::types::env::{Form, Instance};
 use crate::types::kinds::Kind;
 use crate::types::ty::{Binder, PRELUDE, Type};
@@ -40,7 +44,7 @@ impl<'n> Checker<'_> {
         let Some(fields) = self.fields_of(decl, &name, &def.form, refined) else {
             return Vec::new();
         };
-        let has_eq = classes.iter().any(|c| c == "Eq");
+        let has_eq = classes.iter().any(|(_, c)| c == "Eq");
         let mut kinds = Vec::new();
         let mut kind = def.kind.clone();
         while let Kind::Arrow(param, result) = kind {
@@ -58,7 +62,10 @@ impl<'n> Checker<'_> {
             })
             .collect();
         let mut out = Vec::new();
-        for class in classes {
+        for (class_module, class) in classes {
+            if class_module == CLI && !self.cli_value_derivable(decl, &name, &def.form, span) {
+                continue;
+            }
             if (class == "Hash" || class == "Ord") && !has_eq {
                 self.error(
                     codes::C013,
@@ -69,7 +76,7 @@ impl<'n> Checker<'_> {
                 );
                 continue;
             }
-            let con = Type::con(PRELUDE, &class);
+            let con = Type::con(&class_module, &class);
             let head = Type::app(
                 con.clone(),
                 Type::apps(
@@ -143,7 +150,7 @@ impl<'n> Checker<'_> {
     }
 
     /// The classes a `deriving` clause names; others are reported.
-    fn derived_classes(&mut self, clause: &Node) -> Vec<String> {
+    fn derived_classes(&mut self, clause: &Node) -> Vec<(String, String)> {
         let mut out = Vec::new();
         let tokens: Vec<_> = clause
             .child_tokens()
@@ -165,7 +172,12 @@ impl<'n> Checker<'_> {
                         && matches!(def.form, Form::Class { .. })
                         && STRUCTURAL.contains(last) =>
                 {
-                    out.push((*last).to_owned());
+                    out.push((PRELUDE.to_owned(), (*last).to_owned()));
+                }
+                Some((module, def))
+                    if module == CLI && *last == "Value" && matches!(def.form, Form::Class { .. }) =>
+                {
+                    out.push((CLI.to_owned(), "Value".to_owned()));
                 }
                 // a schema witness, not a class: see `types::schemas`
                 Some((module, _)) if module == PRELUDE && *last == "Schema" => {}
@@ -174,12 +186,32 @@ impl<'n> Checker<'_> {
                     codes::C013,
                     self.span(clause),
                     format!(
-                        "`{last}` cannot be derived: deriving covers `Eq`, `Ord`, `Hash` and `Show`"
+                        "`{last}` cannot be derived: deriving covers `Eq`, `Ord`, `Hash`, `Show` and `Cli.Value`"
                     ),
                 ),
             }
         }
         out
+    }
+
+    /// `Cli.Value` is derived for constructors without fields, a choice
+    /// among their names, or for a refined type, whose base parses.
+    fn cli_value_derivable(&mut self, decl: &Node, name: &str, form: &Form, span: Span) -> bool {
+        let ok = match form {
+            Form::Adt { constructors, .. } => constructors
+                .iter()
+                .all(|c| self.constructor_fields(c).is_empty()),
+            Form::Nominal => decl.has_token(K::RefinedKw),
+            _ => false,
+        };
+        if !ok {
+            self.error(
+                codes::C013,
+                span,
+                format!("cannot derive `Cli.Value` for `{name}`: it is derived for a choice among constructors without fields, or for a refined type"),
+            );
+        }
+        ok
     }
 
     /// The field types of a constructor of this module, over the type's parameters.

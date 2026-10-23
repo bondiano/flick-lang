@@ -17,6 +17,10 @@
       "types": "./dist/sql/index.d.ts",
       "default": "./dist/sql/index.js"
     },
+    "./cli": {
+      "types": "./dist/cli/index.d.ts",
+      "default": "./dist/cli/index.js"
+    },
     "./effect/*": {
       "types": "./dist/effect/*.d.ts",
       "default": "./dist/effect/*.js"

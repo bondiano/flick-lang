@@ -148,8 +148,7 @@ impl Checker<'_> {
                 ty
             }
             K::SqlExpr => self.sql_expr(node, None),
-            // shortcut: CLI blocks are typed by their elaboration
-            K::CliExpr => self.fresh(),
+            K::CliExpr => self.cli_expr(node),
             _ => Type::Error,
         }
     }

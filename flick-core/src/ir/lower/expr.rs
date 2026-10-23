@@ -85,6 +85,7 @@ impl Lower<'_> {
             }
             K::Block => return self.block(node),
             K::SqlExpr => return self.sql_block(node),
+            K::CliExpr => return self.cli_block(node),
             // `ui { … }` only opens the names of `Ui`, which the checker resolved
             K::UiExpr => {
                 return match children.iter().find(|n| n.kind == K::Block) {
@@ -404,7 +405,7 @@ impl Lower<'_> {
     }
 }
 
-fn with_dicts(expr: Expr, dicts: Vec<Dict>) -> Expr {
+pub(super) fn with_dicts(expr: Expr, dicts: Vec<Dict>) -> Expr {
     if dicts.is_empty() {
         return expr;
     }

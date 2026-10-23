@@ -15,7 +15,6 @@ impl Gen<'_> {
         let mut out = String::new();
         for i in order {
             let item = &items[i];
-            self.temps = 0;
             let mark = self.mark(item.span);
             let code = self.item(item);
             if !code.is_empty() {
@@ -224,7 +223,7 @@ impl Gen<'_> {
             entries.push(format!("get ${class}() {{\n  return {d};\n}}"));
         }
         let body = if let Some((fields, constructors)) = &info.derived {
-            self.derived(&info.class.1, fields, constructors.as_deref(), &entries)
+            self.derived(info, fields, constructors.as_deref(), &entries)
         } else {
             {
                 for (name, value) in methods {
@@ -272,7 +271,7 @@ impl Gen<'_> {
     /// A derived instance; `supers` are the getters of its superclasses.
     fn derived(
         &mut self,
-        class: &str,
+        info: &InstanceInfo,
         fields: &[Dict],
         constructors: Option<&[Constructor]>,
         supers: &[String],
@@ -298,6 +297,7 @@ impl Gen<'_> {
                 .collect();
             format!("[{}]", cs.join(", "))
         });
+        let class = &info.class.1;
         let derive = self.rt("derive");
         let supers = if supers.is_empty() {
             "{}".to_owned()
@@ -305,8 +305,16 @@ impl Gen<'_> {
             let entries: Vec<String> = supers.iter().map(|e| format!("{e},")).collect();
             format!("{{\n{}}}", indent(&entries))
         };
+        // `Cli.Value` of a refined type parses the base, then checks the predicate
+        let refined = match (class.as_str(), constructors.as_str()) {
+            ("Value", "null") => {
+                let ty = info.name.rsplit(' ').next().unwrap_or_default();
+                format!(", {}, {}", companion_name(ty, "check"), names::string(ty))
+            }
+            _ => String::new(),
+        };
         format!(
-            "{derive}({}, () => [{}], {constructors}, {supers})",
+            "{derive}({}, () => [{}], {constructors}, {supers}{refined})",
             names::string(class),
             fields.join(", ")
         )

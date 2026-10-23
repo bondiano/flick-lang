@@ -1,0 +1,11 @@
+// Top-level values whose pipelines need temporaries: each gets its own.
+module App.Pipelines exposing (a, b)
+
+inc : Number -> Number
+let inc x = x + 1
+
+a : Number
+let a = 1 |> inc |> inc
+
+b : Number
+let b = 2 |> inc |> inc

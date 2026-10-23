@@ -16,11 +16,12 @@ pub enum Area {
     Schema,
     Sql,
     Ui,
+    Cli,
     Project,
 }
 
 impl Area {
-    pub const ALL: [Area; 11] = [
+    pub const ALL: [Area; 12] = [
         Area::Syntax,
         Area::Resolve,
         Area::Types,
@@ -31,6 +32,7 @@ impl Area {
         Area::Schema,
         Area::Sql,
         Area::Ui,
+        Area::Cli,
         Area::Project,
     ];
 
@@ -46,6 +48,7 @@ impl Area {
             Area::Schema => 'D',
             Area::Sql => 'Q',
             Area::Ui => 'U',
+            Area::Cli => 'L',
             Area::Project => 'P',
         }
     }
@@ -193,6 +196,13 @@ codes! {
     Q011 = Sql 11, "column type does not match its SQL type";
     Q012 = Sql 12, "value without a SQL form";
     U001 = Ui 1, "event policy needs a positive integer";
+    L001 = Cli 1, "name taken twice in a command";
+    L002 = Cli 2, "default of an optional parameter";
+    L003 = Cli 3, "positional argument of many values before the last";
+    L004 = Cli 4, "clause given twice";
+    L005 = Cli 5, "command without a handler or subcommands";
+    L006 = Cli 6, "positional argument next to subcommands";
+    L007 = Cli 7, "other names of a positional argument";
     P001 = Project 1, "cannot read source file";
     P002 = Project 2, "file is not formatted";
     P003 = Project 3, "internal formatter error";

@@ -17,6 +17,7 @@ mod bindings;
 mod builtins;
 mod calls;
 mod classes;
+pub mod cli;
 mod codecs;
 mod convert;
 mod decls;
