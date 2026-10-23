@@ -33,7 +33,7 @@ let is_some value =
 is_none : Option a -> Bool
 let is_none value = not (is_some value)
 
-/// The first of the two that is `Some`.
+/// `value` when it is `Some`, otherwise `fallback`: `value |> Option.or_else fallback`.
 or_else : Option a -> Option a -> Option a
 let or_else fallback value =
   match value with
