@@ -161,6 +161,13 @@ fn hover_shows_source_types_with_rows_and_captures() {
         hover("keep", 1)
     );
     assert!(hover("total", 1).contains("total : Number"));
+    // a parameter of a top-level function, where it is used
+    assert!(
+        hover("user.age", 0).contains("user : User"),
+        "{}",
+        hover("user.age", 0)
+    );
+    assert!(hover(" x)", 0).contains("x : a"), "{}", hover(" x)", 0));
     assert!(
         hover("put (", 0).contains("Store.put : String ->{; StoreError} Unit"),
         "{}",

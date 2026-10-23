@@ -21,6 +21,7 @@ const DOMAIN: &str = "module App.Domain exposing (User, greet)
 /// Someone to greet.
 type alias User = { name : String; age : Number }
 
+/// The greeting of a user.
 greet : User -> String
 let greet user = \"Привет, \" ++ user.name
 ";
@@ -218,7 +219,7 @@ fn hover_definition_completion_rename_and_formatting() {
     );
     assert_eq!(
         hover["result"]["contents"]["value"],
-        "```flick\ngreet : User -> String\n```\n\nfrom `App.Domain`"
+        "```flick\ngreet : User -> String\n```\n\nThe greeting of a user.\n\nfrom `App.Domain`"
     );
     let local = lsp.request(
         "textDocument/hover",
@@ -242,7 +243,7 @@ fn hover_definition_completion_rename_and_formatting() {
     );
     assert_eq!(
         definition["result"]["range"]["start"],
-        json!({ "line": 5, "character": 0 })
+        json!({ "line": 6, "character": 0 })
     );
     let builtin = lsp.request(
         "textDocument/definition",

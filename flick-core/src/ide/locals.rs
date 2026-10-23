@@ -44,7 +44,18 @@ pub fn in_scope(root: &Node, offset: u32, text: &str) -> Vec<(String, (u32, u32)
                 }
             }
             K::LetDecl => {
-                let patterns: Vec<&Node> = scope.nodes().filter(|n| is_pattern(n.kind)).collect();
+                // the name, then the parameters of `let f x y =` under their `Params` node
+                let patterns: Vec<&Node> = scope
+                    .nodes()
+                    .flat_map(|n| {
+                        if n.kind == K::Params {
+                            n.nodes().collect()
+                        } else {
+                            vec![n]
+                        }
+                    })
+                    .filter(|n| is_pattern(n.kind))
+                    .collect();
                 let own = patterns.first().is_some_and(|p| p.range() == child.range());
                 if !own {
                     // a recursive local sees itself; its parameters follow its name

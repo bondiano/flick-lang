@@ -12,7 +12,7 @@ protocol; logs go to stderr. It runs the same analysis as `flick check` and
 | Request | Answer |
 | - | - |
 | diagnostics | exactly those of `flick check`, with their `FLICK-` codes, at UTF-16 positions |
-| `textDocument/hover` | the source type: the signature as written for a top-level value (rows, captures, constraints), the inferred type of a local; never a TypeScript helper |
+| `textDocument/hover` | the source type: the signature as written for a top-level value (rows, captures, constraints) with its `///` documentation, the inferred type of a local, a parameter or a pattern variable; never a TypeScript helper |
 | `textDocument/definition` | across modules; into a built-in module (`flick-builtin:///List.fl`, read-only, its text through `workspace/textDocumentContent`); into an installed package's published `.fl`, else its `.iface` at the export; a companion (`schema T`, `T.parse`, a `sql table`'s table) leads to its type, a class method used at a known instance to that instance's definition |
 | `textDocument/references` | every occurrence in the project |
 | `textDocument/rename` | the project's own values, types, constructors and locals, in `.fl` sources only; names of built-in modules and packages, service operations and instance methods have no exact mapping and are refused |

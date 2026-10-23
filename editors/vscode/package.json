@@ -41,7 +41,9 @@
       "[flick]": {
         "editor.insertSpaces": true,
         "editor.tabSize": 2,
-        "editor.detectIndentation": false
+        "editor.detectIndentation": false,
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "bondiano.flick"
       }
     },
     "configuration": {

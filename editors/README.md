@@ -29,8 +29,13 @@ After changing `grammar.js` or `src/scanner.c`, run `just tree-sitter`
 
 ## Language server
 
-`flick lsp --stdio` serves diagnostics, hover, definition, references,
-completion, rename and formatting (see `docs/src/content/docs/reference/editor.md`).
+`flick lsp --stdio` serves diagnostics (errors and warnings, as `flick
+check` reports them, on every change), hover with the source type and the
+`///` documentation (the inferred type of a local, a parameter or a pattern
+variable), definition, references, completion, rename and formatting (see
+`docs/src/content/docs/reference/editor.md`). Both editors format on save
+with it: VS Code through the extension's defaults, Zed by its default
+`format_on_save` with the language server as formatter.
 
 - VS Code: `extension.js` starts it with `vscode-languageclient` (installed
   by `pnpm install` at the repository root, as a workspace package) and shows built-in modules

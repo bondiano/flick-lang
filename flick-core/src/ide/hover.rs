@@ -4,6 +4,7 @@
 use std::fmt::Write;
 
 use super::{Ide, Symbol, tree};
+use crate::doc;
 use crate::iface::Namespace;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
@@ -60,7 +61,14 @@ impl Ide<'_> {
                         (None, None) => e.name.clone(),
                     },
                 };
-                (code, Some(format!("from `{}`", e.module)))
+                let doc = self
+                    .source(&e.module)
+                    .and_then(|source| doc::comments(&source.text).remove(&e.name));
+                let from = format!("from `{}`", e.module);
+                (
+                    code,
+                    Some(doc.map_or(from.clone(), |d| format!("{d}\n\n{from}"))),
+                )
             }
             Symbol::Operation {
                 module,
