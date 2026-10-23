@@ -1,0 +1,6 @@
+clock: (true, true, true)
+clock_with: true
+seeded repeats: (true, false)
+ranges: (true, true, true, true, [1, 2, 3, 4, 5], true)
+half open: true
+seeded: (0.2272248550901319, true, -6060681006916471, 13.003561256663009, 2, [4, 1, 2, 5, 3], "b")

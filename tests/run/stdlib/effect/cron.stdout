@@ -1,0 +1,11 @@
+parse: ["0 9 * * 1-5", "0-45/15 0 1,15 * *", "error: Invalid number of segments in cron expression: \"0 9 * *\"", "error: Expected a value between 0 and 23: \"0 99 * * *\""]
+make: ["0,30 12 * * 6", "error: hours must contain only integers between 0 and 23"]
+format: ("0 0 9 * * 1-5", "0 9 * * 1-5")
+match_: (true, false)
+next: 2024-03-11T09:00:00.000Z
+prev: 2024-03-08T09:00:00.000Z
+sequence: ["2024-03-11T09:00:00.000Z", "2024-03-12T09:00:00.000Z", "2024-03-13T09:00:00.000Z"]
+never: Ok ("none", 0)
+in a zone: 2024-03-12T08:00:00.000Z
+equal: (true, Ok true, Ok false)
+Schedule.cron: (3, true)

@@ -1,0 +1,70 @@
+/// Effect's `Cron`: sets of seconds, minutes, hours, days, months and
+/// weekdays, optionally in a time zone; `Schedule.cron` runs by one.
+module Cron exposing (..)
+
+/// A parsed cron expression.
+type Cron
+
+/// Why a cron expression or its fields were refused.
+type error CronParseError = CronParseError String
+  deriving Eq, Show
+
+/// The fields of `make`; an empty list is every value, `seconds` defaults
+/// to `[0]`; with `and`, both the days and the weekdays must match. The
+/// zone is required, so matching never depends on the machine's zone.
+type alias Fields =
+  {
+    seconds : Option (List Number);
+    minutes : List Number;
+    hours : List Number;
+    days : List Number;
+    months : List Number;
+    weekdays : List Number;
+    and : Option Bool;
+    tz : DateTime.TimeZone
+  }
+
+/// A cron of the fields; an error when a value is out of its range.
+make : Fields -> Result CronParseError Cron
+foreign pure make from "@flick-lang/runtime/effect/Cron" "flickMake"
+  reviewed "effect@4.0.5 sha256:c2b4f0bb7afe1d9c"
+
+/// Parses `"0 9 * * 1-5"` (five fields, or six with seconds first), in the
+/// zone (`DateTime.zone_make_local ()` for the machine's).
+parse : DateTime.TimeZone -> String -> Result CronParseError Cron
+foreign pure parse from "@flick-lang/runtime/effect/Cron" "flickParse"
+  reviewed "effect@4.0.5 sha256:35cf882bb2a2b136"
+
+/// The expression; seconds only when not just 0 or with `includeSeconds`.
+format : { includeSeconds : Option Bool } -> Cron -> String
+foreign pure format from "@flick-lang/runtime/effect/Cron" "flickFormat"
+  reviewed "effect@4.0.5 sha256:ae886bf603f2efbc"
+
+/// Whether the date-time matches the cron.
+match_ : DateTime.DateTime -> Cron -> Bool
+foreign pure match_ from "@flick-lang/runtime/effect/Cron" "flickMatch"
+  reviewed "effect@4.0.5 sha256:4e2f31859d4dd47c"
+
+/// The first matching date-time after `now`; `None` when there is none.
+next : DateTime.DateTime -> Cron -> Option DateTime.DateTime
+foreign pure next from "@flick-lang/runtime/effect/Cron" "flickNext"
+  reviewed "effect@4.0.5 sha256:a1f72ebb92f6c465"
+
+/// The last matching date-time before `now`; `None` when there is none.
+prev : DateTime.DateTime -> Cron -> Option DateTime.DateTime
+foreign pure prev from "@flick-lang/runtime/effect/Cron" "flickPrev"
+  reviewed "effect@4.0.5 sha256:918047eefaa443f0"
+
+/// The first `n` matching date-times after `now`.
+sequence : Number -> DateTime.DateTime -> Cron -> List DateTime.DateTime
+foreign pure sequence from "@flick-lang/runtime/effect/Cron" "flickSequence"
+  reviewed "effect@4.0.5 sha256:b5ba16bdd3820ae7"
+
+/// Whether two crons have the same fields and zone.
+equals_cron : Cron -> Cron -> Bool
+foreign pure equals_cron from "@flick-lang/runtime/effect/Cron" "Equivalence"
+  reviewed "effect@4.0.5 sha256:72a90d81cf191e92"
+
+instance Eq Cron =
+  eq : Cron -> Cron -> Bool
+  let eq x y = equals_cron x y

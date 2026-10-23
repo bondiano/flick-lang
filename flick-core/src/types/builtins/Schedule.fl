@@ -165,3 +165,8 @@ current_metadata : Unit ->{} Metadata JsValue JsValue
 foreign effect current_metadata from "@flick-lang/runtime/effect/Schedule" "flickCurrentMetadata"
   arity 0
   reviewed "effect@4.0.5 sha256:e8b706a551dc4e19"
+
+/// Recurs at each date-time the cron matches, outputting the delay until it.
+cron : Cron.Cron -> Schedule none none i Duration.Duration
+foreign pure cron from "@flick-lang/runtime/effect/Schedule" "cron"
+  reviewed "effect@4.0.5 sha256:cee83aff28207935"

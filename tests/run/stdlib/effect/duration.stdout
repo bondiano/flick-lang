@@ -1,0 +1,16 @@
+units: ["1500ns", "1ms 500000ns", "1s 500ms", "1m 30s", "1h 30m", "1d 1h", "8d", "7d"]
+refused: ["error: micros: -1 is negative", "error: hours: -1 is negative", "error: days: NaN is not a duration", "error: weeks: 1e+308 overflows; use Duration.infinity for an unbounded duration"]
+from_input: ["5s", "1h 30m", "Infinity", "error: from_input \"-5 seconds\": the result is negative", "error: not a duration: \"soon\""]
+to: ["5400", "90", "1.5", "1.5", "2", "none", "none"]
+to_nanos: (Some 2000000n, None)
+to_hr_time: (Some (1, 500000000), None)
+parts: (1, 2, 3, 4, 5, 0)
+predicates: (true, false, true, false, false)
+match_: ["millis 3", "nanos 7n", "infinite"]
+match_pair: ["millis 3", "nanos 3n", "infinite"]
+arithmetic: ("1s 200ms", "6ms")
+checked: ["500ms", "error: subtract: the result is negative", "1s", "error: times: -1 is negative or NaN", "250ms", "error: divide: cannot divide by 0", "error: divide: cannot divide by -2"]
+bounds: ["5ms", "9ms", "10ms", "20ms"]
+between: (true, false)
+compare: [true, true, false, true]
+order: (LT, true, GT)

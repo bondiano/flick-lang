@@ -18,7 +18,7 @@ service Log =
 service Users =
   get : UserId ->{; NotFound} User
 
-service Clock =
+service Ticker =
   now : Unit ->{} Number
 
 service Repo a =
@@ -30,13 +30,13 @@ foreign pure users_live from "./users.js" "usersLive"
 js_now : Unit ->{} Number
 foreign sync js_now from "./clock.js" "now"
 
-clock_impl : Clock.Impl
+clock_impl : Ticker.Impl
 let clock_impl =
   { now = js_now }
 
-clock_layer : Layer none none {Clock}
+clock_layer : Layer none none {Ticker}
 let clock_layer =
-  Layer.succeed Clock clock_impl
+  Layer.succeed Ticker clock_impl
 
 load_name : UserId ->{Users, Log; NotFound} String
 let load_name id =
@@ -53,14 +53,14 @@ let application id =
 timed : Unit ->{} Number
 let timed () =
   provide clock_layer {
-    Clock.now ()
+    Ticker.now ()
   }
 
-environment : Layer {Config} {ConnectError} {Users, Clock}
+environment : Layer {Config} {ConnectError} {Users, Ticker}
 let environment =
   Layer.merge users_live clock_layer
 
-replaced : Layer none none {Clock}
+replaced : Layer none none {Ticker}
 let replaced =
   Layer.override clock_layer clock_layer
 
@@ -69,7 +69,7 @@ let lookup id =
   Repo.find id
 
 // a method of an implementation record runs without a lookup
-read_clock : Clock.Impl -> Unit ->{} Number
+read_clock : Ticker.Impl -> Unit ->{} Number
 let read_clock implementation () =
   implementation.now ()
 

@@ -1,10 +1,12 @@
-[pending]
-Random = "M20"
-choice = "M20"
-next = "M20"
-nextBetween = "M20"
-nextBoolean = "M20"
-nextInt = "M20"
-nextIntBetween = "M20"
-shuffle = "M20"
-withSeed = "M20"
+[wrapped]
+next = "Random.next 139b4a34859dc62b"
+nextBoolean = "Random.next_boolean a67565a1f6dd2738"
+nextInt = "Random.next_int 1a7a2fb0fb70f2ba"
+nextBetween = "Random.next_between aa6a35c1f1be26d2"
+nextIntBetween = "Random.next_int_between f366445a68ad45fc"
+shuffle = "Random.shuffle 0a20473062dfbea9"
+choice = "Random.choice 902606ec0b585c36"
+withSeed = "Random.with_seed 2d13d347f06a3a37"
+
+[excluded]
+Random = "invariant: unsafe: the service offers only `nextIntUnsafe` and `nextDoubleUnsafe`, reads outside a runtime call; the draws of this module read it"

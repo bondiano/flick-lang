@@ -26,6 +26,7 @@ while = "Schedule.while 14e7a1f6ce7c5420"
 addDelay = "Schedule.add_delay 8bc2728ac1228e4a"
 modifyDelay = "Schedule.modify_delay 4781c7c4cc6ad37d"
 CurrentMetadata = "Schedule.current_metadata e8b706a551dc4e19"
+cron = "Schedule.cron cee83aff28207935"
 
 [excluded]
 Env = "TS-only: extracts a type parameter of a schedule type"
@@ -39,6 +40,3 @@ fromStepWithMetadata = "invariant: steps signal their end through the error chan
 toStep = "invariant: steps signal their end through the error channel (`Pull.Halt`); typed failures carry only errors"
 toStepWithMetadata = "invariant: steps signal their end through the error channel (`Pull.Halt`); typed failures carry only errors"
 toStepWithSleep = "invariant: steps signal their end through the error channel (`Pull.Halt`); typed failures carry only errors"
-
-[pending]
-cron = "M20"

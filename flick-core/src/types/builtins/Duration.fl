@@ -2,44 +2,245 @@
 /// checked; `infinity` is explicit.
 module Duration exposing (..)
 
+/// A length of time, finite or `infinity`, never negative.
 type Duration
 
+/// Why a duration could not be made: negative, NaN, overflowing or unparsable.
 type error DurationError = DurationError String
   deriving Eq, Show
 
+/// A finite duration split into whole units, largest first.
+type alias Parts =
+  {
+    days : Number;
+    hours : Number;
+    minutes : Number;
+    seconds : Number;
+    millis : Number;
+    nanos : Number
+  }
+
+/// `n` nanoseconds; an error when negative.
 nanos : BigInt -> Result DurationError Duration
 foreign pure nanos from "@flick-lang/runtime" "durationNanos"
+  reviewed "effect@4.0.5 sha256:f813de78495446b2"
 
+/// `n` microseconds; an error when negative.
+micros : BigInt -> Result DurationError Duration
+foreign pure micros from "@flick-lang/runtime/effect/Duration" "flickMicros"
+  reviewed "effect@4.0.5 sha256:fbb8c8716107aee8"
+
+/// `n` milliseconds; an error when negative, NaN or overflowing.
 millis : Number -> Result DurationError Duration
 foreign pure millis from "@flick-lang/runtime" "durationMillis"
+  reviewed "effect@4.0.5 sha256:0ff8b217e730f07e"
 
+/// `n` seconds; an error when negative, NaN or overflowing.
 seconds : Number -> Result DurationError Duration
 foreign pure seconds from "@flick-lang/runtime" "durationSeconds"
+  reviewed "effect@4.0.5 sha256:21baffcaab36af1f"
 
+/// `n` minutes; an error when negative, NaN or overflowing.
 minutes : Number -> Result DurationError Duration
 foreign pure minutes from "@flick-lang/runtime" "durationMinutes"
+  reviewed "effect@4.0.5 sha256:7880441c236432ce"
 
+/// `n` hours; an error when negative, NaN or overflowing.
+hours : Number -> Result DurationError Duration
+foreign pure hours from "@flick-lang/runtime/effect/Duration" "flickHours"
+  reviewed "effect@4.0.5 sha256:88a215f1814dd0e6"
+
+/// `n` days of 24 hours; an error when negative, NaN or overflowing.
+days : Number -> Result DurationError Duration
+foreign pure days from "@flick-lang/runtime/effect/Duration" "flickDays"
+  reviewed "effect@4.0.5 sha256:b376bd56e16bf06f"
+
+/// `n` weeks of 7 days; an error when negative, NaN or overflowing.
+weeks : Number -> Result DurationError Duration
+foreign pure weeks from "@flick-lang/runtime/effect/Duration" "flickWeeks"
+  reviewed "effect@4.0.5 sha256:45943045333d963f"
+
+/// Parses `"5 seconds"`, `"1.5 hours"`, `"Infinity"`…; an error for
+/// anything else or a negative duration.
+from_input : String -> Result DurationError Duration
+foreign pure from_input from "@flick-lang/runtime/effect/Duration" "flickFromInput"
+  reviewed "effect@4.0.5 sha256:0c492b173776f0ef"
+
+/// No time at all.
 zero : Duration
 foreign pure zero from "@flick-lang/runtime" "durationZero"
+  reviewed "effect@4.0.5 sha256:3ed4c51ffc2f8efd"
 
+/// Longer than any finite duration.
 infinity : Duration
 foreign pure infinity from "@flick-lang/runtime" "durationInfinity"
+  reviewed "effect@4.0.5 sha256:727300e5ca2d5fcd"
 
+/// Whether the duration is not `infinity`.
 is_finite : Duration -> Bool
 foreign pure is_finite from "@flick-lang/runtime" "durationIsFinite"
+  reviewed "effect@4.0.5 sha256:09aaac139e9b6417"
+
+/// Whether the duration is `zero`.
+is_zero : Duration -> Bool
+foreign pure is_zero from "@flick-lang/runtime/effect/Duration" "isZero"
+  reviewed "effect@4.0.5 sha256:b3ae53a140b8b67f"
+
+/// Whether the duration is longer than `zero`.
+is_positive : Duration -> Bool
+foreign pure is_positive from "@flick-lang/runtime/effect/Duration" "isPositive"
+  reviewed "effect@4.0.5 sha256:660e9907ef988198"
 
 /// The milliseconds, rounded as a number; `None` for `infinity`.
 to_millis : Duration -> Option Number
 foreign pure to_millis from "@flick-lang/runtime" "durationToMillis"
+  reviewed "effect@4.0.5 sha256:73d96fb3b27ab61d"
 
+/// The seconds, as a fraction; `None` for `infinity`.
+to_seconds : Duration -> Option Number
+foreign pure to_seconds from "@flick-lang/runtime/effect/Duration" "flickToSeconds"
+  reviewed "effect@4.0.5 sha256:15004b95b1b81cd4"
+
+/// The minutes, as a fraction; `None` for `infinity`.
+to_minutes : Duration -> Option Number
+foreign pure to_minutes from "@flick-lang/runtime/effect/Duration" "flickToMinutes"
+  reviewed "effect@4.0.5 sha256:a9b29940e79604bc"
+
+/// The hours, as a fraction; `None` for `infinity`.
+to_hours : Duration -> Option Number
+foreign pure to_hours from "@flick-lang/runtime/effect/Duration" "flickToHours"
+  reviewed "effect@4.0.5 sha256:e8320ef50db91bd2"
+
+/// The days, as a fraction; `None` for `infinity`.
+to_days : Duration -> Option Number
+foreign pure to_days from "@flick-lang/runtime/effect/Duration" "flickToDays"
+  reviewed "effect@4.0.5 sha256:a1c73ff14822aab0"
+
+/// The weeks, as a fraction; `None` for `infinity`.
+to_weeks : Duration -> Option Number
+foreign pure to_weeks from "@flick-lang/runtime/effect/Duration" "flickToWeeks"
+  reviewed "effect@4.0.5 sha256:05ffb1ea95213af1"
+
+/// The exact nanoseconds; `None` for `infinity`.
+to_nanos : Duration -> Option BigInt
+foreign pure to_nanos from "@flick-lang/runtime/effect/Duration" "toNanos"
+  reviewed "effect@4.0.5 sha256:540b8739438b9345"
+
+/// Whole seconds and the nanoseconds left over; `None` for `infinity`.
+to_hr_time : Duration -> Option (Number, Number)
+foreign pure to_hr_time from "@flick-lang/runtime/effect/Duration" "flickToHrTime"
+  reviewed "effect@4.0.5 sha256:63bc9d9037f64175"
+
+/// The duration's parts: days, hours, minutes, seconds, millis, nanos.
+parts : Duration -> Parts
+foreign pure parts from "@flick-lang/runtime/effect/Duration" "parts"
+  reviewed "effect@4.0.5 sha256:2a19728d3ce685f7"
+
+/// By how the duration is stored: milliseconds, nanoseconds or infinity.
+match_ : { onMillis : Number -> a; onNanos : BigInt -> a; onInfinity : Unit -> a } -> Duration -> a
+foreign pure match_ from "@flick-lang/runtime/effect/Duration" "match"
+  arity 1
+  reviewed "effect@4.0.5 sha256:31d4417eed4e3b44"
+
+/// `match_` of two durations: both in milliseconds, both in nanoseconds,
+/// or either infinite.
+match_pair :
+  Duration ->
+  {
+    onMillis : Number -> Number -> a;
+    onNanos : BigInt -> BigInt -> a;
+    onInfinity : Duration -> Duration -> a
+  } ->
+  Duration ->
+  a
+foreign pure match_pair from "@flick-lang/runtime/effect/Duration" "flickMatchPair"
+  arity 2
+  reviewed "effect@4.0.5 sha256:a8d7bbe01b1d9a5b"
+
+/// The sum of the two durations.
 add : Duration -> Duration -> Duration
 foreign pure add from "@flick-lang/runtime" "durationAdd"
+  reviewed "effect@4.0.5 sha256:babebeb6b19e5ede"
 
+/// The sum of all the durations; `zero` for none.
+sum_all : List Duration -> Duration
+let sum_all ds = List.fold_left add zero ds
+
+/// `d |> subtract x` is `d - x`; an error when `x` is the longer.
+subtract : Duration -> Duration -> Result DurationError Duration
+foreign pure subtract from "@flick-lang/runtime/effect/Duration" "flickSubtract"
+  arity 1
+  reviewed "effect@4.0.5 sha256:8e3e1ffe427d630c"
+
+/// `d |> times n` is `d * n`; an error when `n` is negative or NaN.
+times : Number -> Duration -> Result DurationError Duration
+foreign pure times from "@flick-lang/runtime/effect/Duration" "flickTimes"
+  arity 1
+  reviewed "effect@4.0.5 sha256:cac84b620a48952c"
+
+/// `d |> divide n` is `d / n`; an error when `n` is zero, negative or not finite.
+divide : Number -> Duration -> Result DurationError Duration
+foreign pure divide from "@flick-lang/runtime/effect/Duration" "flickDivide"
+  arity 1
+  reviewed "effect@4.0.5 sha256:b4f2c7988a7c2090"
+
+/// The shorter of the two.
+min : Duration -> Duration -> Duration
+foreign pure min from "@flick-lang/runtime/effect/Duration" "min"
+  arity 1
+  reviewed "effect@4.0.5 sha256:833434d31ef58728"
+
+/// The longer of the two.
+max : Duration -> Duration -> Duration
+foreign pure max from "@flick-lang/runtime/effect/Duration" "max"
+  arity 1
+  reviewed "effect@4.0.5 sha256:c43c839fc51a969f"
+
+/// The duration, moved into the bounds.
+clamp : { minimum : Duration; maximum : Duration } -> Duration -> Duration
+foreign pure clamp from "@flick-lang/runtime/effect/Duration" "clamp"
+  arity 1
+  reviewed "effect@4.0.5 sha256:85cf3ff13183cba2"
+
+/// Whether the duration lies within the bounds, both included.
+between : { minimum : Duration; maximum : Duration } -> Duration -> Bool
+foreign pure between from "@flick-lang/runtime/effect/Duration" "between"
+  arity 1
+  reviewed "effect@4.0.5 sha256:d1b6be25cabdd66b"
+
+/// `d |> is_less_than x` is `d < x`.
+is_less_than : Duration -> Duration -> Bool
+foreign pure is_less_than from "@flick-lang/runtime/effect/Duration" "isLessThan"
+  arity 1
+  reviewed "effect@4.0.5 sha256:1bcb8421e8384dfc"
+
+/// `d |> is_less_than_or_equal_to x` is `d <= x`.
+is_less_than_or_equal_to : Duration -> Duration -> Bool
+foreign pure is_less_than_or_equal_to from "@flick-lang/runtime/effect/Duration" "isLessThanOrEqualTo"
+  arity 1
+  reviewed "effect@4.0.5 sha256:3cfd0fe0c7af42c7"
+
+/// `d |> is_greater_than x` is `d > x`.
+is_greater_than : Duration -> Duration -> Bool
+foreign pure is_greater_than from "@flick-lang/runtime/effect/Duration" "isGreaterThan"
+  arity 1
+  reviewed "effect@4.0.5 sha256:83c48a164b671b93"
+
+/// `d |> is_greater_than_or_equal_to x` is `d >= x`.
+is_greater_than_or_equal_to : Duration -> Duration -> Bool
+foreign pure is_greater_than_or_equal_to from "@flick-lang/runtime/effect/Duration" "isGreaterThanOrEqualTo"
+  arity 1
+  reviewed "effect@4.0.5 sha256:7dcb0ab653d5fa87"
+
+/// The order of durations, shortest first.
 compare_duration : Duration -> Duration -> Ordering
 foreign pure compare_duration from "@flick-lang/runtime" "durationCompare"
+  reviewed "effect@4.0.5 sha256:6ee08c6eacd14cfd"
 
+/// `1h 2m 3s`; `Infinity` for `infinity`.
 format : Duration -> String
 foreign pure format from "@flick-lang/runtime" "durationFormat"
+  reviewed "effect@4.0.5 sha256:5aef00b392b3dadc"
 
 instance Eq Duration =
   eq : Duration -> Duration -> Bool
