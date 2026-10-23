@@ -222,7 +222,7 @@ rec_group   = "rec" "{" { signature | let } "}"
 type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
             | ["opaque"] "type" "alias" Con { param } "=" type [deriving]
             | "refined" "type" Con { param } "=" type "where" expr [deriving]
-            | ("unboxed" | "untagged") "type" Con { param } "=" variants [deriving]
+            | ["opaque"] ("unboxed" | "untagged") "type" Con { param } "=" variants [deriving]
 variants    = ["|"] variant { "|" variant }
 variant     = Con { capture }                   // fields are atomic types
 param       = name | "(" name ":" kind ")"

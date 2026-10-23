@@ -61,6 +61,9 @@ unboxed type UserId = UserId String
 untagged type Key = ByNumber Number | ByName String | ByPath (List String)
 ```
 
+`opaque unboxed type Token = Token String` hides the constructor from
+importers as `opaque type` does, and keeps the string itself at run time.
+
 `==` is canonical structural equality: SameValueZero on numbers, so
 `NaN == NaN` and `0 == -0`; `Number.strict_equal` is `===` and
 `Number.same_value` is `Object.is`. `<`, `<=`, `>`, `>=` are the JS

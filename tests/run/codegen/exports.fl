@@ -8,7 +8,8 @@ type Tree a = Leaf | Node (Tree a) a (Tree a)
 
 type alias Point = { x : Number; y : Number }
 
-opaque type Token = Token String
+// a string in JS, and to TypeScript an opaque brand
+opaque unboxed type Token = Token String
 
 type error NotFound = NotFound String
 

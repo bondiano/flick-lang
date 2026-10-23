@@ -416,7 +416,7 @@ let project_name value =
 class Show a =
   show : a -> String
 
-type PrintableUser =
+unboxed type PrintableUser =
   | PrintableUser User
 
 instance Show PrintableUser =
@@ -548,11 +548,11 @@ Show (List Number)
 Пусть `Hash` определён стандартной библиотекой, а `ExternalId` — SDK. Пакет адаптера, не владеющий ни классом, ни исходным типом, не может объявить глобальный `Hash ExternalId` при no-orphan политике.
 
 ```flick
-type LocalExternalId =
+unboxed type LocalExternalId =
   | LocalExternalId ExternalId
 ```
 
-Теперь адаптер владеет номинальным типом и может дать ему canonical instances. Прозрачный alias `type alias LocalExternalId = ExternalId` новой идентичности не создаёт. Другие пути — instance у владельца класса/типа или переданный явно dictionary.
+Теперь адаптер владеет номинальным типом и может дать ему canonical instances. `unboxed` оставляет во время выполнения сам `ExternalId`: обёртка ничего не аллоцирует и уходит в SDK как есть, а идентичность и instances остаются у номинального типа. Прозрачный alias `type alias LocalExternalId = ExternalId` новой идентичности не создаёт. Другие пути — instance у владельца класса/типа или переданный явно dictionary.
 
 Владение определяется **пакетом**: объявить instance может пакет класса либо пакет внешнего номинального конструктора **первого параметра head**. Прозрачный alias и structural record владельца не создают. Для MPTC владение только более поздним параметром недостаточно: пакет `LocalEmail` не получает право объявить чужой `Convert String LocalEmail`. Для этого нужен explicit codec/dictionary, wrapper первого параметра либо instance у владельца класса. Такой ограничительный anchor исключает конкурирующих владельцев разных параметров; цена — дополнительные wrappers в интеграциях. Binding не меняет идентичность foreign-типа.
 
@@ -1658,7 +1658,7 @@ unboxed type UserId = UserId String
 untagged type Key = ByNumber Number | ByName String | ByPath (List String)
 ```
 
-Значение `unboxed type` — поле его единственного конструктора с одним полем. `untagged type` — поле каждого конструктора; поля различимы по JS-типу (`Number`, `String`, `Bool`, `BigInt`, один list/tuple), и checker отвергает пересечение (`FLICK-T020`). Сопоставление с образцом проверяет `typeof`/`Array.isArray` вместо `_tag`. Derived `Eq`, `Ord`, `Hash`, `Show` работают по представлению; wire-форма `deriving Schema` у `unboxed type` — форма поля, у `untagged type` derived witness нет, его собирают combinators `Schema`. TS-проекция — тип поля или объединение типов полей.
+Значение `unboxed type` — поле его единственного конструктора с одним полем. `opaque unboxed type` скрывает конструктор от импортёров так же, как `opaque type`. `untagged type` — поле каждого конструктора; поля различимы по JS-типу (`Number`, `String`, `Bool`, `BigInt`, один list/tuple), и checker отвергает пересечение (`FLICK-T020`). Сопоставление с образцом проверяет `typeof`/`Array.isArray` вместо `_tag`. Derived `Eq`, `Ord`, `Hash`, `Show` работают по представлению; wire-форма `deriving Schema` у `unboxed type` — форма поля, у `untagged type` derived witness нет, его собирают combinators `Schema`. TS-проекция — тип поля или объединение типов полей.
 
 У [ReScript int имеет 32-битную семантику](https://rescript-lang.org/docs/manual/primitive-types/). `Number` во Flick следует JS, поэтому `(a + b) | 0` и замена обычного умножения на `Math.imul` без отдельного доказательства запрещены.
 

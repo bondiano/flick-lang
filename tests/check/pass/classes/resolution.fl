@@ -2,9 +2,9 @@
 // their superclasses; a functional dependency fixes the element type.
 module App.Resolution exposing (..)
 
-type User = User String
+unboxed type User = User String
 
-type UserSet = UserSet (List User)
+unboxed type UserSet = UserSet (List User)
 
 class Collection c a | c -> a =
   empty : c

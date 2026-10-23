@@ -5,7 +5,8 @@ module App.Main exposing (main)
 
 import File exposing (Path)
 
-type alias UserId = Number
+// JS gets the number itself
+unboxed type UserId = UserId Number
 
 type alias User = { id : Number; name : String }
 
@@ -101,7 +102,7 @@ let user_name http =
   let user =
     try
       provide http {
-        fetch_user 7
+        fetch_user (UserId 7)
       }
     with
     | HttpError reason -> { id = 0; name = reason }

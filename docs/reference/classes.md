@@ -81,13 +81,17 @@ package, each dependency another, the built-in modules a third. A transparent
 alias or a record does not give ownership; a nominal wrapper does:
 
 ```flick
-type LocalExternalId = LocalExternalId ExternalId
+unboxed type LocalExternalId = LocalExternalId ExternalId
 
 instance Hash LocalExternalId =
   let hash id =
     match id with
     | LocalExternalId raw -> hash_external raw
 ```
+
+`unboxed` keeps the `ExternalId` itself at run time: the wrapper costs
+nothing and passes to the SDK as it is, while the instances belong to the
+nominal type.
 
 A module sees the instances of every module it depends on, directly or not,
 however it imports them; the order and form of `import` change nothing.

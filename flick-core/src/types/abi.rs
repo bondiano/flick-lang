@@ -16,8 +16,8 @@ impl Checker<'_> {
     pub(super) fn check_abi(&mut self, decl: &Node, name: &str) {
         let Some(word) = decl
             .child_tokens()
-            .next()
-            .filter(|t| t.kind == K::Ident)
+            .take_while(|t| t.kind != K::TypeKw)
+            .find(|t| t.kind == K::Ident)
             .map(|t| t.text(self.text).to_owned())
         else {
             return;

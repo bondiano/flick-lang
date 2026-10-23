@@ -11,12 +11,10 @@ cfd4deeeb00ff9b0  spec:67  load_name : UserId ->{Users, Log; NotFound} String
 872c8247235efbb4  spec:344  apply_twice :
 74a14e74a12990e3  spec:358  decode_pair :
 9bdd6c03c6da66f8  spec:384  name :
-e5f66d0cf1cb88c9  spec:415  class Show a =
 59ea26d822a0c2ae  spec:439  class Convert input output =
 ecba8ed13060594d  spec:464  class Collection c a | c -> a =
 c18064c876fe3adf  spec:473  empty_users : UserSet
 d2e8d6c7d9e16954  spec:492  class Collection c =
-4ec7dc6ae7ac5c84  spec:549  type LocalExternalId =
 1336bb8a8a86841e  spec:570  invalid : Unit ->{} String
 8e5624e4a3c33f25  spec:591  make_empty : forall a. Unit ->{} Ref (Option a)
 ac73e7b4530d3617  spec:610  make_identity : Unit -> (a -> a)
@@ -60,3 +58,5 @@ f288d88532aaff1e  spec:2179  type alias SaveButtonProps c =
 eafd6510c5484060  spec:1337  lookup : String ->{; JsError} Option String
 90506a3da26b61ad  spec:1655  unboxed type UserId = UserId String
 ded3987556b0d42a  spec:2262  type alias SelectProps a r e c =
+0bf407bdf82852be  spec:416  class Show a =
+9a9c17dd476c81cb  spec:551  unboxed type LocalExternalId =

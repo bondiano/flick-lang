@@ -196,12 +196,13 @@ fn type_params(p: &mut Parser) {
 /// variant type may name its JS representation, `unboxed` or `untagged`.
 fn type_decl(p: &mut Parser) {
     let m = p.start();
-    if p.at(K::Ident) {
-        p.bump();
-    }
     let refined = p.at(K::RefinedKw);
     if !p.eat(K::OpaqueKw) {
         p.eat(K::RefinedKw);
+    }
+    // `unboxed type`, `opaque unboxed type`, `untagged type`
+    if p.at_word("unboxed") || p.at_word("untagged") {
+        p.bump();
     }
     if p.expect(K::TypeKw) {
         // `alias` is a word only here: a type name is capitalized
