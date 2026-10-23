@@ -63,10 +63,12 @@
 | `flick-wasm/` | wasm-bindgen API для демо: `check` и compile preview |
 | `runtime/` | npm-пакет runtime adapter на TS поверх Effect 4.0.5 (owners, scopes, concurrency, FFI adapters, Cause, entry runner, UI bridge, SQL driver adapter) |
 | `stdlib/` | Стандартная библиотека: `.fl` модули + JS/TS adapters к Effect |
-| `tools/dts-importer/` | Node helper на `typescript`, который читает `.d.ts` для `flick ffi import` и снимает поверхность Effect для линтера покрытия (M20) |
-| `stdlib/Effect/surface.toml` | Манифест покрытия: каждый export закреплённого Effect с классификацией (M20) |
+| `tools/dts-importer/` | CLI на Flick поверх TypeScript API: читает `.d.ts` для `flick ffi import`, снимает поверхность Effect для линтера покрытия и переводит репозиторий на новый Effect (`just effect-bump`) (M20) |
+| `tools/astro-flick/` | Astro/Vite-плагин: `.fl`-модули собираются `flick build` и импортируются из страниц |
+| `stdlib/Effect/surface/` | Манифест покрытия: каждый export закреплённого Effect с классификацией, по файлу на модуль (M20) |
 | `tests/` | fixtures checker (pass/fail), e2e-программы на Node, differential debug/release |
-| `docs/` | Language reference, грамматика, каталог диагностик, руководства |
+| `docs/` | Сайт на Astro + Starlight: language reference, грамматика, каталог диагностик, руководства; playground на Flick с компилятором в wasm |
+| `editors/` | Расширения VS Code и Zed: подсветка и `flick lsp` (definition, hover с документацией и типами, format on save, диагностики) |
 
 Модули `flick-core` выносятся в отдельные crates только при реальной потребности
 (время сборки, wasm-граница). Заранее этого не делаем.
@@ -1113,26 +1115,33 @@ cache, tracing — типизированная stdlib. Цель — обёрт�
 - `just effect-bump <version>`: новый снимок, отчёт added/removed/changed,
   обновление pin в runtime и capability check M8.
 
-**Артефакты.** `tools/dts-importer` (режим `surface`), `stdlib/Effect/surface.toml`,
-`stdlib/**` обёртки, тест-линтер в `just check`, отчёт покрытия в CI.
+**Артефакты.** `tools/dts-importer` (написан на Flick: `cli`-блок с режимами
+`import`, `surface`, `bump`; к TypeScript API — тонкие foreign-bindings),
+`stdlib/Effect/snapshot.json`, манифест `stdlib/Effect/surface/` (по файлу на
+модуль), обёртки `flick-core/src/types/builtins/**`, линтер
+`flick-core/tests/effect_surface.rs` (в том числе: ноль `pending`), отчёт
+покрытия в CI (`just effect-coverage`).
+
+**Итог.** Покрытие `effect@4.0.5`: wrapped 3511, language 474, excluded 1234,
+pending 0.
 
 **AC**
 
-- [ ] Линтер падает (fixture с подменённым снимком) на: неклассифицированном
+- [x] Линтер падает (fixture с подменённым снимком) на: неклассифицированном
       export; записи для несуществующего export; изменившемся fingerprint
       сигнатуры `wrapped`-записи; `wrapped`, указывающем на отсутствующий
       символ stdlib `.iface`; `pending` без этапа-владельца. Сообщение называет
       `Module.name` и причину.
-- [ ] Для `effect` (core) ноль `pending`; новый entrypoint Effect без записи — ошибка.
-- [ ] Каждый `wrapped` используется хотя бы в одном тесте stdlib (проверка
+- [x] Для `effect` (core) ноль `pending`; новый entrypoint Effect без записи — ошибка.
+- [x] Каждый `wrapped` используется хотя бы в одном тесте stdlib (проверка
       статически по resolved-именам из `.iface` тестов).
-- [ ] Foreign-binding каждой обёртки несёт provenance `effect@<ver>`; линтер
+- [x] Foreign-binding каждой обёртки несёт provenance `effect@<ver>`; линтер
       сверяет его с закреплённой версией.
-- [ ] `just effect-bump` на fixture-версии с добавленным, удалённым и
+- [x] `just effect-bump` на fixture-версии с добавленным, удалённым и
       изменённым export выдаёт ожидаемый отчёт и красный линтер до ревью.
-- [ ] `Stream`, захвативший scoped-handle, не выходит из scope; `Schedule.retry`
+- [x] `Stream`, захвативший scoped-handle, не выходит из scope; `Schedule.retry`
       повторяет только typed failure, не defect (e2e).
-- [ ] CI публикует счётчики по статусам и модулям.
+- [x] CI публикует счётчики по статусам и модулям.
 
 ---
 
@@ -1164,20 +1173,20 @@ cache, tracing — типизированная stdlib. Цель — обёрт�
 
 **AC**
 
-- [ ] Отсутствующий или лишний handler endpoint'а — ошибка компиляции с именем
+- [x] Отсутствующий или лишний handler endpoint'а — ошибка компиляции с именем
       endpoint'а и группы.
-- [ ] Неверное тело запроса → `HttpApiError` 400 с `SchemaError` без живого
+- [x] Неверное тело запроса → `HttpApiError` 400 с `SchemaError` без живого
       input; typed ошибка handler'а → объявленный статус (e2e на реальном Node-сервере).
-- [ ] Клиент и сервер из одного `HttpApi` проходят round-trip каждого endpoint'а.
-- [ ] Cookies: set → parse round-trip; невалидное имя/значение → `CookiesError`;
+- [x] Клиент и сервер из одного `HttpApi` проходят round-trip каждого endpoint'а.
+- [x] Cookies: set → parse round-trip; невалидное имя/значение → `CookiesError`;
       `Redacted` cookie не печатается в логах.
-- [ ] Остановка сервера закрывает приём, ждёт активные запросы и finalizers (§7
+- [x] Остановка сервера закрывает приём, ждёт активные запросы и finalizers (§7
       протокол owner).
-- [ ] OpenAPI 3.1 для примера API совпадает со snapshot и валиден по
+- [x] OpenAPI 3.1 для примера API совпадает со snapshot и валиден по
       мета-схеме OpenAPI 3.1; нет `{}`/`any`; endpoint со scoped/opaque полем
       без wire codec → `ExportError` с путём `группа.endpoint -> поле`.
-- [ ] Swagger и Scalar Layers отдают тот же документ, что `schema export`.
-- [ ] Для `effect/http` и `effect/http-api` в манифесте ноль `pending`.
+- [x] Swagger и Scalar Layers отдают тот же документ, что `schema export`.
+- [x] Для `effect/http` и `effect/http-api` в манифесте ноль `pending`.
 
 ---
 
@@ -1207,17 +1216,17 @@ combinators. Parser блока уже есть; этап добавляет elab
 
 **AC**
 
-- [ ] Примеры `greet`, `tool` и `main` из §10 (сахар и combinators) компилируются
+- [x] Примеры `greet`, `tool` и `main` из §10 (сахар и combinators) компилируются
       в одинаковый IR.
-- [ ] Ошибки компиляции по списку §10: повтор имени, конфликт alias (включая
+- [x] Ошибки компиляции по списку §10: повтор имени, конфликт alias (включая
       `--help`/`-h`/`--version`/`--completions`), `Option` с default, `List` у
       `arg` не последним, тип без `Cli.Value`, default не того типа, команда без
       `handle` и подкоманд, `arg` рядом с `subcommand`, опечатка в поле record'а опций.
-- [ ] Неверный ввод (`--times abc`, неизвестный флаг, нет обязательного arg) →
+- [x] Неверный ввод (`--times abc`, неизвестный флаг, нет обязательного arg) →
       `CliError` с текстом Effect CLI и кодом выхода `1` после cleanup (e2e).
-- [ ] `--help` и completions (bash, zsh, fish) совпадают со snapshot.
-- [ ] Handler, захвативший scoped-ресурс, не выходит из scope (M6).
-- [ ] Для `effect/cli` в манифесте ноль `pending`.
+- [x] `--help` и completions (bash, zsh, fish) совпадают со snapshot.
+- [x] Handler, захвативший scoped-ресурс, не выходит из scope (M6).
+- [x] Для `effect/cli` в манифесте ноль `pending`.
 
 ---
 
