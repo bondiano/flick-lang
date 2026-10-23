@@ -97,6 +97,8 @@ pub(crate) struct Parser<'t> {
     no_brace: bool,
     /// Inside `sql { … }` clause words end an application.
     sql_depth: u32,
+    /// Inside `sql table`: `via` ends the type of a column.
+    sql_table: bool,
     depth: u32,
 }
 
@@ -168,6 +170,7 @@ impl<'t> Parser<'t> {
             failed: false,
             no_brace: false,
             sql_depth: 0,
+            sql_table: false,
             depth: 0,
         }
     }

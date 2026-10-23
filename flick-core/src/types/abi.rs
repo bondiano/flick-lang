@@ -14,6 +14,9 @@ use crate::syntax::kind::SyntaxKind as K;
 impl Checker<'_> {
     /// Checks the representation a type declaration names and records it.
     pub(super) fn check_abi(&mut self, decl: &Node, name: &str) {
+        if decl.kind != K::TypeDecl {
+            return;
+        }
         let Some(word) = decl
             .child_tokens()
             .take_while(|t| t.kind != K::TypeKw)

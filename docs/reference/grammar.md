@@ -56,6 +56,8 @@ Contextual words are ordinary names everywhere except in one position:
   `insert_into`, `values`, `update`, `set`, `delete_from`, `returning` (plus the
   keywords `from` and `where`). Inside a SQL block such a word ends a function
   application, so a clause may continue on the next line;
+- `table` right after `sql` at the top level, and `via` after the type of a
+  column of a `sql table` (see [sql.md](sql.md));
 - CLI clause words at the start of a clause inside `cli { … }`: `description`,
   `flag`, `arg`, `subcommand`, `handle`.
 
@@ -215,7 +217,7 @@ item        = name | Con | Con "(..)" | ".."
 ModulePath  = Con { "." Con }
 
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
-            | service | class | instance | foreign
+            | service | class | instance | foreign | sql_table
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
 rec_group   = "rec" "{" { signature | let } "}"
@@ -237,6 +239,8 @@ members     = block of: signature | let | type_decl
 foreign     = "foreign" mode name "from" ("global" String | String String) [metadata]
             | "foreign" "blocked" name String
 mode        = "pure" | "sync" | "async" | "effect"
+sql_table   = "sql" "table" Con String "{" column { column } "}"
+column      = name ":" { name | "not" } "as" type ["via" expr]
 metadata    = indented lines: meta_name { atom }
 ```
 

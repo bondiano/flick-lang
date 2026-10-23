@@ -57,7 +57,7 @@ impl Checker<'_> {
     }
 
     /// The companions of each exported type of this module, `T$schema`,
-    /// `T$parse`, `T$value`, `T$json`, as values beside it.
+    /// `T$parse`, `T$value`, `T$json`, `T$table`, as values beside it.
     fn export_companions(&self, interface: &mut Interface) {
         let types: Vec<String> = interface
             .exports
@@ -66,7 +66,7 @@ impl Checker<'_> {
             .map(|e| e.entity.name.clone())
             .collect();
         for ty in types {
-            for member in ["schema", "parse", "value", "json"] {
+            for member in ["schema", "parse", "value", "json", "table"] {
                 let entity = self
                     .env
                     .entity(Namespace::Value, &super::companion_name(&ty, member));

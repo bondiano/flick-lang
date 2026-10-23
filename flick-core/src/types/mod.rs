@@ -38,6 +38,7 @@ mod report;
 mod rows;
 mod schemas;
 mod services;
+mod sql;
 mod toplevel;
 mod ty;
 mod typing;
@@ -56,7 +57,8 @@ pub use schemas::{companion_name, witness_entity};
 pub use ty::{Binder, Effects, PRELUDE, Row, Type};
 pub use typing::{
     CodecBlock, Constructor, ForeignInfo, InstanceInfo, Lift, Owner, Range, Ref, SchemaItem,
-    SchemaPlan, Typing, default_method, passes_dictionary,
+    SchemaPlan, SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue, Typing, default_method,
+    passes_dictionary,
 };
 
 use convert::TyVar;

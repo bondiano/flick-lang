@@ -5,6 +5,7 @@
 
 mod expr;
 mod pattern;
+mod sql;
 
 use std::collections::{HashMap, HashSet};
 use std::iter;
@@ -181,6 +182,7 @@ impl Lower<'_> {
                 }
             }
             K::TypeDecl | K::ErrorDecl => self.type_items(decl, span, items),
+            K::SqlTableDecl => self.sql_table(decl, span, items),
             K::ClassDecl => {
                 let Some(class) = self.token_text(decl, K::Con) else {
                     return;
@@ -387,7 +389,6 @@ impl Lower<'_> {
 
     fn unsupported(&mut self, node: &Node) {
         let what = match node.kind {
-            K::SqlExpr => "`sql` blocks",
             K::UiExpr => "`ui` blocks",
             K::CliExpr => "`cli` blocks",
             _ => "`schema` expressions",

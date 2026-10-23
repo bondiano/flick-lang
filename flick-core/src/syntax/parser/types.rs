@@ -110,10 +110,11 @@ pub(super) fn union(p: &mut Parser) -> Option<Done> {
 }
 
 pub(super) fn at_atom_start(p: &Parser) -> bool {
-    matches!(
-        p.current(),
-        K::Ident | K::Con | K::NoneKw | K::String | K::LParen | K::LBrace
-    )
+    !(p.sql_table && p.at_word("via"))
+        && matches!(
+            p.current(),
+            K::Ident | K::Con | K::NoneKw | K::String | K::LParen | K::LBrace
+        )
 }
 
 fn app(p: &mut Parser) -> Option<Done> {

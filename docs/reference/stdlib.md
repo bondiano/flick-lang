@@ -50,6 +50,7 @@ and `Monad`.
 | `Resource` | `acquire_release` into a scope's owner, and `bracket` |
 | `Events` | `queue` policies and the `log_failures` supervisor |
 | `Ui`, `Ui.Event` | user interfaces rendered with React, see [ui.md](ui.md) |
+| `Sql`, `Database` | typed PostgreSQL queries and the `Database` service, see [sql.md](sql.md) |
 | `JsError` | `JsError.from_js`, the error of a foreign throw or rejection, see [ffi.md](ffi.md) |
 | `Fiber`, `Failure`, `Exit`, `RawCause` | children of a scope and outcomes |
 | `Test`, `Gen` | tests and generators, see below |

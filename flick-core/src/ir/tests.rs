@@ -29,7 +29,8 @@ pub(crate) fn check_text(
         tree: &parse.tree,
         syntax: &syntax,
     };
-    let (mut interface, mut diagnostics) = resolve::resolve(&module, &|_| None);
+    let builtin = |name: &str| types::builtins().iter().find(|i| i.module == name).cloned();
+    let (mut interface, mut diagnostics) = resolve::resolve(&module, &builtin);
     let local = |n: &str| n == module_name;
     let options = types::Options {
         local: &local,
@@ -37,7 +38,7 @@ pub(crate) fn check_text(
     };
     let (more, typing) = types::check_typed(
         &module,
-        &|_| None,
+        &builtin,
         types::builtins(),
         options,
         &mut interface,

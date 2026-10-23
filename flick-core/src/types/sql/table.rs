@@ -1,0 +1,280 @@
+//! `sql table Name "table" { column : sql type … as T [via codec] }`: the
+//! type `Name` of a row and the companion value `Name$table` of type
+//! `Sql.Table { column : Sql.Column T n w, … }`, whose indices say whether
+//! the column may be `NULL` and what an `INSERT` must give it.
+
+use super::super::Checker;
+use super::super::convert::{Free, is_type};
+use super::super::kinds::Kind;
+use super::super::ty::{Row, Type};
+use super::super::typing::{SqlColumn, SqlTable, range};
+use crate::diagnostics::codes;
+use crate::iface::Namespace;
+use crate::source::Span;
+use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::literal::string_value;
+
+pub const SQL: &str = "Sql";
+
+/// SQL types by their words, with the runtime kind and the Flick type a
+/// value of the column has without a codec.
+const TYPES: [(&str, &str, &str); 25] = [
+    ("bigint", "bigint", "BigInt"),
+    ("int8", "bigint", "BigInt"),
+    ("bigserial", "bigint", "BigInt"),
+    ("integer", "number", "Number"),
+    ("int", "number", "Number"),
+    ("int4", "number", "Number"),
+    ("smallint", "number", "Number"),
+    ("int2", "number", "Number"),
+    ("serial", "number", "Number"),
+    ("real", "number", "Number"),
+    ("double precision", "number", "Number"),
+    ("float8", "number", "Number"),
+    ("numeric", "numeric", "BigDecimal"),
+    ("decimal", "numeric", "BigDecimal"),
+    ("text", "text", "String"),
+    ("varchar", "text", "String"),
+    ("character varying", "text", "String"),
+    ("uuid", "uuid", "String"),
+    ("boolean", "bool", "Bool"),
+    ("bool", "bool", "Bool"),
+    ("date", "date", "String"),
+    ("timestamp", "timestamp", "String"),
+    ("timestamptz", "timestamptz", "String"),
+    ("jsonb", "json", "Json"),
+    ("json", "json", "Json"),
+];
+
+/// The Flick type of a value of a runtime kind, without a codec.
+pub fn base_type(kind: &str) -> Type {
+    let name = TYPES
+        .iter()
+        .find(|(_, k, _)| *k == kind)
+        .map_or("Unknown", |(_, _, t)| t);
+    match name {
+        "BigDecimal" => Type::con("BigDecimal", "BigDecimal"),
+        "Json" => Type::prim("Json"),
+        other => Type::prim(other),
+    }
+}
+
+/// `Sql.NonNull`, `Sql.Generated`, ….
+pub fn index(name: &str) -> Type {
+    Type::con(SQL, name)
+}
+
+impl Checker<'_> {
+    /// The row of a table: each column's type, in `Option` when nullable.
+    /// Also defines the companion `Name$table` and records the table for
+    /// lowering.
+    pub(in super::super) fn sql_row(&mut self, decl: &Node, name: &str) -> Type {
+        let table = decl
+            .child_tokens()
+            .find(|t| t.kind == K::String)
+            .map(|t| string_value(t.text(self.text)))
+            .unwrap_or_default();
+        let mut columns: Vec<SqlColumn> = Vec::new();
+        let mut row = Vec::new();
+        let mut cols = Vec::new();
+        for node in decl
+            .nodes()
+            .filter(|n| n.kind == K::Block)
+            .flat_map(Node::nodes)
+            .filter(|n| n.kind == K::SqlColumn)
+        {
+            let ty = node
+                .nodes()
+                .find(|n| is_type(n.kind))
+                .map_or(Type::Error, |t| self.ty(t, &Kind::Type, Free::Reject));
+            let Some(column) = self.sql_column(node, ty.clone()) else {
+                continue;
+            };
+            if columns.iter().any(|c| c.name == column.name) {
+                self.error(
+                    codes::Q001,
+                    self.span(node),
+                    format!("the table has two columns `{}`", column.name),
+                );
+                continue;
+            }
+            let shown = if column.nullable {
+                Type::app(Type::prim("Option"), ty.clone())
+            } else {
+                ty.clone()
+            };
+            row.push((column.name.clone(), shown));
+            let null = index(if column.nullable {
+                "Nullable"
+            } else {
+                "NonNull"
+            });
+            let write = index(&column.write);
+            cols.push((
+                column.name.clone(),
+                Type::apps(Type::con(SQL, "Column"), [ty, null, write]),
+            ));
+            columns.push(column);
+        }
+        let entity = self.env.entity(
+            Namespace::Value,
+            &super::super::companion_name(name, "table"),
+        );
+        self.env.set_value(
+            entity,
+            Type::apps(
+                Type::con(SQL, "Table"),
+                [Type::Symbol(table.clone()), Type::Record(Row::closed(cols))],
+            ),
+        );
+        self.typing.sql_tables.push(SqlTable {
+            decl: range(self.span(decl)),
+            name: name.to_owned(),
+            table,
+            columns,
+        });
+        Type::Record(Row::closed(row))
+    }
+
+    /// The words of a column: its SQL type, then `not null`, `null`,
+    /// `primary key`, `unique`, `default`, `generated always` or
+    /// `generated by default`.
+    fn sql_column(&mut self, node: &Node, ty: Type) -> Option<SqlColumn> {
+        let mut tokens = node.child_tokens();
+        let name = tokens
+            .find(|t| t.kind == K::Ident)?
+            .text(self.text)
+            .to_owned();
+        let words: Vec<_> = node
+            .child_tokens()
+            .skip_while(|t| t.kind != K::Colon)
+            .skip(1)
+            .take_while(|t| t.kind != K::AsKw)
+            .collect();
+        let text: Vec<&str> = words.iter().map(|t| t.text(self.text)).collect();
+        let span = match (words.first(), words.last()) {
+            (Some(a), Some(b)) => Span::new(self.file, a.start, b.end),
+            _ => self.span(node),
+        };
+        let known = TYPES.iter().find(|(w, _, _)| {
+            let n = w.split(' ').count();
+            text.len() >= n && text[..n].join(" ") == *w
+        });
+        let (kind, mut rest) = if let Some((w, kind, _)) = known {
+            (*kind, &text[w.split(' ').count()..])
+        } else {
+            self.error(
+                codes::Q010,
+                span,
+                format!(
+                    "unknown SQL type `{}`; known: {}",
+                    text.first().unwrap_or(&""),
+                    TYPES.iter().map(|t| t.0).collect::<Vec<_>>().join(", ")
+                ),
+            );
+            return None;
+        };
+        let mut nullable = true;
+        let mut write = if text[0].ends_with("serial") {
+            "Defaulted"
+        } else {
+            "Required"
+        };
+        while let Some(word) = rest.first() {
+            let take = match (*word, rest.get(1).copied(), rest.get(2).copied()) {
+                ("not", Some("null"), _) | ("primary", Some("key"), _) => {
+                    nullable = false;
+                    2
+                }
+                ("null" | "unique", ..) => 1,
+                ("default", ..) => {
+                    write = "Defaulted";
+                    1
+                }
+                ("generated", Some("always"), _) => {
+                    write = "Generated";
+                    2
+                }
+                ("generated", Some("by"), Some("default")) => {
+                    write = "Defaulted";
+                    3
+                }
+                _ => {
+                    self.error(
+                        codes::Q010,
+                        span,
+                        format!("unknown column attribute `{word}`"),
+                    );
+                    return None;
+                }
+            };
+            rest = &rest[take..];
+        }
+        if nullable && write == "Required" {
+            write = "Defaulted";
+        }
+        let via = node
+            .nodes()
+            .skip_while(|n| !is_type(n.kind))
+            .nth(1)
+            .map(Node::range);
+        Some(SqlColumn {
+            name,
+            kind: kind.to_owned(),
+            nullable,
+            write: write.to_owned(),
+            via,
+            ty,
+        })
+    }
+
+    /// Each `via` codec decodes the column's SQL value into its type, and
+    /// a column without one has the type its SQL type gives.
+    pub(in super::super) fn check_tables(&mut self, decls: &[&Node]) {
+        for decl in decls.iter().filter(|d| d.kind == K::SqlTableDecl) {
+            let Some(info) = self
+                .typing
+                .sql_tables
+                .iter()
+                .find(|t| t.decl == decl.range())
+                .cloned()
+            else {
+                continue;
+            };
+            let nodes = decl
+                .nodes()
+                .filter(|n| n.kind == K::Block)
+                .flat_map(Node::nodes)
+                .filter(|n| n.kind == K::SqlColumn);
+            for node in nodes {
+                let name = node.child_tokens().find(|t| t.kind == K::Ident);
+                let Some(column) = info
+                    .columns
+                    .iter()
+                    .find(|c| name.is_some_and(|n| n.text(self.text) == c.name))
+                else {
+                    continue;
+                };
+                let base = base_type(&column.kind);
+                let codec = node.nodes().skip_while(|n| !is_type(n.kind)).nth(1);
+                if let Some(codec) = codec {
+                    let expected = Type::apps(Type::prim("PureCodec"), [base, column.ty.clone()]);
+                    self.check(codec, &expected);
+                    self.settle_operators();
+                } else if self.unify(&column.ty, &base).is_err() {
+                    let (shown, base) = (self.show(&column.ty), self.show(&base));
+                    let at = node.nodes().find(|n| is_type(n.kind)).unwrap_or(node);
+                    self.error(
+                        codes::Q011,
+                        self.span(at),
+                        format!(
+                            "a `{}` column holds `{base}`, not `{shown}`: give a codec with `via`",
+                            column.kind
+                        ),
+                    );
+                }
+            }
+        }
+    }
+}

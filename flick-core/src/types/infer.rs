@@ -54,6 +54,9 @@ impl Checker<'_> {
                 let actual = self.codec_expr(node, Some(expected));
                 self.expect(&actual, expected, self.span(node));
             }
+            (K::SqlExpr, _) => {
+                self.sql_expr(node, Some(expected));
+            }
             (K::TupleExpr, Type::Tuple(items)) if items.len() == children.len() => {
                 for (child, item) in children.iter().zip(items) {
                     self.check(child, item);
@@ -144,8 +147,9 @@ impl Checker<'_> {
                 self.ui -= 1;
                 ty
             }
-            // shortcut: SQL and CLI blocks are typed by their elaboration
-            K::SqlExpr | K::CliExpr => self.fresh(),
+            K::SqlExpr => self.sql_expr(node, None),
+            // shortcut: CLI blocks are typed by their elaboration
+            K::CliExpr => self.fresh(),
             _ => Type::Error,
         }
     }

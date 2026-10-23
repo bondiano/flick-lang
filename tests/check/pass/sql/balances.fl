@@ -1,0 +1,61 @@
+// The balances of §10: a LEFT JOIN makes the balance optional, an INNER
+// JOIN keeps it plain, and two LEFT JOINs still give one `Option`.
+module App.Balances exposing (..)
+
+import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+import Database exposing (Database)
+import BigDecimal exposing (BigDecimal)
+
+type UserId = UserId BigInt
+
+user_id_codec : PureCodec BigInt UserId
+let user_id_codec = Sql.codec (fun n -> Ok (UserId n)) (fun (UserId n) -> n)
+
+sql table Users "users" {
+  id : bigint primary key generated always as UserId via user_id_codec
+  name : text not null as String
+}
+
+sql table Accounts "accounts" {
+  id : bigint primary key generated always as BigInt
+  user_id : bigint not null as UserId via user_id_codec
+  balance : numeric not null as BigDecimal
+}
+
+type alias BalanceRow = { name : String; balance : Option BigDecimal }
+
+balances : Sql.Template Pg { user_id : UserId } BalanceRow
+let balances =
+  sql params {
+    from user in Users
+    left_join account in Accounts
+      on account.user_id == user.id
+    where user.id == params.user_id
+    select {
+      name = user.name
+      balance = account.balance
+    }
+  }
+
+inner : Sql.Template Pg { user_id : UserId } { name : String; balance : BigDecimal }
+let inner =
+  sql params {
+    from user in Users
+    join account in Accounts on account.user_id == user.id
+    where user.id == params.user_id
+    select { name = user.name; balance = account.balance }
+  }
+
+twice : Sql.Template Pg {} { balance : Option BigDecimal }
+let twice =
+  sql {
+    from user in Users
+    left_join a in Accounts on a.user_id == user.id
+    left_join b in Accounts on b.user_id == a.user_id
+    select { balance = b.balance }
+  }
+
+load_balances : UserId ->{Database; EncodeError, DbError, DecodeError} List BalanceRow
+let load_balances user_id =
+  let query = Sql.bind balances { user_id = user_id }
+  Database.query query

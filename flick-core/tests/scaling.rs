@@ -76,3 +76,36 @@ fn record_of_200_fields_checks_in_linear_time() {
 fn function_of_2000_lines_checks_in_linear_time() {
     assert_linear("function", long_function, 2000);
 }
+
+/// `tables` tables of 50 columns joined in one query that selects a column
+/// of each.
+fn wide_join(tables: usize) -> String {
+    let mut out = String::from("module App.Wide exposing (wide)\n\nimport Sql exposing (Pg)\n\n");
+    for t in 0..tables {
+        let _ = writeln!(out, "sql table T{t} \"t{t}\" {{");
+        let _ = writeln!(out, "  id : bigint primary key as BigInt");
+        for c in 1..50 {
+            let _ = writeln!(out, "  c{c} : text not null as String");
+        }
+        out.push_str("}\n\n");
+    }
+    out.push_str("wide : Sql.Template Pg { id : BigInt } {");
+    let fields: Vec<String> = (0..tables).map(|t| format!(" r{t} : String")).collect();
+    out.push_str(&fields.join(";"));
+    out.push_str(" }\nlet wide =\n  sql p {\n    from a0 in T0\n");
+    for t in 1..tables {
+        let _ = writeln!(out, "    join a{t} in T{t} on a{t}.id == a{}.id", t - 1);
+    }
+    out.push_str("    where a0.id == p.id\n    select {\n");
+    for t in 0..tables {
+        let _ = writeln!(out, "      r{t} = a{t}.c{}", t + 1);
+    }
+    out.push_str("    }\n  }\n");
+    out
+}
+
+#[test]
+fn query_with_10_joins_of_50_columns_checks_in_budget() {
+    let full = time(&wide_join(11));
+    assert!(full < Duration::from_secs(2), "10 joins take {full:?}");
+}

@@ -37,7 +37,9 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
         tree: &parse.tree,
         syntax: &syntax,
     };
-    let (mut interface, resolved) = resolve::resolve(&module, &|_| None);
+    // a lone file imports only built-in modules
+    let builtin = |name: &str| types::builtins().iter().find(|i| i.module == name).cloned();
+    let (mut interface, resolved) = resolve::resolve(&module, &builtin);
     let local = |name: &str| name == module.name;
     let options = types::Options {
         local: &local,
@@ -51,7 +53,7 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
     {
         diagnostics.extend(types::check(
             &module,
-            &|_| None,
+            &builtin,
             types::builtins(),
             options,
             &mut interface,

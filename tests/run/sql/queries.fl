@@ -1,0 +1,74 @@
+// Building and binding queries runs no I/O: without a `Database` the
+// program prints their SQL. Values only ever become placeholders.
+module App.Main exposing (main)
+
+import Sql exposing (Pg)
+
+type UserId = UserId BigInt
+
+user_id : PureCodec BigInt UserId
+let user_id = Sql.codec (fun n -> Ok (UserId n)) (fun (UserId n) -> n)
+
+sql table Users "users" {
+  id : bigint primary key generated always as UserId via user_id
+  name : text not null as String
+  email : text as String
+}
+
+sql table Accounts "accounts" {
+  id : bigint primary key generated always as BigInt
+  user_id : bigint not null as UserId via user_id
+  balance : numeric not null default as BigDecimal.BigDecimal
+}
+
+by_name : Sql.Template Pg { name : String } { id : UserId; email : Option String }
+let by_name =
+  sql p {
+    from u in Users
+    where u.name == p.name && is_not_null u.email
+    order_by desc u.id
+    limit 10
+    select { id = u.id; email = u.email }
+  }
+
+totals : Sql.Template Pg { min : BigInt } {
+  name : String;
+  accounts : BigInt;
+  total : Option BigDecimal.BigDecimal
+}
+let totals =
+  sql p {
+    from u in Users
+    left_join a in Accounts on a.user_id == u.id
+    group_by u.id, u.name
+    having count a.id >= p.min
+    select { name = u.name; accounts = count a.id; total = sum a.balance }
+  }
+
+rich : Sql.Template Pg {} { name : String }
+let rich =
+  sql {
+    from u in Users
+    where is_in u.id (sql { from a in Accounts; where a.id > 100n; select { id = a.user_id } })
+    select u.name
+    union (sql { from u in Users; where is_null u.email; select u.name })
+  }
+
+add : Sql.Template Pg { name : String; email : Option String } { id : UserId }
+let add =
+  sql p {
+    insert_into Users
+    values { name = p.name; email = p.email }
+    returning { id = Users.id }
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let q = Sql.bind by_name { name = "'; DROP TABLE users; --" }
+  Platform.stdout_line (Sql.text q)
+  Platform.stdout_line (show (Sql.parameter_count q))
+  Platform.stdout_line (Sql.text (Sql.bind totals { min = 2n }))
+  Platform.stdout_line (Sql.text (Sql.bind rich {}))
+  Platform.stdout_line (Sql.text (Sql.bind add { name = "Ada"; email = None }))
+  Platform.stdout_line
+    (show (Option.is_some (Sql.identifier "users"), Option.is_some (Sql.identifier "users; drop")))

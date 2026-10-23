@@ -118,6 +118,8 @@ pub enum SyntaxKind {
     Refinement,
     DerivingClause,
     KindDecl,
+    SqlTableDecl,
+    SqlColumn,
     ErrorDecl,
     ServiceDecl,
     ClassDecl,

@@ -197,21 +197,21 @@ CI workflow.
 
 **AC**
 
-- [ ] Модель диагностики: стабильный код `FLICK-<area><number>`, severity, message,
+- [x] Модель диагностики: стабильный код `FLICK-<area><number>`, severity, message,
       path, UTF-8 byte range, related spans, fix suggestions (§12).
-- [ ] Реестр кодов с диапазонами по областям: syntax, resolve, kinds/types,
+- [x] Реестр кодов с диапазонами по областям: syntax, resolve, kinds/types,
       effects, classes, regions, FFI, schema, SQL, UI, CLI/project. Тест проверяет
       уникальность кодов и наличие текста `explain` у каждого.
-- [ ] Human renderer (с `--color auto|always|never`) и JSON renderer
+- [x] Human renderer (с `--color auto|always|never`) и JSON renderer
       (versioned NDJSON, поле `schema-version`) — snapshot-тесты на оба.
-- [ ] Fixture-харнесс: `tests/check/{pass,fail}/**/*.fl`; fail-fixture задаёт
+- [x] Fixture-харнесс: `tests/check/{pass,fail}/**/*.fl`; fail-fixture задаёт
       ожидаемые коды и spans внутри файла; harness сообщает diff.
-- [ ] E2E-харнесс: компилирует `.fl` → ESM, запускает в Node, сравнивает
+- [x] E2E-харнесс: компилирует `.fl` → ESM, запускает в Node, сравнивает
       stdout/stderr/exit code с ожидаемыми (`tests/run/**`).
-- [ ] `runtime/` устанавливается через pnpm с Effect ровно `4.0.5`; тест падает,
+- [x] `runtime/` устанавливается через pnpm с Effect ровно `4.0.5`; тест падает,
       если резолвнутая версия иная.
-- [ ] CI: `just check` + e2e на Linux; кеш cargo/pnpm.
-- [ ] `flick --version` и `flick help` уже соответствуют формату §12.
+- [x] CI: `just check` + e2e на Linux; кеш cargo/pnpm.
+- [x] `flick --version` и `flick help` уже соответствуют формату §12.
 
 ---
 
@@ -827,28 +827,30 @@ Schema и SQL».
 - Driver adapter (`pg`): pool, отмена без отката, connection не возвращается в
   pool до drain/close.
 
-**Артефакты.** `flick-core::dsl::sql`, `stdlib/Sql/*`, `runtime/src/sql/*`.
+**Артефакты.** `flick-core::types::sql` (elaboration рядом с checker'ом, которому она
+отдаёт типы), встроенные модули `Sql` и `Database`, `runtime/src/sql/*`,
+`docs/reference/sql.md`; e2e против PostgreSQL — `just e2e-postgres`.
 
 **AC**
 
-- [ ] `balances` (§10) выводит `BalanceRow` с `balance : Option BigDecimal` из-за
+- [x] `balances` (§10) выводит `BalanceRow` с `balance : Option BigDecimal` из-за
       LEFT JOIN; с INNER JOIN — non-null; повторный LEFT JOIN не даёт `Option (Option a)` (§13).
-- [ ] Отвергаются: `user.nmae`; сравнение `UserId` с `Date`; ссылка на alias
+- [x] Отвергаются: `user.nmae`; сравнение `UserId` с `Date`; ссылка на alias
       соседнего завершённого запроса; неоднозначное имя; два результата с одним
       именем; неагрегированное поле без группировки; aggregate в WHERE;
       отсутствующее обязательное поле INSERT; запись в generated-always колонку;
       неизвестный параметр; неподходящий codec (§13).
-- [ ] `Sql.bind` и построение запроса не выполняют I/O (тест: без Database сервиса
+- [x] `Sql.bind` и построение запроса не выполняют I/O (тест: без Database сервиса
       запрос строится и печатается) (§13).
-- [ ] Значения передаются только placeholders: e2e с payload `'; DROP TABLE …`
+- [x] Значения передаются только placeholders: e2e с payload `'; DROP TABLE …`
       сохраняется как данные.
-- [ ] Runtime `String` не принимается в позиции identifier без `Identifier`.
-- [ ] Ответ с неожиданным типом колонки → `DecodeError`; нарушение constraint →
+- [x] Runtime `String` не принимается в позиции identifier без `Identifier`.
+- [x] Ответ с неожиданным типом колонки → `DecodeError`; нарушение constraint →
       `DbError` с инертной диагностикой.
-- [ ] E2E против PostgreSQL (контейнер в CI): select, join, group by, insert
+- [x] E2E против PostgreSQL (контейнер в CI): select, join, group by, insert
       returning, update, delete, union, subquery.
-- [ ] Отмена запроса: connection не возвращается в pool до drain/close (тест на pool).
-- [ ] Время проверки запроса с 10 JOIN и таблицами по 50 колонок укладывается в
+- [x] Отмена запроса: connection не возвращается в pool до drain/close (тест на pool).
+- [x] Время проверки запроса с 10 JOIN и таблицами по 50 колонок укладывается в
       бюджет M19; диагностика указывает span в `sql { }`, а не внутренности DSL.
 
 ---

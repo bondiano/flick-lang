@@ -20,6 +20,7 @@ fn top_decl(p: &mut Parser) {
         K::ClassKw => class_decl(p),
         K::InstanceKw => instance_decl(p),
         K::ForeignKw => foreign_decl(p),
+        K::SqlKw if p.nth(1) == K::Ident => sql_table(p),
         _ => member(p),
     }
 }
@@ -273,6 +274,39 @@ fn deriving(p: &mut Parser) {
         expr::con_path(p);
     }
     p.complete(m, K::DerivingClause);
+}
+
+/// `sql table Name "table" { column : sql type words as T [via codec] }`.
+fn sql_table(p: &mut Parser) {
+    let m = p.start();
+    p.bump();
+    if !p.at_word("table") {
+        p.error_expected("`table`");
+    }
+    p.bump();
+    if p.expect(K::Con) && p.expect(K::String) {
+        p.braces(K::Block, sql_column, |_| false);
+    }
+    p.complete(m, K::SqlTableDecl);
+}
+
+fn sql_column(p: &mut Parser) {
+    let m = p.start();
+    if p.expect(K::Ident) && p.expect(K::Colon) {
+        while p.at(K::Ident) || p.at(K::NotKw) {
+            p.bump();
+        }
+        if p.expect(K::AsKw) {
+            p.sql_table = true;
+            types::type_(p);
+            p.sql_table = false;
+            if p.at_word("via") {
+                p.bump();
+                expr::expr(p);
+            }
+        }
+    }
+    p.complete(m, K::SqlColumn);
 }
 
 fn kind_decl(p: &mut Parser) {

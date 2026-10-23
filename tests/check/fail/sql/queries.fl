@@ -1,0 +1,94 @@
+// What the SQL elaboration refuses, each with its span inside `sql { }`.
+module App.Queries exposing (..)
+
+import Sql exposing (Pg)
+
+type UserId = UserId BigInt
+
+type Date = Date String
+
+user_id : PureCodec BigInt UserId
+let user_id = Sql.codec (fun n -> Ok (UserId n)) (fun (UserId n) -> n)
+
+date : PureCodec String Date
+let date = Sql.codec (fun s -> Ok (Date s)) (fun (Date s) -> s)
+
+sql table Users "users" {
+  id : bigint primary key generated always as UserId via user_id
+  name : text not null as String
+  email : text as String
+  born : date not null as Date via date
+}
+
+sql table Posts "posts" {
+  id : bigint primary key generated always as BigInt
+  author : bigint not null as UserId via user_id
+  title : text not null as String
+}
+
+typo : Sql.Template Pg {} { name : String }
+let typo = sql { from user in Users; select { name = user.nmae } }
+//                                                   ^^^^^^^^^ FLICK-Q001 `Users` has no column `nmae`
+
+mixed : Sql.Template Pg {} { name : String }
+let mixed = sql { from user in Users; where user.id == user.born; select { name = user.name } }
+//                                                     ^^^^^^^^^ FLICK-T003 expected `UserId`, found `Date`
+
+leak : Sql.Template Pg {} { title : String }
+let leak =
+  sql {
+    from post in Posts
+    where exists (sql { from user in Users; select { id = user.id } })
+    select { title = user.name }
+//                   ^^^^^^^^^ FLICK-Q002 no table `user` in this query
+  }
+
+ambiguous : Sql.Template Pg {} { t : String }
+let ambiguous =
+  sql {
+    from user in Users
+    join post in Posts on post.author == user.id
+    select { t = id }
+//               ^^ FLICK-Q003 `id` is a column of `user` and `post`
+  }
+
+twice : Sql.Template Pg {} { name : String; title : String }
+let twice = sql { from user in Users; join post in Posts on post.author == user.id; select user.name, post.title, user.name }
+//                                                                                                                ^^^^^^^^^ FLICK-Q004 two results are named `name`
+
+ungrouped : Sql.Template Pg {} { name : String; posts : BigInt }
+let ungrouped =
+  sql {
+    from user in Users
+    join post in Posts on post.author == user.id
+    group_by user.id
+    select { name = user.name; posts = count post.id }
+//           ^^^^^^^^^^^^^^^^ FLICK-Q005 `user.name` is neither grouped nor aggregated
+  }
+
+filtered : Sql.Template Pg {} { name : String }
+let filtered = sql { from user in Users; where count_all > 1n; select { name = user.name } }
+//                                             ^^^^^^^^^ FLICK-Q006 an aggregate is computed per group
+
+missing : Sql.Template Pg { name : String } {}
+let missing = sql p { insert_into Users; values { name = p.name } }
+//                                       ^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-Q007 misses the required column `born`
+
+generated : Sql.Template Pg { born : Date } {}
+let generated = sql p { insert_into Users; values { id = p.id; name = "x"; born = p.born } }
+//                                                  ^^^^^^^^^ FLICK-Q008 the database generates `id`
+
+unknown : Sql.Template Pg { id : UserId } { name : String }
+let unknown = sql p { from user in Users; where user.id == p.user_id; select { name = user.name } }
+//                                                         ^^^^^^^^^ FLICK-Q009 the template declares no parameter `user_id`
+
+sql table Bad "bad" {
+  id : bigint primary key as UserId via date
+//                                      ^^^^ FLICK-T003
+  amount : numeric not null as Number
+//                             ^^^^^^ FLICK-Q011 a `numeric` column holds `BigDecimal`, not `Number`
+}
+
+raw : Sql.Raw
+let raw = Sql.ident "users"
+//                  ^^^^^^^ FLICK-T003 expected `Identifier`, found `String`

@@ -1,0 +1,166 @@
+// Against a real PostgreSQL: the queries of the SQL subset, values that
+// stay data, schema drift as `DecodeError` and a violated constraint as
+// `DbError`. Run by `flick/tests/sql_postgres.rs`.
+module App.Main exposing (main)
+
+import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+import Database exposing (Database)
+import BigDecimal exposing (BigDecimal)
+
+type UserId = UserId BigInt
+  deriving Show
+
+user_id : PureCodec BigInt UserId
+let user_id = Sql.codec (fun n -> Ok (UserId n)) (fun (UserId n) -> n)
+
+sql table Users "users" {
+  id : bigint primary key generated always as UserId via user_id
+  name : text not null as String
+  email : text as String
+}
+
+sql table Accounts "accounts" {
+  id : bigint primary key generated always as BigInt
+  user_id : bigint not null as UserId via user_id
+  balance : numeric not null default as BigDecimal
+}
+
+/// What the database calls `drift.amount` is text, not a number.
+sql table Drift "drift" {
+  id : bigint primary key as BigInt
+  amount : bigint not null as BigInt
+}
+
+add_user : Sql.Template Pg { name : String; email : Option String } { id : UserId }
+let add_user =
+  sql p {
+    insert_into Users;
+    values { name = p.name; email = p.email };
+    returning { id = Users.id }
+  }
+
+open_account : Sql.Template Pg { owner : UserId; balance : BigDecimal } { id : BigInt }
+let open_account =
+  sql p {
+    insert_into Accounts
+    values { user_id = p.owner; balance = p.balance }
+    returning { id = Accounts.id }
+  }
+
+balances : Sql.Template Pg {} { name : String; balance : Option BigDecimal }
+let balances =
+  sql {
+    from user in Users
+    left_join account in Accounts on account.user_id == user.id
+    order_by user.name, account.balance
+    select { name = user.name; balance = account.balance }
+  }
+
+totals : Sql.Template Pg {} { name : String; accounts : BigInt; total : Option BigDecimal }
+let totals =
+  sql {
+    from user in Users
+    left_join account in Accounts on account.user_id == user.id
+    group_by user.id, user.name
+    order_by user.name
+    select { name = user.name; accounts = count account.id; total = sum account.balance }
+  }
+
+deposit : Sql.Template Pg { account : BigInt; amount : BigDecimal } { balance : BigDecimal }
+let deposit =
+  sql p {
+    update Accounts
+    set { balance = Accounts.balance + p.amount }
+    where Accounts.id == p.account
+    returning { balance = Accounts.balance }
+  }
+
+close : Sql.Template Pg { owner : UserId } { id : BigInt }
+let close =
+  sql p { delete_from Accounts; where Accounts.user_id == p.owner; returning { id = Accounts.id } }
+
+names : Sql.Template Pg {} { name : String }
+let names =
+  sql {
+    from u in Users
+    where is_not_null u.email
+    select u.name
+    union_all (sql { from u in Users; where is_null u.email; select u.name })
+  }
+
+savers : Sql.Template Pg {} { name : String }
+let savers =
+  sql {
+    from u in Users
+    where exists (sql { from a in Accounts; where a.balance > a.balance; select { id = a.id } })
+      || is_in u.id (sql { from a in Accounts; select { id = a.user_id } })
+    order_by u.name
+    select u.name
+  }
+
+named : Sql.Template Pg { name : String } { id : UserId }
+let named = sql p { from u in Users; where u.name == p.name; select u.id }
+
+drift : Sql.Template Pg {} { amount : BigInt }
+let drift = sql { from d in Drift; select d.amount }
+
+/// The one row a query returns, or `fallback`.
+one : forall p r. (Sql.Template Pg p r, p, r) ->{Database; EncodeError, DbError, DecodeError} r
+let one (template, params, fallback) =
+  match Database.query (Sql.bind template params) with
+  | [row] -> row
+  | _ -> fallback
+
+/// Runs the queries; returns an account that stays open.
+run : Unit ->{Database; EncodeError, DbError, DecodeError} BigInt
+let run () =
+  let ada =
+    (one (add_user, { name = "Ada"; email = Some "ada@example.org" }, { id = UserId 0n })).id
+  let bob =
+    (one (add_user, { name = "'; DROP TABLE users; --"; email = None }, { id = UserId 0n })).id
+  let first =
+    (one (open_account, { owner = ada; balance = BigDecimal.from_integer 10n }, { id = 0n })).id
+  ignore (one (open_account, { owner = ada; balance = BigDecimal.from_integer 5n }, { id = 0n }))
+  Platform.stdout_line
+    (show (Database.query (Sql.bind named { name = "'; DROP TABLE users; --" }) |> List.length))
+  Platform.stdout_line (show (Database.query (Sql.bind balances {})))
+  Platform.stdout_line (show (Database.query (Sql.bind totals {})))
+  Platform.stdout_line
+    (show
+      (Database.query (Sql.bind deposit { account = first; amount = BigDecimal.from_integer 7n })))
+  Platform.stdout_line (show (Database.query (Sql.bind names {})))
+  Platform.stdout_line (show (Database.query (Sql.bind savers {})))
+  Platform.stdout_line (show (Database.query (Sql.bind close { owner = ada }) |> List.length))
+  let kept =
+    (one (open_account, { owner = bob; balance = BigDecimal.from_integer 1n }, { id = 0n })).id
+  Platform.stdout_line (show (Database.execute (Sql.bind close { owner = UserId 404n })))
+  kept
+
+refused : BigInt ->{Database; EncodeError, DbError, DecodeError} String
+let refused account =
+  let negative = BigDecimal.from_integer (-100n)
+  let outcome =
+    try
+      show (Database.query (Sql.bind deposit { account = account; amount = negative }))
+    with
+    | DbError e -> "DbError " ++ e.code ++ " " ++ show e.constraint
+  outcome
+
+main : Unit ->{; AppError} Unit
+let main () =
+  match Platform.env "DATABASE_URL" with
+  | None -> App.fail "DATABASE_URL is not set"
+  | Some url ->
+    let layer = Database.pg { connection_string = url; max_connections = 2 }
+    let text =
+      try
+        provide layer {
+          let kept = run ()
+          Platform.stdout_line (refused kept)
+          show (Database.query (Sql.bind drift {}))
+        }
+      with
+      | DecodeError e -> "DecodeError " ++ e.column ++ ": " ++ e.message
+      | DbError e -> "DbError " ++ e.message
+      | EncodeError e -> "EncodeError " ++ e.parameter
+    Platform.stdout_line text
