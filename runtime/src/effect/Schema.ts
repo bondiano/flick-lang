@@ -375,3 +375,6 @@ export const flickHashMapJson = (d: HashDict<unknown>, key: AnySchema, value: An
       }),
     ),
   );
+
+/** `Codec.string_tree schema`: every leaf of the value as a string, its structure kept. */
+export const flickStringTree = (schema: AnySchema): AnySchema => fallible(Schema.toCodecStringTree(schema));

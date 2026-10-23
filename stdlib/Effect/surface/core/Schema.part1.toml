@@ -144,6 +144,12 @@ DateTimeUtcFromString = "DateTime.json_utc 67f62f4e02ae87f9"
 DateTimeZoned = "DateTime.json_zoned 021f2de38f524da3"
 DateTimeZonedFromString = "DateTime.json_zoned 316407fb71ddaf0c"
 Graph = "Graph.json 2926db716675106e"
+Cookie = "Http.Codecs.cookie 166a772bf0c18e46"
+Cookies = "Http.Codecs.cookies 2150585ceeae9acc"
+Headers = "Http.Codecs.headers 2137dba63b8e8c3b"
+JsonFromUrlParamsField = "Http.Codecs.json_url_params_field ad3abdcd07564f10"
+fromFormData = "Http.Codecs.from_form_data 85f6a966b6b9995b"
+fromURLSearchParams = "Http.Codecs.from_url_search_params 304cecc3e9f051cf"
 
 [language]
 Class = "`deriving Schema` of a record and the `codec` block (`field \"wire\" codec` names keys)"
@@ -227,13 +233,5 @@ mutableKey = "TS-only: a TS readonly/mutable or optional modifier of a property 
 DateTimeUtcFromDate = "TS-only: decodes a JS `Date`, a host class with no Flick type (`DateTime.json_utc_millis` takes its milliseconds)"
 EncodedGraph = "TS-only: the type alias of the encoded side of `Schema.Graph`"
 GraphIso = "TS-only: the type alias of the iso side of `Schema.Graph`"
-
-[pending]
-Cookie = "M21"
-Cookies = "M21"
-File = "M21"
-FormData = "M21"
-Headers = "M21"
-JsonFromUrlParamsField = "M21"
-fromFormData = "M21"
-fromURLSearchParams = "M21"
+File = "TS-only: a JS `File` host object with no Flick type; uploaded files are `Http.Multipart.PersistedFile`"
+FormData = "TS-only: a JS `FormData` host object with no Flick type; Flick form fields are pairs, decoded by `Http.Codecs.from_form_data`"

@@ -248,6 +248,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("Http.Mime", include_str!("builtins/Http/Mime.fl")),
     ("Http.Cookies", include_str!("builtins/Http/Cookies.fl")),
     ("Http.Etag", include_str!("builtins/Http/Etag.fl")),
+    ("Http.Codecs", include_str!("builtins/Http/Codecs.fl")),
     ("Http.Body", include_str!("builtins/Http/Body.fl")),
     (
         "Http.ClientError",
