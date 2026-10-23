@@ -1,7 +1,7 @@
 // Effect's `ExecutionPlan` for the bindings of the standard library, and
 // the adapters that build its steps one option at a time and hand its
 // events to Flick as values of `ExecutionPlan.Event`.
-import { type Duration, Effect, ExecutionPlan, type Layer, type Schedule } from "effect";
+import { type Duration, Effect, ExecutionPlan, type Layer, type Schedule, Stream } from "effect";
 
 import { toFailure } from "./Cause.ts";
 import { tag } from "../tags.ts";
@@ -63,3 +63,9 @@ export const flickWithExecutionPlan =
   (onEvent: (event: unknown) => Effect.Effect<void>) =>
   <A, E, R>(self: Effect.Effect<A, E, R>) =>
     Effect.withExecutionPlan(self, plan, { onEvent: (e) => onEvent(event(e)) });
+
+/** `Stream.with_execution_plan`: `on_event` gets each event as a Flick value. */
+export const flickStreamWithExecutionPlan =
+  (plan: Plan, preventFallbackOnPartialStream: boolean, onEvent: (event: unknown) => Effect.Effect<void>) =>
+  <A, E, R>(self: Stream.Stream<A, E, R>) =>
+    Stream.withExecutionPlan(self, plan, { preventFallbackOnPartialStream, onEvent: (e) => onEvent(event(e)) });

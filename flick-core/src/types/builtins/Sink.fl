@@ -5,6 +5,7 @@
 module Sink exposing (..)
 
 import Channel exposing (Channel, WritableStream)
+import Stream.Core exposing (Stream)
 
 /// A consumer of elements of `i` giving `a`, with leftovers of `l`.
 type Sink (r : ServiceRow) (e : ErrorRow) i l a
@@ -21,6 +22,12 @@ foreign pure from_channel from "@flick-lang/runtime/effect/Sink" "flickFromChann
 to_channel : Sink r e i l a -> Channel r e (NonEmpty.NonEmpty i) o (End a l) none Unit
 foreign pure to_channel from "@flick-lang/runtime/effect/Sink" "flickToChannel"
   reviewed "effect@4.0.5 sha256:d17e700db852f640"
+
+/// The sink of what `f` does with the stream of its input; it leaves
+/// nothing over.
+make : (Stream none none i ->{r; e} a) -> Sink r e i l a
+foreign pure make from "@flick-lang/runtime/effect/Sink" "flickMake"
+  reviewed "effect@4.0.5 sha256:c8e985f27b02c0df"
 
 /// Writes each chunk to a web stream, closing it at the end when
 /// `closeOnDone`; `onError` makes the typed error of what it throws.

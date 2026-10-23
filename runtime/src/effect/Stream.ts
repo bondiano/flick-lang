@@ -28,6 +28,7 @@ import { toFlick } from "./PlatformError.ts";
 import { nativeStdio } from "./Stdio.ts";
 
 export * from "effect/Stream";
+export { flickStreamWithExecutionPlan } from "./ExecutionPlan.ts";
 
 type Strategy = "suspend" | "dropping" | "sliding";
 

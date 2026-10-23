@@ -221,10 +221,10 @@ const SOURCES: &[(&str, &str)] = &[
     ("Channel.Run", include_str!("builtins/Channel/Run.fl")),
     ("Channel", include_str!("builtins/Channel.fl")),
     ("ChannelSchema", include_str!("builtins/ChannelSchema.fl")),
-    ("Sink", include_str!("builtins/Sink.fl")),
     // end of Effect: streams, sinks and channels
     // Effect: streams, Stream
     ("Stream.Core", include_str!("builtins/Stream/Core.fl")),
+    ("Sink", include_str!("builtins/Sink.fl")),
     (
         "Stream.Transform",
         include_str!("builtins/Stream/Transform.fl"),
@@ -232,6 +232,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("Stream.Combine", include_str!("builtins/Stream/Combine.fl")),
     ("Stream.Errors", include_str!("builtins/Stream/Errors.fl")),
     ("Stream.Run", include_str!("builtins/Stream/Run.fl")),
+    ("Stream.Pipe", include_str!("builtins/Stream/Pipe.fl")),
     (
         "Stream.Platform",
         include_str!("builtins/Stream/Platform.fl"),
