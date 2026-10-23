@@ -16,7 +16,9 @@ use flick_core::{doc, ir, projection, syntax};
 
 use super::build::{Output, artifacts, emit, write};
 use super::check::select;
-use crate::args::{InspectArguments, OutDirArguments, Representation, SchemaExportArguments};
+use crate::args::{
+    InspectArguments, OutDirArguments, Representation, SchemaExportArguments, SchemaTarget,
+};
 use crate::command::Outcome;
 use crate::sources::FsHost;
 
@@ -244,8 +246,14 @@ pub fn schema_export(options: &SchemaExportArguments, explicit: Option<&str>) ->
             diagnostics: problems,
         };
     }
+    let export = match options.target {
+        SchemaTarget::JsonSchema => format!(
+            "import {{ codecJsonSchema }} from \"@flick-lang/runtime\";\nconst r = codecJsonSchema({value:?}, exported);"
+        ),
+        SchemaTarget::OpenApi => "import { httpApiOpenApi } from \"@flick-lang/runtime/effect/http-api/HttpApi\";\nconst r = httpApiOpenApi(exported);".to_owned(),
+    };
     let script = format!(
-        "import {{ codecJsonSchema }} from \"@flick-lang/runtime\";\nimport {{ {value} as codec }} from \"./{}.js\";\nconst r = codecJsonSchema({value:?}, codec);\nif (r._tag === \"Success\") process.stdout.write(r.success); else {{ process.stderr.write(JSON.stringify(r.failure._0)); process.exitCode = 1; }}\n",
+        "{export}\nimport {{ {value} as exported }} from \"./{}.js\";\nif (r._tag === \"Success\") process.stdout.write(r.success); else {{ process.stderr.write(JSON.stringify(r.failure._0)); process.exitCode = 1; }}\n",
         module.replace('.', "/")
     );
     let runner = stage.join("export.mjs");
@@ -277,8 +285,12 @@ pub fn schema_export(options: &SchemaExportArguments, explicit: Option<&str>) ->
             checked.sources,
             codes::D008,
             format!(
-                "`{}` has no strict JSON Schema: {}",
+                "`{}` has no strict {}: {}",
                 options.codec,
+                match options.target {
+                    SchemaTarget::JsonSchema => "JSON Schema",
+                    SchemaTarget::OpenApi => "OpenAPI document",
+                },
                 String::from_utf8_lossy(&out.stderr).trim()
             ),
         ),

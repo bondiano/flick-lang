@@ -7,7 +7,7 @@ export const sidebar = [
   },
   {
     label: "Libraries",
-    items: ["stdlib", "effect-surface", "schema", "sql", "ui", "cli-dsl", "ffi"].map((f) => ({ slug: `reference/${f}` })),
+    items: ["stdlib", "effect-surface", "schema", "sql", "ui", "http-api", "cli-dsl", "ffi"].map((f) => ({ slug: `reference/${f}` })),
   },
   {
     label: "Tools",

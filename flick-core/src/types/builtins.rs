@@ -185,6 +185,7 @@ const SOURCES: &[(&str, &str)] = &[
     // Effect: HTTP
     // end of Effect: HTTP
     // Effect: HttpApi
+    ("HttpApi", include_str!("builtins/HttpApi.fl")),
     // end of Effect: HttpApi
     // Effect: CLI
     ("Cli", include_str!("builtins/Cli.fl")),

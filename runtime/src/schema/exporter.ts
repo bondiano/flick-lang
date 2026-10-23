@@ -15,6 +15,9 @@ const EXPORT_ERROR = tag("Codec.ExportError.ExportError");
 /** `Codec.ExportError`. */
 export type ExportError = Tagged<typeof EXPORT_ERROR, string>;
 
+/** An `ExportError` with its message. */
+export const exportError = (message: string): ExportError => ({ _tag: EXPORT_ERROR, _0: message });
+
 class Unsupported extends Error {
   constructor(path: string, reason: string) {
     super(`${path} -> JSON Schema: ${reason}`);

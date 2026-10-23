@@ -1,3 +1,4 @@
 stdlib/Effect/snapshot.json linguist-generated=true
 tools/dts-importer/test/fixtures/**/*.snapshot.json linguist-generated=true
 tools/dts-importer/test/fixtures/*.snapshot.json linguist-generated=true
+runtime/test/fixtures/openapi-3.1.schema.json linguist-vendored=true

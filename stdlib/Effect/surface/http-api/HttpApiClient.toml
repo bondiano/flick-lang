@@ -1,10 +1,12 @@
-[pending]
-Client = "M21"
-ForApi = "M21"
-SuccessType = "M21"
-UrlBuilder = "M21"
-endpoint = "M21"
-group = "M21"
-make = "M21"
-makeWith = "M21"
-urlBuilder = "M21"
+[wrapped]
+endpoint = "HttpApi.call 054a5eea6e02f31e"
+group = "HttpApi.call 6bcf0d4e0d3fe311"
+make = "HttpApi.call 2cb667ceb4c457eb"
+makeWith = "HttpApi.call 40a1c10bfe6d885e"
+urlBuilder = "HttpApi.url 8f2b544a4fb238d8"
+
+[excluded]
+Client = "TS-only: type-level machinery of Effect's HttpApi types; Flick's `HttpApi` types carry the same information"
+ForApi = "TS-only: type-level machinery of Effect's HttpApi types; Flick's `HttpApi` types carry the same information"
+SuccessType = "TS-only: type-level machinery of Effect's HttpApi types; Flick's `HttpApi` types carry the same information"
+UrlBuilder = "TS-only: type-level machinery of Effect's HttpApi types; Flick's `HttpApi` types carry the same information"

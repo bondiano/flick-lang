@@ -1,0 +1,26 @@
+// A handler record must have exactly one handler per endpoint of each group.
+module App.Handlers exposing (serve)
+
+type alias User = { id : String }
+  deriving Schema
+
+get_user : HttpApi.Endpoint "get_user" (HttpApi.Request Unit Unit Unit Unit ->{r;} User)
+let get_user =
+  HttpApi.endpoint HttpApi.Get "/user" (Record.label : Record.Label "get_user")
+    |> HttpApi.with_success 200 (Codec.json (schema User))
+
+ping : HttpApi.Endpoint "ping" (HttpApi.Request Unit Unit Unit Unit ->{r;} Unit)
+let ping = HttpApi.endpoint HttpApi.Get "/ping" (Record.label : Record.Label "ping")
+
+serve : Unit ->{; HttpApi.ServeError} Unit
+let serve () =
+  let users = HttpApi.group (Record.label : Record.Label "users") |> HttpApi.add get_user |> HttpApi.add ping
+  let api = HttpApi.api "Users" |> HttpApi.add_group users
+  let options = { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }
+  scope s {
+    let missing = HttpApi.listen options api { users = { get_user = fun _ -> { id = "1" } } }
+    let extra = HttpApi.listen options api { users = { get_user = fun _ -> { id = "1" }; ping = fun _ -> (); pong = fun _ -> () } }
+    ()
+  }
+//~ FLICK-T003 @21:56-21:92 field `ping` is missing from `users`
+//~ FLICK-T003 @22:54-22:130 `users` has field `pong`, which the expected type does not

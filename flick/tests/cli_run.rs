@@ -362,9 +362,9 @@ fn the_spec_examples_and_the_ci_set_pass() {
         Some(0)
     );
     let app = root.join("my-app");
-    let domain = "module App.Domain exposing (User, user_json)\n\ntype alias User = { name : String; age : Number }\n  deriving Schema\n\nuser_json : PureCodec Json User\nlet user_json = Codec.json (schema User)\n";
+    let domain = "module App.Domain exposing (User, user_json, api)\n\ntype alias User = { name : String; age : Number }\n  deriving Schema\n\nuser_json : PureCodec Json User\nlet user_json = Codec.json (schema User)\n\nme : HttpApi.Endpoint \"me\" (HttpApi.Request Unit Unit Unit Unit ->{r;} User)\nlet me =\n  HttpApi.endpoint HttpApi.Get \"/me\" (Record.label : Record.Label \"me\")\n    |> HttpApi.with_success 200 user_json\n\napi : HttpApi.Api { users : { me : HttpApi.Request Unit Unit Unit Unit ->{r;} User } }\nlet api =\n  HttpApi.api \"Users\"\n    |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label \"users\") |> HttpApi.add me)\n";
     fs::write(app.join("src/App/Domain.fl"), domain).expect("write");
-    let sessions: [&[&str]; 11] = [
+    let sessions: [&[&str]; 12] = [
         &["check"],
         &["fmt", "--check"],
         &["check", "--diagnostics", "json"],
@@ -380,6 +380,15 @@ fn the_spec_examples_and_the_ci_set_pass() {
             "--out",
             "schema/user.schema.json",
         ],
+        &[
+            "schema",
+            "export",
+            "App.Domain.api",
+            "--target",
+            "openapi-3.1",
+            "--out",
+            "schema/openapi.json",
+        ],
         &["doc", "--out-dir", "docs"],
         &["check", "--warnings-as-errors"],
         &["test", "--profile", "release"],
@@ -393,5 +402,10 @@ fn the_spec_examples_and_the_ci_set_pass() {
     assert!(
         schema.contains("\"age\"") && schema.contains("2020-12"),
         "{schema}"
+    );
+    let openapi = fs::read_to_string(app.join("schema/openapi.json")).expect("openapi");
+    assert!(
+        openapi.contains("\"3.1.0\"") && openapi.contains("\"/me\""),
+        "{openapi}"
     );
 }

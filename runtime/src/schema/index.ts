@@ -66,6 +66,8 @@ export { schemaError };
 
 /** Wire input is strict: a key no field names is an error. */
 const OPTIONS: SchemaAST.ParseOptions = { onExcessProperty: "error", reportInput: true };
+/** For inputs that carry more than any codec declares, such as HTTP headers. */
+const LOOSE: SchemaAST.ParseOptions = { onExcessProperty: "ignore", reportInput: true };
 
 const runtimeAsts = new WeakMap<SchemaAST.AST, boolean>();
 
@@ -117,20 +119,25 @@ const fromExit = <A>(exit: Exit.Exit<A, Schema.SchemaError>, encoding: boolean):
   Exit.mapError(exit, toSchemaError(encoding));
 
 /** The result of a pure codec, at once. */
-const decodePure = (codec: PureCodec, input: unknown): Exit.Exit<unknown, SchemaError> => {
+const decodePure = (codec: PureCodec, input: unknown, options = OPTIONS): Exit.Exit<unknown, SchemaError> => {
   const problem = requireInert(input);
   if (problem) return Exit.fail(problem);
   // a pure codec decodes synchronously, through compiled decoders when installed
-  return fromExit(Schema.decodeUnknownExit(codec)(input, OPTIONS), false);
+  return fromExit(Schema.decodeUnknownExit(codec)(input, options), false);
 };
 
 /** `Codec.decode codec input`: an effect failing with `SchemaError`. */
-export const codecDecode = (codec: AnySchema, input: unknown): Effect.Effect<unknown, SchemaError, unknown> =>
+export const codecDecode = (
+  codec: AnySchema,
+  input: unknown,
+  extra: "refuse" | "ignore" = "refuse",
+): Effect.Effect<unknown, SchemaError, unknown> =>
   Effect.suspend(() => {
-    if (isPure(codec)) return decodePure(codec, input);
+    const options = extra === "ignore" ? LOOSE : OPTIONS;
+    if (isPure(codec)) return decodePure(codec, input, options);
     const problem = requireInert(input);
     if (problem) return Effect.fail(problem);
-    return Effect.mapError(Schema.decodeUnknownEffect(codec)(input, OPTIONS), toSchemaError(false));
+    return Effect.mapError(Schema.decodeUnknownEffect(codec)(input, options), toSchemaError(false));
   });
 
 /** `Codec.encode codec value`. */

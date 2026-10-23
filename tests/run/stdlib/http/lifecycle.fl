@@ -1,0 +1,47 @@
+// Closing the scope of a server stops it gracefully: a request in flight
+// finishes, with its handler's finalizer, before the scope's close returns.
+module App.Main exposing (main)
+
+start : String ->{} JsValue
+foreign sync start from "./raw.mjs" "start"
+
+wait : JsValue ->{} String
+foreign async wait from "./raw.mjs" "wait"
+
+ms : Number -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+slow : HttpApi.Endpoint "slow" (HttpApi.Request Unit Unit Unit Unit ->{r;} Unit)
+let slow = HttpApi.endpoint HttpApi.Get "/slow" (Record.label : Record.Label "slow")
+
+api : HttpApi.Api { work : { slow : HttpApi.Request Unit Unit Unit Unit ->{r;} Unit } }
+let api = HttpApi.api "Work" |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "work") |> HttpApi.add slow)
+
+handle : HttpApi.Request Unit Unit Unit Unit ->{} Unit
+let handle _ =
+  scope {
+    Resource.acquire_release (task { Platform.stdout_line "handler started" }) (fun _ -> Platform.stdout_line "handler finalizer")
+    Effect.sleep (ms 100)
+    Platform.stdout_line "handler finished"
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let options = { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }
+  let pending =
+    try
+      scope s {
+        let server = HttpApi.listen options api { work = { slow = handle } }
+        let request = start ("http://127.0.0.1:" ++ show (HttpApi.port server) ++ "/slow")
+        Effect.sleep (ms 30)
+        Platform.stdout_line "closing the server"
+        Some request
+      }
+    with
+    | HttpApi.ServeError message ->
+      Platform.stdout_line message
+      None
+  Platform.stdout_line "closed"
+  match pending with
+  | Some request -> Platform.stdout_line ("response " ++ wait request)
+  | None -> ()

@@ -249,7 +249,9 @@ impl Checker<'_> {
             let ty = match expected.and_then(|row| row.get(&name)) {
                 Some(ty) => {
                     let ty = ty.clone();
+                    self.field_path.push(name.clone());
                     self.check(value, &ty);
+                    self.field_path.pop();
                     ty
                 }
                 None => self.infer(value),

@@ -1,5 +1,7 @@
-[pending]
-ScalarConfig = "M21"
-ScalarThemeId = "M21"
-layer = "M21"
-layerCdn = "M21"
+[wrapped]
+ScalarConfig = "HttpApi.ServeOptions 68f7a01f4e0aa382"
+layer = "HttpApi.listen 4cb2a54a7e0b2dbb"
+layerCdn = "HttpApi.listen d4df217f27502554"
+
+[excluded]
+ScalarThemeId = "TS-only: a union of theme names for Scalar's TypeScript config"

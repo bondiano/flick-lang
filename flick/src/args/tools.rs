@@ -102,11 +102,15 @@ pub enum SchemaCommands {
 pub enum SchemaTarget {
     #[value(name = "json-schema-2020-12")]
     JsonSchema,
+    /// An `HttpApi.Api` as an `OpenAPI` 3.1 document.
+    #[value(name = "openapi-3.1")]
+    OpenApi,
 }
 
 #[derive(Args)]
 pub struct SchemaExportArguments {
-    /// The codec: `Module.value`, a `PureCodec Json a` the module exports.
+    /// `Module.value`: a `PureCodec Json a` for JSON Schema, an
+    /// `HttpApi.Api gs` for `OpenAPI`.
     pub codec: String,
 
     #[arg(long, value_enum)]

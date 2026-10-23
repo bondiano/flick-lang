@@ -55,3 +55,4 @@ const required = <T>(module: T | undefined, id: string): T => {
 export const nodeFs = () => required(builtin()?.("node:fs"), "node:fs");
 export const nodeFsPromises = () => required(builtin()?.("node:fs/promises"), "node:fs/promises");
 export const nodeUrl = () => required(builtin()?.("node:url"), "node:url");
+export const nodeHttp = () => required(builtin()?.("node:http"), "node:http");

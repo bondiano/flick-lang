@@ -90,13 +90,21 @@ impl Checker<'_> {
                 self.capture_mismatch(&head, label, *left, span);
             }
             Mismatch::Label { label, left } => {
+                // in a nested record literal, the record that lacks or has the field
+                let path = self.field_path.join(".");
                 let detail = match (label.rsplit_once('.'), *left) {
                     (Some((_, name)), true) => {
                         format!("`{name}` is in the row, which the expected type does not allow")
                     }
                     (Some((_, name)), false) => format!("`{name}` is missing from the row"),
+                    (None, true) if !path.is_empty() => {
+                        format!("`{path}` has field `{label}`, which the expected type does not")
+                    }
                     (None, true) => {
                         format!("the value has field `{label}`, which the expected type does not")
+                    }
+                    (None, false) if !path.is_empty() => {
+                        format!("field `{label}` is missing from `{path}`")
                     }
                     (None, false) => format!("field `{label}` is missing"),
                 };

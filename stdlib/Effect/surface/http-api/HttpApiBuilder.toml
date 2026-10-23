@@ -1,8 +1,12 @@
+[wrapped]
+endpoint = "HttpApi.listen 39cb432d1b06d567"
+group = "HttpApi.listen cff2eb4f4bf9f15a"
+handler = "HttpApi.listen cb0e57a54c09c5a8"
+layer = "HttpApi.listen 903958103df4843c"
+securityDecode = "HttpApi.with_security 4254d1f1f0577372"
+
+[excluded]
+Handlers = "TS-only: type-level machinery of Effect's HttpApi types; Flick's `HttpApi` types carry the same information"
+
 [pending]
-Handlers = "M21"
-endpoint = "M21"
-group = "M21"
-handler = "M21"
-layer = "M21"
-securityDecode = "M21"
 securitySetCookie = "M21"

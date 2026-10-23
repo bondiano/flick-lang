@@ -1,0 +1,190 @@
+// A typed API on a real Node server: the client and the server come from the
+// same endpoints, a declared error has its status, a body that does not
+// decode is 400 without the input, and the served OpenAPI document is the
+// one `HttpApi.openapi` writes.
+module App.Main exposing (main)
+
+type alias User = { id : String; name : String }
+  deriving Schema
+
+type alias NewUser = { name : String }
+  deriving Schema
+
+type alias UserPath = { id : String }
+  deriving Schema
+
+type error NotFound = NotFound { id : String }
+  deriving Schema
+
+post_raw : String -> String ->{} String
+foreign async post_raw from "./raw.mjs" "post"
+
+get_raw : String ->{} String
+foreign async get_raw from "./raw.mjs" "get"
+
+head_raw : String ->{} String
+foreign async head_raw from "./raw.mjs" "head"
+
+text_raw : String ->{} String
+foreign async text_raw from "./raw.mjs" "text"
+
+user_path : PureCodec Json UserPath
+let user_path = Codec.json (schema UserPath)
+
+get_user : HttpApi.Endpoint "get_user" (HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User)
+let get_user =
+  HttpApi.endpoint HttpApi.Get "/users/:id" (Record.label : Record.Label "get_user")
+    |> HttpApi.with_path user_path
+    |> HttpApi.with_success 200 (Codec.json (schema User))
+    |> HttpApi.with_errors [HttpApi.error_case 404 (Codec.json (schema NotFound))]
+
+create_user : HttpApi.Endpoint "create_user" (HttpApi.Request Unit Unit Unit NewUser ->{r;} User)
+let create_user =
+  HttpApi.endpoint HttpApi.Post "/users" (Record.label : Record.Label "create_user")
+    |> HttpApi.with_payload (Codec.json (schema NewUser))
+    |> HttpApi.with_success 201 (Codec.json (schema User))
+    |> HttpApi.describe "Adds a user"
+
+type alias Handlers r =
+  {
+    create_user : HttpApi.Request Unit Unit Unit NewUser ->{r;} User
+    get_user : HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User
+    me : HttpApi.Request Unit Unit Auth Unit ->{r; HttpApi.HttpError} String
+    health : HttpApi.Request Unit Unit Unit Unit ->{r;} Unit
+    echo : HttpApi.Request Unit Unit Unit String ->{r;} String
+    login : HttpApi.Request Unit Unit Unit NewUser ->{r;} String
+  }
+
+users : HttpApi.Group "users" (Handlers r)
+let users =
+  HttpApi.group (Record.label : Record.Label "users")
+    |> HttpApi.add get_user
+    |> HttpApi.add create_user
+    |> HttpApi.add me
+    |> HttpApi.add health
+    |> HttpApi.add echo
+    |> HttpApi.add login
+
+api : HttpApi.Api { users : Handlers r }
+let api =
+  HttpApi.api "Users"
+    |> HttpApi.info { version = "1.0.0"; description = "People and their accounts"; servers = ["http://127.0.0.1"] }
+    |> HttpApi.add_group users
+
+type alias Auth = { authorization : String }
+  deriving Schema
+
+token : HttpApi.Security
+let token = HttpApi.bearer "token"
+
+me : HttpApi.Endpoint "me" (HttpApi.Request Unit Unit Auth Unit ->{r; HttpApi.HttpError} String)
+let me =
+  HttpApi.endpoint HttpApi.Get "/me" (Record.label : Record.Label "me")
+    |> HttpApi.with_headers (Codec.json (schema Auth))
+    |> HttpApi.with_success 200 (Codec.json Schema.string)
+    |> HttpApi.with_security token
+    |> HttpApi.with_security (HttpApi.api_key "key" { key = "x-api-key"; location = HttpApi.InHeader })
+    |> HttpApi.with_security (HttpApi.basic "password")
+    |> HttpApi.with_errors [HttpApi.http_error 401, HttpApi.http_error 403]
+    |> HttpApi.with_middleware (fun request ->
+      if String.starts_with "Bearer " request.headers.authorization then ()
+      else from_result (Err (HttpApi.HttpError { status = 401; message = "not a bearer token" })))
+    |> HttpApi.deprecate
+
+echo : HttpApi.Endpoint "echo" (HttpApi.Request Unit Unit Unit String ->{r;} String)
+let echo =
+  HttpApi.endpoint HttpApi.Post "/echo" (Record.label : Record.Label "echo")
+    |> HttpApi.with_text_payload
+    |> HttpApi.with_text_success 200
+
+login : HttpApi.Endpoint "login" (HttpApi.Request Unit Unit Unit NewUser ->{r;} String)
+let login =
+  HttpApi.endpoint HttpApi.Post "/login" (Record.label : Record.Label "login")
+    |> HttpApi.with_form_payload (Codec.json (schema NewUser))
+    |> HttpApi.with_text_success 200
+
+health : HttpApi.Endpoint "health" (HttpApi.Request Unit Unit Unit Unit ->{r;} Unit)
+let health = HttpApi.endpoint HttpApi.Head "/health" (Record.label : Record.Label "health") |> HttpApi.hide
+
+type alias Upload = { name : String; data : Unknown }
+  deriving Schema
+
+upload : HttpApi.Endpoint "upload" (HttpApi.Request Unit Unit Unit Upload ->{r;} Unit)
+let upload =
+  HttpApi.endpoint HttpApi.Post "/files" (Record.label : Record.Label "upload")
+    |> HttpApi.with_payload (Codec.json (schema Upload))
+
+files : HttpApi.Api { files : { upload : HttpApi.Request Unit Unit Unit Upload ->{r;} Unit } }
+let files = HttpApi.api "Files" |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "files") |> HttpApi.add upload)
+
+find : List User -> String -> Option User
+let find all id = List.find (fun u -> u.id == id) all
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let store = Ref.make [{ id = "1"; name = "Ada" }]
+  let handlers : { users : Handlers none } =
+    {
+      users =
+        {
+          get_user = fun request ->
+            match find (Ref.get store) request.path.id with
+            | Some user -> user
+            | None -> from_result (Err (NotFound { id = request.path.id }))
+          create_user = fun request ->
+            let user = { id = show (List.length (Ref.get store) + 1); name = request.payload.name }
+            Ref.set store (Ref.get store ++ [user])
+            user
+          me = fun request ->
+            if request.headers.authorization == "Bearer ada" then "Ada" else from_result (Err (HttpApi.HttpError { status = 403; message = "not Ada" }))
+          health = fun _ -> ()
+          echo = fun request -> String.to_upper request.payload
+          login = fun request -> "welcome " ++ request.payload.name
+        }
+    }
+  match HttpApi.openapi files with
+  | Ok _ -> Platform.stdout_line "files: exported?"
+  | Err (Codec.ExportError message) -> Platform.stdout_line ("files: " ++ message)
+  let options : HttpApi.ServeOptions = { host = "127.0.0.1"; port = 0; openapi = Some "/openapi.json"; swagger = Some "/docs"; scalar = Some "/scalar" }
+  let result =
+    try
+      scope s {
+        let server = HttpApi.listen options api handlers
+        let base = "http://127.0.0.1:" ++ show (HttpApi.port server)
+        let created = HttpApi.call base create_user { path = (); query = (); headers = (); payload = { name = "Bob" } }
+        Platform.stdout_line ("created " ++ show created)
+        let ada = HttpApi.call base get_user { path = { id = "1" }; query = (); headers = (); payload = () }
+        Platform.stdout_line ("got " ++ show ada)
+        let missing =
+          try show (HttpApi.call base get_user { path = { id = "99" }; query = (); headers = (); payload = () }) with
+          | NotFound e -> "not found " ++ e.id
+        Platform.stdout_line missing
+        let who = HttpApi.call base me { path = (); query = (); headers = { authorization = "Bearer ada" }; payload = () }
+        Platform.stdout_line ("me: " ++ who)
+        let refused =
+          try HttpApi.call base me { path = (); query = (); headers = { authorization = "Bearer bob" }; payload = () } with
+          | HttpApi.HttpError e -> show e.status ++ " " ++ e.message
+        Platform.stdout_line ("not me: " ++ refused)
+        let basic =
+          try HttpApi.call base me { path = (); query = (); headers = { authorization = "Basic YWRhOg==" }; payload = () } with
+          | HttpApi.HttpError e -> show e.status ++ " " ++ e.message
+        Platform.stdout_line ("basic: " ++ basic)
+        Platform.stdout_line ("echo: " ++ HttpApi.call base echo { path = (); query = (); headers = (); payload = "plain text" })
+        Platform.stdout_line ("login: " ++ HttpApi.call base login { path = (); query = (); headers = (); payload = { name = "Cy D" } })
+        Platform.stdout_line ("no credentials: " ++ get_raw (base ++ "/me"))
+        Platform.stdout_line ("head: " ++ head_raw (base ++ "/health") ++ ", get: " ++ get_raw (base ++ "/health"))
+        Platform.stdout_line ("url: " ++ show (HttpApi.url "http://example.test/api" get_user { id = "a b" } ()))
+        Platform.stdout_line ("bad body: " ++ post_raw (base ++ "/users") "{\"name\": 42}")
+        Platform.stdout_line ("bad path: " ++ post_raw (base ++ "/users") "not json")
+        let served = text_raw (base ++ "/openapi.json")
+        let written = Result.with_default "" (HttpApi.openapi api)
+        Platform.stdout_line ("served document is written one: " ++ show (served == written))
+        Platform.stdout_line ("docs: " ++ get_raw (base ++ "/docs") ++ "; " ++ get_raw (base ++ "/scalar"))
+        written
+      }
+    with
+    | HttpApi.ServeError message -> "serve error " ++ message
+    | HttpApi.ClientError e -> "client error " ++ e.message
+    | NotFound e -> "unexpected not found " ++ e.id
+    | HttpApi.HttpError e -> "unexpected " ++ e.message
+  Platform.stdout_line result

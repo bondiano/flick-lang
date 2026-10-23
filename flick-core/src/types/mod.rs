@@ -169,6 +169,7 @@ fn run(
         regions: regions::State::default(),
         typing: Typing::default(),
         predicates: HashMap::new(),
+        field_path: Vec::new(),
     };
     checker.module(module.tree);
     checker.fill(interface);
@@ -237,6 +238,9 @@ struct Checker<'a> {
     typing: Typing,
     /// The predicate of each refined type of the module, by type name.
     predicates: HashMap<String, &'a Node>,
+    /// The fields of the record literals around the value being checked,
+    /// outermost first: where a nested record's field is missing.
+    field_path: Vec<String>,
 }
 
 impl Checker<'_> {
