@@ -1,22 +1,91 @@
 /// Mutable cells. Every operation runs through
 /// the runtime, so a fresh cell is never generalized.
-module Ref exposing (make, get, set, modify, same)
+module Ref exposing (
+  make, get, set, modify, same, update, update_and_get, get_and_update, get_and_set, set_and_get,
+  compare_and_set, increment, decrement, increment_and_get, decrement_and_get, get_and_increment,
+  get_and_decrement, toggle
+)
 
+/// A new cell holding the value.
 make : a ->{} Ref a
 foreign sync make from "@flick-lang/runtime" "refMake"
+  reviewed "effect@4.0.5 sha256:5a3b07916910c9d9"
 
+/// The content of the cell.
 get : Ref a ->{} a
 foreign sync get from "@flick-lang/runtime" "refGet"
+  reviewed "effect@4.0.5 sha256:01b8a93a77b6c4c0"
 
 /// Whether both are the same cell. Cells have no `Eq` or `Hash`: a write
 /// would change what they compare by.
 same : Ref a -> Ref a -> Bool
 foreign pure same from "@flick-lang/runtime" "refSame"
 
+/// Replaces the content of the cell.
 set : forall c a. (Ref a)^c -> (a ->{} Unit)^c
 foreign sync set from "@flick-lang/runtime" "refSet"
   retention call
+  reviewed "effect@4.0.5 sha256:804dea36f0e66a48"
 
+/// `f` of the content gives a result and the new content.
 modify : forall c d a b. (Ref a)^c -> ((a -> (b, a))^d ->{} b)^c
 foreign sync modify from "@flick-lang/runtime" "refModify"
   retention call
+
+/// Replaces the content by `f` of it.
+update : forall c d a. (Ref a)^c -> ((a -> a)^d ->{} Unit)^c
+let update ref f = modify ref (fun a -> ((), f a))
+
+/// `update`, returning the new content.
+update_and_get : forall c d a. (Ref a)^c -> ((a -> a)^d ->{} a)^c
+let update_and_get ref f =
+  modify ref (fun a ->
+    let b = f a
+    (b, b))
+
+/// `update`, returning the content before.
+get_and_update : forall c d a. (Ref a)^c -> ((a -> a)^d ->{} a)^c
+let get_and_update ref f = modify ref (fun a -> (a, f a))
+
+/// Sets the content, returning the content before.
+get_and_set : forall c a. (Ref a)^c -> (a ->{} a)^c
+let get_and_set ref value = modify ref (fun a -> (a, value))
+
+/// Sets the content, returning it.
+set_and_get : forall c a. (Ref a)^c -> (a ->{} a)^c
+let set_and_get ref value =
+  set ref value
+  value
+
+/// Sets the content to `next` only if it equals `expected`; whether it did.
+compare_and_set : forall c a. Eq a => (Ref a)^c -> (a -> (a ->{} Bool)^c)^c
+let compare_and_set ref expected next =
+  modify ref (fun a -> if a == expected then (true, next) else (false, a))
+
+/// Adds one.
+increment : Ref Number ->{} Unit
+let increment ref = update ref (fun n -> n + 1)
+
+/// Subtracts one.
+decrement : Ref Number ->{} Unit
+let decrement ref = update ref (fun n -> n - 1)
+
+/// Adds one, returning the new count.
+increment_and_get : Ref Number ->{} Number
+let increment_and_get ref = update_and_get ref (fun n -> n + 1)
+
+/// Subtracts one, returning the new count.
+decrement_and_get : Ref Number ->{} Number
+let decrement_and_get ref = update_and_get ref (fun n -> n - 1)
+
+/// Adds one, returning the count before.
+get_and_increment : Ref Number ->{} Number
+let get_and_increment ref = get_and_update ref (fun n -> n + 1)
+
+/// Subtracts one, returning the count before.
+get_and_decrement : Ref Number ->{} Number
+let get_and_decrement ref = get_and_update ref (fun n -> n - 1)
+
+/// Negates the flag.
+toggle : Ref Bool ->{} Unit
+let toggle ref = update ref (fun b -> not b)

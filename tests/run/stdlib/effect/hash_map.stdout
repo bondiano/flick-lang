@@ -1,0 +1,22 @@
+from_list: [("apple", 3), ("pear", 0), ("plum", 7)]
+empty: (false, true)
+has: (true, false, Some 7)
+by hash: (Some 7, None, true)
+has_by: (true, false)
+keys, values: (["apple", "pear", "plum"], [0, 3, 7])
+modify_at: [("apple", 4), ("kiwi", 1), ("plum", 7)]
+modify_hash: [("apple", 3), ("pear", 0)]
+modify: [("apple", 3), ("pear", 0), ("plum", 14)]
+insert, remove: ([("fig", 1), ("pear", 0), ("plum", 7)], 3)
+many: [("apple", 9), ("fig", 2)]
+map: [("apple", 8), ("pear", 4), ("plum", 11)]
+flat_map: [("apple", 3), ("apple!", 30), ("pear", 0), ("pear!", 0), ("plum", 7), ("plum!", 70)]
+reduce: 23
+filter: [("apple", 3), ("plum", 7)]
+compact: [("a", 1)]
+filter_map: [("apple", 300), ("plum", 700)]
+find_first: (Some ("plum", 7), None)
+some, every: (true, true, false)
+union: [("apple", 3), ("lime", 4), ("pear", 0), ("plum", 1)]
+for_each: 10
+witness kept: [("B", 4), ("a", 3)]

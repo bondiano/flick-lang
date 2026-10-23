@@ -1,0 +1,37 @@
+// Effect's `HashRing`: inputs land on nodes by consistent hashing, and the
+// ring stays persistent.
+module App.Main exposing (main)
+
+type Server = Server String Number
+  deriving Show
+
+name : Server -> String
+let name server = match server with
+  | Server n _ -> n
+
+landing : HashRing.HashRing Server -> List String -> List String
+let landing ring inputs =
+  List.map (fun input -> Option.with_default "-" (Option.map name (HashRing.get input ring))) inputs
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let empty : HashRing.HashRing Server = HashRing.make { baseWeight = None } name
+  Platform.stdout_line ("empty: " ++ show (HashRing.get "x" empty, HashRing.get_shards 2 empty))
+  let one = HashRing.add { weight = None } (Server "a" 1) empty
+  let three = HashRing.add_many { weight = Some 2 } [Server "b" 2, Server "c" 3] one
+  Platform.stdout_line
+    ("has: " ++ show (HashRing.has (Server "b" 0) three, HashRing.has (Server "b" 0) one))
+  let inputs = ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"]
+  let before = landing three inputs
+  Platform.stdout_line ("all on a ring of one: " ++ show (landing one inputs))
+  let without_c = HashRing.remove (Server "c" 3) three
+  let after = landing without_c inputs
+  let moved = List.filter (fun (b, a) -> b != a) (List.zip before after)
+  Platform.stdout_line ("only c's inputs move: " ++ show (List.all (fun (b, _) -> b == "c") moved))
+  Platform.stdout_line
+    ("c gone: " ++ show (List.any (fun a -> a == "c") after, HashRing.has (Server "c" 0) three))
+  let shards = Option.with_default [] (HashRing.get_shards 6 three)
+  Platform.stdout_line ("shards: " ++ show (List.length shards))
+  let small =
+    HashRing.make { baseWeight = Some 4 } name |> HashRing.add { weight = Some 1 } (Server "only" 0)
+  Platform.stdout_line ("base weight: " ++ show (landing small ["x", "y"]))

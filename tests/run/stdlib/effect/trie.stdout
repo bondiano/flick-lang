@@ -1,0 +1,18 @@
+entries: [("sea", 3), ("sells", 4), ("she", 1), ("shells", 2)]
+keys: ["sea", "sells", "she", "shells"]
+values: [3, 4, 1, 2]
+size: (4, false, true)
+get: (Some 3, None, true)
+prefix sh: ["she", "shells"]
+prefix se: ([3, 4], [("sells", 4)])
+longest prefix: (Some ("she", 1), None)
+inserted: [("sea", 3), ("sells", 4), ("she", 10), ("shells", 2), ("shore", 5), ("sun", 6)]
+original kept: Some 1
+removed: ["sells", "she", "shells"]
+modify: Some 300
+reduce: sea=3;sells=4;she=1;shells=2;
+map: [("sea", 6), ("sells", 9), ("she", 4), ("shells", 8)]
+filter: ["sells", "shells"]
+filter_map: [("sells", "sells!"), ("shells", "shells!")]
+compact: [("a", 1), ("c", 3)]
+for_each: ["sea", "sells", "she", "shells"]

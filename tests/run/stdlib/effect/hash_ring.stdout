@@ -1,0 +1,7 @@
+empty: (None, None)
+has: (true, false)
+all on a ring of one: ["a", "a", "a", "a", "a", "a"]
+only c's inputs move: true
+c gone: (false, true)
+shards: 6
+base weight: ["only", "only"]

@@ -1,0 +1,177 @@
+/// Making and changing graphs. Every change returns a new graph and leaves
+/// the one given as it was: Effect's mutations run on a copy.
+module Graph.Build exposing (..)
+
+import Graph.Types exposing (..)
+
+/// The empty graph of the kind.
+make : Kind k -> Graph n e k
+foreign pure make from "@flick-lang/runtime/effect/Graph" "flickMake"
+  reviewed "effect@4.0.5 sha256:0fd423bed4a7656b"
+
+/// The empty directed graph.
+directed : Unit -> Graph n e Directed
+foreign pure directed from "@flick-lang/runtime/effect/Graph" "directed"
+  arity 0
+  reviewed "effect@4.0.5 sha256:99fd5975ce3cef42"
+
+/// The empty undirected graph.
+undirected : Unit -> Graph n e Undirected
+foreign pure undirected from "@flick-lang/runtime/effect/Graph" "undirected"
+  arity 0
+  reviewed "effect@4.0.5 sha256:0bb880c4999dfa54"
+
+/// The graph of a snapshot, keeping its indices; an edge to a missing node or
+/// a repeated index is an error.
+from_snapshot : Snapshot n e k -> Result GraphError (Graph n e k)
+foreign pure from_snapshot from "@flick-lang/runtime/effect/Graph" "flickFromSnapshot"
+  reviewed "effect@4.0.5 sha256:d29fbb37449a00d9"
+
+/// Every node and edge of the graph with its index.
+to_snapshot : Graph n e k -> Snapshot n e k
+foreign pure to_snapshot from "@flick-lang/runtime/effect/Graph" "flickToSnapshot"
+  reviewed "effect@4.0.5 sha256:525c46fa7ad0ad6b"
+
+/// The graph with a new node, and the node's index.
+add_node : n -> Graph n e k -> (NodeIndex, Graph n e k)
+foreign pure add_node from "@flick-lang/runtime/effect/Graph" "flickAddNode"
+  reviewed "effect@4.0.5 sha256:069148a5efd0ff23"
+
+/// The graph with a new edge from `source` to `target`, and the edge's
+/// index; a missing node is an error.
+add_edge : NodeIndex -> NodeIndex -> e -> Graph n e k -> Result GraphError (EdgeIndex, Graph n e k)
+foreign pure add_edge from "@flick-lang/runtime/effect/Graph" "flickAddEdge"
+  reviewed "effect@4.0.5 sha256:979a0396a602319e"
+
+/// The graph without the node and its edges.
+remove_node : NodeIndex -> Graph n e k -> Graph n e k
+foreign pure remove_node from "@flick-lang/runtime/effect/Graph" "flickRemoveNode"
+  reviewed "effect@4.0.5 sha256:2e97bc0c9f268edb"
+
+/// The graph without the nodes and their edges.
+remove_nodes : List NodeIndex -> Graph n e k -> Graph n e k
+foreign pure remove_nodes from "@flick-lang/runtime/effect/Graph" "flickRemoveNodes"
+  reviewed "effect@4.0.5 sha256:67fb5cb41994c591"
+
+/// The graph without the edge.
+remove_edge : EdgeIndex -> Graph n e k -> Graph n e k
+foreign pure remove_edge from "@flick-lang/runtime/effect/Graph" "flickRemoveEdge"
+  reviewed "effect@4.0.5 sha256:4d7ab55fbf423727"
+
+/// The graph without the edges.
+remove_edges : List EdgeIndex -> Graph n e k -> Graph n e k
+foreign pure remove_edges from "@flick-lang/runtime/effect/Graph" "flickRemoveEdges"
+  reviewed "effect@4.0.5 sha256:a2c2a02f45158dd0"
+
+/// The graph with the node's data replaced by `f data`, if it has the node.
+update_node : forall c n e k. NodeIndex -> (n -> n)^c -> (Graph n e k -> Graph n e k)^c
+foreign pure update_node from "@flick-lang/runtime/effect/Graph" "flickUpdateNode"
+  arity 3
+  retention call
+  reviewed "effect@4.0.5 sha256:16154ff1d833075b"
+
+/// The graph with the edge's data replaced by `f data`, if it has the edge.
+update_edge : forall c n e k. EdgeIndex -> (e -> e)^c -> (Graph n e k -> Graph n e k)^c
+foreign pure update_edge from "@flick-lang/runtime/effect/Graph" "flickUpdateEdge"
+  arity 3
+  retention call
+  reviewed "effect@4.0.5 sha256:da31781c36322abd"
+
+/// Each node's data replaced by `f data`.
+map_nodes : forall c n e k. (n -> n)^c -> (Graph n e k -> Graph n e k)^c
+foreign pure map_nodes from "@flick-lang/runtime/effect/Graph" "flickMapNodes"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:49ad1d9a33c6bcad"
+
+/// Each edge's data replaced by `f data`.
+map_edges : forall c n e k. (e -> e)^c -> (Graph n e k -> Graph n e k)^c
+foreign pure map_edges from "@flick-lang/runtime/effect/Graph" "flickMapEdges"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:279d85d5319b1963"
+
+/// The nodes `f` keeps with `Some`, with that data; the others and their
+/// edges removed.
+filter_map_nodes : forall c n e k. (n -> Option n)^c -> (Graph n e k -> Graph n e k)^c
+foreign pure filter_map_nodes from "@flick-lang/runtime/effect/Graph" "flickFilterMapNodes"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:0e74a13a7f978229"
+
+/// The edges `f` keeps with `Some`, with that data.
+filter_map_edges : forall c n e k. (e -> Option e)^c -> (Graph n e k -> Graph n e k)^c
+foreign pure filter_map_edges from "@flick-lang/runtime/effect/Graph" "flickFilterMapEdges"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:bfdd4166a7069936"
+
+/// The nodes whose data satisfies `f`, with the edges between them.
+filter_nodes : forall c n e k. (n -> Bool)^c -> (Graph n e k -> Graph n e k)^c
+foreign pure filter_nodes from "@flick-lang/runtime/effect/Graph" "flickFilterNodes"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:b38e674035378886"
+
+/// The edges whose data satisfies `f`.
+filter_edges : forall c n e k. (e -> Bool)^c -> (Graph n e k -> Graph n e k)^c
+foreign pure filter_edges from "@flick-lang/runtime/effect/Graph" "flickFilterEdges"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:641b0cc95352ab99"
+
+/// Every edge turned around.
+reverse : Graph n e k -> Graph n e k
+foreign pure reverse from "@flick-lang/runtime/effect/Graph" "flickReverse"
+  reviewed "effect@4.0.5 sha256:bbeaf7eb373cc283"
+
+/// `compose options that self`: the union, merging nodes and edges of equal
+/// identity, with `that`'s data; the indices are new.
+compose : IdentityOptions n e ni ei -> Graph n e k -> Graph n e k -> Graph n e k
+foreign pure compose from "@flick-lang/runtime/effect/Graph" "flickCompose"
+  reviewed "effect@4.0.5 sha256:98435b5fc3b83b9a"
+
+/// `intersection options that self`: the nodes and edges of equal identity
+/// in both, nodes with `self`'s data, edges with `that`'s.
+intersection : IdentityOptions n e ni ei -> Graph n e k -> Graph n e k -> Graph n e k
+foreign pure intersection from "@flick-lang/runtime/effect/Graph" "flickIntersection"
+  reviewed "effect@4.0.5 sha256:704a0206ef80060d"
+
+/// `difference options that self`: every node of `self`, and its edges whose
+/// identity `that` lacks.
+difference : IdentityOptions n e ni ei -> Graph n e k -> Graph n e k -> Graph n e k
+foreign pure difference from "@flick-lang/runtime/effect/Graph" "flickDifference"
+  reviewed "effect@4.0.5 sha256:0ff85adf115ef141"
+
+/// `symmetric_difference options that self`: the nodes of both, and the edges
+/// only one of them has.
+symmetric_difference : IdentityOptions n e ni ei -> Graph n e k -> Graph n e k -> Graph n e k
+foreign pure symmetric_difference from "@flick-lang/runtime/effect/Graph" "flickSymmetricDifference"
+  reviewed "effect@4.0.5 sha256:7d291121bce5af17"
+
+/// `sum that self`: the disjoint union, equal data not merged; the indices
+/// are new.
+sum : Graph n e k -> Graph n e k -> Graph n e k
+foreign pure sum from "@flick-lang/runtime/effect/Graph" "sum"
+  arity 1
+  reviewed "effect@4.0.5 sha256:3a3c0c644d408621"
+
+/// The same nodes with an edge, of data `f source target`, between each
+/// pair the graph does not join.
+complement : forall c n e k. (n -> n -> e)^c -> (Graph n e k -> Graph n e k)^c
+foreign pure complement from "@flick-lang/runtime/effect/Graph" "complement"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:7b28b540056f30d4"
+
+/// The subgraph of the nodes within the radius of the node; a missing node
+/// or an invalid radius is an error.
+neighborhood : NodeIndex -> NeighborhoodConfig -> Graph n e k -> Result GraphError (Graph n e k)
+foreign pure neighborhood from "@flick-lang/runtime/effect/Graph" "flickNeighborhood"
+  reviewed "effect@4.0.5 sha256:fc6d5c06f3c0da0c"
+
+/// The subgraph of the nodes and the edges between them; a missing node is
+/// an error.
+induced_subgraph : List NodeIndex -> Graph n e k -> Result GraphError (Graph n e k)
+foreign pure induced_subgraph from "@flick-lang/runtime/effect/Graph" "flickInducedSubgraph"
+  reviewed "effect@4.0.5 sha256:76360e987234317f"

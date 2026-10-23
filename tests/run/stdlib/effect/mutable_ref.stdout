@@ -1,0 +1,7 @@
+update: 20
+update_and_get, get_and_update: (21, 21, 22)
+get_and_set, set_and_get: (22, 6)
+compare_and_set: (true, false, 7)
+increment, decrement: 8
+counters: (9, 9, 9, 9) -> 8
+toggle: (true, false)
