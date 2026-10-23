@@ -36,45 +36,80 @@ let elements () =
   let doubled = nums |> Channel.pipe_to (Channel.map_input (fun n -> n * 2) (Channel.identity ()))
   say ("map_input: " ++ show (Channel.run_collect doubled))
   let failing : Channel.Channel none {Boom} i Number Unit ie id = Channel.fail (Boom "up")
-  let renamed = failing |> Channel.pipe_to (Channel.map_input_error (fun _ -> Boom "renamed") (Channel.identity ()))
+  let renamed =
+    failing
+    |> Channel.pipe_to (Channel.map_input_error (fun _ -> Boom "renamed") (Channel.identity ()))
   let outcome =
     try
       show (Channel.run_collect renamed)
     with
     | Boom why -> why
   say ("map_input_error: " ++ outcome)
-  say ("flat_map: " ++ show (Channel.run_collect (Channel.flat_map (fun n -> Channel.from_list [n, n]) (Channel.from_list [1, 2]))))
-  say ("switch_map: " ++ show (Channel.run_collect (Channel.switch_map (fun n -> Channel.succeed (n * 3)) (Channel.from_list [2]))))
+  say
+    ("flat_map: "
+      ++ show
+        (Channel.run_collect
+          (Channel.flat_map (fun n -> Channel.from_list [n, n]) (Channel.from_list [1, 2]))))
+  say
+    ("switch_map: "
+      ++ show
+        (Channel.run_collect
+          (Channel.switch_map (fun n -> Channel.succeed (n * 3)) (Channel.from_list [2]))))
   let nested = Channel.from_list [Channel.from_list [1], Channel.from_list [2, 3]]
   say ("flatten: " ++ show (Channel.run_collect (Channel.flatten nested)))
-  say ("flatten_array: " ++ show (Channel.run_collect (Channel.flatten_array (Channel.from_list [[1, 2], [], [3]]))))
+  say
+    ("flatten_array: "
+      ++ show (Channel.run_collect (Channel.flatten_array (Channel.from_list [[1, 2], [], [3]]))))
   let merged = Channel.merge_all { concurrency = Some 1; bufferSize = None; switch = false } nested
   say ("merge_all: " ++ show (Channel.run_collect merged))
   say ("concat: " ++ show (Channel.run_collect (Channel.concat (Channel.from_list [9]) nums)))
   let continued = Channel.concat_with (fun _ -> Channel.from_list [0]) nums
   say ("concat_with: " ++ show (Channel.run_collect continued))
-  say ("or_else_if_empty: " ++ show (Channel.run_collect (Channel.or_else_if_empty (fun _ -> Channel.from_list [7]) Channel.empty), Channel.run_collect (Channel.or_else_if_empty (fun _ -> Channel.from_list [7]) nums)))
+  say
+    ("or_else_if_empty: "
+      ++ show
+        (
+          Channel.run_collect
+            (Channel.or_else_if_empty (fun _ -> Channel.from_list [7]) Channel.empty),
+          Channel.run_collect (Channel.or_else_if_empty (fun _ -> Channel.from_list [7]) nums)
+        ))
   say ("drain: " ++ show (Channel.run_count (Channel.drain nums)))
   let looped = Ref.make []
-  Channel.run_for_each_while (fun n -> Ref.set looped (Ref.get looped ++ [n]) |> fun _ -> List.length (Ref.get looped) < 5) (Channel.forever (Channel.from_list [1, 2]))
+  Channel.run_for_each_while
+    (fun n -> Ref.set looped (Ref.get looped ++ [n]) |> fun _ -> List.length (Ref.get looped) < 5)
+    (Channel.forever (Channel.from_list [1, 2]))
   say ("forever: " ++ show (Ref.get looped))
 
 filters : Unit ->{; Boom} Unit
 let filters () =
   say ("filter: " ++ show (Channel.run_collect (Channel.filter even nums)))
   say ("filter_map: " ++ show (Channel.run_collect (Channel.filter_map halves nums)))
-  say ("filter_effect: " ++ show (Channel.run_collect (Channel.filter_effect (fun n -> n > 2) nums)))
-  say ("filter_map_effect: " ++ show (Channel.run_collect (Channel.filter_map_effect halves_effect nums)))
+  say
+    ("filter_effect: " ++ show (Channel.run_collect (Channel.filter_effect (fun n -> n > 2) nums)))
+  say
+    ("filter_map_effect: "
+      ++ show (Channel.run_collect (Channel.filter_map_effect halves_effect nums)))
   say ("filter_array: " ++ show (lists (Channel.filter_array even chunks)))
   say ("filter_map_array: " ++ show (lists (Channel.filter_map_array halves chunks)))
-  say ("filter_array_effect: " ++ show (lists (Channel.filter_array_effect (fun n -> n > 2) chunks)))
-  say ("filter_map_array_effect: " ++ show (lists (Channel.filter_map_array_effect halves_effect chunks)))
+  say
+    ("filter_array_effect: " ++ show (lists (Channel.filter_array_effect (fun n -> n > 2) chunks)))
+  say
+    ("filter_map_array_effect: "
+      ++ show (lists (Channel.filter_map_array_effect halves_effect chunks)))
   let pairs = Channel.map_accum (fun () -> 0) (fun total n -> (total + n, [total + n])) nums
   say ("map_accum: " ++ show (Channel.run_collect pairs))
   say ("scan: " ++ show (Channel.run_collect (Channel.scan 0 (fun total n -> total + n) nums)))
-  say ("scan_effect: " ++ show (Channel.run_collect (Channel.scan_effect 1 (fun total n -> total * n) nums)))
-  say ("buffer: " ++ show (Channel.run_collect (Channel.buffer { capacity = Some 2; strategy = None } nums)))
-  say ("buffer_array: " ++ show (List.concat (lists (Channel.buffer_array { capacity = None; strategy = Some Queue.Suspend } chunks))))
+  say
+    ("scan_effect: "
+      ++ show (Channel.run_collect (Channel.scan_effect 1 (fun total n -> total * n) nums)))
+  say
+    ("buffer: "
+      ++ show (Channel.run_collect (Channel.buffer { capacity = Some 2; strategy = None } nums)))
+  say
+    ("buffer_array: "
+      ++ show
+        (List.concat
+          (lists (Channel.buffer_array { capacity = None; strategy = Some Queue.Suspend } chunks))))
 
 text : Unit ->{; Boom} Unit
 let text () =
@@ -85,7 +120,8 @@ let text () =
   let decoded = bytes |> Channel.pipe_to (Channel.decode_text "utf-8")
   say ("decode_text: " ++ show (lists decoded))
   say ("mk_uint8_array: " ++ show (Channel.mk_uint8_array bytes))
-  let strict = nums |> Channel.pipe_to_or_fail (Channel.map_input (fun n -> n + 100) (Channel.identity ()))
+  let strict =
+    nums |> Channel.pipe_to_or_fail (Channel.map_input (fun n -> n + 100) (Channel.identity ()))
   say ("pipe_to_or_fail: " ++ show (Channel.run_collect strict))
 
 main : Unit ->{; AppError} Unit

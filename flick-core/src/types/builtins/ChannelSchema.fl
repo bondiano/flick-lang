@@ -6,24 +6,28 @@ module ChannelSchema exposing (..)
 import Channel exposing (Channel)
 
 /// Decodes each chunk of wire values.
-decode : Codec rd re w a -> Channel rd {SchemaError | ie} (NonEmpty.NonEmpty w) (NonEmpty.NonEmpty a) d ie d
+decode : Codec rd re w a ->
+  Channel rd {SchemaError | ie} (NonEmpty.NonEmpty w) (NonEmpty.NonEmpty a) d ie d
 foreign pure decode from "@flick-lang/runtime/effect/ChannelSchema" "flickDecode"
   reviewed "effect@4.0.5 sha256:b68dc558b2a1522b"
 
 /// Decodes each chunk of unknown values.
 decode_unknown :
-  Codec rd re w a -> Channel rd {SchemaError | ie} (NonEmpty.NonEmpty Unknown) (NonEmpty.NonEmpty a) d ie d
+  Codec rd re w a ->
+    Channel rd {SchemaError | ie} (NonEmpty.NonEmpty Unknown) (NonEmpty.NonEmpty a) d ie d
 foreign pure decode_unknown from "@flick-lang/runtime/effect/ChannelSchema" "flickDecode"
   reviewed "effect@4.0.5 sha256:b8cf3a9ea357e5e4"
 
 /// Encodes each chunk to wire values.
-encode : Codec rd re w a -> Channel re {SchemaError | ie} (NonEmpty.NonEmpty a) (NonEmpty.NonEmpty w) d ie d
+encode : Codec rd re w a ->
+  Channel re {SchemaError | ie} (NonEmpty.NonEmpty a) (NonEmpty.NonEmpty w) d ie d
 foreign pure encode from "@flick-lang/runtime/effect/ChannelSchema" "flickEncode"
   reviewed "effect@4.0.5 sha256:deab460a9c9e371a"
 
 /// Encodes each chunk, its wire values as unknown values.
 encode_unknown :
-  Codec rd re w a -> Channel re {SchemaError | ie} (NonEmpty.NonEmpty a) (NonEmpty.NonEmpty Unknown) d ie d
+  Codec rd re w a ->
+    Channel re {SchemaError | ie} (NonEmpty.NonEmpty a) (NonEmpty.NonEmpty Unknown) d ie d
 foreign pure encode_unknown from "@flick-lang/runtime/effect/ChannelSchema" "flickEncode"
   reviewed "effect@4.0.5 sha256:db0ae9d339ef3dc5"
 

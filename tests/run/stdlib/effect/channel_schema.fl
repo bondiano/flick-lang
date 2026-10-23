@@ -15,12 +15,16 @@ say : String ->{} Unit
 let say line = Platform.stdout_line line
 
 issues : SchemaError -> String
-let issues (SchemaError found) = "err " ++ String.join "; " (List.map (fun i -> i.path ++ ": " ++ i.message) found)
+let issues (SchemaError found) =
+  "err " ++ String.join "; " (List.map (fun i -> i.path ++ ": " ++ i.message) found)
 
 points : Channel.Channel none none i (NonEmpty.NonEmpty Point) Unit ie id
 let points = Channel.from_list_chunked 2 [{ x = 1; y = 2 }, { x = 3; y = 4 }, { x = 5; y = 6 }]
 
-flat : Channel.Channel none {SchemaError} Unit (NonEmpty.NonEmpty a) Unit none Unit ->{; SchemaError} List a
+flat : Channel.Channel none {SchemaError} Unit (
+  NonEmpty.NonEmpty a
+) Unit none Unit ->{; SchemaError}
+  List a
 let flat channel = List.concat (Channel.run_collect (Channel.map NonEmpty.to_list channel))
 
 round_trips : Unit ->{; SchemaError} Unit
@@ -33,17 +37,23 @@ let round_trips () =
   let decoded = unknown |> Channel.pipe_to (ChannelSchema.decode_unknown point)
   say ("encode_unknown, decode_unknown: " ++ show (flat decoded))
   let moved = Channel.map_input (fun chunk -> chunk) (Channel.identity ())
-  let shifted = points |> Channel.pipe_to (ChannelSchema.duplex { inputSchema = point; outputSchema = point } moved)
+  let shifted =
+    points
+    |> Channel.pipe_to (ChannelSchema.duplex { inputSchema = point; outputSchema = point } moved)
   say ("duplex: " ++ show (flat shifted))
   let reencoded = ChannelSchema.decode point |> Channel.pipe_to (ChannelSchema.encode_unknown point)
-  let through = points |> Channel.pipe_to (ChannelSchema.duplex_unknown { inputSchema = point; outputSchema = point } reencoded)
+  let through =
+    points
+    |> Channel.pipe_to
+      (ChannelSchema.duplex_unknown { inputSchema = point; outputSchema = point } reencoded)
   say ("duplex_unknown: " ++ show (flat through))
 
 main : Unit ->{; AppError} Unit
 let main () =
   try
     round_trips ()
-    let words = Channel.from_list_chunked 1 ["a"] |> Channel.pipe_to (ChannelSchema.encode_unknown text)
+    let words =
+      Channel.from_list_chunked 1 ["a"] |> Channel.pipe_to (ChannelSchema.encode_unknown text)
     let wrong = words |> Channel.pipe_to (ChannelSchema.decode_unknown point)
     say ("wrong: " ++ show (flat wrong))
   with

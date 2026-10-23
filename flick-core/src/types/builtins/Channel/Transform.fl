@@ -29,7 +29,9 @@ foreign pure map_done from "@flick-lang/runtime/effect/Channel" "mapDone"
   reviewed "effect@4.0.5 sha256:6ed3774ca99f9fb2"
 
 /// The done value mapped by the task `f` gives.
-map_done_effect : (d ->{r2; e2} d2) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d2 ie id
+map_done_effect : (d ->{r2; e2} d2) ->
+  Channel r e i o d ie id ->
+  Channel (r + r2) (e + e2) i o d2 ie id
 foreign pure map_done_effect from "@flick-lang/runtime/effect/Channel" "mapDoneEffect"
   arity 1
   reviewed "effect@4.0.5 sha256:653c21afa825f0ae"
@@ -50,14 +52,18 @@ foreign pure map_input_error from "@flick-lang/runtime/effect/Channel" "mapInput
 /// The elements of the channel `f` builds of each element, one after the
 /// other.
 flat_map :
-  (o -> Channel r2 e2 i o2 d2 ie id) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o2 d ie id
+  (o -> Channel r2 e2 i o2 d2 ie id) ->
+    Channel r e i o d ie id ->
+    Channel (r + r2) (e + e2) i o2 d ie id
 foreign pure flat_map from "@flick-lang/runtime/effect/Channel" "flatMap"
   arity 1
   reviewed "effect@4.0.5 sha256:35e47ca1b0633127"
 
 /// `flat_map`, dropping the channel of an element when the next one comes.
 switch_map :
-  (o -> Channel r2 e2 i o2 d2 ie id) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o2 d ie id
+  (o -> Channel r2 e2 i o2 d2 ie id) ->
+    Channel r e i o d ie id ->
+    Channel (r + r2) (e + e2) i o2 d ie id
 foreign pure switch_map from "@flick-lang/runtime/effect/Channel" "switchMap"
   arity 1
   reviewed "effect@4.0.5 sha256:bd0af6fef9d4f1be"
@@ -82,14 +88,18 @@ type alias MergeOptions = { concurrency : Option Number; bufferSize : Option Num
 
 /// The elements of the channels the channel emits, run concurrently.
 merge_all :
-  MergeOptions -> Channel r e i (Channel r2 e2 i o d2 ie id) d ie id -> Channel (r + r2) (e + e2) i o d ie id
+  MergeOptions ->
+    Channel r e i (Channel r2 e2 i o d2 ie id) d ie id ->
+    Channel (r + r2) (e + e2) i o d ie id
 foreign pure merge_all from "@flick-lang/runtime/effect/Channel" "flickMergeAll"
   arity 1
   reviewed "effect@4.0.5 sha256:c7dbb12e3896fc2c"
 
 /// `self |> concat next`: the elements of `self`, then those of `next`,
 /// ending as `next` does.
-concat : Channel r2 e2 i o d2 ie id -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d2 ie id
+concat : Channel r2 e2 i o d2 ie id ->
+  Channel r e i o d ie id ->
+  Channel (r + r2) (e + e2) i o d2 ie id
 foreign pure concat from "@flick-lang/runtime/effect/Channel" "concat"
   arity 1
   reviewed "effect@4.0.5 sha256:8e100df43d06f5e6"
@@ -97,7 +107,9 @@ foreign pure concat from "@flick-lang/runtime/effect/Channel" "concat"
 /// The elements of the channel, then those of the channel `f` builds of
 /// its done value.
 concat_with :
-  (d -> Channel r2 e2 i o d2 ie id) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d2 ie id
+  (d -> Channel r2 e2 i o d2 ie id) ->
+    Channel r e i o d ie id ->
+    Channel (r + r2) (e + e2) i o d2 ie id
 foreign pure concat_with from "@flick-lang/runtime/effect/Channel" "concatWith"
   arity 1
   reviewed "effect@4.0.5 sha256:12ad548b5f0a298d"
@@ -105,7 +117,9 @@ foreign pure concat_with from "@flick-lang/runtime/effect/Channel" "concatWith"
 /// The channel, or the one `f` builds of its done value when it emitted
 /// nothing.
 or_else_if_empty :
-  (d -> Channel r2 e2 i o d ie id) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
+  (d -> Channel r2 e2 i o d ie id) ->
+    Channel r e i o d ie id ->
+    Channel (r + r2) (e + e2) i o d ie id
 foreign pure or_else_if_empty from "@flick-lang/runtime/effect/Channel" "orElseIfEmpty"
   arity 1
   reviewed "effect@4.0.5 sha256:6f0d5b8cb1516e8c"
@@ -133,14 +147,18 @@ foreign pure filter_map from "@flick-lang/runtime/effect/Channel" "filterMap"
   reviewed "effect@4.0.5 sha256:ce216c677d840832"
 
 /// The elements for which the task `f` gives `True`.
-filter_effect : (o ->{r2; e2} Bool) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
+filter_effect : (o ->{r2; e2} Bool) ->
+  Channel r e i o d ie id ->
+  Channel (r + r2) (e + e2) i o d ie id
 foreign pure filter_effect from "@flick-lang/runtime/effect/Channel" "filterEffect"
   arity 1
   reviewed "effect@4.0.5 sha256:72594f6e3abd0ed0"
 
 /// The elements the effectful filter passes, as it maps them.
 filter_map_effect :
-  Filter.FilterEffect r2 e2 o b x -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i b d ie id
+  Filter.FilterEffect r2 e2 o b x ->
+    Channel r e i o d ie id ->
+    Channel (r + r2) (e + e2) i b d ie id
 foreign pure filter_map_effect from "@flick-lang/runtime/effect/Channel" "filterMapEffect"
   arity 1
   reviewed "effect@4.0.5 sha256:a33df49d0dc9e246"
@@ -148,14 +166,18 @@ foreign pure filter_map_effect from "@flick-lang/runtime/effect/Channel" "filter
 /// In each chunk, the elements for which `f` holds; empty chunks are
 /// dropped.
 filter_array :
-  (o -> Bool) -> Channel r e i (NonEmpty.NonEmpty o) d ie id -> Channel r e i (NonEmpty.NonEmpty o) d ie id
+  (o -> Bool) ->
+    Channel r e i (NonEmpty.NonEmpty o) d ie id ->
+    Channel r e i (NonEmpty.NonEmpty o) d ie id
 foreign pure filter_array from "@flick-lang/runtime/effect/Channel" "filterArray"
   arity 1
   reviewed "effect@4.0.5 sha256:ccc1159bbefb1da6"
 
 /// In each chunk, the elements the filter passes, as it maps them.
 filter_map_array :
-  Filter.Filter o b x -> Channel r e i (NonEmpty.NonEmpty o) d ie id -> Channel r e i (NonEmpty.NonEmpty b) d ie id
+  Filter.Filter o b x ->
+    Channel r e i (NonEmpty.NonEmpty o) d ie id ->
+    Channel r e i (NonEmpty.NonEmpty b) d ie id
 foreign pure filter_map_array from "@flick-lang/runtime/effect/Channel" "filterMapArray"
   arity 1
   reviewed "effect@4.0.5 sha256:4dae80a22eba6e8e"
@@ -181,7 +203,10 @@ foreign pure filter_map_array_effect from "@flick-lang/runtime/effect/Channel" "
 /// Threads a state from `initial` through the elements; `f` gives the
 /// next state and the elements to emit.
 map_accum :
-  (Unit -> s) -> (s -> o ->{r2; e2} (s, List b)) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i b d ie id
+  (Unit -> s) ->
+    (s -> o ->{r2; e2} (s, List b)) ->
+    Channel r e i o d ie id ->
+    Channel (r + r2) (e + e2) i b d ie id
 foreign pure map_accum from "@flick-lang/runtime/effect/Channel" "mapAccum"
   arity 2
   reviewed "effect@4.0.5 sha256:b70e1f2fb154df44"
@@ -193,7 +218,10 @@ foreign pure scan from "@flick-lang/runtime/effect/Channel" "scan"
   reviewed "effect@4.0.5 sha256:72bbfa306689d9e4"
 
 /// `scan` with a task for each step.
-scan_effect : s -> (s -> o ->{r2; e2} s) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i s d ie id
+scan_effect : s ->
+  (s -> o ->{r2; e2} s) ->
+  Channel r e i o d ie id ->
+  Channel (r + r2) (e + e2) i s d ie id
 foreign pure scan_effect from "@flick-lang/runtime/effect/Channel" "scanEffect"
   arity 2
   reviewed "effect@4.0.5 sha256:2c47b9f365ecd109"
@@ -207,7 +235,9 @@ foreign pure buffer from "@flick-lang/runtime/effect/Channel" "flickBuffer"
 
 /// `buffer` counting elements of the chunks.
 buffer_array :
-  Buffer -> Channel r e i (NonEmpty.NonEmpty o) d ie id -> Channel r e i (NonEmpty.NonEmpty o) d ie id
+  Buffer ->
+    Channel r e i (NonEmpty.NonEmpty o) d ie id ->
+    Channel r e i (NonEmpty.NonEmpty o) d ie id
 foreign pure buffer_array from "@flick-lang/runtime/effect/Channel" "flickBufferArray"
   arity 1
   reviewed "effect@4.0.5 sha256:2f1eb69947695fbc"
@@ -220,12 +250,14 @@ foreign pure split_lines from "@flick-lang/runtime/effect/Channel" "splitLines"
 
 /// Decodes chunks of bytes (numbers from 0 to 255) as text in the
 /// encoding, such as `"utf-8"`.
-decode_text : String -> Channel none e (NonEmpty.NonEmpty (List Number)) (NonEmpty.NonEmpty String) d e d
+decode_text : String ->
+  Channel none e (NonEmpty.NonEmpty (List Number)) (NonEmpty.NonEmpty String) d e d
 foreign pure decode_text from "@flick-lang/runtime/effect/Channel" "flickDecodeText"
   reviewed "effect@4.0.5 sha256:cd214c5b67f6a503"
 
 /// Encodes chunks of text as UTF-8 bytes.
-encode_text : Unit -> Channel none e (NonEmpty.NonEmpty String) (NonEmpty.NonEmpty (List Number)) d e d
+encode_text : Unit ->
+  Channel none e (NonEmpty.NonEmpty String) (NonEmpty.NonEmpty (List Number)) d e d
 foreign pure encode_text from "@flick-lang/runtime/effect/Channel" "flickEncodeText"
   arity 0
   reviewed "effect@4.0.5 sha256:5757f49f7bab9a06"

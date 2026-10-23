@@ -139,14 +139,16 @@ foreign pure from_queue_array from "@flick-lang/runtime/effect/Channel" "fromQue
 
 /// Emits the messages of a subscription; the channel holds its region, so
 /// it cannot leave the subscription's `scope`.
-from_subscription : forall s a i ie id. PubSub.Subscription s a -> (Channel none none i a Unit ie id)^{s}
+from_subscription : forall s a i ie id. PubSub.Subscription s a ->
+  (Channel none none i a Unit ie id)^{s}
 foreign pure from_subscription from "@flick-lang/runtime/effect/Channel" "fromSubscription"
   retention owner
   reviewed "effect@4.0.5 sha256:669854ebe54e976a"
 
 /// `from_subscription`, a chunk of the messages there are at a time.
 from_subscription_array :
-  forall s a i ie id. PubSub.Subscription s a -> (Channel none none i (NonEmpty.NonEmpty a) Unit ie id)^{s}
+  forall s a i ie id. PubSub.Subscription s a ->
+    (Channel none none i (NonEmpty.NonEmpty a) Unit ie id)^{s}
 foreign pure from_subscription_array from "@flick-lang/runtime/effect/Channel" "fromSubscriptionArray"
   retention owner
   reviewed "effect@4.0.5 sha256:9f582a06b1b2f8df"
@@ -189,7 +191,9 @@ type alias Buffer = { capacity : Option Number; strategy : Option Queue.Strategy
 
 /// Emits what `f` offers to the queue it gets, until `f` ends or fails
 /// the queue; `f` runs as long as the channel does.
-callback : { bufferSize : Option Number; strategy : Option Queue.Strategy } -> (Queue.Queue e o ->{r; e} x) -> Channel r e i o Unit ie id
+callback : { bufferSize : Option Number; strategy : Option Queue.Strategy } ->
+  (Queue.Queue e o ->{r; e} x) ->
+  Channel r e i o Unit ie id
 foreign pure callback from "@flick-lang/runtime/effect/Channel" "flickCallback"
   arity 2
   reviewed "effect@4.0.5 sha256:e5b5a66020a45e56"
@@ -211,7 +215,10 @@ foreign pure acquire_release from "@flick-lang/runtime/effect/Channel" "flickAcq
 /// Acquires a value, runs the channel `use` builds of it, and releases it
 /// with how that channel ended.
 acquire_use_release :
-  Eff r e a -> (a -> Channel r2 e2 i o d ie id) -> (a -> Exit e2 d ->{} x) -> Channel (r + r2) (e + e2) i o d ie id
+  Eff r e a ->
+    (a -> Channel r2 e2 i o d ie id) ->
+    (a -> Exit e2 d ->{} x) ->
+    Channel (r + r2) (e + e2) i o d ie id
 foreign pure acquire_use_release from "@flick-lang/runtime/effect/Channel" "flickAcquireUseRelease"
   arity 3
   reviewed "effect@4.0.5 sha256:528da9b357e55f5d"
