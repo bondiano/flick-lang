@@ -1,0 +1,28 @@
+number: ok 1.5
+string: ok "s"
+bool: ok true
+bigint: ok 12n
+unit: ok ()
+list: ok [1, 2]
+option: ok None
+result: ok Err "no"
+shape: ok Square 2
+never: err (root): expected nothing (Never), got number
+redacted: err (root): a Redacted value has no JSON form without an explicit policy
+json_reveal: "pw"
+opaque: err (root): a handle has no wire form
+unknown: valid
+duration: ok 250ms
+decimal: 0.1
+chunk: 3
+BigInt.json: ok -7n
+json_finite: err (root): Infinity has no JSON form
+transform: ok 4 -> 2
+transform_result: ok 4 | err (root): not a number
+check: err (root): a positive number
+transform_effect: 3
+profile: ("Ada", None, None, Some [], 1, 3)
+encode: {"name":"Ada","nick":"A","age":null,"tags":[],"retries":1,"level":3}
+missing name: err name: a missing key
+json_schema: true
+standard: made

@@ -1,5 +1,5 @@
 /// Effect's immutable `Chunk`, for repeated concatenation.
-module Chunk exposing (Chunk, empty, from_list, to_list, append, concat, size, get, map)
+module Chunk exposing (Chunk, empty, from_list, to_list, append, concat, size, get, map, json)
 
 type Chunk a
 
@@ -36,3 +36,8 @@ instance Eq a => Eq (Chunk a) =
 instance Show a => Show (Chunk a) =
   show : Chunk a -> String
   let show x = "Chunk " ++ show (to_list x)
+
+/// A chunk as a JSON array of its items.
+json : PureCodec Json a -> PureCodec Json (Chunk a)
+foreign pure json from "@flick-lang/runtime/effect/Schema" "flickChunkJson"
+  reviewed "effect@4.0.5 sha256:2826521488c26924"

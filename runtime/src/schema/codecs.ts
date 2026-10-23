@@ -67,7 +67,7 @@ export const codecTaggedOption = (item: AnySchema): AnySchema =>
 export const codecList = (item: AnySchema): AnySchema => Schema.Array(item);
 
 /** The issue of a `SchemaError` of the program. */
-const issueOf = (error: unknown): SchemaIssue.Issue =>
+export const issueOf = (error: unknown): SchemaIssue.Issue =>
   new SchemaIssue.InvalidValue({
     message: isSchemaError(error) ? error._0.map((i) => i.message).join("; ") : String(error),
   });

@@ -31,3 +31,9 @@ foreign pure union from "@flick-lang/runtime" "hashMapUnion"
 
 rehash : EqHash.EqHash x k -> HashMap w k v -> HashMap x k v
 foreign pure rehash from "@flick-lang/runtime" "hashMapRehash"
+
+/// A map as a JSON array of `[key, value]` pairs, rebuilt with the
+/// canonical instances; of a repeated key the last pair wins.
+json : Hash k => PureCodec Json k -> PureCodec Json v -> PureCodec Json (HashMap EqHash.Canonical k v)
+foreign pure json from "@flick-lang/runtime/effect/Schema" "flickHashMapJson"
+  reviewed "effect@4.0.5 sha256:1a2e1d73f8a704a7"

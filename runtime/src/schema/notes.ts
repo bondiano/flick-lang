@@ -2,7 +2,7 @@
 // for the formatter of issues, the exporter, the generators and the
 // detection of runtime decoding. They extend Effect's annotations, so
 // writing and reading them is typed.
-import type { Schema } from "effect";
+import type { Schema, SchemaAST } from "effect";
 
 import type { Rng } from "../stdlib/testing.ts";
 
@@ -50,3 +50,10 @@ const none: Notes = {};
 /** The annotations of an AST node, a check or an issue. */
 export const notesOf = (node: { readonly annotations?: Notes | undefined } | undefined): Notes =>
   node?.annotations ?? none;
+
+/**
+ * A note of the runtime on a node: Effect puts the annotations of a node
+ * with checks on its last check.
+ */
+export const noteOf = <K extends keyof Notes>(ast: SchemaAST.AST, key: K): Notes[K] =>
+  notesOf(ast)[key] ?? notesOf(ast.checks?.[ast.checks.length - 1])[key];

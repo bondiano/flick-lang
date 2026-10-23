@@ -69,6 +69,10 @@ const SOURCES: &[(&str, &str)] = &[
     // Effect: transactions
     // end of Effect: transactions
     // Effect: schema
+    ("Check", include_str!("builtins/Check.fl")),
+    ("Arbitrary", include_str!("builtins/Arbitrary.fl")),
+    ("JsonSchema", include_str!("builtins/JsonSchema.fl")),
+    ("Differ", include_str!("builtins/Differ.fl")),
     // end of Effect: schema
     // Effect: platform and observability
     // end of Effect: platform and observability

@@ -1,0 +1,167 @@
+// Effect Schema's checks on codecs: what each accepts and rejects, and the
+// JSON Schema keywords the strict exporter writes for them, or why it
+// refuses one.
+module App.Main exposing (main)
+
+type alias Pair = (String, Number)
+  deriving Schema
+
+shown : Show a => Result SchemaError a -> String
+let shown result =
+  match result with
+  | Ok v -> "ok " ++ show v
+  | Err (SchemaError issues) -> "err " ++ String.join "; " (List.map (fun i -> i.message) issues)
+
+/// Decodes JSON text with the codec.
+dec : Show a => String -> PureCodec Json a -> String
+let dec text c =
+  match Json.parse text with
+  | Ok input -> shown (Codec.decode_result c input)
+  | Err _ -> "not JSON"
+
+/// The exported JSON Schema on one line, or the export error.
+exported : PureCodec Json a -> String
+let exported c =
+  match Codec.json_schema "T" c with
+  | Err (Codec.ExportError reason) -> "refused: " ++ reason
+  | Ok text ->
+    match Json.parse text with
+    | Err _ -> "not JSON"
+    | Ok input ->
+      match Codec.decode_result Json.json input with
+      | Ok json -> Json.stringify json
+      | Err _ -> "not a JSON value"
+
+rem : Number -> Number -> Number
+let rem n d = n - Number.floor (n / d) * d
+
+str : Check.Check String -> PureCodec Json String
+let str check = Check.apply check String.json
+
+num : Check.Check Number -> PureCodec Json Number
+let num check = Check.apply check Number.json_finite
+
+both : String -> String -> String -> Check.Check String ->{} Unit
+let both name good bad check =
+  let c = str check
+  Platform.stdout_line (name ++ ": " ++ dec good c ++ " | " ++ dec bad c)
+
+nums : String -> String -> String -> Check.Check Number ->{} Unit
+let nums name good bad check =
+  let c = num check
+  Platform.stdout_line (name ++ ": " ++ dec good c ++ " | " ++ dec bad c)
+
+big : String -> Check.Check BigInt -> String
+let big text check = dec text (Check.apply check BigInt.json)
+
+decimal : String -> Check.Check BigDecimal.BigDecimal -> String
+let decimal text check =
+  match Json.parse text with
+  | Ok input ->
+    match Codec.decode_result (Check.apply check BigDecimal.json) input with
+    | Ok d -> "ok " ++ BigDecimal.to_string d
+    | Err _ -> "err"
+  | Err _ -> "not JSON"
+
+size : String -> Check.Check (HashSet.HashSet EqHash.Canonical String) -> String
+let size text check =
+  match Json.parse text with
+  | Ok input ->
+    match Codec.decode_result (Check.apply check (HashSet.json String.json)) input with
+    | Ok s -> "ok " ++ show (List.sort (HashSet.to_list s))
+    | Err (SchemaError issues) -> "err " ++ String.join "; " (List.map (fun i -> i.message) issues)
+  | Err _ -> "not JSON"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  both "min_length" "\"ab\"" "\"a\"" (Check.min_length 2)
+  both "max_length" "\"ab\"" "\"abc\"" (Check.max_length 2)
+  both "length_between" "\"a\"" "\"\"" (Check.length_between 1 2)
+  both "non_empty" "\"a\"" "\"\"" Check.non_empty
+  both "min_code_points" "\"ab\"" "\"a\"" (Check.min_code_points 2)
+  both "max_code_points" "\"a\"" "\"ab\"" (Check.max_code_points 1)
+  both "code_points_between" "\"a\"" "\"ab\"" (Check.code_points_between 1 1)
+  both "pattern" "\"abc\"" "\"a1\"" (Check.pattern "^[a-z]+$")
+  both "starts_with" "\"abc\"" "\"cab\"" (Check.starts_with "ab")
+  both "ends_with" "\"abc\"" "\"cab\"" (Check.ends_with "bc")
+  both "includes" "\"abc\"" "\"ac\"" (Check.includes "b")
+  both "trimmed" "\"a b\"" "\" a\"" Check.trimmed
+  both "lowercased" "\"ab\"" "\"aB\"" Check.lowercased
+  both "uppercased" "\"AB\"" "\"aB\"" Check.uppercased
+  both "capitalized" "\"Ab\"" "\"ab\"" Check.capitalized
+  both "uncapitalized" "\"aB\"" "\"Ab\"" Check.uncapitalized
+  both "uuid" "\"123e4567-e89b-12d3-a456-426614174000\"" "\"123\"" (Check.uuid None)
+  both "uuid 4" "\"123e4567-e89b-42d3-a456-426614174000\"" "\"123e4567-e89b-12d3-a456-426614174000\"" (Check.uuid (Some 4))
+  both "ulid" "\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"" "\"01ARZ3\"" Check.ulid
+  both "guid" "\"123e4567-e89b-12d3-a456-426614174000\"" "\"x\"" Check.guid
+  both "base64" "\"aGk=\"" "\"a*\"" Check.base64
+  both "base64url" "\"aGk\"" "\"a+\"" Check.base64url
+  both "string_finite" "\"1.5\"" "\"abc\"" Check.string_finite
+  both "string_bigint" "\"12\"" "\"1.5\"" Check.string_bigint
+  nums "greater_than" "2" "1" (Check.greater_than 1)
+  nums "greater_than_or_equal_to" "1" "0" (Check.greater_than_or_equal_to 1)
+  nums "less_than" "0" "1" (Check.less_than 1)
+  nums "less_than_or_equal_to" "1" "2" (Check.less_than_or_equal_to 1)
+  let range = { minimum = 1; maximum = 3; exclusiveMinimum = false; exclusiveMaximum = true }
+  nums "between" "1" "3" (Check.between range)
+  nums "multiple_of" "6" "7" (Check.multiple_of 3)
+  nums "int" "2" "2.5" Check.int
+  nums "int32" "2" "3000000000" Check.int32
+  nums "uint32" "3000000000" "-1" Check.uint32
+  let finite = Check.apply Check.finite Number.json
+  Platform.stdout_line ("finite: " ++ dec "1" finite ++ " | " ++ dec "\"NaN\"" finite)
+  Platform.stdout_line ("bigint: " ++ String.join ", " [
+    big "\"2\"" (Check.greater_than_bigint 1n),
+    big "\"1\"" (Check.greater_than_or_equal_to_bigint 2n),
+    big "\"0\"" (Check.less_than_bigint 1n),
+    big "\"2\"" (Check.less_than_or_equal_to_bigint 1n),
+    big "\"2\"" (Check.between_bigint { minimum = 1n; maximum = 2n; exclusiveMinimum = false; exclusiveMaximum = false })
+  ])
+  let one = BigDecimal.from_integer 1n
+  let two = BigDecimal.from_integer 2n
+  Platform.stdout_line ("decimal: " ++ String.join ", " [
+    decimal "\"1.5\"" (Check.greater_than_decimal one),
+    decimal "\"1.5\"" (Check.greater_than_or_equal_to_decimal two),
+    decimal "\"0.5\"" (Check.less_than_decimal one),
+    decimal "\"1.5\"" (Check.less_than_or_equal_to_decimal one),
+    decimal "\"1.25\"" (Check.between_decimal { minimum = one; maximum = two; exclusiveMinimum = false; exclusiveMaximum = false })
+  ])
+  both "greater_than_by" "\"c\"" "\"a\"" (Check.greater_than_by "b")
+  both "greater_than_or_equal_to_by" "\"b\"" "\"a\"" (Check.greater_than_or_equal_to_by "b")
+  both "less_than_by" "\"a\"" "\"b\"" (Check.less_than_by "b")
+  both "less_than_or_equal_to_by" "\"b\"" "\"c\"" (Check.less_than_or_equal_to_by "b")
+  both "between_by" "\"c\"" "\"e\"" (Check.between_by "b" "d")
+  nums "multiple_of_by" "8" "6" (Check.multiple_of_by (fun n d -> rem n d) 0 4)
+  let ints = Codec.list Number.json_finite
+  Platform.stdout_line ("min_items: " ++ dec "[1]" (Check.apply (Check.min_items 2) ints))
+  Platform.stdout_line ("max_items: " ++ dec "[1, 2]" (Check.apply (Check.max_items 1) ints))
+  Platform.stdout_line ("unique: " ++ dec "[1, 2]" (Check.apply Check.unique ints) ++ " | " ++ dec "[1, 1]" (Check.apply Check.unique ints))
+  let pairs = Codec.json (schema Pair)
+  let keyed = Check.apply Check.unique_keys (Codec.list pairs)
+  Platform.stdout_line ("unique_keys: " ++ dec "[[\"a\", 1], [\"b\", 1]]" keyed ++ " | " ++ dec "[[\"a\", 1], [\"a\", 2]]" keyed)
+  Platform.stdout_line ("min_size: " ++ size "[\"a\", \"a\"]" (Check.min_size 2))
+  Platform.stdout_line ("max_size: " ++ size "[\"a\", \"a\"]" (Check.max_size 1))
+  Platform.stdout_line ("size_between: " ++ size "[\"a\", \"b\"]" (Check.size_between 2 3))
+  let dict = Codec.entries Number.json_finite
+  Platform.stdout_line ("min_properties: " ++ dec "{\"a\": 1}" (Check.min_properties 2 dict))
+  Platform.stdout_line ("max_properties: " ++ dec "{\"a\": 1}" (Check.max_properties 1 dict))
+  Platform.stdout_line ("properties_between: " ++ dec "{\"a\": 1, \"b\": 2}" (Check.properties_between 2 3 dict))
+  Platform.stdout_line ("property_names: " ++ dec "{\"ab\": 1}" (Check.property_names (str (Check.max_length 1)) dict))
+  let group = Check.all (NonEmpty.cons (Check.min_length 2) [Check.lowercased])
+  both "all" "\"ab\"" "\"A\"" group
+  let even = Check.predicate (fun n -> rem n 2 == 0) "an even number"
+  nums "predicate" "2" "3" even
+  let encoded = match Codec.encode_result (str (Check.max_length 1)) "ab" with
+    | Ok json -> Json.stringify json
+    | Err (SchemaError issues) -> "err " ++ String.join "; " (List.map (fun i -> i.message) issues)
+  Platform.stdout_line ("encode checks too: " ++ encoded)
+  Platform.stdout_line ("export min_length 1: " ++ exported (str (Check.min_length 1)))
+  Platform.stdout_line ("export min_length 2: " ++ exported (str (Check.min_length 2)))
+  Platform.stdout_line ("export patterns: " ++ exported (str (Check.all (NonEmpty.cons (Check.starts_with "a") [Check.ends_with "z"]))))
+  Platform.stdout_line ("export int: " ++ exported (num Check.int))
+  Platform.stdout_line ("export between: " ++ exported (num (Check.between range)))
+  Platform.stdout_line ("export items: " ++ exported (Check.apply Check.unique (Check.apply (Check.min_items 1) ints)))
+  Platform.stdout_line ("export properties: " ++ exported (Check.min_properties 1 dict))
+  Platform.stdout_line ("export predicate: " ++ exported (num even))
+  Platform.stdout_line ("export lowercased: " ++ exported (str Check.lowercased))
+  Platform.stdout_line ("export after transform: " ++ exported (Check.apply Check.int Codec.number_from_string))

@@ -1,0 +1,69 @@
+/// Effect's `JsonSchema`: JSON Schema documents of other dialects read into
+/// draft 2020-12 and written back. A schema is a `Json` value: decode the
+/// text of `Codec.json_schema` with `Json.json` to get one.
+module JsonSchema exposing (..)
+
+/// A JSON Schema, a JSON value.
+type alias JsonSchema = Json
+
+/// The named schemas a document refers to, a JSON object.
+type alias Definitions = Json
+
+/// A schema, `root` (Effect's `schema`), and its definitions in a dialect: `"draft-2020-12"`,
+/// `"draft-07"`, `"draft-04"`, `"openapi-3.1"` or `"openapi-3.0"`.
+type alias Document = { dialect : String; root : JsonSchema; definitions : Definitions }
+
+/// Several schemas sharing their definitions.
+type alias MultiDocument = { dialect : String; schemas : NonEmpty.NonEmpty JsonSchema; definitions : Definitions }
+
+/// The `$schema` URI of draft-04.
+meta_schema_uri_draft_04 : String
+foreign pure meta_schema_uri_draft_04 from "@flick-lang/runtime/effect/JsonSchema" "META_SCHEMA_URI_DRAFT_04"
+  reviewed "effect@4.0.5 sha256:fd4f94453a0d822f"
+
+/// The `$schema` URI of draft-07.
+meta_schema_uri_draft_07 : String
+foreign pure meta_schema_uri_draft_07 from "@flick-lang/runtime/effect/JsonSchema" "META_SCHEMA_URI_DRAFT_07"
+  reviewed "effect@4.0.5 sha256:5fd241945b1a66e5"
+
+/// The `$schema` URI of draft 2020-12.
+meta_schema_uri_draft_2020_12 : String
+foreign pure meta_schema_uri_draft_2020_12 from "@flick-lang/runtime/effect/JsonSchema" "META_SCHEMA_URI_DRAFT_2020_12"
+  reviewed "effect@4.0.5 sha256:aabd079451be79e0"
+
+/// A draft-07 schema as a draft 2020-12 document.
+from_draft_07 : JsonSchema -> Document
+foreign pure from_draft_07 from "@flick-lang/runtime/effect/JsonSchema" "flickFromSchemaDraft07"
+  reviewed "effect@4.0.5 sha256:e5a4f3c339d42dee"
+
+/// A draft 2020-12 schema as a document, its `$defs` split out.
+from_draft_2020_12 : JsonSchema -> Document
+foreign pure from_draft_2020_12 from "@flick-lang/runtime/effect/JsonSchema" "flickFromSchemaDraft2020_12"
+  reviewed "effect@4.0.5 sha256:c6bb2fb29461b4c2"
+
+/// An OpenAPI 3.1 schema as a draft 2020-12 document.
+from_openapi_3_1 : JsonSchema -> Document
+foreign pure from_openapi_3_1 from "@flick-lang/runtime/effect/JsonSchema" "flickFromSchemaOpenApi3_1"
+  reviewed "effect@4.0.5 sha256:44dea9bb3a3123bb"
+
+/// An OpenAPI 3.0 schema as a draft 2020-12 document.
+from_openapi_3_0 : JsonSchema -> Document
+foreign pure from_openapi_3_0 from "@flick-lang/runtime/effect/JsonSchema" "flickFromSchemaOpenApi3_0"
+  reviewed "effect@4.0.5 sha256:4371f1424a9960f2"
+
+/// A draft 2020-12 document written as draft-07; another dialect is a
+/// defect.
+to_draft_07 : Document -> Document
+foreign pure to_draft_07 from "@flick-lang/runtime/effect/JsonSchema" "flickToDocumentDraft07"
+  reviewed "effect@4.0.5 sha256:e1d8449a2d20f14b"
+
+/// A draft 2020-12 document written as draft-04; another dialect is a
+/// defect.
+to_draft_04 : Document -> Document
+foreign pure to_draft_04 from "@flick-lang/runtime/effect/JsonSchema" "flickToDocumentDraft04"
+  reviewed "effect@4.0.5 sha256:7a0d5274de1b9984"
+
+/// Draft 2020-12 schemas written for OpenAPI 3.1 components.
+to_openapi_3_1 : MultiDocument -> MultiDocument
+foreign pure to_openapi_3_1 from "@flick-lang/runtime/effect/JsonSchema" "toMultiDocumentOpenApi3_1"
+  reviewed "effect@4.0.5 sha256:04d546fc642bf5de"

@@ -37,3 +37,9 @@ foreign pure union from "@flick-lang/runtime" "hashSetUnion"
 /// The same elements under another witness.
 rehash : EqHash.EqHash v a -> HashSet w a -> HashSet v a
 foreign pure rehash from "@flick-lang/runtime" "hashSetRehash"
+
+/// A set as a JSON array of its elements, rebuilt with the canonical
+/// instances; a repeated element is kept once.
+json : Hash a => PureCodec Json a -> PureCodec Json (HashSet EqHash.Canonical a)
+foreign pure json from "@flick-lang/runtime/effect/Schema" "flickHashSetJson"
+  reviewed "effect@4.0.5 sha256:066988b9d5f59b15"

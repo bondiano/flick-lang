@@ -111,6 +111,7 @@ foreign pure shift_right_unsigned from "@flick-lang/runtime" "shiftRightUnsigned
 /// and when encoding.
 json_finite : PureCodec Json Number
 foreign pure json_finite from "@flick-lang/runtime" "codecNumberFinite"
+  reviewed "effect@4.0.5 sha256:aa4a4c8fa6098a04"
 
 /// Every number: non-finite values and `-0` as the strings `"NaN"`,
 /// `"Infinity"`, `"-Infinity"` and `"-0"`.

@@ -1,0 +1,53 @@
+literal: "v1" -> "v1" | err (root): expected "v1", got string
+literals: "b" -> "b" | err (root): expected Union, got string
+entries: [("x", 1), ("y", 2)] -> {"x":1,"y":2}
+non_empty_list: NonEmpty [1, 2] -> [1,2] | err [0]: a missing key
+list_ensure: [3] -> 3 | [3, 4] -> [3,4]
+trim: "a b" -> "a b"
+to_lower_case: "abc" -> "abc"
+to_upper_case: "ABC" -> "ABC"
+capitalize: "Abc" -> "Abc"
+uncapitalize: "aBC" -> "aBC"
+snake_to_camel: "userName" -> "user_name"
+number_from_string: 1.5 -> "1.5" | NaN -> "NaN"
+finite_from_string: 1.5 -> "1.5" | err (root): expected a finite number, got NaN
+bool_from_bit: true -> 1 | err (root): expected Union, got number
+base64_string: "hi" -> "aGk=" | err (root): an invalid value
+base64url_string: "hi" -> "aGk"
+hex_string: "hi" -> "6869"
+uri_component: "a b" -> "a%20b" | err (root): an invalid value
+json_string: [1, 2] -> "[1,2]" | err (root): an invalid value
+split: ["a", "b", "c"] -> "a,b,c"
+split_key_value: [("a", "1"), ("b", "2")] -> "a=1&b=2"
+natural: 3 -> 3 | err (root): expected a value greater than or equal to 0, got number
+port: 8080 -> 8080 | err (root): expected a port number, got number
+char: "a" -> "a" | err (root): expected a value with a length of 1, got string
+annotations: (Some "Age", Some "in years")
+flip: "1.5"
+to_schema: { label = "a", size = 1 } -> {"label":"a","size":1}
+wire_schema: valid "12"
+catch_decoding: "fallback" -> "fallback"
+catch_encoding: 0
+catch_decoding_effect: late
+catch_encoding_effect: 0
+check_effect: 3 | err (root): an invalid value
+encode_xml: <root>   <label>a</label>   <size>1</size> </root>
+Duration.json_millis: 1s 500ms -> 1500 | err (root): expected a value greater than or equal to 0, got number
+Duration.json_nanos: 2ms -> "2000000"
+Duration.json_string: 2s -> "2000 millis" | err (root): an invalid value
+infinity: err (root): Infinity has no JSON form
+BigDecimal.json: 1.25
+Chunk.json: [1, 2]
+HashSet.json: ["a", "b"] member a: true
+HashMap.json: Some 2 size 2
+export literals: {"$schema":"https://json-schema.org/draft/2020-12/schema","enum":["a","b"]}
+export non_empty_list: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"array","prefixItems":[{"type":"string"}],"items":{"type":"string"},"minItems":1}
+export list_ensure: {"$schema":"https://json-schema.org/draft/2020-12/schema","anyOf":[{"type":"string"},{"type":"array","items":{"type":"string"}}]}
+export natural: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"integer","title":"Age","description":"in years","minimum":0,"maximum":9007199254740991}
+export trim: refused: T -> JSON Schema: the check "a string with no leading or trailing whitespace" applies after a transformation
+export finite_from_string: refused: T -> JSON Schema: a fallible transformation has no JSON Schema form
+export json_string: refused: T -> JSON Schema: a fallible transformation has no JSON Schema form
+export catch_decoding: refused: T -> JSON Schema: a decoding fallback accepts input the wire schema does not state
+export json_millis: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"number","minimum":0}
+export Duration.json_string: refused: T -> JSON Schema: a fallible transformation has no JSON Schema form
+export entries: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","additionalProperties":{"type":"string"}}
