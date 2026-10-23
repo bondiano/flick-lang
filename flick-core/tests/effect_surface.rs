@@ -12,7 +12,7 @@ use flick_core::iface::Decl;
 use flick_core::project::{self, Host};
 use flick_core::source::SourceMap;
 use flick_core::types::{self, Ref};
-use surface::{Binding, Manifest, Snapshot, Stdlib, coverage, lint};
+use surface::{Binding, Manifest, Snapshot, Status, Stdlib, coverage, lint};
 
 struct Fs;
 
@@ -151,7 +151,23 @@ fn the_manifest_classifies_the_pinned_effect() {
     let report = coverage(&snapshot, &manifest);
     let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join("effect-coverage.md");
     fs::write(&out, &report).expect("writable target directory");
-    let problems = lint(&snapshot, &manifest, &stdlib, &pinned());
+    let mut problems = lint(&snapshot, &manifest, &stdlib, &pinned());
+    // every wrapped entrypoint is decided export by export for the release
+    problems.extend(
+        manifest
+            .modules
+            .iter()
+            .flat_map(|((dir, module), exports)| {
+                exports
+                    .iter()
+                    .filter_map(move |(name, status)| match status {
+                        Status::Pending(stage) => {
+                            Some(format!("{dir}/{module}.{name}: still pending ({stage})"))
+                        }
+                        _ => None,
+                    })
+            }),
+    );
     assert!(
         problems.is_empty(),
         "{} problems:\n{}",
