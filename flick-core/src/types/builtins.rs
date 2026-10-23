@@ -174,6 +174,17 @@ const SOURCES: &[(&str, &str)] = &[
     ("Tracer", include_str!("builtins/Tracer.fl")),
     // end of Effect: platform and observability
     // Effect: context, layers and requests
+    ("Context", include_str!("builtins/Context.fl")),
+    ("Scope", include_str!("builtins/Scope.fl")),
+    ("Layer.Trace", include_str!("builtins/Layer/Trace.fl")),
+    ("LayerMap", include_str!("builtins/LayerMap.fl")),
+    ("LayerRef", include_str!("builtins/LayerRef.fl")),
+    ("ErrorReporter", include_str!("builtins/ErrorReporter.fl")),
+    ("Request", include_str!("builtins/Request.fl")),
+    (
+        "RequestResolver",
+        include_str!("builtins/RequestResolver.fl"),
+    ),
     // end of Effect: context, layers and requests
     // Effect: effects, schedules and fibers
     ("Schedule", include_str!("builtins/Schedule.fl")),

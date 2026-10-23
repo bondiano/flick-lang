@@ -1,0 +1,16 @@
+build a
+tenant a
+build b
+tenant b
+build a
+tenant a
+record x
+map builds 3
+build ref
+ref ref
+ref again ref
+build ref
+build ref
+ref after invalidate ref
+ref builds 3
+report Info true

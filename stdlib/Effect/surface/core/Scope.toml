@@ -1,14 +1,18 @@
-[pending]
-Closeable = "M20"
-Scope = "M20"
-State = "M20"
-addFinalizer = "M20"
-addFinalizerExit = "M20"
-close = "M20"
-closeUnsafe = "M20"
-fork = "M20"
-forkUnsafe = "M20"
-make = "M20"
-makeUnsafe = "M20"
-provide = "M20"
-use = "M20"
+[wrapped]
+addFinalizer = "Scope.add_finalizer 53499de357d8640a"
+addFinalizerExit = "Scope.add_finalizer_exit 219836b437064bd1"
+
+[language]
+Scope = "`scope`: the `Scope s` service of the innermost `scope`, never a value"
+Closeable = "`scope`: a block's owner is closed when the block ends"
+make = "`scope { … }`: a new lexical owner"
+close = "`scope { … }`: the owner closes, two-phase, when the block ends"
+fork = "a nested `scope { … }`: its owner closes before the outer one"
+use = "`scope { … }`: the block runs with its owner and closes it"
+provide = "`scope [s] { … }`: the compiler gives each call the owner of its region"
+
+[excluded]
+State = "TS-only: the internal state of a scope's finalizers"
+closeUnsafe = "invariant: `unsafe*`; an owner closes only when its block ends"
+forkUnsafe = "invariant: `unsafe*`; a nested `scope` is the child owner"
+makeUnsafe = "invariant: `unsafe*`; a scope value would outlive its block"
