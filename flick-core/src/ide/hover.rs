@@ -30,8 +30,48 @@ impl Ide<'_> {
         )
     }
 
+    /// A `task`, `scope` or `ignore` keyword at `offset`: the type of the
+    /// whole block it opens, or of what it discards, and what it does.
+    fn keyword(&self, file: FileId, offset: u32) -> Option<(String, String, (u32, u32))> {
+        let m = self.module(file)?;
+        let parent = *tree::path_to(&m.tree, offset).last()?;
+        let kw = parent.child_tokens().find(|t| {
+            matches!(t.kind, K::TaskKw | K::ScopeKw | K::IgnoreKw)
+                && t.start <= offset
+                && offset <= t.end
+        })?;
+        let ty = m.typing.types.get(&(kw.start, kw.end))?;
+        let shown = show_type(ty);
+        let (code, note) = match kw.kind {
+            K::TaskKw => (
+                format!("task {{ … }} : {shown}"),
+                "Builds this computation without running it; `await` runs it.".to_owned(),
+            ),
+            K::ScopeKw => (
+                format!("scope {{ … }} : {shown}"),
+                "Runs its body in a fresh region and releases what the body \
+                 acquired when it ends; the value may not mention the region."
+                    .to_owned(),
+            ),
+            _ => {
+                let mut note = format!("Discards a value of type `{shown}`.");
+                if ty.spine().0.is_prim("Eff") {
+                    note.push_str(
+                        " The computation is not run: `ignore (await …)` runs it \
+                         and discards its result.",
+                    );
+                }
+                (format!("ignore : {shown} -> Unit"), note)
+            }
+        };
+        Some((code, note, (kw.start, kw.end)))
+    }
+
     /// Markdown for the symbol at `offset`, and the range it covers.
     pub fn hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
+        if let Some((code, note, range)) = self.keyword(file, offset) {
+            return Some((format!("```flick\n{code}\n```\n\n{note}"), range));
+        }
         let (symbol, range) = self.symbol_at(file, offset)?;
         let (code, note) = match &symbol {
             Symbol::Local { name, binder, .. } => {

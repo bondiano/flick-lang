@@ -316,7 +316,8 @@ impl Checker<'_> {
                 bool_
             }
             K::IgnoreKw => {
-                self.infer(operand);
+                let ty = self.infer(operand);
+                self.note_type(self.token_span(op), &ty);
                 Type::prim("Unit")
             }
             K::AwaitKw => {

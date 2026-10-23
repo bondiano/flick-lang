@@ -74,6 +74,21 @@ let describe x = Some (show x)
 
 keep : forall c r. (Unit -> { name : String | r })^c -> (Unit -> { name : String | r })^c
 let keep f = f
+
+saved : User -> Eff {Store} {StoreError} Number
+let saved user =
+  task {
+    Store.put user.name
+    1
+  }
+
+counted : User ->{Store; StoreError} Number
+let counted user =
+  ignore (saved user)
+  ignore (run user)
+  scope {
+    run user
+  }
 ";
 
 struct Fixture {
@@ -176,6 +191,36 @@ fn hover_shows_source_types_with_rows_and_captures() {
     assert!(
         !hover("run", 1).contains("Effect<"),
         "no TypeScript helpers"
+    );
+}
+
+#[test]
+fn hover_on_a_keyword_shows_the_type_of_its_whole_block() {
+    let f = fixture();
+    let ide = f.ide();
+    let main = f.file("App.Main");
+    let hover = |needle: &str, nth| {
+        ide.hover(main, f.at("App.Main", needle, nth) + 1)
+            .unwrap_or_else(|| panic!("hover {needle}"))
+            .0
+    };
+    let task = hover("task {", 0);
+    assert!(
+        task.contains("task { … } : Eff {Store} {StoreError} Number"),
+        "{task}"
+    );
+    let scope = hover("scope {", 0);
+    assert!(scope.contains("scope { … } : Number"), "{scope}");
+    let deferred = hover("ignore (saved", 0);
+    assert!(
+        deferred.contains("ignore : Eff {Store} {StoreError} Number -> Unit")
+            && deferred.contains("is not run"),
+        "{deferred}"
+    );
+    let ran = hover("ignore (run", 0);
+    assert!(
+        ran.contains("ignore : Number -> Unit") && !ran.contains("is not run"),
+        "{ran}"
     );
 }
 

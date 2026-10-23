@@ -52,7 +52,8 @@ pub struct Typing {
     /// `codec` blocks: the fields' labels in the order written.
     pub codecs: HashMap<Range, CodecBlock>,
     /// The type of each name in an expression and of each variable a
-    /// pattern binds, for editors.
+    /// pattern binds, for editors; at a `task` or `scope` keyword the type
+    /// of the whole block, at `ignore` the type of what it discards.
     pub types: HashMap<Range, Type>,
     /// The type each type name refers to: its module and name.
     pub type_names: HashMap<Range, (String, String)>,

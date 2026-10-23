@@ -3,7 +3,7 @@ export const sidebar = [
   { label: "Start", items: [{ slug: "start/getting-started" }, { slug: "playground" }] },
   {
     label: "Language",
-    items: ["types", "effects", "classes", "regions", "modules", "grammar"].map((f) => ({ slug: `reference/${f}` })),
+    items: ["types", "effects", "classes", "regions", "modules", "grammar", "keywords"].map((f) => ({ slug: `reference/${f}` })),
   },
   {
     label: "Libraries",
