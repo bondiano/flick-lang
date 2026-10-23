@@ -1,0 +1,63 @@
+// The domain: a pure view of a user and two loads through the `Users`
+// and `Log` services, which callers provide.
+module App.Users exposing (
+  UserId,
+  User,
+  UserView,
+  NotFound(..),
+  Users,
+  Log,
+  user_id,
+  to_view,
+  load_view,
+  load_two,
+)
+
+opaque type alias UserId = String
+  deriving Eq, Show
+
+type alias User = {
+  id : UserId;
+  name : String;
+}
+
+type alias UserView = {
+  id : UserId;
+  title : String;
+}
+
+type error NotFound = NotFound UserId
+  deriving Show
+
+service Users =
+  get : UserId ->{; NotFound} User
+
+service Log =
+  info : String ->{} Unit
+
+/// The only way to make a `UserId` outside this module.
+user_id : String -> UserId
+let user_id raw = raw
+
+to_view : User -> UserView
+let to_view user =
+  {
+    id = user.id;
+    title = String.trim user.name;
+  }
+
+load_view : UserId ->{Users, Log; NotFound} UserView
+let load_view id =
+  let user = Users.get id
+  let view = to_view user
+
+  Log.info ("Loaded " ++ view.title)
+
+  view
+
+load_two : UserId -> UserId ->{Users, Log; NotFound} (UserView, UserView)
+let load_two first_id second_id =
+  let first = task { load_view first_id }
+  let second = task { load_view second_id }
+
+  parallel first second

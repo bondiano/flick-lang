@@ -1,0 +1,24 @@
+// The external implementations: `Users` over a JS user directory and
+// `Log` over the console.
+module App.Live exposing (users_live, log_live)
+
+import App.Users exposing (UserId, NotFound(..), Users, Log)
+
+find_name : UserId ->{} Option String
+foreign async find_name from "./directory.mjs" "findName"
+  nullable
+
+console_log : String ->{} Unit
+foreign sync console_log from global "console.log"
+
+users_live : Layer none none {Users}
+let users_live =
+  Layer.succeed Users {
+    get = fun id ->
+      match find_name id with
+      | Some name -> { id = id; name = name }
+      | None -> from_result (Err (NotFound id));
+  }
+
+log_live : Layer none none {Log}
+let log_live = Layer.succeed Log { info = fun line -> console_log ("[log] " ++ line) }
