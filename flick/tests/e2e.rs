@@ -137,7 +137,7 @@ thread_local! {
 }
 
 /// How much longer the release builds of the corpus may take than the debug
-/// ones, until M19 fixes the budgets.
+/// ones.
 const RELEASE_TIME_BUDGET: f64 = 2.0;
 
 /// The JS size and build time of the corpus in both profiles: release must

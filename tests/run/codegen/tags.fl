@@ -7,7 +7,7 @@ type Choice = Some Number | Empty
 tag_of : a -> String
 foreign pure tag_of from "./tags.mjs" "tagOf"
 
-main : Unit ->{none; AppError} Unit
+main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line (tag_of (Some 1))
   Platform.stdout_line (tag_of Empty)

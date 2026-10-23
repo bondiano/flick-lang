@@ -5,7 +5,7 @@ divide : BigInt -> BigInt ->{} BigInt
 let divide a b =
   a / b
 
-main : Unit ->{none; AppError} Unit
+main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line "before"
   ignore (divide 1n 0n)

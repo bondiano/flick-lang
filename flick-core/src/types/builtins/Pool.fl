@@ -20,7 +20,7 @@ make :
     acquire : Eff r e a;
     size : Number;
     concurrency : Option Number;
-    targetUtilization : Option Number
+    targetUtilization : Option Number;
   } ->{Scope s | r;}
   Pool s e a
 foreign effect make from "@flick-lang/runtime/effect/Pool" "flickMake"
@@ -37,7 +37,7 @@ make_with_ttl :
     concurrency : Option Number;
     targetUtilization : Option Number;
     timeToLive : Duration.Duration;
-    timeToLiveStrategy : Option TimeToLiveStrategy
+    timeToLiveStrategy : Option TimeToLiveStrategy;
   } ->{Scope s | r;}
   Pool s e a
 foreign effect make_with_ttl from "@flick-lang/runtime/effect/Pool" "flickMakeWithTtl"

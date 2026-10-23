@@ -224,7 +224,10 @@ type alias ActionContext = { commandPath : List String; version : String }
 
 /// The switch `--<name>` of this command and its subcommands, with its help
 /// text: given, it runs `act` instead of any handler, like `--version`.
-action : forall c r e o. String -> String -> (ActionContext ->{} Unit)^c -> ((Spec r e o)^c -> (Spec r e o)^c)^c
+action : forall c r e o. String ->
+  String ->
+  (ActionContext ->{} Unit)^c ->
+  ((Spec r e o)^c -> (Spec r e o)^c)^c
 foreign pure action from "@flick-lang/runtime/cli" "specAction"
   arity 4
   retention call
@@ -276,10 +279,15 @@ foreign pure group from "@flick-lang/runtime/cli" "specGroup"
   retention call
   reviewed "effect@4.0.5 sha256:ccc0103e6db4f51a"
 
-
 /// A flag in help: `type_` names its value, empty for a switch.
 type alias FlagDoc =
-  { name : String; aliases : List String; type_ : String; description : Option String; required : Bool }
+  {
+    name : String;
+    aliases : List String;
+    type_ : String;
+    description : Option String;
+    required : Bool;
+  }
 
 /// A positional argument in help.
 type alias ArgDoc =
@@ -290,7 +298,10 @@ type alias SubcommandDoc =
   { name : String; alias : Option String; shortDescription : Option String; description : String }
 
 /// Subcommands listed together, under `group` if it has a name.
-type alias SubcommandGroupDoc = { group : Option String; commands : NonEmpty.NonEmpty SubcommandDoc }
+type alias SubcommandGroupDoc = {
+  group : Option String;
+  commands : NonEmpty.NonEmpty SubcommandDoc;
+}
 
 /// An example command line in help.
 type alias ExampleDoc = { command : String; description : Option String }
@@ -304,11 +315,14 @@ type alias HelpDoc =
     globalFlags : List FlagDoc;
     args : List ArgDoc;
     subcommands : List SubcommandGroupDoc;
-    examples : List ExampleDoc
+    examples : List ExampleDoc;
   }
 
 /// How `--help` and `--version` (the command's name, then the version) print.
-type alias Formatter = { formatHelpDoc : HelpDoc -> String; formatVersion : String -> String -> String }
+type alias Formatter = {
+  formatHelpDoc : HelpDoc -> String;
+  formatVersion : String -> String -> String;
+}
 
 /// Effect's formatter, with ANSI colors when `colors`.
 default_formatter : Bool -> Formatter

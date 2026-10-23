@@ -1,8 +1,9 @@
-//! Syntax corpus: every ```` ```flick ```` block of the spec (pinned by
-//! `tests/syntax/spec_examples.txt`) and of `docs/`, plus every `.fl` file under
+//! Syntax corpus: every ```` ```flick ```` block of the Russian spec, the
+//! original text (pinned by `tests/syntax/spec_examples.txt`), and of `docs/`, plus every `.fl` file under
 //! `tests/`. All must round-trip losslessly; error-free ones must also format
 //! idempotently without changing the AST. `tests/syntax/*.fl` must parse
-//! without diagnostics.
+//! without diagnostics. The repository's `.fl` sources must already be
+//! formatted.
 
 use std::path::{Path, PathBuf};
 use std::{env, fs, panic};
@@ -11,7 +12,7 @@ use flick_core::fmt;
 use flick_core::source::SourceMap;
 use flick_core::syntax::parse;
 
-const SPEC: &str = "Flick спецификация ML языка с HKT и Effect.md";
+const SPEC: &str = "docs/src/content/docs/ru/spec";
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
@@ -59,10 +60,30 @@ fn parse_errors(name: &str, text: &str) -> Vec<String> {
         .collect()
 }
 
+/// `(chapter:line, text)` of each block of the spec, chapter by chapter.
+fn spec_blocks() -> Vec<(String, String)> {
+    let mut chapters = Vec::new();
+    md_files(&root().join(SPEC), &mut chapters);
+    chapters.sort();
+    chapters
+        .iter()
+        .flat_map(|path| {
+            let markdown = fs::read_to_string(path).expect("spec is readable");
+            let chapter = path
+                .file_stem()
+                .expect("file name")
+                .to_string_lossy()
+                .into_owned();
+            flick_blocks(&markdown)
+                .into_iter()
+                .map(move |(line, text)| (format!("{chapter}:{line}"), text))
+        })
+        .collect()
+}
+
 #[test]
 fn spec_examples_parse_and_are_pinned() {
-    let spec = fs::read_to_string(root().join(SPEC)).expect("spec is readable");
-    let blocks = flick_blocks(&spec);
+    let blocks = spec_blocks();
     let manifest_path = root().join("tests/syntax/spec_examples.txt");
     let manifest = fs::read_to_string(&manifest_path).unwrap_or_default();
     let pinned: Vec<&str> = manifest
@@ -76,9 +97,9 @@ fn spec_examples_parse_and_are_pinned() {
         let print = fingerprint(text);
         if !pinned.contains(&print.as_str()) {
             let first = text.lines().next().unwrap_or_default();
-            unpinned.push(format!("{print}  spec:{line}  {first}"));
+            unpinned.push(format!("{print}  {line}  {first}"));
         }
-        errors.extend(parse_errors(&format!("spec:{line}"), text));
+        errors.extend(parse_errors(line, text));
     }
     assert!(
         errors.is_empty(),
@@ -109,15 +130,15 @@ fn spec_examples_parse_and_are_pinned() {
 #[ignore = "debug helper"]
 fn dump() {
     let blocks = match env::var("DUMP_FILE") {
-        Ok(path) => vec![(1, fs::read_to_string(path).expect("DUMP_FILE"))],
-        Err(_) => flick_blocks(&fs::read_to_string(root().join(SPEC)).expect("spec")),
+        Ok(path) => vec![(path.clone(), fs::read_to_string(path).expect("DUMP_FILE"))],
+        Err(_) => spec_blocks(),
     };
     let mut out = String::new();
     for (line, text) in blocks {
         let mut sources = SourceMap::default();
         let file = sources.add("x", text.as_str());
         let tree = parse(&text, file).tree.debug_dump(&text);
-        out.extend(["=== ", &line.to_string(), "\n", &text, &tree]);
+        out.extend(["=== ", &line, "\n", &text, &tree]);
     }
     fs::write(env::var("DUMP").expect("DUMP"), out).expect("write");
 }
@@ -160,7 +181,7 @@ fn corpus() -> Vec<(String, String)> {
         let text = fs::read_to_string(&path).expect("UTF-8 fixture");
         entries.push((path.display().to_string(), text));
     }
-    let mut docs = vec![root().join(SPEC)];
+    let mut docs = Vec::new();
     md_files(&root().join("docs"), &mut docs);
     for path in docs {
         let markdown = fs::read_to_string(&path).expect("readable markdown");
@@ -251,5 +272,44 @@ fn corpus_is_lossless_and_formats_stably() {
     assert!(
         formatted > 50,
         "only {formatted} corpus entries were formatted"
+    );
+}
+
+/// `.fl` sources in the repository are kept as `flick fmt` writes them; run
+/// `flick fmt <file>` on a file this reports.
+#[test]
+fn fl_sources_are_formatted() {
+    let dirs = [
+        "tests",
+        "examples",
+        "tools/dts-importer/src",
+        "tools/dts-importer/test",
+        "docs/src/playground",
+        "flick-core/src/types/builtins",
+    ];
+    let mut files = Vec::new();
+    for dir in dirs {
+        let dir = root().join(dir);
+        if dir.is_dir() {
+            fl_files(&dir, &mut files);
+        }
+    }
+    files.sort();
+    assert!(files.len() > 100, "only {} .fl sources found", files.len());
+    let unformatted: Vec<String> = files
+        .iter()
+        .filter(|path| {
+            let text = fs::read_to_string(path).expect("UTF-8 source");
+            let mut sources = SourceMap::default();
+            let file = sources.add(path.display().to_string(), text.as_str());
+            // files with syntax errors are fixtures of those errors
+            fmt::format(&text, file).is_ok_and(|out| out != text)
+        })
+        .map(|path| path.display().to_string())
+        .collect();
+    assert!(
+        unformatted.is_empty(),
+        "not formatted (run `flick fmt` on them):\n{}",
+        unformatted.join("\n")
     );
 }

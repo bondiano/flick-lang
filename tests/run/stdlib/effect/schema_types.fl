@@ -74,7 +74,7 @@ let addresses =
       "\"00:1a:2b:3c:4d:5e\""
       Net.mac_universally_administered_address,
     case "scoped_ipv6_literal" "\"fe80::1%eth0\"" Net.scoped_ipv6_literal,
-    case "dns_record_type" "\"MX\"" Net.dns_record_type
+    case "dns_record_type" "\"MX\"" Net.dns_record_type,
   ]
 
 records : List (String, PureCodec Json Net.DnsRecord, String)
@@ -86,42 +86,42 @@ let records =
     (
       "dns_caa_record",
       Net.dns_caa_record,
-      "{\"_tag\": \"CAA\", \"critical\": false, \"tag\": \"issue\", \"value\": \"ca.example\"}"
+      "{\"_tag\": \"CAA\", \"critical\": false, \"tag\": \"issue\", \"value\": \"ca.example\"}",
     ),
     (
       "dns_cname_record",
       Net.dns_cname_record,
-      "{\"_tag\": \"CNAME\", \"target\": \"example.com\"}"
+      "{\"_tag\": \"CNAME\", \"target\": \"example.com\"}",
     ),
     (
       "dns_mx_record",
       Net.dns_mx_record,
-      "{\"_tag\": \"MX\", \"exchange\": \"mail.example.com\", \"priority\": 10}"
+      "{\"_tag\": \"MX\", \"exchange\": \"mail.example.com\", \"priority\": 10}",
     ),
     (
       "dns_naptr_record",
       Net.dns_naptr_record,
-      "{\"_tag\": \"NAPTR\", \"order\": 1, \"preference\": 2, \"flags\": \"u\", \"service\": \"E2U+sip\", \"regexp\": \"\", \"replacement\": \"example.com\"}"
+      "{\"_tag\": \"NAPTR\", \"order\": 1, \"preference\": 2, \"flags\": \"u\", \"service\": \"E2U+sip\", \"regexp\": \"\", \"replacement\": \"example.com\"}",
     ),
     ("dns_ns_record", Net.dns_ns_record, "{\"_tag\": \"NS\", \"host\": \"ns.example.com\"}"),
     ("dns_ptr_record", Net.dns_ptr_record, "{\"_tag\": \"PTR\", \"host\": \"host.example.com\"}"),
     (
       "dns_soa_record",
       Net.dns_soa_record,
-      "{\"_tag\": \"SOA\", \"primary\": \"ns.example.com\", \"admin\": \"admin.example.com\", \"serial\": 1, \"refresh\": 1000, \"retry\": 1000, \"expire\": 1000, \"minimum\": 1000}"
+      "{\"_tag\": \"SOA\", \"primary\": \"ns.example.com\", \"admin\": \"admin.example.com\", \"serial\": 1, \"refresh\": 1000, \"retry\": 1000, \"expire\": 1000, \"minimum\": 1000}",
     ),
     (
       "dns_srv_record",
       Net.dns_srv_record,
-      "{\"_tag\": \"SRV\", \"target\": \"sip.example.com\", \"port\": 5060, \"priority\": 1, \"weight\": 5}"
+      "{\"_tag\": \"SRV\", \"target\": \"sip.example.com\", \"port\": 5060, \"priority\": 1, \"weight\": 5}",
     ),
     (
       "dns_tlsa_record",
       Net.dns_tlsa_record,
-      "{\"_tag\": \"TLSA\", \"certUsage\": 3, \"selector\": 1, \"matchingType\": 1, \"data\": \"010203\"}"
+      "{\"_tag\": \"TLSA\", \"certUsage\": 3, \"selector\": 1, \"matchingType\": 1, \"data\": \"010203\"}",
     ),
     ("dns_txt_record", Net.dns_txt_record, "{\"_tag\": \"TXT\", \"chunks\": [\"v=spf1\"]}"),
-    ("dns_txt_record", Net.dns_txt_record, "{\"_tag\": \"A\", \"address\": \"192.0.2.1\"}")
+    ("dns_txt_record", Net.dns_txt_record, "{\"_tag\": \"A\", \"address\": \"192.0.2.1\"}"),
   ]
 
 main : Unit ->{; AppError} Unit

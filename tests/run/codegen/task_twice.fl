@@ -2,7 +2,7 @@
 // and each `await` runs the body again.
 module App.Main exposing (main)
 
-main : Unit ->{none; AppError} Unit
+main : Unit ->{; AppError} Unit
 let main () =
   let cell = Ref.make 0
   let request = task {

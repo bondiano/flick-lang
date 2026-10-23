@@ -30,7 +30,7 @@ fn keeps_comments_layout_and_mid_line_blocks() {
       | A ->
         foo
       // between arms
-      | B -> { a = 1
+      | B -> { a = 1;
                b = 2 }
     ");
 }
@@ -141,4 +141,34 @@ fn keeps_a_line_between_its_parent_and_a_deeper_line_apart() {
         | Boom n -> "b"
       x
     "#);
+}
+
+#[test]
+fn items_ending_a_line_end_with_their_separator() {
+    let src = "type alias T = {\n  a : Number\n  b : String\n  | r\n}\nlet xs = [1,\n  2 // two\n]\nlet t = (1, 2)\nlet one = (\n  1\n)\nlet r = { a = 1; b =\n            2\n  }\nlet long = [ \"aaaaaaaaaaaaaaaaaaaaaaaa\", \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\", \"cccccccccccccccccccccccc\" ]\n";
+    let out = fmt(src);
+    insta::assert_snapshot!(out, @r#"
+    type alias T = {
+      a : Number;
+      b : String;
+      | r
+    }
+    let xs = [1,
+      2, // two
+    ]
+    let t = (1, 2)
+    let one = (
+      1
+    )
+    let r = { a = 1; b =
+                2;
+      }
+    let long =
+      [
+        "aaaaaaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "cccccccccccccccccccccccc",
+      ]
+    "#);
+    assert_eq!(fmt(&out), out, "trailing separators are idempotent");
 }

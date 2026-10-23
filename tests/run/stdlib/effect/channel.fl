@@ -44,7 +44,7 @@ let values () =
       ++ show
         (
           Channel.run_drain (Channel.end "done"),
-          Channel.run_drain (Channel.end_sync (fun () -> "later"))
+          Channel.run_drain (Channel.end_sync (fun () -> "later")),
         ))
   say
     ("empty: "
@@ -150,7 +150,7 @@ let js () =
           evaluate = fun () -> transform;
           onError = boom;
           closeOnDone = true;
-          releaseLockOnEnd = true
+          releaseLockOnEnd = true;
         })
   say ("from_transform_stream: " ++ show (lists shouted))
 

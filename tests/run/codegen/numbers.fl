@@ -5,7 +5,7 @@ module App.Main exposing (main)
 line : Bool -> String
 let line b = show b
 
-main : Unit ->{none; AppError} Unit
+main : Unit ->{; AppError} Unit
 let main () =
   let nan = 0 / 0
   let zero = 0

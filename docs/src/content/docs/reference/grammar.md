@@ -2,9 +2,8 @@
 title: "Flick grammar"
 ---
 
-This is the surface syntax accepted by `flick check` and `flick fmt`. Section
-references (§N) point to the language specification
-`Flick спецификация ML языка с HKT и Effect.md`. Every ```` ```flick ```` block
+This is the surface syntax accepted by `flick check` and `flick fmt`; the
+language itself is described in the [specification](../../spec/). Every ```` ```flick ```` block
 in this file and in the specification is parsed by the test suite
 (`flick-core/tests/corpus.rs`); a block that stops parsing fails the build.
 
@@ -66,7 +65,7 @@ Contextual words are ordinary names everywhere except in one position:
 ### Number literals
 
 The grammar of JavaScript `NumericLiteral`, so a literal means exactly the JS
-number (§9):
+number (see [Schema and standard data types](../../spec/09-schema/)):
 
 - decimal `0`, `42`, `1.5`, exponents `1e-3`, `2E+10`;
 - `0x1F`, `0o17`, `0b1010` (prefix letters in either case);
@@ -100,7 +99,7 @@ There is no interpolation.
 
 Line breaks inside any string value are `\n`, also in `\r\n` sources.
 Expressions made only of literals are evaluated at compile time with JS
-semantics (spec §8, "Вычисление литеральных выражений"): `60 * 60 * 24`,
+semantics (see [Evaluating literal expressions](../../spec/08-typescript-and-ffi/#evaluating-literal-expressions)): `60 * 60 * 24`,
 `"a" ++ "b"`, `not false`.
 
 ```flick
@@ -148,7 +147,7 @@ There are no user-defined operators. From weakest to strongest:
 
 Function bodies, match arms and the members of `class`, `instance` and
 `service` are delimited by indentation; there is no `in` and the last
-expression of a block is its value (§3). Braces delimit records and the
+expression of a block is its value (see [Direct effectful calls](../../spec/03-direct-calls/)). Braces delimit records and the
 blocks of `task`, `scope`, `provide`, `sql`, `ui`, `cli`, `codec` and `rec`.
 
 1. Top-level declarations start at column 1. A line indented further continues
@@ -257,7 +256,7 @@ two. Writing `of` before the fields is `FLICK-S010`.
 `type error E` declares an error; its one constructor is named `E` too, and an
 error with fields is `type error E = E T …`. A constructor named otherwise is
 `FLICK-S007`.
-Every named function has its full signature right above its `let` (§3),
+Every named function has its full signature right above its `let` (see [Direct effectful calls](../../spec/03-direct-calls/)),
 except an instance method, whose signature comes from its class; the
 parser accepts a signature without a definition, and later phases check the
 pairing.
@@ -332,7 +331,7 @@ atom        = name | Con { "." Con } | "none" | "(" ")" | "(" type ")"
 
 - `a -> b` is pure; `a ->{r; e} b` is a runtime call needing services `r` and
   failing with errors `e`; `a ->{} b` is a runtime call with both rows empty,
-  never the same as `->` (§2, §4). `-> {` with a space is an arrow to a record
+  never the same as `->` (see [Decisions of the first version](../../spec/02-decisions/), [Values of computations and their execution](../../spec/04-computations/)). `-> {` with a space is an arrow to a record
   type.
 - `none` is the empty row literal. An arrow side left out is empty too:
   `->{; E}` is `->{none; E}`, `->{R;}` is `->{R; none}` (see
@@ -385,12 +384,12 @@ cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
 ```
 
 `if` is an expression and always has `else`. `ignore e` discards a non-`Unit`
-result of an intermediate statement (§3). `await e` runs a stored `Eff` once in
-the current fiber; `task { … }` builds a cold computation (§4). In
+result of an intermediate statement (see [Direct effectful calls](../../spec/03-direct-calls/)). `await e` runs a stored `Eff` once in
+the current fiber; `task { … }` builds a cold computation (see [Values of computations and their execution](../../spec/04-computations/)). In
 `provide e { … }` and `codec e { … }` the `{` ends the head expression.
 In `cli "name" { … }` the parser fixes only the clause shapes; aliases on an
 `arg`, duplicate names and the option types are checked by CLI elaboration
-(spec §10, "CLI eDSL"). A `///` comment right above a `flag`, `arg` or
+(see [CLI eDSL: flags, arguments and subcommands](../../spec/10-type-programming-and-edsl/#cli-edsl-flags-arguments-and-subcommands)). A `///` comment right above a `flag`, `arg` or
 `subcommand` clause is its help text.
 
 ```flick
@@ -450,8 +449,7 @@ atom_pattern = "_" | name | Con | ["-"] Number | ["-"] BigInt | String | "true" 
 ```
 
 A record pattern field without `= pattern` binds a variable named like the
-field. Or-patterns and guards follow Rust's rules (spec §8, "Варианты, guards
-и or-patterns"): every alternative binds the same names, a name is bound at
+field. Or-patterns and guards follow Rust's rules (see [Variants, guards and or-patterns](../../spec/08-typescript-and-ffi/#variants-guards-and-or-patterns)): every alternative binds the same names, a name is bound at
 most once per pattern or per function's parameters (`FLICK-S012`), and a
 guard `when e` covers the whole arm. A `|` at the start of a line inside an
 arm's pattern continues the or-pattern; after `->` it starts the next arm.
@@ -482,7 +480,7 @@ cascade into others in the same statement.
 
 ## Formatting
 
-`flick fmt` changes only whitespace, so the AST is unchanged (it re-parses its
+`flick fmt` changes only whitespace and line-end separators, so the AST is unchanged (it re-parses its
 output and refuses with `FLICK-P003` otherwise). It only drops empty
 rows of an arrow, which are the same type: `->{none; E}` becomes `->{; E}` and
 `->{none; none}` becomes `->{}`; `->{R; none}` and `Eff none none a` stay as
@@ -504,7 +502,14 @@ written.
   application arguments, and finally one item per line inside the widest
   bracket (a single expression in parentheses stays hugged by them). Each
   continuation is two spaces deeper. A break is kept only if the file still
-  has the same AST; a single token longer than the limit stays as it is.
+  has the same AST; a single token longer than the limit stays as it is;
+- in a record, record type or record pattern every field that ends a line
+  ends with `;`, the last one before `}` too, while a row tail `| r` takes
+  none; in a list, tuple or `exposing (…)` whose closing bracket sits on a
+  later line than its last item, that item ends with `,`, as prettier does. A
+  record or list on one line keeps no trailing separator. The parser accepts
+  these separators, including `;` after a field whose value is a block on its
+  own lines, and the AST is the same with or without them.
 
 `flick fmt --check` exits with `1` and reports `FLICK-P002` for each file that
 would change; `flick fmt --stdin --stdin-filepath <file>` reads the source

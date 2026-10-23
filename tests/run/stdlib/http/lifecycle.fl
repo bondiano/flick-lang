@@ -15,12 +15,16 @@ slow : HttpApi.Endpoint "slow" (HttpApi.Request Unit Unit Unit Unit ->{r;} Unit)
 let slow = HttpApi.endpoint HttpApi.Get "/slow" (Record.label : Record.Label "slow")
 
 api : HttpApi.Api { work : { slow : HttpApi.Request Unit Unit Unit Unit ->{r;} Unit } }
-let api = HttpApi.api "Work" |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "work") |> HttpApi.add slow)
+let api =
+  HttpApi.api "Work"
+  |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "work") |> HttpApi.add slow)
 
 handle : HttpApi.Request Unit Unit Unit Unit ->{} Unit
 let handle _ =
   scope {
-    Resource.acquire_release (task { Platform.stdout_line "handler started" }) (fun _ -> Platform.stdout_line "handler finalizer")
+    Resource.acquire_release
+      (task { Platform.stdout_line "handler started" })
+      (fun _ -> Platform.stdout_line "handler finalizer")
     Effect.sleep (ms 100)
     Platform.stdout_line "handler finished"
   }

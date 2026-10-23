@@ -35,10 +35,12 @@ let main () =
   let peak = Ref.make 0
   let results = parallel_all 8 (List.map (track active peak) (List.range 0 20))
   Platform.stdout_line ("sum " ++ show (List.sum results) ++ ", at most " ++ show (Ref.get peak))
-  Platform.stdout_line (show (List.sort [3, Number.nan, 1, -Number.infinity, 2, Number.infinity, 0]))
+  Platform.stdout_line
+    (show (List.sort [3, Number.nan, 1, -Number.infinity, 2, Number.infinity, 0]))
   let pairs = [(2, "a"), (1, "b"), (2, "c"), (1, "d")]
   let by_first = List.sort_by (fun (a, _) (b, _) -> compare a b) pairs
   Platform.stdout_line (show (List.map (fun (_, s) -> s) by_first))
-  Platform.stdout_line (show [compare (-0) 0, compare Number.nan Number.nan, compare Number.infinity Number.nan])
+  Platform.stdout_line
+    (show [compare (-0) 0, compare Number.nan Number.nan, compare Number.infinity Number.nan])
   Platform.stdout_line (show (List.fold_left (fun acc x -> acc ++ show x) "" [1, 2, 3]))
   Platform.stdout_line (show (List.get 1 ["x", "y"], List.get 5 ["x"], List.reverse [1, 2]))

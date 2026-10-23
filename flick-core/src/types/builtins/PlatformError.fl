@@ -29,7 +29,7 @@ type alias SystemError =
     method : String;
     description : Option String;
     syscall : Option String;
-    pathOrDescriptor : Option String
+    pathOrDescriptor : Option String;
   }
 
 /// Why a platform call failed.

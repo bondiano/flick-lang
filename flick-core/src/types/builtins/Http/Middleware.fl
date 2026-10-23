@@ -20,19 +20,30 @@ type alias CorsOptions =
     allowedHeaders : List String;
     exposedHeaders : List String;
     maxAge : Option Number;
-    credentials : Bool
+    credentials : Bool;
   }
 
 /// `cors` that allows any origin.
 cors_options : CorsOptions
 let cors_options =
-  { allowedOrigins = []; allowedMethods = []; allowedHeaders = []; exposedHeaders = []; maxAge = None; credentials = false }
+  {
+    allowedOrigins = [];
+    allowedMethods = [];
+    allowedHeaders = [];
+    exposedHeaders = [];
+    maxAge = None;
+    credentials = false;
+  }
 
 /// What `compression` does: the algorithms it may use, preferred first
 /// (none: the platform's), the smallest body it compresses, and the level of
 /// an algorithm.
 type alias CompressionOptions =
-  { algorithms : List Http.Platform.CompressionAlgorithm; minSize : Option Number; levels : List (Http.Platform.CompressionAlgorithm, Number) }
+  {
+    algorithms : List Http.Platform.CompressionAlgorithm;
+    minSize : Option Number;
+    levels : List (Http.Platform.CompressionAlgorithm, Number);
+  }
 
 /// Logs each request with its method, URL and status, and its failure.
 logger : Handler r e -> Handler r e
@@ -123,14 +134,18 @@ foreign effect with_tracer_header_filter from "@flick-lang/runtime/effect/http/H
 /// Registers `f` to change the response to the request just before it is
 /// sent, after every middleware.
 append_pre_response_handler :
-  (ServerRequest -> ServerResponse ->{; Http.ServerError.HttpServerError} ServerResponse) -> ServerRequest ->{} Unit
+  (ServerRequest -> ServerResponse ->{; Http.ServerError.HttpServerError} ServerResponse) ->
+    ServerRequest ->{}
+    Unit
 foreign effect append_pre_response_handler from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickAppendPreResponseHandler"
   arity 2
   reviewed "effect@4.0.5 sha256:8d42b837128a6182"
 
 /// The handler registering `f` with each request before it runs.
 with_pre_response_handler :
-  (ServerRequest -> ServerResponse ->{; Http.ServerError.HttpServerError} ServerResponse) -> Handler r e -> Handler r e
+  (ServerRequest -> ServerResponse ->{; Http.ServerError.HttpServerError} ServerResponse) ->
+    Handler r e ->
+    Handler r e
 foreign pure with_pre_response_handler from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickWithPreResponseHandler"
   arity 2
   reviewed "effect@4.0.5 sha256:f11574d6347dcaa0"
@@ -138,7 +153,9 @@ foreign pure with_pre_response_handler from "@flick-lang/runtime/effect/http/Htt
 /// The handler answering each request and passing the request and its
 /// response, or the response of its failure, to `send`: the end of a server.
 to_handled :
-  (ServerRequest -> ServerResponse ->{r2; e2} Unit) -> Handler r e -> (ServerRequest ->{r + r2;} Unit)
+  (ServerRequest -> ServerResponse ->{r2; e2} Unit) ->
+    Handler r e ->
+    (ServerRequest ->{r + r2;} Unit)
 foreign pure to_handled from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickToHandled"
   arity 2
   reviewed "effect@4.0.5 sha256:410e9b7d36d30ce7"

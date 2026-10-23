@@ -18,7 +18,16 @@ let main () =
           let one = TxPubSub.publish 1 hub
           (one, TxPubSub.publish_all [2, 3] hub)
         })
-      let sizes = Tx.atomically (task { (TxPubSub.size hub, TxPubSub.is_empty hub, TxPubSub.is_non_empty hub, TxPubSub.pending a) })
+      let sizes =
+        Tx.atomically
+          (task {
+            (
+              TxPubSub.size hub,
+              TxPubSub.is_empty hub,
+              TxPubSub.is_non_empty hub,
+              TxPubSub.pending a,
+            )
+          })
       let first = Tx.atomically (task { TxPubSub.take a })
       let polled = Tx.atomically (task { TxPubSub.poll a })
       (published, sizes, first, polled, Tx.atomically (task { drain b }))

@@ -46,7 +46,7 @@ let main () =
           between >= 10 && between < 20,
           die >= 1 && die <= 6,
           List.sort_by compare order,
-          List.any (fun s -> s == pick) ["a", "b", "c"]
+          List.any (fun s -> s == pick) ["a", "b", "c"],
         ))
   let open_die =
     Random.with_seed

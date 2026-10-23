@@ -14,7 +14,11 @@ type alias Definitions = Json
 type alias Document = { dialect : String; root : JsonSchema; definitions : Definitions }
 
 /// Several schemas sharing their definitions.
-type alias MultiDocument = { dialect : String; schemas : NonEmpty.NonEmpty JsonSchema; definitions : Definitions }
+type alias MultiDocument = {
+  dialect : String;
+  schemas : NonEmpty.NonEmpty JsonSchema;
+  definitions : Definitions;
+}
 
 /// The `$schema` URI of draft-04.
 meta_schema_uri_draft_04 : String

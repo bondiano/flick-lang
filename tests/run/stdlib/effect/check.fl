@@ -91,7 +91,11 @@ let main () =
   both "capitalized" "\"Ab\"" "\"ab\"" Check.capitalized
   both "uncapitalized" "\"aB\"" "\"Ab\"" Check.uncapitalized
   both "uuid" "\"123e4567-e89b-12d3-a456-426614174000\"" "\"123\"" (Check.uuid None)
-  both "uuid 4" "\"123e4567-e89b-42d3-a456-426614174000\"" "\"123e4567-e89b-12d3-a456-426614174000\"" (Check.uuid (Some 4))
+  both
+    "uuid 4"
+    "\"123e4567-e89b-42d3-a456-426614174000\""
+    "\"123e4567-e89b-12d3-a456-426614174000\""
+    (Check.uuid (Some 4))
   both "ulid" "\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"" "\"01ARZ3\"" Check.ulid
   both "guid" "\"123e4567-e89b-12d3-a456-426614174000\"" "\"x\"" Check.guid
   both "base64" "\"aGk=\"" "\"a*\"" Check.base64
@@ -115,7 +119,10 @@ let main () =
     big "\"1\"" (Check.greater_than_or_equal_to_bigint 2n),
     big "\"0\"" (Check.less_than_bigint 1n),
     big "\"2\"" (Check.less_than_or_equal_to_bigint 1n),
-    big "\"2\"" (Check.between_bigint { minimum = 1n; maximum = 2n; exclusiveMinimum = false; exclusiveMaximum = false })
+    big
+      "\"2\""
+      (Check.between_bigint
+        { minimum = 1n; maximum = 2n; exclusiveMinimum = false; exclusiveMaximum = false }),
   ])
   let one = BigDecimal.from_integer 1n
   let two = BigDecimal.from_integer 2n
@@ -124,7 +131,10 @@ let main () =
     decimal "\"1.5\"" (Check.greater_than_or_equal_to_decimal two),
     decimal "\"0.5\"" (Check.less_than_decimal one),
     decimal "\"1.5\"" (Check.less_than_or_equal_to_decimal one),
-    decimal "\"1.25\"" (Check.between_decimal { minimum = one; maximum = two; exclusiveMinimum = false; exclusiveMaximum = false })
+    decimal
+      "\"1.25\""
+      (Check.between_decimal
+        { minimum = one; maximum = two; exclusiveMinimum = false; exclusiveMaximum = false }),
   ])
   both "greater_than_by" "\"c\"" "\"a\"" (Check.greater_than_by "b")
   both "greater_than_or_equal_to_by" "\"b\"" "\"a\"" (Check.greater_than_or_equal_to_by "b")
@@ -135,18 +145,28 @@ let main () =
   let ints = Codec.list Number.json_finite
   Platform.stdout_line ("min_items: " ++ dec "[1]" (Check.apply (Check.min_items 2) ints))
   Platform.stdout_line ("max_items: " ++ dec "[1, 2]" (Check.apply (Check.max_items 1) ints))
-  Platform.stdout_line ("unique: " ++ dec "[1, 2]" (Check.apply Check.unique ints) ++ " | " ++ dec "[1, 1]" (Check.apply Check.unique ints))
+  Platform.stdout_line
+    ("unique: "
+      ++ dec "[1, 2]" (Check.apply Check.unique ints)
+      ++ " | "
+      ++ dec "[1, 1]" (Check.apply Check.unique ints))
   let pairs = Codec.json (schema Pair)
   let keyed = Check.apply Check.unique_keys (Codec.list pairs)
-  Platform.stdout_line ("unique_keys: " ++ dec "[[\"a\", 1], [\"b\", 1]]" keyed ++ " | " ++ dec "[[\"a\", 1], [\"a\", 2]]" keyed)
+  Platform.stdout_line
+    ("unique_keys: "
+      ++ dec "[[\"a\", 1], [\"b\", 1]]" keyed
+      ++ " | "
+      ++ dec "[[\"a\", 1], [\"a\", 2]]" keyed)
   Platform.stdout_line ("min_size: " ++ size "[\"a\", \"a\"]" (Check.min_size 2))
   Platform.stdout_line ("max_size: " ++ size "[\"a\", \"a\"]" (Check.max_size 1))
   Platform.stdout_line ("size_between: " ++ size "[\"a\", \"b\"]" (Check.size_between 2 3))
   let dict = Codec.entries Number.json_finite
   Platform.stdout_line ("min_properties: " ++ dec "{\"a\": 1}" (Check.min_properties 2 dict))
   Platform.stdout_line ("max_properties: " ++ dec "{\"a\": 1}" (Check.max_properties 1 dict))
-  Platform.stdout_line ("properties_between: " ++ dec "{\"a\": 1, \"b\": 2}" (Check.properties_between 2 3 dict))
-  Platform.stdout_line ("property_names: " ++ dec "{\"ab\": 1}" (Check.property_names (str (Check.max_length 1)) dict))
+  Platform.stdout_line
+    ("properties_between: " ++ dec "{\"a\": 1, \"b\": 2}" (Check.properties_between 2 3 dict))
+  Platform.stdout_line
+    ("property_names: " ++ dec "{\"ab\": 1}" (Check.property_names (str (Check.max_length 1)) dict))
   let group = Check.all (NonEmpty.cons (Check.min_length 2) [Check.lowercased])
   both "all" "\"ab\"" "\"A\"" group
   let even = Check.predicate (fun n -> rem n 2 == 0) "an even number"
@@ -157,11 +177,15 @@ let main () =
   Platform.stdout_line ("encode checks too: " ++ encoded)
   Platform.stdout_line ("export min_length 1: " ++ exported (str (Check.min_length 1)))
   Platform.stdout_line ("export min_length 2: " ++ exported (str (Check.min_length 2)))
-  Platform.stdout_line ("export patterns: " ++ exported (str (Check.all (NonEmpty.cons (Check.starts_with "a") [Check.ends_with "z"]))))
+  Platform.stdout_line
+    ("export patterns: "
+      ++ exported (str (Check.all (NonEmpty.cons (Check.starts_with "a") [Check.ends_with "z"]))))
   Platform.stdout_line ("export int: " ++ exported (num Check.int))
   Platform.stdout_line ("export between: " ++ exported (num (Check.between range)))
-  Platform.stdout_line ("export items: " ++ exported (Check.apply Check.unique (Check.apply (Check.min_items 1) ints)))
+  Platform.stdout_line
+    ("export items: " ++ exported (Check.apply Check.unique (Check.apply (Check.min_items 1) ints)))
   Platform.stdout_line ("export properties: " ++ exported (Check.min_properties 1 dict))
   Platform.stdout_line ("export predicate: " ++ exported (num even))
   Platform.stdout_line ("export lowercased: " ++ exported (str Check.lowercased))
-  Platform.stdout_line ("export after transform: " ++ exported (Check.apply Check.int Codec.number_from_string))
+  Platform.stdout_line
+    ("export after transform: " ++ exported (Check.apply Check.int Codec.number_from_string))

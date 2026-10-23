@@ -16,11 +16,23 @@ type alias GaugeState = { value : Number }
 type alias FrequencyState = { occurrences : List (String, Number) }
 
 /// The count of the values up to each boundary, and their total.
-type alias HistogramState = { buckets : List (Number, Number); count : Number; min : Number; max : Number; sum : Number }
+type alias HistogramState = {
+  buckets : List (Number, Number);
+  count : Number;
+  min : Number;
+  max : Number;
+  sum : Number;
+}
 
 /// Each quantile with its value, `None` before any input.
 type alias SummaryState =
-  { quantiles : List (Number, Option Number); count : Number; min : Number; max : Number; sum : Number }
+  {
+    quantiles : List (Number, Option Number);
+    count : Number;
+    min : Number;
+    max : Number;
+    sum : Number;
+  }
 
 /// Adds its inputs, or keeps the last one unless it is `incremental`.
 type alias Counter = Metric Number CounterState
@@ -34,10 +46,22 @@ type alias Frequency = Metric String FrequencyState
 type alias Histogram i = Metric i HistogramState
 type alias Summary i = Metric i SummaryState
 
-type alias CounterOptions = { description : Option String; attributes : Attributes; incremental : Bool }
+type alias CounterOptions = {
+  description : Option String;
+  attributes : Attributes;
+  incremental : Bool;
+}
 type alias GaugeOptions = { description : Option String; attributes : Attributes }
-type alias FrequencyOptions = { description : Option String; attributes : Attributes; preregisteredWords : List String }
-type alias HistogramOptions = { description : Option String; attributes : Attributes; boundaries : List Number }
+type alias FrequencyOptions = {
+  description : Option String;
+  attributes : Attributes;
+  preregisteredWords : List String;
+}
+type alias HistogramOptions = {
+  description : Option String;
+  attributes : Attributes;
+  boundaries : List Number;
+}
 
 /// `maxAge` and `maxSize` bound the inputs a summary keeps.
 type alias SummaryOptions =
@@ -46,11 +70,15 @@ type alias SummaryOptions =
     attributes : Attributes;
     maxAge : Duration.Duration;
     maxSize : Number;
-    quantiles : List Number
+    quantiles : List Number;
   }
 
 /// `boundaries` defaults to exponential ones from 1 millisecond.
-type alias TimerOptions = { description : Option String; attributes : Attributes; boundaries : Option (List Number) }
+type alias TimerOptions = {
+  description : Option String;
+  attributes : Attributes;
+  boundaries : Option (List Number);
+}
 
 /// The state of a metric, by kind.
 type State =
@@ -61,7 +89,12 @@ type State =
   | SummaryValue SummaryState
 
 /// A metric of the registry and its state.
-type alias Snapshot = { id : String; description : Option String; attributes : Attributes; state : State }
+type alias Snapshot = {
+  id : String;
+  description : Option String;
+  attributes : Attributes;
+  state : State;
+}
 
 counter : String -> CounterOptions -> Counter
 foreign pure counter from "@flick-lang/runtime/effect/Metric" "flickCounter"

@@ -28,7 +28,9 @@ let main () =
     Log.info "hello"
     Log.warn "careful"
     Log.debug "below the minimum level")
-  logged (Logger.layer replace [simple |> Logger.map String.to_upper |> Logger.with_console_log]) (fun () ->
+  logged
+    (Logger.layer replace [simple |> Logger.map String.to_upper |> Logger.with_console_log])
+    (fun () ->
     Log.error "mapped")
   logged (Logger.layer replace [Logger.with_leveled_console simple]) (fun () ->
     Log.info "leveled info"
@@ -42,10 +44,22 @@ let main () =
   Platform.stdout_line ("batched " ++ show (Ref.get seen))
   let formats = Ref.make []
   let keep = { window = ms 1; flush = fun outputs -> Ref.set formats (Ref.get formats ++ outputs) }
-  logged (Logger.batched keep replace (Logger.map (contains "message=formatted") Logger.format_simple)) (fun () -> Log.info "formatted")
-  logged (Logger.batched keep replace (Logger.map (contains "message=formatted") Logger.format_logfmt)) (fun () -> Log.info "formatted")
-  logged (Logger.batched keep replace (Logger.map (contains "\"message\":\"formatted\"") Logger.format_json)) (fun () -> Log.info "formatted")
-  let structured = Logger.map (fun s -> s.message == ["formatted"] && s.level == "INFO" && s.cause == None) Logger.format_structured
+  logged
+    (Logger.batched keep replace (Logger.map (contains "message=formatted") Logger.format_simple))
+    (fun () -> Log.info "formatted")
+  logged
+    (Logger.batched keep replace (Logger.map (contains "message=formatted") Logger.format_logfmt))
+    (fun () -> Log.info "formatted")
+  logged
+    (Logger.batched
+      keep
+      replace
+      (Logger.map (contains "\"message\":\"formatted\"") Logger.format_json))
+    (fun () -> Log.info "formatted")
+  let structured =
+    Logger.map
+      (fun s -> s.message == ["formatted"] && s.level == "INFO" && s.cause == None)
+      Logger.format_structured
   logged (Logger.batched keep replace structured) (fun () -> Log.info "formatted")
   Platform.stdout_line ("formats " ++ show (Ref.get formats))
   let pretty_date = Some (fun _ -> "DATE")
@@ -59,7 +73,7 @@ let main () =
         Logger.console_logfmt,
         Logger.console_structured,
         Logger.console_json,
-        Logger.tracer_logger
+        Logger.tracer_logger,
       ])
       (fun () -> Log.info "every console logger")
   })
@@ -72,9 +86,15 @@ let main () =
     try
       provide FileSystem.node {
         scope {
-          let dir = FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-log-" }
+          let dir =
+            FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-log-" }
           let path = dir ++ "/app.log"
-          let to_file = Logger.to_file { flag = None; mode = None; batchWindow = Some (ms 1) } replace path simple
+          let to_file =
+            Logger.to_file
+              { flag = None; mode = None; batchWindow = Some (ms 1) }
+              replace
+              path
+              simple
           provide (Layer.merge to_file Logger.effect_log) {
             Log.info "into the file"
             Log.warn "and another line"

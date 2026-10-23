@@ -17,7 +17,7 @@ type alias Parts =
     minutes : Number;
     seconds : Number;
     millis : Number;
-    nanos : Number
+    nanos : Number;
   }
 
 /// `n` nanoseconds; an error when negative.
@@ -149,7 +149,7 @@ match_pair :
   {
     onMillis : Number -> Number -> a;
     onNanos : BigInt -> BigInt -> a;
-    onInfinity : Duration -> Duration -> a
+    onInfinity : Duration -> Duration -> a;
   } ->
   Duration ->
   a

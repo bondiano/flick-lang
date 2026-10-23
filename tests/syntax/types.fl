@@ -2,7 +2,9 @@ module App.Types exposing (..)
 
 apply : (forall a. Show a => a -> String) -> (String, String)
 
-decode : forall r. (forall a. Schema a -> Unknown ->{r; SchemaError} a) -> Unknown ->{r; SchemaError} User
+decode : forall r. (forall a. Schema a -> Unknown ->{r; SchemaError} a) ->
+  Unknown ->{r; SchemaError}
+  User
 
 open_rows : a ->{Users, Log | r; NotFound | e} b
 
@@ -26,6 +28,6 @@ multiline :
   (Ui {Users} {SaveError})^c
 
 type alias Props c = {
-  on_save : (Unit ->{Users; SaveError} Unit)^c
-  render : (a -> (Ui r e)^c)^c
+  on_save : (Unit ->{Users; SaveError} Unit)^c;
+  render : (a -> (Ui r e)^c)^c;
 }

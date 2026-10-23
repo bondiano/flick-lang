@@ -484,6 +484,9 @@ impl<'t> Parser<'t> {
                 None if may_start || glue(self) => {}
                 // the closer belongs to an enclosing bracket
                 None if self.raw().kind.is_closer() && self.in_brackets() => break,
+                // a `;` after a block on its own lines ends that block and
+                // separates the items of the braces around it
+                None if !braces && self.raw().kind == K::Semi && self.in_brackets() => break,
                 None => {
                     if !item_failed {
                         self.unexpected();

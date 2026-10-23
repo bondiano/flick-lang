@@ -56,7 +56,7 @@ type alias Info =
     rdev : Option BigInt;
     size : BigInt;
     blksize : Option BigInt;
-    blocks : Option BigInt
+    blocks : Option BigInt;
   }
 
 type alias AccessOptions = { ok : Bool; readable : Bool; writable : Bool }
@@ -67,7 +67,7 @@ type alias TempDirectoryOptions = { directory : Option String; prefix : Option S
 type alias TempFileOptions = {
   directory : Option String;
   prefix : Option String;
-  suffix : Option String
+  suffix : Option String;
 }
 type alias OpenOptions = { flag : Option OpenFlag; mode : Option Number; noFollow : Bool }
 type alias RemoveOptions = { recursive : Bool; force : Bool }

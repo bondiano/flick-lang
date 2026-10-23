@@ -133,7 +133,7 @@ let requests () =
         "u", Http.ClientRequest.head
         "u", Http.ClientRequest.options
         "u",
-      Http.ClientRequest.trace "u"
+      Http.ClientRequest.trace "u",
     ]
   Platform.stdout_line ("methods: " ++ (show (List.map Http.ClientRequest.method methods)))
   let bodies =
@@ -143,7 +143,7 @@ let requests () =
       Http.ClientRequest.body_uint8_array [104, 105] None r,
       Http.ClientRequest.body_url_params [("a", "b c")] r,
       Http.ClientRequest.body_form_data [("f", "v")] r,
-      Http.ClientRequest.set_body (Http.Body.text "set" None) r
+      Http.ClientRequest.set_body (Http.Body.text "set" None) r,
     ]
   Platform.stdout_line
     ("bodies: "
@@ -182,7 +182,7 @@ let bodies () =
             Http.Body.empty,
             Http.Body.uint8_array [1, 2] None,
             Http.Body.url_params (Http.UrlParams.make [("k", "v")]) None,
-            Http.Body.form_data [("k", "v")]
+            Http.Body.form_data [("k", "v")],
           ])))
   Platform.stdout_line
     ("length: "
@@ -223,7 +223,7 @@ let responses () =
         (
           codec (schema Whole) {
             status = field "status" Number.json;
-            body = field "body" item_json
+            body = field "body" item_json;
           }
         ))
   Platform.stdout_line
@@ -313,7 +313,7 @@ let combinators () =
           (
             fake
               |> Http.Client.filter_or_fail (fun r -> Http.ClientResponse.status r == 200) refuse,
-            "http://fake/missing"
+            "http://fake/missing",
           )))
   with
   | Refused s -> Platform.stdout_line ("filter_or_fail: " ++ ("refused " ++ show s))
@@ -389,7 +389,7 @@ let combinators () =
           "http://fake/p", Http.Client.patch
           "http://fake/pa", Http.Client.put
           "http://fake/pu",
-        Http.Client.del "http://fake/d", Http.Client.options "http://fake/o"
+        Http.Client.del "http://fake/d", Http.Client.options "http://fake/o",
       ]
     Platform.stdout_line ("service: " ++ (show (List.map Http.ClientResponse.status answers)))
   }

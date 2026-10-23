@@ -246,7 +246,7 @@ from_transform_stream :
     evaluate : Unit -> TransformStream a b;
     onError : JsValue -> Errors e;
     closeOnDone : Bool;
-    releaseLockOnEnd : Bool
+    releaseLockOnEnd : Bool;
   } ->
   Channel none (e + ie) (NonEmpty.NonEmpty a) (NonEmpty.NonEmpty b) Unit ie id
 foreign pure from_transform_stream from "@flick-lang/runtime/effect/Channel" "fromTransformStream"

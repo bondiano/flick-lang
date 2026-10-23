@@ -73,68 +73,110 @@ let single () =
   let exit : Exit {Boom} Number = Effect.exit (task { from_result (Err (Boom 1)) })
   Platform.stdout_line ("exit: " ++ show (Exit.is_failure exit))
   let died : Exit none Number = Effect.exit (task { Effect.die "broken" })
-  Platform.stdout_line ("die: " ++ show (Exit.find_defect died == Ok "broken" || Exit.has_dies died))
+  Platform.stdout_line
+    ("die: " ++ show (Exit.find_defect died == Ok "broken" || Exit.has_dies died))
   let failure : Failure {Boom} = Cause.fail (Boom 2)
-  Platform.stdout_line ("fail_cause_sync: " ++ outcome (task { Effect.fail_cause_sync (fun () -> failure) }))
+  Platform.stdout_line
+    ("fail_cause_sync: " ++ outcome (task { Effect.fail_cause_sync (fun () -> failure) }))
   Effect.yield_now ()
   Effect.yield_now_with 1
   let pair = Effect.zip (task { "b" }) (task { "a" })
   Platform.stdout_line ("zip: " ++ show pair)
-  Platform.stdout_line ("zip_with: " ++ show (task { 2 } |> Effect.zip_with (task { 3 }) (fun a b -> a * b)))
+  Platform.stdout_line
+    ("zip_with: " ++ show (task { 2 } |> Effect.zip_with (task { 3 }) (fun a b -> a * b)))
   Platform.stdout_line ("delay: " ++ show (Effect.delay ms1 (task { "late" })))
   let (took, value) = Effect.timed (task { Effect.sleep ms2; "timed" })
-  Platform.stdout_line ("timed: " ++ value ++ " " ++ show (Option.with_default 0 (Duration.to_millis took) >= 1))
-  Platform.stdout_line ("timeout_or_else: " ++ show (Effect.timeout_or_else ms1 (task { "fallback" }) (task { Effect.never () })))
-  Platform.stdout_line ("timeout_or_else: " ++ show (Effect.timeout_or_else ms50 (task { "fallback" }) (task { "fast" })))
+  Platform.stdout_line
+    ("timed: " ++ value ++ " " ++ show (Option.with_default 0 (Duration.to_millis took) >= 1))
+  Platform.stdout_line
+    ("timeout_or_else: "
+      ++ show (Effect.timeout_or_else ms1 (task { "fallback" }) (task { Effect.never () })))
+  Platform.stdout_line
+    ("timeout_or_else: "
+      ++ show (Effect.timeout_or_else ms50 (task { "fallback" }) (task { "fast" })))
   let runs = Ref.make 0
-  Platform.stdout_line ("forever: " ++ outcome (task { Effect.forever (flaky runs 3 |> fun t -> task { let _ = await t; () }) }))
+  Platform.stdout_line
+    ("forever: "
+      ++ outcome (task { Effect.forever (flaky runs 3 |> fun t -> task { let _ = await t; () }) }))
   let tries = Ref.make 0
   Platform.stdout_line ("eventually: " ++ show (Effect.eventually (flaky tries 2)))
   let fresh = Ref.make 0
   let copies = Effect.replicate 3 (counting fresh)
   Platform.stdout_line ("replicate: " ++ show (List.length copies))
   let shared = Ref.make 0
-  Platform.stdout_line ("replicate_effect: " ++ show (Effect.replicate_effect Effect.Sequential 3 (counting shared)))
-  Platform.stdout_line ("when_: " ++ show (Effect.when_ (task { true }) (task { 1 }), Effect.when_ (task { false }) (task { 2 })))
-  Platform.stdout_line ("timeout: " ++ show (try timeout 1 (task { Effect.never () }) with | TimeoutError -> "timed out"))
+  Platform.stdout_line
+    ("replicate_effect: " ++ show (Effect.replicate_effect Effect.Sequential 3 (counting shared)))
+  Platform.stdout_line
+    ("when_: "
+      ++ show
+        (Effect.when_ (task { true }) (task { 1 }), Effect.when_ (task { false }) (task { 2 })))
+  Platform.stdout_line
+    ("timeout: "
+      ++ show (try timeout 1 (task { Effect.never () }) with | TimeoutError -> "timed out"))
   let quick : Option Number = timeout_option 50 (task { 5 })
   let slow : Option Number = timeout_option 1 (task { Effect.never () })
   Platform.stdout_line ("timeout_option: " ++ show (quick, slow))
-  Platform.stdout_line ("race_success: " ++ show (race_success (task { Effect.sleep ms5; "slow" }) (task { "fast" })))
-  Platform.stdout_line ("race_first: " ++ show (race_first (task { Effect.sleep ms5; "slow" }) (task { "first" })))
+  Platform.stdout_line
+    ("race_success: " ++ show (race_success (task { Effect.sleep ms5; "slow" }) (task { "fast" })))
+  Platform.stdout_line
+    ("race_first: " ++ show (race_first (task { Effect.sleep ms5; "slow" }) (task { "first" })))
 
 collections : Unit ->{} Unit
 let collections () =
   let xs = [1, 2, 3, 4]
-  Platform.stdout_line ("for_each: " ++ show (Effect.for_each (Effect.Bounded 2) (fun n -> n * 2) xs))
+  Platform.stdout_line
+    ("for_each: " ++ show (Effect.for_each (Effect.Bounded 2) (fun n -> n * 2) xs))
   Platform.stdout_line ("all: " ++ show (Effect.all Effect.Unbounded [task { 1 }, task { 2 }]))
   let (passes, fails) = Effect.partition Effect.Sequential even xs
-  Platform.stdout_line ("partition: " ++ show (List.map (fun e -> match e with | Odd n -> n) fails, passes))
+  Platform.stdout_line
+    ("partition: " ++ show (List.map (fun e -> match e with | Odd n -> n) fails, passes))
   let validated =
     try
       show (Effect.validate Effect.Sequential even xs)
     with
-    | Effect.ValidationError errors -> "invalid " ++ show (List.map (fun e -> match e with | Odd n -> n) (NonEmpty.to_list errors))
+    | Effect.ValidationError errors ->
+      "invalid " ++ show (List.map (fun e -> match e with | Odd n -> n) (NonEmpty.to_list errors))
   Platform.stdout_line ("validate: " ++ validated)
-  Platform.stdout_line ("validate: " ++ try show (Effect.validate Effect.Sequential even [2, 4]) with | Effect.ValidationError _ -> "invalid")
+  Platform.stdout_line
+    ("validate: "
+      ++ try show (Effect.validate Effect.Sequential even [2, 4]) with | Effect.ValidationError _ ->
+      "invalid")
   Platform.stdout_line ("filter: " ++ show (Effect.filter Effect.Sequential (fun n -> n > 2) xs))
   Platform.stdout_line ("filter_map: " ++ show (Effect.filter_map parity xs))
-  Platform.stdout_line ("filter_map_effect: " ++ show (Effect.filter_map_effect Effect.Sequential (fun n -> parity n) xs))
-  Platform.stdout_line ("find_first: " ++ show (Effect.find_first (fun n -> n > 1) xs, Effect.find_first (fun n -> n > 9) xs))
-  Platform.stdout_line ("find_first_filter: " ++ show (Effect.find_first_filter (fun n -> parity n) xs))
-  let attempts : List (Eff none {Boom} String) = [task { from_result (Err (Boom 1)) }, task { "second" }]
+  Platform.stdout_line
+    ("filter_map_effect: "
+      ++ show (Effect.filter_map_effect Effect.Sequential (fun n -> parity n) xs))
+  Platform.stdout_line
+    ("find_first: "
+      ++ show (Effect.find_first (fun n -> n > 1) xs, Effect.find_first (fun n -> n > 9) xs))
+  Platform.stdout_line
+    ("find_first_filter: " ++ show (Effect.find_first_filter (fun n -> parity n) xs))
+  let attempts : List (Eff none {Boom} String) =
+    [task { from_result (Err (Boom 1)) }, task { "second" }]
   Platform.stdout_line ("first_success_of: " ++ outcome (task { Effect.first_success_of attempts }))
   Platform.stdout_line ("head: " ++ head_of (task { [7, 8] }) ++ " " ++ head_of (task { [] }))
   Platform.stdout_line ("reduce: " ++ show (Effect.reduce 0 (fun acc n -> acc + n) xs))
-  Platform.stdout_line ("filter_or_else: " ++ show (task { 3 } |> Effect.filter_or_else (fun n -> n > 5) (fun n -> n * 100)))
-  Platform.stdout_line ("filter_map_or_else: " ++ show (task { 3 } |> Effect.filter_map_or_else parity (fun s -> String.length s)))
-  Platform.stdout_line ("filter_or_fail: " ++ checked (task { Effect.filter_or_fail (fun n -> n > 5) (fun n -> Odd n) (task { 3 }) }))
-  Platform.stdout_line ("filter_map_or_fail: " ++ checked (task { Effect.filter_map_or_fail parity (fun _ -> Odd 0) (task { 4 }) }))
+  Platform.stdout_line
+    ("filter_or_else: "
+      ++ show (task { 3 } |> Effect.filter_or_else (fun n -> n > 5) (fun n -> n * 100)))
+  Platform.stdout_line
+    ("filter_map_or_else: "
+      ++ show (task { 3 } |> Effect.filter_map_or_else parity (fun s -> String.length s)))
+  Platform.stdout_line
+    ("filter_or_fail: "
+      ++ checked (task { Effect.filter_or_fail (fun n -> n > 5) (fun n -> Odd n) (task { 3 }) }))
+  Platform.stdout_line
+    ("filter_map_or_fail: "
+      ++ checked (task { Effect.filter_map_or_fail parity (fun _ -> Odd 0) (task { 4 }) }))
 
 resources : Unit ->{} Unit
 let resources () =
   let log = Ref.make []
-  let used = Resource.bracket (task { "file" }) (fun r -> r ++ " used") (fun r -> Ref.update log (fun xs -> xs ++ ["released " ++ r]))
+  let used =
+    Resource.bracket
+      (task { "file" })
+      (fun r -> r ++ " used")
+      (fun r -> Ref.update log (fun xs -> xs ++ ["released " ++ r]))
   Platform.stdout_line ("bracket: " ++ used ++ ", " ++ show (Ref.get log))
   let acquired = Ref.make 0
   let seen = scope {

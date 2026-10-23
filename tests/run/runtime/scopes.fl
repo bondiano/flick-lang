@@ -17,12 +17,12 @@ let report failure = Platform.stdout_line "supervisor saw a failure"
 unexpected : Failure none ->{} Unit
 let unexpected failure = Platform.stdout_line "unexpected failure"
 
-worker : Unit ->{none; Oops} Unit
+worker : Unit ->{; Oops} Unit
 let worker () =
   slow_write "log" 80
   from_result (Err (Oops "late"))
 
-main : Unit ->{none; AppError} Unit
+main : Unit ->{; AppError} Unit
 let main () =
   scope owner {
     let first = open_raw "first"

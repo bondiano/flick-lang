@@ -8,8 +8,8 @@ type Tree a =
   deriving Schema
 
 type alias PairOf f = {
-  count : f Number
-  label : f String
+  count : f Number;
+  label : f String;
 } deriving Schema
 
 type Expr =
@@ -56,5 +56,6 @@ let main () =
   let optional = pair_of_schema Schema.option
   Platform.stdout_line (round_trip optional { count = Some 2; label = None })
   Platform.stdout_line (round_trip (schema Expr) (Neg (Block (Statements [Num 1, Neg (Num 2)]))))
-  Platform.stdout_line (decode "{\"_tag\": \"Branch\", \"_0\": [{\"_tag\": \"Leaf\", \"_0\": \"x\"}]}" numbers)
+  Platform.stdout_line
+    (decode "{\"_tag\": \"Branch\", \"_0\": [{\"_tag\": \"Leaf\", \"_0\": \"x\"}]}" numbers)
   Platform.stdout_line (decode "{\"_tag\": \"Twig\"}" numbers)

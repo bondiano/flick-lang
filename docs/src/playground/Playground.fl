@@ -23,14 +23,14 @@ type alias Line = { stream : String; text : String }
 
 type alias Model =
   {
-    example : String
-    source : String
-    profile : Profile
-    tab : Tab
-    compiled : Compiled
-    output : List Line
-    running : Bool
-    version : String
+    example : String;
+    source : String;
+    profile : Profile;
+    tab : Tab;
+    compiled : Compiled;
+    output : List Line;
+    running : Bool;
+    version : String;
   }
 
 /// Loads the compiler; its language version.
@@ -105,7 +105,7 @@ let toggle label on act =
       [
         button
           { disabled = false; on_click = Ui.Event.latest (fun _ -> task { act () }) }
-          [text label]
+          [text label],
       ]
   }
 
@@ -118,7 +118,7 @@ let code_pane title code =
         span { class_name = "fp-title" } [text title],
         pre
           { class_name = "fp-out" }
-          [text (if code == "" then "no output: the module has errors" else code)]
+          [text (if code == "" then "no output: the module has errors" else code)],
       ]
   }
 
@@ -139,7 +139,7 @@ let problem d =
     item
       [
         span { class_name = "fp-" ++ d.severity } [text d.code],
-        text (" " ++ d.at ++ " " ++ d.message)
+        text (" " ++ d.at ++ " " ++ d.message),
       ]
   }
 
@@ -210,13 +210,13 @@ let view model m =
                 button
                   {
                     disabled = m.version == "";
-                    on_click = Ui.Event.latest (fun _ -> task { run_program model })
+                    on_click = Ui.Event.latest (fun _ -> task { run_program model });
                   }
-                  [text (if m.running then "Running…" else "Run")]
+                  [text (if m.running then "Running…" else "Run")],
               ],
             span
               { class_name = if errors m.compiled > 0 then "fp-bad" else "fp-status" }
-              [text (status m)]
+              [text (status m)],
           ],
         div
           { class_name = "fp-panes" }
@@ -225,9 +225,9 @@ let view model m =
               m.example
               (textarea
                 {
-                  value = m.source
-                  placeholder = "module Main exposing (main)"
-                  on_input = Ui.Event.latest (fun s -> task { edit model s.value })
+                  value = m.source;
+                  placeholder = "module Main exposing (main)";
+                  on_input = Ui.Event.latest (fun s -> task { edit model s.value });
                 }),
             div
               { class_name = "fp-result" }
@@ -235,9 +235,9 @@ let view model m =
                 div
                   { class_name = "fp-bar" }
                   (List.map (set_tab model m) [Output, Js, Compare, Problems]),
-                pane m
-              ]
-          ]
+                pane m,
+              ],
+          ],
       ]
   }
 
@@ -253,14 +253,14 @@ let main () =
     if version == "" then { debug = ""; release = ""; diagnostics = [] } else compile first.source
   let initial =
     {
-      example = first.name
-      source = first.source
-      profile = Debug
-      tab = Output
-      compiled = compiled
-      output = []
-      running = false
-      version = version
+      example = first.name;
+      source = first.source;
+      profile = Debug;
+      tab = Output;
+      compiled = compiled;
+      output = [];
+      running = false;
+      version = version;
     }
   match Ui.container "flick-playground" with
   | None -> App.fail "the page has no element `flick-playground`"

@@ -25,7 +25,7 @@ module Graph exposing (
   is_strongly_connected, is_tree, maximum_flow, minimum_cut, minimum_spanning_forest,
   transitive_reduction, dijkstra, astar, bellman_ford, floyd_warshall, simple_paths,
   all_shortest_paths, dfs, bfs, dfs_post_order, topo, nodes, edges, externals, indices, values,
-  entries, json
+  entries, json,
 )
 
 import Graph.Types exposing (..)

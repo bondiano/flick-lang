@@ -28,7 +28,8 @@ let always_equal () = fun _ _ -> EQ
 /// By each order of the list in turn.
 combine_all : List (Order a) -> Order a
 let combine_all orders =
-  fun self that -> List.fold_left (fun acc order -> if acc == EQ then order self that else acc) EQ orders
+  fun self that ->
+    List.fold_left (fun acc order -> if acc == EQ then order self that else acc) EQ orders
 
 /// Orders `b` by the `a` that `f` gives.
 map_input : (b -> a) -> Order a -> Order b
@@ -48,7 +49,11 @@ let tuple first second =
 list : Order a -> Order (List a)
 let list order =
   fun self that ->
-    let first = List.fold_left (fun acc (x, y) -> if acc == EQ then order x y else acc) EQ (List.zip self that)
+    let first =
+      List.fold_left
+        (fun acc (x, y) -> if acc == EQ then order x y else acc)
+        EQ
+        (List.zip self that)
     if first == EQ then compare (List.length self) (List.length that) else first
 
 /// `self < that` by the order: `x |> Order.is_less_than compare 3`.

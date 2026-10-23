@@ -215,7 +215,7 @@ module Stream exposing (
   watch_with,
   ReadOptions,
   read_file,
-  stdin
+  stdin,
 )
 
 import Stream.Core exposing (..)

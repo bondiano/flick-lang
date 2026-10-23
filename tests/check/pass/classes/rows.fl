@@ -20,7 +20,8 @@ let without = Record.remove (Record.label : Record.Label "age") { age = 3; name 
 names : List String
 let names = Record.labels { b = 1; a = 2 }
 
-tag : Record.Lacks "tag" { id : Number | r } => { id : Number | r } -> { id : Number; tag : String | r }
+tag : Record.Lacks "tag" { id : Number | r } => { id : Number | r } ->
+  { id : Number; tag : String | r }
 let tag value = Record.extend (Record.label : Record.Label "tag") "t" value
 
 name_of : Record.HasField "name" r String => r -> String

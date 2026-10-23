@@ -1,5 +1,39 @@
 /// Optional values: `Some x` or `None`.
-module Option exposing (map, bind, with_default, is_some, is_none, or_else, to_result, to_list, all, as_, as_void, void, compose_k, contains_with, contains, exists, filter, filter_map, first_some_of, flatten, lift2, lift_predicate, match_, or_else_result, or_else_some, partition_map, product, product_many, reduce_compact, tap, zip_left, zip_right, zip_with)
+module Option exposing (
+  map,
+  bind,
+  with_default,
+  is_some,
+  is_none,
+  or_else,
+  to_result,
+  to_list,
+  all,
+  as_,
+  as_void,
+  void,
+  compose_k,
+  contains_with,
+  contains,
+  exists,
+  filter,
+  filter_map,
+  first_some_of,
+  flatten,
+  lift2,
+  lift_predicate,
+  match_,
+  or_else_result,
+  or_else_some,
+  partition_map,
+  product,
+  product_many,
+  reduce_compact,
+  tap,
+  zip_left,
+  zip_right,
+  zip_with,
+)
 
 /// `Some (f x)` for `Some x`.
 map : forall c a b. (a -> b)^c -> (Option a -> Option b)^c

@@ -6,7 +6,10 @@ none_options : Metric.GaugeOptions
 let none_options = { description = None; attributes = [] }
 
 requests : Metric.Counter
-let requests = Metric.counter "test_requests" { description = Some "requests seen"; attributes = []; incremental = false }
+let requests =
+  Metric.counter
+    "test_requests"
+    { description = Some "requests seen"; attributes = []; incremental = false }
 
 ms : Number -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
@@ -44,7 +47,10 @@ let main () =
   level |> Metric.modify 2
   let gauged : Metric.GaugeState = Metric.value level
   Platform.stdout_line ("gauge " ++ show gauged.value)
-  let words : Metric.Frequency = Metric.frequency "test_words" { description = None; attributes = []; preregisteredWords = ["zero"] }
+  let words : Metric.Frequency =
+    Metric.frequency
+      "test_words"
+      { description = None; attributes = []; preregisteredWords = ["zero"] }
   words |> Metric.update "a"
   words |> Metric.update "a"
   words |> Metric.update "b"
@@ -52,13 +58,16 @@ let main () =
   Platform.stdout_line ("frequency " ++ show (List.sort seen.occurrences))
   let bounds = Metric.linear_boundaries { start = 0; width = 10; count = 3 }
   Platform.stdout_line ("linear " ++ show bounds)
-  Platform.stdout_line ("exponential " ++ show (Metric.exponential_boundaries { start = 1; factor = 2; count = 4 }))
+  Platform.stdout_line
+    ("exponential " ++ show (Metric.exponential_boundaries { start = 1; factor = 2; count = 4 }))
   Platform.stdout_line ("from_iterable " ++ show (Metric.boundaries_from_iterable [5, 1, 5, 3]))
-  let sizes : Metric.Histogram Number = Metric.histogram "test_sizes" { description = None; attributes = []; boundaries = bounds }
+  let sizes : Metric.Histogram Number =
+    Metric.histogram "test_sizes" { description = None; attributes = []; boundaries = bounds }
   List.each_effect (fun n -> sizes |> Metric.update n) [1, 15, 25]
   let h : Metric.HistogramState = Metric.value sizes
   Platform.stdout_line ("histogram " ++ show (h.buckets, h.count, h.min, h.max, h.sum))
-  let options = { description = None; attributes = []; maxAge = ms 60000; maxSize = 10; quantiles = [0.5] }
+  let options =
+    { description = None; attributes = []; maxAge = ms 60000; maxSize = 10; quantiles = [0.5] }
   let latency : Metric.Summary Number = Metric.summary "test_latency" options
   List.each_effect (fun n -> latency |> Metric.update n) [1, 2, 3]
   let s : Metric.SummaryState = Metric.value latency
@@ -66,21 +75,33 @@ let main () =
   let stamped = Metric.summary_with_timestamp "test_stamped" options
   stamped |> Metric.update (4, 1000)
   Platform.stdout_line ("summary_with_timestamp " ++ show (Metric.value stamped).count)
-  let timer = Metric.timer "test_timer" { description = None; attributes = []; boundaries = Some [1, 100] }
+  let timer =
+    Metric.timer "test_timer" { description = None; attributes = []; boundaries = Some [1, 100] }
   timer |> Metric.update (ms 50)
   Platform.stdout_line ("timer " ++ show (Metric.value timer).buckets)
-  let lengths : Metric.Metric String Metric.HistogramState = Metric.map_input String.length (Metric.histogram "test_lengths" { description = None; attributes = []; boundaries = [5] })
+  let lengths : Metric.Metric String Metric.HistogramState =
+    Metric.map_input
+      String.length
+      (Metric.histogram "test_lengths" { description = None; attributes = []; boundaries = [5] })
   lengths |> Metric.update "abc"
   Platform.stdout_line ("map_input " ++ show (Metric.value lengths).sum)
-  let constant = Metric.with_constant_input 1 (Metric.counter "test_constant" { description = None; attributes = []; incremental = true })
+  let constant =
+    Metric.with_constant_input
+      1
+      (Metric.counter "test_constant" { description = None; attributes = []; incremental = true })
   constant |> Metric.update "ignored"
   constant |> Metric.update ()
   Platform.stdout_line ("with_constant_input " ++ show (Metric.value constant).count)
   let tagged = Metric.with_attributes [("route", "/a")] requests
   tagged |> Metric.update 10
   Metric.with_current_attributes [("route", "/b")] (task { requests |> Metric.update 100 })
-  let mine = List.filter (fun (m : Metric.Snapshot) -> String.starts_with "test_" m.id) (Metric.snapshot ())
-  let lines = List.map (fun m -> m.id ++ " " ++ show m.attributes ++ " " ++ show m.description ++ " " ++ describe m.state) mine
+  let mine =
+    List.filter (fun (m : Metric.Snapshot) -> String.starts_with "test_" m.id) (Metric.snapshot ())
+  let lines =
+    List.map
+      (fun m ->
+        m.id ++ " " ++ show m.attributes ++ " " ++ show m.description ++ " " ++ describe m.state)
+      mine
   List.each_effect (fun l -> Platform.stdout_line l) (List.sort lines)
   Platform.stdout_line ("dump " ++ show (String.contains "test_requests" (Metric.dump ())))
   Metric.enable_runtime_metrics (task { ignore (parallel (task { 1 }) (task { 2 })) })
@@ -90,4 +111,5 @@ let main () =
   let disabled = started ()
   provide Metric.enable_runtime_metrics_layer { ignore (parallel (task { 1 }) (task { 2 })) }
   let layered = started ()
-  Platform.stdout_line ("runtime metrics " ++ show (enabled > 0, disabled == enabled, layered > disabled))
+  Platform.stdout_line
+    ("runtime metrics " ++ show (enabled > 0, disabled == enabled, layered > disabled))

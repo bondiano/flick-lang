@@ -19,7 +19,7 @@ let params () =
         (
           Http.UrlParams.get_all "a" p,
           Http.UrlParams.get_first "a" p,
-          Http.UrlParams.get_last "a" p
+          Http.UrlParams.get_last "a" p,
         )))
   let q =
     p
@@ -86,7 +86,7 @@ let cookies () =
         secure = true;
         sameSite = Some Http.Cookies.Lax;
         priority = Some Http.Cookies.High;
-        maxAge = Some (seconds 60)
+        maxAge = Some (seconds 60);
     }
   let jar : Http.Cookies.Cookies =
     Http.Cookies.empty
@@ -171,7 +171,7 @@ let main () =
         (
           Http.Mime.get_type "a.html",
           Http.Mime.get_extension "application/json",
-          Http.Mime.get_type "x.zzz"
+          Http.Mime.get_type "x.zzz",
         )))
   Platform.stdout_line ("extensions: " ++ (show (Http.Mime.get_all_extensions "image/jpeg")))
   Platform.stdout_line
@@ -206,5 +206,5 @@ let info () =
     rdev = None;
     size = 255n;
     blksize = None;
-    blocks = None
+    blocks = None;
   }

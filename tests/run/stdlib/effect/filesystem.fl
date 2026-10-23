@@ -65,20 +65,25 @@ let work dir =
   FileSystem.remove { recursive = true; force = false } (dir ++ "/x")
   FileSystem.remove { recursive = false; force = true } (dir ++ "/x")
   line "removed" (show (FileSystem.exists (dir ++ "/x")))
-  let temp = FileSystem.make_temp_file { directory = Some dir; prefix = Some "t-"; suffix = Some ".tmp" }
+  let temp =
+    FileSystem.make_temp_file { directory = Some dir; prefix = Some "t-"; suffix = Some ".tmp" }
   line "make_temp_file" (show (String.ends_with ".tmp" temp, FileSystem.exists temp))
   let sub = FileSystem.make_temp_directory { directory = Some dir; prefix = Some "sub-" }
   line "make_temp_directory" (show (FileSystem.stat sub |> kind_of))
   let scoped =
     scope {
-      let path = FileSystem.make_temp_file_scoped { directory = Some dir; prefix = None; suffix = None }
+      let path =
+        FileSystem.make_temp_file_scoped { directory = Some dir; prefix = None; suffix = None }
       FileSystem.write_file_string plain path "brief"
       path
     }
   line "make_temp_file_scoped" (show (FileSystem.exists scoped))
   let handled =
     scope {
-      let file = FileSystem.open { flag = Some FileSystem.WriteRead; mode = None; noFollow = false } (dir ++ "/h.txt")
+      let file =
+        FileSystem.open
+          { flag = Some FileSystem.WriteRead; mode = None; noFollow = false }
+          (dir ++ "/h.txt")
       FileSystem.write_all [104, 105] file
       let n = FileSystem.write [33, 33] file
       FileSystem.sync file
@@ -108,7 +113,8 @@ let main () =
       provide FileSystem.node {
         let dir =
           scope {
-            let dir = FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-fs-" }
+            let dir =
+              FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-fs-" }
             work dir
             dir
           }

@@ -24,7 +24,9 @@ let main () =
   let q = TxQueue.bounded 3
   let rejected = Tx.atomically (task { (fill [1, 2, 3] q, fill [1, 2, 3] (TxQueue.dropping 2)) })
   Platform.stdout_line ("bounded, dropping reject: " ++ show rejected)
-  let state = Tx.atomically (task { (TxQueue.size q, TxQueue.is_full q, TxQueue.is_empty q, TxQueue.is_non_empty q) })
+  let state =
+    Tx.atomically
+      (task { (TxQueue.size q, TxQueue.is_full q, TxQueue.is_empty q, TxQueue.is_non_empty q) })
   Platform.stdout_line ("size, full, empty, non-empty: " ++ show state)
   let taken = try Tx.atomically (task {
       let a = TxQueue.take q
@@ -65,8 +67,11 @@ let main () =
     })
   let after = try Tx.atomically (task { show (TxQueue.take f) }) with
     | Closed why -> "take fails: " ++ why
-  let flags = Tx.atomically (task { (TxQueue.is_open f, TxQueue.is_closing f, TxQueue.is_done f, TxQueue.is_shutdown f) })
-  Platform.stdout_line ("fail: " ++ show failed ++ ", " ++ after ++ ", open/closing/done/shutdown " ++ show flags)
+  let flags =
+    Tx.atomically
+      (task { (TxQueue.is_open f, TxQueue.is_closing f, TxQueue.is_done f, TxQueue.is_shutdown f) })
+  Platform.stdout_line
+    ("fail: " ++ show failed ++ ", " ++ after ++ ", open/closing/done/shutdown " ++ show flags)
   Tx.atomically (task { TxQueue.await_completion f })
   let c : TxQueue.TxQueue Number {Closed} = TxQueue.unbounded ()
   let caused = match closed_failure "cause" with
@@ -89,7 +94,8 @@ let main () =
   let interrupted = match exits with
     | [exit] -> Option.is_none (Exit.value exit)
     | _ -> false
-  Platform.stdout_line ("drained " ++ show drained ++ ", then take interrupted: " ++ show interrupted)
+  Platform.stdout_line
+    ("drained " ++ show drained ++ ", then take interrupted: " ++ show interrupted)
   let x = TxQueue.unbounded ()
   let shut = Tx.atomically (task {
       let _ = TxQueue.offer 1 x

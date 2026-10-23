@@ -14,7 +14,7 @@ let pins =
     ("runtime/package.json", "(\"effect\": \")[^\"]+(\")"),
     ("runtime/src/capabilities.ts", "(EFFECT_VERSION = \")[^\"]+(\")"),
     ("runtime/test/effect-version.test.ts", "(PINNED_EFFECT = \")[^\"]+(\")"),
-    ("flick/src/toolchain.rs", "(pub const EFFECT: &str = \")[^\"]+(\")")
+    ("flick/src/toolchain.rs", "(pub const EFFECT: &str = \")[^\"]+(\")"),
   ]
 
 /// The capture groups of every match of `source`, a valid pattern.
@@ -105,7 +105,7 @@ let report old next capabilities =
           (List.filter
             (fun c ->
               not (String.starts_with "value" (Option.with_default "" (HashMap.get c core_map))))
-            capabilities)
+            capabilities),
       ]
   String.join "\n" lines ++ "\n"
 

@@ -45,21 +45,21 @@ let main () =
     (
       "map_effect_par",
       (Stream.run_collect
-        (Stream.map_effect_par { concurrency = Some 2; unordered = false } (fun n -> n * 3) nums))
+        (Stream.map_effect_par { concurrency = Some 2; unordered = false } (fun n -> n * 3) nums)),
     )
   line
     (
       "map_effect_par unbounded",
       [
         Stream.run_sum
-          (Stream.map_effect_par { concurrency = None; unordered = true } (fun n -> n) nums)
-      ]
+          (Stream.map_effect_par { concurrency = None; unordered = true } (fun n -> n) nums),
+      ],
     )
   line ("map_chunks_effect", (Stream.run_collect (Stream.map_chunks_effect grow chunked)))
   line
     (
       "flatten_effect",
-      (Stream.run_collect (Stream.flatten_effect (Stream.make [task { 1 }, task { 2 }])))
+      (Stream.run_collect (Stream.flatten_effect (Stream.make [task { 1 }, task { 2 }]))),
     )
   let seen = Ref.make []
   let _ =
@@ -94,7 +94,7 @@ let main () =
     (
       "take_while_filter",
       (Stream.run_collect
-        (Stream.take_while_filter (fun n -> if n < 3 then Ok (n * 100) else Err n) nums))
+        (Stream.take_while_filter (fun n -> if n < 3 then Ok (n * 100) else Err n) nums)),
     )
   line ("take_while_effect", (Stream.run_collect (Stream.take_while_effect (fun n -> n < 3) nums)))
   line ("drop", (Stream.run_collect (Stream.drop 4 nums)))
@@ -105,7 +105,7 @@ let main () =
   line
     (
       "drop_while_filter",
-      (Stream.run_collect (Stream.drop_while_filter half (Stream.make [2, 4, 5, 6])))
+      (Stream.run_collect (Stream.drop_while_filter half (Stream.make [2, 4, 5, 6]))),
     )
   line ("drop_while_effect", (Stream.run_collect (Stream.drop_while_effect (fun n -> n < 6) nums)))
   line ("when_ true", (Stream.run_collect (Stream.when_ (task { true }) (Stream.take 2 nums))))
@@ -123,7 +123,7 @@ let main () =
   line
     (
       "map_accum",
-      (Stream.run_collect (Stream.map_accum 0 (fun acc n -> (acc + n, [acc + n])) nums))
+      (Stream.run_collect (Stream.map_accum 0 (fun acc n -> (acc + n, [acc + n])) nums)),
     )
   line
     (
@@ -134,13 +134,13 @@ let main () =
             0
             (fun acc chunk -> (acc + 1, [acc, NonEmpty.length chunk]))
             chunked
-        ))
+        )),
     )
   line
     (
       "map_accum_effect",
       (Stream.run_collect
-        (Stream.map_accum_effect 1 (fun acc n -> (acc * n, [acc * n])) (Stream.take 4 nums)))
+        (Stream.map_accum_effect 1 (fun acc n -> (acc * n, [acc * n])) (Stream.take 4 nums))),
     )
   line
     (
@@ -149,13 +149,13 @@ let main () =
         (Stream.map_accum_chunks_effect
           0
           (fun acc chunk -> (acc + NonEmpty.length chunk, [acc]))
-          chunked))
+          chunked)),
     )
   line ("scan", (Stream.run_collect (Stream.scan 0 (fun acc n -> acc + n) (Stream.take 4 nums))))
   line
     (
       "scan_effect",
-      (Stream.run_collect (Stream.scan_effect 1 (fun acc n -> acc * n) (Stream.take 4 nums)))
+      (Stream.run_collect (Stream.scan_effect 1 (fun acc n -> acc * n) (Stream.take 4 nums))),
     )
   lists ("collect", (Stream.run_collect (Stream.collect (Stream.take 3 nums))))
   lists ("accumulate", (collect (Stream.accumulate chunked)))
@@ -164,19 +164,19 @@ let main () =
     (
       "changes_with",
       (Stream.run_collect
-        (Stream.changes_with (fun a b -> even a == even b) (Stream.make [1, 3, 2, 4, 5])))
+        (Stream.changes_with (fun a b -> even a == even b) (Stream.make [1, 3, 2, 4, 5]))),
     )
   line
     (
       "changes_with_effect",
-      (Stream.run_collect (Stream.changes_with_effect (fun a b -> a == b) (Stream.make [1, 1, 2])))
+      (Stream.run_collect (Stream.changes_with_effect (fun a b -> a == b) (Stream.make [1, 1, 2]))),
     )
   line ("intersperse", (Stream.run_collect (Stream.intersperse 0 (Stream.take 3 nums))))
   line
     (
       "intersperse_affixes",
       (Stream.run_collect
-        (Stream.intersperse_affixes { start = 9; middle = 0; end = 8 } (Stream.take 2 nums)))
+        (Stream.intersperse_affixes { start = 9; middle = 0; end = 8 } (Stream.take 2 nums))),
     )
   line ("debounce", (Stream.run_collect (Stream.debounce ms5 (Stream.take 3 nums))))
   let throttled =
@@ -186,7 +186,7 @@ let main () =
         units = 100;
         duration = ms1000;
         burst = None;
-        strategy = None
+        strategy = None;
       }
       nums
   line ("throttle", (Stream.run_collect throttled))
@@ -197,7 +197,7 @@ let main () =
         units = 100;
         duration = ms1000;
         burst = Some 1;
-        strategy = Some Stream.Shape
+        strategy = Some Stream.Shape;
       }
       nums
   line ("throttle_effect", (Stream.run_collect shaped))
@@ -208,24 +208,26 @@ let main () =
         units = 100;
         duration = ms1000;
         burst = None;
-        strategy = Some Stream.Enforce
+        strategy = Some Stream.Enforce;
       }
       nums
   line ("throttle enforce", [Stream.run_count enforced])
   line
     (
       "buffer",
-      (Stream.run_collect (Stream.buffer { capacity = Some 2; strategy = Some Queue.Suspend } nums))
+      (
+        Stream.run_collect (Stream.buffer { capacity = Some 2; strategy = Some Queue.Suspend } nums)
+      ),
     )
   line
     (
       "buffer unbounded",
-      (Stream.run_collect (Stream.buffer { capacity = None; strategy = None } nums))
+      (Stream.run_collect (Stream.buffer { capacity = None; strategy = None } nums)),
     )
   line
     (
       "buffer_chunks",
-      (Stream.run_collect (Stream.buffer_chunks { capacity = Some 1; strategy = None } chunked))
+      (Stream.run_collect (Stream.buffer_chunks { capacity = Some 1; strategy = None } chunked)),
     )
   let checked : List (Result Boom Number) =
     Stream.run_collect (Stream.result (Stream.concat (Stream.fail (Boom 4)) (Stream.succeed 1)))

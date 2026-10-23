@@ -44,11 +44,11 @@ type alias InputProps r e c =
 /// The props of `select`: every field speaks of the same `a`.
 type alias SelectProps a r e c =
   {
-    items : List a
-    selected : Option a
-    key : (a -> String)^c
-    render_item : (a -> (Ui r e)^c)^c
-    on_change : (Handler a r e)^c
+    items : List a;
+    selected : Option a;
+    key : (a -> String)^c;
+    render_item : (a -> (Ui r e)^c)^c;
+    on_change : (Handler a r e)^c;
   }
 
 /// The named places of `panel`.

@@ -19,7 +19,7 @@ make :
   {
     lookup : k ->{r; e} a;
     idleTimeToLive : Option (k -> Duration.Duration);
-    capacity : Option Number
+    capacity : Option Number;
   } ->{Scope s | r;}
   RcMap s k e a
 foreign effect make from "@flick-lang/runtime/effect/RcMap" "flickMake"

@@ -22,7 +22,9 @@ type alias Attempt = { attempt : Number; stepAttempt : Number; stepIndex : Numbe
 /// What happens while a plan runs a task: an attempt starts, succeeds after
 /// a duration, or fails after a duration with a failure of the task.
 type Event (e : ErrorRow) =
-  AttemptStart Attempt | AttemptSuccess Attempt Duration.Duration | AttemptFailure Attempt Duration.Duration (Failure e)
+  AttemptStart Attempt | AttemptSuccess Attempt Duration.Duration | AttemptFailure Attempt Duration.Duration (
+    Failure e
+  )
 
 /// A step providing the services the layer builds, tried once.
 step : Layer r e p -> Step p r e i

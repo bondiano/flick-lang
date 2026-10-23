@@ -12,7 +12,11 @@ type alias SetOptions = { onlyIfMissing : Bool; propagateInterruption : Bool }
 
 /// `SetOptions` for `run`; `startImmediately` runs the child before `run`
 /// returns.
-type alias RunOptions = { onlyIfMissing : Bool; propagateInterruption : Bool; startImmediately : Bool }
+type alias RunOptions = {
+  onlyIfMissing : Bool;
+  propagateInterruption : Bool;
+  startImmediately : Bool;
+}
 
 /// An empty handle owned by the innermost `scope` (or the one of region `s`).
 make : forall s e a. Unit ->{Scope s;} FiberHandle s e a

@@ -12,7 +12,7 @@ let rec count_down cell n =
     Ref.set cell n
     count_down cell (n - 1)
 
-main : Unit ->{none; AppError} Unit
+main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line (show (sum_to 0 1000000))
   let cell = Ref.make 0

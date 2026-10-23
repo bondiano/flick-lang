@@ -21,12 +21,13 @@ type alias Options =
     headers : Option Http.Headers.Input;
     body : Option Http.Body.Body;
     accept : Option String;
-    acceptJson : Bool
+    acceptJson : Bool;
   }
 
 /// Options that set nothing: `{ Http.ClientRequest.defaults with acceptJson = true }`.
 defaults : Options
-let defaults = { urlParams = None; hash = None; headers = None; body = None; accept = None; acceptJson = false }
+let defaults =
+  { urlParams = None; hash = None; headers = None; body = None; accept = None; acceptJson = false }
 
 /// A `GET` of no URL.
 empty : ClientRequest
@@ -36,7 +37,12 @@ foreign pure empty from "@flick-lang/runtime/effect/http/HttpClientRequest" "emp
 /// A request of every part: method, URL, parameters, hash, headers, body.
 make_with :
   Http.Method.Method ->
-  String -> Http.UrlParams.UrlParams -> Option String -> Http.Headers.Headers -> Http.Body.Body -> ClientRequest
+  String ->
+    Http.UrlParams.UrlParams ->
+    Option String ->
+    Http.Headers.Headers ->
+    Http.Body.Body ->
+    ClientRequest
 foreign pure make_with from "@flick-lang/runtime/effect/http/HttpClientRequest" "flickMakeWith"
   arity 6
   reviewed "effect@4.0.5 sha256:5f2e310a48379c30"
@@ -255,7 +261,10 @@ foreign effect body_json from "@flick-lang/runtime/effect/http/HttpClientRequest
 
 /// A JSON body of the value as the codec encodes it.
 schema_body_json :
-  Codec rd re Json a -> a -> ClientRequest ->{re; SchemaError, Http.Body.HttpBodyError} ClientRequest
+  Codec rd re Json a ->
+    a ->
+    ClientRequest ->{re; SchemaError, Http.Body.HttpBodyError}
+    ClientRequest
 foreign effect schema_body_json from "@flick-lang/runtime/effect/http/HttpClientRequest" "flickSchemaBodyJson"
   arity 3
   reviewed "effect@4.0.5 sha256:548734a6e79844b8"
@@ -274,14 +283,21 @@ foreign pure body_form_data from "@flick-lang/runtime/effect/http/HttpClientRequ
 
 /// A body of the stream's chunks of bytes, of the content type or
 /// `application/octet-stream`, and of the length if it is known.
-body_stream : forall e. Stream none e (List Number) -> Option String -> Option Number -> ClientRequest -> ClientRequest
+body_stream : forall e. Stream none e (List Number) ->
+  Option String ->
+  Option Number ->
+  ClientRequest ->
+  ClientRequest
 foreign pure body_stream from "@flick-lang/runtime/effect/http/HttpClientRequest" "flickBodyStream"
   arity 4
   reviewed "effect@4.0.5 sha256:0298a2fda8a6af0a"
 
 /// A body of the file at the path, as `Http.Body.file`.
 body_file :
-  Http.Body.FileOptions -> String -> ClientRequest ->{FileSystem.FileSystem; PlatformError.PlatformError} ClientRequest
+  Http.Body.FileOptions ->
+    String ->
+    ClientRequest ->{FileSystem.FileSystem; PlatformError.PlatformError}
+    ClientRequest
 let body_file options path request = set_body (Http.Body.file options path) request
 
 /// The URL with its parameters and hash, if it is a valid URL.
@@ -323,4 +339,9 @@ foreign pure body from "@flick-lang/runtime/effect/http/HttpClientRequest" "flic
 instance Show ClientRequest =
   show : ClientRequest -> String
   let show x =
-    "ClientRequest " ++ show (method x) ++ " " ++ show (Http.UrlParams.redact_url Http.UrlParams.default_redacted_names (url x)) ++ " " ++ show (headers x)
+    "ClientRequest "
+      ++ show (method x)
+      ++ " "
+      ++ show (Http.UrlParams.redact_url Http.UrlParams.default_redacted_names (url x))
+      ++ " "
+      ++ show (headers x)

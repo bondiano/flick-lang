@@ -21,7 +21,7 @@ type alias Fields =
     months : List Number;
     weekdays : List Number;
     and : Option Bool;
-    tz : DateTime.TimeZone
+    tz : DateTime.TimeZone;
   }
 
 /// A cron of the fields; an error when a value is out of its range.

@@ -56,7 +56,7 @@ let main () =
           Graph.get_node 2 sample,
           Graph.get_node 9 sample,
           Graph.has_node 3 sample,
-          Graph.has_node 4 sample
+          Graph.has_node 4 sample,
         ))
   let first : Option (Graph.Edge Number) = Graph.get_edge 0 sample
   Platform.stdout_line
@@ -84,7 +84,7 @@ let main () =
       ++ show
         (
           Graph.find_edge (fun w s _ -> w > 1 && s == 0) sample,
-          Graph.find_edges (fun w _ t -> w < 5 && t > 1) sample
+          Graph.find_edges (fun w _ t -> w < 5 && t > 1) sample,
         ))
   Platform.stdout_line
     ("incident: "
@@ -109,7 +109,7 @@ let main () =
       ++ show
         (
           Graph.neighbors_directed 2 Graph.incoming sample,
-          Graph.neighbors_directed 2 Graph.outgoing sample
+          Graph.neighbors_directed 2 Graph.outgoing sample,
         ))
   let changed =
     sample |> Graph.update_node 0 (fun n -> n ++ "!") |> Graph.update_edge 2 (fun w -> w * 10)
@@ -124,7 +124,7 @@ let main () =
       ++ show
         (
           Graph.values (Graph.nodes mapped),
-          List.map (fun (_, e) -> e.data) (Graph.entries (Graph.edges mapped))
+          List.map (fun (_, e) -> e.data) (Graph.entries (Graph.edges mapped)),
         ))
   let kept = Graph.filter_map_nodes (fun n -> if n == "B" then None else Some (n ++ n)) sample
   Platform.stdout_line
@@ -138,7 +138,7 @@ let main () =
       ++ show
         (
           Graph.node_count (Graph.filter_nodes (fun n -> n != "A") sample),
-          Graph.edge_count (Graph.filter_edges (fun w -> w == 1) sample)
+          Graph.edge_count (Graph.filter_edges (fun w -> w == 1) sample),
         ))
   Platform.stdout_line ("reverse: " ++ show (Graph.successors 2 (Graph.reverse sample)))
   Platform.stdout_line
@@ -148,7 +148,7 @@ let main () =
           Graph.edge_count (Graph.remove_edge 0 sample),
           Graph.edge_count (Graph.remove_edges [0, 1] sample),
           Graph.edge_count (Graph.remove_node 2 sample),
-          Graph.node_count (Graph.remove_nodes [0, 1] sample)
+          Graph.node_count (Graph.remove_nodes [0, 1] sample),
         ))
   let snapshot : Graph.Snapshot String Number Graph.Directed = Graph.to_snapshot sample
   let node_zero : List (Graph.IndexedNode String) = List.take 1 snapshot.nodes
@@ -171,28 +171,28 @@ let main () =
       ++ show
         (
           Graph.node_count (Graph.compose same other sample),
-          Graph.edge_count (Graph.compose same other sample)
+          Graph.edge_count (Graph.compose same other sample),
         ))
   Platform.stdout_line
     ("intersection: "
       ++ show
         (
           Graph.values (Graph.nodes (Graph.intersection same other sample)),
-          Graph.edge_count (Graph.intersection same other sample)
+          Graph.edge_count (Graph.intersection same other sample),
         ))
   Platform.stdout_line
     ("difference: "
       ++ show
         (
           Graph.node_count (Graph.difference same other sample),
-          Graph.edge_count (Graph.difference same other sample)
+          Graph.edge_count (Graph.difference same other sample),
         ))
   Platform.stdout_line
     ("symmetric_difference: "
       ++ show
         (
           Graph.node_count (Graph.symmetric_difference same other sample),
-          Graph.edge_count (Graph.symmetric_difference same other sample)
+          Graph.edge_count (Graph.symmetric_difference same other sample),
         ))
   let by_letter : Graph.IdentityOptions String Number String Bool =
     { nodeIdentity = Some String.to_lower; edgeIdentity = Some (fun _ -> true) }
@@ -255,7 +255,7 @@ let main () =
       ++ show
         (
           Graph.entries sinks,
-          Graph.values (Graph.externals { direction = Some Graph.incoming } sample)
+          Graph.values (Graph.externals { direction = Some Graph.incoming } sample),
         ))
   let all_edges : Graph.EdgeWalker Number = Graph.edges sample
   let walker : Graph.Walker Graph.EdgeIndex (Graph.Edge Number) = all_edges
@@ -269,7 +269,7 @@ let main () =
       edgeLabel = None;
       diagramType = Some Graph.flowchart;
       direction = Some Graph.left_to_right;
-      nodeShape = Some shape
+      nodeShape = Some shape;
     }
   Platform.stdout_line (Graph.to_mermaid diagram sample)
   let direction : Graph.MermaidDirection = Graph.top_to_bottom
@@ -281,7 +281,7 @@ let main () =
       Graph.hexagon,
       Graph.stadium,
       Graph.subroutine,
-      Graph.cylindrical
+      Graph.cylindrical,
     ]
   let each =
     List.map
@@ -292,7 +292,7 @@ let main () =
             edgeLabel = None;
             diagramType = Some diagram_type;
             direction = Some direction;
-            nodeShape = Some (fun _ -> s)
+            nodeShape = Some (fun _ -> s);
           }
           plain)
       shapes
@@ -309,7 +309,7 @@ let main () =
               edgeLabel = None;
               diagramType = None;
               direction = Some d;
-              nodeShape = None
+              nodeShape = None;
             }
             plain)
         rest))

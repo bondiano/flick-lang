@@ -18,12 +18,18 @@ type alias RouterConfig =
     ignoreTrailingSlash : Option Bool;
     ignoreDuplicateSlashes : Option Bool;
     caseSensitive : Option Bool;
-    maxParamLength : Option Number
+    maxParamLength : Option Number;
   }
 
 /// Effect's defaults.
 config : RouterConfig
-let config = { ignoreTrailingSlash = None; ignoreDuplicateSlashes = None; caseSensitive = None; maxParamLength = None }
+let config =
+  {
+    ignoreTrailingSlash = None;
+    ignoreDuplicateSlashes = None;
+    caseSensitive = None;
+    maxParamLength = None;
+  }
 
 /// What a route's handler knows of the match.
 service RouteContext =
@@ -42,7 +48,10 @@ let param name =
   | None -> None
 
 /// A route of the method (`None`: every method) and the path pattern.
-route : Option Http.Method.Method -> String -> (ServerRequest ->{RouteContext | r; e} ServerResponse) -> Route r e
+route : Option Http.Method.Method ->
+  String ->
+  (ServerRequest ->{RouteContext | r; e} ServerResponse) ->
+  Route r e
 foreign pure route from "@flick-lang/runtime/effect/http/HttpRouter" "flickRoute"
   arity 3
   reviewed "effect@4.0.5 sha256:525d5607645939c4"
@@ -61,7 +70,9 @@ foreign pure prefix_route from "@flick-lang/runtime/effect/http/HttpRouter" "pre
 
 /// One handler of the routes: the first route that matches a request
 /// answers it, and a request none matches fails with `RouteNotFound`.
-router : RouterConfig -> List (Route r e) ->{} (ServerRequest ->{r; HttpServerError | e} ServerResponse)
+router : RouterConfig ->
+  List (Route r e) ->{}
+  (ServerRequest ->{r; HttpServerError | e} ServerResponse)
 foreign effect router from "@flick-lang/runtime/effect/http/HttpRouter" "flickRouter"
   arity 2
   reviewed "effect@4.0.5 sha256:4631e316834ea1e9"
@@ -88,7 +99,9 @@ foreign effect schema_no_body from "@flick-lang/runtime/effect/http/HttpRouter" 
   reviewed "effect@4.0.5 sha256:a4db36817d7f5101"
 
 /// `schema_no_body` with the JSON body as `body`.
-schema_json : Codec rd re Json a -> ServerRequest ->{RouteContext | rd; HttpServerError, SchemaError} a
+schema_json : Codec rd re Json a ->
+  ServerRequest ->{RouteContext | rd; HttpServerError, SchemaError}
+  a
 foreign effect schema_json from "@flick-lang/runtime/effect/http/HttpRouter" "flickSchemaJson"
   arity 2
   reviewed "effect@4.0.5 sha256:57fcc073d84e485e"

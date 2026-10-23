@@ -425,7 +425,7 @@ foreign pure group_by_key from "@flick-lang/runtime/effect/Stream" "groupByKey"
 type alias Split = {
   capacity : Option Number;
   strategy : Option Queue.Strategy;
-  replay : Option Number
+  replay : Option Number;
 }
 
 /// A stream that consumers in the scope of region `s` may each run: the

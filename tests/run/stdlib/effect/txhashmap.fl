@@ -51,9 +51,16 @@ let main () =
       let doubled = TxHashMap.map (fun v k -> v * 2 + String.length k) scores
       let big = TxHashMap.filter (fun v _ -> v > 4) scores
       let parsed = TxHashMap.filter_map (fun v _ -> if v > 4 then Ok (show v) else Err ()) scores
-      let maybe = TxHashMap.compact (TxHashMap.map (fun v _ -> if v == 0 then None else Some v) scores)
+      let maybe =
+        TxHashMap.compact (TxHashMap.map (fun v _ -> if v == 0 then None else Some v) scores)
       let total = TxHashMap.reduce 0 (fun acc v _ -> acc + v) scores
-      (entries_of doubled, entries_of big, List.sort (TxHashMap.values parsed), TxHashMap.size maybe, total)
+      (
+        entries_of doubled,
+        entries_of big,
+        List.sort (TxHashMap.values parsed),
+        TxHashMap.size maybe,
+        total,
+      )
     })
   Platform.stdout_line ("derived: " ++ show derived)
   let found = Tx.atomically (task {
@@ -61,17 +68,21 @@ let main () =
         TxHashMap.some (fun v _ -> v == 7) scores,
         TxHashMap.every (fun v _ -> v >= 0) scores,
         TxHashMap.has_by (fun _ k -> k == "eve") scores,
-        TxHashMap.find_first (fun v _ -> v == 4) scores
+        TxHashMap.find_first (fun v _ -> v == 4) scores,
       )
     })
   Platform.stdout_line ("found: " ++ show found)
   let flat = Tx.atomically (task {
-      let m = TxHashMap.flat_map (fun v k -> TxHashMap.make EqHash.canonical [(k, v), (k ++ "!", v + 1)]) scores
+      let m =
+        TxHashMap.flat_map
+          (fun v k -> TxHashMap.make EqHash.canonical [(k, v), (k ++ "!", v + 1)])
+          scores
       TxHashMap.size m
     })
   Platform.stdout_line ("flat_map size: " ++ show flat)
   let visited = Ref.make []
-  Tx.atomically (task { TxHashMap.for_each (fun v k -> Ref.set visited (Ref.get visited ++ [(k, v)])) scores })
+  Tx.atomically
+    (task { TxHashMap.for_each (fun v k -> Ref.set visited (Ref.get visited ++ [(k, v)])) scores })
   Platform.stdout_line ("for_each: " ++ show (sorted (Ref.get visited)))
   let hashed = Tx.atomically (task {
       (TxHashMap.get_hash "eve" (hash "eve") scores, TxHashMap.has_hash "eve" (hash "eve") scores)

@@ -48,7 +48,11 @@ type alias IndexedEdge e = { index : EdgeIndex; source : NodeIndex; target : Nod
 
 /// Every node and edge with its index, and the kind: Effect's `type` field
 /// is `graph_type`.
-type alias Snapshot n e k = { graph_type : Kind k; nodes : List (IndexedNode n); edges : List (IndexedEdge e) }
+type alias Snapshot n e k = {
+  graph_type : Kind k;
+  nodes : List (IndexedNode n);
+  edges : List (IndexedEdge e);
+}
 
 /// What a graph operation rejected: a missing node, an invalid option or
 /// weight, a cycle where none may be.
@@ -80,7 +84,10 @@ let both_ways = TraversalDirection "undirected"
 
 /// How two graphs tell their nodes and edges apart; `None` is the data
 /// itself.
-type alias IdentityOptions n e ni ei = { nodeIdentity : Option (n -> ni); edgeIdentity : Option (e -> ei) }
+type alias IdentityOptions n e ni ei = {
+  nodeIdentity : Option (n -> ni);
+  edgeIdentity : Option (e -> ei);
+}
 
 /// Within `radius` steps (default 1) of a node, along `direction` (default
 /// outgoing).
@@ -109,14 +116,23 @@ type alias BipartiteMatch = { left : NodeIndex; right : NodeIndex; edge : EdgeIn
 type alias MaximumFlowConfig e = { source : NodeIndex; target : NodeIndex; capacity : e -> Number }
 
 /// The flow's value, the flow of each edge, and the edges of a minimum cut.
-type alias MaximumFlowResult = { value : Number; flows : List (EdgeIndex, Number); cut : List EdgeIndex }
+type alias MaximumFlowResult = {
+  value : Number;
+  flows : List (EdgeIndex, Number);
+  cut : List EdgeIndex;
+}
 
 /// A cut: its value, its edges, and the nodes on each side.
 type alias MinimumCutResult =
   { value : Number; edges : List EdgeIndex; source : List NodeIndex; target : List NodeIndex }
 
 /// A path: its nodes, its edges, its total cost and the data of its edges.
-type alias PathResult e = { path : List NodeIndex; edges : List EdgeIndex; distance : Number; costs : List e }
+type alias PathResult e = {
+  path : List NodeIndex;
+  edges : List EdgeIndex;
+  distance : Number;
+  costs : List e;
+}
 
 /// The endpoints of a path and the non-negative cost of each edge.
 type alias DijkstraConfig e = { source : NodeIndex; target : NodeIndex; cost : e -> Number }
@@ -144,7 +160,7 @@ type alias AllPairsResult e =
     distances : List (NodeIndex, List (NodeIndex, Number));
     paths : List (NodeIndex, List (NodeIndex, Option (List NodeIndex)));
     edges : List (NodeIndex, List (NodeIndex, List EdgeIndex));
-    costs : List (NodeIndex, List (NodeIndex, List e))
+    costs : List (NodeIndex, List (NodeIndex, List e));
   }
 
 /// The paths an enumeration finds, in order.
@@ -240,5 +256,5 @@ type alias MermaidOptions n e =
     edgeLabel : Option (e -> String);
     diagramType : Option MermaidDiagramType;
     direction : Option MermaidDirection;
-    nodeShape : Option (n -> MermaidNodeShape)
+    nodeShape : Option (n -> MermaidNodeShape);
   }

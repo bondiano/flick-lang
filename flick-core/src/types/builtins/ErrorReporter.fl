@@ -14,7 +14,7 @@ type alias Report =
     message : String;
     severity : LogLevel.Severity;
     attributes : List (String, String);
-    timestamp : BigInt
+    timestamp : BigInt;
   }
 
 /// Whether `layer` keeps the reporters already installed.

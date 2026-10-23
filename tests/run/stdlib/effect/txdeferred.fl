@@ -31,7 +31,11 @@ let main () =
     | Late n -> (0 - n, false)
   Platform.stdout_line ("awaited: " ++ show got)
   let again = Tx.atomically (task { TxDeferred.fail (Late 1) d })
-  Platform.stdout_line ("second completion: " ++ show again ++ ", " ++ describe (Tx.atomically (task { TxDeferred.poll d })))
+  Platform.stdout_line
+    ("second completion: "
+      ++ show again
+      ++ ", "
+      ++ describe (Tx.atomically (task { TxDeferred.poll d })))
   let e : TxDeferred.TxDeferred Number {Late} = TxDeferred.make ()
   let failed = Tx.atomically (task { TxDeferred.fail (Late 2) e })
   let caught = try Tx.atomically (task { TxDeferred.await_ e }) with
@@ -39,4 +43,5 @@ let main () =
   Platform.stdout_line ("failed: " ++ show (failed, caught))
   let f : TxDeferred.TxDeferred Number {Late} = TxDeferred.make ()
   let done = Tx.atomically (task { TxDeferred.done (Err (Late 3)) f })
-  Platform.stdout_line ("done: " ++ show done ++ ", " ++ describe (Tx.atomically (task { TxDeferred.poll f })))
+  Platform.stdout_line
+    ("done: " ++ show done ++ ", " ++ describe (Tx.atomically (task { TxDeferred.poll f })))

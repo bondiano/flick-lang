@@ -21,10 +21,11 @@ let welcome name =
   let n = Counter.next ()
   Greeter.greet name ++ " #" ++ show n
 
-main : Unit ->{none; AppError} Unit
+main : Unit ->{; AppError} Unit
 let main () =
   let cell = Ref.make 0
-  let layer = Layer.merge (Layer.succeed Greeter greeter_impl) (Layer.succeed Counter (counter_impl cell))
+  let layer =
+    Layer.merge (Layer.succeed Greeter greeter_impl) (Layer.succeed Counter (counter_impl cell))
   let first = provide layer {
     welcome "ada"
   }

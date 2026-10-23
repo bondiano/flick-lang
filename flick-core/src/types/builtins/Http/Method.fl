@@ -22,7 +22,7 @@ let all_short =
     (HEAD, "head"),
     (OPTIONS, "options"),
     (TRACE, "trace"),
-    (QUERY, "query")
+    (QUERY, "query"),
   ]
 
 /// Whether a request of the method carries a body: all but `GET`, `HEAD`,

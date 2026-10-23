@@ -21,7 +21,7 @@ let span_options =
     sampled = None;
     level = None;
     captureStackTrace = true;
-    disablePropagation = false
+    disablePropagation = false;
   }
 
 /// What a failure holds: fails, dies, interrupts, only interrupts.
@@ -102,26 +102,37 @@ let exits () =
   let all = [ok, bad, died, stopped, from_cause]
   Platform.stdout_line ("is_success: " ++ show (List.map Exit.is_success all))
   Platform.stdout_line ("is_failure: " ++ show (List.map Exit.is_failure all))
-  Platform.stdout_line ("has: " ++ show (List.map (fun x -> (Exit.has_fails x, Exit.has_dies x, Exit.has_interrupts x)) all))
+  Platform.stdout_line
+    ("has: "
+      ++ show (List.map (fun x -> (Exit.has_fails x, Exit.has_dies x, Exit.has_interrupts x)) all))
   Platform.stdout_line ("value: " ++ show (List.map Exit.value all))
-  Platform.stdout_line ("find_error_option: " ++ show (List.map (fun x -> boom_text (Exit.find_error_option x)) all))
+  Platform.stdout_line
+    ("find_error_option: " ++ show (List.map (fun x -> boom_text (Exit.find_error_option x)) all))
   Platform.stdout_line ("find_defect: " ++ show (List.map defect_of all))
   Platform.stdout_line ("find_error: " ++ show (List.map error_of all))
   Platform.stdout_line ("filter_value: " ++ show (List.map value_of all))
-  Platform.stdout_line ("filter_success: " ++ show (List.map (fun x -> side (Exit.filter_success x)) all))
-  Platform.stdout_line ("filter_failure: " ++ show (List.map (fun x -> side (Exit.filter_failure x)) all))
+  Platform.stdout_line
+    ("filter_success: " ++ show (List.map (fun x -> side (Exit.filter_success x)) all))
+  Platform.stdout_line
+    ("filter_failure: " ++ show (List.map (fun x -> side (Exit.filter_failure x)) all))
   Platform.stdout_line ("filter_cause: " ++ show (List.map cause_of all))
   Platform.stdout_line ("match_: " ++ show (List.map described all))
-  Platform.stdout_line ("map: " ++ show (List.map (fun x -> Exit.value (Exit.map (fun n -> n * 10) x)) all))
+  Platform.stdout_line
+    ("map: " ++ show (List.map (fun x -> Exit.value (Exit.map (fun n -> n * 10) x)) all))
   let renamed : Exit {Other} Number = Exit.map_error rename bad
   Platform.stdout_line ("map_error: " ++ other_text (Exit.find_error_option renamed))
   let both : Exit {Other} String = Exit.map_both rename (fun n -> show n) ok
   let both_bad : Exit {Other} String = Exit.map_both rename (fun n -> show n) bad
-  Platform.stdout_line ("map_both: " ++ show (Exit.value both) ++ " " ++ other_text (Exit.find_error_option both_bad))
+  Platform.stdout_line
+    ("map_both: " ++ show (Exit.value both) ++ " " ++ other_text (Exit.find_error_option both_bad))
   let nothing : Exit none Unit = Exit.void
   Platform.stdout_line ("as_void: " ++ show (Exit.value (Exit.as_void ok), Exit.is_success nothing))
-  Platform.stdout_line ("as_void_all: " ++ show (Exit.is_success (Exit.as_void_all [ok, ok]), Exit.is_success (Exit.as_void_all [ok, bad])))
-  Platform.stdout_line ("failure: " ++ show (List.map (fun x -> Option.is_some (Exit.failure x)) all))
+  Platform.stdout_line
+    ("as_void_all: "
+      ++ show
+        (Exit.is_success (Exit.as_void_all [ok, ok]), Exit.is_success (Exit.as_void_all [ok, bad])))
+  Platform.stdout_line
+    ("failure: " ++ show (List.map (fun x -> Option.is_some (Exit.failure x)) all))
 
 find_fail_of : Failure {Boom} -> String
 let find_fail_of f =
@@ -168,7 +179,12 @@ let causes () =
   Platform.stdout_line ("flags: " ++ show (List.map flags [failed, died, stopped, nothing, both]))
   Platform.stdout_line ("kinds: " ++ show (kinds both))
   let rebuilt : Failure {Boom} =
-    Cause.from_reasons [Cause.make_fail_reason (Boom 4), Cause.make_die_reason "again", Cause.make_interrupt_reason None]
+    Cause.from_reasons
+      [
+        Cause.make_fail_reason (Boom 4),
+        Cause.make_die_reason "again",
+        Cause.make_interrupt_reason None,
+      ]
   Platform.stdout_line ("from_reasons: " ++ show (kinds rebuilt))
   Platform.stdout_line ("find_error_option: " ++ boom_text (Cause.find_error_option rebuilt))
   Platform.stdout_line ("find_fail: " ++ show (List.map find_fail_of [failed, died]))
@@ -179,11 +195,21 @@ let causes () =
   Platform.stdout_line ("interruptors: " ++ show (Cause.interruptors stopped))
   Platform.stdout_line ("filter_interruptors: " ++ show (List.map ids [stopped, failed]))
   let mapped : Failure {Other} = Cause.map rename both
-  Platform.stdout_line ("map: " ++ other_text (Cause.find_error_option mapped) ++ " " ++ flags mapped)
+  Platform.stdout_line
+    ("map: " ++ other_text (Cause.find_error_option mapped) ++ " " ++ flags mapped)
   Platform.stdout_line ("pretty: " ++ show (String.contains "broken" (Cause.pretty died)))
   Platform.stdout_line ("pretty_errors: " ++ show (List.length (Cause.pretty_errors both)))
-  Platform.stdout_line ("stack_trace: " ++ show (Option.is_some (Cause.stack_trace stopped), Option.is_some (Cause.interruptor_stack_trace stopped)))
-  Platform.stdout_line ("reason_stack_trace: " ++ show (List.map (fun r -> Option.is_some (Cause.reason_stack_trace r)) (Cause.reasons died)))
+  Platform.stdout_line
+    ("stack_trace: "
+      ++ show
+        (
+          Option.is_some (Cause.stack_trace stopped),
+          Option.is_some (Cause.interruptor_stack_trace stopped),
+        ))
+  Platform.stdout_line
+    ("reason_stack_trace: "
+      ++ show
+        (List.map (fun r -> Option.is_some (Cause.reason_stack_trace r)) (Cause.reasons died)))
 
 /// A stack frame of a traced failure, annotated on another one.
 frames : Unit ->{} Unit
@@ -195,12 +221,22 @@ let frames () =
   match frame with
   | Some f ->
     let again : Failure {Boom} = Cause.annotate true f failed
-    Platform.stdout_line ("annotate: " ++ show (Option.map Cause.frame_name (Cause.stack_trace again) == Some (Cause.frame_name f)))
+    Platform.stdout_line
+      ("annotate: "
+        ++ show
+          (Option.map Cause.frame_name (Cause.stack_trace again) == Some (Cause.frame_name f)))
     let stack = Cause.frame_stack f
-    Platform.stdout_line ("frame: " ++ show (Option.is_some (Cause.frame_parent f), Option.is_some stack))
+    Platform.stdout_line
+      ("frame: " ++ show (Option.is_some (Cause.frame_parent f), Option.is_some stack))
   | None -> Platform.stdout_line ("annotate: " ++ "no frame")
 
-handled : Eff none {Cause.NoSuchElementError, Cause.IllegalArgumentError, Cause.UnknownError, TimeoutError} String ->{} String
+handled : Eff none {
+  Cause.NoSuchElementError,
+  Cause.IllegalArgumentError,
+  Cause.UnknownError,
+  TimeoutError
+} String ->{}
+  String
 let handled t =
   try
     await t
@@ -214,16 +250,17 @@ let handled t =
 errors : Unit ->{} Unit
 let errors () =
   let raised =
-    [ task { from_result (Err (Cause.NoSuchElementError "empty")) },
+    [task { from_result (Err (Cause.NoSuchElementError "empty")) },
       task { from_result (Err (Cause.IllegalArgumentError "negative")) },
       task { from_result (Err (Cause.UnknownError "foreign")) },
-      task { timeout 1 (task { Effect.never () }) } ]
+      task { timeout 1 (task { Effect.never () }) }]
   Platform.stdout_line ("errors: " ++ show (List.map_effect handled raised))
 
 /// `Failure.rethrow` fails with the whole cause again.
 rethrown : Unit ->{} Unit
 let rethrown () =
-  let again : Exit {Boom} Unit = Effect.exit (task { Failure.rethrow (Cause.combine (Cause.die "x") failed) })
+  let again : Exit {Boom} Unit =
+    Effect.exit (task { Failure.rethrow (Cause.combine (Cause.die "x") failed) })
   Platform.stdout_line ("rethrow: " ++ show (Option.map flags (Exit.failure again)))
 
 main : Unit ->{; AppError} Unit

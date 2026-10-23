@@ -38,7 +38,7 @@ let main () =
         (
           Stream.catch_if (fun (Boom n) -> n == 3) (fun _ -> Stream.succeed 0) failing
         ) with | Boom _ ->
-        [])
+        []),
     )
   let filtered : Stream.Stream none {Bang} Number =
     Stream.catch_filter
@@ -52,19 +52,19 @@ let main () =
       (Stream.run_collect
         (Stream.catch_cause
           (fun failure -> Stream.succeed (if is_boom failure then 1 else 0))
-          failing))
+          failing)),
     )
   line
     (
       "catch_cause on a defect",
-      (Stream.run_collect (Stream.catch_cause (fun _ -> Stream.succeed 7) dying))
+      (Stream.run_collect (Stream.catch_cause (fun _ -> Stream.succeed 7) dying)),
     )
   line
     (
       "catch_cause_if",
       (try Stream.run_collect
         (Stream.catch_cause_if is_boom (fun _ -> Stream.succeed 5) failing) with | Boom _ ->
-        [])
+        []),
     )
   let selected : Stream.Stream none {Boom} Number =
     Stream.catch_cause_filter
@@ -91,12 +91,12 @@ let main () =
   line
     (
       "or_else_if_empty",
-      (Stream.run_collect (Stream.or_else_if_empty (Stream.succeed 9) Stream.empty))
+      (Stream.run_collect (Stream.or_else_if_empty (Stream.succeed 9) Stream.empty)),
     )
   line
     (
       "or_else_if_empty full",
-      (Stream.run_collect (Stream.or_else_if_empty (Stream.succeed 9) (Stream.succeed 1)))
+      (Stream.run_collect (Stream.or_else_if_empty (Stream.succeed 9) (Stream.succeed 1))),
     )
   line
     ("or_else_succeed", (Stream.run_collect (Stream.or_else_succeed (fun (Boom n) -> n) failing)))

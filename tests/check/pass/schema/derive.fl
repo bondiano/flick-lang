@@ -6,8 +6,8 @@ refined type Email = String where Checks.email
   deriving Eq, Hash, Schema
 
 type alias Profile = {
-  email : Email
-  nickname : Option String
+  email : Email;
+  nickname : Option String;
 } deriving Schema
 
 profile_schema : Schema Profile
@@ -17,8 +17,8 @@ let profile_schema =
 profile_json : PureCodec Json Profile
 let profile_json =
   codec profile_schema {
-    email = field "email_address" Email.json
-    nickname = field "nickname" (option_as_null String.json)
+    email = field "email_address" Email.json;
+    nickname = field "nickname" (option_as_null String.json);
   }
 
 parse_profile : Unknown -> Result SchemaError Profile
@@ -26,17 +26,17 @@ let parse_profile input =
   Codec.decode_result profile_json input
 
 type alias Preferences = {
-  nickname : Option String
-  quota : Number
+  nickname : Option String;
+  quota : Number;
 } deriving Schema
 
 preferences_json : PureCodec Json Preferences
 let preferences_json =
   codec (schema Preferences) {
-    nickname = optional_field "nickname" String.json
+    nickname = optional_field "nickname" String.json;
     quota =
       field "quota" Number.json_finite
-      |> on_missing (fun () -> 0)
+      |> on_missing (fun () -> 0);
   }
 
 type Tree a =
@@ -49,8 +49,8 @@ let tree_schema item_schema =
   schema Tree item_schema
 
 type alias PairOf f = {
-  count : f Number
-  label : f String
+  count : f Number;
+  label : f String;
 } deriving Schema
 
 pair_of_schema :

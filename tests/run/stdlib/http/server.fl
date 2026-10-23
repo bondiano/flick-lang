@@ -233,7 +233,7 @@ let serve_all dir =
               Http.Router.route (Some Http.Method.POST) "/upload-one" upload_one,
               Http.Router.route (Some Http.Method.GET) "/slow" (slow started),
               Http.Router.route (Some Http.Method.GET) "/file" (file (dir ++ "/page.txt")),
-              static_route
+              static_route,
             ]
         let options : Http.Server.ServeOptions =
           { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = Some (ms 2000) }

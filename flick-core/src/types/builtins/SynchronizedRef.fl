@@ -45,7 +45,8 @@ foreign effect get_and_update_some from "@flick-lang/runtime/effect/Synchronized
   reviewed "effect@4.0.5 sha256:b3a34d6055e99516"
 
 /// `get_and_update_effect` where `f` may keep the value with `None`.
-get_and_update_some_effect : forall c r e a. (a ->{r; e} Option a)^c -> (SynchronizedRef a ->{r; e} a)^c
+get_and_update_some_effect : forall c r e a. (a ->{r; e} Option a)^c ->
+  (SynchronizedRef a ->{r; e} a)^c
 foreign effect get_and_update_some_effect from "@flick-lang/runtime/effect/SynchronizedRef" "getAndUpdateSomeEffect"
   arity 1
   retention call
@@ -74,7 +75,8 @@ foreign effect modify_some from "@flick-lang/runtime/effect/SynchronizedRef" "mo
   reviewed "effect@4.0.5 sha256:21dcc2894a2cc5d1"
 
 /// `modify_effect` where `f` may keep the value with `None`.
-modify_some_effect : forall c r e a b. (a ->{r; e} (b, Option a))^c -> (SynchronizedRef a ->{r; e} b)^c
+modify_some_effect : forall c r e a b. (a ->{r; e} (b, Option a))^c ->
+  (SynchronizedRef a ->{r; e} b)^c
 foreign effect modify_some_effect from "@flick-lang/runtime/effect/SynchronizedRef" "modifySomeEffect"
   arity 1
   retention call
@@ -142,7 +144,8 @@ foreign effect update_some_and_get from "@flick-lang/runtime/effect/Synchronized
   reviewed "effect@4.0.5 sha256:d3b291762bab8982"
 
 /// `update_some_effect`, giving the value after.
-update_some_and_get_effect : forall c r e a. (a ->{r; e} Option a)^c -> (SynchronizedRef a ->{r; e} a)^c
+update_some_and_get_effect : forall c r e a. (a ->{r; e} Option a)^c ->
+  (SynchronizedRef a ->{r; e} a)^c
 foreign effect update_some_and_get_effect from "@flick-lang/runtime/effect/SynchronizedRef" "updateSomeAndGetEffect"
   arity 1
   retention call

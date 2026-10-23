@@ -110,4 +110,3 @@ foreign effect schema_headers from "@flick-lang/runtime/effect/http/HttpClientRe
 instance Show ClientResponse =
   show : ClientResponse -> String
   let show x = "ClientResponse " ++ show (status x) ++ " " ++ show (headers x)
-

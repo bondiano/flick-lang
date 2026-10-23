@@ -10,7 +10,7 @@ let trace label n =
 pair : Number -> Number -> Number
 let pair a b = a * 10 + b
 
-main : Unit ->{none; AppError} Unit
+main : Unit ->{; AppError} Unit
 let main () =
   let (x, y) = (trace "t1" 1, trace "t2" 2)
   let r = { b = trace "rb" 3; a = trace "ra" 4 }

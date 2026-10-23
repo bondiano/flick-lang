@@ -30,7 +30,7 @@ type alias Attributes =
     httpOnly : Bool;
     secure : Bool;
     partitioned : Bool;
-    sameSite : Option SameSite
+    sameSite : Option SameSite;
   }
 
 /// No attribute set: `{ Http.Cookies.attributes with secure = true }`.
@@ -45,7 +45,7 @@ let attributes =
     httpOnly = false;
     secure = false;
     partitioned = false;
-    sameSite = None
+    sameSite = None;
   }
 
 /// What a header cannot carry.

@@ -46,19 +46,37 @@ let defects f =
 
 catching : Unit ->{} Unit
 let catching () =
-  Platform.stdout_line ("catch_cause: " ++ show (List.map_effect (fun t -> Effect.catch_cause (fun f -> flags f) t) [boom, broken, fine]))
+  Platform.stdout_line
+    ("catch_cause: "
+      ++ show
+        (List.map_effect (fun t -> Effect.catch_cause (fun f -> flags f) t) [boom, broken, fine]))
   only_dies : Eff none {Boom} String ->{; Boom} String
   let only_dies = Effect.catch_cause_if Cause.has_dies (fun f -> "recovered " ++ flags f)
-  Platform.stdout_line ("catch_cause_if: " ++ show (List.map_effect (fun t -> ended (task { only_dies t })) [boom, broken, fine]))
+  Platform.stdout_line
+    ("catch_cause_if: "
+      ++ show (List.map_effect (fun t -> ended (task { only_dies t })) [boom, broken, fine]))
   filtered : Eff none {Boom} String ->{; Boom} String
   let filtered = Effect.catch_cause_filter defects (fun d f -> "defect " ++ d ++ " " ++ flags f)
-  Platform.stdout_line ("catch_cause_filter: " ++ show (List.map_effect (fun t -> ended (task { filtered t })) [boom, broken, fine]))
-  Platform.stdout_line ("catch_defect: " ++ show (List.map_effect (fun t -> ended (task { Effect.catch_defect (fun d -> "caught " ++ d) t })) [boom, broken, fine]))
+  Platform.stdout_line
+    ("catch_cause_filter: "
+      ++ show (List.map_effect (fun t -> ended (task { filtered t })) [boom, broken, fine]))
+  Platform.stdout_line
+    ("catch_defect: "
+      ++ show
+        (List.map_effect
+          (fun t -> ended (task { Effect.catch_defect (fun d -> "caught " ++ d) t }))
+          [boom, broken, fine]))
   let seen = Ref.make []
   note : String ->{} Unit
   let note s = Ref.update seen (fun xs -> xs ++ [s])
-  let _ = List.map_effect (fun t -> ended (task { Effect.tap_cause (fun f -> note ("cause " ++ flags f)) t })) [boom, fine]
-  let _ = List.map_effect (fun t -> ended (task { Effect.tap_cause_if Cause.has_dies (fun f -> note "if dies") t })) [boom, broken]
+  let _ =
+    List.map_effect
+      (fun t -> ended (task { Effect.tap_cause (fun f -> note ("cause " ++ flags f)) t }))
+      [boom, fine]
+  let _ =
+    List.map_effect
+      (fun t -> ended (task { Effect.tap_cause_if Cause.has_dies (fun f -> note "if dies") t }))
+      [boom, broken]
   let _ = ended (task { Effect.tap_cause_filter defects (fun d f -> note ("filter " ++ d)) broken })
   let _ = ended (task { Effect.tap_defect (fun d -> note ("defect " ++ d)) broken })
   Platform.stdout_line ("tap: " ++ show (Ref.get seen))
@@ -69,17 +87,21 @@ let catching () =
   let eager t = Effect.match_cause_eager (fun f -> "failure " ++ flags f) (fun v -> "value " ++ v) t
   Platform.stdout_line ("match_cause_eager: " ++ show (List.map_effect eager [boom, fine]))
   effectful : Eff none {Boom} String ->{} String
-  let effectful t = Effect.match_cause_effect (fun f -> "failure " ++ flags f) (fun v -> "value " ++ v) t
+  let effectful t =
+    Effect.match_cause_effect (fun f -> "failure " ++ flags f) (fun v -> "value " ++ v) t
   Platform.stdout_line ("match_cause_effect: " ++ show (List.map_effect effectful [boom, fine]))
   effectful_eager : Eff none {Boom} String ->{} String
-  let effectful_eager t = Effect.match_cause_effect_eager (fun f -> "failure " ++ flags f) (fun v -> "value " ++ v) t
-  Platform.stdout_line ("match_cause_effect_eager: " ++ show (List.map_effect effectful_eager [broken, fine]))
+  let effectful_eager t =
+    Effect.match_cause_effect_eager (fun f -> "failure " ++ flags f) (fun v -> "value " ++ v) t
+  Platform.stdout_line
+    ("match_cause_effect_eager: " ++ show (List.map_effect effectful_eager [broken, fine]))
   Platform.stdout_line ("or_die: " ++ ended (task { Effect.or_die boom }))
   Effect.ignore_ None boom
   Effect.ignore_ (Some LogLevel.debug) boom
   Effect.ignore_cause None broken
   Platform.stdout_line ("ignore: " ++ "done")
-  Platform.stdout_line ("with_error_reporting: " ++ outcome (task { Effect.with_error_reporting true boom }))
+  Platform.stdout_line
+    ("with_error_reporting: " ++ outcome (task { Effect.with_error_reporting true boom }))
 
 finalizers : Unit ->{} Unit
 let finalizers () =
@@ -90,13 +112,33 @@ let finalizers () =
   let _ = ended (task { Effect.on_error (fun f -> note ("on_error " ++ flags f)) boom })
   let _ = ended (task { Effect.on_error (fun f -> note "on_error fine") fine })
   let _ = ended (task { Effect.on_error_if Cause.has_dies (fun f -> note "on_error_if") broken })
-  let _ = ended (task { Effect.on_error_filter defects (fun d f -> note ("on_error_filter " ++ d)) broken })
-  let _ = ended (task { Effect.on_exit (fun x -> note ("on_exit " ++ show (Exit.is_success x))) fine })
+  let _ =
+    ended
+      (task { Effect.on_error_filter defects (fun d f -> note ("on_error_filter " ++ d)) broken })
+  let _ =
+    ended (task { Effect.on_exit (fun x -> note ("on_exit " ++ show (Exit.is_success x))) fine })
   let _ = ended (task { Effect.on_exit_if Exit.is_failure (fun x -> note "on_exit_if") boom })
-  let _ = ended (task { Effect.on_exit_filter Exit.filter_value (fun v x -> note ("on_exit_filter " ++ v)) fine })
-  let _ = ended (task { Effect.on_exit_primitive false (fun x -> if Exit.is_success x then Some (task { note "primitive" }) else None) fine })
+  let _ =
+    ended
+      (task {
+        Effect.on_exit_filter Exit.filter_value (fun v x -> note ("on_exit_filter " ++ v)) fine
+      })
+  let _ =
+    ended
+      (task {
+        Effect.on_exit_primitive
+          false
+          (fun x -> if Exit.is_success x then Some (task { note "primitive" }) else None)
+          fine
+      })
   let _ = ended (task { Effect.on_exit_primitive false (fun x -> None) boom })
-  let _ = ended (task { Effect.on_interrupt (fun ids -> note ("on_interrupt " ++ show (List.length ids >= 0))) (task { Effect.interrupt () }) })
+  let _ =
+    ended
+      (task {
+        Effect.on_interrupt
+          (fun ids -> note ("on_interrupt " ++ show (List.length ids >= 0)))
+          (task { Effect.interrupt () })
+      })
   scope {
     Effect.add_finalizer (fun cause -> note ("finalizer " ++ show (Option.is_some cause)))
     note "scope body"
@@ -122,7 +164,10 @@ let interruption () =
   Platform.stdout_line ("uninterruptible_mask: " ++ masked)
   let unmasked = Effect.interruptible_mask (fun restore -> await (restore (task { "free" })))
   Platform.stdout_line ("interruptible_mask: " ++ unmasked)
-  let freed : Option String = timeout_option 1 (task { Effect.uninterruptible (task { Effect.interruptible (task { Effect.never () }) }) })
+  let freed : Option String =
+    timeout_option
+      1
+      (task { Effect.uninterruptible (task { Effect.interruptible (task { Effect.never () }) }) })
   Platform.stdout_line ("interruptible: " ++ show freed)
 
 main : Unit ->{; AppError} Unit

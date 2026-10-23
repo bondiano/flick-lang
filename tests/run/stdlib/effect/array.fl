@@ -24,7 +24,7 @@ let main () =
         List.take_right 3 xs,
         List.drop_right 5 xs,
         List.take_while (fun n -> n < 5) xs,
-        List.drop_while (fun n -> n < 5) xs
+        List.drop_while (fun n -> n < 5) xs,
       ))
   line
     "filters"
@@ -32,7 +32,7 @@ let main () =
       (
         List.take_while_filter half [2, 4, 5, 6],
         List.drop_while_filter half [2, 4, 5, 6],
-        List.filter_map_while half [2, 4, 5, 6]
+        List.filter_map_while half [2, 4, 5, 6],
       ))
   line
     "split"
@@ -41,7 +41,7 @@ let main () =
         List.span even [2, 4, 5, 6],
         List.split_at 2 xs,
         List.split 3 xs,
-        List.split_where (fun n -> n > 4) xs
+        List.split_where (fun n -> n > 4) xs,
       ))
   line "chunks" (show (List.chunks_of 3 xs, List.window 3 [1, 2, 3, 4]))
   line "chop" (show (List.chop (fun ne -> (NonEmpty.head ne * 10, NonEmpty.tail ne)) [1, 2, 3]))
@@ -57,7 +57,7 @@ let main () =
       (
         List.modify 1 (fun n -> n * 100) [1, 2, 3],
         List.replace 9 0 [1],
-        List.intersperse 0 [1, 2, 3]
+        List.intersperse 0 [1, 2, 3],
       ))
   line
     "append"
@@ -66,7 +66,7 @@ let main () =
         List.append_all [3, 4] [1, 2],
         List.append [1, 2] [3, 4],
         List.is_empty nothing,
-        List.length xs
+        List.length xs,
       ))
   line
     "find"
@@ -76,7 +76,7 @@ let main () =
         List.find_index even xs,
         List.find_last even xs,
         List.find_last_index even xs,
-        List.find_first_with_index even xs
+        List.find_first_with_index even xs,
       ))
   line
     "count"
@@ -89,7 +89,7 @@ let main () =
         List.dedupe xs,
         List.dedupe_with (fun a b -> even a == even b) xs,
         List.dedupe_adjacent [1, 1, 2, 1],
-        List.dedupe_adjacent_with (fun a b -> even a == even b) [1, 3, 2, 4, 5]
+        List.dedupe_adjacent_with (fun a b -> even a == even b) [1, 3, 2, 4, 5],
       ))
   line
     "sets"
@@ -98,7 +98,7 @@ let main () =
         List.difference [1, 2] [1, 2, 3],
         List.difference_with (fun a b -> a == b * 10) [1] [10, 20],
         List.intersection [2, 3, 4] [1, 2, 3],
-        List.intersection_with (fun a b -> a == b) [3] [1, 3]
+        List.intersection_with (fun a b -> a == b) [3] [1, 3],
       ))
   line
     "union"
@@ -108,7 +108,7 @@ let main () =
     (show
       (
         List.group [1, 1, 2, 2, 2, 1],
-        List.group_with (fun a b -> even a == even b) [2, 4, 1, 3, 6]
+        List.group_with (fun a b -> even a == even b) [2, 4, 1, 3, 6],
       ))
   line "group_by" (show (List.group_by (fun n -> if even n then "even" else "odd") xs))
   line
@@ -123,7 +123,7 @@ let main () =
       (
         List.zip [1, 2, 3] ["a", "b"],
         List.zip_with [10, 20] (fun a b -> a * b) [1, 2, 3],
-        List.unzip [(1, "a"), (2, "b")]
+        List.unzip [(1, "a"), (2, "b")],
       ))
   line "map_accum" (show (List.map_accum 0 (fun s x -> (s + x, s)) [1, 2, 3]))
   line
@@ -140,7 +140,7 @@ let main () =
         List.get_somes [Some 1, None, Some 3],
         List.get_failures [half 1, half 2],
         List.get_successes [half 1, half 2],
-        List.separate [half 1, half 2, half 3]
+        List.separate [half 1, half 2, half 3],
       ))
   line "partition" (show (List.partition_map half [1, 2, 3, 4], List.partition even xs))
   line "unfold" (show (List.unfold 1 (fun n -> if n > 20 then None else Some (n, n * 2))))
@@ -150,7 +150,7 @@ let main () =
       (
         List.lift_option (fun n -> if n > 0 then Some n else None) 3,
         List.lift_predicate even 3,
-        List.lift_result half 4
+        List.lift_result half 4,
       ))
   line
     "sort"
@@ -158,7 +158,7 @@ let main () =
       (
         List.sort xs,
         List.sort_with (fun s -> String.length s) ["ccc", "a", "bb"],
-        List.sort_by (fun a b -> compare b a) [1, 3, 2]
+        List.sort_by (fun a b -> compare b a) [1, 3, 2],
       ))
   line
     "repeat"
@@ -167,7 +167,7 @@ let main () =
         List.repeat_all 2 [1, 2],
         List.repeat 3 "x",
         List.initialize 3 (fun i -> i * i),
-        List.singleton 1
+        List.singleton 1,
       ))
   matched : List Number -> String
   let matched =
@@ -187,7 +187,7 @@ let main () =
         List.map (fun n -> n + 1) [1, 2],
         List.filter even xs,
         List.filter_map (fun n -> if even n then Some n else None) xs,
-        List.flat_map (fun n -> [n, n]) [1, 2]
+        List.flat_map (fun n -> [n, n]) [1, 2],
       ))
   line
     "fold"
@@ -196,7 +196,7 @@ let main () =
         List.fold_left (fun s x -> s - x) 0 [1, 2, 3],
         List.fold_right (fun x s -> s - x) 0 [1, 2, 3],
         List.concat [[1], [2, 3]],
-        List.reverse [1, 2, 3]
+        List.reverse [1, 2, 3],
       ))
   line
     "access"
@@ -207,7 +207,7 @@ let main () =
         List.last xs,
         List.head nothing,
         List.drop 6 xs,
-        List.take 2 xs
+        List.take 2 xs,
       ))
   line "quantifiers" (show (List.all even xs, List.any even xs))
   List.each_effect (fun n -> Platform.stdout_line ("each " ++ show n)) [1, 2]
@@ -220,7 +220,7 @@ let main () =
         NonEmpty.make_by 3 (fun i -> i * 2),
         NonEmpty.range 2 5,
         NonEmpty.range 3 1,
-        NonEmpty.replicate 2 "y"
+        NonEmpty.replicate 2 "y",
       ))
   line
     "ne ends"
@@ -230,7 +230,7 @@ let main () =
         NonEmpty.last ne,
         NonEmpty.tail ne,
         NonEmpty.init ne,
-        NonEmpty.singleton 0
+        NonEmpty.singleton 0,
       ))
   line
     "ne edit"
@@ -239,7 +239,7 @@ let main () =
         NonEmpty.modify_head (fun n -> n * 2) ne,
         NonEmpty.set_head 0 ne,
         NonEmpty.modify_last (fun n -> n * 2) ne,
-        NonEmpty.set_last 0 ne
+        NonEmpty.set_last 0 ne,
       ))
   line
     "ne split"
@@ -250,7 +250,7 @@ let main () =
     (show
       (
         NonEmpty.group (NonEmpty.cons 1 [1, 2]),
-        NonEmpty.group_with (fun a b -> even a == even b) (NonEmpty.cons 1 [3, 2])
+        NonEmpty.group_with (fun a b -> even a == even b) (NonEmpty.cons 1 [3, 2]),
       ))
   line
     "ne order"

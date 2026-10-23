@@ -449,7 +449,7 @@ throttle :
     units : Number;
     duration : Duration.Duration;
     burst : Option Number;
-    strategy : Option ThrottleStrategy
+    strategy : Option ThrottleStrategy;
   } ->
   (Stream r e a)^c ->
   (Stream r e a)^c
@@ -466,7 +466,7 @@ throttle_effect :
     units : Number;
     duration : Duration.Duration;
     burst : Option Number;
-    strategy : Option ThrottleStrategy
+    strategy : Option ThrottleStrategy;
   } ->
   (Stream r e a)^c ->
   (Stream (r + r2) (e + e2) a)^c

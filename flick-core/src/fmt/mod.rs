@@ -1,7 +1,8 @@
 //! `flick fmt`: rewrites whitespace only — tokens, comments and their order are
 //! kept, so the AST cannot change, except that empty rows of an arrow are
 //! dropped: `->{none; E}` becomes `->{; E}` and `->{none; none}` becomes
-//! `->{}`. Indentation is renormalized to two spaces per level while
+//! `->{}`, and a list broken across lines gets a trailing separator.
+//! Indentation is renormalized to two spaces per level while
 //! preserving how each line's column compares with the columns before it (that comparison is what layout means), spacing inside a
 //! line follows fixed rules, and blank-line runs collapse to one. The result is
 //! re-parsed and compared with the input AST before it is returned.
@@ -12,6 +13,7 @@ use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::{ast, parse};
 
+mod trailing;
 mod wrap;
 
 /// Formats a file; syntax errors are returned instead of output.
@@ -26,8 +28,20 @@ pub fn format(text: &str, file: FileId) -> Result<String, Vec<Diagnostic>> {
         let again = parse(out, file);
         again.diagnostics.is_empty() && ast::lower(&again.tree, out) == expected
     };
-    let lines = layout(text, &flatten(&parsed.tree));
-    let out = wrap::wrap_long_lines(text, &lines, same_program);
+    let pass = |text: &str, tree: &Node| {
+        let toks = flatten(tree);
+        wrap::wrap_long_lines(text, &layout(text, &toks), same_program)
+    };
+    let mut out = pass(text, &parsed.tree);
+    // a trailing separator may push a line past the width, and wrapping may
+    // break another list; a few passes reach the fixed point
+    for _ in 0..3 {
+        let tree = parse(&out, file).tree;
+        let Some(next) = trailing::add(&out, &tree, same_program) else {
+            break;
+        };
+        out = pass(&next, &parse(&next, file).tree);
+    }
     if !same_program(&out) {
         return Err(vec![Diagnostic::new(
             codes::P003,

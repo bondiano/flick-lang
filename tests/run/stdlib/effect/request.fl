@@ -74,7 +74,7 @@ let with_options =
     collectWhile = fun entries -> List.length entries < 10;
     runAll = fun entries key ->
       Platform.stdout_line ("key " ++ show key ++ " batch of " ++ show (NonEmpty.length entries))
-      List.each_effect answer (NonEmpty.to_list entries)
+      List.each_effect answer (NonEmpty.to_list entries);
   }
 
 by_parity : RequestResolver Query {NotFound} String
@@ -82,8 +82,9 @@ let by_parity =
   RequestResolver.make_grouped {
     key = fun entry -> id_of entry < 3;
     resolver = fun entries small ->
-      Platform.stdout_line ("small " ++ show small ++ " batch of " ++ show (NonEmpty.length entries))
-      List.each_effect answer (NonEmpty.to_list entries)
+      Platform.stdout_line
+        ("small " ++ show small ++ " batch of " ++ show (NonEmpty.length entries))
+      List.each_effect answer (NonEmpty.to_list entries);
   }
 
 trace_options : Tracer.SpanOptions
@@ -97,7 +98,7 @@ let trace_options =
     sampled = None;
     level = None;
     captureStackTrace = false;
-    disablePropagation = false
+    disablePropagation = false;
   }
 
 twice : (c ->{; e} String) -> c ->{; e} String
@@ -110,18 +111,23 @@ let main () =
   Platform.stdout_line ("complete " ++ run_all completing [1, 2, 3])
   Platform.stdout_line ("make_with " ++ run_all with_options [1, 2, 3])
   Platform.stdout_line ("make_grouped " ++ run_all by_parity [1, 2, 3])
-  Platform.stdout_line ("grouped " ++ run_all (RequestResolver.grouped (fun e -> id_of e < 2) batched) [1, 2, 3])
+  Platform.stdout_line
+    ("grouped " ++ run_all (RequestResolver.grouped (fun e -> id_of e < 2) batched) [1, 2, 3])
   Platform.stdout_line ("batch_n " ++ run_all (RequestResolver.batch_n 2 batched) [1, 2, 3])
   let one_by_one : RequestResolver Query {NotFound} String =
     RequestResolver.from_function (fun e -> "fn" ++ show (id_of e))
   Platform.stdout_line ("from_function " ++ run_all one_by_one [1, 2])
-  let lists = RequestResolver.from_function_batched (fun es -> List.map (fun e -> "b" ++ show (id_of e)) (NonEmpty.to_list es))
+  let lists =
+    RequestResolver.from_function_batched
+      (fun es -> List.map (fun e -> "b" ++ show (id_of e)) (NonEmpty.to_list es))
   Platform.stdout_line ("from_function_batched " ++ run_all lists [1, 2])
   let effects = RequestResolver.from_effect (fun e -> lookup (id_of e))
   Platform.stdout_line ("from_effect " ++ run_all effects [1, 11])
-  let delayed = batched |> RequestResolver.set_delay (Result.with_default Duration.zero (Duration.millis 1))
+  let delayed =
+    batched |> RequestResolver.set_delay (Result.with_default Duration.zero (Duration.millis 1))
   Platform.stdout_line ("set_delay " ++ run_all delayed [4, 5])
-  let delayed_effect = batched |> RequestResolver.set_delay_effect (task { Platform.stdout_line "delay ran" })
+  let delayed_effect =
+    batched |> RequestResolver.set_delay_effect (task { Platform.stdout_line "delay ran" })
   Platform.stdout_line ("set_delay_effect " ++ run_all delayed_effect [6])
   let wrapped =
     RequestResolver.around
@@ -133,8 +139,10 @@ let main () =
   let never : RequestResolver Query none String = RequestResolver.never
   let stuck = timeout_option 5 (task { Request.run never (Request.of (UserName 1)) })
   Platform.stdout_line ("never " ++ show (Option.is_none stuck))
-  Platform.stdout_line ("with_span " ++ run_all (RequestResolver.with_span "users" trace_options batched) [1])
-  let cached = RequestResolver.with_cache { capacity = 10; strategy = Some RequestResolver.lru } batched
+  Platform.stdout_line
+    ("with_span " ++ run_all (RequestResolver.with_span "users" trace_options batched) [1])
+  let cached =
+    RequestResolver.with_cache { capacity = 10; strategy = Some RequestResolver.lru } batched
   Platform.stdout_line ("with_cache " ++ run_all cached [1])
   Platform.stdout_line ("with_cache again " ++ run_all cached [1])
   let _ = RequestResolver.fifo

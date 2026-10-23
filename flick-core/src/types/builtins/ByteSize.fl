@@ -19,7 +19,7 @@ type alias FormatOptions =
     precision : Option Number;
     trailingZeros : Option Bool;
     binary : Bool;
-    unit : Option ByteUnit
+    unit : Option ByteUnit;
   }
 
 /// The options of `format` that pick the largest fitting binary unit.

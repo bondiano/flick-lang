@@ -74,7 +74,8 @@ let sets () =
     let _ = FiberSet.run run_options (after ms1 "two") set
     Platform.stdout_line ("set size: " ++ show (FiberSet.size set))
     FiberSet.await_empty set
-    Platform.stdout_line ("set empty: " ++ show (FiberSet.size set) ++ " " ++ ended (Fiber.await_ one))
+    Platform.stdout_line
+      ("set empty: " ++ show (FiberSet.size set) ++ " " ++ ended (Fiber.await_ one))
     let other = Fiber.spawn s quiet (after ms50 "added")
     FiberSet.add false other set
     FiberSet.clear set
@@ -87,13 +88,15 @@ let sets () =
     | Boom n -> "join failed with Boom " ++ show n
   }
   Platform.stdout_line ("set join: " ++ joined)
-  let map_options = { onlyIfMissing = false; propagateInterruption = false; startImmediately = false }
+  let map_options =
+    { onlyIfMissing = false; propagateInterruption = false; startImmediately = false }
   scope s {
     let map : FiberMap.FiberMap s String {Boom} String = FiberMap.make ()
     let first = FiberMap.run map_options "k" (after ms50 "first") map
     let _ = FiberMap.run map_options "k" (after ms1 "second") map
     Platform.stdout_line ("map replaced: " ++ ended (Fiber.await_ first))
-    Platform.stdout_line ("map has: " ++ show (FiberMap.has "k" map, FiberMap.has "x" map, FiberMap.size map))
+    Platform.stdout_line
+      ("map has: " ++ show (FiberMap.has "k" map, FiberMap.has "x" map, FiberMap.size map))
     Platform.stdout_line ("map get: " ++ show (Option.is_some (FiberMap.get "k" map)))
     let kept = Fiber.spawn s quiet (after ms50 "kept")
     FiberMap.set { onlyIfMissing = false; propagateInterruption = false } "j" kept map
@@ -126,8 +129,12 @@ let sets () =
 
 races : Unit ->{; Boom} Unit
 let races () =
-  Platform.stdout_line ("race_all: " ++ show (Effect.race_all [after ms20 "slow", after ms1 "fast"]))
-  let first = try Effect.race_all_first [after ms20 "slow", task { from_result (Err (Boom 6)) }] with | Boom n -> "Boom " ++ show n
+  Platform.stdout_line
+    ("race_all: " ++ show (Effect.race_all [after ms20 "slow", after ms1 "fast"]))
+  let first =
+    try Effect.race_all_first
+      [after ms20 "slow", task { from_result (Err (Boom 6)) }] with | Boom n ->
+      "Boom " ++ show n
   Platform.stdout_line ("race_all_first: " ++ first)
   Platform.stdout_line ("fiber_id: " ++ show (Effect.fiber_id () >= 0))
   let runs = Ref.make 0
@@ -150,17 +157,26 @@ let scheduling () =
   let used : Scheduler.Scheduler = Scheduler.with_scheduler mine (task { Scheduler.current () })
   Platform.stdout_line ("with_scheduler: " ++ show (Scheduler.max_ops_before_yield () > 0))
   let _ = used
-  Platform.stdout_line ("with_max_ops_before_yield: " ++ show (Scheduler.with_max_ops_before_yield 5 (task { Scheduler.max_ops_before_yield () })))
-  Platform.stdout_line ("with_prevent_scheduler_yield: " ++ show (Scheduler.with_prevent_scheduler_yield true (task { 1 + 1 })))
+  Platform.stdout_line
+    ("with_max_ops_before_yield: "
+      ++ show (Scheduler.with_max_ops_before_yield 5 (task { Scheduler.max_ops_before_yield () })))
+  Platform.stdout_line
+    ("with_prevent_scheduler_yield: "
+      ++ show (Scheduler.with_prevent_scheduler_yield true (task { 1 + 1 })))
 
 plans : Unit ->{; Boom} Unit
 let plans () =
   let english = Layer.succeed Greeter { greet = fun n -> "hello " ++ n }
   let failing = Layer.succeed Greeter { greet = fun n -> "" }
   let first : ExecutionPlan.ExecutionPlan {Greeter} none none (Errors {Boom}) =
-    ExecutionPlan.make (NonEmpty.singleton (ExecutionPlan.with_attempts 2 (ExecutionPlan.step failing)))
+    ExecutionPlan.make
+      (NonEmpty.singleton (ExecutionPlan.with_attempts 2 (ExecutionPlan.step failing)))
   let second =
-    ExecutionPlan.make (NonEmpty.singleton (ExecutionPlan.with_while (fun _ -> true) (ExecutionPlan.with_schedule Schedule.forever (ExecutionPlan.step english))))
+    ExecutionPlan.make
+      (NonEmpty.singleton
+        (ExecutionPlan.with_while
+          (fun _ -> true)
+          (ExecutionPlan.with_schedule Schedule.forever (ExecutionPlan.step english))))
   let plan = ExecutionPlan.merge (NonEmpty.cons first [second])
   let events = Ref.make []
   record : ExecutionPlan.Event {Boom} ->{} Unit
@@ -173,7 +189,10 @@ let plans () =
   let greeted = Effect.with_execution_plan plan record (task {
     let meta : ExecutionPlan.Metadata = ExecutionPlan.current_metadata ()
     let text = Greeter.greet "ada"
-    if text == "" then from_result (Err (Boom meta.attempt)) else text ++ " at " ++ show meta.attempt
+    if text == "" then
+      from_result (Err (Boom meta.attempt))
+    else
+      text ++ " at " ++ show meta.attempt
   })
   Platform.stdout_line ("with_execution_plan: " ++ greeted)
   Platform.stdout_line ("events: " ++ show (Ref.get events))

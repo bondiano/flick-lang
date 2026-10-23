@@ -68,13 +68,13 @@ let login =
 
 type alias Handlers r =
   {
-    bytes : HttpApi.Request Unit Unit Unit (List Number) ->{r;} List Number
-    form : HttpApi.Request Unit Unit Unit Note ->{r;} String
-    parts : HttpApi.Request Unit Unit Unit Parts ->{r; MultipartError} String
-    chunks : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none (List Number)
-    ticks : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none Tick
-    events : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none HttpApi.SseEvent
-    login : HttpApi.Request Unit Unit Unit Unit ->{r;} ((String, Count), Redacted String)
+    bytes : HttpApi.Request Unit Unit Unit (List Number) ->{r;} List Number;
+    form : HttpApi.Request Unit Unit Unit Note ->{r;} String;
+    parts : HttpApi.Request Unit Unit Unit Parts ->{r; MultipartError} String;
+    chunks : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none (List Number);
+    ticks : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none Tick;
+    events : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none HttpApi.SseEvent;
+    login : HttpApi.Request Unit Unit Unit Unit ->{r;} ((String, Count), Redacted String);
   }
 
 api : HttpApi.Api { bodies : Handlers r }
@@ -113,7 +113,7 @@ let upload =
         key = "doc";
         name = "a.txt";
         contentType = "text/plain";
-        content = Stream.from_list_effect text
+        content = Stream.from_list_effect text;
       }
   Stream.from_list_effect
     (task {
@@ -125,16 +125,16 @@ let handlers =
   {
     bodies =
       {
-        bytes = fun request -> List.reverse request.payload
-        form = fun request -> "title " ++ request.payload.title
+        bytes = fun request -> List.reverse request.payload;
+        form = fun request -> "title " ++ request.payload.title;
         parts =
           fun request ->
-            String.join ", " (Stream.run_collect (Stream.map_effect describe request.payload))
-        chunks = fun _ -> Stream.Platform.encode_text (Stream.from_list ["ab", "cd"])
-        ticks = fun _ -> Stream.from_list [{ n = 1 }, { n = 2 }]
-        events = fun _ -> Stream.from_list [{ id = Some "7"; event = "note"; data = "two\nlines" }]
-        login = fun _ -> (("hi", { total = "3" }), Redacted.make "s3cret")
-      }
+            String.join ", " (Stream.run_collect (Stream.map_effect describe request.payload));
+        chunks = fun _ -> Stream.Platform.encode_text (Stream.from_list ["ab", "cd"]);
+        ticks = fun _ -> Stream.from_list [{ n = 1 }, { n = 2 }];
+        events = fun _ -> Stream.from_list [{ id = Some "7"; event = "note"; data = "two\nlines" }];
+        login = fun _ -> (("hi", { total = "3" }), Redacted.make "s3cret");
+      };
   }
 
 empty : HttpApi.Request Unit Unit Unit Unit
@@ -148,7 +148,7 @@ let main () =
       ++ show
         (
           String.contains "text/event-stream" document,
-          String.contains "multipart/form-data" document
+          String.contains "multipart/form-data" document,
         ))
   let options : HttpApi.ServeOptions =
     { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }

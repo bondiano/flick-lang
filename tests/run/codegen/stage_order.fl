@@ -12,7 +12,7 @@ let argument n =
   Platform.stdout_line "argument"
   n
 
-main : Unit ->{none; AppError} Unit
+main : Unit ->{; AppError} Unit
 let main () =
   let result = stage 1 (argument 2)
   Platform.stdout_line (show result)

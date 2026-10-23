@@ -38,7 +38,9 @@ let refs () =
   let builds = Ref.make 0
   scope s {
     let ref : LayerRef.LayerRef s none {Tenant} =
-      LayerRef.make (tenant builds "ref") { idleTimeToLive = Some Duration.infinity; preload = true }
+      LayerRef.make
+        (tenant builds "ref")
+        { idleTimeToLive = Some Duration.infinity; preload = true }
     provide LayerRef.get ref { Platform.stdout_line ("ref " ++ Tenant.name ()) }
     provide LayerRef.get ref { Platform.stdout_line ("ref again " ++ Tenant.name ()) }
     LayerRef.refresh ref
@@ -59,7 +61,11 @@ let reports () =
   scope s {
     let listener =
       Events.listen s (Events.queue 4) supervise (fun (report : ErrorReporter.Report) -> task {
-        Platform.stdout_line ("report " ++ show report.severity ++ " " ++ show (String.contains "reported" report.message))
+        Platform.stdout_line
+          ("report "
+            ++ show report.severity
+            ++ " "
+            ++ show (String.contains "reported" report.message))
         let _ = Deferred.complete_with (task { () }) done
         ()
       })

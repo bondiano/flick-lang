@@ -115,10 +115,10 @@ let view props =
 json : PureCodec Json Profile
 let json =
   codec (schema Profile) {
-    email = field "email" Email.json
+    email = field "email" Email.json;
     nickname =
       optional_field "nickname" String.json
-      |> on_missing (fun () -> None)
+      |> on_missing (fun () -> None);
   }
 
 tree : Schema a -> Schema (Tree a)

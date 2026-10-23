@@ -44,8 +44,8 @@ let held path =
     let file = File.open_scoped path
     Ui.button
       {
-        disabled = false
-        on_click = Ui.Event.exhaust (fun _ -> task { ignore (File.read_all file) })
+        disabled = false;
+        on_click = Ui.Event.exhaust (fun _ -> task { ignore (File.read_all file) });
       }
       []
   }
@@ -55,11 +55,11 @@ mixed : Ui.SelectProps User {Users} {SaveError} c -> (Ui {Users} {SaveError})^c
 let mixed props =
   Ui.select
     {
-      items = props.items
-      selected = props.selected
-      key = props.key
-      render_item = props.render_item
-      on_change = Ui.Event.latest (fun (product : Product) -> task { Users.save product.sku })
+      items = props.items;
+      selected = props.selected;
+      key = props.key;
+      render_item = props.render_item;
+      on_change = Ui.Event.latest (fun (product : Product) -> task { Users.save product.sku });
     }
 //~ FLICK-T003 @62:19-62:95 expected `Handler { id : Number; name : String }
 

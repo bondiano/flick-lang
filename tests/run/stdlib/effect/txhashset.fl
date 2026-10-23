@@ -17,7 +17,14 @@ let main () =
       TxHashSet.add "dan" a
       let removed = TxHashSet.remove "dan" a
       let missing = TxHashSet.remove "zed" a
-      (removed, missing, TxHashSet.has "ann" a, TxHashSet.size a, TxHashSet.is_empty e, TxHashSet.is_non_empty a)
+      (
+        removed,
+        missing,
+        TxHashSet.has "ann" a,
+        TxHashSet.size a,
+        TxHashSet.is_empty e,
+        TxHashSet.is_non_empty a,
+      )
     })
   Platform.stdout_line ("basics: " ++ show basics)
   let algebra = Tx.atomically (task {
@@ -36,7 +43,7 @@ let main () =
         elements short,
         total,
         TxHashSet.some (fun s -> s == "bob") a,
-        TxHashSet.every (fun s -> String.length s == 3) a
+        TxHashSet.every (fun s -> String.length s == 3) a,
       )
     })
   Platform.stdout_line ("map, filter, reduce, some, every: " ++ show derived)
@@ -64,6 +71,10 @@ let main () =
     })
   Platform.stdout_line ("filtered: " ++ show filtered)
   let others = Tx.atomically (task {
-      (TxPriorityQueue.take_all made, TxPriorityQueue.is_non_empty empty, TxPriorityQueue.take_option empty)
+      (
+        TxPriorityQueue.take_all made,
+        TxPriorityQueue.is_non_empty empty,
+        TxPriorityQueue.take_option empty,
+      )
     })
   Platform.stdout_line ("make, empty: " ++ show others)

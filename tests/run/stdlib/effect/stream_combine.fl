@@ -41,7 +41,7 @@ let main () =
         (Stream.flat_map_par
           { concurrency = Some 2; bufferSize = None }
           (fun n -> Stream.make [n, n * 10])
-          nums))
+          nums)),
     )
   line
     (
@@ -50,19 +50,19 @@ let main () =
         (Stream.flat_map_par
           { concurrency = None; bufferSize = Some 4 }
           (fun n -> Stream.succeed n)
-          nums))
+          nums)),
     )
   line
     (
       "switch_map",
-      (Stream.run_collect (Stream.switch_map (fun n -> Stream.succeed n) (Stream.make [1])))
+      (Stream.run_collect (Stream.switch_map (fun n -> Stream.succeed n) (Stream.make [1]))),
     )
   line ("flatten", (Stream.run_collect (Stream.flatten (Stream.make [nums, tens]))))
   line
     (
       "flatten_chunks",
       (Stream.run_collect
-        (Stream.flatten_chunks (Stream.make [NonEmpty.cons 1 [2], NonEmpty.singleton 3])))
+        (Stream.flatten_chunks (Stream.make [NonEmpty.cons 1 [2], NonEmpty.singleton 3]))),
     )
   line ("flatten_list", (Stream.run_collect (Stream.flatten_list (Stream.make [[1], [], [2, 3]]))))
   let side = Ref.make 0
@@ -74,7 +74,7 @@ let main () =
           Stream.concat
             (Stream.succeed 5)
             (Stream.drain (Stream.tap (fun n -> Ref.set side n) nums))
-        ))
+        )),
     )
   line ("drained", [Ref.get side])
   line ("drain_fork", (Stream.run_collect (Stream.drain_fork Stream.never nums)))
@@ -82,7 +82,7 @@ let main () =
   line
     (
       "repeat_elements",
-      (Stream.run_collect (Stream.repeat_elements (Schedule.recurs 1) (Stream.make [1, 2])))
+      (Stream.run_collect (Stream.repeat_elements (Schedule.recurs 1) (Stream.make [1, 2]))),
     )
   line ("forever", (Stream.run_collect (Stream.take 5 (Stream.forever nums))))
   line ("schedule", (Stream.run_collect (Stream.schedule (Schedule.spaced ms1) nums)))
@@ -90,7 +90,7 @@ let main () =
   line
     (
       "timeout_or_else",
-      (Stream.run_collect (Stream.timeout_or_else ms20 tens (Stream.concat Stream.never nums)))
+      (Stream.run_collect (Stream.timeout_or_else ms20 tens (Stream.concat Stream.never nums))),
     )
   line ("merge", (sorted (Stream.merge tens nums)))
   let left : Stream.HaltStrategy = Stream.Left
@@ -106,7 +106,7 @@ let main () =
       ++ show
         (
           List.length (List.filter (fun r -> match r with | Ok _ -> true | Err _ -> false) tagged),
-          List.length tagged
+          List.length tagged,
         ))
   line ("merge_left", (Stream.run_collect (Stream.merge_left tens nums)))
   line ("merge_right", (Stream.run_collect (Stream.merge_right tens nums)))
@@ -118,14 +118,14 @@ let main () =
           Stream.merge_all
             { concurrency = Some 2; bufferSize = None }
             [nums, tens, Stream.succeed 7]
-        ))
+        )),
     )
   pairs ("cross", (Stream.run_collect (Stream.cross (Stream.make [1, 2]) (Stream.make [5, 6]))))
   line
     (
       "cross_with",
       (Stream.run_collect
-        (Stream.cross_with (Stream.make [1, 2]) (fun a b -> a * b) (Stream.make [5, 6])))
+        (Stream.cross_with (Stream.make [1, 2]) (fun a b -> a * b) (Stream.make [5, 6]))),
     )
   pairs ("zip", (Stream.run_collect (Stream.zip tens nums)))
   line ("zip_with", (Stream.run_collect (Stream.zip_with tens (fun a b -> a + b) nums)))
@@ -136,7 +136,7 @@ let main () =
         (
           NonEmpty.singleton (List.sum (NonEmpty.to_list xs) + List.sum (NonEmpty.to_list ys)),
           [],
-          []
+          [],
         ))
       nums
   line ("zip_with_chunks", (Stream.run_collect zipped))
@@ -157,7 +157,7 @@ let main () =
     (
       "zip_latest_with",
       (Stream.run_collect
-        (Stream.zip_latest_with (Stream.succeed 9) (fun a b -> a + b) (Stream.succeed 1)))
+        (Stream.zip_latest_with (Stream.succeed 9) (fun a b -> a + b) (Stream.succeed 1))),
     )
   let latest = Stream.run_collect (Stream.zip_latest_all [Stream.succeed 1, Stream.succeed 2])
   Platform.stdout_line ("zip_latest_all: " ++ show latest)
@@ -170,13 +170,13 @@ let main () =
       (
         Stream.run_collect
           (Stream.interleave_with tens (Stream.make [true, false, false, true]) nums)
-      )
+      ),
     )
   line
     (
       "interrupt_when",
       (Stream.run_collect
-        (Stream.interrupt_when (task { Effect.sleep ms10 }) (Stream.concat Stream.never nums)))
+        (Stream.interrupt_when (task { Effect.sleep ms10 }) (Stream.concat Stream.never nums))),
     )
   let ticking = Stream.schedule (Schedule.spaced ms2) (Stream.forever (Stream.succeed 1))
   Platform.stdout_line

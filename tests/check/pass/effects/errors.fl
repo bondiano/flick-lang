@@ -97,7 +97,7 @@ let conflict id version =
   from_result (Err (Conflict id version))
 
 // an omitted row is empty, so the explicit `none` is the same type
-conflict_again : UserId -> Number ->{none; Conflict} Unit
+conflict_again : UserId -> Number ->{; Conflict} Unit
 let conflict_again id version =
   conflict id version
 

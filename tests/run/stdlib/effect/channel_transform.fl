@@ -71,7 +71,7 @@ let elements () =
         (
           Channel.run_collect
             (Channel.or_else_if_empty (fun _ -> Channel.from_list [7]) Channel.empty),
-          Channel.run_collect (Channel.or_else_if_empty (fun _ -> Channel.from_list [7]) nums)
+          Channel.run_collect (Channel.or_else_if_empty (fun _ -> Channel.from_list [7]) nums),
         ))
   say ("drain: " ++ show (Channel.run_count (Channel.drain nums)))
   let looped = Ref.make []

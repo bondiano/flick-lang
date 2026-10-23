@@ -7,7 +7,8 @@ type alias Tagged = { label : String; size : Number }
   deriving Schema
 
 issues : SchemaError -> String
-let issues (SchemaError found) = "err " ++ String.join "; " (List.map (fun i -> i.path ++ ": " ++ i.message) found)
+let issues (SchemaError found) =
+  "err " ++ String.join "; " (List.map (fun i -> i.path ++ ": " ++ i.message) found)
 
 /// Decodes the JSON text and encodes the value back.
 round : Show a => String -> PureCodec Json a -> String
@@ -66,25 +67,53 @@ let check_input text =
 
 main : Unit ->{; AppError} Unit
 let main () =
-  line "literal" (round "\"v1\"" (Codec.literal "v1") ++ " | " ++ round "\"v2\"" (Codec.literal "v1"))
-  line "literals" (round "\"b\"" (Codec.literals ["a", "b"]) ++ " | " ++ round "\"c\"" (Codec.literals ["a", "b"]))
+  line
+    "literal"
+    (round "\"v1\"" (Codec.literal "v1") ++ " | " ++ round "\"v2\"" (Codec.literal "v1"))
+  line
+    "literals"
+    (
+      round "\"b\"" (Codec.literals ["a", "b"])
+        ++ " | "
+        ++ round "\"c\"" (Codec.literals ["a", "b"])
+    )
   line "entries" (round "{\"x\": 1, \"y\": 2}" (Codec.entries Number.json_finite))
-  line "non_empty_list" (round "[1, 2]" (Codec.non_empty_list Number.json_finite) ++ " | " ++ round "[]" (Codec.non_empty_list Number.json_finite))
-  line "list_ensure" (round "3" (Codec.list_ensure Number.json_finite) ++ " | " ++ round "[3, 4]" (Codec.list_ensure Number.json_finite))
+  line
+    "non_empty_list"
+    (round "[1, 2]" (Codec.non_empty_list Number.json_finite)
+      ++ " | "
+      ++ round "[]" (Codec.non_empty_list Number.json_finite))
+  line
+    "list_ensure"
+    (round "3" (Codec.list_ensure Number.json_finite)
+      ++ " | "
+      ++ round "[3, 4]" (Codec.list_ensure Number.json_finite))
   line "trim" (round "\"  a b \"" Codec.trim)
   line "to_lower_case" (round "\"AbC\"" Codec.to_lower_case)
   line "to_upper_case" (round "\"AbC\"" Codec.to_upper_case)
   line "capitalize" (round "\"abc\"" Codec.capitalize)
   line "uncapitalize" (round "\"ABC\"" Codec.uncapitalize)
   line "snake_to_camel" (round "\"user_name\"" Codec.snake_to_camel)
-  line "number_from_string" (round "\"1.5\"" Codec.number_from_string ++ " | " ++ round "\"x\"" Codec.number_from_string)
-  line "finite_from_string" (round "\"1.5\"" Codec.finite_from_string ++ " | " ++ round "\"x\"" Codec.finite_from_string)
+  line
+    "number_from_string"
+    (round "\"1.5\"" Codec.number_from_string ++ " | " ++ round "\"x\"" Codec.number_from_string)
+  line
+    "finite_from_string"
+    (round "\"1.5\"" Codec.finite_from_string ++ " | " ++ round "\"x\"" Codec.finite_from_string)
   line "bool_from_bit" (round "1" Codec.bool_from_bit ++ " | " ++ round "2" Codec.bool_from_bit)
-  line "base64_string" (round "\"aGk=\"" Codec.base64_string ++ " | " ++ round "\"*\"" Codec.base64_string)
+  line
+    "base64_string"
+    (round "\"aGk=\"" Codec.base64_string ++ " | " ++ round "\"*\"" Codec.base64_string)
   line "base64url_string" (round "\"aGk\"" Codec.base64url_string)
   line "hex_string" (round "\"6869\"" Codec.hex_string)
-  line "uri_component" (round "\"a%20b\"" Codec.uri_component ++ " | " ++ round "\"%\"" Codec.uri_component)
-  line "json_string" (round "\"[1,2]\"" (Codec.json_string (Codec.list Number.json_finite)) ++ " | " ++ round "\"[\"" (Codec.json_string (Codec.list Number.json_finite)))
+  line
+    "uri_component"
+    (round "\"a%20b\"" Codec.uri_component ++ " | " ++ round "\"%\"" Codec.uri_component)
+  line
+    "json_string"
+    (round "\"[1,2]\"" (Codec.json_string (Codec.list Number.json_finite))
+      ++ " | "
+      ++ round "\"[\"" (Codec.json_string (Codec.list Number.json_finite)))
   line "split" (round "\"a,b,c\"" (Codec.split ","))
   line "split_key_value" (round "\"a=1&b=2\"" (Codec.split_key_value "&" "="))
   line "natural" (round "3" Codec.natural ++ " | " ++ round "-1" Codec.natural)
@@ -99,7 +128,9 @@ let main () =
       | Err e -> issues e)
     | Err _ -> "not JSON")
   let tagged_json = Codec.json (schema Tagged)
-  line "to_schema" (round "{\"label\": \"a\", \"size\": 1}" (Codec.json (Codec.to_schema tagged_json)))
+  line
+    "to_schema"
+    (round "{\"label\": \"a\", \"size\": 1}" (Codec.json (Codec.to_schema tagged_json)))
   let wire = Codec.wire_schema Codec.number_from_string
   line "wire_schema" (match Json.parse "\"12\"" with
     | Ok input -> (match Schema.validate wire input with
@@ -107,7 +138,9 @@ let main () =
       | Err e -> issues e)
     | Err _ -> "not JSON")
   line "catch_decoding" (round "1" (Codec.catch_decoding fallback String.json))
-  line "catch_encoding" (match Codec.encode_result (Codec.catch_encoding zero_wire Number.json_finite) Number.nan with
+  line
+    "catch_encoding"
+    (match Codec.encode_result (Codec.catch_encoding zero_wire Number.json_finite) Number.nan with
     | Ok json -> Json.stringify json
     | Err e -> issues e)
   let late = Codec.catch_decoding_effect late_value String.json
@@ -129,9 +162,13 @@ let main () =
     try Codec.encode_xml (Codec.general tagged_json) { label = "a"; size = 1 } with
     | SchemaError found -> issues (SchemaError found)
   line "encode_xml" (String.replace_all "\n" " " xml)
-  line "Duration.json_millis" (round "1500" Duration.json_millis ++ " | " ++ round "-1" Duration.json_millis)
+  line
+    "Duration.json_millis"
+    (round "1500" Duration.json_millis ++ " | " ++ round "-1" Duration.json_millis)
   line "Duration.json_nanos" (round "\"2000000\"" Duration.json_nanos)
-  line "Duration.json_string" (round "\"2 seconds\"" Duration.json_string ++ " | " ++ round "\"soon\"" Duration.json_string)
+  line
+    "Duration.json_string"
+    (round "\"2 seconds\"" Duration.json_string ++ " | " ++ round "\"soon\"" Duration.json_string)
   line "infinity" (match Codec.encode_result Duration.json_millis Duration.infinity with
     | Ok json -> Json.stringify json
     | Err e -> issues e)
@@ -151,7 +188,8 @@ let main () =
       | Err e -> issues e)
     | Err _ -> "not JSON")
   line "HashMap.json" (match Json.parse "[[\"a\", 1], [\"b\", 2]]" with
-    | Ok input -> (match Codec.decode_result (HashMap.json String.json Number.json_finite) input with
+    | Ok input ->
+      (match Codec.decode_result (HashMap.json String.json Number.json_finite) input with
       | Ok m -> show (HashMap.get "b" m) ++ " size " ++ show (HashMap.size m)
       | Err e -> issues e)
     | Err _ -> "not JSON")

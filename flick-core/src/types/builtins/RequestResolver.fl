@@ -18,7 +18,7 @@ type alias MakeOptions p (e : ErrorRow) a k =
     preCheck : Option (Entry p e a -> Bool);
     delay : Eff none none Unit;
     collectWhile : List (Entry p e a) -> Bool;
-    runAll : NonEmpty.NonEmpty (Entry p e a) -> k ->{; e} Unit
+    runAll : NonEmpty.NonEmpty (Entry p e a) -> k ->{; e} Unit;
   }
 
 /// How `make_grouped` groups a batch by key, and resolves each group.
@@ -43,7 +43,10 @@ type alias CacheOptions = { capacity : Number; strategy : Option Strategy }
 /// The options of `as_cache`: at most `capacity` results, each kept for
 /// `timeToLive` of how it ended and its request (`None`: until dropped).
 type alias AsCacheOptions p (e : ErrorRow) a =
-  { capacity : Number; timeToLive : Option (Exit e a -> Request.Request p e a -> Duration.Duration) }
+  {
+    capacity : Number;
+    timeToLive : Option (Exit e a -> Request.Request p e a -> Duration.Duration);
+  }
 
 /// A resolver running `run_all` on each batch; a failure of it fails every
 /// entry the batch left incomplete.

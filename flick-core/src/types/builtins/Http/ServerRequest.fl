@@ -128,4 +128,9 @@ foreign effect schema_body_url_params from "@flick-lang/runtime/effect/http/Http
 instance Show ServerRequest =
   show : ServerRequest -> String
   let show x =
-    "ServerRequest " ++ show (method x) ++ " " ++ show (Http.UrlParams.redact_url Http.UrlParams.default_redacted_names (url x)) ++ " " ++ show (headers x)
+    "ServerRequest "
+      ++ show (method x)
+      ++ " "
+      ++ show (Http.UrlParams.redact_url Http.UrlParams.default_redacted_names (url x))
+      ++ " "
+      ++ show (headers x)

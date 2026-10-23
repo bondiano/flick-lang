@@ -7,7 +7,7 @@ examples : List Example
 let examples =
   [
     {
-      name = "Hello"
+      name = "Hello";
       source =
         """
       module Main exposing (main)
@@ -15,10 +15,10 @@ let examples =
       main : Unit ->{; AppError} Unit
       let main () =
         Platform.stdout_line "Hello from Flick"
-        """
+        """;
     },
     {
-      name = "Data and patterns"
+      name = "Data and patterns";
       source =
         """
       module Main exposing (main)
@@ -37,10 +37,10 @@ let examples =
         let shapes = [Circle 1, Rect 2 3]
         Platform.stdout_line (show shapes)
         Platform.stdout_line (show (List.map area shapes))
-        """
+        """;
     },
     {
-      name = "Typed errors"
+      name = "Typed errors";
       source =
         """
       module Main exposing (main)
@@ -59,10 +59,10 @@ let examples =
         let other = try show (find "bob") with
           | NotFound who -> "no " ++ who
         Platform.stdout_line other
-        """
+        """;
     },
     {
-      name = "Retry"
+      name = "Retry";
       source =
         """
       module Main exposing (main)
@@ -84,10 +84,10 @@ let examples =
         let result = try Effect.retry (Schedule.recurs 5) (flaky calls) with
           | Flaky n -> "gave up at " ++ show n
         Platform.stdout_line result
-        """
+        """;
     },
     {
-      name = "Concurrency"
+      name = "Concurrency";
       source =
         """
       module Main exposing (main)
@@ -104,10 +104,10 @@ let examples =
         let (a, b) = parallel (after 20 "slow") (after 1 "fast")
         Platform.stdout_line (a ++ " " ++ b)
         Platform.stdout_line (race_first (after 30 "late") (after 1 "early"))
-        """
+        """;
     },
     {
-      name = "A type error"
+      name = "A type error";
       source =
         """
       module Main exposing (main)
@@ -118,6 +118,6 @@ let examples =
       main : Unit ->{; AppError} Unit
       let main () =
         Platform.stdout_line (total ["1", "2"])
-        """
-    }
+        """;
+    },
   ]

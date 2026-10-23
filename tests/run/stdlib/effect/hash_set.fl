@@ -27,7 +27,7 @@ let main () =
       ++ show
         (
           HashSet.is_subset odd (HashSet.from_list EqHash.canonical [1, 5]),
-          HashSet.is_subset odd small
+          HashSet.is_subset odd small,
         ))
   Platform.stdout_line
     ("map: " ++ show (sorted (HashSet.map EqHash.canonical (fun n -> n % 3) odd)))
@@ -38,7 +38,7 @@ let main () =
         (
           HashSet.some (fun n -> n > 6) odd,
           HashSet.every (fun n -> n % 2 == 1) odd,
-          HashSet.every (fun n -> n > 1) odd
+          HashSet.every (fun n -> n > 1) odd,
         ))
   Platform.stdout_line ("reduce: " ++ show (HashSet.reduce 0 (fun acc n -> acc + n) odd))
   let lengths =

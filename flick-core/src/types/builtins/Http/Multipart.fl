@@ -37,12 +37,19 @@ type alias Limits =
     maxFieldSize : Option ByteSize.ByteSize;
     maxFileSize : Option ByteSize.ByteSize;
     maxTotalSize : Option ByteSize.ByteSize;
-    fieldMimeTypes : List String
+    fieldMimeTypes : List String;
   }
 
 /// No bounds besides the defaults.
 limits : Limits
-let limits = { maxParts = None; maxFieldSize = None; maxFileSize = None; maxTotalSize = None; fieldMimeTypes = [] }
+let limits =
+  {
+    maxParts = None;
+    maxFieldSize = None;
+    maxFileSize = None;
+    maxTotalSize = None;
+    fieldMimeTypes = [];
+  }
 
 /// Reads the form of the request; its files are removed when the scope of
 /// region `s` closes.
@@ -76,7 +83,9 @@ foreign effect schema_json from "@flick-lang/runtime/effect/http/Multipart" "fli
 /// Decodes the form of the request, as `schema_persisted` of `persisted`.
 schema_body_multipart :
   forall s rd re a.
-  Codec rd re Json a -> Http.ServerRequest.ServerRequest ->{Scope s | rd; MultipartError, SchemaError} a
+  Codec rd re Json a ->
+    Http.ServerRequest.ServerRequest ->{Scope s | rd; MultipartError, SchemaError}
+    a
 foreign effect schema_body_multipart from "@flick-lang/runtime/effect/http/Multipart" "flickSchemaBodyMultipart"
   arity 2
   reviewed "effect@4.0.5 sha256:19037ac1c9df1f52"
@@ -86,7 +95,13 @@ foreign effect schema_body_multipart from "@flick-lang/runtime/effect/http/Multi
 schema_body_form :
   forall s rd re a.
   Codec rd re Json a ->
-  Http.ServerRequest.ServerRequest ->{Scope s | rd; Http.ServerError.HttpServerError, MultipartError, SchemaError} a
+  Http.ServerRequest.ServerRequest ->{
+    Scope s | rd;
+    Http.ServerError.HttpServerError,
+    MultipartError,
+    SchemaError
+  }
+    a
 foreign effect schema_body_form from "@flick-lang/runtime/effect/http/Multipart" "flickSchemaBodyForm"
   arity 2
   reviewed "effect@4.0.5 sha256:bffe6740849fd0ac"
@@ -94,7 +109,10 @@ foreign effect schema_body_form from "@flick-lang/runtime/effect/http/Multipart"
 /// Decodes the JSON text of the field of the request's form.
 schema_body_form_json :
   forall s rd re a.
-  Codec rd re Json a -> String -> Http.ServerRequest.ServerRequest ->{Scope s | rd; MultipartError, SchemaError} a
+  Codec rd re Json a ->
+    String ->
+    Http.ServerRequest.ServerRequest ->{Scope s | rd; MultipartError, SchemaError}
+    a
 foreign effect schema_body_form_json from "@flick-lang/runtime/effect/http/Multipart" "flickSchemaBodyFormJson"
   arity 3
   reviewed "effect@4.0.5 sha256:689e48d5b357ade0"
@@ -116,7 +134,7 @@ type alias PartInfo =
     contentTypeParameters : List (String, String);
     contentDisposition : String;
     contentDispositionParameters : List (String, String);
-    headers : List (String, String)
+    headers : List (String, String);
   }
 
 /// Whether the parser reads the part as a file: it has a file name, or a
@@ -135,7 +153,12 @@ foreign pure decode_field from "@flick-lang/runtime/effect/http/Multipart" "flic
 /// stream as the form is read. A file must be read before the next part.
 type Part =
   | Field { key : String; contentType : String; value : String }
-  | File { key : String; name : String; contentType : String; content : Stream none {MultipartError} (List Number) }
+  | File {
+    key : String;
+    name : String;
+    contentType : String;
+    content : Stream none {MultipartError} (List Number);
+  }
 
 /// The parts of the request's form, in order.
 parts : Http.ServerRequest.ServerRequest -> Stream none {MultipartError} Part
@@ -147,7 +170,9 @@ foreign pure parts from "@flick-lang/runtime/effect/http/Multipart" "flickParts"
 /// limits of `with_limits` when it runs.
 make_channel :
   forall e. List (String, String) ->
-    Channel none {MultipartError | e} (NonEmpty.NonEmpty (List Number)) (NonEmpty.NonEmpty Part) Unit e Unit
+    Channel none {MultipartError | e} (
+      NonEmpty.NonEmpty (List Number)
+    ) (NonEmpty.NonEmpty Part) Unit e Unit
 foreign pure make_channel from "@flick-lang/runtime/effect/http/Multipart" "flickMakeChannel"
   reviewed "effect@4.0.5 sha256:c4fb7aade4e9dd3f"
 

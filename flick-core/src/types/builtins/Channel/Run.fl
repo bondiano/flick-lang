@@ -128,7 +128,7 @@ type alias HubOptions =
     capacity : Option Number;
     strategy : Option Queue.Strategy;
     replay : Option Number;
-    shutdownOnEnd : Bool
+    shutdownOnEnd : Bool;
   }
 
 /// Runs the channel in the background of the innermost `scope` (or the

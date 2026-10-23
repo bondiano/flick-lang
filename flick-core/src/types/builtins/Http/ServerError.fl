@@ -5,7 +5,11 @@
 module Http.ServerError exposing (..)
 
 /// The request a failure is about: its method, URL and what went wrong.
-type alias RequestDetails = { method : Http.Method.Method; url : String; description : Option String }
+type alias RequestDetails = {
+  method : Http.Method.Method;
+  url : String;
+  description : Option String;
+}
 
 /// The request and the status of the response a failure is about.
 type alias ResponseDetails =

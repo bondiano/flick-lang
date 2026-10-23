@@ -42,7 +42,7 @@ let describe t =
   DateTime.match_
     {
       onUtc = fun u -> "utc " ++ DateTime.format_iso u;
-      onZoned = fun z -> "zoned " ++ DateTime.format_iso_offset z
+      onZoned = fun z -> "zoned " ++ DateTime.format_iso_offset z;
     }
     t
 
@@ -63,7 +63,7 @@ let main () =
           iso (DateTime.make "2024-03-10T08:30:00"),
           iso (DateTime.make "not a date"),
           iso (DateTime.from_epoch_seconds 86400),
-          iso (DateTime.from_epoch_seconds (0 / 0))
+          iso (DateTime.from_epoch_seconds (0 / 0)),
         ])
   Platform.stdout_line
     ("from_parts: "
@@ -76,7 +76,7 @@ let main () =
         [
           iso (DateTime.make_zoned_from_string "2024-03-10T09:00:00.000+01:00[Europe/Paris]"),
           iso (DateTime.make_zoned_from_string "2024-03-10T09:00:00+02:00"),
-          iso (DateTime.make_zoned_from_string "nowhere")
+          iso (DateTime.make_zoned_from_string "nowhere"),
         ])
   Platform.stdout_line
     ("zones: "
@@ -85,7 +85,7 @@ let main () =
           DateTime.zone_to_string paris,
           DateTime.zone_to_string (DateTime.zone_make_offset (-5400000)),
           text (Result.map DateTime.zone_to_string (DateTime.zone_from_string "+05:30")),
-          text (Result.map DateTime.zone_to_string (DateTime.zone_from_string "Mars/Olympus"))
+          text (Result.map DateTime.zone_to_string (DateTime.zone_from_string "Mars/Olympus")),
         ])
   let in_paris = DateTime.set_zone keep paris t
   Platform.stdout_line
@@ -95,7 +95,7 @@ let main () =
           iso in_paris,
           iso (DateTime.set_zone_offset keep 7200000 t),
           iso (DateTime.set_zone_named keep "Asia/Tokyo" t),
-          iso (DateTime.set_zone_named keep "Atlantis" t)
+          iso (DateTime.set_zone_named keep "Atlantis" t),
         ])
   Platform.stdout_line
     ("make_zoned: "
@@ -104,7 +104,7 @@ let main () =
           iso (DateTime.make_zoned (wall DateTime.Compatible) paris (at "2024-03-31T02:30:00Z")),
           iso (DateTime.make_zoned (wall DateTime.Reject) paris (at "2024-03-31T02:30:00Z")),
           iso (DateTime.make_zoned (wall DateTime.Earlier) paris (at "2024-10-27T02:30:00Z")),
-          iso (DateTime.make_zoned (wall DateTime.Later) paris (at "2024-10-27T02:30:00Z"))
+          iso (DateTime.make_zoned (wall DateTime.Later) paris (at "2024-10-27T02:30:00Z")),
         ])
   let z = Result.with_default t in_paris
   Platform.stdout_line
@@ -115,7 +115,7 @@ let main () =
           DateTime.is_zoned z,
           describe t,
           describe z,
-          DateTime.format_iso (DateTime.to_utc z)
+          DateTime.format_iso (DateTime.to_utc z),
         ))
   Platform.stdout_line
     ("offsets: "
@@ -125,7 +125,7 @@ let main () =
           DateTime.zoned_offset_iso z,
           DateTime.zoned_offset t,
           DateTime.format_iso_zoned z,
-          DateTime.format_iso_zoned t
+          DateTime.format_iso_zoned t,
         ))
   let p : DateTime.Parts = DateTime.to_parts z
   let u : DateTime.Parts = DateTime.to_parts_utc z
@@ -142,7 +142,7 @@ let main () =
             (DateTime.set_parts { DateTime.no_parts with hour = Some 23; minute = Some 0 } z),
           DateTime.format_iso
             (DateTime.set_parts_utc { DateTime.no_parts with weekDay = Some 1 } t),
-          DateTime.format_iso (DateTime.remove_time t)
+          DateTime.format_iso (DateTime.remove_time t),
         ])
   Platform.stdout_line
     ("epoch: "
@@ -150,7 +150,7 @@ let main () =
         (
           DateTime.to_epoch_millis t,
           DateTime.to_epoch_seconds t,
-          DateTime.format_iso (DateTime.map_epoch_millis (fun n -> n + 1000) t)
+          DateTime.format_iso (DateTime.map_epoch_millis (fun n -> n + 1000) t),
         ))
   Platform.stdout_line
     ("add: "
@@ -165,7 +165,7 @@ let main () =
               |> DateTime.add DateTime.Week 1
               |> DateTime.add DateTime.Minute 30
               |> DateTime.add DateTime.Second 1
-              |> DateTime.add DateTime.Millisecond 5)
+              |> DateTime.add DateTime.Millisecond 5),
         ])
   let hour = Result.with_default Duration.zero (Duration.hours 1)
   Platform.stdout_line
@@ -175,7 +175,7 @@ let main () =
           DateTime.format_iso (DateTime.add_duration hour t),
           DateTime.format_iso (DateTime.subtract_duration hour t),
           Duration.format (DateTime.distance t (at "2024-03-11T08:30:15.250Z")),
-          Duration.format (DateTime.distance (at "2024-03-11T08:30:15.250Z") t)
+          Duration.format (DateTime.distance (at "2024-03-11T08:30:15.250Z") t),
         ])
   let sunday = { weekStartsOn = None }
   let monday = { weekStartsOn = Some 1 }
@@ -188,7 +188,7 @@ let main () =
           DateTime.format_iso (DateTime.start_of monday DateTime.Week t),
           DateTime.format_iso (DateTime.start_of sunday DateTime.Week t),
           DateTime.format_iso (DateTime.nearest sunday DateTime.Hour t),
-          DateTime.format_iso (DateTime.nearest sunday DateTime.Year t)
+          DateTime.format_iso (DateTime.nearest sunday DateTime.Year t),
         ])
   let early = at "2024-01-01T00:00:00Z"
   let late = at "2025-01-01T00:00:00Z"
@@ -202,7 +202,7 @@ let main () =
           t |> DateTime.is_greater_than early,
           late |> DateTime.is_greater_than_or_equal_to late,
           t |> DateTime.between bounds,
-          at "2030-01-01" |> DateTime.between bounds
+          at "2030-01-01" |> DateTime.between bounds,
         ])
   Platform.stdout_line
     ("order: "
@@ -213,7 +213,7 @@ let main () =
           compare late early,
           DateTime.format_iso (DateTime.min early late),
           DateTime.format_iso (DateTime.max early late),
-          DateTime.format_iso (DateTime.clamp bounds (at "2030-01-01"))
+          DateTime.format_iso (DateTime.clamp bounds (at "2030-01-01")),
         ))
   Platform.stdout_line
     ("format: "
@@ -226,7 +226,7 @@ let main () =
               |> Result.map (fun _ -> "ok")),
           text (DateTime.format_local styles t |> Result.map (fun _ -> "ok")),
           text (DateTime.format { styles with dateStyle = Some "huge" } t),
-          text (DateTime.format { styles with locale = Some "!!" } t)
+          text (DateTime.format { styles with locale = Some "!!" } t),
         ])
   let midnight = at "2024-03-10T23:30:00Z" |> DateTime.set_zone keep paris |> Result.with_default t
   Platform.stdout_line
@@ -236,7 +236,7 @@ let main () =
           DateTime.format_iso z,
           DateTime.format_iso_date midnight,
           DateTime.format_iso_date_utc midnight,
-          DateTime.format_iso_offset z
+          DateTime.format_iso_offset z,
         ])
   let now = DateTime.now ()
   Platform.stdout_line
@@ -246,7 +246,7 @@ let main () =
           DateTime.is_utc now,
           DateTime.is_past early,
           DateTime.is_future early,
-          DateTime.is_future (DateTime.add DateTime.Year 1 now)
+          DateTime.is_future (DateTime.add DateTime.Year 1 now),
         ))
   let named = try DateTime.zone_to_string (DateTime.zone_make_named_effect "Nowhere/City") with
     | DateTime.DateTimeError message -> message

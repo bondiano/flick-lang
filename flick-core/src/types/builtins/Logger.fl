@@ -11,7 +11,12 @@ type Logger o
 
 /// What a logger gets of a message: its parts as text, its level, the
 /// cause logged with it and the time in milliseconds since the epoch.
-type alias Options = { message : List String; logLevel : LogLevel.LogLevel; cause : RawCause; date : Number }
+type alias Options = {
+  message : List String;
+  logLevel : LogLevel.LogLevel;
+  cause : RawCause;
+  date : Number;
+}
 
 /// What `format_structured` makes of a message; `spans` are the log spans
 /// with their start time.
@@ -23,7 +28,7 @@ type alias Structured =
     message : List String;
     cause : Option String;
     annotations : List (String, String);
-    spans : List (String, Number)
+    spans : List (String, Number);
   }
 
 /// Whether a layer keeps the loggers already installed.
@@ -31,7 +36,11 @@ type alias LayerOptions = { mergeWithExisting : Bool }
 
 /// How `console_pretty` writes: `colors` (`None` asks the terminal),
 /// `formatDate` the time, and for which console.
-type alias PrettyOptions = { colors : Option Bool; formatDate : Option (Number -> String); mode : PrettyMode }
+type alias PrettyOptions = {
+  colors : Option Bool;
+  formatDate : Option (Number -> String);
+  mode : PrettyMode;
+}
 
 type PrettyMode = Auto | Browser | Tty
   deriving Eq, Show
@@ -44,7 +53,11 @@ type alias BatchOptions o = { window : Duration.Duration; flush : List o ->{} Un
 
 /// How `to_file` opens the file and how long it gathers lines before a write.
 type alias FileOptions =
-  { flag : Option FileSystem.OpenFlag; mode : Option Number; batchWindow : Option Duration.Duration }
+  {
+    flag : Option FileSystem.OpenFlag;
+    mode : Option Number;
+    batchWindow : Option Duration.Duration;
+  }
 
 /// A logger of `f`, which formats each message.
 make : (Options -> o) -> Logger o

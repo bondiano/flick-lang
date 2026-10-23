@@ -41,7 +41,7 @@ let files dir =
       (
         show
           (Stream.run_collect (Stream.split_lines (Stream.decode_text (Stream.read_file whole a))))
-      )
+      ),
     )
   let missing =
     try show
@@ -54,7 +54,7 @@ let files dir =
   line
     (
       "watch_with",
-      (show (List.length backed, List.map (fun e -> e == Stream.Create (dir ++ "/new")) backed))
+      (show (List.length backed, List.map (fun e -> e == Stream.Create (dir ++ "/new")) backed)),
     )
   let created =
     Stream.watch flat dir

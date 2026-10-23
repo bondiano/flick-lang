@@ -12,7 +12,7 @@ type alias DeployOptions =
     at : Option DateTime.DateTime;
     tags : List String;
     owner : String;
-    target : String
+    target : String;
   }
 
 run_deploy : DeployOptions ->{} Unit
@@ -21,8 +21,10 @@ let run_deploy o =
     | Some t -> Redacted.reveal t
     | None -> "-"
   let at = Option.map DateTime.to_epoch_millis o.at
-  Platform.stdout_line ("deploy " ++ o.target ++ " env " ++ show o.env ++ " token " ++ token ++ " level " ++ o.level)
-  Platform.stdout_line ("  color " ++ o.color ++ " at " ++ show at ++ " tags " ++ show o.tags ++ " owner " ++ o.owner)
+  Platform.stdout_line
+    ("deploy " ++ o.target ++ " env " ++ show o.env ++ " token " ++ token ++ " level " ++ o.level)
+  Platform.stdout_line
+    ("  color " ++ o.color ++ " at " ++ show at ++ " tags " ++ show o.tags ++ " owner " ++ o.owner)
 
 license : Cli.ActionContext ->{} Unit
 let license context =
@@ -37,33 +39,83 @@ let deploy =
     |> Cli.example "deploy -e region=eu prod" "Deploys to prod in eu"
     |> Cli.example "deploy prod" ""
     |> Cli.action "license" "Prints the license" license
-    |> Cli.flag (Record.label : Record.Label "env") ["e"] "Variables" (Cli.many |> Cli.metavar "key=value")
+    |> Cli.flag
+      (Record.label : Record.Label "env")
+      ["e"]
+      "Variables"
+      (Cli.many |> Cli.metavar "key=value")
     |> Cli.flag (Record.label : Record.Label "token") [] "Secret token" (Cli.optional |> Cli.hidden)
-    |> Cli.flag (Record.label : Record.Label "level") [] "Log level" (Cli.from_config (Config.succeed "info"))
-    |> Cli.flag (Record.label : Record.Label "color") [] "When to color" (Cli.default "never" |> Cli.optional_value "auto")
+    |> Cli.flag
+      (Record.label : Record.Label "level")
+      []
+      "Log level"
+      (Cli.from_config (Config.succeed "info"))
+    |> Cli.flag
+      (Record.label : Record.Label "color")
+      []
+      "When to color"
+      (Cli.default "never" |> Cli.optional_value "auto")
     |> Cli.flag (Record.label : Record.Label "at") [] "When to deploy" Cli.optional
     |> Cli.flag (Record.label : Record.Label "tags") ["t"] "One or two tags" tags
-    |> Cli.flag (Record.label : Record.Label "owner") [] "Who deploys" (Cli.from_prompt (Cli.Prompt.succeed "ops"))
+    |> Cli.flag
+      (Record.label : Record.Label "owner")
+      []
+      "Who deploys"
+      (Cli.from_prompt (Cli.Prompt.succeed "ops"))
     |> Cli.arg (Record.label : Record.Label "target") "Where to deploy" Cli.required
     |> Cli.handle run_deploy
 
 type alias FilesOptions =
-  { dir : String; notes : Option String; data : Option String; out : Option String; any : List String; rest : List String }
+  {
+    dir : String;
+    notes : Option String;
+    data : Option String;
+    out : Option String;
+    any : List String;
+    rest : List String;
+  }
 
 run_files : FilesOptions ->{} Unit
 let run_files o =
-  Platform.stdout_line ("files dir " ++ show (String.contains "flick-cli-" o.dir) ++ " notes " ++ show o.notes ++ " data " ++ show o.data)
+  Platform.stdout_line
+    ("files dir "
+      ++ show (String.contains "flick-cli-" o.dir)
+      ++ " notes "
+      ++ show o.notes
+      ++ " data "
+      ++ show o.data)
   let out = Option.map (String.ends_with "/new.txt") o.out
-  Platform.stdout_line ("  out " ++ show out ++ " any " ++ show (List.length o.any) ++ " rest " ++ show o.rest)
+  Platform.stdout_line
+    ("  out " ++ show out ++ " any " ++ show (List.length o.any) ++ " rest " ++ show o.rest)
 
 files : Cli.Command none none
 let files =
   Cli.command "files"
-    |> Cli.flag (Record.label : Record.Label "dir") [] "A directory" (Cli.required |> Cli.directory true)
-    |> Cli.flag (Record.label : Record.Label "notes") [] "A text file" (Cli.optional |> Cli.file_text)
-    |> Cli.flag (Record.label : Record.Label "data") [] "A YAML file" (Cli.optional |> Cli.file_parse (Some Cli.Yaml))
-    |> Cli.flag (Record.label : Record.Label "out") [] "Output file" (Cli.optional |> Cli.file false)
-    |> Cli.flag (Record.label : Record.Label "any") [] "Existing paths" (Cli.at_most 1 |> Cli.path true)
+    |> Cli.flag
+      (Record.label : Record.Label "dir")
+      []
+      "A directory"
+      (Cli.required |> Cli.directory true)
+    |> Cli.flag
+      (Record.label : Record.Label "notes")
+      []
+      "A text file"
+      (Cli.optional |> Cli.file_text)
+    |> Cli.flag
+      (Record.label : Record.Label "data")
+      []
+      "A YAML file"
+      (Cli.optional |> Cli.file_parse (Some Cli.Yaml))
+    |> Cli.flag
+      (Record.label : Record.Label "out")
+      []
+      "Output file"
+      (Cli.optional |> Cli.file false)
+    |> Cli.flag
+      (Record.label : Record.Label "any")
+      []
+      "Existing paths"
+      (Cli.at_most 1 |> Cli.path true)
     |> Cli.arg (Record.label : Record.Label "rest") "More words" (Cli.at_least 1)
     |> Cli.handle run_files
 
@@ -72,7 +124,8 @@ let secret =
   Cli.command "secret" |> Cli.unlisted |> Cli.handle (fun {} -> Platform.stdout_line "secret ran")
 
 tool : Cli.Command none none
-let tool = Cli.command "tool" |> Cli.subcommand deploy "Deploys" |> Cli.subcommand secret "" |> Cli.group
+let tool =
+  Cli.command "tool" |> Cli.subcommand deploy "Deploys" |> Cli.subcommand secret "" |> Cli.group
 
 attempt : Cli.Command none none -> List String ->{} Unit
 let attempt command args =
@@ -100,7 +153,8 @@ attempt_in : String -> Cli.Command none none -> List String ->{} Unit
 let attempt_in dir command args =
   Platform.stdout_line ("$ " ++ String.replace_all dir "$TMP" (String.join " " args))
   try Cli.run command args with
-  | Cli.CliError message -> Platform.stdout_line ("CliError: " ++ String.replace_all dir "$TMP" message)
+  | Cli.CliError message ->
+    Platform.stdout_line ("CliError: " ++ String.replace_all dir "$TMP" message)
 
 show_flag : Cli.FlagDoc -> String
 let show_flag f = f.name ++ ":" ++ f.type_
@@ -110,7 +164,12 @@ let show_arg a = a.name ++ ":" ++ a.type_ ++ (if a.variadic then "..." else "")
 
 show_help : Cli.HelpDoc -> String
 let show_help doc =
-  "usage " ++ doc.usage ++ " flags " ++ show (List.map show_flag doc.flags) ++ " args " ++ show (List.map show_arg doc.args)
+  "usage "
+    ++ doc.usage
+    ++ " flags "
+    ++ show (List.map show_flag doc.flags)
+    ++ " args "
+    ++ show (List.map show_arg doc.args)
 
 show_example : Cli.ExampleDoc -> String
 let show_example e = e.command ++ " / " ++ show e.description
@@ -128,7 +187,8 @@ group_name : Cli.SubcommandGroupDoc -> Option String
 let group_name g = g.group
 
 only_help : Cli.Settings
-let only_help = { version = "1.2.3"; builtIns = [Cli.HelpFlag, Cli.VersionFlag]; formatter = Some custom }
+let only_help =
+  { version = "1.2.3"; builtIns = [Cli.HelpFlag, Cli.VersionFlag]; formatter = Some custom }
 
 with_settings : List String ->{} Unit
 let with_settings args =
@@ -139,14 +199,33 @@ let with_settings args =
 script : Cli.Shell ->{} String
 let script shell =
   let text = Cli.completions shell deploy
-  show shell ++ " " ++ show (String.contains "deploy" text) ++ " " ++ show (String.contains "tags" text)
+  show shell
+    ++ " "
+    ++ show (String.contains "deploy" text)
+    ++ " "
+    ++ show (String.contains "tags" text)
 
 custom : Cli.Formatter
-let custom = { formatHelpDoc = show_help; formatVersion = fun name version -> name ++ "@" ++ version }
+let custom =
+  { formatHelpDoc = show_help; formatVersion = fun name version -> name ++ "@" ++ version }
 
 main : Unit ->{; AppError} Unit
 let main () =
-  attempt deploy ["-e", "region=eu", "-e", "tier=web", "--token", "s3", "-t", "a", "--at", "2026-10-23T10:00:00Z", "prod"]
+  attempt
+    deploy
+    [
+      "-e",
+      "region=eu",
+      "-e",
+      "tier=web",
+      "--token",
+      "s3",
+      "-t",
+      "a",
+      "--at",
+      "2026-10-23T10:00:00Z",
+      "prod",
+    ]
   attempt deploy ["-t", "a", "-t", "b", "--level", "debug", "prod", "--color"]
   attempt deploy ["-t", "a", "--color=always", "--owner", "me", "prod"]
   attempt deploy ["-t", "a", "-t", "b", "-t", "c", "prod"]
@@ -160,10 +239,29 @@ let main () =
     try
       provide FileSystem.node {
         scope {
-          let dir = FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-cli-" }
+          let dir =
+            FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-cli-" }
           FileSystem.write_file_string { flag = None; mode = None } (dir ++ "/notes.txt") "remember"
-          FileSystem.write_file_string { flag = None; mode = None } (dir ++ "/data.yaml") "name: flick\nlist: [1, 2]\n"
-          attempt_in dir files ["--dir", dir, "--notes", dir ++ "/notes.txt", "--data", dir ++ "/data.yaml", "--out", dir ++ "/new.txt", "--any", dir, "word"]
+          FileSystem.write_file_string
+            { flag = None; mode = None }
+            (dir ++ "/data.yaml")
+            "name: flick\nlist: [1, 2]\n"
+          attempt_in
+            dir
+            files
+            [
+              "--dir",
+              dir,
+              "--notes",
+              dir ++ "/notes.txt",
+              "--data",
+              dir ++ "/data.yaml",
+              "--out",
+              dir ++ "/new.txt",
+              "--any",
+              dir,
+              "word",
+            ]
           attempt_in dir files ["--dir", dir ++ "/missing", "word"]
           attempt_in dir files ["--dir", dir, "--notes", dir ++ "/missing.txt", "word"]
           attempt_in dir files ["--dir", dir]
@@ -179,8 +277,20 @@ let main () =
   let defaults : Cli.Settings = Cli.settings
   let number : Result String Number = parsed "12"
   let pair : Result String (String, String) = parsed "a=b=c"
-  Platform.stdout_line ("parse " ++ show number ++ " " ++ show pair ++ " extra " ++ show (List.all (fun b -> List.contains b Cli.builtins) extra_builtins))
-  Platform.stdout_line ("settings " ++ defaults.version ++ " " ++ show defaults.builtIns ++ " " ++ show (Cli.builtins == defaults.builtIns))
+  Platform.stdout_line
+    ("parse "
+      ++ show number
+      ++ " "
+      ++ show pair
+      ++ " extra "
+      ++ show (List.all (fun b -> List.contains b Cli.builtins) extra_builtins))
+  Platform.stdout_line
+    ("settings "
+      ++ defaults.version
+      ++ " "
+      ++ show defaults.builtIns
+      ++ " "
+      ++ show (Cli.builtins == defaults.builtIns))
   try Cli.run_with { defaults with version = "9.9.9" } deploy ["--version"] with
   | Cli.CliError message -> Platform.stdout_line message
   let doc = Cli.help_doc ["deploy"] tool
@@ -195,4 +305,6 @@ let main () =
   Platform.stdout_line ("default formatter " ++ plain.formatVersion "tool" "1.0")
   Platform.stdout_line ("round trip " ++ show (plain.formatHelpDoc doc == Cli.help ["deploy"] tool))
   Platform.stdout_line ("display_width " ++ show (Cli.display_width "日本", Cli.display_width "abc"))
-  Platform.stdout_line ("completions " ++ String.join ", " [script Cli.Bash, script Cli.Zsh, script Cli.Fish, script Cli.PowerShell])
+  Platform.stdout_line
+    ("completions "
+      ++ String.join ", " [script Cli.Bash, script Cli.Zsh, script Cli.Fish, script Cli.PowerShell])

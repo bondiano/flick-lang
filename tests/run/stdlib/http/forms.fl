@@ -29,7 +29,7 @@ let forms () =
         (json_of
           (codec (schema Note) {
             title = field "title" String.json;
-            tag = field "tag" (Codec.list String.json)
+            tag = field "tag" (Codec.list String.json);
           }))
         form
     Platform.stdout_line ("schema_persisted: " ++ (show note))
@@ -52,14 +52,14 @@ let forms () =
       contentTypeParameters = [("charset", "utf-8")];
       contentDisposition = "form-data";
       contentDispositionParameters = [];
-      headers = []
+      headers = [];
     }
   Platform.stdout_line
     ("default_is_file: "
       ++ (show
         (
           Http.Multipart.default_is_file info,
-          Http.Multipart.default_is_file { info with filename = Some "a.txt" }
+          Http.Multipart.default_is_file { info with filename = Some "a.txt" },
         )))
   Platform.stdout_line ("decode_field: " ++ (Http.Multipart.decode_field info [104, 105]))
   let persisted_file : Http.Multipart.PersistedFile =
@@ -89,7 +89,7 @@ let traces () =
               [
                 ("x-b3-traceid", "4bf92f3577b34da6a3ce929d0e0e4736"),
                 ("x-b3-spanid", "00f067aa0ba902b7"),
-                ("x-b3-sampled", "1")
+                ("x-b3-sampled", "1"),
               ])))))
 
 main : Unit ->{; AppError} Unit

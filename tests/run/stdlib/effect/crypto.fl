@@ -9,7 +9,8 @@ digit : Number -> String
 let digit n = String.slice n (n + 1) "0123456789abcdef"
 
 hex : List Number -> String
-let hex bytes = String.join "" (List.map (fun b -> digit (Number.floor (b / 16)) ++ digit (b % 16)) bytes)
+let hex bytes =
+  String.join "" (List.map (fun b -> digit (Number.floor (b / 16)) ++ digit (b % 16)) bytes)
 
 /// The bytes of ASCII text.
 ascii : String -> List Number
@@ -25,19 +26,39 @@ let checks () =
   let sha256 : Crypto.DigestAlgorithm = Crypto.Sha256
   line "sha-256" (hex (Crypto.digest sha256 (ascii "abc"))) ()
   line "sha-1" (hex (Crypto.digest Crypto.Sha1 (ascii "abc"))) ()
-  line "sha-384/512" (show (List.length (Crypto.digest Crypto.Sha384 [])) ++ " " ++ show (List.length (Crypto.digest Crypto.Sha512 []))) ()
+  line
+    "sha-384/512"
+    (show (List.length (Crypto.digest Crypto.Sha384 []))
+      ++ " "
+      ++ show (List.length (Crypto.digest Crypto.Sha512 [])))
+    ()
   let r = Crypto.random ()
   let b = Crypto.random_boolean ()
   let i = Crypto.random_int ()
-  line "random" (show (within 0 1 r) ++ " " ++ show (b || not b) ++ " " ++ show (Number.is_safe_integer i)) ()
+  line
+    "random"
+    (show (within 0 1 r) ++ " " ++ show (b || not b) ++ " " ++ show (Number.is_safe_integer i))
+    ()
   let between = Crypto.random_between 5 6
   let die = Crypto.random_int_between 1 6
-  line "between" (show (within 5 6 between) ++ " " ++ show (within 1 6 die && Number.is_integer die)) ()
+  line
+    "between"
+    (show (within 5 6 between) ++ " " ++ show (within 1 6 die && Number.is_integer die))
+    ()
   line "shuffle" (show (List.sort (Crypto.random_shuffle [3, 1, 2]))) ()
   let v4 = Crypto.random_uuid_v4 ()
   let v7 = Crypto.random_uuid_v7 ()
   let ulid = Crypto.random_ulid ()
-  line "uuid" (show (String.length v4) ++ " " ++ String.slice 14 15 v4 ++ " " ++ show (String.length v7) ++ " " ++ String.slice 14 15 v7) ()
+  line
+    "uuid"
+    (show (String.length v4)
+      ++ " "
+      ++ String.slice 14 15 v4
+      ++ " "
+      ++ show (String.length v7)
+      ++ " "
+      ++ String.slice 14 15 v7)
+    ()
   line "ulid" (show (String.length ulid)) ()
   try
     let _ = Crypto.random_bytes (-1)

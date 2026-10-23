@@ -15,7 +15,7 @@ type alias InputMetadata i =
     start : Number;
     now : Number;
     elapsed : Number;
-    elapsedSincePrevious : Number
+    elapsedSincePrevious : Number;
   }
 
 /// A step's metadata with its output and the delay chosen.
@@ -28,7 +28,7 @@ type alias Metadata o i =
     start : Number;
     now : Number;
     elapsed : Number;
-    elapsedSincePrevious : Number
+    elapsedSincePrevious : Number;
   }
 
 /// Recurs forever, `n` counting the recurrences from 0, without a delay.
@@ -124,7 +124,9 @@ foreign pure min from "@flick-lang/runtime/effect/Schedule" "min"
 
 /// Stops after the duration has elapsed or the number of outputs, whichever
 /// comes first; `None` leaves that bound out.
-up_to : { duration : Option Duration.Duration; times : Option Number } -> Schedule r e i o -> Schedule r e i o
+up_to : { duration : Option Duration.Duration; times : Option Number } ->
+  Schedule r e i o ->
+  Schedule r e i o
 foreign pure up_to from "@flick-lang/runtime/effect/Schedule" "flickUpTo"
   arity 1
   reviewed "effect@4.0.5 sha256:7e9d567a101486f7"
@@ -148,7 +150,9 @@ foreign pure while from "@flick-lang/runtime/effect/Schedule" "while"
   reviewed "effect@4.0.5 sha256:14e7a1f6ce7c5420"
 
 /// Adds the duration `f` computes to each delay.
-add_delay : (Metadata o i ->{r2; e2} Duration.Duration) -> Schedule r e i o -> Schedule (r + r2) (e + e2) i o
+add_delay : (Metadata o i ->{r2; e2} Duration.Duration) ->
+  Schedule r e i o ->
+  Schedule (r + r2) (e + e2) i o
 foreign pure add_delay from "@flick-lang/runtime/effect/Schedule" "addDelay"
   arity 1
   reviewed "effect@4.0.5 sha256:8bc2728ac1228e4a"

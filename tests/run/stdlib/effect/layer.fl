@@ -65,7 +65,8 @@ let contexts () =
   let without = Context.omit Config both
   Platform.stdout_line ("omit " ++ show (Option.is_some (Context.get_option Config without)))
   let readded = Context.add_or_omit Config None (Context.merge only without)
-  Platform.stdout_line ("add_or_omit None " ++ show (Option.is_some (Context.get_option Config readded)))
+  Platform.stdout_line
+    ("add_or_omit None " ++ show (Option.is_some (Context.get_option Config readded)))
   let merged = Context.merge_all only [Context.make Config { prefix = fun () -> "last" }]
   Platform.stdout_line ("merge_all " ++ (Context.get Config merged).prefix ())
   provide Layer.succeed_context both { greet "succeed_context" }
@@ -93,19 +94,33 @@ let layers () =
   }))) {
     Platform.stdout_line (Config.prefix ())
   }
-  let upper = Layer.update_service Config (fun impl -> { prefix = fun () -> impl.prefix () ++ "!" }) greeter_live
+  let upper =
+    Layer.update_service
+      Config
+      (fun impl -> { prefix = fun () -> impl.prefix () ++ "!" })
+      greeter_live
   provide (upper |> Layer.provide_ config_layer) { greet "update_service" }
   let tapped =
-    Layer.tap (fun ctx -> Platform.stdout_line ("tap " ++ (Context.get Config ctx).prefix ())) config_layer
+    Layer.tap
+      (fun ctx -> Platform.stdout_line ("tap " ++ (Context.get Config ctx).prefix ()))
+      config_layer
   provide tapped { () }
   let mapped =
-    Layer.flat_map (fun ctx -> Layer.succeed Greeter { greet = fun n -> (Context.get Config ctx).prefix () ++ " flat_map " ++ n }) config_layer
+    Layer.flat_map
+      (fun ctx ->
+        Layer.succeed
+          Greeter
+          { greet = fun n -> (Context.get Config ctx).prefix () ++ " flat_map " ++ n })
+      config_layer
   provide mapped { greet "x" }
-  provide Layer.effect_context (task { Context.make Config { prefix = fun () -> "effect_context" } }) {
+  provide Layer.effect_context
+    (task { Context.make Config { prefix = fun () -> "effect_context" } }) {
     Platform.stdout_line (Config.prefix ())
   }
   let exits = parallel_exits [task {
-    provide (Layer.or_die failing |> Layer.tap_cause (fun _ -> Platform.stdout_line "tap_cause")) { greet "never" }
+    provide (
+      Layer.or_die failing |> Layer.tap_cause (fun _ -> Platform.stdout_line "tap_cause")
+    ) { greet "never" }
   }]
   let died = List.map (fun exit -> Option.is_some (Exit.failure exit)) exits
   Platform.stdout_line ("or_die died " ++ show died)
@@ -138,7 +153,8 @@ finalizers : Unit ->{} Unit
 let finalizers () =
   scope {
     Scope.add_finalizer (task { Platform.stdout_line "finalizer ran" })
-    Scope.add_finalizer_exit (fun exit -> Platform.stdout_line ("exit failed " ++ show (Option.is_some exit)))
+    Scope.add_finalizer_exit
+      (fun exit -> Platform.stdout_line ("exit failed " ++ show (Option.is_some exit)))
     let ctx = Layer.build config_layer
     Platform.stdout_line ("build " ++ (Context.get Config ctx).prefix ())
   }
@@ -158,7 +174,7 @@ let trace_options =
     sampled = None;
     level = None;
     captureStackTrace = false;
-    disablePropagation = false
+    disablePropagation = false;
   }
 
 span_options : Layer.Trace.SpanOptions
@@ -166,7 +182,8 @@ let span_options =
   {
     span = trace_options;
     onEnd = Some (fun span exit ->
-      Platform.stdout_line ("ended " ++ show (Tracer.span_name span) ++ " failed " ++ show (Option.is_some exit)))
+      Platform.stdout_line
+        ("ended " ++ show (Tracer.span_name span) ++ " failed " ++ show (Option.is_some exit)));
   }
 
 current_span : Unit ->{} String
@@ -197,7 +214,8 @@ let traces () =
   }
   let remote = Tracer.external_span { spanId = "s1"; traceId = "t1"; sampled = true }
   provide Layer.Trace.parent_span remote {
-    Platform.stdout_line ("parent_span " ++ show (Option.map Tracer.span_id (Tracer.parent_span ())))
+    Platform.stdout_line
+      ("parent_span " ++ show (Option.map Tracer.span_id (Tracer.parent_span ())))
   }
   provide Layer.Trace.with_parent_span remote traced_id {
     Platform.stdout_line ("with_parent_span " ++ Config.prefix ())

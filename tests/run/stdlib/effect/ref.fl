@@ -60,7 +60,13 @@ let synchronized () =
         xs ++ [x]) slow
     }
   let _ = parallel (add 1) (add 2)
-  [show (a, b, c, d, e), show (f, g, h, i, j), show (k, l, m, n), failed, "serialized: " ++ show (List.length (SynchronizedRef.get slow))]
+  [
+    show (a, b, c, d, e),
+    show (f, g, h, i, j),
+    show (k, l, m, n),
+    failed,
+    "serialized: " ++ show (List.length (SynchronizedRef.get slow)),
+  ]
 
 subscription : Unit ->{} List String
 let subscription () =

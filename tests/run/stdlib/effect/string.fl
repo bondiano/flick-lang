@@ -17,31 +17,162 @@ let num o =
   | None -> "-"
 
 describe : RegExp.Match -> String
-let describe m = m.matched ++ "@" ++ show m.index ++ "[" ++ String.join "," (List.map opt m.captures) ++ "]"
+let describe m =
+  m.matched ++ "@" ++ show m.index ++ "[" ++ String.join "," (List.map opt m.captures) ++ "]"
 
 main : Unit ->{; AppError} Unit
 let main () =
-  line "trim" ("[" ++ String.trim "  a b  " ++ "][" ++ String.trim_start "  a " ++ "][" ++ String.trim_end " a  " ++ "]") ()
-  line "length" (show (String.length "héllo") ++ " " ++ show (String.is_empty "") ++ " " ++ show (String.is_non_empty "")) ()
+  line
+    "trim"
+    ("["
+      ++ String.trim "  a b  "
+      ++ "]["
+      ++ String.trim_start "  a "
+      ++ "]["
+      ++ String.trim_end " a  "
+      ++ "]")
+    ()
+  line
+    "length"
+    (show (String.length "héllo")
+      ++ " "
+      ++ show (String.is_empty "")
+      ++ " "
+      ++ show (String.is_non_empty ""))
+    ()
   line "split" (String.join "|" ("a,b,,c" |> String.split ",")) ()
-  line "search" (show (String.contains "ell" "hello") ++ " " ++ show (String.starts_with "he" "hello") ++ " " ++ show (String.ends_with "lo" "hello")) ()
-  line "index" (num (String.index_of "l" "hello") ++ " " ++ num (String.last_index_of "l" "hello") ++ " " ++ num (String.index_of "z" "hello")) ()
-  line "case" (String.to_upper "abc" ++ " " ++ String.to_lower "ABC" ++ " " ++ String.to_locale_upper "tr" "i" ++ " " ++ String.to_locale_lower "en" "Q") ()
+  line
+    "search"
+    (show (String.contains "ell" "hello")
+      ++ " "
+      ++ show (String.starts_with "he" "hello")
+      ++ " "
+      ++ show (String.ends_with "lo" "hello"))
+    ()
+  line
+    "index"
+    (num (String.index_of "l" "hello")
+      ++ " "
+      ++ num (String.last_index_of "l" "hello")
+      ++ " "
+      ++ num (String.index_of "z" "hello"))
+    ()
+  line
+    "case"
+    (String.to_upper "abc"
+      ++ " "
+      ++ String.to_lower "ABC"
+      ++ " "
+      ++ String.to_locale_upper "tr" "i"
+      ++ " "
+      ++ String.to_locale_lower "en" "Q")
+    ()
   line "capitalize" (String.capitalize "word" ++ " " ++ String.uncapitalize "Word") ()
-  line "slice" (String.slice 1 3 "hello" ++ " " ++ String.slice (-3) 5 "hello" ++ " " ++ String.substring 3 1 "hello") ()
-  line "take" (String.take_left 2 "hello" ++ " " ++ String.take_right 2 "hello" ++ " " ++ String.take_left 9 "hi") ()
-  line "at" (opt (String.at (-1) "abc") ++ " " ++ opt (String.char_at 1 "abc") ++ " " ++ opt (String.char_at 5 "abc")) ()
-  line "codes" (num (String.char_code_at 0 "A") ++ " " ++ num (String.code_point_at 0 "😀") ++ " " ++ num (String.char_code_at 9 "A")) ()
-  line "locale_compare" (show ("a" |> String.locale_compare "en" "b") ++ " " ++ show ("b" |> String.locale_compare "en" "a") ++ " " ++ show ("a" |> String.locale_compare "en" "a")) ()
-  line "normalize" (show (String.length (String.normalize String.NFD "é")) ++ " " ++ show (String.length (String.normalize String.NFC "e\u{301}")) ++ " " ++ show (String.length (String.normalize String.NFKC "ﬁ")) ++ " " ++ show (String.length (String.normalize String.NFKD "é"))) ()
+  line
+    "slice"
+    (String.slice 1 3 "hello"
+      ++ " "
+      ++ String.slice (-3) 5 "hello"
+      ++ " "
+      ++ String.substring 3 1 "hello")
+    ()
+  line
+    "take"
+    (String.take_left 2 "hello"
+      ++ " "
+      ++ String.take_right 2 "hello"
+      ++ " "
+      ++ String.take_left 9 "hi")
+    ()
+  line
+    "at"
+    (opt (String.at (-1) "abc")
+      ++ " "
+      ++ opt (String.char_at 1 "abc")
+      ++ " "
+      ++ opt (String.char_at 5 "abc"))
+    ()
+  line
+    "codes"
+    (num (String.char_code_at 0 "A")
+      ++ " "
+      ++ num (String.code_point_at 0 "😀")
+      ++ " "
+      ++ num (String.char_code_at 9 "A"))
+    ()
+  line
+    "locale_compare"
+    (show ("a" |> String.locale_compare "en" "b")
+      ++ " "
+      ++ show ("b" |> String.locale_compare "en" "a")
+      ++ " "
+      ++ show ("a" |> String.locale_compare "en" "a"))
+    ()
+  line
+    "normalize"
+    (show (String.length (String.normalize String.NFD "é"))
+      ++ " "
+      ++ show (String.length (String.normalize String.NFC "e\u{301}"))
+      ++ " "
+      ++ show (String.length (String.normalize String.NFKC "ﬁ"))
+      ++ " "
+      ++ show (String.length (String.normalize String.NFKD "é")))
+    ()
   line "pad" (String.pad_start 5 "0" "42" ++ " " ++ String.pad_end 5 ".-" "ab") ()
-  line "repeat" (String.repeat 3 "ab" ++ "|" ++ String.repeat (-1) "ab" ++ "|" ++ String.replace_all "." "!" "a.b.c") ()
-  line "lines" (show (String.lines "a\nb\r\nc") ++ " " ++ show (String.lines_with_separators "a\nb")) ()
-  line "margin" (show (String.strip_margin "  |a\n  |b") ++ " " ++ show (String.strip_margin_with "#" " #x\n #y")) ()
-  line "snake" (String.snake_to_camel "foo_bar" ++ " " ++ String.snake_to_pascal "foo_bar" ++ " " ++ String.snake_to_kebab "foo_bar") ()
-  line "to snake" (String.camel_to_snake "fooBar" ++ " " ++ String.pascal_to_snake "FooBar" ++ " " ++ String.kebab_to_snake "foo-bar") ()
-  line "cases" (String.no_case "fooBar" ++ "|" ++ String.pascal_case "foo bar" ++ "|" ++ String.camel_case "foo bar" ++ "|" ++ String.constant_case "foo bar") ()
-  line "more cases" (String.config_case "fooBar2" ++ "|" ++ String.kebab_case "Foo Bar" ++ "|" ++ String.snake_case "Foo Bar") ()
+  line
+    "repeat"
+    (String.repeat 3 "ab"
+      ++ "|"
+      ++ String.repeat (-1) "ab"
+      ++ "|"
+      ++ String.replace_all "." "!" "a.b.c")
+    ()
+  line
+    "lines"
+    (show (String.lines "a\nb\r\nc") ++ " " ++ show (String.lines_with_separators "a\nb"))
+    ()
+  line
+    "margin"
+    (
+      show (String.strip_margin "  |a\n  |b")
+        ++ " "
+        ++ show (String.strip_margin_with "#" " #x\n #y")
+    )
+    ()
+  line
+    "snake"
+    (String.snake_to_camel "foo_bar"
+      ++ " "
+      ++ String.snake_to_pascal "foo_bar"
+      ++ " "
+      ++ String.snake_to_kebab "foo_bar")
+    ()
+  line
+    "to snake"
+    (String.camel_to_snake "fooBar"
+      ++ " "
+      ++ String.pascal_to_snake "FooBar"
+      ++ " "
+      ++ String.kebab_to_snake "foo-bar")
+    ()
+  line
+    "cases"
+    (String.no_case "fooBar"
+      ++ "|"
+      ++ String.pascal_case "foo bar"
+      ++ "|"
+      ++ String.camel_case "foo bar"
+      ++ "|"
+      ++ String.constant_case "foo bar")
+    ()
+  line
+    "more cases"
+    (String.config_case "fooBar2"
+      ++ "|"
+      ++ String.kebab_case "Foo Bar"
+      ++ "|"
+      ++ String.snake_case "Foo Bar")
+    ()
   match RegExp.make "(\\d+)(x)?" "g" with
   | Err e -> line "regexp" (show e) ()
   | Ok digits ->
@@ -50,10 +181,21 @@ let main () =
       | None -> "-") ()
     line "match_all" (String.join " " (List.map describe (RegExp.match_all digits "a12b3x"))) ()
     line "search" (num (RegExp.search digits "ab7") ++ " " ++ num (RegExp.search digits "ab")) ()
-    line "replace" (RegExp.replace digits "<$1>" "a1b22" ++ " " ++ RegExp.replace_all digits "#" "a1b22") ()
+    line
+      "replace"
+      (RegExp.replace digits "<$1>" "a1b22" ++ " " ++ RegExp.replace_all digits "#" "a1b22")
+      ()
   match RegExp.make "o" "" with
   | Err e -> line "regexp" (show e) ()
-  | Ok o -> line "non-global" (RegExp.replace o "0" "foo" ++ " " ++ RegExp.replace_all o "0" "foo" ++ " " ++ show (List.length (RegExp.match_all o "foo"))) ()
+  | Ok o ->
+    line
+      "non-global"
+      (RegExp.replace o "0" "foo"
+        ++ " "
+        ++ RegExp.replace_all o "0" "foo"
+        ++ " "
+        ++ show (List.length (RegExp.match_all o "foo")))
+      ()
   line "escape" (RegExp.escape "a.b*c") ()
   line "bad pattern" (match RegExp.make "(" "" with
     | Err _ -> "refused"

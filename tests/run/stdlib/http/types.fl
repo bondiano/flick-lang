@@ -31,7 +31,7 @@ let info () =
     rdev = None;
     size = 1n;
     blksize = None;
-    blocks = None
+    blocks = None;
   }
 
 line : String -> String ->{} Unit
@@ -55,7 +55,7 @@ let client_reasons =
     Http.ClientError.InvalidUrlError request,
     Http.ClientError.StatusCodeError response,
     Http.ClientError.DecodeError response,
-    Http.ClientError.EmptyBodyError response
+    Http.ClientError.EmptyBodyError response,
   ]
 
 server_reasons : List Http.ServerError.ServerErrorReason
@@ -68,7 +68,7 @@ let server_reasons =
     Http.ServerError.RequestParseError server_request,
     Http.ServerError.RouteNotFound server_request,
     Http.ServerError.InternalError server_request,
-    Http.ServerError.ResponseError server_response
+    Http.ServerError.ResponseError server_response,
   ]
 
 body_reasons : List Http.Body.BodyErrorReason
@@ -82,12 +82,12 @@ let multipart_reasons = [Http.Multipart.FileTooLarge, Http.Multipart.Parse]
 
 compressions : (
   List Http.ClientRequest.CompressionAlgorithm,
-  List Http.Platform.CompressionAlgorithm
+  List Http.Platform.CompressionAlgorithm,
 )
 let compressions =
   (
     [Http.ClientRequest.Gzip, Http.ClientRequest.Deflate],
-    [Http.Platform.Gzip, Http.Platform.Deflate, Http.Platform.Brotli, Http.Platform.Zstd]
+    [Http.Platform.Gzip, Http.Platform.Deflate, Http.Platform.Brotli, Http.Platform.Zstd],
   )
 
 options : Http.ClientRequest.Options
@@ -134,7 +134,7 @@ let note =
     (ignore_extra_fields
       (codec (schema Note) {
         title = field "title" String.json;
-        tag = field "tag" (Codec.list String.json)
+        tag = field "tag" (Codec.list String.json);
       }))
 
 point : Codec none none Json Point
@@ -214,7 +214,7 @@ let main () =
               (Http.ServerError.HttpServerError
                 (Http.ServerError.RouteNotFound
                   { method = Http.Method.GET; url = "/"; description = None })))
-        }
+        },
       ]
   match List.head exits with
   | Some exit ->
@@ -243,7 +243,7 @@ let main () =
           (show
             (
               Http.ServerResponse.status file,
-              Http.Headers.get "content-type" (Http.ServerResponse.headers file)
+              Http.Headers.get "content-type" (Http.ServerResponse.headers file),
             ))
         static : ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse
         let static =

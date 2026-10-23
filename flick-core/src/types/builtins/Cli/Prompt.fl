@@ -50,7 +50,7 @@ type alias Theme =
     successColor : String;
     errorColor : String;
     submittedColor : String;
-    colors : Bool
+    colors : Bool;
   }
 
 /// Effect's theme, with colors when the output supports them.
@@ -93,7 +93,7 @@ type alias ListOptions =
     message : String;
     default : Option String;
     validate : Option (String -> Result String String);
-    delimiter : Option String
+    delimiter : Option String;
   }
 
 /// Items typed on one line.
@@ -110,7 +110,7 @@ type alias IntOptions =
     max : Option Number;
     incrementBy : Option Number;
     decrementBy : Option Number;
-    validate : Option (Number -> Result String Number)
+    validate : Option (Number -> Result String Number);
   }
 
 /// An integer.
@@ -128,7 +128,7 @@ type alias NumberOptions =
     incrementBy : Option Number;
     decrementBy : Option Number;
     validate : Option (Number -> Result String Number);
-    precision : Option Number
+    precision : Option Number;
   }
 
 /// A number with a fractional part.
@@ -148,7 +148,7 @@ type alias ConfirmOptions =
     message : String;
     initial : Option Bool;
     label : Option ConfirmLabel;
-    placeholder : Option ConfirmPlaceholder
+    placeholder : Option ConfirmPlaceholder;
   }
 
 /// Yes or no, typed as `y` or `n`.
@@ -167,7 +167,12 @@ foreign pure toggle from "@flick-lang/runtime/cli" "promptToggle"
 
 /// The names of months and weekdays, long and short.
 type alias DateLocales =
-  { months : List String; monthsShort : List String; weekdays : List String; weekdaysShort : List String }
+  {
+    months : List String;
+    monthsShort : List String;
+    weekdays : List String;
+    weekdaysShort : List String;
+  }
 
 /// A date question: its mask (`YYYY-MM-DD HH:mm:ss` by default) and a check.
 type alias DateOptions =
@@ -176,7 +181,7 @@ type alias DateOptions =
     initial : Option DateTime.DateTime;
     dateMask : Option String;
     validate : Option (DateTime.DateTime -> Result String DateTime.DateTime);
-    locales : Option DateLocales
+    locales : Option DateLocales;
   }
 
 /// A date and time, edited part by part.
@@ -196,7 +201,7 @@ type alias FileOptions =
     startingPath : Option String;
     default : Option String;
     maxPerPage : Option Number;
-    filter : Option (String -> Bool)
+    filter : Option (String -> Bool);
   }
 
 /// A path of the file system of Node.js.
@@ -225,7 +230,7 @@ type alias AutoCompleteOptions a =
     maxPerPage : Option Number;
     filterLabel : Option String;
     filterPlaceholder : Option String;
-    emptyMessage : Option String
+    emptyMessage : Option String;
   }
 
 /// One of the choices that match the typed filter.
@@ -240,7 +245,7 @@ type alias MultiSelectOptions =
     selectNone : Option String;
     inverseSelection : Option String;
     min : Option Number;
-    max : Option Number
+    max : Option Number;
   }
 
 /// Any of the choices, toggled with space.
@@ -259,7 +264,11 @@ type ProcessInput ev = Input Terminal.UserInput | Event ev
 /// A custom prompt: the frame of a state, the step of an input, and what
 /// erases a frame before the next one.
 type alias Handlers s a i =
-  { render : s -> Action s a -> String; process : i -> s -> Action s a; clear : s -> Action s a -> String }
+  {
+    render : s -> Action s a -> String;
+    process : i -> s -> Action s a;
+    clear : s -> Action s a -> String;
+  }
 
 /// A prompt of its own, from the first state.
 custom : s -> Handlers s a Terminal.UserInput -> Prompt a

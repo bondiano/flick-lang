@@ -167,7 +167,7 @@ let routes () =
       [
         Http.Router.route (Some Http.Method.GET) "/items/:id" item,
         Http.Router.route (Some Http.Method.POST) "/points" posted,
-        Http.Router.prefix_route "/api" (Http.Router.route None "/hello" (fun r -> hello r))
+        Http.Router.prefix_route "/api" (Http.Router.route None "/hello" (fun r -> hello r)),
       ]
   Platform.stdout_line
     ("route: "
@@ -228,7 +228,7 @@ let responses () =
       Http.ServerResponse.json (Codec.encode point { x = 1 }) ok,
       Http.ServerResponse.schema_json point { x = 2 } ok,
       Http.ServerResponse.url_params (Http.UrlParams.make [("k", "v")]) ok,
-      Http.ServerResponse.form_data [("k", "v")] ok
+      Http.ServerResponse.form_data [("k", "v")] ok,
     ]
   Platform.stdout_line
     ("made: "
@@ -273,7 +273,7 @@ let responses () =
         (
           Http.ServerResponse.omits_body false r,
           Http.ServerResponse.omits_body true r,
-          Http.ServerResponse.omits_body false (Http.ServerResponse.empty ok)
+          Http.ServerResponse.omits_body false (Http.ServerResponse.empty ok),
         )))
   let client =
     Http.ServerResponse.to_client_response (Http.ClientRequest.get "http://example.com/") r
@@ -299,7 +299,7 @@ let failures () =
         task {
           empty
             (Http.ServerRequest.from_client_request (Http.ClientRequest.get "http://example.com/x"))
-        }
+        },
       ]
   Platform.stdout_line
     ("cause_response: "

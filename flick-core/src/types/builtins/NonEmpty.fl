@@ -1,5 +1,32 @@
 /// Lists with at least one element.
-module NonEmpty exposing (NonEmpty, from_list, singleton, cons, head, to_list, length, map, append, make_by, range, replicate, last, tail, init, modify_head, set_head, modify_last, set_last, split_at, unappend, unprepend, group_with, group, max, min)
+module NonEmpty exposing (
+  NonEmpty,
+  from_list,
+  singleton,
+  cons,
+  head,
+  to_list,
+  length,
+  map,
+  append,
+  make_by,
+  range,
+  replicate,
+  last,
+  tail,
+  init,
+  modify_head,
+  set_head,
+  modify_last,
+  set_last,
+  split_at,
+  unappend,
+  unprepend,
+  group_with,
+  group,
+  max,
+  min,
+)
 
 /// A list with at least one element, represented as the list.
 type NonEmpty a

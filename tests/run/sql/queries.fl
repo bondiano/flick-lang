@@ -34,7 +34,7 @@ let by_name =
 totals : Sql.Template Pg { min : BigInt } {
   name : String;
   accounts : BigInt;
-  total : Option BigDecimal.BigDecimal
+  total : Option BigDecimal.BigDecimal;
 }
 let totals =
   sql p {

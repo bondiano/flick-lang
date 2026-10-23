@@ -83,7 +83,7 @@ type alias ReadOptions =
   {
     offset : Option ByteSize.ByteSize;
     bytesToRead : Option ByteSize.ByteSize;
-    chunkSize : Option Number
+    chunkSize : Option Number;
   }
 
 /// The bytes of the file in chunks, read through the `open` of the file

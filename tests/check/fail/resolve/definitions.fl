@@ -1,4 +1,13 @@
-module App.Definitions exposing (Status(..), Id(..), Name(..), missing, Gone, Alias(..), load, Show(..))
+module App.Definitions exposing (
+  Status(..),
+  Id(..),
+  Name(..),
+  missing,
+  Gone,
+  Alias(..),
+  load,
+  Show(..),
+)
 
 import App.Text exposing (trim, Text)
 
@@ -7,21 +16,21 @@ type Mode = Active | Off
 //          ^^^^^^ FLICK-R008 `Active` is defined more than once
 
 opaque type Id = Id String
-//~ FLICK-R011 @1:46-1:52 opaque type `Id` cannot export its constructors
+//~ FLICK-R011 @3:3-3:9 opaque type `Id` cannot export its constructors
 
 type alias Name = String
-//~ FLICK-R011 @1:54-1:62 `Name` has no constructors to export
-//~ FLICK-R011 @1:64-1:71 cannot export `missing`
-//~ FLICK-R011 @1:73-1:77 cannot export `Gone`
+//~ FLICK-R011 @4:3-4:11 `Name` has no constructors to export
+//~ FLICK-R011 @5:3-5:10 cannot export `missing`
+//~ FLICK-R011 @6:3-6:7 cannot export `Gone`
 
 type alias Alias = Number
-//~ FLICK-R011 @1:79-1:88 `Alias` has no constructors
+//~ FLICK-R011 @7:3-7:12 `Alias` has no constructors
 
 load : Number -> Number
 let load n = n
 
 load : Number -> Number
-//~ FLICK-R008 @23:1-23:5 `load` is defined more than once
+//~ FLICK-R008 @32:1-32:5 `load` is defined more than once
 let load n = n + 1
 //  ^^^^ FLICK-R008 `load` is defined more than once
 

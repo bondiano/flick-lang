@@ -22,17 +22,37 @@ let document d = d.dialect ++ " " ++ Json.stringify d.root ++ " " ++ Json.string
 
 main : Unit ->{; AppError} Unit
 let main () =
-  line "meta" (String.join " " [JsonSchema.meta_schema_uri_draft_04, JsonSchema.meta_schema_uri_draft_07, JsonSchema.meta_schema_uri_draft_2020_12])
-  let draft07 : JsonSchema.JsonSchema = json "{\"type\": \"object\", \"definitions\": {\"a\": {\"type\": \"string\"}}, \"properties\": {\"x\": {\"$ref\": \"#/definitions/a\"}}}"
+  line
+    "meta"
+    (String.join
+      " "
+      [
+        JsonSchema.meta_schema_uri_draft_04,
+        JsonSchema.meta_schema_uri_draft_07,
+        JsonSchema.meta_schema_uri_draft_2020_12,
+      ])
+  let draft07 : JsonSchema.JsonSchema =
+    json
+      "{\"type\": \"object\", \"definitions\": {\"a\": {\"type\": \"string\"}}, \"properties\": {\"x\": {\"$ref\": \"#/definitions/a\"}}}"
   let doc = JsonSchema.from_draft_07 draft07
   line "from_draft_07" (document doc)
   line "to_draft_07" (document (JsonSchema.to_draft_07 doc))
   line "to_draft_04" (document (JsonSchema.to_draft_04 doc))
-  line "from_draft_2020_12" (document (JsonSchema.from_draft_2020_12 (json "{\"type\": \"array\", \"items\": {\"$ref\": \"#/$defs/n\"}, \"$defs\": {\"n\": {\"type\": \"number\"}}}")))
-  line "from_openapi_3_1" (document (JsonSchema.from_openapi_3_1 (json "{\"type\": \"string\", \"examples\": [\"a\"]}")))
-  line "from_openapi_3_0" (document (JsonSchema.from_openapi_3_0 (json "{\"type\": \"string\", \"nullable\": true}")))
+  line
+    "from_draft_2020_12"
+    (document
+      (JsonSchema.from_draft_2020_12
+        (json
+          "{\"type\": \"array\", \"items\": {\"$ref\": \"#/$defs/n\"}, \"$defs\": {\"n\": {\"type\": \"number\"}}}")))
+  line
+    "from_openapi_3_1"
+    (document (JsonSchema.from_openapi_3_1 (json "{\"type\": \"string\", \"examples\": [\"a\"]}")))
+  line
+    "from_openapi_3_0"
+    (document (JsonSchema.from_openapi_3_0 (json "{\"type\": \"string\", \"nullable\": true}")))
   let defs : JsonSchema.Definitions = doc.definitions
-  let multi : JsonSchema.MultiDocument = { dialect = "draft-2020-12"; schemas = NonEmpty.singleton doc.root; definitions = defs }
+  let multi : JsonSchema.MultiDocument =
+    { dialect = "draft-2020-12"; schemas = NonEmpty.singleton doc.root; definitions = defs }
   let openapi = JsonSchema.to_openapi_3_1 multi
   line "to_openapi_3_1" (openapi.dialect ++ " " ++ Json.stringify (NonEmpty.head openapi.schemas))
   let text = match Codec.json_schema "Item" (Codec.json (schema Item)) with

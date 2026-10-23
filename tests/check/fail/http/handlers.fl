@@ -14,13 +14,18 @@ let ping = HttpApi.endpoint HttpApi.Get "/ping" (Record.label : Record.Label "pi
 
 serve : Unit ->{; HttpApi.ServeError} Unit
 let serve () =
-  let users = HttpApi.group (Record.label : Record.Label "users") |> HttpApi.add get_user |> HttpApi.add ping
+  let users =
+    HttpApi.group (Record.label : Record.Label "users") |> HttpApi.add get_user |> HttpApi.add ping
   let api = HttpApi.api "Users" |> HttpApi.add_group users
   let options = { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }
   scope s {
     let missing = HttpApi.listen options api { users = { get_user = fun _ -> { id = "1" } } }
-    let extra = HttpApi.listen options api { users = { get_user = fun _ -> { id = "1" }; ping = fun _ -> (); pong = fun _ -> () } }
+    let extra =
+      HttpApi.listen
+        options
+        api
+        { users = { get_user = fun _ -> { id = "1" }; ping = fun _ -> (); pong = fun _ -> () } }
     ()
   }
-//~ FLICK-T003 @21:56-21:92 field `ping` is missing from `users`
-//~ FLICK-T003 @22:54-22:130 `users` has field `pong`, which the expected type does not
+//~ FLICK-T003 @22:56-22:92 field `ping` is missing from `users`
+//~ FLICK-T003 @27:19-27:95 `users` has field `pong`, which the expected type does not

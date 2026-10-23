@@ -36,7 +36,7 @@ let same x y = eq x y
 both : (forall a. Show a => a -> String) -> String
 let both render = render 1 ++ " " ++ render "two"
 
-main : Unit ->{none; AppError} Unit
+main : Unit ->{; AppError} Unit
 let main () =
   let small = Node Leaf 1 Leaf
   let big = Node small 2 Leaf
@@ -44,7 +44,8 @@ let main () =
   Platform.stdout_line (show (largest small big == big))
   Platform.stdout_line (show (same Red Red && not (same Red Green)))
   Platform.stdout_line (show (compare Green Red))
-  Platform.stdout_line (describe [Red] ++ ", " ++ describe [Red, Green] ++ ", " ++ describe ([] : List Color))
+  Platform.stdout_line
+    (describe [Red] ++ ", " ++ describe [Red, Green] ++ ", " ++ describe ([] : List Color))
   Platform.stdout_line (show { name = "ada"; age = 36 })
   Platform.stdout_line (show (1, "x", [Some 2, None]))
   Platform.stdout_line (both (fun v -> "<" ++ show v ++ ">"))

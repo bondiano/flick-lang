@@ -25,7 +25,7 @@ let main () =
       Ref.increment_and_get cell,
       Ref.get_and_increment cell,
       Ref.decrement_and_get cell,
-      Ref.get_and_decrement cell
+      Ref.get_and_decrement cell,
     )
   Platform.stdout_line ("counters: " ++ show counts ++ " -> " ++ show (Ref.get cell))
   let flag = Ref.make false

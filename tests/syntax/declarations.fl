@@ -19,7 +19,7 @@ type Shape =
 type Option a = None | Some a
 
 type alias Wrapped (f : Type -> Type) a = {
-  value : f a
+  value : f a;
 } deriving Schema
 
 opaque type alias UserId = String

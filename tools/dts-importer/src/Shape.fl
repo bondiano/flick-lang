@@ -21,7 +21,7 @@ type alias Export = {
   name : String;
   local : String;
   body : List (String, Value);
-  fingerprint : String
+  fingerprint : String;
 }
 
 tag : String -> Value
@@ -46,7 +46,7 @@ let simple =
     ("Void", "void"),
     ("Undefined", "undefined"),
     ("Null", "null"),
-    ("Never", "never")
+    ("Never", "never"),
   ]
 
 is_literal : Ts.Type -> Bool
@@ -101,7 +101,7 @@ rec {
           JObject
             [
               ("k", JString "union"),
-              ("types", JArray (List.map (shape c (depth + 1)) (Ts.members t)))
+              ("types", JArray (List.map (shape c (depth + 1)) (Ts.members t))),
             ]
         else if Ts.type_has "Object" t then
           object_shape c depth t
@@ -138,7 +138,7 @@ rec {
           JObject
             [
               ("k", JString "function"),
-              ("signatures", JArray (List.map (signature c (depth + 1)) calls))
+              ("signatures", JArray (List.map (signature c (depth + 1)) calls)),
             ]
         else
           match name with
@@ -155,7 +155,7 @@ rec {
                 [
                   ("k", JString "object"),
                   ("name", object_name n t),
-                  ("text", JString (Ts.text c t))
+                  ("text", JString (Ts.text c t)),
                 ]
             else
               other c t
@@ -183,7 +183,7 @@ rec {
         ("name", JString (Ts.symbol_name p)),
         ("optional", JBool optional),
         ("rest", JBool (is "dotDotDotToken")),
-        ("type", shape c depth type_)
+        ("type", shape c depth type_),
       ]
 
   signature : Ts.Checker -> Number -> Ts.Signature -> Value
@@ -197,9 +197,9 @@ rec {
           JArray
             (List.map
               (fun t -> JString (Option.with_default "" (symbol_name (Ts.type_symbol t))))
-              (Ts.type_parameters s))
+              (Ts.type_parameters s)),
         ),
-        ("result", shape c depth (Ts.return_type c s))
+        ("result", shape c depth (Ts.return_type c s)),
       ]
 }
 
@@ -214,7 +214,7 @@ let describe c symbol =
     Some
       [
         ("kind", JString "value"),
-        ("type", JObject [("k", JString "other"), ("text", JString "enum")])
+        ("type", JObject [("k", JString "other"), ("text", JString "enum")]),
       ]
   else
     let type_ = Ts.type_of_symbol c symbol
@@ -248,7 +248,7 @@ let export_of c exported =
         name = name;
         local = local_name exported symbol;
         body = body;
-        fingerprint = "sha256:" ++ Ts.sha256 fingerprinted
+        fingerprint = "sha256:" ++ Ts.sha256 fingerprinted;
       })
     (describe c symbol)
 

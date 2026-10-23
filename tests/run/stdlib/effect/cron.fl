@@ -35,7 +35,7 @@ let main () =
           parsed (Cron.parse utc "0 9 * * 1-5"),
           parsed (Cron.parse utc "*/15 0 1,15 * *"),
           parsed (Cron.parse utc "0 9 * *"),
-          parsed (Cron.parse utc "0 99 * * *")
+          parsed (Cron.parse utc "0 99 * * *"),
         ])
   let fields =
     {
@@ -46,14 +46,14 @@ let main () =
       months = [];
       weekdays = [6];
       and = None;
-      tz = utc
+      tz = utc;
     }
   Platform.stdout_line
     ("make: "
       ++ show
         [
           parsed (Cron.make fields),
-          parsed (Cron.make { fields with seconds = Some [5]; hours = [25] })
+          parsed (Cron.make { fields with seconds = Some [5]; hours = [25] }),
         ])
   match Cron.parse utc "0 9 * * 1-5" with
   | Ok workdays -> with_workdays workdays
@@ -67,7 +67,7 @@ let with_workdays workdays =
       ++ show
         (
           Cron.format { includeSeconds = Some true } workdays,
-          Cron.format { includeSeconds = None } workdays
+          Cron.format { includeSeconds = None } workdays,
         ))
   Platform.stdout_line
     ("match_: "
@@ -93,7 +93,7 @@ let with_workdays workdays =
         (
           Cron.equals_cron workdays workdays,
           Result.map (eq workdays) (Cron.parse utc "0 0 9 * * 1-5"),
-          Result.map (eq workdays) (Cron.parse utc "0 10 * * 1-5")
+          Result.map (eq workdays) (Cron.parse utc "0 10 * * 1-5"),
         ))
   let every_second = Result.with_default workdays (Cron.parse utc "* * * * * *")
   let seen = Ref.make []
@@ -110,5 +110,5 @@ let with_workdays workdays =
           List.length delays,
           List.all
             (fun d -> Duration.is_positive d && Duration.is_less_than_or_equal_to second d)
-            delays
+            delays,
         ))

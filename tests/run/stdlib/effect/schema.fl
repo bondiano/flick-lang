@@ -3,7 +3,14 @@
 // decoding and encoding both ways, and the Standard Schema adapter.
 module App.Main exposing (main)
 
-type alias Profile = { name : String; nick : Option String; age : Option Number; tags : Option (List String); retries : Number; level : Number }
+type alias Profile = {
+  name : String;
+  nick : Option String;
+  age : Option Number;
+  tags : Option (List String);
+  retries : Number;
+  level : Number;
+}
   deriving Schema
 
 type Shape = Circle Number | Square Number
@@ -38,12 +45,13 @@ let default_level () = 3
 profile_json : Codec none none Json Profile
 let profile_json =
   codec (schema Profile) {
-    name = field "name" String.json
-    nick = field "nick" (option_as_null String.json)
-    age = field "age" (option_as_nullish Number.json_finite)
-    tags = optional_field "tags" (Codec.list String.json)
-    retries = field "retries" Number.json_finite |> on_missing (fun () -> 1)
-    level = field_effect "level" (Codec.general Number.json_finite) |> on_missing_effect default_level
+    name = field "name" String.json;
+    nick = field "nick" (option_as_null String.json);
+    age = field "age" (option_as_nullish Number.json_finite);
+    tags = optional_field "tags" (Codec.list String.json);
+    retries = field "retries" Number.json_finite |> on_missing (fun () -> 1);
+    level =
+      field_effect "level" (Codec.general Number.json_finite) |> on_missing_effect default_level;
   }
 
 main : Unit ->{; AppError} Unit
@@ -55,8 +63,10 @@ let main () =
   Platform.stdout_line ("unit: " ++ dec "null" (Codec.json Schema.unit))
   Platform.stdout_line ("list: " ++ dec "[1, 2]" (Codec.json (Schema.list Schema.number)))
   Platform.stdout_line ("option: " ++ dec "null" (Codec.json (Schema.option Schema.number)))
-  Platform.stdout_line ("result: " ++ dec "{\"err\": \"no\"}" (Codec.json (Schema.result Schema.string Schema.number)))
-  Platform.stdout_line ("shape: " ++ dec "{\"_tag\": \"Square\", \"_0\": 2}" (Codec.json (schema Shape)))
+  Platform.stdout_line
+    ("result: " ++ dec "{\"err\": \"no\"}" (Codec.json (Schema.result Schema.string Schema.number)))
+  Platform.stdout_line
+    ("shape: " ++ dec "{\"_tag\": \"Square\", \"_0\": 2}" (Codec.json (schema Shape)))
   let never : PureCodec Json Never = Codec.json Schema.never
   Platform.stdout_line ("never: " ++ (match Json.parse "1" with
     | Ok u -> (match Codec.decode_result never u with
@@ -94,16 +104,20 @@ let main () =
       | Err e -> issues e)
     | Err e -> issues e))
   Platform.stdout_line ("BigInt.json: " ++ dec "\"-7\"" BigInt.json)
-  Platform.stdout_line ("json_finite: " ++ wire (Codec.encode_result Number.json_finite Number.infinity))
+  Platform.stdout_line
+    ("json_finite: " ++ wire (Codec.encode_result Number.json_finite Number.infinity))
   let doubled = Codec.transform (fun n -> n * 2) (fun n -> n / 2) Number.json_finite
-  Platform.stdout_line ("transform: " ++ dec "2" doubled ++ " -> " ++ wire (Codec.encode_result doubled 4))
+  Platform.stdout_line
+    ("transform: " ++ dec "2" doubled ++ " -> " ++ wire (Codec.encode_result doubled 4))
   let parsed = Codec.transform_result (fun s -> match Number.parse s with
     | Some n -> Ok n
-    | None -> Err (SchemaError [{ message = "not a number"; path = "" }])) Number.to_string String.json
+    | None ->
+      Err (SchemaError [{ message = "not a number"; path = "" }])) Number.to_string String.json
   Platform.stdout_line ("transform_result: " ++ dec "\"4\"" parsed ++ " | " ++ dec "\"x\"" parsed)
   let positive = Codec.check (fun n -> n > 0) "a positive number" Number.json_finite
   Platform.stdout_line ("check: " ++ dec "-1" positive)
-  let looked_up = Codec.transform_effect (fun s -> String.length s) (fun n -> String.repeat n "x") String.json
+  let looked_up =
+    Codec.transform_effect (fun s -> String.length s) (fun n -> String.repeat n "x") String.json
   let length =
     try
       match Json.parse "\"abc\"" with
@@ -119,7 +133,10 @@ let main () =
       | Err e -> App.fail "not JSON"
     with
     | SchemaError found -> App.fail (issues (SchemaError found))
-  Platform.stdout_line ("profile: " ++ show (profile.name, profile.nick, profile.age, profile.tags, profile.retries, profile.level))
+  Platform.stdout_line
+    ("profile: "
+      ++ show
+        (profile.name, profile.nick, profile.age, profile.tags, profile.retries, profile.level))
   let written =
     try Json.stringify (Codec.encode profile_json { profile with nick = Some "A" }) with
     | SchemaError found -> issues (SchemaError found)

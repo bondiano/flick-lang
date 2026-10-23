@@ -1,5 +1,29 @@
 /// Outcomes as data: `Ok value` or `Err error`.
-module Result exposing (map, map_err, bind, with_default, is_ok, is_err, to_option, from_option, all, fail_void, void, filter_or_fail, flip, get_failure, lift_predicate, map_both, match_, merge, or_else, succeed_none, succeed_some, transpose_option, transpose_map_option)
+module Result exposing (
+  map,
+  map_err,
+  bind,
+  with_default,
+  is_ok,
+  is_err,
+  to_option,
+  from_option,
+  all,
+  fail_void,
+  void,
+  filter_or_fail,
+  flip,
+  get_failure,
+  lift_predicate,
+  map_both,
+  match_,
+  merge,
+  or_else,
+  succeed_none,
+  succeed_some,
+  transpose_option,
+  transpose_map_option,
+)
 
 /// `Ok (f x)` for `Ok x`.
 map : forall c e a b. (a -> b)^c -> (Result e a -> Result e b)^c

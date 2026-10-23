@@ -16,12 +16,14 @@ let options =
     sampled = None;
     level = None;
     captureStackTrace = false;
-    disablePropagation = false
+    disablePropagation = false;
   }
 
 /// A logger writing the level and the message to stdout.
 plain : Logger.Logger Unit
-let plain = Logger.with_console_log (Logger.make (fun o -> show o.logLevel ++ " " ++ String.join " " o.message))
+let plain =
+  Logger.with_console_log
+    (Logger.make (fun o -> show o.logLevel ++ " " ++ String.join " " o.message))
 
 none_loggers : List (Logger.Logger Unit)
 let none_loggers = []
@@ -47,32 +49,44 @@ let logs () =
       References.with_minimum_log_level LogLevel.trace (task { Effect.log_debug "debug at trace" })
       References.with_current_log_level LogLevel.error (task {
         Effect.log "at the current level"
-        Platform.stdout_line ("current_log_level: " ++ LogLevel.name (References.current_log_level ()))
+        Platform.stdout_line
+          ("current_log_level: " ++ LogLevel.name (References.current_log_level ()))
       })
       Effect.annotate_logs "user" "ada" (task {
         Platform.stdout_line ("annotate_logs: " ++ show (References.current_log_annotations ()))
       })
       scope {
         Effect.annotate_logs_scoped "request" "7"
-        Platform.stdout_line ("annotate_logs_scoped: " ++ show (References.current_log_annotations ()))
+        Platform.stdout_line
+          ("annotate_logs_scoped: " ++ show (References.current_log_annotations ()))
       }
       Effect.with_log_span "outer" (task {
-        Effect.with_log_span "inner" (task { Platform.stdout_line ("with_log_span: " ++ show (References.current_log_spans ())) })
+        Effect.with_log_span
+          "inner"
+          (task {
+            Platform.stdout_line ("with_log_span: " ++ show (References.current_log_spans ()))
+          })
       })
-      References.with_unhandled_log_level None (task { Platform.stdout_line ("with_unhandled_log_level: " ++ "set") })
+      References.with_unhandled_log_level
+        None
+        (task { Platform.stdout_line ("with_unhandled_log_level: " ++ "set") })
     })
   })
 
 spans : Unit ->{; Cause.NoSuchElementError} Unit
 let spans () =
   let _ : Tracer.Tracer = Effect.tracer ()
-  let outside = try show (Tracer.span_name (Effect.current_span ())) with | Cause.NoSuchElementError _ -> "no span"
+  let outside =
+    try show (Tracer.span_name (Effect.current_span ())) with | Cause.NoSuchElementError _ ->
+      "no span"
   Platform.stdout_line ("current_span: " ++ outside)
   Tracer.with_span "outer" options (task {
     Platform.stdout_line ("current_span: " ++ show (Tracer.span_name (Effect.current_span ())))
-    Platform.stdout_line ("current_parent_span: " ++ show (Tracer.span_name (Effect.current_parent_span ())))
+    Platform.stdout_line
+      ("current_parent_span: " ++ show (Tracer.span_name (Effect.current_parent_span ())))
     Effect.annotate_current_span "step" "1"
-    Platform.stdout_line ("annotate_current_span: " ++ show (Tracer.attributes (Effect.current_span ())))
+    Platform.stdout_line
+      ("annotate_current_span: " ++ show (Tracer.attributes (Effect.current_span ())))
   })
   Effect.annotate_spans "team" "core" (task {
     Platform.stdout_line ("span_annotations: " ++ show (References.span_annotations ()))
@@ -80,25 +94,37 @@ let spans () =
   let made = Effect.make_span "made" options
   Platform.stdout_line ("make_span: " ++ show (Tracer.span_name made))
   Effect.link_spans [made] [("why", "test")] (task {
-    Platform.stdout_line ("span_links: " ++ show (List.map (fun l -> Tracer.span_name l.span) (Effect.span_links ())))
+    Platform.stdout_line
+      ("span_links: " ++ show (List.map (fun l -> Tracer.span_name l.span) (Effect.span_links ())))
   })
   Effect.with_parent_span made (task {
     Tracer.with_span "child" options (task {
-      Platform.stdout_line ("with_parent_span: " ++ show (Option.bind Tracer.span_name (Tracer.parent (Effect.current_span ()))))
+      Platform.stdout_line
+        ("with_parent_span: "
+          ++ show (Option.bind Tracer.span_name (Tracer.parent (Effect.current_span ()))))
     })
   })
-  Platform.stdout_line ("use_span: " ++ Effect.use_span "used" options (fun s -> show (Tracer.span_name s)))
+  Platform.stdout_line
+    ("use_span: " ++ Effect.use_span "used" options (fun s -> show (Tracer.span_name s)))
   scope {
     let scoped = Effect.make_span_scoped "scoped" options
     Platform.stdout_line ("make_span_scoped: " ++ show (Tracer.span_name scoped))
     Effect.with_span_scoped "scoped task" options (task {
-      Platform.stdout_line ("with_span_scoped: " ++ show (Tracer.span_name (Effect.current_span ())))
+      Platform.stdout_line
+        ("with_span_scoped: " ++ show (Tracer.span_name (Effect.current_span ())))
     })
   }
-  References.with_tracer_enabled false (task { Platform.stdout_line ("with_tracer_enabled: " ++ "off") })
-  References.with_tracer_timing false (task { Platform.stdout_line ("with_tracer_timing: " ++ "off") })
-  References.with_disable_propagation true (task { Platform.stdout_line ("with_disable_propagation: " ++ "on") })
-  Platform.stdout_line ("current_stack_frame: " ++ show (Option.is_some (References.current_stack_frame ())))
+  References.with_tracer_enabled
+    false
+    (task { Platform.stdout_line ("with_tracer_enabled: " ++ "off") })
+  References.with_tracer_timing
+    false
+    (task { Platform.stdout_line ("with_tracer_timing: " ++ "off") })
+  References.with_disable_propagation
+    true
+    (task { Platform.stdout_line ("with_disable_propagation: " ++ "on") })
+  Platform.stdout_line
+    ("current_stack_frame: " ++ show (Option.is_some (References.current_stack_frame ())))
 
 all_runs : Metric.Counter
 let all_runs = Metric.counter "observe_all" counter_options
@@ -142,7 +168,10 @@ let metrics () =
   let bad : Eff none {Boom} Number = task { from_result (Err (Boom 3)) }
   let broken : Eff none {Boom} Number = task { Effect.die "broken" }
   List.each_effect tracked [ok, bad, broken]
-  Platform.stdout_line ("track: " ++ show (count_of all_runs, count_of wins, count_of error_count, count_of defects, count_of timing))
+  Platform.stdout_line
+    ("track: "
+      ++ show
+        (count_of all_runs, count_of wins, count_of error_count, count_of defects, count_of timing))
 
 main : Unit ->{; AppError} Unit
 let main () =

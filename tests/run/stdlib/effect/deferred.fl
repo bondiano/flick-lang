@@ -52,11 +52,14 @@ let deferreds () =
   let _ = Deferred.complete_with counted shared
   Platform.stdout_line ("complete_with: " ++ outcome shared ++ ", " ++ outcome shared)
   let exits = parallel_exits [task { 6 }, task { from_result (Err (Boom 7)) }]
-  List.each_effect (fun exit -> Platform.stdout_line ("done: " ++ completed (Deferred.done exit))) exits
+  List.each_effect
+    (fun exit -> Platform.stdout_line ("done: " ++ completed (Deferred.done exit)))
+    exits
   let failures = List.filter_map Exit.failure exits
   List.each_effect (fun failure ->
     Platform.stdout_line ("fail_cause: " ++ completed (Deferred.fail_cause failure))
-    Platform.stdout_line ("fail_cause_sync: " ++ completed (Deferred.fail_cause_sync (fun () -> failure)))) failures
+    Platform.stdout_line
+      ("fail_cause_sync: " ++ completed (Deferred.fail_cause_sync (fun () -> failure)))) failures
   let into : Deferred.Deferred {Boom} Number = Deferred.make ()
   let fed = task { 8 } |> Deferred.into into
   Platform.stdout_line ("into: " ++ show fed ++ " " ++ outcome into)
@@ -74,7 +77,11 @@ let deferreds () =
   let stopped_too : Deferred.Deferred {Boom} Number = Deferred.make ()
   let interrupted = (Deferred.interrupt stopped, Deferred.interrupt_with 7 stopped_too)
   let seen = parallel_exits [task { Deferred.await_ stopped }, task { Deferred.await_ stopped_too }]
-  Platform.stdout_line ("interrupt: " ++ show interrupted ++ " " ++ show (List.map (fun e -> Option.is_some (Exit.failure e)) seen))
+  Platform.stdout_line
+    ("interrupt: "
+      ++ show interrupted
+      ++ " "
+      ++ show (List.map (fun e -> Option.is_some (Exit.failure e)) seen))
   // a child waits for the deferred another task completes
   let waited = scope s {
     let gate : Deferred.Deferred none String = Deferred.make ()
@@ -121,7 +128,11 @@ let semaphores () =
   }
   let _ = parallel_all 5 (List.repeat 5 (task { Semaphore.with_permit sem work }))
   Platform.stdout_line ("with_permit: at most " ++ show (Ref.get most))
-  let both = Semaphore.with_permits sem 2 (task { Semaphore.with_permits_if_available sem 1 (task { "inner" }) })
+  let both =
+    Semaphore.with_permits
+      sem
+      2
+      (task { Semaphore.with_permits_if_available sem 1 (task { "inner" }) })
   Platform.stdout_line ("with_permits: " ++ show both)
   let taken = Semaphore.take 1 sem
   let more = Semaphore.take_if_available 2 sem
@@ -143,7 +154,8 @@ let partitions () =
   PartitionedSemaphore.take "a" 2 sem
   let none_left = PartitionedSemaphore.with_permits_if_available sem 1 (task { "never" })
   let back = PartitionedSemaphore.release 2 sem
-  let keyed = PartitionedSemaphore.with_permits sem "b" 2 (task { PartitionedSemaphore.available sem })
+  let keyed =
+    PartitionedSemaphore.with_permits sem "b" 2 (task { PartitionedSemaphore.available sem })
   let one = PartitionedSemaphore.with_permit sem "c" (task { PartitionedSemaphore.available sem })
   Platform.stdout_line ("partitioned: " ++ show (total, before, none_left, back, keyed, one))
 

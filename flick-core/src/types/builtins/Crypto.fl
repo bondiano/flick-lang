@@ -17,7 +17,7 @@ module Crypto exposing
     random_uuid_v4,
     random_uuid_v7,
     random_ulid,
-    system
+    system,
   )
 
 /// What the platform refused: a bad size or a failed digest.
@@ -140,5 +140,5 @@ let system =
       random_shuffle = system_random_shuffle;
       random_uuid_v4 = system_random_uuid_v4;
       random_uuid_v7 = system_random_uuid_v7;
-      random_ulid = system_random_ulid
+      random_ulid = system_random_ulid;
     }

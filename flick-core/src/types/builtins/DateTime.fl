@@ -29,7 +29,7 @@ type alias Parts =
     day : Number;
     weekDay : Number;
     month : Number;
-    year : Number
+    year : Number;
   }
 
 /// Some of the parts; `None` keeps a part as it is.
@@ -42,7 +42,7 @@ type alias PartialParts =
     day : Option Number;
     weekDay : Option Number;
     month : Option Number;
-    year : Option Number
+    year : Option Number;
   }
 
 /// How to place a date-time in a zone: keep the instant (the default) or,
@@ -51,7 +51,11 @@ type alias ZoneOptions = { adjustForTimeZone : Option Bool; disambiguation : Opt
 
 /// `Intl.DateTimeFormat` options: a locale, and `"full"`, `"long"`,
 /// `"medium"` or `"short"` styles.
-type alias FormatOptions = { locale : Option String; dateStyle : Option String; timeStyle : Option String }
+type alias FormatOptions = {
+  locale : Option String;
+  dateStyle : Option String;
+  timeStyle : Option String;
+}
 
 /// No part at all, to update: `{ DateTime.no_parts with hour = Some 9 }`.
 no_parts : PartialParts
@@ -64,7 +68,7 @@ let no_parts =
     day = None;
     weekDay = None;
     month = None;
-    year = None
+    year = None;
   }
 
 /// The time zone a program runs in; `layer_current_zone` provides it.

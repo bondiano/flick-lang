@@ -61,7 +61,7 @@ type alias SpanOptions =
     sampled : Option Bool;
     level : Option LogLevel.LogLevel;
     captureStackTrace : Bool;
-    disablePropagation : Bool
+    disablePropagation : Bool;
   }
 
 /// Runs `task` in a new span with the name, which ends with the task.

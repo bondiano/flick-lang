@@ -4,7 +4,7 @@
 module Ref exposing (
   make, get, set, modify, same, get_and_set, get_and_update, get_and_update_some, set_and_get,
   modify_some, update, update_and_get, update_some, update_some_and_get, compare_and_set, increment,
-  decrement, increment_and_get, decrement_and_get, get_and_increment, get_and_decrement, toggle
+  decrement, increment_and_get, decrement_and_get, get_and_increment, get_and_decrement, toggle,
 )
 
 /// A fresh cell holding `value`.

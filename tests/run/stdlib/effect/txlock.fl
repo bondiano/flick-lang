@@ -13,7 +13,7 @@ let counts lock =
     TxReentrantLock.write_locks lock,
     TxReentrantLock.locked lock,
     TxReentrantLock.read_locked lock,
-    TxReentrantLock.write_locked lock
+    TxReentrantLock.write_locked lock,
   )
 
 permits : TxSemaphore.TxSemaphore ->{} Number
@@ -43,8 +43,12 @@ let main () =
     })
   Platform.stdout_line ("reentrant write: " ++ show writes)
   let inside = TxReentrantLock.with_read_lock (task { Tx.atomically (task { counts lock }) }) lock
-  let inside_write = TxReentrantLock.with_write_lock (task { Tx.atomically (task { counts lock }) }) lock
-  let inside_lock = TxReentrantLock.with_lock (task { Tx.atomically (task { TxReentrantLock.write_locked lock }) }) lock
+  let inside_write =
+    TxReentrantLock.with_write_lock (task { Tx.atomically (task { counts lock }) }) lock
+  let inside_lock =
+    TxReentrantLock.with_lock
+      (task { Tx.atomically (task { TxReentrantLock.write_locked lock }) })
+      lock
   Platform.stdout_line ("with locks: " ++ show (inside, inside_write, inside_lock))
   let scoped =
     scope {
@@ -56,7 +60,11 @@ let main () =
       let w = TxReentrantLock.write_lock lock
       Tx.atomically (task { (w, TxReentrantLock.write_locked lock) })
     }
-  Platform.stdout_line ("scoped: " ++ show (scoped, scoped_write, Tx.atomically (task { TxReentrantLock.locked lock })))
+  Platform.stdout_line
+    (
+      "scoped: "
+        ++ show (scoped, scoped_write, Tx.atomically (task { TxReentrantLock.locked lock }))
+    )
   let sem = TxSemaphore.make 3
   let taken = Tx.atomically (task {
       TxSemaphore.acquire sem

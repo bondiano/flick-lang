@@ -20,7 +20,7 @@ let main () =
       ++ show
         (
           HashMap.is_empty stock,
-          HashMap.is_empty (HashMap.empty : HashMap.HashMap EqHash.Canonical String Number)
+          HashMap.is_empty (HashMap.empty : HashMap.HashMap EqHash.Canonical String Number),
         ))
   Platform.stdout_line
     ("has: " ++ show (HashMap.has "pear" stock, HashMap.has "kiwi" stock, HashMap.get "plum" stock))
@@ -30,7 +30,7 @@ let main () =
         (
           HashMap.get_hash "plum" (hash "plum") stock,
           HashMap.get_hash "plum" (hash "plum" + 1) stock,
-          HashMap.has_hash "apple" (hash "apple") stock
+          HashMap.has_hash "apple" (hash "apple") stock,
         ))
   Platform.stdout_line
     ("has_by: "
@@ -84,7 +84,7 @@ let main () =
       ++ show
         (
           HashMap.find_first (fun n _ -> n == 7) stock,
-          HashMap.find_first (fun n _ -> n == 8) stock
+          HashMap.find_first (fun n _ -> n == 8) stock,
         ))
   Platform.stdout_line
     ("some, every: "
@@ -92,7 +92,7 @@ let main () =
         (
           HashMap.some (fun n _ -> n == 0) stock,
           HashMap.every (fun n _ -> n >= 0) stock,
-          HashMap.every (fun n _ -> n > 0) stock
+          HashMap.every (fun n _ -> n > 0) stock,
         ))
   Platform.stdout_line
     ("union: "

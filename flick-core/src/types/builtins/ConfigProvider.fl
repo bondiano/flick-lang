@@ -15,7 +15,9 @@ type alias Path = List Segment
 
 /// What a provider finds at a path: a value, a record with its keys, or an
 /// array with its length; a record or an array may have a value too.
-type Node = ValueNode String | RecordNode (List String) (Option String) | ArrayNode Number (Option String)
+type Node = ValueNode String | RecordNode (List String) (Option String) | ArrayNode Number (
+  Option String
+)
   deriving Eq, Show
 
 /// A provider that could not read its source.
@@ -94,15 +96,25 @@ foreign pure from_dot_env_contents from "@flick-lang/runtime/effect/ConfigProvid
 
 /// Values from a `.env` file, by default `.env`.
 from_dot_env :
-  { path : Option String; expandVariables : Bool; preserveEmptyStrings : Bool } ->{FileSystem.FileSystem; PlatformError.PlatformError}
+  {
+    path : Option String;
+    expandVariables : Bool;
+    preserveEmptyStrings : Bool;
+  } ->{FileSystem.FileSystem; PlatformError.PlatformError}
     ConfigProvider
 let from_dot_env options =
   let text = FileSystem.read_file_string (Option.with_default ".env" options.path)
-  from_dot_env_contents { expandVariables = options.expandVariables; preserveEmptyStrings = options.preserveEmptyStrings } text
+  from_dot_env_contents
+    {
+      expandVariables = options.expandVariables;
+      preserveEmptyStrings = options.preserveEmptyStrings;
+    }
+    text
 
 /// Values from a directory tree, by default `/`: a file is a value, its
 /// trimmed text; a directory is a record of its entries.
-from_dir : { rootPath : Option String; preserveEmptyStrings : Bool } ->{FileSystem.FileSystem;} ConfigProvider
+from_dir : { rootPath : Option String; preserveEmptyStrings : Bool } ->{FileSystem.FileSystem;}
+  ConfigProvider
 foreign effect from_dir from "@flick-lang/runtime/effect/ConfigProvider" "flickFromDir"
   reviewed "effect@4.0.5 sha256:2df6220667d4e4fc"
 

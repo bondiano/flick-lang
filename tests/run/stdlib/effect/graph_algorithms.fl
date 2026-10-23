@@ -117,7 +117,7 @@ let main () =
         (
           Graph.is_weakly_connected roads,
           Graph.is_strongly_connected roads,
-          Graph.is_strongly_connected looped
+          Graph.is_strongly_connected looped,
         ))
   Platform.stdout_line
     ("transitive_reduction: "
@@ -143,7 +143,7 @@ let main () =
         (
           Graph.bridges square,
           Graph.articulation_points square,
-          Graph.biconnected_components square
+          Graph.biconnected_components square,
         ))
   let triangle =
     Graph.undirected ()

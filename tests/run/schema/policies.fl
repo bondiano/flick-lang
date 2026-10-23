@@ -1,26 +1,26 @@
-// The policies of a `codec` block, one per row of the table of §9: a
+// The policies of a `codec` block, one per missing/null/default policy: a
 // required key, `null` as `None`, a key that may be missing, nullish, a
 // tagged `Option`, a default for a missing key and extra keys.
 module App.Main exposing (main)
 
 type alias Row = {
-  required : String
-  nullable : Option String
-  missing : Option String
-  nullish : Option String
-  tagged : Option Number
-  quota : Number
+  required : String;
+  nullable : Option String;
+  missing : Option String;
+  nullish : Option String;
+  tagged : Option Number;
+  quota : Number;
 } deriving Schema
 
 row_json : Ref Number -> PureCodec Json Row
 let row_json calls =
   codec (schema Row) {
-    required = field "required" String.json
-    nullable = field "nullable" (option_as_null String.json)
-    missing = optional_field "missing" String.json
-    nullish = field "nullish" (option_as_nullish String.json)
-    tagged = field "tagged" (Codec.tagged_option Number.json_finite)
-    quota = field "quota" Number.json_finite |> on_missing (fun () -> count calls)
+    required = field "required" String.json;
+    nullable = field "nullable" (option_as_null String.json);
+    missing = optional_field "missing" String.json;
+    nullish = field "nullish" (option_as_nullish String.json);
+    tagged = field "tagged" (Codec.tagged_option Number.json_finite);
+    quota = field "quota" Number.json_finite |> on_missing (fun () -> count calls);
   }
 
 count : Ref Number -> Number
@@ -33,7 +33,8 @@ let decode wire text =
   | Ok input ->
     match Codec.decode_result wire input with
     | Ok row -> "ok " ++ show row
-    | Err (SchemaError issues) -> "error " ++ show (List.map (fun i -> i.path ++ ": " ++ i.message) issues)
+    | Err (SchemaError issues) ->
+      "error " ++ show (List.map (fun i -> i.path ++ ": " ++ i.message) issues)
 
 encode : PureCodec Json Row -> Row -> String
 let encode wire row =
@@ -42,7 +43,8 @@ let encode wire row =
   | Err (SchemaError issues) -> "error"
 
 base : String
-let base = "\"required\": \"r\", \"nullable\": null, \"nullish\": null, \"tagged\": {\"_tag\": \"None\"}"
+let base =
+  "\"required\": \"r\", \"nullable\": null, \"nullish\": null, \"tagged\": {\"_tag\": \"None\"}"
 
 main : Unit ->{; AppError} Unit
 let main () =
@@ -50,11 +52,16 @@ let main () =
   let wire = row_json calls
   Platform.stdout_line (decode wire ("{" ++ base ++ "}"))
   Platform.stdout_line (show (Ref.get calls))
-  Platform.stdout_line (decode wire "{\"nullable\": null, \"nullish\": null, \"tagged\": {\"_tag\": \"None\"}}")
-  Platform.stdout_line (decode wire "{\"required\": \"r\", \"nullish\": null, \"tagged\": {\"_tag\": \"None\"}}")
+  Platform.stdout_line
+    (decode wire "{\"nullable\": null, \"nullish\": null, \"tagged\": {\"_tag\": \"None\"}}")
+  Platform.stdout_line
+    (decode wire "{\"required\": \"r\", \"nullish\": null, \"tagged\": {\"_tag\": \"None\"}}")
   Platform.stdout_line (decode wire ("{" ++ base ++ ", \"missing\": \"here\", \"quota\": 5}"))
   Platform.stdout_line (decode wire ("{" ++ base ++ ", \"missing\": 3}"))
-  Platform.stdout_line (decode wire "{\"required\": \"r\", \"nullable\": null, \"tagged\": {\"_tag\": \"Some\", \"value\": 2}}")
+  Platform.stdout_line
+    (decode
+      wire
+      "{\"required\": \"r\", \"nullable\": null, \"tagged\": {\"_tag\": \"Some\", \"value\": 2}}")
   Platform.stdout_line (decode wire ("{" ++ base ++ ", \"quota\": null}"))
   Platform.stdout_line (decode wire ("{" ++ base ++ ", \"extra\": 1}"))
   Platform.stdout_line (decode (ignore_extra_fields wire) ("{" ++ base ++ ", \"extra\": 1}"))
@@ -64,6 +71,6 @@ let main () =
     missing = None;
     nullish = None;
     tagged = Some 1;
-    quota = 2
+    quota = 2;
   }
   Platform.stdout_line (encode wire row)

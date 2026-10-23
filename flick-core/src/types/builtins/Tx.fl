@@ -20,7 +20,7 @@ type alias Meta =
     start : Number;
     now : Number;
     elapsed : Number;
-    elapsedSincePrevious : Number
+    elapsedSincePrevious : Number;
   }
 
 /// Runs `body` as one transaction: its changes to transactional values
