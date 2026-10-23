@@ -1,8 +1,8 @@
-[pending]
-Etag = "M21"
-Generator = "M21"
-Strong = "M21"
-Weak = "M21"
-layer = "M21"
-layerWeak = "M21"
-toString = "M21"
+[wrapped]
+Etag = "Http.Etag.Etag ceed970b5914499a"
+Generator = "Http.Etag.Generator 1cea542fb4f1eb10"
+Strong = "Http.Etag.Etag 89445beaab17ef45"
+Weak = "Http.Etag.Etag c8d8f97ec206c289"
+layer = "Http.Etag.layer 616074a7cc92d3ab"
+layerWeak = "Http.Etag.layer_weak db322aab894772b2"
+toString = "Http.Etag.to_string ec9298d9cde82e13"

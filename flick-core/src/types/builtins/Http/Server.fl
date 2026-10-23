@@ -1,0 +1,75 @@
+/// Effect's `HttpServer` on Node.js: `serve` starts a server of a handler
+/// that belongs to the scope of region `s`. Each request runs in a fiber of
+/// the server; when the scope closes, the server stops accepting
+/// connections, waits for the requests that are running and their
+/// finalizers, at most `gracefulShutdownTimeout` (20 seconds by default),
+/// and then interrupts what is left. A `HttpServerError` or
+/// `Http.Multipart.MultipartError` a handler lets through is answered with
+/// its status, any other failure with 500.
+module Http.Server exposing (..)
+
+import Http.ServerError exposing (ServeError)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+/// A running server of region `s`.
+type Server (s : Region)
+
+/// Where a server listens.
+type Address = TcpAddress String Number | UnixAddress String
+  deriving Eq, Show
+
+/// Where `serve` listens: a host and a port (0: one the system picks), and
+/// how long closing waits for running requests.
+type alias ServeOptions = { host : String; port : Number; gracefulShutdownTimeout : Option Duration.Duration }
+
+/// Serves the handler until the scope of region `s` closes.
+serve :
+  forall s c r e.
+  Fiber.Outlives c s =>
+  ServeOptions -> (ServerRequest ->{r; e} ServerResponse)^c ->{Scope s | r; ServeError} Server s
+foreign effect serve from "@flick-lang/runtime/effect/http/HttpServer" "flickServe"
+  arity 2
+  retention owner
+  reviewed "effect@4.0.5 sha256:2830adcb190e6acd"
+
+/// Where the server listens.
+address : forall s. Server s -> Address
+foreign pure address from "@flick-lang/runtime/effect/http/HttpServer" "flickAddress"
+  retention call
+  reviewed "effect@4.0.5 sha256:2ee695843d7fe6dc"
+
+/// The URL of an address: `http://127.0.0.1:8080` or `unix://path`.
+format_address : Address -> String
+let format_address a =
+  match a with
+  | TcpAddress host port ->
+      let h = if String.contains ":" host then "[" ++ host ++ "]" else host
+      "http://" ++ h ++ ":" ++ show port
+  | UnixAddress path -> "unix://" ++ path
+
+/// `f` of the URL of the server.
+address_formatted_with : forall s r e a. (String ->{r; e} a) -> Server s ->{r; e} a
+let address_formatted_with f server = f (format_address (address server))
+
+/// Logs `Listening on <url>` at the info level of Effect's logger.
+log_address : forall s. Server s ->{} Unit
+foreign effect log_address from "@flick-lang/runtime/effect/http/HttpServer" "flickLogAddress"
+  retention call
+  reviewed "effect@4.0.5 sha256:13cc22882eaf503e"
+
+/// The client of the service, with each request's URL below the server's.
+test_client : forall s. Server s ->{Http.Client.HttpClient;} Http.Client.Client none {Http.ClientError.HttpClientError}
+let test_client server =
+  Http.Client.current () |> Http.Client.map_request (Http.ClientRequest.prepend_url (format_address (address server)))
+
+/// The service of `test_client`.
+layer_test_client : forall s. Server s -> Layer {Http.Client.HttpClient} none {Http.Client.HttpClient}
+let layer_test_client server =
+  let url = format_address (address server)
+  Http.Client.layer (task { Http.Client.current () |> Http.Client.map_request (Http.ClientRequest.prepend_url url) })
+
+/// The platform services a server's handlers use: `Http.Platform.node` and
+/// strong entity tags.
+layer_services : Layer none none {Http.Platform.HttpPlatform, Http.Etag.Generator}
+let layer_services = Layer.merge Http.Platform.node Http.Etag.layer

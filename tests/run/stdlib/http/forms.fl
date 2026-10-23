@@ -1,0 +1,103 @@
+// Forms of requests made from client requests, their limits and the
+// parser's helpers, and trace context headers to and from spans.
+module App.Main exposing (main)
+
+type alias Note = { title : String; tag : List String }
+  deriving Schema
+
+type alias Point = { x : Number }
+  deriving Schema
+
+json_of : PureCodec Json a -> Codec none none Json a
+let json_of c = Codec.general (ignore_extra_fields c)
+
+point : Codec none none Json Point
+let point = Codec.general (Codec.json (schema Point))
+
+forms : Unit ->{; Http.Multipart.MultipartError, SchemaError} Unit
+let forms () =
+  let post =
+    Http.ClientRequest.body_form_data
+      [("title", "notes"), ("tag", "a"), ("tag", "b"), ("meta", "{\"x\":3}")]
+      (Http.ClientRequest.post "http://example.com/u")
+  scope {
+    let form = Http.Multipart.persisted (Http.ServerRequest.from_client_request post)
+    Platform.stdout_line ("fields: " ++ (show (Http.Multipart.fields form)))
+    Platform.stdout_line ("files: " ++ (show (List.length (Http.Multipart.files form))))
+    let note : Note =
+      Http.Multipart.schema_persisted
+        (json_of
+          (codec (schema Note) {
+            title = field "title" String.json;
+            tag = field "tag" (Codec.list String.json)
+          }))
+        form
+    Platform.stdout_line ("schema_persisted: " ++ (show note))
+    Platform.stdout_line ("schema_json: " ++ (show (Http.Multipart.schema_json point "meta" form)))
+  }
+  try
+    Http.Multipart.with_limits { Http.Multipart.limits with maxParts = Some 1 } (task {
+      scope {
+        let _ = Http.Multipart.persisted (Http.ServerRequest.from_client_request post)
+        Platform.stdout_line ("with_limits: " ++ "accepted")
+      }
+    })
+  with
+  | Http.Multipart.MultipartError reason -> Platform.stdout_line ("with_limits: " ++ (show reason))
+  let info : Http.Multipart.PartInfo =
+    {
+      name = "f";
+      filename = None;
+      contentType = "text/plain";
+      contentTypeParameters = [("charset", "utf-8")];
+      contentDisposition = "form-data";
+      contentDispositionParameters = [];
+      headers = []
+    }
+  Platform.stdout_line
+    ("default_is_file: "
+      ++ (show
+        (
+          Http.Multipart.default_is_file info,
+          Http.Multipart.default_is_file { info with filename = Some "a.txt" }
+        )))
+  Platform.stdout_line ("decode_field: " ++ (Http.Multipart.decode_field info [104, 105]))
+  let persisted_file : Http.Multipart.PersistedFile =
+    { key = "k"; name = "n"; contentType = "c"; path = "p" }
+  Platform.stdout_line ("persisted file: " ++ (persisted_file.name))
+
+traces : Unit ->{} Unit
+let traces () =
+  let span =
+    Tracer.external_span
+      { spanId = "00f067aa0ba902b7"; traceId = "4bf92f3577b34da6a3ce929d0e0e4736"; sampled = true }
+  let headers = Http.TraceContext.to_headers span
+  Platform.stdout_line ("to_headers: " ++ (show (Http.Headers.to_list headers)))
+  read : Http.TraceContext.FromHeaders
+  let read = Http.TraceContext.from_headers
+  Platform.stdout_line ("from_headers: " ++ (show (Option.map Tracer.span_id (read headers))))
+  Platform.stdout_line
+    ("w3c: " ++ (show (Option.map Tracer.trace_id (Http.TraceContext.w3c headers))))
+  Platform.stdout_line ("b3: " ++ (show (Option.map Tracer.sampled (Http.TraceContext.b3 headers))))
+  Platform.stdout_line
+    ("xb3: "
+      ++ (show
+        (Option.map
+          Tracer.span_id
+          (Http.TraceContext.xb3
+            (Http.Headers.from_input
+              [
+                ("x-b3-traceid", "4bf92f3577b34da6a3ce929d0e0e4736"),
+                ("x-b3-spanid", "00f067aa0ba902b7"),
+                ("x-b3-sampled", "1")
+              ])))))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try
+    forms ()
+  with
+  | Http.Multipart.MultipartError reason ->
+    Platform.stdout_line ("multipart error: " ++ (show reason))
+  | SchemaError issues -> Platform.stdout_line ("schema error: " ++ (show issues))
+  traces ()

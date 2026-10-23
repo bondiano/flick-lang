@@ -1,7 +1,9 @@
-[pending]
-Respondable = "M21"
-isRespondable = "M21"
-symbol = "M21"
-toResponse = "M21"
-toResponseOrElse = "M21"
-toResponseOrElseDefect = "M21"
+[wrapped]
+toResponse = "Http.ServerResponse.cause_response 00995d974da865f7"
+toResponseOrElse = "Http.ServerResponse.cause_response 0c13de0960026dfc"
+toResponseOrElseDefect = "Http.ServerResponse.cause_response 5479b1e9cb73cdc5"
+
+[excluded]
+Respondable = "TS-only: a protocol of JS classes by a symbol method; a server answers Flick's `HttpServerError` and `MultipartError` by their status"
+isRespondable = "TS-only: a type guard over `unknown`; Flick values are typed statically"
+symbol = "TS-only: the symbol of the `Respondable` protocol of JS classes"

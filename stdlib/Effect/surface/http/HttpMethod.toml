@@ -1,6 +1,8 @@
-[pending]
-HttpMethod = "M21"
-all = "M21"
-allShort = "M21"
-hasBody = "M21"
-isHttpMethod = "M21"
+[wrapped]
+HttpMethod = "Http.Method.Method 2f8dc3b485eef882"
+all = "Http.Method.all a7a2de4be0a51cee"
+allShort = "Http.Method.all_short d61dc38e417d2e5f"
+hasBody = "Http.Method.has_body c31385da80f300e1"
+
+[excluded]
+isHttpMethod = "TS-only: a type guard over `unknown`; Flick values are typed statically"

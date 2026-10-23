@@ -1,12 +1,12 @@
-[excluded]
-TypeId = "TS-only: a type identifier"
+[wrapped]
+MaxBodySize = "Http.ServerRequest.with_max_body_size 4d3ea3389a8732a7"
+schemaBodyJson = "Http.ServerRequest.schema_body_json a6fc2625f3292603"
+schemaBodyUrlParams = "Http.ServerRequest.schema_body_url_params fb8aac67bbf0234e"
+schemaHeaders = "Http.ServerRequest.schema_headers c09a4db863a5e1ca"
 
-[pending]
-HttpIncomingMessage = "M21"
-JsonOptions = "M21"
-MaxBodySize = "M21"
-inspect = "M21"
-isHttpIncomingMessage = "M21"
-schemaBodyJson = "M21"
-schemaBodyUrlParams = "M21"
-schemaHeaders = "M21"
+[excluded]
+HttpIncomingMessage = "TS-only: the interface `Http.ServerRequest.ServerRequest` and `Http.ClientResponse.ClientResponse` share in TS; each has its own functions"
+JsonOptions = "TS-only: a `JSON.parse` reviver, a JS callback over untyped values; Flick decodes JSON by a codec"
+TypeId = "TS-only: a type identifier"
+inspect = "TS-only: the Node.js `inspect` form of a message; Flick shows values by `Show`"
+isHttpIncomingMessage = "TS-only: a type guard; Flick values are typed statically"

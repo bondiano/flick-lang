@@ -1,0 +1,268 @@
+// The types of `Http` as signatures name them, the redacted names of
+// headers, the platform's file responses and form decoders of requests.
+module App.Main exposing (main)
+
+import Http.Etag exposing (Generator)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+type alias Note = { title : String; tag : List String }
+  deriving Schema
+
+type alias Point = { x : Number }
+  deriving Schema
+
+type alias Theme = { theme : String }
+  deriving Schema
+
+info : Unit -> FileSystem.Info
+let info () =
+  {
+    type_ = FileSystem.RegularFile;
+    mtime = None;
+    atime = None;
+    birthtime = None;
+    dev = 0n;
+    ino = None;
+    mode = 0;
+    nlink = None;
+    uid = None;
+    gid = None;
+    rdev = None;
+    size = 1n;
+    blksize = None;
+    blocks = None
+  }
+
+line : String -> String ->{} Unit
+let line label value = Platform.stdout_line (label ++ ": " ++ value)
+
+etags : List Http.Etag.Etag
+let etags = [Http.Etag.Weak "w", Http.Etag.Strong "s"]
+
+literal : Http.Status.Literal
+let literal = Http.Status.ImATeapot
+
+client_reasons : List Http.ClientError.ClientErrorReason
+let client_reasons =
+  let request : Http.ClientError.RequestDetails =
+    { method = Http.Method.GET; url = "/a"; description = None }
+  let response : Http.ClientError.ResponseDetails =
+    { method = Http.Method.GET; url = "/a"; status = 500; description = Some "x" }
+  [
+    Http.ClientError.TransportError request,
+    Http.ClientError.EncodeError request,
+    Http.ClientError.InvalidUrlError request,
+    Http.ClientError.StatusCodeError response,
+    Http.ClientError.DecodeError response,
+    Http.ClientError.EmptyBodyError response
+  ]
+
+server_reasons : List Http.ServerError.ServerErrorReason
+let server_reasons =
+  let server_request : Http.ServerError.RequestDetails =
+    { method = Http.Method.POST; url = "/b"; description = None }
+  let server_response : Http.ServerError.ResponseDetails =
+    { method = Http.Method.POST; url = "/b"; status = 502; description = None }
+  [
+    Http.ServerError.RequestParseError server_request,
+    Http.ServerError.RouteNotFound server_request,
+    Http.ServerError.InternalError server_request,
+    Http.ServerError.ResponseError server_response
+  ]
+
+body_reasons : List Http.Body.BodyErrorReason
+let body_reasons = [Http.Body.InvalidJson, Http.Body.InvalidSchema "bad"]
+
+cookie_reasons : List Http.Cookies.CookiesErrorReason
+let cookie_reasons = [Http.Cookies.InvalidCookieName, Http.Cookies.InvalidCookiePath]
+
+multipart_reasons : List Http.Multipart.MultipartErrorReason
+let multipart_reasons = [Http.Multipart.FileTooLarge, Http.Multipart.Parse]
+
+compressions : (
+  List Http.ClientRequest.CompressionAlgorithm,
+  List Http.Platform.CompressionAlgorithm
+)
+let compressions =
+  (
+    [Http.ClientRequest.Gzip, Http.ClientRequest.Deflate],
+    [Http.Platform.Gzip, Http.Platform.Deflate, Http.Platform.Brotli, Http.Platform.Zstd]
+  )
+
+options : Http.ClientRequest.Options
+let options = { Http.ClientRequest.defaults with hash = Some "h" }
+
+zip : Http.Middleware.CompressionOptions
+let zip = { algorithms = []; minSize = None; levels = [] }
+
+routing : Http.Router.RouterConfig
+let routing = { Http.Router.config with ignoreTrailingSlash = Some true }
+
+limits : Http.Multipart.Limits
+let limits = { Http.Multipart.limits with maxFileSize = ByteSize.bytes 10 }
+
+fields : Http.Body.FormDataInput
+let fields = [("a", "1")]
+
+headers : Http.Headers.Headers
+let headers = Http.Headers.from_input [("x-token", "t"), ("x-a", "1")]
+
+body : Http.Body.Body
+let body = Http.Body.text "b" None
+
+hello_route : Http.Router.Route none none
+let hello_route =
+  Http.Router.route None "/" (fun _ -> Http.ServerResponse.text "hi" Http.ServerResponse.defaults)
+
+/// A server handle's type names its region.
+port_of : Http.Server.Server s -> Number
+let port_of server =
+  match Http.Server.address server with
+  | Http.Server.TcpAddress _ port -> port
+  | Http.Server.UnixAddress _ -> 0
+
+cookie_of : Http.Cookies.Cookies -> Option Http.Cookies.Cookie
+let cookie_of jar = Http.Cookies.get "a" jar
+
+form_of : Http.Multipart.Persisted -> Number
+let form_of persisted = List.length (Http.Multipart.fields persisted)
+
+note : Codec none none Json Note
+let note =
+  Codec.general
+    (ignore_extra_fields
+      (codec (schema Note) {
+        title = field "title" String.json;
+        tag = field "tag" (Codec.list String.json)
+      }))
+
+point : Codec none none Json Point
+let point = Codec.general (Codec.json (schema Point))
+
+forms : Unit ->{; Http.Multipart.MultipartError, SchemaError, Http.ServerError.HttpServerError} Unit
+let forms () =
+  let form = [("title", "notes"), ("tag", "a"), ("tag", "b"), ("meta", "{\"x\":3}")]
+  multipart : Unit -> ServerRequest
+  let multipart () =
+    Http.ClientRequest.post "http://example.com/u"
+    |> Http.ClientRequest.body_form_data form
+    |> Http.ClientRequest.set_header "content-type" "multipart/form-data"
+    |> Http.ServerRequest.from_client_request
+  let encoded =
+    Http.ServerRequest.from_client_request
+      (Http.ClientRequest.body_url_params form (Http.ClientRequest.post "http://example.com/u"))
+  scope {
+    line "schema_body_multipart" (show (Http.Multipart.schema_body_multipart note (multipart ())))
+    line "schema_body_form multipart" (show (Http.Multipart.schema_body_form note (multipart ())))
+    line "schema_body_form urlencoded" (show (Http.Multipart.schema_body_form note encoded))
+    line
+      "schema_body_form_json"
+      (show (Http.Multipart.schema_body_form_json point "meta" (multipart ())))
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  line "etags" (show etags)
+  line "literal" (show (literal, Http.Status.from_literal literal))
+  line "client reasons" (show (List.length client_reasons))
+  line "server reasons" (show server_reasons)
+  line "body reasons" (show body_reasons)
+  line "cookie reasons" (show cookie_reasons)
+  line "multipart reasons" (show multipart_reasons)
+  line "compressions" (show compressions)
+  line
+    "accept_json"
+    (show
+      (Http.ClientRequest.headers
+        (
+          Http.ClientRequest.accept_json
+            (Http.ClientRequest.modify options Http.ClientRequest.empty)
+        )))
+  line
+    "options"
+    (show (zip.minSize, routing.ignoreTrailingSlash, Option.is_some limits.maxFileSize, fields))
+  line "body" (show (Http.Body.content_type body))
+  line "equivalent" (show (Http.Headers.equivalent headers headers))
+  Http.Headers.with_redacted_names ["x-token"] (task { line "with_redacted_names" "ran" })
+  line "show" (show headers)
+  let params : Http.UrlParams.UrlParams = Http.UrlParams.make [("token", "t"), ("a", "1")]
+  let a_codec = ignore_extra_fields (codec (schema Theme) { theme = field "a" String.json })
+  line
+    "params"
+    (show (Http.UrlParams.equivalent params params)
+      ++ " "
+      ++ show (Codec.decode_result a_codec (Http.UrlParams.to_unknown params)))
+  Http.UrlParams.with_redacted_names
+    ["token"]
+    (task { line "url params with_redacted_names" "ran" })
+  let invalid : Result Http.Url.UrlError Http.Url.Url = Http.Url.from_string "::"
+  line "url error" (show (Result.is_err invalid))
+  provide (Layer.succeed Generator { from_file_info = fun _ -> Http.Etag.Weak "fixed" }) {
+    line "generator" (show (Http.Etag.from_file_info (info ())))
+  }
+  let _ = hello_route
+  let _ = port_of
+  let _ = cookie_of
+  let _ = form_of
+  let exits =
+    parallel_exits
+      [
+        task {
+          from_result
+            (Err
+              (Http.ServerError.HttpServerError
+                (Http.ServerError.RouteNotFound
+                  { method = Http.Method.GET; url = "/"; description = None })))
+        }
+      ]
+  match List.head exits with
+  | Some exit ->
+    match Exit.failure exit with
+    | Some failure ->
+      line
+        "cause_response"
+        (show (Http.ServerResponse.status (Http.ServerResponse.cause_response failure)))
+    | None -> line "cause_response" "succeeded"
+  | None -> ()
+  try
+    forms ()
+  with
+  | Http.Multipart.MultipartError r -> line "multipart error" (show r)
+  | SchemaError issues -> line "schema error" (show issues)
+  | Http.ServerError.HttpServerError r -> line "server error" (show r)
+  provide (Layer.merge Http.Platform.node FileSystem.node) {
+    try
+      scope {
+        let dir =
+          FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-http" }
+        FileSystem.write_file_string { flag = None; mode = None } (dir ++ "/a.html") "<p>a</p>"
+        let file = Http.Platform.file Http.Platform.file_options (dir ++ "/a.html")
+        line
+          "file"
+          (show
+            (
+              Http.ServerResponse.status file,
+              Http.Headers.get "content-type" (Http.ServerResponse.headers file)
+            ))
+        static : ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse
+        let static =
+          Http.StaticServer.make
+            { (Http.StaticServer.static_options dir) with index = Some "a.html" }
+        let index =
+          static
+            (Http.ServerRequest.from_client_request (Http.ClientRequest.get "http://example.com/"))
+        line "static index" (show (Http.ServerResponse.status index))
+        try
+          let _ =
+            static
+              (Http.ServerRequest.from_client_request
+                (Http.ClientRequest.get "http://example.com/../etc/passwd"))
+          line "outside root" "served"
+        with
+        | e -> line "outside root" (show (Http.ServerError.status e))
+      }
+    with
+    | PlatformError.PlatformError r -> line "platform error" (show r)
+    | Http.ServerError.HttpServerError r -> line "server error" (show r)
+  }

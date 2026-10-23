@@ -1,0 +1,37 @@
+/// Effect's `HttpTraceContext`: trace context headers of requests, W3C
+/// `traceparent` and Zipkin's B3, to and from spans.
+module Http.TraceContext exposing (..)
+
+/// Reads the parent span of a request from its headers.
+type alias FromHeaders = Http.Headers.Headers -> Option Tracer.Span
+
+/// The headers of every format that carry the span.
+to_headers : Tracer.Span -> Http.Headers.Headers
+foreign pure to_headers from "@flick-lang/runtime/effect/http/HttpTraceContext" "flickToHeaders"
+  arity 1
+  reviewed "effect@4.0.5 sha256:f499192abfedf946"
+
+/// The span of the first format the headers carry: W3C, then B3, then
+/// `X-B3-*`.
+from_headers : FromHeaders
+foreign pure from_headers from "@flick-lang/runtime/effect/http/HttpTraceContext" "fromHeaders"
+  arity 1
+  reviewed "effect@4.0.5 sha256:d3c1b8059fe41805"
+
+/// The span of a `b3` header.
+b3 : FromHeaders
+foreign pure b3 from "@flick-lang/runtime/effect/http/HttpTraceContext" "b3"
+  arity 1
+  reviewed "effect@4.0.5 sha256:9acf0a4dc2734e04"
+
+/// The span of `X-B3-TraceId`, `X-B3-SpanId` and `X-B3-Sampled` headers.
+xb3 : FromHeaders
+foreign pure xb3 from "@flick-lang/runtime/effect/http/HttpTraceContext" "xb3"
+  arity 1
+  reviewed "effect@4.0.5 sha256:7972052b28f633fb"
+
+/// The span of a W3C `traceparent` header.
+w3c : FromHeaders
+foreign pure w3c from "@flick-lang/runtime/effect/http/HttpTraceContext" "w3c"
+  arity 1
+  reviewed "effect@4.0.5 sha256:b352945896860518"

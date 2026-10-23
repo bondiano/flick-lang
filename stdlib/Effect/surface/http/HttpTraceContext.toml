@@ -1,7 +1,7 @@
-[pending]
-FromHeaders = "M21"
-b3 = "M21"
-fromHeaders = "M21"
-toHeaders = "M21"
-w3c = "M21"
-xb3 = "M21"
+[wrapped]
+FromHeaders = "Http.TraceContext.FromHeaders ea8cbc3fd2f81ba3"
+b3 = "Http.TraceContext.b3 9acf0a4dc2734e04"
+fromHeaders = "Http.TraceContext.from_headers d3c1b8059fe41805"
+toHeaders = "Http.TraceContext.to_headers f499192abfedf946"
+w3c = "Http.TraceContext.w3c b352945896860518"
+xb3 = "Http.TraceContext.xb3 7972052b28f633fb"

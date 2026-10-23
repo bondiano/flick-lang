@@ -1,6 +1,8 @@
-[pending]
-FindResult = "M21"
-PathInput = "M21"
-Router = "M21"
-RouterConfig = "M21"
-make = "M21"
+[wrapped]
+RouterConfig = "Http.Router.RouterConfig 74ed25309524a120"
+
+[excluded]
+FindResult = "invariant: the result of a lookup in the mutable route table of `make`"
+PathInput = "TS-only: a template literal type of paths; Flick passes `String`"
+Router = "invariant: a route table changed in place by `on` and `all`, shared mutable state outside `Ref`; `Http.Router.router` builds one from a list of routes"
+make = "invariant: a route table changed in place by `on` and `all`, shared mutable state outside `Ref`; `Http.Router.router` builds one from a list of routes"

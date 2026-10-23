@@ -1,9 +1,11 @@
-[pending]
-BaseConfig = "M21"
-Config = "M21"
-MultipartError = "M21"
-Parser = "M21"
-PartInfo = "M21"
-decodeField = "M21"
-defaultIsFile = "M21"
-make = "M21"
+[wrapped]
+PartInfo = "Http.Multipart.PartInfo c9bfca7b6d806eab"
+decodeField = "Http.Multipart.decode_field 49be3c553d049561"
+defaultIsFile = "Http.Multipart.default_is_file ebe920f8a497dacd"
+
+[excluded]
+BaseConfig = "invariant: the configuration of the push parser of `make`, which reports parts through mutable `void` callbacks"
+Config = "invariant: the configuration of the push parser of `make`, which reports parts through mutable `void` callbacks"
+MultipartError = "invariant: an error of the push parser of `make`, reported through its `onError` callback; Flick forms fail with `Http.Multipart.MultipartError`"
+Parser = "invariant: a push parser fed by `write` and `end`, shared mutable state outside `Ref`; `Http.Multipart.persisted` reads a whole form"
+make = "invariant: a push parser fed by `write` and `end`, shared mutable state outside `Ref`; `Http.Multipart.persisted` reads a whole form"

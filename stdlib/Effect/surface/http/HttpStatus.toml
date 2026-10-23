@@ -1,3 +1,3 @@
-[pending]
-Literal = "M21"
-fromLiteral = "M21"
+[wrapped]
+Literal = "Http.Status.Literal b4c4b5706e22c753"
+fromLiteral = "Http.Status.from_literal a83571e027b7f930"

@@ -1,0 +1,38 @@
+/// Effect's `HttpPlatform`: what a server needs of its platform to send
+/// files, as a service; `node` is the platform of Node.js.
+module Http.Platform exposing (..)
+
+/// How a response body may be compressed.
+type CompressionAlgorithm = Gzip | Deflate | Brotli | Zstd
+  deriving Eq, Show
+
+/// Which part of a file `file` sends: at most `bytesToRead` bytes from
+/// `offset`, read in chunks of `chunkSize`; and the response's options.
+type alias FileOptions =
+  {
+    bytesToRead : Option ByteSize.ByteSize;
+    chunkSize : Option Number;
+    offset : Option ByteSize.ByteSize;
+    response : Http.ServerResponse.Options
+  }
+
+/// The whole file, with no options of the response.
+file_options : FileOptions
+let file_options = { bytesToRead = None; chunkSize = None; offset = None; response = Http.ServerResponse.defaults }
+
+/// The operations of Effect's `HttpPlatform`.
+service HttpPlatform =
+  file_response : FileOptions -> String ->{; PlatformError.PlatformError} Http.ServerResponse.ServerResponse
+
+/// A response of the file at the path, its content type from its extension
+/// and an `ETag` of its size and modification time.
+file : FileOptions -> String ->{HttpPlatform; PlatformError.PlatformError} Http.ServerResponse.ServerResponse
+let file options path = HttpPlatform.file_response options path
+
+node_of : ServiceTag {HttpPlatform} -> Layer none none {HttpPlatform}
+foreign pure node_of from "@flick-lang/runtime/effect/http/HttpPlatform" "flickNode"
+  reviewed "effect@4.0.5 sha256:ebf6939f7483ac21"
+
+/// The platform of Node.js, with strong entity tags.
+node : Layer none none {HttpPlatform}
+let node = node_of HttpPlatform

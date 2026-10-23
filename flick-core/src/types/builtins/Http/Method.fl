@@ -1,0 +1,41 @@
+/// HTTP request methods, as Effect's `HttpMethod` names them.
+module Http.Method exposing (..)
+
+/// A request method.
+type Method = GET | POST | PUT | DELETE | PATCH | HEAD | OPTIONS | TRACE | QUERY
+  deriving Eq, Ord, Show
+
+/// Every method.
+all : List Method
+let all = [GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE, QUERY]
+
+/// Each method with the lower-case short name Effect's routers use (`del`
+/// for `DELETE`).
+all_short : List (Method, String)
+let all_short =
+  [
+    (GET, "get"),
+    (POST, "post"),
+    (PUT, "put"),
+    (DELETE, "del"),
+    (PATCH, "patch"),
+    (HEAD, "head"),
+    (OPTIONS, "options"),
+    (TRACE, "trace"),
+    (QUERY, "query")
+  ]
+
+/// Whether a request of the method carries a body: all but `GET`, `HEAD`,
+/// `OPTIONS` and `TRACE`.
+has_body : Method -> Bool
+let has_body method =
+  match method with
+  | GET -> false
+  | HEAD -> false
+  | OPTIONS -> false
+  | TRACE -> false
+  | _ -> true
+
+/// The method's name, `"GET"`.
+to_string : Method -> String
+let to_string method = show method

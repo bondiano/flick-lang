@@ -1,0 +1,27 @@
+listening: true
+hello: 200 hello ann [("name", "ann")]
+missing: 404 
+broken: 500 
+parse: 400 
+log info: response ServerResponse 201 Headers [("content-type", "application/json"), ("content-length", "24")] Cookies [Cookie "session=<redacted>; Path=/; HttpOnly"]
+created: 201 { label = "pen", size = 2 }
+set-cookie: Cookies [Cookie "session=<redacted>; Path=/; HttpOnly"]
+cookie value sent: true
+log info: cookies [("session", <redacted>)]
+log info: headers Headers [("cookie", "<redacted>")]
+whoami: known true
+upload: [("title", ["notes"]), ("tag", ["a", "b"])]
+with_limits: 413 
+static: 200 static page
+static missing: 404 
+file: static page true
+test_client: hello tc [("name", "tc")]
+layer_test_client: 200 hello layer [("name", "layer")]
+address_formatted_with: true
+log_address [true]
+slow: acquired
+server: closing
+slow: finalizer
+server: closed
+slow: slow done
+after close: transport error

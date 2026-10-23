@@ -1,12 +1,16 @@
-[pending]
-HttpServer = "M21"
-addressFormattedWith = "M21"
-formatAddress = "M21"
-layerServices = "M21"
-layerTestClient = "M21"
-logAddress = "M21"
-make = "M21"
-makeTestClient = "M21"
-serve = "M21"
-serveEffect = "M21"
-withLogAddress = "M21"
+[wrapped]
+HttpServer = "Http.Server.Server 2ee695843d7fe6dc"
+addressFormattedWith = "Http.Server.address_formatted_with 25763a4fdeb5700e"
+formatAddress = "Http.Server.format_address 183d09320b3ac292"
+layerServices = "Http.Server.layer_services 54b798d1e163577e"
+layerTestClient = "Http.Server.layer_test_client 0ba99bac39c19d79"
+logAddress = "Http.Server.log_address 13cc22882eaf503e"
+makeTestClient = "Http.Server.test_client 62ce938196ed084e"
+serve = "Http.Server.serve 2830adcb190e6acd"
+serveEffect = "Http.Server.serve 7a9f68597bc0a87e"
+
+[language]
+withLogAddress = "a call of `Http.Server.log_address` after `Http.Server.serve`"
+
+[excluded]
+make = "invariant: builds a server of a `serve` function that forks request fibers into an Effect `Scope` it is given, outside a Flick owner; Flick servers start with `Http.Server.serve`, whose requests belong to its scope"
