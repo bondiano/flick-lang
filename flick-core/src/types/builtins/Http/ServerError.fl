@@ -1,0 +1,38 @@
+/// Effect's `HttpServerError`: how handling a request fails, as Flick
+/// errors. A server answers a `HttpServerError` that a handler lets through
+/// with its status: 400 for a request it cannot parse, 404 for no route,
+/// 500 otherwise.
+module Http.ServerError exposing (..)
+
+/// The request a failure is about: its method, URL and what went wrong.
+type alias RequestDetails = { method : Http.Method.Method; url : String; description : Option String }
+
+/// The request and the status of the response a failure is about.
+type alias ResponseDetails =
+  { method : Http.Method.Method; url : String; status : Number; description : Option String }
+
+/// Why handling failed: the request could not be parsed, no route matched
+/// it, the handler failed, or the response could not be sent.
+type ServerErrorReason =
+  | RequestParseError RequestDetails
+  | RouteNotFound RequestDetails
+  | InternalError RequestDetails
+  | ResponseError ResponseDetails
+  deriving Eq, Show
+
+/// A request that could not be handled, with the reason.
+type error HttpServerError = HttpServerError ServerErrorReason
+  deriving Eq, Show
+
+/// A server that could not start listening, with the reason.
+type error ServeError = ServeError String
+  deriving Eq, Show
+
+/// The status a server answers the failure with.
+status : HttpServerError -> Number
+let status failure =
+  match failure with
+  | HttpServerError (RequestParseError _) -> 400
+  | HttpServerError (RouteNotFound _) -> 404
+  | HttpServerError (InternalError _) -> 500
+  | HttpServerError (ResponseError _) -> 500

@@ -1,0 +1,35 @@
+/// Effect's `HttpClientError`: how a request through `Http.Client` fails,
+/// as a Flick error with its reason. URLs in it have their secrets masked.
+module Http.ClientError exposing (..)
+
+/// The request a failure is about: its method, URL and what went wrong.
+type alias RequestDetails = { method : Http.Method.Method; url : String; description : Option String }
+
+/// The request and the status of the response a failure is about.
+type alias ResponseDetails =
+  { method : Http.Method.Method; url : String; status : Number; description : Option String }
+
+/// Why a request failed: before a response came (`TransportError`, the
+/// body could not be encoded, the URL is invalid) or because of the
+/// response (an unexpected status, a body that does not decode, no body).
+type ClientErrorReason =
+  | TransportError RequestDetails
+  | EncodeError RequestDetails
+  | InvalidUrlError RequestDetails
+  | StatusCodeError ResponseDetails
+  | DecodeError ResponseDetails
+  | EmptyBodyError ResponseDetails
+  deriving Eq, Show
+
+/// A failed request, with the reason.
+type error HttpClientError = HttpClientError ClientErrorReason
+  deriving Eq, Show
+
+/// The status of the response, for a failure that has one.
+status : HttpClientError -> Option Number
+let status failure =
+  match failure with
+  | HttpClientError (StatusCodeError d) -> Some d.status
+  | HttpClientError (DecodeError d) -> Some d.status
+  | HttpClientError (EmptyBodyError d) -> Some d.status
+  | _ -> None

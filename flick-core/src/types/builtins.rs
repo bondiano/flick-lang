@@ -239,6 +239,60 @@ const SOURCES: &[(&str, &str)] = &[
     ("Stream", include_str!("builtins/Stream.fl")),
     // end of Effect: streams, Stream
     // Effect: HTTP
+    ("Http.Method", include_str!("builtins/Http/Method.fl")),
+    ("Http.Status", include_str!("builtins/Http/Status.fl")),
+    ("Http.Headers", include_str!("builtins/Http/Headers.fl")),
+    ("Http.UrlParams", include_str!("builtins/Http/UrlParams.fl")),
+    ("Http.Url", include_str!("builtins/Http/Url.fl")),
+    ("Http.Mime", include_str!("builtins/Http/Mime.fl")),
+    ("Http.Cookies", include_str!("builtins/Http/Cookies.fl")),
+    ("Http.Etag", include_str!("builtins/Http/Etag.fl")),
+    ("Http.Body", include_str!("builtins/Http/Body.fl")),
+    (
+        "Http.ClientError",
+        include_str!("builtins/Http/ClientError.fl"),
+    ),
+    (
+        "Http.ClientRequest",
+        include_str!("builtins/Http/ClientRequest.fl"),
+    ),
+    (
+        "Http.ClientResponse",
+        include_str!("builtins/Http/ClientResponse.fl"),
+    ),
+    ("Http.Client", include_str!("builtins/Http/Client.fl")),
+    (
+        "Http.FetchClient",
+        include_str!("builtins/Http/FetchClient.fl"),
+    ),
+    (
+        "Http.ServerError",
+        include_str!("builtins/Http/ServerError.fl"),
+    ),
+    (
+        "Http.ServerRequest",
+        include_str!("builtins/Http/ServerRequest.fl"),
+    ),
+    (
+        "Http.ServerResponse",
+        include_str!("builtins/Http/ServerResponse.fl"),
+    ),
+    ("Http.Multipart", include_str!("builtins/Http/Multipart.fl")),
+    ("Http.Platform", include_str!("builtins/Http/Platform.fl")),
+    (
+        "Http.Middleware",
+        include_str!("builtins/Http/Middleware.fl"),
+    ),
+    ("Http.Router", include_str!("builtins/Http/Router.fl")),
+    ("Http.Server", include_str!("builtins/Http/Server.fl")),
+    (
+        "Http.StaticServer",
+        include_str!("builtins/Http/StaticServer.fl"),
+    ),
+    (
+        "Http.TraceContext",
+        include_str!("builtins/Http/TraceContext.fl"),
+    ),
     // end of Effect: HTTP
     // Effect: HttpApi
     ("HttpApi", include_str!("builtins/HttpApi.fl")),

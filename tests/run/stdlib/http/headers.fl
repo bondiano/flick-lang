@@ -1,0 +1,33 @@
+// Headers, methods and status codes; secret headers are masked by `show`.
+module App.Main exposing (main)
+
+line : String -> String ->{} Unit
+let line label value = Platform.stdout_line (label ++ ": " ++ value)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let input : Http.Headers.Input =
+    [("Content-Type", "text/plain"), ("Authorization", "Bearer s3cret")]
+  let h = Http.Headers.from_input input
+  line "show" (show h)
+  line "get" (show (Http.Headers.get "content-type" h))
+  line "has" (show (Http.Headers.has "authorization" h, Http.Headers.has "x" Http.Headers.empty))
+  let h2 =
+    h
+    |> Http.Headers.set "X-A" "1"
+    |> Http.Headers.set_all [("x-b", "2")]
+    |> Http.Headers.remove "content-type"
+  line "to_list" (show (Http.Headers.to_list h2))
+  line
+    "merge"
+    (show (Http.Headers.to_list (Http.Headers.merge (Http.Headers.from_input [("x-a", "9")]) h2)))
+  line "remove_many" (show (Http.Headers.to_list (Http.Headers.remove_many ["x-a", "x-b"] h2)))
+  line "redact" (show (Http.Headers.redact ["x-a"] h2))
+  line "is_redacted_name" (show (Http.Headers.is_redacted_name "X-Api-Key" ["x-api-key"]))
+  line "eq" (show (h == Http.Headers.from_input input, h == h2))
+  let methods : List Http.Method.Method = Http.Method.all
+  line "methods" (show (List.filter Http.Method.has_body methods))
+  line "short" (show (List.take 4 Http.Method.all_short))
+  line
+    "status"
+    (show (Http.Status.from_literal Http.Status.NotFound, Http.Status.from_literal Http.Status.OK))

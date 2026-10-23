@@ -1,15 +1,19 @@
+[wrapped]
+HttpClientResponse = "Http.ClientResponse.ClientResponse a2b908d0e087ea71"
+filterStatus = "Http.ClientResponse.filter_status 82ece8d5b24b992d"
+filterStatusOk = "Http.ClientResponse.filter_status_ok bd1f82503727157f"
+schemaBodyJson = "Http.ClientResponse.schema_body_json a6fc2625f3292603"
+schemaBodyUrlParams = "Http.ClientResponse.schema_body_url_params fb8aac67bbf0234e"
+schemaHeaders = "Http.ClientResponse.schema_headers c09a4db863a5e1ca"
+schemaJson = "Http.ClientResponse.schema_json 3fc269f3d81aa642"
+schemaNoBody = "Http.ClientResponse.schema_no_body a0e1567b9179e065"
+
+[language]
+matchStatus = "`match` on `Http.ClientResponse.status`, with `when` guards for ranges"
+
 [excluded]
 TypeId = "TS-only: a type identifier"
+fromWeb = "TS-only: converts a Fetch API `Response` object of JS code; a Flick test double answers with `Http.ServerResponse.to_client_response`"
 
 [pending]
-HttpClientResponse = "M21"
-filterStatus = "M21"
-filterStatusOk = "M21"
-fromWeb = "M21"
-matchStatus = "M21"
-schemaBodyJson = "M21"
-schemaBodyUrlParams = "M21"
-schemaHeaders = "M21"
-schemaJson = "M21"
-schemaNoBody = "M21"
-stream = "M21"
+stream = "M20"

@@ -1,0 +1,420 @@
+// Effect's HTTP client against a fake transport made by `Http.Client.make`:
+// requests and their parts, responses and their bodies, and the client
+// combinators; errors are Flick errors.
+module App.Main exposing (main)
+
+import Http.ClientError exposing (HttpClientError)
+import Http.ClientRequest exposing (ClientRequest)
+import Http.ClientResponse exposing (ClientResponse)
+
+type alias Item = { label : String; size : Number }
+  deriving Schema
+
+type error Refused = Refused Number
+  deriving Show
+
+ok : Http.ServerResponse.Options
+let ok = Http.ServerResponse.defaults
+
+item_json : PureCodec Json Item
+let item_json = Codec.json (schema Item)
+
+item : Codec none none Json Item
+let item = Codec.general item_json
+
+/// The fake server: echoes the request, 404 for `/missing`, a redirect for
+/// `/old`, cookies for `/login`, and an item for `/item`.
+answer : ClientRequest -> Http.Url.Url ->{; HttpClientError} ClientResponse
+let answer request url =
+  let path = Http.Url.href url
+  let echo =
+    show (Http.ClientRequest.method request)
+      ++ " "
+      ++ path
+      ++ " "
+      ++ show (Http.ClientRequest.headers request)
+      ++ " " ++ show (Http.Body.to_text (Http.ClientRequest.body request))
+  let response =
+    if String.contains "/missing" path then
+      Http.ServerResponse.text "gone" { ok with status = Some 404 }
+    else if String.contains "/old" path then
+      Http.ServerResponse.redirect "http://fake/new" ok
+    else if String.contains "/login" path then
+      Http.ServerResponse.merge_cookies
+        (Http.Cookies.from_set_cookie ["session=abc; Path=/"])
+        (Http.ServerResponse.text "in" ok)
+    else if String.contains "/item" path then
+      Http.ServerResponse.text
+        "{\"label\":\"pen\",\"size\":2}"
+        { ok with contentType = Some "application/json" }
+    else if String.contains "/form" path then
+      Http.ServerResponse.url_params (Http.UrlParams.make [("a", "1"), ("a", "2")]) ok
+    else
+      Http.ServerResponse.text echo ok
+  Http.ServerResponse.to_client_response request response
+
+fake : Http.Client.Client none {HttpClientError}
+let fake = Http.Client.make answer
+
+describe : HttpClientError -> String
+let describe failure =
+  match failure with
+  | Http.ClientError.HttpClientError (Http.ClientError.StatusCodeError d) ->
+    "status " ++ show d.status ++ " of " ++ show d.method ++ " " ++ d.url
+  | Http.ClientError.HttpClientError reason -> show reason
+
+requests : Unit ->{} Unit
+let requests () =
+  let base =
+    Http.ClientRequest.make
+      Http.Method.POST
+      "/a"
+      { Http.ClientRequest.defaults with acceptJson = true; urlParams = Some [("q", "1")] }
+  Platform.stdout_line ("make: " ++ (show base))
+  let r =
+    base
+    |> Http.ClientRequest.set_method Http.Method.PUT
+    |> Http.ClientRequest.set_header "x-a" "1"
+    |> Http.ClientRequest.set_headers [("x-b", "2")]
+    |> Http.ClientRequest.update_headers (Http.Headers.remove "x-b")
+    |> Http.ClientRequest.remove_header "accept"
+    |> Http.ClientRequest.accept "text/plain"
+    |> Http.ClientRequest.bearer_token (Redacted.make "t0ken")
+    |> Http.ClientRequest.set_url_param "q" "2"
+    |> Http.ClientRequest.append_url_param "q" "3"
+    |> Http.ClientRequest.set_url_params [("r", "4")]
+    |> Http.ClientRequest.append_url_params [("s", "5")]
+    |> Http.ClientRequest.set_hash "top"
+    |> Http.ClientRequest.prepend_url "http://fake"
+    |> Http.ClientRequest.append_url "b"
+    |> Http.ClientRequest.update_url (fun u -> u ++ "/c")
+  Platform.stdout_line ("show: " ++ (show r))
+  Platform.stdout_line
+    ("url: "
+      ++ (Http.ClientRequest.url r
+        ++ " "
+        ++ show (Http.ClientRequest.url_params r)
+        ++ " "
+        ++ show (Http.ClientRequest.hash r)))
+  Platform.stdout_line
+    ("to_url: " ++ (show (Http.ClientRequest.to_url (Http.ClientRequest.remove_hash r))))
+  Platform.stdout_line
+    ("basic_auth: "
+      ++ (show
+        (Http.ClientRequest.headers
+          (Http.ClientRequest.basic_auth "me" (Redacted.make "pw") Http.ClientRequest.empty))))
+  Platform.stdout_line
+    ("set_url: " ++ (Http.ClientRequest.url (Http.ClientRequest.set_url "http://other/x" r)))
+  Platform.stdout_line
+    ("modify: "
+      ++ (show
+        (Http.ClientRequest.modify
+          { Http.ClientRequest.defaults with headers = Some [("x-m", "1")] }
+          r)))
+  let made =
+    Http.ClientRequest.make_with
+      Http.Method.GET
+      "http://fake/w"
+      Http.UrlParams.empty
+      None
+      Http.Headers.empty
+      Http.Body.empty
+  Platform.stdout_line
+    ("make_with: " ++ (show (Http.ClientRequest.method made) ++ " " ++ Http.ClientRequest.url made))
+  let methods =
+    [
+      Http.ClientRequest.get
+        "u", Http.ClientRequest.query
+        "u", Http.ClientRequest.post
+        "u", Http.ClientRequest.patch
+        "u",
+      Http.ClientRequest.put
+        "u", Http.ClientRequest.delete
+        "u", Http.ClientRequest.head
+        "u", Http.ClientRequest.options
+        "u",
+      Http.ClientRequest.trace "u"
+    ]
+  Platform.stdout_line ("methods: " ++ (show (List.map Http.ClientRequest.method methods)))
+  let bodies =
+    [
+      Http.ClientRequest.body_text "hi" None r,
+      Http.ClientRequest.body_text "<p/>" (Some "text/html") r,
+      Http.ClientRequest.body_uint8_array [104, 105] None r,
+      Http.ClientRequest.body_url_params [("a", "b c")] r,
+      Http.ClientRequest.body_form_data [("f", "v")] r,
+      Http.ClientRequest.set_body (Http.Body.text "set" None) r
+    ]
+  Platform.stdout_line
+    ("bodies: "
+      ++ (show (List.map (fun x -> Http.Body.content_type (Http.ClientRequest.body x)) bodies)))
+  Platform.stdout_line
+    ("texts: " ++ (show (List.map (fun x -> Http.Body.to_text (Http.ClientRequest.body x)) bodies)))
+
+bodies : Unit ->{; Http.Body.HttpBodyError, SchemaError} Unit
+let bodies () =
+  let wire = Codec.encode item { label = "cup"; size = 1 }
+  let j = Http.ClientRequest.body_json wire Http.ClientRequest.empty
+  Platform.stdout_line ("body_json: " ++ (show (Http.Body.to_text (Http.ClientRequest.body j))))
+  let s =
+    Http.ClientRequest.schema_body_json item { label = "box"; size = 3 } Http.ClientRequest.empty
+  Platform.stdout_line
+    ("schema_body_json: " ++ (show (Http.Body.to_text (Http.ClientRequest.body s))))
+  let gz =
+    Http.ClientRequest.compress_body
+      Http.ClientRequest.Gzip
+      (Some 0)
+      (Http.ClientRequest.body_text "zip" None Http.ClientRequest.empty)
+  Platform.stdout_line
+    ("compress_body: "
+      ++ (show (Http.Headers.get "content-encoding" (Http.ClientRequest.headers gz))))
+  let b = Http.Body.json wire
+  Platform.stdout_line
+    ("body: " ++ (show (Http.Body.content_type b, Http.Body.content_length b, Http.Body.to_text b)))
+  let bs = Http.Body.json_schema item { label = "jar"; size = 4 }
+  Platform.stdout_line ("json_schema: " ++ (show (Http.Body.to_text bs)))
+  Platform.stdout_line
+    ("others: "
+      ++ (show
+        (List.map
+          Http.Body.content_type
+          [
+            Http.Body.empty,
+            Http.Body.uint8_array [1, 2] None,
+            Http.Body.url_params (Http.UrlParams.make [("k", "v")]) None,
+            Http.Body.form_data [("k", "v")]
+          ])))
+  Platform.stdout_line
+    ("length: "
+      ++ (
+        show (Http.Body.content_length (Http.Body.uint8_array [1, 2, 3] (Some "application/x-bin")))
+      ))
+
+responses : Unit ->{; HttpClientError, SchemaError} Unit
+let responses () =
+  let echo = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/echo")
+  Platform.stdout_line
+    ("status: " ++ (show (Http.ClientResponse.status echo) ++ " " ++ Http.ClientResponse.url echo))
+  Platform.stdout_line
+    ("request: " ++ (show (Http.ClientRequest.method (Http.ClientResponse.request echo))))
+  Platform.stdout_line ("headers: " ++ (show (Http.ClientResponse.headers echo)))
+  Platform.stdout_line ("show: " ++ (show echo))
+  Platform.stdout_line ("text: " ++ (Http.ClientResponse.text echo))
+  let it = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/item")
+  Platform.stdout_line
+    ("schema_body_json: " ++ (show (Http.ClientResponse.schema_body_json item it)))
+  let again = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/item")
+  Platform.stdout_line ("json: " ++ (Json.stringify (Http.ClientResponse.json again)))
+  let bytes = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/item")
+  Platform.stdout_line ("bytes: " ++ (show (List.length (Http.ClientResponse.bytes bytes))))
+  let form = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/form")
+  Platform.stdout_line ("url_params_body: " ++ (show (Http.ClientResponse.url_params_body form)))
+  let headers_codec =
+    Codec.general
+      (
+        ignore_extra_fields
+          (codec (schema Typed) { contentType = field "content-type" String.json })
+      )
+  Platform.stdout_line
+    ("schema_headers: " ++ (show (Http.ClientResponse.schema_headers headers_codec it)))
+  let whole =
+    Codec.general
+      (ignore_extra_fields
+        (
+          codec (schema Whole) {
+            status = field "status" Number.json;
+            body = field "body" item_json
+          }
+        ))
+  Platform.stdout_line
+    ("schema_no_body: "
+      ++ (show
+        (Http.ClientResponse.schema_no_body
+          (Codec.general
+            (ignore_extra_fields (codec (schema Status) { status = field "status" Number.json })))
+          it)))
+  let it2 = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/item")
+  Platform.stdout_line ("schema_json: " ++ (show (Http.ClientResponse.schema_json whole it2)))
+  let pairs = Codec.general (Codec.json (schema Pairs))
+  let form2 = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/form")
+  Platform.stdout_line
+    ("schema_body_url_params: " ++ (show (Http.ClientResponse.schema_body_url_params pairs form2)))
+  Platform.stdout_line
+    ("filter_status: "
+      ++ (
+        show
+          (Http.ClientResponse.status (Http.ClientResponse.filter_status (fun s -> s < 300) echo))
+      ))
+  let login = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/login")
+  Platform.stdout_line ("cookies: " ++ (show (Http.ClientResponse.cookies login)))
+  try
+    let _ =
+      Http.ClientResponse.filter_status_ok
+        (Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/missing"))
+    Platform.stdout_line ("filter_status_ok: " ++ "passed")
+  with
+  | e ->
+    Platform.stdout_line
+      ("filter_status_ok: " ++ (describe e ++ " " ++ show (Http.ClientError.status e)))
+
+body_of : (Http.Client.Client r e, String) ->{r; HttpClientError | e} String
+let body_of (client, url) =
+  Http.ClientResponse.text (Http.Client.execute_with client (Http.ClientRequest.get url))
+
+refuse : ClientResponse -> Errors {Refused}
+let refuse response = Refused (Http.ClientResponse.status response)
+
+combinators : Unit ->{; HttpClientError, Refused} Unit
+let combinators () =
+  let tagged = fake |> Http.Client.map_request (Http.ClientRequest.set_header "x-tag" "1")
+  Platform.stdout_line ("map_request: " ++ (body_of (tagged, "http://fake/a")))
+  let input = fake |> Http.Client.map_request_input (Http.ClientRequest.set_header "x-in" "1")
+  Platform.stdout_line ("map_request_input: " ++ (body_of (input, "http://fake/a")))
+  let effect =
+    fake |> Http.Client.map_request_effect (fun r -> Http.ClientRequest.set_header "x-e" "1" r)
+  Platform.stdout_line ("map_request_effect: " ++ (body_of (effect, "http://fake/a")))
+  let input_effect =
+    fake
+    |> Http.Client.map_request_input_effect (fun r -> Http.ClientRequest.set_header "x-ie" "1" r)
+  Platform.stdout_line ("map_request_input_effect: " ++ (body_of (input_effect, "http://fake/a")))
+  let tapped =
+    fake
+    |> Http.Client.tap_request
+      (fun r -> Platform.stdout_line ("tap_request: " ++ (Http.ClientRequest.url r)))
+    |> Http.Client.tap
+      (fun r -> Platform.stdout_line ("tap: " ++ (show (Http.ClientResponse.status r))))
+  Platform.stdout_line ("tapped: " ++ (body_of (tapped, "http://fake/t")))
+  let strict = fake |> Http.Client.filter_status_ok
+  try
+    Platform.stdout_line ("filter_status_ok: " ++ (body_of (strict, "http://fake/missing")))
+  with
+  | e -> Platform.stdout_line ("filter_status_ok: " ++ (describe e))
+  let recovered =
+    strict
+    |> Http.Client.tap_error (fun e -> Platform.stdout_line ("tap_error: " ++ (describe e)))
+    |> Http.Client.catch
+      (fun _ -> Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/fallback"))
+  Platform.stdout_line ("catch: " ++ (body_of (recovered, "http://fake/missing")))
+  let filtered = fake |> Http.Client.filter_status (fun s -> s == 200)
+  try
+    Platform.stdout_line ("filter_status: " ++ (body_of (filtered, "http://fake/missing")))
+  with
+  | e -> Platform.stdout_line ("filter_status: " ++ (describe e))
+  let or_else =
+    fake
+    |> Http.Client.filter_or_else
+      (fun r -> Http.ClientResponse.status r == 200)
+      (fun _ -> Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/else"))
+  Platform.stdout_line ("filter_or_else: " ++ (body_of (or_else, "http://fake/missing")))
+  try
+    Platform.stdout_line
+      ("filter_or_fail: "
+        ++ (body_of
+          (
+            fake
+              |> Http.Client.filter_or_fail (fun r -> Http.ClientResponse.status r == 200) refuse,
+            "http://fake/missing"
+          )))
+  with
+  | Refused s -> Platform.stdout_line ("filter_or_fail: " ++ ("refused " ++ show s))
+  let attempts = Ref.make 0
+  let flaky =
+    Http.Client.make (fun request url ->
+      Ref.update attempts (fun n -> n + 1)
+      if Ref.get attempts < 3 then
+        Http.ServerResponse.to_client_response
+          request
+          (Http.ServerResponse.text "no" { ok with status = Some 500 })
+      else
+        answer request url)
+    |> Http.Client.filter_status_ok
+  Platform.stdout_line
+    ("retry: "
+      ++ (body_of (flaky |> Http.Client.retry (Schedule.recurs 5), "http://fake/r")
+        ++ " after "
+        ++ show (Ref.get attempts)))
+  Ref.set attempts 0
+  let transient = Http.Client.make (fun request url ->
+    Ref.update attempts (fun n -> n + 1)
+    let status = if Ref.get attempts < 2 then 503 else 200
+    Http.ServerResponse.to_client_response
+      request
+      (Http.ServerResponse.text "t" { ok with status = Some status }))
+  let after =
+    Http.Client.execute_with
+      (transient |> Http.Client.retry_transient Http.Client.ResponseOnly 3)
+      (Http.ClientRequest.get "http://fake/x")
+  Platform.stdout_line
+    ("retry_transient: "
+      ++ (show (Http.ClientResponse.status after) ++ " after " ++ show (Ref.get attempts)))
+  let jar = Ref.make Http.Cookies.empty
+  let cookied = fake |> Http.Client.with_cookies_ref jar
+  let _ = body_of (cookied, "http://fake/login")
+  Platform.stdout_line ("with_cookies_ref: " ++ (body_of (cookied, "http://fake/echo")))
+  let redirected = fake |> Http.Client.follow_redirects (Some 3)
+  Platform.stdout_line ("follow_redirects: " ++ (body_of (redirected, "http://fake/old")))
+  let transformed =
+    fake |> Http.Client.transform (fun response request ->
+      Platform.stdout_line ("transform: " ++ (Http.ClientRequest.url request))
+      await response)
+  Platform.stdout_line ("transformed: " ++ (body_of (transformed, "http://fake/tr")))
+  let responded = fake |> Http.Client.transform_response (fun response -> await response)
+  Platform.stdout_line ("transform_response: " ++ (body_of (responded, "http://fake/trr")))
+  let made_with =
+    Http.Client.make_with
+      (fun prepared -> Http.Client.execute_with fake (await prepared))
+      (fun r -> Http.ClientRequest.set_header "x-pre" "1" r)
+  Platform.stdout_line ("make_with: " ++ (body_of (made_with, "http://fake/mw")))
+  let scoped : Http.Client.Client {Scope s} {HttpClientError} = Http.Client.with_scope fake
+  Platform.stdout_line ("with_scope: " ++ "typed")
+  Http.Client.with_tracer_disabled_when
+    (fun _ -> true)
+    (task { Platform.stdout_line ("with_tracer_disabled_when: " ++ "ran") })
+  Http.Client.with_tracer_header_filter
+    (fun _ _ -> false)
+    (task { Platform.stdout_line ("with_tracer_header_filter: " ++ "ran") })
+  Http.Client.with_span_name_generator
+    (fun r -> Http.ClientRequest.url r)
+    (task { Platform.stdout_line ("with_span_name_generator: " ++ "ran") })
+  provide Http.Client.layer (task { fake }) {
+    Platform.stdout_line ("client: " ++ (body_of (Http.Client.current (), "http://fake/cur")))
+    let answers =
+      [
+        Http.Client.execute (Http.ClientRequest.get "http://fake/x"),
+        Http.Client.get
+          "http://fake/g", Http.Client.query
+          "http://fake/q", Http.Client.head
+          "http://fake/h",
+        Http.Client.post
+          "http://fake/p", Http.Client.patch
+          "http://fake/pa", Http.Client.put
+          "http://fake/pu",
+        Http.Client.del "http://fake/d", Http.Client.options "http://fake/o"
+      ]
+    Platform.stdout_line ("service: " ++ (show (List.map Http.ClientResponse.status answers)))
+  }
+
+type alias Typed = { contentType : String }
+  deriving Schema
+
+type alias Status = { status : Number }
+  deriving Schema
+
+type alias Whole = { status : Number; body : Item }
+  deriving Schema
+
+type alias Pairs = { a : List String }
+  deriving Schema
+
+main : Unit ->{; AppError} Unit
+let main () =
+  requests ()
+  try
+    bodies ()
+    Http.Client.with_tracer_propagation false (task { responses () })
+    Http.Client.with_tracer_propagation false (task { combinators () })
+  with
+  | Http.Body.HttpBodyError r -> Platform.stdout_line ("body failed: " ++ (show r))
+  | Http.ClientError.HttpClientError r -> Platform.stdout_line ("client failed: " ++ (show r))
+  | SchemaError issues -> Platform.stdout_line ("schema failed: " ++ (show issues))
+  | Refused s -> Platform.stdout_line ("refused: " ++ (show s))

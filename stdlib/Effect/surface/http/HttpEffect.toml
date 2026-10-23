@@ -1,13 +1,17 @@
+[wrapped]
+PreResponseHandler = "Http.Middleware.with_pre_response_handler 1fd8c12975022f6c"
+appendPreResponseHandler = "Http.Middleware.append_pre_response_handler 8d42b837128a6182"
+toHandled = "Http.Middleware.to_handled 410e9b7d36d30ce7"
+withPreResponseHandler = "Http.Middleware.with_pre_response_handler f11574d6347dcaa0"
+
+[excluded]
+appendPreResponseHandlerUnsafe = "invariant: `*Unsafe` mutates the request outside a runtime call; `append_pre_response_handler` runs as one"
+fromWebHandler = "TS-only: wraps a JS `(Request) => Promise<Response>` of the Fetch API; Flick handlers are Flick functions"
+scopeDisableClose = "invariant: never expose an Effect `Scope.Scope`; the owner of a request's scope closes it"
+toWebHandler = "invariant: runs effects outside the entry runner, as a `Promise`-returning JS handler"
+toWebHandlerLayer = "invariant: runs effects outside the entry runner, as a `Promise`-returning JS handler"
+toWebHandlerLayerWith = "invariant: runs effects outside the entry runner, as a `Promise`-returning JS handler"
+toWebHandlerWith = "invariant: runs effects outside the entry runner, as a `Promise`-returning JS handler"
+
 [pending]
-PreResponseHandler = "M21"
-appendPreResponseHandler = "M21"
-appendPreResponseHandlerUnsafe = "M21"
-fromWebHandler = "M21"
-scopeDisableClose = "M21"
-scopeTransferToStream = "M21"
-toHandled = "M21"
-toWebHandler = "M21"
-toWebHandlerLayer = "M21"
-toWebHandlerLayerWith = "M21"
-toWebHandlerWith = "M21"
-withPreResponseHandler = "M21"
+scopeTransferToStream = "M20"

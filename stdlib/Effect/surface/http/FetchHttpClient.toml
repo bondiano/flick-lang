@@ -1,4 +1,6 @@
-[pending]
-Fetch = "M21"
-RequestInit = "M21"
-layer = "M21"
+[wrapped]
+layer = "Http.FetchClient.layer 3aff91b759103525"
+
+[excluded]
+Fetch = "TS-only: replaces the JS `fetch` function the client calls; a Flick test double is `Http.Client.make`"
+RequestInit = "TS-only: the JS `RequestInit` object passed to `fetch` as is; Flick requests set their parts through `Http.ClientRequest`"

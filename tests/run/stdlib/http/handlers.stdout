@@ -1,0 +1,44 @@
+request: ServerRequest POST "/items/7?q=x&q=y" Headers [("cookie", "<redacted>"), ("content-type", "application/json"), ("content-length", "7")]
+parts: POST /items/7?q=x&q=y http://example.com/items/7?q=x&q=y None
+cookies: [("session", <redacted>), ("theme", <redacted>)]
+search_params: UrlParams [("q", "x"), ("q", "y")]
+to_url: Some "http://localhost/items/7?q=x&q=y"
+search_params_from_url: [("a", ["1", "2"]), ("b", ["3"])]
+to_client_request: ClientRequest POST "http://localhost/items/7" Headers [("cookie", "<redacted>"), ("content-type", "application/json"), ("content-length", "7")]
+schema_body_json: { x = 1 }
+text: {"x":1}
+json: {"x":1}
+bytes: [123, 34, 120, 34, 58, 49, 125]
+url_params_body: UrlParams [("title", "t"), ("tag", "a"), ("tag", "b")]
+schema_body_url_params: { tag = ["a", "b"], title = "t" }
+schema_cookies: { theme = "dark" }
+schema_headers: { theme = "application/json" }
+schema_search_params: { q = ["x", "y"] }
+with_max_body_size: {"x":1}
+route: ({ theme = "7" }, { id = "7", q = "x" }, { theme = "GET" })
+schema_json: { body = { x = 5 } }
+prefix_route: hello /hello
+prefix_path: /api/users
+not found: RouteNotFound { description = None, method = GET, url = "/nothing" }
+case sensitive: 404
+made: [(204, None), (302, None), (200, Some "application/octet-stream"), (202, Some "text/plain"), (200, Some "text/html"), (200, Some "application/json"), (200, Some "application/json"), (200, Some "application/x-www-form-urlencoded"), (200, None)]
+status_text: [None, None, None, Some "Fine", None, None, None, None, None]
+show: ServerResponse 418 Headers [("content-type", "text/plain"), ("content-length", "1"), ("x-b", "2"), ("authorization", "<redacted>")] Cookies [Cookie "session=<redacted>; Secure", Cookie "a=<redacted>; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure"]
+headers: Headers [("content-type", "text/plain"), ("content-length", "1"), ("x-b", "2"), ("authorization", "<redacted>")]
+cookies: 2
+replace_cookies: Cookies []
+omits_body: (false, true, true)
+from_client_response: 418
+stack: 200 []
+x_forwarded_headers: Some "10.0.0.1"
+cors preflight: 204 [("access-control-allow-origin", Some "https://a.example"), ("access-control-max-age", Some "60")]
+cors: 200 [("access-control-allow-origin", Some "https://a.example")]
+compression: 200 [("content-encoding", Some "gzip")]
+to_handled: 200 [("x-pre", Some "1"), ("x-late", Some "1")]
+with_tracer_disabled_when: ran
+with_tracer_disabled_for_urls: ran
+with_span_name_generator: ran
+with_tracer_header_filter: ran
+logger: 200 []
+exit_response: [200, 500]
+cause_response: [404]

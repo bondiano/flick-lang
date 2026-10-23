@@ -1,0 +1,295 @@
+// Effect's HTTP server on Node.js at an ephemeral port of 127.0.0.1: a
+// router of handlers, request bodies, cookies whose values never reach the
+// log, static files and forms; closing the server's scope waits for the
+// running request and its finalizer, and then the port refuses connections.
+module App.Main exposing (main)
+
+import Http.ClientError exposing (HttpClientError)
+import Http.Router exposing (RouteContext)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+import Log exposing (Log)
+
+type alias Item = { label : String; size : Number }
+  deriving Schema
+
+type error Boom = Boom
+  deriving Show
+
+line : String -> String ->{} Unit
+let line label value = Platform.stdout_line (label ++ ": " ++ value)
+
+ms : Number -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+ok : Http.ServerResponse.Options
+let ok = Http.ServerResponse.defaults
+
+item : Codec none none Json Item
+let item = Codec.general (Codec.json (schema Item))
+
+/// A log on stdout, to show what reaches it.
+stdout_log : Layer none none {Log}
+let stdout_log =
+  Layer.succeed
+    Log
+    { write = fun level message -> Platform.stdout_line ("log " ++ level ++ ": " ++ message) }
+
+/// Effect's log of the address, without the port the system picked.
+listening : Logger.Logger String
+let listening =
+  Logger.make
+    (fun o ->
+      "log_address "
+        ++ show (List.map (String.starts_with "Listening on http://127.0.0.1:") o.message))
+
+unexpected : Failure e ->{} Unit
+let unexpected failure = Platform.stdout_line "unexpected failure"
+
+hello : ServerRequest ->{RouteContext;} ServerResponse
+let hello request =
+  let name = Option.with_default "nobody" (Http.Router.param "name")
+  Http.ServerResponse.text ("hello " ++ name ++ " " ++ show (Http.Router.params ())) ok
+
+create : ServerRequest ->{
+  Log;
+  Http.ServerError.HttpServerError,
+  SchemaError,
+  Http.Body.HttpBodyError,
+  Http.Cookies.CookiesError
+}
+  ServerResponse
+let create request =
+  let created = Http.ServerRequest.schema_body_json item request
+  let response =
+    Http.ServerResponse.schema_json
+      item
+      { created with size = created.size + 1 }
+      { ok with status = Some 201 }
+  let attributes = { Http.Cookies.attributes with httpOnly = true; path = Some "/" }
+  let with_cookie =
+    Http.ServerResponse.set_cookie "session" (Redacted.make "s3cret") attributes response
+  Log.info ("response " ++ show with_cookie)
+  with_cookie
+
+whoami : ServerRequest ->{Log;} ServerResponse
+let whoami request =
+  let cookies = Http.ServerRequest.cookies request
+  Log.info ("cookies " ++ show cookies)
+  Log.info
+    ("headers "
+      ++ show
+        (Http.Headers.remove_many
+          (List.filter
+            (fun k -> k != "cookie")
+            (
+              List.map (fun (k, _) -> k) (Http.Headers.to_list (Http.ServerRequest.headers request))
+            ))
+          (Http.ServerRequest.headers request)))
+  let known = List.any (fun (name, _) -> name == "session") cookies
+  Http.ServerResponse.text ("known " ++ show known) ok
+
+broken : ServerRequest ->{; Boom} ServerResponse
+let broken _ = from_result (Err Boom)
+
+parse : ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse
+let parse request =
+  let _ = Http.ServerRequest.json request
+  Http.ServerResponse.text "parsed" ok
+
+upload : ServerRequest ->{; Http.Multipart.MultipartError} ServerResponse
+let upload request =
+  scope {
+    let form = Http.Multipart.persisted request
+    Http.ServerResponse.text (show (Http.Multipart.fields form)) ok
+  }
+
+/// `upload` of at most one part: a larger form is answered with 413.
+upload_one : ServerRequest ->{; Http.Multipart.MultipartError} ServerResponse
+let upload_one request =
+  Http.Multipart.with_limits
+    { Http.Multipart.limits with maxParts = Some 1 }
+    (task { upload request })
+
+/// Holds the request until the scope of the server closes; its finalizer
+/// runs before the server is closed.
+slow : Deferred.Deferred none Unit -> ServerRequest ->{} ServerResponse
+let slow started _ =
+  scope {
+    Resource.acquire_release (task { line "slow" "acquired" }) (fun _ -> line "slow" "finalizer")
+    let _ = Deferred.succeed () started
+    Effect.sleep (ms 40)
+    Http.ServerResponse.text "slow done" ok
+  }
+
+file : String ->
+  ServerRequest ->{Http.Platform.HttpPlatform; PlatformError.PlatformError}
+  ServerResponse
+let file path _ = Http.Platform.file Http.Platform.file_options path
+
+describe : HttpClientError -> String
+let describe failure =
+  match failure with
+  | Http.ClientError.HttpClientError (Http.ClientError.TransportError _) -> "transport error"
+  | Http.ClientError.HttpClientError reason -> show reason
+
+status_of : String ->{Http.Client.HttpClient; HttpClientError} String
+let status_of url =
+  let response = Http.Client.get url
+  show (Http.ClientResponse.status response) ++ " " ++ Http.ClientResponse.text response
+
+exercise : String ->
+  String ->{Http.Client.HttpClient; HttpClientError, SchemaError, Http.Body.HttpBodyError}
+  Unit
+let exercise base dir =
+  line "hello" (status_of (base ++ "/hello/ann"))
+  line "missing" (status_of (base ++ "/missing"))
+  line "broken" (status_of (base ++ "/broken"))
+  let bad =
+    Http.Client.execute
+      (Http.ClientRequest.body_text "not json" None (Http.ClientRequest.post (base ++ "/parse")))
+  line "parse" (show (Http.ClientResponse.status bad) ++ " " ++ Http.ClientResponse.text bad)
+  let post =
+    Http.ClientRequest.schema_body_json
+      item
+      { label = "pen"; size = 1 }
+      (Http.ClientRequest.post (base ++ "/items"))
+  let created = Http.Client.execute post
+  line
+    "created"
+    (show (Http.ClientResponse.status created)
+      ++ " "
+      ++ show (Http.ClientResponse.schema_body_json item created))
+  line "set-cookie" (show (Http.ClientResponse.cookies created))
+  match Http.Cookies.get_value "session" (Http.ClientResponse.cookies created) with
+  | Some v -> line "cookie value sent" (show (Redacted.reveal v == "s3cret"))
+  | None -> line "cookie value sent" "none"
+  let jar = Ref.make (Http.ClientResponse.cookies created)
+  let client = Http.Client.current () |> Http.Client.with_cookies_ref jar
+  line
+    "whoami"
+    (Http.ClientResponse.text
+      (Http.Client.execute_with client (Http.ClientRequest.get (base ++ "/whoami"))))
+  let form =
+    Http.ClientRequest.body_form_data
+      [("title", "notes"), ("tag", "a"), ("tag", "b")]
+      (Http.ClientRequest.post (base ++ "/upload"))
+  line "upload" (Http.ClientResponse.text (Http.Client.execute form))
+  let too_many =
+    Http.ClientRequest.body_form_data
+      [("a", "1"), ("b", "2")]
+      (Http.ClientRequest.post (base ++ "/upload-one"))
+  let refused = Http.Client.execute too_many
+  line
+    "with_limits"
+    (show (Http.ClientResponse.status refused) ++ " " ++ Http.ClientResponse.text refused)
+  line "static" (status_of (base ++ "/static/page.txt"))
+  line "static missing" (status_of (base ++ "/static/none.txt"))
+  let sent = Http.Client.get (base ++ "/file")
+  line
+    "file"
+    (Http.ClientResponse.text sent
+      ++ " "
+      ++ show (Http.Headers.has "etag" (Http.ClientResponse.headers sent)))
+
+serve_all : String ->{
+  Log,
+  Http.Client.HttpClient,
+  Http.Platform.HttpPlatform;
+  HttpClientError,
+  SchemaError,
+  Http.Body.HttpBodyError,
+  Http.ServerError.ServeError,
+  PlatformError.PlatformError
+}
+  Unit
+let serve_all dir =
+  let started : Deferred.Deferred none Unit = Deferred.make ()
+  scope outer {
+    let (base, pending) =
+      scope {
+        let static_route = Http.StaticServer.route (Http.StaticServer.static_options dir) "/static"
+        app : ServerRequest ->{
+          Log,
+          Http.Platform.HttpPlatform;
+          Http.ServerError.HttpServerError,
+          SchemaError,
+          Http.Body.HttpBodyError,
+          Http.Cookies.CookiesError,
+          Boom,
+          Http.Multipart.MultipartError,
+          PlatformError.PlatformError
+        }
+          ServerResponse
+        let app =
+          Http.Router.router Http.Router.config
+            [
+              Http.Router.route (Some Http.Method.GET) "/hello/:name" hello,
+              Http.Router.route (Some Http.Method.POST) "/items" create,
+              Http.Router.route (Some Http.Method.GET) "/whoami" whoami,
+              Http.Router.route (Some Http.Method.GET) "/broken" broken,
+              Http.Router.route (Some Http.Method.POST) "/parse" parse,
+              Http.Router.route (Some Http.Method.POST) "/upload" upload,
+              Http.Router.route (Some Http.Method.POST) "/upload-one" upload_one,
+              Http.Router.route (Some Http.Method.GET) "/slow" (slow started),
+              Http.Router.route (Some Http.Method.GET) "/file" (file (dir ++ "/page.txt")),
+              static_route
+            ]
+        let options : Http.Server.ServeOptions =
+          { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = Some (ms 2000) }
+        let server = Http.Server.serve options app
+        let base = Http.Server.format_address (Http.Server.address server)
+        line "listening" (show (String.starts_with "http://127.0.0.1:" base))
+        exercise base dir
+        let tc = Http.Server.test_client server
+        line
+          "test_client"
+          (Http.ClientResponse.text
+            (Http.Client.execute_with tc (Http.ClientRequest.get "/hello/tc")))
+        provide (Http.Server.layer_test_client server) {
+          line "layer_test_client" (status_of "/hello/layer")
+        }
+        line
+          "address_formatted_with"
+          (Http.Server.address_formatted_with
+            (fun url -> show (String.starts_with "http://" url))
+            server)
+        provide (Logger.layer { mergeWithExisting = false } [Logger.with_console_log listening]) {
+          Http.Server.log_address server
+        }
+        let pending =
+          Fiber.spawn
+            outer
+            unexpected
+            (task { Http.ClientResponse.text (Http.Client.get (base ++ "/slow")) })
+        Deferred.await_ started
+        line "server" "closing"
+        (base, pending)
+      }
+    line "server" "closed"
+    line "slow" (Fiber.join pending)
+    try
+      line "after close" (status_of (base ++ "/hello/ann"))
+    with
+    | e -> line "after close" (describe e)
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  provide (Layer.merge
+    (Layer.merge Http.FetchClient.layer stdout_log)
+    (Layer.merge Http.Server.layer_services FileSystem.node)) {
+    try
+      scope {
+        let dir =
+          FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-http" }
+        FileSystem.write_file_string { flag = None; mode = None } (dir ++ "/page.txt") "static page"
+        serve_all dir
+      }
+    with
+    | Http.ClientError.HttpClientError r -> line "client failed" (show r)
+    | SchemaError issues -> line "schema failed" (show issues)
+    | Http.Body.HttpBodyError r -> line "body failed" (show r)
+    | Http.ServerError.ServeError r -> line "serve failed" r
+    | PlatformError.PlatformError r -> line "platform failed" (show r)
+  }

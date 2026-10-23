@@ -1,0 +1,61 @@
+make: ClientRequest POST "/a" Headers [("accept", "application/json")]
+show: ClientRequest PUT "http://fake/a/b/c" Headers [("x-a", "1"), ("accept", "text/plain"), ("authorization", "<redacted>")]
+url: http://fake/a/b/c UrlParams [("r", "4"), ("q", "2"), ("q", "3"), ("s", "5")] Some "top"
+to_url: Some http://fake/a/b/c?r=4&q=2&q=3&s=5
+basic_auth: Headers [("authorization", "<redacted>")]
+set_url: http://other/x
+modify: ClientRequest PUT "http://fake/a/b/c" Headers [("x-a", "1"), ("accept", "text/plain"), ("authorization", "<redacted>"), ("x-m", "1")]
+make_with: GET http://fake/w
+methods: [GET, QUERY, POST, PATCH, PUT, DELETE, HEAD, OPTIONS, TRACE]
+bodies: [Some "text/plain", Some "text/html", Some "application/octet-stream", Some "application/x-www-form-urlencoded", None, Some "text/plain"]
+texts: [Some "hi", Some "<p/>", Some "hi", Some "a=b+c", None, Some "set"]
+body_json: Some "{\"label\":\"cup\",\"size\":1}"
+schema_body_json: Some "{\"label\":\"box\",\"size\":3}"
+compress_body: Some "gzip"
+body: (Some "application/json", Some 24, Some "{\"label\":\"cup\",\"size\":1}")
+json_schema: Some "{\"label\":\"jar\",\"size\":4}"
+others: [None, Some "application/octet-stream", Some "application/x-www-form-urlencoded", None]
+length: Some 3
+status: 200 http://fake/echo
+request: GET
+headers: Headers [("content-type", "text/plain"), ("content-length", "36")]
+show: ClientResponse 200 Headers [("content-type", "text/plain"), ("content-length", "36")]
+text: GET http://fake/echo Headers [] None
+schema_body_json: { label = "pen", size = 2 }
+json: {"label":"pen","size":2}
+bytes: 24
+url_params_body: UrlParams [("a", "1"), ("a", "2")]
+schema_headers: { contentType = "application/json" }
+schema_no_body: { status = 200 }
+schema_json: { body = { label = "pen", size = 2 }, status = 200 }
+schema_body_url_params: { a = ["1", "2"] }
+filter_status: 200
+cookies: Cookies [Cookie "session=<redacted>; Path=/"]
+filter_status_ok: status 404 of GET http://fake/missing Some 404
+map_request: GET http://fake/a Headers [("x-tag", "1")] None
+map_request_input: GET http://fake/a Headers [("x-in", "1")] None
+map_request_effect: GET http://fake/a Headers [("x-e", "1")] None
+map_request_input_effect: GET http://fake/a Headers [("x-ie", "1")] None
+tap_request: http://fake/t
+tap: 200
+tapped: GET http://fake/t Headers [] None
+filter_status_ok: status 404 of GET http://fake/missing
+tap_error: status 404 of GET http://fake/missing
+catch: GET http://fake/fallback Headers [] None
+filter_status: status 404 of GET http://fake/missing
+filter_or_else: GET http://fake/else Headers [] None
+filter_or_fail: refused 404
+retry: GET http://fake/r Headers [] None after 3
+retry_transient: 200 after 2
+with_cookies_ref: GET http://fake/echo Headers [("cookie", "<redacted>")] None
+follow_redirects: GET http://fake/new Headers [] None
+transform: http://fake/tr
+transformed: GET http://fake/tr Headers [] None
+transform_response: GET http://fake/trr Headers [] None
+make_with: GET http://fake/mw Headers [("x-pre", "1")] None
+with_scope: typed
+with_tracer_disabled_when: ran
+with_tracer_header_filter: ran
+with_span_name_generator: ran
+client: GET http://fake/cur Headers [] None
+service: [200, 200, 200, 200, 200, 200, 200, 200, 200]

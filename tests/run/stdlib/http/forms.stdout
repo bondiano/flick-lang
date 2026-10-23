@@ -1,0 +1,13 @@
+fields: [("title", ["notes"]), ("tag", ["a", "b"]), ("meta", ["{\"x\":3}"])]
+files: 0
+schema_persisted: { tag = ["a", "b"], title = "notes" }
+schema_json: { x = 3 }
+with_limits: accepted
+default_is_file: (false, true)
+decode_field: hi
+persisted file: n
+to_headers: [("b3", "4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-1"), ("traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")]
+from_headers: Some "00f067aa0ba902b7"
+w3c: Some "4bf92f3577b34da6a3ce929d0e0e4736"
+b3: Some true
+xb3: Some "00f067aa0ba902b7"

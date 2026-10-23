@@ -1,4 +1,4 @@
-[pending]
-getAllExtensions = "M21"
-getExtension = "M21"
-getType = "M21"
+[wrapped]
+getAllExtensions = "Http.Mime.get_all_extensions 1629bc2a0074a697"
+getExtension = "Http.Mime.get_extension 1bcd3c537679f752"
+getType = "Http.Mime.get_type 7e29c2efab05938e"

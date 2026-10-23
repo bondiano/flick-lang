@@ -1,0 +1,12 @@
+show: Headers [("content-type", "text/plain"), ("authorization", "<redacted>")]
+get: Some "text/plain"
+has: (true, false)
+to_list: [("authorization", "Bearer s3cret"), ("x-a", "1"), ("x-b", "2")]
+merge: [("authorization", "Bearer s3cret"), ("x-a", "9"), ("x-b", "2")]
+remove_many: [("authorization", "Bearer s3cret")]
+redact: [("authorization", Plain "Bearer s3cret"), ("x-a", Secret <redacted>), ("x-b", Plain "2")]
+is_redacted_name: true
+eq: (true, false)
+methods: [POST, PUT, DELETE, PATCH, QUERY]
+short: [(GET, "get"), (POST, "post"), (PUT, "put"), (DELETE, "del")]
+status: (404, 200)

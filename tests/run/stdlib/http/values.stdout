@@ -1,0 +1,41 @@
+show: UrlParams [("a", "1"), ("b", "x y"), ("a", "2"), ("sig", "<redacted>")]
+to_string: a=1&b=x+y&a=2&sig=s3cret
+get: (["1", "2"], Some "1", Some "2")
+to_list: [("a", "0"), ("b", "z"), ("c", "3"), ("d", "4")]
+to_record: [("a", ["1", "2"]), ("b", ["x y"]), ("sig", ["s3cret"])]
+transform: [("a", "1")]
+redact: [("a", Plain "0"), ("b", Secret <redacted>), ("c", Plain "3"), ("d", Plain "4")]
+is_redacted_name: true
+redact_url: https://REDACTED:REDACTED@example.com/a?token=REDACTED&x=1
+eq: (true, false)
+url: http://me:pw@api.example.org:9090/v1/items?q=1#end
+show: http://REDACTED:REDACTED@api.example.org:9090/v1/items?q=1#end
+params: UrlParams [("q", "1")]
+set_url_params: http://me:pw@api.example.org:9090/v1/items?k=v#end
+modify: http://me:pw@api.example.org:9090/v1/items?k=v&k=w#end
+set_href: https://b.example/
+set_href invalid: https://example.com/a?x=1#top
+eq: (true, false)
+invalid: true
+make: https://example.com/p?a=b#h
+mime: (Some "text/html", Some "json", None)
+extensions: Some ["jpe", "jpeg", "jpg"]
+etag: ("W/\"1\"", "\"2\"")
+generator: Strong "ff-1000"
+weak: Weak "ff-1000"
+show: Cookies [Cookie "session=<redacted>; Max-Age=60; Path=/; Priority=High; HttpOnly; Secure; SameSite=Lax"]
+set-cookie: ["session=abc123; Max-Age=60; Path=/; Priority=High; HttpOnly; Secure; SameSite=Lax"]
+header: session=abc123
+round trip: [("session", "abc123")]
+get_value: <redacted> / abc123
+cookie: Cookie "theme=<redacted>" theme dark
+serialize: theme=dark
+names: ["session", "theme", "a"]
+get: Some "theme"
+remove: (true, false)
+expire: ["session=; Max-Age=0; Path=/; Priority=High; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure; SameSite=Lax"]
+from_set_cookie: Cookies [Cookie "x=<redacted>; Path=/", Cookie "y=<redacted>"]
+from_readonly_record: Cookies [Cookie "theme=<redacted>"]
+invalid name: InvalidCookieName
+invalid domain: InvalidCookieDomain
+infinite max age: CookieInfinityMaxAge

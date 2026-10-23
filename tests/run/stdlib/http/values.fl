@@ -1,0 +1,210 @@
+// URL parameters, URLs, media types, entity tags and cookies; a cookie's
+// value is a secret that `show` and logs never print.
+module App.Main exposing (main)
+
+reason : Http.Cookies.CookiesError -> String
+let reason failure =
+  match failure with
+  | Http.Cookies.CookiesError r -> show r
+
+params : Unit ->{} Unit
+let params () =
+  let input : Http.UrlParams.Input = [("a", "1"), ("b", "x y"), ("a", "2"), ("sig", "s3cret")]
+  let p = Http.UrlParams.make input
+  Platform.stdout_line ("show: " ++ (show p))
+  Platform.stdout_line ("to_string: " ++ (Http.UrlParams.to_string p))
+  Platform.stdout_line
+    ("get: "
+      ++ (show
+        (
+          Http.UrlParams.get_all "a" p,
+          Http.UrlParams.get_first "a" p,
+          Http.UrlParams.get_last "a" p
+        )))
+  let q =
+    p
+    |> Http.UrlParams.set "b" "z"
+    |> Http.UrlParams.append "c" "3"
+    |> Http.UrlParams.append_all [("d", "4")]
+    |> Http.UrlParams.set_all [("a", "0")]
+    |> Http.UrlParams.remove "sig"
+  Platform.stdout_line ("to_list: " ++ (show (Http.UrlParams.to_list q)))
+  Platform.stdout_line ("to_record: " ++ (show (Http.UrlParams.to_record p)))
+  Platform.stdout_line
+    ("transform: " ++ (show (Http.UrlParams.to_list (Http.UrlParams.transform (List.take 1) p))))
+  Platform.stdout_line ("redact: " ++ (show (Http.UrlParams.redact ["b"] q)))
+  Platform.stdout_line
+    ("is_redacted_name: " ++ (show (Http.UrlParams.is_redacted_name "SIG" ["sig"])))
+  Platform.stdout_line
+    (
+      "redact_url: "
+        ++ (Http.UrlParams.redact_url ["token"] "https://u:pw@example.com/a?token=t&x=1")
+    )
+  Platform.stdout_line
+    ("eq: " ++ (show (Http.UrlParams.from_input input == p, p == Http.UrlParams.empty)))
+
+urls : Unit ->{} Unit
+let urls () =
+  match Http.Url.from_string "https://example.com/a?x=1#top" with
+  | Ok url ->
+    let changed =
+      url
+      |> Http.Url.set_hash "end"
+      |> Http.Url.set_host "example.org:8080"
+      |> Http.Url.set_hostname "api.example.org"
+      |> Http.Url.set_pathname "/v1/items"
+      |> Http.Url.set_port 9090
+      |> Http.Url.set_protocol "http:"
+      |> Http.Url.set_search "?q=1"
+      |> Http.Url.set_username "me"
+      |> Http.Url.set_password (Redacted.make "pw")
+    Platform.stdout_line ("url: " ++ (Http.Url.href changed))
+    Platform.stdout_line ("show: " ++ (show changed))
+    Platform.stdout_line ("params: " ++ (show (Http.Url.url_params changed)))
+    let p = Http.Url.set_url_params (Http.UrlParams.make [("k", "v")]) changed
+    Platform.stdout_line ("set_url_params: " ++ (Http.Url.href p))
+    Platform.stdout_line
+      ("modify: " ++ (Http.Url.href (Http.Url.modify_url_params (Http.UrlParams.append "k" "w") p)))
+    Platform.stdout_line
+      ("set_href: " ++ (Http.Url.href (Http.Url.set_href "https://b.example/" url)))
+    Platform.stdout_line
+      ("set_href invalid: " ++ (Http.Url.href (Http.Url.set_href "not a url" url)))
+    Platform.stdout_line ("eq: " ++ (show (url == url, url == changed)))
+  | Err e -> Platform.stdout_line ("error: " ++ (show e))
+  Platform.stdout_line ("invalid: " ++ (show (Result.is_err (Http.Url.from_string "nope"))))
+  match Http.Url.make "https://example.com/p" (Http.UrlParams.make [("a", "b")]) (Some "h") with
+  | Ok url -> Platform.stdout_line ("make: " ++ (Http.Url.href url))
+  | Err e -> Platform.stdout_line ("make: " ++ (show e))
+
+cookies : Unit ->{; Http.Cookies.CookiesError} Unit
+let cookies () =
+  let attributes : Http.Cookies.Attributes =
+    {
+      Http.Cookies.attributes with
+        path = Some "/";
+        httpOnly = true;
+        secure = true;
+        sameSite = Some Http.Cookies.Lax;
+        priority = Some Http.Cookies.High;
+        maxAge = Some (seconds 60)
+    }
+  let jar : Http.Cookies.Cookies =
+    Http.Cookies.empty
+    |> Http.Cookies.set "session" (Redacted.make "abc123") attributes
+  Platform.stdout_line ("show: " ++ (show jar))
+  Platform.stdout_line ("set-cookie: " ++ (show (Http.Cookies.to_set_cookie_headers jar)))
+  let header = Http.Cookies.to_cookie_header jar
+  Platform.stdout_line ("header: " ++ header)
+  let parsed = Http.Cookies.parse_header header
+  Platform.stdout_line
+    ("round trip: " ++ (show (List.map_effect (fun (n, v) -> (n, Redacted.reveal v)) parsed)))
+  match Http.Cookies.get_value "session" jar with
+  | Some v -> Platform.stdout_line ("get_value: " ++ (show v ++ " / " ++ Redacted.reveal v))
+  | None -> Platform.stdout_line ("get_value: " ++ "none")
+  let cookie = Http.Cookies.make_cookie "theme" (Redacted.make "dark") Http.Cookies.attributes
+  Platform.stdout_line
+    ("cookie: "
+      ++ (show cookie
+        ++ " "
+        ++ Http.Cookies.name cookie
+        ++ " "
+        ++ Redacted.reveal (Http.Cookies.value cookie)))
+  Platform.stdout_line ("serialize: " ++ (Http.Cookies.serialize_cookie cookie))
+  let more =
+    jar
+    |> Http.Cookies.set_cookie cookie
+    |> Http.Cookies.merge (Http.Cookies.from_iterable [cookie])
+    |> Http.Cookies.set_all_cookie [cookie]
+  let more = Http.Cookies.set_all [("a", Redacted.make "1", Http.Cookies.attributes)] more
+  Platform.stdout_line
+    ("names: " ++ (show (List.map (fun (n, _) -> n) (Http.Cookies.to_record more))))
+  Platform.stdout_line
+    ("get: " ++ (show (Option.map Http.Cookies.name (Http.Cookies.get "theme" more))))
+  Platform.stdout_line
+    ("remove: "
+      ++ (
+        show (Http.Cookies.is_empty (Http.Cookies.remove "session" jar), Http.Cookies.is_empty jar)
+      ))
+  let expired = Http.Cookies.expire_cookie "session" attributes jar
+  Platform.stdout_line ("expire: " ++ (show (Http.Cookies.to_set_cookie_headers expired)))
+  Platform.stdout_line
+    ("from_set_cookie: " ++ (show (Http.Cookies.from_set_cookie ["x=1; Path=/", "y=2"])))
+  Platform.stdout_line
+    ("from_readonly_record: " ++ (show (Http.Cookies.from_readonly_record [("t", cookie)])))
+  try
+    let _ = Http.Cookies.set "bad name" (Redacted.make "v") Http.Cookies.attributes jar
+    Platform.stdout_line ("invalid name: " ++ "accepted")
+  with
+  | e -> Platform.stdout_line ("invalid name: " ++ (reason e))
+  try
+    let _ =
+      Http.Cookies.make_cookie
+        "n"
+        (Redacted.make "v")
+        { Http.Cookies.attributes with domain = Some "bad;domain" }
+    Platform.stdout_line ("invalid domain: " ++ "accepted")
+  with
+  | e -> Platform.stdout_line ("invalid domain: " ++ (reason e))
+  try
+    let _ =
+      Http.Cookies.make_cookie
+        "n"
+        (Redacted.make "v")
+        { Http.Cookies.attributes with maxAge = Some Duration.infinity }
+    Platform.stdout_line ("infinite max age: " ++ "accepted")
+  with
+  | e -> Platform.stdout_line ("infinite max age: " ++ (reason e))
+
+seconds : Number -> Duration.Duration
+let seconds n =
+  match Duration.seconds n with
+  | Ok d -> d
+  | Err _ -> Duration.zero
+
+main : Unit ->{; AppError} Unit
+let main () =
+  params ()
+  urls ()
+  Platform.stdout_line
+    ("mime: "
+      ++ (show
+        (
+          Http.Mime.get_type "a.html",
+          Http.Mime.get_extension "application/json",
+          Http.Mime.get_type "x.zzz"
+        )))
+  Platform.stdout_line ("extensions: " ++ (show (Http.Mime.get_all_extensions "image/jpeg")))
+  Platform.stdout_line
+    ("etag: "
+      ++ (
+        show (Http.Etag.to_string (Http.Etag.Weak "1"), Http.Etag.to_string (Http.Etag.Strong "2"))
+      ))
+  provide Http.Etag.layer {
+    Platform.stdout_line ("generator: " ++ (show (Http.Etag.from_file_info (info ()))))
+  }
+  provide Http.Etag.layer_weak {
+    Platform.stdout_line ("weak: " ++ (show (Http.Etag.from_file_info (info ()))))
+  }
+  try
+    cookies ()
+  with
+  | e -> Platform.stdout_line ("cookies failed: " ++ (reason e))
+
+info : Unit -> FileSystem.Info
+let info () =
+  {
+    type_ = FileSystem.RegularFile;
+    mtime = Some 4096;
+    atime = None;
+    birthtime = None;
+    dev = 0n;
+    ino = None;
+    mode = 0;
+    nlink = None;
+    uid = None;
+    gid = None;
+    rdev = None;
+    size = 255n;
+    blksize = None;
+    blocks = None
+  }

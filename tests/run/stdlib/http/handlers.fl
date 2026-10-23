@@ -1,0 +1,425 @@
+// Handlers without a server: requests made from client requests, the
+// router's decoders, responses and their cookies, the middlewares and the
+// responses of failures.
+module App.Main exposing (main)
+
+import Http.Router exposing (RouteContext)
+import Http.ServerError exposing (HttpServerError)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+type alias Query = { id : String; q : String }
+  deriving Schema
+
+type alias Note = { title : String; tag : List String }
+  deriving Schema
+
+type alias Point = { x : Number }
+  deriving Schema
+
+type error Boom = Boom
+  deriving Show
+
+line : String -> String ->{} Unit
+let line label value = Platform.stdout_line (label ++ ": " ++ value)
+
+ok : Http.ServerResponse.Options
+let ok = Http.ServerResponse.defaults
+
+json_of : PureCodec Json a -> Codec none none Json a
+let json_of c = Codec.general (ignore_extra_fields c)
+
+query : Codec none none Json Query
+let query =
+  json_of (codec (schema Query) { id = field "id" String.json; q = field "q" String.json })
+
+point : Codec none none Json Point
+let point = Codec.general (Codec.json (schema Point))
+
+hello : Http.Middleware.Handler none none
+let hello request = Http.ServerResponse.text ("hello " ++ Http.ServerRequest.url request) ok
+
+status_and : ServerResponse -> List String -> String
+let status_and response names =
+  show (Http.ServerResponse.status response) ++ " "
+    ++ show
+      (List.map (fun n -> (n, Http.Headers.get n (Http.ServerResponse.headers response))) names)
+
+requests : Unit ->{; HttpServerError, SchemaError} Unit
+let requests () =
+  let client =
+    Http.ClientRequest.post "http://example.com/items/7?q=x&q=y"
+    |> Http.ClientRequest.set_header "cookie" "session=s3cret; theme=dark"
+    |> Http.ClientRequest.set_header "content-type" "application/json"
+    |> Http.ClientRequest.body_text "{\"x\":1}" (Some "application/json")
+  let r = Http.ServerRequest.from_client_request client
+  Platform.stdout_line ("request: " ++ (show r))
+  Platform.stdout_line
+    ("parts: "
+      ++ (show (Http.ServerRequest.method r)
+        ++ " "
+        ++ Http.ServerRequest.url r
+        ++ " "
+        ++ Http.ServerRequest.original_url r
+        ++ " "
+        ++ show (Http.ServerRequest.remote_address r)))
+  Platform.stdout_line ("cookies: " ++ (show (Http.ServerRequest.cookies r)))
+  Platform.stdout_line ("search_params: " ++ (show (Http.ServerRequest.search_params r)))
+  Platform.stdout_line
+    ("to_url: " ++ (show (Option.map Http.Url.href (Http.ServerRequest.to_url r))))
+  match Http.Url.from_string "http://example.com/?a=1&a=2&b=3" with
+  | Ok u ->
+    Platform.stdout_line
+      ("search_params_from_url: " ++ (show (Http.ServerRequest.search_params_from_url u)))
+  | Err _ -> ()
+  Platform.stdout_line ("to_client_request: " ++ (show (Http.ServerRequest.to_client_request r)))
+  Platform.stdout_line
+    ("schema_body_json: " ++ (show (Http.ServerRequest.schema_body_json point r)))
+  Platform.stdout_line
+    ("text: " ++ (Http.ServerRequest.text (Http.ServerRequest.from_client_request client)))
+  Platform.stdout_line
+    ("json: "
+      ++ (Json.stringify (Http.ServerRequest.json (Http.ServerRequest.from_client_request client))))
+  Platform.stdout_line
+    ("bytes: " ++ (show (Http.ServerRequest.bytes (Http.ServerRequest.from_client_request client))))
+  let form =
+    Http.ServerRequest.from_client_request
+      (Http.ClientRequest.body_url_params
+        [("title", "t"), ("tag", "a"), ("tag", "b")]
+        (Http.ClientRequest.post "http://example.com/f"))
+  Platform.stdout_line ("url_params_body: " ++ (show (Http.ServerRequest.url_params_body form)))
+  let form2 =
+    Http.ServerRequest.from_client_request
+      (Http.ClientRequest.body_url_params
+        [("title", "t"), ("tag", "a"), ("tag", "b")]
+        (Http.ClientRequest.post "http://example.com/f"))
+  Platform.stdout_line
+    ("schema_body_url_params: "
+      ++ (show
+        (
+          Http.ServerRequest.schema_body_url_params (Codec.general (Codec.json (schema Note))) form2
+        )))
+  Platform.stdout_line
+    ("schema_cookies: "
+      ++ (show
+        (Http.ServerRequest.schema_cookies
+          (json_of (codec (schema Theme) { theme = field "theme" String.json }))
+          r)))
+  Platform.stdout_line
+    ("schema_headers: "
+      ++ (show
+        (Http.ServerRequest.schema_headers
+          (json_of (codec (schema Theme) { theme = field "content-type" String.json }))
+          r)))
+  Platform.stdout_line
+    ("schema_search_params: "
+      ++ (
+        show (Http.ServerRequest.schema_search_params (Codec.general (Codec.json (schema Qs))) r)
+      ))
+  let small = Option.with_default ByteSize.zero (ByteSize.bytes 2)
+  try
+    Http.ServerRequest.with_max_body_size
+      small
+      (task {
+        Platform.stdout_line
+          ("with_max_body_size: "
+            ++ (Http.ServerRequest.text (Http.ServerRequest.from_client_request client)))
+      })
+  with
+  | e -> Platform.stdout_line ("with_max_body_size: " ++ (show (Http.ServerError.status e)))
+
+type alias Theme = { theme : String }
+  deriving Schema
+
+type alias Qs = { q : List String }
+  deriving Schema
+
+type alias Posted = { body : Point }
+  deriving Schema
+
+body_text : ServerResponse -> String
+let body_text response =
+  Option.with_default "" (Http.Body.to_text (Http.ServerResponse.body response))
+
+routes : Unit ->{; HttpServerError, SchemaError} Unit
+let routes () =
+  item : ServerRequest ->{RouteContext; SchemaError} ServerResponse
+  let item request =
+    let by_path =
+      Http.Router.schema_path_params
+        (json_of (codec (schema Theme) { theme = field "id" String.json }))
+    let both = Http.Router.schema_params query request
+    let whole =
+      Http.Router.schema_no_body
+        (json_of (codec (schema Theme) { theme = field "method" String.json }))
+        request
+    Http.ServerResponse.text (show (by_path, both, whole)) ok
+  posted : ServerRequest ->{RouteContext; SchemaError, HttpServerError} ServerResponse
+  let posted request =
+    let body =
+      Http.Router.schema_json
+        (json_of (codec (schema Posted) { body = field "body" (Codec.json (schema Point)) }))
+        request
+    Http.ServerResponse.text (show body) ok
+  app : ServerRequest ->{; HttpServerError, SchemaError} ServerResponse
+  let app =
+    Http.Router.router Http.Router.config
+      [
+        Http.Router.route (Some Http.Method.GET) "/items/:id" item,
+        Http.Router.route (Some Http.Method.POST) "/points" posted,
+        Http.Router.prefix_route "/api" (Http.Router.route None "/hello" (fun r -> hello r))
+      ]
+  Platform.stdout_line
+    ("route: "
+      ++ (body_text
+        (app
+          (Http.ServerRequest.from_client_request
+            (Http.ClientRequest.get "http://example.com/items/7?q=x")))))
+  let point_post =
+    Http.ClientRequest.body_text
+      "{\"x\":5}"
+      (Some "application/json")
+      (Http.ClientRequest.post "http://example.com/points")
+  Platform.stdout_line
+    ("schema_json: " ++ (body_text (app (Http.ServerRequest.from_client_request point_post))))
+  Platform.stdout_line
+    ("prefix_route: "
+      ++ (body_text
+        (app
+          (Http.ServerRequest.from_client_request
+            (Http.ClientRequest.post "http://example.com/api/hello")))))
+  Platform.stdout_line ("prefix_path: " ++ (Http.Router.prefix_path "/api" "/users"))
+  try
+    let _ =
+      app
+        (
+          Http.ServerRequest.from_client_request
+            (Http.ClientRequest.get "http://example.com/nothing")
+        )
+    Platform.stdout_line ("not found: " ++ "answered")
+  with
+  | Http.ServerError.HttpServerError reason -> Platform.stdout_line ("not found: " ++ (show reason))
+  | SchemaError _ -> Platform.stdout_line ("not found: " ++ "schema")
+  strict : ServerRequest ->{; HttpServerError} ServerResponse
+  let strict =
+    Http.Router.router
+      { Http.Router.config with caseSensitive = Some true }
+      [Http.Router.route (Some Http.Method.GET) "/A" (fun r -> hello r)]
+  try
+    let _ =
+      strict
+        (Http.ServerRequest.from_client_request (Http.ClientRequest.get "http://example.com/a"))
+    Platform.stdout_line ("case sensitive: " ++ "matched")
+  with
+  | e -> Platform.stdout_line ("case sensitive: " ++ (show (Http.ServerError.status e)))
+
+responses : Unit ->{; Http.Body.HttpBodyError, SchemaError, Http.Cookies.CookiesError} Unit
+let responses () =
+  let attrs = { Http.Cookies.attributes with secure = true }
+  let made =
+    [
+      Http.ServerResponse.empty ok,
+      Http.ServerResponse.redirect "/next" ok,
+      Http.ServerResponse.uint8_array [1, 2] ok,
+      Http.ServerResponse.text
+        "t"
+        { ok with status = Some 202; statusText = Some "Fine"; headers = Some [("x-a", "1")] },
+      Http.ServerResponse.html "<b>x</b>",
+      Http.ServerResponse.json (Codec.encode point { x = 1 }) ok,
+      Http.ServerResponse.schema_json point { x = 2 } ok,
+      Http.ServerResponse.url_params (Http.UrlParams.make [("k", "v")]) ok,
+      Http.ServerResponse.form_data [("k", "v")] ok
+    ]
+  Platform.stdout_line
+    ("made: "
+      ++ (show
+        (List.map
+          (fun r ->
+            (Http.ServerResponse.status r, Http.Body.content_type (Http.ServerResponse.body r)))
+          made)))
+  Platform.stdout_line ("status_text: " ++ (show (List.map Http.ServerResponse.status_text made)))
+  let r =
+    Http.ServerResponse.text "x" ok
+    |> Http.ServerResponse.set_header "x-a" "1"
+    |> Http.ServerResponse.set_headers [("x-b", "2"), ("authorization", "Bearer t")]
+    |> Http.ServerResponse.remove_header "x-a"
+    |> Http.ServerResponse.set_status 418 (Some "Teapot")
+    |> Http.ServerResponse.set_body (Http.Body.text "y" None)
+  let r = Http.ServerResponse.set_cookie "session" (Redacted.make "s3cret") attrs r
+  let r =
+    Http.ServerResponse.set_cookies
+      [("a", Redacted.make "1", attrs), ("b", Redacted.make "2", attrs)]
+      r
+  let r = Http.ServerResponse.expire_cookie "a" attrs r
+  let r =
+    r
+    |> Http.ServerResponse.remove_cookie "b"
+    |> Http.ServerResponse.merge_cookies (Http.Cookies.from_set_cookie ["c=3"])
+  let r = Http.ServerResponse.update_cookies (Http.Cookies.remove "c") r
+  Platform.stdout_line ("show: " ++ (show r))
+  Platform.stdout_line ("headers: " ++ (show (Http.ServerResponse.headers r)))
+  Platform.stdout_line
+    ("cookies: "
+      ++ (show (List.length (Http.Cookies.to_set_cookie_headers (Http.ServerResponse.cookies r)))))
+  Platform.stdout_line
+    ("replace_cookies: "
+      ++ (
+        show
+          (Http.ServerResponse.cookies (Http.ServerResponse.replace_cookies Http.Cookies.empty r))
+      ))
+  Platform.stdout_line
+    ("omits_body: "
+      ++ (show
+        (
+          Http.ServerResponse.omits_body false r,
+          Http.ServerResponse.omits_body true r,
+          Http.ServerResponse.omits_body false (Http.ServerResponse.empty ok)
+        )))
+  let client =
+    Http.ServerResponse.to_client_response (Http.ClientRequest.get "http://example.com/") r
+  Platform.stdout_line
+    ("from_client_response: "
+      ++ (show (Http.ServerResponse.status (Http.ServerResponse.from_client_response client))))
+
+failures : Unit ->{} Unit
+let failures () =
+  let exits =
+    parallel_exits [task { Http.ServerResponse.text "fine" ok }, task { from_result (Err Boom) }]
+  Platform.stdout_line
+    ("exit_response: "
+      ++ (show
+        (List.map_effect
+          (fun e -> Http.ServerResponse.status (Http.ServerResponse.exit_response e))
+          exits)))
+  empty : ServerRequest ->{; HttpServerError} ServerResponse
+  let empty = Http.Router.router Http.Router.config []
+  let not_found =
+    parallel_exits
+      [
+        task {
+          empty
+            (Http.ServerRequest.from_client_request (Http.ClientRequest.get "http://example.com/x"))
+        }
+      ]
+  Platform.stdout_line
+    ("cause_response: "
+      ++ (show
+        (List.map_effect
+          (fun e -> Http.ServerResponse.status (Http.ServerResponse.exit_response e))
+          not_found)))
+
+/// Handles the request as a server would, printing the response's status
+/// and headers as sent, after the pre-response handlers.
+observe : String -> List String -> Http.Middleware.Handler none none -> ServerRequest ->{} Unit
+let observe label names handler request =
+  send : ServerRequest -> ServerResponse ->{} Unit
+  let send _ response = line label (status_and response names)
+  Http.Middleware.to_handled send handler request
+
+middlewares : Unit ->{; HttpServerError} Unit
+let middlewares () =
+  let r = Http.ClientRequest.get "http://example.com/m"
+  wrapped : Http.Middleware.Handler none none
+  let wrapped =
+    hello
+    |> Http.Middleware.tracer
+    |> Http.Middleware.x_forwarded_headers
+    |> Http.Middleware.search_params_parser
+    |> Http.Middleware.with_logger_disabled
+    |> Http.Middleware.decompression None
+  Platform.stdout_line
+    ("stack: " ++ (status_and (wrapped (Http.ServerRequest.from_client_request r)) []))
+  forwarded : Http.Middleware.Handler none none
+  let forwarded =
+    Http.Middleware.x_forwarded_headers
+      (fun req -> Http.ServerResponse.text (show (Http.ServerRequest.remote_address req)) ok)
+  Platform.stdout_line
+    ("x_forwarded_headers: "
+      ++ (body_text
+        (forwarded
+          (Http.ServerRequest.from_client_request
+            (r
+              |> Http.ClientRequest.set_header "x-forwarded-for" "10.0.0.1"
+              |> Http.ClientRequest.set_header "x-forwarded-host" "a.example")))))
+  cors : Http.Middleware.Handler none none
+  let cors =
+    Http.Middleware.cors
+      { Http.Middleware.cors_options with allowedOrigins = ["https://a.example"]; maxAge = Some 60 }
+      hello
+  let preflight =
+    Http.ClientRequest.options "http://example.com/m"
+    |> Http.ClientRequest.set_header "origin" "https://a.example"
+    |> Http.ClientRequest.set_header "access-control-request-method" "POST"
+  Platform.stdout_line
+    ("cors preflight: "
+      ++ (status_and
+        (cors (Http.ServerRequest.from_client_request preflight))
+        ["access-control-allow-origin", "access-control-max-age"]))
+  observe
+    "cors"
+    ["access-control-allow-origin"]
+    cors
+    (Http.ServerRequest.from_client_request
+      (Http.ClientRequest.set_header "origin" "https://a.example" r))
+  big : Http.Middleware.Handler none none
+  let big _ = Http.ServerResponse.text (String.repeat 2000 "a") ok
+  zipped : Http.Middleware.Handler none none
+  let zipped =
+    Http.Middleware.compression
+      { algorithms = [Http.Platform.Gzip]; minSize = Some 10; levels = [(Http.Platform.Gzip, 6)] }
+      big
+  observe
+    "compression"
+    ["content-encoding"]
+    zipped
+    (Http.ServerRequest.from_client_request
+      (Http.ClientRequest.set_header "accept-encoding" "gzip" r))
+  pre : ServerRequest -> ServerResponse ->{; HttpServerError} ServerResponse
+  let pre _ response = Http.ServerResponse.set_header "x-pre" "1" response
+  late : ServerRequest -> ServerResponse ->{; HttpServerError} ServerResponse
+  let late _ response = Http.ServerResponse.set_header "x-late" "1" response
+  appending : Http.Middleware.Handler none none
+  let appending req =
+    Http.Middleware.append_pre_response_handler late req
+    hello req
+  send : ServerRequest -> ServerResponse ->{} Unit
+  let send _ response =
+    Platform.stdout_line ("to_handled: " ++ (status_and response ["x-pre", "x-late"]))
+  handled : ServerRequest ->{} Unit
+  let handled =
+    Http.Middleware.to_handled send (Http.Middleware.with_pre_response_handler pre appending)
+  handled (Http.ServerRequest.from_client_request r)
+  Http.Middleware.with_tracer_disabled_when
+    (fun _ -> true)
+    (task { Platform.stdout_line ("with_tracer_disabled_when: " ++ "ran") })
+  Http.Middleware.with_tracer_disabled_for_urls
+    ["/health"]
+    (task { Platform.stdout_line ("with_tracer_disabled_for_urls: " ++ "ran") })
+  Http.Middleware.with_span_name_generator
+    (fun req -> Http.ServerRequest.url req)
+    (task { Platform.stdout_line ("with_span_name_generator: " ++ "ran") })
+  Http.Middleware.with_tracer_header_filter
+    (fun _ _ -> true)
+    (task { Platform.stdout_line ("with_tracer_header_filter: " ++ "ran") })
+  let simple = Logger.make (fun o -> String.join " " o.message)
+  logged : Http.Middleware.Handler none none
+  let logged = Http.Middleware.logger hello
+  provide (Logger.layer { mergeWithExisting = false } [Logger.with_console_log simple]) {
+    Platform.stdout_line
+      ("logger: " ++ (status_and (logged (Http.ServerRequest.from_client_request r)) []))
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try
+    requests ()
+    routes ()
+    responses ()
+    middlewares ()
+  with
+  | Http.ServerError.HttpServerError reason ->
+    Platform.stdout_line ("server error: " ++ (show reason))
+  | SchemaError issues -> Platform.stdout_line ("schema error: " ++ (show issues))
+  | Http.Body.HttpBodyError reason -> Platform.stdout_line ("body error: " ++ (show reason))
+  | Http.Cookies.CookiesError reason -> Platform.stdout_line ("cookies error: " ++ (show reason))
+  failures ()

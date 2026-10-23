@@ -1,0 +1,107 @@
+/// Effect's `HttpClientResponse`: the response to a request of
+/// `Http.Client`. Its body is read once, by one of `text`, `json`,
+/// `url_params_body`, `bytes` or `form_data`; reading fails with
+/// `HttpClientError`. Streamed bodies wait for Flick's streams.
+module Http.ClientResponse exposing (..)
+
+import Http.ClientError exposing (HttpClientError)
+
+/// A response.
+type ClientResponse
+
+/// The status code.
+status : ClientResponse -> Number
+foreign pure status from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickStatus"
+  reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
+
+/// The headers.
+headers : ClientResponse -> Http.Headers.Headers
+foreign pure headers from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickHeaders"
+  reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
+
+/// The cookies of its `Set-Cookie` headers.
+cookies : ClientResponse -> Http.Cookies.Cookies
+foreign pure cookies from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickCookies"
+  reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
+
+/// The URL the response came from.
+url : ClientResponse -> String
+foreign pure url from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickUrl"
+  reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
+
+/// The request it answers.
+request : ClientResponse -> Http.ClientRequest.ClientRequest
+foreign pure request from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickRequest"
+  reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
+
+/// The body as text.
+text : ClientResponse ->{; HttpClientError} String
+foreign effect text from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickText"
+  reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
+
+/// The body as JSON.
+json : ClientResponse ->{; HttpClientError} Json
+foreign effect json from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickJson"
+  reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
+
+/// The body as URL parameters (`application/x-www-form-urlencoded`).
+url_params_body : ClientResponse ->{; HttpClientError} Http.UrlParams.UrlParams
+foreign effect url_params_body from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickUrlParamsBody"
+  reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
+
+/// The bytes of the body.
+bytes : ClientResponse ->{; HttpClientError} List Number
+foreign effect bytes from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickBytes"
+  reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
+
+/// The text fields of a `multipart/form-data` body.
+form_data : ClientResponse ->{; HttpClientError} List (String, String)
+foreign effect form_data from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickFormData"
+  reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
+
+/// The response, if `f` accepts its status; a `StatusCodeError` otherwise.
+filter_status : (Number -> Bool) -> ClientResponse ->{; HttpClientError} ClientResponse
+foreign effect filter_status from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickFilterStatus"
+  arity 2
+  reviewed "effect@4.0.5 sha256:82ece8d5b24b992d"
+
+/// The response, if its status is 2xx; a `StatusCodeError` otherwise.
+filter_status_ok : ClientResponse ->{; HttpClientError} ClientResponse
+foreign effect filter_status_ok from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickFilterStatusOk"
+  reviewed "effect@4.0.5 sha256:bd1f82503727157f"
+
+/// Decodes `{ status, headers, body }` of the response, the body read as
+/// JSON.
+schema_json : Codec rd re Json a -> ClientResponse ->{rd; HttpClientError, SchemaError} a
+foreign effect schema_json from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickSchemaJson"
+  arity 2
+  reviewed "effect@4.0.5 sha256:3fc269f3d81aa642"
+
+/// Decodes `{ status, headers }` of the response.
+schema_no_body : Codec rd re Json a -> ClientResponse ->{rd; SchemaError} a
+foreign effect schema_no_body from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickSchemaNoBody"
+  arity 2
+  reviewed "effect@4.0.5 sha256:a0e1567b9179e065"
+
+/// Decodes the JSON body.
+schema_body_json : Codec rd re Json a -> ClientResponse ->{rd; HttpClientError, SchemaError} a
+foreign effect schema_body_json from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickSchemaBodyJson"
+  arity 2
+  reviewed "effect@4.0.5 sha256:a6fc2625f3292603"
+
+/// Decodes the URL parameters of the body.
+schema_body_url_params : Codec rd re Json a -> ClientResponse ->{rd; HttpClientError, SchemaError} a
+foreign effect schema_body_url_params from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickSchemaBodyUrlParams"
+  arity 2
+  reviewed "effect@4.0.5 sha256:fb8aac67bbf0234e"
+
+/// Decodes the headers.
+schema_headers : Codec rd re Json a -> ClientResponse ->{rd; SchemaError} a
+foreign effect schema_headers from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickSchemaHeaders"
+  arity 2
+  reviewed "effect@4.0.5 sha256:c09a4db863a5e1ca"
+
+instance Show ClientResponse =
+  show : ClientResponse -> String
+  let show x = "ClientResponse " ++ show (status x) ++ " " ++ show (headers x)
+

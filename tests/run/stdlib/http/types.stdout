@@ -1,0 +1,26 @@
+etags: [Weak "w", Strong "s"]
+literal: (ImATeapot, 418)
+client reasons: 6
+server reasons: [RequestParseError { description = None, method = POST, url = "/b" }, RouteNotFound { description = None, method = POST, url = "/b" }, InternalError { description = None, method = POST, url = "/b" }, ResponseError { description = None, method = POST, status = 502, url = "/b" }]
+body reasons: [InvalidJson, InvalidSchema "bad"]
+cookie reasons: [InvalidCookieName, InvalidCookiePath]
+multipart reasons: [FileTooLarge, Parse]
+compressions: ([Gzip, Deflate], [Gzip, Deflate, Brotli, Zstd])
+accept_json: Headers [("accept", "application/json")]
+options: (None, Some true, true, [("a", "1")])
+body: Some "text/plain"
+equivalent: true
+with_redacted_names: ran
+show: Headers [("x-token", "t"), ("x-a", "1")]
+params: true Ok { theme = "1" }
+url params with_redacted_names: ran
+url error: true
+generator: Weak "fixed"
+cause_response: 404
+schema_body_multipart: { tag = ["a", "b"], title = "notes" }
+schema_body_form multipart: { tag = ["a", "b"], title = "notes" }
+schema_body_form urlencoded: { tag = ["a", "b"], title = "notes" }
+schema_body_form_json: { x = 3 }
+file: (200, Some "text/html")
+static index: 200
+outside root: 404
