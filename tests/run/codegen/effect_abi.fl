@@ -1,0 +1,30 @@
+// JS sees the same values in the debug and the optimized release build: a
+// task is a native Effect, a curried function or a partial application is
+// adapted to one JS call of both arguments, and a computed Number keeps its
+// sign, NaN and infinity.
+module App.Main exposing (main)
+
+is_effect : Eff none none Number -> Bool
+foreign pure is_effect from "./effect_abi.mjs" "isEffect"
+
+run_sync : Eff none none Number -> Number
+foreign pure run_sync from "./effect_abi.mjs" "runSync"
+
+stages : (Number -> Number -> Number) -> String
+foreign pure stages from "./effect_abi.mjs" "stages"
+
+bits : Number -> String
+foreign pure bits from "./effect_abi.mjs" "bits"
+
+add : Number -> Number -> Number
+let add x y = x * 10 + y
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let doubled = task { add 4 2 }
+  Platform.stdout_line (show (is_effect doubled, run_sync doubled))
+  Platform.stdout_line (stages add)
+  Platform.stdout_line (stages (fun a -> add (a + 1)))
+  Platform.stdout_line (stages (fun a -> fun b -> add b a))
+  Platform.stdout_line
+    (String.join " " (List.map bits [0 * -1, -0 + 0, 0 / 0, -1 / 0, 0.1 * 3, 2 ** 0.5]))

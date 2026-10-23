@@ -221,3 +221,23 @@ test("arbitrary values are values of their schema", () => {
   const refined = schemaRefined("Even", schemaNumber, (n: number) => n % 2 === 0, null);
   assert.throws(() => schemaArbitrary(refined)(random(1)), /needs an explicit generator/);
 });
+
+test("missing, null, undefined, defaults and extra keys are told apart", () => {
+  const base = { name: "a", note: null, alias: null };
+  const paths = (value: unknown) => outcome(codecs.fields, value).issues?.map((i: { path: string }) => i.path);
+  assert.equal(paths(base), undefined);
+  // an optional key may be missing, but an explicit undefined is not a string
+  assert.deepEqual(paths({ ...base, nick: undefined }), ["nick"]);
+  // `null` as `None` takes null only; nullish also takes undefined
+  assert.deepEqual(paths({ ...base, note: undefined }), ["note"]);
+  assert.equal(paths({ ...base, alias: undefined }), undefined);
+  // a default fills a missing key, never a null or undefined one
+  assert.deepEqual(outcome(codecs.fields, base), {
+    value: { name: "a", nick: Option.none(), note: Option.none(), alias: Option.none(), count: 7 },
+  });
+  assert.deepEqual(paths({ ...base, count: undefined }), ["count"]);
+  assert.deepEqual(paths({ ...base, count: null }), ["count"]);
+  assert.deepEqual(paths({ ...base, name: undefined }), ["name"]);
+  // an extra key is refused even when its value is undefined
+  assert.deepEqual(paths({ ...base, extra: undefined }), ["extra"]);
+});

@@ -194,4 +194,14 @@ fn an_abstract_higher_kinded_export_has_no_declaration() {
         stderr.contains("`Lib.Abstract.twice` has no TypeScript form"),
         "{stderr}"
     );
+    // a package with declarations refuses the same export before any tarball
+    fs::write(
+        dir.join("flick.toml"),
+        "schema-version = 1\n\n[project]\nkind = \"lib\"\n\n[build]\nemit-dts = true\n",
+    )
+    .expect("write");
+    let pack = flick_in(&dir, &["pack", "--out-dir", "artifacts"]);
+    assert_eq!(pack.status.code(), Some(1), "{pack:?}");
+    assert!(String::from_utf8_lossy(&pack.stderr).contains("FLICK-F004"));
+    assert!(!dir.join("artifacts").exists());
 }

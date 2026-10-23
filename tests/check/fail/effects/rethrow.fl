@@ -1,0 +1,18 @@
+// `Failure.rethrow` raises the original cause with its typed errors: the
+// signature must allow them, and a wider row is allowed.
+module App.Rethrow exposing (..)
+
+type error NotFound = NotFound Number
+
+type error Denied = Denied String
+
+widened : Failure {NotFound} ->{; NotFound, Denied} Unit
+let widened failure = Failure.rethrow failure
+
+dropped : Failure {NotFound} ->{; Denied} Unit
+let dropped failure = Failure.rethrow failure
+//                    ^^^^^^^^^^^^^^^^^^^^^^^ FLICK-E002 does not allow error `NotFound`
+
+hidden : Failure {NotFound} ->{} Unit
+let hidden failure = Failure.rethrow failure
+//                   ^^^^^^^^^^^^^^^^^^^^^^^ FLICK-E002 does not allow error `NotFound`

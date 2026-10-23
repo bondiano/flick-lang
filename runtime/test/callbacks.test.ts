@@ -107,3 +107,59 @@ test("an async foreign call gets a signal that interruption aborts", async () =>
   assert.ok(Exit.isFailure(result));
   assert.ok(aborted);
 });
+
+test("a Promise callback takes one argument whatever `this` and extra arguments JS passes", async () => {
+  const received = await Effect.runPromise(
+    scope(() =>
+      Effect.gen(function* () {
+        const cb = yield* promiseCallback((...args: ReadonlyArray<unknown>) => Effect.succeed(args));
+        const call: (this: unknown, ...args: ReadonlyArray<unknown>) => Promise<ReadonlyArray<unknown>> = cb;
+        return yield* Effect.promise(() => call.call({ self: true }, "ada", "extra"));
+      }),
+    ),
+  );
+  assert.deepEqual(received, ["ada"]);
+});
+
+test("a Promise callback may be called again from its own task", async () => {
+  const result = await Effect.runPromise(
+    scope(() =>
+      Effect.gen(function* () {
+        const self: { call?: (n: number) => Promise<number> } = {};
+        const call = yield* promiseCallback((n: number) =>
+          n === 0 ? Effect.succeed(0) : Effect.map(Effect.promise(() => self.call?.(n - 1) ?? Promise.resolve(0)), (m) => m + n),
+        );
+        self.call = call;
+        return yield* Effect.promise(() => call(3));
+      }),
+    ),
+  );
+  assert.equal(result, 6);
+});
+
+test("a listener called from its own handler queues the event instead of nesting", async () => {
+  const log: Array<string> = [];
+  await Effect.runPromise(
+    scope((owner) =>
+      Effect.gen(function* () {
+        const self: { listener?: (n: number) => void } = {};
+        const listener = yield* eventsListen(
+          owner,
+          eventsQueue(4),
+          () => Effect.void,
+          (n: number) =>
+            Effect.sync(() => {
+              log.push(`start ${n}`);
+              if (n === 1) self.listener?.(2);
+              log.push(`end ${n}`);
+            }),
+        );
+        self.listener = listener;
+        listener(1);
+        log.push("source returned");
+        yield* Effect.sleep(5);
+      }),
+    ),
+  );
+  assert.deepEqual(log, ["source returned", "start 1", "end 1", "start 2", "end 2"]);
+});

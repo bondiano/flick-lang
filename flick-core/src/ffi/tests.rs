@@ -1,4 +1,4 @@
-use super::import::{Status, flick_name, generate};
+use super::import::{Generated, Status, flick_name, generate};
 use super::{Policy, Surface, module_part};
 
 fn lookup_surface() -> Surface {
@@ -167,4 +167,61 @@ fn headers_record_the_import() {
         })
     );
     assert_eq!(header("module X"), None);
+}
+
+#[test]
+fn any_pure_and_cancellation_are_never_implied() {
+    let surface = Surface::parse(
+        r#"{"package": "p", "version": "1.0.0", "declarations": "p/index.d.ts", "exports": [
+          {"name": "wrap", "local": "wrap", "kind": "function", "fingerprint": "sha256:a",
+           "signatures": [{"params": [{"name": "x", "optional": false, "rest": false, "type": {"k": "any"}}],
+             "this": false, "typeParams": [], "result": {"k": "any"}}]},
+          {"name": "fetchIt", "local": "fetchIt", "kind": "function", "fingerprint": "sha256:b",
+           "signatures": [{"params": [], "this": false, "typeParams": [],
+             "result": {"k": "promise", "type": {"k": "number"}}}]}]}"#,
+    )
+    .expect("surface parses");
+    let entry = |generated: &Generated, name: &str| {
+        let e = generated
+            .entries
+            .iter()
+            .find(|e| e.export == name)
+            .expect("entry");
+        (e.status, e.detail.clone())
+    };
+    let plain = Policy::parse("[exports.fetchIt]\ncatch = \"JsError\"").expect("policy");
+    let generated = generate(&surface, &plain, None, "P.Generated");
+    // `any` becomes the opaque `JsValue`, and the call stays effectful
+    assert_eq!(
+        entry(&generated, "wrap"),
+        (Status::Supported, "JsValue ->{} JsValue".into())
+    );
+    assert!(!generated.text.contains("foreign pure"));
+    // an async call is not cancellable unless a policy says so
+    assert!(!generated.text.contains("cancel signal"));
+
+    let strict = generate(
+        &surface,
+        &Policy::parse("strict = true").expect("policy"),
+        None,
+        "P.Generated",
+    );
+    assert_eq!(entry(&strict, "wrap").0, Status::Unsupported);
+    assert_eq!(entry(&strict, "fetchIt").0, Status::NeedsPolicy);
+
+    let explicit = Policy::parse(
+        "[exports.fetchIt]\ncatch = \"JsError\"\ncancel = \"signal\"\n\n[exports.wrap]\nmode = \"pure\"",
+    )
+    .expect("policy");
+    let generated = generate(&surface, &explicit, None, "P.Generated");
+    assert!(generated.text.contains("cancel signal"));
+    assert!(generated.text.contains("foreign pure wrap"));
+
+    let wrong = Policy::parse(
+        "[exports.fetchIt]\ncatch = \"JsError\"\nmode = \"pure\"\n\n[exports.wrap]\ncancel = \"signal\"",
+    )
+    .expect("policy");
+    let generated = generate(&surface, &wrong, None, "P.Generated");
+    assert_eq!(entry(&generated, "fetchIt").0, Status::Unsupported);
+    assert_eq!(entry(&generated, "wrap").0, Status::Unsupported);
 }

@@ -23,15 +23,18 @@ pub fn installed(root: &Path, package: &str) -> Option<String> {
     Some(json.get("version")?.as_str()?.to_owned())
 }
 
+/// The version of `package` the runtime resolves: Effect from the runtime's
+/// own `node_modules` first, as Node does.
+pub fn resolved(root: &Path, package: &str) -> Option<String> {
+    let runtime_dir = root.join("node_modules/@flick-lang/runtime");
+    installed(&runtime_dir, package).or_else(|| installed(root, package))
+}
+
 /// `P015` for an installed runtime or Effect of another version; nothing
 /// when they are absent, which only running needs.
 pub fn check_runtime(root: &Path) -> Option<Diagnostic> {
-    let runtime_dir = root.join("node_modules/@flick-lang/runtime");
-    for (package, wanted, base) in [
-        ("@flick-lang/runtime", RUNTIME, root.to_path_buf()),
-        ("effect", EFFECT, runtime_dir.clone()),
-    ] {
-        let Some(found) = installed(&base, package).or_else(|| installed(root, package)) else {
+    for (package, wanted) in [("@flick-lang/runtime", RUNTIME), ("effect", EFFECT)] {
+        let Some(found) = resolved(root, package) else {
             continue;
         };
         if found != wanted {

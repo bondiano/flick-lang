@@ -45,7 +45,7 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str) -> String {
         );
     }
     for package in ["@flick-lang/runtime", "effect"] {
-        let version = toolchain::installed(&project.root, package).unwrap_or_default();
+        let version = toolchain::resolved(&project.root, package).unwrap_or_default();
         key.add(format!("version {package}"), version);
     }
     let mut sources = Vec::new();

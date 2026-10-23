@@ -1,0 +1,29 @@
+// A higher-rank callback is applied at several types with its `Show`
+// dictionary, and its effect and error rows come from the caller: output
+// happens in order and a typed failure reaches the caller's handler.
+module App.Main exposing (main)
+
+type error Stop = Stop String
+
+each_shown : forall r e. (forall a. Show a => a ->{r; e} Unit) ->{r; e} Unit
+let each_shown log =
+  log 1
+  log "two"
+  log [Some 3]
+
+stop_at_text : Show a => a ->{; AppError, Stop} Unit
+let stop_at_text value =
+  let text = show value
+  if text == "\"two\"" then from_result (Err (Stop text))
+  else Platform.stdout_line ("seen " ++ text)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  each_shown (fun x -> Platform.stdout_line (show x))
+  let outcome =
+    try
+      each_shown stop_at_text
+      "finished"
+    with
+    | Stop text -> "stopped at " ++ text
+  Platform.stdout_line outcome

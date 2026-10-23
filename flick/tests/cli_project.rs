@@ -235,6 +235,100 @@ fn a_wrong_pnpm_or_a_missing_lockfile_changes_nothing() {
     }
 }
 
+#[test]
+fn a_stale_lockfile_is_refused_and_pnpm_speaks_ndjson() {
+    let manifest = format!(
+        "{{ \"name\": \"stale\", \"packageManager\": \"pnpm@{}\", \"dependencies\": {{ \"left-pad\": \"1.3.0\" }} }}\n",
+        pnpm_version()
+    );
+    // the lockfile predates the dependency
+    let lock = "lockfileVersion: '9.0'\n\nimporters:\n\n  .: {}\n";
+    let dir = project(
+        "cli_stale_lock",
+        &[
+            ("flick.toml", APP),
+            ("package.json", &manifest),
+            ("pnpm-lock.yaml", lock),
+            ("pnpm-workspace.yaml", "packages: []\n"),
+        ],
+    );
+    let out = flick_in(&dir, &["--diagnostics", "json", "install", "--locked"]);
+    assert_eq!(code(&out), Some(2), "{out:?}");
+    let events: Vec<serde_json::Value> = stderr(&out)
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap_or_else(|_| panic!("not NDJSON: {l:?}")))
+        .collect();
+    assert!(events.iter().all(|e| e["schema-version"] == 1));
+    assert!(
+        events.iter().any(|e| e["type"] == "package-manager-output"),
+        "{events:?}"
+    );
+    assert!(
+        events.iter().any(|e| e["code"] == "FLICK-P017"),
+        "{events:?}"
+    );
+    assert_eq!(
+        fs::read_to_string(dir.join("pnpm-lock.yaml")).expect("kept"),
+        lock
+    );
+    assert!(!dir.join("node_modules/left-pad").exists());
+}
+
+#[test]
+fn an_incompatible_effect_blocks_build_and_run() {
+    let dir = project(
+        "cli_effect_version",
+        &[
+            ("flick.toml", APP),
+            ("src/App/Main.fl", MAIN),
+            (
+                "node_modules/@flick-lang/runtime/package.json",
+                "{ \"name\": \"@flick-lang/runtime\", \"version\": \"0.1.0\" }",
+            ),
+            (
+                "node_modules/@flick-lang/runtime/node_modules/effect/package.json",
+                "{ \"name\": \"effect\", \"version\": \"3.0.0\" }",
+            ),
+        ],
+    );
+    for command in ["build", "run"] {
+        let out = flick_in(&dir, &[command]);
+        assert_eq!(code(&out), Some(2), "{command}: {out:?}");
+        assert!(stderr(&out).contains("FLICK-P015"), "{command}: {out:?}");
+    }
+    assert!(!dir.join("dist").exists());
+    assert!(
+        !dir.join(".flick/run/1").exists(),
+        "no generation was written"
+    );
+}
+
+#[test]
+fn the_installed_runtime_and_effect_are_in_the_cache_key() {
+    let dir = project(
+        "cli_cache_runtime",
+        &[("flick.toml", APP), ("src/App/Main.fl", MAIN)],
+    );
+    let build = || assert_eq!(code(&flick_in(&dir, &["build"])), Some(0));
+    build();
+    let runtime = dir.join("node_modules/@flick-lang/runtime");
+    fs::create_dir_all(runtime.join("node_modules/effect")).expect("dir");
+    fs::write(
+        runtime.join("package.json"),
+        "{ \"name\": \"@flick-lang/runtime\", \"version\": \"0.1.0\" }",
+    )
+    .expect("write");
+    build();
+    assert_eq!(cached(&dir), 2, "the runtime version is in the key");
+    fs::write(
+        runtime.join("node_modules/effect/package.json"),
+        "{ \"name\": \"effect\", \"version\": \"4.0.5\" }",
+    )
+    .expect("write");
+    build();
+    assert_eq!(cached(&dir), 3, "the Effect version is in the key");
+}
+
 fn pnpm_version() -> String {
     process::Command::new("pnpm")
         .arg("--version")

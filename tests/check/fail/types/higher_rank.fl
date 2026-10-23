@@ -25,7 +25,37 @@ let escape () =
   let cell = Ref.make None
   each (fun x -> Ref.set cell (Some x))
 
+// The caller's effect and error rows flow through a higher-rank callback and
+// are checked there; a nested `forall` without `Show` gives no dictionary.
+type error Stop = Stop String
+
+each_shown : forall r e. (forall a. Show a => a ->{r; e} Unit) ->{r; e} Unit
+let each_shown log =
+  log 1
+  log "two"
+
+failing : Show a => a ->{; Stop} Unit
+let failing value = from_result (Err (Stop (show value)))
+
+lost_error : Unit ->{} Unit
+let lost_error () = each_shown failing
+
+pure_only : (forall a. Show a => a ->{} Unit) ->{} Unit
+let pure_only log = log 1
+
+lost_effect : Unit ->{} Unit
+let lost_effect () = pure_only failing
+
+no_dictionary : (forall a. a -> String) -> String
+let no_dictionary render = render 1
+
+needs_show : Unit -> String
+let needs_show () = no_dictionary show
+
 //~ FLICK-T008 @8:19-8:20 expected `a`, found `Number`: `a` stands for any type the
 //~ FLICK-T008 @12:29-12:30 expected `a`, found `Number`: `a` stands for any type the
 //~ FLICK-T008 @16:15-16:26 expected `a -> a`, found `String -> String`: `a` stands for
 //~ FLICK-T007 @26:32-26:38 expected `Option _`, found `Option a`: the type variable
+//~ FLICK-E002 @41:21-41:39 does not allow error `Stop`
+//~ FLICK-E002 @47:32-47:39 the expected type `a ->{} Unit` does not allow error `Stop`
+//~ FLICK-C001 @53:35-53:39 cannot deduce `Show a`

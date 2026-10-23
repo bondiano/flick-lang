@@ -4,7 +4,7 @@
 
 mod common;
 
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 use std::process::{Child, Command, Output, Stdio};
 use std::sync::mpsc;
@@ -261,6 +261,80 @@ fn dev_replaces_the_app_only_after_its_shutdown() {
     let status = dev.wait().expect("wait");
     assert_eq!(status.code(), Some(1));
     assert!(rx.iter().all(|l| l != "started v3"), "v3 never starts");
+    let mut err = String::new();
+    dev.stderr
+        .take()
+        .expect("stderr")
+        .read_to_string(&mut err)
+        .expect("read");
+    // the final Cause keeps the finalizer's defect with its stack, and it turns
+    // the interrupted v2 into a failure (exit 1, not 143)
+    assert!(
+        err.contains("SyntaxError") && err.contains("at JSON.parse"),
+        "the cleanup failure is reported: {err}"
+    );
+    assert!(
+        err.contains("FLICK-P021") && err.contains("exit code 1)"),
+        "{err}"
+    );
+}
+
+/// Logs `aborted` when interrupted but settles only after its own delay.
+const LINGER: &str = "export const linger = (signal) =>
+  new Promise((resolve) => {
+    signal.addEventListener(\"abort\", () => console.log(\"aborted v1\"));
+    setTimeout(() => { console.log(\"settled v1\"); resolve(); }, 5000);
+  });
+";
+
+const LINGERING: &str = "module App.Main exposing (main)
+
+linger : Unit ->{} Unit
+foreign async linger from \"./linger.mjs\" \"linger\"
+  arity 0
+  cancel signal
+
+main : Unit ->{; AppError} Unit
+let main () =
+  scope {
+    Resource.acquire_release (task { Platform.stdout_line \"started v1\" }) (fun _ -> Platform.stdout_line \"cleanup v1\")
+    linger ()
+  }
+";
+
+#[test]
+#[ignore = "needs Node and the installed runtime"]
+fn dev_starts_the_next_version_after_foreign_work_settles() {
+    let dir = project(
+        "dev_quiescence",
+        &[
+            ("flick.toml", APP),
+            ("src/App/Main.fl", LINGERING),
+            ("src/App/linger.mjs", LINGER),
+            ("src/App/forever.mjs", FOREVER),
+        ],
+    );
+    let mut dev = flick(&dir, &["--quiet", "dev"])
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+    let rx = lines(&mut dev);
+    expect_line(&rx, "started v1");
+    thread::sleep(Duration::from_millis(1100));
+    fs::write(dir.join("src/App/Main.fl"), waiting("v2", false)).expect("write");
+    let mut seen = Vec::new();
+    while seen.last().is_none_or(|l| l != "started v2") {
+        let line = rx.recv_timeout(Duration::from_secs(60)).expect("a line");
+        seen.push(line);
+    }
+    signal(&dev, "TERM");
+    let _ = dev.wait();
+    // the promise ignored the abort, yet v2 waited for it and for the finalizer
+    assert_eq!(
+        seen,
+        ["aborted v1", "settled v1", "cleanup v1", "started v2"],
+        "after started v1"
+    );
 }
 
 #[test]
@@ -348,7 +422,7 @@ fn json_reporter_and_json_diagnostics_keep_their_streams() {
     );
 }
 
-/// The sessions of §12 "Examples", without the commands that reach the
+/// The example sessions of the CLI specification, without the commands that reach the
 /// npm registry (`install`, `add`), on a project from `flick new`.
 #[test]
 #[ignore = "needs Node and the installed runtime"]

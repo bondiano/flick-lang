@@ -1,0 +1,19 @@
+// One generic `map` over the prelude `Functor` serves `Option` and `Eff r e`;
+// mapping a task stays lazy until it is awaited.
+module App.Main exposing (main)
+
+twice : Functor f => f Number -> f Number
+let twice values = map (fun n -> n * 2) values
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (show (twice (Some 21)))
+  Platform.stdout_line (show (twice None))
+  let request = task {
+    Platform.stdout_line "body"
+    5
+  }
+  let doubled = twice request
+  Platform.stdout_line "built"
+  Platform.stdout_line (show (await doubled))
+  Platform.stdout_line (show (await (map (fun n -> n + 1) doubled)))

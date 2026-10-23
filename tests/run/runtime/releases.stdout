@@ -1,0 +1,9 @@
+open on error
+close on error
+0
+open on timeout
+close on timeout
+timed out
+open in parallel
+close in parallel
+sibling failed

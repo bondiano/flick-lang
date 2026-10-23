@@ -59,3 +59,23 @@ fn exports_have_typescript_types_without_any() {
     let typed: Vec<&str> = out.lines().filter(|l| !l.contains(": !")).collect();
     assert!(typed.iter().all(|l| !l.contains("any")), "{out}");
 }
+
+#[test]
+fn unit_never_and_empty_rows_have_distinct_typescript_types() {
+    let out = project(
+        "module App.Shapes exposing (..)\n\
+         type error Oops = Oops\n\
+         skip : Unit -> Unit\nlet skip u = u\n\
+         absurd : Never -> Number\nlet absurd n = 1\n\
+         quiet : Eff none none Unit\nlet quiet = task { () }\n\
+         failing : Eff none {Oops} Never\nlet failing = task { from_result (Err Oops) }\n",
+    );
+    for expected in [
+        "skip: (arg: undefined) => undefined",
+        "absurd: (arg: never) => number",
+        "quiet: $Effect.Effect<undefined, never, never>",
+        "failing: $Effect.Effect<never, Oops, never>",
+    ] {
+        assert!(out.contains(expected), "{expected}\n{out}");
+    }
+}

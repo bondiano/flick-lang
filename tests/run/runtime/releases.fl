@@ -1,0 +1,61 @@
+// A scope releases its resources however its body ends: with a typed
+// error, by interruption from a timeout, or when a sibling branch of
+// `parallel` fails and interrupts it. Each release happens before the
+// outcome reaches the caller.
+module App.Main exposing (main)
+
+open_raw : String ->{} String
+foreign effect open_raw from "./resources.mjs" "open"
+
+sleep : Number ->{} Unit
+foreign async sleep from "./timers.mjs" "sleep"
+
+type error Oops = Oops String
+
+failing_scope : Unit ->{; Oops} Number
+let failing_scope () =
+  scope {
+    let file = open_raw "on error"
+    from_result (Err (Oops "body failed"))
+  }
+
+slow_scope : Unit ->{} String
+let slow_scope () =
+  scope {
+    let file = open_raw "on timeout"
+    sleep 1000
+    "never"
+  }
+
+waiting : Eff none {Oops} Number
+let waiting = task {
+  scope {
+    let file = open_raw "in parallel"
+    sleep 1000
+    1
+  }
+}
+
+failing_soon : Eff none {Oops} Number
+let failing_soon = task {
+  sleep 5
+  from_result (Err (Oops "sibling failed"))
+}
+
+race_sibling : Unit ->{} String
+let race_sibling () =
+  try
+    let (a, b) = parallel waiting failing_soon
+    "both ended"
+  with
+  | Oops text -> text
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let caught = try failing_scope () with
+    | Oops text -> 0
+  Platform.stdout_line (show caught)
+  let timed = try timeout 5 (task { slow_scope () }) with
+    | TimeoutError -> "timed out"
+  Platform.stdout_line timed
+  Platform.stdout_line (race_sibling ())
