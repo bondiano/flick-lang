@@ -65,7 +65,13 @@ export const listPartition = <A>(p: (a: A) => boolean, xs: List<A>): [Array<A>, 
   return [yes, no];
 };
 
-const order = (o: Ordering): number => (o._tag === LT._tag ? -1 : o._tag === EQ._tag ? 0 : 1);
+const order = (o: Ordering): -1 | 0 | 1 => (o._tag === LT._tag ? -1 : o._tag === EQ._tag ? 0 : 1);
+
+/** An Effect `Order` from a Flick comparison, for the bindings of `effect/*`. */
+export const flickOrder =
+  <A>(cmp: (a: A, b: A) => Ordering) =>
+  (a: A, b: A): -1 | 0 | 1 =>
+    order(cmp(a, b));
 
 /** A stable sort: `Array.prototype.sort` is stable, on a copy. */
 export const listSortBy = <A>(cmp: (a: A, b: A) => Ordering, xs: List<A>): Array<A> =>

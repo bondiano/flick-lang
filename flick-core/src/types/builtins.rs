@@ -26,10 +26,16 @@ const SOURCES: &[(&str, &str)] = &[
     ("RawCause", include_str!("builtins/RawCause.fl")),
     ("Failure", include_str!("builtins/Failure.fl")),
     ("Exit", include_str!("builtins/Exit.fl")),
+    ("NonEmpty", include_str!("builtins/NonEmpty.fl")),
     ("Option", include_str!("builtins/Option.fl")),
     ("Result", include_str!("builtins/Result.fl")),
+    ("List.Core", include_str!("builtins/List/Core.fl")),
+    ("List.Slice", include_str!("builtins/List/Slice.fl")),
+    ("List.Search", include_str!("builtins/List/Search.fl")),
+    ("List.Transform", include_str!("builtins/List/Transform.fl")),
     ("List", include_str!("builtins/List.fl")),
-    ("NonEmpty", include_str!("builtins/NonEmpty.fl")),
+    ("Chunk.Core", include_str!("builtins/Chunk/Core.fl")),
+    ("Chunk.Ops", include_str!("builtins/Chunk/Ops.fl")),
     ("Chunk", include_str!("builtins/Chunk.fl")),
     ("Js.Array", include_str!("builtins/Js/Array.fl")),
     ("Js", include_str!("builtins/Js.fl")),
@@ -74,6 +80,10 @@ const SOURCES: &[(&str, &str)] = &[
     ("Crypto", include_str!("builtins/Crypto.fl")),
     // end of Effect: values and classes
     // Effect: lists and records
+    ("Bool", include_str!("builtins/Bool.fl")),
+    ("Predicate", include_str!("builtins/Predicate.fl")),
+    ("Filter", include_str!("builtins/Filter.fl")),
+    ("Function", include_str!("builtins/Function.fl")),
     // end of Effect: lists and records
     // Effect: collections
     // end of Effect: collections

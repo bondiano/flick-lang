@@ -1,0 +1,72 @@
+/// Predicates as values: Effect's `Predicate` combinators over functions
+/// `a -> Bool`. The combined predicate keeps the ones it is made of.
+module Predicate exposing (..)
+
+/// A test of a value.
+type alias Predicate a = a -> Bool
+
+/// `p |> map_input f` tests `f x` with `p`.
+map_input : (b -> a) -> Predicate a -> Predicate b
+foreign pure map_input from "@flick-lang/runtime/effect/Predicate" "mapInput"
+  arity 1
+  reviewed "effect@4.0.5 sha256:15ae97b1e42a7f07"
+
+/// Holds when `p` does not.
+not_ : Predicate a -> Predicate a
+foreign pure not_ from "@flick-lang/runtime/effect/Predicate" "not"
+  arity 1
+  reviewed "effect@4.0.5 sha256:1e766c3087cd50e3"
+
+/// Holds when both do.
+and : Predicate a -> Predicate a -> Predicate a
+foreign pure and from "@flick-lang/runtime/effect/Predicate" "and"
+  arity 1
+  reviewed "effect@4.0.5 sha256:d5a53f572ab73d2e"
+
+/// Holds when either does.
+or : Predicate a -> Predicate a -> Predicate a
+foreign pure or from "@flick-lang/runtime/effect/Predicate" "or"
+  arity 1
+  reviewed "effect@4.0.5 sha256:23d453654c2c9438"
+
+/// Holds when exactly one does.
+xor : Predicate a -> Predicate a -> Predicate a
+foreign pure xor from "@flick-lang/runtime/effect/Predicate" "xor"
+  arity 1
+  reviewed "effect@4.0.5 sha256:860f901746e584b9"
+
+/// Holds when both agree.
+eqv : Predicate a -> Predicate a -> Predicate a
+foreign pure eqv from "@flick-lang/runtime/effect/Predicate" "eqv"
+  arity 1
+  reviewed "effect@4.0.5 sha256:2c920c62681b0eb2"
+
+/// `p |> implies q` holds when `q` does whenever `p` does.
+implies : Predicate a -> Predicate a -> Predicate a
+foreign pure implies from "@flick-lang/runtime/effect/Predicate" "implies"
+  arity 1
+  reviewed "effect@4.0.5 sha256:cde603a333111451"
+
+/// Holds when not both do.
+nand : Predicate a -> Predicate a -> Predicate a
+foreign pure nand from "@flick-lang/runtime/effect/Predicate" "nand"
+  arity 1
+  reviewed "effect@4.0.5 sha256:78106a3c3abd8c20"
+
+/// Holds when neither does.
+nor : Predicate a -> Predicate a -> Predicate a
+foreign pure nor from "@flick-lang/runtime/effect/Predicate" "nor"
+  arity 1
+  reviewed "effect@4.0.5 sha256:296a0c3589f30204"
+
+/// Holds when every predicate of the list does.
+every : List (Predicate a) -> Predicate a
+foreign pure every from "@flick-lang/runtime/effect/Predicate" "every"
+  arity 1
+  reviewed "effect@4.0.5 sha256:996ecd4c136e3130"
+
+/// Holds when some predicate of the list does.
+some : List (Predicate a) -> Predicate a
+foreign pure some from "@flick-lang/runtime/effect/Predicate" "some"
+  arity 1
+  reviewed "effect@4.0.5 sha256:98e9cab8881a5a12"

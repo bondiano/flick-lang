@@ -1,38 +1,5 @@
 /// Effect's immutable `Chunk`, for repeated concatenation.
-module Chunk exposing (Chunk, empty, from_list, to_list, append, concat, size, get, map)
+module Chunk exposing (Chunk, NonEmptyChunk, empty, from_list, to_list, append, concat, size, get, map, to_chunk, non_empty, is_empty, of, make, make_by, range, head, head_non_empty, last, last_non_empty, tail, tail_non_empty, prepend, append_all, take, take_right, drop, drop_right, take_while, drop_while, split_at, split_non_empty_at, split, split_where, chunks_of, remove, modify, replace, reverse, filter, filter_map, filter_map_while, compact, flat_map, flatten, each_effect, contains_with, contains, dedupe, dedupe_adjacent, difference_with, difference, intersection, union, every, some, find_first, find_first_index, find_last, find_last_index, join, map_accum, partition, separate, reduce, reduce_right, sort_by, sort, sort_with, unzip, zip, zip_with)
 
-type Chunk a
-
-empty : Chunk a
-foreign pure empty from "@flick-lang/runtime" "chunkEmpty"
-
-from_list : List a -> Chunk a
-foreign pure from_list from "@flick-lang/runtime" "chunkFromList"
-
-to_list : Chunk a -> List a
-foreign pure to_list from "@flick-lang/runtime" "chunkToList"
-
-append : a -> Chunk a -> Chunk a
-foreign pure append from "@flick-lang/runtime" "chunkAppend"
-
-concat : Chunk a -> Chunk a -> Chunk a
-foreign pure concat from "@flick-lang/runtime" "chunkConcat"
-
-size : Chunk a -> Number
-foreign pure size from "@flick-lang/runtime" "chunkSize"
-
-get : Number -> Chunk a -> Option a
-foreign pure get from "@flick-lang/runtime" "chunkGet"
-
-map : forall c a b. (a -> b)^c -> (Chunk a -> Chunk b)^c
-foreign pure map from "@flick-lang/runtime" "chunkMap"
-  arity 2
-  retention call
-
-instance Eq a => Eq (Chunk a) =
-  eq : Chunk a -> Chunk a -> Bool
-  let eq x y = eq (to_list x) (to_list y)
-
-instance Show a => Show (Chunk a) =
-  show : Chunk a -> String
-  let show x = "Chunk " ++ show (to_list x)
+import Chunk.Core exposing (..)
+import Chunk.Ops exposing (..)

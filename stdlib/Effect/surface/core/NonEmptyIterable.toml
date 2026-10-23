@@ -1,4 +1,6 @@
-[pending]
-NonEmptyIterable = "M20"
-nonEmpty = "M20"
-unprepend = "M20"
+[wrapped]
+NonEmptyIterable = "NonEmpty.NonEmpty 0c13741f6b68fd3f"
+unprepend = "NonEmpty.unprepend 2a36b4cde5a613a0"
+
+[excluded]
+nonEmpty = "TS-only: the brand symbol of the non-empty type"

@@ -1,7 +1,11 @@
-[pending]
-absurd = "M20"
-cast = "M20"
-flow = "M20"
-hole = "M20"
-identity = "M20"
-pipe = "M20"
+[wrapped]
+absurd = "Function.absurd 100c0d7e0aea5d8e"
+identity = "Prelude.identity 8cf967e5529da2ab"
+
+[language]
+pipe = "`|>`: `x |> f |> g`"
+flow = "`fun x -> x |> f |> g`"
+
+[excluded]
+hole = "TS-only: a typed placeholder for unfinished TS code, which throws"
+cast = "invariant: an unchecked cast would erase types, and with them captures and regions"

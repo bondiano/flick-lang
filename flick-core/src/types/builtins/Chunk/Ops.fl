@@ -1,0 +1,207 @@
+/// Chunks filtered, searched, folded, sorted and combined: the part of
+/// `Chunk` that computes from the elements. `dedupe`, `intersection` and
+/// `union` compare by `==`.
+module Chunk.Ops exposing (..)
+
+import Chunk.Core exposing (Chunk, to_list)
+
+/// The elements that satisfy `p`.
+filter : forall c a. (a -> Bool)^c -> (Chunk a -> Chunk a)^c
+foreign pure filter from "@flick-lang/runtime/effect/Chunk" "filter"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:5b6f8b4df57d9246"
+
+/// The `Ok` values of `f` over the elements.
+filter_map : forall c a b e. (a -> Result e b)^c -> (Chunk a -> Chunk b)^c
+foreign pure filter_map from "@flick-lang/runtime/effect/Chunk" "filterMap"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:472ff04b8075832b"
+
+/// The `Ok` values of `f` over the elements, up to the first `Err`.
+filter_map_while : forall c a b e. (a -> Result e b)^c -> (Chunk a -> Chunk b)^c
+foreign pure filter_map_while from "@flick-lang/runtime/effect/Chunk" "filterMapWhile"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:02462112dd4dab9d"
+
+/// The values of the `Some` elements.
+compact : Chunk (Option a) -> Chunk a
+foreign pure compact from "@flick-lang/runtime/effect/Chunk" "compact"
+  reviewed "effect@4.0.5 sha256:2254fda6c17b10cc"
+
+/// The chunks `f` gives each element, joined.
+flat_map : forall c a b. (a -> Chunk b)^c -> (Chunk a -> Chunk b)^c
+foreign pure flat_map from "@flick-lang/runtime/effect/Chunk" "flatMap"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:5425515fd7c1fe06"
+
+/// The chunks joined.
+flatten : Chunk (Chunk a) -> Chunk a
+foreign pure flatten from "@flick-lang/runtime/effect/Chunk" "flatten"
+  reviewed "effect@4.0.5 sha256:d40db7f5af1f97b5"
+
+/// Runs a runtime function on each element in order, for what it does.
+each_effect : forall c a r e. (a ->{r; e} Unit)^c -> (Chunk a ->{r; e} Unit)^c
+let each_effect f chunk = List.each_effect f (to_list chunk)
+
+/// Whether an element is `same` as `x`.
+contains_with : forall c a. (a -> a -> Bool)^c -> (a -> Chunk a -> Bool)^c
+foreign pure contains_with from "@flick-lang/runtime/effect/Chunk" "containsWith"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:ccec8ce893d30b3e"
+
+/// Whether an element equals `x`.
+contains : Eq a => a -> Chunk a -> Bool
+let contains x chunk = contains_with eq x chunk
+
+/// The first of each set of `==` elements, in order.
+dedupe : Chunk a -> Chunk a
+foreign pure dedupe from "@flick-lang/runtime/effect/Chunk" "dedupe"
+  reviewed "effect@4.0.5 sha256:e23e0e0455a41988"
+
+/// The chunk without an element `==` to the one before it.
+dedupe_adjacent : Chunk a -> Chunk a
+foreign pure dedupe_adjacent from "@flick-lang/runtime/effect/Chunk" "dedupeAdjacent"
+  reviewed "effect@4.0.5 sha256:b643d6b5bba0afdc"
+
+/// `c |> difference_with same d`: the elements of `c` with none `same` in `d`.
+difference_with : forall c a. (a -> a -> Bool)^c -> (Chunk a -> Chunk a -> Chunk a)^c
+foreign pure difference_with from "@flick-lang/runtime/effect/Chunk" "differenceWith"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:960d9c37cfc461dc"
+
+/// `c |> difference d`: the elements of `c` not in `d`, by `Eq`.
+difference : Eq a => Chunk a -> Chunk a -> Chunk a
+let difference that chunk = difference_with eq that chunk
+
+/// `c |> intersection d`: the elements of `c` also in `d`, by `==`.
+intersection : Chunk a -> Chunk a -> Chunk a
+foreign pure intersection from "@flick-lang/runtime/effect/Chunk" "intersection"
+  arity 1
+  reviewed "effect@4.0.5 sha256:8c6072cea49f3ba9"
+
+/// `c |> union d`: the elements of both, each once, by `==`.
+union : Chunk a -> Chunk a -> Chunk a
+foreign pure union from "@flick-lang/runtime/effect/Chunk" "union"
+  arity 1
+  reviewed "effect@4.0.5 sha256:4da0b21887053551"
+
+/// Whether every element satisfies `p`.
+every : forall c a. (a -> Bool)^c -> (Chunk a -> Bool)^c
+foreign pure every from "@flick-lang/runtime/effect/Chunk" "every"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:e830ddc44d126681"
+
+/// Whether some element satisfies `p`.
+some : forall c a. (a -> Bool)^c -> (Chunk a -> Bool)^c
+foreign pure some from "@flick-lang/runtime/effect/Chunk" "some"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:d15067e9e6730a3e"
+
+/// The first element that satisfies `p`.
+find_first : forall c a. (a -> Bool)^c -> (Chunk a -> Option a)^c
+foreign pure find_first from "@flick-lang/runtime/effect/Chunk" "findFirst"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:10dae4d47f952371"
+
+/// The index of the first element that satisfies `p`.
+find_first_index : forall c a. (a -> Bool)^c -> (Chunk a -> Option Number)^c
+foreign pure find_first_index from "@flick-lang/runtime/effect/Chunk" "findFirstIndex"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:aff106aee52f9c1d"
+
+/// The last element that satisfies `p`.
+find_last : forall c a. (a -> Bool)^c -> (Chunk a -> Option a)^c
+foreign pure find_last from "@flick-lang/runtime/effect/Chunk" "findLast"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:868885f7ed37200d"
+
+/// The index of the last element that satisfies `p`.
+find_last_index : forall c a. (a -> Bool)^c -> (Chunk a -> Option Number)^c
+foreign pure find_last_index from "@flick-lang/runtime/effect/Chunk" "findLastIndex"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:dfbf39c0c6400a92"
+
+/// The strings joined with `separator` between them.
+join : String -> Chunk String -> String
+foreign pure join from "@flick-lang/runtime/effect/Chunk" "join"
+  arity 1
+  reviewed "effect@4.0.5 sha256:b10068f7a7b4d7c0"
+
+/// Maps each element while threading a state from the first: the final
+/// state and the mapped chunk.
+map_accum : forall c s a b. s -> (s -> a -> (s, b))^c -> (Chunk a -> (s, Chunk b))^c
+foreign pure map_accum from "@flick-lang/runtime/effect/Chunk" "mapAccum"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:8a280bbf63fd6efa"
+
+/// The `Ok` values and the `Err` errors of `f` over the elements.
+partition : forall c a f p. (a -> Result f p)^c -> (Chunk a -> (Chunk p, Chunk f))^c
+foreign pure partition from "@flick-lang/runtime/effect/Chunk" "partition"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:60ee185549645983"
+
+/// The `Ok` values and the `Err` errors.
+separate : Chunk (Result e a) -> (Chunk a, Chunk e)
+foreign pure separate from "@flick-lang/runtime/effect/Chunk" "separate"
+  reviewed "effect@4.0.5 sha256:a08b4df9c9f1d73e"
+
+/// Folds from the first element.
+reduce : forall c a b. b -> (b -> a -> b)^c -> (Chunk a -> b)^c
+foreign pure reduce from "@flick-lang/runtime/effect/Chunk" "reduce"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:ac5e1a8d7f7e4f78"
+
+/// Folds from the last element.
+reduce_right : forall c a b. b -> (b -> a -> b)^c -> (Chunk a -> b)^c
+foreign pure reduce_right from "@flick-lang/runtime/effect/Chunk" "reduceRight"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:54edc840a88d4e23"
+
+/// Sorts by `compare`, keeping equal elements in their order.
+sort_by : forall c a. (a -> a -> Ordering)^c -> (Chunk a -> Chunk a)^c
+foreign pure sort_by from "@flick-lang/runtime/effect/Chunk" "flickSortBy"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:8ceacf5f0e19c3f0"
+
+/// Sorts by `Ord`, keeping equal elements in their order.
+sort : Ord a => Chunk a -> Chunk a
+let sort chunk = sort_by compare chunk
+
+/// Sorts by the `Ord` of the key `f` gives each element.
+sort_with : Ord b => (a -> b) -> Chunk a -> Chunk a
+let sort_with f chunk = sort_by (fun x y -> compare (f x) (f y)) chunk
+
+/// The firsts and the seconds of the pairs.
+unzip : Chunk (a, b) -> (Chunk a, Chunk b)
+foreign pure unzip from "@flick-lang/runtime/effect/Chunk" "unzip"
+  reviewed "effect@4.0.5 sha256:471e171b8c108739"
+
+/// `c |> zip d`: the pairs of the elements at each index of both.
+zip : Chunk b -> Chunk a -> Chunk (a, b)
+foreign pure zip from "@flick-lang/runtime/effect/Chunk" "zip"
+  arity 1
+  reviewed "effect@4.0.5 sha256:42894adfa84ab804"
+
+/// `c |> zip_with d f`: `f` of the elements at each index of both.
+zip_with : forall c a b d. Chunk b -> (a -> b -> d)^c -> (Chunk a -> Chunk d)^c
+foreign pure zip_with from "@flick-lang/runtime/effect/Chunk" "zipWith"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:254ac56a1a06677e"

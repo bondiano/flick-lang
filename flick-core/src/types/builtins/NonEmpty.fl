@@ -1,27 +1,38 @@
 /// Lists with at least one element.
-module NonEmpty exposing (NonEmpty, from_list, singleton, cons, head, to_list, length, map)
+module NonEmpty exposing (NonEmpty, from_list, singleton, cons, head, to_list, length, map, append, make_by, range, replicate, last, tail, init, modify_head, set_head, modify_last, set_last, split_at, unappend, unprepend, group_with, group, max, min)
 
 /// A list with at least one element, represented as the list.
 type NonEmpty a
 
+/// The list as a non-empty one, `None` when it is empty.
 from_list : List a -> Option (NonEmpty a)
 foreign pure from_list from "@flick-lang/runtime" "nonEmptyFromList"
+  reviewed "effect@4.0.5 sha256:ca4cf0d1107e51ad"
 
+/// The non-empty list of one element.
 singleton : a -> NonEmpty a
 foreign pure singleton from "@flick-lang/runtime" "listSingleton"
+  reviewed "effect@4.0.5 sha256:6efb12cf213bc013"
 
+/// `x` in front of `rest`.
 cons : a -> List a -> NonEmpty a
 foreign pure cons from "@flick-lang/runtime" "nonEmptyCons"
+  reviewed "effect@4.0.5 sha256:7e9498e2c4c16007"
 
+/// The first element.
 head : NonEmpty a -> a
 foreign pure head from "@flick-lang/runtime" "nonEmptyHead"
+  reviewed "effect@4.0.5 sha256:14f7fba1ff2eb042"
 
+/// The non-empty list as a list.
 to_list : NonEmpty a -> List a
 foreign pure to_list from "@flick-lang/runtime" "identity"
 
+/// How many elements the list has.
 length : NonEmpty a -> Number
 foreign pure length from "@flick-lang/runtime" "listLength"
 
+/// Applies a pure function to each element.
 map : forall c a b. (a -> b)^c -> (NonEmpty a -> NonEmpty b)^c
 foreign pure map from "@flick-lang/runtime" "listMap"
   arity 2
@@ -34,3 +45,112 @@ instance Eq a => Eq (NonEmpty a) =
 instance Show a => Show (NonEmpty a) =
   show : NonEmpty a -> String
   let show x = "NonEmpty " ++ show (to_list x)
+
+/// The list with `x` added at the end.
+append : a -> List a -> NonEmpty a
+foreign pure append from "@flick-lang/runtime/effect/Array" "append"
+  arity 1
+  reviewed "effect@4.0.5 sha256:1242e48aa3d7a343"
+
+/// `f 0`, …, `f (n - 1)`, with at least `f 0`: `n` is taken as at least 1.
+make_by : forall c a. Number -> (Number -> a)^c -> NonEmpty a
+foreign pure make_by from "@flick-lang/runtime/effect/Array" "makeBy"
+  retention call
+  reviewed "effect@4.0.5 sha256:e70091e0cb298790"
+
+/// `[start, start + 1, …, end]`, end included; `[start]` when `end < start`.
+range : Number -> Number -> NonEmpty Number
+foreign pure range from "@flick-lang/runtime/effect/Array" "range"
+  reviewed "effect@4.0.5 sha256:70c8b487a3250c87"
+
+/// `n` copies of `x`, at least one.
+replicate : Number -> a -> NonEmpty a
+foreign pure replicate from "@flick-lang/runtime/effect/Array" "replicate"
+  arity 1
+  reviewed "effect@4.0.5 sha256:a084315d5431a079"
+
+/// The last element.
+last : NonEmpty a -> a
+foreign pure last from "@flick-lang/runtime/effect/Array" "lastNonEmpty"
+  reviewed "effect@4.0.5 sha256:6e61426d5f7f6df5"
+
+/// Every element after the first.
+tail : NonEmpty a -> List a
+foreign pure tail from "@flick-lang/runtime/effect/Array" "tailNonEmpty"
+  reviewed "effect@4.0.5 sha256:bac48064c2b2e12f"
+
+/// Every element before the last.
+init : NonEmpty a -> List a
+foreign pure init from "@flick-lang/runtime/effect/Array" "initNonEmpty"
+  reviewed "effect@4.0.5 sha256:ae1dbbce233c5179"
+
+/// The first element replaced by `f` of it.
+modify_head : forall c a. (a -> a)^c -> (NonEmpty a -> NonEmpty a)^c
+foreign pure modify_head from "@flick-lang/runtime/effect/Array" "modifyHeadNonEmpty"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:a684cd327f14f126"
+
+/// The first element replaced by `x`.
+set_head : a -> NonEmpty a -> NonEmpty a
+foreign pure set_head from "@flick-lang/runtime/effect/Array" "setHeadNonEmpty"
+  arity 1
+  reviewed "effect@4.0.5 sha256:d6ba945e2d8fb313"
+
+/// The last element replaced by `f` of it.
+modify_last : forall c a. (a -> a)^c -> (NonEmpty a -> NonEmpty a)^c
+foreign pure modify_last from "@flick-lang/runtime/effect/Array" "modifyLastNonEmpty"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:5e365d9766374b9b"
+
+/// The last element replaced by `x`.
+set_last : a -> NonEmpty a -> NonEmpty a
+foreign pure set_last from "@flick-lang/runtime/effect/Array" "setLastNonEmpty"
+  arity 1
+  reviewed "effect@4.0.5 sha256:6396c05198797d00"
+
+/// The first `n` elements, at least one, and the rest.
+split_at : Number -> NonEmpty a -> (NonEmpty a, List a)
+foreign pure split_at from "@flick-lang/runtime/effect/Array" "splitAtNonEmpty"
+  arity 1
+  reviewed "effect@4.0.5 sha256:d8c2c97507679d50"
+
+/// The elements before the last, and the last.
+unappend : NonEmpty a -> (List a, a)
+foreign pure unappend from "@flick-lang/runtime/effect/Array" "unappend"
+  reviewed "effect@4.0.5 sha256:4e054e8ced8978e4"
+
+/// The first element, and the rest.
+unprepend : NonEmpty a -> (a, List a)
+foreign pure unprepend from "@flick-lang/runtime/effect/Array" "unprepend"
+  reviewed "effect@4.0.5 sha256:ca87b1ccd853c6ac"
+
+/// Runs of adjacent elements that `same` relates to the first of their run.
+group_with : forall c a. (a -> a -> Bool)^c -> (NonEmpty a -> NonEmpty (NonEmpty a))^c
+foreign pure group_with from "@flick-lang/runtime/effect/Array" "groupWith"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:7a9a8235c3d51159"
+
+/// Runs of adjacent equal elements.
+group : Eq a => NonEmpty a -> NonEmpty (NonEmpty a)
+let group xs = group_with eq xs
+
+max_by : forall c a. (a -> a -> Ordering)^c -> (NonEmpty a -> a)^c
+foreign pure max_by from "@flick-lang/runtime/effect/Array" "flickMax"
+  arity 1
+  retention call
+
+min_by : forall c a. (a -> a -> Ordering)^c -> (NonEmpty a -> a)^c
+foreign pure min_by from "@flick-lang/runtime/effect/Array" "flickMin"
+  arity 1
+  retention call
+
+/// The greatest element by `Ord`.
+max : Ord a => NonEmpty a -> a
+let max xs = max_by compare xs
+
+/// The least element by `Ord`.
+min : Ord a => NonEmpty a -> a
+let min xs = min_by compare xs
