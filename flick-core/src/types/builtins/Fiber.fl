@@ -1,6 +1,6 @@
 /// Children of a `scope`: a child runs until its owner's scope closes, and
-/// its supervisor observes how it failed.
-module Fiber exposing (Owner, Fiber, Outlives, spawn, join)
+/// its supervisor observes how it failed. Effect's `Fiber` over them.
+module Fiber exposing (Owner, Fiber, Outlives, spawn, join, await_, await_all, join_all, interrupt, interrupt_as, interrupt_all, interrupt_all_as)
 
 /// The owner of a `scope`; `scope s { … }` names it `s`.
 type Owner (s : Region)
@@ -24,3 +24,42 @@ foreign effect spawn from "@flick-lang/runtime" "fiberSpawn"
 /// Waits for the child: its result, or its failure with the original cause.
 join : Fiber e a ->{none; e} a
 foreign effect join from "@flick-lang/runtime" "fiberJoin"
+  reviewed "effect@4.0.5 sha256:397c57c3ab8ccb72"
+
+/// Waits for the child and gives how it ended, without failing.
+await_ : Fiber e a ->{} Exit e a
+foreign effect await_ from "@flick-lang/runtime/effect/Fiber" "flickAwait"
+  reviewed "effect@4.0.5 sha256:aa39e3b85d3974ab"
+
+/// Waits for every child; how each ended, in order.
+await_all : List (Fiber e a) ->{} List (Exit e a)
+foreign effect await_all from "@flick-lang/runtime/effect/Fiber" "flickAwaitAll"
+  reviewed "effect@4.0.5 sha256:4354c9187b891885"
+
+/// Waits for every child: their results in order, or the first failure.
+join_all : List (Fiber e a) ->{; e} List a
+foreign effect join_all from "@flick-lang/runtime/effect/Fiber" "flickJoinAll"
+  reviewed "effect@4.0.5 sha256:93cd83981814beab"
+
+/// Interrupts the child and waits until it ended; its supervisor sees the
+/// interruption.
+interrupt : Fiber e a ->{} Unit
+foreign effect interrupt from "@flick-lang/runtime/effect/Fiber" "flickInterrupt"
+  reviewed "effect@4.0.5 sha256:b4dea4597062574b"
+
+/// `interrupt`, naming the fiber id of the interruption.
+interrupt_as : Option Number -> Fiber e a ->{} Unit
+foreign effect interrupt_as from "@flick-lang/runtime/effect/Fiber" "flickInterruptAs"
+  arity 1
+  reviewed "effect@4.0.5 sha256:463d52162c7cfb42"
+
+/// Interrupts every child and waits until they ended.
+interrupt_all : List (Fiber e a) ->{} Unit
+foreign effect interrupt_all from "@flick-lang/runtime/effect/Fiber" "flickInterruptAll"
+  reviewed "effect@4.0.5 sha256:1dcaa52c1653c261"
+
+/// `interrupt_all`, naming the fiber id of the interruption.
+interrupt_all_as : Number -> List (Fiber e a) ->{} Unit
+foreign effect interrupt_all_as from "@flick-lang/runtime/effect/Fiber" "flickInterruptAllAs"
+  arity 1
+  reviewed "effect@4.0.5 sha256:77c88f3e42b05419"

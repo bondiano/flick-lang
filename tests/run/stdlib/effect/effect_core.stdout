@@ -1,0 +1,38 @@
+exit: true
+die: true
+fail_cause_sync: Boom 2
+zip: ("a", "b")
+zip_with: 6
+delay: "late"
+timed: timed true
+timeout_or_else: "fallback"
+timeout_or_else: "fast"
+forever: Boom 1
+eventually: 3
+replicate: 3
+replicate_effect: [1, 2, 3]
+when_: (Some 1, None)
+timeout: "timed out"
+timeout_option: (Some 5, None)
+race_success: "fast"
+race_first: "first"
+for_each: [2, 4, 6, 8]
+all: [1, 2]
+partition: ([1, 3], [20, 40])
+validate: invalid [1, 3]
+validate: [20, 40]
+filter: [3, 4]
+filter_map: [20, 40]
+filter_map_effect: [20, 40]
+find_first: (Some 2, None)
+find_first_filter: Some 20
+first_success_of: second
+head: 7 empty
+reduce: 10
+filter_or_else: 300
+filter_map_or_else: 5
+filter_or_fail: Odd 3
+filter_map_or_fail: 40
+bracket: file used, ["released file"]
+resource_auto: (1, true)
+tx: (1, None)

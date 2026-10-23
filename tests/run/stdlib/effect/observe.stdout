@@ -1,0 +1,29 @@
+Info plain
+Fatal fatal
+Error error
+Warn warning
+Info info
+Warn with level
+Debug debug at trace
+Error at the current level
+current_log_level: Error
+annotate_logs: [("user", "ada")]
+annotate_logs_scoped: [("request", "7")]
+with_log_span: ["inner", "outer"]
+with_unhandled_log_level: set
+current_span: no span
+current_span: Some "outer"
+current_parent_span: Some "outer"
+annotate_current_span: [("user", "ada"), ("step", "1")]
+span_annotations: [("team", "core")]
+make_span: Some "made"
+span_links: [Some "made"]
+with_parent_span: Some "made"
+use_span: Some "used"
+make_span_scoped: Some "scoped"
+with_span_scoped: Some "scoped task"
+with_tracer_enabled: off
+with_tracer_timing: off
+with_disable_propagation: on
+current_stack_frame: false
+track: (3, 2, 3, 6, 3)

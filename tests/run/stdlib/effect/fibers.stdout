@@ -1,0 +1,33 @@
+await_: a
+await_all: ["a", "failed (true, false, false)", "c"]
+join_all: ["a", "c"]
+interrupt: failed (false, false, true)
+interrupt_as: failed (false, false, true)
+interrupt_all: ["failed (false, false, true)", "failed (false, false, true)", "failed (false, false, true)"]
+set size: 2
+set empty: 0 one
+set clear: failed (false, false, true)
+set join: join failed with Boom 3
+map replaced: failed (false, false, true)
+map has: (true, false, 1)
+map get: true
+map remove: failed (false, false, true)
+map await_empty: joined
+map clear: 0
+map join: Boom 4
+handle replaced: failed (false, false, true)
+handle get: true
+handle second: second
+handle clear: failed (false, false, true)
+handle join: Boom 5
+race_all: "fast"
+race_all_first: Boom 6
+fiber_id: true
+cached: (1, 1)
+cached_with_ttl: (2, 2)
+cached_invalidate_with_ttl: (3, 4)
+with_scheduler: true
+with_max_ops_before_yield: 5
+with_prevent_scheduler_yield: 2
+with_execution_plan: hello ada at 3
+events: ["start 1", "failure 0", "start 2", "failure 0", "start 3", "success 1"]

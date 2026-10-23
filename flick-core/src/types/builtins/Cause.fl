@@ -1,0 +1,202 @@
+/// Effect's `Cause` over Flick's opaque `Failure e`: build, combine and
+/// read how a computation failed. Its reasons keep a typed failure, a
+/// defect and an interruption apart; a defect is read only as inert text.
+module Cause exposing (..)
+
+/// One reason of a failure: a typed failure with an error of `e`, a
+/// defect, or an interruption.
+type Reason (e : ErrorRow)
+
+/// A frame of the stack trace Effect attaches to a failure.
+type StackFrame
+
+/// A value that should be there is not: the first element of an empty
+/// list, a span outside every span.
+type error NoSuchElementError = NoSuchElementError String
+  deriving Eq, Show
+
+/// An argument outside what a function accepts.
+type error IllegalArgumentError = IllegalArgumentError String
+  deriving Eq, Show
+
+/// An error of foreign code that has no type of its own.
+type error UnknownError = UnknownError String
+  deriving Eq, Show
+
+/// The failure without reasons.
+empty : Failure e
+foreign pure empty from "@flick-lang/runtime/effect/Cause" "flickEmpty"
+  reviewed "effect@4.0.5 sha256:b362f94e3abdc737"
+
+/// A typed failure with `error`.
+fail : Errors e -> Failure e
+foreign pure fail from "@flick-lang/runtime/effect/Cause" "flickFail"
+  reviewed "effect@4.0.5 sha256:1c3fc13b99851bf1"
+
+/// A defect with the message.
+die : String -> Failure e
+foreign pure die from "@flick-lang/runtime/effect/Cause" "flickDie"
+  reviewed "effect@4.0.5 sha256:b28e8615af7eafba"
+
+/// An interruption, by the fiber of the id if one is given.
+interrupt : Option Number -> Failure e
+foreign pure interrupt from "@flick-lang/runtime/effect/Cause" "flickInterrupt"
+  reviewed "effect@4.0.5 sha256:2542b5c6598bc863"
+
+/// The failure of these reasons.
+from_reasons : List (Reason e) -> Failure e
+foreign pure from_reasons from "@flick-lang/runtime/effect/Cause" "flickFromReasons"
+  reviewed "effect@4.0.5 sha256:f8cdcf44e1860855"
+
+/// The reasons of a failure, in order.
+reasons : Failure e -> List (Reason e)
+foreign pure reasons from "@flick-lang/runtime/effect/Cause" "flickReasons"
+
+/// The reason of a typed failure with `error`.
+make_fail_reason : Errors e -> Reason e
+foreign pure make_fail_reason from "@flick-lang/runtime/effect/Cause" "makeFailReason"
+  reviewed "effect@4.0.5 sha256:9719f6c8890044d0"
+
+/// The reason of a defect with the message.
+make_die_reason : String -> Reason e
+foreign pure make_die_reason from "@flick-lang/runtime/effect/Cause" "makeDieReason"
+  reviewed "effect@4.0.5 sha256:2877b5f4dff167f6"
+
+/// The reason of an interruption, by the fiber of the id if one is given.
+make_interrupt_reason : Option Number -> Reason e
+foreign pure make_interrupt_reason from "@flick-lang/runtime/effect/Cause" "flickMakeInterruptReason"
+  reviewed "effect@4.0.5 sha256:005d85addbb65ea9"
+
+/// Whether the reason is a typed failure.
+is_fail_reason : Reason e -> Bool
+foreign pure is_fail_reason from "@flick-lang/runtime/effect/Cause" "isFailReason"
+  reviewed "effect@4.0.5 sha256:62b6ee8727fbe363"
+
+/// Whether the reason is a defect.
+is_die_reason : Reason e -> Bool
+foreign pure is_die_reason from "@flick-lang/runtime/effect/Cause" "isDieReason"
+  reviewed "effect@4.0.5 sha256:58c0228d3ecd0f54"
+
+/// Whether the reason is an interruption.
+is_interrupt_reason : Reason e -> Bool
+foreign pure is_interrupt_reason from "@flick-lang/runtime/effect/Cause" "isInterruptReason"
+  reviewed "effect@4.0.5 sha256:f23e913b42aec071"
+
+/// Whether every reason is an interruption, and there is one.
+has_interrupts_only : Failure e -> Bool
+foreign pure has_interrupts_only from "@flick-lang/runtime/effect/Cause" "flickHasInterruptsOnly"
+  reviewed "effect@4.0.5 sha256:e260f0e69073995e"
+
+/// Whether a reason is a typed failure.
+has_fails : Failure e -> Bool
+foreign pure has_fails from "@flick-lang/runtime/effect/Cause" "flickHasFails"
+  reviewed "effect@4.0.5 sha256:da0ba89bc1a20aad"
+
+/// Whether a reason is a defect.
+has_dies : Failure e -> Bool
+foreign pure has_dies from "@flick-lang/runtime/effect/Cause" "flickHasDies"
+  reviewed "effect@4.0.5 sha256:4487bf3823f07466"
+
+/// Whether a reason is an interruption.
+has_interrupts : Failure e -> Bool
+foreign pure has_interrupts from "@flick-lang/runtime/effect/Cause" "flickHasInterrupts"
+  reviewed "effect@4.0.5 sha256:e62729f5a9d564e4"
+
+/// The typed errors changed by `f`; defects and interruptions stay.
+map : forall c e e2. (Errors e -> Errors e2)^c -> (Failure e -> Failure e2)^c
+foreign pure map from "@flick-lang/runtime/effect/Cause" "flickMap"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:39718bf9dcd00590"
+
+/// The reasons of both failures.
+combine : Failure e2 -> Failure e -> Failure (e + e2)
+foreign pure combine from "@flick-lang/runtime/effect/Cause" "flickCombine"
+  arity 1
+  reviewed "effect@4.0.5 sha256:5fbd3b91dfea3813"
+
+/// The first typed failure, or the failure without one.
+find_fail : Failure e -> Result (Failure none) (Reason e)
+foreign pure find_fail from "@flick-lang/runtime/effect/Cause" "flickFindFail"
+  reviewed "effect@4.0.5 sha256:1af6ed994a07d3b7"
+
+/// The first typed error, or the failure without one.
+find_error : Failure e -> Result (Failure none) (Errors e)
+foreign pure find_error from "@flick-lang/runtime/effect/Cause" "flickFindError"
+  reviewed "effect@4.0.5 sha256:993cf0e676745cbb"
+
+/// The first typed error, if any.
+find_error_option : Failure e -> Option (Errors e)
+foreign pure find_error_option from "@flick-lang/runtime/effect/Cause" "flickFindErrorOption"
+  reviewed "effect@4.0.5 sha256:729f468fc242ef1e"
+
+/// The first defect's reason, or the failure without one.
+find_die : Failure e -> Result (Failure e) (Reason e)
+foreign pure find_die from "@flick-lang/runtime/effect/Cause" "flickFindDie"
+  reviewed "effect@4.0.5 sha256:58b030b813ad18f3"
+
+/// The first defect as inert text: an error's message, a string, or the
+/// constructor of a value; or the failure without one.
+find_defect : Failure e -> Result (Failure e) String
+foreign pure find_defect from "@flick-lang/runtime/effect/Cause" "flickFindDefect"
+  reviewed "effect@4.0.5 sha256:3a5c977226f2bd39"
+
+/// The first interruption's reason, or the failure without one.
+find_interrupt : Failure e -> Result (Failure e) (Reason e)
+foreign pure find_interrupt from "@flick-lang/runtime/effect/Cause" "flickFindInterrupt"
+  reviewed "effect@4.0.5 sha256:e08899504b52f64e"
+
+/// The ids of the fibers that interrupted.
+interruptors : Failure e -> List Number
+foreign pure interruptors from "@flick-lang/runtime/effect/Cause" "flickInterruptors"
+  reviewed "effect@4.0.5 sha256:b3db1dee8aa5500e"
+
+/// The ids of the interrupting fibers, or the failure without interruptions.
+filter_interruptors : Failure e -> Result (Failure e) (List Number)
+foreign pure filter_interruptors from "@flick-lang/runtime/effect/Cause" "flickFilterInterruptors"
+  reviewed "effect@4.0.5 sha256:7d2e92ffd915d0d3"
+
+/// A readable report of every reason, with stack traces.
+pretty : Failure e ->{} String
+foreign sync pretty from "@flick-lang/runtime/effect/Cause" "flickPretty"
+  reviewed "effect@4.0.5 sha256:8c70887b615de4e8"
+
+/// `name: message` of each reason as an error.
+pretty_errors : Failure e ->{} List String
+foreign sync pretty_errors from "@flick-lang/runtime/effect/Cause" "flickPrettyErrors"
+  reviewed "effect@4.0.5 sha256:96cf0a2f7bb52a61"
+
+/// The stack frame annotated on the failure, if any.
+stack_trace : Failure e -> Option StackFrame
+foreign pure stack_trace from "@flick-lang/runtime/effect/Cause" "flickStackTrace"
+  reviewed "effect@4.0.5 sha256:0dad9854ff4e9f42"
+
+/// The stack frame of the interrupting fiber, if annotated.
+interruptor_stack_trace : Failure e -> Option StackFrame
+foreign pure interruptor_stack_trace from "@flick-lang/runtime/effect/Cause" "flickInterruptorStackTrace"
+  reviewed "effect@4.0.5 sha256:492316d664e0a4c4"
+
+/// The stack frame annotated on one reason, if any.
+reason_stack_trace : Reason e -> Option StackFrame
+foreign pure reason_stack_trace from "@flick-lang/runtime/effect/Cause" "flickReasonStackTrace"
+  reviewed "effect@4.0.5 sha256:5edea91f64d36e2e"
+
+/// Every reason annotated with the frame; with `overwrite` it replaces a
+/// frame already there.
+annotate : Bool -> StackFrame -> Failure e -> Failure e
+foreign pure annotate from "@flick-lang/runtime/effect/Cause" "flickAnnotate"
+  arity 1
+  reviewed "effect@4.0.5 sha256:1dec88e9006d7ec4"
+
+/// The name of the frame: a span or a function.
+frame_name : StackFrame -> String
+foreign pure frame_name from "@flick-lang/runtime/effect/Cause" "flickFrameName"
+  reviewed "effect@4.0.5 sha256:6986d0193c723e4e"
+
+/// The JS stack of the frame, if it was captured.
+frame_stack : StackFrame ->{} Option String
+foreign sync frame_stack from "@flick-lang/runtime/effect/Cause" "flickFrameStack"
+
+/// The frame around this one.
+frame_parent : StackFrame -> Option StackFrame
+foreign pure frame_parent from "@flick-lang/runtime/effect/Cause" "flickFrameParent"

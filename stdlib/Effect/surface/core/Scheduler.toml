@@ -1,6 +1,8 @@
-[pending]
-MaxOpsBeforeYield = "M20"
-MixedScheduler = "M20"
-PreventSchedulerYield = "M20"
-Scheduler = "M20"
-SchedulerDispatcher = "M20"
+[wrapped]
+Scheduler = "Scheduler.Scheduler 70845d060d47fc95"
+MixedScheduler = "Scheduler.make_mixed 599cb79ccc778b11"
+MaxOpsBeforeYield = "Scheduler.with_max_ops_before_yield 5382e7fca4410878"
+PreventSchedulerYield = "Scheduler.with_prevent_scheduler_yield 9f51c84fce10c69a"
+
+[excluded]
+SchedulerDispatcher = "invariant: a dispatcher runs raw JS thunks outside every fiber; Flick code runs only in fibers of the entry runner"

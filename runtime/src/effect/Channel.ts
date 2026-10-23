@@ -8,7 +8,7 @@ import { Failure } from "../cause.ts";
 import type { Data } from "../data.ts";
 import { failureCause, flickExit } from "../stdlib/outcome.ts";
 import { tag } from "../tags.ts";
-import { type FlickSpanOptions, spanOptions } from "./Tracer.ts";
+import { type FlickSpanOptions, nativeSpanOptions } from "./Tracer.ts";
 
 export * from "effect/Channel";
 
@@ -149,7 +149,7 @@ export const flickMerge = (haltStrategy: Channel.HaltStrategy, right: Any) => (l
 
 /** `Channel.with_span`. */
 export const flickWithSpan = (name: string, options: FlickSpanOptions) => (self: Any) =>
-  Channel.withSpan(self, name, spanOptions(options));
+  Channel.withSpan(self, name, nativeSpanOptions(options));
 
 /** `Channel.mk_uint8_array`: bytes as lists of numbers. */
 export const flickMkUint8Array = <OX, OD, Env>(

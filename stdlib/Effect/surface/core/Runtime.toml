@@ -1,8 +1,9 @@
-[pending]
-Teardown = "M20"
-defaultTeardown = "M20"
-errorExitCode = "M20"
-errorReported = "M20"
-getErrorExitCode = "M20"
-getErrorReported = "M20"
-makeRunMain = "M20"
+
+[excluded]
+Teardown = "invariant: runs effects outside the entry runner, which alone runs a Flick program"
+defaultTeardown = "invariant: runs effects outside the entry runner, which alone runs a Flick program"
+makeRunMain = "invariant: runs effects outside the entry runner, which alone runs a Flick program"
+errorExitCode = "invariant: the entry runner decides the exit code and reports the failure of a program"
+getErrorExitCode = "invariant: the entry runner decides the exit code and reports the failure of a program"
+errorReported = "invariant: the entry runner decides the exit code and reports the failure of a program"
+getErrorReported = "invariant: the entry runner decides the exit code and reports the failure of a program"

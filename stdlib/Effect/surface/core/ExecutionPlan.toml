@@ -1,15 +1,15 @@
+[wrapped]
+ExecutionPlan = "ExecutionPlan.ExecutionPlan c2ef89eddfc268b6"
+make = "ExecutionPlan.make 558d7d1b14e5c534"
+merge = "ExecutionPlan.merge 3b9926fe30ac6c1e"
+CurrentMetadata = "ExecutionPlan.current_metadata 331a4ec44cf66af8"
+Metadata = "ExecutionPlan.Metadata d1a1df35a8446c3b"
+Event = "ExecutionPlan.Event 859b5e81f975fb07"
+AttemptStart = "ExecutionPlan.Event a196de53f6b472c4"
+AttemptSuccess = "ExecutionPlan.Event 27c27ca1abec4be2"
+AttemptFailure = "ExecutionPlan.Event c6f7be7ce65c3842"
+
 [excluded]
 TypeId = "TS-only: a type identifier"
-
-[pending]
-AttemptFailure = "M20"
-AttemptStart = "M20"
-AttemptSuccess = "M20"
-ConfigBase = "M20"
-CurrentMetadata = "M20"
-Event = "M20"
-ExecutionPlan = "M20"
-Metadata = "M20"
-isExecutionPlan = "M20"
-make = "M20"
-merge = "M20"
+isExecutionPlan = "TS-only: a type guard; Flick values are typed statically"
+ConfigBase = "TS-only: the bound of a plan's type parameter"
