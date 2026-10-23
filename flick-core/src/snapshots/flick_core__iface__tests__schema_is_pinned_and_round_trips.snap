@@ -1,5 +1,6 @@
 ---
 source: flick-core/src/iface.rs
+assertion_line: 325
 expression: json
 ---
 {
@@ -19,7 +20,11 @@ expression: json
           "Circle",
           "Square"
         ]
-      }
+      },
+      "at": [
+        152,
+        157
+      ]
     },
     {
       "module": "App.Shapes",
@@ -42,7 +47,11 @@ expression: json
             }
           }
         }
-      }
+      },
+      "at": [
+        160,
+        166
+      ]
     },
     {
       "module": "App.Shapes",
@@ -65,7 +74,11 @@ expression: json
             }
           }
         }
-      }
+      },
+      "at": [
+        176,
+        182
+      ]
     },
     {
       "module": "App.Shapes",
@@ -75,7 +88,11 @@ expression: json
       "definition": {
         "kind": "type",
         "form": "nominal"
-      }
+      },
+      "at": [
+        216,
+        218
+      ]
     },
     {
       "module": "App.Shapes",
@@ -92,7 +109,11 @@ expression: json
             "name": "Number"
           }
         }
-      }
+      },
+      "at": [
+        242,
+        246
+      ]
     },
     {
       "module": "App.Shapes",
@@ -107,7 +128,11 @@ expression: json
           }
         },
         "form": "kind"
-      }
+      },
+      "at": [
+        261,
+        265
+      ]
     },
     {
       "module": "App.Shapes",
@@ -123,7 +148,11 @@ expression: json
           }
         },
         "form": "kind-member"
-      }
+      },
+      "at": [
+        268,
+        273
+      ]
     },
     {
       "module": "App.Shapes",
@@ -139,7 +168,11 @@ expression: json
           }
         },
         "form": "kind-member"
-      }
+      },
+      "at": [
+        276,
+        279
+      ]
     },
     {
       "module": "App.Shapes",
@@ -160,7 +193,11 @@ expression: json
         "methods": [
           "show"
         ]
-      }
+      },
+      "at": [
+        286,
+        290
+      ]
     },
     {
       "module": "App.Shapes",
@@ -205,7 +242,11 @@ expression: json
             }
           }
         }
-      }
+      },
+      "at": [
+        297,
+        301
+      ]
     },
     {
       "module": "App.Shapes",
@@ -257,7 +298,11 @@ expression: json
         "methods": [
           "empty"
         ]
-      }
+      },
+      "at": [
+        330,
+        340
+      ]
     },
     {
       "module": "App.Shapes",
@@ -303,7 +348,11 @@ expression: json
             "var": "c"
           }
         }
-      }
+      },
+      "at": [
+        358,
+        363
+      ]
     },
     {
       "module": "App.Shapes",
@@ -325,7 +374,11 @@ expression: json
             }
           }
         }
-      }
+      },
+      "at": [
+        465,
+        469
+      ]
     },
     {
       "module": "App.Shapes",
@@ -359,7 +412,11 @@ expression: json
             }
           }
         }
-      }
+      },
+      "at": [
+        512,
+        515
+      ]
     },
     {
       "module": "App.Shapes",
@@ -369,7 +426,11 @@ expression: json
       "definition": {
         "kind": "type",
         "form": "nominal"
-      }
+      },
+      "at": [
+        544,
+        548
+      ]
     },
     {
       "module": "App.Shapes",
@@ -413,7 +474,11 @@ expression: json
             }
           }
         ]
-      }
+      },
+      "at": [
+        557,
+        562
+      ]
     },
     {
       "module": "App.Shapes",
@@ -423,7 +488,11 @@ expression: json
       "definition": {
         "kind": "type",
         "form": "error"
-      }
+      },
+      "at": [
+        602,
+        610
+      ]
     },
     {
       "module": "App.Shapes",
@@ -446,7 +515,11 @@ expression: json
             }
           }
         }
-      }
+      },
+      "at": [
+        602,
+        610
+      ]
     },
     {
       "module": "App.Shapes",
@@ -456,7 +529,11 @@ expression: json
       "definition": {
         "kind": "type",
         "form": "nominal"
-      }
+      },
+      "at": [
+        642,
+        646
+      ]
     },
     {
       "module": "App.Shapes",
@@ -513,7 +590,11 @@ expression: json
             ]
           }
         }
-      }
+      },
+      "at": [
+        688,
+        691
+      ]
     },
     {
       "module": "App.Shapes",
@@ -580,7 +661,11 @@ expression: json
             }
           }
         }
-      }
+      },
+      "at": [
+        770,
+        774
+      ]
     },
     {
       "module": "App.Shapes",
@@ -652,7 +737,11 @@ expression: json
             }
           }
         }
-      }
+      },
+      "at": [
+        868,
+        873
+      ]
     },
     {
       "module": "App.Shapes",

@@ -1,5 +1,6 @@
 ---
 source: flick-core/src/build/mod.rs
+assertion_line: 439
 expression: json
 ---
 {
@@ -19,7 +20,11 @@ expression: json
           "Circle",
           "Rect"
         ]
-      }
+      },
+      "at": [
+        62,
+        67
+      ]
     },
     {
       "module": "App.Shapes",
@@ -42,7 +47,11 @@ expression: json
             }
           }
         }
-      }
+      },
+      "at": [
+        70,
+        76
+      ]
     },
     {
       "module": "App.Shapes",
@@ -75,7 +84,11 @@ expression: json
             }
           }
         }
-      }
+      },
+      "at": [
+        86,
+        90
+      ]
     },
     {
       "module": "App.Shapes",
@@ -97,7 +110,11 @@ expression: json
             }
           }
         }
-      }
+      },
+      "at": [
+        249,
+        253
+      ]
     },
     {
       "module": "App.Shapes",
@@ -129,7 +146,11 @@ expression: json
             }
           }
         }
-      }
+      },
+      "at": [
+        354,
+        359
+      ]
     },
     {
       "module": "App.Shapes",
@@ -163,7 +184,11 @@ expression: json
             }
           }
         }
-      }
+      },
+      "at": [
+        411,
+        414
+      ]
     }
   ],
   "instances": [

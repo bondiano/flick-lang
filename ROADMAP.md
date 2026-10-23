@@ -979,7 +979,7 @@ derived `Eq`/`Ord`/`Hash`/`Show` и `Schema` (unboxed) следуют предс
 **Артефакты.** `flick/src/commands/*`, `flick/src/{cache,child,toolchain}.rs`,
 `flick-core::project::{cache, pnpm}`, `flick-core::doc`, `docs/reference/cli.md`.
 Не сделано: раскладка `dist/debug/` и `dist/release/` (артефакты пишутся прямо в
-`out-dir`), `schema export --target openapi-3.1` (после M21), `lsp --stdio` (M17).
+`out-dir`), `schema export --target openapi-3.1` (после M21).
 
 **AC**
 
@@ -1003,7 +1003,7 @@ derived `Eq`/`Ord`/`Hash`/`Show` и `Schema` (unboxed) следуют предс
 - [x] `--diagnostics json`: весь stderr — валидный versioned NDJSON, включая
       вывод приложения (`application-stderr`), тестов и pnpm
       (`package-manager-output`), без ANSI (§13).
-- [ ] stdout `lsp --stdio` содержит только протокол (M17); `test --reporter json` — только
+- [x] stdout `lsp --stdio` содержит только протокол; `test --reporter json` — только
       события тестов (§13).
 - [x] Коды выхода учитывают результат cleanup (матрица тестов на `0/1/2/3/130/143`) (§13).
 - [x] `pack`: tarball содержит ESM, `.iface`, заявленные `.d.ts`; отсутствующий
@@ -1030,32 +1030,33 @@ derived `Eq`/`Ord`/`Hash`/`Show` и `Schema` (unboxed) следуют предс
 - Versioned Content Mapper adapter для typescript-go (интеграция не блокирует
   source checker).
 
-**Артефакты.** `flick/src/lsp/*`, `flick-core::projection`, `editors/vscode/`
-(минимальный клиент для ручной проверки).
+**Артефакты.** `flick/src/lsp/*`, `flick-core::{ide, projection}`,
+`tools/content-mapper/` (адаптер к API TypeScript 7.0.2), `editors/vscode/extension.js`
+(минимальный клиент для ручной проверки), `docs/reference/editor.md`.
 
 **AC**
 
-- [ ] Hover показывает source-типы (rows, captures, constraints), а не TS helpers (§13).
-- [ ] Executable и editor outputs согласованы: для каждого e2e-модуля проекция и
+- [x] Hover показывает source-типы (rows, captures, constraints), а не TS helpers (§13).
+- [x] Executable и editor outputs согласованы: для каждого e2e-модуля проекция и
       исполняемый код получены из одного analysis (тест сравнивает fingerprints) (§13).
-- [ ] Diagnostics LSP совпадают с `flick check` (коды, spans в UTF-16 после конвертации).
-- [ ] Definition работает между модулями и для импортированных `.iface`.
-- [ ] `.iface` хранит позицию объявления каждого export'а (путь исходника
+- [x] Diagnostics LSP совпадают с `flick check` (коды, spans в UTF-16 после конвертации).
+- [x] Definition работает между модулями и для импортированных `.iface`.
+- [x] `.iface` хранит позицию объявления каждого export'а (путь исходника
       относительно пакета + span); definition в установленный пакет открывает его
       `.fl`, если исходник опубликован, иначе — `.iface`/`.d.ts` на нужной позиции.
-- [ ] Definition на встроенный модуль (`Prelude`, `List`, `Schema`, …) открывает
+- [x] Definition на встроенный модуль (`Prelude`, `List`, `Schema`, …) открывает
       его исходник как read-only документ из бинарника (`flick-builtin:///List.fl`),
       позиции берутся повторным разбором встроенного `.fl`; тест покрывает функцию,
       тип, конструктор, класс и метод класса.
-- [ ] Definition по `T.parse`/`T.schema`/методу instance-словаря ведёт к исходному
+- [x] Definition по `T.parse`/`T.schema`/методу instance-словаря ведёт к исходному
       объявлению (`deriving Schema`, refined-тип, instance), а не к сгенерированному
       companion.
-- [ ] Rename меняет все использования в проекте; rename с неточным mapping
+- [x] Rename меняет все использования в проекте; rename с неточным mapping
       отклоняется, JS не меняется.
-- [ ] Completion предлагает поля records (включая открытые строки), методы
+- [x] Completion предлагает поля records (включая открытые строки), методы
       сервисов, конструкторы.
-- [ ] Отклик hover/completion на модуле в 2000 строк укладывается в бюджет M19.
-- [ ] Content Mapper adapter проходит smoke-тест на зафиксированной версии
+- [x] Отклик hover/completion на модуле в 2000 строк укладывается в бюджет M19.
+- [x] Content Mapper adapter проходит smoke-тест на зафиксированной версии
       typescript-go (риск: внешний API — см. §4).
 
 ---

@@ -29,9 +29,13 @@ After changing `grammar.js` or `src/scanner.c`, run `just tree-sitter`
 
 ## Language server
 
-Neither extension starts a server yet. When `flick lsp` (stdio) exists:
+`flick lsp --stdio` serves diagnostics, hover, definition, references,
+completion, rename and formatting (see `docs/reference/editor.md`).
 
-- VS Code: add a `main` entry that starts it with `vscode-languageclient`.
+- VS Code: `extension.js` starts it with `vscode-languageclient` (run
+  `npm install` inside `editors/vscode` once) and shows built-in modules
+  (`flick-builtin:///List.fl`) as read-only documents. `flick.path` names
+  the executable.
 - Zed: add `[language_servers.flick]` (`languages = ["Flick"]`) to
   `extension.toml` and a Rust `src/lib.rs` implementing
   `language_server_command` that finds `flick` on `PATH`.

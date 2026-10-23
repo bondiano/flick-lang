@@ -324,6 +324,7 @@ pub fn artifacts(
         source_path: &source_path,
         extras: output.extras,
         release: output.release,
+        root: project.map(|p| p.root.as_path()),
     };
     build::emit(compilation, sources, &settings)
 }

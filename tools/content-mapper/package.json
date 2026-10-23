@@ -1,0 +1,15 @@
+{
+  "name": "@flick-lang/content-mapper",
+  "version": "0.1.0",
+  "description": "Flick's editor projection for typescript-go: virtual .flick.ts files and their span maps",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": "./index.mjs",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "typescript": "7.0.2"
+  }
+}

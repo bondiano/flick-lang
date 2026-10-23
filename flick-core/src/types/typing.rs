@@ -51,6 +51,12 @@ pub struct Typing {
     pub schemas: Vec<SchemaItem>,
     /// `codec` blocks: the fields' labels in the order written.
     pub codecs: HashMap<Range, CodecBlock>,
+    /// The type of each name in an expression and of each variable a
+    /// pattern binds, for editors.
+    pub types: HashMap<Range, Type>,
+    /// The type each type name refers to: its module and name.
+    pub type_names: HashMap<Range, (String, String)>,
+    pending_types: Vec<(Range, Type)>,
     /// `sql table` declarations.
     pub sql_tables: Vec<SqlTable>,
     /// `sql { … }` blocks: their SQL and how values cross the driver.
@@ -315,6 +321,12 @@ impl Checker<'_> {
         }
     }
 
+    /// Records the type of a name or binder at `span`, settled once the
+    /// module is solved.
+    pub fn note_type(&mut self, span: Span, ty: &Type) {
+        self.typing.pending_types.push((range(span), ty.clone()));
+    }
+
     pub fn record_dict(&mut self, span: Span, order: u32, dict: Dict) {
         self.typing.pending_dicts.push((range(span), order, dict));
     }
@@ -370,9 +382,21 @@ impl Checker<'_> {
         }
     }
 
+    /// `t` with each rigid variable written as the variable it stands for.
+    fn named_skolems(&self, t: &Type) -> Type {
+        match t {
+            Type::Skolem(s) => Type::Var(self.store.skolem_name(*s).to_owned()),
+            other => other.map_children(&mut |c| self.named_skolems(c)),
+        }
+    }
+
     /// Settles what waited for the whole module to be solved.
     pub fn finish_typing(&mut self) -> Typing {
         let mut typing = mem::take(&mut self.typing);
+        for (at, ty) in mem::take(&mut typing.pending_types) {
+            let ty = self.named_skolems(&self.zonk(&ty));
+            typing.types.insert(at, ty);
+        }
         for (at, ty) in mem::take(&mut typing.pending_labels) {
             let ty = self.zonk(&ty);
             if let Type::App { arg, .. } = ty

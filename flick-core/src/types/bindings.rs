@@ -191,6 +191,13 @@ impl Checker<'_> {
             }
             self.push_local(&name, ty);
         }
+        if let (Some(binder), Some(local)) = (
+            decl.nodes().find(|n| n.kind == K::VarPat),
+            self.locals.last(),
+        ) {
+            let ty = local.ty.clone();
+            self.note_type(self.span(binder), &ty);
+        }
     }
 
     /// `let (a, b) = …`: the names are monomorphic.

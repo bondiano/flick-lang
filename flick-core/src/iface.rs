@@ -84,6 +84,10 @@ pub struct Export {
     /// Why a `foreign blocked` value cannot be used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blocked: Option<String>,
+    /// The UTF-8 byte range of the declared name in the source of the
+    /// module that declares it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<[u32; 2]>,
 }
 
 /// A constructor of an exported type that is itself not exported; kept only
@@ -111,6 +115,10 @@ pub struct Interface {
     /// The fingerprint of each interface this one was built against.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub dependencies: BTreeMap<String, String>,
+    /// The module's source, relative to the root of its package; written by
+    /// a build, so editors find a declaration in a published package.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 /// The ABI of a compiled module.
@@ -179,6 +187,11 @@ pub struct Summary {
 pub fn fingerprint(interface: &Interface) -> String {
     let mut bare = interface.clone();
     bare.dependencies.clear();
+    // where declarations are written changes nothing for importers
+    bare.source = None;
+    for export in &mut bare.exports {
+        export.at = None;
+    }
     let json = serde_json::to_string(&bare).expect("an interface serializes");
     let hash = json.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
         (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)

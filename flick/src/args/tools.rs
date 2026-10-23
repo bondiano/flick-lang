@@ -142,3 +142,10 @@ pub struct InspectArguments {
     #[arg(long, value_enum)]
     pub emit: Representation,
 }
+
+#[derive(Args)]
+pub struct LspArguments {
+    /// Talk the protocol over stdin and stdout, the only transport.
+    #[arg(long, required = true)]
+    pub stdio: bool,
+}

@@ -1,3 +1,4 @@
 packages:
   - runtime
   - tools/dts-importer
+  - tools/content-mapper

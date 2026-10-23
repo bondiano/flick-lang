@@ -6,15 +6,27 @@
   "publisher": "bondiano",
   "license": "MIT",
   "private": true,
-  "repository": { "type": "git", "url": "https://github.com/bondiano/flick-lang" },
-  "engines": { "vscode": "^1.80.0" },
-  "categories": ["Programming Languages"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bondiano/flick-lang"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
   "contributes": {
     "languages": [
       {
         "id": "flick",
-        "aliases": ["Flick", "flick"],
-        "extensions": [".fl"],
+        "aliases": [
+          "Flick",
+          "flick"
+        ],
+        "extensions": [
+          ".fl"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -31,6 +43,23 @@
         "editor.tabSize": 2,
         "editor.detectIndentation": false
       }
+    },
+    "configuration": {
+      "title": "Flick",
+      "properties": {
+        "flick.path": {
+          "type": "string",
+          "default": "flick",
+          "description": "The `flick` executable that serves `flick lsp --stdio`."
+        }
+      }
     }
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:flick"
+  ],
+  "dependencies": {
+    "vscode-languageclient": "9.0.1"
   }
 }

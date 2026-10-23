@@ -65,6 +65,8 @@ pub enum Commands {
     /// Print a representation of a module: AST, typed IR, JS, TS, interface
     /// or source mapping.
     Inspect(InspectArguments),
+    /// Run the language server.
+    Lsp(LspArguments),
 }
 
 #[derive(Subcommand)]

@@ -11,7 +11,8 @@ use flick_core::build::Extras;
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
 use flick_core::project::{self, Compilation, Project, cache};
 use flick_core::source::SourceMap;
-use flick_core::{doc, ir, syntax};
+use flick_core::types::builtins;
+use flick_core::{doc, ir, projection, syntax};
 
 use super::build::{Output, artifacts, emit, write};
 use super::check::select;
@@ -96,12 +97,21 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
             syntax::parse(source, module.file).tree.debug_dump(source)
         }
         Representation::TypedIr => ir::print(&module.ir),
+        Representation::Mapping => match projected(explicit, &options.module) {
+            Some(json) => json,
+            None => {
+                return failure(
+                    checked.sources,
+                    codes::P018,
+                    format!("no projection of `{}`", options.module),
+                );
+            }
+        },
         other => {
             let (file, typescript) = match other {
                 Representation::Js => (format!("{path}.js"), false),
                 Representation::Ts => (format!("{path}.ts"), true),
-                Representation::Iface => (format!("{path}.iface"), false),
-                _ => (format!("{path}.js.map"), false),
+                _ => (format!("{path}.iface"), false),
             };
             let out = output(checked.host.cwd.join("dist"), typescript);
             let (built, diagnostics) = artifacts(
@@ -127,6 +137,39 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
         println!();
     }
     Outcome::default()
+}
+
+/// The editor projection of `module` and its span maps, as JSON.
+fn projected(explicit: Option<&str>, module: &str) -> Option<String> {
+    let host = FsHost::new();
+    let mut sources = SourceMap::default();
+    let (project, roots) = select(&host, &mut sources, explicit, &[]).ok()?;
+    let analysis = project::analyze(&host, &mut sources, project.as_ref(), &roots);
+    let analyzed = analysis.module(module)?;
+    let fingerprint = project::analysis_fingerprint(&analysis.compilation);
+    let lookup = |m: &str| {
+        analysis
+            .module(m)
+            .map(|a| a.interface.clone())
+            .or_else(|| {
+                analysis
+                    .compilation
+                    .packages
+                    .iter()
+                    .find(|p| p.0 == m)
+                    .map(|p| p.2.clone())
+            })
+            .or_else(|| builtins().iter().find(|i| i.module == m).cloned())
+    };
+    let root = project.as_ref().map(|p| p.root.clone());
+    let package = |m: &str| {
+        let own = analysis.module(m).is_some();
+        let name = root.as_ref().and_then(|r| project::project_name(&host, r));
+        own.then_some(name).flatten()
+    };
+    let text = &sources.get(analyzed.file).text;
+    let projected = projection::project(analyzed, text, &fingerprint, &lookup, &package);
+    serde_json::to_string_pretty(&projected).ok()
 }
 
 pub fn doc(options: &OutDirArguments, explicit: Option<&str>) -> Outcome {

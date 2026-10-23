@@ -46,6 +46,8 @@ pub struct Settings<'a> {
     pub source_dir: &'a dyn Fn(&str) -> Option<PathBuf>,
     /// The absolute output directory.
     pub out_dir: &'a Path,
+    /// The project's root: interfaces name their source relative to it.
+    pub root: Option<&'a Path>,
 }
 
 /// The opt-in outputs of a build.
@@ -201,13 +203,18 @@ fn compiled_module(
         path: format!("{file}.map"),
         contents: map,
     });
-    let built = interface(
+    let mut built = interface(
         &module.ir,
         &module.interface,
         (ctx.package)(&module.name).as_deref(),
         &module.imports,
         ctx.interface_of,
     );
+    built.source = ctx
+        .settings
+        .root
+        .and_then(|root| module.path.strip_prefix(root).ok())
+        .map(|p| p.to_string_lossy().replace('\\', "/"));
     if ctx.settings.extras.dts
         && let Some((text, refused)) =
             declarations(&module.name, ctx.any_interface, ctx.package, ctx.path)

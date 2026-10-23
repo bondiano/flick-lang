@@ -5,7 +5,7 @@ use std::{iter, ops};
 
 use crate::diagnostics::{Diagnostic, codes};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FileId(u32);
 
 /// Half-open UTF-8 byte range `start..end` in one file.

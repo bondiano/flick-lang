@@ -8,6 +8,9 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 mod entry;
+mod ide;
+
+pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze};
 
 use super::packages::Packages;
 use super::{Host, Project, module_name, module_path, normalize};
@@ -37,6 +40,16 @@ struct Loaded {
     name: String,
 }
 
+/// How far a run goes past checking.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    Check,
+    /// Also lowers every module to the IR when nothing has errors.
+    Compile,
+    /// [`Mode::Compile`], keeping what editors need of each module.
+    Analyze,
+}
+
 struct Loader<'a> {
     host: &'a dyn Host,
     sources: &'a mut SourceMap,
@@ -50,6 +63,8 @@ struct Loader<'a> {
     diagnostics: Vec<Diagnostic>,
     /// With `Some`, the IR of each module that checks without errors.
     lowered: Option<Vec<Option<ir::Module>>>,
+    /// With `Some`, what editors need of each module that parses.
+    ide: Option<Vec<Analyzed>>,
 }
 
 /// The modules of a build and the package modules they use.
@@ -82,7 +97,7 @@ pub fn check(
     project: Option<&Project>,
     roots: &[PathBuf],
 ) -> Vec<Diagnostic> {
-    run(host, sources, project, roots, false).0
+    run(host, sources, project, roots, Mode::Check).0
 }
 
 /// [`check`], also lowering every module to the IR when nothing has errors.
@@ -92,7 +107,8 @@ pub fn compile(
     project: Option<&Project>,
     roots: &[PathBuf],
 ) -> (Vec<Diagnostic>, Compilation) {
-    run(host, sources, project, roots, true)
+    let (diagnostics, compilation, _) = run(host, sources, project, roots, Mode::Compile);
+    (diagnostics, compilation)
 }
 
 fn run(
@@ -100,8 +116,8 @@ fn run(
     sources: &mut SourceMap,
     project: Option<&Project>,
     roots: &[PathBuf],
-    lower: bool,
-) -> (Vec<Diagnostic>, Compilation) {
+    mode: Mode,
+) -> (Vec<Diagnostic>, Compilation, Vec<Analyzed>) {
     let mut diagnostics = Vec::new();
     let packages = project.map_or_else(Packages::default, |p| {
         Packages::load(host, &p.root, &mut diagnostics)
@@ -116,7 +132,8 @@ fn run(
         from_packages: BTreeMap::new(),
         owners: BTreeMap::new(),
         diagnostics,
-        lowered: lower.then(Vec::new),
+        lowered: (mode != Mode::Check).then(Vec::new),
+        ide: (mode == Mode::Analyze).then(Vec::new),
     };
     let mut roots: Vec<(Root, PathBuf)> = roots
         .iter()
@@ -177,6 +194,7 @@ fn run(
         modules: compiled,
         packages,
     };
+    let analyzed = loader.ide.take().unwrap_or_default();
     let mut diagnostics = loader.diagnostics;
     // by path, not by load order, which follows the order of imports
     let sources = &*loader.sources;
@@ -187,7 +205,7 @@ fn run(
                 .map(|s| (sources.get(s.file).path.clone(), s.start, s.end)),
         )
     });
-    (diagnostics, compilation)
+    (diagnostics, compilation, analyzed)
 }
 
 impl Loader<'_> {
@@ -489,6 +507,9 @@ impl Loader<'_> {
                     Ok(ir) => lowered[i] = Some(ir),
                     Err(d) => self.diagnostics.extend(d),
                 }
+            }
+            if let Some(ide) = &mut self.ide {
+                ide.push(Analyzed::new(loaded, typing, interface.clone()));
             }
         }
         interfaces[i] = Some(interface);

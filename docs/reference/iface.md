@@ -39,6 +39,7 @@ Until 0.1.0 the schema grows with the compiler: every change bumps
 | `instances` | the instances of the module and of every module it depends on, except built-in ones; omitted when empty |
 | `abi` | how the compiled code represents what the module defines, see [ABI](#abi); written by `flick build`, absent from `flick check` |
 | `dependencies` | the fingerprint of each imported module's interface the module was built against; omitted when empty |
+| `source` | the module's source, relative to the root of its package, so editors find declarations in a published package; written by `flick build` |
 
 Each export names an **entity** by `module`, `namespace` and `name`. `module`
 is where the entity is *defined*: a re-export keeps the defining module, which
@@ -71,9 +72,11 @@ re-exported from `App.Domain`).
 `T(..)` in an import exposes the exports whose `parent` is `T`.
 
 An exported type also exports its companion values as `value` entities named
-`T$member`, which no source name can spell: `T$schema` of a type deriving
+`T$member`, which no source name can spell (`T$table` of a `sql table`): `T$schema` of a type deriving
 `Schema`, `T$parse` and `T$value` of a refined type, and `T$json` of a
-refined type with a schema. `schema T` and `T.parse` name them. A class's
+refined type with a schema. `schema T` and `T.parse` name them. An export
+of a declaration of the module has `at`, the UTF-8 byte range of its name in
+`source`. A class's
 `definition` lists in `defaults` the methods with a default definition.
 
 ### Types and kinds
@@ -175,7 +178,8 @@ dependencies, and resolves constraints with them.
 ### Fingerprints
 
 The fingerprint of an interface is a 64-bit FNV-1a hash, as 16 hex digits,
-of its JSON without `dependencies`. Equal fingerprints mean that code
+of its JSON without `dependencies`, `source` and the `at` of exports:
+moving a declaration changes nothing for importers. Equal fingerprints mean that code
 compiled against one interface is valid against the other. `dependencies`
 records the fingerprint of every imported module's interface at build time;
 when an installed package's module was built against an interface other than

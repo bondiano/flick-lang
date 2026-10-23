@@ -355,9 +355,19 @@ fn doctor_reports_without_failing_on_a_missing_content_mapper() {
     let dir = project("cli_doctor", &[("flick.toml", APP)]);
     let out = flick_in(&dir, &["doctor"]);
     let text = String::from_utf8_lossy(&out.stdout);
-    for check in ["compiler: flick", "Node.js:", "pnpm:", "@flick-lang/runtime:", "effect:", "Content Mapper:"] {
+    for check in [
+        "compiler: flick",
+        "Node.js:",
+        "pnpm:",
+        "@flick-lang/runtime:",
+        "effect:",
+        "Content Mapper:",
+    ] {
         assert!(text.contains(check), "`{check}` in\n{text}");
     }
-    let mapper = text.lines().find(|l| l.contains("Content Mapper")).expect("a line");
+    let mapper = text
+        .lines()
+        .find(|l| l.contains("Content Mapper"))
+        .expect("a line");
     assert!(!mapper.starts_with("FAIL"), "{mapper}");
 }

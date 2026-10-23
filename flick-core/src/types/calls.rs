@@ -28,6 +28,12 @@ impl Checker<'_> {
 
     /// The type of a value or constructor reference, instantiated.
     pub fn name(&mut self, node: &Node) -> Type {
+        let ty = self.name_type(node);
+        self.note_type(self.span(node), &ty);
+        ty
+    }
+
+    fn name_type(&mut self, node: &Node) -> Type {
         let parts: Vec<&str> = node
             .child_tokens()
             .filter(|t| t.kind != K::Dot)

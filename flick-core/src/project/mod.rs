@@ -11,7 +11,9 @@ pub mod pnpm;
 use std::path::{Component, Path, PathBuf};
 
 pub use config::Config;
-pub use load::{Compilation, Compiled, check, compile};
+pub use load::{
+    Analysis, Analyzed, Compilation, Compiled, analysis_fingerprint, analyze, check, compile,
+};
 pub use packages::project_name;
 use std::io;
 

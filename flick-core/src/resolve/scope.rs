@@ -293,6 +293,7 @@ impl<'a> Scope<'a> {
             scheme: None,
             definition: None,
             blocked: def.blocked.clone(),
+            at: Some([def.span.start, def.span.end]),
         }
     }
 

@@ -1,0 +1,246 @@
+//! Completion: after `x.` the fields of a record (open rows too), after
+//! `M.` the exports of a module or the operations of a service; otherwise
+//! the locals in scope, the module's own names, imported names and the
+//! Prelude's, constructors included.
+
+use std::collections::BTreeMap;
+use std::iter;
+
+use super::{Ide, locals};
+use crate::iface::{Export, Interface, Namespace};
+use crate::resolve::declarations;
+use crate::source::FileId;
+use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
+use crate::types::{Form, PRELUDE, Type, show_type};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CompletionKind {
+    Local,
+    Value,
+    Constructor,
+    Type,
+    Module,
+    Field,
+    Operation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Completion {
+    pub label: String,
+    pub kind: CompletionKind,
+    /// The source type, when known.
+    pub detail: Option<String>,
+}
+
+fn item(label: &str, kind: CompletionKind, detail: Option<String>) -> Completion {
+    Completion {
+        label: label.to_owned(),
+        kind,
+        detail,
+    }
+}
+
+impl Ide<'_> {
+    /// Completions at `offset` of `file`. With `dotted`, `offset` is the end
+    /// of what comes before a `.`.
+    pub fn complete(&self, file: FileId, offset: u32, dotted: bool) -> Vec<Completion> {
+        let Some(m) = self.module(file) else {
+            return Vec::new();
+        };
+        let text = &self.sources.get(file).text;
+        if dotted {
+            return self.after_dot(file, offset);
+        }
+        let mut out: BTreeMap<String, Completion> = BTreeMap::new();
+        let mut add = |c: Completion| {
+            out.entry(c.label.clone()).or_insert(c);
+        };
+        for (name, binder) in locals::in_scope(&m.tree, offset, text).into_iter().rev() {
+            let ty = m
+                .typing
+                .types
+                .iter()
+                .find(|(r, _)| r.0 == binder.0)
+                .map(|(_, t)| show_type(t));
+            add(item(&name, CompletionKind::Local, ty));
+        }
+        for c in exports(&m.interface) {
+            add(c);
+        }
+        for d in declarations(&m.tree, text, file) {
+            let kind = match d.namespace {
+                Namespace::Value => CompletionKind::Value,
+                Namespace::Constructor => CompletionKind::Constructor,
+                Namespace::Type => CompletionKind::Type,
+            };
+            add(item(&d.name, kind, None));
+        }
+        for import in m.tree.nodes().filter(|n| n.kind == K::ImportDecl) {
+            let Some(path) = import.nodes().find(|n| n.kind == K::ModulePath) else {
+                continue;
+            };
+            let module: String = path.text(text).split_whitespace().collect();
+            add(item(
+                module.rsplit('.').next().unwrap_or(&module),
+                CompletionKind::Module,
+                None,
+            ));
+            let Some(interface) = self.interface(&module) else {
+                continue;
+            };
+            let exposing: Vec<String> = import
+                .nodes()
+                .filter(|n| n.kind == K::Exposing)
+                .flat_map(Node::nodes)
+                .map(|i| i.text(text).split_whitespace().collect())
+                .collect();
+            let all = exposing.iter().any(|e| e == "..");
+            for e in interface
+                .exports
+                .iter()
+                .filter(|e| !e.entity.name.contains('$'))
+            {
+                let label = &e.entity.name;
+                let named = exposing.iter().any(|x| {
+                    x == label
+                        || x.strip_suffix("(..)") == Some(label.as_str())
+                        || e.parent
+                            .as_ref()
+                            .is_some_and(|p| x.strip_suffix("(..)") == Some(p.as_str()))
+                });
+                if all || named {
+                    add(completion(e));
+                }
+            }
+        }
+        if let Some(prelude) = self.interface(PRELUDE) {
+            for c in exports(&prelude) {
+                add(c);
+            }
+        }
+        out.into_values().collect()
+    }
+
+    fn after_dot(&self, file: FileId, offset: u32) -> Vec<Completion> {
+        let Some(m) = self.module(file) else {
+            return Vec::new();
+        };
+        let text = &self.sources.get(file).text;
+        // `M.` or `M.N.`: a module, or a service's operations
+        let qualifier: String = text[..offset as usize]
+            .chars()
+            .rev()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '.')
+            .collect::<String>()
+            .chars()
+            .rev()
+            .collect();
+        if qualifier.starts_with(|c: char| c.is_ascii_uppercase()) {
+            if let Some(interface) = self.interface(&qualifier) {
+                return exports(&interface);
+            }
+            if let Some(ops) = local_operations(&m.tree, text, &qualifier) {
+                return ops;
+            }
+            let service = iter::once(&m.interface)
+                .chain(self.analysis.modules.iter().map(|x| &x.interface))
+                .find_map(|i| i.find(Namespace::Type, &qualifier)?.definition.clone());
+            if let Some(def) = service
+                && let Form::Service { operations, .. } = def.form
+            {
+                return operations
+                    .iter()
+                    .map(|o| item(&o.name, CompletionKind::Operation, Some(show_type(&o.ty))))
+                    .collect();
+            }
+        }
+        let Some((_, ty)) = m
+            .typing
+            .types
+            .iter()
+            .filter(|(r, _)| r.1 == offset)
+            .min_by_key(|(r, _)| r.1 - r.0)
+        else {
+            return Vec::new();
+        };
+        let mut fields = Vec::new();
+        self.fields(ty, &mut fields, 0);
+        fields
+            .into_iter()
+            .map(|(label, t)| item(&label, CompletionKind::Field, Some(show_type(&t))))
+            .collect()
+    }
+
+    /// The known fields of a record type, through transparent aliases.
+    fn fields(&self, ty: &Type, out: &mut Vec<(String, Type)>, depth: u32) {
+        let ty = match ty {
+            Type::Captured { ty, .. } => ty,
+            other => other,
+        };
+        match ty {
+            Type::Record(row) => out.extend(row.entries.iter().cloned()),
+            Type::App { .. } | Type::Con { .. } if depth < 8 => {
+                let (head, args) = ty.spine();
+                let Type::Con { module, name } = head else {
+                    return;
+                };
+                let def = self
+                    .interface(module)
+                    .and_then(|i| i.find(Namespace::Type, name)?.definition.clone());
+                if let Some(Form::Alias { params, body, .. }) = def.map(|d| d.form) {
+                    let subst: Vec<(String, Type)> =
+                        params.into_iter().zip(args.into_iter().cloned()).collect();
+                    self.fields(&body.substitute(&subst), out, depth + 1);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// The values, constructors and types an interface exports, without the
+/// companions of types.
+fn exports(interface: &Interface) -> Vec<Completion> {
+    interface
+        .exports
+        .iter()
+        .filter(|e| !e.entity.name.contains('$'))
+        .map(completion)
+        .collect()
+}
+
+fn completion(e: &Export) -> Completion {
+    let kind = match e.entity.namespace {
+        Namespace::Value => CompletionKind::Value,
+        Namespace::Constructor => CompletionKind::Constructor,
+        Namespace::Type => CompletionKind::Type,
+    };
+    item(&e.entity.name, kind, e.scheme.as_ref().map(show_type))
+}
+
+/// The operations of a service the module declares, with their signatures.
+fn local_operations(root: &Node, text: &str, service: &str) -> Option<Vec<Completion>> {
+    let decl = root.nodes().find(|d| {
+        d.kind == K::ServiceDecl
+            && d.child_tokens()
+                .any(|t| t.kind == K::Con && t.text(text) == service)
+    })?;
+    Some(
+        decl.nodes()
+            .filter(|n| n.kind == K::Members)
+            .flat_map(Node::nodes)
+            .filter(|n| n.kind == K::Signature)
+            .filter_map(|sig| {
+                let name = sig.child_tokens().find(|t| t.kind == K::Ident)?;
+                let ty = sig.nodes().next().map(|t| {
+                    t.text(text)
+                        .split_whitespace()
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                });
+                Some(item(name.text(text), CompletionKind::Operation, ty))
+            })
+            .collect(),
+    )
+}

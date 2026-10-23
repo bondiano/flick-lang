@@ -62,6 +62,7 @@ impl Checker<'_> {
             K::WildcardPat => Pat::Wild,
             K::VarPat => {
                 if let Some(name) = node.child_tokens().find(|t| t.kind == K::Ident) {
+                    self.note_type(span, ty);
                     let name = name.text(self.text).to_owned();
                     self.locals.push(Local {
                         name,

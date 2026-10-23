@@ -402,6 +402,10 @@ impl Checker<'_> {
         let (name, qualifier) = parts.split_last()?;
         let qualifier = qualifier.join(".");
         let (module, def) = self.find_type(node, &qualifier, name)?;
+        let named = (module.clone(), (*name).to_owned());
+        self.typing
+            .type_names
+            .insert((node.range().0, node.range().1), named);
         let ty = if self.service_module(&qualifier, name).is_some() {
             Type::con(&module, &format!("{qualifier}.{name}"))
         } else {

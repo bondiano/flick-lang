@@ -80,6 +80,7 @@ impl Checker<'_> {
                         scheme: None,
                         definition: None,
                         blocked: None,
+                        at: None,
                     });
                 }
             }

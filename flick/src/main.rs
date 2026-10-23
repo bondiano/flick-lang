@@ -16,6 +16,7 @@ mod cache;
 mod child;
 mod command;
 mod commands;
+mod lsp;
 mod report;
 mod sources;
 mod toolchain;
@@ -128,5 +129,6 @@ fn main() -> ExitCode {
         Commands::Explain(o) => report(commands::explain(&o), global),
         Commands::Doctor => report(commands::doctor(global), global),
         Commands::Inspect(o) => report(commands::inspect(&o, project), global),
+        Commands::Lsp(_) => lsp::serve(),
     }
 }

@@ -10,10 +10,37 @@ mod uses;
 pub(crate) use defs::shortest_cycle;
 pub use syntax::{Header, Import, Item, ItemKind, ModuleSyntax, module_syntax};
 
+/// A top-level name a module declares, signatures included.
+#[derive(Debug, Clone)]
+pub struct Declared {
+    pub namespace: Namespace,
+    pub name: String,
+    pub span: Span,
+    /// Type of a constructor, class of a method.
+    pub parent: Option<String>,
+    pub decl: Decl,
+    pub signature: bool,
+}
+
+/// Every top-level name `tree` declares, in source order.
+pub fn declarations(tree: &Node, text: &str, file: FileId) -> Vec<Declared> {
+    defs::collect(tree, text, file)
+        .into_iter()
+        .map(|d| Declared {
+            namespace: d.namespace,
+            name: d.name,
+            span: d.span,
+            parent: d.parent,
+            decl: d.decl,
+            signature: d.signature,
+        })
+        .collect()
+}
+
 pub use crate::iface::{Decl, Entity, Export, Hidden, Interface, Namespace};
 
 use crate::diagnostics::Diagnostic;
-use crate::source::FileId;
+use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
 
 /// One parsed module to resolve.

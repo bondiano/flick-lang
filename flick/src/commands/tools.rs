@@ -109,15 +109,21 @@ pub fn doctor(global: &GlobalArguments) -> Outcome {
         ),
     }
     installed(root.as_deref(), &mut line);
-    let mapper = version_of("tsgo");
-    line(
-        None,
-        "Content Mapper",
-        mapper.map_or_else(
-            || "typescript-go not found: editors use `flick lsp` only".to_owned(),
-            |v| format!("typescript-go {v}"),
+    // the adapter is verified against one typescript-go release
+    let mapper = root
+        .as_deref()
+        .and_then(|r| toolchain::installed(r, "typescript"));
+    let detail = match mapper {
+        Some(v) if v == toolchain::TYPESCRIPT_GO => {
+            format!("typescript-go {v}, the adapter's release")
+        }
+        Some(v) => format!(
+            "typescript {v}: the adapter is verified against {}",
+            toolchain::TYPESCRIPT_GO
         ),
-    );
+        None => "typescript-go not installed: editors use `flick lsp` only".to_owned(),
+    };
+    line(None, "Content Mapper", detail);
     Outcome {
         sources: SourceMap::default(),
         diagnostics: failed
