@@ -68,7 +68,10 @@ let edit model source =
 choose : Ref Model -> Example ->{} Unit
 let choose model example =
   let compiled = compile example.source
-  update model (fun m -> { m with example = example.name; source = example.source; compiled = compiled; output = [] })
+  update
+    model
+    (fun m ->
+      { m with example = example.name; source = example.source; compiled = compiled; output = [] })
 
 /// Runs the program, giving up after ten seconds.
 run_program : Ref Model ->{} Unit
@@ -81,7 +84,8 @@ let run_program model =
   update model (fun m -> { m with running = false; output = output })
 
 errors : Compiled -> Number
-let errors compiled = List.length (List.filter (fun d -> d.severity == "error") compiled.diagnostics)
+let errors compiled =
+  List.length (List.filter (fun d -> d.severity == "error") compiled.diagnostics)
 
 status : Model -> String
 let status m =
@@ -98,7 +102,11 @@ let toggle label on act =
   ui {
     span
       { class_name = if on then "fp-on" else "fp-off" }
-      [button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { act () }) } [text label]]
+      [
+        button
+          { disabled = false; on_click = Ui.Event.latest (fun _ -> task { act () }) }
+          [text label]
+      ]
   }
 
 code_pane : String -> String -> Ui none none
@@ -108,7 +116,9 @@ let code_pane title code =
       { class_name = "fp-code" }
       [
         span { class_name = "fp-title" } [text title],
-        pre { class_name = "fp-out" } [text (if code == "" then "no output: the module has errors" else code)]
+        pre
+          { class_name = "fp-out" }
+          [text (if code == "" then "no output: the module has errors" else code)]
       ]
   }
 
@@ -126,7 +136,11 @@ let output_pane m =
 problem : Diagnostic -> Ui none none
 let problem d =
   ui {
-    item [span { class_name = "fp-" ++ d.severity } [text d.code], text (" " ++ d.at ++ " " ++ d.message)]
+    item
+      [
+        span { class_name = "fp-" ++ d.severity } [text d.code],
+        text (" " ++ d.at ++ " " ++ d.message)
+      ]
   }
 
 problems_pane : Compiled -> Ui none none
@@ -141,10 +155,15 @@ pane : Model -> Ui none none
 let pane m =
   match m.tab with
   | Output -> output_pane m
-  | Js -> code_pane ("JavaScript, " ++ profile_name m.profile) (if m.profile == Debug then m.compiled.debug else m.compiled.release)
+  | Js ->
+    code_pane
+      ("JavaScript, " ++ profile_name m.profile)
+      (if m.profile == Debug then m.compiled.debug else m.compiled.release)
   | Compare ->
     ui {
-      div { class_name = "fp-compare" } [code_pane "debug" m.compiled.debug, code_pane "release" m.compiled.release]
+      div
+        { class_name = "fp-compare" }
+        [code_pane "debug" m.compiled.debug, code_pane "release" m.compiled.release]
     }
   | Problems -> problems_pane m.compiled
 
@@ -160,11 +179,15 @@ let tab_label m t =
     | ds -> "Diagnostics (" ++ show (List.length ds) ++ ")"
 
 set_tab : Ref Model -> Model -> Tab -> Ui none none
-let set_tab model m t = toggle (tab_label m t) (m.tab == t) (fun () -> update model (fun m -> { m with tab = t }))
+let set_tab model m t =
+  toggle (tab_label m t) (m.tab == t) (fun () -> update model (fun m -> { m with tab = t }))
 
 set_profile : Ref Model -> Model -> Profile -> Ui none none
 let set_profile model m p =
-  toggle (profile_name p) (m.profile == p) (fun () -> update model (fun m -> { m with profile = p }))
+  toggle
+    (profile_name p)
+    (m.profile == p)
+    (fun () -> update model (fun m -> { m with profile = p }))
 
 pick : Ref Model -> Model -> Example -> Ui none none
 let pick model m e = toggle e.name (m.example == e.name) (fun () -> choose model e)
@@ -185,10 +208,15 @@ let view model m =
               { class_name = "fp-run" }
               [
                 button
-                  { disabled = m.version == ""; on_click = Ui.Event.latest (fun _ -> task { run_program model }) }
+                  {
+                    disabled = m.version == "";
+                    on_click = Ui.Event.latest (fun _ -> task { run_program model })
+                  }
                   [text (if m.running then "Running…" else "Run")]
               ],
-            span { class_name = if errors m.compiled > 0 then "fp-bad" else "fp-status" } [text (status m)]
+            span
+              { class_name = if errors m.compiled > 0 then "fp-bad" else "fp-status" }
+              [text (status m)]
           ],
         div
           { class_name = "fp-panes" }
@@ -203,7 +231,12 @@ let view model m =
                 }),
             div
               { class_name = "fp-result" }
-              [div { class_name = "fp-bar" } (List.map (set_tab model m) [Output, Js, Compare, Problems]), pane m]
+              [
+                div
+                  { class_name = "fp-bar" }
+                  (List.map (set_tab model m) [Output, Js, Compare, Problems]),
+                pane m
+              ]
           ]
       ]
   }
@@ -216,7 +249,8 @@ let main () =
   let version = try load () with
     | JsError _ -> ""
   let first = Option.with_default { name = ""; source = "" } (List.get 0 examples)
-  let compiled = if version == "" then { debug = ""; release = ""; diagnostics = [] } else compile first.source
+  let compiled =
+    if version == "" then { debug = ""; release = ""; diagnostics = [] } else compile first.source
   let initial =
     {
       example = first.name

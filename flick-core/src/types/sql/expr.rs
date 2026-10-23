@@ -87,7 +87,7 @@ impl Checker<'_> {
     ) -> Val {
         let node = inner(node);
         let children: Vec<&Node> = node.nodes().collect();
-        match node.kind {
+        let value = match node.kind {
             K::ParenExpr if children.len() == 1 => {
                 let mut v = self.sql_value(cx, scope, children[0], place);
                 v.sql = format!("({})", v.sql);
@@ -129,7 +129,12 @@ impl Checker<'_> {
                 );
                 Val::error()
             }
-        }
+        };
+        self.note_type(
+            self.span(node),
+            &super::query::optional(value.ty.clone(), value.null),
+        );
+        value
     }
 
     /// A literal: `true` and `false` inline, anything else a placeholder.

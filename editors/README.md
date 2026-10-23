@@ -27,22 +27,32 @@ to `file:///path/to/flick-lang` while developing). Then run
 After changing `grammar.js` or `src/scanner.c`, run `just tree-sitter`
 (needs the `tree-sitter` CLI) and commit the regenerated `src/`.
 
+The `Release` workflow publishes `flick` archives for macOS, Linux and Windows
+(aarch64 and x86_64) when a `v*` tag is pushed. The tag must match the versions
+in `flick/Cargo.toml`, `zed/Cargo.toml` and `zed/extension.toml`: the extension
+downloads that exact release, not the latest one.
+
 ## Language server
 
 `flick lsp --stdio` serves diagnostics (errors and warnings, as `flick
 check` reports them, on every change), hover with the source type and the
-`///` documentation (the inferred type of a local, a parameter or a pattern
-variable), definition, references, completion, rename and formatting (see
+`///` documentation of public and private values (including inferred locals
+and the `ignore` keyword), definition, references, completion, rename and formatting (see
 `docs/src/content/docs/reference/editor.md`). Both editors format on save
 with it: VS Code through the extension's defaults, Zed by its default
 `format_on_save` with the language server as formatter.
 
 - VS Code: `extension.js` starts it with `vscode-languageclient` (installed
-  by `pnpm install` at the repository root, as a workspace package) and shows built-in modules
-  (`flick-builtin:///List.fl`) as read-only documents. `flick.path` names
-  the executable.
-- Zed: `src/lib.rs` starts the `flick` it finds on the worktree's `PATH`
-  (`[language_servers.flick]` in `extension.toml`). Zed builds the
-  extension itself when installed as a dev extension; `just zed` checks
-  that it compiles. Definitions in built-in modules (`flick-builtin:`
-  documents) do not open in Zed, which has no virtual documents.
+  by `pnpm install` at the repository root, as a workspace package).
+  `flick.path` names the executable.
+- Zed: `src/lib.rs` uses an explicit `lsp.flick.binary.path`, then the
+  worktree's `PATH`, otherwise a matching release, with an offline cache.
+  See [local configuration](../docs/src/content/docs/reference/editor.md#zed).
+  Zed builds the extension itself when installed as a dev extension;
+  `just zed` checks that it compiles.
+
+Built-in module definitions open as real read-only `.fl` files in both
+editors. The server writes its embedded sources to a content-keyed system
+temporary directory; no virtual-document provider is needed. Hover on a
+module qualifier shows its `///` documentation. SQL blocks complete tables,
+aliases, columns and parameters, with the same nullable types as the checker.

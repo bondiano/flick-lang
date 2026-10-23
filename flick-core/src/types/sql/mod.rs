@@ -6,3 +6,5 @@ mod expr;
 mod query;
 mod select;
 mod table;
+
+pub(crate) use table::TYPES as SQL_TYPES;

@@ -124,11 +124,6 @@ pub fn uri_of(path: &Path) -> String {
     out
 }
 
-/// The URI of a built-in module's source, a read-only document.
-pub fn builtin_uri(module: &str) -> String {
-    format!("flick-builtin:///{module}.fl")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

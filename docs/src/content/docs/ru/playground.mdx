@@ -1,0 +1,14 @@
+---
+title: Песочница
+description: Редактируйте модуль Flick с проверкой по мере ввода, сравнивайте JavaScript для отладочной и релизной сборки и запускайте его в браузере.
+tableOfContents: false
+template: splash
+---
+
+import Playground from "../../../components/Playground.astro";
+
+Компилятор работает в вашем браузере как WebAssembly. Сама песочница —
+программа на Flick: её представление — блок `ui`, отображаемый через React,
+а собранный модуль выполняется в отдельном worker на среде выполнения Flick.
+
+<Playground />

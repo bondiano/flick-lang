@@ -30,6 +30,22 @@ pub struct Alias {
     pub nullable: bool,
 }
 
+impl Alias {
+    pub fn row_type(&self) -> Type {
+        Type::Record(Row::closed(
+            self.columns
+                .iter()
+                .map(|c| {
+                    (
+                        c.name.clone(),
+                        optional(c.ty.clone(), self.nullable || c.nullable),
+                    )
+                })
+                .collect(),
+        ))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Col {
     pub name: String,
@@ -142,12 +158,16 @@ fn clauses<'n>(node: &'n Node, text: &str) -> Vec<(String, &'n Node)> {
 impl Checker<'_> {
     /// `sql [params] { … }`: a `Sql.Template Pg p r`.
     pub fn sql_expr(&mut self, node: &Node, expected: Option<&Type>) -> Type {
-        let binder = node
-            .child_tokens()
-            .find(|t| t.kind == K::Ident)
-            .map(|t| t.text(self.text).to_owned());
+        let binder = node.child_tokens().find(|t| t.kind == K::Ident);
+        let declared = expected.and_then(|e| self.sql_declared_params(e));
+        if let (Some(token), Some(row)) = (binder, &declared) {
+            self.note_type(
+                Span::new(self.file, token.start, token.end),
+                &Type::Record(row.clone()),
+            );
+        }
         let mut cx = Cx {
-            binder,
+            binder: binder.map(|t| t.text(self.text).to_owned()),
             params: Vec::new(),
             plan: SqlPlan::default(),
             slots: Vec::new(),
@@ -155,7 +175,6 @@ impl Checker<'_> {
         let Some(query) = self.sql_statement(&mut cx, node) else {
             return Type::Error;
         };
-        let declared = expected.and_then(|e| self.sql_declared_params(e));
         if let Some(declared) = &declared {
             let unknown: Vec<(String, Span)> = cx
                 .params
@@ -180,6 +199,12 @@ impl Checker<'_> {
                 .map(|p| (p.name.clone(), optional(p.ty.clone(), p.nullable)))
                 .collect(),
         );
+        if let Some(token) = binder {
+            self.note_type(
+                Span::new(self.file, token.start, token.end),
+                &Type::Record(declared.as_ref().unwrap_or(&params).clone()),
+            );
+        }
         let rows = Row::closed(
             query
                 .columns
@@ -425,6 +450,10 @@ impl Checker<'_> {
                         continue;
                     };
                     let v = self.sql_value(cx, scope, value, place);
+                    self.note_type(
+                        Span::new(self.file, label.start, label.end),
+                        &optional(v.ty.clone(), v.null),
+                    );
                     items.push((label.text(self.text).to_owned(), v, self.span(field)));
                 }
                 continue;
@@ -437,6 +466,7 @@ impl Checker<'_> {
                 })
                 .filter(|t| t.len() == 1);
             if let Some(alias) = lone.and_then(|t| scope.aliases.iter().find(|a| a.name == t[0])) {
+                self.note_type(self.span(e), &alias.row_type());
                 for col in &alias.columns.clone() {
                     let v = super::expr::column_of(alias, &col.name);
                     items.push((col.name.clone(), v, self.span(e)));

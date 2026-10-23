@@ -30,6 +30,22 @@ pub fn comments(text: &str) -> HashMap<String, String> {
     out
 }
 
+/// The `///` documentation immediately before the module header.
+pub fn module_comment(text: &str) -> Option<String> {
+    let mut pending = Vec::new();
+    for line in text.lines() {
+        if line.starts_with("module ") {
+            return (!pending.is_empty()).then(|| pending.join("\n"));
+        }
+        if let Some(doc) = line.strip_prefix("///") {
+            pending.push(doc.strip_prefix(' ').unwrap_or(doc));
+        } else if !line.trim().is_empty() {
+            pending.clear();
+        }
+    }
+    None
+}
+
 /// The name a top-level line declares: `name :`, `type [alias|error] N`,
 /// `service N`, `class … N`, `sql table N`, `kind N`.
 fn declared(line: &str) -> Option<String> {

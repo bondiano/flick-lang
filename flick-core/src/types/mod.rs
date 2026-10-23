@@ -56,6 +56,7 @@ pub use env::{Abi, Form, Fundep, Instance, JsClass, Operation, Rep, TypeDef};
 pub use kinds::Kind;
 pub use patterns::is_pattern;
 pub use schemas::{companion_name, witness_entity};
+pub(crate) use sql::SQL_TYPES;
 pub use ty::{Binder, Effects, PRELUDE, Row, Type};
 pub use typing::{
     CodecBlock, Constructor, ForeignInfo, InstanceInfo, Lift, Owner, Range, Ref, SchemaItem,

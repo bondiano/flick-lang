@@ -1,17 +1,22 @@
 //! Requests: hover, definition, references, completion, rename and
-//! formatting, answered from the current analysis; the text of built-in
-//! modules as read-only documents.
+//! formatting, answered from the current analysis; built-in modules are
+//! materialized as read-only `.fl` files for every editor.
 
+use std::collections::hash_map::DefaultHasher;
 use std::fs;
+use std::hash::{Hash, Hasher};
+use std::io;
 use std::path::{Path, PathBuf};
+use std::process;
 
 use flick_core::fmt;
 use flick_core::ide::{CompletionKind, Ide, Location, Target};
 use flick_core::source::FileId;
+use flick_core::syntax::{self, cst::Node, kind::SyntaxKind as K};
 use flick_core::types::builtin_sources;
 use serde_json::{Value, json};
 
-use super::{Server, Snapshot, analyze, protocol};
+use super::{BUILTIN_DIR, Server, Snapshot, analyze, builtin_index, protocol};
 
 type Reply = Result<Value, (i64, String)>;
 
@@ -38,18 +43,6 @@ impl Server {
     pub(super) fn request(&mut self, method: &str, params: &Value) -> Reply {
         match method {
             "initialize" => Ok(capabilities()),
-            "workspace/textDocumentContent" | "flick/builtinSource" => {
-                let uri = params["uri"].as_str().unwrap_or("");
-                let module = uri
-                    .strip_prefix("flick-builtin:///")
-                    .and_then(|m| m.strip_suffix(".fl"))
-                    .ok_or((INVALID_PARAMS, format!("`{uri}` is not a built-in module")))?;
-                let (_, text) = builtin_sources()
-                    .iter()
-                    .find(|(n, _)| *n == module)
-                    .ok_or((INVALID_PARAMS, format!("no built-in module `{module}`")))?;
-                Ok(json!({ "text": text }))
-            }
             "textDocument/formatting" => {
                 let (_, text) = self.document(params)?;
                 let Ok(formatted) = fmt::format(&text, FileId::default()) else {
@@ -88,6 +81,14 @@ impl Server {
 
     fn at_position(&mut self, method: &str, params: &Value) -> Reply {
         let (path, text) = self.document(params)?;
+        if matches!(method, "textDocument/prepareRename" | "textDocument/rename")
+            && builtin_index(&path).is_some()
+        {
+            return Err((
+                REQUEST_FAILED,
+                "built-in module sources are read-only".into(),
+            ));
+        }
         let offset = protocol::offset(&text, &params["position"]);
         let snapshot = self.snapshot_for(&path);
         let Some(file) = snapshot.file(&path) else {
@@ -106,15 +107,15 @@ impl Server {
                         })
                     }))
             }
-            "textDocument/definition" => Ok(ide
+            "textDocument/definition" => ide
                 .symbol_at(file, offset)
                 .and_then(|(symbol, _)| ide.definition(&symbol))
-                .map_or(Value::Null, |l| location(snapshot, &l))),
+                .map_or(Ok(Value::Null), |l| location(snapshot, &l)),
             "textDocument/references" => {
                 let Some((symbol, _)) = ide.symbol_at(file, offset) else {
                     return Ok(json!([]));
                 };
-                let refs: Vec<Value> = ide
+                let refs: Result<Vec<Value>, _> = ide
                     .references(&symbol)
                     .into_iter()
                     .map(|(f, (s, e))| {
@@ -128,7 +129,7 @@ impl Server {
                         )
                     })
                     .collect();
-                Ok(Value::Array(refs))
+                Ok(Value::Array(refs?))
             }
             "textDocument/prepareRename" => {
                 let (_, (s, e), _) = ide
@@ -171,7 +172,7 @@ impl Server {
             .last()
             .map_or(cursor, |(i, _)| i);
         let dotted = text[..word].ends_with('.');
-        let (snapshot, offset) = if dotted {
+        let (mut snapshot, offset) = if dotted {
             let dot = word - 1;
             let mut docs = self.docs.clone();
             docs.insert(path.clone(), format!("{}{}", &text[..dot], &text[cursor..]));
@@ -181,6 +182,16 @@ impl Server {
             docs.insert(path.clone(), text.clone());
             (analyze(&docs, &path), word)
         };
+        if snapshot.file(&path).is_none()
+            && let Some(replacement) = completion_recovery(&text, word, cursor)
+        {
+            let mut docs = self.docs.clone();
+            docs.insert(
+                path.clone(),
+                format!("{}{replacement}{}", &text[..word], &text[cursor..]),
+            );
+            snapshot = analyze(&docs, &path);
+        }
         let Some(file) = snapshot.file(&path) else {
             return Ok(json!([]));
         };
@@ -197,6 +208,7 @@ impl Server {
                     CompletionKind::Module => 9,
                     CompletionKind::Field => 5,
                     CompletionKind::Operation => 2,
+                    CompletionKind::Keyword => 14,
                 };
                 json!({ "label": c.label, "kind": kind, "detail": c.detail })
             })
@@ -206,28 +218,93 @@ impl Server {
 }
 
 /// An LSP location of a declaration.
-fn location(snapshot: &Snapshot, l: &Location) -> Value {
-    let (uri, text) = match &l.target {
+fn location(snapshot: &Snapshot, l: &Location) -> Reply {
+    let path;
+    let text;
+    let (path, text) = match &l.target {
         Target::File(f) => {
             let source = snapshot.sources.get(*f);
-            (
-                protocol::uri_of(Path::new(&source.path)),
-                source.text.clone(),
-            )
+            (Path::new(&source.path), source.text.as_str())
         }
         Target::Builtin(module) => {
             let text = builtin_sources()
                 .iter()
                 .find(|(n, _)| n == module)
-                .map_or("", |(_, t)| *t);
-            (protocol::builtin_uri(module), text.to_owned())
+                .map(|(_, text)| *text)
+                .ok_or((REQUEST_FAILED, format!("no built-in module `{module}`")))?;
+            path = builtin_file(module, text).map_err(|e| {
+                (
+                    REQUEST_FAILED,
+                    format!("cannot open built-in `{module}`: {e}"),
+                )
+            })?;
+            (path.as_path(), text)
         }
-        Target::Path(p) => (
-            protocol::uri_of(p),
-            fs::read_to_string(p).unwrap_or_default(),
-        ),
+        Target::Path(p) => {
+            text = fs::read_to_string(p).map_err(|e| (REQUEST_FAILED, e.to_string()))?;
+            (p.as_path(), text.as_str())
+        }
     };
-    json!({ "uri": uri, "range": protocol::range(&text, l.start, l.end) })
+    Ok(json!({ "uri": protocol::uri_of(path), "range": protocol::range(text, l.start, l.end) }))
+}
+
+/// Content-addressed sources stay valid across server/compiler restarts.
+fn builtin_file(module: &str, text: &str) -> io::Result<PathBuf> {
+    let mut hash = DefaultHasher::new();
+    text.hash(&mut hash);
+    let path = BUILTIN_DIR
+        .join(format!("{:016x}", hash.finish()))
+        .join(module.replace('.', "/"))
+        .with_extension("fl");
+    if fs::read_to_string(&path).is_ok_and(|old| old == text) {
+        return Ok(path);
+    }
+    fs::create_dir_all(path.parent().expect("source directory"))?;
+    let pending = path.with_extension(format!("{}.tmp", process::id()));
+    fs::write(&pending, text)?;
+    let mut permissions = fs::metadata(&pending)?.permissions();
+    permissions.set_readonly(true);
+    fs::set_permissions(&pending, permissions)?;
+    fs::rename(&pending, &path)?;
+    Ok(path)
+}
+
+/// Like removing an unfinished `.member`, supply syntax for the expression
+/// or clause currently being typed; never change the open buffer.
+fn completion_recovery(text: &str, offset: usize, cursor: usize) -> Option<&'static str> {
+    fn in_sql(node: &Node, offset: u32) -> bool {
+        let (start, end) = node.range();
+        start <= offset
+            && offset <= end
+            && (node.kind == K::SqlExpr || node.nodes().any(|n| in_sql(n, offset)))
+    }
+    let tree = syntax::parse(text, FileId::default()).tree;
+    if !in_sql(&tree, u32::try_from(offset).ok()?) {
+        return None;
+    }
+    let tokens = tree.tokens();
+    let previous = tokens
+        .iter()
+        .rev()
+        .find(|t| !t.kind.is_trivia() && t.end as usize <= offset)?;
+    let next = tokens
+        .iter()
+        .find(|t| !t.kind.is_trivia() && t.start as usize >= cursor);
+    let select = if next.is_some_and(|t| t.kind == K::LBrace) {
+        "select"
+    } else {
+        "select {}"
+    };
+    Some(match previous.kind {
+        K::FromKw => "__flick_completion in __flick_completion",
+        K::Ident if matches!(previous.text(text), "join" | "left_join") => {
+            "__flick_completion in __flick_completion"
+        }
+        K::InKw | K::Eq | K::Comma | K::Dot | K::LParen => "__flick_completion",
+        K::LBrace => select,
+        _ if text[..offset].rsplit('\n').next()?.trim().is_empty() => select,
+        _ => "__flick_completion",
+    })
 }
 
 fn capabilities() -> Value {
@@ -240,7 +317,6 @@ fn capabilities() -> Value {
             "completionProvider": { "triggerCharacters": ["."] },
             "renameProvider": { "prepareProvider": true },
             "documentFormattingProvider": true,
-            "workspace": { "textDocumentContent": { "schemes": ["flick-builtin"] } },
         },
         "serverInfo": { "name": "flick", "version": env!("CARGO_PKG_VERSION") },
     })

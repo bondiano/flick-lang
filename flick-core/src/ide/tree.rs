@@ -27,11 +27,12 @@ pub fn find(root: &Node, range: (u32, u32)) -> Option<&Node> {
         .find_map(|n| find(n, range))
 }
 
-/// The name token of a name node: the last identifier or capitalized name.
+/// The last name of a name node, through same-range wrappers such as a row.
 pub fn last_name(node: &Node) -> Option<Token> {
     node.child_tokens()
         .filter(|t| matches!(t.kind, K::Ident | K::Con))
         .last()
+        .or_else(|| node.nodes().filter_map(last_name).last())
 }
 
 /// The name token touching `offset` among `node`'s own tokens.
