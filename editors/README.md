@@ -32,8 +32,8 @@ After changing `grammar.js` or `src/scanner.c`, run `just tree-sitter`
 `flick lsp --stdio` serves diagnostics, hover, definition, references,
 completion, rename and formatting (see `docs/src/content/docs/reference/editor.md`).
 
-- VS Code: `extension.js` starts it with `vscode-languageclient` (run
-  `npm install` inside `editors/vscode` once) and shows built-in modules
+- VS Code: `extension.js` starts it with `vscode-languageclient` (installed
+  by `pnpm install` at the repository root, as a workspace package) and shows built-in modules
   (`flick-builtin:///List.fl`) as read-only documents. `flick.path` names
   the executable.
 - Zed: `src/lib.rs` starts the `flick` it finds on the worktree's `PATH`

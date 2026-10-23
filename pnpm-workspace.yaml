@@ -4,5 +4,6 @@ packages:
   - tools/content-mapper
   - tools/astro-flick
   - docs
+  - editors/vscode
 overrides:
   "@effect/platform-node-shared": 4.0.5
