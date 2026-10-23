@@ -2,6 +2,7 @@ mod common;
 
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 
 use common::flick_in;
 use flick_core::iface;
@@ -133,16 +134,31 @@ fn a_package_module_is_imported_next_to_its_interface() {
     assert!(installed.join("dist/Text/Shout.js").exists());
 }
 
+const AOT_APP: &str = r#"module Main exposing (main)
+
+type alias Point = { x : Number; y : Number }
+  deriving Schema
+
+point_json : PureCodec Json Point
+let point_json = Codec.json (schema Point)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  match Json.parse "{\"x\": 1, \"y\": 2}" with
+  | Err _ -> Platform.stdout_line "not JSON"
+  | Ok input ->
+    match Codec.decode_result point_json input with
+    | Ok p -> Platform.stdout_line (show (p.x + p.y))
+    | Err _ -> Platform.stdout_line "not a point"
+"#;
+
 #[test]
-fn schema_aot_turns_on_compiled_codecs_in_the_runner() {
+#[ignore = "needs Node and pnpm install"]
+fn schema_aot_writes_compiled_decoders_the_runner_installs() {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("build_schema_aot");
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).expect("dir");
-    fs::write(
-        dir.join("Main.fl"),
-        "module Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n",
-    )
-    .expect("write");
+    fs::write(dir.join("Main.fl"), AOT_APP).expect("write");
     let out = flick_in(
         &dir,
         &["build", "Main.fl", "--out-dir", "out", "--schema-aot"],
@@ -150,11 +166,39 @@ fn schema_aot_turns_on_compiled_codecs_in_the_runner() {
     assert!(out.status.success(), "{out:?}");
     let runner = fs::read_to_string(dir.join("out/main.js")).expect("runner");
     assert!(
-        runner.contains("enableSchemaAot();\nawait runMain(main);"),
+        runner.contains(
+            "installSchemaAot(await import(\"./schemas.aot.js\"));\nawait runMain(main);"
+        ),
         "{runner}"
+    );
+    let aot = fs::read_to_string(dir.join("out/schemas.aot.js")).expect("compiled decoders");
+    assert!(aot.contains("from \"@flick-lang/runtime\""), "{aot}");
+    let run = Command::new("node")
+        .arg("out/main.js")
+        .current_dir(&dir)
+        .output()
+        .expect("node");
+    assert!(run.status.success(), "{run:?}");
+    assert_eq!(String::from_utf8_lossy(&run.stdout), "3\n");
+    // a stale module is refused, and decoding still works
+    fs::write(
+        dir.join("out/schemas.aot.js"),
+        "export const fingerprint = \"\";\nexport const install = () => {};\n",
+    )
+    .expect("write");
+    let stale = Command::new("node")
+        .arg("out/main.js")
+        .current_dir(&dir)
+        .output()
+        .expect("node");
+    assert_eq!(String::from_utf8_lossy(&stale.stdout), "3\n");
+    assert!(
+        String::from_utf8_lossy(&stale.stderr).contains("stale"),
+        "{stale:?}"
     );
     let plain = flick_in(&dir, &["build", "Main.fl", "--out-dir", "plain"]);
     assert!(plain.status.success(), "{plain:?}");
     let runner = fs::read_to_string(dir.join("plain/main.js")).expect("runner");
-    assert!(!runner.contains("enableSchemaAot"), "{runner}");
+    assert!(!runner.contains("SchemaAot"), "{runner}");
+    assert!(!dir.join("plain/schemas.aot.js").exists());
 }

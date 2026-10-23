@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::{fs, io};
+use std::{fs, io, process};
 
 use flick_core::build::{self, Extras, Settings};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
@@ -167,7 +167,41 @@ pub fn emit(
             break;
         }
     }
+    if let (true, Some(entry)) = (output.extras.schema_aot, output.entry)
+        && diagnostics.is_empty()
+    {
+        let ext = if output.typescript { "ts" } else { "js" };
+        let module = out_dir.join(format!("{}.{ext}", entry.replace('.', "/")));
+        if let Err(reason) = compile_schemas(out_dir, &module) {
+            diagnostics.push(Diagnostic::new(
+                codes::P013,
+                Severity::Error,
+                format!(
+                    "cannot write the compiled decoders `{}`: {reason}",
+                    build::SCHEMA_AOT
+                ),
+            ));
+        }
+    }
     diagnostics
+}
+
+/// Loads the app's modules on Node and writes the compiled decoders of the
+/// codecs they make, which the runner installs.
+fn compile_schemas(out_dir: &Path, module: &Path) -> Result<(), String> {
+    let script = "import { writeSchemaAot } from \"@flick-lang/runtime\";\nawait writeSchemaAot(process.argv[1], process.argv[2]);\n";
+    let output = process::Command::new("node")
+        .args(["--input-type=module", "-e", script])
+        .arg(module)
+        .arg(out_dir.join(build::SCHEMA_AOT))
+        .current_dir(out_dir)
+        .output()
+        .map_err(|err| format!("cannot run node: {err}"))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_owned())
+    }
 }
 
 pub fn write(path: &Path, contents: &str) -> io::Result<()> {

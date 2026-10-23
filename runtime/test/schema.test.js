@@ -1,53 +1,34 @@
 import assert from "node:assert/strict";
+import { rmSync } from "node:fs";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { Effect, Exit, Option } from "effect";
 
 import {
   codecBlock,
   codecCheckWhole,
+  codecDecode,
   codecJsonSchema,
   codecList,
   codecNumberFinite,
-  codecOptionNull,
-  codecOptionNullish,
   codecString,
-  codecTransformPure,
   dslField,
   dslOnMissing,
   dslOptionalField,
-  schemaAdt,
+  enableSchemaAot,
+  installSchemaAot,
   schemaArbitrary,
   schemaJsonCodec,
-  schemaLazy,
-  schemaList,
   schemaNumber,
   schemaOption,
   schemaRecord,
   schemaRefined,
   schemaString,
   schemaValidate,
+  writeSchemaAot,
 } from "../src/index.js";
-import { compileDecoder } from "../src/schema/compile.js";
-import { context, decode } from "../src/schema/interpret.js";
-
-const tree = schemaAdt("Tree", [
-  ["T.Leaf", "Leaf", [schemaNumber]],
-  ["T.Branch", "Branch", [schemaList(schemaLazy("Tree", () => tree))]],
-]);
-
-const codecs = {
-  fields: codecBlock("Row", [
-    ["name", dslField("name", codecString)],
-    ["nick", dslOptionalField("nick", codecString)],
-    ["note", dslField("note", codecOptionNull(codecString))],
-    ["alias", dslField("alias", codecOptionNullish(codecString))],
-    ["count", dslOnMissing(() => 7, dslField("count", codecNumberFinite))],
-  ]),
-  list: codecList(codecTransformPure((n) => n * 2, (n) => n / 2, codecNumberFinite)),
-  checked: codecCheckWhole((s) => s.length < 3, "too long", codecString),
-  tree: schemaJsonCodec(tree),
-};
+import { codecs, tree } from "./fixtures/codecs.js";
 
 /** A small seeded generator of JSON-like inputs, NaN and undefined included. */
 const random = (seed) => {
@@ -60,7 +41,7 @@ const random = (seed) => {
   };
 };
 
-const KEYS = ["name", "nick", "note", "alias", "count", "_tag", "_0", "extra"];
+const KEYS = ["name", "nick", "note", "alias", "count", "xs", "s", "_tag", "_0", "extra"];
 
 const input = (rng, depth = 0) => {
   const r = rng();
@@ -74,31 +55,55 @@ const input = (rng, depth = 0) => {
   return out;
 };
 
-const outcome = (exit) =>
-  Exit.isSuccess(exit) ? { value: exit.value } : { issue: exit.cause.reasons[0].error._0[0] };
+const outcome = (codec, value) => {
+  const exit = Effect.runSyncExit(codecDecode(codec, value));
+  return Exit.isSuccess(exit) ? { value: exit.value } : { issues: exit.cause.reasons[0].error._0 };
+};
 
-test("compiled decoders agree with the interpreter on every input", () => {
-  for (const [name, codec] of Object.entries(codecs)) {
-    const compiled = compileDecoder(codec);
-    assert.ok(compiled, name);
-    for (let seed = 0; seed < 400; seed++) {
-      const value = input(random(seed));
-      const expected = outcome(Effect.runSyncExit(decode(codec, value, "", context())));
-      const actual = outcome(Effect.runSyncExit(compiled(value)));
-      assert.deepEqual(actual, expected, `${name}, seed ${seed}: ${JSON.stringify(value)}`);
+test("compiled decoders agree with the interpreter on every input", async () => {
+  const entry = new URL("./fixtures/codecs.js?generate", import.meta.url).href;
+  const out = fileURLToPath(new URL("./fixtures/codecs.aot.js", import.meta.url));
+  try {
+    await writeSchemaAot(entry, out);
+    enableSchemaAot();
+    const compiled = await import("./fixtures/codecs.js?compiled");
+    assert.ok(installSchemaAot(await import("./fixtures/codecs.aot.js")), "the module matches");
+    for (const [name, codec] of Object.entries(codecs)) {
+      for (let seed = 0; seed < 400; seed++) {
+        const value = input(random(seed));
+        assert.deepEqual(
+          outcome(compiled.codecs[name], value),
+          outcome(codec, value),
+          `${name}, seed ${seed}: ${JSON.stringify(value)}`,
+        );
+      }
     }
+  } finally {
+    rmSync(out, { force: true });
   }
 });
 
-test("a decoder of a pure codec with a missing default calls it once", () => {
+test("a stale compiled module is not installed", () => {
+  enableSchemaAot();
+  schemaJsonCodec(schemaRecord([["a", schemaNumber]]));
+  assert.equal(installSchemaAot({ fingerprint: "other", install: () => assert.fail("installed") }), false);
+});
+
+test("a pure codec with a missing default calls it once per decode", () => {
   let calls = 0;
   const codec = codecBlock("R", [["n", dslOnMissing(() => ++calls, dslField("n", codecNumberFinite))]]);
-  for (const run of [(v) => decode(codec, v, "", context()), compileDecoder(codec)]) {
-    calls = 0;
-    const exit = Effect.runSyncExit(run({}));
-    assert.ok(Exit.isSuccess(exit));
-    assert.equal(calls, 1);
-  }
+  assert.deepEqual(outcome(codec, {}), { value: { n: 1 } });
+  assert.equal(calls, 1);
+});
+
+test("decoding refuses cycles and getters and accepts shared values", () => {
+  const leaf = { _tag: "Leaf", _0: 1 };
+  assert.ok("value" in outcome(codecs.tree, { _tag: "Branch", _0: [leaf, leaf] }));
+  const node = { _tag: "Branch", _0: [] };
+  node._0.push(node);
+  assert.deepEqual(outcome(codecs.tree, node).issues, [{ path: "_0[0]", message: "a cycle in the input" }]);
+  const getter = Object.defineProperty({ _tag: "Leaf" }, "_0", { get: () => 1, enumerable: true });
+  assert.deepEqual(outcome(codecs.tree, getter).issues, [{ path: "_0", message: "a getter, not data" }]);
 });
 
 const SIMPLE_TYPES = new Set(["array", "boolean", "integer", "null", "number", "object", "string"]);
@@ -176,7 +181,7 @@ test("exported JSON Schemas follow the 2020-12 meta-schema and never accept anyt
     valid(json);
     assert.ok(!out.success.includes("{}"), out.success);
   }
-  const unsupported = codecJsonSchema("Root", codecs.checked);
+  const unsupported = codecJsonSchema("Root", codecCheckWhole((s) => s.length < 3, "too long", codecString));
   assert.equal(unsupported._tag, "Failure");
   assert.match(unsupported.failure._0, /^Root -> JSON Schema: the check "too long"/);
 });

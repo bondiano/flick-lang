@@ -1,41 +1,72 @@
-// The source API of schemas and codecs over the interpreter, the exporter,
-// the Standard Schema adapter, generators and the compiled decoders.
-import { Cause, Effect, Exit, Option } from "effect";
+// The source API of schemas and codecs over Effect Schema: decoding and
+// encoding with the program's `SchemaError`, the Standard Schema adapter,
+// the `codec` DSL and refined types.
+import { Cause, Effect, Exit, Schema } from "effect";
 
 import { err, ok } from "../data.js";
 import { CurrentOwner } from "../owner.js";
-import { compileDecoder } from "./compile.js";
+import { registerCodec } from "./aot.js";
+import { codecCheck, codecFields, codecTransform } from "./codecs.js";
 import { exportJsonSchema } from "./exporter.js";
-import { check, context, decode, encode, schemaError } from "./interpret.js";
-import {
-  codecCheck as codecCheckNode,
-  codecFields,
-  codecJson,
-  codecTransform as codecTransformNode,
-  schemaRefined,
-} from "./nodes.js";
+import { requireInert, schemaError, toSchemaError } from "./issues.js";
+import { jsonOf, schemaRefined } from "./schemas.js";
 
-export * from "./nodes.js";
+export * from "./codecs.js";
+export * from "./schemas.js";
+export { enableSchemaAot, installSchemaAot, schemaCompilerRuntime, writeSchemaAot } from "./aot.js";
+export { schemaError };
 
-/** Compiled decoders, when the entry point turned them on (`schema-aot`). */
-let compiled;
+/** Wire input is strict: a key no field names is an error. */
+const OPTIONS = { onExcessProperty: "error", reportInput: true };
 
-/** Turns on compiled decoding of pure codecs for the run. */
-export const enableSchemaAot = () => {
-  compiled ??= new WeakMap();
+/** Whether decoding with `ast` may need services or wait: a runtime transformation or default. */
+const runtimeAsts = new WeakMap();
+const reaches = (ast, seen) => {
+  const notes = ast.annotations ?? {};
+  // a generic recursive type makes a new node per level: its name stands for all of them
+  const key = notes["flick/ref"] ?? ast;
+  if (seen.has(key)) return false;
+  seen.add(key);
+  if (notes["flick/transform"] === "effect" || notes["flick/effect"] === true) return true;
+  const children = [
+    ...(ast.encoding ?? []).map((link) => link.to),
+    ...(ast.propertySignatures ?? []).map((p) => p.type),
+    ...(ast.indexSignatures ?? []).map((i) => i.type),
+    ...(ast.elements ?? []),
+    ...(ast.rest ?? []),
+    ...(ast.types ?? []),
+    ...(ast.typeParameters ?? []),
+    ...(ast._tag === "Suspend" ? [ast.thunk()] : []),
+  ];
+  return children.some((child) => reaches(child, seen));
+};
+const needsRuntime = (ast) => {
+  if (!runtimeAsts.has(ast)) runtimeAsts.set(ast, reaches(ast, new Set()));
+  return runtimeAsts.get(ast);
 };
 
-const decoder = (codec) => {
-  if (compiled === undefined) return undefined;
-  if (!compiled.has(codec)) compiled.set(codec, compileDecoder(codec));
-  return compiled.get(codec);
-};
+const fromExit = (exit, encoding) =>
+  Exit.isSuccess(exit) ? Effect.succeed(exit.value) : Effect.failCause(Cause.map(exit.cause, (e) => toSchemaError(e, encoding)));
 
 /** `Codec.decode codec input`: an effect failing with `SchemaError`. */
-export const codecDecode = (codec, input) => decoder(codec)?.(input) ?? decode(codec, input, "", context());
+export const codecDecode = (codec, input) =>
+  Effect.suspend(() => {
+    const problem = requireInert(input);
+    if (problem) return problem;
+    if (needsRuntime(codec.ast)) {
+      return Effect.mapError(Schema.decodeUnknownEffect(codec)(input, OPTIONS), (e) => toSchemaError(e, false));
+    }
+    // a pure codec decodes synchronously, through compiled decoders when installed
+    return fromExit(Schema.decodeUnknownExit(codec)(input, OPTIONS), false);
+  });
 
 /** `Codec.encode codec value`. */
-export const codecEncode = (codec, value) => encode(codec, value, "");
+export const codecEncode = (codec, value) =>
+  Effect.suspend(() =>
+    needsRuntime(codec.ast)
+      ? Effect.mapError(Schema.encodeUnknownEffect(codec)(value, OPTIONS), (e) => toSchemaError(e, true))
+      : fromExit(Schema.encodeUnknownExit(codec)(value, OPTIONS), true),
+  );
 
 const result = (effect) => {
   const exit = Effect.runSyncExit(effect);
@@ -50,17 +81,18 @@ export const codecDecodeResult = (codec, input) => result(codecDecode(codec, inp
 export const codecEncodeResult = (codec, value) => result(codecEncode(codec, value));
 
 /** `Schema.validate schema input`: whether `input` is a value of the type. */
-export const schemaValidate = (schema, input) =>
-  result(Effect.as(check(schema, input, "", context()), input));
+export const schemaValidate = (schema, input) => result(fromExit(Schema.decodeUnknownExit(schema)(input, OPTIONS), false));
 
-export const schemaJsonCodec = (schema) => codecJson(schema);
+/** `Codec.json schema`: the canonical JSON codec, compiled when installed. */
+export const schemaJsonCodec = (schema) => registerCodec(jsonOf(schema));
 
 /** A field of a `codec` block, before its label is known. */
 export const dslField = (wire, codec) => Object.freeze({ wire, codec, optional: false });
 export const dslOptionalField = (wire, codec) => Object.freeze({ wire, codec, optional: true });
 export const dslFieldEffect = (wire, codec) => Object.freeze({ wire, codec, optional: false });
 export const dslOnMissing = (factory, field) => Object.freeze({ ...field, onMissing: factory });
-export const dslOnMissingEffect = (factory, field) => Object.freeze({ ...field, onMissingEffect: factory });
+export const dslOnMissingEffect = (factory, field) =>
+  Object.freeze({ ...field, onMissingEffect: factory, codec: field.codec.annotate({ "flick/effect": true }) });
 
 /**
  * The codec of a `codec` block: `fields` lists `[label, field]`. Two fields
@@ -72,7 +104,7 @@ export const codecBlock = (name, fields) => {
     if (wires.has(f.wire)) throw new Error(`two fields of the codec of ${name} use the wire name "${f.wire}"`);
     wires.add(f.wire);
   }
-  return codecFields(name, fields.map(([label, f]) => Object.freeze({ label, ...f })), false);
+  return registerCodec(codecFields(name, fields.map(([label, f]) => Object.freeze({ label, ...f })), false));
 };
 
 /** A refined type's `parse`: its check as a `Result`. */
@@ -133,16 +165,10 @@ export const codecStandardAsync = (codec) =>
     });
   });
 
-/** `Option` of a decoded value, for tests of the interpreter. */
-export const decodedOption = (o) => (Option.isSome(o) ? o.value : undefined);
-
-export const codecTransformPure = (decodeFn, encodeFn, from) =>
-  codecTransformNode("pure", decodeFn, encodeFn, from);
-export const codecTransformResult = (decodeFn, encodeFn, from) =>
-  codecTransformNode("result", decodeFn, encodeFn, from);
-export const codecTransformEffect = (decodeFn, encodeFn, from) =>
-  codecTransformNode("effect", decodeFn, encodeFn, from);
-export const codecCheckWhole = (predicate, message, from) => codecCheckNode(predicate, message, from);
+export const codecTransformPure = (decodeFn, encodeFn, from) => codecTransform("pure", decodeFn, encodeFn, from);
+export const codecTransformResult = (decodeFn, encodeFn, from) => codecTransform("result", decodeFn, encodeFn, from);
+export const codecTransformEffect = (decodeFn, encodeFn, from) => codecTransform("effect", decodeFn, encodeFn, from);
+export const codecCheckWhole = (predicate, message, from) => codecCheck(predicate, message, from);
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

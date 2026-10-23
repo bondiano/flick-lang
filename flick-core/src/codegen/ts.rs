@@ -24,6 +24,7 @@ const PRIMITIVES: &[(&str, &str)] = &[
     ("Unit", "undefined"),
     ("Never", "never"),
     ("Unknown", "unknown"),
+    ("Json", "unknown"),
 ];
 
 /// Prelude types projected to native Effect or TypeScript types, or not at all.
@@ -37,6 +38,9 @@ const NATIVE: &[&str] = &[
     "ServiceTag",
     "ServiceImpl",
     "Scope",
+    "Schema",
+    "PureCodec",
+    "Codec",
 ];
 
 pub struct Projection<'a> {
@@ -270,6 +274,19 @@ impl Projection<'_> {
                     return Ok(format!("$Layer.Layer<{ro}, {e}, {ri}>"));
                 }
                 ("Errors", 1) => return self.row(args[0], vars),
+                ("Schema", 1) => return Ok(format!("$Schema.Codec<{0}, {0}>", arg(0)?)),
+                ("PureCodec", 2) => {
+                    return Ok(format!("$Schema.Codec<{}, {}>", arg(1)?, arg(0)?));
+                }
+                ("Codec", 4) => {
+                    let rd = self.row(args[0], vars)?;
+                    let re = self.row(args[1], vars)?;
+                    return Ok(format!(
+                        "$Schema.Codec<{}, {}, {rd}, {re}>",
+                        arg(3)?,
+                        arg(2)?
+                    ));
+                }
                 ("ServiceTag" | "ServiceImpl" | "Scope", _) => {
                     return Err(format!("`{name}` has no TypeScript form"));
                 }
@@ -336,7 +353,7 @@ impl Projection<'_> {
     /// `path(module)` the import specifier of a module.
     pub fn imports(&self, path: &dyn Fn(&str) -> String) -> String {
         let mut out = format!(
-            "import type {{ Effect as $Effect, Option as $Option, Result as $Result, Layer as $Layer }} from \"{RUNTIME}\";\n"
+            "import type {{ Effect as $Effect, Option as $Option, Result as $Result, Layer as $Layer, Schema as $Schema }} from \"{RUNTIME}\";\n"
         );
         for module in self.used.borrow().iter() {
             let _ = writeln!(

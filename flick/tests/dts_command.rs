@@ -16,6 +16,7 @@ const SHAPES: &str = r#"module Lib.Shapes exposing (..)
 type Shape = Circle Number | Rect Number Number
 
 type alias Point = { x : Number; y : Number }
+  deriving Schema
 
 type error NotFound = NotFound String
 
@@ -36,6 +37,9 @@ let area shape =
 
 origin : Point
 let origin = { x = 0; y = 0 }
+
+point_json : PureCodec Json Point
+let point_json = Codec.json (schema Point)
 
 identity_of : a -> a
 let identity_of x = x
@@ -69,8 +73,8 @@ twice : Functor f => f Number -> f Number
 let twice values = map (fun n -> n * 2) values
 ";
 
-const CONSUMER: &str = r#"import type { Effect, Option, Result } from "@flick-lang/runtime";
-import { area, identity_of, origin, maybe, find, later, Circle } from "./dist/Lib/Shapes.js";
+const CONSUMER: &str = r#"import type { Effect, Option, Result, Schema } from "@flick-lang/runtime";
+import { area, identity_of, origin, maybe, find, later, point_json, Circle } from "./dist/Lib/Shapes.js";
 import type { Shape, Point, NotFound, Tree } from "./dist/Lib/Shapes.js";
 import { find as findPromise } from "./dist/Lib/Shapes.promise.js";
 
@@ -83,7 +87,8 @@ const e: Effect.Effect<number, NotFound, never> = find("one");
 const l: Effect.Effect<number, never, never> = later(1);
 const r: Promise<Result.Result<number, NotFound>> = findPromise("one");
 const t: Tree<number> = { _tag: "@acme/shapes/Lib.Shapes.Tree.Leaf" };
-export { a, p, s, m, e, l, r, t };
+const c: Schema.Codec<Point, unknown> = point_json;
+export { a, p, s, m, e, l, r, t, c };
 "#;
 
 const RUN: &str = r#"import { find, broken } from "./dist/Lib/Shapes.promise.js";

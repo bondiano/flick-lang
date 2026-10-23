@@ -126,9 +126,15 @@ type needs `Schema.with_generator`.
 
 ## Running decoders
 
-The interpreter is the baseline. `flick build --schema-aot` (or
-`schema-aot = true`) makes the app's runner turn on compiled decoders: a pure
-codec is compiled once into closures, an effectful one stays on the
-interpreter, and a node the compiler does not handle keeps the interpreter
-for its subtree. Both give the same outcome on every input; a test compares
-them on random inputs.
+Schemas and codecs are Effect Schema values: a `Schema a` is an Effect
+Schema of the program's values of `a`, and a codec an Effect Schema codec
+from its wire form, so JS code can use them with Effect directly, and
+`--emit-dts` projects them as `Schema.Codec<A, I, RD, RE>`. Effect's
+interpreter is the baseline. `flick build --schema-aot` (or
+`schema-aot = true`) loads the app's modules once on Node, hands the codecs
+they make while loading to Effect's `SchemaAOTCompiler` and writes the
+static module `schemas.aot.js`; the runner collects the same codecs and
+installs it before `main` starts. A codec made later, or a node the
+compiler does not handle, keeps the interpreter, and a module that no
+longer matches the program is skipped with a warning. Both give the same
+outcome on every input; a test compares them on random inputs.

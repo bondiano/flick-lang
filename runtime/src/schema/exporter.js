@@ -1,6 +1,8 @@
-// The strict JSON Schema 2020-12 exporter: a codec's wire contract written
-// exactly, or an `ExportError` naming the path of the node that has no
-// exact form. Never `{}` or `true` for something it cannot state.
+// The strict JSON Schema 2020-12 exporter, over the AST of an Effect Schema
+// codec: the wire contract written exactly, or an `ExportError` naming the
+// path of the node that has no exact form. Never `{}` or `true` for
+// something it cannot state.
+import { at } from "./issues.js";
 
 const EXPORT_ERROR = "Codec.ExportError.ExportError";
 
@@ -10,160 +12,133 @@ class Unsupported extends Error {
   }
 }
 
-const at = (path, key) => `${path}.${key}`;
-
-const unlazy = (node, defs) => {
-  if (node.kind !== "lazy") return { node };
-  return { ref: node.name, target: node.get() };
-};
-
+/** The JSON Schema keywords of the checks the exporter knows. */
 const KNOWN = {
-  email: { type: "string", format: "email" },
-  non_empty: { type: "string", minLength: 1 },
-  positive: { type: "number", exclusiveMinimum: 0 },
+  email: { format: "email" },
+  non_empty: { minLength: 1 },
+  positive: { exclusiveMinimum: 0 },
 };
 
-/** The JSON Schema of the canonical JSON form of a schema node. */
-const schemaOf = (node, path, defs) => {
-  const lazy = unlazy(node, defs);
-  if (lazy.ref) {
-    if (!defs.has(lazy.ref)) {
-      defs.set(lazy.ref, null);
-      defs.set(lazy.ref, schemaOf(lazy.target, path, defs));
-    }
-    return { $ref: `#/$defs/${lazy.ref}` };
-  }
-  const s = lazy.node;
-  switch (s.kind) {
-    case "number":
-      return { type: "number" };
-    case "string":
-      return { type: "string" };
-    case "bool":
-      return { type: "boolean" };
-    case "bigint":
-      return { type: "string", pattern: "^-?[0-9]+$" };
-    case "unit":
-      return { type: "null" };
-    case "never":
-      return false;
-    case "list":
-      return { type: "array", items: schemaOf(s.item, `${path}[]`, defs) };
-    case "tuple":
-      return {
-        type: "array",
-        prefixItems: s.items.map((item, i) => schemaOf(item, `${path}[${i}]`, defs)),
-        items: false,
-      };
-    case "option":
-      return { anyOf: [schemaOf(s.item, path, defs), { type: "null" }] };
-    case "result":
-      return {
-        oneOf: [
-          object({ ok: schemaOf(s.value, at(path, "ok"), defs) }, ["ok"]),
-          object({ err: schemaOf(s.error, at(path, "err"), defs) }, ["err"]),
-        ],
-      };
-    case "record":
-      return object(
-        Object.fromEntries(s.fields.map(([label, f]) => [label, schemaOf(f, at(path, label), defs)])),
-        s.fields.map(([label]) => label),
-      );
-    case "adt":
-      return {
-        oneOf: s.variants.map(([, name, fields]) =>
-          object(
-            Object.fromEntries([
-              ["_tag", { const: name }],
-              ...fields.map((f, i) => [`_${i}`, schemaOf(f, at(at(path, name), `_${i}`), defs)]),
-            ]),
-            ["_tag", ...fields.map((_, i) => `_${i}`)],
-          ),
-        ),
-      };
-    case "refined": {
-      const known = s.known && KNOWN[s.known];
-      if (!known) throw new Unsupported(path, `the check of ${s.name} has no JSON Schema form`);
-      return { ...schemaOf(s.base, path, defs), ...known };
-    }
-    case "redacted":
-      throw new Unsupported(path, "a Redacted value has no wire codec without an explicit policy");
-    case "opaque":
-      throw new Unsupported(path, s.reason);
-    case "unknown":
-      throw new Unsupported(path, "an Unknown value accepts anything, which strict export does not write");
-    default:
-      throw new Unsupported(path, `${s.kind} has no JSON form`);
-  }
+const TRANSFORMS = {
+  result: "a fallible transformation has no JSON Schema form",
+  effect: "an effectful transformation decides acceptance at run time",
 };
 
-const object = (properties, required) => ({
+/** The keywords of the checks of `ast`, which constrain what reaches it. */
+const checks = (ast, path) => {
+  let out = {};
+  for (const check of ast.checks ?? []) {
+    const notes = check.annotations ?? {};
+    // JSON numbers are finite: the wire type already says it
+    if (notes["flick/wire"]) continue;
+    if (notes["flick/pattern"]) out = { ...out, pattern: notes["flick/pattern"] };
+    else if (KNOWN[notes["flick/known"]]) out = { ...out, ...KNOWN[notes["flick/known"]] };
+    else if (notes["flick/refined"]) throw new Unsupported(path, `the check of ${notes["flick/refined"]} has no JSON Schema form`);
+    else throw new Unsupported(path, `the check "${notes.message ?? "a check"}" has no JSON Schema form`);
+  }
+  return out;
+};
+
+const object = (properties, required, closed) => ({
   type: "object",
   properties,
   required,
-  additionalProperties: false,
+  ...(closed ? { additionalProperties: false } : {}),
 });
 
-/** The JSON Schema of a codec's wire form. */
-const codecOf = (codec, path, defs) => {
-  switch (codec.kind) {
-    case "json":
-      return schemaOf(codec.schema, path, defs);
-    case "jsonString":
-      return { type: "string" };
-    case "jsonNumberFinite":
-      return { type: "number" };
-    case "jsonBool":
-      return { type: "boolean" };
-    case "jsonBigint":
-      return { type: "string", pattern: "^-?[0-9]+$" };
-    case "jsonNumberLossless":
-      return { anyOf: [{ type: "number" }, { enum: ["NaN", "Infinity", "-Infinity", "-0"] }] };
-    case "jsonList":
-      return { type: "array", items: codecOf(codec.item, `${path}[]`, defs) };
-    case "optionNull":
-    case "optionNullish":
-      return { anyOf: [codecOf(codec.item, path, defs), { type: "null" }] };
-    case "taggedOption":
-      return {
-        oneOf: [
-          object({ _tag: { const: "None" } }, ["_tag"]),
-          object({ _tag: { const: "Some" }, value: codecOf(codec.item, at(path, "value"), defs) }, ["_tag", "value"]),
-        ],
-      };
-    case "fields": {
-      const out = object(
-        Object.fromEntries(codec.fields.map((f) => [f.wire, codecOf(f.codec, at(path, f.label), defs)])),
-        codec.fields
-          .filter((f) => !f.optional && !f.onMissing && !f.onMissingEffect && f.codec.kind !== "optionNullish")
-          .map((f) => f.wire),
-      );
-      if (codec.ignoreExtra) delete out.additionalProperties;
-      return out;
-    }
-    case "transform":
-      if (codec.mode === "pure") return codecOf(codec.from, path, defs);
-      throw new Unsupported(
-        path,
-        codec.mode === "effect" ? "an effectful transformation decides acceptance at run time" : "a fallible transformation has no JSON Schema form",
-      );
-    case "check":
-      throw new Unsupported(path, `the check "${codec.message}" has no JSON Schema form`);
-    case "redactedReveal":
-      return codecOf(codec.item, path, defs);
-    case "redactedMasked":
-      return { const: "<redacted>" };
-    default:
-      throw new Unsupported(path, `${codec.kind} has no JSON form`);
+/** The properties of a struct, written under `wires` names. */
+const objectOf = (ast, path, defs, wires, closed) => {
+  const variant = ast.annotations?.["flick/variant"];
+  const entries = ast.propertySignatures.map((p) => {
+    const key = wires?.[p.name] ?? p.name;
+    const inner = variant && key !== "_tag" ? at(at(path, variant), key) : at(path, key);
+    return [key, schemaOf(p.type, inner, defs), p.type.context?.isOptional === true];
+  });
+  return object(
+    Object.fromEntries(entries.map(([key, s]) => [key, s])),
+    entries.filter(([, , optional]) => !optional).map(([key]) => key),
+    closed,
+  );
+};
+
+/** The wire end of `ast`: the last link of its encoding. */
+const wireEnd = (ast) => ast.encoding?.[ast.encoding.length - 1].to;
+
+const body = (ast, path, defs) => {
+  const notes = ast.annotations ?? {};
+  if (notes["flick/refuse"]) throw new Unsupported(path, notes["flick/refuse"]);
+  if (TRANSFORMS[notes["flick/transform"]]) throw new Unsupported(path, TRANSFORMS[notes["flick/transform"]]);
+  if (notes["flick/block"]) {
+    const end = wireEnd(ast);
+    const closed = !end?.annotations?.["flick/ignoreExtra"];
+    return objectOf(ast, path, defs, notes["flick/wires"], closed);
   }
+  if (ast.encoding) return schemaOf(wireEnd(ast), path, defs);
+  switch (ast._tag) {
+    case "String":
+      return { type: "string" };
+    case "Number":
+      return { type: "number" };
+    case "Boolean":
+      return { type: "boolean" };
+    case "Null":
+      return { type: "null" };
+    case "Literal":
+      return { const: ast.literal };
+    case "Never":
+      return false;
+    case "Arrays":
+      if (ast.elements.length === 0 && ast.rest.length === 1) {
+        return { type: "array", items: schemaOf(ast.rest[0], `${path}[]`, defs) };
+      }
+      if (ast.rest.length === 0) {
+        return {
+          type: "array",
+          prefixItems: ast.elements.map((e, i) => schemaOf(e, `${path}[${i}]`, defs)),
+          items: false,
+        };
+      }
+      break;
+    case "Objects":
+      if (ast.indexSignatures.length === 0) return objectOf(ast, path, defs, undefined, true);
+      break;
+    case "Union": {
+      // an absent key is no wire value
+      const members = ast.types.filter((t) => t._tag !== "Undefined");
+      if (members.every((t) => t._tag === "Literal")) return { enum: members.map((t) => t.literal) };
+      return { [notes["flick/oneOf"] ? "oneOf" : "anyOf"]: members.map((t) => schemaOf(t, path, defs)) };
+    }
+    case "Suspend":
+      return schemaOf(ast.thunk(), path, defs);
+    case "Unknown":
+    case "Any":
+      throw new Unsupported(path, "an Unknown value accepts anything, which strict export does not write");
+    default:
+      break;
+  }
+  throw new Unsupported(path, `${notes.expected ?? ast._tag} has no JSON form`);
+};
+
+/** The JSON Schema of the wire form of `ast`. */
+const schemaOf = (ast, path, defs) => {
+  const ref = ast.annotations?.["flick/ref"];
+  if (ref && ast._tag === "Suspend") {
+    if (!defs.has(ref)) {
+      defs.set(ref, null);
+      defs.set(ref, schemaOf(ast.thunk(), path, defs));
+    }
+    return { $ref: `#/$defs/${ref}` };
+  }
+  const keywords = checks(ast, path);
+  const out = body(ast, path, defs);
+  return Object.keys(keywords).length > 0 ? { ...out, ...keywords } : out;
 };
 
 /** `Codec.json_schema root codec`: the schema as JSON text, or an `ExportError`. */
 export const exportJsonSchema = (root, codec) => {
   const defs = new Map();
   try {
-    const body = codecOf(codec, root, defs);
-    const out = { $schema: "https://json-schema.org/draft/2020-12/schema", ...body };
+    const out = { $schema: "https://json-schema.org/draft/2020-12/schema", ...schemaOf(codec.ast, root, defs) };
     if (defs.size > 0) out.$defs = Object.fromEntries(defs);
     return { _tag: "Success", value: JSON.stringify(out, null, 2) };
   } catch (error) {

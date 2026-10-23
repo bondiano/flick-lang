@@ -2,7 +2,7 @@
 // them: `Effect` with its real types, everything else untyped. Every export
 // of index.js is declared here (test/types.test.js checks it).
 export { Effect } from "effect";
-export type { Layer, Option, Result } from "effect";
+export type { Layer, Option, Result, Schema } from "effect";
 
 export declare const APP_ERROR: any;
 export declare const CurrentOwner: any;
@@ -84,7 +84,6 @@ export declare const decimalNormalString: any;
 export declare const decimalScale: any;
 export declare const decimalSubtract: any;
 export declare const decimalToString: any;
-export declare const decodedOption: any;
 export declare const derive: any;
 export declare const describeCause: any;
 export declare const describeReport: any;
@@ -320,3 +319,14 @@ export declare const withOwner: any;
 export declare const within: any;
 export declare const jsonParse: any;
 export declare const jsonStringify: any;
+export declare const anyOption: any;
+export declare const anyRedacted: any;
+export declare const anyResult: any;
+export declare const installSchemaAot: any;
+export declare const jsonBigint: any;
+export declare const jsonNumber: any;
+export declare const jsonOf: any;
+export declare const refuse: any;
+export declare const schemaCompilerRuntime: any;
+export declare const schemaError: any;
+export declare const writeSchemaAot: any;

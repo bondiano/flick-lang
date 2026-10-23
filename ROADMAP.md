@@ -729,9 +729,10 @@ callbacks», «Подписки», «Higher-rank callback на FFI», «Публ
 codec DSL, refined companions), модули `Schema`, `Codec`, `Checks`, `Json`,
 `runtime/src/schema/*` (интерпретатор, strict exporter, компилируемые
 декодеры, Standard Schema, Arbitrary), справка — `docs/reference/schema.md`.
-Runtime-представление — собственное инертное дерево узлов, а не объект
-Effect Schema; AOT — компиляция в замыкания при первом использовании,
-включаемая runner'ом приложения. CLI `flick schema export` — в M16.
+Runtime-представление — значения Effect Schema; строгий экспортёр работает
+поверх `SchemaAST`; `--schema-aot` пишет статический модуль
+`SchemaAOTCompiler` (`schemas.aot.js`), который runner устанавливает до
+`main`. CLI `flick schema export` — в M16.
 
 **AC**
 

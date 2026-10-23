@@ -229,21 +229,27 @@ fn compiled_module(
     });
 }
 
-/// The runner of an app: starts `main` of the entry module at `entry`,
-/// after turning on compiled codecs with `schema_aot`.
+/// The runner of an app: starts `main` of the entry module at `entry`. With
+/// `schema_aot` it collects the codecs the modules make while loading and
+/// installs their compiled decoders, which `flick build` writes next to it.
 fn runner(file: &str, entry: &str, schema_aot: bool) -> Artifact {
-    let (import, init) = if schema_aot {
-        (", enableSchemaAot", "enableSchemaAot();\n")
+    let contents = if schema_aot {
+        format!(
+            "import {{ runMain, enableSchemaAot, installSchemaAot }} from \"@flick-lang/runtime\";\n\nenableSchemaAot();\nconst {{ main }} = await import(\"./{entry}\");\ninstallSchemaAot(await import(\"./{SCHEMA_AOT}\"));\nawait runMain(main);\n"
+        )
     } else {
-        ("", "")
+        format!(
+            "import {{ runMain }} from \"@flick-lang/runtime\";\nimport {{ main }} from \"./{entry}\";\n\nawait runMain(main);\n"
+        )
     };
     Artifact {
         path: file.to_owned(),
-        contents: format!(
-            "import {{ runMain{import} }} from \"@flick-lang/runtime\";\nimport {{ main }} from \"./{entry}\";\n\n{init}await runMain(main);\n"
-        ),
+        contents,
     }
 }
+
+/// The module of compiled decoders an app's runner installs.
+pub const SCHEMA_AOT: &str = "schemas.aot.js";
 
 /// The `.d.ts` of module `name`, and the exports it refused with why.
 fn declarations(
