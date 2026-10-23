@@ -22,8 +22,8 @@ const proc = {
   argv: ["node", "main.js"],
   env: {},
   exitCode: undefined as number | undefined,
-  on: (): void => {},
-  off: (): void => {},
+  on: (): void => { },
+  off: (): void => { },
 };
 (globalThis as { process?: unknown }).process = proc;
 

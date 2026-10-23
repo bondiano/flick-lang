@@ -30,10 +30,33 @@ impl Ide<'_> {
         )
     }
 
+    fn typed_hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
+        let m = self.module(file)?;
+        let (range, ty) = tree::innermost(m.typing.types.iter(), offset)?;
+        let name = &self.text(file)[range.0 as usize..range.1 as usize];
+        let mut text = format!("```flick\n{name} : {}\n```", show_type(ty));
+        if name == "ignore" {
+            text.push_str("\n\nEvaluates the expression and discards its result; its effects and errors are preserved.");
+        }
+        Some((text, range))
+    }
+
     /// Markdown for the symbol at `offset`, and the range it covers.
     pub fn hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
-        let (symbol, range) = self.symbol_at(file, offset)?;
+        if let Some(hover) = self.sql_hover(file, offset) {
+            return Some(hover);
+        }
+        let Some((symbol, range)) = self.symbol_at(file, offset) else {
+            return self.typed_hover(file, offset);
+        };
         let (code, note) = match &symbol {
+            Symbol::Module(module) => {
+                let source = self.source(module)?;
+                (
+                    format!("module {module}"),
+                    doc::module_comment(&source.text),
+                )
+            }
             Symbol::Local { name, binder, .. } => {
                 let m = self.module(file)?;
                 let ty = tree::innermost(m.typing.types.iter(), offset)
@@ -43,8 +66,8 @@ impl Ide<'_> {
             }
             Symbol::Entity(e) => {
                 let interface = self.interface(&e.module)?;
-                let export = interface.find(e.namespace, &e.name)?;
-                let code = match (e.namespace, &export.definition) {
+                let export = interface.find(e.namespace, &e.name);
+                let code = match (e.namespace, export.and_then(|e| e.definition.as_ref())) {
                     (Namespace::Type, Some(def)) => match &def.form {
                         Form::Alias { params, body, .. } => {
                             let params = params.iter().fold(String::new(), |mut acc, p| {
@@ -53,12 +76,21 @@ impl Ide<'_> {
                             });
                             format!("type alias {}{params} = {}", e.name, show_type(body))
                         }
+                        Form::Error => format!("type error {}", e.name),
+                        Form::Service { .. } => format!("service {}", e.name),
                         _ => format!("type {} : {}", e.name, def.kind),
                     },
-                    _ => match (self.signature(&e.module, &e.name), &export.scheme) {
+                    _ => match (
+                        self.signature(&e.module, &e.name),
+                        export.and_then(|e| e.scheme.as_ref()),
+                    ) {
                         (Some(written), _) => format!("{} : {written}", e.name),
                         (None, Some(scheme)) => format!("{} : {}", e.name, show_type(scheme)),
-                        (None, None) => e.name.clone(),
+                        (None, None) => {
+                            let m = self.module(file)?;
+                            let (_, ty) = tree::innermost(m.typing.types.iter(), offset)?;
+                            format!("{} : {}", e.name, show_type(ty))
+                        }
                     },
                 };
                 let doc = self

@@ -19,7 +19,7 @@ pub const SQL: &str = "Sql";
 
 /// SQL types by their words, with the runtime kind and the Flick type a
 /// value of the column has without a codec.
-const TYPES: [(&str, &str, &str); 25] = [
+pub(crate) const TYPES: [(&str, &str, &str); 25] = [
     ("bigint", "bigint", "BigInt"),
     ("int8", "bigint", "BigInt"),
     ("bigserial", "bigint", "BigInt"),
@@ -104,6 +104,9 @@ impl Checker<'_> {
             } else {
                 ty.clone()
             };
+            if let Some(token) = node.child_tokens().find(|t| t.kind == K::Ident) {
+                self.note_type(Span::new(self.file, token.start, token.end), &shown);
+            }
             row.push((column.name.clone(), shown));
             let null = index(if column.nullable {
                 "Nullable"

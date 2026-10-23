@@ -29,7 +29,16 @@ impl Checker<'_> {
     fn sql_alias_of(&mut self, cx: &mut Cx, clause: &Node) -> Option<Alias> {
         let name = clause.child_tokens().skip(1).find(|t| t.kind == K::Ident)?;
         let table = clause.nodes().next()?;
-        self.sql_table_alias(cx, name.text(self.text), table)
+        let mut alias = self.sql_table_alias(cx, name.text(self.text), table)?;
+        alias.nullable = clause
+            .child_tokens()
+            .next()
+            .is_some_and(|t| t.text(self.text) == "left_join");
+        self.note_type(
+            Span::new(self.file, name.start, name.end),
+            &alias.row_type(),
+        );
+        Some(alias)
     }
 
     /// `WHERE`-like conditions: a `Bool` without aggregates.
@@ -159,7 +168,7 @@ impl Checker<'_> {
         for (i, (word, clause)) in clauses.iter().enumerate().skip(1) {
             match word.as_str() {
                 "join" | "left_join" => {
-                    let Some(mut alias) = self.sql_alias_of(cx, clause) else {
+                    let Some(alias) = self.sql_alias_of(cx, clause) else {
                         continue;
                     };
                     if scope.aliases.iter().any(|a| a.name == alias.name) {
@@ -170,7 +179,6 @@ impl Checker<'_> {
                         );
                         continue;
                     }
-                    alias.nullable = word == "left_join";
                     let keyword = if alias.nullable { "LEFT JOIN" } else { "JOIN" };
                     let _ = write!(
                         sql,

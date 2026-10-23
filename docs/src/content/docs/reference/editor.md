@@ -12,12 +12,32 @@ protocol; logs go to stderr. It runs the same analysis as `flick check` and
 | Request | Answer |
 | - | - |
 | diagnostics | exactly those of `flick check`, with their `FLICK-` codes, at UTF-16 positions |
-| `textDocument/hover` | the source type: the signature as written for a top-level value (rows, captures, constraints) with its `///` documentation, the inferred type of a local, a parameter or a pattern variable; never a TypeScript helper |
-| `textDocument/definition` | across modules; into a built-in module (`flick-builtin:///List.fl`, read-only, its text through `workspace/textDocumentContent`); into an installed package's published `.fl`, else its `.iface` at the export; a companion (`schema T`, `T.parse`, a `sql table`'s table) leads to its type, a class method used at a known instance to that instance's definition |
+| `textDocument/hover` | source signatures and `///` documentation for public and private values, at declarations and uses; module documentation on qualifiers such as `Sql`; inferred locals and values, SQL aliases, columns and parameters, and the type of `ignore`; declarations distinguish `type error` from `service` |
+| `textDocument/definition` | across modules; module qualifiers lead to their module header, members to their declaration; built-ins open as real read-only `.fl` files; installed packages use their published `.fl`, else `.iface`; companions lead to their type, class methods at a known instance to that instance |
 | `textDocument/references` | every occurrence in the project |
 | `textDocument/rename` | the project's own values, types, constructors and locals, in `.fl` sources only; names of built-in modules and packages, service operations and instance methods have no exact mapping and are refused |
-| `textDocument/completion` | after `x.` the fields of `x`'s record (open rows too), after `M.` a module's exports or a service's operations, otherwise locals in scope, the module's names, imported names and the Prelude's |
+| `textDocument/completion` | record fields after `x.`, module exports or service operations after `M.`, otherwise names in scope; SQL blocks offer tables, aliases, columns, parameters, clauses and functions; `sql table` columns offer SQL types and modifiers |
 | `textDocument/formatting` | `flick fmt` |
+
+Hover resolves source bindings, not just the public export list. Private
+helpers such as a view or an error reporter show their written signatures
+and documentation without making them public. The `ignore` keyword shows its
+discard type at that use (for example `Never -> Unit` around `Ui.run`);
+discarding a result does not discard the expression's effects or errors.
+The [Gleam language server reference](https://gleam.run/documentation/language-server-reference/)
+is the behavior reference for symbol hover and navigation, not a claim of
+complete feature parity.
+
+SQL column hover and completion preserve nullability: a column from a
+`left_join` reads as `Option`, without adding a second `Option` to an already
+nullable column. Nested queries have their own table aliases.
+
+Built-in definitions use ordinary `file://` URIs in both Zed and VS Code.
+The server materializes its embedded sources under `flick-lsp` in the system
+temporary directory, keyed by content and read-only. Opening them checks
+them as library sources, without adding them to the application's project.
+Both `textDocument/prepareRename` and `textDocument/rename` reject these
+read-only documents rather than returning edits to the cached source.
 
 ## Zed
 

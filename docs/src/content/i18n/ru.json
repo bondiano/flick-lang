@@ -1,0 +1,12 @@
+{
+  "pagefind.clear_search": "Очистить",
+  "pagefind.load_more": "Загрузить ещё результаты",
+  "pagefind.search_label": "Поиск по сайту",
+  "pagefind.filters_label": "Фильтры",
+  "pagefind.zero_results": "По запросу «[SEARCH_TERM]» ничего не найдено",
+  "pagefind.many_results": "Результатов по запросу «[SEARCH_TERM]»: [COUNT]",
+  "pagefind.one_result": "По запросу «[SEARCH_TERM]» найден [COUNT] результат",
+  "pagefind.alt_search": "По запросу «[SEARCH_TERM]» ничего не найдено. Показаны результаты для «[DIFFERENT_TERM]»",
+  "pagefind.search_suggestion": "По запросу «[SEARCH_TERM]» ничего не найдено. Попробуйте один из следующих запросов:",
+  "pagefind.searching": "Поиск по запросу «[SEARCH_TERM]»…"
+}

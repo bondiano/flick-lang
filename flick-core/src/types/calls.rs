@@ -316,8 +316,13 @@ impl Checker<'_> {
                 bool_
             }
             K::IgnoreKw => {
-                self.infer(operand);
-                Type::prim("Unit")
+                let ty = self.infer(operand);
+                let unit = Type::prim("Unit");
+                self.note_type(
+                    Span::new(self.file, op.start, op.end),
+                    &Type::pure_fun(ty, unit.clone()),
+                );
+                unit
             }
             K::AwaitKw => {
                 let ty = self.infer(operand);

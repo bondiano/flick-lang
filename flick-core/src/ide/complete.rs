@@ -23,6 +23,7 @@ pub enum CompletionKind {
     Module,
     Field,
     Operation,
+    Keyword,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,7 +34,7 @@ pub struct Completion {
     pub detail: Option<String>,
 }
 
-fn item(label: &str, kind: CompletionKind, detail: Option<String>) -> Completion {
+pub(super) fn item(label: &str, kind: CompletionKind, detail: Option<String>) -> Completion {
     Completion {
         label: label.to_owned(),
         kind,
@@ -45,13 +46,20 @@ impl Ide<'_> {
     /// Completions at `offset` of `file`. With `dotted`, `offset` is the end
     /// of what comes before a `.`.
     pub fn complete(&self, file: FileId, offset: u32, dotted: bool) -> Vec<Completion> {
+        if let Some(items) = self.sql_complete(file, offset, dotted) {
+            return items;
+        }
+        if dotted {
+            return self.after_dot(file, offset);
+        }
+        self.complete_names(file, offset)
+    }
+
+    pub(super) fn complete_names(&self, file: FileId, offset: u32) -> Vec<Completion> {
         let Some(m) = self.module(file) else {
             return Vec::new();
         };
         let text = &self.sources.get(file).text;
-        if dotted {
-            return self.after_dot(file, offset);
-        }
         let mut out: BTreeMap<String, Completion> = BTreeMap::new();
         let mut add = |c: Completion| {
             out.entry(c.label.clone()).or_insert(c);

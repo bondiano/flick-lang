@@ -3,6 +3,7 @@
 //! completion, rename, formatting, and a stdout of protocol only.
 
 mod common;
+mod lsp_editor;
 
 use std::fmt::Write as _;
 use std::fs;
@@ -244,29 +245,6 @@ fn hover_definition_completion_rename_and_formatting() {
     assert_eq!(
         definition["result"]["range"]["start"],
         json!({ "line": 6, "character": 0 })
-    );
-    let builtin = lsp.request(
-        "textDocument/definition",
-        &json!({ "textDocument": doc, "position": at(&fixed, "length") }),
-    );
-    // `List` is a facade: `length` is defined in its part `List.Core`
-    assert_eq!(builtin["result"]["uri"], "flick-builtin:///List.Core.fl");
-    let content = lsp.request(
-        "workspace/textDocumentContent",
-        &json!({ "uri": "flick-builtin:///List.Core.fl" }),
-    );
-    let line = builtin["result"]["range"]["start"]["line"]
-        .as_u64()
-        .and_then(|n| usize::try_from(n).ok())
-        .expect("line");
-    assert!(
-        content["result"]["text"]
-            .as_str()
-            .expect("text")
-            .lines()
-            .nth(line)
-            .expect("line")
-            .starts_with("length")
     );
 
     // `user.` completes the fields of the record

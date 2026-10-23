@@ -7,6 +7,7 @@ mod hover;
 mod locals;
 mod navigate;
 mod rename;
+mod sql;
 mod tree;
 
 pub use complete::{Completion, CompletionKind};
@@ -42,6 +43,8 @@ pub struct Location {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Symbol {
     Entity(Entity),
+    /// A module qualifier or an import/module path.
+    Module(String),
     /// An operation of the service `service` of `module`.
     Operation {
         module: String,
@@ -111,6 +114,9 @@ impl Ide<'_> {
     pub fn symbol_at(&self, file: FileId, offset: u32) -> Option<(Symbol, (u32, u32))> {
         let m = self.module(file)?;
         let text = self.text(file);
+        if let Some(symbol) = self.module_at(m, offset) {
+            return Some(symbol);
+        }
         if let Some((range, r)) = tree::innermost(m.typing.names.iter(), offset) {
             let node = tree::find(&m.tree, range)?;
             let token = tree::last_name(node)?;
@@ -164,6 +170,43 @@ impl Ide<'_> {
             ));
         }
         self.declared_at(m, file, offset)
+    }
+
+    fn module_at(&self, m: &Analyzed, offset: u32) -> Option<(Symbol, (u32, u32))> {
+        let text = self.text(m.file);
+        for node in tree::path_to(&m.tree, offset).into_iter().rev() {
+            if !node
+                .child_tokens()
+                .any(|t| t.kind == K::Con && t.start <= offset && offset < t.end)
+            {
+                continue;
+            }
+            if !matches!(node.kind, K::NameExpr | K::NameType | K::ModulePath) {
+                continue;
+            }
+            let mut names: Vec<_> = node
+                .child_tokens()
+                .filter(|t| matches!(t.kind, K::Con | K::Ident))
+                .collect();
+            if node.kind != K::ModulePath {
+                names.pop();
+            }
+            if !names.iter().any(|t| t.start <= offset && offset < t.end) {
+                continue;
+            }
+            let module = names
+                .iter()
+                .map(|t| t.text(text))
+                .collect::<Vec<_>>()
+                .join(".");
+            if self.interface(&module).is_some() {
+                return Some((
+                    Symbol::Module(module),
+                    (names.first()?.start, names.last()?.end),
+                ));
+            }
+        }
+        None
     }
 
     /// A declaration's own name, a binder, or a name in `exposing`.

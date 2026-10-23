@@ -24,6 +24,11 @@ export default defineConfig({
     starlight({
       title: "Flick",
       description: "An ML language with higher-kinded types, typed effects and regions, on Effect",
+      defaultLocale: "root",
+      locales: {
+        root: { label: "English", lang: "en" },
+        ru: { label: "Русский" },
+      },
       sidebar,
       customCss: ["./src/styles/custom.css"],
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/bondiano/flick-lang" }],

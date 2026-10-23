@@ -8,17 +8,25 @@ mod protocol;
 mod requests;
 
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::fs;
 use std::io::{self, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::{MAIN_SEPARATOR, Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::LazyLock;
 
 use flick_core::diagnostics::{Diagnostic, Severity};
-use flick_core::project::{self, Analysis, Host};
+use flick_core::project::{self, Analysis, Analyzed, Compilation, Host};
 use flick_core::source::{FileId, SourceMap};
+use flick_core::{resolve, syntax, types};
 use serde_json::{Value, json};
 
 use crate::sources;
+
+static BUILTIN_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+    let temp = env::temp_dir();
+    temp.canonicalize().unwrap_or(temp).join("flick-lsp")
+});
 
 /// Files read from the open buffers first.
 struct Overlay<'a> {
@@ -58,6 +66,9 @@ impl Snapshot {
 
 /// Analyzes the project of `path` with `docs` over the files.
 pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path) -> Snapshot {
+    if let Some(index) = builtin_index(path) {
+        return analyze_builtin(path, index);
+    }
     let host = Overlay { docs };
     let mut sources = SourceMap::default();
     let dir = path
@@ -89,6 +100,66 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path) -> Snapshot {
         analysis,
         sources,
         root,
+    }
+}
+
+fn builtin_index(path: &Path) -> Option<usize> {
+    if path.extension()? != "fl" {
+        return None;
+    }
+    let relative = path.strip_prefix(&*BUILTIN_DIR).ok()?;
+    let mut parts = relative.components();
+    parts.next()?;
+    let module = parts.as_path().with_extension("");
+    let module = module.to_str()?.replace(MAIN_SEPARATOR, ".");
+    types::builtin_sources()
+        .iter()
+        .position(|(name, _)| *name == module)
+}
+
+/// Check library sources in the compiler's dependency order, not as project
+/// roots importing their own already-registered instances.
+fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
+    let (name, text) = types::builtin_sources()[index];
+    let dependencies = &types::builtins()[..index];
+    let mut sources = SourceMap::default();
+    let file = sources.add(path.to_string_lossy(), text);
+    let parsed = syntax::parse(text, file);
+    let module_syntax = resolve::module_syntax(&parsed.tree, text, file);
+    let module = resolve::Module {
+        name,
+        file,
+        text,
+        tree: &parsed.tree,
+        syntax: &module_syntax,
+    };
+    let imported = |name: &str| dependencies.iter().find(|i| i.module == name).cloned();
+    let (mut interface, mut diagnostics) = resolve::resolve(&module, &imported);
+    diagnostics.extend(parsed.diagnostics);
+    let local = |name: &str| types::builtin_sources().iter().any(|(n, _)| *n == name);
+    let options = types::Options {
+        local: &local,
+        limits: types::Limits::default(),
+    };
+    let (checked, typing) =
+        types::check_typed(&module, &imported, dependencies, options, &mut interface);
+    diagnostics.extend(checked);
+    Snapshot {
+        analysis: Analysis {
+            modules: vec![Analyzed {
+                name: name.to_owned(),
+                path: path.to_path_buf(),
+                file,
+                test: false,
+                tree: parsed.tree,
+                typing,
+                interface,
+            }],
+            compilation: Compilation::default(),
+            diagnostics,
+        },
+        sources,
+        root: path.parent().expect("source directory").to_path_buf(),
     }
 }
 
@@ -150,6 +221,21 @@ impl Server {
         let Some(path) = protocol::path_of(uri) else {
             return;
         };
+        if let Some(index) = builtin_index(&path) {
+            if method == "textDocument/didOpen" {
+                let snapshot = analyze_builtin(&path, index);
+                let diagnostics: Vec<_> = snapshot
+                    .analysis
+                    .diagnostics
+                    .iter()
+                    .filter(|d| d.span.is_some())
+                    .map(|d| lsp_diagnostic(&snapshot.sources, d))
+                    .collect();
+                self.send(&publish(&path, &diagnostics));
+                self.snapshot = Some(snapshot);
+            }
+            return;
+        }
         match method {
             "textDocument/didOpen" => {
                 let text = params["textDocument"]["text"]

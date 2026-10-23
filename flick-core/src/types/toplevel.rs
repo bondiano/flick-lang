@@ -333,8 +333,14 @@ impl<'a> Checker<'a> {
         if let Some((scheme, _)) = scheme {
             let runtime = self.check_signed(decl, &parts, &scheme, rec, None);
             self.polymorphic_runtime(&name, &scheme, runtime, decl);
+            if let Some(binder) = parts.pattern {
+                self.note_type(self.span(binder), &scheme);
+            }
         } else {
             let ty = self.unsigned(decl, &parts, &name);
+            if let Some(binder) = parts.pattern {
+                self.note_type(self.span(binder), &ty);
+            }
             self.env.set_value(entity, ty);
         }
     }

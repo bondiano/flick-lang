@@ -1,0 +1,44 @@
+---
+title: Flick
+description: Язык семейства ML с типами высших порядков, типизированными эффектами и регионами, компилируемый в ESM на Effect.
+template: splash
+hero:
+  tagline: Типы высших порядков, типизированные эффекты и ошибки, регионы — с компиляцией в ESM-модули, работающие на Effect.
+  actions:
+    - text: Открыть песочницу
+      link: /ru/playground/
+      icon: right-arrow
+    - text: Начало работы
+      link: /ru/start/getting-started/
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+```flick
+load_name : UserId ->{Users, Log; NotFound} String
+let load_name id =
+  let user = Users.get id
+  Log.info user.name
+  user.name
+```
+
+<CardGrid>
+  <Card title="Типизированные эффекты и ошибки" icon="seti:config">
+    Функция времени выполнения указывает, какие сервисы ей нужны и какие ошибки
+    она может вернуть. Чистый код остаётся чистым, а пустая строка эффектов
+    не означает чистоту.
+  </Card>
+  <Card title="Структурированная конкурентность" icon="random">
+    Область владеет тем, что запускает: дочерние задачи, ресурсы и гонки
+    завершаются в определённом порядке в среде выполнения Effect.
+  </Card>
+  <Card title="Регионы и захваты" icon="approve-check">
+    Дескриптор закрытой области не может покинуть её — ни через замыкание,
+    ни через задачу, ни через обратный вызов.
+  </Card>
+  <Card title="Одна проверка — много результатов" icon="rocket">
+    Один и тот же анализ используется для ESM, TypeScript, интерфейсов `.iface`,
+    проекции для редактора и песочницы этого сайта.
+  </Card>
+</CardGrid>

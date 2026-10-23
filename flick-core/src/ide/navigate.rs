@@ -75,6 +75,17 @@ impl Ide<'_> {
 
     pub fn definition(&self, symbol: &Symbol) -> Option<Location> {
         match symbol {
+            Symbol::Module(module) => {
+                let source = self.source(module)?;
+                let path = source
+                    .tree
+                    .nodes()
+                    .find(|n| n.kind == K::ModuleHeader)?
+                    .nodes()
+                    .find(|n| n.kind == K::ModulePath)?;
+                let (start, end) = path.range();
+                Some(at(source.target, start, end))
+            }
             Symbol::Local { file, binder, .. } => Some(Location {
                 target: Target::File(*file),
                 start: binder.0,
