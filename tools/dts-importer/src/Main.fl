@@ -1,0 +1,86 @@
+// The `.d.ts` reader of `flick ffi import` and the surface of Effect for
+// the coverage linter, reaching the TypeScript compiler through `Ts`.
+module Main exposing (main, import_main)
+
+import Bump
+import Import
+import Surface
+
+import_command : Cli.Command {Path.Path, Stdio.Stdio} {AppError, PlatformError.PlatformError}
+let import_command =
+  cli "import" {
+    description "Reads {\"root\", \"package\"} on stdin and prints the shapes of the package's value exports"
+    handle fun {} -> Import.run ()
+  }
+
+surface_command : Cli.Command {
+  FileSystem.FileSystem,
+  Path.Path
+} {AppError, PlatformError.PlatformError}
+let surface_command =
+  cli "surface" {
+    description "Prints the snapshot of an installed Effect's surface, as stdlib/Effect/snapshot.json holds it"
+    /// The directory of the effect package
+    arg dir : String = "runtime/node_modules/effect"
+    handle fun { dir } -> Platform.stdout_write (Surface.render (Surface.snapshot dir))
+  }
+
+bump_command : Cli.Command {
+  FileSystem.FileSystem,
+  Path.Path
+} {AppError, PlatformError.PlatformError}
+let bump_command =
+  cli "bump" {
+    description "Moves the repository to another Effect release: snapshot, report, pins"
+    /// The unpacked effect package, instead of downloading it with npm
+    flag package_dir : Option String
+    /// The repository
+    flag root : String = "."
+    /// The Effect version
+    arg version : String
+    handle fun { package_dir; root; version } -> Bump.run version package_dir root
+  }
+
+tool : Cli.Command {
+  FileSystem.FileSystem,
+  Path.Path,
+  Stdio.Stdio
+} {AppError, PlatformError.PlatformError}
+let tool =
+  cli "dts-importer" {
+    description "Reads TypeScript declarations for Flick"
+    subcommand import_command
+    subcommand surface_command
+    subcommand bump_command
+  }
+
+/// Runs the task with the Node.js services, a platform error failing the app.
+with_node :
+  (
+    Unit ->{FileSystem.FileSystem, Path.Path, Stdio.Stdio; AppError, PlatformError.PlatformError}
+      Unit
+  ) ->
+  Unit ->{; AppError} Unit
+let with_node act () =
+  try
+    provide FileSystem.node {
+      provide Path.layer {
+        provide Stdio.node {
+          act ()
+        }
+      }
+    }
+  with
+  | PlatformError.PlatformError reason -> App.fail (show reason)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  with_node
+    (fun () ->
+      try Cli.run tool (Platform.args ()) with
+      | Cli.CliError message -> App.fail message)
+    ()
+
+/// The import mode alone, as `flick ffi import` runs it: no arguments.
+import_main : Unit ->{; AppError} Unit
+let import_main () = with_node (fun () -> Import.run ()) ()

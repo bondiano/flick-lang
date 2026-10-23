@@ -1,0 +1,188 @@
+/// The TypeScript compiler as opaque handles and primitive queries over
+/// them. A query is `pure`: the checker answers the same question the same
+/// way. Flags are named as in `ts.SymbolFlags`, `ts.TypeFlags` and
+/// `ts.ObjectFlags`.
+module Ts exposing (..)
+
+type Resolution
+
+type Program
+
+type Checker
+
+type Symbol
+
+type Type
+
+type Signature
+
+type Declaration
+
+/// The package a resolution found its declarations in.
+type alias PackageId = { name : String; version : String; subModuleName : String }
+
+/// The declarations `import "pkg"` finds from the file `from`.
+resolve : String -> String ->{} Option Resolution
+foreign sync resolve from "./ts.mjs" "resolve"
+  arity 2
+  nullable
+
+resolved_file : Resolution -> String
+foreign pure resolved_file from "./ts.mjs" "resolvedFile"
+
+resolved_package : Resolution -> Option PackageId
+foreign pure resolved_package from "./ts.mjs" "resolvedPackage"
+  nullable
+
+/// The program of one root file, with NodeNext resolution.
+program : String ->{} Program
+foreign sync program from "./ts.mjs" "program"
+
+checker : Program -> Checker
+foreign pure checker from "./ts.mjs" "checker"
+
+/// The symbol of the module the file declares.
+module_of : Program -> String -> Option Symbol
+foreign pure module_of from "./ts.mjs" "moduleOf"
+  arity 2
+  nullable
+
+exports_of : Checker -> Symbol -> List Symbol
+foreign pure exports_of from "./ts.mjs" "exportsOf"
+  arity 2
+
+aliased : Checker -> Symbol -> Symbol
+foreign pure aliased from "./ts.mjs" "aliased"
+  arity 2
+
+type_of_symbol : Checker -> Symbol -> Type
+foreign pure type_of_symbol from "./ts.mjs" "typeOfSymbol"
+  arity 2
+
+/// The type as TypeScript prints it, never truncated.
+text : Checker -> Type -> String
+foreign pure text from "./ts.mjs" "typeText"
+  arity 2
+
+base_constraint : Checker -> Type -> Option Type
+foreign pure base_constraint from "./ts.mjs" "baseConstraint"
+  arity 2
+  nullable
+
+is_tuple : Checker -> Type -> Bool
+foreign pure is_tuple from "./ts.mjs" "isTuple"
+  arity 2
+
+is_array : Checker -> Type -> Bool
+foreign pure is_array from "./ts.mjs" "isArray"
+  arity 2
+
+type_arguments : Checker -> Type -> List Type
+foreign pure type_arguments from "./ts.mjs" "typeArguments"
+  arity 2
+
+return_type : Checker -> Signature -> Type
+foreign pure return_type from "./ts.mjs" "returnType"
+  arity 2
+
+symbol_name : Symbol -> String
+foreign pure symbol_name from "./ts.mjs" "symbolName"
+
+symbol_has : String -> Symbol -> Bool
+foreign pure symbol_has from "./ts.mjs" "symbolHas"
+  arity 2
+
+value_declaration : Symbol -> Option Declaration
+foreign pure value_declaration from "./ts.mjs" "valueDeclaration"
+  nullable
+
+declarations : Symbol -> List Declaration
+foreign pure declarations from "./ts.mjs" "declarations"
+
+type_has : String -> Type -> Bool
+foreign pure type_has from "./ts.mjs" "typeHas"
+  arity 2
+
+object_has : String -> Type -> Bool
+foreign pure object_has from "./ts.mjs" "objectHas"
+  arity 2
+
+/// Whether both are the very same type.
+same : Type -> Type -> Bool
+foreign pure same from "./ts.mjs" "same"
+  arity 2
+
+/// Whether the type is the implicit `this` of an interface.
+is_this : Type -> Bool
+foreign pure is_this from "./ts.mjs" "isThis"
+
+/// The members of a union.
+members : Type -> List Type
+foreign pure members from "./ts.mjs" "members"
+
+type_symbol : Type -> Option Symbol
+foreign pure type_symbol from "./ts.mjs" "typeSymbol"
+  nullable
+
+alias_symbol : Type -> Option Symbol
+foreign pure alias_symbol from "./ts.mjs" "aliasSymbol"
+  nullable
+
+alias_arguments : Type -> Option (List Type)
+foreign pure alias_arguments from "./ts.mjs" "aliasArguments"
+  nullable
+
+tuple_has_rest : Type -> Bool
+foreign pure tuple_has_rest from "./ts.mjs" "tupleHasRest"
+
+tuple_min_length : Type -> Number
+foreign pure tuple_min_length from "./ts.mjs" "tupleMinLength"
+
+tuple_fixed_length : Type -> Number
+foreign pure tuple_fixed_length from "./ts.mjs" "tupleFixedLength"
+
+call_signatures : Type -> List Signature
+foreign pure call_signatures from "./ts.mjs" "callSignatures"
+
+construct_signatures : Type -> List Signature
+foreign pure construct_signatures from "./ts.mjs" "constructSignatures"
+
+property_count : Type -> Number
+foreign pure property_count from "./ts.mjs" "propertyCount"
+
+parameters : Signature -> List Symbol
+foreign pure parameters from "./ts.mjs" "parameters"
+
+has_this : Signature -> Bool
+foreign pure has_this from "./ts.mjs" "hasThis"
+
+type_parameters : Signature -> List Type
+foreign pure type_parameters from "./ts.mjs" "typeParameters"
+
+/// `ts.is<kind>`, as `declaration_is "Parameter"`.
+declaration_is : String -> Declaration -> Bool
+foreign pure declaration_is from "./ts.mjs" "declarationIs"
+  arity 2
+
+/// Whether the node has the child `field`, as `questionToken`.
+declaration_has : String -> Declaration -> Bool
+foreign pure declaration_has from "./ts.mjs" "declarationHas"
+  arity 2
+
+/// The source text of the declaration's name.
+declaration_name : Declaration -> Option String
+foreign pure declaration_name from "./ts.mjs" "declarationName"
+  nullable
+
+/// The declaration printed without comments.
+printed : Declaration -> String
+foreign pure printed from "./ts.mjs" "printed"
+
+/// The SHA-256 of the text's UTF-8 bytes, in hex.
+sha256 : String -> String
+foreign pure sha256 from "./ts.mjs" "sha256"
+
+/// Runs the command with the arguments; its stdout is discarded.
+exec : String -> List String ->{} Unit
+foreign sync exec from "./ts.mjs" "exec"
+  arity 2

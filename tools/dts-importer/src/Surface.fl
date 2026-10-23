@@ -1,0 +1,192 @@
+/// The public surface of an installed Effect for the coverage linter: every
+/// entrypoint of its `package.json`, and for the entrypoints the standard
+/// library wraps, every export of every module as `Module.name` with its
+/// kind and a fingerprint of its declarations.
+module Surface exposing (Snapshot, wrapped, snapshot, render, snapshot_json)
+
+import JsonText exposing (quote)
+import Ts
+
+/// The entrypoints whose modules the standard library wraps export by export.
+wrapped : List String
+let wrapped = ["effect", "effect/cli", "effect/http", "effect/http-api"]
+
+/// A snapshot: `modules` maps an entrypoint to `Module.name` → `kind fingerprint`.
+type alias Snapshot =
+  {
+    package : String;
+    version : String;
+    entrypoints : List String;
+    modules : List (String, List (String, String))
+  }
+  deriving Schema
+
+snapshot_json : PureCodec Json Snapshot
+let snapshot_json =
+  codec (schema Snapshot) {
+    package = field "package" String.json
+    version = field "version" String.json
+    entrypoints = field "entrypoints" (Codec.list String.json)
+    modules = field "modules" (Codec.entries (Codec.entries String.json))
+  }
+
+/// The files of an entrypoint's conditions.
+type alias Conditions = { types : Option String; default : Option String }
+  deriving Schema
+
+conditions_json : PureCodec Json Conditions
+let conditions_json =
+  ignore_extra_fields
+    (codec (schema Conditions) {
+      types = optional_field "types" String.json
+      default = optional_field "default" String.json
+    })
+
+/// What an entry of `exports` in `package.json` names: nothing, a file, or
+/// the files of its conditions.
+type Target = Excluded | File String | Conditional Conditions
+
+decoded : PureCodec Json a -> Json -> Option a
+let decoded c json = Result.to_option (Codec.decode_result c (Json.to_unknown json))
+
+target : Json -> Target
+let target json =
+  match decoded (option_as_null String.json) json with
+  | Some None -> Excluded
+  | Some (Some file) -> File file
+  | None ->
+    Conditional
+      (Option.with_default { types = None; default = None } (decoded conditions_json json))
+
+/// The declarations of a target's JavaScript file.
+declarations_file : Target -> Option String
+let declarations_file t =
+  let js =
+    match t with
+    | Excluded -> None
+    | File file -> Some file
+    | Conditional c -> Option.or_else c.default c.types
+  Option.map
+    (fun f ->
+      if String.ends_with ".js" f then String.slice 0 (String.length f - 3) f ++ ".d.ts" else f)
+    js
+
+/// What a symbol is: `value`, `type` or `value+type`.
+kind_of : Ts.Symbol -> String
+let kind_of s =
+  let value = Ts.symbol_has "Value" s
+  let type_ = Ts.symbol_has "Type" s || Ts.symbol_has "Namespace" s
+  if value && type_ then "value+type" else if value then "value" else "type"
+
+/// Each run of whitespace as one space.
+squeeze : String -> String
+let squeeze text =
+  match RegExp.make "\\s+" "g" with
+  | Ok whitespace -> RegExp.replace_all whitespace " " text
+  | Err _ -> text
+
+/// 16 hex digits of the SHA-256 of the declarations as printed without comments.
+fingerprint : Ts.Symbol -> String
+let fingerprint s =
+  let text = String.join "\n" (List.map (fun d -> squeeze (Ts.printed d)) (Ts.declarations s))
+  String.slice 0 16 (Ts.sha256 text)
+
+entry : String -> Ts.Symbol -> (String, String)
+let entry key s = (key, kind_of s ++ " " ++ fingerprint s)
+
+by_key : List (String, v) -> List (String, v)
+let by_key pairs = List.sort_by (fun (a, _) (b, _) -> compare a b) pairs
+
+/// `Module.name` → `kind fingerprint` for every export of the entrypoint's modules.
+exports_of : String -> String ->{} List (String, String)
+let exports_of file entrypoint =
+  let program = Ts.program file
+  let c = Ts.checker program
+  resolve : Ts.Symbol -> Ts.Symbol
+  let resolve s = if Ts.symbol_has "Alias" s then Ts.aliased c s else s
+  of_export : Ts.Symbol -> List (String, String)
+  let of_export exported =
+    let s = resolve exported
+    let is_module =
+      Ts.symbol_has "ValueModule" s && List.any (Ts.declaration_is "SourceFile") (Ts.declarations s)
+    if is_module then
+      List.map
+        (fun m -> entry (Ts.symbol_name exported ++ "." ++ Ts.symbol_name m) (resolve m))
+        (Ts.exports_of c s)
+    else
+      [entry (entrypoint ++ "." ++ Ts.symbol_name exported) s]
+  match Ts.module_of program file with
+  | None -> []
+  | Some root -> by_key (List.flat_map of_export (Ts.exports_of c root))
+
+lookup : String -> List (String, a) -> Option a
+let lookup key pairs = Option.map (fun (_, v) -> v) (List.find (fun (k, _) -> k == key) pairs)
+
+is_entrypoint : (String, Target) -> Bool
+let is_entrypoint (key, t) =
+  match t with
+  | Excluded -> false
+  | _ -> key != "./package.json" && not (String.contains "*" key)
+
+/// The snapshot of the Effect installed at `dir`.
+snapshot : String ->{FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError}
+  Snapshot
+let snapshot dir =
+  let file = Path.join [dir, "package.json"]
+  let fields =
+    match Json.parse (FileSystem.read_file_string file) with
+    | Ok input -> Result.with_default [] (Codec.decode_result (Codec.entries Json.json) input)
+    | Err _ -> []
+  text : String -> Option String
+  let text key = Option.bind (decoded String.json) (lookup key fields)
+  match (text "name", text "version") with
+  | (Some name, Some version) ->
+    let exports =
+      Option.with_default
+        []
+        (Option.bind (decoded (Codec.entries Json.json)) (lookup "exports" fields))
+    let targets = List.map (fun (key, json) -> (key, target json)) exports
+    let entrypoints =
+      List.sort
+        (List.map
+          (fun (key, _) ->
+            if key == "." then name else name ++ "/" ++ String.slice 2 (String.length key) key)
+          (List.filter is_entrypoint targets))
+    declared : String -> Option (String, String)
+    let declared entrypoint =
+      let sub =
+        if entrypoint == name then
+          "."
+        else
+          "./" ++ String.slice (String.length name + 1) (String.length entrypoint) entrypoint
+      Option.map (fun js -> (entrypoint, js)) (Option.bind declarations_file (lookup sub targets))
+    let files =
+      List.filter_map declared (List.filter (fun e -> List.contains e entrypoints) wrapped)
+    let modules =
+      List.map_effect
+        (fun (entrypoint, js) -> (entrypoint, exports_of (Path.join [dir, js]) entrypoint))
+        files
+    { package = name; version = version; entrypoints = entrypoints; modules = modules }
+  | _ -> App.fail (file ++ " has no name or version")
+
+/// The snapshot as JSON, one export per line.
+render : Snapshot -> String
+let render snap =
+  module_text : (String, List (String, String)) -> String
+  let module_text (entrypoint, exports) =
+    let body = List.map (fun (key, value) -> "      " ++ quote key ++ ": " ++ quote value) exports
+    "    " ++ quote entrypoint ++ ": {\n" ++ String.join ",\n" body ++ "\n    }"
+  let lines =
+    [
+      "{",
+      "  \"package\": " ++ quote snap.package ++ ",",
+      "  \"version\": " ++ quote snap.version ++ ",",
+      "  \"entrypoints\": [",
+      String.join ",\n" (List.map (fun e -> "    " ++ quote e) snap.entrypoints),
+      "  ],",
+      "  \"modules\": {",
+      String.join ",\n" (List.map module_text snap.modules),
+      "  }",
+      "}"
+    ]
+  String.join "\n" lines ++ "\n"

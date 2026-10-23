@@ -11,7 +11,8 @@ Effect moves.
 ## Snapshot
 
 `stdlib/Effect/snapshot.json` is the surface of the installed Effect, written
-by `node tools/dts-importer/surface.mjs > stdlib/Effect/snapshot.json`:
+by `node tools/dts-importer/index.mjs surface > stdlib/Effect/snapshot.json`
+(a Flick program: `pnpm -C tools/dts-importer build` first):
 every entrypoint of its `package.json`, and for the four wrapped ones each
 export of each module as `Module.name` with its kind (`value`, `type` or
 `value+type`) and a fingerprint, 16 hex digits of the SHA-256 of its

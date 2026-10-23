@@ -9,6 +9,7 @@
     "flick-dts-importer": "./index.mjs"
   },
   "dependencies": {
+    "@flick-lang/runtime": "workspace:*",
     "typescript": "5.9.3"
   },
   "devDependencies": {
@@ -18,6 +19,7 @@
     "p-map": "7.1.1"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "build": "${FLICK_BIN:-../../target/debug/flick} build src/Main.fl --out-dir dist --color never",
+    "test": "pnpm run build && node --test test/*.test.mjs"
   }
 }
