@@ -1,9 +1,12 @@
 # Flick records are exact plain objects with the fields of their type.
+
 [wrapped]
 keys = "Record.labels 59a472c41aac0334"
 pick = "Record.project 0c8a737842e9bc05"
 omit = "Record.project 020f178bdcdf0adf"
 Record = "Record.from_keys 7d29b11beef137d7"
+makeCombiner = "Combiner.struct ed0f562a63bb30bb"
+makeReducer = "Reducer.struct 634cd82769808e1c"
 
 [language]
 get = "field access `r.field`"
@@ -25,7 +28,3 @@ Assign = "TS-only: a type-level helper"
 Lambda = "TS-only: the type-level lambda of `Struct.map`"
 Apply = "TS-only: applies a type-level lambda"
 lambda = "TS-only: fixes the TS type of a type-level lambda"
-
-[pending]
-makeCombiner = "M20"
-makeReducer = "M20"

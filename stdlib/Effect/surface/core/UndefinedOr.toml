@@ -2,13 +2,11 @@
 [wrapped]
 map = "Option.map edc6c04fbfaa2677"
 match = "Option.match_ b91f518555515362"
+makeCombinerFailFast = "Combiner.option_fail_fast 8eee2e966f027537"
+makeReducer = "Reducer.option b5a56eaf45749a45"
+makeReducerFailFast = "Reducer.option_fail_fast 2930b03862575bc1"
 
 [excluded]
 getOrThrow = "invariant: throws a defect for `undefined` instead of a typed failure (`Result.from_option`, `from_result`)"
 getOrThrowWith = "invariant: throws a defect for `undefined` instead of a typed failure (`Result.from_option`, `from_result`)"
 liftThrowable = "invariant: turns a defect (a JS throw) into `undefined`; defects stay defects (`catch` on a foreign binding gives typed errors)"
-
-[pending]
-makeCombinerFailFast = "M20"
-makeReducer = "M20"
-makeReducerFailFast = "M20"

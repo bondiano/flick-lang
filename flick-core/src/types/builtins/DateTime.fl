@@ -407,3 +407,33 @@ instance Eq DateTime =
 instance Ord DateTime =
   compare : DateTime -> DateTime -> Ordering
   let compare x y = compare_date_time x y
+
+/// A date-time as JSON ISO 8601 text, decoded to UTC; encodes only UTC ones.
+json_utc : PureCodec Json DateTime
+foreign pure json_utc from "@flick-lang/runtime/effect/DateTime" "flickJsonUtc"
+  reviewed "effect@4.0.5 sha256:67f62f4e02ae87f9"
+
+/// A UTC date-time as a whole JSON number of milliseconds since the epoch.
+json_utc_millis : PureCodec Json DateTime
+foreign pure json_utc_millis from "@flick-lang/runtime/effect/DateTime" "flickJsonUtcMillis"
+  reviewed "effect@4.0.5 sha256:051d69ddbcb03e32"
+
+/// A zoned date-time as JSON text: `"2024-01-01T09:00:00.000+01:00[Europe/Paris]"`.
+json_zoned : PureCodec Json DateTime
+foreign pure json_zoned from "@flick-lang/runtime/effect/DateTime" "flickJsonZoned"
+  reviewed "effect@4.0.5 sha256:316407fb71ddaf0c"
+
+/// A zone as JSON text: an IANA name or an offset such as `"+02:00"`.
+json_zone : PureCodec Json TimeZone
+foreign pure json_zone from "@flick-lang/runtime/effect/DateTime" "flickJsonZone"
+  reviewed "effect@4.0.5 sha256:37916e1b4cac8244"
+
+/// A named zone as JSON text; an offset or unknown name is a `SchemaError`.
+json_zone_named : PureCodec Json TimeZone
+foreign pure json_zone_named from "@flick-lang/runtime/effect/DateTime" "flickJsonZoneNamed"
+  reviewed "effect@4.0.5 sha256:0b47a93cf88d7295"
+
+/// A fixed-offset zone as a JSON number of milliseconds east of UTC.
+json_zone_offset : PureCodec Json TimeZone
+foreign pure json_zone_offset from "@flick-lang/runtime/effect/DateTime" "flickJsonZoneOffset"
+  reviewed "effect@4.0.5 sha256:e80b9a59e619e0e8"

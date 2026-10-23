@@ -1,11 +1,14 @@
 // Effect's `DateTime` for the bindings of the standard library, and the
 // adapters where a Flick value differs from what Effect takes: options
 // records with `Option` fields, unit constructors instead of strings, and
-// `DateTime.DateTimeError` instead of `None` or a throw.
-import { DateTime, Duration, Option, Result } from "effect";
+// `DateTime.DateTimeError` instead of `None` or a throw; the JSON codecs are
+// fallible ones of the strict exporter.
+import { DateTime, Duration, Option, Result, Schema, SchemaTransformation } from "effect";
 
 import { EQ, GT, LT, type Ordering, type Tagged, err, none, ok, some } from "../data.ts";
+import { type AnySchema, jsonNumber } from "../schema/schemas.ts";
 import { constructorName, tag } from "../tags.ts";
+import { fallible } from "./Schema.ts";
 
 export * from "effect/DateTime";
 
@@ -172,3 +175,23 @@ export const flickFormatIntl = (o: FormatOptions, self: DateTime.DateTime): Chec
     const { locale, ...options } = intl(o);
     return DateTime.formatIntl(self, new Intl.DateTimeFormat(locale, options));
   });
+
+/** `DateTime.json_utc`: ISO 8601 text, decoded to UTC. */
+export const flickJsonUtc: AnySchema = fallible(Schema.DateTimeUtcFromString);
+
+/** `DateTime.json_utc_millis`: milliseconds since the epoch, a whole JSON number. */
+export const flickJsonUtcMillis: AnySchema = fallible(Schema.DateTimeUtcFromMillis);
+
+/** `DateTime.json_zoned`: ISO 8601 text with the zone, `…+01:00[Europe/Paris]`. */
+export const flickJsonZoned: AnySchema = fallible(Schema.DateTimeZonedFromString);
+
+/** `DateTime.json_zone`: an IANA name or an offset `+02:00`. */
+export const flickJsonZone: AnySchema = fallible(Schema.TimeZoneFromString);
+
+/** `DateTime.json_zone_named`: an IANA name only. */
+export const flickJsonZoneNamed: AnySchema = fallible(Schema.TimeZoneNamedFromString);
+
+/** `DateTime.json_zone_offset`: a fixed offset as a JSON number of milliseconds. */
+export const flickJsonZoneOffset: AnySchema = jsonNumber.pipe(
+  Schema.decodeTo(Schema.TimeZoneOffset, SchemaTransformation.timeZoneOffsetFromNumber),
+);

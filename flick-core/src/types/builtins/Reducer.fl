@@ -66,3 +66,47 @@ foreign pure bigint_multiply from "@flick-lang/runtime/effect/BigInt" "ReducerMu
 string_concat : Reducer String
 foreign pure string_concat from "@flick-lang/runtime/effect/String" "ReducerConcat"
   reviewed "effect@4.0.5 sha256:f005936903549672"
+
+/// Joins lists from `[]`.
+list_concat : Unit -> Reducer (List a)
+foreign pure list_concat from "@flick-lang/runtime/effect/Array" "getReadonlyReducerConcat"
+  arity 0
+  reviewed "effect@4.0.5 sha256:2846d408f33ea840"
+
+/// Combines the `Some`s with the combiner, skipping `None`s, from `None`.
+option : Combiner.Combiner a -> Reducer (Option a)
+foreign pure option from "@flick-lang/runtime/effect/Option" "makeReducer"
+  reviewed "effect@4.0.5 sha256:f3bc69e157cb83ca"
+
+/// Combines `Some`s with the reducer from `Some` of its start value; a
+/// `None` anywhere makes the result `None`.
+option_fail_fast : Reducer a -> Reducer (Option a)
+foreign pure option_fail_fast from "@flick-lang/runtime/effect/Option" "makeReducerFailFast"
+  reviewed "effect@4.0.5 sha256:4f1d76faa5d133ee"
+
+/// Merges dictionaries from the empty one, keeping every key; the values of
+/// a key in both are combined.
+record_union : Combiner.Combiner a -> Reducer (Record.ReadonlyRecord a)
+foreign pure record_union from "@flick-lang/runtime/effect/Record" "makeReducerUnion"
+  reviewed "effect@4.0.5 sha256:08fd43a07eb3cf4e"
+
+/// Merges dictionaries keeping only the keys in both, their values combined.
+record_intersection : Combiner.Combiner a -> Reducer (Record.ReadonlyRecord a)
+foreign pure record_intersection from "@flick-lang/runtime/effect/Record" "makeReducerIntersection"
+  reviewed "effect@4.0.5 sha256:e99799583e430bac"
+
+/// Reduces records field by field, each field with its own reducer; the
+/// start value is the record of their start values.
+struct : Record.Map Reducer r rs => rs -> Reducer r
+foreign pure struct from "@flick-lang/runtime/effect/Struct" "flickMakeReducer"
+  reviewed "effect@4.0.5 sha256:634cd82769808e1c"
+
+/// Reduces pairs element by element.
+tuple2 : (Reducer a, Reducer b) -> Reducer (a, b)
+foreign pure tuple2 from "@flick-lang/runtime/effect/Tuple" "makeReducer"
+  reviewed "effect@4.0.5 sha256:648ef4fcfc81715b"
+
+/// Reduces triples element by element.
+tuple3 : (Reducer a, Reducer b, Reducer c) -> Reducer (a, b, c)
+foreign pure tuple3 from "@flick-lang/runtime/effect/Tuple" "makeReducer"
+  reviewed "effect@4.0.5 sha256:648ef4fcfc81715b"

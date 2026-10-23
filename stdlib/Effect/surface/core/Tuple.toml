@@ -17,6 +17,6 @@ makeOrder = "the class `Ord`: tuples compare lexicographically"
 isTupleOf = "TS-only: a type guard; Flick tuples have a static arity"
 isTupleOfAtLeast = "TS-only: a type guard; Flick tuples have a static arity"
 
-[pending]
-makeCombiner = "M20"
-makeReducer = "M20"
+[wrapped]
+makeCombiner = "Combiner.tuple2 f554726d0614da4c"
+makeReducer = "Reducer.tuple2 648ef4fcfc81715b"

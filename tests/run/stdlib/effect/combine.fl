@@ -1,0 +1,33 @@
+// Combiners and reducers of options, lists, booleans, dictionaries,
+// records and tuples, from Effect's `Option`, `Array`, `Boolean`, `Record`,
+// `Struct` and `Tuple`.
+module App.Main exposing (main)
+
+type alias Stats = { hits : Number; tags : List String }
+
+sum : Combiner.Combiner Number
+let sum = Combiner.make (fun a b -> a + b)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line ("option: " ++ show (Reducer.combine_all (Reducer.option sum) [Some 1, None, Some 2]) ++ " " ++ show (Reducer.combine_all (Reducer.option sum) []))
+  let strict = Reducer.option_fail_fast Reducer.number_sum
+  Platform.stdout_line ("fail_fast: " ++ show (Reducer.combine_all strict [Some 1, Some 2]) ++ " " ++ show (Reducer.combine_all strict [Some 1, None, Some 2]))
+  Platform.stdout_line ("combiner fail_fast: " ++ show (Combiner.combine (Combiner.option_fail_fast sum) (Some 1) (Some 2)) ++ " " ++ show (Combiner.combine (Combiner.option_fail_fast sum) (Some 1) None))
+  Platform.stdout_line ("lists: " ++ show (Reducer.combine_all (Reducer.list_concat ()) [[1, 2], [], [3]]))
+  Platform.stdout_line ("bools: " ++ show (Reducer.combine_all Bool.reducer_and [true, false], Reducer.combine_all Bool.reducer_and [], Reducer.combine_all Bool.reducer_or [false, true], Reducer.combine_all Bool.reducer_or []))
+  let a : Record.ReadonlyRecord Number = Record.from_entries [("x", 1), ("y", 2)]
+  let b : Record.ReadonlyRecord Number = Record.from_entries [("y", 10), ("z", 20)]
+  Platform.stdout_line ("union: " ++ show (Record.to_entries (Reducer.combine_all (Reducer.record_union sum) [a, b])))
+  Platform.stdout_line ("intersection: " ++ show (Record.to_entries (Reducer.combine (Reducer.record_intersection sum) a b)))
+  stats : Combiner.Combiner Stats
+  let stats = Combiner.struct { hits = sum; tags = Reducer.to_combiner (Reducer.list_concat ()) }
+  let s = Combiner.combine stats { hits = 1; tags = ["a"] } { hits = 2; tags = ["b"] }
+  Platform.stdout_line ("struct combiner: " ++ show s.hits ++ " " ++ show s.tags)
+  totals : Reducer.Reducer Stats
+  let totals = Reducer.struct { hits = Reducer.number_sum; tags = Reducer.list_concat () }
+  let t = Reducer.combine_all totals [{ hits = 1; tags = ["a"] }, { hits = 4; tags = [] }]
+  let e = Reducer.initial_value totals
+  Platform.stdout_line ("struct reducer: " ++ show t.hits ++ " " ++ show t.tags ++ " from " ++ show e.hits ++ " " ++ show e.tags)
+  Platform.stdout_line ("tuple2: " ++ show (Combiner.combine (Combiner.tuple2 (sum, Combiner.last ())) (1, "a") (2, "b")) ++ " " ++ show (Reducer.combine_all (Reducer.tuple2 (Reducer.number_sum, Reducer.string_concat)) [(1, "a"), (2, "b")]))
+  Platform.stdout_line ("tuple3: " ++ show (Combiner.combine (Combiner.tuple3 (sum, Combiner.first (), Combiner.max compare)) (1, "a", 5) (2, "b", 3)) ++ " " ++ show (Reducer.combine_all (Reducer.tuple3 (Reducer.number_sum, Reducer.string_concat, Bool.reducer_or)) [(1, "a", false), (2, "b", true)]))

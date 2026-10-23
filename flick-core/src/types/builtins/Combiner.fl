@@ -61,3 +61,24 @@ foreign pure bigint_max from "@flick-lang/runtime/effect/BigInt" "CombinerMax"
 bigint_min : Combiner BigInt
 foreign pure bigint_min from "@flick-lang/runtime/effect/BigInt" "CombinerMin"
   reviewed "effect@4.0.5 sha256:2acf6233664fff9d"
+
+/// Combines two `Some`s with the combiner; a `None` on either side wins.
+option_fail_fast : Combiner a -> Combiner (Option a)
+foreign pure option_fail_fast from "@flick-lang/runtime/effect/Option" "makeCombinerFailFast"
+  reviewed "effect@4.0.5 sha256:8d4d6192c776d9bf"
+
+/// Combines records field by field, each field with its own combiner:
+/// `Combiner.struct { n = Combiner.max compare; s = Combiner.first () }`.
+struct : Record.Map Combiner r cs => cs -> Combiner r
+foreign pure struct from "@flick-lang/runtime/effect/Struct" "flickMakeCombiner"
+  reviewed "effect@4.0.5 sha256:ed0f562a63bb30bb"
+
+/// Combines pairs element by element.
+tuple2 : (Combiner a, Combiner b) -> Combiner (a, b)
+foreign pure tuple2 from "@flick-lang/runtime/effect/Tuple" "makeCombiner"
+  reviewed "effect@4.0.5 sha256:f554726d0614da4c"
+
+/// Combines triples element by element.
+tuple3 : (Combiner a, Combiner b, Combiner c) -> Combiner (a, b, c)
+foreign pure tuple3 from "@flick-lang/runtime/effect/Tuple" "makeCombiner"
+  reviewed "effect@4.0.5 sha256:f554726d0614da4c"

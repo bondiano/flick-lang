@@ -1,5 +1,6 @@
 # Effect's records with keys as data are `Record.ReadonlyRecord a`, keyed by
 # strings; Flick records with fixed fields are covered by `Struct`.
+
 [wrapped]
 ReadonlyRecord = "Record.ReadonlyRecord 0720319d841b5f22"
 collect = "Record.collect a79badd974887206"
@@ -41,11 +42,9 @@ some = "Record.some 2c419dcd222b33b7"
 toEntries = "Record.to_entries cb4a8883efc8012b"
 union = "Record.union cd57676a46225568"
 values = "Record.values a1a0ac144ab23772"
+makeReducerIntersection = "Reducer.record_intersection e99799583e430bac"
+makeReducerUnion = "Reducer.record_union 08fd43a07eb3cf4e"
 
 [excluded]
 ReadonlyRecordTypeLambda = "TS-only: a type lambda for TS higher-kinded encodings"
 assignProperty = "invariant: mutates an object in place; Flick dictionaries are immutable (`Record.set` makes a new one)"
-
-[pending]
-makeReducerIntersection = "M20"
-makeReducerUnion = "M20"

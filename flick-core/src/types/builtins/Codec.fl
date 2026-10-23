@@ -203,6 +203,22 @@ hex_string : PureCodec Json String
 foreign pure hex_string from "@flick-lang/runtime/effect/Schema" "flickStringFromHex"
   reviewed "effect@4.0.5 sha256:dacb982d97b093d9"
 
+/// Bytes, each a whole number from 0 to 255, as base64 JSON text; encoding
+/// another number is a `SchemaError`.
+bytes_base64 : PureCodec Json (List Number)
+foreign pure bytes_base64 from "@flick-lang/runtime/effect/Schema" "flickBytesFromBase64"
+  reviewed "effect@4.0.5 sha256:3ba856cf6e36bc12"
+
+/// Bytes as URL-safe base64 JSON text.
+bytes_base64url : PureCodec Json (List Number)
+foreign pure bytes_base64url from "@flick-lang/runtime/effect/Schema" "flickBytesFromBase64Url"
+  reviewed "effect@4.0.5 sha256:bb23107359dfe500"
+
+/// Bytes as hexadecimal JSON text, `"0a0b"`.
+bytes_hex : PureCodec Json (List Number)
+foreign pure bytes_hex from "@flick-lang/runtime/effect/Schema" "flickBytesFromHex"
+  reviewed "effect@4.0.5 sha256:e355fc2b69a96c0e"
+
 /// A string written URI-component encoded.
 uri_component : PureCodec Json String
 foreign pure uri_component from "@flick-lang/runtime/effect/Schema" "flickStringFromUriComponent"
