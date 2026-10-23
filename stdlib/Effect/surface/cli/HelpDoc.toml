@@ -1,7 +1,7 @@
-[pending]
-ArgDoc = "M22"
-ExampleDoc = "M22"
-FlagDoc = "M22"
-HelpDoc = "M22"
-SubcommandDoc = "M22"
-SubcommandGroupDoc = "M22"
+[wrapped]
+ArgDoc = "Cli.ArgDoc e5949ba92a81fa7f"
+ExampleDoc = "Cli.ExampleDoc 86cde5959d6491fa"
+FlagDoc = "Cli.FlagDoc 2a1ab9679feb4e11"
+HelpDoc = "Cli.HelpDoc 765206af2d25ce95"
+SubcommandDoc = "Cli.SubcommandDoc 9ac4743af5fd2cf1"
+SubcommandGroupDoc = "Cli.SubcommandGroupDoc 563d7995fc737660"

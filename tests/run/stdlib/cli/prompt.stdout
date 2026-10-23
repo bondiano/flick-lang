@@ -1,0 +1,20 @@
+text Ada
+validated x
+default Paris
+password s3 hidden hh
+confirm (true, false)
+toggle true
+int 42 number 0.25
+list ["a", "b"]
+select 2
+auto_complete rs
+multi_select [2, 3]
+date 1792749600000
+all ["one", "given"]
+map/flat_map ABAB
+custom 3
+keys left 0
+no keys quit
+custom_events event arrived
+run_themed z prefix drawn true
+done

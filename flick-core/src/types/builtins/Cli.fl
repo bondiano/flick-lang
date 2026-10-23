@@ -53,33 +53,135 @@ instance Value (Redacted String) =
   parse : String ->{} Result String (Redacted String)
   let parse text = Ok (Redacted.make text)
 
+/// An ISO 8601 date and time, `2026-10-23T10:00:00Z`.
+instance Value DateTime.DateTime =
+  parse : String ->{} Result String DateTime.DateTime
+  let parse text =
+    match DateTime.make text with
+    | Ok date -> Ok date
+    | Err _ -> Err ("not a date: " ++ text)
+
+/// `key=value`, split at the first `=`; a `List` of them is a map of options.
+instance Value (String, String) =
+  parse : String ->{} Result String (String, String)
+  let parse text =
+    match String.index_of "=" text with
+    | Some at -> Ok (String.slice 0 at text, String.slice (at + 1) (String.length text) text)
+    | None -> Err ("not key=value: " ++ text)
+
 /// A flag without a value: present is `true`, absent `false`.
 switch : Multi Bool Bool
 foreign pure switch from "@flick-lang/runtime/cli" "multiSwitch"
+  reviewed "effect@4.0.5 sha256:e1a44b3854025e04"
 
 /// One value, required.
 required : Multi a a
 foreign pure required from "@flick-lang/runtime/cli" "multiRequired"
+  reviewed "effect@4.0.5 sha256:412b66f29e784f00"
 
 /// One value, `value` when absent.
 default : a -> Multi a a
 foreign pure default from "@flick-lang/runtime/cli" "multiDefault"
+  reviewed "effect@4.0.5 sha256:caecb2b3eaafc203"
 
 /// One value, or `None`.
 optional : Multi a (Option a)
 foreign pure optional from "@flick-lang/runtime/cli" "multiOptional"
+  reviewed "effect@4.0.5 sha256:cf0569efe880619b"
 
 /// Any number of values: a repeated flag, or the rest of the arguments.
 many : Multi a (List a)
 foreign pure many from "@flick-lang/runtime/cli" "multiMany"
+  reviewed "effect@4.0.5 sha256:85fe2ddc827a41b6"
 
 /// At least one value.
 some : Multi a (NonEmpty.NonEmpty a)
 foreign pure some from "@flick-lang/runtime/cli" "multiSome"
+  reviewed "effect@4.0.5 sha256:5e88f4ac77db4501"
+
+/// At least `min` values.
+at_least : Number -> Multi a (List a)
+foreign pure at_least from "@flick-lang/runtime/cli" "multiAtLeast"
+  reviewed "effect@4.0.5 sha256:e42e6aa23f7e9d05"
+
+/// At most `max` values.
+at_most : Number -> Multi a (List a)
+foreign pure at_most from "@flick-lang/runtime/cli" "multiAtMost"
+  reviewed "effect@4.0.5 sha256:b24c3438bc79d4eb"
+
+/// From `min` to `max` values.
+between : Number -> Number -> Multi a (List a)
+foreign pure between from "@flick-lang/runtime/cli" "multiBetween"
+  arity 2
+  reviewed "effect@4.0.5 sha256:a93023741eb028ac"
+
+/// One value, read from `config` when absent; a config that does not read
+/// is `CliError`.
+from_config : Config.Config a -> Multi a a
+foreign pure from_config from "@flick-lang/runtime/cli" "multiConfig"
+  reviewed "effect@4.0.5 sha256:6dffe04efbd7d8a1"
+
+/// One value, asked with `prompt` on the terminal of the process when
+/// absent; without an answer the value is missing.
+from_prompt : Cli.Prompt.Prompt a -> Multi a a
+foreign pure from_prompt from "@flick-lang/runtime/cli" "multiPrompt"
+  reviewed "effect@4.0.5 sha256:771652c2d8bad476"
+
+/// The parameter is left out of help and completions.
+hidden : Multi a t -> Multi a t
+foreign pure hidden from "@flick-lang/runtime/cli" "multiHidden"
+  reviewed "effect@4.0.5 sha256:6991c5a17408c60a"
+
+/// The name help shows for the parameter's value, `<file>` for `string`.
+metavar : String -> Multi a t -> Multi a t
+foreign pure metavar from "@flick-lang/runtime/cli" "multiMetavar"
+  arity 2
+  reviewed "effect@4.0.5 sha256:744d6162898dacda"
+
+/// A flag written without a value takes `text`: `--color` as `--color=auto`.
+optional_value : String -> Multi a t -> Multi a t
+foreign pure optional_value from "@flick-lang/runtime/cli" "multiOptionalValue"
+  arity 2
+  reviewed "effect@4.0.5 sha256:31d4af878d0bbeab"
+
+/// The value names a file, which must exist when `must_exist`.
+file : Bool -> Multi a t -> Multi a t
+foreign pure file from "@flick-lang/runtime/cli" "multiFile"
+  arity 2
+  reviewed "effect@4.0.5 sha256:efa7830339320456"
+
+/// The value names a directory, which must exist when `must_exist`.
+directory : Bool -> Multi a t -> Multi a t
+foreign pure directory from "@flick-lang/runtime/cli" "multiDirectory"
+  arity 2
+  reviewed "effect@4.0.5 sha256:a8970fc7a01e8e08"
+
+/// The value names a file or a directory, which must exist when `must_exist`.
+path : Bool -> Multi a t -> Multi a t
+foreign pure path from "@flick-lang/runtime/cli" "multiPath"
+  arity 2
+  reviewed "effect@4.0.5 sha256:e1356e339182b8cc"
+
+/// `Cli.Value` parses the text of the file the value names.
+file_text : Multi a t -> Multi a t
+foreign pure file_text from "@flick-lang/runtime/cli" "multiFileText"
+  reviewed "effect@4.0.5 sha256:0d9045ebad6c7654"
+
+/// The formats `file_parse` reads.
+type FileFormat = Ini | Json | Toml | Yaml
+  deriving Eq, Show
+
+/// `Cli.Value` parses the JSON text of the data of the file the value
+/// names, read in `format` (`None`: by its extension).
+file_parse : Option FileFormat -> Multi a t -> Multi a t
+foreign pure file_parse from "@flick-lang/runtime/cli" "multiFileParse"
+  arity 2
+  reviewed "effect@4.0.5 sha256:56348d624c058c67"
 
 /// A command named `name` with no options yet.
 command : String -> Spec none none {}
 foreign pure command from "@flick-lang/runtime/cli" "specCommand"
+  reviewed "effect@4.0.5 sha256:2cfaa70f0f57d3d2"
 
 /// The help text of the command. Like every combinator here, it keeps the
 /// captures `c` of what it is given, so a command whose handler holds a
@@ -88,6 +190,45 @@ description : forall c r e o. String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
 foreign pure description from "@flick-lang/runtime/cli" "specDescription"
   arity 2
   retention call
+  reviewed "effect@4.0.5 sha256:886f18ab4b8311a8"
+
+/// The line that lists the command among its parent's subcommands.
+short_description : forall c r e o. String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
+foreign pure short_description from "@flick-lang/runtime/cli" "specShortDescription"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:0275fa273590d7b2"
+
+/// Another name of the command as a subcommand.
+alias : forall c r e o. String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
+foreign pure alias from "@flick-lang/runtime/cli" "specAlias"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:2252299d039557d0"
+
+/// The command is left out of its parent's help; it still runs.
+unlisted : forall c r e o. (Spec r e o)^c -> (Spec r e o)^c
+foreign pure unlisted from "@flick-lang/runtime/cli" "specUnlisted"
+  retention call
+  reviewed "effect@4.0.5 sha256:6f69c621e82d6d55"
+
+/// An example command line for help, with what it does (`""`: nothing).
+example : forall c r e o. String -> String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
+foreign pure example from "@flick-lang/runtime/cli" "specExample"
+  arity 3
+  retention call
+  reviewed "effect@4.0.5 sha256:ad3bc05d789d6457"
+
+/// What an action sees: the names of the command line's commands and the version.
+type alias ActionContext = { commandPath : List String; version : String }
+
+/// The switch `--<name>` of this command and its subcommands, with its help
+/// text: given, it runs `act` instead of any handler, like `--version`.
+action : forall c r e o. String -> String -> (ActionContext ->{} Unit)^c -> ((Spec r e o)^c -> (Spec r e o)^c)^c
+foreign pure action from "@flick-lang/runtime/cli" "specAction"
+  arity 4
+  retention call
+  reviewed "effect@4.0.5 sha256:485a1c3df2cdedc3"
 
 /// The flag `--<label>` (underscores become dashes), with more names
 /// (`"n"` is `-n`), its help text and how its values make field `l`.
@@ -98,6 +239,7 @@ flag :
 foreign pure flag from "@flick-lang/runtime/cli" "specFlag"
   arity 5
   retention call
+  reviewed "effect@4.0.5 sha256:e2248cc36d41abe8"
 
 /// The next positional argument, with its help text.
 arg :
@@ -107,6 +249,7 @@ arg :
 foreign pure arg from "@flick-lang/runtime/cli" "specArg"
   arity 4
   retention call
+  reviewed "effect@4.0.5 sha256:82fa61fff2987aa0"
 
 /// A nested command, with its help text.
 subcommand :
@@ -115,6 +258,7 @@ subcommand :
 foreign pure subcommand from "@flick-lang/runtime/cli" "specSubcommand"
   arity 3
   retention call
+  reviewed "effect@4.0.5 sha256:ce9428c267177c25"
 
 /// The command, running `handler` with the parsed options.
 handle :
@@ -123,17 +267,109 @@ handle :
 foreign pure handle from "@flick-lang/runtime/cli" "specHandle"
   arity 2
   retention call
+  reviewed "effect@4.0.5 sha256:3be9ad830ea5e5f6"
 
 /// The command without a handler of its own: it needs subcommands, and run
 /// without one it prints its help and fails with `CliError`.
 group : forall c r e o. (Spec r e o)^c -> (Command r e)^c
 foreign pure group from "@flick-lang/runtime/cli" "specGroup"
   retention call
+  reviewed "effect@4.0.5 sha256:ccc0103e6db4f51a"
+
+
+/// A flag in help: `type_` names its value, empty for a switch.
+type alias FlagDoc =
+  { name : String; aliases : List String; type_ : String; description : Option String; required : Bool }
+
+/// A positional argument in help.
+type alias ArgDoc =
+  { name : String; type_ : String; description : Option String; required : Bool; variadic : Bool }
+
+/// A subcommand in its parent's help.
+type alias SubcommandDoc =
+  { name : String; alias : Option String; shortDescription : Option String; description : String }
+
+/// Subcommands listed together, under `group` if it has a name.
+type alias SubcommandGroupDoc = { group : Option String; commands : NonEmpty.NonEmpty SubcommandDoc }
+
+/// An example command line in help.
+type alias ExampleDoc = { command : String; description : Option String }
+
+/// What `--help` shows of a command, before a `Formatter` renders it.
+type alias HelpDoc =
+  {
+    description : String;
+    usage : String;
+    flags : List FlagDoc;
+    globalFlags : List FlagDoc;
+    args : List ArgDoc;
+    subcommands : List SubcommandGroupDoc;
+    examples : List ExampleDoc
+  }
+
+/// How `--help` and `--version` (the command's name, then the version) print.
+type alias Formatter = { formatHelpDoc : HelpDoc -> String; formatVersion : String -> String -> String }
+
+/// Effect's formatter, with ANSI colors when `colors`.
+default_formatter : Bool -> Formatter
+foreign pure default_formatter from "@flick-lang/runtime/cli" "cliDefaultFormatter"
+  reviewed "effect@4.0.5 sha256:381e2a39c3f920ba"
+
+/// The columns `text` takes in a terminal, without its ANSI escapes.
+display_width : String -> Number
+foreign pure display_width from "@flick-lang/runtime/cli" "cliDisplayWidth"
+  reviewed "effect@4.0.5 sha256:2a6f63717edc3afe"
+
+/// The help document `--help` gives after the subcommand names `path`.
+help_doc : forall c r e. List String -> (Command r e)^c ->{} HelpDoc
+foreign effect help_doc from "@flick-lang/runtime/cli" "cliHelpDoc"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:765206af2d25ce95"
+
+/// The text of `help_doc`, without colors.
+help : forall c r e. List String -> (Command r e)^c ->{} String
+let help path command = (default_formatter false).formatHelpDoc (help_doc path command)
+
+/// The shells `completions` writes scripts for.
+type Shell = Bash | Zsh | Fish | PowerShell
+  deriving Eq, Show
+
+/// The script that completes the command line of `command` in `shell`.
+completions : forall c r e. Shell -> (Command r e)^c ->{} String
+foreign effect completions from "@flick-lang/runtime/cli" "cliCompletions"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:a9819eb64f8a0291"
+
+/// The flags every command line has unless `Settings` leave them out:
+/// `--help`, `--version`, `--wizard` (asks for each value on the terminal),
+/// `--completions <shell>` and `--log-level <level>` (the handler's minimum).
+type BuiltIn = HelpFlag | VersionFlag | WizardFlag | CompletionsFlag | LogLevelFlag
+  deriving Eq, Show
+
+/// Every built-in flag, in Effect's order.
+builtins : List BuiltIn
+let builtins = [HelpFlag, VersionFlag, WizardFlag, CompletionsFlag, LogLevelFlag]
+
+/// How `run_with` runs: the text of `--version`, the built-in flags, and the
+/// formatter of help (`None`: Effect's, colored on a terminal).
+type alias Settings = { version : String; builtIns : List BuiltIn; formatter : Option Formatter }
+
+/// Version `0.0.0`, every built-in flag, Effect's formatter.
+settings : Settings
+let settings = { version = "0.0.0"; builtIns = builtins; formatter = None }
 
 /// Parses `args` and runs the handler of the command they name, in the
-/// current fiber, after the whole line parsed. `--help`, `--version` (which
-/// prints `version`) and `--completions bash|zsh|fish` print to stdout and
-/// run no handler; invalid input is `CliError` with Effect's text.
+/// current fiber, after the whole line parsed. The built-in flags print to
+/// stdout and run no handler; invalid input is `CliError` with Effect's text.
+run_with : forall c r e. Settings -> (Command r e)^c -> (List String ->{r; CliError | e} Unit)^c
+foreign effect run_with from "@flick-lang/runtime/cli" "cliRunWith"
+  arity 3
+  retention call
+  reviewed "effect@4.0.5 sha256:fe039b878ff7b17a"
+
+/// `run_with` the `settings` with `version`.
 run_version : forall c r e. String -> (Command r e)^c -> (List String ->{r; CliError | e} Unit)^c
 foreign effect run_version from "@flick-lang/runtime/cli" "cliRunVersion"
   arity 3

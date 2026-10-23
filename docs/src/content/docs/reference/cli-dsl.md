@@ -50,8 +50,9 @@ alias of one character `-n`, a longer one `--name`.
 | `NonEmpty T` | as `List T`, at least one | `Cli.some` |
 
 A value of type `T` is parsed by the class `Cli.Value T`: instances exist for
-`String`, `Bool`, `Number` (no NaN, no empty text), `BigInt` and
-`Redacted String`. `deriving Cli.Value` makes one for a type of constructors
+`String`, `Bool`, `Number` (no NaN, no empty text), `BigInt`,
+`Redacted String`, `DateTime.DateTime` (ISO 8601) and `(String, String)`
+(`key=value`, split at the first `=`). `deriving Cli.Value` makes one for a type of constructors
 without fields — a choice among their names in kebab case, `GreenLight` is
 `green-light` — and for a refined type, which parses its base and checks its
 predicate.
@@ -72,8 +73,30 @@ let greet =
     |> Cli.handle (fun { loud; times; name } -> Platform.stdout_line name)
 ```
 
-`Cli.subcommand command help` adds a subcommand; `Cli.group` ends a command
-without a handler of its own. The options record grows through
+`Cli.subcommand command help` adds a subcommand (`help` lists it in its
+parent's help); `Cli.group` ends a command without a handler of its own.
+
+Only the combinators reach these:
+
+| Combinator | Meaning |
+| - | - |
+| `Cli.at_least n`, `Cli.at_most n`, `Cli.between m n` | a `List` of that many values |
+| `Cli.from_config config` | one value, read from a `Config.Config` when absent |
+| `Cli.from_prompt prompt` | one value, asked with a `Cli.Prompt.Prompt` when absent |
+| `Cli.hidden`, `Cli.metavar name` | applied to a multiplicity: left out of help, or the name of the value there |
+| `Cli.optional_value text` | a flag written alone takes `text` |
+| `Cli.file b`, `Cli.directory b`, `Cli.path b` | the value names a path, which must exist when `b` |
+| `Cli.file_text`, `Cli.file_parse format` | `Cli.Value` parses the file's text, or the JSON of its INI, JSON, TOML or YAML data |
+| `Cli.short_description`, `Cli.alias`, `Cli.unlisted`, `Cli.example` | how the command shows in help |
+| `Cli.action name help act` | the switch `--name`, which runs `act` instead of any handler |
+
+`Cli.help_doc path command` is the `Cli.HelpDoc` record `--help` shows after
+the subcommands `path`, `Cli.help` its text, and `Cli.completions shell
+command` the completion script. Interactive questions are `Cli.Prompt`:
+values such as `Cli.Prompt.text`, `Cli.Prompt.select` or `Cli.Prompt.custom`,
+asked by `Cli.Prompt.run` on the service `Cli.Prompt.Tty` (`Cli.Prompt.node`
+is the process's terminal; a fake is a `Layer.succeed Tty` record), one key
+press at a time. The options record grows through
 `Record.Lacks` and `Record.UnionDisjoint`, so a field given twice or a
 handler pattern naming a field the command does not have is a type error.
 
@@ -82,7 +105,9 @@ handler pattern naming a field the command does not have is a type error.
 `Cli.run command args` parses `args` with Effect's CLI and only then runs
 the handler of the command they name, in the current fiber, with the
 Node.js services Effect's CLI needs. `Cli.run_version version command args`
-also gives the text of `--version` (`Cli.run` uses `0.0.0`).
+also gives the text of `--version` (`Cli.run` uses `0.0.0`), and
+`Cli.run_with settings` chooses the built-in flags and a `Cli.Formatter`
+of help and version as well.
 
 ```flick
 main : Unit ->{; AppError} Unit
