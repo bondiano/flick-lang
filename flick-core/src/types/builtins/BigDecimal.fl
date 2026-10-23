@@ -240,3 +240,8 @@ instance Show BigDecimal =
 
 to_string_normal : BigDecimal -> String
 foreign pure to_string_normal from "@flick-lang/runtime" "decimalNormalString"
+
+/// A decimal as its JSON string, `"1.25"`; other text is an error.
+json : PureCodec Json BigDecimal
+foreign pure json from "@flick-lang/runtime/effect/Schema" "flickBigDecimalFromString"
+  reviewed "effect@4.0.5 sha256:9a46b1224dbb404f"

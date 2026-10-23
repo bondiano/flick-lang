@@ -18,7 +18,7 @@ import {
 import { type ExportError, exportJsonSchema } from "./exporter.ts";
 import { type SchemaError, isSchemaError, requireInert, schemaError, toSchemaError } from "./issues.ts";
 import { erase } from "../internal.ts";
-import { notesOf } from "./notes.ts";
+import { noteOf, notesOf } from "./notes.ts";
 import { type AnySchema, jsonOf, schemaRefined } from "./schemas.ts";
 
 export {
@@ -94,7 +94,7 @@ const reaches = (ast: SchemaAST.AST, seen: Set<SchemaAST.AST | string>): boolean
   const key = notes["flick/ref"] ?? ast;
   if (seen.has(key)) return false;
   seen.add(key);
-  if (notes["flick/transform"] === "effect" || notes["flick/effect"] === true) return true;
+  if (noteOf(ast, "flick/transform") === "effect" || noteOf(ast, "flick/effect") === true) return true;
   return childrenOf(ast).some((child) => reaches(child, seen));
 };
 

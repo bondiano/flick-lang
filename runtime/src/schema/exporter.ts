@@ -2,11 +2,11 @@
 // codec: the wire contract written exactly, or an `ExportError` naming the
 // path of the node that has no exact form. Never `{}` or `true` for
 // something it cannot state.
-import type { Result, SchemaAST } from "effect";
+import { type JsonSchema as EffectJsonSchema, type Result, SchemaAST } from "effect";
 
 import { err, ok, type Tagged } from "../data.ts";
 import { at } from "./issues.ts";
-import { notesOf } from "./notes.ts";
+import { noteOf, notesOf } from "./notes.ts";
 import type { AnySchema } from "./schemas.ts";
 import { tag } from "../tags.ts";
 
@@ -39,8 +39,59 @@ const TRANSFORMS = {
   effect: "an effectful transformation decides acceptance at run time",
 } as const;
 
+const TYPES: ReadonlyArray<EffectJsonSchema.Type> = ["string", "number", "boolean", "array", "object", "null", "integer"];
+
+/** Bounds that combine into one: the tighter of the two. */
+const LOWER = new Set(["minimum", "exclusiveMinimum", "minLength", "minItems", "minProperties"]);
+const UPPER = new Set(["maximum", "exclusiveMaximum", "maxLength", "maxItems", "maxProperties"]);
+
+/** `keywords` added to `out`; a keyword already there is tightened, or joins it under `allOf`. */
+const merge = (out: Record<string, unknown>, keywords: Readonly<Record<string, unknown>>): void => {
+  for (const [k, v] of Object.entries(keywords)) {
+    const old = out[k];
+    // an integer is a number: the narrower type replaces the wider
+    if (!(k in out) || (k === "type" && old === "number" && v === "integer")) out[k] = v;
+    else if (typeof old === "number" && typeof v === "number" && LOWER.has(k)) out[k] = Math.max(old, v);
+    else if (typeof old === "number" && typeof v === "number" && UPPER.has(k)) out[k] = Math.min(old, v);
+    else if (JSON.stringify(old) !== JSON.stringify(v)) {
+      const all: unknown = out["allOf"];
+      out["allOf"] = Array.isArray(all) ? all.concat([{ [k]: v }]) : [{ [k]: v }];
+    }
+  }
+};
+
+/** The keywords Effect gives a check of a node of JSON type `type`, if exact. */
+const effectKeywords = (
+  check: SchemaAST.Check<never>,
+  ast: SchemaAST.AST,
+  type: unknown,
+  path: string,
+  out: Record<string, unknown>,
+): void => {
+  if (check._tag === "FilterGroup") {
+    for (const c of check.checks) effectKeywords(c, ast, type, path, out);
+    return;
+  }
+  const notes = notesOf(check);
+  const describe = notes.expected ?? notes.message ?? "a check";
+  const write = check.annotations?.toJsonSchema;
+  if (write === undefined) throw new Unsupported(path, `the check "${describe}" has no JSON Schema form`);
+  // a check of a transformed value constrains the decoded side, not the wire
+  if (ast.encoding !== undefined) throw new Unsupported(path, `the check "${describe}" applies after a transformation`);
+  let keywords: unknown;
+  try {
+    keywords = write({ type: TYPES.find((t) => t === type), schemas: [] });
+  } catch {
+    throw new Unsupported(path, `the check "${describe}" has no JSON Schema form`);
+  }
+  if (Array.isArray(keywords) || typeof keywords !== "object" || keywords === null) {
+    throw new Unsupported(path, `the check "${describe}" has no exact JSON Schema form`);
+  }
+  merge(out, Object.fromEntries(Object.entries(keywords)));
+};
+
 /** The keywords of the checks of `ast`, which constrain what reaches it. */
-const checks = (ast: SchemaAST.AST, path: string): Readonly<Record<string, unknown>> => {
+const checks = (ast: SchemaAST.AST, path: string, type: unknown): Readonly<Record<string, unknown>> => {
   const out: Record<string, unknown> = {};
   for (const check of ast.checks ?? []) {
     const notes = notesOf(check);
@@ -51,7 +102,7 @@ const checks = (ast: SchemaAST.AST, path: string): Readonly<Record<string, unkno
     if (notes["flick/pattern"]) out["pattern"] = notes["flick/pattern"];
     else if (typeof keywords === "object") Object.assign(out, keywords);
     else if (notes["flick/refined"]) throw new Unsupported(path, `the check of ${notes["flick/refined"]} has no JSON Schema form`);
-    else throw new Unsupported(path, `the check "${notes.message ?? "a check"}" has no JSON Schema form`);
+    else effectKeywords(check, ast, type, path, out);
   }
   return out;
 };
@@ -90,9 +141,9 @@ const wireEnd = (ast: SchemaAST.AST): SchemaAST.AST | undefined => ast.encoding?
 
 const body = (ast: SchemaAST.AST, path: string, defs: Defs): JsonSchema => {
   const notes = notesOf(ast);
-  const refused = notes["flick/refuse"];
+  const refused = noteOf(ast, "flick/refuse");
   if (refused) throw new Unsupported(path, refused);
-  const transform = notes["flick/transform"];
+  const transform = noteOf(ast, "flick/transform");
   const unwritable = transform && TRANSFORMS[transform];
   if (unwritable) throw new Unsupported(path, unwritable);
   if (notes["flick/block"] && ast._tag === "Objects") {
@@ -119,18 +170,23 @@ const body = (ast: SchemaAST.AST, path: string, defs: Defs): JsonSchema => {
       if (ast.elements.length === 0 && rest !== undefined && more.length === 0) {
         return { type: "array", items: schemaOf(rest, `${path}[]`, defs) };
       }
-      if (rest === undefined) {
-        return {
-          type: "array",
-          prefixItems: ast.elements.map((e, i) => schemaOf(e, `${path}[${i}]`, defs)),
-          items: false,
-        };
+      const prefixItems = ast.elements.map((e, i) => schemaOf(e, `${path}[${i}]`, defs));
+      if (rest === undefined) return { type: "array", prefixItems, items: false };
+      if (more.length === 0 && ast.elements.every((e) => e.context?.isOptional !== true)) {
+        return { type: "array", prefixItems, items: schemaOf(rest, `${path}[]`, defs), minItems: prefixItems.length };
       }
       break;
     }
-    case "Objects":
+    case "Objects": {
       if (ast.indexSignatures.length === 0) return objectOf(ast, path, defs, undefined, true);
+      const [index, ...others] = ast.indexSignatures;
+      // a dictionary: string keys, every value of one schema
+      if (index && others.length === 0 && ast.propertySignatures.length === 0 && index.parameter._tag === "String") {
+        if (index.parameter.checks?.length) break;
+        return { type: "object", additionalProperties: schemaOf(index.type, `${path}.*`, defs) };
+      }
       break;
+    }
     case "Union": {
       // an absent key is no wire value
       const members = ast.types.filter((t) => t._tag !== "Undefined");
@@ -159,9 +215,18 @@ const schemaOf = (ast: SchemaAST.AST, path: string, defs: Defs): JsonSchema => {
     }
     return { $ref: `#/$defs/${ref}` };
   }
-  const keywords = checks(ast, path);
   const out = body(ast, path, defs);
-  return Object.keys(keywords).length > 0 && typeof out === "object" ? { ...out, ...keywords } : out;
+  const keywords = checks(ast, path, typeof out === "object" ? out["type"] : undefined);
+  if (typeof out !== "object") return out;
+  // an annotation of a node with checks sits on its last check
+  const { title, description } = SchemaAST.resolve(ast) ?? {};
+  const merged: Record<string, unknown> = {
+    ...out,
+    ...(typeof title === "string" ? { title } : {}),
+    ...(typeof description === "string" ? { description } : {}),
+  };
+  merge(merged, keywords);
+  return merged;
 };
 
 /** `Codec.json_schema root codec`: the schema as JSON text, or an `ExportError`. */

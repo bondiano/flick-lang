@@ -1,0 +1,13 @@
+digits in range: true, count 20
+constant: ["x", "x"]
+list lengths in bounds: true
+filter evens: true
+filter_map: true
+flat_map and all: true
+from_schema_with: 3
+check: passed 50, report None
+check: falsified at 5 (false), replay true
+report mentions shrunk input: true
+check: falsified at 4 (error), replay true
+check: exhausted after 501 discards
+sample error after 101 discards

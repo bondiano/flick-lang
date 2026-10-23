@@ -1,0 +1,329 @@
+/// Checks of decoded values: Effect Schema's filters as values, applied to
+/// a codec by `apply`: `String.json |> Check.apply (Check.min_length 3)`.
+/// The strict JSON Schema exporter states a check only when its keywords
+/// are exact, and refuses it otherwise.
+module Check exposing (..)
+
+/// A check of values of type `a`.
+type Check a
+
+/// The codec, accepting only values that pass the check both ways.
+apply : Check a -> PureCodec i a -> PureCodec i a
+foreign pure apply from "@flick-lang/runtime/effect/Schema" "flickCheck"
+  reviewed "effect@4.0.5 sha256:bfef4982ef0cbdbc"
+
+/// All of the checks, reported together.
+all : NonEmpty.NonEmpty (Check a) -> Check a
+foreign pure all from "@flick-lang/runtime/effect/Schema" "makeFilterGroup"
+  reviewed "effect@4.0.5 sha256:a32bb44f8aa2efa9"
+
+/// A check by a pure predicate, failing with `message`; it has no JSON
+/// Schema form.
+predicate : (a -> Bool) -> String -> Check a
+foreign pure predicate from "@flick-lang/runtime/effect/Schema" "flickMakeFilter"
+  reviewed "effect@4.0.5 sha256:7eab283772e9e378"
+
+/// At least `n` UTF-16 code units.
+min_length : Number -> Check String
+foreign pure min_length from "@flick-lang/runtime/effect/Schema" "isMinLength"
+  reviewed "effect@4.0.5 sha256:f1d7a04512c67b3e"
+
+/// At most `n` UTF-16 code units.
+max_length : Number -> Check String
+foreign pure max_length from "@flick-lang/runtime/effect/Schema" "isMaxLength"
+  reviewed "effect@4.0.5 sha256:24a60bba09eeaf98"
+
+/// Between `low` and `high` UTF-16 code units, inclusive.
+length_between : Number -> Number -> Check String
+foreign pure length_between from "@flick-lang/runtime/effect/Schema" "isBetweenLength"
+  reviewed "effect@4.0.5 sha256:3c385000227a76d5"
+
+/// Not the empty string.
+non_empty : Check String
+foreign pure non_empty from "@flick-lang/runtime/effect/Schema" "flickIsNonEmpty"
+  reviewed "effect@4.0.5 sha256:dd1c00c7ac8cd7c4"
+
+/// At least `n` code points.
+min_code_points : Number -> Check String
+foreign pure min_code_points from "@flick-lang/runtime/effect/Schema" "isMinCodePoints"
+  reviewed "effect@4.0.5 sha256:48921469629e24a9"
+
+/// At most `n` code points.
+max_code_points : Number -> Check String
+foreign pure max_code_points from "@flick-lang/runtime/effect/Schema" "isMaxCodePoints"
+  reviewed "effect@4.0.5 sha256:99e66dd2ec37f435"
+
+/// Between `low` and `high` code points, inclusive.
+code_points_between : Number -> Number -> Check String
+foreign pure code_points_between from "@flick-lang/runtime/effect/Schema" "isBetweenCodePoints"
+  reviewed "effect@4.0.5 sha256:f5ae99b4fba2c9fd"
+
+/// Matches the regular expression `source` (no flags); a malformed one is
+/// a defect.
+pattern : String -> Check String
+foreign pure pattern from "@flick-lang/runtime/effect/Schema" "flickIsPattern"
+  reviewed "effect@4.0.5 sha256:a4f632a0bc6bade9"
+
+/// Begins with the prefix.
+starts_with : String -> Check String
+foreign pure starts_with from "@flick-lang/runtime/effect/Schema" "isStartingWith"
+  reviewed "effect@4.0.5 sha256:332b1877fa023bba"
+
+/// Ends with the suffix.
+ends_with : String -> Check String
+foreign pure ends_with from "@flick-lang/runtime/effect/Schema" "isEndingWith"
+  reviewed "effect@4.0.5 sha256:ef98d333f7917b04"
+
+/// Contains the text.
+includes : String -> Check String
+foreign pure includes from "@flick-lang/runtime/effect/Schema" "isIncluding"
+  reviewed "effect@4.0.5 sha256:4aa88fc34e688f86"
+
+/// No leading or trailing whitespace.
+trimmed : Check String
+foreign pure trimmed from "@flick-lang/runtime/effect/Schema" "flickIsTrimmed"
+  reviewed "effect@4.0.5 sha256:63bb833d418a1e78"
+
+/// No uppercase letter.
+lowercased : Check String
+foreign pure lowercased from "@flick-lang/runtime/effect/Schema" "flickIsLowercased"
+  reviewed "effect@4.0.5 sha256:cf510ad98cb838ba"
+
+/// No lowercase letter.
+uppercased : Check String
+foreign pure uppercased from "@flick-lang/runtime/effect/Schema" "flickIsUppercased"
+  reviewed "effect@4.0.5 sha256:b10ba778ac9d8838"
+
+/// The first character is not lowercase.
+capitalized : Check String
+foreign pure capitalized from "@flick-lang/runtime/effect/Schema" "flickIsCapitalized"
+  reviewed "effect@4.0.5 sha256:d7c771b8ecef258d"
+
+/// The first character is not uppercase.
+uncapitalized : Check String
+foreign pure uncapitalized from "@flick-lang/runtime/effect/Schema" "flickIsUncapitalized"
+  reviewed "effect@4.0.5 sha256:882ff1774bfbe675"
+
+/// A UUID, of the version given or of any.
+uuid : Option Number -> Check String
+foreign pure uuid from "@flick-lang/runtime/effect/Schema" "isUUID"
+  optional 0
+  reviewed "effect@4.0.5 sha256:842233f83770db63"
+
+/// A ULID: 26 characters of Crockford base32.
+ulid : Check String
+foreign pure ulid from "@flick-lang/runtime/effect/Schema" "flickIsULID"
+  reviewed "effect@4.0.5 sha256:39bd633750b9c8a5"
+
+/// A GUID: a UUID of any version, or the nil or max one.
+guid : Check String
+foreign pure guid from "@flick-lang/runtime/effect/Schema" "flickIsGUID"
+  reviewed "effect@4.0.5 sha256:9663be38969f6017"
+
+/// Base64 text, padded.
+base64 : Check String
+foreign pure base64 from "@flick-lang/runtime/effect/Schema" "flickIsBase64"
+  reviewed "effect@4.0.5 sha256:1da4a52985b358bd"
+
+/// URL-safe base64 text, without padding.
+base64url : Check String
+foreign pure base64url from "@flick-lang/runtime/effect/Schema" "flickIsBase64Url"
+  reviewed "effect@4.0.5 sha256:0023432d0e950c08"
+
+/// The text of a finite number.
+string_finite : Check String
+foreign pure string_finite from "@flick-lang/runtime/effect/Schema" "flickIsStringFinite"
+  reviewed "effect@4.0.5 sha256:006b45fdfc0bdecb"
+
+/// The text of an integer, as `BigInt` reads it.
+string_bigint : Check String
+foreign pure string_bigint from "@flick-lang/runtime/effect/Schema" "flickIsStringBigInt"
+  reviewed "effect@4.0.5 sha256:b7d6b562dc4fc03d"
+
+/// Greater than the bound.
+greater_than : Number -> Check Number
+foreign pure greater_than from "@flick-lang/runtime/effect/Schema" "isGreaterThan"
+  reviewed "effect@4.0.5 sha256:e1fd1d098feb730a"
+
+/// At least the bound.
+greater_than_or_equal_to : Number -> Check Number
+foreign pure greater_than_or_equal_to from "@flick-lang/runtime/effect/Schema" "isGreaterThanOrEqualTo"
+  reviewed "effect@4.0.5 sha256:f954f1c75e85b59b"
+
+/// Less than the bound.
+less_than : Number -> Check Number
+foreign pure less_than from "@flick-lang/runtime/effect/Schema" "isLessThan"
+  reviewed "effect@4.0.5 sha256:1db615b16c861f04"
+
+/// At most the bound.
+less_than_or_equal_to : Number -> Check Number
+foreign pure less_than_or_equal_to from "@flick-lang/runtime/effect/Schema" "isLessThanOrEqualTo"
+  reviewed "effect@4.0.5 sha256:daf02fd9efb0618d"
+
+/// Between the bounds; each excluded when its flag is set.
+between : { minimum : Number; maximum : Number; exclusiveMinimum : Bool; exclusiveMaximum : Bool } -> Check Number
+foreign pure between from "@flick-lang/runtime/effect/Schema" "isBetween"
+  reviewed "effect@4.0.5 sha256:79353aaa06cb14d9"
+
+/// A multiple of the divisor.
+multiple_of : Number -> Check Number
+foreign pure multiple_of from "@flick-lang/runtime/effect/Schema" "isMultipleOf"
+  reviewed "effect@4.0.5 sha256:4fb163cbebd7797c"
+
+/// A safe integer.
+int : Check Number
+foreign pure int from "@flick-lang/runtime/effect/Schema" "flickIsInt"
+  reviewed "effect@4.0.5 sha256:44a60667ef66074f"
+
+/// An integer that fits in 32 signed bits.
+int32 : Check Number
+foreign pure int32 from "@flick-lang/runtime/effect/Schema" "flickIsInt32"
+  reviewed "effect@4.0.5 sha256:d60a1337f9ea88cd"
+
+/// An integer that fits in 32 unsigned bits.
+uint32 : Check Number
+foreign pure uint32 from "@flick-lang/runtime/effect/Schema" "flickIsUint32"
+  reviewed "effect@4.0.5 sha256:341e2c1abc9b152b"
+
+/// Neither `NaN` nor an infinity.
+finite : Check Number
+foreign pure finite from "@flick-lang/runtime/effect/Schema" "flickIsFinite"
+  reviewed "effect@4.0.5 sha256:6e7ca9ed57962346"
+
+/// Greater than the bound.
+greater_than_bigint : BigInt -> Check BigInt
+foreign pure greater_than_bigint from "@flick-lang/runtime/effect/Schema" "isGreaterThanBigInt"
+  reviewed "effect@4.0.5 sha256:c1c72657d7c0895d"
+
+/// At least the bound.
+greater_than_or_equal_to_bigint : BigInt -> Check BigInt
+foreign pure greater_than_or_equal_to_bigint from "@flick-lang/runtime/effect/Schema" "isGreaterThanOrEqualToBigInt"
+  reviewed "effect@4.0.5 sha256:b5a57f80f234caf8"
+
+/// Less than the bound.
+less_than_bigint : BigInt -> Check BigInt
+foreign pure less_than_bigint from "@flick-lang/runtime/effect/Schema" "isLessThanBigInt"
+  reviewed "effect@4.0.5 sha256:4aeed7ff58112503"
+
+/// At most the bound.
+less_than_or_equal_to_bigint : BigInt -> Check BigInt
+foreign pure less_than_or_equal_to_bigint from "@flick-lang/runtime/effect/Schema" "isLessThanOrEqualToBigInt"
+  reviewed "effect@4.0.5 sha256:d73801f2576fd562"
+
+/// Between the bounds; each excluded when its flag is set.
+between_bigint : { minimum : BigInt; maximum : BigInt; exclusiveMinimum : Bool; exclusiveMaximum : Bool } -> Check BigInt
+foreign pure between_bigint from "@flick-lang/runtime/effect/Schema" "isBetweenBigInt"
+  reviewed "effect@4.0.5 sha256:fc75d2b810b84787"
+
+/// Greater than the bound.
+greater_than_decimal : BigDecimal.BigDecimal -> Check BigDecimal.BigDecimal
+foreign pure greater_than_decimal from "@flick-lang/runtime/effect/Schema" "isGreaterThanBigDecimal"
+  reviewed "effect@4.0.5 sha256:60de0f9f3eb543bf"
+
+/// At least the bound.
+greater_than_or_equal_to_decimal : BigDecimal.BigDecimal -> Check BigDecimal.BigDecimal
+foreign pure greater_than_or_equal_to_decimal from "@flick-lang/runtime/effect/Schema" "isGreaterThanOrEqualToBigDecimal"
+  reviewed "effect@4.0.5 sha256:9584ba69db9318ac"
+
+/// Less than the bound.
+less_than_decimal : BigDecimal.BigDecimal -> Check BigDecimal.BigDecimal
+foreign pure less_than_decimal from "@flick-lang/runtime/effect/Schema" "isLessThanBigDecimal"
+  reviewed "effect@4.0.5 sha256:cb5f6c41de40958f"
+
+/// At most the bound.
+less_than_or_equal_to_decimal : BigDecimal.BigDecimal -> Check BigDecimal.BigDecimal
+foreign pure less_than_or_equal_to_decimal from "@flick-lang/runtime/effect/Schema" "isLessThanOrEqualToBigDecimal"
+  reviewed "effect@4.0.5 sha256:ac557c63c7aa6f01"
+
+/// Between the bounds; each excluded when its flag is set.
+between_decimal :
+  { minimum : BigDecimal.BigDecimal; maximum : BigDecimal.BigDecimal; exclusiveMinimum : Bool; exclusiveMaximum : Bool } ->
+  Check BigDecimal.BigDecimal
+foreign pure between_decimal from "@flick-lang/runtime/effect/Schema" "isBetweenBigDecimal"
+  reviewed "effect@4.0.5 sha256:29a29dc732dd37f2"
+
+/// Greater than the bound by the type's `Ord`.
+greater_than_by : Ord a => a -> Check a
+foreign pure greater_than_by from "@flick-lang/runtime/effect/Schema" "flickMakeIsGreaterThan"
+  reviewed "effect@4.0.5 sha256:36bcfd5072ba14b7"
+
+/// At least the bound by the type's `Ord`.
+greater_than_or_equal_to_by : Ord a => a -> Check a
+foreign pure greater_than_or_equal_to_by from "@flick-lang/runtime/effect/Schema" "flickMakeIsGreaterThanOrEqualTo"
+  reviewed "effect@4.0.5 sha256:a402d4f31abe9e08"
+
+/// Less than the bound by the type's `Ord`.
+less_than_by : Ord a => a -> Check a
+foreign pure less_than_by from "@flick-lang/runtime/effect/Schema" "flickMakeIsLessThan"
+  reviewed "effect@4.0.5 sha256:de073a3a3828fa27"
+
+/// At most the bound by the type's `Ord`.
+less_than_or_equal_to_by : Ord a => a -> Check a
+foreign pure less_than_or_equal_to_by from "@flick-lang/runtime/effect/Schema" "flickMakeIsLessThanOrEqualTo"
+  reviewed "effect@4.0.5 sha256:f56e76d01d7160a7"
+
+/// Between the bounds, inclusive, by the type's `Ord`.
+between_by : Ord a => a -> a -> Check a
+foreign pure between_by from "@flick-lang/runtime/effect/Schema" "flickMakeIsBetween"
+  reviewed "effect@4.0.5 sha256:0094105df0e5b10e"
+
+/// `remainder value divisor` is `zero` (compared with JS `===`, so for
+/// primitive types).
+multiple_of_by : (a -> a -> a) -> a -> a -> Check a
+foreign pure multiple_of_by from "@flick-lang/runtime/effect/Schema" "flickMakeIsMultipleOf"
+  reviewed "effect@4.0.5 sha256:7341632612f22be7"
+
+/// At least `n` elements.
+min_items : Number -> Check (List a)
+foreign pure min_items from "@flick-lang/runtime/effect/Schema" "isMinLength"
+  reviewed "effect@4.0.5 sha256:f1d7a04512c67b3e"
+
+/// At most `n` elements.
+max_items : Number -> Check (List a)
+foreign pure max_items from "@flick-lang/runtime/effect/Schema" "isMaxLength"
+  reviewed "effect@4.0.5 sha256:24a60bba09eeaf98"
+
+/// No two elements equal by Effect's structural `Equal`.
+unique : Check (List a)
+foreign pure unique from "@flick-lang/runtime/effect/Schema" "flickIsUnique"
+  reviewed "effect@4.0.5 sha256:af0e9e28be5f89ec"
+
+/// No two pairs with equal keys.
+unique_keys : Check (List (k, v))
+foreign pure unique_keys from "@flick-lang/runtime/effect/Schema" "flickIsUniqueKey"
+  reviewed "effect@4.0.5 sha256:0c3e4dca300f2abb"
+
+/// A set of at least `n` elements.
+min_size : Number -> Check (HashSet.HashSet w a)
+foreign pure min_size from "@flick-lang/runtime/effect/Schema" "flickIsMinSize"
+  reviewed "effect@4.0.5 sha256:28eb708b257fc422"
+
+/// A set of at most `n` elements.
+max_size : Number -> Check (HashSet.HashSet w a)
+foreign pure max_size from "@flick-lang/runtime/effect/Schema" "flickIsMaxSize"
+  reviewed "effect@4.0.5 sha256:59f38203b45a8bef"
+
+/// A set of `low` to `high` elements, inclusive.
+size_between : Number -> Number -> Check (HashSet.HashSet w a)
+foreign pure size_between from "@flick-lang/runtime/effect/Schema" "flickIsBetweenSize"
+  reviewed "effect@4.0.5 sha256:46dcb2c6d6c788d6"
+
+/// At least `n` keys in the object of a `Codec.entries` codec.
+min_properties : Number -> PureCodec Json (List (String, v)) -> PureCodec Json (List (String, v))
+foreign pure min_properties from "@flick-lang/runtime/effect/Schema" "flickIsMinProperties"
+  reviewed "effect@4.0.5 sha256:de473f1b0c84478c"
+
+/// At most `n` keys in the object of a `Codec.entries` codec.
+max_properties : Number -> PureCodec Json (List (String, v)) -> PureCodec Json (List (String, v))
+foreign pure max_properties from "@flick-lang/runtime/effect/Schema" "flickIsMaxProperties"
+  reviewed "effect@4.0.5 sha256:0073940e582a44a2"
+
+/// `low` to `high` keys in the object of a `Codec.entries` codec.
+properties_between : Number -> Number -> PureCodec Json (List (String, v)) -> PureCodec Json (List (String, v))
+foreign pure properties_between from "@flick-lang/runtime/effect/Schema" "flickIsBetweenProperties"
+  reviewed "effect@4.0.5 sha256:f0d1fe343313d4a4"
+
+/// Every key of the object of a `Codec.entries` codec decodes with `key`.
+property_names : PureCodec Json String -> PureCodec Json (List (String, v)) -> PureCodec Json (List (String, v))
+foreign pure property_names from "@flick-lang/runtime/effect/Schema" "flickIsPropertyNames"
+  reviewed "effect@4.0.5 sha256:18e0e777ae354f9c"

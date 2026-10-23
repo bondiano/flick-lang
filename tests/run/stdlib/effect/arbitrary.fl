@@ -1,0 +1,80 @@
+// Effect's `Arbitrary`: seeded samples of generators made from schemas and
+// combinators, and property checks that pass, shrink a failure, report a
+// typed error of the property, or run out of values.
+module App.Main exposing (main)
+
+type error TooBig = TooBig Number
+
+seeded : Number -> Arbitrary.SampleOptions
+let seeded n = { count = Some n; size = None; maxDiscards = None; seed = Some 42 }
+
+checking : Arbitrary.CheckOptions
+let checking = { runs = Some 50; size = None; maxDiscards = None; maxShrinks = None; seed = Some 7; replay = None }
+
+/// Effect generates within the bounds its checks state.
+digit_json : PureCodec Json Number
+let digit_json =
+  Number.json_finite
+    |> Check.apply Check.int
+    |> Check.apply (Check.between { minimum = 0; maximum = 9; exclusiveMinimum = false; exclusiveMaximum = false })
+
+digits : Arbitrary.Arbitrary Number
+let digits = Arbitrary.map (fun n -> n) (Arbitrary.from_schema (Codec.to_schema digit_json))
+
+describe : Show a => Arbitrary.CheckResult e a -> String
+let describe result =
+  match result with
+  | Arbitrary.Passed r -> "passed " ++ show r.runs
+  | Arbitrary.Falsified r ->
+    let failure : Arbitrary.PropertyFailure e = r.failure
+    let why = match failure with
+      | Arbitrary.ReturnedFalse -> "false"
+      | Arbitrary.PropertyError _ -> "error"
+    let replay : Arbitrary.Replay = r.replay
+    "falsified at " ++ show r.shrunkInput ++ " (" ++ why ++ "), replay " ++ show (String.length replay > 0)
+  | Arbitrary.Exhausted r -> "exhausted after " ++ show r.discards ++ " discards"
+  | Arbitrary.ReplayMismatch reason -> "replay mismatch " ++ reason
+
+below_five : Number ->{} Bool
+let below_five n = n < 5
+
+small : Number ->{; TooBig} Bool
+let small n = if n > 3 then from_result (Err (TooBig n)) else true
+
+run : Unit ->{; Arbitrary.SampleError} Unit
+let run () =
+  let all_digits = Arbitrary.sample (seeded 20) digits
+  Platform.stdout_line ("digits in range: " ++ show (List.all (fun n -> n >= 0 && n <= 9) all_digits) ++ ", count " ++ show (List.length all_digits))
+  Platform.stdout_line ("constant: " ++ show (Arbitrary.sample (seeded 2) (Arbitrary.constant "x")))
+  let bounds : Arbitrary.ArrayOptions = { minLength = Some 1; maxLength = Some 3 }
+  let lists = Arbitrary.sample (seeded 10) (Arbitrary.list bounds digits)
+  Platform.stdout_line ("list lengths in bounds: " ++ show (List.all (fun xs -> List.length xs >= 1 && List.length xs <= 3) lists))
+  let evens = Arbitrary.sample (seeded 10) (Arbitrary.filter (fun n -> n == 2 * Number.floor (n / 2)) digits)
+  Platform.stdout_line ("filter evens: " ++ show (List.all (fun n -> n == 2 * Number.floor (n / 2)) evens))
+  let tens = Arbitrary.sample (seeded 10) (Arbitrary.filter_map (fun n -> if n > 4 then Ok (n * 10) else Err n) digits)
+  Platform.stdout_line ("filter_map: " ++ show (List.all (fun n -> n >= 50) tens))
+  let pairs = Arbitrary.sample (seeded 5) (Arbitrary.flat_map (fun n -> Arbitrary.all [Arbitrary.constant n, Arbitrary.constant (n + 1)]) digits)
+  Platform.stdout_line ("flat_map and all: " ++ show (List.all (fun p -> match p with
+    | [a, b] -> b == a + 1
+    | _ -> false) pairs))
+  let shrinking : Arbitrary.SchemaOptions Number = { shrink = None }
+  Platform.stdout_line ("from_schema_with: " ++ show (List.length (Arbitrary.sample (seeded 3) (Arbitrary.from_schema_with shrinking Schema.number))))
+  let passed = Arbitrary.check checking (fun n -> n < 10) digits
+  Platform.stdout_line ("check: " ++ describe passed ++ ", report " ++ show (Arbitrary.format_check_failure passed))
+  let falsified = Arbitrary.check checking below_five digits
+  Platform.stdout_line ("check: " ++ describe falsified)
+  let report = Option.with_default "" (Arbitrary.format_check_failure falsified)
+  Platform.stdout_line ("report mentions shrunk input: " ++ show (String.contains "Shrunk input: 5" report))
+  let failed = Arbitrary.check checking small digits
+  Platform.stdout_line ("check: " ++ describe failed)
+  let exhausted = Arbitrary.check checking (fun _ -> true) (Arbitrary.filter (fun _ -> false) digits)
+  Platform.stdout_line ("check: " ++ describe exhausted)
+  let sampled =
+    try show (Arbitrary.sample (seeded 2) (Arbitrary.filter (fun _ -> false) digits)) with
+    | Arbitrary.SampleError e -> "sample error after " ++ show e.discards ++ " discards"
+  Platform.stdout_line sampled
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try run () with
+  | Arbitrary.SampleError _ -> App.fail "a sample ran out of values"

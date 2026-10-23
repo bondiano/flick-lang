@@ -1,0 +1,53 @@
+// Effect's `JsonSchema` dialect conversions over JSON values, and `Differ`
+// patches of values through their codec's JSON form.
+module App.Main exposing (main)
+
+type alias Item = { name : String; tags : List String }
+  deriving Schema
+
+/// The JSON value of the text.
+json : String ->{; AppError} Json
+let json text =
+  match Json.parse text with
+  | Ok input -> (match Codec.decode_result Json.json input with
+    | Ok value -> value
+    | Err _ -> App.fail "not a JSON value")
+  | Err _ -> App.fail "not JSON"
+
+line : String -> String ->{} Unit
+let line name text = Platform.stdout_line (name ++ ": " ++ text)
+
+document : JsonSchema.Document -> String
+let document d = d.dialect ++ " " ++ Json.stringify d.root ++ " " ++ Json.stringify d.definitions
+
+main : Unit ->{; AppError} Unit
+let main () =
+  line "meta" (String.join " " [JsonSchema.meta_schema_uri_draft_04, JsonSchema.meta_schema_uri_draft_07, JsonSchema.meta_schema_uri_draft_2020_12])
+  let draft07 : JsonSchema.JsonSchema = json "{\"type\": \"object\", \"definitions\": {\"a\": {\"type\": \"string\"}}, \"properties\": {\"x\": {\"$ref\": \"#/definitions/a\"}}}"
+  let doc = JsonSchema.from_draft_07 draft07
+  line "from_draft_07" (document doc)
+  line "to_draft_07" (document (JsonSchema.to_draft_07 doc))
+  line "to_draft_04" (document (JsonSchema.to_draft_04 doc))
+  line "from_draft_2020_12" (document (JsonSchema.from_draft_2020_12 (json "{\"type\": \"array\", \"items\": {\"$ref\": \"#/$defs/n\"}, \"$defs\": {\"n\": {\"type\": \"number\"}}}")))
+  line "from_openapi_3_1" (document (JsonSchema.from_openapi_3_1 (json "{\"type\": \"string\", \"examples\": [\"a\"]}")))
+  line "from_openapi_3_0" (document (JsonSchema.from_openapi_3_0 (json "{\"type\": \"string\", \"nullable\": true}")))
+  let defs : JsonSchema.Definitions = doc.definitions
+  let multi : JsonSchema.MultiDocument = { dialect = "draft-2020-12"; schemas = NonEmpty.singleton doc.root; definitions = defs }
+  let openapi = JsonSchema.to_openapi_3_1 multi
+  line "to_openapi_3_1" (openapi.dialect ++ " " ++ Json.stringify (NonEmpty.head openapi.schemas))
+  let text = match Codec.json_schema "Item" (Codec.json (schema Item)) with
+    | Ok text -> text
+    | Err _ -> App.fail "no JSON Schema"
+  let exported = JsonSchema.from_draft_2020_12 (json text)
+  line "exported to draft-07" (document (JsonSchema.to_draft_07 exported))
+  let differ : Differ.Differ Item Json = Differ.json_patch (Codec.json (schema Item))
+  let old = { name = "a"; tags = ["x"] }
+  let new = { name = "b"; tags = ["x", "y"] }
+  let patch = Differ.diff old new differ
+  line "diff" (Json.stringify patch)
+  let patched = Differ.patch old patch differ
+  line "patch" (patched.name ++ " " ++ show patched.tags)
+  line "empty" (Json.stringify (Differ.empty differ))
+  line "combine" (Json.stringify (Differ.combine patch (Differ.diff new old differ) differ))
+  let back = Differ.patch old (Differ.combine patch (Differ.diff new old differ) differ) differ
+  line "round trip" (back.name ++ " " ++ show back.tags)

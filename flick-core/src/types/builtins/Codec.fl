@@ -10,45 +10,58 @@ type error ExportError = ExportError String
 /// A Standard Schema V1 object for JS libraries.
 type StandardSchema i a
 
+/// Decodes unknown input, failing with `SchemaError`; the input must be inert data.
 decode :
   forall c ci rd re i a.
   (Codec rd re i a)^c ->
   (Unknown^ci ->{rd; SchemaError} a)^c
 foreign effect decode from "@flick-lang/runtime" "codecDecode"
   retention call
+  reviewed "effect@4.0.5 sha256:0ba82b2229e48f1a"
 
+/// Encodes a value to its wire form, failing with `SchemaError`.
 encode :
   forall c rd re i a.
   (Codec rd re i a)^c -> (a ->{re; SchemaError} i)^c
 foreign effect encode from "@flick-lang/runtime" "codecEncode"
   retention call
+  reviewed "effect@4.0.5 sha256:4152dced7e364e25"
 
+/// `decode` of a pure codec, at once.
 decode_result :
   forall c ci i a.
   (PureCodec i a)^c ->
   (Unknown^ci -> Result SchemaError a)^c
 foreign pure decode_result from "@flick-lang/runtime" "codecDecodeResult"
   retention call
+  reviewed "effect@4.0.5 sha256:1770b64eba8235d3"
 
+/// `encode` of a pure codec, at once.
 encode_result :
   forall c i a.
   (PureCodec i a)^c -> (a -> Result SchemaError i)^c
 foreign pure encode_result from "@flick-lang/runtime" "codecEncodeResult"
   retention call
+  reviewed "effect@4.0.5 sha256:0475f2036c0a9a24"
 
 /// A pure codec used where a general one is expected.
 general : PureCodec i a -> Codec none none i a
 foreign pure general from "@flick-lang/runtime" "identity"
+  reviewed "effect@4.0.5 sha256:395729b0180c3f87"
 
 /// The canonical JSON form of a schema: records as objects, variants as
 /// `{"_tag": "Name", "_0": …}`, `Option` as the value or `null`. A
 /// `Redacted` value has none without an explicit policy.
 json : Schema a -> PureCodec Json a
 foreign pure json from "@flick-lang/runtime" "schemaJsonCodec"
+  reviewed "effect@4.0.5 sha256:f615eef1b6a99a43"
 
+/// A JSON array of the item's values.
 list : PureCodec Json a -> PureCodec Json (List a)
 foreign pure list from "@flick-lang/runtime" "codecList"
+  reviewed "effect@4.0.5 sha256:31e04eb2626179de"
 
+/// A JSON boolean.
 bool : PureCodec Json Bool
 foreign pure bool from "@flick-lang/runtime" "codecBool"
 
@@ -61,6 +74,7 @@ transform : forall c a b. (a -> b)^c -> (b -> a)^c -> (PureCodec Json a -> PureC
 foreign pure transform from "@flick-lang/runtime" "codecTransformPure"
   arity 3
   retention call
+  reviewed "effect@4.0.5 sha256:931c4e91baad9254"
 
 /// A decoding that may fail, and its encoding.
 transform_result :
@@ -69,6 +83,7 @@ transform_result :
 foreign pure transform_result from "@flick-lang/runtime" "codecTransformResult"
   arity 3
   retention call
+  reviewed "effect@4.0.5 sha256:c600e745195e0d87"
 
 /// A runtime decoding, whose services decoding needs: no `PureCodec`.
 transform_effect :
@@ -77,22 +92,212 @@ transform_effect :
 foreign pure transform_effect from "@flick-lang/runtime" "codecTransformEffect"
   arity 3
   retention call
+  reviewed "effect@4.0.5 sha256:c600e745195e0d87"
 
 /// A check of the whole decoded value.
 check : forall c a. (a -> Bool)^c -> String -> (PureCodec Json a -> PureCodec Json a)^c
 foreign pure check from "@flick-lang/runtime" "codecCheckWhole"
   arity 3
   retention call
+  reviewed "effect@4.0.5 sha256:7eab283772e9e378"
 
 /// The JSON Schema 2020-12 of the codec's wire form, exactly, or why not.
 json_schema : String -> PureCodec Json a -> Result ExportError String
 foreign pure json_schema from "@flick-lang/runtime" "codecJsonSchema"
+  reviewed "effect@4.0.5 sha256:2650807e6a7094fe"
 
 /// A Standard Schema V1 that validates synchronously.
 standard : PureCodec i a -> StandardSchema i a
 foreign pure standard from "@flick-lang/runtime" "codecStandard"
+  reviewed "effect@4.0.5 sha256:7e3132b35af6df94"
 
 /// A Standard Schema V1 with a Promise `validate`, run with the services
 /// and the scope of where it was made.
 standard_async : Codec rd re i a ->{rd;} StandardSchema i a
 foreign effect standard_async from "@flick-lang/runtime" "codecStandardAsync"
+
+/// Exactly the string `value`.
+literal : String -> PureCodec Json String
+foreign pure literal from "@flick-lang/runtime/effect/Schema" "Literal"
+  reviewed "effect@4.0.5 sha256:0fb873fe2f3da9df"
+
+/// One of the strings, as JSON Schema's `enum`.
+literals : List String -> PureCodec Json String
+foreign pure literals from "@flick-lang/runtime/effect/Schema" "Literals"
+  reviewed "effect@4.0.5 sha256:484a55e6c8b28050"
+
+/// A JSON object of any keys as the list of its entries, in key order of
+/// the object.
+entries : PureCodec Json v -> PureCodec Json (List (String, v))
+foreign pure entries from "@flick-lang/runtime/effect/Schema" "flickEntries"
+  reviewed "effect@4.0.5 sha256:c5df0112350001dc"
+
+/// A JSON array with at least one element.
+non_empty_list : PureCodec Json a -> PureCodec Json (NonEmpty.NonEmpty a)
+foreign pure non_empty_list from "@flick-lang/runtime/effect/Schema" "NonEmptyArray"
+  reviewed "effect@4.0.5 sha256:f724852d9c45f47b"
+
+/// An array, or one element standing for a list of it; a list of one is
+/// written as the element.
+list_ensure : PureCodec Json a -> PureCodec Json (List a)
+foreign pure list_ensure from "@flick-lang/runtime/effect/Schema" "ArrayEnsure"
+  reviewed "effect@4.0.5 sha256:08e58cac79e46223"
+
+/// A string decoded without its surrounding whitespace.
+trim : PureCodec Json String
+foreign pure trim from "@flick-lang/runtime/effect/Schema" "Trim"
+  reviewed "effect@4.0.5 sha256:118b0693ba9cf8a1"
+
+/// A string decoded in lowercase, written as it is.
+to_lower_case : PureCodec Json String
+foreign pure to_lower_case from "@flick-lang/runtime/effect/Schema" "flickToLowerCase"
+  reviewed "effect@4.0.5 sha256:1ac4a57cb654eda1"
+
+/// A string decoded in uppercase, written as it is.
+to_upper_case : PureCodec Json String
+foreign pure to_upper_case from "@flick-lang/runtime/effect/Schema" "flickToUpperCase"
+  reviewed "effect@4.0.5 sha256:fc1702d9756d9107"
+
+/// A string decoded with its first character in uppercase.
+capitalize : PureCodec Json String
+foreign pure capitalize from "@flick-lang/runtime/effect/Schema" "flickCapitalize"
+  reviewed "effect@4.0.5 sha256:180a874b72ba7b95"
+
+/// A string decoded with its first character in lowercase.
+uncapitalize : PureCodec Json String
+foreign pure uncapitalize from "@flick-lang/runtime/effect/Schema" "flickUncapitalize"
+  reviewed "effect@4.0.5 sha256:b9a6637cdda12b36"
+
+/// `snake_case` on the wire, `camelCase` decoded.
+snake_to_camel : PureCodec Json String
+foreign pure snake_to_camel from "@flick-lang/runtime/effect/Schema" "flickSnakeToCamel"
+  reviewed "effect@4.0.5 sha256:90535e9d31c899a1"
+
+/// A number as a JSON string, read by JS `Number` (`"abc"` is `NaN`).
+number_from_string : PureCodec Json Number
+foreign pure number_from_string from "@flick-lang/runtime/effect/Schema" "NumberFromString"
+  reviewed "effect@4.0.5 sha256:b18c8f34d7117585"
+
+/// A finite number as a JSON string; other text is an error.
+finite_from_string : PureCodec Json Number
+foreign pure finite_from_string from "@flick-lang/runtime/effect/Schema" "flickFiniteFromString"
+  reviewed "effect@4.0.5 sha256:6798a7c30aa830e8"
+
+/// A `Bool` as `0` or `1`.
+bool_from_bit : PureCodec Json Bool
+foreign pure bool_from_bit from "@flick-lang/runtime/effect/Schema" "BooleanFromBit"
+  reviewed "effect@4.0.5 sha256:5973acf661683b5f"
+
+/// A string written in base64.
+base64_string : PureCodec Json String
+foreign pure base64_string from "@flick-lang/runtime/effect/Schema" "flickStringFromBase64"
+  reviewed "effect@4.0.5 sha256:92f329d254f508d3"
+
+/// A string written in URL-safe base64.
+base64url_string : PureCodec Json String
+foreign pure base64url_string from "@flick-lang/runtime/effect/Schema" "flickStringFromBase64Url"
+  reviewed "effect@4.0.5 sha256:b407017792f03735"
+
+/// A string written as the hex of its UTF-8 bytes.
+hex_string : PureCodec Json String
+foreign pure hex_string from "@flick-lang/runtime/effect/Schema" "flickStringFromHex"
+  reviewed "effect@4.0.5 sha256:dacb982d97b093d9"
+
+/// A string written URI-component encoded.
+uri_component : PureCodec Json String
+foreign pure uri_component from "@flick-lang/runtime/effect/Schema" "flickStringFromUriComponent"
+  reviewed "effect@4.0.5 sha256:3b7f96246d74c8d1"
+
+/// A value written as JSON text inside a JSON string.
+json_string : PureCodec Json a -> PureCodec Json a
+foreign pure json_string from "@flick-lang/runtime/effect/Schema" "flickFromJsonString"
+  reviewed "effect@4.0.5 sha256:1ec7540b7c29f60a"
+
+/// A string as the list of its parts between `separator`.
+split : String -> PureCodec Json (List String)
+foreign pure split from "@flick-lang/runtime/effect/Schema" "flickSplit"
+  reviewed "effect@4.0.5 sha256:51df5e1e515cf056"
+
+/// `"a=1,b=2"` as `[("a", "1"), ("b", "2")]`, with the given separators.
+split_key_value : String -> String -> PureCodec Json (List (String, String))
+foreign pure split_key_value from "@flick-lang/runtime/effect/Schema" "flickSplitKeyValue"
+  reviewed "effect@4.0.5 sha256:b9449d888550c74f"
+
+/// A non-negative safe integer.
+natural : PureCodec Json Number
+foreign pure natural from "@flick-lang/runtime/effect/Schema" "Natural"
+  reviewed "effect@4.0.5 sha256:4bdca78e545f95dc"
+
+/// A port number: an integer from 0 to 65535.
+port : PureCodec Json Number
+foreign pure port from "@flick-lang/runtime/effect/Schema" "Port"
+  reviewed "effect@4.0.5 sha256:89ee76825ff9a5bc"
+
+/// A string of exactly one character.
+char : PureCodec Json String
+foreign pure char from "@flick-lang/runtime/effect/Schema" "Char"
+  reviewed "effect@4.0.5 sha256:3548cf1737c1d234"
+
+/// The title and description of a codec, written by `json_schema`.
+type alias Annotations = { title : Option String; description : Option String }
+
+/// The codec with the annotations; `None` keeps what it had.
+annotate : Annotations -> PureCodec i a -> PureCodec i a
+foreign pure annotate from "@flick-lang/runtime/effect/Schema" "flickAnnotate"
+  reviewed "effect@4.0.5 sha256:e8ebe1017c77bf16"
+
+/// The title and description the codec carries.
+annotations : PureCodec i a -> Annotations
+foreign pure annotations from "@flick-lang/runtime/effect/Schema" "flickResolveAnnotations"
+  reviewed "effect@4.0.5 sha256:5fe477450b420ffb"
+
+/// The codec the other way round: decoding encodes and encoding decodes.
+flip : PureCodec i a -> PureCodec a i
+foreign pure flip from "@flick-lang/runtime/effect/Schema" "flip"
+  reviewed "effect@4.0.5 sha256:991f80062f143c19"
+
+/// The schema of what the codec decodes; its canonical JSON form is the
+/// codec.
+to_schema : PureCodec Json a -> Schema a
+foreign pure to_schema from "@flick-lang/runtime/effect/Schema" "flickToType"
+  reviewed "effect@4.0.5 sha256:da3189cc5b788852"
+
+/// The schema of the codec's wire values.
+wire_schema : PureCodec Json a -> Schema Json
+foreign pure wire_schema from "@flick-lang/runtime/effect/Schema" "flickToEncoded"
+  reviewed "effect@4.0.5 sha256:bf3d90194629c317"
+
+/// Decoding that fails is given to `f`, whose `Ok` value is decoded
+/// instead; strict export refuses the codec.
+catch_decoding : (SchemaError -> Result SchemaError a) -> PureCodec i a -> PureCodec i a
+foreign pure catch_decoding from "@flick-lang/runtime/effect/Schema" "flickCatchDecoding"
+  reviewed "effect@4.0.5 sha256:2cc0e44ebecae019"
+
+/// `catch_decoding` with a runtime fallback, whose services decoding then
+/// needs.
+catch_decoding_effect : (SchemaError ->{r; SchemaError} a) -> PureCodec i a -> Codec r none i a
+foreign pure catch_decoding_effect from "@flick-lang/runtime/effect/Schema" "flickCatchDecodingWithContext"
+  reviewed "effect@4.0.5 sha256:d6343ee410570ff7"
+
+/// Encoding that fails is given to `f`, whose `Ok` wire value is written
+/// instead.
+catch_encoding : (SchemaError -> Result SchemaError i) -> PureCodec i a -> PureCodec i a
+foreign pure catch_encoding from "@flick-lang/runtime/effect/Schema" "flickCatchEncoding"
+  reviewed "effect@4.0.5 sha256:5e4d3e37a125cd85"
+
+/// `catch_encoding` with a runtime fallback, whose services encoding then
+/// needs.
+catch_encoding_effect : (SchemaError ->{r; SchemaError} i) -> PureCodec i a -> Codec none r i a
+foreign pure catch_encoding_effect from "@flick-lang/runtime/effect/Schema" "flickCatchEncodingWithContext"
+  reviewed "effect@4.0.5 sha256:5aeb7ce062ab7618"
+
+/// A runtime check of the decoded value; `false` or a failure rejects it.
+check_effect : (a ->{r; SchemaError} Bool) -> PureCodec Json a -> Codec r none Json a
+foreign pure check_effect from "@flick-lang/runtime/effect/Schema" "flickCheckEffect"
+  reviewed "effect@4.0.5 sha256:2166212aa1cb7a69"
+
+/// The value encoded by the codec, written as XML under `<root>`.
+encode_xml : forall c rd re i a. (Codec rd re i a)^c -> (a ->{re; SchemaError} String)^c
+foreign effect encode_xml from "@flick-lang/runtime/effect/Schema" "flickToEncoderXml"
+  retention call
+  reviewed "effect@4.0.5 sha256:3b9304a35b08fe20"

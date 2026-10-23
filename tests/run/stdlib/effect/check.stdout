@@ -1,0 +1,66 @@
+min_length: ok "ab" | err expected a value with a length of at least 2, got string
+max_length: ok "ab" | err expected a value with a length of at most 2, got string
+length_between: ok "a" | err expected a value with a length between 1 and 2, got string
+non_empty: ok "a" | err expected a value with a length of at least 1, got string
+min_code_points: ok "ab" | err expected a string with at least 2 code points, got string
+max_code_points: ok "a" | err expected a string with at most 1 code points, got string
+code_points_between: ok "a" | err expected a string with 1 code points, got string
+pattern: ok "abc" | err expected a string matching the RegExp ^[a-z]+$, got string
+starts_with: ok "abc" | err expected a string starting with "ab", got string
+ends_with: ok "abc" | err expected a string ending with "bc", got string
+includes: ok "abc" | err expected a string including "b", got string
+trimmed: ok "a b" | err expected a string with no leading or trailing whitespace, got string
+lowercased: ok "ab" | err expected a string with all characters in lowercase, got string
+uppercased: ok "AB" | err expected a string with all characters in uppercase, got string
+capitalized: ok "Ab" | err expected a string with the first character in uppercase, got string
+uncapitalized: ok "aB" | err expected a string with the first character in lowercase, got string
+uuid: ok "123e4567-e89b-12d3-a456-426614174000" | err expected a UUID, got string
+uuid 4: ok "123e4567-e89b-42d3-a456-426614174000" | err expected a UUID v4, got string
+ulid: ok "01ARZ3NDEKTSV4RRFFQ69G5FAV" | err expected a string matching the RegExp ^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$, got string
+guid: ok "123e4567-e89b-12d3-a456-426614174000" | err expected a GUID, got string
+base64: ok "aGk=" | err expected a base64 encoded string, got string
+base64url: ok "aGk" | err expected a base64url encoded string, got string
+string_finite: ok "1.5" | err expected a string representing a finite number, got string
+string_bigint: ok "12" | err expected a string representing a bigint, got string
+greater_than: ok 2 | err expected a value greater than 1, got number
+greater_than_or_equal_to: ok 1 | err expected a value greater than or equal to 1, got number
+less_than: ok 0 | err expected a value less than 1, got number
+less_than_or_equal_to: ok 1 | err expected a value less than or equal to 1, got number
+between: ok 1 | err expected a value between 1 and 3 (excluded), got number
+multiple_of: ok 6 | err expected a value that is a multiple of 3, got number
+int: ok 2 | err expected an integer, got number
+int32: ok 2 | err expected a value between -2147483648 and 2147483647, got number
+uint32: ok 3000000000 | err expected a value between 0 and 4294967295, got number
+finite: ok 1 | err expected a finite number, got NaN
+bigint: ok 2n, err expected a value greater than or equal to 2n, got bigint, ok 0n, err expected a value less than or equal to 1n, got bigint, ok 2n
+decimal: ok 1.5, err, ok 0.5, err, ok 1.25
+greater_than_by: ok "c" | err expected a value greater than "b", got string
+greater_than_or_equal_to_by: ok "b" | err expected a value greater than or equal to "b", got string
+less_than_by: ok "a" | err expected a value less than "b", got string
+less_than_or_equal_to_by: ok "b" | err expected a value less than or equal to "b", got string
+between_by: ok "c" | err expected a value between "b" and "d", got string
+multiple_of_by: ok 8 | err expected a value that is a multiple of 4, got number
+min_items: err expected a value with a length of at least 2, got an array
+max_items: err expected a value with a length of at most 1, got an array
+unique: ok [1, 2] | err expected an array with unique items, got an array
+unique_keys: ok [("a", 1), ("b", 1)] | err expected an array with unique keys, got an array
+min_size: err expected a value with a size of at least 2, got an object
+max_size: ok ["a"]
+size_between: ok ["a", "b"]
+min_properties: err expected a value with at least 2 entries, got an object
+max_properties: ok [("a", 1)]
+properties_between: ok [("a", 1), ("b", 2)]
+property_names: err expected an object with property names matching the schema, got an object
+all: ok "ab" | err expected a value with a length of at least 2, got string
+predicate: ok 2 | err an even number
+encode checks too: err expected a value with a length of at most 1, got string
+export min_length 1: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"string","minLength":1}
+export min_length 2: refused: T -> JSON Schema: the check "a value with a length of at least 2" has no exact JSON Schema form
+export patterns: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"string","pattern":"^a","allOf":[{"pattern":"z$"}]}
+export int: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"integer","minimum":-9007199254740991,"maximum":9007199254740991}
+export between: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"number","minimum":1,"exclusiveMaximum":3}
+export items: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"array","items":{"type":"number"},"minItems":1,"uniqueItems":true}
+export properties: {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","additionalProperties":{"type":"number"},"minProperties":1}
+export predicate: refused: T -> JSON Schema: the check "an even number" has no JSON Schema form
+export lowercased: refused: T -> JSON Schema: the check "a string with all characters in lowercase" has no exact JSON Schema form
+export after transform: refused: T -> JSON Schema: the check "an integer" applies after a transformation

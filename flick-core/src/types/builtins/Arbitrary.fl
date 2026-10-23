@@ -1,0 +1,123 @@
+/// Effect's `Arbitrary`: generators of values with shrinking, made from a
+/// schema or combined, and property checks over them. The seed of the
+/// options makes a run reproducible; a failed check carries a replay.
+module Arbitrary exposing (..)
+
+/// A generator of values of type `a`.
+type Arbitrary a
+
+/// The text that replays a failed check exactly.
+type alias Replay = String
+
+/// The bounds of a generated list; `None` leaves one out.
+type alias ArrayOptions = { minLength : Option Number; maxLength : Option Number }
+
+/// How a value of a schema shrinks; `None` uses Effect's shrinking.
+type alias SchemaOptions a = { shrink : Option (a -> List a) }
+
+/// How many values to draw, how large, how many discards to allow, and
+/// the seed.
+type alias SampleOptions =
+  { count : Option Number; size : Option Number; maxDiscards : Option Number; seed : Option Number }
+
+/// The runs of a check, the sizes, the limits of discards and shrinks, the
+/// seed, and a replay of an earlier failure.
+type alias CheckOptions =
+  {
+    runs : Option Number;
+    size : Option Number;
+    maxDiscards : Option Number;
+    maxShrinks : Option Number;
+    seed : Option Number;
+    replay : Option Replay
+  }
+
+/// Sampling stopped: the filters discarded too many values.
+type error SampleError = SampleError { generated : Number; discards : Number; seed : String }
+  deriving Eq, Show
+
+/// Why a property failed: it returned `false`, or it failed with an error.
+type PropertyFailure (e : ErrorRow) = ReturnedFalse | PropertyError (Errors e)
+
+/// The outcome of a check.
+type CheckResult (e : ErrorRow) a =
+  | Passed { runs : Number; discards : Number }
+  | Falsified {
+      initialInput : a;
+      shrunkInput : a;
+      failure : PropertyFailure e;
+      runs : Number;
+      discards : Number;
+      shrinks : Number;
+      replay : Replay
+    }
+  | Exhausted { runs : Number; discards : Number; seed : String }
+  | ReplayMismatch String
+
+/// Values of the schema.
+from_schema : Schema a -> Arbitrary a
+foreign pure from_schema from "@flick-lang/runtime/effect/Arbitrary" "schema"
+  reviewed "effect@4.0.5 sha256:b3d6dd17bee4b1d1"
+
+/// Values of the schema, shrinking by the options.
+from_schema_with : SchemaOptions a -> Schema a -> Arbitrary a
+foreign pure from_schema_with from "@flick-lang/runtime/effect/Arbitrary" "flickSchema"
+  reviewed "effect@4.0.5 sha256:b3d6dd17bee4b1d1"
+
+/// Always `value`.
+constant : a -> Arbitrary a
+foreign pure constant from "@flick-lang/runtime/effect/Arbitrary" "Constant"
+  reviewed "effect@4.0.5 sha256:d5b6d788a8786bef"
+
+/// Lists of the item's values, within the bounds.
+list : ArrayOptions -> Arbitrary a -> Arbitrary (List a)
+foreign pure list from "@flick-lang/runtime/effect/Arbitrary" "flickArray"
+  reviewed "effect@4.0.5 sha256:e09d73273525c6dc"
+
+/// One value of each generator, in order.
+all : List (Arbitrary a) -> Arbitrary (List a)
+foreign pure all from "@flick-lang/runtime/effect/Arbitrary" "all"
+  reviewed "effect@4.0.5 sha256:bd5b1360a00c3f03"
+
+/// Each value mapped by `f`.
+map : (a -> b) -> Arbitrary a -> Arbitrary b
+foreign pure map from "@flick-lang/runtime/effect/Arbitrary" "map"
+  arity 1
+  reviewed "effect@4.0.5 sha256:8df5e62214140afe"
+
+/// The values for which `f` holds; the others are discarded.
+filter : (a -> Bool) -> Arbitrary a -> Arbitrary a
+foreign pure filter from "@flick-lang/runtime/effect/Arbitrary" "filter"
+  arity 1
+  reviewed "effect@4.0.5 sha256:d4f04279dfa87b59"
+
+/// The `Ok` values of `f`; an `Err` discards the value.
+filter_map : (a -> Result x b) -> Arbitrary a -> Arbitrary b
+foreign pure filter_map from "@flick-lang/runtime/effect/Arbitrary" "filterMap"
+  arity 1
+  reviewed "effect@4.0.5 sha256:766c5eae97943724"
+
+/// A value of the generator `f` gives for each value.
+flat_map : (a -> Arbitrary b) -> Arbitrary a -> Arbitrary b
+foreign pure flat_map from "@flick-lang/runtime/effect/Arbitrary" "flatMap"
+  arity 1
+  reviewed "effect@4.0.5 sha256:22f13bed7791dea1"
+
+/// Draws values; drawing from the system's randomness without a seed.
+sample : SampleOptions -> Arbitrary a ->{; SampleError} List a
+foreign effect sample from "@flick-lang/runtime/effect/Arbitrary" "flickSampleEffect"
+  reviewed "effect@4.0.5 sha256:fe703ac99706d073"
+
+/// Runs the property on generated values and shrinks the first failure.
+check :
+  forall c r e a.
+  CheckOptions -> (a ->{r; e} Bool)^c -> Arbitrary a ->{r;} CheckResult e a
+foreign effect check from "@flick-lang/runtime/effect/Arbitrary" "flickCheckEffect"
+  retention call
+  reviewed "effect@4.0.5 sha256:20e42afa9a0d1275"
+
+/// The report of a failed check: inputs, failure and replay; `None` when
+/// it passed.
+format_check_failure : CheckResult e a -> Option String
+foreign pure format_check_failure from "@flick-lang/runtime/effect/Arbitrary" "flickFormatCheckFailure"
+  reviewed "effect@4.0.5 sha256:d7a91c9cd25717cb"

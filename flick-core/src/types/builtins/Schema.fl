@@ -3,40 +3,61 @@
 /// combinators build them by hand.
 module Schema exposing (..)
 
+/// Numbers, `NaN` and the infinities included.
 number : Schema Number
 foreign pure number from "@flick-lang/runtime" "schemaNumber"
+  reviewed "effect@4.0.5 sha256:896cf94fa87a6316"
 
+/// Strings.
 string : Schema String
 foreign pure string from "@flick-lang/runtime" "schemaString"
+  reviewed "effect@4.0.5 sha256:9f6f00ea557ca8a0"
 
+/// Booleans.
 bool : Schema Bool
 foreign pure bool from "@flick-lang/runtime" "schemaBool"
+  reviewed "effect@4.0.5 sha256:9d843d230714ef54"
 
+/// BigInts.
 bigint : Schema BigInt
 foreign pure bigint from "@flick-lang/runtime" "schemaBigint"
+  reviewed "effect@4.0.5 sha256:758082cef0274082"
 
+/// `()`.
 unit : Schema Unit
 foreign pure unit from "@flick-lang/runtime" "schemaUnit"
+  reviewed "effect@4.0.5 sha256:ddce6c1333e4efc5"
 
+/// No value.
 never : Schema Never
 foreign pure never from "@flick-lang/runtime" "schemaNever"
+  reviewed "effect@4.0.5 sha256:c42dc25a140bc120"
 
+/// Lists of the item's values.
 list : Schema a -> Schema (List a)
 foreign pure list from "@flick-lang/runtime" "schemaList"
+  reviewed "effect@4.0.5 sha256:31e04eb2626179de"
 
+/// `Some` of the item's values, or `None`.
 option : Schema a -> Schema (Option a)
 foreign pure option from "@flick-lang/runtime" "schemaOption"
+  reviewed "effect@4.0.5 sha256:3efe859326288138"
 
+/// `Err` of the error's values or `Ok` of the value's.
 result : Schema e -> Schema a -> Schema (Result e a)
 foreign pure result from "@flick-lang/runtime" "schemaResult"
+  reviewed "effect@4.0.5 sha256:62953f28b638050a"
 
+/// Redacted values of the item; no JSON form without an explicit policy.
 redacted : Schema a -> Schema (Redacted a)
 foreign pure redacted from "@flick-lang/runtime" "schemaRedacted"
+  reviewed "effect@4.0.5 sha256:dcdd94df46f88c71"
 
 /// A witness of a type with no wire form, as a scoped resource: checking a
 /// value passes, a JSON codec or export of it is refused with `reason`.
 opaque : String -> String -> Schema a
 foreign pure opaque from "@flick-lang/runtime" "schemaOpaque"
+  reviewed "effect@4.0.5 sha256:0013d2728a6e900b"
 
 /// A schema with an explicit generator for `Schema.arbitrary`.
 with_generator : Gen.Gen a -> Schema a -> Schema a
@@ -50,3 +71,23 @@ foreign pure validate from "@flick-lang/runtime" "schemaValidate"
 /// `with_generator`.
 arbitrary : Schema a -> Gen.Gen a
 foreign pure arbitrary from "@flick-lang/runtime" "schemaArbitrary"
+
+/// Any inert data, kept as it is; strict JSON Schema export refuses it.
+unknown : Schema Unknown
+foreign pure unknown from "@flick-lang/runtime" "schemaUnknown"
+  reviewed "effect@4.0.5 sha256:4bcffb96fdb94636"
+
+/// Durations; their canonical JSON form is `Duration.json_millis`.
+duration : Schema Duration.Duration
+foreign pure duration from "@flick-lang/runtime/effect/Schema" "flickDuration"
+  reviewed "effect@4.0.5 sha256:5eb928efac635541"
+
+/// Decimals; their canonical JSON form is `BigDecimal.json`.
+decimal : Schema BigDecimal.BigDecimal
+foreign pure decimal from "@flick-lang/runtime/effect/Schema" "flickBigDecimal"
+  reviewed "effect@4.0.5 sha256:e63580a9cec685b8"
+
+/// Chunks of the item's values; their canonical JSON form is an array.
+chunk : Schema a -> Schema (Chunk.Chunk a)
+foreign pure chunk from "@flick-lang/runtime/effect/Schema" "flickChunk"
+  reviewed "effect@4.0.5 sha256:2826521488c26924"

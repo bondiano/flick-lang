@@ -22,7 +22,7 @@ export const annotate = (schema: AnySchema, notes: Notes): AnySchema => schema.a
 const jsonMakers = new WeakMap<AnySchema, () => AnySchema>();
 const jsonCodecs = new WeakMap<AnySchema, AnySchema>();
 
-const withJson = <S extends AnySchema>(schema: S, make: () => AnySchema): S => {
+export const withJson = <S extends AnySchema>(schema: S, make: () => AnySchema): S => {
   jsonMakers.set(schema, make);
   return schema;
 };

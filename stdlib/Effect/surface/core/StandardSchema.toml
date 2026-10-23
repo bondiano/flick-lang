@@ -1,4 +1,6 @@
-[pending]
-StandardJSONSchemaV1 = "M20"
-StandardSchemaV1 = "M20"
-StandardTypedV1 = "M20"
+[wrapped]
+StandardSchemaV1 = "Codec.StandardSchema 9e094bce1edf23cb"
+
+[excluded]
+StandardJSONSchemaV1 = "invariant: Effect's JSON Schema generation writes approximations (`{}` for what it cannot state, looser keywords); export goes through the strict `Codec.json_schema`"
+StandardTypedV1 = "TS-only: a Standard Schema of types only, with no `validate`; Flick's `Codec.standard` validates"

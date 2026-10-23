@@ -253,3 +253,18 @@ instance Ord Duration =
 instance Show Duration =
   show : Duration -> String
   let show x = format x
+
+/// A duration as a finite, non-negative JSON number of milliseconds.
+json_millis : PureCodec Json Duration
+foreign pure json_millis from "@flick-lang/runtime/effect/Schema" "flickDurationFromMillis"
+  reviewed "effect@4.0.5 sha256:558e039e0ff72756"
+
+/// A duration as its nanoseconds, a JSON string of digits.
+json_nanos : PureCodec Json Duration
+foreign pure json_nanos from "@flick-lang/runtime/effect/Schema" "flickDurationFromNanos"
+  reviewed "effect@4.0.5 sha256:6b74c43c4c8154c4"
+
+/// A duration as Effect's text, such as `"1500 millis"` or `"2 seconds"`.
+json_string : PureCodec Json Duration
+foreign pure json_string from "@flick-lang/runtime/effect/Schema" "flickDurationFromString"
+  reviewed "effect@4.0.5 sha256:ffa95659e9b3c068"

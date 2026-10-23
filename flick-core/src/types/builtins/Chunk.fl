@@ -1,5 +1,10 @@
 /// Effect's immutable `Chunk`, for repeated concatenation.
-module Chunk exposing (Chunk, NonEmptyChunk, empty, from_list, to_list, append, concat, size, get, map, to_chunk, non_empty, is_empty, of, make, make_by, range, head, head_non_empty, last, last_non_empty, tail, tail_non_empty, prepend, append_all, take, take_right, drop, drop_right, take_while, drop_while, split_at, split_non_empty_at, split, split_where, chunks_of, remove, modify, replace, reverse, filter, filter_map, filter_map_while, compact, flat_map, flatten, each_effect, contains_with, contains, dedupe, dedupe_adjacent, difference_with, difference, intersection, union, every, some, find_first, find_first_index, find_last, find_last_index, join, map_accum, partition, separate, reduce, reduce_right, sort_by, sort, sort_with, unzip, zip, zip_with)
+module Chunk exposing (Chunk, NonEmptyChunk, empty, from_list, to_list, append, concat, size, get, map, to_chunk, non_empty, is_empty, of, make, make_by, range, head, head_non_empty, last, last_non_empty, tail, tail_non_empty, prepend, append_all, take, take_right, drop, drop_right, take_while, drop_while, split_at, split_non_empty_at, split, split_where, chunks_of, remove, modify, replace, reverse, filter, filter_map, filter_map_while, compact, flat_map, flatten, each_effect, contains_with, contains, dedupe, dedupe_adjacent, difference_with, difference, intersection, union, every, some, find_first, find_first_index, find_last, find_last_index, join, map_accum, partition, separate, reduce, reduce_right, sort_by, sort, sort_with, unzip, zip, zip_with, json)
 
 import Chunk.Core exposing (..)
 import Chunk.Ops exposing (..)
+
+/// A chunk as a JSON array of its items.
+json : PureCodec Json a -> PureCodec Json (Chunk a)
+foreign pure json from "@flick-lang/runtime/effect/Schema" "flickChunkJson"
+  reviewed "effect@4.0.5 sha256:2826521488c26924"

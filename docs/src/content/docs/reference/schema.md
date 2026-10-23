@@ -112,11 +112,16 @@ an `Unknown` to decode.
 `Codec.json_schema root codec` writes the JSON Schema 2020-12 of the wire
 form exactly, or returns an `ExportError` naming the path of the node it
 cannot state: `Profile.session -> JSON Schema: scoped resource has no wire
-codec`. A check without a JSON Schema form (other than `Checks.email`,
-`Checks.non_empty`, `Checks.positive`), a fallible or runtime transformation,
-a `Redacted` value without a policy, an opaque witness (`Schema.opaque`) and
-`Unknown` are refused; nothing is written as `{}` or `true`. A recursive type
-becomes a `$ref` into `$defs`.
+codec`. A check without an exact JSON Schema form, a check of a value
+after a transformation, a fallible or runtime transformation or decoding
+fallback, a `Redacted` value without a policy, an opaque witness
+(`Schema.opaque`) and `Unknown` are refused; nothing is written as `{}` or
+`true`. The checks of refined types it knows are `Checks.email`,
+`Checks.non_empty` and `Checks.positive`; an Effect check of the `Check`
+module is written with the keywords Effect gives it when they are exact
+(`Check.min_items 1` is `minItems`, `Check.lowercased` is refused because
+its pattern is looser than the check). A recursive type becomes a `$ref`
+into `$defs`; `Codec.annotate` adds a `title` and `description`.
 
 `Codec.standard codec` is a Standard Schema V1 object that validates
 synchronously. `Codec.standard_async codec` is made at run time: its
@@ -125,6 +130,20 @@ where it was made, and once that scope has closed it reports an issue.
 
 `Schema.arbitrary schema` generates values for property tests; a refined
 type needs `Schema.with_generator`.
+
+## Effect checks and codecs
+
+`Check.apply check codec` restricts what a codec decodes and encodes with
+one of Effect Schema's checks: lengths and code points, patterns, string
+forms (`Check.uuid`, `Check.base64`), number, `BigInt`, `BigDecimal` and
+`Ord` bounds, list items and uniqueness, set sizes, and the keys of a
+`Codec.entries` dictionary. `Codec` adds Effect's ready transformations
+(`Codec.trim`, `Codec.number_from_string`, `Codec.base64_string`,
+`Codec.json_string`, `Codec.split`), literals, dictionaries, decoding and
+encoding fallbacks, runtime checks and XML encoding; `Duration`,
+`BigDecimal`, `Chunk`, `HashSet` and `HashMap` have JSON codecs, and
+`Arbitrary`, `JsonSchema` and `Differ` wrap Effect's generators, dialect
+conversions and JSON patches.
 
 ## Running decoders
 

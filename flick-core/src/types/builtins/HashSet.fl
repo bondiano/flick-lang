@@ -105,3 +105,9 @@ foreign pure reduce from "@flick-lang/runtime/effect/HashSet" "flickReduce"
   arity 3
   retention call
   reviewed "effect@4.0.5 sha256:fd8b28545e7a21a4"
+
+/// A set as a JSON array of its elements, rebuilt with the canonical
+/// instances; a repeated element is kept once.
+json : Hash a => PureCodec Json a -> PureCodec Json (HashSet EqHash.Canonical a)
+foreign pure json from "@flick-lang/runtime/effect/Schema" "flickHashSetJson"
+  reviewed "effect@4.0.5 sha256:066988b9d5f59b15"

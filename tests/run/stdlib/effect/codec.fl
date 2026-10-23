@@ -1,0 +1,168 @@
+// Codecs over Effect Schema's transformations and structures: each decodes
+// a wire value, encodes it back, and the strict exporter states it exactly
+// or refuses what decoding decides beyond the wire type.
+module App.Main exposing (main)
+
+type alias Tagged = { label : String; size : Number }
+  deriving Schema
+
+issues : SchemaError -> String
+let issues (SchemaError found) = "err " ++ String.join "; " (List.map (fun i -> i.path ++ ": " ++ i.message) found)
+
+/// Decodes the JSON text and encodes the value back.
+round : Show a => String -> PureCodec Json a -> String
+let round text c =
+  match Json.parse text with
+  | Err _ -> "not JSON"
+  | Ok input ->
+    match Codec.decode_result c input with
+    | Err e -> issues e
+    | Ok value ->
+      match Codec.encode_result c value with
+      | Ok wire -> show value ++ " -> " ++ Json.stringify wire
+      | Err e -> show value ++ " -> " ++ issues e
+
+exported : PureCodec Json a -> String
+let exported c =
+  match Codec.json_schema "T" c with
+  | Err (Codec.ExportError reason) -> "refused: " ++ reason
+  | Ok text ->
+    match Json.parse text with
+    | Err _ -> "not JSON"
+    | Ok input ->
+      match Codec.decode_result Json.json input with
+      | Ok json -> Json.stringify json
+      | Err e -> issues e
+
+line : String -> String ->{} Unit
+let line name text = Platform.stdout_line (name ++ ": " ++ text)
+
+ms : Number -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+fallback : SchemaError -> Result SchemaError String
+let fallback _ = Ok "fallback"
+
+zero_wire : SchemaError -> Result SchemaError Json
+let zero_wire _ = Codec.encode_result Number.json_finite 0
+
+late_value : SchemaError ->{; SchemaError} String
+let late_value _ = "late"
+
+late_zero : SchemaError ->{; SchemaError} Json
+let late_zero e = from_result (zero_wire e)
+
+small_enough : Number ->{; SchemaError} Bool
+let small_enough n = n < 10
+
+check_input : String ->{} String
+let check_input text =
+  try
+    match Json.parse text with
+    | Ok input -> show (Codec.decode (Codec.check_effect small_enough Number.json_finite) input)
+    | Err _ -> "not JSON"
+  with
+  | SchemaError found -> issues (SchemaError found)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  line "literal" (round "\"v1\"" (Codec.literal "v1") ++ " | " ++ round "\"v2\"" (Codec.literal "v1"))
+  line "literals" (round "\"b\"" (Codec.literals ["a", "b"]) ++ " | " ++ round "\"c\"" (Codec.literals ["a", "b"]))
+  line "entries" (round "{\"x\": 1, \"y\": 2}" (Codec.entries Number.json_finite))
+  line "non_empty_list" (round "[1, 2]" (Codec.non_empty_list Number.json_finite) ++ " | " ++ round "[]" (Codec.non_empty_list Number.json_finite))
+  line "list_ensure" (round "3" (Codec.list_ensure Number.json_finite) ++ " | " ++ round "[3, 4]" (Codec.list_ensure Number.json_finite))
+  line "trim" (round "\"  a b \"" Codec.trim)
+  line "to_lower_case" (round "\"AbC\"" Codec.to_lower_case)
+  line "to_upper_case" (round "\"AbC\"" Codec.to_upper_case)
+  line "capitalize" (round "\"abc\"" Codec.capitalize)
+  line "uncapitalize" (round "\"ABC\"" Codec.uncapitalize)
+  line "snake_to_camel" (round "\"user_name\"" Codec.snake_to_camel)
+  line "number_from_string" (round "\"1.5\"" Codec.number_from_string ++ " | " ++ round "\"x\"" Codec.number_from_string)
+  line "finite_from_string" (round "\"1.5\"" Codec.finite_from_string ++ " | " ++ round "\"x\"" Codec.finite_from_string)
+  line "bool_from_bit" (round "1" Codec.bool_from_bit ++ " | " ++ round "2" Codec.bool_from_bit)
+  line "base64_string" (round "\"aGk=\"" Codec.base64_string ++ " | " ++ round "\"*\"" Codec.base64_string)
+  line "base64url_string" (round "\"aGk\"" Codec.base64url_string)
+  line "hex_string" (round "\"6869\"" Codec.hex_string)
+  line "uri_component" (round "\"a%20b\"" Codec.uri_component ++ " | " ++ round "\"%\"" Codec.uri_component)
+  line "json_string" (round "\"[1,2]\"" (Codec.json_string (Codec.list Number.json_finite)) ++ " | " ++ round "\"[\"" (Codec.json_string (Codec.list Number.json_finite)))
+  line "split" (round "\"a,b,c\"" (Codec.split ","))
+  line "split_key_value" (round "\"a=1&b=2\"" (Codec.split_key_value "&" "="))
+  line "natural" (round "3" Codec.natural ++ " | " ++ round "-1" Codec.natural)
+  line "port" (round "8080" Codec.port ++ " | " ++ round "65536" Codec.port)
+  line "char" (round "\"a\"" Codec.char ++ " | " ++ round "\"ab\"" Codec.char)
+  let titled = Codec.annotate { title = Some "Age"; description = Some "in years" } Codec.natural
+  let notes : Codec.Annotations = Codec.annotations titled
+  line "annotations" (show (notes.title, notes.description))
+  line "flip" (match Json.parse "1.5" with
+    | Ok input -> (match Codec.decode_result (Codec.flip Codec.number_from_string) input with
+      | Ok json -> Json.stringify json
+      | Err e -> issues e)
+    | Err _ -> "not JSON")
+  let tagged_json = Codec.json (schema Tagged)
+  line "to_schema" (round "{\"label\": \"a\", \"size\": 1}" (Codec.json (Codec.to_schema tagged_json)))
+  let wire = Codec.wire_schema Codec.number_from_string
+  line "wire_schema" (match Json.parse "\"12\"" with
+    | Ok input -> (match Schema.validate wire input with
+      | Ok json -> "valid " ++ Json.stringify json
+      | Err e -> issues e)
+    | Err _ -> "not JSON")
+  line "catch_decoding" (round "1" (Codec.catch_decoding fallback String.json))
+  line "catch_encoding" (match Codec.encode_result (Codec.catch_encoding zero_wire Number.json_finite) Number.nan with
+    | Ok json -> Json.stringify json
+    | Err e -> issues e)
+  let late = Codec.catch_decoding_effect late_value String.json
+  let decoded =
+    try
+      match Json.parse "1" with
+      | Ok input -> Codec.decode late input
+      | Err _ -> "not JSON"
+    with
+    | SchemaError found -> issues (SchemaError found)
+  line "catch_decoding_effect" decoded
+  let late_wire = Codec.catch_encoding_effect late_zero Number.json_finite
+  let written =
+    try Json.stringify (Codec.encode late_wire Number.nan) with
+    | SchemaError found -> issues (SchemaError found)
+  line "catch_encoding_effect" written
+  line "check_effect" (check_input "3" ++ " | " ++ check_input "12")
+  let xml =
+    try Codec.encode_xml (Codec.general tagged_json) { label = "a"; size = 1 } with
+    | SchemaError found -> issues (SchemaError found)
+  line "encode_xml" (String.replace_all "\n" " " xml)
+  line "Duration.json_millis" (round "1500" Duration.json_millis ++ " | " ++ round "-1" Duration.json_millis)
+  line "Duration.json_nanos" (round "\"2000000\"" Duration.json_nanos)
+  line "Duration.json_string" (round "\"2 seconds\"" Duration.json_string ++ " | " ++ round "\"soon\"" Duration.json_string)
+  line "infinity" (match Codec.encode_result Duration.json_millis Duration.infinity with
+    | Ok json -> Json.stringify json
+    | Err e -> issues e)
+  line "BigDecimal.json" (match Json.parse "\"1.25\"" with
+    | Ok input -> (match Codec.decode_result BigDecimal.json input with
+      | Ok d -> BigDecimal.to_string d
+      | Err e -> issues e)
+    | Err _ -> "not JSON")
+  line "Chunk.json" (match Json.parse "[1, 2]" with
+    | Ok input -> (match Codec.decode_result (Chunk.json Number.json_finite) input with
+      | Ok c -> show (Chunk.to_list c)
+      | Err e -> issues e)
+    | Err _ -> "not JSON")
+  line "HashSet.json" (match Json.parse "[\"b\", \"a\", \"b\"]" with
+    | Ok input -> (match Codec.decode_result (HashSet.json String.json) input with
+      | Ok s -> show (List.sort (HashSet.to_list s)) ++ " member a: " ++ show (HashSet.member "a" s)
+      | Err e -> issues e)
+    | Err _ -> "not JSON")
+  line "HashMap.json" (match Json.parse "[[\"a\", 1], [\"b\", 2]]" with
+    | Ok input -> (match Codec.decode_result (HashMap.json String.json Number.json_finite) input with
+      | Ok m -> show (HashMap.get "b" m) ++ " size " ++ show (HashMap.size m)
+      | Err e -> issues e)
+    | Err _ -> "not JSON")
+  line "export literals" (exported (Codec.literals ["a", "b"]))
+  line "export non_empty_list" (exported (Codec.non_empty_list String.json))
+  line "export list_ensure" (exported (Codec.list_ensure String.json))
+  line "export natural" (exported titled)
+  line "export trim" (exported Codec.trim)
+  line "export finite_from_string" (exported Codec.finite_from_string)
+  line "export json_string" (exported (Codec.json_string String.json))
+  line "export catch_decoding" (exported (Codec.catch_decoding fallback String.json))
+  line "export json_millis" (exported Duration.json_millis)
+  line "export Duration.json_string" (exported Duration.json_string)
+  line "export entries" (exported (Codec.entries String.json))

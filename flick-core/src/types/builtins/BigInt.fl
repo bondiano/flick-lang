@@ -160,3 +160,4 @@ foreign pure sign from "@flick-lang/runtime/effect/BigInt" "flickSign"
 /// A BigInt as a JSON string of digits.
 json : PureCodec Json BigInt
 foreign pure json from "@flick-lang/runtime" "codecBigint"
+  reviewed "effect@4.0.5 sha256:a09d15749ce57a24"
