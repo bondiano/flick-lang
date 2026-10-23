@@ -155,12 +155,10 @@ let run () =
 refused : BigInt ->{Database; EncodeError, DbError, DecodeError} String
 let refused account =
   let negative = BigDecimal.from_integer (-100n)
-  let outcome =
-    try
-      show (Database.query (Sql.bind deposit { account = account; amount = negative }))
-    with
-    | DbError e -> "DbError " ++ e.code ++ " " ++ show e.constraint
-  outcome
+  try
+    show (Database.query (Sql.bind deposit { account = account; amount = negative }))
+  with
+  | DbError e -> "DbError " ++ e.code ++ " " ++ show e.constraint
 
 main : Unit ->{; AppError} Unit
 let main () =
