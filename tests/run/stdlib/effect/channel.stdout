@@ -1,0 +1,29 @@
+from_list: [1, 2, 3]
+from_list_chunked: [[1, 2], [3, 4], [5]]
+from_chunk: ["a", "b"]
+succeed, sync: ([1], [2])
+end, end_sync: ("done", "later")
+empty: 0, default chunk: 4096
+never: Some 1
+from_effect: [42]
+from_effect_done: "d"
+from_effect_drain: (0, 7)
+suspend: [3]
+unwrap: ["built"]
+identity: [1, 2]
+from_schedule: [0, 1]
+from_queue: [1, 2, 3]
+from_queue_array: [[4, 5]]
+from_queue failing: failed: queue
+from_pubsub: Some 2
+from_pubsub_array: Some [2, 3]
+from_subscription: (Some 2, Some [3, 8, 9])
+callback: [1, 2]
+callback_array: [[3, 4]]
+acquire_release: [5] ["release 5"]
+acquire_use_release: [10, 11] ["release 5", "used 10 Some \"ok\""]
+from_readable_stream: [["x"], ["y"]]
+from_async_iterable: [1, 2]
+its end: only end
+from_async_iterable_array: [[3], [4]]
+from_transform_stream: [["A"], ["B"]]

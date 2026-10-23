@@ -1,0 +1,397 @@
+/// Effect's `Sink`: what consumes a stream. `Sink r e i l a` reads chunks
+/// of `i`, may stop early and hand back leftovers of `l`, fails with `e`,
+/// needs `r`, and gives `a`. A sink is a pure description; a stream runs
+/// it. Callbacks kept in a sink hold no captures.
+module Sink exposing (..)
+
+import Channel exposing (Channel, WritableStream)
+
+/// A consumer of elements of `i` giving `a`, with leftovers of `l`.
+type Sink (r : ServiceRow) (e : ErrorRow) i l a
+
+/// How a sink ends: its value and the elements it did not consume.
+type alias End a l = (a, Option (NonEmpty.NonEmpty l))
+
+/// The sink of a channel that reads chunks and ends with an `End`.
+from_channel : Channel r e (NonEmpty.NonEmpty i) o (End a l) none Unit -> Sink r e i l a
+foreign pure from_channel from "@flick-lang/runtime/effect/Sink" "flickFromChannel"
+  reviewed "effect@4.0.5 sha256:6e13a29ea82b0fa1"
+
+/// The channel of a sink: it reads chunks and ends with an `End`.
+to_channel : Sink r e i l a -> Channel r e (NonEmpty.NonEmpty i) o (End a l) none Unit
+foreign pure to_channel from "@flick-lang/runtime/effect/Sink" "flickToChannel"
+  reviewed "effect@4.0.5 sha256:d17e700db852f640"
+
+/// Writes each chunk to a web stream, closing it at the end when
+/// `closeOnDone`; `onError` makes the typed error of what it throws.
+from_writable_stream :
+  { evaluate : Unit -> WritableStream a; onError : JsValue -> Errors e; closeOnDone : Bool } -> Sink none e a l Unit
+foreign pure from_writable_stream from "@flick-lang/runtime/effect/Sink" "fromWritableStream"
+  reviewed "effect@4.0.5 sha256:439f942e9fef8a7a"
+
+/// Runs the task, consuming nothing, and ends as it gives.
+from_effect_end : Eff r e (End a l) -> Sink r e i l a
+foreign pure from_effect_end from "@flick-lang/runtime/effect/Sink" "flickFromEffectEnd"
+  reviewed "effect@4.0.5 sha256:fab7dbecd4bd9c74"
+
+/// Runs the task, consuming nothing, and gives its value.
+from_effect : Eff r e a -> Sink r e i l a
+foreign pure from_effect from "@flick-lang/runtime/effect/Sink" "fromEffect"
+  reviewed "effect@4.0.5 sha256:913e72d57127b8d0"
+
+/// Offers every element to the queue and ends it at the end.
+from_queue : Queue.Queue e i -> Sink none none i l Unit
+foreign pure from_queue from "@flick-lang/runtime/effect/Sink" "fromQueue"
+  reviewed "effect@4.0.5 sha256:462cfb5a1728d226"
+
+/// Publishes every element to the hub.
+from_pubsub : PubSub.PubSub i -> Sink none none i l Unit
+foreign pure from_pubsub from "@flick-lang/runtime/effect/Sink" "fromPubSub"
+  reviewed "effect@4.0.5 sha256:185b5de08415f467"
+
+/// Consumes nothing and gives the value.
+succeed : a -> Sink none none i l a
+foreign pure succeed from "@flick-lang/runtime/effect/Sink" "succeed"
+  reviewed "effect@4.0.5 sha256:983d2c73de619f59"
+
+/// Consumes nothing and gives the value `f` computes when it runs.
+sync : (Unit -> a) -> Sink none none i l a
+foreign pure sync from "@flick-lang/runtime/effect/Sink" "sync"
+  reviewed "effect@4.0.5 sha256:0fd3fd651767b37d"
+
+/// The sink `f` builds each time it runs.
+suspend : (Unit -> Sink r e i l a) -> Sink r e i l a
+foreign pure suspend from "@flick-lang/runtime/effect/Sink" "suspend"
+  reviewed "effect@4.0.5 sha256:ff7088c26b505c32"
+
+/// Fails with the error.
+fail : Errors e -> Sink none e i l a
+foreign pure fail from "@flick-lang/runtime/effect/Sink" "fail"
+  reviewed "effect@4.0.5 sha256:139393f4fa3cb8e5"
+
+/// Fails with the error `f` computes when it runs.
+fail_sync : (Unit -> Errors e) -> Sink none e i l a
+foreign pure fail_sync from "@flick-lang/runtime/effect/Sink" "failSync"
+  reviewed "effect@4.0.5 sha256:84a9d3c231d217c0"
+
+/// Fails with the whole cause of `failure`.
+fail_cause : Failure e -> Sink none e i l a
+foreign pure fail_cause from "@flick-lang/runtime/effect/Sink" "flickFailCause"
+  reviewed "effect@4.0.5 sha256:9dde72609fde03bf"
+
+/// Fails with the cause of the failure `f` computes when it runs.
+fail_cause_sync : (Unit -> Failure e) -> Sink none e i l a
+foreign pure fail_cause_sync from "@flick-lang/runtime/effect/Sink" "flickFailCauseSync"
+  reviewed "effect@4.0.5 sha256:96763334c6a0934c"
+
+/// Consumes everything and never ends.
+never : Sink none none i l a
+foreign pure never from "@flick-lang/runtime/effect/Sink" "never"
+  reviewed "effect@4.0.5 sha256:a7d0529bf85187ba"
+
+/// The sink without its leftovers.
+ignore_leftover : Sink r e i l a -> Sink r e i l2 a
+foreign pure ignore_leftover from "@flick-lang/runtime/effect/Sink" "ignoreLeftover"
+  reviewed "effect@4.0.5 sha256:c9cf1505d19c2ce5"
+
+/// Consumes everything, giving nothing.
+drain : Sink none none i l Unit
+foreign pure drain from "@flick-lang/runtime/effect/Sink" "drain"
+  reviewed "effect@4.0.5 sha256:96e1077debf00e32"
+
+/// Folds elements from `initial` with `f` while `continue` holds of the
+/// state; the rest is left over.
+fold : (Unit -> s) -> (s -> Bool) -> (s -> i ->{r; e} s) -> Sink r e i i s
+foreign pure fold from "@flick-lang/runtime/effect/Sink" "fold"
+  arity 3
+  reviewed "effect@4.0.5 sha256:339c3605526f01e5"
+
+/// `fold` a chunk at a time.
+fold_array : (Unit -> s) -> (s -> Bool) -> (s -> NonEmpty.NonEmpty i ->{r; e} s) -> Sink r e i l s
+foreign pure fold_array from "@flick-lang/runtime/effect/Sink" "foldArray"
+  arity 3
+  reviewed "effect@4.0.5 sha256:73d9fabd4f46bd4e"
+
+/// Folds at most `max` elements.
+fold_until : (Unit -> s) -> Number -> (s -> i ->{r; e} s) -> Sink r e i i s
+foreign pure fold_until from "@flick-lang/runtime/effect/Sink" "foldUntil"
+  arity 3
+  reviewed "effect@4.0.5 sha256:c42b0503c09f43b1"
+
+/// Whether `f` holds for every element; stops at the first that fails.
+every : (i -> Bool) -> Sink none none i i Bool
+foreign pure every from "@flick-lang/runtime/effect/Sink" "every"
+  reviewed "effect@4.0.5 sha256:b66c40368d50445e"
+
+/// Whether `f` holds for some element; stops at the first.
+some : (i -> Bool) -> Sink none none i i Bool
+foreign pure some from "@flick-lang/runtime/effect/Sink" "some"
+  reviewed "effect@4.0.5 sha256:7154ca600c4d207e"
+
+/// The value mapped by `f`.
+map : (a -> b) -> Sink r e i l a -> Sink r e i l b
+foreign pure map from "@flick-lang/runtime/effect/Sink" "map"
+  arity 1
+  reviewed "effect@4.0.5 sha256:f14591484f8baa79"
+
+/// The value replaced by `b`.
+as_ : b -> Sink r e i l a -> Sink r e i l b
+foreign pure as_ from "@flick-lang/runtime/effect/Sink" "as"
+  arity 1
+  reviewed "effect@4.0.5 sha256:b623d80cfcba29ba"
+
+/// Each element mapped by `f` before the sink reads it.
+map_input : (i0 -> i) -> Sink r e i l a -> Sink r e i0 l a
+foreign pure map_input from "@flick-lang/runtime/effect/Sink" "mapInput"
+  arity 1
+  reviewed "effect@4.0.5 sha256:003e2a9802b8ba0d"
+
+/// Each element mapped by the task `f` gives.
+map_input_effect : (i0 ->{r2; e2} i) -> Sink r e i l a -> Sink (r + r2) (e + e2) i0 l a
+foreign pure map_input_effect from "@flick-lang/runtime/effect/Sink" "mapInputEffect"
+  arity 1
+  reviewed "effect@4.0.5 sha256:93a6c22e33b39f95"
+
+/// Each chunk mapped by `f` before the sink reads it.
+map_input_array : (NonEmpty.NonEmpty i0 -> NonEmpty.NonEmpty i) -> Sink r e i l a -> Sink r e i0 l a
+foreign pure map_input_array from "@flick-lang/runtime/effect/Sink" "mapInputArray"
+  arity 1
+  reviewed "effect@4.0.5 sha256:33b70d078fadcd76"
+
+/// Each chunk mapped by the task `f` gives.
+map_input_array_effect :
+  (NonEmpty.NonEmpty i0 ->{r2; e2} NonEmpty.NonEmpty i) -> Sink r e i l a -> Sink (r + r2) (e + e2) i0 l a
+foreign pure map_input_array_effect from "@flick-lang/runtime/effect/Sink" "mapInputArrayEffect"
+  arity 1
+  reviewed "effect@4.0.5 sha256:9221c3ddc576124e"
+
+/// The end, value and leftovers, mapped by `f`.
+map_end : (End a l -> End a2 l2) -> Sink r e i l a -> Sink r e i l2 a2
+foreign pure map_end from "@flick-lang/runtime/effect/Sink" "flickMapEnd"
+  arity 1
+  reviewed "effect@4.0.5 sha256:f1fa2b82a99a7b86"
+
+/// The end mapped by the task `f` gives.
+map_effect_end : (End a l ->{r2; e2} End a2 l2) -> Sink r e i l a -> Sink (r + r2) (e + e2) i l2 a2
+foreign pure map_effect_end from "@flick-lang/runtime/effect/Sink" "flickMapEffectEnd"
+  arity 1
+  reviewed "effect@4.0.5 sha256:c3fa50f4d2545dc1"
+
+/// The value mapped by the task `f` gives.
+map_effect : (a ->{r2; e2} b) -> Sink r e i l a -> Sink (r + r2) (e + e2) i l b
+foreign pure map_effect from "@flick-lang/runtime/effect/Sink" "mapEffect"
+  arity 1
+  reviewed "effect@4.0.5 sha256:5a30aaa469d8d7f9"
+
+/// Each typed error mapped by `f`.
+map_error : (Errors e -> Errors e2) -> Sink r e i l a -> Sink r e2 i l a
+foreign pure map_error from "@flick-lang/runtime/effect/Sink" "mapError"
+  arity 1
+  reviewed "effect@4.0.5 sha256:e873cc19c1b7185d"
+
+/// Each leftover mapped by `f`.
+map_leftover : (l -> l2) -> Sink r e i l a -> Sink r e i l2 a
+foreign pure map_leftover from "@flick-lang/runtime/effect/Sink" "mapLeftover"
+  arity 1
+  reviewed "effect@4.0.5 sha256:507338b396bffc52"
+
+/// The first `n` elements; the rest is left over.
+take : Number -> Sink none none i i (List i)
+foreign pure take from "@flick-lang/runtime/effect/Sink" "take"
+  reviewed "effect@4.0.5 sha256:59d6cdc21738adca"
+
+/// Runs the sink, then the one `f` builds of its value on what is left.
+flat_map : (a -> Sink r2 e2 i i b) -> Sink r e i i a -> Sink (r + r2) (e + e2) i i b
+foreign pure flat_map from "@flick-lang/runtime/effect/Sink" "flatMap"
+  arity 1
+  reviewed "effect@4.0.5 sha256:7760fdcfd6d2adf4"
+
+/// Folds elements with `f` while `continue` holds of the state.
+reduce_while : (Unit -> s) -> (s -> Bool) -> (s -> i -> s) -> Sink none none i i s
+foreign pure reduce_while from "@flick-lang/runtime/effect/Sink" "reduceWhile"
+  arity 3
+  reviewed "effect@4.0.5 sha256:1de5bdc3d0e7b7ea"
+
+/// `reduce_while` with a task for each step.
+reduce_while_effect : (Unit -> s) -> (s -> Bool) -> (s -> i ->{r; e} s) -> Sink r e i i s
+foreign pure reduce_while_effect from "@flick-lang/runtime/effect/Sink" "reduceWhileEffect"
+  arity 3
+  reviewed "effect@4.0.5 sha256:1459f50c00f652a1"
+
+/// `reduce_while` a chunk at a time.
+reduce_while_array : (Unit -> s) -> (s -> Bool) -> (s -> NonEmpty.NonEmpty i -> s) -> Sink none none i l s
+foreign pure reduce_while_array from "@flick-lang/runtime/effect/Sink" "reduceWhileArray"
+  arity 3
+  reviewed "effect@4.0.5 sha256:18b733207e94b286"
+
+/// `reduce_while_array` with a task for each chunk.
+reduce_while_array_effect :
+  (Unit -> s) -> (s -> Bool) -> (s -> NonEmpty.NonEmpty i ->{r; e} s) -> Sink r e i l s
+foreign pure reduce_while_array_effect from "@flick-lang/runtime/effect/Sink" "reduceWhileArrayEffect"
+  arity 3
+  reviewed "effect@4.0.5 sha256:99f9afc954846660"
+
+/// Folds every element with `f`.
+reduce : (Unit -> s) -> (s -> i -> s) -> Sink none none i l s
+foreign pure reduce from "@flick-lang/runtime/effect/Sink" "reduce"
+  arity 2
+  reviewed "effect@4.0.5 sha256:3fc74a6de694f457"
+
+/// Folds every chunk with `f`.
+reduce_array : (Unit -> s) -> (s -> NonEmpty.NonEmpty i -> s) -> Sink none none i l s
+foreign pure reduce_array from "@flick-lang/runtime/effect/Sink" "reduceArray"
+  arity 2
+  reviewed "effect@4.0.5 sha256:9da6ac0d4f4f9f8f"
+
+/// Folds every element with a task.
+reduce_effect : (Unit -> s) -> (s -> i ->{r; e} s) -> Sink r e i l s
+foreign pure reduce_effect from "@flick-lang/runtime/effect/Sink" "reduceEffect"
+  arity 2
+  reviewed "effect@4.0.5 sha256:75295b716a802ef1"
+
+/// The first element, if any; the rest is left over.
+head : Unit -> Sink none none i i (Option i)
+foreign pure head from "@flick-lang/runtime/effect/Sink" "head"
+  arity 0
+  reviewed "effect@4.0.5 sha256:3c21dc9e8224f449"
+
+/// The last element, if any.
+last : Unit -> Sink none none i l (Option i)
+foreign pure last from "@flick-lang/runtime/effect/Sink" "last"
+  arity 0
+  reviewed "effect@4.0.5 sha256:1bbff7621403d0ef"
+
+/// The first element for which `f` holds.
+find : (i -> Bool) -> Sink none none i i (Option i)
+foreign pure find from "@flick-lang/runtime/effect/Sink" "find"
+  reviewed "effect@4.0.5 sha256:6f3b1acf6c6658db"
+
+/// The first element for which the task `f` gives `True`.
+find_effect : (i ->{r; e} Bool) -> Sink r e i i (Option i)
+foreign pure find_effect from "@flick-lang/runtime/effect/Sink" "findEffect"
+  reviewed "effect@4.0.5 sha256:7fc989f45e182a86"
+
+/// The sum of the elements.
+sum : Sink none none Number l Number
+foreign pure sum from "@flick-lang/runtime/effect/Sink" "sum"
+  reviewed "effect@4.0.5 sha256:3c72b4897d00d627"
+
+/// The number of elements.
+count : Sink none none i l Number
+foreign pure count from "@flick-lang/runtime/effect/Sink" "count"
+  reviewed "effect@4.0.5 sha256:cb35f8ae5a6e4132"
+
+/// Every element, in order.
+collect : Unit -> Sink none none i l (List i)
+foreign pure collect from "@flick-lang/runtime/effect/Sink" "collect"
+  arity 0
+  reviewed "effect@4.0.5 sha256:c6bf72dc188f6a65"
+
+/// The elements while `f` holds; the rest is left over.
+take_while : (i -> Bool) -> Sink none none i i (List i)
+foreign pure take_while from "@flick-lang/runtime/effect/Sink" "takeWhile"
+  reviewed "effect@4.0.5 sha256:c4d0b46e2aefae54"
+
+/// The elements the filter passes, as it maps them, up to the first it
+/// rejects.
+take_while_filter : Filter.Filter i b x -> Sink none none i i (List b)
+foreign pure take_while_filter from "@flick-lang/runtime/effect/Sink" "takeWhileFilter"
+  reviewed "effect@4.0.5 sha256:addfa1a6aa9e2dc8"
+
+/// The elements while the task `f` gives `True`.
+take_while_effect : (i ->{r; e} Bool) -> Sink r e i i (List i)
+foreign pure take_while_effect from "@flick-lang/runtime/effect/Sink" "takeWhileEffect"
+  reviewed "effect@4.0.5 sha256:cad43221f0c4d079"
+
+/// `take_while_filter` with an effectful filter.
+take_while_filter_effect : Filter.FilterEffect r e i b x -> Sink r e i i (List b)
+foreign pure take_while_filter_effect from "@flick-lang/runtime/effect/Sink" "takeWhileFilterEffect"
+  reviewed "effect@4.0.5 sha256:2a34dc5f78df0594"
+
+/// The elements up to and including the first for which `f` holds.
+take_until : (i -> Bool) -> Sink none none i i (List i)
+foreign pure take_until from "@flick-lang/runtime/effect/Sink" "takeUntil"
+  reviewed "effect@4.0.5 sha256:0ae1cda2537e32d7"
+
+/// `take_until` with a task.
+take_until_effect : (i ->{r; e} Bool) -> Sink r e i i (List i)
+foreign pure take_until_effect from "@flick-lang/runtime/effect/Sink" "takeUntilEffect"
+  reviewed "effect@4.0.5 sha256:14574155379ff2a0"
+
+/// Runs `f` on each element.
+for_each : (i ->{r; e} x) -> Sink r e i l Unit
+foreign pure for_each from "@flick-lang/runtime/effect/Sink" "forEach"
+  reviewed "effect@4.0.5 sha256:39ff754cf5ab3307"
+
+/// Runs `f` on each chunk.
+for_each_array : (NonEmpty.NonEmpty i ->{r; e} x) -> Sink r e i l Unit
+foreign pure for_each_array from "@flick-lang/runtime/effect/Sink" "forEachArray"
+  reviewed "effect@4.0.5 sha256:03b7c1a21b3f0384"
+
+/// Runs `f` on each element while it gives `True`.
+for_each_while : (i ->{r; e} Bool) -> Sink r e i l Unit
+foreign pure for_each_while from "@flick-lang/runtime/effect/Sink" "forEachWhile"
+  reviewed "effect@4.0.5 sha256:e7d469e6ed7c4eea"
+
+/// Runs `f` on each chunk while it gives `True`.
+for_each_while_array : (NonEmpty.NonEmpty i ->{r; e} Bool) -> Sink r e i l Unit
+foreign pure for_each_while_array from "@flick-lang/runtime/effect/Sink" "forEachWhileArray"
+  reviewed "effect@4.0.5 sha256:b05c92518759a8a0"
+
+/// The sink the task builds when it runs.
+unwrap : Eff r e1 (Sink r2 e2 i l a) -> Sink (r + r2) (e1 + e2) i l a
+foreign pure unwrap from "@flick-lang/runtime/effect/Sink" "unwrap"
+  reviewed "effect@4.0.5 sha256:5f66edc478550d3b"
+
+/// Runs `summary` before and after the sink, and pairs its value with `f`
+/// of the two results.
+summarized : Eff r2 e2 x -> (x -> x -> y) -> Sink r e i l a -> Sink (r + r2) (e + e2) i l (a, y)
+foreign pure summarized from "@flick-lang/runtime/effect/Sink" "summarized"
+  arity 2
+  reviewed "effect@4.0.5 sha256:66b4a408f13e31e5"
+
+/// The value paired with how long the sink ran.
+with_duration : Sink r e i l a -> Sink r e i l (a, Duration.Duration)
+foreign pure with_duration from "@flick-lang/runtime/effect/Sink" "withDuration"
+  reviewed "effect@4.0.5 sha256:8fe5817424169be7"
+
+/// Consumes everything and gives how long it took.
+timed : Sink none none i l Duration.Duration
+foreign pure timed from "@flick-lang/runtime/effect/Sink" "timed"
+  reviewed "effect@4.0.5 sha256:9438c776e0d833ea"
+
+/// Provides the service named by the tag with the implementation.
+provide_service : ServiceTag s -> ServiceImpl s -> Sink (s + r) e i l a -> Sink r e i l a
+foreign pure provide_service from "@flick-lang/runtime/effect/Sink" "provideService"
+  arity 2
+  reviewed "effect@4.0.5 sha256:5540e2602b621e87"
+
+/// On a typed error, runs the sink `f` builds of it instead.
+or_else : (Errors e -> Sink r2 e2 i l a) -> Sink r e i l a -> Sink (r + r2) (e + e2) i l a
+foreign pure or_else from "@flick-lang/runtime/effect/Sink" "orElse"
+  arity 1
+  reviewed "effect@4.0.5 sha256:f5fb0dc25edca7a0"
+
+/// Recovers from a typed error with the value of the task `f` builds.
+catch : (Errors e ->{r2; e2} a) -> Sink r e i l a -> Sink (r + r2) e2 i l a
+foreign pure catch from "@flick-lang/runtime/effect/Sink" "catch"
+  arity 1
+  reviewed "effect@4.0.5 sha256:ef474a840acf900e"
+
+/// Recovers from any failure with the value of the task `f` builds.
+catch_cause : (Failure e ->{r2; e2} a) -> Sink r e i l a -> Sink (r + r2) e2 i l a
+foreign pure catch_cause from "@flick-lang/runtime/effect/Sink" "flickCatchCause"
+  arity 1
+  reviewed "effect@4.0.5 sha256:f8638e34a56e751e"
+
+/// Runs `f` with how the sink ended.
+on_exit : (Exit e a ->{r2; e2} x) -> Sink r e i l a -> Sink (r + r2) (e + e2) i l a
+foreign pure on_exit from "@flick-lang/runtime/effect/Sink" "flickOnExit"
+  arity 1
+  reviewed "effect@4.0.5 sha256:1c0e0aef5efe8a9a"
+
+/// Runs the task when the sink ends, however it ends.
+ensuring : Eff r2 e2 x -> Sink r e i l a -> Sink (r + r2) (e + e2) i l a
+foreign pure ensuring from "@flick-lang/runtime/effect/Sink" "ensuring"
+  arity 1
+  reviewed "effect@4.0.5 sha256:8cbe47bb9004b24a"

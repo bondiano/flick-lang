@@ -1,0 +1,169 @@
+// Effect's `Sink`, run on chunks of two through its channel: the value it
+// gives and the elements it leaves over.
+module App.Main exposing (main)
+
+type error Boom = Boom String
+
+service Scale =
+  factor : Unit ->{} Number
+
+writable : Unit ->{} Channel.WritableStream Number
+foreign sync writable from "./channel_js.mjs" "writable"
+  arity 0
+
+written : Unit ->{} List Number
+foreign sync written from "./channel_js.mjs" "writtenSoFar"
+  arity 0
+
+boom : JsValue -> Boom
+let boom value = Boom "js"
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+/// Feeds 1 to 5 in chunks of two to the sink; its end.
+run : Sink.Sink r e Number l a ->{r; e} Sink.End a l
+let run sink =
+  Channel.run_drain (Channel.from_list_chunked 2 [1, 2, 3, 4, 5] |> Channel.pipe_to (Sink.to_channel sink))
+
+ended : Show a => String -> Sink.End a Number -> String
+let ended label end =
+  match end with
+  | (value, leftover) -> label ++ ": " ++ show value ++ " " ++ show (Option.map NonEmpty.to_list leftover)
+
+value_of : Sink.End a l -> a
+let value_of end =
+  match end with
+  | (value, _) -> value
+
+even : Number -> Bool
+let even n = n % 2 == 0
+
+small : Filter.Filter Number Number Number
+let small = Filter.make (fun n -> if n < 3 then Ok (n * 10) else Err n)
+
+small_effect : Filter.FilterEffect none none Number Number Number
+let small_effect = Filter.make_effect (fun n -> if n < 3 then Ok (n * 10) else Err n)
+
+folds : Unit ->{; Boom} Unit
+let folds () =
+  say (ended "collect" (run (Sink.collect ())))
+  say (ended "count" (run Sink.count))
+  say (ended "sum" (run Sink.sum))
+  say (ended "take" (run (Sink.take 3)))
+  say (ended "head" (run (Sink.head ())))
+  say (ended "last" (run (Sink.last ())))
+  say (ended "find" (run (Sink.find (fun n -> n > 3))))
+  say (ended "find_effect" (run (Sink.find_effect (fun n -> n > 1))))
+  say (ended "every" (run (Sink.every (fun n -> n < 3))))
+  say (ended "some" (run (Sink.some even)))
+  say (ended "fold" (run (Sink.fold (fun () -> 0) (fun s -> s < 5) (fun s n -> s + n))))
+  say (ended "fold_array" (run (Sink.fold_array (fun () -> 0) (fun s -> s < 5) (fun s chunk -> s + NonEmpty.length chunk))))
+  say (ended "fold_until" (run (Sink.fold_until (fun () -> 0) 2 (fun s n -> s + n))))
+  say (ended "reduce" (run (Sink.reduce (fun () -> 0) (fun s n -> s + n))))
+  say (ended "reduce_array" (run (Sink.reduce_array (fun () -> 0) (fun s chunk -> s + NonEmpty.length chunk))))
+  say (ended "reduce_effect" (run (Sink.reduce_effect (fun () -> 1) (fun s n -> s * n))))
+  say (ended "reduce_while" (run (Sink.reduce_while (fun () -> 0) (fun s -> s < 4) (fun s n -> s + n))))
+  say (ended "reduce_while_effect" (run (Sink.reduce_while_effect (fun () -> 0) (fun s -> s < 4) (fun s n -> s + n))))
+  say (ended "reduce_while_array" (run (Sink.reduce_while_array (fun () -> 0) (fun s -> s < 3) (fun s chunk -> s + NonEmpty.length chunk))))
+  say (ended "reduce_while_array_effect" (run (Sink.reduce_while_array_effect (fun () -> 0) (fun s -> s < 3) (fun s chunk -> s + NonEmpty.length chunk))))
+  say (ended "take_while" (run (Sink.take_while (fun n -> n < 3))))
+  say (ended "take_while_effect" (run (Sink.take_while_effect (fun n -> n < 2))))
+  say (ended "take_while_filter" (run (Sink.take_while_filter small)))
+  say (ended "take_while_filter_effect" (run (Sink.take_while_filter_effect small_effect)))
+  say (ended "take_until" (run (Sink.take_until even)))
+  say (ended "take_until_effect" (run (Sink.take_until_effect (fun n -> n == 3))))
+  let seen = Ref.make []
+  say (ended "for_each" (run (Sink.for_each (fun n -> Ref.set seen (Ref.get seen ++ [n])))) ++ " " ++ show (Ref.get seen))
+  let chunks = Ref.make []
+  say (ended "for_each_array" (run (Sink.for_each_array (fun c -> Ref.set chunks (Ref.get chunks ++ [NonEmpty.to_list c])))) ++ " " ++ show (Ref.get chunks))
+  say (ended "for_each_while" (run (Sink.for_each_while (fun n -> n < 3))))
+  say (ended "for_each_while_array" (run (Sink.for_each_while_array (fun c -> NonEmpty.length c > 1))))
+  say (ended "drain" (run Sink.drain))
+  let stopped : Sink.End String Number = ("stopped", None)
+  let forever = Channel.from_list_chunked 2 [1, 2] |> Channel.pipe_to (Sink.to_channel Sink.never)
+  say (ended "never, interrupted" (Channel.run_drain (Channel.interrupt_when (task { stopped }) forever)))
+
+shapes : Unit ->{; Boom} Unit
+let shapes () =
+  say (ended "succeed" (run (Sink.succeed "x")))
+  say (ended "sync" (run (Sink.sync (fun () -> "lazy"))))
+  say (ended "suspend" (run (Sink.suspend (fun () -> Sink.succeed 9))))
+  say (ended "from_effect" (run (Sink.from_effect (task { "effect" }))))
+  let given : Sink.End String Number = ("given", NonEmpty.from_list [7])
+  say (ended "from_effect_end" (run (Sink.from_effect_end (task { given }))))
+  say (ended "unwrap" (run (Sink.unwrap (task { Sink.count }))))
+  say (ended "map" (run (Sink.map (fun n -> n * 100) Sink.count)))
+  say (ended "as_" (run (Sink.as_ "same" Sink.count)))
+  say (ended "map_effect" (run (Sink.map_effect (fun n -> n + 1) Sink.sum)))
+  say (ended "map_input" (run (Sink.map_input (fun n -> n * 2) Sink.sum)))
+  say (ended "map_input_effect" (run (Sink.map_input_effect (fun n -> n * 3) Sink.sum)))
+  say (ended "map_input_array" (run (Sink.map_input_array (fun c -> NonEmpty.singleton (NonEmpty.head c)) Sink.sum)))
+  say (ended "map_input_array_effect" (run (Sink.map_input_array_effect (fun c -> NonEmpty.singleton (NonEmpty.length c)) Sink.sum)))
+  say (ended "map_end" (run (Sink.map_end (fun end -> (show (value_of end), None)) (Sink.take 1))))
+  say (ended "map_effect_end" (run (Sink.map_effect_end (fun end -> (value_of end * 2, NonEmpty.from_list [0])) Sink.sum)))
+  say (ended "map_leftover" (run (Sink.map_leftover (fun n -> n * 10) (Sink.take 3))))
+  say (ended "ignore_leftover" (run (Sink.ignore_leftover (Sink.take 3))))
+  say (ended "flat_map" (run (Sink.flat_map (fun first -> Sink.map (fun rest -> (first, rest)) (Sink.take 2)) (Sink.take 1))))
+  let with_time = run (Sink.with_duration Sink.count)
+  let counted =
+    match value_of with_time with
+    | (n, took) -> (n, Duration.is_finite took)
+  say ("with_duration: " ++ show counted)
+  say ("timed: " ++ show (Duration.is_finite (value_of (run Sink.timed))))
+  let calls = Ref.make 0
+  let summary = Sink.summarized (task { Ref.set calls (Ref.get calls + 1) |> fun _ -> Ref.get calls }) (fun start stop -> stop - start) Sink.count
+  say (ended "summarized" (run summary))
+  let scaled = Sink.map_effect (fun n -> n * Scale.factor ()) Sink.count
+  say (ended "provide_service" (run (Sink.provide_service Scale { factor = fun () -> 10 } scaled)))
+
+failures : Unit ->{; Boom} Unit
+let failures () =
+  let failing : Sink.Sink none {Boom} Number Number Number = Sink.fail (Boom "sink")
+  say (ended "catch" (run (Sink.catch (fun e -> match e with | Boom why -> String.length why) failing)))
+  say (ended "or_else" (run (Sink.or_else (fun e -> Sink.count) failing)))
+  let caught = Ref.make None
+  say (ended "catch_cause" (run (Sink.catch_cause (fun f -> Ref.set caught (Some f) |> fun _ -> 0) (Sink.fail_sync (fun () -> Boom "lazy")))))
+  match Ref.get caught with
+  | Some failure ->
+    let again = Sink.catch (fun e -> -1) (Sink.fail_cause failure)
+    let lazily = Sink.catch (fun e -> -2) (Sink.fail_cause_sync (fun () -> failure))
+    say (ended "fail_cause" (run again) ++ ", " ++ ended "fail_cause_sync" (run lazily))
+  | None -> say "no failure"
+  let log = Ref.make []
+  let noted = Sink.ensuring (task { Ref.set log (Ref.get log ++ ["ensuring"]) }) (Sink.on_exit (fun exit -> Ref.set log (Ref.get log ++ ["exit " ++ show (Exit.value exit)])) Sink.count)
+  say (ended "on_exit, ensuring" (run noted) ++ " " ++ show (Ref.get log))
+  let message =
+    try
+      show (value_of (run (Sink.map_error (fun e -> Boom "mapped") failing)))
+    with
+    | Boom why -> why
+  say ("map_error: " ++ message)
+
+targets : Unit ->{; Boom} Unit
+let targets () =
+  let q : Queue.Queue none Number = Queue.unbounded ()
+  let _ = run (Sink.from_queue q)
+  say ("from_queue: " ++ show (Queue.collect q))
+  let hub : PubSub.PubSub Number = PubSub.unbounded { replay = Some 5 }
+  let _ = run (Sink.from_pubsub hub)
+  let got = scope {
+    let sub = PubSub.subscribe hub
+    PubSub.take_between 5 5 sub
+  }
+  say ("from_pubsub: " ++ show got)
+  let stream = writable ()
+  let _ = run (Sink.from_writable_stream { evaluate = fun () -> stream; onError = boom; closeOnDone = true })
+  say ("from_writable_stream: " ++ show (written ()))
+  let summing : Channel.Channel none none (NonEmpty.NonEmpty Number) o (Sink.End Number Number) none Unit = Sink.to_channel Sink.sum
+  say (ended "from_channel" (run (Sink.from_channel summing)))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try
+    folds ()
+    shapes ()
+    failures ()
+    targets ()
+  with
+  | Boom why -> say ("unexpected " ++ why)

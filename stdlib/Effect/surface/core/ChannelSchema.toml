@@ -1,7 +1,7 @@
-[pending]
-decode = "M20"
-decodeUnknown = "M20"
-duplex = "M20"
-duplexUnknown = "M20"
-encode = "M20"
-encodeUnknown = "M20"
+[wrapped]
+decode = "ChannelSchema.decode b68dc558b2a1522b"
+decodeUnknown = "ChannelSchema.decode_unknown b8cf3a9ea357e5e4"
+encode = "ChannelSchema.encode deab460a9c9e371a"
+encodeUnknown = "ChannelSchema.encode_unknown db0ae9d339ef3dc5"
+duplex = "ChannelSchema.duplex 549ab6426e2eb9ed"
+duplexUnknown = "ChannelSchema.duplex_unknown 1cab1c2c63ba1071"

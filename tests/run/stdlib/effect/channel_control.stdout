@@ -1,0 +1,39 @@
+fail: failed broken
+fail_sync: failed later
+catch: [1, 6]
+catch_cause: [1], primary Some "broken"
+fail_cause: failed broken
+fail_cause_sync: failed broken
+tap_error: failed broken ["tapped"]
+tap_cause: failed broken
+map_error: other 1
+ignore: ([1], [1])
+ensuring, on_start, on_end, on_first: [1, 2, 3]
+on_error, on_exit: failed broken
+log: ["tapped", "cause", "start", "first 1", "ensuring", "end", "on_error", "on_exit true"]
+retry: [3]
+repeat: [7, 7, 7]
+schedule: [1]
+merge both: [1, 2, 3, 10, 20]
+merge left: [1, 2, 3]
+merge right: [1, 2, 3]
+merge either: [1, 2, 3]
+interrupt_when: interrupted
+halt_when: [1, 2, 3]
+merge_effect: ([0], 1)
+provide_: ["hi ada"]
+provide_service: ["hi ada"]
+provide_service_effect: ["hi ada"]
+update_service: ["HEY ada"]
+with_span: [Some "pipeline"]
+run_count, run_head, run_last: (3, Some 1, Some 3)
+run_fold: 6
+run_fold_effect: 24
+run_for_each: [1, 2, 3]
+run_into_queue: [1, 2, 3]
+run_into_queue_array: [4, 5, 6]
+run_into_queue failing: failed broken
+to_queue, to_queue_array: ([1, 2, 3], [7, 8, 9])
+to_pubsub, to_pubsub_array: ([1, 2, 3], [5, 6])
+run_into_pubsub, run_into_pubsub_array: ([1, 2, 3, 4], "array done")
+from_writable_stream: ["a", "b", "c"]

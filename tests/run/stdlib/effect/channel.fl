@@ -1,0 +1,116 @@
+// Effect's `Channel`: the sources of a pipeline, from values, effects,
+// queues, hubs, schedules and JS streams.
+module App.Main exposing (main)
+
+type error Boom = Boom String
+
+readable : List String ->{} Channel.ReadableStream String
+foreign sync readable from "./channel_js.mjs" "readable"
+
+async_iterable : List Number -> String ->{} Channel.AsyncIterable Number String
+foreign sync async_iterable from "./channel_js.mjs" "asyncIterable"
+
+upper : Unit ->{} Channel.TransformStream String String
+foreign sync upper from "./channel_js.mjs" "upper"
+  arity 0
+
+boom : JsValue -> Boom
+let boom value = Boom "js"
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+lists : Channel.Channel none e i (NonEmpty.NonEmpty a) d none Unit ->{; e} List (List a)
+let lists channel = Channel.run_collect (Channel.map NonEmpty.to_list channel)
+
+/// Offers the numbers to the queue and ends it.
+feed : List Number -> Queue.Queue e Number ->{} Bool
+let feed numbers queue =
+  let _ = Queue.offer_all numbers queue
+  Queue.end queue
+
+values : Unit ->{; Boom} Unit
+let values () =
+  say ("from_list: " ++ show (Channel.run_collect (Channel.from_list [1, 2, 3])))
+  say ("from_list_chunked: " ++ show (lists (Channel.from_list_chunked 2 [1, 2, 3, 4, 5])))
+  say ("from_chunk: " ++ show (Channel.run_collect (Channel.from_chunk (Chunk.from_list ["a", "b"]))))
+  say ("succeed, sync: " ++ show (Channel.run_collect (Channel.succeed 1), Channel.run_collect (Channel.sync (fun () -> 2))))
+  say ("end, end_sync: " ++ show (Channel.run_drain (Channel.end "done"), Channel.run_drain (Channel.end_sync (fun () -> "later"))))
+  say ("empty: " ++ show (Channel.run_count Channel.empty) ++ ", default chunk: " ++ show Channel.default_chunk_size)
+  say ("never: " ++ show (Channel.run_head (Channel.merge Channel.halt_either (Channel.succeed 1) Channel.never)))
+  say ("from_effect: " ++ show (Channel.run_collect (Channel.from_effect (task { 40 + 2 }))))
+  say ("from_effect_done: " ++ show (Channel.run_drain (Channel.from_effect_done (task { "d" }))))
+  let seen = Ref.make 0
+  let drained = Channel.run_count (Channel.from_effect_drain (task { Ref.set seen 7 }))
+  say ("from_effect_drain: " ++ show (drained, Ref.get seen))
+  let lazy = Channel.suspend (fun () -> Channel.from_list [3])
+  say ("suspend: " ++ show (Channel.run_collect lazy))
+  say ("unwrap: " ++ show (Channel.run_collect (Channel.unwrap (task { Channel.from_list ["built"] }))))
+  let echoed = Channel.from_list [1, 2] |> Channel.pipe_to (Channel.identity ())
+  say ("identity: " ++ show (Channel.run_collect echoed))
+  say ("from_schedule: " ++ show (Channel.run_collect (Channel.from_schedule (Schedule.recurs 2))))
+
+queues : Unit ->{; Boom} Unit
+let queues () =
+  let q : Queue.Queue {Boom} Number = Queue.unbounded ()
+  let _ = feed [1, 2, 3] q
+  say ("from_queue: " ++ show (Channel.run_collect (Channel.from_queue q)))
+  let q2 : Queue.Queue {Boom} Number = Queue.unbounded ()
+  let _ = feed [4, 5] q2
+  say ("from_queue_array: " ++ show (lists (Channel.from_queue_array q2)))
+  let failed : Queue.Queue {Boom} Number = Queue.unbounded ()
+  let _ = Queue.offer 1 failed
+  let _ = Queue.fail (Boom "queue") failed
+  let outcome =
+    try
+      show (Channel.run_collect (Channel.from_queue failed))
+    with
+    | Boom why -> "failed: " ++ why
+  say ("from_queue failing: " ++ outcome)
+  let hub : PubSub.PubSub Number = PubSub.unbounded { replay = Some 2 }
+  let _ = PubSub.publish_all [1, 2, 3] hub
+  say ("from_pubsub: " ++ show (Channel.run_head (Channel.from_pubsub hub)))
+  say ("from_pubsub_array: " ++ show (Option.map NonEmpty.to_list (Channel.run_head (Channel.from_pubsub_array hub))))
+  let got = scope s {
+    let sub = PubSub.subscribe hub
+    let _ = PubSub.publish_all [8, 9] hub
+    let one = Channel.run_head (Channel.from_subscription sub)
+    let rest = Channel.run_head (Channel.from_subscription_array sub)
+    (one, Option.map NonEmpty.to_list rest)
+  }
+  say ("from_subscription: " ++ show got)
+  let fed = Channel.callback { bufferSize = None; strategy = None } (fun queue -> feed [1, 2] queue)
+  say ("callback: " ++ show (Channel.run_collect fed))
+  let fed_chunks = Channel.callback_array { bufferSize = Some 8; strategy = Some Queue.Sliding } (fun queue -> feed [3, 4] queue)
+  say ("callback_array: " ++ show (lists fed_chunks))
+
+resources : Unit ->{; Boom} Unit
+let resources () =
+  let log = Ref.make []
+  let acquired = Channel.acquire_release (fun n -> Ref.set log (Ref.get log ++ ["release " ++ show n])) (task { 5 })
+  say ("acquire_release: " ++ show (Channel.run_collect acquired) ++ " " ++ show (Ref.get log))
+  let used = Channel.acquire_use_release (task { 10 }) (fun n -> Channel.from_list [n, n + 1] |> Channel.map_done (fun _ -> "ok")) (fun n exit -> Ref.set log (Ref.get log ++ ["used " ++ show n ++ " " ++ show (Exit.value exit)]))
+  say ("acquire_use_release: " ++ show (Channel.run_collect used) ++ " " ++ show (Ref.get log))
+
+js : Unit ->{; Boom} Unit
+let js () =
+  let stream = readable ["x", "y"]
+  let web = Channel.from_readable_stream { evaluate = fun () -> stream; onError = boom; releaseLockOnEnd = true }
+  say ("from_readable_stream: " ++ show (lists web))
+  let iterated = Channel.from_async_iterable (async_iterable [1, 2] "end") boom
+  say ("from_async_iterable: " ++ show (Channel.run_collect iterated))
+  say ("its end: " ++ Channel.run_drain (Channel.from_async_iterable (async_iterable [] "only end") boom))
+  say ("from_async_iterable_array: " ++ show (lists (Channel.from_async_iterable_array (async_iterable [3, 4] "end") boom)))
+  let transform = upper ()
+  let shouted = Channel.from_list_chunked 1 ["a", "b"] |> Channel.pipe_to_or_fail (Channel.from_transform_stream { evaluate = fun () -> transform; onError = boom; closeOnDone = true; releaseLockOnEnd = true })
+  say ("from_transform_stream: " ++ show (lists shouted))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try
+    values ()
+    queues ()
+    resources ()
+    js ()
+  with
+  | Boom why -> say ("unexpected " ++ why)

@@ -1,0 +1,6 @@
+encode: ["{\"x\":1,\"y\":2}", "{\"x\":3,\"y\":4}", "{\"x\":5,\"y\":6}"]
+decode: [{ x = 1, y = 2 }, { x = 3, y = 4 }, { x = 5, y = 6 }]
+encode_unknown, decode_unknown: [{ x = 1, y = 2 }, { x = 3, y = 4 }, { x = 5, y = 6 }]
+duplex: [{ x = 1, y = 2 }, { x = 3, y = 4 }, { x = 5, y = 6 }]
+duplex_unknown: [{ x = 1, y = 2 }, { x = 3, y = 4 }, { x = 5, y = 6 }]
+err [0]: expected an object

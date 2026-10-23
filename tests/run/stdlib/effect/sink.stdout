@@ -1,0 +1,64 @@
+collect: [1, 2, 3, 4, 5] None
+count: 5 None
+sum: 15 None
+take: [1, 2, 3] Some [4]
+head: Some 1 Some [2]
+last: Some 5 None
+find: Some 4 None
+find_effect: Some 2 None
+every: false Some [4]
+some: true None
+fold: 6 Some [4]
+fold_array: 5 None
+fold_until: 3 None
+reduce: 15 None
+reduce_array: 5 None
+reduce_effect: 120 None
+reduce_while: 6 Some [4]
+reduce_while_effect: 6 Some [4]
+reduce_while_array: 4 None
+reduce_while_array_effect: 4 None
+take_while: [1, 2] Some [4]
+take_while_effect: [1] None
+take_while_filter: [10, 20] Some [4]
+take_while_filter_effect: [10, 20] Some [4]
+take_until: [1, 2] None
+take_until_effect: [1, 2, 3] Some [4]
+for_each: () None [1, 2, 3, 4, 5]
+for_each_array: () None [[1, 2], [3, 4], [5]]
+for_each_while: () None
+for_each_while_array: () None
+drain: () None
+never, interrupted: "stopped" None
+succeed: "x" None
+sync: "lazy" None
+suspend: 9 None
+from_effect: "effect" None
+from_effect_end: "given" Some [7]
+unwrap: 5 None
+map: 500 None
+as_: "same" None
+map_effect: 16 None
+map_input: 30 None
+map_input_effect: 45 None
+map_input_array: 9 None
+map_input_array_effect: 5 None
+map_end: "[1]" None
+map_effect_end: 30 Some [0]
+map_leftover: [1, 2, 3] Some [40]
+ignore_leftover: [1, 2, 3] None
+flat_map: ([1], [2, 3]) Some [4]
+with_duration: (5, true)
+timed: true
+summarized: (5, 1) None
+provide_service: 50 None
+catch: 4 None
+or_else: 5 None
+catch_cause: 0 None
+fail_cause: -1 None, fail_cause_sync: -2 None
+on_exit, ensuring: 5 None ["exit Some 5", "ensuring"]
+map_error: mapped
+from_queue: [1, 2, 3, 4, 5]
+from_pubsub: [1, 2, 3, 4, 5]
+from_writable_stream: [1, 2, 3, 4, 5]
+from_channel: 15 None
