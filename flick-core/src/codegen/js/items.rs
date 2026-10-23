@@ -58,17 +58,18 @@ impl Gen<'_> {
             }
             ItemKind::Value { name, dicts, body } => {
                 let target = Target::Global(format!("{}.{name}", self.module));
-                let (mut stmts, value) = self.block(|g| g.function(dicts, body, Some(target)));
-                stmts.push(self.export(&names::ident(name), &value));
-                stmts.join("\n")
+                let (stmts, value) = self.block(|g| g.function(dicts, body, Some(target)));
+                let value = self.scoped(&stmts, value);
+                self.export(&names::ident(name), &value)
             }
             ItemKind::Destructure { pattern, body } => {
-                let (mut stmts, value) = self.block(|g| g.expr(body));
+                let (stmts, value) = self.block(|g| g.expr(body));
+                let value = self.scoped(&stmts, value);
                 let t = self.temp();
-                stmts.push(self.constant(&t, &value));
+                let mut out = vec![self.constant(&t, &value)];
                 let (binds, ()) = self.block(|g| g.destructure(pattern, &t));
-                stmts.extend(binds.into_iter().map(|b| format!("export {b}")));
-                stmts.join("\n")
+                out.extend(binds.into_iter().map(|b| format!("export {b}")));
+                out.join("\n")
             }
             ItemKind::Foreign(f) => self.foreign(f),
             ItemKind::Constructor(c) => self.constructor_item(c),
@@ -83,6 +84,16 @@ impl Gen<'_> {
             ItemKind::Instance { info, methods } => self.instance(info, methods),
             ItemKind::Refined { name, check } => self.refined(name, check),
             ItemKind::Schema(item) => self.schema(item),
+        }
+    }
+
+    /// `value` after the statements it needs, run in a scope of their own:
+    /// the locals of two top-level values may share a name.
+    fn scoped(&self, stmts: &[String], value: String) -> String {
+        if stmts.is_empty() {
+            value
+        } else {
+            format!("({} {})()", self.arrow(""), arrow_body(stmts, &value))
         }
     }
 
@@ -228,11 +239,7 @@ impl Gen<'_> {
             {
                 for (name, value) in methods {
                     let (stmts, v) = self.block(|g| g.function(&[], value, None));
-                    let v = if stmts.is_empty() {
-                        v
-                    } else {
-                        format!("({} {})()", self.arrow(""), arrow_body(&stmts, &v))
-                    };
+                    let v = self.scoped(&stmts, v);
                     match self.direct.get(&(info.name.clone(), name.clone())).cloned() {
                         Some(direct) => {
                             methods_first.push(self.constant(&direct, &v));
