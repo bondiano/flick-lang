@@ -1,17 +1,12 @@
-// The React adapter of `Ui`: `Ui.run` renders a description with React 19
-// and runs the tasks of its events through a bridge. Closing is two-phase:
-// React cleanup stops events and removes listeners at once; then the tasks
-// are interrupted and joined, and only then `Ui.run` ends, so the scope
-// around it releases its resources after them.
-import { type Cause, Effect, Fiber } from "effect";
-import { Fragment, type ReactNode, createElement } from "react";
-import { flushSync } from "react-dom";
-import { createRoot } from "react-dom/client";
+// React-only rendering and event ownership. Adapters mount roots; this core
+// stops events first, then interrupts and joins tasks before its scope closes.
+import { Cause, Effect, Fiber } from "effect";
+import { Component, Fragment, type ReactNode, createElement, memo, useLayoutEffect, useMemo } from "react";
 
 import type { Cell } from "../../builtins.ts";
 import type { Failure } from "../../cause.ts";
 import type { Ui } from "./nodes.ts";
-import { Bridge } from "./policies.ts";
+import { Bridge, type Listener } from "./policies.ts";
 
 export * from "./nodes.ts";
 export {
@@ -24,39 +19,96 @@ export {
   type Policy,
 } from "./policies.ts";
 
-/**
- * The React node of `node`; `place` names its position, so the policy
- * state of a handler survives a render of the same tree.
- */
-const toReact = <R>(bridge: Bridge<R>, node: Ui, place: string, key?: string): ReactNode => {
-  if (node.kind === "text") {
-    return key === undefined ? node.value : createElement(Fragment, { key }, node.value);
-  }
-  if (node.kind === "fragment") {
-    return createElement(Fragment, key === undefined ? null : { key }, ...children(bridge, node.children, place));
-  }
-  if (node.kind === "keyed") return toReact(bridge, node.node, `${place}/#${node.key}`, node.key);
-  if (node.kind === "component") return createElement(node.component, key === undefined ? node.props : { ...node.props, key });
+interface RenderRoot {
+  render(node: ReactNode): void;
+  unmount(): void;
+}
+
+/** A backend opens its root when the effect runs, not when the description is built. */
+export type Renderer = () => RenderRoot;
+
+type Events = Pick<Bridge<never>, "listener">;
+type ElementNode = Extract<Ui, { readonly kind: "element" }>;
+type LazyNode = Extract<Ui, { readonly kind: "lazy" }>;
+
+const EventElement = ({ bridge, node }: { readonly bridge: Events; readonly node: ElementNode }): ReactNode => {
+  const listeners = useMemo(() => new Map<string, Listener>(), [bridge]);
   const props: Record<string, unknown> = { ...node.attrs };
-  if (key !== undefined) props["key"] = key;
   for (const [name, binding] of Object.entries(node.events)) {
-    props[name] = bridge.listener(`${place}:${name}`, binding);
+    let listener = listeners.get(name);
+    if (listener === undefined) {
+      listener = bridge.listener(binding);
+      listeners.set(name, listener);
+    }
+    props[name] = listener.callback;
   }
-  if (node.html === undefined) return createElement(node.tag, props, ...children(bridge, node.children, place));
+  // Publish new closures only after React commits; an abandoned render cannot change a live listener.
+  useLayoutEffect(() => {
+    for (const [name, listener] of listeners) {
+      const binding = node.events[name];
+      if (binding === undefined) {
+        listener.close();
+        listeners.delete(name);
+      } else listener.update(binding);
+    }
+  });
+  useLayoutEffect(
+    () => () => {
+      for (const listener of listeners.values()) listener.close();
+    },
+    [listeners],
+  );
+  if (node.html === undefined) return createElement(node.tag, props, ...children(bridge, node.children));
   props["dangerouslySetInnerHTML"] = { __html: node.html };
   return createElement(node.tag, props);
 };
 
-const children = <R>(bridge: Bridge<R>, nodes: ReadonlyArray<Ui>, place: string): Array<ReactNode> =>
-  nodes.map((child, i) => toReact(bridge, child, `${place}/${i}`));
+const LazyView = memo(
+  ({ bridge, node }: { readonly bridge: Events; readonly node: LazyNode }): ReactNode => toReact(bridge, node.view(node.model)),
+  (before, after) =>
+    before.bridge === after.bridge &&
+    before.node.view === after.node.view &&
+    after.node.equal(before.node.model, after.node.model),
+);
 
-/**
- * `Ui.run container supervisor model view`: renders `view model` and again
- * after each handler task; runs until interrupted, then closes in two
- * phases. A failure of `supervisor` ends it as a defect.
- */
-export const uiRun = <M, R>(
-  container: Element,
+const toReact = (bridge: Events, node: Ui): ReactNode => {
+  if (node.kind === "text") return node.value;
+  if (node.kind === "fragment") return createElement(Fragment, null, ...children(bridge, node.children));
+  if (node.kind === "keyed") return createElement(Fragment, { key: node.key }, toReact(bridge, node.node));
+  if (node.kind === "lazy") return createElement(LazyView, { bridge, node });
+  if (node.kind === "component") return createElement(node.component, node.props);
+  if (Object.keys(node.events).length > 0) return createElement(EventElement, { bridge, node });
+  const props: Record<string, unknown> = { ...node.attrs };
+  if (node.html === undefined) return createElement(node.tag, props, ...children(bridge, node.children));
+  props["dangerouslySetInnerHTML"] = { __html: node.html };
+  return createElement(node.tag, props);
+};
+
+const children = (bridge: Events, nodes: ReadonlyArray<Ui>): Array<ReactNode> => nodes.map((node) => toReact(bridge, node));
+
+class RenderBoundary extends Component<
+  { readonly broken: (cause: Cause.Cause<unknown>) => void; readonly children: ReactNode },
+  { readonly failed: boolean }
+> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError(): { readonly failed: boolean } {
+    return { failed: true };
+  }
+
+  override componentDidCatch(error: unknown): void {
+    // Effect resumes synchronously; unmount only after React has finished this commit.
+    queueMicrotask(() => this.props.broken(Cause.die(error)));
+  }
+
+  override render(): ReactNode {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+/** Runs a pure view through a React renderer; task completions request batched renders only when the model changes. */
+export const uiRunWith = <M, R>(
+  renderer: Renderer,
   supervisor: (failure: Failure) => Effect.Effect<unknown, unknown, R>,
   model: Cell<M>,
   view: (model: M) => Ui,
@@ -64,22 +116,48 @@ export const uiRun = <M, R>(
   Effect.uninterruptibleMask((restore) =>
     Effect.gen(function* () {
       const context = yield* Effect.context<R>();
-      let broken: ((cause: Cause.Cause<unknown>) => void) | undefined;
-      const root = createRoot(container);
-      const render = (): void => flushSync(() => root.render(toReact(bridge, view(model.value), "")));
-      const bridge = new Bridge(context, supervisor, render, (cause) => broken?.(cause));
-      render();
-      const exit = yield* Effect.exit(
-        restore(
+      let root: RenderRoot | undefined;
+      let failure: Cause.Cause<unknown> | undefined;
+      let resumeFailure: ((cause: Cause.Cause<unknown>) => void) | undefined;
+      const broken = (cause: Cause.Cause<unknown>): void => {
+        if (failure !== undefined) return;
+        failure = cause;
+        resumeFailure?.(cause);
+      };
+      let rendered = false;
+      let previous: M | undefined;
+      const render = (): void => {
+        const current = model.value;
+        if (!bridge.accepting || failure !== undefined || (rendered && Object.is(previous, current))) return;
+        previous = current;
+        rendered = true;
+        try {
+          root?.render(createElement(RenderBoundary, { broken, children: createElement(View, { value: current }) }));
+        } catch (error) {
+          broken(Cause.die(error));
+        }
+      };
+      const bridge = new Bridge(context, supervisor, render, broken);
+      const View = memo(({ value }: { readonly value: M }): ReactNode => toReact(bridge, view(value)));
+      const run = Effect.gen(function* () {
+        root = yield* Effect.sync(renderer);
+        render();
+        return yield* restore(
           Effect.callback<never, unknown>((resume) => {
-            broken = (cause) => resume(Effect.failCause(cause));
+            resumeFailure = (cause) => resume(Effect.failCause(cause));
+            if (failure !== undefined) resumeFailure(failure);
           }),
-        ),
+        );
+      });
+      return yield* Effect.ensuring(
+        run,
+        Effect.gen(function* () {
+          bridge.accepting = false;
+          const unmounted = yield* Effect.exit(Effect.sync(() => root?.unmount()));
+          yield* Fiber.interruptAll([...bridge.tasks]);
+          yield* Fiber.awaitAll([...bridge.supervisors]);
+          return yield* unmounted;
+        }),
       );
-      bridge.accepting = false;
-      root.unmount();
-      yield* Fiber.interruptAll([...bridge.tasks]);
-      yield* Fiber.awaitAll([...bridge.supervisors]);
-      return yield* exit;
     }),
   );

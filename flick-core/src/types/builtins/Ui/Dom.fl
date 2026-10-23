@@ -1,0 +1,26 @@
+/// React DOM roots. Keep DOM imports out of `Ui`, so `Ui.run_with` also
+/// works with renderers that do not install `react-dom` or provide a document.
+module Ui.Dom exposing (..)
+
+/// The DOM element a root renders into.
+type Container
+
+/// The element with this id in the document.
+container : String ->{} Option Container
+foreign sync container from "@flick-lang/runtime/ui" "uiContainer"
+  arity 1
+  nullable
+
+/// Renders pure `view` of the contents of `model` into `container` with
+/// React. After handler tasks end, React coalesces pending model changes;
+/// an unchanged model identity skips `view`. Each event runs a task of its
+/// handler with the services here; a failure goes to `supervisor`, and so
+/// does an event a full policy rejects. It runs until the fiber running it
+/// is interrupted: then events stop at once, React unmounts, the handler
+/// tasks are interrupted and joined, and only then it ends. A failure of
+/// `supervisor` itself ends it as a defect.
+run :
+  forall c r e m.
+  Container -> (Failure e ->{r; none} Unit)^c -> Ref m -> (m -> (Ui r e)^c)^c ->{r; none} Never
+foreign effect run from "@flick-lang/runtime/ui" "uiRun"
+  retention call

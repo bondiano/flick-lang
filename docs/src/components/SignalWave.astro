@@ -1,0 +1,16 @@
+---
+// Static geometry; only the whole field drifts, never thousands of individual nodes.
+const dots = Array.from({ length: 110 * 62 }, (_, n) => {
+  const i = n % 110;
+  const j = Math.floor(n / 110);
+  const u = i / 109;
+  const v = j / 61;
+  return {
+    x: -40 + 10 * i + 30 * Math.sin(8 * v + 4 * u),
+    y: 10 + 9.4 * j + 26 * Math.sin(9 * u - 3 * v) + 10 * Math.sin(21 * u + 5 * v),
+  };
+});
+---
+<svg class="signal-wave" viewBox="0 0 1020 600" aria-hidden="true" focusable="false">
+  <g>{dots.map(({ x, y }) => <circle cx={x.toFixed(2)} cy={y.toFixed(2)} r="0.7" />)}</g>
+</svg>

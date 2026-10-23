@@ -40,11 +40,18 @@ export const eventPreventDefault = (decide: (snapshot: unknown) => boolean, inne
 
 type Task = Fiber.Fiber<unknown, unknown>;
 
-/** The policy state of one event prop at one place of the tree, kept across renders. */
+/** The policy state of one mounted event prop, kept across renders. */
 interface Slot {
+  binding: Binding | undefined;
   readonly running: Set<Task>;
   /** `queue`: the events waiting; `latest`: the one event waiting. */
   readonly waiting: Array<{ readonly handler: Handler; readonly snapshot: unknown }>;
+}
+
+export interface Listener {
+  readonly callback: (event: DomEvent) => void;
+  update(binding: Binding): void;
+  close(): void;
 }
 
 /**
@@ -55,7 +62,6 @@ export class Bridge<R> {
   accepting = true;
   readonly tasks = new Set<Task>();
   readonly supervisors = new Set<Task>();
-  private readonly slots = new Map<string, Slot>();
   private readonly context: Context.Context<R>;
   private readonly supervisor: (failure: Failure) => Effect.Effect<unknown, unknown, R>;
   private readonly settled: () => void;
@@ -77,17 +83,27 @@ export class Bridge<R> {
     this.broken = broken;
   }
 
-  /** The DOM callback of `binding` at `place`. */
-  listener(place: string, binding: Binding): (event: DomEvent) => void {
-    return (event) => this.dispatch(place, binding, event);
+  /** One committed event prop owns its policy and reuses its callback across renders. */
+  listener(binding: Binding): Listener {
+    const slot: Slot = { binding, running: new Set<Task>(), waiting: [] };
+    return {
+      callback: (event) => {
+        if (slot.binding !== undefined) this.dispatch(slot, slot.binding, event);
+      },
+      update: (current) => {
+        slot.binding = current;
+      },
+      close: () => {
+        slot.binding = undefined;
+        slot.waiting.length = 0;
+      },
+    };
   }
 
-  private dispatch(place: string, { handler, snapshot: take }: Binding, event: DomEvent): void {
+  private dispatch(slot: Slot, { handler, snapshot: take }: Binding, event: DomEvent): void {
     if (!this.accepting) return;
     const snapshot = take(event);
     if (handler.prevent?.(snapshot) === true) event.preventDefault();
-    const slot = this.slots.get(place) ?? { running: new Set<Task>(), waiting: [] };
-    this.slots.set(place, slot);
     const { policy } = handler;
     switch (policy.kind) {
       case "exhaust":
@@ -116,7 +132,7 @@ export class Bridge<R> {
   }
 
   private start(slot: Slot, handler: Handler, snapshot: unknown): void {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the checker gave the handlers of a root the services of its `Ui.run`
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the checker gave the handlers the services of their root
     const task = Effect.suspend(() => handler.run(snapshot) as Effect.Effect<unknown, unknown, R>);
     const fiber = Effect.runFork(Effect.provideContext(task, this.context));
     slot.running.add(fiber);
@@ -128,7 +144,7 @@ export class Bridge<R> {
       if (Exit.isFailure(exit) && !Cause.hasInterruptsOnly(exit.cause)) this.supervise(exit.cause);
       if (!this.accepting) return;
       this.settled();
-      if (slot.running.size === 0) this.next(slot);
+      if (slot.binding !== undefined && slot.running.size === 0) this.next(slot);
     });
   }
 

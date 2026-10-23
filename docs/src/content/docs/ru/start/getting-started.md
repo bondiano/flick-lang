@@ -51,6 +51,9 @@ export default defineConfig({ integrations: [flick()] });
 </script>
 ```
 
-[Песочница](../../playground/) этого сайта — именно такая программа: модуль
+[Play](../../play/) этого сайта — именно такая программа: модуль
 Flick с представлением `ui`, который компилирует ваш код компилятором Flick,
 собранным в WebAssembly.
+
+[Transpile](../../transpile/) показывает сгенерированный JavaScript рядом
+с редактируемым исходным кодом отдельно для debug и release.

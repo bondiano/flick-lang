@@ -1,0 +1,18 @@
+---
+interface Entry {
+  type: string;
+  label: string;
+  href?: string;
+  isCurrent?: boolean;
+  entries?: Entry[];
+}
+interface Props { entries: Entry[]; nested?: boolean }
+const { entries, nested = false } = Astro.props;
+---
+<ul class:list={["doc-nav-list", { "doc-nav-nested": nested }]}>
+  {entries.map((entry) => <li>
+    {entry.type === "link"
+      ? <a href={entry.href} aria-current={entry.isCurrent ? "page" : undefined}>{entry.label}</a>
+      : <section class="doc-nav-group"><h2>{entry.label}</h2><Astro.self entries={entry.entries ?? []} nested /></section>}
+  </li>)}
+</ul>

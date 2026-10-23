@@ -7,3 +7,5 @@ export declare const settle: () => Promise<undefined>;
 export declare const text: () => string;
 export declare const markup: () => string;
 export declare const Badge: (props: { label: string }) => string;
+export declare const badgeRenders: () => number;
+export declare const renderer: import("@flick-lang/runtime/ui/react").Renderer;

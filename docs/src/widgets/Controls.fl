@@ -1,0 +1,81 @@
+module Controls exposing (main)
+
+import Elements exposing (attributes, icon)
+
+type alias Model = { ru : Bool; dark : Bool; paused : Bool; home : Bool }
+
+preferences : Unit ->{} Model
+foreign sync preferences from "./browser.ts" "preferences"
+  arity 0
+
+set_dark : Bool ->{} Unit
+foreign sync set_dark from "./browser.ts" "setDark"
+  arity 1
+
+set_paused : Bool ->{} Unit
+foreign sync set_paused from "./browser.ts" "setPaused"
+  arity 1
+
+open_search : Unit ->{} Unit
+foreign sync open_search from "./browser.ts" "openSearch"
+  arity 0
+
+view : Ref Model -> Model -> Ui none none
+let view model m =
+  let search_label = if m.ru then "Поиск" else "Search"
+  let theme_label = if m.ru then "Переключить тему" else "Toggle color theme"
+  let motion_label =
+    if m.paused then
+      if m.ru then "Включить анимацию" else "Resume background motion"
+    else
+      if m.ru then "Остановить анимацию" else "Pause background motion"
+  ui {
+    div { class_name = "site-controls" }
+      [
+        span { class_name = "search-control" }
+          [attributes [("id", "flick-search-open"), ("aria-label", search_label), ("aria-haspopup", "dialog")]
+            (button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { open_search () }) }
+              [
+                icon "search",
+                span { class_name = "search-word" } [text search_label],
+                span { class_name = "search-shortcut" } [text "⌘ K"],
+              ])],
+        span { class_name = "icon-control theme-control" }
+          [attributes [("aria-label", theme_label), ("title", theme_label), ("aria-pressed", if m.dark then "true" else "false")]
+            (button
+              { disabled = false; on_click = Ui.Event.latest (fun _ -> task {
+                  let dark = not m.dark
+                  set_dark dark
+                  Ref.set model { m with dark = dark }
+                }) }
+              [icon (if m.dark then "sun" else "moon")])],
+        if m.home then
+          span { class_name = "icon-control motion-control" }
+            [attributes [("aria-label", motion_label), ("title", motion_label), ("aria-pressed", if m.paused then "true" else "false")]
+              (button
+                { disabled = false; on_click = Ui.Event.latest (fun _ -> task {
+                    let paused = not m.paused
+                    set_paused paused
+                    Ref.set model { m with paused = paused }
+                  }) }
+                [icon (if m.paused then "play" else "pause")])]
+        else empty,
+        span { class_name = "icon-control mobile-menu-control" }
+          [attributes [("aria-label", if m.ru then "Навигация" else "Navigation"), ("popovertarget", "flick-navigation")]
+            (button
+              { disabled = false; on_click = Ui.Event.latest (fun _ -> task { () }) }
+              [icon "menu"])],
+      ]
+  }
+
+report : Failure e ->{} Unit
+let report failure = Platform.stderr_line (RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let initial = preferences ()
+  match Ui.Dom.container "flick-site-controls" with
+  | None -> App.fail "Missing site controls container"
+  | Some root ->
+    let model = Ref.make initial
+    ignore (Ui.Dom.run root report model (fun m -> view model m))

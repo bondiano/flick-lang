@@ -101,7 +101,7 @@ main : Unit ->{; AppError} Unit
 let main () =
   setup ()
   let model = Ref.make None
-  match Ui.container "app" with
+  match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
   | Some root ->
     scope s {
@@ -110,7 +110,7 @@ let main () =
         Fiber.spawn
           s
           closed
-          (task { Ui.run root report model (fun selected -> directory model log selected) })
+          (task { Ui.Dom.run root report model (fun selected -> directory model log selected) })
       settle ()
       Platform.stdout_line (markup ())
       choose "Ada"

@@ -1,0 +1,26 @@
+---
+title: Play
+description: Edit real Flick, check types and run a program in an isolated browser worker.
+tableOfContents: false
+template: splash
+---
+
+import Playground from "../../components/Playground.astro";
+
+Write Flick and run it here. Start with an example, change the source and press **Run**. The real WebAssembly compiler checks every edit; your program runs separately in a worker.
+
+<Playground mode="play" locale="en" />
+
+### What to try
+
+- **Hello** prints a line. **Data and patterns** matches algebraic data types.
+- **Typed errors**, **Retry** and **Concurrency** exercise the Flick runtime on Effect.
+- **A type error** intentionally fails: read the diagnostic, then replace the strings with numbers.
+
+Output appears when the program finishes. **Stop** cancels a running worker; a run is stopped automatically after 10 seconds. A successful program may print nothing, and a module must export `main` to run.
+
+This is a single-module browser environment, not a local Node.js project. Node filesystem access, database connections and arbitrary foreign npm packages are not supplied. Compilation happens locally; no Flick installation is needed.
+
+Want to inspect what the compiler emits instead? Open [Transpile](/transpile/). For a local project, follow [Getting started](/start/getting-started/).
+
+The interactive interface is itself written in Flick with the [`ui` DSL](/reference/ui/). TypeScript only connects it to the browser, compiler and worker.

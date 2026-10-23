@@ -10,6 +10,10 @@
       "default": "./dist/index.js"
     },
     "./ui": {
+      "types": "./dist/ui/index.d.ts",
+      "default": "./dist/ui/index.js"
+    },
+    "./ui/react": {
       "types": "./dist/ui/react/index.d.ts",
       "default": "./dist/ui/react/index.js"
     },

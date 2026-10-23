@@ -1,6 +1,6 @@
-// A counter mounted with React 19 in jsdom: handlers run as tasks under
-// their policies, the view renders again after each task, a failure goes to
-// the supervisor, text stays text, and closing the scope unmounts the root.
+// A counter mounted with React 19 in jsdom: changed models refresh the
+// view, lazy children use Flick's Eq, failures reach the supervisor, text
+// stays text, and both DOM and custom renderer scopes unmount their roots.
 module App.Main exposing (main)
 
 type error Refused = Refused String
@@ -26,8 +26,25 @@ markup : Unit ->{} String
 foreign sync markup from "./dom.mjs" "markup"
   arity 0
 
+badge_renders : Unit ->{} Number
+foreign sync badge_renders from "./dom.mjs" "badgeRenders"
+  arity 0
+
+renderer : Ui.Renderer
+foreign pure renderer from "./dom.mjs" "renderer"
+
 badge : Ui.Component { label : String }
 foreign pure badge from "./dom.mjs" "Badge"
+
+type BadgeModel = BadgeModel { label : String; revision : Number }
+
+// Revisions do not affect this view; equality must use this dictionary.
+instance Eq BadgeModel =
+  eq : BadgeModel -> BadgeModel -> Bool
+  let eq (BadgeModel a) (BadgeModel b) = a.label == b.label
+
+badge_view : forall r e. BadgeModel -> Ui r e
+let badge_view (BadgeModel m) = Ui.component badge { label = m.label }
 
 counter : Ref Number -> Number -> Ui none {Refused}
 let counter model n =
@@ -49,7 +66,7 @@ let counter model n =
           }
           [text "refuse"],
         paragraph [text "<b>bold?</b>"],
-        component badge { label = "new" },
+        lazy_view badge_view (BadgeModel { label = "new"; revision = n }),
       ]
   }
 
@@ -61,12 +78,13 @@ main : Unit ->{; AppError} Unit
 let main () =
   setup ()
   let model = Ref.make 0
-  let found = Ui.container "app"
+  let found = Ui.Dom.container "app"
   match found with
   | None -> Platform.stdout_line "no container"
   | Some root ->
     scope s {
-      let ui = Fiber.spawn s report (task { Ui.run root report model (fun n -> counter model n) })
+      let ui =
+        Fiber.spawn s report (task { Ui.Dom.run root report model (fun n -> counter model n) })
       settle ()
       Platform.stdout_line (text ())
       click "+1"
@@ -74,8 +92,20 @@ let main () =
       click "+1"
       settle ()
       Platform.stdout_line (text ())
+      Platform.stdout_line ("lazy badge renders: " ++ show (badge_renders ()))
       click "refuse"
       settle ()
       Platform.stdout_line (markup ())
     }
     Platform.stdout_line ("after the scope: [" ++ text () ++ "]")
+    scope s {
+      let custom = Ref.make 7
+      let ui =
+        Fiber.spawn
+          s
+          report
+          (task { Ui.run_with renderer report custom (fun n -> Ui.text ("custom " ++ show n)) })
+      settle ()
+      Platform.stdout_line (text ())
+    }
+    Platform.stdout_line ("after renderer scope: [" ++ text () ++ "]")

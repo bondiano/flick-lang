@@ -5,6 +5,8 @@ import path from "node:path";
 import { link, packages } from "../src/playground/loader.ts";
 
 const dir = process.argv[2] ?? ".";
+const entry = process.argv[3];
+if (entry === undefined) throw new Error("Pass the compiled module's path");
 const files: Record<string, string> = {};
 const walk = (sub: string): void => {
   for (const name of readdirSync(path.join(dir, sub))) {
@@ -15,7 +17,7 @@ const walk = (sub: string): void => {
 };
 walk("");
 const store: Record<string, Readonly<Record<string, unknown>>> = {};
-for (const spec of packages(files, "main.js")) store[spec] = (await import(spec)) as Readonly<Record<string, unknown>>;
+for (const spec of packages(files, entry)) store[spec] = (await import(spec)) as Readonly<Record<string, unknown>>;
 (globalThis as { __flickPackages?: unknown }).__flickPackages = store;
 const url = (code: string): string => `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`;
-await import(link(files, "main.js", url));
+await import(link(files, entry, url));

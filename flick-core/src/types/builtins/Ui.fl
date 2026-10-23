@@ -1,6 +1,6 @@
 /// User interfaces as values. `Ui r e` describes elements whose event
 /// handlers need the services `r` and may fail with `e`; building one runs
-/// no handler and reads no state. `run` renders it with React and runs each
+/// no handler and reads no state. `run_with` renders it with React and runs each
 /// event as a task under the policy of its handler (`Ui.Event`). Inside
 /// `ui { … }` the names of this module need no `Ui.`.
 module Ui exposing (..)
@@ -26,8 +26,10 @@ type SafeUrl
 /// HTML trusted to be safe; nothing checks it.
 type SanitizedHtml
 
-/// The DOM element a root renders into.
-type Container
+/// A React renderer factory bound with `foreign pure`. It is called when
+/// `run_with` starts and returns `render(node)` and `unmount()` operations;
+/// importing it does not mount a root. The adapter supplies its host nodes.
+type Renderer
 
 /// A React component of foreign code taking props `p`, bound with
 /// `foreign pure`: Flick renders it and never calls it.
@@ -57,123 +59,134 @@ type alias PanelSlots r e c =
 
 /// Text through the text channel: markup in it stays text.
 text : forall r e. String -> Ui r e
-foreign pure text from "@flick-lang/runtime/ui" "uiText"
+foreign pure text from "@flick-lang/runtime/ui/react" "uiText"
 
 /// No node at all.
 empty : forall r e. Ui r e
 let empty = fragment []
 
 fragment : forall c r e. List ((Ui r e)^c) -> (Ui r e)^c
-foreign pure fragment from "@flick-lang/runtime/ui" "uiFragment"
+foreign pure fragment from "@flick-lang/runtime/ui/react" "uiFragment"
   retention call
 
 /// The node, or nothing.
 optional : forall c r e. Option ((Ui r e)^c) -> (Ui r e)^c
-foreign pure optional from "@flick-lang/runtime/ui" "uiOptional"
+foreign pure optional from "@flick-lang/runtime/ui/react" "uiOptional"
   retention call
 
 /// The React key of a node in a dynamic list: metadata, not a prop.
 keyed : forall c r e. String -> (Ui r e)^c -> (Ui r e)^c
-foreign pure keyed from "@flick-lang/runtime/ui" "uiKeyed"
+foreign pure keyed from "@flick-lang/runtime/ui/react" "uiKeyed"
   retention call
 
+/// A pure lazy view: compares the previous and current model with pure
+/// `equal` and reuses its subtree when they are equal. Keep `view`'s function
+/// identity stable (for example, a top-level function) to skip rebuilding.
+/// Equality must cover every value the view renders and every value its
+/// handlers capture; ignoring captured data would keep stale handlers.
+/// Captures of the comparator, view and retained model stay in the `Ui`.
+lazy_view_with :
+  forall c r e m.
+  (m -> (m -> Bool)^c)^c -> (m -> (Ui r e)^c)^c -> m^c -> (Ui r e)^c
+foreign pure lazy_view_with from "@flick-lang/runtime/ui/react" "uiLazyWith"
+  retention call
+
+/// `lazy_view_with eq view model`, using the model's `Eq` instance.
+/// The same pure-view, stable-function and captured-data rules apply.
+lazy_view :
+  forall c r e m.
+  Eq m => (m -> (Ui r e)^c)^c -> m^c -> (Ui r e)^c
+let lazy_view view model = lazy_view_with eq view model
+
 div : forall c r e. { class_name : String } -> List ((Ui r e)^c) -> (Ui r e)^c
-foreign pure div from "@flick-lang/runtime/ui" "uiDiv"
+foreign pure div from "@flick-lang/runtime/ui/react" "uiDiv"
   retention call
 
 span : forall c r e. { class_name : String } -> List ((Ui r e)^c) -> (Ui r e)^c
-foreign pure span from "@flick-lang/runtime/ui" "uiSpan"
+foreign pure span from "@flick-lang/runtime/ui/react" "uiSpan"
   retention call
 
 paragraph : forall c r e. List ((Ui r e)^c) -> (Ui r e)^c
-foreign pure paragraph from "@flick-lang/runtime/ui" "uiParagraph"
+foreign pure paragraph from "@flick-lang/runtime/ui/react" "uiParagraph"
   retention call
 
 heading : forall c r e. List ((Ui r e)^c) -> (Ui r e)^c
-foreign pure heading from "@flick-lang/runtime/ui" "uiHeading"
+foreign pure heading from "@flick-lang/runtime/ui/react" "uiHeading"
   retention call
 
 list : forall c r e. List ((Ui r e)^c) -> (Ui r e)^c
-foreign pure list from "@flick-lang/runtime/ui" "uiList"
+foreign pure list from "@flick-lang/runtime/ui/react" "uiList"
   retention call
 
 item : forall c r e. List ((Ui r e)^c) -> (Ui r e)^c
-foreign pure item from "@flick-lang/runtime/ui" "uiItem"
+foreign pure item from "@flick-lang/runtime/ui/react" "uiItem"
   retention call
 
 button : forall c r e. ButtonProps r e c -> List ((Ui r e)^c) -> (Ui r e)^c
-foreign pure button from "@flick-lang/runtime/ui" "uiButton"
+foreign pure button from "@flick-lang/runtime/ui/react" "uiButton"
   retention call
 
 /// A text input; it has no children.
 input : forall c r e. InputProps r e c -> (Ui r e)^c
-foreign pure input from "@flick-lang/runtime/ui" "uiInput"
+foreign pure input from "@flick-lang/runtime/ui/react" "uiInput"
   retention call
 
 /// A text area of several lines; like `input`, `value` is the initial text.
 textarea : forall c r e. InputProps r e c -> (Ui r e)^c
-foreign pure textarea from "@flick-lang/runtime/ui" "uiTextarea"
+foreign pure textarea from "@flick-lang/runtime/ui/react" "uiTextarea"
   retention call
 
 /// Preformatted text: spaces and line breaks are kept.
 pre : forall c r e. { class_name : String } -> List ((Ui r e)^c) -> (Ui r e)^c
-foreign pure pre from "@flick-lang/runtime/ui" "uiPre"
+foreign pure pre from "@flick-lang/runtime/ui/react" "uiPre"
   retention call
 
 link : forall c r e. { href : SafeUrl } -> List ((Ui r e)^c) -> (Ui r e)^c
-foreign pure link from "@flick-lang/runtime/ui" "uiLink"
+foreign pure link from "@flick-lang/runtime/ui/react" "uiLink"
   retention call
 
 /// Trusted HTML, inside a `div`.
 html : forall r e. SanitizedHtml -> Ui r e
-foreign pure html from "@flick-lang/runtime/ui" "uiHtml"
+foreign pure html from "@flick-lang/runtime/ui/react" "uiHtml"
 
 /// A listbox of `items`; choosing one runs `on_change` with it.
 select : forall c a r e. SelectProps a r e c -> (Ui r e)^c
-foreign pure select from "@flick-lang/runtime/ui" "uiSelect"
+foreign pure select from "@flick-lang/runtime/ui/react" "uiSelect"
   retention call
 
 /// Header, body and an optional footer, each in its place.
 panel : forall c r e. PanelSlots r e c -> (Ui r e)^c
-foreign pure panel from "@flick-lang/runtime/ui" "uiPanel"
+foreign pure panel from "@flick-lang/runtime/ui/react" "uiPanel"
   retention call
 
 tab : forall c r e. String -> (Ui r e)^c -> (Tab r e)^c
-foreign pure tab from "@flick-lang/runtime/ui" "uiTab"
+foreign pure tab from "@flick-lang/runtime/ui/react" "uiTab"
   retention call
 
 /// At least one tab; `selected` counts from 0.
 tabs : forall c r e. { selected : Number } -> NonEmpty.NonEmpty ((Tab r e)^c) -> (Ui r e)^c
-foreign pure tabs from "@flick-lang/runtime/ui" "uiTabs"
+foreign pure tabs from "@flick-lang/runtime/ui/react" "uiTabs"
   retention call
 
 /// A foreign component with its props, which React gets as they are.
 component : forall r e p. Component p -> p -> Ui r e
-foreign pure component from "@flick-lang/runtime/ui" "uiComponent"
+foreign pure component from "@flick-lang/runtime/ui/react" "uiComponent"
 
 /// The URL if its scheme is safe.
 safe_url : String -> Option SafeUrl
-foreign pure safe_url from "@flick-lang/runtime/ui" "uiSafeUrl"
+foreign pure safe_url from "@flick-lang/runtime/ui/react" "uiSafeUrl"
 
 /// HTML the program vouches for: it is inserted as it is.
 trusted_html : String -> SanitizedHtml
-foreign pure trusted_html from "@flick-lang/runtime/ui" "uiTrustedHtml"
+foreign pure trusted_html from "@flick-lang/runtime/ui/react" "uiTrustedHtml"
 
-/// The element with this id in the document.
-container : String ->{} Option Container
-foreign sync container from "@flick-lang/runtime/ui" "uiContainer"
-  arity 1
-  nullable
-
-/// Renders `view` of the contents of `model` into `container` with React,
-/// and again after each handler task ends. Each event runs a task of its
-/// handler with the services here; a failure goes to `supervisor`, and so
-/// does an event a full policy rejects. It runs until the fiber running it
-/// is interrupted: then events stop at once, React unmounts, the handler
-/// tasks are interrupted and joined, and only then it ends. A failure of
-/// `supervisor` itself ends it as a defect.
-run :
+/// Like `Ui.Dom.run`, with a renderer factory instead of a DOM container. The
+/// factory is called only when this runtime call starts; event services,
+/// supervision, React-coalesced model changes and cleanup are the same.
+/// The DOM helpers of this module still build DOM nodes, not host-neutral
+/// primitives; a native adapter supplies its own components.
+run_with :
   forall c r e m.
-  Container -> (Failure e ->{r; none} Unit)^c -> Ref m -> (m -> (Ui r e)^c)^c ->{r; none} Never
-foreign effect run from "@flick-lang/runtime/ui" "uiRun"
+  Renderer -> (Failure e ->{r; none} Unit)^c -> Ref m -> (m -> (Ui r e)^c)^c ->{r; none} Never
+foreign effect run_with from "@flick-lang/runtime/ui/react" "uiRunWith"
   retention call

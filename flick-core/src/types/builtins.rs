@@ -54,6 +54,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("Events", include_str!("builtins/Events.fl")),
     ("Ui", include_str!("builtins/Ui.fl")),
     ("Ui.Event", include_str!("builtins/Ui/Event.fl")),
+    ("Ui.Dom", include_str!("builtins/Ui/Dom.fl")),
     ("Gen", include_str!("builtins/Gen.fl")),
     ("Checks", include_str!("builtins/Checks.fl")),
     ("Schema", include_str!("builtins/Schema.fl")),

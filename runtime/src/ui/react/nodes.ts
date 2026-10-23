@@ -29,6 +29,12 @@ export type Ui =
   | { readonly kind: "keyed"; readonly key: string; readonly node: Ui }
   | { readonly kind: "component"; readonly component: ComponentType<object>; readonly props: object }
   | {
+      readonly kind: "lazy";
+      readonly equal: (a: unknown, b: unknown) => boolean;
+      readonly view: (model: unknown) => Ui;
+      readonly model: unknown;
+    }
+  | {
       readonly kind: "element";
       readonly tag: string;
       readonly attrs: Readonly<Record<string, string | boolean>>;
@@ -73,6 +79,9 @@ export const uiOptional = (node: Option.Option<Ui>): Ui => (Option.isSome(node) 
 export const uiComponent = (component: ComponentType<object>, props: object): Ui =>
   Object.freeze({ kind: "component", component, props });
 export const uiKeyed = (key: string, node: Ui): Ui => Object.freeze({ kind: "keyed", key, node });
+export const uiLazyWith = <M>(equal: (a: M, b: M) => boolean, view: (model: M) => Ui, model: M): Ui =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the constructor keeps the erased model, view and equality types together
+  Object.freeze({ kind: "lazy", equal, view, model }) as Ui;
 
 interface ClassProps {
   readonly class_name: string;
@@ -195,6 +204,3 @@ export const uiSafeUrl = (url: string): Option.Option<string> => {
 };
 
 export const uiTrustedHtml = (html: string): string => html;
-
-/** `Ui.container id`: the element of the document, or null. */
-export const uiContainer = (id: string): Element | null => globalThis.document?.getElementById(id) ?? null;

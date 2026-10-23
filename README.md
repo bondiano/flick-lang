@@ -32,12 +32,38 @@ just e2e    # runtime tests + compiled programs on Node
 
 ## Documentation
 
-The Starlight site in `docs/` serves English at `/` and Russian at `/ru/`.
-English pages live in `docs/src/content/docs/`; Russian translations mirror
-their paths under `docs/src/content/docs/ru/`. Keep matching filenames so
-the language selector opens the same page, and keep code examples unchanged.
-Sidebar group labels are translated in `docs/astro.sidebar.mjs`; additional
-Russian search UI strings live in `docs/src/content/i18n/ru.json`.
+The Astro/Starlight site in `docs/` serves English at `/` and Russian at
+`/ru/`. The custom homepages live in `docs/src/pages/`; documentation lives
+in `docs/src/content/docs/`, with matching Russian paths under `ru/`.
+Keep translated code examples identical and preserve reference URLs.
 
-Build with `pnpm --filter @flick-lang/docs build`, then run
-`pnpm --filter @flick-lang/docs preview` to view the static site and search index.
+The main entry points are Learn, Guides, API and Ecosystem. `/play/` runs a
+single Flick module in an isolated browser worker; `/transpile/` shows its
+real debug or release JavaScript without executing it. Both use the
+WebAssembly build of the same compiler core.
+
+Interactive widgets are Flick programs: `docs/src/widgets/` owns search,
+theme/motion controls, the live homepage example and code copying;
+`docs/src/playground/Playground.fl` owns the shared Play/Transpile model and
+actions. TypeScript is limited to mounting and browser/compiler/worker
+interop. `Ui.Dom` mounts browser roots; widget event policies remain in
+Flick. The sandbox supplies the bundled runtime, not arbitrary npm
+packages, Node filesystem access or database connections.
+
+`docs/astro.sidebar.mjs` owns section labels and translations;
+`docs/src/styles/custom.css` owns the shared visual tokens. Geist is
+self-hosted with its license under `docs/public/fonts/`.
+
+After installing workspace dependencies, build and preview the complete
+site (including its static Pagefind search index):
+
+```sh
+pnpm -C runtime build
+just docs
+pnpm -C docs preview
+```
+
+Use the production preview to check search; its index is generated during
+the build. `pnpm -C docs test` exercises linking and executing a real
+compiled program. The visual contract and approved composition are
+recorded in `PRODUCT.md`, `DESIGN.md` and `.impeccable/`.

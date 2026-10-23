@@ -30,6 +30,7 @@ const proc = {
 const modules = import.meta.glob<Namespace>([
   "../../../runtime/dist/index.js",
   "../../../runtime/dist/cli/index.js",
+  "../../../runtime/dist/ui/react/index.js",
   "../../../runtime/dist/effect/*.js",
 ]);
 

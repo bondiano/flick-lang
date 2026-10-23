@@ -117,11 +117,15 @@ test("a refused query is a DbError with inert data, and the connection is reused
 });
 
 test("an interrupted query closes its connection before the interruption ends", async () => {
-  const { pool, log } = fakePool(() => new Promise(() => {}));
+  const started = Promise.withResolvers<void>();
+  const { pool, log } = fakePool(() => {
+    started.resolve();
+    return Promise.withResolvers<never>().promise;
+  });
   const exit = await Effect.runPromise(
     Effect.gen(function* () {
       const fiber = yield* Effect.forkDetach(databaseOf(pool).run_query(sqlBind(byName, { name: "x" })));
-      yield* Effect.sleep(10);
+      yield* Effect.promise(() => started.promise);
       yield* Fiber.interrupt(fiber);
       log.push("interrupted");
       return yield* Fiber.await(fiber);

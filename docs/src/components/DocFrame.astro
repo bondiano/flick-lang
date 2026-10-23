@@ -1,0 +1,8 @@
+---
+const { hasSidebar, lang } = Astro.locals.starlightRoute;
+---
+<div class="site-doc-frame">
+  <header class="site-frame-header"><slot name="header" /></header>
+  {hasSidebar && <nav class="site-docs-sidebar" aria-label={lang === "ru" ? "Разделы документации" : "Documentation sections"}><slot name="sidebar" /></nav>}
+  <div class="site-main-frame"><slot /></div>
+</div>

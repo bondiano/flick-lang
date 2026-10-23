@@ -1,25 +1,45 @@
-// The sidebar: guides first, then the reference by topic.
+// Documentation entry points, with existing reference URLs preserved.
 export const sidebar = [
-  { label: "Start", translations: { ru: "Начало" }, items: [{ slug: "start/getting-started" }, { slug: "playground" }] },
   {
-    label: "Language",
-    translations: { ru: "Язык" },
-    items: ["types", "effects", "classes", "regions", "modules", "grammar", "keywords"].map((f) => ({ slug: `reference/${f}` })),
+    label: "Learn",
+    translations: { ru: "Изучение" },
+    items: [{ slug: "learn" }, { slug: "start/getting-started" }, { slug: "learn/flick-and-effect" }],
   },
   {
-    label: "Libraries",
-    translations: { ru: "Библиотеки" },
-    items: ["stdlib", "effect-surface", "schema", "sql", "ui", "http-api", "cli-dsl", "ffi"].map((f) => ({ slug: `reference/${f}` })),
+    label: "Guides",
+    translations: { ru: "Руководства" },
+    items: [{ slug: "guides" }, ...["ui", "cli-dsl", "http-api", "schema", "sql", "ffi"].map((f) => ({ slug: `reference/${f}` }))],
   },
   {
-    label: "Tools",
-    translations: { ru: "Инструменты" },
-    items: ["cli", "project", "editor", "codegen", "runtime", "iface"].map((f) => ({ slug: `reference/${f}` })),
+    label: "API",
+    items: [
+      { slug: "api" },
+      {
+        label: "Language",
+        translations: { ru: "Язык" },
+        items: ["types", "effects", "classes", "regions", "modules", "grammar", "keywords"].map((f) => ({ slug: `reference/${f}` })),
+      },
+      {
+        label: "Runtime",
+        translations: { ru: "Рантайм" },
+        items: ["stdlib", "effect-surface", "runtime"].map((f) => ({ slug: `reference/${f}` })),
+      },
+    ],
   },
   {
     label: "Specification",
     translations: { ru: "Спецификация" },
     items: [{ slug: "spec" }, { autogenerate: { directory: "spec" } }],
   },
-  { label: "Contributing", translations: { ru: "Участие в разработке" }, items: [{ slug: "contributing/testing" }, { slug: "contributing/implementation-decisions" }] },
+  {
+    label: "Ecosystem",
+    translations: { ru: "Экосистема" },
+    items: [
+      { slug: "ecosystem" },
+      ...["cli", "project", "editor", "codegen", "iface"].map((f) => ({ slug: `reference/${f}` })),
+      { slug: "contributing/testing" },
+      { slug: "contributing/implementation-decisions" },
+    ],
+  },
+  { label: "Play", items: [{ slug: "play" }, { slug: "transpile" }] },
 ];

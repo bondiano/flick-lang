@@ -152,7 +152,7 @@ fn installed(root: Option<&Path>, line: &mut impl FnMut(Option<bool>, &str, Stri
             }
             for (package, what) in [
                 ("pg", "PostgreSQL driver of `Database.pg`"),
-                ("react", "React adapter of `Ui.run`"),
+                ("react", "React adapter of `Ui.Dom.run`"),
             ] {
                 let found = toolchain::installed(root, package).or_else(|| {
                     toolchain::installed(&root.join("node_modules/@flick-lang/runtime"), package)

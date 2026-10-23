@@ -1,8 +1,22 @@
 ---
-// Mounts the playground, a Flick program, into the page.
+import "../styles/playground.css";
+
+interface Props {
+  mode: "play" | "transpile";
+  locale: "en" | "ru";
+}
+
+const { mode, locale } = Astro.props;
 ---
 
-<div id="flick-playground" class="not-content"></div>
+<div id="flick-playground" class="not-content flick-playground-shell" data-mode={mode} data-locale={locale}>
+  <p class="fp-boot" role="status">
+    {locale === "ru" ? "Загрузка интерфейса Flick…" : "Loading the Flick interface…"}
+  </p>
+  <noscript>
+    {locale === "ru" ? "Для компиляции и запуска в браузере нужен JavaScript." : "Browser compilation and execution require JavaScript."}
+  </noscript>
+</div>
 
 <script>
   import { runMain } from "@flick-lang/runtime";
@@ -10,34 +24,3 @@
 
   void runMain(main as Parameters<typeof runMain>[0]);
 </script>
-
-<style is:global>
-  .fp { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem; }
-  .fp-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
-  .fp button {
-    border: 1px solid var(--sl-color-gray-5); border-radius: 0.4rem; padding: 0.25rem 0.75rem;
-    background: var(--sl-color-gray-6); color: var(--sl-color-white); font-size: var(--sl-text-sm); cursor: pointer;
-  }
-  .fp-on button { background: var(--sl-color-accent); border-color: var(--sl-color-accent); color: var(--sl-color-black); }
-  .fp-run button { background: var(--sl-color-accent-high); color: var(--sl-color-black); font-weight: 600; }
-  .fp button:disabled { opacity: 0.5; cursor: default; }
-  .fp-status { color: var(--sl-color-gray-3); font-size: var(--sl-text-sm); }
-  .fp-bad, .fp-error, .fp-stderr { color: var(--sl-color-red); }
-  .fp-warning { color: var(--sl-color-orange); }
-  .fp-panes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.75rem; }
-  @media (max-width: 60rem) { .fp-panes { grid-template-columns: minmax(0, 1fr); } }
-  .fp textarea {
-    width: 100%; min-height: 32rem; resize: vertical; padding: 0.75rem; border-radius: 0.5rem;
-    border: 1px solid var(--sl-color-gray-5); background: var(--sl-color-gray-7, var(--sl-color-black));
-    color: var(--sl-color-white); font-family: var(--__sl-font-mono); font-size: 0.85rem; line-height: 1.5; tab-size: 2;
-  }
-  .fp-result { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
-  .fp-out {
-    margin: 0; padding: 0.75rem; min-height: 28rem; max-height: 36rem; overflow: auto; border-radius: 0.5rem;
-    border: 1px solid var(--sl-color-gray-5); font-size: 0.8rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
-  }
-  .fp-code .fp-out, .fp textarea { white-space: pre; word-break: normal; overflow-wrap: normal; }
-  .fp-compare { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.5rem; }
-  .fp-code { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
-  .fp-title { font-size: var(--sl-text-xs); color: var(--sl-color-gray-3); }
-</style>

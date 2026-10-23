@@ -1,0 +1,82 @@
+---
+import Brand from "./Brand.astro";
+import Icon from "./Icon.astro";
+import DocNavigation from "./DocNavigation.astro";
+
+const route = Astro.props.locale === undefined ? Astro.locals.starlightRoute : undefined;
+const ru = Astro.props.locale === "ru" || route?.lang === "ru";
+const prefix = ru ? "/ru" : "";
+const current = Astro.url.pathname;
+const unlocalized = current.replace(/^\/ru(?=\/|$)/, "") || "/";
+const english = unlocalized;
+const russian = `/ru${unlocalized === "/" ? "/" : unlocalized}`;
+const links = [
+  ["Learn", "/learn/"], ["Guides", "/guides/"], ["API", "/api/"], ["Ecosystem", "/ecosystem/"],
+];
+const sidebar = route?.hasSidebar ? route.sidebar : undefined;
+---
+<div class="site-header" data-pagefind-ignore>
+  <Brand href={`${prefix}/`} label={ru ? "Flick — главная" : "Flick home"} />
+  <nav class="site-links" aria-label={ru ? "Основная навигация" : "Main navigation"}>
+    {links.map(([label, href]) => <a href={`${prefix}${href}`} aria-current={unlocalized.startsWith(href) ? "page" : undefined}>{label}</a>)}
+  </nav>
+  <div class="site-header-right">
+    <div id="flick-site-controls"></div>
+    <div class="locale-switch" aria-label={ru ? "Язык" : "Language"}>
+      {ru ? <a href={english} lang="en" aria-label="Switch to English">EN</a> : <span aria-current="true">EN</span>}
+      <span class="locale-divider" aria-hidden="true">/</span>
+      {ru ? <span aria-current="true">RU</span> : <a href={russian} lang="ru" aria-label="Переключить на русский">RU</a>}
+    </div>
+    <a class="header-transpile" href={`${prefix}/transpile/`}>Transpile</a>
+    <a class="header-play" href={`${prefix}/play/`}>Play <Icon name="northeast" size={17} /></a>
+  </div>
+  <nav id="flick-navigation" class="mobile-navigation" popover="auto" aria-label={ru ? "Навигация по сайту" : "Site navigation"}>
+    <div class="mobile-primary-links">{links.map(([label, href]) => <a href={`${prefix}${href}`}>{label}</a>)}<a href={`${prefix}/play/`}>Play</a><a href={`${prefix}/transpile/`}>Transpile</a></div>
+    <div class="mobile-languages" aria-label={ru ? "Язык документации" : "Documentation language"}>
+      <a href={english} lang="en" aria-current={!ru ? "page" : undefined}>English</a>
+      <a href={russian} lang="ru" aria-current={ru ? "page" : undefined}>Русский</a>
+    </div>
+    {sidebar && <DocNavigation entries={sidebar} />}
+    <a class="mobile-repository" href="https://github.com/bondiano/flick-lang">GitHub <Icon name="northeast" size={16} /></a>
+  </nav>
+  <dialog id="flick-search-dialog" aria-label={ru ? "Поиск по документации" : "Search documentation"}>
+    <div id="flick-search-root"></div>
+  </dialog>
+</div>
+
+<script>
+  import { runMain } from "@flick-lang/runtime";
+  import { main as controls } from "../widgets/Controls.fl";
+  import { main as search } from "../widgets/Search.fl";
+  import { mount } from "../widgets/Copy.fl";
+
+  type Main = Parameters<typeof runMain>[0];
+  type CopyInput = { id: string; source: string; ru: boolean };
+  const mountCopy = mount as (input: CopyInput) => ReturnType<Main>;
+  void runMain(controls as Main);
+  void runMain(search as Main);
+
+  // Mount Flick controls beside rendered code. The clipboard state and action are Flick.
+  document.querySelectorAll<HTMLElement>(".expressive-code").forEach((block, i) => {
+    const code = block.querySelector("pre code");
+    if (!code) return;
+    const lines = Array.from(code.querySelectorAll(".ec-line .code"), (line) => {
+      const value = line.textContent ?? "";
+      return value === "\n" ? "" : value;
+    });
+    const source = lines.length > 0 ? lines.join("\n") : code.textContent ?? "";
+    const root = document.createElement("div");
+    root.id = `flick-code-copy-${i}`;
+    root.className = "flick-code-copy";
+    block.append(root);
+    void runMain(() => mountCopy({ id: root.id, source, ru: document.documentElement.lang === "ru" }));
+  });
+
+  // Native keyboard events invoke the same Flick button as pointer input.
+  document.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      document.getElementById("flick-search-open")?.click();
+    }
+  });
+</script>

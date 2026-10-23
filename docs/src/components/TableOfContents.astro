@@ -1,0 +1,7 @@
+---
+import TocList from "./TocList.astro";
+const { toc, lang } = Astro.locals.starlightRoute;
+---
+{toc && <nav class="flick-toc" aria-label={lang === "ru" ? "На этой странице" : "On this page"}>
+  <h2>{lang === "ru" ? "На этой странице" : "On this page"}</h2><TocList items={toc.items} />
+</nav>}

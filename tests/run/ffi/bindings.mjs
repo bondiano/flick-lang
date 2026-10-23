@@ -47,6 +47,8 @@ export const sum = (...xs) => xs.reduce((a, b) => a + b, 0);
 /** Calls a two-argument callback as JS does. */
 export const combine = (f, a, b) => f(a, b);
 
+export const sameCallback = (left, right) => left === right;
+
 /** Runs an Effect callback twice inside the caller's fiber. */
 export const twice = (f) => Effect.zipWith(f(1), f(2), (a, b) => a + b);
 

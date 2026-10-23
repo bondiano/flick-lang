@@ -1,13 +1,14 @@
 // The programs the playground starts from.
 module Examples exposing (Example, examples)
 
-type alias Example = { name : String; source : String }
+type alias Example = { name : String; name_ru : String; source : String }
 
 examples : List Example
 let examples =
   [
     {
       name = "Hello";
+      name_ru = "Приветствие";
       source =
         """
       module Main exposing (main)
@@ -19,6 +20,7 @@ let examples =
     },
     {
       name = "Data and patterns";
+      name_ru = "Данные и образцы";
       source =
         """
       module Main exposing (main)
@@ -41,6 +43,7 @@ let examples =
     },
     {
       name = "Typed errors";
+      name_ru = "Типизированные ошибки";
       source =
         """
       module Main exposing (main)
@@ -63,6 +66,7 @@ let examples =
     },
     {
       name = "Retry";
+      name_ru = "Повторные попытки";
       source =
         """
       module Main exposing (main)
@@ -88,6 +92,7 @@ let examples =
     },
     {
       name = "Concurrency";
+      name_ru = "Конкурентность";
       source =
         """
       module Main exposing (main)
@@ -108,6 +113,7 @@ let examples =
     },
     {
       name = "A type error";
+      name_ru = "Ошибка типа";
       source =
         """
       module Main exposing (main)

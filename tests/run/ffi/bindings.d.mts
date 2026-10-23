@@ -11,6 +11,7 @@ export declare const lookup: (key: string) => string | null;
 export declare const greet: (name: string, greeting?: string) => string;
 export declare const sum: (...xs: number[]) => number;
 export declare const combine: (f: any, a: any, b: any) => any;
+export declare const sameCallback: (left: (value: string) => string, right: (value: string) => string) => boolean;
 export declare const twice: (f: any) => any;
 export declare const awaitBoth: (f: any) => Promise<number>;
 export declare const emitter: () => any;

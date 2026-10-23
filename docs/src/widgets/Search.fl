@@ -1,0 +1,115 @@
+module Search exposing (main)
+
+import Elements exposing (attributes, icon, route)
+import JsError exposing (JsError(..))
+
+type alias Hit = { title : String; excerpt : String; url : String }
+type alias Model = { ru : Bool; query : String; hits : List Hit; problem : String }
+
+is_russian : Unit ->{} Bool
+foreign sync is_russian from "./browser.ts" "isRussian"
+  arity 0
+
+search : String ->{; JsError} List Hit
+foreign async search from "./browser.ts" "search"
+  arity 1
+  catch JsError.from_js
+
+close_search : Unit ->{} Unit
+foreign sync close_search from "./browser.ts" "closeSearch"
+  arity 0
+
+find : Ref Model -> String ->{} Unit
+let find model query =
+  let m = Ref.get model
+  if String.trim query == "" then
+    Ref.set model { m with query = query; hits = []; problem = "" }
+  else
+    let found = try Ok (search query) with
+      | JsError failure ->
+        Err
+          ((if m.ru then
+            "Поиск недоступен. Перезагрузите страницу и попробуйте снова."
+          else
+            "Search is unavailable. Reload the page and try again.") ++ " " ++ failure.message)
+    match found with
+    | Ok hits -> Ref.set model { m with query = query; hits = hits; problem = "" }
+    | Err problem -> Ref.set model { m with query = query; hits = []; problem = problem }
+
+hit : Hit -> Ui none none
+let hit result =
+  ui {
+    item
+      [span { class_name = "search-result-title" } [route result.url result.title],
+        paragraph [text result.excerpt]]
+  }
+
+view : Ref Model -> Model -> Ui none none
+let view model m =
+  let prefix = if m.ru then "/ru" else ""
+  ui {
+    div { class_name = "search-widget" }
+      [
+        div { class_name = "search-heading" }
+          [span { class_name = "search-dialog-title" } [text (if m.ru then "Найти в документации" else "Find it in the docs")],
+            attributes [("aria-label", if m.ru then "Закрыть поиск" else "Close search")]
+              (button
+                { disabled = false; on_click = Ui.Event.latest (fun _ -> task { close_search () }) }
+                [icon "close"])],
+        div { class_name = "search-field" }
+          [icon "search",
+            attributes
+              [
+                ("aria-label", if m.ru then "Поисковый запрос" else "Search query"),
+                ("id", "flick-search-input"),
+                ("type", "search"),
+              ]
+              (input
+                {
+                  value = m.query;
+                  placeholder =
+                    if m.ru then "Эффекты, типы, сервисы…" else "Effects, types, services…";
+                  on_input = Ui.Event.latest (fun event -> task { find model event.value });
+                })],
+        attributes [("aria-live", "polite"), ("aria-atomic", "true")]
+          (div { class_name = "search-results" }
+            [if m.problem != "" then paragraph [text m.problem]
+              else if String.trim m.query == "" then
+                div { class_name = "search-suggestions" }
+                  [paragraph [text (if m.ru then "С чего начать" else "Good places to start")],
+                    route
+                      (prefix ++ "/start/getting-started/")
+                      (if m.ru then "Начало работы" else "Getting started"),
+                    route (prefix ++ "/learn/flick-and-effect/") "Flick & Effect",
+                    route
+                      (prefix ++ "/reference/effects/")
+                      (
+                        if m.ru then "Эффекты, ошибки и сервисы" else "Effects, errors and services"
+                      ),
+                    route (prefix ++ "/api/") (if m.ru then "Справочник API" else "API reference")]
+              else
+                match m.hits with
+                | [] ->
+                  paragraph
+                    [
+                      text
+                        (if m.ru then
+                          "Ничего не найдено. Попробуйте другой запрос."
+                        else
+                          "No matches. Try a different term."),
+                    ]
+                | hits -> list (List.map hit hits)]),
+      ]
+  }
+
+report : Failure e ->{} Unit
+let report failure = Platform.stderr_line (RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let ru = is_russian ()
+  match Ui.Dom.container "flick-search-root" with
+  | None -> App.fail "Missing search container"
+  | Some root ->
+    let model = Ref.make { ru = ru; query = ""; hits = []; problem = "" }
+    ignore (Ui.Dom.run root report model (fun m -> view model m))

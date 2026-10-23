@@ -55,9 +55,9 @@ let refusing model n =
       []
   }
 
-run_narrow : Ui.Container -> Ref Number ->{} Never
-let run_narrow root model = Ui.run root narrow_supervisor model (fun n -> refusing model n)
-//                                                                        ^^^^^^^^^^^^^^^^ FLICK-T003 `Refused` is in the row, which the expected type does not allow
+run_narrow : Ui.Dom.Container -> Ref Number ->{} Never
+let run_narrow root model = Ui.Dom.run root narrow_supervisor model (fun n -> refusing model n)
+//                                                                            ^^^^^^^^^^^^^^^^ FLICK-T003 `Refused` is in the row, which the expected type does not allow
 
 // hold the button inside the scope, or open the file inside the task
 escaping : File.Path ->{File.FileSystem; File.OpenError} Ui {File.FileSystem} {File.ReadError}

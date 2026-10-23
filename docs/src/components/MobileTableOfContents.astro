@@ -1,0 +1,6 @@
+---
+const { toc, lang } = Astro.locals.starlightRoute;
+---
+{toc && <nav class="flick-mobile-toc" aria-label={lang === "ru" ? "На этой странице" : "On this page"}>
+  {toc.items.map((item) => <a href={`#${item.slug}`}>{item.text}</a>)}
+</nav>}

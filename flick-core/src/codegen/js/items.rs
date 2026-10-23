@@ -123,6 +123,7 @@ impl Gen<'_> {
         for (i, param) in params.iter().take(f.arity).enumerate() {
             let arg = match info.callbacks.get(i).copied().flatten() {
                 _ if info.this && i == 0 => param.clone(),
+                Some(1) => param.clone(),
                 Some(n) => {
                     let xs: Vec<String> = (0..n).map(|k| format!("$x{k}")).collect();
                     let applied = xs.iter().fold(String::new(), |acc, x| acc + "(" + x + ")");

@@ -132,6 +132,48 @@ fn run_cases() {
     metrics(&out_root, times[0], times[2]);
 }
 
+#[test]
+#[ignore = "needs Node and `pnpm install`; run `just e2e`"]
+fn compiled_ui_core_imports_without_a_dom_renderer() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("ui_core_import");
+    let build = Command::new(env!("CARGO_BIN_EXE_flick"))
+        .arg("build")
+        .arg(repo.join("tests/check/pass/ui/lazy.fl"))
+        .arg("--out-dir")
+        .arg(&dir)
+        .args(["--emit", "js"])
+        .output()
+        .expect("flick runs");
+    assert!(build.status.success(), "{build:?}");
+    let imported = Command::new("node")
+        .args([
+            "--input-type=module",
+            "--eval",
+            r#"
+import assert from "node:assert/strict";
+import { registerHooks } from "node:module";
+import { pathToFileURL } from "node:url";
+registerHooks({
+  resolve(specifier, context, next) {
+    if (specifier === "react-dom" || specifier.startsWith("react-dom/")) {
+      throw new Error("a compiled Ui.run_with consumer loaded react-dom");
+    }
+    return next(specifier, context);
+  }
+});
+assert.equal(typeof document, "undefined");
+assert.equal(typeof window, "undefined");
+const app = await import(pathToFileURL(process.argv[1]).href);
+assert.equal(app.structural.view(app.structural.model).value, "count 1");
+"#,
+        ])
+        .arg(dir.join("App/Lazy.js"))
+        .output()
+        .expect("Node is installed");
+    assert!(imported.status.success(), "{imported:?}");
+}
+
 thread_local! {
     static BUILD_TIME: Cell<Duration> = const { Cell::new(Duration::ZERO) };
 }

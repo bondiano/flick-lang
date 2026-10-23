@@ -1,0 +1,8 @@
+---
+interface Item { text: string; slug: string; children?: Item[] }
+interface Props { items: Item[] }
+const { items } = Astro.props;
+---
+<ul class="flick-toc-list">
+  {items.map((item) => <li><a href={`#${item.slug}`}>{item.text}</a>{item.children?.length ? <Astro.self items={item.children} /> : null}</li>)}
+</ul>

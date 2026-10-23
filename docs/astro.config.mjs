@@ -24,6 +24,7 @@ export default defineConfig({
     starlight({
       title: "Flick",
       description: "An ML language with higher-kinded types, typed effects and regions, on Effect",
+      favicon: "/favicon.svg",
       defaultLocale: "root",
       locales: {
         root: { label: "English", lang: "en" },
@@ -31,9 +32,20 @@ export default defineConfig({
       },
       sidebar,
       customCss: ["./src/styles/custom.css"],
+      components: {
+        Header: "./src/components/Header.astro",
+        PageFrame: "./src/components/DocFrame.astro",
+        Sidebar: "./src/components/Sidebar.astro",
+        ThemeProvider: "./src/components/ThemeInit.astro",
+        TableOfContents: "./src/components/TableOfContents.astro",
+        MobileTableOfContents: "./src/components/MobileTableOfContents.astro",
+      },
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/bondiano/flick-lang" }],
       editLink: { baseUrl: "https://github.com/bondiano/flick-lang/edit/main/docs/" },
-      expressiveCode: { shiki: { langs: [{ ...grammar, name: "flick" }] } },
+      expressiveCode: {
+        frames: { showCopyToClipboardButton: false },
+        shiki: { langs: [{ ...grammar, name: "flick" }] },
+      },
     }),
   ],
 });

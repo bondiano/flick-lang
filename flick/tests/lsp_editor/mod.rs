@@ -229,11 +229,11 @@ let view model m = Ui.text (show m)
 let seed = 0
 main : Unit ->{; AppError} Unit
 let main () =
-  match Ui.container "playground" with
+  match Ui.Dom.container "playground" with
   | None -> App.fail "missing root"
   | Some root ->
     let model = Ref.make seed
-    ignore (Ui.run root report model (fun m -> view model m))
+    ignore (Ui.Dom.run root report model (fun m -> view model m))
 "#;
     let dir = project(
         "lsp_private_hover",

@@ -1,269 +1,615 @@
-// The playground of the documentation site, written in Flick: the model is a
-// `Ref`, the view a `ui` block that React renders again after each handler
-// task, and the compiler and the runner are reached through the FFI.
+// Two documentation tools sharing one Flick model, pure view and supervised actions.
 module Playground exposing (main)
 
 import Examples exposing (Example, examples)
 import JsError exposing (JsError(..))
 
+type Mode = Play | Transpile
+  deriving Eq
+
+type Locale = En | Ru
+  deriving Eq
+
 type Profile = Debug | Release
-  deriving Eq, Show
+  deriving Eq
 
-type Tab = Output | Js | Compare | Problems
-  deriving Eq, Show
+type Tab = Output | Problems
+  deriving Eq
 
-/// A diagnostic of the compiler, its position as `line:column`.
 type alias Diagnostic = { code : String; severity : String; message : String; at : String }
-
-/// Both profiles' JS of the module, and what the compiler reported.
-type alias Compiled = { debug : String; release : String; diagnostics : List Diagnostic }
-
-/// A piece of the program's output: `stdout`, `stderr` or `status`.
+type alias Generated = { code : String; diagnostics : List Diagnostic }
+type alias Compiled = { debug : Generated; release : Generated }
 type alias Line = { stream : String; text : String }
+type alias Execution = {
+  lines : List Line;
+  status : String;
+  detail : String;
+  diagnostics : List Diagnostic;
+}
 
 type alias Model =
   {
-    example : String;
+    mode : Mode;
+    locale : Locale;
     source : String;
+    revision : Number;
     profile : Profile;
     tab : Tab;
     compiled : Compiled;
-    output : List Line;
+    execution : Execution;
+    ran_source : String;
+    ran_profile : Profile;
     running : Bool;
+    loading : Bool;
     version : String;
+    load_error : String;
+    compile_error : String;
+    fault : String;
   }
 
-/// Loads the compiler; its language version.
+configuration : Unit ->{} { mode : String; locale : String }
+foreign sync configuration from "./dom.ts" "configuration"
+  arity 0
+
+notify : String ->{} Unit
+foreign sync notify from "./dom.ts" "notify"
+  arity 1
+
+// The UI DSL deliberately keeps host attributes out of its event/state model.
+attributes : forall c r e. List (String, String) -> (Ui r e)^c -> (Ui r e)^c
+foreign pure attributes from "./dom.ts" "attributes"
+  arity 2
+  retention call
+
 load : Unit ->{; JsError} String
 foreign async load from "./compiler.ts" "load"
   arity 0
   catch JsError.from_js
 
-/// Checks and compiles the module in both profiles.
-compile : String ->{} Compiled
+compile : String ->{; JsError} Compiled
 foreign sync compile from "./compiler.ts" "compile"
   arity 1
+  catch JsError.from_js
 
-/// Builds the module in the profile and runs its `main` in a worker, until
-/// it ends or the call is interrupted; everything it printed.
-run_build : String -> String ->{} List Line
+run_build : String -> String ->{; JsError} Execution
 foreign async run_build from "./compiler.ts" "run"
   arity 2
+  catch JsError.from_js
   cancel signal
+
+empty_compiled : Compiled
+let empty_compiled =
+  { debug = { code = ""; diagnostics = [] }; release = { code = ""; diagnostics = [] } }
+
+empty_execution : Execution
+let empty_execution = { lines = []; status = ""; detail = ""; diagnostics = [] }
+
+tr : Locale -> String -> String -> String
+let tr locale english russian = if locale == Ru then russian else english
 
 update : Ref Model -> (Model -> Model) ->{} Unit
 let update model f = Ref.modify model (fun m -> ((), f m))
 
 profile_name : Profile -> String
-let profile_name p =
-  match p with
-  | Debug -> "debug"
-  | Release -> "release"
+let profile_name profile = if profile == Debug then "debug" else "release"
+
+generated : Model -> Generated
+let generated m = if m.profile == Debug then m.compiled.debug else m.compiled.release
+
+errors : Generated -> Number
+let errors result = List.length (List.filter (fun d -> d.severity == "error") result.diagnostics)
+
+refresh : Ref Model ->{} Unit
+let refresh model =
+  let m = Ref.get model
+  if m.version == "" then
+    ()
+  else
+    let result = try Ok (compile m.source) with
+      | JsError failure -> Err failure.message
+    match result with
+    | Err message ->
+      update model (fun m -> { m with compiled = empty_compiled; compile_error = message })
+    | Ok compiled ->
+      update model (fun m ->
+        let current = if m.profile == Debug then compiled.debug else compiled.release
+        { m with compiled = compiled; compile_error = ""; tab = if errors current > 0 then Problems else m.tab })
+
+load_compiler : Ref Model ->{} Unit
+let load_compiler model =
+  update model (fun m -> { m with loading = true; load_error = ""; compile_error = "" })
+  notify "fp-refresh"
+  let result = try Ok (load ()) with
+    | JsError failure -> Err failure.message
+  match result with
+  | Err message ->
+    update model (fun m -> { m with loading = false; version = ""; load_error = message })
+  | Ok version ->
+    update model (fun m -> { m with loading = false; version = version })
+    refresh model
+  notify "fp-refresh"
 
 edit : Ref Model -> String ->{} Unit
 let edit model source =
-  let compiled = compile source
-  update model (fun m -> { m with source = source; compiled = compiled })
+  update model (fun m -> { m with source = source })
+  refresh model
 
 choose : Ref Model -> Example ->{} Unit
 let choose model example =
-  let compiled = compile example.source
-  update
-    model
-    (fun m ->
-      { m with example = example.name; source = example.source; compiled = compiled; output = [] })
+  update model (fun m ->
+    { m with source = example.source; revision = m.revision + 1; execution = empty_execution; tab = Output })
+  refresh model
 
-/// Runs the program, giving up after ten seconds.
+// `latest` on the same button aborts and joins the worker before this Stop action.
 run_program : Ref Model ->{} Unit
 let run_program model =
   let m = Ref.get model
-  update model (fun m -> { m with running = true; tab = Output; output = [] })
-  let output =
-    try timeout 10000 (task { run_build m.source (profile_name m.profile) }) with
-    | TimeoutError -> [{ stream = "status"; text = "stopped after 10 s" }]
-  update model (fun m -> { m with running = false; output = output })
-
-errors : Compiled -> Number
-let errors compiled =
-  List.length (List.filter (fun d -> d.severity == "error") compiled.diagnostics)
+  if m.running then
+    update model (fun m ->
+      { m with running = false; execution = { empty_execution with status = "stopped" } })
+  else
+    update model (fun m ->
+      { m with running = true; tab = Output; execution = empty_execution; ran_source = m.source; ran_profile = m.profile })
+    notify "fp-refresh"
+    let execution =
+      try timeout 10000 (task { run_build m.source (profile_name m.profile) }) with
+      | TimeoutError -> { empty_execution with status = "timeout" }
+      | JsError failure -> { empty_execution with status = "failure"; detail = failure.message }
+    update model (fun m -> { m with running = false; execution = execution })
 
 status : Model -> String
 let status m =
-  if m.version == "" then
-    "the compiler did not load"
-  else if errors m.compiled > 0 then
-    show (errors m.compiled) ++ " error(s)"
+  if m.loading then
+    tr m.locale "Loading compiler…" "Загрузка компилятора…"
+  else if m.version == "" then
+    tr m.locale "Compiler unavailable" "Компилятор недоступен"
+  else if m.compile_error != "" then
+    tr m.locale "Compilation failed" "Сбой компиляции"
+  else if errors (generated m) > 0 then
+    tr m.locale "Errors: " "Ошибок: " ++ show (errors (generated m))
+  else if m.running then
+    tr m.locale "Running · 10 s limit" "Выполняется · лимит 10 с"
   else
-    "Flick " ++ m.version ++ ": no errors"
+    "Flick " ++ m.version ++ " · " ++ tr m.locale "Type-checked" "Проверено"
 
-/// A button that is pressed when `on`.
-toggle : String -> Bool -> (Unit ->{} Unit) -> Ui none none
-let toggle label on act =
-  ui {
-    span
-      { class_name = if on then "fp-on" else "fp-off" }
-      [
-        button
-          { disabled = false; on_click = Ui.Event.latest (fun _ -> task { act () }) }
-          [text label],
-      ]
-  }
+choice : String -> Bool -> Bool -> (Unit ->{} Unit) -> Ui none none
+let choice label active disabled act =
+  attributes
+    [
+      ("className", if active then "fp-choice fp-on" else "fp-choice"),
+      ("aria-pressed", if active then "true" else "false"),
+    ]
+    (Ui.button
+      { disabled = disabled; on_click = Ui.Event.latest (fun _ -> task { act () }) }
+      [Ui.text label])
 
-code_pane : String -> String -> Ui none none
-let code_pane title code =
-  ui {
-    div
-      { class_name = "fp-code" }
-      [
-        span { class_name = "fp-title" } [text title],
-        pre
-          { class_name = "fp-out" }
-          [text (if code == "" then "no output: the module has errors" else code)],
-      ]
-  }
+pick : Ref Model -> Model -> Example -> Ui none none
+let pick model m example =
+  Ui.keyed example.name
+    (choice (tr m.locale example.name example.name_ru) (m.source == example.source) m.running
+      (fun () -> choose model example))
 
-output_pane : Model -> Ui none none
-let output_pane m =
-  let hint = if m.running then "running…" else "Press Run to build the module and run its `main`."
-  ui {
-    pre
-      { class_name = "fp-out" }
-      (match m.output with
-      | [] -> [span { class_name = "fp-status" } [text hint]]
-      | lines -> List.map (fun l -> span { class_name = "fp-" ++ l.stream } [text l.text]) lines)
-  }
+set_profile : Ref Model -> Model -> Profile -> Ui none none
+let set_profile model m profile =
+  choice
+    (if profile == Debug then tr m.locale "Debug" "Отладка" else tr m.locale "Release" "Релиз")
+    (m.profile == profile)
+    m.running
+    (fun () -> update model (fun m ->
+      let current = if profile == Debug then m.compiled.debug else m.compiled.release
+      { m with profile = profile; tab = if errors current > 0 then Problems else m.tab }))
 
-problem : Diagnostic -> Ui none none
-let problem d =
+problem : Locale -> Diagnostic -> Ui none none
+let problem locale diagnostic =
   ui {
     item
       [
-        span { class_name = "fp-" ++ d.severity } [text d.code],
-        text (" " ++ d.at ++ " " ++ d.message),
+        span
+          { class_name = "fp-diagnostic-code fp-" ++ diagnostic.severity }
+          [text diagnostic.code],
+        span { class_name = "fp-diagnostic-at" }
+          [
+            text
+              (if diagnostic.severity == "error" then
+                tr locale "Error" "Ошибка"
+              else if diagnostic.severity == "warning" then
+                tr locale "Warning" "Предупреждение"
+              else
+                tr locale "Info" "Сообщение"),
+          ],
+        span { class_name = "fp-diagnostic-at" } [text diagnostic.at],
+        paragraph [text diagnostic.message],
       ]
   }
 
-problems_pane : Compiled -> Ui none none
-let problems_pane compiled =
+problems_pane : Locale -> List Diagnostic -> Ui none none
+let problems_pane locale diagnostics =
   ui {
-    match compiled.diagnostics with
-    | [] -> paragraph [text "No diagnostics."]
-    | ds -> list (List.map problem ds)
+    div { class_name = "fp-diagnostics" }
+      [
+        match diagnostics with
+        | [] -> paragraph [text (tr locale "No diagnostics." "Диагностик нет.")]
+        | items -> list (List.map (problem locale) items),
+      ]
   }
 
-pane : Model -> Ui none none
-let pane m =
-  match m.tab with
-  | Output -> output_pane m
-  | Js ->
-    code_pane
-      ("JavaScript, " ++ profile_name m.profile)
-      (if m.profile == Debug then m.compiled.debug else m.compiled.release)
-  | Compare ->
+current_problems : Model -> Ui none none
+let current_problems m =
+  if m.loading then
+    Ui.paragraph
+      [
+        Ui.text
+          (tr
+            m.locale
+            "Diagnostics appear when the compiler is ready."
+            "Диагностика появится после загрузки компилятора."),
+      ]
+  else if m.version == "" || m.compile_error != "" then
+    Ui.paragraph
+      [
+        Ui.text
+          (tr
+            m.locale
+            "Restore the compiler above to check this source."
+            "Восстановите компилятор выше, чтобы проверить код."),
+      ]
+  else
+    problems_pane m.locale (generated m).diagnostics
+
+execution_status : Model -> String
+let execution_status m =
+  if m.execution.status == "exit" then
+    tr m.locale "Exit code " "Код завершения " ++ m.execution.detail
+  else if m.execution.status == "timeout" then
+    tr m.locale "Stopped after 10 seconds" "Остановлено через 10 секунд"
+  else if m.execution.status == "stopped" then
+    tr m.locale "Stopped" "Остановлено"
+  else if m.execution.status == "no-main" then
+    tr
+      m.locale
+      "Nothing to run: export a main function."
+      "Нечего запускать: экспортируйте функцию main."
+  else if m.execution.status == "invalid" then
+    tr
+      m.locale
+      "Build failed. Fix the diagnostics and run again."
+      "Сборка не удалась. Исправьте ошибки и запустите снова."
+  else
+    tr m.locale "Program failed" "Программа завершилась с ошибкой"
+
+output_pane : Model -> Ui none none
+let output_pane m =
+  if m.running || m.execution.status == "" then
     ui {
-      div
-        { class_name = "fp-compare" }
-        [code_pane "debug" m.compiled.debug, code_pane "release" m.compiled.release]
+      div { class_name = "fp-empty" }
+        [
+          paragraph
+            [
+              text
+                (if m.running then
+                  tr m.locale "Running in an isolated worker…" "Выполняется в отдельном worker…"
+                else
+                  tr m.locale "Your program’s output goes here." "Здесь появится вывод программы."),
+            ],
+          paragraph
+            [
+              text
+                (if m.running then
+                  tr
+                    m.locale
+                    "Output appears when the program ends. Stop it at any time; the limit is 10 seconds."
+                    "Вывод появится после завершения. Можно остановить программу; лимит — 10 секунд."
+                else
+                  tr
+                    m.locale
+                    "Choose an example or edit Main.fl, then press Run."
+                    "Выберите пример или измените Main.fl, затем нажмите «Запустить»."),
+            ],
+        ]
     }
-  | Problems -> problems_pane m.compiled
+  else
+    ui {
+      div { class_name = "fp-execution" }
+        [
+          attributes
+            [("tabIndex", "0"), ("aria-label", tr m.locale "Program output" "Вывод программы")]
+            (pre { class_name = "fp-output" }
+              (match m.execution.lines with
+              | [] ->
+                [
+                  span
+                    { class_name = "fp-muted" }
+                    [
+                      text
+                        (if m.execution.status == "exit" then
+                          tr m.locale "The program wrote no output." "Программа ничего не вывела."
+                        else
+                          tr m.locale "No output captured." "Вывод не получен."),
+                    ],
+                ]
+              | lines ->
+                List.map
+                  (fun line -> span { class_name = "fp-" ++ line.stream } [text line.text])
+                  lines)),
+          attributes [("role", "status")]
+            (div { class_name = if m.execution.status == "exit" && m.execution.detail == "0" then "fp-exit" else "fp-exit fp-bad" }
+              [text (execution_status m ++ " · " ++ profile_name m.ran_profile)]),
+          if m.execution.status == "failure" then pre { class_name = "fp-failure-detail" } [text m.execution.detail] else empty,
+          if m.execution.status == "invalid" then problems_pane m.locale m.execution.diagnostics else empty,
+          if m.source != m.ran_source || m.profile != m.ran_profile then
+            div
+              { class_name = "fp-stale" }
+              [
+                text
+                  (tr
+                    m.locale
+                    "Source or build profile changed. Run again for fresh output."
+                    "Код или профиль сборки изменился. Запустите снова, чтобы обновить вывод."),
+              ]
+          else empty,
+        ]
+    }
 
-tab_label : Model -> Tab -> String
-let tab_label m t =
-  match t with
-  | Output -> "Output"
-  | Js -> "JS"
-  | Compare -> "debug vs release"
-  | Problems ->
-    match m.compiled.diagnostics with
-    | [] -> "Diagnostics"
-    | ds -> "Diagnostics (" ++ show (List.length ds) ++ ")"
+generated_pane : Model -> Ui none none
+let generated_pane m =
+  let result = generated m
+  let hint =
+    if m.loading then
+      tr m.locale "Loading the WebAssembly compiler…" "Загрузка WebAssembly-компилятора…"
+    else if m.version
+      == "" then tr
+        m.locale
+        "Load the compiler to generate JavaScript."
+        "Загрузите компилятор, чтобы получить JavaScript."
+    else if m.compile_error
+      != "" then tr
+        m.locale
+        "Compilation failed. See the error above."
+        "Компиляция не удалась. Подробности выше."
+    else if errors result
+      > 0 then tr
+        m.locale
+        "Fix the diagnostics below to generate JavaScript."
+        "Исправьте ошибки ниже, чтобы получить JavaScript."
+    else tr m.locale "This module emits no JavaScript." "Этот модуль не создаёт JavaScript."
+  attributes
+    [
+      ("tabIndex", "0"),
+      ("aria-label", tr m.locale "Generated JavaScript" "Сгенерированный JavaScript"),
+    ]
+    (Ui.pre { class_name = "fp-generated-code" }
+      [Ui.text (if result.code == "" then hint else result.code)])
 
-set_tab : Ref Model -> Model -> Tab -> Ui none none
-let set_tab model m t =
-  toggle (tab_label m t) (m.tab == t) (fun () -> update model (fun m -> { m with tab = t }))
+source_pane : Ref Model -> Model -> Ui none none
+let source_pane model m =
+  ui {
+    div { class_name = "fp-source" }
+      [
+        div { class_name = "fp-pane-header" }
+          [
+            span { class_name = "fp-file" } [text "Main.fl"],
+            span { class_name = "fp-pane-note" } [text (tr m.locale "Flick source" "Код на Flick")],
+          ],
+        keyed (show m.revision)
+          (attributes
+            [
+              ("aria-label", tr m.locale "Flick source code" "Исходный код Flick"),
+              ("aria-describedby", "fp-source-hint"),
+              ("autoCapitalize", "off"),
+              ("autoCorrect", "off"),
+            ]
+            (textarea
+              {
+                value = m.source;
+                placeholder = "module Main exposing (main)";
+                on_input = Ui.Event.latest (fun snapshot -> task { edit model snapshot.value });
+              })),
+        attributes [("id", "fp-source-hint")]
+          (div { class_name = "fp-pane-footer" }
+            [
+              text
+                (tr
+                  m.locale
+                  "Checked on every edit · compiled locally"
+                  "Проверка при каждом изменении · локальная компиляция"),
+            ]),
+      ]
+  }
 
-set_profile : Ref Model -> Model -> Profile -> Ui none none
-let set_profile model m p =
-  toggle
-    (profile_name p)
-    (m.profile == p)
-    (fun () -> update model (fun m -> { m with profile = p }))
+diagnostic_label : Model -> String
+let diagnostic_label m =
+  tr m.locale "Diagnostics" "Диагностика"
+    ++ " ("
+    ++ show (List.length (generated m).diagnostics)
+    ++ ")"
 
-pick : Ref Model -> Model -> Example -> Ui none none
-let pick model m e = toggle e.name (m.example == e.name) (fun () -> choose model e)
+result_pane : Ref Model -> Model -> Ui none none
+let result_pane model m =
+  ui {
+    div { class_name = "fp-result" }
+      [
+        div { class_name = "fp-pane-header" }
+          (if m.mode == Transpile then
+            [
+              span { class_name = "fp-file" } [text "JavaScript"],
+              span { class_name = "fp-pane-note" } [text (profile_name m.profile)],
+            ]
+          else
+            [
+              choice
+                (tr m.locale "Output" "Вывод")
+                (m.tab == Output)
+                false
+                (fun () -> update model (fun m -> { m with tab = Output })),
+              choice
+                (diagnostic_label m)
+                (m.tab == Problems)
+                false
+                (fun () -> update model (fun m -> { m with tab = Problems })),
+            ]),
+        if m.mode == Transpile then generated_pane m
+        else if m.tab == Problems then div { class_name = "fp-problems-panel" } [current_problems m]
+        else output_pane m,
+      ]
+  }
+
+notice : String -> String -> Ui none none
+let notice title detail =
+  ui {
+    div { class_name = "fp-notice" }
+      [paragraph [text title], pre { class_name = "fp-failure-detail" } [text detail]]
+  }
 
 view : Ref Model -> Model -> Ui none none
 let view model m =
   ui {
-    div
-      { class_name = "fp" }
+    div { class_name = if m.mode == Play then "fp fp-play" else "fp fp-transpile" }
       [
-        div { class_name = "fp-bar" } (List.map (pick model m) examples),
-        div
-          { class_name = "fp-bar" }
+        // Ui.Dom.run redraws after its own events, including this platform notification.
+        attributes
           [
-            set_profile model m Debug,
-            set_profile model m Release,
-            span
-              { class_name = "fp-run" }
-              [
-                button
-                  {
-                    disabled = m.version == "";
-                    on_click = Ui.Event.latest (fun _ -> task { run_program model });
-                  }
-                  [text (if m.running then "Running…" else "Run")],
-              ],
-            span
-              { class_name = if errors m.compiled > 0 then "fp-bad" else "fp-status" }
-              [text (status m)],
-          ],
-        div
-          { class_name = "fp-panes" }
+            ("id", "fp-refresh"),
+            ("className", "fp-refresh"),
+            ("aria-hidden", "true"),
+            ("tabIndex", "-1"),
+          ]
+          (button { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { () }) } []),
+        attributes [("role", "group"), ("aria-label", tr m.locale "Examples" "Примеры")]
+          (div { class_name = "fp-examples" }
+            [
+              span { class_name = "fp-control-label" } [text (tr m.locale "Examples" "Примеры")],
+              div { class_name = "fp-example-options" } (List.map (pick model m) examples),
+            ]),
+        div { class_name = "fp-workspace" }
           [
-            keyed
-              m.example
-              (textarea
-                {
-                  value = m.source;
-                  placeholder = "module Main exposing (main)";
-                  on_input = Ui.Event.latest (fun s -> task { edit model s.value });
-                }),
-            div
-              { class_name = "fp-result" }
+            div { class_name = "fp-toolbar" }
               [
-                div
-                  { class_name = "fp-bar" }
-                  (List.map (set_tab model m) [Output, Js, Compare, Problems]),
-                pane m,
+                attributes
+                  [("role", "group"), ("aria-label", tr m.locale "Build profile" "Профиль сборки")]
+                  (div { class_name = "fp-profiles" }
+                    [
+                      span
+                        { class_name = "fp-control-label" }
+                        [text (tr m.locale "Build" "Сборка")],
+                      set_profile model m Debug,
+                      set_profile model m Release,
+                    ]),
+                attributes [("role", "status"), ("aria-live", "polite")]
+                  (span { class_name = if m.loading then "fp-status fp-status-loading" else if m.version == "" || m.compile_error != "" || errors (generated m) > 0 then "fp-status fp-bad" else "fp-status fp-status-ready" }
+                    [text (status m)]),
+                if m.mode == Play then
+                  attributes
+                    [("className", if m.running then "fp-primary fp-stop" else "fp-primary")]
+                    (button
+                      {
+                        disabled =
+                          not m.running
+                            && (m.loading
+                              || m.version == ""
+                              || m.compile_error != ""
+                              || errors (generated m) > 0);
+                        on_click = Ui.Event.latest (fun _ -> task { run_program model });
+                      }
+                      [
+                        text
+                          (if m.running then
+                            tr m.locale "Stop" "Остановить"
+                          else
+                            tr m.locale "Run" "Запустить"),
+                      ])
+                else empty,
               ],
+            if m.load_error != "" then
+              attributes [("role", "alert")]
+                (div { class_name = "fp-recovery" }
+                  [
+                    notice
+                      (tr
+                        m.locale
+                        "The compiler could not load. Retry, or reload this page after checking your connection."
+                        "Не удалось загрузить компилятор. Повторите попытку или проверьте соединение и обновите страницу.")
+                      m.load_error,
+                    button
+                      {
+                        disabled = m.loading;
+                        on_click = Ui.Event.exhaust (fun _ -> task { load_compiler model });
+                      }
+                      [text (tr m.locale "Retry compiler" "Загрузить снова")],
+                  ])
+            else empty,
+            if m.compile_error != "" then
+              attributes [("role", "alert")]
+                (div { class_name = "fp-recovery" }
+                  [
+                    notice
+                      (tr
+                        m.locale
+                        "The compiler failed while checking this source."
+                        "Сбой компилятора при проверке кода.")
+                      m.compile_error,
+                    button
+                      {
+                        disabled = false;
+                        on_click = Ui.Event.latest (fun _ -> task { refresh model });
+                      }
+                      [text (tr m.locale "Retry compilation" "Повторить компиляцию")],
+                  ])
+            else empty,
+            if m.fault != "" then
+              attributes [("role", "alert")]
+                (notice
+                  (tr
+                    m.locale
+                    "The playground encountered an error. Reload the page to recover."
+                    "Ошибка песочницы. Обновите страницу, чтобы восстановить работу.")
+                  m.fault)
+            else empty,
+            div { class_name = "fp-panes" } [source_pane model m, result_pane model m],
+            if m.mode == Transpile then
+              div { class_name = "fp-transpile-diagnostics" }
+                [
+                  div { class_name = "fp-diagnostics-heading" } [text (diagnostic_label m)],
+                  current_problems m,
+                ]
+            else empty,
           ],
       ]
   }
 
-report : Failure e ->{} Unit
-let report failure = Platform.stderr_line (RawCause.describe (Failure.inspect failure))
+report : Ref Model -> Failure e ->{} Unit
+let report model failure =
+  let message = RawCause.describe (Failure.inspect failure)
+  update model (fun m -> { m with fault = message; running = false; loading = false })
+  notify "fp-refresh"
+  Platform.stderr_line message
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let version = try load () with
-    | JsError _ -> ""
-  let first = Option.with_default { name = ""; source = "" } (List.get 0 examples)
-  let compiled =
-    if version == "" then { debug = ""; release = ""; diagnostics = [] } else compile first.source
+  let config = configuration ()
+  let first = Option.with_default { name = ""; name_ru = ""; source = "" } (List.get 0 examples)
   let initial =
     {
-      example = first.name;
+      mode = if config.mode == "transpile" then Transpile else Play;
+      locale = if config.locale == "ru" then Ru else En;
       source = first.source;
+      revision = 0;
       profile = Debug;
       tab = Output;
-      compiled = compiled;
-      output = [];
+      compiled = empty_compiled;
+      execution = empty_execution;
+      ran_source = "";
+      ran_profile = Debug;
       running = false;
-      version = version;
+      loading = true;
+      version = "";
+      load_error = "";
+      compile_error = "";
+      fault = "";
     }
-  match Ui.container "flick-playground" with
-  | None -> App.fail "the page has no element `flick-playground`"
+  match Ui.Dom.container "flick-playground" with
+  | None -> App.fail "The page has no element flick-playground"
   | Some root ->
     let model = Ref.make initial
-    ignore (Ui.run root report model (fun m -> view model m))
+    ignore (parallel
+      (task { load_compiler model })
+      (task { ignore (Ui.Dom.run root (report model) model (fun m -> view model m)) }))
