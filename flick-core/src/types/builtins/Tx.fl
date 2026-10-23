@@ -1,0 +1,45 @@
+/// Transactions over Effect's transactional values (`TxRef`, `TxQueue`,
+/// …): an operation on one needs `Transaction`, which only `atomically`
+/// provides, so it always runs inside a transaction.
+module Tx exposing (..)
+
+/// Being inside a transaction: `atomically` provides it. It has no
+/// operations of its own.
+service Transaction
+
+/// Why an attempt of a transaction runs again: its body called `retry`,
+/// or a value it read changed before it committed.
+type RetryReason = Retry | Conflict
+  deriving Eq, Show
+
+/// What a transaction knows of its current attempt; times in milliseconds.
+type alias Meta =
+  {
+    attempt : Number;
+    retryReason : Option RetryReason;
+    start : Number;
+    now : Number;
+    elapsed : Number;
+    elapsedSincePrevious : Number
+  }
+
+/// Runs `body` as one transaction: its changes to transactional values
+/// commit together or not at all, and it runs again when a value it read
+/// changes before it commits. Inside another transaction it joins it.
+atomically : forall c r e a. (Eff {Transaction | r} e a)^c ->{r; e} a
+foreign effect atomically from "@flick-lang/runtime/effect/Effect" "tx"
+  retention call
+  reviewed "effect@4.0.5 sha256:3e9edfbfca5d9263"
+
+/// Abandons this attempt and runs the transaction again once a value it
+/// read changes.
+retry : Unit ->{Transaction;} a
+foreign effect retry from "@flick-lang/runtime/effect/Tx" "flickRetry"
+  arity 0
+  reviewed "effect@4.0.5 sha256:24b8d20da1fdf180"
+
+/// The metadata of the current attempt.
+current : Unit ->{Transaction;} Meta
+foreign effect current from "@flick-lang/runtime/effect/Tx" "flickCurrent"
+  arity 0
+  reviewed "effect@4.0.5 sha256:59c4f4b0b993945d"

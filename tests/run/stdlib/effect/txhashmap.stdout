@@ -1,0 +1,12 @@
+basics: (Some 1, false, true, false, 2)
+changed: (Some 1, None, [("ann", 11), ("dan", 4), ("eve", 5)])
+views: (["ann", "dan", "eve"], [4, 5, 11], true, [("ann", 11), ("dan", 4), ("eve", 5)])
+snapshot kept: (Some 11, 3)
+union: [("ann", 11), ("dan", 4), ("eve", 5), ("gus", 7)]
+derived: ([("ann", 25), ("dan", 11), ("eve", 13), ("gus", 17)], [("ann", 11), ("eve", 5), ("gus", 7)], ["11", "5", "7"], 4, 27)
+found: (true, true, true, Some ("dan", 4))
+flat_map size: 8
+for_each: [("ann", 11), ("dan", 4), ("eve", 5), ("gus", 7)]
+by hash: (Some 5, true)
+clear rolled back: 4
+fresh: (Some 2, true, true)

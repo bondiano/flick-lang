@@ -1,0 +1,54 @@
+// Transactional cells from Effect's `TxRef`, inside `Tx.atomically`: all
+// or nothing, joined when nested, and run again after `Tx.retry`.
+module App.Main exposing (main)
+
+type error Broke = Broke
+
+ms : Number -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+transfer : Number -> TxRef.TxRef Number -> TxRef.TxRef Number ->{Tx.Transaction; Broke} Unit
+let transfer amount src dst =
+  TxRef.update (fun b -> b - amount) src
+  TxRef.update (fun b -> b + amount) dst
+  if TxRef.get src < 0 then from_result (Err Broke) else ()
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let a = TxRef.make 10
+  let b = TxRef.make 0
+  let first = try Tx.atomically (task { transfer 4 a b; "committed" }) with
+    | Broke -> "rolled back"
+  Platform.stdout_line ("first: " ++ first)
+  let second = try Tx.atomically (task {
+      TxRef.set 100 b
+      transfer 100 a b
+      "committed"
+    }) with
+    | Broke -> "rolled back"
+  Platform.stdout_line ("second: " ++ second)
+  Platform.stdout_line ("balances: " ++ show (Tx.atomically (task { (TxRef.get a, TxRef.get b) })))
+  let old = Tx.atomically (task { TxRef.modify (fun x -> (x, x * 2)) a })
+  Platform.stdout_line ("modify: " ++ show (old, Tx.atomically (task { TxRef.get a })))
+  let nested = Tx.atomically (task {
+      TxRef.set 1 a
+      Tx.atomically (task { TxRef.set 2 b })
+      TxRef.get a + TxRef.get b
+    })
+  Platform.stdout_line ("nested: " ++ show nested)
+  let meta = Tx.atomically (task { Tx.current () })
+  Platform.stdout_line ("first attempt: " ++ show (meta.attempt, meta.retryReason))
+  let flag = TxRef.make 0
+  let (seen, _) =
+    parallel
+      (task {
+        Tx.atomically (task {
+          let v = TxRef.get flag
+          if v == 0 then Tx.retry () else (v, (Tx.current ()).retryReason == Some Tx.Retry)
+        })
+      })
+      (task {
+        Effect.sleep (ms 2)
+        Tx.atomically (task { TxRef.set 7 flag })
+      })
+  Platform.stdout_line ("after retry: " ++ show seen)

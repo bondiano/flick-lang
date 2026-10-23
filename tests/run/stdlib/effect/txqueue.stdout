@@ -1,0 +1,11 @@
+bounded, dropping reject: ([], [3])
+size, full, empty, non-empty: (3, true, false, true)
+take, peek, poll, take_all: (1, 2, Some 2, [3])
+poll empty: None
+take_between waits: [7, 8]
+dropping, sliding, take_n, clear: (1, 2, [1, 2], [3])
+fail: true, take fails: gone, open/closing/done/shutdown (false, false, true, true)
+fail_cause: true, take fails: cause
+interrupt: (true, false, true)
+drained 5, then take interrupted: true
+shutdown: (true, 0, true)
