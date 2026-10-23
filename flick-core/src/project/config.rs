@@ -1,4 +1,4 @@
-//! `flick.toml`: the schema version, `[project]` and `[build]`. Unknown
+//! `flick.toml`: the schema version, `[project]`, `[build]` and `[sql]`. Unknown
 //! keys are errors so that a typo never silently means a default.
 
 use std::ops;
@@ -6,9 +6,9 @@ use std::ops;
 use serde::Deserialize;
 use toml::{Spanned, de};
 
-use crate::diagnostics::{Diagnostic, Severity, codes};
+use crate::diagnostics::{Code, Diagnostic, Severity, codes};
 use crate::source::{FileId, Span};
-use crate::types;
+use crate::types::{self, Dialect, dialect};
 
 pub const SCHEMA_VERSION: i64 = 1;
 
@@ -20,6 +20,8 @@ pub struct Config {
     /// Entry module of an app, with the span of its value.
     pub entry: Option<(String, Span)>,
     pub build: Build,
+    /// `[sql] dialect`: what `sql table` and `sql { … }` are checked against.
+    pub sql_dialect: &'static Dialect,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -87,6 +89,14 @@ struct Raw {
     project: Spanned<RawProject>,
     #[serde(default)]
     build: Build,
+    #[serde(default)]
+    sql: RawSql,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawSql {
+    dialect: Option<Spanned<String>>,
 }
 
 #[derive(Deserialize)]
@@ -158,13 +168,46 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
             Vec::new(),
         ));
     }
+    let sql_dialect = match raw.sql.dialect {
+        None => Default::default(),
+        Some(name) => sql_dialect(name.get_ref())
+            .map_err(|(code, message)| Diagnostic::error(code, message, span(name.span())))?,
+    };
     Ok(Config {
         kind: project.kind,
         source_dir: project.source_dir,
         test_dir: project.test_dir,
         entry,
         build: raw.build,
+        sql_dialect,
     })
+}
+
+/// The dialect `[sql] dialect` names, or why it cannot be used.
+fn sql_dialect(name: &str) -> Result<&'static Dialect, (Code, String)> {
+    match dialect::DIALECTS.iter().find(|(n, _)| *n == name) {
+        Some((_, Some(d))) => Ok(d),
+        Some((_, None)) => Err((
+            codes::P022,
+            format!(
+                "the SQL dialect `{name}` is not supported yet; supported: {}",
+                names(true)
+            ),
+        )),
+        None => Err((
+            codes::P023,
+            format!("unknown SQL dialect `{name}`; known: {}", names(false)),
+        )),
+    }
+}
+
+fn names(supported: bool) -> String {
+    dialect::DIALECTS
+        .iter()
+        .filter(|(_, d)| !supported || d.is_some())
+        .map(|(n, _)| format!("`{n}`"))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn offset(n: usize) -> u32 {
@@ -198,6 +241,32 @@ mod tests {
             (lib.source_dir.as_str(), lib.test_dir.as_str()),
             ("src", "test")
         );
+        assert_eq!(lib.sql_dialect.name, "postgresql");
+    }
+
+    #[test]
+    fn sql_dialect() {
+        let pg = parse_text(
+            "schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\ndialect = \"postgresql\"\n",
+        )
+        .expect("valid");
+        assert_eq!(pg.sql_dialect, &dialect::POSTGRESQL);
+        let err = parse_text(
+            "schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\ndialect = \"oracle\"\n",
+        )
+        .expect_err("unsupported");
+        assert_eq!(
+            err.message,
+            "the SQL dialect `oracle` is not supported yet; supported: `postgresql`"
+        );
+        let err = parse_text(
+            "schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\ndialect = \"postgres\"\n",
+        )
+        .expect_err("unknown");
+        assert_eq!(
+            err.message,
+            "unknown SQL dialect `postgres`; known: `postgresql`, `mysql`, `sqlite`, `clickhouse`, `oracle`"
+        );
     }
 
     #[test]
@@ -230,6 +299,21 @@ mod tests {
                 "\"fast\"",
             ),
             ("schema-version = 1\n[project\n", codes::P005, ""),
+            (
+                "schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\ndialect = \"mysql\"\n",
+                codes::P022,
+                "\"mysql\"",
+            ),
+            (
+                "schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\ndialect = \"pg\"\n",
+                codes::P023,
+                "\"pg\"",
+            ),
+            (
+                "schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\nname = \"x\"\n",
+                codes::P005,
+                "name",
+            ),
         ];
         for (text, code, spanned) in cases {
             let err = parse_text(text).expect_err(text);

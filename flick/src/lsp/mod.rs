@@ -140,6 +140,7 @@ fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
     let options = types::Options {
         local: &local,
         limits: types::Limits::default(),
+        sql: Default::default(),
     };
     let (checked, typing) =
         types::check_typed(&module, &imported, dependencies, options, &mut interface);

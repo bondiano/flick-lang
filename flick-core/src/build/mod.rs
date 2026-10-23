@@ -392,6 +392,7 @@ pub fn builtin_modules() -> &'static [ir::Module] {
                 let options = types::Options {
                     local: &local,
                     limits: types::Limits::default(),
+                    sql: Default::default(),
                 };
                 let (_, typing) = types::check_typed(
                     &module,

@@ -75,6 +75,8 @@ fn configuration_and_missing_dependencies_exit_with_2() {
         "config_kind",
         "config_no_entry",
         "config_version",
+        "config_sql_dialect",
+        "config_sql_unknown",
         "entry",
     ] {
         let out = flick(&[

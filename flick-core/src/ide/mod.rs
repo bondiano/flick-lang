@@ -8,6 +8,7 @@ mod locals;
 mod navigate;
 mod rename;
 mod sql;
+mod sql_table;
 mod tree;
 
 pub use complete::{Completion, CompletionKind};

@@ -219,7 +219,11 @@ impl Checker<'_> {
         );
         let ty = Type::apps(
             Type::con(SQL, "Template"),
-            [index("Pg"), Type::Record(params), Type::Record(rows)],
+            [
+                index(self.options.sql.tag),
+                Type::Record(params),
+                Type::Record(rows),
+            ],
         );
         if let Some(expected) = expected {
             self.expect(&ty, expected, self.span(node));

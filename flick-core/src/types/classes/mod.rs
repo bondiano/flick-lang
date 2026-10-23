@@ -17,6 +17,7 @@ use super::env::{Form, Fundep};
 use super::ty::{PRELUDE, Type};
 use crate::source::Span;
 use crate::types::regions;
+pub(crate) use matching::{Match, match_type};
 pub use solve::Outcome;
 
 /// The module of the row primitives.

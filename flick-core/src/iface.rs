@@ -287,6 +287,7 @@ mod tests {
         let options = crate::types::Options {
             local: &local,
             limits: types::Limits::default(),
+            sql: Default::default(),
         };
         diagnostics.extend(types::check(
             &module,

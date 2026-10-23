@@ -224,6 +224,8 @@ codes! {
     P019 = Project 19, "file exists";
     P020 = Project 20, "incomplete package";
     P021 = Project 21, "application cleanup failed";
+    P022 = Project 22, "SQL dialect not supported yet";
+    P023 = Project 23, "unknown SQL dialect";
 }
 
 #[cfg(test)]

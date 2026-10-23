@@ -8,6 +8,7 @@ use super::super::convert::{Free, is_type};
 use super::super::kinds::Kind;
 use super::super::ty::{Row, Type};
 use super::super::typing::{SqlColumn, SqlTable, range};
+use super::dialect::Dialect;
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
 use crate::source::Span;
@@ -17,47 +18,49 @@ use crate::syntax::literal::string_value;
 
 pub const SQL: &str = "Sql";
 
-/// SQL types by their words, with the runtime kind and the Flick type a
-/// value of the column has without a codec.
-pub(crate) const TYPES: [(&str, &str, &str); 25] = [
-    ("bigint", "bigint", "BigInt"),
-    ("int8", "bigint", "BigInt"),
-    ("bigserial", "bigint", "BigInt"),
-    ("integer", "number", "Number"),
-    ("int", "number", "Number"),
-    ("int4", "number", "Number"),
-    ("smallint", "number", "Number"),
-    ("int2", "number", "Number"),
-    ("serial", "number", "Number"),
-    ("real", "number", "Number"),
-    ("double precision", "number", "Number"),
-    ("float8", "number", "Number"),
-    ("numeric", "numeric", "BigDecimal"),
-    ("decimal", "numeric", "BigDecimal"),
-    ("text", "text", "String"),
-    ("varchar", "text", "String"),
-    ("character varying", "text", "String"),
-    ("uuid", "uuid", "String"),
-    ("boolean", "bool", "Bool"),
-    ("bool", "bool", "Bool"),
-    ("date", "date", "String"),
-    ("timestamp", "timestamp", "String"),
-    ("timestamptz", "timestamptz", "String"),
-    ("jsonb", "json", "Json"),
-    ("json", "json", "Json"),
-];
-
 /// The Flick type of a value of a runtime kind, without a codec.
-pub fn base_type(kind: &str) -> Type {
-    let name = TYPES
-        .iter()
-        .find(|(_, k, _)| *k == kind)
-        .map_or("Unknown", |(_, _, t)| t);
-    match name {
+pub fn base_type(dialect: &Dialect, kind: &str) -> Type {
+    match dialect.flick_type(kind) {
         "BigDecimal" => Type::con("BigDecimal", "BigDecimal"),
-        "Json" => Type::prim("Json"),
         other => Type::prim(other),
     }
+}
+
+/// The record of a table's rows: each column's type, in `Option` when nullable.
+fn row_type(table: &SqlTable) -> Type {
+    Type::Record(Row::closed(
+        table
+            .columns
+            .iter()
+            .map(|c| {
+                let ty = if c.nullable {
+                    Type::app(Type::prim("Option"), c.ty.clone())
+                } else {
+                    c.ty.clone()
+                };
+                (c.name.clone(), ty)
+            })
+            .collect(),
+    ))
+}
+
+/// The type of the companion `Name$table`.
+fn table_type(table: &SqlTable) -> Type {
+    let columns = table.columns.iter().map(|c| {
+        let null = index(if c.nullable { "Nullable" } else { "NonNull" });
+        let column = Type::apps(
+            Type::con(SQL, "Column"),
+            [c.ty.clone(), null, index(&c.write)],
+        );
+        (c.name.clone(), column)
+    });
+    Type::apps(
+        Type::con(SQL, "Table"),
+        [
+            Type::Symbol(table.table.clone()),
+            Type::Record(Row::closed(columns.collect())),
+        ],
+    )
 }
 
 /// `Sql.NonNull`, `Sql.Generated`, ….
@@ -76,8 +79,6 @@ impl Checker<'_> {
             .map(|t| string_value(t.text(self.text)))
             .unwrap_or_default();
         let mut columns: Vec<SqlColumn> = Vec::new();
-        let mut row = Vec::new();
-        let mut cols = Vec::new();
         for node in decl
             .nodes()
             .filter(|n| n.kind == K::Block)
@@ -99,45 +100,30 @@ impl Checker<'_> {
                 );
                 continue;
             }
-            let shown = if column.nullable {
-                Type::app(Type::prim("Option"), ty.clone())
-            } else {
-                ty.clone()
-            };
             if let Some(token) = node.child_tokens().find(|t| t.kind == K::Ident) {
+                let shown = if column.nullable {
+                    Type::app(Type::prim("Option"), ty)
+                } else {
+                    ty
+                };
                 self.note_type(Span::new(self.file, token.start, token.end), &shown);
             }
-            row.push((column.name.clone(), shown));
-            let null = index(if column.nullable {
-                "Nullable"
-            } else {
-                "NonNull"
-            });
-            let write = index(&column.write);
-            cols.push((
-                column.name.clone(),
-                Type::apps(Type::con(SQL, "Column"), [ty, null, write]),
-            ));
             columns.push(column);
         }
-        let entity = self.env.entity(
-            Namespace::Value,
-            &super::super::companion_name(name, "table"),
-        );
-        self.env.set_value(
-            entity,
-            Type::apps(
-                Type::con(SQL, "Table"),
-                [Type::Symbol(table.clone()), Type::Record(Row::closed(cols))],
-            ),
-        );
-        self.typing.sql_tables.push(SqlTable {
+        let info = SqlTable {
             decl: range(self.span(decl)),
             name: name.to_owned(),
             table,
             columns,
-        });
-        Type::Record(Row::closed(row))
+        };
+        let entity = self.env.entity(
+            Namespace::Value,
+            &super::super::companion_name(name, "table"),
+        );
+        self.env.set_value(entity, table_type(&info));
+        let row = row_type(&info);
+        self.typing.sql_tables.push(info);
+        row
     }
 
     /// The words of a column: its SQL type, then `not null`, `null`,
@@ -160,12 +146,9 @@ impl Checker<'_> {
             (Some(a), Some(b)) => Span::new(self.file, a.start, b.end),
             _ => self.span(node),
         };
-        let known = TYPES.iter().find(|(w, _, _)| {
-            let n = w.split(' ').count();
-            text.len() >= n && text[..n].join(" ") == *w
-        });
-        let (kind, mut rest) = if let Some((w, kind, _)) = known {
-            (*kind, &text[w.split(' ').count()..])
+        let dialect = self.options.sql;
+        let (kind, mut rest) = if let Some(t) = dialect.column_type(&text) {
+            (t.kind, &text[t.words.split(' ').count()..])
         } else {
             self.error(
                 codes::Q010,
@@ -173,7 +156,12 @@ impl Checker<'_> {
                 format!(
                     "unknown SQL type `{}`; known: {}",
                     text.first().unwrap_or(&""),
-                    TYPES.iter().map(|t| t.0).collect::<Vec<_>>().join(", ")
+                    dialect
+                        .types
+                        .iter()
+                        .map(|t| t.words)
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 ),
             );
             return None;
@@ -259,7 +247,7 @@ impl Checker<'_> {
                 else {
                     continue;
                 };
-                let base = base_type(&column.kind);
+                let base = base_type(self.options.sql, &column.kind);
                 let codec = node.nodes().skip_while(|n| !is_type(n.kind)).nth(1);
                 if let Some(codec) = codec {
                     let expected = Type::apps(Type::prim("PureCodec"), [base, column.ty.clone()]);

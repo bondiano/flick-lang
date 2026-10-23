@@ -10,6 +10,7 @@ use std::mem;
 use super::Checker;
 use super::classes::Dict;
 use super::env::{Abi, Rep};
+use super::sql::dialect::Dialect;
 use super::ty::Type;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -63,6 +64,11 @@ pub struct Typing {
     pending_types: Vec<(Range, Type)>,
     /// `sql table` declarations.
     pub sql_tables: Vec<SqlTable>,
+    /// The dialect the SQL of the module was checked against.
+    pub sql_dialect: &'static Dialect,
+    /// The transparent aliases the module declares, exported or not: their
+    /// parameters and bodies.
+    pub aliases: HashMap<String, (Vec<String>, Type)>,
     /// `sql { … }` blocks: their SQL and how values cross the driver.
     pub sql: HashMap<Range, SqlPlan>,
     /// Runtime calls inside a `scope` that acquire into the owner of another
@@ -420,6 +426,11 @@ impl Checker<'_> {
     /// Settles what waited for the whole module to be solved.
     pub fn finish_typing(&mut self) -> Typing {
         let mut typing = mem::take(&mut self.typing);
+        typing.aliases = self
+            .env
+            .local_aliases()
+            .map(|(name, params, body)| (name.to_owned(), (params.to_vec(), body.clone())))
+            .collect();
         for (at, ty) in mem::take(&mut typing.pending_types) {
             let ty = self.named_skolems(&self.zonk(&ty));
             typing.types.insert(at, ty);

@@ -492,6 +492,9 @@ impl Loader<'_> {
                 steps: b.solver_steps,
                 depth: b.solver_depth,
             }),
+            sql: self
+                .project
+                .map_or_else(Default::default, |p| p.config.sql_dialect),
         };
         self.diagnostics
             .extend(loaded.parse.diagnostics.iter().cloned());

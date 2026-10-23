@@ -1,0 +1,8 @@
+schema-version = 1
+
+[project]
+kind = "lib"
+
+[sql]
+dialect = "sqlite"
+#         ^^^^^^^^ FLICK-P022 the SQL dialect `sqlite` is not supported yet

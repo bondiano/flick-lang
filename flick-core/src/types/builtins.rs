@@ -336,6 +336,7 @@ pub fn builtins() -> &'static [Interface] {
             let options = super::Options {
                 local: &local,
                 limits: super::Limits::default(),
+                sql: Default::default(),
             };
             diagnostics.extend(super::check(
                 &module,

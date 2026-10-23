@@ -35,6 +35,7 @@ pub(crate) fn check_text(
     let options = types::Options {
         local: &local,
         limits: types::Limits::default(),
+        sql: Default::default(),
     };
     let (more, typing) = types::check_typed(
         &module,

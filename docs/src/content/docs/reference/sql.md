@@ -6,6 +6,11 @@ Flick checks queries for PostgreSQL against tables declared in source. A
 query is a pure value: building and binding it does no I/O. Only
 `Database.query` and `Database.execute` talk to the database.
 
+The dialect is `[sql] dialect` in `flick.toml` (see
+[project.md](../project/)); `postgresql`, the default, is the only supported
+one. The dialect gives the column types below, the functions of queries and
+the tag of templates (`Sql.Template Pg p r`).
+
 ## Tables
 
 ```flick

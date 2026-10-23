@@ -50,6 +50,7 @@ mod unify;
 pub use bindings::{LetParts, let_parts, signature_name};
 pub use builtins::{builtin_sources, builtins};
 pub use classes::Dict;
+pub(crate) use classes::{Match, match_type};
 pub use convert::is_type;
 pub use decls::class_defaults;
 pub use display::show_type;
@@ -57,7 +58,8 @@ pub use env::{Abi, Form, Fundep, Instance, JsClass, Operation, Rep, TypeDef};
 pub use kinds::Kind;
 pub use patterns::is_pattern;
 pub use schemas::{companion_name, witness_entity};
-pub(crate) use sql::SQL_TYPES;
+pub(crate) use sql::base_type;
+pub use sql::dialect::{self, Dialect};
 pub use ty::{Binder, Effects, PRELUDE, Row, Type};
 pub use typing::{
     CodecBlock, Constructor, ForeignInfo, InstanceInfo, Lift, Owner, Range, Ref, SchemaItem,
@@ -101,6 +103,8 @@ pub struct Options<'a> {
     /// package of a class or of the type an instance is for may declare it.
     pub local: &'a dyn Fn(&str) -> bool,
     pub limits: Limits,
+    /// The SQL dialect of `sql table` and `sql { … }`.
+    pub sql: &'static Dialect,
 }
 
 /// Type-checks `module` and stores the types of its exports in `interface`.
@@ -173,6 +177,7 @@ fn run(
         predicates: HashMap::new(),
         field_path: Vec::new(),
     };
+    checker.typing.sql_dialect = options.sql;
     checker.module(module.tree);
     checker.fill(interface);
     let typing = checker.finish_typing();

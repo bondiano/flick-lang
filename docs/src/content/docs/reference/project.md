@@ -2,7 +2,7 @@
 title: "Project"
 ---
 
-A project is a directory with `flick.toml` (§12). Commands find the nearest
+A project is a directory with `flick.toml` (see [The Flick CLI](../../spec/12-cli/)). Commands find the nearest
 `flick.toml` from the working directory upwards; `--project <path>` selects a
 project directory or a configuration file explicitly.
 
@@ -24,6 +24,9 @@ emit = "js"
 emit-dts = false
 promise-facade = false
 schema-aot = false
+
+[sql]
+dialect = "postgresql"
 ```
 
 | Key | Values | Default |
@@ -41,6 +44,7 @@ schema-aot = false
 | `build.schema-aot` | boolean | `false` |
 | `build.solver-steps` | instance resolution steps per definition | `100000` |
 | `build.solver-depth` | depth of nested class constraints | `256` |
+| `sql.dialect` | the SQL dialect of `sql table` and `sql { … }` (see [sql.md](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` and `"oracle"` are recognized but not supported yet | `"postgresql"` |
 
 Errors in the configuration exit with code `2`:
 
@@ -51,6 +55,8 @@ Errors in the configuration exit with code `2`:
 | `kind = "app"` without `entry` | `FLICK-P007` |
 | no project found, or `--project` names none | `FLICK-P008` |
 | `entry` is not a source module that exports `main` | `FLICK-P011` |
+| `sql.dialect` names a dialect that is not supported yet | `FLICK-P022` |
+| `sql.dialect` names no dialect; the message lists the known ones | `FLICK-P023` |
 
 ## `flick check`
 
