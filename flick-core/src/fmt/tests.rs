@@ -117,3 +117,15 @@ fn drops_empty_arrow_rows() {
     k : A ->{} B
     ");
 }
+
+#[test]
+fn hugging_parentheses_do_not_push_a_piece_past_the_width() {
+    // the `)` after the last operator piece used to make a 101-column line
+    let src = "let main () =\n  Platform.stdout_line\n    (\"max: \" ++ show (count (Schedule.max (NonEmpty.consxxxxxxxx (Schedule.recurs 1) [Schedule.recurs 3]))))\n";
+    let out = fmt(src);
+    assert_eq!(fmt(&out), out, "wrapping is idempotent");
+    assert!(
+        out.lines().all(|l| l.chars().count() <= wrap::WIDTH),
+        "{out}"
+    );
+}

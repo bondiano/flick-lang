@@ -1,0 +1,6 @@
+// A qualified type the module does not export is reported, not taken as an error type.
+module App.Missing exposing (x)
+
+x : List.Nope
+//  ^^^^^^^^^ FLICK-T001 `List` does not export type `Nope`
+let x = 1

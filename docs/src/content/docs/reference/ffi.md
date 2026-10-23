@@ -56,7 +56,8 @@ passed (`FLICK-G001`).
 ## Callbacks
 
 A Flick function passed to JS is adapted to the JS arity of its type:
-`(a -> b -> c)` arrives as `(a, b) => c`. There are four families:
+`(a -> b -> c)` arrives as `(a, b) => c`. Only an argument of the binding is adapted: a function
+inside a record, a list or an `Option` arrives curried, as Flick holds it. There are four families:
 
 | Family | JS gets | Runs |
 | - | - | - |

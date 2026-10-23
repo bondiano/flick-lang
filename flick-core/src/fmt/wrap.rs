@@ -261,7 +261,8 @@ impl Long<'_> {
                 first.append(&mut pieces[0].1);
                 pieces[0] = (self.indent, first);
                 pieces.last_mut()?.1.extend_from_slice(&toks[close..]);
-                return Some(pieces);
+                // the hugging brackets may push a piece past the width again
+                return Some(self.recurse(pieces));
             }
         }
         let mut pieces = vec![(self.indent, toks[..=open].to_vec())];

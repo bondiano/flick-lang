@@ -456,11 +456,15 @@ impl Checker<'_> {
                 );
                 return None;
             };
-            interface?
-                .find(Namespace::Type, name)?
-                .entity
-                .module
-                .clone()
+            let Some(export) = interface?.find(Namespace::Type, name) else {
+                self.error(
+                    codes::T001,
+                    self.span(node),
+                    format!("`{qualifier}` does not export type `{name}`"),
+                );
+                return None;
+            };
+            export.entity.module.clone()
         };
         let def = match self.env.type_def(&module, name) {
             Some(def) => def.clone(),
@@ -472,9 +476,10 @@ impl Checker<'_> {
         Some((module, def))
     }
 
-    /// The module of the service `S` in `S.Impl`, when `S` is not a module.
+    /// The module of the service `S` in `S.Impl`: a service in scope wins
+    /// over a module of its name, as it does for `S.operation`.
     fn service_module(&self, qualifier: &str, name: &str) -> Option<String> {
-        if name != "Impl" || self.env.qualified_module(qualifier).is_some() {
+        if name != "Impl" {
             return None;
         }
         let Found::Entity(entity) = self.env.find(Namespace::Type, qualifier) else {

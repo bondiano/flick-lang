@@ -1,0 +1,13 @@
+// A service of the program named like a built-in module: `Log.Impl` is the
+// service's implementation record, not a type of the built-in `Log`.
+module App.Ticks exposing (..)
+
+service Log =
+  now : Unit ->{} Number
+
+js_now : Unit ->{} Number
+foreign sync js_now from global "Date.now"
+  arity 0
+
+impl : Log.Impl
+let impl = { now = js_now }
