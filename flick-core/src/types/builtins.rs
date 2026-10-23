@@ -10,7 +10,7 @@ use crate::source::SourceMap;
 use crate::syntax;
 
 /// In dependency order: each module sees the ones before it.
-const SOURCES: [(&str, &str); 39] = [
+const SOURCES: [(&str, &str); 41] = [
     ("Prelude", include_str!("builtins/Prelude.fl")),
     ("Instances", include_str!("builtins/Instances.fl")),
     ("Record", include_str!("builtins/Record.fl")),
@@ -44,6 +44,8 @@ const SOURCES: [(&str, &str); 39] = [
     ("File", include_str!("builtins/File.fl")),
     ("Resource", include_str!("builtins/Resource.fl")),
     ("Events", include_str!("builtins/Events.fl")),
+    ("Ui", include_str!("builtins/Ui.fl")),
+    ("Ui.Event", include_str!("builtins/Ui/Event.fl")),
     ("Gen", include_str!("builtins/Gen.fl")),
     ("Checks", include_str!("builtins/Checks.fl")),
     ("Schema", include_str!("builtins/Schema.fl")),
@@ -144,6 +146,8 @@ mod tests {
                 "File",
                 "Resource",
                 "Events",
+                "Ui",
+                "Ui.Event",
                 "Gen",
                 "Checks",
                 "Schema",

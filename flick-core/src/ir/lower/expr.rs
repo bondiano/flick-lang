@@ -84,6 +84,13 @@ impl Lower<'_> {
                 return self.function(&params, body, stages, span);
             }
             K::Block => return self.block(node),
+            // `ui { … }` only opens the names of `Ui`, which the checker resolved
+            K::UiExpr => {
+                return match children.iter().find(|n| n.kind == K::Block) {
+                    Some(body) => self.block(body),
+                    None => Expr::new(ExprKind::Lit(Lit::Unit), span),
+                };
+            }
             K::IfExpr => ExprKind::If(
                 self.boxed(children[0]),
                 self.boxed(children[1]),

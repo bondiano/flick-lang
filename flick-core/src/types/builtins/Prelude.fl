@@ -23,6 +23,10 @@ type Layer (ri : ServiceRow) (e : ErrorRow) (ro : ServiceRow)
 type Codec (rd : ServiceRow) (re : ServiceRow) i a
 type Errors (e : ErrorRow)
 
+/// A user interface whose event handlers need `r` and fail with `e`: see
+/// the module `Ui`.
+type Ui (r : ServiceRow) (e : ErrorRow)
+
 /// A service named as a value, as in `Layer.succeed Clock clock_impl`.
 type ServiceTag (r : ServiceRow)
 

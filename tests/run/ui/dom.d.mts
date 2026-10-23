@@ -1,0 +1,6 @@
+export declare const setup: () => undefined;
+export declare const click: (label: string) => void;
+export declare const settle: () => Promise<undefined>;
+export declare const text: () => string;
+export declare const markup: () => string;
+export declare const Badge: (props: { label: string }) => string;

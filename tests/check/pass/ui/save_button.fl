@@ -1,0 +1,44 @@
+// The two forms of `save_button` (spec §10): the `Ui` functions and the
+// `ui { … }` block, which only opens the names of `Ui`.
+module App.SaveButton exposing (..)
+
+type error SaveError = SaveError String
+
+service Users =
+  save : String ->{; SaveError} Unit
+
+type alias SaveButtonProps c =
+  {
+    label : String
+    disabled : Bool
+    on_save : (Unit ->{Users; SaveError} Unit)^c
+  }
+
+save_button : forall c. SaveButtonProps c -> (Ui {Users} {SaveError})^c
+let save_button props =
+  Ui.button
+    {
+      disabled = props.disabled
+      on_click = Ui.Event.exhaust (fun _ ->
+        task { props.on_save () }
+      )
+    }
+    [Ui.text props.label]
+
+save_button_ui : forall c. SaveButtonProps c -> (Ui {Users} {SaveError})^c
+let save_button_ui props =
+  ui {
+    button
+      {
+        disabled = props.disabled
+        on_click = Ui.Event.exhaust (fun _ ->
+          task { props.on_save () }
+        )
+      }
+      [text props.label]
+  }
+
+type alias User = { id : Number; name : String }
+
+users : Ui.SelectProps User {Users} {SaveError} c -> (Ui {Users} {SaveError})^c
+let users props = Ui.select props

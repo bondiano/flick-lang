@@ -1,0 +1,76 @@
+// What the UI library refuses: props that are not exactly the record,
+// state read while rendering, a handler without a policy, a handler that
+// escapes the scope of a file it holds, a select whose fields disagree on
+// the item, a string where a checked URL is needed and a policy bound that
+// is not a positive integer.
+module App.Props exposing (..)
+
+type error SaveError = SaveError String
+
+type alias User = { id : Number; name : String }
+
+type alias Product = { sku : String }
+
+service Users =
+  save : String ->{; SaveError} Unit
+
+noop : Ui.Handler Ui.ClickSnapshot {Users} {SaveError}
+let noop = Ui.Event.exhaust (fun _ -> task { Users.save "x" })
+
+typo : Ui {Users} {SaveError}
+let typo = Ui.button { disabled = false; on_clik = noop } []
+//                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 the value has field `on_clik`
+
+missing : Ui {Users} {SaveError}
+let missing = Ui.button { on_click = noop } []
+//                      ^^^^^^^^^^^^^^^^^^^ FLICK-T003 field `disabled` is missing
+
+wrong : Ui {Users} {SaveError}
+let wrong = Ui.button { disabled = "no"; on_click = noop } []
+//                                 ^^^^ FLICK-T003 expected `Bool`, found `String`
+
+counter : Ref Number -> Ui none none
+let counter count = Ui.text (show (Ref.get count))
+//                                 ^^^^^^^^^^^^^ FLICK-E001 runtime call
+
+no_policy : Ui {Users} {SaveError}
+let no_policy = Ui.button { disabled = false; on_click = fun _ -> task { Users.save "x" } } []
+//                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 expected `Handler
+
+held : forall c. File.Path ->{File.FileSystem; File.OpenError}
+  (Ui {File.FileSystem} {File.ReadError})^c
+let held path =
+  scope {
+    let file = File.open_scoped path
+    Ui.button
+      {
+        disabled = false
+        on_click = Ui.Event.exhaust (fun _ -> task { ignore (File.read_all file) })
+      }
+      []
+  }
+//~ FLICK-G001 @45:5-50:9 holds region `s`
+
+mixed : Ui.SelectProps User {Users} {SaveError} c -> (Ui {Users} {SaveError})^c
+let mixed props =
+  Ui.select
+    {
+      items = props.items
+      selected = props.selected
+      key = props.key
+      render_item = props.render_item
+      on_change = Ui.Event.latest (fun (product : Product) -> task { Users.save product.sku })
+    }
+//~ FLICK-T003 @62:19-62:95 expected `Handler { id : Number; name : String }
+
+link : Ui none none
+let link = Ui.link { href = "javascript:alert(1)" } [Ui.text "x"]
+//                          ^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 expected `SafeUrl`, found `String`
+
+overflow : Ui.Handler Ui.ClickSnapshot {Users} {SaveError}
+let overflow = Ui.Event.queue 0 (fun _ -> task { Users.save "x" })
+//                            ^ FLICK-U001 the capacity of `Ui.Event.queue` must be a positive integer
+
+too_many : Ui.Handler Ui.ClickSnapshot {Users} {SaveError}
+let too_many = Ui.Event.concurrent 1.5 (fun _ -> task { Users.save "x" })
+//                                 ^^^ FLICK-U001 the limit

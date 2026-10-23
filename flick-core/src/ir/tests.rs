@@ -109,3 +109,23 @@ fn dump() {
         super::print(&lower_text("Dump", &text).expect("lowers"))
     );
 }
+
+#[test]
+fn both_forms_of_save_button_lower_to_the_same_ir() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/check/pass/ui/save_button.fl");
+    let text = fs::read_to_string(path).expect("utf-8");
+    let ir = lower_text("App", &text).expect("lowers");
+    let body = |wanted: &str| {
+        ir.items
+            .iter()
+            .find_map(|item| match &item.kind {
+                super::ItemKind::Value { name, body, .. } if name == wanted => {
+                    Some(super::print::expr(body))
+                }
+                _ => None,
+            })
+            .expect("defined")
+    };
+    assert!(body("save_button").contains("Ui.button"));
+    assert_eq!(body("save_button"), body("save_button_ui"));
+}

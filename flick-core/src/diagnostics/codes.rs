@@ -178,6 +178,7 @@ codes! {
     D005 = Schema 5, "two codec fields share a wire name";
     D006 = Schema 6, "constant fails the check of its refined type";
     D007 = Schema 7, "codec block over a schema that is not a record";
+    U001 = Ui 1, "event policy needs a positive integer";
     P001 = Project 1, "cannot read source file";
     P002 = Project 2, "file is not formatted";
     P003 = Project 3, "internal formatter error";

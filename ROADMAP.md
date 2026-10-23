@@ -871,24 +871,31 @@ Schema и SQL».
 - `Ui.text` безопасный канал; `SafeUrl`, `SanitizedHtml` opaque.
 - Foreign React components через FFI pipeline как opaque renderer components.
 
-**Артефакты.** `flick-core::dsl::ui`, `stdlib/Ui/*`, `runtime/src/ui/react/*`.
+**Артефакты.** Встроенные модули `Ui` и `Ui.Event`, тип `Ui r e` в Prelude,
+`ui { … }` открывает имена `Ui` (`flick-core::types` — флаг `ui` при выводе
+имён; IR тот же, что у `Ui.*`), `FLICK-U001` для констант capacity/limit,
+`runtime/src/ui/react/*` (подпуть `@flick-lang/runtime/ui`, React 19 — peer
+dependency), справка — `docs/reference/ui.md`. `Ui.text` — `forall r e.
+String -> Ui r e`, чтобы стоять среди детей любого элемента; `Ui.run` берёт
+модель как `Ref m` и перерисовывает после каждой задачи; `on_change` у
+`SelectProps` — `Ui.Handler a r e`, потому что policy обязательна.
 
 **AC**
 
-- [ ] `save_button` (обе формы §10) компилируется в одинаковый IR.
-- [ ] Неверный prop, опечатка, отсутствующее обязательное поле — ошибки (§13).
-- [ ] Runtime-вызов (например, `Ref.get`) в render отвергается (§13).
-- [ ] Handler без policy не компилируется (нет fire-and-forget).
-- [ ] Кнопка, чей handler захватил file из закрытого scope, не может быть
+- [x] `save_button` (обе формы §10) компилируется в одинаковый IR.
+- [x] Неверный prop, опечатка, отсутствующее обязательное поле — ошибки (§13).
+- [x] Runtime-вызов (например, `Ref.get`) в render отвергается (§13).
+- [x] Handler без policy не компилируется (нет fire-and-forget).
+- [x] Кнопка, чей handler захватил file из закрытого scope, не может быть
       возвращена из scope (§13).
-- [ ] `SelectProps` с `items : List User` и `on_change` для `Product` отвергается.
-- [ ] `exhaust` игнорирует клики во время задачи; `latest` отменяет прежнюю и ждёт
+- [x] `SelectProps` с `items : List User` и `on_change` для `Product` отвергается.
+- [x] `exhaust` игнорирует клики во время задачи; `latest` отменяет прежнюю и ждёт
       quiescence; `queue`/`concurrent` при переполнении отвергают событие и
       сообщают supervisor infrastructure defect (тесты в jsdom или happy-dom) (§13).
-- [ ] Unmount: приём событий закрыт синхронно; ресурсы освобождаются только после
+- [x] Unmount: приём событий закрыт синхронно; ресурсы освобождаются только после
       join задач (тест на порядок событий) (§13).
-- [ ] `Ui.text "<script>"` рендерится как текст; `String` не принимается вместо `SafeUrl`.
-- [ ] E2E: пример-приложение собирается в ESM и монтируется в jsdom с реальным React 19.
+- [x] `Ui.text "<script>"` рендерится как текст; `String` не принимается вместо `SafeUrl`.
+- [x] E2E: пример-приложение собирается в ESM и монтируется в jsdom с реальным React 19.
 
 ---
 

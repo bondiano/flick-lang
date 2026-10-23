@@ -135,8 +135,17 @@ impl Checker<'_> {
             K::ProvideExpr => self.provide(node, None),
             K::SchemaExpr => self.schema_expr(node),
             K::CodecExpr => self.codec_expr(node, None),
-            // shortcut: SQL, UI and CLI blocks are typed by their elaboration
-            K::SqlExpr | K::UiExpr | K::CliExpr => self.fresh(),
+            K::UiExpr => {
+                self.ui += 1;
+                let ty = node
+                    .nodes()
+                    .find(|n| n.kind == K::Block)
+                    .map_or(Type::Error, |b| self.block(b, None));
+                self.ui -= 1;
+                ty
+            }
+            // shortcut: SQL and CLI blocks are typed by their elaboration
+            K::SqlExpr | K::CliExpr => self.fresh(),
             _ => Type::Error,
         }
     }

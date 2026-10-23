@@ -48,7 +48,7 @@ const MATRIX: Readonly<Record<string, ReadonlyArray<string>>> = {
   Equal: ["symbol"],
   Hash: ["symbol"],
   Scope: ["make", "close", "addFinalizer", "Scope"],
-  Fiber: ["await", "join", "interrupt", "interruptAll"],
+  Fiber: ["await", "awaitAll", "join", "interrupt", "interruptAll"],
   Layer: ["buildWithScope", "succeed", "merge"],
   Cause: ["fromReasons", "combine", "hasDies", "hasFails", "hasInterruptsOnly", "pretty"],
   Context: ["Reference", "Service"],

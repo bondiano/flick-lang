@@ -1,0 +1,81 @@
+// A counter mounted with React 19 in jsdom: handlers run as tasks under
+// their policies, the view renders again after each task, a failure goes to
+// the supervisor, text stays text, and closing the scope unmounts the root.
+module App.Main exposing (main)
+
+type error Refused = Refused String
+  deriving Show
+
+setup : Unit ->{} Unit
+foreign sync setup from "./dom.mjs" "setup"
+  arity 0
+
+click : String ->{} Unit
+foreign sync click from "./dom.mjs" "click"
+  arity 1
+
+settle : Unit ->{} Unit
+foreign async settle from "./dom.mjs" "settle"
+  arity 0
+
+text : Unit ->{} String
+foreign sync text from "./dom.mjs" "text"
+  arity 0
+
+markup : Unit ->{} String
+foreign sync markup from "./dom.mjs" "markup"
+  arity 0
+
+badge : Ui.Component { label : String }
+foreign pure badge from "./dom.mjs" "Badge"
+
+counter : Ref Number -> Number -> Ui none {Refused}
+let counter model n =
+  ui {
+    div
+      { class_name = "counter" }
+      [
+        heading [text ("count " ++ show n)],
+        button
+          {
+            disabled = false
+            on_click = Ui.Event.exhaust (fun _ -> task { Ref.set model (n + 1) })
+          }
+          [text "+1"],
+        button
+          {
+            disabled = false
+            on_click = Ui.Event.latest (fun _ -> task { from_result (Err (Refused "no")) })
+          }
+          [text "refuse"],
+        paragraph [text "<b>bold?</b>"],
+        component badge { label = "new" }
+      ]
+  }
+
+report : Failure e ->{} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  setup ()
+  let model = Ref.make 0
+  let found = Ui.container "app"
+  match found with
+  | None -> Platform.stdout_line "no container"
+  | Some root ->
+    scope s {
+      let ui = Fiber.spawn s report (task { Ui.run root report model (fun n -> counter model n) })
+      settle ()
+      Platform.stdout_line (text ())
+      click "+1"
+      settle ()
+      click "+1"
+      settle ()
+      Platform.stdout_line (text ())
+      click "refuse"
+      settle ()
+      Platform.stdout_line (markup ())
+    }
+    Platform.stdout_line ("after the scope: [" ++ text () ++ "]")

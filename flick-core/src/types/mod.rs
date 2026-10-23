@@ -39,6 +39,7 @@ mod services;
 mod toplevel;
 mod ty;
 mod typing;
+mod ui;
 mod unify;
 
 pub use bindings::{LetParts, let_parts, signature_name};
@@ -148,6 +149,7 @@ fn run(
         kinds: KindStore::default(),
         diagnostics: Vec::new(),
         locals: Vec::new(),
+        ui: 0,
         tyvars: Vec::new(),
         runtime: false,
         stage: effects::Stage::default(),
@@ -208,6 +210,9 @@ struct Checker<'a> {
     kinds: KindStore,
     diagnostics: Vec<Diagnostic>,
     locals: Vec<Local>,
+    /// How many `ui { … }` blocks enclose the expression: inside one, the
+    /// names `Ui` exports need no `Ui.`.
+    ui: usize,
     tyvars: Vec<TyVar>,
     /// Whether the expression being inferred runs a runtime call at this
     /// stage; lambdas and `task` bodies are deferred and do not count.
