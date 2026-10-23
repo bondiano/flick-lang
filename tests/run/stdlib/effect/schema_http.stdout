@@ -1,0 +1,12 @@
+headers: [("x-id", "7")] -> {"x-id":"7"}
+url_params: [("a", "1"), ("a", "2")] -> [["a","1"],["a","2"]]
+cookie: sid -> "sid=abc; Path=/" | err (root): an invalid value
+cookies: Cookies [Cookie "a=<redacted>", Cookie "b=<redacted>"] -> ["a=1","b=2"]
+url: https://example.com/a?b=1 -> "https://example.com/a?b=1" | err (root): an invalid value
+string_tree: { age = 30, name = "Ann" } -> {"age":"30","name":"Ann"}
+from_url_params: { age = 4, name = "Bo" } -> [["age","4"],["name","Bo"]]
+from_cookies: { age = 5, name = "Cy" } -> ["age=5","name=Cy"]
+json_url_params_field: [1, 2] -> [["q","[1,2]"]] | err q: a missing key
+from_url_search_params: { tags = ["x", "y"], user = { name = "Di" } } -> "tags=x&tags=y&user%5Bname%5D=Di"
+from_form_data: { tags = ["z"], user = { name = "Ed" } } -> [["tags","z"],["user[name]","Ed"]]
+export: refused: T -> JSON Schema: a fallible transformation has no JSON Schema form

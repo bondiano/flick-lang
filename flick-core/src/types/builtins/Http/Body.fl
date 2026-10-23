@@ -1,7 +1,9 @@
 /// Effect's `HttpBody`: the body of a request or a response, with its
-/// content type. Bytes are lists of numbers from 0 to 255. Streamed and
-/// file bodies wait for Flick's streams.
+/// content type. Bytes are lists of numbers from 0 to 255. A streamed body
+/// holds no services or region; its stream's failure ends the body.
 module Http.Body exposing (..)
+
+import Stream.Core exposing (Stream)
 
 /// A body.
 type Body
@@ -74,3 +76,36 @@ foreign pure content_length from "@flick-lang/runtime/effect/http/HttpBody" "fli
 to_text : Body -> Option String
 foreign pure to_text from "@flick-lang/runtime/effect/http/HttpBody" "flickToText"
   reviewed "effect@4.0.5 sha256:989b9d895700352a"
+
+/// The chunks of bytes of the stream, of the content type or
+/// `application/octet-stream`, and of the length if it is known.
+stream : forall e. Stream none e (List Number) -> Option String -> Option Number -> Body
+foreign pure stream from "@flick-lang/runtime/effect/http/HttpBody" "flickStream"
+  arity 3
+  reviewed "effect@4.0.5 sha256:52e3ba8e5568e864"
+
+/// Which part of a file `file` streams: at most `bytesToRead` bytes from
+/// `offset`, in chunks of `chunkSize`; and the content type.
+type alias FileOptions =
+  {
+    offset : Option ByteSize.ByteSize;
+    bytesToRead : Option ByteSize.ByteSize;
+    chunkSize : Option Number;
+    contentType : Option String
+  }
+
+/// The whole file, `application/octet-stream`.
+file_options : FileOptions
+let file_options = { offset = None; bytesToRead = None; chunkSize = None; contentType = None }
+
+/// The file at the path, of the size `stat` told: its length is that of
+/// the part the options choose. The bytes are read when the body is sent.
+file_from_info :
+  FileOptions -> String -> FileSystem.Info ->{FileSystem.FileSystem; PlatformError.PlatformError} Body
+foreign effect file_from_info from "@flick-lang/runtime/effect/http/HttpBody" "flickFileFromInfo"
+  arity 3
+  reviewed "effect@4.0.5 sha256:9488e0fdf507824a"
+
+/// The file at the path, as `file_from_info` of its `stat`.
+file : FileOptions -> String ->{FileSystem.FileSystem; PlatformError.PlatformError} Body
+let file options path = file_from_info options path (FileSystem.stat path)

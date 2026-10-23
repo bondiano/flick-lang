@@ -17,7 +17,9 @@ import { codecDecode, codecEncode } from "../schema/index.ts";
 import type { SchemaError } from "../schema/issues.ts";
 import type { AnySchema } from "../schema/schemas.ts";
 import { tag } from "../tags.ts";
-import type { Api, Endpoint, Security } from "./model.ts";
+import { multipartStatusOf } from "../effect/http/Multipart.ts";
+import { otherPayload, otherSuccess, unwrapExtras } from "./encodings.ts";
+import { type Api, type Endpoint, hasPayload, type Security, typed } from "./model.ts";
 import { httpApiOpenApi } from "./openapi.ts";
 
 type Handler = (request: unknown) => Effect.Effect<unknown, unknown, unknown>;
@@ -46,8 +48,13 @@ const serveError = (message: string): ServeError => ({ _tag: tag("HttpApi.ServeE
 const decode = (codec: AnySchema | null, input: unknown, extra: "refuse" | "ignore" = "refuse"): Effect.Effect<unknown, SchemaError, unknown> =>
   codec === null ? Effect.succeed(undefined) : codecDecode(codec, input, extra);
 
-const badRequest = (error: SchemaError): HttpServerResponse.HttpServerResponse =>
-  HttpServerResponse.jsonUnsafe({ error: "BadRequest", issues: error._0 }, { status: 400 });
+/** 400 with the issues of a request that does not decode, or the status of a form's `MultipartError`. */
+const badRequest = (error: unknown): HttpServerResponse.HttpServerResponse => {
+  const status = multipartStatusOf(error);
+  return status === undefined
+    ? HttpServerResponse.jsonUnsafe({ error: "BadRequest", issues: typed<SchemaError>(error)._0 }, { status: 400 })
+    : HttpServerResponse.empty({ status });
+};
 
 const internal = (): HttpServerResponse.HttpServerResponse =>
   HttpServerResponse.jsonUnsafe({ error: "InternalServerError" }, { status: 500 });
@@ -92,20 +99,25 @@ const failed = (endpoint: Endpoint, error: unknown): Effect.Effect<HttpServerRes
   });
 };
 
-const succeeded = (
-  endpoint: Endpoint,
-  value: unknown,
-): Effect.Effect<HttpServerResponse.HttpServerResponse, never, unknown> => {
+const successBody = (endpoint: Endpoint, value: unknown): Effect.Effect<HttpServerResponse.HttpServerResponse, unknown, unknown> => {
+  const other = otherSuccess(endpoint, value);
+  if (other !== undefined) return Effect.succeed(other);
   const codec = endpoint.success;
   if (codec === null) return Effect.succeed(HttpServerResponse.empty({ status: endpoint.status }));
-  return Effect.match(codecEncode(codec, value), {
-    onFailure: internal,
-    onSuccess: (encoded) =>
-      endpoint.successEncoding === "text"
-        ? HttpServerResponse.text(String(encoded), { status: endpoint.status })
-        : HttpServerResponse.jsonUnsafe(encoded, { status: endpoint.status }),
-  });
+  return Effect.map(codecEncode(codec, value), (encoded) =>
+    endpoint.successEncoding === "text"
+      ? HttpServerResponse.text(String(encoded), { status: endpoint.status })
+      : HttpServerResponse.jsonUnsafe(encoded, { status: endpoint.status }),
+  );
 };
+
+const succeeded = (endpoint: Endpoint, value: unknown): Effect.Effect<HttpServerResponse.HttpServerResponse, never, unknown> =>
+  Effect.orElseSucceed(
+    Effect.flatMap(unwrapExtras(endpoint.successExtras, value), ([inner, extras]) =>
+      Effect.flatMap(successBody(endpoint, inner), extras),
+    ),
+    internal,
+  );
 
 /** A middleware hook's result: the effect of a runtime function, or nothing of a lifted pure one. */
 const effectOf = (value: unknown): Effect.Effect<unknown, unknown, unknown> =>
@@ -139,14 +151,15 @@ const route =
       const params = yield* HttpRouter.params;
       const url = new URL(request.url, "http://localhost");
       if (!authorized(endpoint.security, request, url)) return unauthorized();
-      const payload = endpoint.payload === null ? undefined : yield* body(request, endpoint.payloadEncoding);
+      const other = ["multipart", "bytes", "parts"].includes(endpoint.payloadEncoding);
+      const payload = !hasPayload(endpoint) || other ? undefined : yield* body(request, endpoint.payloadEncoding);
       const decoded = yield* Effect.result(
         Effect.all({
           path: decode(endpoint.params, params),
           query: decode(endpoint.query, Object.fromEntries(url.searchParams)),
           // a request has more headers than any endpoint declares
           headers: decode(endpoint.headers, request.headers, "ignore"),
-          payload: decode(endpoint.payload, payload),
+          payload: other ? otherPayload(endpoint, request) : decode(endpoint.payload, payload),
         }),
       );
       if (Result.isFailure(decoded)) return badRequest(decoded.failure);

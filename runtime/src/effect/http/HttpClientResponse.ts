@@ -1,12 +1,13 @@
 // Effect's `HttpClientResponse` for the bindings of the standard library:
 // reading the body fails with the Flick `Http.ClientError.HttpClientError`.
-import { Effect, Option } from "effect";
+import { Effect, Option, Stream } from "effect";
+import * as HttpClientError from "effect/http/HttpClientError";
 import * as Response from "effect/http/HttpClientResponse";
 
 import { type AnySchema, codecDecode } from "../../schema/index.ts";
 import { fromBytes } from "./convert.ts";
 import { flickToUnknown as headersToUnknown } from "./Headers.ts";
-import { mapError } from "./HttpClientError.ts";
+import { mapError, toFlick } from "./HttpClientError.ts";
 import { flickToUnknown } from "./UrlParams.ts";
 
 export * from "effect/http/HttpClientResponse";
@@ -22,6 +23,12 @@ export const flickText = (self: R) => mapError(self.text);
 export const flickJson = (self: R) => mapError(self.json);
 export const flickUrlParamsBody = (self: R) => mapError(self.urlParamsBody);
 export const flickBytes = (self: R) => mapError(Effect.map(self.arrayBuffer, fromBytes));
+
+export const flickStream = (self: R) =>
+  Stream.map(
+    Stream.mapError(self.stream, (e) => (HttpClientError.isHttpClientError(e) ? toFlick(e) : e)),
+    fromBytes,
+  );
 
 /** The text fields of a form body. */
 export const flickFormData = (self: R) =>

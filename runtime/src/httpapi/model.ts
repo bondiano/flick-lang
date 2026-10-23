@@ -17,6 +17,24 @@ export interface ErrorCase {
   readonly codec: AnySchema;
 }
 
+export type PayloadEncoding = "json" | "text" | "form" | "multipart" | "bytes" | "parts";
+
+export type SuccessEncoding = "json" | "text" | "bytes" | "stream" | "sse" | "events";
+
+/** `(value, extra)` answered by the handler: headers of the codec, or the value of the cookie `key`. */
+export type SuccessExtra = { readonly kind: "headers"; readonly codec: AnySchema } | { readonly kind: "cookie"; readonly key: string };
+
+/** A value of the type the checker gave it by the endpoint: a handler's value or a call's payload. */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion, typescript/no-unnecessary-type-parameters -- the checker typed the value by the endpoint's signature
+export const typed = <A>(value: unknown): A => value as A;
+
+/** Whether the endpoint reads a body: one of a codec, or bytes or parts. */
+export const hasPayload = (e: Endpoint): boolean => e.payload !== null || e.payloadEncoding === "bytes" || e.payloadEncoding === "parts";
+
+/** Whether the success has a body: one of a codec, or bytes, a stream or events. */
+export const hasSuccessBody = (e: Endpoint): boolean =>
+  e.success !== null || e.successEncoding === "bytes" || e.successEncoding === "stream" || e.successEncoding === "events";
+
 /** `HttpApi.Endpoint l f`. */
 export interface Endpoint {
   readonly name: string;
@@ -26,11 +44,20 @@ export interface Endpoint {
   readonly query: AnySchema | null;
   readonly headers: AnySchema | null;
   readonly payload: AnySchema | null;
-  /** How the body is written: JSON, plain text or a URL-encoded form. */
-  readonly payloadEncoding: "json" | "text" | "form";
+  /**
+   * How the body is written: JSON, plain text, a URL-encoded or multipart
+   * form, bytes, or the parts of a form as a stream (these two without a codec).
+   */
+  readonly payloadEncoding: PayloadEncoding;
   readonly status: number;
-  readonly successEncoding: "json" | "text";
+  /**
+   * How the success is written: JSON, plain text, bytes, a stream of bytes,
+   * Server-Sent Events of JSON data (with the codec of the data) or events.
+   */
+  readonly successEncoding: SuccessEncoding;
   readonly success: AnySchema | null;
+  /** What the handler answers besides the value, innermost first: response headers, a cookie. */
+  readonly successExtras: ReadonlyArray<SuccessExtra>;
   readonly errors: ReadonlyArray<ErrorCase>;
   readonly description: string;
   readonly security: ReadonlyArray<Security>;
@@ -93,6 +120,7 @@ export const httpApiEndpoint = (method: { readonly _tag: string }, path: string,
     status: 204,
     successEncoding: "json",
     success: null,
+    successExtras: [],
     errors: [],
     description: "",
     security: [],
@@ -106,7 +134,8 @@ const update = (endpoint: Endpoint, change: Partial<Endpoint>): Endpoint => Obje
 export const httpApiWithPath = (codec: AnySchema, e: Endpoint): Endpoint => update(e, { params: codec });
 export const httpApiWithQuery = (codec: AnySchema, e: Endpoint): Endpoint => update(e, { query: codec });
 export const httpApiWithHeaders = (codec: AnySchema, e: Endpoint): Endpoint => update(e, { headers: codec });
-export const httpApiWithPayload = (codec: AnySchema, e: Endpoint): Endpoint => update(e, { payload: codec });
+export const httpApiWithPayload = (codec: AnySchema, e: Endpoint): Endpoint =>
+  update(e, { payload: codec, payloadEncoding: "json" });
 export const httpApiWithTextPayload = (text: AnySchema, e: Endpoint): Endpoint =>
   update(e, { payload: text, payloadEncoding: "text" });
 export const httpApiWithFormPayload = (codec: AnySchema, e: Endpoint): Endpoint =>
@@ -114,7 +143,29 @@ export const httpApiWithFormPayload = (codec: AnySchema, e: Endpoint): Endpoint 
 export const httpApiWithTextSuccess = (status: number, text: AnySchema, e: Endpoint): Endpoint =>
   update(e, { status, success: text, successEncoding: "text" });
 export const httpApiWithSuccess = (status: number, codec: AnySchema, e: Endpoint): Endpoint =>
-  update(e, { status, success: codec });
+  update(e, { status, success: codec, successEncoding: "json" });
+export const httpApiWithBytesPayload = (e: Endpoint): Endpoint => update(e, { payload: null, payloadEncoding: "bytes" });
+export const httpApiWithMultipartPayload = (codec: AnySchema, e: Endpoint): Endpoint =>
+  update(e, { payload: codec, payloadEncoding: "multipart" });
+export const httpApiWithMultipartStreamPayload = (e: Endpoint): Endpoint => update(e, { payload: null, payloadEncoding: "parts" });
+export const httpApiWithBytesSuccess = (status: number, e: Endpoint): Endpoint =>
+  update(e, { status, success: null, successEncoding: "bytes" });
+export const httpApiWithStreamSuccess = (status: number, e: Endpoint): Endpoint =>
+  update(e, { status, success: null, successEncoding: "stream" });
+export const httpApiWithSseSuccess = (status: number, codec: AnySchema, e: Endpoint): Endpoint =>
+  update(e, { status, success: codec, successEncoding: "sse" });
+export const httpApiWithSseEventsSuccess = (status: number, e: Endpoint): Endpoint =>
+  update(e, { status, success: null, successEncoding: "events" });
+export const httpApiWithSuccessHeaders = (codec: AnySchema, e: Endpoint): Endpoint =>
+  update(e, { successExtras: [...e.successExtras, { kind: "headers", codec }] });
+
+/** `HttpApi.security_set_cookie`: the security must be an API key in a cookie. */
+export const httpApiSecuritySetCookie = (security: Security, e: Endpoint): Endpoint => {
+  if (security.kind !== "apiKey" || security.in !== "cookie") {
+    throw new TypeError(`security_set_cookie needs an API key in a cookie: ${security.name}`);
+  }
+  return update(e, { successExtras: [...e.successExtras, { kind: "cookie", key: security.key }] });
+};
 export const httpApiWithErrors = (errors: ReadonlyArray<ErrorCase>, e: Endpoint): Endpoint =>
   update(e, { errors: [...e.errors, ...errors] });
 export const httpApiDescribe = (description: string, e: Endpoint): Endpoint => update(e, { description });
@@ -130,10 +181,10 @@ export const httpApiHide = (e: Endpoint): Endpoint => update(e, { hidden: true }
 export const httpApiBearer = (name: string): Security => Object.freeze({ kind: "bearer", name });
 export const httpApiBasic = (name: string): Security => Object.freeze({ kind: "basic", name });
 
-/** `HttpApi.api_key name { key; location }`; the location is `Header`, `Query` or `Cookie`. */
+/** `HttpApi.api_key name { key; location }`; the location is `InHeader`, `InQuery` or `InCookie`. */
 export const httpApiKey = (name: string, options: { readonly key: string; readonly location: { readonly _tag: string } }): Security => {
   const where = options.location._tag.split("#")[0];
-  const place = where === "Query" ? "query" : where === "Cookie" ? "cookie" : "header";
+  const place = where === "InQuery" ? "query" : where === "InCookie" ? "cookie" : "header";
   return Object.freeze({ kind: "apiKey", name, key: options.key, in: place });
 };
 

@@ -36,6 +36,9 @@ timeZoneFromString = "DateTime.json_zone d0968f1f4e689870"
 timeZoneNamedFromString = "DateTime.json_zone_named 7677658a2f6523c4"
 timeZoneOffsetFromNumber = "DateTime.json_zone_offset e80b9a59e619e0e8"
 uint8ArrayFromBase64String = "Codec.bytes_base64 9e3768e631dd957f"
+fromFormData = "Http.Codecs.from_form_data e701f8d4377435d3"
+fromURLSearchParams = "Http.Codecs.from_url_search_params 9243355d5a1a4c22"
+urlFromString = "Http.Codecs.url 41f2f6fab4f2a32a"
 
 [language]
 composeTransformation = "`|>`: transformations of codecs compose by piping"
@@ -48,8 +51,3 @@ dateFromMillis = "TS-only: decodes to a JS `Date`, a host class with no Flick ty
 dateFromString = "TS-only: decodes to a JS `Date`, a host class with no Flick type"
 isTransformation = "TS-only: a type guard over `unknown`; Flick values are typed statically"
 optionFromUndefinedOr = "TS-only: `undefined` is no JSON value and no Flick value besides `()`; a missing key is `optional_field`"
-
-[pending]
-fromFormData = "M21"
-fromURLSearchParams = "M21"
-urlFromString = "M21"

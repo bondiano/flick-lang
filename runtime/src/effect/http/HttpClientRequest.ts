@@ -1,6 +1,6 @@
 // Effect's `HttpClientRequest` for the bindings of the standard library:
 // methods as `Http.Method.Method`, options as records of `Option` fields.
-import { Effect, Option } from "effect";
+import { Effect, Option, type Stream } from "effect";
 import type * as Headers from "effect/http/Headers";
 import type * as HttpBody from "effect/http/HttpBody";
 import * as Request from "effect/http/HttpClientRequest";
@@ -9,7 +9,7 @@ import type * as UrlParams from "effect/http/UrlParams";
 import type { Data } from "../../data.ts";
 import { type AnySchema, codecEncode } from "../../schema/index.ts";
 import { defined, enumeration, method, toBytes } from "./convert.ts";
-import { formData, mapError } from "./HttpBody.ts";
+import { flickStream, formData, mapError } from "./HttpBody.ts";
 
 export * from "effect/http/HttpClientRequest";
 
@@ -61,6 +61,13 @@ export const flickBodyJson = (value: unknown, self: Request.HttpClientRequest) =
 
 export const flickSchemaBodyJson = (codec: AnySchema, value: unknown, self: Request.HttpClientRequest) =>
   Effect.flatMap(codecEncode(codec, value), (json) => flickBodyJson(json, self));
+
+export const flickBodyStream = (
+  chunks: Stream.Stream<ReadonlyArray<number>, unknown>,
+  contentType: Option.Option<string>,
+  contentLength: Option.Option<number>,
+  self: Request.HttpClientRequest,
+) => Request.setBody(self, flickStream(chunks, contentType, contentLength));
 
 export const flickBodyFormData = (pairs: Pairs, self: Request.HttpClientRequest) =>
   Request.bodyFormData(self, formData(pairs));

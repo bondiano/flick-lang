@@ -5,7 +5,7 @@ import { Result } from "effect";
 
 import { exportError, exportJsonSchema, type ExportError } from "../schema/exporter.ts";
 import type { AnySchema } from "../schema/schemas.ts";
-import type { Api, Endpoint, Group, Security } from "./model.ts";
+import { type Api, type Endpoint, type Group, hasPayload, hasSuccessBody, type PayloadEncoding, type Security, type SuccessEncoding } from "./model.ts";
 
 type Json = { readonly [key: string]: unknown };
 
@@ -81,17 +81,51 @@ const parameters = (
 
 const json = (s: Json, type = "application/json"): Json => ({ content: { [type]: { schema: s } } });
 
-const MEDIA = { json: "application/json", text: "text/plain", form: "application/x-www-form-urlencoded" } as const;
+const PAYLOAD_MEDIA: Readonly<Record<PayloadEncoding, string>> = {
+  json: "application/json",
+  text: "text/plain",
+  form: "application/x-www-form-urlencoded",
+  multipart: "multipart/form-data",
+  bytes: "application/octet-stream",
+  parts: "multipart/form-data",
+};
+
+const SUCCESS_MEDIA: Readonly<Record<SuccessEncoding, string>> = {
+  json: "application/json",
+  text: "text/plain",
+  bytes: "application/octet-stream",
+  stream: "application/octet-stream",
+  sse: "text/event-stream",
+  events: "text/event-stream",
+};
+
+/** The schema of a body without a codec: bytes, a form's parts, or the text of events. */
+const uncoded = (encoding: string): Json =>
+  encoding === "parts" ? { type: "object" } : encoding === "events" ? { type: "string" } : { type: "string", format: "binary" };
+
+/** The response headers the handler answers with its value. */
+const responseHeaders = (endpoint: Endpoint, root: string, components: Map<string, unknown>): Json => {
+  const headers = endpoint.successExtras.flatMap((extra, i) =>
+    extra.kind === "headers" ? parameters(extra.codec, "header", `${root}.success.headers${i}`, components) : [],
+  );
+  return headers.length === 0
+    ? {}
+    : { headers: Object.fromEntries(headers.map((h) => [h["name"], { required: h["required"], schema: h["schema"] }])) };
+};
 
 const operation = (group: Group, endpoint: Endpoint, components: Map<string, unknown>): Json => {
   const root = `${group.name}.${endpoint.name}`;
   const responses: Record<string, unknown> = {
     [String(endpoint.status)]:
-      endpoint.success === null
-        ? { description: "Success" }
+      !hasSuccessBody(endpoint)
+        ? { description: "Success", ...responseHeaders(endpoint, root, components) }
         : {
             description: "Success",
-            ...json(schema(endpoint.success, `${root}.success`, components), MEDIA[endpoint.successEncoding]),
+            ...responseHeaders(endpoint, root, components),
+            ...json(
+              endpoint.success === null ? uncoded(endpoint.successEncoding) : schema(endpoint.success, `${root}.success`, components),
+              SUCCESS_MEDIA[endpoint.successEncoding],
+            ),
           },
     "400": { description: "The request does not decode", ...json(DECODE_ERROR) },
   };
@@ -114,12 +148,15 @@ const operation = (group: Group, endpoint: Endpoint, components: Map<string, unk
       ...parameters(endpoint.query, "query", `${root}.query`, components),
       ...parameters(endpoint.headers, "header", `${root}.headers`, components),
     ],
-    ...(endpoint.payload === null
+    ...(!hasPayload(endpoint)
       ? {}
       : {
           requestBody: {
             required: true,
-            ...json(schema(endpoint.payload, `${root}.payload`, components), MEDIA[endpoint.payloadEncoding]),
+            ...json(
+              endpoint.payload === null ? uncoded(endpoint.payloadEncoding) : schema(endpoint.payload, `${root}.payload`, components),
+              PAYLOAD_MEDIA[endpoint.payloadEncoding],
+            ),
           },
         }),
     responses,

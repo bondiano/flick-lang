@@ -2,13 +2,14 @@
 // is built from. Its parts are encoded with the endpoint's codecs, the
 // response decoded by its status: the success, a declared error as the
 // typed failure, anything else a `ClientError`.
-import { Effect, Exit, Result } from "effect";
+import { Effect, Exit, Option, Redacted, Result, Stream } from "effect";
 
 import type { Tagged } from "../data.ts";
 import { codecDecode, codecEncode, codecEncodeResult } from "../schema/index.ts";
 import type { AnySchema } from "../schema/schemas.ts";
 import { tag } from "../tags.ts";
-import type { Endpoint } from "./model.ts";
+import { strings } from "./encodings.ts";
+import { type Endpoint, hasPayload, typed } from "./model.ts";
 
 /** `HttpApi.ClientError`. */
 export type ClientError = Tagged<string, { readonly status: number; readonly message: string }>;
@@ -32,14 +33,6 @@ const encode = (codec: AnySchema | null, value: unknown, part: string): Effect.E
         clientError(0, `${part}: ${e._0.map((i) => `${i.path}: ${i.message}`).join("; ")}`),
       );
 
-/** The fields of an encoded record as strings; `null` and absent fields are left out. */
-const strings = (encoded: unknown): Array<[string, string]> =>
-  typeof encoded === "object" && encoded !== null
-    ? Object.entries(encoded).flatMap(([k, v]: [string, unknown]) =>
-        v === undefined || v === null ? [] : [[k, typeof v === "string" ? v : JSON.stringify(v)] as [string, string]],
-      )
-    : [];
-
 const json = (text: string): unknown => {
   try {
     return JSON.parse(text) as unknown;
@@ -58,6 +51,133 @@ const declared = (endpoint: Endpoint, status: number, body: unknown): Effect.Eff
     return yield* Effect.fail(clientError(status, typeof body === "string" ? body : JSON.stringify(body)));
   });
 
+const MEDIA: Readonly<Record<string, string>> = {
+  json: "application/json",
+  text: "text/plain",
+  form: "application/x-www-form-urlencoded",
+  bytes: "application/octet-stream",
+};
+
+/** A `FormData` of the fields of an encoded record; a list is a field of each value. */
+const formOf = (encoded: unknown): FormData => {
+  const data = new FormData();
+  if (typeof encoded === "object" && encoded !== null) {
+    for (const [k, v] of Object.entries(encoded)) {
+      for (const one of Array.isArray(v) ? v : [v]) if (one !== undefined && one !== null) data.append(k, typeof one === "string" ? one : JSON.stringify(one));
+    }
+  }
+  return data;
+};
+
+/** `Http.Multipart.Part` as Flick holds it. */
+interface FlickPart {
+  readonly _tag: string;
+  readonly _0: {
+    readonly key: string;
+    readonly contentType: string;
+    readonly value?: string;
+    readonly name?: string;
+    readonly content?: Stream.Stream<ReadonlyArray<number>, unknown>;
+  };
+}
+
+/** A `FormData` of the parts: each file's bytes are read. */
+const partsForm = (parts: Stream.Stream<FlickPart, unknown>): Effect.Effect<FormData, ClientError> =>
+  Effect.mapError(
+    Stream.runFold(
+      Stream.mapEffect(parts, (part) =>
+        part._0.content === undefined
+          ? Effect.succeed([part, new Uint8Array()] as const)
+          : Effect.map(Stream.runCollect(part._0.content), (chunks) => [part, Uint8Array.from(chunks.flat())] as const),
+      ),
+      () => new FormData(),
+      (data, [part, bytes]) => {
+        if (part._0.content === undefined) data.append(part._0.key, part._0.value ?? "");
+        else data.append(part._0.key, new Blob([bytes], { type: part._0.contentType }), part._0.name ?? part._0.key);
+        return data;
+      },
+    ),
+    (e) => clientError(0, `payload: ${String(e)}`),
+  );
+
+/** The body a call sends, and its content type (a form's own boundary for `FormData`). */
+const sent = (endpoint: Endpoint, payload: unknown): Effect.Effect<BodyInit | undefined, ClientError> => {
+  switch (endpoint.payloadEncoding) {
+    case "json":
+      return Effect.succeed(JSON.stringify(payload));
+    case "text":
+      return Effect.succeed(String(payload));
+    case "form":
+      return Effect.succeed(new URLSearchParams(strings(payload)).toString());
+    case "multipart":
+      return Effect.succeed(formOf(payload));
+    case "bytes":
+      return Effect.succeed(Uint8Array.from(typed<ReadonlyArray<number>>(payload)));
+    default:
+      return partsForm(typed<Stream.Stream<FlickPart, unknown>>(payload));
+  }
+};
+
+const undecoded = (status: number, issues: { readonly _0: ReadonlyArray<{ readonly path: string; readonly message: string }> }) =>
+  clientError(status, `the response does not decode: ${issues._0.map((i) => `${i.path}: ${i.message}`).join("; ")}`);
+
+/** The SSE events of the text: their id, name and data lines. */
+const events = (text: string) =>
+  text
+    .split(/\r?\n\r?\n/)
+    .map((block) => {
+      const fields = block.split(/\r?\n/).map((line) => [line.slice(0, line.indexOf(":")), line.slice(line.indexOf(":") + 1).replace(/^ /, "")] as const);
+      const data = fields.filter(([k]) => k === "data").map(([, v]) => v);
+      const id = fields.find(([k]) => k === "id");
+      const name = fields.find(([k]) => k === "event");
+      return { id: Option.fromUndefinedOr(id?.[1]), event: name?.[1] ?? "message", data: data.join("\n"), any: data.length > 0 };
+    })
+    .filter((e) => e.any)
+    .map((e) => ({ id: e.id, event: e.event, data: e.data }));
+
+interface Received {
+  readonly status: number;
+  readonly headers: Headers;
+  readonly bytes: Uint8Array;
+}
+
+/** The success value of the response, before its extras. */
+const successOf = (endpoint: Endpoint, r: Received, text: string): Effect.Effect<unknown, ClientError, unknown> => {
+  const success = endpoint.success;
+  switch (endpoint.successEncoding) {
+    case "bytes":
+      return Effect.succeed(Array.from(r.bytes));
+    case "stream":
+      return Effect.succeed(Stream.succeed(Array.from(r.bytes)));
+    case "events":
+      return Effect.succeed(Stream.fromIterable(events(text)));
+    case "sse":
+      if (success === null) return Effect.void;
+      return Effect.map(
+        Effect.forEach(events(text), (e) => Effect.mapError(codecDecode(success, json(e.data)), (x) => undecoded(r.status, x))),
+        Stream.fromIterable,
+      );
+    default:
+      if (success === null) return Effect.void;
+      return Effect.mapError(codecDecode(success, endpoint.successEncoding === "text" ? text : json(text)), (x) => undecoded(r.status, x));
+  }
+};
+
+/** The value with each extra of the response: its decoded headers, the value of its cookie. */
+const withExtras = (endpoint: Endpoint, r: Received, value: unknown): Effect.Effect<unknown, ClientError, unknown> =>
+  Effect.reduce(endpoint.successExtras, () => value, (inner, extra) => {
+    if (extra.kind === "headers") {
+      return Effect.mapError(
+        Effect.map(codecDecode(extra.codec, Object.fromEntries(r.headers), "ignore"), (h) => [inner, h] as const),
+        (x) => undecoded(r.status, x),
+      );
+    }
+    const cookie = r.headers.getSetCookie().map((c) => c.split(";")[0] ?? "").find((c) => c.startsWith(`${extra.key}=`));
+    return cookie === undefined
+      ? Effect.fail(clientError(r.status, `the response sets no cookie ${extra.key}`))
+      : Effect.succeed([inner, Redacted.make(decodeURIComponent(cookie.slice(extra.key.length + 1)))] as const);
+  });
+
 /** `HttpApi.call base endpoint request`. */
 export const httpApiCall = (base: string, endpoint: Endpoint, request: Request): Effect.Effect<unknown, unknown, unknown> =>
   Effect.gen(function* () {
@@ -66,34 +186,20 @@ export const httpApiCall = (base: string, endpoint: Endpoint, request: Request):
     const url = new URL(path.replace(/^\//, ""), base.endsWith("/") ? base : `${base}/`);
     for (const [k, v] of strings(yield* encode(endpoint.query, request.query, "query"))) url.searchParams.append(k, v);
     const headers = new Headers(strings(yield* encode(endpoint.headers, request.headers, "headers")));
-    const payload = yield* encode(endpoint.payload, request.payload, "payload");
-    const types = { json: "application/json", text: "text/plain", form: "application/x-www-form-urlencoded" };
-    if (endpoint.payload !== null) headers.set("content-type", types[endpoint.payloadEncoding]);
-    const sent =
-      endpoint.payloadEncoding === "json"
-        ? JSON.stringify(payload)
-        : endpoint.payloadEncoding === "text"
-          ? String(payload)
-          : new URLSearchParams(strings(payload)).toString();
-    const response = yield* Effect.tryPromise({
+    const payload = endpoint.payload === null ? request.payload : yield* encode(endpoint.payload, request.payload, "payload");
+    const type = MEDIA[endpoint.payloadEncoding];
+    if (hasPayload(endpoint) && type !== undefined) headers.set("content-type", type);
+    const body = hasPayload(endpoint) ? yield* sent(endpoint, payload) : undefined;
+    const response: Received = yield* Effect.tryPromise({
       try: async (signal) => {
-        const r = await fetch(url, {
-          method: endpoint.method,
-          headers,
-          signal,
-          ...(endpoint.payload === null ? {} : { body: sent }),
-        });
-        return { status: r.status, text: await r.text() };
+        const r = await fetch(url, { method: endpoint.method, headers, signal, ...(body === undefined ? {} : { body }) });
+        return { status: r.status, headers: r.headers, bytes: new Uint8Array(await r.arrayBuffer()) };
       },
       catch: (error) => clientError(0, error instanceof Error ? error.message : String(error)),
     });
-    if (response.status !== endpoint.status) return yield* declared(endpoint, response.status, json(response.text));
-    const success = endpoint.success;
-    if (success === null) return undefined;
-    const received = endpoint.successEncoding === "text" ? response.text : json(response.text);
-    return yield* Effect.mapError(codecDecode(success, received), (e) =>
-      clientError(response.status, `the response does not decode: ${e._0.map((i) => `${i.path}: ${i.message}`).join("; ")}`),
-    );
+    const text = new TextDecoder().decode(response.bytes);
+    if (response.status !== endpoint.status) return yield* declared(endpoint, response.status, json(text));
+    return yield* withExtras(endpoint, response, yield* successOf(endpoint, response, text));
   });
 
 /** The fields of an encoded part as strings, or the error of its encoding. */

@@ -3,11 +3,9 @@ Compression = "Http.Middleware.compression cb1d4511a82ce234"
 CompressionAlgorithm = "Http.Platform.CompressionAlgorithm 3be0ead70fcd3112"
 CompressionOptions = "Http.Middleware.CompressionOptions 3c8d6a617a239974"
 HttpPlatform = "Http.Platform.HttpPlatform f6f4e7d9dd13385d"
+compressionTransformWeb = "Http.Middleware.compression_web 1bdfea841ac1989d"
 layer = "Http.Platform.node ebf6939f7483ac21"
+makeCompressionWeb = "Http.Middleware.compression_web d1f41e90c6b44cde"
 
 [language]
 make = "`service`: `Layer.succeed HttpPlatform` with an `Http.Platform.HttpPlatform.Impl` record of the operations"
-
-[pending]
-compressionTransformWeb = "M20"
-makeCompressionWeb = "M20"

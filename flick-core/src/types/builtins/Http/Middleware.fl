@@ -77,6 +77,13 @@ foreign pure compression from "@flick-lang/runtime/effect/http/HttpMiddleware" "
   arity 2
   reviewed "effect@4.0.5 sha256:af22e04d244b96ff"
 
+/// `compression` through the web `CompressionStream`: gzip and deflate,
+/// whatever the levels say.
+compression_web : CompressionOptions -> Handler r e -> Handler r e
+foreign pure compression_web from "@flick-lang/runtime/effect/http/HttpMiddleware" "flickCompressionWeb"
+  arity 2
+  reviewed "effect@4.0.5 sha256:d1f41e90c6b44cde"
+
 /// Decompresses request bodies by their `Content-Encoding`, refusing one
 /// that grows past the size.
 decompression : Option ByteSize.ByteSize -> Handler r e -> Handler r e

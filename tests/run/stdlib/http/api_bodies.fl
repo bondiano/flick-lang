@@ -1,0 +1,194 @@
+// Typed API bodies besides JSON and text, on a real Node server: bytes,
+// multipart forms whole and part by part, streamed successes, Server-Sent
+// Events, response headers and a security cookie.
+module App.Main exposing (main)
+
+import Http.Multipart exposing (MultipartError, Part(..))
+import Stream.Core exposing (Stream)
+
+type alias Note = { title : String }
+  deriving Schema
+
+type alias Tick = { n : Number }
+  deriving Schema
+
+type alias Count = { total : String }
+  deriving Schema
+
+type alias Parts = Stream none {MultipartError} Part
+
+bytes : HttpApi.Endpoint "bytes" (HttpApi.Request Unit Unit Unit (List Number) ->{r;} List Number)
+let bytes =
+  HttpApi.endpoint HttpApi.Post "/bytes" (Record.label : Record.Label "bytes")
+    |> HttpApi.with_bytes_payload
+    |> HttpApi.with_bytes_success 200
+
+form : HttpApi.Endpoint "form" (HttpApi.Request Unit Unit Unit Note ->{r;} String)
+let form =
+  HttpApi.endpoint HttpApi.Post "/form" (Record.label : Record.Label "form")
+    |> HttpApi.with_multipart_payload (Codec.json (schema Note))
+    |> HttpApi.with_text_success 200
+
+parts : HttpApi.Endpoint "parts" (HttpApi.Request Unit Unit Unit Parts ->{r; MultipartError} String)
+let parts =
+  HttpApi.endpoint HttpApi.Post "/parts" (Record.label : Record.Label "parts")
+    |> HttpApi.with_multipart_stream_payload
+    |> HttpApi.with_text_success 200
+
+chunks : HttpApi.Endpoint "chunks" (
+  HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none (List Number)
+)
+let chunks =
+  HttpApi.endpoint HttpApi.Get "/chunks" (Record.label : Record.Label "chunks")
+    |> HttpApi.with_stream_success 200
+
+ticks : HttpApi.Endpoint "ticks" (HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none Tick)
+let ticks =
+  HttpApi.endpoint HttpApi.Get "/ticks" (Record.label : Record.Label "ticks")
+    |> HttpApi.with_sse_success 200 (Codec.json (schema Tick))
+
+events : HttpApi.Endpoint "events" (
+  HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none HttpApi.SseEvent
+)
+let events =
+  HttpApi.endpoint HttpApi.Get "/events" (Record.label : Record.Label "events")
+    |> HttpApi.with_sse_events_success 200
+
+session : HttpApi.Security
+let session = HttpApi.api_key "session" { key = "sid"; location = HttpApi.InCookie }
+
+login : HttpApi.Endpoint "login" (
+  HttpApi.Request Unit Unit Unit Unit ->{r;} ((String, Count), Redacted String)
+)
+let login =
+  HttpApi.endpoint HttpApi.Post "/login" (Record.label : Record.Label "login")
+    |> HttpApi.with_text_success 200
+    |> HttpApi.with_success_headers (Codec.json (schema Count))
+    |> HttpApi.security_set_cookie session
+
+type alias Handlers r =
+  {
+    bytes : HttpApi.Request Unit Unit Unit (List Number) ->{r;} List Number
+    form : HttpApi.Request Unit Unit Unit Note ->{r;} String
+    parts : HttpApi.Request Unit Unit Unit Parts ->{r; MultipartError} String
+    chunks : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none (List Number)
+    ticks : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none Tick
+    events : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none HttpApi.SseEvent
+    login : HttpApi.Request Unit Unit Unit Unit ->{r;} ((String, Count), Redacted String)
+  }
+
+api : HttpApi.Api { bodies : Handlers r }
+let api =
+  HttpApi.api "Bodies"
+    |> HttpApi.add_group
+      (HttpApi.group (Record.label : Record.Label "bodies")
+        |> HttpApi.add bytes
+        |> HttpApi.add form
+        |> HttpApi.add parts
+        |> HttpApi.add chunks
+        |> HttpApi.add ticks
+        |> HttpApi.add events
+        |> HttpApi.add login)
+
+describe : Part ->{; MultipartError} String
+let describe part =
+  match part with
+  | Field f -> f.key ++ "=" ++ f.value
+  | File f ->
+    f.key
+      ++ ":"
+      ++ f.name
+      ++ "="
+      ++ String.join "" (Stream.run_collect (Stream.Platform.decode_text f.content))
+
+upload : Parts
+let upload =
+  let text =
+    (task {
+      [[102, 105, 108, 101], [32, 116, 101, 120, 116]]
+    } : Eff none {MultipartError} (List (List Number)))
+  let file =
+    File
+      {
+        key = "doc";
+        name = "a.txt";
+        contentType = "text/plain";
+        content = Stream.from_list_effect text
+      }
+  Stream.from_list_effect
+    (task {
+      [Field { key = "title"; contentType = "text/plain"; value = "notes" }, file]
+    } : Eff none {MultipartError} (List Part))
+
+handlers : { bodies : Handlers none }
+let handlers =
+  {
+    bodies =
+      {
+        bytes = fun request -> List.reverse request.payload
+        form = fun request -> "title " ++ request.payload.title
+        parts =
+          fun request ->
+            String.join ", " (Stream.run_collect (Stream.map_effect describe request.payload))
+        chunks = fun _ -> Stream.Platform.encode_text (Stream.from_list ["ab", "cd"])
+        ticks = fun _ -> Stream.from_list [{ n = 1 }, { n = 2 }]
+        events = fun _ -> Stream.from_list [{ id = Some "7"; event = "note"; data = "two\nlines" }]
+        login = fun _ -> (("hi", { total = "3" }), Redacted.make "s3cret")
+      }
+  }
+
+empty : HttpApi.Request Unit Unit Unit Unit
+let empty = { path = (); query = (); headers = (); payload = () }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let document = Result.with_default "" (HttpApi.openapi api)
+  Platform.stdout_line
+    ("openapi: "
+      ++ show
+        (
+          String.contains "text/event-stream" document,
+          String.contains "multipart/form-data" document
+        ))
+  let options : HttpApi.ServeOptions =
+    { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }
+  try
+    scope s {
+      let server = HttpApi.listen options api handlers
+      let base = "http://127.0.0.1:" ++ show (HttpApi.port server)
+      Platform.stdout_line
+        ("bytes: "
+          ++ show
+            (HttpApi.call base bytes { path = (); query = (); headers = (); payload = [1, 2, 3] }))
+      Platform.stdout_line
+        ("form: "
+          ++ HttpApi.call
+            base
+            form
+            { path = (); query = (); headers = (); payload = { title = "notes" } })
+      Platform.stdout_line
+        ("parts: "
+          ++ HttpApi.call base parts { path = (); query = (); headers = (); payload = upload })
+      Platform.stdout_line
+        ("chunks: "
+          ++ show
+            (Stream.run_collect (Stream.Platform.decode_text (HttpApi.call base chunks empty))))
+      Platform.stdout_line ("ticks: " ++ show (Stream.run_collect (HttpApi.call base ticks empty)))
+      Platform.stdout_line
+        ("events: " ++ show (Stream.run_collect (HttpApi.call base events empty)))
+      let ((greeting, count), cookie) = HttpApi.call base login empty
+      Platform.stdout_line
+        ("login: "
+          ++ greeting
+          ++ " "
+          ++ count.total
+          ++ " "
+          ++ show cookie
+          ++ " "
+          ++ show (Redacted.reveal cookie == "s3cret"))
+    }
+  with
+  | HttpApi.ServeError message -> Platform.stdout_line ("serve error " ++ message)
+  | HttpApi.ClientError e ->
+    Platform.stdout_line ("client error " ++ show e.status ++ " " ++ e.message)
+  | Http.Multipart.MultipartError reason -> Platform.stdout_line ("multipart error " ++ show reason)

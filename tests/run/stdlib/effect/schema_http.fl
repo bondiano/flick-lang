@@ -1,0 +1,75 @@
+// Codecs of HTTP values and of query strings and forms: each decodes a wire
+// value and encodes it back; the strict exporter refuses them.
+module App.Main exposing (main)
+
+type alias Query = { name : String; age : Number }
+  deriving Schema
+
+type alias Tree = { user : { name : String }; tags : List String }
+  deriving Schema
+
+/// Decodes the JSON text, shows the value and encodes it back.
+round : (a -> String) -> String -> PureCodec Json a -> String
+let round show_value text c =
+  match Json.parse text with
+  | Err _ -> "not JSON"
+  | Ok input ->
+    match Codec.decode_result c input with
+    | Err (SchemaError found) ->
+      "err " ++ String.join "; " (List.map (fun i -> i.path ++ ": " ++ i.message) found)
+    | Ok value ->
+      match Codec.encode_result c value with
+      | Ok wire -> show_value value ++ " -> " ++ Json.stringify wire
+      | Err _ -> show_value value ++ " -> encoding failed"
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line
+    ("headers: "
+      ++ round (fun h -> show (Http.Headers.to_list h)) "{\"X-Id\":\"7\"}" Http.Codecs.headers)
+  Platform.stdout_line
+    ("url_params: "
+      ++ round
+        (fun p -> show (Http.UrlParams.to_list p))
+        "[[\"a\",\"1\"],[\"a\",\"2\"]]"
+        Http.Codecs.url_params)
+  Platform.stdout_line
+    ("cookie: "
+      ++ round Http.Cookies.name "\"sid=abc; Path=/\"" Http.Codecs.cookie
+      ++ " | "
+      ++ round Http.Cookies.name "\"\"" Http.Codecs.cookie)
+  Platform.stdout_line
+    ("cookies: " ++ round Http.Cookies.show_cookies "[\"a=1\",\"b=2\"]" Http.Codecs.cookies)
+  Platform.stdout_line
+    ("url: "
+      ++ round Http.Url.href "\"https://example.com/a?b=1\"" Http.Codecs.url
+      ++ " | "
+      ++ round Http.Url.href "\"nope\"" Http.Codecs.url)
+  let query = Codec.string_tree (schema Query)
+  Platform.stdout_line ("string_tree: " ++ round show "{\"name\":\"Ann\",\"age\":\"30\"}" query)
+  Platform.stdout_line
+    ("from_url_params: "
+      ++ round show "[[\"name\",\"Bo\"],[\"age\",\"4\"]]" (Http.Codecs.from_url_params query))
+  Platform.stdout_line
+    ("from_cookies: " ++ round show "[\"name=Cy\",\"age=5\"]" (Http.Codecs.from_cookies query))
+  Platform.stdout_line
+    ("json_url_params_field: "
+      ++ round
+        show
+        "[[\"q\",\"[1,2]\"]]"
+        (Http.Codecs.json_url_params_field "q" (Codec.list Number.json_finite))
+      ++ " | "
+      ++ round show "[]" (Http.Codecs.json_url_params_field "q" (Codec.list Number.json_finite)))
+  let tree = Codec.string_tree (schema Tree)
+  Platform.stdout_line
+    ("from_url_search_params: "
+      ++ round show "\"user[name]=Di&tags[]=x&tags[]=y\"" (Http.Codecs.from_url_search_params tree))
+  Platform.stdout_line
+    ("from_form_data: "
+      ++ round
+        show
+        "[[\"user[name]\",\"Ed\"],[\"tags[]\",\"z\"]]"
+        (Http.Codecs.from_form_data tree))
+  match Codec.json_schema "T" Http.Codecs.url with
+  | Err (Codec.ExportError reason) -> Platform.stdout_line ("export: refused: " ++ reason)
+  | Ok _ -> Platform.stdout_line "export: exported"

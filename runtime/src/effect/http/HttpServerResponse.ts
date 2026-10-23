@@ -1,7 +1,7 @@
 // Effect's `HttpServerResponse` for the bindings of the standard library:
 // options as records of `Option` fields, cookie values as `Redacted`
 // strings, and the responses a server answers the Flick errors of `Http` with.
-import { Cause, Effect, Option, Redacted } from "effect";
+import { Cause, Effect, Option, Redacted, Stream } from "effect";
 import type * as Cookies from "effect/http/Cookies";
 import type * as ClientRequest from "effect/http/HttpClientRequest";
 import * as HttpServerError from "effect/http/HttpServerError";
@@ -40,6 +40,8 @@ export const flickRedirect = (location: string, o: FlickOptions) => Response.red
 export const flickUint8Array = (bytes: ReadonlyArray<number>, o: FlickOptions) =>
   Response.uint8Array(toBytes(bytes), options(o));
 export const flickText = (body: string, o: FlickOptions) => Response.text(body, options(o));
+export const flickStream = (chunks: Stream.Stream<ReadonlyArray<number>, unknown>, o: FlickOptions) =>
+  Response.stream(Stream.map(chunks, toBytes), options(o));
 export const flickJson = (body: unknown, o: FlickOptions) => mapError(Response.json(body, options(o)));
 export const flickSchemaJson = (codec: AnySchema, value: unknown, o: FlickOptions) =>
   Effect.flatMap(codecEncode(codec, value), (body) => flickJson(body, o));

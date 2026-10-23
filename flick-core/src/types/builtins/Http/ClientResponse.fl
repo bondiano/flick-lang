@@ -1,10 +1,11 @@
 /// Effect's `HttpClientResponse`: the response to a request of
 /// `Http.Client`. Its body is read once, by one of `text`, `json`,
 /// `url_params_body`, `bytes` or `form_data`; reading fails with
-/// `HttpClientError`. Streamed bodies wait for Flick's streams.
+/// `HttpClientError`, or streamed by `stream`.
 module Http.ClientResponse exposing (..)
 
 import Http.ClientError exposing (HttpClientError)
+import Stream.Core exposing (Stream)
 
 /// A response.
 type ClientResponse
@@ -53,6 +54,11 @@ foreign effect url_params_body from "@flick-lang/runtime/effect/http/HttpClientR
 bytes : ClientResponse ->{; HttpClientError} List Number
 foreign effect bytes from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickBytes"
   reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
+
+/// The chunks of bytes of the body, as they arrive.
+stream : ClientResponse -> Stream none {HttpClientError} (List Number)
+foreign pure stream from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickStream"
+  reviewed "effect@4.0.5 sha256:d1e975aadadf634b"
 
 /// The text fields of a `multipart/form-data` body.
 form_data : ClientResponse ->{; HttpClientError} List (String, String)

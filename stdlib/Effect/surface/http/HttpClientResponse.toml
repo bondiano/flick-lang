@@ -7,6 +7,7 @@ schemaBodyUrlParams = "Http.ClientResponse.schema_body_url_params fb8aac67bbf023
 schemaHeaders = "Http.ClientResponse.schema_headers c09a4db863a5e1ca"
 schemaJson = "Http.ClientResponse.schema_json 3fc269f3d81aa642"
 schemaNoBody = "Http.ClientResponse.schema_no_body a0e1567b9179e065"
+stream = "Http.ClientResponse.stream d1e975aadadf634b"
 
 [language]
 matchStatus = "`match` on `Http.ClientResponse.status`, with `when` guards for ranges"
@@ -14,6 +15,3 @@ matchStatus = "`match` on `Http.ClientResponse.status`, with `when` guards for r
 [excluded]
 TypeId = "TS-only: a type identifier"
 fromWeb = "TS-only: converts a Fetch API `Response` object of JS code; a Flick test double answers with `Http.ServerResponse.to_client_response`"
-
-[pending]
-stream = "M20"

@@ -4,9 +4,7 @@ group = "HttpApi.listen cff2eb4f4bf9f15a"
 handler = "HttpApi.listen cb0e57a54c09c5a8"
 layer = "HttpApi.listen 903958103df4843c"
 securityDecode = "HttpApi.with_security 4254d1f1f0577372"
+securitySetCookie = "HttpApi.security_set_cookie f7064c514e82a9c6"
 
 [excluded]
 Handlers = "TS-only: type-level machinery of Effect's HttpApi types; Flick's `HttpApi` types carry the same information"
-
-[pending]
-securitySetCookie = "M21"

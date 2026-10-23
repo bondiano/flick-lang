@@ -1,15 +1,21 @@
 [wrapped]
+Field = "Http.Multipart.Part 3a1b0e832c04c712"
 FieldMimeTypes = "Http.Multipart.with_limits e891ec4576ffe5cd"
+File = "Http.Multipart.Part ac160a53853a9bf5"
 MaxFieldSize = "Http.Multipart.with_limits 9d7e2be7f57426cd"
 MaxFileSize = "Http.Multipart.with_limits a371c5539b931cfa"
 MaxParts = "Http.Multipart.with_limits 7bd2f4791f3455d7"
 MultipartError = "Http.Multipart.MultipartError 22f55179d6b09980"
 MultipartErrorReason = "Http.Multipart.MultipartErrorReason 71b3deb56ddc2d12"
+Part = "Http.Multipart.Part e5f1e8023bf26c37"
 Persisted = "Http.Multipart.Persisted 7c2d97a9b575ef4e"
 PersistedFile = "Http.Multipart.PersistedFile 4d1c89a92aadd42d"
+collectUint8Array = "Channel.mk_uint8_array 40ff8d7b356576ba"
 limitsServices = "Http.Multipart.with_limits 7d736d5d9b8ba138"
+makeChannel = "Http.Multipart.make_channel c4fb7aade4e9dd3f"
 schemaJson = "Http.Multipart.schema_json f56a1dd7a3f2a1c7"
 schemaPersisted = "Http.Multipart.schema_persisted 947b6de4b7f057ec"
+toPersisted = "Http.Multipart.to_persisted 22e22f2f7418accd"
 withLimits = "Http.Multipart.Limits f98cb39c72cb43fd"
 
 [language]
@@ -25,12 +31,4 @@ isMultipartError = "TS-only: a type guard over `unknown`; Flick values are typed
 isPart = "TS-only: a type guard over `unknown`; Flick values are typed statically"
 isPersistedFile = "TS-only: a type guard over `unknown`; Flick values are typed statically"
 isStreamPart = "TS-only: a type guard over `unknown`; Flick values are typed statically"
-
-[pending]
-Field = "M20"
-File = "M20"
-Part = "M20"
-collectUint8Array = "M20"
-makeChannel = "M20"
-makeConfig = "M20"
-toPersisted = "M20"
+makeConfig = "invariant: the configuration of the push parser of `MultipartParser.make` (excluded), read from the limits of the fiber; `with_limits` sets them for `parts` and `make_channel`"

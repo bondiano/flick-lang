@@ -3,6 +3,8 @@
 /// secret headers.
 module Http.ClientRequest exposing (..)
 
+import Stream.Core exposing (Stream)
+
 /// A request.
 type ClientRequest
 
@@ -269,6 +271,18 @@ body_form_data : Http.Body.FormDataInput -> ClientRequest -> ClientRequest
 foreign pure body_form_data from "@flick-lang/runtime/effect/http/HttpClientRequest" "flickBodyFormData"
   arity 2
   reviewed "effect@4.0.5 sha256:880e6823b420b68c"
+
+/// A body of the stream's chunks of bytes, of the content type or
+/// `application/octet-stream`, and of the length if it is known.
+body_stream : forall e. Stream none e (List Number) -> Option String -> Option Number -> ClientRequest -> ClientRequest
+foreign pure body_stream from "@flick-lang/runtime/effect/http/HttpClientRequest" "flickBodyStream"
+  arity 4
+  reviewed "effect@4.0.5 sha256:0298a2fda8a6af0a"
+
+/// A body of the file at the path, as `Http.Body.file`.
+body_file :
+  Http.Body.FileOptions -> String -> ClientRequest ->{FileSystem.FileSystem; PlatformError.PlatformError} ClientRequest
+let body_file options path request = set_body (Http.Body.file options path) request
 
 /// The URL with its parameters and hash, if it is a valid URL.
 to_url : ClientRequest -> Option Http.Url.Url
