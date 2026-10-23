@@ -1,5 +1,9 @@
-[pending]
-LayerRef = "M20"
-Service = "M20"
-TagClass = "M20"
-make = "M20"
+[wrapped]
+LayerRef = "LayerRef.LayerRef c82e4d83d5068737"
+make = "LayerRef.make 920ebbf52b1b72f1"
+
+[language]
+Service = "`service` with an operation over a `LayerRef` made by `LayerRef.make` in `Layer.effect`"
+
+[excluded]
+TagClass = "TS-only: the class type of `LayerRef.Service`"

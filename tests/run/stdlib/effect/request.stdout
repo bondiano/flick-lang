@@ -1,0 +1,37 @@
+payload UserName 1
+batch of 4
+make ["user1", "user2", "user3", "not found 12"]
+complete ["user1", "user2", "not found 99"]
+key 1 batch of 2
+key 0 batch of 1
+make_with ["user1", "user2", "user3"]
+small true batch of 2
+small false batch of 1
+make_grouped ["user1", "user2", "user3"]
+batch of 1
+batch of 2
+grouped ["user1", "user2", "user3"]
+batch of 2
+batch of 1
+batch_n ["user1", "user2", "user3"]
+from_function ["fn1", "fn2"]
+from_function_batched ["b1", "b2"]
+from_effect ["user1", "not found 11"]
+batch of 2
+set_delay ["user4", "user5"]
+delay ran
+batch of 1
+set_delay_effect ["user6"]
+batch of 2
+around ["user7", "user8"]
+around after 2
+batch of 1
+race ["user1"]
+never true
+batch of 1
+with_span ["user1"]
+batch of 1
+with_cache ["user1"]
+with_cache again ["user1"]
+batch of 1
+as_cache user2 user2

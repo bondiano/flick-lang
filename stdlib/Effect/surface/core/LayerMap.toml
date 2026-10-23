@@ -1,6 +1,10 @@
-[pending]
-LayerMap = "M20"
-Service = "M20"
-TagClass = "M20"
-fromRecord = "M20"
-make = "M20"
+[wrapped]
+LayerMap = "LayerMap.LayerMap a22211e3de138964"
+make = "LayerMap.make b3f9d448a158acb0"
+fromRecord = "LayerMap.from_record 9ffecdbbd834efcf"
+
+[language]
+Service = "`service` with an operation over a `LayerMap` made by `LayerMap.make` in `Layer.effect`"
+
+[excluded]
+TagClass = "TS-only: the class type of `LayerMap.Service`"

@@ -1,0 +1,213 @@
+// Effect's `Layer`, `Context` and `Scope`: layers as values, built
+// services as a `Context`, references and finalizers of a scope.
+module App.Main exposing (main)
+
+service Greeter =
+  greet : String ->{} String
+
+service Config =
+  prefix : Unit ->{} String
+
+type error BootError = BootError String
+
+config_layer : Layer none none {Config}
+let config_layer = Layer.succeed Config { prefix = fun () -> "hello" }
+
+greeter_live : Layer {Config} none {Greeter}
+let greeter_live =
+  Layer.effect Greeter (task {
+    let p = Config.prefix ()
+    { greet = fun name -> p ++ ", " ++ name }
+  })
+
+greet : String ->{Greeter;} Unit
+let greet name = Platform.stdout_line (Greeter.greet name)
+
+failing : Layer none {BootError} {Greeter}
+let failing = Layer.effect Greeter (task { from_result (Err (BootError "no greeter")) })
+
+fallback : Layer none none {Greeter}
+let fallback = Layer.succeed Greeter { greet = fun name -> "fallback " ++ name }
+
+recovered : Layer none none {Greeter}
+let recovered =
+  failing
+    |> Layer.tap_error (fun err ->
+      match err with
+      | BootError m -> Platform.stdout_line ("tap_error " ++ m))
+    |> Layer.catch (fun _ -> fallback)
+
+counting : Ref Number -> Layer none none {Config}
+let counting count =
+  Layer.effect Config (task {
+    Ref.update count (fun n -> n + 1)
+    { prefix = fun () -> "counted" }
+  })
+
+level : Context.Reference String
+let level = Context.reference "App.level" (fun () -> "default")
+
+show_level : Unit ->{} Unit
+let show_level () = Platform.stdout_line ("level " ++ Context.read level)
+
+contexts : Unit ->{} Unit
+let contexts () =
+  let tag : ServiceTag {Config} = Config
+  let c : Context.Context {Config} = Context.make tag { prefix = fun () -> "ctx" }
+  let both = Context.add Greeter { greet = fun n -> "ctx " ++ n } c
+  let g = Context.get Greeter both
+  Platform.stdout_line (g.greet "get")
+  let none_yet = Context.get_option Greeter (Context.empty ())
+  Platform.stdout_line ("get_option empty " ++ show (Option.is_some none_yet))
+  let other = Context.get_or_else Greeter (fun () -> { greet = fun n -> "else " ++ n }) c
+  Platform.stdout_line (other.greet "x")
+  let only = Context.pick Config both
+  let without = Context.omit Config both
+  Platform.stdout_line ("omit " ++ show (Option.is_some (Context.get_option Config without)))
+  let readded = Context.add_or_omit Config None (Context.merge only without)
+  Platform.stdout_line ("add_or_omit None " ++ show (Option.is_some (Context.get_option Config readded)))
+  let merged = Context.merge_all only [Context.make Config { prefix = fun () -> "last" }]
+  Platform.stdout_line ("merge_all " ++ (Context.get Config merged).prefix ())
+  provide Layer.succeed_context both { greet "succeed_context" }
+  provide Layer.sync_context (fun () -> both) { greet "sync_context" }
+  show_level ()
+  Context.with_reference level "changed" (task { show_level () })
+  show_level ()
+
+layers : Unit ->{; BootError} Unit
+let layers () =
+  provide (greeter_live |> Layer.provide_ config_layer) { greet "provide_" }
+  provide (greeter_live |> Layer.provide_merge config_layer) {
+    greet ("provide_merge " ++ Config.prefix ())
+  }
+  provide recovered { greet "catch" }
+  provide (Layer.catch_cause (fun _ -> fallback) failing) { greet "catch_cause" }
+  provide Layer.sync Greeter (fun () -> { greet = fun n -> "sync " ++ n }) { greet "x" }
+  provide Layer.suspend (fun () -> fallback) { greet "suspend" }
+  provide Layer.unwrap (task { fallback }) { greet "unwrap" }
+  provide Layer.merge_all fallback [Layer.succeed Greeter { greet = fun n -> "second " ++ n }] {
+    greet "merge_all"
+  }
+  provide Layer.merge Layer.empty (Layer.merge config_layer (Layer.effect_discard (task {
+    Platform.stdout_line "effect_discard ran"
+  }))) {
+    Platform.stdout_line (Config.prefix ())
+  }
+  let upper = Layer.update_service Config (fun impl -> { prefix = fun () -> impl.prefix () ++ "!" }) greeter_live
+  provide (upper |> Layer.provide_ config_layer) { greet "update_service" }
+  let tapped =
+    Layer.tap (fun ctx -> Platform.stdout_line ("tap " ++ (Context.get Config ctx).prefix ())) config_layer
+  provide tapped { () }
+  let mapped =
+    Layer.flat_map (fun ctx -> Layer.succeed Greeter { greet = fun n -> (Context.get Config ctx).prefix () ++ " flat_map " ++ n }) config_layer
+  provide mapped { greet "x" }
+  provide Layer.effect_context (task { Context.make Config { prefix = fun () -> "effect_context" } }) {
+    Platform.stdout_line (Config.prefix ())
+  }
+  let exits = parallel_exits [task {
+    provide (Layer.or_die failing |> Layer.tap_cause (fun _ -> Platform.stdout_line "tap_cause")) { greet "never" }
+  }]
+  let died = List.map (fun exit -> Option.is_some (Exit.failure exit)) exits
+  Platform.stdout_line ("or_die died " ++ show died)
+
+shared : Unit ->{} Unit
+let shared () =
+  let count = Ref.make 0
+  let once = counting count
+  provide Layer.merge once (Layer.provide_ once greeter_live) { () }
+  Platform.stdout_line ("shared builds " ++ show (Ref.get count))
+  let fresh = Layer.fresh (counting count)
+  provide Layer.merge fresh (Layer.provide_ fresh greeter_live) { () }
+  Platform.stdout_line ("fresh builds " ++ show (Ref.get count))
+  let memo : Layer.MemoMap = Layer.make_memo_map ()
+  let child = Layer.fork_memo_map memo
+  let _ = Layer.current_memo_map ()
+  scope {
+    let _ = Layer.build_with_memo_map memo once
+    let _ = Layer.build_with_memo_map memo once
+    let _ = Layer.build_with_memo_map child once
+    ()
+  }
+  Platform.stdout_line ("memo builds " ++ show (Ref.get count))
+  let built = Layer.from_build (fun m -> Layer.build_with_memo_map m config_layer)
+  provide built { Platform.stdout_line ("from_build " ++ Config.prefix ()) }
+  let memoized = Layer.from_build_memo (fun m -> Layer.build_with_memo_map m config_layer)
+  provide memoized { Platform.stdout_line ("from_build_memo " ++ Config.prefix ()) }
+
+finalizers : Unit ->{} Unit
+let finalizers () =
+  scope {
+    Scope.add_finalizer (task { Platform.stdout_line "finalizer ran" })
+    Scope.add_finalizer_exit (fun exit -> Platform.stdout_line ("exit failed " ++ show (Option.is_some exit)))
+    let ctx = Layer.build config_layer
+    Platform.stdout_line ("build " ++ (Context.get Config ctx).prefix ())
+  }
+  let launched = timeout_option 5 (task {
+    Layer.launch (Layer.effect_discard (task { Platform.stdout_line "launched" }))
+  })
+  Platform.stdout_line ("launch interrupted " ++ show (Option.is_none launched))
+
+trace_options : Tracer.SpanOptions
+let trace_options =
+  {
+    attributes = [];
+    links = [];
+    parent = None;
+    root = false;
+    kind_ = Tracer.internal;
+    sampled = None;
+    level = None;
+    captureStackTrace = false;
+    disablePropagation = false
+  }
+
+span_options : Layer.Trace.SpanOptions
+let span_options =
+  {
+    span = trace_options;
+    onEnd = Some (fun span exit ->
+      Platform.stdout_line ("ended " ++ show (Tracer.span_name span) ++ " failed " ++ show (Option.is_some exit)))
+  }
+
+current_span : Unit ->{} String
+let current_span () =
+  match Tracer.parent_span () with
+  | Some span -> show (Tracer.span_name span)
+  | None -> "no span"
+
+traced : Layer none none {Config}
+let traced =
+  Layer.effect Config (task {
+    let name = current_span ()
+    { prefix = fun () -> name }
+  })
+
+traced_id : Layer none none {Config}
+let traced_id =
+  Layer.effect Config (task {
+    let id = show (Option.map Tracer.span_id (Tracer.parent_span ()))
+    { prefix = fun () -> id }
+  })
+
+traces : Unit ->{} Unit
+let traces () =
+  provide Layer.Trace.span "boot" span_options { Platform.stdout_line ("span " ++ current_span ()) }
+  provide Layer.Trace.with_span "build" span_options traced {
+    Platform.stdout_line ("with_span " ++ Config.prefix ())
+  }
+  let remote = Tracer.external_span { spanId = "s1"; traceId = "t1"; sampled = true }
+  provide Layer.Trace.parent_span remote {
+    Platform.stdout_line ("parent_span " ++ show (Option.map Tracer.span_id (Tracer.parent_span ())))
+  }
+  provide Layer.Trace.with_parent_span remote traced_id {
+    Platform.stdout_line ("with_parent_span " ++ Config.prefix ())
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  contexts ()
+  try layers () with
+  | BootError m -> Platform.stdout_line ("unexpected " ++ m)
+  shared ()
+  finalizers ()
+  traces ()

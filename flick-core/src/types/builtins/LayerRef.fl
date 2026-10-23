@@ -1,0 +1,31 @@
+/// Effect's `LayerRef`: one layer's services, built on first use, shared
+/// while in use and built anew on `refresh` or after `invalidate`.
+module LayerRef exposing (..)
+
+/// The services `ro` of a layer failing with `e`, owned by the scope of
+/// region `s`.
+type LayerRef (s : Region) (e : ErrorRow) (ro : ServiceRow)
+
+/// How long the services stay built once unused (`None`: until the ref
+/// is released), and whether they are built at once.
+type alias Options = { idleTimeToLive : Option Duration.Duration; preload : Bool }
+
+/// A ref of the services `layer` builds.
+make : forall s ri e ro. Layer ri e ro -> Options ->{Scope s | ri; e} LayerRef s e ro
+foreign effect make from "@flick-lang/runtime/effect/LayerRef" "flickMake"
+  reviewed "effect@4.0.5 sha256:920ebbf52b1b72f1"
+
+/// The services as a layer: a `provide` of it shares those already built.
+get : LayerRef s e ro -> Layer none e ro
+foreign pure get from "@flick-lang/runtime/effect/LayerRef" "flickGet"
+  retention owner
+
+/// Drops the services: the next use builds them anew.
+invalidate : LayerRef s e ro ->{} Unit
+foreign effect invalidate from "@flick-lang/runtime/effect/LayerRef" "flickInvalidate"
+  retention call
+
+/// Builds the services anew now, replacing those built before.
+refresh : LayerRef s e ro ->{; e} Unit
+foreign effect refresh from "@flick-lang/runtime/effect/LayerRef" "flickRefresh"
+  retention call

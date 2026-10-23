@@ -1,0 +1,79 @@
+// Effect's `LayerMap`, `LayerRef` and `ErrorReporter`: layers built on
+// demand by key or once and refreshed, and failures reported to a listener.
+module App.Main exposing (main)
+
+service Tenant =
+  name : Unit ->{} String
+
+tenant : Ref Number -> String -> Layer none none {Tenant}
+let tenant builds key =
+  Layer.effect Tenant (task {
+    Ref.update builds (fun n -> n + 1)
+    Platform.stdout_line ("build " ++ key)
+    { name = fun () -> key }
+  })
+
+options : LayerMap.Options String
+let options = { idleTimeToLive = None; preloadKeys = Some ["a"] }
+
+maps : Unit ->{} Unit
+let maps () =
+  let builds = Ref.make 0
+  scope s {
+    let map : LayerMap.LayerMap s String none {Tenant} = LayerMap.make (tenant builds) options
+    provide LayerMap.get "a" map { Platform.stdout_line ("tenant " ++ Tenant.name ()) }
+    provide LayerMap.get "b" map { Platform.stdout_line ("tenant " ++ Tenant.name ()) }
+    LayerMap.invalidate "a" map
+    provide LayerMap.get "a" map { Platform.stdout_line ("tenant " ++ Tenant.name ()) }
+    let named =
+      LayerMap.from_record
+        [("x", Layer.succeed Tenant { name = fun () -> "record x" })]
+        { idleTimeToLive = None; preload = false }
+    provide LayerMap.get "x" named { Platform.stdout_line (Tenant.name ()) }
+  }
+  Platform.stdout_line ("map builds " ++ show (Ref.get builds))
+
+refs : Unit ->{} Unit
+let refs () =
+  let builds = Ref.make 0
+  scope s {
+    let ref : LayerRef.LayerRef s none {Tenant} =
+      LayerRef.make (tenant builds "ref") { idleTimeToLive = Some Duration.infinity; preload = true }
+    provide LayerRef.get ref { Platform.stdout_line ("ref " ++ Tenant.name ()) }
+    provide LayerRef.get ref { Platform.stdout_line ("ref again " ++ Tenant.name ()) }
+    LayerRef.refresh ref
+    LayerRef.invalidate ref
+    provide LayerRef.get ref { Platform.stdout_line ("ref after invalidate " ++ Tenant.name ()) }
+  }
+  Platform.stdout_line ("ref builds " ++ show (Ref.get builds))
+
+type error Boom = Boom String
+
+supervise : Failure none ->{} Unit
+let supervise _ = Platform.stdout_line "supervisor"
+
+reports : Unit ->{} Unit
+let reports () =
+  let exits = parallel_exits [task { from_result (Err (Boom "reported")) }]
+  let done : Deferred.Deferred none Unit = Deferred.make ()
+  scope s {
+    let listener =
+      Events.listen s (Events.queue 4) supervise (fun (report : ErrorReporter.Report) -> task {
+        Platform.stdout_line ("report " ++ show report.severity ++ " " ++ show (String.contains "reported" report.message))
+        let _ = Deferred.complete_with (task { () }) done
+        ()
+      })
+    let reporter : ErrorReporter.ErrorReporter s = ErrorReporter.make listener
+    provide (ErrorReporter.layer [reporter] { mergeWithExisting = false }) {
+      match Option.bind Exit.failure (List.head exits) with
+      | Some failure -> ErrorReporter.report failure
+      | None -> ()
+    }
+    Deferred.await_ done
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  maps ()
+  refs ()
+  reports ()

@@ -1,0 +1,44 @@
+ctx get
+get_option empty false
+else x
+omit false
+add_or_omit None false
+merge_all last
+ctx succeed_context
+ctx sync_context
+level default
+level changed
+level default
+hello, provide_
+hello, provide_merge hello
+tap_error no greeter
+fallback catch
+fallback catch_cause
+sync x
+fallback suspend
+fallback unwrap
+second merge_all
+effect_discard ran
+hello
+hello!, update_service
+tap hello
+hello flat_map x
+effect_context
+tap_cause
+or_die died [true]
+shared builds 1
+fresh builds 3
+memo builds 4
+from_build hello
+from_build_memo hello
+build hello
+exit failed false
+finalizer ran
+launched
+launch interrupted true
+span Some "boot"
+ended Some "boot" failed false
+with_span Some "build"
+ended Some "build" failed false
+parent_span Some "s1"
+with_parent_span Some "s1"

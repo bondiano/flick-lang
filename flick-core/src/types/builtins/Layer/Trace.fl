@@ -1,0 +1,31 @@
+/// Layers and spans: a layer that opens a span for the body of its
+/// `provide`, or builds another layer inside one.
+module Layer.Trace exposing (..)
+
+/// How `span` and `with_span` make their span; `onEnd` runs when it ends,
+/// with how the body ended (`None`: it succeeded).
+type alias SpanOptions =
+  { span : Tracer.SpanOptions; onEnd : Option (Tracer.Span -> Option RawCause ->{;} Unit) }
+
+/// A span of the name around the body of a `provide`, which ends when the
+/// `provide` releases its services; the spans inside are its children.
+span : String -> SpanOptions -> Layer none none none
+foreign pure span from "@flick-lang/runtime/effect/Layer" "flickSpan"
+  reviewed "effect@4.0.5 sha256:345d9918768caadb"
+
+/// `parent` as the parent of the spans in the body of a `provide`.
+parent_span : Tracer.Span -> Layer none none none
+foreign pure parent_span from "@flick-lang/runtime/effect/Layer" "parentSpan"
+  reviewed "effect@4.0.5 sha256:cf257c4b4e20d2b9"
+
+/// Builds `layer` inside a new span of the name.
+with_span : String -> SpanOptions -> Layer ri e ro -> Layer ri e ro
+foreign pure with_span from "@flick-lang/runtime/effect/Layer" "flickWithSpan"
+  arity 2
+  reviewed "effect@4.0.5 sha256:ee1bf34c4d30ed92"
+
+/// Builds `layer` with `parent` as the parent of its spans.
+with_parent_span : Tracer.Span -> Layer ri e ro -> Layer ri e ro
+foreign pure with_parent_span from "@flick-lang/runtime/effect/Layer" "withParentSpan"
+  arity 1
+  reviewed "effect@4.0.5 sha256:e227003a5f29d35d"

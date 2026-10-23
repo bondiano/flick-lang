@@ -1,16 +1,16 @@
+[wrapped]
+ErrorReporter = "ErrorReporter.ErrorReporter f0f8f4abd66146e8"
+CurrentErrorReporters = "ErrorReporter.layer 01a636063e0ab3c6"
+make = "ErrorReporter.make 9f9f7bbdfa054642"
+layer = "ErrorReporter.layer a4bfb912e10f9fd1"
+report = "ErrorReporter.report 0410343a98c91ca0"
+
 [excluded]
 TypeId = "TS-only: a type identifier"
-
-[pending]
-CurrentErrorReporters = "M20"
-ErrorReporter = "M20"
-Reportable = "M20"
-attributes = "M20"
-getAttributes = "M20"
-getSeverity = "M20"
-ignore = "M20"
-isIgnored = "M20"
-layer = "M20"
-make = "M20"
-report = "M20"
-severity = "M20"
+Reportable = "TS-only: the symbol keys a JS `Error` may carry; a Flick `type error` value has none"
+ignore = "TS-only: a symbol key of a JS `Error`; a Flick error value carries no symbol keys"
+severity = "TS-only: a symbol key of a JS `Error`; a report gives its severity"
+attributes = "TS-only: a symbol key of a JS `Error`; a report gives its attributes"
+isIgnored = "TS-only: reads a symbol key of any JS value; a Flick error value carries none"
+getSeverity = "TS-only: reads a symbol key of a JS object; `ErrorReporter.Report` has the severity"
+getAttributes = "TS-only: reads a symbol key of a JS object; `ErrorReporter.Report` has the attributes"
