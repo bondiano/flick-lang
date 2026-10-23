@@ -1,4 +1,5 @@
 [wrapped]
+request = "Request.run c9fdf75926dde85d"
 sleep = "Effect.sleep 2900e4923ff8d2f8"
 retry = "Effect.retry 508d9e1864f6c9d3"
 retryOrElse = "Effect.retry_or_else 5fe0f949f1b659e3"
@@ -247,6 +248,3 @@ updateContext = "invariant: a first-class `Context` carries services outside the
 provideContext = "invariant: a first-class `Context` carries services outside the checked service row; services pass only through rows and `provide`"
 serviceOption = "invariant: asks for a service its service row does not name"
 requestUnsafe = "invariant: `unsafe*` runs the request outside a fiber, with a callback"
-
-[pending]
-request = "M20"
