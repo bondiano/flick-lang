@@ -34,22 +34,64 @@ let main () =
   line ("concat", (Stream.run_collect (nums |> Stream.concat tens)))
   line ("prepend", (Stream.run_collect (Stream.prepend [0] nums)))
   line ("flat_map", (Stream.run_collect (Stream.flat_map (fun n -> Stream.make [n, n]) nums)))
-  line ("flat_map_par", (sorted (Stream.flat_map_par { concurrency = Some 2; bufferSize = None } (fun n -> Stream.make [n, n * 10]) nums)))
-  line ("flat_map_par unbounded", (sorted (Stream.flat_map_par { concurrency = None; bufferSize = Some 4 } (fun n -> Stream.succeed n) nums)))
-  line ("switch_map", (Stream.run_collect (Stream.switch_map (fun n -> Stream.succeed n) (Stream.make [1]))))
+  line
+    (
+      "flat_map_par",
+      (sorted
+        (Stream.flat_map_par
+          { concurrency = Some 2; bufferSize = None }
+          (fun n -> Stream.make [n, n * 10])
+          nums))
+    )
+  line
+    (
+      "flat_map_par unbounded",
+      (sorted
+        (Stream.flat_map_par
+          { concurrency = None; bufferSize = Some 4 }
+          (fun n -> Stream.succeed n)
+          nums))
+    )
+  line
+    (
+      "switch_map",
+      (Stream.run_collect (Stream.switch_map (fun n -> Stream.succeed n) (Stream.make [1])))
+    )
   line ("flatten", (Stream.run_collect (Stream.flatten (Stream.make [nums, tens]))))
-  line ("flatten_chunks", (Stream.run_collect (Stream.flatten_chunks (Stream.make [NonEmpty.cons 1 [2], NonEmpty.singleton 3]))))
+  line
+    (
+      "flatten_chunks",
+      (Stream.run_collect
+        (Stream.flatten_chunks (Stream.make [NonEmpty.cons 1 [2], NonEmpty.singleton 3])))
+    )
   line ("flatten_list", (Stream.run_collect (Stream.flatten_list (Stream.make [[1], [], [2, 3]]))))
   let side = Ref.make 0
-  line ("drain", (Stream.run_collect (Stream.concat (Stream.succeed 5) (Stream.drain (Stream.tap (fun n -> Ref.set side n) nums)))))
+  line
+    (
+      "drain",
+      (Stream.run_collect
+        (
+          Stream.concat
+            (Stream.succeed 5)
+            (Stream.drain (Stream.tap (fun n -> Ref.set side n) nums))
+        ))
+    )
   line ("drained", [Ref.get side])
   line ("drain_fork", (Stream.run_collect (Stream.drain_fork Stream.never nums)))
   line ("repeat", (Stream.run_collect (Stream.repeat (Schedule.recurs 1) nums)))
-  line ("repeat_elements", (Stream.run_collect (Stream.repeat_elements (Schedule.recurs 1) (Stream.make [1, 2]))))
+  line
+    (
+      "repeat_elements",
+      (Stream.run_collect (Stream.repeat_elements (Schedule.recurs 1) (Stream.make [1, 2])))
+    )
   line ("forever", (Stream.run_collect (Stream.take 5 (Stream.forever nums))))
   line ("schedule", (Stream.run_collect (Stream.schedule (Schedule.spaced ms1) nums)))
   line ("timeout", (Stream.run_collect (Stream.timeout ms20 (Stream.concat Stream.never nums))))
-  line ("timeout_or_else", (Stream.run_collect (Stream.timeout_or_else ms20 tens (Stream.concat Stream.never nums))))
+  line
+    (
+      "timeout_or_else",
+      (Stream.run_collect (Stream.timeout_or_else ms20 tens (Stream.concat Stream.never nums)))
+    )
   line ("merge", (sorted (Stream.merge tens nums)))
   let left : Stream.HaltStrategy = Stream.Left
   line ("merge_with", (sorted (Stream.merge_with left Stream.never nums)))
@@ -59,15 +101,44 @@ let main () =
   line ("merge_effect", (Stream.run_collect (Stream.merge_effect (task { Ref.set side 42 }) nums)))
   line ("merged effect", [Ref.get side])
   let tagged = Stream.run_collect (Stream.merge_result tens nums)
-  Platform.stdout_line ("merge_result: " ++ show (List.length (List.filter (fun r -> match r with | Ok _ -> true | Err _ -> false) tagged), List.length tagged))
+  Platform.stdout_line
+    ("merge_result: "
+      ++ show
+        (
+          List.length (List.filter (fun r -> match r with | Ok _ -> true | Err _ -> false) tagged),
+          List.length tagged
+        ))
   line ("merge_left", (Stream.run_collect (Stream.merge_left tens nums)))
   line ("merge_right", (Stream.run_collect (Stream.merge_right tens nums)))
-  line ("merge_all", (sorted (Stream.merge_all { concurrency = Some 2; bufferSize = None } [nums, tens, Stream.succeed 7])))
+  line
+    (
+      "merge_all",
+      (sorted
+        (
+          Stream.merge_all
+            { concurrency = Some 2; bufferSize = None }
+            [nums, tens, Stream.succeed 7]
+        ))
+    )
   pairs ("cross", (Stream.run_collect (Stream.cross (Stream.make [1, 2]) (Stream.make [5, 6]))))
-  line ("cross_with", (Stream.run_collect (Stream.cross_with (Stream.make [1, 2]) (fun a b -> a * b) (Stream.make [5, 6]))))
+  line
+    (
+      "cross_with",
+      (Stream.run_collect
+        (Stream.cross_with (Stream.make [1, 2]) (fun a b -> a * b) (Stream.make [5, 6])))
+    )
   pairs ("zip", (Stream.run_collect (Stream.zip tens nums)))
   line ("zip_with", (Stream.run_collect (Stream.zip_with tens (fun a b -> a + b) nums)))
-  let zipped = Stream.zip_with_chunks tens (fun xs ys -> (NonEmpty.singleton (List.sum (NonEmpty.to_list xs) + List.sum (NonEmpty.to_list ys)), [], [])) nums
+  let zipped =
+    Stream.zip_with_chunks
+      tens
+      (fun xs ys ->
+        (
+          NonEmpty.singleton (List.sum (NonEmpty.to_list xs) + List.sum (NonEmpty.to_list ys)),
+          [],
+          []
+        ))
+      nums
   line ("zip_with_chunks", (Stream.run_collect zipped))
   line ("zip_left", (Stream.run_collect (Stream.zip_left (Stream.make [0]) nums)))
   line ("zip_right", (Stream.run_collect (Stream.zip_right (Stream.make [0]) nums)))
@@ -80,21 +151,51 @@ let main () =
   Platform.stdout_line ("zip_with_previous: " ++ show previous)
   let around = Stream.run_collect (Stream.zip_with_previous_and_next (Stream.make [1, 2]))
   Platform.stdout_line ("zip_with_previous_and_next: " ++ show around)
-  pairs ("zip_latest", (Stream.run_collect (Stream.zip_latest (Stream.succeed 9) (Stream.succeed 1))))
-  line ("zip_latest_with", (Stream.run_collect (Stream.zip_latest_with (Stream.succeed 9) (fun a b -> a + b) (Stream.succeed 1))))
+  pairs
+    ("zip_latest", (Stream.run_collect (Stream.zip_latest (Stream.succeed 9) (Stream.succeed 1))))
+  line
+    (
+      "zip_latest_with",
+      (Stream.run_collect
+        (Stream.zip_latest_with (Stream.succeed 9) (fun a b -> a + b) (Stream.succeed 1)))
+    )
   let latest = Stream.run_collect (Stream.zip_latest_all [Stream.succeed 1, Stream.succeed 2])
   Platform.stdout_line ("zip_latest_all: " ++ show latest)
   line ("race", (Stream.run_collect (Stream.race Stream.never nums)))
   line ("race_all", (Stream.run_collect (Stream.race_all [Stream.never, tens])))
   line ("interleave", (Stream.run_collect (Stream.interleave tens nums)))
-  line ("interleave_with", (Stream.run_collect (Stream.interleave_with tens (Stream.make [true, false, false, true]) nums)))
-  line ("interrupt_when", (Stream.run_collect (Stream.interrupt_when (task { Effect.sleep ms10 }) (Stream.concat Stream.never nums))))
+  line
+    (
+      "interleave_with",
+      (
+        Stream.run_collect
+          (Stream.interleave_with tens (Stream.make [true, false, false, true]) nums)
+      )
+    )
+  line
+    (
+      "interrupt_when",
+      (Stream.run_collect
+        (Stream.interrupt_when (task { Effect.sleep ms10 }) (Stream.concat Stream.never nums)))
+    )
   let ticking = Stream.schedule (Schedule.spaced ms2) (Stream.forever (Stream.succeed 1))
-  Platform.stdout_line ("halt_when: " ++ show (Stream.run_count (Stream.halt_when (task { Effect.sleep ms10 }) ticking) > 0))
-  let groups = Stream.run_collect (Stream.flat_map_par { concurrency = None; bufferSize = None } (fun (k, g) -> Stream.map (fun v -> (k, v)) (Stream.collect g)) (Stream.group_by_key (fun n -> n % 2) (Stream.range 1 5)))
+  Platform.stdout_line
+    ("halt_when: "
+      ++ show (Stream.run_count (Stream.halt_when (task { Effect.sleep ms10 }) ticking) > 0))
+  let groups =
+    Stream.run_collect
+      (Stream.flat_map_par
+        { concurrency = None; bufferSize = None }
+        (fun (k, g) -> Stream.map (fun v -> (k, v)) (Stream.collect g))
+        (Stream.group_by_key (fun n -> n % 2) (Stream.range 1 5)))
   Platform.stdout_line ("group_by_key: " ++ show (List.sort groups))
   let keyed = Stream.group_by (fun n -> (n > 2, n * 10)) (Stream.range 1 4)
-  let grouped = Stream.run_collect (Stream.flat_map_par { concurrency = None; bufferSize = None } (fun (k, g) -> Stream.map (fun v -> (k, v)) (Stream.collect g)) keyed)
+  let grouped =
+    Stream.run_collect
+      (Stream.flat_map_par
+        { concurrency = None; bufferSize = None }
+        (fun (k, g) -> Stream.map (fun v -> (k, v)) (Stream.collect g))
+        keyed)
   Platform.stdout_line ("group_by: " ++ show (List.sort grouped))
   let split = { capacity = Some 8; strategy = None; replay = Some 3 }
   let fanned =
@@ -118,19 +219,22 @@ let main () =
   line ("share", [reused])
   let halves =
     scope {
-      let (passed, refused) = Stream.partition (fun n -> if n % 2 == 0 then Ok n else Err n) (Stream.range 1 6)
+      let (passed, refused) =
+        Stream.partition (fun n -> if n % 2 == 0 then Ok n else Err n) (Stream.range 1 6)
       (Stream.run_collect passed, Stream.run_collect refused)
     }
   Platform.stdout_line ("partition: " ++ show halves)
   let checked =
     scope {
-      let (passed, refused) = Stream.partition_effect (fun n -> if n > 2 then Ok n else Err n) (Stream.range 1 4)
+      let (passed, refused) =
+        Stream.partition_effect (fun n -> if n > 2 then Ok n else Err n) (Stream.range 1 4)
       (Stream.run_collect passed, Stream.run_collect refused)
     }
   Platform.stdout_line ("partition_effect: " ++ show checked)
   let queues =
     scope {
-      let (passed, refused) = Stream.partition_queue (fun n -> if n < 3 then Ok n else Err n) (Stream.range 1 4)
+      let (passed, refused) =
+        Stream.partition_queue (fun n -> if n < 3 then Ok n else Err n) (Stream.range 1 4)
       (Queue.collect passed, Queue.collect refused)
     }
   Platform.stdout_line ("partition_queue: " ++ show queues)

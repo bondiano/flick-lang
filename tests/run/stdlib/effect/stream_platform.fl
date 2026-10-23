@@ -16,7 +16,10 @@ let whole = { offset = None; bytesToRead = None; chunkSize = None }
 
 /// Two events, whatever the file system would see.
 fixed_backend : Stream.WatchBackend
-let fixed_backend path _ = Some (Stream.from_list_effect (task { [Stream.Create (path ++ "/new"), Stream.Remove (path ++ "/old")] }))
+let fixed_backend path _ =
+  Some
+    (Stream.from_list_effect
+      (task { [Stream.Create (path ++ "/new"), Stream.Remove (path ++ "/old")] }))
 
 flat : Stream.WatchOptions
 let flat = { recursive = false }
@@ -32,11 +35,27 @@ let files dir =
   line ("read_file", (show (Stream.mk_string (Stream.decode_text (Stream.read_file whole a)))))
   let part = { offset = ByteSize.bytes 4; bytesToRead = ByteSize.bytes 3; chunkSize = Some 2 }
   line ("read_file part", (show (Stream.run_collect (Stream.read_file part a))))
-  line ("split_lines", (show (Stream.run_collect (Stream.split_lines (Stream.decode_text (Stream.read_file whole a))))))
-  let missing = try show (Stream.run_count (Stream.read_file whole (dir ++ "/none"))) with | PlatformError.PlatformError _ -> "missing"
+  line
+    (
+      "split_lines",
+      (
+        show
+          (Stream.run_collect (Stream.split_lines (Stream.decode_text (Stream.read_file whole a))))
+      )
+    )
+  let missing =
+    try show
+      (
+        Stream.run_count (Stream.read_file whole (dir ++ "/none"))
+      ) with | PlatformError.PlatformError _ ->
+      "missing"
   line ("read_file missing", missing)
   let backed = Stream.run_collect (Stream.watch_with fixed_backend flat dir)
-  line ("watch_with", (show (List.length backed, List.map (fun e -> e == Stream.Create (dir ++ "/new")) backed)))
+  line
+    (
+      "watch_with",
+      (show (List.length backed, List.map (fun e -> e == Stream.Create (dir ++ "/new")) backed))
+    )
   let created =
     Stream.watch flat dir
       |> Stream.merge_effect (task {
@@ -54,7 +73,10 @@ let subscribed hub =
   scope {
     let sub = PubSub.subscribe hub
     let _ = PubSub.publish_all [1, 2, 3] hub
-    Stream.from_subscription sub |> Stream.map (fun n -> n * 10) |> Stream.take 3 |> Stream.run_collect
+    Stream.from_subscription sub
+      |> Stream.map (fun n -> n * 10)
+      |> Stream.take 3
+      |> Stream.run_collect
   }
 
 /// Streams of open files, read inside the scope that closes them.
@@ -63,14 +85,21 @@ let opened path =
   scope {
     let file = FileSystem.open { flag = None; mode = None; noFollow = false } path
     let handles = Stream.make [file, file]
-    Stream.run_collect (Stream.map_effect (fun f -> List.length (Option.with_default [] (FileSystem.read_alloc 2 (Some 0n) f))) handles)
+    Stream.run_collect
+      (Stream.map_effect
+        (fun f -> List.length (Option.with_default [] (FileSystem.read_alloc 2 (Some 0n) f)))
+        handles)
   }
 
 main : Unit ->{; AppError} Unit
 let main () =
   line ("decode_text", (Stream.mk_string (Stream.decode_text (Stream.make [[104, 195], [169]]))))
   line ("encode_text", (show (Stream.mk_bytes (Stream.encode_text (Stream.make ["é", "!"])))))
-  let limited = Stream.limit_bytes (Option.with_default ByteSize.zero (ByteSize.bytes 3)) (Stream.succeed [0]) (Stream.make [[1, 2], [3, 4], [5]])
+  let limited =
+    Stream.limit_bytes
+      (Option.with_default ByteSize.zero (ByteSize.bytes 3))
+      (Stream.succeed [0])
+      (Stream.make [[1, 2], [3, 4], [5]])
   line ("limit_bytes", (show (Stream.run_collect limited)))
   let hub = PubSub.unbounded { replay = None }
   line ("from_subscription", (show (subscribed hub)))
@@ -78,7 +107,9 @@ let main () =
     try
       provide FileSystem.node {
         scope {
-          let dir = FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-stream-" }
+          let dir =
+            FileSystem.make_temp_directory_scoped
+              { directory = None; prefix = Some "flick-stream-" }
           files dir
           FileSystem.write_file_string plain (dir ++ "/h.txt") "handle"
           line ("scoped handles", (show (opened (dir ++ "/h.txt"))))

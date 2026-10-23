@@ -49,21 +49,25 @@ foreign effect run_fold from "@flick-lang/runtime/effect/Stream" "flickRunFold"
   reviewed "effect@4.0.5 sha256:b323a8cfa66ab7cb"
 
 /// `run_fold` with a task as the step.
-run_fold_effect : forall c r e a z r2 e2. z -> (z -> a ->{r2; e2} z)^c -> ((Stream r e a)^c ->{r + r2; e + e2} z)^c
+run_fold_effect : forall c r e a z r2 e2. z ->
+  (z -> a ->{r2; e2} z)^c ->
+  ((Stream r e a)^c ->{r + r2; e + e2} z)^c
 foreign effect run_fold_effect from "@flick-lang/runtime/effect/Stream" "flickRunFoldEffect"
   arity 2
   retention call
   reviewed "effect@4.0.5 sha256:c626d5a96011fd77"
 
 /// Runs `f` on each element.
-run_for_each : forall c r e a r2 e2 x. (a ->{r2; e2} x)^c -> ((Stream r e a)^c ->{r + r2; e + e2} Unit)^c
+run_for_each : forall c r e a r2 e2 x. (a ->{r2; e2} x)^c ->
+  ((Stream r e a)^c ->{r + r2; e + e2} Unit)^c
 foreign effect run_for_each from "@flick-lang/runtime/effect/Stream" "runForEach"
   arity 1
   retention call
   reviewed "effect@4.0.5 sha256:d91007d002b3f9ac"
 
 /// Runs `f` on each element while it gives `true`.
-run_for_each_while : forall c r e a r2 e2. (a ->{r2; e2} Bool)^c -> ((Stream r e a)^c ->{r + r2; e + e2} Unit)^c
+run_for_each_while : forall c r e a r2 e2. (a ->{r2; e2} Bool)^c ->
+  ((Stream r e a)^c ->{r + r2; e + e2} Unit)^c
 foreign effect run_for_each_while from "@flick-lang/runtime/effect/Stream" "runForEachWhile"
   arity 1
   retention call
@@ -71,7 +75,8 @@ foreign effect run_for_each_while from "@flick-lang/runtime/effect/Stream" "runF
 
 /// Runs `f` on each chunk.
 run_for_each_chunk :
-  forall c r e a r2 e2 x. (NonEmpty.NonEmpty a ->{r2; e2} x)^c -> ((Stream r e a)^c ->{r + r2; e + e2} Unit)^c
+  forall c r e a r2 e2 x. (NonEmpty.NonEmpty a ->{r2; e2} x)^c ->
+    ((Stream r e a)^c ->{r + r2; e + e2} Unit)^c
 foreign effect run_for_each_chunk from "@flick-lang/runtime/effect/Stream" "runForEachArray"
   arity 1
   retention call
@@ -125,7 +130,9 @@ foreign effect to_pubsub from "@flick-lang/runtime/effect/Stream" "flickToPubSub
 to_queue :
   forall s c r e a.
   Fiber.Outlives c s =>
-  { capacity : Option Number; strategy : Option Queue.Strategy } -> (Stream r e a)^c ->{Scope s | r;} Queue.Queue e a
+  { capacity : Option Number; strategy : Option Queue.Strategy } ->
+    (Stream r e a)^c ->{Scope s | r;}
+    Queue.Queue e a
 foreign effect to_queue from "@flick-lang/runtime/effect/Stream" "flickToQueue"
   arity 1
   retention owner

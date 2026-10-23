@@ -25,7 +25,10 @@ foreign pure split_lines from "@flick-lang/runtime/effect/Stream" "splitLines"
 
 /// Chunks of bytes up to `limit`; past it, `on_limit` instead of the rest.
 limit_bytes :
-  forall c r e. ByteSize.ByteSize -> (Stream r e (List Number))^c -> (Stream r e (List Number))^c -> (Stream r e (List Number))^c
+  forall c r e. ByteSize.ByteSize ->
+    (Stream r e (List Number))^c ->
+    (Stream r e (List Number))^c ->
+    (Stream r e (List Number))^c
 foreign pure limit_bytes from "@flick-lang/runtime/effect/Stream" "flickLimitBytes"
   arity 2
   retention call
@@ -57,14 +60,19 @@ type alias WatchBackend =
 /// The changes under the path, until the stream ends. It needs the file
 /// system of `FileSystem.node`; another implementation fails with
 /// `NotFound`.
-watch : WatchOptions -> String -> Stream {FileSystem.FileSystem} {PlatformError.PlatformError} WatchEvent
+watch : WatchOptions ->
+  String ->
+  Stream {FileSystem.FileSystem} {PlatformError.PlatformError} WatchEvent
 foreign pure watch from "@flick-lang/runtime/effect/Stream" "flickWatch"
   arity 2
   reviewed "effect@4.0.5 sha256:e72be4f6c861122c"
 
 /// `watch` through `backend` where it gives a stream.
 watch_with :
-  WatchBackend -> WatchOptions -> String -> Stream {FileSystem.FileSystem} {PlatformError.PlatformError} WatchEvent
+  WatchBackend ->
+    WatchOptions ->
+    String ->
+    Stream {FileSystem.FileSystem} {PlatformError.PlatformError} WatchEvent
 foreign pure watch_with from "@flick-lang/runtime/effect/Stream" "flickWatchWith"
   arity 3
   reviewed "effect@4.0.5 sha256:22f38a5c95d1031b"
@@ -72,11 +80,17 @@ foreign pure watch_with from "@flick-lang/runtime/effect/Stream" "flickWatchWith
 /// Where `read_file` starts and how much it reads (`None`: from the start,
 /// all of it, in chunks of 64 KiB).
 type alias ReadOptions =
-  { offset : Option ByteSize.ByteSize; bytesToRead : Option ByteSize.ByteSize; chunkSize : Option Number }
+  {
+    offset : Option ByteSize.ByteSize;
+    bytesToRead : Option ByteSize.ByteSize;
+    chunkSize : Option Number
+  }
 
 /// The bytes of the file in chunks, read through the `open` of the file
 /// system; the file is closed when the stream ends.
-read_file : ReadOptions -> String -> Stream {FileSystem.FileSystem} {PlatformError.PlatformError} (List Number)
+read_file : ReadOptions ->
+  String ->
+  Stream {FileSystem.FileSystem} {PlatformError.PlatformError} (List Number)
 foreign pure read_file from "@flick-lang/runtime/effect/Stream" "flickReadFile"
   arity 2
   reviewed "effect@4.0.5 sha256:e72be4f6c861122c"
