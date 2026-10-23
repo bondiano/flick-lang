@@ -89,6 +89,19 @@ let counted user =
   scope {
     run user
   }
+
+sql table Items \"items\" {
+  id : bigint primary key generated always as BigInt
+  label : text not null as String
+}
+
+items_of : User -> Sql.Template Sql.Pg {} { label : String }
+let items_of owner =
+  sql {
+    from item in Items
+    where item.label == $owner.name || item.label == $(greet owner)
+    select { label = item.label }
+  }
 ";
 
 struct Fixture {
@@ -303,10 +316,11 @@ fn rename_changes_every_use_and_refuses_what_has_no_exact_mapping() {
         )
         .expect("renamed");
     let count = |m: &str| edits.iter().filter(|(file, _)| *file == f.file(m)).count();
-    // exposing, signature, let in Domain; exposing and the use in Main
+    // exposing, signature, let in Domain; exposing, the use and the
+    // capture `$(greet owner)` in Main
     assert_eq!(
         (count("App.Domain"), count("App.Main")),
-        (3, 2),
+        (3, 3),
         "{edits:?}"
     );
     assert!(
@@ -408,4 +422,50 @@ fn the_projection_maps_names_exactly_and_comes_from_the_analysis() {
             &text[m.fl[0] as usize..m.fl[1] as usize]
         );
     }
+}
+
+#[test]
+fn captures_in_sql_are_names_of_the_program() {
+    let f = fixture();
+    let ide = f.ide();
+    let main = f.file("App.Main");
+    let text = &f.sources.get(main).text;
+    let go = |needle: &str| {
+        let (symbol, _) = ide
+            .symbol_at(main, f.at("App.Main", needle, 0) + 1)
+            .expect("a symbol");
+        let loc = ide.definition(&symbol).expect("a definition");
+        (loc.start, f.text_at(&loc.target, loc.start, loc.end))
+    };
+    let binder = f.at("App.Main", "owner =", 0);
+    assert_eq!(go("owner.name"), (binder, "owner".into()));
+    assert_eq!(go("owner)"), (binder, "owner".into()));
+    assert_eq!(go("greet owner)").1, "greet");
+    let (hover, _) = ide
+        .hover(main, f.at("App.Main", "owner.name", 0) + 1)
+        .expect("a hover");
+    assert!(hover.contains("owner : User"), "{hover}");
+    let labels = |cs: Vec<super::Completion>| {
+        cs.into_iter()
+            .map(|c| (c.label, c.kind))
+            .collect::<Vec<_>>()
+    };
+    let fields = labels(ide.complete(main, f.at("App.Main", "owner.name", 0) + 5, true));
+    assert!(
+        fields.contains(&("age".into(), CompletionKind::Field)),
+        "{fields:?}"
+    );
+    let names = labels(ide.complete(main, f.at("App.Main", "owner.name", 0), false));
+    assert!(
+        names.contains(&("owner".into(), CompletionKind::Local)),
+        "{names:?}"
+    );
+    let edits = ide
+        .rename(main, f.at("App.Main", "owner.name", 0) + 1, "who")
+        .expect("renamed");
+    let renamed: Vec<&str> = edits
+        .iter()
+        .map(|(_, (s, e))| &text[*s as usize..*e as usize])
+        .collect();
+    assert_eq!(renamed, ["owner"; 3]);
 }

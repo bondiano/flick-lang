@@ -4,6 +4,9 @@
 [{ balance = 17 }]
 [{ name = "Ada" }, { name = "'; DROP TABLE users; --" }]
 [{ name = "Ada" }]
+[{ balance = 5 }, { balance = 17 }]
+[{ email = None }]
+[{ email = Some "'; --" }]
 2
 0
 DbError 23514 Some "balance_not_negative"

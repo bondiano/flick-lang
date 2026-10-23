@@ -69,6 +69,9 @@ pub struct Param {
     pub form: Option<SqlForm>,
     pub span: Span,
     pub placeholder: usize,
+    /// The type of the captured value of a `$name`, which is no parameter
+    /// of the template.
+    pub captured: Option<Type>,
 }
 
 /// What a query and its subqueries share: the parameter binder, the
@@ -95,6 +98,7 @@ impl Cx {
             form: None,
             span,
             placeholder: self.slots.len(),
+            captured: None,
         });
         self.slots.push(ty);
         self.plan.params.push(SqlValue {
@@ -179,7 +183,7 @@ impl Checker<'_> {
             let unknown: Vec<(String, Span)> = cx
                 .params
                 .iter()
-                .filter(|p| declared.get(&p.name).is_none())
+                .filter(|p| p.captured.is_none() && declared.get(&p.name).is_none())
                 .map(|p| (p.name.clone(), p.span))
                 .collect();
             for (name, span) in &unknown {
@@ -196,6 +200,7 @@ impl Checker<'_> {
         let params = Row::closed(
             cx.params
                 .iter()
+                .filter(|p| p.captured.is_none())
                 .map(|p| (p.name.clone(), optional(p.ty.clone(), p.nullable)))
                 .collect(),
         );
@@ -241,13 +246,17 @@ impl Checker<'_> {
     /// Settles how each parameter and result crosses the driver.
     fn sql_plan(&mut self, mut cx: Cx, query: Query, node: &Node) {
         for p in &cx.params {
+            if let Some(captured) = &p.captured {
+                self.expect(captured, &optional(p.ty.clone(), p.nullable), p.span);
+            }
             let form = self.sql_form(p.form.clone(), &p.ty, p.span);
             let slot = &mut cx.plan.params[p.placeholder];
             slot.form = form;
             slot.nullable = p.nullable;
         }
         for (i, ty) in cx.slots.iter().enumerate() {
-            if cx.plan.params[i].literal.is_some() {
+            let captured = cx.params.iter().any(|p| p.placeholder == i);
+            if cx.plan.params[i].literal.is_some() && !captured {
                 let span = self.span(node);
                 cx.plan.params[i].form = self.sql_form(None, ty, span);
             }

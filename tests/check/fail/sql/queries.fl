@@ -92,3 +92,11 @@ sql table Bad "bad" {
 raw : Sql.Raw
 let raw = Sql.ident "users"
 //                  ^^^^^^^ FLICK-T003 expected `Identifier`, found `String`
+
+captured : Date -> Sql.Template Pg {} { name : String }
+let captured d = sql { from user in Users; where user.id == $d; select { name = user.name } }
+//                                                          ^^ FLICK-T003 expected `UserId`, found `Date`
+
+unbound : Sql.Template Pg {} { name : String }
+let unbound = sql { from user in Users; where user.id == $nowhere; select { name = user.name } }
+//                                                        ^^^^^^^ FLICK-T001 cannot find value `nowhere`

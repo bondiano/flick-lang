@@ -101,6 +101,19 @@ let savers =
 named : Sql.Template Pg { name : String } { id : UserId }
 let named = sql p { from u in Users; where u.name == p.name; select u.id }
 
+accounts_of : UserId -> Sql.Template Pg {} { balance : BigDecimal }
+let accounts_of owner =
+  sql { from a in Accounts; where a.user_id == $owner; order_by a.balance; select a.balance }
+
+set_email : UserId -> Option String -> Sql.Template Pg {} { email : Option String }
+let set_email who email =
+  sql {
+    update Users
+    set { email = $email }
+    where Users.id == $who
+    returning { email = Users.email }
+  }
+
 drift : Sql.Template Pg {} { amount : BigInt }
 let drift = sql { from d in Drift; select d.amount }
 
@@ -130,6 +143,9 @@ let run () =
       (Database.query (Sql.bind deposit { account = first; amount = BigDecimal.from_integer 7n })))
   Platform.stdout_line (show (Database.query (Sql.bind names {})))
   Platform.stdout_line (show (Database.query (Sql.bind savers {})))
+  Platform.stdout_line (show (Database.query (Sql.bind (accounts_of ada) {})))
+  Platform.stdout_line (show (Database.query (Sql.bind (set_email ada None) {})))
+  Platform.stdout_line (show (Database.query (Sql.bind (set_email bob (Some "'; --")) {})))
   Platform.stdout_line (show (Database.query (Sql.bind close { owner = ada }) |> List.length))
   let kept =
     (one (open_account, { owner = bob; balance = BigDecimal.from_integer 1n }, { id = 0n })).id

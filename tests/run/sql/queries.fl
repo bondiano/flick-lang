@@ -62,6 +62,35 @@ let add =
     returning { id = Users.id }
   }
 
+by_id : UserId -> Sql.Template Pg {} { name : String; balance : Option BigDecimal.BigDecimal }
+let by_id id =
+  sql {
+    from u in Users
+    left_join a in Accounts on a.user_id == u.id
+    where u.id == $id && u.name != $default_name
+    select { name = u.name; balance = a.balance }
+  }
+
+default_name : String
+let default_name = "nobody"
+
+rename : UserId -> Option String -> Sql.Template Pg { name : String } { id : UserId }
+let rename id email =
+  sql p {
+    update Users
+    set { name = p.name; email = $email }
+    where Users.id == $id
+    returning { id = Users.id }
+  }
+
+by_owner : { name : String; email : Option String } -> Sql.Template Pg {} { id : UserId }
+let by_owner who =
+  sql {
+    from u in Users
+    where u.name == $who.name && u.name != $(String.trim default_name)
+    select { id = u.id }
+  }
+
 main : Unit ->{; AppError} Unit
 let main () =
   let q = Sql.bind by_name { name = "'; DROP TABLE users; --" }
@@ -70,5 +99,9 @@ let main () =
   Platform.stdout_line (Sql.text (Sql.bind totals { min = 2n }))
   Platform.stdout_line (Sql.text (Sql.bind rich {}))
   Platform.stdout_line (Sql.text (Sql.bind add { name = "Ada"; email = None }))
+  Platform.stdout_line (Sql.template_text (by_id (UserId 7n)))
+  Platform.stdout_line (show (Sql.parameter_count (Sql.bind (by_id (UserId 7n)) {})))
+  Platform.stdout_line (Sql.text (Sql.bind (rename (UserId 7n) None) { name = "Ada" }))
+  Platform.stdout_line (Sql.template_text (by_owner { name = "Ada"; email = None }))
   Platform.stdout_line
     (show (Option.is_some (Sql.identifier "users"), Option.is_some (Sql.identifier "users; drop")))

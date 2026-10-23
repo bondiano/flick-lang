@@ -3,6 +3,7 @@
 //! unifies with the rest of the program. Rules: `docs/src/content/docs/reference/sql.md`.
 
 mod expr;
+mod placeholder;
 mod query;
 mod select;
 mod table;

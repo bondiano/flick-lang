@@ -83,6 +83,14 @@ fn clauses(query: &Node) -> impl Iterator<Item = &Node> {
         .filter(|n| n.kind == K::SqlClause)
 }
 
+/// Whether `path` ends inside a `$…` capture, whose names are the program's.
+fn captured(path: &[&Node]) -> bool {
+    path.iter()
+        .rev()
+        .find(|n| matches!(n.kind, K::SqlExpr | K::SqlCapture))
+        .is_some_and(|n| n.kind == K::SqlCapture)
+}
+
 fn bindings<'a>(
     path: &[&Node],
     typing: &'a Typing,
@@ -166,6 +174,9 @@ impl Ide<'_> {
         let m = self.module(file)?;
         let text = self.text(file);
         let path = tree::path_to(&m.tree, offset);
+        if captured(&path) {
+            return None;
+        }
         if path.iter().any(|n| n.kind == K::SqlTableDecl) {
             let column = path.iter().find(|n| n.kind == K::SqlColumn)?;
             if dotted
@@ -302,9 +313,10 @@ impl Ide<'_> {
         let m = self.module(file)?;
         let text = self.text(file);
         let path = tree::path_to(&m.tree, offset);
-        if !path
-            .iter()
-            .any(|n| matches!(n.kind, K::SqlExpr | K::SqlTableDecl))
+        if captured(&path)
+            || !path
+                .iter()
+                .any(|n| matches!(n.kind, K::SqlExpr | K::SqlTableDecl))
         {
             return None;
         }

@@ -38,8 +38,12 @@ impl<'a> Walker<'a> {
     fn walk(&mut self, node: &Node) {
         let mark = self.locals.len();
         match node.kind {
+            K::ModuleHeader | K::ImportDecl => return,
             // shortcut: names inside `sql { }` are SQL-scoped; resolve them in SQL elaboration
-            K::ModuleHeader | K::ImportDecl | K::SqlExpr => return,
+            K::SqlExpr => {
+                self.captures(node);
+                return;
+            }
             K::NameExpr | K::ConPat => self.reference(node, Namespace::Constructor),
             K::NameType => self.reference(node, Namespace::Type),
             K::LetDecl => {
@@ -70,6 +74,17 @@ impl<'a> Walker<'a> {
             self.walk(child);
         }
         self.locals.truncate(mark);
+    }
+
+    /// The `$name` captures of a `sql { … }` block: names of the program.
+    fn captures(&mut self, node: &Node) {
+        for child in node.nodes() {
+            if child.kind == K::SqlCapture {
+                self.walk(child);
+            } else {
+                self.captures(child);
+            }
+        }
     }
 
     /// Walks a `let`, then leaves the names it binds in scope.

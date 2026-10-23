@@ -94,6 +94,7 @@ pub enum SyntaxKind {
     Percent,
     StarStar,
     Caret,
+    Dollar,
     Underscore,
     /// A character that starts no token.
     Unknown,
@@ -161,6 +162,8 @@ pub enum SyntaxKind {
     ProvideExpr,
     SqlExpr,
     SqlClause,
+    /// `$name` inside `sql { … }`: a value of the program as a placeholder.
+    SqlCapture,
     UiExpr,
     CliExpr,
     CliClause,

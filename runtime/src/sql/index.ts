@@ -73,6 +73,8 @@ export const sqlBind = (template: Template, values: Readonly<Record<string, unkn
 
 export const sqlText = (query: Query): string => (query._tag === "Typed" ? query.template.text : query.text);
 
+export const sqlTemplateText = (template: Template): string => template.text;
+
 export const sqlParameterCount = (query: Query): number =>
   query._tag === "Typed" ? query.template.params.length : query.values.length;
 

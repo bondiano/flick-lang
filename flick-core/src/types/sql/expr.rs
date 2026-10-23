@@ -5,9 +5,8 @@
 //! uncorrelated subqueries.
 
 use super::super::Checker;
-use super::super::infer::literal_type;
 use super::super::ty::Type;
-use super::super::typing::{SqlForm, range};
+use super::super::typing::SqlForm;
 use super::query::{Alias, Cx, Scope};
 use crate::diagnostics::codes;
 use crate::source::Span;
@@ -40,7 +39,7 @@ pub struct Val {
 }
 
 impl Val {
-    fn plain(sql: String, ty: Type) -> Val {
+    pub(super) fn plain(sql: String, ty: Type) -> Val {
         Val {
             sql,
             ty,
@@ -52,7 +51,7 @@ impl Val {
         }
     }
 
-    fn error() -> Val {
+    pub(super) fn error() -> Val {
         Val::plain(String::new(), Type::Error)
     }
 }
@@ -94,6 +93,7 @@ impl Checker<'_> {
                 v
             }
             K::Literal => self.sql_literal(cx, node),
+            K::SqlCapture => self.sql_capture(cx, node),
             K::NameExpr => self.sql_name(scope, node, place),
             K::FieldExpr => self.sql_field(cx, scope, node, children[0]),
             K::BinExpr if children.len() == 2 => {
@@ -135,20 +135,6 @@ impl Checker<'_> {
             &super::query::optional(value.ty.clone(), value.null),
         );
         value
-    }
-
-    /// A literal: `true` and `false` inline, anything else a placeholder.
-    fn sql_literal(&mut self, cx: &mut Cx, node: &Node) -> Val {
-        let token = node.child_tokens().next().map(|t| t.kind);
-        let ty = literal_type(token);
-        match token {
-            Some(K::TrueKw) => Val::plain("TRUE".into(), ty),
-            Some(K::FalseKw) => Val::plain("FALSE".into(), ty),
-            _ => {
-                let at = cx.literal(range(self.span(node)), ty.clone());
-                Val::plain(format!("${}", at + 1), ty)
-            }
-        }
     }
 
     /// `count_all`, an unqualified column, or `Table.column` in a statement
