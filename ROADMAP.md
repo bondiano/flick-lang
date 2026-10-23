@@ -1066,12 +1066,15 @@ derived `Eq`/`Ord`/`Hash`/`Show` и `Schema` (unboxed) следуют предс
 **Объём.** Существующий `flick-wasm`: API для страницы демо без Node и файловой
 системы. REPL в 0.1.0 не входит (спека §12 относит REPL к «После первой версии»).
 
+**Артефакты.** `flick-wasm/src/lib.rs` (`check`, `compile`, `language_version`),
+`flick/tests/wasm_demo.rs`, бюджет размера в `just wasm` (4 MiB; release сейчас ≈2.1 MB).
+
 **AC**
 
-- [ ] `check(source) -> diagnostics JSON` и `compile(source, profile) -> { js, diagnostics }`
+- [x] `check(source) -> diagnostics JSON` и `compile(source, profile) -> { js, diagnostics }`
       для одного модуля со stdlib, встроенной в wasm.
-- [ ] Вывод `compile` совпадает с `flick build` для того же модуля и профиля.
-- [ ] `cargo clippy --target wasm32-unknown-unknown` без предупреждений;
+- [x] Вывод `compile` совпадает с `flick build` для того же модуля и профиля.
+- [x] `cargo clippy --target wasm32-unknown-unknown` без предупреждений;
       размер `.wasm` (release) ограничен бюджетом M19.
 
 ---

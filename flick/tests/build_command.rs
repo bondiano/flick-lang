@@ -204,3 +204,18 @@ fn schema_aot_writes_compiled_decoders_the_runner_installs() {
     assert!(!runner.contains("SchemaAot"), "{runner}");
     assert!(!dir.join("plain/schemas.aot.js").exists());
 }
+
+#[test]
+fn build_stops_at_an_unresolved_name() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("build_unresolved");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("dir");
+    fs::write(
+        dir.join("Lib.fl"),
+        "module Lib exposing (one)\nimport List\none : Number\nlet one = List.nope 1\n",
+    )
+    .expect("write");
+    let out = flick_in(&dir, &["build", "Lib.fl"]);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert!(String::from_utf8_lossy(&out.stderr).contains("FLICK-R004"));
+}

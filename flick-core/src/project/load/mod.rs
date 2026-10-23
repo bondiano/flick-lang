@@ -495,12 +495,13 @@ impl Loader<'_> {
         };
         self.diagnostics
             .extend(loaded.parse.diagnostics.iter().cloned());
+        let resolved = !diagnostics.iter().any(|d| d.severity == Severity::Error);
         self.diagnostics.extend(diagnostics);
         // a module with syntax errors keeps untyped exports: importers trust them
         if loaded.parse.diagnostics.is_empty() {
             let (checked, typing) =
                 types::check_typed(&module, &lookup, types::builtins(), options, &mut interface);
-            let clean = !checked.iter().any(|d| d.severity == Severity::Error);
+            let clean = resolved && !checked.iter().any(|d| d.severity == Severity::Error);
             self.diagnostics.extend(checked);
             if clean && let Some(lowered) = &mut self.lowered {
                 match ir::lower(&module, &typing) {

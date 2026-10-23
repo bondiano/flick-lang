@@ -34,9 +34,10 @@ e2e-postgres:
 fuzz iterations="1000000":
     FLICK_FUZZ_ITERATIONS={{iterations}} cargo test --release -p flick-core --test fuzz
 
-# Build the wasm module the in-browser demo loads
+# Build the wasm module the in-browser demo loads and hold it to its size budget
 wasm:
     cargo build -p flick-wasm --target wasm32-unknown-unknown --release
+    test $(wc -c < target/wasm32-unknown-unknown/release/flick_wasm.wasm) -le 4194304
 
 # Everything CI runs
 check: lint test
