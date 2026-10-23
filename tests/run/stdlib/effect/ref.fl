@@ -1,0 +1,98 @@
+// Effect's `Ref` as Flick cells, and `SynchronizedRef` and `SubscriptionRef`,
+// whose updates may run tasks.
+module App.Main exposing (main)
+
+type error Refused = Refused Number
+
+/// `n - k` while it stays positive.
+less : Number -> Number -> Option Number
+let less k n = if n > k then Some (n - k) else None
+
+cells : Unit ->{} List String
+let cells () =
+  let cell : Ref Number = Ref.make 1
+  let a = Ref.get_and_set cell 2
+  let b = Ref.get_and_update cell (fun n -> n * 10)
+  let c = Ref.get_and_update_some cell (fun _ -> None)
+  let d = Ref.set_and_get cell 5
+  let e = Ref.modify_some cell (fun n -> ("seen " ++ show n, None))
+  Ref.update cell (fun n -> n + 1)
+  let f = Ref.update_and_get cell (fun n -> n * 2)
+  Ref.update_some cell (less 20)
+  let g = Ref.update_some_and_get cell (less 2)
+  [show (a, b, c, d), e, show (f, Ref.get cell, g)]
+
+synchronized : Unit ->{; Refused} List String
+let synchronized () =
+  let ref : SynchronizedRef.SynchronizedRef Number = SynchronizedRef.make 1
+  let a = SynchronizedRef.get_and_set 2 ref
+  let b = SynchronizedRef.get_and_update (fun n -> n + 1) ref
+  let c = SynchronizedRef.get_and_update_effect (fun n -> n * 10) ref
+  let d = SynchronizedRef.get_and_update_some (fun _ -> None) ref
+  let e = SynchronizedRef.get_and_update_some_effect (less 29) ref
+  let f = SynchronizedRef.modify (fun n -> (n + 100, n)) ref
+  let g = SynchronizedRef.modify_effect (fun n -> (n, n + 1)) ref
+  let h = SynchronizedRef.modify_some (fun n -> (n, None)) ref
+  let i = SynchronizedRef.modify_some_effect (fun n -> (n * 3, Some 0)) ref
+  SynchronizedRef.set 4 ref
+  let j = SynchronizedRef.set_and_get 6 ref
+  SynchronizedRef.update (fun n -> n + 1) ref
+  SynchronizedRef.update_effect (fun n -> n + 1) ref
+  let k = SynchronizedRef.update_and_get (fun n -> n * 2) ref
+  let l = SynchronizedRef.update_and_get_effect (fun n -> n + 1) ref
+  SynchronizedRef.update_some (less 100) ref
+  SynchronizedRef.update_some_effect (less 10) ref
+  let m = SynchronizedRef.update_some_and_get (less 1) ref
+  let n = SynchronizedRef.update_some_and_get_effect (less 1) ref
+  let failed =
+    try
+      SynchronizedRef.update_effect (fun n -> from_result (Err (Refused n))) ref
+      "updated"
+    with
+    | Refused n -> "refused at " ++ show n
+  // updates that sleep run one after another: neither loses the other's
+  let slow = SynchronizedRef.make []
+  add : Number -> Eff none none Unit
+  let add x =
+    task {
+      SynchronizedRef.update_effect (fun xs ->
+        Effect.sleep (Result.with_default Duration.zero (Duration.millis 2))
+        xs ++ [x]) slow
+    }
+  let _ = parallel (add 1) (add 2)
+  [show (a, b, c, d, e), show (f, g, h, i, j), show (k, l, m, n), failed, "serialized: " ++ show (List.length (SynchronizedRef.get slow))]
+
+subscription : Unit ->{} List String
+let subscription () =
+  let ref : SubscriptionRef.SubscriptionRef String = SubscriptionRef.make "a"
+  let a = SubscriptionRef.get_and_set "b" ref
+  let b = SubscriptionRef.get_and_update (fun s -> s ++ "c") ref
+  let c = SubscriptionRef.get_and_update_effect (fun s -> s ++ "d") ref
+  let d = SubscriptionRef.get_and_update_some (fun _ -> None) ref
+  let e = SubscriptionRef.get_and_update_some_effect (fun s -> Some (s ++ "e")) ref
+  let f = SubscriptionRef.modify (fun s -> (String.length s, s ++ "f")) ref
+  let g = SubscriptionRef.modify_effect (fun s -> (s, "x")) ref
+  let h = SubscriptionRef.modify_some (fun s -> (s, None)) ref
+  let i = SubscriptionRef.modify_some_effect (fun s -> (s, Some "y")) ref
+  SubscriptionRef.set "z" ref
+  let j = SubscriptionRef.set_and_get "w" ref
+  SubscriptionRef.update (fun s -> s ++ "1") ref
+  SubscriptionRef.update_effect (fun s -> s ++ "2") ref
+  let k = SubscriptionRef.update_and_get (fun s -> s ++ "3") ref
+  let l = SubscriptionRef.update_and_get_effect (fun s -> s ++ "4") ref
+  SubscriptionRef.update_some (fun _ -> None) ref
+  SubscriptionRef.update_some_effect (fun s -> Some (s ++ "5")) ref
+  let m = SubscriptionRef.update_some_and_get (fun s -> Some (s ++ "6")) ref
+  let n = SubscriptionRef.update_some_and_get_effect (fun _ -> None) ref
+  [show (a, b, c, d, e), show (f, g, h, i, j), show (k, l, m, n), SubscriptionRef.get ref]
+
+main : Unit ->{; AppError} Unit
+let main () =
+  List.each_effect Platform.stdout_line (cells ())
+  let lines =
+    try
+      synchronized ()
+    with
+    | Refused _ -> ["unexpected"]
+  List.each_effect Platform.stdout_line lines
+  List.each_effect Platform.stdout_line (subscription ())

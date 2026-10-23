@@ -1,0 +1,155 @@
+// Effect's synchronization primitives: `Deferred` (set once, awaited by
+// many), `Latch`, `Semaphore` and `PartitionedSemaphore`.
+module App.Main exposing (main)
+
+type error Boom = Boom Number
+  deriving Show
+
+/// A short delay that lets the other fibers run.
+tick : Duration.Duration
+let tick = Result.with_default Duration.zero (Duration.millis 2)
+
+unexpected : Failure e ->{} Unit
+let unexpected failure = Platform.stdout_line "unexpected failure"
+
+/// How awaiting `d` ends.
+outcome : Deferred.Deferred {Boom} Number ->{} String
+let outcome d =
+  try
+    "ok " ++ show (Deferred.await_ d)
+  with
+  | Boom n -> "boom " ++ show n
+
+/// How the task `Deferred.poll` gives ends.
+outcome_of : Eff none {Boom} Number ->{} String
+let outcome_of t =
+  try
+    show (await t)
+  with
+  | Boom n -> "boom " ++ show n
+
+/// A fresh deferred completed by `complete`, and how awaiting it ends.
+completed : (Deferred.Deferred {Boom} Number ->{} Bool) ->{} String
+let completed complete =
+  let d : Deferred.Deferred {Boom} Number = Deferred.make ()
+  let first = complete d
+  let again = Deferred.succeed 0 d
+  show (first, again) ++ " " ++ outcome d
+
+deferreds : Unit ->{} Unit
+let deferreds () =
+  Platform.stdout_line ("succeed: " ++ completed (Deferred.succeed 1))
+  Platform.stdout_line ("fail: " ++ completed (Deferred.fail (Boom 2)))
+  Platform.stdout_line ("sync: " ++ completed (Deferred.sync (fun () -> 3)))
+  Platform.stdout_line ("fail_sync: " ++ completed (Deferred.fail_sync (fun () -> Boom 4)))
+  Platform.stdout_line ("complete: " ++ completed (Deferred.complete (task { 5 })))
+  let runs = Ref.make 0
+  let counted = task {
+    Ref.update runs (fun n -> n + 1)
+    Ref.get runs
+  }
+  let shared : Deferred.Deferred {Boom} Number = Deferred.make ()
+  let _ = Deferred.complete_with counted shared
+  Platform.stdout_line ("complete_with: " ++ outcome shared ++ ", " ++ outcome shared)
+  let exits = parallel_exits [task { 6 }, task { from_result (Err (Boom 7)) }]
+  List.each_effect (fun exit -> Platform.stdout_line ("done: " ++ completed (Deferred.done exit))) exits
+  let failures = List.filter_map Exit.failure exits
+  List.each_effect (fun failure ->
+    Platform.stdout_line ("fail_cause: " ++ completed (Deferred.fail_cause failure))
+    Platform.stdout_line ("fail_cause_sync: " ++ completed (Deferred.fail_cause_sync (fun () -> failure)))) failures
+  let into : Deferred.Deferred {Boom} Number = Deferred.make ()
+  let fed = task { 8 } |> Deferred.into into
+  Platform.stdout_line ("into: " ++ show fed ++ " " ++ outcome into)
+  let pending : Deferred.Deferred {Boom} Number = Deferred.make ()
+  let polled = match Deferred.poll pending with
+    | None -> "none"
+    | Some _ -> "some"
+  Platform.stdout_line ("poll: " ++ polled ++ ", done " ++ show (Deferred.is_done pending))
+  let _ = Deferred.succeed 9 pending
+  let later = match Deferred.poll pending with
+    | None -> "none"
+    | Some t -> "some " ++ outcome_of t
+  Platform.stdout_line ("poll: " ++ later ++ ", done " ++ show (Deferred.is_done pending))
+  let stopped : Deferred.Deferred {Boom} Number = Deferred.make ()
+  let stopped_too : Deferred.Deferred {Boom} Number = Deferred.make ()
+  let interrupted = (Deferred.interrupt stopped, Deferred.interrupt_with 7 stopped_too)
+  let seen = parallel_exits [task { Deferred.await_ stopped }, task { Deferred.await_ stopped_too }]
+  Platform.stdout_line ("interrupt: " ++ show interrupted ++ " " ++ show (List.map (fun e -> Option.is_some (Exit.failure e)) seen))
+  // a child waits for the deferred another task completes
+  let waited = scope s {
+    let gate : Deferred.Deferred none String = Deferred.make ()
+    let child = Fiber.spawn s unexpected (task { "child got " ++ Deferred.await_ gate })
+    Effect.sleep tick
+    let _ = Deferred.succeed "go" gate
+    Fiber.join child
+  }
+  Platform.stdout_line waited
+
+latches : Unit ->{} Unit
+let latches () =
+  let latch : Latch.Latch = Latch.make false
+  let log = Ref.make []
+  note : String ->{} Unit
+  let note s = Ref.update log (fun xs -> xs ++ [s])
+  scope s {
+    let child = Fiber.spawn s unexpected (task {
+      Latch.await_ latch
+      note "released"
+      task { note "through" } |> Latch.when_open latch
+    })
+    Effect.sleep tick
+    note ("open " ++ show (Latch.is_open latch))
+    note ("release " ++ show (Latch.release latch))
+    Effect.sleep tick
+    note ("opened " ++ show (Latch.open latch))
+    Fiber.join child
+    note ("closed " ++ show (Latch.close latch) ++ " " ++ show (Latch.is_open latch))
+  }
+  Platform.stdout_line ("latch: " ++ show (Ref.get log))
+
+semaphores : Unit ->{} Unit
+let semaphores () =
+  let sem : Semaphore.Semaphore = Semaphore.make 2
+  let running = Ref.make 0
+  let most = Ref.make 0
+  let work = task {
+    Ref.update running (fun n -> n + 1)
+    let now = Ref.get running
+    Ref.update most (fun m -> if now > m then now else m)
+    Effect.sleep tick
+    Ref.update running (fun n -> n - 1)
+  }
+  let _ = parallel_all 5 (List.repeat 5 (task { Semaphore.with_permit sem work }))
+  Platform.stdout_line ("with_permit: at most " ++ show (Ref.get most))
+  let both = Semaphore.with_permits sem 2 (task { Semaphore.with_permits_if_available sem 1 (task { "inner" }) })
+  Platform.stdout_line ("with_permits: " ++ show both)
+  let taken = Semaphore.take 1 sem
+  let more = Semaphore.take_if_available 2 sem
+  let one = Semaphore.take_if_available 1 sem
+  let released = Semaphore.release 1 sem
+  let all = Semaphore.release_all sem
+  Semaphore.resize 3 sem
+  let three = Semaphore.with_permits_if_available sem 3 (task { "three" })
+  Platform.stdout_line ("permits: " ++ show (taken, more, one, released, all) ++ " " ++ show three)
+
+capacity_of : PartitionedSemaphore.PartitionedSemaphore k -> Number
+let capacity_of sem = PartitionedSemaphore.capacity sem
+
+partitions : Unit ->{} Unit
+let partitions () =
+  let sem : PartitionedSemaphore.Partitioned String = PartitionedSemaphore.make { permits = 2 }
+  let total = capacity_of sem
+  let before = PartitionedSemaphore.available sem
+  PartitionedSemaphore.take "a" 2 sem
+  let none_left = PartitionedSemaphore.with_permits_if_available sem 1 (task { "never" })
+  let back = PartitionedSemaphore.release 2 sem
+  let keyed = PartitionedSemaphore.with_permits sem "b" 2 (task { PartitionedSemaphore.available sem })
+  let one = PartitionedSemaphore.with_permit sem "c" (task { PartitionedSemaphore.available sem })
+  Platform.stdout_line ("partitioned: " ++ show (total, before, none_left, back, keyed, one))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  deferreds ()
+  latches ()
+  semaphores ()
+  partitions ()

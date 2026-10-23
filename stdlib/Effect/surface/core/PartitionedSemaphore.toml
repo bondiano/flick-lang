@@ -1,15 +1,15 @@
-[excluded]
-PartitionedTypeId = "TS-only: a type identifier"
+[wrapped]
+PartitionedSemaphore = "PartitionedSemaphore.PartitionedSemaphore 0a2399c8bc201c8a"
+Partitioned = "PartitionedSemaphore.Partitioned 2433cb12f8de55ed"
+make = "PartitionedSemaphore.make de2761f586fcc95a"
+available = "PartitionedSemaphore.available 2af0d7d6a1e1144d"
+capacity = "PartitionedSemaphore.capacity a91a340b46bf0b11"
+take = "PartitionedSemaphore.take a2d6d38910bbb44d"
+release = "PartitionedSemaphore.release e14b14af31b562ac"
+withPermits = "PartitionedSemaphore.with_permits 61f317963471330a"
+withPermit = "PartitionedSemaphore.with_permit fb6978cb8133423a"
+withPermitsIfAvailable = "PartitionedSemaphore.with_permits_if_available 341971dddf709c66"
 
-[pending]
-Partitioned = "M20"
-PartitionedSemaphore = "M20"
-available = "M20"
-capacity = "M20"
-make = "M20"
-makeUnsafe = "M20"
-release = "M20"
-take = "M20"
-withPermit = "M20"
-withPermits = "M20"
-withPermitsIfAvailable = "M20"
+[excluded]
+PartitionedTypeId = "TS-only: a brand symbol for TypeScript's nominal typing"
+makeUnsafe = "invariant: `unsafe*`: a plain synchronous call outside the effect, unordered with the fiber's steps"

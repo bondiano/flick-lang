@@ -1,5 +1,10 @@
-/// Resources owned by a `scope`.
-module Resource exposing (acquire_release, bracket)
+/// Resources owned by a `scope`, and Effect's `Resource`: a value acquired
+/// again on `refresh`, released when its `scope` closes.
+module Resource exposing (acquire_release, bracket, Resource, manual, get, refresh)
+
+/// A value of `a` of region `s` that its acquisition, failing with `e`,
+/// may give anew.
+type Resource (s : Region) (e : ErrorRow) a
 
 /// Runs `acquire` and registers `release` with the owner of region `s`,
 /// which runs it when that scope closes; `release` has no typed errors.
@@ -15,3 +20,23 @@ bracket :
   (Eff r e a)^c -> ((a ->{r; e} b)^c -> ((a ->{r; e} Unit)^c ->{r; e} b)^c)^c
 foreign effect bracket from "@flick-lang/runtime" "bracket"
   retention call
+
+/// A resource owned by the innermost `scope` (or the one of region `s`),
+/// acquired now by `acquire`, which runs with the services of this call;
+/// `refresh` acquires it again.
+manual : forall s r e a. Eff r e a ->{Scope s | r;} Resource s e a
+foreign effect manual from "@flick-lang/runtime/effect/Resource" "manual"
+  reviewed "effect@4.0.5 sha256:dc5efdabe12bb39c"
+
+/// The current value, or the failure of the last acquisition.
+get : forall s e a. Resource s e a ->{; e} a
+foreign effect get from "@flick-lang/runtime/effect/Resource" "get"
+  retention call
+  reviewed "effect@4.0.5 sha256:b24249fe7c7dc046"
+
+/// Acquires the value again, releasing the previous one; if it fails, the
+/// previous value stays.
+refresh : forall s e a. Resource s e a ->{; e} Unit
+foreign effect refresh from "@flick-lang/runtime/effect/Resource" "refresh"
+  retention call
+  reviewed "effect@4.0.5 sha256:36d31345cd1fd458"

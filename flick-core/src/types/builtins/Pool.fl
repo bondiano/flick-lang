@@ -1,0 +1,75 @@
+/// Effect's `Pool`: items acquired ahead and lent to tasks, at most
+/// `concurrency` tasks per item. Items are released when the `scope`
+/// owning the pool's region closes.
+module Pool exposing (..)
+
+/// A pool of items of `a` of region `s`, whose acquisition fails with `e`.
+type Pool (s : Region) (e : ErrorRow) a
+
+/// When an item of `make_with_ttl` expires: counted from its acquisition,
+/// or from its last use.
+type TimeToLiveStrategy = Creation | Usage
+
+/// A pool of `size` items owned by the innermost `scope` (or the one of
+/// region `s`); `acquire` runs with the services of this call. Each item
+/// serves `concurrency` tasks at once (`None`: one), and the pool grows
+/// when `targetUtilization` of it is in use (`None`: all of it).
+make :
+  forall s r e a.
+  {
+    acquire : Eff r e a;
+    size : Number;
+    concurrency : Option Number;
+    targetUtilization : Option Number
+  } ->{Scope s | r;}
+  Pool s e a
+foreign effect make from "@flick-lang/runtime/effect/Pool" "flickMake"
+  reviewed "effect@4.0.5 sha256:875466331abc2dab"
+
+/// `make` with `min` to `max` items, where an item beyond `min` is released
+/// after `timeToLive` (by `timeToLiveStrategy`; `None`: `Usage`).
+make_with_ttl :
+  forall s r e a.
+  {
+    acquire : Eff r e a;
+    min : Number;
+    max : Number;
+    concurrency : Option Number;
+    targetUtilization : Option Number;
+    timeToLive : Duration.Duration;
+    timeToLiveStrategy : Option TimeToLiveStrategy
+  } ->{Scope s | r;}
+  Pool s e a
+foreign effect make_with_ttl from "@flick-lang/runtime/effect/Pool" "flickMakeWithTtl"
+  reviewed "effect@4.0.5 sha256:02cbce8f61aa83d9"
+
+/// An item, waiting for one to be free; the innermost `scope` (or the one
+/// of region `t`) holds it until it closes.
+get : forall s t e a. Pool s e a ->{Scope t; e} a
+foreign effect get from "@flick-lang/runtime/effect/Pool" "get"
+  retention call
+  reviewed "effect@4.0.5 sha256:8a6e6eaddc6c9d40"
+
+/// Runs `f` with an item, given back when `f` ends.
+use : forall c s r e e2 a b. (a ->{r; e2} b)^c -> (Pool s e a ->{r; e + e2} b)^c
+foreign effect use from "@flick-lang/runtime/effect/Pool" "use"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:ccf766ed3107bea9"
+
+/// Releases `item`, the very value `get` gave, once its tasks are done;
+/// the pool acquires another when it needs one.
+invalidate : forall s e a. a -> Pool s e a ->{} Unit
+foreign effect invalidate from "@flick-lang/runtime/effect/Pool" "invalidate"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:aaab56e8f35086ca"
+
+/// Keeps the borrowed `item` for this task alone until the innermost
+/// `scope` (or the one of region `t`) closes; with a `concurrency` of one
+/// it changes nothing.
+reserve : forall s t e a. a -> Pool s e a ->{Scope t;} Unit
+foreign effect reserve from "@flick-lang/runtime/effect/Pool" "reserve"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:a2deed232381ff9a"

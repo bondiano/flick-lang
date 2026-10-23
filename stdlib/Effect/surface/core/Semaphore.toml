@@ -1,12 +1,14 @@
-[pending]
-Semaphore = "M20"
-make = "M20"
-makeUnsafe = "M20"
-release = "M20"
-releaseAll = "M20"
-resize = "M20"
-take = "M20"
-takeIfAvailable = "M20"
-withPermit = "M20"
-withPermits = "M20"
-withPermitsIfAvailable = "M20"
+[wrapped]
+Semaphore = "Semaphore.Semaphore dfc09adad67970fd"
+make = "Semaphore.make bdb4b05fc373aa39"
+resize = "Semaphore.resize b62848d985c2f336"
+withPermits = "Semaphore.with_permits 1c963a339f788ddd"
+withPermit = "Semaphore.with_permit 6747bcd8fefc97cf"
+withPermitsIfAvailable = "Semaphore.with_permits_if_available 8ce935520a994ce8"
+take = "Semaphore.take 0e705668842c0868"
+takeIfAvailable = "Semaphore.take_if_available 96da3b6d578127bd"
+release = "Semaphore.release 29d25e627ab56bc9"
+releaseAll = "Semaphore.release_all 2d52897abf63236f"
+
+[excluded]
+makeUnsafe = "invariant: `unsafe*`: a plain synchronous call outside the effect, unordered with the fiber's steps"
