@@ -67,6 +67,27 @@ const SOURCES: &[(&str, &str)] = &[
     // Effect: concurrency
     // end of Effect: concurrency
     // Effect: transactions
+    ("Tx", include_str!("builtins/Tx.fl")),
+    ("TxRef", include_str!("builtins/TxRef.fl")),
+    ("TxChunk", include_str!("builtins/TxChunk.fl")),
+    ("TxDeferred", include_str!("builtins/TxDeferred.fl")),
+    ("TxHashMap", include_str!("builtins/TxHashMap.fl")),
+    ("TxHashSet", include_str!("builtins/TxHashSet.fl")),
+    (
+        "TxPriorityQueue",
+        include_str!("builtins/TxPriorityQueue.fl"),
+    ),
+    ("TxQueue", include_str!("builtins/TxQueue.fl")),
+    ("TxPubSub", include_str!("builtins/TxPubSub.fl")),
+    (
+        "TxReentrantLock",
+        include_str!("builtins/TxReentrantLock.fl"),
+    ),
+    ("TxSemaphore", include_str!("builtins/TxSemaphore.fl")),
+    (
+        "TxSubscriptionRef",
+        include_str!("builtins/TxSubscriptionRef.fl"),
+    ),
     // end of Effect: transactions
     // Effect: schema
     // end of Effect: schema

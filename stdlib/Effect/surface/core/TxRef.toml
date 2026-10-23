@@ -1,8 +1,10 @@
-[pending]
-TxRef = "M20"
-get = "M20"
-make = "M20"
-makeUnsafe = "M20"
-modify = "M20"
-set = "M20"
-update = "M20"
+[wrapped]
+TxRef = "TxRef.TxRef 27907f98c33bc725"
+get = "TxRef.get c7903e0d0c832052"
+make = "TxRef.make b759a9ff75590599"
+modify = "TxRef.modify 526c2831c92131de"
+set = "TxRef.set cc7dc9d082f8540d"
+update = "TxRef.update 65fa1fa830be5d12"
+
+[excluded]
+makeUnsafe = "invariant: unsafe*: builds the value outside the effect that allocates it"

@@ -1,9 +1,11 @@
-[pending]
-TxDeferred = "M20"
-await = "M20"
-done = "M20"
-fail = "M20"
-isTxDeferred = "M20"
-make = "M20"
-poll = "M20"
-succeed = "M20"
+[wrapped]
+TxDeferred = "TxDeferred.TxDeferred 998c93c6c2e53929"
+await = "TxDeferred.await_ f0edc72d9760c34b"
+done = "TxDeferred.done 0923eff1e97152a2"
+fail = "TxDeferred.fail 91c64e09b1cd9a1d"
+make = "TxDeferred.make 2c9059e16c2bf37d"
+poll = "TxDeferred.poll bc55cbe6b4ccce98"
+succeed = "TxDeferred.succeed fceed9a9fb98e5c7"
+
+[excluded]
+isTxDeferred = "TS-only: a type guard over unknown; Flick values are typed statically"

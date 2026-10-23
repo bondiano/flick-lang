@@ -1,13 +1,17 @@
+[wrapped]
+TxSubscriptionRef = "TxSubscriptionRef.TxSubscriptionRef 32cfcf851e36f0ba"
+changes = "TxSubscriptionRef.changes 5d5df32fd724aaba"
+get = "TxSubscriptionRef.get 33c61c174f79caae"
+getAndSet = "TxSubscriptionRef.get_and_set 043ad471769a9316"
+getAndUpdate = "TxSubscriptionRef.get_and_update b7dc4ac3de1eae68"
+make = "TxSubscriptionRef.make 53c40eedbcc63048"
+modify = "TxSubscriptionRef.modify 0fe7bb09d7a3ebe6"
+set = "TxSubscriptionRef.set 1cbe4957b141632b"
+update = "TxSubscriptionRef.update f161ae49091848e0"
+updateAndGet = "TxSubscriptionRef.update_and_get 11210413b1a8356b"
+
+[excluded]
+isTxSubscriptionRef = "TS-only: a type guard over unknown; Flick values are typed statically"
+
 [pending]
-TxSubscriptionRef = "M20"
-changes = "M20"
 changesStream = "M20"
-get = "M20"
-getAndSet = "M20"
-getAndUpdate = "M20"
-isTxSubscriptionRef = "M20"
-make = "M20"
-modify = "M20"
-set = "M20"
-update = "M20"
-updateAndGet = "M20"

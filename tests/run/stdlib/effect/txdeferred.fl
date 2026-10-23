@@ -1,0 +1,42 @@
+// Deferred values from Effect's `TxDeferred`: awaiting one retries the
+// transaction until another fiber completes it.
+module App.Main exposing (main)
+
+type error Late = Late Number
+  deriving Show
+
+ms : Number -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+describe : Option (Result Late Number) -> String
+let describe outcome =
+  match outcome with
+  | None -> "pending"
+  | Some (Ok n) -> "ok " ++ show n
+  | Some (Err (Late n)) -> "late " ++ show n
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let d : TxDeferred.TxDeferred Number {Late} = TxDeferred.make ()
+  Platform.stdout_line ("before: " ++ describe (Tx.atomically (task { TxDeferred.poll d })))
+  let (got, _) =
+    try
+      parallel
+        (task { Tx.atomically (task { TxDeferred.await_ d }) })
+        (task {
+          Effect.sleep (ms 2)
+          Tx.atomically (task { TxDeferred.succeed 5 d })
+        })
+    with
+    | Late n -> (0 - n, false)
+  Platform.stdout_line ("awaited: " ++ show got)
+  let again = Tx.atomically (task { TxDeferred.fail (Late 1) d })
+  Platform.stdout_line ("second completion: " ++ show again ++ ", " ++ describe (Tx.atomically (task { TxDeferred.poll d })))
+  let e : TxDeferred.TxDeferred Number {Late} = TxDeferred.make ()
+  let failed = Tx.atomically (task { TxDeferred.fail (Late 2) e })
+  let caught = try Tx.atomically (task { TxDeferred.await_ e }) with
+    | Late n -> 0 - n
+  Platform.stdout_line ("failed: " ++ show (failed, caught))
+  let f : TxDeferred.TxDeferred Number {Late} = TxDeferred.make ()
+  let done = Tx.atomically (task { TxDeferred.done (Err (Late 3)) f })
+  Platform.stdout_line ("done: " ++ show done ++ ", " ++ describe (Tx.atomically (task { TxDeferred.poll f })))

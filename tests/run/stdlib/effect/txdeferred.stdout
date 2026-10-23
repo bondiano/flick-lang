@@ -1,0 +1,5 @@
+before: pending
+awaited: 5
+second completion: false, ok 5
+failed: (true, -2)
+done: true, late 3

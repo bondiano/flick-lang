@@ -1,0 +1,5 @@
+built: [0, 1, 2, 3, 4, 5, 6, 7]
+drop, take, slice: [2, 3, 4, 5]
+map, filter: [20, 40, 50]
+concat, update, modify: ([1, 20, 40, 50, 9], 0, true, true, 5)
+rolled back: [1, 20, 40, 50, 9]

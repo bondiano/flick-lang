@@ -1,0 +1,99 @@
+// Transactional queues from Effect's `TxQueue`: offers and takes commit
+// with their transaction, a take waits for an element, and a closed
+// queue fails or interrupts its takers.
+module App.Main exposing (main)
+
+type error Closed = Closed String
+  deriving Show
+
+ms : Number -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+fill : List Number -> TxQueue.TxQueue Number {Closed} ->{Tx.Transaction;} List Number
+let fill xs q = TxQueue.offer_all xs q
+
+/// A failure of `Closed`, as a child's exit gives it.
+closed_failure : String ->{} Option (Failure {Closed})
+let closed_failure why =
+  match parallel_exits [task { from_result (Err (Closed why)) }] with
+  | [exit] -> Exit.failure exit
+  | _ -> None
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let q = TxQueue.bounded 3
+  let rejected = Tx.atomically (task { (fill [1, 2, 3] q, fill [1, 2, 3] (TxQueue.dropping 2)) })
+  Platform.stdout_line ("bounded, dropping reject: " ++ show rejected)
+  let state = Tx.atomically (task { (TxQueue.size q, TxQueue.is_full q, TxQueue.is_empty q, TxQueue.is_non_empty q) })
+  Platform.stdout_line ("size, full, empty, non-empty: " ++ show state)
+  let taken = try Tx.atomically (task {
+      let a = TxQueue.take q
+      let p = TxQueue.peek q
+      let b = TxQueue.poll q
+      (a, p, b, NonEmpty.to_list (TxQueue.take_all q))
+    }) with
+    | Closed _ -> (0, 0, None, [])
+  Platform.stdout_line ("take, peek, poll, take_all: " ++ show taken)
+  Platform.stdout_line ("poll empty: " ++ show (Tx.atomically (task { TxQueue.poll q })))
+  let (waited, _) =
+    try
+      parallel
+        (task { Tx.atomically (task { TxQueue.take_between 2 5 q }) })
+        (task {
+          Effect.sleep (ms 2)
+          let _ = Tx.atomically (task { TxQueue.offer 7 q })
+          Tx.atomically (task { TxQueue.offer 8 q })
+        })
+    with
+    | Closed _ -> ([], false)
+  Platform.stdout_line ("take_between waits: " ++ show waited)
+  let d = TxQueue.dropping 1
+  let s = TxQueue.sliding 1
+  let u = TxQueue.unbounded ()
+  let kept = try Tx.atomically (task {
+      let _ = TxQueue.offer_all [1, 2] d
+      let _ = TxQueue.offer_all [1, 2] s
+      let _ = TxQueue.offer_all [1, 2, 3] u
+      (TxQueue.take d, TxQueue.take s, TxQueue.take_n 2 u, TxQueue.clear u)
+    }) with
+    | Closed _ -> (0, 0, [], [])
+  Platform.stdout_line ("dropping, sliding, take_n, clear: " ++ show kept)
+  let f = TxQueue.unbounded ()
+  let failed = Tx.atomically (task {
+      let _ = TxQueue.offer 1 f
+      TxQueue.fail (Closed "gone") f
+    })
+  let after = try Tx.atomically (task { show (TxQueue.take f) }) with
+    | Closed why -> "take fails: " ++ why
+  let flags = Tx.atomically (task { (TxQueue.is_open f, TxQueue.is_closing f, TxQueue.is_done f, TxQueue.is_shutdown f) })
+  Platform.stdout_line ("fail: " ++ show failed ++ ", " ++ after ++ ", open/closing/done/shutdown " ++ show flags)
+  Tx.atomically (task { TxQueue.await_completion f })
+  let c : TxQueue.TxQueue Number {Closed} = TxQueue.unbounded ()
+  let caused = match closed_failure "cause" with
+    | Some failure -> Tx.atomically (task { TxQueue.fail_cause failure c })
+    | None -> false
+  let via_cause = try Tx.atomically (task { show (TxQueue.take c) }) with
+    | Closed why -> "take fails: " ++ why
+  Platform.stdout_line ("fail_cause: " ++ show caused ++ ", " ++ via_cause)
+  let i = TxQueue.unbounded ()
+  let closing = Tx.atomically (task {
+      let _ = TxQueue.offer 5 i
+      let first = TxQueue.interrupt i
+      let second = TxQueue.interrupt i
+      (first, second, TxQueue.is_closing i)
+    })
+  Platform.stdout_line ("interrupt: " ++ show closing)
+  let drained = try Tx.atomically (task { TxQueue.take i }) with
+    | Closed _ -> 0
+  let exits = parallel_exits [task { Tx.atomically (task { TxQueue.take i }) }]
+  let interrupted = match exits with
+    | [exit] -> Option.is_none (Exit.value exit)
+    | _ -> false
+  Platform.stdout_line ("drained " ++ show drained ++ ", then take interrupted: " ++ show interrupted)
+  let x = TxQueue.unbounded ()
+  let shut = Tx.atomically (task {
+      let _ = TxQueue.offer 1 x
+      let r = TxQueue.shutdown x
+      (r, TxQueue.size x, TxQueue.is_shutdown x)
+    })
+  Platform.stdout_line ("shutdown: " ++ show shut)

@@ -11,7 +11,7 @@ export interface Witness<A> {
   readonly hash: (a: A) => number;
 }
 
-class Key<A> implements Equal.Equal {
+export class Key<A> implements Equal.Equal {
   readonly value: A;
   readonly witness: Witness<A>;
   constructor(value: A, witness: Witness<A>) {

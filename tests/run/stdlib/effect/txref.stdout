@@ -1,0 +1,7 @@
+first: committed
+second: rolled back
+balances: (6, 4)
+modify: (6, 12)
+nested: 3
+first attempt: (1, None)
+after retry: (7, true)

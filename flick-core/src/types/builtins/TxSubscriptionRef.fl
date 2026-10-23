@@ -1,0 +1,62 @@
+/// Effect's `TxSubscriptionRef`: a transactional cell that hands each new
+/// value to its subscribers.
+module TxSubscriptionRef exposing (..)
+
+/// A transactional cell of `a` with subscribers.
+type TxSubscriptionRef a
+
+/// A new cell holding `value`.
+make : a ->{} TxSubscriptionRef a
+foreign effect make from "@flick-lang/runtime/effect/TxSubscriptionRef" "make"
+  reviewed "effect@4.0.5 sha256:53c40eedbcc63048"
+
+/// The value the transaction sees.
+get : TxSubscriptionRef a ->{Tx.Transaction;} a
+foreign effect get from "@flick-lang/runtime/effect/TxSubscriptionRef" "get"
+  reviewed "effect@4.0.5 sha256:33c61c174f79caae"
+
+/// Replaces the value with the second of `f` of it; returns the first.
+modify : forall c a b. (a -> (b, a))^c -> (TxSubscriptionRef a ->{Tx.Transaction;} b)^c
+foreign effect modify from "@flick-lang/runtime/effect/TxSubscriptionRef" "modify"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:0fe7bb09d7a3ebe6"
+
+/// Replaces the value.
+set : a -> TxSubscriptionRef a ->{Tx.Transaction;} Unit
+foreign effect set from "@flick-lang/runtime/effect/TxSubscriptionRef" "set"
+  arity 1
+  reviewed "effect@4.0.5 sha256:1cbe4957b141632b"
+
+/// Replaces the value with `f` of it.
+update : forall c a. (a -> a)^c -> (TxSubscriptionRef a ->{Tx.Transaction;} Unit)^c
+foreign effect update from "@flick-lang/runtime/effect/TxSubscriptionRef" "update"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:f161ae49091848e0"
+
+/// Replaces the value; returns the old one.
+get_and_set : a -> TxSubscriptionRef a ->{Tx.Transaction;} a
+foreign effect get_and_set from "@flick-lang/runtime/effect/TxSubscriptionRef" "getAndSet"
+  arity 1
+  reviewed "effect@4.0.5 sha256:043ad471769a9316"
+
+/// Replaces the value with `f` of it; returns the old one.
+get_and_update : forall c a. (a -> a)^c -> (TxSubscriptionRef a ->{Tx.Transaction;} a)^c
+foreign effect get_and_update from "@flick-lang/runtime/effect/TxSubscriptionRef" "getAndUpdate"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:b7dc4ac3de1eae68"
+
+/// Replaces the value with `f` of it; returns the new one.
+update_and_get : forall c a. (a -> a)^c -> (TxSubscriptionRef a ->{Tx.Transaction;} a)^c
+foreign effect update_and_get from "@flick-lang/runtime/effect/TxSubscriptionRef" "updateAndGet"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:11210413b1a8356b"
+
+/// Subscribes until the scope of region `s` closes: the subscription
+/// holds the current value, then each new one.
+changes : forall s a. TxSubscriptionRef a ->{Scope s;} TxPubSub.Subscription s a
+foreign effect changes from "@flick-lang/runtime/effect/TxSubscriptionRef" "changes"
+  reviewed "effect@4.0.5 sha256:5d5df32fd724aaba"

@@ -1,0 +1,6 @@
+no subscriber: true
+subscribed: ((true, true), (3, false, true, 3), 1, Some 2, [1, 2, 3])
+capacities: (1, 1, Infinity)
+dropping, sliding: (((false, true), true), (1, 2))
+shutdown: (true, false)
+subscription ref: ((3, 10, 21, 20, 21), [1, 2, 3, 10, 20, 21, 21])
