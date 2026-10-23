@@ -196,7 +196,7 @@ impl Lexer<'_> {
     /// Length and kind of the operator or delimiter at `pos`, if any.
     fn punct(&self) -> Option<(usize, SyntaxKind)> {
         use SyntaxKind as K;
-        const TABLE: [(&str, SyntaxKind); 32] = [
+        const TABLE: [(&str, SyntaxKind); 33] = [
             ("..", K::DotDot),
             ("->", K::Arrow),
             ("=>", K::FatArrow),
@@ -229,6 +229,7 @@ impl Lexer<'_> {
             ("/", K::Slash),
             ("%", K::Percent),
             ("^", K::Caret),
+            ("$", K::Dollar),
         ];
         let rest = self.rest();
         let (text, kind) = TABLE.iter().find(|(text, _)| rest.starts_with(text))?;

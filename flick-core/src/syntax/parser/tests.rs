@@ -193,3 +193,20 @@ fn cli_block_clauses() {
         ["FLICK-S007 :", "FLICK-S007 bogus"]
     );
 }
+
+#[test]
+fn sql_captures_take_a_name_a_field_path_or_parentheses() {
+    let tree = sexp("let q = sql { from u in T; where u.a == $x.y && u.b == $(f x); limit $M.n }");
+    assert_eq!(
+        tree,
+        "(LetDecl let (VarPat q) = (Block (SqlExpr sql { (Block (SqlClause from u in (NameExpr T)) ; \
+         (SqlClause where (BinExpr (BinExpr (FieldExpr (NameExpr u) . a) == (SqlCapture $ (FieldExpr (NameExpr x) . y))) && \
+         (BinExpr (FieldExpr (NameExpr u) . b) == (SqlCapture $ (ParenExpr ( (AppExpr (NameExpr f) (NameExpr x)) )))))) ; \
+         (SqlClause limit (SqlCapture $ (NameExpr M . n)))) })))"
+    );
+    assert_eq!(
+        errors("let q = sql { from u in T; where u.a == $ x }\nlet r = $x\n"),
+        // a space after `$`, and `$` outside `sql { … }`
+        ["FLICK-S007 x", "FLICK-S007 $"]
+    );
+}

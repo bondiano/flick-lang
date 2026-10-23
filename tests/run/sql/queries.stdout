@@ -3,4 +3,8 @@ SELECT "u"."id" AS "id", "u"."email" AS "email" FROM "users" AS "u" WHERE (("u".
 SELECT "u"."name" AS "name", COUNT("a"."id") AS "accounts", SUM("a"."balance")::numeric AS "total" FROM "users" AS "u" LEFT JOIN "accounts" AS "a" ON ("a"."user_id" = "u"."id") GROUP BY "u"."id", "u"."name" HAVING (COUNT("a"."id") >= $1)
 (SELECT "u"."name" AS "name" FROM "users" AS "u" WHERE ("u"."id" IN (SELECT "a"."user_id" AS "id" FROM "accounts" AS "a" WHERE ("a"."id" > $1)))) UNION (SELECT "u"."name" AS "name" FROM "users" AS "u" WHERE ("u"."email" IS NULL))
 INSERT INTO "users" AS "Users" ("name", "email") VALUES ($1, $2) RETURNING "Users"."id" AS "id"
+SELECT "u"."name" AS "name", "a"."balance" AS "balance" FROM "users" AS "u" LEFT JOIN "accounts" AS "a" ON ("a"."user_id" = "u"."id") WHERE (("u"."id" = $1) AND ("u"."name" <> $2))
+2
+UPDATE "users" AS "Users" SET "name" = $1, "email" = $2 WHERE ("Users"."id" = $3) RETURNING "Users"."id" AS "id"
+SELECT "u"."id" AS "id" FROM "users" AS "u" WHERE (("u"."name" = $1) AND ("u"."name" <> $2))
 (true, false)

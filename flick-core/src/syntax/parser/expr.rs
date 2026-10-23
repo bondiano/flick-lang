@@ -1,5 +1,7 @@
 //! Expressions and block statements.
 
+use std::mem;
+
 use super::{Done, K, Parser, decl, pattern, types};
 use crate::diagnostics::codes;
 
@@ -169,6 +171,7 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::CodecKw
         | K::SchemaKw => true,
         K::LBrace => !p.no_brace,
+        K::Dollar => p.sql_depth > 0,
         _ => false,
     }
 }
@@ -233,6 +236,18 @@ fn atom(p: &mut Parser) -> Option<Done> {
             K::ListExpr
         }
         K::LBrace if !p.no_brace => record(p),
+        K::Dollar if p.sql_depth > 0 => {
+            p.bump();
+            // `$name`, `$name.field` or `$(e)`: a Flick expression, not SQL
+            if matches!(p.current(), K::Ident | K::Con | K::LParen) && p.adjacent() {
+                let depth = mem::replace(&mut p.sql_depth, 0);
+                postfix(p);
+                p.sql_depth = depth;
+            } else {
+                p.error_expected("a name or `(` right after `$`");
+            }
+            K::SqlCapture
+        }
         K::TaskKw | K::UiKw => {
             let kind = if p.at(K::TaskKw) {
                 K::TaskExpr

@@ -40,7 +40,7 @@ pub struct Val {
 }
 
 impl Val {
-    fn plain(sql: String, ty: Type) -> Val {
+    pub(super) fn plain(sql: String, ty: Type) -> Val {
         Val {
             sql,
             ty,
@@ -52,7 +52,7 @@ impl Val {
         }
     }
 
-    fn error() -> Val {
+    pub(super) fn error() -> Val {
         Val::plain(String::new(), Type::Error)
     }
 }
@@ -94,6 +94,7 @@ impl Checker<'_> {
                 v
             }
             K::Literal => self.sql_literal(cx, node),
+            K::SqlCapture => self.sql_capture(cx, node),
             K::NameExpr => self.sql_name(scope, node, place),
             K::FieldExpr => self.sql_field(cx, scope, node, children[0]),
             K::BinExpr if children.len() == 2 => {

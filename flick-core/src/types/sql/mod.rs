@@ -2,6 +2,7 @@
 //! queries, elaborated into checked plans whose types the general checker
 //! unifies with the rest of the program. Rules: `docs/src/content/docs/reference/sql.md`.
 
+mod capture;
 mod expr;
 mod query;
 mod select;

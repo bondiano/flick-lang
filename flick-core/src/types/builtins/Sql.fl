@@ -57,6 +57,10 @@ foreign pure bind from "@flick-lang/runtime/sql" "sqlBind"
 text : forall d r. Query d r -> String
 foreign pure text from "@flick-lang/runtime/sql" "sqlText"
 
+/// The SQL text of a template: the same as of any query bound from it.
+template_text : forall d p r. Template d p r -> String
+foreign pure template_text from "@flick-lang/runtime/sql" "sqlTemplateText"
+
 /// How many parameters a query passes beside its text.
 parameter_count : forall d r. Query d r -> Number
 foreign pure parameter_count from "@flick-lang/runtime/sql" "sqlParameterCount"

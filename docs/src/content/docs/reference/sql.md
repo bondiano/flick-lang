@@ -64,6 +64,27 @@ binds the parameters: `p.x` is the parameter `x`, whose type follows from
 where it is used. With a signature, a parameter the signature does not
 declare is `FLICK-Q009`. A query without a name has no parameters.
 
+`$name` captures a value of the program, a local or a top-level one, as a
+placeholder; `$name.field` captures a field of it and `$(e)` the value of any
+expression `e`, both written right after `$`: its type follows from where it is used, as a parameter's does,
+and it passes through the codec of the column it is compared with or
+written to. A capture is no parameter of the template, so a function builds
+the template from its arguments:
+
+```flick
+balances_of : UserId -> Sql.Template Pg {} BalanceRow
+let balances_of id =
+  sql {
+    from user in Users
+    left_join account in Accounts on account.user_id == user.id
+    where user.id == $id
+    select { name = user.name; balance = account.balance }
+  }
+```
+
+A bare name inside `sql { … }` is always a column: `$` is what makes it a
+value of the program, and `$` outside `sql { … }` is a syntax error.
+
 Clauses come one per line or separated by `;`, and are checked in SQL's
 order whatever order they are written in:
 
@@ -86,7 +107,7 @@ order whatever order they are written in:
 In an insert, update or delete the table's name is its alias: `Users.id`.
 
 Expressions are columns (`alias.column`, or `column` when exactly one table
-has it: `FLICK-Q003` otherwise), parameters, literals, `== != < <= > >=`,
+has it: `FLICK-Q003` otherwise), parameters, captures, literals, `== != < <= > >=`,
 `&&`, `||`, `not`, `+ - * / %` on `Number`, `BigInt` and `BigDecimal`, `++` on
 `String`, and the functions:
 
@@ -134,7 +155,7 @@ let load id = Database.query (Sql.bind balances { user_id = id })
 ```
 
 `Sql.bind template params` is a `Sql.Query Pg row`, without I/O.
-`Sql.text` gives its SQL; values are never in it: each parameter and each
+`Sql.text` gives its SQL, `Sql.template_text` the same SQL of a template; values are never in it: each parameter and each
 literal is a `$n` placeholder whose value the driver passes beside the
 text. Tables, aliases and columns come from metadata and are quoted.
 
