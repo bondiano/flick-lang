@@ -1,7 +1,7 @@
 /// Effect's `Stdio`: the arguments and standard streams of the process as a
-/// service; `node` is those of Node.js. Effect's streams of the standard
-/// streams (`stdin`, the `stdout` and `stderr` sinks) are not wrapped yet:
-/// `write_stdout` and `write_stderr` write text through those sinks.
+/// service; `node` is those of Node.js. stdin as a stream is
+/// `Stream.stdin`; the `stdout` and `stderr` sinks are not wrapped yet:
+/// `write_stdout` and `write_stderr` write text through them.
 module Stdio exposing (..)
 
 /// The operations of Effect's `Stdio`; the functions below call them.

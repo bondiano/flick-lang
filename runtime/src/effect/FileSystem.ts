@@ -63,7 +63,7 @@ const fileType = enumeration<FileSystem.File.Type>("FileType", [
 const millis = (date: Option.Option<Date>): Option.Option<number> => Option.map(date, (d) => d.getTime());
 
 /** `FileSystem.Info`, in the order of its fields. */
-const info = (i: FileSystem.File.Info) => ({
+export const info = (i: FileSystem.File.Info) => ({
   type_: fileType.flick(i.type),
   mtime: millis(i.mtime),
   atime: millis(i.atime),
@@ -148,9 +148,22 @@ const impl = (fs: FileSystem.FileSystem) => ({
 
 type Impl = ReturnType<typeof impl>;
 
+/** The Effect file system behind each Flick one `node` built, for its streams (`Stream.watch`). */
+const natives = new WeakMap<object, FileSystem.FileSystem>();
+
+/** The Effect file system behind a Flick one, if `node` built it. */
+export const nativeFileSystem = (flick: object): FileSystem.FileSystem | undefined => natives.get(flick);
+
 /** `FileSystem.node`: the file system of Node.js. */
 export const flickNode = <I>(key: Context.Key<I, Impl>): Layer.Layer<I> =>
-  Layer.effect(key, Effect.map(Effect.service(FileSystem.FileSystem), impl)).pipe(
+  Layer.effect(
+    key,
+    Effect.map(Effect.service(FileSystem.FileSystem), (fs) => {
+      const record = impl(fs);
+      natives.set(record, fs);
+      return record;
+    }),
+  ).pipe(
     Layer.provide(NodeFileSystem.layer),
   );
 

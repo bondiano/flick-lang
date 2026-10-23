@@ -1,0 +1,98 @@
+// Streams of text and bytes, of files through `FileSystem`, of stdin through
+// `Stdio`, and streams that hold a scoped handle, used inside its scope.
+module App.Main exposing (main)
+
+ms50 : Duration.Duration
+let ms50 = Result.with_default Duration.zero (Duration.millis 50)
+
+plain : FileSystem.WriteOptions
+let plain = { flag = None; mode = None }
+
+line : (String, String) ->{} Unit
+let line (label, value) = Platform.stdout_line (label ++ ": " ++ value)
+
+whole : Stream.ReadOptions
+let whole = { offset = None; bytesToRead = None; chunkSize = None }
+
+/// Two events, whatever the file system would see.
+fixed_backend : Stream.WatchBackend
+let fixed_backend path _ = Some (Stream.from_list_effect (task { [Stream.Create (path ++ "/new"), Stream.Remove (path ++ "/old")] }))
+
+flat : Stream.WatchOptions
+let flat = { recursive = false }
+
+/// Whether the event is the creation or an update of `b.txt`.
+about_b : Stream.WatchEvent -> Bool
+let about_b e = e == Stream.Create "b.txt" || e == Stream.Update "b.txt"
+
+files : String ->{FileSystem.FileSystem; PlatformError.PlatformError} Unit
+let files dir =
+  let a = dir ++ "/a.txt"
+  FileSystem.write_file_string plain a "one\ntwo\nthree"
+  line ("read_file", (show (Stream.mk_string (Stream.decode_text (Stream.read_file whole a)))))
+  let part = { offset = ByteSize.bytes 4; bytesToRead = ByteSize.bytes 3; chunkSize = Some 2 }
+  line ("read_file part", (show (Stream.run_collect (Stream.read_file part a))))
+  line ("split_lines", (show (Stream.run_collect (Stream.split_lines (Stream.decode_text (Stream.read_file whole a))))))
+  let missing = try show (Stream.run_count (Stream.read_file whole (dir ++ "/none"))) with | PlatformError.PlatformError _ -> "missing"
+  line ("read_file missing", missing)
+  let backed = Stream.run_collect (Stream.watch_with fixed_backend flat dir)
+  line ("watch_with", (show (List.length backed, List.map (fun e -> e == Stream.Create (dir ++ "/new")) backed)))
+  let created =
+    Stream.watch flat dir
+      |> Stream.merge_effect (task {
+        Effect.sleep ms50
+        FileSystem.write_file_string plain (dir ++ "/b.txt") "b"
+      })
+      |> Stream.filter about_b
+      |> Stream.take 1
+      |> Stream.run_count
+  line ("watch", (show created))
+
+/// Each element of a stream of the scope's subscription, inside the scope.
+subscribed : PubSub.PubSub Number ->{} List Number
+let subscribed hub =
+  scope {
+    let sub = PubSub.subscribe hub
+    let _ = PubSub.publish_all [1, 2, 3] hub
+    Stream.from_subscription sub |> Stream.map (fun n -> n * 10) |> Stream.take 3 |> Stream.run_collect
+  }
+
+/// Streams of open files, read inside the scope that closes them.
+opened : String ->{FileSystem.FileSystem; PlatformError.PlatformError} List Number
+let opened path =
+  scope {
+    let file = FileSystem.open { flag = None; mode = None; noFollow = false } path
+    let handles = Stream.make [file, file]
+    Stream.run_collect (Stream.map_effect (fun f -> List.length (Option.with_default [] (FileSystem.read_alloc 2 (Some 0n) f))) handles)
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  line ("decode_text", (Stream.mk_string (Stream.decode_text (Stream.make [[104, 195], [169]]))))
+  line ("encode_text", (show (Stream.mk_bytes (Stream.encode_text (Stream.make ["é", "!"])))))
+  let limited = Stream.limit_bytes (Option.with_default ByteSize.zero (ByteSize.bytes 3)) (Stream.succeed [0]) (Stream.make [[1, 2], [3, 4], [5]])
+  line ("limit_bytes", (show (Stream.run_collect limited)))
+  let hub = PubSub.unbounded { replay = None }
+  line ("from_subscription", (show (subscribed hub)))
+  let outcome =
+    try
+      provide FileSystem.node {
+        scope {
+          let dir = FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-stream-" }
+          files dir
+          FileSystem.write_file_string plain (dir ++ "/h.txt") "handle"
+          line ("scoped handles", (show (opened (dir ++ "/h.txt"))))
+        }
+        "done"
+      }
+    with
+    | PlatformError.PlatformError reason -> "failed: " ++ show reason
+  Platform.stdout_line outcome
+  let stdin =
+    try
+      provide Stdio.node {
+        show (Stream.mk_bytes Stream.stdin)
+      }
+    with
+    | PlatformError.PlatformError _ -> "failed"
+  line ("stdin", stdin)

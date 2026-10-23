@@ -1,0 +1,29 @@
+// A stream that holds a scoped handle cannot leave the handle's scope, and
+// a stream cannot store a callback over a scoped value.
+module App.Streams exposing (..)
+
+/// The stream of a subscription holds its region.
+escaped : PubSub.PubSub Number ->{} Stream.Stream none none Number
+let escaped hub =
+  scope {
+    let sub = PubSub.subscribe hub
+    Stream.from_subscription sub |> Stream.take 3
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-G001 holds region `s`
+  }
+
+/// So does a stream that a scope broadcasts.
+broadcast : Stream.Stream none none Number ->{} Stream.Stream none none Number
+let broadcast source =
+  scope {
+    Stream.broadcast { capacity = None; strategy = None; replay = None } source
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-G001 holds region `s`
+  }
+
+/// A callback stored in a stream is bare: it may not hold a scoped value.
+stored : PubSub.PubSub Number ->{} List Number
+let stored hub =
+  scope {
+    let sub = PubSub.subscribe hub
+    Stream.run_collect (Stream.map_effect (fun n -> PubSub.take sub + n) (Stream.range 1 2))
+//                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-G001 holds region `s`
+  }

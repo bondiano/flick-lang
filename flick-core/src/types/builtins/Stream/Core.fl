@@ -1,0 +1,189 @@
+/// The stream type and its sources: a `Stream r e a` is a cold description
+/// of elements of `a` that needs the services `r` and may fail with `e`;
+/// nothing runs until a `run_*` call runs it. A stream holds at most the
+/// regions its qualifier names, so one made from a scoped handle stays in
+/// that handle's scope.
+module Stream.Core exposing (..)
+
+/// A description of a stream of `a` that needs `r` and fails with `e`.
+type Stream (r : ServiceRow) (e : ErrorRow) a
+
+/// Which side ends a merge of two streams: the left one, the right one,
+/// both, or either of them.
+type HaltStrategy = Left | Right | Both | Either
+
+/// How many elements a source puts in one chunk when it is not told.
+default_chunk_size : Number
+foreign pure default_chunk_size from "@flick-lang/runtime/effect/Stream" "DefaultChunkSize"
+  reviewed "effect@4.0.5 sha256:328d7eb584c7877e"
+
+/// The stream without elements.
+empty : Stream none none a
+foreign pure empty from "@flick-lang/runtime/effect/Stream" "empty"
+  reviewed "effect@4.0.5 sha256:7907e7723a113197"
+
+/// The stream that never emits and never ends.
+never : Stream none none a
+foreign pure never from "@flick-lang/runtime/effect/Stream" "never"
+  reviewed "effect@4.0.5 sha256:804da98273af4b31"
+
+/// The stream of one element.
+succeed : a -> Stream none none a
+foreign pure succeed from "@flick-lang/runtime/effect/Stream" "succeed"
+  reviewed "effect@4.0.5 sha256:f5e762b91b37632d"
+
+/// The stream of the elements, in order.
+make : List a -> Stream none none a
+foreign pure make from "@flick-lang/runtime/effect/Stream" "make"
+  variadic
+  reviewed "effect@4.0.5 sha256:db604636e01e824a"
+
+/// The stream of the elements of the list.
+from_list : List a -> Stream none none a
+foreign pure from_list from "@flick-lang/runtime/effect/Stream" "fromArray"
+  reviewed "effect@4.0.5 sha256:6c43f74d4003ca81"
+
+/// The elements of each list, one list after the other.
+from_lists : List (List a) -> Stream none none a
+foreign pure from_lists from "@flick-lang/runtime/effect/Stream" "fromArrays"
+  variadic
+  reviewed "effect@4.0.5 sha256:337bffdef27495f2"
+
+/// The stream built by `f` when it runs; for streams defined by recursion.
+suspend : (Unit -> Stream r e a) -> Stream r e a
+foreign pure suspend from "@flick-lang/runtime/effect/Stream" "suspend"
+  reviewed "effect@4.0.5 sha256:79e16f1b7622c50b"
+
+/// The stream that fails with `error`.
+fail : Errors e -> Stream none e a
+foreign pure fail from "@flick-lang/runtime/effect/Stream" "fail"
+  reviewed "effect@4.0.5 sha256:e295433291f08408"
+
+/// The stream that fails with the whole cause of `failure`.
+fail_cause : Failure e -> Stream none e a
+foreign pure fail_cause from "@flick-lang/runtime/effect/Stream" "flickFailCause"
+  reviewed "effect@4.0.5 sha256:9f984db02832c0ed"
+
+/// The stream that dies with a defect of the message.
+die : String -> Stream none none a
+foreign pure die from "@flick-lang/runtime/effect/Stream" "flickDie"
+  reviewed "effect@4.0.5 sha256:4694145500515a58"
+
+/// The value of `task`, run each time the stream runs.
+from_effect : Eff r e a -> Stream r e a
+foreign pure from_effect from "@flick-lang/runtime/effect/Stream" "fromEffect"
+  reviewed "effect@4.0.5 sha256:ef6540fb78647c45"
+
+/// Runs `task` for its effects and emits nothing.
+from_effect_drain : Eff r e x -> Stream r e a
+foreign pure from_effect_drain from "@flick-lang/runtime/effect/Stream" "fromEffectDrain"
+  reviewed "effect@4.0.5 sha256:82af88f80ec97c00"
+
+/// The values of `task` run again and again, forever.
+from_effect_repeat : Eff r e a -> Stream r e a
+foreign pure from_effect_repeat from "@flick-lang/runtime/effect/Stream" "fromEffectRepeat"
+  reviewed "effect@4.0.5 sha256:0a21a4054e0364b9"
+
+/// The values of `task` run by the schedule, which gets each value.
+from_effect_schedule : Schedule.Schedule r2 e2 a o -> Eff r e a -> Stream (r + r2) (e + e2) a
+foreign pure from_effect_schedule from "@flick-lang/runtime/effect/Stream" "flickFromEffectSchedule"
+  arity 1
+  reviewed "effect@4.0.5 sha256:e800d8185ced7b63"
+
+/// The elements of the list `task` gives.
+from_list_effect : Eff r e (List a) -> Stream r e a
+foreign pure from_list_effect from "@flick-lang/runtime/effect/Stream" "fromArrayEffect"
+  reviewed "effect@4.0.5 sha256:2ea93e3404b74a10"
+
+/// The elements of the lists `task` gives, run again and again.
+from_list_effect_repeat : Eff r e (List a) -> Stream r e a
+foreign pure from_list_effect_repeat from "@flick-lang/runtime/effect/Stream" "fromIterableEffectRepeat"
+  reviewed "effect@4.0.5 sha256:81270b00dbd6ea3f"
+
+/// The stream `task` gives, run when the stream runs; what the task
+/// acquires belongs to the scope the stream runs in.
+unwrap : Eff r e (Stream r2 e2 a) -> Stream (r + r2) (e + e2) a
+foreign pure unwrap from "@flick-lang/runtime/effect/Stream" "flickUnwrap"
+  reviewed "effect@4.0.5 sha256:97d5b10206b0bd9a"
+
+/// The stream `producer` feeds through the queue it gets: each message is an
+/// element, `Queue.end` ends the stream and `Queue.fail` fails it. The
+/// producer runs while the stream runs and is interrupted when it ends.
+callback : (Queue.Queue e a ->{r; e} x) -> Stream r e a
+foreign pure callback from "@flick-lang/runtime/effect/Stream" "flickCallback"
+  reviewed "effect@4.0.5 sha256:9b598402efa33474"
+
+/// A unit each `interval`, the first at once.
+tick : Duration.Duration -> Stream none none Unit
+foreign pure tick from "@flick-lang/runtime/effect/Stream" "tick"
+  reviewed "effect@4.0.5 sha256:30a1382d726e7d70"
+
+/// The outputs of the schedule, each after its delay.
+from_schedule : Schedule.Schedule r e Unit o -> Stream r e o
+foreign pure from_schedule from "@flick-lang/runtime/effect/Stream" "fromSchedule"
+  reviewed "effect@4.0.5 sha256:3039848d854c2607"
+
+/// The messages taken from the queue until it ends; a failed queue fails
+/// the stream.
+from_queue : Queue.Queue e a -> Stream none e a
+foreign pure from_queue from "@flick-lang/runtime/effect/Stream" "fromQueue"
+  reviewed "effect@4.0.5 sha256:74eae58a270b8b4a"
+
+/// The messages published to the hub while the stream runs, which
+/// subscribes when it starts.
+from_pubsub : PubSub.PubSub a -> Stream none none a
+foreign pure from_pubsub from "@flick-lang/runtime/effect/Stream" "fromPubSub"
+  reviewed "effect@4.0.5 sha256:a6b1f2ec6ae3ff53"
+
+/// The messages of the subscription: the stream holds its region and
+/// cannot leave the subscription's scope.
+from_subscription : forall s a. PubSub.Subscription s a -> (Stream none none a)^{s}
+foreign pure from_subscription from "@flick-lang/runtime/effect/Stream" "fromSubscription"
+  retention call
+  reviewed "effect@4.0.5 sha256:3067d6d121f26d54"
+
+/// The chunks of a JS `ReadableStream`; a read that fails becomes
+/// `on_error` of what it threw.
+from_readable_stream : (JsValue -> Errors e) -> JsValue -> Stream none e JsValue
+foreign pure from_readable_stream from "@flick-lang/runtime/effect/Stream" "flickFromReadableStream"
+  arity 2
+  reviewed "effect@4.0.5 sha256:55df33ec947c1649"
+
+/// The values of a JS async iterable; a failure becomes `on_error` of what
+/// it threw.
+from_async_iterable : (JsValue -> Errors e) -> JsValue -> Stream none e JsValue
+foreign pure from_async_iterable from "@flick-lang/runtime/effect/Stream" "flickFromAsyncIterable"
+  arity 2
+  reviewed "effect@4.0.5 sha256:422651542bc69232"
+
+/// The events of the type that a JS event target (`addEventListener`)
+/// dispatches while the stream runs.
+from_event_listener : String -> JsValue -> Stream none none JsValue
+foreign pure from_event_listener from "@flick-lang/runtime/effect/Stream" "flickFromEventListener"
+  arity 2
+  reviewed "effect@4.0.5 sha256:6f03b8d6c3daf370"
+
+/// The elements `f` unfolds from `seed` until it gives `None`.
+unfold : s -> (s ->{r; e} Option (a, s)) -> Stream r e a
+foreign pure unfold from "@flick-lang/runtime/effect/Stream" "flickUnfold"
+  arity 2
+  reviewed "effect@4.0.5 sha256:9e1a3cad1471e9c6"
+
+/// Pages from `seed`: `f` gives the elements of a page and the seed of the
+/// next one, `None` after the last.
+paginate : s -> (s ->{r; e} (List a, Option s)) -> Stream r e a
+foreign pure paginate from "@flick-lang/runtime/effect/Stream" "paginate"
+  arity 2
+  reviewed "effect@4.0.5 sha256:0c5be7da8b2e3eda"
+
+/// `value`, `next value`, `next (next value)`, … forever.
+iterate : a -> (a -> a) -> Stream none none a
+foreign pure iterate from "@flick-lang/runtime/effect/Stream" "iterate"
+  arity 2
+  reviewed "effect@4.0.5 sha256:7cf45f347b48d70d"
+
+/// The integers from `min` to `max`, both included.
+range : Number -> Number -> Stream none none Number
+foreign pure range from "@flick-lang/runtime/effect/Stream" "range"
+  arity 2
+  reviewed "effect@4.0.5 sha256:e258f35819bf3d82"

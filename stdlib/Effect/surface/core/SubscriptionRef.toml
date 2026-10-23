@@ -1,4 +1,5 @@
 [wrapped]
+changes = "Stream.from_subscription_ref 602266e1b3d1aff7"
 SubscriptionRef = "SubscriptionRef.SubscriptionRef db7f512c11ba3867"
 make = "SubscriptionRef.make f3f6e5a550530038"
 get = "SubscriptionRef.get 53991aa417733785"
@@ -25,6 +26,3 @@ updateSomeAndGetEffect = "SubscriptionRef.update_some_and_get_effect ace75de0096
 [excluded]
 getUnsafe = "invariant: `unsafe*`: a plain synchronous call outside the effect, unordered with the fiber's steps"
 isSubscriptionRef = "TS-only: a type guard; Flick values are typed statically"
-
-[pending]
-changes = "M20"

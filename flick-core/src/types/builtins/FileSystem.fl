@@ -1,8 +1,9 @@
 /// Effect's `FileSystem`: files and directories through a service whose
 /// calls fail with `PlatformError`; `node` is the file system of Node.js.
 /// Bytes are lists of numbers from 0 to 255. An opened file and a scoped
-/// temporary path belong to the `scope` that owns their region. Effect's
-/// streams of a file (`stream`, `sink`, `watch`) are not wrapped yet.
+/// temporary path belong to the `scope` that owns their region. The
+/// streams of a file are `Stream.read_file` and `Stream.watch`; Effect's
+/// `sink` of a file is not wrapped yet.
 module FileSystem exposing (..)
 
 /// An open file of region `s`, closed when that scope ends.
