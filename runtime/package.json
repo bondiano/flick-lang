@@ -6,14 +6,27 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./src/index.d.ts",
-      "default": "./src/index.js"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "test": "node --test"
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "oxlint --type-aware --deny-warnings",
+    "test": "tsc -p tsconfig.build.json && node --test"
   },
   "dependencies": {
     "effect": "4.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "oxlint": "1.89.0",
+    "oxlint-tsgolint": "7.0.2004",
+    "typescript": "7.0.2"
   }
 }

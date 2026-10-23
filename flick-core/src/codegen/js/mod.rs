@@ -60,8 +60,23 @@ pub fn js(module: &Module, options: &Options) -> Output {
     if g.effect {
         let _ = writeln!(code, "import {{ Effect }} from \"{RUNTIME}\";");
     }
+    // code inside a module is untyped: only exports carry types, so what it
+    // imports is `any` in TypeScript
+    let untyped = |code: &mut String, alias: &str| {
+        if options.typescript {
+            let _ = writeln!(code, "const {alias}: any = {alias}$;");
+        }
+    };
+    let bound = |alias: &str| {
+        if options.typescript {
+            format!("{alias}$")
+        } else {
+            alias.to_owned()
+        }
+    };
     if g.runtime {
-        let _ = writeln!(code, "import * as $rt from \"{RUNTIME}\";");
+        let _ = writeln!(code, "import * as {} from \"{RUNTIME}\";", bound("$rt"));
+        untyped(&mut code, "$rt");
     }
     for (source, export, alias) in &g.foreign {
         let export = if names::is_property(export) {
@@ -71,22 +86,19 @@ pub fn js(module: &Module, options: &Options) -> Output {
         };
         let _ = writeln!(
             code,
-            "import {{ {export} as {alias} }} from {};",
+            "import {{ {export} as {} }} from {};",
+            bound(alias),
             names::string(source)
         );
+        untyped(&mut code, alias);
     }
     let here = (options.path)(&module.name);
     for imported in &g.imports {
         let target = (options.path)(imported);
         let alias = names::module_alias(imported);
         let from = names::string(&relative(&here, &target));
-        if options.typescript {
-            // code inside a module is untyped: only exports carry types
-            let _ = writeln!(code, "import * as {alias}$ from {from};");
-            let _ = writeln!(code, "const {alias}: any = {alias}$;");
-        } else {
-            let _ = writeln!(code, "import * as {alias} from {from};");
-        }
+        let _ = writeln!(code, "import * as {} from {from};", bound(&alias));
+        untyped(&mut code, &alias);
     }
     if !code.is_empty() {
         code.push('\n');

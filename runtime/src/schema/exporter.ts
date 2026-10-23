@@ -1,0 +1,182 @@
+// The strict JSON Schema 2020-12 exporter, over the AST of an Effect Schema
+// codec: the wire contract written exactly, or an `ExportError` naming the
+// path of the node that has no exact form. Never `{}` or `true` for
+// something it cannot state.
+import type { Result, SchemaAST } from "effect";
+
+import { err, ok, type Tagged } from "../data.ts";
+import { at } from "./issues.ts";
+import { notesOf } from "./notes.ts";
+import type { AnySchema } from "./schemas.ts";
+
+const EXPORT_ERROR = "Codec.ExportError.ExportError";
+
+/** `Codec.ExportError`. */
+export type ExportError = Tagged<typeof EXPORT_ERROR, string>;
+
+class Unsupported extends Error {
+  constructor(path: string, reason: string) {
+    super(`${path} -> JSON Schema: ${reason}`);
+  }
+}
+
+/** A JSON Schema, as the exporter writes it. */
+type JsonSchema = boolean | { readonly [keyword: string]: unknown };
+
+type Defs = Map<string, JsonSchema | null>;
+
+/** The JSON Schema keywords of the checks the exporter knows. */
+const KNOWN: Readonly<Record<string, JsonSchema>> = {
+  email: { format: "email" },
+  non_empty: { minLength: 1 },
+  positive: { exclusiveMinimum: 0 },
+};
+
+const TRANSFORMS = {
+  pure: undefined,
+  result: "a fallible transformation has no JSON Schema form",
+  effect: "an effectful transformation decides acceptance at run time",
+} as const;
+
+/** The keywords of the checks of `ast`, which constrain what reaches it. */
+const checks = (ast: SchemaAST.AST, path: string): Readonly<Record<string, unknown>> => {
+  const out: Record<string, unknown> = {};
+  for (const check of ast.checks ?? []) {
+    const notes = notesOf(check);
+    const known = notes["flick/known"];
+    const keywords = known ? KNOWN[known] : undefined;
+    // JSON numbers are finite: the wire type already says it
+    if (notes["flick/wire"]) continue;
+    if (notes["flick/pattern"]) out["pattern"] = notes["flick/pattern"];
+    else if (typeof keywords === "object") Object.assign(out, keywords);
+    else if (notes["flick/refined"]) throw new Unsupported(path, `the check of ${notes["flick/refined"]} has no JSON Schema form`);
+    else throw new Unsupported(path, `the check "${notes.message ?? "a check"}" has no JSON Schema form`);
+  }
+  return out;
+};
+
+const object = (properties: Record<string, JsonSchema>, required: ReadonlyArray<string>, closed: boolean): JsonSchema => ({
+  type: "object",
+  properties,
+  required,
+  ...(closed ? { additionalProperties: false } : {}),
+});
+
+/** The properties of a struct, written under `wires` names. */
+const objectOf = (
+  ast: SchemaAST.Objects,
+  path: string,
+  defs: Defs,
+  wires: Readonly<Record<string, string>> | undefined,
+  closed: boolean,
+): JsonSchema => {
+  const variant = notesOf(ast)["flick/variant"];
+  const entries = ast.propertySignatures.map((p) => {
+    const label = String(p.name);
+    const key = wires?.[label] ?? label;
+    const inner = variant && key !== "_tag" ? at(at(path, variant), key) : at(path, key);
+    return { key, schema: schemaOf(p.type, inner, defs), optional: p.type.context?.isOptional === true };
+  });
+  return object(
+    Object.fromEntries(entries.map((e) => [e.key, e.schema])),
+    entries.filter((e) => !e.optional).map((e) => e.key),
+    closed,
+  );
+};
+
+/** The wire end of `ast`: the last link of its encoding. */
+const wireEnd = (ast: SchemaAST.AST): SchemaAST.AST | undefined => ast.encoding?.[ast.encoding.length - 1]?.to;
+
+const body = (ast: SchemaAST.AST, path: string, defs: Defs): JsonSchema => {
+  const notes = notesOf(ast);
+  const refused = notes["flick/refuse"];
+  if (refused) throw new Unsupported(path, refused);
+  const transform = notes["flick/transform"];
+  const unwritable = transform && TRANSFORMS[transform];
+  if (unwritable) throw new Unsupported(path, unwritable);
+  if (notes["flick/block"] && ast._tag === "Objects") {
+    const closed = !notesOf(wireEnd(ast))["flick/ignoreExtra"];
+    return objectOf(ast, path, defs, notes["flick/wires"], closed);
+  }
+  const end = wireEnd(ast);
+  if (end) return schemaOf(end, path, defs);
+  switch (ast._tag) {
+    case "String":
+      return { type: "string" };
+    case "Number":
+      return { type: "number" };
+    case "Boolean":
+      return { type: "boolean" };
+    case "Null":
+      return { type: "null" };
+    case "Literal":
+      return { const: ast.literal };
+    case "Never":
+      return false;
+    case "Arrays": {
+      const [rest, ...more] = ast.rest;
+      if (ast.elements.length === 0 && rest !== undefined && more.length === 0) {
+        return { type: "array", items: schemaOf(rest, `${path}[]`, defs) };
+      }
+      if (rest === undefined) {
+        return {
+          type: "array",
+          prefixItems: ast.elements.map((e, i) => schemaOf(e, `${path}[${i}]`, defs)),
+          items: false,
+        };
+      }
+      break;
+    }
+    case "Objects":
+      if (ast.indexSignatures.length === 0) return objectOf(ast, path, defs, undefined, true);
+      break;
+    case "Union": {
+      // an absent key is no wire value
+      const members = ast.types.filter((t) => t._tag !== "Undefined");
+      const literals = members.flatMap((t) => (t._tag === "Literal" ? [t.literal] : []));
+      if (literals.length === members.length) return { enum: literals };
+      return { [notes["flick/oneOf"] ? "oneOf" : "anyOf"]: members.map((t) => schemaOf(t, path, defs)) };
+    }
+    case "Suspend":
+      return schemaOf(ast.thunk(), path, defs);
+    case "Unknown":
+    case "Any":
+      throw new Unsupported(path, "an Unknown value accepts anything, which strict export does not write");
+    default:
+      break;
+  }
+  throw new Unsupported(path, `${notes.expected ?? ast._tag} has no JSON form`);
+};
+
+/** The JSON Schema of the wire form of `ast`. */
+const schemaOf = (ast: SchemaAST.AST, path: string, defs: Defs): JsonSchema => {
+  const ref = notesOf(ast)["flick/ref"];
+  if (ref && ast._tag === "Suspend") {
+    if (!defs.has(ref)) {
+      defs.set(ref, null);
+      defs.set(ref, schemaOf(ast.thunk(), path, defs));
+    }
+    return { $ref: `#/$defs/${ref}` };
+  }
+  const keywords = checks(ast, path);
+  const out = body(ast, path, defs);
+  return Object.keys(keywords).length > 0 && typeof out === "object" ? { ...out, ...keywords } : out;
+};
+
+/** `Codec.json_schema root codec`: the schema as JSON text, or an `ExportError`. */
+export const exportJsonSchema = (root: string, codec: AnySchema): Result.Result<string, ExportError> => {
+  const defs: Defs = new Map();
+  try {
+    const top = schemaOf(codec.ast, root, defs);
+    if (typeof top !== "object") throw new Unsupported(root, "no value has this type");
+    const out = {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      ...top,
+      ...(defs.size > 0 ? { $defs: Object.fromEntries(defs) } : {}),
+    };
+    return ok(JSON.stringify(out, null, 2));
+  } catch (error) {
+    if (error instanceof Unsupported) return err({ _tag: EXPORT_ERROR, _0: error.message });
+    throw error;
+  }
+};

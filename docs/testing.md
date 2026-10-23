@@ -78,12 +78,19 @@ spec's `text` blocks.
 
 ## Runtime tests — `runtime/test/`
 
-`node --test` in `runtime/` (part of `just e2e`) checks the adapter's
+The runtime is TypeScript 7 (`runtime/src/*.ts`), built to `runtime/dist/`
+with declarations; `just e2e` type-checks it with `tsc` (strict, with
+`noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`, tests included),
+lints it with `oxlint --type-aware` (no `any`, no floating promises, and an
+unchecked type assertion only with its reason beside it) and runs the tests.
+
+`node --test` in `runtime/` runs the `.test.ts` files on Node's type
+stripping, after building `dist/`, and checks the adapter's
 contracts directly on Effect: the recovery table of `try … with`, inert cause
 reports, the two-phase close of owners, children and supervisors,
 concurrency, races and layers, the Effect `4.0.5` pin and its capability
-matrix. Entry runner tests start `runtime/fixtures/entry.mjs` in a child
-process and send it signals.
+matrix, codecs against their compiled decoders. Entry runner tests start
+`runtime/fixtures/entry.ts` in a child process and send it signals.
 
 ## Syntax corpus and fuzzing — `flick-core/tests/{corpus,fuzz}.rs`
 
