@@ -19,6 +19,7 @@ test:
 
 # Install the JS runtime, check its pinned Effect, run compiled programs on Node
 e2e:
+    cargo build -p flick
     pnpm install --frozen-lockfile
     pnpm -r typecheck
     pnpm -r lint
@@ -67,7 +68,8 @@ tree-sitter:
 
 # Move to another Effect release: new surface snapshot, report, pins; the coverage linter stays red until review
 effect-bump version:
-    node tools/dts-importer/bump.mjs {{version}}
+    pnpm -C tools/dts-importer build
+    node tools/dts-importer/index.mjs bump {{version}}
 
 # Print the Effect coverage counters by status and module
 effect-coverage:

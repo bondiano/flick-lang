@@ -14,7 +14,7 @@ test("effect-bump reports the change, writes the snapshot and moves the pins", (
   cpSync(path.join(fixtures, "repo"), root, { recursive: true });
   const out = execFileSync(
     "node",
-    [path.join(here, "../bump.mjs"), "1.1.0", "--package-dir", path.join(fixtures, "effect-1.1.0"), "--root", root],
+    [path.join(here, "../index.mjs"), "bump", "1.1.0", "--package-dir", path.join(fixtures, "effect-1.1.0"), "--root", root],
     { encoding: "utf8" },
   );
   assert.equal(

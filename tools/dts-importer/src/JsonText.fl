@@ -1,0 +1,27 @@
+/// JSON text written as `JSON.stringify` writes it: no spaces, the fields
+/// of an object in the order given.
+module JsonText exposing (Value(..), quote, render)
+
+type Value =
+  | JString String
+  | JBool Bool
+  | JNull
+  | JArray (List Value)
+  | JObject (List (String, Value))
+
+/// The string as a JSON string literal.
+quote : String -> String
+let quote s =
+  match Codec.encode_result String.json s with
+  | Ok json -> Json.stringify json
+  | Err _ -> "\"\""
+
+render : Value -> String
+let rec render v =
+  match v with
+  | JString s -> quote s
+  | JBool b -> if b then "true" else "false"
+  | JNull -> "null"
+  | JArray items -> "[" ++ String.join "," (List.map render items) ++ "]"
+  | JObject fields ->
+    "{" ++ String.join "," (List.map (fun (k, x) -> quote k ++ ":" ++ render x) fields) ++ "}"

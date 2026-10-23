@@ -8,7 +8,7 @@ use std::fmt::Write;
 
 use serde::Deserialize;
 
-/// `stdlib/Effect/snapshot.json`, written by `tools/dts-importer/surface.mjs`.
+/// `stdlib/Effect/snapshot.json`, written by `tools/dts-importer/index.mjs surface`.
 #[derive(Debug, Deserialize)]
 pub struct Snapshot {
     pub version: String,

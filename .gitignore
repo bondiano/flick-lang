@@ -2,6 +2,7 @@
 node_modules/
 !/tests/check/projects/*/node_modules/
 /runtime/dist/
+/tools/dts-importer/dist/
 # the playground's compiler, built by `just site-wasm`
 /site/.vitepress/wasm/
 /site/.vitepress/cache/

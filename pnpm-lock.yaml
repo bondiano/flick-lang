@@ -265,6 +265,9 @@ importers:
 
   tools/dts-importer:
     dependencies:
+      '@flick-lang/runtime':
+        specifier: workspace:*
+        version: link:../../runtime
       typescript:
         specifier: 5.9.3
         version: 5.9.3

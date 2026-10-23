@@ -1,0 +1,260 @@
+/// The shapes of a package's value exports, for `flick ffi import`. The
+/// checker has already reduced the types: aliases, mapped and conditional
+/// types are resolved; whatever stays outside the forms below is
+/// `{"k": "other"}` with its TypeScript text, for the importer to refuse.
+module Shape exposing (exports, Export)
+
+import JsonText exposing (Value(..))
+import Ts
+
+/// How deep a shape goes before the rest is `other`.
+max_depth : Number
+let max_depth = 8
+
+/// Classes of the platform a binding keeps as opaque handles.
+handles : List String
+let handles = ["Date", "RegExp", "Error", "AbortSignal", "URL", "Uint8Array", "ArrayBuffer"]
+
+/// An export: its name, the name Flick binds it by, its description
+/// without either and the fingerprint of all but `local`.
+type alias Export = {
+  name : String;
+  local : String;
+  body : List (String, Value);
+  fingerprint : String
+}
+
+tag : String -> Value
+let tag k = JObject [("k", JString k)]
+
+other : Ts.Checker -> Ts.Type -> Value
+let other c t = JObject [("k", JString "other"), ("text", JString (Ts.text c t))]
+
+symbol_name : Option Ts.Symbol -> Option String
+let symbol_name s = Option.map Ts.symbol_name s
+
+/// The forms that are a single flag of the type, in the order they win.
+simple : List (String, String)
+let simple =
+  [
+    ("Any", "any"),
+    ("Unknown", "unknown"),
+    ("Boolean", "boolean"),
+    ("String", "string"),
+    ("Number", "number"),
+    ("BigInt", "bigint"),
+    ("Void", "void"),
+    ("Undefined", "undefined"),
+    ("Null", "null"),
+    ("Never", "never")
+  ]
+
+is_literal : Ts.Type -> Bool
+let is_literal t =
+  Ts.type_has "StringLiteral" t || Ts.type_has "NumberLiteral" t || Ts.type_has "BooleanLiteral" t
+
+/// A type parameter, with its constraint when it has one.
+parameter_shape : Ts.Checker -> Ts.Type -> Value
+let parameter_shape c t =
+  let name = ("name", JString (Option.with_default "" (symbol_name (Ts.type_symbol t))))
+  let bound =
+    match Ts.base_constraint c t with
+    | Some b ->
+      if Ts.type_has "Unknown" b || Ts.same b t then [] else [("bound", JString (Ts.text c b))]
+    | None -> []
+  JObject (List.concat [[("k", JString "param"), name], bound])
+
+/// The type arguments of a reference, or of an alias; an interface's own
+/// end with its implicit `this`.
+arguments : Ts.Checker -> Ts.Type -> List Ts.Type
+let arguments c t =
+  match Ts.alias_arguments t with
+  | Some args -> args
+  | None ->
+    if Ts.object_has "Reference" t then
+      List.filter (fun a -> not (Ts.is_this a)) (Ts.type_arguments c t)
+    else
+      []
+
+/// The name of a named object type; an anonymous one has `null`.
+object_name : String -> Ts.Type -> Value
+let object_name n t =
+  match symbol_name (Ts.alias_symbol t) with
+  | Some alias -> JString alias
+  | None -> if n == "__type" || n == "__object" then JNull else JString n
+
+rec {
+  /// The shape of a type, `depth` levels deep.
+  shape : Ts.Checker -> Number -> Ts.Type -> Value
+  let shape c depth t =
+    if depth > max_depth then
+      other c t
+    else
+      match List.find (fun (flag, _) -> Ts.type_has flag t) simple with
+      | Some (_, k) -> tag k
+      | None ->
+        if is_literal t then
+          JObject [("k", JString "literal"), ("text", JString (Ts.text c t))]
+        else if Ts.type_has "TypeParameter" t then
+          parameter_shape c t
+        else if Ts.type_has "Union" t then
+          JObject
+            [
+              ("k", JString "union"),
+              ("types", JArray (List.map (shape c (depth + 1)) (Ts.members t)))
+            ]
+        else if Ts.type_has "Object" t then
+          object_shape c depth t
+        else
+          other c t
+
+  object_shape : Ts.Checker -> Number -> Ts.Type -> Value
+  let object_shape c depth t =
+    deeper : Ts.Type -> Value
+    let deeper x = shape c (depth + 1) x
+    if Ts.is_tuple c t then
+      if Ts.tuple_has_rest t || Ts.tuple_min_length t != Ts.tuple_fixed_length t then
+        other c t
+      else
+        JObject
+          [("k", JString "tuple"), ("elements", JArray (List.map deeper (Ts.type_arguments c t)))]
+    else if Ts.is_array c t then
+      match List.head (Ts.type_arguments c t) with
+      | Some element -> JObject [("k", JString "array"), ("element", deeper element)]
+      | None -> other c t
+    else
+      let name = symbol_name (Ts.type_symbol t)
+      let args = arguments c t
+      let calls = Ts.call_signatures t
+      let promise = name == Some "Promise" || name == Some "PromiseLike"
+      let is_class =
+        match Ts.type_symbol t with
+        | Some s -> Ts.symbol_has "Class" s
+        | None -> false
+      match (promise, args) with
+      | (true, [arg]) -> JObject [("k", JString "promise"), ("type", deeper arg)]
+      | _ ->
+        if not (List.is_empty calls) && Ts.property_count t == 0 then
+          JObject
+            [
+              ("k", JString "function"),
+              ("signatures", JArray (List.map (signature c (depth + 1)) calls))
+            ]
+        else
+          match name with
+          | Some n ->
+            if is_class || List.contains n handles then
+              if List.is_empty args then
+                JObject [("k", JString "handle"), ("name", JString n)]
+              else
+                other c t
+            else if List.is_empty calls
+              && List.is_empty (Ts.construct_signatures t)
+              && List.is_empty args then
+              JObject
+                [
+                  ("k", JString "object"),
+                  ("name", object_name n t),
+                  ("text", JString (Ts.text c t))
+                ]
+            else
+              other c t
+          | None -> other c t
+
+  parameter : Ts.Checker -> Number -> Ts.Symbol -> Value
+  let parameter c depth p =
+    is : String -> Bool
+    let is field =
+      match Ts.value_declaration p with
+      | Some d -> Ts.declaration_is "Parameter" d && Ts.declaration_has field d
+      | None -> false
+    let optional = is "questionToken" || is "initializer"
+    let declared = Ts.type_of_symbol c p
+    // an optional parameter's type carries `| undefined`; the flag says it already
+    let type_ =
+      if optional && Ts.type_has "Union" declared then
+        match List.filter (fun m -> not (Ts.type_has "Undefined" m)) (Ts.members declared) with
+        | [single] -> single
+        | _ -> declared
+      else
+        declared
+    JObject
+      [
+        ("name", JString (Ts.symbol_name p)),
+        ("optional", JBool optional),
+        ("rest", JBool (is "dotDotDotToken")),
+        ("type", shape c depth type_)
+      ]
+
+  signature : Ts.Checker -> Number -> Ts.Signature -> Value
+  let signature c depth s =
+    JObject
+      [
+        ("params", JArray (List.map (parameter c depth) (Ts.parameters s))),
+        ("this", JBool (Ts.has_this s)),
+        (
+          "typeParams",
+          JArray
+            (List.map
+              (fun t -> JString (Option.with_default "" (symbol_name (Ts.type_symbol t))))
+              (Ts.type_parameters s))
+        ),
+        ("result", shape c depth (Ts.return_type c s))
+      ]
+}
+
+/// The description of an export after its name and local name, if it is a value.
+describe : Ts.Checker -> Ts.Symbol -> Option (List (String, Value))
+let describe c symbol =
+  if not (Ts.symbol_has "Value" symbol) then
+    None
+  else if Ts.symbol_has "Class" symbol then
+    Some [("kind", JString "class")]
+  else if Ts.symbol_has "Enum" symbol then
+    Some
+      [
+        ("kind", JString "value"),
+        ("type", JObject [("k", JString "other"), ("text", JString "enum")])
+      ]
+  else
+    let type_ = Ts.type_of_symbol c symbol
+    let calls = Ts.call_signatures type_
+    if not (List.is_empty calls)
+      && (Ts.symbol_has "Function" symbol || Ts.symbol_has "Variable" symbol) then
+      Some [("kind", JString "function"), ("signatures", JArray (List.map (signature c 0) calls))]
+    else
+      Some [("kind", JString "value"), ("type", shape c 0 type_)]
+
+/// `export default function delay` is bound in Flick by the function's own name.
+local_name : Ts.Symbol -> Ts.Symbol -> String
+let local_name exported symbol =
+  let declaration =
+    match Ts.value_declaration symbol with
+    | Some d -> Some d
+    | None -> List.head (Ts.declarations symbol)
+  let own = Option.bind Ts.declaration_name declaration
+  match own with
+  | Some n -> if Ts.symbol_name exported == "default" then n else Ts.symbol_name exported
+  | None -> Ts.symbol_name exported
+
+export_of : Ts.Checker -> Ts.Symbol -> Option Export
+let export_of c exported =
+  let symbol = if Ts.symbol_has "Alias" exported then Ts.aliased c exported else exported
+  let name = Ts.symbol_name exported
+  Option.map
+    (fun body ->
+      let fingerprinted = JsonText.render (JObject (List.concat [[("name", JString name)], body]))
+      {
+        name = name;
+        local = local_name exported symbol;
+        body = body;
+        fingerprint = "sha256:" ++ Ts.sha256 fingerprinted
+      })
+    (describe c symbol)
+
+/// The value exports of the module, by name.
+exports : Ts.Checker -> Ts.Symbol -> List Export
+let exports c module_ =
+  List.sort_by
+    (fun a b -> compare a.name b.name)
+    (List.filter_map (export_of c) (Ts.exports_of c module_))

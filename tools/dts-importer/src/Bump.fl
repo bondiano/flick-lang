@@ -1,0 +1,162 @@
+/// Moves the repository to another Effect release: takes the snapshot of its
+/// surface, reports what was added, removed or changed against the current
+/// one and what the runtime's capability matrix lacks, writes the snapshot
+/// and the pins. The coverage linter stays red until the manifest is reviewed.
+module Bump exposing (report, matrix, run)
+
+import Surface exposing (Snapshot)
+import Ts
+
+/// The files that pin the Effect release, and how each spells it.
+pins : List (String, String)
+let pins =
+  [
+    ("runtime/package.json", "(\"effect\": \")[^\"]+(\")"),
+    ("runtime/src/capabilities.ts", "(EFFECT_VERSION = \")[^\"]+(\")"),
+    ("runtime/test/effect-version.test.ts", "(PINNED_EFFECT = \")[^\"]+(\")"),
+    ("flick/src/toolchain.rs", "(pub const EFFECT: &str = \")[^\"]+(\")")
+  ]
+
+/// The capture groups of every match of `source`, a valid pattern.
+groups : String -> String -> List (List String)
+let groups source text =
+  match RegExp.make source "g" with
+  | Ok re ->
+    List.map (fun m -> List.map (Option.with_default "") m.captures) (RegExp.match_all re text)
+  | Err _ -> []
+
+/// The text with the version in the first match of the pin's pattern.
+repin : String -> String -> String -> String
+let repin source version text =
+  match RegExp.make source "" with
+  | Ok re -> RegExp.replace re ("$1" ++ version ++ "$2") text
+  | Err _ -> text
+
+/// The `Module.op` names of the capability matrix in `capabilities.ts`.
+matrix : String -> List String
+let matrix text =
+  match String.index_of "const MATRIX" text with
+  | None -> []
+  | Some start ->
+    let rest = String.slice start (String.length text) text
+    let body =
+      match String.index_of "};" rest with
+      | Some end -> String.slice 0 end rest
+      | None -> rest
+    List.flat_map
+      (fun g ->
+        match g with
+        | [module_, ops] ->
+          List.flat_map
+            (fun op -> List.map (fun o -> module_ ++ "." ++ o) op)
+            (groups "\"(\\w+)\"" ops)
+        | _ -> [])
+      (groups "(\\w+): \\[([^\\]]*)\\]" body)
+
+/// `entrypoint Module.name` → `kind fingerprint` of every export.
+flat : Snapshot -> List (String, String)
+let flat snap =
+  List.flat_map
+    (fun (entry, exports) -> List.map (fun (k, v) -> (entry ++ " " ++ k, v)) exports)
+    snap.modules
+
+/// The report of the move from snapshot `old` to `next`.
+report : Snapshot -> Snapshot -> List String -> String
+let report old next capabilities =
+  section : String -> List String -> List String
+  let section title items =
+    if List.is_empty items then
+      []
+    else
+      List.concat
+        [[title ++ " (" ++ show (List.length items) ++ "):"], List.map (fun i -> "  " ++ i) items]
+  let before = HashMap.insert_many (flat old) HashMap.empty
+  let after = flat next
+  let after_map = HashMap.insert_many after HashMap.empty
+  let keys = List.map (fun (k, _) -> k) after
+  let core =
+    Option.with_default
+      []
+      (Option.map (fun (_, e) -> e) (List.find (fun (e, _) -> e == "effect") next.modules))
+  let core_map = HashMap.insert_many core HashMap.empty
+  changed : (String, String) -> Bool
+  let changed (k, v) =
+    match HashMap.get k before with
+    | Some w -> w != v
+    | None -> false
+  let lines =
+    List.concat
+      [
+        ["effect " ++ old.version ++ " -> " ++ next.version],
+        section
+          "entrypoints added"
+          (List.filter (fun e -> not (List.contains e old.entrypoints)) next.entrypoints),
+        section
+          "entrypoints removed"
+          (List.filter (fun e -> not (List.contains e next.entrypoints)) old.entrypoints),
+        section "exports added" (List.filter (fun k -> not (HashMap.has k before)) keys),
+        section
+          "exports removed"
+          (List.filter (fun (k, _) -> not (HashMap.has k after_map)) (flat old)
+            |> List.map (fun (k, _) -> k)),
+        section "exports changed" (List.map (fun (k, _) -> k) (List.filter changed after)),
+        section
+          "capability matrix missing"
+          (List.filter
+            (fun c ->
+              not (String.starts_with "value" (Option.with_default "" (HashMap.get c core_map))))
+            capabilities)
+      ]
+  String.join "\n" lines ++ "\n"
+
+/// Downloads `effect@version` and unpacks it into a fresh directory.
+download : String ->{FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError} String
+let download version =
+  let dir = FileSystem.make_temp_directory { directory = None; prefix = Some "effect-bump-" }
+  Ts.exec "npm" ["pack", "effect@" ++ version, "--pack-destination", dir]
+  match List.find (String.ends_with ".tgz") (FileSystem.read_directory false dir) with
+  | None -> App.fail ("npm pack wrote no tarball into " ++ dir)
+  | Some tarball ->
+    // fingerprints are printed declarations: the package's own dependencies are not needed
+    Ts.exec "tar" ["-xzf", Path.join [dir, tarball], "-C", dir]
+    Path.join [dir, "package"]
+
+plain : FileSystem.WriteOptions
+let plain = { flag = None; mode = None }
+
+/// Moves the repository at `root` to `version`, from the package unpacked
+/// at `package_dir` or downloaded.
+run : String ->
+  Option String ->
+  String ->{FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError}
+  Unit
+let run version package_dir root =
+  let dir =
+    match package_dir with
+    | Some d -> d
+    | None -> download version
+  let next = Surface.snapshot dir
+  if next.version != version then
+    App.fail (dir ++ " holds effect " ++ next.version ++ ", not " ++ version)
+  else
+    ()
+  let file = Path.join [root, "stdlib/Effect/snapshot.json"]
+  let old =
+    match Json.parse (FileSystem.read_file_string file) with
+    | Err _ -> App.fail (file ++ " is not JSON")
+    | Ok input ->
+      match Codec.decode_result Surface.snapshot_json input with
+      | Err _ -> App.fail (file ++ " is not a snapshot")
+      | Ok snap -> snap
+  let capabilities =
+    matrix (FileSystem.read_file_string (Path.join [root, "runtime/src/capabilities.ts"]))
+  Platform.stdout_write (report old next capabilities)
+  FileSystem.write_file_string plain file (Surface.render next)
+  List.each_effect
+    (fun (rel, source) ->
+      let pin = Path.join [root, rel]
+      let text = FileSystem.read_file_string pin
+      FileSystem.write_file_string plain pin (repin source version text))
+    pins
+  Platform.stdout_write
+    "\nwrote the snapshot and the pins; next: `pnpm install`, review stdlib/Effect/surface/ until `cargo test -p flick-core --test effect_surface` passes\n"
