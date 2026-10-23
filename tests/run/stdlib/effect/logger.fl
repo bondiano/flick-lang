@@ -1,0 +1,87 @@
+// Effect's `Logger`: the `Log` service through Effect's loggers, custom and
+// built-in formats, batches and a log file. Loggers whose lines carry the
+// time write to a console on stderr.
+module App.Main exposing (main)
+
+ms : Number -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+simple : Logger.Logger String
+let simple = Logger.make (fun o -> show o.logLevel ++ " " ++ String.join " " o.message)
+
+replace : Logger.LayerOptions
+let replace = { mergeWithExisting = false }
+
+/// Logs through `Log` with the loggers of `loggers`.
+logged : Layer none none none -> (Unit ->{Log.Log;} Unit) ->{} Unit
+let logged loggers body =
+  provide (Layer.merge loggers Logger.effect_log) {
+    body ()
+  }
+
+contains : String -> String -> Bool
+let contains part whole = String.contains part whole
+
+main : Unit ->{; AppError} Unit
+let main () =
+  logged (Logger.layer replace [Logger.with_console_log simple]) (fun () ->
+    Log.info "hello"
+    Log.warn "careful"
+    Log.debug "below the minimum level")
+  logged (Logger.layer replace [simple |> Logger.map String.to_upper |> Logger.with_console_log]) (fun () ->
+    Log.error "mapped")
+  logged (Logger.layer replace [Logger.with_leveled_console simple]) (fun () ->
+    Log.info "leveled info"
+    Log.error "leveled error")
+  logged (Logger.layer replace [Logger.with_console_error simple]) (fun () -> Log.info "to stderr")
+  let checks =
+    Logger.make (fun (o : Logger.Options) -> o.date > 0)
+  let seen = Ref.make []
+  let collect = { window = ms 1; flush = fun outputs -> Ref.set seen (Ref.get seen ++ outputs) }
+  logged (Logger.batched collect replace checks) (fun () -> Log.info "batched")
+  Platform.stdout_line ("batched " ++ show (Ref.get seen))
+  let formats = Ref.make []
+  let keep = { window = ms 1; flush = fun outputs -> Ref.set formats (Ref.get formats ++ outputs) }
+  logged (Logger.batched keep replace (Logger.map (contains "message=formatted") Logger.format_simple)) (fun () -> Log.info "formatted")
+  logged (Logger.batched keep replace (Logger.map (contains "message=formatted") Logger.format_logfmt)) (fun () -> Log.info "formatted")
+  logged (Logger.batched keep replace (Logger.map (contains "\"message\":\"formatted\"") Logger.format_json)) (fun () -> Log.info "formatted")
+  let structured = Logger.map (fun s -> s.message == ["formatted"] && s.level == "INFO" && s.cause == None) Logger.format_structured
+  logged (Logger.batched keep replace structured) (fun () -> Log.info "formatted")
+  Platform.stdout_line ("formats " ++ show (Ref.get formats))
+  let pretty_date = Some (fun _ -> "DATE")
+  Console.with_console (Console.to_stderr ()) (task {
+    logged
+      (Logger.layer replace [
+        Logger.default_logger,
+        Logger.console_pretty { colors = Some false; formatDate = pretty_date; mode = Logger.Tty },
+        Logger.console_pretty_tty { colors = false; formatDate = None },
+        Logger.console_pretty_browser { colors = false; formatDate = None },
+        Logger.console_logfmt,
+        Logger.console_structured,
+        Logger.console_json,
+        Logger.tracer_logger
+      ])
+      (fun () -> Log.info "every console logger")
+  })
+  logged (Logger.layer { mergeWithExisting = true } []) (fun () ->
+    Logger.with_log_to_stderr true (task { Log.info "default logger on stderr" }))
+  logged (Logger.layer replace []) (fun () ->
+    Log.info "no logger"
+    Logger.with_loggers [Logger.with_console_log simple] (task { Log.info "with_loggers" }))
+  let written =
+    try
+      provide FileSystem.node {
+        scope {
+          let dir = FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-log-" }
+          let path = dir ++ "/app.log"
+          let to_file = Logger.to_file { flag = None; mode = None; batchWindow = Some (ms 1) } replace path simple
+          provide (Layer.merge to_file Logger.effect_log) {
+            Log.info "into the file"
+            Log.warn "and another line"
+          }
+          FileSystem.read_file_string path
+        }
+      }
+    with
+    | PlatformError.PlatformError r -> "failed " ++ show r
+  Platform.stdout_write ("file:\n" ++ written)

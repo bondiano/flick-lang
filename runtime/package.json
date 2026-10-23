@@ -37,6 +37,7 @@
     "test": "tsc -p tsconfig.build.json && node --test"
   },
   "dependencies": {
+    "@effect/platform-node": "4.0.5",
     "effect": "4.0.5"
   },
   "peerDependencies": {

@@ -1,7 +1,9 @@
+[wrapped]
+Stdio = "Stdio.Stdio 92ea6c7dce0e93e7"
+
+[language]
+make = "`service`: `Layer.succeed Stdio` with a `Stdio.Impl` record of the operations"
+layerTest = "`service`: `Layer.succeed Stdio` with a `Stdio.Impl` record of fixed answers"
+
 [excluded]
 TypeId = "TS-only: a type identifier"
-
-[pending]
-Stdio = "M20"
-layerTest = "M20"
-make = "M20"

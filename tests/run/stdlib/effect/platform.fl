@@ -1,0 +1,86 @@
+// Effect's `Path`, `Terminal` and `Stdio` as services: the layers of Effect
+// and Node.js, and fakes made with `Layer.succeed`. Stdin is not a terminal
+// here, so the terminal of Node.js has no size and its input has ended.
+module App.Main exposing (main)
+
+import Terminal exposing (Terminal)
+
+show_parsed : Path.Parsed -> String
+let show_parsed p = String.join "|" [p.root, p.dir, p.base, p.ext, p.name]
+
+failure_of : PlatformError.PlatformError -> String
+let failure_of failure =
+  match failure with
+  | PlatformError.PlatformError (PlatformError.Bad r) -> "bad " ++ r.module_ ++ "." ++ r.method
+  | PlatformError.PlatformError (PlatformError.System r) -> "system " ++ show r.tag
+
+paths : Unit ->{Path.Path; PlatformError.PlatformError} Unit
+let paths () =
+  Platform.stdout_line ("sep " ++ Path.sep ())
+  Platform.stdout_line ("join " ++ Path.join ["a", "b", "../c.txt"])
+  Platform.stdout_line ("basename " ++ Path.basename "/x/y.fl" ++ " " ++ Path.basename_without ".fl" "/x/y.fl")
+  Platform.stdout_line ("dirname " ++ Path.dirname "/x/y.fl" ++ " extname " ++ Path.extname "/x/y.tar.gz")
+  Platform.stdout_line ("parse " ++ show_parsed (Path.parse "/x/y.tar.gz"))
+  Platform.stdout_line ("format " ++ Path.format { root = "/"; dir = "/home"; base = "f.txt"; ext = ""; name = "" })
+  Platform.stdout_line ("is_absolute " ++ show (Path.is_absolute "/a", Path.is_absolute "a"))
+  Platform.stdout_line ("normalize " ++ Path.normalize "/a//b/./c/..")
+  Platform.stdout_line ("relative " ++ Path.relative "/a/b" "/a/c/d")
+  Platform.stdout_line ("resolve " ++ Path.resolve ["/a", "b", "../c"])
+  Platform.stdout_line ("resolve_within " ++ show (Path.resolve_within "/root" "x/y", Path.resolve_within "/root" "../etc"))
+  Platform.stdout_line ("to_namespaced_path " ++ Path.to_namespaced_path "/a/b")
+  let url = Path.to_file_url "/tmp/a b"
+  Platform.stdout_line ("to_file_url " ++ url ++ " back " ++ Path.from_file_url url)
+  let bad = try Path.from_file_url "http://example.com/x" with
+    | failure -> failure_of failure
+  Platform.stdout_line ("from_file_url " ++ bad)
+
+fake_terminal : Layer none none {Terminal.Terminal}
+let fake_terminal =
+  Layer.succeed Terminal {
+    columns = fun () -> 80;
+    rows = fun () -> 24;
+    read_line = fun () -> "typed";
+    display = fun text -> Platform.stdout_write ("[" ++ text ++ "]\n")
+  }
+
+quit_on_q : Terminal.UserInput -> Bool
+let quit_on_q input =
+  let key : Terminal.Key = input.key
+  key.name == "q" || key.ctrl
+
+terminal : Unit ->{Terminal.Terminal; PlatformError.PlatformError} Unit
+let terminal () =
+  Platform.stdout_line ("size " ++ show (Terminal.columns (), Terminal.rows ()))
+  Terminal.display "displayed\n"
+  let read = try Terminal.read_line () with
+    | Terminal.QuitError -> "quit"
+  Platform.stdout_line ("read_line " ++ read)
+
+stdio : Unit ->{Stdio.Stdio; PlatformError.PlatformError} Unit
+let stdio () =
+  Platform.stdout_line ("args " ++ show (Stdio.args ()))
+  Platform.stdout_line ("stdout_is_terminal " ++ show (Stdio.stdout_is_terminal (), Stdio.stderr_is_terminal ()))
+  let _ = Stdio.stdin_is_terminal ()
+  Stdio.write_stdout "written to stdout\n"
+  Stdio.write_stderr "written to stderr\n"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let outcome =
+    try
+      provide Path.layer { paths () }
+      provide Path.node { Platform.stdout_line ("node join " ++ Path.join ["x", "y"]) }
+      provide fake_terminal { terminal () }
+      provide Terminal.node { terminal () }
+      provide (Terminal.node_quitting quit_on_q) { Platform.stdout_line ("quitting columns " ++ show (Terminal.columns ())) }
+      provide Stdio.node { stdio () }
+      let busy : PlatformError.SystemErrorTag = PlatformError.Busy
+      let system : PlatformError.SystemError = { tag = busy; module_ = "App"; method = "main"; description = None; syscall = None; pathOrDescriptor = Some "/x" }
+      let argument : PlatformError.BadArgument = { module_ = "App"; method = "main"; description = Some "no" }
+      let made = PlatformError.system_error system
+      let refused = PlatformError.bad_argument argument
+      Platform.stdout_line ("errors " ++ failure_of made ++ ", " ++ failure_of refused)
+      "done"
+    with
+    | failure -> "failed: " ++ failure_of failure
+  Platform.stdout_line outcome

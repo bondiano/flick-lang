@@ -159,6 +159,18 @@ const SOURCES: &[(&str, &str)] = &[
     ("Differ", include_str!("builtins/Differ.fl")),
     // end of Effect: schema
     // Effect: platform and observability
+    ("PlatformError", include_str!("builtins/PlatformError.fl")),
+    ("Path", include_str!("builtins/Path.fl")),
+    ("LogLevel", include_str!("builtins/LogLevel.fl")),
+    ("Console", include_str!("builtins/Console.fl")),
+    ("FileSystem", include_str!("builtins/FileSystem.fl")),
+    ("Terminal", include_str!("builtins/Terminal.fl")),
+    ("Stdio", include_str!("builtins/Stdio.fl")),
+    ("Logger", include_str!("builtins/Logger.fl")),
+    ("ConfigProvider", include_str!("builtins/ConfigProvider.fl")),
+    ("Config", include_str!("builtins/Config.fl")),
+    ("Metric", include_str!("builtins/Metric.fl")),
+    ("Tracer", include_str!("builtins/Tracer.fl")),
     // end of Effect: platform and observability
     // Effect: context, layers and requests
     // end of Effect: context, layers and requests

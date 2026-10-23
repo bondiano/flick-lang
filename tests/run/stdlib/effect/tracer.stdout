@@ -1,0 +1,14 @@
+outside no span
+inner (Some "inner", Some "outer", true)
+outer (Some internal, [("user", "ada")], true)
+ids (true, true)
+ended true
+child of remote ("trace-1", Some "span-1", [("span-1", [("why", "retry")])], "running")
+external (None, None, true, 0, [], true)
+kinds [internal, server, client, producer, consumer]
+root (Some "root", None, true)
+with_tracer (Some "native", None, true)
+with_minimum_trace_level (Some "debug span", None, false)
+with_trace_level (Some "error span", None, true)
+disablePropagation (Some "child", Some "outer", true)
+status Started 0n

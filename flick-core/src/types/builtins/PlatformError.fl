@@ -1,0 +1,49 @@
+/// Effect's `PlatformError`: how the platform services (`FileSystem`,
+/// `Path`, `Terminal`, `Stdio`) fail, as a Flick error with its reason.
+module PlatformError exposing (..)
+
+/// The kind of a failed system call.
+type SystemErrorTag =
+  | AlreadyExists
+  | BadResource
+  | Busy
+  | InvalidData
+  | NotFound
+  | PermissionDenied
+  | TimedOut
+  | UnexpectedEof
+  | UnknownError
+  | WouldBlock
+  | WriteZero
+  deriving Eq, Show
+
+/// A call refused before it reached the system: the module and method
+/// that refused it, and why.
+type alias BadArgument = { module_ : String; method : String; description : Option String }
+
+/// A system call that failed; `pathOrDescriptor` is the file it was about.
+type alias SystemError =
+  {
+    tag : SystemErrorTag;
+    module_ : String;
+    method : String;
+    description : Option String;
+    syscall : Option String;
+    pathOrDescriptor : Option String
+  }
+
+/// Why a platform call failed.
+type Reason = Bad BadArgument | System SystemError
+  deriving Eq, Show
+
+/// A failed platform call, with its reason.
+type error PlatformError = PlatformError Reason
+  deriving Eq, Show
+
+/// A `PlatformError` for an argument the method refused.
+bad_argument : BadArgument -> PlatformError
+let bad_argument reason = PlatformError (Bad reason)
+
+/// A `PlatformError` for a failed system call.
+system_error : SystemError -> PlatformError
+let system_error reason = PlatformError (System reason)

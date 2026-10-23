@@ -1,0 +1,25 @@
+counter (3, false)
+gauge 7
+frequency [("a", 2), ("b", 1), ("zero", 0)]
+linear [10, Infinity]
+exponential [1, 2, 4, Infinity]
+from_iterable [5, 1, 3, Infinity]
+histogram ([(10, 1), (Infinity, 3)], 3, 1, 25, 41)
+summary ([(0.5, Some 2)], 3, 1, 3, 6)
+summary_with_timestamp 1
+timer [(1, 0), (100, 1)]
+map_input 3
+with_constant_input 2
+test_constant [] None counter 2
+test_latency [] None summary 3
+test_lengths [] None histogram 1
+test_level [] None gauge 7
+test_requests [("route", "/a")] Some "requests seen" counter 10
+test_requests [("route", "/b")] Some "requests seen" counter 100
+test_requests [] Some "requests seen" counter 3
+test_sizes [] None histogram 3
+test_stamped [] None summary 1
+test_timer [("time_unit", "milliseconds")] None histogram 1
+test_words [] None frequency [("a", 2), ("b", 1), ("zero", 0)]
+dump true
+runtime metrics (true, true, true)

@@ -1,0 +1,120 @@
+// Effect's `FileSystem` on Node.js, in a temporary directory that the scope
+// removes, and `PlatformError` for what fails.
+module App.Main exposing (main)
+
+plain : FileSystem.WriteOptions
+let plain = { flag = None; mode = None }
+
+line : String -> String ->{} Unit
+let line label value = Platform.stdout_line (label ++ ": " ++ value)
+
+/// The tag of a failed system call.
+reason : PlatformError.PlatformError -> String
+let reason failure =
+  match failure with
+  | PlatformError.PlatformError (PlatformError.System r) -> show r.tag
+  | PlatformError.PlatformError (PlatformError.Bad r) -> "bad argument " ++ r.method
+
+kind_of : FileSystem.Info -> FileSystem.FileType
+let kind_of info = info.type_
+
+/// The open file's bytes from the start, as text.
+contents : FileSystem.File s ->{; PlatformError.PlatformError} String
+let contents file =
+  let start : FileSystem.SeekMode = FileSystem.Start
+  let _ = FileSystem.seek 0n start file
+  match FileSystem.read_alloc 64 None file with
+  | Some bytes -> show bytes
+  | None -> "end of file"
+
+work : String ->{FileSystem.FileSystem; PlatformError.PlatformError} Unit
+let work dir =
+  let a = dir ++ "/a.txt"
+  FileSystem.write_file_string plain a "hello"
+  line "read_file_string" (FileSystem.read_file_string a)
+  line "exists" (show (FileSystem.exists a, FileSystem.exists (dir ++ "/none")))
+  FileSystem.access { ok = true; readable = true; writable = true } a
+  FileSystem.copy_file a (dir ++ "/b.txt")
+  FileSystem.copy { overwrite = true; preserveTimestamps = false } a (dir ++ "/c.txt")
+  FileSystem.rename (dir ++ "/c.txt") (dir ++ "/d.txt")
+  FileSystem.chmod 0o600 (dir ++ "/d.txt")
+  let d = FileSystem.stat (dir ++ "/d.txt")
+  line "chmod" (show (Number.bit_and d.mode 0o777 == 0o600))
+  match (d.uid, d.gid) with
+  | (Some uid, Some gid) -> FileSystem.chown uid gid (dir ++ "/d.txt")
+  | _ -> ()
+  FileSystem.link a (dir ++ "/hard.txt")
+  FileSystem.symlink a (dir ++ "/soft.txt")
+  line "read_link" (show (FileSystem.read_link (dir ++ "/soft.txt") == a))
+  line "real_path" (show (FileSystem.real_path (dir ++ "/soft.txt") == FileSystem.real_path a))
+  line "glob" (show (List.sort (FileSystem.glob { root = Some dir; exclude = ["b.txt"] } "*.txt")))
+  FileSystem.make_directory { recursive = true; mode = None } (dir ++ "/x/y")
+  FileSystem.write_file plain (dir ++ "/x/y/z.bin") [1, 2, 255]
+  line "read_file" (show (FileSystem.read_file (dir ++ "/x/y/z.bin")))
+  line "read_directory" (show (List.sort (FileSystem.read_directory false dir)))
+  line "recursive" (show (List.sort (FileSystem.read_directory true (dir ++ "/x"))))
+  let append : FileSystem.OpenFlag = FileSystem.Append
+  FileSystem.write_file { flag = Some append; mode = None } a [33]
+  line "append" (FileSystem.read_file_string a)
+  FileSystem.truncate (Some 4) a
+  line "truncate" (FileSystem.read_file_string a)
+  FileSystem.utimes 1000 2000 a
+  let info = FileSystem.stat a
+  line "stat" (show (kind_of info, info.size, info.mtime, info.atime))
+  line "directory" (show (kind_of (FileSystem.stat (dir ++ "/x"))))
+  FileSystem.remove { recursive = true; force = false } (dir ++ "/x")
+  FileSystem.remove { recursive = false; force = true } (dir ++ "/x")
+  line "removed" (show (FileSystem.exists (dir ++ "/x")))
+  let temp = FileSystem.make_temp_file { directory = Some dir; prefix = Some "t-"; suffix = Some ".tmp" }
+  line "make_temp_file" (show (String.ends_with ".tmp" temp, FileSystem.exists temp))
+  let sub = FileSystem.make_temp_directory { directory = Some dir; prefix = Some "sub-" }
+  line "make_temp_directory" (show (FileSystem.stat sub |> kind_of))
+  let scoped =
+    scope {
+      let path = FileSystem.make_temp_file_scoped { directory = Some dir; prefix = None; suffix = None }
+      FileSystem.write_file_string plain path "brief"
+      path
+    }
+  line "make_temp_file_scoped" (show (FileSystem.exists scoped))
+  let handled =
+    scope {
+      let file = FileSystem.open { flag = Some FileSystem.WriteRead; mode = None; noFollow = false } (dir ++ "/h.txt")
+      FileSystem.write_all [104, 105] file
+      let n = FileSystem.write [33, 33] file
+      FileSystem.sync file
+      let size = (FileSystem.file_stat file).size
+      let text = contents file
+      FileSystem.file_truncate (Some 1) file
+      let cut = contents file
+      let _ = FileSystem.seek 0n FileSystem.Current file
+      (n, size, text, cut)
+    }
+  line "open" (show handled)
+  let missing = try FileSystem.read_file_string (dir ++ "/missing") with
+    | e -> reason e
+  line "missing" missing
+  let exclusive =
+    try
+      FileSystem.write_file_string { flag = Some FileSystem.WriteExclusive; mode = None } a "x"
+      "written"
+    with
+    | e -> reason e
+  line "exclusive" exclusive
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let outcome =
+    try
+      provide FileSystem.node {
+        let dir =
+          scope {
+            let dir = FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-fs-" }
+            work dir
+            dir
+          }
+        line "cleaned up" (show (not (FileSystem.exists dir)))
+        "done"
+      }
+    with
+    | e -> "failed: " ++ show e
+  Platform.stdout_line outcome

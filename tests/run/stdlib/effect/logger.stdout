@@ -1,0 +1,10 @@
+Info hello
+Warn careful
+ERROR MAPPED
+Info leveled info
+batched [true]
+formats [true, true, true, true]
+Info with_loggers
+file:
+Info into the file
+Warn and another line

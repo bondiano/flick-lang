@@ -1,0 +1,108 @@
+/// Effect's `Path`: file paths as a service, so a program states that it
+/// works with the paths of a platform. `layer` gives Effect's POSIX paths,
+/// `node` those of Node.js (`node:path`).
+module Path exposing (..)
+
+/// A path taken apart: `format` puts it back together.
+type alias Parsed = { root : String; dir : String; base : String; ext : String; name : String }
+
+/// The operations of Effect's `Path`; the functions below call them.
+service Path =
+  sep : Unit ->{} String
+  basename : String ->{} String
+  basename_without : String -> String ->{} String
+  dirname : String ->{} String
+  extname : String ->{} String
+  format : Parsed ->{} String
+  from_file_url : String ->{; PlatformError.PlatformError} String
+  is_absolute : String ->{} Bool
+  join : List String ->{} String
+  normalize : String ->{} String
+  parse : String ->{} Parsed
+  relative : String -> String ->{} String
+  resolve : List String ->{} String
+  resolve_within : String -> String ->{} Option String
+  to_file_url : String ->{; PlatformError.PlatformError} String
+  to_namespaced_path : String ->{} String
+
+/// The separator of the segments.
+sep : Unit ->{Path;} String
+let sep () = Path.sep ()
+
+/// The last segment.
+basename : String ->{Path;} String
+let basename path = Path.basename path
+
+/// The last segment without `suffix`: `basename_without ".fl" "a/b.fl"` is `"b"`.
+basename_without : String -> String ->{Path;} String
+let basename_without suffix path = Path.basename_without suffix path
+
+/// All but the last segment.
+dirname : String ->{Path;} String
+let dirname path = Path.dirname path
+
+/// The extension of the last segment, with its dot.
+extname : String ->{Path;} String
+let extname path = Path.extname path
+
+/// A path from its parts: a non-empty `dir` wins over `root`, `base` over
+/// `name` and `ext`.
+format : Parsed ->{Path;} String
+let format parts = Path.format parts
+
+/// The path of a `file:` URL; another URL is a `BadArgument`.
+from_file_url : String ->{Path; PlatformError.PlatformError} String
+let from_file_url url = Path.from_file_url url
+
+/// Whether the path starts at a root.
+is_absolute : String ->{Path;} Bool
+let is_absolute path = Path.is_absolute path
+
+/// The segments joined and normalized.
+join : List String ->{Path;} String
+let join paths = Path.join paths
+
+/// The path with `.`, `..` and repeated separators resolved.
+normalize : String ->{Path;} String
+let normalize path = Path.normalize path
+
+/// The parts of the path.
+parse : String ->{Path;} Parsed
+let parse path = Path.parse path
+
+/// The path that leads from `from` to `to`.
+relative : String -> String ->{Path;} String
+let relative from_path to_path = Path.relative from_path to_path
+
+/// The absolute path of the segments, resolved from the right and then
+/// against the working directory.
+resolve : List String ->{Path;} String
+let resolve paths = Path.resolve paths
+
+/// `input` resolved under `root`, or `None` when it leads out of `root`.
+resolve_within : String -> String ->{Path;} Option String
+let resolve_within root input = Path.resolve_within root input
+
+/// The `file:` URL of a path.
+to_file_url : String ->{Path; PlatformError.PlatformError} String
+let to_file_url path = Path.to_file_url path
+
+/// The path in the namespace form of Windows; elsewhere unchanged.
+to_namespaced_path : String ->{Path;} String
+let to_namespaced_path path = Path.to_namespaced_path path
+
+layer_of : ServiceTag {Path} -> Layer none none {Path}
+foreign pure layer_of from "@flick-lang/runtime/effect/Path" "flickLayer"
+  reviewed "effect@4.0.5 sha256:b30d228cd978968d"
+
+node_of : ServiceTag {Path} -> Layer none none {Path}
+foreign pure node_of from "@flick-lang/runtime/effect/Path" "flickNode"
+  reviewed "effect@4.0.5 sha256:4c4fc166a1beee53"
+
+/// Effect's own POSIX paths, the same on every platform.
+layer : Layer none none {Path}
+let layer = layer_of Path
+
+/// The paths of the platform Node.js runs on.
+node : Layer none none {Path}
+let node = node_of Path

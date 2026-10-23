@@ -1,0 +1,31 @@
+log
+info
+debug
+calls: 1
+calls: 2
+calls: 1
+42
+xml
+┌─────────┬──────┐
+│ (index) │ size │
+├─────────┼──────┤
+│ 0       │ 1    │
+│ 1       │ 2    │
+└─────────┴──────┘
+group
+  inside the group
+after the group 1
+scoped
+  in a scoped group
+the scope closed the group
+true
+back on stdout
+values: [All, Fatal, Error, Warn, Info, Debug, Trace, None] Warn
+ordinal info < warn: true
+sorted: [All, Debug, Info, Fatal, None]
+warn > info: true
+warn >= warn: true
+debug < trace: false
+error <= fatal: true
+eq: (true, false, "Trace")
+enabled: (6, true, false)
