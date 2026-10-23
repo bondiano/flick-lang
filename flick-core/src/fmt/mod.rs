@@ -142,14 +142,25 @@ fn space(a: Tok, b: Tok) -> bool {
 
 /// Maps an original indentation to the new one; `stack` holds `(original,
 /// new)` columns of enclosing lines and mid-line block anchors, increasing.
-fn indent(stack: &mut Vec<(usize, usize)>, orig: usize, keep: bool) -> usize {
+/// `later` gives the original columns of the code lines after this one: a
+/// line one level deeper than its parent goes two columns further when a
+/// later line, before the block ends, sits strictly between the two.
+fn indent(stack: &mut Vec<(usize, usize)>, orig: usize, keep: bool, later: &[usize]) -> usize {
     let mut depth = stack.len();
     while depth > 1 && stack[depth - 1].0 > orig {
         depth -= 1;
     }
     let (top_orig, top_new) = stack[depth - 1];
+    let between = || {
+        later
+            .iter()
+            .take_while(|&&c| c > top_orig)
+            .any(|&c| c < orig)
+    };
     let new = if top_orig == orig {
         top_new
+    } else if between() {
+        top_new + 4
     } else {
         top_new + 2
     };
@@ -193,6 +204,21 @@ fn layout(text: &str, toks: &[Tok]) -> Vec<Option<Line>> {
         }
     }
 
+    // the original column of each code line, in order
+    let mut code_columns = Vec::new();
+    let mut at_start = true;
+    for t in toks {
+        if t.token.kind == K::Newline {
+            at_start = true;
+        } else if at_start {
+            if !t.token.kind.is_comment() {
+                code_columns.push(column(t.token.start));
+            }
+            at_start = false;
+        }
+    }
+    let mut code_line = 0;
+
     let mut out = Vec::new();
     let mut stack = vec![(0, 0)];
     let mut blank = false;
@@ -214,7 +240,11 @@ fn layout(text: &str, toks: &[Tok]) -> Vec<Option<Line>> {
             blank = false;
         }
         let code = line.iter().any(|t| !t.token.kind.is_comment());
-        let new_indent = indent(&mut stack, column(line[0].token.start), code);
+        if code && !line[0].token.kind.is_comment() {
+            code_line += 1;
+        }
+        let later = &code_columns[code_line.min(code_columns.len())..];
+        let new_indent = indent(&mut stack, column(line[0].token.start), code, later);
         let mut width = new_indent;
         let mut anchors = Vec::new();
         for (k, &t) in line.iter().enumerate() {

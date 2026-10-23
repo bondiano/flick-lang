@@ -129,3 +129,16 @@ fn hugging_parentheses_do_not_push_a_piece_past_the_width() {
         "{out}"
     );
 }
+
+#[test]
+fn keeps_a_line_between_its_parent_and_a_deeper_line_apart() {
+    let src = "let main () =\n  let x = try\n      get ()\n    with\n    | Boom n -> \"b\"\n  x\n";
+    insta::assert_snapshot!(fmt(src), @r#"
+    let main () =
+      let x = try
+          get ()
+        with
+        | Boom n -> "b"
+      x
+    "#);
+}
