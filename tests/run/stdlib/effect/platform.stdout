@@ -1,0 +1,28 @@
+sep /
+join a/c.txt
+basename y.fl y
+dirname /x extname .gz
+parse /|/x|y.tar.gz|.gz|y.tar
+format /home/f.txt
+is_absolute (true, false)
+normalize /a/b
+relative ../c/d
+resolve /a/c
+resolve_within (Some "/root/x/y", None)
+to_namespaced_path /a/b
+to_file_url file:///tmp/a%20b back /tmp/a b
+from_file_url bad Path.fromFileUrl
+node join x/y
+size (80, 24)
+[displayed
+]
+read_line typed
+size (0, 0)
+displayed
+read_line quit
+quitting columns 0
+args []
+stdout_is_terminal (false, false)
+written to stdout
+errors system Busy, bad App.main
+done

@@ -1,0 +1,47 @@
+localhost:8080
+true
+[0.5, 0.5, 3]
+NaN
+error: SchemaError(Expected a string representing a finite number
+  at ["NAN"])
+error: SchemaError(Expected an integer
+  at ["RATIO"])
+<redacted>
+10s
+2048n
+Warn
+https://example.com/b
+1704153600000
+prod
+error: SchemaError(Expected "dev" | "test"
+  at ["MODE"])
+["a", "b", "c"]
+[("a", 1), ("b", 2)]
+3
+db
+error: SchemaError(Expected string
+  at ["EMPTY"])
+error: SchemaError(Expected a value between 1 and 65535
+  at ["BAD_PORT"])
+error: SchemaError(Expected string
+  at ["MISSING"])
+None
+fallback
+recovered
+error: SourceError: refused
+error: odd
+8080
+own ["error SchemaError(Expected string\n  at [\"LIST\"])"]
+own array [0, 10]
+own record [("x", 1)]
+own broken SourceError: unreachable
+from_unknown json
+dotenv 12
+constant_case db
+nested db
+map_input prod
+or_else localhost
+layer prod
+layer_add ["own", "localhost"]
+from_env missing
+files dot tree

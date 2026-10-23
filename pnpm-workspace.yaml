@@ -2,3 +2,5 @@ packages:
   - runtime
   - tools/dts-importer
   - tools/content-mapper
+overrides:
+  "@effect/platform-node-shared": 4.0.5

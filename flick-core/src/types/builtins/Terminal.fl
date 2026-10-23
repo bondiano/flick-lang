@@ -1,0 +1,50 @@
+/// Effect's `Terminal`: the size of the terminal, its lines of input and
+/// output, as a service; `node` is the terminal of the Node.js process.
+/// Effect's queue of key presses (`readInput`) is not wrapped yet.
+module Terminal exposing (..)
+
+/// A key, with the modifiers held.
+type alias Key = { name : String; ctrl : Bool; meta : Bool; shift : Bool }
+
+/// A key press and the text it typed, if any.
+type alias UserInput = { input : Option String; key : Key }
+
+/// The user ended the input (end of stdin, or the quit key).
+type error QuitError
+  deriving Eq, Show
+
+/// The operations of Effect's `Terminal`; the functions below call them.
+service Terminal =
+  columns : Unit ->{} Number
+  rows : Unit ->{} Number
+  read_line : Unit ->{; QuitError} String
+  display : String ->{; PlatformError.PlatformError} Unit
+
+/// The width of the terminal in characters; 0 when stdout is not one.
+columns : Unit ->{Terminal;} Number
+let columns () = Terminal.columns ()
+
+/// The height of the terminal in lines; 0 when stdout is not one.
+rows : Unit ->{Terminal;} Number
+let rows () = Terminal.rows ()
+
+/// The next line of input.
+read_line : Unit ->{Terminal; QuitError} String
+let read_line () = Terminal.read_line ()
+
+/// Writes the text to the terminal as it is.
+display : String ->{Terminal; PlatformError.PlatformError} Unit
+let display text = Terminal.display text
+
+node_of : ServiceTag {Terminal} -> Option (UserInput -> Bool) -> Layer none none {Terminal}
+foreign pure node_of from "@flick-lang/runtime/effect/Terminal" "flickNode"
+  arity 2
+  reviewed "effect@4.0.5 sha256:53f60ec0037ec04f"
+
+/// The terminal of the process; Ctrl+C and Ctrl+D quit.
+node : Layer none none {Terminal}
+let node = node_of Terminal None
+
+/// The terminal of the process, quitting on the key presses `should_quit` picks.
+node_quitting : (UserInput -> Bool) -> Layer none none {Terminal}
+let node_quitting should_quit = node_of Terminal (Some should_quit)

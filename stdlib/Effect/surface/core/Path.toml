@@ -1,7 +1,9 @@
+[wrapped]
+Path = "Path.Path 4c4fc166a1beee53"
+layer = "Path.layer b30d228cd978968d"
+
+[language]
+make = "`service`: `Layer.succeed Path` with a `Path.Impl` record of the operations"
+
 [excluded]
 TypeId = "TS-only: a type identifier"
-
-[pending]
-Path = "M20"
-layer = "M20"
-make = "M20"

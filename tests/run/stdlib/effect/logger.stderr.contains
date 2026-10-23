@@ -1,0 +1,6 @@
+Error leveled error
+Info to stderr
+[DATE] INFO (#
+message="every console logger"
+{"message":"every console logger","level":"INFO"
+: default logger on stderr

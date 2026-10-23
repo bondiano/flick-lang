@@ -1,0 +1,180 @@
+/// Effect's `Logger`: what happens to each log message. A `Logger o` turns
+/// a message into an `o`; the console loggers write it. `layer` installs
+/// loggers for the body of a `provide`, and `effect_log` sends the `Log`
+/// service to them.
+module Logger exposing (..)
+
+import Log exposing (Log)
+
+/// Turns each log message into an `o`.
+type Logger o
+
+/// What a logger gets of a message: its parts as text, its level, the
+/// cause logged with it and the time in milliseconds since the epoch.
+type alias Options = { message : List String; logLevel : LogLevel.LogLevel; cause : RawCause; date : Number }
+
+/// What `format_structured` makes of a message; `spans` are the log spans
+/// with their start time.
+type alias Structured =
+  {
+    level : String;
+    fiberId : String;
+    timestamp : String;
+    message : List String;
+    cause : Option String;
+    annotations : List (String, String);
+    spans : List (String, Number)
+  }
+
+/// Whether a layer keeps the loggers already installed.
+type alias LayerOptions = { mergeWithExisting : Bool }
+
+/// How `console_pretty` writes: `colors` (`None` asks the terminal),
+/// `formatDate` the time, and for which console.
+type alias PrettyOptions = { colors : Option Bool; formatDate : Option (Number -> String); mode : PrettyMode }
+
+type PrettyMode = Auto | Browser | Tty
+  deriving Eq, Show
+
+/// The options of `console_pretty_tty` and `console_pretty_browser`.
+type alias PrettyConsoleOptions = { colors : Bool; formatDate : Option (Number -> String) }
+
+/// How `batched` collects: the window of a batch and what runs on it.
+type alias BatchOptions o = { window : Duration.Duration; flush : List o ->{} Unit }
+
+/// How `to_file` opens the file and how long it gathers lines before a write.
+type alias FileOptions =
+  { flag : Option FileSystem.OpenFlag; mode : Option Number; batchWindow : Option Duration.Duration }
+
+/// A logger of `f`, which formats each message.
+make : (Options -> o) -> Logger o
+foreign pure make from "@flick-lang/runtime/effect/Logger" "flickMake"
+  reviewed "effect@4.0.5 sha256:af5153dcd62c24f7"
+
+/// The logger's output mapped by `f`.
+map : (o -> o2) -> Logger o -> Logger o2
+foreign pure map from "@flick-lang/runtime/effect/Logger" "map"
+  arity 1
+  reviewed "effect@4.0.5 sha256:e72c2b49aa52471c"
+
+/// Writes each output with `console.log`.
+with_console_log : Logger o -> Logger Unit
+foreign pure with_console_log from "@flick-lang/runtime/effect/Logger" "withConsoleLog"
+  reviewed "effect@4.0.5 sha256:faffe7e919a9aed5"
+
+/// Writes each output with `console.error`.
+with_console_error : Logger o -> Logger Unit
+foreign pure with_console_error from "@flick-lang/runtime/effect/Logger" "withConsoleError"
+  reviewed "effect@4.0.5 sha256:659c1215b13fb679"
+
+/// Writes each output with the console method of its level (`console.warn`, …).
+with_leveled_console : Logger o -> Logger Unit
+foreign pure with_leveled_console from "@flick-lang/runtime/effect/Logger" "withLeveledConsole"
+  reviewed "effect@4.0.5 sha256:5ffd4c966037647a"
+
+/// Effect's default: `[time] LEVEL (#fiber): message` on the console.
+default_logger : Logger Unit
+foreign pure default_logger from "@flick-lang/runtime/effect/Logger" "defaultLogger"
+  reviewed "effect@4.0.5 sha256:8328337a393ac745"
+
+/// `timestamp=… level=… fiber=… message=…` as one line.
+format_simple : Logger String
+foreign pure format_simple from "@flick-lang/runtime/effect/Logger" "formatSimple"
+  reviewed "effect@4.0.5 sha256:c668c527e27385f8"
+
+/// The message in logfmt.
+format_logfmt : Logger String
+foreign pure format_logfmt from "@flick-lang/runtime/effect/Logger" "formatLogFmt"
+  reviewed "effect@4.0.5 sha256:89a7f28fe8566972"
+
+/// The message as a `Structured` record.
+format_structured : Logger Structured
+foreign pure format_structured from "@flick-lang/runtime/effect/Logger" "flickFormatStructured"
+  reviewed "effect@4.0.5 sha256:22b28239fa02900f"
+
+/// The structured message as a line of JSON.
+format_json : Logger String
+foreign pure format_json from "@flick-lang/runtime/effect/Logger" "formatJson"
+  reviewed "effect@4.0.5 sha256:849022002c45aab5"
+
+/// Writes messages readably, for a terminal or a browser console.
+console_pretty : PrettyOptions -> Logger Unit
+foreign pure console_pretty from "@flick-lang/runtime/effect/Logger" "flickConsolePretty"
+  reviewed "effect@4.0.5 sha256:a7255e2a0f0cacb7"
+
+/// `console_pretty` for a browser console.
+console_pretty_browser : PrettyConsoleOptions -> Logger Unit
+foreign pure console_pretty_browser from "@flick-lang/runtime/effect/Logger" "flickConsolePrettyBrowser"
+  reviewed "effect@4.0.5 sha256:6a3c92e2d460b749"
+
+/// `console_pretty` for a terminal.
+console_pretty_tty : PrettyConsoleOptions -> Logger Unit
+foreign pure console_pretty_tty from "@flick-lang/runtime/effect/Logger" "flickConsolePrettyTty"
+  reviewed "effect@4.0.5 sha256:3b1b7888d7369414"
+
+/// `format_logfmt` on the console.
+console_logfmt : Logger Unit
+foreign pure console_logfmt from "@flick-lang/runtime/effect/Logger" "consoleLogFmt"
+  reviewed "effect@4.0.5 sha256:e2d5b4c1d02e5c04"
+
+/// `format_structured` on the console.
+console_structured : Logger Unit
+foreign pure console_structured from "@flick-lang/runtime/effect/Logger" "consoleStructured"
+  reviewed "effect@4.0.5 sha256:149385962a7457fc"
+
+/// `format_json` on the console.
+console_json : Logger Unit
+foreign pure console_json from "@flick-lang/runtime/effect/Logger" "consoleJson"
+  reviewed "effect@4.0.5 sha256:0e5437c337002acf"
+
+/// Adds each message as an event of the current span.
+tracer_logger : Logger Unit
+foreign pure tracer_logger from "@flick-lang/runtime/effect/Logger" "tracerLogger"
+  reviewed "effect@4.0.5 sha256:dfd480a5ba0a1038"
+
+/// Installs the loggers for the body of a `provide`.
+layer : LayerOptions -> List (Logger o) -> Layer none none none
+foreign pure layer from "@flick-lang/runtime/effect/Logger" "flickLayer"
+  arity 2
+  reviewed "effect@4.0.5 sha256:0dda4cb2338fa89f"
+
+/// Installs a logger that gathers the outputs of `logger` for a window and
+/// passes each batch to `flush`; the last batch is flushed when the scope
+/// of the `provide` closes.
+batched : BatchOptions o -> LayerOptions -> Logger o -> Layer none none none
+foreign pure batched from "@flick-lang/runtime/effect/Logger" "flickBatched"
+  arity 3
+  reviewed "effect@4.0.5 sha256:8c0f789f00053667"
+
+/// Installs a logger that appends the lines of `logger` to the file at the
+/// path, which the scope of the `provide` closes.
+to_file :
+  FileOptions -> LayerOptions -> String -> Logger String ->
+  Layer {FileSystem.FileSystem} {PlatformError.PlatformError} none
+foreign pure to_file from "@flick-lang/runtime/effect/Logger" "flickToFile"
+  arity 4
+  reviewed "effect@4.0.5 sha256:7a672d271850c9b0"
+
+/// Runs `task` with exactly these loggers.
+with_loggers : forall c r e a. List (Logger o) -> (Eff r e a)^c ->{r; e} a
+foreign effect with_loggers from "@flick-lang/runtime/effect/Logger" "flickWithLoggers"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:501ea15592009797"
+
+/// Runs `task` with the default logger writing to stderr when the flag is
+/// `true`.
+with_log_to_stderr : forall c r e a. Bool -> (Eff r e a)^c ->{r; e} a
+foreign effect with_log_to_stderr from "@flick-lang/runtime/effect/Logger" "flickWithLogToStderr"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:7b57f79c02230b4f"
+
+write_effect : String -> String ->{} Unit
+foreign effect write_effect from "@flick-lang/runtime/effect/Logger" "flickLogWrite"
+  arity 2
+
+/// The `Log` service through Effect's loggers: `Log.info` logs at `info`,
+/// and so on.
+effect_log : Layer none none {Log}
+let effect_log = Layer.succeed Log { write = write_effect }

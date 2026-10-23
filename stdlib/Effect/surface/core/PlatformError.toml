@@ -1,8 +1,10 @@
-[pending]
-BadArgument = "M20"
-PlatformError = "M20"
-SystemError = "M20"
-SystemErrorTag = "M20"
-badArgument = "M20"
-isPlatformError = "M20"
-systemError = "M20"
+[wrapped]
+BadArgument = "PlatformError.BadArgument e41f2fc365342f87"
+PlatformError = "PlatformError.PlatformError 6a13644cff7bd87a"
+SystemError = "PlatformError.SystemError a96cfde3cb6b8ae7"
+SystemErrorTag = "PlatformError.SystemErrorTag 74183caf56f9a70d"
+badArgument = "PlatformError.bad_argument d591e2cd49300687"
+systemError = "PlatformError.system_error 3c4b308b945dd0f6"
+
+[excluded]
+isPlatformError = "TS-only: a type guard; Flick values are typed statically"

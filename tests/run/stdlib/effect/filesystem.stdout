@@ -1,0 +1,22 @@
+read_file_string: hello
+exists: (true, false)
+chmod: true
+read_link: true
+real_path: true
+glob: ["a.txt", "d.txt", "hard.txt", "soft.txt"]
+read_file: [1, 2, 255]
+read_directory: ["a.txt", "b.txt", "d.txt", "hard.txt", "soft.txt", "x"]
+recursive: ["y", "y/z.bin"]
+append: hello!
+truncate: hell
+stat: (RegularFile, 4n, Some 2000, Some 1000)
+directory: Directory
+removed: false
+make_temp_file: (true, true)
+make_temp_directory: Directory
+make_temp_file_scoped: false
+open: (2, 4n, "[104, 105, 33, 33]", "[104]")
+missing: NotFound
+exclusive: AlreadyExists
+cleaned up: true
+done

@@ -1,0 +1,264 @@
+/// Effect's `FileSystem`: files and directories through a service whose
+/// calls fail with `PlatformError`; `node` is the file system of Node.js.
+/// Bytes are lists of numbers from 0 to 255. An opened file and a scoped
+/// temporary path belong to the `scope` that owns their region. Effect's
+/// streams of a file (`stream`, `sink`, `watch`) are not wrapped yet.
+module FileSystem exposing (..)
+
+/// An open file of region `s`, closed when that scope ends.
+type File (s : Region)
+
+/// How `open` and the writes open a file: `r`, `r+`, `w`, `wx`, `w+`,
+/// `wx+`, `a`, `ax`, `a+`, `ax+` in Node.js terms.
+type OpenFlag =
+  | Read
+  | ReadWrite
+  | Write
+  | WriteExclusive
+  | WriteRead
+  | WriteReadExclusive
+  | Append
+  | AppendExclusive
+  | AppendRead
+  | AppendReadExclusive
+  deriving Eq, Show
+
+/// Where `seek` counts from.
+type SeekMode = Start | Current
+  deriving Eq, Show
+
+/// What a path names.
+type FileType =
+  | RegularFile
+  | Directory
+  | SymbolicLink
+  | BlockDevice
+  | CharacterDevice
+  | Fifo
+  | Socket
+  | UnknownType
+  deriving Eq, Show
+
+/// What `stat` tells of a file; times are milliseconds since the epoch.
+type alias Info =
+  {
+    type_ : FileType;
+    mtime : Option Number;
+    atime : Option Number;
+    birthtime : Option Number;
+    dev : BigInt;
+    ino : Option BigInt;
+    mode : Number;
+    nlink : Option BigInt;
+    uid : Option Number;
+    gid : Option Number;
+    rdev : Option BigInt;
+    size : BigInt;
+    blksize : Option BigInt;
+    blocks : Option BigInt
+  }
+
+type alias AccessOptions = { ok : Bool; readable : Bool; writable : Bool }
+type alias CopyOptions = { overwrite : Bool; preserveTimestamps : Bool }
+type alias GlobOptions = { root : Option String; exclude : List String }
+type alias MakeDirectoryOptions = { recursive : Bool; mode : Option Number }
+type alias TempDirectoryOptions = { directory : Option String; prefix : Option String }
+type alias TempFileOptions = { directory : Option String; prefix : Option String; suffix : Option String }
+type alias OpenOptions = { flag : Option OpenFlag; mode : Option Number; noFollow : Bool }
+type alias RemoveOptions = { recursive : Bool; force : Bool }
+type alias WriteOptions = { flag : Option OpenFlag; mode : Option Number }
+
+/// The operations of Effect's `FileSystem`; the functions below call them.
+service FileSystem =
+  access : AccessOptions -> String ->{; PlatformError.PlatformError} Unit
+  copy : CopyOptions -> String -> String ->{; PlatformError.PlatformError} Unit
+  copy_file : String -> String ->{; PlatformError.PlatformError} Unit
+  chmod : Number -> String ->{; PlatformError.PlatformError} Unit
+  chown : Number -> Number -> String ->{; PlatformError.PlatformError} Unit
+  glob : GlobOptions -> String ->{; PlatformError.PlatformError} List String
+  exists : String ->{; PlatformError.PlatformError} Bool
+  link : String -> String ->{; PlatformError.PlatformError} Unit
+  make_directory : MakeDirectoryOptions -> String ->{; PlatformError.PlatformError} Unit
+  make_temp_directory : TempDirectoryOptions ->{; PlatformError.PlatformError} String
+  make_temp_directory_scoped : forall s. TempDirectoryOptions ->{Scope s; PlatformError.PlatformError} String
+  make_temp_file : TempFileOptions ->{; PlatformError.PlatformError} String
+  make_temp_file_scoped : forall s. TempFileOptions ->{Scope s; PlatformError.PlatformError} String
+  open : forall s. OpenOptions -> String ->{Scope s; PlatformError.PlatformError} File s
+  read_directory : Bool -> String ->{; PlatformError.PlatformError} List String
+  read_file : String ->{; PlatformError.PlatformError} List Number
+  read_file_string : String ->{; PlatformError.PlatformError} String
+  read_link : String ->{; PlatformError.PlatformError} String
+  real_path : String ->{; PlatformError.PlatformError} String
+  remove : RemoveOptions -> String ->{; PlatformError.PlatformError} Unit
+  rename : String -> String ->{; PlatformError.PlatformError} Unit
+  stat : String ->{; PlatformError.PlatformError} Info
+  symlink : String -> String ->{; PlatformError.PlatformError} Unit
+  truncate : Option Number -> String ->{; PlatformError.PlatformError} Unit
+  utimes : Number -> Number -> String ->{; PlatformError.PlatformError} Unit
+  write_file : WriteOptions -> String -> List Number ->{; PlatformError.PlatformError} Unit
+  write_file_string : WriteOptions -> String -> String ->{; PlatformError.PlatformError} Unit
+
+/// Fails unless the path exists and allows what the options ask.
+access : AccessOptions -> String ->{FileSystem; PlatformError.PlatformError} Unit
+let access options path = FileSystem.access options path
+
+/// Copies a file or a directory tree from the first path to the second.
+copy : CopyOptions -> String -> String ->{FileSystem; PlatformError.PlatformError} Unit
+let copy options from_path to_path = FileSystem.copy options from_path to_path
+
+/// Copies one file from the first path to the second.
+copy_file : String -> String ->{FileSystem; PlatformError.PlatformError} Unit
+let copy_file from_path to_path = FileSystem.copy_file from_path to_path
+
+/// Sets the permission bits of the path.
+chmod : Number -> String ->{FileSystem; PlatformError.PlatformError} Unit
+let chmod mode path = FileSystem.chmod mode path
+
+/// Sets the owner: `chown uid gid path`.
+chown : Number -> Number -> String ->{FileSystem; PlatformError.PlatformError} Unit
+let chown uid gid path = FileSystem.chown uid gid path
+
+/// The paths matching the pattern.
+glob : GlobOptions -> String ->{FileSystem; PlatformError.PlatformError} List String
+let glob options pattern = FileSystem.glob options pattern
+
+/// Whether the path exists.
+exists : String ->{FileSystem; PlatformError.PlatformError} Bool
+let exists path = FileSystem.exists path
+
+/// Makes the second path a hard link to the first.
+link : String -> String ->{FileSystem; PlatformError.PlatformError} Unit
+let link from_path to_path = FileSystem.link from_path to_path
+
+make_directory : MakeDirectoryOptions -> String ->{FileSystem; PlatformError.PlatformError} Unit
+let make_directory options path = FileSystem.make_directory options path
+
+/// Makes a new directory under the system's temporary one; its path.
+make_temp_directory : TempDirectoryOptions ->{FileSystem; PlatformError.PlatformError} String
+let make_temp_directory options = FileSystem.make_temp_directory options
+
+/// `make_temp_directory`, removed with its contents when the scope of
+/// region `s` closes.
+make_temp_directory_scoped : forall s. TempDirectoryOptions ->{FileSystem, Scope s; PlatformError.PlatformError} String
+let make_temp_directory_scoped options = FileSystem.make_temp_directory_scoped options
+
+/// Makes a new empty file under the system's temporary directory; its path.
+make_temp_file : TempFileOptions ->{FileSystem; PlatformError.PlatformError} String
+let make_temp_file options = FileSystem.make_temp_file options
+
+/// `make_temp_file`, removed when the scope of region `s` closes.
+make_temp_file_scoped : forall s. TempFileOptions ->{FileSystem, Scope s; PlatformError.PlatformError} String
+let make_temp_file_scoped options = FileSystem.make_temp_file_scoped options
+
+/// Opens the file, which the scope of region `s` closes.
+open : forall s. OpenOptions -> String ->{FileSystem, Scope s; PlatformError.PlatformError} File s
+let open options path = FileSystem.open options path
+
+/// The entries of the directory, with those of its subdirectories when the
+/// flag is `true`.
+read_directory : Bool -> String ->{FileSystem; PlatformError.PlatformError} List String
+let read_directory recursive path = FileSystem.read_directory recursive path
+
+/// The bytes of the file.
+read_file : String ->{FileSystem; PlatformError.PlatformError} List Number
+let read_file path = FileSystem.read_file path
+
+/// The file as UTF-8 text.
+read_file_string : String ->{FileSystem; PlatformError.PlatformError} String
+let read_file_string path = FileSystem.read_file_string path
+
+/// Where the symbolic link points.
+read_link : String ->{FileSystem; PlatformError.PlatformError} String
+let read_link path = FileSystem.read_link path
+
+/// The canonical absolute path, with links resolved.
+real_path : String ->{FileSystem; PlatformError.PlatformError} String
+let real_path path = FileSystem.real_path path
+
+/// Removes a file, or a directory (`recursive` for a non-empty one; `force`
+/// ignores a missing path).
+remove : RemoveOptions -> String ->{FileSystem; PlatformError.PlatformError} Unit
+let remove options path = FileSystem.remove options path
+
+/// Moves the first path to the second.
+rename : String -> String ->{FileSystem; PlatformError.PlatformError} Unit
+let rename old_path new_path = FileSystem.rename old_path new_path
+
+stat : String ->{FileSystem; PlatformError.PlatformError} Info
+let stat path = FileSystem.stat path
+
+/// Makes the second path a symbolic link to the first.
+symlink : String -> String ->{FileSystem; PlatformError.PlatformError} Unit
+let symlink from_path to_path = FileSystem.symlink from_path to_path
+
+/// Cuts or extends the file to the length, by default 0.
+truncate : Option Number -> String ->{FileSystem; PlatformError.PlatformError} Unit
+let truncate length path = FileSystem.truncate length path
+
+/// Sets the access and modification times, in milliseconds since the epoch.
+utimes : Number -> Number -> String ->{FileSystem; PlatformError.PlatformError} Unit
+let utimes atime mtime path = FileSystem.utimes atime mtime path
+
+/// Writes the bytes to the file.
+write_file : WriteOptions -> String -> List Number ->{FileSystem; PlatformError.PlatformError} Unit
+let write_file options path bytes = FileSystem.write_file options path bytes
+
+/// Writes the text to the file as UTF-8.
+write_file_string : WriteOptions -> String -> String ->{FileSystem; PlatformError.PlatformError} Unit
+let write_file_string options path text = FileSystem.write_file_string options path text
+
+/// What `stat` tells of the open file.
+file_stat : forall s. File s ->{; PlatformError.PlatformError} Info
+foreign effect file_stat from "@flick-lang/runtime/effect/FileSystem" "flickFileStat"
+  retention call
+  reviewed "effect@4.0.5 sha256:e5908aede5e43a55"
+
+/// Moves the position of the file; the new position.
+seek : forall s. BigInt -> SeekMode -> File s ->{; PlatformError.PlatformError} BigInt
+foreign effect seek from "@flick-lang/runtime/effect/FileSystem" "flickSeek"
+  arity 3
+  retention call
+  reviewed "effect@4.0.5 sha256:e5908aede5e43a55"
+
+/// Flushes what was written to the storage device.
+sync : forall s. File s ->{; PlatformError.PlatformError} Unit
+foreign effect sync from "@flick-lang/runtime/effect/FileSystem" "flickSync"
+  retention call
+  reviewed "effect@4.0.5 sha256:e5908aede5e43a55"
+
+/// Reads at most `size` bytes from the position, or from the current one;
+/// `None` at the end of the file.
+read_alloc : forall s. Number -> Option BigInt -> File s ->{; PlatformError.PlatformError} Option (List Number)
+foreign effect read_alloc from "@flick-lang/runtime/effect/FileSystem" "flickReadAlloc"
+  arity 3
+  retention call
+  reviewed "effect@4.0.5 sha256:e5908aede5e43a55"
+
+/// Cuts or extends the open file to the length, by default 0.
+file_truncate : forall s. Option Number -> File s ->{; PlatformError.PlatformError} Unit
+foreign effect file_truncate from "@flick-lang/runtime/effect/FileSystem" "flickFileTruncate"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:e5908aede5e43a55"
+
+/// Writes some of the bytes at the position; how many it wrote.
+write : forall s. List Number -> File s ->{; PlatformError.PlatformError} Number
+foreign effect write from "@flick-lang/runtime/effect/FileSystem" "flickWrite"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:e5908aede5e43a55"
+
+/// Writes all the bytes at the position.
+write_all : forall s. List Number -> File s ->{; PlatformError.PlatformError} Unit
+foreign effect write_all from "@flick-lang/runtime/effect/FileSystem" "flickWriteAll"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:e5908aede5e43a55"
+
+node_of : ServiceTag {FileSystem} -> Layer none none {FileSystem}
+foreign pure node_of from "@flick-lang/runtime/effect/FileSystem" "flickNode"
+  reviewed "effect@4.0.5 sha256:e72be4f6c861122c"
+
+/// The file system of Node.js.
+node : Layer none none {FileSystem}
+let node = node_of FileSystem
