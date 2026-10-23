@@ -4,7 +4,7 @@ title: "Command-line applications"
 
 A `Cli.Command r e` describes a command line: flags, positional arguments,
 subcommands and a handler that needs services `r` and fails with errors `e`
-(spec §10 "CLI eDSL"). Building one parses and runs nothing; `Cli.run`
+(see [CLI eDSL: flags, arguments and subcommands](../../spec/10-type-programming-and-edsl/#cli-edsl-flags-arguments-and-subcommands)). Building one parses and runs nothing; `Cli.run`
 parses the arguments with Effect's CLI and only then runs the handler.
 
 ```flick

@@ -3,7 +3,7 @@ title: "Kinds and types"
 ---
 
 The type checker runs after name resolution on every module without syntax
-errors (§4, §5, §9). It knows other modules only through their interfaces
+errors (see [Values of computations and their execution](../../spec/04-computations/), [The HKT type core and type classes](../../spec/05-types-and-classes/), [Schema and standard data types](../../spec/09-schema/)). It knows other modules only through their interfaces
 ([iface.md](../iface/)).
 
 ## Built-in types
@@ -58,7 +58,7 @@ used without its argument and `Number String` are `FLICK-T002`.
 
 ## Signatures
 
-Every named function has its full signature right above its `let` (§3): at
+Every named function has its full signature right above its `let` (see [Direct effectful calls](../../spec/03-direct-calls/)): at
 the top level, locally, in instances, and for a function made by partial
 application. A function without one is `FLICK-T004`, with the inferred type
 as a suggestion; types written in the `let` header are `FLICK-T005`; a
@@ -83,7 +83,7 @@ caller may choose (`FLICK-T008` when it needs one concrete type).
 ## Functions and higher rank
 
 `a -> b`, `a ->{r; e} b` and `a ->{} b` are three different types; an empty
-row never makes a runtime arrow pure (§4). A lambda takes each arrow of the
+row never makes a runtime arrow pure (see [Values of computations and their execution](../../spec/04-computations/)). A lambda takes each arrow of the
 type it is checked against. Which rows a body's calls need, and where a
 runtime call may run at all, is the subject of [effects.md](../effects/).
 
@@ -103,7 +103,7 @@ being stored in a cell created outside the callback (`FLICK-T007`).
 
 ## Records
 
-Records are exact and structural (§5). `type alias User = { … }` is a transparent
+Records are exact and structural (see [The HKT type core and type classes](../../spec/05-types-and-classes/)). `type alias User = { … }` is a transparent
 alias, and the order of fields does not matter. A record with extra fields
 does not pass for a closed record type; a signature accepts more fields with
 an open row:
@@ -127,7 +127,7 @@ value. A record pattern lists some of the fields.
 
 ## Numbers and operators
 
-There are no implicit conversions (§9).
+There are no implicit conversions (see [Schema and standard data types](../../spec/09-schema/)).
 
 | Operators | Operands | Result |
 | - | - | - |
@@ -171,7 +171,7 @@ let rec depth value =
 ## Generalization
 
 A binding is polymorphic only when it is built purely: no runtime call runs
-while it is defined (§5 "Generalization при наличии Ref"). Lambdas and `task`
+while it is defined (see [Generalization in the presence of Ref](../../spec/05-types-and-classes/#generalization-in-the-presence-of-ref)). Lambdas and `task`
 bodies are deferred and count as pure. A polymorphic signature over a runtime
 result is `FLICK-T013`, and so is a top-level value whose type stays unknown.
 Type variables of an enclosing signature, or of a value already in scope,

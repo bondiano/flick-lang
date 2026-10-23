@@ -2,7 +2,7 @@
 title: "Runtime adapter"
 ---
 
-`@flick-lang/runtime` is what compiled code runs on (§7, §11). It is a thin
+`@flick-lang/runtime` is what compiled code runs on (see [Errors, services, resources and concurrency](../../spec/07-errors-and-concurrency/), [The Flick compiler and Content Mapper integration](../../spec/11-compiler/)). It is a thin
 adapter over Effect `4.0.5`: generated modules import only this package, and
 the adapter fixes the contracts below so that they hold whatever Effect does
 by default.

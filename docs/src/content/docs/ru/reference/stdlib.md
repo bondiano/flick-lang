@@ -2,7 +2,7 @@
 title: "Стандартная библиотека"
 ---
 
-Стандартная библиотека — это код Flick поверх адаптера среды выполнения (§6, §9, §12).
+Стандартная библиотека — это код Flick поверх адаптера среды выполнения (см. [Функции высшего порядка и обход коллекций](../../spec/06-higher-order/), [Schema и стандартные типы данных](../../spec/09-schema/), [CLI Flick](../../spec/12-cli/)).
 Её модули встроены в компилятор: программа обращается к ним по полному имени
 без импорта (`List.map`, `Ref.make`) или импортирует из них имена, как
 из любого модуля (`import File exposing (FileSystem, OpenError)`).
@@ -120,7 +120,7 @@ let tests =
     Test.effect_test "reads" (task { Test.expect (Test.equal 1 1) }),
     Test.property "reverse twice" (Gen.list 10 (Gen.int 0 9)) (fun xs ->
       Test.equal xs (List.reverse (List.reverse xs))),
-    Test.group "numbers" [Test.test "adds" (fun () -> Test.equal 2 (1 + 1))]
+    Test.group "numbers" [Test.test "adds" (fun () -> Test.equal 2 (1 + 1))],
   ]
 ```
 

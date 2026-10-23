@@ -2,7 +2,7 @@
 title: "Standard library"
 ---
 
-The standard library is Flick code over the runtime adapter (§6, §9, §12).
+The standard library is Flick code over the runtime adapter (see [Higher-order functions and collection traversal](../../spec/06-higher-order/), [Schema and standard data types](../../spec/09-schema/), [The Flick CLI](../../spec/12-cli/)).
 Its modules are built into the compiler: a program names them qualified
 without an import (`List.map`, `Ref.make`), or imports names from them like
 from any module (`import File exposing (FileSystem, OpenError)`). The
@@ -119,7 +119,7 @@ let tests =
     Test.effect_test "reads" (task { Test.expect (Test.equal 1 1) }),
     Test.property "reverse twice" (Gen.list 10 (Gen.int 0 9)) (fun xs ->
       Test.equal xs (List.reverse (List.reverse xs))),
-    Test.group "numbers" [Test.test "adds" (fun () -> Test.equal 2 (1 + 1))]
+    Test.group "numbers" [Test.test "adds" (fun () -> Test.equal 2 (1 + 1))],
   ]
 ```
 

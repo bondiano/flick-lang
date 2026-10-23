@@ -2,7 +2,7 @@
 title: "Modules and names"
 ---
 
-One `.fl` file is one module (§11). The module header names it and lists
+One `.fl` file is one module (see [The Flick compiler and Content Mapper integration](../../spec/11-compiler/)). The module header names it and lists
 what it exports; imports bring other modules' exports into scope.
 
 ```flick

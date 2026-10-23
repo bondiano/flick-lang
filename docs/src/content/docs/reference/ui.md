@@ -2,7 +2,7 @@
 title: "User interfaces"
 ---
 
-`Ui r e` (spec §10) describes a user interface whose event handlers need
+`Ui r e` (see [Type-level programming and eDSLs](../../spec/10-type-programming-and-edsl/)) describes a user interface whose event handlers need
 the services `r` and may fail with `e`. Building one is pure: it runs no
 handler, reads no state and touches no DOM. `Ui.run` renders it with React
 19 (`react-dom/client`) and runs each event as a task.
@@ -10,9 +10,9 @@ handler, reads no state and touches no DOM. `Ui.run` renders it with React
 ```flick
 type alias SaveButtonProps c =
   {
-    label : String
-    disabled : Bool
-    on_save : (Unit ->{Users; SaveError} Unit)^c
+    label : String;
+    disabled : Bool;
+    on_save : (Unit ->{Users; SaveError} Unit)^c;
   }
 
 save_button : SaveButtonProps c -> (Ui {Users} {SaveError})^c
@@ -20,10 +20,10 @@ let save_button props =
   ui {
     button
       {
-        disabled = props.disabled
+        disabled = props.disabled;
         on_click = Ui.Event.exhaust (fun _ ->
           task { props.on_save () }
-        )
+        );
       }
       [text props.label]
   }

@@ -2,7 +2,7 @@
 //! it stands for (`Cli.command "name" |> Cli.flag … |> Cli.handle f`), so the
 //! options record, the rows and the constraints come from the combinators'
 //! signatures. What the types cannot state is checked first: names, aliases,
-//! defaults and the shape of the command (spec §10 "CLI eDSL").
+//! defaults and the shape of the command.
 
 use std::collections::BTreeMap;
 

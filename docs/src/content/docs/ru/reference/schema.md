@@ -3,7 +3,7 @@ title: "Схемы и кодеки"
 ---
 
 Схема — свидетельство о значениях типа в среде выполнения; кодек добавляет
-формат передачи и преобразует его в значения и обратно (§9). И то и другое —
+формат передачи и преобразует его в значения и обратно (см. [Schema и стандартные типы данных](../../spec/09-schema/)). И то и другое —
 значения программы, создаваемые из объявлений, DSL и библиотечных комбинаторов.
 Декодирование завершается ошибкой `SchemaError` — списком проблем
 `{ message; path }`, который указывает пути и никогда не содержит входные данные.
@@ -61,8 +61,8 @@ let tree_schema item_schema =
 profile_json : PureCodec Json Profile
 let profile_json =
   codec (schema Profile) {
-    email = field "email_address" Email.json
-    nickname = field "nickname" (option_as_null String.json)
+    email = field "email_address" Email.json;
+    nickname = field "nickname" (option_as_null String.json);
   }
 ```
 

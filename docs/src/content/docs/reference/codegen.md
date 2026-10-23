@@ -2,7 +2,7 @@
 title: "Code generation"
 ---
 
-`flick build` compiles each module to an ES module (§8, §11). This page
+`flick build` compiles each module to an ES module (see [TypeScript generation and the FFI boundary](../../spec/08-typescript-and-ffi/), [The Flick compiler and Content Mapper integration](../../spec/11-compiler/)). This page
 describes the debug profile, which is the reference lowering: every other
 profile must behave the same way.
 
@@ -152,8 +152,7 @@ under `node --enable-source-maps` points at `.fl` lines.
 `flick build --emit ts` (or `emit = "ts"` in `flick.toml`) writes the same
 modules as `.ts` files, importing each other with the `.ts` extension. Each
 module declares the TypeScript form of the types it exports and annotates its
-exported values with their projected types (§8 "Публичные TypeScript
-интерфейсы"):
+exported values with their projected types (see [Public TypeScript interfaces](../../spec/08-typescript-and-ffi/#public-typescript-interfaces)):
 
 | Flick | TypeScript |
 | - | - |

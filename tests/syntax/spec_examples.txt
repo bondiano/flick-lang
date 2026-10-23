@@ -1,62 +1,63 @@
-# Fingerprints of the ```flick blocks of the spec, checked by flick-core/tests/corpus.rs.
+# Fingerprints of the ```flick blocks of the Russian spec (docs/src/content/docs/ru/spec),
+# checked by flick-core/tests/corpus.rs.
 # A new or edited example fails the test until its parse is reviewed and its line added.
-cfd4deeeb00ff9b0  spec:67  load_name : UserId ->{Users, Log; NotFound} String
-593814cb393c3a84  spec:102  render : Show a => a -> String
-0e0762aff3749216  spec:124  greet : String -> String -> String
-6c70dbf125707c4a  spec:153  load_user : UserId ->{Users; NotFound} User
-1f4fb3d7472f358e  spec:173  load_twice :
-5490665b39c55003  spec:213  load_name_pair : UserId -> UserId ->{Users; NotFound} (String, String)
-7250ff6a1fbd12e3  spec:266  class Functor (f : Type -> Type) =
-351c17a8bae37ce1  spec:289  class Show a =
-872c8247235efbb4  spec:344  apply_twice :
-74a14e74a12990e3  spec:358  decode_pair :
-9bdd6c03c6da66f8  spec:384  name :
-59ea26d822a0c2ae  spec:439  class Convert input output =
-ecba8ed13060594d  spec:464  class Collection c a | c -> a =
-c18064c876fe3adf  spec:473  empty_users : UserSet
-d2e8d6c7d9e16954  spec:492  class Collection c =
-1336bb8a8a86841e  spec:570  invalid : Unit ->{} String
-8e5624e4a3c33f25  spec:591  make_empty : forall a. Unit ->{} Ref (Option a)
-ac73e7b4530d3617  spec:610  make_identity : Unit -> (a -> a)
-ce831b060f823d82  spec:624  fresh_cell : forall a. Eff none none (Ref (Option a))
-659dd5e1c7324273  spec:639  capture_cell : Ref (Option a) -> Eff none none (Ref (Option a))
-f42159967b1e64b5  spec:649  logged_none : Unit ->{Log; none} Option a
-5e483a0a0ce484e8  spec:705  normalize_names : List String -> List String
-7644f905482ebdd8  spec:744  pair_optional : Option a -> Option b -> Option (a, b)
-90c190d26dc0c631  spec:769  type error NotFound = NotFound UserId
-91f550830e015b91  spec:784  type error RetryExhausted e = RetryExhausted e Number
-234a19d9938bb3aa  spec:810  service Clock =
-db871b0a6a9f20ec  spec:836  application : UserId ->{Config, Log; NotFound, ConnectError} String
-68432730286d9e2d  spec:908  type error NotFound = NotFound UserId
-3731ef4320e94d37  spec:988  read_config :
-b7a55d14d7cfb20d  spec:1008  bad_deferred :
-49320955ffe530fe  spec:1022  deferred_read :
-cbe0185a943553e9  spec:1040  bad_callback :
-e8bd3190545a729d  spec:1102  load_pair : UserId -> UserId ->{Users; NotFound} (User, User)
-24f2c1693e734bbf  spec:1148  identity : a -> a
-1d4de52c15fcfbac  spec:1178  with_default : a -> Option a -> a
-6d421b900cc63c54  spec:1209  type Shape =
-cfd4deeeb00ff9b0  spec:1245  load_name : UserId ->{Users, Log; NotFound} String
-f78643ad295517ef  spec:1370  hypot : Number -> Number -> Number
-410efc85cb82fc5a  spec:1457  on_message : Message ->{Log; none} Unit
-c7457701e10aa513  spec:1581  add : Number -> Number -> Number
-390b567318ca1210  spec:1603  sum_pair : Number -> Number -> Number
-6b1b974f39d51523  spec:1731  refined type Email = String where Checks.email
-002c4c46c829649b  spec:1774  type alias Preferences = {
-62b3490f7ac7e56f  spec:1817  type Tree a =
-70265bd42f7414d7  spec:1912  increment : Ref Number ->{} Number
-d72679edd15d953e  spec:1929  class Eq a => Hash a =
-e28dd24856e76943  spec:2085  type alias BalanceRow =
-1838791670c05b74  spec:2119  deferred_balances :
-aa414f379b88aedd  spec:2194  type alias SaveButtonProps c =
-924fb2766af07dd1  spec:2223  save_button :
-4f1eda6ee144286a  spec:2345  module App.Users exposing (User, load_user)
-6ab2908136691e1a  spec:2567  opaque type alias UserId = String
-0ea7549614206500  spec:2292  greet : Cli.Command {Platform} none
-616df64b98d90310  spec:2340  tool : Cli.Command {Platform} none
-213799199fbee0b5  spec:2362  main : Unit ->{; AppError} Unit
-eafd6510c5484060  spec:1337  lookup : String ->{; JsError} Option String
-90506a3da26b61ad  spec:1655  unboxed type UserId = UserId String
-ded3987556b0d42a  spec:2262  type alias SelectProps a r e c =
-0bf407bdf82852be  spec:416  class Show a =
-9a9c17dd476c81cb  spec:551  unboxed type LocalExternalId =
+cfd4deeeb00ff9b0  03-direct-calls:8  load_name : UserId ->{Users, Log; NotFound} String
+593814cb393c3a84  03-direct-calls:43  render : Show a => a -> String
+0e0762aff3749216  03-direct-calls:65  greet : String -> String -> String
+6c70dbf125707c4a  04-computations:17  load_user : UserId ->{Users; NotFound} User
+1f4fb3d7472f358e  04-computations:37  load_twice :
+5490665b39c55003  04-computations:78  load_name_pair : UserId -> UserId ->{Users; NotFound} (String, String)
+7250ff6a1fbd12e3  05-types-and-classes:40  class Functor (f : Type -> Type) =
+351c17a8bae37ce1  05-types-and-classes:63  class Show a =
+872c8247235efbb4  05-types-and-classes:119  apply_twice :
+74a14e74a12990e3  05-types-and-classes:133  decode_pair :
+9bdd6c03c6da66f8  05-types-and-classes:159  name :
+0bf407bdf82852be  05-types-and-classes:189  class Show a =
+59ea26d822a0c2ae  05-types-and-classes:213  class Convert input output =
+ecba8ed13060594d  05-types-and-classes:238  class Collection c a | c -> a =
+c18064c876fe3adf  05-types-and-classes:248  empty_users : UserSet
+d2e8d6c7d9e16954  05-types-and-classes:266  class Collection c =
+9a9c17dd476c81cb  05-types-and-classes:324  unboxed type LocalExternalId =
+1336bb8a8a86841e  05-types-and-classes:345  invalid : Unit ->{} String
+8e5624e4a3c33f25  05-types-and-classes:366  make_empty : forall a. Unit ->{} Ref (Option a)
+ac73e7b4530d3617  05-types-and-classes:385  make_identity : Unit -> (a -> a)
+ce831b060f823d82  05-types-and-classes:399  fresh_cell : forall a. Eff none none (Ref (Option a))
+659dd5e1c7324273  05-types-and-classes:414  capture_cell : Ref (Option a) -> Eff none none (Ref (Option a))
+f42159967b1e64b5  05-types-and-classes:424  logged_none : Unit ->{Log; none} Option a
+5e483a0a0ce484e8  06-higher-order:8  normalize_names : List String -> List String
+7644f905482ebdd8  06-higher-order:47  pair_optional : Option a -> Option b -> Option (a, b)
+90c190d26dc0c631  07-errors-and-concurrency:12  type error NotFound = NotFound UserId
+91f550830e015b91  07-errors-and-concurrency:27  type error RetryExhausted e = RetryExhausted e Number
+234a19d9938bb3aa  07-errors-and-concurrency:53  service Clock =
+db871b0a6a9f20ec  07-errors-and-concurrency:79  application : UserId ->{Config, Log; NotFound, ConnectError} String
+68432730286d9e2d  07-errors-and-concurrency:151  type error NotFound = NotFound UserId
+3731ef4320e94d37  07-errors-and-concurrency:231  read_config :
+b7a55d14d7cfb20d  07-errors-and-concurrency:251  bad_deferred :
+49320955ffe530fe  07-errors-and-concurrency:265  deferred_read :
+cbe0185a943553e9  07-errors-and-concurrency:281  bad_callback :
+e8bd3190545a729d  07-errors-and-concurrency:345  load_pair : UserId -> UserId ->{Users; NotFound} (User, User)
+24f2c1693e734bbf  08-typescript-and-ffi:8  identity : a -> a
+1d4de52c15fcfbac  08-typescript-and-ffi:38  with_default : a -> Option a -> a
+6d421b900cc63c54  08-typescript-and-ffi:69  type Shape =
+cfd4deeeb00ff9b0  08-typescript-and-ffi:105  load_name : UserId ->{Users, Log; NotFound} String
+eafd6510c5484060  08-typescript-and-ffi:195  lookup : String ->{; JsError} Option String
+f78643ad295517ef  08-typescript-and-ffi:229  hypot : Number -> Number -> Number
+410efc85cb82fc5a  08-typescript-and-ffi:318  on_message : Message ->{Log; none} Unit
+c7457701e10aa513  08-typescript-and-ffi:442  add : Number -> Number -> Number
+390b567318ca1210  08-typescript-and-ffi:464  sum_pair : Number -> Number -> Number
+90506a3da26b61ad  08-typescript-and-ffi:513  unboxed type UserId = UserId String
+6b1b974f39d51523  09-schema:77  refined type Email = String where Checks.email
+002c4c46c829649b  09-schema:120  type alias Preferences = {
+62b3490f7ac7e56f  09-schema:163  type Tree a =
+70265bd42f7414d7  09-schema:259  increment : Ref Number ->{} Number
+d72679edd15d953e  09-schema:274  class Eq a => Hash a =
+e28dd24856e76943  10-type-programming-and-edsl:69  type alias BalanceRow =
+1838791670c05b74  10-type-programming-and-edsl:103  deferred_balances :
+aa414f379b88aedd  10-type-programming-and-edsl:163  type alias SaveButtonProps c =
+924fb2766af07dd1  10-type-programming-and-edsl:192  save_button :
+ded3987556b0d42a  10-type-programming-and-edsl:229  type alias SelectProps a r e c =
+0ea7549614206500  10-type-programming-and-edsl:273  greet : Cli.Command {Platform} none
+616df64b98d90310  10-type-programming-and-edsl:321  tool : Cli.Command {Platform} none
+213799199fbee0b5  10-type-programming-and-edsl:341  main : Unit ->{; AppError} Unit
+4f1eda6ee144286a  11-compiler:52  module App.Users exposing (User, load_user)
+6ab2908136691e1a  13-first-slice:10  opaque type alias UserId = String

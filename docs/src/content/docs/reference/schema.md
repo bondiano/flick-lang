@@ -3,7 +3,7 @@ title: "Schemas and codecs"
 ---
 
 A schema is a runtime witness of the values of a type; a codec adds a wire
-form and turns it into values and back (§9). Both are values of the program
+form and turns it into values and back (see [Schema and standard data types](../../spec/09-schema/)). Both are values of the program
 built from declarations, a DSL and library combinators. Decoding fails with
 `SchemaError`, a list of issues `{ message; path }` that names paths and
 never holds the input.
@@ -61,8 +61,8 @@ witness: `FLICK-D001` names the path of the field, as `Session.handler`.
 profile_json : PureCodec Json Profile
 let profile_json =
   codec (schema Profile) {
-    email = field "email_address" Email.json
-    nickname = field "nickname" (option_as_null String.json)
+    email = field "email_address" Email.json;
+    nickname = field "nickname" (option_as_null String.json);
   }
 ```
 

@@ -16,5 +16,10 @@ export const sidebar = [
     translations: { ru: "Инструменты" },
     items: ["cli", "project", "editor", "codegen", "runtime", "iface"].map((f) => ({ slug: `reference/${f}` })),
   },
-  { label: "Contributing", translations: { ru: "Участие в разработке" }, items: [{ slug: "contributing/testing" }] },
+  {
+    label: "Specification",
+    translations: { ru: "Спецификация" },
+    items: [{ slug: "spec" }, { autogenerate: { directory: "spec" } }],
+  },
+  { label: "Contributing", translations: { ru: "Участие в разработке" }, items: [{ slug: "contributing/testing" }, { slug: "contributing/implementation-decisions" }] },
 ];

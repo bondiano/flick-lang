@@ -3,9 +3,10 @@
 Rust implementation of **Flick** — an ML-family language with HKT, type
 classes and a single Effect backend (JavaScript/TypeScript output).
 
-The language is fully specified but not yet implemented:
-
-- Spec: [`Flick спецификация ML языка с HKT и Effect.md`](./Flick%20спецификация%20ML%20языка%20с%20HKT%20и%20Effect.md) (Flick 0.7)
+The language specification (Flick 0.7) is part of the documentation site:
+[`docs/src/content/docs/spec/`](./docs/src/content/docs/spec/) in English and
+[`docs/src/content/docs/ru/spec/`](./docs/src/content/docs/ru/spec/) in Russian,
+the original text.
 
 ## Crates
 
@@ -26,6 +27,8 @@ just test
 just check  # lint + test
 just e2e    # runtime tests + compiled programs on Node
 ```
+
+`examples/first-slice` is a complete project (services, layers, tests); run `flick run` or `flick test` inside it.
 
 ## Documentation
 

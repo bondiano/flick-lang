@@ -1,8 +1,6 @@
 //! Shared Rust core for the Flick compiler and LSP.
 //!
-//! Source of truth: `Flick спецификация ML языка с HKT и Effect.md` in the
-//! repository root. Implemented so far: diagnostics, syntax, `fmt`, names and
-//! modules, the project model, kinds and types, and classes.
+//! Source of truth: the language specification in `docs/src/content/docs/spec/`.
 
 pub mod bootstrap;
 pub mod build;
@@ -47,6 +45,7 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
     let options = types::Options {
         local: &local,
         limits: types::Limits::default(),
+        sql: Default::default(),
     };
     let mut diagnostics = parse.diagnostics;
     diagnostics.extend(resolved);

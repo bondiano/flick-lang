@@ -2,7 +2,7 @@
 title: "Пользовательские интерфейсы"
 ---
 
-`Ui r e` (§10 спецификации) описывает пользовательский интерфейс, обработчики событий
+`Ui r e` (см. [Типовое программирование и eDSL](../../spec/10-type-programming-and-edsl/)) описывает пользовательский интерфейс, обработчики событий
 которого нуждаются в сервисах `r` и могут завершаться с ошибками `e`. Его построение
 чистое: оно не запускает обработчики, не читает состояние и не обращается к DOM. `Ui.run`
 отображает его с помощью React 19 (`react-dom/client`) и выполняет каждое событие как задачу.
@@ -10,9 +10,9 @@ title: "Пользовательские интерфейсы"
 ```flick
 type alias SaveButtonProps c =
   {
-    label : String
-    disabled : Bool
-    on_save : (Unit ->{Users; SaveError} Unit)^c
+    label : String;
+    disabled : Bool;
+    on_save : (Unit ->{Users; SaveError} Unit)^c;
   }
 
 save_button : SaveButtonProps c -> (Ui {Users} {SaveError})^c
@@ -20,10 +20,10 @@ let save_button props =
   ui {
     button
       {
-        disabled = props.disabled
+        disabled = props.disabled;
         on_click = Ui.Event.exhaust (fun _ ->
           task { props.on_save () }
-        )
+        );
       }
       [text props.label]
   }

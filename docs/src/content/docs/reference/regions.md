@@ -3,8 +3,7 @@ title: "Regions and captures"
 ---
 
 A `scope` releases what it acquired when its body ends, and the checker
-proves that nothing usable outlives it (§7 "Ресурсы", "Статические regions и
-захваты"). Regions are checked after types and effects; there is no early
+proves that nothing usable outlives it (see [Resources](../../spec/07-errors-and-concurrency/#resources), [Static regions and captures](../../spec/07-errors-and-concurrency/#static-regions-and-captures)). Regions are checked after types and effects; there is no early
 close and no linearity: a resource may be used any number of times while its
 scope is open.
 

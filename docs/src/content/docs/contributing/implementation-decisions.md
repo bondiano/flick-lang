@@ -1,0 +1,44 @@
+---
+title: "Implementation decisions"
+---
+
+## Decisions the specification leaves to the implementation
+
+| Question | Decision |
+| - | - |
+| Parser | Hand-written recursive descent with Pratt parsing for operators; a lossless CST (trivia kept) for `fmt` and the LSP |
+| Incrementality | No query framework. A build is cached whole in `.flick/cache/` by a key over all its inputs, including the sources and the interfaces of installed dependencies (see [Outputs and the cache](../../reference/cli/#outputs-and-the-cache)); an `.iface` records the fingerprints of the interfaces it was built against |
+| Spans | UTF-8 byte ranges (see [Common options and diagnostics](../../spec/12-cli/#common-options-and-diagnostics)); the LSP translates them to UTF-16 |
+| Snapshot tests | `insta` for diagnostics, IR and JS output (see [Testing](../testing/)) |
+| Node host | Node.js 24.18.0 is the minimum supported version, checked by `flick doctor` |
+| pnpm | A pinned version through `packageManager` in the project template (`pnpm@12.14.0`); `flick doctor` compares the installed pnpm with it |
+| Effect | Exactly 4.0.5, commit `81fc8d9c7855d0f31bf493f379ec7bc2a6150a6f` (see [A complex Cause](../../spec/07-errors-and-concurrency/#a-complex-cause-what-the-error-row-promises), [The compiler](../../spec/11-compiler/) and [Effect release](../../reference/runtime/#effect-release)) |
+| Effect API coverage | Every export of `effect`, `effect/cli`, `effect/http` and `effect/http-api` is classified in a manifest; a linter in `cargo test` fails on an unclassified, stale or changed-signature export (see [Effect coverage](../../reference/effect-surface/)) |
+| Effect Node platform | The HTTP server and `Terminal`/`FileSystem`/`Path` for the CLI come from `@effect/platform-node`, pinned to 4.0.5 alongside Effect as a dependency of `@flick-lang/runtime` |
+| PostgreSQL driver | `pg` (node-postgres), an optional peer dependency of `@flick-lang/runtime`, bound through `foreign` in the standard library module `Database` (`Database.pg`) |
+| React | React 19 and `react-dom/client`, optional peer dependencies of `@flick-lang/runtime` |
+| `.d.ts` resolution | The npm package `typescript` in the Node helper `@flick-lang/dts-importer`; a JSON request on stdin, the surface as JSON on stdout (see [Importing a package's `.d.ts`](../../reference/ffi/#importing-a-packages-dts)) |
+| npm package scope | `@flick-lang/*` (`@flick-lang/runtime`, `@flick-lang/dts-importer`); the standard library ships inside the compiler |
+
+## Resolutions of gaps in the specification
+
+The specification fixes the semantics but leaves a number of surface details
+open. The decisions below are taken and described in the reference.
+
+| Gap | Decision |
+| - | - |
+| Comments | `//` line, `/* */` block with nesting, `///` doc comment for `flick doc`. `//` works inside `sql { }` too (see [Whitespace and comments](../../reference/grammar/#whitespace-and-comments)) |
+| Strings | Escapes `\n \t \r \\ \" \0 \u{…}` (braced form only, 1 to 6 hex digits, no surrogates; `\0` cannot be followed by a digit); raw `r"…"`, `r#"…"#`, `r##"…"##`…; multi-line `"""…"""` with the common indentation removed; no interpolation (see [String literals](../../reference/grammar/#string-literals)) |
+| Operators | A fixed table, no user-defined operators. From weakest to strongest: `\|>` (left), `\|\|` (right), `&&` (right), `== != < <= > >=` (non-associative), `++` (right), `+ -` (left), `* / %` (left, `%` is the JS remainder), `**` (right), prefix `-`, `not`, `await`, `ignore`, application, `.field` / `M.x`. Bitwise operations are the functions `Number.bit_*` (see [Operator table](../../reference/grammar/#operator-table)) |
+| Bool and `if` | `Bool` is the JS boolean; literals `true`/`false` (allowed in patterns); `if c then a else b` is an expression, `else` is required, `else if` chains, a multi-line form by layout (see [Layout](../../reference/grammar/#layout) and [Expressions](../../reference/grammar/#expressions)) |
+| Number literals | The grammar of JS `NumericLiteral`: decimal, exponent `1e-3`, `0x`/`0o`/`0b`, the `_` separator by JS rules (not at the start or end of a digit run, not doubled, not next to `.`/`e`/a prefix), BigInt suffix `n` (no fraction or exponent); legacy octal `010` and a leading zero like `09` are errors. Unlike JS, `.5` and `5.` are errors, since `.` is field access (see [Number literals](../../reference/grammar/#number-literals)) |
+| Tests | No new syntax: a module of the test root exports `tests : List Test.Test`; `Test.test`, `Test.effect_test`, `Test.property`, `Test.group` and the generators `Gen.*` are library functions (see [Tests](../../reference/stdlib/#tests)) |
+| Platform API | `Platform.args`, `Platform.env`, `stdout_line`/`stderr_line`/`stdout_write` are a standard library module (see [Modules](../../reference/stdlib/#modules)) |
+| `AppError` | A Prelude type: `type error AppError = AppError { message : String; details : Option String }`; `App.fail : String ->{; AppError} a`; the runner prints `error: <message>` safely and exits with code `1` (see [Entry runner](../../reference/runtime/#entry-runner)) |
+| SQL table metadata | A block `sql table Name "table" { col : sql_type [not null \| null] [primary key] [unique] [default] [generated always \| generated by default] as T [via codec] }`; it declares the row type `Name` and the table `Name$table : Sql.Table "table" { … }` of `Sql.Column`s; tables generated from migrations take the same form (see [Tables](../../reference/sql/#tables)) |
+| FFI overrides | The importer writes only `<Pkg>/Generated.fl`; a module of your own, usually `<Pkg>.fl`, holds ordinary `foreign` declarations with `reviewed "<pkg>@<ver> sha256:…"` and re-exports the rest; `flick ffi check` compares the fingerprints (see [Reviewed bindings and `ffi check`](../../reference/ffi/#reviewed-bindings-and-ffi-check)) |
+| Shadowing and ambiguity | Local bindings shadow everything without a diagnostic. A top-level definition named like an import `exposing (name)` is `FLICK-R009`; names from `exposing (..)` are shadowed by top-level definitions silently. Two imports exposing one name by name as different entities are `FLICK-R010` at once; a conflict between `(..)` imports is `FLICK-R010` only where the name is used; two imports under one qualifier are `FLICK-R010`. Re-exports of the same entity do not conflict. The order of imports changes nothing (see [Shadowing and ambiguity](../../reference/modules/#shadowing-and-ambiguity)) |
+| HTTP | No syntax (see [The boundary of the language core](../../spec/07-errors-and-concurrency/#the-boundary-of-the-language-core)): `Http.*` and `HttpApi.*` are library combinators; endpoint parts are described by codecs built from `Schema a` (see [Typed HTTP APIs](../../reference/http-api/)) |
+| CLI eDSL | See [CLI eDSL](../../spec/10-type-programming-and-edsl/#cli-edsl-flags-arguments-and-subcommands). A block `cli "name" { … }` with the clauses `description`, `flag`, `arg`, `subcommand` and `handle`; it elaborates into the library functions `Cli.*` over `effect/cli`, which are usable directly (see [CLI eDSL](../../reference/cli-dsl/) and the [grammar](../../reference/grammar/#expressions)) |
+| Class methods | A method is declared by a plain signature `name : T` (there is no `val` keyword; the old form is `FLICK-S010`). A default method is its signature with a `let name … =` right below it in the class body; an instance may leave it out. A signature without a `let` is an abstract method, which an instance must define (`FLICK-C011` otherwise; see [Instances](../../reference/classes/#instances)) |
+| Packages with Flick modules | A package declares `"flick": { "iface-dir": "<dir>" }` in its `package.json`; module `A.B` is described by `<dir>/A/B.iface`. `flick build` writes the files and `flick pack` the field, not the user. Installation is pnpm only (`flick install`/`add`); Flick reads the installed tree of the project's direct dependencies (see [Packages](../../reference/project/#packages) and [Location in a package](../../reference/iface/#location-in-a-package)) |

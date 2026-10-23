@@ -8,7 +8,7 @@ use std::path::Path;
 
 use flick_core::types::builtin_sources;
 
-const SPEC: &str = "Flick спецификация ML языка с HKT и Effect.md";
+const SPEC: &str = "docs/src/content/docs/ru/spec";
 
 /// Prelude values the spec gives without a module.
 const PRELUDE: &[&str] = &["bind", "bind_eff", "from_result"];
@@ -68,7 +68,15 @@ fn declared(source: &str, name: &str) -> Option<String> {
 #[test]
 fn stdlib_declares_the_spec_signatures_word_for_word() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-    let spec = fs::read_to_string(root.join(SPEC)).expect("spec is readable");
+    let mut chapters: Vec<_> = fs::read_dir(root.join(SPEC))
+        .expect("spec is readable")
+        .map(|entry| entry.expect("entry").path())
+        .collect();
+    chapters.sort();
+    let spec: String = chapters
+        .iter()
+        .map(|path| fs::read_to_string(path).expect("spec is readable"))
+        .collect();
     let mut checked = Vec::new();
     let mut mismatches = Vec::new();
     for (name, signature) in spec_signatures(&spec) {
