@@ -1,0 +1,2 @@
+"effect" = { modules = "core" }
+"effect/ai" = { excluded = "not wrapped" }

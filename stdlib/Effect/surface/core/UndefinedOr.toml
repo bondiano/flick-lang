@@ -1,0 +1,9 @@
+[pending]
+getOrThrow = "M20"
+getOrThrowWith = "M20"
+liftThrowable = "M20"
+makeCombinerFailFast = "M20"
+makeReducer = "M20"
+makeReducerFailFast = "M20"
+map = "M20"
+match = "M20"

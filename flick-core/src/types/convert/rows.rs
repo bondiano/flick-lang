@@ -86,6 +86,7 @@ impl Checker<'_> {
         }
         let tail = tail
             .and_then(|t| t.nodes().next())
+            .and_then(|t| self.row_tail(t))
             .map(|t| Box::new(self.ty(t, &kind, free)));
         entries.sort_by(|a, b| a.0.cmp(&b.0));
         Type::Row(Row { entries, tail })
@@ -186,6 +187,7 @@ impl Checker<'_> {
                     tail = child
                         .nodes()
                         .next()
+                        .and_then(|t| self.row_tail(t))
                         .map(|t| Box::new(self.ty(t, &kind, free)));
                 }
                 _ => {}
@@ -193,5 +195,19 @@ impl Checker<'_> {
         }
         entries.sort_by(|a, b| a.0.cmp(&b.0));
         Row { entries, tail }
+    }
+
+    /// The tail after `|`, which names a row: an applied type there is
+    /// `FLICK-T002`.
+    fn row_tail<'n>(&mut self, tail: &'n Node) -> Option<&'n Node> {
+        if tail.kind == K::AppType {
+            self.error(
+                codes::T002,
+                self.span(tail),
+                "the tail of a row is a row variable: `{A, B | r}`",
+            );
+            return None;
+        }
+        Some(tail)
     }
 }

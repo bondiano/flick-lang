@@ -1,0 +1,18 @@
+{
+  "package": "effect",
+  "version": "1.1.0",
+  "entrypoints": [
+    "effect",
+    "effect/ai",
+    "effect/extra"
+  ],
+  "modules": {
+    "effect": {
+      "Effect.gen": "value ac914e4d45760acd",
+      "Sched.Sched": "type 5b5243fdac8dd63b",
+      "Sched.added": "value 80f49ccd4f9198ba",
+      "Sched.forever": "value 2a307640e3841503",
+      "Sched.spaced": "value eff66506c8d77152"
+    }
+  }
+}

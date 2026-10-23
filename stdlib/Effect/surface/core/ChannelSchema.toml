@@ -1,0 +1,7 @@
+[pending]
+decode = "M20"
+decodeUnknown = "M20"
+duplex = "M20"
+duplexUnknown = "M20"
+encode = "M20"
+encodeUnknown = "M20"

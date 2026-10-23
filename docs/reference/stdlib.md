@@ -54,6 +54,11 @@ and `Monad`.
 | `JsError` | `JsError.from_js`, the error of a foreign throw or rejection, see [ffi.md](ffi.md) |
 | `Fiber`, `Failure`, `Exit`, `RawCause` | children of a scope and outcomes |
 | `Test`, `Gen` | tests and generators, see below |
+| `Schedule` | Effect's schedules: `recurs`, `spaced`, `exponential`, `fibonacci`, `up_to`, `while`, `tap`, … |
+| `Effect` | what Effect's `Effect` offers beyond the language: `retry` (typed failures only), `repeat`, `schedule`, `sleep`, … |
+
+Every export of the pinned Effect is wrapped or decided in a manifest that
+a linter checks, see [effect-surface.md](effect-surface.md).
 
 ## Numbers
 

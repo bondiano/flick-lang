@@ -1,0 +1,10 @@
+[pending]
+Combiner = "M20"
+constant = "M20"
+first = "M20"
+flip = "M20"
+intercalate = "M20"
+last = "M20"
+make = "M20"
+max = "M20"
+min = "M20"

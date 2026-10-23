@@ -1,0 +1,9 @@
+[pending]
+TxDeferred = "M20"
+await = "M20"
+done = "M20"
+fail = "M20"
+isTxDeferred = "M20"
+make = "M20"
+poll = "M20"
+succeed = "M20"

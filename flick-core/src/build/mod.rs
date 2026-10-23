@@ -386,7 +386,8 @@ pub fn builtin_modules() -> &'static [ir::Module] {
                     tree: &parse.tree,
                     syntax: &module_syntax,
                 };
-                let (mut interface, _) = resolve::resolve(&module, &|_| None);
+                let imported = |m: &str| interfaces[..i].iter().find(|x| x.module == m).cloned();
+                let (mut interface, _) = resolve::resolve(&module, &imported);
                 let local = |n: &str| types::builtin_sources().iter().any(|(m, _)| *m == n);
                 let options = types::Options {
                     local: &local,
@@ -394,7 +395,7 @@ pub fn builtin_modules() -> &'static [ir::Module] {
                 };
                 let (_, typing) = types::check_typed(
                     &module,
-                    &|_| None,
+                    &imported,
                     &interfaces[..i],
                     options,
                     &mut interface,

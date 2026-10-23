@@ -1,0 +1,12 @@
+[pending]
+Latch = "M20"
+await = "M20"
+close = "M20"
+closeUnsafe = "M20"
+isOpen = "M20"
+make = "M20"
+makeUnsafe = "M20"
+open = "M20"
+openUnsafe = "M20"
+release = "M20"
+whenOpen = "M20"

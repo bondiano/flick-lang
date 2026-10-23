@@ -1,0 +1,7 @@
+[pending]
+BaseProto = "M20"
+Class = "M20"
+Inspectable = "M20"
+NodeInspectSymbol = "M20"
+toJson = "M20"
+toStringUnknown = "M20"

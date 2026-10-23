@@ -1,0 +1,13 @@
+[pending]
+PreResponseHandler = "M21"
+appendPreResponseHandler = "M21"
+appendPreResponseHandlerUnsafe = "M21"
+fromWebHandler = "M21"
+scopeDisableClose = "M21"
+scopeTransferToStream = "M21"
+toHandled = "M21"
+toWebHandler = "M21"
+toWebHandlerLayer = "M21"
+toWebHandlerLayerWith = "M21"
+toWebHandlerWith = "M21"
+withPreResponseHandler = "M21"

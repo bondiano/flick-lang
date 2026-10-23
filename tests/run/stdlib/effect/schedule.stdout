@@ -1,0 +1,28 @@
+recurs 2: 3
+once: 2
+forever up to 2: 3
+spaced: 3
+fixed: 3
+windowed: 3
+duration: 2
+jittered: 2
+exponential: ["1ms", "3ms", "9ms", "27ms"]
+fibonacci: ["1ms", "2ms", "3ms", "5ms"]
+during: 4
+max: 2
+min: 4
+concat: 4
+concat_result: second 1
+passthrough: 7
+identity: echo
+while: 3
+delays: (2, 3)
+current_metadata: 2
+ok after 3
+gave up at 3
+fallback (2, 1)
+defect runs 1, typed error none
+repeat_or_else: 0
+schedule: 2
+schedule_from: 6
+slept

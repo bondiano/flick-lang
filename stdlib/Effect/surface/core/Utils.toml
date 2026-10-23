@@ -1,0 +1,2 @@
+[excluded]
+"*" = "TS-only: generator adapters for `Effect.gen`; Flick has direct calls"

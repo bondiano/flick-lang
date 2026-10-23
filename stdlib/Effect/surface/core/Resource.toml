@@ -1,0 +1,7 @@
+[pending]
+Resource = "M20"
+auto = "M20"
+get = "M20"
+isResource = "M20"
+manual = "M20"
+refresh = "M20"

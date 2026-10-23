@@ -1,0 +1,16 @@
+[excluded]
+TypeId = "TS-only: a type identifier"
+
+[pending]
+CurrentErrorReporters = "M20"
+ErrorReporter = "M20"
+Reportable = "M20"
+attributes = "M20"
+getAttributes = "M20"
+getSeverity = "M20"
+ignore = "M20"
+isIgnored = "M20"
+layer = "M20"
+make = "M20"
+report = "M20"
+severity = "M20"

@@ -1,0 +1,13 @@
+[pending]
+CliError = "M22"
+DuplicateOption = "M22"
+InvalidValue = "M22"
+MissingArgument = "M22"
+MissingOption = "M22"
+NonShowHelpErrors = "M22"
+ShowHelp = "M22"
+UnexpectedArgument = "M22"
+UnknownSubcommand = "M22"
+UnrecognizedOption = "M22"
+UserError = "M22"
+isCliError = "M22"

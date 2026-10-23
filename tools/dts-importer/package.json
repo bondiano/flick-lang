@@ -1,7 +1,7 @@
 {
   "name": "@flick-lang/dts-importer",
   "version": "0.1.0",
-  "description": "Reads the .d.ts of an installed package for `flick ffi import`",
+  "description": "Reads the .d.ts of an installed package for `flick ffi import` and the surface of Effect for the coverage linter",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -16,5 +16,8 @@
     "delay": "7.0.0",
     "get-port": "7.2.0",
     "p-map": "7.1.1"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
   }
 }

@@ -1,0 +1,10 @@
+[pending]
+HashRing = "M20"
+add = "M20"
+addMany = "M20"
+get = "M20"
+getShards = "M20"
+has = "M20"
+isHashRing = "M20"
+make = "M20"
+remove = "M20"

@@ -1,0 +1,12 @@
+[pending]
+Equivalence = "M20"
+LogLevel = "M20"
+Order = "M20"
+Severity = "M20"
+getOrdinal = "M20"
+isEnabled = "M20"
+isGreaterThan = "M20"
+isGreaterThanOrEqualTo = "M20"
+isLessThan = "M20"
+isLessThanOrEqualTo = "M20"
+values = "M20"

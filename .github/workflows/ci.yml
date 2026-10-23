@@ -21,5 +21,6 @@ jobs:
           node-version: 24.18.0
           cache: pnpm
       - run: just check
+      - run: just effect-coverage >> "$GITHUB_STEP_SUMMARY"
       - run: just e2e
       - run: just e2e-postgres

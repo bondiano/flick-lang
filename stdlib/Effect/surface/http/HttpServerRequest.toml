@@ -1,0 +1,23 @@
+[excluded]
+TypeId = "TS-only: a type identifier"
+
+[pending]
+HttpServerRequest = "M21"
+MaxBodySize = "M21"
+ParsedSearchParams = "M21"
+fromClientRequest = "M21"
+fromWeb = "M21"
+schemaBodyForm = "M21"
+schemaBodyFormJson = "M21"
+schemaBodyJson = "M21"
+schemaBodyMultipart = "M21"
+schemaBodyUrlParams = "M21"
+schemaCookies = "M21"
+schemaHeaders = "M21"
+schemaSearchParams = "M21"
+searchParamsFromURL = "M21"
+toClientRequest = "M21"
+toURL = "M21"
+toWeb = "M21"
+toWebResult = "M21"
+upgradeChannel = "M21"

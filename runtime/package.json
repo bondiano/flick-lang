@@ -16,6 +16,10 @@
     "./sql": {
       "types": "./dist/sql/index.d.ts",
       "default": "./dist/sql/index.js"
+    },
+    "./effect/*": {
+      "types": "./dist/effect/*.d.ts",
+      "default": "./dist/effect/*.js"
     }
   },
   "files": [

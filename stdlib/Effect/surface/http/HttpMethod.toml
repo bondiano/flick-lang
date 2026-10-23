@@ -1,0 +1,6 @@
+[pending]
+HttpMethod = "M21"
+all = "M21"
+allShort = "M21"
+hasBody = "M21"
+isHttpMethod = "M21"

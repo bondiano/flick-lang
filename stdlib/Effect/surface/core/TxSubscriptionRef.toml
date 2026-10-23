@@ -1,0 +1,13 @@
+[pending]
+TxSubscriptionRef = "M20"
+changes = "M20"
+changesStream = "M20"
+get = "M20"
+getAndSet = "M20"
+getAndUpdate = "M20"
+isTxSubscriptionRef = "M20"
+make = "M20"
+modify = "M20"
+set = "M20"
+update = "M20"
+updateAndGet = "M20"

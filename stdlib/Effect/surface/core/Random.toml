@@ -1,0 +1,10 @@
+[pending]
+Random = "M20"
+choice = "M20"
+next = "M20"
+nextBetween = "M20"
+nextBoolean = "M20"
+nextInt = "M20"
+nextIntBetween = "M20"
+shuffle = "M20"
+withSeed = "M20"

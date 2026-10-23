@@ -1,0 +1,15 @@
+[excluded]
+TypeId = "TS-only: a type identifier"
+
+[pending]
+AttemptFailure = "M20"
+AttemptStart = "M20"
+AttemptSuccess = "M20"
+ConfigBase = "M20"
+CurrentMetadata = "M20"
+Event = "M20"
+ExecutionPlan = "M20"
+Metadata = "M20"
+isExecutionPlan = "M20"
+make = "M20"
+merge = "M20"

@@ -1,0 +1,13 @@
+// The tail of a row names a row: an applied type there used to send the
+// region checker into exponential work.
+module App.RowTail exposing (open_file)
+
+type File (s : Region)
+
+service A =
+  ping : Unit ->{} Unit
+
+open_file : forall s. String ->{A | p s;} File s
+//                                  ^^^ FLICK-T002 the tail of a row is a row variable
+foreign effect open_file from "./files.js" "open"
+  retention call

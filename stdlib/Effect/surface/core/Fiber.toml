@@ -1,0 +1,13 @@
+[pending]
+Fiber = "M20"
+await = "M20"
+awaitAll = "M20"
+getCurrent = "M20"
+interrupt = "M20"
+interruptAll = "M20"
+interruptAllAs = "M20"
+interruptAs = "M20"
+isFiber = "M20"
+join = "M20"
+joinAll = "M20"
+runIn = "M20"

@@ -1,0 +1,2 @@
+[excluded]
+"*" = "TS-only: higher-kinded type encoding; Flick has kinds"

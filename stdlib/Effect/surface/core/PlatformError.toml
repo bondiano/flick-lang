@@ -1,0 +1,8 @@
+[pending]
+BadArgument = "M20"
+PlatformError = "M20"
+SystemError = "M20"
+SystemErrorTag = "M20"
+badArgument = "M20"
+isPlatformError = "M20"
+systemError = "M20"

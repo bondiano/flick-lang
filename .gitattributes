@@ -1,0 +1,3 @@
+stdlib/Effect/snapshot.json linguist-generated=true
+tools/dts-importer/test/fixtures/**/*.snapshot.json linguist-generated=true
+tools/dts-importer/test/fixtures/*.snapshot.json linguist-generated=true

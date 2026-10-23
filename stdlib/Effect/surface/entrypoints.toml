@@ -1,0 +1,25 @@
+# Each entrypoint of the pinned `effect` package: its modules are classified
+# export by export under `modules`, or it is excluded as a whole.
+
+"effect" = { modules = "core" }
+"effect/ai" = { excluded = "AI provider clients are outside the 0.1.0 standard library" }
+"effect/cli" = { modules = "cli" }
+"effect/cluster" = { excluded = "distributed entities and sharding are outside 0.1.0" }
+"effect/devtools" = { excluded = "a developer-tools protocol, not a library surface" }
+"effect/encoding" = { excluded = "byte encodings are outside the 0.1.0 standard library" }
+"effect/eventlog" = { excluded = "event-sourcing infrastructure is outside 0.1.0" }
+"effect/graphql" = { excluded = "GraphQL is outside the 0.1.0 standard library" }
+"effect/http" = { modules = "http" }
+"effect/http-api" = { modules = "http-api" }
+"effect/net" = { excluded = "sockets and networking below HTTP are outside 0.1.0" }
+"effect/observability" = { excluded = "exporters for observability backends are outside 0.1.0" }
+"effect/persistence" = { excluded = "persistence backends are outside 0.1.0" }
+"effect/process" = { excluded = "child processes are outside the 0.1.0 standard library" }
+"effect/reactivity" = { excluded = "reactive keys for UI caches are outside 0.1.0" }
+"effect/rpc" = { excluded = "RPC protocols are outside 0.1.0" }
+"effect/schema" = { excluded = "Flick's Schema and codecs (M11) cover schemas; this entrypoint's extras are outside 0.1.0" }
+"effect/socket" = { excluded = "sockets are outside the 0.1.0 standard library" }
+"effect/sql" = { excluded = "Flick's SQL eDSL (M13) has its own PostgreSQL driver" }
+"effect/testing" = { excluded = "Flick tests run through `flick test` and the Test module" }
+"effect/workers" = { excluded = "worker threads are outside the 0.1.0 standard library" }
+"effect/workflow" = { excluded = "durable workflows are outside 0.1.0" }

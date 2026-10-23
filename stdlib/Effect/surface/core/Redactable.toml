@@ -1,0 +1,6 @@
+[pending]
+Redactable = "M20"
+getRedacted = "M20"
+isRedactable = "M20"
+redact = "M20"
+symbolRedactable = "M20"

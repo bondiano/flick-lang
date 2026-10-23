@@ -1,0 +1,15 @@
+[excluded]
+TypeId = "TS-only: a type identifier"
+
+[pending]
+HttpClientResponse = "M21"
+filterStatus = "M21"
+filterStatusOk = "M21"
+fromWeb = "M21"
+matchStatus = "M21"
+schemaBodyJson = "M21"
+schemaBodyUrlParams = "M21"
+schemaHeaders = "M21"
+schemaJson = "M21"
+schemaNoBody = "M21"
+stream = "M21"

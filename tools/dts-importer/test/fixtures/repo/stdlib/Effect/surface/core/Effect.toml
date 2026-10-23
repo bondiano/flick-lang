@@ -1,0 +1,3 @@
+[language]
+gen = "direct calls"
+sync = "a pure function where a runtime one is expected"

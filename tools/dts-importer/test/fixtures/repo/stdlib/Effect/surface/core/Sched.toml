@@ -1,0 +1,6 @@
+[wrapped]
+spaced = "Sched.spaced eff66506c8d77152"
+forever = "Sched.forever 45883391242a65f7"
+[excluded]
+Sched = "an opaque type"
+removed = "gone in the next release"

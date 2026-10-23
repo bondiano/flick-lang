@@ -9,8 +9,10 @@ use crate::resolve::{self, Module};
 use crate::source::SourceMap;
 use crate::syntax;
 
-/// In dependency order: each module sees the ones before it.
-const SOURCES: [(&str, &str); 43] = [
+/// In dependency order: each module sees the ones before it. The modules
+/// over Effect sit in blocks by area, each module where its dependencies
+/// are already in.
+const SOURCES: &[(&str, &str)] = &[
     ("Prelude", include_str!("builtins/Prelude.fl")),
     ("Instances", include_str!("builtins/Instances.fl")),
     ("Record", include_str!("builtins/Record.fl")),
@@ -54,11 +56,39 @@ const SOURCES: [(&str, &str); 43] = [
     ("Sql", include_str!("builtins/Sql.fl")),
     ("Database", include_str!("builtins/Database.fl")),
     ("Test", include_str!("builtins/Test.fl")),
+    // Effect: values and classes
+    // end of Effect: values and classes
+    // Effect: lists and records
+    // end of Effect: lists and records
+    // Effect: collections
+    // end of Effect: collections
+    // Effect: time
+    // end of Effect: time
+    // Effect: concurrency
+    // end of Effect: concurrency
+    // Effect: transactions
+    // end of Effect: transactions
+    // Effect: schema
+    // end of Effect: schema
+    // Effect: platform and observability
+    // end of Effect: platform and observability
+    // Effect: context, layers and requests
+    // end of Effect: context, layers and requests
+    // Effect: effects, schedules and fibers
+    ("Schedule", include_str!("builtins/Schedule.fl")),
+    ("Effect", include_str!("builtins/Effect.fl")),
+    // end of Effect: effects, schedules and fibers
+    // Effect: streams
+    // end of Effect: streams
+    // Effect: HTTP
+    // end of Effect: HTTP
+    // Effect: CLI
+    // end of Effect: CLI
 ];
 
 /// Names and sources of the built-in modules, in dependency order.
 pub fn builtin_sources() -> &'static [(&'static str, &'static str)] {
-    &SOURCES
+    SOURCES
 }
 
 /// Interfaces of the built-in modules.
@@ -66,7 +96,7 @@ pub fn builtins() -> &'static [Interface] {
     static BUILTINS: OnceLock<Vec<Interface>> = OnceLock::new();
     BUILTINS.get_or_init(|| {
         let mut done: Vec<Interface> = Vec::new();
-        for (name, text) in SOURCES {
+        for &(name, text) in SOURCES {
             let mut sources = SourceMap::default();
             let file = sources.add(format!("<builtin>/{name}.fl"), text);
             let parse = syntax::parse(text, file);
@@ -78,7 +108,8 @@ pub fn builtins() -> &'static [Interface] {
                 tree: &parse.tree,
                 syntax: &module_syntax,
             };
-            let imported = |_: &str| None;
+            // a facade re-exports the names of the modules before it
+            let imported = |m: &str| done.iter().find(|i| i.module == m).cloned();
             let (mut interface, mut diagnostics) = resolve::resolve(&module, &imported);
             diagnostics.extend(parse.diagnostics);
             // the built-in modules are one package
@@ -106,59 +137,17 @@ pub fn builtins() -> &'static [Interface] {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     #[test]
     fn builtins_check_cleanly() {
         let names: Vec<&str> = super::builtins()
             .iter()
             .map(|i| i.module.as_str())
             .collect();
-        assert_eq!(
-            names,
-            [
-                "Prelude",
-                "Instances",
-                "Record",
-                "Ref",
-                "String",
-                "Number",
-                "Platform",
-                "App",
-                "Layer",
-                "Fiber",
-                "RawCause",
-                "Failure",
-                "Exit",
-                "Option",
-                "Result",
-                "List",
-                "NonEmpty",
-                "Chunk",
-                "Js.Array",
-                "Js",
-                "JsError",
-                "BigInt",
-                "Redacted",
-                "BigDecimal",
-                "Duration",
-                "EqHash",
-                "HashSet",
-                "HashMap",
-                "Loop",
-                "Log",
-                "File",
-                "Resource",
-                "Events",
-                "Ui",
-                "Ui.Event",
-                "Gen",
-                "Checks",
-                "Schema",
-                "Codec",
-                "Json",
-                "Sql",
-                "Database",
-                "Test"
-            ]
-        );
+        let sources: Vec<&str> = super::SOURCES.iter().map(|(n, _)| *n).collect();
+        assert_eq!(names, sources);
+        assert_eq!(names.iter().collect::<BTreeSet<_>>().len(), names.len());
+        assert_eq!(names[..2], ["Prelude", "Instances"]);
     }
 }

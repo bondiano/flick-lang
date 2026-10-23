@@ -1,0 +1,2 @@
+[excluded]
+"*" = "TS-only: method-chaining `pipe`; Flick has `|>`"

@@ -45,3 +45,12 @@ check: lint test
 # Regenerate the tree-sitter grammar Zed uses and run its corpus tests
 tree-sitter:
     cd editors/tree-sitter-flick && tree-sitter generate && tree-sitter test
+
+# Move to another Effect release: new surface snapshot, report, pins; the coverage linter stays red until review
+effect-bump version:
+    node tools/dts-importer/bump.mjs {{version}}
+
+# Print the Effect coverage counters by status and module
+effect-coverage:
+    @cargo test -q -p flick-core --test effect_surface the_manifest_classifies > /dev/null
+    @cat target/tmp/effect-coverage.md

@@ -1,0 +1,8 @@
+[pending]
+Newtype = "M20"
+makeCombiner = "M20"
+makeEquivalence = "M20"
+makeIso = "M20"
+makeOrder = "M20"
+makeReducer = "M20"
+value = "M20"

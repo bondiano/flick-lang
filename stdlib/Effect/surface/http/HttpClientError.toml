@@ -1,0 +1,13 @@
+[pending]
+DecodeError = "M21"
+EmptyBodyError = "M21"
+EncodeError = "M21"
+HttpClientError = "M21"
+HttpClientErrorReason = "M21"
+HttpClientErrorSchema = "M21"
+InvalidUrlError = "M21"
+RequestError = "M21"
+ResponseError = "M21"
+StatusCodeError = "M21"
+TransportError = "M21"
+isHttpClientError = "M21"

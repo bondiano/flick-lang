@@ -1,0 +1,6 @@
+[pending]
+MaxOpsBeforeYield = "M20"
+MixedScheduler = "M20"
+PreventSchedulerYield = "M20"
+Scheduler = "M20"
+SchedulerDispatcher = "M20"

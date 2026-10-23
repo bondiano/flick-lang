@@ -1,0 +1,9 @@
+[pending]
+Compression = "M21"
+CompressionAlgorithm = "M21"
+CompressionOptions = "M21"
+HttpPlatform = "M21"
+compressionTransformWeb = "M21"
+layer = "M21"
+make = "M21"
+makeCompressionWeb = "M21"

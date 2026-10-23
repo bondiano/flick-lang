@@ -1,0 +1,12 @@
+[pending]
+Semaphore = "M20"
+make = "M20"
+makeUnsafe = "M20"
+release = "M20"
+releaseAll = "M20"
+resize = "M20"
+take = "M20"
+takeIfAvailable = "M20"
+withPermit = "M20"
+withPermits = "M20"
+withPermitsIfAvailable = "M20"

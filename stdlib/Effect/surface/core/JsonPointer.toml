@@ -1,0 +1,5 @@
+[pending]
+escapeToken = "M20"
+formatUriFragment = "M20"
+parseUriFragment = "M20"
+unescapeToken = "M20"

@@ -1,0 +1,7 @@
+[pending]
+Respondable = "M21"
+isRespondable = "M21"
+symbol = "M21"
+toResponse = "M21"
+toResponseOrElse = "M21"
+toResponseOrElseDefect = "M21"

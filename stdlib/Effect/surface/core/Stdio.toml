@@ -1,0 +1,7 @@
+[excluded]
+TypeId = "TS-only: a type identifier"
+
+[pending]
+Stdio = "M20"
+layerTest = "M20"
+make = "M20"

@@ -1,0 +1,21 @@
+[excluded]
+TypeId = "TS-only: a type identifier"
+
+[pending]
+CurrentRedactedNames = "M21"
+Equivalence = "M21"
+Headers = "M21"
+Input = "M21"
+empty = "M21"
+fromInput = "M21"
+fromRecordUnsafe = "M21"
+get = "M21"
+has = "M21"
+isHeaders = "M21"
+isRedactedName = "M21"
+merge = "M21"
+redact = "M21"
+remove = "M21"
+removeMany = "M21"
+set = "M21"
+setAll = "M21"

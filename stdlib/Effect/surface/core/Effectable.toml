@@ -1,0 +1,2 @@
+[excluded]
+"*" = "TS-only: prototypes to make classes yieldable"

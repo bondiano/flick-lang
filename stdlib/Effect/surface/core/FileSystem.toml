@@ -1,0 +1,15 @@
+[excluded]
+FileTypeId = "TS-only: a type identifier"
+
+[pending]
+File = "M20"
+FileSystem = "M20"
+OpenFlag = "M20"
+SeekMode = "M20"
+WatchBackend = "M20"
+WatchEvent = "M20"
+WatchOptions = "M20"
+isFile = "M20"
+layerNoop = "M20"
+make = "M20"
+makeNoop = "M20"

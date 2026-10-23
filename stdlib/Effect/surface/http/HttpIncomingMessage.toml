@@ -1,0 +1,12 @@
+[excluded]
+TypeId = "TS-only: a type identifier"
+
+[pending]
+HttpIncomingMessage = "M21"
+JsonOptions = "M21"
+MaxBodySize = "M21"
+inspect = "M21"
+isHttpIncomingMessage = "M21"
+schemaBodyJson = "M21"
+schemaBodyUrlParams = "M21"
+schemaHeaders = "M21"
