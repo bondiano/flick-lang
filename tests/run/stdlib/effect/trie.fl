@@ -1,0 +1,43 @@
+// Effect's `Trie`: string keys in order, prefix queries, persistent updates.
+module App.Main exposing (main)
+
+words : Trie.Trie Number
+let words = Trie.from_list [("she", 1), ("shells", 2), ("sea", 3), ("sells", 4)]
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line ("entries: " ++ show (Trie.entries words))
+  Platform.stdout_line ("keys: " ++ show (Trie.keys words))
+  Platform.stdout_line ("values: " ++ show (Trie.values words))
+  Platform.stdout_line
+    ("size: " ++ show (Trie.size words, Trie.is_empty words, Trie.is_empty Trie.empty))
+  Platform.stdout_line
+    ("get: " ++ show (Trie.get "sea" words, Trie.get "se" words, Trie.has "she" words))
+  Platform.stdout_line ("prefix sh: " ++ show (Trie.keys_with_prefix "sh" words))
+  Platform.stdout_line
+    (
+      "prefix se: "
+        ++ show (Trie.values_with_prefix "se" words, Trie.entries_with_prefix "sel" words)
+    )
+  Platform.stdout_line
+    ("longest prefix: "
+      ++ show (Trie.longest_prefix_of "shellfish" words, Trie.longest_prefix_of "x" words))
+  let more = words |> Trie.insert "shore" 5 |> Trie.insert_many [("sun", 6), ("she", 10)]
+  Platform.stdout_line ("inserted: " ++ show (Trie.entries more))
+  Platform.stdout_line ("original kept: " ++ show (Trie.get "she" words))
+  Platform.stdout_line
+    ("removed: " ++ show (Trie.keys (Trie.remove_many ["sun", "sea"] (Trie.remove "shore" more))))
+  Platform.stdout_line
+    ("modify: " ++ show (Trie.get "sea" (Trie.modify "sea" (fun n -> n * 100) words)))
+  Platform.stdout_line
+    ("reduce: " ++ Trie.reduce "" (fun acc n key -> acc ++ key ++ "=" ++ show n ++ ";") words)
+  Platform.stdout_line
+    ("map: " ++ show (Trie.entries (Trie.map (fun n key -> String.length key + n) words)))
+  Platform.stdout_line ("filter: " ++ show (Trie.keys (Trie.filter (fun n _ -> n % 2 == 0) words)))
+  let halves = Trie.filter_map (fun n key -> if n % 2 == 0 then Ok (key ++ "!") else Err ()) words
+  Platform.stdout_line ("filter_map: " ++ show (Trie.entries halves))
+  let options = Trie.from_list [("a", Some 1), ("b", None), ("c", Some 3)]
+  Platform.stdout_line ("compact: " ++ show (Trie.entries (Trie.compact options)))
+  let seen = Ref.make []
+  Trie.for_each (fun n key -> Ref.set seen (Ref.get seen ++ [key])) words
+  Platform.stdout_line ("for_each: " ++ show (Ref.get seen))

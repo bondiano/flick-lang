@@ -1,11 +1,3 @@
-[pending]
-MutableHashSet = "M20"
-add = "M20"
-clear = "M20"
-empty = "M20"
-fromIterable = "M20"
-has = "M20"
-isMutableHashSet = "M20"
-make = "M20"
-remove = "M20"
-size = "M20"
+[excluded]
+isMutableHashSet = "TS-only: a type guard; Flick values are typed statically"
+"*" = "invariant: an in-place mutable set is shared mutable state outside `Ref`; Flick's `HashSet` is persistent, and a `Ref (HashSet.HashSet w a)` holds a changing one"

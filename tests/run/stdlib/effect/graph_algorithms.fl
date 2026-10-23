@@ -1,0 +1,171 @@
+// Effect's `Graph` algorithms: paths, cycles, connectivity, matching and
+// flows; invalid weights or nodes are a `GraphError`, never a defect.
+module App.Main exposing (main)
+
+res : Show a => Result Graph.GraphError a -> String
+let res r = match r with
+  | Ok a -> "Ok " ++ show a
+  | Err (Graph.GraphError message) -> "Err " ++ message
+
+node : String -> Graph.Graph String e k -> Graph.Graph String e k
+let node name g =
+  let (_, next) = Graph.add_node name g
+  next
+
+edge : Graph.NodeIndex -> Graph.NodeIndex -> e -> Graph.Graph n e k -> Graph.Graph n e k
+let edge s t w g =
+  Result.with_default g (Result.map (fun (_, next) -> next) (Graph.add_edge s t w g))
+
+/// The graph with the nodes, then the edges, added in order.
+build : List String ->
+  List (Graph.NodeIndex, Graph.NodeIndex, Number) ->
+  Graph.Graph String Number k ->
+  Graph.Graph String Number k
+let build names edges g =
+  List.fold_left
+    (fun acc (s, t, w) -> edge s t w acc)
+    (List.fold_left (fun acc n -> node n acc) g names)
+    edges
+
+/// A -1-> B -2-> C -1-> D, and A -5-> C.
+roads : Graph.DirectedGraph String Number
+let roads =
+  build ["A", "B", "C", "D"] [(0, 1, 1), (1, 2, 2), (0, 2, 5), (2, 3, 1)] (Graph.directed ())
+
+/// A square a-b-c-d-a with a tail d-e.
+square : Graph.UndirectedGraph String Number
+let square =
+  build
+    ["a", "b", "c", "d", "e"]
+    [(0, 1, 1), (1, 2, 2), (2, 3, 3), (3, 0, 4), (3, 4, 5)]
+    (Graph.undirected ())
+
+path : Result Graph.GraphError (Option (Graph.PathResult Number)) -> String
+let path r =
+  res
+    (Result.map
+      (Option.map (fun (p : Graph.PathResult Number) -> (p.path, p.edges, p.distance, p.costs)))
+      r)
+
+paths : Result Graph.GraphError (Graph.PathWalker Number) -> String
+let paths r =
+  res (Result.map (List.map (fun (p : Graph.PathResult Number) -> (p.path, p.distance))) r)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let cheap : Graph.DijkstraConfig Number = { source = 0; target = 3; cost = fun w -> w }
+  Platform.stdout_line ("dijkstra: " ++ path (Graph.dijkstra cheap roads))
+  Platform.stdout_line
+    ("dijkstra, negative: "
+      ++ path (Graph.dijkstra { source = 0; target = 3; cost = fun w -> 0 - w } roads))
+  Platform.stdout_line
+    ("dijkstra, missing: "
+      ++ path (Graph.dijkstra { source = 0; target = 9; cost = fun w -> w } roads))
+  Platform.stdout_line
+    ("dijkstra, unreachable: "
+      ++ path (Graph.dijkstra { source = 3; target = 0; cost = fun w -> w } roads))
+  let guided : Graph.AstarConfig Number String =
+    { source = 0; target = 3; cost = fun w -> w; heuristic = fun s t -> if s == t then 0 else 1 }
+  Platform.stdout_line ("astar: " ++ path (Graph.astar guided roads))
+  let signed : Graph.BellmanFordConfig Number = { source = 0; target = 3; cost = fun w -> w - 2 }
+  Platform.stdout_line ("bellman_ford: " ++ path (Graph.bellman_ford signed roads))
+  let looped = edge 3 0 1 roads
+  Platform.stdout_line
+    ("bellman_ford, negative cycle: "
+      ++ path (Graph.bellman_ford { source = 0; target = 3; cost = fun _ -> 0 - 1 } looped))
+  let all : Result Graph.GraphError (Graph.AllPairsResult Number) =
+    Graph.floyd_warshall (fun w -> w) roads
+  Platform.stdout_line
+    ("floyd_warshall: "
+      ++ res (Result.map (fun (r : Graph.AllPairsResult Number) -> List.take 1 r.distances) all))
+  Platform.stdout_line
+    ("  paths from A: "
+      ++ res (Result.map (fun (r : Graph.AllPairsResult Number) -> List.take 1 r.paths) all))
+  Platform.stdout_line
+    ("  edges, costs: "
+      ++ res
+        (Result.map
+          (fun (r : Graph.AllPairsResult Number) -> (List.take 1 r.edges, List.take 1 r.costs))
+          all))
+  let simple : Graph.SimplePathsConfig = { source = 0; target = 3; limit = None }
+  Platform.stdout_line ("simple_paths: " ++ paths (Graph.simple_paths simple roads))
+  Platform.stdout_line
+    ("simple_paths, limit 1: "
+      ++ paths (Graph.simple_paths { source = 0; target = 3; limit = Some 1 } roads))
+  let tied = edge 0 2 3 roads
+  let shortest : Graph.AllShortestPathsConfig Number =
+    { source = 0; target = 3; cost = fun w -> w; limit = None }
+  Platform.stdout_line ("all_shortest_paths: " ++ paths (Graph.all_shortest_paths shortest tied))
+  let reach : Graph.ReachabilityConfig = { direction = None }
+  Platform.stdout_line ("unweighted_distances: " ++ res (Graph.unweighted_distances 0 reach roads))
+  Platform.stdout_line
+    ("has_path: "
+      ++ res (Graph.has_path 3 0 reach roads)
+      ++ " "
+      ++ res (Graph.has_path 3 0 { direction = Some Graph.both_ways } roads)
+      ++ " "
+      ++ res (Graph.has_path 0 7 reach roads))
+  let cycle : Option Graph.CycleResult = Graph.find_cycle looped
+  Platform.stdout_line ("find_cycle: " ++ show (cycle, Graph.find_cycle roads))
+  Platform.stdout_line ("acyclic: " ++ show (Graph.is_acyclic roads, Graph.is_acyclic looped))
+  Platform.stdout_line
+    ("components: "
+      ++ show (Graph.weakly_connected_components roads, Graph.strongly_connected_components looped))
+  Platform.stdout_line
+    ("connected: "
+      ++ show
+        (
+          Graph.is_weakly_connected roads,
+          Graph.is_strongly_connected roads,
+          Graph.is_strongly_connected looped
+        ))
+  Platform.stdout_line
+    ("transitive_reduction: "
+      ++ res (Result.map Graph.edge_count (Graph.transitive_reduction roads))
+      ++ " "
+      ++ res (Result.map Graph.edge_count (Graph.transitive_reduction looped)))
+  let capacity : Graph.MaximumFlowConfig Number = { source = 0; target = 3; capacity = fun w -> w }
+  let flow : Result Graph.GraphError Graph.MaximumFlowResult = Graph.maximum_flow capacity roads
+  Platform.stdout_line ("maximum_flow: " ++ res flow)
+  let cut : Result Graph.GraphError Graph.MinimumCutResult = Graph.minimum_cut capacity roads
+  Platform.stdout_line ("minimum_cut: " ++ res cut)
+  Platform.stdout_line
+    ("maximum_flow, missing: "
+      ++ res (Graph.maximum_flow { source = 0; target = 8; capacity = fun w -> w } roads))
+  Platform.stdout_line
+    ("undirected: "
+      ++ show (Graph.connected_components square, Graph.is_connected square, Graph.is_tree square))
+  Platform.stdout_line
+    ("degree: " ++ res (Graph.degree 3 square) ++ " " ++ res (Graph.degree 9 square))
+  Platform.stdout_line
+    ("bridges: "
+      ++ show
+        (
+          Graph.bridges square,
+          Graph.articulation_points square,
+          Graph.biconnected_components square
+        ))
+  let triangle =
+    Graph.undirected ()
+    |> node "x"
+    |> node "y"
+    |> node "z"
+    |> edge 0 1 1
+    |> edge 1 2 1
+    |> edge 2 0 1
+  Platform.stdout_line
+    ("bipartite: " ++ show (Graph.is_bipartite square, Graph.is_bipartite triangle))
+  let matching : Result Graph.GraphError (List Graph.BipartiteMatch) =
+    Graph.maximum_bipartite_matching square
+  Platform.stdout_line
+    ("matching: "
+      ++ res (Result.map List.length matching)
+      ++ " "
+      ++ res (Graph.maximum_bipartite_matching triangle))
+  let forest = Graph.minimum_spanning_forest (fun w -> w) square
+  Platform.stdout_line
+    ("minimum_spanning_forest: "
+      ++ res (Result.map (fun g -> (Graph.edge_count g, Graph.is_tree g)) forest))
+  Platform.stdout_line
+    ("  NaN weight: "
+      ++ res (Result.map Graph.edge_count (Graph.minimum_spanning_forest (fun _ -> 0 / 0) square)))

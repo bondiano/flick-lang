@@ -1,0 +1,35 @@
+// Effect's `MutableRef` operations, on Flick's runtime cells `Ref`.
+module App.Main exposing (main)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let cell : Ref Number = Ref.make 1
+  Ref.set cell 2
+  Ref.update cell (fun n -> n * 10)
+  Platform.stdout_line ("update: " ++ show (Ref.get cell))
+  let after = Ref.update_and_get cell (fun n -> n + 1)
+  let before = Ref.get_and_update cell (fun n -> n + 1)
+  Platform.stdout_line ("update_and_get, get_and_update: " ++ show (after, before, Ref.get cell))
+  let old = Ref.get_and_set cell 5
+  let now = Ref.set_and_get cell 6
+  Platform.stdout_line ("get_and_set, set_and_get: " ++ show (old, now))
+  let swapped = Ref.compare_and_set cell 6 7
+  let missed = Ref.compare_and_set cell 6 8
+  Platform.stdout_line ("compare_and_set: " ++ show (swapped, missed, Ref.get cell))
+  Ref.increment cell
+  Ref.increment cell
+  Ref.decrement cell
+  Platform.stdout_line ("increment, decrement: " ++ show (Ref.get cell))
+  let counts =
+    (
+      Ref.increment_and_get cell,
+      Ref.get_and_increment cell,
+      Ref.decrement_and_get cell,
+      Ref.get_and_decrement cell
+    )
+  Platform.stdout_line ("counters: " ++ show counts ++ " -> " ++ show (Ref.get cell))
+  let flag = Ref.make false
+  Ref.toggle flag
+  let once = Ref.get flag
+  Ref.toggle flag
+  Platform.stdout_line ("toggle: " ++ show (once, Ref.get flag))

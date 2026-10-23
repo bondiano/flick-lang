@@ -1,10 +1,12 @@
-[pending]
-HashRing = "M20"
-add = "M20"
-addMany = "M20"
-get = "M20"
-getShards = "M20"
-has = "M20"
-isHashRing = "M20"
-make = "M20"
-remove = "M20"
+[wrapped]
+HashRing = "HashRing.HashRing e88f2dd04322af26"
+add = "HashRing.add e2fa54cf4ca24789"
+addMany = "HashRing.add_many f1f3be499d77f7bc"
+get = "HashRing.get 89547da67ed27e82"
+getShards = "HashRing.get_shards 0511a769213f28e7"
+has = "HashRing.has 51520b8f167d0c0f"
+make = "HashRing.make b3f579cc8b7cb11f"
+remove = "HashRing.remove ee463ac747bcee19"
+
+[excluded]
+isHashRing = "TS-only: a type guard; Flick values are typed statically"

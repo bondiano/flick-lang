@@ -1,0 +1,30 @@
+dijkstra: Ok Some ([0, 1, 2, 3], [0, 1, 3], 4, [1, 2, 1])
+dijkstra, negative: Err Dijkstra's algorithm requires non-negative edge weights
+dijkstra, missing: Err Node 9 does not exist
+dijkstra, unreachable: Ok None
+astar: Ok Some ([0, 1, 2, 3], [0, 1, 3], 4, [1, 2, 1])
+bellman_ford: Ok Some ([0, 1, 2, 3], [0, 1, 3], -2, [1, 2, 1])
+bellman_ford, negative cycle: Err Negative cycle affects path to node 3
+floyd_warshall: Ok [(0, [(0, 0), (1, 1), (2, 3), (3, 4)])]
+  paths from A: Ok [(0, [(0, Some [0]), (1, Some [0, 1]), (2, Some [0, 1, 2]), (3, Some [0, 1, 2, 3])])]
+  edges, costs: Ok ([(0, [(0, []), (1, [0]), (2, [0, 1]), (3, [0, 1, 3])])], [(0, [(0, []), (1, [1]), (2, [1, 2]), (3, [1, 2, 1])])])
+simple_paths: Ok [([0, 1, 2, 3], 3), ([0, 2, 3], 2)]
+simple_paths, limit 1: Ok [([0, 1, 2, 3], 3)]
+all_shortest_paths: Ok [([0, 2, 3], 4), ([0, 1, 2, 3], 4)]
+unweighted_distances: Ok [(0, 0), (1, 1), (2, 1), (3, 2)]
+has_path: Ok false Ok true Err Node 7 does not exist
+find_cycle: (Some { edges = [0, 1, 3, 4], path = [0, 1, 2, 3, 0] }, None)
+acyclic: (true, false)
+components: ([[0, 2, 1, 3]], [[0, 3, 2, 1]])
+connected: (true, false, true)
+transitive_reduction: Ok 3 Err Cannot transitively reduce cyclic graph
+maximum_flow: Ok { cut = [3], flows = [(0, 0), (1, 0), (2, 1), (3, 1)], value = 1 }
+minimum_cut: Ok { edges = [3], source = [0, 1, 2], target = [3], value = 1 }
+maximum_flow, missing: Err Node 8 does not exist
+undirected: ([[0, 3, 4, 2, 1]], true, false)
+degree: Ok 3 Err Node 9 does not exist
+bridges: ([4], [3], [[0, 1, 2, 3], [3, 4]])
+bipartite: (true, false)
+matching: Ok 2 Err Cannot find bipartite matching of non-bipartite graph
+minimum_spanning_forest: Ok (4, true)
+  NaN weight: Err Minimum spanning forest does not support NaN or -Infinity edge weights

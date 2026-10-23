@@ -1,0 +1,244 @@
+/// The types of `Graph`: the graph, its indices, edges, snapshots, the
+/// options of its algorithms and their results. Records keep Effect's field
+/// names; string literal unions of Effect are unboxed strings with a value
+/// per literal.
+module Graph.Types exposing (..)
+
+/// An immutable graph with node data `n`, edge data `e`, and kind `k`:
+/// `Directed` or `Undirected`.
+type Graph n e k
+
+/// The kind of a graph whose edges go from source to target.
+type Directed
+
+/// The kind of a graph whose edges join their nodes both ways.
+type Undirected
+
+/// A graph whose edges go from source to target.
+type alias DirectedGraph n e = Graph n e Directed
+
+/// A graph whose edges join their nodes both ways.
+type alias UndirectedGraph n e = Graph n e Undirected
+
+/// The kind of a graph as a value, for `Graph.make` and snapshots.
+opaque unboxed type Kind k = Kind String
+
+/// The kind of directed graphs.
+directed_kind : Kind Directed
+let directed_kind = Kind "directed"
+
+/// The kind of undirected graphs.
+undirected_kind : Kind Undirected
+let undirected_kind = Kind "undirected"
+
+/// A node's index: stable while the node is in the graph, never reused.
+type alias NodeIndex = Number
+
+/// An edge's index: stable while the edge is in the graph, never reused.
+type alias EdgeIndex = Number
+
+/// An edge: its endpoints and data.
+type alias Edge e = { source : NodeIndex; target : NodeIndex; data : e }
+
+/// A node of a snapshot: its index and data.
+type alias IndexedNode n = { index : NodeIndex; data : n }
+
+/// An edge of a snapshot: its index, endpoints and data.
+type alias IndexedEdge e = { index : EdgeIndex; source : NodeIndex; target : NodeIndex; data : e }
+
+/// Every node and edge with its index, and the kind: Effect's `type` field
+/// is `graph_type`.
+type alias Snapshot n e k = { graph_type : Kind k; nodes : List (IndexedNode n); edges : List (IndexedEdge e) }
+
+/// What a graph operation rejected: a missing node, an invalid option or
+/// weight, a cycle where none may be.
+type error GraphError = GraphError String
+  deriving Eq, Show
+
+/// Which edges of a directed graph a step follows.
+opaque unboxed type Direction = Direction String
+
+/// Edges from the node.
+outgoing : Direction
+let outgoing = Direction "outgoing"
+
+/// Edges into the node.
+incoming : Direction
+let incoming = Direction "incoming"
+
+/// The edges a traversal follows: one `Direction`, or both.
+opaque unboxed type TraversalDirection = TraversalDirection String
+
+/// Follows the edges of one direction.
+along : Direction -> TraversalDirection
+let along d = match d with
+  | Direction s -> TraversalDirection s
+
+/// Follows edges both ways.
+both_ways : TraversalDirection
+let both_ways = TraversalDirection "undirected"
+
+/// How two graphs tell their nodes and edges apart; `None` is the data
+/// itself.
+type alias IdentityOptions n e ni ei = { nodeIdentity : Option (n -> ni); edgeIdentity : Option (e -> ei) }
+
+/// Within `radius` steps (default 1) of a node, along `direction` (default
+/// outgoing).
+type alias NeighborhoodConfig = { radius : Option Number; direction : Option TraversalDirection }
+
+/// The edges reachability follows (default outgoing).
+type alias ReachabilityConfig = { direction : Option TraversalDirection }
+
+/// Where a search starts, which edges it follows and how many steps.
+type alias SearchConfig =
+  { start : Option (List NodeIndex); direction : Option TraversalDirection; radius : Option Number }
+
+/// Where a topological order starts (default: the nodes without incoming edges).
+type alias TopoConfig = { initials : Option (List NodeIndex) }
+
+/// The direction in which an external node has no edges (default outgoing).
+type alias ExternalsConfig = { direction : Option Direction }
+
+/// A cycle: its nodes, the first repeated at the end, and its edges.
+type alias CycleResult = { path : List NodeIndex; edges : List EdgeIndex }
+
+/// A matched pair of nodes and the edge joining them.
+type alias BipartiteMatch = { left : NodeIndex; right : NodeIndex; edge : EdgeIndex }
+
+/// The source and target of a flow, and the capacity of each edge.
+type alias MaximumFlowConfig e = { source : NodeIndex; target : NodeIndex; capacity : e -> Number }
+
+/// The flow's value, the flow of each edge, and the edges of a minimum cut.
+type alias MaximumFlowResult = { value : Number; flows : List (EdgeIndex, Number); cut : List EdgeIndex }
+
+/// A cut: its value, its edges, and the nodes on each side.
+type alias MinimumCutResult =
+  { value : Number; edges : List EdgeIndex; source : List NodeIndex; target : List NodeIndex }
+
+/// A path: its nodes, its edges, its total cost and the data of its edges.
+type alias PathResult e = { path : List NodeIndex; edges : List EdgeIndex; distance : Number; costs : List e }
+
+/// The endpoints of a path and the non-negative cost of each edge.
+type alias DijkstraConfig e = { source : NodeIndex; target : NodeIndex; cost : e -> Number }
+
+/// The endpoints of a path and the cost of each edge, maybe negative.
+type alias BellmanFordConfig e = { source : NodeIndex; target : NodeIndex; cost : e -> Number }
+
+/// The endpoints, the cost of each edge, and `heuristic node target`, an
+/// estimate of the cost left.
+type alias AstarConfig e n =
+  { source : NodeIndex; target : NodeIndex; cost : e -> Number; heuristic : n -> n -> Number }
+
+/// The endpoints of the paths, and at most how many (default all).
+type alias SimplePathsConfig = { source : NodeIndex; target : NodeIndex; limit : Option Number }
+
+/// The endpoints, the cost of each edge, and at most how many paths
+/// (default all).
+type alias AllShortestPathsConfig e =
+  { source : NodeIndex; target : NodeIndex; cost : e -> Number; limit : Option Number }
+
+/// Distances, paths (`None` where none exists), edges and edge data of the
+/// shortest path between each pair of nodes, by source then target.
+type alias AllPairsResult e =
+  {
+    distances : List (NodeIndex, List (NodeIndex, Number));
+    paths : List (NodeIndex, List (NodeIndex, Option (List NodeIndex)));
+    edges : List (NodeIndex, List (NodeIndex, List EdgeIndex));
+    costs : List (NodeIndex, List (NodeIndex, List e))
+  }
+
+/// The paths an enumeration finds, in order.
+type alias PathWalker e = List (PathResult e)
+
+/// What a traversal visits: entries of an index `t` and data `a`, in order.
+type Walker t a
+
+/// A walk over nodes: their indices and data.
+type alias NodeWalker n = Walker NodeIndex n
+
+/// A walk over edges: their indices and edges.
+type alias EdgeWalker e = Walker EdgeIndex (Edge e)
+
+/// Labels of nodes and edges (default the index), and the graph name.
+type alias GraphVizOptions n e =
+  { nodeLabel : Option (n -> String); edgeLabel : Option (e -> String); graphName : Option String }
+
+/// The shape of a node in a Mermaid diagram.
+opaque unboxed type MermaidNodeShape = MermaidNodeShape String
+
+/// `["…"]`
+rectangle : MermaidNodeShape
+let rectangle = MermaidNodeShape "rectangle"
+
+/// `("…")`
+rounded : MermaidNodeShape
+let rounded = MermaidNodeShape "rounded"
+
+/// `(("…"))`
+circle : MermaidNodeShape
+let circle = MermaidNodeShape "circle"
+
+/// `{"…"}`
+diamond : MermaidNodeShape
+let diamond = MermaidNodeShape "diamond"
+
+/// `{{"…"}}`
+hexagon : MermaidNodeShape
+let hexagon = MermaidNodeShape "hexagon"
+
+/// `(["…"])`
+stadium : MermaidNodeShape
+let stadium = MermaidNodeShape "stadium"
+
+/// `[["…"]]`
+subroutine : MermaidNodeShape
+let subroutine = MermaidNodeShape "subroutine"
+
+/// `[("…")]`
+cylindrical : MermaidNodeShape
+let cylindrical = MermaidNodeShape "cylindrical"
+
+/// The direction a Mermaid diagram flows: `TB`, `TD`, `BT`, `RL` or `LR`.
+opaque unboxed type MermaidDirection = MermaidDirection String
+
+/// `TB`
+top_to_bottom : MermaidDirection
+let top_to_bottom = MermaidDirection "TB"
+
+/// `TD`
+top_down : MermaidDirection
+let top_down = MermaidDirection "TD"
+
+/// `BT`
+bottom_to_top : MermaidDirection
+let bottom_to_top = MermaidDirection "BT"
+
+/// `RL`
+right_to_left : MermaidDirection
+let right_to_left = MermaidDirection "RL"
+
+/// `LR`
+left_to_right : MermaidDirection
+let left_to_right = MermaidDirection "LR"
+
+/// The header of a Mermaid diagram: `flowchart` or `graph`.
+opaque unboxed type MermaidDiagramType = MermaidDiagramType String
+
+/// A `flowchart` diagram.
+flowchart : MermaidDiagramType
+let flowchart = MermaidDiagramType "flowchart"
+
+/// A `graph` diagram.
+graph_diagram : MermaidDiagramType
+let graph_diagram = MermaidDiagramType "graph"
+
+/// Labels and shapes of nodes, labels of edges, the diagram type and its
+/// direction.
+type alias MermaidOptions n e =
+  {
+    nodeLabel : Option (n -> String);
+    edgeLabel : Option (e -> String);
+    diagramType : Option MermaidDiagramType;
+    direction : Option MermaidDirection;
+    nodeShape : Option (n -> MermaidNodeShape)
+  }

@@ -1,0 +1,12 @@
+from_list: ([1, 3, 5, 7], 4)
+member: (true, false, false)
+is_empty: (false, true)
+union: [1, 2, 3, 5, 7]
+intersection: [1]
+difference: [3, 5, 7]
+is_subset: (true, false)
+map: [0, 1, 2]
+filter: [5, 7]
+some, every: (true, true, false)
+reduce: 16
+map into a witness: ["x", "xxx", "xxxxx", "xxxxxxx"]

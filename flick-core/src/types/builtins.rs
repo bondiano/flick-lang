@@ -61,6 +61,17 @@ const SOURCES: &[(&str, &str)] = &[
     // Effect: lists and records
     // end of Effect: lists and records
     // Effect: collections
+    ("Trie", include_str!("builtins/Trie.fl")),
+    ("HashRing", include_str!("builtins/HashRing.fl")),
+    ("Graph.Types", include_str!("builtins/Graph/Types.fl")),
+    ("Graph.Build", include_str!("builtins/Graph/Build.fl")),
+    ("Graph.Query", include_str!("builtins/Graph/Query.fl")),
+    (
+        "Graph.Algorithms",
+        include_str!("builtins/Graph/Algorithms.fl"),
+    ),
+    ("Graph.Walk", include_str!("builtins/Graph/Walk.fl")),
+    ("Graph", include_str!("builtins/Graph.fl")),
     // end of Effect: collections
     // Effect: time
     // end of Effect: time

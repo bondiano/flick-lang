@@ -1,0 +1,114 @@
+// Effect's `HashMap` through Flick's maps, which keep the witness of their keys.
+module App.Main exposing (main)
+
+sorted : HashMap.HashMap w String Number -> List (String, Number)
+let sorted m = List.sort (HashMap.to_list m)
+
+stock : HashMap.HashMap EqHash.Canonical String Number
+let stock = HashMap.from_list EqHash.canonical [("apple", 3), ("pear", 0), ("plum", 7)]
+
+bump : Option Number -> Option Number
+let bump o = match o with
+  | Some n -> Some (n + 1)
+  | None -> Some 1
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line ("from_list: " ++ show (sorted stock))
+  Platform.stdout_line
+    ("empty: "
+      ++ show
+        (
+          HashMap.is_empty stock,
+          HashMap.is_empty (HashMap.empty : HashMap.HashMap EqHash.Canonical String Number)
+        ))
+  Platform.stdout_line
+    ("has: " ++ show (HashMap.has "pear" stock, HashMap.has "kiwi" stock, HashMap.get "plum" stock))
+  Platform.stdout_line
+    ("by hash: "
+      ++ show
+        (
+          HashMap.get_hash "plum" (hash "plum") stock,
+          HashMap.get_hash "plum" (hash "plum" + 1) stock,
+          HashMap.has_hash "apple" (hash "apple") stock
+        ))
+  Platform.stdout_line
+    ("has_by: "
+      ++ show
+        (HashMap.has_by (fun n _ -> n > 5) stock, HashMap.has_by (fun _ k -> k == "kiwi") stock))
+  Platform.stdout_line
+    ("keys, values: " ++ show (List.sort (HashMap.keys stock), List.sort (HashMap.values stock)))
+  let more =
+    stock
+    |> HashMap.modify_at "kiwi" bump
+    |> HashMap.modify_at "apple" bump
+    |> HashMap.modify_at "pear" (fun _ -> None)
+  Platform.stdout_line ("modify_at: " ++ show (sorted more))
+  Platform.stdout_line
+    ("modify_hash: "
+      ++ show (sorted (HashMap.modify_hash "plum" (hash "plum") (fun _ -> None) stock)))
+  Platform.stdout_line
+    ("modify: "
+      ++ show
+        (
+          sorted (HashMap.modify "plum" (fun n -> n * 2) (HashMap.modify "nope" (fun n -> n) stock))
+        ))
+  Platform.stdout_line
+    ("insert, remove: "
+      ++ show (sorted (HashMap.remove "apple" (HashMap.insert "fig" 1 stock)), HashMap.size stock))
+  Platform.stdout_line
+    ("many: "
+      ++ show
+        (sorted
+          (HashMap.insert_many
+            [("fig", 2), ("apple", 9)]
+            (HashMap.remove_many ["pear", "plum"] stock))))
+  Platform.stdout_line
+    ("map: " ++ show (sorted (HashMap.map (fun n k -> n + String.length k) stock)))
+  let split =
+    HashMap.flat_map
+      (fun n k -> HashMap.from_list EqHash.canonical [(k, n), (k ++ "!", n * 10)])
+      stock
+  Platform.stdout_line ("flat_map: " ++ show (sorted split))
+  Platform.stdout_line
+    ("reduce: " ++ show (HashMap.reduce 0 (fun acc n k -> acc + n + String.length k) stock))
+  Platform.stdout_line ("filter: " ++ show (sorted (HashMap.filter (fun n _ -> n > 0) stock)))
+  let options = HashMap.from_list EqHash.canonical [("a", Some 1), ("b", None)]
+  Platform.stdout_line ("compact: " ++ show (sorted (HashMap.compact options)))
+  Platform.stdout_line
+    ("filter_map: "
+      ++ show
+        (sorted (HashMap.filter_map (fun n k -> if n > 0 then Ok (n * 100) else Err k) stock)))
+  Platform.stdout_line
+    ("find_first: "
+      ++ show
+        (
+          HashMap.find_first (fun n _ -> n == 7) stock,
+          HashMap.find_first (fun n _ -> n == 8) stock
+        ))
+  Platform.stdout_line
+    ("some, every: "
+      ++ show
+        (
+          HashMap.some (fun n _ -> n == 0) stock,
+          HashMap.every (fun n _ -> n >= 0) stock,
+          HashMap.every (fun n _ -> n > 0) stock
+        ))
+  Platform.stdout_line
+    ("union: "
+      ++ show
+        (
+          sorted
+            (HashMap.union stock (HashMap.from_list EqHash.canonical [("plum", 1), ("lime", 4)]))
+        ))
+  let total = Ref.make 0
+  HashMap.for_each (fun n _ -> Ref.set total (Ref.get total + n)) stock
+  Platform.stdout_line ("for_each: " ++ show (Ref.get total))
+  let blind =
+    EqHash.with
+      (fun a b -> String.to_lower a == String.to_lower b)
+      (fun s -> hash (String.to_lower s))
+      (fun w ->
+        sorted
+          (HashMap.map (fun n _ -> n + 1) (HashMap.from_list w [("A", 1), ("a", 2), ("B", 3)])))
+  Platform.stdout_line ("witness kept: " ++ show blind)
