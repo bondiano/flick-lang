@@ -248,10 +248,11 @@ fn hover_definition_completion_rename_and_formatting() {
         "textDocument/definition",
         &json!({ "textDocument": doc, "position": at(&fixed, "length") }),
     );
-    assert_eq!(builtin["result"]["uri"], "flick-builtin:///List.fl");
+    // `List` is a facade: `length` is defined in its part `List.Core`
+    assert_eq!(builtin["result"]["uri"], "flick-builtin:///List.Core.fl");
     let content = lsp.request(
         "workspace/textDocumentContent",
-        &json!({ "uri": "flick-builtin:///List.fl" }),
+        &json!({ "uri": "flick-builtin:///List.Core.fl" }),
     );
     let line = builtin["result"]["range"]["start"]["line"]
         .as_u64()
