@@ -226,12 +226,8 @@ fn watch_runs_again_after_the_previous_run_cleaned_up() {
     )
     .expect("write");
     let text = wait_for(&out, "acquired", 2);
+    // the runner of the second run stops by itself: its stdin closes with the watcher
     let _ = child.kill();
-    // the runner of the second run, which the killed watcher left behind
-    let runner = dir.join(".flick/test/test.js");
-    let _ = Command::new("pkill")
-        .args(["-INT", "-f", &runner.to_string_lossy()])
-        .status();
     let released = text
         .find("released")
         .expect("the first run released its resource");

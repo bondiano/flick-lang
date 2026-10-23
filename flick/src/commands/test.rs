@@ -1,11 +1,12 @@
 //! `flick test`: builds the project with its test root into `.flick/test/`,
 //! writes a runner that imports the `tests` of each test module, and runs it
-//! on Node. With `--watch`, a change of a source file stops the run (SIGINT:
-//! every running test closes its scope) and starts the next one after it.
+//! on Node. With `--watch`, a change of a source file stops the run (closing
+//! the runner's stdin: every running test closes its scope) and starts the
+//! next one after it.
 
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, ExitCode};
+use std::process::{Child, Command, ExitCode, Stdio};
 use std::time::{Duration, SystemTime};
 use std::{fs, io, thread};
 
@@ -30,7 +31,7 @@ pub fn test(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
     let Ok(runner) = prepare(options, global) else {
         return ExitCode::from(1);
     };
-    match start(&runner, options).and_then(|mut child| child.wait()) {
+    match start(&runner, options, false).and_then(|mut child| child.wait()) {
         Ok(status) => ExitCode::from(status.code().map_or(1, |c| u8::try_from(c).unwrap_or(1))),
         Err(err) => {
             eprintln!("error: cannot run node: {err}");
@@ -109,9 +110,12 @@ fn runner_source(suites: &[(String, String)]) -> String {
     out
 }
 
-fn start(runner: &Path, options: &TestArguments) -> io::Result<Child> {
+fn start(runner: &Path, options: &TestArguments, watched: bool) -> io::Result<Child> {
     let mut command = Command::new("node");
     command.arg("--enable-source-maps").arg(runner);
+    if watched {
+        command.arg("--watched").stdin(Stdio::piped());
+    }
     if let Some(filter) = &options.filter {
         command.args(["--filter", filter]);
     }
@@ -164,16 +168,11 @@ fn stamp(paths: &[PathBuf]) -> Option<SystemTime> {
     out
 }
 
-/// Stops a run: SIGINT lets every running test close its scope, and the
-/// wait returns only once the runner has exited.
+/// Stops a run: closing its stdin lets every running test close its scope,
+/// and the wait returns only once the runner has exited.
 fn stop(child: &mut Child) {
-    if child.try_wait().ok().flatten().is_none() {
-        // shortcut: signals through `kill`, so watching needs a Unix host
-        let _ = Command::new("kill")
-            .args(["-INT", &child.id().to_string()])
-            .status();
-        let _ = child.wait();
-    }
+    drop(child.stdin.take());
+    let _ = child.wait();
 }
 
 fn watch(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
@@ -182,7 +181,7 @@ fn watch(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
         let before = stamp(&paths);
         let mut child = prepare(options, global)
             .ok()
-            .and_then(|runner| start(&runner, options).ok());
+            .and_then(|runner| start(&runner, options, true).ok());
         while stamp(&paths) == before {
             thread::sleep(Duration::from_millis(200));
         }

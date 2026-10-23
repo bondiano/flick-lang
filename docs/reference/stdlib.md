@@ -136,4 +136,6 @@ Each result is `passed` or `failed` with what failed: `assertion`, `failure`
 cleanly; a test whose body passed fails too) or `interrupted`. The exit code
 is `0` when every test passed, `1` otherwise. SIGINT interrupts the running
 tests, and every one of them closes its scope before the runner exits; under
-`--watch` a change starts the next run only after that.
+`--watch` a change stops the run the same way (the watcher closes the
+runner's stdin, so it works on every platform) and starts the next run only
+after that.

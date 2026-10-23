@@ -112,14 +112,17 @@ const runOne = ({ name, test }, seed) =>
 
 /** Options of `flick test`, from the runner's arguments. */
 export const parseTestArgs = (argv) => {
-  const options = { filter: "", jobs: 1, seed: undefined, reporter: "human" };
+  const options = { filter: "", jobs: 1, seed: undefined, reporter: "human", watched: false };
   for (let i = 0; i < argv.length; i++) {
     const [flag, value] = [argv[i], argv[i + 1]];
     if (flag === "--filter") options.filter = value;
     else if (flag === "--jobs") options.jobs = Number(value);
     else if (flag === "--seed") options.seed = Number(value);
     else if (flag === "--reporter") options.reporter = value;
-    else continue;
+    else if (flag === "--watched") {
+      options.watched = true;
+      continue;
+    } else continue;
     i++;
   }
   return options;
@@ -146,8 +149,9 @@ const report = (results, seed, reporter, write) => {
 
 /**
  * Runs the `tests` of each module, at most `jobs` at a time, and sets the
- * exit code: 0 when all passed, 1 otherwise, 130 when SIGINT stopped the
- * run after every running test's cleanup.
+ * exit code: 0 when all passed, 1 otherwise, 130 when SIGINT (or, for a
+ * `watched` run, the end of stdin) stopped the run after every running
+ * test's cleanup.
  */
 export const runTests = async (modules, options = parseTestArgs(process.argv.slice(2))) => {
   const write = options.write ?? ((text) => process.stdout.write(text));
@@ -169,8 +173,11 @@ export const runTests = async (modules, options = parseTestArgs(process.argv.sli
     Effect.runFork(Fiber.interrupt(fiber));
   };
   process.once("SIGINT", stop);
+  // a watcher stops the run by closing stdin, which works on every platform
+  if (options.watched) process.stdin.once("end", stop).resume();
   const exit = await new Promise((resolve) => fiber.addObserver(resolve));
   process.off("SIGINT", stop);
+  if (options.watched) process.stdin.off("end", stop).destroy();
   if (Exit.isFailure(exit)) {
     write(interrupted ? "interrupted: every running test closed its scope\n" : `${Cause.pretty(exit.cause)}\n`);
     process.exitCode = interrupted ? 130 : 1;
