@@ -190,6 +190,18 @@ module Stream exposing (
   run_into_queue,
   to_pubsub,
   to_queue,
+  run,
+  transduce,
+  aggregate,
+  aggregate_within,
+  pipe_through,
+  tap_sink,
+  peel,
+  to_channel,
+  from_channel,
+  pipe_through_channel,
+  pipe_through_channel_or_fail,
+  with_execution_plan,
   decode_text,
   encode_text,
   split_lines,
@@ -211,4 +223,5 @@ import Stream.Transform exposing (..)
 import Stream.Combine exposing (..)
 import Stream.Errors exposing (..)
 import Stream.Run exposing (..)
+import Stream.Pipe exposing (..)
 import Stream.Platform exposing (..)

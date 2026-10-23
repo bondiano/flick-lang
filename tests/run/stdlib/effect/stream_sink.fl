@@ -1,0 +1,67 @@
+// Effect's `Stream` with sinks, channels and an execution plan.
+module App.Main exposing (main)
+
+type error Boom = Boom Number
+
+service Greeter =
+  greet : String ->{} String
+
+line : String -> List Number ->{} Unit
+let line label xs = Platform.stdout_line (label ++ ": " ++ show xs)
+
+nums : Stream.Stream none none Number
+let nums = Stream.range 1 5
+
+failing : Stream.Stream none {Boom} Number
+let failing = Stream.concat (Stream.fail (Boom 3)) (Stream.make [1, 2])
+
+pairs : Sink.Sink none none Number Number (List Number)
+let pairs = Sink.take 2
+
+summed : Sink.Sink none none Number Number Number
+let summed = Sink.make (fun input -> Stream.run_sum input)
+
+tens : Channel.Channel none e (NonEmpty.NonEmpty Number) (NonEmpty.NonEmpty Number) Unit e Unit
+let tens = Channel.map (NonEmpty.map (fun n -> n * 10)) (Channel.identity ())
+
+greeting : Stream.Stream {Greeter} {Boom} String
+let greeting =
+  Stream.from_effect (task {
+    let text = Greeter.greet "ada"
+    if text == "" then from_result (Err (Boom 0)) else text
+  })
+
+main : Unit ->{; AppError} Unit
+let main () =
+  line "run" [Stream.run summed nums]
+  line "run take" (Stream.run pairs nums)
+  Platform.stdout_line ("transduce: " ++ show (Stream.run_collect (Stream.transduce pairs nums)))
+  Platform.stdout_line ("aggregate: " ++ show (Stream.run_collect (Stream.aggregate pairs nums)))
+  let within : Stream.Stream none none (List Number) =
+    Stream.aggregate_within pairs Schedule.forever nums
+  Platform.stdout_line ("aggregate_within: " ++ show (Stream.run_collect within))
+  line "pipe_through" (Stream.run_collect (Stream.pipe_through pairs nums))
+  let tapped : Stream.Stream none none Number = Stream.tap_sink pairs nums
+  line "tap_sink" (Stream.run_collect tapped)
+  let peeled =
+    scope {
+      let (head, rest) = Stream.peel pairs nums
+      head ++ [0] ++ Stream.run_collect rest
+    }
+  line "peel" peeled
+  let round : Stream.Stream none none Number = Stream.from_channel (Stream.to_channel nums)
+  line "to_channel/from_channel" (Stream.run_collect round)
+  let piped : Stream.Stream none none Number = Stream.pipe_through_channel tens nums
+  line "pipe_through_channel" (Stream.run_collect piped)
+  let or_fail : Stream.Stream none {Boom} Number = Stream.pipe_through_channel_or_fail tens failing
+  line "pipe_through_channel_or_fail" (try Stream.run_collect or_fail with | Boom n -> [0 - n])
+  let english = Layer.succeed Greeter { greet = fun n -> "hello " ++ n }
+  let silent = Layer.succeed Greeter { greet = fun _ -> "" }
+  let plan : ExecutionPlan.ExecutionPlan {Greeter} none none (Errors {Boom}) =
+    ExecutionPlan.make (NonEmpty.cons (ExecutionPlan.step silent) [ExecutionPlan.step english])
+  let events = Ref.make 0
+  let planned : Stream.Stream none {Boom} String =
+    Stream.with_execution_plan plan false (fun _ -> Ref.update events (fun n -> n + 1)) greeting
+  Platform.stdout_line
+    ("with_execution_plan: " ++ show (try Stream.run_collect planned with | Boom _ -> []))
+  line "events" [Ref.get events]

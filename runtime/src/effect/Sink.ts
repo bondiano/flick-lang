@@ -2,7 +2,7 @@
 // adapters where a Flick value differs from what Effect takes: an `End`
 // keeps its leftovers in an `Option`, and failures are `Failure` and
 // `Exit` values.
-import { Channel, Effect, Option, Sink } from "effect";
+import { Channel, Effect, Option, Sink, type Stream } from "effect";
 
 import { Failure } from "../cause.ts";
 import { failureCause, flickExit } from "../stdlib/outcome.ts";
@@ -33,6 +33,10 @@ export const flickFromChannel = <L, In, E, A, R>(
 /** `Sink.to_channel`. */
 export const flickToChannel = <A, In, L, E, R>(self: Sink.Sink<A, In, L, E, R>) =>
   Channel.mapDone(Sink.toChannel(self), fromEnd);
+
+/** `Sink.make`: the sink of what `f` does with the stream of its input. */
+export const flickMake = <In, A, E, R>(f: (input: Stream.Stream<In>) => Effect.Effect<A, E, R>): Sink.Sink<A, In, never, E, R> =>
+  Sink.make<In>()(f);
 
 /** `Sink.from_effect_end`. */
 export const flickFromEffectEnd = <A, E, R, L>(effect: Effect.Effect<FlickEnd<A, L>, E, R>) =>
