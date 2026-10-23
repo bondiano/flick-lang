@@ -239,6 +239,12 @@ split_key_value : String -> String -> PureCodec Json (List (String, String))
 foreign pure split_key_value from "@flick-lang/runtime/effect/Schema" "flickSplitKeyValue"
   reviewed "effect@4.0.5 sha256:b9449d888550c74f"
 
+/// The codec of a schema whose every leaf is a string on the wire, as in
+/// query strings and forms; its structure is kept.
+string_tree : Schema a -> PureCodec Json a
+foreign pure string_tree from "@flick-lang/runtime/effect/Schema" "flickStringTree"
+  reviewed "effect@4.0.5 sha256:884914a3fb66bd42"
+
 /// A non-negative safe integer.
 natural : PureCodec Json Number
 foreign pure natural from "@flick-lang/runtime/effect/Schema" "Natural"

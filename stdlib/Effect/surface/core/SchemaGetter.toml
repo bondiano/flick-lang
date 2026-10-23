@@ -46,6 +46,12 @@ dateTimeUtcFromInput = "DateTime.json_utc 9e418552f6a2adc5"
 decodeBase64 = "Codec.bytes_base64 b7c0a657ce4af3f9"
 decodeBase64Url = "Codec.bytes_base64url 71d9f1f21000859d"
 decodeHex = "Codec.bytes_hex e241c31f9095fb5a"
+collectBracketPathEntries = "Http.Codecs.from_url_search_params 7b80dd33fbd51c8c"
+decodeFormData = "Http.Codecs.from_form_data cfa6c652216cc44e"
+decodeURLSearchParams = "Http.Codecs.from_url_search_params 15cdba62bfd5f66e"
+encodeFormData = "Http.Codecs.from_form_data ccaad7cc94894cad"
+encodeURLSearchParams = "Http.Codecs.from_url_search_params 7459c537c7d343d0"
+makeTreeRecord = "Http.Codecs.from_url_search_params d430f4276843f9b1"
 
 [language]
 Passthrough = "a codec used as it is: no transformation"
@@ -57,11 +63,3 @@ passthroughSupertype = "a codec used as it is: no transformation"
 [excluded]
 Date = "TS-only: coerces to a JS `Date`, a host class with no Flick type"
 JsonReplacer = "TS-only: the replacer of `JSON.stringify`; Flick values reach JSON through their codecs"
-
-[pending]
-collectBracketPathEntries = "M21"
-decodeFormData = "M21"
-decodeURLSearchParams = "M21"
-encodeFormData = "M21"
-encodeURLSearchParams = "M21"
-makeTreeRecord = "M21"

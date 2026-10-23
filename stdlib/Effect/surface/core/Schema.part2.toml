@@ -51,6 +51,12 @@ Uint8ArrayFromBase64Url = "Codec.bytes_base64url bb23107359dfe500"
 Uint8ArrayFromHex = "Codec.bytes_hex e355fc2b69a96c0e"
 UnixPathAddress = "Net.unix_path_address 6164425c83db5148"
 UnixPathAddressFromString = "Net.unix_path_address 55c47635917687fe"
+RecordFromCookies = "Http.Codecs.from_cookies f28a7270eb9dcc35"
+RecordFromUrlParams = "Http.Codecs.from_url_params b769c67f9a3eb42f"
+URL = "Http.Codecs.url f4710800066ed1b9"
+URLFromString = "Http.Codecs.url def675f38e2f3123"
+UrlParams = "Http.Codecs.url_params 7575391af4f8542f"
+toCodecStringTree = "Codec.string_tree 884914a3fb66bd42"
 
 [language]
 Struct = "`deriving Schema` of a record and the `codec` block (`field \"wire\" codec` names keys)"
@@ -104,12 +110,4 @@ toIsoFocus = "TS-only: an `Optic.Iso` between a schema's type and its iso repres
 toIsoSource = "TS-only: an `Optic.Iso` between a schema's type and its iso representation, for TS optics; Flick has no optics over schemas"
 toRepresentation = "TS-only: Effect's representation of a schema serves generating TS schema code and reviving schemas; Flick schemas come from declarations"
 toStandardJSONSchemaV1 = "invariant: Effect's JSON Schema generation writes approximations (`{}` for what it cannot state, looser keywords); export goes through the strict `Codec.json_schema`"
-
-[pending]
-RecordFromCookies = "M21"
-RecordFromUrlParams = "M21"
-URL = "M21"
-URLFromString = "M21"
-URLSearchParams = "M21"
-UrlParams = "M21"
-toCodecStringTree = "M21"
+URLSearchParams = "TS-only: a JS `URLSearchParams` host object with no Flick type; query strings decode by `Http.Codecs.from_url_search_params`, parameters are `Http.UrlParams.UrlParams`"
