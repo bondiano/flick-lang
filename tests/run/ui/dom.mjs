@@ -17,6 +17,28 @@ export const click = (label) => {
   button.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
 };
 
+export const choose = (label) => {
+  const option = [...root.querySelectorAll('[role="option"]')].find((o) => o.textContent === label);
+  if (option === undefined) throw new Error(`no option ${label}`);
+  option.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
+};
+
+let pending;
+
+/** A write that ignores interruption and finishes only on `release`. */
+export const writeOnRelease = (line) =>
+  new Promise((resolve) => {
+    pending = () => {
+      process.stdout.write(`${line}\n`);
+      resolve();
+    };
+  });
+
+export const release = () => {
+  pending?.();
+  pending = undefined;
+};
+
 export const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 export const text = () => root.textContent;

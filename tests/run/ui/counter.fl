@@ -38,18 +38,18 @@ let counter model n =
         heading [text ("count " ++ show n)],
         button
           {
-            disabled = false
-            on_click = Ui.Event.exhaust (fun _ -> task { Ref.set model (n + 1) })
+            disabled = false;
+            on_click = Ui.Event.exhaust (fun _ -> task { Ref.set model (n + 1) });
           }
           [text "+1"],
         button
           {
-            disabled = false
-            on_click = Ui.Event.latest (fun _ -> task { from_result (Err (Refused "no")) })
+            disabled = false;
+            on_click = Ui.Event.latest (fun _ -> task { from_result (Err (Refused "no")) });
           }
           [text "refuse"],
         paragraph [text "<b>bold?</b>"],
-        component badge { label = "new" }
+        component badge { label = "new" },
       ]
   }
 

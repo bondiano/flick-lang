@@ -1,0 +1,125 @@
+// One whole UI path with React 19 in jsdom: a generic select inside typed
+// children (panel slots, non-empty tabs, an optional footer) renders as a
+// pure view of the model; choosing an item runs a task under its policy, a
+// refused choice goes to the supervisor, and closing the scope unmounts at
+// once but releases the scope's resource only after the running task's
+// write has finished, which it can only do once the root has closed.
+module App.Main exposing (main)
+
+type error Refused = Refused String
+
+type alias User = { id : Number; name : String }
+
+setup : Unit ->{} Unit
+foreign sync setup from "./dom.mjs" "setup"
+  arity 0
+
+choose : String ->{} Unit
+foreign sync choose from "./dom.mjs" "choose"
+  arity 1
+
+settle : Unit ->{} Unit
+foreign async settle from "./dom.mjs" "settle"
+  arity 0
+
+text : Unit ->{} String
+foreign sync text from "./dom.mjs" "text"
+  arity 0
+
+markup : Unit ->{} String
+foreign sync markup from "./dom.mjs" "markup"
+  arity 0
+
+open_raw : String ->{} String
+foreign effect open_raw from "../runtime/resources.mjs" "open"
+
+write_on_release : String ->{} Unit
+foreign async write_on_release from "./dom.mjs" "writeOnRelease"
+
+release : Unit ->{} Unit
+foreign sync release from "./dom.mjs" "release"
+  arity 0
+
+// Generic over the item: the items, key, render_item and on_change of the
+// props all speak of the same `a`.
+picker : String -> Ui.SelectProps a r e c -> (Ui r e)^c
+let picker title props =
+  ui {
+    panel
+      {
+        header = heading [text title];
+        body = select props;
+        footer =
+          Option.map (fun item -> paragraph [text ("chosen " ++ props.key item)]) props.selected;
+      }
+  }
+
+people : List User
+let people = [{ id = 1; name = "Ada" }, { id = 2; name = "Mallory" }, { id = 3; name = "Carol" }]
+
+// The handler task: nothing of it runs while rendering.
+save : Ref (Option User) -> String -> User ->{; Refused} Unit
+let save model log user =
+  if user.name == "Mallory" then from_result (Err (Refused user.name))
+  else
+    let line = user.name ++ " saved to " ++ log
+    if user.name == "Carol" then write_on_release line else Platform.stdout_line line
+    Ref.set model (Some user)
+
+directory : Ref (Option User) -> String -> Option User -> Ui none {Refused}
+let directory model log selected =
+  ui {
+    tabs
+      { selected = 0 }
+      (NonEmpty.cons
+        (tab "People" (picker "People"
+          {
+            items = people;
+            selected = selected;
+            key = fun (user : User) -> user.name;
+            render_item = fun (user : User) -> text user.name;
+            on_change = Ui.Event.latest (fun user -> task { save model log user });
+          }))
+        [tab "About" (paragraph [text "about"])])
+  }
+
+report : Failure e ->{} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+// What the fiber of the root reports when the scope closes it: by then the
+// tree is unmounted, though the write of the task it interrupted is still
+// pending. Only now that write may finish, and the scope waits for it
+// before it releases the log.
+closed : Failure e ->{} Unit
+let closed failure =
+  Platform.stdout_line
+    ("root closed: " ++ RawCause.describe (Failure.inspect failure) ++ ", page [" ++ text () ++ "]")
+  release ()
+
+main : Unit ->{; AppError} Unit
+let main () =
+  setup ()
+  let model = Ref.make None
+  match Ui.container "app" with
+  | None -> Platform.stdout_line "no container"
+  | Some root ->
+    scope s {
+      let log = open_raw "log"
+      let running =
+        Fiber.spawn
+          s
+          closed
+          (task { Ui.run root report model (fun selected -> directory model log selected) })
+      settle ()
+      Platform.stdout_line (markup ())
+      choose "Ada"
+      settle ()
+      Platform.stdout_line (text ())
+      choose "Mallory"
+      settle ()
+      choose "Carol"
+      settle ()
+      Platform.stdout_line "closing"
+    }
+    Platform.stdout_line ("after the scope: [" ++ text () ++ "]")

@@ -1,0 +1,94 @@
+// What the UI library refuses about children, render and roots: tabs that
+// are not a non-empty list of `Tab`, children for an element that has none,
+// a missing or bare slot of `panel`, state read in a `ui { }` view, a
+// supervisor that does not cover the errors of the handlers, and a button
+// built in a `ui { }` block that escapes the scope of the file it holds.
+module App.Children exposing (..)
+
+type error Refused = Refused String
+
+// a plain list may be empty
+tabs_from_list : Ui none none
+let tabs_from_list = Ui.tabs { selected = 0 } [Ui.tab "a" (Ui.text "a")]
+//                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 expected `NonEmpty (Tab _ _)`, found `List
+
+// a `Ui` erased from a `Tab` is no longer a tab
+tabs_of_nodes : Ui none none
+let tabs_of_nodes = Ui.tabs { selected = 0 } (NonEmpty.singleton (Ui.text "a"))
+//                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 expected `NonEmpty (Tab _ _)`, found `NonEmpty
+
+// an input has no children argument
+input_children : Ui none none
+let input_children =
+  Ui.input
+    { value = ""; placeholder = ""; on_input = Ui.Event.latest (fun _ -> task { () }) }
+    [Ui.text "x"]
+//~ FLICK-T003 @23:3-25:18 this is not a function: it has type `Ui _ _`,
+
+// named places are exact fields
+panel_no_header : Ui none none
+let panel_no_header = Ui.panel { body = Ui.text "b"; footer = None }
+//                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 expected `{ body : Ui _ _; footer : Option (Ui
+
+// the footer is optional, so it is an `Option`
+footer_bare : Ui none none
+let footer_bare = Ui.panel { header = Ui.text "h"; body = Ui.text "b"; footer = Ui.text "f" }
+//                                                                              ^^^^^^^^^^^ FLICK-T003 expected `Option (Ui _ _)`, found `Ui _ _`
+
+// a view is a pure function of the model
+view_reads : Ref Number -> Number -> Ui none none
+let view_reads model n = ui { paragraph [text (show (Ref.get model))] }
+//                                                   ^^^^^^^^^^^^^ FLICK-E001 this is a runtime call, but `view_reads` is
+
+// the supervisor must take the full `Failure e` of the handlers
+narrow_supervisor : Failure none ->{} Unit
+let narrow_supervisor failure = ()
+
+refusing : Ref Number -> Number -> Ui none {Refused}
+let refusing model n =
+  ui {
+    button
+      {
+        disabled = false;
+        on_click = Ui.Event.exhaust (fun _ -> task { from_result (Err (Refused "no")) });
+      }
+      []
+  }
+
+run_narrow : Ui.Container -> Ref Number ->{} Never
+let run_narrow root model = Ui.run root narrow_supervisor model (fun n -> refusing model n)
+//                                                                        ^^^^^^^^^^^^^^^^ FLICK-T003 `Refused` is in the row, which the expected type does not allow
+
+// hold the button inside the scope, or open the file inside the task
+escaping : File.Path ->{File.FileSystem; File.OpenError} Ui {File.FileSystem} {File.ReadError}
+let escaping path =
+  scope {
+    let file = File.open_scoped path
+    ui {
+      button
+        {
+          disabled = false;
+          on_click = Ui.Event.exhaust (fun _ -> task { ignore (File.read_all file) });
+        }
+        []
+    }
+//~ FLICK-G001 @67:5-74:6 this value holds region `s`, but the expected
+  }
+
+// bound to a local first, it still cannot leave
+escaping_bound : File.Path ->{File.FileSystem; File.OpenError} Ui {File.FileSystem} {File.ReadError}
+let escaping_bound path =
+  scope {
+    let file = File.open_scoped path
+    let view =
+      ui {
+        button
+          {
+            disabled = false;
+            on_click = Ui.Event.exhaust (fun _ -> task { ignore (File.read_all file) });
+          }
+          []
+      }
+    view
+//  ^^^^ FLICK-G001 this value holds region `s`
+  }

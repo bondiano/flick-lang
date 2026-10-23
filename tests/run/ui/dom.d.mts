@@ -1,5 +1,8 @@
 export declare const setup: () => undefined;
 export declare const click: (label: string) => void;
+export declare const choose: (label: string) => void;
+export declare const writeOnRelease: (line: string) => Promise<void>;
+export declare const release: () => void;
 export declare const settle: () => Promise<undefined>;
 export declare const text: () => string;
 export declare const markup: () => string;
