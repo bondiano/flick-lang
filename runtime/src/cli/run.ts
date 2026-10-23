@@ -3,12 +3,24 @@
 // input becomes the Flick error `Cli.CliError` with Effect's text; the
 // handler runs only after the whole command line parsed.
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { Effect, Result } from "effect";
-import { Argument, CliError, Command, Flag } from "effect/cli";
+import { Console, Effect, Layer, Option, Result } from "effect";
+import { TestConsole } from "effect/testing";
+import {
+  CliConfig,
+  CliError,
+  CliOutput,
+  Command,
+  Flag,
+  GlobalFlag,
+  type HelpDoc,
+  Param as EffectParam,
+  Primitive,
+} from "effect/cli";
 
 import type { Tagged } from "../data.ts";
-import { tag } from "../tags.ts";
-import type { Command as Spec, Param } from "./spec.ts";
+import { constructorName, tag } from "../tags.ts";
+import { type FlickFormatter, type FlickHelpDoc, fromEffectDoc, toEffectFormatter, withHelp } from "./output.ts";
+import type { Command as Spec, Param, Source } from "./spec.ts";
 
 /** `Cli.CliError`. */
 export type FlickCliError = Tagged<string, string>;
@@ -32,32 +44,60 @@ const parse =
           ),
     );
 
-const flag = (param: Param): Flag.Flag<unknown> => {
-  const name = param.label.replaceAll("_", "-");
-  let f: Flag.Flag<unknown> =
-    param.multi.kind === "switch"
-      ? Flag.withDefault(Flag.Boolean(name), false)
-      : Flag.mapEffect(Flag.String(name), parse(param));
-  for (const alias of param.aliases) f = Flag.withAlias(f, alias);
-  if (param.help !== "") f = Flag.withDescription(f, param.help);
-  const multi = param.multi;
-  if (multi.kind === "default") return Flag.withDefault(f, multi.value);
-  if (multi.kind === "optional") return Flag.optional(f);
-  if (multi.kind === "many") return Flag.atLeast(f, 0);
-  if (multi.kind === "some") return Flag.atLeast(f, 1);
+/** What Effect reads for a parameter before `Cli.Value` parses its text. */
+const primitive = (source: Source): Primitive.Primitive<unknown> => {
+  if (source.kind === "path") return Primitive.Path(source.pathType, source.mustExist);
+  if (source.kind === "fileText") return Primitive.FileText;
+  if (source.kind === "fileParse")
+    return Primitive.FileParse(source.format === undefined ? {} : { format: source.format });
+  return Primitive.String;
+};
+
+/** The text of what Effect read: the data of a parsed file is its JSON. */
+const text = (source: Source, value: unknown): string =>
+  source.kind === "fileParse" ? JSON.stringify(value) : String(value);
+
+type AnyParam<K extends EffectParam.ParamKind> = EffectParam.Param<K, unknown>;
+
+/** Effect's flag or argument of a parameter, its multiplicity and modifiers applied. */
+const param = <K extends EffectParam.ParamKind>(kind: K, p: Param): AnyParam<K> => {
+  const name = p.label.replaceAll("_", "-");
+  const { multi } = p;
+  const { mods } = multi;
+  let f: AnyParam<K> =
+    multi.kind === "switch"
+      ? EffectParam.withDefault(EffectParam.Boolean(kind, name), false)
+      : EffectParam.mapEffect(
+          EffectParam.makeSingle({ kind, name, primitiveType: primitive(mods.source) }),
+          (value: unknown) => parse(p)(text(mods.source, value)),
+        );
+  for (const alias of p.aliases) f = EffectParam.withAlias(f, alias);
+  if (p.help !== "") f = EffectParam.withDescription(f, p.help);
+  if (mods.hidden) f = EffectParam.withHidden(f);
+  if (mods.metavar !== undefined) f = EffectParam.withMetavar(f, mods.metavar);
+  if (multi.kind === "default") return EffectParam.withDefault(f, multi.value);
+  if (multi.kind === "optional") return EffectParam.optional(f);
+  if (multi.kind === "variadic") return EffectParam.variadic(f, { min: multi.min, max: multi.max });
+  if (multi.kind === "some") return EffectParam.atLeast(f, 1);
+  if (multi.kind === "config") return EffectParam.withFallbackConfig(f, multi.config);
+  if (multi.kind === "prompt") return EffectParam.withFallbackPrompt(f, multi.prompt);
   return f;
 };
 
-const argument = (param: Param): Argument.Argument<unknown> => {
-  let a: Argument.Argument<unknown> = Argument.mapEffect(Argument.String(param.label.replaceAll("_", "-")), parse(param));
-  if (param.help !== "") a = Argument.withDescription(a, param.help);
-  const multi = param.multi;
-  if (multi.kind === "default") return Argument.withDefault(a, multi.value);
-  if (multi.kind === "optional") return Argument.optional(a);
-  if (multi.kind === "many") return Argument.atLeast(a, 0);
-  if (multi.kind === "some") return Argument.atLeast(a, 1);
-  return a;
+/** A flag, which may take the text of `Cli.optional_value` when written alone. */
+const flagParam = (p: Param): AnyParam<"flag"> => {
+  const f = param("flag", p);
+  const { optionalValue } = p.multi.mods;
+  return optionalValue === undefined ? f : EffectParam.withOptionalValue(f, optionalValue);
 };
+
+/** `Cli.action`: a switch that runs the Flick action instead of the command. */
+const action = (a: Spec["actions"][number]): GlobalFlag.GlobalFlag<boolean> =>
+  GlobalFlag.Action({
+    flag: Flag.withDefault(Flag.withDescription(Flag.Boolean(a.name), a.help), false),
+    run: (present, context) =>
+      present ? Effect.asVoid(a.run({ commandPath: context.commandPath, version: context.version })) : Effect.void,
+  });
 
 /**
  * Effect's command of a Flick command, its subcommands included. The flags
@@ -65,18 +105,33 @@ const argument = (param: Param): Argument.Argument<unknown> => {
  * the subcommand's name, and they are seen only by this command's handler.
  */
 const command = (spec: Spec): Command.Command.Any => {
-  const config: Record<string, Flag.Flag<unknown> | Argument.Argument<unknown>> = {};
-  const flags: Record<string, Flag.Flag<unknown>> = {};
-  for (const param of spec.params) {
-    if (!param.flag) config[param.label] = argument(param);
-    else if (spec.subcommands.length > 0) flags[param.label] = flag(param);
-    else config[param.label] = flag(param);
+  const config: Record<string, AnyParam<EffectParam.ParamKind>> = {};
+  const flags: Record<string, AnyParam<"flag">> = {};
+  for (const p of spec.params) {
+    if (!p.flag) config[p.label] = param("argument", p);
+    else if (spec.subcommands.length > 0) flags[p.label] = flagParam(p);
+    else config[p.label] = flagParam(p);
   }
   const finish = <I, CI, E, R>(made: Command.Command<string, I, CI, E, R>): Command.Command.Any => {
-    const described = spec.description === "" ? made : Command.withDescription(made, spec.description);
-    if (spec.subcommands.length === 0) return described;
-    const shared = Command.withSharedFlags(described, flags);
-    return Command.withSubcommands(shared, spec.subcommands.map((s) => command(s.command)));
+    let c: Command.Command<string, I, CI, E, R> = made;
+    if (spec.description !== "") c = Command.withDescription(c, spec.description);
+    if (spec.shortDescription !== "") c = Command.withShortDescription(c, spec.shortDescription);
+    if (spec.alias !== "") c = Command.withAlias(c, spec.alias);
+    if (spec.unlisted) c = Command.unlisted(c);
+    if (spec.examples.length > 0)
+      c = Command.withExamples(
+        c,
+        spec.examples.map((e) => (e.description === "" ? { command: e.command } : e)),
+      );
+    if (spec.actions.length > 0) c = Command.withGlobalFlags(c, spec.actions.map(action));
+    if (spec.subcommands.length === 0) return c;
+    const shared = Command.withSharedFlags(c, flags);
+    const subcommands = spec.subcommands.map((s) => {
+      const sub = command(s.command);
+      // the help of `subcommand` lists it, unless it has a short description of its own
+      return s.help !== "" && s.command.shortDescription === "" ? Command.withShortDescription(sub, s.help) : sub;
+    });
+    return Command.withSubcommands(shared, subcommands);
   };
   const handler = spec.handler;
   if (handler === null) return finish(Command.make(spec.name, config));
@@ -89,13 +144,81 @@ const cliError = (error: CliError.CliError): FlickCliError => {
   return { _tag: CLI_ERROR, _0: causes.length > 0 ? causes.join("\n") : error.message };
 };
 
+const BUILT_INS: Readonly<Record<string, CliConfig.CliConfig.Service["builtIns"][number]>> = {
+  HelpFlag: GlobalFlag.Help,
+  VersionFlag: GlobalFlag.Version,
+  WizardFlag: GlobalFlag.Wizard,
+  CompletionsFlag: GlobalFlag.Completions,
+  LogLevelFlag: GlobalFlag.LogLevel,
+};
+
+/** `Cli.Settings`. */
+export interface Settings {
+  readonly version: string;
+  readonly builtIns: ReadonlyArray<{ readonly _tag: string }>;
+  readonly formatter: Option.Option<FlickFormatter>;
+}
+
+/** The layers of Effect's CLI the settings choose, with the Node.js services. */
+const services = (settings: Settings) =>
+  Layer.mergeAll(
+    NodeServices.layer,
+    CliConfig.layer({ builtIns: settings.builtIns.flatMap((b) => BUILT_INS[constructorName(b._tag)] ?? []) }),
+    Option.isSome(settings.formatter) ? CliOutput.layer(toEffectFormatter(settings.formatter.value)) : Layer.empty,
+  );
+
+/** `Cli.run_with settings command args`. */
+export const cliRunWith = (
+  settings: Settings,
+  spec: Spec,
+  args: ReadonlyArray<string>,
+): Effect.Effect<void, unknown, unknown> =>
+  Command.runWith(command(spec), { version: settings.version, renderErrors: false })(args).pipe(
+    Effect.catchIf(CliError.isCliError, (error) => Effect.fail(cliError(error))),
+    Effect.provide(services(settings)),
+  );
+
+const ALL = Object.keys(BUILT_INS).map((name) => ({ _tag: tag(`Cli.BuiltIn.${name}`) }));
+
 /** `Cli.run command args`, with `version` for `--version`. */
 export const cliRunVersion = (
   version: string,
   spec: Spec,
   args: ReadonlyArray<string>,
 ): Effect.Effect<void, unknown, unknown> =>
-  Command.runWith(command(spec), { version, renderErrors: false })(args).pipe(
-    Effect.catchIf(CliError.isCliError, (error) => Effect.fail(cliError(error))),
-    Effect.provide(NodeServices.layer),
+  cliRunWith({ version, builtIns: ALL, formatter: Option.none() }, spec, args);
+
+
+/** What the command prints for `args`, with every built-in flag; failures are ignored. */
+const printed = (
+  spec: Spec,
+  args: ReadonlyArray<string>,
+  formatter: CliOutput.Formatter,
+): Effect.Effect<string, never, unknown> =>
+  Effect.flatMap(TestConsole.make, (console) =>
+    Command.runWith(command(spec), { version: "0.0.0", renderErrors: false })(args).pipe(
+      Effect.ignore,
+      Effect.provideService(Console.Console, console),
+      Effect.provide(Layer.merge(NodeServices.layer, CliOutput.layer(formatter))),
+      Effect.andThen(console.logLines),
+      Effect.map((lines) => lines.map(String).join("\n")),
+    ),
   );
+
+const PLAIN = CliOutput.defaultFormatter({ colors: false });
+
+/** `Cli.completions shell command`. */
+export const cliCompletions = (shell: { readonly _tag: string }, spec: Spec): Effect.Effect<string, never, unknown> =>
+  printed(spec, ["--completions", constructorName(shell._tag).toLowerCase()], PLAIN);
+
+/** `Cli.help_doc path command`: an unknown subcommand gives the help of the command above it. */
+export const cliHelpDoc = (path: ReadonlyArray<string>, spec: Spec): Effect.Effect<FlickHelpDoc, never, unknown> => {
+  let doc: HelpDoc.HelpDoc | undefined;
+  const capture = withHelp(PLAIN, (d) => {
+    doc = d;
+    return "";
+  });
+  return Effect.flatMap(printed(spec, [...path, "--help"], capture), () =>
+    doc === undefined ? Effect.die(new Error("Effect's CLI printed no help")) : Effect.succeed(fromEffectDoc(doc)),
+  );
+};

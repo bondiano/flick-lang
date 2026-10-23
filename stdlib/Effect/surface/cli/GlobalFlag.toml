@@ -1,12 +1,14 @@
-[pending]
-Action = "M22"
-BuiltIn = "M22"
-BuiltIns = "M22"
-Completions = "M22"
-GlobalFlag = "M22"
-HandlerContext = "M22"
-Help = "M22"
-LogLevel = "M22"
-Setting = "M22"
-Version = "M22"
-Wizard = "M22"
+[wrapped]
+Action = "Cli.action 485a1c3df2cdedc3"
+BuiltIn = "Cli.BuiltIn 34a996651a56b9d0"
+BuiltIns = "Cli.builtins 3f311b429225c8a5"
+Completions = "Cli.CompletionsFlag 108a30321b287d10"
+GlobalFlag = "Cli.action ba498e5b152fd8f7"
+HandlerContext = "Cli.ActionContext 70c8f70a5e078837"
+Help = "Cli.HelpFlag 0c94df9ea60f9546"
+LogLevel = "Cli.LogLevelFlag 0f25cb3e632e3835"
+Version = "Cli.VersionFlag a17293f9528f0734"
+Wizard = "Cli.WizardFlag 99cbbacf10e7b051"
+
+[language]
+Setting = "a service provided in `main`, or a shared flag of the parent command"

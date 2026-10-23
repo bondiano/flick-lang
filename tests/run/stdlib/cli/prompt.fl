@@ -1,0 +1,219 @@
+// Prompts of Effect's CLI on a scripted `Cli.Prompt.Tty`: each prompt reads
+// only the key presses it needs, so the next one finds the rest.
+module App.Main exposing (main)
+
+import Cli.Prompt exposing (Tty)
+
+key : String -> Terminal.UserInput
+let key name = { input = None; key = { name = name; ctrl = false; meta = false; shift = false } }
+
+typed : String -> List Terminal.UserInput
+let typed text =
+  List.map (fun c -> { input = Some c; key = { name = c; ctrl = false; meta = false; shift = false } }) (String.chars text)
+
+/// The key presses of a script: `<name>` presses that key, other text is typed.
+play : List String -> List Terminal.UserInput
+let play script = List.concat (List.map step script)
+
+step : String -> List Terminal.UserInput
+let step token =
+  if String.starts_with "<" token then [key (String.slice 1 (String.length token - 1) token)] else typed token
+
+/// The next key of the script; with none left it waits a moment and quits.
+next_key : Ref (List Terminal.UserInput) ->{; Terminal.QuitError} Terminal.UserInput
+let next_key keys =
+  let pending = Ref.get keys
+  match List.head pending with
+  | Some next ->
+    Ref.set keys (List.drop 1 pending)
+    next
+  | None ->
+    Effect.sleep (Result.with_default Duration.zero (Duration.millis 20))
+    from_result (Err Terminal.QuitError)
+
+/// A terminal that plays `keys` and keeps what is drawn.
+scripted : Ref (List Terminal.UserInput) -> Ref (List String) -> Layer none none {Cli.Prompt.Tty}
+let scripted keys frames =
+  Layer.succeed Tty {
+    read_key = fun () -> next_key keys;
+    display = fun text -> Ref.set frames ([text] ++ Ref.get frames);
+    columns = fun () -> 80;
+    rows = fun () -> 24
+  }
+
+/// A question without a default or a check; the frames are not shown here.
+question : Cli.Prompt.TextOptions
+let question = { message = "Answer?"; default = None; validate = None }
+
+not_empty : String -> Result String String
+let not_empty value = if value == "" then Err "required" else Ok value
+
+choice : String -> a -> Cli.Prompt.SelectChoice a
+let choice title value = { title = title; value = value; description = None; disabled = false; selected = false }
+
+sure : Cli.Prompt.ConfirmOptions
+let sure = { message = "Sure?"; initial = None; label = None; placeholder = None }
+
+toggle_options : Cli.Prompt.ToggleOptions
+let toggle_options = { message = "On?"; initial = Some false; active = Some "on"; inactive = Some "off" }
+
+int_options : Cli.Prompt.IntOptions
+let int_options =
+  { message = "Count?"; default = None; min = Some 0; max = Some 100; incrementBy = None; decrementBy = None; validate = None }
+
+number_options : Cli.Prompt.NumberOptions
+let number_options =
+  {
+    message = "Ratio?";
+    default = None;
+    min = None;
+    max = None;
+    incrementBy = None;
+    decrementBy = None;
+    validate = None;
+    precision = Some 2
+  }
+
+list_options : Cli.Prompt.ListOptions
+let list_options = { message = "Tags?"; default = None; validate = None; delimiter = Some ";" }
+
+colors : Cli.Prompt.SelectOptions Number
+let colors = { message = Some "Pick"; choices = [choice "red" 1, choice "green" 2, choice "blue" 3]; maxPerPage = None }
+
+languages : Cli.Prompt.AutoCompleteOptions String
+let languages =
+  {
+    message = "Language?";
+    choices = [choice "TypeScript" "ts", choice "Rust" "rs"];
+    maxPerPage = None;
+    filterLabel = None;
+    filterPlaceholder = None;
+    emptyMessage = None
+  }
+
+date_options : DateTime.DateTime -> Cli.Prompt.DateOptions
+let date_options start = { message = "When?"; initial = Some start; dateMask = None; validate = None; locales = None }
+
+/// Effect's theme with another prefix and no colors.
+plain_theme : Unit ->{} Cli.Prompt.Theme
+let plain_theme () = { (Cli.Prompt.default_theme ()) with prefix = ">>"; colors = false }
+
+only_directories : Cli.Prompt.PathType
+let only_directories = Cli.Prompt.DirectoryPath
+
+/// A prompt that walks directories from `options`; built, not asked here.
+directories : Cli.Prompt.FileOptions -> Cli.Prompt.Prompt String
+let directories options = Cli.Prompt.file { options with type_ = Some only_directories }
+
+/// A step of `counter`: up counts, return ends, any other key beeps.
+count_key : Terminal.UserInput -> Number -> Cli.Prompt.Action Number Number
+let count_key input state =
+  let k : Terminal.Key = input.key
+  if k.name == "up" then Cli.Prompt.NextFrame (state + 1)
+  else if k.name == "return" then Cli.Prompt.Submit state
+  else Cli.Prompt.Beep
+
+/// Counts the up arrows until return.
+counter : Cli.Prompt.Handlers Number Number Terminal.UserInput
+let counter = { render = fun state _ -> "count " ++ show state; process = count_key; clear = fun _ _ -> "" }
+
+/// A step of `on_event`: the first event ends it.
+event_step : Cli.Prompt.ProcessInput String -> Number -> Cli.Prompt.Action Number String
+let event_step input _ =
+  match input with
+  | Cli.Prompt.Event value -> Cli.Prompt.Submit ("event " ++ value)
+  | Cli.Prompt.Input _ -> Cli.Prompt.Beep
+
+/// Ends with the first event of its queue.
+on_event : Cli.Prompt.Handlers Number String (Cli.Prompt.ProcessInput String)
+let on_event = { render = fun _ _ -> "waiting"; process = event_step; clear = fun _ _ -> "" }
+
+questions : Unit ->{Cli.Prompt.Tty; Terminal.QuitError} Unit
+let questions () =
+  let name = Cli.Prompt.run (Cli.Prompt.text question)
+  Platform.stdout_line ("text " ++ name)
+  let checked = Cli.Prompt.run (Cli.Prompt.text { message = "Again?"; default = None; validate = Some not_empty })
+  Platform.stdout_line ("validated " ++ checked)
+  let fallback = Cli.Prompt.run (Cli.Prompt.text { message = "City?"; default = Some "Paris"; validate = None })
+  Platform.stdout_line ("default " ++ fallback)
+  let secret = Cli.Prompt.run (Cli.Prompt.password question)
+  let quiet = Cli.Prompt.run (Cli.Prompt.hidden question)
+  Platform.stdout_line ("password " ++ Redacted.reveal secret ++ " hidden " ++ Redacted.reveal quiet)
+  let yes = Cli.Prompt.run (Cli.Prompt.confirm sure)
+  let label : Cli.Prompt.ConfirmLabel = { confirm = "Y"; deny = "N" }
+  let placeholder : Cli.Prompt.ConfirmPlaceholder = { defaultConfirm = None; defaultDeny = None }
+  let no = Cli.Prompt.run (Cli.Prompt.confirm { message = "Really?"; initial = Some true; label = Some label; placeholder = Some placeholder })
+  Platform.stdout_line ("confirm " ++ show (yes, no))
+  let on = Cli.Prompt.run (Cli.Prompt.toggle toggle_options)
+  Platform.stdout_line ("toggle " ++ show on)
+  let n = Cli.Prompt.run (Cli.Prompt.int int_options)
+  let x = Cli.Prompt.run (Cli.Prompt.number number_options)
+  Platform.stdout_line ("int " ++ show n ++ " number " ++ show x)
+  let items = Cli.Prompt.run (Cli.Prompt.list list_options)
+  Platform.stdout_line ("list " ++ show items)
+  let picked = Cli.Prompt.run (Cli.Prompt.select colors)
+  Platform.stdout_line ("select " ++ show picked)
+  let language = Cli.Prompt.run (Cli.Prompt.auto_complete languages)
+  Platform.stdout_line ("auto_complete " ++ language)
+  let multi : Cli.Prompt.MultiSelectOptions = { selectAll = None; selectNone = None; inverseSelection = None; min = Some 1; max = None }
+  let many = Cli.Prompt.run (Cli.Prompt.multi_select colors multi)
+  Platform.stdout_line ("multi_select " ++ show many)
+  let start = Result.with_default (DateTime.now ()) (DateTime.make "2026-10-23T10:00:00Z")
+  let day = Cli.Prompt.run (Cli.Prompt.date (date_options start))
+  Platform.stdout_line ("date " ++ show (DateTime.to_epoch_millis day))
+  let both = Cli.Prompt.run (Cli.Prompt.all [Cli.Prompt.text question, Cli.Prompt.succeed "given"])
+  Platform.stdout_line ("all " ++ show both)
+  let chained =
+    Cli.Prompt.run
+      (Cli.Prompt.text question
+        |> Cli.Prompt.flat_map (fun w -> Cli.Prompt.succeed (w ++ w))
+        |> Cli.Prompt.map String.to_upper)
+  Platform.stdout_line ("map/flat_map " ++ chained)
+  Platform.stdout_line ("custom " ++ show (Cli.Prompt.run (Cli.Prompt.custom 0 counter)))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  // `<name>` is the key of that name, other text is typed
+  let script =
+    play
+      [ "Ada", "<return>"
+      , "<return>", "x", "<return>"
+      , "<return>"
+      , "s3", "<return>", "hh", "<return>"
+      , "y", "n"
+      , "<left>", "<return>"
+      , "42", "<return>", "0.25", "<return>"
+      , "a;b", "<return>"
+      , "<down>", "<return>"
+      , "ru", "<return>"
+      // select all, then the first choice off
+      , "<space>", "<down>", "<down>", "<space>", "<return>"
+      , "<return>"
+      , "one", "<return>"
+      , "ab", "<return>"
+      , "<up>", "<up>", "<x>", "<up>", "<return>"
+      ]
+  let keys = Ref.make script
+  let frames = Ref.make []
+  try provide (scripted keys frames) { questions () } with
+  | Terminal.QuitError -> Platform.stdout_line "quit early"
+  Platform.stdout_line ("keys left " ++ show (List.length (Ref.get keys)))
+  let ended = try provide (scripted keys frames) { Cli.Prompt.run (Cli.Prompt.text question) } with
+    | Terminal.QuitError -> "quit"
+  Platform.stdout_line ("no keys " ++ ended)
+  let events : Queue.Queue none String = Queue.unbounded ()
+  let _ = Queue.offer "arrived" events
+  let got = try provide (scripted keys frames) { Cli.Prompt.run (Cli.Prompt.custom_events 0 events on_event) } with
+    | Terminal.QuitError -> "quit"
+  Platform.stdout_line ("custom_events " ++ got)
+  Ref.set keys (play ["z", "<return>"])
+  Ref.set frames []
+  let theme = plain_theme ()
+  let themed = try provide (scripted keys frames) { Cli.Prompt.run_themed theme (Cli.Prompt.text question) } with
+    | Terminal.QuitError -> "quit"
+  let drawn = List.any (fun f -> String.contains ">>" f) (Ref.get frames)
+  Platform.stdout_line ("run_themed " ++ themed ++ " prefix drawn " ++ show drawn)
+  let walk : Cli.Prompt.FileOptions = { type_ = Some Cli.Prompt.DirectoryPath; message = None; startingPath = Some "/"; default = None; maxPerPage = Some 5; filter = None }
+  let _ = directories walk
+  let _ : Layer none none {Cli.Prompt.Tty} = Cli.Prompt.node
+  Platform.stdout_line "done"

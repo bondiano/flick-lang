@@ -185,6 +185,7 @@ const SOURCES: &[(&str, &str)] = &[
     // Effect: HTTP
     // end of Effect: HTTP
     // Effect: CLI
+    ("Cli.Prompt", include_str!("builtins/Cli/Prompt.fl")),
     ("Cli", include_str!("builtins/Cli.fl")),
     // end of Effect: CLI
 ];

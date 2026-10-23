@@ -1,0 +1,260 @@
+$ -e region=eu -e tier=web --token s3 -t a --at 2026-10-23T10:00:00Z prod
+deploy prod env [("region", "eu"), ("tier", "web")] token s3 level info
+  color never at Some 1792749600000 tags ["a"] owner ops
+$ -t a -t b --level debug prod --color
+deploy prod env [] token - level debug
+  color auto at None tags ["a", "b"] owner ops
+$ -t a --color=always --owner me prod
+deploy prod env [] token - level info
+  color always at None tags ["a"] owner me
+$ -t a -t b -t c prod
+DESCRIPTION
+  Deploys a build
+
+USAGE
+  deploy [flags] <target>
+
+ARGUMENTS
+  target string    Where to deploy
+
+FLAGS
+  --env, -e key=value    Variables
+  --level string         Log level
+  --color [=string]      When to color
+  --at string            When to deploy
+  --tags, -t string      One or two tags
+  --owner string         Who deploys
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --license                                                           Prints the license
+
+EXAMPLES
+  # Deploys to prod in eu
+  deploy -e region=eu prod
+
+  deploy prod
+CliError: Invalid value for flag --tags: "3 occurrences". Expected: at most 2 values
+$ prod
+DESCRIPTION
+  Deploys a build
+
+USAGE
+  deploy [flags] <target>
+
+ARGUMENTS
+  target string    Where to deploy
+
+FLAGS
+  --env, -e key=value    Variables
+  --level string         Log level
+  --color [=string]      When to color
+  --at string            When to deploy
+  --tags, -t string      One or two tags
+  --owner string         Who deploys
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --license                                                           Prints the license
+
+EXAMPLES
+  # Deploys to prod in eu
+  deploy -e region=eu prod
+
+  deploy prod
+CliError: Missing required flag: --tags
+$ -e novalue -t a prod
+DESCRIPTION
+  Deploys a build
+
+USAGE
+  deploy [flags] <target>
+
+ARGUMENTS
+  target string    Where to deploy
+
+FLAGS
+  --env, -e key=value    Variables
+  --level string         Log level
+  --color [=string]      When to color
+  --at string            When to deploy
+  --tags, -t string      One or two tags
+  --owner string         Who deploys
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --license                                                           Prints the license
+
+EXAMPLES
+  # Deploys to prod in eu
+  deploy -e region=eu prod
+
+  deploy prod
+CliError: Invalid value for flag --env: "novalue". Expected: not key=value: novalue
+$ -t a --at yesterday prod
+DESCRIPTION
+  Deploys a build
+
+USAGE
+  deploy [flags] <target>
+
+ARGUMENTS
+  target string    Where to deploy
+
+FLAGS
+  --env, -e key=value    Variables
+  --level string         Log level
+  --color [=string]      When to color
+  --at string            When to deploy
+  --tags, -t string      One or two tags
+  --owner string         Who deploys
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --license                                                           Prints the license
+
+EXAMPLES
+  # Deploys to prod in eu
+  deploy -e region=eu prod
+
+  deploy prod
+CliError: Invalid value for flag --at: "yesterday". Expected: not a date: yesterday
+$ --license
+MIT, deploy 0.0.0
+$ d -t x staging
+deploy staging env [] token - level info
+  color never at None tags ["x"] owner ops
+$ secret
+secret ran
+$ --dir $TMP --notes $TMP/notes.txt --data $TMP/data.yaml --out $TMP/new.txt --any $TMP word
+files dir true notes Some "remember" data Some "{\"name\":\"flick\",\"list\":[1,2]}"
+  out Some true any 1 rest ["word"]
+$ --dir $TMP/missing word
+USAGE
+  files [flags] <rest...>
+
+ARGUMENTS
+  rest... string    More words
+
+FLAGS
+  --dir path      A directory
+  --notes file    A text file
+  --data file     A YAML file
+  --out path      Output file
+  --any path      Existing paths
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+CliError: Invalid value for flag --dir: "$TMP/missing". Expected: Path does not exist: $TMP/missing
+$ --dir $TMP --notes $TMP/missing.txt word
+USAGE
+  files [flags] <rest...>
+
+ARGUMENTS
+  rest... string    More words
+
+FLAGS
+  --dir path      A directory
+  --notes file    A text file
+  --data file     A YAML file
+  --out path      Output file
+  --any path      Existing paths
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+CliError: Invalid value for flag --notes: "$TMP/missing.txt". Expected: File does not exist: $TMP/missing.txt
+$ --dir $TMP
+USAGE
+  files [flags] <rest...>
+
+ARGUMENTS
+  rest... string    More words
+
+FLAGS
+  --dir path      A directory
+  --notes file    A text file
+  --data file     A YAML file
+  --out path      Output file
+  --any path      Existing paths
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+CliError: Missing required argument: rest
+files ok
+$ --version
+deploy@1.2.3
+$ --help
+usage deploy [flags] <target> flags ["env:key=value", "level:string", "color:[=string]", "at:string", "tags:string", "owner:string"] args ["target:string"]
+$ --completions fish
+usage deploy [flags] <target> flags ["env:key=value", "level:string", "color:[=string]", "at:string", "tags:string", "owner:string"] args ["target:string"]
+CliError: Unrecognized flag: --completions in command deploy
+parse Ok 12 Ok ("a", "b=c") extra true
+settings 0.0.0 [HelpFlag, VersionFlag, WizardFlag, CompletionsFlag, LogLevelFlag] true
+deploy v9.9.9
+help_doc usage tool deploy [flags] <target> flags ["env:key=value", "level:string", "color:[=string]", "at:string", "tags:string", "owner:string"] args ["target:string"]
+examples ["deploy -e region=eu prod / Some \"Deploys to prod in eu\"", "deploy prod / None"]
+global flags ["help", "version", "wizard", "completions", "log-level", "license"]
+subcommands [["deploy Some \"d\" Some \"Ships it\""]]
+groups [None]
+DESCRIPTION
+  Deploys a build
+
+USAGE
+  deploy [flags] <target>
+
+ARGUMENTS
+  target string    Where to deploy
+
+FLAGS
+  --env, -e key=value    Variables
+  --level string         Log level
+  --color [=string]      When to color
+  --at string            When to deploy
+  --tags, -t string      One or two tags
+  --owner string         Who deploys
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --license                                                           Prints the license
+
+EXAMPLES
+  # Deploys to prod in eu
+  deploy -e region=eu prod
+
+  deploy prod
+default formatter tool v1.0
+round trip true
+display_width (4, 3)
+completions Bash true true, Zsh true true, Fish true true, PowerShell true true
