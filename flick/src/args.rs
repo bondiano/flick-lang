@@ -3,6 +3,10 @@
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
+mod tools;
+
+pub use tools::*;
+
 /// The Flick compiler and toolchain.
 #[derive(Parser)]
 #[command(name = "flick", version = version())]
@@ -27,6 +31,40 @@ pub enum Commands {
     /// Bindings to npm packages from their `.d.ts`.
     #[command(subcommand)]
     Ffi(FfiCommands),
+    /// Create a project in a new directory.
+    New(NewArguments),
+    /// Add a project to the working directory; existing files are kept.
+    Init(InitArguments),
+    /// Build the app as JavaScript and run its `main`.
+    Run(RunArguments),
+    /// Rebuild on changes and replace the running app after its shutdown.
+    Dev(RunArguments),
+    /// Remove the build artifacts of the project.
+    Clean(CleanArguments),
+    /// Install the dependencies with the pinned pnpm.
+    Install(InstallArguments),
+    /// Add npm packages to the dependencies.
+    Add(AddArguments),
+    /// Remove direct dependencies.
+    Remove(PackagesArguments),
+    /// Update dependencies within the ranges of `package.json`.
+    Update(PackagesArguments),
+    /// Show the installed dependencies and their Flick interfaces.
+    Deps(DepsArguments),
+    /// Build a release package and an npm tarball of it.
+    Pack(OutDirArguments),
+    /// Static schemas of codecs.
+    #[command(subcommand)]
+    Schema(SchemaCommands),
+    /// Write documentation of the public API.
+    Doc(OutDirArguments),
+    /// Explain a diagnostic code.
+    Explain(ExplainArguments),
+    /// Check the compiler, Node.js, pnpm and the runtime.
+    Doctor,
+    /// Print a representation of a module: AST, typed IR, JS, TS, interface
+    /// or source mapping.
+    Inspect(InspectArguments),
 }
 
 #[derive(Subcommand)]
@@ -59,7 +97,7 @@ pub struct FfiCheckArguments {
     pub paths: Vec<String>,
 }
 
-#[derive(Args)]
+#[derive(Args, Clone)]
 pub struct GlobalArguments {
     /// Format of diagnostics on stderr.
     #[arg(long, global = true, value_enum, default_value_t = DiagnosticsFormat::Human)]
@@ -81,6 +119,10 @@ pub struct GlobalArguments {
     /// `flick.toml` from the working directory upwards.
     #[arg(long, global = true, value_name = "PATH")]
     pub project: Option<String>,
+
+    /// Treat warnings as errors.
+    #[arg(long, global = true)]
+    pub warnings_as_errors: bool,
 }
 
 #[derive(Args)]
@@ -88,9 +130,14 @@ pub struct CheckArguments {
     /// Files or directories to check, with everything they import; by
     /// default the project's source and test roots.
     pub paths: Vec<String>,
+
+    /// Check again whenever a source file changes.
+    #[arg(long)]
+    pub watch: bool,
 }
 
 #[derive(Args)]
+#[allow(clippy::struct_excessive_bools, reason = "one per command-line flag")]
 pub struct BuildArguments {
     /// Files or directories to compile, with everything they import; by
     /// default the project's source root.
@@ -121,6 +168,11 @@ pub struct BuildArguments {
     /// `build.profile` of the project.
     #[arg(long, value_enum)]
     pub profile: Option<ProfileArgument>,
+
+    /// Build again whenever a source file changes; a failed build keeps the
+    /// last output.
+    #[arg(long)]
+    pub watch: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -137,8 +189,9 @@ pub enum EmitArgument {
 
 #[derive(Args)]
 pub struct FmtArguments {
-    /// Files, or directories to search for `.fl` files.
-    #[arg(required_unless_present = "stdin", conflicts_with = "stdin")]
+    /// Files, or directories to search for `.fl` files; by default the
+    /// project's source and test roots.
+    #[arg(conflicts_with = "stdin")]
     pub paths: Vec<String>,
 
     /// Only check: exit with 1 if a file is not formatted, write nothing.

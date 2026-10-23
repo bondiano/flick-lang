@@ -976,42 +976,45 @@ derived `Eq`/`Ord`/`Hash`/`Show` и `Schema` (unboxed) следуют предс
   автоперезапуска при сбое cleanup.
 - Коды выхода `0/1/2/3/130/143` и потоки stdout/stderr по §12.
 
-**Артефакты.** `flick/src/commands/*`, `flick-core::project::{cache, generations, pnpm}`.
+**Артефакты.** `flick/src/commands/*`, `flick/src/{cache,child,toolchain}.rs`,
+`flick-core::project::{cache, pnpm}`, `flick-core::doc`, `docs/reference/cli.md`.
+Не сделано: раскладка `dist/debug/` и `dist/release/` (артефакты пишутся прямо в
+`out-dir`), `schema export --target openapi-3.1` (после M21), `lsp --stdio` (M17).
 
 **AC**
 
-- [ ] `check` и `build` не запускают `main`, не выполняют эффектную инициализацию
+- [x] `check` и `build` не запускают `main`, не выполняют эффектную инициализацию
       foreign modules и не устанавливают зависимости (тест: foreign-модуль с
       side effect при импорте не срабатывает) (§13).
-- [ ] `run`, `dev`, `test` всегда строят исполняемый JS, даже при `emit = "ts"` (§13).
-- [ ] `dev`: при ошибке сборки работает старая версия; новая стартует только после
+- [x] `run`, `dev`, `test` всегда строят исполняемый JS, даже при `emit = "ts"` (§13).
+- [x] `dev`: при ошибке сборки работает старая версия; новая стартует только после
       join, quiescence и finalizers старой; сбой cleanup останавливает перезапуск
       и попадает в итоговый Cause (§13).
-- [ ] Поздний `import()` в запущенной генерации не видит файлы следующей сборки (§13).
-- [ ] Кеш различает эффективную конфигурацию, профили, emit-режимы, версии
+- [x] Поздний `import()` в запущенной генерации не видит файлы следующей сборки (§13).
+- [x] Кеш различает эффективную конфигурацию, профили, emit-режимы, версии
       toolchain/runtime и dependency fingerprints: изменение любого из них —
       cache miss; cache miss не меняет результат (§13).
-- [ ] `clean` сохраняет активные генерации, их locks и пользовательские файлы в
+- [x] `clean` сохраняет активные генерации, их locks и пользовательские файлы в
       общем output-каталоге (§13).
-- [ ] `install --locked` без lockfile или при расхождении с manifest — код `2` (§13).
-- [ ] Неверная версия pnpm обнаруживается **до** изменения manifest/lockfile,
+- [x] `install --locked` без lockfile или при расхождении с manifest — код `2` (§13).
+- [x] Неверная версия pnpm обнаруживается **до** изменения manifest/lockfile,
       код `2` с инструкцией (§13).
-- [ ] Несовместимые compiler/runtime/Effect блокируют компиляцию и запуск (§13).
-- [ ] `--diagnostics json`: весь stderr — валидный versioned NDJSON, включая
+- [x] Несовместимые compiler/runtime/Effect блокируют компиляцию и запуск (§13).
+- [x] `--diagnostics json`: весь stderr — валидный versioned NDJSON, включая
       вывод приложения (`application-stderr`), тестов и pnpm
       (`package-manager-output`), без ANSI (§13).
-- [ ] stdout `lsp --stdio` содержит только протокол; `test --reporter json` — только
+- [ ] stdout `lsp --stdio` содержит только протокол (M17); `test --reporter json` — только
       события тестов (§13).
-- [ ] Коды выхода учитывают результат cleanup (матрица тестов на `0/1/2/3/130/143`) (§13).
-- [ ] `pack`: tarball содержит ESM, `.iface`, заявленные `.d.ts`; отсутствующий
+- [x] Коды выхода учитывают результат cleanup (матрица тестов на `0/1/2/3/130/143`) (§13).
+- [x] `pack`: tarball содержит ESM, `.iface`, заявленные `.d.ts`; отсутствующий
       export/`.iface` или несовместимый fingerprint отвергаются; импорт пакета
       ничего не запускает (§13).
-- [ ] `doc` генерирует страницы с source-типами, kinds, constraints, эффектами,
+- [x] `doc` генерирует страницы с source-типами, kinds, constraints, эффектами,
       captures.
-- [ ] `explain FLICK-…` работает для **каждого** зарегистрированного кода.
-- [ ] `doctor` проверяет compiler, Node, pnpm, Effect ABI, adapters; отсутствие
+- [x] `explain FLICK-…` работает для **каждого** зарегистрированного кода.
+- [x] `doctor` проверяет compiler, Node, pnpm, Effect ABI, adapters; отсутствие
       Content Mapper adapter не является ошибкой.
-- [ ] Сценарии из §12 «Примеры работы» и базовый CI-набор проходят как e2e-скрипт.
+- [x] Сценарии из §12 «Примеры работы» и базовый CI-набор проходят как e2e-скрипт.
 
 ---
 

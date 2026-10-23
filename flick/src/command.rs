@@ -21,10 +21,18 @@ pub trait Command {
 }
 
 pub fn run_command(command: &impl Command, global: &GlobalArguments) -> ExitCode {
+    finish(command.run(), global)
+}
+
+/// Reports `outcome` on stderr; its exit code.
+pub fn finish(outcome: Outcome, global: &GlobalArguments) -> ExitCode {
     let Outcome {
         sources,
         diagnostics,
-    } = command.run();
+    } = outcome;
     report::render(global, &sources, &diagnostics);
+    if global.warnings_as_errors {
+        return report::exit_code(&report::promote(&diagnostics));
+    }
     report::exit_code(&diagnostics)
 }

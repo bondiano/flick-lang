@@ -14,7 +14,7 @@ type alias SaveButtonProps c =
     on_save : (Unit ->{Users; SaveError} Unit)^c
   }
 
-save_button : forall c. SaveButtonProps c -> (Ui {Users} {SaveError})^c
+save_button : SaveButtonProps c -> (Ui {Users} {SaveError})^c
 let save_button props =
   Ui.button
     {
@@ -25,7 +25,7 @@ let save_button props =
     }
     [Ui.text props.label]
 
-save_button_ui : forall c. SaveButtonProps c -> (Ui {Users} {SaveError})^c
+save_button_ui : SaveButtonProps c -> (Ui {Users} {SaveError})^c
 let save_button_ui props =
   ui {
     button

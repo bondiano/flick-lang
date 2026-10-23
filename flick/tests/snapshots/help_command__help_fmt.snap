@@ -1,5 +1,6 @@
 ---
 source: flick/tests/help_command.rs
+assertion_line: 40
 expression: "stdout(&[\"help\", \"fmt\"])"
 ---
 Format Flick source files in place
@@ -7,7 +8,7 @@ Format Flick source files in place
 Usage: flick fmt [OPTIONS] [PATHS]...
 
 Arguments:
-  [PATHS]...  Files, or directories to search for `.fl` files
+  [PATHS]...  Files, or directories to search for `.fl` files; by default the project's source and test roots
 
 Options:
       --check                      Only check: exit with 1 if a file is not formatted, write nothing
@@ -18,4 +19,5 @@ Options:
       --stdin-filepath <FILE>      Path of the `--stdin` source, used in diagnostics. Requires `--stdin`
       --verbose                    Print more service output
       --project <PATH>             Project directory or its `flick.toml`; by default the nearest `flick.toml` from the working directory upwards
+      --warnings-as-errors         Treat warnings as errors
   -h, --help                       Print help

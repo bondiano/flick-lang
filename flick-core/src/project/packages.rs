@@ -41,7 +41,11 @@ struct Manifest {
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 struct FlickField {
-    iface_dir: String,
+    /// Where a package of Flick modules keeps their interfaces.
+    iface_dir: Option<String>,
+    /// The compiler a project pins; `flick` itself reads it.
+    #[serde(rename = "compiler")]
+    _compiler: Option<String>,
 }
 
 /// The `name` in the project's `package.json`, which owns its modules.
@@ -65,7 +69,7 @@ impl Packages {
                 let installed = manifest(host, &dir.join("package.json"), diagnostics);
                 let layout = installed
                     .as_ref()
-                    .and_then(|m| Some(m.flick.as_ref()?.iface_dir.clone()));
+                    .and_then(|m| m.flick.as_ref()?.iface_dir.clone());
                 Package {
                     name: name.clone(),
                     installed: installed.is_some(),

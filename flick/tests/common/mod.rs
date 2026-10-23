@@ -1,8 +1,8 @@
 //! Runs the built `flick` binary from the repository root.
 
 use std::io::Write;
-use std::path;
 use std::process::{Command, Output, Stdio};
+use std::{fs, path};
 
 pub fn flick(args: &[&str]) -> Output {
     flick_in(concat!(env!("CARGO_MANIFEST_DIR"), "/.."), args)
@@ -42,3 +42,20 @@ pub fn flick_stdin(args: &[&str], input: &str) -> Output {
         .expect("write stdin");
     child.wait_with_output().expect("flick exits")
 }
+
+/// A fresh directory `name` of the target's temporary directory with `files`.
+#[allow(dead_code, reason = "not every test file uses it")]
+pub fn project(name: &str, files: &[(&str, &str)]) -> path::PathBuf {
+    let dir = path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    let _ = fs::remove_dir_all(&dir);
+    for (file, contents) in files {
+        let path = dir.join(file);
+        fs::create_dir_all(path.parent().expect("a parent")).expect("dir");
+        fs::write(path, contents).expect("write");
+    }
+    dir
+}
+
+/// An app project's `flick.toml`.
+#[allow(dead_code, reason = "not every test file uses it")]
+pub const APP: &str = "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n";

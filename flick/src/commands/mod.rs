@@ -1,11 +1,27 @@
 mod build;
 mod check;
+mod clean;
+mod deps;
+mod dev;
 mod ffi;
 mod fmt;
+mod inspect;
+mod pack;
+mod run;
+mod scaffold;
 mod test;
+mod tools;
 
 pub use build::BuildCommand;
 pub use check::CheckCommand;
+pub use clean::clean;
+pub use deps::deps;
+pub use dev::dev;
 pub use ffi::{FfiCheckCommand, FfiImportCommand};
 pub use fmt::FmtCommand;
-pub use test::test;
+pub use inspect::{doc, inspect, schema_export};
+pub use pack::pack;
+pub use run::run;
+pub use scaffold::ScaffoldCommand;
+pub use test::{stamp, test, watched};
+pub use tools::{doctor, explain};

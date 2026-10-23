@@ -2,9 +2,11 @@
 //! source and test roots, the module ↔ path mapping and installed packages.
 //! File access goes through [`Host`], so the core stays free of I/O.
 
+pub mod cache;
 pub mod config;
 mod load;
 mod packages;
+pub mod pnpm;
 
 use std::path::{Component, Path, PathBuf};
 

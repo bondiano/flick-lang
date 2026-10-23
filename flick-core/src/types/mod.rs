@@ -50,6 +50,7 @@ pub use builtins::{builtin_sources, builtins};
 pub use classes::Dict;
 pub use convert::is_type;
 pub use decls::class_defaults;
+pub use display::show_type;
 pub use env::{Abi, Form, Fundep, Instance, JsClass, Operation, Rep, TypeDef};
 pub use kinds::Kind;
 pub use patterns::is_pattern;

@@ -11,14 +11,14 @@ use std::time::{Duration, SystemTime};
 use std::{fs, io, thread};
 
 use flick_core::diagnostics::{Diagnostic, Severity};
-use flick_core::project;
+use flick_core::project::{self, Project};
 use flick_core::source::SourceMap;
 
 use super::build::{Output, emit, release, write};
 use super::check::select;
 use crate::args::{GlobalArguments, Reporter, TestArguments};
-use crate::report;
 use crate::sources::FsHost;
+use crate::{child, report, toolchain};
 use flick_core::build::Extras;
 
 /// Where the test build goes, inside the project.
@@ -31,8 +31,10 @@ pub fn test(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
     let Ok(runner) = prepare(options, global) else {
         return ExitCode::from(1);
     };
-    match start(&runner, options, false).and_then(|mut child| child.wait()) {
-        Ok(status) => ExitCode::from(status.code().map_or(1, |c| u8::try_from(c).unwrap_or(1))),
+    let signals = child::signals();
+    let mut command = runner_command(&runner, options, false);
+    match child::spawn(&mut command, global, "application-stderr").and_then(|r| r.wait(&signals)) {
+        Ok(status) => ExitCode::from(child::code(status)),
         Err(err) => {
             eprintln!("error: cannot run node: {err}");
             ExitCode::from(2)
@@ -55,6 +57,9 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     let Some(project) = project else {
         return Err(());
     };
+    if let Some(problem) = toolchain::check_runtime(&project.root) {
+        return fail(&sources, vec![problem]);
+    }
     let wanted: Vec<PathBuf> = options
         .paths
         .iter()
@@ -71,13 +76,13 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     let out = project.root.join(OUT_DIR);
     let _ = fs::remove_dir_all(&out);
     let output = Output {
-        out_dir: &out,
+        out_dir: out.clone(),
         entry: None,
         typescript: false,
         extras: Extras::default(),
         release: release(options.profile, Some(&project.config.build)),
     };
-    let problems = emit(&host, &sources, Some(&project), &compilation, &output);
+    let (problems, _) = emit(&host, &sources, Some(&project), &compilation, &output);
     if !problems.is_empty() {
         return fail(&sources, problems);
     }
@@ -112,6 +117,10 @@ fn runner_source(suites: &[(String, String)]) -> String {
 }
 
 fn start(runner: &Path, options: &TestArguments, watched: bool) -> io::Result<Child> {
+    runner_command(runner, options, watched).spawn()
+}
+
+fn runner_command(runner: &Path, options: &TestArguments, watched: bool) -> Command {
     let mut command = Command::new("node");
     command.arg("--enable-source-maps").arg(runner);
     if watched {
@@ -128,25 +137,31 @@ fn start(runner: &Path, options: &TestArguments, watched: bool) -> io::Result<Ch
         Reporter::Human => "human",
         Reporter::Json => "json",
     };
-    command.args(["--reporter", reporter]).spawn()
+    command.args(["--reporter", reporter]);
+    command
 }
 
 /// The source and test roots and the configuration of the project.
-fn watched(global: &GlobalArguments) -> Vec<PathBuf> {
+pub fn watched(global: &GlobalArguments) -> Vec<PathBuf> {
     let host = FsHost::new();
     let explicit = global.project.as_deref().map(Path::new);
     match project::discover(&host, &mut SourceMap::default(), &host.cwd, explicit) {
-        Ok(Some(project)) => vec![
-            project.source_root(),
-            project.test_root(),
-            project.root.join(project::CONFIG_FILE),
-        ],
+        Ok(Some(project)) => watched_roots(&project),
         _ => vec![host.cwd],
     }
 }
 
+/// What a watch of `project` follows.
+pub fn watched_roots(project: &Project) -> Vec<PathBuf> {
+    vec![
+        project.source_root(),
+        project.test_root(),
+        project.root.join(project::CONFIG_FILE),
+    ]
+}
+
 /// The latest modification time under `paths`.
-fn stamp(paths: &[PathBuf]) -> Option<SystemTime> {
+pub fn stamp(paths: &[PathBuf]) -> Option<SystemTime> {
     fn newest(path: &Path, out: &mut Option<SystemTime>) {
         let Ok(meta) = fs::metadata(path) else {
             return;

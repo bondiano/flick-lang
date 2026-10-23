@@ -1,5 +1,6 @@
 ---
 source: flick/tests/help_command.rs
+assertion_line: 23
 expression: "stdout(&[\"help\", \"build\"])"
 ---
 Compile the project, or the given files, to ES modules
@@ -21,4 +22,6 @@ Options:
       --project <PATH>             Project directory or its `flick.toml`; by default the nearest `flick.toml` from the working directory upwards
       --schema-aot                 Compile pure codecs ahead of use in the app's runner
       --profile <PROFILE>          `debug`, the reference lowering, or `release`, optimized; by default `build.profile` of the project [possible values: debug, release]
+      --warnings-as-errors         Treat warnings as errors
+      --watch                      Build again whenever a source file changes; a failed build keeps the last output
   -h, --help                       Print help

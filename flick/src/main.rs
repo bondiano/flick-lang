@@ -1,37 +1,132 @@
 use std::process::ExitCode;
+use std::thread;
+use std::time::Duration;
 
 use clap::Parser;
+use flick_core::project::pnpm;
 
-use crate::args::{CommandArguments, Commands, FfiCommands};
-use crate::command::run_command;
-use crate::commands::{BuildCommand, CheckCommand, FfiCheckCommand, FfiImportCommand, FmtCommand};
+use crate::args::{CommandArguments, Commands, FfiCommands, GlobalArguments, SchemaCommands};
+use crate::command::{Command, finish as report, run_command};
+use crate::commands::{
+    BuildCommand, CheckCommand, FfiCheckCommand, FfiImportCommand, FmtCommand, ScaffoldCommand,
+};
 
 mod args;
+mod cache;
+mod child;
 mod command;
 mod commands;
 mod report;
 mod sources;
+mod toolchain;
+
+/// Runs `command` again after every change of the project's files.
+fn watch(command: &impl Command, global: &GlobalArguments) -> ExitCode {
+    let paths = commands::watched(global);
+    loop {
+        let before = commands::stamp(&paths);
+        run_command(command, global);
+        while commands::stamp(&paths) == before {
+            thread::sleep(Duration::from_millis(200));
+        }
+        report::log(global, "a file changed: running again");
+    }
+}
+
+/// The pnpm command of a dependency command.
+fn dependency_command(cmd: Commands) -> pnpm::Command {
+    match cmd {
+        Commands::Install(o) => pnpm::Command::Install {
+            locked: o.locked,
+            offline: o.offline,
+        },
+        Commands::Add(o) => pnpm::Command::Add {
+            packages: o.packages,
+            dev: o.dev,
+        },
+        Commands::Remove(o) => pnpm::Command::Remove {
+            packages: o.packages,
+        },
+        Commands::Update(o) => pnpm::Command::Update {
+            packages: o.packages,
+        },
+        Commands::Deps(o) => match o.why {
+            Some(package) => pnpm::Command::Why { package },
+            None => pnpm::Command::List,
+        },
+        _ => unreachable!("only dependency commands"),
+    }
+}
 
 fn main() -> ExitCode {
     let args = CommandArguments::parse();
+    let global = &args.global;
+    let project = global.project.as_deref();
     match args.cmd {
-        Commands::Check(options) => run_command(
-            &CheckCommand::new(options, args.global.project.clone()),
-            &args.global,
-        ),
-        Commands::Build(options) => run_command(
-            &BuildCommand::new(options, args.global.project.clone()),
-            &args.global,
-        ),
-        Commands::Fmt(options) => run_command(&FmtCommand::new(options), &args.global),
-        Commands::Test(options) => commands::test(&options, &args.global),
+        Commands::Check(options) => {
+            let watching = options.watch;
+            let command = CheckCommand::new(options, global.project.clone());
+            if watching {
+                watch(&command, global)
+            } else {
+                run_command(&command, global)
+            }
+        }
+        Commands::Build(options) => {
+            let watching = options.watch;
+            let command = BuildCommand::new(options, global.project.clone());
+            if watching {
+                watch(&command, global)
+            } else {
+                run_command(&command, global)
+            }
+        }
+        Commands::Fmt(options) => {
+            run_command(&FmtCommand::new(options, global.project.clone()), global)
+        }
+        Commands::Test(options) => commands::test(&options, global),
         Commands::Ffi(FfiCommands::Import(options)) => run_command(
-            &FfiImportCommand::new(options, args.global.project.clone()),
-            &args.global,
+            &FfiImportCommand::new(options, global.project.clone()),
+            global,
         ),
         Commands::Ffi(FfiCommands::Check(options)) => run_command(
-            &FfiCheckCommand::new(options, args.global.project.clone()),
-            &args.global,
+            &FfiCheckCommand::new(options, global.project.clone()),
+            global,
         ),
+        Commands::New(options) => run_command(
+            &ScaffoldCommand {
+                dir: options.directory.into(),
+                template: options.template,
+                fresh: true,
+            },
+            global,
+        ),
+        Commands::Init(options) => run_command(
+            &ScaffoldCommand {
+                dir: ".".into(),
+                template: options.template,
+                fresh: false,
+            },
+            global,
+        ),
+        Commands::Run(options) => commands::run(&options, global),
+        Commands::Dev(options) => commands::dev(&options, global),
+        Commands::Clean(options) => report(commands::clean(&options, global), global),
+        Commands::Install(_)
+        | Commands::Add(_)
+        | Commands::Remove(_)
+        | Commands::Update(_)
+        | Commands::Deps(_) => report(
+            commands::deps(&dependency_command(args.cmd), global),
+            global,
+        ),
+        Commands::Pack(o) => report(commands::pack(&o, global), global),
+        Commands::Schema(SchemaCommands::Export(o)) => {
+            report(commands::schema_export(&o, project), global)
+        }
+        Commands::Doc(o) => report(commands::doc(&o, project), global),
+        Commands::Explain(o) => report(commands::explain(&o), global),
+        Commands::Doctor => report(commands::doctor(global), global),
+        Commands::Inspect(o) => report(commands::inspect(&o, project), global),
     }
 }

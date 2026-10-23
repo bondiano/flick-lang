@@ -179,6 +179,7 @@ codes! {
     D005 = Schema 5, "two codec fields share a wire name";
     D006 = Schema 6, "constant fails the check of its refined type";
     D007 = Schema 7, "codec block over a schema that is not a record";
+    D008 = Schema 8, "codec has no strict JSON Schema";
     Q001 = Sql 1, "unknown column";
     Q002 = Sql 2, "unknown table alias";
     Q003 = Sql 3, "ambiguous column";
@@ -206,6 +207,13 @@ codes! {
     P012 = Project 12, "construct is not compiled yet";
     P013 = Project 13, "cannot write build output";
     P014 = Project 14, "package built against another interface of a dependency";
+    P015 = Project 15, "incompatible toolchain or runtime";
+    P016 = Project 16, "package manager unavailable or of another version";
+    P017 = Project 17, "package manager failed";
+    P018 = Project 18, "unknown module or value for a tool";
+    P019 = Project 19, "file exists";
+    P020 = Project 20, "incomplete package";
+    P021 = Project 21, "application cleanup failed";
 }
 
 #[cfg(test)]

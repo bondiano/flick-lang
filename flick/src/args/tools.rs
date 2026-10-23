@@ -1,0 +1,144 @@
+//! Arguments of the project, run, dependency and tooling commands.
+
+use clap::{Args, Subcommand, ValueEnum};
+
+use super::ProfileArgument;
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum Template {
+    App,
+    Lib,
+}
+
+#[derive(Args)]
+pub struct NewArguments {
+    /// The directory to create.
+    pub directory: String,
+
+    /// An application with `main`, or a library.
+    #[arg(long, value_enum, default_value_t = Template::App)]
+    pub template: Template,
+}
+
+#[derive(Args)]
+pub struct InitArguments {
+    /// An application with `main`, or a library.
+    #[arg(long, value_enum, default_value_t = Template::App)]
+    pub template: Template,
+}
+
+#[derive(Args)]
+pub struct RunArguments {
+    /// The module whose `main` runs; by default `entry` of the project.
+    #[arg(long, value_name = "MODULE")]
+    pub entry: Option<String>,
+
+    /// `debug` or `release`; by default `build.profile` of the project.
+    #[arg(long, value_enum)]
+    pub profile: Option<ProfileArgument>,
+
+    /// Arguments of the application, after `--`.
+    #[arg(last = true)]
+    pub args: Vec<String>,
+}
+
+#[derive(Args)]
+pub struct CleanArguments {
+    /// Also remove the project's Flick cache.
+    #[arg(long)]
+    pub cache: bool,
+}
+
+#[derive(Args)]
+pub struct InstallArguments {
+    /// Install exactly the lockfile: no lockfile, or one out of date with
+    /// `package.json`, is an error.
+    #[arg(long)]
+    pub locked: bool,
+
+    /// Install only from the local store.
+    #[arg(long)]
+    pub offline: bool,
+}
+
+#[derive(Args)]
+pub struct AddArguments {
+    /// npm package specs, such as `date-fns` or `date-fns@4`.
+    #[arg(required = true)]
+    pub packages: Vec<String>,
+
+    /// Add to `devDependencies`.
+    #[arg(long)]
+    pub dev: bool,
+}
+
+#[derive(Args)]
+pub struct PackagesArguments {
+    /// Package names.
+    pub packages: Vec<String>,
+}
+
+#[derive(Args)]
+pub struct DepsArguments {
+    /// Why this package is installed.
+    #[arg(long, value_name = "PACKAGE")]
+    pub why: Option<String>,
+}
+
+#[derive(Args)]
+pub struct OutDirArguments {
+    /// Directory to write into.
+    #[arg(long, value_name = "DIR")]
+    pub out_dir: String,
+}
+
+#[derive(Subcommand)]
+pub enum SchemaCommands {
+    /// Export the static wire form of a JSON codec.
+    Export(SchemaExportArguments),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum SchemaTarget {
+    #[value(name = "json-schema-2020-12")]
+    JsonSchema,
+}
+
+#[derive(Args)]
+pub struct SchemaExportArguments {
+    /// The codec: `Module.value`, a `PureCodec Json a` the module exports.
+    pub codec: String,
+
+    #[arg(long, value_enum)]
+    pub target: SchemaTarget,
+
+    /// The file to write.
+    #[arg(long, value_name = "FILE")]
+    pub out: String,
+}
+
+#[derive(Args)]
+pub struct ExplainArguments {
+    /// A diagnostic code, such as `FLICK-T003`.
+    pub code: String,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum Representation {
+    Ast,
+    TypedIr,
+    Js,
+    Ts,
+    Iface,
+    Mapping,
+}
+
+#[derive(Args)]
+pub struct InspectArguments {
+    /// The module, such as `App.Main`.
+    pub module: String,
+
+    /// What to print.
+    #[arg(long, value_enum)]
+    pub emit: Representation,
+}

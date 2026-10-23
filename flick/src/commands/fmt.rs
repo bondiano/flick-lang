@@ -13,12 +13,13 @@ use crate::sources;
 
 pub struct FmtCommand {
     options: FmtArguments,
+    project: Option<String>,
 }
 
 impl FmtCommand {
     /// Exits with a usage error (code 2) for `--stdin-filepath` without
     /// `--stdin`: clap's `requires` counts the defaulted bool flag as present.
-    pub fn new(options: FmtArguments) -> Self {
+    pub fn new(options: FmtArguments, project: Option<String>) -> Self {
         if options.stdin_filepath.is_some() && !options.stdin {
             CommandArguments::command()
                 .error(
@@ -27,15 +28,28 @@ impl FmtCommand {
                 )
                 .exit();
         }
-        Self { options }
+        Self { options, project }
     }
 
     fn files(&self) -> Outcome {
+        let mut outcome = Outcome::default();
         let mut paths = Vec::new();
+        if self.options.paths.is_empty() {
+            // without paths: the project's source and test roots
+            let host = sources::FsHost::new();
+            match super::check::select(&host, &mut outcome.sources, self.project.as_deref(), &[]) {
+                Ok((_, roots)) => {
+                    paths.extend(roots.iter().map(|r| r.to_string_lossy().into_owned()));
+                }
+                Err(d) => {
+                    outcome.diagnostics.push(d);
+                    return outcome;
+                }
+            }
+        }
         for path in &self.options.paths {
             sources::source_files(path, &mut paths);
         }
-        let mut outcome = Outcome::default();
         for path in paths {
             let file = match sources::load(&mut outcome.sources, &path) {
                 Ok(file) => file,

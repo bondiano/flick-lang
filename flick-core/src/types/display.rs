@@ -4,14 +4,30 @@ use std::fmt::Write;
 
 use super::Checker;
 use super::ty::{Binder, Row, Type};
+use super::unify::Store;
 
 impl Checker<'_> {
     pub fn show(&self, t: &Type) -> String {
         let mut out = String::new();
-        self.print(&self.zonk(t), Prec::Top, &mut out);
+        let printer = Printer { store: &self.store };
+        printer.print(&self.zonk(t), Prec::Top, &mut out);
         out
     }
+}
 
+/// A closed type, as an interface stores it, in source syntax.
+pub fn show_type(t: &Type) -> String {
+    let store = Store::default();
+    let mut out = String::new();
+    Printer { store: &store }.print(t, Prec::Top, &mut out);
+    out
+}
+
+struct Printer<'s> {
+    store: &'s Store,
+}
+
+impl Printer<'_> {
     fn print(&self, t: &Type, prec: Prec, out: &mut String) {
         let parens = |needed: bool, out: &mut String, f: &mut dyn FnMut(&mut String)| {
             if needed {

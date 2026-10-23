@@ -48,8 +48,8 @@ c7457701e10aa513  spec:1581  add : Number -> Number -> Number
 d72679edd15d953e  spec:1929  class Eq a => Hash a =
 e28dd24856e76943  spec:2085  type alias BalanceRow =
 1838791670c05b74  spec:2119  deferred_balances :
-f288d88532aaff1e  spec:2179  type alias SaveButtonProps c =
-241cd523f0895a4c  spec:2209  save_button :
+aa414f379b88aedd  spec:2194  type alias SaveButtonProps c =
+924fb2766af07dd1  spec:2223  save_button :
 4f1eda6ee144286a  spec:2345  module App.Users exposing (User, load_user)
 6ab2908136691e1a  spec:2567  opaque type alias UserId = String
 0ea7549614206500  spec:2292  greet : Cli.Command {Platform} none

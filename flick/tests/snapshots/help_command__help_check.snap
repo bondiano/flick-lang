@@ -1,5 +1,6 @@
 ---
 source: flick/tests/help_command.rs
+assertion_line: 18
 expression: "stdout(&[\"help\", \"check\"])"
 ---
 Check Flick source files and report diagnostics
@@ -11,8 +12,10 @@ Arguments:
 
 Options:
       --diagnostics <DIAGNOSTICS>  Format of diagnostics on stderr [default: human] [possible values: human, json]
+      --watch                      Check again whenever a source file changes
       --color <COLOR>              Colorize human-readable output [default: auto] [possible values: auto, always, never]
       --quiet                      Print less service output
       --verbose                    Print more service output
       --project <PATH>             Project directory or its `flick.toml`; by default the nearest `flick.toml` from the working directory upwards
+      --warnings-as-errors         Treat warnings as errors
   -h, --help                       Print help
