@@ -117,6 +117,8 @@ unzip = "List.unzip fc08e4a943b8119d"
 window = "List.window ca2e713ca8eb60f1"
 zip = "List.zip acfd4eb64d599b89"
 zipWith = "List.zip_with 6c2154874d632092"
+getReadonlyReducerConcat = "Reducer.list_concat 2846d408f33ea840"
+makeReducerConcat = "Reducer.list_concat 0cd4b3c8afb536e2"
 
 [language]
 Do = "nested `List.flat_map` building record literals: Flick has no do notation"
@@ -137,7 +139,3 @@ fromIterable = "TS-only: Flick has no `Iterable` interface; each collection has 
 allocate = "invariant: an array of holes filled by mutation; Flick lists are immutable and hold no `undefined` (mutable arrays are `Js.Array`)"
 copy = "invariant: a copy exists only to be mutated; Flick lists are immutable and shared as they are (mutable arrays are `Js.Array`)"
 getUnsafe = "invariant: `unsafe*` throws a defect for a missing element instead of a typed `Option` (`List.get`)"
-
-[pending]
-getReadonlyReducerConcat = "M20"
-makeReducerConcat = "M20"

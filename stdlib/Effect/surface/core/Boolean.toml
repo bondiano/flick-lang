@@ -11,6 +11,8 @@ not = "Bool.not_ 92ca3f39b61d9d06"
 or = "Bool.or f6769cc0c2d7691e"
 some = "Bool.some 8d208581d86b345c"
 xor = "Bool.xor 283639866f91d605"
+ReducerAnd = "Bool.reducer_and 79e99da315caa107"
+ReducerOr = "Bool.reducer_or a5da2cb09b99525e"
 
 [language]
 Equivalence = "the class `Eq`: the instance `Eq Bool`"
@@ -18,7 +20,3 @@ Order = "the class `Ord`: the instance `Ord Bool`, `false` first"
 
 [excluded]
 isBoolean = "TS-only: a type guard over `unknown`; Flick values are typed statically"
-
-[pending]
-ReducerAnd = "M20"
-ReducerOr = "M20"

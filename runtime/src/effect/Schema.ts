@@ -44,7 +44,7 @@ type Of<T> = Schema.Codec<T, unknown, unknown, unknown>;
 const noted = (codec: AnySchema, notes: Notes): AnySchema => codec.annotate(notes);
 
 /** A codec whose decoding may fail on a wire value of the right JSON type: no exact JSON Schema. */
-const fallible = (codec: AnySchema): AnySchema => noted(codec, { "flick/transform": "result" });
+export const fallible = (codec: AnySchema): AnySchema => noted(codec, { "flick/transform": "result" });
 
 // Checks: Effect's filters as values, applied to a codec by `Check.apply`.
 
@@ -123,6 +123,27 @@ export const flickStringFromBase64 = fallible(Schema.StringFromBase64);
 export const flickStringFromBase64Url = fallible(Schema.StringFromBase64Url);
 export const flickStringFromHex = fallible(Schema.StringFromHex);
 export const flickStringFromUriComponent = fallible(Schema.StringFromUriComponent);
+
+/** Flick's bytes: a list of whole numbers from 0 to 255. */
+const byteList = Schema.Array(Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 255 })));
+
+/** `Codec.bytes_*`: a codec of a `Uint8Array` with the bytes as a Flick list. */
+const asBytes = (codec: Schema.Codec<Uint8Array, string>): AnySchema =>
+  fallible(
+    codec.pipe(
+      Schema.decodeTo(
+        byteList,
+        SchemaTransformation.transform({
+          decode: (u: Uint8Array): ReadonlyArray<number> => Array.from(u),
+          encode: (xs: ReadonlyArray<number>): Uint8Array => Uint8Array.from(xs),
+        }),
+      ),
+    ),
+  );
+
+export const flickBytesFromBase64 = asBytes(Schema.Uint8ArrayFromBase64);
+export const flickBytesFromBase64Url = asBytes(Schema.Uint8ArrayFromBase64Url);
+export const flickBytesFromHex = asBytes(Schema.Uint8ArrayFromHex);
 
 /** `Codec.json_string codec`: JSON text in a string, decoded by `codec`. */
 export const flickFromJsonString = (codec: AnySchema): AnySchema => fallible(Schema.fromJsonString(codec));

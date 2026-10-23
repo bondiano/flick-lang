@@ -1,0 +1,11 @@
+option: Some 3 None
+fail_fast: Some 3 None
+combiner fail_fast: Some 3 None
+lists: [1, 2, 3]
+bools: (false, true, true, false)
+union: [("x", 1), ("y", 12), ("z", 20)]
+intersection: [("y", 12)]
+struct combiner: 3 ["a", "b"]
+struct reducer: 5 ["a"] from 0 []
+tuple2: (3, "b") (3, "ab")
+tuple3: (3, "a", 5) (3, "ab", true)

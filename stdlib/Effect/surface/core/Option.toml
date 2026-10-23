@@ -40,6 +40,9 @@ toArray = "Option.to_list bb698640bd308975"
 zipLeft = "Option.zip_left 44bbd88ecc4de0d4"
 zipRight = "Option.zip_right a19da2db6fcbe826"
 zipWith = "Option.zip_with 69b0e55cac93db55"
+makeCombinerFailFast = "Combiner.option_fail_fast 8d4d6192c776d9bf"
+makeReducer = "Reducer.option f3bc69e157cb83ca"
+makeReducerFailFast = "Reducer.option_fail_fast 4f1d76faa5d133ee"
 
 [language]
 Do = "`Option.bind` chains building record literals: Flick has no do notation"
@@ -67,8 +70,3 @@ getOrNull = "TS-only: Flick has no `null`; `Option.with_default` gives a value"
 getOrThrow = "invariant: throws a defect for `None` instead of a typed failure (`Result.from_option`, `from_result`)"
 getOrThrowWith = "invariant: throws a defect for `None` instead of a typed failure (`Result.from_option`, `from_result`)"
 liftThrowable = "invariant: turns a defect (a JS throw) into `None`; defects stay defects (`catch` on a foreign binding gives typed errors)"
-
-[pending]
-makeCombinerFailFast = "M20"
-makeReducer = "M20"
-makeReducerFailFast = "M20"

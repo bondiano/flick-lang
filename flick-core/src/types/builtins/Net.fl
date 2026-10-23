@@ -1,0 +1,243 @@
+/// Network addresses and DNS records as JSON, from Effect's `Schema`. An
+/// address is kept as its canonical text: decoding validates and normalizes
+/// it (`"2001:DB8:0::1"` becomes `"2001:db8::1"`), encoding validates it, and
+/// text of another form is a `SchemaError`.
+module Net exposing (..)
+
+/// A DNS record of any type, as Effect keeps it; `format_record` writes it.
+type DnsRecord
+
+/// The record as one line of zone-file text: `"MX 10 mail.example.com"`.
+format_record : DnsRecord -> String
+foreign pure format_record from "@flick-lang/runtime/effect/Net" "flickFormatRecord"
+
+/// A domain name, lowercased: `"example.com"`.
+domain_name : PureCodec Json String
+foreign pure domain_name from "@flick-lang/runtime/effect/Net" "flickDomainName"
+  reviewed "effect@4.0.5 sha256:38ef79733a663a19"
+
+/// A host: an IP address, a scoped IPv6 literal or a domain name.
+host : PureCodec Json String
+foreign pure host from "@flick-lang/runtime/effect/Net" "flickHost"
+  reviewed "effect@4.0.5 sha256:6a3bce142a0bcfa7"
+
+/// A host and a port: `"example.com:8080"`, `"[::1]:80"`.
+host_port : PureCodec Json String
+foreign pure host_port from "@flick-lang/runtime/effect/Net" "flickHostPort"
+  reviewed "effect@4.0.5 sha256:f6de950f11d44a6e"
+
+/// An IP socket address: `"127.0.0.1:80"`, `"[::1]:80"`.
+inet_address : PureCodec Json String
+foreign pure inet_address from "@flick-lang/runtime/effect/Net" "flickInetAddress"
+  reviewed "effect@4.0.5 sha256:6f0620bfd0f9fa1e"
+
+/// An IPv4 socket address: `"127.0.0.1:80"`.
+inet_address_v4 : PureCodec Json String
+foreign pure inet_address_v4 from "@flick-lang/runtime/effect/Net" "flickInetAddressV4"
+  reviewed "effect@4.0.5 sha256:fcb2bdd206c988fc"
+
+/// An IPv6 socket address: `"[::1]:80"`.
+inet_address_v6 : PureCodec Json String
+foreign pure inet_address_v6 from "@flick-lang/runtime/effect/Net" "flickInetAddressV6"
+  reviewed "effect@4.0.5 sha256:f273b76c54db7d22"
+
+/// An IP socket address or a Unix socket path.
+socket_address : PureCodec Json String
+foreign pure socket_address from "@flick-lang/runtime/effect/Net" "flickSocketAddress"
+  reviewed "effect@4.0.5 sha256:432cb05e00a635a6"
+
+/// A Unix socket path: `"/run/app.sock"`.
+unix_path_address : PureCodec Json String
+foreign pure unix_path_address from "@flick-lang/runtime/effect/Net" "flickUnixPathAddress"
+  reviewed "effect@4.0.5 sha256:55c47635917687fe"
+
+/// An IPv4 or IPv6 address, as written canonically: `"2001:db8::1"`.
+ip_address : PureCodec Json String
+foreign pure ip_address from "@flick-lang/runtime/effect/Net" "flickIpAddress"
+  reviewed "effect@4.0.5 sha256:51cd8ab0784014c4"
+
+/// An address with its prefix length: `"10.1.2.3/8"`.
+ip_interface : PureCodec Json String
+foreign pure ip_interface from "@flick-lang/runtime/effect/Net" "flickIpInterface"
+  reviewed "effect@4.0.5 sha256:ca69830b0e9051b6"
+
+/// A link-local IP address.
+ip_link_local_address : PureCodec Json String
+foreign pure ip_link_local_address from "@flick-lang/runtime/effect/Net" "flickIpLinkLocalAddress"
+  reviewed "effect@4.0.5 sha256:0db228c276b10734"
+
+/// A loopback IP address.
+ip_loopback_address : PureCodec Json String
+foreign pure ip_loopback_address from "@flick-lang/runtime/effect/Net" "flickIpLoopbackAddress"
+  reviewed "effect@4.0.5 sha256:51d2060d527738ab"
+
+/// A multicast IP address.
+ip_multicast_address : PureCodec Json String
+foreign pure ip_multicast_address from "@flick-lang/runtime/effect/Net" "flickIpMulticastAddress"
+  reviewed "effect@4.0.5 sha256:74a9262b86e70f1d"
+
+/// A network without host bits: `"10.0.0.0/8"`.
+ip_network : PureCodec Json String
+foreign pure ip_network from "@flick-lang/runtime/effect/Net" "flickIpNetwork"
+  reviewed "effect@4.0.5 sha256:4f28390a4af8a704"
+
+/// A unicast IP address.
+ip_unicast_address : PureCodec Json String
+foreign pure ip_unicast_address from "@flick-lang/runtime/effect/Net" "flickIpUnicastAddress"
+  reviewed "effect@4.0.5 sha256:0deab2b9497d649e"
+
+/// The unspecified address, `"0.0.0.0"` or `"::"`.
+ip_unspecified_address : PureCodec Json String
+foreign pure ip_unspecified_address from "@flick-lang/runtime/effect/Net" "flickIpUnspecifiedAddress"
+  reviewed "effect@4.0.5 sha256:c0c2277ebf8a734f"
+
+/// An IPv4 address: `"192.168.0.1"`, no leading zeroes.
+ipv4_address : PureCodec Json String
+foreign pure ipv4_address from "@flick-lang/runtime/effect/Net" "flickIpv4Address"
+  reviewed "effect@4.0.5 sha256:ab3782c92616a934"
+
+/// The IPv4 broadcast address.
+ipv4_broadcast_address : PureCodec Json String
+foreign pure ipv4_broadcast_address from "@flick-lang/runtime/effect/Net" "flickIpv4BroadcastAddress"
+  reviewed "effect@4.0.5 sha256:e68c3098f9f3353b"
+
+/// An IPv4 address with its prefix length.
+ipv4_interface : PureCodec Json String
+foreign pure ipv4_interface from "@flick-lang/runtime/effect/Net" "flickIpv4Interface"
+  reviewed "effect@4.0.5 sha256:2d9725521f81f5b7"
+
+/// An IPv4 network without host bits.
+ipv4_network : PureCodec Json String
+foreign pure ipv4_network from "@flick-lang/runtime/effect/Net" "flickIpv4Network"
+  reviewed "effect@4.0.5 sha256:e724ca0420055eae"
+
+/// A private IPv4 address (RFC 1918).
+ipv4_private_address : PureCodec Json String
+foreign pure ipv4_private_address from "@flick-lang/runtime/effect/Net" "flickIpv4PrivateAddress"
+  reviewed "effect@4.0.5 sha256:ff4053264b2757c2"
+
+/// An IPv6 address, as written canonically.
+ipv6_address : PureCodec Json String
+foreign pure ipv6_address from "@flick-lang/runtime/effect/Net" "flickIpv6Address"
+  reviewed "effect@4.0.5 sha256:019a0b68eb4f1792"
+
+/// An IPv6 address with its prefix length.
+ipv6_interface : PureCodec Json String
+foreign pure ipv6_interface from "@flick-lang/runtime/effect/Net" "flickIpv6Interface"
+  reviewed "effect@4.0.5 sha256:56f227074b52a428"
+
+/// An IPv6 network without host bits.
+ipv6_network : PureCodec Json String
+foreign pure ipv6_network from "@flick-lang/runtime/effect/Net" "flickIpv6Network"
+  reviewed "effect@4.0.5 sha256:01afa2f83506989c"
+
+/// A unique local IPv6 address (`fc00::/7`).
+ipv6_unique_local_address : PureCodec Json String
+foreign pure ipv6_unique_local_address from "@flick-lang/runtime/effect/Net" "flickIpv6UniqueLocalAddress"
+  reviewed "effect@4.0.5 sha256:a7b2c5800033c563"
+
+/// A MAC address: six two-digit hex octets separated by colons.
+mac_address : PureCodec Json String
+foreign pure mac_address from "@flick-lang/runtime/effect/Net" "flickMacAddress"
+  reviewed "effect@4.0.5 sha256:c74a5cf4c1c87274"
+
+/// The broadcast MAC address.
+mac_broadcast_address : PureCodec Json String
+foreign pure mac_broadcast_address from "@flick-lang/runtime/effect/Net" "flickMacBroadcastAddress"
+  reviewed "effect@4.0.5 sha256:d05b47bb41875029"
+
+/// A locally administered MAC address.
+mac_locally_administered_address : PureCodec Json String
+foreign pure mac_locally_administered_address from "@flick-lang/runtime/effect/Net" "flickMacLocallyAdministeredAddress"
+  reviewed "effect@4.0.5 sha256:030ed33f1dd738cf"
+
+/// A multicast MAC address.
+mac_multicast_address : PureCodec Json String
+foreign pure mac_multicast_address from "@flick-lang/runtime/effect/Net" "flickMacMulticastAddress"
+  reviewed "effect@4.0.5 sha256:0d584e72fa5fa7b4"
+
+/// A unicast MAC address.
+mac_unicast_address : PureCodec Json String
+foreign pure mac_unicast_address from "@flick-lang/runtime/effect/Net" "flickMacUnicastAddress"
+  reviewed "effect@4.0.5 sha256:0184928b56df0517"
+
+/// A universally administered MAC address.
+mac_universally_administered_address : PureCodec Json String
+foreign pure mac_universally_administered_address from "@flick-lang/runtime/effect/Net" "flickMacUniversallyAdministeredAddress"
+  reviewed "effect@4.0.5 sha256:2558f5bdb8d9108e"
+
+/// An IPv6 address with a zone: `"fe80::1%eth0"`.
+scoped_ipv6_literal : PureCodec Json String
+foreign pure scoped_ipv6_literal from "@flick-lang/runtime/effect/Net" "flickScopedIpv6Literal"
+  reviewed "effect@4.0.5 sha256:120263e034f9bb0e"
+
+/// A DNS record of any type as Effect's JSON object, tagged by `"_tag"`:
+/// `{ "_tag": "A", "address": "192.0.2.1" }`.
+dns_record : PureCodec Json DnsRecord
+foreign pure dns_record from "@flick-lang/runtime/effect/Net" "flickDnsRecord"
+  reviewed "effect@4.0.5 sha256:cbd79313fbf4314b"
+
+/// A DNS A record as JSON; a record of another type is a `SchemaError`.
+dns_a_record : PureCodec Json DnsRecord
+foreign pure dns_a_record from "@flick-lang/runtime/effect/Net" "flickDnsARecord"
+  reviewed "effect@4.0.5 sha256:f4323ed24e73b5e1"
+
+/// A DNS AAAA record as JSON; a record of another type is a `SchemaError`.
+dns_aaaa_record : PureCodec Json DnsRecord
+foreign pure dns_aaaa_record from "@flick-lang/runtime/effect/Net" "flickDnsAaaaRecord"
+  reviewed "effect@4.0.5 sha256:37fcfcbbbfa0edad"
+
+/// A DNS CAA record as JSON; a record of another type is a `SchemaError`.
+dns_caa_record : PureCodec Json DnsRecord
+foreign pure dns_caa_record from "@flick-lang/runtime/effect/Net" "flickDnsCaaRecord"
+  reviewed "effect@4.0.5 sha256:8990a188674207bf"
+
+/// A DNS CNAME record as JSON; a record of another type is a `SchemaError`.
+dns_cname_record : PureCodec Json DnsRecord
+foreign pure dns_cname_record from "@flick-lang/runtime/effect/Net" "flickDnsCnameRecord"
+  reviewed "effect@4.0.5 sha256:efa5e59a30c6cf0e"
+
+/// A DNS MX record as JSON; a record of another type is a `SchemaError`.
+dns_mx_record : PureCodec Json DnsRecord
+foreign pure dns_mx_record from "@flick-lang/runtime/effect/Net" "flickDnsMxRecord"
+  reviewed "effect@4.0.5 sha256:b36ef2df355d2296"
+
+/// A DNS NAPTR record as JSON; a record of another type is a `SchemaError`.
+dns_naptr_record : PureCodec Json DnsRecord
+foreign pure dns_naptr_record from "@flick-lang/runtime/effect/Net" "flickDnsNaptrRecord"
+  reviewed "effect@4.0.5 sha256:f750f7cb39f8cec5"
+
+/// A DNS NS record as JSON; a record of another type is a `SchemaError`.
+dns_ns_record : PureCodec Json DnsRecord
+foreign pure dns_ns_record from "@flick-lang/runtime/effect/Net" "flickDnsNsRecord"
+  reviewed "effect@4.0.5 sha256:29d0b46be1138b2d"
+
+/// A DNS PTR record as JSON; a record of another type is a `SchemaError`.
+dns_ptr_record : PureCodec Json DnsRecord
+foreign pure dns_ptr_record from "@flick-lang/runtime/effect/Net" "flickDnsPtrRecord"
+  reviewed "effect@4.0.5 sha256:709baa0375fa7aa7"
+
+/// A DNS SOA record as JSON; a record of another type is a `SchemaError`.
+dns_soa_record : PureCodec Json DnsRecord
+foreign pure dns_soa_record from "@flick-lang/runtime/effect/Net" "flickDnsSoaRecord"
+  reviewed "effect@4.0.5 sha256:14b5d07dad1fab51"
+
+/// A DNS SRV record as JSON; a record of another type is a `SchemaError`.
+dns_srv_record : PureCodec Json DnsRecord
+foreign pure dns_srv_record from "@flick-lang/runtime/effect/Net" "flickDnsSrvRecord"
+  reviewed "effect@4.0.5 sha256:25e19f56dcbc7d1b"
+
+/// A DNS TLSA record as JSON; a record of another type is a `SchemaError`.
+dns_tlsa_record : PureCodec Json DnsRecord
+foreign pure dns_tlsa_record from "@flick-lang/runtime/effect/Net" "flickDnsTlsaRecord"
+  reviewed "effect@4.0.5 sha256:4ff417e21ad1bd57"
+
+/// A DNS TXT record as JSON; a record of another type is a `SchemaError`.
+dns_txt_record : PureCodec Json DnsRecord
+foreign pure dns_txt_record from "@flick-lang/runtime/effect/Net" "flickDnsTxtRecord"
+  reviewed "effect@4.0.5 sha256:7b7d169925990254"
+
+/// A DNS record type name as JSON text: `"A"`, `"AAAA"`, `"MX"`, ….
+dns_record_type : PureCodec Json String
+foreign pure dns_record_type from "@flick-lang/runtime/effect/Net" "flickDnsRecordType"
+  reviewed "effect@4.0.5 sha256:2544c6d4fb4542d8"

@@ -157,6 +157,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("Arbitrary", include_str!("builtins/Arbitrary.fl")),
     ("JsonSchema", include_str!("builtins/JsonSchema.fl")),
     ("Differ", include_str!("builtins/Differ.fl")),
+    ("Net", include_str!("builtins/Net.fl")),
     // end of Effect: schema
     // Effect: platform and observability
     ("PlatformError", include_str!("builtins/PlatformError.fl")),

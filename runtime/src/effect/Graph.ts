@@ -3,10 +3,12 @@
 // copy (`Graph.mutate`); a `GraphError` Effect throws becomes the `Err` of a
 // `Result`; options records with `Option` fields become Effect's optional
 // fields; `Map` results become lists of entries.
-import { Graph, Option, Result } from "effect";
+import { Graph, Option, Result, Schema } from "effect";
 
 import type { Tagged } from "../data.ts";
+import type { AnySchema } from "../schema/schemas.ts";
 import { tag } from "../tags.ts";
+import { fallible } from "./Schema.ts";
 
 export * from "effect/Graph";
 
@@ -298,3 +300,7 @@ export const flickExternals = <N, E, T extends K>(o: { readonly direction: Optio
 export const flickIndices = <T, N>(w: Graph.Walker<T, N>): Array<T> => Array.from(Graph.indices(w));
 export const flickValues = <T, N>(w: Graph.Walker<T, N>): Array<N> => Array.from(Graph.values(w));
 export const flickEntries = <T, N>(w: Graph.Walker<T, N>): Array<[T, N]> => Array.from(Graph.entries(w));
+
+/** `Graph.json kind node edge`: Effect's JSON form of a graph, its snapshot. */
+export const flickJson = (kind: K, node: AnySchema, edge: AnySchema): AnySchema =>
+  fallible(Schema.toCodecJson(Schema.Graph(kind, node, edge)));

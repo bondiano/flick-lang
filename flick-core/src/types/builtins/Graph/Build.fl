@@ -175,3 +175,9 @@ foreign pure neighborhood from "@flick-lang/runtime/effect/Graph" "flickNeighbor
 induced_subgraph : List NodeIndex -> Graph n e k -> Result GraphError (Graph n e k)
 foreign pure induced_subgraph from "@flick-lang/runtime/effect/Graph" "flickInducedSubgraph"
   reviewed "effect@4.0.5 sha256:76360e987234317f"
+
+/// A graph of the kind as JSON: `{ "type", "nodes", "edges" }` with each
+/// node and edge's data in its codec. A bad index is a `SchemaError`.
+json : Kind k -> PureCodec Json n -> PureCodec Json e -> PureCodec Json (Graph n e k)
+foreign pure json from "@flick-lang/runtime/effect/Graph" "flickJson"
+  reviewed "effect@4.0.5 sha256:2926db716675106e"

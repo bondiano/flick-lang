@@ -64,3 +64,13 @@ match_ : { onFalse : Unit -> a; onTrue : Unit -> a } -> Bool -> a
 foreign pure match_ from "@flick-lang/runtime/effect/Boolean" "match"
   arity 1
   reviewed "effect@4.0.5 sha256:4b014132f01259fa"
+
+/// `&&` over a list, from `true`.
+reducer_and : Reducer.Reducer Bool
+foreign pure reducer_and from "@flick-lang/runtime/effect/Boolean" "ReducerAnd"
+  reviewed "effect@4.0.5 sha256:79e99da315caa107"
+
+/// `||` over a list, from `false`.
+reducer_or : Reducer.Reducer Bool
+foreign pure reducer_or from "@flick-lang/runtime/effect/Boolean" "ReducerOr"
+  reviewed "effect@4.0.5 sha256:a5da2cb09b99525e"

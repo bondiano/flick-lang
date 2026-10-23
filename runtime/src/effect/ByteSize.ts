@@ -1,9 +1,12 @@
 // Effect's `ByteSize` for the bindings of the standard library, and the
 // adapters where a Flick value differs from what Effect takes: a unit is a
-// `ByteSize.ByteUnit`, and a constructor refuses with `None`, not a throw.
-import { ByteSize, Option } from "effect";
+// `ByteSize.ByteUnit`, a constructor refuses with `None`, not a throw, and
+// the JSON codecs are fallible ones of the strict exporter.
+import { ByteSize, Option, Schema, SchemaTransformation } from "effect";
 
+import { type AnySchema, jsonNumber } from "../schema/schemas.ts";
 import { constructorName } from "../tags.ts";
+import { fallible } from "./Schema.ts";
 
 export * from "effect/ByteSize";
 
@@ -77,3 +80,19 @@ export const flickFormat = (options: FormatOptions, self: Size): string => {
     ? ByteSize.format(self, { precision, trailingZeros, unit: u })
     : ByteSize.format(self, { precision, trailingZeros, unit: u });
 };
+
+/** `ByteSize.json`: a size as its text, `"1.5 KiB"`; encodes as `"1536 bytes"`. */
+export const flickJson: AnySchema = fallible(Schema.ByteSizeFromString);
+
+/** `ByteSize.json_number`: a whole, non-negative JSON number of bytes. */
+export const flickJsonNumber: AnySchema = fallible(
+  jsonNumber.pipe(Schema.decodeTo(Schema.ByteSize, SchemaTransformation.byteSizeFromNumber)),
+);
+
+/** `ByteSize.json_bigint`: a number of bytes as a JSON string of digits. */
+export const flickJsonBigint: AnySchema = fallible(
+  Schema.String.check(Schema.isPattern(/^[0-9]+$/)).pipe(
+    Schema.decodeTo(Schema.BigInt, SchemaTransformation.bigintFromString),
+    Schema.decodeTo(Schema.ByteSize, SchemaTransformation.byteSizeFromBigInt),
+  ),
+);

@@ -1,0 +1,70 @@
+ByteSize.json "1.5 KiB": "1536 bytes"
+ByteSize.json "lots": err an invalid value
+ByteSize.json_number 1536: 1536
+ByteSize.json_number 1.5: err an invalid value
+ByteSize.json_bigint "5": "5"
+ByteSize decoded: 2 MiB
+DateTime.json_utc "2024-01-01T10:00:00+02:00": "2024-01-01T08:00:00.000Z"
+DateTime.json_utc_millis 0: 0
+DateTime.json_zoned "2024-01-01T10:00:00+02:00[Europe/Paris]": "2024-01-01T09:00:00.000+01:00[Europe/Paris]"
+DateTime.json_zone "+02:00": "+02:00"
+DateTime.json_zone "Europe/Paris": "Europe/Paris"
+DateTime.json_zone_named "Nowhere/X": err an invalid value
+DateTime.json_zone_offset 3600000: 3600000
+Codec.bytes_base64 "AQID": "AQID"
+Codec.bytes_base64url "-_8": "-_8"
+Codec.bytes_hex "0a0B": "0a0b"
+bytes decoded: [255, 0]
+bytes 300: err expected a value between 0 and 255, got number
+Graph.json: {"type":"directed","nodes":[{"index":0,"data":"a"},{"index":1,"data":"b"}],"edges":[{"index":0,"source":0,"target":1,"data":3}]}
+Graph.json counts: (2, 1)
+domain_name "Example.com": "example.com"
+host "Example.COM": "example.com"
+host_port "example.com:8080": "example.com:8080"
+inet_address "[::1]:80": "[::1]:80"
+inet_address_v4 "127.0.0.1:80": "127.0.0.1:80"
+inet_address_v4 "[::1]:80": err expected an IPv4 socket address, got an object
+inet_address_v6 "[::1]:80": "[::1]:80"
+socket_address "/run/app.sock": "/run/app.sock"
+unix_path_address "/run/app.sock": "/run/app.sock"
+ip_address "2001:DB8:0::1": "2001:db8::1"
+ip_interface "10.1.2.3/8": "10.1.2.3/8"
+ip_link_local_address "169.254.1.1": "169.254.1.1"
+ip_loopback_address "127.0.0.1": "127.0.0.1"
+ip_multicast_address "224.0.0.1": "224.0.0.1"
+ip_network "10.1.2.3/8": err address has non-zero host bits
+ip_unicast_address "8.8.8.8": "8.8.8.8"
+ip_unspecified_address "::": "::"
+ipv4_address "192.168.000.1": err leading zeroes are not allowed
+ipv4_broadcast_address "255.255.255.255": "255.255.255.255"
+ipv4_interface "192.168.0.1/24": "192.168.0.1/24"
+ipv4_network "192.168.0.0/24": "192.168.0.0/24"
+ipv4_private_address "8.8.8.8": err expected a private address, got an object
+ipv6_address "::FFFF:1": "::ffff:1"
+ipv6_interface "fe80::1/64": "fe80::1/64"
+ipv6_network "2001:db8::/32": "2001:db8::/32"
+ipv6_unique_local_address "fd00::1": "fd00::1"
+mac_address "AA:BB:CC:DD:EE:FF": "aa:bb:cc:dd:ee:ff"
+mac_broadcast_address "ff:ff:ff:ff:ff:ff": "ff:ff:ff:ff:ff:ff"
+mac_locally_administered_address "02:00:00:00:00:01": "02:00:00:00:00:01"
+mac_multicast_address "01:00:5e:00:00:01": "01:00:5e:00:00:01"
+mac_unicast_address "00:1a:2b:3c:4d:5e": "00:1a:2b:3c:4d:5e"
+mac_universally_administered_address "00:1a:2b:3c:4d:5e": "00:1a:2b:3c:4d:5e"
+scoped_ipv6_literal "fe80::1%eth0": "fe80::1%eth0"
+dns_record_type "MX": "MX"
+ip encode: err an invalid value
+dns_record {"_tag": "A", "address": "192.0.2.1"}: {"_tag":"A","address":"192.0.2.1"}
+dns_a_record {"_tag": "A", "address": "192.0.2.1"}: {"_tag":"A","address":"192.0.2.1"}
+dns_aaaa_record {"_tag": "AAAA", "address": "2001:db8::1"}: {"_tag":"AAAA","address":"2001:db8::1"}
+dns_caa_record {"_tag": "CAA", "critical": false, "tag": "issue", "value": "ca.example"}: {"_tag":"CAA","critical":false,"tag":"issue","value":"ca.example"}
+dns_cname_record {"_tag": "CNAME", "target": "example.com"}: {"_tag":"CNAME","target":"example.com"}
+dns_mx_record {"_tag": "MX", "exchange": "mail.example.com", "priority": 10}: {"_tag":"MX","exchange":"mail.example.com","priority":10}
+dns_naptr_record {"_tag": "NAPTR", "order": 1, "preference": 2, "flags": "u", "service": "E2U+sip", "regexp": "", "replacement": "example.com"}: {"_tag":"NAPTR","order":1,"preference":2,"flags":"u","service":"E2U+sip","regexp":"","replacement":"example.com"}
+dns_ns_record {"_tag": "NS", "host": "ns.example.com"}: {"_tag":"NS","host":"ns.example.com"}
+dns_ptr_record {"_tag": "PTR", "host": "host.example.com"}: {"_tag":"PTR","host":"host.example.com"}
+dns_soa_record {"_tag": "SOA", "primary": "ns.example.com", "admin": "admin.example.com", "serial": 1, "refresh": 1000, "retry": 1000, "expire": 1000, "minimum": 1000}: {"_tag":"SOA","primary":"ns.example.com","admin":"admin.example.com","serial":1,"refresh":1000,"retry":1000,"expire":1000,"minimum":1000}
+dns_srv_record {"_tag": "SRV", "target": "sip.example.com", "port": 5060, "priority": 1, "weight": 5}: {"_tag":"SRV","target":"sip.example.com","port":5060,"priority":1,"weight":5}
+dns_tlsa_record {"_tag": "TLSA", "certUsage": 3, "selector": 1, "matchingType": 1, "data": "010203"}: {"_tag":"TLSA","certUsage":3,"selector":1,"matchingType":1,"data":"010203"}
+dns_txt_record {"_tag": "TXT", "chunks": ["v=spf1"]}: {"_tag":"TXT","chunks":["v=spf1"]}
+dns_txt_record {"_tag": "A", "address": "192.0.2.1"}: err an unknown key
+format_record: MX 10 mail.example.com
