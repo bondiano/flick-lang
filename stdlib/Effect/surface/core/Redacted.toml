@@ -1,7 +1,9 @@
-[pending]
-Redacted = "M20"
-isRedacted = "M20"
-make = "M20"
-makeEquivalence = "M20"
-value = "M20"
-wipeUnsafe = "M20"
+[wrapped]
+Redacted = "Prelude.Redacted 328a44add7409bd5"
+make = "Redacted.make 9f57fa63eab8298e"
+value = "Redacted.reveal 7db6ee381d3b5fc2"
+makeEquivalence = "Redacted.equivalent 5508d5211d1a1370"
+
+[excluded]
+isRedacted = "TS-only: a type guard; Flick values are typed statically"
+wipeUnsafe = "invariant: `unsafe*`; wipes the content that every copy of the value shares, shared mutable state outside `Ref`"

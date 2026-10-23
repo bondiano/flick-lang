@@ -1,4 +1,4 @@
-[pending]
-Reducer = "M20"
-flip = "M20"
-make = "M20"
+[wrapped]
+Reducer = "Reducer.Reducer ab5eccbe46f870b5"
+make = "Reducer.make ee774290311a23cf"
+flip = "Reducer.flip f89f57f47aa5dc8a"

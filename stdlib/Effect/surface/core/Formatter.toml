@@ -1,4 +1,6 @@
-[pending]
-Formatter = "M20"
-format = "M20"
-formatJson = "M20"
+[wrapped]
+format = "Formatter.format e11f1775ecc1e146"
+formatJson = "Formatter.format_json a883240b23b23332"
+
+[language]
+Formatter = "a Flick function `a -> String`, as `show`"

@@ -1,0 +1,22 @@
+get: 2
+replace: { x = 7, y = 5 }
+modify: { x = 20, y = 5 }
+prism: 3 error: not positive 4
+optional: 4 error: odd x
+replace_result: error: odd value
+compose: 2
+iso: 6 4
+id: "same"
+some: 1 Some 2
+none: None
+result: Ok 1 Err "e" true
+from_check: 3 error: too big
+traversal: [1, 2] [2, 3]
+patch: replace /corner/y 6; replace /name "big box"
+apply: {"corner":{"x":2,"y":6},"name":"big box"}
+bad patch: Cannot remove at "/nothing/here" (parent not found or not a container).
+inspect: {"corner":{"x":2,"y":5},"name":"box"} | {"corner":{"x":2,"y":5},"name":"box"}
+format_json: {"corner":{"x":2,"y":5},"name":"box"} true
+pointer: a~1b~0c a/b~c #/a%20b/c
+fragment: Some ["a b", "c"] None
+version: 4.0.5

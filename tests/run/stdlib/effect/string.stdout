@@ -1,0 +1,29 @@
+trim: [a b][a ][ a]
+length: 5 true false
+split: a|b||c
+search: true true true
+index: 2 3 -
+case: ABC abc İ q
+capitalize: Word word
+slice: el llo el
+take: he lo hi
+at: c b -
+codes: 65 128512 -
+locale_compare: LT GT EQ
+normalize: 2 1 2 2
+pad: 00042 ab.-.
+repeat: ababab||a!b!c
+lines: ["a", "b", "c"] ["a\n", "b"]
+margin: "a\nb" "x\ny"
+snake: fooBar FooBar foo-bar
+to snake: foo_bar foo_bar foo_bar
+cases: foo bar|FooBar|fooBar|FOO_BAR
+more cases: FOO_BAR2|foo-bar|foo_bar
+match_first: 12@1[12,-]
+match_all: 12@1[12,-] 3x@4[3,x]
+search: 2 -
+replace: a<1>b<22> a#b#
+non-global: f0o f00 2
+escape: a\.b\*c
+bad pattern: refused
+sticky: the sticky flag `y` is not supported

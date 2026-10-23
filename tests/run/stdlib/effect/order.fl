@@ -1,0 +1,63 @@
+// Orders, equivalences, combiners and reducers from Effect's `Order`,
+// `Ordering`, `Equivalence`, `Combiner`, `Reducer` and `Hash`.
+module App.Main exposing (main)
+
+type alias Person = { name : String; age : Number }
+
+by_age : Order.Order Person
+let by_age = Order.map_input (fun p -> p.age) compare
+
+by_name : Order.Order Person
+let by_name = Order.make (fun a b -> compare a.name b.name)
+
+names : List Person -> String
+let names people = String.join "," (List.map (fun p -> p.name) people)
+
+people : List Person
+let people = [{ name = "bo"; age = 30 }, { name = "al"; age = 30 }, { name = "cy"; age = 20 }]
+
+same_length : Equivalence.Equivalence String
+let same_length = Equivalence.map_input String.length (Equivalence.make (fun a b -> a == b))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  age_then_name : Order.Order Person
+  let age_then_name = by_age |> Order.combine by_name
+  Platform.stdout_line ("sorted: " ++ names (List.sort_by age_then_name people))
+  Platform.stdout_line ("flipped: " ++ names (List.sort_by (Order.flip age_then_name) people))
+  Platform.stdout_line ("combine_all: " ++ names (List.sort_by (Order.combine_all [by_age, by_name]) people))
+  Platform.stdout_line ("always_equal: " ++ names (List.sort_by (Order.always_equal ()) people))
+  reduced : Order.Order Person
+  let reduced = Reducer.combine_all (Order.make_reducer ()) [by_age, by_name]
+  Platform.stdout_line ("make_reducer: " ++ names (List.sort_by reduced people))
+  Platform.stdout_line ("tuple: " ++ show (Order.tuple compare compare (1, "b") (1, "a")))
+  Platform.stdout_line ("list: " ++ show (Order.list compare [1, 2] [1, 2, 0]) ++ " " ++ show (Order.list compare [1, 3] [1, 2, 0]))
+  Platform.stdout_line ("is_less_than: " ++ show (2 |> Order.is_less_than compare 3) ++ " " ++ show (3 |> Order.is_greater_than compare 3))
+  Platform.stdout_line ("or_equal: " ++ show (3 |> Order.is_less_than_or_equal_to compare 3) ++ " " ++ show (2 |> Order.is_greater_than_or_equal_to compare 3))
+  Platform.stdout_line ("min/max: " ++ show (Order.min compare 2 5) ++ " " ++ show (Order.max compare 2 5))
+  Platform.stdout_line ("clamp: " ++ show (Order.clamp compare { minimum = 0; maximum = 10 } 12) ++ " " ++ show (Order.is_between compare { minimum = 0; maximum = 10 } 12))
+  Platform.stdout_line ("reverse: " ++ show (Ordering.reverse LT) ++ " " ++ show (Ordering.reverse EQ))
+  let ordering : Ordering = Reducer.combine_all Ordering.reducer [EQ, GT, LT]
+  Platform.stdout_line ("ordering reducer: " ++ show ordering)
+  Platform.stdout_line ("equivalence: " ++ show (same_length "ab" "cd") ++ " " ++ show (same_length "ab" "c"))
+  both : Equivalence.Equivalence String
+  let both = same_length |> Equivalence.combine (fun a b -> String.starts_with "a" a == String.starts_with "a" b)
+  Platform.stdout_line ("combine: " ++ show (both "ab" "ax") ++ " " ++ show (both "ab" "cd"))
+  Platform.stdout_line ("combine_all: " ++ show (Equivalence.combine_all [same_length, both] "ab" "cd"))
+  Platform.stdout_line ("tuple/list: " ++ show (Equivalence.tuple same_length same_length ("a", "bb") ("c", "dd")) ++ " " ++ show (Equivalence.list same_length ["a"] ["b", "c"]))
+  eq_reduced : Equivalence.Equivalence String
+  let eq_reduced = Reducer.combine_all (Equivalence.make_reducer ()) [same_length, both]
+  Platform.stdout_line ("make_reducer: " ++ show (eq_reduced "ab" "cd"))
+  let longer : Combiner.Combiner String = Combiner.make (fun a b -> if String.length b > String.length a then b else a)
+  Platform.stdout_line ("combiner: " ++ Combiner.combine longer "abc" "de" ++ " " ++ Combiner.combine (Combiner.flip (Combiner.first ())) "x" "y")
+  Platform.stdout_line ("min/max: " ++ show (Combiner.combine (Combiner.min compare) 3 1) ++ " " ++ show (Combiner.combine (Combiner.max compare) 3 1))
+  Platform.stdout_line ("last/constant: " ++ Combiner.combine (Combiner.last ()) "x" "y" ++ " " ++ Combiner.combine (Combiner.constant "k") "x" "y")
+  let dashed = Combiner.intercalate "-" (Combiner.make (fun a b -> a ++ b))
+  Platform.stdout_line ("intercalate: " ++ Combiner.combine dashed "a" "b")
+  Platform.stdout_line ("bigint: " ++ show (Combiner.combine Combiner.bigint_max 3n 9n) ++ " " ++ show (Combiner.combine Combiner.bigint_min 3n 9n))
+  let words : Reducer.Reducer String = Reducer.make (fun a b -> a ++ b) ">"
+  Platform.stdout_line ("reducer: " ++ Reducer.combine_all words ["a", "b"] ++ " " ++ Reducer.combine_all (Reducer.flip words) ["a", "b"] ++ " " ++ Reducer.initial_value words ++ " " ++ Reducer.combine words "x" "y")
+  Platform.stdout_line ("to_combiner: " ++ Combiner.combine (Reducer.to_combiner words) "x" "y")
+  Platform.stdout_line ("numbers: " ++ show (Reducer.combine_all Reducer.number_sum [1, 2, 3]) ++ " " ++ show (Reducer.combine_all Reducer.number_multiply [2, 3]) ++ " " ++ show (Reducer.combine_all Reducer.number_max [2, 7, 3]) ++ " " ++ show (Reducer.combine_all Reducer.number_min [2, 7, 3]))
+  Platform.stdout_line ("bigints: " ++ show (Reducer.combine_all Reducer.bigint_sum [1n, 2n]) ++ " " ++ show (Reducer.combine_all Reducer.bigint_multiply [2n, 5n]) ++ " " ++ Reducer.combine_all Reducer.string_concat ["a", "b", "c"])
+  Platform.stdout_line ("hash: " ++ show (Hash.combine (hash 2) (hash 1) == Hash.combine (hash 2) (hash 1)) ++ " " ++ show (Hash.combine 1 2 == Hash.combine 2 1) ++ " " ++ show (Hash.optimize 7 == Hash.optimize 7))

@@ -1,9 +1,9 @@
-[pending]
-Brand = "M20"
-BrandError = "M20"
-Branded = "M20"
-Constructor = "M20"
-all = "M20"
-check = "M20"
-make = "M20"
-nominal = "M20"
+[language]
+Brand = "`opaque unboxed type`: a nominal type with the representation of its field"
+Branded = "`opaque unboxed type`: a nominal type with the representation of its field"
+nominal = "`unboxed type`: its constructor brands without a check"
+make = "`refined type T = A where check`: the constructor checks"
+check = "`refined type T = A where check`"
+all = "`refined type T = A where check`, the check joining the predicates"
+Constructor = "`refined type`: its checked constructor"
+BrandError = "`refined type`: a failed check is a `SchemaError`"

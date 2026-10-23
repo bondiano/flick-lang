@@ -54,17 +54,129 @@ foreign pure trunc from global "Math.trunc"
 sqrt : Number -> Number
 foreign pure sqrt from global "Math.sqrt"
 
+/// The lesser of two numbers by Effect's order, where NaN is least.
 min : Number -> Number -> Number
-foreign pure min from global "Math.min"
+foreign pure min from "@flick-lang/runtime/effect/Number" "min"
+  arity 1
+  reviewed "effect@4.0.5 sha256:a308f0d3d25f7462"
 
+/// The greater of two numbers by Effect's order, where NaN is least.
 max : Number -> Number -> Number
-foreign pure max from global "Math.max"
+foreign pure max from "@flick-lang/runtime/effect/Number" "max"
+  arity 1
+  reviewed "effect@4.0.5 sha256:acfad47a78c46b4b"
 
 to_string : Number -> String
 foreign pure to_string from "@flick-lang/runtime" "stringFromNumber"
 
+/// The number the string spells in JS syntax, `"NaN"` and the infinities
+/// included; blank and malformed text are `None`.
 parse : String -> Option Number
-foreign pure parse from "@flick-lang/runtime" "stringToNumber"
+foreign pure parse from "@flick-lang/runtime/effect/Number" "parse"
+  reviewed "effect@4.0.5 sha256:2c3ff3f04116475d"
+
+/// `self + that`: `x |> Number.sum 1`.
+sum : Number -> Number -> Number
+foreign pure sum from "@flick-lang/runtime/effect/Number" "sum"
+  arity 1
+  reviewed "effect@4.0.5 sha256:87ed019662896b16"
+
+/// `self - that`: `10 |> Number.subtract 3` is 7.
+subtract : Number -> Number -> Number
+foreign pure subtract from "@flick-lang/runtime/effect/Number" "subtract"
+  arity 1
+  reviewed "effect@4.0.5 sha256:df7d0ef882d7233c"
+
+/// `self * that`.
+multiply : Number -> Number -> Number
+foreign pure multiply from "@flick-lang/runtime/effect/Number" "multiply"
+  arity 1
+  reviewed "effect@4.0.5 sha256:30fc2997152666f9"
+
+/// `self / that`; `None` when `that` is 0: `10 |> Number.divide 4` is 2.5.
+divide : Number -> Number -> Option Number
+foreign pure divide from "@flick-lang/runtime/effect/Number" "divide"
+  arity 1
+  reviewed "effect@4.0.5 sha256:293fe56192c03b49"
+
+/// The remainder of `self / divisor`, exact on decimals (`0.3 % 0.1` is 0);
+/// NaN for a zero or non-finite operand.
+remainder : Number -> Number -> Number
+foreign pure remainder from "@flick-lang/runtime/effect/Number" "remainder"
+  arity 1
+  reviewed "effect@4.0.5 sha256:fe7d9b4651bec4d2"
+
+/// `n + 1`.
+increment : Number -> Number
+foreign pure increment from "@flick-lang/runtime/effect/Number" "increment"
+  reviewed "effect@4.0.5 sha256:0702b04d9c0be595"
+
+/// `n - 1`.
+decrement : Number -> Number
+foreign pure decrement from "@flick-lang/runtime/effect/Number" "decrement"
+  reviewed "effect@4.0.5 sha256:8a9a01f7a10ceef0"
+
+/// The sum of the list, 0 when it is empty.
+sum_all : List Number -> Number
+foreign pure sum_all from "@flick-lang/runtime/effect/Number" "sumAll"
+  reviewed "effect@4.0.5 sha256:72f0f5c0ebe9f2e2"
+
+/// The product of the list, 1 when it is empty.
+multiply_all : List Number -> Number
+foreign pure multiply_all from "@flick-lang/runtime/effect/Number" "multiplyAll"
+  reviewed "effect@4.0.5 sha256:568b0e4eebb80af0"
+
+/// `self < that` by Effect's order: `x |> Number.is_less_than 3`.
+is_less_than : Number -> Number -> Bool
+foreign pure is_less_than from "@flick-lang/runtime/effect/Number" "isLessThan"
+  arity 1
+  reviewed "effect@4.0.5 sha256:f93dca59da8efce8"
+
+/// `self <= that` by Effect's order.
+is_less_than_or_equal_to : Number -> Number -> Bool
+foreign pure is_less_than_or_equal_to from "@flick-lang/runtime/effect/Number" "isLessThanOrEqualTo"
+  arity 1
+  reviewed "effect@4.0.5 sha256:396e72de3afcdd6e"
+
+/// `self > that` by Effect's order.
+is_greater_than : Number -> Number -> Bool
+foreign pure is_greater_than from "@flick-lang/runtime/effect/Number" "isGreaterThan"
+  arity 1
+  reviewed "effect@4.0.5 sha256:4b25fdb77a95059a"
+
+/// `self >= that` by Effect's order.
+is_greater_than_or_equal_to : Number -> Number -> Bool
+foreign pure is_greater_than_or_equal_to from "@flick-lang/runtime/effect/Number" "isGreaterThanOrEqualTo"
+  arity 1
+  reviewed "effect@4.0.5 sha256:5b6c97534b4f6ed3"
+
+/// Whether `self` lies within `minimum` and `maximum`, both included.
+between : { minimum : Number; maximum : Number } -> Number -> Bool
+foreign pure between from "@flick-lang/runtime/effect/Number" "between"
+  arity 1
+  reviewed "effect@4.0.5 sha256:20d59e8f086a60be"
+
+/// `self` kept within `minimum` and `maximum`.
+clamp : { minimum : Number; maximum : Number } -> Number -> Number
+foreign pure clamp from "@flick-lang/runtime/effect/Number" "clamp"
+  arity 1
+  reviewed "effect@4.0.5 sha256:9f672d4a6810e097"
+
+/// How `n` compares with 0; NaN is `LT`.
+sign : Number -> Ordering
+foreign pure sign from "@flick-lang/runtime/effect/Number" "flickSign"
+  reviewed "effect@4.0.5 sha256:44055224f974a5bc"
+
+/// The least power of two at least `n`, and at least 2.
+next_pow2 : Number -> Number
+foreign pure next_pow2 from "@flick-lang/runtime/effect/Number" "nextPow2"
+  reviewed "effect@4.0.5 sha256:b4310805857b7079"
+
+/// Rounded to `precision` decimal places: `3.14159 |> Number.round_to 2`.
+round_to : Number -> Number -> Number
+foreign pure round_to from "@flick-lang/runtime/effect/Number" "round"
+  arity 1
+  reviewed "effect@4.0.5 sha256:37c5519fadd3a790"
 
 /// `n` itself when it is a safe integer.
 safe_integer : Number -> Option Number

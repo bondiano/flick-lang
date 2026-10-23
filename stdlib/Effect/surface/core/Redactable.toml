@@ -1,6 +1,6 @@
-[pending]
-Redactable = "M20"
-getRedacted = "M20"
-isRedactable = "M20"
-redact = "M20"
-symbolRedactable = "M20"
+[excluded]
+Redactable = "TS-only: a symbol protocol of JS objects that redact themselves in logs; Flick values cannot carry methods, and `Redacted` with its `Show` covers redaction"
+symbolRedactable = "TS-only: the method key of the `Redactable` protocol of JS objects"
+isRedactable = "TS-only: a type guard; Flick values are typed statically"
+redact = "TS-only: calls the `Redactable` method of a JS object, which Flick values do not have"
+getRedacted = "TS-only: calls the `Redactable` method of a JS object, which Flick values do not have"

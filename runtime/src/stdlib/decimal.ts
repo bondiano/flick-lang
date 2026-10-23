@@ -27,7 +27,7 @@ export const decimalFromString = (s: string): Result.Result<Decimal, DecimalErro
 export const decimalFromBigInt = (value: bigint, scale: number): Result.Result<Decimal, DecimalError> =>
   scaleOk(scale) ? ok(BigDecimal.make(value, scale)) : decimalError(`scale ${scale} is not a safe integer`);
 
-export const decimalFromInteger = (value: bigint): Decimal => BigDecimal.make(value, 0);
+export const decimalFromInteger = (value: bigint): Decimal => BigDecimal.fromBigInt(value);
 
 export const decimalFromNumber = (n: number): Result.Result<Decimal, DecimalError> => {
   if (!Number.isFinite(n)) return decimalError(`${n} is not finite`);
@@ -44,7 +44,7 @@ export const decimalSubtract = (a: Decimal, b: Decimal): Decimal => BigDecimal.s
 export const decimalMultiply = (a: Decimal, b: Decimal): Result.Result<Decimal, DecimalError> => {
   const scale = a.scale + b.scale;
   return scaleOk(scale)
-    ? ok(BigDecimal.make(a.value * b.value, scale))
+    ? ok(BigDecimal.multiply(a, b))
     : decimalError(`the product's scale ${scale} is not a safe integer`);
 };
 
@@ -54,7 +54,19 @@ export const decimalCompare = (a: Decimal, b: Decimal): Ordering => ordering(Big
 export type RoundingMode = Readonly<{ _tag: string }>;
 
 const MODES = new Map(
-  ["TowardZero", "Floor", "Ceiling", "HalfAwayFromZero", "HalfEven", "Exact"].map((m) => [
+  [
+    "TowardZero",
+    "AwayFromZero",
+    "Floor",
+    "Ceiling",
+    "HalfAwayFromZero",
+    "HalfTowardZero",
+    "HalfFloor",
+    "HalfCeiling",
+    "HalfEven",
+    "HalfOdd",
+    "Exact",
+  ].map((m) => [
     tag(`BigDecimal.RoundingMode.${m}`),
     m,
   ]),
@@ -72,16 +84,28 @@ const roundQuotient = (num: bigint, den: bigint, mode: RoundingMode["_tag"]): bi
   switch (MODES.get(mode)) {
     case "TowardZero":
       return q;
+    case "AwayFromZero":
+      return q + sign;
     case "Floor":
       return sign < 0n ? q - 1n : q;
     case "Ceiling":
       return sign > 0n ? q + 1n : q;
     case "HalfAwayFromZero":
       return half >= 0n ? q + sign : q;
+    case "HalfTowardZero":
+      return half > 0n ? q + sign : q;
+    case "HalfFloor":
+      return half > 0n || (half === 0n && sign < 0n) ? q + sign : q;
+    case "HalfCeiling":
+      return half > 0n || (half === 0n && sign > 0n) ? q + sign : q;
     case "HalfEven":
       if (half > 0n) return q + sign;
       if (half < 0n) return q;
       return q % 2n === 0n ? q : q + sign;
+    case "HalfOdd":
+      if (half > 0n) return q + sign;
+      if (half < 0n) return q;
+      return q % 2n === 0n ? q + sign : q;
     default:
       // `Exact`: a remainder means the quotient cannot be exact
       return undefined;

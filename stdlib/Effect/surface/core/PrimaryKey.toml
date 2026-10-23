@@ -1,5 +1,5 @@
-[pending]
-PrimaryKey = "M20"
-isPrimaryKey = "M20"
-symbol = "M20"
-value = "M20"
+[excluded]
+PrimaryKey = "TS-only: a symbol method protocol of JS objects; Flick values cannot carry methods"
+symbol = "TS-only: the method key of the `PrimaryKey` protocol of JS objects"
+isPrimaryKey = "TS-only: a type guard; Flick values are typed statically"
+value = "TS-only: calls the `PrimaryKey` method of a JS object, which Flick values do not have"

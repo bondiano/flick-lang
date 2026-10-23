@@ -1,0 +1,15 @@
+/// Operations on `Ordering`, the result of `compare`: Effect's `Ordering`,
+/// whose -1, 0 and 1 are `LT`, `EQ` and `GT`.
+module Ordering exposing (..)
+
+/// `LT` and `GT` swapped.
+reverse : Ordering -> Ordering
+let reverse o =
+  match o with
+  | LT -> GT
+  | EQ -> EQ
+  | GT -> LT
+
+/// The first ordering that is not `EQ`: compares by one key, then the next.
+reducer : Reducer.Reducer Ordering
+let reducer = Reducer.make (fun a b -> if a == EQ then b else a) EQ

@@ -1,0 +1,63 @@
+/// Effect's `Combiner`: a way to combine two values of a type into one, as
+/// a value. `Combiner.combine c x y` runs it; `Reducer` adds a start value.
+module Combiner exposing (..)
+
+/// Effect's combiner of values of `a`.
+type Combiner a
+
+/// The combiner of `combine`, called as `combine self that`.
+make : (a -> a -> a) -> Combiner a
+foreign pure make from "@flick-lang/runtime/effect/Combiner" "make"
+  reviewed "effect@4.0.5 sha256:bb10bcbaeb721a04"
+
+/// Combines `self` with `that`.
+combine : Combiner a -> a -> a -> a
+foreign pure combine from "@flick-lang/runtime/effect/Combiner" "flickCombine"
+
+/// The combiner with its arguments swapped.
+flip : Combiner a -> Combiner a
+foreign pure flip from "@flick-lang/runtime/effect/Combiner" "flip"
+  reviewed "effect@4.0.5 sha256:2e5aa6fec2adf90e"
+
+/// The lesser of the two by the order; `self` on a tie.
+min : (a -> a -> Ordering) -> Combiner a
+foreign pure min from "@flick-lang/runtime/effect/Combiner" "flickMin"
+  reviewed "effect@4.0.5 sha256:1e958dca77a15e1f"
+
+/// The greater of the two by the order; `self` on a tie.
+max : (a -> a -> Ordering) -> Combiner a
+foreign pure max from "@flick-lang/runtime/effect/Combiner" "flickMax"
+  reviewed "effect@4.0.5 sha256:8eaecad16288f5fe"
+
+/// Keeps the first value.
+first : Unit -> Combiner a
+foreign pure first from "@flick-lang/runtime/effect/Combiner" "first"
+  arity 0
+  reviewed "effect@4.0.5 sha256:3066ad30ac4b1676"
+
+/// Keeps the last value.
+last : Unit -> Combiner a
+foreign pure last from "@flick-lang/runtime/effect/Combiner" "last"
+  arity 0
+  reviewed "effect@4.0.5 sha256:d89a67b23319db5d"
+
+/// Always `a`, whatever it combines.
+constant : a -> Combiner a
+foreign pure constant from "@flick-lang/runtime/effect/Combiner" "constant"
+  reviewed "effect@4.0.5 sha256:2d911ee3a9491850"
+
+/// Puts `middle` between the two values: `combine (combine self middle) that`.
+intercalate : a -> Combiner a -> Combiner a
+foreign pure intercalate from "@flick-lang/runtime/effect/Combiner" "intercalate"
+  arity 1
+  reviewed "effect@4.0.5 sha256:bd8c80c96aebcfce"
+
+/// The greater of two BigInts.
+bigint_max : Combiner BigInt
+foreign pure bigint_max from "@flick-lang/runtime/effect/BigInt" "CombinerMax"
+  reviewed "effect@4.0.5 sha256:1caa26b1e5c4abde"
+
+/// The lesser of two BigInts.
+bigint_min : Combiner BigInt
+foreign pure bigint_min from "@flick-lang/runtime/effect/BigInt" "CombinerMin"
+  reviewed "effect@4.0.5 sha256:2acf6233664fff9d"

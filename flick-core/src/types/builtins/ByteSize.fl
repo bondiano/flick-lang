@@ -1,0 +1,267 @@
+/// Effect's `ByteSize`: an exact, non-negative number of bytes, made from
+/// decimal (`kilobytes`, 1000) or binary (`kibibytes`, 1024) units and
+/// formatted back into them. Constructors refuse a negative or inexact size.
+module ByteSize exposing (..)
+
+/// A number of bytes, a `BigInt` at run time.
+type ByteSize
+
+/// A unit: the byte, the decimal units (`KB` is `kB`) and the binary ones.
+type ByteUnit =
+  | B | KB | MB | GB | TB | PB | EB | ZB | YB | RB | QB
+  | KiB | MiB | GiB | TiB | PiB | EiB | ZiB | YiB
+
+/// How `format` writes a size: the digits after the point (2 by default; cut
+/// to an integer from 0 to 20), whether to keep trailing zeros, and either a
+/// unit or the largest fitting one of the binary or the decimal units.
+type alias FormatOptions =
+  {
+    precision : Option Number;
+    trailingZeros : Option Bool;
+    binary : Bool;
+    unit : Option ByteUnit
+  }
+
+/// The options of `format` that pick the largest fitting binary unit.
+default_format : FormatOptions
+let default_format = { precision = None; trailingZeros = None; binary = true; unit = None }
+
+/// No bytes.
+zero : ByteSize
+foreign pure zero from "@flick-lang/runtime/effect/ByteSize" "zero"
+  reviewed "effect@4.0.5 sha256:c8f5ad84568cdd21"
+
+instance Eq ByteSize =
+  eq : ByteSize -> ByteSize -> Bool
+  let eq x y = equals x y
+
+instance Ord ByteSize =
+  compare : ByteSize -> ByteSize -> Ordering
+  let compare x y = compare (to_bigint x) (to_bigint y)
+
+instance Hash ByteSize =
+  hash : ByteSize -> Number
+  let hash x = hash (to_bigint x)
+
+instance Show ByteSize =
+  show : ByteSize -> String
+  let show x = format default_format x
+
+/// `n` bytes; `None` unless that is a whole, non-negative, safe number of bytes.
+bytes : Number -> Option ByteSize
+foreign pure bytes from "@flick-lang/runtime/effect/ByteSize" "flickBytes"
+  reviewed "effect@4.0.5 sha256:7e6fdea26a33e505"
+
+/// `n` kB (1000 bytes); `None` unless that is a whole, non-negative, safe number of bytes.
+kilobytes : Number -> Option ByteSize
+foreign pure kilobytes from "@flick-lang/runtime/effect/ByteSize" "flickKilobytes"
+  reviewed "effect@4.0.5 sha256:5076fd1cb1d9b494"
+
+/// `n` MB; `None` unless that is a whole, non-negative, safe number of bytes.
+megabytes : Number -> Option ByteSize
+foreign pure megabytes from "@flick-lang/runtime/effect/ByteSize" "flickMegabytes"
+  reviewed "effect@4.0.5 sha256:a335e85d0c32c9a0"
+
+/// `n` GB; `None` unless that is a whole, non-negative, safe number of bytes.
+gigabytes : Number -> Option ByteSize
+foreign pure gigabytes from "@flick-lang/runtime/effect/ByteSize" "flickGigabytes"
+  reviewed "effect@4.0.5 sha256:29e3945cc96095c8"
+
+/// `n` TB; `None` unless that is a whole, non-negative, safe number of bytes.
+terabytes : Number -> Option ByteSize
+foreign pure terabytes from "@flick-lang/runtime/effect/ByteSize" "flickTerabytes"
+  reviewed "effect@4.0.5 sha256:fdde24c5d238e02e"
+
+/// `n` PB; `None` unless that is a whole, non-negative, safe number of bytes.
+petabytes : Number -> Option ByteSize
+foreign pure petabytes from "@flick-lang/runtime/effect/ByteSize" "flickPetabytes"
+  reviewed "effect@4.0.5 sha256:44d54101f043dad7"
+
+/// `n` EB; `None` unless that is a whole, non-negative, safe number of bytes.
+exabytes : Number -> Option ByteSize
+foreign pure exabytes from "@flick-lang/runtime/effect/ByteSize" "flickExabytes"
+  reviewed "effect@4.0.5 sha256:0dba137317d678fa"
+
+/// `n` ZB; `None` unless that is a whole, non-negative, safe number of bytes.
+zettabytes : Number -> Option ByteSize
+foreign pure zettabytes from "@flick-lang/runtime/effect/ByteSize" "flickZettabytes"
+  reviewed "effect@4.0.5 sha256:d896f8418e968df1"
+
+/// `n` YB; `None` unless that is a whole, non-negative, safe number of bytes.
+yottabytes : Number -> Option ByteSize
+foreign pure yottabytes from "@flick-lang/runtime/effect/ByteSize" "flickYottabytes"
+  reviewed "effect@4.0.5 sha256:c85fd5eaff8208a0"
+
+/// `n` RB; `None` unless that is a whole, non-negative, safe number of bytes.
+ronnabytes : Number -> Option ByteSize
+foreign pure ronnabytes from "@flick-lang/runtime/effect/ByteSize" "flickRonnabytes"
+  reviewed "effect@4.0.5 sha256:35d6a048114e3dbd"
+
+/// `n` QB; `None` unless that is a whole, non-negative, safe number of bytes.
+quettabytes : Number -> Option ByteSize
+foreign pure quettabytes from "@flick-lang/runtime/effect/ByteSize" "flickQuettabytes"
+  reviewed "effect@4.0.5 sha256:d6283c99e8b2c643"
+
+/// `n` KiB (1024 bytes); `None` unless that is a whole, non-negative, safe number of bytes.
+kibibytes : Number -> Option ByteSize
+foreign pure kibibytes from "@flick-lang/runtime/effect/ByteSize" "flickKibibytes"
+  reviewed "effect@4.0.5 sha256:b3cc57ff0a65a742"
+
+/// `n` MiB; `None` unless that is a whole, non-negative, safe number of bytes.
+mebibytes : Number -> Option ByteSize
+foreign pure mebibytes from "@flick-lang/runtime/effect/ByteSize" "flickMebibytes"
+  reviewed "effect@4.0.5 sha256:4e998a15f8102103"
+
+/// `n` GiB; `None` unless that is a whole, non-negative, safe number of bytes.
+gibibytes : Number -> Option ByteSize
+foreign pure gibibytes from "@flick-lang/runtime/effect/ByteSize" "flickGibibytes"
+  reviewed "effect@4.0.5 sha256:3ce5bb1d52d57a8c"
+
+/// `n` TiB; `None` unless that is a whole, non-negative, safe number of bytes.
+tebibytes : Number -> Option ByteSize
+foreign pure tebibytes from "@flick-lang/runtime/effect/ByteSize" "flickTebibytes"
+  reviewed "effect@4.0.5 sha256:dad789457ccca587"
+
+/// `n` PiB; `None` unless that is a whole, non-negative, safe number of bytes.
+pebibytes : Number -> Option ByteSize
+foreign pure pebibytes from "@flick-lang/runtime/effect/ByteSize" "flickPebibytes"
+  reviewed "effect@4.0.5 sha256:351e8f3e4cc3f62d"
+
+/// `n` EiB; `None` unless that is a whole, non-negative, safe number of bytes.
+exbibytes : Number -> Option ByteSize
+foreign pure exbibytes from "@flick-lang/runtime/effect/ByteSize" "flickExbibytes"
+  reviewed "effect@4.0.5 sha256:c8a9c07fdb27579c"
+
+/// `n` ZiB; `None` unless that is a whole, non-negative, safe number of bytes.
+zebibytes : Number -> Option ByteSize
+foreign pure zebibytes from "@flick-lang/runtime/effect/ByteSize" "flickZebibytes"
+  reviewed "effect@4.0.5 sha256:17a9755114d3d8c1"
+
+/// `n` YiB; `None` unless that is a whole, non-negative, safe number of bytes.
+yobibytes : Number -> Option ByteSize
+foreign pure yobibytes from "@flick-lang/runtime/effect/ByteSize" "flickYobibytes"
+  reviewed "effect@4.0.5 sha256:e9a7209cd27d053e"
+
+/// The size a string spells, as `"1.5 kB"` or `"2 mebibytes"`.
+from_string : String -> Option ByteSize
+foreign pure from_string from "@flick-lang/runtime/effect/ByteSize" "fromString"
+  reviewed "effect@4.0.5 sha256:1fbbb9611681f55a"
+
+/// Whether the size is no bytes.
+is_zero : ByteSize -> Bool
+foreign pure is_zero from "@flick-lang/runtime/effect/ByteSize" "isZero"
+  reviewed "effect@4.0.5 sha256:615311c29fc8ec15"
+
+/// The number of bytes.
+to_bigint : ByteSize -> BigInt
+foreign pure to_bigint from "@flick-lang/runtime/effect/ByteSize" "toBigInt"
+  reviewed "effect@4.0.5 sha256:fe413cfa29f04444"
+
+/// The number of bytes, when it is a safe integer.
+to_number : ByteSize -> Option Number
+foreign pure to_number from "@flick-lang/runtime/effect/ByteSize" "toNumber"
+  reviewed "effect@4.0.5 sha256:4d89735b6c92ae19"
+
+/// The size in a unit, as a number that may be fractional.
+to_unit : ByteUnit -> ByteSize -> Number
+foreign pure to_unit from "@flick-lang/runtime/effect/ByteSize" "flickToUnit"
+  reviewed "effect@4.0.5 sha256:6291ffce829cd84a"
+
+/// Whether both are the same number of bytes.
+equals : ByteSize -> ByteSize -> Bool
+foreign pure equals from "@flick-lang/runtime/effect/ByteSize" "equals"
+  arity 1
+  reviewed "effect@4.0.5 sha256:944aebda0c94ae69"
+
+/// Whether `self` lies within `minimum` and `maximum`, both included.
+between : { minimum : ByteSize; maximum : ByteSize } -> ByteSize -> Bool
+foreign pure between from "@flick-lang/runtime/effect/ByteSize" "between"
+  arity 1
+  reviewed "effect@4.0.5 sha256:2552698c6e66eaaf"
+
+/// `self` kept within `minimum` and `maximum`.
+clamp : { minimum : ByteSize; maximum : ByteSize } -> ByteSize -> ByteSize
+foreign pure clamp from "@flick-lang/runtime/effect/ByteSize" "clamp"
+  arity 1
+  reviewed "effect@4.0.5 sha256:74a54a29530d8c9d"
+
+/// The smaller of the two.
+min : ByteSize -> ByteSize -> ByteSize
+foreign pure min from "@flick-lang/runtime/effect/ByteSize" "min"
+  arity 1
+  reviewed "effect@4.0.5 sha256:f39c8df67a0155cc"
+
+/// The larger of the two.
+max : ByteSize -> ByteSize -> ByteSize
+foreign pure max from "@flick-lang/runtime/effect/ByteSize" "max"
+  arity 1
+  reviewed "effect@4.0.5 sha256:a4c97cd51b22802a"
+
+/// `self < that`: `size |> ByteSize.is_less_than limit`.
+is_less_than : ByteSize -> ByteSize -> Bool
+foreign pure is_less_than from "@flick-lang/runtime/effect/ByteSize" "isLessThan"
+  arity 1
+  reviewed "effect@4.0.5 sha256:d7ce136aa69dc4e0"
+
+/// `self <= that`.
+is_less_than_or_equal_to : ByteSize -> ByteSize -> Bool
+foreign pure is_less_than_or_equal_to from "@flick-lang/runtime/effect/ByteSize" "isLessThanOrEqualTo"
+  arity 1
+  reviewed "effect@4.0.5 sha256:ed62e69dbaa62f09"
+
+/// `self > that`.
+is_greater_than : ByteSize -> ByteSize -> Bool
+foreign pure is_greater_than from "@flick-lang/runtime/effect/ByteSize" "isGreaterThan"
+  arity 1
+  reviewed "effect@4.0.5 sha256:3b2aff9d7c2ca11a"
+
+/// `self >= that`.
+is_greater_than_or_equal_to : ByteSize -> ByteSize -> Bool
+foreign pure is_greater_than_or_equal_to from "@flick-lang/runtime/effect/ByteSize" "isGreaterThanOrEqualTo"
+  arity 1
+  reviewed "effect@4.0.5 sha256:eb8ffc64f191efe4"
+
+/// Both sizes together.
+sum : ByteSize -> ByteSize -> ByteSize
+foreign pure sum from "@flick-lang/runtime/effect/ByteSize" "sum"
+  arity 1
+  reviewed "effect@4.0.5 sha256:6c2589fb48d4b85c"
+
+/// `self - that`; `None` when `that` is larger.
+subtract : ByteSize -> ByteSize -> Option ByteSize
+foreign pure subtract from "@flick-lang/runtime/effect/ByteSize" "subtract"
+  arity 1
+  reviewed "effect@4.0.5 sha256:fc6c6b6f312d9235"
+
+/// `self` times a whole, non-negative, safe number; `None` otherwise.
+times : Number -> ByteSize -> Option ByteSize
+foreign pure times from "@flick-lang/runtime/effect/ByteSize" "times"
+  arity 1
+  reviewed "effect@4.0.5 sha256:99da3dfe95feedb3"
+
+/// `self` divided by a whole, positive, safe number, rounded down; `None`
+/// otherwise.
+divide : Number -> ByteSize -> Option ByteSize
+foreign pure divide from "@flick-lang/runtime/effect/ByteSize" "divide"
+  arity 1
+  reviewed "effect@4.0.5 sha256:00b41bab58ef0a29"
+
+/// The size as text in a unit: `"1.5 KiB"`.
+format : FormatOptions -> ByteSize -> String
+foreign pure format from "@flick-lang/runtime/effect/ByteSize" "flickFormat"
+  reviewed "effect@4.0.5 sha256:ce94ffb1e3723d16"
+
+/// Sums sizes from `zero`.
+reducer_sum : Reducer.Reducer ByteSize
+foreign pure reducer_sum from "@flick-lang/runtime/effect/ByteSize" "ReducerSum"
+  reviewed "effect@4.0.5 sha256:b18343fbdcc9aa03"
+
+/// The larger of two sizes.
+combiner_max : Combiner.Combiner ByteSize
+foreign pure combiner_max from "@flick-lang/runtime/effect/ByteSize" "CombinerMax"
+  reviewed "effect@4.0.5 sha256:af30c6a95d8ba20b"
+
+/// The smaller of two sizes.
+combiner_min : Combiner.Combiner ByteSize
+foreign pure combiner_min from "@flick-lang/runtime/effect/ByteSize" "CombinerMin"
+  reviewed "effect@4.0.5 sha256:6dcd87653f39fc92"

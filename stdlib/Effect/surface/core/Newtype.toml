@@ -1,8 +1,8 @@
-[pending]
-Newtype = "M20"
-makeCombiner = "M20"
-makeEquivalence = "M20"
-makeIso = "M20"
-makeOrder = "M20"
-makeReducer = "M20"
-value = "M20"
+[language]
+Newtype = "`unboxed type`: a nominal wrapper with the carrier's representation"
+value = "a pattern on the `unboxed type`'s constructor"
+makeIso = "`Optic.make_iso` of the constructor and a pattern"
+makeEquivalence = "`deriving Eq` on the `unboxed type`, which follows the carrier"
+makeOrder = "`deriving Ord` on the `unboxed type`, which follows the carrier"
+makeCombiner = "`Combiner.make` over the constructor and a pattern"
+makeReducer = "`Reducer.make` over the constructor and a pattern"

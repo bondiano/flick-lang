@@ -1,5 +1,5 @@
-[pending]
-JsonPatch = "M20"
-JsonPatchOperation = "M20"
-apply = "M20"
-get = "M20"
+[wrapped]
+JsonPatch = "JsonPatch.JsonPatch efffb94b06484094"
+JsonPatchOperation = "JsonPatch.Operation 9c8e88ea8c1eb30f"
+get = "JsonPatch.get ddd08e9b587c85f7"
+apply = "JsonPatch.apply 7f3d050630dffd85"

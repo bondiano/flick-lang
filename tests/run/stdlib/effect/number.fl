@@ -1,0 +1,69 @@
+// Numbers, BigInts and decimals from Effect's `Number`, `BigInt` and
+// `BigDecimal`, and redacted values from `Redacted`.
+module App.Main exposing (main)
+
+line : String -> String -> Unit ->{} Unit
+let line label value () = Platform.stdout_line (label ++ ": " ++ value)
+
+num : Option Number -> String
+let num o =
+  match o with
+  | Some n -> show n
+  | None -> "-"
+
+big : Option BigInt -> String
+let big o =
+  match o with
+  | Some n -> show n
+  | None -> "-"
+
+decimal : String -> BigDecimal.BigDecimal
+let decimal s = Result.with_default (BigDecimal.from_integer 0n) (BigDecimal.from_string s)
+
+decimal_or : Option BigDecimal.BigDecimal -> String
+let decimal_or o =
+  match o with
+  | Some d -> BigDecimal.to_string d
+  | None -> "-"
+
+checked : Result BigDecimal.DecimalError BigDecimal.BigDecimal -> String
+let checked r =
+  match r with
+  | Ok d -> BigDecimal.to_string d
+  | Err (BigDecimal.DecimalError message) -> "error: " ++ message
+
+main : Unit ->{; AppError} Unit
+let main () =
+  line "arith" (show (10 |> Number.sum 2) ++ " " ++ show (10 |> Number.subtract 3) ++ " " ++ show (10 |> Number.multiply 3) ++ " " ++ num (10 |> Number.divide 4) ++ " " ++ num (1 |> Number.divide 0)) ()
+  line "remainder" (show (7 |> Number.remainder 3) ++ " " ++ show (0.3 |> Number.remainder 0.1) ++ " " ++ show (Number.increment 1) ++ " " ++ show (Number.decrement 1)) ()
+  line "all" (show (Number.sum_all [1, 2, 3]) ++ " " ++ show (Number.multiply_all [2, 3, 4]) ++ " " ++ show (Number.sum_all [])) ()
+  line "compare" (show (1 |> Number.is_less_than 2) ++ " " ++ show (2 |> Number.is_less_than_or_equal_to 2) ++ " " ++ show (1 |> Number.is_greater_than 2) ++ " " ++ show (2 |> Number.is_greater_than_or_equal_to 2)) ()
+  line "bounds" (show (Number.between { minimum = 0; maximum = 5 } 3) ++ " " ++ show (Number.clamp { minimum = 0; maximum = 5 } 9) ++ " " ++ show (Number.min 2 3) ++ " " ++ show (Number.max 2 3)) ()
+  line "sign" (show (Number.sign (-2)) ++ " " ++ show (Number.sign 0) ++ " " ++ show (Number.sign 5)) ()
+  line "misc" (show (Number.next_pow2 17) ++ " " ++ show (3.14159 |> Number.round_to 2) ++ " " ++ num (Number.parse "1e3") ++ " " ++ num (Number.parse "x")) ()
+  line "bigint arith" (show (10n |> BigInt.sum 2n) ++ " " ++ show (10n |> BigInt.subtract 3n) ++ " " ++ show (10n |> BigInt.multiply 3n) ++ " " ++ show (BigInt.increment 1n) ++ " " ++ show (BigInt.decrement 1n)) ()
+  line "bigint div" (show (BigInt.divide 7n 2n) ++ " " ++ show (BigInt.remainder 7n 0n) ++ " " ++ show (BigInt.abs (-4n))) ()
+  line "bigint gcd" (show (12n |> BigInt.gcd 18n) ++ " " ++ show (4n |> BigInt.lcm 6n) ++ " " ++ big (BigInt.sqrt 17n) ++ " " ++ big (BigInt.sqrt (-1n))) ()
+  line "bigint all" (show (BigInt.sum_all [1n, 2n]) ++ " " ++ show (BigInt.multiply_all [2n, 3n]) ++ " " ++ show (BigInt.min 1n 2n) ++ " " ++ show (BigInt.max 1n 2n)) ()
+  line "bigint compare" (show (1n |> BigInt.is_less_than 2n) ++ " " ++ show (2n |> BigInt.is_less_than_or_equal_to 2n) ++ " " ++ show (1n |> BigInt.is_greater_than 2n) ++ " " ++ show (2n |> BigInt.is_greater_than_or_equal_to 2n)) ()
+  line "bigint bounds" (show (BigInt.between { minimum = 0n; maximum = 5n } 3n) ++ " " ++ show (BigInt.clamp { minimum = 0n; maximum = 5n } 9n) ++ " " ++ show (BigInt.sign (-3n))) ()
+  line "bigint convert" (num (BigInt.to_safe_number 5n) ++ " " ++ num (BigInt.to_safe_number 99999999999999999999n) ++ " " ++ big (BigInt.from_safe_number 3) ++ " " ++ big (BigInt.from_safe_number 1.5) ++ " " ++ big (BigInt.from_string "0x1f") ++ " " ++ big (BigInt.from_string "")) ()
+  let a = decimal "1.50"
+  let b = decimal "0.25"
+  line "decimal" (BigDecimal.to_string (BigDecimal.normalize a) ++ " " ++ checked (BigDecimal.set_scale 3 a) ++ " " ++ checked (BigDecimal.set_scale 0.5 a)) ()
+  line "decimal all" (BigDecimal.to_string (BigDecimal.sum_all [a, b]) ++ " " ++ BigDecimal.to_string (BigDecimal.multiply_all [a, b]) ++ " " ++ decimal_or (a |> BigDecimal.divide b) ++ " " ++ decimal_or (a |> BigDecimal.divide (decimal "0"))) ()
+  line "decimal remainder" (decimal_or (a |> BigDecimal.remainder (decimal "0.4")) ++ " " ++ BigDecimal.to_string (BigDecimal.min a b) ++ " " ++ BigDecimal.to_string (BigDecimal.max a b)) ()
+  line "decimal compare" (show (a |> BigDecimal.is_less_than b) ++ " " ++ show (a |> BigDecimal.is_less_than_or_equal_to a) ++ " " ++ show (a |> BigDecimal.is_greater_than b) ++ " " ++ show (b |> BigDecimal.is_greater_than_or_equal_to a)) ()
+  line "decimal bounds" (show (BigDecimal.between { minimum = b; maximum = a } (decimal "1")) ++ " " ++ BigDecimal.to_string (BigDecimal.clamp { minimum = b; maximum = a } (decimal "7"))) ()
+  line "decimal sign" (show (BigDecimal.sign (BigDecimal.negate a)) ++ " " ++ BigDecimal.to_string (BigDecimal.abs (decimal "-2.5")) ++ " " ++ BigDecimal.to_exponential (decimal "1500")) ()
+  line "decimal tests" (show (BigDecimal.is_integer (decimal "2.00")) ++ " " ++ show (BigDecimal.is_zero (decimal "0.0")) ++ " " ++ show (BigDecimal.is_negative b) ++ " " ++ show (BigDecimal.is_positive b)) ()
+  let x = decimal "2.345"
+  line "round" (checked (BigDecimal.round 2 BigDecimal.HalfEven x) ++ " " ++ checked (BigDecimal.round 2 BigDecimal.HalfFloor x) ++ " " ++ checked (BigDecimal.round 2 BigDecimal.HalfCeiling x) ++ " " ++ checked (BigDecimal.round 1 BigDecimal.Exact x) ++ " " ++ checked (BigDecimal.round 3 BigDecimal.Exact x)) ()
+  line "round modes" (checked (BigDecimal.round 0 BigDecimal.AwayFromZero x) ++ " " ++ checked (BigDecimal.round 2 BigDecimal.HalfTowardZero x) ++ " " ++ checked (BigDecimal.round 2 BigDecimal.HalfOdd x)) ()
+  line "cut" (checked (BigDecimal.truncate 1 x) ++ " " ++ checked (BigDecimal.ceil 1 x) ++ " " ++ checked (BigDecimal.floor 1 (BigDecimal.negate x))) ()
+  line "divide_to_scale" (checked (BigDecimal.divide_to_scale 0 BigDecimal.HalfOdd (decimal "5") (decimal "2")) ++ " " ++ checked (BigDecimal.divide_to_scale 0 BigDecimal.AwayFromZero (decimal "4.1") (decimal "2"))) ()
+  line "decimal ops" (checked (BigDecimal.from_number 0.5) ++ " " ++ checked (BigDecimal.from_bigint 125n 2) ++ " " ++ checked (BigDecimal.multiply a b) ++ " " ++ BigDecimal.to_string (BigDecimal.subtract a b) ++ " " ++ BigDecimal.to_string (BigDecimal.add a b)) ()
+  let secret : Redacted String = Redacted.make "pw"
+  let other = Redacted.make "PW"
+  let same_case = Redacted.equivalent (fun p q -> String.to_lower p == String.to_lower q) secret other
+  line "redacted" (show secret ++ " " ++ Redacted.reveal secret ++ " " ++ show same_case) ()

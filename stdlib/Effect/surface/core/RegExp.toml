@@ -1,4 +1,6 @@
-[pending]
-RegExp = "M20"
-escape = "M20"
-isRegExp = "M20"
+[wrapped]
+RegExp = "RegExp.make 805450df9d9be81c"
+escape = "RegExp.escape b48e526f3585b949"
+
+[excluded]
+isRegExp = "TS-only: a type guard; Flick values are typed statically"

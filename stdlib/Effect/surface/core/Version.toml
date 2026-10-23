@@ -1,3 +1,5 @@
-[pending]
-getCurrentVersion = "M20"
-setCurrentVersion = "M20"
+[wrapped]
+getCurrentVersion = "Version.current 4fb6f20c9643e6bd"
+
+[excluded]
+setCurrentVersion = "invariant: sets a global of Effect's, shared mutable state outside `Ref`"

@@ -1,0 +1,41 @@
+/// Effect's `Equivalence`: an equivalence relation as a Flick function,
+/// `eq` (`==`) for the types with an `Eq` instance. The combinators build
+/// equivalences from others.
+module Equivalence exposing (..)
+
+/// An equivalence: `true` when `self` and `that` count as equal.
+type alias Equivalence a = a -> a -> Bool
+
+/// The equivalence `is_equivalent` gives.
+make : (a -> a -> Bool) -> Equivalence a
+let make is_equivalent = is_equivalent
+
+/// Equal by both equivalences.
+combine : Equivalence a -> Equivalence a -> Equivalence a
+let combine that equivalence = fun x y -> equivalence x y && that x y
+
+/// Equal by every equivalence of the list.
+combine_all : List (Equivalence a) -> Equivalence a
+let combine_all equivalences = fun x y -> List.all (fun e -> e x y) equivalences
+
+/// Compares `b` by the `a` that `f` gives.
+map_input : (b -> a) -> Equivalence a -> Equivalence b
+let map_input f equivalence = fun x y -> equivalence (f x) (f y)
+
+/// Pairs equal part by part.
+tuple : Equivalence a -> Equivalence b -> Equivalence (a, b)
+let tuple first second =
+  fun x y ->
+    let (a1, b1) = x
+    let (a2, b2) = y
+    first a1 a2 && second b1 b2
+
+/// Lists of the same length, equal element by element.
+list : Equivalence a -> Equivalence (List a)
+let list item =
+  fun xs ys ->
+    List.length xs == List.length ys && List.all (fun (x, y) -> item x y) (List.zip xs ys)
+
+/// Combines equivalences with `combine`, starting from "always equal".
+make_reducer : Unit -> Reducer.Reducer (Equivalence a)
+let make_reducer () = Reducer.make (fun first next -> combine next first) (fun _ _ -> true)
