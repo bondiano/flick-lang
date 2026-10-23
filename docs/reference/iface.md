@@ -13,7 +13,7 @@ Until 0.1.0 the schema grows with the compiler: every change bumps
 
 ```json
 {
-  "iface-version": 5,
+  "iface-version": 1,
   "language": "0.7",
   "module": "App.Shapes",
   "exports": [
