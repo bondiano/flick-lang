@@ -32,43 +32,49 @@ let decoded text c =
 case : String -> String -> PureCodec Json a -> String
 let case name text c = name ++ " " ++ text ++ ": " ++ rt text c
 
-addresses : List (String, PureCodec Json String, String)
+addresses : List String
 let addresses =
   [
-    ("domain_name", Net.domain_name, "\"Example.com\""),
-    ("host", Net.host, "\"Example.COM\""),
-    ("host_port", Net.host_port, "\"example.com:8080\""),
-    ("inet_address", Net.inet_address, "\"[::1]:80\""),
-    ("inet_address_v4", Net.inet_address_v4, "\"127.0.0.1:80\""),
-    ("inet_address_v4", Net.inet_address_v4, "\"[::1]:80\""),
-    ("inet_address_v6", Net.inet_address_v6, "\"[::1]:80\""),
-    ("socket_address", Net.socket_address, "\"/run/app.sock\""),
-    ("unix_path_address", Net.unix_path_address, "\"/run/app.sock\""),
-    ("ip_address", Net.ip_address, "\"2001:DB8:0::1\""),
-    ("ip_interface", Net.ip_interface, "\"10.1.2.3/8\""),
-    ("ip_link_local_address", Net.ip_link_local_address, "\"169.254.1.1\""),
-    ("ip_loopback_address", Net.ip_loopback_address, "\"127.0.0.1\""),
-    ("ip_multicast_address", Net.ip_multicast_address, "\"224.0.0.1\""),
-    ("ip_network", Net.ip_network, "\"10.1.2.3/8\""),
-    ("ip_unicast_address", Net.ip_unicast_address, "\"8.8.8.8\""),
-    ("ip_unspecified_address", Net.ip_unspecified_address, "\"::\""),
-    ("ipv4_address", Net.ipv4_address, "\"192.168.000.1\""),
-    ("ipv4_broadcast_address", Net.ipv4_broadcast_address, "\"255.255.255.255\""),
-    ("ipv4_interface", Net.ipv4_interface, "\"192.168.0.1/24\""),
-    ("ipv4_network", Net.ipv4_network, "\"192.168.0.0/24\""),
-    ("ipv4_private_address", Net.ipv4_private_address, "\"8.8.8.8\""),
-    ("ipv6_address", Net.ipv6_address, "\"::FFFF:1\""),
-    ("ipv6_interface", Net.ipv6_interface, "\"fe80::1/64\""),
-    ("ipv6_network", Net.ipv6_network, "\"2001:db8::/32\""),
-    ("ipv6_unique_local_address", Net.ipv6_unique_local_address, "\"fd00::1\""),
-    ("mac_address", Net.mac_address, "\"AA:BB:CC:DD:EE:FF\""),
-    ("mac_broadcast_address", Net.mac_broadcast_address, "\"ff:ff:ff:ff:ff:ff\""),
-    ("mac_locally_administered_address", Net.mac_locally_administered_address, "\"02:00:00:00:00:01\""),
-    ("mac_multicast_address", Net.mac_multicast_address, "\"01:00:5e:00:00:01\""),
-    ("mac_unicast_address", Net.mac_unicast_address, "\"00:1a:2b:3c:4d:5e\""),
-    ("mac_universally_administered_address", Net.mac_universally_administered_address, "\"00:1a:2b:3c:4d:5e\""),
-    ("scoped_ipv6_literal", Net.scoped_ipv6_literal, "\"fe80::1%eth0\""),
-    ("dns_record_type", Net.dns_record_type, "\"MX\"")
+    case "domain_name" "\"Example.com\"" Net.domain_name,
+    case "host" "\"Example.COM\"" Net.host,
+    case "host_port" "\"example.com:8080\"" Net.host_port,
+    case "inet_address" "\"[::1]:80\"" Net.inet_address,
+    case "inet_address_v4" "\"127.0.0.1:80\"" Net.inet_address_v4,
+    case "inet_address_v4" "\"[::1]:80\"" Net.inet_address_v4,
+    case "inet_address_v6" "\"[::1]:80\"" Net.inet_address_v6,
+    case "socket_address" "\"/run/app.sock\"" Net.socket_address,
+    case "unix_path_address" "\"/run/app.sock\"" Net.unix_path_address,
+    case "ip_address" "\"2001:DB8:0::1\"" Net.ip_address,
+    case "ip_interface" "\"10.1.2.3/8\"" Net.ip_interface,
+    case "ip_link_local_address" "\"169.254.1.1\"" Net.ip_link_local_address,
+    case "ip_loopback_address" "\"127.0.0.1\"" Net.ip_loopback_address,
+    case "ip_multicast_address" "\"224.0.0.1\"" Net.ip_multicast_address,
+    case "ip_network" "\"10.1.2.3/8\"" Net.ip_network,
+    case "ip_unicast_address" "\"8.8.8.8\"" Net.ip_unicast_address,
+    case "ip_unspecified_address" "\"::\"" Net.ip_unspecified_address,
+    case "ipv4_address" "\"192.168.000.1\"" Net.ipv4_address,
+    case "ipv4_broadcast_address" "\"255.255.255.255\"" Net.ipv4_broadcast_address,
+    case "ipv4_interface" "\"192.168.0.1/24\"" Net.ipv4_interface,
+    case "ipv4_network" "\"192.168.0.0/24\"" Net.ipv4_network,
+    case "ipv4_private_address" "\"8.8.8.8\"" Net.ipv4_private_address,
+    case "ipv6_address" "\"::FFFF:1\"" Net.ipv6_address,
+    case "ipv6_interface" "\"fe80::1/64\"" Net.ipv6_interface,
+    case "ipv6_network" "\"2001:db8::/32\"" Net.ipv6_network,
+    case "ipv6_unique_local_address" "\"fd00::1\"" Net.ipv6_unique_local_address,
+    case "mac_address" "\"AA:BB:CC:DD:EE:FF\"" Net.mac_address,
+    case "mac_broadcast_address" "\"ff:ff:ff:ff:ff:ff\"" Net.mac_broadcast_address,
+    case
+      "mac_locally_administered_address"
+      "\"02:00:00:00:00:01\""
+      Net.mac_locally_administered_address,
+    case "mac_multicast_address" "\"01:00:5e:00:00:01\"" Net.mac_multicast_address,
+    case "mac_unicast_address" "\"00:1a:2b:3c:4d:5e\"" Net.mac_unicast_address,
+    case
+      "mac_universally_administered_address"
+      "\"00:1a:2b:3c:4d:5e\""
+      Net.mac_universally_administered_address,
+    case "scoped_ipv6_literal" "\"fe80::1%eth0\"" Net.scoped_ipv6_literal,
+    case "dns_record_type" "\"MX\"" Net.dns_record_type
   ]
 
 records : List (String, PureCodec Json Net.DnsRecord, String)
@@ -77,15 +83,43 @@ let records =
     ("dns_record", Net.dns_record, "{\"_tag\": \"A\", \"address\": \"192.0.2.1\"}"),
     ("dns_a_record", Net.dns_a_record, "{\"_tag\": \"A\", \"address\": \"192.0.2.1\"}"),
     ("dns_aaaa_record", Net.dns_aaaa_record, "{\"_tag\": \"AAAA\", \"address\": \"2001:db8::1\"}"),
-    ("dns_caa_record", Net.dns_caa_record, "{\"_tag\": \"CAA\", \"critical\": false, \"tag\": \"issue\", \"value\": \"ca.example\"}"),
-    ("dns_cname_record", Net.dns_cname_record, "{\"_tag\": \"CNAME\", \"target\": \"example.com\"}"),
-    ("dns_mx_record", Net.dns_mx_record, "{\"_tag\": \"MX\", \"exchange\": \"mail.example.com\", \"priority\": 10}"),
-    ("dns_naptr_record", Net.dns_naptr_record, "{\"_tag\": \"NAPTR\", \"order\": 1, \"preference\": 2, \"flags\": \"u\", \"service\": \"E2U+sip\", \"regexp\": \"\", \"replacement\": \"example.com\"}"),
+    (
+      "dns_caa_record",
+      Net.dns_caa_record,
+      "{\"_tag\": \"CAA\", \"critical\": false, \"tag\": \"issue\", \"value\": \"ca.example\"}"
+    ),
+    (
+      "dns_cname_record",
+      Net.dns_cname_record,
+      "{\"_tag\": \"CNAME\", \"target\": \"example.com\"}"
+    ),
+    (
+      "dns_mx_record",
+      Net.dns_mx_record,
+      "{\"_tag\": \"MX\", \"exchange\": \"mail.example.com\", \"priority\": 10}"
+    ),
+    (
+      "dns_naptr_record",
+      Net.dns_naptr_record,
+      "{\"_tag\": \"NAPTR\", \"order\": 1, \"preference\": 2, \"flags\": \"u\", \"service\": \"E2U+sip\", \"regexp\": \"\", \"replacement\": \"example.com\"}"
+    ),
     ("dns_ns_record", Net.dns_ns_record, "{\"_tag\": \"NS\", \"host\": \"ns.example.com\"}"),
     ("dns_ptr_record", Net.dns_ptr_record, "{\"_tag\": \"PTR\", \"host\": \"host.example.com\"}"),
-    ("dns_soa_record", Net.dns_soa_record, "{\"_tag\": \"SOA\", \"primary\": \"ns.example.com\", \"admin\": \"admin.example.com\", \"serial\": 1, \"refresh\": 1000, \"retry\": 1000, \"expire\": 1000, \"minimum\": 1000}"),
-    ("dns_srv_record", Net.dns_srv_record, "{\"_tag\": \"SRV\", \"target\": \"sip.example.com\", \"port\": 5060, \"priority\": 1, \"weight\": 5}"),
-    ("dns_tlsa_record", Net.dns_tlsa_record, "{\"_tag\": \"TLSA\", \"certUsage\": 3, \"selector\": 1, \"matchingType\": 1, \"data\": \"010203\"}"),
+    (
+      "dns_soa_record",
+      Net.dns_soa_record,
+      "{\"_tag\": \"SOA\", \"primary\": \"ns.example.com\", \"admin\": \"admin.example.com\", \"serial\": 1, \"refresh\": 1000, \"retry\": 1000, \"expire\": 1000, \"minimum\": 1000}"
+    ),
+    (
+      "dns_srv_record",
+      Net.dns_srv_record,
+      "{\"_tag\": \"SRV\", \"target\": \"sip.example.com\", \"port\": 5060, \"priority\": 1, \"weight\": 5}"
+    ),
+    (
+      "dns_tlsa_record",
+      Net.dns_tlsa_record,
+      "{\"_tag\": \"TLSA\", \"certUsage\": 3, \"selector\": 1, \"matchingType\": 1, \"data\": \"010203\"}"
+    ),
     ("dns_txt_record", Net.dns_txt_record, "{\"_tag\": \"TXT\", \"chunks\": [\"v=spf1\"]}"),
     ("dns_txt_record", Net.dns_txt_record, "{\"_tag\": \"A\", \"address\": \"192.0.2.1\"}")
   ]
@@ -102,7 +136,8 @@ let main () =
     | Err e -> issues e))
   Platform.stdout_line (case "DateTime.json_utc" "\"2024-01-01T10:00:00+02:00\"" DateTime.json_utc)
   Platform.stdout_line (case "DateTime.json_utc_millis" "0" DateTime.json_utc_millis)
-  Platform.stdout_line (case "DateTime.json_zoned" "\"2024-01-01T10:00:00+02:00[Europe/Paris]\"" DateTime.json_zoned)
+  Platform.stdout_line
+    (case "DateTime.json_zoned" "\"2024-01-01T10:00:00+02:00[Europe/Paris]\"" DateTime.json_zoned)
   Platform.stdout_line (case "DateTime.json_zone" "\"+02:00\"" DateTime.json_zone)
   Platform.stdout_line (case "DateTime.json_zone" "\"Europe/Paris\"" DateTime.json_zone)
   Platform.stdout_line (case "DateTime.json_zone_named" "\"Nowhere/X\"" DateTime.json_zone_named)
@@ -116,14 +151,20 @@ let main () =
   Platform.stdout_line ("bytes 300: " ++ wire (Codec.encode_result Codec.bytes_base64 [1, 300]))
   graph_json : PureCodec Json (Graph.DirectedGraph String Number)
   let graph_json = Graph.json Graph.directed_kind String.json Number.json
-  let g_text = "{\"type\": \"directed\", \"nodes\": [{\"index\": 0, \"data\": \"a\"}, {\"index\": 1, \"data\": \"b\"}], \"edges\": [{\"index\": 0, \"source\": 0, \"target\": 1, \"data\": 3}]}"
+  let g_text =
+    "{\"type\": \"directed\", \"nodes\": [{\"index\": 0, \"data\": \"a\"}, {\"index\": 1, \"data\": \"b\"}], \"edges\": [{\"index\": 0, \"source\": 0, \"target\": 1, \"data\": 3}]}"
   Platform.stdout_line ("Graph.json: " ++ rt g_text graph_json)
   Platform.stdout_line ("Graph.json counts: " ++ (match decoded g_text graph_json with
     | Ok g -> show (Graph.node_count g, Graph.edge_count g)
     | Err e -> issues e))
-  Platform.stdout_line (String.join "\n" (List.map (fun (name, c, text) -> case name text c) addresses))
-  Platform.stdout_line ("ip encode: " ++ wire (Codec.encode_result Net.ip_address "not an ip"))
-  Platform.stdout_line (String.join "\n" (List.map (fun (name, c, text) -> case name text c) records))
-  Platform.stdout_line ("format_record: " ++ (match decoded "{\"_tag\": \"MX\", \"exchange\": \"mail.example.com\", \"priority\": 10}" Net.dns_mx_record with
+  Platform.stdout_line (String.join "\n" addresses)
+  Platform.stdout_line
+    ("ip typed: " ++ (match (decoded "\"::1\"" Net.ip_address, decoded "\"0:0::1\"" Net.ipv6_address) with
+    | (Ok x, Ok y) -> show x ++ " == " ++ Net.format_ip y ++ ": " ++ show (x == y)
+    | _ -> "err"))
+  Platform.stdout_line
+    (String.join "\n" (List.map (fun (name, c, text) -> case name text c) records))
+  Platform.stdout_line
+    ("format_record: " ++ (match decoded "{\"_tag\": \"MX\", \"exchange\": \"mail.example.com\", \"priority\": 10}" Net.dns_mx_record with
     | Ok r -> Net.format_record r
     | Err e -> issues e))

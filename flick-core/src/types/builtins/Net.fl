@@ -1,173 +1,339 @@
-/// Network addresses and DNS records as JSON, from Effect's `Schema`. An
-/// address is kept as its canonical text: decoding validates and normalizes
-/// it (`"2001:DB8:0::1"` becomes `"2001:db8::1"`), encoding validates it, and
-/// text of another form is a `SchemaError`.
+/// Network addresses and DNS records as JSON, from Effect's `Schema`. Each
+/// kind of address is its own type, holding Effect's value: decoding
+/// validates and normalizes the text (`"2001:DB8:0::1"` becomes an address
+/// written `2001:db8::1`), and text of another form is a `SchemaError`. Two
+/// addresses are equal when their canonical texts are.
 module Net exposing (..)
 
 /// A DNS record of any type, as Effect keeps it; `format_record` writes it.
 type DnsRecord
+
+/// An IPv4 or IPv6 address: `2001:db8::1`.
+type IpAddress
+
+/// The canonical text of the address.
+format_ip : IpAddress -> String
+foreign pure format_ip from "@flick-lang/runtime/effect/Net" "flickFormatIp"
+
+instance Eq IpAddress =
+  eq : IpAddress -> IpAddress -> Bool
+  let eq x y = format_ip x == format_ip y
+
+instance Show IpAddress =
+  show : IpAddress -> String
+  let show x = format_ip x
+
+/// An IP address with its prefix length: `10.1.2.3/8`.
+type IpInterface
+
+/// The canonical text of the address.
+format_interface : IpInterface -> String
+foreign pure format_interface from "@flick-lang/runtime/effect/Net" "flickFormatInterface"
+
+instance Eq IpInterface =
+  eq : IpInterface -> IpInterface -> Bool
+  let eq x y = format_interface x == format_interface y
+
+instance Show IpInterface =
+  show : IpInterface -> String
+  let show x = format_interface x
+
+/// An IP network without host bits: `10.0.0.0/8`.
+type IpNetwork
+
+/// The canonical text of the address.
+format_network : IpNetwork -> String
+foreign pure format_network from "@flick-lang/runtime/effect/Net" "flickFormatNetwork"
+
+instance Eq IpNetwork =
+  eq : IpNetwork -> IpNetwork -> Bool
+  let eq x y = format_network x == format_network y
+
+instance Show IpNetwork =
+  show : IpNetwork -> String
+  let show x = format_network x
+
+/// A MAC address: `aa:bb:cc:dd:ee:ff`.
+type MacAddress
+
+/// The canonical text of the address.
+format_mac : MacAddress -> String
+foreign pure format_mac from "@flick-lang/runtime/effect/Net" "flickFormatMac"
+
+instance Eq MacAddress =
+  eq : MacAddress -> MacAddress -> Bool
+  let eq x y = format_mac x == format_mac y
+
+instance Show MacAddress =
+  show : MacAddress -> String
+  let show x = format_mac x
+
+/// A lowercased domain name: `example.com`.
+type DomainName
+
+/// The canonical text of the address.
+format_domain : DomainName -> String
+foreign pure format_domain from "@flick-lang/runtime/effect/Net" "flickFormatDomain"
+
+instance Eq DomainName =
+  eq : DomainName -> DomainName -> Bool
+  let eq x y = format_domain x == format_domain y
+
+instance Show DomainName =
+  show : DomainName -> String
+  let show x = format_domain x
+
+/// An IPv6 address with a zone: `fe80::1%eth0`.
+type ScopedIpv6Literal
+
+/// The canonical text of the address.
+format_scoped : ScopedIpv6Literal -> String
+foreign pure format_scoped from "@flick-lang/runtime/effect/Net" "flickFormatScoped"
+
+instance Eq ScopedIpv6Literal =
+  eq : ScopedIpv6Literal -> ScopedIpv6Literal -> Bool
+  let eq x y = format_scoped x == format_scoped y
+
+instance Show ScopedIpv6Literal =
+  show : ScopedIpv6Literal -> String
+  let show x = format_scoped x
+
+/// An IP address, a scoped IPv6 literal or a domain name.
+type Host
+
+/// The canonical text of the address.
+format_host : Host -> String
+foreign pure format_host from "@flick-lang/runtime/effect/Net" "flickFormatHost"
+
+instance Eq Host =
+  eq : Host -> Host -> Bool
+  let eq x y = format_host x == format_host y
+
+instance Show Host =
+  show : Host -> String
+  let show x = format_host x
+
+/// A host and a port: `example.com:8080`.
+type HostPort
+
+/// The canonical text of the address.
+format_host_port : HostPort -> String
+foreign pure format_host_port from "@flick-lang/runtime/effect/Net" "flickFormatHostPort"
+
+instance Eq HostPort =
+  eq : HostPort -> HostPort -> Bool
+  let eq x y = format_host_port x == format_host_port y
+
+instance Show HostPort =
+  show : HostPort -> String
+  let show x = format_host_port x
+
+/// An IP socket address: `127.0.0.1:80`, `[::1]:80`.
+type InetAddress
+
+/// The canonical text of the address.
+format_inet : InetAddress -> String
+foreign pure format_inet from "@flick-lang/runtime/effect/Net" "flickFormatInet"
+
+instance Eq InetAddress =
+  eq : InetAddress -> InetAddress -> Bool
+  let eq x y = format_inet x == format_inet y
+
+instance Show InetAddress =
+  show : InetAddress -> String
+  let show x = format_inet x
+
+/// A Unix socket path: `/run/app.sock`.
+type UnixPathAddress
+
+/// The canonical text of the address.
+format_unix_path : UnixPathAddress -> String
+foreign pure format_unix_path from "@flick-lang/runtime/effect/Net" "flickFormatUnixPath"
+
+instance Eq UnixPathAddress =
+  eq : UnixPathAddress -> UnixPathAddress -> Bool
+  let eq x y = format_unix_path x == format_unix_path y
+
+instance Show UnixPathAddress =
+  show : UnixPathAddress -> String
+  let show x = format_unix_path x
+
+/// An IP socket address or a Unix socket path.
+type SocketAddress
+
+/// The canonical text of the address.
+format_socket : SocketAddress -> String
+foreign pure format_socket from "@flick-lang/runtime/effect/Net" "flickFormatSocket"
+
+instance Eq SocketAddress =
+  eq : SocketAddress -> SocketAddress -> Bool
+  let eq x y = format_socket x == format_socket y
+
+instance Show SocketAddress =
+  show : SocketAddress -> String
+  let show x = format_socket x
 
 /// The record as one line of zone-file text: `"MX 10 mail.example.com"`.
 format_record : DnsRecord -> String
 foreign pure format_record from "@flick-lang/runtime/effect/Net" "flickFormatRecord"
 
 /// A domain name, lowercased: `"example.com"`.
-domain_name : PureCodec Json String
+domain_name : PureCodec Json DomainName
 foreign pure domain_name from "@flick-lang/runtime/effect/Net" "flickDomainName"
   reviewed "effect@4.0.5 sha256:38ef79733a663a19"
 
 /// A host: an IP address, a scoped IPv6 literal or a domain name.
-host : PureCodec Json String
+host : PureCodec Json Host
 foreign pure host from "@flick-lang/runtime/effect/Net" "flickHost"
   reviewed "effect@4.0.5 sha256:6a3bce142a0bcfa7"
 
 /// A host and a port: `"example.com:8080"`, `"[::1]:80"`.
-host_port : PureCodec Json String
+host_port : PureCodec Json HostPort
 foreign pure host_port from "@flick-lang/runtime/effect/Net" "flickHostPort"
   reviewed "effect@4.0.5 sha256:f6de950f11d44a6e"
 
 /// An IP socket address: `"127.0.0.1:80"`, `"[::1]:80"`.
-inet_address : PureCodec Json String
+inet_address : PureCodec Json InetAddress
 foreign pure inet_address from "@flick-lang/runtime/effect/Net" "flickInetAddress"
   reviewed "effect@4.0.5 sha256:6f0620bfd0f9fa1e"
 
 /// An IPv4 socket address: `"127.0.0.1:80"`.
-inet_address_v4 : PureCodec Json String
+inet_address_v4 : PureCodec Json InetAddress
 foreign pure inet_address_v4 from "@flick-lang/runtime/effect/Net" "flickInetAddressV4"
   reviewed "effect@4.0.5 sha256:fcb2bdd206c988fc"
 
 /// An IPv6 socket address: `"[::1]:80"`.
-inet_address_v6 : PureCodec Json String
+inet_address_v6 : PureCodec Json InetAddress
 foreign pure inet_address_v6 from "@flick-lang/runtime/effect/Net" "flickInetAddressV6"
   reviewed "effect@4.0.5 sha256:f273b76c54db7d22"
 
 /// An IP socket address or a Unix socket path.
-socket_address : PureCodec Json String
+socket_address : PureCodec Json SocketAddress
 foreign pure socket_address from "@flick-lang/runtime/effect/Net" "flickSocketAddress"
   reviewed "effect@4.0.5 sha256:432cb05e00a635a6"
 
 /// A Unix socket path: `"/run/app.sock"`.
-unix_path_address : PureCodec Json String
+unix_path_address : PureCodec Json UnixPathAddress
 foreign pure unix_path_address from "@flick-lang/runtime/effect/Net" "flickUnixPathAddress"
   reviewed "effect@4.0.5 sha256:55c47635917687fe"
 
 /// An IPv4 or IPv6 address, as written canonically: `"2001:db8::1"`.
-ip_address : PureCodec Json String
+ip_address : PureCodec Json IpAddress
 foreign pure ip_address from "@flick-lang/runtime/effect/Net" "flickIpAddress"
   reviewed "effect@4.0.5 sha256:51cd8ab0784014c4"
 
 /// An address with its prefix length: `"10.1.2.3/8"`.
-ip_interface : PureCodec Json String
+ip_interface : PureCodec Json IpInterface
 foreign pure ip_interface from "@flick-lang/runtime/effect/Net" "flickIpInterface"
   reviewed "effect@4.0.5 sha256:ca69830b0e9051b6"
 
 /// A link-local IP address.
-ip_link_local_address : PureCodec Json String
+ip_link_local_address : PureCodec Json IpAddress
 foreign pure ip_link_local_address from "@flick-lang/runtime/effect/Net" "flickIpLinkLocalAddress"
   reviewed "effect@4.0.5 sha256:0db228c276b10734"
 
 /// A loopback IP address.
-ip_loopback_address : PureCodec Json String
+ip_loopback_address : PureCodec Json IpAddress
 foreign pure ip_loopback_address from "@flick-lang/runtime/effect/Net" "flickIpLoopbackAddress"
   reviewed "effect@4.0.5 sha256:51d2060d527738ab"
 
 /// A multicast IP address.
-ip_multicast_address : PureCodec Json String
+ip_multicast_address : PureCodec Json IpAddress
 foreign pure ip_multicast_address from "@flick-lang/runtime/effect/Net" "flickIpMulticastAddress"
   reviewed "effect@4.0.5 sha256:74a9262b86e70f1d"
 
 /// A network without host bits: `"10.0.0.0/8"`.
-ip_network : PureCodec Json String
+ip_network : PureCodec Json IpNetwork
 foreign pure ip_network from "@flick-lang/runtime/effect/Net" "flickIpNetwork"
   reviewed "effect@4.0.5 sha256:4f28390a4af8a704"
 
 /// A unicast IP address.
-ip_unicast_address : PureCodec Json String
+ip_unicast_address : PureCodec Json IpAddress
 foreign pure ip_unicast_address from "@flick-lang/runtime/effect/Net" "flickIpUnicastAddress"
   reviewed "effect@4.0.5 sha256:0deab2b9497d649e"
 
 /// The unspecified address, `"0.0.0.0"` or `"::"`.
-ip_unspecified_address : PureCodec Json String
+ip_unspecified_address : PureCodec Json IpAddress
 foreign pure ip_unspecified_address from "@flick-lang/runtime/effect/Net" "flickIpUnspecifiedAddress"
   reviewed "effect@4.0.5 sha256:c0c2277ebf8a734f"
 
 /// An IPv4 address: `"192.168.0.1"`, no leading zeroes.
-ipv4_address : PureCodec Json String
+ipv4_address : PureCodec Json IpAddress
 foreign pure ipv4_address from "@flick-lang/runtime/effect/Net" "flickIpv4Address"
   reviewed "effect@4.0.5 sha256:ab3782c92616a934"
 
 /// The IPv4 broadcast address.
-ipv4_broadcast_address : PureCodec Json String
+ipv4_broadcast_address : PureCodec Json IpAddress
 foreign pure ipv4_broadcast_address from "@flick-lang/runtime/effect/Net" "flickIpv4BroadcastAddress"
   reviewed "effect@4.0.5 sha256:e68c3098f9f3353b"
 
 /// An IPv4 address with its prefix length.
-ipv4_interface : PureCodec Json String
+ipv4_interface : PureCodec Json IpInterface
 foreign pure ipv4_interface from "@flick-lang/runtime/effect/Net" "flickIpv4Interface"
   reviewed "effect@4.0.5 sha256:2d9725521f81f5b7"
 
 /// An IPv4 network without host bits.
-ipv4_network : PureCodec Json String
+ipv4_network : PureCodec Json IpNetwork
 foreign pure ipv4_network from "@flick-lang/runtime/effect/Net" "flickIpv4Network"
   reviewed "effect@4.0.5 sha256:e724ca0420055eae"
 
 /// A private IPv4 address (RFC 1918).
-ipv4_private_address : PureCodec Json String
+ipv4_private_address : PureCodec Json IpAddress
 foreign pure ipv4_private_address from "@flick-lang/runtime/effect/Net" "flickIpv4PrivateAddress"
   reviewed "effect@4.0.5 sha256:ff4053264b2757c2"
 
 /// An IPv6 address, as written canonically.
-ipv6_address : PureCodec Json String
+ipv6_address : PureCodec Json IpAddress
 foreign pure ipv6_address from "@flick-lang/runtime/effect/Net" "flickIpv6Address"
   reviewed "effect@4.0.5 sha256:019a0b68eb4f1792"
 
 /// An IPv6 address with its prefix length.
-ipv6_interface : PureCodec Json String
+ipv6_interface : PureCodec Json IpInterface
 foreign pure ipv6_interface from "@flick-lang/runtime/effect/Net" "flickIpv6Interface"
   reviewed "effect@4.0.5 sha256:56f227074b52a428"
 
 /// An IPv6 network without host bits.
-ipv6_network : PureCodec Json String
+ipv6_network : PureCodec Json IpNetwork
 foreign pure ipv6_network from "@flick-lang/runtime/effect/Net" "flickIpv6Network"
   reviewed "effect@4.0.5 sha256:01afa2f83506989c"
 
 /// A unique local IPv6 address (`fc00::/7`).
-ipv6_unique_local_address : PureCodec Json String
+ipv6_unique_local_address : PureCodec Json IpAddress
 foreign pure ipv6_unique_local_address from "@flick-lang/runtime/effect/Net" "flickIpv6UniqueLocalAddress"
   reviewed "effect@4.0.5 sha256:a7b2c5800033c563"
 
 /// A MAC address: six two-digit hex octets separated by colons.
-mac_address : PureCodec Json String
+mac_address : PureCodec Json MacAddress
 foreign pure mac_address from "@flick-lang/runtime/effect/Net" "flickMacAddress"
   reviewed "effect@4.0.5 sha256:c74a5cf4c1c87274"
 
 /// The broadcast MAC address.
-mac_broadcast_address : PureCodec Json String
+mac_broadcast_address : PureCodec Json MacAddress
 foreign pure mac_broadcast_address from "@flick-lang/runtime/effect/Net" "flickMacBroadcastAddress"
   reviewed "effect@4.0.5 sha256:d05b47bb41875029"
 
 /// A locally administered MAC address.
-mac_locally_administered_address : PureCodec Json String
+mac_locally_administered_address : PureCodec Json MacAddress
 foreign pure mac_locally_administered_address from "@flick-lang/runtime/effect/Net" "flickMacLocallyAdministeredAddress"
   reviewed "effect@4.0.5 sha256:030ed33f1dd738cf"
 
 /// A multicast MAC address.
-mac_multicast_address : PureCodec Json String
+mac_multicast_address : PureCodec Json MacAddress
 foreign pure mac_multicast_address from "@flick-lang/runtime/effect/Net" "flickMacMulticastAddress"
   reviewed "effect@4.0.5 sha256:0d584e72fa5fa7b4"
 
 /// A unicast MAC address.
-mac_unicast_address : PureCodec Json String
+mac_unicast_address : PureCodec Json MacAddress
 foreign pure mac_unicast_address from "@flick-lang/runtime/effect/Net" "flickMacUnicastAddress"
   reviewed "effect@4.0.5 sha256:0184928b56df0517"
 
 /// A universally administered MAC address.
-mac_universally_administered_address : PureCodec Json String
+mac_universally_administered_address : PureCodec Json MacAddress
 foreign pure mac_universally_administered_address from "@flick-lang/runtime/effect/Net" "flickMacUniversallyAdministeredAddress"
   reviewed "effect@4.0.5 sha256:2558f5bdb8d9108e"
 
 /// An IPv6 address with a zone: `"fe80::1%eth0"`.
-scoped_ipv6_literal : PureCodec Json String
+scoped_ipv6_literal : PureCodec Json ScopedIpv6Literal
 foreign pure scoped_ipv6_literal from "@flick-lang/runtime/effect/Net" "flickScopedIpv6Literal"
   reviewed "effect@4.0.5 sha256:120263e034f9bb0e"
 
