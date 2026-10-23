@@ -17,7 +17,7 @@ use crate::iface::{Interface, Namespace};
 use crate::project::{Compilation, Compiled, normalize};
 use crate::resolve::{self, Module};
 use crate::source::{FileId, SourceMap};
-use crate::{ir, syntax, types};
+use crate::{ir, opt, syntax, types};
 
 /// Directory of the built-in modules inside the output.
 pub const BUILTIN_DIR: &str = "_flick";
@@ -35,6 +35,8 @@ pub struct Settings<'a> {
     /// The entry module of an app.
     pub entry: Option<&'a str>,
     pub typescript: bool,
+    /// The release profile: the optimizer's passes before code generation.
+    pub release: bool,
     /// What else the build writes.
     pub extras: Extras,
     /// How a source map refers to a source file.
@@ -118,6 +120,7 @@ pub fn emit(
         foreign: &foreign,
         typescript: settings.typescript,
         interface: &any_interface,
+        release: settings.release,
     };
     let mut out = vec![Artifact {
         path: "package.json".to_owned(),
@@ -179,7 +182,14 @@ fn compiled_module(
     out: &mut Vec<Artifact>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let output = codegen::js(&module.ir, ctx.options);
+    // the interface and its summaries come from the reference lowering
+    let optimized = ctx.settings.release.then(|| {
+        let mut ir = module.ir.clone();
+        let exported = |name: &str| module.interface.exports_value(name);
+        opt::optimize(&mut ir, &exported);
+        ir
+    });
+    let output = codegen::js(optimized.as_ref().unwrap_or(&module.ir), ctx.options);
     let file = (ctx.path)(&module.name);
     let base = file.rsplit('/').next().unwrap_or(&file).to_owned();
     let map = sourcemap::source_map(&base, &output, ctx.sources, ctx.settings.source_path);

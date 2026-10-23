@@ -162,7 +162,34 @@ is annotated `any`: the source types live in the Flick checker and its
 `tsc --noEmit` with `strict`, `allowImportingTsExtensions` and
 `module: nodenext`. `@flick-lang/runtime` ships `index.d.ts` for it.
 
+## Release profile
+
+`--profile release` (or `build.profile = "release"`; `flick test` takes the
+same flag) runs the optimizer on the typed IR before code generation. It
+uses the same runtime and keeps everything a program can observe: the
+output, the order of runtime calls, failures, `Exit` and exit codes, and
+the module's `.iface`, which comes from the reference lowering. The e2e
+corpus runs in both profiles against the same expectations.
+
+| Pass | What it does |
+| - | - |
+| constant folding | literal expressions with JS semantics bit for bit (`60 * 60 * 24` → `86400`); a branch of a constant condition; a result JS might compute differently (`2 ** 0.5`) or would throw (`1n / 0n`) stays a computation |
+| inlining | a known full application of a small pure function of the module, or of a private one used once; the arguments are bound in order first; beta reduction of `(fun x -> …) a` |
+| propagation | a local bound to a literal or a name is replaced by it; a pure value that cannot throw moves to its one use when that use surely runs |
+| scalar replacement | a local record whose every use reads a field, or a local tuple only destructured, becomes one local per part: no object |
+| dead code | unused pure bindings (an unused `task { … }` included) and private top-level values nothing reaches; a runtime call always stays, its result used or not |
+| workers | a top-level function whose stages before the last are pure gets `f$n` taking all `n` arguments; a known full application calls it, a partial one keeps the curried `f`; a private function only ever applied fully has no curried form |
+| dictionaries | a method of a canonical instance of the module is a constant of its own that its uses call directly; a dictionary passed as a value (an `EqHash` witness) is never replaced |
+
+A function whose first stage computes or runs something gets no worker:
+joining the stages would move that work after the next argument. Pure
+self tail recursion is a loop in both profiles; a runtime recursion stays a
+chain of `Effect.gen` steps, so it yields to the scheduler and can be
+interrupted. Nothing reassociates arithmetic (`(a + b) + c`), folds `x * 0`,
+runs or memoizes a task, merges two `Layer` builds, moves a service lookup
+across `provide` or drops a schema check.
+
 ## Not compiled yet
 
-`sql`, `ui`, `cli`, `codec` and `schema` blocks are checked but not compiled:
-`flick build` reports `FLICK-P012`.
+`sql` and `cli` blocks are checked but not compiled: `flick build` reports
+`FLICK-P012`.

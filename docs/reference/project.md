@@ -32,7 +32,7 @@ schema-aot = false
 | `project.test-dir` | directory of test modules | `"test"` |
 | `project.entry` | module that exports `main`; required for `app` | — |
 | `build.out-dir` | base directory of artifacts | `"dist"` |
-| `build.profile` | `"debug"` or `"release"` | `"debug"` |
+| `build.profile` | `"debug"` or `"release"` (see [codegen.md](codegen.md)); `--profile` of `build` and `test` overrides it | `"debug"` |
 | `build.emit` | `"js"` or `"ts"` | `"js"` |
 | `build.emit-dts` | boolean | `false` |
 | `build.promise-facade` | boolean | `false` |

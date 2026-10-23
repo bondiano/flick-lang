@@ -4,9 +4,12 @@
 //! `<name>.stderr.contains` (lines stderr must contain), and `<name>.exit`
 //! (default `0`).
 
-use std::fs;
+use std::cell::Cell;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{Duration, Instant};
+use std::{env, fs};
 
 fn cases(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir).expect("readable tests/run") {
@@ -28,10 +31,11 @@ fn compare(what: &str, expected: &str, actual: &str) -> Option<String> {
         .then(|| format!("  {what}:\n    expected: {expected:?}\n    actual:   {actual:?}"))
 }
 
-/// Builds and runs one case, as JS or as TypeScript; returns the mismatch
-/// report, if any.
-fn run_case(case: &Path, out_dir: &Path, emit: &str) -> Option<String> {
+/// Builds and runs one case, as JS or as TypeScript, in a profile; returns
+/// the mismatch report, if any.
+fn run_case(case: &Path, out_dir: &Path, emit: &str, profile: &str) -> Option<String> {
     let _ = fs::remove_dir_all(out_dir);
+    let started = Instant::now();
     let build = Command::new(env!("CARGO_BIN_EXE_flick"))
         .arg("build")
         .arg(case)
@@ -39,8 +43,11 @@ fn run_case(case: &Path, out_dir: &Path, emit: &str) -> Option<String> {
         .arg(out_dir)
         .arg("--emit")
         .arg(emit)
+        .arg("--profile")
+        .arg(profile)
         .output()
         .expect("flick runs");
+    BUILD_TIME.with(|t| t.set(t.get() + started.elapsed()));
     if !build.status.success() {
         return Some(format!(
             "  build failed:\n{}",
@@ -104,17 +111,84 @@ fn run_cases() {
     // node_modules exactly as it would in a project.
     let out_root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("e2e");
     let mut report = Vec::new();
-    for emit in ["js", "ts"] {
+    let mut times = Vec::new();
+    // release must agree with the debug reference: same stdout, stderr and exit
+    for (emit, profile) in [("js", "debug"), ("ts", "debug"), ("js", "release")] {
+        BUILD_TIME.with(|t| t.set(Duration::ZERO));
         for case in &paths {
             let rel = case.strip_prefix(&root).expect("case under root");
-            let out_dir = out_root.join(emit).join(rel.with_extension(""));
-            if let Some(p) = run_case(case, &out_dir, emit) {
-                report.push(format!("{} ({emit}):\n{p}", rel.display()));
+            let out_dir = out_root
+                .join(profile)
+                .join(emit)
+                .join(rel.with_extension(""));
+            if let Some(p) = run_case(case, &out_dir, emit, profile) {
+                report.push(format!("{} ({emit}, {profile}):\n{p}", rel.display()));
             }
         }
+        times.push(BUILD_TIME.with(Cell::get));
     }
-    report.extend(typecheck(&repo, &out_root.join("ts")));
+    report.extend(typecheck(&repo, &out_root.join("debug/ts")));
     assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));
+    metrics(&out_root, times[0], times[2]);
+}
+
+thread_local! {
+    static BUILD_TIME: Cell<Duration> = const { Cell::new(Duration::ZERO) };
+}
+
+/// How much longer the release builds of the corpus may take than the debug
+/// ones, until M19 fixes the budgets.
+const RELEASE_TIME_BUDGET: f64 = 2.0;
+
+/// The JS size and build time of the corpus in both profiles: release must
+/// be smaller and within its time budget. CI shows the numbers in the job
+/// summary.
+fn metrics(out_root: &Path, debug_time: Duration, release_time: Duration) {
+    let size = |profile: &str| js_size(&out_root.join(profile).join("js"));
+    let (debug, release) = (size("debug"), size("release"));
+    let line = format!(
+        "e2e corpus: JS {debug} bytes in debug, {release} in release ({:+.1}%); build {:.2}s in debug, {:.2}s in release",
+        percent(release, debug),
+        debug_time.as_secs_f64(),
+        release_time.as_secs_f64(),
+    );
+    println!("{line}");
+    if let Ok(summary) = env::var("GITHUB_STEP_SUMMARY") {
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(summary)
+            .expect("summary");
+        writeln!(file, "{line}").expect("write summary");
+    }
+    assert!(release < debug, "{line}");
+    assert!(
+        release_time.as_secs_f64() <= debug_time.as_secs_f64() * RELEASE_TIME_BUDGET,
+        "{line}"
+    );
+}
+
+/// How much `new` differs from `old`, in percent.
+fn percent(new: u64, old: u64) -> f64 {
+    let (new, old) = (
+        u32::try_from(new).unwrap_or(u32::MAX),
+        u32::try_from(old).unwrap_or(u32::MAX),
+    );
+    (f64::from(new) / f64::from(old) - 1.0) * 100.0
+}
+
+/// Bytes of the compiled modules under `dir`, the built-in ones left out.
+fn js_size(dir: &Path) -> u64 {
+    let mut total = 0;
+    for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
+        let path = entry.path();
+        if path.is_dir() && !path.ends_with("_flick") {
+            total += js_size(&path);
+        } else if path.extension().is_some_and(|e| e == "js") && !path.ends_with("main.js") {
+            total += entry.metadata().map_or(0, |m| m.len());
+        }
+    }
+    total
 }
 
 /// `tsc --noEmit` over everything `--emit ts` wrote under `dir`.

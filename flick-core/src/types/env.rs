@@ -116,6 +116,8 @@ pub struct Env {
     ambiguous: HashSet<(Namespace, String)>,
     /// Import qualifiers and built-in modules, by qualifier.
     qualifiers: HashMap<String, String>,
+    /// The qualifiers of the module's imports.
+    imported: HashSet<String>,
     interfaces: HashMap<String, Option<Interface>>,
     /// Some open import could not be loaded, so a missing name may exist.
     open_unknown: bool,
@@ -158,6 +160,7 @@ impl Env {
             let interface = imported(&import.module);
             env.qualifiers
                 .insert(import.qualifier().to_owned(), import.module.clone());
+            env.imported.insert(import.qualifier().to_owned());
             if let Some(i) = &interface {
                 env.learn(i);
             }
@@ -304,6 +307,12 @@ impl Env {
     }
 
     /// The module a qualifier names, and its interface if it was loaded.
+    /// Whether `qualifier` names an import, whose missing names name
+    /// resolution reports, rather than a built-in module used without one.
+    pub fn is_import(&self, qualifier: &str) -> bool {
+        self.imported.contains(qualifier)
+    }
+
     pub fn qualified_module(&self, qualifier: &str) -> Option<(&str, Option<&Interface>)> {
         let module = self.qualifiers.get(qualifier)?;
         let interface = self.interfaces.get(module).and_then(Option::as_ref);

@@ -12,6 +12,7 @@ fn compile(text: &str) -> String {
         foreign: &foreign,
         typescript: false,
         interface: &|_| None,
+        release: false,
     };
     js(&ir, &options).code
 }

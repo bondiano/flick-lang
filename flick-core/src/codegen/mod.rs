@@ -29,6 +29,9 @@ pub struct Options<'a> {
     /// The interface of a module, this one included: TypeScript output
     /// declares the exported types and annotates the exported values.
     pub interface: &'a dyn Fn(&str) -> Option<Interface>,
+    /// The release profile: worker functions for known full applications
+    /// and direct methods of canonical instances.
+    pub release: bool,
 }
 
 /// A compiled module.

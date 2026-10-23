@@ -116,6 +116,17 @@ pub struct BuildArguments {
     /// Compile pure codecs ahead of use in the app's runner.
     #[arg(long)]
     pub schema_aot: bool,
+
+    /// `debug`, the reference lowering, or `release`, optimized; by default
+    /// `build.profile` of the project.
+    #[arg(long, value_enum)]
+    pub profile: Option<ProfileArgument>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ProfileArgument {
+    Debug,
+    Release,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -168,6 +179,10 @@ pub struct TestArguments {
     /// closed its scopes.
     #[arg(long)]
     pub watch: bool,
+
+    /// `debug` or `release`; by default `build.profile` of the project.
+    #[arg(long, value_enum)]
+    pub profile: Option<ProfileArgument>,
 }
 
 #[derive(Clone, Copy, ValueEnum)]

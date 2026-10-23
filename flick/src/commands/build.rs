@@ -3,12 +3,12 @@ use std::{fs, io, process};
 
 use flick_core::build::{self, Extras, Settings};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::config::{Emit, Kind};
+use flick_core::project::config::{Build, Emit, Kind, Profile};
 use flick_core::project::{self, Compilation, Compiled, Project};
 use flick_core::source::{FileId, SourceMap};
 
 use super::check::select;
-use crate::args::{BuildArguments, EmitArgument};
+use crate::args::{BuildArguments, EmitArgument, ProfileArgument};
 use crate::command::{Command, Outcome};
 use crate::sources::FsHost;
 
@@ -87,6 +87,7 @@ impl Command for BuildCommand {
                     || config.is_some_and(|b| b.promise_facade),
                 schema_aot: self.options.schema_aot || config.is_some_and(|b| b.schema_aot),
             },
+            release: release(self.options.profile, config),
         };
         diagnostics.extend(emit(
             &host,
@@ -102,12 +103,21 @@ impl Command for BuildCommand {
     }
 }
 
+/// Whether the build optimizes: `--profile`, else `build.profile`.
+pub fn release(profile: Option<ProfileArgument>, config: Option<&Build>) -> bool {
+    match profile {
+        Some(p) => p == ProfileArgument::Release,
+        None => config.is_some_and(|b| b.profile == Profile::Release),
+    }
+}
+
 /// Where and what a build writes.
 pub struct Output<'a> {
     pub out_dir: &'a Path,
     pub entry: Option<&'a str>,
     pub typescript: bool,
     pub extras: Extras,
+    pub release: bool,
 }
 
 /// Writes the build of `compilation`; what could not be written or has no
@@ -151,6 +161,7 @@ pub fn emit(
         typescript: output.typescript,
         source_path: &source_path,
         extras: output.extras,
+        release: output.release,
     };
     let (artifacts, mut diagnostics) = build::emit(compilation, sources, &settings);
     if diagnostics.iter().any(|d| d.severity == Severity::Error) {

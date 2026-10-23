@@ -14,7 +14,7 @@ use flick_core::diagnostics::{Diagnostic, Severity};
 use flick_core::project;
 use flick_core::source::SourceMap;
 
-use super::build::{Output, emit, write};
+use super::build::{Output, emit, release, write};
 use super::check::select;
 use crate::args::{GlobalArguments, Reporter, TestArguments};
 use crate::report;
@@ -75,6 +75,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         entry: None,
         typescript: false,
         extras: Extras::default(),
+        release: release(options.profile, Some(&project.config.build)),
     };
     let problems = emit(&host, &sources, Some(&project), &compilation, &output);
     if !problems.is_empty() {

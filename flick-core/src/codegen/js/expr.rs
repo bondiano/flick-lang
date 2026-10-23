@@ -6,7 +6,7 @@ use std::mem;
 use super::{Gen, Target, indent, names};
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stmt};
 use crate::source::Span;
-use crate::types::{Constructor, Lift};
+use crate::types::{Constructor, Dict, Lift};
 
 /// Whether moving the evaluation of `js` later is unobservable: a name, a
 /// property of a module namespace, or a literal.
@@ -63,7 +63,10 @@ impl Gen<'_> {
             ExprKind::Lit(lit) => literal(lit),
             ExprKind::Local(name) => names::ident(name),
             ExprKind::Global { module, name } => self.global(module, &names::ident(name)),
-            ExprKind::Method { dict, name } => format!("{}.{name}", self.dict(dict)),
+            ExprKind::Method { dict, name } => match self.direct_method(dict, name) {
+                Some(direct) => direct,
+                None => format!("{}.{name}", self.dict(dict)),
+            },
             ExprKind::Con(c) => self.constructor(c),
             ExprKind::Operation {
                 service,
@@ -92,7 +95,7 @@ impl Gen<'_> {
                 runtime,
                 arg_first,
             } => self.app(e, func, arg, *runtime, *arg_first),
-            ExprKind::Lambda { params, body } => self.lambda(params, body, None),
+            ExprKind::Lambda { params, body } => self.lambda(params, body, None, false),
             ExprKind::Block(stmts, result) => {
                 for stmt in stmts {
                     self.stmt(stmt);
@@ -124,7 +127,7 @@ impl Gen<'_> {
                     format!("{r}[{}]", names::string(label))
                 }
             }
-            ExprKind::Binary(op, lhs, rhs) => self.binary(*op, lhs, rhs),
+            ExprKind::Binary(op, lhs, rhs) => self.binary(e.span, *op, lhs, rhs),
             ExprKind::Not(inner) => format!("(!{})", self.expr(inner)),
             ExprKind::Neg(inner) => format!("(-{})", self.expr(inner)),
             ExprKind::Ignore(inner) => {
@@ -158,6 +161,16 @@ impl Gen<'_> {
     }
 
     fn app(&mut self, e: &Expr, func: &Expr, arg: &Expr, runtime: bool, arg_first: bool) -> String {
+        if let Some((worker, args)) = self.worker_call(e) {
+            let owner = self.owner.take();
+            let js = self.ordered(&args);
+            let call = format!("{}{worker}({})", self.mark(e.span), js.join(", "));
+            return if runtime {
+                self.run(owner, &call)
+            } else {
+                call
+            };
+        }
         let owner = self.owner.take();
         let (f, a) = if arg_first {
             let a = self.expr(arg);
@@ -167,7 +180,8 @@ impl Gen<'_> {
             let js = self.ordered(&[func, arg]);
             (js[0].clone(), js[1].clone())
         };
-        let call_like = f.ends_with(')') && (f.starts_with('(') || !f.contains("=>"));
+        // `(x) => (y)` ends with `)` too, yet needs parentheses to be called
+        let call_like = f.ends_with(')') && !f.contains("=>");
         let f = if atomic(&f) || call_like {
             f
         } else {
@@ -180,6 +194,46 @@ impl Gen<'_> {
         } else {
             call
         }
+    }
+
+    /// The constant of `method` of `dict`, a canonical instance of this
+    /// module whose method is emitted on its own.
+    fn direct_method(&self, dict: &Dict, method: &str) -> Option<String> {
+        let Dict::Instance { module, name, args } = dict else {
+            return None;
+        };
+        if module != self.module || !args.is_empty() {
+            return None;
+        }
+        self.direct.get(&(name.clone(), method.to_owned())).cloned()
+    }
+
+    /// A known full application of a function of the module with a worker,
+    /// its stages before the last pure and none evaluating its argument first.
+    fn worker_call<'e>(&self, e: &'e Expr) -> Option<(String, Vec<&'e Expr>)> {
+        let mut args = Vec::new();
+        let mut head = e;
+        let mut last = true;
+        while let ExprKind::App {
+            func,
+            arg,
+            runtime,
+            arg_first: false,
+        } = &head.kind
+        {
+            if *runtime && !last {
+                return None;
+            }
+            last = false;
+            args.push(&**arg);
+            head = func;
+        }
+        let ExprKind::Global { module, name } = &head.kind else {
+            return None;
+        };
+        let (arity, _) = *self.workers.get(name).filter(|_| module == self.module)?;
+        args.reverse();
+        (args.len() == arity).then(|| (format!("{}${arity}", names::ident(name)), args))
     }
 
     /// `yield*` of the effect `js`, in `owner` when a `Within` gave one.
@@ -268,7 +322,7 @@ impl Gen<'_> {
         format!("{{ {} }}", entries.join(", "))
     }
 
-    fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr) -> String {
+    fn binary(&mut self, span: Span, op: BinOp, lhs: &Expr, rhs: &Expr) -> String {
         if matches!(op, BinOp::And | BinOp::Or) {
             let l = self.expr(lhs);
             let (rs, rv) = self.block(|g| g.expr(rhs));
@@ -290,7 +344,6 @@ impl Gen<'_> {
         }
         let js = self.ordered(&[lhs, rhs]);
         let (l, r) = (&js[0], &js[1]);
-        let span = Span::new(lhs.span.file, lhs.span.start, rhs.span.end);
         let l = &format!("{}{l}", self.mark(span));
         match op {
             BinOp::Eq => format!("{}({l}, {r})", self.rt("equals")),

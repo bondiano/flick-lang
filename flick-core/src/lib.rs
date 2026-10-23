@@ -13,6 +13,7 @@ pub mod ffi;
 pub mod fmt;
 pub mod iface;
 pub mod ir;
+pub mod opt;
 pub mod project;
 pub mod resolve;
 pub mod source;

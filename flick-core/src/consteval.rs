@@ -79,7 +79,7 @@ fn literal_value(token: Token, src: &str) -> Option<Const> {
     })
 }
 
-fn prefix(op: K, value: Const) -> Option<Const> {
+pub(crate) fn prefix(op: K, value: Const) -> Option<Const> {
     Some(match (op, value) {
         (K::Minus, Const::Number(x)) => Const::Number(-x),
         (K::Minus, Const::BigInt(x)) => Const::BigInt(x.checked_neg()?),
@@ -89,7 +89,7 @@ fn prefix(op: K, value: Const) -> Option<Const> {
 }
 
 #[allow(clippy::float_cmp, reason = "JS compares numbers exactly")]
-fn binary(op: K, lhs: Const, rhs: Const) -> Option<Const> {
+pub(crate) fn binary(op: K, lhs: Const, rhs: Const) -> Option<Const> {
     use Const::{BigInt, Bool, Number, String};
     Some(match (lhs, rhs) {
         (Number(a), Number(b)) => match op {

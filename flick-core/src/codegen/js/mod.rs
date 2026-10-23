@@ -7,6 +7,7 @@ mod expr;
 mod function;
 mod items;
 mod pattern;
+mod release;
 mod schema;
 
 use std::collections::{BTreeSet, HashMap};
@@ -41,6 +42,18 @@ pub fn js(module: &Module, options: &Options) -> Output {
         owner: None,
         tail: None,
         annotations: HashMap::new(),
+        workers: if options.release {
+            let interface = (options.interface)(&module.name);
+            let exported = |name: &str| interface.as_ref().is_none_or(|i| i.exports_value(name));
+            release::workers(&module.name, &module.items, &exported)
+        } else {
+            HashMap::new()
+        },
+        direct: if options.release {
+            release::direct_methods(&module.name, &module.items)
+        } else {
+            HashMap::new()
+        },
     };
     let projection = Projection::new(&module.name, options.interface, options.package);
     let mut declarations = Vec::new();
@@ -198,6 +211,13 @@ struct Gen<'a> {
     /// The owner the next runtime call acquires into, from `Within`.
     owner: Option<String>,
     tail: Option<Tail>,
+    /// Release: the top-level functions of the module with a worker taking
+    /// all their arguments at once, by name, with its arity and whether its
+    /// curried form is still needed.
+    workers: HashMap<String, (usize, bool)>,
+    /// Release: the methods of the module's canonical instances emitted as
+    /// constants of their own, by instance and method.
+    direct: HashMap<(String, String), String>,
     /// TypeScript types of the exported values, by their JS name.
     annotations: HashMap<String, String>,
 }

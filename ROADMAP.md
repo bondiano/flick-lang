@@ -918,22 +918,33 @@ String -> Ui r e`, чтобы стоять среди детей любого э
   memoization task, слияние Layer, перенос lookup через provide, удаление
   Schema-проверки) отсутствуют и закреплены тестами.
 
-**Артефакты.** `flick-core::opt::{inline, arity, sroa, dce, specialize, tailrec}`.
+**Артефакты.** `flick-core::opt` (`fold`, `inline` с beta reduction,
+`sroa`, propagation и DCE в `opt/mod.rs`) над typed IR; worker-функции
+(`arity`) и прямые методы canonical instances (`specialize`) — в
+`codegen/js/release.rs`, потому что это решения о JS-представлении; pure
+self-tail recursion → loop уже в debug codegen и работает в worker'ах.
+`flick build|test --profile debug|release`, `build.profile`; `.iface` строится
+из debug-IR, поэтому fingerprints профилей совпадают. e2e-корпус и
+Number-корпус прогоняются в обоих профилях; метрика размера JS и времени
+сборки печатается и пишется в `GITHUB_STEP_SUMMARY`, бюджет времени —
+`RELEASE_TIME_BUDGET = 2.0` в `flick/tests/e2e.rs` до M19. Unboxed nominal
+wrappers и различимые unions по явному ABI не сделаны: синтаксиса явного ABI
+пока нет, а native Effect-типы и так сохраняют представление.
 
 **AC**
 
-- [ ] Differential-тестирование: весь e2e-корпус даёт идентичные stdout, порядок
+- [x] Differential-тестирование: весь e2e-корпус даёт идентичные stdout, порядок
       эффектов, Exit и коды выхода в `debug` и `release` (§13).
-- [ ] Полное известное применение `add x y` вызывает worker; частичное — closure;
+- [x] Полное известное применение `add x y` вызывает worker; частичное — closure;
       если первая стадия runtime/частичная, uncurrying не применяется (тест с
       бросающей первой стадией).
-- [ ] `sum_pair` в release не аллоцирует объект (snapshot JS).
-- [ ] Специализированный dictionary вызывает метод напрямую; при двух разных
+- [x] `sum_pair` в release не аллоцирует объект (snapshot JS).
+- [x] Специализированный dictionary вызывает метод напрямую; при двух разных
       dictionaries одного типа (`EqHash` witnesses) сохраняется выбранный.
-- [ ] Набор negative-тестов на каждое запрещённое преобразование из §8.
-- [ ] Number-корпус из M7 проходит в release бит-в-бит (§13).
-- [ ] Бесконечный runtime-цикл в release остаётся прерываемым (тест на interruption).
-- [ ] Размер и время: release-сборка e2e-корпуса не медленнее debug более чем на
+- [x] Набор negative-тестов на каждое запрещённое преобразование из §8.
+- [x] Number-корпус из M7 проходит в release бит-в-бит (§13).
+- [x] Бесконечный runtime-цикл в release остаётся прерываемым (тест на interruption).
+- [x] Размер и время: release-сборка e2e-корпуса не медленнее debug более чем на
       заданный в M19 бюджет; размер JS уменьшается (метрика публикуется в CI).
 
 ---

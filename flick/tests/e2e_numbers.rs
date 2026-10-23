@@ -88,16 +88,21 @@ fn numbers_match_js() {
         ),
     )
     .expect("write");
-    let out = dir.join("out");
-    run(Command::new(env!("CARGO_BIN_EXE_flick"))
-        .arg("build")
-        .arg(&source)
-        .arg("--out-dir")
-        .arg(&out));
-    let compiled = run(Command::new("node").arg(out.join("main.js")));
     let expected = run(Command::new("node").arg(&reference));
-    for (i, (a, b)) in compiled.lines().zip(expected.lines()).enumerate() {
-        assert_eq!(a, b, "expression {i}: {}", flick[i]);
+    // release folds the literal expressions when it compiles: bit for bit the same
+    for profile in ["debug", "release"] {
+        let out = dir.join(profile);
+        run(Command::new(env!("CARGO_BIN_EXE_flick"))
+            .arg("build")
+            .arg(&source)
+            .arg("--out-dir")
+            .arg(&out)
+            .arg("--profile")
+            .arg(profile));
+        let compiled = run(Command::new("node").arg(out.join("main.js")));
+        for (i, (a, b)) in compiled.lines().zip(expected.lines()).enumerate() {
+            assert_eq!(a, b, "expression {i} ({profile}): {}", flick[i]);
+        }
+        assert_eq!(compiled.lines().count(), 400);
     }
-    assert_eq!(compiled.lines().count(), 400);
 }

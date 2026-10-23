@@ -20,4 +20,5 @@ Options:
       --verbose                    Print more service output
       --project <PATH>             Project directory or its `flick.toml`; by default the nearest `flick.toml` from the working directory upwards
       --schema-aot                 Compile pure codecs ahead of use in the app's runner
+      --profile <PROFILE>          `debug`, the reference lowering, or `release`, optimized; by default `build.profile` of the project [possible values: debug, release]
   -h, --help                       Print help

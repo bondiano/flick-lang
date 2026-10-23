@@ -269,6 +269,90 @@ impl Expr {
     }
 }
 
+impl Expr {
+    /// Calls `f` on each direct subexpression, mutably, in evaluation order.
+    pub fn each_child_mut(&mut self, f: &mut dyn FnMut(&mut Expr)) {
+        match &mut self.kind {
+            ExprKind::Dicts(inner, _)
+            | ExprKind::Abstract(_, inner)
+            | ExprKind::Field(inner, _)
+            | ExprKind::Not(inner)
+            | ExprKind::Neg(inner)
+            | ExprKind::Ignore(inner)
+            | ExprKind::Await(inner)
+            | ExprKind::Task(inner)
+            | ExprKind::Scope { body: inner, .. }
+            | ExprKind::Within(_, inner)
+            | ExprKind::Lift(inner, _)
+            | ExprKind::Lambda { body: inner, .. } => f(inner),
+            ExprKind::App {
+                func,
+                arg,
+                arg_first,
+                ..
+            } => {
+                if *arg_first {
+                    f(arg);
+                    f(func);
+                } else {
+                    f(func);
+                    f(arg);
+                }
+            }
+            ExprKind::Block(stmts, result) => {
+                for stmt in stmts {
+                    match stmt {
+                        Stmt::Let(_, v) | Stmt::Expr(v) | Stmt::Fun { value: v, .. } => f(v),
+                    }
+                }
+                f(result);
+            }
+            ExprKind::If(c, t, e) => {
+                f(c);
+                f(t);
+                f(e);
+            }
+            ExprKind::Match(s, arms) | ExprKind::Try(s, arms) => {
+                f(s);
+                for arm in arms {
+                    if let Some(g) = &mut arm.guard {
+                        f(g);
+                    }
+                    f(&mut arm.body);
+                }
+            }
+            ExprKind::Tuple(items) | ExprKind::List(items) => {
+                for item in items {
+                    f(item);
+                }
+            }
+            ExprKind::Record(fields) | ExprKind::CodecBlock(_, fields) => {
+                for (_, v) in fields {
+                    f(v);
+                }
+            }
+            ExprKind::Update(r, fields) => {
+                f(r);
+                for (_, v) in fields {
+                    f(v);
+                }
+            }
+            ExprKind::Binary(_, l, r) | ExprKind::Provide(l, r) => {
+                f(l);
+                f(r);
+            }
+            ExprKind::Lit(_)
+            | ExprKind::Local(_)
+            | ExprKind::Global { .. }
+            | ExprKind::Method { .. }
+            | ExprKind::Con(_)
+            | ExprKind::Operation { .. }
+            | ExprKind::ServiceTag(_)
+            | ExprKind::Label(_) => {}
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Param {
     pub pat: Pat,

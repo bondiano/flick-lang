@@ -145,6 +145,14 @@ impl Checker<'_> {
             let entity = interface
                 .and_then(|i| i.find(namespace, name))
                 .map(|e| e.entity.clone());
+            if entity.is_none() && interface.is_some() && !self.env.is_import(qualifier) {
+                self.error(
+                    codes::T001,
+                    span,
+                    format!("`{qualifier}` does not export `{name}`"),
+                );
+                return Type::Error;
+            }
             let scheme = entity.as_ref().and_then(|e| self.env.value(e).cloned());
             let ty = scheme.map_or(Type::Error, |s| self.instantiate(&s, span));
             if let Some(entity) = entity {

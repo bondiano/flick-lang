@@ -21,7 +21,7 @@ impl Gen<'_> {
         let params = self.bind_givens(dicts);
         let body = match &value.kind {
             ExprKind::Lambda { params, body } if dicts.is_empty() => {
-                self.lambda(params, body, target)
+                self.lambda(params, body, target, false)
             }
             // a value: its statements go before it, unless dictionaries defer it
             _ if dicts.is_empty() => self.expr(value),
@@ -40,12 +40,14 @@ impl Gen<'_> {
         }
     }
 
-    /// A curried function: one arrow per stage, the body at the last one.
+    /// A curried function: one arrow per stage, the body at the last one;
+    /// `uncurried`, one arrow taking every parameter (a worker).
     pub(super) fn lambda(
         &mut self,
         params: &[Param],
         body: &Expr,
         target: Option<Target>,
+        uncurried: bool,
     ) -> String {
         let saved = (mem::take(&mut self.buf), self.generator, self.tail.take());
         let last_runtime = params.last().is_some_and(|p| p.runtime);
@@ -123,7 +125,10 @@ impl Gen<'_> {
                 _ => format!("{{\n{}}}", indent(&stmts)),
             }
         };
-        for (i, head) in heads.iter().enumerate().rev() {
+        if uncurried {
+            text = format!("{} {text}", self.arrow(&heads.join(", ")));
+        }
+        for (i, head) in heads.iter().enumerate().rev().filter(|_| !uncurried) {
             if i + 1 < params.len() && params[i].runtime {
                 text = format!("{}({text})", self.effect("succeed"));
             }

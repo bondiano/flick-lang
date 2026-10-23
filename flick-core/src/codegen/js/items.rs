@@ -31,6 +31,32 @@ impl Gen<'_> {
 
     fn item(&mut self, item: &Item) -> String {
         match &item.kind {
+            ItemKind::Value {
+                name,
+                dicts,
+                body:
+                    Expr {
+                        kind: ExprKind::Lambda { params, body },
+                        ..
+                    },
+            } if dicts.is_empty() && self.workers.contains_key(name) => {
+                let target = Target::Global(format!("{}.{name}", self.module));
+                let (mut stmts, worker) =
+                    self.block(|g| g.lambda(params, body, Some(target), true));
+                let id = names::ident(name);
+                let worker_id = format!("{id}${}", params.len());
+                stmts.push(self.constant(&worker_id, &worker));
+                if !self.workers.get(name).is_some_and(|&(_, curried)| curried) {
+                    return stmts.join("\n");
+                }
+                let heads: Vec<String> = (0..params.len()).map(|i| format!("$a{i}")).collect();
+                let mut curried = format!("{worker_id}({})", heads.join(", "));
+                for head in heads.iter().rev() {
+                    curried = format!("{} {curried}", self.arrow(head));
+                }
+                stmts.push(self.export(&id, &curried));
+                stmts.join("\n")
+            }
             ItemKind::Value { name, dicts, body } => {
                 let target = Target::Global(format!("{}.{name}", self.module));
                 let (mut stmts, value) = self.block(|g| g.function(dicts, body, Some(target)));
@@ -185,6 +211,8 @@ impl Gen<'_> {
 
     fn instance(&mut self, info: &InstanceInfo, methods: &[(String, Expr)]) -> String {
         let mark = self.givens.len();
+        // release: the methods a canonical use calls directly, before the dictionary
+        let mut methods_first = Vec::new();
         let params = self.bind_givens(&info.context);
         let mut entries = Vec::new();
         for (class, dict) in &info.supers {
@@ -202,7 +230,13 @@ impl Gen<'_> {
                     } else {
                         format!("({} {})()", self.arrow(""), arrow_body(&stmts, &v))
                     };
-                    entries.push(format!("{name}: {v}"));
+                    match self.direct.get(&(info.name.clone(), name.clone())).cloned() {
+                        Some(direct) => {
+                            methods_first.push(self.constant(&direct, &v));
+                            entries.push(format!("{name}: {direct}"));
+                        }
+                        None => entries.push(format!("{name}: {v}")),
+                    }
                 }
                 for (name, own) in &info.defaults {
                     let (module, class) = &info.class;
@@ -223,7 +257,8 @@ impl Gen<'_> {
         self.givens.truncate(mark);
         let id = names::instance(&info.name);
         if info.context.is_empty() {
-            format!("export {}", self.constant(&id, &body))
+            methods_first.push(format!("export {}", self.constant(&id, &body)));
+            methods_first.join("\n")
         } else {
             let value = format!("{} {body}", self.arrow(&params));
             format!("export {}", self.constant(&id, &value))
