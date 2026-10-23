@@ -1,5 +1,5 @@
-// The balances of §10: a LEFT JOIN makes the balance optional, an INNER
-// JOIN keeps it plain, and two LEFT JOINs still give one `Option`.
+// The balances example of the SQL design: a LEFT JOIN makes the balance
+// optional, an INNER JOIN keeps it plain, and two LEFT JOINs give one `Option`.
 module App.Balances exposing (..)
 
 import Sql exposing (Pg, EncodeError, DbError, DecodeError)
@@ -32,8 +32,8 @@ let balances =
       on account.user_id == user.id
     where user.id == params.user_id
     select {
-      name = user.name
-      balance = account.balance
+      name = user.name;
+      balance = account.balance;
     }
   }
 

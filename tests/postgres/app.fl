@@ -1,4 +1,5 @@
-// Against a real PostgreSQL: the queries of the SQL subset, values that
+// Against a real PostgreSQL: the queries of the SQL subset, a typed
+// LEFT JOIN bound and run directly and as a deferred `Eff`, values that
 // stay data, schema drift as `DecodeError` and a violated constraint as
 // `DbError`. Run by `flick/tests/sql_postgres.rs`.
 module App.Main exposing (main)
@@ -55,6 +56,34 @@ let balances =
     order_by user.name, account.balance
     select { name = user.name; balance = account.balance }
   }
+
+type alias BalanceRow = { name : String; balance : Option BigDecimal }
+
+/// One user's balances: the LEFT JOIN alone makes `balance` optional.
+balances_of : Sql.Template Pg { user_id : UserId } BalanceRow
+let balances_of =
+  sql params {
+    from user in Users
+    left_join account in Accounts
+      on account.user_id == user.id
+    where user.id == params.user_id
+    order_by account.balance
+    select {
+      name = user.name;
+      balance = account.balance;
+    }
+  }
+
+/// Binding is pure; `Database.query` encodes, runs and decodes.
+load_balances : UserId ->{Database; EncodeError, DbError, DecodeError} List BalanceRow
+let load_balances user_id =
+  let query = Sql.bind balances_of { user_id = user_id }
+  Database.query query
+
+/// The same call kept for later as an `Eff` value.
+deferred_balances : UserId -> Eff {Database} {EncodeError, DbError, DecodeError} (List BalanceRow)
+let deferred_balances user_id =
+  task { load_balances user_id }
 
 totals : Sql.Template Pg {} { name : String; accounts : BigInt; total : Option BigDecimal }
 let totals =
@@ -137,6 +166,8 @@ let run () =
   Platform.stdout_line
     (show (Database.query (Sql.bind named { name = "'; DROP TABLE users; --" }) |> List.length))
   Platform.stdout_line (show (Database.query (Sql.bind balances {})))
+  Platform.stdout_line (show (await (deferred_balances ada)))
+  Platform.stdout_line (show (load_balances bob))
   Platform.stdout_line (show (Database.query (Sql.bind totals {})))
   Platform.stdout_line
     (show
