@@ -329,6 +329,20 @@ impl Env {
             .insert((self.module.clone(), name.to_owned()), def);
     }
 
+    /// The transparent type aliases the module declares, exported or not.
+    pub fn local_aliases(&self) -> impl Iterator<Item = (&str, &[String], &Type)> {
+        self.types
+            .iter()
+            .filter_map(|((module, name), def)| match &def.form {
+                Form::Alias {
+                    params,
+                    body,
+                    opaque: false,
+                } if *module == self.module => Some((name.as_str(), params.as_slice(), body)),
+                _ => None,
+            })
+    }
+
     pub fn type_def_mut(&mut self, name: &str) -> Option<&mut TypeDef> {
         self.types.get_mut(&(self.module.clone(), name.to_owned()))
     }
@@ -390,6 +404,15 @@ impl Env {
                 .map_or(Rep::Tagged, |i| abi.rep(i)),
             _ => Rep::Tagged,
         }
+    }
+
+    /// The shortest qualifier that names `module`.
+    pub fn qualifier_of(&self, module: &str) -> Option<&str> {
+        self.qualifiers
+            .iter()
+            .filter(|(_, m)| *m == module)
+            .map(|(q, _)| q.as_str())
+            .min_by_key(|q| (q.len(), *q))
     }
 
     pub fn qualified_module(&self, qualifier: &str) -> Option<(&str, Option<&Interface>)> {

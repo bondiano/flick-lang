@@ -1,6 +1,6 @@
-//! Requests: hover, definition, references, completion, rename and
-//! formatting, answered from the current analysis; built-in modules are
-//! materialized as read-only `.fl` files for every editor.
+//! Requests: hover, definition, references, completion, rename, quick
+//! fixes and formatting, answered from the current analysis; built-in
+//! modules are materialized as read-only `.fl` files for every editor.
 
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
@@ -12,11 +12,11 @@ use std::process;
 use flick_core::fmt;
 use flick_core::ide::{CompletionKind, Ide, Location, Target};
 use flick_core::source::FileId;
-use flick_core::syntax::{self, cst::Node, kind::SyntaxKind as K};
+use flick_core::syntax::{self, cst::Node, kind::SyntaxKind as K, lexer};
 use flick_core::types::builtin_sources;
 use serde_json::{Value, json};
 
-use super::{BUILTIN_DIR, Server, Snapshot, analyze, builtin_index, protocol};
+use super::{BUILTIN_DIR, Server, Snapshot, analyze, builtin_index, lsp_diagnostic, protocol};
 
 type Reply = Result<Value, (i64, String)>;
 
@@ -52,6 +52,7 @@ impl Server {
                 Ok(json!([{ "range": protocol::range(&text, 0, end), "newText": formatted }]))
             }
             "textDocument/completion" => self.completion(params),
+            "textDocument/codeAction" => self.code_actions(params),
             _ => self.at_position(method, params),
         }
     }
@@ -160,11 +161,55 @@ impl Server {
         }
     }
 
+    /// Quick fixes: the edits of the fixes of the diagnostics in the range.
+    fn code_actions(&mut self, params: &Value) -> Reply {
+        let (path, text) = self.document(params)?;
+        let start = protocol::offset(&text, &params["range"]["start"]);
+        let end = protocol::offset(&text, &params["range"]["end"]);
+        let snapshot = self.snapshot_for(&path);
+        let Some(file) = snapshot.file(&path) else {
+            return Ok(json!([]));
+        };
+        let mut actions = Vec::new();
+        for d in &snapshot.analysis.diagnostics {
+            let Some(span) = d.span.filter(|s| s.file == file) else {
+                continue;
+            };
+            if span.end < start || end < span.start {
+                continue;
+            }
+            for fix in d.fixes.iter().filter(|f| !f.edits.is_empty()) {
+                let mut changes = serde_json::Map::new();
+                for edit in &fix.edits {
+                    let source = snapshot.sources.get(edit.span.file);
+                    let range = protocol::range(&source.text, edit.span.start, edit.span.end);
+                    changes
+                        .entry(protocol::uri_of(Path::new(&source.path)))
+                        .or_insert_with(|| json!([]))
+                        .as_array_mut()
+                        .expect("array")
+                        .push(json!({ "range": range, "newText": edit.replacement }));
+                }
+                actions.push(json!({
+                    "title": fix.message,
+                    "kind": "quickfix",
+                    "diagnostics": [lsp_diagnostic(&snapshot.sources, d)],
+                    "isPreferred": true,
+                    "edit": { "changes": changes },
+                }));
+            }
+        }
+        Ok(Value::Array(actions))
+    }
+
     /// Completions; after a `.` the incomplete member is cut out so the
     /// module parses, and the text before the dot is analyzed.
     fn completion(&mut self, params: &Value) -> Reply {
         let (path, text) = self.document(params)?;
         let cursor = protocol::offset(&text, &params["position"]) as usize;
+        if in_comment_or_string(&text, cursor) {
+            return Ok(json!([]));
+        }
         let word = text[..cursor]
             .char_indices()
             .rev()
@@ -269,24 +314,58 @@ fn builtin_file(module: &str, text: &str) -> io::Result<PathBuf> {
     Ok(path)
 }
 
+/// Whether `cursor` is inside a comment, a doc comment or a string: prose,
+/// where names of the program are not offered. The end of a line comment is
+/// still inside it; a string's closing quote is not.
+fn in_comment_or_string(text: &str, cursor: usize) -> bool {
+    let Ok(cursor) = u32::try_from(cursor) else {
+        return false;
+    };
+    let (tokens, _) = lexer::lex(text, FileId::default());
+    tokens.iter().any(|t| match t.kind {
+        K::LineComment | K::DocComment => t.start < cursor && cursor <= t.end,
+        K::BlockComment => {
+            t.start < cursor && (cursor < t.end || !text[..t.end as usize].ends_with("*/"))
+        }
+        K::String => {
+            t.start < cursor && (cursor < t.end || !closed(&text[t.start as usize..t.end as usize]))
+        }
+        _ => false,
+    })
+}
+
+/// Whether string literal text has its closing quote.
+fn closed(literal: &str) -> bool {
+    literal.len() > 1 && literal.trim_end_matches('#').ends_with('"')
+}
+
 /// Like removing an unfinished `.member`, supply syntax for the expression
 /// or clause currently being typed; never change the open buffer.
 fn completion_recovery(text: &str, offset: usize, cursor: usize) -> Option<&'static str> {
-    fn in_sql(node: &Node, offset: u32) -> bool {
+    fn in_sql(node: &Node, kind: K, offset: u32) -> bool {
         let (start, end) = node.range();
         start <= offset
             && offset <= end
-            && (node.kind == K::SqlExpr || node.nodes().any(|n| in_sql(n, offset)))
+            && (node.kind == kind || node.nodes().any(|n| in_sql(n, kind, offset)))
     }
     let tree = syntax::parse(text, FileId::default()).tree;
-    if !in_sql(&tree, u32::try_from(offset).ok()?) {
-        return None;
-    }
     let tokens = tree.tokens();
     let previous = tokens
         .iter()
         .rev()
         .find(|t| !t.kind.is_trivia() && t.end as usize <= offset)?;
+    let at = u32::try_from(offset).ok()?;
+    // a column of a `sql table` that ends in `as` or `via`: a type or a codec
+    if in_sql(&tree, K::SqlTableDecl, previous.start) {
+        return match (previous.kind, previous.text(text)) {
+            (K::AsKw, _) => Some("FlickCompletion"),
+            (K::Ident, "via") => Some("__flick_completion"),
+            _ => None,
+        };
+    }
+    if !in_sql(&tree, K::SqlExpr, at) {
+        return None;
+    }
     let next = tokens
         .iter()
         .find(|t| !t.kind.is_trivia() && t.start as usize >= cursor);
@@ -316,6 +395,7 @@ fn capabilities() -> Value {
             "referencesProvider": true,
             "completionProvider": { "triggerCharacters": ["."] },
             "renameProvider": { "prepareProvider": true },
+            "codeActionProvider": { "codeActionKinds": ["quickfix"] },
             "documentFormattingProvider": true,
         },
         "serverInfo": { "name": "flick", "version": env!("CARGO_PKG_VERSION") },

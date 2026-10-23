@@ -3,8 +3,11 @@
 //! environment; the result of a runtime call stays monomorphic, even of `->{}`.
 
 use super::Checker;
+use super::classes::Outcome;
+use super::env::Found;
 use super::kinds::Kind;
 use super::ty::{Binder, Type};
+use crate::iface::Namespace;
 
 impl Checker<'_> {
     /// Quantifies the variables of `ty` that are deeper than the current level.
@@ -14,6 +17,13 @@ impl Checker<'_> {
         self.solve_classes(false);
         for w in self.classes.wanted.clone() {
             self.store.lower(&w.constraint);
+        }
+        // a value a pending hold still checks stays monomorphic: its unknown
+        // rows, once quantified, would count as variables it captures
+        for hold in &self.regions.holds {
+            for (_, held) in &hold.held {
+                self.store.lower(held);
+            }
         }
         let ty = self.zonk(ty);
         let metas = self.store.deep_metas(&ty);
@@ -37,23 +47,80 @@ impl Checker<'_> {
         }
     }
 
-    /// `ty` with every unknown named, for showing a signature to write.
-    pub fn generalize_copy(&self, ty: &Type) -> Type {
+    /// `ty` as a signature to write: every unknown named, the classes still
+    /// required of those unknowns as constraints, and every type by the
+    /// name the module can write it with.
+    pub fn signature_of(&mut self, ty: &Type) -> Type {
         let ty = self.zonk(ty);
-        let mut metas = Vec::new();
-        ty.visit(&mut |t| {
-            if let Type::Meta(m) = t
-                && !metas.contains(m)
+        let metas = metas_of(&ty);
+        let mut constraints: Vec<Type> = Vec::new();
+        for w in self.classes.wanted.clone() {
+            let c = self.zonk(&w.constraint);
+            let own = metas_of(&c);
+            if own.is_empty() || !own.iter().all(|m| metas.contains(m)) || constraints.contains(&c)
             {
-                metas.push(*m);
+                continue;
             }
-        });
+            if !matches!(self.entails(&c, &w.givens), Outcome::Solved(_)) {
+                constraints.push(c);
+            }
+        }
+        // an operand of an arithmetic operator nothing determined becomes
+        // the operator's first allowed type once the declaration is settled
+        let settled: Vec<(u32, &str)> = self
+            .operators
+            .iter()
+            .filter_map(|op| match self.zonk(&op.ty) {
+                Type::Meta(m) => Some((m, op.allowed[0])),
+                _ => None,
+            })
+            .collect();
         let mut names = self.free_names(&ty);
         let subst: Vec<(u32, Type)> = metas
             .into_iter()
-            .map(|m| (m, Type::Var(names.next().expect("names are endless"))))
+            .map(|m| match settled.iter().find(|(x, _)| *x == m) {
+                Some((_, prim)) => (m, Type::prim(prim)),
+                None => (m, Type::Var(names.next().expect("names are endless"))),
+            })
             .collect();
-        replace_metas(&ty, &subst)
+        let written = |t: &Type| self.written(&replace_metas(t, &subst));
+        let body = written(&ty);
+        if constraints.is_empty() {
+            return body;
+        }
+        Type::Forall {
+            vars: Vec::new(),
+            constraints: constraints.iter().map(written).collect(),
+            body: Box::new(body),
+        }
+    }
+
+    /// Whether every pending operator will accept its operands once settled.
+    pub fn operators_fit(&self) -> bool {
+        self.operators
+            .iter()
+            .all(|op| match self.zonk(&op.ty).spine().0 {
+                Type::Meta(_) | Type::Error => true,
+                head => op.allowed.iter().any(|name| head.is_prim(name)),
+            })
+    }
+
+    /// `t` with each type not in scope by its plain name qualified the way
+    /// the module's imports let it be written.
+    fn written(&self, t: &Type) -> Type {
+        match t {
+            Type::Con { module, name } if !name.contains('.') => {
+                let plain = matches!(
+                    self.env.find(Namespace::Type, name),
+                    Found::Entity(e) if e.module == *module
+                );
+                match self.env.qualifier_of(module) {
+                    Some(q) if !plain => Type::con(module, &format!("{q}.{name}")),
+                    _ => t.clone(),
+                }
+            }
+            _ => t.map_children(&mut |c| self.written(c)),
+        }
     }
 
     /// Variable names not used in `ty` or by a variable in scope.
@@ -74,6 +141,19 @@ impl Checker<'_> {
             (!taken.contains(&name)).then_some(name)
         })
     }
+}
+
+/// The unknowns of `t`, in order of appearance.
+fn metas_of(t: &Type) -> Vec<u32> {
+    let mut metas = Vec::new();
+    t.visit(&mut |t| {
+        if let Type::Meta(m) = t
+            && !metas.contains(m)
+        {
+            metas.push(*m);
+        }
+    });
+    metas
 }
 
 fn replace_metas(t: &Type, subst: &[(u32, Type)]) -> Type {

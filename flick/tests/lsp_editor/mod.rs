@@ -1,3 +1,7 @@
+mod completion;
+mod quick_fix;
+mod sql_table;
+
 use super::*;
 
 #[test]

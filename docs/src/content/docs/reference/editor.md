@@ -16,7 +16,8 @@ protocol; logs go to stderr. It runs the same analysis as `flick check` and
 | `textDocument/definition` | across modules; module qualifiers lead to their module header, members to their declaration; built-ins open as real read-only `.fl` files; installed packages use their published `.fl`, else `.iface`; companions lead to their type, class methods at a known instance to that instance |
 | `textDocument/references` | every occurrence in the project |
 | `textDocument/rename` | the project's own values, types, constructors and locals, in `.fl` sources only; names of built-in modules and packages, service operations and instance methods have no exact mapping and are refused |
-| `textDocument/completion` | record fields after `x.`, module exports or service operations after `M.`, otherwise names in scope; SQL blocks offer tables, aliases, columns, parameters, clauses and functions; `sql table` columns offer SQL types and modifiers |
+| `textDocument/completion` | record fields after `x.`, module exports or service operations after `M.`, otherwise names in scope; SQL blocks offer tables, aliases, columns, parameters, clauses and functions; `sql table` columns offer the SQL types of the project's dialect, then the modifiers that are not written yet and do not conflict, after `as` Flick types and after `via` the codecs in scope whose type instantiates to the column's `PureCodec`, imported ones also as `Module.codec` |
+| `textDocument/codeAction` | quick fixes of diagnostics that carry an edit; on `FLICK-T004` it inserts the inferred signature `name : T` right above the `let`, at its indentation, with effect rows, type variables, class constraints and names qualified as the module's imports allow; a binding the checker rejected gets none |
 | `textDocument/formatting` | `flick fmt` |
 
 Hover resolves source bindings, not just the public export list. Private
@@ -27,6 +28,11 @@ discarding a result does not discard the expression's effects or errors.
 The [Gleam language server reference](https://gleam.run/documentation/language-server-reference/)
 is the behavior reference for symbol hover and navigation, not a claim of
 complete feature parity.
+
+Hover on `sql table` shows the row type and the type of `Name$table` in
+column order; on the name, the row type and the SQL table; on the table
+name string, the table it names; on a column's SQL type, the Flick type the
+dialect gives it; on a modifier, `as` and `via`, what they mean.
 
 SQL column hover and completion preserve nullability: a column from a
 `left_join` reads as `Option`, without adding a second `Option` to an already

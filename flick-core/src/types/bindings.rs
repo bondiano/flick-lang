@@ -336,6 +336,7 @@ impl Checker<'_> {
         }
         self.store.level += 1;
         let saved = mem::take(&mut self.runtime);
+        let errors = self.diagnostics.len();
         let ty = match (parts.params.is_empty(), parts.header) {
             (false, _) => self.function(&parts.params, parts.body, None, decl),
             (true, Some(header)) => {
@@ -362,15 +363,33 @@ impl Checker<'_> {
         } else if (function || is_fun) && !header {
             // the suggestion shows the rows the body needs, not their unknowns
             self.close_rows();
-            let suggestion = self.generalize_copy(&ty);
+            let suggestion = self.signature_of(&ty);
             let shown = self.show(&suggestion);
+            let span = self.span(decl);
+            // the edit is offered only for a type inferred without errors
+            let line = self.text[..span.start as usize]
+                .rfind('\n')
+                .map_or(0, |i| i + 1);
+            let indent = &self.text[line..span.start as usize];
+            let inferred = errors == self.diagnostics.len()
+                && self.operators_fit()
+                && !suggestion.contains(&mut |t| matches!(t, Type::Error | Type::Meta(_)));
+            let edits = if inferred && indent.chars().all(|c| c == ' ' || c == '\t') {
+                let at = u32::try_from(line).expect("offsets fit in u32");
+                vec![Edit {
+                    span: Span::new(span.file, at, at),
+                    replacement: format!("{indent}{name} : {shown}\n"),
+                }]
+            } else {
+                Vec::new()
+            };
             self.diagnostics.push(
                 Diagnostic::error(
                     codes::T004,
                     format!("function `{name}` needs a signature right above its `let`"),
-                    self.span(decl),
+                    span,
                 )
-                .with_fix(format!("add `{name} : {shown}`"), Vec::new()),
+                .with_fix(format!("add `{name} : {shown}`"), edits),
             );
         }
         if runtime || function {
