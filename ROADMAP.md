@@ -927,9 +927,12 @@ self-tail recursion → loop уже в debug codegen и работает в work
 из debug-IR, поэтому fingerprints профилей совпадают. e2e-корпус и
 Number-корпус прогоняются в обоих профилях; метрика размера JS и времени
 сборки печатается и пишется в `GITHUB_STEP_SUMMARY`, бюджет времени —
-`RELEASE_TIME_BUDGET = 2.0` в `flick/tests/e2e.rs` до M19. Unboxed nominal
-wrappers и различимые unions по явному ABI не сделаны: синтаксиса явного ABI
-пока нет, а native Effect-типы и так сохраняют представление.
+`RELEASE_TIME_BUDGET = 2.0` в `flick/tests/e2e.rs` до M19. Явный ABI:
+`unboxed type` (значение — поле) и `untagged type` (поля, различимые по
+JS-типу; иначе `FLICK-T020`) во всех профилях, `flick-core::types::abi`;
+derived `Eq`/`Ord`/`Hash`/`Show` и `Schema` (unboxed) следуют представлению.
+`_tag` — `Имя#hash` (48 бит FNV-1a 64 от квалифицированного id), id
+остаётся в `.iface`.
 
 **AC**
 

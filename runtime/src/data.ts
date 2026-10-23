@@ -5,6 +5,7 @@
 import { Equal, Hash, Option, Result } from "effect";
 
 import { item } from "./internal.ts";
+import { constructorName, tag } from "./tags.ts";
 
 /** A value of a variant type: its qualified constructor id and positional fields. */
 export interface Data {
@@ -19,7 +20,7 @@ export interface Tagged<T extends string, A> {
 }
 
 /** `Prelude.Ordering`. */
-export type Ordering = Readonly<{ _tag: `Prelude.Ordering.${"LT" | "EQ" | "GT"}` }>;
+export type Ordering = Readonly<{ _tag: string }>;
 
 /** Dictionaries of the built-in classes, curried as generated code calls them. */
 export interface EqDict<A> {
@@ -42,7 +43,7 @@ export const none: Option.Option<never> = Option.none();
 export const ok = <A>(value: A): Result.Result<A> => Result.succeed(value);
 export const err = <E>(error: E): Result.Result<never, E> => Result.fail(error);
 
-const ordering = (name: "LT" | "EQ" | "GT"): Ordering => Object.freeze({ _tag: `Prelude.Ordering.${name}` as const });
+const ordering = (name: "LT" | "EQ" | "GT"): Ordering => Object.freeze({ _tag: tag(`Prelude.Ordering.${name}`) });
 export const LT = ordering("LT");
 export const EQ = ordering("EQ");
 export const GT = ordering("GT");
@@ -67,8 +68,8 @@ export const compare = <A extends number | string | bigint | boolean>(a: A, b: A
 export const hash = (a: unknown): number => Hash.hash(a);
 
 const tagOf = (a: object): string | undefined => {
-  const tag: unknown = Reflect.get(a, "_tag");
-  return typeof tag === "string" ? tag : undefined;
+  const t: unknown = Reflect.get(a, "_tag");
+  return typeof t === "string" ? t : undefined;
 };
 
 /** `Show` of a primitive. */
@@ -80,8 +81,8 @@ export const show = (a: unknown): string => {
       return `${a}n`;
     case "object": {
       if (a === null) return "null";
-      const tag = tagOf(a);
-      return tag === undefined ? Object.prototype.toString.call(a) : tag.slice(tag.lastIndexOf(".") + 1);
+      const t = tagOf(a);
+      return t === undefined ? Object.prototype.toString.call(a) : constructorName(t);
     }
     default:
       return Object.is(a, -0) ? "-0" : String(a);
@@ -178,12 +179,34 @@ export const structural = (name: string, dicts: ReadonlyArray<FieldDict>): Dict 
   }
 };
 
-/** A constructor of a derived type: its qualified id, its name and arity. */
-type ConstructorInfo = readonly [tag: string, name: string, arity: number];
+/**
+ * A constructor of a derived type: its qualified id, its name and arity.
+ * `rep`, when present: `"unboxed"`, the value is the one field; or the JS
+ * type that tells an `untagged` constructor's field apart.
+ */
+type ConstructorInfo = readonly [tag: string, name: string, arity: number, rep?: string];
 
 const field = (value: Data, k: number): unknown => value[`_${k}`];
 
 const argsOf = (value: Data, arity: number): Array<unknown> => Array.from({ length: arity }, (_, k) => field(value, k));
+
+/** The JS type a value of an `untagged` type is told apart by. */
+const jsClass = (value: unknown): string => (Array.isArray(value) ? "array" : typeof value);
+
+const isData = (value: unknown): value is Data => typeof value === "object" && value !== null && "_tag" in value;
+
+/** Whether `value` is of constructor `c`. */
+const isOf = (c: ConstructorInfo, value: unknown): boolean => {
+  const rep = c[3];
+  if (rep === undefined) return isData(value) && value._tag === c[0];
+  return rep === "unboxed" || rep === jsClass(value);
+};
+
+/** The fields of `value`, a value of constructor `c`. */
+const partsOf = (c: ConstructorInfo, value: unknown): Array<unknown> => {
+  if (c[3] !== undefined) return [value];
+  return isData(value) ? argsOf(value, c[2]) : [];
+};
 
 /**
  * A derived instance of class `name`. `fields` gives the dictionaries of the
@@ -200,49 +223,54 @@ export const derive = (
   let cache: ReadonlyArray<FieldDict> | undefined;
   const dicts = (): ReadonlyArray<FieldDict> => (cache ??= fields());
   const dict = (k: number): FieldDict => at(dicts(), k);
-  const variant = (all: ReadonlyArray<ConstructorInfo>, value: Data) => {
-    const i = all.findIndex(([tag]) => tag === value._tag);
+  const variant = (all: ReadonlyArray<ConstructorInfo>, value: unknown) => {
+    const i = all.findIndex((c) => isOf(c, value));
     const offset = all.slice(0, i).reduce((n, c) => n + c[2], 0);
     return { i, offset, arity: at(all, i)[2] };
   };
-  const args = argsOf;
+  const args = (value: unknown): Array<unknown> => {
+    const all = constructors ?? [];
+    return partsOf(at(all, variant(all, value).i), value);
+  };
   const self: Dict = {};
   // the instance's superclass dictionaries are its prototype, as generated code reads them
   Object.setPrototypeOf(self, supers);
   switch (name) {
     case "Eq":
-      self.eq = (a: Data) => (b: Data) => {
+      self.eq = (a: unknown) => (b: unknown) => {
         if (constructors === null) return dict(0).eq(a)(b);
-        if (a._tag !== b._tag) return false;
-        const { offset, arity } = variant(constructors, a);
-        return args(a, arity).every((x, k) => dict(offset + k).eq(x)(field(b, k)));
+        const { i, offset } = variant(constructors, a);
+        if (i !== variant(constructors, b).i) return false;
+        const right = args(b);
+        return args(a).every((x, k) => dict(offset + k).eq(x)(right[k]));
       };
       break;
     case "Ord":
-      self.compare = (a: Data) => (b: Data) => {
+      self.compare = (a: unknown) => (b: unknown) => {
         if (constructors === null) return dict(0).compare(a)(b);
         const va = variant(constructors, a);
         const vb = variant(constructors, b);
         if (va.i !== vb.i) return va.i < vb.i ? LT : GT;
+        const [left, right] = [args(a), args(b)];
         for (let k = 0; k < va.arity; k++) {
-          const o = dict(va.offset + k).compare(field(a, k))(field(b, k));
+          const o = dict(va.offset + k).compare(left[k])(right[k]);
           if (o._tag !== EQ._tag) return o;
         }
         return EQ;
       };
       break;
     case "Hash":
-      self.hash = (a: Data) => {
+      self.hash = (a: unknown) => {
         if (constructors === null) return dict(0).hash(a);
-        const { i, offset, arity } = variant(constructors, a);
-        return args(a, arity).reduce<number>((h, x, k) => combine(h, dict(offset + k).hash(x)), i);
+        const { i, offset } = variant(constructors, a);
+        return args(a).reduce<number>((h, x, k) => combine(h, dict(offset + k).hash(x)), i);
       };
       break;
     default:
-      self.show = (a: Data) => {
+      self.show = (a: unknown) => {
         if (constructors === null) return dict(0).show(a);
-        const { i, offset, arity } = variant(constructors, a);
-        const shown = args(a, arity).map((x, k) => atom(dict(offset + k).show(x)));
+        const { i, offset } = variant(constructors, a);
+        const shown = args(a).map((x, k) => atom(dict(offset + k).show(x)));
         return [at(constructors, i)[1], ...shown].join(" ");
       };
   }

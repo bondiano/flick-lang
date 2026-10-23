@@ -1,5 +1,5 @@
-// A constructor id names its module and type: a user `Some` is not the
-// native `Option`.
+// A constructor id names its package, module and type, hashed after the
+// name: a user `Some` is not the native `Option`.
 module App.Main exposing (main)
 
 type Choice = Some Number | Empty

@@ -2,6 +2,7 @@
 import { Effect, type Option, Result } from "effect";
 
 import { type Tagged, none } from "./data.ts";
+import { tag } from "./tags.ts";
 
 const writeLine = (stream: NodeJS.WriteStream, text: string): void => void stream.write(`${text}\n`);
 
@@ -9,7 +10,7 @@ export const stdoutLine = (text: string): void => writeLine(process.stdout, text
 
 export const stderrLine = (text: string): void => writeLine(process.stderr, text);
 
-export const APP_ERROR = "Prelude.AppError.AppError";
+export const APP_ERROR = tag("Prelude.AppError.AppError");
 
 /** `Prelude.AppError`: what the entry runner reports when `main` fails. */
 export type AppError = Tagged<typeof APP_ERROR, { readonly message: string; readonly details: Option.Option<string> }>;

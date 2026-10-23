@@ -137,8 +137,12 @@ pub struct Data {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConstructorAbi {
     pub name: String,
-    /// The `_tag` of its values.
-    pub tag: String,
+    /// The qualified id: package, module, type and name.
+    pub id: String,
+    /// The `_tag` of its values: the name and a hash of the id; absent for
+    /// an `unboxed` or `untagged` type, whose values are their field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
     /// Fields `_0` … `_{arity - 1}`.
     pub arity: usize,
 }

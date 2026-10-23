@@ -166,7 +166,7 @@ dependencies, and resolves constraints with them.
 
 | Field | Contents |
 | - | - |
-| `data` | each type and error the module declares, with its constructors: `tag` is the `_tag` of their values (package, module, type, constructor), `arity` the fields `_0` … |
+| `data` | each type and error the module declares, with its constructors: `id` is the qualified id (package, module, type, constructor), `tag` the `_tag` of their values, the name and a hash of the id (none for an `unboxed` or `untagged` type, whose values are their field), `arity` the fields `_0` … |
 | `dictionaries` | each instance the module declares: the JS `export` of its dictionary, how many context dictionaries it takes, its `methods` and the superclasses it has a `$Class` getter for |
 | `values` | each exported value: `stages` has one character per parameter of its definition, `.` for a pure and `!` for a runtime arrow; `dicts` counts the dictionaries it takes first; `partial` is `false` only when applying it to all its parameters certainly neither throws nor diverges |
 

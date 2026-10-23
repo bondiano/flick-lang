@@ -17,7 +17,7 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 use crate::types::{
-    Constructor, Range, Typing, class_defaults, default_method, is_type, let_parts,
+    Constructor, Range, Rep, Typing, class_defaults, default_method, is_type, let_parts,
 };
 
 /// Lowers `module`, which checked without errors, with what its check recorded.
@@ -236,7 +236,8 @@ impl Lower<'_> {
                 span,
             });
         }
-        for variant in decl.nodes().filter(|n| n.kind == K::Variant) {
+        let abi = self.typing.abis.get(&ty).cloned().unwrap_or_default();
+        for (i, variant) in decl.nodes().filter(|n| n.kind == K::Variant).enumerate() {
             let Some(name) = self.token_text(variant, K::Con) else {
                 continue;
             };
@@ -245,6 +246,7 @@ impl Lower<'_> {
                 ty: ty.clone(),
                 name,
                 arity: variant.nodes().filter(|n| is_type(n.kind)).count(),
+                rep: abi.rep(i),
             };
             items.push(Item {
                 kind: ItemKind::Constructor(constructor),
@@ -258,6 +260,7 @@ impl Lower<'_> {
                 ty: ty.clone(),
                 name: ty,
                 arity: 0,
+                rep: Rep::Tagged,
             };
             items.push(Item {
                 kind: ItemKind::Constructor(constructor),

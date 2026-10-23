@@ -1,0 +1,37 @@
+// `unboxed type` and `untagged type`: values are their fields, as JS sees
+// them; matching, derived instances and schemas follow the representation.
+module App.Main exposing (main)
+
+unboxed type UserId = UserId String
+  deriving Eq, Ord, Hash, Show, Schema
+
+untagged type Key = ByNumber Number | ByName String | ByPath (List String) | Flag Bool
+  deriving Eq, Ord, Show
+
+describe : Key -> String
+let describe key =
+  match key with
+  | ByNumber n -> "number " ++ show n
+  | ByName s -> "name " ++ s
+  | ByPath parts -> "path " ++ String.join "/" parts
+  | Flag b -> "flag " ++ show b
+
+raw : UserId -> JsValue
+foreign pure raw from "./abi.mjs" "raw"
+
+js_type : JsValue -> String
+foreign pure js_type from "./abi.mjs" "kind"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let id = UserId "ada"
+  Platform.stdout_line (js_type (raw id))
+  Platform.stdout_line (show (id, id == UserId "ada", compare id (UserId "bob")))
+  let keys = [ByNumber 1, ByName "x", ByPath ["a", "b"], Flag true]
+  Platform.stdout_line (String.join "; " (List.map describe keys))
+  Platform.stdout_line
+    (show
+      (keys, ByNumber 1 == ByNumber 1, ByNumber 1 == ByName "1", compare (ByNumber 9) (ByName "a")))
+  match Codec.encode_result (Codec.json (schema UserId)) id with
+  | Ok json -> Platform.stdout_line (Json.stringify json)
+  | Err _ -> Platform.stdout_line "no wire form"

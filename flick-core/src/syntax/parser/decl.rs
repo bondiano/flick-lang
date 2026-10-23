@@ -30,6 +30,10 @@ fn member(p: &mut Parser) {
     match p.current() {
         K::LetKw => let_decl(p),
         K::TypeKw | K::OpaqueKw | K::RefinedKw => type_decl(p),
+        // `unboxed type` and `untagged type`: the words are names elsewhere
+        K::Ident if (p.at_word("unboxed") || p.at_word("untagged")) && p.nth(1) == K::TypeKw => {
+            type_decl(p);
+        }
         K::Ident if p.at_word("val") && p.nth(1) == K::Ident && p.nth(2) == K::Colon => {
             let val = p.raw();
             p.error_at(
@@ -188,9 +192,13 @@ fn type_params(p: &mut Parser) {
 }
 
 /// `type Name params = variants`, `type alias Name params = T`, the nominal
-/// `opaque` and `refined` forms, or an abstract `type Name params`.
+/// `opaque` and `refined` forms, or an abstract `type Name params`; a
+/// variant type may name its JS representation, `unboxed` or `untagged`.
 fn type_decl(p: &mut Parser) {
     let m = p.start();
+    if p.at(K::Ident) {
+        p.bump();
+    }
     let refined = p.at(K::RefinedKw);
     if !p.eat(K::OpaqueKw) {
         p.eat(K::RefinedKw);

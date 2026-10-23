@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { Effect, Option } from "effect";
 
 import { raceFirst, raceSuccess, timeout, timeoutOption } from "../src/index.ts";
+import { tag } from "../src/tags.ts";
 import { errorsOf, value } from "./support.ts";
 
 const loser = (log: Array<string>, name: string) =>
@@ -39,7 +40,7 @@ test("timeout fails with TimeoutError after interrupting and awaiting the work",
   const exit = await Effect.runPromiseExit(timeout(5, loser(log, "work")));
   log.push("returned");
   assert.deepEqual(errorsOf(exit), [
-    { _tag: "Prelude.TimeoutError.TimeoutError" },
+    { _tag: tag("Prelude.TimeoutError.TimeoutError") },
   ]);
   assert.deepEqual(log, ["work cleaned up", "returned"]);
 });

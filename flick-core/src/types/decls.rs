@@ -5,7 +5,7 @@
 
 use super::Checker;
 use super::convert::{Free, TyVar, is_type};
-use super::env::{Form, Fundep, Operation, TypeDef};
+use super::env::{Abi, Form, Fundep, Operation, TypeDef};
 use super::kinds::Kind;
 use super::ty::{Binder, Type};
 use crate::diagnostics::codes;
@@ -48,6 +48,9 @@ impl Checker<'_> {
             }
         }
         self.break_alias_cycles(&pending);
+        for p in &pending {
+            self.check_abi(p.node, &p.name);
+        }
         refined
     }
 
@@ -161,6 +164,7 @@ impl Checker<'_> {
             K::TypeDecl if !variants.is_empty() => (
                 Form::Adt {
                     constructors: variants,
+                    abi: Abi::Tagged,
                 },
                 result,
             ),

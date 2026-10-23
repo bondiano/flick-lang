@@ -45,6 +45,7 @@ sql ui cli in when do
 
 Contextual words are ordinary names everywhere except in one position:
 
+- `unboxed` and `untagged` right before `type` (see `codegen.md`);
 - foreign modes `pure`, `sync`, `async`, `effect`, `blocked` and the source
   `global`;
 - foreign metadata `arity`, `this`, `catch`, `cancel`, `nullable`,
@@ -221,6 +222,7 @@ rec_group   = "rec" "{" { signature | let } "}"
 type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
             | ["opaque"] "type" "alias" Con { param } "=" type [deriving]
             | "refined" "type" Con { param } "=" type "where" expr [deriving]
+            | ("unboxed" | "untagged") "type" Con { param } "=" variants [deriving]
 variants    = ["|"] variant { "|" variant }
 variant     = Con { capture }                   // fields are atomic types
 param       = name | "(" name ":" kind ")"

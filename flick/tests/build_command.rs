@@ -26,10 +26,7 @@ fn build_writes_modules_maps_builtins_and_the_runner() {
     let out = flick_in(&dir, &["build"]);
     assert!(out.status.success(), "{out:?}");
     let main = fs::read_to_string(dir.join("dist/App/Main.js")).expect("module");
-    assert!(
-        main.contains("\"@acme/hello/App.Main.Greeting.Hello\""),
-        "{main}"
-    );
+    assert!(main.contains("_tag: \"Hello#"), "{main}");
     assert!(main.ends_with("//# sourceMappingURL=Main.js.map\n"));
     let map: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(dir.join("dist/App/Main.js.map")).expect("map"))
@@ -44,9 +41,14 @@ fn build_writes_modules_maps_builtins_and_the_runner() {
     let iface = fs::read(dir.join("dist/App/Main.iface")).expect("interface");
     let interface = iface::read(&iface, "App.Main").expect("valid interface");
     let abi = interface.abi.expect("a built interface has its ABI");
-    assert_eq!(
-        abi.data[0].constructors[0].tag,
-        "@acme/hello/App.Main.Greeting.Hello"
+    let hello = &abi.data[0].constructors[0];
+    assert_eq!(hello.id, "@acme/hello/App.Main.Greeting.Hello");
+    assert!(
+        hello
+            .tag
+            .as_deref()
+            .is_some_and(|t| t.starts_with("Hello#")),
+        "{hello:?}"
     );
     assert_eq!(abi.values[0].stages, "!");
     let runner = fs::read_to_string(dir.join("dist/main.js")).expect("runner");

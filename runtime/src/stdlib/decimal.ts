@@ -4,8 +4,9 @@
 import { BigDecimal, Duration, Option, type Result } from "effect";
 
 import { EQ, GT, LT, type Ordering, type Tagged, err, none, ok, some } from "../data.ts";
+import { tag } from "../tags.ts";
 
-const DECIMAL = "BigDecimal.DecimalError.DecimalError";
+const DECIMAL = tag("BigDecimal.DecimalError.DecimalError");
 
 /** `BigDecimal.DecimalError`. */
 export type DecimalError = Tagged<typeof DECIMAL, string>;
@@ -49,12 +50,15 @@ export const decimalMultiply = (a: Decimal, b: Decimal): Result.Result<Decimal, 
 
 export const decimalCompare = (a: Decimal, b: Decimal): Ordering => ordering(BigDecimal.Order(a, b));
 
-const MODE = "BigDecimal.RoundingMode.";
-
 /** `BigDecimal.RoundingMode`. */
-export type RoundingMode = Readonly<{
-  _tag: `${typeof MODE}${"TowardZero" | "Floor" | "Ceiling" | "HalfAwayFromZero" | "HalfEven" | "Exact"}`;
-}>;
+export type RoundingMode = Readonly<{ _tag: string }>;
+
+const MODES = new Map(
+  ["TowardZero", "Floor", "Ceiling", "HalfAwayFromZero", "HalfEven", "Exact"].map((m) => [
+    tag(`BigDecimal.RoundingMode.${m}`),
+    m,
+  ]),
+);
 
 const abs = (n: bigint): bigint => (n < 0n ? -n : n);
 
@@ -65,16 +69,16 @@ const roundQuotient = (num: bigint, den: bigint, mode: RoundingMode["_tag"]): bi
   if (r === 0n) return q;
   const sign = num < 0n !== den < 0n ? -1n : 1n;
   const half = 2n * abs(r) - abs(den);
-  switch (mode) {
-    case `${MODE}TowardZero`:
+  switch (MODES.get(mode)) {
+    case "TowardZero":
       return q;
-    case `${MODE}Floor`:
+    case "Floor":
       return sign < 0n ? q - 1n : q;
-    case `${MODE}Ceiling`:
+    case "Ceiling":
       return sign > 0n ? q + 1n : q;
-    case `${MODE}HalfAwayFromZero`:
+    case "HalfAwayFromZero":
       return half >= 0n ? q + sign : q;
-    case `${MODE}HalfEven`:
+    case "HalfEven":
       if (half > 0n) return q + sign;
       if (half < 0n) return q;
       return q % 2n === 0n ? q : q + sign;
@@ -103,7 +107,7 @@ export const decimalDivideToScale = (
     : ok(BigDecimal.make(q, scale));
 };
 
-const DURATION = "Duration.DurationError.DurationError";
+const DURATION = tag("Duration.DurationError.DurationError");
 
 /** `Duration.DurationError`. */
 export type DurationError = Tagged<typeof DURATION, string>;

@@ -3,7 +3,7 @@
 
 use super::{Gen, names};
 use crate::ir::Expr;
-use crate::types::{Constructor, SchemaItem, SchemaPlan, companion_name};
+use crate::types::{Constructor, Rep, SchemaItem, SchemaPlan, companion_name};
 
 impl Gen<'_> {
     /// `T$check`, `T$parse` and `T$value` of a refined type.
@@ -133,6 +133,7 @@ impl Gen<'_> {
                     ty: name.to_owned(),
                     name: c.clone(),
                     arity: fields.len(),
+                    rep: Rep::Tagged,
                 };
                 let tag = names::tag(&constructor, package.as_deref());
                 let fields: Vec<String> = fields.iter().map(|p| self.plan(p)).collect();

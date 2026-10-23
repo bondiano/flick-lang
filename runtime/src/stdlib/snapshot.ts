@@ -4,8 +4,9 @@
 import { Effect } from "effect";
 
 import type { Tagged } from "../data.ts";
+import { tag } from "../tags.ts";
 
-const SNAPSHOT = "Js.SnapshotError.SnapshotError";
+const SNAPSHOT = tag("Js.SnapshotError.SnapshotError");
 
 /** `Js.SnapshotError`. */
 export type SnapshotError = Tagged<typeof SNAPSHOT, string>;

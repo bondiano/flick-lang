@@ -12,6 +12,7 @@
 //! are known only through their [`Interface`], which this phase fills with
 //! the types and kinds of the exports.
 
+mod abi;
 mod bindings;
 mod builtins;
 mod calls;
@@ -31,6 +32,7 @@ mod infer;
 mod instances;
 mod kinds;
 mod patterns;
+mod qualified;
 mod regions;
 mod report;
 mod rows;
@@ -47,7 +49,7 @@ pub use builtins::{builtin_sources, builtins};
 pub use classes::Dict;
 pub use convert::is_type;
 pub use decls::class_defaults;
-pub use env::{Form, Fundep, Instance, Operation, TypeDef};
+pub use env::{Abi, Form, Fundep, Instance, JsClass, Operation, Rep, TypeDef};
 pub use kinds::Kind;
 pub use patterns::is_pattern;
 pub use schemas::{companion_name, witness_entity};

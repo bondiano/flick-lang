@@ -25,8 +25,13 @@ pub struct TypeDef {
 pub enum Form {
     /// Equal only to itself: built-in, abstract, opaque or refined.
     Nominal,
-    /// A variant type with every constructor, exported or not.
-    Adt { constructors: Vec<String> },
+    /// A variant type with every constructor, exported or not, and how its
+    /// values are represented in JS.
+    Adt {
+        constructors: Vec<String>,
+        #[serde(default, skip_serializing_if = "Abi::is_tagged")]
+        abi: Abi,
+    },
     /// `type error E = E T …`: a nominal type with the one constructor `E`.
     Error,
     /// A transparent alias. An opaque alias is one only inside its module.
@@ -56,6 +61,69 @@ pub enum Form {
     Kind,
     /// A member of a `kind` declaration.
     KindMember,
+}
+
+/// The JS representation of a variant type's values.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Abi {
+    /// `{ _tag, _0, … }`.
+    #[default]
+    Tagged,
+    /// `unboxed type`: the one field of the one constructor.
+    Unboxed,
+    /// `untagged type`: the one field of each constructor, told apart by
+    /// its JS type, given per constructor.
+    Untagged(Vec<JsClass>),
+}
+
+impl Abi {
+    pub fn is_tagged(&self) -> bool {
+        *self == Abi::Tagged
+    }
+
+    /// The representation of constructor `i`.
+    pub fn rep(&self, i: usize) -> Rep {
+        match self {
+            Abi::Tagged => Rep::Tagged,
+            Abi::Unboxed => Rep::Unboxed,
+            Abi::Untagged(classes) => classes.get(i).map_or(Rep::Tagged, |c| Rep::Typeof(*c)),
+        }
+    }
+}
+
+/// What JS can tell a value apart by, without a tag.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum JsClass {
+    Number,
+    String,
+    Boolean,
+    Bigint,
+    /// A list or a tuple.
+    Array,
+}
+
+impl JsClass {
+    /// The name the runtime and the generated tests use.
+    pub fn name(self) -> &'static str {
+        match self {
+            JsClass::Number => "number",
+            JsClass::String => "string",
+            JsClass::Boolean => "boolean",
+            JsClass::Bigint => "bigint",
+            JsClass::Array => "array",
+        }
+    }
+}
+
+/// How the values of one constructor are represented.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Rep {
+    #[default]
+    Tagged,
+    Unboxed,
+    Typeof(JsClass),
 }
 
 /// `a b -> c` of a class: the parameters at `from` determine those at `to`,
@@ -311,6 +379,17 @@ impl Env {
     /// resolution reports, rather than a built-in module used without one.
     pub fn is_import(&self, qualifier: &str) -> bool {
         self.imported.contains(qualifier)
+    }
+
+    /// The representation of constructor `name` of type `ty` of `module`.
+    pub fn constructor_rep(&self, module: &str, ty: &str, name: &str) -> Rep {
+        match self.type_def(module, ty).map(|d| &d.form) {
+            Some(Form::Adt { constructors, abi }) => constructors
+                .iter()
+                .position(|c| c == name)
+                .map_or(Rep::Tagged, |i| abi.rep(i)),
+            _ => Rep::Tagged,
+        }
     }
 
     pub fn qualified_module(&self, qualifier: &str) -> Option<(&str, Option<&Interface>)> {

@@ -8,8 +8,9 @@ import { err, ok, type Tagged } from "../data.ts";
 import { at } from "./issues.ts";
 import { notesOf } from "./notes.ts";
 import type { AnySchema } from "./schemas.ts";
+import { tag } from "../tags.ts";
 
-const EXPORT_ERROR = "Codec.ExportError.ExportError";
+const EXPORT_ERROR = tag("Codec.ExportError.ExportError");
 
 /** `Codec.ExportError`. */
 export type ExportError = Tagged<typeof EXPORT_ERROR, string>;

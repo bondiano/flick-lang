@@ -9,7 +9,7 @@ pub mod sourcemap;
 pub mod ts;
 
 pub use js::{js, relative};
-pub use names::{instance as instance_export, tag};
+pub use names::{instance as instance_export, qualified_id, tag};
 
 use crate::iface::Interface;
 use crate::source::Span;

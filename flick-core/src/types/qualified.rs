@@ -1,0 +1,136 @@
+//! What a top-level or qualified name refers to: `M.name` of a module, an
+//! operation of a service, a companion of a type.
+
+use super::Checker;
+use super::ty::Type;
+use super::typing::{Constructor, Ref};
+use crate::diagnostics::codes;
+use crate::iface::{Entity, Namespace};
+use crate::source::Span;
+
+impl Checker<'_> {
+    /// Records what a top-level name refers to; `ty` is its type at the use.
+    pub(super) fn record_entity(&mut self, entity: &Entity, ty: &Type, span: Span) {
+        let parent = self.env.parent(entity);
+        let r = match (entity.namespace, parent) {
+            (Namespace::Constructor, Some((module, ty_name))) => {
+                let arity = self.arrow_stages(ty).len();
+                let rep = self.env.constructor_rep(&module, &ty_name, &entity.name);
+                Ref::Constructor(Constructor {
+                    module,
+                    ty: ty_name,
+                    name: entity.name.clone(),
+                    arity,
+                    rep,
+                })
+            }
+            (Namespace::Value, Some(_)) => Ref::Method {
+                module: entity.module.clone(),
+                name: entity.name.clone(),
+            },
+            _ => Ref::Value {
+                module: entity.module.clone(),
+                name: entity.name.clone(),
+            },
+        };
+        if entity.module == super::classes::RECORD && entity.name == "label" {
+            self.record_label(span, ty.clone());
+        }
+        self.record_name(span, r);
+    }
+
+    /// `Module.name`, `Module.Con`, or `Service.operation`.
+    pub(super) fn qualified(
+        &mut self,
+        qualifier: &str,
+        namespace: Namespace,
+        name: &str,
+        span: Span,
+    ) -> Type {
+        // a service in scope with this operation wins over a module of its name
+        let operation = match self.env.find(Namespace::Type, qualifier) {
+            super::env::Found::Entity(e) => self.env.type_def(&e.module, &e.name).is_some_and(
+                |d| matches!(&d.form, super::env::Form::Service { operations, .. } if operations.iter().any(|o| o.name == name)),
+            ),
+            _ => false,
+        };
+        if !operation && let Some((_, interface)) = self.env.qualified_module(qualifier) {
+            // a name the module does not export is reported by name resolution
+            let entity = interface
+                .and_then(|i| i.find(namespace, name))
+                .map(|e| e.entity.clone());
+            if entity.is_none() && interface.is_some() && !self.env.is_import(qualifier) {
+                self.error(
+                    codes::T001,
+                    span,
+                    format!("`{qualifier}` does not export `{name}`"),
+                );
+                return Type::Error;
+            }
+            let scheme = entity.as_ref().and_then(|e| self.env.value(e).cloned());
+            let ty = scheme.map_or(Type::Error, |s| self.instantiate(&s, span));
+            if let Some(entity) = entity {
+                self.record_entity(&entity, &ty, span);
+            }
+            return ty;
+        }
+        // `Email.parse`: a companion of a type
+        if let super::env::Found::Entity(e) = self.env.find(Namespace::Type, qualifier) {
+            let entity = Entity {
+                module: e.module.clone(),
+                namespace: Namespace::Value,
+                name: super::companion_name(&e.name, name),
+            };
+            if let Some(scheme) = self.env.value(&entity).cloned() {
+                let ty = self.instantiate(&scheme, span);
+                self.record_entity(&entity, &ty, span);
+                return ty;
+            }
+        }
+        let service = match self.env.find(Namespace::Type, qualifier) {
+            super::env::Found::Entity(e) => self
+                .env
+                .type_def(&e.module, &e.name)
+                .cloned()
+                .map(|d| (e.module, d)),
+            super::env::Found::Unknown => return Type::Error,
+            super::env::Found::Missing => None,
+        };
+        match service.map(|(module, d)| (module, d.form)) {
+            Some((module, super::env::Form::Service { params, operations })) => {
+                if let Some(op) = operations.iter().find(|o| o.name == name) {
+                    let ty = self.operation_type(&module, qualifier, params.len(), &op.ty, span);
+                    let stages = self.arrow_stages(&ty);
+                    self.record_name(
+                        span,
+                        Ref::Operation {
+                            service: format!("{module}.{qualifier}"),
+                            name: name.to_owned(),
+                            stages,
+                        },
+                    );
+                    ty
+                } else {
+                    self.error(
+                        codes::T001,
+                        span,
+                        format!("service `{qualifier}` has no operation `{name}`"),
+                    );
+                    Type::Error
+                }
+            }
+            Some(_) => {
+                self.error(
+                    codes::T001,
+                    span,
+                    format!("`{qualifier}` is a type, not a module or a service"),
+                );
+                Type::Error
+            }
+            None => {
+                self.error(codes::T001, span, format!("unknown module `{qualifier}`"));
+                Type::Error
+            }
+        }
+    }
+}

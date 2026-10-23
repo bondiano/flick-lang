@@ -6,7 +6,7 @@ use super::{Gen, indent, names};
 use std::mem;
 
 use crate::ir::{Arm, Expr, Lit, Pat};
-use crate::types::Constructor;
+use crate::types::{Constructor, JsClass, Rep};
 
 #[derive(Default)]
 struct Test {
@@ -44,6 +44,17 @@ impl Gen<'_> {
                         format!("{subject}[{}]", names::string(label))
                     };
                     self.test(p, &path, t);
+                }
+            }
+            Pat::Con(c, args) if c.rep != Rep::Tagged => {
+                if let Rep::Typeof(class) = c.rep {
+                    t.conds.push(match class {
+                        JsClass::Array => format!("Array.isArray({subject})"),
+                        class => format!("typeof {subject} === {}", names::string(class.name())),
+                    });
+                }
+                for arg in args {
+                    self.test(arg, subject, t);
                 }
             }
             Pat::Con(c, args) => {

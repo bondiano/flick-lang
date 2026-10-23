@@ -39,7 +39,6 @@ e8bd3190545a729d  spec:1102  load_pair : UserId -> UserId ->{Users; NotFound} (U
 1d4de52c15fcfbac  spec:1178  with_default : a -> Option a -> a
 6d421b900cc63c54  spec:1209  type Shape =
 cfd4deeeb00ff9b0  spec:1245  load_name : UserId ->{Users, Log; NotFound} String
-26abcb0d4226287b  spec:1337  lookup : String ->{; JsError} Option String
 f78643ad295517ef  spec:1370  hypot : Number -> Number -> Number
 410efc85cb82fc5a  spec:1457  on_message : Message ->{Log; none} Unit
 c7457701e10aa513  spec:1581  add : Number -> Number -> Number
@@ -53,9 +52,11 @@ e28dd24856e76943  spec:2085  type alias BalanceRow =
 1838791670c05b74  spec:2119  deferred_balances :
 f288d88532aaff1e  spec:2179  type alias SaveButtonProps c =
 241cd523f0895a4c  spec:2209  save_button :
-34bef7a114a0a77c  spec:2247  type alias SelectProps a r e c =
 4f1eda6ee144286a  spec:2345  module App.Users exposing (User, load_user)
 6ab2908136691e1a  spec:2567  opaque type alias UserId = String
 0ea7549614206500  spec:2292  greet : Cli.Command {Platform} none
 616df64b98d90310  spec:2340  tool : Cli.Command {Platform} none
 213799199fbee0b5  spec:2362  main : Unit ->{; AppError} Unit
+eafd6510c5484060  spec:1337  lookup : String ->{; JsError} Option String
+90506a3da26b61ad  spec:1655  unboxed type UserId = UserId String
+ded3987556b0d42a  spec:2262  type alias SelectProps a r e c =

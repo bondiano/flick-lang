@@ -86,7 +86,7 @@ const m: Option.Option<number> = maybe([1]);
 const e: Effect.Effect<number, NotFound, never> = find("one");
 const l: Effect.Effect<number, never, never> = later(1);
 const r: Promise<Result.Result<number, NotFound>> = findPromise("one");
-const t: Tree<number> = { _tag: "@acme/shapes/Lib.Shapes.Tree.Leaf" };
+const t: Tree<number> = { _tag: "Leaf#1145052a8bd3" };
 const c: Schema.Codec<Point, unknown> = point_json;
 export { a, p, s, m, e, l, r, t, c };
 "#;
@@ -168,7 +168,9 @@ fn declarations_pass_tsc_and_the_facade_separates_outcomes() {
     let text = String::from_utf8_lossy(&node.stdout);
     assert!(node.status.success(), "{node:?}");
     assert!(
-        text.contains(r#""ok":"Success","value":1,"failed":"Failure","error":"@acme/shapes/Lib.Shapes.NotFound.NotFound""#),
+        text.contains(
+            r#""ok":"Success","value":1,"failed":"Failure","error":"NotFound#14b4b8bdcbdc""#
+        ),
         "{text}"
     );
     assert!(

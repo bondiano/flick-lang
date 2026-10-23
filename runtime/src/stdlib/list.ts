@@ -4,6 +4,7 @@ import { Chunk, Effect, Option } from "effect";
 
 import { EQ, LT, type Ordering, type Tagged, none, some } from "../data.ts";
 import { item } from "../internal.ts";
+import { tag } from "../tags.ts";
 
 type List<A> = ReadonlyArray<A>;
 
@@ -146,17 +147,20 @@ export const bindEff = <A, B, E, R, E2, R2>(
   f: (a: A) => Effect.Effect<B, E2, R2>,
 ): Effect.Effect<B, E | E2, R | R2> => Effect.flatMap(eff, (x) => f(x));
 
-const CONTINUE = "Loop.Step.Continue";
+const CONTINUE = tag("Loop.Step.Continue");
 
-/** `Loop.Step s a`. */
-export type Step<S, A> = Tagged<typeof CONTINUE, S> | Tagged<"Loop.Step.Done", A>;
+/** `Loop.Step s a`: the tags alone tell `Continue` from `Done`. */
+export type Step<S, A> = (Tagged<string, S> & { readonly continue?: true }) | (Tagged<string, A> & { readonly continue?: false });
+
+const isContinue = <S, A>(step: Step<S, A>): step is Tagged<string, S> & { readonly continue?: true } =>
+  step._tag === CONTINUE;
 
 /** `Loop.loop step state`: runs until `Done`, without growing the stack. */
 export const loop = <S, A>(step: (s: S) => Step<S, A>, state: S): A => {
   let s = state;
   for (;;) {
     const next = step(s);
-    if (next._tag !== CONTINUE) return next._0;
+    if (!isContinue(next)) return next._0;
     s = next._0;
   }
 };

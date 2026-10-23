@@ -2,11 +2,11 @@
 source: flick-core/src/codegen/ts/tests.rs
 expression: out
 ---
-export type Shape = { readonly _tag: "@acme/shapes/App.Shapes.Shape.Circle"; readonly _0: number } | { readonly _tag: "@acme/shapes/App.Shapes.Shape.Rect"; readonly _0: number; readonly _1: number };
-export type Tree<A> = { readonly _tag: "@acme/shapes/App.Shapes.Tree.Leaf" } | { readonly _tag: "@acme/shapes/App.Shapes.Tree.Node"; readonly _0: Tree<A>; readonly _1: A; readonly _2: Tree<A> };
+export type Shape = { readonly _tag: "Circle#7c57f5571734"; readonly _0: number } | { readonly _tag: "Rect#98a20d8a91fb"; readonly _0: number; readonly _1: number };
+export type Tree<A> = { readonly _tag: "Leaf#22e8146bf446" } | { readonly _tag: "Node#db3efd7ce4a1"; readonly _0: Tree<A>; readonly _1: A; readonly _2: Tree<A> };
 export type Point = { readonly x: number; readonly y: number };
 export interface Token { readonly "~flick/brand": "@acme/shapes/App.Shapes.Token" }
-export type NotFound = { readonly _tag: "@acme/shapes/App.Shapes.NotFound.NotFound"; readonly _0: string };
+export type NotFound = { readonly _tag: "NotFound#533441c0ba25"; readonly _0: string };
 export interface Users { readonly "~flick/brand": "@acme/shapes/App.Shapes.Users" }
 export interface Describe<A> { readonly describe: (arg: A) => string }
 describe: <A>(dictionary0: Describe<A>) => (arg: A) => string

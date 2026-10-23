@@ -264,11 +264,13 @@ impl Checker<'_> {
             args_pats.push(self.bind_pattern(arg, param));
         }
         if let Some((module, ty)) = self.env.parent(&entity) {
+            let rep = self.env.constructor_rep(&module, &ty, name);
             let constructor = super::typing::Constructor {
                 module,
                 ty,
                 name: name.to_owned(),
                 arity: params.len(),
+                rep,
             };
             self.record_name(
                 self.span(node),

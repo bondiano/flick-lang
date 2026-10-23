@@ -96,13 +96,26 @@ pub fn service(name: &str) -> String {
     format!("$s_{name}")
 }
 
-/// The `_tag` of a constructor: its package, module, type and name.
+/// The `_tag` of a constructor: its name, and a hash of its qualified id —
+/// package, module, type and name — so the tag keeps the whole identity at
+/// a fraction of its length: `Circle#3a0c5e1b9d27`.
 pub fn tag(c: &Constructor, package: Option<&str>) -> String {
+    format!("{}#{:012x}", c.name, fnv64(&qualified_id(c, package)) >> 16)
+}
+
+/// `@acme/shapes/App.Shapes.Shape.Circle`: what a tag stands for.
+pub fn qualified_id(c: &Constructor, package: Option<&str>) -> String {
     let id = format!("{}.{}.{}", c.module, c.ty, c.name);
     match package {
         Some(p) => format!("{p}/{id}"),
         None => id,
     }
+}
+
+fn fnv64(text: &str) -> u64 {
+    text.bytes().fold(0xcbf2_9ce4_8422_2325, |h, b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+    })
 }
 
 /// Constructors with the native Effect representation.

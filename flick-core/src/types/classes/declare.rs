@@ -474,7 +474,7 @@ impl Checker<'_> {
             return None;
         };
         let names = match &self.env.type_def(module, name)?.form {
-            Form::Adt { constructors } => constructors.clone(),
+            Form::Adt { constructors, .. } => constructors.clone(),
             Form::Error => vec![name.clone()],
             _ => return None,
         };
@@ -485,6 +485,7 @@ impl Checker<'_> {
                     module: module.clone(),
                     ty: name.clone(),
                     arity: self.constructor_fields(&c).len(),
+                    rep: self.env.constructor_rep(module, name, &c),
                     name: c,
                 })
                 .collect(),

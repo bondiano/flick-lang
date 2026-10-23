@@ -236,7 +236,7 @@ impl Checker<'_> {
                 seen.push(key);
                 let inner = match self.env.type_def(module, name).map(|d| &d.form) {
                     Some(Form::Alias { body, .. }) => vec![body.clone()],
-                    Some(Form::Adt { constructors }) => constructors
+                    Some(Form::Adt { constructors, .. }) => constructors
                         .iter()
                         .filter_map(|c| {
                             self.env.value(&Entity {

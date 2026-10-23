@@ -235,12 +235,14 @@ expression: json
         "constructors": [
           {
             "name": "Circle",
-            "tag": "@acme/shapes/App.Shapes.Shape.Circle",
+            "id": "@acme/shapes/App.Shapes.Shape.Circle",
+            "tag": "Circle#7c57f5571734",
             "arity": 1
           },
           {
             "name": "Rect",
-            "tag": "@acme/shapes/App.Shapes.Shape.Rect",
+            "id": "@acme/shapes/App.Shapes.Shape.Rect",
+            "tag": "Rect#98a20d8a91fb",
             "arity": 2
           }
         ]

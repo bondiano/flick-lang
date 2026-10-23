@@ -90,6 +90,6 @@ ExportError: Profile.session -> JSON Schema: scoped resource has no wire codec
 }
 Err SchemaError [{ message = "not a valid Email", path = "(root)" }]
 ada@example.com
-value: {"_tag":"App.Main.Tree.Branch","_0":[{"_tag":"App.Main.Tree.Leaf","_0":1},{"_tag":"App.Main.Tree.Leaf","_0":1}]}
+value: {"_tag":"Branch#6cb650d9094f","_0":[{"_tag":"Leaf#14bfc88080cc","_0":1},{"_tag":"Leaf#14bfc88080cc","_0":1}]}
 issues: the scope of this validator has closed
 issues: a cycle in the input

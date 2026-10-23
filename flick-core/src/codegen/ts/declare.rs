@@ -3,7 +3,7 @@
 use super::{NATIVE, PRELUDE, PRIMITIVES, Projection, Vars, generic, key, params, type_args};
 use crate::codegen::names;
 use crate::iface::{Decl, Export, Interface, Namespace};
-use crate::types::{Constructor, Form, Kind, Type};
+use crate::types::{Constructor, Form, Kind, Rep, Type};
 
 impl Projection<'_> {
     /// Declarations of the types `interface` exports; a type without a
@@ -80,7 +80,7 @@ impl Projection<'_> {
                     type_args(&shown)
                 )))
             }
-            (Form::Adt { constructors }, _) => {
+            (Form::Adt { constructors, abi }, _) => {
                 let exported: Vec<&Export> = constructors
                     .iter()
                     .filter_map(|c| interface.find(Namespace::Constructor, c))
@@ -88,7 +88,7 @@ impl Projection<'_> {
                 if exported.len() < constructors.len() {
                     return Ok(Some(brand(&generics)));
                 }
-                self.variants(name, &exported).map(Some)
+                self.variants(name, &exported, abi.is_tagged()).map(Some)
             }
             (Form::Error, _) => {
                 let constructors: Vec<&Export> = interface
@@ -98,7 +98,7 @@ impl Projection<'_> {
                 if constructors.is_empty() {
                     return Ok(Some(brand(&generics)));
                 }
-                self.variants(name, &constructors).map(Some)
+                self.variants(name, &constructors, true).map(Some)
             }
             (Form::Class { .. }, _) | (_, Decl::Class) => {
                 self.class(interface, name, &kinds).map(Some)
@@ -107,8 +107,14 @@ impl Projection<'_> {
         }
     }
 
-    /// `export type T<A> = { readonly _tag: "…"; readonly _0: A } | …`.
-    fn variants(&self, name: &str, constructors: &[&Export]) -> Result<String, String> {
+    /// `export type T<A> = { readonly _tag: "…"; readonly _0: A } | …`; an
+    /// `unboxed` or `untagged` type is the union of its fields.
+    fn variants(
+        &self,
+        name: &str,
+        constructors: &[&Export],
+        tagged: bool,
+    ) -> Result<String, String> {
         let mut params: Vec<String> = Vec::new();
         let mut cases = Vec::new();
         for c in constructors {
@@ -134,11 +140,16 @@ impl Projection<'_> {
                     .map(|a| self.ty(a, &scope))
                     .collect::<Result<_, _>>()?;
             }
+            if !tagged {
+                cases.extend(fields);
+                continue;
+            }
             let constructor = Constructor {
                 module: self.module.to_owned(),
                 ty: name.to_owned(),
                 name: c.entity.name.clone(),
                 arity: fields.len(),
+                rep: Rep::Tagged,
             };
             let tag = names::string(&names::tag(
                 &constructor,

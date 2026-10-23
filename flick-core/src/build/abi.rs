@@ -4,11 +4,12 @@
 
 use std::collections::BTreeMap;
 
-use crate::codegen::{instance_export, tag};
+use crate::codegen::{instance_export, qualified_id, tag};
 use crate::iface::{
     Abi, ConstructorAbi, Data, Dictionary, Interface, Namespace, Summary, fingerprint,
 };
 use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Module, Stmt};
+use crate::types::Rep;
 
 /// The interface of a built module: `interface` with its ABI, and the
 /// fingerprints of `imports` as `interface_of` finds them.
@@ -40,7 +41,8 @@ fn data(module: &Module, package: Option<&str>) -> Vec<Data> {
         };
         let constructor = ConstructorAbi {
             name: c.name.clone(),
-            tag: tag(c, package),
+            id: qualified_id(c, package),
+            tag: (c.rep == Rep::Tagged).then(|| tag(c, package)),
             arity: c.arity,
         };
         match out.iter_mut().find(|d| d.ty == c.ty) {

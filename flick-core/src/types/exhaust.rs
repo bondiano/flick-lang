@@ -168,7 +168,7 @@ impl Checker<'_> {
             Ctor::List(_) | Ctor::Literal(_) => None,
             Ctor::Variant { module, ty, .. } => {
                 let names = match &self.env.type_def(module, ty)?.form {
-                    Form::Adt { constructors } => constructors.clone(),
+                    Form::Adt { constructors, .. } => constructors.clone(),
                     Form::Error => vec![ty.clone()],
                     _ => return None,
                 };

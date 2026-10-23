@@ -29,14 +29,37 @@ A module that has no runtime stage imports no `Effect` at all.
 | tuple, `List` | dense array |
 | record | plain object with exactly its fields, in the order written |
 | ADT value | `{ _tag, _0, _1, … }`, fields in declaration order |
+| `unboxed type T = C f` | the field itself |
+| `untagged type T = A f \| B g …` | the field of its constructor, told apart by its JS type |
 | `type error E = E …` | the same shape: errors are values of their one constructor |
 | `Option`, `Result` | native Effect `Option` (`Some`/`None`, `value`) and `Result` (`Success`/`Failure`, `success`/`failure`) |
 | `Ref` | a runtime cell, equal only to itself |
 
 A constructor id names the package, module, type and constructor:
 `@acme/shapes/App.Shapes.Shape.Circle`; without a package (a file outside a
-project, the built-in modules) it is `App.Shapes.Shape.Circle`. A user type
-with a `Some` constructor is never mistaken for `Option`.
+project, the built-in modules) it is `App.Shapes.Shape.Circle`. The `_tag`
+is the constructor's name and the 48 high bits of the FNV-1a 64 hash of its
+id, `Circle#7c57f5571734`: the identity stays in the tag at about half its
+length. The `.iface` records both. A user type with a `Some` constructor is
+never mistaken for `Option`.
+
+`unboxed type` and `untagged type` name the representation of a variant
+type for code across the FFI, in every profile. An unboxed type has one
+constructor with one field and is that field; an untagged type is the one
+field of each constructor, which must differ in JS type — `Number`,
+`String`, `Bool`, `BigInt`, or one list or tuple (`FLICK-T020` otherwise).
+A pattern tests `typeof` or `Array.isArray` instead of `_tag`; derived
+`Eq`, `Ord`, `Hash` and `Show` follow the representation; `deriving Schema`
+of an unboxed type has the field's wire form, an untagged one has no
+derived witness. The TypeScript projection is the field type, or the union
+of the field types.
+
+```flick
+unboxed type UserId = UserId String
+  deriving Eq, Show, Schema
+
+untagged type Key = ByNumber Number | ByName String | ByPath (List String)
+```
 
 `==` is canonical structural equality: SameValueZero on numbers, so
 `NaN == NaN` and `0 == -0`; `Number.strict_equal` is `===` and

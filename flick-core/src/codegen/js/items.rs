@@ -7,7 +7,7 @@ use super::expr::arrow_body;
 use super::schema::{plan_uses, schema_names};
 use super::{Gen, Target, indent, names};
 use crate::ir::{Expr, ExprKind, Foreign, ForeignMode, Item, ItemKind};
-use crate::types::{Constructor, Dict, InstanceInfo, companion_name, default_method};
+use crate::types::{Constructor, Dict, InstanceInfo, Rep, companion_name, default_method};
 
 impl Gen<'_> {
     pub(super) fn items(&mut self, items: &[Item]) -> String {
@@ -195,6 +195,10 @@ impl Gen<'_> {
             let native = self.constructor(c);
             return self.export(&name, &native);
         }
+        if c.rep != Rep::Tagged {
+            // `unboxed` and `untagged`: a value is its one field
+            return self.export(&name, &format!("{} _0", self.arrow("_0")));
+        }
         let package = (self.options.package)(&c.module);
         let tag = names::string(&names::tag(c, package.as_deref()));
         let fields: Vec<String> = (0..c.arity).map(|i| format!("_{i}")).collect();
@@ -279,8 +283,13 @@ impl Gen<'_> {
                 .iter()
                 .map(|c| {
                     let tag = self.tag_of(c);
+                    let rep = match c.rep {
+                        Rep::Tagged => String::new(),
+                        Rep::Unboxed => ", \"unboxed\"".to_owned(),
+                        Rep::Typeof(class) => format!(", {}", names::string(class.name())),
+                    };
                     format!(
-                        "[{}, {}, {}]",
+                        "[{}, {}, {}{rep}]",
                         names::string(&tag),
                         names::string(&c.name),
                         c.arity

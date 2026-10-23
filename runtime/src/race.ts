@@ -1,9 +1,10 @@
 // Races: the winner's result, losers interrupted and awaited; their exits
 // are not added to the result.
 import { Cause, Duration, Effect, type Option } from "effect";
+import { tag } from "./tags.ts";
 
 /** The `_tag` of the stdlib `TimeoutError`. */
-export const TIMEOUT_ERROR = "Prelude.TimeoutError.TimeoutError";
+export const TIMEOUT_ERROR = tag("Prelude.TimeoutError.TimeoutError");
 
 /** `Prelude.TimeoutError`. */
 export type TimeoutError = Readonly<{ _tag: typeof TIMEOUT_ERROR }>;

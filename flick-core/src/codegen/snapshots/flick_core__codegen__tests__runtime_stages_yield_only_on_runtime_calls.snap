@@ -6,7 +6,7 @@ import { Effect } from "@flick-lang/runtime";
 import * as $rt from "@flick-lang/runtime";
 import * as $m_String from "../String.js";
 
-export const NotFound = (_0) => ({ _tag: "@acme/users/App.Users.NotFound.NotFound", _0 });
+export const NotFound = (_0) => ({ _tag: "NotFound#82397ace53fc", _0 });
 
 export const $s_Users = $rt.service("App.Users.Users");
 

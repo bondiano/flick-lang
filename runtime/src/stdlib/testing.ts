@@ -7,12 +7,13 @@ import { describeCause } from "../cause.ts";
 import type { Tagged } from "../data.ts";
 import { item } from "../internal.ts";
 import { ownedExits } from "../owner.ts";
+import { tag } from "../tags.ts";
 
-const ASSERTION = "Test.AssertionFailed.AssertionFailed";
-const PASS = "Test.Assertion.Pass";
+const ASSERTION = tag("Test.AssertionFailed.AssertionFailed");
+const PASS = tag("Test.Assertion.Pass");
 
 /** `Test.Assertion`: a pass, or a failure with its message. */
-export type Assertion = Readonly<{ _tag: typeof PASS }> | Tagged<"Test.Assertion.Fail", string>;
+export type Assertion = Readonly<{ _tag: string; _0?: string }>;
 
 /** A number in `[0, 1)`. */
 export type Rng = () => number;

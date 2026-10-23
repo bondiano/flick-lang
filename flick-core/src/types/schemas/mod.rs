@@ -189,7 +189,7 @@ impl Checker<'_> {
             return Vec::new();
         };
         match &def.form {
-            super::env::Form::Adt { constructors } => constructors
+            super::env::Form::Adt { constructors, .. } => constructors
                 .iter()
                 .flat_map(|c| self.constructor_fields(c))
                 .collect(),
@@ -222,7 +222,26 @@ impl Checker<'_> {
             .cloned()
             .ok_or_else(|| (name.to_owned(), "no definition".to_owned()))?;
         match &def.form {
-            super::env::Form::Adt { constructors } => {
+            // the value is its field, and so is its wire form
+            super::env::Form::Adt {
+                constructors,
+                abi: super::env::Abi::Unboxed,
+            } => {
+                let field = constructors
+                    .first()
+                    .and_then(|c| self.constructor_fields(c).into_iter().next())
+                    .ok_or_else(|| (name.to_owned(), "no field".to_owned()))?;
+                self.plan(&field, &format!("{name}[0]"), &ctx)
+            }
+            super::env::Form::Adt {
+                abi: super::env::Abi::Untagged(_),
+                ..
+            } => Err((
+                name.to_owned(),
+                "an `untagged type` has no derived witness: write it with `Schema` combinators"
+                    .to_owned(),
+            )),
+            super::env::Form::Adt { constructors, .. } => {
                 let mut variants = Vec::new();
                 for c in constructors {
                     let mut fields = Vec::new();

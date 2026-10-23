@@ -1,5 +1,6 @@
 use super::{Options, js};
 use crate::ir::tests::lower_text;
+use crate::types::{Constructor, Rep};
 
 fn compile(text: &str) -> String {
     let ir = lower_text("App", text).expect("lowers");
@@ -59,10 +60,22 @@ fn constructor_ids_name_package_module_and_type() {
         "module App.Users exposing (..)\n\
          type Choice = Some Number | Empty\n",
     );
+    // the name, and a hash of package, module, type and name
+    let c = |module: &str| Constructor {
+        module: module.to_owned(),
+        ty: "Choice".to_owned(),
+        name: "Some".to_owned(),
+        arity: 1,
+        rep: Rep::Tagged,
+    };
+    let tag = super::tag(&c("App.Users"), Some("@acme/users"));
     assert!(
-        js.contains("_tag: \"@acme/users/App.Users.Choice.Some\""),
-        "{js}"
+        tag.starts_with("Some#") && tag.len() == "Some#".len() + 12,
+        "{tag}"
     );
+    assert!(js.contains(&format!("_tag: \"{tag}\"")), "{js}");
+    assert_ne!(tag, super::tag(&c("App.Users"), Some("@acme/other")));
+    assert_ne!(tag, super::tag(&c("App.Other"), Some("@acme/users")));
     let native =
         compile("module App.Main exposing (..)\nnative : Option Number\nlet native = Some 1\n");
     assert!(

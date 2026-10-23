@@ -115,7 +115,7 @@ impl<'n> Checker<'_> {
             .find(|n| n.kind == K::DerivingClause)
             .map_or_else(|| self.span(decl), |c| self.span(c));
         let message = match form {
-            Form::Adt { constructors } => {
+            Form::Adt { constructors, .. } => {
                 return Some(
                     constructors
                         .iter()

@@ -1,0 +1,5 @@
+string
+(UserId "ada", true, LT)
+number 1; name x; path a/b; flag true
+([ByNumber 1, ByName "x", ByPath ["a", "b"], Flag true], true, false, LT)
+"ada"

@@ -1,0 +1,29 @@
+module App.Abi exposing (..)
+
+type alias Name = String
+
+unboxed type Pair = Pair Number Number
+//~ FLICK-T020 @5:1-5:39 one constructor with one field
+
+untagged type Twice = First Number | Second Number
+//~ FLICK-T020 @8:1-8:51 both hold a JS number
+
+untagged type Open a = Value a | Text String
+//~ FLICK-T020 @11:1-11:45 has no JS type of its own
+
+untagged type Lone = Lone Name
+//~ FLICK-T020 @14:1-14:31 two constructors at least
+
+unboxed type Named = Named Name
+
+untagged type Mixed = ById Named | ByCount Number
+
+untagged type Clash = Wrapped Named | Plain String
+//~ FLICK-T020 @21:1-21:51 both hold a JS string
+
+unboxed type Abstract
+//~ FLICK-T020 @24:1-24:22 has no constructors
+
+untagged type Sch = Num Number | Str String
+  deriving Schema
+//~ FLICK-D001 @28:3-28:18 no derived witness

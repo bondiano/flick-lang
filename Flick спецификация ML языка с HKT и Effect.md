@@ -1338,9 +1338,10 @@ lookup : String ->{; JsError} Option String
 foreign async lookup from "package" "lookup"
   arity 1
   catch JsError.from_js
+  nullable
 ```
 
-Преобразование результата задаётся metadata/adaptor binding; показанный `foreign` сохраняет общий стиль существующих деклараций. Promise создаётся при выполнении Effect, а не при построении task. В этой сигнатуре нет доказательства cancellation; сигнал добавляется только для реально поддерживающего его JS API.
+Преобразование результата задаётся metadata/adaptor binding: `Option` в ABI — нативное значение Effect, поэтому `undefined -> None` записывается строкой `nullable`, а не выводится из типа результата. Политики пакета importer читает из `policy.toml` рядом со сгенерированным модулем (`undefined = "none"`, `catch = "JsError"`, `retention`, `cancel`, `mode = "pure"`, `strict`) и никогда его не пишет. Заблокированный export генерируется как `foreign blocked name "причина"`: его использование — ошибка компиляции, остальные exports пакета доступны. Проверенный вручную binding несёт metadata `reviewed "<pkg>@<ver> sha256:…"` — отпечаток декларации, против которой его проверили; `ffi check` сравнивает его с установленной версией. Promise создаётся при выполнении Effect, а не при построении task. В этой сигнатуре нет доказательства cancellation; сигнал добавляется только для реально поддерживающего его JS API.
 
 Другой экспорт:
 
@@ -1424,15 +1425,15 @@ Throw и rejected Promise переводятся в typed error только п�
 | Tuple | Dense JS array фиксированной длины |
 | List | Dense JS array с immutable source API |
 | Record | Plain JS object с точным набором собственных data fields |
-| Пользовательский ADT | Object с `_tag` — квалифицированным constructor id, payload в `_0`, `_1` и далее |
-| Nominal wrapper | Реальный tagged object на публичной/protocol границе; локальное стирание только по доказательству |
+| Пользовательский ADT | Object с `_tag` = `Имя#hash`, где hash — 48 старших бит FNV-1a 64 квалифицированного constructor id; payload в `_0`, `_1` и далее |
+| Nominal wrapper | Реальный tagged object по умолчанию; `unboxed type` объявляет представление полем, `untagged type` — различимыми по JS-типу полями |
 | Native Effect types | Нативный ABI закреплённой версии; реальные constructors/protocols |
 | Unknown input из JS | Opaque JsValue до checked runtime import |
 | Nullable/optional | Явный adapter различает null, undefined и отсутствие ключа |
 | Methods | Сохраняются this, arity, порядок вычисления и listener identity |
 | Callbacks | Четыре явных семейства: pure, Effect, Promise, scoped event |
 
-FFI поддерживает фиксированные uncurried вызовы, `this`, optional arguments и variadic tail через явный List adapter. Currying Flick сохраняется. Constructor id включает номинальную идентичность пакета/модуля/типа/конструктора и фиксируется в `.iface`; совпадения короткого `_tag` недостаточно. Immutable data по умолчанию копируются на недоверенной входной и выходной границе. Opaque native handles передаются только своим adapter, без попытки скопировать mutable internals. [Bindings ReScript](https://rescript-lang.org/docs/manual/bind-to-js-function/) дают примеры таких соглашений о вызове.
+FFI поддерживает фиксированные uncurried вызовы, `this`, optional arguments и variadic tail через явный List adapter. Currying Flick сохраняется. Constructor id включает номинальную идентичность пакета/модуля/типа/конструктора и фиксируется в `.iface` (поле `id` рядом с `tag`); `_tag` несёт имя конструктора и хеш этого id, что короче полного id в бандле и не сводит идентичность к одному имени. Immutable data по умолчанию копируются на недоверенной входной и выходной границе. Opaque native handles передаются только своим adapter, без попытки скопировать mutable internals. [Bindings ReScript](https://rescript-lang.org/docs/manual/bind-to-js-function/) дают примеры таких соглашений о вызове.
 
 Для JS-callbacks выбраны **четыре явных семейства адаптеров**. Дополнительная sync-модальность и автоматическое превращение callback `void` в запуск Effect не входят в первую версию. Runtime-стрелка с пустыми строками не доказывает синхронность.
 
@@ -1573,7 +1574,7 @@ const readName = (
 | Первый набор | Pure self-tail recursion в loop | Stack-safe чистые обходы без зависимости от TCO JS-движка |
 | Первый набор | Устранение временных records/tuples | Объект заменяется полями, если его representation/identity не наблюдается |
 | Первый набор | DCE и подходящие для bundler ES modules | Удаляются недостижимые чистые построения; эффекты и module initialization сохраняются |
-| По явному ABI | Unboxed nominal wrappers и различимые JS unions | Полезны для FFI; canonical Effect-типы сохраняют своё представление |
+| По явному ABI | Unboxed nominal wrappers (`unboxed type`) и различимые JS unions (`untagged type`) | Полезны для FFI; canonical Effect-типы сохраняют своё представление |
 | Следующий этап | Ограниченный межмодульный inlining | Versioned summaries с arity, эффектами, captures, ABI и ограничением роста кода |
 | Следующий этап | Локальное устранение mutable blocks | Только после escape/alias/identity анализа; не общее правило для Effect Ref |
 
@@ -1647,6 +1648,17 @@ function sumPair$2(left, right) {
 [ReScript DCE](https://rescript-lang.org/docs/manual/introduction/) использует информацию о чистоте. Во Flick неиспользуемое `task { Log.info message }` можно удалить как чистое описание, если само построение не имеет наблюдаемого действия. Выполненное `Log.info message` нельзя удалить из-за неиспользованного результата `Unit`.
 
 [Unboxed variants ReScript](https://rescript-lang.org/docs/manual/variant/) допустимы при различимых runtime-представлениях. Для opaque newtype Flick erasure не снимает ограничений Eq/Hash: особое поведение может требовать оболочки или dictionary adapter. Native `Option`, `Result`, `Ref`, `Schema` и `Redacted` Effect не меняют ABI ради этой оптимизации.
+
+Представление объявляется явно и одинаково во всех профилях, потому что это ABI, а не решение optimizer:
+
+```flick
+unboxed type UserId = UserId String
+  deriving Eq, Hash, Show, Schema
+
+untagged type Key = ByNumber Number | ByName String | ByPath (List String)
+```
+
+Значение `unboxed type` — поле его единственного конструктора с одним полем. `untagged type` — поле каждого конструктора; поля различимы по JS-типу (`Number`, `String`, `Bool`, `BigInt`, один list/tuple), и checker отвергает пересечение (`FLICK-T020`). Сопоставление с образцом проверяет `typeof`/`Array.isArray` вместо `_tag`. Derived `Eq`, `Ord`, `Hash`, `Show` работают по представлению; wire-форма `deriving Schema` у `unboxed type` — форма поля, у `untagged type` derived witness нет, его собирают combinators `Schema`. TS-проекция — тип поля или объединение типов полей.
 
 У [ReScript int имеет 32-битную семантику](https://rescript-lang.org/docs/manual/primitive-types/). `Number` во Flick следует JS, поэтому `(a + b) | 0` и замена обычного умножения на `Math.imul` без отдельного доказательства запрещены.
 
@@ -2225,7 +2237,7 @@ let save_button props =
   }
 ```
 
-JSX `<...>` не добавляется в первую версию; `ui { ... }` и обычные Ui functions строят одно представление. Это оставляет ML-синтаксис и единые правила props/callbacks. [ReScript components](https://rescript-lang.org/docs/react/components-and-props/) служат примером типизированного façade к React; surface syntax Flick выбран независимо.
+JSX `<...>` не добавляется в первую версию; `ui { ... }` и обычные Ui functions строят одно представление: блок только открывает имена модуля `Ui` (локальная привязка сильнее, затем имя `Ui`, затем имена модуля) и даёт тот же typed IR. Это оставляет ML-синтаксис и единые правила props/callbacks. [ReScript components](https://rescript-lang.org/docs/react/components-and-props/) служат примером типизированного façade к React; surface syntax Flick выбран независимо.
 
 Первый renderer — **React adapter**. Собственный reconciler/DOM renderer, SSR, hydration, React Server Components и полная hooks-модель вынесены за первую версию. Adapter сохраняет component boundaries, key/ref и lifecycle React; optimizer не заменяет компонент произвольным прямым вызовом функции. Runtime состояние bridge находится вне pure component body.
 
@@ -2253,17 +2265,17 @@ type alias SelectProps a r e c =
     selected : Option a
     key : (a -> String)^c
     render_item : (a -> (Ui r e)^c)^c
-    on_change : (a -> (Eff r e Unit)^c)^c
+    on_change : (Ui.Handler a r e)^c
   }
 ```
 
-Все поля связаны одним a. Нельзя совместить items из User и обработчик для Product. Row operations потребуются для универсальных wrappers, defaults и контролируемого spread; higher-rank — для специальных полиморфных render callbacks, а не для каждого generic-компонента. В [TypeScript JSX](https://www.typescriptlang.org/docs/handbook/jsx.html) также разделены проверка intrinsic props и children; DSL Flick может выразить эти контракты обычными функциями без воспроизведения всей системы типов TS.
+`on_change` — обработчик с обязательной policy (`Ui.Event.latest …`), snapshot события — выбранный элемент: голая функция `a -> Eff r e Unit` означала бы неявный fire-and-forget. Все поля связаны одним a. Нельзя совместить items из User и обработчик для Product. Row operations потребуются для универсальных wrappers, defaults и контролируемого spread; higher-rank — для специальных полиморфных render callbacks, а не для каждого generic-компонента. В [TypeScript JSX](https://www.typescriptlang.org/docs/handbook/jsx.html) также разделены проверка intrinsic props и children; DSL Flick может выразить эти контракты обычными функциями без воспроизведения всей системы типов TS.
 
 ### Исполнение событий и время жизни
 
 DOM callback, который ожидает void, не исполняет возвращённый Eff. Адаптер обязан получить инертный event snapshot, синхронно принять решение о default action, запустить управляемую задачу и наблюдать её завершение. `preventDefault` нельзя откладывать до произвольного await; подходят декларативная политика либо чистый синхронный decision callback.
 
-`e` в Ui описывает selected expected errors будущих обработчиков. UI root обязательно получает supervisor полного `Failure e`; инфраструктурные defects и shutdown interruption различимы. `Ui.run` живёт до закрытия root и завершения cleanup. Завершившийся mount не обещает вернуть будущие failures через свой обычный результат. Сбой самого supervisor завершает root как defect и передаётся runtime reporter, без рекурсивного reporting.
+`e` в Ui описывает selected expected errors будущих обработчиков. UI root обязательно получает supervisor полного `Failure e`; инфраструктурные defects и shutdown interruption различимы. `Ui.run container supervisor model view` рендерит `view` содержимого `model : Ref m` и перерисовывает после завершения каждой задачи обработчика; обработчики меняют модель через `Ref.set`. `Ui.run` живёт до закрытия root и завершения cleanup. Завершившийся mount не обещает вернуть будущие failures через свой обычный результат. Сбой самого supervisor завершает root как defect и передаётся runtime reporter, без рекурсивного reporting.
 
 Policy обязательна у каждого обработчика; неявного fire-and-forget нет.
 
@@ -2282,7 +2294,7 @@ React cleanup синхронно закрывает приём событий и
 
 ### Безопасность содержимого и interop
 
-`Ui.text : String -> Ui none none` вставляет текст через безопасный текстовый канал. URL и raw HTML имеют отдельные политики и непрозрачные типы, например SafeUrl и SanitizedHtml. Их конструкторы проверяют вход или являются явно доверенными; простое приведение String не создаёт доказательство безопасности. Это разделение каналов, а не обещание автоматически доказать всю HTML-грамматику, accessibility и корректность приложения.
+`Ui.text : forall r e. String -> Ui r e` (полиморфна по строкам, чтобы стоять среди детей любого элемента) вставляет текст через безопасный текстовый канал. URL и raw HTML имеют отдельные политики и непрозрачные типы, например SafeUrl и SanitizedHtml. Их конструкторы проверяют вход или являются явно доверенными; простое приведение String не создаёт доказательство безопасности. Это разделение каналов, а не обещание автоматически доказать всю HTML-грамматику, accessibility и корректность приложения.
 
 `.d.ts` может дать shape props foreign component, но не доказывает purity, retention и cancellation. Foreign component хранится как opaque renderer component; pure source builder его не исполняет. Adapter задаёт callback/lifetime policy и owner. Импортируемая поддержанная часть React-экосистемы проходит тот же FFI pipeline; непредставимые гарантии не стираются.
 

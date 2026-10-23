@@ -3,6 +3,7 @@
 import type { Option, Result } from "effect";
 
 import { type Tagged, err, none, ok, some } from "../data.ts";
+import { tag } from "../tags.ts";
 
 const writeStream = (stream: NodeJS.WriteStream, text: string): void => void stream.write(text);
 
@@ -47,7 +48,7 @@ export const stringToNumber = (s: string): Option.Option<number> => {
   return Number.isNaN(n) && text !== "NaN" ? none : some(n);
 };
 
-const ARITHMETIC = "Number.ArithmeticError.ArithmeticError";
+const ARITHMETIC = tag("Number.ArithmeticError.ArithmeticError");
 
 /** `Number.ArithmeticError`. */
 export type ArithmeticError = Tagged<typeof ARITHMETIC, string>;

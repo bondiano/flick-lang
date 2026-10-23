@@ -9,6 +9,7 @@ use std::mem;
 
 use super::Checker;
 use super::classes::Dict;
+use super::env::{Abi, Rep};
 use super::ty::Type;
 use crate::source::Span;
 
@@ -23,6 +24,8 @@ pub fn range(span: Span) -> Range {
 pub struct Typing {
     /// Every name in an expression or a constructor pattern.
     pub names: HashMap<Range, Ref>,
+    /// The representation of each `unboxed` or `untagged` type of the module.
+    pub abis: HashMap<String, Abi>,
     /// Applications `f a1 … ai` (from `f` to `ai`) and pipes `x |> f` whose
     /// stage runs a runtime call.
     pub runtime: HashSet<Range>,
@@ -90,6 +93,8 @@ pub struct Constructor {
     pub ty: String,
     pub name: String,
     pub arity: usize,
+    /// How its values are represented in JS.
+    pub rep: Rep,
 }
 
 /// How a `foreign` is called: its arrows, the dictionaries it takes and

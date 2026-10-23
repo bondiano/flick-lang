@@ -7,6 +7,7 @@ import { types } from "node:util";
 import { Cause, Effect, Exit, type Option, Result } from "effect";
 
 import { none, some } from "./data.ts";
+import { constructorName } from "./tags.ts";
 
 const failsToDies = <E>(cause: Cause.Cause<E>): Cause.Cause<never> =>
   Cause.fromReasons(cause.reasons.map((r) => (Cause.isFailReason(r) ? Cause.makeDieReason(r.error) : r)).filter(
@@ -186,7 +187,8 @@ export const describeReport = (r: CauseReport): string =>
   r.reasons
     .map((reason) => {
       if (reason.kind === "interrupt") return "interrupt";
-      const what = reason.error ? `error ${reason.message ?? ""}` : (reason.tag ?? reason.value ?? "");
+      const shown = reason.tag === undefined ? reason.value : constructorName(reason.tag);
+      const what = reason.error ? `error ${reason.message ?? ""}` : (shown ?? "");
       return `${reason.kind} ${what}`;
     })
     .join("; ");
