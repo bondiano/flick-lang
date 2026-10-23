@@ -2199,7 +2199,6 @@ type alias SaveButtonProps c =
   }
 
 save_button :
-  forall c.
   SaveButtonProps c -> (Ui {Users} {SaveError})^c
 let save_button props =
   Ui.button
@@ -2222,7 +2221,6 @@ let save_button props =
 
 ```flick
 save_button :
-  forall c.
   SaveButtonProps c -> (Ui {Users} {SaveError})^c
 let save_button props =
   ui {

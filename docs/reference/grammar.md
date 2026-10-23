@@ -350,7 +350,6 @@ open_rows : a ->{Users, Log | r; NotFound | e} b
 fields : forall fields. { name : String | fields } -> { name : String }
 
 save_button :
-  forall c.
   SaveButtonProps c -> (Ui {Users} {SaveError})^c
 ```
 
