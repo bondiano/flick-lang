@@ -12,7 +12,7 @@ protocol; logs go to stderr. It runs the same analysis as `flick check` and
 | Request | Answer |
 | - | - |
 | diagnostics | exactly those of `flick check`, with their `FLICK-` codes, at UTF-16 positions |
-| `textDocument/hover` | source signatures and `///` documentation for public and private values, at declarations and uses; module documentation on qualifiers such as `Sql`; inferred locals and values, SQL aliases, columns and parameters, on `task` and `scope` the type of the whole block, on `ignore` the type it discards (see [keywords.md](../keywords/#in-the-editor)); declarations distinguish `type error` from `service` |
+| `textDocument/hover` | source signatures and `///` documentation for public and private values, at declarations and uses; module documentation on qualifiers such as `Sql`; inferred locals and values, SQL aliases, columns and parameters, on a keyword that opens an expression (`task`, `scope`, `match`, `fun` …) the type of the whole expression, on `await` and `ignore` the type of the operand (see [keywords.md](../keywords/#in-the-editor)); declarations distinguish `type error` from `service` |
 | `textDocument/definition` | across modules; module qualifiers lead to their module header, members to their declaration; built-ins open as real read-only `.fl` files; installed packages use their published `.fl`, else `.iface`; companions lead to their type, class methods at a known instance to that instance |
 | `textDocument/references` | every occurrence in the project |
 | `textDocument/rename` | the project's own values, types, constructors and locals, in `.fl` sources only; names of built-in modules and packages, service operations and instance methods have no exact mapping and are refused |

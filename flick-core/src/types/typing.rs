@@ -12,6 +12,8 @@ use super::classes::Dict;
 use super::env::{Abi, Rep};
 use super::ty::Type;
 use crate::source::Span;
+use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
 
 /// A source range of the module being checked.
 pub type Range = (u32, u32);
@@ -52,8 +54,9 @@ pub struct Typing {
     /// `codec` blocks: the fields' labels in the order written.
     pub codecs: HashMap<Range, CodecBlock>,
     /// The type of each name in an expression and of each variable a
-    /// pattern binds, for editors; at a `task` or `scope` keyword the type
-    /// of the whole block, at `ignore` the type of what it discards.
+    /// pattern binds, for editors; at a keyword that opens an expression
+    /// (`task`, `match`, `fun` …) the type of the whole expression, at
+    /// `ignore` and `await` the type of the operand.
     pub types: HashMap<Range, Type>,
     /// The type each type name refers to: its module and name.
     pub type_names: HashMap<Range, (String, String)>,
@@ -326,6 +329,29 @@ impl Checker<'_> {
     /// module is solved.
     pub fn note_type(&mut self, span: Span, ty: &Type) {
         self.typing.pending_types.push((range(span), ty.clone()));
+    }
+
+    /// The type of an expression a keyword opens (`task`, `match`, `fun` …),
+    /// recorded at the keyword so an editor can show it there.
+    pub fn note_head(&mut self, node: &Node, ty: &Type) {
+        let head = match node.kind {
+            K::TaskExpr => K::TaskKw,
+            K::ScopeExpr => K::ScopeKw,
+            K::ProvideExpr => K::ProvideKw,
+            K::TryExpr => K::TryKw,
+            K::MatchExpr => K::MatchKw,
+            K::IfExpr => K::IfKw,
+            K::FunExpr => K::FunKw,
+            K::UiExpr => K::UiKw,
+            K::SqlExpr => K::SqlKw,
+            K::CodecExpr => K::CodecKw,
+            K::CliExpr => K::CliKw,
+            K::SchemaExpr => K::SchemaKw,
+            _ => return,
+        };
+        if let Some(kw) = node.child_tokens().find(|t| t.kind == head) {
+            self.note_type(self.token_span(kw), ty);
+        }
     }
 
     pub fn record_dict(&mut self, span: Span, order: u32, dict: Dict) {

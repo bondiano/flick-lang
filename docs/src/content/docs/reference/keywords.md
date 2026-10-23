@@ -92,14 +92,19 @@ computation.
 
 ## In the editor
 
-Hovering a keyword that opens a block shows the type of the whole block, the
-type an ML language server shows for an expression, together with what the
-keyword does:
+Hovering a keyword that opens an expression shows the type of the whole
+expression, the type an ML language server shows for an expression, together
+with what the keyword does:
 
 | Hover on | Shows |
 | - | - |
 | `task` | `task { … } : Eff {Store} {StoreError} Number`: the computation the block builds |
 | `scope` | `scope { … } : Number`: the value the block returns once its resources are released |
+| `provide`, `try` | the value of the block, with the services or errors it removes |
+| `match`, `if` | `match … with : String`: the value of the arm or branch taken |
+| `fun` | `fun … -> … : Number -> Number`: the function |
+| `sql`, `codec`, `cli`, `ui`, `schema` | the value the block builds, such as `sql { … } : Template Pg {} { label : String }` |
+| `await` | `await … : Number`: the result, with the `Eff` it runs |
 | `ignore` | `ignore : Eff {Store} {StoreError} Number -> Unit`: the type of what is discarded, with a warning when it is an `Eff` that is not run |
 
 Other keywords show nothing on hover; the names around them show their types.

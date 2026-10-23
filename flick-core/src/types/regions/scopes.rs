@@ -79,7 +79,6 @@ impl Checker<'_> {
             let head = format!("the value of this `scope` has type `{shown}`");
             self.region_escape(skolem, &head, span);
         }
-        self.note_type(span, &ty);
         ty
     }
 

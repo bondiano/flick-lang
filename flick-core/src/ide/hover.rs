@@ -30,30 +30,60 @@ impl Ide<'_> {
         )
     }
 
-    /// A `task`, `scope` or `ignore` keyword at `offset`: the type of the
-    /// whole block it opens, or of what it discards, and what it does.
+    /// A keyword at `offset` that opens an expression: the type of the whole
+    /// expression and what the keyword does; at `ignore` and `await` the
+    /// type of the operand.
     fn keyword(&self, file: FileId, offset: u32) -> Option<(String, String, (u32, u32))> {
         let m = self.module(file)?;
         let parent = *tree::path_to(&m.tree, offset).last()?;
-        let kw = parent.child_tokens().find(|t| {
-            matches!(t.kind, K::TaskKw | K::ScopeKw | K::IgnoreKw)
-                && t.start <= offset
-                && offset <= t.end
-        })?;
+        let kw = parent
+            .child_tokens()
+            .find(|t| t.start <= offset && offset <= t.end && t.kind != K::Ident)?;
         let ty = m.typing.types.get(&(kw.start, kw.end))?;
         let shown = show_type(ty);
-        let (code, note) = match kw.kind {
+        let (head, note) = match kw.kind {
             K::TaskKw => (
-                format!("task {{ … }} : {shown}"),
-                "Builds this computation without running it; `await` runs it.".to_owned(),
+                "task { … }",
+                "Builds this computation without running it; `await` runs it.",
             ),
             K::ScopeKw => (
-                format!("scope {{ … }} : {shown}"),
+                "scope { … }",
                 "Runs its body in a fresh region and releases what the body \
-                 acquired when it ends; the value may not mention the region."
-                    .to_owned(),
+                 acquired when it ends; the value may not mention the region.",
             ),
-            _ => {
+            K::ProvideKw => (
+                "provide … { … }",
+                "Runs its body with the services the layer builds; they leave \
+                 the row, and what building the layer needs is added.",
+            ),
+            K::TryKw => (
+                "try … with",
+                "Handles the errors of its body: an error leaves the row when an \
+                 arm without a guard matches every value of it.",
+            ),
+            K::MatchKw => ("match … with", "The value of the arm that matches."),
+            K::IfKw => ("if … then … else …", "The value of the branch taken."),
+            K::FunKw => ("fun … -> …", "An anonymous function."),
+            K::UiKw => (
+                "ui { … }",
+                "Describes a user interface; building it runs no handler.",
+            ),
+            K::SqlKw => ("sql { … }", "A typed SQL query."),
+            K::CodecKw => ("codec … { … }", "A codec built field by field."),
+            K::CliKw => ("cli … { … }", "A command-line interface."),
+            K::SchemaKw => ("schema …", "The `Schema` of a type that derives it."),
+            K::AwaitKw => {
+                let ran = match ty.spine() {
+                    (h, args) if h.is_prim("Eff") && args.len() == 3 => show_type(args[2]),
+                    _ => shown.clone(),
+                };
+                return Some((
+                    format!("await … : {ran}"),
+                    format!("Runs `{shown}` once in the current fiber."),
+                    (kw.start, kw.end),
+                ));
+            }
+            K::IgnoreKw => {
                 let mut note = format!(
                     "Evaluates its operand and discards its value of type `{shown}`; \
                      its effects and errors are kept."
@@ -64,10 +94,19 @@ impl Ide<'_> {
                          and discards its result.",
                     );
                 }
-                (format!("ignore : {shown} -> Unit"), note)
+                return Some((
+                    format!("ignore : {shown} -> Unit"),
+                    note,
+                    (kw.start, kw.end),
+                ));
             }
+            _ => return None,
         };
-        Some((code, note, (kw.start, kw.end)))
+        Some((
+            format!("{head} : {shown}"),
+            note.to_owned(),
+            (kw.start, kw.end),
+        ))
     }
 
     fn typed_hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
@@ -79,11 +118,11 @@ impl Ide<'_> {
 
     /// Markdown for the symbol at `offset`, and the range it covers.
     pub fn hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
-        if let Some(hover) = self.sql_hover(file, offset) {
-            return Some(hover);
-        }
         if let Some((code, note, range)) = self.keyword(file, offset) {
             return Some((format!("```flick\n{code}\n```\n\n{note}"), range));
+        }
+        if let Some(hover) = self.sql_hover(file, offset) {
+            return Some(hover);
         }
         let Some((symbol, range)) = self.symbol_at(file, offset) else {
             return self.typed_hover(file, offset);

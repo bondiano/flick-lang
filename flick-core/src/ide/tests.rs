@@ -90,6 +90,17 @@ let counted user =
     run user
   }
 
+picked : User ->{Store; StoreError} Number
+let picked user =
+  let m = await (saved user)
+  if m > 0 then (fun x -> x + 1) m else 0
+
+sign : Number -> String
+let sign n =
+  match n with
+  | 0 -> \"zero\"
+  | _ -> \"other\"
+
 sql table Items \"items\" {
   id : bigint primary key generated always as BigInt
   label : text not null as String
@@ -230,6 +241,21 @@ fn hover_on_a_keyword_shows_the_type_of_its_whole_block() {
             && deferred.contains("is not run"),
         "{deferred}"
     );
+    let awaited = hover("await (saved", 0);
+    assert!(
+        awaited.contains("await … : Number")
+            && awaited.contains("Runs `Eff {Store} {StoreError} Number`"),
+        "{awaited}"
+    );
+    for (needle, shown) in [
+        ("fun x", "fun … -> … : Number -> Number"),
+        ("if m", "if … then … else … : Number"),
+        ("match n", "match … with : String"),
+        ("sql {", "sql { … } : Template Pg {} { label : String }"),
+    ] {
+        let text = hover(needle, 0);
+        assert!(text.contains(shown), "{needle}: {text}");
+    }
     let ran = hover("ignore (run", 0);
     assert!(
         ran.contains("ignore : Number -> Unit") && !ran.contains("is not run"),

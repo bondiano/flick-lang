@@ -322,6 +322,7 @@ impl Checker<'_> {
             }
             K::AwaitKw => {
                 let ty = self.infer(operand);
+                self.note_type(self.token_span(op), &ty);
                 let (services, errors, result) = (self.fresh(), self.fresh(), self.fresh());
                 let shape = super::infer::eff(services.clone(), errors.clone(), result.clone());
                 if self.unify(&self.whnf(&ty), &shape).is_err() {

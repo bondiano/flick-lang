@@ -34,6 +34,7 @@ mod instances;
 mod kinds;
 mod patterns;
 mod qualified;
+mod records;
 mod regions;
 mod report;
 mod rows;

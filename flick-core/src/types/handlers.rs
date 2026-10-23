@@ -45,11 +45,7 @@ impl Checker<'_> {
         let held = self.held_since(uses, locals);
         let ty = eff(inner.services, inner.errors, result);
         let span = self.span(node);
-        let ty = self.close_over(ty, held, expected.cloned(), "task", span);
-        if let Some(kw) = node.child_tokens().find(|t| t.kind == K::TaskKw) {
-            self.note_type(self.token_span(kw), &ty);
-        }
-        ty
+        self.close_over(ty, held, expected.cloned(), "task", span)
     }
 
     /// `try body with | E p -> handler …`. An error leaves the row only when
