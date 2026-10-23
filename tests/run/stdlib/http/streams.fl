@@ -1,0 +1,128 @@
+// Streamed bodies of requests and responses, files as bodies, forms read
+// part by part, and compression through web streams.
+module App.Main exposing (main)
+
+import Http.ClientError exposing (HttpClientError)
+import Http.Multipart exposing (MultipartError, Part(..))
+import Http.ServerError exposing (HttpServerError)
+
+ok : Http.ServerResponse.Options
+let ok = Http.ServerResponse.defaults
+
+hello : Stream.Stream none none (List Number)
+let hello = Stream.Platform.encode_text (Stream.from_list ["hel", "lo"])
+
+form_type : String
+let form_type = "multipart/form-data; boundary=XX"
+
+form_body : String
+let form_body =
+  "--XX\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nnotes\r\n"
+    ++ "--XX\r\nContent-Disposition: form-data; name=\"doc\"; filename=\"a.txt\"\r\n"
+    ++ "Content-Type: application/octet-stream\r\n\r\nfile text\r\n--XX--\r\n"
+
+form : Http.ServerRequest.ServerRequest
+let form =
+  Http.ServerRequest.from_client_request
+    (Http.ClientRequest.body_text
+      form_body
+      (Some form_type)
+      (Http.ClientRequest.post "http://fake/f"))
+
+describe : Part ->{; MultipartError} String
+let describe part =
+  match part with
+  | Field f -> f.key ++ "=" ++ f.value
+  | File f ->
+    f.key
+      ++ ":"
+      ++ f.name
+      ++ "="
+      ++ String.join "" (Stream.run_collect (Stream.Platform.decode_text f.content))
+
+bodies : Unit ->{; HttpClientError, HttpServerError} Unit
+let bodies () =
+  let body = Http.Body.stream hello (Some "text/plain") (Some 5)
+  Platform.stdout_line
+    ("stream: " ++ show (Http.Body.content_type body, Http.Body.content_length body))
+  let sent =
+    Http.ClientRequest.body_stream hello None None (Http.ClientRequest.post "http://fake/s")
+  Platform.stdout_line
+    ("body_stream: " ++ Http.ServerRequest.text (Http.ServerRequest.from_client_request sent))
+  let answer = Http.ServerResponse.to_client_response sent (Http.ServerResponse.stream hello ok)
+  let got = Stream.run_collect (Stream.Platform.decode_text (Http.ClientResponse.stream answer))
+  Platform.stdout_line ("response stream: " ++ String.join "" got)
+
+files : Unit ->{; PlatformError.PlatformError, HttpServerError} Unit
+let files () =
+  provide FileSystem.node {
+    scope {
+      let dir =
+        FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-streams" }
+      let path = dir ++ "/f.txt"
+      FileSystem.write_file_string { flag = None; mode = None } path "file body"
+      let part = { Http.Body.file_options with offset = ByteSize.bytes 5 }
+      Platform.stdout_line ("file: " ++ show (Http.Body.content_length (Http.Body.file part path)))
+      let whole = Http.Body.file_from_info Http.Body.file_options path (FileSystem.stat path)
+      Platform.stdout_line ("file_from_info: " ++ show (Http.Body.content_length whole))
+      let request = Http.ClientRequest.body_file part path (Http.ClientRequest.post "http://fake/u")
+      Platform.stdout_line
+        ("body_file: " ++ Http.ServerRequest.text (Http.ServerRequest.from_client_request request))
+    }
+  }
+
+forms : Unit ->{; MultipartError} Unit
+let forms () =
+  Platform.stdout_line
+    (
+      "parts: "
+        ++ show (Stream.run_collect (Stream.map_effect describe (Http.Multipart.parts form)))
+    )
+  let parsed =
+    Stream.pipe_through_channel
+      (Http.Multipart.make_channel [("content-type", form_type)])
+      (Stream.Platform.encode_text (Stream.from_list [form_body]))
+  Platform.stdout_line
+    ("make_channel: " ++ show (Stream.run_collect (Stream.map_effect describe parsed)))
+  scope {
+    let persisted = Http.Multipart.to_persisted (Http.Multipart.parts form)
+    Platform.stdout_line ("to_persisted: " ++ show (Http.Multipart.fields persisted))
+    Platform.stdout_line
+      ("persisted files: " ++ show (List.length (Http.Multipart.files persisted)))
+  }
+
+compressed : Unit ->{; HttpClientError} Unit
+let compressed () =
+  zipped : Http.Middleware.Handler none none
+  let zipped =
+    Http.Middleware.compression_web
+      { algorithms = []; minSize = Some 10; levels = [] }
+      (fun _ -> Http.ServerResponse.text (String.repeat 200 "a") ok)
+  let request =
+    Http.ClientRequest.set_header "accept-encoding" "gzip" (Http.ClientRequest.get "http://fake/z")
+  send : Http.ServerRequest.ServerRequest ->
+    Http.ServerResponse.ServerResponse ->{; HttpClientError}
+    Unit
+  let send _ response =
+    Platform.stdout_line
+      ("compression_web: "
+        ++ show (Http.Headers.get "content-encoding" (Http.ServerResponse.headers response)))
+    let zbytes = Http.ClientResponse.bytes (Http.ServerResponse.to_client_response request response)
+    Platform.stdout_line ("gzip magic: " ++ show (List.take 2 zbytes))
+  Http.Middleware.to_handled send zipped (Http.ServerRequest.from_client_request request)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try
+    bodies ()
+    files ()
+    forms ()
+    compressed ()
+  with
+  | Http.ClientError.HttpClientError reason ->
+    Platform.stdout_line ("client error: " ++ show reason)
+  | Http.ServerError.HttpServerError reason ->
+    Platform.stdout_line ("server error: " ++ show reason)
+  | Http.Multipart.MultipartError reason ->
+    Platform.stdout_line ("multipart error: " ++ show reason)
+  | PlatformError.PlatformError reason -> Platform.stdout_line ("platform error: " ++ show reason)

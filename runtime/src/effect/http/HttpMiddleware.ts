@@ -2,12 +2,14 @@
 // standard library: middlewares of Effect's apps as functions of Flick
 // handlers.
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
-import { Effect, Option } from "effect";
+import { Effect, Layer, Option } from "effect";
 import type * as ByteSize from "effect/ByteSize";
 import * as HttpEffect from "effect/http/HttpEffect";
+import * as HttpPlatform from "effect/http/HttpPlatform";
 import * as Middleware from "effect/http/HttpMiddleware";
 import { HttpServerRequest } from "effect/http/HttpServerRequest";
 import type { HttpServerResponse } from "effect/http/HttpServerResponse";
+import * as Response from "effect/http/HttpServerResponse";
 
 import type { Data } from "../../data.ts";
 import { type Handler, lift, toApp, toHandler } from "./handler.ts";
@@ -52,17 +54,48 @@ export interface CompressionOptions {
   readonly levels: ReadonlyArray<readonly [Data, number]>;
 }
 
-export const flickCompression = (o: CompressionOptions, handler: Handler) =>
-  lift((app) =>
-    Effect.provide(
-      Middleware.compression({
-        algorithms: o.algorithms.length === 0 ? undefined : o.algorithms.map(compression.js),
-        minSize: Option.getOrUndefined(o.minSize),
-        levels: Object.fromEntries(o.levels.map(([algorithm, level]) => [compression.js(algorithm), level])),
-      })(app),
-      NodeHttpServer.layerHttpServices,
-    ),
-  )(handler);
+const compressWith =
+  (platform: Layer.Layer<HttpPlatform.HttpPlatform>) => (o: CompressionOptions, handler: Handler) =>
+    lift((app) =>
+      Effect.provide(
+        Middleware.compression({
+          algorithms: o.algorithms.length === 0 ? undefined : o.algorithms.map(compression.js),
+          minSize: Option.getOrUndefined(o.minSize),
+          levels: Object.fromEntries(o.levels.map(([algorithm, level]) => [compression.js(algorithm), level])),
+        })(app),
+        platform,
+      ),
+    )(handler);
+
+export const flickCompression = compressWith(NodeHttpServer.layerHttpServices);
+
+const web = HttpPlatform.makeCompressionWeb({
+  algorithms: ["gzip", "deflate"],
+  transform: (algorithm) => HttpPlatform.compressionTransformWeb(algorithm),
+});
+
+/** The web compression with the headers `HttpPlatform.make` adds to each compressed response. */
+const webCompression: HttpPlatform.Compression = {
+  algorithms: web.algorithms,
+  compressResponse: (response, algorithm, o) =>
+    Effect.map(web.compressResponse(response, algorithm, o), (compressed) => {
+      if (compressed === response) return response;
+      const etag = compressed.headers["etag"];
+      const vary = compressed.headers["vary"];
+      return Response.setHeaders(compressed, {
+        "content-encoding": algorithm,
+        vary: vary === undefined ? "Accept-Encoding" : `${vary}, Accept-Encoding`,
+        ...(etag !== undefined && !etag.startsWith("W/") ? { etag: `W/${etag}` } : {}),
+      });
+    }),
+};
+
+const webPlatform = Layer.effect(
+  HttpPlatform.HttpPlatform,
+  Effect.map(Effect.service(HttpPlatform.HttpPlatform), (p) => HttpPlatform.HttpPlatform.of({ ...p, compression: webCompression })),
+).pipe(Layer.provide(NodeHttpServer.layerHttpServices));
+
+export const flickCompressionWeb = compressWith(webPlatform);
 
 export const flickDecompression = (max: Option.Option<ByteSize.ByteSize>, handler: Handler) =>
   lift(Middleware.decompression({ maxDecompressedSize: Option.getOrUndefined(max) }))(handler);

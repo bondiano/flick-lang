@@ -1,8 +1,10 @@
 /// Effect's `HttpServerResponse`: what a handler answers, an immutable
 /// value of status, headers, cookies and body. Cookie values are secrets;
-/// `show` masks them and secret headers. Streamed bodies wait for Flick's
-/// streams; files are sent by `Http.Platform.file`.
+/// `show` masks them and secret headers. A streamed body holds no services
+/// or region; files are sent by `Http.Platform.file`.
 module Http.ServerResponse exposing (..)
+
+import Stream.Core exposing (Stream)
 
 /// A response.
 type ServerResponse
@@ -44,6 +46,13 @@ text : String -> Options -> ServerResponse
 foreign pure text from "@flick-lang/runtime/effect/http/HttpServerResponse" "flickText"
   arity 2
   reviewed "effect@4.0.5 sha256:8f7360a508f1bd5f"
+
+/// A body of the stream's chunks of bytes, sent as they come;
+/// `application/octet-stream` unless the options set a content type.
+stream : forall e. Stream none e (List Number) -> Options -> ServerResponse
+foreign pure stream from "@flick-lang/runtime/effect/http/HttpServerResponse" "flickStream"
+  arity 2
+  reviewed "effect@4.0.5 sha256:261a610a1e39cd04"
 
 /// A `text/html` body of the markup.
 html : String -> ServerResponse

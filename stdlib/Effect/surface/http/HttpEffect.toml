@@ -4,6 +4,9 @@ appendPreResponseHandler = "Http.Middleware.append_pre_response_handler 8d42b837
 toHandled = "Http.Middleware.to_handled 410e9b7d36d30ce7"
 withPreResponseHandler = "Http.Middleware.with_pre_response_handler f11574d6347dcaa0"
 
+[language]
+scopeTransferToStream = "`Stream.ensuring` or `Stream.on_exit` on the stream of the body releases what it holds when it ends; a body stream holds no region, and a handler's lexical `scope` closes before the body is sent"
+
 [excluded]
 appendPreResponseHandlerUnsafe = "invariant: `*Unsafe` mutates the request outside a runtime call; `append_pre_response_handler` runs as one"
 fromWebHandler = "TS-only: wraps a JS `(Request) => Promise<Response>` of the Fetch API; Flick handlers are Flick functions"
@@ -12,6 +15,3 @@ toWebHandler = "invariant: runs effects outside the entry runner, as a `Promise`
 toWebHandlerLayer = "invariant: runs effects outside the entry runner, as a `Promise`-returning JS handler"
 toWebHandlerLayerWith = "invariant: runs effects outside the entry runner, as a `Promise`-returning JS handler"
 toWebHandlerWith = "invariant: runs effects outside the entry runner, as a `Promise`-returning JS handler"
-
-[pending]
-scopeTransferToStream = "M20"

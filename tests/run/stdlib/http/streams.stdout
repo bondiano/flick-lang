@@ -1,0 +1,12 @@
+stream: (Some "text/plain", Some 5)
+body_stream: hello
+response stream: hello
+file: Some 4
+file_from_info: Some 9
+body_file: body
+parts: ["title=notes", "doc:a.txt=file text"]
+make_channel: ["title=notes", "doc:a.txt=file text"]
+to_persisted: [("title", ["notes"])]
+persisted files: 1
+compression_web: Some "gzip"
+gzip magic: [31, 139]

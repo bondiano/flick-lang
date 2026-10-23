@@ -80,6 +80,26 @@ export const info = (i: FileSystem.File.Info) => ({
   blocks: i.blocks,
 });
 
+const date = (ms: Option.Option<number>): Option.Option<Date> => Option.map(ms, (m) => new Date(m));
+
+/** The Effect `File.Info` of a Flick `FileSystem.Info`. */
+export const effectInfo = (i: ReturnType<typeof info>): FileSystem.File.Info => ({
+  type: fileType.js(i.type_),
+  mtime: date(i.mtime),
+  atime: date(i.atime),
+  birthtime: date(i.birthtime),
+  dev: i.dev,
+  ino: i.ino,
+  mode: i.mode,
+  nlink: i.nlink,
+  uid: i.uid,
+  gid: i.gid,
+  rdev: i.rdev,
+  size: i.size,
+  blksize: i.blksize,
+  blocks: i.blocks,
+});
+
 interface WriteOptions {
   readonly flag: Option.Option<Data>;
   readonly mode: Option.Option<number>;

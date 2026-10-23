@@ -1,8 +1,11 @@
 /// Effect's `Multipart`: `multipart/form-data` bodies of server requests.
 /// `persisted` reads the whole form, writing its files to temporary files
 /// that the scope of region `s` removes; `with_limits` bounds what a form
-/// may hold. A form read part by part waits for Flick's streams.
+/// may hold. `parts` reads a form part by part, as a stream.
 module Http.Multipart exposing (..)
+
+import Channel exposing (Channel)
+import Stream.Core exposing (Stream)
 
 /// A file of a form, written to `path` until the scope closes.
 type alias PersistedFile = { key : String; name : String; contentType : String; path : String }
@@ -127,3 +130,29 @@ decode_field : PartInfo -> List Number -> String
 foreign pure decode_field from "@flick-lang/runtime/effect/http/Multipart" "flickDecodeField"
   arity 2
   reviewed "effect@4.0.5 sha256:49be3c553d049561"
+
+/// A part of a form read part by part: a text field, or a file whose bytes
+/// stream as the form is read. A file must be read before the next part.
+type Part =
+  | Field { key : String; contentType : String; value : String }
+  | File { key : String; name : String; contentType : String; content : Stream none {MultipartError} (List Number) }
+
+/// The parts of the request's form, in order.
+parts : Http.ServerRequest.ServerRequest -> Stream none {MultipartError} Part
+foreign pure parts from "@flick-lang/runtime/effect/http/Multipart" "flickParts"
+  reviewed "effect@4.0.5 sha256:e5f1e8023bf26c37"
+
+/// Parses chunks of bytes of a form into its parts; `headers` are those of
+/// the form's message, its `content-type` naming the boundary. It reads the
+/// limits of `with_limits` when it runs.
+make_channel :
+  forall e. List (String, String) ->
+    Channel none {MultipartError | e} (NonEmpty.NonEmpty (List Number)) (NonEmpty.NonEmpty Part) Unit e Unit
+foreign pure make_channel from "@flick-lang/runtime/effect/http/Multipart" "flickMakeChannel"
+  reviewed "effect@4.0.5 sha256:c4fb7aade4e9dd3f"
+
+/// The whole form of the parts, as `persisted` reads it: files are written
+/// to temporary files that the scope of region `s` removes.
+to_persisted : forall s. Stream none {MultipartError} Part ->{Scope s; MultipartError} Persisted
+foreign effect to_persisted from "@flick-lang/runtime/effect/http/Multipart" "flickToPersisted"
+  reviewed "effect@4.0.5 sha256:22e22f2f7418accd"

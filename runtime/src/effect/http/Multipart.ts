@@ -2,7 +2,7 @@
 // requests of the Node server, read with Node's file system, and
 // `MultipartError` as the Flick error `Http.Multipart.MultipartError`.
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { Effect, Option } from "effect";
+import { Array as Arr, Channel, Effect, Option, Stream } from "effect";
 import type * as ByteSize from "effect/ByteSize";
 import type * as Request from "effect/http/HttpServerRequest";
 import * as Multipart from "effect/http/Multipart";
@@ -10,7 +10,7 @@ import * as MultipartParser from "effect/http/MultipartParser";
 
 import { type AnySchema, codecDecode, jsonParse } from "../../schema/index.ts";
 import { tag } from "../../tags.ts";
-import { enumeration, toBytes } from "./convert.ts";
+import { enumeration, fromBytes, toBytes } from "./convert.ts";
 import { flickSchemaBodyUrlParams } from "./HttpServerRequest.ts";
 
 export * from "effect/http/Multipart";
@@ -145,3 +145,76 @@ export const flickDefaultIsFile = (info: PartInfo): boolean => MultipartParser.d
 
 export const flickDecodeField = (info: PartInfo, bytes: ReadonlyArray<number>): string =>
   MultipartParser.decodeField(partInfo(info), toBytes(bytes));
+
+const FIELD = tag("Http.Multipart.Part.Field");
+const FILE = tag("Http.Multipart.Part.File");
+
+/** Effect's failures of a form as the Flick error, and back. */
+const flickError = (e: unknown) => (Multipart.isMultipartError(e) ? toFlick(e) : e);
+/** A failure of a Flick stream of parts, which the checker types as `MultipartError`. */
+const effectError = (e: unknown): Multipart.MultipartError =>
+  Multipart.MultipartError.fromReason(isFlick(e) ? reason.js(e._0) : "InternalError", e);
+
+/** The Flick `Http.Multipart.Part` of an Effect part. */
+const flickPart = (part: Multipart.Part) =>
+  part._tag === "Field"
+    ? { _tag: FIELD, _0: { key: part.key, contentType: part.contentType, value: part.value } }
+    : {
+        _tag: FILE,
+        _0: {
+          key: part.key,
+          name: part.name,
+          contentType: part.contentType,
+          content: Stream.map(Stream.mapError(part.content, flickError), fromBytes),
+        },
+      };
+
+/** `Http.Multipart.Part`, both constructors' fields. */
+interface FlickPart {
+  readonly _tag: string;
+  readonly _0: {
+    readonly key: string;
+    readonly contentType: string;
+    readonly value?: string;
+    readonly name?: string;
+    readonly content?: Stream.Stream<ReadonlyArray<number>, unknown>;
+  };
+}
+
+/**
+ * The Effect part of a Flick one, for `toPersisted`, which reads only its
+ * tag, key, value, name and content.
+ */
+const effectPart = (part: FlickPart): Multipart.Part => {
+  const p = part._0;
+  const base = { [Multipart.TypeId]: Multipart.TypeId, key: p.key, contentType: p.contentType };
+  const content = Stream.mapError(Stream.map(p.content ?? Stream.empty, toBytes), effectError);
+  const made =
+    part._tag === FIELD
+      ? { ...base, _tag: "Field", value: p.value ?? "" }
+      : { ...base, _tag: "File", name: p.name ?? "", content, contentEffect: Stream.mkUint8Array(content) };
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the fields `toPersisted` reads; Effect's part classes are not exported
+  return made as unknown as Multipart.Part;
+};
+
+export const flickParts = (request: Request.HttpServerRequest) =>
+  Stream.map(Stream.mapError(request.multipartStream, flickError), flickPart);
+
+type NonEmpty<A> = readonly [A, ...Array<A>];
+
+export const flickMakeChannel = (headers: ReadonlyArray<readonly [string, string]>) =>
+  Channel.map(
+    Channel.mapError(
+      Channel.mapInput(Multipart.makeChannel(Object.fromEntries(headers)), (chunk: NonEmpty<ReadonlyArray<number>>) =>
+        Effect.succeed(Arr.map(chunk, toBytes)),
+      ),
+      flickError,
+    ),
+    (parts) => parts.map(flickPart),
+  );
+
+export const flickToPersisted = (parts: Stream.Stream<FlickPart, unknown>) =>
+  Multipart.toPersisted(Stream.mapError(Stream.map(parts, effectPart), effectError)).pipe(
+    Effect.mapError(flickError),
+    Effect.provide(NodeServices.layer),
+  );

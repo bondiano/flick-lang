@@ -6,6 +6,8 @@
 /// `openapi` writes the API as strict OpenAPI 3.1.
 module HttpApi exposing (..)
 
+import Stream.Core exposing (Stream)
+
 type Method = Get | Post | Put | Patch | Delete | Head | Options | Query
   deriving Eq, Show
 
@@ -285,3 +287,82 @@ foreign pure url from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiUrl"
 openapi : Api gs -> Result Codec.ExportError String
 foreign pure openapi from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiOpenApi"
   reviewed "effect@4.0.5 sha256:38e741b3195d9f08"
+
+/// The body as bytes, `application/octet-stream`.
+with_bytes_payload :
+  forall l p q h b r e s. Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h (List Number) ->{r; e} s)
+foreign pure with_bytes_payload from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithBytesPayload"
+  reviewed "effect@4.0.5 sha256:f68406c2b4703e1e"
+
+/// The body as a `multipart/form-data` form, decoded as
+/// `Http.Multipart.schema_persisted` decodes; its files are removed after
+/// the request. A client sends the text fields of the encoded record.
+with_multipart_payload :
+  forall l p q h b r e s b2.
+  PureCodec Json b2 -> Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h b2 ->{r; e} s)
+foreign pure with_multipart_payload from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithMultipartPayload"
+  arity 2
+  reviewed "effect@4.0.5 sha256:f777c853d129da86"
+
+/// The body as the parts of a form, read as the handler streams them; a
+/// client sends the parts of its stream.
+with_multipart_stream_payload :
+  forall l p q h b r e s.
+  Endpoint l (Request p q h b ->{r; e} s) ->
+    Endpoint l (Request p q h (Stream none {Http.Multipart.MultipartError} Http.Multipart.Part) ->{r; e} s)
+foreign pure with_multipart_stream_payload from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithMultipartStreamPayload"
+  reviewed "effect@4.0.5 sha256:007eacb6e7e077d7"
+
+/// The success as bytes, with its status.
+with_bytes_success :
+  forall l p q h b r e s. Number -> Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h b ->{r; e} List Number)
+foreign pure with_bytes_success from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithBytesSuccess"
+  arity 2
+  reviewed "effect@4.0.5 sha256:f68406c2b4703e1e"
+
+/// The success as a stream of bytes, sent as it comes; a client gets the
+/// whole body as one chunk.
+with_stream_success :
+  forall l p q h b r e s.
+  Number -> Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h b ->{r; e} Stream none none (List Number))
+foreign pure with_stream_success from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithStreamSuccess"
+  arity 2
+  reviewed "effect@4.0.5 sha256:98b0f8d5ab912444"
+
+/// The success as Server-Sent Events, each element the JSON data of one; a
+/// client reads the events of the whole body.
+with_sse_success :
+  forall l p q h b r e s a.
+  Number -> PureCodec Json a -> Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h b ->{r; e} Stream none none a)
+foreign pure with_sse_success from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithSseSuccess"
+  arity 3
+  reviewed "effect@4.0.5 sha256:9bcb3390ec1e9755"
+
+/// A Server-Sent Event: its id, name and data.
+type alias SseEvent = { id : Option String; event : String; data : String }
+
+/// The success as Server-Sent Events of the elements.
+with_sse_events_success :
+  forall l p q h b r e s.
+  Number -> Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h b ->{r; e} Stream none none SseEvent)
+foreign pure with_sse_events_success from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithSseEventsSuccess"
+  arity 2
+  reviewed "effect@4.0.5 sha256:9bcb3390ec1e9755"
+
+/// The success with response headers: the handler answers the value and a
+/// record the codec encodes as headers (names in lower case).
+with_success_headers :
+  forall l p q h b r e s hs.
+  PureCodec Json hs -> Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h b ->{r; e} (s, hs))
+foreign pure with_success_headers from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithSuccessHeaders"
+  arity 2
+  reviewed "effect@4.0.5 sha256:478331636310bbe4"
+
+/// The success with the value of the cookie of the security, an `api_key`
+/// `InCookie`, set `Secure` and `HttpOnly`.
+security_set_cookie :
+  forall l p q h b r e s.
+  Security -> Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h b ->{r; e} (s, Redacted String))
+foreign pure security_set_cookie from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiSecuritySetCookie"
+  arity 2
+  reviewed "effect@4.0.5 sha256:f7064c514e82a9c6"

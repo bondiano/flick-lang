@@ -1,11 +1,9 @@
 [language]
 make = "a runtime function body: direct calls build the parts and `++` joins them; a tagged template literal has no Flick form"
+stream = "a stream of the parts: `Stream.from_list` of the texts, `Stream.concat` with streams of text; a tagged template literal has no Flick form"
 
 [excluded]
 Interpolated = "TS-only: the JS values a tagged template accepts, a type-level union"
 InterpolatedWithStream = "TS-only: the JS values a tagged template accepts, a type-level union"
 Primitive = "TS-only: the JS primitive values a tagged template accepts"
 PrimitiveValue = "TS-only: the JS primitive values a tagged template accepts"
-
-[pending]
-stream = "M20"

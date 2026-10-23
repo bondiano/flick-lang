@@ -1,10 +1,12 @@
 // Effect's `HttpBody` for the bindings of the standard library: bytes as
 // lists of numbers, and `HttpBodyError` as the Flick error `Http.Body.HttpBodyError`.
-import { Effect, Option, SchemaIssue } from "effect";
+import { Effect, FileSystem, Option, SchemaIssue, Stream } from "effect";
 import * as HttpBody from "effect/http/HttpBody";
 
 import { type AnySchema, codecEncode } from "../../schema/index.ts";
 import { tag } from "../../tags.ts";
+import { effectFileSystem, effectInfo, type info } from "../FileSystem.ts";
+import { mapError as platformError } from "../PlatformError.ts";
 import { toBytes } from "./convert.ts";
 
 export * from "effect/http/HttpBody";
@@ -56,3 +58,35 @@ export const flickContentLength = (body: HttpBody.HttpBody): Option.Option<numbe
 /** The text of a body of bytes. */
 export const flickToText = (body: HttpBody.HttpBody): Option.Option<string> =>
   body._tag === "Uint8Array" ? Option.some(body.text ?? new TextDecoder().decode(body.body)) : Option.none();
+
+/** `Http.Body.stream chunks contentType contentLength`. */
+export const flickStream = (
+  chunks: Stream.Stream<ReadonlyArray<number>, unknown>,
+  contentType: Option.Option<string>,
+  contentLength: Option.Option<number>,
+) => HttpBody.stream(Stream.map(chunks, toBytes), Option.getOrUndefined(contentType), Option.getOrUndefined(contentLength));
+
+/** `Http.Body.FileOptions`. */
+export interface FileOptions {
+  readonly offset: Option.Option<bigint>;
+  readonly bytesToRead: Option.Option<bigint>;
+  readonly chunkSize: Option.Option<number>;
+  readonly contentType: Option.Option<string>;
+}
+
+/** `Http.Body.file_from_info options path info`, read through the `open` of the Flick file system. */
+export const flickFileFromInfo = (o: FileOptions, path: string, i: ReturnType<typeof info>) =>
+  Effect.flatMap(effectFileSystem, (fs) =>
+    platformError(
+      Effect.provideService(
+        HttpBody.fileFromInfo(path, effectInfo(i), {
+          offset: Option.getOrUndefined(o.offset),
+          bytesToRead: Option.getOrUndefined(o.bytesToRead),
+          chunkSize: Option.getOrUndefined(o.chunkSize),
+          contentType: Option.getOrUndefined(o.contentType),
+        }),
+        FileSystem.FileSystem,
+        FileSystem.make(fs),
+      ),
+    ),
+  );

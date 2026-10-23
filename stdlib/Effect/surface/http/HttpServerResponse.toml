@@ -21,11 +21,15 @@ setCookies = "Http.ServerResponse.set_cookies b33857d0d0581c83"
 setHeader = "Http.ServerResponse.set_header 72c076c80ebf641f"
 setHeaders = "Http.ServerResponse.set_headers e7d86ae76b30fa68"
 setStatus = "Http.ServerResponse.set_status 5c2196d52716a656"
+stream = "Http.ServerResponse.stream 261a610a1e39cd04"
 text = "Http.ServerResponse.text 8f7360a508f1bd5f"
 toClientResponse = "Http.ServerResponse.to_client_response c74fb88476778652"
 uint8Array = "Http.ServerResponse.uint8_array c3153f9d552b4137"
 updateCookies = "Http.ServerResponse.update_cookies 134de5d5be1a5778"
 urlParams = "Http.ServerResponse.url_params 987fcbd97fa0f366"
+
+[language]
+htmlStream = "`Http.ServerResponse.stream` of `Stream.Platform.encode_text` of the stream of the markup, with `contentType = Some \"text/html\"`; a tagged template literal has no Flick form"
 
 [excluded]
 expireCookieUnsafe = "invariant: `*Unsafe` throws on an invalid cookie; `expire_cookie` fails with `CookiesError`"
@@ -37,7 +41,3 @@ raw = "invariant: a body of any JS value the platform writes as is would erase t
 setCookieUnsafe = "invariant: `*Unsafe` throws on an invalid cookie; `set_cookie` fails with `CookiesError`"
 setCookiesUnsafe = "invariant: `*Unsafe` throws on an invalid cookie; `set_cookies` fails with `CookiesError`"
 toWeb = "TS-only: converts to a Fetch API `Response` object for JS code"
-
-[pending]
-htmlStream = "M20"
-stream = "M20"
