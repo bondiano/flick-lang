@@ -1,0 +1,18 @@
+---
+source: flick-core/src/ffi/tests.rs
+expression: generated.report(&lookup_surface())
+---
+lookup-lib@1.0.0 (lookup-lib/index.d.ts)
+  supported    lookup — String ->{; JsError} Option String
+  supported    next_id — Unit ->{} Number
+  supported    parse_1 — String ->{} Number
+  supported    parse_2 — String -> Number ->{} Number
+  unsupported  to_date — parameter `value`: the union `string | number` has no single Flick type; pick one member in a reviewed binding
+  supported    describe — JsValue ->{} String
+                 note: optional parameter `options: { depth?: number }` is left out
+  supported    each — forall t. List t -> (t -> Unit) ->{} Unit
+  unsupported  make — type parameter `T` appears in no parameter, so nothing ties it to a value
+  supported    join — String -> List String ->{} String
+  unsupported  client — a class: its constructor and methods are bound by hand; functions see its instances as an opaque type
+  unsupported  version — a value, not a function: bind it by hand
+7 supported, 0 need a policy, 4 unsupported

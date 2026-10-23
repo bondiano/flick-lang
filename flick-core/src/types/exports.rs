@@ -79,6 +79,7 @@ impl Checker<'_> {
                         parent: None,
                         scheme: None,
                         definition: None,
+                        blocked: None,
                     });
                 }
             }

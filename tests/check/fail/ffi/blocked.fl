@@ -1,0 +1,14 @@
+module App.Blocked exposing (..)
+
+next_id : Unit ->{} Number
+foreign sync next_id from "lib" "nextId"
+  arity 0
+  reviewed "lib@1.0.0 sha256:00"
+
+foreign blocked lookup "needs policy: returns a Promise"
+
+use : Unit ->{} Number
+let use u =
+  let found = lookup "a"
+//            ^^^^^^ FLICK-F005 `lookup` is blocked: needs policy: returns a Promise
+  next_id ()

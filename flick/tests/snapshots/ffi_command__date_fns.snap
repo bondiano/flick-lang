@@ -1,0 +1,17 @@
+---
+source: flick/tests/ffi_command.rs
+expression: "corpus(\"date-fns\",\n\"isValid,secondsToHours,millisecondsToSeconds,format,addDays,closestIndexTo,intervalToDuration,isLeapYear,setDefaultOptions,getDefaultOptions,daysInWeek\")"
+---
+date-fns@4.4.0 (date-fns/index.d.ts)
+  unsupported  add_days — parameter `date`: the union `string | number | DateType` has no single Flick type; pick one member in a reviewed binding
+  unsupported  closest_index_to — parameter `dateToCompare`: the union `string | number | Date` has no single Flick type; pick one member in a reviewed binding
+  unsupported  format — parameter `date`: the union `string | number | Date` has no single Flick type; pick one member in a reviewed binding
+  unsupported  get_default_options — `DefaultOptions` is outside the supported subset
+  unsupported  interval_to_duration — parameter `interval`: `Interval<DateArg<Date>, DateArg<Date>>` is outside the supported subset
+  unsupported  is_leap_year — parameter `date`: the union `string | number | Date` has no single Flick type; pick one member in a reviewed binding
+  supported    is_valid — JsValue ->{} Bool
+  supported    milliseconds_to_seconds — Number ->{} Number
+  supported    seconds_to_hours — Number ->{} Number
+  unsupported  set_default_options — parameter `options`: `DefaultOptions` is outside the supported subset
+  missing      daysInWeek — not exported by the package
+3 supported, 0 need a policy, 7 unsupported

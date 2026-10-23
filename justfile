@@ -23,7 +23,7 @@ e2e:
     pnpm -r typecheck
     pnpm -r lint
     pnpm -r test
-    cargo test -p flick --test e2e --test e2e_numbers --test test_command --test dts_command --test build_command -- --ignored
+    cargo test -p flick --test e2e --test e2e_numbers --test test_command --test dts_command --test build_command --test ffi_command -- --ignored
     cargo test -p flick-core --test consteval_node -- --ignored
 
 # Mutation-fuzz the parser (the nightly CI job runs 1 000 000 inputs)

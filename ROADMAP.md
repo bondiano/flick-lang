@@ -776,23 +776,29 @@ d.ts», «Диагностика и обновление пакетов»; CLI `
   overrides хранятся раздельно; provenance и версия зависимости в контракте.
 - `ffi check`: fingerprints, совместимость overrides после обновления, обязательные policies.
 
-**Артефакты.** `tools/dts-importer/`, `flick-core::ffi::import`, `flick ffi …`.
+**Артефакты.** `tools/dts-importer/` (Node helper на `typescript` 5.9, JSON по
+stdio, sha256-fingerprint каждого export), `flick-core::ffi::{import, check}`,
+`flick ffi import` / `flick ffi check`, `foreign blocked name "reason"`
+(`FLICK-F005` при использовании, `Decl::Blocked` в `.iface`), metadata
+`reviewed`, модуль `JsError`, policies в `<out>/<Pkg>/policy.toml`, справка —
+`docs/reference/ffi.md`. Binding `lookup` из §8 получает ещё строку
+`nullable`: в ABI `Option` — значение Effect, а не `undefined`.
 
 **AC**
 
-- [ ] `lookup` из §8 с политикой `undefined -> None` и rejection → `JsError`
+- [x] `lookup` из §8 с политикой `undefined -> None` и rejection → `JsError`
       импортируется ровно в показанный binding.
-- [ ] `nextId(): number` импортируется как `Unit ->{} Number`, не pure.
-- [ ] Отчёт покрытия перечисляет каждый выбранный export со статусом и причиной;
+- [x] `nextId(): number` импортируется как `Unit ->{} Number`, не pure.
+- [x] Отчёт покрытия перечисляет каждый выбранный export со статусом и причиной;
       нет неявного `any`, pure или cancellation (§13).
-- [ ] Blocked export: использование — ошибка; независимые supported exports того
+- [x] Blocked export: использование — ошибка; независимые supported exports того
       же пакета доступны.
-- [ ] Повторный `ffi import` после обновления пакета не перезаписывает reviewed
+- [x] Повторный `ffi import` после обновления пакета не перезаписывает reviewed
       overrides (§13).
-- [ ] `ffi check` падает, если shape декларации изменился несовместимо с override
+- [x] `ffi check` падает, если shape декларации изменился несовместимо с override
       или отсутствует обязательная policy.
-- [ ] `--select <names>` ограничивает поверхность импорта.
-- [ ] Корпус из ≥3 реальных пакетов (например, `date-fns` и два пакета с
+- [x] `--select <names>` ограничивает поверхность импорта.
+- [x] Корпус из ≥3 реальных пакетов (например, `date-fns` и два пакета с
       Promise/callback API) импортируется с ожидаемым snapshot-отчётом.
 
 ---

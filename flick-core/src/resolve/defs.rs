@@ -8,6 +8,7 @@ use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::literal::string_value;
 
 #[derive(Debug, Clone)]
 pub(super) struct Def {
@@ -19,6 +20,8 @@ pub(super) struct Def {
     pub decl: Decl,
     /// A signature; pairing with its definition is checked later.
     pub signature: bool,
+    /// Why a `foreign blocked` value cannot be used.
+    pub blocked: Option<String>,
 }
 
 pub(super) fn collect(tree: &Node, text: &str, file: FileId) -> Vec<Def> {
@@ -38,17 +41,14 @@ fn declaration(decl: &Node, text: &str, file: FileId, defs: &mut Vec<Def>) {
         parent: parent.map(str::to_owned),
         decl,
         signature: decl_node.kind == K::Signature,
+        blocked: None,
     };
     let first = |kind: K| decl.child_tokens().find(|t| t.kind == kind);
     match decl.kind {
         K::Signature => {
             defs.extend(first(K::Ident).map(|t| def(Namespace::Value, t, None, Decl::Let)));
         }
-        K::ForeignDecl => {
-            // `foreign <mode> <name> …`
-            let name = decl.child_tokens().filter(|t| t.kind == K::Ident).nth(1);
-            defs.extend(name.map(|t| def(Namespace::Value, t, None, Decl::Foreign)));
-        }
+        K::ForeignDecl => defs.extend(foreign(decl, text, def)),
         K::LetDecl => {
             let mut names = Vec::new();
             match decl.nodes().next() {
@@ -120,6 +120,30 @@ fn declaration(decl: &Node, text: &str, file: FileId, defs: &mut Vec<Def>) {
         }
         _ => {}
     }
+}
+
+/// `foreign <mode> <name> …`; `foreign blocked <name> "<reason>"`.
+fn foreign(
+    decl: &Node,
+    text: &str,
+    def: impl Fn(Namespace, Token, Option<&str>, Decl) -> Def,
+) -> Option<Def> {
+    let mut words = decl.child_tokens().filter(|t| t.kind == K::Ident);
+    let blocked = words.next().is_some_and(|m| m.text(text) == "blocked");
+    let def = def(Namespace::Value, words.next()?, None, Decl::Foreign);
+    if !blocked {
+        return Some(def);
+    }
+    let reason = decl.child_tokens().find(|t| t.kind == K::String);
+    Some(Def {
+        decl: Decl::Blocked,
+        blocked: Some(
+            reason
+                .map(|t| string_value(t.text(text)))
+                .unwrap_or_default(),
+        ),
+        ..def
+    })
 }
 
 /// Names a pattern binds, in source order.

@@ -2,9 +2,9 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use crate::args::{CommandArguments, Commands};
+use crate::args::{CommandArguments, Commands, FfiCommands};
 use crate::command::run_command;
-use crate::commands::{BuildCommand, CheckCommand, FmtCommand};
+use crate::commands::{BuildCommand, CheckCommand, FfiCheckCommand, FfiImportCommand, FmtCommand};
 
 mod args;
 mod command;
@@ -25,5 +25,13 @@ fn main() -> ExitCode {
         ),
         Commands::Fmt(options) => run_command(&FmtCommand::new(options), &args.global),
         Commands::Test(options) => commands::test(&options, &args.global),
+        Commands::Ffi(FfiCommands::Import(options)) => run_command(
+            &FfiImportCommand::new(options, args.global.project.clone()),
+            &args.global,
+        ),
+        Commands::Ffi(FfiCommands::Check(options)) => run_command(
+            &FfiCheckCommand::new(options, args.global.project.clone()),
+            &args.global,
+        ),
     }
 }

@@ -1,0 +1,9 @@
+---
+source: flick/tests/ffi_command.rs
+expression: "corpus(\"get-port\", \"default,portNumbers,clearLockedPorts\")"
+---
+get-port@7.2.0 (get-port/index.d.ts)
+  supported    clear_locked_ports — Unit ->{} Unit
+  needs policy get_port — it returns a Promise: say what a rejection becomes (`catch = "JsError"`)
+  unsupported  port_numbers — `Iterable<number>` is outside the supported subset
+1 supported, 1 need a policy, 1 unsupported

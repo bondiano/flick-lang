@@ -118,7 +118,11 @@ impl<'a> Checker<'a> {
                         .map(|j| decls[j])
                         .filter(|s| s.kind == K::Signature && self.pairs(s, decl))
                         .or_else(|| self.misplaced(decls, decl));
-                    if sig.is_none() {
+                    let blocked = decl
+                        .child_tokens()
+                        .find(|t| t.kind == K::Ident)
+                        .is_some_and(|t| t.text(self.text) == "blocked");
+                    if sig.is_none() && !blocked {
                         let name = foreign_name(decl, self.text).unwrap_or_default();
                         self.error(
                             codes::T004,

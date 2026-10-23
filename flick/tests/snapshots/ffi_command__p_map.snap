@@ -1,0 +1,9 @@
+---
+source: flick/tests/ffi_command.rs
+expression: "corpus(\"p-map\", \"default,pMapIterable,pMapSkip\")"
+---
+p-map@7.1.1 (p-map/index.d.ts)
+  unsupported  p_map — parameter `input`: the union `AsyncIterable<Element | Promise<Element>> | Iterable<Element | Promise<Element>>` has no single Flick type; pick one member in a reviewed binding
+  unsupported  p_map_iterable — parameter `input`: the union `AsyncIterable<Element | Promise<Element>> | Iterable<Element | Promise<Element>>` has no single Flick type; pick one member in a reviewed binding
+  unsupported  p_map_skip — a value, not a function: bind it by hand
+0 supported, 0 need a policy, 3 unsupported

@@ -126,6 +126,10 @@ impl Checker<'_> {
                     )),
                 },
                 "this" => info.this = true,
+                "reviewed" if !word(0).is_some_and(|w| w.starts_with('"')) => self.bad_meta(
+                    item,
+                    "`reviewed` takes the package and fingerprint the binding was checked against, as a string",
+                ),
                 "nullable" => info.result.nullable = true,
                 "variadic" => info.variadic = true,
                 "optional" => match number(0) {

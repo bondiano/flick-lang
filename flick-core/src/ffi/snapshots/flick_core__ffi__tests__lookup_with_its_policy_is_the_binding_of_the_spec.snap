@@ -1,0 +1,62 @@
+---
+source: flick-core/src/ffi/tests.rs
+expression: generated.text
+---
+// flick ffi import lookup-lib
+// Generated from lookup-lib/index.d.ts of lookup-lib@1.0.0: do not edit.
+// Reviewed bindings go in a module of your own, which a new import
+// never touches.
+module Ffi.LookupLib.Generated exposing (..)
+
+import JsError exposing (JsError)
+
+/// lookup-lib@1.0.0 sha256:aa
+lookup : String ->{; JsError} Option String
+foreign async lookup from "lookup-lib" "lookup"
+  arity 1
+  catch JsError.from_js
+  nullable
+
+/// lookup-lib@1.0.0 sha256:bb
+next_id : Unit ->{} Number
+foreign sync next_id from "lookup-lib" "nextId"
+  arity 0
+
+/// lookup-lib@1.0.0 sha256:cc
+parse_1 : String ->{} Number
+foreign sync parse_1 from "lookup-lib" "parse"
+  arity 1
+
+/// lookup-lib@1.0.0 sha256:cc
+parse_2 : String -> Number ->{} Number
+foreign sync parse_2 from "lookup-lib" "parse"
+  arity 2
+
+/// lookup-lib@1.0.0 sha256:dd
+foreign blocked to_date "unsupported: parameter `value`: the union `string | number` has no single Flick type; pick one member in a reviewed binding"
+
+/// lookup-lib@1.0.0 sha256:ee
+describe : JsValue ->{} String
+foreign sync describe from "lookup-lib" "describe"
+  arity 1
+
+/// lookup-lib@1.0.0 sha256:ff
+each : forall t. List t -> (t -> Unit) ->{} Unit
+foreign sync each from "lookup-lib" "each"
+  arity 2
+  retention call
+
+/// lookup-lib@1.0.0 sha256:gg
+foreign blocked make "unsupported: type parameter `T` appears in no parameter, so nothing ties it to a value"
+
+/// lookup-lib@1.0.0 sha256:hh
+join : String -> List String ->{} String
+foreign sync join from "lookup-lib" "join"
+  arity 2
+  variadic
+
+/// lookup-lib@1.0.0 sha256:ii
+foreign blocked client "unsupported: a class: its constructor and methods are bound by hand; functions see its instances as an opaque type"
+
+/// lookup-lib@1.0.0 sha256:jj
+foreign blocked version "unsupported: a value, not a function: bind it by hand"

@@ -11,6 +11,7 @@ Commands:
   build  Compile the project, or the given files, to ES modules
   fmt    Format Flick source files in place
   test   Run the tests of the project's test root
+  ffi    Bindings to npm packages from their `.d.ts`
   help   Print this message or the help of the given subcommand(s)
 
 Options:

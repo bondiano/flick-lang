@@ -1,0 +1,15 @@
+/// A failure of foreign code as data: what the thrown JS value says, never
+/// the value itself.
+module JsError exposing (JsError(..), from_js)
+
+type error JsError = JsError { message : String }
+  deriving Eq, Show
+
+/// The error a JS exception or rejection maps to, for `catch
+/// JsError.from_js`: `name: message` of an `Error`, a thrown string as it
+/// is, the tag of any other value. It never runs a getter of the value.
+from_js : JsValue -> JsError
+let from_js value = JsError { message = describe value }
+
+describe : JsValue -> String
+foreign pure describe from "@flick-lang/runtime" "jsErrorMessage"

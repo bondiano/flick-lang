@@ -292,6 +292,7 @@ impl<'a> Scope<'a> {
             parent: def.parent.clone(),
             scheme: None,
             definition: None,
+            blocked: def.blocked.clone(),
         }
     }
 
@@ -360,6 +361,15 @@ impl<'a> Scope<'a> {
             name,
             span,
         } = reference;
+        if let Some(reason) = self.blocked(reference) {
+            diagnostics.push(
+                Diagnostic::error(codes::F005, format!("`{name}` is blocked: {reason}"), *span)
+                    .with_fix(
+                        "write a reviewed `foreign` binding for it beside the generated module",
+                        Vec::new(),
+                    ),
+            );
+        }
         if let Some(qualifier) = qualifier {
             let interface = self
                 .imports
@@ -407,6 +417,40 @@ impl<'a> Scope<'a> {
                 ),
             );
         }
+    }
+}
+
+impl Scope<'_> {
+    /// Why the value a reference names is a `foreign blocked` one, if it is.
+    fn blocked(&self, reference: &Reference) -> Option<&str> {
+        if reference.namespace != Namespace::Value {
+            return None;
+        }
+        let name = &reference.name;
+        if let Some(qualifier) = &reference.qualifier {
+            return self
+                .imports
+                .iter()
+                .filter(|(import, _)| import.qualifier() == qualifier)
+                .find_map(|(_, interface)| interface.as_ref())?
+                .find(Namespace::Value, name)?
+                .blocked
+                .as_deref();
+        }
+        if let Some(def) = self
+            .defs
+            .iter()
+            .find(|d| d.namespace == Namespace::Value && &d.name == name)
+        {
+            return def.blocked.as_deref();
+        }
+        if let Some(bindings) = self.explicit.get(&(Namespace::Value, name.clone())) {
+            return bindings
+                .iter()
+                .find_map(|(export, _, _)| export.as_ref()?.blocked.as_deref());
+        }
+        self.open(Namespace::Value, name)
+            .find_map(|(export, _)| export.blocked.as_deref())
     }
 }
 

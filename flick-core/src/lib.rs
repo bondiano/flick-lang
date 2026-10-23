@@ -9,6 +9,7 @@ pub mod build;
 pub mod codegen;
 pub mod consteval;
 pub mod diagnostics;
+pub mod ffi;
 pub mod fmt;
 pub mod iface;
 pub mod ir;

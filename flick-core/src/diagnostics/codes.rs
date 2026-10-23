@@ -167,6 +167,10 @@ codes! {
     F002 = Ffi 2, "foreign parameter may hold a scope without a retention contract";
     F003 = Ffi 3, "catch mapping does not make an error of the signature";
     F004 = Ffi 4, "export has no TypeScript form";
+    F005 = Ffi 5, "use of a blocked foreign import";
+    F006 = Ffi 6, "generated bindings are out of date";
+    F007 = Ffi 7, "reviewed binding does not match its declaration";
+    F008 = Ffi 8, "cannot import the declarations of a package";
     D001 = Schema 1, "type has no Schema witness";
     D002 = Schema 2, "codec misses a field";
     D003 = Schema 3, "codec gives a field twice";

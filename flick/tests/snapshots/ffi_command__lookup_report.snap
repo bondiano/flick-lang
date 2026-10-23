@@ -1,0 +1,10 @@
+---
+source: flick/tests/ffi_command.rs
+expression: text(&out.stdout)
+---
+lookup-lib@1.0.0 (lookup-lib/index.d.ts)
+  supported    each — forall t. List t -> (t -> Unit) ->{} Unit
+  supported    lookup — String ->{; JsError} Option String
+  supported    next_id — Unit ->{} Number
+  unsupported  to_date — parameter `value`: the union `string | number` has no single Flick type; pick one member in a reviewed binding
+3 supported, 0 need a policy, 1 unsupported

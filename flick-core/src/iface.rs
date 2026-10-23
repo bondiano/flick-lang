@@ -37,6 +37,8 @@ pub enum Decl {
     /// `let`, or a signature whose definition is checked later
     Let,
     Foreign,
+    /// `foreign blocked name "reason"`: an import that cannot be used
+    Blocked,
     /// a method signature of a class
     Method,
     /// `type T = A | B`
@@ -79,6 +81,9 @@ pub struct Export {
     /// Kind and definition of a type, service, class or kind.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub definition: Option<TypeDef>,
+    /// Why a `foreign blocked` value cannot be used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blocked: Option<String>,
 }
 
 /// A constructor of an exported type that is itself not exported; kept only

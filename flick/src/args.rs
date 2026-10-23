@@ -24,6 +24,39 @@ pub enum Commands {
     Fmt(FmtArguments),
     /// Run the tests of the project's test root.
     Test(TestArguments),
+    /// Bindings to npm packages from their `.d.ts`.
+    #[command(subcommand)]
+    Ffi(FfiCommands),
+}
+
+#[derive(Subcommand)]
+pub enum FfiCommands {
+    /// Read the `.d.ts` of an installed package and write
+    /// `<out>/<Pkg>/Generated.fl` with a coverage report.
+    Import(FfiImportArguments),
+    /// Check generated bindings, reviewed bindings and their policies
+    /// against the installed packages.
+    Check(FfiCheckArguments),
+}
+
+#[derive(Args)]
+pub struct FfiImportArguments {
+    /// The npm package, installed in the project.
+    pub package: String,
+
+    /// Directory that gets `<Pkg>/Generated.fl`.
+    #[arg(long, value_name = "DIR")]
+    pub out: String,
+
+    /// Import only these exports.
+    #[arg(long, value_name = "NAMES", value_delimiter = ',')]
+    pub select: Option<Vec<String>>,
+}
+
+#[derive(Args)]
+pub struct FfiCheckArguments {
+    /// Files or directories to check; by default the project's source root.
+    pub paths: Vec<String>,
 }
 
 #[derive(Args)]

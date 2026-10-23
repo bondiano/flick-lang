@@ -1,0 +1,10 @@
+---
+source: flick/tests/ffi_command.rs
+expression: "corpus(\"delay\", \"default,rangeDelay,clearDelay,createDelay\")"
+---
+delay@7.0.0 (delay/index.d.ts)
+  unsupported  clear_delay — parameter `delayPromise`: `Promise<unknown>` inside another type; only a returned Promise is awaited
+  unsupported  create_delay — parameter `timers`: the object type `{ clearTimeout: (timeoutId: any) => void; setTimeout: (callback: (...args: any[]) => void, milliseconds: number, ...args: any[]) => unknown; }` needs a checked adapter
+  unsupported  delay — type parameter `T` appears in no parameter, so nothing ties it to a value
+  unsupported  range_delay — type parameter `T` appears in no parameter, so nothing ties it to a value
+0 supported, 0 need a policy, 4 unsupported

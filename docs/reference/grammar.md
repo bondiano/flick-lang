@@ -45,9 +45,11 @@ sql ui cli in when do
 
 Contextual words are ordinary names everywhere except in one position:
 
-- foreign modes `pure`, `sync`, `async`, `effect` and the source `global`;
+- foreign modes `pure`, `sync`, `async`, `effect`, `blocked` and the source
+  `global`;
 - foreign metadata `arity`, `this`, `catch`, `cancel`, `nullable`,
-  `retention`, `optional`, `variadic` (unknown metadata is `FLICK-S011`);
+  `retention`, `optional`, `variadic`, `reviewed` (unknown metadata is
+  `FLICK-S011`);
 - SQL clause words inside `sql { … }`: `join`, `left_join`, `on`, `group_by`,
   `having`, `order_by`, `limit`, `offset`, `select`, `union`, `union_all`,
   `insert_into`, `values`, `update`, `set`, `delete_from`, `returning` (plus the
@@ -231,6 +233,7 @@ fundep      = { name } "->" { name }
 instance    = "instance" [context "=>"] type ["=" members]
 members     = block of: signature | let | type_decl
 foreign     = "foreign" mode name "from" ("global" String | String String) [metadata]
+            | "foreign" "blocked" name String
 mode        = "pure" | "sync" | "async" | "effect"
 metadata    = indented lines: meta_name { atom }
 ```

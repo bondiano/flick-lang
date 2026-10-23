@@ -382,8 +382,8 @@ fn instance_decl(p: &mut Parser) {
     p.complete(m, K::InstanceDecl);
 }
 
-const FOREIGN_MODES: [&str; 4] = ["pure", "sync", "async", "effect"];
-const FOREIGN_META: [&str; 8] = [
+const FOREIGN_MODES: [&str; 5] = ["pure", "sync", "async", "effect", "blocked"];
+const FOREIGN_META: [&str; 9] = [
     "arity",
     "this",
     "catch",
@@ -392,20 +392,28 @@ const FOREIGN_META: [&str; 8] = [
     "retention",
     "optional",
     "variadic",
+    "reviewed",
 ];
 
-/// `foreign mode name from (global "path" | "module" "export")` + metadata lines.
+/// `foreign mode name from (global "path" | "module" "export")` + metadata
+/// lines, or `foreign blocked name "reason"`.
 fn foreign_decl(p: &mut Parser) {
     let m = p.start();
     p.bump();
-    if !(p.at(K::Ident) && FOREIGN_MODES.contains(&p.text_of(p.raw()))) {
-        p.error_expected("a foreign mode: `pure`, `sync`, `async` or `effect`");
+    let mode = p.at(K::Ident).then(|| p.text_of(p.raw()));
+    if !mode.is_some_and(|w| FOREIGN_MODES.contains(&w)) {
+        p.error_expected("a foreign mode: `pure`, `sync`, `async`, `effect` or `blocked`");
     }
     // an unknown mode word still takes the mode position
     if p.at(K::Ident) && p.nth(1) == K::Ident {
         p.bump();
     }
     p.expect(K::Ident);
+    if mode == Some("blocked") {
+        p.expect(K::String);
+        p.complete(m, K::ForeignDecl);
+        return;
+    }
     let source = p.start();
     if p.expect(K::FromKw) {
         if p.at_word("global") {
