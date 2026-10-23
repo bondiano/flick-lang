@@ -1,0 +1,22 @@
+// A command whose handler holds a file of a scope cannot leave that scope.
+module App.Captures exposing (leak)
+
+type File (s : Region)
+
+open_file : forall s. String ->{Scope s;} File s
+foreign effect open_file from "./files.js" "open"
+  retention call
+
+read_file : forall s. File s ->{} String
+foreign sync read_file from "./files.js" "read"
+  retention call
+
+leak : Unit ->{} Cli.Command none none
+let leak () =
+  scope {
+    let file = open_file "config"
+    cli "show" {
+      handle fun {} -> Platform.stdout_line (read_file file)
+    }
+  }
+//~ FLICK-G001 @18:5-20:6 holds region `s`

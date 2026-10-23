@@ -1,0 +1,14 @@
+// Invalid input fails `main` with the CLI's text: exit code 1, the handler never runs.
+module App.Main exposing (main)
+
+count : Cli.Command none none
+let count =
+  cli "count" {
+    flag times : Number = 1
+    handle fun { times } -> Platform.stdout_line "handler ran"
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try Cli.run count ["--times", "abc"] with
+  | Cli.CliError message -> App.fail message

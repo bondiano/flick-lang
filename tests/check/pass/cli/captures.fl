@@ -1,0 +1,23 @@
+// A command whose handler holds a file of a scope runs inside that scope.
+module App.Scoped exposing (show)
+
+type File (s : Region)
+
+open_file : forall s. String ->{Scope s;} File s
+foreign effect open_file from "./files.js" "open"
+  retention call
+
+read_file : forall s. File s ->{} String
+foreign sync read_file from "./files.js" "read"
+  retention call
+
+show : List String ->{; Cli.CliError} Unit
+let show args =
+  scope {
+    let file = open_file "config"
+    let command =
+      cli "show" {
+        handle fun {} -> Platform.stdout_line (read_file file)
+      }
+    Cli.run command args
+  }

@@ -1,7 +1,8 @@
 /// Command-line applications on Effect's CLI: a `Command r e` is a pure
 /// description of flags, positional arguments, subcommands and a handler
 /// that needs `r` and fails with `e`. `cli "name" { … }` is sugar for the
-/// combinators below; both build the same value.
+/// combinators below; both build the same value. `Cli.run` parses the
+/// arguments and only then runs the handler.
 module Cli exposing (..)
 
 /// A command ready to run.
@@ -80,37 +81,65 @@ foreign pure some from "@flick-lang/runtime/cli" "multiSome"
 command : String -> Spec none none {}
 foreign pure command from "@flick-lang/runtime/cli" "specCommand"
 
-/// The help text of the command.
-description : String -> Spec r e o -> Spec r e o
+/// The help text of the command. Like every combinator here, it keeps the
+/// captures `c` of what it is given, so a command whose handler holds a
+/// resource of a scope cannot leave that scope.
+description : forall c r e o. String -> ((Spec r e o)^c -> (Spec r e o)^c)^c
 foreign pure description from "@flick-lang/runtime/cli" "specDescription"
   arity 2
+  retention call
 
 /// The flag `--<label>` (underscores become dashes), with more names
 /// (`"n"` is `-n`), its help text and how its values make field `l`.
 flag :
+  forall c a l o t out r e.
   (Value a, Record.Lacks l o, Record.UnionDisjoint o (Record.Field l t) out) =>
-  Record.Label l -> List String -> String -> Multi a t -> Spec r e o -> Spec r e out
+  Record.Label l -> List String -> String -> Multi a t -> ((Spec r e o)^c -> (Spec r e out)^c)^c
 foreign pure flag from "@flick-lang/runtime/cli" "specFlag"
   arity 5
+  retention call
 
 /// The next positional argument, with its help text.
 arg :
+  forall c a l o t out r e.
   (Value a, Record.Lacks l o, Record.UnionDisjoint o (Record.Field l t) out) =>
-  Record.Label l -> String -> Multi a t -> Spec r e o -> Spec r e out
+  Record.Label l -> String -> Multi a t -> ((Spec r e o)^c -> (Spec r e out)^c)^c
 foreign pure arg from "@flick-lang/runtime/cli" "specArg"
   arity 4
+  retention call
 
 /// A nested command, with its help text.
-subcommand : Command r2 e2 -> String -> Spec r e o -> Spec (r + r2) (e + e2) o
+subcommand :
+  forall c r e o r2 e2.
+  (Command r2 e2)^c -> String -> ((Spec r e o)^c -> (Spec (r + r2) (e + e2) o)^c)^c
 foreign pure subcommand from "@flick-lang/runtime/cli" "specSubcommand"
   arity 3
+  retention call
 
 /// The command, running `handler` with the parsed options.
-handle : (o ->{r2; e2} Unit) -> Spec r e o -> Command (r + r2) (e + e2)
+handle :
+  forall c r e o r2 e2.
+  (o ->{r2; e2} Unit)^c -> ((Spec r e o)^c -> (Command (r + r2) (e + e2))^c)^c
 foreign pure handle from "@flick-lang/runtime/cli" "specHandle"
   arity 2
+  retention call
 
 /// The command without a handler of its own: it needs subcommands, and run
 /// without one it prints its help and fails with `CliError`.
-group : Spec r e o -> Command r e
+group : forall c r e o. (Spec r e o)^c -> (Command r e)^c
 foreign pure group from "@flick-lang/runtime/cli" "specGroup"
+  retention call
+
+/// Parses `args` and runs the handler of the command they name, in the
+/// current fiber, after the whole line parsed. `--help`, `--version` (which
+/// prints `version`) and `--completions bash|zsh|fish` print to stdout and
+/// run no handler; invalid input is `CliError` with Effect's text.
+run_version : forall c r e. String -> (Command r e)^c -> (List String ->{r; CliError | e} Unit)^c
+foreign effect run_version from "@flick-lang/runtime/cli" "cliRunVersion"
+  arity 3
+  retention call
+  reviewed "effect@4.0.5 sha256:fe039b878ff7b17a"
+
+/// `run_version "0.0.0"`.
+run : forall c r e. (Command r e)^c -> (List String ->{r; CliError | e} Unit)^c
+let run command args = run_version "0.0.0" command args

@@ -1,0 +1,201 @@
+$ Ada
+Hello, AdaNone
+$ --loud -n 2 --color green-light Bob
+HELLO, BOBSOME GREENLIGHT / HELLO, BOBSOME GREENLIGHT
+$ --times abc Ada
+DESCRIPTION
+  Prints a greeting
+
+USAGE
+  greet [flags] <name>
+
+ARGUMENTS
+  name string    Who to greet
+
+FLAGS
+  --loud                Print in capitals
+  --times, -n string    How many times
+  --color, -c string    The color of the text
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+CliError: Invalid value for flag --times: "abc". Expected: not a number: abc
+$ --color blue Ada
+DESCRIPTION
+  Prints a greeting
+
+USAGE
+  greet [flags] <name>
+
+ARGUMENTS
+  name string    Who to greet
+
+FLAGS
+  --loud                Print in capitals
+  --times, -n string    How many times
+  --color, -c string    The color of the text
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+CliError: Invalid value for flag --color: "blue". Expected: expected one of red, green-light, got blue
+$ --nope Ada
+DESCRIPTION
+  Prints a greeting
+
+USAGE
+  greet [flags] <name>
+
+ARGUMENTS
+  name string    Who to greet
+
+FLAGS
+  --loud                Print in capitals
+  --times, -n string    How many times
+  --color, -c string    The color of the text
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+CliError: Unrecognized flag: --nope in command greet
+$ 
+DESCRIPTION
+  Prints a greeting
+
+USAGE
+  greet [flags] <name>
+
+ARGUMENTS
+  name string    Who to greet
+
+FLAGS
+  --loud                Print in capitals
+  --times, -n string    How many times
+  --color, -c string    The color of the text
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+CliError: Missing required argument: name
+$ 1 2 3.5
+6.5
+$ 
+DESCRIPTION
+  Adds numbers
+
+USAGE
+  sum [flags] <numbers...>
+
+ARGUMENTS
+  numbers... string    
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+CliError: Missing required argument: numbers
+$ greet Cy
+Hello, CyNone
+$ sum 4 5
+9
+$ --verbose sum 1
+1
+$ nope
+DESCRIPTION
+  Project tools
+
+USAGE
+  tool <subcommand> [flags]
+
+FLAGS
+  --verbose, -v    Verbose output
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+
+SUBCOMMANDS
+  greet    Prints a greeting
+  sum      Adds numbers
+CliError: Unknown subcommand "nope" for "tool"
+$ --help
+DESCRIPTION
+  Prints a greeting
+
+USAGE
+  greet [flags] <name>
+
+ARGUMENTS
+  name string    Who to greet
+
+FLAGS
+  --loud                Print in capitals
+  --times, -n string    How many times
+  --color, -c string    The color of the text
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+$ --help
+DESCRIPTION
+  Project tools
+
+USAGE
+  tool <subcommand> [flags]
+
+FLAGS
+  --verbose, -v    Verbose output
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+
+SUBCOMMANDS
+  greet    Prints a greeting
+  sum      Adds numbers
+$ --version
+greet v0.0.0
+$ --completions fish
+###-begin-greet-completions-###
+#
+# Static completion script for Fish
+#
+# Installation:
+#   greet --completions fish > ~/.config/fish/completions/greet.fish
+#
+
+complete -c greet -f
+complete -c greet -n 'not __fish_contains_opt loud no-loud' -l loud -d 'Print in capitals'
+complete -c greet -n 'not __fish_contains_opt loud no-loud' -l no-loud -d 'Disable loud'
+complete -c greet -n 'begin; not __fish_contains_opt -s n times; or contains -- (commandline -poc)[-1] --times -n; end' -l times -s n -d 'How many times' -r -f
+complete -c greet -n 'begin; not __fish_contains_opt -s c color; or contains -- (commandline -poc)[-1] --color -c; end' -l color -s c -d 'The color of the text' -r -f
+complete -c greet -n 'not string match -q -- "-*" (commandline -ct); and not __fish_contains_opt loud no-loud' -f -a '--loud' -d 'Print in capitals'
+complete -c greet -n 'not string match -q -- "-*" (commandline -ct); and not __fish_contains_opt loud no-loud' -f -a '--no-loud' -d 'Disable loud'
+complete -c greet -n 'not string match -q -- "-*" (commandline -ct); and not __fish_contains_opt -s n times' -f -a '--times' -d 'How many times'
+complete -c greet -n 'not string match -q -- "-*" (commandline -ct); and not __fish_contains_opt -s c color' -f -a '--color' -d 'The color of the text'
+
+###-end-greet-completions-###

@@ -77,6 +77,31 @@ without a handler of its own. The options record grows through
 `Record.Lacks` and `Record.UnionDisjoint`, so a field given twice or a
 handler pattern naming a field the command does not have is a type error.
 
+## Running
+
+`Cli.run command args` parses `args` with Effect's CLI and only then runs
+the handler of the command they name, in the current fiber, with the
+Node.js services Effect's CLI needs. `Cli.run_version version command args`
+also gives the text of `--version` (`Cli.run` uses `0.0.0`).
+
+```flick
+main : Unit ->{; AppError} Unit
+let main () =
+  try Cli.run greet (Platform.args ()) with
+  | Cli.CliError message -> App.fail message
+```
+
+`--help`, `--version` and `--completions bash|zsh|fish` print to stdout and
+run no handler. Invalid input — an unknown flag, a missing argument, a value
+`Cli.Value` refuses — prints the command's help and fails with
+`Cli.CliError` and Effect's text; no handler runs, and `App.fail` turns it
+into exit code 1. The flags of a command with subcommands come before the
+subcommand's name and are seen only by that command's handler.
+
+A command keeps the captures of its handler: one whose handler holds a
+resource of a `scope` runs inside that scope and cannot leave it
+(`FLICK-G001`).
+
 ## Rules
 
 | Rule | Code |
