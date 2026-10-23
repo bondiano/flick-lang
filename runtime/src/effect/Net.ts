@@ -1,10 +1,11 @@
 // Effect's network schemas for the bindings of the standard library (`Net`):
 // an address codec decodes text to Effect's address value, a DNS record
 // codec to Effect's record; both are opaque to Flick.
-import { Schema } from "effect";
+import { type Result, Schema } from "effect";
 import { Dns } from "effect/net";
 
 import type { AnySchema } from "../schema/schemas.ts";
+import { type SchemaError, codecDecodeResult } from "../schema/index.ts";
 import { fallible } from "./Schema.ts";
 
 /** The canonical text of an address, by the codec it was decoded with. */
@@ -79,3 +80,18 @@ export const flickDnsTxtRecord = record(Schema.DnsTxtRecord);
 
 /** `Net.dns_record_type`: one of the record type names. */
 export const flickDnsRecordType: AnySchema = Schema.toCodecJson(Schema.DnsRecordType);
+
+/** `Net.parse_*`: the text decoded by the address codec. */
+const parse = (codec: AnySchema) => (text: string): Result.Result<unknown, SchemaError> => codecDecodeResult(codec, text);
+
+export const flickParseIp = parse(flickIpAddress);
+export const flickParseInterface = parse(flickIpInterface);
+export const flickParseNetwork = parse(flickIpNetwork);
+export const flickParseMac = parse(flickMacAddress);
+export const flickParseDomain = parse(flickDomainName);
+export const flickParseScoped = parse(flickScopedIpv6Literal);
+export const flickParseHost = parse(flickHost);
+export const flickParseHostPort = parse(flickHostPort);
+export const flickParseInet = parse(flickInetAddress);
+export const flickParseUnixPath = parse(flickUnixPathAddress);
+export const flickParseSocket = parse(flickSocketAddress);

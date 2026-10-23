@@ -159,6 +159,13 @@ let main () =
     | Err e -> issues e))
   Platform.stdout_line (String.join "\n" addresses)
   Platform.stdout_line
+    ("parse: " ++ (match (Net.parse_ip "::FFFF:1", Net.parse_host_port "example.com:8080") with
+    | (Ok ip, Ok hp) -> show ip ++ ", " ++ show hp
+    | _ -> "err"))
+  Platform.stdout_line ("parse bad: " ++ (match Net.parse_mac "zz" with
+    | Ok m -> show m
+    | Err e -> issues e))
+  Platform.stdout_line
     ("ip typed: " ++ (match (decoded "\"::1\"" Net.ip_address, decoded "\"0:0::1\"" Net.ipv6_address) with
     | (Ok x, Ok y) -> show x ++ " == " ++ Net.format_ip y ++ ": " ++ show (x == y)
     | _ -> "err"))

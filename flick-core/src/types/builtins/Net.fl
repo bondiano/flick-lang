@@ -15,6 +15,10 @@ type IpAddress
 format_ip : IpAddress -> String
 foreign pure format_ip from "@flick-lang/runtime/effect/Net" "flickFormatIp"
 
+/// The address written in `text`, or why it is not one.
+parse_ip : String -> Result SchemaError IpAddress
+foreign pure parse_ip from "@flick-lang/runtime/effect/Net" "flickParseIp"
+
 instance Eq IpAddress =
   eq : IpAddress -> IpAddress -> Bool
   let eq x y = format_ip x == format_ip y
@@ -29,6 +33,10 @@ type IpInterface
 /// The canonical text of the address.
 format_interface : IpInterface -> String
 foreign pure format_interface from "@flick-lang/runtime/effect/Net" "flickFormatInterface"
+
+/// The address written in `text`, or why it is not one.
+parse_interface : String -> Result SchemaError IpInterface
+foreign pure parse_interface from "@flick-lang/runtime/effect/Net" "flickParseInterface"
 
 instance Eq IpInterface =
   eq : IpInterface -> IpInterface -> Bool
@@ -45,6 +53,10 @@ type IpNetwork
 format_network : IpNetwork -> String
 foreign pure format_network from "@flick-lang/runtime/effect/Net" "flickFormatNetwork"
 
+/// The address written in `text`, or why it is not one.
+parse_network : String -> Result SchemaError IpNetwork
+foreign pure parse_network from "@flick-lang/runtime/effect/Net" "flickParseNetwork"
+
 instance Eq IpNetwork =
   eq : IpNetwork -> IpNetwork -> Bool
   let eq x y = format_network x == format_network y
@@ -59,6 +71,10 @@ type MacAddress
 /// The canonical text of the address.
 format_mac : MacAddress -> String
 foreign pure format_mac from "@flick-lang/runtime/effect/Net" "flickFormatMac"
+
+/// The address written in `text`, or why it is not one.
+parse_mac : String -> Result SchemaError MacAddress
+foreign pure parse_mac from "@flick-lang/runtime/effect/Net" "flickParseMac"
 
 instance Eq MacAddress =
   eq : MacAddress -> MacAddress -> Bool
@@ -75,6 +91,10 @@ type DomainName
 format_domain : DomainName -> String
 foreign pure format_domain from "@flick-lang/runtime/effect/Net" "flickFormatDomain"
 
+/// The address written in `text`, or why it is not one.
+parse_domain : String -> Result SchemaError DomainName
+foreign pure parse_domain from "@flick-lang/runtime/effect/Net" "flickParseDomain"
+
 instance Eq DomainName =
   eq : DomainName -> DomainName -> Bool
   let eq x y = format_domain x == format_domain y
@@ -89,6 +109,10 @@ type ScopedIpv6Literal
 /// The canonical text of the address.
 format_scoped : ScopedIpv6Literal -> String
 foreign pure format_scoped from "@flick-lang/runtime/effect/Net" "flickFormatScoped"
+
+/// The address written in `text`, or why it is not one.
+parse_scoped : String -> Result SchemaError ScopedIpv6Literal
+foreign pure parse_scoped from "@flick-lang/runtime/effect/Net" "flickParseScoped"
 
 instance Eq ScopedIpv6Literal =
   eq : ScopedIpv6Literal -> ScopedIpv6Literal -> Bool
@@ -105,6 +129,10 @@ type Host
 format_host : Host -> String
 foreign pure format_host from "@flick-lang/runtime/effect/Net" "flickFormatHost"
 
+/// The address written in `text`, or why it is not one.
+parse_host : String -> Result SchemaError Host
+foreign pure parse_host from "@flick-lang/runtime/effect/Net" "flickParseHost"
+
 instance Eq Host =
   eq : Host -> Host -> Bool
   let eq x y = format_host x == format_host y
@@ -119,6 +147,10 @@ type HostPort
 /// The canonical text of the address.
 format_host_port : HostPort -> String
 foreign pure format_host_port from "@flick-lang/runtime/effect/Net" "flickFormatHostPort"
+
+/// The address written in `text`, or why it is not one.
+parse_host_port : String -> Result SchemaError HostPort
+foreign pure parse_host_port from "@flick-lang/runtime/effect/Net" "flickParseHostPort"
 
 instance Eq HostPort =
   eq : HostPort -> HostPort -> Bool
@@ -135,6 +167,10 @@ type InetAddress
 format_inet : InetAddress -> String
 foreign pure format_inet from "@flick-lang/runtime/effect/Net" "flickFormatInet"
 
+/// The address written in `text`, or why it is not one.
+parse_inet : String -> Result SchemaError InetAddress
+foreign pure parse_inet from "@flick-lang/runtime/effect/Net" "flickParseInet"
+
 instance Eq InetAddress =
   eq : InetAddress -> InetAddress -> Bool
   let eq x y = format_inet x == format_inet y
@@ -150,6 +186,10 @@ type UnixPathAddress
 format_unix_path : UnixPathAddress -> String
 foreign pure format_unix_path from "@flick-lang/runtime/effect/Net" "flickFormatUnixPath"
 
+/// The address written in `text`, or why it is not one.
+parse_unix_path : String -> Result SchemaError UnixPathAddress
+foreign pure parse_unix_path from "@flick-lang/runtime/effect/Net" "flickParseUnixPath"
+
 instance Eq UnixPathAddress =
   eq : UnixPathAddress -> UnixPathAddress -> Bool
   let eq x y = format_unix_path x == format_unix_path y
@@ -164,6 +204,10 @@ type SocketAddress
 /// The canonical text of the address.
 format_socket : SocketAddress -> String
 foreign pure format_socket from "@flick-lang/runtime/effect/Net" "flickFormatSocket"
+
+/// The address written in `text`, or why it is not one.
+parse_socket : String -> Result SchemaError SocketAddress
+foreign pure parse_socket from "@flick-lang/runtime/effect/Net" "flickParseSocket"
 
 instance Eq SocketAddress =
   eq : SocketAddress -> SocketAddress -> Bool

@@ -52,6 +52,8 @@ mac_unicast_address "00:1a:2b:3c:4d:5e": "00:1a:2b:3c:4d:5e"
 mac_universally_administered_address "00:1a:2b:3c:4d:5e": "00:1a:2b:3c:4d:5e"
 scoped_ipv6_literal "fe80::1%eth0": "fe80::1%eth0"
 dns_record_type "MX": "MX"
+parse: ::ffff:1, example.com:8080
+parse bad: err expected six two-digit hexadecimal octets separated by colons
 ip typed: ::1 == ::1: true
 dns_record {"_tag": "A", "address": "192.0.2.1"}: {"_tag":"A","address":"192.0.2.1"}
 dns_a_record {"_tag": "A", "address": "192.0.2.1"}: {"_tag":"A","address":"192.0.2.1"}
