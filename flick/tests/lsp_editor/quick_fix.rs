@@ -209,3 +209,40 @@ fn unused_import_is_greyed_out_and_removable() {
     );
     lsp.close();
 }
+
+#[test]
+fn redundant_annotation_quick_fix_removes_it() {
+    let text =
+        "module App.Kinds exposing (..)\n\ntype Kind = A | B\n\nlet kinds : List Kind = [A, B]\n";
+    let dir = project(
+        "lsp_redundant_annotation",
+        &[("flick.toml", LIB), ("src/App/Kinds.fl", text)],
+    );
+    let file = dir.join("src/App/Kinds.fl");
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": text } }));
+    let reported = lsp.diagnostics(&uri(&file));
+    let t021 = reported
+        .iter()
+        .find(|d| d["code"] == "FLICK-T021")
+        .unwrap_or_else(|| panic!("{reported:?}"));
+    let actions = lsp.request(
+        "textDocument/codeAction",
+        &json!({ "textDocument": { "uri": uri(&file) }, "range": t021["range"], "context": { "diagnostics": [t021] } }),
+    );
+    let fix = &actions["result"][0];
+    assert_eq!(fix["title"], "remove the annotation", "{actions}");
+    let edit = &fix["edit"]["changes"][uri(&file)][0];
+    let (start, end) = (
+        offset(text, &edit["range"]["start"]),
+        offset(text, &edit["range"]["end"]),
+    );
+    let fixed = format!(
+        "{}{}{}",
+        &text[..start],
+        edit["newText"].as_str().expect("text"),
+        &text[end..]
+    );
+    assert!(fixed.contains("\nlet kinds = [A, B]\n"), "{fixed}");
+    lsp.close();
+}

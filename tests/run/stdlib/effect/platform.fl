@@ -82,7 +82,7 @@ let main () =
         Platform.stdout_line ("quitting columns " ++ show (Terminal.columns ()))
       }
       provide Stdio.node { stdio () }
-      let busy : PlatformError.SystemErrorTag = PlatformError.Busy
+      let busy = PlatformError.Busy
       let system : PlatformError.SystemError =
         {
           tag = busy;

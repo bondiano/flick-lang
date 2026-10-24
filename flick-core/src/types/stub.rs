@@ -55,6 +55,7 @@ impl Checker<'_> {
         );
         let d = &mut self.diagnostics[since + i];
         d.fixes.push(Fix {
+            safe: false,
             message: format!("define `{name}`"),
             edits: vec![Edit {
                 span: Span::new(self.file, end, end),

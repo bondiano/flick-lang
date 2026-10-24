@@ -104,7 +104,7 @@ let main () =
     "compose"
     (result (Optic.get_result (Optic.lens_optional corner |> Optic.compose even_x) shape))
     ()
-  let doubled : Optic.Iso Number Number = Optic.make_iso (fun n -> n * 2) (fun n -> n / 2)
+  let doubled = Optic.make_iso (fun n -> n * 2) (fun n -> n / 2)
   line
     "iso"
     (show (Optic.get (Optic.iso_lens doubled) 3)

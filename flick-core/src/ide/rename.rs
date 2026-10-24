@@ -39,9 +39,11 @@ impl Ide<'_> {
                     && e.namespace == Namespace::Type
                     && e.module == *module
                     && e.name == *name
-                    && let Some(token) = tree::find(&m.tree, *range).and_then(tree::last_name)
                 {
-                    out.push((m.file, (token.start, token.end)));
+                    let at = tree::find(&m.tree, *range)
+                        .and_then(tree::last_name)
+                        .map_or(*range, |t| (t.start, t.end));
+                    out.push((m.file, at));
                 }
             }
             for d in declarations(&m.tree, text, m.file) {

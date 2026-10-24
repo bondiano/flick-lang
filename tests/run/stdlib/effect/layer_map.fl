@@ -20,7 +20,7 @@ maps : Unit ->{} Unit
 let maps () =
   let builds = Ref.make 0
   scope s {
-    let map : LayerMap.LayerMap s String none {Tenant} = LayerMap.make (tenant builds) options
+    let map = LayerMap.make (tenant builds) options
     provide LayerMap.get "a" map { Platform.stdout_line ("tenant " ++ Tenant.name ()) }
     provide LayerMap.get "b" map { Platform.stdout_line ("tenant " ++ Tenant.name ()) }
     LayerMap.invalidate "a" map
@@ -37,7 +37,7 @@ refs : Unit ->{} Unit
 let refs () =
   let builds = Ref.make 0
   scope s {
-    let ref : LayerRef.LayerRef s none {Tenant} =
+    let ref =
       LayerRef.make
         (tenant builds "ref")
         { idleTimeToLive = Some Duration.infinity; preload = true }
@@ -69,7 +69,7 @@ let reports () =
         let _ = Deferred.complete_with (task { () }) done
         ()
       })
-    let reporter : ErrorReporter.ErrorReporter s = ErrorReporter.make listener
+    let reporter = ErrorReporter.make listener
     provide (ErrorReporter.layer [reporter] { mergeWithExisting = false }) {
       match Option.bind Exit.failure (List.head exits) with
       | Some failure -> ErrorReporter.report failure

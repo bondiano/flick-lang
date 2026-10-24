@@ -172,6 +172,24 @@ the React-only adapter, so compiled `Ui.run_with` programs do not require
 `react-dom`. DOM callers use `Ui.Dom.run` and `Ui.Dom.container`; there are
 no aliases in `Ui`.
 
+## Server-rendered initial views
+
+Expose an initial-view function from Flick and evaluate its cold effect on
+the server. Pass the resulting `Ui` to `uiRenderStatic` from
+`@flick-lang/runtime/ui/react`, then serialize that React node with
+`renderToString` from `react-dom/server`. Event bindings remain inert on
+the server; the application does not need a second HTML implementation.
+
+Mark its container with `data-flick-ssr`. `Ui.Dom.run` then uses
+`hydrateRoot` instead of clearing the existing HTML. Server and client
+must use the same initial model, keys and markup. Native textarea drafts,
+focus and selection survive startup; adopt a pre-boot draft into the
+Flick model before checking or submitting it. Mount the root before
+starting background tasks that notify its event handlers.
+
+The documentation header and Play/Transpile use this path. Without the
+marker, ordinary client-only mounting is unchanged.
+
 ## Other React renderers
 
 `@flick-lang/runtime/ui` is the React DOM adapter.
@@ -283,7 +301,6 @@ does not create another backend.
 | P1 | Real Native / Ink / R3F adapters | Build on `Renderer` and host primitives: registration/mounting, updates, synchronous detachment and resource shutdown. Define R3F's MVU/frame-loop/invalidation relationship explicitly; do not send 60 messages per second unnecessarily. |
 | P1 | Controlled fields and value synchronization | `input`/`textarea` currently supply only an initial `defaultValue`. Reset/external updates, caret/IME preservation and asynchronous-handler behavior need defined contracts. Elmish's `valueOrDefault` is a reference, not an existing controlled-input model. |
 | P2 | Typed React interop | Foreign-component children/slots, scoped refs, Context/providers and lifecycle with defined resource release. Currently only opaque `Ui.component` with props is available. |
-| P2 | SSR and hydration | A separate DOM adapter using `hydrateRoot`, matching initial model/keys and mismatch handling. It needs a real server use case, not an unused option. |
 | P2 | MVU diagnostics and development | Message/model tracing, replay of pure updates and state-preserving HMR. Build on the MVU contract, not on a global mutable singleton. |
 
 Separate `lazyView2`/`lazyView3` helpers are unnecessary: records or tuples

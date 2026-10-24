@@ -280,7 +280,7 @@ let main () =
       ++ " "
       ++ BigDecimal.to_string (BigDecimal.add a b))
     ()
-  let secret : Redacted String = Redacted.make "pw"
+  let secret = Redacted.make "pw"
   let other = Redacted.make "PW"
   let same_case =
     Redacted.equivalent (fun p q -> String.to_lower p == String.to_lower q) secret other

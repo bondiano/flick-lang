@@ -166,6 +166,13 @@ impl<'n> Checker<'_> {
                 continue;
             };
             let found = self.find_type(clause, &qualifier.join("."), last);
+            // the class name has no node of its own: hover and rename find it by its token
+            if let (Some((module, _)), Some(token)) = (&found, path.last()) {
+                let named = (module.clone(), (*last).to_owned());
+                self.typing
+                    .type_names
+                    .insert((token.start, token.end), named);
+            }
             match found {
                 Some((module, def))
                     if module == PRELUDE

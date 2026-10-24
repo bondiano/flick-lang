@@ -119,10 +119,10 @@ let exits () =
   Platform.stdout_line ("match_: " ++ show (List.map described all))
   Platform.stdout_line
     ("map: " ++ show (List.map (fun x -> Exit.value (Exit.map (fun n -> n * 10) x)) all))
-  let renamed : Exit {Other} Number = Exit.map_error rename bad
+  let renamed = Exit.map_error rename bad
   Platform.stdout_line ("map_error: " ++ other_text (Exit.find_error_option renamed))
-  let both : Exit {Other} String = Exit.map_both rename (fun n -> show n) ok
-  let both_bad : Exit {Other} String = Exit.map_both rename (fun n -> show n) bad
+  let both = Exit.map_both rename (fun n -> show n) ok
+  let both_bad = Exit.map_both rename (fun n -> show n) bad
   Platform.stdout_line
     ("map_both: " ++ show (Exit.value both) ++ " " ++ other_text (Exit.find_error_option both_bad))
   let nothing : Exit none Unit = Exit.void
@@ -178,7 +178,7 @@ let causes () =
   let both = Cause.combine died failed
   Platform.stdout_line ("flags: " ++ show (List.map flags [failed, died, stopped, nothing, both]))
   Platform.stdout_line ("kinds: " ++ show (kinds both))
-  let rebuilt : Failure {Boom} =
+  let rebuilt =
     Cause.from_reasons
       [
         Cause.make_fail_reason (Boom 4),
@@ -194,7 +194,7 @@ let causes () =
   Platform.stdout_line ("find_interrupt: " ++ show (List.map interrupt_of [failed, stopped]))
   Platform.stdout_line ("interruptors: " ++ show (Cause.interruptors stopped))
   Platform.stdout_line ("filter_interruptors: " ++ show (List.map ids [stopped, failed]))
-  let mapped : Failure {Other} = Cause.map rename both
+  let mapped = Cause.map rename both
   Platform.stdout_line
     ("map: " ++ other_text (Cause.find_error_option mapped) ++ " " ++ flags mapped)
   Platform.stdout_line ("pretty: " ++ show (String.contains "broken" (Cause.pretty died)))
@@ -217,10 +217,10 @@ let frames () =
   let traced : Exit {Boom} Unit = Effect.exit (task {
     Tracer.with_span "outer" span_options (task { from_result (Err (Boom 9)) })
   })
-  let frame : Option Cause.StackFrame = Option.bind Cause.stack_trace (Exit.failure traced)
+  let frame = Option.bind Cause.stack_trace (Exit.failure traced)
   match frame with
   | Some f ->
-    let again : Failure {Boom} = Cause.annotate true f failed
+    let again = Cause.annotate true f failed
     Platform.stdout_line
       ("annotate: "
         ++ show

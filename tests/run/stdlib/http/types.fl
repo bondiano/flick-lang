@@ -186,7 +186,7 @@ let main () =
   line "equivalent" (show (Http.Headers.equivalent headers headers))
   Http.Headers.with_redacted_names ["x-token"] (task { line "with_redacted_names" "ran" })
   line "show" (show headers)
-  let params : Http.UrlParams.UrlParams = Http.UrlParams.make [("token", "t"), ("a", "1")]
+  let params = Http.UrlParams.make [("token", "t"), ("a", "1")]
   let a_codec = ignore_extra_fields (codec (schema Theme) { theme = field "a" String.json })
   line
     "params"
@@ -196,7 +196,7 @@ let main () =
   Http.UrlParams.with_redacted_names
     ["token"]
     (task { line "url params with_redacted_names" "ran" })
-  let invalid : Result Http.Url.UrlError Http.Url.Url = Http.Url.from_string "::"
+  let invalid = Http.Url.from_string "::"
   line "url error" (show (Result.is_err invalid))
   provide (Layer.succeed Generator { from_file_info = fun _ -> Http.Etag.Weak "fixed" }) {
     line "generator" (show (Http.Etag.from_file_info (info ())))

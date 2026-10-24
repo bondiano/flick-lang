@@ -118,7 +118,7 @@ hubs : Unit ->{} Unit
 let hubs () =
   let hub : PubSub.PubSub String = PubSub.bounded { capacity = 4; replay = None }
   let got = scope s {
-    let a : PubSub.Subscription s String = PubSub.subscribe hub
+    let a = PubSub.subscribe hub
     let b = PubSub.subscribe hub
     let _ = PubSub.publish "x" hub
     let _ = PubSub.publish_all ["y", "z"] hub

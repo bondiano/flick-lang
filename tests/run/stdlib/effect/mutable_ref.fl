@@ -3,7 +3,7 @@ module App.Main exposing (main)
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let cell : Ref Number = Ref.make 1
+  let cell = Ref.make 1
   Ref.set cell 2
   Ref.update cell (fun n -> n * 10)
   Platform.stdout_line ("update: " ++ show (Ref.get cell))

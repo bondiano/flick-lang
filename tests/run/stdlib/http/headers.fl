@@ -25,7 +25,7 @@ let main () =
   line "redact" (show (Http.Headers.redact ["x-a"] h2))
   line "is_redacted_name" (show (Http.Headers.is_redacted_name "X-Api-Key" ["x-api-key"]))
   line "eq" (show (h == Http.Headers.from_input input, h == h2))
-  let methods : List Http.Method.Method = Http.Method.all
+  let methods = Http.Method.all
   line "methods" (show (List.filter Http.Method.has_body methods))
   line "short" (show (List.take 4 Http.Method.all_short))
   line

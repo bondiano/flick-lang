@@ -139,7 +139,7 @@ let shapes () =
   say (ended "sync" (run (Sink.sync (fun () -> "lazy"))))
   say (ended "suspend" (run (Sink.suspend (fun () -> Sink.succeed 9))))
   say (ended "from_effect" (run (Sink.from_effect (task { "effect" }))))
-  let given : Sink.End String Number = ("given", NonEmpty.from_list [7])
+  let given = ("given", NonEmpty.from_list [7])
   say (ended "from_effect_end" (run (Sink.from_effect_end (task { given }))))
   say (ended "unwrap" (run (Sink.unwrap (task { Sink.count }))))
   say (ended "map" (run (Sink.map (fun n -> n * 100) Sink.count)))

@@ -1,0 +1,481 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-23T20:30:55.821742Z",
+  "title": "Design System: Flick — Signal",
+  "extensions": {
+    "colorMeta": {
+      "violet": {
+        "role": "primary",
+        "displayName": "Signal Violet",
+        "canonical": "#584dd0",
+        "tonalRamp": [
+          "oklch(15.00% 0.19438 280.75)",
+          "oklch(26.43% 0.19438 280.75)",
+          "oklch(37.86% 0.19438 280.75)",
+          "oklch(49.29% 0.19438 280.75)",
+          "oklch(60.71% 0.19438 280.75)",
+          "oklch(72.14% 0.19438 280.75)",
+          "oklch(83.57% 0.19438 280.75)",
+          "oklch(95.00% 0.19438 280.75)"
+        ]
+      },
+      "violet-wash": {
+        "role": "primary",
+        "displayName": "Violet Wash",
+        "canonical": "#eeecfa",
+        "tonalRamp": [
+          "oklch(15.00% 0.01881 292.61)",
+          "oklch(26.43% 0.01881 292.61)",
+          "oklch(37.86% 0.01881 292.61)",
+          "oklch(49.29% 0.01881 292.61)",
+          "oklch(60.71% 0.01881 292.61)",
+          "oklch(72.14% 0.01881 292.61)",
+          "oklch(83.57% 0.01881 292.61)",
+          "oklch(95.00% 0.01881 292.61)"
+        ]
+      },
+      "cool-paper": {
+        "role": "neutral",
+        "displayName": "Cool Paper",
+        "canonical": "#fafafc",
+        "tonalRamp": [
+          "oklch(15.00% 0.00264 286.35)",
+          "oklch(26.43% 0.00264 286.35)",
+          "oklch(37.86% 0.00264 286.35)",
+          "oklch(49.29% 0.00264 286.35)",
+          "oklch(60.71% 0.00264 286.35)",
+          "oklch(72.14% 0.00264 286.35)",
+          "oklch(83.57% 0.00264 286.35)",
+          "oklch(95.00% 0.00264 286.35)"
+        ]
+      },
+      "graphite": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "canonical": "#101016",
+        "tonalRamp": [
+          "oklch(15.00% 0.01232 285.06)",
+          "oklch(26.43% 0.01232 285.06)",
+          "oklch(37.86% 0.01232 285.06)",
+          "oklch(49.29% 0.01232 285.06)",
+          "oklch(60.71% 0.01232 285.06)",
+          "oklch(72.14% 0.01232 285.06)",
+          "oklch(83.57% 0.01232 285.06)",
+          "oklch(95.00% 0.01232 285.06)"
+        ]
+      },
+      "body-ink": {
+        "role": "neutral",
+        "displayName": "Body Ink",
+        "canonical": "#373740",
+        "tonalRamp": [
+          "oklch(15.00% 0.01563 285.54)",
+          "oklch(26.43% 0.01563 285.54)",
+          "oklch(37.86% 0.01563 285.54)",
+          "oklch(49.29% 0.01563 285.54)",
+          "oklch(60.71% 0.01563 285.54)",
+          "oklch(72.14% 0.01563 285.54)",
+          "oklch(83.57% 0.01563 285.54)",
+          "oklch(95.00% 0.01563 285.54)"
+        ]
+      },
+      "secondary-ink": {
+        "role": "neutral",
+        "displayName": "Secondary Ink",
+        "canonical": "#484852",
+        "tonalRamp": [
+          "oklch(15.00% 0.01662 285.64)",
+          "oklch(26.43% 0.01662 285.64)",
+          "oklch(37.86% 0.01662 285.64)",
+          "oklch(49.29% 0.01662 285.64)",
+          "oklch(60.71% 0.01662 285.64)",
+          "oklch(72.14% 0.01662 285.64)",
+          "oklch(83.57% 0.01662 285.64)",
+          "oklch(95.00% 0.01662 285.64)"
+        ]
+      },
+      "muted-ink": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#686873",
+        "tonalRamp": [
+          "oklch(15.00% 0.01714 285.79)",
+          "oklch(26.43% 0.01714 285.79)",
+          "oklch(37.86% 0.01714 285.79)",
+          "oklch(49.29% 0.01714 285.79)",
+          "oklch(60.71% 0.01714 285.79)",
+          "oklch(72.14% 0.01714 285.79)",
+          "oklch(83.57% 0.01714 285.79)",
+          "oklch(95.00% 0.01714 285.79)"
+        ]
+      },
+      "control-border": {
+        "role": "neutral",
+        "displayName": "Control Border",
+        "canonical": "#d6d6e0",
+        "tonalRamp": [
+          "oklch(15.00% 0.01363 286.12)",
+          "oklch(26.43% 0.01363 286.12)",
+          "oklch(37.86% 0.01363 286.12)",
+          "oklch(49.29% 0.01363 286.12)",
+          "oklch(60.71% 0.01363 286.12)",
+          "oklch(72.14% 0.01363 286.12)",
+          "oklch(83.57% 0.01363 286.12)",
+          "oklch(95.00% 0.01363 286.12)"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#e0e0e8",
+        "tonalRamp": [
+          "oklch(15.00% 0.01080 286.18)",
+          "oklch(26.43% 0.01080 286.18)",
+          "oklch(37.86% 0.01080 286.18)",
+          "oklch(49.29% 0.01080 286.18)",
+          "oklch(60.71% 0.01080 286.18)",
+          "oklch(72.14% 0.01080 286.18)",
+          "oklch(83.57% 0.01080 286.18)",
+          "oklch(95.00% 0.01080 286.18)"
+        ]
+      },
+      "soft-surface": {
+        "role": "neutral",
+        "displayName": "Soft Surface",
+        "canonical": "#eeeef5",
+        "tonalRamp": [
+          "oklch(15.00% 0.00934 286.22)",
+          "oklch(26.43% 0.00934 286.22)",
+          "oklch(37.86% 0.00934 286.22)",
+          "oklch(49.29% 0.00934 286.22)",
+          "oklch(60.71% 0.00934 286.22)",
+          "oklch(72.14% 0.00934 286.22)",
+          "oklch(83.57% 0.00934 286.22)",
+          "oklch(95.00% 0.00934 286.22)"
+        ]
+      },
+      "editor-top": {
+        "role": "neutral",
+        "displayName": "Editor Top",
+        "canonical": "#f5f4fb",
+        "tonalRamp": [
+          "oklch(15.00% 0.00934 292.80)",
+          "oklch(26.43% 0.00934 292.80)",
+          "oklch(37.86% 0.00934 292.80)",
+          "oklch(49.29% 0.00934 292.80)",
+          "oklch(60.71% 0.00934 292.80)",
+          "oklch(72.14% 0.00934 292.80)",
+          "oklch(83.57% 0.00934 292.80)",
+          "oklch(95.00% 0.00934 292.80)"
+        ]
+      },
+      "inverse-white": {
+        "role": "neutral",
+        "displayName": "Inverse White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15.00% 0.00000 0.00)",
+          "oklch(26.43% 0.00000 0.00)",
+          "oklch(37.86% 0.00000 0.00)",
+          "oklch(49.29% 0.00000 0.00)",
+          "oklch(60.71% 0.00000 0.00)",
+          "oklch(72.14% 0.00000 0.00)",
+          "oklch(83.57% 0.00000 0.00)",
+          "oklch(95.00% 0.00000 0.00)"
+        ]
+      },
+      "success": {
+        "role": "semantic",
+        "displayName": "Success",
+        "canonical": "#347b57",
+        "tonalRamp": [
+          "oklch(15.00% 0.09201 158.72)",
+          "oklch(26.43% 0.09201 158.72)",
+          "oklch(37.86% 0.09201 158.72)",
+          "oklch(49.29% 0.09201 158.72)",
+          "oklch(60.71% 0.09201 158.72)",
+          "oklch(72.14% 0.09201 158.72)",
+          "oklch(83.57% 0.09201 158.72)",
+          "oklch(95.00% 0.09201 158.72)"
+        ]
+      },
+      "error": {
+        "role": "semantic",
+        "displayName": "Error",
+        "canonical": "#b43b4f",
+        "tonalRamp": [
+          "oklch(15.00% 0.15609 14.58)",
+          "oklch(26.43% 0.15609 14.58)",
+          "oklch(37.86% 0.15609 14.58)",
+          "oklch(49.29% 0.15609 14.58)",
+          "oklch(60.71% 0.15609 14.58)",
+          "oklch(72.14% 0.15609 14.58)",
+          "oklch(83.57% 0.15609 14.58)",
+          "oklch(95.00% 0.15609 14.58)"
+        ]
+      },
+      "night-paper": {
+        "role": "neutral",
+        "displayName": "Night Paper",
+        "canonical": "#17171d",
+        "tonalRamp": [
+          "oklch(15.00% 0.01181 285.32)",
+          "oklch(26.43% 0.01181 285.32)",
+          "oklch(37.86% 0.01181 285.32)",
+          "oklch(49.29% 0.01181 285.32)",
+          "oklch(60.71% 0.01181 285.32)",
+          "oklch(72.14% 0.01181 285.32)",
+          "oklch(83.57% 0.01181 285.32)",
+          "oklch(95.00% 0.01181 285.32)"
+        ]
+      },
+      "night-ink": {
+        "role": "neutral",
+        "displayName": "Night Ink",
+        "canonical": "#f1f0f8",
+        "tonalRamp": [
+          "oklch(15.00% 0.01069 291.95)",
+          "oklch(26.43% 0.01069 291.95)",
+          "oklch(37.86% 0.01069 291.95)",
+          "oklch(49.29% 0.01069 291.95)",
+          "oklch(60.71% 0.01069 291.95)",
+          "oklch(72.14% 0.01069 291.95)",
+          "oklch(83.57% 0.01069 291.95)",
+          "oklch(95.00% 0.01069 291.95)"
+        ]
+      },
+      "night-violet": {
+        "role": "primary",
+        "displayName": "Night Violet",
+        "canonical": "#b1a6ff",
+        "tonalRamp": [
+          "oklch(15.00% 0.12590 288.74)",
+          "oklch(26.43% 0.12590 288.74)",
+          "oklch(37.86% 0.12590 288.74)",
+          "oklch(49.29% 0.12590 288.74)",
+          "oklch(60.71% 0.12590 288.74)",
+          "oklch(72.14% 0.12590 288.74)",
+          "oklch(83.57% 0.12590 288.74)",
+          "oklch(95.00% 0.12590 288.74)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Signal display",
+        "purpose": "Homepage headline; responsive overrides remain contextual to that surface."
+      },
+      "headline": {
+        "displayName": "Editorial section headline",
+        "purpose": "Open homepage section hierarchy."
+      },
+      "title": {
+        "displayName": "Feature title",
+        "purpose": "Compact explanatory feature headings."
+      },
+      "body": {
+        "displayName": "Reading body",
+        "purpose": "Bounded document prose with open line height."
+      },
+      "label": {
+        "displayName": "Tool label",
+        "purpose": "Compact supporting labels in Play and Transpile."
+      },
+      "code": {
+        "displayName": "Operating source",
+        "purpose": "Whitespace-preserving editable source and generated JavaScript."
+      }
+    },
+    "shadows": [
+      {
+        "name": "search-dialog",
+        "value": "0 18px 65px #10101626",
+        "purpose": "Native search dialog only; editorial sections and editor containers stay flat."
+      }
+    ],
+    "motion": [
+      {
+        "name": "signal-group-drift",
+        "value": "signal-drift 24s cubic-bezier(0.22, 1, 0.36, 1) infinite alternate",
+        "purpose": "The single group containing all 6,820 static SVG dots; no per-dot animations."
+      },
+      {
+        "name": "signal-drift-from",
+        "value": "translate(-8px, 5px) rotate(-0.6deg)",
+        "purpose": "Starting transform for the shared wave group."
+      },
+      {
+        "name": "signal-drift-to",
+        "value": "translate(8px, -7px) rotate(0.6deg)",
+        "purpose": "Ending transform for the shared wave group."
+      },
+      {
+        "name": "tool-state-transition",
+        "value": "background-color 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out",
+        "purpose": "Operating button states only; not a global marketing transition."
+      },
+      {
+        "name": "motion-accessibility",
+        "value": "The wave runs continuously on desktop and mobile; prefers-reduced-motion:reduce removes its animation and tool-button transitions. There is no header pause control or stored motion state.",
+        "purpose": "System reduced-motion behavior from custom.css/playground.css."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "tool-compact-max",
+        "value": "36rem"
+      },
+      {
+        "name": "header-and-home-compact-max",
+        "value": "40rem"
+      },
+      {
+        "name": "mobile-reading-max",
+        "value": "49.99rem"
+      },
+      {
+        "name": "desktop-sidebar-min",
+        "value": "50rem"
+      },
+      {
+        "name": "tool-stacked-max",
+        "value": "56rem"
+      },
+      {
+        "name": "home-stacked-and-menu-max",
+        "value": "63rem"
+      },
+      {
+        "name": "desktop-contents-min",
+        "value": "72rem"
+      },
+      {
+        "name": "header-tight-max",
+        "value": "79rem"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary learning action",
+      "kind": "button",
+      "description": "Marketing link from Landing.astro and custom.css; fixed violet/white, not the denser tool button.",
+      "html": "<a class=\"ds-primary\" href=\"/learn/\">Start learning <svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14m-6-6 6 6-6 6\"/></svg></a>",
+      "css": ".ds-primary { display:inline-flex; align-items:center; justify-content:center; gap:0.7rem; min-height:50px; padding:0.7rem 1.25rem; font-family:var(--sl-font, Geist, sans-serif); font-size:1rem; font-weight:560; line-height:1.4; text-decoration:none; border-radius:6px; border:1px solid transparent; color:#fff; background:#584dd0; } .ds-primary:hover { background:#493dbd; } .ds-primary:focus-visible { outline:2px solid var(--sl-color-accent-high, #584dd0); outline-offset:4px; } @media(max-width:40rem) { .ds-primary { font-size:0.9rem; min-height:48px; padding:0.65rem 0.9rem; } }",
+      "refersTo": "button-primary"
+    },
+    {
+      "name": "Secondary playground action",
+      "kind": "button",
+      "description": "Quiet bordered alternative to the learning action; semantic colors follow the active theme.",
+      "html": "<a class=\"ds-secondary\" href=\"/play/\">Open playground</a>",
+      "css": ".ds-secondary { display:inline-flex; align-items:center; justify-content:center; gap:0.7rem; min-height:50px; padding:0.7rem 1.25rem; font-family:var(--sl-font, Geist, sans-serif); font-size:1rem; font-weight:560; line-height:1.4; text-decoration:none; border-radius:6px; border:1px solid var(--sl-color-gray-5, #d6d6e0); color:var(--sl-color-white, #101016); background:var(--sl-color-bg, #fafafc); } .ds-secondary:hover { border-color:var(--sl-color-accent-high, #584dd0); } .ds-secondary:focus-visible { outline:2px solid var(--sl-color-accent-high, #584dd0); outline-offset:4px; } @media(max-width:40rem) { .ds-secondary { font-size:0.9rem; min-height:48px; padding:0.65rem 0.9rem; } }",
+      "refersTo": "button-secondary"
+    },
+    {
+      "name": "Search query field",
+      "kind": "input",
+      "description": "Bordered native search input from Search.fl; results and asynchronous state remain owned by Flick.",
+      "html": "<div class=\"ds-search-field\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" aria-hidden=\"true\"><circle cx=\"10.5\" cy=\"10.5\" r=\"6.5\"/><path d=\"m16 16 4.5 4.5\"/></svg><input type=\"search\" aria-label=\"Search query\" placeholder=\"Effects, types, services…\" /></div>",
+      "css": ".ds-search-field { display:flex; align-items:center; gap:0.75rem; border:1px solid var(--sl-color-gray-4, #a2a2ad); padding:0.75rem 1rem; border-radius:6px; color:var(--sl-color-gray-3, #686873); font-family:var(--sl-font, Geist, sans-serif); } .ds-search-field svg { flex-shrink:0; } .ds-search-field input { min-width:0; width:100%; border:0; background:transparent; color:var(--sl-color-white, #101016); font:inherit; font-size:1rem; padding:0; caret-color:var(--sl-color-accent-high, #584dd0); } .ds-search-field input::placeholder { color:var(--sl-color-gray-3, #686873); } .ds-search-field:focus-within { outline:2px solid var(--sl-color-accent-high, #584dd0); outline-offset:2px; } .ds-search-field input:focus { outline:0; }",
+      "refersTo": "search-field"
+    },
+    {
+      "name": "Reading navigation",
+      "kind": "nav",
+      "description": "Sidebar link anatomy with current-page wash and quiet neutral hover; source custom.css and DocNavigation.astro.",
+      "html": "<nav class=\"ds-doc-nav\" aria-label=\"Learn\"><a href=\"/learn/\" aria-current=\"page\">Learn</a><a href=\"/learn/flick-and-effect/\">Flick &amp; Effect</a></nav>",
+      "css": ".ds-doc-nav { font-family:var(--sl-font, Geist, sans-serif); } .ds-doc-nav a { display:block; padding:0.45rem 0.65rem; font-size:0.84rem; line-height:1.5; color:var(--sl-color-gray-2, #484852); text-decoration:none; border-radius:5px; } .ds-doc-nav a:hover { background:var(--sl-color-gray-6, #eeeef5); color:var(--sl-color-white, #101016); } .ds-doc-nav a[aria-current=\"page\"] { background:var(--sl-color-accent-low, #eeecfa); color:var(--sl-color-accent-high, #584dd0); font-weight:600; } .ds-doc-nav a:focus-visible { outline:2px solid var(--sl-color-accent-high, #584dd0); outline-offset:4px; }",
+      "refersTo": "navigation-current"
+    },
+    {
+      "name": "Profile choices",
+      "kind": "chip",
+      "description": "Pressed buttons from playground/Toolbar.fl, not inert tags. This specimen records Debug/Release visual states without implementing widget state.",
+      "html": "<div class=\"ds-profiles\"><button class=\"ds-choice\" type=\"button\" aria-pressed=\"true\">Debug</button><button class=\"ds-choice\" type=\"button\" aria-pressed=\"false\">Release</button></div>",
+      "css": ".ds-profiles { display:flex; flex-wrap:wrap; align-items:center; gap:0.375rem; font-family:var(--sl-font, Geist, sans-serif); font-size:0.875rem; line-height:1.5; } .ds-choice { min-height:2.125rem; padding:0.375rem 0.75rem; border:1px solid transparent; border-radius:6px; background:transparent; color:var(--sl-color-gray-2, #484852); cursor:pointer; font:inherit; line-height:1.35; transition:background-color 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out; } .ds-choice:hover:not(:disabled) { border-color:var(--sl-color-gray-5, #d6d6e0); background:color-mix(in srgb, var(--sl-color-gray-6, #eeeef5) 45%, var(--sl-color-bg, #fafafc)); color:var(--sl-color-white, #101016); } .ds-choice:active:not(:disabled) { background:var(--sl-color-gray-6, #eeeef5); } .ds-choice[aria-pressed=\"true\"] { border-color:color-mix(in srgb, var(--sl-color-accent-high, #584dd0) 25%, var(--sl-color-gray-5, #d6d6e0)); background:var(--sl-color-accent-low, #eeecfa); color:var(--sl-color-accent-high, #584dd0); } .ds-choice[aria-pressed=\"true\"]:hover:not(:disabled) { border-color:var(--sl-color-accent-high, #584dd0); background:var(--sl-color-accent-low, #eeecfa); color:var(--sl-color-accent-high, #584dd0); } .ds-choice:disabled { opacity:0.5; cursor:not-allowed; } .ds-choice:focus-visible { outline:2px solid var(--sl-color-accent-high, #584dd0); outline-offset:3px; } @media(max-width:36rem) { .ds-choice { min-height:2.75rem; padding-inline:0.625rem; } } @media(prefers-reduced-motion:reduce) { .ds-choice { transition:none; } }",
+      "refersTo": "choice-selected"
+    },
+    {
+      "name": "Run tool action",
+      "kind": "button",
+      "description": "Dense tool action from playground.css. The real Flick widget supplies disabled, running/Stop, and timeout states.",
+      "html": "<button class=\"ds-run\" type=\"button\">Run</button>",
+      "css": ".ds-run { min-height:2.125rem; min-width:6.25rem; padding:0.375rem 0.75rem; border:1px solid var(--sl-color-accent-high, #584dd0); border-radius:6px; background:var(--sl-color-accent-high, #584dd0); color:var(--sl-color-bg, #fafafc); cursor:pointer; font-family:var(--sl-font, Geist, sans-serif); font-size:0.875rem; font-weight:650; line-height:1.35; transition:background-color 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out; } .ds-run:hover:not(:disabled) { background:color-mix(in srgb, var(--sl-color-accent-high, #584dd0) 88%, var(--sl-color-white, #101016)); } .ds-run:active:not(:disabled) { background:var(--sl-color-gray-6, #eeeef5); } .ds-run:disabled { opacity:0.5; cursor:not-allowed; } .ds-run:focus-visible { outline:2px solid var(--sl-color-accent-high, #584dd0); outline-offset:3px; } @media(max-width:36rem) { .ds-run { min-height:2.75rem; min-width:5rem; padding-inline:0.625rem; } } @media(prefers-reduced-motion:reduce) { .ds-run { transition:none; } }",
+      "refersTo": "operate-primary"
+    },
+    {
+      "name": "Editable Flick source",
+      "kind": "input",
+      "description": "Native boot/fallback textarea anatomy from playground.css. The live widget adds a lazy, precisely aligned token overlay rendered by Flick; this static specimen does not simulate compilation or syntax loading.",
+      "html": "<textarea class=\"ds-source\" aria-label=\"Flick source\" spellcheck=\"false\">module Main exposing (main)\n\nmain : Unit -&gt;{; AppError} Unit\nlet main () =\n  Platform.stdout_line \"Hello, effects.\"</textarea>",
+      "css": ".ds-source { display:block; width:100%; min-height:30rem; resize:vertical; padding:1.25rem; border:0; border-radius:0; background:var(--sl-color-bg, #fafafc); color:var(--sl-color-white, #101016); caret-color:var(--sl-color-accent-high, #584dd0); font-family:var(--__sl-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size:0.8125rem; line-height:1.75; tab-size:2; white-space:pre; overflow-wrap:normal; scrollbar-color:var(--sl-color-gray-4, #a2a2ad) var(--sl-color-bg, #fafafc); scrollbar-width:thin; } .ds-source:focus-visible { outline:2px solid var(--sl-color-accent-high, #584dd0); outline-offset:-2px; } .ds-source::placeholder { color:var(--sl-color-gray-3, #686873); opacity:1; } .ds-source::selection { background:var(--sl-color-accent-low, #eeecfa); color:var(--sl-color-accent-high, #584dd0); } @media(max-width:56rem) { .ds-source { min-height:22rem; } } @media(max-width:36rem) { .ds-source { padding:1rem; } }",
+      "refersTo": "source-field"
+    },
+    {
+      "name": "Hero editor shell",
+      "kind": "card",
+      "description": "Bordered editor, tonal tabs, active underline, source, and truthful idle status from Hero.fl/custom.css. Visual specimen only, not an alternate runtime.",
+      "html": "<section class=\"ds-editor\"><div class=\"ds-editor-tabs\"><span class=\"ds-editor-tab ds-editor-tab-current\"><button type=\"button\" aria-pressed=\"true\">Flick</button></span><span class=\"ds-editor-tab\"><button type=\"button\" aria-pressed=\"false\">Effect</button></span></div><div class=\"ds-editor-file\">main.fl</div><pre class=\"ds-editor-source\"><span class=\"ds-editor-keyword\">module</span> Main <span class=\"ds-editor-keyword\">exposing</span> (main)\n\nmain : Unit -&gt;{; AppError} Unit\n<span class=\"ds-editor-keyword\">let</span> main () =\n  Platform.stdout_line <span class=\"ds-editor-string\">\"Hello, effects.\"</span></pre><div class=\"ds-editor-status\"><span class=\"ds-editor-dot\" aria-hidden=\"true\"></span>Real Flick. Right in your browser.</div></section>",
+      "css": ".ds-editor { min-width:0; border:1px solid var(--sl-color-gray-5, #d6d6e0); border-radius:12px; background:var(--flick-editor-bg, #fafafc); color:var(--sl-color-white, #101016); overflow:hidden; font-family:var(--sl-font, Geist, sans-serif); } .ds-editor-tabs { display:flex; align-items:stretch; min-height:54px; gap:0.65rem; padding:0 1.2rem; background:var(--flick-editor-top, #f5f4fb); border-bottom:1px solid var(--sl-color-gray-5, #d6d6e0); } .ds-editor-tab { display:inline-flex; position:relative; } .ds-editor-tab button { display:inline-flex; align-items:center; justify-content:center; background:transparent; color:var(--sl-color-white, #101016); border:0; cursor:pointer; padding:0 0.65rem; min-height:54px; font:inherit; font-weight:520; } .ds-editor-tab button:hover { background:var(--sl-color-gray-6, #eeeef5); } .ds-editor-tab button:focus-visible { outline:2px solid var(--sl-color-accent-high, #584dd0); outline-offset:4px; } .ds-editor-tab button:disabled { opacity:0.55; cursor:wait; } .ds-editor-tab-current::after { content:\"\"; position:absolute; inset:auto 0.5rem -1px; height:2px; background:var(--sl-color-accent-high, #584dd0); } .ds-editor-tab-current button, .ds-editor-keyword { color:var(--sl-color-accent-high, #584dd0); } .ds-editor-file { display:flex; min-height:51px; align-items:center; gap:0.5rem; padding-left:1.5rem; border-bottom:1px solid var(--sl-color-gray-5, #d6d6e0); font-family:var(--sl-font-mono, SFMono-Regular, Consolas, Liberation Mono, monospace); font-size:0.9rem; } .ds-editor-source { padding:1.35rem 1.5rem; overflow:auto; margin:0; background:transparent; font-family:var(--sl-font-mono, SFMono-Regular, Consolas, Liberation Mono, monospace); font-size:clamp(0.8rem, 1.11vw, 1.08rem); font-variant-ligatures:none; line-height:2.3; white-space:pre; tab-size:2; } .ds-editor-string { color:var(--flick-success, #347b57); } .ds-editor-status { display:flex; align-items:center; gap:0.6rem; min-height:44px; padding:0.7rem 1.3rem; font-size:0.8rem; color:var(--sl-color-gray-2, #484852); border-top:1px solid var(--sl-color-hairline, #e0e0e8); white-space:pre-wrap; overflow-wrap:anywhere; } .ds-editor-dot { flex:0 0 7px; width:7px; height:7px; background:var(--flick-success, #347b57); border-radius:50%; } @media(max-width:63rem) { .ds-editor-source { font-size:1rem; } } @media(max-width:40rem) { .ds-editor-tabs { padding:0 0.65rem; } .ds-editor-file { padding-left:1rem; } .ds-editor-source { font-size:0.75rem; line-height:2.1; padding:1.3rem 1rem; } .ds-editor-status { font-size:0.73rem; padding-inline:1rem; } }",
+      "refersTo": "editor-container"
+    },
+    {
+      "name": "Ruled destination row",
+      "kind": "nav",
+      "description": "Unboxed exploration link from Landing.astro; this is the site’s alternative to an invented raised-card grid.",
+      "html": "<a class=\"ds-destination\" href=\"/learn/\"><div><h3>Learn</h3><p>From your first program to effects, types, and regions. A path, not a wall of reference pages.</p></div><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14m-6-6 6 6-6 6\"/></svg></a>",
+      "css": ".ds-destination { display:flex; justify-content:space-between; align-items:center; padding:2rem 0; gap:2rem; color:var(--sl-color-text, #373740); text-decoration:none; border-top:1px solid var(--sl-color-hairline, #e0e0e8); font-family:var(--sl-font, Geist, sans-serif); line-height:1.6; } .ds-destination h3 { font-size:1.75rem; color:var(--sl-color-white, #101016); margin:0.2rem 0 0.7rem; font-weight:600; letter-spacing:-0.025em; } .ds-destination p { margin:0; max-width:44ch; font-size:1rem; } .ds-destination > svg { flex-shrink:0; } .ds-destination:hover h3, .ds-destination:hover > svg { color:var(--sl-color-accent-high, #584dd0); } .ds-destination:focus-visible { outline:2px solid var(--sl-color-accent-high, #584dd0); outline-offset:4px; } @media(max-width:40rem) { .ds-destination { padding:1.6rem 0; } }"
+    },
+    {
+      "name": "Geometric Flick brand",
+      "kind": "custom",
+      "description": "Exact SVG paths from Brand.astro, including the separate violet spark; no icon package or image URL.",
+      "html": "<a class=\"ds-brand\" href=\"/\" aria-label=\"Flick home\"><svg viewBox=\"0 0 56 54\" width=\"49\" height=\"48\" fill=\"none\" aria-hidden=\"true\"><g fill=\"currentColor\" transform=\"translate(0 9)\"><path d=\"M0 18v-3C0 6 6 0 15 0h17l-4 7H15C9 7 4 11 0 18Z\"/><path d=\"M0 44V27c0-6 5-10 11-10h21l-4 7H14l-4 4v7Z\"/></g><path class=\"ds-brand-spark\" d=\"M46 0c1.4 6.2 3.8 8.6 10 10-6.2 1.4-8.6 3.8-10 10-1.4-6.2-3.8-8.6-10-10 6.2-1.4 8.6-3.8 10-10Z\"/></svg><span>flick</span></a>",
+      "css": ".ds-brand { display:inline-flex; flex-shrink:0; align-items:center; gap:0.8rem; color:var(--sl-color-white, #101016); text-decoration:none; min-height:44px; font-family:var(--sl-font, Geist, sans-serif); } .ds-brand span { font-size:2.35rem; line-height:1; font-weight:760; letter-spacing:-0.035em; } .ds-brand-spark { fill:var(--sl-color-accent-high, #584dd0); } .ds-brand:focus-visible { outline:2px solid var(--sl-color-accent-high, #584dd0); outline-offset:4px; } @media(max-width:49.99rem) { .ds-brand { gap:0.5rem; } .ds-brand svg { width:38px; height:39px; } .ds-brand span { font-size:1.85rem; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Signal",
+    "overview": "Signal is a cool-paper engineering editorial: precise graphite geometry, violet emphasis, generous breathing room, and code with a real job to do. The owner-approved world is confident without becoming a dashboard or a decorative card collection. The geometric F and violet spark carry the identity; the drifting dot field is the signature atmospheric material.\n\nThe visual language stays shared while density follows the task. Persuade surfaces give the headline and working code room to lead. Read surfaces quiet the decoration and prioritize navigation, line length, and document hierarchy. Operate surfaces spend their width on source, diagnostics, output, and generated JavaScript. These are different applications of the same system, not a requirement to reuse the homepage composition everywhere.",
+    "keyCharacteristics": [
+      "Cool paper, graphite text, and restrained violet signals.",
+      "Geist editorial hierarchy paired with practical monospace code.",
+      "Unboxed content sections, fine rules, and small controlled radii.",
+      "Real interactive examples with explicit loading, failure, and recovery states.",
+      "A static dot geometry with one slow group drift honoring system reduced motion."
+    ],
+    "rules": [
+      {
+        "name": "The Signal Rule",
+        "body": "Violet denotes identity, action, selection, focus, or language structure; neutral ink carries ordinary reading.",
+        "section": "colors"
+      },
+      {
+        "name": "The Code Is Content Rule",
+        "body": "Preserve code whitespace, line breaks, and horizontal access to long lines; never shrink the whole page to fit a source line.",
+        "section": "typography"
+      },
+      {
+        "name": "The Task-Width Rule",
+        "body": "Keep reading columns bounded, but give Play and Transpile their wider workspace; the document measure is not the editor measure.",
+        "section": "layout"
+      }
+    ],
+    "dos": [
+      "**Do** reuse semantic theme properties so controls, code, and reading surfaces respond together to theme changes.",
+      "**Do** keep reading measures bounded and allow Play and Transpile the wider workspace.",
+      "**Do** preserve the graphite geometric F, separate violet spark, fine rules, and restrained corners.",
+      "**Do** keep source whitespace, keyboard focus, localized labels, and explicit recovery feedback intact.",
+      "**Do** author custom widget state and behavior in Flick, leaving platform interoperability and mounting at the JavaScript/TypeScript boundary.",
+      "**Do** honor system reduced-motion preferences; animate the wave as one group only."
+    ],
+    "donts": [
+      "**Don't** turn every feature or destination into an elevated card; the shipped editorial sections and ruled rows are intentionally open.",
+      "**Don't** copy the homepage's headline/editor composition into every reading or operating surface.",
+      "**Don't** remove mobile access to locales, reference navigation, or Transpile when compacting the header.",
+      "**Don't** replace real compiler output, copy failures, diagnostics, or loading states with ornamental success claims.",
+      "**Don't** add per-dot animation or atmospheric motion to reading and editing surfaces."
+    ]
+  }
+}

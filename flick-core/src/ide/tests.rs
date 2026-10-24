@@ -51,6 +51,12 @@ let area s =
   match s with
   | Circle r -> r * r
   | Square a -> a * a
+
+type Pair a b = Pair a b
+  deriving Eq, Ord
+
+type Tagged (f : Type -> Type) a = Tagged a
+  deriving Hash, Eq
 ";
 
 const MAIN: &str = "module App.Main exposing (run, keep, describe)
@@ -503,4 +509,39 @@ fn captures_in_sql_are_names_of_the_program() {
         .map(|(_, (s, e))| &text[*s as usize..*e as usize])
         .collect();
     assert_eq!(renamed, ["owner"; 3]);
+}
+
+#[test]
+fn hover_on_a_derived_class_shows_the_instance_it_makes() {
+    let f = fixture();
+    let ide = f.ide();
+    let domain = f.file("App.Domain");
+    let hover = |needle: &str| {
+        ide.hover(domain, f.at("App.Domain", needle, 0) + 1)
+            .unwrap_or_else(|| panic!("hover {needle}"))
+            .0
+    };
+    let show = hover("Show, Schema");
+    assert!(
+        show.contains("instance Show Shape")
+            && show.contains("`Circle 2`")
+            && show.contains("from `Prelude`"),
+        "{show}"
+    );
+    let ord = hover("Ord\n");
+    assert!(
+        ord.contains("instance (Ord a, Ord b) => Ord (Pair a b)"),
+        "{ord}"
+    );
+    // no context for `f`, a parameter of a higher kind
+    let tagged = hover("Hash, Eq");
+    assert!(
+        tagged.contains("instance Hash a => Hash (Tagged f a)"),
+        "{tagged}"
+    );
+    let schema = hover("Schema\n");
+    assert!(schema.contains("schema Shape"), "{schema}");
+    let at = f.at("App.Domain", "Show, Schema", 0);
+    let (_, range) = ide.symbol_at(domain, at + 1).expect("Show");
+    assert_eq!(range, (at, at + 4));
 }

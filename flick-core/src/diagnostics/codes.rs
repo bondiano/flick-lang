@@ -146,6 +146,7 @@ codes! {
     T018 = Types 18, "wrong number of constructor arguments in a pattern";
     T019 = Types 19, "block without a result expression";
     T020 = Types 20, "representation of a type that does not fit it";
+    T021 = Types 21, "annotation of a type the value already has";
     T022 = Types 22, "`todo` left in the code";
     T023 = Types 23, "`echo` left in the code";
     T024 = Types 24, "type hole";

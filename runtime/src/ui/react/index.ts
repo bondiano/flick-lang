@@ -64,27 +64,30 @@ const EventElement = ({ bridge, node }: { readonly bridge: Events; readonly node
 };
 
 const LazyView = memo(
-  ({ bridge, node }: { readonly bridge: Events; readonly node: LazyNode }): ReactNode => toReact(bridge, node.view(node.model)),
+  ({ bridge, node }: { readonly bridge: Events | undefined; readonly node: LazyNode }): ReactNode => toReact(bridge, node.view(node.model)),
   (before, after) =>
     before.bridge === after.bridge &&
     before.node.view === after.node.view &&
     after.node.equal(before.node.model, after.node.model),
 );
 
-const toReact = (bridge: Events, node: Ui): ReactNode => {
+const toReact = (bridge: Events | undefined, node: Ui): ReactNode => {
   if (node.kind === "text") return node.value;
   if (node.kind === "fragment") return createElement(Fragment, null, ...children(bridge, node.children));
   if (node.kind === "keyed") return createElement(Fragment, { key: node.key }, toReact(bridge, node.node));
   if (node.kind === "lazy") return createElement(LazyView, { bridge, node });
   if (node.kind === "component") return createElement(node.component, node.props);
-  if (Object.keys(node.events).length > 0) return createElement(EventElement, { bridge, node });
+  if (bridge !== undefined && Object.keys(node.events).length > 0) return createElement(EventElement, { bridge, node });
   const props: Record<string, unknown> = { ...node.attrs };
   if (node.html === undefined) return createElement(node.tag, props, ...children(bridge, node.children));
   props["dangerouslySetInnerHTML"] = { __html: node.html };
   return createElement(node.tag, props);
 };
 
-const children = (bridge: Events, nodes: ReadonlyArray<Ui>): Array<ReactNode> => nodes.map((node) => toReact(bridge, node));
+const children = (bridge: Events | undefined, nodes: ReadonlyArray<Ui>): Array<ReactNode> => nodes.map((node) => toReact(bridge, node));
+
+/** The same inert view for server markup; event bindings are attached by the client root. */
+export const uiRenderStatic = (node: Ui): ReactNode => toReact(undefined, node);
 
 class RenderBoundary extends Component<
   { readonly broken: (cause: Cause.Cause<unknown>) => void; readonly children: ReactNode },

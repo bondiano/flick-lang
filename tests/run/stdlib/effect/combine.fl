@@ -37,8 +37,8 @@ let main () =
           Reducer.combine_all Bool.reducer_or [false, true],
           Reducer.combine_all Bool.reducer_or [],
         ))
-  let a : Record.ReadonlyRecord Number = Record.from_entries [("x", 1), ("y", 2)]
-  let b : Record.ReadonlyRecord Number = Record.from_entries [("y", 10), ("z", 20)]
+  let a = Record.from_entries [("x", 1), ("y", 2)]
+  let b = Record.from_entries [("y", 10), ("z", 20)]
   Platform.stdout_line
     ("union: " ++ show (Record.to_entries (Reducer.combine_all (Reducer.record_union sum) [a, b])))
   Platform.stdout_line

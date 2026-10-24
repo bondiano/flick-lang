@@ -154,7 +154,7 @@ let races () =
 scheduling : Unit ->{} Unit
 let scheduling () =
   let mine = Scheduler.make_mixed ()
-  let used : Scheduler.Scheduler = Scheduler.with_scheduler mine (task { Scheduler.current () })
+  let used = Scheduler.with_scheduler mine (task { Scheduler.current () })
   Platform.stdout_line ("with_scheduler: " ++ show (Scheduler.max_ops_before_yield () > 0))
   let _ = used
   Platform.stdout_line

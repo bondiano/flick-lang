@@ -2,6 +2,10 @@
 import Brand from "./Brand.astro";
 import Icon from "./Icon.astro";
 import DocNavigation from "./DocNavigation.astro";
+import { Effect } from "@flick-lang/runtime";
+import { uiRenderStatic, type Ui } from "@flick-lang/runtime/ui/react";
+import { renderToString } from "react-dom/server";
+import { shell } from "../widgets/Controls.fl";
 
 const route = Astro.props.locale === undefined ? Astro.locals.starlightRoute : undefined;
 const ru = Astro.props.locale === "ru" || route?.lang === "ru";
@@ -14,6 +18,8 @@ const links = [
   ["Learn", "/learn/"], ["Guides", "/guides/"], ["API", "/api/"], ["Ecosystem", "/ecosystem/"],
 ];
 const sidebar = route?.hasSidebar ? route.sidebar : undefined;
+const controlView = shell as (ru: boolean) => Effect.Effect<Ui>;
+const controlsHtml = renderToString(uiRenderStatic(await Effect.runPromise(controlView(ru))));
 ---
 <div class="site-header" data-pagefind-ignore>
   <Brand href={`${prefix}/`} label={ru ? "Flick — главная" : "Flick home"} />
@@ -21,7 +27,7 @@ const sidebar = route?.hasSidebar ? route.sidebar : undefined;
     {links.map(([label, href]) => <a href={`${prefix}${href}`} aria-current={unlocalized.startsWith(href) ? "page" : undefined}>{label}</a>)}
   </nav>
   <div class="site-header-right">
-    <div id="flick-site-controls"></div>
+    <div id="flick-site-controls" data-flick-ssr set:html={controlsHtml}></div>
     <div class="locale-switch" aria-label={ru ? "Язык" : "Language"}>
       {ru ? <a href={english} lang="en" aria-label="Switch to English">EN</a> : <span aria-current="true">EN</span>}
       <span class="locale-divider" aria-hidden="true">/</span>

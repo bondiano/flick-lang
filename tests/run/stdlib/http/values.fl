@@ -88,7 +88,7 @@ let cookies () =
         priority = Some Http.Cookies.High;
         maxAge = Some (seconds 60);
     }
-  let jar : Http.Cookies.Cookies =
+  let jar =
     Http.Cookies.empty
     |> Http.Cookies.set "session" (Redacted.make "abc123") attributes
   Platform.stdout_line ("show: " ++ (show jar))

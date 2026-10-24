@@ -337,12 +337,15 @@ impl Checker<'_> {
         self.store.level += 1;
         let saved = mem::take(&mut self.runtime);
         let errors = self.diagnostics.len();
+        let mut redundant = None;
         let ty = match (parts.params.is_empty(), parts.header) {
             (false, _) => self.function(&parts.params, parts.body, None, decl),
             (true, Some(header)) => {
                 let ty = self.annotation(header);
-                if let Some(b) = parts.body {
-                    self.check(b, &ty);
+                if let Some(b) = parts.body
+                    && self.check_exact(b, &ty)
+                {
+                    redundant = Some(header);
                 }
                 ty
             }
@@ -391,6 +394,8 @@ impl Checker<'_> {
                 )
                 .with_fix(format!("add `{name} : {shown}`"), edits),
             );
+        } else if let Some(header) = redundant {
+            self.redundant_annotation(decl, parts, header);
         }
         if runtime || function {
             self.store.lower(&ty);

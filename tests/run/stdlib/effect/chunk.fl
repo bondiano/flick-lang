@@ -12,7 +12,7 @@ let half n = if even n then Ok (n / 2) else Err ("odd " ++ show n)
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let c : Chunk.Chunk Number = Chunk.from_list [3, 1, 4, 1, 5, 9, 2, 6]
+  let c = Chunk.from_list [3, 1, 4, 1, 5, 9, 2, 6]
   let nothing : Chunk.Chunk Number = Chunk.empty
   line
     "build"
@@ -24,7 +24,7 @@ let main () =
         Chunk.to_list (Chunk.to_chunk (Chunk.range 1 4)),
       ))
   line "size" (show (Chunk.size c, Chunk.is_empty nothing, Chunk.is_empty c, Chunk.get 2 c))
-  let first : Option (Chunk.NonEmptyChunk Number) = Chunk.non_empty c
+  let first = Chunk.non_empty c
   line "non_empty" (show (Option.is_some first, Option.is_some (Chunk.non_empty nothing)))
   match first with
   | Some n ->

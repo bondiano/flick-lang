@@ -10,7 +10,7 @@ let less k n = if n > k then Some (n - k) else None
 
 cells : Unit ->{} List String
 let cells () =
-  let cell : Ref Number = Ref.make 1
+  let cell = Ref.make 1
   let a = Ref.get_and_set cell 2
   let b = Ref.get_and_update cell (fun n -> n * 10)
   let c = Ref.get_and_update_some cell (fun _ -> None)
@@ -24,7 +24,7 @@ let cells () =
 
 synchronized : Unit ->{; Refused} List String
 let synchronized () =
-  let ref : SynchronizedRef.SynchronizedRef Number = SynchronizedRef.make 1
+  let ref = SynchronizedRef.make 1
   let a = SynchronizedRef.get_and_set 2 ref
   let b = SynchronizedRef.get_and_update (fun n -> n + 1) ref
   let c = SynchronizedRef.get_and_update_effect (fun n -> n * 10) ref
@@ -70,7 +70,7 @@ let synchronized () =
 
 subscription : Unit ->{} List String
 let subscription () =
-  let ref : SubscriptionRef.SubscriptionRef String = SubscriptionRef.make "a"
+  let ref = SubscriptionRef.make "a"
   let a = SubscriptionRef.get_and_set "b" ref
   let b = SubscriptionRef.get_and_update (fun s -> s ++ "c") ref
   let c = SubscriptionRef.get_and_update_effect (fun s -> s ++ "d") ref

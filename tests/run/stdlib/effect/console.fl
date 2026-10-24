@@ -37,7 +37,7 @@ let main () =
     Console.log "in a scoped group"
   }
   Console.log "the scope closed the group"
-  let quiet : Console.Console = Console.to_stderr ()
+  let quiet = Console.to_stderr ()
   Console.with_console quiet (task {
     scope {
       Console.time "timer"
@@ -50,7 +50,7 @@ let main () =
   let same = Console.with_console quiet (task { Console.current () })
   Console.dir (same == quiet)
   Console.log "back on stdout"
-  let warn_level : LogLevel.LogLevel = LogLevel.warn
+  let warn_level = LogLevel.warn
   Platform.stdout_line ("values: " ++ show LogLevel.values ++ " " ++ show warn_level)
   Platform.stdout_line
     ("ordinal info < warn: "

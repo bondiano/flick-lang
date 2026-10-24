@@ -45,7 +45,7 @@ let main () =
     ("ids "
       ++ show (String.length (Tracer.span_id span) > 0, String.length (Tracer.trace_id span) > 0))
   let ended =
-    let status : Tracer.SpanStatus = Tracer.status span
+    let status = Tracer.status span
     match status with
     | Tracer.Ended start finish -> finish >= start
     | Tracer.Started _ -> false
@@ -81,7 +81,7 @@ let main () =
           Tracer.attributes remote,
           Tracer.sampled remote,
         ))
-  let kinds : List Tracer.SpanKind =
+  let kinds =
     [Tracer.internal, Tracer.server, Tracer.client, Tracer.producer, Tracer.consumer]
   Platform.stdout_line ("kinds " ++ show kinds)
   let rooted =
@@ -89,7 +89,7 @@ let main () =
       Tracer.with_span "root" { options with root = true } (task { names () })
     })
   Platform.stdout_line ("root " ++ rooted)
-  let native : Tracer.Tracer = Tracer.native_tracer
+  let native = Tracer.native_tracer
   let traced =
     Tracer.with_tracer native (task { Tracer.with_span "native" options (task { names () }) })
   Platform.stdout_line ("with_tracer " ++ traced)

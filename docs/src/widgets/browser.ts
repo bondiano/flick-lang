@@ -4,8 +4,6 @@ export const isRussian = (): boolean => document.documentElement.lang === "ru";
 export const preferences = () => ({
   ru: isRussian(),
   dark: document.documentElement.dataset.theme === "dark",
-  paused: document.documentElement.dataset.motion === "paused" || matchMedia("(prefers-reduced-motion: reduce)").matches,
-  home: document.body.classList.contains("flick-home"),
 });
 
 const remember = (key: string, value: string): void => {
@@ -18,11 +16,6 @@ export const setDark = (dark: boolean): void => {
   remember("starlight-theme", theme);
 };
 
-export const setPaused = (paused: boolean): void => {
-  document.documentElement.dataset.motion = paused ? "paused" : "running";
-  remember("flick-motion", paused ? "paused" : "running");
-};
-
 export const openSearch = (): void => {
   const dialog = document.querySelector<HTMLDialogElement>("#flick-search-dialog");
   dialog?.showModal();
@@ -33,18 +26,19 @@ export const copyText = (source: string): Promise<void> => navigator.clipboard.w
 
 interface SearchData { meta: { title?: string }; excerpt: string; url: string }
 interface SearchIndex {
-  options(settings: { basePath: string }): Promise<void>;
   search(query: string): Promise<{ results: Array<{ data(): Promise<SearchData> }> }>;
+}
+interface SearchModule {
+  createInstance(settings: { noWorker: boolean }): SearchIndex;
 }
 let index: Promise<SearchIndex> | undefined;
 
 export const search = async (query: string) => {
   // The production-only Pagefind module does not exist in source, so a static import cannot resolve it.
   const path = "/pagefind/pagefind.js";
-  const pagefind = await (index ??= import(/* @vite-ignore */ path).then(async (module: SearchIndex) => {
-    // Blob workers need an absolute URL for the index and metadata fetches.
-    await module.options({ basePath: new URL("/pagefind/", location.href).href });
-    return module;
+  const pagefind = await (index ??= import(/* @vite-ignore */ path).then((module: SearchModule) => {
+    // shortcut: Pagefind 1.5 gives blob workers relative URLs; re-enable workers when its initializer preserves absolute paths.
+    return module.createInstance({ noWorker: true });
   }).catch((error: unknown) => {
     index = undefined;
     throw error;

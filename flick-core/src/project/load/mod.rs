@@ -197,6 +197,10 @@ fn run(
     };
     let analyzed = loader.ide.take().unwrap_or_default();
     let mut diagnostics = loader.diagnostics;
+    if let Some(p) = project {
+        diagnostics
+            .retain(|d| d.severity != Severity::Warning || !p.config.allow.contains(&d.code));
+    }
     // by path, not by load order, which follows the order of imports
     let sources = &*loader.sources;
     diagnostics.sort_by_cached_key(|d| {

@@ -138,6 +138,11 @@ pub struct CheckArguments {
     /// Check again whenever a source file changes.
     #[arg(long)]
     pub watch: bool,
+
+    /// Apply the fixes that keep the program's meaning, such as removing a
+    /// type annotation the value already has, then report what is left.
+    #[arg(long, conflicts_with = "watch")]
+    pub fix: bool,
 }
 
 #[derive(Args)]

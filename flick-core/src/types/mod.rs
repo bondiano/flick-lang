@@ -37,6 +37,7 @@ mod origin;
 mod patterns;
 mod qualified;
 mod records;
+mod redundant;
 mod regions;
 mod report;
 mod rows;

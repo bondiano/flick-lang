@@ -1,5 +1,9 @@
 ---
 import "../styles/playground.css";
+import { Effect } from "@flick-lang/runtime";
+import { uiRenderStatic, type Ui } from "@flick-lang/runtime/ui/react";
+import { renderToString } from "react-dom/server";
+import { initial_view } from "../playground/Playground.fl";
 
 interface Props {
   mode: "play" | "transpile";
@@ -7,20 +11,25 @@ interface Props {
 }
 
 const { mode, locale } = Astro.props;
+const initialView = initial_view as (config: { mode: string; locale: string }) => Effect.Effect<Ui>;
+const markup = renderToString(uiRenderStatic(await Effect.runPromise(initialView({ mode, locale }))));
 ---
 
-<div id="flick-playground" class="not-content flick-playground-shell" data-mode={mode} data-locale={locale}>
-  <p class="fp-boot" role="status">
-    {locale === "ru" ? "Загрузка интерфейса Flick…" : "Loading the Flick interface…"}
-  </p>
-  <noscript>
-    {locale === "ru" ? "Для компиляции и запуска в браузере нужен JavaScript." : "Browser compilation and execution require JavaScript."}
-  </noscript>
-</div>
+<div id="flick-playground" class="not-content flick-playground-shell" data-mode={mode} data-locale={locale} data-flick-ssr data-pagefind-ignore set:html={markup}></div>
+<noscript>
+  <p class="fp-boot">{locale === "ru" ? "Для компиляции и запуска в браузере нужен JavaScript." : "Browser compilation and execution require JavaScript."}</p>
+</noscript>
 
 <script>
   import { runMain } from "@flick-lang/runtime";
   import { main } from "../playground/Playground.fl";
+  import { bindEditorScroll } from "../playground/highlight.ts";
 
   void runMain(main as Parameters<typeof runMain>[0]);
+  const root = document.getElementById("flick-playground");
+  if (root !== null) {
+    const dispose = bindEditorScroll(root);
+    window.addEventListener("pagehide", dispose, { once: true });
+    import.meta.hot?.dispose(dispose);
+  }
 </script>
