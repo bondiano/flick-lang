@@ -1,11 +1,27 @@
 // React-only rendering and event ownership. Adapters mount roots; this core
 // stops events first, then interrupts and joins tasks before its scope closes.
 import { Cause, Effect, Fiber } from "effect";
-import { Component, Fragment, type ReactNode, createElement, memo, useLayoutEffect, useMemo } from "react";
+import type * as Atom from "effect/reactivity/Atom";
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry";
+import {
+  Component,
+  type FunctionComponent,
+  Fragment,
+  type ReactNode,
+  createContext,
+  createElement,
+  memo,
+  useContext,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+} from "react";
+
+import { runReading } from "../../atoms.ts";
 
 import type { Cell } from "../../builtins.ts";
 import type { Failure } from "../../cause.ts";
-import type { Ui } from "./nodes.ts";
+import type { Ui, View } from "./nodes.ts";
 import { Bridge, type Listener } from "./policies.ts";
 
 export * from "./nodes.ts";
@@ -71,8 +87,56 @@ const LazyView = /*#__PURE__*/ memo(
     after.node.equal(before.node.model, after.node.model),
 );
 
+/** The registry views read atoms from: `Ui.Dom.mount` provides it. */
+const RegistryContext = /*#__PURE__*/ createContext<AtomRegistry.AtomRegistry | undefined>(undefined);
+
+interface ViewProps {
+  readonly bridge: Events | undefined;
+  readonly props: unknown;
+}
+
+/** One React component per view, named as React's tools show it. */
+const components = new WeakMap<View, FunctionComponent<ViewProps>>();
+
+const component = (view: View): FunctionComponent<ViewProps> => {
+  const known = components.get(view);
+  if (known !== undefined) return known;
+  const render = ({ bridge, props }: ViewProps): ReactNode => {
+    const registry = useContext(RegistryContext);
+    if (registry === undefined) throw new Error("a view reads atoms: render it with `Ui.Dom.mount`, which provides the registry");
+    const [, rerender] = useReducer((n: number) => n + 1, 0);
+    const read = new Map<Atom.Atom<unknown>, unknown>();
+    const node = runReading(view.render(props), (atom) => {
+      const value = registry.get(atom);
+      read.set(atom, value);
+      return value;
+    });
+    // Subscribe after the commit; a write since the render renders again.
+    useLayoutEffect(() => {
+      const unsubscribe = [...read.keys()].map((atom) => registry.subscribe(atom, rerender));
+      for (const [atom, value] of read) {
+        if (!Object.is(registry.get(atom), value)) {
+          rerender();
+          break;
+        }
+      }
+      return () => {
+        for (const off of unsubscribe) off();
+      };
+    });
+    return toReact(bridge, node);
+  };
+  const made = memo(render);
+  made.displayName = view.label ?? "FlickView";
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `memo` of a function component is one to render
+  const result = made as unknown as FunctionComponent<ViewProps>;
+  components.set(view, result);
+  return result;
+};
+
 const toReact = (bridge: Events | undefined, node: Ui): ReactNode => {
   if (node.kind === "text") return node.value;
+  if (node.kind === "view") return createElement(component(node.view), { bridge, props: node.props });
   if (node.kind === "fragment") return createElement(Fragment, null, ...children(bridge, node.children));
   if (node.kind === "keyed") return createElement(Fragment, { key: node.key }, toReact(bridge, node.node));
   if (node.kind === "lazy") return createElement(LazyView, { bridge, node });
@@ -115,6 +179,7 @@ export const uiRunWith = <M, R>(
   supervisor: (failure: Failure) => Effect.Effect<unknown, unknown, R>,
   model: Cell<M>,
   view: (model: M) => Ui,
+  registry?: AtomRegistry.AtomRegistry,
 ): Effect.Effect<never, unknown, R> =>
   Effect.uninterruptibleMask((restore) =>
     Effect.gen(function* () {
@@ -135,7 +200,8 @@ export const uiRunWith = <M, R>(
         previous = current;
         rendered = true;
         try {
-          root?.render(createElement(RenderBoundary, { broken, children: createElement(View, { value: current }) }));
+          const tree = createElement(RenderBoundary, { broken, children: createElement(View, { value: current }) });
+          root?.render(registry === undefined ? tree : createElement(RegistryContext.Provider, { value: registry }, tree));
         } catch (error) {
           broken(Cause.die(error));
         }

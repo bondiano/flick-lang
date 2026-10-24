@@ -24,3 +24,15 @@ run :
   Container -> (Failure e ->{r; none} Unit)^c -> Ref m -> (m -> (Ui r e)^c)^c ->{r; none} Never
 foreign effect run from "@flick-lang/runtime/ui" "uiRun"
   retention call
+
+/// Renders `ui` into `container` with React. The views in it read atoms
+/// from the provided registry, and each renders again only when an atom it
+/// read changes. Events, `supervisor` and shutdown work as in `run`.
+mount :
+  forall c r e.
+  Container ->
+    (Failure e ->{r; none} Unit)^c ->
+    (Ui r e)^c ->{Reactivity.Atom.Registry | r; none}
+    Never
+foreign effect mount from "@flick-lang/runtime/ui" "uiMount"
+  retention call

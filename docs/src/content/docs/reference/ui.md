@@ -106,6 +106,41 @@ Reordering preserves both the React subtree and the event policy state of
 that key; it must not start another task for a busy `exhaust` handler.
 
 
+## Atoms and views
+
+An atom (`Atom`) describes a value; the registry a program provides with
+`provide Reactivity.Atom.layer { … }` holds the values of the atoms read
+through it. `Atom.make value` is a state, `Atom.derived` an atom computed
+from the atoms it reads, and `Atom.set`/`Atom.update` write a state.
+
+A view is a component whose render reads atoms through the service
+`Atom.Read`. `Ui.Dom.mount` renders a `Ui` with the provided registry, and
+each view in it renders again only when an atom it read changes, not when a
+sibling's does:
+
+```flick
+count : Atom.Writable Number
+let count = Atom.make 0
+
+counter_view : Ui.View Unit {Reactivity.Atom.Registry} none
+let counter_view =
+  Ui.named "App.Counter.counter_view" (Ui.view (fun () ->
+    ui {
+      button
+        {
+          disabled = false;
+          on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
+        }
+        [text (Atom.value count |> show)]
+    }))
+```
+
+`Ui.render view props` places a view in a `Ui`; `Ui.named` is the name
+React's developer tools show. A view subscribes to what it read after React
+commits, and a write between its render and its subscription renders it
+again. Rendering a view outside `Ui.Dom.mount` fails with what to do. The
+render reads synchronously: it may read atoms but run nothing else.
+
 ## Handlers and policies
 
 A handler field has the opaque type `Ui.Handler snapshot r e`, which only a

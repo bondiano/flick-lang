@@ -52,8 +52,19 @@ const impl = (registry: AtomRegistry.AtomRegistry) => ({
   refresh: <A>(atom: Atom.Atom<A>) => Effect.sync(() => registry.refresh(atom)),
 });
 
+/** Effect's registry behind each implementation of the service, for views that subscribe. */
+const natives = new WeakMap<object, AtomRegistry.AtomRegistry>();
+
+/** The registry of an implementation of `Reactivity.Atom.Registry`. */
+export const nativeRegistry = (record: object): AtomRegistry.AtomRegistry | undefined => natives.get(record);
+
 /** `Reactivity.Atom.layer`: a fresh registry as the service `key`. */
 export const flickLayer = <I>(key: Context.Key<I, ReturnType<typeof impl>>): Layer.Layer<I> =>
-  Layer.effect(key, Effect.map(Effect.service(AtomRegistry.AtomRegistry), impl)).pipe(
-    Layer.provide(AtomRegistry.layer),
-  );
+  Layer.effect(
+    key,
+    Effect.map(Effect.service(AtomRegistry.AtomRegistry), (registry) => {
+      const record = impl(registry);
+      natives.set(record, registry);
+      return record;
+    }),
+  ).pipe(Layer.provide(AtomRegistry.layer));

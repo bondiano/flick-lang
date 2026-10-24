@@ -52,9 +52,6 @@ const SOURCES: &[(&str, &str)] = &[
     ("File", include_str!("builtins/File.fl")),
     ("Resource", include_str!("builtins/Resource.fl")),
     ("Events", include_str!("builtins/Events.fl")),
-    ("Ui", include_str!("builtins/Ui.fl")),
-    ("Ui.Event", include_str!("builtins/Ui/Event.fl")),
-    ("Ui.Dom", include_str!("builtins/Ui/Dom.fl")),
     ("Gen", include_str!("builtins/Gen.fl")),
     ("Checks", include_str!("builtins/Checks.fl")),
     ("Schema", include_str!("builtins/Schema.fl")),
@@ -246,6 +243,11 @@ const SOURCES: &[(&str, &str)] = &[
         include_str!("builtins/Reactivity/AsyncResult.fl"),
     ),
     ("Reactivity.Atom", include_str!("builtins/Reactivity/Atom.fl")),
+    // UI on atoms: `Atom` over the reactivity modules, then `Ui`
+    ("Atom", include_str!("builtins/Atom.fl")),
+    ("Ui", include_str!("builtins/Ui.fl")),
+    ("Ui.Event", include_str!("builtins/Ui/Event.fl")),
+    ("Ui.Dom", include_str!("builtins/Ui/Dom.fl")),
     // Effect: HTTP
     ("Http.Method", include_str!("builtins/Http/Method.fl")),
     ("Http.Status", include_str!("builtins/Http/Status.fl")),

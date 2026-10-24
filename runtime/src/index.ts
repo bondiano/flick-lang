@@ -10,6 +10,7 @@ export * from "./capabilities.ts";
 export * from "./cause.ts";
 export * from "./concurrency.ts";
 export * from "./data.ts";
+export * from "./atoms.ts";
 export * from "./effects.ts";
 export * from "./entry.ts";
 export * from "./layer.ts";

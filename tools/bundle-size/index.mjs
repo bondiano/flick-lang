@@ -20,6 +20,8 @@ export const PROGRAMS = [
   { name: "pure", source: "tools/bundle-size/pure.fl", budget: 12 },
   { name: "counter", source: "tests/run/ui/counter.fl", budget: 81 },
   { name: "playground", source: "docs/src/playground/Playground.fl", budget: 91 },
+  // views on atoms: at most the counter's budget and 18 KB for effect/reactivity (U8)
+  { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 99 },
 ];
 
 /** Modules no tracked program uses: a bundle that keeps one is an error. */

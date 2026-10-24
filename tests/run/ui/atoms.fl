@@ -1,0 +1,77 @@
+// Views on atoms mounted with React 19 in jsdom: a click writes a state,
+// the view that read it and a view of a derived atom render again, and the
+// scope's end unmounts the root.
+module App.Main exposing (main)
+
+setup : Unit ->{} Unit
+foreign sync setup from "./dom.mjs" "setup"
+  arity 0
+
+click : String ->{} Unit
+foreign sync click from "./dom.mjs" "click"
+  arity 1
+
+settle : Unit ->{} Unit
+foreign async settle from "./dom.mjs" "settle"
+  arity 0
+
+text : Unit ->{} String
+foreign sync text from "./dom.mjs" "text"
+  arity 0
+
+count : Atom.Writable Number
+let count = Atom.make 0
+
+doubled : Atom.Atom Number
+let doubled = Atom.derived (fun () -> Atom.value count * 2)
+
+counter_view : Ui.View Unit {Reactivity.Atom.Registry} none
+let counter_view =
+  Ui.named
+    "App.Main.counter_view"
+    (Ui.view (fun () ->
+      let n = Atom.value count
+      ui {
+        div
+          { class_name = "counter" }
+          [
+            text ("count " ++ show n),
+            button
+              {
+                disabled = false;
+                on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun c -> c + 1) });
+              }
+              [text "+1"],
+          ]
+      }))
+
+doubled_view : Ui.View Unit {Reactivity.Atom.Registry} none
+let doubled_view =
+  Ui.named
+    "App.Main.doubled_view"
+    (Ui.view (fun () -> ui { text (" doubled " ++ show (Atom.get doubled)) }))
+
+report : Failure e ->{} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  setup ()
+  match Ui.Dom.container "app" with
+  | None -> Platform.stdout_line "no container"
+  | Some root ->
+    provide Reactivity.Atom.layer {
+      scope s {
+        let app = ui { fragment [Ui.render counter_view (), Ui.render doubled_view ()] }
+        let mounted = Fiber.spawn s report (task { Ui.Dom.mount root report app })
+        settle ()
+        Platform.stdout_line (text ())
+        click "+1"
+        settle ()
+        click "+1"
+        settle ()
+        Platform.stdout_line (text ())
+      }
+    }
+    Platform.stdout_line ("after the scope: [" ++ text () ++ "]")

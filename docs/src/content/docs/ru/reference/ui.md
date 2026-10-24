@@ -109,6 +109,43 @@ let label n = Ui.lazy_view count_label n
 задача.
 
 
+## Атомы и представления
+
+Атом (`Atom`) описывает значение; реестр, который программа предоставляет
+через `provide Reactivity.Atom.layer { … }`, хранит значения прочитанных
+через него атомов. `Atom.make value` — состояние, `Atom.derived` — атом,
+вычисляемый из прочитанных им атомов, `Atom.set`/`Atom.update` пишут
+состояние.
+
+Представление (view) — компонент, чей render читает атомы через сервис
+`Atom.Read`. `Ui.Dom.mount` рисует `Ui` с предоставленным реестром, и каждое
+представление в нём перерисовывается только когда меняется прочитанный им
+атом, а не атом соседа:
+
+```flick
+count : Atom.Writable Number
+let count = Atom.make 0
+
+counter_view : Ui.View Unit {Reactivity.Atom.Registry} none
+let counter_view =
+  Ui.named "App.Counter.counter_view" (Ui.view (fun () ->
+    ui {
+      button
+        {
+          disabled = false;
+          on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
+        }
+        [text (Atom.value count |> show)]
+    }))
+```
+
+`Ui.render view props` вставляет представление в `Ui`; `Ui.named` — имя,
+которое показывают инструменты разработчика React. Представление
+подписывается на прочитанное после коммита React, а запись между его
+рендером и подпиской перерисовывает его снова. Представление вне
+`Ui.Dom.mount` падает с подсказкой, что делать. Render читает синхронно:
+он может читать атомы, но ничего не запускает.
+
 ## Обработчики и политики
 
 Поле обработчика имеет непрозрачный тип `Ui.Handler snapshot r e`, который создаётся

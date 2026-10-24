@@ -190,3 +190,19 @@ run_with :
   Renderer -> (Failure e ->{r; none} Unit)^c -> Ref m -> (m -> (Ui r e)^c)^c ->{r; none} Never
 foreign effect run_with from "@flick-lang/runtime/ui/react" "uiRunWith"
   retention call
+
+/// A component that reads atoms while it renders: React renders it again
+/// when one of them changes, or when its props do.
+type View p (r : ServiceRow) (e : ErrorRow)
+
+/// The component of `render`.
+view : forall p r e. (p ->{Atom.Read;} Ui r e) -> View p r e
+foreign pure view from "@flick-lang/runtime/ui/react" "uiView"
+
+/// The component named `name` in React's developer tools.
+named : forall p r e. String -> View p r e -> View p r e
+foreign pure named from "@flick-lang/runtime/ui/react" "uiNamed"
+
+/// The component with the props `props`.
+render : forall p r e. View p r e -> p -> Ui r e
+foreign pure render from "@flick-lang/runtime/ui/react" "uiRender"

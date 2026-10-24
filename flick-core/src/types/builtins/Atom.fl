@@ -1,0 +1,46 @@
+/// Reactive state. An atom describes a value; the registry a program
+/// provides (`Reactivity.Atom.layer`) holds the values of the atoms read
+/// through it. A view reads atoms through `Read` while it renders and
+/// renders again only when one of them changes; a derived atom does the
+/// same for its value.
+module Atom exposing (..)
+
+/// A value to read.
+type alias Atom a = Reactivity.Atom.Atom a
+
+/// A state: a value to read and write.
+type alias Writable a = Reactivity.Atom.Writable a
+
+/// Reading atoms: the reader depends on what it read.
+service Read =
+  get : forall a. Atom a ->{} a
+
+/// A state holding `value`, whatever its type.
+make : a -> Writable a
+let make value = Reactivity.Atom.state value
+
+/// An atom computed by `compute` from the atoms it reads, again when one
+/// of them changes.
+derived : (Unit ->{Read;} a) -> Atom a
+foreign pure derived from "@flick-lang/runtime" "atomDerived"
+  arity 1
+
+/// A state read as an atom.
+readonly : Writable a -> Atom a
+let readonly atom = Reactivity.Atom.readonly atom
+
+/// The value of `atom`; the reader renders or computes again when it changes.
+get : Atom a ->{Read;} a
+let get atom = Read.get atom
+
+/// The value of the state `atom`, read as `get` reads.
+value : Writable a ->{Read;} a
+let value atom = Read.get (readonly atom)
+
+/// Replaces the value of `atom`; whoever read it renders or computes again.
+set : Writable a -> a ->{Reactivity.Atom.Registry;} Unit
+let set atom new_value = Reactivity.Atom.set atom new_value
+
+/// Replaces the value of `atom` by `f` of it.
+update : Writable a -> (a -> a) ->{Reactivity.Atom.Registry;} Unit
+let update atom f = Reactivity.Atom.update atom f
