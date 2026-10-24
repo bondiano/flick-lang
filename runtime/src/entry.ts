@@ -16,6 +16,39 @@ const SIGNAL_NAMES: ReadonlyArray<Signal> = ["SIGINT", "SIGTERM"];
 
 const write = writeStderr;
 
+/** The text of a failure: an `Error`'s stack, else its message, else JSON. */
+const describe = (u: unknown): string => {
+  if (u instanceof Error) {
+    // frames from the Effect runloop on say nothing about the program
+    const frames = (u.stack ?? `${u.name}: ${u.message}`).split("\n");
+    const end = frames.findIndex((line) => /Generator\.next|~effect\/(?:Effect|Utils)/.test(line));
+    const own = frames.slice(0, end < 0 ? frames.length : end).join("\n");
+    return u.cause === undefined ? own : `${own} {\n  [cause]: ${describe(u.cause)}\n}`;
+  }
+  if (typeof u === "string") return u;
+  if (typeof u === "object" && u !== null) {
+    const message: unknown = Reflect.get(u, "message");
+    if (typeof message === "string") return message;
+  }
+  try {
+    return JSON.stringify(u) ?? String(u);
+  } catch {
+    return String(u);
+  }
+};
+
+/**
+ * What went wrong in `cause`, one failure or defect after another. Effect's
+ * `Cause.pretty` says the same with stack annotations, at the price of its
+ * value formatter in every bundle.
+ */
+const pretty = (cause: Cause.Cause<unknown>): string => {
+  const failures = cause.reasons.flatMap((r) =>
+    Cause.isFailReason(r) ? [describe(r.error)] : Cause.isDieReason(r) ? [describe(r.defect)] : [],
+  );
+  return failures.length > 0 ? failures.join("\n") : "InterruptError: All fibers interrupted without error";
+};
+
 const isAppError = (error: unknown): error is AppError =>
   typeof error === "object" && error !== null && Reflect.get(error, "_tag") === APP_ERROR;
 
@@ -25,7 +58,7 @@ const conclude = (
   signal: Signal | undefined,
   defects: ReadonlyArray<Cause.Cause<unknown>>,
 ): number => {
-  for (const cause of defects) write(`error: a supervisor failed\n${Cause.pretty(cause)}\n`);
+  for (const cause of defects) write(`error: a supervisor failed\n${pretty(cause)}\n`);
   if (Exit.isSuccess(exit)) return defects.length > 0 ? 1 : 0;
   const { cause } = exit;
   if (Cause.hasInterruptsOnly(cause)) {
@@ -37,7 +70,7 @@ const conclude = (
   write(
     appError && isAppError(appError.error) && !Cause.hasDies(cause)
       ? `error: ${appError.error._0.message}\n`
-      : `${Cause.pretty(cause)}\n`,
+      : `${pretty(cause)}\n`,
   );
   return 1;
 };

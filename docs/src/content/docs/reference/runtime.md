@@ -154,4 +154,6 @@ shutting down: waiting for cleanup to finish
 | `130` / `143` | only SIGINT / SIGTERM stopped `main`, and cleanup succeeded |
 
 A failure of the application or of cleanup keeps code `1` even when a signal
-came at the same time.
+came at the same time. A printed cause lists each failure and defect: an
+`Error` by its stack up to the first frame of the Effect runloop, another
+value by its `message` or as JSON.

@@ -125,3 +125,20 @@ test("runMain in process maps success and AppError to exit codes", async (t) => 
     ["err", "error: boom\n"],
   ]);
 });
+
+test("runMain reports a defect by its stack and a typed failure by its JSON", async (t) => {
+  const errors: Array<string> = [];
+  t.mock.method(process.stderr, "write", (s: string) => errors.push(s) > 0);
+  try {
+    await runMain(() => Effect.die(new RangeError("Division by zero")));
+    await runMain(() => Effect.fail({ _tag: "Refused#0", _0: "no" }));
+    await runMain(() => Effect.die({ message: "plain" }));
+  } finally {
+    process.exitCode = 0;
+  }
+  const [defect, failure, plain] = errors;
+  assert.match(defect ?? "", /^RangeError: Division by zero\n\s+at /);
+  assert.doesNotMatch(defect ?? "", /Generator\.next/);
+  assert.equal(failure, '{"_tag":"Refused#0","_0":"no"}\n');
+  assert.equal(plain, "plain\n");
+});
