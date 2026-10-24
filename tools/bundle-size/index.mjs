@@ -20,11 +20,12 @@ export const PROGRAMS = [
   { name: "pure", source: "tools/bundle-size/pure.fl", budget: 12 },
   { name: "counter", source: "tests/run/ui/counter.fl", budget: 81 },
   { name: "playground", source: "docs/src/playground/Playground.fl", budget: 91 },
-  // views on atoms: at most the counter's budget and 18 KB for effect/reactivity (U8)
-  { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 99 },
+  // views on atoms: at most the counter's budget and 18 KB for effect/reactivity (U8);
+  // its atoms keep `Stream`, which `effect/reactivity` needs for stream atoms
+  { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 99, unused: ["effect/dist/Graph.js"] },
 ];
 
-/** Modules no tracked program uses: a bundle that keeps one is an error. */
+/** Modules a tracked program does not use, unless it lists its own: a bundle that keeps one is an error. */
 const UNUSED = ["effect/dist/Graph.js", "effect/dist/Stream.js"];
 
 const host = (id) => id.startsWith("node:") || id === "jsdom" || (/^\.\.?\//.test(id) && /\.(m?ts|mjs)$/.test(id));
@@ -145,7 +146,7 @@ const main = async () => {
   const errors = rows.flatMap((r) => [
     ...(r.gzip > r.budget * 1024 ? [`${r.name} is ${kb(r.gzip)} KB gzip, over its budget of ${r.budget} KB`] : []),
     ...(r.min > r.debug.min ? [`${r.name} is ${r.min} B minified in release, more than ${r.debug.min} B in debug`] : []),
-    ...UNUSED.filter((m) => r.modules.some((id) => id.replaceAll("\\", "/").endsWith(m))).map(
+    ...(r.unused ?? UNUSED).filter((m) => r.modules.some((id) => id.replaceAll("\\", "/").endsWith(m))).map(
       (m) => `${r.name} keeps ${m}, which it does not use`,
     ),
   ]);
