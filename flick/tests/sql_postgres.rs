@@ -9,6 +9,8 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 use std::{fs, thread};
 
+use flick_core::build::runner_path;
+
 mod common;
 
 const IMAGE: &str = "postgres:17-alpine";
@@ -118,7 +120,7 @@ fn queries_against_postgres() {
     ]);
     assert!(build.status.success(), "build: {build:?}");
     let run = Command::new("node")
-        .arg(out.join("main.js"))
+        .arg(out.join(runner_path(false)))
         .env("DATABASE_URL", &url)
         .output()
         .expect("node runs");

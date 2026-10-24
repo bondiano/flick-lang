@@ -135,7 +135,7 @@ were registered with.
 
 ## Entry runner
 
-`main.js` runs `main` under the root owner. SIGINT and SIGTERM interrupt
+`flick-main.js` runs `main` under the root owner. SIGINT and SIGTERM interrupt
 `main` and close the root owner by the same protocol; the process keeps
 running until cleanup has finished, and reports on stderr when that takes
 longer than two seconds (`FLICK_SHUTDOWN_NOTICE_MS` sets the delay):

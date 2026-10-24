@@ -11,6 +11,8 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 use std::{env, fs};
 
+use flick_core::build::runner_path;
+
 fn cases(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir).expect("readable tests/run") {
         let path = entry.expect("readable entry").path();
@@ -56,7 +58,7 @@ fn run_case(case: &Path, out_dir: &Path, emit: &str, profile: &str) -> Option<St
     }
     let output = Command::new("node")
         .arg("--enable-source-maps")
-        .arg(out_dir.join(format!("main.{emit}")))
+        .arg(out_dir.join(runner_path(emit == "ts")))
         .output()
         .expect("`node` is on PATH (Node.js >= 24.18.0)");
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -226,7 +228,8 @@ fn js_size(dir: &Path) -> u64 {
         let path = entry.path();
         if path.is_dir() && !path.ends_with("_flick") {
             total += js_size(&path);
-        } else if path.extension().is_some_and(|e| e == "js") && !path.ends_with("main.js") {
+        } else if path.extension().is_some_and(|e| e == "js") && !path.ends_with(runner_path(false))
+        {
             total += entry.metadata().map_or(0, |m| m.len());
         }
     }

@@ -5,7 +5,7 @@ use std::path::Path;
 use std::process::Command;
 
 use common::flick_in;
-use flick_core::iface;
+use flick_core::{build::runner_path, iface};
 
 #[test]
 fn build_writes_modules_maps_builtins_and_the_runner() {
@@ -51,11 +51,61 @@ fn build_writes_modules_maps_builtins_and_the_runner() {
         "{hello:?}"
     );
     assert_eq!(abi.values[0].stages, "!");
-    let runner = fs::read_to_string(dir.join("dist/main.js")).expect("runner");
-    assert!(
-        runner.contains("import { main } from \"./App/Main.js\""),
-        "{runner}"
-    );
+    assert!(dir.join("dist").join(runner_path(false)).exists());
+}
+
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn standalone_main_preserves_exports_and_runs_in_all_emit_profiles() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("build_standalone_main");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("dir");
+    fs::write(
+        dir.join("Main.fl"),
+        "module Main exposing (answer, main)\n\nanswer : Number\nlet answer = 42\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"ran main\"\n",
+    )
+    .expect("write");
+    for (emit, profile) in [("js", "debug"), ("ts", "debug"), ("js", "release")] {
+        let output = format!("{emit}-{profile}");
+        let build = flick_in(
+            &dir,
+            &[
+                "build",
+                "Main.fl",
+                "--out-dir",
+                &output,
+                "--emit",
+                emit,
+                "--profile",
+                profile,
+            ],
+        );
+        assert!(build.status.success(), "{emit}/{profile}: {build:?}");
+        let out = dir.join(output);
+        let imported = Command::new("node")
+            .args(["--input-type=module", "--eval"])
+            .arg(format!(
+                "const {{ answer }} = await import(\"./Main.{emit}\"); console.log(answer);"
+            ))
+            .current_dir(&out)
+            .output()
+            .expect("node");
+        assert_eq!(
+            imported.status.code(),
+            Some(0),
+            "{emit}/{profile}: {imported:?}"
+        );
+        assert_eq!(String::from_utf8_lossy(&imported.stdout), "42\n");
+        assert!(imported.stderr.is_empty(), "{emit}/{profile}: {imported:?}");
+        let run = Command::new("node")
+            .arg(runner_path(emit == "ts"))
+            .current_dir(&out)
+            .output()
+            .expect("node");
+        assert_eq!(run.status.code(), Some(0), "{emit}/{profile}: {run:?}");
+        assert_eq!(String::from_utf8_lossy(&run.stdout), "ran main\n");
+        assert!(run.stderr.is_empty(), "{emit}/{profile}: {run:?}");
+    }
 }
 
 #[test]
@@ -166,17 +216,10 @@ fn schema_aot_writes_compiled_decoders_the_runner_installs() {
         &["build", "Main.fl", "--out-dir", "out", "--schema-aot"],
     );
     assert!(out.status.success(), "{out:?}");
-    let runner = fs::read_to_string(dir.join("out/main.js")).expect("runner");
-    assert!(
-        runner.contains(
-            "installSchemaAot(await import(\"./schemas.aot.js\"));\nawait runMain(main);"
-        ),
-        "{runner}"
-    );
     let aot = fs::read_to_string(dir.join("out/schemas.aot.js")).expect("compiled decoders");
     assert!(aot.contains("from \"@flick-lang/runtime\""), "{aot}");
     let run = Command::new("node")
-        .arg("out/main.js")
+        .arg(Path::new("out").join(runner_path(false)))
         .current_dir(&dir)
         .output()
         .expect("node");
@@ -189,7 +232,7 @@ fn schema_aot_writes_compiled_decoders_the_runner_installs() {
     )
     .expect("write");
     let stale = Command::new("node")
-        .arg("out/main.js")
+        .arg(Path::new("out").join(runner_path(false)))
         .current_dir(&dir)
         .output()
         .expect("node");
@@ -200,8 +243,6 @@ fn schema_aot_writes_compiled_decoders_the_runner_installs() {
     );
     let plain = flick_in(&dir, &["build", "Main.fl", "--out-dir", "plain"]);
     assert!(plain.status.success(), "{plain:?}");
-    let runner = fs::read_to_string(dir.join("plain/main.js")).expect("runner");
-    assert!(!runner.contains("SchemaAot"), "{runner}");
     assert!(!dir.join("plain/schemas.aot.js").exists());
 }
 

@@ -34,7 +34,7 @@ and an example test. `flick install` installs the pinned dependencies;
 3. Use `flick run -- args` to pass arguments to the application, or
    `flick dev` to rebuild and restart after changes.
 4. Use `flick build` when you need the emitted files instead of starting a
-   process. The default app output includes `main.js`, the entry runner.
+   process. The default app output includes `flick-main.js`, the entry runner.
 
 **Read next:** [CLI](../reference/cli/),
 [Project and packages](../reference/project/) and

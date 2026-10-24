@@ -48,7 +48,7 @@ pub fn compile(source: &str, profile: &str) -> String {
 /// `{ "files": { path: contents } | null, "entry": path | null,
 /// "diagnostics": […] }`: everything `flick build` writes for the module —
 /// its JS, the built-in modules and, when it exports `main`, the runner
-/// `main.js`, which is the entry.
+/// `flick-main.js`, which is the entry.
 #[wasm_bindgen]
 pub fn build(source: &str, profile: &str) -> String {
     let (output, diagnostics) = emit(source, profile);
@@ -56,8 +56,8 @@ pub fn build(source: &str, profile: &str) -> String {
         Some((_, artifacts)) => {
             let entry = artifacts
                 .iter()
-                .any(|a| a.path == RUNNER)
-                .then(|| RUNNER.to_owned());
+                .any(|a| a.path == build::runner_path(false))
+                .then(|| build::runner_path(false).to_owned());
             let files: serde_json::Map<String, Value> = artifacts
                 .into_iter()
                 .filter(|a| Path::new(&a.path).extension().is_some_and(|e| e == "js"))
@@ -72,8 +72,6 @@ pub fn build(source: &str, profile: &str) -> String {
     };
     json!({ "files": files, "entry": entry, "diagnostics": diagnostics }).to_string()
 }
-
-const RUNNER: &str = "main.js";
 
 /// The build of the demo's module, with the path of its JS, and the
 /// diagnostics as JSON; no build when there are errors.

@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 use std::{fs, thread};
 
 use common::{APP, project};
+use flick_core::build::runner_path;
 
 const FOREVER: &str =
     "import { Effect } from \"@flick-lang/runtime\";\nexport const forever = () => Effect.never;\n";
@@ -368,7 +369,10 @@ fn pack_writes_a_complete_package_that_runs_nothing_on_import() {
     ] {
         assert!(listing.contains(file), "{file} in\n{listing}");
     }
-    assert!(!listing.contains("main.js"), "a library has no runner");
+    assert!(
+        !listing.contains(runner_path(false)),
+        "a library has no runner"
+    );
     let probe = dir.join(".flick/pack/probe.mjs");
     fs::write(
         &probe,

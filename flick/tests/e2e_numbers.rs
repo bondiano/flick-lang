@@ -6,6 +6,8 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use flick_core::build::runner_path;
+
 const ATOMS: [(&str, &str); 9] = [
     ("0", "0"),
     ("(-0)", "(-0)"),
@@ -99,7 +101,7 @@ fn numbers_match_js() {
             .arg(&out)
             .arg("--profile")
             .arg(profile));
-        let compiled = run(Command::new("node").arg(out.join("main.js")));
+        let compiled = run(Command::new("node").arg(out.join(runner_path(false))));
         for (i, (a, b)) in compiled.lines().zip(expected.lines()).enumerate() {
             assert_eq!(a, b, "expression {i} ({profile}): {}", flick[i]);
         }

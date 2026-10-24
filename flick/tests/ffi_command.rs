@@ -7,6 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+use flick_core::build::runner_path;
 use flick_core::ffi::module_part;
 
 const MAIN: &str = r#"module App.Main exposing (main)
@@ -143,7 +144,7 @@ fn import_review_update_and_check() {
     let build = flick(&dir, &["build"]);
     assert!(build.status.success(), "{}", text(&build.stderr));
     let run = Command::new("node")
-        .arg(dir.join("dist/main.js"))
+        .arg(dir.join("dist").join(runner_path(false)))
         .output()
         .expect("node runs");
     assert_eq!(

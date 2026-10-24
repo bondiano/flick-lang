@@ -19,7 +19,7 @@ const writer = (stream: "stdout" | "stderr") => ({
 const proc = {
   stdout: writer("stdout"),
   stderr: writer("stderr"),
-  argv: ["node", "main.js"],
+  argv: ["node", "flick-main.js"],
   env: {},
   exitCode: undefined as number | undefined,
   on: (): void => { },

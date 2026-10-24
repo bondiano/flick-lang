@@ -59,7 +59,7 @@ to it:
 | `<name>.exit` | `0` |
 
 Every case runs twice: compiled to JS and compiled with `--emit ts`, whose
-`main.ts` Node runs directly; afterwards `tsc --noEmit` (strict) checks all of
+`flick-main.ts` Node runs directly; afterwards `tsc --noEmit` (strict) checks all of
 the TypeScript output. Output goes to `target/tmp/e2e/` and imports `@flick-lang/runtime` from the
 workspace. A foreign module next to a case (`./tags.mjs`) is imported from
 there. `just e2e` also builds every `tests/check/pass/**` fixture and runs

@@ -12,8 +12,10 @@ profile must behave the same way.
 | - | - |
 | `A/B.js`, `A/B.js.map` | module `A.B` and its source map |
 | `_flick/<Name>.js` | the built-in modules (`Prelude`, `Platform`, …) |
-| `main.js` | for an app: runs `main` of the entry module through the runtime's entry runner |
+| `flick-main.js` | for an app: runs `main` of the entry module through the runtime's entry runner |
 | `package.json` | `{ "type": "module" }` |
+
+Module `Main` stays `Main.js`/`Main.ts`; the hyphenated launcher `flick-main.js`/`flick-main.ts` avoids case-insensitive filename collisions, and the old launcher name is no longer emitted.
 
 Without a project, `flick build <files> --out-dir <dir>` writes the same
 layout; a root file whose module exports `main` gets the runner. Importing a

@@ -9,6 +9,7 @@ use std::path::Path;
 use std::process::{self, Output};
 
 use common::{APP, flick_in, project};
+use flick_core::build::runner_path;
 use flick_core::diagnostics::codes::REGISTRY;
 
 const MAIN: &str = "module App.Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
@@ -164,7 +165,7 @@ fn clean_keeps_user_files_and_running_generations() {
         let g = dir.join(".flick/run").join(generation);
         fs::create_dir_all(&g).expect("dir");
         fs::write(g.join(".lock"), pid).expect("lock");
-        fs::write(g.join("main.js"), "").expect("file");
+        fs::write(g.join(runner_path(false)), "").expect("file");
     }
     assert_eq!(code(&flick_in(&dir, &["clean"])), Some(0));
     assert!(!dir.join("dist/App/Main.js").exists());

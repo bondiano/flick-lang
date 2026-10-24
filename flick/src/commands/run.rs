@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command as Process, ExitCode};
 use std::sync::atomic::AtomicUsize;
 
+use flick_core::build::runner_path;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::{self, Project, cache};
 use flick_core::source::SourceMap;
@@ -112,7 +113,7 @@ pub fn launch(generation: &Path, args: &[String], global: &GlobalArguments) -> O
     let mut command = Process::new("node");
     command
         .arg("--enable-source-maps")
-        .arg(generation.join("main.js"))
+        .arg(generation.join(runner_path(false)))
         .args(args);
     match child::spawn(&mut command, global, "application-stderr") {
         Ok(running) => {

@@ -22,6 +22,15 @@ use crate::{ir, opt, syntax, types};
 /// Directory of the built-in modules inside the output.
 pub const BUILTIN_DIR: &str = "_flick";
 
+/// The app launcher: a hyphen cannot occur in a module name.
+pub const fn runner_path(typescript: bool) -> &'static str {
+    if typescript {
+        "flick-main.ts"
+    } else {
+        "flick-main.js"
+    }
+}
+
 /// A file of the output, by its path relative to the output directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Artifact {
@@ -157,7 +166,7 @@ pub fn emit(
     }
     if let Some(entry) = settings.entry {
         out.push(runner(
-            &format!("main.{ext}"),
+            runner_path(settings.typescript),
             &path(entry),
             settings.extras.schema_aot,
         ));
