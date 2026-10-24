@@ -1,6 +1,7 @@
 // `Ui r e` values: inert descriptions of elements. Building one runs no
 // handler and touches no DOM; the bridge turns them into React elements.
 import { type Effect, Option } from "effect";
+import type * as Atom from "effect/reactivity/Atom";
 import type { ComponentType } from "react";
 
 import type { Handler } from "./policies.ts";
@@ -36,6 +37,14 @@ export interface View {
 export type Ui =
   | { readonly kind: "text"; readonly value: string }
   | { readonly kind: "view"; readonly view: View; readonly props: unknown }
+  | {
+      readonly kind: "field";
+      readonly tag: "input" | "textarea";
+      /** The state the field shows and writes, as each keystroke happens. */
+      readonly bind: Atom.Writable<string>;
+      readonly placeholder: string;
+      readonly input: Binding | undefined;
+    }
   | { readonly kind: "fragment"; readonly children: ReadonlyArray<Ui> }
   | { readonly kind: "keyed"; readonly key: string; readonly node: Ui }
   | { readonly kind: "component"; readonly component: ComponentType<object>; readonly props: object }
@@ -224,3 +233,26 @@ export const uiNamed = (label: string, view: View): View => Object.freeze({ rend
 
 /** `Ui.render`: the component with these props. */
 export const uiRender = (view: View, props: unknown): Ui => Object.freeze({ kind: "view", view, props });
+
+interface FieldProps {
+  readonly bind: Atom.Writable<string>;
+  readonly placeholder: string;
+  readonly on_input: Option.Option<Handler>;
+}
+
+const field =
+  (tag: "input" | "textarea") =>
+  (props: FieldProps): Ui =>
+    Object.freeze({
+      kind: "field",
+      tag,
+      bind: props.bind,
+      placeholder: props.placeholder,
+      input: Option.isSome(props.on_input) ? { handler: props.on_input.value, snapshot: inputSnapshot } : undefined,
+    });
+
+/** `Ui.field`: an input showing `bind` and writing each keystroke to it at once. */
+export const uiField = /*#__PURE__*/ field("input");
+
+/** `Ui.field_area`: a text area bound as `Ui.field` is. */
+export const uiFieldArea = /*#__PURE__*/ field("textarea");

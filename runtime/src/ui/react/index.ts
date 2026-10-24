@@ -13,15 +13,17 @@ import {
   memo,
   useContext,
   useLayoutEffect,
+  useCallback,
   useMemo,
   useReducer,
+  useSyncExternalStore,
 } from "react";
 
 import { runReading } from "../../atoms.ts";
 
 import type { Cell } from "../../builtins.ts";
 import type { Failure } from "../../cause.ts";
-import type { Ui, View } from "./nodes.ts";
+import type { DomEvent, Ui, View } from "./nodes.ts";
 import { Bridge, type Listener } from "./policies.ts";
 
 export * from "./nodes.ts";
@@ -139,8 +141,39 @@ const component = (view: View): FunctionComponent<ViewProps> => {
   return result;
 };
 
+type FieldNode = Extract<Ui, { readonly kind: "field" }>;
+
+/**
+ * A field bound to a state: the value comes from the registry and each
+ * change goes to it synchronously, inside the DOM callback, so React keeps
+ * the caret and an IME composition intact; `on_input` then runs as a task.
+ */
+const Field = ({ bridge, node }: { readonly bridge: Events | undefined; readonly node: FieldNode }): ReactNode => {
+  const registry = useContext(RegistryContext);
+  if (registry === undefined) throw new Error("a field binds a state: render it with `Ui.Dom.mount`, which provides the registry");
+  const { bind } = node;
+  const subscribe = useCallback((changed: () => void) => registry.subscribe(bind, changed), [registry, bind]);
+  const value = useSyncExternalStore(subscribe, () => registry.get(bind));
+  const listener = useMemo(() => (bridge === undefined || node.input === undefined ? undefined : bridge.listener(node.input)), [bridge]);
+  useLayoutEffect(() => {
+    if (listener !== undefined && node.input !== undefined) listener.update(node.input);
+  });
+  useLayoutEffect(() => () => listener?.close(), [listener]);
+  const onChange = (event: { readonly target: { readonly value: string } } & DomEvent): void => {
+    registry.set(bind, event.target.value);
+    listener?.callback(event);
+  };
+  return createElement(node.tag, {
+    value,
+    placeholder: node.placeholder,
+    onChange,
+    ...(node.tag === "textarea" ? { spellCheck: false } : {}),
+  });
+};
+
 const toReact = (bridge: Events | undefined, node: Ui): ReactNode => {
   if (node.kind === "text") return node.value;
+  if (node.kind === "field") return createElement(Field, { bridge, node });
   if (node.kind === "view") return createElement(component(node.view), { bridge, props: node.props });
   if (node.kind === "fragment") return createElement(Fragment, null, ...children(bridge, node.children));
   if (node.kind === "keyed") return createElement(Fragment, { key: node.key }, toReact(bridge, node.node));

@@ -141,6 +141,16 @@ commits, and a write between its render and its subscription renders it
 again. Rendering a view outside `Ui.Dom.mount` fails with what to do. The
 render reads synchronously: it may read atoms but run nothing else.
 
+## Fields bound to a state
+
+`Ui.field { bind = query; placeholder = "Find"; on_input = None }` is an
+input that shows the state `query` and writes each keystroke to it at once,
+inside the browser's event. React then keeps the caret where the user left
+it and an IME composition intact, and a write to `query` from elsewhere, a
+reset, shows in the field. `on_input`, when given, runs as a task with the
+text after the state has it. `Ui.field_area` is the text area. Like views,
+fields need the registry of `Ui.Dom.mount`.
+
 ## Actions
 
 An action is a handler declared once, usually at the top level, and given to

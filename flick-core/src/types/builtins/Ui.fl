@@ -206,3 +206,24 @@ foreign pure named from "@flick-lang/runtime/ui/react" "uiNamed"
 /// The component with the props `props`.
 render : forall p r e. View p r e -> p -> Ui r e
 foreign pure render from "@flick-lang/runtime/ui/react" "uiRender"
+
+/// The props of a field bound to a state.
+type alias FieldProps r e c =
+  {
+    bind : Atom.Writable String;
+    placeholder : String;
+    on_input : Option ((Handler InputSnapshot r e)^c);
+  }
+
+/// An input showing the state `bind`. Each keystroke writes it at once,
+/// inside the browser's event, so the caret and an IME composition stay
+/// where the user left them; a write to the state from elsewhere, a reset,
+/// shows in the field. `on_input` then runs as a task.
+field : forall c r e. FieldProps r e c -> (Ui r e)^c
+foreign pure field from "@flick-lang/runtime/ui/react" "uiField"
+  retention call
+
+/// A text area bound to a state as `field` is.
+field_area : forall c r e. FieldProps r e c -> (Ui r e)^c
+foreign pure field_area from "@flick-lang/runtime/ui/react" "uiFieldArea"
+  retention call
