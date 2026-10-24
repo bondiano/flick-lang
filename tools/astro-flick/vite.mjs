@@ -2,10 +2,13 @@
 // CLI into the cache directory and re-exports the compiled module, whose
 // imports (the runtime, the built-in modules, foreign JS next to the source)
 // Vite resolves as usual. A change to any `.fl` beside it rebuilds.
-import { spawnSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
+import { promisify } from "node:util";
+
+const compile = promisify(execFile);
 
 /** The `.fl` files under `dir`, without `node_modules`. */
 const sources = (dir) =>
@@ -27,13 +30,14 @@ export const flickVite = (options = {}) => {
   const binary = options.binary ?? process.env.FLICK_BIN ?? "flick";
   const profile = options.profile ?? "debug";
   let outBase = options.outDir;
+  const builds = new Map();
   return {
     name: "flick",
     enforce: "pre",
     configResolved(config) {
       outBase ??= path.join(config.cacheDir, "flick");
     },
-    load(id) {
+    async load(id) {
       const file = id.split("?")[0];
       if (!file.endsWith(".fl")) return null;
       const dir = path.dirname(file);
@@ -43,17 +47,23 @@ export const flickVite = (options = {}) => {
       const hash = createHash("sha256").update(file).update(profile);
       for (const source of all) hash.update(source).update(readFileSync(source));
       const out = path.join(outBase, hash.digest("hex").slice(0, 16));
-      const result = spawnSync(
-        binary,
-        ["build", file, "--out-dir", out, "--profile", profile, "--color", "never"],
-        { cwd: dir, encoding: "utf8" },
-      );
-      if (result.error !== undefined) {
-        this.error(`cannot run ${binary}: ${result.error.message}; set FLICK_BIN or the plugin's \`binary\``);
-      }
-      if (result.status !== 0) this.error(`flick build ${path.basename(file)} failed:\n${result.stderr}`);
       const name = moduleName(readFileSync(file, "utf8"));
       if (name === undefined) this.error(`${file} has no \`module\` header`);
+      // SSR, client transforms and dependency discovery share the same build.
+      if (!builds.has(out)) {
+        builds.set(out, compile(
+          binary,
+          ["build", file, "--out-dir", out, "--profile", profile, "--color", "never"],
+          { cwd: dir, encoding: "utf8" },
+        ).catch((error) => {
+          builds.delete(out);
+          if (typeof error.code === "string") {
+            this.error(`cannot run ${binary}: ${error.message}; set FLICK_BIN or the plugin's \`binary\``);
+          }
+          this.error(`flick build ${path.basename(file)} failed:\n${error.stderr ?? error.message}`);
+        }));
+      }
+      await builds.get(out);
       const target = path.join(out, `${name.replaceAll(".", "/")}.js`);
       return `export * from ${JSON.stringify(target)};\n`;
     },

@@ -76,6 +76,11 @@ just docs
 pnpm -C docs preview
 ```
 
+For live development, run `pnpm -C docs dev` with a built native compiler
+(`cargo build -p flick`). Flick compilation is asynchronous, and Vite's
+server/client passes reuse builds for the same source state. Restart the
+dev server after rebuilding the native compiler.
+
 Use the production preview to check search; its index is generated during
 the build. Search uses Pagefind's supported main-thread mode: its 1.5
 blob-worker initializer loses the absolute index URL. Revisit this when
