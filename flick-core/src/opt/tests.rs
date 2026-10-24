@@ -255,3 +255,14 @@ fn matches_switch_on_tags_and_skip_the_last_test() {
     assert!(js.contains("{ _tag: \"Rect#"), "{js}");
     assert!(js.contains("_0: 2, _1: 3 }"), "{js}");
 }
+
+#[test]
+fn a_worker_names_each_ignored_parameter_apart() {
+    let workers = |m: &str, name: &str| ((m, name) == ("App", "first")).then_some(3);
+    let js = release_with(
+        "module App exposing (first)\n\n\
+         first : Number -> String -> Bool -> Number\nlet first n _ _ = n\n",
+        &workers,
+    );
+    assert!(js.contains("export const first$3 = (n, $_, $_2) => n;"), "{js}");
+}

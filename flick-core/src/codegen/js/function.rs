@@ -54,9 +54,13 @@ impl Gen<'_> {
         self.generator = last_runtime;
         let mut heads = Vec::new();
         let mut destructure = Vec::new();
-        for p in params {
+        for (i, p) in params.iter().enumerate() {
             let name = match &p.pat {
                 Pat::Bind(n) => names::ident(n),
+                // one arrow takes every parameter of a worker: names must differ
+                Pat::Wild | Pat::Lit(Lit::Unit) if uncurried && heads.iter().any(|h| h == "$_") => {
+                    format!("$_{i}")
+                }
                 Pat::Wild | Pat::Lit(Lit::Unit) => "$_".to_owned(),
                 pat => {
                     let t = self.temp();
