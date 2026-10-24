@@ -19,11 +19,15 @@ let api =
   HttpApi.api "Work"
   |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "work") |> HttpApi.add slow)
 
-handle : HttpApi.Request Unit Unit Unit Unit ->{} Unit
-let handle _ =
+/// The slow handler; `started` tells the client side it is running.
+handle : Deferred.Deferred {} Unit -> HttpApi.Request Unit Unit Unit Unit ->{} Unit
+let handle started _ =
   scope {
     Resource.acquire_release
-      (task { Platform.stdout_line "handler started" })
+      (task {
+        Platform.stdout_line "handler started"
+        ignore (Deferred.succeed () started)
+      })
       (fun _ -> Platform.stdout_line "handler finalizer")
     Effect.sleep (ms 100)
     Platform.stdout_line "handler finished"
@@ -32,12 +36,14 @@ let handle _ =
 main : Unit ->{; AppError} Unit
 let main () =
   let options = { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }
+  let started : Deferred.Deferred {} Unit = Deferred.make ()
   let pending =
     try
       scope s {
-        let server = HttpApi.listen options api { work = { slow = handle } }
+        let server = HttpApi.listen options api { work = { slow = handle started } }
         let request = start ("http://127.0.0.1:" ++ show (HttpApi.port server) ++ "/slow")
-        Effect.sleep (ms 30)
+        // close only once the request is in flight, however slow the machine
+        Deferred.await_ started
         Platform.stdout_line "closing the server"
         Some request
       }
