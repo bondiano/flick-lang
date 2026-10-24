@@ -95,9 +95,11 @@ impl Store {
     pub fn resolve(&self, t: &Type) -> Type {
         let mut t = t;
         while let Type::Meta(m) = t {
-            match &self.metas[*m as usize] {
-                MetaState::Bound(next) => t = next,
-                MetaState::Open { .. } => break,
+            // a variable this store never made (a stored type shown by
+            // `show_type` with an empty store) is open
+            match self.metas.get(*m as usize) {
+                Some(MetaState::Bound(next)) => t = next,
+                Some(MetaState::Open { .. }) | None => break,
             }
         }
         t.clone()

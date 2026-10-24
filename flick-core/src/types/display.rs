@@ -224,3 +224,17 @@ enum Prec {
     /// Argument of an application.
     Arg,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn show_type_leaves_out_a_capture_still_being_inferred() {
+        let t = Type::Captured {
+            ty: Box::new(Type::prim("Int")),
+            captures: Box::new(Type::Meta(207)),
+        };
+        assert_eq!(show_type(&t), "Int");
+    }
+}
