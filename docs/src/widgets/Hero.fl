@@ -131,14 +131,14 @@ view : Ref Model -> Model -> Ui none none
 let view model m =
   let status =
     if not m.ready then
-      if m.ru then "Загружаем живой пример…" else "Loading the live example…"
+      if m.ru then "Загрузка примера…" else "Loading the live example…"
     else if m.running then
-      if m.ru then "Загружаем и запускаем…" else "Compiling and running…"
+      if m.ru then "Компиляция и запуск…" else "Compiling and running…"
     else if m.output != "" then m.output
     else if m.effect then
       if m.ru then "Тот же результат. Другой синтаксис." else "Same result. Different syntax."
     else
-      if m.ru then "Настоящий Flick. Прямо в браузере." else "Real Flick. Right in your browser."
+      if m.ru then "Нажмите «Запустить Flick», чтобы выполнить пример." else "Real Flick. Right in your browser."
   ui {
     attributes [("aria-busy", if m.ready then "false" else "true")]
       (div { class_name = "hero-editor" }
@@ -188,7 +188,7 @@ let view model m =
           [span { class_name = "hero-filename" } [text (if m.effect then "main.ts" else "main.fl")],
             span
               { class_name = "hero-runtime-note" }
-              [text (if m.ru then "На рантайме Effect" else "On the Effect runtime")],
+              [text (if m.ru then "На основе Effect" else "On the Effect runtime")],
             span { class_name = "hero-run" }
               [button { disabled = not m.ready || m.running; on_click = Ui.Event.exhaust (fun _ -> task { run_example model }) }
                 [

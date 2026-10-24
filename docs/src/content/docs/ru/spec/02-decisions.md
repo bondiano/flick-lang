@@ -4,25 +4,25 @@ title: "2. Решения первой версии"
 
 | Область | Принято | Цена выбора |
 | - | - | - |
-| Sequencing | Прямые вызовы с let; task/await; без generic do | Для пользовательских монад обычные combinators |
-| Тип вычисления | Eff r e a, результат последним | Source order отличается от native TS order |
-| Классы | MPTC, superclasses, FD; canonical instances | Strict coverage/termination; часть instance chains не переносится |
-| Coherence | No overlap/orphans/local implicits; package ownership | Для альтернатив нужны wrappers или explicit dictionaries |
-| Generalization | Только доказанно pure построения; runtime results мономорфны | Иногда требуется фабрика; variance-generalization отложена |
-| Higher-order API | map и последовательный map_effect; явный parallel limit | Два семейства операций вместо скрытого runtime bridge |
-| Collections | List = dense immutable JS array; отдельный Effect Chunk | Prepend/tail/update обычно O(n) |
-| Records | Exact structural + row polymorphism | Нет implicit width subtyping и silent overwrite |
-| Type-level | Fixed row primitives, labels, finite kinds, MPTC/FD | Общие type families и associated types отложены |
-| Lifetime | Fresh regions, captures, без early close | Закрытие ждёт children и foreign quiescence |
-| Errors | Native recovery; opaque Failure/Exit/RawCause; region-free typed payloads | Raw failures нельзя считать остаточной e |
-| Concurrency | Structured combinators, scoped supervisor, native race/timeout | Нет nursery, detached scoped work и hard deadline |
-| FFI | Fixed ABI, четыре callback families, checked `.d.ts` subset | Purity/retention/cancellation требуют contracts |
-| Schema | Full deriving, explicit codecs, strict exporters | Не всякая schema выражается во внешнем формате |
-| SQL | Pure DSL, PostgreSQL, Query/Template | Зафиксирован ограниченный SQL subset |
-| UI | ui-блок, React adapter, explicit event policy | Без JSX, собственного renderer, SSR и полной hooks-модели |
-| CLI-приложения | cli-блок поверх Effect CLI, точный record опций, `Cli.Value` для разбора | Подкоманда не видит опции родителя; без собственного парсера аргументов |
-| Compiler | Rust core Flick, typed IR, source LSP, versioned JSON iface | Собственный checker, Mapper — слой интеграции |
-| Optimization | Debug baseline и typed release passes из подходов ReScript | Нужны доказательства сохранения observable contracts |
-| CLI | `flick`, `.fl`, `flick.toml`, один pnpm lockfile; check/build/run/dev/test/fmt и инструменты FFI/Schema | Команды разделяют один checker; версии runtime и интерфейсов проверяются явно |
+| Последовательность операций | Прямые вызовы с `let`; `task`/`await`; без обобщённого `do` | Для пользовательских монад нужны обычные комбинаторы |
+| Тип вычисления | `Eff r e a`, результат последним | Порядок параметров в Flick отличается от порядка в TS-представлении Effect |
+| Классы | Многопараметрические классы (MPTC), суперклассы, функциональные зависимости (FD); канонические экземпляры | Строгие проверки покрытия и завершения поиска; часть цепочек экземпляров классов не переносится |
+| Согласованность экземпляров | Без перекрытий, экземпляров-сирот и локального неявного поиска; владение определяется пакетом | Для альтернатив нужны обёртки или явные словари |
+| Обобщение | Только доказанно чистые построения; результаты эффектных вызовов мономорфны | Иногда требуется фабрика; обобщение по вариантности отложено |
+| API высшего порядка | `map` и последовательный `map_effect`; явный предел конкурентности | Два семейства операций вместо скрытого преобразования между чистыми и эффектными вызовами |
+| Коллекции | List — плотный неизменяемый массив JS; отдельно доступен Effect Chunk | Добавление в начало, получение хвоста и обновление обычно требуют O(n) |
+| Записи | Точные структурные записи с полиморфизмом строк | Нет неявного подтипирования по ширине и незаметной перезаписи полей |
+| Механизмы на уровне типов | Фиксированные операции над строками, метки, конечный набор киндов, MPTC/FD | Общие семейства типов и ассоциированные типы отложены |
+| Время жизни | Свежие регионы, захваты, без досрочного закрытия | Закрытие ждёт завершения дочерних задач и прекращения активности внешнего кода |
+| Ошибки | Восстановление средствами Effect; непрозрачные Failure/Exit/RawCause; данные типизированных ошибок не зависят от регионов | Исходные данные сбоев нельзя считать остаточной строкой `e` |
+| Конкурентность | Структурированные комбинаторы, супервизор с областью владения, `race`/`timeout` средствами Effect | Нет отдельной конструкции для группы дочерних задач (nursery), задач, отделённых от области владения, и жёстких сроков завершения |
+| FFI | Фиксированный ABI, четыре семейства функций обратного вызова, проверяемое подмножество `.d.ts` | Нужны контракты чистоты, удержания значений и отмены |
+| Schema | Полноценный deriving, явные кодеки, строгие экспортёры | Не всякая схема выразима во внешнем формате |
+| SQL | Чистый DSL, PostgreSQL, Query/Template | Зафиксировано ограниченное подмножество SQL |
+| UI | Блок `ui`, адаптер React, явные правила обработки событий | Без JSX, собственного рендерера, SSR и полной модели хуков |
+| CLI-приложения | Блок `cli` на основе Effect CLI, точная запись опций, `Cli.Value` для разбора | Подкоманда не видит опции родителя; собственного парсера аргументов нет |
+| Компилятор | Ядро Flick на Rust, типизированный IR, LSP для исходного кода, версионируемый JSON-интерфейс iface | Собственный анализатор типов; Mapper служит слоем интеграции |
+| Оптимизация | Базовая отладочная генерация и типизированные проходы оптимизации для сборки release по подходам ReScript | Нужны доказательства сохранения наблюдаемого поведения, заданного контрактами |
+| CLI | `flick`, `.fl`, `flick.toml`, один файл фиксации зависимостей pnpm; check/build/run/dev/test/fmt и инструменты FFI/Schema | Команды используют один анализатор типов; версии среды выполнения и интерфейсов проверяются явно |
 
-Все перечисленные решения относятся к первой версии. Pure `a -> b`, runtime `a ->{r; e} b` и runtime без requirements/errors `a ->{} b` различаются в checker и IR. Статические guarantees действуют для проверенного source и правдивых trusted bindings; native Effect и Content Mapper не доказывают их автоматически.
+Все перечисленные решения относятся к первой версии. Чистая стрелка `a -> b`, эффектная `a ->{r; e} b` и эффектная стрелка без требований и ошибок `a ->{} b` различаются в анализаторе типов и IR. Статические гарантии действуют для проверенного исходного кода и доверенных привязок, которые соблюдают свои контракты; сами по себе Effect и Content Mapper этих гарантий не доказывают.

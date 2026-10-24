@@ -15,7 +15,7 @@ const unlocalized = current.replace(/^\/ru(?=\/|$)/, "") || "/";
 const english = unlocalized;
 const russian = `/ru${unlocalized === "/" ? "/" : unlocalized}`;
 const links = [
-  ["Learn", "/learn/"], ["Guides", "/guides/"], ["API", "/api/"], ["Ecosystem", "/ecosystem/"],
+  [ru ? "Изучение" : "Learn", "/learn/"], [ru ? "Руководства" : "Guides", "/guides/"], [ru ? "Справочник" : "API", "/api/"], [ru ? "Экосистема" : "Ecosystem", "/ecosystem/"],
 ];
 const sidebar = route?.hasSidebar ? route.sidebar : undefined;
 const controlView = shell as (ru: boolean) => Effect.Effect<Ui>;

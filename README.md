@@ -1,25 +1,91 @@
-# flick-lang
+<p align="center">
+  <img src="./docs/public/flick-logo.svg" width="240" height="240" alt="Flick logo: a lowercase f shaped like a toggle switch.">
+</p>
 
-Rust implementation of **Flick** — an ML-family language with HKT, type
-classes and a single Effect backend (JavaScript/TypeScript output).
+<h1 align="center">Flick</h1>
 
-The language specification (Flick 0.7) is part of the documentation site:
-[`docs/src/content/docs/spec/`](./docs/src/content/docs/spec/) in English and
-[`docs/src/content/docs/ru/spec/`](./docs/src/content/docs/ru/spec/) in Russian,
-the original text.
+<p align="center">
+  <strong>Functional programming. Explicit effects. JavaScript.</strong>
+</p>
 
-## Crates
+<p align="center">
+  <a href="./docs/src/content/docs/learn/index.md">Learn</a> ·
+  <a href="./docs/src/content/docs/start/getting-started.md">Get started</a> ·
+  <a href="./examples/first-slice/">Examples</a> ·
+  <a href="./editors/README.md">Editor setup</a>
+</p>
+
+Flick is an ML-family language that compiles to JavaScript and TypeScript,
+with [Effect](https://effect.website/) at its runtime foundation.
+Pattern matching, higher-kinded types and type classes meet typed effects,
+errors and services, with regions to keep scoped resources from escaping.
+
+## A little Flick
+
+```flick
+module Main exposing (main)
+
+type Greeting = Hello String | Goodbye
+
+message : Greeting -> String
+let message greeting =
+  match greeting with
+  | Hello name -> "Hello, " ++ name ++ "!"
+  | Goodbye -> "See you soon!"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (message (Hello "Flick"))
+```
+
+`message` is pure. `main` performs an effect, and its signature makes the
+possible `AppError` explicit. Generated programs are ordinary ES modules.
+
+## Try it from source
+
+From a checkout, install the [pinned Rust toolchain](./rust-toolchain.toml),
+Node.js **24.18.0 or newer**, and **pnpm 12.14.0**:
+
+```sh
+pnpm install --frozen-lockfile
+cargo build -p flick
+./target/debug/flick --project examples/first-slice run
+```
+
+The example combines services, layers and typed errors. To create your own
+project once `flick` is on your `PATH`, follow
+[Getting started](./docs/src/content/docs/start/getting-started.md).
+Use matching compiler and runtime versions.
+
+## Explore
+
+- [Learn Flick](./docs/src/content/docs/learn/index.md) — start with types,
+  functions and effects, including a path for TypeScript and Effect users.
+- [Guides](./docs/src/content/docs/guides/index.md) — work through real tasks.
+- [API & reference](./docs/src/content/docs/api/index.md) — syntax, standard
+  library and runtime contracts.
+- [Ecosystem](./docs/src/content/docs/ecosystem/index.md) — compiler, browser
+  playground, JavaScript interop and editor tooling.
+- **Flick 0.7 specification:** [English](./docs/src/content/docs/spec/) ·
+  [Русский — оригинал](./docs/src/content/docs/ru/spec/).
+
+The documentation site includes **Play**, which runs Flick in an isolated
+browser worker, and **Transpile**, which shows the generated JavaScript.
+See the documentation-site development notes below to run them locally.
+
+## Contributing
+
+Bug reports, small examples and documentation improvements are welcome.
+Use [issues](https://github.com/bondiano/flick-lang/issues) to report a
+problem or discuss a change.
 
 | Crate | Purpose |
 | - | - |
-| `flick-core` | Shared Rust core for the compiler and the LSP |
-| `flick` | The `flick` CLI |
-| `flick-wasm` | wasm-bindgen interface for the in-browser demo (compile preview, REPL) |
+| [`flick-core`](./flick-core/) | Shared compiler and language-server core |
+| [`flick`](./flick/) | The `flick` command-line tool |
+| [`flick-wasm`](./flick-wasm/) | The same compiler core, built for the browser |
 
-## Development
-
-Requires Rust 1.94 (pinned in `rust-toolchain.toml`) and `just`; the e2e suite
-also needs Node.js >= 24.18.0 and pnpm (pinned via `packageManager`).
+Development also uses [`just`](https://just.systems/):
 
 ```sh
 just lint   # fmt --check + clippy -D warnings
@@ -30,7 +96,10 @@ just e2e    # runtime tests + compiled programs on Node
 
 `examples/first-slice` is a complete project (services, layers, tests); run `flick run` or `flick test` inside it.
 
-## Documentation
+<details>
+<summary>Documentation-site development</summary>
+
+### Documentation site
 
 The Astro/Starlight site in `docs/` serves English at `/` and Russian at
 `/ru/`. The custom homepages live in `docs/src/pages/`; documentation lives
@@ -88,3 +157,9 @@ upgrading Pagefind; it does not affect program-worker isolation.
 `pnpm -C docs test` exercises linking and executing a real compiled program.
 The visual contract and approved composition are recorded in `PRODUCT.md`,
 `DESIGN.md` and `.impeccable/`.
+
+</details>
+
+## License
+
+[MIT](./LICENSE).

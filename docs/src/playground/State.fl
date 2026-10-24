@@ -114,7 +114,7 @@ let status m =
   else if m.running then
     tr m.locale "Running · 10 s limit" "Выполняется · лимит 10 с"
   else
-    "Flick " ++ m.version ++ " · " ++ tr m.locale "Type-checked" "Проверено"
+    "Flick " ++ m.version ++ " · " ++ tr m.locale "Type-checked" "Типы проверены"
 
 initial_model : Configuration -> Model
 let initial_model config =

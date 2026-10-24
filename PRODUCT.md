@@ -35,6 +35,8 @@ The repository contains an Astro/Starlight documentation site, a Rust compiler e
 
 The product name is Flick. The owner requested a distinctive logo, beautiful documentation, and a gentle animated background. Their explicit visual references are Effector documentation, effect.website, and v1001.reatom.dev. Effect's Play and Flow's Try are interaction references for Play and Transpile. The owner chose visual mockups before implementation.
 
+For the repository identity, the owner prefers visual wordplay like the logos at [Tonsky](https://tonsky.me/design/) and [Evil Martians](https://evilmartians.com/opensource), not a childish cartoon mascot. They rejected the firefly sticker and selected a lowercase `f` combined with a physical toggle switch from three monochrome concepts. This selection applies to the README and repository logo assets; the documentation site's existing Signal identity remains unchanged.
+
 ## Evidence on Hand
 
 - `docs/src/content/docs/`: existing English and Russian tutorials and language/runtime references.

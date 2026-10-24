@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="#f0442e" role="img" aria-labelledby="title">
+  <title id="title">Flick — an f shaped like a toggle switch</title>
+  <path d="M60 232V91c0-38 29-67 66-67 21 0 39 8 52 22l-29 29c-6-7-14-11-23-11-16 0-26 12-26 28v26h15.144A24 24 0 1 0 145.884 138.639L168.161 118H188v56h-88v58Z" />
+  <path d="M116.223 134.765L184.223 71.765L195.777 84.235L127.777 147.235Z" />
+  <circle cx="122" cy="141" r="13" />
+  <circle cx="190" cy="78" r="21" />
+</svg>
