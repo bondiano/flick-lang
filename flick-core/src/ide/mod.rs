@@ -2,16 +2,24 @@
 //! is declared, its source type, its references, renames and completions.
 //! Positions are UTF-8 byte offsets; the language server converts them.
 
+mod actions;
 mod complete;
+mod hints;
 mod hover;
 mod locals;
 mod navigate;
 mod rename;
 mod sql;
 mod sql_table;
+mod symbols;
+mod tokens;
 mod tree;
 
+pub use actions::Action;
 pub use complete::{Completion, CompletionKind};
+pub use hints::Help;
+pub use symbols::Outline;
+pub use tokens::TOKEN_TYPES;
 
 use std::path::PathBuf;
 
@@ -269,5 +277,7 @@ fn entity(module: &str, namespace: Namespace, name: &str) -> Symbol {
         name: name.to_owned(),
     })
 }
+#[cfg(test)]
+mod hints_tests;
 #[cfg(test)]
 mod tests;

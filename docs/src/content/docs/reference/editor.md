@@ -11,14 +11,21 @@ protocol; logs go to stderr. It runs the same analysis as `flick check` and
 
 | Request | Answer |
 | - | - |
-| diagnostics | exactly those of `flick check`, with their `FLICK-` codes, at UTF-16 positions |
+| diagnostics | exactly those of `flick check`, with their `FLICK-` codes, at UTF-16 positions, published when a document is opened or saved; help lines follow the message, related spans (where an expected type came from) are `relatedInformation`, unused code is tagged `Unnecessary` |
 | `textDocument/hover` | source signatures and `///` documentation for public and private values, at declarations and uses; module documentation on qualifiers such as `Sql`; inferred locals and values, SQL aliases, columns and parameters, on a keyword that opens an expression (`task`, `scope`, `match`, `fun` …) the type of the whole expression, on `await` and `ignore` the type of the operand (see [keywords.md](../keywords/#in-the-editor)); declarations distinguish `type error` from `service` |
 | `textDocument/definition` | across modules; module qualifiers lead to their module header, members to their declaration; built-ins open as real read-only `.fl` files; installed packages use their published `.fl`, else `.iface`; companions lead to their type, class methods at a known instance to that instance |
 | `textDocument/references` | every occurrence in the project |
 | `textDocument/rename` | the project's own values, types, constructors and locals, in `.fl` sources only; names of built-in modules and packages, service operations and instance methods have no exact mapping and are refused |
 | `textDocument/completion` | record fields after `x.`, module exports or service operations after `M.`, otherwise names in scope; SQL blocks offer tables, aliases, columns, parameters, clauses and functions; `sql table` columns offer the SQL types of the project's dialect, then the modifiers that are not written yet and do not conflict, after `as` Flick types and after `via` the codecs in scope whose type instantiates to the column's `PureCodec`, imported ones also as `Module.codec` |
-| `textDocument/codeAction` | quick fixes of diagnostics that carry an edit; on `FLICK-T004` it inserts the inferred signature `name : T` right above the `let`, at its indentation, with effect rows, type variables, class constraints and names qualified as the module's imports allow; a binding the checker rejected gets none |
+| `textDocument/codeAction` | quick fixes of diagnostics that carry an edit: the closest name for a misspelt one, removing unused imports and definitions, `_` for an unused variable, the missing arms of a `match`, a `todo` definition of a missing function, the inferred type for a `_` hole; on `FLICK-T004` it inserts the inferred signature `name : T` right above the `let`, at its indentation, with effect rows, type variables, class constraints and names qualified as the module's imports allow; a binding the checker rejected gets none |
+| `textDocument/codeAction` (refactors) | add the signature of a `let` value; pattern match on a variable that is a block's result; qualify an imported name at every use, or drop a qualifier and import the name; extract the selected expression into a `let`; inline a local `let` into its uses |
 | `textDocument/formatting` | `flick fmt` |
+| `textDocument/documentSymbol`, `workspace/symbol` | declarations, with constructors and methods under their type or class; workspace symbols match the letters of the query in order |
+| `textDocument/signatureHelp` | in a call `f a b`, the signature of `f` with the argument being written marked |
+| `textDocument/typeDefinition` | the declaration of the type of the expression under the cursor |
+| `textDocument/semanticTokens/full` | what each name is: module, type, constructor, function, variable, method or parameter |
+| `textDocument/foldingRange` | declarations, `match`, records, lists, embedded blocks and the run of imports |
+| `textDocument/inlayHint` | the type of each `let` without a signature, and of each stage of a pipeline written over several lines |
 
 Hover resolves source bindings, not just the public export list. Private
 helpers such as a view or an error reporter show their written signatures

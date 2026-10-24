@@ -12,6 +12,7 @@ mod uses;
 
 pub(crate) use defs::shortest_cycle;
 pub use syntax::{Header, Import, Item, ItemKind, ModuleSyntax, module_syntax};
+pub(crate) use unused::item_removal;
 
 /// A top-level name a module declares, signatures included.
 #[derive(Debug, Clone)]

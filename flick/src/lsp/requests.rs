@@ -9,29 +9,32 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process;
 
+use flick_core::diagnostics::Edit;
 use flick_core::fmt;
-use flick_core::ide::{CompletionKind, Ide, Location, Target};
-use flick_core::source::FileId;
+use flick_core::ide::{CompletionKind, Ide, Location, TOKEN_TYPES, Target};
+use flick_core::source::{FileId, SourceMap};
 use flick_core::syntax::{self, cst::Node, kind::SyntaxKind as K, lexer};
 use flick_core::types::builtin_sources;
 use serde_json::{Value, json};
 
-use super::{BUILTIN_DIR, Server, Snapshot, analyze, builtin_index, lsp_diagnostic, protocol};
+use super::{
+    BUILTIN_DIR, Server, Snapshot, analyze, builtin_index, features, lsp_diagnostic, protocol,
+};
 
-type Reply = Result<Value, (i64, String)>;
+pub(super) type Reply = Result<Value, (i64, String)>;
 
 const INVALID_PARAMS: i64 = -32602;
 const REQUEST_FAILED: i64 = -32803;
 
 /// The directory of an installed package of the project at `root`.
-fn package_dir(root: &Path) -> impl Fn(&str) -> Option<PathBuf> + '_ {
+pub(super) fn package_dir(root: &Path) -> impl Fn(&str) -> Option<PathBuf> + '_ {
     move |package| {
         let dir = root.join("node_modules").join(package);
         dir.exists().then_some(dir)
     }
 }
 
-fn ide<'a>(snapshot: &'a Snapshot, dir: &'a dyn Fn(&str) -> Option<PathBuf>) -> Ide<'a> {
+pub(super) fn ide<'a>(snapshot: &'a Snapshot, dir: &'a dyn Fn(&str) -> Option<PathBuf>) -> Ide<'a> {
     Ide {
         analysis: &snapshot.analysis,
         sources: &snapshot.sources,
@@ -53,6 +56,7 @@ impl Server {
             }
             "textDocument/completion" => self.completion(params),
             "textDocument/codeAction" => self.code_actions(params),
+            "workspace/symbol" => Ok(self.workspace_symbols(params)),
             _ => self.at_position(method, params),
         }
     }
@@ -108,6 +112,14 @@ impl Server {
                         })
                     }))
             }
+            "textDocument/documentSymbol" => Ok(features::document_symbols(&ide, &text, file)),
+            "textDocument/semanticTokens/full" => Ok(features::semantic_tokens(&ide, &text, file)),
+            "textDocument/foldingRange" => Ok(features::folding_ranges(&ide, &text, file)),
+            "textDocument/inlayHint" => Ok(features::inlay_hints(&ide, &text, file)),
+            "textDocument/signatureHelp" => Ok(features::signature_help(&ide, file, offset)),
+            "textDocument/typeDefinition" => ide
+                .type_definition(file, offset)
+                .map_or(Ok(Value::Null), |l| location(snapshot, &l)),
             "textDocument/definition" => ide
                 .symbol_at(file, offset)
                 .and_then(|(symbol, _)| ide.definition(&symbol))
@@ -161,7 +173,8 @@ impl Server {
         }
     }
 
-    /// Quick fixes: the edits of the fixes of the diagnostics in the range.
+    /// Quick fixes, the edits of the fixes of the diagnostics in the range,
+    /// then the rewrites the range offers.
     fn code_actions(&mut self, params: &Value) -> Reply {
         let (path, text) = self.document(params)?;
         let start = protocol::offset(&text, &params["range"]["start"]);
@@ -179,25 +192,22 @@ impl Server {
                 continue;
             }
             for fix in d.fixes.iter().filter(|f| !f.edits.is_empty()) {
-                let mut changes = serde_json::Map::new();
-                for edit in &fix.edits {
-                    let source = snapshot.sources.get(edit.span.file);
-                    let range = protocol::range(&source.text, edit.span.start, edit.span.end);
-                    changes
-                        .entry(protocol::uri_of(Path::new(&source.path)))
-                        .or_insert_with(|| json!([]))
-                        .as_array_mut()
-                        .expect("array")
-                        .push(json!({ "range": range, "newText": edit.replacement }));
-                }
                 actions.push(json!({
                     "title": fix.message,
                     "kind": "quickfix",
                     "diagnostics": [lsp_diagnostic(&snapshot.sources, d)],
                     "isPreferred": true,
-                    "edit": { "changes": changes },
+                    "edit": { "changes": changes(&snapshot.sources, &fix.edits) },
                 }));
             }
+        }
+        let dir = package_dir(&snapshot.root);
+        for action in ide(snapshot, &dir).actions(file, start, end) {
+            actions.push(json!({
+                "title": action.title,
+                "kind": action.kind,
+                "edit": { "changes": changes(&snapshot.sources, &action.edits) },
+            }));
         }
         Ok(Value::Array(actions))
     }
@@ -263,7 +273,7 @@ impl Server {
 }
 
 /// An LSP location of a declaration.
-fn location(snapshot: &Snapshot, l: &Location) -> Reply {
+pub(super) fn location(snapshot: &Snapshot, l: &Location) -> Reply {
     let path;
     let text;
     let (path, text) = match &l.target {
@@ -395,9 +405,37 @@ fn capabilities() -> Value {
             "referencesProvider": true,
             "completionProvider": { "triggerCharacters": ["."] },
             "renameProvider": { "prepareProvider": true },
-            "codeActionProvider": { "codeActionKinds": ["quickfix"] },
+            "codeActionProvider": {
+                "codeActionKinds": ["quickfix", "refactor.rewrite", "refactor.extract", "refactor.inline"],
+            },
             "documentFormattingProvider": true,
+            "documentSymbolProvider": true,
+            "workspaceSymbolProvider": true,
+            "typeDefinitionProvider": true,
+            "foldingRangeProvider": true,
+            "inlayHintProvider": true,
+            "signatureHelpProvider": { "triggerCharacters": [" "] },
+            "semanticTokensProvider": {
+                "legend": { "tokenTypes": TOKEN_TYPES, "tokenModifiers": [] },
+                "full": true,
+            },
         },
         "serverInfo": { "name": "flick", "version": env!("CARGO_PKG_VERSION") },
     })
+}
+
+/// LSP `changes`: the edits by document URI.
+fn changes(sources: &SourceMap, edits: &[Edit]) -> serde_json::Map<String, Value> {
+    let mut changes = serde_json::Map::new();
+    for edit in edits {
+        let source = sources.get(edit.span.file);
+        let range = protocol::range(&source.text, edit.span.start, edit.span.end);
+        changes
+            .entry(protocol::uri_of(Path::new(&source.path)))
+            .or_insert_with(|| json!([]))
+            .as_array_mut()
+            .expect("array")
+            .push(json!({ "range": range, "newText": edit.replacement }));
+    }
+    changes
 }

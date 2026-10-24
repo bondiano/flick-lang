@@ -4,6 +4,7 @@
 //! leave no value unmatched (the diagnostic shows one); an arm that is not
 //! useful can never run. Guarded arms cover nothing, since the guard may fail.
 
+use std::fmt::Write;
 use std::{iter, slice};
 
 use super::Checker;
@@ -15,6 +16,10 @@ use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
+
+/// How many missing patterns the fix of a non-exhaustive `match` adds.
+const MISSING_SHOWN: usize = 8;
 
 impl Checker<'_> {
     pub fn exhaustive(&mut self, node: &Node, arms: &[(Pat, bool, Span)]) {
@@ -31,20 +36,54 @@ impl Checker<'_> {
                 rows.push(vec![pat.clone()]);
             }
         }
-        if let Some(witness) = self.useful(&rows, &[Pat::Wild]) {
-            let shown = self.show_pat(&witness[0], false);
-            let start = node.range().0;
-            let end = node.nodes().next().map_or(start, |s| s.range().1);
-            let span = Span::new(self.file, start, end);
-            self.diagnostics.push(
-                diagnostics::Diagnostic::error(
-                    codes::T009,
-                    format!("`match` does not cover every value: `{shown}` is not matched"),
-                    span,
-                )
-                .with_fix(format!("add an arm `| {shown} -> …`"), Vec::new()),
-            );
+        // a handful of missing patterns, each the first one the arms before miss
+        let mut missing = Vec::new();
+        while missing.len() < MISSING_SHOWN
+            && let Some(witness) = self.useful(&rows, &[Pat::Wild])
+        {
+            missing.push(self.show_pat(&witness[0], false));
+            rows.push(witness);
         }
+        let Some(first) = missing.first() else {
+            return;
+        };
+        let start = node.range().0;
+        let end = node.nodes().next().map_or(start, |s| s.range().1);
+        let span = Span::new(self.file, start, end);
+        let message = format!("`match` does not cover every value: `{first}` is not matched");
+        let title = match &missing[..] {
+            [one] => format!("add an arm `| {one} -> todo`"),
+            _ => "add the missing arms".to_owned(),
+        };
+        let edits = self.missing_arms(node, &missing).into_iter().collect();
+        self.diagnostics.push(
+            diagnostics::Diagnostic::error(codes::T009, message, span).with_fix(title, edits),
+        );
+    }
+
+    /// Inserts `| pattern -> todo` for each pattern after the last arm, at
+    /// its indentation.
+    fn missing_arms(&self, node: &Node, missing: &[String]) -> Option<diagnostics::Edit> {
+        let last = node.nodes().filter(|n| n.kind == K::MatchArm).last()?;
+        let (arm_start, end) = last.range();
+        let line = self.text[..arm_start as usize]
+            .rfind('\n')
+            .map_or(0, |i| i + 1);
+        let before = &self.text[line..arm_start as usize];
+        let indent = if before.trim().is_empty() {
+            before.to_owned()
+        } else {
+            let lead = before.len() - before.trim_start().len();
+            format!("{}  ", &before[..lead])
+        };
+        let mut arms = String::new();
+        for p in missing {
+            let _ = write!(arms, "\n{indent}| {p} -> todo");
+        }
+        Some(diagnostics::Edit {
+            span: Span::new(self.file, end, end),
+            replacement: arms,
+        })
     }
 
     /// A pattern of `let` or of a parameter must match every value.

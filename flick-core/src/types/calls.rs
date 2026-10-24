@@ -123,7 +123,9 @@ impl Checker<'_> {
     /// `f a b` is `(f a) b`: each argument is one stage, and a runtime arrow
     /// at a stage makes the application a runtime call.
     pub fn apply(&mut self, head: &Node, args: &[&Node]) -> Type {
+        let since = self.diagnostics.len();
         let mut ty = self.infer(head);
+        let mut unknown = Vec::new();
         let mut params = Vec::new();
         for (i, arg) in args.iter().enumerate() {
             let span = Span::new(self.file, head.range().0, arg.range().1);
@@ -152,7 +154,7 @@ impl Checker<'_> {
                     ty = self.instantiate(&result, span);
                 }
                 Type::Error => {
-                    self.infer(arg);
+                    unknown.push(self.infer(arg));
                 }
                 meta @ Type::Meta(_) => {
                     let (param, result) = (self.fresh(), self.fresh());
@@ -173,6 +175,9 @@ impl Checker<'_> {
                     return Type::Error;
                 }
             }
+        }
+        if unknown.len() == args.len() && head.kind == K::NameExpr {
+            self.stub_fix(since, head, args, &unknown);
         }
         if let [first, second] = &params[..]
             && self.is_builtin(head, "Layer", "merge")
@@ -239,7 +244,12 @@ impl Checker<'_> {
         let span = self.span(node);
         let bool_ = Type::prim("Bool");
         match op.kind {
-            K::PipeGt => self.pipe(lhs, rhs),
+            K::PipeGt => {
+                // at the `|>`, the type after the stage: hover and inlay hints show it
+                let ty = self.pipe(lhs, rhs);
+                self.note_type(self.token_span(op), &ty);
+                ty
+            }
             K::OrOr | K::AndAnd => {
                 self.check(lhs, &bool_);
                 self.check(rhs, &bool_);

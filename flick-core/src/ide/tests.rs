@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::io::{self, ErrorKind};
+use std::iter;
 use std::path::{Path, PathBuf};
 
 use super::{CompletionKind, Ide, Symbol, Target};
@@ -116,36 +117,43 @@ let items_of owner =
   }
 ";
 
-struct Fixture {
+pub(super) struct Fixture {
     analysis: Analysis,
     sources: SourceMap,
 }
 
 fn fixture() -> Fixture {
+    let fixture = fixture_of(&[("src/App/Domain.fl", DOMAIN), ("src/App/Main.fl", MAIN)]);
+    assert!(
+        fixture
+            .analysis
+            .diagnostics
+            .iter()
+            .all(Diagnostic::unnecessary),
+        "{:?}",
+        fixture.analysis.diagnostics
+    );
+    fixture
+}
+
+/// A library project of `files` (paths under `src/`), analysed from its last file.
+pub(super) fn fixture_of(files: &[(&str, &str)]) -> Fixture {
     let host = Memory(
-        [
-            ("flick.toml", LIB),
-            ("src/App/Domain.fl", DOMAIN),
-            ("src/App/Main.fl", MAIN),
-        ]
-        .iter()
-        .map(|(p, t)| (Path::new("/p").join(p), (*t).to_owned()))
-        .collect(),
+        iter::once(("flick.toml", LIB))
+            .chain(files.iter().copied())
+            .map(|(p, t)| (Path::new("/p").join(p), t.to_owned()))
+            .collect(),
     );
     let mut sources = SourceMap::default();
     let project = project::discover(&host, &mut sources, Path::new("/p"), None).expect("config");
-    let roots = [PathBuf::from("/p/src/App/Main.fl")];
+    let last = files.last().expect("a file").0;
+    let roots = [Path::new("/p").join(last)];
     let analysis = project::analyze(&host, &mut sources, project.as_ref(), &roots);
-    assert!(
-        analysis.diagnostics.iter().all(Diagnostic::unnecessary),
-        "{:?}",
-        analysis.diagnostics
-    );
     Fixture { analysis, sources }
 }
 
 impl Fixture {
-    fn ide(&self) -> Ide<'_> {
+    pub(super) fn ide(&self) -> Ide<'_> {
         Ide {
             analysis: &self.analysis,
             sources: &self.sources,
@@ -153,12 +161,12 @@ impl Fixture {
         }
     }
 
-    fn file(&self, module: &str) -> FileId {
+    pub(super) fn file(&self, module: &str) -> FileId {
         self.analysis.module(module).expect("module").file
     }
 
     /// The offset of the `nth` occurrence of `needle` in `module`.
-    fn at(&self, module: &str, needle: &str, nth: usize) -> u32 {
+    pub(super) fn at(&self, module: &str, needle: &str, nth: usize) -> u32 {
         let text = &self.sources.get(self.file(module)).text;
         let found = text.match_indices(needle).nth(nth).expect("occurs").0;
         u32::try_from(found).expect("small")

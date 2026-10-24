@@ -4,6 +4,7 @@
 //! same analysis that compiles it, and publishes the diagnostics `flick
 //! check` reports, positions converted to UTF-16.
 
+mod features;
 mod protocol;
 mod requests;
 

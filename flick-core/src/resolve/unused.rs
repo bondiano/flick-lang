@@ -157,7 +157,7 @@ fn unused_item(text: &str, import: &Import, item: &Item) -> Diagnostic {
 
 /// The text to delete with an `exposing` item: its comma, or the whole
 /// `exposing (…)` when it is the only item.
-fn item_removal(text: &str, import: &Import, item: Span) -> (u32, u32) {
+pub(crate) fn item_removal(text: &str, import: &Import, item: Span) -> (u32, u32) {
     let after = &text[item.end as usize..];
     let gap = after.len() - after.trim_start().len();
     if after.trim_start().starts_with(',') {

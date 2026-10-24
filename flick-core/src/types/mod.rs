@@ -43,6 +43,7 @@ mod rows;
 mod schemas;
 mod services;
 mod sql;
+mod stub;
 mod toplevel;
 mod ty;
 mod typing;

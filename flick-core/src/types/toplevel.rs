@@ -345,6 +345,11 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// Where the top-level declaration being checked ends.
+    pub fn current_end(&self) -> Option<u32> {
+        self.top.current.map(|i| self.top.items[i].decl.range().1)
+    }
+
     /// The span of the signature of this module's top-level value `name`.
     pub fn signature_span(&self, name: &str) -> Option<Span> {
         let i = *self.top.by_name.get(name)?;

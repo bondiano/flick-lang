@@ -1,4 +1,5 @@
 mod completion;
+mod features;
 mod quick_fix;
 mod sql_table;
 
