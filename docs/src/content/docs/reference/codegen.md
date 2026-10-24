@@ -217,6 +217,7 @@ corpus runs in both profiles against the same expectations.
 | dictionaries | a method written in an instance without a context is an exported constant `<instance>$<method>`; a canonical use calls it directly, in the module or an importer; a dictionary passed as a value (an `EqHash` witness) is never replaced |
 | foreign | a pure `foreign` that passes its arguments and result as they are is the import itself: `export { $f_div as div$2 }`, and a full application in the module calls `$f_div` |
 | lone effects | a runtime body that only returns one effect, `Effect.gen(function* () { return (yield* x); })`, is `Effect.suspend(() => x)`: built as late, without a generator |
+| matches and constructors | the last arm of a `match` without a guard is not tested, since the match is exhaustive; three or more arms that are constructors with only bound fields, the last one possibly any binding, are a `switch (x._tag)` with `default` last; a tagged constructor applied to all its fields is the object it builds, `{ _tag: "Rect#…", _0: 3, _1: 4 }` |
 
 A function whose first stage computes or runs something gets no worker:
 joining the stages would move that work after the next argument. Pure

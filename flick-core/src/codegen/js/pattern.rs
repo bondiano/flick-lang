@@ -131,19 +131,31 @@ impl Gen<'_> {
         if label.is_some() {
             self.temps += 1;
         }
+        let emit = |g: &mut Self, body: &Expr| match (result, &label) {
+            (Some(r), Some(label)) => {
+                let v = g.expr(body);
+                g.buf.push(format!("{r} = {v};"));
+                g.buf.push(format!("break {label};"));
+            }
+            _ => g.tail_expr(body),
+        };
+        let release = self.options.release;
         let mut out = Vec::new();
-        for arm in arms {
-            let (stmts, ()) = self.block(|g| {
-                g.arm(subject, arm, |g, body| match (result, &label) {
-                    (Some(r), Some(label)) => {
-                        let v = g.expr(body);
-                        g.buf.push(format!("{r} = {v};"));
-                        g.buf.push(format!("break {label};"));
-                    }
-                    _ => g.tail_expr(body),
-                });
-            });
-            out.extend(stmts);
+        if release && let Some(cases) = self.switch_cases(arms) {
+            let mut body = Vec::new();
+            for (case, arm) in cases.into_iter().zip(arms) {
+                let (stmts, ()) = self.block(|g| g.arm(subject, arm, true, emit));
+                let head = case.map_or("default:".to_owned(), |tag| format!("case {tag}:"));
+                body.push(format!("{head} {{\n{}}}", indent(&stmts)));
+            }
+            out.push(format!("switch ({subject}._tag) {{\n{}}}", indent(&body)));
+        } else {
+            for (i, arm) in arms.iter().enumerate() {
+                // the match is exhaustive: its last arm without a guard needs no test
+                let last = release && i + 1 == arms.len();
+                let (stmts, ()) = self.block(|g| g.arm(subject, arm, last, emit));
+                out.extend(stmts);
+            }
         }
         match label {
             Some(label) => self.buf.push(format!("{label}: {{\n{}}}", indent(&out))),
@@ -155,7 +167,7 @@ impl Gen<'_> {
     /// returns its handler, and no match returns `undefined`.
     pub(super) fn handlers(&mut self, subject: &str, arms: &[Arm]) {
         for arm in arms {
-            self.arm(subject, arm, |g, body| {
+            self.arm(subject, arm, false, |g, body| {
                 let handler = g.gen_block(body);
                 g.buf.push(format!("return {handler};"));
             });
@@ -163,9 +175,48 @@ impl Gen<'_> {
         self.buf.push("return undefined;".to_owned());
     }
 
-    fn arm(&mut self, subject: &str, arm: &Arm, body: impl FnOnce(&mut Self, &Expr)) {
+    /// The `case` tag of each arm of a `match` a `switch` can take, `None`
+    /// for the last arm, which is `default`: three or more arms without
+    /// guards, each a tagged constructor of distinct tag whose fields are
+    /// only bound, or for the last arm any binding.
+    fn switch_cases(&self, arms: &[Arm]) -> Option<Vec<Option<String>>> {
+        if arms.len() < 3 || arms.iter().any(|a| a.guard.is_some()) {
+            return None;
+        }
+        let plain = |p: &Pat| matches!(p, Pat::Wild | Pat::Bind(_) | Pat::Lit(Lit::Unit));
+        let mut cases = Vec::new();
+        for (i, arm) in arms.iter().enumerate() {
+            let case = match &arm.pat {
+                Pat::Con(c, args) if c.rep == Rep::Tagged && args.iter().all(plain) => {
+                    Some(names::string(&self.shape(c, args.len()).0))
+                }
+                p if plain(p) && i + 1 == arms.len() => None,
+                _ => return None,
+            };
+            if case.is_some() && cases.contains(&case) {
+                return None;
+            }
+            cases.push(case);
+        }
+        if let Some(last) = cases.last_mut() {
+            *last = None;
+        }
+        Some(cases)
+    }
+
+    /// An arm on `subject`; `exhaustive`, it matches whatever reaches it.
+    fn arm(
+        &mut self,
+        subject: &str,
+        arm: &Arm,
+        exhaustive: bool,
+        body: impl FnOnce(&mut Self, &Expr),
+    ) {
         let mut t = Test::default();
         self.test(&arm.pat, subject, &mut t);
+        if exhaustive && arm.guard.is_none() {
+            t.conds.clear();
+        }
         let (inner, ()) = self.block(|g| {
             for (name, path) in &t.binds {
                 let c = g.constant(name, path);

@@ -6,7 +6,7 @@ use std::mem;
 use super::{Gen, Target, indent, names};
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stmt};
 use crate::source::Span;
-use crate::types::{Constructor, Dict, Lift};
+use crate::types::{Constructor, Dict, Lift, Rep};
 
 /// Whether moving the evaluation of `js` later is unobservable: a name, a
 /// property of a module namespace, or a literal.
@@ -161,6 +161,9 @@ impl Gen<'_> {
     }
 
     fn app(&mut self, e: &Expr, func: &Expr, arg: &Expr, runtime: bool, arg_first: bool) -> String {
+        if let Some(value) = self.constructed(e) {
+            return value;
+        }
         if let Some((worker, args)) = self.worker_call(e) {
             let owner = self.owner.take();
             let js = self.ordered(&args);
@@ -247,6 +250,46 @@ impl Gen<'_> {
         }
         let (arity, _) = *self.workers.get(name)?;
         (args.len() == arity).then(|| (format!("{}${arity}", names::ident(name)), args))
+    }
+
+    /// Release: a tagged constructor applied to all its fields, as the
+    /// object it builds, `{ _tag: "Rect#…", _0: 3, _1: 4 }`.
+    fn constructed(&mut self, e: &Expr) -> Option<String> {
+        if !self.options.release {
+            return None;
+        }
+        let mut args = Vec::new();
+        let mut head = e;
+        while let ExprKind::App {
+            func,
+            arg,
+            runtime: false,
+            arg_first: false,
+        } = &head.kind
+        {
+            args.push(&**arg);
+            head = func;
+        }
+        let ExprKind::Con(c) = &head.kind else {
+            return None;
+        };
+        if c.rep != Rep::Tagged || names::native(c).is_some() || args.len() != c.arity {
+            return None;
+        }
+        args.reverse();
+        let js = self.ordered(&args);
+        let package = (self.options.package)(&c.module);
+        let tag = names::string(&names::tag(c, package.as_deref()));
+        let fields: Vec<String> = js
+            .iter()
+            .enumerate()
+            .map(|(i, v)| format!("_{i}: {v}"))
+            .collect();
+        Some(format!(
+            "{}{{ _tag: {tag}, {} }}",
+            self.mark(e.span),
+            fields.join(", ")
+        ))
     }
 
     /// `yield*` of the effect `js`, in `owner` when a `Within` gave one.

@@ -235,3 +235,23 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
     assert!(!js.contains(".show("), "{js}");
     assert!(js.contains("$f_join(s, s)"), "{js}");
 }
+
+#[test]
+fn matches_switch_on_tags_and_skip_the_last_test() {
+    let js = release(
+        "module App exposing (area, name, unit)\n\n\
+         type Shape = Circle Number | Rect Number Number | Dot\n\n\
+         area : Shape -> Number\n\
+         let area s =\n  match s with\n  | Circle r -> r * r\n  | Rect w h -> w * h\n  | Dot -> 0\n\n\
+         name : Shape -> String\n\
+         let name s =\n  match s with\n  | Circle _ -> \"circle\"\n  | _ -> \"other\"\n\n\
+         unit : Unit -> Number\nlet unit () = area (Rect 2 3)\n",
+    );
+    assert!(js.contains("switch (s._tag) {"), "{js}");
+    assert!(js.contains("case \"Circle#"), "{js}");
+    assert!(js.contains("default: {"), "{js}");
+    // two arms: one test, the last arm runs whatever reaches it
+    assert_eq!(js.matches("s._tag ===").count(), 1, "{js}");
+    assert!(js.contains("{ _tag: \"Rect#"), "{js}");
+    assert!(js.contains("_0: 2, _1: 3 }"), "{js}");
+}
