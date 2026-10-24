@@ -80,6 +80,15 @@ let compose f g x =
 A signature is checked, not trusted: the body must work for every type the
 caller may choose (`FLICK-T008` when it needs one concrete type).
 
+A `_` in a signature or annotation is a hole: the checker infers that part
+and reports it (`FLICK-T024`), with a fix that writes the inferred type in.
+A hole is for drafting; a type declaration cannot have one.
+
+```flick
+swap : (Number, String) -> _
+let swap (a, b) = (b, a)
+```
+
 ## Functions and higher rank
 
 `a -> b`, `a ->{r; e} b` and `a ->{} b` are three different types; an empty

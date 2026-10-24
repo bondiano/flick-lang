@@ -7,6 +7,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use flick_core::diagnostics::Severity;
 use flick_core::project::{self, Host, analysis_fingerprint};
 use flick_core::projection;
 use flick_core::source::SourceMap;
@@ -47,8 +48,12 @@ fn projection_and_executable_share_the_analysis() {
         let roots = [path.clone()];
         let mut sources = SourceMap::default();
         let analysis = project::analyze(&Files, &mut sources, None, &roots);
+        // warnings are fine: programs may leave names unused or `echo` values
         assert!(
-            analysis.diagnostics.is_empty(),
+            analysis
+                .diagnostics
+                .iter()
+                .all(|d| d.severity == Severity::Warning),
             "{}: {:?}",
             path.display(),
             analysis.diagnostics

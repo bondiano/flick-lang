@@ -20,6 +20,7 @@ mod classes;
 pub mod cli;
 mod codecs;
 mod convert;
+mod debug;
 mod decls;
 mod display;
 mod effects;
@@ -178,9 +179,12 @@ fn run(
         typing: Typing::default(),
         predicates: HashMap::new(),
         field_path: Vec::new(),
+        holes: Vec::new(),
+        hole_ok: false,
     };
     checker.typing.sql_dialect = options.sql;
     checker.module(module.tree);
+    checker.report_holes();
     checker.fill(interface);
     let typing = checker.finish_typing();
     let mut evidence = checker.classes.evidence;
@@ -250,6 +254,10 @@ struct Checker<'a> {
     /// The fields of the record literals around the value being checked,
     /// outermost first: where a nested record's field is missing.
     field_path: Vec<String>,
+    /// Each `_` written in a type, and the variable that stands for it.
+    holes: Vec<(Span, Type)>,
+    /// Whether the type being converted may have holes.
+    hole_ok: bool,
 }
 
 impl Checker<'_> {

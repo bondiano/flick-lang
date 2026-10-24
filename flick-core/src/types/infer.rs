@@ -129,6 +129,7 @@ impl Checker<'_> {
             K::AppExpr => self.apply(children[0], &children[1..]),
             K::BinExpr => self.binary(node, &children),
             K::PrefixExpr => self.prefix(node, &children),
+            K::TodoExpr => self.todo(node),
             K::RecordExpr => self.record(node, None),
             K::RecordUpdate => self.record_update(node, &children),
             K::FunExpr => self.lambda(node, None),

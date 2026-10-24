@@ -4,6 +4,7 @@
 const KEYWORDS = [
   'module', 'exposing', 'import', 'as', 'let', 'rec', 'fun', 'match', 'with',
   'try', 'if', 'then', 'else', 'task', 'await', 'scope', 'provide', 'ignore',
+  'todo', 'echo',
   'type', 'opaque', 'refined', 'where', 'kind', 'error', 'service', 'class',
   'instance', 'deriving', 'foreign', 'from', 'forall', 'not', 'none',
   'schema', 'codec', 'sql', 'ui', 'cli', 'in', 'when', 'do',

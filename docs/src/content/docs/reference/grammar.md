@@ -36,7 +36,7 @@ Qualified names are written without spaces around `.`: `Users.get`,
 
 ```text
 module exposing import as let rec fun match with try if then else task await
-scope provide ignore type opaque refined where kind error service class
+scope provide ignore todo echo type opaque refined where kind error service class
 instance deriving foreign from forall not none true false schema codec
 sql ui cli in when do
 ```
@@ -136,7 +136,7 @@ There are no user-defined operators. From weakest to strongest:
 | 6 | `+` `-` | left |
 | 7 | `*` `/` `%` (`%` is the JS remainder) | left |
 | 8 | `**` | right |
-| 9 | prefix `-`, `not`, `await`, `ignore` | — |
+| 9 | prefix `-`, `not`, `await`, `ignore`, `echo` | — |
 | 10 | function application `f x y` | left |
 | 11 | `.field`, `Module.name` | left |
 
@@ -383,7 +383,9 @@ cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
             | ("description" | "subcommand" | "handle") expr
 ```
 
-`if` is an expression and always has `else`. `ignore e` discards a non-`Unit`
+`todo` (optionally followed by a string) is an expression of any type, and
+`echo` without an operand is a function, as in `x |> echo`. `_` is a type
+only in a signature or annotation. `if` is an expression and always has `else`. `ignore e` discards a non-`Unit`
 result of an intermediate statement (see [Direct effectful calls](../../spec/03-direct-calls/)). `await e` runs a stored `Eff` once in
 the current fiber; `task { … }` builds a cold computation (see [Values of computations and their execution](../../spec/04-computations/)). In
 `provide e { … }` and `codec e { … }` the `{` ends the head expression.

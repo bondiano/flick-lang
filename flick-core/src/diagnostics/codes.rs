@@ -146,6 +146,9 @@ codes! {
     T018 = Types 18, "wrong number of constructor arguments in a pattern";
     T019 = Types 19, "block without a result expression";
     T020 = Types 20, "representation of a type that does not fit it";
+    T022 = Types 22, "`todo` left in the code";
+    T023 = Types 23, "`echo` left in the code";
+    T024 = Types 24, "type hole";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";
@@ -229,6 +232,7 @@ codes! {
     P021 = Project 21, "application cleanup failed";
     P022 = Project 22, "SQL dialect not supported yet";
     P023 = Project 23, "unknown SQL dialect";
+    P024 = Project 24, "package with `todo` or `echo` left in it";
 }
 
 #[cfg(test)]

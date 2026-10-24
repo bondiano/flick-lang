@@ -1,0 +1,3 @@
+App.Main:6 42
+App.Main:8 ["ada","grace"]
+Error: App.Main:10: the rest of main

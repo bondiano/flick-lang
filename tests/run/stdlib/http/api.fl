@@ -64,7 +64,7 @@ let users =
     |> HttpApi.add create_user
     |> HttpApi.add me
     |> HttpApi.add health
-    |> HttpApi.add echo
+    |> HttpApi.add echo_text
     |> HttpApi.add login
 
 api : HttpApi.Api { users : Handlers r }
@@ -99,8 +99,8 @@ let me =
       else from_result (Err (HttpApi.HttpError { status = 401; message = "not a bearer token" })))
     |> HttpApi.deprecate
 
-echo : HttpApi.Endpoint "echo" (HttpApi.Request Unit Unit Unit String ->{r;} String)
-let echo =
+echo_text : HttpApi.Endpoint "echo" (HttpApi.Request Unit Unit Unit String ->{r;} String)
+let echo_text =
   HttpApi.endpoint HttpApi.Post "/echo" (Record.label : Record.Label "echo")
     |> HttpApi.with_text_payload
     |> HttpApi.with_text_success 200
@@ -218,7 +218,7 @@ let main () =
           ("echo: "
             ++ HttpApi.call
               base
-              echo
+              echo_text
               { path = (); query = (); headers = (); payload = "plain text" })
         Platform.stdout_line
           ("login: "

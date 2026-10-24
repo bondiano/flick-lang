@@ -35,6 +35,8 @@ pub enum SyntaxKind {
     ScopeKw,
     ProvideKw,
     IgnoreKw,
+    TodoKw,
+    EchoKw,
     TypeKw,
     OpaqueKw,
     RefinedKw,
@@ -143,6 +145,8 @@ pub enum SyntaxKind {
     AppExpr,
     BinExpr,
     PrefixExpr,
+    /// `todo` or `todo "what is missing"`.
+    TodoExpr,
     ParenExpr,
     TupleExpr,
     UnitExpr,
@@ -200,6 +204,8 @@ pub enum SyntaxKind {
     RecordTypeField,
     RowType,
     UnionType,
+    /// `_`: a type left for the checker to infer.
+    HoleType,
     CaptureType,
 }
 
@@ -260,6 +266,8 @@ pub fn keyword(text: &str) -> Option<SyntaxKind> {
         "scope" => K::ScopeKw,
         "provide" => K::ProvideKw,
         "ignore" => K::IgnoreKw,
+        "todo" => K::TodoKw,
+        "echo" => K::EchoKw,
         "type" => K::TypeKw,
         "opaque" => K::OpaqueKw,
         "refined" => K::RefinedKw,

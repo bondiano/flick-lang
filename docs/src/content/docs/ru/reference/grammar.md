@@ -37,7 +37,7 @@ title: "Грамматика Flick"
 
 ```text
 module exposing import as let rec fun match with try if then else task await
-scope provide ignore type opaque refined where kind error service class
+scope provide ignore todo echo type opaque refined where kind error service class
 instance deriving foreign from forall not none true false schema codec
 sql ui cli in when do
 ```
@@ -140,7 +140,7 @@ let examples =
 | 6 | `+` `-` | левая |
 | 7 | `*` `/` `%` (`%` — остаток от деления JS) | левая |
 | 8 | `**` | правая |
-| 9 | префиксные `-`, `not`, `await`, `ignore` | — |
+| 9 | префиксные `-`, `not`, `await`, `ignore`, `echo` | — |
 | 10 | применение функции `f x y` | левая |
 | 11 | `.field`, `Module.name` | левая |
 
@@ -391,7 +391,9 @@ cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
             | ("description" | "subcommand" | "handle") expr
 ```
 
-`if` — выражение, в котором всегда есть `else`. `ignore e` отбрасывает
+`todo` (с необязательной строкой после него) — выражение любого типа, а
+`echo` без операнда — функция, как в `x |> echo`. `_` — тип только в
+сигнатуре или аннотации. `if` — выражение, в котором всегда есть `else`. `ignore e` отбрасывает
 результат промежуточной инструкции, отличный от `Unit` (см. [Прямые эффектные вызовы](../../spec/03-direct-calls/)). `await e`
 однократно запускает сохранённый `Eff` в текущем файбере; `task { … }`
 создаёт холодное вычисление (см. [Значения вычислений и их выполнение](../../spec/04-computations/)). В `provide e { … }` и `codec e { … }`

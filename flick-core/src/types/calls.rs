@@ -319,6 +319,9 @@ impl Checker<'_> {
         let Some(op) = node.child_tokens().next() else {
             return Type::Error;
         };
+        if op.kind == K::EchoKw {
+            return self.echo(node, op, children.first().copied());
+        }
         let Some(operand) = children.first() else {
             return Type::Error;
         };

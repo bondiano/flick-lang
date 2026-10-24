@@ -73,10 +73,17 @@ fn expr_bp(p: &mut Parser, min_bp: u8) -> Option<Done> {
 }
 
 fn prefix(p: &mut Parser) -> Option<Done> {
-    if matches!(p.current(), K::Minus | K::NotKw | K::AwaitKw | K::IgnoreKw) {
+    if matches!(
+        p.current(),
+        K::Minus | K::NotKw | K::AwaitKw | K::IgnoreKw | K::EchoKw
+    ) {
         let m = p.start();
+        let echo = p.at(K::EchoKw);
         p.bump();
-        expr_bp(p, PREFIX_OPERAND);
+        // a bare `echo`, as in `x |> echo`, is a function
+        if !echo || at_operand_start(p) {
+            expr_bp(p, PREFIX_OPERAND);
+        }
         return Some(p.complete(m, K::PrefixExpr));
     }
     match p.current() {
@@ -95,6 +102,23 @@ fn prefix(p: &mut Parser) -> Option<Done> {
         )),
         _ => app(p),
     }
+}
+
+/// Whether the next token can start the operand of a prefix operator.
+fn at_operand_start(p: &Parser) -> bool {
+    at_arg_start(p)
+        || matches!(
+            p.current(),
+            K::Minus
+                | K::NotKw
+                | K::AwaitKw
+                | K::IgnoreKw
+                | K::EchoKw
+                | K::FunKw
+                | K::MatchKw
+                | K::TryKw
+                | K::IfKw
+        )
 }
 
 fn is_jsx(p: &Parser) -> bool {
@@ -163,6 +187,7 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::LParen
         | K::LBracket
         | K::TaskKw
+        | K::TodoKw
         | K::ScopeKw
         | K::ProvideKw
         | K::SqlKw
@@ -213,6 +238,13 @@ pub(super) fn con_path(p: &mut Parser) {
     }
 }
 
+/// `todo` and the string that says what it stands for.
+fn todo(p: &mut Parser) -> K {
+    p.bump();
+    p.eat(K::String);
+    K::TodoExpr
+}
+
 fn atom(p: &mut Parser) -> Option<Done> {
     let m = p.start();
     let kind = match p.current() {
@@ -228,6 +260,7 @@ fn atom(p: &mut Parser) -> Option<Done> {
             p.bump();
             K::Literal
         }
+        K::TodoKw => todo(p),
         K::LParen => paren(p),
         K::LBracket => {
             p.delimited(K::RBracket, |p| {

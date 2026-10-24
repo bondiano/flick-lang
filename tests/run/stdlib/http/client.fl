@@ -27,7 +27,7 @@ let item = Codec.general item_json
 answer : ClientRequest -> Http.Url.Url ->{; HttpClientError} ClientResponse
 let answer request url =
   let path = Http.Url.href url
-  let echo =
+  let echoed =
     show (Http.ClientRequest.method request)
       ++ " "
       ++ path
@@ -50,7 +50,7 @@ let answer request url =
     else if String.contains "/form" path then
       Http.ServerResponse.url_params (Http.UrlParams.make [("a", "1"), ("a", "2")]) ok
     else
-      Http.ServerResponse.text echo ok
+      Http.ServerResponse.text echoed ok
   Http.ServerResponse.to_client_response request response
 
 fake : Http.Client.Client none {HttpClientError}
@@ -192,14 +192,15 @@ let bodies () =
 
 responses : Unit ->{; HttpClientError, SchemaError} Unit
 let responses () =
-  let echo = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/echo")
+  let echoed = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/echo")
   Platform.stdout_line
-    ("status: " ++ (show (Http.ClientResponse.status echo) ++ " " ++ Http.ClientResponse.url echo))
+    ("status: "
+      ++ (show (Http.ClientResponse.status echoed) ++ " " ++ Http.ClientResponse.url echoed))
   Platform.stdout_line
-    ("request: " ++ (show (Http.ClientRequest.method (Http.ClientResponse.request echo))))
-  Platform.stdout_line ("headers: " ++ (show (Http.ClientResponse.headers echo)))
-  Platform.stdout_line ("show: " ++ (show echo))
-  Platform.stdout_line ("text: " ++ (Http.ClientResponse.text echo))
+    ("request: " ++ (show (Http.ClientRequest.method (Http.ClientResponse.request echoed))))
+  Platform.stdout_line ("headers: " ++ (show (Http.ClientResponse.headers echoed)))
+  Platform.stdout_line ("show: " ++ (show echoed))
+  Platform.stdout_line ("text: " ++ (Http.ClientResponse.text echoed))
   let it = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/item")
   Platform.stdout_line
     ("schema_body_json: " ++ (show (Http.ClientResponse.schema_body_json item it)))
@@ -243,7 +244,7 @@ let responses () =
     ("filter_status: "
       ++ (
         show
-          (Http.ClientResponse.status (Http.ClientResponse.filter_status (fun s -> s < 300) echo))
+          (Http.ClientResponse.status (Http.ClientResponse.filter_status (fun s -> s < 300) echoed))
       ))
   let login = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/login")
   Platform.stdout_line ("cookies: " ++ (show (Http.ClientResponse.cookies login)))

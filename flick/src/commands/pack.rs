@@ -66,6 +66,12 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
     if report::code(&outcome.diagnostics) != 0 {
         return outcome;
     }
+    if let Some(diagnostics) = debugging_left(&outcome.diagnostics) {
+        return Outcome {
+            sources: outcome.sources,
+            diagnostics,
+        };
+    }
     report::render(global, &outcome.sources, &outcome.diagnostics);
     let problems = incomplete(&stage.join("dist"), dts);
     if !problems.is_empty() {
@@ -109,6 +115,27 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
         ),
         Err(err) => failure(codes::P016, format!("cannot run pnpm: {err}")),
     }
+}
+
+/// The `todo`s and `echo`s a package must not ship, as errors.
+fn debugging_left(built: &[Diagnostic]) -> Option<Vec<Diagnostic>> {
+    let mut diagnostics: Vec<Diagnostic> = built
+        .iter()
+        .filter(|d| [codes::T022, codes::T023].contains(&d.code))
+        .map(|d| Diagnostic {
+            severity: Severity::Error,
+            ..d.clone()
+        })
+        .collect();
+    if diagnostics.is_empty() {
+        return None;
+    }
+    diagnostics.push(Diagnostic::new(
+        codes::P024,
+        Severity::Error,
+        "a package cannot have `todo` or `echo` left in it",
+    ));
+    Some(diagnostics)
 }
 
 fn global_path(dir: &str) -> PathBuf {

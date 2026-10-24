@@ -1,0 +1,10 @@
+// `echo` shows a value with its place and returns it; `todo` fails there.
+module App.Main exposing (main)
+
+main : Unit ->{} Unit
+let main () =
+  let doubled = echo (21 * 2)
+  Platform.stdout_line (show doubled)
+  let names = ["ada", "grace"] |> echo
+  Platform.stdout_line (show (List.length names))
+  todo "the rest of main"

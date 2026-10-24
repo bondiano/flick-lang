@@ -1,0 +1,5 @@
+module App.Holes exposing (Box)
+
+// `_` stands for a type in signatures and annotations, not in a definition
+type Box = Box _
+//             ^ FLICK-S007

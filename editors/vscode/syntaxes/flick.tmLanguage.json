@@ -91,7 +91,7 @@
         { "name": "keyword.operator.word.flick", "match": "(?<![.\\w])not\\b" },
         {
           "name": "keyword.other.flick",
-          "match": "(?<![.\\w])(?:module|exposing|import|as|let|rec|fun|task|scope|provide|ignore|type|opaque|refined|where|kind|error|service|class|instance|deriving|foreign|from|forall|none|schema|codec|sql|ui|cli)\\b"
+          "match": "(?<![.\\w])(?:module|exposing|import|as|let|rec|fun|task|scope|provide|ignore|todo|echo|type|opaque|refined|where|kind|error|service|class|instance|deriving|foreign|from|forall|none|schema|codec|sql|ui|cli)\\b"
         }
       ]
     },

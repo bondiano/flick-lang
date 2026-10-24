@@ -4,6 +4,7 @@
 //! shadowing in the generated code.
 
 mod cli;
+mod debug;
 mod expr;
 mod pattern;
 mod sql;
