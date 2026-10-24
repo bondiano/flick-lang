@@ -3,6 +3,7 @@ packages:
   - tools/dts-importer
   - tools/content-mapper
   - tools/astro-flick
+  - tools/bundle-size
   - docs
   - editors/vscode
 overrides:

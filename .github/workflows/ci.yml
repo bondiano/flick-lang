@@ -27,4 +27,5 @@ jobs:
       - run: just check
       - run: just effect-coverage >> "$GITHUB_STEP_SUMMARY"
       - run: just e2e
+      - run: just bundle-size >> "$GITHUB_STEP_SUMMARY"
       - run: just e2e-postgres

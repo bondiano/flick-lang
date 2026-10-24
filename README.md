@@ -26,6 +26,7 @@ just lint   # fmt --check + clippy -D warnings
 just test
 just check  # lint + test
 just e2e    # runtime tests + compiled programs on Node
+just bundle-size  # browser bundles against their gzip budgets
 ```
 
 `examples/first-slice` is a complete project (services, layers, tests); run `flick run` or `flick test` inside it.

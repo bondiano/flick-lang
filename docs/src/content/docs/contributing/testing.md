@@ -6,6 +6,7 @@ title: "Testing"
 | - | - |
 | `just check` | fmt, clippy (`-D warnings`, also for `wasm32`), `cargo test --workspace` |
 | `just e2e` | `pnpm install --frozen-lockfile`, runtime tests, `tests/run/**` on Node, `flick test` on sample projects |
+| `just bundle-size` | release builds of `tools/bundle-size/pure.fl`, `tests/run/ui/counter.fl` and the playground, bundled for the browser with rolldown; fails when a gzip size exceeds its budget in `tools/bundle-size/index.mjs` |
 
 Snapshot tests use [`insta`](https://insta.rs); review changes with
 `cargo insta review` or accept them with `INSTA_UPDATE=always cargo test`.

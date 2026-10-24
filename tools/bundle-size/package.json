@@ -1,0 +1,15 @@
+{
+  "name": "@flick-lang/bundle-size",
+  "version": "0.1.0",
+  "description": "Bundle budget of Flick programs: `just bundle-size` builds, bundles with rolldown and checks gzip sizes",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": "./index.mjs",
+  "dependencies": {
+    "@flick-lang/runtime": "workspace:*",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "rolldown": "1.2.15"
+  }
+}

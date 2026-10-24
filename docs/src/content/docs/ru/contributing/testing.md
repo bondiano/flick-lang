@@ -6,6 +6,7 @@ title: "Тестирование"
 | - | - |
 | `just check` | fmt, clippy (`-D warnings`, в том числе для `wasm32`), `cargo test --workspace` |
 | `just e2e` | `pnpm install --frozen-lockfile`, тесты среды выполнения, `tests/run/**` на Node, `flick test` на примерах проектов |
+| `just bundle-size` | release-сборки `tools/bundle-size/pure.fl`, `tests/run/ui/counter.fl` и плейграунда, собранные для браузера через rolldown; падает, если размер в gzip превышает бюджет из `tools/bundle-size/index.mjs` |
 
 Снимки проверяются через [`insta`](https://insta.rs); просматривайте изменения
 командой `cargo insta review` или принимайте их через

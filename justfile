@@ -27,6 +27,10 @@ e2e:
     cargo test -p flick --test e2e --test e2e_numbers --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test first_slice -- --ignored
     cargo test -p flick-core --test consteval_node -- --ignored
 
+# Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
+bundle-size:
+    node tools/bundle-size/index.mjs "$(cargo build -p flick --message-format=json-render-diagnostics | jq -r 'select(.executable != null) | .executable')"
+
 # Run SQL queries against PostgreSQL in Docker (after `just e2e` installs the runtime)
 e2e-postgres:
     cargo test -p flick --test sql_postgres -- --ignored
