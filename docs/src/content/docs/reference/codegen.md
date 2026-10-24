@@ -211,11 +211,12 @@ corpus runs in both profiles against the same expectations.
 | dead code | unused pure bindings (an unused `task { … }` included) and private top-level values nothing reaches; a runtime call always stays, its result used or not |
 | workers | a top-level function whose stages before the last are pure gets `f$n` taking all `n` arguments; a known full application calls it, a partial one keeps the curried `f`; a private function only ever applied fully has no curried form |
 | dictionaries | a method of a canonical instance of the module is a constant of its own that its uses call directly; a dictionary passed as a value (an `EqHash` witness) is never replaced |
+| lone effects | a runtime body that only returns one effect, `Effect.gen(function* () { return (yield* x); })`, is `Effect.suspend(() => x)`: built as late, without a generator |
 
 A function whose first stage computes or runs something gets no worker:
 joining the stages would move that work after the next argument. Pure
 self tail recursion is a loop in both profiles; a runtime recursion stays a
-chain of `Effect.gen` steps, so it yields to the scheduler and can be
+chain of `Effect.gen` or `Effect.suspend` steps, so it yields to the scheduler and can be
 interrupted. Nothing reassociates arithmetic (`(a + b) + c`), folds `x * 0`,
 runs or memoizes a task, merges two `Layer` builds, moves a service lookup
 across `provide` or drops a schema check.

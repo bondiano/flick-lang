@@ -107,11 +107,7 @@ impl Gen<'_> {
             stmts
         };
         let mut text = if last_runtime {
-            format!(
-                "{}(function* () {{\n{}}})",
-                self.effect("gen"),
-                indent(&stmts)
-            )
+            self.generator_of(&stmts)
         } else {
             match &stmts[..] {
                 [only] if only.starts_with("return ") && !only.contains('\n') => {
@@ -191,12 +187,68 @@ impl Gen<'_> {
         self.generator = true;
         let (stmts, ()) = self.block(|g| g.tail_expr(body));
         (self.generator, self.tail) = saved;
+        self.generator_of(&stmts)
+    }
+
+    /// An `Effect.gen` running `stmts`. In release, a lone `return (yield* x);`
+    /// is `Effect.suspend(() => x)`: the same effect, built as late, without
+    /// a generator.
+    fn generator_of(&mut self, stmts: &[String]) -> String {
+        if self.options.release
+            && let [only] = stmts
+            && let Some(effect) = lone_yield(only)
+        {
+            return format!("{}(() => {effect})", self.effect("suspend"));
+        }
         format!(
             "{}(function* () {{\n{}}})",
             self.effect("gen"),
-            indent(&stmts)
+            indent(stmts)
         )
     }
+}
+
+/// `x` of `return (yield* x);` when `x` yields nothing itself, with the
+/// markers before it.
+fn lone_yield(stmt: &str) -> Option<String> {
+    let value = stmt.strip_prefix("return ")?.strip_suffix(';')?;
+    let code = unmarked(value);
+    let marks = &value[..value.len() - code.len()];
+    let inner = code.strip_prefix("(yield* ")?.strip_suffix(')')?;
+    (!stmt.contains('\n') && balanced_without_yield(inner)).then(|| format!("{marks}{inner}"))
+}
+
+/// Whether the parentheses of `js` balance and it has no `yield` outside a
+/// nested `function*`, skipping string literals.
+fn balanced_without_yield(js: &str) -> bool {
+    let bytes = js.as_bytes();
+    // braces open, `true` for the body of a nested generator
+    let mut braces: Vec<bool> = Vec::new();
+    let mut parens = 0usize;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            quote @ (b'"' | b'\'' | b'`') => {
+                i += 1;
+                while i < bytes.len() && bytes[i] != quote {
+                    i += if bytes[i] == b'\\' { 2 } else { 1 };
+                }
+            }
+            b'(' => parens += 1,
+            b')' => match parens.checked_sub(1) {
+                Some(p) => parens = p,
+                None => return false,
+            },
+            b'{' => braces.push(js[..i].trim_end().ends_with("function* ()")),
+            b'}' => {
+                braces.pop();
+            }
+            b'y' if js[i..].starts_with("yield") && !braces.contains(&true) => return false,
+            _ => {}
+        }
+        i += 1;
+    }
+    parens == 0
 }
 
 /// The arguments of a full pure call of the loop's function.

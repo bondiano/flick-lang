@@ -142,3 +142,20 @@ fn unused_pure_code_is_dropped_and_effects_stay() {
     assert!(js.contains("\"runs\""), "{js}");
     assert!(!js.contains("unused"), "{js}");
 }
+
+#[test]
+fn a_lone_tail_effect_needs_no_generator() {
+    let js = release(
+        "module App exposing (once, twice, nested)\n\n\
+         once : Number ->{} Unit\nlet once n = Platform.stdout_line (show n)\n\n\
+         twice : Number ->{} Unit\n\
+         let twice n =\n  Platform.stdout_line (show n)\n  Platform.stdout_line (show n)\n\n\
+         nested : Unit ->{} Unit\nlet nested () = Platform.stdout_line (show (Platform.env \"HOME\"))\n",
+    );
+    assert!(
+        js.contains("export const once = (n) => Effect.suspend(() => $m_Platform.stdout_line("),
+        "{js}"
+    );
+    // two steps, or an effect inside the arguments, keep the generator
+    assert_eq!(js.matches("Effect.gen(function* () {").count(), 2, "{js}");
+}
