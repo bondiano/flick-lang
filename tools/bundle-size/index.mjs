@@ -17,8 +17,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 /** Programs and their gzip budgets in KB. */
 export const PROGRAMS = [
   { name: "pure", source: "tools/bundle-size/pure.fl", budget: 12 },
-  { name: "counter", source: "tests/run/ui/counter.fl", budget: 83 },
-  { name: "playground", source: "docs/src/playground/Playground.fl", budget: 93 },
+  { name: "counter", source: "tests/run/ui/counter.fl", budget: 82 },
+  { name: "playground", source: "docs/src/playground/Playground.fl", budget: 92 },
 ];
 
 /** Modules no tracked program uses: a bundle that keeps one is an error. */

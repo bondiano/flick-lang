@@ -1,0 +1,15 @@
+// `plain.fl` with `deriving Show, Eq` that nothing uses: the bundle must
+// not grow.
+module App.Main exposing (main)
+
+type Light = Red | Green
+  deriving Show, Eq
+
+name : Light -> String
+let name l =
+  match l with
+  | Red -> "red"
+  | Green -> "green"
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (name Green)

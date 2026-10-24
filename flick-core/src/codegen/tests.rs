@@ -79,7 +79,7 @@ fn constructor_ids_name_package_module_and_type() {
     let native =
         compile("module App.Main exposing (..)\nnative : Option Number\nlet native = Some 1\n");
     assert!(
-        native.contains("export const native = $rt.some(1);"),
+        native.contains("export const native = /*#__PURE__*/ $rt.some(1);"),
         "{native}"
     );
 }

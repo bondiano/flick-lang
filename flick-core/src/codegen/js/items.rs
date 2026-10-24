@@ -268,7 +268,10 @@ impl Gen<'_> {
         self.givens.truncate(mark);
         let id = names::instance(&info.name);
         if info.context.is_empty() {
-            methods_first.push(format!("export {}", self.constant(&id, &body)));
+            methods_first.push(format!(
+                "export {}",
+                self.constant(&id, &super::pure(&body))
+            ));
             methods_first.join("\n")
         } else {
             let value = format!("{} {body}", self.arrow(&params));

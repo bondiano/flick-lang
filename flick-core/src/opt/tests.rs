@@ -44,7 +44,10 @@ fn a_full_application_calls_the_worker_and_a_partial_one_keeps_the_closure() {
         js.contains("export const both = (x) => add$2(x, 2);"),
         "{js}"
     );
-    assert!(js.contains("export const inc = add(1);"), "{js}");
+    assert!(
+        js.contains("export const inc = /*#__PURE__*/ add(1);"),
+        "{js}"
+    );
     // the first stage of `staged` computes: no worker joins its stages
     assert!(!js.contains("staged$2"), "{js}");
     // inlined, the first stage still runs before the second gets its argument

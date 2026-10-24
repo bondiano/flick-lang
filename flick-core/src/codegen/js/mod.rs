@@ -269,9 +269,10 @@ impl Gen<'_> {
 
     /// An exported `const`: in TypeScript with its projected type.
     fn export(&self, name: &str, value: &str) -> String {
+        let value = pure(value);
         match self.annotations.get(name) {
             Some(ty) => format!("export const {name}: {ty} = {value};"),
-            None => format!("export {}", self.constant(name, value)),
+            None => format!("export {}", self.constant(name, &value)),
         }
     }
 
@@ -381,4 +382,20 @@ fn indent(stmts: &[String]) -> String {
         }
     }
     out
+}
+
+/// A top-level `value` that is a call or an immediately run arrow, marked
+/// `/*#__PURE__*/`: top-level initialization is pure (spec 11), so a bundler
+/// may drop it when nothing uses it.
+fn pure(value: &str) -> String {
+    // a call starts with the marker of its span
+    let code = expr::unmarked(value);
+    let rest =
+        code.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_' || c == '$' || c == '.');
+    let call = rest.len() < code.len() && rest.starts_with('(');
+    if call || code.starts_with("((") {
+        format!("/*#__PURE__*/ {value}")
+    } else {
+        value.to_owned()
+    }
 }

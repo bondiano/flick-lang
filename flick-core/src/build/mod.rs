@@ -133,9 +133,14 @@ pub fn emit(
         interface: &any_interface,
         release: settings.release,
     };
+    // top-level initialization is pure (spec 11): only the runner runs anything
+    let side_effects = match settings.entry {
+        Some(_) => format!("[\"./{}\"]", runner_path(settings.typescript)),
+        None => "false".to_owned(),
+    };
     let mut out = vec![Artifact {
         path: "package.json".to_owned(),
-        contents: "{ \"type\": \"module\" }\n".to_owned(),
+        contents: format!("{{ \"type\": \"module\", \"sideEffects\": {side_effects} }}\n"),
     }];
     let decls = |name: &str| declarations(name, &any_interface, &package, &path);
     for module in builtin_modules() {

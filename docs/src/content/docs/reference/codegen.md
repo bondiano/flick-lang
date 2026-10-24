@@ -13,13 +13,15 @@ profile must behave the same way.
 | `A/B.js`, `A/B.js.map` | module `A.B` and its source map |
 | `_flick/<Name>.js` | the built-in modules (`Prelude`, `Platform`, …) |
 | `flick-main.js` | for an app: runs `main` of the entry module through the runtime's entry runner |
-| `package.json` | `{ "type": "module" }` |
+| `package.json` | `{ "type": "module", "sideEffects": ["./flick-main.js"] }`; `"sideEffects": false` without a runner |
 
 Module `Main` stays `Main.js`/`Main.ts`; the hyphenated launcher `flick-main.js`/`flick-main.ts` avoids case-insensitive filename collisions, and the old launcher name is no longer emitted.
 
 Without a project, `flick build <files> --out-dir <dir>` writes the same
 layout; a root file whose module exports `main` gets the runner. Importing a
-module never runs anything: modules only define values.
+module never runs anything: modules only define values. A top-level value
+that is a call, a derived instance or an immediately run arrow is marked
+`/*#__PURE__*/`, so a bundler drops what the program does not use.
 
 Generated code imports `@flick-lang/runtime` only: `Effect` comes through it.
 A module that has no runtime stage imports no `Effect` at all.

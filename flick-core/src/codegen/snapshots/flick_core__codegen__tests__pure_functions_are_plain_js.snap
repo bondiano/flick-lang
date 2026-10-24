@@ -6,7 +6,7 @@ export const identity = (value) => value;
 
 export const greet = (prefix) => (name) => (prefix + (", " + name));
 
-export const hello = greet("Hello");
+export const hello = /*#__PURE__*/ greet("Hello");
 
 export const with_default = (fallback) => (value) => {
   if (value._tag === "None") {
