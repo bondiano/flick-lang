@@ -32,8 +32,9 @@ impl Gen<'_> {
         }
         let id = names::ident(&f.name);
         let plain = self.direct_foreigns.contains_key(&f.name);
+        // a constant, not `export { … as … }`: the module names it too
         if plain && params.len() == 1 {
-            return format!("export {{ {target} as {id} }};");
+            return self.export(&id, &target);
         }
         let call = self.foreign_call(f, &target, &dicts, &params);
         let result = |g: &mut Self, v: &str| {
@@ -85,7 +86,7 @@ impl Gen<'_> {
             let worker_id = format!("{id}${n}");
             let curried = self.curried(&worker_id, n);
             let worker = if plain {
-                format!("export {{ {target} as {worker_id} }};")
+                self.export(&worker_id, &target)
             } else {
                 let worker = format!("{} {body}", self.arrow(&params.join(", ")));
                 self.export(&worker_id, &worker)

@@ -269,3 +269,22 @@ fn a_worker_names_each_ignored_parameter_apart() {
         "{js}"
     );
 }
+
+#[test]
+fn a_plain_foreign_named_as_a_value_is_defined_in_its_module() {
+    let workers = |m: &str, name: &str| ((m, name) == ("App", "join")).then_some(2);
+    let js = release_with(
+        "module App exposing (join, both, pick)\n\n\
+         join : String -> String -> String\nforeign pure join from \"./x.mjs\" \"join\"\n\n\
+         upper : String -> String\nforeign pure upper from \"./x.mjs\" \"upper\"\n\n\
+         both : List String -> List String\nlet both xs = List.map upper xs\n\n\
+         pick : (String -> String -> String)\nlet pick = join\n",
+        &workers,
+    );
+    assert!(js.contains("export const upper = $f_upper;"), "{js}");
+    assert!(js.contains("export const join$2 = $f_join;"), "{js}");
+    assert!(
+        js.contains("export const join = ($a0) => ($a1) => join$2($a0, $a1);"),
+        "{js}"
+    );
+}
