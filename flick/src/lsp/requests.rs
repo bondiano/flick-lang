@@ -265,7 +265,29 @@ impl Server {
                     CompletionKind::Operation => 2,
                     CompletionKind::Keyword => 14,
                 };
-                json!({ "label": c.label, "kind": kind, "detail": c.detail })
+                let mut item = json!({
+                    "label": c.label,
+                    "kind": kind,
+                    "detail": c.detail,
+                    "sortText": format!("{}{}", c.sort, c.label),
+                });
+                if let Some(doc) = c.documentation {
+                    item["documentation"] = json!({ "kind": "markdown", "value": doc });
+                }
+                if let Some(snippet) = c.snippet {
+                    item["insertText"] = json!(snippet);
+                    item["insertTextFormat"] = json!(2);
+                }
+                if !c.edits.is_empty() {
+                    // imports go above the cursor, where both texts agree
+                    let edits: Vec<Value> = c
+                        .edits
+                        .iter()
+                        .map(|e| json!({ "range": protocol::range(&text, e.span.start, e.span.end), "newText": e.replacement }))
+                        .collect();
+                    item["additionalTextEdits"] = json!(edits);
+                }
+                item
             })
             .collect();
         Ok(Value::Array(items))
