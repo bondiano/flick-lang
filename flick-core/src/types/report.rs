@@ -3,10 +3,20 @@
 use super::Checker;
 use super::ty::Type;
 use super::unify::Mismatch;
-use crate::diagnostics::codes;
+use crate::diagnostics::{Code, Diagnostic, codes};
 use crate::source::Span;
 
 impl Checker<'_> {
+    /// An error whose `detail`, when there is one, is a help line under it.
+    fn error_help(&mut self, code: Code, span: Span, head: &str, detail: String) {
+        let d = Diagnostic::error(code, head, span);
+        self.diagnostics.push(if detail.is_empty() {
+            d
+        } else {
+            d.with_fix(detail, Vec::new())
+        });
+    }
+
     /// Unifies the type an expression has with the one its position expects;
     /// reports a mismatch at `span`. `false` after a diagnostic.
     pub fn expect(&mut self, actual: &Type, expected: &Type, span: Span) -> bool {
@@ -35,10 +45,11 @@ impl Checker<'_> {
         } else {
             "the expected type holds it, and mutable storage keeps its captures exactly"
         };
-        self.error(
+        self.error_help(
             codes::T003,
             span,
-            format!("{head}: region `{region}` differs: {detail}"),
+            head,
+            format!("region `{region}` differs: {detail}"),
         );
     }
 
@@ -66,13 +77,13 @@ impl Checker<'_> {
                     (Type::Fun { effects: e1, .. }, Type::Fun { effects: e2, .. })
                         if e1.is_some() != e2.is_some() =>
                     {
-                        ": a pure function `->` and a runtime function `->{…}` are different types"
+                        "a pure function `->` and a runtime function `->{…}` are different types"
                             .to_owned()
                     }
                     (x, y) if errors(x) || errors(y) => {
                         let other = self.show(if errors(x) { y } else { x });
                         format!(
-                            ": `{other}` is not an error; an error row holds types declared with `type error`, so convert the value into one first"
+                            "`{other}` is not an error; an error row holds types declared with `type error`, so convert the value into one first"
                         )
                     }
                     _ => {
@@ -80,11 +91,11 @@ impl Checker<'_> {
                         if sa == actual && sb == expected || sa == expected && sb == actual {
                             String::new()
                         } else {
-                            format!(": `{sa}` is not `{sb}`")
+                            format!("`{sa}` is not `{sb}`")
                         }
                     }
                 };
-                self.error(codes::T003, span, format!("{head}{detail}"));
+                self.error_help(codes::T003, span, &head, detail);
             }
             Mismatch::Label { label, left } if label.starts_with('^') => {
                 self.capture_mismatch(&head, label, *left, span);
@@ -108,7 +119,7 @@ impl Checker<'_> {
                     }
                     (None, false) => format!("field `{label}` is missing"),
                 };
-                self.error(codes::T003, span, format!("{head}: {detail}"));
+                self.error_help(codes::T003, span, &head, detail);
             }
             Mismatch::Occurs(t) => {
                 let t = self.show(t);

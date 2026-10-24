@@ -182,8 +182,20 @@ impl Checker<'_> {
         if let Some(condition) = children.first() {
             self.check(condition, &Type::prim("Bool"));
         }
-        for branch in children.iter().skip(1) {
+        // an inferred `if` takes the type of its `then` branch
+        let open = matches!(self.store.resolve(expected), Type::Meta(_));
+        if let Some(then) = children.get(1) {
+            self.check(then, expected);
+        }
+        for branch in children.iter().skip(2) {
+            let since = self.diagnostics.len();
             self.check(branch, expected);
+            if open {
+                let then = self.span(children[1]);
+                self.explain_since(since, expected, then, |t| {
+                    format!("the `then` branch has type `{t}`")
+                });
+            }
         }
     }
 
@@ -347,9 +359,24 @@ impl Checker<'_> {
         let scrutinee = nodes.next().map_or(Type::Error, |s| self.infer(s));
         let result = expected.cloned().unwrap_or_else(|| self.fresh());
         let errors = self.diagnostics.len();
+        // an inferred `match` takes the type of its first arm
+        let open = expected.is_none();
+        let mut first = None;
         let mut arms = Vec::new();
         for arm in nodes.filter(|n| n.kind == K::MatchArm) {
+            let since = self.diagnostics.len();
             arms.push(self.arm(arm, &scrutinee, &result));
+            let body = arm
+                .nodes()
+                .find(|n| n.kind == K::Block)
+                .map(|b| self.span(b));
+            match first {
+                Some(first) if open => self.explain_since(since, &result, first, |t| {
+                    format!("the first arm has type `{t}`")
+                }),
+                Some(_) => {}
+                None => first = body,
+            }
         }
         if self.diagnostics.len() == errors {
             self.exhaustive(node, &arms);

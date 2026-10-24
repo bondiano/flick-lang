@@ -42,7 +42,8 @@ diagnostics without a span are annotated in `flick.toml`. A project without
 annotations must check cleanly.
 
 Columns count characters, not bytes. `text` is optional and must be a
-substring of the diagnostic message. Codes must be registered in
+substring of the diagnostic message, with each help line appended as
+`: help`. Codes must be registered in
 `flick-core/src/diagnostics/codes.rs`.
 
 ## E2E programs — `tests/run/`

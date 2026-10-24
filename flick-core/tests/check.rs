@@ -133,9 +133,17 @@ fn diff(sources: &SourceMap, actual: &[&Diagnostic], expected: Vec<Expected>) ->
     for d in actual {
         let pos = d.span.map(|s| to_pos(sources.get(s.file), s.start, s.end));
         let code = d.code.to_string();
+        // help lines read as the message they explain: `message: help`
+        let text = d
+            .fixes
+            .iter()
+            .filter(|f| f.edits.is_empty())
+            .fold(d.message.clone(), |text, f| {
+                format!("{text}: {}", f.message)
+            });
         let hit = missing
             .iter()
-            .position(|e| e.code == code && e.pos == pos && d.message.contains(&e.message));
+            .position(|e| e.code == code && e.pos == pos && text.contains(&e.message));
         match hit {
             Some(i) => {
                 missing.remove(i);
@@ -143,7 +151,7 @@ fn diff(sources: &SourceMap, actual: &[&Diagnostic], expected: Vec<Expected>) ->
             None => unexpected.push(Expected {
                 code,
                 pos,
-                message: d.message.clone(),
+                message: text,
             }),
         }
     }

@@ -335,12 +335,20 @@ pub fn lsp_diagnostic(sources: &SourceMap, d: &Diagnostic) -> Value {
             })
         })
         .collect();
+    // fixes without edits are advice; editors show them under the message
+    let message = d
+        .fixes
+        .iter()
+        .filter(|f| f.edits.is_empty())
+        .fold(d.message.clone(), |m, f| {
+            format!("{m}\nhelp: {}", f.message)
+        });
     json!({
         "range": protocol::range(text, span.start, span.end),
         "severity": severity,
         "code": d.code.to_string(),
         "source": "flick",
-        "message": d.message,
+        "message": message,
         "relatedInformation": related,
     })
 }

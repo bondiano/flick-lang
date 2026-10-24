@@ -134,7 +134,9 @@ impl Checker<'_> {
                     result,
                 } => {
                     let calls = self.stage.calls;
+                    let since = self.diagnostics.len();
                     self.check(arg, &param);
+                    self.explain_argument(since, head, i, &param);
                     if i == 0 {
                         self.refined_constant(head, arg);
                         self.ui_capacity(head, arg);
