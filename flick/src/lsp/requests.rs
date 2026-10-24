@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use flick_core::diagnostics::Edit;
+use flick_core::diagnostics::codes::Area;
 use flick_core::fmt;
 use flick_core::ide::{CompletionKind, Ide, Location, TOKEN_TYPES, Target};
 use flick_core::source::{FileId, SourceMap};
@@ -237,9 +238,16 @@ impl Server {
             docs.insert(path.clone(), text.clone());
             (analyze(&docs, &path), word)
         };
-        if snapshot.file(&path).is_none()
-            && let Some(replacement) = completion_recovery(&text, word, cursor)
-        {
+        // a file with syntax errors is analyzed, but completes better repaired
+        let broken = match snapshot.file(&path) {
+            None => true,
+            Some(file) => snapshot
+                .analysis
+                .diagnostics
+                .iter()
+                .any(|d| d.code.area == Area::Syntax && d.span.is_some_and(|s| s.file == file)),
+        };
+        if broken && let Some(replacement) = completion_recovery(&text, word, cursor) {
             let mut docs = self.docs.clone();
             docs.insert(
                 path.clone(),

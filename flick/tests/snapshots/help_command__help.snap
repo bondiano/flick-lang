@@ -1,6 +1,5 @@
 ---
 source: flick/tests/help_command.rs
-assertion_line: 12
 expression: "stdout(&[\"help\"])"
 ---
 The Flick compiler and toolchain
@@ -24,6 +23,7 @@ Commands:
   update   Update dependencies within the ranges of `package.json`
   deps     Show the installed dependencies and their Flick interfaces
   pack     Build a release package and an npm tarball of it
+  diff     Compare the public API with a git revision and name the version bump
   schema   Static schemas of codecs
   doc      Write documentation of the public API
   explain  Explain a diagnostic code

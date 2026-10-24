@@ -23,7 +23,7 @@ let scaled xs =
 #[test]
 fn outline_tokens_folding_hints_and_signature_help() {
     let dir = project(
-        "lsp_features",
+        "lsp_outline",
         &[("flick.toml", LIB), ("src/App/Geo.fl", SOURCE)],
     );
     let file = dir.join("src/App/Geo.fl");
