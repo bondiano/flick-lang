@@ -299,7 +299,7 @@ pub fn artifacts(
         paths
             .iter()
             .find(|(f, _)| *f == file)
-            .map_or_else(String::new, |(_, p)| format!("file://{}", p.display()))
+            .map_or_else(String::new, |(_, p)| p.display().to_string())
     };
     let dirs: Vec<(String, PathBuf)> = modules
         .iter()

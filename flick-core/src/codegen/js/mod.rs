@@ -13,6 +13,7 @@ mod schema;
 
 pub use release::{direct_methods, exported_worker};
 
+use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write;
 use std::mem;
@@ -30,40 +31,7 @@ const MARK_END: char = '\u{E001}';
 
 /// Compiles `module` to ESM (or TypeScript, see [`Options::typescript`]).
 pub fn js(module: &Module, options: &Options) -> Output {
-    let mut g = Gen {
-        module: &module.name,
-        options,
-        imports: BTreeSet::new(),
-        foreign: Vec::new(),
-        runtime: false,
-        effect: false,
-        temps: 0,
-        givens: Vec::new(),
-        spans: Vec::new(),
-        buf: Vec::new(),
-        generator: false,
-        owner: None,
-        tail: None,
-        annotations: HashMap::new(),
-        workers: if options.release {
-            let interface = (options.interface)(&module.name);
-            let exported = |name: &str| interface.as_ref().is_none_or(|i| i.exports_value(name));
-            let exported_arity = |name: &str| (options.workers)(&module.name, name);
-            release::workers(&module.name, &module.items, &exported, &exported_arity)
-        } else {
-            HashMap::new()
-        },
-        direct_foreigns: if options.release && !options.typescript {
-            foreign::plain_foreigns(&module.items)
-        } else {
-            HashMap::new()
-        },
-        direct: if options.release {
-            release::direct_constants(&module.items)
-        } else {
-            HashMap::new()
-        },
-    };
+    let mut g = Gen::new(module, options);
     let projection = Projection::new(&module.name, options.interface, options.package);
     let mut declarations = Vec::new();
     if options.typescript
@@ -74,9 +42,13 @@ pub fn js(module: &Module, options: &Options) -> Output {
     }
     let body = g.items(&module.items);
     let mut code = String::new();
+    let typed = RefCell::new(Vec::new());
     if options.typescript {
         let here = (options.path)(&module.name);
-        let path = |m: &str| relative(&here, &(options.path)(m));
+        let path = |m: &str| {
+            typed.borrow_mut().push(m.to_owned());
+            relative(&here, &(options.path)(m))
+        };
         code.push_str(&projection.imports(&path));
     }
     if g.effect {
@@ -130,7 +102,9 @@ pub fn js(module: &Module, options: &Options) -> Output {
         code.push_str("\n\n");
     }
     code.push_str(&body);
-    finish(&code, &g.spans)
+    let mut output = finish(&code, &g.spans);
+    output.imports = g.imports.into_iter().chain(typed.into_inner()).collect();
+    output
 }
 
 /// The import specifier of `to` from `from`, both relative to the output
@@ -157,6 +131,46 @@ pub fn relative(from: &str, to: &str) -> String {
 }
 
 /// Removes the markers from `code`, recording where each one was.
+impl<'a> Gen<'a> {
+    fn new(module: &'a Module, options: &'a Options<'a>) -> Self {
+        Gen {
+            module: &module.name,
+            options,
+            imports: BTreeSet::new(),
+            foreign: Vec::new(),
+            runtime: false,
+            effect: false,
+            temps: 0,
+            givens: Vec::new(),
+            spans: Vec::new(),
+            buf: Vec::new(),
+            generator: false,
+            owner: None,
+            tail: None,
+            annotations: HashMap::new(),
+            workers: if options.release {
+                let interface = (options.interface)(&module.name);
+                let exported =
+                    |name: &str| interface.as_ref().is_none_or(|i| i.exports_value(name));
+                let exported_arity = |name: &str| (options.workers)(&module.name, name);
+                release::workers(&module.name, &module.items, &exported, &exported_arity)
+            } else {
+                HashMap::new()
+            },
+            direct_foreigns: if options.release && !options.typescript {
+                foreign::plain_foreigns(&module.items)
+            } else {
+                HashMap::new()
+            },
+            direct: if options.release {
+                release::direct_constants(&module.items)
+            } else {
+                HashMap::new()
+            },
+        }
+    }
+}
+
 fn finish(code: &str, spans: &[Span]) -> Output {
     let mut out = String::with_capacity(code.len());
     let mut mappings = Vec::new();
@@ -184,6 +198,7 @@ fn finish(code: &str, spans: &[Span]) -> Output {
     Output {
         code: out,
         mappings,
+        imports: Vec::new(),
     }
 }
 

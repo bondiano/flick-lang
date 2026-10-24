@@ -11,7 +11,7 @@ profile must behave the same way.
 | Path in the output directory | Contents |
 | - | - |
 | `A/B.js`, `A/B.js.map` | module `A.B` and its source map |
-| `_flick/<Name>.js` | the built-in modules (`Prelude`, `Platform`, …) |
+| `_flick/<Name>.js` | the built-in modules the program reaches (`Prelude`, `Platform`, …); with `--emit-dts`, all of them |
 | `flick-main.js` | for an app: runs `main` of the entry module through the runtime's entry runner |
 | `package.json` | `{ "type": "module", "sideEffects": ["./flick-main.js"] }`; `"sideEffects": false` without a runner |
 
@@ -153,7 +153,9 @@ resolved against the source file. `global` names a global, as in
 
 Each module has a version 3 source map. Definitions, statements, calls,
 operators and returns map to the start of their Flick node, so a stack trace
-under `node --enable-source-maps` points at `.fl` lines.
+under `node --enable-source-maps` points at `.fl` lines. A map names its
+sources relative to itself, `../../src/App/Main.fl`, so no path of the
+build machine ships with it.
 
 ## TypeScript
 

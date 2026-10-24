@@ -32,12 +32,14 @@ fn build_writes_modules_maps_builtins_and_the_runner() {
         serde_json::from_str(&fs::read_to_string(dir.join("dist/App/Main.js.map")).expect("map"))
             .expect("json");
     assert_eq!(map["version"], 3);
-    assert!(
-        map["sources"][0]
-            .as_str()
-            .is_some_and(|s| s.ends_with("src/App/Main.fl"))
-    );
+    // relative to the map: no path of the build machine ships
+    assert_eq!(map["sources"][0], "../../src/App/Main.fl");
     assert!(dir.join("dist/_flick/Platform.js").exists());
+    // only the built-in modules the program reaches
+    let builtins = fs::read_dir(dir.join("dist/_flick"))
+        .expect("builtins")
+        .count();
+    assert!(builtins <= 5, "{builtins} built-in modules");
     let iface = fs::read(dir.join("dist/App/Main.iface")).expect("interface");
     let interface = iface::read(&iface, "App.Main").expect("valid interface");
     let abi = interface.abi.expect("a built interface has its ABI");

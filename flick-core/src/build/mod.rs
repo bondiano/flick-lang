@@ -49,7 +49,8 @@ pub struct Settings<'a> {
     pub release: bool,
     /// What else the build writes.
     pub extras: Extras,
-    /// How a source map refers to a source file.
+    /// How a source map refers to a source file; an absolute path becomes
+    /// relative to the map.
     pub source_path: &'a dyn Fn(FileId) -> String,
     /// The directory of a module's source, which a relative foreign module
     /// is resolved against; `None` for a module outside the build.
@@ -142,21 +143,6 @@ pub fn emit(
         direct: &direct,
     };
     let mut out = vec![package_json(settings)];
-    let decls = |name: &str| declarations(name, &any_interface, &package, &path);
-    for module in builtin_modules() {
-        out.push(Artifact {
-            path: path(&module.name),
-            contents: codegen::js(module, &options).code,
-        });
-        if settings.extras.dts
-            && let Some((text, _)) = decls(&module.name)
-        {
-            out.push(Artifact {
-                path: dts_path(&path(&module.name)),
-                contents: text,
-            });
-        }
-    }
     let ctx = Context {
         settings,
         sources,
@@ -166,9 +152,11 @@ pub fn emit(
         interface_of: &interface_of,
         any_interface: &any_interface,
     };
+    let mut imports = Vec::new();
     for module in modules {
-        compiled_module(&ctx, module, &mut out, &mut diagnostics);
+        imports.extend(compiled_module(&ctx, module, &mut out, &mut diagnostics));
     }
+    builtins(&ctx, imports, &mut out);
     if let Some(entry) = settings.entry {
         out.push(runner(
             runner_path(settings.typescript),
@@ -231,6 +219,42 @@ fn exports(
     out
 }
 
+/// The built-in modules the build's modules import, directly or through
+/// one another. `.d.ts` files of other modules may name the types of any
+/// built-in module, so with them every built-in module is written.
+fn builtins(ctx: &Context, imports: Vec<String>, out: &mut Vec<Artifact>) {
+    let dts = ctx.settings.extras.dts;
+    let mut pending: Vec<String> = if dts {
+        builtin_modules().iter().map(|m| m.name.clone()).collect()
+    } else {
+        imports
+    };
+    let mut written = HashSet::new();
+    while let Some(name) = pending.pop() {
+        let Some(module) = builtin_modules().iter().find(|m| m.name == name) else {
+            continue;
+        };
+        if !written.insert(name) {
+            continue;
+        }
+        let output = codegen::js(module, ctx.options);
+        pending.extend(output.imports);
+        out.push(Artifact {
+            path: (ctx.path)(&module.name),
+            contents: output.code,
+        });
+        if dts
+            && let Some((text, _)) =
+                declarations(&module.name, ctx.any_interface, ctx.package, ctx.path)
+        {
+            out.push(Artifact {
+                path: dts_path(&(ctx.path)(&module.name)),
+                contents: text,
+            });
+        }
+    }
+}
+
 /// What the compilation of every module shares.
 struct Context<'a> {
     settings: &'a Settings<'a>,
@@ -249,7 +273,7 @@ fn compiled_module(
     module: &Compiled,
     out: &mut Vec<Artifact>,
     diagnostics: &mut Vec<Diagnostic>,
-) {
+) -> Vec<String> {
     // the interface and its summaries come from the reference lowering
     let optimized = ctx.settings.release.then(|| {
         let mut ir = module.ir.clone();
@@ -260,7 +284,18 @@ fn compiled_module(
     let output = codegen::js(optimized.as_ref().unwrap_or(&module.ir), ctx.options);
     let file = (ctx.path)(&module.name);
     let base = file.rsplit('/').next().unwrap_or(&file).to_owned();
-    let map = sourcemap::source_map(&base, &output, ctx.sources, ctx.settings.source_path);
+    // an absolute source becomes relative to the map, so no build path ships
+    let map_dir = normalize(&ctx.settings.out_dir.join(&file));
+    let map_dir = map_dir.parent().unwrap_or(ctx.settings.out_dir);
+    let source_path = |f: FileId| {
+        let source = (ctx.settings.source_path)(f);
+        if Path::new(&source).is_absolute() {
+            specifier(map_dir, &normalize(Path::new(&source)))
+        } else {
+            source
+        }
+    };
+    let map = sourcemap::source_map(&base, &output, ctx.sources, &source_path);
     out.push(Artifact {
         path: file.clone(),
         contents: format!("{}//# sourceMappingURL={base}.map\n", output.code),
@@ -310,6 +345,7 @@ fn compiled_module(
         path: format!("{}.iface", module.name.replace('.', "/")),
         contents: iface::write(&built),
     });
+    output.imports
 }
 
 /// The runner of an app: starts `main` of the entry module at `entry`. With

@@ -48,6 +48,8 @@ pub struct Output {
     /// Each generated position, 0-based line and UTF-16 column, with the
     /// source node it comes from.
     pub mappings: Vec<(u32, u32, Span)>,
+    /// The Flick modules the code imports, types included.
+    pub imports: Vec<String>,
 }
 
 #[cfg(test)]
