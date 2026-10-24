@@ -135,7 +135,7 @@ let load_two first_id second_id =
 - [x] Строгий экспорт схем отвергает непредставимый контракт внешнего представления; при AOT-оптимизации отдельно допускается возврат к интерпретатору.
   Тесты: `flick/tests/schema_export.rs` (`strict_export_refuses_what_it_cannot_state`); `runtime/test/schema.test.ts`; `tests/run/schema/contracts.fl`; `flick/tests/build_command.rs` (`schema_aot_writes_compiled_decoders_the_runner_installs`).
 
-- [x] Экспорт OpenAPI 3.1 из `HttpApi` соответствует спецификации OpenAPI 3.1, не содержит `{}`/`any` и отвергает непредставимую схему конечной точки с указанием пути.
+- [x] Экспорт OpenAPI 3.1 из `HttpApi` соответствует спецификации OpenAPI 3.1, не содержит `{}`/`any` и отвергает непредставимую схему эндпоинта с указанием пути.
   Тесты: `runtime/test/httpapi.test.ts`; `runtime/test/fixtures/openapi-3.1.schema.json`; `tests/run/stdlib/http/api.fl`; `flick/tests/schema_export.rs` (`strict_export_refuses_what_it_cannot_state`); `flick/tests/cli_run.rs` (`the_spec_examples_and_the_ci_set_pass`).
 
 - [x] Schema раздельно проверяет отсутствие поля, null, undefined, значения по умолчанию и лишние ключи; эффектный кодек не получает сертификат PureCodec.

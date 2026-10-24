@@ -92,11 +92,10 @@ button { font: inherit; }
 /* One shared header; its controls and clipboard/search state are Flick programs. */
 .site-frame-header, .home-header { position: fixed; z-index: 30; inset: 0 0 auto; height: var(--sl-nav-height); background: var(--sl-color-bg-nav); border-bottom: 1px solid var(--sl-color-hairline); }
 .site-header { display: flex; align-items: center; width: 100%; height: 100%; padding: 0 clamp(1.5rem, 3.1vw, 3rem); gap: 2rem; }
-.flick-brand { display: inline-flex; flex-shrink: 0; align-items: center; width: 144px; text-decoration: none; min-height: 44px; }
+.flick-brand { display: inline-flex; flex-shrink: 0; align-items: center; width: 150px; min-height: 44px; text-decoration: none; }
 .flick-brand img { display: block; width: 100%; height: auto; }
-.flick-brand .flick-wordmark-dark { display: none; }
-:root[data-theme='dark'] .flick-wordmark-light { display: none; }
-:root[data-theme='dark'] .flick-wordmark-dark { display: block; }
+.flick-brand .brand-dark, :root[data-theme='dark'] .flick-brand .brand-light { display: none; }
+:root[data-theme='dark'] .flick-brand .brand-dark { display: block; }
 .site-links { display: flex; align-items: center; gap: clamp(1.4rem, 2.3vw, 2.4rem); margin-left: auto; }
 .site-links a, .header-transpile { font-size: 0.98rem; text-decoration: none; color: var(--sl-color-white); white-space: nowrap; }
 .site-links a { display: inline-flex; align-items: center; min-height: 44px; }
@@ -203,7 +202,7 @@ button { font: inherit; }
 .try-section p { max-width: 48ch; font-size: 1.02rem; margin: 1.25rem 0 0; }
 .try-actions { display: flex; align-items: flex-start; flex-direction: column; gap: 1.25rem; flex-shrink: 0; }
 .home-footer { display: flex; align-items: center; gap: 2rem; max-width: 1536px; margin: auto; padding: 2rem var(--flick-gutter); border-top: 1px solid var(--sl-color-hairline); }
-.home-footer .flick-brand { width: 104px; }
+.home-footer .flick-brand { width: 110px; }
 .home-footer p { font-size: 0.85rem; color: var(--sl-color-gray-3); margin-right: auto; }
 .home-footer > a { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--sl-color-gray-2); text-decoration: none; font-size: 0.85rem; }
 
@@ -298,7 +297,7 @@ button { font: inherit; }
 @media (max-width: 49.99rem) {
   :root { --sl-nav-height: 4.5rem; }
   .site-header { gap: 0.75rem; padding: 0 1.25rem; }
-  .flick-brand { width: 114px; }
+  .flick-brand { width: 125px; min-width: 0; flex-shrink: 1; }
   .site-header-right { gap: 0.5rem; }
   .site-docs-sidebar { display: none; }
   .site-main-frame { padding-top: calc(var(--sl-nav-height) + var(--sl-mobile-toc-height)); }

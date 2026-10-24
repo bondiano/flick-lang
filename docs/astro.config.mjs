@@ -41,7 +41,18 @@ export default defineConfig({
     starlight({
       title: "Flick",
       description: "An ML language with higher-kinded types, typed effects and regions, on Effect",
-      favicon: "/flick-logo.svg",
+      favicon: "/favicon.ico",
+      head: [
+        { tag: "link", attrs: { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" } },
+        { tag: "link", attrs: { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" } },
+        { tag: "meta", attrs: { property: "og:image", content: "https://flick-lang.dev/social.png" } },
+        { tag: "meta", attrs: { property: "og:image:type", content: "image/png" } },
+        { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
+        { tag: "meta", attrs: { property: "og:image:height", content: "630" } },
+        { tag: "meta", attrs: { property: "og:image:alt", content: "Flick" } },
+        { tag: "meta", attrs: { name: "twitter:image", content: "https://flick-lang.dev/social.png" } },
+        { tag: "meta", attrs: { name: "twitter:image:alt", content: "Flick" } },
+      ],
       disable404Route: true,
       defaultLocale: "root",
       locales: {

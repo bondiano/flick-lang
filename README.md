@@ -1,7 +1,8 @@
 <h1 align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="./docs/public/flick-wordmark-dark.svg">
-    <img src="./docs/public/flick-wordmark.svg" width="420" alt="Flick">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/public/flick-wordmark.svg">
+    <img src="./docs/public/flick-wordmark.svg" width="600" height="240" alt="Flick — a sharp violet woodpecker shaped like a lowercase f.">
   </picture>
 </h1>
 

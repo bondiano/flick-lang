@@ -107,7 +107,7 @@ components:
 
 **Creative North Star: "Signal"**
 
-Signal is a cool-paper engineering editorial: precise graphite geometry, violet emphasis, generous breathing room, and code with a real job to do. The owner-approved world is confident without becoming a dashboard or a decorative card collection. The geometric F and violet spark carry the identity; the drifting dot field is the signature atmospheric material.
+Signal combines cool-paper editorial layout, graphite geometry and violet signals. The approved sharp woodpecker/f carries the identity; the drifting dot field remains the signature atmosphere.
 
 The visual language stays shared while density follows the task. Persuade surfaces give the headline and working code room to lead. Read surfaces quiet the decoration and prioritize navigation, line length, and document hierarchy. Operate surfaces spend their width on source, diagnostics, output, and generated JavaScript. These are different applications of the same system, not a requirement to reuse the homepage composition everywhere.
 
@@ -122,7 +122,7 @@ Evidence: `docs/src/styles/custom.css`, `docs/src/styles/playground.css`, and th
 
 ## Colors
 
-The palette is cool and near-neutral until violet marks an action, a selected state, a language token, or the brand spark.
+UI colors stay cool and near-neutral; violet marks action, selection and language. The logo's coral is not a UI accent.
 
 ### Primary
 - **Signal Violet** (`violet`): primary learning actions, links, active navigation, keyword/type highlighting, focus outlines, and the atmospheric field. **Violet Wash** (`violet-wash`) is the low-intensity selected background, not a second accent.
@@ -183,7 +183,11 @@ The dot field sits behind the hero editor within an isolated composition; it is 
 
 Fine one-pixel rules and restrained rounded rectangles establish the form language. Small navigation/copy affordances use the navigation radius; buttons and fields use the control radius; hero/workspace/dialog/popover shells use the container radius. Internal code panes stay square so adjacent panels meet cleanly. Status dots are circles; they are not a general invitation to pill-shaped controls.
 
-The brand is an actual SVG silhouette: two rising graphite strokes form the F, with a separate four-point violet spark. Reuse `Brand.astro` and its paths rather than replacing the mark with a text glyph or an unrelated icon. Small supporting icons are explicit SVG paths.
+The approved violet woodpecker/f has coral accents, a sharp eye, one three-tip wing and shallow relief. Preserve its pose; never add a chest projection.
+
+Use `Brand.astro` and `docs/public/` assets. The SVG/PNG master, themed outlined wordmarks, favicons, touch icon and social image share the bird; only wordmark ink changes.
+
+README `<picture>` follows `prefers-color-scheme`; site URLs are root-relative. UI icons remain separate SVG paths.
 
 ## Components
 
@@ -236,7 +240,7 @@ Play and Transpile expose their real initial Flick view in server HTML. Hydratio
 ### Do:
 - **Do** reuse semantic theme properties so controls, code, and reading surfaces respond together to theme changes.
 - **Do** keep reading measures bounded and allow Play and Transpile the wider workspace.
-- **Do** preserve the graphite geometric F, separate violet spark, fine rules, and restrained corners.
+- **Do** preserve the approved woodpecker/f, coral accents, angular features and shallow relief alongside the site's fine rules and restrained corners.
 - **Do** keep source whitespace, keyboard focus, localized labels, and explicit recovery feedback intact.
 - **Do** author custom widget state and behavior in Flick, leaving platform interoperability and mounting at the JavaScript/TypeScript boundary.
 - **Do** honor system reduced-motion preferences; animate the wave as one group only.
