@@ -81,11 +81,19 @@ fn signature_quick_fix_makes_the_module_check() {
         fixed.insert_str(at, edit["newText"].as_str().expect("text"));
     }
     lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri(&file), "version": 2 }, "contentChanges": [{ "text": fixed }] }));
+    lsp.notify(
+        "textDocument/didSave",
+        &json!({ "textDocument": { "uri": uri(&file) } }),
+    );
     assert_eq!(lsp.diagnostics(&uri(&file)), Vec::<Value>::new(), "{fixed}");
 
     // a binding the checker rejects gets no signature to insert
     let broken = format!("{fixed}\nlet broken x = x + \"a\"\n");
     lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri(&file), "version": 3 }, "contentChanges": [{ "text": broken }] }));
+    lsp.notify(
+        "textDocument/didSave",
+        &json!({ "textDocument": { "uri": uri(&file) } }),
+    );
     let reported = lsp.diagnostics(&uri(&file));
     let t004 = reported
         .iter()
@@ -96,5 +104,45 @@ fn signature_quick_fix_makes_the_module_check() {
         &json!({ "textDocument": doc, "range": t004["range"], "context": { "diagnostics": [t004] } }),
     );
     assert_eq!(actions["result"], json!([]), "{actions}");
+    lsp.close();
+}
+
+#[test]
+fn rec_quick_fix_and_diagnostics_wait_for_save() {
+    let text = "module App.Fib exposing (..)\n\nfib : Number -> Number\nlet fib n = if n < 2 then n else fib (n - 1) + fib (n - 2)\n";
+    let dir = project(
+        "lsp_rec_fix",
+        &[("flick.toml", LIB), ("src/App/Fib.fl", text)],
+    );
+    let file = dir.join("src/App/Fib.fl");
+    let doc = json!({ "uri": uri(&file) });
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": text } }));
+    let reported = lsp.diagnostics(&uri(&file));
+    let t017 = reported
+        .iter()
+        .find(|d| d["code"] == "FLICK-T017")
+        .unwrap_or_else(|| panic!("{reported:?}"));
+    let actions = lsp.request(
+        "textDocument/codeAction",
+        &json!({ "textDocument": doc, "range": t017["range"], "context": { "diagnostics": [t017] } }),
+    );
+    let edit = &actions["result"][0]["edit"]["changes"][uri(&file)][0];
+    let mut fixed = text.to_owned();
+    fixed.insert_str(
+        offset(text, &edit["range"]["start"]),
+        edit["newText"].as_str().expect("text"),
+    );
+    assert!(fixed.contains("let rec fib n ="), "{fixed}");
+
+    // an edit alone publishes nothing: the first report is the saved, fixed text
+    let typing = text.replace("fib (n - 2)", "fib (n -");
+    lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri(&file), "version": 2 }, "contentChanges": [{ "text": typing }] }));
+    lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri(&file), "version": 3 }, "contentChanges": [{ "text": fixed }] }));
+    lsp.notify(
+        "textDocument/didSave",
+        &json!({ "textDocument": { "uri": uri(&file) } }),
+    );
+    assert_eq!(lsp.diagnostics(&uri(&file)), Vec::<Value>::new());
     lsp.close();
 }

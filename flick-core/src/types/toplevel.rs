@@ -10,7 +10,7 @@ use super::Checker;
 use super::bindings::{let_parts, signature_name};
 use super::convert::is_type;
 use super::ty::Type;
-use crate::diagnostics::codes;
+use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::iface::Namespace;
 use crate::resolve;
 use crate::source::Span;
@@ -426,7 +426,23 @@ impl<'a> Checker<'a> {
                     ),
                 ),
             };
-            self.error(code, span, message);
+            let mut diagnostic = Diagnostic::error(code, message, span);
+            if let ([only], false) = (&cycle[..], values) {
+                let let_kw = items[*only]
+                    .decl
+                    .child_tokens()
+                    .find(|t| t.kind == K::LetKw);
+                if let Some(kw) = let_kw {
+                    diagnostic = diagnostic.with_fix(
+                        "write `let rec`",
+                        vec![Edit {
+                            span: Span::new(span.file, kw.end, kw.end),
+                            replacement: " rec".to_owned(),
+                        }],
+                    );
+                }
+            }
+            self.diagnostics.push(diagnostic);
         }
     }
 

@@ -253,6 +253,10 @@ impl Server {
                 {
                     self.docs.insert(path.clone(), text.to_owned());
                 }
+                // like Gleam, diagnostics wait for a save so half-typed code
+                // is not flagged; requests re-analyze the new text lazily
+                self.snapshot = None;
+                return;
             }
             "textDocument/didClose" => {
                 self.docs.remove(&path);
