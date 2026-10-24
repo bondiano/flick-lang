@@ -22,6 +22,8 @@ pub struct Config {
     pub build: Build,
     /// `[sql] dialect`: what `sql table` and `sql { … }` are checked against.
     pub sql_dialect: &'static Dialect,
+    /// `[lint] allow`: warnings that are not reported.
+    pub allow: Vec<Code>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -91,6 +93,15 @@ struct Raw {
     build: Build,
     #[serde(default)]
     sql: RawSql,
+    #[serde(default)]
+    lint: RawLint,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawLint {
+    #[serde(default)]
+    allow: Vec<Spanned<String>>,
 }
 
 #[derive(Default, Deserialize)]
@@ -173,6 +184,20 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
         Some(name) => sql_dialect(name.get_ref())
             .map_err(|(code, message)| Diagnostic::error(code, message, span(name.span())))?,
     };
+    let allow = raw
+        .lint
+        .allow
+        .iter()
+        .map(|c| {
+            c.get_ref().parse::<Code>().map_err(|()| {
+                let message = format!(
+                    "unknown diagnostic code `{}` in `[lint] allow`",
+                    c.get_ref()
+                );
+                Diagnostic::error(codes::P005, message, span(c.span()))
+            })
+        })
+        .collect::<Result<_, _>>()?;
     Ok(Config {
         kind: project.kind,
         source_dir: project.source_dir,
@@ -180,6 +205,7 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
         entry,
         build: raw.build,
         sql_dialect,
+        allow,
     })
 }
 
@@ -299,6 +325,11 @@ mod tests {
                 "\"fast\"",
             ),
             ("schema-version = 1\n[project\n", codes::P005, ""),
+            (
+                "schema-version = 1\n[project]\nkind = \"lib\"\n[lint]\nallow = [\"FLICK-T999\"]\n",
+                codes::P005,
+                "\"FLICK-T999\"",
+            ),
             (
                 "schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\ndialect = \"mysql\"\n",
                 codes::P022,

@@ -93,7 +93,7 @@ let main () =
       (Stream.run_collect (Stream.timeout_or_else ms20 tens (Stream.concat Stream.never nums))),
     )
   line ("merge", (sorted (Stream.merge tens nums)))
-  let left : Stream.HaltStrategy = Stream.Left
+  let left = Stream.Left
   line ("merge_with", (sorted (Stream.merge_with left Stream.never nums)))
   line ("merge_with right", [Stream.run_count (Stream.merge_with Stream.Right nums Stream.never)])
   line ("merge_with both", (sorted (Stream.merge_with Stream.Both tens nums)))

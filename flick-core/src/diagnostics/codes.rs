@@ -143,6 +143,7 @@ codes! {
     T018 = Types 18, "wrong number of constructor arguments in a pattern";
     T019 = Types 19, "block without a result expression";
     T020 = Types 20, "representation of a type that does not fit it";
+    T021 = Types 21, "annotation of a type the value already has";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";

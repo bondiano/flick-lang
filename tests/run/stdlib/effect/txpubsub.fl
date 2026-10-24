@@ -57,7 +57,7 @@ let main () =
       (TxPubSub.is_shutdown small, TxPubSub.publish 1 small)
     })
   Platform.stdout_line ("shutdown: " ++ show closed)
-  let cell : TxSubscriptionRef.TxSubscriptionRef Number = TxSubscriptionRef.make 1
+  let cell = TxSubscriptionRef.make 1
   let changes =
     scope {
       let sub = TxSubscriptionRef.changes cell

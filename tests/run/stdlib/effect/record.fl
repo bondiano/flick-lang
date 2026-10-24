@@ -9,7 +9,7 @@ let half n = if n - 2 * Number.floor (n / 2) == 0 then Ok (n / 2) else Err ("odd
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let d : Record.ReadonlyRecord Number = Record.from_entries [("a", 1), ("b", 2), ("c", 3)]
+  let d = Record.from_entries [("a", 1), ("b", 2), ("c", 3)]
   let nothing : Record.ReadonlyRecord Number = Record.empty ()
   line "build" (show (d, Record.singleton "k" true, Record.from_keys ["x", "y"] 0))
   line

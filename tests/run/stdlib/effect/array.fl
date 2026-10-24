@@ -15,7 +15,7 @@ let half n = if even n then Ok (n / 2) else Err ("odd " ++ show n)
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let xs : List Number = [3, 1, 4, 1, 5, 9, 2, 6]
+  let xs = [3, 1, 4, 1, 5, 9, 2, 6]
   let nothing : List Number = List.empty
   line
     "slices"
@@ -255,5 +255,5 @@ let main () =
   line
     "ne order"
     (show (NonEmpty.max ne, NonEmpty.min ne, NonEmpty.from_list nothing, NonEmpty.from_list [1]))
-  let typed : NonEmpty.NonEmpty String = NonEmpty.cons "a" []
+  let typed = NonEmpty.cons "a" []
   say "types" [show (NonEmpty.to_list typed)] ()

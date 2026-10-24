@@ -37,6 +37,8 @@ pub struct Related {
 pub struct Fix {
     pub message: String,
     pub edits: Vec<Edit>,
+    /// Keeps the program's meaning, so `flick check --fix` applies it.
+    pub safe: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,6 +85,18 @@ impl Diagnostic {
         self.fixes.push(Fix {
             message: message.into(),
             edits,
+            safe: false,
+        });
+        self
+    }
+
+    /// [`Self::with_fix`] for a fix that `flick check --fix` applies.
+    #[must_use]
+    pub fn with_safe_fix(mut self, message: impl Into<String>, edits: Vec<Edit>) -> Self {
+        self.fixes.push(Fix {
+            message: message.into(),
+            edits,
+            safe: true,
         });
         self
     }

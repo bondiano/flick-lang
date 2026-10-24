@@ -52,7 +52,7 @@ let show_level () = Platform.stdout_line ("level " ++ Context.read level)
 
 contexts : Unit ->{} Unit
 let contexts () =
-  let tag : ServiceTag {Config} = Config
+  let tag = Config
   let c : Context.Context {Config} = Context.make tag { prefix = fun () -> "ctx" }
   let both = Context.add Greeter { greet = fun n -> "ctx " ++ n } c
   let g = Context.get Greeter both
@@ -134,7 +134,7 @@ let shared () =
   let fresh = Layer.fresh (counting count)
   provide Layer.merge fresh (Layer.provide_ fresh greeter_live) { () }
   Platform.stdout_line ("fresh builds " ++ show (Ref.get count))
-  let memo : Layer.MemoMap = Layer.make_memo_map ()
+  let memo = Layer.make_memo_map ()
   let child = Layer.fork_memo_map memo
   let _ = Layer.current_memo_map ()
   scope {

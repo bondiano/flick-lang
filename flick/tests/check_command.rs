@@ -1,5 +1,7 @@
 mod common;
 
+use std::fs;
+
 use common::flick;
 
 #[test]
@@ -50,4 +52,24 @@ fn color_flag_controls_ansi() {
     assert!(always.contains(&0x1b));
     assert!(!never.contains(&0x1b));
     assert_eq!(auto, never);
+}
+
+#[test]
+fn fix_removes_annotations_the_values_already_have() {
+    let text = "module App.Kinds exposing (..)\n\ntype Kind = A | B\n\nlet kinds : List Kind = [A, B]\n\nlet none : List Kind = []\n";
+    let dir = common::project(
+        "check_fix",
+        &[
+            (
+                "flick.toml",
+                "schema-version = 1\n[project]\nkind = \"lib\"\n",
+            ),
+            ("src/App/Kinds.fl", text),
+        ],
+    );
+    let out = common::flick_in(&dir, &["check", "--fix"]);
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert!(out.stderr.is_empty(), "nothing left to report: {out:?}");
+    let fixed = fs::read_to_string(dir.join("src/App/Kinds.fl")).expect("source");
+    assert_eq!(fixed, text.replace("kinds : List Kind =", "kinds ="));
 }

@@ -94,7 +94,7 @@ let deferreds () =
 
 latches : Unit ->{} Unit
 let latches () =
-  let latch : Latch.Latch = Latch.make false
+  let latch = Latch.make false
   let log = Ref.make []
   note : String ->{} Unit
   let note s = Ref.update log (fun xs -> xs ++ [s])
@@ -116,7 +116,7 @@ let latches () =
 
 semaphores : Unit ->{} Unit
 let semaphores () =
-  let sem : Semaphore.Semaphore = Semaphore.make 2
+  let sem = Semaphore.make 2
   let running = Ref.make 0
   let most = Ref.make 0
   let work = task {

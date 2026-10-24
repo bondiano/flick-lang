@@ -21,7 +21,7 @@ let kind_of info = info.type_
 /// The open file's bytes from the start, as text.
 contents : FileSystem.File s ->{; PlatformError.PlatformError} String
 let contents file =
-  let start : FileSystem.SeekMode = FileSystem.Start
+  let start = FileSystem.Start
   let _ = FileSystem.seek 0n start file
   match FileSystem.read_alloc 64 None file with
   | Some bytes -> show bytes
@@ -53,7 +53,7 @@ let work dir =
   line "read_file" (show (FileSystem.read_file (dir ++ "/x/y/z.bin")))
   line "read_directory" (show (List.sort (FileSystem.read_directory false dir)))
   line "recursive" (show (List.sort (FileSystem.read_directory true (dir ++ "/x"))))
-  let append : FileSystem.OpenFlag = FileSystem.Append
+  let append = FileSystem.Append
   FileSystem.write_file { flag = Some append; mode = None } a [33]
   line "append" (FileSystem.read_file_string a)
   FileSystem.truncate (Some 4) a

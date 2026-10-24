@@ -27,6 +27,9 @@ schema-aot = false
 
 [sql]
 dialect = "postgresql"
+
+[lint]
+allow = ["FLICK-T021"]
 ```
 
 | Key | Values | Default |
@@ -45,6 +48,7 @@ dialect = "postgresql"
 | `build.solver-steps` | instance resolution steps per definition | `100000` |
 | `build.solver-depth` | depth of nested class constraints | `256` |
 | `sql.dialect` | the SQL dialect of `sql table` and `sql { … }` (see [sql.md](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` and `"oracle"` are recognized but not supported yet | `"postgresql"` |
+| `lint.allow` | warning codes not reported, such as `"FLICK-T021"`; errors cannot be turned off | `[]` |
 
 Errors in the configuration exit with code `2`:
 
@@ -57,6 +61,7 @@ Errors in the configuration exit with code `2`:
 | `entry` is not a source module that exports `main` | `FLICK-P011` |
 | `sql.dialect` names a dialect that is not supported yet | `FLICK-P022` |
 | `sql.dialect` names no dialect; the message lists the known ones | `FLICK-P023` |
+| `lint.allow` names an unknown code | `FLICK-P005` |
 
 ## `flick check`
 

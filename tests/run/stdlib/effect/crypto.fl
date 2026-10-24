@@ -23,7 +23,7 @@ checks : Unit ->{Crypto.Crypto; Crypto.CryptoError} Unit
 let checks () =
   let bytes = Crypto.random_bytes 16
   line "random_bytes" (show (List.length bytes) ++ " " ++ show (List.all (within 0 255) bytes)) ()
-  let sha256 : Crypto.DigestAlgorithm = Crypto.Sha256
+  let sha256 = Crypto.Sha256
   line "sha-256" (hex (Crypto.digest sha256 (ascii "abc"))) ()
   line "sha-1" (hex (Crypto.digest Crypto.Sha1 (ascii "abc"))) ()
   line

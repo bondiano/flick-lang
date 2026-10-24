@@ -38,7 +38,7 @@ let describe result =
   match result with
   | Arbitrary.Passed r -> "passed " ++ show r.runs
   | Arbitrary.Falsified r ->
-    let failure : Arbitrary.PropertyFailure e = r.failure
+    let failure = r.failure
     let why = match failure with
       | Arbitrary.ReturnedFalse -> "false"
       | Arbitrary.PropertyError _ -> "error"

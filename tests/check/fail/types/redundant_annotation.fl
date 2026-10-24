@@ -1,0 +1,21 @@
+module App.RedundantAnnotation exposing (..)
+
+type Kind = A | B
+
+type alias Id = String
+
+let a : Kind = A
+
+let kinds : List Kind = [A, B, a]
+
+let pair : (Number, String) = (1, "s")
+
+let id : Id = "x"
+
+let none : List Kind = []
+
+let maybe : Option Number = None
+
+//~ FLICK-T021 @7:7-7:13 the value already has type `Kind`; the annotation can be inferred
+//~ FLICK-T021 @9:11-9:22 the value already has type `List Kind`; the annotation can be inferred
+//~ FLICK-T021 @11:10-11:28 the value already has type `(Number, String)`; the annotation

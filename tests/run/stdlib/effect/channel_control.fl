@@ -149,7 +149,7 @@ let failures () =
 
 merging : Unit ->{; Boom} Unit
 let merging () =
-  let both : Channel.HaltStrategy = Channel.halt_both
+  let both = Channel.halt_both
   say
     ("merge both: "
       ++ show

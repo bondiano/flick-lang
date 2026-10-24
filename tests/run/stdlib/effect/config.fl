@@ -50,7 +50,7 @@ let own =
   ConfigProvider.make (fun (path : ConfigProvider.Path) ->
     match path with
     | [ConfigProvider.Key "NAME"] ->
-      let node : ConfigProvider.Node = ConfigProvider.make_value "own"
+      let node = ConfigProvider.make_value "own"
       Some node
     | [ConfigProvider.Key "LIST"] -> Some (ConfigProvider.make_array 2 None)
     | [ConfigProvider.Key "LIST", ConfigProvider.Index i] ->

@@ -31,5 +31,5 @@ let compose f g x =
 total : Number
 let total =
   let base = 40
-  let extra : Number = 2
-  base + extra
+  let extras : List Number = []
+  base + 2

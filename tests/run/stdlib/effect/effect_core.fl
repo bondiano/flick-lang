@@ -75,7 +75,7 @@ let single () =
   let died : Exit none Number = Effect.exit (task { Effect.die "broken" })
   Platform.stdout_line
     ("die: " ++ show (Exit.find_defect died == Ok "broken" || Exit.has_dies died))
-  let failure : Failure {Boom} = Cause.fail (Boom 2)
+  let failure = Cause.fail (Boom 2)
   Platform.stdout_line
     ("fail_cause_sync: " ++ outcome (task { Effect.fail_cause_sync (fun () -> failure) }))
   Effect.yield_now ()
@@ -113,7 +113,7 @@ let single () =
   Platform.stdout_line
     ("timeout: "
       ++ show (try timeout 1 (task { Effect.never () }) with | TimeoutError -> "timed out"))
-  let quick : Option Number = timeout_option 50 (task { 5 })
+  let quick = timeout_option 50 (task { 5 })
   let slow : Option Number = timeout_option 1 (task { Effect.never () })
   Platform.stdout_line ("timeout_option: " ++ show (quick, slow))
   Platform.stdout_line
@@ -190,7 +190,7 @@ let resources () =
 transactions : Unit ->{} Unit
 let transactions () =
   let meta : Tx.Meta = Tx.atomically (task { Tx.current () })
-  let reason : Option Tx.RetryReason = meta.retryReason
+  let reason = meta.retryReason
   Platform.stdout_line ("tx: " ++ show (meta.attempt, reason))
 
 main : Unit ->{; AppError} Unit

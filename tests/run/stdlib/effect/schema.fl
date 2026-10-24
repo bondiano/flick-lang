@@ -67,7 +67,7 @@ let main () =
     ("result: " ++ dec "{\"err\": \"no\"}" (Codec.json (Schema.result Schema.string Schema.number)))
   Platform.stdout_line
     ("shape: " ++ dec "{\"_tag\": \"Square\", \"_0\": 2}" (Codec.json (schema Shape)))
-  let never : PureCodec Json Never = Codec.json Schema.never
+  let never = Codec.json Schema.never
   Platform.stdout_line ("never: " ++ (match Json.parse "1" with
     | Ok u -> (match Codec.decode_result never u with
       | Ok _ -> "decoded"
@@ -153,6 +153,6 @@ let main () =
     | Ok text -> String.length text > 0
     | Err _ -> false
   Platform.stdout_line ("json_schema: " ++ show schema_text)
-  let standard : Codec.StandardSchema Json Number = Codec.standard Number.json_finite
+  let standard = Codec.standard Number.json_finite
   let _ = standard
   Platform.stdout_line "standard: made"

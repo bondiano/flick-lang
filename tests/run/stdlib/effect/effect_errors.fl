@@ -156,10 +156,10 @@ let interruption () =
     })
     "after"
   }
-  let raced : Option String = timeout_option 1 guarded
+  let raced = timeout_option 1 guarded
   Platform.stdout_line ("uninterruptible: " ++ show (raced, Ref.get steps))
   let masked = Effect.uninterruptible_mask (fun restore ->
-    let inner : Option String = timeout_option 1 (restore (task { Effect.sleep ms20; "inner" }))
+    let inner = timeout_option 1 (restore (task { Effect.sleep ms20; "inner" }))
     show inner)
   Platform.stdout_line ("uninterruptible_mask: " ++ masked)
   let unmasked = Effect.interruptible_mask (fun restore -> await (restore (task { "free" })))

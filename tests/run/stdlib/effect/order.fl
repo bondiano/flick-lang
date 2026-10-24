@@ -56,7 +56,7 @@ let main () =
       ++ show (Order.is_between compare { minimum = 0; maximum = 10 } 12))
   Platform.stdout_line
     ("reverse: " ++ show (Ordering.reverse LT) ++ " " ++ show (Ordering.reverse EQ))
-  let ordering : Ordering = Reducer.combine_all Ordering.reducer [EQ, GT, LT]
+  let ordering = Reducer.combine_all Ordering.reducer [EQ, GT, LT]
   Platform.stdout_line ("ordering reducer: " ++ show ordering)
   Platform.stdout_line
     ("equivalence: " ++ show (same_length "ab" "cd") ++ " " ++ show (same_length "ab" "c"))
@@ -75,7 +75,7 @@ let main () =
   eq_reduced : Equivalence.Equivalence String
   let eq_reduced = Reducer.combine_all (Equivalence.make_reducer ()) [same_length, both]
   Platform.stdout_line ("make_reducer: " ++ show (eq_reduced "ab" "cd"))
-  let longer : Combiner.Combiner String =
+  let longer =
     Combiner.make (fun a b -> if String.length b > String.length a then b else a)
   Platform.stdout_line
     ("combiner: "
@@ -99,7 +99,7 @@ let main () =
       ++ show (Combiner.combine Combiner.bigint_max 3n 9n)
       ++ " "
       ++ show (Combiner.combine Combiner.bigint_min 3n 9n))
-  let words : Reducer.Reducer String = Reducer.make (fun a b -> a ++ b) ">"
+  let words = Reducer.make (fun a b -> a ++ b) ">"
   Platform.stdout_line
     ("reducer: "
       ++ Reducer.combine_all words ["a", "b"]

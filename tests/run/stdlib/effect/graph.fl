@@ -161,7 +161,7 @@ let main () =
   let broken =
     Graph.from_snapshot { graph_type = Graph.directed_kind; nodes = []; edges = snapshot.edges }
   Platform.stdout_line ("broken snapshot: " ++ res (Result.map Graph.edge_count broken))
-  let kind_value : Graph.Kind Graph.Undirected = Graph.undirected_kind
+  let kind_value = Graph.undirected_kind
   let plain : Graph.UndirectedGraph String Number =
     Graph.make kind_value |> node "x" |> node "y" |> edge 0 1 3
   Platform.stdout_line ("make: " ++ show (Graph.has_edge 1 0 plain, Graph.neighbors 1 plain))
@@ -207,8 +207,8 @@ let main () =
   Platform.stdout_line
     ("complement: "
       ++ show (Graph.edge_count missing, Graph.has_edge 1 0 missing, Graph.has_edge 0 1 missing))
-  let forward : Graph.Direction = Graph.outgoing
-  let follow : Graph.TraversalDirection = Graph.along forward
+  let forward = Graph.outgoing
+  let follow = Graph.along forward
   let one_step : Graph.NeighborhoodConfig = { radius = Some 1; direction = Some follow }
   let near = Graph.neighborhood 1 one_step sample
   Platform.stdout_line
@@ -272,8 +272,8 @@ let main () =
       nodeShape = Some shape;
     }
   Platform.stdout_line (Graph.to_mermaid diagram sample)
-  let direction : Graph.MermaidDirection = Graph.top_to_bottom
-  let diagram_type : Graph.MermaidDiagramType = Graph.graph_diagram
+  let direction = Graph.top_to_bottom
+  let diagram_type = Graph.graph_diagram
   let shapes =
     [
       Graph.rounded,

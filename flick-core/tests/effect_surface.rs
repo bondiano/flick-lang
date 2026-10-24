@@ -11,7 +11,7 @@ use flick_core::ffi::check::reviewed;
 use flick_core::iface::Decl;
 use flick_core::project::{self, Host};
 use flick_core::source::SourceMap;
-use flick_core::types::{self, Ref};
+use flick_core::types::{self, Ref, Type};
 use surface::{Binding, Manifest, Snapshot, Status, Stdlib, coverage, lint};
 
 struct Fs;
@@ -60,7 +60,8 @@ fn fl_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Every `Module.name` the stdlib tests refer to, as resolved by the checker.
+/// Every `Module.name` the stdlib tests refer to, as resolved by the checker,
+/// and every type their values have.
 fn used_names() -> BTreeSet<String> {
     let mut paths = Vec::new();
     fl_files(&repo().join("tests/run/stdlib"), &mut paths);
@@ -88,6 +89,14 @@ fn used_names() -> BTreeSet<String> {
             }
             for (module, name) in module.typing.type_names.values() {
                 used.insert(format!("{module}.{name}"));
+            }
+            // a type is used by a value of it too, written or inferred
+            for ty in module.typing.types.values() {
+                ty.visit(&mut |t| {
+                    if let Type::Con { module, name } = t {
+                        used.insert(format!("{module}.{name}"));
+                    }
+                });
             }
         }
     }

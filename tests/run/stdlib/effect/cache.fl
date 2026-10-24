@@ -115,7 +115,7 @@ let scoped () =
   }
   say "scoped cache closed"
   scope s {
-    let ref : ScopedRef.ScopedRef s String = ScopedRef.from_acquire (task { acquire "first" })
+    let ref = ScopedRef.from_acquire (task { acquire "first" })
     say ("scoped ref: " ++ ScopedRef.get ref)
     ScopedRef.set (task { acquire "second" }) ref
     say ("scoped ref: " ++ ScopedRef.get ref)

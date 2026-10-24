@@ -15,7 +15,7 @@ let landing ring inputs =
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let empty : HashRing.HashRing Server = HashRing.make { baseWeight = None } name
+  let empty = HashRing.make { baseWeight = None } name
   Platform.stdout_line ("empty: " ++ show (HashRing.get "x" empty, HashRing.get_shards 2 empty))
   let one = HashRing.add { weight = None } (Server "a" 1) empty
   let three = HashRing.add_many { weight = Some 2 } [Server "b" 2, Server "c" 3] one

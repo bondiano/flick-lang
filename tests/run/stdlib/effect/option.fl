@@ -12,7 +12,7 @@ let positive n = if n > 0 then Some n else None
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let some : Option Number = Some 4
+  let some = Some 4
   let nothing : Option Number = None
   line
     "basics"
