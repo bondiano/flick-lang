@@ -2,11 +2,12 @@
 // service `FileSystem.FileSystem` built from an Effect `FileSystem`, the
 // operations of an open file, and back, the Effect `FileSystem` that Effect
 // code (`ConfigProvider.fromDir`, `Logger.toFile`) needs, from the Flick one.
-import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
+
 import { type Context, Effect, FileSystem, Layer, Option, type PlatformError } from "effect";
 
 import type { Data } from "../data.ts";
 import { applyRuntime, type ServiceImpl, service } from "../effects.ts";
+import { nodeModule } from "../host.ts";
 import { tag } from "../tags.ts";
 import { mapError } from "./PlatformError.ts";
 
@@ -184,7 +185,9 @@ export const flickNode = <I>(key: Context.Key<I, Impl>): Layer.Layer<I> =>
       return record;
     }),
   ).pipe(
-    Layer.provide(NodeFileSystem.layer),
+    Layer.provide(
+      Layer.suspend(() => nodeModule("@effect/platform-node/NodeFileSystem").layer),
+    ),
   );
 
 export const flickFileStat = (file: FileSystem.File) => mapError(Effect.map(file.stat, info));

@@ -6,6 +6,7 @@
 //! JavaScript, whatever `emit` the project chooses.
 
 use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::{Command as Process, ExitCode};
 use std::sync::atomic::AtomicUsize;
@@ -14,6 +15,10 @@ use flick_core::build::runner_path;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::{self, Project, cache};
 use flick_core::source::SourceMap;
+#[cfg(unix)]
+use rustix::io::Errno;
+#[cfg(unix)]
+use rustix::process::{Pid, test_kill_process};
 
 use super::build::{BuildCommand, write};
 use crate::args::{BuildArguments, EmitArgument, GlobalArguments, RunArguments};
@@ -27,14 +32,32 @@ pub fn generations(root: &Path) -> PathBuf {
     root.join(cache::DIR).join("run")
 }
 
-/// Whether the process that locked `generation` still runs.
+/// Whether a generation's lock is held, conservatively keeping unknown states.
 pub fn locked(generation: &Path) -> bool {
-    let Ok(pid) = fs::read_to_string(generation.join(".lock")) else {
-        return false;
+    let lock = generation.join(".lock");
+    match fs::symlink_metadata(&lock) {
+        Ok(metadata) if metadata.is_file() => {}
+        Err(err) if err.kind() == ErrorKind::NotFound => return false,
+        _ => return true,
+    }
+    let Ok(pid) = fs::read_to_string(lock) else {
+        return true;
     };
-    let pid = pid.trim();
-    // without /proc (not Linux) a lock is assumed held
-    !Path::new("/proc/self").exists() || Path::new("/proc").join(pid).exists()
+    process_alive(&pid)
+}
+
+fn process_alive(pid: &str) -> bool {
+    let Ok(pid) = pid.trim().parse::<i32>() else {
+        return true;
+    };
+    if pid <= 0 {
+        return true;
+    }
+    #[cfg(unix)]
+    if let Some(pid) = Pid::from_raw(pid) {
+        return test_kill_process(pid) != Err(Errno::SRCH);
+    }
+    true
 }
 
 /// The project, or the diagnostics that stop the command.
@@ -159,5 +182,33 @@ fn finish(running: Running, signals: &AtomicUsize) -> u8 {
     match running.wait(signals) {
         Ok(status) => child::code(status),
         Err(_) => 1,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::process;
+
+    use super::*;
+
+    #[test]
+    fn locks_keep_live_or_unknown_processes() {
+        assert!(process_alive(&format!("\n{}\n", process::id())));
+        #[cfg(unix)]
+        assert!(!process_alive("999999999"));
+        for pid in [
+            "",
+            " \n",
+            "0",
+            "-1",
+            "-999999999",
+            "2147483648",
+            "1 2",
+            "../1",
+            "/proc/1",
+            "1; exit 1",
+        ] {
+            assert!(process_alive(pid), "{pid:?}");
+        }
     }
 }

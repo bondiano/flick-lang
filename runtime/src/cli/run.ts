@@ -2,9 +2,9 @@
 // on the arguments with the Node.js services Effect's CLI needs. Invalid
 // input becomes the Flick error `Cli.CliError` with Effect's text; the
 // handler runs only after the whole command line parsed.
-import * as NodeServices from "@effect/platform-node/NodeServices";
+
 import { Console, Effect, Layer, Option, Result } from "effect";
-import { TestConsole } from "effect/testing";
+import * as TestConsole from "effect/testing/TestConsole";
 import {
   CliConfig,
   CliError,
@@ -18,6 +18,7 @@ import {
 } from "effect/cli";
 
 import type { Tagged } from "../data.ts";
+import { nodeModule } from "../host.ts";
 import { constructorName, tag } from "../tags.ts";
 import { type FlickFormatter, type FlickHelpDoc, fromEffectDoc, toEffectFormatter, withHelp } from "./output.ts";
 import type { Command as Spec, Param, Source } from "./spec.ts";
@@ -161,10 +162,12 @@ export interface Settings {
 
 /** The layers of Effect's CLI the settings choose, with the Node.js services. */
 const services = (settings: Settings) =>
-  Layer.mergeAll(
-    NodeServices.layer,
-    CliConfig.layer({ builtIns: settings.builtIns.flatMap((b) => BUILT_INS[constructorName(b._tag)] ?? []) }),
-    Option.isSome(settings.formatter) ? CliOutput.layer(toEffectFormatter(settings.formatter.value)) : Layer.empty,
+  Layer.suspend(() =>
+    Layer.mergeAll(
+      nodeModule("@effect/platform-node/NodeServices").layer,
+      CliConfig.layer({ builtIns: settings.builtIns.flatMap((b) => BUILT_INS[constructorName(b._tag)] ?? []) }),
+      Option.isSome(settings.formatter) ? CliOutput.layer(toEffectFormatter(settings.formatter.value)) : Layer.empty,
+    ),
   );
 
 /** `Cli.run_with settings command args`. */
@@ -199,7 +202,12 @@ const printed = (
     Command.runWith(command(spec), { version: "0.0.0", renderErrors: false })(args).pipe(
       Effect.ignore,
       Effect.provideService(Console.Console, console),
-      Effect.provide(Layer.merge(NodeServices.layer, CliOutput.layer(formatter))),
+      Effect.provide(
+        Layer.merge(
+          nodeModule("@effect/platform-node/NodeServices").layer,
+          CliOutput.layer(formatter),
+        ),
+      ),
       Effect.andThen(console.logLines),
       Effect.map((lines) => lines.map(String).join("\n")),
     ),

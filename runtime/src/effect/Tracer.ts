@@ -1,9 +1,8 @@
 // Effect's `Tracer` for the bindings of the standard library, and the
 // adapters that read spans and run tasks in them.
-import { inspect } from "node:util";
-
 import { Context, Effect, type LogLevel, Option, Tracer } from "effect";
 
+import { inspect } from "../host.ts";
 import { tag } from "../tags.ts";
 
 export * from "effect/Tracer";

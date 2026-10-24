@@ -1,0 +1,20 @@
+---
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "404 — Page not found",
+    description: "The requested page could not be found.",
+    template: "splash",
+    editUrl: false,
+    pagefind: false,
+    hero: {
+      tagline: "Check the address or use search to find a page.",
+      actions: [
+        { text: "Documentation", link: "/learn/" },
+        { text: "Документация на русском", link: "/ru/learn/", variant: "secondary" },
+      ],
+    },
+  }}
+/>

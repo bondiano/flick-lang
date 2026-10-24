@@ -12,8 +12,9 @@ const ru = Astro.props.locale === "ru" || route?.lang === "ru";
 const prefix = ru ? "/ru" : "";
 const current = Astro.url.pathname;
 const unlocalized = current.replace(/^\/ru(?=\/|$)/, "") || "/";
-const english = unlocalized;
-const russian = `/ru${unlocalized === "/" ? "/" : unlocalized}`;
+const notFound = route?.entry.id === "404";
+const english = notFound ? "/" : unlocalized;
+const russian = notFound ? "/ru/" : `/ru${unlocalized === "/" ? "/" : unlocalized}`;
 const links = [
   [ru ? "Изучение" : "Learn", "/learn/"], [ru ? "Руководства" : "Guides", "/guides/"], [ru ? "Справочник" : "API", "/api/"], [ru ? "Экосистема" : "Ecosystem", "/ecosystem/"],
 ];

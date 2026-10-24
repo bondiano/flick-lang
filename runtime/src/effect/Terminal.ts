@@ -1,8 +1,9 @@
 // Effect's `Terminal` for the bindings of the standard library: the Flick
 // service `Terminal.Terminal` built from an Effect `Terminal`.
-import * as NodeTerminal from "@effect/platform-node/NodeTerminal";
+
 import { type Context, Effect, Layer, Option, type Terminal } from "effect";
 
+import { nodeModule } from "../host.ts";
 import { tag } from "../tags.ts";
 import { mapError } from "./PlatformError.ts";
 
@@ -25,4 +26,12 @@ export const flickNode = <I>(
   key: Context.Key<I, Impl>,
   shouldQuit: Option.Option<(input: Terminal.UserInput) => boolean>,
 ): Layer.Layer<I> =>
-  Layer.effect(key, Effect.map(NodeTerminal.make(Option.getOrUndefined(shouldQuit)), impl));
+  Layer.effect(
+    key,
+    Effect.suspend(() =>
+      Effect.map(
+        nodeModule("@effect/platform-node/NodeTerminal").make(Option.getOrUndefined(shouldQuit)),
+        impl,
+      ),
+    ),
+  );

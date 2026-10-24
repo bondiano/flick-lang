@@ -1,8 +1,10 @@
 // Effect's `Console` for the bindings of the standard library, and the
 // adapters where a Flick value differs from what Effect takes.
-import { Console as NodeConsole } from "node:console";
+
 
 import { Console, Effect, Option } from "effect";
+
+import { nodeModule } from "../host.ts";
 
 export * from "effect/Console";
 
@@ -16,7 +18,10 @@ export const flickWithConsole =
     Effect.provideService(self, Console.Console, console);
 
 /** `Console.to_stderr`: a Node.js console on stderr only. */
-export const flickToStderr = (): Console.Console => new NodeConsole(process.stderr, process.stderr);
+export const flickToStderr = (): Console.Console => {
+  const { Console: NodeConsole } = nodeModule("node:console");
+  return new NodeConsole(process.stderr, process.stderr);
+};
 
 /** `Console.clear`. */
 export const flickClear = (): Effect.Effect<void> => Console.clear;

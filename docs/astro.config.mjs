@@ -16,15 +16,33 @@ const local = ["release", "debug"]
 /** The TextMate grammar of the VS Code extension highlights `flick` blocks. */
 const grammar = JSON.parse(readFileSync(new URL("../editors/vscode/syntaxes/flick.tmLanguage.json", import.meta.url), "utf8"));
 
+const output = {
+  // Effect's cyclic modules must keep their execution order across chunks.
+  strictExecutionOrder: true,
+  codeSplitting: {
+    groups: [{ name: "vendor", test: /node_modules/, maxSize: 400_000 }],
+  },
+};
+
 export default defineConfig({
   site: "https://flick-lang.dev",
   output: "static",
+  vite: {
+    environments: {
+      client: { build: { rolldownOptions: { output } } },
+    },
+    worker: {
+      format: "es",
+      rolldownOptions: { output },
+    },
+  },
   integrations: [
     flick({ binary: process.env.FLICK_BIN ?? local ?? "flick" }),
     starlight({
       title: "Flick",
       description: "An ML language with higher-kinded types, typed effects and regions, on Effect",
       favicon: "/favicon.svg",
+      disable404Route: true,
       defaultLocale: "root",
       locales: {
         root: { label: "English", lang: "en" },

@@ -33,9 +33,23 @@ fn pinned(root: &Path) -> String {
         .unwrap_or_else(|| toolchain::PNPM.to_owned())
 }
 
+// Flick owns the version gate; even `pnpm --version` must not bootstrap or pin pnpm.
+fn pnpm_process(root: &Path) -> Process {
+    let mut process = Process::new("pnpm");
+    process
+        .current_dir(root)
+        .env("npm_config_manage_package_manager_versions", "false")
+        .env("PNPM_CONFIG_PM_ON_FAIL", "ignore")
+        .env("COREPACK_ENABLE_PROJECT_SPEC", "0")
+        .env("COREPACK_ENABLE_AUTO_PIN", "0")
+        .env("COREPACK_ENABLE_NETWORK", "0")
+        .env("COREPACK_DEFAULT_TO_LATEST", "0");
+    process
+}
+
 /// `P016` unless `pnpm --version` is `wanted`.
-fn check_pnpm(wanted: &str) -> Option<Outcome> {
-    let found = Process::new("pnpm")
+fn check_pnpm(root: &Path, wanted: &str) -> Option<Outcome> {
+    let found = pnpm_process(root)
         .arg("--version")
         .output()
         .ok()
@@ -69,7 +83,7 @@ pub fn deps(command: &Command, global: &GlobalArguments) -> Outcome {
     };
     let root = &project.root;
     if pnpm::writes(command) {
-        if let Some(problem) = check_pnpm(&pinned(root)) {
+        if let Some(problem) = check_pnpm(root, &pinned(root)) {
             return problem;
         }
         if matches!(command, Command::Install { locked: true, .. })
@@ -82,8 +96,8 @@ pub fn deps(command: &Command, global: &GlobalArguments) -> Outcome {
             );
         }
     }
-    let mut process = Process::new("pnpm");
-    process.args(pnpm::args(command)).current_dir(root);
+    let mut process = pnpm_process(root);
+    process.args(pnpm::args(command));
     let status = if pnpm::writes(command) {
         child::spawn_tool(&mut process, global, "package-manager-output")
     } else {
