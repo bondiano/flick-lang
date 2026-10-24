@@ -19,6 +19,7 @@ title: "Implementation decisions"
 | React | React 19 and `react-dom/client`, optional peer dependencies of `@flick-lang/runtime` |
 | `.d.ts` resolution | The npm package `typescript` in the Node helper `@flick-lang/dts-importer`; a JSON request on stdin, the surface as JSON on stdout (see [Importing a package's `.d.ts`](../../reference/ffi/#importing-a-packages-dts)) |
 | npm package scope | `@flick-lang/*` (`@flick-lang/runtime`, `@flick-lang/dts-importer`); the standard library ships inside the compiler |
+| Generated names | An instance dictionary is `$i_<Class>_<Type>` when its head is names separated by spaces (`Show Number`), which maps back to one head; any other head (`Show (List a)`) keeps an 8-hex suffix of its FNV hash. Constructor tags keep their 48-bit hash (`Circle#d930eed2c811`) in every profile, private types included: the tag is a value's identity across packages and modules, `derive`, `show` and `equals` read it at run time, and a debug and a release build must agree on it. Revisit when the hash costs measurable bytes after gzip |
 
 ## Resolutions of gaps in the specification
 

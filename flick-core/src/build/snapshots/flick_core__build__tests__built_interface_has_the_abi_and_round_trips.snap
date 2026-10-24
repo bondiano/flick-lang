@@ -1,6 +1,5 @@
 ---
 source: flick-core/src/build/mod.rs
-assertion_line: 439
 expression: json
 ---
 {
@@ -276,7 +275,7 @@ expression: json
     "dictionaries": [
       {
         "instance": "Eq Shape",
-        "export": "$i_Eq_Shape_e6febeea",
+        "export": "$i_Eq_Shape",
         "context": 0,
         "methods": [
           "eq"
@@ -284,7 +283,7 @@ expression: json
       },
       {
         "instance": "Show Shape",
-        "export": "$i_Show_Shape_1e6d3f49",
+        "export": "$i_Show_Shape",
         "context": 0,
         "methods": [
           "show"
@@ -292,7 +291,7 @@ expression: json
       },
       {
         "instance": "Describe Shape",
-        "export": "$i_Describe_Shape_89d0562d",
+        "export": "$i_Describe_Shape",
         "context": 0,
         "methods": [
           "describe"

@@ -73,7 +73,7 @@ fn a_canonical_instance_is_called_directly_and_a_witness_stays_chosen() {
          let count shapes =\n  EqHash.with (fun a b -> by_size a == by_size b) by_size (fun witness ->\n    HashSet.size (HashSet.from_list witness shapes)\n  )\n",
     );
     assert!(
-        js.contains("export const label = (s) => $i_Show_Shape_"),
+        js.contains("export const label = (s) => $i_Show_Shape$show(s);"),
         "{js}"
     );
     assert!(js.contains("$show(s);"), "{js}");
@@ -231,7 +231,7 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
         direct: &direct,
     };
     let js = js(&ir, &options).code;
-    assert!(js.contains("$m_Instances.$i_Show_Number_"), "{js}");
+    assert!(js.contains("$m_Instances.$i_Show_Number$show(n)"), "{js}");
     assert!(!js.contains(".show("), "{js}");
     assert!(js.contains("$f_join(s, s)"), "{js}");
 }

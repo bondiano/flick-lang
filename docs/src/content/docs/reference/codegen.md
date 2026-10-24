@@ -134,7 +134,9 @@ methods with a getter per superclass (`$Eq` of an `Ord` dictionary). An
 instance with a context is a function of the context's dictionaries. Derived
 instances and the compiler-owned instances of records and tuples are built
 by the runtime from the dictionaries of their fields. A higher-rank argument
-with a constraint is a function of its dictionaries.
+with a constraint is a function of its dictionaries. The dictionary of
+`instance Show Number` is `$i_Show_Number`; a head that is not names
+separated by spaces, `Show (List a)`, adds a hash: `$i_Show_List_a_19082212`.
 
 ## Foreign functions
 

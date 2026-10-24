@@ -79,8 +79,18 @@ pub fn module_alias(module: &str) -> String {
     format!("$m_{}", module.replace('.', "_"))
 }
 
-/// The dictionary of an instance, by the head it is named by.
+/// The dictionary of an instance, by the head it is named by: `$i_Show_Number`
+/// when the head is names separated by single spaces, which the name maps
+/// back to; any other head (`Show (List a)`) also gets a hash, so two heads
+/// never share a dictionary.
 pub fn instance(name: &str) -> String {
+    let words = name.split(' ');
+    if words
+        .clone()
+        .all(|w| !w.is_empty() && w.chars().all(|c| c.is_ascii_alphanumeric()))
+    {
+        return format!("$i_{}", words.collect::<Vec<_>>().join("_"));
+    }
     let readable: String = name
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
