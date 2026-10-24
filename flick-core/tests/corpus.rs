@@ -157,8 +157,12 @@ fn fl_files(dir: &Path, out: &mut Vec<PathBuf>) {
 fn md_files(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir).expect("readable dir") {
         let path = entry.expect("entry").path();
+        // `research` holds notes that sketch syntax the parser does not have yet
         let skipped = path.file_name().is_some_and(|n| {
-            n == "node_modules" || n == "dist" || n.to_string_lossy().starts_with('.')
+            n == "node_modules"
+                || n == "dist"
+                || n == "research"
+                || n.to_string_lossy().starts_with('.')
         });
         if skipped {
             continue;
