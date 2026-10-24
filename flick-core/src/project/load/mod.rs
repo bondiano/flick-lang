@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 
 mod entry;
 mod ide;
+mod unknown;
 
 pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze};
 
@@ -378,31 +379,6 @@ impl Loader<'_> {
             }
         }
         local
-    }
-
-    fn unknown_module(&self, name: &str, span: Span) -> Diagnostic {
-        let missing = self.packages.missing();
-        if missing.is_empty() {
-            let local = module_path(name);
-            return Diagnostic::error(codes::R003, format!("unknown module `{name}`"), span).with_fix(
-                format!(
-                    "a local module goes in `{}`; if it comes from an npm package, add it with `flick add <package>`",
-                    self.project.map_or(local.clone(), |p| Path::new(&p.config.source_dir).join(&local)).display()
-                ),
-                Vec::new(),
-            );
-        }
-        let list = missing
-            .iter()
-            .map(|m| format!("`{m}`"))
-            .collect::<Vec<_>>()
-            .join(", ");
-        Diagnostic::error(
-            codes::P009,
-            format!("cannot find module `{name}`; dependencies in package.json are not installed: {list}"),
-            span,
-        )
-        .with_fix("install them with `flick install`", Vec::new())
     }
 
     fn import_cycles(&mut self, edges: &[Vec<usize>]) {

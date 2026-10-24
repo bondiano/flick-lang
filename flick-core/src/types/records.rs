@@ -3,7 +3,8 @@
 use super::Checker;
 use super::env::Form;
 use super::ty::{Row, Type};
-use crate::diagnostics::codes;
+use crate::diagnostics::suggest::closest;
+use crate::diagnostics::{Diagnostic, codes};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -36,10 +37,25 @@ impl Checker<'_> {
         row.get(label).map(|t| t.substitute(&subst))
     }
 
+    /// The labels a record type is known to have, for "did you mean".
+    fn labels(&self, record: &Type) -> Vec<String> {
+        let mut labels = Vec::new();
+        let mut ty = self.whnf(record);
+        while let Type::Record(row) = ty {
+            labels.extend(row.entries.into_iter().map(|(l, _)| l));
+            match row.tail {
+                Some(tail) => ty = self.whnf(&tail),
+                None => break,
+            }
+        }
+        labels
+    }
+
     pub(super) fn field(&mut self, node: &Node, target: &Node) -> Type {
         let Some(label) = node.child_tokens().find(|t| t.kind == K::Ident) else {
             return Type::Error;
         };
+        let label_span = self.token_span(label);
         let label = label.text(self.text).to_owned();
         let record = self.infer(target);
         if let Some(field) = self.known_field(&record, &label) {
@@ -53,10 +69,15 @@ impl Checker<'_> {
         });
         if self.unify(&self.whnf(&record), &shape).is_err() {
             let shown = self.show(&record);
-            self.error(
-                codes::T003,
-                self.span(node),
-                format!("`{shown}` has no field `{label}`"),
+            let labels = self.labels(&record);
+            let guess = closest(&label, labels.iter().map(String::as_str));
+            self.diagnostics.push(
+                Diagnostic::error(
+                    codes::T003,
+                    format!("`{shown}` has no field `{label}`"),
+                    self.span(node),
+                )
+                .did_you_mean(label_span, guess.map(str::to_owned)),
             );
             return Type::Error;
         }
@@ -114,12 +135,15 @@ impl Checker<'_> {
             });
             if self.unify(&self.whnf(&record), &shape).is_err() {
                 let shown = self.show(&record);
-                self.error(
+                let labels = self.labels(&record);
+                let guess = closest(&name, labels.iter().map(String::as_str));
+                self.error_guess(
                     codes::T003,
                     self.token_span(label),
                     format!(
                         "`{shown}` has no field `{name}`; `with` only replaces existing fields"
                     ),
+                    guess,
                 );
             } else if let Some(value) = field.nodes().next() {
                 self.check(value, &ty);

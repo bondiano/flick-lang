@@ -7,6 +7,7 @@ use std::mem;
 use super::ty::Type;
 use super::typing::Ref;
 use super::{Checker, Local, Operator};
+use crate::diagnostics::suggest::closest;
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::iface::Namespace;
 use crate::source::Span;
@@ -80,10 +81,12 @@ impl Checker<'_> {
                     self.record_name(span, Ref::ServiceTag(format!("{}.{}", e.module, e.name)));
                 }
                 self.service_tag(name).unwrap_or_else(|| {
-                    self.error(
+                    let guess = closest(name, self.env.names(namespace)).map(str::to_owned);
+                    self.error_guess(
                         codes::T001,
                         span,
                         format!("cannot find constructor `{name}`"),
+                        guess.as_deref(),
                     );
                     Type::Error
                 })
@@ -93,7 +96,15 @@ impl Checker<'_> {
                     Namespace::Constructor => "constructor",
                     _ => "value",
                 };
-                self.error(codes::T001, span, format!("cannot find {what} `{name}`"));
+                let locals = self.locals.iter().map(|l| l.name.as_str());
+                let guess =
+                    closest(name, self.env.names(namespace).chain(locals)).map(str::to_owned);
+                self.error_guess(
+                    codes::T001,
+                    span,
+                    format!("cannot find {what} `{name}`"),
+                    guess.as_deref(),
+                );
                 Type::Error
             }
         }

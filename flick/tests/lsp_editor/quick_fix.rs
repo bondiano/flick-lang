@@ -146,3 +146,30 @@ fn rec_quick_fix_and_diagnostics_wait_for_save() {
     assert_eq!(lsp.diagnostics(&uri(&file)), Vec::<Value>::new());
     lsp.close();
 }
+
+#[test]
+fn misspelt_name_quick_fix_replaces_it() {
+    let text = "module App.Typo exposing (..)\n\nlet total = 1\n\nlet more () = totl + 1\n";
+    let dir = project(
+        "lsp_typo_fix",
+        &[("flick.toml", LIB), ("src/App/Typo.fl", text)],
+    );
+    let file = dir.join("src/App/Typo.fl");
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": text } }));
+    let reported = lsp.diagnostics(&uri(&file));
+    let t001 = reported
+        .iter()
+        .find(|d| d["code"] == "FLICK-T001")
+        .unwrap_or_else(|| panic!("{reported:?}"));
+    let actions = lsp.request(
+        "textDocument/codeAction",
+        &json!({ "textDocument": { "uri": uri(&file) }, "range": t001["range"], "context": { "diagnostics": [t001] } }),
+    );
+    let fix = &actions["result"][0];
+    assert_eq!(fix["title"], "did you mean `total`?", "{actions}");
+    let edit = &fix["edit"]["changes"][uri(&file)][0];
+    assert_eq!(edit["newText"], "total");
+    assert_eq!(edit["range"], t001["range"]);
+    lsp.close();
+}

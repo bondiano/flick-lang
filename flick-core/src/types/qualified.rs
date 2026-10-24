@@ -5,6 +5,7 @@ use super::Checker;
 use super::ty::Type;
 use super::typing::{Constructor, Ref};
 use crate::diagnostics::codes;
+use crate::diagnostics::suggest::closest;
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 
@@ -59,11 +60,21 @@ impl Checker<'_> {
             let entity = interface
                 .and_then(|i| i.find(namespace, name))
                 .map(|e| e.entity.clone());
-            if entity.is_none() && interface.is_some() && !self.env.is_import(qualifier) {
-                self.error(
+            if entity.is_none()
+                && let Some(interface) = interface
+                && !self.env.is_import(qualifier)
+            {
+                let exports = interface
+                    .exports
+                    .iter()
+                    .filter(|e| e.entity.namespace == namespace);
+                let guess =
+                    qualified_guess(qualifier, name, exports.map(|e| e.entity.name.as_str()));
+                self.error_guess(
                     codes::T001,
                     span,
                     format!("`{qualifier}` does not export `{name}`"),
+                    guess.as_deref(),
                 );
                 return Type::Error;
             }
@@ -87,6 +98,11 @@ impl Checker<'_> {
                 return ty;
             }
         }
+        self.service_member(qualifier, name, span)
+    }
+
+    /// `Service.operation`, or the error for a qualifier that names nothing.
+    fn service_member(&mut self, qualifier: &str, name: &str, span: Span) -> Type {
         let service = match self.env.find(Namespace::Type, qualifier) {
             super::env::Found::Entity(e) => self
                 .env
@@ -111,10 +127,16 @@ impl Checker<'_> {
                     );
                     ty
                 } else {
-                    self.error(
+                    let guess = qualified_guess(
+                        qualifier,
+                        name,
+                        operations.iter().map(|o| o.name.as_str()),
+                    );
+                    self.error_guess(
                         codes::T001,
                         span,
                         format!("service `{qualifier}` has no operation `{name}`"),
+                        guess.as_deref(),
                     );
                     Type::Error
                 }
@@ -128,9 +150,25 @@ impl Checker<'_> {
                 Type::Error
             }
             None => {
-                self.error(codes::T001, span, format!("unknown module `{qualifier}`"));
+                let guess =
+                    closest(qualifier, self.env.qualifier_names()).map(|g| format!("{g}.{name}"));
+                self.error_guess(
+                    codes::T001,
+                    span,
+                    format!("unknown module `{qualifier}`"),
+                    guess.as_deref(),
+                );
                 Type::Error
             }
         }
     }
+}
+
+/// `qualifier.candidate` for the candidate closest to a misspelt `name`.
+fn qualified_guess<'a>(
+    qualifier: &str,
+    name: &str,
+    candidates: impl Iterator<Item = &'a str>,
+) -> Option<String> {
+    closest(name, candidates).map(|g| format!("{qualifier}.{g}"))
 }
