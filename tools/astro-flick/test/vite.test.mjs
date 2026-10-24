@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -64,4 +64,24 @@ test("a failed build can be retried after the compiler becomes available", async
   const { code } = await load(plugin, file);
   const target = /export \* from "(.*)";/.exec(code)[1];
   assert.equal((await import(pathToFileURL(target))).answer, "ready");
+});
+
+test("`vite build` compiles in release, the dev server in debug", async (t) => {
+  const dir = path.join(repo, "target/tmp/astro-flick-profile");
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const compiler = path.join(dir, "flick");
+  writeFileSync(compiler, '#!/bin/sh\necho "$@" >> "$(dirname "$0")/args"\n', { mode: 0o755 });
+  const profiles = [];
+  for (const command of ["build", "serve"]) {
+    const file = path.join(dir, `${command}.fl`);
+    writeFileSync(file, "module Main exposing (x)\n\nx : Number\nlet x = 1\n");
+    const plugin = flickVite({ binary: compiler });
+    plugin.configResolved({ command, cacheDir: path.join(dir, command) });
+    await load(plugin, file);
+    const args = readFileSync(path.join(dir, "args"), "utf8").trim().split("\n").at(-1).split(" ");
+    profiles.push(args[args.indexOf("--profile") + 1]);
+  }
+  assert.deepEqual(profiles, ["release", "debug"]);
 });

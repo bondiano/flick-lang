@@ -4,11 +4,14 @@
 //! that evaluation stays left to right.
 
 mod expr;
+mod foreign;
 mod function;
 mod items;
 mod pattern;
 mod release;
 mod schema;
+
+pub use release::exported_worker;
 
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write;
@@ -45,7 +48,8 @@ pub fn js(module: &Module, options: &Options) -> Output {
         workers: if options.release {
             let interface = (options.interface)(&module.name);
             let exported = |name: &str| interface.as_ref().is_none_or(|i| i.exports_value(name));
-            release::workers(&module.name, &module.items, &exported)
+            let exported_arity = |name: &str| (options.workers)(&module.name, name);
+            release::workers(&module.name, &module.items, &exported, &exported_arity)
         } else {
             HashMap::new()
         },

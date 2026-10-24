@@ -8,15 +8,42 @@ use super::names;
 use crate::ir::{Expr, ExprKind, Item, ItemKind};
 use crate::types::Dict;
 
+/// The name and arity of the worker `name$n` a top-level `item` exports in
+/// release when the module exports it: a function of two or more
+/// parameters, without dictionaries, whose stages before the last are pure.
+/// It agrees with the item's stages in the summaries of `.iface`, so an
+/// importer calls `name$n` for a full application.
+pub fn exported_worker(item: &Item) -> Option<(&str, usize)> {
+    let (name, arity, before_last_pure) = match &item.kind {
+        ItemKind::Value { name, dicts, body } if dicts.is_empty() => match &body.kind {
+            ExprKind::Lambda { params, .. } => (
+                name,
+                params.len(),
+                params.iter().rev().skip(1).all(|p| !p.runtime),
+            ),
+            _ => return None,
+        },
+        ItemKind::Foreign(f) if f.dicts == 0 && f.info.stages_taken() == f.stages.len() => (
+            &f.name,
+            f.stages.len(),
+            f.stages.iter().rev().skip(1).all(|&r| !r),
+        ),
+        _ => return None,
+    };
+    (arity >= 2 && before_last_pure).then_some((name.as_str(), arity))
+}
+
 /// Functions whose stages before the last are pure, taking their parameters
-/// directly, that the module applies fully somewhere: such a call goes to a
-/// worker with all the arguments, without the closures in between. Each
-/// with its arity, and whether it still needs its curried form: it does
-/// when it is exported or named other than in a full application.
+/// directly, that the module applies fully somewhere or exports with a
+/// worker (`exported_arity`): such a call goes to a worker with all the
+/// arguments, without the closures in between. Each with its arity, and
+/// whether it still needs its curried form: it does when it is exported or
+/// named other than in a full application.
 pub(super) fn workers(
     module: &str,
     items: &[Item],
     exported: &dyn Fn(&str) -> bool,
+    exported_arity: &dyn Fn(&str) -> Option<usize>,
 ) -> HashMap<String, (usize, bool)> {
     let mut calls = HashMap::new();
     for item in items {
@@ -30,15 +57,13 @@ pub(super) fn workers(
                     if params.len() >= 2
                         && params[..params.len() - 1].iter().all(|p| !p.runtime) =>
                 {
-                    let (refs, full) =
-                        calls
-                            .get(name.as_str())
-                            .and_then(|by_arity: &HashMap<usize, usize>| {
-                                Some((
-                                    by_arity.values().sum::<usize>(),
-                                    *by_arity.get(&params.len())?,
-                                ))
-                            })?;
+                    let by_arity: Option<&HashMap<usize, usize>> = calls.get(name.as_str());
+                    let refs = by_arity.map_or(0, |b| b.values().sum::<usize>());
+                    let full = by_arity.and_then(|b| b.get(&params.len())).copied();
+                    if full.is_none() && exported_arity(name) != Some(params.len()) {
+                        return None;
+                    }
+                    let full = full.unwrap_or(0);
                     Some((name.clone(), (params.len(), exported(name) || refs > full)))
                 }
                 _ => None,

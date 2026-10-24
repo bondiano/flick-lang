@@ -210,7 +210,7 @@ impl Gen<'_> {
 
     /// A known full application of a function of the module with a worker,
     /// its stages before the last pure and none evaluating its argument first.
-    fn worker_call<'e>(&self, e: &'e Expr) -> Option<(String, Vec<&'e Expr>)> {
+    fn worker_call<'e>(&mut self, e: &'e Expr) -> Option<(String, Vec<&'e Expr>)> {
         let mut args = Vec::new();
         let mut head = e;
         let mut last = true;
@@ -231,8 +231,13 @@ impl Gen<'_> {
         let ExprKind::Global { module, name } = &head.kind else {
             return None;
         };
-        let (arity, _) = *self.workers.get(name).filter(|_| module == self.module)?;
         args.reverse();
+        if module != self.module {
+            let arity = (self.options.workers)(module, name).filter(|&n| n == args.len())?;
+            let worker = self.global(module, &format!("{}${arity}", names::ident(name)));
+            return Some((worker, args));
+        }
+        let (arity, _) = *self.workers.get(name)?;
         (args.len() == arity).then(|| (format!("{}${arity}", names::ident(name)), args))
     }
 

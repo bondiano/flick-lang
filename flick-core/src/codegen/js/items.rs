@@ -6,7 +6,7 @@ use std::collections::{BTreeSet, HashMap};
 use super::expr::arrow_body;
 use super::schema::{plan_uses, schema_names};
 use super::{Gen, Target, indent, names};
-use crate::ir::{Expr, ExprKind, Foreign, ForeignMode, Item, ItemKind};
+use crate::ir::{Expr, ExprKind, Item, ItemKind};
 use crate::types::{Constructor, Dict, InstanceInfo, Rep, companion_name, default_method};
 
 impl Gen<'_> {
@@ -44,23 +44,29 @@ impl Gen<'_> {
                     self.block(|g| g.lambda(params, body, Some(target), true));
                 let id = names::ident(name);
                 let worker_id = format!("{id}${}", params.len());
-                stmts.push(self.constant(&worker_id, &worker));
-                if !self.workers.get(name).is_some_and(|&(_, curried)| curried) {
-                    return stmts.join("\n");
+                match (self.options.workers)(self.module, name) {
+                    Some(n) if n == params.len() => stmts.push(self.export(&worker_id, &worker)),
+                    Some(n) => {
+                        stmts.push(self.constant(&worker_id, &worker));
+                        stmts.push(self.applying_worker(&id, n));
+                    }
+                    None => stmts.push(self.constant(&worker_id, &worker)),
                 }
-                let heads: Vec<String> = (0..params.len()).map(|i| format!("$a{i}")).collect();
-                let mut curried = format!("{worker_id}({})", heads.join(", "));
-                for head in heads.iter().rev() {
-                    curried = format!("{} {curried}", self.arrow(head));
+                if self.workers.get(name).is_some_and(|&(_, curried)| curried) {
+                    stmts.push(self.export(&id, &self.curried(&worker_id, params.len())));
                 }
-                stmts.push(self.export(&id, &curried));
                 stmts.join("\n")
             }
             ItemKind::Value { name, dicts, body } => {
                 let target = Target::Global(format!("{}.{name}", self.module));
                 let (stmts, value) = self.block(|g| g.function(dicts, body, Some(target)));
                 let value = self.scoped(&stmts, value);
-                self.export(&names::ident(name), &value)
+                let id = names::ident(name);
+                let code = self.export(&id, &value);
+                match (self.options.workers)(self.module, name) {
+                    Some(n) => format!("{code}\n{}", self.applying_worker(&id, n)),
+                    None => code,
+                }
             }
             ItemKind::Destructure { pattern, body } => {
                 let (stmts, value) = self.block(|g| g.expr(body));
@@ -87,6 +93,28 @@ impl Gen<'_> {
         }
     }
 
+    /// The exported worker `id$n` that applies the curried `id`: the value
+    /// was optimized into another shape than importers expect.
+    fn applying_worker(&self, id: &str, n: usize) -> String {
+        let heads: Vec<String> = (0..n).map(|i| format!("$a{i}")).collect();
+        let worker = format!(
+            "{} {id}({})",
+            self.arrow(&heads.join(", ")),
+            heads.join(")(")
+        );
+        self.export(&format!("{id}${n}"), &worker)
+    }
+
+    /// The curried form of the worker `worker` of `n` parameters.
+    pub(super) fn curried(&self, worker: &str, n: usize) -> String {
+        let heads: Vec<String> = (0..n).map(|i| format!("$a{i}")).collect();
+        let mut curried = format!("{worker}({})", heads.join(", "));
+        for head in heads.iter().rev() {
+            curried = format!("{} {curried}", self.arrow(head));
+        }
+        curried
+    }
+
     /// `value` after the statements it needs, run in a scope of their own:
     /// the locals of two top-level values may share a name.
     fn scoped(&self, stmts: &[String], value: String) -> String {
@@ -95,109 +123,6 @@ impl Gen<'_> {
         } else {
             format!("({} {})()", self.arrow(""), arrow_body(stmts, &value))
         }
-    }
-
-    fn foreign(&mut self, f: &Foreign) -> String {
-        let alias = format!("$f_{}", f.name);
-        let target = match &f.module {
-            Some(module) => {
-                let spec = (self.options.foreign)(self.module, module);
-                self.foreign.push((spec, f.export.clone(), alias.clone()));
-                alias
-            }
-            None => format!("globalThis.{}", f.export),
-        };
-        let info = &f.info;
-        let dicts: Vec<String> = (0..f.dicts).map(|i| format!("$d{i}")).collect();
-        let params: Vec<String> = (0..info.stages_taken()).map(|i| format!("$a{i}")).collect();
-        let runtime = params
-            .len()
-            .checked_sub(1)
-            .and_then(|i| f.stages.get(i))
-            .copied()
-            .unwrap_or(false);
-        if f.arity == 0 && params.is_empty() && f.dicts == 0 && f.mode == ForeignMode::Pure {
-            return self.export(&names::ident(&f.name), &target);
-        }
-        let mut args: Vec<String> = dicts.clone();
-        for (i, param) in params.iter().take(f.arity).enumerate() {
-            let arg = match info.callbacks.get(i).copied().flatten() {
-                _ if info.this && i == 0 => param.clone(),
-                Some(1) => param.clone(),
-                Some(n) => {
-                    let xs: Vec<String> = (0..n).map(|k| format!("$x{k}")).collect();
-                    let applied = xs.iter().fold(String::new(), |acc, x| acc + "(" + x + ")");
-                    format!("{} {param}{applied}", self.arrow(&xs.join(", ")))
-                }
-                None if info.optional.contains(&i) => {
-                    format!("{}({param})", self.rt("optionalArg"))
-                }
-                None if info.variadic && i + 1 == f.arity => format!("...{param}"),
-                None => param.clone(),
-            };
-            args.push(arg);
-        }
-        if info.cancel {
-            args.push("$signal".to_owned());
-        }
-        let call = if info.this && !args.is_empty() {
-            let receiver = args.remove(dicts.len());
-            let rest: Vec<String> = [receiver].into_iter().chain(args).collect();
-            format!("{target}.call({})", rest.join(", "))
-        } else {
-            format!("{target}({})", args.join(", "))
-        };
-        let result = |g: &mut Self, v: &str| {
-            let v = if info.result.nullable {
-                format!("{}({v})", g.rt("fromNullable"))
-            } else {
-                v.to_owned()
-            };
-            if info.result.unit {
-                format!("(void {v})")
-            } else {
-                v
-            }
-        };
-        let catch = f.catch.as_ref().map(|c| self.expr(c));
-        let mut body = match (f.mode, runtime) {
-            (ForeignMode::Pure, _) | (_, false) => result(self, &call),
-            (ForeignMode::Sync, true) => {
-                let value = result(self, &call);
-                match catch {
-                    Some(c) => format!("{}(() => {value}, {c})", self.rt("foreignSync")),
-                    None => format!("{}(() => {value})", self.effect("sync")),
-                }
-            }
-            (ForeignMode::Async, true) => {
-                let value = result(self, "$v");
-                let start = format!(
-                    "{} Promise.resolve({call}).then(($v) => {value})",
-                    self.arrow("$signal")
-                );
-                let catch = catch.map_or(String::new(), |c| format!(", {c}"));
-                format!("{}({start}{catch})", self.rt("foreignAsync"))
-            }
-            (ForeignMode::Effect, true) => {
-                let effect = match catch {
-                    Some(c) => format!("{}(() => {call}, {c})", self.rt("foreignEffect")),
-                    None => format!("{}(() => {call})", self.effect("suspend")),
-                };
-                if info.result.nullable || info.result.unit {
-                    let value = result(self, "$v");
-                    format!("{}({effect}, ($v) => {value})", self.effect("map"))
-                } else {
-                    effect
-                }
-            }
-        };
-        for param in params.iter().rev() {
-            body = format!("{} {body}", self.arrow(param));
-        }
-        if !dicts.is_empty() {
-            body = format!("{} {body}", self.arrow(&dicts.join(", ")));
-        }
-        self.export(&names::ident(&f.name), &body)
     }
 
     fn constructor_item(&mut self, c: &Constructor) -> String {

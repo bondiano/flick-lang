@@ -14,6 +14,7 @@ fn compile(text: &str) -> String {
         typescript: false,
         interface: &|_| None,
         release: false,
+        workers: &|_, _| None,
     };
     js(&ir, &options).code
 }

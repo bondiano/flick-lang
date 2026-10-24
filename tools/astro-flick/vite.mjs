@@ -24,11 +24,12 @@ export const moduleName = (text) => /^module\s+([A-Z][\w]*(?:\.[A-Z][\w]*)*)/m.e
 /**
  * @param {{ binary?: string, profile?: "debug" | "release", outDir?: string }} options
  * `binary` is the `flick` CLI (`FLICK_BIN`, else `flick` on the PATH);
+ * `profile` is by default `release` for `vite build` and `debug` otherwise;
  * `outDir` holds the builds (by default `<vite cache>/flick`).
  */
 export const flickVite = (options = {}) => {
   const binary = options.binary ?? process.env.FLICK_BIN ?? "flick";
-  const profile = options.profile ?? "debug";
+  let profile = options.profile ?? "debug";
   let outBase = options.outDir;
   const builds = new Map();
   return {
@@ -36,6 +37,7 @@ export const flickVite = (options = {}) => {
     enforce: "pre",
     configResolved(config) {
       outBase ??= path.join(config.cacheDir, "flick");
+      if (options.profile === undefined && config.command === "build") profile = "release";
     },
     async load(id) {
       const file = id.split("?")[0];

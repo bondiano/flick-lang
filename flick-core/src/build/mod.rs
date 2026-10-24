@@ -6,6 +6,7 @@ mod abi;
 
 pub use abi::interface;
 
+use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -125,6 +126,12 @@ pub fn emit(
     let any_interface = |m: &str| {
         interface_of(m).or_else(|| types::builtins().iter().find(|i| i.module == m).cloned())
     };
+    let exported_workers = exported_workers(settings.release, modules, &any_interface);
+    let workers = |m: &str, name: &str| {
+        exported_workers
+            .get(&(m.to_owned(), name.to_owned()))
+            .copied()
+    };
     let options = Options {
         path: &path,
         package: &package,
@@ -132,16 +139,9 @@ pub fn emit(
         typescript: settings.typescript,
         interface: &any_interface,
         release: settings.release,
+        workers: &workers,
     };
-    // top-level initialization is pure (spec 11): only the runner runs anything
-    let side_effects = match settings.entry {
-        Some(_) => format!("[\"./{}\"]", runner_path(settings.typescript)),
-        None => "false".to_owned(),
-    };
-    let mut out = vec![Artifact {
-        path: "package.json".to_owned(),
-        contents: format!("{{ \"type\": \"module\", \"sideEffects\": {side_effects} }}\n"),
-    }];
+    let mut out = vec![package_json(settings)];
     let decls = |name: &str| declarations(name, &any_interface, &package, &path);
     for module in builtin_modules() {
         out.push(Artifact {
@@ -177,6 +177,46 @@ pub fn emit(
         ));
     }
     (out, diagnostics)
+}
+
+/// `package.json` of the output. Top-level initialization is pure
+/// (spec 11): only the runner of an app runs anything when loaded.
+fn package_json(settings: &Settings) -> Artifact {
+    let side_effects = match settings.entry {
+        Some(_) => format!("[\"./{}\"]", runner_path(settings.typescript)),
+        None => "false".to_owned(),
+    };
+    Artifact {
+        path: "package.json".to_owned(),
+        contents: format!("{{ \"type\": \"module\", \"sideEffects\": {side_effects} }}\n"),
+    }
+}
+
+/// In release, the worker `name$n` each module of the build and each
+/// built-in module exports for a value, from its reference lowering as its `.iface`
+/// summaries say: a full application in another module calls it.
+fn exported_workers(
+    release: bool,
+    modules: &[Compiled],
+    any_interface: &dyn Fn(&str) -> Option<Interface>,
+) -> HashMap<(String, String), usize> {
+    if !release {
+        return HashMap::new();
+    }
+    let own = modules.iter().map(|c| (&c.name, &c.ir.items));
+    let builtin = builtin_modules().iter().map(|m| (&m.name, &m.items));
+    let mut out = HashMap::new();
+    for (module, items) in own.chain(builtin) {
+        let Some(interface) = any_interface(module) else {
+            continue;
+        };
+        for (name, arity) in items.iter().filter_map(codegen::exported_worker) {
+            if interface.exports_value(name) {
+                out.insert((module.clone(), name.to_owned()), arity);
+            }
+        }
+    }
+    out
 }
 
 /// What the compilation of every module shares.

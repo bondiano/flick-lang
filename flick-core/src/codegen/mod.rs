@@ -8,7 +8,7 @@ mod names;
 pub mod sourcemap;
 pub mod ts;
 
-pub use js::{js, relative};
+pub use js::{exported_worker, js, relative};
 pub use names::{ident, instance as instance_export, qualified_id, tag};
 
 use crate::iface::Interface;
@@ -32,6 +32,10 @@ pub struct Options<'a> {
     /// The release profile: worker functions for known full applications
     /// and direct methods of canonical instances.
     pub release: bool,
+    /// In release, the arity `n` of the worker `name$n` that a module,
+    /// this one included, exports for its value `name` (see
+    /// [`exported_worker`]); a full application calls it.
+    pub workers: &'a dyn Fn(&str, &str) -> Option<usize>,
 }
 
 /// A compiled module.

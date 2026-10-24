@@ -209,7 +209,7 @@ corpus runs in both profiles against the same expectations.
 | propagation | a local bound to a literal or a name is replaced by it; a pure value that cannot throw moves to its one use when that use surely runs |
 | scalar replacement | a local record whose every use reads a field, or a local tuple only destructured, becomes one local per part: no object |
 | dead code | unused pure bindings (an unused `task { … }` included) and private top-level values nothing reaches; a runtime call always stays, its result used or not |
-| workers | a top-level function whose stages before the last are pure gets `f$n` taking all `n` arguments; a known full application calls it, a partial one keeps the curried `f`; a private function only ever applied fully has no curried form |
+| workers | a top-level function whose stages before the last are pure gets `f$n` taking all `n` arguments; a known full application calls it, a partial one keeps the curried `f`; a private function only ever applied fully has no curried form. An exported function of two or more parameters without dictionaries, `foreign` included, exports `f$n` beside `f`, and a full application in another module calls it: the `stages` of its `.iface` summary give `n` |
 | dictionaries | a method of a canonical instance of the module is a constant of its own that its uses call directly; a dictionary passed as a value (an `EqHash` witness) is never replaced |
 | lone effects | a runtime body that only returns one effect, `Effect.gen(function* () { return (yield* x); })`, is `Effect.suspend(() => x)`: built as late, without a generator |
 

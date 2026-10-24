@@ -3,6 +3,11 @@ use crate::ir::tests::check_text;
 
 /// The JS of a self-contained module in the release profile.
 fn release(text: &str) -> String {
+    release_with(text, &|_, _| None)
+}
+
+/// `release` where `workers` names the workers modules export.
+fn release_with(text: &str, workers: &dyn Fn(&str, &str) -> Option<usize>) -> String {
     let (mut ir, interface) = check_text("App", text).expect("lowers");
     super::optimize(&mut ir, &|name| interface.exports_value(name));
     let path = |m: &str| format!("{}.js", m.replace('.', "/"));
@@ -13,6 +18,7 @@ fn release(text: &str) -> String {
         typescript: false,
         interface: &|m| (m == interface.module).then(|| interface.clone()),
         release: true,
+        workers,
     };
     js(&ir, &options).code
 }
@@ -158,4 +164,27 @@ fn a_lone_tail_effect_needs_no_generator() {
     );
     // two steps, or an effect inside the arguments, keep the generator
     assert_eq!(js.matches("Effect.gen(function* () {").count(), 2, "{js}");
+}
+
+#[test]
+fn exported_workers_take_full_applications_across_modules() {
+    let workers = |m: &str, name: &str| match (m, name) {
+        ("Ui", "div") | ("App", "add") => Some(2),
+        _ => None,
+    };
+    let js = release_with(
+        "module App exposing (add, view)\n\n\
+         add : Number -> Number -> Number\nlet add a b = a + b\n\n\
+         view : Unit -> Ui none none\nlet view () = Ui.div { class_name = \"x\" } []\n",
+        &workers,
+    );
+    assert!(js.contains("export const add$2 = (a, b) =>"), "{js}");
+    assert!(
+        js.contains("export const add = ($a0) => ($a1) => add$2($a0, $a1);"),
+        "{js}"
+    );
+    assert!(
+        js.contains("$m_Ui.div$2({ class_name: \"x\" }, [])"),
+        "{js}"
+    );
 }
