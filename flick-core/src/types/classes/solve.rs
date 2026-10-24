@@ -138,8 +138,13 @@ impl Checker<'_> {
             return Outcome::Solved(dict.clone());
         }
         if self.improve_by_givens(&module, &name, &args, givens) {
-            let c = self.canon(c);
-            return self.entail_one(&c, givens, chain);
+            let improved = self.canon(c);
+            // an assumption with an error in it unifies yet fixes nothing:
+            // that error is reported already
+            if improved == *c {
+                return Outcome::Solved(Dict::Error);
+            }
+            return self.entail_one(&improved, givens, chain);
         }
         let outcome = if module == RECORD {
             self.primitive(c, &name, &args, givens, chain)

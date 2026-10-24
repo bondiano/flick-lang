@@ -1,0 +1,7 @@
+module App.AssumptionWithUnknownType exposing (..)
+
+name_of : Record.HasField "name" r Strg => r -> Strg
+let name_of r = Record.get (Record.label : Record.Label "name") r
+
+//~ FLICK-T001 @3:36-3:40 unknown type `Strg`
+//~ FLICK-T001 @3:49-3:53 unknown type `Strg`
