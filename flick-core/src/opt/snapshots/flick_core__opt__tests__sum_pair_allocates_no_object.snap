@@ -2,6 +2,6 @@
 source: flick-core/src/opt/tests.rs
 expression: js
 ---
-export const sum_pair = (left) => (right) => (left + right);
+export const sum_pair = (left) => (right) => left + right;
 
-export const total = (n) => (n + 1);
+export const total = (n) => n + 1;

@@ -15,8 +15,8 @@ export const $s_Log = $rt.service("App.Users.Log");
 export const normalize_name = (name) => $m_String.trim(name);
 
 export const load_name = (id) => Effect.gen(function* () {
-  const user = (yield* $rt.operation($s_Users, "get", 1)(id));
+  const user = yield* $rt.operation($s_Users, "get", 1)(id);
   const name = normalize_name(user.name);
-  (yield* $rt.operation($s_Log, "info", 1)(name));
+  yield* $rt.operation($s_Log, "info", 1)(name);
   return name;
 });

@@ -3,6 +3,7 @@
 //! current statement list, earlier operands spilled into constants first so
 //! that evaluation stays left to right.
 
+mod binary;
 mod expr;
 mod foreign;
 mod function;
@@ -10,6 +11,7 @@ mod items;
 mod pattern;
 mod release;
 mod schema;
+mod tidy;
 
 pub use release::{direct_methods, exported_worker};
 
@@ -102,6 +104,10 @@ pub fn js(module: &Module, options: &Options) -> Output {
         code.push_str("\n\n");
     }
     code.push_str(&body);
+    let mut code = tidy::parens(&code);
+    if !options.release {
+        code = tidy::layout(&code);
+    }
     let mut output = finish(&code, &g.spans);
     output.imports = g.imports.into_iter().chain(typed.into_inner()).collect();
     output

@@ -3,9 +3,8 @@
 
 use std::mem;
 
-use super::{Gen, Target, indent, names};
-use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stmt};
-use crate::source::Span;
+use super::{Gen, Target, indent, names, tidy};
+use crate::ir::{Arm, Expr, ExprKind, Lit, Pat, Stmt};
 use crate::types::{Constructor, Dict, Lift, Rep};
 
 /// Whether moving the evaluation of `js` later is unobservable: a name, a
@@ -184,7 +183,7 @@ impl Gen<'_> {
             (js[0].clone(), js[1].clone())
         };
         // `(x) => (y)` ends with `)` too, yet needs parentheses to be called
-        let call_like = f.ends_with(')') && !f.contains("=>");
+        let call_like = tidy::is_call(&f);
         let f = if atomic(&f) || call_like {
             f
         } else {
@@ -376,38 +375,6 @@ impl Gen<'_> {
                 .map(|((label, _), v)| format!("{}: {v}", key(label))),
         );
         format!("{{ {} }}", entries.join(", "))
-    }
-
-    fn binary(&mut self, span: Span, op: BinOp, lhs: &Expr, rhs: &Expr) -> String {
-        if matches!(op, BinOp::And | BinOp::Or) {
-            let l = self.expr(lhs);
-            let (rs, rv) = self.block(|g| g.expr(rhs));
-            let js = if op == BinOp::And { "&&" } else { "||" };
-            if rs.is_empty() {
-                return format!("({l} {js} {rv})");
-            }
-            let t = self.temp();
-            let test = if op == BinOp::And {
-                t.clone()
-            } else {
-                format!("!{t}")
-            };
-            self.buf.push(format!(
-                "let {t} = {l};\nif ({test}) {{\n{}  {t} = {rv};\n}}",
-                indent(&rs)
-            ));
-            return t;
-        }
-        let js = self.ordered(&[lhs, rhs]);
-        let (l, r) = (&js[0], &js[1]);
-        let l = &format!("{}{l}", self.mark(span));
-        match op {
-            BinOp::Eq => format!("{}({l}, {r})", self.rt("equals")),
-            BinOp::NotEq => format!("!{}({l}, {r})", self.rt("equals")),
-            BinOp::ListConcat => format!("({l}).concat({r})"),
-            BinOp::Concat => format!("({l} + {r})"),
-            _ => format!("({l} {} {r})", op.symbol()),
-        }
     }
 
     pub(super) fn stmt(&mut self, stmt: &Stmt) {

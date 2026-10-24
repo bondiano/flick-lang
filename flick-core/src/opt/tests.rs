@@ -58,7 +58,7 @@ fn a_full_application_calls_the_worker_and_a_partial_one_keeps_the_closure() {
     // the first stage of `staged` computes: no worker joins its stages
     assert!(!js.contains("staged$2"), "{js}");
     // inlined, the first stage still runs before the second gets its argument
-    assert!(js.contains("const checked$i1 = (10 / 0);"), "{js}");
+    assert!(js.contains("const checked$i1 = 10 / 0;"), "{js}");
 }
 
 #[test]
@@ -95,11 +95,11 @@ fn forbidden_transformations_stay_out() {
          let read layer () =\n  provide layer {\n    Clock.now ()\n  }\n\n\
          checked : Unknown -> Unit\nlet checked input =\n  let decoded = Codec.decode_result (Codec.json Schema.number) input\n  ()\n",
     );
-    // no reassociation, no `x * 0 -> 0`
-    assert!(js.contains("((a + b) + c)"), "{js}");
-    assert!(js.contains("(x * 0)"), "{js}");
+    // no reassociation (`a + b + c` is `(a + b) + c`), no `x * 0 -> 0`
+    assert!(js.contains("a + b + c"), "{js}");
+    assert!(js.contains("x * 0"), "{js}");
     // a task runs as often as it is awaited
-    assert_eq!(js.matches("(yield* t)").count(), 2, "{js}");
+    assert_eq!(js.matches("yield* t;").count(), 2, "{js}");
     // two layers stay two builds
     assert_eq!(js.matches("Layer.succeed").count(), 2, "{js}");
     // the lookup stays inside `provide`
@@ -126,10 +126,10 @@ fn literal_expressions_fold_with_js_semantics() {
         "export const day = 86400;",
         "export const text = \"Hello, world\";",
         "export const sum = false;",
-        "export const minus_zero = (-0);",
+        "export const minus_zero = -0;",
         "export const big = 1267650600228229401496703205376n;",
-        "export const by_zero = (1n / 0n);",
-        "export const rounded = (2 ** 0.5);",
+        "export const by_zero = 1n / 0n;",
+        "export const rounded = 2 ** 0.5;",
         "export const pick = 10;",
     ] {
         assert!(js.contains(expected), "{expected} in\n{js}");
@@ -198,11 +198,11 @@ fn equality_whose_identity_decides_is_strict() {
          same : String -> Locale -> Number -> Bool -> Bool\n\
          let same s l n b = s == \"a\" && l != Ru && n == 1 && b == true\n",
     );
-    assert!(js.contains("(s === \"a\")"), "{js}");
-    assert!(js.contains("(l._tag !== Ru._tag)"), "{js}");
+    assert!(js.contains("s === \"a\" &&"), "{js}");
+    assert!(js.contains("&& l._tag !== Ru._tag &&"), "{js}");
     // SameValueZero on Number stays the runtime's
     assert!(js.contains("$rt.equals(n, 1)"), "{js}");
-    assert!(js.contains("(b === true)"), "{js}");
+    assert!(js.contains("&& b === true"), "{js}");
 }
 
 #[test]
@@ -264,5 +264,8 @@ fn a_worker_names_each_ignored_parameter_apart() {
          first : Number -> String -> Bool -> Number\nlet first n _ _ = n\n",
         &workers,
     );
-    assert!(js.contains("export const first$3 = (n, $_, $_2) => n;"), "{js}");
+    assert!(
+        js.contains("export const first$3 = (n, $_, $_2) => n;"),
+        "{js}"
+    );
 }

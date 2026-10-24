@@ -6,6 +6,12 @@ title: "Code generation"
 describes the debug profile, which is the reference lowering: every other
 profile must behave the same way.
 
+Debug output is laid out for reading: a bracket group that does not fit in
+100 columns, or whose elements span lines, puts each element on a line of
+its own, and a lone callback hugs its call. Both profiles leave out the
+parentheses precedence does not need. Release output stays compact; read it
+through its source maps.
+
 ## Output
 
 | Path in the output directory | Contents |
@@ -94,9 +100,9 @@ let load_name id =
 
 ```js
 export const load_name = (id) => Effect.gen(function* () {
-  const user = (yield* $rt.operation($s_Users, "get", 1)(id));
+  const user = yield* $rt.operation($s_Users, "get", 1)(id);
   const name = normalize_name(user.name);
-  (yield* $rt.operation($s_Log, "info", 1)(name));
+  yield* $rt.operation($s_Log, "info", 1)(name);
   return name;
 });
 ```
@@ -218,7 +224,7 @@ corpus runs in both profiles against the same expectations.
 | workers | a top-level function whose stages before the last are pure gets `f$n` taking all `n` arguments; a known full application calls it, a partial one keeps the curried `f`; a private function only ever applied fully has no curried form. An exported function of two or more parameters without dictionaries, `foreign` included, exports `f$n` beside `f`, and a full application in another module calls it: the `stages` of its `.iface` summary give `n` |
 | dictionaries | a method written in an instance without a context is an exported constant `<instance>$<method>`; a canonical use calls it directly, in the module or an importer; a dictionary passed as a value (an `EqHash` witness) is never replaced |
 | foreign | a pure `foreign` that passes its arguments and result as they are is the import itself: `export { $f_div as div$2 }`, and a full application in the module calls `$f_div` |
-| lone effects | a runtime body that only returns one effect, `Effect.gen(function* () { return (yield* x); })`, is `Effect.suspend(() => x)`: built as late, without a generator |
+| lone effects | a runtime body that only returns one effect, `Effect.gen(function* () { return yield* x; })`, is `Effect.suspend(() => x)`: built as late, without a generator |
 | matches and constructors | the last arm of a `match` without a guard is not tested, since the match is exhaustive; three or more arms that are constructors with only bound fields, the last one possibly any binding, are a `switch (x._tag)` with `default` last; a tagged constructor applied to all its fields is the object it builds, `{ _tag: "Rect#…", _0: 3, _1: 4 }` |
 
 A function whose first stage computes or runs something gets no worker:

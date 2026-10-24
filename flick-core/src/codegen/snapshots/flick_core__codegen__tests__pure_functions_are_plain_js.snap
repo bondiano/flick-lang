@@ -4,7 +4,7 @@ expression: js
 ---
 export const identity = (value) => value;
 
-export const greet = (prefix) => (name) => (prefix + (", " + name));
+export const greet = (prefix) => (name) => prefix + ", " + name;
 
 export const hello = /*#__PURE__*/ greet("Hello");
 
