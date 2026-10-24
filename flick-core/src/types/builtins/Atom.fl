@@ -44,3 +44,27 @@ let set atom new_value = Reactivity.Atom.set atom new_value
 /// Replaces the value of `atom` by `f` of it.
 update : Writable a -> (a -> a) ->{Reactivity.Atom.Registry;} Unit
 let update atom f = Reactivity.Atom.update atom f
+
+/// The result of a task an atom runs: still loading, loaded, or failed.
+type Async a (e : ErrorRow) = Loading | Loaded a | Failed (Failure e)
+
+/// An atom of the result of `task`, run by the registry that first reads
+/// it and run anew by `Reactivity.Atom.refresh`. A view reads it like any
+/// atom and matches its three cases.
+task : Eff none e a -> Atom (Async a e)
+foreign pure task from "@flick-lang/runtime" "atomTask"
+
+/// What `ready` does while a task loads: a view of `Ui.suspended` shows
+/// its fallback, any other reader fails.
+pending : Unit ->{} a
+foreign effect pending from "@flick-lang/runtime" "atomPending"
+
+/// The value of a loaded task atom, its failure as an error of `e`. Read
+/// in a view of `Ui.suspended`, which shows its fallback while the task
+/// loads and its failure view when it failed.
+ready : Atom (Async a e) ->{Read; e} a
+let ready atom =
+  match get atom with
+  | Loaded value -> value
+  | Failed failure -> Failure.rethrow failure
+  | Loading -> pending ()

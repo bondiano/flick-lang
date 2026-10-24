@@ -1,7 +1,7 @@
 // Views and fields on atoms: React components a `Ui` holds as foreign
 // components do, so a program that renders none keeps none of this code.
 // They take the root's events and registry from React context.
-import { type Effect, Option } from "effect";
+import { Cause, Effect, Option } from "effect";
 import type * as Atom from "effect/reactivity/Atom";
 import {
   type FunctionComponent,
@@ -16,7 +16,8 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import { runReading } from "../../atoms.ts";
+import { isPending, runReading } from "../../atoms.ts";
+import { Failure } from "../../cause.ts";
 import { BridgeContext, RegistryContext, toReact } from "./render.ts";
 import { type Binding, type DomEvent, type Ui, inputSnapshot, uiComponent } from "./nodes.ts";
 import type { Handler } from "./policies.ts";
@@ -33,6 +34,19 @@ export interface View {
 
 /** `Ui.view`: a component of `render`. */
 export const uiView = (render: View["render"]): View => Object.freeze({ render, label: undefined });
+
+/**
+ * `Ui.suspended`: a view whose render may read a loading task (it shows
+ * `fallback`) or a failed one (it shows `failed` of the failure).
+ */
+export const uiSuspended = (failed: (failure: Failure) => Ui, fallback: Ui, render: View["render"]): View =>
+  uiView((props) =>
+    Effect.catchCause(render(props), (cause) => {
+      if (isPending(cause)) return Effect.succeed(fallback);
+      if (Cause.hasFails(cause)) return Effect.succeed(failed(new Failure(cause)));
+      return Effect.failCause(cause);
+    }),
+  );
 
 /** `Ui.named`: the component as React's tools show it. */
 export const uiNamed = (label: string, view: View): View => Object.freeze({ render: view.render, label });

@@ -149,6 +149,21 @@ commits, and a write between its render and its subscription renders it
 again. Rendering a view outside `Ui.Dom.mount` fails with what to do. The
 render reads synchronously: it may read atoms but run nothing else.
 
+## Tasks in views
+
+`Atom.task t` is an atom of the result of the task `t`, run by the registry
+that first reads it: `Atom.Async a e` is `Loading`, `Loaded a` or
+`Failed (Failure e)`. A view reads it like any atom and matches the three
+cases; there is no Suspense by default, so loading and failure are visible
+where the value is read.
+
+`Ui.suspended failed fallback render` is the opt-in: its render may read a
+task with `Atom.ready`, which gives the value of a loaded task. While one
+loads the view shows `fallback`; when one failed, `failed` of the failure.
+The errors `Atom.ready` raises are in the render's error row `x`, so a task
+that can fail needs that view to have somewhere to put them. `Atom.ready`
+in a plain `Ui.view` of a task still loading is a defect that says so.
+
 ## Fields bound to a state
 
 `Ui.field { bind = query; placeholder = "Find"; on_input = None }` is an

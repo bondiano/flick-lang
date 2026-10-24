@@ -287,3 +287,10 @@ type Level = H1 | H2 | H3 | H4 | H5 | H6
 heading_at : forall c r e. Level -> List ((Ui r e)^c) -> (Ui r e)^c
 foreign pure heading_at from "@flick-lang/runtime/ui/react" "uiHeadingAt"
   retention call
+
+/// A view whose render may read tasks with `Atom.ready`: while one loads
+/// it shows `fallback`, and when one failed it shows `failed` of the
+/// failure, so each error of `x` has a place to go.
+suspended :
+  forall p r e x. (Failure x -> Ui r e) -> Ui r e -> (p ->{Atom.Read; x} Ui r e) -> View p r e
+foreign pure suspended from "@flick-lang/runtime/ui/react" "uiSuspended"

@@ -1,0 +1,62 @@
+// Tasks read in views: one view matches the three cases of `Atom.Async`,
+// another reads with `Atom.ready` inside `Ui.suspended`, showing its
+// fallback while the task loads and its failure view when it failed.
+module App.Main exposing (main)
+
+type error Offline = Offline
+  deriving Show
+
+setup : Unit ->{} Unit
+foreign sync setup from "./dom.mjs" "setup"
+  arity 0
+
+settle : Unit ->{} Unit
+foreign async settle from "./dom.mjs" "settle"
+  arity 0
+
+text : Unit ->{} String
+foreign sync text from "./dom.mjs" "text"
+  arity 0
+
+user : Atom.Atom (Atom.Async String none)
+let user = Atom.task (task { "ada" })
+
+offline : Atom.Atom (Atom.Async String {Offline})
+let offline = Atom.task (task { from_result (Err Offline) })
+
+status_view : Ui.View Unit none none
+let status_view =
+  Ui.view (fun () ->
+    match Atom.get user with
+    | Atom.Loading -> ui { text "[loading]" }
+    | Atom.Loaded name -> ui { text ("[" ++ name ++ "]") }
+    | Atom.Failed _ -> ui { text "[failed]" })
+
+greeting_view : Ui.View Unit none none
+let greeting_view =
+  Ui.suspended
+    (fun _ -> ui { text " offline" })
+    (ui { text " waiting" })
+    (fun () ->
+      let name = Atom.ready user
+      let more = Atom.ready offline
+      ui { text (" hello " ++ name ++ more) })
+
+report : Failure e ->{} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  setup ()
+  match Ui.Dom.container "app" with
+  | None -> Platform.stdout_line "no container"
+  | Some root ->
+    provide Reactivity.Atom.layer {
+      scope s {
+        let app = ui { fragment [Ui.render status_view (), Ui.render greeting_view ()] }
+        let mounted = Fiber.spawn s report (task { Ui.Dom.mount root report app })
+        settle ()
+        Platform.stdout_line (text ())
+      }
+    }
