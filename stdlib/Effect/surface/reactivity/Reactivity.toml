@@ -1,0 +1,9 @@
+[excluded]
+Reactivity = "reactive keys invalidate queries; the fullstack track binds them (F3)"
+TypeId = "TS-only: a type id or a type guard; Flick values are typed statically"
+invalidate = "reactive keys invalidate queries; the fullstack track binds them (F3)"
+layer = "reactive keys invalidate queries; the fullstack track binds them (F3)"
+make = "reactive keys invalidate queries; the fullstack track binds them (F3)"
+mutation = "reactive keys invalidate queries; the fullstack track binds them (F3)"
+query = "reactive keys invalidate queries; the fullstack track binds them (F3)"
+stream = "reactive keys invalidate queries; the fullstack track binds them (F3)"

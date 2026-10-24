@@ -1,0 +1,113 @@
+/// Effect's reactive atoms (`effect/reactivity`, unstable in Effect 4.0.5).
+/// An atom only describes a value: a `Registry` holds the values of the
+/// atoms read through it, computes a derived atom again when an atom it
+/// read changes, and drops a value nobody reads, after its idle time. The
+/// same atom read through two registries has two values.
+module Reactivity.Atom exposing (..)
+
+/// A value a registry computes and keeps.
+type Atom a
+
+/// An atom that also takes writes: a state.
+type Writable a
+
+/// What a read function gets: the atoms it reads through it are its
+/// dependencies.
+type Context
+
+/// A writable atom holding `value`, whatever its type: a function or a task
+/// is the value itself.
+state : a -> Writable a
+foreign pure state from "@flick-lang/runtime/effect/reactivity/Atom" "flickState"
+  reviewed "effect@4.0.5 sha256:bc281fccfb5af41b"
+
+/// A derived atom: `read` computes its value from the atoms it reads
+/// through the context, and runs again when one of them changes.
+readable : (Context -> a) -> Atom a
+foreign pure readable from "@flick-lang/runtime/effect/reactivity/Atom" "readable"
+  arity 1
+  reviewed "effect@4.0.5 sha256:a6c2a0d7197620cd"
+
+/// The value of `atom` inside a read function, which then depends on it.
+read : Context -> Atom a -> a
+foreign pure read from "@flick-lang/runtime/effect/reactivity/Atom" "flickRead"
+  reviewed "effect@4.0.5 sha256:1a93a277076bb044"
+
+/// A writable atom read as an atom.
+readonly : Writable a -> Atom a
+foreign pure readonly from "@flick-lang/runtime/effect/reactivity/Atom" "flickReadonly"
+  reviewed "effect@4.0.5 sha256:1f579e00e5d57973"
+
+/// The atom of a task's result, run by the registry that first reads it.
+from_task : Eff none e a -> Atom (Reactivity.AsyncResult.AsyncResult a e)
+foreign pure from_task from "@flick-lang/runtime/effect/reactivity/Atom" "flickFromTask"
+  reviewed "effect@4.0.5 sha256:bc281fccfb5af41b"
+
+/// The values of `atom` through `f`.
+map : (a -> b) -> Atom a -> Atom b
+foreign pure map from "@flick-lang/runtime/effect/reactivity/Atom" "flickMap"
+  reviewed "effect@4.0.5 sha256:66489a3049c532a3"
+
+/// One atom per key, made by `f` the first time and the same after: keys
+/// compare as Effect's `Equal` does, strings and numbers by value.
+family : (k -> Atom a) -> k -> Atom a
+foreign pure family from "@flick-lang/runtime/effect/reactivity/Atom" "family"
+  arity 1
+  reviewed "effect@4.0.5 sha256:00393d08b77f0bbb"
+
+/// The atom named `name` in debugging tools.
+with_label : String -> Atom a -> Atom a
+foreign pure with_label from "@flick-lang/runtime/effect/reactivity/Atom" "flickWithLabel"
+  reviewed "effect@4.0.5 sha256:dcf199329ec11958"
+
+/// A writable atom named `name` in debugging tools.
+label_state : String -> Writable a -> Writable a
+foreign pure label_state from "@flick-lang/runtime/effect/reactivity/Atom" "flickWithLabel"
+  reviewed "effect@4.0.5 sha256:dcf199329ec11958"
+
+/// The atom with its value kept while the registry lives, read or not.
+keep_alive : Atom a -> Atom a
+foreign pure keep_alive from "@flick-lang/runtime/effect/reactivity/Atom" "keepAlive"
+  reviewed "effect@4.0.5 sha256:3b9956a5f7e73649"
+
+/// The atom with its value kept for `ttl` after nobody reads it.
+idle_ttl : Duration.Duration -> Atom a -> Atom a
+foreign pure idle_ttl from "@flick-lang/runtime/effect/reactivity/Atom" "flickIdleTtl"
+  reviewed "effect@4.0.5 sha256:ff359ba0593bfaa2"
+
+/// The values of atoms, held by Effect's `AtomRegistry`.
+service Registry =
+  get : forall a. Atom a ->{} a
+  set : forall a. Writable a -> a ->{} Unit
+  update : forall a. Writable a -> (a -> a) ->{} Unit
+  modify : forall a b. Writable a -> (a -> (b, a)) ->{} b
+  refresh : forall a. Atom a ->{} Unit
+
+layer_of : ServiceTag {Registry} -> Layer none none {Registry}
+foreign pure layer_of from "@flick-lang/runtime/effect/reactivity/Atom" "flickLayer"
+  reviewed "effect@4.0.5 sha256:aed6a9830749e2d0"
+
+/// A fresh registry.
+layer : Layer none none {Registry}
+let layer = layer_of Registry
+
+/// The value of `atom` in the registry.
+get : Atom a ->{Registry;} a
+let get atom = Registry.get atom
+
+/// Replaces the value of `atom`; the atoms that read it compute again.
+set : Writable a -> a ->{Registry;} Unit
+let set atom value = Registry.set atom value
+
+/// Replaces the value of `atom` by `f` of it.
+update : Writable a -> (a -> a) ->{Registry;} Unit
+let update atom f = Registry.update atom f
+
+/// Replaces the value of `atom` by the second part of `f` of it and gives
+/// the first.
+modify : Writable a -> (a -> (b, a)) ->{Registry;} b
+let modify atom f = Registry.modify atom f
+
+/// Computes `atom` again: a task atom runs its task anew.
+refresh : Atom a ->{Registry;} Unit
+let refresh atom = Registry.refresh atom

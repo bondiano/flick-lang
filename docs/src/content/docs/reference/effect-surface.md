@@ -3,7 +3,7 @@ title: "Effect coverage"
 ---
 
 The standard library wraps the pinned Effect release (see [The boundary of the language core](../../spec/07-errors-and-concurrency/#the-boundary-of-the-language-core)): every public export of the entrypoints `effect`, `effect/cli`,
-`effect/http` and `effect/http-api` has a typed wrapper or an explicit
+`effect/http`, `effect/http-api` and `effect/reactivity` has a typed wrapper or an explicit
 decision, and a linter in `cargo test` checks that nothing is lost when
 Effect moves.
 
@@ -12,7 +12,7 @@ Effect moves.
 `stdlib/Effect/snapshot.json` is the surface of the installed Effect, written
 by `node tools/dts-importer/index.mjs surface > stdlib/Effect/snapshot.json`
 (a Flick program: `pnpm -C tools/dts-importer build` first):
-every entrypoint of its `package.json`, and for the four wrapped ones each
+every entrypoint of its `package.json`, and for the five wrapped ones each
 export of each module as `Module.name` with its kind (`value`, `type` or
 `value+type`) and a fingerprint, 16 hex digits of the SHA-256 of its
 declarations printed without comments. A changed doc comment keeps the
@@ -80,6 +80,14 @@ capability matrix lacks, and moves the pins (`runtime/package.json`,
 `runtime/src/capabilities.ts`, the runtime's version test,
 `flick/src/toolchain.rs`). The linter stays red until the manifest and the
 reviewed bindings agree with the new snapshot.
+
+## Unstable modules
+
+Effect marks `effect/reactivity` `@stability unstable` in 4.0.5, and so are
+its bindings: `Reactivity.Atom` (atoms, the service `Registry` that holds
+their values, and its `layer`) and `Reactivity.AsyncResult` (the value of an
+atom a task computes). Their API may change with any Effect release; the UI
+modules built on them are the stable surface.
 
 ## Bindings
 

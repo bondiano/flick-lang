@@ -240,6 +240,12 @@ const SOURCES: &[(&str, &str)] = &[
     ),
     ("Stream", include_str!("builtins/Stream.fl")),
     // end of Effect: streams, Stream
+    // Effect: reactivity (unstable in Effect 4.0.5)
+    (
+        "Reactivity.AsyncResult",
+        include_str!("builtins/Reactivity/AsyncResult.fl"),
+    ),
+    ("Reactivity.Atom", include_str!("builtins/Reactivity/Atom.fl")),
     // Effect: HTTP
     ("Http.Method", include_str!("builtins/Http/Method.fl")),
     ("Http.Status", include_str!("builtins/Http/Status.fl")),

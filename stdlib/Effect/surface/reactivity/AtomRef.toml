@@ -1,0 +1,7 @@
+[excluded]
+AtomRef = "`AtomRef` is a mutable cell outside the registry; Flick state lives in `state` atoms"
+Collection = "`AtomRef` is a mutable cell outside the registry; Flick state lives in `state` atoms"
+ReadonlyRef = "`AtomRef` is a mutable cell outside the registry; Flick state lives in `state` atoms"
+TypeId = "TS-only: a type id or a type guard; Flick values are typed statically"
+collection = "`AtomRef` is a mutable cell outside the registry; Flick state lives in `state` atoms"
+make = "`AtomRef` is a mutable cell outside the registry; Flick state lives in `state` atoms"

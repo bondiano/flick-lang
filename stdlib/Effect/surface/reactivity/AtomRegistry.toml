@@ -1,0 +1,14 @@
+[wrapped]
+AtomRegistry = "Reactivity.Atom.Registry 6cf5e876dee41c91"
+layer = "Reactivity.Atom.layer aed6a9830749e2d0"
+
+[excluded]
+Node = "TS-only: a type-level helper of the TypeScript API"
+TypeId = "TS-only: a type id or a type guard; Flick values are typed statically"
+getResult = "the value of an effect atom as an effect: `get` gives its `AsyncResult`"
+isAtomRegistry = "TS-only: a type id or a type guard; Flick values are typed statically"
+layerOptions = "registry options (initial values, scheduling) are not bound: `layer` uses Effect's defaults"
+make = "the registry is the service `Reactivity.Atom.Registry`: `layer` builds one"
+mount = "mounting keeps an atom alive for a subscriber; the React adapter (U1) mounts the atoms a view reads"
+toStream = "streams of atom values are not bound: views read atoms through the registry"
+toStreamResult = "streams of atom values are not bound: views read atoms through the registry"
