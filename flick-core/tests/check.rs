@@ -8,6 +8,7 @@
 use std::path::{Path, PathBuf};
 use std::{fmt, fs, io};
 
+use flick_core::diagnostics::codes::Area;
 use flick_core::diagnostics::{Diagnostic, codes};
 use flick_core::project::{self, Host};
 use flick_core::source;
@@ -130,11 +131,15 @@ fn to_pos(file: &SourceFile, start: u32, end: u32) -> Pos {
 /// code: fixtures of other rules bind names they never use.
 const UNUSED: [&str; 3] = ["FLICK-R012", "FLICK-R013", "FLICK-R014"];
 
+/// Unused-code warnings, and in syntax fixtures every diagnostic of a later
+/// phase, count only in files that mention their code.
 fn opted_out(sources: &SourceMap, d: &Diagnostic) -> bool {
     let code = d.code.to_string();
-    UNUSED.contains(&code.as_str())
-        && d.span
-            .is_some_and(|s| !sources.get(s.file).text.contains(&code))
+    let Some(file) = d.span.map(|s| sources.get(s.file)) else {
+        return false;
+    };
+    let syntax_fixture = file.path.contains("fail/syntax/") && d.code.area != Area::Syntax;
+    (UNUSED.contains(&code.as_str()) || syntax_fixture) && !file.text.contains(&code)
 }
 
 /// Matches diagnostics against expectations; returns the diff lines.

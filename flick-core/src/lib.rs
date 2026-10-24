@@ -49,18 +49,14 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
     };
     let mut diagnostics = parse.diagnostics;
     diagnostics.extend(resolved);
-    if !diagnostics
-        .iter()
-        .any(|d| d.code.area == diagnostics::codes::Area::Syntax)
-    {
-        diagnostics.extend(types::check(
-            &module,
-            &builtin,
-            types::builtins(),
-            options,
-            &mut interface,
-        ));
-    }
+    let checked = types::check(
+        &module,
+        &builtin,
+        types::builtins(),
+        options,
+        &mut interface,
+    );
+    diagnostics.extend(types::beside_syntax_errors(&parse.tree, checked));
     diagnostics.sort_by_key(|d| d.span.map(|s| (s.start, s.end)));
     diagnostics
 }

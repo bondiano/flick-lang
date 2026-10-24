@@ -476,23 +476,25 @@ impl Loader<'_> {
             .extend(loaded.parse.diagnostics.iter().cloned());
         let resolved = !diagnostics.iter().any(|d| d.severity == Severity::Error);
         self.diagnostics.extend(diagnostics);
-        // a module with syntax errors keeps untyped exports: importers trust them
-        if loaded.parse.diagnostics.is_empty() {
-            let (checked, typing) =
-                types::check_typed(&module, &lookup, types::builtins(), options, &mut interface);
-            let clean = resolved && !checked.iter().any(|d| d.severity == Severity::Error);
-            self.diagnostics.extend(checked);
-            if clean && let Some(lowered) = &mut self.lowered {
-                match ir::lower(&module, &typing) {
-                    Ok(ir) => lowered[i] = Some(ir),
-                    Err(d) => self.diagnostics.extend(d),
-                }
-            }
-            if let Some(ide) = &mut self.ide {
-                ide.push(Analyzed::new(loaded, typing, interface.clone()));
+        // a module with syntax errors is checked for its other errors, but keeps
+        // untyped exports: importers trust them
+        let broken = !loaded.parse.diagnostics.is_empty();
+        let untyped = broken.then(|| interface.clone());
+        let (checked, typing) =
+            types::check_typed(&module, &lookup, types::builtins(), options, &mut interface);
+        let checked = types::beside_syntax_errors(&loaded.parse.tree, checked);
+        let clean = !broken && resolved && !checked.iter().any(|d| d.severity == Severity::Error);
+        self.diagnostics.extend(checked);
+        if clean && let Some(lowered) = &mut self.lowered {
+            match ir::lower(&module, &typing) {
+                Ok(ir) => lowered[i] = Some(ir),
+                Err(d) => self.diagnostics.extend(d),
             }
         }
-        interfaces[i] = Some(interface);
+        if let Some(ide) = &mut self.ide {
+            ide.push(Analyzed::new(loaded, typing, interface.clone()));
+        }
+        interfaces[i] = Some(untyped.unwrap_or(interface));
         visiting[i] = false;
     }
 }
