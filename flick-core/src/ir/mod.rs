@@ -411,6 +411,10 @@ pub enum BinOp {
     /// Structural equality; `SameValueZero` on `Number`.
     Eq,
     NotEq,
+    /// `===`: equality of values whose identity is their equality (`String`,
+    /// `Bool`, `BigInt`, the tags of constructors without fields).
+    Same,
+    NotSame,
     Lt,
     Le,
     Gt,
@@ -434,6 +438,8 @@ impl BinOp {
             BinOp::And => "&&",
             BinOp::Eq => "==",
             BinOp::NotEq => "!=",
+            BinOp::Same => "===",
+            BinOp::NotSame => "!==",
             BinOp::Lt => "<",
             BinOp::Le => "<=",
             BinOp::Gt => ">",

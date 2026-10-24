@@ -2,11 +2,10 @@
 //! known full applications (`add$2`) and constants for the methods of
 //! canonical instances that the module calls through them.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 
 use super::names;
 use crate::ir::{Expr, ExprKind, Item, ItemKind};
-use crate::types::Dict;
 
 /// The name and arity of the worker `name$n` a top-level `item` exports in
 /// release when the module exports it: a function of two or more
@@ -112,46 +111,34 @@ fn count_calls<'a>(e: &'a Expr, module: &str, out: &mut HashMap<&'a str, HashMap
     e.each_child(&mut |c| count_calls(c, module, out));
 }
 
-/// The methods of the module's instances without a context, written in the
-/// instance, that the module calls through that very instance: each becomes
-/// a constant `<instance>$<method>` the calls name directly. A method of
-/// another dictionary of the same type is never replaced.
-pub(super) fn direct_methods(module: &str, items: &[Item]) -> HashMap<(String, String), String> {
-    let mut used = BTreeSet::new();
-    for item in items {
-        item_bodies(item, &mut |e| method_uses(e, module, &mut used));
-    }
-    let mut out = HashMap::new();
-    for item in items {
-        if let ItemKind::Instance { info, methods } = &item.kind
-            && info.context.is_empty()
-            && info.derived.is_none()
+/// The methods of `item`, an instance without a context, written in it
+/// rather than derived or defaulted: in release each is a constant
+/// `<instance>$<method>` the module exports, and a canonical use calls it
+/// directly, in this module or an importer. A method of another dictionary
+/// of the same type is never replaced.
+pub fn direct_methods(item: &Item) -> Vec<(&str, &str)> {
+    match &item.kind {
+        ItemKind::Instance { info, methods }
+            if info.context.is_empty() && info.derived.is_none() =>
         {
-            for (method, _) in methods {
-                let key = (info.name.clone(), method.clone());
-                if used.contains(&key) {
-                    let constant = format!("{}${method}", names::instance(&info.name));
-                    out.insert(key, constant);
-                }
-            }
+            methods
+                .iter()
+                .map(|(method, _)| (info.name.as_str(), method.as_str()))
+                .collect()
         }
+        _ => Vec::new(),
     }
-    out
 }
 
-fn method_uses(e: &Expr, module: &str, out: &mut BTreeSet<(String, String)>) {
-    if let ExprKind::Method {
-        dict: Dict::Instance {
-            module: m,
-            name,
-            args,
-        },
-        name: method,
-    } = &e.kind
-        && m == module
-        && args.is_empty()
-    {
-        out.insert((name.clone(), method.clone()));
-    }
-    e.each_child(&mut |c| method_uses(c, module, out));
+/// The constant of each direct method of the module's instances (see
+/// [`direct_methods`]), by instance and method.
+pub(super) fn direct_constants(items: &[Item]) -> HashMap<(String, String), String> {
+    items
+        .iter()
+        .flat_map(direct_methods)
+        .map(|(instance, method)| {
+            let constant = format!("{}${method}", names::instance(instance));
+            ((instance.to_owned(), method.to_owned()), constant)
+        })
+        .collect()
 }

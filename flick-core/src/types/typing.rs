@@ -39,6 +39,9 @@ pub struct Typing {
     pub lifts: HashMap<Range, Lift>,
     /// `++` on lists rather than strings.
     pub list_concat: HashSet<Range>,
+    /// `==` and `!=` that JS `===` decides: on the values themselves, or on
+    /// their tags when every constructor of the type has no fields.
+    pub identity_eq: HashMap<Range, Identity>,
     /// Dictionaries a use receives, in the order of its constraints.
     pub dicts: HashMap<Range, Vec<Dict>>,
     /// The constraints a definition, a method or a higher-rank argument
@@ -115,6 +118,13 @@ pub struct Constructor {
     pub arity: usize,
     /// How its values are represented in JS.
     pub rep: Rep,
+}
+
+/// What `===` compares for an `==` (see [`Typing::identity_eq`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Identity {
+    Value,
+    Tag,
 }
 
 /// How a `foreign` is called: its arrows, the dictionaries it takes and

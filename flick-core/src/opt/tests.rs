@@ -19,6 +19,7 @@ fn release_with(text: &str, workers: &dyn Fn(&str, &str) -> Option<usize>) -> St
         interface: &|m| (m == interface.module).then(|| interface.clone()),
         release: true,
         workers,
+        direct: &|_, _, _| false,
     };
     js(&ir, &options).code
 }
@@ -187,4 +188,50 @@ fn exported_workers_take_full_applications_across_modules() {
         js.contains("$m_Ui.div$2({ class_name: \"x\" }, [])"),
         "{js}"
     );
+}
+
+#[test]
+fn equality_whose_identity_decides_is_strict() {
+    let js = release(
+        "module App exposing (same)\n\n\
+         type Locale = En | Ru\n\n\
+         same : String -> Locale -> Number -> Bool -> Bool\n\
+         let same s l n b = s == \"a\" && l != Ru && n == 1 && b == true\n",
+    );
+    assert!(js.contains("(s === \"a\")"), "{js}");
+    assert!(js.contains("(l._tag !== Ru._tag)"), "{js}");
+    // SameValueZero on Number stays the runtime's
+    assert!(js.contains("$rt.equals(n, 1)"), "{js}");
+    assert!(js.contains("(b === true)"), "{js}");
+}
+
+#[test]
+fn known_instances_and_plain_foreigns_are_called_directly() {
+    let direct = |m: &str, instance: &str, method: &str| {
+        (m, instance, method) == ("Instances", "Show Number", "show")
+    };
+    let workers = |_: &str, _: &str| None;
+    let (mut ir, interface) = check_text(
+        "App",
+        "module App exposing (label, both)\n\n\
+         label : Number -> String\nlet label n = show n\n\n\
+         join : String -> String -> String\nforeign pure join from \"./x.mjs\" \"join\"\n\n\
+         both : String -> String\nlet both s = join s s\n",
+    )
+    .expect("lowers");
+    super::optimize(&mut ir, &|name| interface.exports_value(name));
+    let options = Options {
+        path: &|m| format!("{}.js", m.replace('.', "/")),
+        package: &|_| None,
+        foreign: &|_, spec| spec.to_owned(),
+        typescript: false,
+        interface: &|m| (m == interface.module).then(|| interface.clone()),
+        release: true,
+        workers: &workers,
+        direct: &direct,
+    };
+    let js = js(&ir, &options).code;
+    assert!(js.contains("$m_Instances.$i_Show_Number_"), "{js}");
+    assert!(!js.contains(".show("), "{js}");
+    assert!(js.contains("$f_join(s, s)"), "{js}");
 }

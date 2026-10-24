@@ -4,12 +4,13 @@
 
 use std::mem;
 
+use super::env::{Form, TypeDef};
 use super::ty::Type;
-use super::typing::Ref;
+use super::typing::{Identity, Ref};
 use super::{Checker, Local, Operator};
 use crate::diagnostics::suggest::closest;
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
-use crate::iface::Namespace;
+use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -246,6 +247,7 @@ impl Checker<'_> {
             K::EqEq | K::NotEq => {
                 let ty = self.infer(lhs);
                 self.check(rhs, &ty);
+                self.equalities.push((ty, span));
                 bool_
             }
             kind => {
@@ -365,6 +367,12 @@ impl Checker<'_> {
     /// inferred; an operand type nothing determined becomes the first
     /// allowed type (`Number`, or `String` for `++`).
     pub fn settle_operators(&mut self) {
+        for (ty, span) in mem::take(&mut self.equalities) {
+            if let Some(identity) = self.identity(&ty) {
+                let key = super::typing::range(span);
+                self.typing.identity_eq.insert(key, identity);
+            }
+        }
         for op in mem::take(&mut self.operators) {
             let ty = self.whnf(&op.ty);
             let (head, _) = ty.spine();
@@ -411,4 +419,46 @@ impl Checker<'_> {
             }
         }
     }
+}
+
+impl Checker<'_> {
+    /// Whether `===` decides `==` on `ty`: `String`, `Bool` and `BigInt`
+    /// by value, a tagged type whose constructors have no fields by tag.
+    fn identity(&mut self, ty: &Type) -> Option<Identity> {
+        let ty = self.whnf(ty);
+        let (head, _) = ty.spine();
+        if ["String", "Bool", "BigInt"].iter().any(|p| head.is_prim(p)) {
+            return Some(Identity::Value);
+        }
+        let Type::Con { module, name } = head else {
+            return None;
+        };
+        let Some(TypeDef {
+            form: Form::Adt { constructors, abi },
+            ..
+        }) = self.env.type_def(module, name)
+        else {
+            return None;
+        };
+        let nullary = |c: &String| {
+            let entity = Entity {
+                module: module.clone(),
+                namespace: Namespace::Constructor,
+                name: c.clone(),
+            };
+            self.env
+                .value(&entity)
+                .is_some_and(|s| !matches!(strip(s), Type::Fun { .. }))
+        };
+        (abi.is_tagged() && constructors.iter().all(nullary)).then_some(Identity::Tag)
+    }
+}
+
+/// `scheme` without its `forall`s.
+fn strip(scheme: &Type) -> &Type {
+    let mut t = scheme;
+    while let Type::Forall { body, .. } = t {
+        t = body;
+    }
+    t
 }

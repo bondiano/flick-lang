@@ -41,8 +41,8 @@ fn token(op: BinOp) -> Option<K> {
     Some(match op {
         BinOp::Or => K::OrOr,
         BinOp::And => K::AndAnd,
-        BinOp::Eq => K::EqEq,
-        BinOp::NotEq => K::NotEq,
+        BinOp::Eq | BinOp::Same => K::EqEq,
+        BinOp::NotEq | BinOp::NotSame => K::NotEq,
         BinOp::Lt => K::Lt,
         BinOp::Le => K::Le,
         BinOp::Gt => K::Gt,

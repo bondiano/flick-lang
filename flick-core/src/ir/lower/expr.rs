@@ -6,7 +6,7 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
-use crate::types::{Dict, Range, Ref, is_pattern, let_parts};
+use crate::types::{Dict, Identity, Range, Ref, is_pattern, let_parts};
 
 impl Lower<'_> {
     /// An expression with the lift and the dictionaries its position gives it.
@@ -279,6 +279,24 @@ impl Lower<'_> {
             .map(|t| t.kind);
         let lhs = self.boxed(children[0]);
         let rhs = self.boxed(children[1]);
+        if let (Some(kind @ (K::EqEq | K::NotEq)), Some(&identity)) =
+            (op, self.typing.identity_eq.get(&key))
+        {
+            let op = if kind == K::EqEq {
+                BinOp::Same
+            } else {
+                BinOp::NotSame
+            };
+            let tag = |e: Box<Expr>| {
+                let span = e.span;
+                Box::new(Expr::new(ExprKind::Field(e, "_tag".to_owned()), span))
+            };
+            let (lhs, rhs) = match identity {
+                Identity::Value => (lhs, rhs),
+                Identity::Tag => (tag(lhs), tag(rhs)),
+            };
+            return Expr::new(ExprKind::Binary(op, lhs, rhs), span);
+        }
         let op = match op {
             Some(K::PipeGt) => {
                 let app = ExprKind::App {

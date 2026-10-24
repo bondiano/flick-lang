@@ -6,7 +6,7 @@ mod abi;
 
 pub use abi::interface;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -126,11 +126,10 @@ pub fn emit(
     let any_interface = |m: &str| {
         interface_of(m).or_else(|| types::builtins().iter().find(|i| i.module == m).cloned())
     };
-    let exported_workers = exported_workers(settings.release, modules, &any_interface);
-    let workers = |m: &str, name: &str| {
-        exported_workers
-            .get(&(m.to_owned(), name.to_owned()))
-            .copied()
+    let (workers, direct) = exports(settings.release, modules, &any_interface);
+    let workers = |m: &str, name: &str| workers.get(&(m.to_owned(), name.to_owned())).copied();
+    let direct = |m: &str, i: &str, method: &str| {
+        direct.contains(&(m.to_owned(), i.to_owned(), method.to_owned()))
     };
     let options = Options {
         path: &path,
@@ -140,6 +139,7 @@ pub fn emit(
         interface: &any_interface,
         release: settings.release,
         workers: &workers,
+        direct: &direct,
     };
     let mut out = vec![package_json(settings)];
     let decls = |name: &str| declarations(name, &any_interface, &package, &path);
@@ -192,28 +192,40 @@ fn package_json(settings: &Settings) -> Artifact {
     }
 }
 
-/// In release, the worker `name$n` each module of the build and each
-/// built-in module exports for a value, from its reference lowering as its `.iface`
-/// summaries say: a full application in another module calls it.
-fn exported_workers(
+/// Workers by module and value, and direct methods by module, instance
+/// and method.
+type Exports = (
+    HashMap<(String, String), usize>,
+    HashSet<(String, String, String)>,
+);
+
+/// In release, what each module of the build and each built-in module
+/// exports for a full application or a canonical method call in another
+/// module, from its reference lowering: the worker `name$n` of a value, as
+/// its `.iface` summaries say, and the constants of instance methods.
+fn exports(
     release: bool,
     modules: &[Compiled],
     any_interface: &dyn Fn(&str) -> Option<Interface>,
-) -> HashMap<(String, String), usize> {
+) -> Exports {
+    let mut out = Exports::default();
     if !release {
-        return HashMap::new();
+        return out;
     }
     let own = modules.iter().map(|c| (&c.name, &c.ir.items));
     let builtin = builtin_modules().iter().map(|m| (&m.name, &m.items));
-    let mut out = HashMap::new();
     for (module, items) in own.chain(builtin) {
         let Some(interface) = any_interface(module) else {
             continue;
         };
         for (name, arity) in items.iter().filter_map(codegen::exported_worker) {
             if interface.exports_value(name) {
-                out.insert((module.clone(), name.to_owned()), arity);
+                out.0.insert((module.clone(), name.to_owned()), arity);
             }
+        }
+        for (instance, method) in items.iter().flat_map(codegen::direct_methods) {
+            out.1
+                .insert((module.clone(), instance.to_owned(), method.to_owned()));
         }
     }
     out

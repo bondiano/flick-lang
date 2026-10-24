@@ -198,12 +198,17 @@ impl Gen<'_> {
 
     /// The constant of `method` of `dict`, a canonical instance of this
     /// module whose method is emitted on its own.
-    fn direct_method(&self, dict: &Dict, method: &str) -> Option<String> {
+    fn direct_method(&mut self, dict: &Dict, method: &str) -> Option<String> {
         let Dict::Instance { module, name, args } = dict else {
             return None;
         };
-        if module != self.module || !args.is_empty() {
+        if !args.is_empty() {
             return None;
+        }
+        if module != self.module {
+            let constant = format!("{}${method}", names::instance(name));
+            return (self.options.direct)(module, name, method)
+                .then(|| self.global(module, &constant));
         }
         self.direct.get(&(name.clone(), method.to_owned())).cloned()
     }
@@ -236,6 +241,9 @@ impl Gen<'_> {
             let arity = (self.options.workers)(module, name).filter(|&n| n == args.len())?;
             let worker = self.global(module, &format!("{}${arity}", names::ident(name)));
             return Some((worker, args));
+        }
+        if let Some((arity, alias)) = self.direct_foreigns.get(name) {
+            return (args.len() == *arity).then(|| (alias.clone(), args));
         }
         let (arity, _) = *self.workers.get(name)?;
         (args.len() == arity).then(|| (format!("{}${arity}", names::ident(name)), args))

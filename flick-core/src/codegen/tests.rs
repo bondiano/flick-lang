@@ -15,6 +15,7 @@ fn compile(text: &str) -> String {
         interface: &|_| None,
         release: false,
         workers: &|_, _| None,
+        direct: &|_, _, _| false,
     };
     js(&ir, &options).code
 }

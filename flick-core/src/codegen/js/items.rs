@@ -168,7 +168,7 @@ impl Gen<'_> {
                     let v = self.scoped(&stmts, v);
                     match self.direct.get(&(info.name.clone(), name.clone())).cloned() {
                         Some(direct) => {
-                            methods_first.push(self.constant(&direct, &v));
+                            methods_first.push(self.export(&direct, &v));
                             entries.push(format!("{name}: {direct}"));
                         }
                         None => entries.push(format!("{name}: {v}")),

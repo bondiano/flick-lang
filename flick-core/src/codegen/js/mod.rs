@@ -11,7 +11,7 @@ mod pattern;
 mod release;
 mod schema;
 
-pub use release::exported_worker;
+pub use release::{direct_methods, exported_worker};
 
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write;
@@ -53,8 +53,13 @@ pub fn js(module: &Module, options: &Options) -> Output {
         } else {
             HashMap::new()
         },
+        direct_foreigns: if options.release && !options.typescript {
+            foreign::plain_foreigns(&module.items)
+        } else {
+            HashMap::new()
+        },
         direct: if options.release {
-            release::direct_methods(&module.name, &module.items)
+            release::direct_constants(&module.items)
         } else {
             HashMap::new()
         },
@@ -222,6 +227,9 @@ struct Gen<'a> {
     /// Release: the methods of the module's canonical instances emitted as
     /// constants of their own, by instance and method.
     direct: HashMap<(String, String), String>,
+    /// Release, JS: the plain pure foreigns of the module (see
+    /// [`foreign::plain`]), by name, with their arity and import alias.
+    direct_foreigns: HashMap<String, (usize, String)>,
     /// TypeScript types of the exported values, by their JS name.
     annotations: HashMap<String, String>,
 }

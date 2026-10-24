@@ -63,9 +63,9 @@ pub(crate) use sql::base_type;
 pub use sql::dialect::{self, Dialect};
 pub use ty::{Binder, Effects, PRELUDE, Row, Type};
 pub use typing::{
-    CodecBlock, Constructor, ForeignInfo, InstanceInfo, Lift, Owner, Range, Ref, SchemaItem,
-    SchemaPlan, SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue, Typing, default_method,
-    passes_dictionary,
+    CodecBlock, Constructor, ForeignInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref,
+    SchemaItem, SchemaPlan, SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue, Typing,
+    default_method, passes_dictionary,
 };
 
 use convert::TyVar;
@@ -170,6 +170,7 @@ fn run(
         sites: Vec::new(),
         subrows: Vec::new(),
         operators: Vec::new(),
+        equalities: Vec::new(),
         recs: Vec::new(),
         top: toplevel::TopLevel::default(),
         options,
@@ -239,6 +240,8 @@ struct Checker<'a> {
     /// Row constraints of the declaration being checked.
     subrows: Vec<effects::SubRow>,
     operators: Vec<Operator>,
+    /// `==` and `!=` with the type of their operands.
+    equalities: Vec<(Type, Span)>,
     recs: Vec<Rec>,
     top: toplevel::TopLevel<'a>,
     options: Options<'a>,

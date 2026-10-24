@@ -74,6 +74,8 @@ importers as `opaque type` does, and keeps the string itself at run time.
 `NaN == NaN` and `0 == -0`; `Number.strict_equal` is `===` and
 `Number.same_value` is `Object.is`. `<`, `<=`, `>`, `>=` are the JS
 operators; `Ord Number` (`compare`) is the total order with NaN last.
+Where the operands are `String`, `Bool` or `BigInt`, `==` is `===`; on a
+type whose constructors have no fields it is `a._tag === b._tag`.
 
 ## Functions and stages
 
@@ -210,7 +212,8 @@ corpus runs in both profiles against the same expectations.
 | scalar replacement | a local record whose every use reads a field, or a local tuple only destructured, becomes one local per part: no object |
 | dead code | unused pure bindings (an unused `task { … }` included) and private top-level values nothing reaches; a runtime call always stays, its result used or not |
 | workers | a top-level function whose stages before the last are pure gets `f$n` taking all `n` arguments; a known full application calls it, a partial one keeps the curried `f`; a private function only ever applied fully has no curried form. An exported function of two or more parameters without dictionaries, `foreign` included, exports `f$n` beside `f`, and a full application in another module calls it: the `stages` of its `.iface` summary give `n` |
-| dictionaries | a method of a canonical instance of the module is a constant of its own that its uses call directly; a dictionary passed as a value (an `EqHash` witness) is never replaced |
+| dictionaries | a method written in an instance without a context is an exported constant `<instance>$<method>`; a canonical use calls it directly, in the module or an importer; a dictionary passed as a value (an `EqHash` witness) is never replaced |
+| foreign | a pure `foreign` that passes its arguments and result as they are is the import itself: `export { $f_div as div$2 }`, and a full application in the module calls `$f_div` |
 | lone effects | a runtime body that only returns one effect, `Effect.gen(function* () { return (yield* x); })`, is `Effect.suspend(() => x)`: built as late, without a generator |
 
 A function whose first stage computes or runs something gets no worker:

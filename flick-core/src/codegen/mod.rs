@@ -8,7 +8,7 @@ mod names;
 pub mod sourcemap;
 pub mod ts;
 
-pub use js::{exported_worker, js, relative};
+pub use js::{direct_methods, exported_worker, js, relative};
 pub use names::{ident, instance as instance_export, qualified_id, tag};
 
 use crate::iface::Interface;
@@ -36,6 +36,9 @@ pub struct Options<'a> {
     /// this one included, exports for its value `name` (see
     /// [`exported_worker`]); a full application calls it.
     pub workers: &'a dyn Fn(&str, &str) -> Option<usize>,
+    /// In release, whether a module exports the method of its instance as
+    /// a constant (see [`direct_methods`]): by module, instance and method.
+    pub direct: &'a dyn Fn(&str, &str, &str) -> bool,
 }
 
 /// A compiled module.
