@@ -1,8 +1,9 @@
-<p align="center">
-  <img src="./docs/public/flick-logo.svg" width="240" height="240" alt="Flick logo: a lowercase f shaped like a toggle switch.">
-</p>
-
-<h1 align="center">Flick</h1>
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/public/flick-wordmark-dark.svg">
+    <img src="./docs/public/flick-wordmark.svg" width="420" alt="Flick">
+  </picture>
+</h1>
 
 <p align="center">
   <strong>Functional programming. Explicit effects. JavaScript.</strong>

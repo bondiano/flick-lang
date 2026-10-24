@@ -41,7 +41,7 @@ export default defineConfig({
     starlight({
       title: "Flick",
       description: "An ML language with higher-kinded types, typed effects and regions, on Effect",
-      favicon: "/favicon.svg",
+      favicon: "/flick-logo.svg",
       disable404Route: true,
       defaultLocale: "root",
       locales: {

@@ -2,12 +2,6 @@
 const { label = "Flick home" } = Astro.props;
 ---
 <a class="flick-brand" href={Astro.props.href ?? "/"} aria-label={label}>
-  <svg viewBox="0 0 56 54" width="49" height="48" fill="none" aria-hidden="true">
-    <g fill="currentColor" transform="translate(0 9)">
-      <path d="M0 18v-3C0 6 6 0 15 0h17l-4 7H15C9 7 4 11 0 18Z" />
-      <path d="M0 44V27c0-6 5-10 11-10h21l-4 7H14l-4 4v7Z" />
-    </g>
-    <path class="brand-spark" d="M46 0c1.4 6.2 3.8 8.6 10 10-6.2 1.4-8.6 3.8-10 10-1.4-6.2-3.8-8.6-10-10 6.2-1.4 8.6-3.8 10-10Z" />
-  </svg>
-  <span>flick</span>
+  <img class="flick-wordmark-light" src="/flick-wordmark.svg" width="724" height="258" alt="" aria-hidden="true" />
+  <img class="flick-wordmark-dark" src="/flick-wordmark-dark.svg" width="724" height="258" alt="" aria-hidden="true" />
 </a>
