@@ -227,6 +227,8 @@ Custom widget state, views, event decisions, and recovery belong to Flick: `Cont
 
 The hero displays actual source with Flick/Effect selection, copy feedback, execution progress, and honest success/failure output. The tools distinguish loading, compiler failure/retry, valid or invalid source, Debug/Release, diagnostics, Run/Stop, timeout, stale output, and generated code. Copy failure offers manual selection instead of claiming success. These are behavior contracts, not decorative status badges. Sidecar snippets are static visual specimens only; they do not replace the real Flick components.
 
+The homepage server-renders `Hero.initial_view` with its full tabs, syntax-colored source, line numbers, file toolbar, and status footer. Tabs, copy, and Run stay disabled with `aria-busy="true"` until client hydration attaches the handlers. Hydration reuses the same DOM and dimensions; startup changes only the controls and status, not the editor layout.
+
 Play and Transpile expose their real initial Flick view in server HTML. Hydration preserves native drafts and selection, then background compiler/highlighter loading begins without replacing the interface. Compiler work stays in its worker, and one latest-check policy with worker backpressure prevents canceled queued checks from delaying current input. Tokenization supplies allowlisted classes and literal text, never source-derived HTML.
 
 ## Do's and Don'ts

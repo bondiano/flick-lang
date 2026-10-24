@@ -170,9 +170,7 @@ button { font: inherit; }
 .status-dot { flex: 0 0 7px; width: 7px; height: 7px; background: var(--flick-success); border-radius: 50%; }
 .hero-editor-status.is-error { color: var(--flick-error); }
 .hero-editor-status.is-error .status-dot { background: var(--flick-error); }
-.hero-loading { min-height: 436px; padding: 2rem; }
-.hero-loading pre { overflow: auto; font-size: 0.9rem; line-height: 2; }
-.hero-loading p { color: var(--sl-color-gray-3); font-size: 0.9rem; }
+.hero-editor[aria-busy='true'] .status-dot { background: var(--sl-color-gray-3); }
 .home-section { max-width: 1536px; margin: auto; padding: 3.9rem var(--flick-gutter); }
 .home-section h2 { color: var(--sl-color-white); font-size: clamp(1.85rem, 2.6vw, 2.5rem); line-height: 1.2; font-weight: 650; letter-spacing: -0.028em; text-wrap: balance; margin: 0; white-space: pre-line; }
 .feature-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3.75rem; margin-top: 2.6rem; }

@@ -5,11 +5,17 @@ import ThemeInit from "./ThemeInit.astro";
 import SignalWave from "./SignalWave.astro";
 import Brand from "./Brand.astro";
 import Icon from "./Icon.astro";
+import { Effect } from "@flick-lang/runtime";
+import { uiRenderStatic, type Ui } from "@flick-lang/runtime/ui/react";
+import { renderToString } from "react-dom/server";
+import { initial_view } from "../widgets/Hero.fl";
 
 const { locale = "en" } = Astro.props;
 const ru = locale === "ru";
 const prefix = ru ? "/ru" : "";
 const text = (en: string, russian: string) => ru ? russian : en;
+const initialView = initial_view as (ru: boolean) => Effect.Effect<Ui>;
+const heroHtml = renderToString(uiRenderStatic(await Effect.runPromise(initialView(ru))));
 const features = [
   { icon: "code", title: text("Inference that follows you", "Вывод типов, который помогает"), body: text("Model with variants, compose with higher-kinded types, and let inference connect the details. Types work for you, not the other way around.", "Моделируйте данные вариантами, обобщайте с типами высших порядков и оставляйте детали выводу типов. Типы работают на вас, а не наоборот."), href: "/reference/types/" },
   { icon: "effects", title: text("Effects in the signature", "Эффекты видны в сигнатуре"), body: text("Know what a function needs and how it can fail. Write direct calls; the compiler handles the Effect sequencing.", "Знайте, что нужно функции и какие ошибки она возвращает. Пишите обычные вызовы — последовательность Effect построит компилятор."), href: "/reference/effects/" },
@@ -54,9 +60,7 @@ const sections = [
           </div>
           <div class="hero-demo">
             <SignalWave />
-            <div id="flick-hero">
-              <div class="hero-editor hero-loading"><pre>{'module Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () =\n  Platform.stdout_line "Hello, effects."'}</pre><p>{text("Loading the live example…", "Загружаем живой пример…")}</p></div>
-            </div>
+            <div id="flick-hero" data-flick-ssr set:html={heroHtml}></div>
           </div>
         </div>
       </section>
