@@ -1,6 +1,6 @@
-// Views on atoms mounted with React 19 in jsdom: a click writes a state,
-// the view that read it and a view of a derived atom render again, and the
-// scope's end unmounts the root.
+// Views on atoms mounted with React 19 in jsdom: a click runs an action
+// that writes a state, the view that read it and a view of a derived atom
+// render again, and the scope's end unmounts the root.
 module App.Main exposing (main)
 
 setup : Unit ->{} Unit
@@ -25,6 +25,9 @@ let count = Atom.make 0
 doubled : Atom.Atom Number
 let doubled = Atom.derived (fun () -> Atom.value count * 2)
 
+increment : Action.Action Ui.ClickSnapshot {Reactivity.Atom.Registry} none
+let increment = Action.exhaust (fun _ -> task { Atom.update count (fun c -> c + 1) })
+
 counter_view : Ui.View Unit {Reactivity.Atom.Registry} none
 let counter_view =
   Ui.named
@@ -39,7 +42,7 @@ let counter_view =
             button
               {
                 disabled = false;
-                on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun c -> c + 1) });
+                on_click = increment;
               }
               [text "+1"],
           ]

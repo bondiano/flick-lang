@@ -141,6 +141,21 @@ commits, and a write between its render and its subscription renders it
 again. Rendering a view outside `Ui.Dom.mount` fails with what to do. The
 render reads synchronously: it may read atoms but run nothing else.
 
+## Actions
+
+An action is a handler declared once, usually at the top level, and given to
+as many elements as need it: `on_click = increment`. `Action.exhaust`,
+`latest`, `queue` and `concurrent` take the policies of `Ui.Event`, but the
+elements that use one action share its policy state in a root, so
+`Action.exhaust` ignores a click on any of its buttons while the task of an
+earlier one runs. The tasks belong to the root, which interrupts and joins
+them when it unmounts.
+
+```flick
+increment : Action.Action Ui.ClickSnapshot {Reactivity.Atom.Registry} none
+let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
+```
+
 ## Handlers and policies
 
 A handler field has the opaque type `Ui.Handler snapshot r e`, which only a

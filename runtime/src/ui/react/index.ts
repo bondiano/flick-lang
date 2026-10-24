@@ -26,6 +26,10 @@ import { Bridge, type Listener } from "./policies.ts";
 
 export * from "./nodes.ts";
 export {
+  actionConcurrent,
+  actionExhaust,
+  actionLatest,
+  actionQueue,
   eventConcurrent,
   eventExhaust,
   eventLatest,

@@ -18,6 +18,8 @@ export interface Handler {
   readonly run: (snapshot: unknown) => Effect.Effect<unknown, unknown>;
   /** A pure decision, taken while the browser waits, to prevent the default action. */
   readonly prevent?: (snapshot: unknown) => boolean;
+  /** An `Action`: every element that uses it shares one policy state per root. */
+  readonly shared?: boolean;
 }
 
 const makeHandler = (policy: Policy, run: Handler["run"]): Handler => Object.freeze({ policy, run });
@@ -37,6 +39,15 @@ export const eventConcurrent = (limit: number, run: Handler["run"]): Handler =>
   makeHandler({ kind: "concurrent", limit: positive("limit", limit) }, run);
 export const eventPreventDefault = (decide: (snapshot: unknown) => boolean, inner: Handler): Handler =>
   Object.freeze({ ...inner, prevent: decide });
+
+const makeAction = (policy: Policy, run: Handler["run"]): Handler => Object.freeze({ policy, run, shared: true });
+
+export const actionExhaust = (run: Handler["run"]): Handler => makeAction({ kind: "exhaust" }, run);
+export const actionLatest = (run: Handler["run"]): Handler => makeAction({ kind: "latest" }, run);
+export const actionQueue = (capacity: number, run: Handler["run"]): Handler =>
+  makeAction({ kind: "queue", capacity: positive("capacity", capacity) }, run);
+export const actionConcurrent = (limit: number, run: Handler["run"]): Handler =>
+  makeAction({ kind: "concurrent", limit: positive("limit", limit) }, run);
 
 type Task = Fiber.Fiber<unknown, unknown>;
 
@@ -62,6 +73,8 @@ export class Bridge<R> {
   accepting = true;
   readonly tasks = new Set<Task>();
   readonly supervisors = new Set<Task>();
+  /** The policy state of each `Action`, shared by the elements that use it. */
+  private readonly actions = new Map<Handler, Slot>();
   private readonly context: Context.Context<R>;
   private readonly supervisor: (failure: Failure) => Effect.Effect<unknown, unknown, R>;
   private readonly settled: () => void;
@@ -85,6 +98,7 @@ export class Bridge<R> {
 
   /** One committed event prop owns its policy and reuses its callback across renders. */
   listener(binding: Binding): Listener {
+    if (binding.handler.shared === true) return this.actionListener(binding);
     const slot: Slot = { binding, running: new Set<Task>(), waiting: [] };
     return {
       callback: (event) => {
@@ -97,6 +111,27 @@ export class Bridge<R> {
         slot.binding = undefined;
         slot.waiting.length = 0;
       },
+    };
+  }
+
+  /**
+   * An event prop of an `Action`: the action's state outlives the element,
+   * since other elements may use it, and its tasks belong to the root.
+   */
+  private actionListener(initial: Binding): Listener {
+    let current = initial;
+    let slot = this.actions.get(initial.handler);
+    if (slot === undefined) {
+      slot = { binding: initial, running: new Set<Task>(), waiting: [] };
+      this.actions.set(initial.handler, slot);
+    }
+    const shared = slot;
+    return {
+      callback: (event) => this.dispatch(shared, current, event),
+      update: (binding) => {
+        current = binding;
+      },
+      close: () => undefined,
     };
   }
 

@@ -1,0 +1,33 @@
+/// Actions: event handlers declared once, usually at the top level, and
+/// given to as many elements as need them. Every element using an action
+/// shares one policy state per root: `Action.exhaust` ignores a click on
+/// any of its buttons while the task of an earlier one runs. Its tasks
+/// belong to the root, which interrupts and joins them when it unmounts.
+/// `capacity` and `limit` are positive integers.
+module Action exposing (..)
+
+/// A handler of events with a snapshot `s`.
+type alias Action s r e = Ui.Handler s r e
+
+/// Ignores events while the task of an earlier one runs.
+exhaust : forall c s r e. (s -> (Eff r e Unit)^c)^c -> (Action s r e)^c
+foreign pure exhaust from "@flick-lang/runtime/ui/react" "actionExhaust"
+  retention call
+
+/// Interrupts the running task, waits until it stopped, then runs the last
+/// event; one event waits at most.
+latest : forall c s r e. (s -> (Eff r e Unit)^c)^c -> (Action s r e)^c
+foreign pure latest from "@flick-lang/runtime/ui/react" "actionLatest"
+  retention call
+
+/// Runs events one by one, `capacity` of them waiting at most; an event
+/// that finds the queue full is rejected and reported to the supervisor.
+queue : forall c s r e. Number -> (s -> (Eff r e Unit)^c)^c -> (Action s r e)^c
+foreign pure queue from "@flick-lang/runtime/ui/react" "actionQueue"
+  retention call
+
+/// Runs at most `limit` tasks at once; an event beyond that is rejected
+/// and reported to the supervisor.
+concurrent : forall c s r e. Number -> (s -> (Eff r e Unit)^c)^c -> (Action s r e)^c
+foreign pure concurrent from "@flick-lang/runtime/ui/react" "actionConcurrent"
+  retention call
