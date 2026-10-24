@@ -9,13 +9,13 @@ import { tag } from "../tags.ts";
 
 export * from "effect/Arbitrary";
 
-const SAMPLE_ERROR = tag("Arbitrary.SampleError.SampleError");
-const RETURNED_FALSE = tag("Arbitrary.PropertyFailure.ReturnedFalse");
-const PROPERTY_ERROR = tag("Arbitrary.PropertyFailure.PropertyError");
-const PASSED = tag("Arbitrary.CheckResult.Passed");
-const FALSIFIED = tag("Arbitrary.CheckResult.Falsified");
-const EXHAUSTED = tag("Arbitrary.CheckResult.Exhausted");
-const REPLAY_MISMATCH = tag("Arbitrary.CheckResult.ReplayMismatch");
+const SAMPLE_ERROR = /*#__PURE__*/ tag("Arbitrary.SampleError.SampleError");
+const RETURNED_FALSE = /*#__PURE__*/ tag("Arbitrary.PropertyFailure.ReturnedFalse");
+const PROPERTY_ERROR = /*#__PURE__*/ tag("Arbitrary.PropertyFailure.PropertyError");
+const PASSED = /*#__PURE__*/ tag("Arbitrary.CheckResult.Passed");
+const FALSIFIED = /*#__PURE__*/ tag("Arbitrary.CheckResult.Falsified");
+const EXHAUSTED = /*#__PURE__*/ tag("Arbitrary.CheckResult.Exhausted");
+const REPLAY_MISMATCH = /*#__PURE__*/ tag("Arbitrary.CheckResult.ReplayMismatch");
 
 /** `Arbitrary.ArrayOptions`. */
 interface ArrayOptions {

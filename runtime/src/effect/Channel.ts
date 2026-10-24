@@ -16,7 +16,7 @@ type Any = Channel.Channel<unknown, unknown, unknown, unknown, unknown, unknown,
 type NonEmpty<A> = readonly [A, ...Array<A>];
 type Strategy = "suspend" | "dropping" | "sliding";
 
-const strategies = new Map<string, Strategy>([
+const strategies = /*#__PURE__*/ new Map<string, Strategy>([
   [tag("Queue.Strategy.Suspend"), "suspend"],
   [tag("Queue.Strategy.Dropping"), "dropping"],
   [tag("Queue.Strategy.Sliding"), "sliding"],

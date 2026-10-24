@@ -13,7 +13,7 @@ export * from "effect/Queue";
 /** A Flick queue: its error row and the end of the queue. */
 type FlickQueue<A, E> = Queue.Queue<A, E | Cause.Done>;
 
-const strategies = new Map<string, "suspend" | "dropping" | "sliding">([
+const strategies = /*#__PURE__*/ new Map<string, "suspend" | "dropping" | "sliding">([
   [tag("Queue.Strategy.Suspend"), "suspend"],
   [tag("Queue.Strategy.Dropping"), "dropping"],
   [tag("Queue.Strategy.Sliding"), "sliding"],

@@ -39,14 +39,14 @@ export interface ShowDict<A> {
 }
 
 export const some = <A>(value: A): Option.Option<A> => Option.some(value);
-export const none: Option.Option<never> = Option.none();
+export const none: Option.Option<never> = /*#__PURE__*/ Option.none();
 export const ok = <A>(value: A): Result.Result<A> => Result.succeed(value);
 export const err = <E>(error: E): Result.Result<never, E> => Result.fail(error);
 
 const ordering = (name: "LT" | "EQ" | "GT"): Ordering => Object.freeze({ _tag: tag(`Prelude.Ordering.${name}`) });
-export const LT = ordering("LT");
-export const EQ = ordering("EQ");
-export const GT = ordering("GT");
+export const LT = /*#__PURE__*/ ordering("LT");
+export const EQ = /*#__PURE__*/ ordering("EQ");
+export const GT = /*#__PURE__*/ ordering("GT");
 
 /** `==`: structural equality with SameValueZero on numbers. */
 export const equals = (a: unknown, b: unknown): boolean => Equal.equals(a, b);

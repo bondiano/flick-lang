@@ -11,7 +11,7 @@ import { nodeUtil } from "./host.ts";
 import { constructorName } from "./tags.ts";
 
 // a Proxy is told apart only on Node.js; elsewhere a payload is read by its descriptors anyway
-const types: Pick<typeof NodeTypes, "isProxy" | "isNativeError"> = nodeUtil()?.types ?? {
+const types: Pick<typeof NodeTypes, "isProxy" | "isNativeError"> = /*#__PURE__*/ nodeUtil()?.types ?? {
   isProxy: (_value: unknown): _value is never => false,
   isNativeError: (value: unknown): value is Error => value instanceof Error,
 };
@@ -53,7 +53,7 @@ export const tryWith = <A, E, R, A2, E2, R2>(
     (selected) => ("die" in selected ? Effect.failCause(selected.die) : selected.handled),
   );
 
-const causes = new WeakMap<object, Cause.Cause<unknown>>();
+const causes = /*#__PURE__*/ new WeakMap<object, Cause.Cause<unknown>>();
 
 const causeOf = (value: object): Cause.Cause<unknown> => {
   const cause = causes.get(value);

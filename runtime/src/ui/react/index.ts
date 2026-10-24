@@ -63,7 +63,7 @@ const EventElement = ({ bridge, node }: { readonly bridge: Events; readonly node
   return createElement(node.tag, props);
 };
 
-const LazyView = memo(
+const LazyView = /*#__PURE__*/ memo(
   ({ bridge, node }: { readonly bridge: Events | undefined; readonly node: LazyNode }): ReactNode => toReact(bridge, node.view(node.model)),
   (before, after) =>
     before.bridge === after.bridge &&

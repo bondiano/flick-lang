@@ -75,7 +75,7 @@ const body = (request: HttpServerRequest.HttpServerRequest, encoding: Endpoint["
     }
   });
 
-const HTTP_ERROR = tag("HttpApi.HttpError.HttpError");
+const HTTP_ERROR = /*#__PURE__*/ tag("HttpApi.HttpError.HttpError");
 
 /** `HttpApi.HttpError`, which carries its own status. */
 const isHttpError = (error: unknown): error is { readonly _0: { readonly status: number; readonly message: string } } =>

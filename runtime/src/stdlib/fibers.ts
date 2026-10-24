@@ -5,7 +5,7 @@ import { Effect, type Fiber, Option, type Scope } from "effect";
 
 import { CurrentOwner, FlickFiber, type Owner, within } from "../owner.ts";
 
-const owners = new WeakMap<object, Owner>();
+const owners = /*#__PURE__*/ new WeakMap<object, Owner>();
 
 /** Makes the collection and remembers the owner the call acquires into. */
 export const owned = <T extends object>(make: Effect.Effect<T, never, Scope.Scope>): Effect.Effect<T, never, Scope.Scope> =>

@@ -12,7 +12,7 @@ import { fallible } from "./Schema.ts";
 
 export * from "effect/Graph";
 
-const GRAPH_ERROR = tag("Graph.Types.GraphError.GraphError");
+const GRAPH_ERROR = /*#__PURE__*/ tag("Graph.Types.GraphError.GraphError");
 
 /** `Graph.GraphError`. */
 export type FlickGraphError = Tagged<string, string>;
@@ -126,10 +126,10 @@ const combine =
   <N, E, T extends K, NI, EI>(o: FlickIdentity<N, E, NI, EI>, that: G<N, E, T>, self: G<N, E, T>): G<N, E, T> =>
     f(self, that, identity(o));
 
-export const flickCompose = combine((self, that, o) => Graph.compose(self, that, o));
-export const flickIntersection = combine((self, that, o) => Graph.intersection(self, that, o));
-export const flickDifference = combine((self, that, o) => Graph.difference(self, that, o));
-export const flickSymmetricDifference = combine((self, that, o) => Graph.symmetricDifference(self, that, o));
+export const flickCompose = /*#__PURE__*/ combine((self, that, o) => Graph.compose(self, that, o));
+export const flickIntersection = /*#__PURE__*/ combine((self, that, o) => Graph.intersection(self, that, o));
+export const flickDifference = /*#__PURE__*/ combine((self, that, o) => Graph.difference(self, that, o));
+export const flickSymmetricDifference = /*#__PURE__*/ combine((self, that, o) => Graph.symmetricDifference(self, that, o));
 
 export interface FlickNeighborhood {
   readonly radius: Option.Option<number>;

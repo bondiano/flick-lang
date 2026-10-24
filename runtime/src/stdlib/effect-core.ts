@@ -22,7 +22,7 @@ const concurrency = (c: Data): number | "unbounded" | undefined => {
   }
 };
 
-const VALIDATION = tag("Effect.Collections.ValidationError.ValidationError");
+const VALIDATION = /*#__PURE__*/ tag("Effect.Collections.ValidationError.ValidationError");
 
 export const flickNever = (): Effect.Effect<never> => Effect.never;
 export const flickYieldNow = (): Effect.Effect<void> => Effect.yieldNow;

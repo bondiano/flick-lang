@@ -11,7 +11,7 @@ export * from "effect/RcMap";
 /** `RcMap.ExceededCapacity`. */
 export type ExceededCapacity = Tagged<string, string>;
 
-const EXCEEDED = tag("RcMap.ExceededCapacity.ExceededCapacity");
+const EXCEEDED = /*#__PURE__*/ tag("RcMap.ExceededCapacity.ExceededCapacity");
 
 /** `RcMap.make`: the options record with `Option` fields. */
 export const flickMake = <K, A, E, R>(options: {

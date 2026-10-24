@@ -7,8 +7,8 @@ import { effectFileSystem } from "./FileSystem.ts";
 
 export * from "effect/ConfigProvider";
 
-const VALUE = tag("ConfigProvider.Node.ValueNode");
-const SOURCE_ERROR = tag("ConfigProvider.SourceError.SourceError");
+const VALUE = /*#__PURE__*/ tag("ConfigProvider.Node.ValueNode");
+const SOURCE_ERROR = /*#__PURE__*/ tag("ConfigProvider.SourceError.SourceError");
 
 /** `ConfigProvider.Node` as Flick code sees it. */
 interface FlickNode {

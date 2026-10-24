@@ -130,7 +130,7 @@ export const jsArraySet = <A>(i: number, x: A, array: Array<A>): void => {
   if (index(i, array.length + 1)) array[i] = x;
 };
 
-export const chunkEmpty: Chunk.Chunk<never> = Chunk.empty();
+export const chunkEmpty: Chunk.Chunk<never> = /*#__PURE__*/ Chunk.empty();
 export const chunkFromList = <A>(xs: List<A>): Chunk.Chunk<A> => Chunk.fromIterable(xs);
 export const chunkToList = <A>(c: Chunk.Chunk<A>): Array<A> => Chunk.toArray(c);
 export const chunkAppend = <A>(x: A, c: Chunk.Chunk<A>): Chunk.Chunk<A> => Chunk.append(c, x);
@@ -153,7 +153,7 @@ export const bindEff = <A, B, E, R, E2, R2>(
   f: (a: A) => Effect.Effect<B, E2, R2>,
 ): Effect.Effect<B, E | E2, R | R2> => Effect.flatMap(eff, (x) => f(x));
 
-const CONTINUE = tag("Loop.Step.Continue");
+const CONTINUE = /*#__PURE__*/ tag("Loop.Step.Continue");
 
 /** `Loop.Step s a`: the tags alone tell `Continue` from `Done`. */
 export type Step<S, A> = (Tagged<string, S> & { readonly continue?: true }) | (Tagged<string, A> & { readonly continue?: false });

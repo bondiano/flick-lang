@@ -42,7 +42,7 @@ export const flickModify = (o: FlickOptions, self: Request.HttpClientRequest) =>
 
 export const flickSetMethod = (m: Data, self: Request.HttpClientRequest) => Request.setMethod(self, method.js(m));
 
-const compression = enumeration<Request.CompressionAlgorithm>("Http.ClientRequest.CompressionAlgorithm", [
+const compression = /*#__PURE__*/ enumeration<Request.CompressionAlgorithm>("Http.ClientRequest.CompressionAlgorithm", [
   ["Gzip", "gzip"],
   ["Deflate", "deflate"],
 ]);

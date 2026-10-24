@@ -65,8 +65,8 @@ export const flickServe = (options: ServeOptions, handler: Handler) =>
     return server;
   });
 
-const TCP = tag("Http.Server.Address.TcpAddress");
-const UNIX = tag("Http.Server.Address.UnixAddress");
+const TCP = /*#__PURE__*/ tag("Http.Server.Address.TcpAddress");
+const UNIX = /*#__PURE__*/ tag("Http.Server.Address.UnixAddress");
 
 /** `Http.Server.address server`. */
 export const flickAddress = (server: Server) => {

@@ -7,7 +7,7 @@ import { tag } from "../tags.ts";
 
 export * from "effect/Config";
 
-const CONFIG_ERROR = tag("Config.ConfigError.ConfigError");
+const CONFIG_ERROR = /*#__PURE__*/ tag("Config.ConfigError.ConfigError");
 
 /** The Flick error of a failure: an Effect `ConfigError`, or one a Flick callback raised. */
 const toFlick = (error: unknown): unknown =>

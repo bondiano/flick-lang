@@ -9,7 +9,7 @@ import { method, option } from "./convert.ts";
 
 export * from "effect/http/HttpClientError";
 
-const ERROR = tag("Http.ClientError.HttpClientError.HttpClientError");
+const ERROR = /*#__PURE__*/ tag("Http.ClientError.HttpClientError.HttpClientError");
 const reasonTag = (name: string): string => tag(`Http.ClientError.ClientErrorReason.${name}`);
 
 const describe = (description: string | undefined, cause: unknown) =>

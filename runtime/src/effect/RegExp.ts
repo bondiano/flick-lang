@@ -9,7 +9,7 @@ import { tag } from "../tags.ts";
 
 export * from "effect/RegExp";
 
-const REGEXP_ERROR = tag("RegExp.RegExpError.RegExpError");
+const REGEXP_ERROR = /*#__PURE__*/ tag("RegExp.RegExpError.RegExpError");
 
 /** `RegExp.RegExpError`. */
 export type RegExpError = Tagged<typeof REGEXP_ERROR, string>;

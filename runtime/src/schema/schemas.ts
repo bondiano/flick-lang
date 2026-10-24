@@ -20,7 +20,7 @@ export const annotate = (schema: AnySchema, notes: Notes): AnySchema => schema.a
 
 /** How to build the JSON codec of a schema, by schema. */
 const jsonMakers = new WeakMap<AnySchema, () => AnySchema>();
-const jsonCodecs = new WeakMap<AnySchema, AnySchema>();
+const jsonCodecs = /*#__PURE__*/ new WeakMap<AnySchema, AnySchema>();
 
 export const withJson = <S extends AnySchema>(schema: S, make: () => AnySchema): S => {
   jsonMakers.set(schema, make);
@@ -53,47 +53,47 @@ const mapped =
   (from: Schema.Codec<E, unknown, unknown, unknown>): AnySchema =>
     from.pipe(Schema.decodeTo(to, SchemaTransformation.transform({ decode, encode })));
 
-export const anyOption: Schema.Codec<Option.Option<unknown>> = Schema.declare(Option.isOption, { expected: "an Option" });
-export const anyResult: Schema.Codec<Result.Result<unknown, unknown>> = Schema.declare(Result.isResult, {
+export const anyOption: Schema.Codec<Option.Option<unknown>> = /*#__PURE__*/ Schema.declare(Option.isOption, { expected: "an Option" });
+export const anyResult: Schema.Codec<Result.Result<unknown, unknown>> = /*#__PURE__*/ Schema.declare(Result.isResult, {
   expected: "a Result",
 });
-export const anyRedacted: Schema.Codec<Redacted.Redacted<unknown>> = Schema.declare(Redacted.isRedacted, {
+export const anyRedacted: Schema.Codec<Redacted.Redacted<unknown>> = /*#__PURE__*/ Schema.declare(Redacted.isRedacted, {
   expected: "a Redacted value",
 });
 
-const finite = Schema.makeFilter((n: number) => Number.isFinite(n), {
+const finite = /*#__PURE__*/ Schema.makeFilter((n: number) => Number.isFinite(n), {
   expected: "a finite number",
   "flick/wire": true,
 } satisfies Notes);
 
 /** A JSON number: finite both ways. */
-export const jsonNumber: Schema.Codec<number> = Schema.Number.annotate({ expected: "a finite number" }).check(finite);
+export const jsonNumber: Schema.Codec<number> = /*#__PURE__*/ Schema.Number.annotate({ expected: "a finite number" }).check(finite);
 
-const digits = Schema.makeFilter((s: string) => /^-?\d+$/.test(s), {
+const digits = /*#__PURE__*/ Schema.makeFilter((s: string) => /^-?\d+$/.test(s), {
   message: "expected a string of digits",
   "flick/pattern": "^-?[0-9]+$",
 } satisfies Notes);
 
 /** A BigInt as a string of digits. */
-export const jsonBigint: AnySchema = mapped(
+export const jsonBigint: AnySchema = /*#__PURE__*/ mapped(
   Schema.BigInt,
   (s: string) => BigInt(s),
   (n) => String(n),
 )(Schema.String.annotate({ expected: "a string of digits" }).check(digits));
 
-const jsonUnit = mapped(
+const jsonUnit = /*#__PURE__*/ mapped(
   Schema.Undefined,
   () => undefined,
   () => null,
 )(Schema.Null);
 
-export const schemaNumber: AnySchema = withJson(Schema.Number, () => jsonNumber);
-export const schemaString: AnySchema = withJson(Schema.String, () => Schema.String);
-export const schemaBool: AnySchema = withJson(Schema.Boolean, () => Schema.Boolean);
-export const schemaBigint: AnySchema = withJson(Schema.BigInt, () => jsonBigint);
-export const schemaUnit: AnySchema = withJson(annotate(Schema.Undefined, { expected: "()" }), () => jsonUnit);
-export const schemaNever: AnySchema = withJson(Schema.Never, () => Schema.Never);
-export const schemaUnknown: AnySchema = withJson(Schema.Unknown, () => Schema.Unknown);
+export const schemaNumber: AnySchema = /*#__PURE__*/ withJson(Schema.Number, () => jsonNumber);
+export const schemaString: AnySchema = /*#__PURE__*/ withJson(Schema.String, () => Schema.String);
+export const schemaBool: AnySchema = /*#__PURE__*/ withJson(Schema.Boolean, () => Schema.Boolean);
+export const schemaBigint: AnySchema = /*#__PURE__*/ withJson(Schema.BigInt, () => jsonBigint);
+export const schemaUnit: AnySchema = /*#__PURE__*/ withJson(annotate(Schema.Undefined, { expected: "()" }), () => jsonUnit);
+export const schemaNever: AnySchema = /*#__PURE__*/ withJson(Schema.Never, () => Schema.Never);
+export const schemaUnknown: AnySchema = /*#__PURE__*/ withJson(Schema.Unknown, () => Schema.Unknown);
 
 export const schemaList = (item: AnySchema): AnySchema =>
   withJson(annotate(Schema.Array(item), { expected: "a list" }), () => Schema.Array(jsonOf(item)));

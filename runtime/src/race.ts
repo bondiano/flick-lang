@@ -4,12 +4,12 @@ import { Cause, Duration, Effect, type Option } from "effect";
 import { tag } from "./tags.ts";
 
 /** The `_tag` of the stdlib `TimeoutError`. */
-export const TIMEOUT_ERROR = tag("Prelude.TimeoutError.TimeoutError");
+export const TIMEOUT_ERROR = /*#__PURE__*/ tag("Prelude.TimeoutError.TimeoutError");
 
 /** `Prelude.TimeoutError`. */
 export type TimeoutError = Readonly<{ _tag: typeof TIMEOUT_ERROR }>;
 
-const timeoutError: TimeoutError = Object.freeze({ _tag: TIMEOUT_ERROR });
+const timeoutError: TimeoutError = /*#__PURE__*/ Object.freeze({ _tag: TIMEOUT_ERROR });
 
 /** `race_success`: the first branch to succeed. */
 export const raceSuccess = <A, E, R, A2, E2, R2>(

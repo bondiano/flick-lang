@@ -7,8 +7,8 @@ import { tag } from "../../tags.ts";
 
 export * from "effect/http/Etag";
 
-const WEAK = tag("Http.Etag.Etag.Weak");
-const STRONG = tag("Http.Etag.Etag.Strong");
+const WEAK = /*#__PURE__*/ tag("Http.Etag.Etag.Weak");
+const STRONG = /*#__PURE__*/ tag("Http.Etag.Etag.Strong");
 
 /** The Flick `Http.Etag.Etag` of Effect's. */
 export const toFlick = (etag: Etag.Etag) => ({ _tag: etag._tag === "Weak" ? WEAK : STRONG, _0: etag.value });
@@ -35,7 +35,7 @@ const of =
     Layer.effect(key, Effect.map(Effect.service(Etag.Generator), impl)).pipe(Layer.provide(layer));
 
 /** `Http.Etag.layer`. */
-export const flickLayer = of(Etag.layer);
+export const flickLayer = /*#__PURE__*/ of(Etag.layer);
 
 /** `Http.Etag.layer_weak`. */
-export const flickLayerWeak = of(Etag.layerWeak);
+export const flickLayerWeak = /*#__PURE__*/ of(Etag.layerWeak);

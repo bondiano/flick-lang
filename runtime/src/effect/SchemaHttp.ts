@@ -11,12 +11,12 @@ import { fallible } from "./Schema.ts";
 
 const json = (schema: AnySchema): AnySchema => fallible(Schema.toCodecJson(schema));
 
-const pairs = Schema.Array(Schema.Tuple([Schema.String, Schema.String]));
+const pairs = /*#__PURE__*/ Schema.Array(Schema.Tuple([Schema.String, Schema.String]));
 
-export const flickHeaders = json(Schema.Headers);
-export const flickUrlParams = json(Schema.UrlParams);
+export const flickHeaders = /*#__PURE__*/ json(Schema.Headers);
+export const flickUrlParams = /*#__PURE__*/ json(Schema.UrlParams);
 /** Effect gives a cookie no JSON form: here it is its `Set-Cookie` header text. */
-export const flickCookie = fallible(
+export const flickCookie = /*#__PURE__*/ fallible(
   Schema.String.pipe(
     Schema.decodeTo(
       Schema.Cookie,
@@ -32,8 +32,8 @@ export const flickCookie = fallible(
     ),
   ),
 );
-export const flickCookies = json(Schema.Cookies);
-export const flickUrl = json(Schema.URLFromString);
+export const flickCookies = /*#__PURE__*/ json(Schema.Cookies);
+export const flickUrl = /*#__PURE__*/ json(Schema.URLFromString);
 
 /** The parameters as Effect's record of a value or values per key, decoded by `codec`. */
 export const flickFromUrlParams = (codec: AnySchema): AnySchema =>

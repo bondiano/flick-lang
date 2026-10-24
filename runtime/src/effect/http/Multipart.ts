@@ -15,7 +15,7 @@ import { flickSchemaBodyUrlParams } from "./HttpServerRequest.ts";
 
 export * from "effect/http/Multipart";
 
-const reason = enumeration<Multipart.MultipartErrorReason["_tag"]>("Http.Multipart.MultipartErrorReason", [
+const reason = /*#__PURE__*/ enumeration<Multipart.MultipartErrorReason["_tag"]>("Http.Multipart.MultipartErrorReason", [
   ["FileTooLarge", "FileTooLarge"],
   ["FieldTooLarge", "FieldTooLarge"],
   ["BodyTooLarge", "BodyTooLarge"],
@@ -24,8 +24,8 @@ const reason = enumeration<Multipart.MultipartErrorReason["_tag"]>("Http.Multipa
   ["Parse", "Parse"],
 ]);
 
-const ERROR = tag("Http.Multipart.MultipartError.MultipartError");
-const STATUS = new Map<string, number>([
+const ERROR = /*#__PURE__*/ tag("Http.Multipart.MultipartError.MultipartError");
+const STATUS = /*#__PURE__*/ new Map<string, number>([
   [tag("Http.Multipart.MultipartErrorReason.FileTooLarge"), 413],
   [tag("Http.Multipart.MultipartErrorReason.FieldTooLarge"), 413],
   [tag("Http.Multipart.MultipartErrorReason.BodyTooLarge"), 413],
@@ -146,8 +146,8 @@ export const flickDefaultIsFile = (info: PartInfo): boolean => MultipartParser.d
 export const flickDecodeField = (info: PartInfo, bytes: ReadonlyArray<number>): string =>
   MultipartParser.decodeField(partInfo(info), toBytes(bytes));
 
-const FIELD = tag("Http.Multipart.Part.Field");
-const FILE = tag("Http.Multipart.Part.File");
+const FIELD = /*#__PURE__*/ tag("Http.Multipart.Part.Field");
+const FILE = /*#__PURE__*/ tag("Http.Multipart.Part.File");
 
 /** Effect's failures of a form as the Flick error, and back. */
 const flickError = (e: unknown) => (Multipart.isMultipartError(e) ? toFlick(e) : e);

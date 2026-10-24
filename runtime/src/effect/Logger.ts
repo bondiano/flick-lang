@@ -34,7 +34,7 @@ export const flickMake = <O>(
   );
 
 /** `Logger.format_structured`: `Logger.Structured`. */
-export const flickFormatStructured = Logger.map(Logger.formatStructured, (s) => ({
+export const flickFormatStructured = /*#__PURE__*/ Logger.map(Logger.formatStructured, (s) => ({
   level: s.level,
   fiberId: s.fiberId,
   timestamp: s.timestamp,
@@ -47,7 +47,7 @@ export const flickFormatStructured = Logger.map(Logger.formatStructured, (s) => 
 const formatDate = (f: Option.Option<(millis: number) => string>) =>
   Option.getOrUndefined(Option.map(f, (format) => (date: Date) => format(date.getTime())));
 
-const MODES = new Map([
+const MODES = /*#__PURE__*/ new Map([
   [tag("Logger.PrettyMode.Auto"), "auto"],
   [tag("Logger.PrettyMode.Browser"), "browser"],
   [tag("Logger.PrettyMode.Tty"), "tty"],

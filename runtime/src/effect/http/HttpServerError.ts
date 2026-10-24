@@ -9,11 +9,11 @@ import { method, option } from "./convert.ts";
 
 export * from "effect/http/HttpServerError";
 
-const ERROR = tag("Http.ServerError.HttpServerError.HttpServerError");
-const SERVE_ERROR = tag("Http.ServerError.ServeError.ServeError");
+const ERROR = /*#__PURE__*/ tag("Http.ServerError.HttpServerError.HttpServerError");
+const SERVE_ERROR = /*#__PURE__*/ tag("Http.ServerError.ServeError.ServeError");
 const reasonTag = (name: string): string => tag(`Http.ServerError.ServerErrorReason.${name}`);
 
-const STATUS = new Map([
+const STATUS = /*#__PURE__*/ new Map([
   [reasonTag("RequestParseError"), 400],
   [reasonTag("RouteNotFound"), 404],
   [reasonTag("InternalError"), 500],

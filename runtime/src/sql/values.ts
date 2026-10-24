@@ -10,9 +10,9 @@ import type { SchemaError } from "../schema/issues.ts";
 import type { AnySchema } from "../schema/schemas.ts";
 import { tag } from "../tags.ts";
 
-export const ENCODE_ERROR = tag("Sql.EncodeError.EncodeError");
-export const DECODE_ERROR = tag("Sql.DecodeError.DecodeError");
-export const DB_ERROR = tag("Sql.DbError.DbError");
+export const ENCODE_ERROR = /*#__PURE__*/ tag("Sql.EncodeError.EncodeError");
+export const DECODE_ERROR = /*#__PURE__*/ tag("Sql.DecodeError.DecodeError");
+export const DB_ERROR = /*#__PURE__*/ tag("Sql.DbError.DbError");
 
 /** `Sql.EncodeError`. */
 export type EncodeError = Tagged<typeof ENCODE_ERROR, { readonly parameter: string; readonly message: string }>;

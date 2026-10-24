@@ -86,7 +86,7 @@ export interface Command extends Spec {
   readonly handler: ((options: Readonly<Record<string, unknown>>) => Effect.Effect<unknown, unknown, unknown>) | null;
 }
 
-const NO_MODS: Mods = Object.freeze({
+const NO_MODS: Mods = /*#__PURE__*/ Object.freeze({
   hidden: false,
   metavar: undefined,
   optionalValue: undefined,
@@ -95,11 +95,11 @@ const NO_MODS: Mods = Object.freeze({
 
 const make = (m: MultiKind): Multi => Object.freeze({ ...m, mods: NO_MODS });
 
-export const multiSwitch: Multi = make({ kind: "switch" });
-export const multiRequired: Multi = make({ kind: "required" });
-export const multiOptional: Multi = make({ kind: "optional" });
-export const multiMany: Multi = make({ kind: "variadic", min: 0, max: undefined });
-export const multiSome: Multi = make({ kind: "some" });
+export const multiSwitch: Multi = /*#__PURE__*/ make({ kind: "switch" });
+export const multiRequired: Multi = /*#__PURE__*/ make({ kind: "required" });
+export const multiOptional: Multi = /*#__PURE__*/ make({ kind: "optional" });
+export const multiMany: Multi = /*#__PURE__*/ make({ kind: "variadic", min: 0, max: undefined });
+export const multiSome: Multi = /*#__PURE__*/ make({ kind: "some" });
 export const multiDefault = (value: unknown): Multi => make({ kind: "default", value });
 export const multiAtLeast = (min: number): Multi => make({ kind: "variadic", min, max: undefined });
 export const multiAtMost = (max: number): Multi => make({ kind: "variadic", min: undefined, max });

@@ -33,11 +33,11 @@ const finite =
   (d: Duration.Duration): Option.Option<number> =>
     Duration.isFinite(d) ? some(to(d)) : none;
 
-export const flickToSeconds = finite(Duration.toSeconds);
-export const flickToMinutes = finite(Duration.toMinutes);
-export const flickToHours = finite(Duration.toHours);
-export const flickToDays = finite(Duration.toDays);
-export const flickToWeeks = finite(Duration.toWeeks);
+export const flickToSeconds = /*#__PURE__*/ finite(Duration.toSeconds);
+export const flickToMinutes = /*#__PURE__*/ finite(Duration.toMinutes);
+export const flickToHours = /*#__PURE__*/ finite(Duration.toHours);
+export const flickToDays = /*#__PURE__*/ finite(Duration.toDays);
+export const flickToWeeks = /*#__PURE__*/ finite(Duration.toWeeks);
 
 export const flickToHrTime = (d: Duration.Duration): Option.Option<readonly [number, number]> =>
   Duration.isFinite(d) ? some(Duration.toHrTime(d)) : none;

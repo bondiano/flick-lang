@@ -6,4 +6,4 @@ import { serviceOf } from "./HttpClient.ts";
 export * from "effect/http/FetchHttpClient";
 
 /** `Http.FetchClient.layer`. */
-export const flickLayer = serviceOf(FetchHttpClient.layer);
+export const flickLayer = /*#__PURE__*/ serviceOf(FetchHttpClient.layer);

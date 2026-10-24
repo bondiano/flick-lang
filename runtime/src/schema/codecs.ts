@@ -17,7 +17,7 @@ export const codecJson = (schema: AnySchema): AnySchema => jsonOf(schema);
 const LOSSLESS = ["NaN", "Infinity", "-Infinity", "-0"] as const;
 
 /** `NaN`, the infinities and `-0` as strings, every other number as itself. */
-export const codecNumberLossless: AnySchema = Schema.Union([Schema.Number, Schema.Literals(LOSSLESS)])
+export const codecNumberLossless: AnySchema = /*#__PURE__*/ Schema.Union([Schema.Number, Schema.Literals(LOSSLESS)])
   .annotate({ expected: "a number" })
   .pipe(
     Schema.decodeTo(
@@ -139,7 +139,7 @@ export const codecRedactedReveal = (item: AnySchema): AnySchema =>
   );
 
 /** A Redacted value written as `"<redacted>"`; it cannot be decoded. */
-export const codecRedactedMasked: AnySchema = Schema.Literal("<redacted>").pipe(
+export const codecRedactedMasked: AnySchema = /*#__PURE__*/ Schema.Literal("<redacted>").pipe(
   Schema.decodeTo(anyRedacted, {
     decode: SchemaGetter.forbidden(() => "a masked Redacted value cannot be decoded"),
     encode: SchemaGetter.transform((): "<redacted>" => "<redacted>"),
@@ -179,7 +179,7 @@ const fieldCodec = (f: Field): AnySchema => {
 };
 
 /** What a block was made of, for `ignore_extra_fields`. */
-const blocks = new WeakMap<AnySchema, { readonly name: string; readonly fields: ReadonlyArray<Field> }>();
+const blocks = /*#__PURE__*/ new WeakMap<AnySchema, { readonly name: string; readonly fields: ReadonlyArray<Field> }>();
 
 /** A record codec of the `codec` DSL. */
 export const codecFields = (name: string, fields: ReadonlyArray<Field>, ignoreExtra: boolean): AnySchema => {

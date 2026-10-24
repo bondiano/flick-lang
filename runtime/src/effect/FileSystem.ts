@@ -31,7 +31,7 @@ const enumeration = <T extends string>(type: string, names: ReadonlyArray<readon
   };
 };
 
-export const openFlag = enumeration<FileSystem.OpenFlag>("OpenFlag", [
+export const openFlag = /*#__PURE__*/ enumeration<FileSystem.OpenFlag>("OpenFlag", [
   ["Read", "r"],
   ["ReadWrite", "r+"],
   ["Write", "w"],
@@ -44,12 +44,12 @@ export const openFlag = enumeration<FileSystem.OpenFlag>("OpenFlag", [
   ["AppendReadExclusive", "ax+"],
 ]);
 
-const seekMode = enumeration<FileSystem.SeekMode>("SeekMode", [
+const seekMode = /*#__PURE__*/ enumeration<FileSystem.SeekMode>("SeekMode", [
   ["Start", "start"],
   ["Current", "current"],
 ]);
 
-const fileType = enumeration<FileSystem.File.Type>("FileType", [
+const fileType = /*#__PURE__*/ enumeration<FileSystem.File.Type>("FileType", [
   ["RegularFile", "File"],
   ["Directory", "Directory"],
   ["SymbolicLink", "SymbolicLink"],
@@ -169,7 +169,7 @@ const impl = (fs: FileSystem.FileSystem) => ({
 type Impl = ReturnType<typeof impl>;
 
 /** The Effect file system behind each Flick one `node` built, for its streams (`Stream.watch`). */
-const natives = new WeakMap<object, FileSystem.FileSystem>();
+const natives = /*#__PURE__*/ new WeakMap<object, FileSystem.FileSystem>();
 
 /** The Effect file system behind a Flick one, if `node` built it. */
 export const nativeFileSystem = (flick: object): FileSystem.FileSystem | undefined => natives.get(flick);
@@ -207,7 +207,7 @@ export const flickWrite = (data: Bytes, file: FileSystem.File) => mapError(file.
 export const flickWriteAll = (data: Bytes, file: FileSystem.File) => mapError(file.writeAll(Uint8Array.from(data)));
 
 /** The service key of `FileSystem.FileSystem`. */
-const FlickFileSystem = service("FileSystem.FileSystem");
+const FlickFileSystem = /*#__PURE__*/ service("FileSystem.FileSystem");
 
 const call = <A>(f: unknown, args: ReadonlyArray<unknown>) =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the checker typed the operation; it fails with the Flick form of `PlatformError`, which Effect passes on without inspecting it
@@ -218,7 +218,7 @@ const call = <A>(f: unknown, args: ReadonlyArray<unknown>) =>
  * Effect code that reads directories and files and opens files; its
  * failures are the Flick errors the service fails with.
  */
-export const effectFileSystem: Effect.Effect<FileSystem.FileSystem, never, ServiceImpl> = Effect.map(
+export const effectFileSystem: Effect.Effect<FileSystem.FileSystem, never, ServiceImpl> = /*#__PURE__*/ Effect.map(
   Effect.service(FlickFileSystem),
   (flick) =>
     FileSystem.makeNoop({

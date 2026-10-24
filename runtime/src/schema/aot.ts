@@ -16,7 +16,7 @@ import { nodeFs, nodeUrl, writeStderr } from "../host.ts";
  * What the generated module imports in place of Effect's compiler runtime,
  * which apps cannot import themselves. Effect declares no type for it.
  */
-export const schemaCompilerRuntime: unknown = Reflect.get(compilerRuntime, "runtime");
+export const schemaCompilerRuntime: unknown = /*#__PURE__*/ Reflect.get(compilerRuntime, "runtime");
 
 /** The generated module of compiled decoders. */
 export interface CompiledSchemas {

@@ -9,7 +9,7 @@ export const stdoutLine = (text: string): void => writeStdout(`${text}\n`);
 
 export const stderrLine = (text: string): void => writeStderr(`${text}\n`);
 
-export const APP_ERROR = tag("Prelude.AppError.AppError");
+export const APP_ERROR = /*#__PURE__*/ tag("Prelude.AppError.AppError");
 
 /** `Prelude.AppError`: what the entry runner reports when `main` fails. */
 export type AppError = Tagged<typeof APP_ERROR, { readonly message: string; readonly details: Option.Option<string> }>;

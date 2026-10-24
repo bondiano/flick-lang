@@ -8,7 +8,7 @@ import { tag } from "../tags.ts";
 
 export * from "effect/Cron";
 
-const ERROR = tag("Cron.CronParseError.CronParseError");
+const ERROR = /*#__PURE__*/ tag("Cron.CronParseError.CronParseError");
 
 /** `Cron.CronParseError`. */
 export type CronParseError = Tagged<typeof ERROR, string>;

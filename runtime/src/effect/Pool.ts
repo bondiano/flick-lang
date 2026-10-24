@@ -7,7 +7,7 @@ import { tag } from "../tags.ts";
 
 export * from "effect/Pool";
 
-const CREATION = tag("Pool.TimeToLiveStrategy.Creation");
+const CREATION = /*#__PURE__*/ tag("Pool.TimeToLiveStrategy.Creation");
 
 /** `Pool.make`: the options record with `Option` fields. */
 export const flickMake = <A, E, R>(options: {

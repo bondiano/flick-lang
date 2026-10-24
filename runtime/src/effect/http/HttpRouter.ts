@@ -24,7 +24,7 @@ interface RouteContextImpl {
 }
 
 /** The service key of `Http.Router.RouteContext`. */
-const FlickRouteContext = service<RouteContextImpl>("Http.Router.RouteContext");
+const FlickRouteContext = /*#__PURE__*/ service<RouteContextImpl>("Http.Router.RouteContext");
 
 const pairs = (params: Readonly<Record<string, string | undefined>>): Pairs =>
   Object.entries(params).flatMap(([k, v]) => (v === undefined ? [] : [[k, v] as const]));
@@ -68,7 +68,7 @@ export const flickRouter = (config: RouterConfig, routes: ReadonlyArray<Router.R
 
 export const flickParamsUnknown = (params: Pairs): unknown => Object.freeze(Object.fromEntries(params));
 
-const routeParams = Effect.flatMap(Effect.service(FlickRouteContext), (context) => context.params(undefined));
+const routeParams = /*#__PURE__*/ Effect.flatMap(Effect.service(FlickRouteContext), (context) => context.params(undefined));
 
 export const flickSchemaParams = (codec: AnySchema, request: HttpServerRequest) =>
   Effect.flatMap(routeParams, (params) =>

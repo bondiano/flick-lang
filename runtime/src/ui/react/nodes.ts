@@ -192,7 +192,7 @@ export const uiTabs = (props: { readonly selected: number }, tabs: ReadonlyArray
   ]);
 };
 
-const SAFE_SCHEMES = new Set(["http", "https", "mailto"]);
+const SAFE_SCHEMES = /*#__PURE__*/ new Set(["http", "https", "mailto"]);
 
 /** `Ui.safe_url`: a relative URL, or one with a safe scheme. */
 export const uiSafeUrl = (url: string): Option.Option<string> => {

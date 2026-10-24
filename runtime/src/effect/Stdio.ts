@@ -20,7 +20,7 @@ const impl = (stdio: Stdio.Stdio) => ({
 type Impl = ReturnType<typeof impl>;
 
 /** The Effect `Stdio` behind each Flick one `node` built, for its stdin (`Stream.stdin`). */
-const natives = new WeakMap<object, Stdio.Stdio>();
+const natives = /*#__PURE__*/ new WeakMap<object, Stdio.Stdio>();
 
 /** The Effect `Stdio` behind a Flick one, if `node` built it. */
 export const nativeStdio = (flick: object): Stdio.Stdio | undefined => natives.get(flick);

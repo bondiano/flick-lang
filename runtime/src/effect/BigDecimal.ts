@@ -11,7 +11,7 @@ export * from "effect/BigDecimal";
 
 type Decimal = BigDecimal.BigDecimal;
 
-const DECIMAL = tag("BigDecimal.DecimalError.DecimalError");
+const DECIMAL = /*#__PURE__*/ tag("BigDecimal.DecimalError.DecimalError");
 
 type DecimalError = Tagged<typeof DECIMAL, string>;
 

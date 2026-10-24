@@ -47,7 +47,7 @@ export const stringToNumber = (s: string): Option.Option<number> => {
   return Number.isNaN(n) && text !== "NaN" ? none : some(n);
 };
 
-const ARITHMETIC = tag("Number.ArithmeticError.ArithmeticError");
+const ARITHMETIC = /*#__PURE__*/ tag("Number.ArithmeticError.ArithmeticError");
 
 /** `Number.ArithmeticError`. */
 export type ArithmeticError = Tagged<typeof ARITHMETIC, string>;
@@ -72,11 +72,11 @@ const checked =
     return Number.isSafeInteger(r) ? ok(r + 0) : arithmetic(`${name}: ${r} is not a safe integer`);
   };
 
-export const intAdd = checked("add_int", (a, b) => a + b);
-export const intSub = checked("sub_int", (a, b) => a - b);
-export const intMul = checked("mul_int", (a, b) => a * b);
-export const intDiv = checked("div_int", (a, b) => Math.trunc(a / b));
-export const intRem = checked("rem_int", (a, b) => a % b);
+export const intAdd = /*#__PURE__*/ checked("add_int", (a, b) => a + b);
+export const intSub = /*#__PURE__*/ checked("sub_int", (a, b) => a - b);
+export const intMul = /*#__PURE__*/ checked("mul_int", (a, b) => a * b);
+export const intDiv = /*#__PURE__*/ checked("div_int", (a, b) => Math.trunc(a / b));
+export const intRem = /*#__PURE__*/ checked("rem_int", (a, b) => a % b);
 
 export const bitAnd = (a: number, b: number): number => a & b;
 export const bitOr = (a: number, b: number): number => a | b;

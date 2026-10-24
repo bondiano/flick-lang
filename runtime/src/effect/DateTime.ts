@@ -12,7 +12,7 @@ import { fallible } from "./Schema.ts";
 
 export * from "effect/DateTime";
 
-const ERROR = tag("DateTime.DateTimeError.DateTimeError");
+const ERROR = /*#__PURE__*/ tag("DateTime.DateTimeError.DateTimeError");
 
 /** `DateTime.DateTimeError`. */
 export type DateTimeError = Tagged<typeof ERROR, string>;
@@ -177,21 +177,21 @@ export const flickFormatIntl = (o: FormatOptions, self: DateTime.DateTime): Chec
   });
 
 /** `DateTime.json_utc`: ISO 8601 text, decoded to UTC. */
-export const flickJsonUtc: AnySchema = fallible(Schema.DateTimeUtcFromString);
+export const flickJsonUtc: AnySchema = /*#__PURE__*/ fallible(Schema.DateTimeUtcFromString);
 
 /** `DateTime.json_utc_millis`: milliseconds since the epoch, a whole JSON number. */
-export const flickJsonUtcMillis: AnySchema = fallible(Schema.DateTimeUtcFromMillis);
+export const flickJsonUtcMillis: AnySchema = /*#__PURE__*/ fallible(Schema.DateTimeUtcFromMillis);
 
 /** `DateTime.json_zoned`: ISO 8601 text with the zone, `…+01:00[Europe/Paris]`. */
-export const flickJsonZoned: AnySchema = fallible(Schema.DateTimeZonedFromString);
+export const flickJsonZoned: AnySchema = /*#__PURE__*/ fallible(Schema.DateTimeZonedFromString);
 
 /** `DateTime.json_zone`: an IANA name or an offset `+02:00`. */
-export const flickJsonZone: AnySchema = fallible(Schema.TimeZoneFromString);
+export const flickJsonZone: AnySchema = /*#__PURE__*/ fallible(Schema.TimeZoneFromString);
 
 /** `DateTime.json_zone_named`: an IANA name only. */
-export const flickJsonZoneNamed: AnySchema = fallible(Schema.TimeZoneNamedFromString);
+export const flickJsonZoneNamed: AnySchema = /*#__PURE__*/ fallible(Schema.TimeZoneNamedFromString);
 
 /** `DateTime.json_zone_offset`: a fixed offset as a JSON number of milliseconds. */
-export const flickJsonZoneOffset: AnySchema = jsonNumber.pipe(
+export const flickJsonZoneOffset: AnySchema = /*#__PURE__*/ jsonNumber.pipe(
   Schema.decodeTo(Schema.TimeZoneOffset, SchemaTransformation.timeZoneOffsetFromNumber),
 );

@@ -24,25 +24,25 @@ const checked =
     }
   };
 
-export const flickBytes = checked(ByteSize.bytes);
-export const flickKilobytes = checked(ByteSize.kilobytes);
-export const flickMegabytes = checked(ByteSize.megabytes);
-export const flickGigabytes = checked(ByteSize.gigabytes);
-export const flickTerabytes = checked(ByteSize.terabytes);
-export const flickPetabytes = checked(ByteSize.petabytes);
-export const flickExabytes = checked(ByteSize.exabytes);
-export const flickZettabytes = checked(ByteSize.zettabytes);
-export const flickYottabytes = checked(ByteSize.yottabytes);
-export const flickRonnabytes = checked(ByteSize.ronnabytes);
-export const flickQuettabytes = checked(ByteSize.quettabytes);
-export const flickKibibytes = checked(ByteSize.kibibytes);
-export const flickMebibytes = checked(ByteSize.mebibytes);
-export const flickGibibytes = checked(ByteSize.gibibytes);
-export const flickTebibytes = checked(ByteSize.tebibytes);
-export const flickPebibytes = checked(ByteSize.pebibytes);
-export const flickExbibytes = checked(ByteSize.exbibytes);
-export const flickZebibytes = checked(ByteSize.zebibytes);
-export const flickYobibytes = checked(ByteSize.yobibytes);
+export const flickBytes = /*#__PURE__*/ checked(ByteSize.bytes);
+export const flickKilobytes = /*#__PURE__*/ checked(ByteSize.kilobytes);
+export const flickMegabytes = /*#__PURE__*/ checked(ByteSize.megabytes);
+export const flickGigabytes = /*#__PURE__*/ checked(ByteSize.gigabytes);
+export const flickTerabytes = /*#__PURE__*/ checked(ByteSize.terabytes);
+export const flickPetabytes = /*#__PURE__*/ checked(ByteSize.petabytes);
+export const flickExabytes = /*#__PURE__*/ checked(ByteSize.exabytes);
+export const flickZettabytes = /*#__PURE__*/ checked(ByteSize.zettabytes);
+export const flickYottabytes = /*#__PURE__*/ checked(ByteSize.yottabytes);
+export const flickRonnabytes = /*#__PURE__*/ checked(ByteSize.ronnabytes);
+export const flickQuettabytes = /*#__PURE__*/ checked(ByteSize.quettabytes);
+export const flickKibibytes = /*#__PURE__*/ checked(ByteSize.kibibytes);
+export const flickMebibytes = /*#__PURE__*/ checked(ByteSize.mebibytes);
+export const flickGibibytes = /*#__PURE__*/ checked(ByteSize.gibibytes);
+export const flickTebibytes = /*#__PURE__*/ checked(ByteSize.tebibytes);
+export const flickPebibytes = /*#__PURE__*/ checked(ByteSize.pebibytes);
+export const flickExbibytes = /*#__PURE__*/ checked(ByteSize.exbibytes);
+export const flickZebibytes = /*#__PURE__*/ checked(ByteSize.zebibytes);
+export const flickYobibytes = /*#__PURE__*/ checked(ByteSize.yobibytes);
 
 const DECIMAL: ReadonlyArray<ByteSize.DecimalUnit> = ["B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB", "RB", "QB"];
 const BINARY: ReadonlyArray<ByteSize.BinaryUnit> = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"];
@@ -82,15 +82,15 @@ export const flickFormat = (options: FormatOptions, self: Size): string => {
 };
 
 /** `ByteSize.json`: a size as its text, `"1.5 KiB"`; encodes as `"1536 bytes"`. */
-export const flickJson: AnySchema = fallible(Schema.ByteSizeFromString);
+export const flickJson: AnySchema = /*#__PURE__*/ fallible(Schema.ByteSizeFromString);
 
 /** `ByteSize.json_number`: a whole, non-negative JSON number of bytes. */
-export const flickJsonNumber: AnySchema = fallible(
+export const flickJsonNumber: AnySchema = /*#__PURE__*/ fallible(
   jsonNumber.pipe(Schema.decodeTo(Schema.ByteSize, SchemaTransformation.byteSizeFromNumber)),
 );
 
 /** `ByteSize.json_bigint`: a number of bytes as a JSON string of digits. */
-export const flickJsonBigint: AnySchema = fallible(
+export const flickJsonBigint: AnySchema = /*#__PURE__*/ fallible(
   Schema.String.check(Schema.isPattern(/^[0-9]+$/)).pipe(
     Schema.decodeTo(Schema.BigInt, SchemaTransformation.bigintFromString),
     Schema.decodeTo(Schema.ByteSize, SchemaTransformation.byteSizeFromBigInt),

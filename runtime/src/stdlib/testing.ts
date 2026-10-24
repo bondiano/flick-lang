@@ -9,8 +9,8 @@ import { item } from "../internal.ts";
 import { ownedExits } from "../owner.ts";
 import { tag } from "../tags.ts";
 
-const ASSERTION = tag("Test.AssertionFailed.AssertionFailed");
-const PASS = tag("Test.Assertion.Pass");
+const ASSERTION = /*#__PURE__*/ tag("Test.AssertionFailed.AssertionFailed");
+const PASS = /*#__PURE__*/ tag("Test.Assertion.Pass");
 
 /** `Test.Assertion`: a pass, or a failure with its message. */
 export type Assertion = Readonly<{ _tag: string; _0?: string }>;

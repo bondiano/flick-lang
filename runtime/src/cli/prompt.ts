@@ -20,7 +20,7 @@ import { Prompt } from "effect/cli";
 
 import { constructorName, tag } from "../tags.ts";
 
-const QUIT = Object.freeze({ _tag: tag("Terminal.QuitError.QuitError") });
+const QUIT = /*#__PURE__*/ Object.freeze({ _tag: tag("Terminal.QuitError.QuitError") });
 
 /** The operations of `Cli.Prompt.Tty`, as Flick calls them. */
 export interface TtyImpl {
@@ -383,9 +383,9 @@ export const promptMultiSelect = (
   });
 
 /** A Flick `Cli.Prompt.Action` as Effect's, and back. */
-const BEEP = tag("Cli.Prompt.Action.Beep");
-const NEXT_FRAME = tag("Cli.Prompt.Action.NextFrame");
-const SUBMIT = tag("Cli.Prompt.Action.Submit");
+const BEEP = /*#__PURE__*/ tag("Cli.Prompt.Action.Beep");
+const NEXT_FRAME = /*#__PURE__*/ tag("Cli.Prompt.Action.NextFrame");
+const SUBMIT = /*#__PURE__*/ tag("Cli.Prompt.Action.Submit");
 interface FlickAction {
   readonly _tag: string;
   readonly _0?: unknown;
@@ -425,8 +425,8 @@ export const promptCustom = (state: unknown, h: FlickHandlers<Terminal.UserInput
     handlers(h, (i: Terminal.UserInput) => i),
   );
 
-const INPUT = tag("Cli.Prompt.ProcessInput.Input");
-const EVENT = tag("Cli.Prompt.ProcessInput.Event");
+const INPUT = /*#__PURE__*/ tag("Cli.Prompt.ProcessInput.Input");
+const EVENT = /*#__PURE__*/ tag("Cli.Prompt.ProcessInput.Event");
 
 export const promptCustomEvents = (state: unknown, events: Queue.Dequeue<unknown>, h: FlickHandlers<FlickAction>) =>
   Prompt.Custom(

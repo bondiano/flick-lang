@@ -6,7 +6,7 @@ import { BigDecimal, Duration, Option, type Result } from "effect";
 import { EQ, GT, LT, type Ordering, type Tagged, err, none, ok, some } from "../data.ts";
 import { tag } from "../tags.ts";
 
-const DECIMAL = tag("BigDecimal.DecimalError.DecimalError");
+const DECIMAL = /*#__PURE__*/ tag("BigDecimal.DecimalError.DecimalError");
 
 /** `BigDecimal.DecimalError`. */
 export type DecimalError = Tagged<typeof DECIMAL, string>;
@@ -53,7 +53,7 @@ export const decimalCompare = (a: Decimal, b: Decimal): Ordering => ordering(Big
 /** `BigDecimal.RoundingMode`. */
 export type RoundingMode = Readonly<{ _tag: string }>;
 
-const MODES = new Map(
+const MODES = /*#__PURE__*/ new Map(
   [
     "TowardZero",
     "AwayFromZero",
@@ -131,7 +131,7 @@ export const decimalDivideToScale = (
     : ok(BigDecimal.make(q, scale));
 };
 
-const DURATION = tag("Duration.DurationError.DurationError");
+const DURATION = /*#__PURE__*/ tag("Duration.DurationError.DurationError");
 
 /** `Duration.DurationError`. */
 export type DurationError = Tagged<typeof DURATION, string>;

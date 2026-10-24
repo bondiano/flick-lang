@@ -8,7 +8,7 @@ import { mapError } from "./PlatformError.ts";
 
 export * from "effect/Terminal";
 
-const QUIT = Object.freeze({ _tag: tag("Terminal.QuitError.QuitError") });
+const QUIT = /*#__PURE__*/ Object.freeze({ _tag: tag("Terminal.QuitError.QuitError") });
 
 /** The operations of `Terminal.Terminal`, curried as Flick calls them. */
 const impl = (terminal: Terminal.Terminal) => ({

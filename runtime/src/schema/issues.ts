@@ -8,7 +8,7 @@ import type { Schema, SchemaAST, SchemaIssue } from "effect";
 import { notesOf } from "./notes.ts";
 import { tag } from "../tags.ts";
 
-const SCHEMA_ERROR = tag("Prelude.SchemaError.SchemaError");
+const SCHEMA_ERROR = /*#__PURE__*/ tag("Prelude.SchemaError.SchemaError");
 
 /** `Prelude.SchemaIssue`. */
 export interface Issue {

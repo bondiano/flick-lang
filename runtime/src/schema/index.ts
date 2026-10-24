@@ -69,7 +69,7 @@ const OPTIONS: SchemaAST.ParseOptions = { onExcessProperty: "error", reportInput
 /** For inputs that carry more than any codec declares, such as HTTP headers. */
 const LOOSE: SchemaAST.ParseOptions = { onExcessProperty: "ignore", reportInput: true };
 
-const runtimeAsts = new WeakMap<SchemaAST.AST, boolean>();
+const runtimeAsts = /*#__PURE__*/ new WeakMap<SchemaAST.AST, boolean>();
 
 const childrenOf = (ast: SchemaAST.AST): ReadonlyArray<SchemaAST.AST> => {
   const links = (ast.encoding ?? []).map((link) => link.to);

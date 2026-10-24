@@ -6,6 +6,9 @@
   "private": true,
   "type": "module",
   "exports": "./index.mjs",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
   "dependencies": {
     "@flick-lang/runtime": "workspace:*",
     "react": "19.3.1",

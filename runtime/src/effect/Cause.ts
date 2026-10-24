@@ -19,13 +19,13 @@ export const causeOf = <E>(failure: Failure): Cause.Cause<E> => failureCause<E>(
 /** `Cause.NoSuchElementError`. */
 export type NoSuchElement = Tagged<string, string>;
 
-const NO_SUCH_ELEMENT = tag("Cause.NoSuchElementError.NoSuchElementError");
+const NO_SUCH_ELEMENT = /*#__PURE__*/ tag("Cause.NoSuchElementError.NoSuchElementError");
 
 /** Effect's `NoSuchElementError` as the Flick error of the same name; other errors as they are. */
 export const noSuchElement = <E>(error: E | Cause.NoSuchElementError): E | NoSuchElement =>
   Cause.isNoSuchElementError(error) ? { _tag: NO_SUCH_ELEMENT, _0: error.message } : error;
 
-export const flickEmpty: Failure = toFailure(Cause.empty);
+export const flickEmpty: Failure = /*#__PURE__*/ toFailure(Cause.empty);
 export const flickFail = (error: unknown): Failure => toFailure(Cause.fail(error));
 export const flickDie = (defect: string): Failure => toFailure(Cause.die(defect));
 export const flickInterrupt = (fiberId: Option.Option<number>): Failure =>

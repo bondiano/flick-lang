@@ -6,7 +6,7 @@ import { Effect } from "effect";
 import type { Tagged } from "../data.ts";
 import { tag } from "../tags.ts";
 
-const SNAPSHOT = tag("Js.SnapshotError.SnapshotError");
+const SNAPSHOT = /*#__PURE__*/ tag("Js.SnapshotError.SnapshotError");
 
 /** `Js.SnapshotError`. */
 export type SnapshotError = Tagged<typeof SNAPSHOT, string>;

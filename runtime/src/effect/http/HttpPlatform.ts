@@ -12,7 +12,7 @@ import { mapError } from "../PlatformError.ts";
 export * from "effect/http/HttpPlatform";
 
 /** `Http.Platform.CompressionAlgorithm`. */
-export const compression = enumeration<HttpPlatform.CompressionAlgorithm>("Http.Platform.CompressionAlgorithm", [
+export const compression = /*#__PURE__*/ enumeration<HttpPlatform.CompressionAlgorithm>("Http.Platform.CompressionAlgorithm", [
   ["Gzip", "gzip"],
   ["Deflate", "deflate"],
   ["Brotli", "br"],

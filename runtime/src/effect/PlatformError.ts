@@ -12,9 +12,9 @@ type Reason = Tagged<string, Readonly<Record<string, unknown>>>;
 /** `PlatformError.PlatformError` as Flick code sees it. */
 export type FlickPlatformError = Tagged<string, Reason>;
 
-const ERROR = tag("PlatformError.PlatformError.PlatformError");
-const BAD_ARGUMENT = tag("PlatformError.Reason.Bad");
-const SYSTEM_ERROR = tag("PlatformError.Reason.System");
+const ERROR = /*#__PURE__*/ tag("PlatformError.PlatformError.PlatformError");
+const BAD_ARGUMENT = /*#__PURE__*/ tag("PlatformError.Reason.Bad");
+const SYSTEM_ERROR = /*#__PURE__*/ tag("PlatformError.Reason.System");
 const UNKNOWN = "UnknownError";
 
 const text = (value: string | number | undefined): Option.Option<string> =>

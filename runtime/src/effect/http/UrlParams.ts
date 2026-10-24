@@ -29,7 +29,7 @@ export const flickWithRedactedNames = <A, E, R>(names: ReadonlyArray<string>, ef
   Effect.provideService(effect, UrlParams.CurrentRedactedNames, names);
 
 /** `Http.UrlParams.default_redacted_names`. */
-export const flickDefaultRedactedNames: ReadonlyArray<string> = UrlParams.CurrentRedactedNames.defaultValue().filter(
+export const flickDefaultRedactedNames: ReadonlyArray<string> = /*#__PURE__*/ UrlParams.CurrentRedactedNames.defaultValue().filter(
   (name): name is string => typeof name === "string",
 );
 

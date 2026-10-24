@@ -12,19 +12,19 @@ export * from "effect/http/Cookies";
 
 type Options = NonNullable<Cookies.Cookie["options"]>;
 
-const sameSite = enumeration<NonNullable<Options["sameSite"]>>("Http.Cookies.SameSite", [
+const sameSite = /*#__PURE__*/ enumeration<NonNullable<Options["sameSite"]>>("Http.Cookies.SameSite", [
   ["Lax", "lax"],
   ["Strict", "strict"],
   ["NoSameSite", "none"],
 ]);
 
-const priority = enumeration<NonNullable<Options["priority"]>>("Http.Cookies.Priority", [
+const priority = /*#__PURE__*/ enumeration<NonNullable<Options["priority"]>>("Http.Cookies.Priority", [
   ["Low", "low"],
   ["Medium", "medium"],
   ["High", "high"],
 ]);
 
-const reason = enumeration<Cookies.CookiesErrorReason["_tag"]>("Http.Cookies.CookiesErrorReason", [
+const reason = /*#__PURE__*/ enumeration<Cookies.CookiesErrorReason["_tag"]>("Http.Cookies.CookiesErrorReason", [
   ["InvalidCookieName", "InvalidCookieName"],
   ["InvalidCookieValue", "InvalidCookieValue"],
   ["InvalidCookieDomain", "InvalidCookieDomain"],
@@ -58,7 +58,7 @@ export const options = (a: Attributes): Options => ({
   sameSite: Option.getOrUndefined(Option.map(a.sameSite, sameSite.js)),
 });
 
-const ERROR = tag("Http.Cookies.CookiesError.CookiesError");
+const ERROR = /*#__PURE__*/ tag("Http.Cookies.CookiesError.CookiesError");
 
 /** The Flick `CookiesError` of Effect's. */
 export const toFlick = (error: Cookies.CookiesError) => ({ _tag: ERROR, _0: reason.flick(error.reason._tag) });

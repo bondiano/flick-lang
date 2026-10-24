@@ -16,7 +16,7 @@ export const flickFailCause = (failure: Failure): FlickExit<never> => flickExit(
 export const flickDie = (defect: string): FlickExit<never> => flickExit(Exit.die(defect));
 export const flickInterrupt = (fiberId: Option.Option<number>): FlickExit<never> =>
   flickExit(Exit.interrupt(Option.getOrUndefined(fiberId)));
-export const flickVoid: FlickExit<void> = flickExit(Exit.void);
+export const flickVoid: FlickExit<void> = /*#__PURE__*/ flickExit(Exit.void);
 
 export const flickIsSuccess = <A>(exit: FlickExit<A>): boolean => Exit.isSuccess(native(exit));
 export const flickIsFailure = <A>(exit: FlickExit<A>): boolean => Exit.isFailure(native(exit));

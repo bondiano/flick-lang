@@ -11,11 +11,11 @@ import { toBytes } from "./convert.ts";
 
 export * from "effect/http/HttpBody";
 
-const ERROR = tag("Http.Body.HttpBodyError.HttpBodyError");
-const INVALID_JSON = tag("Http.Body.BodyErrorReason.InvalidJson");
-const INVALID_SCHEMA = tag("Http.Body.BodyErrorReason.InvalidSchema");
+const ERROR = /*#__PURE__*/ tag("Http.Body.HttpBodyError.HttpBodyError");
+const INVALID_JSON = /*#__PURE__*/ tag("Http.Body.BodyErrorReason.InvalidJson");
+const INVALID_SCHEMA = /*#__PURE__*/ tag("Http.Body.BodyErrorReason.InvalidSchema");
 
-const formatIssue = SchemaIssue.makeFormatterDefault();
+const formatIssue = /*#__PURE__*/ SchemaIssue.makeFormatterDefault();
 
 /** The Flick value of an Effect `HttpBodyError`. */
 export const toFlick = (error: HttpBody.HttpBodyError) => ({

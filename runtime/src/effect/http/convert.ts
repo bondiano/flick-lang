@@ -28,7 +28,7 @@ export const enumeration = <T extends string>(type: string, names: ReadonlyArray
 const METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "TRACE", "QUERY"] as const;
 
 /** `Http.Method.Method`. */
-export const method = enumeration<HttpMethod>(
+export const method = /*#__PURE__*/ enumeration<HttpMethod>(
   "Http.Method.Method",
   METHODS.map((m) => [m, m] as const),
 );
@@ -55,8 +55,8 @@ export const masked = (value: unknown): string => (Redacted.isRedacted(value) ? 
 export const showPairs = (name: string, pairs: Iterable<readonly [string, unknown]>): string =>
   `${name} [${Array.from(pairs, ([k, v]) => `(${JSON.stringify(k)}, ${JSON.stringify(masked(v))})`).join(", ")}]`;
 
-const PLAIN = tag("Http.Headers.Redaction.Plain");
-const SECRET = tag("Http.Headers.Redaction.Secret");
+const PLAIN = /*#__PURE__*/ tag("Http.Headers.Redaction.Plain");
+const SECRET = /*#__PURE__*/ tag("Http.Headers.Redaction.Secret");
 
 /** `Http.Headers.Redaction` of a value Effect may have redacted. */
 export const redaction = (value: unknown): Data =>

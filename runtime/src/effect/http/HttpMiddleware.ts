@@ -17,11 +17,11 @@ import { compression } from "./HttpPlatform.ts";
 
 export * from "effect/http/HttpMiddleware";
 
-export const flickLogger = lift(Middleware.logger);
-export const flickWithLoggerDisabled = lift(Middleware.withLoggerDisabled);
-export const flickTracer = lift(Middleware.tracer);
-export const flickXForwardedHeaders = lift(Middleware.xForwardedHeaders);
-export const flickSearchParamsParser = lift(Middleware.searchParamsParser);
+export const flickLogger = /*#__PURE__*/ lift(Middleware.logger);
+export const flickWithLoggerDisabled = /*#__PURE__*/ lift(Middleware.withLoggerDisabled);
+export const flickTracer = /*#__PURE__*/ lift(Middleware.tracer);
+export const flickXForwardedHeaders = /*#__PURE__*/ lift(Middleware.xForwardedHeaders);
+export const flickSearchParamsParser = /*#__PURE__*/ lift(Middleware.searchParamsParser);
 
 /** `Http.Middleware.CorsOptions`. */
 export interface CorsOptions {
@@ -67,9 +67,9 @@ const compressWith =
       ),
     )(handler);
 
-export const flickCompression = compressWith(NodeHttpServer.layerHttpServices);
+export const flickCompression = /*#__PURE__*/ compressWith(NodeHttpServer.layerHttpServices);
 
-const web = HttpPlatform.makeCompressionWeb({
+const web = /*#__PURE__*/ HttpPlatform.makeCompressionWeb({
   algorithms: ["gzip", "deflate"],
   transform: (algorithm) => HttpPlatform.compressionTransformWeb(algorithm),
 });
@@ -90,12 +90,12 @@ const webCompression: HttpPlatform.Compression = {
     }),
 };
 
-const webPlatform = Layer.effect(
+const webPlatform = /*#__PURE__*/ Layer.effect(
   HttpPlatform.HttpPlatform,
   Effect.map(Effect.service(HttpPlatform.HttpPlatform), (p) => HttpPlatform.HttpPlatform.of({ ...p, compression: webCompression })),
 ).pipe(Layer.provide(NodeHttpServer.layerHttpServices));
 
-export const flickCompressionWeb = compressWith(webPlatform);
+export const flickCompressionWeb = /*#__PURE__*/ compressWith(webPlatform);
 
 export const flickDecompression = (max: Option.Option<ByteSize.ByteSize>, handler: Handler) =>
   lift(Middleware.decompression({ maxDecompressedSize: Option.getOrUndefined(max) }))(handler);

@@ -82,8 +82,8 @@ export const flickLinks = (span: Tracer.AnySpan): ReadonlyArray<FlickLink> =>
       })),
   });
 
-const STARTED = tag("Tracer.SpanStatus.Started");
-const ENDED = tag("Tracer.SpanStatus.Ended");
+const STARTED = /*#__PURE__*/ tag("Tracer.SpanStatus.Started");
+const ENDED = /*#__PURE__*/ tag("Tracer.SpanStatus.Ended");
 
 /** `Tracer.status`: an external span counts as running since 0. */
 export const flickStatus = (span: Tracer.AnySpan) =>

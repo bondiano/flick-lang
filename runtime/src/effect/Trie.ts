@@ -5,7 +5,7 @@ import { Trie } from "effect";
 export * from "effect/Trie";
 
 /** `Trie.empty`: one empty trie for every value type. */
-export const flickEmpty: Trie.Trie<never> = Trie.empty();
+export const flickEmpty: Trie.Trie<never> = /*#__PURE__*/ Trie.empty();
 
 export const flickKeys = <V>(self: Trie.Trie<V>): Array<string> => Array.from(Trie.keys(self));
 export const flickValues = <V>(self: Trie.Trie<V>): Array<V> => Array.from(Trie.values(self));

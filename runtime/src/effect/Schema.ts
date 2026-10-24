@@ -48,24 +48,24 @@ export const fallible = (codec: AnySchema): AnySchema => noted(codec, { "flick/t
 
 // Checks: Effect's filters as values, applied to a codec by `Check.apply`.
 
-export const flickIsNonEmpty = Schema.isNonEmpty();
-export const flickIsTrimmed = Schema.isTrimmed();
-export const flickIsLowercased = Schema.isLowercased();
-export const flickIsUppercased = Schema.isUppercased();
-export const flickIsCapitalized = Schema.isCapitalized();
-export const flickIsUncapitalized = Schema.isUncapitalized();
-export const flickIsULID = Schema.isULID();
-export const flickIsGUID = Schema.isGUID();
-export const flickIsBase64 = Schema.isBase64();
-export const flickIsBase64Url = Schema.isBase64Url();
-export const flickIsStringFinite = Schema.isStringFinite();
-export const flickIsStringBigInt = Schema.isStringBigInt();
-export const flickIsInt = Schema.isInt();
-export const flickIsInt32 = Schema.isInt32();
-export const flickIsUint32 = Schema.isUint32();
-export const flickIsFinite = Schema.isFinite();
-export const flickIsUnique = Schema.isUnique();
-export const flickIsUniqueKey = Schema.isUniqueKey();
+export const flickIsNonEmpty = /*#__PURE__*/ Schema.isNonEmpty();
+export const flickIsTrimmed = /*#__PURE__*/ Schema.isTrimmed();
+export const flickIsLowercased = /*#__PURE__*/ Schema.isLowercased();
+export const flickIsUppercased = /*#__PURE__*/ Schema.isUppercased();
+export const flickIsCapitalized = /*#__PURE__*/ Schema.isCapitalized();
+export const flickIsUncapitalized = /*#__PURE__*/ Schema.isUncapitalized();
+export const flickIsULID = /*#__PURE__*/ Schema.isULID();
+export const flickIsGUID = /*#__PURE__*/ Schema.isGUID();
+export const flickIsBase64 = /*#__PURE__*/ Schema.isBase64();
+export const flickIsBase64Url = /*#__PURE__*/ Schema.isBase64Url();
+export const flickIsStringFinite = /*#__PURE__*/ Schema.isStringFinite();
+export const flickIsStringBigInt = /*#__PURE__*/ Schema.isStringBigInt();
+export const flickIsInt = /*#__PURE__*/ Schema.isInt();
+export const flickIsInt32 = /*#__PURE__*/ Schema.isInt32();
+export const flickIsUint32 = /*#__PURE__*/ Schema.isUint32();
+export const flickIsFinite = /*#__PURE__*/ Schema.isFinite();
+export const flickIsUnique = /*#__PURE__*/ Schema.isUnique();
+export const flickIsUniqueKey = /*#__PURE__*/ Schema.isUniqueKey();
 
 /** `Check.pattern source`: a regular expression without flags; a malformed one is a defect. */
 export const flickIsPattern = (source: string): SchemaAST.Filter<string> => Schema.isPattern(new RegExp(source));
@@ -112,20 +112,20 @@ export const flickCheck = <T>(check: SchemaAST.Check<T>, codec: Of<T>): AnySchem
 const lowered = (t: SchemaTransformation.Transformation<string, string>): AnySchema =>
   Schema.String.pipe(Schema.decodeTo(Schema.String, t));
 
-export const flickToLowerCase = lowered(SchemaTransformation.toLowerCase());
-export const flickToUpperCase = lowered(SchemaTransformation.toUpperCase());
-export const flickCapitalize = lowered(SchemaTransformation.capitalize());
-export const flickUncapitalize = lowered(SchemaTransformation.uncapitalize());
-export const flickSnakeToCamel = lowered(SchemaTransformation.snakeToCamel());
+export const flickToLowerCase = /*#__PURE__*/ lowered(SchemaTransformation.toLowerCase());
+export const flickToUpperCase = /*#__PURE__*/ lowered(SchemaTransformation.toUpperCase());
+export const flickCapitalize = /*#__PURE__*/ lowered(SchemaTransformation.capitalize());
+export const flickUncapitalize = /*#__PURE__*/ lowered(SchemaTransformation.uncapitalize());
+export const flickSnakeToCamel = /*#__PURE__*/ lowered(SchemaTransformation.snakeToCamel());
 
-export const flickFiniteFromString = fallible(Schema.FiniteFromString);
-export const flickStringFromBase64 = fallible(Schema.StringFromBase64);
-export const flickStringFromBase64Url = fallible(Schema.StringFromBase64Url);
-export const flickStringFromHex = fallible(Schema.StringFromHex);
-export const flickStringFromUriComponent = fallible(Schema.StringFromUriComponent);
+export const flickFiniteFromString = /*#__PURE__*/ fallible(Schema.FiniteFromString);
+export const flickStringFromBase64 = /*#__PURE__*/ fallible(Schema.StringFromBase64);
+export const flickStringFromBase64Url = /*#__PURE__*/ fallible(Schema.StringFromBase64Url);
+export const flickStringFromHex = /*#__PURE__*/ fallible(Schema.StringFromHex);
+export const flickStringFromUriComponent = /*#__PURE__*/ fallible(Schema.StringFromUriComponent);
 
 /** Flick's bytes: a list of whole numbers from 0 to 255. */
-const byteList = Schema.Array(Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 255 })));
+const byteList = /*#__PURE__*/ Schema.Array(Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 255 })));
 
 /** `Codec.bytes_*`: a codec of a `Uint8Array` with the bytes as a Flick list. */
 const asBytes = (codec: Schema.Codec<Uint8Array, string>): AnySchema =>
@@ -141,9 +141,9 @@ const asBytes = (codec: Schema.Codec<Uint8Array, string>): AnySchema =>
     ),
   );
 
-export const flickBytesFromBase64 = asBytes(Schema.Uint8ArrayFromBase64);
-export const flickBytesFromBase64Url = asBytes(Schema.Uint8ArrayFromBase64Url);
-export const flickBytesFromHex = asBytes(Schema.Uint8ArrayFromHex);
+export const flickBytesFromBase64 = /*#__PURE__*/ asBytes(Schema.Uint8ArrayFromBase64);
+export const flickBytesFromBase64Url = /*#__PURE__*/ asBytes(Schema.Uint8ArrayFromBase64Url);
+export const flickBytesFromHex = /*#__PURE__*/ asBytes(Schema.Uint8ArrayFromHex);
 
 /** `Codec.json_string codec`: JSON text in a string, decoded by `codec`. */
 export const flickFromJsonString = (codec: AnySchema): AnySchema => fallible(Schema.fromJsonString(codec));
@@ -172,7 +172,7 @@ const asEntries = (record: Of<Readonly<Record<string, unknown>>>, value: AnySche
   );
 
 /** The record of a dictionary codec and the checks of its keys, for adding more. */
-const dictionaries = new WeakMap<AnySchema, { readonly value: AnySchema; readonly checks: ReadonlyArray<SchemaAST.Check<object>> }>();
+const dictionaries = /*#__PURE__*/ new WeakMap<AnySchema, { readonly value: AnySchema; readonly checks: ReadonlyArray<SchemaAST.Check<object>> }>();
 
 const dictionary = (value: AnySchema, checks: ReadonlyArray<SchemaAST.Check<object>>): AnySchema => {
   const [first, ...rest] = checks;
@@ -304,7 +304,7 @@ export const flickToEncoderXml = (codec: AnySchema, value: unknown): Effect.Effe
 
 // Schemas and codecs of the standard library's types.
 
-const nonNegative = Schema.makeFilter((d: Duration.Duration) => Duration.isGreaterThanOrEqualTo(d, Duration.zero), {
+const nonNegative = /*#__PURE__*/ Schema.makeFilter((d: Duration.Duration) => Duration.isGreaterThanOrEqualTo(d, Duration.zero), {
   expected: "a non-negative duration",
 });
 
@@ -314,20 +314,20 @@ export const flickDurationFromMillis: AnySchema = jsonNumber
   .pipe(Schema.decodeTo(Schema.Duration, SchemaTransformation.durationFromMillis));
 
 /** `Duration.json_nanos`: a non-negative number of nanoseconds as a string of digits. */
-export const flickDurationFromNanos: AnySchema = Schema.String.check(Schema.isPattern(/^[0-9]+$/)).pipe(
+export const flickDurationFromNanos: AnySchema = /*#__PURE__*/ Schema.String.check(Schema.isPattern(/^[0-9]+$/)).pipe(
   Schema.decodeTo(Schema.BigInt, SchemaTransformation.bigintFromString),
   Schema.decodeTo(Schema.Duration, SchemaTransformation.durationFromNanos),
 );
 
 /** `Duration.json_string`: Effect's text form, `"1500 millis"`. */
-export const flickDurationFromString: AnySchema = fallible(Schema.DurationFromString.check(nonNegative));
+export const flickDurationFromString: AnySchema = /*#__PURE__*/ fallible(Schema.DurationFromString.check(nonNegative));
 
-export const flickDuration: AnySchema = withJson(Schema.Duration.check(nonNegative), () => flickDurationFromMillis);
+export const flickDuration: AnySchema = /*#__PURE__*/ withJson(Schema.Duration.check(nonNegative), () => flickDurationFromMillis);
 
 /** `BigDecimal.json`: a decimal as its string. */
-export const flickBigDecimalFromString: AnySchema = fallible(Schema.BigDecimalFromString);
+export const flickBigDecimalFromString: AnySchema = /*#__PURE__*/ fallible(Schema.BigDecimalFromString);
 
-export const flickBigDecimal: AnySchema = withJson(Schema.BigDecimal, () => flickBigDecimalFromString);
+export const flickBigDecimal: AnySchema = /*#__PURE__*/ withJson(Schema.BigDecimal, () => flickBigDecimalFromString);
 
 const chunkOf = (item: AnySchema): AnySchema =>
   Schema.Array(item).pipe(

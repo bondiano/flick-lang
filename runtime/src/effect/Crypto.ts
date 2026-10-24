@@ -9,7 +9,7 @@ import { constructorName, tag } from "../tags.ts";
 
 export * from "effect/Crypto";
 
-const CRYPTO_ERROR = tag("Crypto.CryptoError.CryptoError");
+const CRYPTO_ERROR = /*#__PURE__*/ tag("Crypto.CryptoError.CryptoError");
 
 type CryptoError = Tagged<typeof CRYPTO_ERROR, string>;
 
@@ -30,7 +30,7 @@ const digest = (algorithm: Crypto.DigestAlgorithm, data: Uint8Array): Effect.Eff
     catch: (cause) => PlatformError.systemError({ _tag: "Unknown", module: "Crypto", method: "digest", cause }),
   });
 
-const system: Crypto.Crypto = Crypto.make({ randomBytes, digest });
+const system: Crypto.Crypto = /*#__PURE__*/ Crypto.make({ randomBytes, digest });
 
 const ALGORITHMS: Record<string, Crypto.DigestAlgorithm> = {
   Sha1: "SHA-1",

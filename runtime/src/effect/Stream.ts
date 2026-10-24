@@ -364,8 +364,8 @@ const notFound = (module: string, method: string, path: string) =>
     }),
   );
 
-const FlickFileSystem = service("FileSystem.FileSystem");
-const FlickStdio = service("Stdio.Stdio");
+const FlickFileSystem = /*#__PURE__*/ service("FileSystem.FileSystem");
+const FlickStdio = /*#__PURE__*/ service("Stdio.Stdio");
 
 const watchTag = (name: string): string => tag(`Stream.Platform.WatchEvent.${name}`);
 
@@ -439,7 +439,7 @@ export const flickReadFile = (
     ),
   );
 
-export const flickStdin = Stream.unwrap(
+export const flickStdin = /*#__PURE__*/ Stream.unwrap(
   Effect.map(Effect.service(FlickStdio), (flick) => {
     const stdio = nativeStdio(flick);
     return stdio === undefined ? Stream.fail(notFound("Stdio", "stdin", "stdin")) : fromBytes(flickErrors(stdio.stdin));

@@ -25,7 +25,7 @@ import type { Command as Spec, Param, Source } from "./spec.ts";
 /** `Cli.CliError`. */
 export type FlickCliError = Tagged<string, string>;
 
-const CLI_ERROR = tag("Cli.CliError.CliError");
+const CLI_ERROR = /*#__PURE__*/ tag("Cli.CliError.CliError");
 
 /** The value of a parameter's text, through its `Cli.Value` dictionary. */
 const parse =
@@ -178,7 +178,7 @@ export const cliRunWith = (
     Effect.provide(services(settings)),
   );
 
-const ALL = Object.keys(BUILT_INS).map((name) => ({ _tag: tag(`Cli.BuiltIn.${name}`) }));
+const ALL = /*#__PURE__*/ Object.keys(BUILT_INS).map((name) => ({ _tag: tag(`Cli.BuiltIn.${name}`) }));
 
 /** `Cli.run command args`, with `version` for `--version`. */
 export const cliRunVersion = (
@@ -205,7 +205,7 @@ const printed = (
     ),
   );
 
-const PLAIN = CliOutput.defaultFormatter({ colors: false });
+const PLAIN = /*#__PURE__*/ CliOutput.defaultFormatter({ colors: false });
 
 /** `Cli.completions shell command`. */
 export const cliCompletions = (shell: { readonly _tag: string }, spec: Spec): Effect.Effect<string, never, unknown> =>

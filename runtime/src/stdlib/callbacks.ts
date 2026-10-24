@@ -27,7 +27,7 @@ const runChild = <A, E, R>(
   return fiber;
 };
 
-const currentOwner = Effect.flatMap(Effect.service(CurrentOwner), (owner) =>
+const currentOwner = /*#__PURE__*/ Effect.flatMap(Effect.service(CurrentOwner), (owner) =>
   owner === undefined ? Effect.die(new Error("a callback needs an owner: run it inside `main` or a scope")) : Effect.succeed(owner),
 );
 
@@ -52,7 +52,7 @@ export const promiseCallback = <A, B, E, R>(
   });
 
 /** The state of a listener, kept on its function: the ABI of a listener is the function. */
-const STATE = Symbol("flick/listener");
+const STATE = /*#__PURE__*/ Symbol("flick/listener");
 
 interface ListenerState<A> {
   closed: boolean;

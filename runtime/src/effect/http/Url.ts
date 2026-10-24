@@ -8,7 +8,7 @@ import { tag } from "../../tags.ts";
 
 export * from "effect/http/Url";
 
-const URL_ERROR = tag("Http.Url.UrlError.UrlError");
+const URL_ERROR = /*#__PURE__*/ tag("Http.Url.UrlError.UrlError");
 
 const message = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
 

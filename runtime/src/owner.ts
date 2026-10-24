@@ -8,7 +8,7 @@ import { Cause, Context, Effect, Exit, Fiber, Scope } from "effect";
 import { Failure } from "./cause.ts";
 
 /** The owner of the innermost scope; the entry runner's root owner outside one. */
-export const CurrentOwner = Context.Reference<Owner | undefined>("@flick-lang/runtime/CurrentOwner", {
+export const CurrentOwner = /*#__PURE__*/ Context.Reference<Owner | undefined>("@flick-lang/runtime/CurrentOwner", {
   defaultValue: () => undefined,
 });
 

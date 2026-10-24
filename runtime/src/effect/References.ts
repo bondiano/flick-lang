@@ -12,11 +12,11 @@ const setting =
 
 const text = (value: unknown): string => (typeof value === "string" ? value : JSON.stringify(value) ?? String(value));
 
-export const flickWithCurrentLogLevel = setting(References.CurrentLogLevel);
-export const flickWithMinimumLogLevel = setting(References.MinimumLogLevel);
-export const flickWithDisablePropagation = setting(References.DisablePropagation);
-export const flickWithTracerEnabled = setting(References.TracerEnabled);
-export const flickWithTracerTimingEnabled = setting(References.TracerTimingEnabled);
+export const flickWithCurrentLogLevel = /*#__PURE__*/ setting(References.CurrentLogLevel);
+export const flickWithMinimumLogLevel = /*#__PURE__*/ setting(References.MinimumLogLevel);
+export const flickWithDisablePropagation = /*#__PURE__*/ setting(References.DisablePropagation);
+export const flickWithTracerEnabled = /*#__PURE__*/ setting(References.TracerEnabled);
+export const flickWithTracerTimingEnabled = /*#__PURE__*/ setting(References.TracerTimingEnabled);
 export const flickWithUnhandledLogLevel = (level: Option.Option<LogLevel.Severity>) =>
   setting(References.UnhandledLogLevel)(Option.getOrUndefined(level));
 

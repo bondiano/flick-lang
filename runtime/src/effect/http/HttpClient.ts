@@ -29,16 +29,16 @@ export const flickFilterStatus = <E, R>(f: (status: number) => boolean, client: 
 export const flickFilterStatusOk = <E, R>(client: With<E, R>) =>
   HttpClient.transformResponse(HttpClient.filterStatusOk(client), mapError);
 
-const retryOn = enumeration<"errors-only" | "response-only" | "errors-and-responses">("Http.Client.RetryOn", [
+const retryOn = /*#__PURE__*/ enumeration<"errors-only" | "response-only" | "errors-and-responses">("Http.Client.RetryOn", [
   ["ErrorsOnly", "errors-only"],
   ["ResponseOnly", "response-only"],
   ["ErrorsAndResponses", "errors-and-responses"],
 ]);
 
-const ERROR = tag("Http.ClientError.HttpClientError.HttpClientError");
-const TRANSPORT = tag("Http.ClientError.ClientErrorReason.TransportError");
-const STATUS = tag("Http.ClientError.ClientErrorReason.StatusCodeError");
-const TRANSIENT = new Set([408, 429, 500, 502, 503, 504]);
+const ERROR = /*#__PURE__*/ tag("Http.ClientError.HttpClientError.HttpClientError");
+const TRANSPORT = /*#__PURE__*/ tag("Http.ClientError.ClientErrorReason.TransportError");
+const STATUS = /*#__PURE__*/ tag("Http.ClientError.ClientErrorReason.StatusCodeError");
+const TRANSIENT = /*#__PURE__*/ new Set([408, 429, 500, 502, 503, 504]);
 
 interface FlickError {
   readonly _tag: string;
@@ -74,10 +74,10 @@ const withReference =
   <B, E, R>(value: A, effect: Effect.Effect<B, E, R>) =>
     Effect.provideService(effect, reference, value);
 
-export const flickWithTracerDisabledWhen = withReference(HttpClient.TracerDisabledWhen);
-export const flickWithTracerHeaderFilter = withReference(HttpClient.TracerHeaderFilter);
-export const flickWithTracerPropagation = withReference(HttpClient.TracerPropagationEnabled);
-export const flickWithSpanNameGenerator = withReference(HttpClient.SpanNameGenerator);
+export const flickWithTracerDisabledWhen = /*#__PURE__*/ withReference(HttpClient.TracerDisabledWhen);
+export const flickWithTracerHeaderFilter = /*#__PURE__*/ withReference(HttpClient.TracerHeaderFilter);
+export const flickWithTracerPropagation = /*#__PURE__*/ withReference(HttpClient.TracerPropagationEnabled);
+export const flickWithSpanNameGenerator = /*#__PURE__*/ withReference(HttpClient.SpanNameGenerator);
 
 /** The operations of the Flick service `Http.Client.HttpClient`. */
 const impl = <E, R>(client: With<E, R>): Impl => ({ client: () => Effect.succeed(client) });

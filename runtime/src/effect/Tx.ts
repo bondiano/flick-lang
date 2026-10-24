@@ -8,8 +8,8 @@ import { tag } from "../tags.ts";
 /** `Tx.RetryReason`. */
 export type RetryReason = Readonly<{ _tag: string }>;
 
-const retry: RetryReason = Object.freeze({ _tag: tag("Tx.RetryReason.Retry") });
-const conflict: RetryReason = Object.freeze({ _tag: tag("Tx.RetryReason.Conflict") });
+const retry: RetryReason = /*#__PURE__*/ Object.freeze({ _tag: tag("Tx.RetryReason.Retry") });
+const conflict: RetryReason = /*#__PURE__*/ Object.freeze({ _tag: tag("Tx.RetryReason.Conflict") });
 
 /** `Tx.retry`: runs the transaction again once a value it read changes. */
 export const flickRetry = (): Effect.Effect<never, never, Effect.Transaction> => Effect.txRetry;

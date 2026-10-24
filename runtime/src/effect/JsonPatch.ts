@@ -8,10 +8,10 @@ import { constructorName, tag } from "../tags.ts";
 
 export * from "effect/JsonPatch";
 
-const ADD = tag("JsonPatch.Operation.Add");
-const REMOVE = tag("JsonPatch.Operation.Remove");
-const REPLACE = tag("JsonPatch.Operation.Replace");
-const PATCH_ERROR = tag("JsonPatch.PatchError.PatchError");
+const ADD = /*#__PURE__*/ tag("JsonPatch.Operation.Add");
+const REMOVE = /*#__PURE__*/ tag("JsonPatch.Operation.Remove");
+const REPLACE = /*#__PURE__*/ tag("JsonPatch.Operation.Replace");
+const PATCH_ERROR = /*#__PURE__*/ tag("JsonPatch.PatchError.PatchError");
 
 /** `JsonPatch.Operation`: a path, and a value but for `Remove`. */
 type Operation = Readonly<{ _tag: string; _0: string; _1?: Schema.Json }>;

@@ -34,9 +34,9 @@ export const flickMerge = (plans: readonly [Plan, ...Array<Plan>]): Plan => Exec
 
 export const flickCurrentMetadata = (): Effect.Effect<ExecutionPlan.Metadata> => Effect.service(ExecutionPlan.CurrentMetadata);
 
-const START = tag("ExecutionPlan.Event.AttemptStart");
-const SUCCESS = tag("ExecutionPlan.Event.AttemptSuccess");
-const FAILURE = tag("ExecutionPlan.Event.AttemptFailure");
+const START = /*#__PURE__*/ tag("ExecutionPlan.Event.AttemptStart");
+const SUCCESS = /*#__PURE__*/ tag("ExecutionPlan.Event.AttemptSuccess");
+const FAILURE = /*#__PURE__*/ tag("ExecutionPlan.Event.AttemptFailure");
 
 interface Attempt {
   readonly attempt: number;

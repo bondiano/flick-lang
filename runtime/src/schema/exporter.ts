@@ -10,7 +10,7 @@ import { noteOf, notesOf } from "./notes.ts";
 import type { AnySchema } from "./schemas.ts";
 import { tag } from "../tags.ts";
 
-const EXPORT_ERROR = tag("Codec.ExportError.ExportError");
+const EXPORT_ERROR = /*#__PURE__*/ tag("Codec.ExportError.ExportError");
 
 /** `Codec.ExportError`. */
 export type ExportError = Tagged<typeof EXPORT_ERROR, string>;
@@ -45,8 +45,8 @@ const TRANSFORMS = {
 const TYPES: ReadonlyArray<EffectJsonSchema.Type> = ["string", "number", "boolean", "array", "object", "null", "integer"];
 
 /** Bounds that combine into one: the tighter of the two. */
-const LOWER = new Set(["minimum", "exclusiveMinimum", "minLength", "minItems", "minProperties"]);
-const UPPER = new Set(["maximum", "exclusiveMaximum", "maxLength", "maxItems", "maxProperties"]);
+const LOWER = /*#__PURE__*/ new Set(["minimum", "exclusiveMinimum", "minLength", "minItems", "minProperties"]);
+const UPPER = /*#__PURE__*/ new Set(["maximum", "exclusiveMaximum", "maxLength", "maxItems", "maxProperties"]);
 
 /** `keywords` added to `out`; a keyword already there is tightened, or joins it under `allOf`. */
 const merge = (out: Record<string, unknown>, keywords: Readonly<Record<string, unknown>>): void => {
