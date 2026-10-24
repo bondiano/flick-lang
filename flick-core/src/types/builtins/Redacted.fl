@@ -21,7 +21,7 @@ foreign sync equivalent from "@flick-lang/runtime/effect/Redacted" "flickEquival
 
 instance Show (Redacted a) =
   show : Redacted a -> String
-  let show x = "<redacted>"
+  let show _x = "<redacted>"
 
 /// The content's own wire form: an explicit decision to let the secret out.
 json_reveal : PureCodec Json a -> PureCodec Json (Redacted a)

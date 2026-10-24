@@ -173,3 +173,39 @@ fn misspelt_name_quick_fix_replaces_it() {
     assert_eq!(edit["range"], t001["range"]);
     lsp.close();
 }
+
+#[test]
+fn unused_import_is_greyed_out_and_removable() {
+    let text = "module App.Tidy exposing (one)\n\nimport String\n\none : Number\nlet one = 1\n";
+    let dir = project(
+        "lsp_unused_import",
+        &[("flick.toml", LIB), ("src/App/Tidy.fl", text)],
+    );
+    let file = dir.join("src/App/Tidy.fl");
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": text } }));
+    let reported = lsp.diagnostics(&uri(&file));
+    let r012 = reported
+        .iter()
+        .find(|d| d["code"] == "FLICK-R012")
+        .unwrap_or_else(|| panic!("{reported:?}"));
+    assert_eq!(r012["severity"], 2);
+    assert_eq!(r012["tags"], json!([1]));
+    let actions = lsp.request(
+        "textDocument/codeAction",
+        &json!({ "textDocument": { "uri": uri(&file) }, "range": r012["range"], "context": { "diagnostics": [r012] } }),
+    );
+    let fix = &actions["result"][0];
+    assert_eq!(fix["title"], "remove the import", "{actions}");
+    let edit = &fix["edit"]["changes"][uri(&file)][0];
+    let (start, end) = (
+        offset(text, &edit["range"]["start"]),
+        offset(text, &edit["range"]["end"]),
+    );
+    let fixed = format!("{}{}", &text[..start], &text[end..]);
+    assert_eq!(
+        fixed,
+        "module App.Tidy exposing (one)\n\n\none : Number\nlet one = 1\n"
+    );
+    lsp.close();
+}

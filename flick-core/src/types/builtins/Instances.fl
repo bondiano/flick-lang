@@ -44,7 +44,7 @@ instance Eq Bool =
 
 instance Eq Unit =
   eq : Unit -> Unit -> Bool
-  let eq x y = true
+  let eq _x _y = true
 
 instance Eq Ordering =
   eq : Ordering -> Ordering -> Bool
@@ -88,7 +88,7 @@ instance Ord Bool =
 
 instance Ord Unit =
   compare : Unit -> Unit -> Ordering
-  let compare x y = EQ
+  let compare _x _y = EQ
 
 instance Ord a => Ord (List a) =
   compare : List a -> List a -> Ordering
@@ -121,7 +121,7 @@ instance Hash Bool =
 
 instance Hash Unit =
   hash : Unit -> Number
-  let hash x = 0
+  let hash _x = 0
 
 instance Hash a => Hash (List a) =
   hash : List a -> Number
@@ -152,7 +152,7 @@ instance Show Bool =
 
 instance Show Unit =
   show : Unit -> String
-  let show x = "()"
+  let show _x = "()"
 
 instance Show Ordering =
   show : Ordering -> String

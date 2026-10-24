@@ -2,10 +2,12 @@
 //! export lists, imports and the names they bring into scope. Rules:
 //! `docs/src/content/docs/reference/modules.md`.
 
+mod dead;
 mod defs;
 mod scope;
 mod syntax;
 mod unexported;
+mod unused;
 mod uses;
 
 pub(crate) use defs::shortest_cycle;
@@ -61,14 +63,18 @@ pub fn resolve(
     module: &Module,
     imported: &dyn Fn(&str) -> Option<Interface>,
 ) -> (Interface, Vec<Diagnostic>) {
-    let defs = defs::collect(module.tree, module.text, module.file);
-    let mut diagnostics = defs::duplicates(&defs);
-    let defs = defs::defined(defs);
+    let all = defs::collect(module.tree, module.text, module.file);
+    let mut diagnostics = defs::duplicates(&all);
+    let defs = defs::defined(all.clone());
     diagnostics.extend(defs::alias_cycles(module.tree, module.text, module.file));
     let scope = scope::Scope::new(module, &defs, imported, &mut diagnostics);
     let interface = scope.exports(&mut diagnostics);
-    for reference in uses::references(module.tree, module.text, module.file) {
-        scope.check_use(&reference, &mut diagnostics);
+    let (references, unused) = uses::references(module.tree, module.text, module.file);
+    for reference in &references {
+        scope.check_use(reference, &mut diagnostics);
     }
+    scope.unused_imports(&references, &mut diagnostics);
+    diagnostics.extend(dead::dead_values(module, &all, &interface, &references));
+    diagnostics.extend(unused::unused_locals(unused));
     (interface, diagnostics)
 }

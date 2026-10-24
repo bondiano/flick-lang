@@ -126,11 +126,22 @@ fn to_pos(file: &SourceFile, start: u32, end: u32) -> Pos {
     }
 }
 
+/// Warnings about unused code, checked only in files that mention the
+/// code: fixtures of other rules bind names they never use.
+const UNUSED: [&str; 3] = ["FLICK-R012", "FLICK-R013", "FLICK-R014"];
+
+fn opted_out(sources: &SourceMap, d: &Diagnostic) -> bool {
+    let code = d.code.to_string();
+    UNUSED.contains(&code.as_str())
+        && d.span
+            .is_some_and(|s| !sources.get(s.file).text.contains(&code))
+}
+
 /// Matches diagnostics against expectations; returns the diff lines.
 fn diff(sources: &SourceMap, actual: &[&Diagnostic], expected: Vec<Expected>) -> Vec<String> {
     let mut missing = expected;
     let mut unexpected = Vec::new();
-    for d in actual {
+    for d in actual.iter().filter(|d| !opted_out(sources, d)) {
         let pos = d.span.map(|s| to_pos(sources.get(s.file), s.start, s.end));
         let code = d.code.to_string();
         // help lines read as the message they explain: `message: help`
@@ -305,6 +316,10 @@ fn check_project(dir: &Path) -> Vec<String> {
         Ok(None) => vec![],
         Err(diagnostic) => vec![diagnostic],
     };
+    let diagnostics: Vec<Diagnostic> = diagnostics
+        .into_iter()
+        .filter(|d| !opted_out(&sources, d))
+        .collect();
     let mut files: Vec<PathBuf> = Vec::new();
     fixtures(dir, &mut files);
     files.push(dir.join("flick.toml"));

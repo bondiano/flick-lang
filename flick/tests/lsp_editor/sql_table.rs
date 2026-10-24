@@ -55,7 +55,11 @@ fn open(name: &str) -> (Lsp, PathBuf) {
     let file = dir.join("src/App/Ledger.fl");
     let mut lsp = Lsp::start(&dir);
     lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": SOURCE } }));
-    assert!(lsp.diagnostics(&uri(&file)).is_empty());
+    let diagnostics = lsp.diagnostics(&uri(&file));
+    assert!(
+        diagnostics.iter().all(|d| d["tags"] == json!([1])),
+        "{diagnostics:?}"
+    );
     (lsp, file)
 }
 

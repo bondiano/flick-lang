@@ -123,6 +123,9 @@ codes! {
     R009 = Resolve 9, "definition shadows an imported name";
     R010 = Resolve 10, "ambiguous name";
     R011 = Resolve 11, "invalid export";
+    R012 = Resolve 12, "unused import";
+    R013 = Resolve 13, "unused variable";
+    R014 = Resolve 14, "unused private definition";
     T001 = Types 1, "unknown name";
     T002 = Types 2, "kind mismatch";
     T003 = Types 3, "type mismatch";

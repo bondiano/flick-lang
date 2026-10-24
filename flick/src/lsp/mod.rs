@@ -350,5 +350,7 @@ pub fn lsp_diagnostic(sources: &SourceMap, d: &Diagnostic) -> Value {
         "source": "flick",
         "message": message,
         "relatedInformation": related,
+        // 1 is `Unnecessary`: editors grey the code out
+        "tags": if d.unnecessary() { json!([1]) } else { json!([]) },
     })
 }

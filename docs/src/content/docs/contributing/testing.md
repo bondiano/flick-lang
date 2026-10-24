@@ -43,7 +43,9 @@ annotations must check cleanly.
 
 Columns count characters, not bytes. `text` is optional and must be a
 substring of the diagnostic message, with each help line appended as
-`: help`. Codes must be registered in
+`: help`. Warnings about unused code (`FLICK-R012`–`R014`) count only in
+files that mention their code: fixtures of other rules bind names they never
+use. Codes must be registered in
 `flick-core/src/diagnostics/codes.rs`.
 
 ## E2E programs — `tests/run/`

@@ -3,6 +3,7 @@ use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
 
 use super::{CompletionKind, Ide, Symbol, Target};
+use crate::diagnostics::Diagnostic;
 use crate::project::{self, Analysis, Host, analysis_fingerprint};
 use crate::projection;
 use crate::source::{FileId, SourceMap};
@@ -136,7 +137,7 @@ fn fixture() -> Fixture {
     let roots = [PathBuf::from("/p/src/App/Main.fl")];
     let analysis = project::analyze(&host, &mut sources, project.as_ref(), &roots);
     assert!(
-        analysis.diagnostics.is_empty(),
+        analysis.diagnostics.iter().all(Diagnostic::unnecessary),
         "{:?}",
         analysis.diagnostics
     );
