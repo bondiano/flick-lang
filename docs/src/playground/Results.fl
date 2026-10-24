@@ -1,6 +1,5 @@
 module Results exposing (current_problems, output_pane, diagnostic_label)
 
-import Dom exposing (attributes)
 import State exposing (Diagnostic, Locale, Model, generated, profile_name, tr)
 
 problem : Locale -> Diagnostic -> Ui none none
@@ -117,8 +116,7 @@ let output_pane m =
     ui {
       div { class_name = "fp-execution" }
         [
-          attributes
-            [("tabIndex", "0"), ("aria-label", tr m.locale "Program output" "Вывод программы")]
+          Ui.with_host { Ui.host with tab_index = Some 0; aria_label = Some (tr m.locale "Program output" "Вывод программы") }
             (pre { class_name = "fp-output" }
               (match m.execution.lines with
               | [] ->
@@ -137,7 +135,7 @@ let output_pane m =
                 List.map
                   (fun line -> span { class_name = "fp-" ++ line.stream } [text line.text])
                   lines)),
-          attributes [("role", "status")]
+          Ui.with_host { Ui.host with role = Some "status" }
             (div { class_name = if m.execution.status == "exit" && m.execution.detail == "0" then "fp-exit" else "fp-exit fp-bad" }
               [text (execution_status m ++ " · " ++ profile_name m.ran_profile)]),
           if m.execution.status == "failure" then pre { class_name = "fp-failure-detail" } [text m.execution.detail] else empty,

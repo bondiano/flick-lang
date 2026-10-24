@@ -1,7 +1,7 @@
 module View exposing (view)
 
 import Actions exposing (load_compiler, refresh, update)
-import Dom exposing (attributes, notify)
+import Dom exposing (notify)
 import Editor exposing (generated_pane, source_pane)
 import Results exposing (current_problems, diagnostic_label, output_pane)
 import State exposing (Model, Mode(..), Tab(..), profile_name, tr)
@@ -50,21 +50,9 @@ let view model m =
     div { class_name = if m.mode == Play then "fp fp-play" else "fp fp-transpile" }
       [
         // Ui.Dom.run redraws after its own events, including this platform notification.
-        attributes
-          [
-            ("id", "fp-refresh"),
-            ("className", "fp-refresh"),
-            ("aria-hidden", "true"),
-            ("tabIndex", "-1"),
-          ]
+        Ui.with_host { Ui.host with id = Some "fp-refresh"; class_name = Some "fp-refresh"; aria_hidden = Some true; tab_index = Some (-1) }
           (button { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { () }) } []),
-        attributes
-          [
-            ("id", "fp-compile"),
-            ("className", "fp-refresh"),
-            ("aria-hidden", "true"),
-            ("tabIndex", "-1"),
-          ]
+        Ui.with_host { Ui.host with id = Some "fp-compile"; class_name = Some "fp-refresh"; aria_hidden = Some true; tab_index = Some (-1) }
           (button
             { disabled = false; on_click = Ui.Event.latest (fun _ -> task { refresh model }) }
             []),
@@ -73,7 +61,7 @@ let view model m =
           [
             Toolbar.view model m,
             if m.load_error != "" then
-              attributes [("role", "alert")]
+              Ui.with_host { Ui.host with role = Some "alert" }
                 (div { class_name = "fp-recovery" }
                   [
                     notice
@@ -91,7 +79,7 @@ let view model m =
                   ])
             else empty,
             if m.compile_error != "" then
-              attributes [("role", "alert")]
+              Ui.with_host { Ui.host with role = Some "alert" }
                 (div { class_name = "fp-recovery" }
                   [
                     notice
@@ -109,7 +97,7 @@ let view model m =
                   ])
             else empty,
             if m.fault != "" then
-              attributes [("role", "alert")]
+              Ui.with_host { Ui.host with role = Some "alert" }
                 (notice
                   (tr
                     m.locale
@@ -118,7 +106,7 @@ let view model m =
                   m.fault)
             else empty,
             if m.syntax_error != "" then
-              attributes [("role", "status")]
+              Ui.with_host { Ui.host with role = Some "status" }
                 (div { class_name = "fp-recovery" }
                   [notice
                     (tr m.locale

@@ -60,6 +60,7 @@ an error. A key is metadata, given with `Ui.keyed`, never a prop.
 | `fragment`, `optional`, `empty` | no element | `List`, `Option`, none |
 | `div`, `span` `{ class_name }` | `div`, `span` | `List (Ui r e)` |
 | `paragraph`, `heading`, `list`, `item` | `p`, `h1`, `ul`, `li` | `List (Ui r e)` |
+| `heading_at level` | `h1` … `h6` for `H1` … `H6` | `List (Ui r e)` |
 | `button { disabled; on_click }` | `button type="button"` | `List (Ui r e)` |
 | `input { value; placeholder; on_input }` | `input`; `value` is the initial text | none |
 | `textarea { value; placeholder; on_input }` | `textarea`, as `input` over several lines | none |
@@ -77,6 +78,13 @@ URLs and the schemes `http`, `https` and `mailto` and refuses control
 characters; `SanitizedHtml` only from `Ui.trusted_html`, the program's own
 word. A `String` is neither. A foreign component is a `Ui.Component p` bound
 with `foreign pure`; React renders it, Flick never calls it.
+
+`with_host attrs node` puts host attributes on an element: `id`,
+`class_name`, `role`, `aria_label`, `aria_describedby`, `aria_hidden`,
+`aria_pressed`, `aria_live` (`Polite`, `Assertive`, `Off`), `tab_index`,
+`data` (pairs written `data-<name>`), and the text-entry hints
+`auto_capitalize`, `auto_correct` and `wrap`. Each is typed and optional:
+`with_host { host with role = Some "status" } (span { class_name = "s" } […])`.
 
 ## Memoized views
 

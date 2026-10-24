@@ -1,7 +1,6 @@
 module Editor exposing (source_pane, generated_pane)
 
 import Actions exposing (edit)
-import Dom exposing (attributes)
 import State exposing (Model, Profile(..), SyntaxToken, errors, generated, tr)
 
 generated_pane : Model -> Ui none none
@@ -28,11 +27,7 @@ let generated_pane m =
         "Fix the diagnostics below to generate JavaScript."
         "Исправьте ошибки ниже, чтобы получить JavaScript."
     else tr m.locale "This module emits no JavaScript." "Этот модуль не создаёт JavaScript."
-  attributes
-    [
-      ("tabIndex", "0"),
-      ("aria-label", tr m.locale "Generated JavaScript" "Сгенерированный JavaScript"),
-    ]
+  Ui.with_host { Ui.host with tab_index = Some 0; aria_label = Some (tr m.locale "Generated JavaScript" "Сгенерированный JavaScript") }
     (Ui.pre { class_name = "fp-generated-code" }
       (if result.code == "" then [Ui.text hint]
         else if m.highlighting then syntax_nodes
@@ -56,18 +51,11 @@ let source_pane model m =
         div
           { class_name = if m.highlighting then "fp-editor fp-editor-highlighted" else "fp-editor" }
           [
-            attributes [("aria-hidden", "true")]
+            Ui.with_host { Ui.host with aria_hidden = Some true }
               (pre { class_name = "fp-source-highlight" }
                 (if m.highlighting then syntax_nodes m.source_tokens else [text m.source])),
             keyed (show m.revision)
-              (attributes
-                [
-                  ("aria-label", tr m.locale "Flick source code" "Исходный код Flick"),
-                  ("aria-describedby", "fp-source-hint"),
-                  ("autoCapitalize", "off"),
-                  ("autoCorrect", "off"),
-                  ("wrap", "off"),
-                ]
+              (Ui.with_host { Ui.host with aria_label = Some (tr m.locale "Flick source code" "Исходный код Flick"); aria_describedby = Some "fp-source-hint"; auto_capitalize = Some false; auto_correct = Some false; wrap = Some false }
                 (textarea
                   {
                     value = m.source;
@@ -75,7 +63,7 @@ let source_pane model m =
                     on_input = Ui.Event.latest (fun snapshot -> task { edit model snapshot.value });
                   })),
           ],
-        attributes [("id", "fp-source-hint")]
+        Ui.with_host { Ui.host with id = Some "fp-source-hint" }
           (div { class_name = "fp-pane-footer" }
             [
               text

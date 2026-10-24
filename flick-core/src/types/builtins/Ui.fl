@@ -227,3 +227,63 @@ foreign pure field from "@flick-lang/runtime/ui/react" "uiField"
 field_area : forall c r e. FieldProps r e c -> (Ui r e)^c
 foreign pure field_area from "@flick-lang/runtime/ui/react" "uiFieldArea"
   retention call
+
+/// How a live region announces its changes.
+type Live = Polite | Assertive | Off
+  deriving Eq, Show
+
+/// Host attributes an element may carry beside its props: its identity and
+/// class (`class_name` replaces the one its props give), accessibility,
+/// text-entry hints and `data-*` attributes. `host` sets
+/// none: `with_host { host with role = Some "status" } node`.
+type alias Host =
+  {
+    id : Option String;
+    class_name : Option String;
+    role : Option String;
+    aria_label : Option String;
+    aria_describedby : Option String;
+    aria_hidden : Option Bool;
+    aria_pressed : Option Bool;
+    aria_live : Option Live;
+    tab_index : Option Number;
+    data : List (String, String);
+    auto_capitalize : Option Bool;
+    auto_correct : Option Bool;
+    wrap : Option Bool;
+  }
+
+/// No host attribute.
+host : Host
+let host =
+  {
+    id = None;
+    class_name = None;
+    role = None;
+    aria_label = None;
+    aria_describedby = None;
+    aria_hidden = None;
+    aria_pressed = None;
+    aria_live = None;
+    tab_index = None;
+    data = [];
+    auto_capitalize = None;
+    auto_correct = None;
+    wrap = None;
+  }
+
+/// The element `node` with the host attributes `attrs`; `data` names are
+/// lowercase letters, digits and hyphens, written `data-<name>`. A node
+/// that is not an element is a defect.
+with_host : forall c r e. Host -> (Ui r e)^c -> (Ui r e)^c
+foreign pure with_host from "@flick-lang/runtime/ui/react" "uiWithHost"
+  retention call
+
+/// The level of a heading, `h1` to `h6`.
+type Level = H1 | H2 | H3 | H4 | H5 | H6
+  deriving Eq, Show
+
+/// A heading of the level.
+heading_at : forall c r e. Level -> List ((Ui r e)^c) -> (Ui r e)^c
+foreign pure heading_at from "@flick-lang/runtime/ui/react" "uiHeadingAt"
+  retention call

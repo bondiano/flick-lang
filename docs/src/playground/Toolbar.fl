@@ -1,17 +1,12 @@
 module Toolbar exposing (choice, examples_view, view)
 
 import Actions exposing (choose, run_program, update)
-import Dom exposing (attributes)
 import Examples exposing (Example, examples)
 import State exposing (Model, Mode(..), Profile(..), Tab(..), errors, generated, status, tr)
 
 choice : String -> Bool -> Bool -> (Unit ->{} Unit) -> Ui none none
 let choice label active disabled act =
-  attributes
-    [
-      ("className", if active then "fp-choice fp-on" else "fp-choice"),
-      ("aria-pressed", if active then "true" else "false"),
-    ]
+  Ui.with_host { Ui.host with class_name = Some (if active then "fp-choice fp-on" else "fp-choice"); aria_pressed = Some (active) }
     (Ui.button
       { disabled = disabled; on_click = Ui.Event.latest (fun _ -> task { act () }) }
       [Ui.text label])
@@ -34,7 +29,8 @@ let set_profile model m profile =
 
 examples_view : Ref Model -> Model -> Ui none none
 let examples_view model m =
-  attributes [("role", "group"), ("aria-label", tr m.locale "Examples" "Примеры")]
+  Ui.with_host
+    { Ui.host with role = Some "group"; aria_label = Some (tr m.locale "Examples" "Примеры") }
     (Ui.div { class_name = "fp-examples" }
       [
         Ui.span { class_name = "fp-control-label" } [Ui.text (tr m.locale "Examples" "Примеры")],
@@ -46,20 +42,18 @@ let view model m =
   ui {
     div { class_name = "fp-toolbar" }
       [
-        attributes
-          [("role", "group"), ("aria-label", tr m.locale "Build profile" "Профиль сборки")]
+        Ui.with_host { Ui.host with role = Some "group"; aria_label = Some (tr m.locale "Build profile" "Профиль сборки") }
           (div { class_name = "fp-profiles" }
             [
               span { class_name = "fp-control-label" } [text (tr m.locale "Build" "Сборка")],
               set_profile model m Debug,
               set_profile model m Release,
             ]),
-        attributes [("role", "status"), ("aria-live", "polite")]
+        Ui.with_host { Ui.host with role = Some "status"; aria_live = Some Ui.Polite }
           (span { class_name = if m.loading || m.checking then "fp-status fp-status-loading" else if m.version == "" || m.compile_error != "" || errors (generated m) > 0 then "fp-status fp-bad" else "fp-status fp-status-ready" }
             [text (status m)]),
         if m.mode == Play then
-          attributes
-            [("className", if m.running then "fp-primary fp-stop" else "fp-primary")]
+          Ui.with_host { Ui.host with class_name = Some (if m.running then "fp-primary fp-stop" else "fp-primary") }
             (button
               {
                 disabled =

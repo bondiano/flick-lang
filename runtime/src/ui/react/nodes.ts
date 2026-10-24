@@ -3,6 +3,7 @@
 import { Option } from "effect";
 import type { ComponentType } from "react";
 
+import { constructorName } from "../../tags.ts";
 import type { Handler } from "./policies.ts";
 
 /** What an event prop of an element gives its handler. */
@@ -37,7 +38,7 @@ export type Ui =
   | {
       readonly kind: "element";
       readonly tag: string;
-      readonly attrs: Readonly<Record<string, string | boolean>>;
+      readonly attrs: Readonly<Record<string, string | boolean | number>>;
       readonly events: Readonly<Record<string, Binding>>;
       readonly children: ReadonlyArray<Ui>;
       /** Trusted HTML, inserted as it is. */
@@ -52,7 +53,7 @@ export interface Tab {
 
 const element = (
   tag: string,
-  attrs: Record<string, string | boolean>,
+  attrs: Record<string, string | boolean | number>,
   events: Record<string, Binding>,
   children: ReadonlyArray<Ui>,
 ): Ui => Object.freeze({ kind: "element", tag, attrs: Object.freeze(attrs), events: Object.freeze(events), children });
@@ -204,3 +205,51 @@ export const uiSafeUrl = (url: string): Option.Option<string> => {
 };
 
 export const uiTrustedHtml = (html: string): string => html;
+
+interface Host {
+  readonly id: Option.Option<string>;
+  readonly class_name: Option.Option<string>;
+  readonly role: Option.Option<string>;
+  readonly aria_label: Option.Option<string>;
+  readonly aria_describedby: Option.Option<string>;
+  readonly aria_hidden: Option.Option<boolean>;
+  readonly aria_pressed: Option.Option<boolean>;
+  readonly aria_live: Option.Option<{ readonly _tag: string }>;
+  readonly tab_index: Option.Option<number>;
+  readonly data: ReadonlyArray<readonly [string, string]>;
+  readonly auto_capitalize: Option.Option<boolean>;
+  readonly auto_correct: Option.Option<boolean>;
+  readonly wrap: Option.Option<boolean>;
+}
+
+const onOff = (on: boolean): string => (on ? "on" : "off");
+
+/** `Ui.with_host`: the element with these host attributes. */
+export const uiWithHost = (host: Host, node: Ui): Ui => {
+  if (node.kind !== "element") throw new TypeError("host attributes go on an element, not on a " + node.kind);
+  const attrs: Record<string, string | boolean | number> = { ...node.attrs };
+  const put = <A>(name: string, value: Option.Option<A>, write: (a: A) => string | number): void => {
+    if (Option.isSome(value)) attrs[name] = write(value.value);
+  };
+  put("id", host.id, String);
+  put("className", host.class_name, String);
+  put("role", host.role, String);
+  put("aria-label", host.aria_label, String);
+  put("aria-describedby", host.aria_describedby, String);
+  put("aria-hidden", host.aria_hidden, String);
+  put("aria-pressed", host.aria_pressed, String);
+  put("aria-live", host.aria_live, (live) => constructorName(live._tag).toLowerCase());
+  put("tabIndex", host.tab_index, (n) => n);
+  put("autoCapitalize", host.auto_capitalize, onOff);
+  put("autoCorrect", host.auto_correct, onOff);
+  put("wrap", host.wrap, (wrap) => (wrap ? "soft" : "off"));
+  for (const [name, value] of host.data) {
+    if (!/^[a-z][a-z0-9-]*$/.test(name)) throw new RangeError(`\`data-${name}\` is not an attribute name: use lowercase letters, digits and hyphens`);
+    attrs[`data-${name}`] = value;
+  }
+  return Object.freeze({ ...node, attrs: Object.freeze(attrs) });
+};
+
+/** `Ui.heading_at`: a heading of the level `H1` … `H6`. */
+export const uiHeadingAt = (level: { readonly _tag: string }, children: ReadonlyArray<Ui>): Ui =>
+  element(constructorName(level._tag).toLowerCase(), {}, {}, children);

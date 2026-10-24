@@ -60,6 +60,7 @@ SaveError} Unit` функция обратного вызова, использ�
 | `fragment`, `optional`, `empty` | без элемента | `List`, `Option`, нет |
 | `div`, `span` `{ class_name }` | `div`, `span` | `List (Ui r e)` |
 | `paragraph`, `heading`, `list`, `item` | `p`, `h1`, `ul`, `li` | `List (Ui r e)` |
+| `heading_at level` | `h1` … `h6` для `H1` … `H6` | `List (Ui r e)` |
 | `button { disabled; on_click }` | `button type="button"` | `List (Ui r e)` |
 | `input { value; placeholder; on_input }` | `input`; `value` — начальный текст | нет |
 | `textarea { value; placeholder; on_input }` | `textarea`, как `input` на несколько строк | нет |
@@ -77,6 +78,13 @@ SaveError} Unit` функция обратного вызова, использ�
 символы; `SanitizedHtml` — только из `Ui.trusted_html`, под ответственность самой
 программы. `String` не является ни тем, ни другим. Внешний компонент — это `Ui.Component p`,
 привязанный через `foreign pure`; его отображает React, Flick никогда его не вызывает.
+
+`with_host attrs node` ставит на элемент атрибуты хоста: `id`,
+`class_name`, `role`, `aria_label`, `aria_describedby`, `aria_hidden`,
+`aria_pressed`, `aria_live` (`Polite`, `Assertive`, `Off`), `tab_index`,
+`data` (пары, записываемые как `data-<name>`) и подсказки ввода текста
+`auto_capitalize`, `auto_correct` и `wrap`. Каждый атрибут типизирован и
+необязателен: `with_host { host with role = Some "status" } (span { class_name = "s" } […])`.
 
 ## Мемоизация представлений
 

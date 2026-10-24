@@ -1,4 +1,4 @@
-module Dom exposing (configuration, source_value, notify, attributes)
+module Dom exposing (configuration, source_value, notify)
 
 import State exposing (Configuration)
 
@@ -13,9 +13,3 @@ foreign sync source_value from "./dom.ts" "sourceValue"
 notify : String ->{} Unit
 foreign sync notify from "./dom.ts" "notify"
   arity 1
-
-// The UI DSL deliberately keeps host attributes out of its event/state model.
-attributes : forall c r e. List (String, String) -> (Ui r e)^c -> (Ui r e)^c
-foreign pure attributes from "./dom.ts" "attributes"
-  arity 2
-  retention call
