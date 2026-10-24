@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 import { Effect } from "effect";
 
-import { appFail, capabilities, runMain, stdoutLine } from "../src/index.ts";
+import { appFail, capabilities, runMain, stdoutLine, versionProblems } from "../src/index.ts";
 
 const fixture = new URL("../fixtures/entry.ts", import.meta.url).pathname;
 
@@ -95,6 +95,8 @@ test("the capability check names the version and missing operations", () => {
   assert.equal(problems[0], "the Flick runtime requires effect 4.0.5, found 4.1.0");
   assert.ok(problems.includes("effect is missing Effect.gen"));
   assert.ok(problems.includes("effect is missing Scope.make"));
+  assert.deepEqual(versionProblems(), []);
+  assert.deepEqual(versionProblems("4.1.0"), [problems[0]]);
 });
 
 const line = (text: string) => Effect.sync(() => stdoutLine(text));

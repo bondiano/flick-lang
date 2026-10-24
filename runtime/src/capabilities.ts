@@ -61,14 +61,20 @@ const has = (module: unknown, name: string): boolean =>
   typeof module === "object" && module !== null && Reflect.get(module, name) !== undefined;
 
 /**
+ * The problem of an installed Effect of another version, if any. The entry
+ * runner checks only this: the matrix needs every Effect module at hand,
+ * which would keep all of Effect in a browser bundle.
+ */
+export const versionProblems = (version: string = effectPackage.version): Array<string> =>
+  version === EFFECT_VERSION ? [] : [`the Flick runtime requires effect ${EFFECT_VERSION}, found ${version}`];
+
+/**
  * Problems that make the installed Effect unusable: another version, or an
- * operation of the matrix that is missing.
+ * operation of the matrix that is missing. The runtime's tests and
+ * `just effect-bump` run it.
  */
 export const capabilities = (version: string = effectPackage.version, modules: Modules = effect): Array<string> => {
-  const problems: Array<string> = [];
-  if (version !== EFFECT_VERSION) {
-    problems.push(`the Flick runtime requires effect ${EFFECT_VERSION}, found ${version}`);
-  }
+  const problems = versionProblems(version);
   for (const [module, names] of Object.entries(MATRIX)) {
     for (const name of names) {
       if (!has(modules[module], name)) {

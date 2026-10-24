@@ -4,7 +4,7 @@
 import { Cause, Effect, Exit, Fiber } from "effect";
 
 import { APP_ERROR, type AppError } from "./builtins.ts";
-import { capabilities } from "./capabilities.ts";
+import { versionProblems } from "./capabilities.ts";
 import { env, offSignal, onSignal, setExitCode, writeStderr } from "./host.ts";
 import { reportedDefects, withOwner } from "./owner.ts";
 
@@ -58,7 +58,7 @@ export const runMain = async (
   main: (unit: undefined) => Effect.Effect<unknown, unknown>,
   options: RunOptions = {},
 ): Promise<void> => {
-  const problems = options.capabilities ?? capabilities();
+  const problems = options.capabilities ?? versionProblems();
   if (problems.length > 0) {
     for (const problem of problems) write(`error: ${problem}\n`);
     setExitCode(2);

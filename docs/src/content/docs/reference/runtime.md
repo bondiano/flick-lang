@@ -10,9 +10,11 @@ by default.
 ## Effect release
 
 The adapter was verified against exactly Effect `4.0.5`. The entry runner
-checks the installed release and a capability matrix of the Effect
-operations it relies on before `main` starts; another release, or a
-missing operation, ends the run with exit code `2`:
+checks the installed release before `main` starts; another release ends
+the run with exit code `2`. The capability matrix of the Effect operations
+the adapter relies on is checked by the runtime's tests and by
+`just effect-bump`, not at run time: it needs every Effect module, which
+would keep all of Effect in a browser bundle.
 
 ```text
 error: the Flick runtime requires effect 4.0.5, found 4.1.0
