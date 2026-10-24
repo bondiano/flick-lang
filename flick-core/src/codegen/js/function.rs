@@ -61,7 +61,9 @@ impl Gen<'_> {
                 Pat::Wild | Pat::Lit(Lit::Unit) if uncurried && heads.iter().any(|h| h == "$_") => {
                     format!("$_{i}")
                 }
-                Pat::Wild | Pat::Lit(Lit::Unit) => "$_".to_owned(),
+                // release keeps the generator's name for a parameter nobody reads
+                Pat::Wild | Pat::Lit(Lit::Unit) if self.options.release => "$_".to_owned(),
+                Pat::Wild | Pat::Lit(Lit::Unit) => "_".to_owned(),
                 pat => {
                     let t = self.temp();
                     destructure.push((pat.clone(), t.clone()));

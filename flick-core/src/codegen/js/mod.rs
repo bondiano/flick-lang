@@ -23,7 +23,7 @@ use std::mem;
 use super::ts::Projection;
 use super::{Options, Output, names};
 use crate::iface::{Interface, Namespace};
-use crate::ir::Module;
+use crate::ir::{ItemKind, Module};
 use crate::source::Span;
 use crate::types::Dict;
 
@@ -91,7 +91,11 @@ pub fn js(module: &Module, options: &Options) -> Output {
     let here = (options.path)(&module.name);
     for imported in &g.imports {
         let target = (options.path)(imported);
-        let alias = names::module_alias(imported);
+        let alias = g
+            .aliases
+            .get(imported)
+            .cloned()
+            .unwrap_or_else(|| names::module_alias(imported));
         let from = names::string(&relative(&here, &target));
         let _ = writeln!(code, "import * as {} from {from};", bound(&alias));
         untyped(&mut code, &alias);
@@ -163,6 +167,15 @@ impl<'a> Gen<'a> {
             } else {
                 HashMap::new()
             },
+            aliases: HashMap::new(),
+            constructors: module
+                .items
+                .iter()
+                .filter_map(|item| match &item.kind {
+                    ItemKind::Constructor(c) => Some(names::ident(&c.name)),
+                    _ => None,
+                })
+                .collect(),
             direct_foreigns: if options.release && !options.typescript {
                 foreign::plain_foreigns(&module.items)
             } else {
@@ -251,6 +264,10 @@ struct Gen<'a> {
     /// Release, JS: the plain pure foreigns of the module (see
     /// [`foreign::plain`]), by name, with their arity and import alias.
     direct_foreigns: HashMap<String, (usize, String)>,
+    /// The name each imported module goes by (see [`Gen::alias`]).
+    aliases: HashMap<String, String>,
+    /// The constructors of the module, which a module alias must not shadow.
+    constructors: Vec<String>,
     /// TypeScript types of the exported values, by their JS name.
     annotations: HashMap<String, String>,
 }
@@ -341,8 +358,29 @@ impl Gen<'_> {
             name.to_owned()
         } else {
             self.imports.insert(module.to_owned());
-            format!("{}.{name}", names::module_alias(module))
+            format!("{}.{name}", self.alias(module))
         }
+    }
+
+    /// The name `module` is imported under: in debug its own (`Ui`,
+    /// `Ui_Event`) unless a constructor of this module, a JS global or
+    /// another import has it; `$m_Ui` otherwise.
+    fn alias(&mut self, module: &str) -> String {
+        if let Some(alias) = self.aliases.get(module) {
+            return alias.clone();
+        }
+        let readable = module.replace('.', "_");
+        let free = !self.options.release
+            && !names::is_global(&readable)
+            && !self.constructors.contains(&readable)
+            && !self.aliases.values().any(|a| *a == readable);
+        let alias = if free {
+            readable
+        } else {
+            names::module_alias(module)
+        };
+        self.aliases.insert(module.to_owned(), alias.clone());
+        alias
     }
 
     fn dict(&mut self, dict: &Dict) -> String {

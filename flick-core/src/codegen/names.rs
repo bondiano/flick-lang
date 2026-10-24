@@ -74,7 +74,18 @@ pub fn ident(name: &str) -> String {
     }
 }
 
-/// The namespace a module's exports are imported under.
+/// JS globals generated code may name: a module alias must not shadow them.
+const GLOBALS: &[&str] = &[
+    "Atomics", "BigInt", "Boolean", "Date", "Function", "Intl", "JSON", "Map", "Math", "Number",
+    "Proxy", "Reflect", "RegExp", "Set", "String", "WeakMap", "WeakSet", "console",
+];
+
+/// Whether `name` is reserved in JS or names a global generated code uses.
+pub fn is_global(name: &str) -> bool {
+    RESERVED.contains(&name) || GLOBALS.contains(&name)
+}
+
+/// The namespace a module's exports are imported under in release.
 pub fn module_alias(module: &str) -> String {
     format!("$m_{}", module.replace('.', "_"))
 }

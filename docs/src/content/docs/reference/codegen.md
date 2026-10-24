@@ -9,8 +9,10 @@ profile must behave the same way.
 Debug output is laid out for reading: a bracket group that does not fit in
 100 columns, or whose elements span lines, puts each element on a line of
 its own, and a lone callback hugs its call. Both profiles leave out the
-parentheses precedence does not need. Release output stays compact; read it
-through its source maps.
+parentheses precedence does not need. Debug imports a module under its own
+name, `Ui.div`, `Ui_Event.exhaust`, unless a constructor of the module or a
+JS global has it, and an ignored parameter is `_`; release uses `$m_Ui` and
+`$_`. Release output stays compact; read it through its source maps.
 
 ## Output
 

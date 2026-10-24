@@ -85,3 +85,17 @@ fn constructor_ids_name_package_module_and_type() {
         "{native}"
     );
 }
+
+#[test]
+fn debug_imports_a_module_by_its_own_name_unless_taken() {
+    let js = compile(
+        "module App.Main exposing (..)\n\n\
+         type Shape = Option Number | Dot\n\n\
+         line : Unit ->{} Unit\nlet line _ = Platform.stdout_line (show (Option.with_default 0 (Some 1)))\n",
+    );
+    assert!(js.contains("import * as Platform from"), "{js}");
+    assert!(js.contains("Platform.stdout_line("), "{js}");
+    // the constructor `Option` keeps the module `Option` apart
+    assert!(js.contains("import * as $m_Option from"), "{js}");
+    assert!(js.contains("export const line = (_) =>"), "{js}");
+}
