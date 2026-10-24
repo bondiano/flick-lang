@@ -2,6 +2,7 @@
 //!
 //! Source of truth: the language specification in `docs/src/content/docs/spec/`.
 
+pub mod api_diff;
 pub mod bootstrap;
 pub mod build;
 pub mod codegen;

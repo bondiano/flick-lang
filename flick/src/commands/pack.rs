@@ -17,6 +17,7 @@ use flick_core::project::cache;
 use flick_core::source::SourceMap;
 
 use super::build::{BuildCommand, write};
+use super::diff;
 use super::run::find_project;
 use crate::args::{
     BuildArguments, EmitArgument, GlobalArguments, OutDirArguments, ProfileArgument,
@@ -73,6 +74,15 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
         };
     }
     report::render(global, &outcome.sources, &outcome.diagnostics);
+    // a warning, not a refusal: the version in `package.json` is the author's call
+    if let Some(tag) = diff::latest_tag(root)
+        && let Ok(changes) = diff::changes_since(root, &tag)
+        && diff::breaking(&changes)
+    {
+        eprintln!(
+            "warning: the public API breaks importers since {tag}; `flick diff {tag}` lists the changes"
+        );
+    }
     let problems = incomplete(&stage.join("dist"), dts);
     if !problems.is_empty() {
         return Outcome {

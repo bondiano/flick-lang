@@ -233,6 +233,7 @@ codes! {
     P022 = Project 22, "SQL dialect not supported yet";
     P023 = Project 23, "unknown SQL dialect";
     P024 = Project 24, "package with `todo` or `echo` left in it";
+    P025 = Project 25, "cannot compare the API with a git revision";
 }
 
 #[cfg(test)]

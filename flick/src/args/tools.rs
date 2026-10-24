@@ -122,6 +122,13 @@ pub struct SchemaExportArguments {
 }
 
 #[derive(Args)]
+pub struct DiffArguments {
+    /// The git revision to compare with; the latest tag by default.
+    #[arg(value_name = "REF")]
+    pub git_ref: Option<String>,
+}
+
+#[derive(Args)]
 pub struct ExplainArguments {
     /// A diagnostic code, such as `FLICK-T003`.
     pub code: String,
