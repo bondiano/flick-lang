@@ -109,6 +109,63 @@ impl Ide<'_> {
         ))
     }
 
+    /// The class `class` named at `at` in a `deriving` clause: the instance
+    /// it makes, as `instance Show a => Show (Tree a)`, and what that does.
+    fn derived(
+        &self,
+        file: FileId,
+        at: (u32, u32),
+        module: &str,
+        class: &str,
+    ) -> Option<(String, String)> {
+        let m = self.module(file)?;
+        let text = self.text(file);
+        let path = tree::path_to(&m.tree, at.0);
+        let i = path.iter().rposition(|n| n.kind == K::DerivingClause)?;
+        let decl = path.get(i.checked_sub(1)?)?;
+        let name = tree::name_of(decl, K::Con, text)?;
+        // the instance as the checker derived it: its context follows the kinds of the parameters
+        let instance = m.typing.instances.iter().find(|i| {
+            i.span.0 <= at.0 && at.1 <= i.span.1 && i.class.0 == module && i.class.1 == class
+        });
+        let note = match class {
+            "Eq" => "Two values are equal when they have the same constructor and equal fields.",
+            "Ord" => {
+                "Orders by constructor, in the order they are declared, then by the fields \
+                 from left to right; derived only together with `Eq`."
+            }
+            "Hash" => {
+                "Hashes the constructor and its fields, so that equal values hash alike; \
+                 derived only together with `Eq`."
+            }
+            "Show" => "Shows the constructor and its fields, as in `Circle 2`.",
+            "Value" => {
+                "Parses the name of a constructor without fields in kebab case \
+                 (`GreenLight` is `green-light`), or the base of a refined type, \
+                 checking its predicate."
+            }
+            "Schema" => {
+                return Some((
+                    format!("schema {name}"),
+                    "Defines the witness `schema T`, the description of the type that \
+                     codecs such as `Codec.json` are built from."
+                        .to_owned(),
+                ));
+            }
+            _ => return None,
+        };
+        let instance = instance?;
+        let context = match instance.context.as_slice() {
+            [] => String::new(),
+            [c] => format!("{c} => "),
+            cs => format!("({}) => ", cs.join(", ")),
+        };
+        Some((
+            format!("instance {context}{}", instance.name),
+            format!("Derived by the compiler. {note}"),
+        ))
+    }
+
     fn typed_hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
         let m = self.module(file)?;
         let (range, ty) = tree::innermost(m.typing.types.iter(), offset)?;
@@ -175,10 +232,11 @@ impl Ide<'_> {
                     .source(&e.module)
                     .and_then(|source| doc::comments(&source.text).remove(&e.name));
                 let from = format!("from `{}`", e.module);
-                (
-                    code,
-                    Some(doc.map_or(from.clone(), |d| format!("{d}\n\n{from}"))),
-                )
+                let note = doc.map_or(from.clone(), |d| format!("{d}\n\n{from}"));
+                match self.derived(file, range, &e.module, &e.name) {
+                    Some((instance, what)) => (instance, Some(format!("{what}\n\n{note}"))),
+                    None => (code, Some(note)),
+                }
             }
             Symbol::Operation {
                 module,

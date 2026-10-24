@@ -163,12 +163,11 @@ impl Ide<'_> {
             return Some((symbol, at));
         }
         if let Some((range, (module, name))) = tree::innermost(m.typing.type_names.iter(), offset) {
-            let node = tree::find(&m.tree, range)?;
-            let token = tree::last_name(node)?;
-            return Some((
-                entity(module, Namespace::Type, name),
-                (token.start, token.end),
-            ));
+            // a class of `deriving` is a bare token, without a node
+            let at = tree::find(&m.tree, range)
+                .and_then(tree::last_name)
+                .map_or(range, |t| (t.start, t.end));
+            return Some((entity(module, Namespace::Type, name), at));
         }
         self.declared_at(m, file, offset)
     }
