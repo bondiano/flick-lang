@@ -1,0 +1,164 @@
+module Results exposing (current_problems, output_pane, diagnostic_label)
+
+import Dom exposing (attributes)
+import State exposing (Diagnostic, Locale, Model, generated, profile_name, tr)
+
+problem : Locale -> Diagnostic -> Ui none none
+let problem locale diagnostic =
+  ui {
+    item
+      [
+        span
+          { class_name = "fp-diagnostic-code fp-" ++ diagnostic.severity }
+          [text diagnostic.code],
+        span { class_name = "fp-diagnostic-at" }
+          [
+            text
+              (if diagnostic.severity == "error" then
+                tr locale "Error" "Ошибка"
+              else if diagnostic.severity == "warning" then
+                tr locale "Warning" "Предупреждение"
+              else
+                tr locale "Info" "Сообщение"),
+          ],
+        span { class_name = "fp-diagnostic-at" } [text diagnostic.at],
+        paragraph [text diagnostic.message],
+      ]
+  }
+
+problems_pane : Locale -> List Diagnostic -> Ui none none
+let problems_pane locale diagnostics =
+  ui {
+    div { class_name = "fp-diagnostics" }
+      [
+        match diagnostics with
+        | [] -> paragraph [text (tr locale "No diagnostics." "Диагностик нет.")]
+        | items -> list (List.map (problem locale) items),
+      ]
+  }
+
+current_problems : Model -> Ui none none
+let current_problems m =
+  if m.loading then
+    Ui.paragraph
+      [
+        Ui.text
+          (tr
+            m.locale
+            "Diagnostics appear when the compiler is ready."
+            "Диагностика появится после загрузки компилятора."),
+      ]
+  else if m.checking then
+    Ui.paragraph [Ui.text (tr m.locale "Checking source…" "Проверка кода…")]
+  else if m.version == "" || m.compile_error != "" then
+    Ui.paragraph
+      [
+        Ui.text
+          (tr
+            m.locale
+            "Restore the compiler above to check this source."
+            "Восстановите компилятор выше, чтобы проверить код."),
+      ]
+  else
+    problems_pane m.locale (generated m).diagnostics
+
+execution_status : Model -> String
+let execution_status m =
+  if m.execution.status == "exit" then
+    tr m.locale "Exit code " "Код завершения " ++ m.execution.detail
+  else if m.execution.status == "timeout" then
+    tr m.locale "Stopped after 10 seconds" "Остановлено через 10 секунд"
+  else if m.execution.status == "stopped" then
+    tr m.locale "Stopped" "Остановлено"
+  else if m.execution.status == "no-main" then
+    tr
+      m.locale
+      "Nothing to run: export a main function."
+      "Нечего запускать: экспортируйте функцию main."
+  else if m.execution.status == "invalid" then
+    tr
+      m.locale
+      "Build failed. Fix the diagnostics and run again."
+      "Сборка не удалась. Исправьте ошибки и запустите снова."
+  else
+    tr m.locale "Program failed" "Программа завершилась с ошибкой"
+
+output_pane : Model -> Ui none none
+let output_pane m =
+  if m.running || m.execution.status == "" then
+    ui {
+      div { class_name = "fp-empty" }
+        [
+          paragraph
+            [
+              text
+                (if m.running then
+                  tr m.locale "Running in an isolated worker…" "Выполняется в отдельном worker…"
+                else
+                  tr m.locale "Your program’s output goes here." "Здесь появится вывод программы."),
+            ],
+          paragraph
+            [
+              text
+                (if m.running then
+                  tr
+                    m.locale
+                    "Output appears when the program ends. Stop it at any time; the limit is 10 seconds."
+                    "Вывод появится после завершения. Можно остановить программу; лимит — 10 секунд."
+                else
+                  tr
+                    m.locale
+                    "Choose an example or edit Main.fl, then press Run."
+                    "Выберите пример или измените Main.fl, затем нажмите «Запустить»."),
+            ],
+        ]
+    }
+  else
+    ui {
+      div { class_name = "fp-execution" }
+        [
+          attributes
+            [("tabIndex", "0"), ("aria-label", tr m.locale "Program output" "Вывод программы")]
+            (pre { class_name = "fp-output" }
+              (match m.execution.lines with
+              | [] ->
+                [
+                  span
+                    { class_name = "fp-muted" }
+                    [
+                      text
+                        (if m.execution.status == "exit" then
+                          tr m.locale "The program wrote no output." "Программа ничего не вывела."
+                        else
+                          tr m.locale "No output captured." "Вывод не получен."),
+                    ],
+                ]
+              | lines ->
+                List.map
+                  (fun line -> span { class_name = "fp-" ++ line.stream } [text line.text])
+                  lines)),
+          attributes [("role", "status")]
+            (div { class_name = if m.execution.status == "exit" && m.execution.detail == "0" then "fp-exit" else "fp-exit fp-bad" }
+              [text (execution_status m ++ " · " ++ profile_name m.ran_profile)]),
+          if m.execution.status == "failure" then pre { class_name = "fp-failure-detail" } [text m.execution.detail] else empty,
+          if m.execution.status == "invalid" then problems_pane m.locale m.execution.diagnostics else empty,
+          if m.source != m.ran_source || m.profile != m.ran_profile then
+            div
+              { class_name = "fp-stale" }
+              [
+                text
+                  (tr
+                    m.locale
+                    "Source or build profile changed. Run again for fresh output."
+                    "Код или профиль сборки изменился. Запустите снова, чтобы обновить вывод."),
+              ]
+          else empty,
+        ]
+    }
+
+diagnostic_label : Model -> String
+let diagnostic_label m =
+  tr m.locale "Diagnostics" "Диагностика"
+    ++ " ("
+    ++ show (List.length (generated m).diagnostics)
+    ++ ")"

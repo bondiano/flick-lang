@@ -1,0 +1,192 @@
+module Actions exposing (
+  update,
+  prepare_highlighting,
+  refresh,
+  load_compiler,
+  edit,
+  choose,
+  run_program,
+  report,
+)
+
+import Dom exposing (notify, source_value)
+import Examples exposing (Example)
+import JsError exposing (JsError(..))
+import State exposing (
+  Compiled,
+  Execution,
+  Model,
+  Profile(..),
+  SyntaxToken,
+  Tab(..),
+  empty_compiled,
+  empty_execution,
+  errors,
+  initial_source,
+  profile_name,
+)
+
+load_highlighting : Unit ->{; JsError} Unit
+foreign async load_highlighting from "./highlight.ts" "loadHighlighting"
+  arity 0
+  catch JsError.from_js
+
+highlight : String -> String ->{; JsError} List SyntaxToken
+foreign sync highlight from "./highlight.ts" "highlight"
+  arity 2
+  catch JsError.from_js
+
+load : Unit ->{; JsError} String
+foreign async load from "./compiler.ts" "load"
+  arity 0
+  catch JsError.from_js
+
+compile : String ->{; JsError} Compiled
+foreign async compile from "./compiler.ts" "compile"
+  arity 1
+  catch JsError.from_js
+  cancel signal
+
+run_build : String -> String ->{; JsError} Execution
+foreign async run_build from "./compiler.ts" "run"
+  arity 2
+  catch JsError.from_js
+  cancel signal
+
+update : Ref Model -> (Model -> Model) ->{} Unit
+let update model f = Ref.modify model (fun m -> ((), f m))
+
+syntax_failure : Ref Model -> String ->{} Unit
+let syntax_failure model message =
+  update model (fun m ->
+    { m with highlighting = false; source_tokens = []; debug_tokens = []; release_tokens = []; syntax_error = message })
+
+paint_source : Ref Model ->{} Unit
+let paint_source model =
+  let m = Ref.get model
+  if m.highlighting then
+    let result = try Ok (highlight m.source "flick") with
+      | JsError failure -> Err failure.message
+    match result with
+    | Ok tokens -> update model (fun m -> { m with source_tokens = tokens })
+    | Err message -> syntax_failure model message
+  else ()
+
+paint_generated : Ref Model ->{} Unit
+let paint_generated model =
+  let m = Ref.get model
+  if m.highlighting then
+    let result =
+      try Ok
+        (
+          highlight m.compiled.debug.code "javascript",
+          highlight m.compiled.release.code "javascript",
+        ) with
+      | JsError failure -> Err failure.message
+    match result with
+    | Ok (debug, release) ->
+      update model (fun m -> { m with debug_tokens = debug; release_tokens = release })
+    | Err message -> syntax_failure model message
+  else ()
+
+adopt_source : Ref Model ->{} Unit
+let adopt_source model =
+  let m = Ref.get model
+  // A later example selection may not have committed its textarea yet.
+  if m.revision == 0 && m.source == initial_source then
+    let source = source_value ()
+    if source != m.source then
+      update model (fun m -> { m with source = source })
+      paint_source model
+    else ()
+  else ()
+
+prepare_highlighting : Ref Model ->{} Unit
+let prepare_highlighting model =
+  let result = try Ok (load_highlighting ()) with
+    | JsError failure -> Err failure.message
+  match result with
+  | Err message -> syntax_failure model message
+  | Ok () ->
+    adopt_source model
+    update model (fun m -> { m with highlighting = true; syntax_error = "" })
+    paint_source model
+    paint_generated model
+  notify "fp-refresh"
+
+refresh : Ref Model ->{} Unit
+let refresh model =
+  let m = Ref.get model
+  if m.version == "" then
+    ()
+  else
+    update model (fun m ->
+      { m with checking = true; compiled = empty_compiled; debug_tokens = []; release_tokens = []; compile_error = "" })
+    notify "fp-refresh"
+    let result = try Ok (compile m.source) with
+      | JsError failure -> Err failure.message
+    let current = Ref.get model
+    if current.source != m.source then
+      ()
+    else
+      match result with
+      | Err message ->
+        update model (fun m -> { m with checking = false; compile_error = message })
+      | Ok compiled ->
+        update model (fun m ->
+          let current = if m.profile == Debug then compiled.debug else compiled.release
+          { m with checking = false; compiled = compiled; tab = if errors current > 0 then Problems else m.tab })
+        paint_generated model
+
+load_compiler : Ref Model ->{} Unit
+let load_compiler model =
+  update
+    model
+    (fun m -> { m with loading = true; checking = false; load_error = ""; compile_error = "" })
+  notify "fp-refresh"
+  let result = try Ok (load ()) with
+    | JsError failure -> Err failure.message
+  match result with
+  | Err message ->
+    update model (fun m -> { m with loading = false; version = ""; load_error = message })
+  | Ok version ->
+    update model (fun m -> { m with loading = false; checking = true; version = version })
+    adopt_source model
+    notify "fp-compile"
+  notify "fp-refresh"
+
+edit : Ref Model -> String ->{} Unit
+let edit model source =
+  update model (fun m -> { m with source = source })
+  paint_source model
+  notify "fp-compile"
+
+choose : Ref Model -> Example ->{} Unit
+let choose model example =
+  update model (fun m ->
+    { m with revision = m.revision + 1; execution = empty_execution; tab = Output })
+  edit model example.source
+
+// `latest` on the same button aborts and joins the worker before this Stop action.
+run_program : Ref Model ->{} Unit
+let run_program model =
+  let m = Ref.get model
+  if m.running then
+    update model (fun m ->
+      { m with running = false; execution = { empty_execution with status = "stopped" } })
+  else
+    update model (fun m ->
+      { m with running = true; tab = Output; execution = empty_execution; ran_source = m.source; ran_profile = m.profile })
+    notify "fp-refresh"
+    let execution =
+      try timeout 10000 (task { run_build m.source (profile_name m.profile) }) with
+      | TimeoutError -> { empty_execution with status = "timeout" }
+      | JsError failure -> { empty_execution with status = "failure"; detail = failure.message }
+    update model (fun m -> { m with running = false; execution = execution })
+
+report : Ref Model -> Failure e ->{} Unit
+let report model failure =
+  let message = RawCause.describe (Failure.inspect failure)
+  update model (fun m -> { m with fault = message; running = false; loading = false })
+  notify "fp-refresh"
+  Platform.stderr_line message

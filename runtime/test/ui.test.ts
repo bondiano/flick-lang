@@ -116,6 +116,35 @@ test("latest interrupts the running task, waits until it stopped, then runs the 
   await Effect.runPromise(Fiber.interrupt(fiber));
 });
 
+test("latest does not interrupt the replacement started by synchronous cancellation", { timeout: 1000 }, async () => {
+  const log: Array<string> = [];
+  const started = Promise.withResolvers<void>();
+  let release: (() => void) | undefined;
+  let n = 0;
+  const run = (value: number) => Effect.gen(function* () {
+    log.push(`start ${value}`);
+    if (value === 1) yield* Effect.never;
+    else yield* Effect.callback<void>((resume) => {
+      release = () => resume(Effect.void);
+      started.resolve();
+    });
+    log.push(`end ${value}`);
+  });
+  const root = container();
+  const { fiber } = mount(root, () => eventLatest(() => run(++n)), log);
+  try {
+    click(root);
+    click(root);
+    await started.promise;
+    assert.ok(release);
+    release();
+    await tick();
+    assert.deepEqual(log, ["start 1", "start 2", "end 2"]);
+  } finally {
+    await Effect.runPromise(Fiber.interrupt(fiber));
+  }
+});
+
 test("queue and concurrent reject an event beyond their bound and tell the supervisor", async () => {
   const log: Array<string> = [];
   const { run, release } = gated(log);

@@ -43,12 +43,25 @@ real debug or release JavaScript without executing it. Both use the
 WebAssembly build of the same compiler core.
 
 Interactive widgets are Flick programs: `docs/src/widgets/` owns search,
-theme/motion controls, the live homepage example and code copying;
-`docs/src/playground/Playground.fl` owns the shared Play/Transpile model and
-actions. TypeScript is limited to mounting and browser/compiler/worker
-interop. `Ui.Dom` mounts browser roots; widget event policies remain in
-Flick. The sandbox supplies the bundled runtime, not arbitrary npm
-packages, Node filesystem access or database connections.
+theme controls, the live homepage example and code copying;
+`docs/src/playground/` shares Play/Transpile through a small entrypoint
+(`Playground.fl`), model (`State.fl`), actions (`Actions.fl`), layout
+(`View.fl`), and components (`Toolbar.fl`, `Editor.fl`, `Results.fl`).
+`Dom.fl` contains browser ports. TypeScript is limited to mounting and
+browser/compiler/worker interop. `Ui.Dom` mounts browser roots; widget
+event policies remain in Flick. The sandbox supplies the bundled runtime,
+not arbitrary npm packages, Node filesystem access or database connections.
+
+The header and editor render their initial Flick views on the server and
+hydrate them in place; native text entered before startup is preserved.
+The UI mounts before background loading starts. WASM initialization,
+checking and builds run in `compiler.worker.ts`; user programs run in a
+separate disposable worker. Canceled queued checks are never dispatched;
+an already-running pure WASM call finishes without applying stale output.
+Syntax highlighting loads independently through Shiki's JavaScript engine
+and the existing Flick grammar. Flick renders safe token spans over a
+native textarea; selection, caret, scrolling and resize remain native.
+The ambient wave runs without a header toggle and honors reduced motion.
 
 `docs/astro.sidebar.mjs` owns section labels and translations;
 `docs/src/styles/custom.css` owns the shared visual tokens. Geist is
@@ -64,6 +77,9 @@ pnpm -C docs preview
 ```
 
 Use the production preview to check search; its index is generated during
-the build. `pnpm -C docs test` exercises linking and executing a real
-compiled program. The visual contract and approved composition are
-recorded in `PRODUCT.md`, `DESIGN.md` and `.impeccable/`.
+the build. Search uses Pagefind's supported main-thread mode: its 1.5
+blob-worker initializer loses the absolute index URL. Revisit this when
+upgrading Pagefind; it does not affect program-worker isolation.
+`pnpm -C docs test` exercises linking and executing a real compiled program.
+The visual contract and approved composition are recorded in `PRODUCT.md`,
+`DESIGN.md` and `.impeccable/`.

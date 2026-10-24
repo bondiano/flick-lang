@@ -2,12 +2,9 @@
   // Apply browser preferences before paint; interactive controls are implemented in Flick.
   (() => {
     let theme = "light";
-    let motion = "running";
     try {
       theme = localStorage.getItem("starlight-theme") === "dark" ? "dark" : "light";
-      motion = localStorage.getItem("flick-motion") === "paused" ? "paused" : "running";
     } catch { /* Preference storage is optional in private browsing. */ }
     document.documentElement.dataset.theme = theme;
-    document.documentElement.dataset.motion = motion;
   })();
 </script>

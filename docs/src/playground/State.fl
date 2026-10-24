@@ -1,0 +1,144 @@
+module State exposing (
+  Mode(..),
+  Locale(..),
+  Profile(..),
+  Tab(..),
+  Configuration,
+  SyntaxToken,
+  Diagnostic,
+  Generated,
+  Compiled,
+  Line,
+  Execution,
+  Model,
+  empty_compiled,
+  empty_execution,
+  initial_source,
+  tr,
+  profile_name,
+  generated,
+  errors,
+  status,
+  initial_model,
+)
+
+import Examples exposing (examples)
+
+type Mode = Play | Transpile
+  deriving Eq
+
+type Locale = En | Ru
+  deriving Eq
+
+type Profile = Debug | Release
+  deriving Eq
+
+type Tab = Output | Problems
+  deriving Eq
+
+type alias Configuration = { mode : String; locale : String }
+type alias SyntaxToken = { text : String; class_name : String }
+type alias Diagnostic = { code : String; severity : String; message : String; at : String }
+type alias Generated = { code : String; diagnostics : List Diagnostic }
+type alias Compiled = { debug : Generated; release : Generated }
+type alias Line = { stream : String; text : String }
+type alias Execution = {
+  lines : List Line;
+  status : String;
+  detail : String;
+  diagnostics : List Diagnostic;
+}
+
+type alias Model =
+  {
+    mode : Mode;
+    locale : Locale;
+    source : String;
+    revision : Number;
+    profile : Profile;
+    tab : Tab;
+    compiled : Compiled;
+    execution : Execution;
+    ran_source : String;
+    ran_profile : Profile;
+    running : Bool;
+    loading : Bool;
+    checking : Bool;
+    highlighting : Bool;
+    source_tokens : List SyntaxToken;
+    debug_tokens : List SyntaxToken;
+    release_tokens : List SyntaxToken;
+    syntax_error : String;
+    version : String;
+    load_error : String;
+    compile_error : String;
+    fault : String;
+  }
+
+empty_compiled : Compiled
+let empty_compiled =
+  { debug = { code = ""; diagnostics = [] }; release = { code = ""; diagnostics = [] } }
+
+empty_execution : Execution
+let empty_execution = { lines = []; status = ""; detail = ""; diagnostics = [] }
+
+initial_source : String
+let initial_source =
+  let first = Option.with_default { name = ""; name_ru = ""; source = "" } (List.get 0 examples)
+  first.source
+
+tr : Locale -> String -> String -> String
+let tr locale english russian = if locale == Ru then russian else english
+
+profile_name : Profile -> String
+let profile_name profile = if profile == Debug then "debug" else "release"
+
+generated : Model -> Generated
+let generated m = if m.profile == Debug then m.compiled.debug else m.compiled.release
+
+errors : Generated -> Number
+let errors result = List.length (List.filter (fun d -> d.severity == "error") result.diagnostics)
+
+status : Model -> String
+let status m =
+  if m.loading then
+    tr m.locale "Loading compiler…" "Загрузка компилятора…"
+  else if m.checking then
+    tr m.locale "Checking source…" "Проверка кода…"
+  else if m.version == "" then
+    tr m.locale "Compiler unavailable" "Компилятор недоступен"
+  else if m.compile_error != "" then
+    tr m.locale "Compilation failed" "Сбой компиляции"
+  else if errors (generated m) > 0 then
+    tr m.locale "Errors: " "Ошибок: " ++ show (errors (generated m))
+  else if m.running then
+    tr m.locale "Running · 10 s limit" "Выполняется · лимит 10 с"
+  else
+    "Flick " ++ m.version ++ " · " ++ tr m.locale "Type-checked" "Проверено"
+
+initial_model : Configuration -> Model
+let initial_model config =
+  {
+    mode = if config.mode == "transpile" then Transpile else Play;
+    locale = if config.locale == "ru" then Ru else En;
+    source = initial_source;
+    revision = 0;
+    profile = Debug;
+    tab = Output;
+    compiled = empty_compiled;
+    execution = empty_execution;
+    ran_source = "";
+    ran_profile = Debug;
+    running = false;
+    loading = true;
+    checking = false;
+    highlighting = false;
+    source_tokens = [];
+    debug_tokens = [];
+    release_tokens = [];
+    syntax_error = "";
+    version = "";
+    load_error = "";
+    compile_error = "";
+    fault = "";
+  }

@@ -1,0 +1,88 @@
+module Editor exposing (source_pane, generated_pane)
+
+import Actions exposing (edit)
+import Dom exposing (attributes)
+import State exposing (Model, Profile(..), SyntaxToken, errors, generated, tr)
+
+generated_pane : Model -> Ui none none
+let generated_pane m =
+  let result = generated m
+  let hint =
+    if m.loading then
+      tr m.locale "Loading the WebAssembly compiler…" "Загрузка WebAssembly-компилятора…"
+    else if m.checking then
+      tr m.locale "Checking source…" "Проверка кода…"
+    else if m.version
+      == "" then tr
+        m.locale
+        "Load the compiler to generate JavaScript."
+        "Загрузите компилятор, чтобы получить JavaScript."
+    else if m.compile_error
+      != "" then tr
+        m.locale
+        "Compilation failed. See the error above."
+        "Компиляция не удалась. Подробности выше."
+    else if errors result
+      > 0 then tr
+        m.locale
+        "Fix the diagnostics below to generate JavaScript."
+        "Исправьте ошибки ниже, чтобы получить JavaScript."
+    else tr m.locale "This module emits no JavaScript." "Этот модуль не создаёт JavaScript."
+  attributes
+    [
+      ("tabIndex", "0"),
+      ("aria-label", tr m.locale "Generated JavaScript" "Сгенерированный JavaScript"),
+    ]
+    (Ui.pre { class_name = "fp-generated-code" }
+      (if result.code == "" then [Ui.text hint]
+        else if m.highlighting then syntax_nodes
+          (if m.profile == Debug then m.debug_tokens else m.release_tokens)
+        else [Ui.text result.code]))
+
+syntax_nodes : List SyntaxToken -> List (Ui none none)
+let syntax_nodes tokens =
+  List.map (fun token -> Ui.span { class_name = token.class_name } [Ui.text token.text]) tokens
+
+source_pane : Ref Model -> Model -> Ui none none
+let source_pane model m =
+  ui {
+    div { class_name = "fp-source" }
+      [
+        div { class_name = "fp-pane-header" }
+          [
+            span { class_name = "fp-file" } [text "Main.fl"],
+            span { class_name = "fp-pane-note" } [text (tr m.locale "Flick source" "Код на Flick")],
+          ],
+        div
+          { class_name = if m.highlighting then "fp-editor fp-editor-highlighted" else "fp-editor" }
+          [
+            attributes [("aria-hidden", "true")]
+              (pre { class_name = "fp-source-highlight" }
+                (if m.highlighting then syntax_nodes m.source_tokens else [text m.source])),
+            keyed (show m.revision)
+              (attributes
+                [
+                  ("aria-label", tr m.locale "Flick source code" "Исходный код Flick"),
+                  ("aria-describedby", "fp-source-hint"),
+                  ("autoCapitalize", "off"),
+                  ("autoCorrect", "off"),
+                  ("wrap", "off"),
+                ]
+                (textarea
+                  {
+                    value = m.source;
+                    placeholder = "module Main exposing (main)";
+                    on_input = Ui.Event.latest (fun snapshot -> task { edit model snapshot.value });
+                  })),
+          ],
+        attributes [("id", "fp-source-hint")]
+          (div { class_name = "fp-pane-footer" }
+            [
+              text
+                (tr
+                  m.locale
+                  "Checked on every edit · compiled locally"
+                  "Проверка при каждом изменении · локальная компиляция"),
+            ]),
+      ]
+  }

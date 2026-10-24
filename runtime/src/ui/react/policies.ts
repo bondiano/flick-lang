@@ -112,7 +112,11 @@ export class Bridge<R> {
       case "latest":
         slot.waiting.splice(0, slot.waiting.length, { handler, snapshot });
         if (slot.running.size === 0) this.next(slot);
-        else for (const task of slot.running) Effect.runFork(Fiber.interrupt(task));
+        else {
+          // Interrupting an old task can synchronously start its replacement.
+          const running = [...slot.running];
+          for (const task of running) Effect.runFork(Fiber.interrupt(task));
+        }
         return;
       case "queue":
         if (slot.running.size === 0) this.start(slot, handler, snapshot);

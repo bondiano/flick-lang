@@ -204,6 +204,59 @@
   tab-size: 2;
 }
 
+.fp textarea, .fp pre {
+  font-style: normal;
+  font-weight: 400;
+  font-variant-ligatures: none;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-transform: none;
+}
+
+.fp-editor {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  isolation: isolate;
+}
+
+.fp-editor > textarea { position: relative; z-index: 1; min-width: 0; overflow: auto; word-break: normal; }
+.fp .fp-source-highlight {
+  position: absolute;
+  inset: 0;
+  display: none;
+  min-width: 0;
+  padding: 1.25rem;
+  overflow: hidden;
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* The empty final line must occupy the same line box as the textarea caret. */
+.fp .fp-source-highlight::after { content: "\200b"; }
+.fp-editor-highlighted .fp-source-highlight { display: block; }
+.fp .fp-editor-highlighted > textarea {
+  background: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.fp .fp-editor-highlighted > textarea::selection {
+  background: var(--flick-selection);
+  color: var(--sl-color-white);
+  -webkit-text-fill-color: var(--sl-color-white);
+}
+
+.fp .fp-editor-highlighted > textarea::placeholder { -webkit-text-fill-color: var(--sl-color-gray-3); }
+.fp .fp-token-comment { color: var(--sl-color-gray-3); }
+.fp .fp-token-keyword { color: var(--sl-color-accent-high); }
+.fp .fp-token-string { color: var(--flick-success); }
+.fp .fp-token-invalid { color: var(--flick-error); }
+
 .fp-generated-code {
   min-height: 30rem;
   max-height: 48rem;
@@ -263,8 +316,18 @@
   .fp-status { order: 3; width: 100%; margin-left: 0; }
   .fp .fp-primary { min-width: 5rem; margin-left: auto; }
   .fp-pane-header { padding-inline: 0.75rem; }
-  .fp textarea, .fp-generated-code, .fp .fp-output { padding: 1rem; }
+  .fp textarea, .fp .fp-source-highlight, .fp-generated-code, .fp .fp-output { padding: 1rem; }
   .fp-pane-footer { font-size: 0.625rem; }
+}
+
+@media (forced-colors: active) {
+  .fp-editor-highlighted .fp-source-highlight { display: none; }
+  .fp .fp-editor-highlighted > textarea {
+    background: Canvas;
+    color: CanvasText;
+    -webkit-text-fill-color: CanvasText;
+    caret-color: CanvasText;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

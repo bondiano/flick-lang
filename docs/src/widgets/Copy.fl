@@ -4,7 +4,7 @@ import Elements exposing (attributes, icon)
 import JsError exposing (JsError(..))
 
 type alias Input = { id : String; source : String; ru : Bool }
-type alias Model = { copied : Bool; failed : Bool }
+type alias Model = { copied : Bool; problem : String }
 
 copy_text : String ->{; JsError} Unit
 foreign async copy_text from "./browser.ts" "copyText"
@@ -14,11 +14,11 @@ foreign async copy_text from "./browser.ts" "copyText"
 view : Input -> Ref Model -> Model -> Ui none none
 let view input model m =
   let label =
-    if m.failed then
-      if input.ru then
+    if m.problem != "" then
+      (if input.ru then
         "Не удалось скопировать. Выделите код вручную."
       else
-        "Copy failed. Select the code manually."
+        "Copy failed. Select the code manually.") ++ " " ++ m.problem
     else if m.copied then
       if input.ru then "Скопировано" else "Copied"
     else
@@ -27,9 +27,9 @@ let view input model m =
     attributes [("aria-label", label), ("title", label), ("aria-live", "polite")]
       (button
         { disabled = false; on_click = Ui.Event.latest (fun _ -> task {
-            let copied = try (copy_text input.source |> fun _ -> true) with
-              | JsError _ -> false
-            Ref.set model { copied = copied; failed = not copied }
+            let problem = try (copy_text input.source |> fun _ -> "") with
+              | JsError failure -> failure.message
+            Ref.set model { copied = problem == ""; problem = problem }
           }) }
         [icon (if m.copied then "check" else "copy"),
           span { class_name = "sr-only" } [text label]])
@@ -43,5 +43,5 @@ let mount input =
   match Ui.Dom.container input.id with
   | None -> App.fail "Missing code copy container"
   | Some root ->
-    let model = Ref.make { copied = false; failed = false }
+    let model = Ref.make { copied = false; problem = "" }
     ignore (Ui.Dom.run root report model (fun m -> view input model m))

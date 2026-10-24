@@ -1,0 +1,57 @@
+{
+  "approved": "signal",
+  "round": 2,
+  "captureCeilingReached": true,
+  "finishReview": {
+    "disposition": "ship",
+    "scope": "Final verdict scores the four prior material fixes, not a fresh whole-site audit.",
+    "remainingMaterialFixes": 0
+  },
+  "build": { "pages": 95, "loaderTests": { "passed": 3, "failed": 0 } },
+  "internalNavigation": { "uniqueDestinations": 94, "failedResponses": 0 },
+  "layout": {
+    "desktopViewport": 1440,
+    "desktopPlaygroundWidth": 1392,
+    "mobileViewport": 390,
+    "mobilePlaygroundWidth": 358,
+    "pageLevelHorizontalOverflow": false
+  },
+  "verified": [
+    "homepage executes the real WASM compiler and prints Hello, effects.",
+    "five valid Play examples execute with expected output",
+    "FLICK-T003 diagnostic disables Run and valid source recovers",
+    "Stop and automatic ten-second timeout terminate program workers",
+    "no-main, empty output, expected failure and recovery states",
+    "editing source marks old output stale without changing it",
+    "reselecting the current example restores its original source",
+    "Transpile output changes with source and supports Debug/Release",
+    "invalid Transpile source clears previously generated JavaScript",
+    "one actual WASM request blocked; failure UI shown; Retry compiler recovers",
+    "English and Russian searches return real localized Pagefind results",
+    "native mobile popover exposes English/Russian above reference navigation",
+    "theme toggles and restores",
+    "ambient motion pauses/resumes; prefers-reduced-motion disables animation",
+    "native clipboard copies exact multiline commands after explicit permission grant",
+    "denied clipboard permission produces a recoverable error state",
+    "equivalent Flick and pinned Effect 4.0.5 examples return Ada, Guest and Hello, Ada",
+    "new bilingual documentation code fences match"
+  ],
+  "scopedCorrections": [
+    "dot-wave envelope opacity 0.4, visible mask extent, one animated group",
+    "Play and Transpile use 88rem operating width rather than reading width",
+    "mobile locale links precede long documentation navigation",
+    "runtime footnote moved below hero actions; route-hint eyebrows removed",
+    "code copying joins Expressive Code lines; caption cannot cover copy button"
+  ],
+  "limits": [
+    "single-module browser sandbox; no arbitrary npm packages, Node filesystem or database connections",
+    "Pagefind 1.5 blob-worker initializer sends relative URLs: supported noWorker mode used for search only",
+    "existing Node-only externalization and large-chunk build warnings remain visible",
+    "no deployment or full Rust suite"
+  ],
+  "captures": [
+    "desktop.png", "mobile.png", "hero-repro.png", "docs-desktop.png", "docs-mobile.png",
+    "play-desktop.png", "transpile-desktop.png", "play-mobile.png", "transpile-mobile.png",
+    "mobile-menu.png", "search.png"
+  ]
+}

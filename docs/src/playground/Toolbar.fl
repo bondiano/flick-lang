@@ -1,0 +1,83 @@
+module Toolbar exposing (choice, examples_view, view)
+
+import Actions exposing (choose, run_program, update)
+import Dom exposing (attributes)
+import Examples exposing (Example, examples)
+import State exposing (Model, Mode(..), Profile(..), Tab(..), errors, generated, status, tr)
+
+choice : String -> Bool -> Bool -> (Unit ->{} Unit) -> Ui none none
+let choice label active disabled act =
+  attributes
+    [
+      ("className", if active then "fp-choice fp-on" else "fp-choice"),
+      ("aria-pressed", if active then "true" else "false"),
+    ]
+    (Ui.button
+      { disabled = disabled; on_click = Ui.Event.latest (fun _ -> task { act () }) }
+      [Ui.text label])
+
+pick : Ref Model -> Model -> Example -> Ui none none
+let pick model m example =
+  Ui.keyed example.name
+    (choice (tr m.locale example.name example.name_ru) (m.source == example.source) m.running
+      (fun () -> choose model example))
+
+set_profile : Ref Model -> Model -> Profile -> Ui none none
+let set_profile model m profile =
+  choice
+    (if profile == Debug then tr m.locale "Debug" "Отладка" else tr m.locale "Release" "Релиз")
+    (m.profile == profile)
+    m.running
+    (fun () -> update model (fun m ->
+      let current = if profile == Debug then m.compiled.debug else m.compiled.release
+      { m with profile = profile; tab = if errors current > 0 then Problems else m.tab }))
+
+examples_view : Ref Model -> Model -> Ui none none
+let examples_view model m =
+  attributes [("role", "group"), ("aria-label", tr m.locale "Examples" "Примеры")]
+    (Ui.div { class_name = "fp-examples" }
+      [
+        Ui.span { class_name = "fp-control-label" } [Ui.text (tr m.locale "Examples" "Примеры")],
+        Ui.div { class_name = "fp-example-options" } (List.map (pick model m) examples),
+      ])
+
+view : Ref Model -> Model -> Ui none none
+let view model m =
+  ui {
+    div { class_name = "fp-toolbar" }
+      [
+        attributes
+          [("role", "group"), ("aria-label", tr m.locale "Build profile" "Профиль сборки")]
+          (div { class_name = "fp-profiles" }
+            [
+              span { class_name = "fp-control-label" } [text (tr m.locale "Build" "Сборка")],
+              set_profile model m Debug,
+              set_profile model m Release,
+            ]),
+        attributes [("role", "status"), ("aria-live", "polite")]
+          (span { class_name = if m.loading || m.checking then "fp-status fp-status-loading" else if m.version == "" || m.compile_error != "" || errors (generated m) > 0 then "fp-status fp-bad" else "fp-status fp-status-ready" }
+            [text (status m)]),
+        if m.mode == Play then
+          attributes
+            [("className", if m.running then "fp-primary fp-stop" else "fp-primary")]
+            (button
+              {
+                disabled =
+                  not m.running
+                    && (m.loading
+                      || m.checking
+                      || m.version == ""
+                      || m.compile_error != ""
+                      || errors (generated m) > 0);
+                on_click = Ui.Event.latest (fun _ -> task { run_program model });
+              }
+              [
+                text
+                  (if m.running then
+                    tr m.locale "Stop" "Остановить"
+                  else
+                    tr m.locale "Run" "Запустить"),
+              ])
+        else empty,
+      ]
+  }

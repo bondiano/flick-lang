@@ -13,6 +13,13 @@ export const configuration = (): { mode: string; locale: string } => {
   return { mode: root.dataset.mode ?? "", locale: root.dataset.locale ?? "" };
 };
 
+/** Read native text entered before hydration; Flick adopts it into its model. */
+export const sourceValue = (): string => {
+  const editor = document.querySelector<HTMLTextAreaElement>("#flick-playground textarea");
+  if (editor === null) throw new Error("The playground source editor is missing");
+  return editor.value;
+};
+
 /** Queue a host event so a mounted Flick root can render its changed Ref. */
 export const notify = (id: string): void => {
   queueMicrotask(() => document.getElementById(id)?.click());

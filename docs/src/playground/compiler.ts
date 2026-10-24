@@ -1,26 +1,17 @@
 // Compiler/worker interoperability only. Widget state and presentation live in Flick.
-import init, { build, compile as compileModule, language_version } from "./wasm/flick_wasm.js";
+import type { Built, Compiled, Diagnostic, Operation, Reply, Request, Result } from "./compiler.worker.ts";
 import type { Message } from "./worker.ts";
-
-interface Diagnostic {
-  readonly code: string;
-  readonly severity: string;
-  readonly message: string;
-  readonly at: string;
-}
 
 interface Line {
   readonly stream: string;
   readonly text: string;
 }
 
-interface Event {
-  readonly code: string;
-  readonly severity: string;
-  readonly message: string;
-  readonly range?: { readonly start: number };
+interface Pending {
+  readonly message: Request;
+  readonly resolve: (result: Result) => void;
+  readonly reject: (error: unknown) => void;
 }
-
 interface Execution {
   readonly lines: Array<Line>;
   readonly status: string;
@@ -28,53 +19,115 @@ interface Execution {
   readonly diagnostics: Array<Diagnostic>;
 }
 
-let ready: Promise<unknown> | undefined;
+let compiler: Worker | undefined;
+let ready: Promise<string> | undefined;
+let sequence = 0;
+let active: number | undefined;
+const pending = new Map<number, Pending>();
 
-/** A rejected initialization is not cached, so Flick's Retry can load again. */
-export const load = async (): Promise<string> => {
+const detail = (error: unknown): string => error instanceof Error ? (error.stack ?? error.message) : String(error);
+
+/** Discard a failed instance so the next explicit request can initialize afresh. */
+const fail = (worker: Worker, error: Error): void => {
+  if (compiler !== worker) return;
+  compiler = undefined;
+  ready = undefined;
+  active = undefined;
+  worker.terminate();
+  for (const call of pending.values()) call.reject(error);
+};
+
+/** Backpressure keeps canceled queued work out of the worker entirely. */
+const dispatch = (worker: Worker): void => {
+  if (active !== undefined) return;
+  const next = pending.entries().next().value;
+  if (next === undefined) return;
+  const [id, call] = next;
+  active = id;
   try {
-    await (ready ??= init());
-    return language_version();
+    worker.postMessage(call.message);
   } catch (error) {
-    ready = undefined;
+    fail(worker, new Error(detail(error)));
+  }
+};
+
+const instance = (): Worker => {
+  if (compiler !== undefined) return compiler;
+  const worker = new Worker(new URL("./compiler.worker.ts", import.meta.url), { type: "module" });
+  compiler = worker;
+  worker.onmessage = (event: MessageEvent<Reply>) => {
+    if (compiler !== worker) return;
+    const reply = event.data;
+    if ("error" in reply) fail(worker, new Error(reply.error));
+    else {
+      if (active === reply.id) active = undefined;
+      pending.get(reply.id)?.resolve(reply.result);
+      dispatch(worker);
+    }
+  };
+  worker.onerror = (event) => fail(worker, new Error(event.error instanceof Error ? detail(event.error) : event.message));
+  worker.onmessageerror = () => fail(worker, new Error("The compiler returned an unreadable message"));
+  return worker;
+};
+
+const request = <T>(operation: Operation, signal?: AbortSignal): Promise<T> => {
+  if (signal?.aborted) return Promise.reject(signal.reason ?? new DOMException("The operation was aborted", "AbortError"));
+  let worker: Worker;
+  try {
+    worker = instance();
+  } catch (error) {
+    return Promise.reject(error);
+  }
+  const { promise, resolve, reject } = Promise.withResolvers<T>();
+  const id = ++sequence;
+  const cleanup = (): void => {
+    pending.delete(id);
+    signal?.removeEventListener("abort", abort);
+  };
+  // shortcut: active WASM cannot be interrupted; reload the shared compiler if hard cancellation becomes necessary.
+  const abort = (): void => {
+    cleanup();
+    reject(signal?.reason ?? new DOMException("The operation was aborted", "AbortError"));
+  };
+  pending.set(id, {
+    message: { ...operation, id },
+    resolve: (result) => { cleanup(); resolve(result as T); },
+    reject: (error) => { cleanup(); reject(error); },
+  });
+  signal?.addEventListener("abort", abort, { once: true });
+  dispatch(worker);
+  return promise;
+};
+
+/** Initialization and its language version are shared; a failure permits Retry. */
+export const load = async (): Promise<string> => {
+  const loading = ready ??= request<string>({ action: "load" });
+  try {
+    return await loading;
+  } catch (error) {
+    if (ready === loading) ready = undefined;
     throw error;
   }
 };
 
-/** `line:column` (from 1) of a UTF-8 offset of `source`. */
-const position = (source: string, offset: number): string => {
-  const before = new TextDecoder().decode(new TextEncoder().encode(source).slice(0, offset));
-  const lines = before.split("\n");
-  return `${lines.length}:${(lines.at(-1)?.length ?? 0) + 1}`;
-};
+/** Both real profiles, with each profile's generated code and diagnostics. */
+export const compile = (source: string, signal: AbortSignal): Promise<Compiled> =>
+  request<Compiled>({ action: "compile", source }, signal);
 
-const diagnostics = (source: string, events: ReadonlyArray<Event>): Array<Diagnostic> => events.map((event) => ({
-  code: event.code,
-  severity: event.severity,
-  message: event.message,
-  at: event.range === undefined ? "" : position(source, event.range.start),
-}));
-
-/** Both real generated profiles, retaining each profile's diagnostics. */
-export const compile = (source: string) => {
-  const profile = (name: string) => {
-    const result = JSON.parse(compileModule(source, name)) as { js: string | null; diagnostics: Array<Event> };
-    return { code: result.js ?? "", diagnostics: diagnostics(source, result.diagnostics) };
-  };
-  return { debug: profile("debug"), release: profile("release") };
-};
-
-/** Builds and executes only in the existing isolated worker; abort always terminates it. */
-export const run = (source: string, profile: string, signal: AbortSignal): Promise<Execution> => {
-  if (signal.aborted) return Promise.resolve({ lines: [], status: "stopped", detail: "", diagnostics: [] });
-  const result = JSON.parse(build(source, profile)) as {
-    files: Record<string, string> | null;
-    entry: string | null;
-    diagnostics: Array<Event>;
-  };
-  const problems = diagnostics(source, result.diagnostics);
-  if (result.files === null) return Promise.resolve({ lines: [], status: "invalid", detail: "", diagnostics: problems });
-  if (result.entry === null) return Promise.resolve({ lines: [], status: "no-main", detail: "", diagnostics: problems });
+/** Build off-thread, then execute in the existing isolated, terminable runner. */
+export const run = async (source: string, profile: string, signal: AbortSignal): Promise<Execution> => {
+  if (signal.aborted) return { lines: [], status: "stopped", detail: "", diagnostics: [] };
+  let result: Built;
+  try {
+    result = await request<Built>({ action: "build", source, profile }, signal);
+  } catch (error) {
+    if (signal.aborted) return { lines: [], status: "stopped", detail: "", diagnostics: [] };
+    throw error;
+  }
+  const problems = result.diagnostics;
+  if (signal.aborted) return { lines: [], status: "stopped", detail: "", diagnostics: problems };
+  if (result.files === null) return { lines: [], status: "invalid", detail: "", diagnostics: problems };
+  if (result.entry === null) return { lines: [], status: "no-main", detail: "", diagnostics: problems };
   const lines: Array<Line> = [];
   const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
   const { promise, resolve } = Promise.withResolvers<Execution>();
@@ -94,12 +147,12 @@ export const run = (source: string, profile: string, signal: AbortSignal): Promi
     else if (message.stream === "crash") finish("failure", message.text);
     else lines.push({ stream: message.stream, text: message.text });
   };
-  worker.onerror = (event) => finish("failure", event.error instanceof Error ? (event.error.stack ?? event.error.message) : event.message);
+  worker.onerror = (event) => finish("failure", event.error instanceof Error ? detail(event.error) : event.message);
   worker.onmessageerror = () => finish("failure", "The worker returned an unreadable message");
   try {
     worker.postMessage({ files: result.files, entry: result.entry });
   } catch (error) {
-    finish("failure", error instanceof Error ? (error.stack ?? error.message) : String(error));
+    finish("failure", detail(error));
   }
   return promise;
 };
