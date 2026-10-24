@@ -12,6 +12,7 @@ import {
   type Ui,
   actionExhaust,
   actionLatest,
+  actionWith,
   eventExhaust,
   uiButton,
   uiFragment,
@@ -109,5 +110,27 @@ test("a latest action interrupts its task started from another element", async (
   click(1);
   await tick();
   assert.deepEqual(log, ["start 1", "stopped", "start 2"]);
+  await stop();
+});
+
+test("`Action.with` passes its data and shares the policy of its action", async () => {
+  const seen: Array<unknown> = [];
+  const log: Array<string> = [];
+  const tasks = gated(log);
+  const remove = actionExhaust((pair: unknown) => {
+    seen.push(Array.isArray(pair) ? pair[0] : undefined);
+    return tasks.run();
+  });
+  const { click, stop } = mount(two(actionWith(remove, "a"), actionWith(remove, "b")));
+  await tick();
+  click(1);
+  click(0);
+  await tick();
+  assert.deepEqual(seen, ["b"], "the second button waits for the shared exhaust policy");
+  tasks.release();
+  await tick();
+  click(0);
+  await tick();
+  assert.deepEqual(seen, ["b", "a"]);
   await stop();
 });

@@ -1,0 +1,22 @@
+module App.RenderHandler exposing (..)
+
+count : Atom.Writable Number
+let count = Atom.make 0
+
+remove : Action.Action (Number, Ui.ClickSnapshot) {Reactivity.Atom.Registry} none
+let remove = Action.exhaust (fun (n, _) -> task { Atom.set count n })
+
+counter : Ui.View Number {Reactivity.Atom.Registry} none
+let counter =
+  Ui.view (fun n ->
+    ui {
+      fragment
+        [
+          button
+            { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { Atom.set count n }) }
+            [text "set"],
+          button { disabled = false; on_click = Action.with remove n } [text "remove"],
+        ]
+    })
+
+//~ FLICK-U002 @16:44-16:97 `Ui.Event.exhaust` of a `fun` makes a handler on every render: declare an `Action` at the top level, or pass data with `Action.with`

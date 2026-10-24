@@ -30,6 +30,7 @@ export {
   actionExhaust,
   actionLatest,
   actionQueue,
+  actionWith,
   eventConcurrent,
   eventExhaust,
   eventLatest,

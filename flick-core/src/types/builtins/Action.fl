@@ -31,3 +31,10 @@ foreign pure queue from "@flick-lang/runtime/ui/react" "actionQueue"
 concurrent : forall c s r e. Number -> (s -> (Eff r e Unit)^c)^c -> (Action s r e)^c
 foreign pure concurrent from "@flick-lang/runtime/ui/react" "actionConcurrent"
   retention call
+
+/// `action` with `arg` paired with each snapshot: data, not a closure, so
+/// a view gives each element its argument without making a handler per
+/// render. It shares the policy state of `action`.
+with : forall c a s r e. (Action (a, s) r e)^c -> a -> (Action s r e)^c
+foreign pure with from "@flick-lang/runtime/ui/react" "actionWith"
+  retention call

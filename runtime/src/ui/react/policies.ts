@@ -20,6 +20,8 @@ export interface Handler {
   readonly prevent?: (snapshot: unknown) => boolean;
   /** An `Action`: every element that uses it shares one policy state per root. */
   readonly shared?: boolean;
+  /** `Action.with base arg`: the action whose policy state it shares. */
+  readonly base?: Handler;
 }
 
 const makeHandler = (policy: Policy, run: Handler["run"]): Handler => Object.freeze({ policy, run });
@@ -48,6 +50,18 @@ export const actionQueue = (capacity: number, run: Handler["run"]): Handler =>
   makeAction({ kind: "queue", capacity: positive("capacity", capacity) }, run);
 export const actionConcurrent = (limit: number, run: Handler["run"]): Handler =>
   makeAction({ kind: "concurrent", limit: positive("limit", limit) }, run);
+
+/** `Action.with action arg`: the action given `arg` with each snapshot, sharing its policy state. */
+export const actionWith = (action: Handler, arg: unknown): Handler => {
+  const { prevent } = action;
+  return Object.freeze({
+    policy: action.policy,
+    run: (snapshot: unknown) => action.run([arg, snapshot]),
+    shared: true,
+    base: action.base ?? action,
+    ...(prevent === undefined ? {} : { prevent: (snapshot: unknown) => prevent([arg, snapshot]) }),
+  });
+};
 
 type Task = Fiber.Fiber<unknown, unknown>;
 
@@ -120,10 +134,11 @@ export class Bridge<R> {
    */
   private actionListener(initial: Binding): Listener {
     let current = initial;
-    let slot = this.actions.get(initial.handler);
+    const key = initial.handler.base ?? initial.handler;
+    let slot = this.actions.get(key);
     if (slot === undefined) {
       slot = { binding: initial, running: new Set<Task>(), waiting: [] };
-      this.actions.set(initial.handler, slot);
+      this.actions.set(key, slot);
     }
     const shared = slot;
     return {

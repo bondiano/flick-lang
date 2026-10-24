@@ -161,6 +161,12 @@ increment : Action.Action Ui.ClickSnapshot {Reactivity.Atom.Registry} none
 let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
 ```
 
+`Action.with action arg` передаёт действию аргумент как данные: каждый
+элемент списка передаёт свой элемент, `on_click = Action.with remove item`, и
+все они делят состояние политики `remove`. Обработчик, созданный из `fun`
+внутри render представления, — новое замыкание на каждом рендере; это
+работает, но `FLICK-U002` предупреждает об этом.
+
 ## Обработчики и политики
 
 Поле обработчика имеет непрозрачный тип `Ui.Handler snapshot r e`, который создаётся

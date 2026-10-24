@@ -139,6 +139,7 @@ impl Checker<'_> {
                     if i == 0 {
                         self.refined_constant(head, arg);
                         self.ui_capacity(head, arg);
+                        self.ui_render_handlers(head, arg);
                     }
                     if self.stage.calls > calls && self.eff_parts(&param).is_some() {
                         self.early_argument(head, arg);

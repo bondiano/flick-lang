@@ -156,6 +156,12 @@ increment : Action.Action Ui.ClickSnapshot {Reactivity.Atom.Registry} none
 let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
 ```
 
+`Action.with action arg` gives an action its argument as data: each element
+of a list passes its item, `on_click = Action.with remove item`, and they all
+share the policy state of `remove`. A handler made from a `fun` inside a
+view's render is a new closure on every render; it works, but
+`FLICK-U002` warns about it.
+
 ## Handlers and policies
 
 A handler field has the opaque type `Ui.Handler snapshot r e`, which only a

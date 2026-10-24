@@ -242,7 +242,10 @@ const SOURCES: &[(&str, &str)] = &[
         "Reactivity.AsyncResult",
         include_str!("builtins/Reactivity/AsyncResult.fl"),
     ),
-    ("Reactivity.Atom", include_str!("builtins/Reactivity/Atom.fl")),
+    (
+        "Reactivity.Atom",
+        include_str!("builtins/Reactivity/Atom.fl"),
+    ),
     // UI on atoms: `Atom` over the reactivity modules, then `Ui`
     ("Atom", include_str!("builtins/Atom.fl")),
     ("Ui", include_str!("builtins/Ui.fl")),
