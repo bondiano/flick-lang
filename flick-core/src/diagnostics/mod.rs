@@ -3,6 +3,7 @@
 
 pub mod codes;
 pub mod render;
+pub mod suggest;
 
 pub use codes::Code;
 

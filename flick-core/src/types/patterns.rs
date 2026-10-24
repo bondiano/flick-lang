@@ -6,6 +6,7 @@ use std::iter;
 use super::ty::{Row, Type};
 use super::{Checker, Local};
 use crate::diagnostics::codes;
+use crate::diagnostics::suggest::closest;
 use crate::iface;
 use crate::iface::Namespace;
 use crate::syntax::cst::Node;
@@ -301,10 +302,13 @@ impl Checker<'_> {
                     .map(|e| e.entity.clone())
             });
             if found.is_none() {
-                self.error(
+                let guess =
+                    closest(qualifier, self.env.qualifier_names()).map(|g| format!("{g}.{name}"));
+                self.error_guess(
                     codes::T001,
-                    self.span(node),
+                    self.name_span(node),
                     format!("unknown module `{qualifier}`"),
+                    guess.as_deref(),
                 );
             }
             return found.flatten();
@@ -313,10 +317,13 @@ impl Checker<'_> {
             super::env::Found::Entity(entity) => Some(entity),
             super::env::Found::Unknown => None,
             super::env::Found::Missing => {
-                self.error(
+                let guess =
+                    closest(name, self.env.names(Namespace::Constructor)).map(str::to_owned);
+                self.error_guess(
                     codes::T001,
-                    self.span(node),
+                    self.name_span(node),
                     format!("cannot find constructor `{name}`"),
+                    guess.as_deref(),
                 );
                 None
             }

@@ -5,6 +5,7 @@
 mod defs;
 mod scope;
 mod syntax;
+mod unexported;
 mod uses;
 
 pub(crate) use defs::shortest_cycle;

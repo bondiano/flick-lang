@@ -7,6 +7,7 @@ use super::env::{Form, Found};
 use super::kinds::Kind;
 use super::ty::{Binder, Row, Type};
 use crate::diagnostics::codes;
+use crate::diagnostics::suggest::closest;
 use crate::iface::Namespace;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -437,10 +438,12 @@ impl Checker<'_> {
                 Found::Entity(e) => e.module,
                 Found::Unknown => return None,
                 Found::Missing => {
-                    self.error(
+                    let guess = closest(name, self.env.names(Namespace::Type)).map(str::to_owned);
+                    self.error_guess(
                         codes::T001,
-                        self.span(node),
+                        self.name_span(node),
                         format!("unknown type `{name}`"),
+                        guess.as_deref(),
                     );
                     return None;
                 }
@@ -449,18 +452,29 @@ impl Checker<'_> {
             module
         } else {
             let Some((_, interface)) = self.env.qualified_module(qualifier) else {
-                self.error(
+                let guess =
+                    closest(qualifier, self.env.qualifier_names()).map(|g| format!("{g}.{name}"));
+                self.error_guess(
                     codes::T001,
-                    self.span(node),
+                    self.name_span(node),
                     format!("unknown module `{qualifier}`"),
+                    guess.as_deref(),
                 );
                 return None;
             };
-            let Some(export) = interface?.find(Namespace::Type, name) else {
-                self.error(
+            let interface = interface?;
+            let Some(export) = interface.find(Namespace::Type, name) else {
+                let types = interface
+                    .exports
+                    .iter()
+                    .filter(|e| e.entity.namespace == Namespace::Type);
+                let guess = closest(name, types.map(|e| e.entity.name.as_str()))
+                    .map(|g| format!("{qualifier}.{g}"));
+                self.error_guess(
                     codes::T001,
-                    self.span(node),
+                    self.name_span(node),
                     format!("`{qualifier}` does not export type `{name}`"),
+                    guess.as_deref(),
                 );
                 return None;
             };

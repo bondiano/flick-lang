@@ -388,6 +388,21 @@ impl Env {
         }
     }
 
+    /// Every unqualified name in `namespace`: candidates for a misspelt one.
+    pub fn names(&self, namespace: Namespace) -> impl Iterator<Item = &str> {
+        self.scope
+            .keys()
+            .chain(self.open.keys())
+            .chain(self.prelude.keys())
+            .filter(move |(n, _)| *n == namespace)
+            .map(|(_, name)| name.as_str())
+    }
+
+    /// Every import qualifier and built-in module name.
+    pub fn qualifier_names(&self) -> impl Iterator<Item = &str> {
+        self.qualifiers.keys().map(String::as_str)
+    }
+
     /// The module a qualifier names, and its interface if it was loaded.
     /// Whether `qualifier` names an import, whose missing names name
     /// resolution reports, rather than a built-in module used without one.
