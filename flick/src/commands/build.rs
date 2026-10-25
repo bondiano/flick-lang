@@ -354,6 +354,7 @@ pub fn artifacts(
         .flat_map(|p| &p.config.entries)
         .filter_map(|e| Some((e.name.clone(), e.runner.as_ref()?.0.clone())))
         .collect();
+    let backend = project.map_or(Backend::Effect, |p| p.config.build.effect);
     let settings = Settings {
         source_dir: &source_dir,
         out_dir,
@@ -364,9 +365,44 @@ pub fn artifacts(
         extras: output.extras,
         release: output.release,
         root: project.map(|p| p.root.as_path()),
-        backend: project.map_or(Backend::Effect, |p| p.config.build.effect),
+        backend,
         ui: project.and_then(|p| p.config.build.ui.as_deref()),
         runners: &runners,
+        core_modules: &[],
+        core_only: false,
     };
-    build::emit(compilation, sources, &settings)
+    // a library on Effect is also built without it, for applications with `effect = "none"`
+    let library = project.is_some_and(|p| p.config.kind == Kind::Lib) && backend == Backend::Effect;
+    if !library {
+        return build::emit(compilation, sources, &settings);
+    }
+    let core_dir = out_dir.join(build::effects::CORE_DIR);
+    let (core, _) = build::emit(
+        compilation,
+        sources,
+        &Settings {
+            out_dir: &core_dir,
+            backend: Backend::None,
+            extras: Extras {
+                labels: output.extras.labels,
+                ..Extras::default()
+            },
+            core_only: true,
+            ..settings
+        },
+    );
+    let core_modules = build::core_built(&core, compilation, output.typescript);
+    let (mut artifacts, diagnostics) = build::emit(
+        compilation,
+        sources,
+        &Settings {
+            core_modules: &core_modules,
+            ..settings
+        },
+    );
+    artifacts.extend(core.into_iter().map(|a| Artifact {
+        path: format!("{}{}", build::effects::CORE_DIR, a.path),
+        contents: a.contents,
+    }));
+    (artifacts, diagnostics)
 }

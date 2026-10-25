@@ -3,7 +3,7 @@
 //! for an app the runner that starts `main`.
 
 mod abi;
-mod effects;
+pub mod effects;
 
 pub use abi::interface;
 
@@ -90,6 +90,12 @@ pub struct Settings<'a> {
     /// The module whose `run` starts an entry, by the entry's name; an entry
     /// without one starts the default way.
     pub runners: &'a [(String, String)],
+    /// The modules of a library on Effect that it also built without Effect,
+    /// under [`effects::CORE_DIR`].
+    pub core_modules: &'a [String],
+    /// Build, without Effect, only the modules that need no Effect, and no
+    /// interfaces: the part of a library under [`effects::CORE_DIR`].
+    pub core_only: bool,
 }
 
 /// The opt-in outputs of a build.
@@ -113,15 +119,8 @@ pub fn emit(
     settings: &Settings,
 ) -> (Vec<Artifact>, Vec<Diagnostic>) {
     let mut diagnostics = Vec::new();
-    if settings.backend == Backend::None {
-        // shortcut: a package's JS is built on Effect; allow one once its interface records how it was built
-        diagnostics.extend(compilation.packages.iter().map(|(module, package, ..)| {
-            let message = format!(
-                "`{module}` of `{package}` is built on Effect, but {}",
-                types::NO_EFFECTS
-            );
-            Diagnostic::new(codes::E008, Severity::Error, message)
-        }));
+    if !settings.core_only {
+        effects::check_packages(&compilation.packages, settings.backend, &mut diagnostics);
     }
     let modules = &compilation.modules;
     let provider = |m: &str| {
@@ -137,7 +136,10 @@ pub fn emit(
         let file = format!("{}.{ext}", m.replace('.', "/"));
         match provider(m) {
             // a package's module sits next to its interface in `iface-dir`
-            Some((_, _, js)) => format!("npm:{js}.js"),
+            Some((_, interface, js)) => format!(
+                "npm:{}.js",
+                effects::package_path(&js, m, &interface, settings.backend)
+            ),
             None if is_builtin(m) => format!("{BUILTIN_DIR}/{file}"),
             None => file,
         }
@@ -195,7 +197,11 @@ pub fn emit(
         direct: &direct,
         labels: settings.extras.labels,
     };
-    let mut out = vec![package_json(settings)];
+    let mut out = if settings.core_only {
+        Vec::new()
+    } else {
+        vec![package_json(settings)]
+    };
     let ctx = Context {
         settings,
         sources,
@@ -207,8 +213,12 @@ pub fn emit(
     };
     // a built-in runner is written like any module the program imports
     let mut imports: Vec<String> = settings.runners.iter().map(|(_, r)| r.clone()).collect();
-    for module in modules {
-        imports.extend(compiled_module(&ctx, module, &mut out, &mut diagnostics));
+    if settings.core_only {
+        imports.extend(core_modules(&ctx, compilation, &mut out));
+    } else {
+        for module in modules {
+            imports.extend(compiled_module(&ctx, module, &mut out, &mut diagnostics));
+        }
     }
     builtins(&ctx, imports, &mut out, &mut diagnostics);
     entry_runners(settings, modules, &path, &mut out, &mut diagnostics);
@@ -267,6 +277,71 @@ fn entry_runners(
             }
         }
     }
+}
+
+/// The build without Effect of a library's modules that need no Effect, nor
+/// any module that needs it; what they import.
+fn core_modules(ctx: &Context, compilation: &Compilation, out: &mut Vec<Artifact>) -> Vec<String> {
+    let compiled: Vec<(&str, Vec<Artifact>, Vec<String>, bool)> = compilation
+        .modules
+        .iter()
+        .map(|module| {
+            let (mut artifacts, mut needs) = (Vec::new(), Vec::new());
+            let imports = compiled_module(ctx, module, &mut artifacts, &mut needs);
+            (module.name.as_str(), artifacts, imports, needs.is_empty())
+        })
+        .collect();
+    let package = |m: &str| compilation.packages.iter().find(|(module, ..)| module == m);
+    let mut core: HashSet<&str> = compiled.iter().filter(|c| c.3).map(|c| c.0).collect();
+    // a module is out with what it imports
+    loop {
+        let out_now: Vec<&str> = compiled
+            .iter()
+            .filter(|(name, _, imports, _)| {
+                core.contains(name)
+                    && !imports.iter().all(|i| match package(i) {
+                        Some((.., interface, _)) => effects::importable(interface, Backend::None),
+                        None if compilation.modules.iter().any(|m| &m.name == i) => {
+                            core.contains(i.as_str())
+                        }
+                        None => effects::in_core(i),
+                    })
+            })
+            .map(|c| c.0)
+            .collect();
+        if out_now.is_empty() {
+            break;
+        }
+        for name in out_now {
+            core.remove(name);
+        }
+    }
+    compiled
+        .into_iter()
+        .filter(|c| core.contains(c.0))
+        .flat_map(|(_, artifacts, imports, _)| {
+            out.extend(artifacts);
+            imports
+        })
+        .collect()
+}
+
+/// The modules of a library a build with `core_only` wrote.
+pub fn core_built(
+    artifacts: &[Artifact],
+    compilation: &Compilation,
+    typescript: bool,
+) -> Vec<String> {
+    let ext = if typescript { "ts" } else { "js" };
+    compilation
+        .modules
+        .iter()
+        .filter(|m| {
+            let file = format!("{}.{ext}", m.name.replace('.', "/"));
+            artifacts.iter().any(|a| a.path == file)
+        })
+        .map(|m| m.name.clone())
+        .collect()
 }
 
 /// `package.json` of the output. Top-level initialization is pure
@@ -423,6 +498,9 @@ fn compiled_module(
         path: format!("{file}.map"),
         contents: map,
     });
+    if ctx.settings.core_only {
+        return output.imports;
+    }
     let mut built = interface(
         &module.ir,
         &module.interface,
@@ -435,6 +513,16 @@ fn compiled_module(
         .root
         .and_then(|root| module.path.strip_prefix(root).ok())
         .map(|p| p.to_string_lossy().replace('\\', "/"));
+    if let Some(abi) = &mut built.abi {
+        abi.core = if ctx.settings.backend == Backend::None {
+            Some(String::new())
+        } else {
+            ctx.settings
+                .core_modules
+                .contains(&module.name)
+                .then(|| effects::CORE_DIR.to_owned())
+        };
+    }
     if ctx.settings.extras.dts
         && let Some((text, refused)) =
             declarations(&module.name, ctx.any_interface, ctx.package, ctx.path)
