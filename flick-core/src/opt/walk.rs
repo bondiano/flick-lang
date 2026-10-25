@@ -96,7 +96,11 @@ fn pat_size(p: &Pat) -> usize {
             1 + items.iter().map(pat_size).sum::<usize>()
         }
         Pat::List(items, rest) => {
-            1 + items.iter().chain(rest.as_deref()).map(pat_size).sum::<usize>()
+            1 + items
+                .iter()
+                .chain(rest.as_deref())
+                .map(pat_size)
+                .sum::<usize>()
         }
         Pat::Record(fields) => 1 + fields.iter().map(|(_, p)| pat_size(p)).sum::<usize>(),
     }

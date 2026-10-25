@@ -309,7 +309,9 @@ impl Checker<'_> {
         if !qualifier.is_empty() {
             let found = self.env.qualified_module(qualifier).map(|(_, interface)| {
                 interface.map(|i| {
-                    let entity = i.find(Namespace::Constructor, name).map(|e| e.entity.clone());
+                    let entity = i
+                        .find(Namespace::Constructor, name)
+                        .map(|e| e.entity.clone());
                     let guess = closest(
                         name,
                         i.exports

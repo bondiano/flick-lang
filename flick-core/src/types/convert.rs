@@ -456,7 +456,10 @@ impl Checker<'_> {
                 }
             }
         } else if let Some((module, service)) = self.service_module(qualifier, name) {
-            let def = self.env.type_def(&module, &format!("{service}.{name}"))?.clone();
+            let def = self
+                .env
+                .type_def(&module, &format!("{service}.{name}"))?
+                .clone();
             return Some((module, def));
         } else {
             let Some((_, interface)) = self.env.qualified_module(qualifier) else {
