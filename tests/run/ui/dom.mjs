@@ -12,6 +12,23 @@ export const setup = () => {
   return undefined;
 };
 
+let errors = [];
+
+/** A page a server rendered: `markup` in the container, `state` after it; React's complaints are kept. */
+export const serve = (markup, state) => {
+  dom = new JSDOM(`<!doctype html><html><body><div id="app" data-flick-ssr>${markup}</div>${state}</body></html>`);
+  Object.assign(globalThis, { window: dom.window, document: dom.window.document });
+  root = dom.window.document.getElementById("app");
+  console.error = (...args) => errors.push(args.join(" "));
+  return undefined;
+};
+
+/** What React reported since `serve`, such as a hydration mismatch. */
+export const complaints = () => errors.join("\n");
+
+/** Whether the page still holds the state a server wrote. */
+export const stateLeft = () => dom.window.document.getElementById("flick-state") !== null;
+
 export const click = (label) => {
   const button = [...root.querySelectorAll("button")].find((b) => b.textContent === label);
   if (button === undefined) throw new Error(`no button ${label}`);

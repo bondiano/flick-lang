@@ -1,4 +1,7 @@
 export declare const setup: () => undefined;
+export declare const serve: (markup: string, state: string) => undefined;
+export declare const complaints: () => string;
+export declare const stateLeft: () => boolean;
 export declare const click: (label: string) => void;
 export declare const choose: (label: string) => void;
 export declare const writeOnRelease: (line: string) => Promise<void>;

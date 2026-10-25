@@ -305,6 +305,25 @@ draft : String -> Atom.Writable String
 let draft = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.make "")
 ```
 
+Сервер передаёт их через `Ui.Server.state ()`: это
+`<script type="application/json" id="flick-state">` с сериализуемыми
+атомами реестра, который кладут в страницу после контейнера, когда тот
+отрисован. `Ui.Dom.mount` записывает их в свой реестр до первого рендера и
+удаляет скрипт, поэтому клиент начинает со значений сервера, а не
+запрашивает их заново, и следующий корень не перезапишет изменённые с тех
+пор значения. Атом, значение которого кодек не кодирует, — дефект с именем
+его ключа, а не молча пропущенное значение.
+
+```flick
+page : Number ->{} String
+let page n =
+  provide Reactivity.Atom.layer {
+    Atom.set count n
+    let markup = Ui.Server.render (Ui.render counter_view ())
+    "<div id=\"app\" data-flick-ssr>" ++ markup ++ "</div>" ++ Ui.Server.state ()
+  }
+```
+
 ## Другие рендереры React
 
 `@flick-lang/runtime/ui` — адаптер React DOM.

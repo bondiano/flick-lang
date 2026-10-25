@@ -1,0 +1,80 @@
+// A page a server rendered with its serializable atoms: the client mounts
+// it in a fresh registry, starts from the server's values without a
+// hydration mismatch, consumes the state script, and then runs as usual.
+module App.Main exposing (main)
+
+serve : String -> String ->{} Unit
+foreign sync serve from "./dom.mjs" "serve"
+  arity 2
+
+complaints : Unit ->{} String
+foreign sync complaints from "./dom.mjs" "complaints"
+  arity 0
+
+state_left : Unit ->{} Bool
+foreign sync state_left from "./dom.mjs" "stateLeft"
+  arity 0
+
+click : String ->{} Unit
+foreign sync click from "./dom.mjs" "click"
+  arity 1
+
+settle : Unit ->{} Unit
+foreign async settle from "./dom.mjs" "settle"
+  arity 0
+
+text : Unit ->{} String
+foreign sync text from "./dom.mjs" "text"
+  arity 0
+
+count : Atom.Writable Number
+let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
+
+greeting : Atom.Writable String
+let greeting = Atom.serializable (Codec.json Schema.string) (Atom.make "")
+
+increment : Action.Action Ui.ClickSnapshot {Reactivity.Atom.Registry} none
+let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
+
+page : Ui.View Unit {Reactivity.Atom.Registry} none
+let page =
+  Ui.view (fun () ->
+    ui {
+      div
+        { class_name = "page" }
+        [
+          paragraph [text (Atom.value greeting ++ " " ++ show (Atom.value count))],
+          button { disabled = false; on_click = increment } [text "+1"],
+        ]
+    })
+
+report : Failure e ->{} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let (markup, state) =
+    provide Reactivity.Atom.layer {
+      Atom.set count 5
+      Atom.set greeting "</script> hi"
+      let markup = Ui.Server.render (Ui.render page ())
+      (markup, Ui.Server.state ())
+    }
+  Platform.stdout_line state
+  serve markup state
+  match Ui.Dom.container "app" with
+  | None -> Platform.stdout_line "no container"
+  | Some root ->
+    provide Reactivity.Atom.layer {
+      scope s {
+        let ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render page ()) })
+        settle ()
+        Platform.stdout_line (text ())
+        Platform.stdout_line ("state left: " ++ show (state_left ()))
+        click "+1"
+        settle ()
+        Platform.stdout_line (text ())
+      }
+    }
+  Platform.stdout_line ("complaints: [" ++ complaints () ++ "]")
