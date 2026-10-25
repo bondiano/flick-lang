@@ -1,5 +1,5 @@
 // Recursion is explicit; polymorphic recursion needs a full `forall`.
-module App.Recursion exposing (depth, countdown, is_even, sum)
+module App.Recursion exposing (depth, countdown, is_even, sum, even_len, first_even)
 
 type Nested a = Flat a | Nest (Nested (List a))
 
@@ -19,6 +19,36 @@ rec {
 
   is_odd : Number -> Bool
   let is_odd n = if n == 0 then false else is_even (n - 1)
+}
+
+// the members of a group use each other at their own types, whatever the
+// names of their variables
+rec {
+  even_len : List a -> Bool
+  let even_len xs =
+    match xs with
+    | [] -> true
+    | [_, ...rest] -> odd_len rest
+
+  odd_len : List b -> Bool
+  let odd_len xs =
+    match xs with
+    | [] -> false
+    | [_, ...rest] -> even_len rest
+}
+
+rec {
+  first_even : (a -> Bool) -> List a -> Option a
+  let first_even p xs =
+    match xs with
+    | [] -> None
+    | [x, ...rest] -> if p x then Some x else first_odd p rest
+
+  first_odd : (a -> Bool) -> List a -> Option a
+  let first_odd p xs =
+    match xs with
+    | [] -> None
+    | [_, ...rest] -> first_even p rest
 }
 
 sum : List Number -> Number

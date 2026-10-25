@@ -39,6 +39,7 @@ mod origin;
 mod patterns;
 mod qualified;
 mod records;
+mod recursion;
 mod redundant;
 mod regions;
 mod report;
@@ -241,12 +242,16 @@ struct Local {
 }
 
 /// A recursive function whose signature has no explicit `forall`: its
-/// recursive uses must have exactly the type being checked.
-#[derive(Debug, Clone)]
+/// recursive uses must have the type being checked, up to the names of the
+/// variables of its group.
+#[derive(Debug, Clone, Default)]
 struct Rec {
     name: String,
-    /// The signature with the skolems its body is checked against.
+    /// The signature, and its body with the skolems its body is checked
+    /// against, by variable.
+    scheme: Option<Type>,
     target: Option<Type>,
+    skolems: Vec<(String, Type)>,
     uses: Vec<(Type, Span)>,
 }
 

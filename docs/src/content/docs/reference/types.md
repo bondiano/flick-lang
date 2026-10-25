@@ -179,7 +179,10 @@ recurse; a value that would be evaluated while it is defined is `FLICK-T012`.
 
 A recursive function may call itself at another type only when its
 signature starts with a `forall` that binds all its variables; otherwise
-that call is `FLICK-T015`.
+that call is `FLICK-T015`. The members of a `rec` group call each other at
+their own types without one, whatever their variables are named: `odd_len`
+of `List b -> Bool` called from `even_len` of `List a -> Bool` on a
+`List a` is the same type.
 
 ```flick
 type Nested a = Flat a | Nest (Nested (List a))

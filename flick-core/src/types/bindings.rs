@@ -7,7 +7,7 @@ use std::mem;
 use super::convert::{TyVar, is_type};
 use super::patterns::is_pattern;
 use super::ty::Type;
-use super::{Checker, Local, Rec};
+use super::{Checker, Local};
 use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -180,7 +180,7 @@ impl Checker<'_> {
             let runtime = self.check_signed(decl, &parts, &scheme, rec.flatten(), Some(&captures));
             self.locals.truncate(mark - usize::from(rec.is_some()));
             if let Some(Some(rec)) = rec {
-                self.finish_rec(rec);
+                self.finish_recs(&[rec]);
             }
             self.polymorphic_runtime(&name, &scheme, runtime, decl);
             let ty = self.inferred_captures(scheme, captures, self.span(decl));
@@ -222,47 +222,6 @@ impl Checker<'_> {
         }
     }
 
-    pub fn new_rec(&mut self, name: &str) -> usize {
-        self.recs.push(Rec {
-            name: name.to_owned(),
-            target: None,
-            uses: Vec::new(),
-        });
-        self.recs.len() - 1
-    }
-
-    /// Recursive uses of a function without an explicit `forall` must have
-    /// the very type its body is checked against.
-    pub fn finish_rec(&mut self, rec: usize) {
-        let Rec { name, target, uses } = mem::replace(
-            &mut self.recs[rec],
-            Rec {
-                name: String::new(),
-                target: None,
-                uses: Vec::new(),
-            },
-        );
-        let Some(target) = target else { return };
-        for (ty, span) in uses {
-            if self.unify(&ty, &target).is_err() {
-                let (used, own) = (self.show(&ty), self.show(&target));
-                self.diagnostics.push(
-                    Diagnostic::error(
-                        codes::T015,
-                        format!(
-                            "`{name}` is used at type `{used}` inside its own definition, which has type `{own}`: that is polymorphic recursion"
-                        ),
-                        span,
-                    )
-                    .with_fix(
-                        format!("quantify every variable of the signature explicitly: `{name} : forall … .`"),
-                        Vec::new(),
-                    ),
-                );
-            }
-        }
-    }
-
     /// Checks the definition against its signature; returns whether the
     /// right-hand side ran a runtime call while being defined.
     pub fn check_signed(
@@ -288,7 +247,7 @@ impl Checker<'_> {
         let assumed = self.classes.givens.len();
         self.classes.givens.extend(givens);
         let mark = self.tyvars.len();
-        for (name, ty) in skolems {
+        for (name, ty) in skolems.iter().cloned() {
             let kind = kinds
                 .iter()
                 .find(|b| b.name == name)
@@ -296,7 +255,10 @@ impl Checker<'_> {
             self.tyvars.push(TyVar { name, ty, kind });
         }
         if let Some(rec) = rec {
-            self.recs[rec].target = Some(body.clone());
+            let rec = &mut self.recs[rec];
+            rec.scheme = Some(scheme.clone());
+            rec.target = Some(body.clone());
+            rec.skolems.clone_from(&skolems);
         }
         let saved = mem::take(&mut self.runtime);
         if parts.params.is_empty() {

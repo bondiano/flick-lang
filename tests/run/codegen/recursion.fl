@@ -55,13 +55,13 @@ let rec restart acc n xs =
   | [x, ...rest] -> restart (acc + x) n rest
 
 rec {
-  even_len : forall a. List a -> Bool
+  even_len : List a -> Bool
   let even_len xs =
     match xs with
     | [] -> true
     | [_, ...rest] -> odd_len rest
 
-  odd_len : forall a. List a -> Bool
+  odd_len : List a -> Bool
   let odd_len xs =
     match xs with
     | [] -> false
