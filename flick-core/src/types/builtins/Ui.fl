@@ -14,10 +14,25 @@ type Handler s
 
 /// A click, as an inert copy of the DOM event.
 type alias ClickSnapshot =
-  { button : Number; alt : Bool; ctrl : Bool; shift : Bool; meta : Bool }
+  {
+    /// The mouse button: 0 the main one, 1 the wheel, 2 the secondary one.
+    button : Number;
+    /// Whether Alt (Option) was held.
+    alt : Bool;
+    /// Whether Control was held.
+    ctrl : Bool;
+    /// Whether Shift was held.
+    shift : Bool;
+    /// Whether Meta (Command, Windows) was held.
+    meta : Bool;
+  }
 
 /// The text of an input after an edit.
-type alias InputSnapshot = { value : String }
+type alias InputSnapshot =
+  {
+    /// The whole text, as the input holds it now.
+    value : String;
+  }
 
 /// A tab of `tabs`: a label and its content.
 type Tab
@@ -37,27 +52,74 @@ type Renderer
 /// `foreign pure`: Flick renders it and never calls it.
 type Component p
 
+/// The props of `div`, `span` and `pre`.
+type alias ElementProps =
+  {
+    /// The CSS classes of the element, separated by spaces: its `class`
+    /// attribute.
+    class_name : String;
+  }
+
+/// The props of `link`.
+type alias LinkProps =
+  {
+    /// Where the link goes: a URL with a safe scheme, or a relative one.
+    href : SafeUrl;
+  }
+
+/// The props of `tabs`.
+type alias TabsProps =
+  {
+    /// The tab shown, counting from 0.
+    selected : Number;
+  }
+
 /// The props of `button`.
 type alias ButtonProps c =
-  { disabled : Bool; on_click : (Handler ClickSnapshot)^c }
+  {
+    /// Whether the button is greyed out and ignores clicks.
+    disabled : Bool;
+    /// What runs on each click, with a copy of it.
+    on_click : (Handler ClickSnapshot)^c;
+  }
 
 /// The props of `input`.
 type alias InputProps c =
-  { value : String; placeholder : String; on_input : (Handler InputSnapshot)^c }
+  {
+    /// The initial text: later edits do not reset it.
+    value : String;
+    /// The hint shown while the input is empty.
+    placeholder : String;
+    /// What runs after each edit, with the new text.
+    on_input : (Handler InputSnapshot)^c;
+  }
 
 /// The props of `select`: every field speaks of the same `a`.
 type alias SelectProps a c =
   {
+    /// The choices, in the order they are listed.
     items : List a;
+    /// The item shown as chosen, if any: the one with its `key`.
     selected : Option a;
+    /// A string telling the items apart: their React key, and how
+    /// `selected` is found among them.
     key : (a -> String)^c;
+    /// How an item is shown in the list.
     render_item : (a -> Ui^c)^c;
+    /// What runs when an item is chosen, with that item.
     on_change : (Handler a)^c;
   }
 
 /// The named places of `panel`.
 type alias PanelSlots c =
-  { header : Ui^c; body : Ui^c; footer : Option (Ui^c) }
+  {
+    /// The top of the panel.
+    header : Ui^c;
+    /// The content of the panel.
+    body : Ui^c;
+    /// The bottom of the panel, when there is one.
+    footer : Option (Ui^c);
+  }
 
 /// Text through the text channel: markup in it stays text.
 text : String -> Ui
@@ -81,11 +143,11 @@ keyed : forall c. String -> Ui^c -> Ui^c
 foreign pure keyed from "@flick-lang/runtime/ui/react" "uiKeyed"
   retention call
 
-div : forall c. { class_name : String } -> List (Ui^c) -> Ui^c
+div : forall c. ElementProps -> List (Ui^c) -> Ui^c
 foreign pure div from "@flick-lang/runtime/ui/react" "uiDiv"
   retention call
 
-span : forall c. { class_name : String } -> List (Ui^c) -> Ui^c
+span : forall c. ElementProps -> List (Ui^c) -> Ui^c
 foreign pure span from "@flick-lang/runtime/ui/react" "uiSpan"
   retention call
 
@@ -120,11 +182,11 @@ foreign pure textarea from "@flick-lang/runtime/ui/react" "uiTextarea"
   retention call
 
 /// Preformatted text: spaces and line breaks are kept.
-pre : forall c. { class_name : String } -> List (Ui^c) -> Ui^c
+pre : forall c. ElementProps -> List (Ui^c) -> Ui^c
 foreign pure pre from "@flick-lang/runtime/ui/react" "uiPre"
   retention call
 
-link : forall c. { href : SafeUrl } -> List (Ui^c) -> Ui^c
+link : forall c. LinkProps -> List (Ui^c) -> Ui^c
 foreign pure link from "@flick-lang/runtime/ui/react" "uiLink"
   retention call
 
@@ -147,7 +209,7 @@ foreign pure tab from "@flick-lang/runtime/ui/react" "uiTab"
   retention call
 
 /// At least one tab; `selected` counts from 0.
-tabs : forall c. { selected : Number } -> NonEmpty.NonEmpty (Tab^c) -> Ui^c
+tabs : forall c. TabsProps -> NonEmpty.NonEmpty (Tab^c) -> Ui^c
 foreign pure tabs from "@flick-lang/runtime/ui/react" "uiTabs"
   retention call
 
@@ -199,8 +261,11 @@ foreign pure render from "@flick-lang/runtime/ui/react" "uiRender"
 /// The props of a field bound to a state.
 type alias FieldProps c =
   {
+    /// The state the field shows and each keystroke writes.
     bind : Atom.Writable String;
+    /// The hint shown while the field is empty.
     placeholder : String;
+    /// What runs as a task after each edit, once `bind` is written.
     on_input : Option ((Handler InputSnapshot)^c);
   }
 
@@ -227,18 +292,34 @@ type Live = Polite | Assertive | Off
 /// none: `with_host { host with role = Some "status" } node`.
 type alias Host =
   {
+    /// The `id` attribute: unique in the page.
     id : Option String;
+    /// The CSS classes, separated by spaces; they replace the ones the
+    /// props give.
     class_name : Option String;
+    /// The ARIA role, such as `"status"` or `"dialog"`.
     role : Option String;
+    /// `aria-label`: the name assistive technology reads.
     aria_label : Option String;
+    /// `aria-describedby`: the `id` of the element that describes this one.
     aria_describedby : Option String;
+    /// `aria-hidden`: whether assistive technology skips the element.
     aria_hidden : Option Bool;
+    /// `aria-pressed`: whether a toggle button is on.
     aria_pressed : Option Bool;
+    /// `aria-live`: how changes inside the element are announced.
     aria_live : Option Live;
+    /// `tabindex`: 0 puts the element in the tab order, -1 takes it out.
     tab_index : Option Number;
+    /// `data-*` attributes, by the name after `data-`: lowercase letters,
+    /// digits and hyphens.
     data : List (String, String);
+    /// `autocapitalize`: whether text entry starts sentences with a capital.
     auto_capitalize : Option Bool;
+    /// `autocorrect`: whether text entry corrects spelling.
     auto_correct : Option Bool;
+    /// Whether a text area wraps long lines (`wrap="soft"`) or scrolls
+    /// (`wrap="off"`).
     wrap : Option Bool;
   }
 
