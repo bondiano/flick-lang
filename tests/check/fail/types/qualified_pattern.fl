@@ -1,0 +1,9 @@
+// A constructor pattern through a module that does not export the
+// constructor: `Http.Server` imports `ServeError` but does not re-export it.
+module App.Patterns exposing (..)
+
+describe : Http.ServerError.ServeError -> String
+let describe failure =
+  match failure with
+  | Http.Server.ServeError message -> message
+//  ^^^^^^^^^^^^^^^^^^^^^^ FLICK-T001 `Http.Server` does not export constructor `ServeError`
