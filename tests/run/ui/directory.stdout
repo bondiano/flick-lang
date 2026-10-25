@@ -2,7 +2,7 @@ open log
 <div><ul role="tablist"><li role="tab" aria-selected="true">People</li><li role="tab" aria-selected="false">About</li></ul><div role="tabpanel"><section><header><h1>People</h1></header><main><ul role="listbox"><li role="option" aria-selected="false">Ada</li><li role="option" aria-selected="false">Mallory</li><li role="option" aria-selected="false">Carol</li></ul></main></section></div></div>
 Ada saved to log
 PeopleAboutPeopleAdaMalloryCarolchosen Ada
-supervisor: fail Refused
+refused Mallory
 closing
 root closed: interrupt, page []
 Carol saved to log

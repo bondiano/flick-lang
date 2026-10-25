@@ -25,7 +25,7 @@ let query = Atom.on_server "(none)" (Atom.search_param "q")
 seen : Atom.Atom (Option String)
 let seen = Atom.client_only (Atom.search_param "q")
 
-page : Ui.View Unit {Atom.Write} none
+page : Ui.View Unit
 let page =
   Ui.view (fun () ->
     let client =

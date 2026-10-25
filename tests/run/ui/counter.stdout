@@ -1,6 +1,6 @@
 count 0+1refuse<b>bold?</b>badge: new
 count 2+1refuse<b>bold?</b>badge: new
-supervisor: fail Refused
+supervisor: die refused
 <div class="counter"><h1>count 2</h1><button type="button">+1</button><button type="button">refuse</button><p>&lt;b&gt;bold?&lt;/b&gt;</p>badge: new</div>
 supervisor: interrupt
 after the scope: []

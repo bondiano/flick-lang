@@ -7,7 +7,7 @@ module Ui.Server exposing (..)
 /// request its own with `provide Atom.layer { … }`, so requests
 /// rendered at once do not see each other's atoms, and nothing reads that
 /// registry once its `provide` ends. Handlers do not run here.
-render : forall c r e. (Ui r e)^c ->{Reactivity.Atom.Registry; none} String
+render : forall c. Ui^c ->{Reactivity.Atom.Registry; none} String
 foreign effect render from "@flick-lang/runtime/ui/server" "uiServerRender"
   retention call
 
@@ -27,5 +27,5 @@ foreign effect state from "@flick-lang/runtime/ui/server" "uiServerState"
 /// this call alone, so the same `ui` always gives the same HTML. Handlers
 /// are left out, and a foreign component, which only React renders, is a
 /// defect.
-to_html : forall r e. Ui r e -> String
+to_html : Ui -> String
 foreign pure to_html from "@flick-lang/runtime/ui/html" "uiToHtml"

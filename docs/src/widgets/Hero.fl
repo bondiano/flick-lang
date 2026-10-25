@@ -48,10 +48,10 @@ effect_source : String
 let effect_source =
   "import { Console, Effect } from \"effect\"\n\nconst main = Console.log(\"Hello, effects.\")\n\nEffect.runPromise(main)\n"
 
-token : String -> String -> Ui {Atom.Write} none
+token : String -> String -> Ui
 let token category value = Ui.span { class_name = "token-" ++ category } [Ui.text value]
 
-snippet : Bool -> Ui {Atom.Write} none
+snippet : Bool -> Ui
 let snippet effect =
   ui {
     pre { class_name = "hero-source" }
@@ -127,7 +127,7 @@ let run_example model =
   | Ok output -> Atom.set model { current with running = false; output = output; failed = false }
   | Err message -> Atom.set model { current with running = false; output = message; failed = true }
 
-view : Atom.Writable Model -> Model -> Ui {Atom.Write} none
+view : Atom.Writable Model -> Model -> Ui
 let view model m =
   let status =
     if not m.ready then
@@ -219,7 +219,7 @@ initial_model : Bool -> Model
 let initial_model ru =
   { ru = ru; ready = false; effect = false; running = false; output = ""; failed = false; copied = false }
 
-initial_view : Bool ->{} Ui {Atom.Write} none
+initial_view : Bool ->{} Ui
 let initial_view ru =
   let initial = initial_model ru
   view (Atom.make initial) initial

@@ -1,11 +1,11 @@
 module Elements exposing (attributes, icon, route)
 
-attributes : forall c r e. List (String, String) -> (Ui r e)^c -> (Ui r e)^c
+attributes : forall c. List (String, String) -> Ui^c -> Ui^c
 foreign pure attributes from "./dom.ts" "attributes"
   arity 2
   retention call
 
-icon : forall r e. String -> Ui r e
+icon : String -> Ui
 let icon name =
   let path =
     match name with
@@ -25,7 +25,7 @@ let icon name =
         ++ path
         ++ "</svg>"))
 
-route : forall r e. String -> String -> Ui r e
+route : String -> String -> Ui
 let route href label =
   match Ui.safe_url href with
   | Some url -> Ui.link { href = url } [Ui.text label]

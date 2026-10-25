@@ -36,7 +36,7 @@ let find model query =
     | Ok hits -> Atom.set model { m with query = query; hits = hits; problem = "" }
     | Err problem -> Atom.set model { m with query = query; hits = []; problem = problem }
 
-hit : Hit -> Ui {Atom.Write} none
+hit : Hit -> Ui
 let hit result =
   ui {
     item
@@ -44,7 +44,7 @@ let hit result =
         paragraph [text result.excerpt]]
   }
 
-view : Atom.Writable Model -> Model -> Ui {Atom.Write} none
+view : Atom.Writable Model -> Model -> Ui
 let view model m =
   let prefix = if m.ru then "/ru" else ""
   ui {

@@ -1,6 +1,8 @@
 // The two forms of `save_button`: the `Ui` functions and the `ui { … }`
-// block, which only opens the names of `Ui`. Then the two ways a handler may
-// use a scoped file: open it inside the task, or keep the UI in the scope.
+// block, which only opens the names of `Ui`. A handler writes atoms and
+// nothing else, so `save` provides `Users` and handles `SaveError` itself.
+// Then the two ways a handler may use a scoped file: open it inside the
+// task, or keep the UI in the scope.
 module App.SaveButton exposing (..)
 
 type error SaveError = SaveError String
@@ -12,10 +14,20 @@ type alias SaveButtonProps c =
   {
     label : String;
     disabled : Bool;
-    on_save : (Unit ->{Users; SaveError} Unit)^c;
+    on_save : (Unit ->{Atom.Write;} Unit)^c;
   }
 
-save_button : SaveButtonProps c -> (Ui {Users} {SaveError})^c
+failure : Atom.Writable (Option String)
+let failure = Atom.make None
+
+save : Layer none none {Users} -> String -> Unit ->{Atom.Write;} Unit
+let save users name () =
+  provide users {
+    try Users.save name with
+    | SaveError reason -> Atom.set failure (Some reason)
+  }
+
+save_button : SaveButtonProps c -> Ui^c
 let save_button props =
   Ui.button
     {
@@ -26,7 +38,7 @@ let save_button props =
     }
     [Ui.text props.label]
 
-save_button_ui : SaveButtonProps c -> (Ui {Users} {SaveError})^c
+save_button_ui : SaveButtonProps c -> Ui^c
 let save_button_ui props =
   ui {
     button
@@ -41,17 +53,20 @@ let save_button_ui props =
 
 type alias User = { id : Number; name : String }
 
-users : Ui.SelectProps User {Users} {SaveError} c -> (Ui {Users} {SaveError})^c
+users : Ui.SelectProps User c -> Ui^c
 let users props = Ui.select props
 
-reader : File.Path -> Ui {File.FileSystem} {File.OpenError, File.ReadError}
+reader : File.Path -> Ui
 let reader path =
   ui {
     button
       {
         disabled = false;
         on_click = Ui.Event.exhaust (fun _ -> task {
-          scope { ignore (File.read_all (File.open_scoped path)) }
+          provide File.node {
+            try scope { ignore (File.read_all (File.open_scoped path)) } with
+            | _ -> ()
+          }
         });
       }
       [text "read"]
@@ -66,7 +81,12 @@ let held_in_scope path =
         button
           {
             disabled = false;
-            on_click = Ui.Event.exhaust (fun _ -> task { ignore (File.read_all file) });
+            on_click = Ui.Event.exhaust (fun _ -> task {
+              provide File.node {
+                try ignore (File.read_all file) with
+                | _ -> ()
+              }
+            });
           }
           [text "read"]
       }

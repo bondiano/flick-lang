@@ -12,7 +12,7 @@ let count = Atom.make 0
 name : Atom.Writable String
 let name = Atom.make ""
 
-page : Ui.View Unit {Atom.Write} none
+page : Ui.View Unit
 let page =
   Ui.view (fun () ->
     ui {

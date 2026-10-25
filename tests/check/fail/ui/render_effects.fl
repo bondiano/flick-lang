@@ -3,7 +3,7 @@ module App.RenderEffects exposing (..)
 count : Atom.Writable Number
 let count = Atom.make 0
 
-writes : Ui.View Unit {Atom.Write} none
+writes : Ui.View Unit
 let writes =
   Ui.view (fun () ->
     Atom.set count 1
@@ -18,19 +18,19 @@ let computes =
 service Log =
   line : String ->{} Unit
 
-logs : Ui.View Unit none none
+logs : Ui.View Unit
 let logs =
   Ui.view (fun () ->
     Log.line "render"
     ui { text "x" })
 
-fails : Ui.View Unit none none
+fails : Ui.View Unit
 let fails =
   Ui.view (fun () ->
     App.fail "no"
     ui { text "x" })
 
-suspends : Ui.View Unit none none
+suspends : Ui.View Unit
 let suspends = Ui.suspended (fun _ -> ui { text "failed" }) (ui { text "…" }) (fun () ->
   App.fail "no"
   ui { text "x" })

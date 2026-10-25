@@ -1,7 +1,7 @@
 // One whole UI path with React 19 in jsdom: a generic select inside typed
 // children (panel slots, non-empty tabs, an optional footer) renders as a
-// view of the state; choosing an item runs a task under its policy, a
-// refused choice goes to the supervisor, and closing the scope unmounts at
+// view of the state; choosing an item runs a task under its policy, which
+// handles a refused choice itself, and closing the scope unmounts at
 // once but releases the scope's resource only after the running task's
 // write has finished, which it can only do once the root has closed.
 module App.Main exposing (main)
@@ -42,7 +42,7 @@ foreign sync release from "./dom.mjs" "release"
 
 // Generic over the item: the items, key, render_item and on_change of the
 // props all speak of the same `a`.
-picker : String -> Ui.SelectProps a r e c -> (Ui r e)^c
+picker : String -> Ui.SelectProps a c -> Ui^c
 let picker title props =
   ui {
     panel
@@ -69,7 +69,7 @@ let save model log user =
 directory : Atom.Writable (Option User) ->
   String ->
   Option User ->
-  Ui {Atom.Write} {Refused}
+  Ui
 let directory model log selected =
   ui {
     tabs
@@ -81,7 +81,10 @@ let directory model log selected =
             selected = selected;
             key = fun (user : User) -> user.name;
             render_item = fun (user : User) -> text user.name;
-            on_change = Ui.Event.latest (fun user -> task { save model log user });
+            on_change = Ui.Event.latest (fun user -> task {
+              try save model log user with
+              | Refused name -> Platform.stdout_line ("refused " ++ name)
+            });
           }))
         [tab "About" (paragraph [text "about"])])
   }

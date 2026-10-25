@@ -1,11 +1,8 @@
 // A counter on atoms mounted with React 19 in jsdom: actions write its
 // state and the view renders again, a foreign component renders inside it,
-// failures reach the supervisor, text stays text, and both DOM and custom
+// a handler's defect reaches the supervisor, text stays text, and both DOM and custom
 // renderer scopes unmount their roots.
 module App.Main exposing (main)
-
-type error Refused = Refused String
-  deriving Show
 
 setup : Unit ->{} Unit
 foreign sync setup from "./dom.mjs" "setup"
@@ -36,13 +33,13 @@ foreign pure badge from "./dom.mjs" "Badge"
 count : Atom.Writable Number
 let count = Atom.make 0
 
-increment : Action.Action Ui.ClickSnapshot {Atom.Write} {Refused}
+increment : Action.Action Ui.ClickSnapshot
 let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
 
-refuse : Action.Action Ui.ClickSnapshot {Atom.Write} {Refused}
-let refuse = Action.latest (fun _ -> task { from_result (Err (Refused "no")) })
+refuse : Action.Action Ui.ClickSnapshot
+let refuse = Action.latest (fun _ -> task { Failure.rethrow (Cause.die "refused") })
 
-counter : Ui.View Unit {Atom.Write} {Refused}
+counter : Ui.View Unit
 let counter =
   Ui.named
     "App.Main.counter"

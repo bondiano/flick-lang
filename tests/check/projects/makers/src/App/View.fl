@@ -2,7 +2,7 @@ module App.View exposing (view)
 
 import App.State
 
-view : Ui.View Number none none
+view : Ui.View Number
 let view =
   Ui.view
     (

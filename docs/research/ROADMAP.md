@@ -183,9 +183,9 @@ component search (props : SearchProps) =
 - AC: тип по-прежнему требует обработчик ошибки `e` (или `e = Never`); тест рантайма: loading → loaded → failed.
 - AC: никакой неявной приостановки: `Atom.get` на task-атоме по-прежнему даёт `Atom.Async`.
 
-**U7. Миграция и удаление старого (§6.2).** 🔶 `5daf143`
+**U7. Миграция и удаление старого (§6.2).** ✅ `5daf143` + U7b
 - ✅ AC: плейграунд и docs-header на атомах; `Ui.Dom.run`, `Ui.run_with`, `Ui.lazy_view(_with)` удалены; `ui.test.ts` разбит по темам; `reference/ui.md` и ru переписаны.
-- **U7b. 🆕 `Ui r e` → `Ui`.** ⬜ AC: после U2/U3 параметры `r e` у `Ui` ничего не несут (обработчики — action со своей строкой) — тип схлопнут до `Ui` во всех builtins, тестах, docs и плейграунде; если какой-то параметр всё же нужен — записка с причиной в `implementation-decisions.md`, и он остаётся один. Deprecated-алиасов не оставляем.
+- **U7b. 🆕 `Ui r e` → `Ui`.** ✅ (строка обработчика фиксирована: `{Atom.Write}`, без ошибок; `mount` требует `Atom.Write`, супервизор получает `Failure none`; `FLICK-U001` проверяет и `Action.queue/concurrent`) AC: после U2/U3 параметры `r e` у `Ui` ничего не несут (обработчики — action со своей строкой) — тип схлопнут до `Ui` во всех builtins, тестах, docs и плейграунде; если какой-то параметр всё же нужен — записка с причиной в `implementation-decisions.md`, и он остаётся один. Deprecated-алиасов не оставляем.
 
 **U8. Бюджет.** ✅ `5daf143`, `20edc6a`
 - AC: counter на атомах ≤ 99 KB (B2 + 18), playground ≤ 110 KB gz; превышение валит `just bundle-size`.
@@ -257,7 +257,7 @@ component search (props : SearchProps) =
 
 ```
 B0…B9 ✅ ─ B7b                        (замер, независимо)
-S1 ✅ ─ U1…U6 ✅ ─ U7 🔶 ─ U7b ─ U6b
+S1 ✅ ─ U1…U6 ✅ ─ U7 ✅ ─ U7b ✅ ─ U6b
         └─ R1…R4 ✅ ─ R5 🔶 ─ R6 ✅
 C2/C3/C4/C6 ✅ ─ C6b ✅
 C7a ─ C7b ─ C7c ─ C7d ─ C5            C1 (бенчмарк, может закрыться без реализации)

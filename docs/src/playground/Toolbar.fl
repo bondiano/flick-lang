@@ -8,20 +8,20 @@ choice : String ->
   Bool ->
   Bool ->
   (Unit ->{Atom.Write;} Unit) ->
-  Ui {Atom.Write} none
+  Ui
 let choice label active disabled act =
   Ui.with_host { Ui.host with class_name = Some (if active then "fp-choice fp-on" else "fp-choice"); aria_pressed = Some (active) }
     (Ui.button
       { disabled = disabled; on_click = Ui.Event.latest (fun _ -> task { act () }) }
       [Ui.text label])
 
-pick : Atom.Writable Model -> Model -> Example -> Ui {Atom.Write} none
+pick : Atom.Writable Model -> Model -> Example -> Ui
 let pick model m example =
   Ui.keyed example.name
     (choice (tr m.locale example.name example.name_ru) (m.source == example.source) m.running
       (fun () -> choose model example))
 
-set_profile : Atom.Writable Model -> Model -> Profile -> Ui {Atom.Write} none
+set_profile : Atom.Writable Model -> Model -> Profile -> Ui
 let set_profile model m profile =
   choice
     (if profile == Debug then tr m.locale "Debug" "Отладка" else tr m.locale "Release" "Релиз")
@@ -31,7 +31,7 @@ let set_profile model m profile =
       let current = if profile == Debug then m.compiled.debug else m.compiled.release
       { m with profile = profile; tab = if errors current > 0 then Problems else m.tab }))
 
-examples_view : Atom.Writable Model -> Model -> Ui {Atom.Write} none
+examples_view : Atom.Writable Model -> Model -> Ui
 let examples_view model m =
   Ui.with_host
     { Ui.host with role = Some "group"; aria_label = Some (tr m.locale "Examples" "Примеры") }
@@ -41,7 +41,7 @@ let examples_view model m =
         Ui.div { class_name = "fp-example-options" } (List.map (pick model m) examples),
       ])
 
-view : Atom.Writable Model -> Model -> Ui {Atom.Write} none
+view : Atom.Writable Model -> Model -> Ui
 let view model m =
   ui {
     div { class_name = "fp-toolbar" }

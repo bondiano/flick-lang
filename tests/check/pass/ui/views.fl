@@ -4,11 +4,11 @@ module App.Views exposing (..)
 count : Atom.Writable Number
 let count = Atom.make 1
 
-count_view : Ui.View Unit none none
+count_view : Ui.View Unit
 let count_view = Ui.view (fun () -> Ui.text ("count " ++ show (Atom.value count)))
 
-app : Ui none none
+app : Ui
 let app = Ui.render count_view ()
 
-run : Ui.Renderer ->{Reactivity.Atom.Registry; none} Never
+run : Ui.Renderer ->{Reactivity.Atom.Registry, Atom.Write; none} Never
 let run renderer = Ui.mount_with renderer (fun _ -> ()) app

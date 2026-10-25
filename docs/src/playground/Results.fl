@@ -2,7 +2,7 @@ module Results exposing (current_problems, output_pane, diagnostic_label)
 
 import State exposing (Diagnostic, Locale, Model, generated, profile_name, tr)
 
-problem : Locale -> Diagnostic -> Ui {Atom.Write} none
+problem : Locale -> Diagnostic -> Ui
 let problem locale diagnostic =
   ui {
     item
@@ -25,7 +25,7 @@ let problem locale diagnostic =
       ]
   }
 
-problems_pane : Locale -> List Diagnostic -> Ui {Atom.Write} none
+problems_pane : Locale -> List Diagnostic -> Ui
 let problems_pane locale diagnostics =
   ui {
     div { class_name = "fp-diagnostics" }
@@ -36,7 +36,7 @@ let problems_pane locale diagnostics =
       ]
   }
 
-current_problems : Model -> Ui {Atom.Write} none
+current_problems : Model -> Ui
 let current_problems m =
   if m.loading then
     Ui.paragraph
@@ -82,7 +82,7 @@ let execution_status m =
   else
     tr m.locale "Program failed" "Программа завершилась с ошибкой"
 
-output_pane : Model -> Ui {Atom.Write} none
+output_pane : Model -> Ui
 let output_pane m =
   if m.running || m.execution.status == "" then
     ui {

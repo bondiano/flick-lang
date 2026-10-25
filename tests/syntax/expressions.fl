@@ -104,7 +104,7 @@ let query =
     select { name = user.name; balance = account.balance }
   }
 
-view : Props -> Ui {Users} {SaveError}
+view : Props -> Ui
 let view props =
   ui {
     button

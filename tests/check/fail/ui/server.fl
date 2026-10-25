@@ -5,7 +5,7 @@ module App.Main exposing (outside, after)
 count : Atom.Writable Number
 let count = Atom.make 0
 
-page : Ui none none
+page : Ui
 let page = Ui.render (Ui.view (fun () -> Ui.text (show (Atom.value count)))) ()
 
 outside : Unit ->{} String

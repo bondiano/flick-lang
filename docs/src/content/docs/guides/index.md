@@ -113,7 +113,7 @@ explicit policy.
    adapter uses React 19 and React DOM, which are application-installed
    optional peer dependencies of the runtime.
 3. Keep the state in atoms (`Atom.make`) and write views with `Ui.view`:
-   a view's render reads atoms with `Atom.value` and returns `Ui r e`.
+   a view's render reads atoms with `Atom.value` and returns a `Ui`.
    It runs no handler and performs no DOM access.
 4. Choose an event policy deliberately: `Ui.Event.exhaust`, `latest`,
    bounded `queue`, or bounded `concurrent`. Write atoms inside the event

@@ -6,17 +6,17 @@ let count = Atom.make 0
 drafts : Atom.Family Number (Atom.Writable String)
 let drafts = Atom.family (fun _ -> Atom.make "")
 
-remove : Action.Action (Number, Ui.ClickSnapshot) {Atom.Write} none
+remove : Action.Action (Number, Ui.ClickSnapshot)
 let remove = Action.exhaust (fun (n, _) -> task { Atom.set count n })
 
-states : Ui.View Number {Atom.Write} none
+states : Ui.View Number
 let states =
   Ui.view (fun n ->
     let local = Atom.make n
     let twice = Atom.derived (fun () -> Atom.value local * 2)
     ui { text (show (Atom.get twice)) })
 
-actions : Ui.View Number {Atom.Write} none
+actions : Ui.View Number
 let actions =
   Ui.view (fun n ->
     ui {
@@ -29,18 +29,18 @@ let actions =
         ]
     })
 
-inner : Ui.View Unit {Atom.Write} none
+inner : Ui.View Unit
 let inner = Ui.view (fun () -> ui { text "inner" })
 
-views : Ui.View Unit none none
+views : Ui.View Unit
 let views = Ui.view (fun () -> ui { Ui.render (Ui.view (fun () -> ui { text "made" })) () })
 
-row : Number ->{Atom.Read;} Ui {Atom.Write} none
+row : Number ->{Atom.Read;} Ui
 let row n =
   let made = Atom.make ""
   ui { Ui.field { bind = made; placeholder = ""; on_input = None } }
 
-keyed : Ui.View Number {Atom.Write} none
+keyed : Ui.View Number
 let keyed =
   Ui.view
     (fun id ->
@@ -53,7 +53,7 @@ let keyed =
       })
 
 // a handler's task runs on an event, not while rendering
-handler : Ui.View Unit {Atom.Write} none
+handler : Ui.View Unit
 let handler =
   Ui.view (fun () ->
     let reset =
@@ -74,7 +74,7 @@ notes : String -> Atom.Writable String
 let notes = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.make "")
 
 // a function that makes an atom, called or named, makes one while rendering
-through : Ui.View Number {Atom.Write} none
+through : Ui.View Number
 let through =
   Ui.view (fun n ->
     let a = fresh n

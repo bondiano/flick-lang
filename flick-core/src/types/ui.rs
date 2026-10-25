@@ -14,13 +14,15 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
 impl Checker<'_> {
-    /// `Ui.Event.queue c` and `Ui.Event.concurrent c` of a constant `c`:
-    /// the capacity or limit must be a positive integer.
+    /// `queue c` and `concurrent c` of `Ui.Event` or `Action` with a
+    /// constant `c`: the capacity or limit must be a positive integer.
     pub fn ui_capacity(&mut self, head: &Node, arg: &Node) {
         let Some(Ref::Value { module, name }) = self.typing.names.get(&head.range()) else {
             return;
         };
-        if module != "Ui.Event" || !matches!(name.as_str(), "queue" | "concurrent") {
+        if !matches!(module.as_str(), "Ui.Event" | "Action")
+            || !matches!(name.as_str(), "queue" | "concurrent")
+        {
             return;
         }
         let what = if name == "queue" { "capacity" } else { "limit" };
@@ -30,7 +32,7 @@ impl Checker<'_> {
             self.error(
                 codes::U001,
                 self.span(arg),
-                format!("the {what} of `Ui.Event.{name}` must be a positive integer"),
+                format!("the {what} of `{module}.{name}` must be a positive integer"),
             );
         }
     }

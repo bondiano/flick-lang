@@ -7,7 +7,7 @@ import Results exposing (current_problems, diagnostic_label, output_pane)
 import State exposing (Model, Mode(..), Tab(..), profile_name, tr)
 import Toolbar exposing (choice, examples_view)
 
-result_pane : Atom.Writable Model -> Model -> Ui {Atom.Write} none
+result_pane : Atom.Writable Model -> Model -> Ui
 let result_pane model m =
   ui {
     div { class_name = "fp-result" }
@@ -37,14 +37,14 @@ let result_pane model m =
       ]
   }
 
-notice : String -> String -> Ui {Atom.Write} none
+notice : String -> String -> Ui
 let notice title detail =
   ui {
     div { class_name = "fp-notice" }
       [paragraph [text title], pre { class_name = "fp-failure-detail" } [text detail]]
   }
 
-view : Atom.Writable Model -> Model -> Ui {Atom.Write} none
+view : Atom.Writable Model -> Model -> Ui
 let view model m =
   ui {
     div { class_name = if m.mode == Play then "fp fp-play" else "fp fp-transpile" }

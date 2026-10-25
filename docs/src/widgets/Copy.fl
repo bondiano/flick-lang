@@ -11,7 +11,7 @@ foreign async copy_text from "./browser.ts" "copyText"
   arity 1
   catch JsError.from_js
 
-view : Input -> Atom.Writable Model -> Model -> Ui {Atom.Write} none
+view : Input -> Atom.Writable Model -> Model -> Ui
 let view input model m =
   let label =
     if m.problem != "" then

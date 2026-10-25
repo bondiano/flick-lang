@@ -2,9 +2,11 @@
 title: "Пользовательские интерфейсы"
 ---
 
-`Ui r e` описывает пользовательский интерфейс. Его обработчикам событий
-нужны сервисы `r`; они могут завершиться с ошибками `e`
+`Ui` описывает пользовательский интерфейс и обработчики его событий
 (см. [Программирование на уровне типов и eDSL](../../spec/10-type-programming-and-edsl/)).
+Задача обработчика только изменяет атомы (`Atom.Write`): другие сервисы
+она предоставляет себе сама и свои ошибки обрабатывает сама, поэтому
+у `Ui` нет строк эффектов.
 Построение `Ui` — чистая операция: оно не запускает обработчики, не читает
 состояние и не обращается к DOM. `Ui.Dom.mount` отображает интерфейс
 через React 19 (`react-dom/client`) и выполняет каждый обработчик события
@@ -18,7 +20,7 @@ type alias SaveButtonProps c =
     on_save : (Unit ->{Users; SaveError} Unit)^c;
   }
 
-save_button : SaveButtonProps c -> (Ui {Users} {SaveError})^c
+save_button : SaveButtonProps c -> Ui^c
 let save_button props =
   ui {
     button
@@ -68,21 +70,21 @@ SaveError} Unit` нельзя передать функцию обратного
 | - | - | - |
 | `text s` | текстовый узел React; разметка не интерпретируется | нет |
 | `fragment`, `optional`, `empty` | без элемента | `List`, `Option`, нет |
-| `div`, `span` `{ class_name }` | `div`, `span` | `List (Ui r e)` |
-| `paragraph`, `heading`, `list`, `item` | `p`, `h1`, `ul`, `li` | `List (Ui r e)` |
-| `heading_at level` | `h1` … `h6` для `H1` … `H6` | `List (Ui r e)` |
-| `button { disabled; on_click }` | `button type="button"` | `List (Ui r e)` |
+| `div`, `span` `{ class_name }` | `div`, `span` | `List Ui` |
+| `paragraph`, `heading`, `list`, `item` | `p`, `h1`, `ul`, `li` | `List Ui` |
+| `heading_at level` | `h1` … `h6` для `H1` … `H6` | `List Ui` |
+| `button { disabled; on_click }` | `button type="button"` | `List Ui` |
 | `input { value; placeholder; on_input }` | `input`; `value` — начальный текст | нет |
 | `textarea { value; placeholder; on_input }` | многострочный вариант `input` | нет |
-| `pre { class_name }` | `pre`: пробелы и переводы строк сохраняются | `List (Ui r e)` |
-| `link { href : SafeUrl }` | `a` | `List (Ui r e)` |
+| `pre { class_name }` | `pre`: пробелы и переводы строк сохраняются | `List Ui` |
+| `link { href : SafeUrl }` | `a` | `List Ui` |
 | `html (s : SanitizedHtml)` | `div` с HTML | нет |
-| `select (SelectProps a r e c)` | `ul role="listbox"`; выбор элемента запускает `on_change` с этим элементом | элементы через `render_item` |
+| `select (SelectProps a c)` | `ul role="listbox"`; выбор элемента запускает `on_change` с этим элементом | элементы через `render_item` |
 | `panel { header; body; footer }` | `section` с `header`, `main`, `footer` | задаются именованными полями |
-| `tabs { selected } (NonEmpty (Tab r e))` | список вкладок и выбранная панель | значения `Tab` из `tab label ui` |
+| `tabs { selected } (NonEmpty Tab)` | список вкладок и выбранная панель | значения `Tab` из `tab label ui` |
 | `component c props` | внешний компонент React | его свойства |
 
-`text` имеет тип `forall r e. String -> Ui r e`, поэтому его можно
+`text` имеет тип `String -> Ui`, поэтому его можно
 включить в список дочерних элементов любого элемента.
 `SafeUrl` можно получить только через `Ui.safe_url`: функция принимает
 относительные URL и схемы `http`, `https`, `mailto`, но отклоняет
@@ -120,7 +122,7 @@ SaveError} Unit` нельзя передать функцию обратного
 count : Atom.Writable Number
 let count = Atom.make 0
 
-counter_view : Ui.View Unit {Atom.Write} none
+counter_view : Ui.View Unit
 let counter_view =
   Ui.view (fun () ->
     ui {
@@ -169,7 +171,7 @@ let counter_view =
 drafts : Atom.Family Number (Atom.Writable String)
 let drafts = Atom.family (fun _ -> Atom.make "")
 
-remove : Action.Action (Number, Ui.ClickSnapshot) {Atom.Write} none
+remove : Action.Action (Number, Ui.ClickSnapshot)
 let remove =
   Action.exhaust (fun (id, _) ->
     task {
@@ -223,7 +225,7 @@ React и состояние политики событий этого ключ�
 при размонтировании он прерывает их и ждёт их завершения.
 
 ```flick
-increment : Action.Action Ui.ClickSnapshot {Atom.Write} none
+increment : Action.Action Ui.ClickSnapshot
 let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
 ```
 
@@ -235,7 +237,7 @@ let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 
 
 ## Обработчики и политики
 
-Поле обработчика имеет непрозрачный тип `Ui.Handler snapshot r e`.
+Поле обработчика имеет непрозрачный тип `Ui.Handler snapshot`.
 Создать его можно только через политику из `Ui.Event`, поэтому обработчик
 нельзя запустить без отслеживания его задачи:
 
@@ -271,15 +273,16 @@ let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 
 
 ```flick
 mount :
-  forall c r e.
-  Ui.Dom.Container -> (Failure e ->{r; none} Unit)^c -> (Ui r e)^c ->{Reactivity.Atom.Registry | r; none} Never
+  forall c r.
+  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Reactivity.Atom.Registry, Atom.Write | r; none} Never
 ```
 
 `Ui.Dom.mount container supervisor ui` отображает `ui` один раз; входящие
 в него представления перерисовываются, когда меняются прочитанные ими атомы.
 Первое монтирование DOM синхронно, последующие рендеры планирует
-и объединяет React 19. Каждая задача получает сервисы вызова `mount`,
-а реестр предоставляет программа:
+и объединяет React 19. Каждая задача изменяет атомы через `Atom.Write`
+вызова `mount`, её дефекты получает супервизор, а реестр предоставляет
+программа:
 
 ```flick
 main : Unit ->{; AppError} Unit

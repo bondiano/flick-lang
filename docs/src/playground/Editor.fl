@@ -3,7 +3,7 @@ module Editor exposing (source_pane, generated_pane)
 import Actions exposing (edit)
 import State exposing (Model, Profile(..), SyntaxToken, errors, generated, tr)
 
-generated_pane : Model -> Ui {Atom.Write} none
+generated_pane : Model -> Ui
 let generated_pane m =
   let result = generated m
   let hint =
@@ -37,11 +37,11 @@ let generated_pane m =
           (if m.profile == Debug then m.debug_tokens else m.release_tokens)
         else [Ui.text result.code]))
 
-syntax_nodes : List SyntaxToken -> List (Ui {Atom.Write} none)
+syntax_nodes : List SyntaxToken -> List Ui
 let syntax_nodes tokens =
   List.map (fun token -> Ui.span { class_name = token.class_name } [Ui.text token.text]) tokens
 
-source_pane : Atom.Writable Model -> Model -> Ui {Atom.Write} none
+source_pane : Atom.Writable Model -> Model -> Ui
 let source_pane model m =
   ui {
     div { class_name = "fp-source" }

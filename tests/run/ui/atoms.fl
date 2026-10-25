@@ -25,10 +25,10 @@ let count = Atom.make 0
 doubled : Atom.Atom Number
 let doubled = Atom.derived (fun () -> Atom.value count * 2)
 
-increment : Action.Action Ui.ClickSnapshot {Atom.Write} none
+increment : Action.Action Ui.ClickSnapshot
 let increment = Action.exhaust (fun _ -> task { Atom.update count (fun c -> c + 1) })
 
-counter_view : Ui.View Unit {Atom.Write} none
+counter_view : Ui.View Unit
 let counter_view =
   Ui.named
     "App.Main.counter_view"
@@ -48,7 +48,7 @@ let counter_view =
           ]
       }))
 
-doubled_view : Ui.View Unit {Atom.Write} none
+doubled_view : Ui.View Unit
 let doubled_view =
   Ui.named
     "App.Main.doubled_view"

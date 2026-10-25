@@ -177,7 +177,7 @@ fn exported_workers_take_full_applications_across_modules() {
     let js = release_with(
         "module App exposing (add, view)\n\n\
          add : Number -> Number -> Number\nlet add a b = a + b\n\n\
-         view : Unit -> Ui none none\nlet view () = Ui.div { class_name = \"x\" } []\n",
+         view : Unit -> Ui\nlet view () = Ui.div { class_name = \"x\" } []\n",
         &workers,
     );
     assert!(js.contains("export const add$2 = (a, b) =>"), "{js}");

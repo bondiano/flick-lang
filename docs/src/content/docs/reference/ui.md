@@ -2,8 +2,10 @@
 title: "User interfaces"
 ---
 
-`Ui r e` (see [Type-level programming and eDSLs](../../spec/10-type-programming-and-edsl/)) describes a user interface whose event handlers need
-the services `r` and may fail with `e`. Building one is pure: it runs no
+`Ui` (see [Type-level programming and eDSLs](../../spec/10-type-programming-and-edsl/)) describes a user interface and the handlers of
+its events. A handler's task writes atoms (`Atom.Write`) and nothing else:
+it provides any other service itself and handles its own errors, so a
+`Ui` carries no rows. Building one is pure: it runs no
 handler, reads no state and touches no DOM. `Ui.Dom.mount` renders it with
 React 19 (`react-dom/client`) and runs each event as a task.
 
@@ -15,7 +17,7 @@ type alias SaveButtonProps c =
     on_save : (Unit ->{Users; SaveError} Unit)^c;
   }
 
-save_button : SaveButtonProps c -> (Ui {Users} {SaveError})^c
+save_button : SaveButtonProps c -> Ui^c
 let save_button props =
   ui {
     button
@@ -58,21 +60,21 @@ an error. A key is metadata, given with `Ui.keyed`, never a prop.
 | - | - | - |
 | `text s` | text, through React's text channel: markup stays text | none |
 | `fragment`, `optional`, `empty` | no element | `List`, `Option`, none |
-| `div`, `span` `{ class_name }` | `div`, `span` | `List (Ui r e)` |
-| `paragraph`, `heading`, `list`, `item` | `p`, `h1`, `ul`, `li` | `List (Ui r e)` |
-| `heading_at level` | `h1` … `h6` for `H1` … `H6` | `List (Ui r e)` |
-| `button { disabled; on_click }` | `button type="button"` | `List (Ui r e)` |
+| `div`, `span` `{ class_name }` | `div`, `span` | `List Ui` |
+| `paragraph`, `heading`, `list`, `item` | `p`, `h1`, `ul`, `li` | `List Ui` |
+| `heading_at level` | `h1` … `h6` for `H1` … `H6` | `List Ui` |
+| `button { disabled; on_click }` | `button type="button"` | `List Ui` |
 | `input { value; placeholder; on_input }` | `input`; `value` is the initial text | none |
 | `textarea { value; placeholder; on_input }` | `textarea`, as `input` over several lines | none |
-| `pre { class_name }` | `pre`: spaces and line breaks kept | `List (Ui r e)` |
-| `link { href : SafeUrl }` | `a` | `List (Ui r e)` |
+| `pre { class_name }` | `pre`: spaces and line breaks kept | `List Ui` |
+| `link { href : SafeUrl }` | `a` | `List Ui` |
 | `html (s : SanitizedHtml)` | `div` with the HTML | none |
-| `select (SelectProps a r e c)` | `ul role="listbox"`; choosing an item runs `on_change` with it | items through `render_item` |
+| `select (SelectProps a c)` | `ul role="listbox"`; choosing an item runs `on_change` with it | items through `render_item` |
 | `panel { header; body; footer }` | `section` with `header`, `main`, `footer` | named places |
-| `tabs { selected } (NonEmpty (Tab r e))` | a tab list and the selected panel | `Tab`s from `tab label ui` |
+| `tabs { selected } (NonEmpty Tab)` | a tab list and the selected panel | `Tab`s from `tab label ui` |
 | `component c props` | a foreign React component | its props |
 
-`text` is `forall r e. String -> Ui r e`, so it sits among the children of
+`text` is `String -> Ui`, so it sits among the children of
 any element. `SafeUrl` comes only from `Ui.safe_url`, which accepts relative
 URLs and the schemes `http`, `https` and `mailto` and refuses control
 characters; `SanitizedHtml` only from `Ui.trusted_html`, the program's own
@@ -106,7 +108,7 @@ sibling's does:
 count : Atom.Writable Number
 let count = Atom.make 0
 
-counter_view : Ui.View Unit {Atom.Write} none
+counter_view : Ui.View Unit
 let counter_view =
   Ui.view (fun () ->
     ui {
@@ -150,7 +152,7 @@ make what it needs.
 drafts : Atom.Family Number (Atom.Writable String)
 let drafts = Atom.family (fun _ -> Atom.make "")
 
-remove : Action.Action (Number, Ui.ClickSnapshot) {Atom.Write} none
+remove : Action.Action (Number, Ui.ClickSnapshot)
 let remove =
   Action.exhaust (fun (id, _) ->
     task {
@@ -200,7 +202,7 @@ earlier one runs. The tasks belong to the root, which interrupts and joins
 them when it unmounts.
 
 ```flick
-increment : Action.Action Ui.ClickSnapshot {Atom.Write} none
+increment : Action.Action Ui.ClickSnapshot
 let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
 ```
 
@@ -212,7 +214,7 @@ view's render is a new closure on every render; it works, but
 
 ## Handlers and policies
 
-A handler field has the opaque type `Ui.Handler snapshot r e`, which only a
+A handler field has the opaque type `Ui.Handler snapshot`, which only a
 policy of `Ui.Event` makes, so no handler is fire-and-forget:
 
 | Policy | An event that comes while earlier tasks run |
@@ -247,15 +249,16 @@ still interrupts and joins them.
 
 ```flick
 mount :
-  forall c r e.
-  Ui.Dom.Container -> (Failure e ->{r; none} Unit)^c -> (Ui r e)^c ->{Reactivity.Atom.Registry | r; none} Never
+  forall c r.
+  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Reactivity.Atom.Registry, Atom.Write | r; none} Never
 ```
 
 `Ui.Dom.mount container supervisor ui` renders `ui` once; the views in it
 render again when the atoms they read change. The initial DOM mount is
 synchronous, later renders are React 19's to schedule and coalesce. Each
-task runs with the services of the `mount` call, and the registry is the
-one the program provides:
+task writes atoms with the `Atom.Write` of the `mount` call, the
+supervisor gets its defects, and the registry is the one the program
+provides:
 
 ```flick
 main : Unit ->{; AppError} Unit

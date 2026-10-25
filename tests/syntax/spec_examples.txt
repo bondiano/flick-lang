@@ -53,9 +53,9 @@ c7457701e10aa513  08-typescript-and-ffi:442  add : Number -> Number -> Number
 d72679edd15d953e  09-schema:274  class Eq a => Hash a =
 e28dd24856e76943  10-type-programming-and-edsl:69  type alias BalanceRow =
 1838791670c05b74  10-type-programming-and-edsl:103  deferred_balances :
-aa414f379b88aedd  10-type-programming-and-edsl:163  type alias SaveButtonProps c =
-924fb2766af07dd1  10-type-programming-and-edsl:192  save_button :
-ded3987556b0d42a  10-type-programming-and-edsl:229  type alias SelectProps a r e c =
+b3787233ce690f3a  10-type-programming-and-edsl:167  type alias SaveButtonProps c =
+d12b90a1adddfd23  10-type-programming-and-edsl:196  save_button :
+569e94364977c35c  10-type-programming-and-edsl:235  type alias SelectProps a c =
 0ea7549614206500  10-type-programming-and-edsl:273  greet : Cli.Command {Platform} none
 616df64b98d90310  10-type-programming-and-edsl:321  tool : Cli.Command {Platform} none
 213799199fbee0b5  10-type-programming-and-edsl:341  main : Unit ->{; AppError} Unit

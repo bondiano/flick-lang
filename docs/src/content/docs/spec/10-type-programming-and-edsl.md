@@ -157,18 +157,18 @@ Cancellation does not promise to roll back SQL that has already been executed. T
 
 ## UI eDSL: types of props, children and actions
 
-The base model is `Ui r e`: a pure description of an interface with deferred handlers that need services r and may finish with errors e. Building the UI does not run these handlers.
+The base model is `Ui`: a pure description of an interface with deferred handlers. A handler's task writes atoms through `Atom.Write` and nothing else; it provides any other service itself and handles its own errors, so `Ui` carries no service or error rows. Building the UI does not run these handlers.
 
 ```flick
 type alias SaveButtonProps c =
   {
     label : String;
     disabled : Bool;
-    on_save : (Unit ->{Users; SaveError} Unit)^c;
+    on_save : (Unit ->{Atom.Write;} Unit)^c;
   }
 
 save_button :
-  SaveButtonProps c -> (Ui {Users} {SaveError})^c
+  SaveButtonProps c -> Ui^c
 let save_button props =
   Ui.button
     {
@@ -180,7 +180,7 @@ let save_button props =
     [Ui.text props.label]
 ```
 
-`on_click` has the opaque type `(Ui.Handler ClickSnapshot r e)^c`. Its builder takes a callback that creates a cold Eff and an explicitly chosen concurrency policy. In the example, Exhaust ignores new clicks until the current task finishes. The pure `save_button` does not run `props.on_save` or Ref.get during render; state arrives through the model/props. General effectful hooks inside a pure render are not allowed. Captures of props/handlers are preserved in Ui.
+`on_click` has the opaque type `(Ui.Handler ClickSnapshot)^c`. Its builder takes a callback that creates a cold Eff and an explicitly chosen concurrency policy. In the example, Exhaust ignores new clicks until the current task finishes. The pure `save_button` does not run `props.on_save` or Ref.get during render; state arrives through the model/props. General effectful hooks inside a pure render are not allowed. Captures of props/handlers are preserved in Ui.
 
 This agrees with [React](https://react.dev/reference/rules/components-and-hooks-must-be-pure)'s requirement of repeatable render, but the purity and lifetime checking is a Flick contract.
 
@@ -190,7 +190,7 @@ This agrees with [React](https://react.dev/reference/rules/components-and-hooks-
 
 ```flick
 save_button :
-  SaveButtonProps c -> (Ui {Users} {SaveError})^c
+  SaveButtonProps c -> Ui^c
 let save_button props =
   ui {
     button
@@ -214,11 +214,11 @@ Props are an exact structural record. A missing required field, a typo or a wron
 
 | Children contract | Data type |
 | - | - |
-| Any number of nodes | `List (Ui r e)` |
-| Exactly one node | `Ui r e` |
-| An optional node | `Option (Ui r e)` |
+| Any number of nodes | `List Ui` |
+| Exactly one node | `Ui` |
+| An optional node | `Option Ui` |
 | Named slots | A record with header/body/footer |
-| A non-empty set of tabs | `NonEmpty (Tab r e)` |
+| A non-empty set of tabs | `NonEmpty Tab` |
 | An element without content | The API has no children argument |
 
 If a component must accept specifically Tab, we keep the Tab type until the container is assembled. After any child is erased into a general Ui, it is too late to find out its origin. An ordinary signature also does not prove key uniqueness in a dynamic list.
@@ -226,13 +226,13 @@ If a component must accept specifically Tab, we keep the Tab type until the cont
 An ordinary generic component does not require general type families:
 
 ```flick
-type alias SelectProps a r e c =
+type alias SelectProps a c =
   {
     items : List a;
     selected : Option a;
     key : (a -> String)^c;
-    render_item : (a -> (Ui r e)^c)^c;
-    on_change : (Ui.Handler a r e)^c;
+    render_item : (a -> Ui^c)^c;
+    on_change : (Ui.Handler a)^c;
   }
 ```
 
@@ -242,7 +242,7 @@ type alias SelectProps a r e c =
 
 A DOM callback that expects void does not run the returned Eff. The adapter must obtain an inert event snapshot, synchronously decide on the default action, start a managed task and observe its completion. `preventDefault` cannot be deferred to an arbitrary await; a declarative policy or a pure synchronous decision callback is suitable.
 
-`e` in Ui describes the selected expected errors of future handlers. A UI root necessarily receives a supervisor of the full `Failure e`; infrastructure defects and shutdown interruption are distinguishable. `Ui.Dom.container id` looks up an optional `Ui.Dom.Container`. `Ui.Dom.mount container supervisor ui` renders `ui` with the registry of `Reactivity.Atom.Registry`; a view (`Ui.view`) reads atoms through `Atom.Read` while it renders and renders again only when an atom it read changes, and handlers write atoms with `Atom.set`/`Atom.update` through the service `Atom.Write`; `Atom.layer` provides the registry as both. The initial DOM mount is synchronous. React 19 may coalesce later renders; this does not promise a commit after every task or one render per animation frame. `Ui.Dom.mount` lives until the root is closed and cleanup is complete. A completed mount does not promise to return future failures through its ordinary result. A failure of the supervisor itself ends the root as a defect and is passed to the runtime reporter, without recursive reporting.
+A handler handles its expected errors in its own task, so a UI root's supervisor receives `Failure none`: infrastructure defects, such as an event a full policy rejects, and shutdown interruption remain distinguishable. `Ui.Dom.container id` looks up an optional `Ui.Dom.Container`. `Ui.Dom.mount container supervisor ui` renders `ui` with the registry of `Reactivity.Atom.Registry`; a view (`Ui.view`) reads atoms through `Atom.Read` while it renders and renders again only when an atom it read changes, and handlers write atoms with `Atom.set`/`Atom.update` through the service `Atom.Write`; `Atom.layer` provides the registry as both. The initial DOM mount is synchronous. React 19 may coalesce later renders; this does not promise a commit after every task or one render per animation frame. `Ui.Dom.mount` lives until the root is closed and cleanup is complete. A completed mount does not promise to return future failures through its ordinary result. A failure of the supervisor itself ends the root as a defect and is passed to the runtime reporter, without recursive reporting.
 
 `Ui.mount_with renderer supervisor ui` has the same registry, services, errors, captures and shutdown contract, using an opaque `Ui.Renderer` factory instead of a DOM container. The factory opens the root only when the Effect runs and supplies `render(node)` and synchronous `unmount()` operations. `Ui` imports only `@flick-lang/runtime/ui/react`; DOM mounting belongs to `Ui.Dom` and `@flick-lang/runtime/ui`, so a compiled `Ui.mount_with` consumer need not load `react-dom`. HTML constructors remain DOM-specific. React Native, Ink and React Three Fiber adapters and their typed host primitives are not implemented.
 
@@ -259,13 +259,13 @@ A policy is mandatory for every handler; there is no implicit fire-and-forget.
 
 Capacity/limit are checked positive integers; constants are checked by the compiler, dynamic values by a checked constructor. Infrastructure defects are not passed off as a new element of the typed row `e`. Cancellation does not roll back an external action that has already taken place. The default action is preserved if a declarative policy or a pure synchronous decision does not require preventDefault.
 
-Capture checking passes through props, callbacks, Eff and Ui. Returning a button whose handler captured a file from an already closed scope is an error. It is acceptable to open the file inside a task or to keep the UI within the file's lifetime region. The presence of `Ui none e` does not prove the absence of a captured scoped resource.
+Capture checking passes through props, callbacks, Eff and Ui. Returning a button whose handler captured a file from an already closed scope is an error. It is acceptable to open the file inside a task or to keep the UI within the file's lifetime region. The presence of `Ui` does not prove the absence of a captured scoped resource.
 
 React cleanup synchronously closes event intake and removes registrations. The app-owned close task interrupts and joins owned fibers, waits for foreign quiescence and only then releases resources. `Ui.Dom.mount` and `Ui.mount_with` hold the app owner until this work is done. The renderer must unmount its React components, not merely hide its surface. The React cleanup callback itself is not declared a promise to wait for async finalizers. [React useEffect](https://react.dev/reference/react/useEffect) defines lifecycle cleanup; the two-phase wait is an additional contract of the Flick bridge.
 
 ### Content safety and interop
 
-`Ui.text : forall r e. String -> Ui r e` (polymorphic over strings so that it can stand among the children of any element) inserts text through a safe text channel. URLs and raw HTML have separate policies and opaque types, for example SafeUrl and SanitizedHtml. Their constructors validate the input or are explicitly trusted; a plain String cast does not create a proof of safety. This is a separation of channels, not a promise to automatically prove the entire HTML grammar, accessibility and the correctness of the application.
+`Ui.text : String -> Ui` (polymorphic over strings so that it can stand among the children of any element) inserts text through a safe text channel. URLs and raw HTML have separate policies and opaque types, for example SafeUrl and SanitizedHtml. Their constructors validate the input or are explicitly trusted; a plain String cast does not create a proof of safety. This is a separation of channels, not a promise to automatically prove the entire HTML grammar, accessibility and the correctness of the application.
 
 A `.d.ts` can give the props shape of a foreign component, but does not prove purity, retention and cancellation. A foreign component is stored as an opaque renderer component; a pure source builder does not execute it. The adapter sets the callback/lifetime policy and the owner. The supported part of the React ecosystem that is imported goes through the same FFI pipeline; unrepresentable guarantees are not erased.
 

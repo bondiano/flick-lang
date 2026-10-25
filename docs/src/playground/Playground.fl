@@ -5,7 +5,7 @@ import Dom exposing (configuration)
 import State exposing (Configuration, initial_model)
 import View exposing (view)
 
-initial_view : Configuration ->{} Ui {Atom.Write} none
+initial_view : Configuration ->{} Ui
 let initial_view config =
   let initial = initial_model config
   view (Atom.make initial) initial

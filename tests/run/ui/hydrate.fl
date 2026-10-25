@@ -33,10 +33,10 @@ let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
 greeting : Atom.Writable String
 let greeting = Atom.serializable (Codec.json Schema.string) (Atom.make "")
 
-increment : Action.Action Ui.ClickSnapshot {Atom.Write} none
+increment : Action.Action Ui.ClickSnapshot
 let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
 
-page : Ui.View Unit {Atom.Write} none
+page : Ui.View Unit
 let page =
   Ui.view (fun () ->
     ui {

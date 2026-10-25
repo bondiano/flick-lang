@@ -1,14 +1,16 @@
-/// User interfaces as values. `Ui r e` describes elements whose event
-/// handlers need the services `r` and may fail with `e`; building one runs
-/// no handler and reads no state. `run_with` renders it with React and runs each
-/// event as a task under the policy of its handler (`Ui.Event`). Inside
-/// `ui { … }` the names of this module need no `Ui.`.
+/// User interfaces as values. A `Ui` describes elements and the handlers
+/// of their events; building one runs no handler and reads no state.
+/// `Ui.Dom.mount` renders it with React and runs each event as a task under
+/// the policy of its handler (`Action`, `Ui.Event`). Inside `ui { … }` the
+/// names of this module need no `Ui.`.
 module Ui exposing (..)
 
 /// What handles DOM events with snapshot `s`: a task per event under a
 /// concurrency policy. Only `Ui.Event.exhaust`, `latest`, `queue` and
-/// `concurrent` make one, so no handler is fire-and-forget.
-type Handler s (r : ServiceRow) (e : ErrorRow)
+/// `concurrent` and their `Action` forms make one, so no handler is
+/// fire-and-forget. A handler's task writes atoms and nothing else: it
+/// provides any other service itself and handles its own errors.
+type Handler s
 
 /// A click, as an inert copy of the DOM event.
 type alias ClickSnapshot =
@@ -18,7 +20,7 @@ type alias ClickSnapshot =
 type alias InputSnapshot = { value : String }
 
 /// A tab of `tabs`: a label and its content.
-type Tab (r : ServiceRow) (e : ErrorRow)
+type Tab
 
 /// A URL with a safe scheme (`http`, `https`, `mailto`) or relative.
 type SafeUrl
@@ -36,121 +38,121 @@ type Renderer
 type Component p
 
 /// The props of `button`.
-type alias ButtonProps r e c =
-  { disabled : Bool; on_click : (Handler ClickSnapshot r e)^c }
+type alias ButtonProps c =
+  { disabled : Bool; on_click : (Handler ClickSnapshot)^c }
 
 /// The props of `input`.
-type alias InputProps r e c =
-  { value : String; placeholder : String; on_input : (Handler InputSnapshot r e)^c }
+type alias InputProps c =
+  { value : String; placeholder : String; on_input : (Handler InputSnapshot)^c }
 
 /// The props of `select`: every field speaks of the same `a`.
-type alias SelectProps a r e c =
+type alias SelectProps a c =
   {
     items : List a;
     selected : Option a;
     key : (a -> String)^c;
-    render_item : (a -> (Ui r e)^c)^c;
-    on_change : (Handler a r e)^c;
+    render_item : (a -> Ui^c)^c;
+    on_change : (Handler a)^c;
   }
 
 /// The named places of `panel`.
-type alias PanelSlots r e c =
-  { header : (Ui r e)^c; body : (Ui r e)^c; footer : Option ((Ui r e)^c) }
+type alias PanelSlots c =
+  { header : Ui^c; body : Ui^c; footer : Option (Ui^c) }
 
 /// Text through the text channel: markup in it stays text.
-text : forall r e. String -> Ui r e
+text : String -> Ui
 foreign pure text from "@flick-lang/runtime/ui/react" "uiText"
 
 /// No node at all.
-empty : forall r e. Ui r e
+empty : Ui
 let empty = fragment []
 
-fragment : forall c r e. List ((Ui r e)^c) -> (Ui r e)^c
+fragment : forall c. List (Ui^c) -> Ui^c
 foreign pure fragment from "@flick-lang/runtime/ui/react" "uiFragment"
   retention call
 
 /// The node, or nothing.
-optional : forall c r e. Option ((Ui r e)^c) -> (Ui r e)^c
+optional : forall c. Option (Ui^c) -> Ui^c
 foreign pure optional from "@flick-lang/runtime/ui/react" "uiOptional"
   retention call
 
 /// The React key of a node in a dynamic list: metadata, not a prop.
-keyed : forall c r e. String -> (Ui r e)^c -> (Ui r e)^c
+keyed : forall c. String -> Ui^c -> Ui^c
 foreign pure keyed from "@flick-lang/runtime/ui/react" "uiKeyed"
   retention call
 
-div : forall c r e. { class_name : String } -> List ((Ui r e)^c) -> (Ui r e)^c
+div : forall c. { class_name : String } -> List (Ui^c) -> Ui^c
 foreign pure div from "@flick-lang/runtime/ui/react" "uiDiv"
   retention call
 
-span : forall c r e. { class_name : String } -> List ((Ui r e)^c) -> (Ui r e)^c
+span : forall c. { class_name : String } -> List (Ui^c) -> Ui^c
 foreign pure span from "@flick-lang/runtime/ui/react" "uiSpan"
   retention call
 
-paragraph : forall c r e. List ((Ui r e)^c) -> (Ui r e)^c
+paragraph : forall c. List (Ui^c) -> Ui^c
 foreign pure paragraph from "@flick-lang/runtime/ui/react" "uiParagraph"
   retention call
 
-heading : forall c r e. List ((Ui r e)^c) -> (Ui r e)^c
+heading : forall c. List (Ui^c) -> Ui^c
 foreign pure heading from "@flick-lang/runtime/ui/react" "uiHeading"
   retention call
 
-list : forall c r e. List ((Ui r e)^c) -> (Ui r e)^c
+list : forall c. List (Ui^c) -> Ui^c
 foreign pure list from "@flick-lang/runtime/ui/react" "uiList"
   retention call
 
-item : forall c r e. List ((Ui r e)^c) -> (Ui r e)^c
+item : forall c. List (Ui^c) -> Ui^c
 foreign pure item from "@flick-lang/runtime/ui/react" "uiItem"
   retention call
 
-button : forall c r e. ButtonProps r e c -> List ((Ui r e)^c) -> (Ui r e)^c
+button : forall c. ButtonProps c -> List (Ui^c) -> Ui^c
 foreign pure button from "@flick-lang/runtime/ui/react" "uiButton"
   retention call
 
 /// A text input; it has no children.
-input : forall c r e. InputProps r e c -> (Ui r e)^c
+input : forall c. InputProps c -> Ui^c
 foreign pure input from "@flick-lang/runtime/ui/react" "uiInput"
   retention call
 
 /// A text area of several lines; like `input`, `value` is the initial text.
-textarea : forall c r e. InputProps r e c -> (Ui r e)^c
+textarea : forall c. InputProps c -> Ui^c
 foreign pure textarea from "@flick-lang/runtime/ui/react" "uiTextarea"
   retention call
 
 /// Preformatted text: spaces and line breaks are kept.
-pre : forall c r e. { class_name : String } -> List ((Ui r e)^c) -> (Ui r e)^c
+pre : forall c. { class_name : String } -> List (Ui^c) -> Ui^c
 foreign pure pre from "@flick-lang/runtime/ui/react" "uiPre"
   retention call
 
-link : forall c r e. { href : SafeUrl } -> List ((Ui r e)^c) -> (Ui r e)^c
+link : forall c. { href : SafeUrl } -> List (Ui^c) -> Ui^c
 foreign pure link from "@flick-lang/runtime/ui/react" "uiLink"
   retention call
 
 /// Trusted HTML, inside a `div`.
-html : forall r e. SanitizedHtml -> Ui r e
+html : SanitizedHtml -> Ui
 foreign pure html from "@flick-lang/runtime/ui/react" "uiHtml"
 
 /// A listbox of `items`; choosing one runs `on_change` with it.
-select : forall c a r e. SelectProps a r e c -> (Ui r e)^c
+select : forall c a. SelectProps a c -> Ui^c
 foreign pure select from "@flick-lang/runtime/ui/react" "uiSelect"
   retention call
 
 /// Header, body and an optional footer, each in its place.
-panel : forall c r e. PanelSlots r e c -> (Ui r e)^c
+panel : forall c. PanelSlots c -> Ui^c
 foreign pure panel from "@flick-lang/runtime/ui/react" "uiPanel"
   retention call
 
-tab : forall c r e. String -> (Ui r e)^c -> (Tab r e)^c
+tab : forall c. String -> Ui^c -> Tab^c
 foreign pure tab from "@flick-lang/runtime/ui/react" "uiTab"
   retention call
 
 /// At least one tab; `selected` counts from 0.
-tabs : forall c r e. { selected : Number } -> NonEmpty.NonEmpty ((Tab r e)^c) -> (Ui r e)^c
+tabs : forall c. { selected : Number } -> NonEmpty.NonEmpty (Tab^c) -> Ui^c
 foreign pure tabs from "@flick-lang/runtime/ui/react" "uiTabs"
   retention call
 
 /// A foreign component with its props, which React gets as they are.
-component : forall r e p. Component p -> p -> Ui r e
+component : forall p. Component p -> p -> Ui
 foreign pure component from "@flick-lang/runtime/ui/react" "uiComponent"
 
 /// The URL if its scheme is safe.
@@ -167,51 +169,51 @@ foreign pure trusted_html from "@flick-lang/runtime/ui/react" "uiTrustedHtml"
 /// module still build DOM nodes, not host-neutral primitives; a native
 /// adapter supplies its own components.
 mount_with :
-  forall c r e.
+  forall c r.
   Renderer ->
-    (Failure e ->{r; none} Unit)^c ->
-    (Ui r e)^c ->{Reactivity.Atom.Registry | r; none}
+    (Failure none ->{r; none} Unit)^c ->
+    Ui^c ->{Reactivity.Atom.Registry, Atom.Write | r; none}
     Never
 foreign effect mount_with from "@flick-lang/runtime/ui/react" "uiMountWith"
   retention call
 
 /// A component that reads atoms while it renders: React renders it again
 /// when one of them changes, or when its props do.
-type View p (r : ServiceRow) (e : ErrorRow)
+type View p
 
 /// The component of `render`.
-view : forall c p r e. (p ->{Atom.Read;} (Ui r e)^c)^c -> (View p r e)^c
+view : forall c p. (p ->{Atom.Read;} Ui^c)^c -> (View p)^c
 foreign pure view from "@flick-lang/runtime/ui/react" "uiView"
   retention call
 
 /// The component named `name` in React's developer tools.
-named : forall c p r e. String -> (View p r e)^c -> (View p r e)^c
+named : forall c p. String -> (View p)^c -> (View p)^c
 foreign pure named from "@flick-lang/runtime/ui/react" "uiNamed"
   retention call
 
 /// The component with the props `props`.
-render : forall c p r e. (View p r e)^c -> p^c -> (Ui r e)^c
+render : forall c p. (View p)^c -> p^c -> Ui^c
 foreign pure render from "@flick-lang/runtime/ui/react" "uiRender"
   retention call
 
 /// The props of a field bound to a state.
-type alias FieldProps r e c =
+type alias FieldProps c =
   {
     bind : Atom.Writable String;
     placeholder : String;
-    on_input : Option ((Handler InputSnapshot r e)^c);
+    on_input : Option ((Handler InputSnapshot)^c);
   }
 
 /// An input showing the state `bind`. Each keystroke writes it at once,
 /// inside the browser's event, so the caret and an IME composition stay
 /// where the user left them; a write to the state from elsewhere, a reset,
 /// shows in the field. `on_input` then runs as a task.
-field : forall c r e. FieldProps r e c -> (Ui r e)^c
+field : forall c. FieldProps c -> Ui^c
 foreign pure field from "@flick-lang/runtime/ui/react" "uiField"
   retention call
 
 /// A text area bound to a state as `field` is.
-field_area : forall c r e. FieldProps r e c -> (Ui r e)^c
+field_area : forall c. FieldProps c -> Ui^c
 foreign pure field_area from "@flick-lang/runtime/ui/react" "uiFieldArea"
   retention call
 
@@ -262,7 +264,7 @@ let host =
 /// The element `node` with the host attributes `attrs`; `data` names are
 /// lowercase letters, digits and hyphens, written `data-<name>`. A node
 /// that is not an element is a defect.
-with_host : forall c r e. Host -> (Ui r e)^c -> (Ui r e)^c
+with_host : forall c. Host -> Ui^c -> Ui^c
 foreign pure with_host from "@flick-lang/runtime/ui/react" "uiWithHost"
   retention call
 
@@ -271,7 +273,7 @@ type Level = H1 | H2 | H3 | H4 | H5 | H6
   deriving Eq, Show
 
 /// A heading of the level.
-heading_at : forall c r e. Level -> List ((Ui r e)^c) -> (Ui r e)^c
+heading_at : forall c. Level -> List (Ui^c) -> Ui^c
 foreign pure heading_at from "@flick-lang/runtime/ui/react" "uiHeadingAt"
   retention call
 
@@ -279,5 +281,5 @@ foreign pure heading_at from "@flick-lang/runtime/ui/react" "uiHeadingAt"
 /// it shows `fallback`, and when one failed it shows `failed` of the
 /// failure, so each error of `x` has a place to go.
 suspended :
-  forall p r e x. (Failure x -> Ui r e) -> Ui r e -> (p ->{Atom.Read; x} Ui r e) -> View p r e
+  forall p x. (Failure x -> Ui) -> Ui -> (p ->{Atom.Read; x} Ui) -> View p
 foreign pure suspended from "@flick-lang/runtime/ui/react" "uiSuspended"

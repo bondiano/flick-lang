@@ -11,47 +11,51 @@ type alias User = { id : Number; name : String }
 
 type alias Product = { sku : String }
 
-service Users =
-  save : String ->{; SaveError} Unit
+saved : Atom.Writable String
+let saved = Atom.make ""
 
-noop : Ui.Handler Ui.ClickSnapshot {Users} {SaveError}
-let noop = Ui.Event.exhaust (fun _ -> task { Users.save "x" })
+noop : Ui.Handler Ui.ClickSnapshot
+let noop = Ui.Event.exhaust (fun _ -> task { Atom.set saved "x" })
 
-typo : Ui {Users} {SaveError}
+typo : Ui
 let typo = Ui.button { disabled = false; on_clik = noop } []
 //                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 the value has field `on_clik`
 
-missing : Ui {Users} {SaveError}
+missing : Ui
 let missing = Ui.button { on_click = noop } []
 //                      ^^^^^^^^^^^^^^^^^^^ FLICK-T003 field `disabled` is missing
 
-wrong : Ui {Users} {SaveError}
+wrong : Ui
 let wrong = Ui.button { disabled = "no"; on_click = noop } []
 //                                 ^^^^ FLICK-T003 expected `Bool`, found `String`
 
-counter : Ref Number -> Ui none none
+counter : Ref Number -> Ui
 let counter count = Ui.text (show (Ref.get count))
 //                                 ^^^^^^^^^^^^^ FLICK-E001 runtime call
 
-no_policy : Ui {Users} {SaveError}
-let no_policy = Ui.button { disabled = false; on_click = fun _ -> task { Users.save "x" } } []
-//                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 expected `Handler
+no_policy : Ui
+let no_policy = Ui.button { disabled = false; on_click = fun _ -> task { Atom.set saved "x" } } []
+//                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 expected `Handler
 
 held : forall c. File.Path ->{File.FileSystem; File.OpenError}
-  (Ui {File.FileSystem} {File.ReadError})^c
+  Ui^c
 let held path =
   scope {
     let file = File.open_scoped path
     Ui.button
       {
         disabled = false;
-        on_click = Ui.Event.exhaust (fun _ -> task { ignore (File.read_all file) });
+        on_click =
+          Ui.Event.exhaust
+            (
+              fun _ -> task { provide File.node { try ignore (File.read_all file) with | _ -> () } }
+            );
       }
       []
   }
-//~ FLICK-G001 @45:5-50:9 holds region `s`
+//~ FLICK-G001 @45:5-54:9 holds region `s`
 
-mixed : Ui.SelectProps User {Users} {SaveError} c -> (Ui {Users} {SaveError})^c
+mixed : Ui.SelectProps User c -> Ui^c
 let mixed props =
   Ui.select
     {
@@ -59,18 +63,22 @@ let mixed props =
       selected = props.selected;
       key = props.key;
       render_item = props.render_item;
-      on_change = Ui.Event.latest (fun (product : Product) -> task { Users.save product.sku });
+      on_change = Ui.Event.latest (fun (product : Product) -> task { Atom.set saved product.sku });
     }
-//~ FLICK-T003 @62:19-62:95 expected `Handler { id : Number; name : String }
+//~ FLICK-T003 @66:19-66:99 expected `Handler { id : Number; name : String }
 
-link : Ui none none
+link : Ui
 let link = Ui.link { href = "javascript:alert(1)" } [Ui.text "x"]
 //                          ^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 expected `SafeUrl`, found `String`
 
-overflow : Ui.Handler Ui.ClickSnapshot {Users} {SaveError}
-let overflow = Ui.Event.queue 0 (fun _ -> task { Users.save "x" })
+overflow : Ui.Handler Ui.ClickSnapshot
+let overflow = Ui.Event.queue 0 (fun _ -> task { Atom.set saved "x" })
 //                            ^ FLICK-U001 the capacity of `Ui.Event.queue` must be a positive integer
 
-too_many : Ui.Handler Ui.ClickSnapshot {Users} {SaveError}
-let too_many = Ui.Event.concurrent 1.5 (fun _ -> task { Users.save "x" })
+too_many : Ui.Handler Ui.ClickSnapshot
+let too_many = Ui.Event.concurrent 1.5 (fun _ -> task { Atom.set saved "x" })
 //                                 ^^^ FLICK-U001 the limit
+
+action_overflow : Action.Action Ui.ClickSnapshot
+let action_overflow = Action.queue 0 (fun _ -> task { Atom.set saved "x" })
+//                                 ^ FLICK-U001 the capacity of `Action.queue` must be a positive integer
