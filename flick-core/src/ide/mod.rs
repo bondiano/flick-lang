@@ -5,6 +5,7 @@
 mod actions;
 mod complete;
 mod enrich;
+mod fields;
 mod hints;
 mod hover;
 mod locals;

@@ -5,21 +5,25 @@
 
 use std::collections::HashMap;
 use std::fmt::Write;
+use std::ptr;
 
 use crate::iface::{Decl, Export, Interface, Namespace};
+use crate::syntax::cst::{Element, Node};
+use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{Form, show_type};
 
-/// The `///` comment right above each top-level declaration, by name.
+/// The `///` comment right above each top-level declaration, and above
+/// each constructor on a line of its own (`| Circle Number`), by name.
 pub fn comments(text: &str) -> HashMap<String, String> {
     let mut out = HashMap::new();
     let mut pending: Vec<&str> = Vec::new();
     for line in text.lines() {
-        if let Some(doc) = line.strip_prefix("///") {
+        if let Some(doc) = line.trim_start().strip_prefix("///") {
             pending.push(doc.strip_prefix(' ').unwrap_or(doc));
             continue;
         }
         if !pending.is_empty()
-            && let Some(name) = declared(line)
+            && let Some(name) = declared(line).or_else(|| variant(line))
         {
             out.entry(name).or_insert_with(|| pending.join("\n"));
         }
@@ -44,6 +48,43 @@ pub fn module_comment(text: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// The constructor a line `| Name …` of a type declaration starts.
+fn variant(line: &str) -> Option<String> {
+    let rest = line.trim_start().strip_prefix('|')?.trim_start();
+    let name: String = rest
+        .chars()
+        .take_while(|c| c.is_alphanumeric() || *c == '_')
+        .collect();
+    name.starts_with(|c: char| c.is_ascii_uppercase())
+        .then_some(name)
+}
+
+/// The `///` comment right above `child` among the children of `parent`,
+/// where the parser keeps the comments before a node.
+pub fn leading_doc(parent: &Node, child: &Node, text: &str) -> Option<String> {
+    let at = parent
+        .children
+        .iter()
+        .position(|c| matches!(c, Element::Node(n) if ptr::eq(n, child)))?;
+    let mut lines = Vec::new();
+    for element in parent.children[..at].iter().rev() {
+        match element {
+            Element::Token(t) if t.kind == K::DocComment => {
+                let doc = t
+                    .text(text)
+                    .trim_end()
+                    .strip_prefix("///")
+                    .unwrap_or_default();
+                lines.push(doc.strip_prefix(' ').unwrap_or(doc));
+            }
+            Element::Token(t) if t.kind.is_trivia() && !t.kind.is_comment() => {}
+            _ => break,
+        }
+    }
+    lines.reverse();
+    (!lines.is_empty()).then(|| lines.join("\n"))
 }
 
 /// The name a top-level line declares: `name :`, `type [alias|error] N`,

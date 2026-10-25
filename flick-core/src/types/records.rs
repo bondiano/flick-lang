@@ -58,6 +58,7 @@ impl Checker<'_> {
         let label_span = self.token_span(label);
         let label = label.text(self.text).to_owned();
         let record = self.infer(target);
+        self.note_field(label_span, &record);
         if let Some(field) = self.known_field(&record, &label) {
             return field;
         }
@@ -87,10 +88,12 @@ impl Checker<'_> {
     /// A record literal; `expected` gives the types of fields it mentions.
     pub(super) fn record(&mut self, node: &Node, expected: Option<&Row>) -> Type {
         let mut entries: Vec<(String, Type)> = Vec::new();
+        let mut labels = Vec::new();
         for field in node.nodes().filter(|n| n.kind == K::RecordField) {
             let Some(label) = field.child_tokens().find(|t| t.kind == K::Ident) else {
                 continue;
             };
+            labels.push(self.token_span(label));
             let name = label.text(self.text).to_owned();
             let Some(value) = field.nodes().next() else {
                 continue;
@@ -111,7 +114,13 @@ impl Checker<'_> {
                 entries.push((name, ty));
             }
         }
-        Type::Record(Row::closed(entries))
+        let record = Type::Record(Row::closed(entries));
+        // an editor shows the fields as the expected type declares them
+        let declared = expected.map_or_else(|| record.clone(), |row| Type::Record(row.clone()));
+        for span in labels {
+            self.note_field(span, &declared);
+        }
+        record
     }
 
     /// `{ r with f = v }` replaces existing fields with values of the same type.
@@ -123,6 +132,7 @@ impl Checker<'_> {
                 continue;
             };
             let name = label.text(self.text).to_owned();
+            self.note_field(self.token_span(label), &record);
             if seen.contains(&name) {
                 self.duplicate_label(&name, self.token_span(label));
                 continue;
