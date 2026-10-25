@@ -32,6 +32,7 @@ mod generalize;
 mod handlers;
 mod infer;
 mod instances;
+mod irrefutable;
 mod kinds;
 mod makers;
 mod origin;

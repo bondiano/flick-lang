@@ -137,7 +137,9 @@ value. A record pattern lists some of the fields.
 A list pattern `[a, b]` matches only lists of that length, and `[a, b, ...rest]`
 only lists of at least that length, so `[] | [x, ...rest]` covers every list.
 A list can have any length, so a list pattern in `let` is an error unless it is
-`[...all]`: use `match`, or a tuple when the length is fixed.
+`[...all]`: use `match`, or a tuple when the length is fixed. The error of a
+local `let` offers both as fixes: `match` takes the rest of the block as the
+arm of the pattern and adds an arm `-> todo` for what it misses.
 
 ## Numbers and operators
 

@@ -36,14 +36,7 @@ impl Checker<'_> {
                 rows.push(vec![pat.clone()]);
             }
         }
-        // a handful of missing patterns, each the first one the arms before miss
-        let mut missing = Vec::new();
-        while missing.len() < MISSING_SHOWN
-            && let Some(witness) = self.useful(&rows, &[Pat::Wild])
-        {
-            missing.push(self.show_pat(&witness[0], false));
-            rows.push(witness);
-        }
+        let (missing, _) = self.missing_patterns(rows);
         let Some(first) = missing.first() else {
             return;
         };
@@ -59,6 +52,20 @@ impl Checker<'_> {
         self.diagnostics.push(
             diagnostics::Diagnostic::error(codes::T009, message, span).with_fix(title, edits),
         );
+    }
+
+    /// A handful of patterns `rows` miss, each the first one the rows before
+    /// miss, and whether they are all of them.
+    pub(super) fn missing_patterns(&self, mut rows: Vec<Vec<Pat>>) -> (Vec<String>, bool) {
+        let mut missing = Vec::new();
+        while let Some(witness) = self.useful(&rows, &[Pat::Wild]) {
+            if missing.len() == MISSING_SHOWN {
+                return (missing, false);
+            }
+            missing.push(self.show_pat(&witness[0], false));
+            rows.push(witness);
+        }
+        (missing, true)
     }
 
     /// Inserts `| pattern -> todo` for each pattern after the last arm, at
@@ -86,71 +93,13 @@ impl Checker<'_> {
         })
     }
 
-    /// A pattern of `let` or of a parameter must match every value. `value`
-    /// is the expression a `let` binds, for the fix of a list pattern.
-    pub fn irrefutable(&mut self, pat: &Pat, node: &Node, value: Option<&Node>) {
-        if *pat == Pat::Wild {
-            return;
-        }
-        let Some(witness) = self.useful(&[vec![pat.clone()]], &[Pat::Wild]) else {
-            return;
-        };
-        let shown = self.show_pat(&witness[0], false);
-        let items = |n: usize| if n == 1 { "1 item".to_owned() } else { format!("{n} items") };
-        let message = match pat {
-            Pat::Ctor(Ctor::List(n), _) => format!(
-                "a list can have any length, but this pattern matches only lists of {}, \
-                 not `{shown}`; use `match` to handle every length, or a tuple if the length is fixed",
-                items(*n)
-            ),
-            Pat::Ctor(Ctor::ListRest(n), _) => format!(
-                "a list can have any length, but this pattern matches only lists of at least {}, \
-                 not `{shown}`; use `match` to handle every length",
-                items(*n)
-            ),
-            _ => format!("this pattern does not match `{shown}`; use `match` to handle every case"),
-        };
-        let diagnostic = diagnostics::Diagnostic::error(codes::T009, message, self.span(node));
-        self.diagnostics.push(match self.tuple_fix(node, value) {
-            Some(edits) => diagnostic.with_fix("use a tuple", edits),
-            None => diagnostic,
-        });
-    }
-
-    /// `let [a, b] = [x, y]` becomes `let (a, b) = (x, y)`.
-    fn tuple_fix(&self, pattern: &Node, value: Option<&Node>) -> Option<Vec<diagnostics::Edit>> {
-        let value = value?;
-        let n = pattern.nodes().count();
-        let fits = pattern.kind == K::ListPat
-            && value.kind == K::ListExpr
-            && n >= 2
-            && value.nodes().count() == n
-            && pattern.nodes().all(|c| c.kind != K::RestPat);
-        if !fits {
-            return None;
-        }
-        let edit = |at: u32, text: &str| diagnostics::Edit {
-            span: Span::new(self.file, at, at + 1),
-            replacement: text.to_owned(),
-        };
-        Some(
-            [pattern, value]
-                .iter()
-                .flat_map(|n| {
-                    let (start, end) = n.range();
-                    [edit(start, "("), edit(end - 1, ")")]
-                })
-                .collect(),
-        )
-    }
-
     /// Whether `pat` matches every value of its type.
     pub fn covers_all(&self, pat: &Pat) -> bool {
         self.useful(&[vec![pat.clone()]], &[Pat::Wild]).is_none()
     }
 
     /// A value vector that matches `v` but no row; `None` if there is none.
-    fn useful(&self, rows: &[Vec<Pat>], v: &[Pat]) -> Option<Vec<Pat>> {
+    pub(super) fn useful(&self, rows: &[Vec<Pat>], v: &[Pat]) -> Option<Vec<Pat>> {
         let Some((first, rest)) = v.split_first() else {
             return rows.is_empty().then(Vec::new);
         };
@@ -300,7 +249,7 @@ impl Checker<'_> {
         }
     }
 
-    fn show_pat(&self, pat: &Pat, nested: bool) -> String {
+    pub(super) fn show_pat(&self, pat: &Pat, nested: bool) -> String {
         let wrap = |s: String, args: bool| if nested && args { format!("({s})") } else { s };
         match pat {
             Pat::Wild | Pat::Or(_) => "_".to_owned(),

@@ -83,13 +83,13 @@ impl Checker<'_> {
                     });
                     match next {
                         Some(decl) => {
-                            self.local_let(decl, Some(statement));
+                            self.local_let(decl, Some(statement), &statements[i + 2..]);
                             i += 1;
                         }
                         None => self.lone_signature(statement, false),
                     }
                 }
-                K::LetDecl => self.local_let(statement, None),
+                K::LetDecl => self.local_let(statement, None, &statements[i + 1..]),
                 _ if last => {
                     result = Some(match expected {
                         Some(expected) => {
@@ -150,10 +150,10 @@ impl Checker<'_> {
         self.error(codes::T006, self.span(sig), message);
     }
 
-    fn local_let(&mut self, decl: &Node, sig: Option<&Node>) {
+    fn local_let(&mut self, decl: &Node, sig: Option<&Node>, rest: &[&Node]) {
         let parts = let_parts(decl, self.text);
         let Some(name) = parts.name.clone() else {
-            self.pattern_let(decl, &parts);
+            self.pattern_let(decl, &parts, Some(rest));
             return;
         };
         let signature = sig
@@ -201,20 +201,15 @@ impl Checker<'_> {
     }
 
     /// `let (a, b) = …`: the names are monomorphic.
-    pub fn pattern_let(&mut self, decl: &Node, parts: &LetParts) {
+    /// `rest` holds the statements after a local `let` in its block.
+    pub fn pattern_let(&mut self, decl: &Node, parts: &LetParts, rest: Option<&[&Node]>) {
         self.store.level += 1;
         let ty = parts.body.map_or(Type::Error, |b| self.infer(b));
         self.store.level -= 1;
         self.store.lower(&ty);
         if let Some(pattern) = parts.pattern {
             let pat = self.bind_pattern(pattern, &ty);
-            let value = parts.body.and_then(|b| match b.nodes().collect::<Vec<_>>()[..] {
-                [only] => Some(only),
-                _ => None,
-            });
-            self.irrefutable(&pat, pattern, value);
-        } else {
-            let _ = decl;
+            self.irrefutable(&pat, pattern, rest.map(|rest| (decl, rest)));
         }
     }
 

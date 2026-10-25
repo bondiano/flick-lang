@@ -325,7 +325,7 @@ impl<'a> Checker<'a> {
         let parts = let_parts(decl, self.text);
         let Some(name) = parts.name.clone() else {
             let mark = self.locals.len();
-            self.pattern_let(decl, &parts);
+            self.pattern_let(decl, &parts, None);
             let bound: Vec<_> = self.locals.drain(mark..).collect();
             for local in bound {
                 let entity = self.env.entity(Namespace::Value, &local.name);
