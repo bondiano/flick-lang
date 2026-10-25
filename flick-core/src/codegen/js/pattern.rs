@@ -30,14 +30,28 @@ impl Gen<'_> {
                 }
             }
             Pat::List(items, rest) => {
+                // a walked list starts at its offset (see `view`)
+                let view = self.views.get(subject).cloned();
+                let at = |n: usize| match &view {
+                    Some((offset, _)) if n == 0 => offset.clone(),
+                    Some((offset, _)) => format!("{offset} + {n}"),
+                    None => n.to_string(),
+                };
                 let op = if rest.is_some() { ">=" } else { "===" };
                 t.conds
-                    .push(format!("{subject}.length {op} {}", items.len()));
+                    .push(format!("{subject}.length {op} {}", at(items.len())));
                 for (i, item) in items.iter().enumerate() {
-                    self.test(item, &format!("{subject}[{i}]"), t);
+                    self.test(item, &format!("{subject}[{}]", at(i)), t);
                 }
-                if let Some(rest) = rest {
-                    self.test(rest, &format!("{subject}.slice({})", items.len()), t);
+                match (rest.as_deref(), &view) {
+                    // a jump moves the offset there instead
+                    (Some(Pat::Bind(r)), Some((_, pos))) => {
+                        self.rests.insert(r.clone(), (*pos, at(items.len())));
+                    }
+                    (Some(rest), _) => {
+                        self.test(rest, &format!("{subject}.slice({})", at(items.len())), t);
+                    }
+                    (None, _) => {}
                 }
             }
             Pat::Record(fields) => {

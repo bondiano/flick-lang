@@ -139,13 +139,18 @@ fn debug_imports_a_module_by_its_own_name_unless_taken() {
     assert!(js.contains("export const line = (_) =>"), "{js}");
 }
 
-/// The body of the exported `name` in `js`, up to the next export.
+/// The top-level constant `name` in `js`, up to the next one.
 fn export_of<'a>(js: &'a str, name: &str) -> &'a str {
     let start = js
-        .find(&format!("export const {name} "))
+        .find(&format!("const {name} "))
         .unwrap_or_else(|| panic!("no {name} in {js}"));
     let rest = &js[start + 1..];
-    &js[start..start + 1 + rest.find("\nexport ").unwrap_or(rest.len())]
+    let end = [rest.find("\nexport "), rest.find("\nconst ")]
+        .into_iter()
+        .flatten()
+        .min()
+        .unwrap_or(rest.len());
+    &js[start..start + 1 + end]
 }
 
 #[test]
@@ -238,5 +243,47 @@ fn mutually_tail_recursive_functions_run_as_one_loop() {
             "(n) => a$rec(0, acc, n)"
         };
         assert!(js.contains(calls_a), "{js}");
+    }
+}
+
+#[test]
+fn a_loop_walks_a_list_by_offset_unless_its_rest_escapes() {
+    let text = "module App.Walk exposing (..)\n\
+         pairs : Number -> List Number -> Number\n\
+         let rec pairs acc xs =\n  match xs with\n  | [a, b, ...rest] -> pairs (acc + a * b) rest\n  | [a] -> acc + a\n  | _ -> acc\n\
+         restart : Number -> List Number -> Number\n\
+         let rec restart n xs =\n  match xs with\n  | [] -> if n == 0 then 0 else restart (n - 1) [1, 2]\n  | [_, ...rest] -> restart n rest\n\
+         sum : List Number -> Number\n\
+         let rec sum xs =\n  match xs with\n  | [] -> 0\n  | [x, ...rest] -> x + sum rest\n\
+         total : Number -> List Number -> Number\n\
+         let rec total acc xs =\n  match xs with\n  | [] -> acc\n  | [x, ...rest] -> if x > 9 then acc + sum rest else total (acc + x) rest\n\
+         rec {\n\
+         \x20 even_len : forall a. List a -> Bool\n  let even_len xs =\n    match xs with\n    | [] -> true\n    | [_, ...rest] -> odd_len rest\n\
+         \x20 odd_len : forall a. List a -> Bool\n  let odd_len xs =\n    match xs with\n    | [] -> false\n    | [_, ...rest] -> even_len rest\n\
+         }\n";
+    for release in [false, true] {
+        let js = compile_with(text, release, Labels::default()).code;
+        let pairs = export_of(&js, if release { "pairs$2" } else { "pairs" });
+        assert!(!pairs.contains("slice("), "{pairs}");
+        assert!(
+            pairs.contains("xs[$o1 + 1]") && pairs.contains("$o1 = $o1 + 2;"),
+            "{pairs}"
+        );
+        // another list on the walked position starts at its beginning
+        let restart = export_of(&js, if release { "restart$2" } else { "restart" });
+        assert!(
+            restart.contains("$l1 = [1, 2];\n") && restart.contains("$o1 = 0;"),
+            "{restart}"
+        );
+        assert!(!restart.contains("slice("), "{restart}");
+        let group = &js[js.find("const even_len$rec").expect("a group")..];
+        assert!(
+            group.contains("let $o0 = 0;") && !group.contains("slice("),
+            "{group}"
+        );
+        // `rest` is a value of its own outside a loop, or when it escapes one
+        let total = export_of(&js, if release { "total$2" } else { "total" });
+        assert!(total.contains("slice(1)"), "{total}");
+        assert!(export_of(&js, "sum").contains("slice(1)"), "{js}");
     }
 }
