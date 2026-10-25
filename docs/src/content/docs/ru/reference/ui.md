@@ -89,10 +89,12 @@ SaveError} Unit` функция обратного вызова, использ�
 ## Атомы и представления
 
 Атом (`Atom`) описывает значение; реестр, который программа предоставляет
-через `provide Reactivity.Atom.layer { … }`, хранит значения прочитанных
+через `provide Atom.layer { … }`, хранит значения прочитанных
 через него атомов. `Atom.make value` — состояние, `Atom.derived` — атом,
 вычисляемый из прочитанных им атомов, `Atom.set`/`Atom.update` пишут
-состояние.
+состояние через сервис `Atom.Write`, который есть у задачи action и нет у
+render. `Atom.layer` даёт один реестр как `Reactivity.Atom.Registry`,
+который читают корни и серверная разметка, и как `Atom.Write`.
 
 Представление (view) — компонент, чей render читает атомы через сервис
 `Atom.Read`. `Ui.Dom.mount` рисует `Ui` с предоставленным реестром, и каждое
@@ -103,7 +105,7 @@ SaveError} Unit` функция обратного вызова, использ�
 count : Atom.Writable Number
 let count = Atom.make 0
 
-counter_view : Ui.View Unit {Reactivity.Atom.Registry} none
+counter_view : Ui.View Unit {Atom.Write} none
 let counter_view =
   Ui.view (fun () ->
     ui {
@@ -189,7 +191,7 @@ increment`. `Action.exhaust`, `latest`, `queue` и `concurrent` берут по�
 прерывает их и дожидается их при размонтировании.
 
 ```flick
-increment : Action.Action Ui.ClickSnapshot {Reactivity.Atom.Registry} none
+increment : Action.Action Ui.ClickSnapshot {Atom.Write} none
 let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
 ```
 
@@ -251,7 +253,7 @@ let main () =
   match Ui.Dom.container "app" with
   | None -> App.fail "missing root"
   | Some root ->
-    provide Reactivity.Atom.layer {
+    provide Atom.layer {
       ignore (Ui.Dom.mount root report (Ui.render counter_view ()))
     }
 ```
@@ -286,7 +288,7 @@ peer-зависимости среды выполнения, устанавли�
 ```flick
 request : Number ->{} String
 let request n =
-  provide Reactivity.Atom.layer {
+  provide Atom.layer {
     Atom.set count n
     Ui.Server.render (Ui.render counter_view ())
   }
@@ -341,7 +343,7 @@ let draft = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.m
 ```flick
 page : Number ->{} String
 let page n =
-  provide Reactivity.Atom.layer {
+  provide Atom.layer {
     Atom.set count n
     let markup = Ui.Server.render (Ui.render counter_view ())
     "<div id=\"app\" data-flick-ssr>" ++ markup ++ "</div>" ++ Ui.Server.state "app"

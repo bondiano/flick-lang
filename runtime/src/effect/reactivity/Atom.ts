@@ -3,7 +3,7 @@
 // alone, so a function or an effect as the value stays a value; the
 // registry is the Flick service `Reactivity.Atom.Registry`, whose operations
 // read and write through Effect's registry.
-import { type Context, type Duration, Effect, Layer, type Schema } from "effect";
+import { Context, type Duration, Effect, Layer, type Schema } from "effect";
 import * as Atom from "effect/reactivity/Atom";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 
@@ -74,6 +74,29 @@ const natives = new WeakMap<object, AtomRegistry.AtomRegistry>();
 
 /** The registry of an implementation of `Reactivity.Atom.Registry`. */
 export const nativeRegistry = (record: object): AtomRegistry.AtomRegistry | undefined => natives.get(record);
+
+/** The service `Atom.Write`: the writes of `Reactivity.Atom.Registry`, and its reads without tracking. */
+const writeImpl = (record: ReturnType<typeof impl>) => ({
+  set: record.set,
+  update: record.update,
+  modify: record.modify,
+  current: record.get,
+  refresh: record.refresh,
+});
+
+/** The service `Atom.Write`. */
+export const WriteService = /*#__PURE__*/ service<ReturnType<typeof writeImpl>>("Atom.Write");
+
+/** `Atom.layer`: a fresh registry as `Reactivity.Atom.Registry` and as `Atom.Write`. */
+export const atomLayer = /*#__PURE__*/ Layer.effectContext(
+  Effect.map(Effect.service(AtomRegistry.AtomRegistry), (registry) => {
+    const record = impl(registry);
+    const write = writeImpl(record);
+    natives.set(record, registry);
+    natives.set(write, registry);
+    return Context.make(RegistryService, record).pipe(Context.add(WriteService, write));
+  }),
+).pipe(Layer.provide(AtomRegistry.layer));
 
 /** `Reactivity.Atom.layer`: a fresh registry as the service `key`. */
 export const flickLayer = <I>(key: Context.Key<I, ReturnType<typeof impl>>): Layer.Layer<I> =>

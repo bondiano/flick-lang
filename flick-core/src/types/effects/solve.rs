@@ -270,7 +270,7 @@ impl Checker<'_> {
         let writes = e
             .services
             .iter()
-            .any(|s| s.rsplit('.').next() == Some("Registry"));
+            .any(|s| matches!(s.rsplit('.').next(), Some("Write" | "Registry")));
         let fixes = [
             writes.then_some("write atoms in an `Action`, which runs on an event"),
             (!writes && !e.services.is_empty())

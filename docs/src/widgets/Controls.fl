@@ -16,7 +16,7 @@ open_search : Unit ->{} Unit
 foreign sync open_search from "./browser.ts" "openSearch"
   arity 0
 
-view : Atom.Writable Model -> Model -> Ui {Reactivity.Atom.Registry} none
+view : Atom.Writable Model -> Model -> Ui {Atom.Write} none
 let view model m =
   let search_label = if m.ru then "Поиск" else "Search"
   let theme_label = if m.ru then "Переключить тему" else "Toggle color theme"
@@ -49,7 +49,7 @@ let view model m =
       ]
   }
 
-shell : Bool ->{} Ui {Reactivity.Atom.Registry} none
+shell : Bool ->{} Ui {Atom.Write} none
 let shell ru =
   let initial = { ru = ru; dark = false }
   let model = Atom.make initial
@@ -65,7 +65,7 @@ let main () =
   | None -> App.fail "Missing site controls container"
   | Some root ->
     let model = Atom.make initial
-    provide Reactivity.Atom.layer {
+    provide Atom.layer {
       ignore (
         Ui.Dom.mount root report (Ui.render (Ui.view (fun () -> view model (Atom.value model))) ())
       )

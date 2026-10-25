@@ -47,10 +47,10 @@ effect_source : String
 let effect_source =
   "import { Console, Effect } from \"effect\"\n\nconst main = Console.log(\"Hello, effects.\")\n\nEffect.runPromise(main)\n"
 
-token : String -> String -> Ui {Reactivity.Atom.Registry} none
+token : String -> String -> Ui {Atom.Write} none
 let token category value = Ui.span { class_name = "token-" ++ category } [Ui.text value]
 
-snippet : Bool -> Ui {Reactivity.Atom.Registry} none
+snippet : Bool -> Ui {Atom.Write} none
 let snippet effect =
   ui {
     pre { class_name = "hero-source" }
@@ -86,7 +86,7 @@ let snippet effect =
               "\"Hello, effects.\""])
   }
 
-run_example : Atom.Writable Model ->{Reactivity.Atom.Registry;} Unit
+run_example : Atom.Writable Model ->{Atom.Write;} Unit
 let run_example model =
   let m = Atom.current model
   Atom.set model { m with running = true; failed = false; output = "" }
@@ -126,7 +126,7 @@ let run_example model =
   | Ok output -> Atom.set model { current with running = false; output = output; failed = false }
   | Err message -> Atom.set model { current with running = false; output = message; failed = true }
 
-view : Atom.Writable Model -> Model -> Ui {Reactivity.Atom.Registry} none
+view : Atom.Writable Model -> Model -> Ui {Atom.Write} none
 let view model m =
   let status =
     if m.running then
@@ -223,7 +223,7 @@ let main () =
     let model =
       Atom.make
         { ru = ru; effect = false; running = false; output = ""; failed = false; copied = false }
-    provide Reactivity.Atom.layer {
+    provide Atom.layer {
       ignore (
         Ui.Dom.mount root report (Ui.render (Ui.view (fun () -> view model (Atom.value model))) ())
       )

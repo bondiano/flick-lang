@@ -3,10 +3,10 @@ module App.RenderHandler exposing (..)
 count : Atom.Writable Number
 let count = Atom.make 0
 
-remove : Action.Action (Number, Ui.ClickSnapshot) {Reactivity.Atom.Registry} none
+remove : Action.Action (Number, Ui.ClickSnapshot) {Atom.Write} none
 let remove = Action.exhaust (fun (n, _) -> task { Atom.set count n })
 
-counter : Ui.View Number {Reactivity.Atom.Registry} none
+counter : Ui.View Number {Atom.Write} none
 let counter =
   Ui.view (fun n ->
     ui {

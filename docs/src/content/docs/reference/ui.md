@@ -89,9 +89,13 @@ with `foreign pure`; React renders it, Flick never calls it.
 ## Atoms and views
 
 An atom (`Atom`) describes a value; the registry a program provides with
-`provide Reactivity.Atom.layer { … }` holds the values of the atoms read
+`provide Atom.layer { … }` holds the values of the atoms read
 through it. `Atom.make value` is a state, `Atom.derived` an atom computed
-from the atoms it reads, and `Atom.set`/`Atom.update` write a state.
+from the atoms it reads, and `Atom.set`/`Atom.update` write a state
+through the service `Atom.Write`, which the task of an action has and a
+render does not. `Atom.layer` provides one registry as both
+`Reactivity.Atom.Registry`, which roots and server markup read, and
+`Atom.Write`.
 
 A view is a component whose render reads atoms through the service
 `Atom.Read`. `Ui.Dom.mount` renders a `Ui` with the provided registry, and
@@ -102,7 +106,7 @@ sibling's does:
 count : Atom.Writable Number
 let count = Atom.make 0
 
-counter_view : Ui.View Unit {Reactivity.Atom.Registry} none
+counter_view : Ui.View Unit {Atom.Write} none
 let counter_view =
   Ui.view (fun () ->
     ui {
@@ -183,7 +187,7 @@ earlier one runs. The tasks belong to the root, which interrupts and joins
 them when it unmounts.
 
 ```flick
-increment : Action.Action Ui.ClickSnapshot {Reactivity.Atom.Registry} none
+increment : Action.Action Ui.ClickSnapshot {Atom.Write} none
 let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
 ```
 
@@ -246,7 +250,7 @@ let main () =
   match Ui.Dom.container "app" with
   | None -> App.fail "missing root"
   | Some root ->
-    provide Reactivity.Atom.layer {
+    provide Atom.layer {
       ignore (Ui.Dom.mount root report (Ui.render counter_view ()))
     }
 ```
@@ -281,7 +285,7 @@ is a service of the `provide`, nothing can render with it after the
 ```flick
 request : Number ->{} String
 let request n =
-  provide Reactivity.Atom.layer {
+  provide Atom.layer {
     Atom.set count n
     Ui.Server.render (Ui.render counter_view ())
   }
@@ -336,7 +340,7 @@ encode is a defect naming its key, not a value silently left out.
 ```flick
 page : Number ->{} String
 let page n =
-  provide Reactivity.Atom.layer {
+  provide Atom.layer {
     Atom.set count n
     let markup = Ui.Server.render (Ui.render counter_view ())
     "<div id=\"app\" data-flick-ssr>" ++ markup ++ "</div>" ++ Ui.Server.state "app"

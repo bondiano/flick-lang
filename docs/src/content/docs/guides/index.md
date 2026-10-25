@@ -118,7 +118,7 @@ explicit policy.
 4. Choose an event policy deliberately: `Ui.Event.exhaust`, `latest`,
    bounded `queue`, or bounded `concurrent`. Write atoms inside the event
    task, not while rendering a view.
-5. Inside `provide Reactivity.Atom.layer { … }`, start
+5. Inside `provide Atom.layer { … }`, start
    `Ui.Dom.mount container supervisor ui` in the intended lifetime.
    It runs until interrupted, and routes handler failures to its supervisor.
    A scope that owns the root waits for handler cleanup before releasing

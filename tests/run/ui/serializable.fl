@@ -17,7 +17,7 @@ let local = Atom.make 7
 
 main : Unit ->{; AppError} Unit
 let main () =
-  provide Reactivity.Atom.layer {
+  provide Atom.layer {
     Atom.set count 3
     Atom.set (draft "intro") "hello"
     Atom.set (draft "outro") "bye"

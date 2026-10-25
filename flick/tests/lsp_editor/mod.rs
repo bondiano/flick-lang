@@ -233,7 +233,7 @@ let main () =
   | None -> App.fail "missing root"
   | Some root ->
     let model = Atom.make seed
-    provide Reactivity.Atom.layer {
+    provide Atom.layer {
       ignore (Ui.Dom.mount root report (Ui.render (Ui.view (fun () -> view model (Atom.value model))) ()))
     }
 "#;

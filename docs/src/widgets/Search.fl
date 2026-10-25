@@ -19,7 +19,7 @@ close_search : Unit ->{} Unit
 foreign sync close_search from "./browser.ts" "closeSearch"
   arity 0
 
-find : Atom.Writable Model -> String ->{Reactivity.Atom.Registry;} Unit
+find : Atom.Writable Model -> String ->{Atom.Write;} Unit
 let find model query =
   let m = Atom.current model
   if String.trim query == "" then
@@ -36,7 +36,7 @@ let find model query =
     | Ok hits -> Atom.set model { m with query = query; hits = hits; problem = "" }
     | Err problem -> Atom.set model { m with query = query; hits = []; problem = problem }
 
-hit : Hit -> Ui {Reactivity.Atom.Registry} none
+hit : Hit -> Ui {Atom.Write} none
 let hit result =
   ui {
     item
@@ -44,7 +44,7 @@ let hit result =
         paragraph [text result.excerpt]]
   }
 
-view : Atom.Writable Model -> Model -> Ui {Reactivity.Atom.Registry} none
+view : Atom.Writable Model -> Model -> Ui {Atom.Write} none
 let view model m =
   let prefix = if m.ru then "/ru" else ""
   ui {
@@ -112,7 +112,7 @@ let main () =
   | None -> App.fail "Missing search container"
   | Some root ->
     let model = Atom.make { ru = ru; query = ""; hits = []; problem = "" }
-    provide Reactivity.Atom.layer {
+    provide Atom.layer {
       ignore (
         Ui.Dom.mount root report (Ui.render (Ui.view (fun () -> view model (Atom.value model))) ())
       )

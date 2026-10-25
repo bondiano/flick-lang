@@ -5,7 +5,7 @@ import Dom exposing (configuration)
 import State exposing (Configuration, initial_model)
 import View exposing (view)
 
-initial_view : Configuration ->{} Ui {Reactivity.Atom.Registry} none
+initial_view : Configuration ->{} Ui {Atom.Write} none
 let initial_view config =
   let initial = initial_model config
   view (Atom.make initial) initial
@@ -18,7 +18,7 @@ let main () =
   | Some root ->
     let model = Atom.make initial
     let app = Ui.render (Ui.view (fun () -> view model (Atom.value model))) ()
-    provide Reactivity.Atom.layer {
+    provide Atom.layer {
       ignore (parallel
         (task { ignore (Ui.Dom.mount root (report model) app) })
         (task {

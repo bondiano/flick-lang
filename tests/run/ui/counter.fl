@@ -36,13 +36,13 @@ foreign pure badge from "./dom.mjs" "Badge"
 count : Atom.Writable Number
 let count = Atom.make 0
 
-increment : Action.Action Ui.ClickSnapshot {Reactivity.Atom.Registry} {Refused}
+increment : Action.Action Ui.ClickSnapshot {Atom.Write} {Refused}
 let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
 
-refuse : Action.Action Ui.ClickSnapshot {Reactivity.Atom.Registry} {Refused}
+refuse : Action.Action Ui.ClickSnapshot {Atom.Write} {Refused}
 let refuse = Action.latest (fun _ -> task { from_result (Err (Refused "no")) })
 
-counter : Ui.View Unit {Reactivity.Atom.Registry} {Refused}
+counter : Ui.View Unit {Atom.Write} {Refused}
 let counter =
   Ui.named
     "App.Main.counter"
@@ -69,7 +69,7 @@ let main () =
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
   | Some root ->
-    provide Reactivity.Atom.layer {
+    provide Atom.layer {
       scope s {
         let ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render counter ()) })
         settle ()

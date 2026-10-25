@@ -33,10 +33,10 @@ let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
 greeting : Atom.Writable String
 let greeting = Atom.serializable (Codec.json Schema.string) (Atom.make "")
 
-increment : Action.Action Ui.ClickSnapshot {Reactivity.Atom.Registry} none
+increment : Action.Action Ui.ClickSnapshot {Atom.Write} none
 let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
 
-page : Ui.View Unit {Reactivity.Atom.Registry} none
+page : Ui.View Unit {Atom.Write} none
 let page =
   Ui.view (fun () ->
     ui {
@@ -55,7 +55,7 @@ let report failure =
 main : Unit ->{; AppError} Unit
 let main () =
   let (markup, state) =
-    provide Reactivity.Atom.layer {
+    provide Atom.layer {
       Atom.set count 5
       Atom.set greeting "</script> hi"
       let markup = Ui.Server.render (Ui.render page ())
@@ -66,7 +66,7 @@ let main () =
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
   | Some root ->
-    provide Reactivity.Atom.layer {
+    provide Atom.layer {
       scope s {
         let ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render page ()) })
         settle ()

@@ -6,17 +6,17 @@ let count = Atom.make 0
 draft : Number -> Atom.Writable String
 let draft = Atom.family (fun _ -> Atom.make "")
 
-remove : Action.Action (Number, Ui.ClickSnapshot) {Reactivity.Atom.Registry} none
+remove : Action.Action (Number, Ui.ClickSnapshot) {Atom.Write} none
 let remove = Action.exhaust (fun (n, _) -> task { Atom.set count n })
 
-states : Ui.View Number {Reactivity.Atom.Registry} none
+states : Ui.View Number {Atom.Write} none
 let states =
   Ui.view (fun n ->
     let local = Atom.make n
     let twice = Atom.derived (fun () -> Atom.value local * 2)
     ui { text (show (Atom.get twice)) })
 
-actions : Ui.View Number {Reactivity.Atom.Registry} none
+actions : Ui.View Number {Atom.Write} none
 let actions =
   Ui.view (fun n ->
     ui {
@@ -29,18 +29,18 @@ let actions =
         ]
     })
 
-inner : Ui.View Unit {Reactivity.Atom.Registry} none
+inner : Ui.View Unit {Atom.Write} none
 let inner = Ui.view (fun () -> ui { text "inner" })
 
 views : Ui.View Unit none none
 let views = Ui.view (fun () -> ui { Ui.render (Ui.view (fun () -> ui { text "made" })) () })
 
-row : Number ->{Atom.Read;} Ui {Reactivity.Atom.Registry} none
+row : Number ->{Atom.Read;} Ui {Atom.Write} none
 let row n =
   let made = Atom.make ""
   ui { Ui.field { bind = made; placeholder = ""; on_input = None } }
 
-keyed : Ui.View Number {Reactivity.Atom.Registry} none
+keyed : Ui.View Number {Atom.Write} none
 let keyed =
   Ui.view
     (fun id ->
@@ -50,7 +50,7 @@ let keyed =
       })
 
 // a handler's task runs on an event, not while rendering
-handler : Ui.View Unit {Reactivity.Atom.Registry} none
+handler : Ui.View Unit {Atom.Write} none
 let handler =
   Ui.view (fun () ->
     let reset =

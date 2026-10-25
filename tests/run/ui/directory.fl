@@ -58,7 +58,7 @@ people : List User
 let people = [{ id = 1; name = "Ada" }, { id = 2; name = "Mallory" }, { id = 3; name = "Carol" }]
 
 // The handler task: nothing of it runs while rendering.
-save : Atom.Writable (Option User) -> String -> User ->{Reactivity.Atom.Registry; Refused} Unit
+save : Atom.Writable (Option User) -> String -> User ->{Atom.Write; Refused} Unit
 let save model log user =
   if user.name == "Mallory" then from_result (Err (Refused user.name))
   else
@@ -69,7 +69,7 @@ let save model log user =
 directory : Atom.Writable (Option User) ->
   String ->
   Option User ->
-  Ui {Reactivity.Atom.Registry} {Refused}
+  Ui {Atom.Write} {Refused}
 let directory model log selected =
   ui {
     tabs
@@ -107,7 +107,7 @@ let main () =
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
   | Some root ->
-    provide Reactivity.Atom.layer {
+    provide Atom.layer {
     scope s {
       let log = open_raw "log"
       let running =

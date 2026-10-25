@@ -25,7 +25,7 @@ let query = Atom.on_server "(none)" (Atom.search_param "q")
 seen : Atom.Atom (Option String)
 let seen = Atom.client_only (Atom.search_param "q")
 
-page : Ui.View Unit {Reactivity.Atom.Registry} none
+page : Ui.View Unit {Atom.Write} none
 let page =
   Ui.view (fun () ->
     let client =
@@ -48,13 +48,13 @@ let report failure =
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let server = provide Reactivity.Atom.layer { Ui.Server.render (Ui.render page ()) }
+  let server = provide Atom.layer { Ui.Server.render (Ui.render page ()) }
   Platform.stdout_line server
   serve_at "http://localhost/?q=hi" server ""
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
   | Some root ->
-    provide Reactivity.Atom.layer {
+    provide Atom.layer {
       scope s {
         let ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render page ()) })
         settle ()

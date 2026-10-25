@@ -12,7 +12,7 @@ let count = Atom.make 0
 name : Atom.Writable String
 let name = Atom.make ""
 
-page : Ui.View Unit {Reactivity.Atom.Registry} none
+page : Ui.View Unit {Atom.Write} none
 let page =
   Ui.view (fun () ->
     ui {
@@ -26,7 +26,7 @@ let page =
 
 request : Number ->{} String
 let request n =
-  provide Reactivity.Atom.layer {
+  provide Atom.layer {
     Atom.set count n
     Atom.set name ("user " ++ show n)
     // the other request writes its own registry meanwhile

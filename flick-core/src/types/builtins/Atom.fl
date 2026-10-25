@@ -1,8 +1,8 @@
 /// Reactive state. An atom describes a value; the registry a program
-/// provides (`Reactivity.Atom.layer`) holds the values of the atoms read
-/// through it. A view reads atoms through `Read` while it renders and
-/// renders again only when one of them changes; a derived atom does the
-/// same for its value.
+/// provides (`Atom.layer`) holds the values of the atoms read through it.
+/// A view reads atoms through `Read` while it renders and renders again
+/// only when one of them changes; a derived atom does the same for its
+/// value. The task of an action writes them through `Write`.
 module Atom exposing (..)
 
 /// A value to read.
@@ -14,6 +14,20 @@ type alias Writable a = Reactivity.Atom.Writable a
 /// Reading atoms: the reader depends on what it read.
 service Read =
   get : forall a. Atom a ->{} a
+
+/// Writing atoms: the task of an action, or a request on a server, writes
+/// states through it; a render, whose only service is `Read`, cannot.
+service Write =
+  set : forall a. Writable a -> a ->{} Unit
+  update : forall a. Writable a -> (a -> a) ->{} Unit
+  modify : forall a b. Writable a -> (a -> (b, a)) ->{} b
+  current : forall a. Atom a ->{} a
+  refresh : forall a. Atom a ->{} Unit
+
+/// A fresh registry: the values of atoms, which views read and `Write`
+/// writes. Provide one per root, and on a server one per request.
+layer : Layer none none {Reactivity.Atom.Registry, Write}
+foreign pure layer from "@flick-lang/runtime/effect/reactivity/Atom" "atomLayer"
 
 /// A state holding `value`, whatever its type. A registry keeps its value
 /// while it lives, read or not, so a write before the first read stays.
@@ -76,28 +90,32 @@ value : Writable a ->{Read;} a
 let value atom = Read.get (readonly atom)
 
 /// Replaces the value of `atom`; whoever read it renders or computes again.
-set : Writable a -> a ->{Reactivity.Atom.Registry;} Unit
-let set atom new_value = Reactivity.Atom.set atom new_value
+set : Writable a -> a ->{Write;} Unit
+let set atom new_value = Write.set atom new_value
 
 /// Replaces the value of `atom` by `f` of it.
-update : Writable a -> (a -> a) ->{Reactivity.Atom.Registry;} Unit
-let update atom f = Reactivity.Atom.update atom f
+update : Writable a -> (a -> a) ->{Write;} Unit
+let update atom f = Write.update atom f
 
 /// Replaces the value of `atom` by the second part of `f` of it and gives
 /// the first.
-modify : Writable a -> (a -> (b, a)) ->{Reactivity.Atom.Registry;} b
-let modify atom f = Reactivity.Atom.modify atom f
+modify : Writable a -> (a -> (b, a)) ->{Write;} b
+let modify atom f = Write.modify atom f
 
 /// The value of the state `atom` now, in a task: a task reads without
 /// depending on what it read.
-current : Writable a ->{Reactivity.Atom.Registry;} a
-let current atom = Reactivity.Atom.get (readonly atom)
+current : Writable a ->{Write;} a
+let current atom = Write.current (readonly atom)
+
+/// Computes `atom` again: a task atom runs its task anew.
+refresh : Atom a ->{Write;} Unit
+let refresh atom = Write.refresh atom
 
 /// The result of a task an atom runs: still loading, loaded, or failed.
 type Async a (e : ErrorRow) = Loading | Loaded a | Failed (Failure e)
 
 /// An atom of the result of `task`, run by the registry that first reads
-/// it and run anew by `Reactivity.Atom.refresh`. A view reads it like any
+/// it and run anew by `Atom.refresh`. A view reads it like any
 /// atom and matches its three cases.
 task : Eff none e a -> Atom (Async a e)
 foreign pure task from "@flick-lang/runtime" "atomTask"

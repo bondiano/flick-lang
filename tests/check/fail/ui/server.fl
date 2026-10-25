@@ -14,6 +14,6 @@ let outside () = Ui.Server.render page
 
 after : Unit ->{} String
 let after () =
-  provide Reactivity.Atom.layer { Atom.set count 1 }
+  provide Atom.layer { Atom.set count 1 }
   Ui.Server.render page
 //^^^^^^^^^^^^^^^^^^^^^ FLICK-E002 does not allow service `Registry`

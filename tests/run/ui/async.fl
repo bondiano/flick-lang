@@ -52,7 +52,7 @@ let main () =
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
   | Some root ->
-    provide Reactivity.Atom.layer {
+    provide Atom.layer {
       scope s {
         let app = ui { fragment [Ui.render status_view (), Ui.render greeting_view ()] }
         let mounted = Fiber.spawn s report (task { Ui.Dom.mount root report app })
