@@ -150,6 +150,9 @@ codes! {
     T022 = Types 22, "`todo` left in the code";
     T023 = Types 23, "`echo` left in the code";
     T024 = Types 24, "type hole";
+    T025 = Types 25, "`let assert` with a pattern that matches every value";
+    T026 = Types 26, "`let assert` outside a block";
+    T027 = Types 27, "`let assert` in a project with `[lint] no-let-assert`";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";

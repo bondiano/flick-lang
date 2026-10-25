@@ -141,6 +141,13 @@ A list can have any length, so a list pattern in `let` is an error unless it is
 local `let` offers both as fixes: `match` takes the rest of the block as the
 arm of the pattern and adds an arm `-> todo` for what it misses.
 
+`let assert p = e` binds `p` when it matches, and otherwise fails like `todo`
+with its place, the message of `as "…"` and the value: `let assert [x, ..._] =
+xs as "no items"`. It belongs in a block, not at the top level of a module
+(`FLICK-T026`); with a pattern that matches every value it is the warning
+`FLICK-T025`. `[lint] no-let-assert` in `flick.toml` makes every `let assert`
+an error (`FLICK-T027`).
+
 ## Numbers and operators
 
 There are no implicit conversions (see [Schema and standard data types](../../spec/09-schema/)).

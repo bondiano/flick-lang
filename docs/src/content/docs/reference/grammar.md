@@ -221,6 +221,7 @@ decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
             | service | class | instance | foreign | sql_table
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
+            | "let" "assert" pattern [":" type] "=" block ["as" String]
 rec_group   = "rec" "{" { signature | let } "}"
 type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
             | ["opaque"] "type" "alias" Con { param } "=" type [deriving]

@@ -112,6 +112,8 @@ pub struct Options<'a> {
     pub limits: Limits,
     /// The SQL dialect of `sql table` and `sql { … }`.
     pub sql: &'static Dialect,
+    /// `[lint] no-let-assert`: every `let assert` is an error.
+    pub no_let_assert: bool,
 }
 
 /// Type-checks `module` and stores the types of its exports in `interface`.

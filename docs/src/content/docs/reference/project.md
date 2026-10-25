@@ -30,6 +30,7 @@ dialect = "postgresql"
 
 [lint]
 allow = ["FLICK-T021"]
+no-let-assert = false
 ```
 
 | Key | Values | Default |
@@ -50,6 +51,7 @@ allow = ["FLICK-T021"]
 | `build.labels` | what a release build labels `Module.name` for debugging tools: `"all"` (atoms, views, actions), `"components"` (views and actions) or `"none"`; debug labels all; `flick build --labels` overrides it | `"all"` |
 | `sql.dialect` | the SQL dialect of `sql table` and `sql { … }` (see [sql.md](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` and `"oracle"` are recognized but not supported yet | `"postgresql"` |
 | `lint.allow` | warning codes not reported, such as `"FLICK-T021"`; errors cannot be turned off | `[]` |
+| `lint.no-let-assert` | `true` makes every `let assert` an error (`FLICK-T027`), in `flick check`, `build`, `test` and the editor | `false` |
 
 Errors in the configuration exit with code `2`:
 

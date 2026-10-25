@@ -127,7 +127,8 @@ pub(super) fn signature(p: &mut Parser) {
     p.complete(m, K::Signature);
 }
 
-/// `let [rec] name params [: T] = body` or `let pattern [: T] = body`.
+/// `let [rec] name params [: T] = body`, `let pattern [: T] = body`, or
+/// `let assert pattern [: T] = body [as "message"]`.
 pub(super) fn let_decl(p: &mut Parser) {
     let m = p.start();
     let let_kw = p.raw();
@@ -141,7 +142,14 @@ pub(super) fn let_decl(p: &mut Parser) {
         );
         p.bump();
     }
-    p.eat(K::RecKw);
+    let assert = p.eat(K::AssertKw);
+    if p.at(K::RecKw) && assert {
+        p.error_expected("a pattern after `let assert`");
+    }
+    if p.eat(K::RecKw) && p.at(K::AssertKw) {
+        p.error_expected("a name after `let rec`");
+        p.bump();
+    }
     if p.at(K::Ident) {
         let name = p.start();
         p.bump();
@@ -161,6 +169,13 @@ pub(super) fn let_decl(p: &mut Parser) {
     }
     if p.expect(K::Eq) {
         p.body(K::Block, expr::stmt);
+    }
+    if p.at(K::AsKw) {
+        if !assert {
+            p.error_expected("the end of the `let`: only `let assert` takes `as \"message\"`");
+        }
+        p.bump();
+        p.expect(K::String);
     }
     p.complete(m, K::LetDecl);
 }

@@ -125,6 +125,9 @@ fn keywords_name_members_after_a_qualifier_and_in_declarations() {
     assert_eq!(ident("foreign pure with from", 2), (K::Ident, "with"));
     assert_eq!(ident("let error message =", 1), (K::Ident, "error"));
     assert_eq!(ident("let rec x", 1), (K::RecKw, "rec"));
+    assert_eq!(ident("let assert x", 1), (K::AssertKw, "assert"));
+    assert_eq!(ident("Console.assert ok", 2), (K::Ident, "assert"));
+    assert_eq!(ident("foreign effect assert from", 2), (K::Ident, "assert"));
     assert_eq!(ident("try x with", 2), (K::WithKw, "with"));
     assert_eq!(ident("x . with", 2), (K::WithKw, "with"));
 }

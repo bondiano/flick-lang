@@ -9,7 +9,7 @@ use super::Checker;
 use super::bindings::let_parts;
 use super::patterns::{Ctor, Pat};
 use crate::diagnostics;
-use crate::diagnostics::codes;
+use crate::diagnostics::{Severity, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -58,8 +58,60 @@ impl Checker<'_> {
             if let Some(edit) = self.match_fix(pat, node, decl, value, rest) {
                 diagnostic = diagnostic.with_fix("use `match`", vec![edit]);
             }
+            if let Some(kw) = decl.child_tokens().find(|t| t.kind == K::LetKw)
+                && !self.options.no_let_assert
+            {
+                let edit = diagnostics::Edit {
+                    span: Span::new(self.file, kw.end, kw.end),
+                    replacement: " assert".to_owned(),
+                };
+                diagnostic = diagnostic.with_fix("use `let assert`", vec![edit]);
+            }
         }
         self.diagnostics.push(diagnostic);
+    }
+
+    /// `let assert`: only in a block, where a project allows it, and with a
+    /// pattern that may miss. `rest` is `None` at the top level.
+    pub fn let_assert(&mut self, pat: &Pat, pattern: &Node, decl: &Node, rest: Option<&[&Node]>) {
+        let Some(kw) = decl.child_tokens().find(|t| t.kind == K::AssertKw) else {
+            return;
+        };
+        let span = Span::new(self.file, kw.start, kw.end);
+        let Some(rest) = rest else {
+            self.error(
+                codes::T026,
+                span,
+                "`let assert` is only for a block: a module does not fail while it loads",
+            );
+            return;
+        };
+        if self.options.no_let_assert {
+            let message = "`let assert` is not allowed in this project (`[lint] no-let-assert`); \
+                           use `match` to handle every case";
+            let value = let_parts(decl, self.text).body;
+            let mut diagnostic = diagnostics::Diagnostic::error(codes::T027, message, span);
+            if let Some(edit) = self.match_fix(pat, pattern, decl, value, rest) {
+                diagnostic = diagnostic.with_fix("use `match`", vec![edit]);
+            }
+            self.diagnostics.push(diagnostic);
+        } else if self.covers_all(pat) {
+            // the space after `assert` goes with it
+            let end = kw.end + u32::from(self.text.as_bytes().get(kw.end as usize) == Some(&b' '));
+            let edit = diagnostics::Edit {
+                span: Span::new(self.file, kw.start, end),
+                replacement: String::new(),
+            };
+            self.diagnostics.push(
+                diagnostics::Diagnostic::new(
+                    codes::T025,
+                    Severity::Warning,
+                    "this pattern matches every value: `let assert` cannot fail, use `let`",
+                )
+                .with_span(span)
+                .with_fix("use `let`", vec![edit]),
+            );
+        }
     }
 
     /// `let p = e` and the rest of its block become `match e with | p -> rest`,

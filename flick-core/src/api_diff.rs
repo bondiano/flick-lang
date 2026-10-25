@@ -182,6 +182,7 @@ mod tests {
             local: &local,
             limits: types::Limits::default(),
             sql: Default::default(),
+            no_let_assert: false,
         };
         let _ = types::check(
             &module,

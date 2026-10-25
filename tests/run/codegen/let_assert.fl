@@ -1,0 +1,22 @@
+// `let assert` binds when its pattern matches and fails, with its place,
+// message and the value, when it does not.
+module App.Main exposing (main)
+
+first : List Number -> Number
+let first xs =
+  let assert [x, ..._] = xs as "no first item"
+  x
+
+pair : List Number -> Number
+let pair xs =
+  let assert [a, b] = xs
+  let sum = a + b
+  sum * 2
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (first [3, 4]))
+  Platform.stdout_line (show (pair [1, 2]))
+  let assert Some n = List.head [5]
+  Platform.stdout_line (show n)
+  Platform.stdout_line (show (first []))
