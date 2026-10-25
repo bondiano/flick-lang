@@ -91,8 +91,10 @@ modules built on them are the stable surface.
 
 `effect/rpc` is unstable too, and so is `Rpc`: procedures described with
 codecs, a group whose type is the record of its handlers, `listen` serving
-it over HTTP with NDJSON until its scope closes, and `call` and
-`call_stream` calling a procedure of the same value.
+it over HTTP until its scope closes, and `call` and `call_stream` calling a
+procedure of the same value. Messages are NDJSON unless `ServeOptions` and
+`call_with` / `call_stream_with` choose `json`, `json_rpc`, `ndjson_rpc` or
+`binary` (Effect's frames, which only a program that names it bundles).
 
 `effect/observability` is unstable as well, and so are `Otlp` and
 `Prometheus`. `Otlp.layer`, `traces`, `logs` and `metrics` export spans, log

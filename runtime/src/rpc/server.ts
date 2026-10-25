@@ -4,7 +4,6 @@
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import { Effect, Exit, Scope, Stream } from "effect";
 import { HttpRouter } from "effect/http";
-import * as RpcSerialization from "effect/rpc/RpcSerialization";
 import * as RpcServer from "effect/rpc/RpcServer";
 
 import { nodeHttp } from "../host.ts";
@@ -33,7 +32,7 @@ const start = (options: ServeOptions, group: Group, handlers: Readonly<Record<st
     const handled = yield* Effect.provideService(rpcs.toHandlers(own as never), Scope.Scope, scope);
     const app = yield* RpcServer.toHttpEffect(rpcs).pipe(
       Effect.provideContext(handled),
-      Effect.provide(RpcSerialization.layerNdjson),
+      Effect.provide(options.serialization),
       Effect.provideService(Scope.Scope, scope),
     );
     const router = yield* HttpRouter.make;

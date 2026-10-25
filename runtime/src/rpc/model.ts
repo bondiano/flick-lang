@@ -1,9 +1,10 @@
 // `Rpc` values: procedures and groups as frozen data, made into Effect's
 // `Rpc` and `RpcGroup` when served or called. The codecs are Flick's (Effect
 // Schema codecs of the JSON wire form), so they are the RPC schemas as they are.
-import { Schema, type Scope } from "effect";
+import { type Layer, Schema, type Scope } from "effect";
 import * as Rpc from "effect/rpc/Rpc";
 import * as RpcGroup from "effect/rpc/RpcGroup";
+import * as RpcSerialization from "effect/rpc/RpcSerialization";
 
 import type { Tagged } from "../data.ts";
 import type { AnySchema } from "../schema/schemas.ts";
@@ -23,11 +24,35 @@ export interface Group {
   readonly procedures: ReadonlyArray<Procedure>;
 }
 
+/** `Rpc.Serialization`: how messages are written, as the layer of Effect's serialization. */
+export type Serialization = Layer.Layer<RpcSerialization.RpcSerialization>;
+
+/** `Rpc.ndjson`: JSON, one message a line, so a stream's elements come as they are sent. */
+export const rpcNdjson: Serialization = RpcSerialization.layerNdjson;
+
+/** `Rpc.json`: one JSON document; over HTTP a call's messages come together. */
+export const rpcJson: Serialization = RpcSerialization.layerJson;
+
+/** `Rpc.json_rpc`: JSON-RPC 2.0 documents. */
+export const rpcJsonRpc: Serialization = /*#__PURE__*/ RpcSerialization.layerJsonRpc();
+
+/** `Rpc.ndjson_rpc`: JSON-RPC 2.0, one message a line. */
+export const rpcNdjsonRpc: Serialization = /*#__PURE__*/ RpcSerialization.layerNdJsonRpc();
+
+/** `Rpc.binary`: Effect's schema-driven binary frames. */
+export const rpcBinary: Serialization = /*#__PURE__*/ RpcSerialization.layerSchemaBinary();
+
 /** `Rpc.ServeOptions`. */
 export interface ServeOptions {
   readonly host: string;
   readonly port: number;
   readonly path: string;
+  readonly serialization: Serialization;
+}
+
+/** `Rpc.CallOptions`. */
+export interface CallOptions {
+  readonly serialization: Serialization;
 }
 
 /** `Rpc.Server s`. */

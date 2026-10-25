@@ -42,7 +42,7 @@ let main () =
         if id == 1 then { id = 1; name = "Ada" } else from_result (Err (NotFound { id = id }));
       count_to = fun n -> Stream.from_list (List.range 1 (n + 1));
     }
-  let options : Rpc.ServeOptions = { host = "127.0.0.1"; port = 0; path = "/rpc" }
+  let options = Rpc.defaults
   let result =
     try
       scope s {

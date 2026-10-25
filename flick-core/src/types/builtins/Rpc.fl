@@ -24,8 +24,52 @@ type Group hs
 /// closes, after the calls it is serving.
 type Server (s : Region)
 
-/// Where the server listens, and the path of its procedures.
-type alias ServeOptions = { host : String; port : Number; path : String }
+/// How messages are written on the wire.
+type Serialization
+
+/// JSON, one message a line: a stream's elements come as they are sent.
+/// The default.
+ndjson : Serialization
+foreign pure ndjson from "@flick-lang/runtime/effect/rpc/Rpc" "rpcNdjson"
+  reviewed "effect@4.0.5 sha256:c72ee8574fb6c140"
+
+/// One JSON document: over HTTP the messages of a call come together, so a
+/// stream's elements come once it ends.
+json : Serialization
+foreign pure json from "@flick-lang/runtime/effect/rpc/Rpc" "rpcJson"
+  reviewed "effect@4.0.5 sha256:868b3e8b899a14b1"
+
+/// JSON-RPC 2.0 documents, for clients that speak it.
+json_rpc : Serialization
+foreign pure json_rpc from "@flick-lang/runtime/effect/rpc/Rpc" "rpcJsonRpc"
+  reviewed "effect@4.0.5 sha256:e6046c0ea4f44ba8"
+
+/// JSON-RPC 2.0, one message a line.
+ndjson_rpc : Serialization
+foreign pure ndjson_rpc from "@flick-lang/runtime/effect/rpc/Rpc" "rpcNdjsonRpc"
+  reviewed "effect@4.0.5 sha256:a78d50601c4030fb"
+
+/// Effect's binary frames, laid out by the codecs: smaller than JSON, but
+/// both ends must be Effect's, and it adds to a bundle.
+binary : Serialization
+foreign pure binary from "@flick-lang/runtime/effect/rpc/Rpc" "rpcBinary"
+  reviewed "effect@4.0.5 sha256:5d78f3975991bfc4"
+
+/// Where the server listens, the path of its procedures and how it writes
+/// its messages.
+type alias ServeOptions = {
+  host : String;
+  port : Number;
+  path : String;
+  serialization : Serialization;
+}
+
+/// `127.0.0.1`, a port the system chooses, `/rpc` and `ndjson`.
+defaults : ServeOptions
+let defaults = { host = "127.0.0.1"; port = 0; path = "/rpc"; serialization = ndjson }
+
+/// How a client writes its messages: as the server does.
+type alias CallOptions = { serialization : Serialization }
 
 /// The server could not start.
 type error ServeError = ServeError String
@@ -106,18 +150,39 @@ foreign pure port from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcPort"
   retention call
   reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"
 
-/// Calls the procedure at `url` (`http://127.0.0.1:8080/rpc`): the success,
-/// a declared error as the typed failure, or `ClientError`.
+/// Calls the procedure at `url` (`http://127.0.0.1:8080/rpc`) writing as
+/// `options` says: the success, a declared error as the typed failure, or
+/// `ClientError`.
+call_with :
+  forall l p r e s. CallOptions -> String -> Rpc l (p ->{r; e} s) -> p ->{; ClientError | e} s
+foreign effect call_with from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCall"
+  arity 4
+  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+
+/// `call_with` in `ndjson`.
 call : forall l p r e s. String -> Rpc l (p ->{r; e} s) -> p ->{; ClientError | e} s
-foreign effect call from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCall"
+foreign effect call from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallNdjson"
   arity 3
   reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
 
-/// Calls the stream procedure at `url`: its elements as they come, a
-/// declared error as the stream's failure, or `ClientError`.
+/// Calls the stream procedure at `url` writing as `options` says: its
+/// elements as they come, a declared error as the stream's failure, or
+/// `ClientError`.
+call_stream_with :
+  forall l p r e a.
+  CallOptions ->
+    String ->
+    Rpc l (p ->{r; e} Stream none none a) ->
+    p ->
+    Stream none {ClientError | e} a
+foreign pure call_stream_with from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStream"
+  arity 4
+  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+
+/// `call_stream_with` in `ndjson`.
 call_stream :
   forall l p r e a.
   String -> Rpc l (p ->{r; e} Stream none none a) -> p -> Stream none {ClientError | e} a
-foreign pure call_stream from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStream"
+foreign pure call_stream from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStreamNdjson"
   arity 3
   reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"

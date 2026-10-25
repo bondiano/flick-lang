@@ -1,0 +1,65 @@
+// Each serialization serves and calls the same group: a unary call, a
+// declared error and a stream, whose elements come together over HTTP
+// when the serialization writes one document.
+module App.Main exposing (main)
+
+import Stream.Core exposing (Stream)
+
+type error NotFound = NotFound { id : Number }
+  deriving Schema
+
+double : Rpc.Rpc "double" (Number ->{r; NotFound} Number)
+let double =
+  Rpc.make (Record.label : Record.Label "double")
+    |> Rpc.with_payload (Codec.json Schema.number)
+    |> Rpc.with_success (Codec.json Schema.number)
+    |> Rpc.with_errors [Rpc.error_case (Codec.json (schema NotFound))]
+
+count_to : Rpc.Rpc "count_to" (Number ->{r;} Stream none none Number)
+let count_to =
+  Rpc.make (Record.label : Record.Label "count_to")
+    |> Rpc.with_payload (Codec.json Schema.number)
+    |> Rpc.with_stream (Codec.json Schema.number)
+
+type alias Handlers r =
+  { double : Number ->{r; NotFound} Number; count_to : Number ->{r;} Stream none none Number }
+
+group : Rpc.Group (Handlers r)
+let group = Rpc.group |> Rpc.add double |> Rpc.add count_to
+
+handlers : Handlers none
+let handlers =
+  {
+    double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2;
+    count_to = fun n -> Stream.from_list (List.range 1 (n + 1));
+  }
+
+round_trip : String -> Rpc.Serialization ->{; AppError} Unit
+let round_trip name serialization =
+  let result =
+    try
+      scope s {
+        let server = Rpc.listen { Rpc.defaults with serialization = serialization } group handlers
+        let url = "http://127.0.0.1:" ++ show (Rpc.port server) ++ "/rpc"
+        let options = { serialization = serialization }
+        let doubled = Rpc.call_with options url double 21
+        let refused =
+          try show (Rpc.call_with options url double (0 - 1)) with
+          | NotFound e -> "not found " ++ show e.id
+        let counted = Stream.run_collect (Rpc.call_stream_with options url count_to 3)
+        Platform.stdout_line
+          (name ++ ": " ++ show doubled ++ ", " ++ refused ++ ", " ++ show counted)
+      }
+    with
+    | Rpc.ServeError message -> Platform.stdout_line (name ++ " serve: " ++ message)
+    | Rpc.ClientError message -> Platform.stdout_line (name ++ " client: " ++ message)
+    | NotFound e -> Platform.stdout_line (name ++ " not found " ++ show e.id)
+  result
+
+main : Unit ->{; AppError} Unit
+let main () =
+  round_trip "ndjson" Rpc.ndjson
+  round_trip "json" Rpc.json
+  round_trip "json_rpc" Rpc.json_rpc
+  round_trip "ndjson_rpc" Rpc.ndjson_rpc
+  round_trip "binary" Rpc.binary
