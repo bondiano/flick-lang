@@ -290,3 +290,39 @@ fn a_plain_foreign_named_as_a_value_is_defined_in_its_module() {
         "{js}"
     );
 }
+
+#[test]
+fn show_of_a_literal_folds_into_the_string() {
+    let js = release(
+        "module App exposing (main)\n\n\
+         main : Unit ->{; AppError} Unit\n\
+         let main () =\n  let test = 2 + 3\n  Platform.stdout_line (\"Hello from Flick\" ++ show test)\n",
+    );
+    assert!(js.contains("stdout_line(\"Hello from Flick5\")"), "{js}");
+    assert!(!js.contains("$show"), "{js}");
+}
+
+#[test]
+fn show_folds_as_the_runtime_spells_it() {
+    let js = release(
+        "module App exposing (shown, fraction)\n\n\
+         shown : String\nlet shown = show true ++ show \"a\\n\\\"\" ++ show 12n ++ show (-0)\n\n\
+         fraction : String\nlet fraction = show 0.1\n",
+    );
+    assert!(
+        js.contains(r#"export const shown = "true\"a\\n\\\"\"12n-0";"#),
+        "{js}"
+    );
+    assert!(js.contains("show(0.1)"), "{js}");
+}
+
+#[test]
+fn a_private_literal_constant_inlines_at_its_uses() {
+    let js = release(
+        "module App exposing (label)\n\n\
+         size : Number\nlet size = 128 * 2\n\n\
+         label : Unit -> String\nlet label () = \"w\" ++ show size\n",
+    );
+    assert!(js.contains("\"w256\""), "{js}");
+    assert!(!js.contains("const size"), "{js}");
+}
