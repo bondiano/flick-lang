@@ -1,0 +1,6 @@
+call: 42
+error: not found -1
+stream: [1, 2, 3]
+connection: 2, 4
+refused unframed
+no server

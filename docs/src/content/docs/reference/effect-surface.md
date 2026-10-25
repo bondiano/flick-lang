@@ -96,7 +96,9 @@ procedure of the same value. Messages are NDJSON unless `ServeOptions` and
 `call_with` / `call_stream_with` choose `json`, `json_rpc`, `ndjson_rpc` or
 `binary` (Effect's frames, which only a program that names it bundles).
 `listen_websocket` serves the same group over WebSocket, which a client
-reaches with `transport = Rpc.websocket`; `connect` keeps one connection
+reaches with `transport = Rpc.websocket`, and `listen_tcp` over TCP on
+Node, with `Rpc.tcp` and a serialization that frames its messages;
+`connect` keeps one connection
 that `call_on` and `call_stream_on` share.
 
 `effect/observability` is unstable as well, and so are `Otlp` and

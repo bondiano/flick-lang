@@ -2,22 +2,29 @@
 // Flick scope that started it. A separate entry point from the client, so a
 // program that only calls procedures loads no Node server.
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
-import { Effect, Exit, Scope, Stream } from "effect";
+import * as NodeSocket from "@effect/platform-node/NodeSocket";
+import * as NodeSocketServer from "@effect/platform-node/NodeSocketServer";
+import { Effect, Exit, Layer, Scope, Stream } from "effect";
+import { RpcSerialization } from "effect/rpc/RpcSerialization";
 import { HttpRouter } from "effect/http";
+import * as RpcClient from "effect/rpc/RpcClient";
 import * as RpcServer from "effect/rpc/RpcServer";
 
 import { nodeHttp } from "../host.ts";
 import { acquireRelease } from "../owner.ts";
-import { effectGroup, type Group, type RpcError, type Server, type ServeOptions, serveError } from "./model.ts";
+import { Socket, SocketServer } from "effect/socket";
+
+import { effectGroup, type Group, type RpcError, type Serialization, type Server, type ServeOptions, serveError, type Transport } from "./model.ts";
 
 type Handler = (payload: unknown) => Effect.Effect<unknown, unknown, unknown>;
 
 const isRoutePath = (path: string): path is `/${string}` => path.startsWith("/");
 
-/** How the server takes calls: a POST per call, or the messages of a WebSocket. */
-type Transport = "http" | "websocket";
-
-const start = (transport: Transport, options: ServeOptions, group: Group, handlers: Readonly<Record<string, Handler>>) =>
+/**
+ * Effect's group of `group` with `handlers`, each running with the services
+ * of the caller, in a scope of its own the server closes.
+ */
+const prepare = (group: Group, handlers: Readonly<Record<string, Handler>>) =>
   Effect.gen(function* () {
     const context = yield* Effect.context<unknown>();
     const own: Record<string, (payload: unknown) => unknown> = {};
@@ -26,13 +33,26 @@ const start = (transport: Transport, options: ServeOptions, group: Group, handle
       if (handler === undefined) return yield* Effect.die(new TypeError(`no handler for ${procedure.name}`));
       // a handler runs with the services of `listen`; a stream's handler gives the stream as its result
       own[procedure.name] = procedure.stream
-        ? (payload) => Stream.unwrap(Effect.provideContext(Effect.map(handler(payload), toStream), context))
-        : (payload) => Effect.provideContext(handler(payload), context);
+        ? (payload: unknown) => Stream.unwrap(Effect.provideContext(Effect.map(handler(payload), toStream), context))
+        : (payload: unknown) => Effect.provideContext(handler(payload), context);
     }
     const rpcs = effectGroup(group.procedures);
     const scope = yield* Scope.make();
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the checker typed each handler by its procedure
     const handled = yield* Effect.provideService(rpcs.toHandlers(own as never), Scope.Scope, scope);
+    return { rpcs, scope, handled };
+  });
+
+/** Whether `serialization` frames its messages, which a byte stream such as TCP needs. */
+const framed = (serialization: Serialization): boolean =>
+  Effect.runSync(Effect.map(Effect.provide(Effect.service(RpcSerialization), serialization), (s) => s.includesFraming));
+
+/** How the server takes calls: a POST per call, or the messages of a WebSocket. */
+type Served = "http" | "websocket";
+
+const start = (transport: Served, options: ServeOptions, group: Group, handlers: Readonly<Record<string, Handler>>) =>
+  Effect.gen(function* () {
+    const { rpcs, scope, handled } = yield* prepare(group, handlers);
     const app = yield* (transport === "http" ? RpcServer.toHttpEffect(rpcs) : RpcServer.toHttpEffectWebsocket(rpcs)).pipe(
       Effect.provideContext(handled),
       Effect.provide(options.serialization),
@@ -72,3 +92,44 @@ export const rpcListenWebsocket = (
 
 export const rpcPort = (server: Server): number => server.port;
 
+
+/** The TCP server of `listen_tcp`: messages framed on each connection. */
+const startTcp = (options: ServeOptions, group: Group, handlers: Readonly<Record<string, Handler>>) =>
+  Effect.gen(function* () {
+    if (!framed(options.serialization)) {
+      return yield* Effect.fail(serveError("TCP needs a serialization that frames its messages, such as `Rpc.ndjson`"));
+    }
+    const { rpcs, scope, handled } = yield* prepare(group, handlers);
+    const sockets = yield* NodeSocketServer.make({ host: options.host, port: options.port }).pipe(
+      Effect.provideService(Scope.Scope, scope),
+      Effect.mapError((error) => serveError(error.message)),
+      Effect.onError((cause) => Scope.close(scope, Exit.failCause(cause))),
+    );
+    const protocol = yield* Layer.build(RpcServer.layerProtocolSocketServer).pipe(
+      Effect.provideService(SocketServer.SocketServer, sockets),
+      Effect.provide(options.serialization),
+      Effect.provideService(Scope.Scope, scope),
+    );
+    yield* RpcServer.make(rpcs).pipe(
+      Effect.provideContext(handled),
+      Effect.provideContext(protocol),
+      Effect.forkIn(scope),
+    );
+    const port = sockets.address._tag === "UnixPathAddress" ? 0 : sockets.address.port;
+    return { port, scope } satisfies Server;
+  });
+
+/** `Rpc.listen_tcp options group handlers`: as `listen`, each client a TCP connection. */
+export const rpcListenTcp = (
+  options: ServeOptions,
+  group: Group,
+  handlers: Readonly<Record<string, Handler>>,
+): Effect.Effect<Server, RpcError, unknown> =>
+  acquireRelease(startTcp(options, group, handlers), (server) => Scope.close(server.scope, Exit.void));
+
+/** `Rpc.tcp`: the messages of calls over a TCP connection to `tcp://host:port`, opened on the first call. */
+export const rpcTcp: Transport = (url, serialization) => {
+  const { hostname, port } = new URL(url);
+  const socket = Layer.effect(Socket.Socket, NodeSocket.makeNet({ host: hostname, port: Number(port) }));
+  return RpcClient.layerProtocolSocket().pipe(Layer.provide([socket, serialization]));
+};

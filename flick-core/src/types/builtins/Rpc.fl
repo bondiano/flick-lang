@@ -82,6 +82,12 @@ websocket : Transport
 foreign pure websocket from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWebsocket"
   reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"
 
+/// The messages of calls over a TCP connection to `tcp://host:port`, opened
+/// on the first call: a server of `listen_tcp`. Node only.
+tcp : Transport
+foreign pure tcp from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcTcp"
+  reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"
+
 /// How a client writes its messages, as its server does, and how it
 /// reaches the server.
 type alias CallOptions = { serialization : Serialization; transport : Transport }
@@ -170,6 +176,17 @@ foreign effect listen_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "r
   arity 3
   retention owner
   reviewed "effect@4.0.5 sha256:9aaac4b7a11d7595"
+
+/// As `listen`, each client a TCP connection to `host` and `port` whose
+/// messages carry its calls: `tcp://127.0.0.1:8080`. Only a serialization
+/// that frames its messages (`ndjson`, `ndjson_rpc`, `binary`) fits a byte
+/// stream; another is `ServeError`. Node only.
+listen_tcp :
+  forall c s r hs. ServeOptions -> Group hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
+foreign effect listen_tcp from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenTcp"
+  arity 3
+  retention owner
+  reviewed "effect@4.0.5 sha256:32acbc4cf74e10ac"
 
 /// The port the server listens on: the one asked for, or the one the system
 /// chose for port 0.
