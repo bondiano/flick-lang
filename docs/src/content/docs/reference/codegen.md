@@ -261,7 +261,8 @@ under an owner of its own and returns `Promise<Result<A, E>>`. An expected
 failure resolves to `Result.fail`; a defect or an interruption rejects with a
 `RuntimeFailure` whose message is the inert report of the cause;
 `options.signal` interrupts the run, and the promise settles after cleanup.
-Importing either file runs nothing.
+An already-aborted signal rejects before the function or its effects run;
+completed calls release their abort listeners. Importing either file runs nothing.
 
 A type TypeScript cannot state faithfully — a higher-kinded variable, a
 region or a value holding one, an open record — has no projection: the export

@@ -1,25 +1,11 @@
-// A Vite plugin for Flick: importing a `.fl` file builds it with the `flick`
-// CLI into the cache directory and re-exports the compiled module, whose
-// imports (the runtime, the built-in modules, foreign JS next to the source)
-// Vite resolves as usual. A change to any `.fl` beside it rebuilds.
+// Builds `.fl` imports with the native compiler; Vite resolves the emitted
+// runtime, built-ins and foreign JavaScript imports as usual.
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 
 const compile = promisify(execFile);
-
-/** The `.fl` files under `dir`, without `node_modules`. */
-const sources = (dir) =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) return entry.name === "node_modules" || entry.name.startsWith(".") ? [] : sources(full);
-    return entry.name.endsWith(".fl") ? [full] : [];
-  });
-
-/** The module a source declares in its header. */
-export const moduleName = (text) => /^module\s+([A-Z][\w]*(?:\.[A-Z][\w]*)*)/m.exec(text)?.[1];
 
 /**
  * @param {{ binary?: string, profile?: "debug" | "release", outDir?: string }} options
@@ -31,7 +17,9 @@ export const flickVite = (options = {}) => {
   const binary = options.binary ?? process.env.FLICK_BIN ?? "flick";
   let profile = options.profile ?? "debug";
   let outBase = options.outDir;
+  let watcher;
   const builds = new Map();
+  const watched = new Map();
   return {
     name: "flick",
     enforce: "pre",
@@ -39,35 +27,81 @@ export const flickVite = (options = {}) => {
       outBase ??= path.join(config.cacheDir, "flick");
       if (options.profile === undefined && config.command === "build") profile = "release";
     },
+    configureServer(server) {
+      watcher = server.watcher;
+    },
     async load(id) {
-      const file = id.split("?")[0];
+      const file = path.resolve(id.split("?")[0]);
       if (!file.endsWith(".fl")) return null;
-      const dir = path.dirname(file);
-      const all = sources(dir);
-      for (const source of all) this.addWatchFile(source);
-      // a build per state of the sources, so an edit gives Vite new modules
-      const hash = createHash("sha256").update(file).update(profile);
-      for (const source of all) hash.update(source).update(readFileSync(source));
-      const out = path.join(outBase, hash.digest("hex").slice(0, 16));
-      const name = moduleName(readFileSync(file, "utf8"));
-      if (name === undefined) this.error(`${file} has no \`module\` header`);
-      // SSR, client transforms and dependency discovery share the same build.
-      if (!builds.has(out)) {
-        builds.set(out, compile(
+      const key = JSON.stringify([file, profile, outBase]);
+      // Only concurrent SSR/client transforms share a build; the CLI owns caching.
+      if (!builds.has(key)) {
+        const inputs = compile(
           binary,
-          ["build", file, "--out-dir", out, "--profile", profile, "--color", "never"],
-          { cwd: dir, encoding: "utf8" },
-        ).catch((error) => {
-          builds.delete(out);
-          if (typeof error.code === "string") {
-            this.error(`cannot run ${binary}: ${error.message}; set FLICK_BIN or the plugin's \`binary\``);
-          }
-          this.error(`flick build ${path.basename(file)} failed:\n${error.stderr ?? error.message}`);
-        }));
+          ["build", file, "--inputs", "--color", "never"],
+          { cwd: path.dirname(file), encoding: "utf8" },
+        ).then(({ stdout }) => JSON.parse(stdout));
+        const output = inputs.then(async (inventory) => {
+          const name = inventory.modules.find((module) => path.resolve(module.path) === file)?.name;
+          if (!name) throw new Error(`${file} has no \`module\` header`);
+          const hash = createHash("sha256").update(JSON.stringify([file, profile, inventory.key]));
+          const out = path.join(outBase, hash.digest("hex").slice(0, 16));
+          await compile(
+            binary,
+            ["build", file, "--emit", "js", "--out-dir", out, "--profile", profile, "--color", "never"],
+            { cwd: path.dirname(file), encoding: "utf8" },
+          );
+          return path.join(out, `${name.replaceAll(".", "/")}.js`);
+        }).finally(() => builds.delete(key));
+        builds.set(key, { inputs, output });
       }
-      await builds.get(out);
-      const target = path.join(out, `${name.replaceAll(".", "/")}.js`);
-      return `export * from ${JSON.stringify(target)};\n`;
+      const pending = builds.get(key);
+      try {
+        const [, target] = await Promise.all([
+          pending.inputs.then((inventory) => {
+            const files = inventory.files.map((source) => path.resolve(source));
+            const roots = inventory.roots.map((root) => path.resolve(root));
+            watched.set(file, { files: new Set(files), roots });
+            // Vite treats addWatchFile paths as imports in dev, unlike its watcher.
+            const paths = [...files, ...roots];
+            if (watcher) watcher.add(paths);
+            else for (const source of paths) this.addWatchFile(source);
+          }),
+          pending.output,
+        ]);
+        return `export * from ${JSON.stringify(target)};\n`;
+      } catch (error) {
+        if (typeof error.code === "string") {
+          this.error(`cannot run ${binary}: ${error.message}; set FLICK_BIN or the plugin's \`binary\``);
+        }
+        this.error(`flick build ${path.basename(file)} failed:\n${error.stderr ?? error.message}`);
+      }
+    },
+    hotUpdate({ file, modules, timestamp }) {
+      const changed = path.resolve(file);
+      const affected = new Set(modules);
+      const graph = this.environment.moduleGraph;
+      const invalidated = new Set();
+      for (const [source, inputs] of watched) {
+        const inRoot = changed.endsWith(".fl") && inputs.roots.some((root) =>
+          changed.startsWith(root.endsWith(path.sep) ? root : `${root}${path.sep}`));
+        if (!inputs.files.has(changed) && !inRoot) continue;
+        for (const module of graph.getModulesByFile(source) ?? []) {
+          affected.add(module);
+          graph.invalidateModule(module, invalidated, timestamp, true);
+        }
+      }
+      // Native inputs aren't runtime modules, so runners cannot trace their reload trigger.
+      if (invalidated.size > 0) {
+        const cache = this.environment.runner?.evaluatedModules;
+        if (cache) {
+          for (const module of invalidated) {
+            const evaluated = module.id && cache.getModuleById(module.id);
+            if (evaluated) cache.invalidateModule(evaluated);
+          }
+        }
+      }
+      return [...affected];
     },
   };
 };

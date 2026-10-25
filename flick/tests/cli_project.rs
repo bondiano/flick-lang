@@ -2,11 +2,13 @@
 //! manifest, `clean`, toolchain checks, the pnpm adapter's refusals,
 //! `explain`, `doc` and `inspect`.
 
+#[path = "cli_project/artifacts.rs"]
+mod artifacts;
 mod common;
 
 use std::fs;
 use std::path::Path;
-use std::process::{self, Output};
+use std::process::{self, Output, Stdio};
 
 use common::{APP, flick_in, project};
 use flick_core::build::runner_path;
@@ -350,7 +352,7 @@ fn an_incompatible_effect_blocks_build_and_run() {
     }
     assert!(!dir.join("dist").exists());
     assert!(
-        !dir.join(".flick/run/1").exists(),
+        fs::read_dir(dir.join(".flick/run")).map_or(0, Iterator::count) == 0,
         "no generation was written"
     );
 }

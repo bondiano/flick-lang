@@ -4,7 +4,7 @@ mod human;
 mod json;
 
 pub use human::render_human;
-pub use json::{SCHEMA_VERSION, render_json};
+pub use json::{Event, SCHEMA_VERSION, json_events, render_json};
 
 #[cfg(test)]
 mod tests;

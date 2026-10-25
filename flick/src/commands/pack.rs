@@ -1,8 +1,8 @@
 //! `flick pack`: a release build of the project's modules into a staging
 //! package, checked for completeness, and an npm tarball of it made by
-//! pnpm. Every module has its ESM and `.iface`, with `.d.ts` when the
-//! project emits them; each interface's dependencies have the fingerprints
-//! it was built against; every path the manifest's `exports` names exists.
+//! pnpm. Each public module has its ESM and `.iface`, with `.d.ts` when the
+//! project emits them; its interface owns any alternate backend implementation.
+//! Dependencies have the recorded fingerprints and manifest exports exist.
 //! Importing a module runs nothing, as its top level is pure; an app also
 //! packs the runner of each entry, which the manifest's `bin` names.
 
@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command as Process;
 use std::{env, fs};
 
-use flick_core::build::{BUILTIN_DIR, runner_file};
+use flick_core::build::{BUILTIN_DIR, effects::CORE_DIR, runner_file};
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
 use flick_core::iface;
 use flick_core::project::cache;
@@ -60,6 +60,7 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
             profile: Some(ProfileArgument::Release),
             labels: None,
             watch: false,
+            inputs: false,
         },
         project: Some(root.to_string_lossy().into_owned()),
         // an app packs its runners, a library none
@@ -156,13 +157,15 @@ fn global_path(dir: &str) -> PathBuf {
     env::current_dir().unwrap_or_default().join(dir)
 }
 
-/// Modules without their `.iface` or `.d.ts`, and interfaces whose
-/// dependencies in the package have other fingerprints.
+/// Primary module companions, declared backend implementations and interface
+/// dependency fingerprints must all agree.
 fn incomplete(dist: &Path, dts: bool) -> Vec<Diagnostic> {
     let mut files = Vec::new();
     files_under(dist, &mut files);
     let mut out = Vec::new();
-    let own = |p: &Path| !p.starts_with(dist.join(BUILTIN_DIR));
+    let builtins = dist.join(BUILTIN_DIR);
+    let core = dist.join(CORE_DIR);
+    let own = |p: &Path| !p.starts_with(&builtins) && !p.starts_with(&core);
     for js in files
         .iter()
         .filter(|f| own(f) && f.extension().is_some_and(|e| e == "js"))
@@ -207,6 +210,26 @@ fn incomplete(dist: &Path, dts: bool) -> Vec<Diagnostic> {
             ));
             continue;
         };
+        if let Some(core) = interface
+            .abi
+            .as_ref()
+            .and_then(|abi| abi.core.as_deref())
+            .filter(|core| !core.is_empty())
+        {
+            let implementation = dist
+                .join(core)
+                .join(format!("{}.js", module.replace('.', "/")));
+            if !implementation.is_file() {
+                out.push(Diagnostic::new(
+                    codes::P020,
+                    Severity::Error,
+                    format!(
+                        "`{module}` declares a build without Effect at `{}`, which the package does not have",
+                        relative(&implementation, dist)
+                    ),
+                ));
+            }
+        }
         for (dependency, fingerprint) in &interface.dependencies {
             let dep_path = dist.join(format!("{}.iface", dependency.replace('.', "/")));
             let Some(dep) = fs::read(&dep_path)
@@ -302,4 +325,67 @@ fn missing_exports(manifest: &serde_json::Value, stage: &Path) -> Option<String>
         .into_iter()
         .find(|p| !p.contains('*') && !stage.join(p).exists())
         .map(|p| format!("`exports` names `{p}`, which the package does not have"))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::process;
+
+    use super::*;
+
+    #[test]
+    fn completeness_follows_primary_interfaces_and_their_backend_implementations() {
+        let root = env::temp_dir().join(format!("flick-package-completeness-{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        write(
+            &root.join("flick.toml"),
+            "schema-version = 1\n[project]\nkind = \"lib\"\n",
+        )
+        .expect("config");
+        write(
+            &root.join("src/Lib/Greeting.fl"),
+            "module Lib.Greeting exposing (greet)\ngreet : String -> String\nlet greet name = \"Hello, \" ++ name\n",
+        )
+        .expect("module");
+        let built = BuildCommand::new(
+            BuildArguments {
+                paths: Vec::new(),
+                out_dir: None,
+                emit: Some(EmitArgument::Js),
+                emit_dts: true,
+                promise_facade: false,
+                schema_aot: false,
+                profile: Some(ProfileArgument::Release),
+                labels: None,
+                inputs: false,
+                watch: false,
+            },
+            Some(root.to_string_lossy().into_owned()),
+        )
+        .run();
+        assert!(built.diagnostics.is_empty(), "{:?}", built.diagnostics);
+        let dist = root.join("dist");
+        let core = dist.join(CORE_DIR).join("Lib/Greeting.js");
+        assert!(core.is_file());
+        assert!(!core.with_extension("iface").exists());
+        assert!(!core.with_extension("d.ts").exists());
+        assert!(incomplete(&dist, true).is_empty());
+        let implementation = fs::read(&core).expect("alternate implementation");
+        fs::remove_file(&core).expect("remove alternate");
+        assert!(
+            incomplete(&dist, true)
+                .iter()
+                .any(|d| d.code == codes::P020 && d.message.contains("_core/Lib/Greeting.js")),
+            "the authoritative interface must not advertise a missing implementation"
+        );
+        fs::write(&core, implementation).expect("restore alternate");
+        fs::remove_file(dist.join("Lib/Greeting.iface")).expect("remove interface");
+        assert!(
+            incomplete(&dist, true)
+                .iter()
+                .any(|d| d.code == codes::P020 && d.message.contains("Lib/Greeting.iface")),
+            "a backend alternative does not waive the primary interface"
+        );
+        fs::remove_dir_all(root).expect("fixture cleanup");
+    }
 }

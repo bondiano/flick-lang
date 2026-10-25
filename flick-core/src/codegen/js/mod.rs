@@ -101,7 +101,7 @@ pub fn js(module: &Module, options: &Options) -> Output {
             .aliases
             .get(imported)
             .cloned()
-            .unwrap_or_else(|| names::module_alias(imported));
+            .unwrap_or_else(|| names::module_alias(imported, 'm'));
         let from = names::string(&relative(&here, &target));
         let _ = writeln!(code, "import * as {} from {from};", bound(&alias));
         untyped(&mut code, &alias);
@@ -427,7 +427,7 @@ impl Gen<'_> {
         let alias = if free {
             readable
         } else {
-            names::module_alias(module)
+            names::module_alias(module, 'm')
         };
         self.aliases.insert(module.to_owned(), alias.clone());
         alias

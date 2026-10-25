@@ -223,6 +223,128 @@ fn import_review_update_and_check() {
     assert!(text(&select.stderr).contains("`toDate` is blocked"));
 }
 
+fn identity_binding(
+    module_specifier: &str,
+    package_name: &str,
+    declaration: &str,
+    version: &str,
+    expected: u32,
+) {
+    let part = module_part(module_specifier);
+    let dir = root().join("target/tmp/ffi_command/identity").join(&part);
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("src/App")).expect("app dir");
+    fs::create_dir_all(dir.join("src/Ffi")).expect("ffi dir");
+    let installed = dir
+        .join("node_modules")
+        .join(module_specifier.split('/').next().expect("fixture package"));
+    fs::create_dir_all(&installed).expect("package dir");
+    let fixture = root().join("tests/ffi/import-identity").join(package_name);
+    let implementation = declaration.replace(".d.ts", ".js");
+    for file in ["package.json", declaration, &implementation] {
+        fs::copy(fixture.join(file), installed.join(file)).expect("copy fixture");
+    }
+    fs::write(
+        dir.join("flick.toml"),
+        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n",
+    )
+    .expect("project");
+    let dependency = if module_specifier == package_name
+        || module_specifier.starts_with(&format!("{package_name}/"))
+    {
+        version.to_owned()
+    } else {
+        format!("npm:{package_name}@{version}")
+    };
+    fs::write(
+        dir.join("package.json"),
+        serde_json::json!({
+            "name": "identity-consumer",
+            "type": "module",
+            "dependencies": { (installed.file_name().expect("package name").to_str().expect("UTF-8 package name")): dependency },
+        })
+        .to_string(),
+    )
+    .expect("package");
+    fs::write(
+        dir.join("src/App/Main.fl"),
+        format!(
+            "module App.Main exposing (main)\n\n\
+             import Ffi.{part}.Generated as Generated\n\
+             import Ffi.Reviewed as Reviewed\n\n\
+             main : Unit ->{{; AppError}} Unit\n\
+             let main () = Platform.stdout_line (show (Generated.answer (), Reviewed.answer ()))\n"
+        ),
+    )
+    .expect("consumer");
+    let wrong = format!("{module_specifier}@{version} intentionally-wrong-fingerprint");
+    let reviewed = format!(
+        "module Ffi.Reviewed exposing (answer)\n\n\
+         answer : Unit ->{{}} Number\n\
+         foreign sync answer from \"{module_specifier}\" \"answer\"\n  arity 0\n  reviewed \"{wrong}\"\n"
+    );
+    let reviewed_path = dir.join("src/Ffi/Reviewed.fl");
+    fs::write(&reviewed_path, &reviewed).expect("reviewed");
+    // No Generated.fl exists yet: a reviewed binding alone must still be checked.
+    let check = flick(&dir, &["ffi", "check"]);
+    assert!(!check.status.success(), "{}", text(&check.stderr));
+    assert!(
+        text(&check.stderr).contains("FLICK-F007"),
+        "{}",
+        text(&check.stderr)
+    );
+
+    let import = flick(
+        &dir,
+        &["ffi", "import", module_specifier, "--out", "src/Ffi"],
+    );
+    assert!(import.status.success(), "{}", text(&import.stderr));
+    let generated = fs::read_to_string(dir.join("src/Ffi").join(&part).join("Generated.fl"))
+        .expect("generated");
+    let provenance = fingerprint(&generated, "answer");
+    assert!(provenance.starts_with(&format!("{module_specifier}@{version} sha256:")));
+    fs::write(&reviewed_path, reviewed.replace(&wrong, &provenance)).expect("reviewed");
+    let check = flick(&dir, &["ffi", "check"]);
+    assert!(check.status.success(), "{}", text(&check.stderr));
+    let build = flick(&dir, &["build", "--emit", "js"]);
+    assert!(build.status.success(), "{}", text(&build.stderr));
+    let run = Command::new("node")
+        .arg(dir.join("dist").join(runner_path(false)))
+        .output()
+        .expect("node runs");
+    assert!(run.status.success(), "{}", text(&run.stderr));
+    assert_eq!(
+        text(&run.stdout),
+        format!("({expected}, {expected})\n"),
+        "{}",
+        text(&run.stderr)
+    );
+}
+
+#[test]
+#[ignore = "needs Node and `pnpm install`"]
+fn subpath_only_package_identity() {
+    identity_binding(
+        "subpath-package/feature",
+        "subpath-package",
+        "feature.d.ts",
+        "1.0.0",
+        41,
+    );
+}
+
+#[test]
+#[ignore = "needs Node and `pnpm install`"]
+fn npm_alias_package_identity() {
+    identity_binding(
+        "package-alias",
+        "original-package",
+        "index.d.ts",
+        "2.0.0",
+        42,
+    );
+}
+
 /// Imports a selection of a real package; the report is the snapshot.
 fn corpus(package: &str, select: &str) -> String {
     let out_dir = root().join("target/tmp/ffi_command/corpus");

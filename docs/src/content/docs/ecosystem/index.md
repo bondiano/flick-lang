@@ -70,15 +70,15 @@ import { defineConfig } from "astro/config";
 export default defineConfig({ integrations: [flick()] });
 ```
 
-The same package exports `flickVite` from `@flick-lang/astro/vite` for a Vite configuration. The plugin resolves its compiler from the `binary` option, then `FLICK_BIN`, then `flick` on `PATH`; its other options are `profile` and `outDir`. It watches Flick sources under the imported file's directory and compiles with the selected native binary. Vite resolves the generated runtime and foreign JavaScript imports, so those dependencies must be available to the host project.
+The same package exports `flickVite` from `@flick-lang/astro/vite` for a Vite configuration. The plugin resolves its compiler from the `binary` option, then `FLICK_BIN`, then `flick` on `PATH`; its other options are `profile` and `outDir`. It requests JavaScript explicitly and obtains source roots, configuration and dependency inputs from `flick build --inputs`, including imports outside the entry's directory. Only simultaneous SSR/client builds are coalesced; completed-build caching belongs to the compiler. Source creation, deletion and configuration changes invalidate the import. Restart the host after replacing the compiler binary. Vite resolves the generated runtime and foreign JavaScript imports, so those dependencies must be available to the host project.
 
 This documentation site uses the workspace integration itself. See the [integration source](https://github.com/bondiano/flick-lang/tree/main/tools/astro-flick) before adopting it outside the checkout: it is private workspace tooling, not a documented public npm install.
 
 ## Editors and syntax tools
 
-The native language server runs with `flick lsp --stdio`. It provides diagnostics with quick fixes, source-type hover, definition, type definition and references, completion, signature help, refactors, document and workspace symbols, semantic highlighting, folding, inlay type hints, formatting and rename for supported project symbols. Built-in library definitions open as real read-only `.fl` files; browsing them does not make them editable project sources.
+The native language server runs with `flick lsp --stdio`. It provides diagnostics with quick fixes, source-type hover, definition, type definition and references, completion, signature help, refactors, document and workspace symbols, semantic highlighting, folding, inlay type hints, formatting and rename for supported project symbols. Each project owns its analysis and diagnostics, even when another open project uses the same module names. Built-in library definitions open as real read-only `.fl` files; browsing them does not make them editable project sources.
 
-- **VS Code:** `editors/vscode/` contains the TextMate grammar and language-server client. The repository's setup uses a local extension; `flick.path` selects the executable.
+- **VS Code 1.82 or later:** `editors/vscode/` contains the TextMate grammar and language-server client. The repository's setup uses a local extension; `flick.path` selects the executable.
 - **Zed:** `editors/zed/` contains the extension and tree-sitter integration. Its launcher tries an explicit `lsp.flick.binary.path`, then the worktree's `PATH`, then a release matching the extension version, with an offline cache. A local path avoids depending on a matching downloadable release.
 - **tree-sitter:** `editors/tree-sitter-flick/` is a token-level grammar with nested brackets, not the compiler's complete semantic analysis. Precise semantic information comes from the language server.
 

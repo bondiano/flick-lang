@@ -7,7 +7,7 @@ pub mod effects;
 
 pub use abi::interface;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -120,15 +120,18 @@ pub fn emit(
 ) -> (Vec<Artifact>, Vec<Diagnostic>) {
     let mut diagnostics = Vec::new();
     if !settings.core_only {
-        effects::check_packages(&compilation.packages, settings.backend, &mut diagnostics);
+        effects::check_packages(
+            &compilation.package_modules,
+            settings.backend,
+            &mut diagnostics,
+        );
     }
     let modules = &compilation.modules;
     let provider = |m: &str| {
         compilation
-            .packages
+            .package_modules
             .iter()
-            .find(|(module, ..)| module == m)
-            .map(|(_, package, interface, js)| (package.clone(), interface.clone(), js.clone()))
+            .find(|module| module.module == m)
     };
     let ext = if settings.typescript { "ts" } else { "js" };
     let is_builtin = |m: &str| types::builtin_sources().iter().any(|(n, _)| *n == m);
@@ -136,9 +139,9 @@ pub fn emit(
         let file = format!("{}.{ext}", m.replace('.', "/"));
         match provider(m) {
             // a package's module sits next to its interface in `iface-dir`
-            Some((_, interface, js)) => format!(
+            Some(module) => format!(
                 "npm:{}.js",
-                effects::package_path(&js, m, &interface, settings.backend)
+                effects::package_path(&module.js_specifier, m, &module.interface, settings.backend)
             ),
             None if is_builtin(m) => format!("{BUILTIN_DIR}/{file}"),
             None => file,
@@ -146,17 +149,17 @@ pub fn emit(
     };
     let own = |m: &str| modules.iter().any(|c| c.name == m);
     let package = |m: &str| match provider(m) {
-        Some((package, ..)) => Some(package),
+        Some(module) => Some(module.package.clone()),
         None => own(m)
             .then(|| settings.package.map(str::to_owned))
             .flatten(),
     };
+    let published_interfaces = published_interfaces(compilation, settings);
     let interface_of = |m: &str| {
-        modules
-            .iter()
-            .find(|c| c.name == m)
-            .map(|c| c.interface.clone())
-            .or_else(|| provider(m).map(|(_, i, _)| i))
+        published_interfaces
+            .get(m)
+            .cloned()
+            .or_else(|| provider(m).map(|module| module.interface.clone()))
     };
     let foreign = |module: &str, spec: &str| {
         // `[build] ui` stands for the renderer and the mount of `Ui` and `Action`
@@ -208,7 +211,7 @@ pub fn emit(
         options: &options,
         path: &path,
         package: &package,
-        interface_of: &interface_of,
+        published_interfaces: &published_interfaces,
         any_interface: &any_interface,
     };
     // a built-in runner is written like any module the program imports
@@ -217,6 +220,75 @@ pub fn emit(
     builtins(&ctx, imports, &mut out, &mut diagnostics);
     entry_runners(settings, modules, &path, &mut out, &mut diagnostics);
     (out, diagnostics)
+}
+
+fn published_interfaces<'a>(
+    compilation: &'a Compilation,
+    settings: &Settings,
+) -> BTreeMap<&'a str, Interface> {
+    let modules = &compilation.modules;
+    let checked_interfaces = |name: &str| {
+        modules
+            .iter()
+            .find(|module| module.name == name)
+            .map(|module| module.interface.clone())
+            .or_else(|| {
+                compilation
+                    .package_modules
+                    .iter()
+                    .find(|module| module.module == name)
+                    .map(|module| module.interface.clone())
+            })
+    };
+    let mut published_interfaces: BTreeMap<&str, Interface> = modules
+        .iter()
+        .map(|module| {
+            let mut published = interface(
+                &module.ir,
+                &module.interface,
+                settings.package,
+                &[],
+                &checked_interfaces,
+            );
+            published.source = settings
+                .root
+                .and_then(|root| module.path.strip_prefix(root).ok())
+                .map(|p| p.to_string_lossy().replace('\\', "/"));
+            if let Some(abi) = &mut published.abi {
+                abi.core = if settings.backend == Backend::None {
+                    Some(String::new())
+                } else {
+                    settings
+                        .core_modules
+                        .contains(&module.name)
+                        .then(|| effects::CORE_DIR.to_owned())
+                };
+            }
+            (module.name.as_str(), published)
+        })
+        .collect();
+    // Hash only finalized ABI, including backend availability, exactly as published.
+    let fingerprints: BTreeMap<&str, String> = published_interfaces
+        .iter()
+        .map(|(name, interface)| (*name, iface::fingerprint(interface)))
+        .chain(compilation.package_modules.iter().map(|module| {
+            (
+                module.module.as_str(),
+                iface::fingerprint(&module.interface),
+            )
+        }))
+        .collect();
+    for module in modules {
+        let published = published_interfaces
+            .get_mut(module.name.as_str())
+            .expect("every compiled module has a published interface");
+        published.dependencies = module
+            .imports
+            .iter()
+            .filter_map(|name| Some((name.clone(), fingerprints.get(name.as_str())?.clone())))
+            .collect();
+    }
+    published_interfaces
 }
 
 /// The runner of each entry, or why `main` cannot be started.
@@ -301,7 +373,12 @@ fn core_modules(ctx: &Context, compilation: &Compilation, out: &mut Vec<Artifact
             (module.name.as_str(), artifacts, imports, needs.is_empty())
         })
         .collect();
-    let package = |m: &str| compilation.packages.iter().find(|(module, ..)| module == m);
+    let package = |m: &str| {
+        compilation
+            .package_modules
+            .iter()
+            .find(|module| module.module == m)
+    };
     let mut core: HashSet<&str> = compiled.iter().filter(|c| c.3).map(|c| c.0).collect();
     // a module is out with what it imports
     loop {
@@ -310,7 +387,7 @@ fn core_modules(ctx: &Context, compilation: &Compilation, out: &mut Vec<Artifact
             .filter(|(name, _, imports, _)| {
                 core.contains(name)
                     && !imports.iter().all(|i| match package(i) {
-                        Some((.., interface, _)) => effects::importable(interface, Backend::None),
+                        Some(module) => effects::importable(&module.interface, Backend::None),
                         None if compilation.modules.iter().any(|m| &m.name == i) => {
                             core.contains(i.as_str())
                         }
@@ -463,7 +540,7 @@ struct Context<'a> {
     options: &'a Options<'a>,
     path: &'a dyn Fn(&str) -> String,
     package: &'a dyn Fn(&str) -> Option<String>,
-    interface_of: &'a dyn Fn(&str) -> Option<Interface>,
+    published_interfaces: &'a BTreeMap<&'a str, Interface>,
     any_interface: &'a dyn Fn(&str) -> Option<Interface>,
 }
 
@@ -511,28 +588,10 @@ fn compiled_module(
     if ctx.settings.core_only {
         return output.imports;
     }
-    let mut built = interface(
-        &module.ir,
-        &module.interface,
-        (ctx.package)(&module.name).as_deref(),
-        &module.imports,
-        ctx.interface_of,
-    );
-    built.source = ctx
-        .settings
-        .root
-        .and_then(|root| module.path.strip_prefix(root).ok())
-        .map(|p| p.to_string_lossy().replace('\\', "/"));
-    if let Some(abi) = &mut built.abi {
-        abi.core = if ctx.settings.backend == Backend::None {
-            Some(String::new())
-        } else {
-            ctx.settings
-                .core_modules
-                .contains(&module.name)
-                .then(|| effects::CORE_DIR.to_owned())
-        };
-    }
+    let built = ctx
+        .published_interfaces
+        .get(module.name.as_str())
+        .expect("every compiled module has a published interface");
     if ctx.settings.extras.dts
         && let Some((text, refused)) =
             declarations(&module.name, ctx.any_interface, ctx.package, ctx.path)
@@ -552,7 +611,7 @@ fn compiled_module(
     if ctx.settings.extras.promise_facade {
         out.extend(facade(
             module,
-            &built,
+            built,
             ctx.any_interface,
             ctx.package,
             ctx.path,
@@ -560,7 +619,7 @@ fn compiled_module(
     }
     out.push(Artifact {
         path: format!("{}.iface", module.name.replace('.', "/")),
-        contents: iface::write(&built),
+        contents: iface::write(built),
     });
     output.imports
 }

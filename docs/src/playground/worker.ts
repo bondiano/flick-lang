@@ -32,6 +32,13 @@ const modules = import.meta.glob<Namespace>([
   "../../../runtime/dist/cli/index.js",
   "../../../runtime/dist/ui/react/index.js",
   "../../../runtime/dist/effect/*.js",
+  "../../../runtime/dist/effect/http/*.js",
+  // These adapters (including Response through Multipart) load Node services.
+  "!../../../runtime/dist/effect/http/{HttpServer,HttpPlatform,HttpMiddleware,HttpStaticServer,HttpServerResponse,Multipart}.js",
+  "../../../runtime/dist/effect/reactivity/*.js",
+  "../../../runtime/dist/effect/observability/*.js",
+  "../../../runtime/dist/effect/devtools/DevTools.js",
+  "../../../runtime/dist/effect/rpc/Rpc.js",
 ]);
 
 /** The built file a specifier of the runtime package resolves to. */

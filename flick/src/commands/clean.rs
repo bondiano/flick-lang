@@ -11,7 +11,7 @@ use flick_core::source::SourceMap;
 
 use super::run::{find_project, generations, locked};
 use crate::args::{CleanArguments, GlobalArguments};
-use crate::cache::manifest;
+use crate::cache::{manifest, remove_empty_parents};
 use crate::command::Outcome;
 use crate::report;
 
@@ -40,16 +40,7 @@ pub fn clean(options: &CleanArguments, global: &GlobalArguments) -> Outcome {
     }
     let _ = fs::remove_file(root.join(cache::MANIFEST));
     let _ = fs::remove_dir_all(root.join(cache::DIR).join("test"));
-    let mut kept = 0;
-    if let Ok(entries) = fs::read_dir(generations(root)) {
-        for generation in entries.flatten().map(|e| e.path()) {
-            if locked(&generation) {
-                kept += 1;
-            } else {
-                let _ = fs::remove_dir_all(&generation);
-            }
-        }
-    }
+    let kept = clean_generations(root);
     if options.cache {
         let _ = fs::remove_dir_all(root.join(cache::DIR).join("cache"));
     }
@@ -65,13 +56,17 @@ pub fn clean(options: &CleanArguments, global: &GlobalArguments) -> Outcome {
     }
 }
 
-/// Removes the directories of `path` up to `top` that are left empty.
-fn remove_empty_parents(path: &Path, top: &Path) {
-    let mut dir = path.parent();
-    while let Some(d) = dir {
-        if d == top || fs::remove_dir(d).is_err() {
-            break;
+/// Keeps both construction reservations and running or orphaned generations.
+pub(super) fn clean_generations(root: &Path) -> usize {
+    let mut kept = 0;
+    if let Ok(entries) = fs::read_dir(generations(root)) {
+        for generation in entries.flatten().map(|e| e.path()) {
+            if locked(&generation) {
+                kept += 1;
+            } else {
+                let _ = fs::remove_dir_all(&generation);
+            }
         }
-        dir = d.parent();
     }
+    kept
 }

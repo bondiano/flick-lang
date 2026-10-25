@@ -99,10 +99,10 @@ impl Ide<'_> {
         }
         self.analysis
             .compilation
-            .packages
+            .package_modules
             .iter()
-            .find(|(m, ..)| m == module)
-            .map(|(_, _, i, _)| i.clone())
+            .find(|m| m.module == module)
+            .map(|m| m.interface.clone())
             .or_else(|| {
                 types::builtins()
                     .iter()
@@ -115,10 +115,10 @@ impl Ide<'_> {
     fn package_of(&self, module: &str) -> Option<&str> {
         self.analysis
             .compilation
-            .packages
+            .package_modules
             .iter()
-            .find(|(m, ..)| m == module)
-            .map(|(_, p, ..)| p.as_str())
+            .find(|m| m.module == module)
+            .map(|m| m.package.as_str())
     }
 
     /// The symbol at `offset` of `file`, with the range of the name there.

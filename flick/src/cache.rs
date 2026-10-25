@@ -4,12 +4,13 @@
 //! interfaces of installed dependencies), and the manifest of what each
 //! build wrote, which `flick clean` follows.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::{env, fs};
+use std::{env, fs, io};
 
 use flick_core::build::Artifact;
-use flick_core::project::Project;
 use flick_core::project::cache::{self, Key, Manifest};
+use flick_core::project::{self, Project};
 
 use crate::toolchain;
 
@@ -34,6 +35,12 @@ pub fn files_under(dir: &Path, out: &mut Vec<PathBuf>) {
 pub fn key(project: &Project, roots: &[PathBuf], settings: &str) -> String {
     let mut key = Key::default();
     key.add("settings", settings);
+    let mut selected: Vec<PathBuf> = roots.iter().map(|p| project::normalize(p)).collect();
+    selected.sort();
+    selected.dedup();
+    for path in &selected {
+        key.add("selected-root", path.to_string_lossy().as_bytes());
+    }
     key.add("config", format!("{:?}", project.config));
     key.add("compiler", toolchain::COMPILER);
     key.add("language", flick_core::LANGUAGE_VERSION);
@@ -48,34 +55,38 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str) -> String {
         let version = toolchain::resolved(&project.root, package).unwrap_or_default();
         key.add(format!("version {package}"), version);
     }
-    let mut sources = Vec::new();
-    for root in [project.source_root(), project.test_root()] {
-        files_under(&root, &mut sources);
-    }
-    sources.extend(roots.iter().cloned());
-    sources.sort();
-    sources.dedup();
-    for path in sources
-        .iter()
-        .filter(|p| p.extension().is_some_and(|e| e == "fl"))
-    {
+    for path in input_files(project, &selected) {
         key.add(
-            format!("source {}", path.display()),
+            format!("input {}", path.display()),
             fs::read(path).unwrap_or_default(),
         );
-    }
-    for file in ["package.json", "pnpm-lock.yaml"] {
-        key.add(file, fs::read(project.root.join(file)).unwrap_or_default());
-    }
-    for (name, bytes) in dependency_files(&project.root) {
-        key.add(name, bytes);
     }
     key.finish()
 }
 
-/// `package.json` of each installed direct dependency and the files of its
-/// Flick interfaces.
-fn dependency_files(root: &Path) -> Vec<(String, Vec<u8>)> {
+/// Files that affect a build, including absent manifests whose creation matters.
+pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    for root in [project.source_root(), project.test_root()] {
+        files_under(&root, &mut files);
+    }
+    files.extend(roots.iter().cloned());
+    files.retain(|p| p.extension().is_some_and(|e| e == "fl"));
+    files.extend(
+        [project::CONFIG_FILE, "package.json", "pnpm-lock.yaml"]
+            .map(|file| project.root.join(file)),
+    );
+    files.extend(dependency_files(&project.root));
+    for path in &mut files {
+        *path = project::normalize(path);
+    }
+    files.sort();
+    files.dedup();
+    files
+}
+
+/// Manifests of direct dependencies and their installed Flick interfaces.
+fn dependency_files(root: &Path) -> Vec<PathBuf> {
     let Ok(text) = fs::read_to_string(root.join("package.json")) else {
         return Vec::new();
     };
@@ -89,22 +100,15 @@ fn dependency_files(root: &Path) -> Vec<(String, Vec<u8>)> {
         };
         for name in deps.keys() {
             let dir = root.join("node_modules").join(name);
+            out.push(dir.join("package.json"));
             let Ok(package) = fs::read(dir.join("package.json")) else {
                 continue;
             };
             let iface_dir = serde_json::from_slice::<serde_json::Value>(&package)
                 .ok()
                 .and_then(|p| Some(p.get("flick")?.get("iface-dir")?.as_str()?.to_owned()));
-            out.push((format!("dependency {name}"), package));
             if let Some(iface_dir) = iface_dir {
-                let mut files = Vec::new();
-                files_under(&dir.join(iface_dir), &mut files);
-                for f in files {
-                    out.push((
-                        format!("interface {}", f.display()),
-                        fs::read(&f).unwrap_or_default(),
-                    ));
-                }
+                files_under(&dir.join(iface_dir), &mut out);
             }
         }
     }
@@ -145,23 +149,42 @@ pub fn store(root: &Path, key: &str, artifacts: &[Artifact]) {
     }
 }
 
-/// Records the files a build wrote into `out_dir`.
-pub fn record(root: &Path, out_dir: &Path, artifacts: &[Artifact]) {
+/// Removes obsolete build-owned files and records a successful publication.
+pub fn record(root: &Path, out_dir: &Path, files: Vec<String>) -> io::Result<()> {
     let path = root.join(cache::MANIFEST);
-    let mut manifest: Manifest = fs::read_to_string(&path)
-        .ok()
-        .and_then(|t| serde_json::from_str(&t).ok())
-        .unwrap_or_default();
+    let mut manifest = manifest(root);
     let dir = out_dir.strip_prefix(root).unwrap_or(out_dir);
-    manifest.record(
-        &dir.to_string_lossy(),
-        artifacts.iter().map(|a| a.path.clone()).collect(),
-    );
-    if let Some(parent) = path.parent()
-        && fs::create_dir_all(parent).is_ok()
-        && let Ok(json) = serde_json::to_string_pretty(&manifest)
-    {
-        let _ = fs::write(path, json);
+    let dir = dir.to_string_lossy();
+    let current: HashSet<&str> = files.iter().map(String::as_str).collect();
+    if let Some((_, previous)) = manifest.outputs.iter().find(|(output, _)| output == &dir) {
+        for stale in previous
+            .iter()
+            .filter(|file| !current.contains(file.as_str()))
+        {
+            let path = out_dir.join(stale);
+            match fs::remove_file(&path) {
+                Ok(()) => remove_empty_parents(&path, out_dir),
+                Err(err) if err.kind() == io::ErrorKind::NotFound => {}
+                Err(err) => return Err(err),
+            }
+        }
+    }
+    manifest.record(&dir, files);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let json = serde_json::to_string_pretty(&manifest).map_err(io::Error::other)?;
+    fs::write(path, json)
+}
+
+/// Removes the directories of `path` up to `top` that are left empty.
+pub fn remove_empty_parents(path: &Path, top: &Path) {
+    let mut dir = path.parent();
+    while let Some(d) = dir {
+        if d == top || fs::remove_dir(d).is_err() {
+            break;
+        }
+        dir = d.parent();
     }
 }
 

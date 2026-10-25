@@ -11,8 +11,8 @@ use crate::iface::{
 use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Module, Stmt};
 use crate::types::Rep;
 
-/// The interface of a built module: `interface` with its ABI, and the
-/// fingerprints of `imports` as `interface_of` finds them.
+/// The interface with its ABI and dependency fingerprints. When `imports`
+/// is nonempty, `interface_of` must return the finalized published interfaces.
 pub fn interface(
     module: &Module,
     interface: &Interface,

@@ -292,3 +292,60 @@ fn for_do_runs_a_body_inline_indented_or_braced() {
     assert!(sexp(src).contains("} do (Block (AppExpr"), "{}", sexp(src));
     assert!(sexp("let f xs = for x <- xs do { log x; log x }").contains("do { (Block"));
 }
+
+#[test]
+fn token_columns_follow_unicode_crlf_and_multiline_tokens() {
+    for (literal, plus_col) in [("r\"é\r\n🙂\"", 3), ("\"\"\"\r\n  é🙂\r\n  \"\"\"", 6)] {
+        let text = format!("/*é🙂*/let a = {literal} + 1\r\n/*α\r\nβ*/  let b = 2\r\n");
+        let mut sources = SourceMap::default();
+        let file = sources.add("layout.fl", &text);
+        let (raw, errors) = lex(&text, file);
+        assert!(errors.is_empty(), "{errors:?}");
+        let parser = Parser::new(&text, file, &raw);
+        let layout: Vec<_> = parser
+            .toks
+            .iter()
+            .filter(|t| t.kind != K::Eof)
+            .map(|t| {
+                (
+                    &text[t.start as usize..t.end as usize],
+                    t.col,
+                    t.line_start,
+                    t.line_indent,
+                )
+            })
+            .collect();
+        assert_eq!(
+            layout,
+            [
+                ("let", 6, true, 6),
+                ("a", 10, false, 6),
+                ("=", 12, false, 6),
+                (literal, 14, false, 6),
+                ("+", plus_col, false, 6),
+                ("1", plus_col + 2, false, 6),
+                ("let", 5, true, 5),
+                ("b", 9, false, 5),
+                ("=", 11, false, 5),
+                ("2", 13, false, 5),
+            ],
+            "{text}"
+        );
+    }
+}
+
+#[test]
+fn unicode_comment_columns_preserve_record_layout() {
+    for newline in ["\n", "\r\n"] {
+        let src = format!(
+            "let r = {{ /*é🙂*/ a = 1{newline}{}b = 2 }}{newline}",
+            " ".repeat(17)
+        );
+        assert_eq!(
+            sexp(&src),
+            "(LetDecl let (VarPat r) = (Block (RecordExpr { (RecordField a = (Block (Literal 1))) \
+             (RecordField b = (Block (Literal 2))) })))"
+        );
+        assert_eq!(parse_ok(&src).tree.text(&src), src);
+    }
+}

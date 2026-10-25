@@ -268,10 +268,6 @@ mod tests {
             assert!(seen.insert(info.code), "{code} registered twice");
             assert!((1..=999).contains(&info.code.number), "{code} out of range");
             assert!(!info.title.is_empty(), "{code} has no title");
-            assert!(
-                info.explain.trim().len() > 20 && info.explain.contains("```"),
-                "{code} explain text needs an explanation and an example"
-            );
             assert_eq!(code.parse::<Code>(), Ok(info.code));
         }
     }

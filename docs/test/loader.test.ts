@@ -34,3 +34,17 @@ test("a linked build runs as `flick build` output does", () => {
   const out = execFileSync("node", [path.join(here, "run-linked.ts"), path.join(dir, "out"), "flick-main.js"], { cwd: here, encoding: "utf8" });
   assert.equal(out, "[2, 4, 6]\n");
 });
+
+test("source-map text survives a compiled and linked release build", () => {
+  const dir = path.join(repo, "target/tmp/docs-loader-source-map");
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  const text = "//# sourceMappingURL=payload";
+  writeFileSync(
+    path.join(dir, "Main.fl"),
+    `module Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line ${JSON.stringify(text)}\n`,
+  );
+  execFileSync(path.join(repo, "target/debug/flick"), ["build", "Main.fl", "--profile", "release", "--out-dir", "out"], { cwd: dir });
+  const out = execFileSync("node", [path.join(here, "run-linked.ts"), path.join(dir, "out"), "flick-main.js"], { cwd: here, encoding: "utf8" });
+  assert.equal(out, `${text}\n`);
+});

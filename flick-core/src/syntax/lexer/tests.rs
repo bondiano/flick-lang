@@ -131,3 +131,33 @@ fn keywords_name_members_after_a_qualifier_and_in_declarations() {
     assert_eq!(ident("try x with", 2), (K::WithKw, "with"));
     assert_eq!(ident("x . with", 2), (K::WithKw, "with"));
 }
+
+#[test]
+fn keyword_context_requires_whole_words_and_adjacent_qualifiers() {
+    for name in ["with_suffix", "let2", "_echo", "foreign_pure", "assertion"] {
+        assert_eq!(kinds(name), (vec![(K::Ident, name)], vec![]));
+    }
+    for (src, word, expected) in [
+        ("with :: Number", "with", K::WithKw),
+        (" with : Number", "with", K::WithKw),
+        ("HashSet.with", "with", K::Ident),
+        ("HashSet. with", "with", K::WithKw),
+        ("let rec with = 1", "with", K::Ident),
+        ("foreign async with from", "with", K::Ident),
+        ("foreign asynchronous with from", "with", K::WithKw),
+        ("let assert x = value", "assert", K::AssertKw),
+        ("{ echo = 1 }", "echo", K::Ident),
+        ("{ todo : Number }", "todo", K::Ident),
+        ("echo == value", "echo", K::EchoKw),
+        ("todo => value", "todo", K::TodoKw),
+        ("todo :: value", "todo", K::TodoKw),
+    ] {
+        let (tokens, errors) = kinds(src);
+        assert!(errors.is_empty(), "{src}: {errors:?}");
+        let token = tokens
+            .iter()
+            .find(|(_, text)| *text == word)
+            .expect("word token");
+        assert_eq!(*token, (expected, word), "{src}");
+    }
+}

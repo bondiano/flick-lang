@@ -102,7 +102,10 @@ fn run_builds_javascript_even_for_a_typescript_project() {
     assert_eq!(out.status.code(), Some(0), "{out:?}");
     assert_eq!(String::from_utf8_lossy(&out.stdout), "[\"a\", \"b\"]\n");
     assert!(
-        !dir.join(".flick/run/1").exists(),
+        fs::read_dir(dir.join(".flick/run"))
+            .expect("generations")
+            .count()
+            == 0,
         "the generation goes after the run"
     );
 }
@@ -186,7 +189,7 @@ fn json_diagnostics_own_the_whole_stderr() {
 
 #[test]
 #[ignore = "needs Node and the installed runtime"]
-fn a_running_generation_keeps_its_files() {
+fn simultaneous_runs_keep_the_survivors_files() {
     let dir = project(
         "run_generations",
         &[
@@ -199,30 +202,48 @@ fn a_running_generation_keeps_its_files() {
         .stdout(Stdio::piped())
         .spawn()
         .expect("spawn");
-    let rx = lines(&mut first);
-    expect_line(&rx, "started v1");
-    let module = dir.join(".flick/run/1/App/Main.js");
-    let before = fs::read_to_string(&module).expect("generation 1");
-    fs::write(dir.join("src/App/Main.fl"), waiting("v2", false)).expect("write");
+    let first_path = dir.join(".flick/run").join(format!("{}-1", first.id()));
     let mut second = flick(&dir, &["run"])
         .stdout(Stdio::piped())
         .spawn()
         .expect("spawn");
+    let second_path = dir.join(".flick/run").join(format!("{}-1", second.id()));
+    let rx = lines(&mut first);
     let rx2 = lines(&mut second);
-    expect_line(&rx2, "started v2");
-    assert!(dir.join(".flick/run/2").exists());
-    assert_eq!(
-        fs::read_to_string(&module).expect("still there"),
-        before,
-        "generation 1 is untouched"
-    );
+    expect_line(&rx, "started v1");
+    expect_line(&rx2, "started v1");
+    assert_ne!(first_path, second_path);
+    let module = second_path.join("App/Main.js");
+    let before = fs::read_to_string(&module).expect("survivor artifact");
+    assert!(first_path.join("App/Main.js").exists());
     assert_eq!(run(&dir, &["clean"]).status.code(), Some(0));
-    assert!(module.exists(), "clean keeps a running generation");
-    for child in [&first, &second] {
-        signal(child, "TERM");
-    }
-    assert_eq!(first.wait().expect("wait").code(), Some(143));
-    assert_eq!(second.wait().expect("wait").code(), Some(143));
+    assert!(module.exists(), "clean keeps both running generations");
+    signal(&first, "TERM");
+    assert_eq!(first.wait().expect("first cleanup").code(), Some(143));
+    assert!(
+        !first_path.exists(),
+        "only the first reservation is released"
+    );
+    assert!(second.try_wait().expect("survivor status").is_none());
+    assert_eq!(
+        fs::read_to_string(&module).expect("surviving artifact"),
+        before
+    );
+    let late_import = Command::new("node")
+        .args([
+            "--input-type=module",
+            "-e",
+            "await import(process.argv[1]);",
+        ])
+        .arg(&module)
+        .output()
+        .expect("late import");
+    assert!(late_import.status.success(), "{late_import:?}");
+    assert_eq!(run(&dir, &["clean"]).status.code(), Some(0));
+    assert!(module.exists(), "clean still keeps the survivor");
+    signal(&second, "TERM");
+    assert_eq!(second.wait().expect("second cleanup").code(), Some(143));
+    assert!(!second_path.exists());
 }
 
 #[test]
@@ -365,6 +386,7 @@ fn pack_writes_a_complete_package_that_runs_nothing_on_import() {
         "package/dist/Lib/Greeting.js",
         "package/dist/Lib/Greeting.iface",
         "package/dist/Lib/Greeting.d.ts",
+        "package/dist/_core/Lib/Greeting.js",
         "package/package.json",
     ] {
         assert!(listing.contains(file), "{file} in\n{listing}");
@@ -376,13 +398,13 @@ fn pack_writes_a_complete_package_that_runs_nothing_on_import() {
     let probe = dir.join(".flick/pack/probe.mjs");
     fs::write(
         &probe,
-        "const m = await import(\"./dist/Lib/Greeting.js\");\nconsole.log(typeof m.greet);\n",
+        "const m = await import(\"./dist/Lib/Greeting.js\");\nconst core = await import(\"./dist/_core/Lib/Greeting.js\");\nconsole.log(typeof m.greet);\nconsole.log(m.greet(\"Flick\"));\nconsole.log(core.greet(\"Flick\"));\n",
     )
     .expect("write");
     let imported = Command::new("node").arg(&probe).output().expect("node");
     assert_eq!(
         String::from_utf8_lossy(&imported.stdout),
-        "function\n",
+        "function\nHello, Flick\nHello, Flick\n",
         "{imported:?}"
     );
 

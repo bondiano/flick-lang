@@ -19,7 +19,8 @@ use flick_core::types::builtin_sources;
 use serde_json::{Value, json};
 
 use super::{
-    BUILTIN_DIR, Server, Snapshot, analyze, builtin_index, features, lsp_diagnostic, protocol,
+    BUILTIN_DIR, Context, Server, Snapshot, analyze, builtin_index, features, lsp_diagnostic,
+    protocol,
 };
 
 pub(super) type Reply = Result<Value, (i64, String)>;
@@ -75,10 +76,11 @@ impl Server {
     }
 
     fn snapshot_for(&mut self, path: &Path) -> &Snapshot {
+        let context = Context::of(&self.docs, path);
         let fresh = self
             .snapshot
             .as_ref()
-            .is_some_and(|s| s.file(path).is_some());
+            .is_some_and(|s| s.context == context && s.file(path).is_some());
         if !fresh {
             self.snapshot = Some(analyze(&self.docs, path));
         }

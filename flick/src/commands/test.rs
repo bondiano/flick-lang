@@ -14,7 +14,7 @@ use flick_core::diagnostics::{Diagnostic, Severity};
 use flick_core::project::{self, Project};
 use flick_core::source::SourceMap;
 
-use super::build::{Output, emit, release, write};
+use super::build::{BuildPlan, emit, release, write};
 use super::check::select;
 use crate::args::{GlobalArguments, Reporter, TestArguments};
 use crate::sources::FsHost;
@@ -75,16 +75,16 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     }
     let out = project.root.join(OUT_DIR);
     let _ = fs::remove_dir_all(&out);
-    let output = Output {
+    let output = BuildPlan {
         out_dir: out.clone(),
         entries: Vec::new(),
         typescript: false,
         extras: Extras::default(),
         release: release(options.profile, Some(&project.config.build)),
     };
-    let (problems, _) = emit(&host, &sources, Some(&project), &compilation, &output);
-    if !problems.is_empty() {
-        return fail(&sources, problems);
+    let emitted = emit(&host, &sources, Some(&project), &compilation, &output);
+    if !emitted.diagnostics.is_empty() {
+        return fail(&sources, emitted.diagnostics);
     }
     let suites: Vec<(String, String)> = compilation
         .modules
@@ -160,28 +160,44 @@ pub fn watched_roots(project: &Project) -> Vec<PathBuf> {
     ]
 }
 
-/// The latest modification time under `paths`.
-pub fn stamp(paths: &[PathBuf]) -> Option<SystemTime> {
-    fn newest(path: &Path, out: &mut Option<SystemTime>) {
+/// Per-path filesystem state, independent of the newest timestamp in the tree.
+#[derive(Debug, PartialEq, Eq)]
+pub struct WatchSnapshot(Vec<WatchedPath>);
+
+#[derive(Debug, PartialEq, Eq)]
+struct WatchedPath {
+    path: PathBuf,
+    modified: Option<SystemTime>,
+    size: u64,
+    directory: bool,
+}
+
+/// Captures changes, additions and removals even when another file is future-dated.
+pub fn watch_snapshot(paths: &[PathBuf]) -> WatchSnapshot {
+    fn capture(path: &Path, out: &mut Vec<WatchedPath>) {
         let Ok(meta) = fs::metadata(path) else {
             return;
         };
-        if let Ok(time) = meta.modified() {
-            *out = (*out).max(Some(time));
-        }
+        out.push(WatchedPath {
+            path: path.to_path_buf(),
+            modified: meta.modified().ok(),
+            size: meta.len(),
+            directory: meta.is_dir(),
+        });
         if meta.is_dir()
             && let Ok(entries) = fs::read_dir(path)
         {
             for entry in entries.flatten() {
-                newest(&entry.path(), out);
+                capture(&entry.path(), out);
             }
         }
     }
-    let mut out = None;
-    for p in paths {
-        newest(p, &mut out);
+    let mut out = Vec::new();
+    for path in paths {
+        capture(path, &mut out);
     }
-    out
+    out.sort_unstable_by(|a, b| a.path.cmp(&b.path));
+    WatchSnapshot(out)
 }
 
 /// Stops a run: closing its stdin lets every running test close its scope,
@@ -194,16 +210,65 @@ fn stop(child: &mut Child) {
 fn watch(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
     let paths = watched(global);
     loop {
-        let before = stamp(&paths);
+        let before = watch_snapshot(&paths);
         let mut child = prepare(options, global)
             .ok()
             .and_then(|runner| start(&runner, options, true).ok());
-        while stamp(&paths) == before {
+        while watch_snapshot(&paths) == before {
             thread::sleep(Duration::from_millis(200));
         }
         if let Some(child) = &mut child {
             stop(child);
         }
         println!("\n— a file changed: running the tests again —\n");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+    use std::fs::{File, FileTimes};
+    use std::process;
+    use std::time::UNIX_EPOCH;
+
+    use super::*;
+
+    #[test]
+    fn snapshots_follow_each_path_despite_future_timestamps() {
+        let root = env::temp_dir().join(format!("flick-watch-snapshot-{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).expect("fixture");
+        let future = root.join("Future.fl");
+        let ordinary = root.join("Main.fl");
+        fs::write(&future, "future").expect("future");
+        fs::write(&ordinary, "1").expect("main");
+        let set_time = |path: &Path, seconds| {
+            File::open(path)
+                .expect("file")
+                .set_times(FileTimes::new().set_modified(UNIX_EPOCH + Duration::from_secs(seconds)))
+                .expect("timestamp");
+        };
+        set_time(&future, 4_102_444_800);
+        set_time(&ordinary, 1_000);
+        let paths = [root.clone()];
+        let before = watch_snapshot(&paths);
+        assert_eq!(before, watch_snapshot(&paths), "stable order and state");
+        fs::write(&ordinary, "2").expect("change");
+        set_time(&ordinary, 2_000);
+        let changed = watch_snapshot(&paths);
+        assert_ne!(before, changed, "the future file cannot mask another file");
+        let created = root.join("New.fl");
+        fs::write(&created, "new").expect("create");
+        set_time(&created, 1_000);
+        let added = watch_snapshot(&paths);
+        assert_ne!(changed, added, "creation changes path identity");
+        fs::remove_file(created).expect("delete");
+        assert_ne!(
+            added,
+            watch_snapshot(&paths),
+            "deletion changes path identity"
+        );
+        fs::remove_dir_all(&root).expect("delete root");
+        assert_eq!(watch_snapshot(&paths), WatchSnapshot(Vec::new()));
     }
 }

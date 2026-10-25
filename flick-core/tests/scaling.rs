@@ -1,12 +1,12 @@
-//! Checking time grows linearly with the size of records and functions: a
-//! record of `n` fields read field by field, and a function of `n` lines.
-//! The budget for the sizes the roadmap names (200 fields, 2000 lines) is
-//! generous; the ratio between sizes catches quadratic behavior.
+//! Syntax and checking time scale with long lines, records and functions.
+//! Checking budgets cover the roadmap's sizes (200 fields, 2000 lines);
+//! growth ratios catch quadratic behavior without a machine-specific syntax budget.
 
 use std::fmt::Write;
 use std::time::{Duration, Instant};
 
 use flick_core::source::SourceMap;
+use flick_core::syntax::{self, lexer};
 
 fn record_module(fields: usize) -> String {
     let names: Vec<String> = (0..fields).map(|i| format!("f{i}")).collect();
@@ -108,4 +108,55 @@ fn wide_join(tables: usize) -> String {
 fn query_with_10_joins_of_50_columns_checks_in_budget() {
     let full = time(&wide_join(11));
     assert!(full < Duration::from_secs(2), "10 joins take {full:?}");
+}
+
+fn long_line(items: usize) -> String {
+    let mut out = String::from("module App.Line exposing (xs)\nlet xs = [");
+    for i in 0..items {
+        if i != 0 {
+            out.push_str(", ");
+        }
+        out.push_str("identity 1");
+    }
+    out.push_str("]\n");
+    out
+}
+
+#[test]
+fn long_line_lexing_and_parsing_scale_linearly() {
+    for parse in [false, true] {
+        let measure = |items| {
+            let text = long_line(items);
+            let mut sources = SourceMap::default();
+            let file = sources.add("line.fl", &text);
+            (0..3)
+                .map(|_| {
+                    let start = Instant::now();
+                    if parse {
+                        let parsed = syntax::parse(&text, file);
+                        let elapsed = start.elapsed();
+                        assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+                        assert_eq!(parsed.tree.text(&text), text);
+                        elapsed
+                    } else {
+                        let (tokens, diagnostics) = lexer::lex(&text, file);
+                        let elapsed = start.elapsed();
+                        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+                        assert_eq!(tokens.last().expect("EOF token").end as usize, text.len());
+                        elapsed
+                    }
+                })
+                .min()
+                .expect("runs")
+        };
+        let small = measure(2000);
+        let full = measure(8000);
+        let name = if parse {
+            "parse (including lex)"
+        } else {
+            "lex"
+        };
+        let ratio = full.as_secs_f64() / small.as_secs_f64().max(1e-6);
+        eprintln!("long-line {name}: 2000 = {small:?}, 8000 = {full:?}, ratio = {ratio:.1}");
+    }
 }

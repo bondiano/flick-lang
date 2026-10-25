@@ -14,7 +14,7 @@ use flick_core::source::SourceMap;
 use flick_core::types::builtins;
 use flick_core::{doc, ir, projection, syntax};
 
-use super::build::{Output, artifacts, emit, write};
+use super::build::{BuildPlan, artifacts, emit, write};
 use super::check::select;
 use crate::args::{
     InspectArguments, OutDirArguments, Representation, SchemaExportArguments, SchemaTarget,
@@ -65,8 +65,8 @@ pub fn compile(explicit: Option<&str>) -> Result<Checked, Outcome> {
     })
 }
 
-fn output(dir: PathBuf, typescript: bool) -> Output {
-    Output {
+fn output(dir: PathBuf, typescript: bool) -> BuildPlan {
+    BuildPlan {
         out_dir: dir,
         entries: Vec::new(),
         typescript,
@@ -116,19 +116,19 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
                 _ => (format!("{path}.iface"), false),
             };
             let out = output(checked.host.cwd.join("dist"), typescript);
-            let (built, diagnostics) = artifacts(
+            let emission = artifacts(
                 &checked.host,
                 &checked.sources,
                 checked.project.as_ref(),
                 &checked.compilation,
                 &out,
             );
-            match built.into_iter().find(|a| a.path == file) {
+            match emission.artifacts.into_iter().find(|a| a.path == file) {
                 Some(a) => a.contents,
                 None => {
                     return Outcome {
                         sources: checked.sources,
-                        diagnostics,
+                        diagnostics: emission.diagnostics,
                     };
                 }
             }
@@ -156,10 +156,10 @@ fn projected(explicit: Option<&str>, module: &str) -> Option<String> {
             .or_else(|| {
                 analysis
                     .compilation
-                    .packages
+                    .package_modules
                     .iter()
-                    .find(|p| p.0 == m)
-                    .map(|p| p.2.clone())
+                    .find(|p| p.module == m)
+                    .map(|p| p.interface.clone())
             })
             .or_else(|| builtins().iter().find(|i| i.module == m).cloned())
     };
@@ -233,17 +233,17 @@ pub fn schema_export(options: &SchemaExportArguments, explicit: Option<&str>) ->
         .map_or_else(|| checked.host.cwd.clone(), |p| p.root.clone());
     let stage = root.join(cache::DIR).join("schema");
     let _ = fs::remove_dir_all(&stage);
-    let (problems, _) = emit(
+    let emission = emit(
         &checked.host,
         &checked.sources,
         checked.project.as_ref(),
         &checked.compilation,
         &output(stage.clone(), false),
     );
-    if !problems.is_empty() {
+    if !emission.diagnostics.is_empty() {
         return Outcome {
             sources: checked.sources,
-            diagnostics: problems,
+            diagnostics: emission.diagnostics,
         };
     }
     let export = match options.target {

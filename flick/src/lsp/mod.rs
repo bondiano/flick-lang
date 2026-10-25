@@ -29,21 +29,60 @@ static BUILTIN_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     temp.canonicalize().unwrap_or(temp).join("flick-lsp")
 });
 
+fn canonical(path: &Path) -> PathBuf {
+    path.canonicalize()
+        .unwrap_or_else(|_| match (path.parent(), path.file_name()) {
+            (Some(parent), Some(name)) => canonical(parent).join(name),
+            _ => project::normalize(path),
+        })
+}
+
 /// Files read from the open buffers first.
 struct Overlay<'a> {
-    docs: &'a HashMap<PathBuf, String>,
+    docs: HashMap<PathBuf, (&'a Path, &'a str)>,
 }
 
 impl Host for Overlay<'_> {
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
-        match self.docs.get(path) {
-            Some(text) => Ok(text.clone().into_bytes()),
+        match self
+            .docs
+            .get(path)
+            .or_else(|| self.docs.get(&canonical(path)))
+        {
+            Some((_, text)) => Ok(text.as_bytes().to_vec()),
             None => fs::read(path),
         }
     }
 
     fn display(&self, path: &Path) -> String {
-        path.display().to_string()
+        self.docs
+            .get(path)
+            .or_else(|| self.docs.get(&canonical(path)))
+            .map_or(path, |(original, _)| *original)
+            .display()
+            .to_string()
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum Context {
+    Project(PathBuf),
+    Standalone(PathBuf),
+    Builtin(PathBuf),
+}
+
+impl Context {
+    fn of(docs: &HashMap<PathBuf, String>, path: &Path) -> Self {
+        if builtin_index(path).is_some() {
+            return Self::Builtin(canonical(path));
+        }
+        for dir in path.parent().unwrap_or(Path::new("/")).ancestors() {
+            let config = dir.join(project::CONFIG_FILE);
+            if docs.contains_key(&config) || config.is_file() {
+                return Self::Project(canonical(dir));
+            }
+        }
+        Self::Standalone(canonical(path))
     }
 }
 
@@ -53,6 +92,7 @@ pub struct Snapshot {
     pub sources: SourceMap,
     /// The project's root, where `node_modules` is.
     pub root: PathBuf,
+    context: Context,
 }
 
 impl Snapshot {
@@ -61,6 +101,13 @@ impl Snapshot {
             .modules
             .iter()
             .find(|m| m.path == path)
+            .or_else(|| {
+                let path = canonical(path);
+                self.analysis
+                    .modules
+                    .iter()
+                    .find(|m| canonical(&m.path) == path)
+            })
             .map(|m| m.file)
     }
 }
@@ -68,9 +115,14 @@ impl Snapshot {
 /// Analyzes the project of `path` with `docs` over the files.
 pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path) -> Snapshot {
     if let Some(index) = builtin_index(path) {
-        return analyze_builtin(path, index);
+        return analyze_builtin(&canonical(path), index);
     }
-    let host = Overlay { docs };
+    let host = Overlay {
+        docs: docs
+            .iter()
+            .map(|(path, text)| (canonical(path), (path.as_path(), text.as_str())))
+            .collect(),
+    };
     let mut sources = SourceMap::default();
     let dir = path
         .parent()
@@ -78,9 +130,11 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path) -> Snapshot {
     let found = project::discover(&host, &mut sources, &dir, None)
         .ok()
         .flatten();
+    let context = Context::of(docs, path);
     let mut roots: Vec<PathBuf> = Vec::new();
-    if let Some(p) = &found {
-        for root in [p.source_root(), p.test_root()] {
+    let directories = found.as_ref().map(|p| [p.source_root(), p.test_root()]);
+    if let Some(directories) = &directories {
+        for root in directories {
             let mut files = Vec::new();
             if root.is_dir() {
                 sources::source_files(&root.to_string_lossy(), &mut files);
@@ -93,14 +147,33 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path) -> Snapshot {
             .filter(|p| p.extension().is_some_and(|e| e == "fl"))
             .cloned(),
     );
+    if path.extension().is_some_and(|e| e == "fl") {
+        roots.push(path.to_path_buf());
+    }
+    roots.retain(|root| Context::of(docs, root) == context);
+    // Aliases of one project must keep the same source/test module paths.
+    if let Some(directories) = &directories {
+        let physical = directories.each_ref().map(|dir| canonical(dir));
+        for root in &mut roots {
+            let path = canonical(root);
+            for (dir, physical) in directories.iter().zip(&physical) {
+                if let Ok(relative) = path.strip_prefix(physical) {
+                    *root = dir.join(relative);
+                    break;
+                }
+            }
+        }
+    }
     roots.sort();
-    roots.dedup();
+    let mut seen = HashSet::new();
+    roots.retain(|root| seen.insert(canonical(root)));
     let analysis = project::analyze(&host, &mut sources, found.as_ref(), &roots);
     let root = found.map_or(dir, |p| p.root);
     Snapshot {
         analysis,
         sources,
         root,
+        context,
     }
 }
 
@@ -108,6 +181,7 @@ fn builtin_index(path: &Path) -> Option<usize> {
     if path.extension()? != "fl" {
         return None;
     }
+    let path = canonical(path);
     let relative = path.strip_prefix(&*BUILTIN_DIR).ok()?;
     let mut parts = relative.components();
     parts.next()?;
@@ -164,14 +238,15 @@ fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
         },
         sources,
         root: path.parent().expect("source directory").to_path_buf(),
+        context: Context::Builtin(path.to_path_buf()),
     }
 }
 
 pub struct Server {
     docs: HashMap<PathBuf, String>,
     snapshot: Option<Snapshot>,
-    /// Files that have diagnostics published, to clear them later.
-    published: HashSet<PathBuf>,
+    /// Each context clears only the diagnostics it previously published.
+    published: HashMap<Context, HashSet<PathBuf>>,
     out: io::Stdout,
 }
 
@@ -179,7 +254,7 @@ pub fn serve() -> ExitCode {
     let mut server = Server {
         docs: HashMap::new(),
         snapshot: None,
-        published: HashSet::new(),
+        published: HashMap::new(),
         out: io::stdout(),
     };
     let mut input = BufReader::new(io::stdin().lock());
@@ -225,18 +300,11 @@ impl Server {
         let Some(path) = protocol::path_of(uri) else {
             return;
         };
-        if let Some(index) = builtin_index(&path) {
-            if method == "textDocument/didOpen" {
-                let snapshot = analyze_builtin(&path, index);
-                let diagnostics: Vec<_> = snapshot
-                    .analysis
-                    .diagnostics
-                    .iter()
-                    .filter(|d| d.span.is_some())
-                    .map(|d| lsp_diagnostic(&snapshot.sources, d))
-                    .collect();
-                self.send(&publish(&path, &diagnostics));
-                self.snapshot = Some(snapshot);
+        if builtin_index(&path).is_some() {
+            match method {
+                "textDocument/didOpen" => self.refresh(&path),
+                "textDocument/didClose" => self.clear(&Context::of(&self.docs, &path), &path),
+                _ => {}
             }
             return;
         }
@@ -258,11 +326,27 @@ impl Server {
                 }
                 // like Gleam, diagnostics wait for a save so half-typed code
                 // is not flagged; requests re-analyze the new text lazily
-                self.snapshot = None;
+                let context = Context::of(&self.docs, &path);
+                if self
+                    .snapshot
+                    .as_ref()
+                    .is_some_and(|s| s.context == context || s.file(&path).is_some())
+                {
+                    self.snapshot = None;
+                }
                 return;
             }
             "textDocument/didClose" => {
+                let context = Context::of(&self.docs, &path);
                 self.docs.remove(&path);
+                if !self
+                    .docs
+                    .keys()
+                    .any(|p| Context::of(&self.docs, p) == context)
+                {
+                    self.clear(&context, &path);
+                    return;
+                }
             }
             "textDocument/didSave" => {}
             _ => return,
@@ -270,7 +354,22 @@ impl Server {
         self.refresh(&path);
     }
 
-    /// Re-analyzes and publishes every file's diagnostics.
+    fn clear(&mut self, context: &Context, path: &Path) {
+        if self
+            .snapshot
+            .as_ref()
+            .is_some_and(|s| s.context == *context || s.file(path).is_some())
+        {
+            self.snapshot = None;
+        }
+        if let Some(files) = self.published.remove(context) {
+            for file in files {
+                self.send(&publish(&file, &[]));
+            }
+        }
+    }
+
+    /// Re-analyzes and publishes this context's diagnostics.
     fn refresh(&mut self, path: &Path) {
         let snapshot = analyze(&self.docs, path);
         let mut by_file: HashMap<PathBuf, Vec<&Diagnostic>> = HashMap::new();
@@ -282,14 +381,23 @@ impl Server {
                     .push(d);
             }
         }
-        // open documents always get a report, even an empty one
+        // Open documents always get a report, even an empty one.
         for open in self.docs.keys() {
-            by_file.entry(open.clone()).or_default();
+            if Context::of(&self.docs, open) == snapshot.context {
+                by_file.entry(open.clone()).or_default();
+            }
         }
+        if builtin_index(path).is_some() {
+            by_file.entry(path.to_path_buf()).or_default();
+        }
+        let current: HashSet<_> = by_file.keys().cloned().collect();
         let mut messages = Vec::new();
         for stale in self
             .published
-            .difference(&by_file.keys().cloned().collect())
+            .get(&snapshot.context)
+            .into_iter()
+            .flatten()
+            .filter(|file| !current.contains(*file))
         {
             messages.push(publish(stale, &[]));
         }
@@ -300,7 +408,7 @@ impl Server {
                 .collect();
             messages.push(publish(file, &list));
         }
-        self.published = by_file.keys().cloned().collect();
+        self.published.insert(snapshot.context.clone(), current);
         self.snapshot = Some(snapshot);
         for m in messages {
             self.send(&m);
