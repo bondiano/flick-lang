@@ -317,6 +317,10 @@ const SOURCES: &[(&str, &str)] = &[
     // Effect: RPC (unstable in Effect 4.0.5)
     ("Rpc", include_str!("builtins/Rpc.fl")),
     // end of Effect: RPC
+    // Effect: observability (unstable in Effect 4.0.5)
+    ("Otlp", include_str!("builtins/Otlp.fl")),
+    ("Prometheus", include_str!("builtins/Prometheus.fl")),
+    // end of Effect: observability
     // Effect: CLI
     ("Cli.Prompt", include_str!("builtins/Cli/Prompt.fl")),
     ("Cli", include_str!("builtins/Cli.fl")),

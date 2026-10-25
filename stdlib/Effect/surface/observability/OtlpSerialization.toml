@@ -1,0 +1,6 @@
+[wrapped]
+layerJson = "Otlp.layer 83cbfbfb44846be1"
+
+[excluded]
+OtlpSerialization = "`Otlp` layers send JSON; protobuf and the serialization service are outside the first binding"
+layerProtobuf = "`Otlp` layers send JSON; protobuf and the serialization service are outside the first binding"

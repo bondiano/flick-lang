@@ -1,0 +1,13 @@
+[excluded]
+AnyValue = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
+ArrayValue = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
+Fixed64 = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
+KeyValue = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
+KeyValueList = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
+LongBits = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
+Resource = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
+entriesToAttributes = "the resource is the service name of `Otlp.Options`; building attributes by hand is outside the first binding"
+fromConfig = "the resource is the service name of `Otlp.Options`; building attributes by hand is outside the first binding"
+make = "the resource is the service name of `Otlp.Options`; building attributes by hand is outside the first binding"
+serviceNameUnsafe = "the resource is the service name of `Otlp.Options`; building attributes by hand is outside the first binding"
+unknownToAttributeValue = "the resource is the service name of `Otlp.Options`; building attributes by hand is outside the first binding"

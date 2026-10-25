@@ -1,0 +1,10 @@
+/v1/traces: true
+"checkout": true
+"user": true
+"ada": true
+"shop": true
+/v1/logs: true
+"paid": true
+/v1/metrics: true
+"refund": true
+checkouts: true

@@ -1,0 +1,7 @@
+[wrapped]
+layer = "Otlp.layer d572158125d5099d"
+
+[excluded]
+layerFromConfig = "`Otlp.layer` sends JSON with the exporter's options; config-driven and protobuf layers are outside the first binding"
+layerJson = "`Otlp.layer` sends JSON with the exporter's options; config-driven and protobuf layers are outside the first binding"
+layerProtobuf = "`Otlp.layer` sends JSON with the exporter's options; config-driven and protobuf layers are outside the first binding"

@@ -1,0 +1,7 @@
+[wrapped]
+layer = "Otlp.logs 84bff042d5561fc1"
+
+[excluded]
+LogsData = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
+layerFromConfig = "`Otlp.logs` builds the logger with its options; config-driven and hand-made loggers are outside the first binding"
+make = "`Otlp.logs` builds the logger with its options; config-driven and hand-made loggers are outside the first binding"

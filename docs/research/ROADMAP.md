@@ -76,7 +76,7 @@ component search (props : SearchProps) =
 **S2. `effect/rpc`.** ✅ (модуль `Rpc`: процедуры с кодеками, группа как запись обработчиков, `listen` по HTTP + NDJSON, `call`/`call_stream`; 169 экспортов классифицированы)
 - AC: `Rpc`, `RpcGroup`, `RpcClient`, `RpcServer`, `RpcSerialization` классифицированы; run-тест в `tests/run/stdlib/rpc/`: сервер и клиент на одном `RpcGroup`, unary и stream вызов; линтер покрытия зелёный.
 
-**S3. `effect/observability`.** ⬜
+**S3. `effect/observability`.** ✅ (модули `Otlp` — `layer`/`traces`/`logs`/`metrics` с `{ url; service_name }`, HTTP-клиент и JSON внутри — и `Prometheus.format`)
 - AC: обёрнуты `Otlp`, `OtlpTracer`, `OtlpLogger`, `OtlpMetrics`, `PrometheusMetrics`; run-тест экспортирует span в локальный HTTP-приёмник и проверяет имя и атрибуты.
 
 **S4. `effect/devtools`.** ⬜

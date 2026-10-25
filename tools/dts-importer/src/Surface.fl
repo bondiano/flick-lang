@@ -10,7 +10,15 @@ import Ts
 /// The entrypoints whose modules the standard library wraps export by export.
 wrapped : List String
 let wrapped =
-  ["effect", "effect/cli", "effect/http", "effect/http-api", "effect/reactivity", "effect/rpc"]
+  [
+    "effect",
+    "effect/cli",
+    "effect/http",
+    "effect/http-api",
+    "effect/observability",
+    "effect/reactivity",
+    "effect/rpc",
+  ]
 
 /// A snapshot: `modules` maps an entrypoint to `Module.name` → `kind fingerprint`.
 type alias Snapshot =

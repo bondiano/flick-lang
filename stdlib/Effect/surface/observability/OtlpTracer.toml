@@ -1,0 +1,9 @@
+[wrapped]
+layer = "Otlp.traces b9be076a3b681501"
+
+[excluded]
+ResourceSpan = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
+ScopeSpan = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
+TraceData = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
+layerFromConfig = "`Otlp.traces` builds the tracer with its options; config-driven and hand-made tracers are outside the first binding"
+make = "`Otlp.traces` builds the tracer with its options; config-driven and hand-made tracers are outside the first binding"
