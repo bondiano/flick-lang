@@ -19,7 +19,7 @@ title: "2. Решения первой версии"
 | FFI | Fixed ABI, четыре callback families, checked `.d.ts` subset | Purity/retention/cancellation требуют contracts |
 | Schema | Full deriving, explicit codecs, strict exporters | Не всякая schema выражается во внешнем формате |
 | SQL | Pure DSL, PostgreSQL, Query/Template | Зафиксирован ограниченный SQL subset |
-| UI | ui-блок, React adapter, explicit event policy | Без JSX, собственного renderer, SSR и полной hooks-модели |
+| UI | ui-блок, React adapter, состояние в атомах `effect/reactivity`, actions с explicit event policy, серверный рендер с реестром на запрос | Без JSX и собственного renderer; без React hooks, состояние только в атомах; Suspense только opt-in |
 | CLI-приложения | cli-блок поверх Effect CLI, точный record опций, `Cli.Value` для разбора | Подкоманда не видит опции родителя; без собственного парсера аргументов |
 | Compiler | Rust core Flick, typed IR, source LSP, versioned JSON iface | Собственный checker, Mapper — слой интеграции |
 | Optimization | Debug baseline и typed release passes из подходов ReScript | Нужны доказательства сохранения observable contracts |

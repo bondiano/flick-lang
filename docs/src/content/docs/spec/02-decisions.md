@@ -19,7 +19,7 @@ title: "2. Decisions of the first version"
 | FFI | Fixed ABI, four callback families, checked `.d.ts` subset | Purity/retention/cancellation require contracts |
 | Schema | Full deriving, explicit codecs, strict exporters | Not every schema is expressible in an external format |
 | SQL | Pure DSL, PostgreSQL, Query/Template | A restricted SQL subset is fixed |
-| UI | ui block, React adapter, explicit event policy | No JSX, no custom renderer, no SSR and no full hooks model |
+| UI | ui block, React adapter, state in `effect/reactivity` atoms, actions with explicit event policy, server rendering with a registry per request | No JSX and no custom renderer; no React hooks, state lives only in atoms; Suspense is opt-in |
 | CLI applications | cli block on top of Effect CLI, exact record of options, `Cli.Value` for parsing | A subcommand does not see the parent's options; no custom argument parser |
 | Compiler | Rust core of Flick, typed IR, source LSP, versioned JSON iface | Own checker, Mapper is an integration layer |
 | Optimization | Debug baseline and typed release passes from ReScript approaches | Proofs that observable contracts are preserved are needed |
