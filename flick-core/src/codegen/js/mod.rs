@@ -224,11 +224,12 @@ fn finish(code: &str, spans: &[Span], names: &HashMap<usize, String>) -> Output 
     }
 }
 
-/// Where a self tail call jumps: the function, its parameter count and the
-/// loop variables.
+/// Where a self tail call jumps: the function, its loop variables and the
+/// local each parameter binds, if it is a name.
 struct Tail {
     target: Target,
     vars: Vec<String>,
+    binds: Vec<Option<String>>,
 }
 
 #[derive(Clone, PartialEq, Eq)]

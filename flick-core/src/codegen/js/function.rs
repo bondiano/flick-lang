@@ -87,6 +87,7 @@ impl Gen<'_> {
                 g.tail = Some(Tail {
                     target,
                     vars: vars.clone(),
+                    binds: binds(params),
                 });
                 g.tail_expr(body);
                 g.tail = None;
@@ -167,15 +168,20 @@ impl Gen<'_> {
             }
             _ => {
                 if let Some(args) = self.tail.as_ref().and_then(|t| self_call(e, t)) {
-                    let js = self.ordered(&args);
-                    let temps: Vec<String> = js.into_iter().map(|j| self.spill(j)).collect();
-                    let vars = self
+                    let (vars, binds) = self
                         .tail
                         .as_ref()
-                        .map(|t| t.vars.clone())
+                        .map(|t| (t.vars.clone(), t.binds.clone()))
                         .unwrap_or_default();
-                    for (var, value) in vars.iter().zip(temps) {
-                        self.buf.push(format!("{var} = {value};"));
+                    // a parameter passed on unchanged keeps its variable
+                    let changed: Vec<usize> = (0..args.len())
+                        .filter(|&i| !matches!(&args[i].kind, ExprKind::Local(n) if binds[i].as_ref() == Some(n)))
+                        .collect();
+                    let args: Vec<&Expr> = changed.iter().map(|&i| args[i]).collect();
+                    // the arguments read the parameters, never the loop variables
+                    let js = self.ordered(&args);
+                    for (&i, value) in changed.iter().zip(js) {
+                        self.buf.push(format!("{} = {value};", vars[i]));
                     }
                     self.buf.push("continue;".to_owned());
                     return;
@@ -257,6 +263,17 @@ fn balanced_without_yield(js: &str) -> bool {
     parens == 0
 }
 
+/// The local each parameter binds, if it is a name.
+fn binds(params: &[Param]) -> Vec<Option<String>> {
+    params
+        .iter()
+        .map(|p| match &p.pat {
+            Pat::Bind(n) => Some(n.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
 /// The arguments of a full pure call of the loop's function.
 fn self_call<'e>(e: &'e Expr, tail: &Tail) -> Option<Vec<&'e Expr>> {
     let mut args = Vec::new();
@@ -285,6 +302,7 @@ fn has_tail_call(body: &Expr, target: &Target, arity: usize) -> bool {
     let tail = Tail {
         target: target.clone(),
         vars: vec![String::new(); arity],
+        binds: Vec::new(),
     };
     let mut pending = vec![body];
     while let Some(e) = pending.pop() {

@@ -138,3 +138,27 @@ fn debug_imports_a_module_by_its_own_name_unless_taken() {
     assert!(js.contains("import * as $m_Option from"), "{js}");
     assert!(js.contains("export const line = (_) =>"), "{js}");
 }
+
+/// The body of the exported `name` in `js`, up to the next export.
+fn export_of<'a>(js: &'a str, name: &str) -> &'a str {
+    let start = js
+        .find(&format!("export const {name} "))
+        .unwrap_or_else(|| panic!("no {name} in {js}"));
+    let rest = &js[start + 1..];
+    &js[start..start + 1 + rest.find("\nexport ").unwrap_or(rest.len())]
+}
+
+#[test]
+fn a_tail_call_assigns_only_the_arguments_it_changes() {
+    let js = compile(
+        "module App.Loop exposing (..)\n\
+         find : (a -> Bool) -> List a -> Option a\n\
+         let rec find p xs =\n  match xs with\n  | [] -> None\n  | [x, ...rest] -> if p x then Some x else find p (List.drop 1 rest)\n",
+    );
+    let find = export_of(&js, "find");
+    assert!(find.contains("for (;;)"), "{find}");
+    assert!(!find.contains("const $t"), "{find}");
+    // only the initialization sets `p`
+    assert_eq!(find.matches("$l0 =").count(), 1, "{find}");
+    assert!(find.contains("$l1 ="), "{find}");
+}
