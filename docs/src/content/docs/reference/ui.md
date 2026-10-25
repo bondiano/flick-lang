@@ -119,7 +119,10 @@ let counter_view =
 React's developer tools show. A view subscribes to what it read after React
 commits, and a write between its render and its subscription renders it
 again. Rendering a view outside `Ui.Dom.mount` fails with what to do. The
-render reads synchronously: it may read atoms but run nothing else.
+render reads synchronously: like a derived atom's computation, its only
+service is `Atom.Read`. A write, another service or an error in it is
+`FLICK-U004`: write atoms in an action, run a task as `Atom.task` and read
+its result, or give failures a view with `Ui.suspended`.
 
 `Ui.keyed id node` gives a dynamic sibling a stable identity. Keys are
 local to a sibling list and must be unique there. Reordering preserves both

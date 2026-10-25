@@ -199,6 +199,7 @@ codes! {
     U001 = Ui 1, "event policy needs a positive integer";
     U002 = Ui 2, "handler made while a view renders";
     U003 = Ui 3, "serializable atom without a key of its own";
+    U004 = Ui 4, "render does more than read atoms";
     L001 = Cli 1, "name taken twice in a command";
     L002 = Cli 2, "default of an optional parameter";
     L003 = Cli 3, "positional argument of many values before the last";

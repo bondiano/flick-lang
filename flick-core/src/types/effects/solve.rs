@@ -244,6 +244,11 @@ impl Checker<'_> {
             .flatten()
             .collect::<Vec<_>>()
             .join(" and ");
+        if let Site::Expected(ty) = &self.sites[e.site]
+            && self.reads_only(&ty.clone())
+        {
+            return self.render_excess(e, &list);
+        }
         let (bound, needer) = match &self.sites[e.site] {
             Site::Signature(name) => (format!("the signature of `{name}`"), "its body"),
             Site::Expected(ty) => (format!("the expected type `{}`", self.show(ty)), "this"),
@@ -258,5 +263,32 @@ impl Checker<'_> {
             diagnostic = diagnostic.with_fix(format!("add {list} to {bound}"), Vec::new());
         }
         self.diagnostics.push(diagnostic);
+    }
+
+    /// A render that does more than read atoms.
+    fn render_excess(&mut self, e: &Excess, list: &str) {
+        let writes = e
+            .services
+            .iter()
+            .any(|s| s.rsplit('.').next() == Some("Registry"));
+        let fixes = [
+            writes.then_some("write atoms in an `Action`, which runs on an event"),
+            (!writes && !e.services.is_empty())
+                .then_some("run the task as `Atom.task` and read its result"),
+            (!e.errors.is_empty()).then_some(
+                "handle the failure here, or render with `Ui.suspended`, which gives it a view",
+            ),
+        ];
+        let fix = fixes.into_iter().flatten().collect::<Vec<_>>().join("; ");
+        self.diagnostics.push(
+            Diagnostic::error(
+                codes::U004,
+                format!(
+                    "a view's render and a derived atom only read atoms: {list} is not allowed here"
+                ),
+                e.span,
+            )
+            .with_fix(fix, Vec::new()),
+        );
     }
 }

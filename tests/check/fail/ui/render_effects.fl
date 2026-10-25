@@ -1,0 +1,41 @@
+module App.RenderEffects exposing (..)
+
+count : Atom.Writable Number
+let count = Atom.make 0
+
+writes : Ui.View Unit {Reactivity.Atom.Registry} none
+let writes =
+  Ui.view (fun () ->
+    Atom.set count 1
+    ui { text "x" })
+
+computes : Atom.Atom Number
+let computes =
+  Atom.derived (fun () ->
+    Atom.update count (fun n -> n + 1)
+    Atom.value count)
+
+service Log =
+  line : String ->{} Unit
+
+logs : Ui.View Unit none none
+let logs =
+  Ui.view (fun () ->
+    Log.line "render"
+    ui { text "x" })
+
+fails : Ui.View Unit none none
+let fails =
+  Ui.view (fun () ->
+    App.fail "no"
+    ui { text "x" })
+
+suspends : Ui.View Unit none none
+let suspends = Ui.suspended (fun _ -> ui { text "failed" }) (ui { text "…" }) (fun () ->
+  App.fail "no"
+  ui { text "x" })
+
+//~ FLICK-U004 @9:5-9:21 a view's render and a derived atom only read atoms: service `Registry` is not allowed here
+//~ FLICK-U004 @15:5-15:39 service `Registry` is not allowed here
+//~ FLICK-U004 @24:5-24:22 service `Log` is not allowed here
+//~ FLICK-U004 @30:5-30:18 error `AppError` is not allowed here

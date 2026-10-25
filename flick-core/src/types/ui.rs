@@ -2,6 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use super::ty::Type;
 use super::typing::Ref;
 use super::{Checker, Range, let_parts};
 use crate::consteval::{self, Const};
@@ -105,6 +106,37 @@ impl Checker<'_> {
             }
         }
     }
+}
+
+impl Checker<'_> {
+    /// Whether `ty` is a render: a function whose services are `Atom.Read`
+    /// alone, as a view's render and a derived atom's computation are.
+    pub(crate) fn reads_only(&mut self, ty: &Type) -> bool {
+        let Type::Fun {
+            effects: Some(effects),
+            ..
+        } = self.bare(ty)
+        else {
+            return false;
+        };
+        let services = self.store.normalize(&effects.services);
+        services.tails.is_empty()
+            && services
+                .entries
+                .iter()
+                .map(|(l, _)| l.as_str())
+                .eq(["Atom.Read"])
+    }
+
+    /// `ty` resolved, without its captures and quantifiers.
+    fn bare(&self, ty: &Type) -> Type {
+        let mut ty = self.store.resolve(ty);
+        while let Type::Captured { ty: inner, .. } | Type::Forall { body: inner, .. } = ty {
+            ty = self.store.resolve(&inner);
+        }
+        ty
+    }
+
 }
 
 /// The serializable atoms under a declaration: where each is named, and
