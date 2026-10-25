@@ -240,6 +240,33 @@ foreign pure map_eff from "@flick-lang/runtime" "mapEff"
   arity 2
   retention call
 
+map2_option :
+  forall c d a b x. (a -> b -> x)^c ->
+    ((Option a)^d -> ((Option b)^d -> (Option x)^(c + d))^(c + d))^c
+foreign pure map2_option from "@flick-lang/runtime" "optionMap2"
+  arity 3
+  retention call
+
+map2_result :
+  forall c d e a b x. (a -> b -> x)^c ->
+    ((Result e a)^d -> ((Result e b)^d -> (Result e x)^(c + d))^(c + d))^c
+foreign pure map2_result from "@flick-lang/runtime" "resultMap2"
+  arity 3
+  retention call
+
+map2_list :
+  forall c d a b x. (a -> b -> x)^c -> ((List a)^d -> ((List b)^d -> (List x)^(c + d))^(c + d))^c
+foreign pure map2_list from "@flick-lang/runtime" "listMap2"
+  arity 3
+  retention call
+
+map2_eff :
+  forall c d r e a b x. (a -> b -> x)^c ->
+    ((Eff r e a)^d -> ((Eff r e b)^d -> (Eff r e x)^(c + d))^(c + d))^c
+foreign pure map2_eff from "@flick-lang/runtime" "map2Eff"
+  arity 3
+  retention call
+
 instance Functor Option =
   map : forall c d a b. (a -> b)^c -> ((Option a)^d -> (Option b)^(c + d))^c
   let map f value =
@@ -264,6 +291,10 @@ instance Traversable Option =
 instance Applicative Option =
   pure : forall a. a -> Option a
   let pure x = Some x
+  map2 :
+    forall c d a b x. (a -> b -> x)^c ->
+      ((Option a)^d -> ((Option b)^d -> (Option x)^(c + d))^(c + d))^c
+  let map2 f = map2_option f
 
 instance Monad Option =
   flat_map : forall c d a b. (a -> (Option b)^d)^c -> ((Option a)^d -> (Option b)^(c + d))^c
@@ -296,6 +327,10 @@ instance Traversable (Result e) =
 instance Applicative (Result e) =
   pure : forall a. a -> Result e a
   let pure x = Ok x
+  map2 :
+    forall c d a b x. (a -> b -> x)^c ->
+      ((Result e a)^d -> ((Result e b)^d -> (Result e x)^(c + d))^(c + d))^c
+  let map2 f = map2_result f
 
 instance Monad (Result e) =
   flat_map :
@@ -320,6 +355,9 @@ instance Traversable List =
 instance Applicative List =
   pure : forall a. a -> List a
   let pure x = [x]
+  map2 :
+    forall c d a b x. (a -> b -> x)^c -> ((List a)^d -> ((List b)^d -> (List x)^(c + d))^(c + d))^c
+  let map2 f = map2_list f
 
 instance Monad List =
   flat_map : forall c d a b. (a -> (List b)^d)^c -> ((List a)^d -> (List b)^(c + d))^c
@@ -332,11 +370,46 @@ instance Functor (Eff r e) =
 instance Applicative (Eff r e) =
   pure : forall a. a -> Eff r e a
   let pure x = pure_eff x
+  map2 :
+    forall c d a b x. (a -> b -> x)^c ->
+      ((Eff r e a)^d -> ((Eff r e b)^d -> (Eff r e x)^(c + d))^(c + d))^c
+  let map2 f = map2_eff f
 
 instance Monad (Eff r e) =
   flat_map :
     forall c d a b. (a -> (Eff r e b)^d)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
   let flat_map f eff = flat_map_eff f eff
+
+instance Alternative Option =
+  nothing : forall a. Option a
+  let nothing = None
+  or_else : forall a. Option a -> Option a -> Option a
+  let or_else first second =
+    match first with
+    | None -> second
+    | Some _ -> first
+
+instance Alternative List =
+  nothing : forall a. List a
+  let nothing = []
+  or_else : forall a. List a -> List a -> List a
+  let or_else xs ys = xs ++ ys
+
+instance Semigroup String =
+  combine : String -> String -> String
+  let combine x y = x ++ y
+
+instance Monoid String =
+  empty : String
+  let empty = ""
+
+instance Semigroup (List a) =
+  combine : List a -> List a -> List a
+  let combine xs ys = xs ++ ys
+
+instance Monoid (List a) =
+  empty : List a
+  let empty = []
 
 instance Eq SchemaError =
   eq : SchemaError -> SchemaError -> Bool

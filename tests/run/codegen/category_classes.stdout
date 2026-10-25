@@ -1,0 +1,13 @@
+Some 3
+None
+[(1, "x"), (1, "y"), (2, "x"), (2, "y")]
+Err "first"
+Ok 3
+42
+Some 3
+Some 1
+[1, 2, 3]
+None
+abcdef
+[1, 2, 3]
+""

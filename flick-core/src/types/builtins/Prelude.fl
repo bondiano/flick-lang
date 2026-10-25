@@ -75,9 +75,26 @@ class Functor f => Traversable (f : Type -> Type) =
 
 class Functor f => Applicative (f : Type -> Type) =
   pure : forall a. a -> f a
+  /// `f` of the values of both, in order: for `List`, every pair.
+  map2 :
+    forall c d a b x. (a -> b -> x)^c -> ((f a)^d -> ((f b)^d -> (f x)^(c + d))^(c + d))^c
 
 class Applicative m => Monad (m : Type -> Type) =
   flat_map : forall c d a b. (a -> (m b)^d)^c -> ((m a)^d -> (m b)^(c + d))^c
+
+/// Applicative containers with a choice: `nothing` holds no value, and
+/// `or_else` keeps the first that holds one (`List` keeps both).
+class Applicative f => Alternative (f : Type -> Type) =
+  nothing : forall a. f a
+  or_else : forall a. f a -> f a -> f a
+
+/// Values with an associative `combine`.
+class Semigroup a =
+  combine : a -> a -> a
+
+/// A `Semigroup` whose `empty` changes nothing it is combined with.
+class Semigroup a => Monoid a =
+  empty : a
 
 /// How a computation ended: its value, or how it failed (`Exit.value`,
 /// `Exit.failure`).

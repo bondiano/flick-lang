@@ -44,6 +44,7 @@ export const listEachEffect = /*#__PURE__*/ needsEffect("listEachEffect");
 export const listFoldEffect = /*#__PURE__*/ needsEffect("listFoldEffect");
 export const listMapEffect = /*#__PURE__*/ needsEffect("listMapEffect");
 export const mapEff = /*#__PURE__*/ needsEffect("mapEff");
+export const map2Eff = /*#__PURE__*/ needsEffect("map2Eff");
 export const operation = /*#__PURE__*/ needsEffect("operation");
 export const parallel = /*#__PURE__*/ needsEffect("parallel");
 export const parallelAll = /*#__PURE__*/ needsEffect("parallelAll");

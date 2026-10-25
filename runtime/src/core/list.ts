@@ -1,6 +1,6 @@
 // Lists, non-empty lists and mutable JS arrays, without Effect. A callback
 // comes adapted to its JS arity, `f(a, b)`.
-import { EQ, LT, type Option, type Ordering, none, some } from "./data.ts";
+import { EQ, LT, type Option, type Ordering, type Result, none, ok, some } from "./data.ts";
 import { item } from "../internal.ts";
 
 type List<A> = ReadonlyArray<A>;
@@ -30,6 +30,16 @@ export const listFilterMap = <A, B>(f: (a: A) => Option<B>, xs: List<A>): Array<
 };
 
 export const listFlatMap = <A, B>(f: (a: A) => List<B>, xs: List<A>): Array<B> => xs.flatMap((x) => f(x));
+
+/** `Applicative.map2` of lists: every pair, the first list outermost. */
+export const listMap2 = <A, B, C>(f: (a: A, b: B) => C, xs: List<A>, ys: List<B>): Array<C> =>
+  xs.flatMap((x) => ys.map((y) => f(x, y)));
+
+export const optionMap2 = <A, B, C>(f: (a: A, b: B) => C, x: Option<A>, y: Option<B>): Option<C> =>
+  x._tag === "Some" && y._tag === "Some" ? some(f(x.value, y.value)) : none;
+
+export const resultMap2 = <A, B, C, E>(f: (a: A, b: B) => C, x: Result<A, E>, y: Result<B, E>): Result<C, E> =>
+  x._tag === "Failure" ? x : y._tag === "Failure" ? y : ok(f(x.success, y.success));
 
 export const listFind = <A>(p: (a: A) => boolean, xs: List<A>): Option<A> => {
   for (const x of xs) if (p(x)) return some(x);

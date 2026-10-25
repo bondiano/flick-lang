@@ -316,8 +316,8 @@ component search (props : SearchProps) =
 **D1. Спека.** ✅
 - AC: `spec/01,02,05,06` (en + ru) описывают `do` над `Monad` с чистыми продолжениями, `for … yield` и `[for … yield]` вместо «без обобщённого `do`».
 
-**D2. Классы прелюдии.** ⬜
-- AC: `Semigroup`, `Monoid` (инстансы `String`, `List a`; у `Number` нет — обёртки D13), `Alternative` (`Option`, `List`), `Applicative.map2` во всех инстансах; `Combiner` строится из `Semigroup`.
+**D2. Классы прелюдии.** ✅
+- AC: `Semigroup`, `Monoid` (инстансы `String`, `List a`; у `Number` нет — обёртки D13), `Alternative` (`nothing`, `or_else`; `Option`, `List`), `Applicative.map2` во всех инстансах (foreign: каррированное тело на Flick не проходит проверку захватов — замыкание держит `f a`).
 
 **D3. Синтаксис `do`/`for`.** ⬜
 - AC: `do { … }`, `for { … } yield e`, `[for … yield e]`, `for { … } do body`; утверждения `p <- e`, `let`, `if c`, выражение; `<-` — контекстно (смежные `<` `-` в начале утверждения), `a<-1` вне блоков остаётся `a < -1`; `for`/`yield` — ключевые слова, конфликты в `stdlib`/`examples`/`tests` исправлены.

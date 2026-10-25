@@ -1,8 +1,8 @@
 // Lists, non-empty lists, mutable JS arrays and chunks. A callback comes
 // adapted to its JS arity, `f(a, b)`; a runtime callback returns an `Effect`.
-import { Chunk, Effect, type Option } from "effect";
+import { Chunk, Effect, type Option, Result } from "effect";
 
-import { type Tagged, none, some } from "../data.ts";
+import { type Tagged, none, ok, some } from "../data.ts";
 import { item } from "../internal.ts";
 import { tag } from "../tags.ts";
 
@@ -17,6 +17,7 @@ export {
   listFilter,
   listFilterMap,
   listFlatMap,
+  listMap2,
   listAny,
   listAll,
   listPartition,
@@ -90,6 +91,20 @@ export const flatMapEff = <A, B, E, R, E2, R2>(
 ): Effect.Effect<B, E | E2, R | R2> => Effect.flatMap(eff, (x) => f(x));
 export const mapEff = <A, B, E, R>(f: (a: A) => B, eff: Effect.Effect<A, E, R>): Effect.Effect<B, E, R> =>
   Effect.map(eff, (x) => f(x));
+/** `Applicative.map2` of computations: the first, then the second. */
+export const map2Eff = <A, B, C, E, R>(
+  f: (a: A, b: B) => C,
+  x: Effect.Effect<A, E, R>,
+  y: Effect.Effect<B, E, R>,
+): Effect.Effect<C, E, R> => Effect.zipWith(x, y, (a, b) => f(a, b));
+export const optionMap2 = <A, B, C>(f: (a: A, b: B) => C, x: Option.Option<A>, y: Option.Option<B>): Option.Option<C> =>
+  x._tag === "Some" && y._tag === "Some" ? some(f(x.value, y.value)) : none;
+export const resultMap2 = <A, B, C, E>(
+  f: (a: A, b: B) => C,
+  x: Result.Result<A, E>,
+  y: Result.Result<B, E>,
+): Result.Result<C, E> =>
+  x._tag === "Failure" ? Result.fail(x.failure) : y._tag === "Failure" ? Result.fail(y.failure) : ok(f(x.success, y.success));
 export const bindEff = <A, B, E, R, E2, R2>(
   eff: Effect.Effect<A, E, R>,
   f: (a: A) => Effect.Effect<B, E2, R2>,
