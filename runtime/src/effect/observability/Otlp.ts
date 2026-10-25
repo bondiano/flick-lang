@@ -122,3 +122,14 @@ export const otlpMetricsWith = (settings: Settings) =>
     }),
     sending(settings),
   );
+
+/**
+ * `Otlp.from_config service`: traces, logs and metrics as the `OTEL_`
+ * configuration says, in JSON; a signal is sent only when its
+ * `OTEL_<SIGNAL>_EXPORTER` names `otlp`.
+ */
+export const otlpFromConfig = (service: Option.Option<string>) =>
+  Layer.provide(
+    Otlp.layerFromConfig(Option.isSome(service) ? { resource: { serviceName: service.value } } : undefined),
+    transport,
+  );

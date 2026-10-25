@@ -1,7 +1,5 @@
 [wrapped]
 layer = "Otlp.layer d572158125d5099d"
+layerFromConfig = "Otlp.from_config c36eb5f55d8fd9d9"
 layerJson = "Otlp.layer_with ca21e60175e66b40"
 layerProtobuf = "Otlp.layer_with ad73e6c8121864b8"
-
-[excluded]
-layerFromConfig = "`Otlp.layer` and `layer_with` cover it; this form is outside the binding"

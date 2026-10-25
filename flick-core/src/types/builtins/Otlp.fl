@@ -97,3 +97,17 @@ foreign pure logs_with from "@flick-lang/runtime/effect/observability/Otlp" "otl
 metrics_with : Settings -> Layer none none none
 foreign pure metrics_with from "@flick-lang/runtime/effect/observability/Otlp" "otlpMetricsWith"
   reviewed "effect@4.0.5 sha256:03304a237d1ab870"
+
+/// Traces, logs and metrics as the current configuration says, in JSON:
+/// a signal is exported only when `OTEL_TRACES_EXPORTER`,
+/// `OTEL_LOGS_EXPORTER` or `OTEL_METRICS_EXPORTER` names `otlp`; then
+/// `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_<SIGNAL>_ENDPOINT`),
+/// `_HEADERS`, `_COMPRESSION` and `_TIMEOUT`, the batch settings
+/// `OTEL_BSP_*`, `OTEL_BLRP_*` and `OTEL_METRIC_EXPORT_*`, and the resource
+/// `OTEL_SERVICE_NAME`, `OTEL_SERVICE_VERSION` and `OTEL_RESOURCE_ATTRIBUTES`
+/// apply. `service`, when given, names the service instead. The
+/// configuration is the provided `ConfigProvider`, the process's
+/// environment by default.
+from_config : Option String -> Layer none none none
+foreign pure from_config from "@flick-lang/runtime/effect/observability/Otlp" "otlpFromConfig"
+  reviewed "effect@4.0.5 sha256:c36eb5f55d8fd9d9"

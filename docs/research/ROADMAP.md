@@ -79,7 +79,7 @@ component search (props : SearchProps) =
 **S2b. 🆕 RPC в маршрутизаторе Flick.** ⬜
 - AC: `Rpc.handler`/`handler_websocket` монтируются в `Http.Router.route`; для этого `route`/`router` принимают обработчик с захватом региона сервера (`^s`), фикстура G001 на утечку; тест: группа на `Http.Server.serve` рядом с обычными маршрутами.
 
-**S3. `effect/observability`.** ✅ (модули `Otlp` — `layer`/`traces`/`logs`/`metrics` с `{ url; service_name }`, HTTP-клиент и JSON внутри — и `Prometheus.format`; `Otlp.Settings` + `*_with`: версия, атрибуты, заголовки, gzip, `Otlp.protobuf`, интервалы, пачка, таймаут)
+**S3. `effect/observability`.** ✅ (модули `Otlp` — `layer`/`traces`/`logs`/`metrics` с `{ url; service_name }`, HTTP-клиент и JSON внутри — и `Prometheus.format`; `Otlp.Settings` + `*_with`: версия, атрибуты, заголовки, gzip, `Otlp.protobuf`, интервалы, пачка, таймаут; `Otlp.from_config` по `OTEL_*`)
 - AC: обёрнуты `Otlp`, `OtlpTracer`, `OtlpLogger`, `OtlpMetrics`, `PrometheusMetrics`; run-тест экспортирует span в локальный HTTP-приёмник и проверяет имя и атрибуты.
 
 **S4. `effect/devtools`.** ✅ (`DevTools.layer url`; сервер для тестов — `@flick-lang/runtime/effect/devtools/DevToolsServer` на `@effect/platform-node`)

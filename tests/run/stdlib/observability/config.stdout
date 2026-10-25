@@ -1,0 +1,5 @@
+without an exporter, sent: false
+/v1/traces: true
+"checkout": true
+"shop": true
+"store": true

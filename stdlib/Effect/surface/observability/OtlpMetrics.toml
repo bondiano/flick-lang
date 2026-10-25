@@ -4,5 +4,5 @@ layer = "Otlp.metrics 03304a237d1ab870"
 [excluded]
 AggregationTemporality = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
 MetricsData = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
-layerFromConfig = "`Otlp.metrics` builds the exporter with its options; config-driven and hand-made exporters are outside the first binding"
+layerFromConfig = "`Otlp.from_config` exports each signal the configuration names; one signal alone is outside the binding"
 make = "`Otlp.metrics` builds the exporter with its options; config-driven and hand-made exporters are outside the first binding"

@@ -114,7 +114,9 @@ bringing its own fetch client; `Otlp.settings url service` and
 `layer_with`, `traces_with`, `logs_with` and `metrics_with` add the service's
 version and attributes, request headers, gzip, protobuf (`Otlp.protobuf`,
 bundled only where named), export intervals, batch size and shutdown
-timeout. `Prometheus.format` gives the recorded metrics in Prometheus's text
+timeout. `Otlp.from_config` exports what the `OTEL_` configuration of the
+provided `ConfigProvider` says, a signal only when its
+`OTEL_<SIGNAL>_EXPORTER` names `otlp`. `Prometheus.format` gives the recorded metrics in Prometheus's text
 format.
 
 `effect/devtools` is unstable, and so is `DevTools`: `DevTools.layer url`

@@ -1,0 +1,67 @@
+// OTLP from the `OTEL_` configuration, given by a provider rather than the
+// process's environment: with `OTEL_TRACES_EXPORTER=otlp` a span reaches the
+// endpoint's `/v1/traces` under the configured service; without it nothing
+// is sent.
+module App.Main exposing (main)
+
+start : Unit ->{} Number
+foreign async start from "./receiver.mjs" "start"
+  arity 0
+
+received : Unit ->{} String
+foreign sync received from "./receiver.mjs" "received"
+  arity 0
+
+stop : Unit ->{} Unit
+foreign async stop from "./receiver.mjs" "stop"
+  arity 0
+
+span : Tracer.SpanOptions
+let span =
+  {
+    attributes = [];
+    links = [];
+    parent = None;
+    root = false;
+    kind_ = Tracer.internal;
+    sampled = None;
+    level = None;
+    captureStackTrace = false;
+    disablePropagation = false;
+  }
+
+has : String -> String -> String
+let has text needle = needle ++ ": " ++ show (String.contains needle text)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let base = "http://127.0.0.1:" ++ show (start ())
+  let quiet =
+    ConfigProvider.from_env_record
+      { preserveEmptyStrings = false }
+      [("OTEL_EXPORTER_OTLP_ENDPOINT", base)]
+  provide (ConfigProvider.layer quiet) {
+    provide (Otlp.from_config None) { Tracer.with_span "ignored" span (task { () }) }
+  }
+  Platform.stdout_line
+    ("without an exporter, sent: " ++ show (String.contains "ignored" (received ())))
+  let env =
+    ConfigProvider.from_env_record
+      { preserveEmptyStrings = false }
+      [
+        ("OTEL_TRACES_EXPORTER", "otlp"),
+        ("OTEL_EXPORTER_OTLP_ENDPOINT", base),
+        ("OTEL_SERVICE_NAME", "shop"),
+      ]
+  provide (ConfigProvider.layer env) {
+    provide (Otlp.from_config None) { Tracer.with_span "checkout" span (task { () }) }
+  }
+  let got = received ()
+  Platform.stdout_line (has got "/v1/traces")
+  Platform.stdout_line (has got "\"checkout\"")
+  Platform.stdout_line (has got "\"shop\"")
+  provide (ConfigProvider.layer env) {
+    provide (Otlp.from_config (Some "store")) { Tracer.with_span "named" span (task { () }) }
+  }
+  Platform.stdout_line (has (received ()) "\"store\"")
+  stop ()

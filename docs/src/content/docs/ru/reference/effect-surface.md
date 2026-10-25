@@ -119,6 +119,9 @@ fetch-клиентом. `Otlp.settings url service` и `layer_with`, `traces_wit
 `logs_with`, `metrics_with` добавляют версию и атрибуты сервиса, заголовки
 запросов, gzip, protobuf (`Otlp.protobuf` попадает в бандл, только если его
 назвать), интервалы отправки, размер пачки и таймаут завершения.
+`Otlp.from_config` экспортирует то, что говорит конфигурация `OTEL_`
+текущего `ConfigProvider`; сигнал отправляется, только если его
+`OTEL_<SIGNAL>_EXPORTER` называет `otlp`.
 `Prometheus.format` выдаёт записанные метрики в текстовом формате Prometheus.
 
 `effect/devtools` нестабилен, как и `DevTools`: `DevTools.layer url` отправляет
