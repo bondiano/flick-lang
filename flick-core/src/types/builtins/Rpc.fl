@@ -94,7 +94,7 @@ foreign pure add from "@flick-lang/runtime/effect/rpc/Rpc" "rpcAdd"
 /// the calls it serves finish and runs their finalizers. The handlers run
 /// with the services here.
 listen : forall c s r hs. ServeOptions -> Group hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
-foreign effect listen from "@flick-lang/runtime/effect/rpc/Rpc" "rpcListen"
+foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
   arity 3
   retention owner
   reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"
@@ -102,7 +102,7 @@ foreign effect listen from "@flick-lang/runtime/effect/rpc/Rpc" "rpcListen"
 /// The port the server listens on: the one asked for, or the one the system
 /// chose for port 0.
 port : Server s -> Number
-foreign pure port from "@flick-lang/runtime/effect/rpc/Rpc" "rpcPort"
+foreign pure port from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcPort"
   retention call
   reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"
 

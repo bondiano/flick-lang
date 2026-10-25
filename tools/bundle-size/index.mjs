@@ -25,6 +25,13 @@ export const PROGRAMS = [
   { name: "counter", source: "tests/run/ui/counter.fl", budget: 99, unused: ["effect/dist/Graph.js"] },
   { name: "playground", source: "docs/src/playground/Playground.fl", budget: 110, unused: ["effect/dist/Graph.js"] },
   { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 99, unused: ["effect/dist/Graph.js"] },
+  // a browser client of a procedure keeps no Node server
+  {
+    name: "rpc",
+    source: "tools/bundle-size/rpc.fl",
+    budget: 52,
+    unused: ["effect/dist/Graph.js", "platform-node/dist/NodeHttpServer.js", "platform-node-shared/dist/NodeSocketServer.js"],
+  },
   // a template renders without `react-dom/server` (R6); its view is still a React component
   {
     name: "email",
