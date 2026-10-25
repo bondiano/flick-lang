@@ -5,7 +5,7 @@
 "effect/ai" = { excluded = "AI provider clients are outside the 0.1.0 standard library" }
 "effect/cli" = { modules = "cli" }
 "effect/cluster" = { excluded = "distributed entities and sharding are outside 0.1.0" }
-"effect/devtools" = { excluded = "a developer-tools protocol, not a library surface" }
+"effect/devtools" = { modules = "devtools" }
 "effect/encoding" = { excluded = "byte encodings are outside the 0.1.0 standard library" }
 "effect/eventlog" = { excluded = "event-sourcing infrastructure is outside 0.1.0" }
 "effect/graphql" = { excluded = "GraphQL is outside the 0.1.0 standard library" }

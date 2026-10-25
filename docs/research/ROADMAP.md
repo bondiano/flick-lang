@@ -79,7 +79,7 @@ component search (props : SearchProps) =
 **S3. `effect/observability`.** ✅ (модули `Otlp` — `layer`/`traces`/`logs`/`metrics` с `{ url; service_name }`, HTTP-клиент и JSON внутри — и `Prometheus.format`)
 - AC: обёрнуты `Otlp`, `OtlpTracer`, `OtlpLogger`, `OtlpMetrics`, `PrometheusMetrics`; run-тест экспортирует span в локальный HTTP-приёмник и проверяет имя и атрибуты.
 
-**S4. `effect/devtools`.** ⬜
+**S4. `effect/devtools`.** ✅ (`DevTools.layer url`; сервер для тестов — `@flick-lang/runtime/effect/devtools/DevToolsServer` на `@effect/platform-node`)
 - AC: обёрнут `DevTools.layer` (по умолчанию `ws://localhost:34437`); смоук-тест подключения к фейковому ws-серверу.
 
 **S5. Пересмотр решения о UI.** ✅ `8cae598`

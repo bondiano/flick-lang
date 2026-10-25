@@ -2,7 +2,7 @@
 title: "Effect coverage"
 ---
 
-The standard library wraps the pinned Effect release (see [The boundary of the language core](../../spec/07-errors-and-concurrency/#the-boundary-of-the-language-core)): every public export of the entrypoints `effect`, `effect/cli`,
+The standard library wraps the pinned Effect release (see [The boundary of the language core](../../spec/07-errors-and-concurrency/#the-boundary-of-the-language-core)): every public export of the entrypoints `effect`, `effect/cli`, `effect/devtools`,
 `effect/http`, `effect/http-api`, `effect/observability`, `effect/reactivity` and `effect/rpc` has a typed wrapper or an explicit
 decision, and a linter in `cargo test` checks that nothing is lost when
 Effect moves.
@@ -12,7 +12,7 @@ Effect moves.
 `stdlib/Effect/snapshot.json` is the surface of the installed Effect, written
 by `node tools/dts-importer/index.mjs surface > stdlib/Effect/snapshot.json`
 (a Flick program: `pnpm -C tools/dts-importer build` first):
-every entrypoint of its `package.json`, and for the seven wrapped ones each
+every entrypoint of its `package.json`, and for the eight wrapped ones each
 export of each module as `Module.name` with its kind (`value`, `type` or
 `value+type`) and a fingerprint, 16 hex digits of the SHA-256 of its
 declarations printed without comments. A changed doc comment keeps the
@@ -99,6 +99,10 @@ it over HTTP with NDJSON until its scope closes, and `call` and
 records and metrics with OpenTelemetry's protocol over HTTP with JSON, each
 bringing its own fetch client; `Prometheus.format` gives the recorded
 metrics in Prometheus's text format.
+
+`effect/devtools` is unstable, and so is `DevTools`: `DevTools.layer url`
+sends a program's spans over a WebSocket to the Effect DevTools listening
+at `url`.
 
 ## Bindings
 

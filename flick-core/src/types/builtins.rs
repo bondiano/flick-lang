@@ -321,6 +321,9 @@ const SOURCES: &[(&str, &str)] = &[
     ("Otlp", include_str!("builtins/Otlp.fl")),
     ("Prometheus", include_str!("builtins/Prometheus.fl")),
     // end of Effect: observability
+    // Effect: devtools (unstable in Effect 4.0.5)
+    ("DevTools", include_str!("builtins/DevTools.fl")),
+    // end of Effect: devtools
     // Effect: CLI
     ("Cli.Prompt", include_str!("builtins/Cli/Prompt.fl")),
     ("Cli", include_str!("builtins/Cli.fl")),

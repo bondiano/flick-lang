@@ -13,6 +13,7 @@ let wrapped =
   [
     "effect",
     "effect/cli",
+    "effect/devtools",
     "effect/http",
     "effect/http-api",
     "effect/observability",

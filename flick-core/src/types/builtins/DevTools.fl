@@ -1,0 +1,11 @@
+/// The Effect DevTools: a program that provides `layer` sends its spans,
+/// as they start and end, over a WebSocket to the DevTools at `url`, which
+/// must already listen. The module is unstable, as Effect marks
+/// `effect/devtools`.
+module DevTools exposing (..)
+
+/// Spans sent to the DevTools at `url`; Effect's default is
+/// `ws://localhost:34437`.
+layer : String -> Layer none none none
+foreign pure layer from "@flick-lang/runtime/effect/devtools/DevTools" "devToolsLayer"
+  reviewed "effect@4.0.5 sha256:8efdbda563d781dc"

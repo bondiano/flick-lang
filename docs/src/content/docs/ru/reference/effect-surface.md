@@ -4,7 +4,7 @@ title: "Покрытие Effect"
 
 Стандартная библиотека оборачивает закреплённую версию Effect
 (см. [Граница языкового ядра](../../spec/07-errors-and-concurrency/#граница-языкового-ядра)).
-Для каждого публичного экспорта из точек входа `effect`, `effect/cli`,
+Для каждого публичного экспорта из точек входа `effect`, `effect/cli`, `effect/devtools`,
 `effect/http`, `effect/http-api`, `effect/observability`, `effect/reactivity` и `effect/rpc` есть типизированная обёртка или явно
 записанное решение. Линтер, который выполняется в `cargo test`,
 следит за тем, чтобы при обновлении Effect ни один экспорт не остался без решения.
@@ -13,7 +13,7 @@ title: "Покрытие Effect"
 
 `stdlib/Effect/snapshot.json` описывает API установленной версии Effect.
 Снимок записывается командой `node tools/dts-importer/surface.mjs > stdlib/Effect/snapshot.json`
-и содержит все точки входа из её `package.json`. Для семи оборачиваемых
+и содержит все точки входа из её `package.json`. Для восьми оборачиваемых
 точек входа в нём перечислены все экспорты каждого модуля в виде `Module.name`.
 У каждого экспорта указаны категория (`value`, `type` или `value+type`)
 и отпечаток — 16 шестнадцатеричных цифр SHA-256 от объявлений, напечатанных
@@ -104,6 +104,9 @@ Effect помечает `effect/reactivity` как `@stability unstable` в 4.0.
 и метрики по протоколу OpenTelemetry через HTTP с JSON, каждый со своим
 fetch-клиентом; `Prometheus.format` выдаёт записанные метрики в текстовом
 формате Prometheus.
+
+`effect/devtools` нестабилен, как и `DevTools`: `DevTools.layer url` отправляет
+span'ы программы по WebSocket в Effect DevTools, которые слушают `url`.
 
 ## Привязки
 
