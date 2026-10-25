@@ -22,10 +22,6 @@ pub struct Config {
     /// The entry points of an app, by name: `entries`, or `entry` as the
     /// one named `main`. Each builds a runner `flick-<name>.js`.
     pub entries: Vec<Entry>,
-    /// `runner`: the module whose `run` starts each entry and whose `Main`
-    /// is the type of its `main`, with the span of its name; without one, a
-    /// pure `main` is called and an effect is run on Node or in a browser.
-    pub runner: Option<(String, Span)>,
     pub build: Build,
     /// `[sql] dialect`: what `sql table` and `sql { … }` are checked against.
     pub sql_dialect: &'static Dialect,
@@ -40,6 +36,11 @@ pub struct Entry {
     pub module: String,
     /// The span of the module's name in `flick.toml`.
     pub span: Span,
+    /// The module whose `run` starts the entry and whose `Main` is the type
+    /// of its `main`, with the span of its name: the entry's `runner`, else
+    /// the project's; without one, a pure `main` is called and an effect is
+    /// run as on Node.
+    pub runner: Option<(String, Span)>,
 }
 
 /// The name of the entry `entry = "…"` defines.
@@ -156,7 +157,7 @@ struct RawProject {
     #[serde(default = "test_dir")]
     test_dir: String,
     entry: Option<Spanned<String>>,
-    entries: Option<Spanned<BTreeMap<Spanned<String>, Spanned<String>>>>,
+    entries: Option<Spanned<BTreeMap<Spanned<String>, Spanned<toml::Value>>>>,
     runner: Option<Spanned<String>>,
 }
 
@@ -206,7 +207,7 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
     let raw: Raw = toml::from_str(text).map_err(invalid)?;
     let project_span = span(raw.project.span());
     let project = raw.project.into_inner();
-    let entries = entries(project.entry, project.entries, &span)?;
+    let entries = entries(project.entry, project.entries, project.runner, &span)?;
     if project.kind == Kind::App && entries.is_empty() {
         return Err(Diagnostic::error(
             codes::P007,
@@ -242,9 +243,6 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
         source_dir: project.source_dir,
         test_dir: project.test_dir,
         entries,
-        runner: project
-            .runner
-            .map(|r| (r.get_ref().clone(), span(r.span()))),
         build: raw.build,
         sql_dialect,
         allow,
@@ -259,9 +257,11 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
 )]
 fn entries(
     entry: Option<Spanned<String>>,
-    entries: Option<Spanned<BTreeMap<Spanned<String>, Spanned<String>>>>,
+    entries: Option<Spanned<BTreeMap<Spanned<String>, Spanned<toml::Value>>>>,
+    runner: Option<Spanned<String>>,
     span: &dyn Fn(ops::Range<usize>) -> Span,
 ) -> Result<Vec<Entry>, Diagnostic> {
+    let runner = runner.map(|r| (r.get_ref().clone(), span(r.span())));
     let entry = entry.map(|e| (e.get_ref().clone(), span(e.span())));
     let entries = match (&entry, entries) {
         (Some(_), Some(table)) => {
@@ -275,18 +275,15 @@ fn entries(
             name: MAIN_ENTRY.to_owned(),
             module: module.clone(),
             span: *at,
+            runner,
         }],
         (None, Some(table)) => {
             let table_span = span(table.span());
             let entries: Vec<Entry> = table
                 .into_inner()
                 .into_iter()
-                .map(|(name, module)| Entry {
-                    name: name.get_ref().clone(),
-                    module: module.get_ref().clone(),
-                    span: span(module.span()),
-                })
-                .collect();
+                .map(|(name, value)| entry_point(name.into_inner(), &value, runner.as_ref(), span))
+                .collect::<Result<_, _>>()?;
             if let Some(bad) = entries.iter().find(|e| !is_entry_name(&e.name)) {
                 return Err(Diagnostic::error(
                     codes::P005,
@@ -309,6 +306,45 @@ fn entries(
         (None, None) => Vec::new(),
     };
     Ok(entries)
+}
+
+/// The entry `name` of `entries`: its module, or `{ module, runner }` with a
+/// runner of its own instead of the project's `runner`.
+fn entry_point(
+    name: String,
+    value: &Spanned<toml::Value>,
+    runner: Option<&(String, Span)>,
+    span: &dyn Fn(ops::Range<usize>) -> Span,
+) -> Result<Entry, Diagnostic> {
+    let at = span(value.span());
+    let invalid = || {
+        Diagnostic::error(
+            codes::P005,
+            format!("entry `{name}` is a module name, or `{{ module = \"…\", runner = \"…\" }}`"),
+            at,
+        )
+    };
+    let text = |v: Option<&toml::Value>| v.and_then(toml::Value::as_str).map(str::to_owned);
+    let (module, runner) = match value.get_ref() {
+        toml::Value::String(module) => (module.clone(), runner.cloned()),
+        toml::Value::Table(table) => {
+            if table.keys().any(|k| k != "module" && k != "runner") {
+                return Err(invalid());
+            }
+            let own = match table.get("runner") {
+                Some(r) => Some((text(Some(r)).ok_or_else(invalid)?, at)),
+                None => runner.cloned(),
+            };
+            (text(table.get("module")).ok_or_else(invalid)?, own)
+        }
+        _ => return Err(invalid()),
+    };
+    Ok(Entry {
+        name,
+        module,
+        span: at,
+        runner,
+    })
 }
 
 /// Whether `name` can name an entry, and so the file of its runner.
@@ -401,6 +437,35 @@ mod tests {
             .map(|e| (e.name.as_str(), e.module.as_str()))
             .collect();
         assert_eq!(named, [("cli-2", "App.Cli"), ("server", "App.Server")]);
+    }
+
+    #[test]
+    fn an_entry_takes_its_runner_or_the_project_s() {
+        let config = parse_text(
+            "schema-version = 1\n[project]\nkind = \"app\"\nrunner = \"Runner.Node\"\nentries = { web = { module = \"App.Web\", runner = \"Runner.Cloudflare\" }, cli = \"App.Cli\" }\n",
+        )
+        .expect("valid");
+        let runners: Vec<_> = config
+            .entries
+            .iter()
+            .map(|e| (e.module.as_str(), e.runner.as_ref().map(|r| r.0.as_str())))
+            .collect();
+        assert_eq!(
+            runners,
+            [
+                ("App.Cli", Some("Runner.Node")),
+                ("App.Web", Some("Runner.Cloudflare"))
+            ]
+        );
+        let err = parse_text(
+            "schema-version = 1\n[project]\nkind = \"app\"\nentries = { web = { module = \"App.Web\", host = \"x\" } }\n",
+        )
+        .expect_err("unknown key");
+        assert!(
+            err.message.starts_with("entry `web` is a module name"),
+            "{}",
+            err.message
+        );
     }
 
     #[test]

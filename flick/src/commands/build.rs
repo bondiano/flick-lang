@@ -349,6 +349,11 @@ pub fn artifacts(
             .find(|(name, _)| name == module)
             .map(|(_, dir)| dir.clone())
     };
+    let runners: Vec<(String, String)> = project
+        .iter()
+        .flat_map(|p| &p.config.entries)
+        .filter_map(|e| Some((e.name.clone(), e.runner.as_ref()?.0.clone())))
+        .collect();
     let settings = Settings {
         source_dir: &source_dir,
         out_dir,
@@ -361,7 +366,7 @@ pub fn artifacts(
         root: project.map(|p| p.root.as_path()),
         backend: project.map_or(Backend::Effect, |p| p.config.build.effect),
         ui: project.and_then(|p| p.config.build.ui.as_deref()),
-        runner: project.and_then(|p| p.config.runner.as_ref().map(|r| r.0.as_str())),
+        runners: &runners,
     };
     build::emit(compilation, sources, &settings)
 }

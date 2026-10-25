@@ -6,7 +6,7 @@ use super::{Loader, Root};
 use crate::diagnostics::Diagnostic;
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
-use crate::project::config::{Backend, Kind};
+use crate::project::config::{self, Backend, Kind};
 use crate::project::{Project, is_module_name, module_path};
 use crate::resolve::Interface;
 use crate::source::Span;
@@ -79,18 +79,19 @@ impl Loader<'_> {
         let Some(project) = self.project.filter(|p| p.config.kind == Kind::App) else {
             return;
         };
-        for entry in project.config.entries.clone() {
-            self.check_one_entry(project, &entry.module, entry.span, interfaces);
+        for entry in &project.config.entries {
+            self.check_one_entry(project, entry, interfaces);
         }
     }
 
     fn check_one_entry(
         &mut self,
         project: &Project,
-        entry: &str,
-        span: Span,
+        entry: &config::Entry,
         interfaces: &[Option<Interface>],
     ) {
+        let (span, runner) = (entry.span, entry.runner.as_ref());
+        let entry = entry.module.as_str();
         let error = |message: String| Diagnostic::error(codes::P011, message, span);
         if !is_module_name(entry) {
             self.diagnostics
@@ -120,7 +121,7 @@ impl Loader<'_> {
                     Span::new(self.modules[d].file, start, end)
                 });
                 // no type when the module failed to check: that is reported already
-                if let Some((runner, runner_at)) = &project.config.runner
+                if let Some((runner, runner_at)) = runner
                     && main.scheme.is_some()
                 {
                     let module = main.entity.module.clone();

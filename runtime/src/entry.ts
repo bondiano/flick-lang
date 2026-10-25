@@ -42,7 +42,7 @@ const describe = (u: unknown): string => {
  * `Cause.pretty` says the same with stack annotations, at the price of its
  * value formatter in every bundle.
  */
-const pretty = (cause: Cause.Cause<unknown>): string => {
+export const pretty = (cause: Cause.Cause<unknown>): string => {
   const failures = cause.reasons.flatMap((r) =>
     Cause.isFailReason(r) ? [describe(r.error)] : Cause.isDieReason(r) ? [describe(r.defect)] : [],
   );

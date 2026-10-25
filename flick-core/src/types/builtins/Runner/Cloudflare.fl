@@ -2,14 +2,41 @@
 /// The runner of the entry exports `{ fetch }`, which answers each request
 /// with `main` run under its own root owner; a failure is a 500 response,
 /// reported on the console.
-module Runner.Cloudflare exposing (Main, run)
+module Runner.Cloudflare exposing (Main, Fetch, Env, Context, run, var, binding, wait_until)
 
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 
+/// The Worker's bindings: variables, secrets, KV namespaces and the like.
+type Env
+
+/// The Worker's execution context.
+type Context
+
+/// What `fetch` gives `main`: the request, the bindings and the context.
+type alias Fetch = { request : ServerRequest; env : Env; context : Context }
+
 /// What `main` of an entry is: the response to a request.
-type alias Main = ServerRequest ->{; AppError} ServerResponse
+type alias Main = Fetch ->{; AppError} ServerResponse
 
 /// The Worker's handler of `main`.
 run : Main -> Unknown
 foreign pure run from "@flick-lang/runtime/runner/cloudflare" "run"
+
+/// The variable or secret `name`; `None` when there is none, or the binding
+/// is not text.
+var : String -> Env -> Option String
+foreign pure var from "@flick-lang/runtime/runner/cloudflare" "envVar"
+  nullable
+
+/// The binding `name` as it is, for a foreign function to use: a KV
+/// namespace, a queue, a service.
+binding : String -> Env -> Option Unknown
+foreign pure binding from "@flick-lang/runtime/runner/cloudflare" "envBinding"
+  nullable
+
+/// Keeps the Worker alive until `task` ends, after the response is sent;
+/// its failure is reported on the console. It outlives the request, so it
+/// holds nothing of the request's scopes.
+wait_until : Context -> Eff none none Unit ->{} Unit
+foreign effect wait_until from "@flick-lang/runtime/runner/cloudflare" "waitUntil"

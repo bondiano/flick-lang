@@ -87,8 +87,9 @@ pub struct Settings<'a> {
     /// The module that renders and mounts views in place of React's; a
     /// relative one is relative to the project's root.
     pub ui: Option<&'a str>,
-    /// The module whose `run` starts each entry, if not the default one.
-    pub runner: Option<&'a str>,
+    /// The module whose `run` starts an entry, by the entry's name; an entry
+    /// without one starts the default way.
+    pub runners: &'a [(String, String)],
 }
 
 /// The opt-in outputs of a build.
@@ -205,7 +206,7 @@ pub fn emit(
         any_interface: &any_interface,
     };
     // a built-in runner is written like any module the program imports
-    let mut imports: Vec<String> = settings.runner.into_iter().map(str::to_owned).collect();
+    let mut imports: Vec<String> = settings.runners.iter().map(|(_, r)| r.clone()).collect();
     for module in modules {
         imports.extend(compiled_module(&ctx, module, &mut out, &mut diagnostics));
     }
@@ -223,6 +224,11 @@ fn entry_runners(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for (name, entry) in settings.entries {
+        let started_by = settings
+            .runners
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, r)| r.as_str());
         let module = modules.iter().find(|m| &m.name == entry);
         let main = module.and_then(|m| m.interface.find(Namespace::Value, "main"));
         // a re-exported `main` is imported from the module that defines it, whose output has it
@@ -230,7 +236,7 @@ fn entry_runners(
         // a project checked its entry already, against its runner if it has one;
         // a file built alone is checked here
         let kind = main
-            .filter(|_| settings.runner.is_none())
+            .filter(|_| started_by.is_none())
             .and_then(|e| Some(main_kind(e.scheme.as_ref()?)));
         match kind {
             Some(Err(message)) => {
@@ -245,7 +251,7 @@ fn entry_runners(
             kind => {
                 let file = runner_file(name, settings.typescript);
                 let aot = settings.extras.schema_aot.then(|| schema_aot_file(name));
-                let start = match settings.runner {
+                let start = match started_by {
                     Some(module) => Start::Run(codegen::relative(&file, &path(module))),
                     None => match kind.and_then(Result::ok) {
                         Some(MainKind::Pure) => Start::Call,
