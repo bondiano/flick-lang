@@ -1,0 +1,12 @@
+module App.View exposing (view)
+
+import App.State
+
+view : Ui.View Number none none
+let view =
+  Ui.view
+    (
+      fun n ->
+        ui { text (show (Atom.value (App.State.fresh n) + Atom.value (App.State.pick true))) }
+    )
+//~ FLICK-U006 @10:38-10:53 `App.State.fresh` while rendering

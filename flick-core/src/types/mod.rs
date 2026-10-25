@@ -32,6 +32,7 @@ mod handlers;
 mod infer;
 mod instances;
 mod kinds;
+mod makers;
 mod patterns;
 mod qualified;
 mod records;

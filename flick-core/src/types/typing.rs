@@ -53,6 +53,9 @@ pub struct Typing {
     /// The top-level atoms, views and actions, which debugging tools know
     /// by `Module.name`.
     pub labelled: HashMap<String, Label>,
+    /// The top-level functions that make an atom, an action or a view, each
+    /// with the maker of the library it ends at.
+    pub makers: HashMap<String, String>,
     /// Each `foreign`: its calling convention.
     pub foreigns: HashMap<Range, ForeignInfo>,
     /// Instances declared or derived in this module.

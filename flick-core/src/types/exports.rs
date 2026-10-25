@@ -17,6 +17,15 @@ impl Checker<'_> {
             .cloned()
             .collect();
         self.export_companions(interface);
+        let exported: Vec<&str> = interface
+            .exports
+            .iter()
+            .filter(|e| {
+                e.entity.module == self.env.module && e.entity.namespace == Namespace::Value
+            })
+            .map(|e| e.entity.name.as_str())
+            .collect();
+        interface.makers = super::makers::exported_makers(&self.typing.makers, &exported);
         for export in &mut interface.exports {
             let entity = &export.entity;
             if entity.module != self.env.module {

@@ -1,0 +1,10 @@
+module App.State exposing (fresh, pick)
+
+count : Atom.Writable Number
+let count = Atom.make 0
+
+fresh : Number -> Atom.Writable Number
+let fresh n = Atom.make n
+
+pick : Bool -> Atom.Writable Number
+let pick _ = count

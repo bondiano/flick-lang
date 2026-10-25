@@ -430,6 +430,11 @@ impl Env {
             .min_by_key(|q| (q.len(), *q))
     }
 
+    /// The interface of an imported or built-in module.
+    pub fn interface(&self, module: &str) -> Option<&Interface> {
+        self.interfaces.get(module).and_then(Option::as_ref)
+    }
+
     pub fn qualified_module(&self, qualifier: &str) -> Option<(&str, Option<&Interface>)> {
         let module = self.qualifiers.get(qualifier)?;
         let interface = self.interfaces.get(module).and_then(Option::as_ref);

@@ -202,7 +202,7 @@ impl Checker<'_> {
     }
 
     /// `ty` resolved, without its captures and quantifiers.
-    fn bare(&self, ty: &Type) -> Type {
+    pub(super) fn bare(&self, ty: &Type) -> Type {
         let mut ty = self.store.resolve(ty);
         while let Type::Captured { ty: inner, .. } | Type::Forall { body: inner, .. } = ty {
             ty = self.store.resolve(&inner);
@@ -256,15 +256,20 @@ impl Checker<'_> {
         }
         let mut found = Vec::new();
         for render in renders {
-            made(render, &self.typing.names, &mut found);
+            self.made(render, &mut found);
         }
         found.sort_unstable();
         found.dedup();
-        for (range, what) in found {
+        for (range, what, maker) in found {
+            let what = if what == maker {
+                format!("`{what}`")
+            } else {
+                format!("`{what}`, which calls `{maker}`,")
+            };
             self.error(
                 codes::U006,
                 Span::new(self.file, range.0, range.1),
-                format!("`{what}` while rendering makes another one on every render: make it once, with a top-level `let`, or one per key with `Atom.family`"),
+                format!("{what} while rendering makes another one on every render: make it once, with a top-level `let`, or one per key with `Atom.family`"),
             );
         }
     }
@@ -286,44 +291,6 @@ fn funs<'n>(
     }
 }
 
-/// What makes an atom, an action or a view, by module and names.
-const MAKERS: [(&str, &[&str]); 3] = [
-    (
-        "Atom",
-        &[
-            "make",
-            "derived",
-            "task",
-            "serializable",
-            "serializable_family",
-            "on_server",
-            "client_only",
-            "search_param",
-            "family",
-        ],
-    ),
-    ("Action", &["exhaust", "latest", "queue", "concurrent"]),
-    ("Ui", &["view", "suspended", "named"]),
-];
-
-/// The names under `node` that make an atom, an action or a view, outside
-/// the tasks of handlers.
-fn made(node: &Node, names: &HashMap<Range, Ref>, out: &mut Vec<(Range, String)>) {
-    if node.kind == K::TaskExpr {
-        return;
-    }
-    if let Some(Ref::Value { module, name }) = names.get(&node.range())
-        && MAKERS
-            .iter()
-            .any(|(m, ns)| m == module && ns.contains(&name.as_str()))
-    {
-        out.push((node.range(), format!("{module}.{name}")));
-    }
-    for child in node.nodes() {
-        made(child, names, out);
-    }
-}
-
 /// The types of atoms, by module and name; a signature keeps the aliases.
 const ATOMS: [(&str, &str); 6] = [
     ("Reactivity.Atom", "Atom"),
@@ -335,7 +302,7 @@ const ATOMS: [(&str, &str); 6] = [
 ];
 
 /// The declarations, those of each `rec` group one by one.
-fn members<'n>(decls: &[&'n Node]) -> impl Iterator<Item = &'n Node> {
+pub(super) fn members<'n>(decls: &[&'n Node]) -> impl Iterator<Item = &'n Node> {
     decls.iter().flat_map(|d| match d.kind {
         K::RecGroup => d
             .nodes()

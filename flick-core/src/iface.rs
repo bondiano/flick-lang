@@ -119,6 +119,10 @@ pub struct Interface {
     /// a build, so editors find a declaration in a published package.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
+    /// The exported functions that make an atom, an action or a view, which
+    /// a render must not call.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub makers: Vec<String>,
 }
 
 /// The ABI of a compiled module.
