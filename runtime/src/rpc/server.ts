@@ -14,7 +14,10 @@ type Handler = (payload: unknown) => Effect.Effect<unknown, unknown, unknown>;
 
 const isRoutePath = (path: string): path is `/${string}` => path.startsWith("/");
 
-const start = (options: ServeOptions, group: Group, handlers: Readonly<Record<string, Handler>>) =>
+/** How the server takes calls: a POST per call, or the messages of a WebSocket. */
+type Transport = "http" | "websocket";
+
+const start = (transport: Transport, options: ServeOptions, group: Group, handlers: Readonly<Record<string, Handler>>) =>
   Effect.gen(function* () {
     const context = yield* Effect.context<unknown>();
     const own: Record<string, (payload: unknown) => unknown> = {};
@@ -30,13 +33,14 @@ const start = (options: ServeOptions, group: Group, handlers: Readonly<Record<st
     const scope = yield* Scope.make();
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the checker typed each handler by its procedure
     const handled = yield* Effect.provideService(rpcs.toHandlers(own as never), Scope.Scope, scope);
-    const app = yield* RpcServer.toHttpEffect(rpcs).pipe(
+    const app = yield* (transport === "http" ? RpcServer.toHttpEffect(rpcs) : RpcServer.toHttpEffectWebsocket(rpcs)).pipe(
       Effect.provideContext(handled),
       Effect.provide(options.serialization),
       Effect.provideService(Scope.Scope, scope),
     );
     const router = yield* HttpRouter.make;
-    yield* router.add("POST", isRoutePath(options.path) ? options.path : `/${options.path}`, app);
+    const path: `/${string}` = isRoutePath(options.path) ? options.path : `/${options.path}`;
+    yield* router.add(transport === "http" ? "POST" : "GET", path, app);
     const made = yield* NodeHttpServer.make(() => nodeHttp().createServer(), { host: options.host, port: options.port }).pipe(
       Effect.provideService(Scope.Scope, scope),
       Effect.mapError((error) => serveError(error.message)),
@@ -55,7 +59,16 @@ export const rpcListen = (
   options: ServeOptions,
   group: Group,
   handlers: Readonly<Record<string, Handler>>,
-): Effect.Effect<Server, RpcError, unknown> => acquireRelease(start(options, group, handlers), (server) => Scope.close(server.scope, Exit.void));
+): Effect.Effect<Server, RpcError, unknown> =>
+  acquireRelease(start("http", options, group, handlers), (server) => Scope.close(server.scope, Exit.void));
+
+/** `Rpc.listen_websocket options group handlers`: as `listen`, each connection a WebSocket at the path. */
+export const rpcListenWebsocket = (
+  options: ServeOptions,
+  group: Group,
+  handlers: Readonly<Record<string, Handler>>,
+): Effect.Effect<Server, RpcError, unknown> =>
+  acquireRelease(start("websocket", options, group, handlers), (server) => Scope.close(server.scope, Exit.void));
 
 export const rpcPort = (server: Server): number => server.port;
 

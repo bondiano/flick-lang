@@ -68,8 +68,27 @@ type alias ServeOptions = {
 defaults : ServeOptions
 let defaults = { host = "127.0.0.1"; port = 0; path = "/rpc"; serialization = ndjson }
 
-/// How a client writes its messages: as the server does.
-type alias CallOptions = { serialization : Serialization }
+/// How a client reaches a server.
+type Transport
+
+/// A POST per call over fetch: a server of `listen`.
+http : Transport
+foreign pure http from "@flick-lang/runtime/effect/rpc/Rpc" "rpcHttp"
+  reviewed "effect@4.0.5 sha256:8da7c46726693970"
+
+/// The messages of calls over the global WebSocket: a server of
+/// `listen_websocket`. Only a program that names it bundles it.
+websocket : Transport
+foreign pure websocket from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWebsocket"
+  reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"
+
+/// How a client writes its messages, as its server does, and how it
+/// reaches the server.
+type alias CallOptions = { serialization : Serialization; transport : Transport }
+
+/// `ndjson` over `http`.
+call_defaults : CallOptions
+let call_defaults = { serialization = ndjson; transport = http }
 
 /// The server could not start.
 type error ServeError = ServeError String
@@ -143,6 +162,15 @@ foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
   retention owner
   reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"
 
+/// As `listen`, each client a WebSocket at `path` whose messages carry its
+/// calls: `ws://127.0.0.1:8080/rpc`. Every serialization streams over it.
+listen_websocket :
+  forall c s r hs. ServeOptions -> Group hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
+foreign effect listen_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenWebsocket"
+  arity 3
+  retention owner
+  reviewed "effect@4.0.5 sha256:9aaac4b7a11d7595"
+
 /// The port the server listens on: the one asked for, or the one the system
 /// chose for port 0.
 port : Server s -> Number
@@ -150,16 +178,16 @@ foreign pure port from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcPort"
   retention call
   reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"
 
-/// Calls the procedure at `url` (`http://127.0.0.1:8080/rpc`) writing as
-/// `options` says: the success, a declared error as the typed failure, or
-/// `ClientError`.
+/// Calls the procedure at `url` (`http://127.0.0.1:8080/rpc`, or
+/// `ws://…` over `websocket`) as `options` says: the success, a declared
+/// error as the typed failure, or `ClientError`.
 call_with :
   forall l p r e s. CallOptions -> String -> Rpc l (p ->{r; e} s) -> p ->{; ClientError | e} s
 foreign effect call_with from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCall"
   arity 4
   reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
 
-/// `call_with` in `ndjson`.
+/// `call_with call_defaults`.
 call : forall l p r e s. String -> Rpc l (p ->{r; e} s) -> p ->{; ClientError | e} s
 foreign effect call from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallNdjson"
   arity 3
@@ -179,10 +207,38 @@ foreign pure call_stream_with from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCall
   arity 4
   reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
 
-/// `call_stream_with` in `ndjson`.
+/// `call_stream_with call_defaults`.
 call_stream :
   forall l p r e a.
   String -> Rpc l (p ->{r; e} Stream none none a) -> p -> Stream none {ClientError | e} a
 foreign pure call_stream from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStreamNdjson"
   arity 3
+  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+
+/// A connection to a server that calls share until the scope owning region
+/// `s` closes.
+type Client (s : Region)
+
+/// Connects to the server at `url` as `options` says, as `call_with` would
+/// for one call: a WebSocket stays open, and HTTP keeps its connections
+/// alive.
+connect : forall s. CallOptions -> String ->{Scope s; ClientError} Client s
+foreign effect connect from "@flick-lang/runtime/effect/rpc/Rpc" "rpcConnect"
+  arity 2
+  reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"
+
+/// Calls the procedure over the connection.
+call_on : forall s l p r e x. Client s -> Rpc l (p ->{r; e} x) -> p ->{; ClientError | e} x
+foreign effect call_on from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallOn"
+  arity 3
+  retention call
+  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+
+/// Calls the stream procedure over the connection.
+call_stream_on :
+  forall s l p r e a.
+  Client s -> Rpc l (p ->{r; e} Stream none none a) -> p -> (Stream none {ClientError | e} a)^{s}
+foreign pure call_stream_on from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStreamOn"
+  arity 3
+  retention owner
   reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"

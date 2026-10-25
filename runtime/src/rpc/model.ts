@@ -3,6 +3,7 @@
 // Schema codecs of the JSON wire form), so they are the RPC schemas as they are.
 import { type Layer, Schema, type Scope } from "effect";
 import * as Rpc from "effect/rpc/Rpc";
+import type * as RpcClient from "effect/rpc/RpcClient";
 import * as RpcGroup from "effect/rpc/RpcGroup";
 import * as RpcSerialization from "effect/rpc/RpcSerialization";
 
@@ -50,9 +51,13 @@ export interface ServeOptions {
   readonly serialization: Serialization;
 }
 
+/** `Rpc.Transport`: the protocol of a client at a URL that writes with a serialization. */
+export type Transport = (url: string, serialization: Serialization) => Layer.Layer<RpcClient.Protocol>;
+
 /** `Rpc.CallOptions`. */
 export interface CallOptions {
   readonly serialization: Serialization;
+  readonly transport: Transport;
 }
 
 /** `Rpc.Server s`. */

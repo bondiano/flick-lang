@@ -100,7 +100,10 @@ Effect помечает `effect/reactivity` как `@stability unstable` в 4.0.
 того же значения. Сообщения пишутся в NDJSON, если `ServeOptions` и
 `call_with` / `call_stream_with` не выбирают `json`, `json_rpc`, `ndjson_rpc`
 или `binary` (бинарные кадры Effect, которые попадают в бандл, только если
-программа их называет).
+программа их называет). `listen_websocket` обслуживает ту же группу
+по WebSocket, а клиент обращается к ней с `transport = Rpc.websocket`;
+`connect` держит одно соединение, которое делят `call_on` и
+`call_stream_on`.
 
 `effect/observability` тоже нестабилен, как и `Otlp` и `Prometheus`.
 `Otlp.layer`, `traces`, `logs` и `metrics` экспортируют span'ы, записи журнала

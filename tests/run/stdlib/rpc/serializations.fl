@@ -41,7 +41,7 @@ let round_trip name serialization =
       scope s {
         let server = Rpc.listen { Rpc.defaults with serialization = serialization } group handlers
         let url = "http://127.0.0.1:" ++ show (Rpc.port server) ++ "/rpc"
-        let options = { serialization = serialization }
+        let options = { Rpc.call_defaults with serialization = serialization }
         let doubled = Rpc.call_with options url double 21
         let refused =
           try show (Rpc.call_with options url double (0 - 1)) with
