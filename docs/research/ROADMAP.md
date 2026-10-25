@@ -66,7 +66,7 @@ component search (props : SearchProps) =
 
 ## 3. Треки
 
-Нумерация: `S` — stdlib surface, `B` — бандл и выходной JS, `C` — компилятор/язык, `U` — UI-ядро, `R` — SSR, `F` — fullstack, `O` — observability, `L` — CLI. Внутри трека порядок = приоритет.
+Нумерация: `S` — stdlib surface, `B` — бандл и выходной JS, `C` — компилятор/язык, `U` — UI-ядро, `R` — SSR, `F` — fullstack, `O` — observability, `L` — CLI, `H` — хосты и бэкенды эффектов. Внутри трека порядок = приоритет.
 
 ### Трек S — снять исключения Effect-entrypoint'ов
 
@@ -270,6 +270,32 @@ component search (props : SearchProps) =
 
 **L5. `flick dev` для фронта.** ⬜ AC: решение записано: браузер — HMR модулей Vite с сохранением состояния реестра (атомы с метками C6 переживают замену); сервер — текущий перезапуск.
 
+### Трек H — хосты и бэкенды эффектов 🆕
+
+Цель: программа на Flick запускается на любом хосте (Node, браузер, Cloudflare Workers, свой), а Effect — бэкенд, который можно выключить так, что его нет в бандле.
+
+**H1. Тип `main` и чистый `main`.** ✅ `5f9281b`
+- AC: `main` — `Unit -> Unit` (вызывается без рантайма) или `Unit ->{; AppError} Unit`; другой тип, сервис в строке или ошибка не `AppError` — `FLICK-P026` при проверке, а не дефект при запуске.
+
+**H2. Runner'ы.** ✅ `bf7d437`, `8ea7afa`, `a1afb78`
+- AC: `[project] runner = "<модуль>"`; runner — Flick-модуль с `type alias Main` (тип `main`, проверяет checker, иначе `P026`) и `run`; раннер входа — `export default run(main)`.
+- AC: встроены `Runner.Node` (сигналы, код выхода), `Runner.Browser` (консоль, вход со страницы; виджеты сайта без кастов `runMain`), `Runner.Cloudflare` (`{ fetch }`, `main : Fetch ->{; AppError} ServerResponse` с запросом, привязками `var`/`binding` и `wait_until`); сторонний runner — пакет с таким модулем.
+- AC: вход `entries` может быть таблицей `{ module, runner }` со своим runner'ом; `[project] runner` — по умолчанию для остальных.
+
+**H3. `[build] effect = "none"`.** ✅ `c2cfa9b`, `64efe93`
+- AC: вызов времени выполнения — `E001`, `task`, уточнённый тип, схема и встроенный модуль без версии на `core` — `E008`; `main` — `Unit -> Unit`.
+- AC: вывод импортирует только `@flick-lang/runtime/core`, где нет ни одного импорта `effect` (тест); Option/Result — простые данные с полями Effect, привязки Prelude, List, Option, Result, String, Number, Bool сверены с Effect parity-тестами; программа `none` в `just bundle-size` — 0.4 KB gzip без `effect/dist/*`.
+- AC: библиотека на Effect пишет в `_core/` модули, которым Effect не нужен, и отмечает это в `.iface` (`abi.core`); приложение `none` импортирует их, модуль пакета без такой сборки — `E008`; библиотека, собранная только с `none`, в приложении на Effect — `P027` (её Option не Effect'овский, `==` их не сравнит).
+
+**H4. `[build] ui`.** ✅ `727e396`
+- AC: модуль вместо `@flick-lang/runtime/ui` и `ui/react` для привязок `Ui` и `Action`; относительный путь — от корня проекта.
+
+**H5. Сервисы runner'а.** ⬜
+- AC: runner объявляет сервисы, которые предоставляет сам (например, `Cloudflare.Env` вместо поля `env`), и `main` может держать их в строке; проверка `P026` вычитает их из строки.
+
+**H6. Пакеты на `core` без второй сборки.** ⬜ (исследование)
+- AC: решение записано: либо Option/Result Effect и `core` совместимы по `==` и хешу (тогда `_core/` не нужен), либо остаётся двойная сборка; замер, сколько весит `_core/` у пакетов из `examples/`.
+
 ## 4. Порядок и зависимости
 
 ```
@@ -282,6 +308,7 @@ U9 ✅ ─ U9b
 S2 ─ F1 ─ F2 ─ F3 ─ F4 ─ F5 ─ F6
 S3 ─ S4 ─ O1 ─ O2 ─ O3 ─ O4 ─ O5      (O2/O3 после C6b)
 L1 ─ L2 ─ L3 (после O1) ─ L4 ─ L5
+H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ─ H6     (H2 по входам — после L6 ✅)
 ```
 
 Вехи:
