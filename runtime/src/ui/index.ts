@@ -48,12 +48,12 @@ const domRenderer =
   };
 
 /**
- * The atoms `Ui.Server.state` wrote into the document, into `registry`.
+ * The atoms `Ui.Server.state` wrote into the document for `container`, into `registry`.
  * The script is removed, so a later root does not write them over values
  * changed since.
  */
-const hydrateState = (registry: AtomRegistry.AtomRegistry): void => {
-  const script = globalThis.document?.getElementById("flick-state");
+const hydrateState = (container: Element, registry: AtomRegistry.AtomRegistry): void => {
+  const script = container.ownerDocument.getElementById(`flick-state-${container.id}`);
   if (script === null || script === undefined) return;
   script.remove();
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Ui.Server.state` wrote these entries
@@ -74,7 +74,7 @@ export const uiMount = <R>(
     Effect.flatMap(Effect.service(RegistryService), (record) =>
       Effect.sync(() => {
         const registry = nativeRegistry(record);
-        if (registry !== undefined) hydrateState(registry);
+        if (registry !== undefined) hydrateState(container, registry);
       }),
     ),
     uiMountWith(domRenderer(container), supervisor, ui),

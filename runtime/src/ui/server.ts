@@ -23,9 +23,10 @@ export const uiServerRender = (ui: Ui): Effect.Effect<string, never, unknown> =>
  * `Ui.Server.state`: the serializable atoms of the registry, as entries of
  * `Hydration.hydrate` in a JSON script. Unlike `Hydration.dehydrate`, an
  * atom whose value does not encode is a defect naming its key, not skipped.
- * `Ui.Dom.mount` reads the script by its id `flick-state`.
+ * The script's id is `flick-state-` and the container's, so each root
+ * `Ui.Dom.mount` mounts reads its own.
  */
-export const uiServerState = (): Effect.Effect<string, never, unknown> =>
+export const uiServerState = (container: string): Effect.Effect<string, never, unknown> =>
   withRegistry((registry) => {
     const entries: Array<{ key: string; value: unknown }> = [];
     registry.getNodes().forEach((node, key) => {
@@ -41,7 +42,8 @@ export const uiServerState = (): Effect.Effect<string, never, unknown> =>
     });
     // `<` escaped, so no value closes the script
     const json = JSON.stringify(entries).replaceAll("<", "\\u003c");
-    return `<script type="application/json" id="flick-state">${json}</script>`;
+    const id = `flick-state-${container}`.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+    return `<script type="application/json" id="${id}">${json}</script>`;
   });
 
 const withRegistry = <A>(f: (registry: AtomRegistry.AtomRegistry) => A): Effect.Effect<A, never, unknown> =>

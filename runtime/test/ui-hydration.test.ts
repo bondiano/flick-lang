@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import { dom } from "./jsdom.ts";
 
-import { Effect, Fiber } from "effect";
+import { Effect, Fiber, Schema } from "effect";
 import * as Atom from "effect/reactivity/Atom";
 import { renderToString } from "react-dom/server";
 
@@ -72,3 +72,32 @@ test("hydration keeps text and focus entered before startup, then handles each e
   }
 });
 
+
+test("each root hydrates the state script of its own container into its own registry", async () => {
+  const count = Atom.serializable(Atom.make(0), { key: "count", schema: Schema.Number });
+  const view = uiView(() =>
+    Effect.map(Effect.flatMap(Effect.service(ReadService), (read) => read.get(count)), (n) => uiText(`count ${String(n)}`)),
+  );
+  const roots = ["first", "second"].map((id, n) => {
+    const root = container();
+    root.id = id;
+    root.setAttribute("data-flick-ssr", "");
+    root.innerHTML = `count ${String(n + 1)}`;
+    root.insertAdjacentHTML(
+      "afterend",
+      `<script type="application/json" id="flick-state-${id}">[{"key":"count","value":${String(n + 1)}}]</script>`,
+    );
+    return root;
+  });
+  const fibers = roots.map((root) =>
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the layer provides the root's one service
+    Effect.runFork(Effect.provide(uiMount(root, () => Effect.void, uiRender(view, undefined)), flickLayer(RegistryService)) as Effect.Effect<never, unknown>),
+  );
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(roots.map((root) => root.textContent), ["count 1", "count 2"]);
+    assert.equal(dom.window.document.querySelector('script[type="application/json"]'), null);
+  } finally {
+    await Effect.runPromise(Fiber.interruptAll(fibers));
+  }
+});

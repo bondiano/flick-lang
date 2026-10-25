@@ -1,4 +1,4 @@
-<script type="application/json" id="flick-state">[{"key":"App.Main.count","value":5},{"key":"App.Main.greeting","value":"\u003c/script> hi"}]</script>
+<script type="application/json" id="flick-state-app">[{"key":"App.Main.count","value":5},{"key":"App.Main.greeting","value":"\u003c/script> hi"}]</script>
 </script> hi 5+1
 state left: false
 </script> hi 6+1

@@ -59,7 +59,7 @@ let main () =
       Atom.set count 5
       Atom.set greeting "</script> hi"
       let markup = Ui.Server.render (Ui.render page ())
-      (markup, Ui.Server.state ())
+      (markup, Ui.Server.state "app")
     }
   Platform.stdout_line state
   serve markup state

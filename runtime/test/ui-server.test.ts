@@ -44,7 +44,7 @@ test("the state script holds each serializable atom of the registry, and one tha
         const registry = yield* Effect.service(RegistryService);
         yield* registry.set(count)(n);
         yield* registry.set(whole)(n);
-        return yield* uiServerState();
+        return yield* uiServerState("app");
       }),
       flickLayer(RegistryService),
     );
@@ -54,7 +54,7 @@ test("the state script holds each serializable atom of the registry, and one tha
   assert.ok(Exit.isSuccess(kept));
   assert.equal(
     kept.value,
-    '<script type="application/json" id="flick-state">[{"key":"count","value":2},{"key":"whole","value":2}]</script>',
+    '<script type="application/json" id="flick-state-app">[{"key":"count","value":2},{"key":"whole","value":2}]</script>',
   );
   const refused = await run(1.5);
   assert.ok(Exit.isFailure(refused));

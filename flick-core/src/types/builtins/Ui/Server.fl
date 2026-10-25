@@ -12,10 +12,11 @@ foreign effect render from "@flick-lang/runtime/ui/server" "uiServerRender"
   retention call
 
 /// The serializable atoms of the registry as a JSON
-/// `<script type="application/json" id="flick-state">` to put in the page
-/// after rendering it: `Ui.Dom.mount` writes them into its registry before
-/// its first render, so the client starts from the server's values. An
-/// atom whose value its codec does not encode is a defect naming its key.
-state : Unit ->{Reactivity.Atom.Registry; none} String
+/// `<script type="application/json" id="flick-state-…">` for the container
+/// with this id, to put in the page after rendering it: `Ui.Dom.mount` on
+/// that container writes them into its registry before its first render,
+/// so the client starts from the server's values. An atom whose value its
+/// codec does not encode is a defect naming its key.
+state : String ->{Reactivity.Atom.Registry; none} String
 foreign effect state from "@flick-lang/runtime/ui/server" "uiServerState"
-  arity 0
+  arity 1

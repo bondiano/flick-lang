@@ -302,13 +302,14 @@ draft : String -> Atom.Writable String
 let draft = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.make "")
 ```
 
-The server hands them over with `Ui.Server.state ()`: a
-`<script type="application/json" id="flick-state">` with the registry's
-serializable atoms, to put in the page after the container once it is
-rendered. `Ui.Dom.mount` writes them into its registry before its first
-render and removes the script, so the client starts from the server's
-values rather than asking for them again, and a later root does not write
-them over values changed since. An atom whose value its codec does not
+The server hands them over with `Ui.Server.state "app"`: a
+`<script type="application/json" id="flick-state-app">` with the
+registry's serializable atoms for the container `app`, to put in the page
+once the container is rendered. `Ui.Dom.mount` on that container writes
+them into its registry before its first render and removes the script, so
+the client starts from the server's values rather than asking for them
+again, and mounting it again does not write them over values changed
+since. Each root of a page reads only the script of its own container. An atom whose value its codec does not
 encode is a defect naming its key, not a value silently left out.
 
 ```flick
@@ -317,7 +318,7 @@ let page n =
   provide Reactivity.Atom.layer {
     Atom.set count n
     let markup = Ui.Server.render (Ui.render counter_view ())
-    "<div id=\"app\" data-flick-ssr>" ++ markup ++ "</div>" ++ Ui.Server.state ()
+    "<div id=\"app\" data-flick-ssr>" ++ markup ++ "</div>" ++ Ui.Server.state "app"
   }
 ```
 
