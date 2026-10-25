@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { dom } from "./jsdom.ts";
+import { gated, get } from "./ui-helpers.ts";
 
 import { Effect, Fiber, Option } from "effect";
 import * as Atom from "effect/reactivity/Atom";
@@ -9,7 +10,7 @@ import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 
-import { type Renderer, type Ui, eventLatest, uiField, uiFieldArea, uiRunWith } from "../src/ui/react/index.ts";
+import { type Renderer, type Ui, eventLatest, eventQueue, uiField, uiFieldArea, uiRender, uiRunWith, uiView } from "../src/ui/react/index.ts";
 
 const tick = (ms = 5): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -106,3 +107,97 @@ test("`on_input` runs as a task after the state has the text", async () => {
   assert.deepEqual(seen, ["fl/fl"]);
   await stop();
 });
+
+for (const [tag, field] of [["input", uiField], ["textarea", uiFieldArea]] as const) {
+  test(`${tag} toggles its input handler without remounting or retaining removed events`, async () => {
+    const registry = AtomRegistry.make();
+    const query = Atom.make("abc");
+    const enabled = Atom.make(false);
+    const log: Array<string> = [];
+    const { run, release } = gated(log);
+    let calls = 0;
+    const handler = eventQueue(1, () => run(++calls));
+    const view = uiView(() =>
+      Effect.map(get(enabled), (active) =>
+        field({ bind: query, placeholder: "", on_input: active ? Option.some(handler) : Option.none() }),
+      ),
+    );
+    const { container, stop } = mount(uiRender(view, undefined), registry);
+    try {
+      await tick();
+      const node = container.querySelector(tag);
+      assert.ok(node instanceof dom.window.HTMLInputElement || node instanceof dom.window.HTMLTextAreaElement);
+      node.focus();
+      type(node, "axbc", 2);
+      assert.equal(registry.get(query), "axbc");
+      assert.deepEqual(log, []);
+
+      flushSync(() => registry.set(enabled, true));
+      assert.equal(container.querySelector(tag), node);
+      assert.equal(dom.window.document.activeElement, node);
+      assert.equal(node.selectionStart, 2);
+      type(node, "axybc", 3);
+      type(node, "axyzbc", 4);
+      await tick();
+      assert.deepEqual(log, ["start 1"]);
+
+      node.dispatchEvent(new dom.window.CompositionEvent("compositionstart", { bubbles: true }));
+      flushSync(() => registry.set(enabled, false));
+      assert.equal(container.querySelector(tag), node);
+      assert.equal(dom.window.document.activeElement, node);
+      assert.equal(node.selectionStart, 4);
+      type(node, "か", 1);
+      node.dispatchEvent(new dom.window.CompositionEvent("compositionend", { bubbles: true, data: "か" }));
+      type(node, "かな", 2);
+      assert.equal(registry.get(query), "かな");
+      assert.equal(node.selectionStart, 2);
+      release();
+      await tick();
+      assert.deepEqual(log, ["start 1", "end 1"], "removing the listener drops its queued event");
+
+      flushSync(() => registry.set(enabled, true));
+      assert.equal(container.querySelector(tag), node);
+      assert.equal(node.selectionStart, 2);
+      type(node, "かなた", 3);
+      await tick();
+      assert.deepEqual(log, ["start 1", "end 1", "start 2"]);
+      assert.equal(registry.get(query), "かなた");
+      assert.equal(node.selectionStart, 3);
+    } finally {
+      await stop();
+    }
+  });
+
+  test(`${tag} preserves its input policy while replacing a present handler`, async () => {
+    const registry = AtomRegistry.make();
+    const query = Atom.make("");
+    const revision = Atom.make(0);
+    const log: Array<string> = [];
+    const { run, release } = gated(log);
+    const view = uiView(() =>
+      Effect.map(get(revision), (current) =>
+        field({ bind: query, placeholder: "", on_input: Option.some(eventQueue(1, () => run(current))) }),
+      ),
+    );
+    const { container, stop } = mount(uiRender(view, undefined), registry);
+    try {
+      await tick();
+      const node = container.querySelector(tag);
+      assert.ok(node instanceof dom.window.HTMLInputElement || node instanceof dom.window.HTMLTextAreaElement);
+      type(node, "a", 1);
+      flushSync(() => registry.set(revision, 1));
+      assert.equal(container.querySelector(tag), node);
+      assert.equal(node.selectionStart, 1);
+      type(node, "ab", 2);
+      await tick();
+      assert.deepEqual(log, ["start 0"], "the replacement waits behind the already running task");
+      release();
+      await tick();
+      assert.deepEqual(log, ["start 0", "end 0", "start 1"], "the next event uses the new handler");
+      assert.equal(container.querySelector(tag), node);
+      assert.equal(node.selectionStart, 2);
+    } finally {
+      await stop();
+    }
+  });
+}

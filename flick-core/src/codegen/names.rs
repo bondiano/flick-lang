@@ -85,9 +85,14 @@ pub fn is_global(name: &str) -> bool {
     RESERVED.contains(&name) || GLOBALS.contains(&name)
 }
 
-/// The namespace a module's exports are imported under in release.
-pub fn module_alias(module: &str) -> String {
-    format!("$m_{}", module.replace('.', "_"))
+/// A module namespace: `$` cannot occur in a Flick module name.
+pub fn module_alias(module: &str, namespace: char) -> String {
+    let mut alias = String::with_capacity(module.len() + 3);
+    alias.push('$');
+    alias.push(namespace);
+    alias.push('_');
+    alias.extend(module.chars().map(|c| if c == '.' { '$' } else { c }));
+    alias
 }
 
 /// The dictionary of an instance, by the head it is named by: `$i_Show_Number`

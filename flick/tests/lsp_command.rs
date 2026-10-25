@@ -3,6 +3,8 @@
 //! completion, rename, formatting, and a stdout of protocol only.
 
 mod common;
+#[path = "lsp_command/isolation.rs"]
+mod isolation;
 mod lsp_editor;
 
 use std::fmt::Write as _;
@@ -101,15 +103,31 @@ impl Lsp {
     }
 
     fn request(&mut self, method: &str, params: &Value) -> Value {
+        self.request_with_notifications(method, params).0
+    }
+
+    fn request_with_notifications(&mut self, method: &str, params: &Value) -> (Value, Vec<Value>) {
         self.next += 1;
         let id = self.next;
         self.send(&json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params }));
+        let mut notifications = Vec::new();
         loop {
             let message = self.receive();
             if message["id"] == json!(id) {
-                return message;
+                return (message, notifications);
             }
+            notifications.push(message);
         }
+    }
+
+    /// A request is a barrier for all notifications sent before it.
+    fn publications(&mut self) -> Vec<Value> {
+        self.request_with_notifications("workspace/symbol", &json!({}))
+            .1
+            .into_iter()
+            .filter(|m| m["method"] == "textDocument/publishDiagnostics")
+            .map(|m| m["params"].clone())
+            .collect()
     }
 
     /// The diagnostics published for `uri` next.

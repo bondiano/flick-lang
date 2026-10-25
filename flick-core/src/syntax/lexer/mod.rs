@@ -132,10 +132,14 @@ impl Lexer<'_> {
                     K::Underscore
                 } else if b.is_ascii_uppercase() {
                     K::Con
-                } else if self.member_name(start) {
-                    K::Ident
+                } else if let Some(kind) = keyword(text) {
+                    if self.member_name(start) {
+                        K::Ident
+                    } else {
+                        kind
+                    }
                 } else {
-                    keyword(text).unwrap_or(K::Ident)
+                    K::Ident
                 }
             }
             _ => {

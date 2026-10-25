@@ -5,6 +5,7 @@
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface::Interface;
 use crate::ir::{self, ItemKind};
+use crate::project::PackageModule;
 use crate::project::config::Backend;
 use crate::types::NO_EFFECTS;
 
@@ -110,11 +111,17 @@ pub fn importable(interface: &Interface, backend: Backend) -> bool {
 /// import: one without a build without Effect, or, on Effect, one built only
 /// without it, whose Option and Result are not Effect's.
 pub fn check_packages(
-    packages: &[(String, String, Interface, String)],
+    package_modules: &[PackageModule],
     backend: Backend,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    for (module, package, interface, _) in packages {
+    for PackageModule {
+        module,
+        package,
+        interface,
+        ..
+    } in package_modules
+    {
         if importable(interface, backend) {
             continue;
         }

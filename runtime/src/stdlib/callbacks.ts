@@ -1,7 +1,7 @@
 // Callbacks JS calls that run Flick tasks: Promise callbacks and scoped
 // event listeners. Both belong to an owner: they run its children with the
 // services of where they were made, and stop with it.
-import { Cause, type Context, Effect, Exit, Fiber, Result } from "effect";
+import { Cause, type Context, Effect, Exit, type Fiber, Result } from "effect";
 
 import { Failure, describeCause } from "../cause.ts";
 import { applyRuntime } from "../effects.ts";
@@ -166,6 +166,7 @@ export const promiseFacade =
   (fn: unknown, arity: number) =>
   (...args: ReadonlyArray<unknown>): Promise<Result.Result<unknown, unknown>> => {
     const signal = signalOf(args[arity]);
+    if (signal?.aborted === true) return Promise.reject(new RuntimeFailure(Cause.interrupt()));
     const run = withOwner(() =>
       Effect.suspend(
         () =>
@@ -173,8 +174,7 @@ export const promiseFacade =
           applyRuntime(fn, args.slice(0, arity)) as Effect.Effect<unknown, unknown>,
       ),
     );
-    const fiber = Effect.runFork(run);
-    signal?.addEventListener("abort", () => Effect.runFork(Fiber.interrupt(fiber)), { once: true });
+    const fiber = Effect.runFork(run, { signal });
     return new Promise((resolve, reject) =>
       fiber.addObserver((exit) => {
         if (Exit.isSuccess(exit)) return resolve(Result.succeed(exit.value));

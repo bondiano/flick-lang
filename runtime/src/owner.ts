@@ -54,17 +54,19 @@ const settle = async (owner: Owner): Promise<void> => {
 export const close = <A, E>(owner: Owner, exit: Exit.Exit<A, E>): Effect.Effect<Exit.Exit<A, unknown>> =>
   Effect.gen(function* () {
     owner.open = false;
-    for (const hook of owner.closing) yield* Effect.exit(hook());
+    let cause: Cause.Cause<unknown> = Exit.isFailure(exit) ? exit.cause : Cause.empty;
+    for (const hook of owner.closing) {
+      const closed = yield* Effect.exit(Effect.suspend(hook));
+      if (Exit.isFailure(closed)) cause = Cause.combine(cause, closed.cause);
+    }
     yield* Fiber.interruptAll([...owner.children]);
     for (let next = first(owner.watchers); next !== undefined; next = first(owner.watchers)) {
       yield* Fiber.await(next);
     }
     yield* Effect.promise(() => settle(owner));
     const closed = yield* Effect.exit(Scope.close(owner.resources, exit));
-    if (Exit.isSuccess(closed)) return exit;
-    return Exit.isSuccess(exit)
-      ? Exit.failCause(closed.cause)
-      : Exit.failCause(Cause.combine(exit.cause, closed.cause));
+    if (Exit.isFailure(closed)) cause = Cause.combine(cause, closed.cause);
+    return cause.reasons.length === 0 ? exit : Exit.failCause(cause);
   });
 
 const first = <A>(set: ReadonlySet<A>): A | undefined => set.values().next().value;

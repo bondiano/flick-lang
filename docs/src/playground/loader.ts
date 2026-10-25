@@ -81,7 +81,7 @@ export const link = (files: Files, entry: string, url: (code: string) => string)
     const code = files[path];
     if (code === undefined) throw new Error(`the build has no ${path}`);
     const rewritten = code
-      .replace(/\/\/# sourceMappingURL=.*$/gm, "")
+      .replace(/^[ \t]*\/\/# sourceMappingURL=.*$/gm, "")
       .replace(SPECIFIER, (_, head: string, spec: string) => {
         const target = isRelative(spec) ? visit(resolve(path, spec)) : packageUrl(spec);
         return `${head}${JSON.stringify(target)}`;

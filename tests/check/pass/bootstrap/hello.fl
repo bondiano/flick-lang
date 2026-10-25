@@ -1,4 +1,4 @@
-// Every statement form the bootstrap front-end accepts.
+// Entry calls and string escapes supported by the full compiler.
 module App.Main exposing (main)
 
 main : Unit ->{; AppError} Unit

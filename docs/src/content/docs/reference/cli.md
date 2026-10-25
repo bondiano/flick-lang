@@ -16,6 +16,7 @@ and `--help`; `flick help <command>` prints a command's help and
 | `init [--template app\|lib]` | the same files in the working directory; every file that exists is reported before anything is written (`FLICK-P019`) |
 | `check [paths] [--watch] [--fix]` | checks; without paths the source and test roots; `--fix` applies the fixes that keep the program's meaning (such as removing a type annotation the value already has, `FLICK-T021`) to those files and reports what is left |
 | `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts] [--emit-dts] [--schema-aot] [--out-dir] [--watch]` | writes ESM, source maps and `.iface` files |
+| `build [paths] --inputs` | prints a conservative JSON input inventory (`key`, `files`, `roots`, `modules`) without writing build artifacts or cache entries |
 | `run [name] [--entry M] [--profile] -- args` | builds JavaScript and runs the `main` of the entry `name` (the only one when left out) |
 | `dev [name] [--entry M] [--profile] -- args` | rebuilds on changes and replaces the running app |
 | `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile]` | runs the tests of the test root |
@@ -42,24 +43,30 @@ module that makes the codec, whose top level is pure, and nothing else.
 ## Outputs and the cache
 
 A build writes into `build.out-dir` (or `--out-dir`) and records the files
-it wrote in `.flick/artifacts.json`. `clean` removes exactly those files and
-directories they leave empty: other files in a shared output directory
-stay.
+it wrote in `.flick/artifacts.json`. After successful publication, obsolete
+manifest-owned files are removed, including after an emit-mode change or a
+cache hit. `clean` removes the remaining owned files and empty directories;
+other files in a shared output directory stay.
 
 The cache in `.flick/cache/` keeps the artifacts of each build by a key over
-the sources of the project, its effective configuration, the profile, emit
+the normalized selected roots separately from the available sources of the
+project, its effective configuration, the profile, emit
 and output settings, the compiler (version and binary), the installed
 runtime and Effect, `package.json`, `pnpm-lock.yaml` and the manifests and
 interfaces of the installed dependencies. Any change of these is a miss; a
 hit writes exactly the files the build would.
 
+Watch commands compare individual paths and their state, including file
+creation and deletion; one unrelated timestamp cannot hide another edit.
+
 ## Running and replacing an app
 
 `run` and `dev` always build JavaScript, whatever `emit` says. Each build
-goes into a generation `.flick/run/<n>/`, never written again once its
-process starts, so a late `import()` sees the files it started with. A
-generation holds a lock while its process runs and is removed after it
-ends; `clean` keeps locked generations.
+goes into an atomically reserved generation `.flick/run/<pid>-<n>/`, never
+written again once its process starts, so a late `import()` sees the files
+it started with. The CLI owns the generation from construction through
+shutdown; `clean` preserves live construction reservations and running
+children. The generation is removed after shutdown.
 
 `dev` builds the next version while the current one runs. A failed build
 leaves the current version running. A successful one first stops the

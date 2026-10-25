@@ -40,16 +40,19 @@ let surface request resolved file =
                 [("fingerprint", JString e.fingerprint)],
               ]))
         (Shape.exports checker module_)
-    let id = Ts.resolved_package resolved
+    let package_id = Ts.resolved_package resolved
     let declarations =
-      match id with
+      match package_id with
       | Some p -> p.name ++ "/" ++ p.subModuleName
       | None -> Path.basename file
     JsonText.render
       (JObject
         [
-          ("package", JString (Option.with_default request.name (Option.map (fun p -> p.name) id))),
-          ("version", Option.with_default JNull (Option.map (fun p -> JString p.version) id)),
+          ("package", JString request.name),
+          (
+            "version",
+            Option.with_default JNull (Option.map (fun p -> JString p.version) package_id),
+          ),
           ("declarations", JString declarations),
           ("exports", JArray exports),
         ])

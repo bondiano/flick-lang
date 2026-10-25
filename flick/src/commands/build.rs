@@ -55,6 +55,9 @@ impl Command for BuildCommand {
                 };
             }
         };
+        if self.options.inputs {
+            return super::inputs::describe(&host, sources, project.as_ref(), &roots);
+        }
         if let Some(problem) = project
             .as_ref()
             .and_then(|p| toolchain::check_runtime(&p.root))
@@ -96,17 +99,16 @@ impl Command for BuildCommand {
                 }
             }
         };
-        let output = self.output(&host, project.as_ref(), entries);
-        let (problems, artifacts) = emit(&host, &sources, project.as_ref(), &compilation, &output);
-        let clean = diagnostics.is_empty() && problems.is_empty();
-        diagnostics.extend(problems);
-        if let Some(p) = &project {
-            if clean && !output.extras.schema_aot {
-                cache::store(&p.root, &self.key(p, &roots, &output), &artifacts);
-            }
-            if !self.generation {
-                cache::record(&p.root, &output.out_dir, &artifacts);
-            }
+        let output = self.plan(&host, project.as_ref(), entries);
+        let mut emitted = artifacts(&host, &sources, project.as_ref(), &compilation, &output);
+        self.publish(project.as_ref(), &output, &mut emitted);
+        let clean = diagnostics.is_empty() && emitted.diagnostics.is_empty();
+        diagnostics.extend(emitted.diagnostics);
+        if let Some(p) = &project
+            && clean
+            && !output.extras.schema_aot
+        {
+            cache::store(&p.root, &self.key(p, &roots, &output), &emitted.artifacts);
         }
         Outcome {
             sources,
@@ -143,12 +145,12 @@ impl BuildCommand {
     }
 
     /// What the build writes where.
-    fn output(
+    fn plan(
         &self,
         host: &FsHost,
         project: Option<&Project>,
         entries: Vec<(String, String)>,
-    ) -> Output {
+    ) -> BuildPlan {
         let out_dir = match (&self.options.out_dir, project) {
             (Some(dir), _) => host.cwd.join(dir),
             (None, Some(p)) => p.root.join(&p.config.build.out_dir),
@@ -160,7 +162,7 @@ impl BuildCommand {
             (None, None) => false,
         };
         let config = project.map(|p| &p.config.build);
-        Output {
+        BuildPlan {
             out_dir: project::normalize(&out_dir),
             entries,
             typescript,
@@ -180,7 +182,7 @@ impl BuildCommand {
         }
     }
 
-    fn key(&self, project: &Project, roots: &[PathBuf], output: &Output) -> String {
+    fn key(&self, project: &Project, roots: &[PathBuf], output: &BuildPlan) -> String {
         // generations sit at one depth, so their artifacts are the same
         let out_dir = if self.generation {
             project.root.join(".flick/run/*")
@@ -206,25 +208,52 @@ impl BuildCommand {
         roots: &[PathBuf],
         host: &FsHost,
     ) -> Option<Vec<Diagnostic>> {
-        let output = self.output(host, Some(project), self.entries(project));
+        let output = self.plan(host, Some(project), self.entries(project));
         if output.extras.schema_aot {
             return None;
         }
         let artifacts = cache::load(&project.root, &self.key(project, roots, &output))?;
-        for artifact in &artifacts {
-            let path = output.out_dir.join(&artifact.path);
-            if let Err(err) = write(&path, &artifact.contents) {
-                return Some(vec![Diagnostic::new(
-                    codes::P013,
-                    Severity::Error,
-                    format!("cannot write `{}`: {err}", path.display()),
-                )]);
-            }
+        let mut emitted = Emission {
+            artifacts,
+            diagnostics: Vec::new(),
+        };
+        self.publish(Some(project), &output, &mut emitted);
+        Some(emitted.diagnostics)
+    }
+
+    /// Cache hits and fresh builds have the same publication and ownership policy.
+    fn publish(&self, project: Option<&Project>, output: &BuildPlan, emitted: &mut Emission) {
+        write_artifacts(output, emitted);
+        if self.generation
+            || emitted
+                .diagnostics
+                .iter()
+                .any(|d| d.severity == Severity::Error)
+        {
+            return;
         }
-        if !self.generation {
-            cache::record(&project.root, &output.out_dir, &artifacts);
+        let Some(project) = project else {
+            return;
+        };
+        let mut paths: Vec<String> = emitted.artifacts.iter().map(|a| a.path.clone()).collect();
+        if output.extras.schema_aot {
+            paths.extend(
+                output
+                    .entries
+                    .iter()
+                    .map(|(name, _)| build::schema_aot_file(name)),
+            );
         }
-        Some(Vec::new())
+        if let Err(err) = cache::record(&project.root, &output.out_dir, paths) {
+            emitted.diagnostics.push(Diagnostic::new(
+                codes::P013,
+                Severity::Error,
+                format!(
+                    "cannot record artifacts in `{}`: {err}",
+                    output.out_dir.display()
+                ),
+            ));
+        }
     }
 }
 
@@ -237,13 +266,19 @@ pub fn release(profile: Option<ProfileArgument>, config: Option<&Build>) -> bool
 }
 
 /// Where and what a build writes.
-pub struct Output {
+pub struct BuildPlan {
     pub out_dir: PathBuf,
     /// The entries a runner is written for, by name and module.
     pub entries: Vec<(String, String)>,
     pub typescript: bool,
     pub extras: Extras,
     pub release: bool,
+}
+
+/// Native emission keeps diagnostics and artifacts in named fields.
+pub struct Emission {
+    pub artifacts: Vec<Artifact>,
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 /// Writes the build of `compilation`; what could not be written or has no
@@ -253,25 +288,34 @@ pub fn emit(
     sources: &SourceMap,
     project: Option<&Project>,
     compilation: &Compilation,
-    output: &Output,
-) -> (Vec<Diagnostic>, Vec<Artifact>) {
-    let out_dir = output.out_dir.as_path();
-    let (artifacts, mut diagnostics) = artifacts(host, sources, project, compilation, output);
-    if diagnostics.iter().any(|d| d.severity == Severity::Error) {
-        return (diagnostics, Vec::new());
+    output: &BuildPlan,
+) -> Emission {
+    let mut emitted = artifacts(host, sources, project, compilation, output);
+    write_artifacts(output, &mut emitted);
+    emitted
+}
+
+fn write_artifacts(output: &BuildPlan, emitted: &mut Emission) {
+    if emitted
+        .diagnostics
+        .iter()
+        .any(|d| d.severity == Severity::Error)
+    {
+        return;
     }
-    for artifact in &artifacts {
+    let out_dir = output.out_dir.as_path();
+    for artifact in &emitted.artifacts {
         let path = out_dir.join(&artifact.path);
         if let Err(err) = write(&path, &artifact.contents) {
-            diagnostics.push(Diagnostic::new(
+            emitted.diagnostics.push(Diagnostic::new(
                 codes::P013,
                 Severity::Error,
                 format!("cannot write `{}`: {err}", path.display()),
             ));
-            break;
+            return;
         }
     }
-    let aot = if output.extras.schema_aot && diagnostics.is_empty() {
+    let aot = if output.extras.schema_aot {
         output.entries.as_slice()
     } else {
         &[]
@@ -281,7 +325,7 @@ pub fn emit(
         let module = out_dir.join(format!("{}.{ext}", entry.replace('.', "/")));
         let file = build::schema_aot_file(name);
         if let Err(reason) = compile_schemas(out_dir, &module, &file) {
-            diagnostics.push(Diagnostic::new(
+            emitted.diagnostics.push(Diagnostic::new(
                 codes::P013,
                 Severity::Error,
                 format!("cannot write the compiled decoders `{file}`: {reason}"),
@@ -289,7 +333,6 @@ pub fn emit(
             break;
         }
     }
-    (diagnostics, artifacts)
 }
 
 /// Loads the app's modules on Node and writes the compiled decoders of the
@@ -323,8 +366,8 @@ pub fn artifacts(
     sources: &SourceMap,
     project: Option<&Project>,
     compilation: &Compilation,
-    output: &Output,
-) -> (Vec<Artifact>, Vec<Diagnostic>) {
+    output: &BuildPlan,
+) -> Emission {
     let out_dir = output.out_dir.as_path();
     let modules = &compilation.modules;
     let package = project.and_then(|p| project::project_name(host, &p.root));
@@ -374,7 +417,11 @@ pub fn artifacts(
     // a library on Effect is also built without it, for applications with `effect = "none"`
     let library = project.is_some_and(|p| p.config.kind == Kind::Lib) && backend == Backend::Effect;
     if !library {
-        return build::emit(compilation, sources, &settings);
+        let (artifacts, diagnostics) = build::emit(compilation, sources, &settings);
+        return Emission {
+            artifacts,
+            diagnostics,
+        };
     }
     let core_dir = out_dir.join(build::effects::CORE_DIR);
     let (core, _) = build::emit(
@@ -404,5 +451,8 @@ pub fn artifacts(
         path: format!("{}{}", build::effects::CORE_DIR, a.path),
         contents: a.contents,
     }));
-    (artifacts, diagnostics)
+    Emission {
+        artifacts,
+        diagnostics,
+    }
 }

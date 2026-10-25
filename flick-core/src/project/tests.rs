@@ -288,3 +288,43 @@ fn a_runner_gives_the_type_of_main() {
         );
     }
 }
+
+#[test]
+fn a_package_dependency_still_conflicts_with_a_later_local_import() {
+    use crate::iface::{self, Interface};
+
+    let core = Interface {
+        module: "Core".into(),
+        ..Interface::default()
+    };
+    let api = Interface {
+        module: "Api".into(),
+        dependencies: BTreeMap::from([("Core".into(), iface::fingerprint(&core))]),
+        ..Interface::default()
+    };
+    let host = memory(&[
+        ("flick.toml", LIB),
+        ("package.json", r#"{"dependencies":{"lib":"1"}}"#),
+        (
+            "node_modules/lib/package.json",
+            r#"{"flick":{"iface-dir":"iface"}}"#,
+        ),
+        ("node_modules/lib/iface/Api.iface", &iface::write(&api)),
+        ("node_modules/lib/iface/Core.iface", &iface::write(&core)),
+        (
+            "src/Core.fl",
+            "module Core exposing (answer)\nanswer : Number\nlet answer = 1\n",
+        ),
+        (
+            "src/Main.fl",
+            "module Main exposing (answer)\nimport Api\nimport Core\nanswer : Number\nlet answer = 1\n",
+        ),
+    ]);
+    let diagnostics = run(&host, &["src/Main.fl"]);
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.starts_with("FLICK-R002") && d.contains("package `lib`")),
+        "{diagnostics:?}",
+    );
+}

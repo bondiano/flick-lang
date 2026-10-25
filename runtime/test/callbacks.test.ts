@@ -1,19 +1,23 @@
 import assert from "node:assert/strict";
+import { getEventListeners } from "node:events";
 import { test } from "node:test";
 
-import { Effect, Exit, Fiber, Layer } from "effect";
+import { Cause, Effect, Exit, Fiber, Layer, Result } from "effect";
 
 import {
   RuntimeFailure,
+  acquireRelease,
   eventsAttach,
   eventsListen,
   eventsQueue,
   foreignAsync,
   promiseCallback,
+  promiseFacade,
   provide,
   scope,
   service,
 } from "../src/index.ts";
+import { causeOf, errorsOf } from "./support.ts";
 
 interface Greeter {
   readonly greet: (name: string) => Effect.Effect<string>;
@@ -163,3 +167,94 @@ test("a listener called from its own handler queues the event instead of nesting
   );
   assert.deepEqual(log, ["source returned", "start 1", "end 1", "start 2", "end 2"]);
 });
+
+test("a pre-aborted Promise facade runs neither the function nor its effects", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let calls = 0;
+  let effects = 0;
+  const call = promiseFacade(() => {
+    calls++;
+    return Effect.sync(() => ++effects);
+  }, 1);
+  await assert.rejects(call(undefined, { signal: controller.signal }), RuntimeFailure);
+  assert.equal(calls, 0);
+  assert.equal(effects, 0);
+  assert.equal(getEventListeners(controller.signal, "abort").length, 0);
+});
+
+test("completed Promise facades dispose listeners on a reused AbortSignal", async () => {
+  const controller = new AbortController();
+  const call = promiseFacade(() => Effect.andThen(Effect.yieldNow, Effect.succeed("ready")), 1);
+  for (let i = 0; i < 3; i++) {
+    const pending = call(undefined, { signal: controller.signal });
+    assert.equal(getEventListeners(controller.signal, "abort").length, 1);
+    // oxlint-disable-next-line no-await-in-loop -- each completed call must release the signal before its reuse
+    assert.deepEqual(await pending, Result.succeed("ready"));
+    assert.equal(getEventListeners(controller.signal, "abort").length, 0);
+  }
+});
+
+test("an aborted Promise facade rejects only after resource cleanup", { timeout: 1000 }, async () => {
+  const controller = new AbortController();
+  const started = Promise.withResolvers<void>();
+  const closing = Promise.withResolvers<void>();
+  const released = Promise.withResolvers<void>();
+  const log: Array<string> = [];
+  const call = promiseFacade(
+    () =>
+      Effect.gen(function* () {
+        yield* acquireRelease(Effect.void, () =>
+          Effect.gen(function* () {
+            log.push("cleanup started");
+            closing.resolve();
+            yield* Effect.promise(() => released.promise);
+            log.push("cleanup ended");
+          }),
+        );
+        started.resolve();
+        yield* Effect.never;
+      }),
+    1,
+  );
+  const rejected = assert.rejects(call(undefined, { signal: controller.signal }), RuntimeFailure).then(() => {
+    log.push("rejected");
+  });
+  try {
+    await started.promise;
+    controller.abort();
+    await closing.promise;
+    assert.deepEqual(log, ["cleanup started"]);
+  } finally {
+    released.resolve();
+    await rejected;
+  }
+  assert.deepEqual(log, ["cleanup started", "cleanup ended", "rejected"]);
+  assert.equal(getEventListeners(controller.signal, "abort").length, 0);
+});
+
+for (const bodyFails of [false, true]) {
+  test(`all detach failures survive a ${bodyFails ? "failed" : "successful"} body and resource cleanup`, async () => {
+    const log: Array<string> = [];
+    const failures = [new Error("detach failed"), new Error("next detach failed")];
+    const exit = await Effect.runPromiseExit(
+      scope((owner) =>
+        Effect.gen(function* () {
+          yield* acquireRelease(Effect.void, () => Effect.sync(() => log.push("released")));
+          const listener = yield* eventsListen(owner, eventsQueue(1), () => Effect.void, () => Effect.void);
+          for (const failure of failures) {
+            yield* eventsAttach(
+              listener,
+              () => Effect.void,
+              () => Effect.andThen(Effect.sync(() => log.push(failure.message)), Effect.die(failure)),
+            );
+          }
+          if (bodyFails) yield* Effect.fail("body failed");
+        }),
+      ),
+    );
+    assert.deepEqual(log, ["detach failed", "next detach failed", "released"]);
+    assert.deepEqual(causeOf(exit).reasons.filter(Cause.isDieReason).map((reason) => reason.defect), failures);
+    assert.deepEqual(errorsOf(exit), bodyFails ? ["body failed"] : []);
+  });
+}

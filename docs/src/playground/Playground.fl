@@ -20,8 +20,8 @@ let main () =
     let app = Ui.render (Ui.view (fun () -> view model (Atom.value model))) ()
     provide Atom.layer {
       ignore (parallel
-        (task { ignore (Ui.Dom.mount root (report model) app) })
+        (task { Ui.Dom.mount root (report model) app })
         (task {
-          ignore (parallel (task { load_compiler model }) (task { prepare_highlighting model }))
+          parallel (task { load_compiler model }) (task { prepare_highlighting model })
         }))
     }

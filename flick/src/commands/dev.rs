@@ -5,25 +5,24 @@
 //! finalizers) and starts the new one only after that shutdown ends; a
 //! shutdown that fails stops the restarts, and its cause stays on stderr.
 
-use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::atomic::Ordering;
+use std::thread;
 use std::time::Duration;
-use std::{fs, thread};
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::source::SourceMap;
 use signal_hook::consts::SIGTERM;
 
-use super::run::{build_generation, find_project, launch};
-use super::test::{stamp, watched_roots};
+use super::run::{Generation, build_generation, find_project, launch};
+use super::test::{watch_snapshot, watched_roots};
 use crate::args::{GlobalArguments, RunArguments};
 use crate::child::{self, Running};
 use crate::report;
 
 /// A running generation.
 struct Live {
-    generation: PathBuf,
+    generation: Generation,
     running: Running,
 }
 
@@ -34,7 +33,7 @@ impl Live {
         child::send(self.running.child.id(), signal);
         let code = self.running.child.wait().map_or(1, child::code);
         self.running.drain();
-        let _ = fs::remove_dir_all(&self.generation);
+        drop(self.generation);
         code
     }
 }
@@ -52,16 +51,15 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
     let mut live: Option<Live> = None;
     let mut seen = None;
     loop {
-        let now = stamp(&paths);
-        if now != seen {
-            seen = now;
+        let now = watch_snapshot(&paths);
+        if seen.as_ref() != Some(&now) {
+            seen = Some(now);
             if let Ok((generation, name)) = build_generation(&project, options, global) {
                 if let Some(old) = live.take() {
                     report::log(global, "dev: stopping the running version");
                     let code = old.stop(SIGTERM as usize);
                     // 143: interrupted and cleaned up; 0: it had ended
                     if code != 143 && code != 0 {
-                        let _ = fs::remove_dir_all(&generation);
                         let d = Diagnostic::new(
                             codes::P021,
                             Severity::Error,
@@ -96,8 +94,8 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
                 global,
                 &format!("dev: the app ended with exit code {code}; waiting for a change"),
             );
-            let ended = live.take().expect("live");
-            let _ = fs::remove_dir_all(&ended.generation);
+            let mut ended = live.take().expect("live");
+            ended.running.drain();
         }
         thread::sleep(Duration::from_millis(200));
     }

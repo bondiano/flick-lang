@@ -146,3 +146,67 @@ test("a closing owner admits no new children", async () => {
   const exit = await Effect.runPromiseExit(fiberSpawn(saved, quiet, Effect.void));
   assert.ok(Exit.isFailure(exit) && Cause.hasDies(exit.cause));
 });
+
+test("failed closing hooks preserve every failure and complete all shutdown stages", { timeout: 1000 }, async () => {
+  const log: Array<string> = [];
+  const started = Promise.withResolvers<void>();
+  const supervised = Promise.withResolvers<void>();
+  const settled = Promise.withResolvers<void>();
+  const detachFailure = new Error("detach failed");
+  const releaseFailure = new Error("release failed");
+  const fiber = Effect.runFork(
+    scope((owner) =>
+      Effect.gen(function* () {
+        yield* acquireRelease(Effect.void, () => Effect.sync(() => log.push("released last")));
+        yield* acquireRelease(Effect.void, () =>
+          Effect.andThen(Effect.sync(() => log.push("release failed")), Effect.die(releaseFailure)),
+        );
+        owner.closing.add(() => {
+          log.push("detach failed");
+          throw detachFailure;
+        });
+        owner.closing.add(() => Effect.andThen(Effect.sync(() => log.push("next hook")), Effect.fail("next hook failed")));
+        yield* fiberSpawn(
+          owner,
+          () =>
+            Effect.sync(() => {
+              log.push("supervised");
+              supervised.resolve();
+            }),
+          Effect.onInterrupt(
+            foreignAsync(() => {
+              started.resolve();
+              return settled.promise.then(() => void log.push("foreign settled"));
+            }),
+            () => Effect.sync(() => log.push("interrupted")),
+          ),
+        );
+        yield* Effect.promise(() => started.promise);
+        return yield* Effect.fail("body failed");
+      }),
+    ),
+  );
+  try {
+    await supervised.promise;
+    assert.deepEqual(log, ["detach failed", "next hook", "interrupted", "supervised"]);
+    settled.resolve();
+    const exit = await Effect.runPromise(Fiber.await(fiber));
+    assert.deepEqual(errorsOf(exit), ["body failed", "next hook failed"]);
+    assert.deepEqual(
+      causeOf(exit).reasons.filter(Cause.isDieReason).map((reason) => reason.defect),
+      [detachFailure, releaseFailure],
+    );
+    assert.deepEqual(log, [
+      "detach failed",
+      "next hook",
+      "interrupted",
+      "supervised",
+      "foreign settled",
+      "release failed",
+      "released last",
+    ]);
+  } finally {
+    settled.resolve();
+    await Effect.runPromise(Fiber.interrupt(fiber));
+  }
+});

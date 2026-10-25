@@ -8,7 +8,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use flick_core::build::{self, Extras, Settings};
-use flick_core::diagnostics::render::render_json;
+use flick_core::diagnostics::render::json_events;
 use flick_core::diagnostics::{Diagnostic, Severity};
 use flick_core::project::config::Backend;
 use flick_core::project::{self, Host};
@@ -124,11 +124,8 @@ fn path() -> PathBuf {
 }
 
 fn diagnostics_json(sources: &SourceMap, diagnostics: &[Diagnostic]) -> Value {
-    render_json(sources, diagnostics)
-        .lines()
-        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
-        .collect::<Vec<_>>()
-        .into()
+    serde_json::to_value(json_events(sources, diagnostics).collect::<Vec<_>>())
+        .expect("diagnostic events serialize")
 }
 
 /// A file system holding only the demo's module.

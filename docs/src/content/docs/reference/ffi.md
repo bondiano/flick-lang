@@ -92,6 +92,9 @@ installed package with TypeScript (through the Node helper
 `@flick-lang/dts-importer`, or the script `FLICK_DTS_IMPORTER` names) and
 writes `<dir>/<Pkg>/Generated.fl`, module `<Dir>.<Pkg>.Generated`
 (`date-fns` → `DateFns`), with a report of every selected export.
+Package subpaths and npm aliases remain the exact import specifier supplied
+to the command; resolved package identity supplies version provenance, not
+a replacement import path.
 `--select a,b` imports only those exports. Each export gets one status:
 
 | Status | Generated |

@@ -25,9 +25,9 @@ mod toolchain;
 fn watch(command: &impl Command, global: &GlobalArguments) -> ExitCode {
     let paths = commands::watched(global);
     loop {
-        let before = commands::stamp(&paths);
+        let before = commands::watch_snapshot(&paths);
         run_command(command, global);
-        while commands::stamp(&paths) == before {
+        while commands::watch_snapshot(&paths) == before {
             thread::sleep(Duration::from_millis(200));
         }
         report::log(global, "a file changed: running again");

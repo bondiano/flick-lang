@@ -21,8 +21,11 @@ jobs:
             fi
           done
 
+  checks:
+    uses: ./.github/workflows/ci.yml
+
   build:
-    needs: version
+    needs: [version, checks]
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -56,7 +59,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: build
+    needs: [checks, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -1,0 +1,11 @@
+{
+  "name": "subpath-package",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    "./feature": {
+      "types": "./feature.d.ts",
+      "default": "./feature.js"
+    }
+  }
+}

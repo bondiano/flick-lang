@@ -11,6 +11,8 @@ definitions) is meant to come from the language server's semantic tokens.
 
 ## VS Code
 
+Requires VS Code 1.82.0 or later, matching `vscode-languageclient`.
+
 ```sh
 ln -s "$PWD/editors/vscode" ~/.vscode/extensions/flick
 ```

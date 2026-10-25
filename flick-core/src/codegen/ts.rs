@@ -73,7 +73,7 @@ impl Projection<'_> {
 
     /// The namespace alias a module's types are imported under.
     pub fn alias(module: &str) -> String {
-        format!("$t_{}", module.replace('.', "_"))
+        names::module_alias(module, 't')
     }
 
     /// The type of a value of type `scheme`.
@@ -330,7 +330,7 @@ impl Projection<'_> {
         ))
     }
 
-    /// `T` of this module, `$t_A_B.T` of another.
+    /// `T` of this module, `$t_A$B.T` of another.
     fn qualified(&self, module: &str, name: &str) -> String {
         if module == self.module {
             name.to_owned()

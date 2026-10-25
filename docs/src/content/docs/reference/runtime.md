@@ -28,13 +28,16 @@ resource finalizers of what was acquired in it. When the body ends —
 success, typed error, defect or interruption — the owner closes in two
 phases:
 
-1. it admits no new children;
+1. it admits no new children and detaches external event sources;
 2. it interrupts every child and waits until each has ended, supervisors
    included; an uninterruptible child delays the close;
 3. it waits for every pending foreign `async` promise to settle, also one
    that ignores interruption;
 4. it runs resource finalizers, the last acquired first;
 5. the scope ends with the body's exit, joined with any cleanup failure.
+
+Detachment failures are retained alongside body and finalizer failures;
+they do not skip interruption, joining or resource cleanup.
 
 Children and resources are separate groups: a resource acquired after a
 child started is still released after that child ended.

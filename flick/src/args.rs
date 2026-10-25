@@ -183,6 +183,10 @@ pub struct BuildArguments {
     #[arg(long, value_enum)]
     pub labels: Option<LabelsArgument>,
 
+    /// Print the compiler's input inventory as JSON without building.
+    #[arg(long, conflicts_with = "watch")]
+    pub inputs: bool,
+
     /// Build again whenever a source file changes; a failed build keeps the
     /// last output.
     #[arg(long)]

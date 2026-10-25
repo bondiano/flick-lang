@@ -16,6 +16,7 @@ impl Loader<'_> {
         &mut self,
         name: &str,
         interfaces: &[Option<Interface>],
+        span: Span,
     ) -> Option<Interface> {
         if let Some(&i) = self.by_name.get(name) {
             return interfaces.get(i).cloned().flatten();
@@ -23,20 +24,11 @@ impl Loader<'_> {
         if let Some(interface) = self.from_packages.get(name) {
             return Some(interface.clone());
         }
-        let (owner, interface) = match self
-            .packages
-            .find(self.host, name, &mut self.diagnostics)
-            .pop()
-        {
-            Some((package, interface)) => (Some(package), interface),
-            None => (
-                None,
-                types::builtins().iter().find(|i| i.module == name)?.clone(),
-            ),
-        };
-        if let Some(package) = owner {
-            self.owners.insert(name.to_owned(), package);
+        self.load_package_interfaces(name, span);
+        if let Some(interface) = self.from_packages.get(name) {
+            return Some(interface.clone());
         }
+        let interface = types::builtins().iter().find(|i| i.module == name)?.clone();
         self.from_packages
             .insert(name.to_owned(), interface.clone());
         Some(interface)
@@ -53,7 +45,7 @@ impl Loader<'_> {
         interfaces: &[Option<Interface>],
     ) {
         let error = |message: String, at: Span| Diagnostic::error(codes::P026, message, at);
-        let Some(interface) = self.runner_interface(runner, interfaces) else {
+        let Some(interface) = self.runner_interface(runner, interfaces, runner_at) else {
             let message = format!(
                 "runner `{runner}` not found: a built-in one such as `Runner.Node`, or a module of the program or of an installed package"
             );

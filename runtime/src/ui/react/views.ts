@@ -154,7 +154,8 @@ const Field = ({ tag, bind, placeholder, input }: FieldState): ReactNode => {
   const subscribe = useCallback((changed: () => void) => registry.subscribe(bind, changed), [registry, bind]);
   const snapshot = (): string => registry.get(bind);
   const value = useSyncExternalStore(subscribe, snapshot, () => Atom.getServerValue(bind, registry));
-  const listener = useMemo(() => (bridge === undefined || input === undefined ? undefined : bridge.listener(input)), [bridge]);
+  const hasInput = input !== undefined;
+  const listener = useMemo(() => (bridge === undefined || input === undefined ? undefined : bridge.listener(input)), [bridge, hasInput]);
   useLayoutEffect(() => {
     if (listener !== undefined && input !== undefined) listener.update(input);
   });

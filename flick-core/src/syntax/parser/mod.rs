@@ -112,40 +112,33 @@ fn continues(kind: SyntaxKind) -> bool {
 impl<'t> Parser<'t> {
     fn new(text: &'t str, file: FileId, raw: &[RawToken]) -> Self {
         let mut toks = Vec::new();
-        let mut line_begin = 0usize;
+        let mut col = 0;
         let mut line_has_token = false;
         let mut indent = 0;
         for t in raw {
-            match t.kind {
-                K::Newline => {
-                    line_begin = t.end as usize;
-                    line_has_token = false;
+            if !t.kind.is_trivia() {
+                let kind = t.kind;
+                let line_start = !line_has_token;
+                if line_start {
+                    indent = col;
                 }
-                kind if kind.is_trivia() => {}
-                kind => {
-                    let col = text[line_begin..t.start as usize].chars().count();
-                    let col = u32::try_from(col).expect("columns fit in u32");
-                    let line_start = !line_has_token;
-                    if line_start {
-                        indent = col;
-                    }
-                    toks.push(Tok {
-                        kind,
-                        start: t.start,
-                        end: t.end,
-                        col,
-                        line_start,
-                        line_indent: indent,
-                    });
-                    line_has_token = true;
-                }
+                toks.push(Tok {
+                    kind,
+                    start: t.start,
+                    end: t.end,
+                    col,
+                    line_start,
+                    line_indent: indent,
+                });
+                line_has_token = true;
             }
-            // a multi-line string or comment moves the line start inside the token
-            if t.kind != K::Newline
-                && let Some(nl) = text[t.start as usize..t.end as usize].rfind('\n')
-            {
-                line_begin = t.start as usize + nl + 1;
+            let token = &text[t.start as usize..t.end as usize];
+            if let Some((_, tail)) = token.rsplit_once('\n') {
+                // A multi-line string still occupies its final line; trivia does not.
+                col = u32::try_from(tail.chars().count()).expect("columns fit in u32");
                 line_has_token = !t.kind.is_trivia();
+            } else {
+                col += u32::try_from(token.chars().count()).expect("columns fit in u32");
             }
         }
         let end = u32::try_from(text.len()).expect("source fits in u32");

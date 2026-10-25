@@ -118,6 +118,14 @@ impl Packages {
         module: &str,
         diagnostics: &mut Vec<Diagnostic>,
     ) -> Vec<(String, Interface)> {
+        if !super::is_module_name(module) {
+            diagnostics.push(Diagnostic::new(
+                codes::P010,
+                Severity::Error,
+                format!("invalid installed interface module reference `{module}`"),
+            ));
+            return Vec::new();
+        }
         let mut found = Vec::new();
         for package in &self.packages {
             let Some(dir) = &package.iface_dir else {
@@ -176,6 +184,13 @@ pub(super) fn stale(
         };
         for (dependency, recorded) in &interface.dependencies {
             let Some(installed) = interfaces.get(dependency) else {
+                out.push(Diagnostic::new(
+                    codes::P014,
+                    Severity::Error,
+                    format!(
+                        "`{module}` of package `{package}` depends on `{dependency}`, whose installed interface cannot be found"
+                    ),
+                ));
                 continue;
             };
             let actual = iface::fingerprint(installed);

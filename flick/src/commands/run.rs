@@ -1,15 +1,15 @@
 //! `flick run` and `flick dev`. Each build of the app goes into its own
-//! generation `.flick/run/<n>/`, never written again once it runs, so a late
-//! `import()` of a running generation never sees the next build. A
-//! generation is locked while its process runs and removed after it ends;
-//! `flick clean` keeps locked generations. `run` and `dev` always build
+//! generation `.flick/run/<pid>-<n>/`, never written again once it runs, so
+//! a late `import()` never sees the next build. Its CLI owns the directory
+//! from reservation through cleanup; `clean` also keeps an orphaned live
+//! child. `run` and `dev` always build
 //! JavaScript, whatever `emit` the project chooses.
 
-use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::{Command as Process, ExitCode};
 use std::sync::atomic::AtomicUsize;
+use std::{fs, io, process};
 
 use flick_core::build::runner_file;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
@@ -33,8 +33,49 @@ pub fn generations(root: &Path) -> PathBuf {
     root.join(cache::DIR).join("run")
 }
 
+/// A directory atomically reserved by this CLI until all cleanup ends.
+pub struct Generation {
+    path: PathBuf,
+}
+
+impl Generation {
+    fn reserve(root: &Path) -> io::Result<Self> {
+        let dir = generations(root);
+        fs::create_dir_all(&dir)?;
+        let owner = process::id();
+        for number in 1..=u64::MAX {
+            // The owner is in the name, so clean cannot race lock-file creation.
+            let path = dir.join(format!("{owner}-{number}"));
+            match fs::create_dir(&path) {
+                Ok(()) => return Ok(Self { path }),
+                Err(err) if err.kind() == ErrorKind::AlreadyExists => {}
+                Err(err) => return Err(err),
+            }
+        }
+        Err(io::Error::other("run generation identifiers exhausted"))
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for Generation {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
+    }
+}
+
 /// Whether a generation's lock is held, conservatively keeping unknown states.
 pub fn locked(generation: &Path) -> bool {
+    if let Some((owner, _)) = generation
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(|name| name.split_once('-'))
+        && process_alive(owner)
+    {
+        return true;
+    }
     let lock = generation.join(".lock");
     match fs::symlink_metadata(&lock) {
         Ok(metadata) if metadata.is_file() => {}
@@ -119,7 +160,7 @@ pub fn build_generation(
     project: &Project,
     options: &RunArguments,
     global: &GlobalArguments,
-) -> Result<(PathBuf, String), u8> {
+) -> Result<(Generation, String), u8> {
     let name = match chosen_entry(project, options) {
         Ok(name) => name,
         Err(message) => {
@@ -128,22 +169,22 @@ pub fn build_generation(
             return Err(2);
         }
     };
-    let dir = generations(&project.root);
-    let next = fs::read_dir(&dir)
-        .map(|entries| {
-            entries
-                .flatten()
-                .filter_map(|e| e.file_name().to_str()?.parse::<u64>().ok())
-                .max()
-                .unwrap_or(0)
-        })
-        .unwrap_or(0)
-        + 1;
-    let generation = dir.join(next.to_string());
+    let generation = match Generation::reserve(&project.root) {
+        Ok(generation) => generation,
+        Err(err) => {
+            let d = Diagnostic::new(
+                codes::P013,
+                Severity::Error,
+                format!("cannot reserve a run generation: {err}"),
+            );
+            report::render(global, &SourceMap::default(), &[d]);
+            return Err(2);
+        }
+    };
     let build = BuildCommand {
         options: BuildArguments {
             paths: Vec::new(),
-            out_dir: Some(generation.to_string_lossy().into_owned()),
+            out_dir: Some(generation.path().to_string_lossy().into_owned()),
             emit: Some(EmitArgument::Js),
             emit_dts: false,
             promise_facade: false,
@@ -151,6 +192,7 @@ pub fn build_generation(
             profile: options.profile,
             labels: None,
             watch: false,
+            inputs: false,
         },
         project: Some(project.root.to_string_lossy().into_owned()),
         entry: options.entry.clone(),
@@ -161,15 +203,14 @@ pub fn build_generation(
     let code = report::code(&outcome.diagnostics);
     let failed = code != 0 || (global.warnings_as_errors && !outcome.diagnostics.is_empty());
     if failed {
-        let _ = fs::remove_dir_all(&generation);
         return Err(code.max(1));
     }
     Ok((generation, name))
 }
 
-/// Starts the runner of the entry `name` in `generation` and locks it.
+/// Starts the runner and records its child PID for cleanup after an orphaned CLI.
 pub fn launch(
-    generation: &Path,
+    generation: &Generation,
     name: &str,
     args: &[String],
     global: &GlobalArguments,
@@ -177,11 +218,14 @@ pub fn launch(
     let mut command = Process::new("node");
     command
         .arg("--enable-source-maps")
-        .arg(generation.join(runner_file(name, false)))
+        .arg(generation.path().join(runner_file(name, false)))
         .args(args);
     match child::spawn(&mut command, global, "application-stderr") {
         Ok(running) => {
-            let _ = write(&generation.join(".lock"), &running.child.id().to_string());
+            let _ = write(
+                &generation.path().join(".lock"),
+                &running.child.id().to_string(),
+            );
             Some(running)
         }
         Err(err) => {
@@ -210,11 +254,9 @@ pub fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
         Err(code) => return ExitCode::from(code),
     };
     let Some(running) = launch(&generation, &name, &options.args, global) else {
-        let _ = fs::remove_dir_all(&generation);
         return ExitCode::from(2);
     };
     let code = finish(running, &signals);
-    let _ = fs::remove_dir_all(&generation);
     ExitCode::from(code)
 }
 
@@ -228,7 +270,11 @@ fn finish(running: Running, signals: &AtomicUsize) -> u8 {
 
 #[cfg(test)]
 mod tests {
-    use std::process;
+    use std::env;
+    use std::sync::{Barrier, mpsc};
+    use std::thread;
+
+    use crate::commands::clean::clean_generations;
 
     use super::*;
 
@@ -251,5 +297,47 @@ mod tests {
         ] {
             assert!(process_alive(pid), "{pid:?}");
         }
+    }
+
+    #[test]
+    fn concurrent_reservations_survive_clean_before_launch_and_other_cleanup() {
+        let root = env::temp_dir().join(format!("flick-reservations-{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let gate = Barrier::new(2);
+        thread::scope(|scope| {
+            let (reserved, paths) = mpsc::channel();
+            let (release, released) = mpsc::channel();
+            let root = &root;
+            let gate = &gate;
+            let first = scope.spawn(move || {
+                gate.wait();
+                let generation = Generation::reserve(root).expect("first reservation");
+                fs::write(generation.path().join("Main.js"), "first").expect("first artifact");
+                reserved
+                    .send(generation.path().to_path_buf())
+                    .expect("path");
+                released.recv().expect("release first");
+            });
+            gate.wait();
+            let second = Generation::reserve(root).expect("second reservation");
+            fs::write(second.path().join("Main.js"), "second").expect("second artifact");
+            let first_path = paths.recv().expect("reserved path");
+            assert_ne!(first_path, second.path());
+            assert_eq!(clean_generations(root), 2, "construction owns both paths");
+            assert!(first_path.join("Main.js").exists());
+            assert!(second.path().join("Main.js").exists());
+            release.send(()).expect("finish first");
+            first.join().expect("first cleanup");
+            assert!(!first_path.exists());
+            assert_eq!(clean_generations(root), 1);
+            assert_eq!(
+                fs::read_to_string(second.path().join("Main.js")).expect("surviving artifact"),
+                "second"
+            );
+            let second_path = second.path().to_path_buf();
+            drop(second);
+            assert!(!second_path.exists());
+        });
+        fs::remove_dir_all(root).expect("fixture cleanup");
     }
 }

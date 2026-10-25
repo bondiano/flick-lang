@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 
 mod entry;
 mod ide;
+mod packages;
 mod runner;
 mod unknown;
 
@@ -75,10 +76,16 @@ struct Loader<'a> {
 #[derive(Default)]
 pub struct Compilation {
     pub modules: Vec<Compiled>,
-    /// Modules from installed packages: the module, its package, its
-    /// interface and the import specifier of its compiled JS without the
-    /// extension.
-    pub packages: Vec<(String, String, Interface, String)>,
+    pub package_modules: Vec<PackageModule>,
+}
+
+/// An installed module, retaining its defining package and compiled JS location.
+pub struct PackageModule {
+    pub module: String,
+    pub package: String,
+    pub interface: Interface,
+    /// The import specifier of its compiled JS, without the extension.
+    pub js_specifier: String,
 }
 
 /// A module that checked cleanly, lowered to the IR.
@@ -155,13 +162,12 @@ fn run(
     }
     let edges = loader.load_imports();
     loader.import_cycles(&edges);
-    let stale = super::packages::stale(&loader.from_packages, &loader.owners);
-    loader.diagnostics.extend(stale);
     if let Some(lowered) = &mut loader.lowered {
         lowered.resize_with(loader.modules.len(), || None);
     }
     let interfaces = loader.resolve_all(&edges);
     loader.check_entry(&interfaces);
+    loader.check_packages();
     let failed = loader
         .diagnostics
         .iter()
@@ -185,18 +191,23 @@ fn run(
             .collect(),
         _ => Vec::new(),
     };
-    let packages = loader
+    let package_modules = loader
         .owners
         .iter()
-        .filter_map(|(m, p)| {
-            let interface = loader.from_packages.get(m)?.clone();
-            let js = loader.packages.js_specifier(p, &m.replace('.', "/"));
-            Some((m.clone(), p.clone(), interface, js))
+        .filter_map(|(module, package)| {
+            Some(PackageModule {
+                module: module.clone(),
+                package: package.clone(),
+                interface: loader.from_packages.get(module)?.clone(),
+                js_specifier: loader
+                    .packages
+                    .js_specifier(package, &module.replace('.', "/")),
+            })
         })
         .collect();
     let compilation = Compilation {
         modules: compiled,
-        packages,
+        package_modules,
     };
     let analyzed = loader.ide.take().unwrap_or_default();
     let mut diagnostics = loader.diagnostics;
@@ -355,28 +366,7 @@ impl Loader<'_> {
             }
         }
         let local = self.by_name.get(name).copied();
-        if !self.from_packages.contains_key(name) {
-            let mut found = self.packages.find(self.host, name, &mut self.diagnostics);
-            if let Some((package, interface)) = found.pop() {
-                if let Some(local) = local {
-                    let header = self.modules[local].syntax.header.as_ref();
-                    self.diagnostics.push(Diagnostic::error(
-                        codes::R002,
-                        format!("module `{name}` is also provided by package `{package}`"),
-                        header.map_or(Span::new(self.modules[local].file, 0, 0), |h| h.span),
-                    ));
-                }
-                if let Some((other, _)) = found.first() {
-                    self.diagnostics.push(Diagnostic::error(
-                        codes::R002,
-                        format!("module `{name}` is provided by both `{other}` and `{package}`"),
-                        span,
-                    ));
-                }
-                self.owners.insert(name.to_owned(), package);
-                self.from_packages.insert(name.to_owned(), interface);
-            }
-        }
+        self.load_package_interfaces(name, span);
         if local.is_none() && !self.from_packages.contains_key(name) {
             match types::builtins().iter().find(|i| i.module == name) {
                 Some(builtin) => {
