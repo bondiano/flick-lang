@@ -84,6 +84,12 @@ impl Walker<'_> {
                 for child in node.nodes() {
                     if child.kind == K::LetDecl {
                         self.let_decl(child);
+                    } else if child.kind == K::BindStmt {
+                        // `p <- e` of a `do` block: `e` cannot see `p`
+                        for part in child.nodes() {
+                            self.walk(part);
+                        }
+                        self.bind_patterns(child);
                     } else {
                         self.walk(child);
                     }

@@ -31,7 +31,7 @@ fn is_pattern(kind: K) -> bool {
 impl Validator<'_> {
     fn walk(&mut self, node: &Node) {
         match node.kind {
-            K::MatchArm => {
+            K::MatchArm | K::BindStmt => {
                 if let Some(pattern) = node.nodes().find(|n| is_pattern(n.kind)) {
                     self.group(&[pattern]);
                 }

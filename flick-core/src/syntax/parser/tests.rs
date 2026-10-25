@@ -240,3 +240,27 @@ fn let_assert_takes_a_pattern_and_a_message() {
     assert_eq!(errors("let rec assert f x = x"), ["FLICK-S007 assert"]);
     assert_eq!(errors("let x = v as \"no\""), ["FLICK-S007 as"]);
 }
+
+#[test]
+fn do_blocks_bind_guard_and_sequence() {
+    let src = "let p =\n  do {\n    Some x <- a\n    if x > 0\n    let y = x\n    log y\n    pure (x, y)\n  }\n";
+    assert_eq!(
+        sexp(src),
+        "(LetDecl let (VarPat p) = (Block (DoExpr do { (Block (BindStmt (ConPat Some (VarPat x)) <- \
+         (NameExpr a)) (GuardStmt if (BinExpr (NameExpr x) > (Literal 0))) (LetDecl let (VarPat y) = \
+         (Block (NameExpr x))) (AppExpr (NameExpr log) (NameExpr y)) (AppExpr (NameExpr pure) \
+         (TupleExpr ( (NameExpr x) , (NameExpr y) )))) })))"
+    );
+    assert!(
+        sexp("let q = do { (a, b) <- f (fun x -> x); if c then g a else h b }")
+            .contains("(BindStmt (TuplePat ( (VarPat a) , (VarPat b) )) <- (AppExpr (NameExpr f)")
+    );
+    assert!(sexp("let q = do { if c then g else h }").contains("(IfExpr if"));
+}
+
+#[test]
+fn larrow_outside_do_and_do_without_braces_are_errors() {
+    assert_eq!(errors("let f x =\n  y <- load x\n  y\n"), ["FLICK-S013 <-"]);
+    assert_eq!(errors("let b = a < -1"), Vec::<String>::new());
+    assert_eq!(errors("let f x =\n  do\n    x\n"), ["FLICK-S010 do"]);
+}

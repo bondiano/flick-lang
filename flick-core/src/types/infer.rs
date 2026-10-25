@@ -73,6 +73,9 @@ impl Checker<'_> {
                 let actual = self.record(node, Some(&row));
                 self.expect(&actual, expected, self.span(node));
             }
+            (K::DoExpr, _) => {
+                self.do_expr(node, Some(expected));
+            }
             (K::TaskExpr, _) if self.eff_parts(&target).is_some() => {
                 self.task(node, Some(expected));
             }
@@ -142,6 +145,7 @@ impl Checker<'_> {
                 ty
             }
             K::TaskExpr => self.task(node, None),
+            K::DoExpr => self.do_expr(node, None),
             K::ScopeExpr => self.scope_expr(node, None),
             K::ProvideExpr => self.provide(node, None),
             K::SchemaExpr => self.schema_expr(node),
@@ -243,6 +247,27 @@ impl Checker<'_> {
         expected: Option<&Type>,
         node: &Node,
     ) -> Type {
+        let params: Vec<Option<&Node>> = params.iter().copied().map(Some).collect();
+        let body = |c: &mut Self, rest: Option<Type>| match (rest, body) {
+            (Some(rest), Some(body)) => {
+                c.check(body, &rest);
+                rest
+            }
+            (None, Some(body)) => c.infer(body),
+            (_, None) => Type::Error,
+        };
+        self.function_with(&params, body, expected, node)
+    }
+
+    /// [`Self::function`] with a body that checks against the result type
+    /// the stages leave, if known; a `None` parameter binds nothing.
+    pub fn function_with(
+        &mut self,
+        params: &[Option<&Node>],
+        body: impl FnOnce(&mut Self, Option<Type>) -> Type,
+        expected: Option<&Type>,
+        node: &Node,
+    ) -> Type {
         let saved = mem::take(&mut self.runtime);
         let mark = self.locals.len();
         let givens = self.classes.givens.len();
@@ -295,8 +320,10 @@ impl Checker<'_> {
                 }
                 None => (self.fresh(), None),
             };
-            let pat = self.bind_pattern(param, &ty);
-            self.irrefutable(&pat, param, None);
+            if let Some(param) = param {
+                let pat = self.bind_pattern(param, &ty);
+                self.irrefutable(&pat, param, None);
+            }
             stages.push((ty, effects));
         }
         let name = (node.kind == K::LetDecl)
@@ -306,6 +333,11 @@ impl Checker<'_> {
         let stage = match last {
             Some(None) => Stage::pure(match &name {
                 Some(name) => format!("`{name}` is pure: its signature has `->`, not `->{{…}}`"),
+                None if matches!(node.kind, K::DoExpr | K::BindStmt) => {
+                    "the rest of a `do` block is the pure function of `flat_map`: bind the result of \
+                     a runtime call with `let` before the `do`"
+                        .to_owned()
+                }
                 None => {
                     "this function must be pure: the expected type has `->`, not `->{…}`".to_owned()
                 }
@@ -321,14 +353,7 @@ impl Checker<'_> {
             None => self.open_stage(),
         };
         let outer = mem::replace(&mut self.stage, stage);
-        let result = match (rest, body) {
-            (Some(rest), Some(body)) => {
-                self.check(body, &rest);
-                rest
-            }
-            (None, Some(body)) => self.infer(body),
-            (_, None) => Type::Error,
-        };
+        let result = body(self, rest);
         let inner = mem::replace(&mut self.stage, outer);
         if inferred && let Some(stage) = stages.last_mut() {
             stage.1 = Self::stage_effects(&inner);

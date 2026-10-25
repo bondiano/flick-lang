@@ -56,6 +56,7 @@ and [ffi.md](../ffi/).
 | `true` `false` | the two `Bool` values | `if ok then true else false` |
 | `none` | the empty row in a type | `a ->{none; NotFound} b` |
 | `in` | binds a row in a SQL `from` or `join` clause | `join account in Accounts` |
+| `do` | statements sequenced through `Monad`: `x <- e` binds, `if c` guards | `do { x <- left; y <- right; return (x, y) }` |
 
 ## Effects and resources
 
@@ -96,12 +97,6 @@ as record labels: `{ echo = … }`.
 
 See [schema.md](../schema/), [sql.md](../sql/), [ui.md](../ui/) and
 [cli-dsl.md](../cli-dsl/).
-
-## Reserved
-
-`do` is reserved only to report a precise error (`FLICK-S010`): Flick has no
-`do` notation. A block runs its statements in order; `await` runs a stored
-computation.
 
 ## In the editor
 

@@ -1,0 +1,53 @@
+// `do` over Option, Result, List, any `Monad m` and Eff: bindings, `let`,
+// guards through `Alternative`, statements bound to nothing.
+module App.Main exposing (main)
+
+pair_optional : Option a -> Option b -> Option (a, b)
+let pair_optional left right =
+  do {
+    x <- left
+    y <- right
+    return (x, y)
+  }
+
+safe_div : Number -> Number -> Result String Number
+let safe_div a b = if b == 0 then Err "divide by zero" else Ok (a / b)
+
+ratio : Number -> Number -> Number -> Result String Number
+let ratio a b c =
+  do {
+    x <- safe_div a b
+    let doubled = x * 2
+    y <- safe_div doubled c
+    return (y + 1)
+  }
+
+triples : Number -> List (Number, Number, Number)
+let triples n =
+  let range = List.range 1 n
+  do {
+    a <- range
+    b <- range
+    c <- range
+    if a * a + b * b == c * c && a < b
+    return (a, b, c)
+  }
+
+twice : Monad m => m Number -> m Number
+let twice m = do { x <- m; y <- m; return (x + y) }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (show (pair_optional (Some 1) (Some "a")))
+  Platform.stdout_line (show (pair_optional (Some 1) (None : Option String)))
+  Platform.stdout_line (show (ratio 10 2 5))
+  Platform.stdout_line (show (ratio 10 0 5))
+  Platform.stdout_line (show (triples 13))
+  Platform.stdout_line (show (twice (Some 21)))
+  Platform.stdout_line (show (twice [1, 2]))
+  let eff = do {
+    x <- return 40
+    task { Platform.stdout_line "inside" }
+    return (x + 2)
+  }
+  Platform.stdout_line (show (await eff))

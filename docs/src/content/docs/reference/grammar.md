@@ -41,9 +41,6 @@ instance deriving foreign from forall not none true false schema codec
 sql ui cli in when do
 ```
 
-`do` is reserved only so that its use gets a precise diagnostic
-(`FLICK-S010`); Flick has no `do` notation.
-
 Contextual words are ordinary names everywhere except in one position:
 
 - `unboxed` and `untagged` right before `type` (see `codegen.md`);
@@ -118,7 +115,7 @@ let examples =
 ### Operators and punctuation
 
 ```text
-( ) [ ] { } , ; : . .. = -> => | ^ _
+( ) [ ] { } , ; : . .. = -> <- => | ^ _
 |> || && == != < <= > >= ++ + - * / % ** not
 ```
 
@@ -374,15 +371,27 @@ atom        = name | Con { "." Con } ["." name] | Number | BigInt | String
             | "{" "}" | "{" field "=" block { ";" | line break … } "}"
             | "{" expr "with" field "=" block { … } "}"
             | "task" "{" block "}" | "ui" "{" block "}"
+            | "do" "{" do_stmt { ";" | line break … } "}"
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
             | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
             | "cli" String "{" cli_clause { cli_clause } "}"
+do_stmt     = or_pattern "<-" expr | "if" expr | statement
 clause      = ("from" | "join" | "left_join") name "in" expr
             | clause_word expr { "," expr }
 cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
             | ("description" | "subcommand" | "handle") expr
 ```
+
+`do { … }` sequences its statements through the Prelude's `Monad`:
+`p <- e` is `flat_map (fun p -> rest) e`, a bare expression is bound to
+nothing, `if c` without `then` is `if c then rest else nothing` of
+`Alternative`, `let` scopes over the rest, and the last statement is an
+expression of the block's monad. The pattern after `<-` must be irrefutable,
+and the rest of the block is a pure function: a runtime call there is
+`FLICK-E001` (see [`do`, `for` and comprehensions](../../spec/06-higher-order/#do-for-and-comprehensions)).
+`<-` outside a `do` block is `FLICK-S013`; a comparison with a negative number
+is written `a < -1`.
 
 `todo` (optionally followed by a string) is an expression of any type, and
 `echo` without an operand is a function, as in `x |> echo`. `_` is a type
@@ -472,9 +481,10 @@ let describe shape =
 
 ## Constructs Flick does not have
 
-Generic `do` notation, `let*` binding operators and JSX `<…>` each produce
-one `FLICK-S010` diagnostic naming the Flick replacement (direct calls with
-`let`, `task`/`await`, `ui { … }`), not a generic parse error.
+A `do` block laid out without braces, `let*` binding operators and JSX `<…>`
+each produce one `FLICK-S010` diagnostic naming the Flick replacement
+(`do { … }`, direct calls with `let`, `task`/`await`, `ui { … }`), not a
+generic parse error.
 
 ## Error recovery
 

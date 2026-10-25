@@ -371,6 +371,7 @@ impl Checker<'_> {
     pub fn note_head(&mut self, node: &Node, ty: &Type) {
         let head = match node.kind {
             K::TaskExpr => K::TaskKw,
+            K::DoExpr => K::DoKw,
             K::ScopeExpr => K::ScopeKw,
             K::ProvideExpr => K::ProvideKw,
             K::TryExpr => K::TryKw,

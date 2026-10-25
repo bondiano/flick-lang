@@ -38,7 +38,7 @@ pub fn in_scope(root: &Node, offset: u32, text: &str) -> Vec<(String, (u32, u32)
         match scope.kind {
             K::Block => {
                 for statement in scope.nodes().filter(before) {
-                    if statement.kind == K::LetDecl {
+                    if matches!(statement.kind, K::LetDecl | K::BindStmt) {
                         out.extend(let_binders(statement, text));
                     }
                 }

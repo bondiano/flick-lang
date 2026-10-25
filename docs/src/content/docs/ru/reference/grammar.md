@@ -44,9 +44,6 @@ instance deriving foreign from forall not none true false schema codec
 sql ui cli in when do
 ```
 
-Слово `do` зарезервировано, но нотации `do` во Flick нет.
-При его использовании выдаётся отдельная диагностика `FLICK-S010`.
-
 Контекстные слова считаются обычными именами, кроме следующих позиций:
 
 - `unboxed` и `untagged` непосредственно перед `type` (см. `codegen.md`);
@@ -129,7 +126,7 @@ let examples =
 ### Операторы и пунктуация
 
 ```text
-( ) [ ] { } , ; : . .. = -> => | ^ _
+( ) [ ] { } , ; : . .. = -> <- => | ^ _
 |> || && == != < <= > >= ++ + - * / % ** not
 ```
 
@@ -397,15 +394,26 @@ atom        = name | Con { "." Con } ["." name] | Number | BigInt | String
             | "{" "}" | "{" field "=" block { ";" | line break … } "}"
             | "{" expr "with" field "=" block { … } "}"
             | "task" "{" block "}" | "ui" "{" block "}"
+            | "do" "{" do_stmt { ";" | line break … } "}"
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
             | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
             | "cli" String "{" cli_clause { cli_clause } "}"
+do_stmt     = or_pattern "<-" expr | "if" expr | statement
 clause      = ("from" | "join" | "left_join") name "in" expr
             | clause_word expr { "," expr }
 cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
             | ("description" | "subcommand" | "handle") expr
 ```
+
+`do { … }` выполняет утверждения через `Monad` из прелюдии: `p <- e` —
+это `flat_map (fun p -> rest) e`, голое выражение связывается ни с чем,
+`if c` без `then` — это `if c then rest else nothing` из `Alternative`,
+`let` действует до конца блока, а последнее утверждение — выражение монады
+блока. Образец после `<-` должен быть неопровержимым, а остаток блока — чистая
+функция: эффектный вызов в нём даёт `FLICK-E001` (см. [`do`, `for` и списковые выражения](../../spec/06-higher-order/#do-for-и-списковые-выражения)).
+`<-` вне блока `do` — `FLICK-S013`; сравнение с отрицательным числом пишется
+`a < -1`.
 
 `todo` (с необязательной строкой после него) — выражение любого типа, а
 `echo` без операнда — функция, как в `x |> echo`. `_` — тип только в
@@ -510,10 +518,10 @@ let describe shape =
 
 ## Конструкции, которых нет во Flick
 
-Нотация `do`, операторы связывания `let*` и JSX `<…>` вызывают
-по одной диагностике `FLICK-S010`, а не общую ошибку разбора.
+Блок `do` без фигурных скобок, операторы связывания `let*` и JSX `<…>`
+вызывают по одной диагностике `FLICK-S010`, а не общую ошибку разбора.
 Сообщение предлагает соответствующую конструкцию Flick:
-прямые вызовы с `let`, `task`/`await` или `ui { … }`.
+`do { … }`, прямые вызовы с `let`, `task`/`await` или `ui { … }`.
 
 ## Восстановление после ошибок
 

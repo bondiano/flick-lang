@@ -80,6 +80,8 @@ pub enum SyntaxKind {
     Eq,
     Arrow,
     FatArrow,
+    /// `<-` of a `do` binding.
+    LArrow,
     Pipe,
     PipeGt,
     OrOr,
@@ -164,6 +166,12 @@ pub enum SyntaxKind {
     TryExpr,
     IfExpr,
     TaskExpr,
+    /// `do { … }`: statements sequenced through `Monad`.
+    DoExpr,
+    /// `pattern <- expr` in a `do` block.
+    BindStmt,
+    /// `if condition` without `then` in a `do` block: a guard through `Alternative`.
+    GuardStmt,
     ScopeExpr,
     ProvideExpr,
     SqlExpr,
@@ -326,6 +334,7 @@ pub fn describe(kind: SyntaxKind) -> &'static str {
         K::Dot => "`.`",
         K::Eq => "`=`",
         K::Arrow => "`->`",
+        K::LArrow => "`<-`",
         K::Pipe => "`|`",
         K::Eof => "end of file",
         K::LayoutSep => "a new line",

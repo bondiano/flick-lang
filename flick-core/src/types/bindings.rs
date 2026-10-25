@@ -155,7 +155,7 @@ impl Checker<'_> {
         self.error(codes::T006, self.span(sig), message);
     }
 
-    fn local_let(&mut self, decl: &Node, sig: Option<&Node>, rest: &[&Node]) {
+    pub(super) fn local_let(&mut self, decl: &Node, sig: Option<&Node>, rest: &[&Node]) {
         let parts = let_parts(decl, self.text);
         let Some(name) = parts.name.clone() else {
             self.pattern_let(decl, &parts, Some(rest));

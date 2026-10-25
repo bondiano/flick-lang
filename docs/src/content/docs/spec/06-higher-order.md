@@ -54,7 +54,19 @@ let pair_optional left right =
     | Some y -> Some (x, y)
 ```
 
-With `do` the nested matches become `x <- left`, `y <- right`, `pure (x, y)`. `do` is sugar over the `Monad` of the Prelude: `p <- e` binds through `flat_map`, a bare expression is sequenced and discarded, `if c` is a guard through `Alternative`, and the last expression is the result. Continuations are pure functions, as `flat_map` requires: a runtime call inside a `do` over `Option` is an error that suggests binding it before the block. A refutable pattern after `<-` is an error; use `match`. `do` over `Eff` is allowed and gets a lint with a fix to direct calls, which join rows that `Monad (Eff r e)` keeps fixed.
+With `do` the nested matches become bindings:
+
+```flick
+pair_optional : Option a -> Option b -> Option (a, b)
+let pair_optional left right =
+  do {
+    x <- left
+    y <- right
+    return (x, y)
+  }
+```
+
+`do` is sugar over the `Monad` of the Prelude: `p <- e` binds through `flat_map`, a bare expression is sequenced and discarded, `if c` is a guard through `Alternative`, and the last expression is the result. Continuations are pure functions, as `flat_map` requires: a runtime call inside a `do` over `Option` is an error that suggests binding it before the block. A refutable pattern after `<-` is an error; use `match`. `do` over `Eff` is allowed and gets a lint with a fix to direct calls, which join rows that `Monad (Eff r e)` keeps fixed.
 
 `for { x <- xs; if p x; y <- ys x } yield e` is a lazy `Seq` compiled to one native generator; `[for … yield e]` is the strict `List`, compiled to a loop. Inside `for`, a refutable pattern after `<-` skips the elements that do not match. The body of a generator is pure; a `Seq` keeps the captures of what it uses, since it runs later.
 

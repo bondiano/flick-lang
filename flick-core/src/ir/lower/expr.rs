@@ -117,6 +117,7 @@ impl Lower<'_> {
                 ExprKind::Try(body, self.arms(node))
             }
             K::TaskExpr => ExprKind::Task(self.boxed(children[0])),
+            K::DoExpr => return self.do_expr(node),
             K::ScopeExpr => {
                 let mark = self.scope.len();
                 let key = node.range();
@@ -395,7 +396,8 @@ impl Lower<'_> {
             match statement.kind {
                 K::Signature => {}
                 K::LetDecl if statement.has_token(K::AssertKw) => {
-                    result = Some(self.let_assert(statement, &statements[i + 1..], span));
+                    let rest = &statements[i + 1..];
+                    result = Some(self.let_assert(statement, span, |l| l.statements(rest, span)));
                     break;
                 }
                 K::LetDecl => stmts.push(self.local_let(statement)),
@@ -410,7 +412,7 @@ impl Lower<'_> {
         Expr::new(ExprKind::Block(stmts, Box::new(result)), span)
     }
 
-    fn local_let(&mut self, decl: &Node) -> Stmt {
+    pub(super) fn local_let(&mut self, decl: &Node) -> Stmt {
         let parts = let_parts(decl, self.text);
         let Some(name) = parts.name.clone() else {
             let value = self.definition(decl);

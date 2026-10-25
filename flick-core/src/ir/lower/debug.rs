@@ -35,12 +35,17 @@ impl Lower<'_> {
 
     /// `let assert p = e [as "message"]` and the statements after it:
     /// `match e with | p -> rest | value -> fail with the place and value`.
-    pub(super) fn let_assert(&mut self, decl: &Node, rest: &[&Node], span: Span) -> Expr {
+    pub(super) fn let_assert(
+        &mut self,
+        decl: &Node,
+        span: Span,
+        rest: impl FnOnce(&mut Self) -> Expr,
+    ) -> Expr {
         let value = self.definition(decl);
         let pat = let_parts(decl, self.text)
             .pattern
             .map_or(Pat::Wild, |p| self.pattern(p));
-        let body = self.statements(rest, span);
+        let body = rest(self);
         let message = decl
             .child_tokens()
             .find(|t| t.kind == K::String)

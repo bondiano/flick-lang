@@ -5,6 +5,7 @@
 
 mod cli;
 mod debug;
+mod do_notation;
 mod expr;
 mod pattern;
 mod sql;

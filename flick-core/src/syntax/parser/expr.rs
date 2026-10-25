@@ -49,6 +49,20 @@ fn expr_bp(p: &mut Parser, min_bp: u8) -> Option<Done> {
     let mut lhs = prefix(p);
     while let Some(done) = lhs {
         let op = p.current();
+        if op == K::LArrow {
+            let m = p.precede(done);
+            let span = p.here_span();
+            p.error_at(
+                codes::S013,
+                span,
+                "`<-` binds only in a `do` block: bind with `let`, or write `a < -1` for a comparison"
+                    .into(),
+            );
+            p.bump();
+            expr_bp(p, 0);
+            lhs = Some(p.complete(m, K::Error));
+            break;
+        }
         let Some((left, right)) = infix(op) else {
             break;
         };
@@ -91,11 +105,6 @@ fn prefix(p: &mut Parser) -> Option<Done> {
         K::MatchKw => Some(match_expr(p)),
         K::TryKw => Some(try_expr(p)),
         K::IfKw => Some(if_expr(p)),
-        K::DoKw => Some(not_in_v1(
-            p,
-            "Flick has no `do` notation: write effectful calls directly and bind them with `let`, \
-             or build a computation with `task { … }` and run it with `await`",
-        )),
         K::Lt if is_jsx(p) => Some(not_in_v1(
             p,
             "Flick has no JSX `<…>`: build UI with `ui { … }` or `Ui` functions",
@@ -187,6 +196,7 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::LParen
         | K::LBracket
         | K::TaskKw
+        | K::DoKw
         | K::TodoKw
         | K::ScopeKw
         | K::ProvideKw
@@ -281,6 +291,7 @@ fn atom(p: &mut Parser) -> Option<Done> {
             }
             K::SqlCapture
         }
+        K::DoKw => do_expr(p),
         K::TaskKw | K::UiKw => {
             let kind = if p.at(K::TaskKw) {
                 K::TaskExpr
@@ -468,6 +479,59 @@ fn cli_clause(p: &mut Parser) {
         expr(p);
     }
     p.complete(m, K::CliClause);
+}
+
+fn do_expr(p: &mut Parser) -> K {
+    let span = p.here_span();
+    p.bump();
+    if p.at(K::LBrace) {
+        p.braces(K::Block, do_stmt, |_| false);
+    } else {
+        p.error_at(
+            codes::S010,
+            span,
+            "a `do` block takes braces: `do { x <- e; … }`".into(),
+        );
+    }
+    K::DoExpr
+}
+
+/// A statement of `do { … }`: `pattern <- e`, a guard `if c` without `then`,
+/// or a statement of an ordinary block.
+fn do_stmt(p: &mut Parser) {
+    if p.at(K::IfKw) && !ahead(p, K::ThenKw) {
+        let m = p.start();
+        p.bump();
+        expr(p);
+        p.complete(m, K::GuardStmt);
+    } else if !p.at(K::LetKw) && ahead(p, K::LArrow) {
+        let m = p.start();
+        pattern::pattern(p);
+        p.expect(K::LArrow);
+        expr(p);
+        p.complete(m, K::BindStmt);
+    } else {
+        stmt(p);
+    }
+}
+
+/// Whether `kind` comes before the current statement ends, outside brackets.
+fn ahead(p: &Parser, kind: K) -> bool {
+    let mut depth = 0u32;
+    for i in p.pos..p.toks.len() {
+        if i > p.pos && p.sep_at(i).is_some() {
+            return false;
+        }
+        match p.toks[i].kind {
+            K::Eof => return false,
+            K::LParen | K::LBracket | K::LBrace => depth += 1,
+            K::RParen | K::RBracket | K::RBrace | K::Semi | K::Eq if depth == 0 => return false,
+            K::RParen | K::RBracket | K::RBrace => depth -= 1,
+            k if depth == 0 && k == kind => return true,
+            _ => {}
+        }
+    }
+    false
 }
 
 fn fun_expr(p: &mut Parser) -> Done {

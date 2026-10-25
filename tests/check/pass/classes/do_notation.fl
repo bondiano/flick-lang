@@ -1,0 +1,46 @@
+// `do` sequences through the Prelude's `Monad` whatever `flat_map` is in
+// scope: guards need `Alternative`, a statement without `<-` is bound to
+// nothing, `let` and `let assert` scope over the rest, and the monad may be
+// any `Monad m`.
+module App.Do exposing (pairs, evens, twice, first_some, flat_map, chained)
+
+/// Not the method: `do` does not call it.
+flat_map : Number -> Number
+let flat_map n = n
+
+pairs : Option a -> Option b -> Option (a, b)
+let pairs left right =
+  do {
+    x <- left
+    y <- right
+    return (x, y)
+  }
+
+evens : List Number -> List Number
+let evens xs =
+  do {
+    x <- xs
+    if x % 2 == 0
+    let doubled = x * 2
+    return doubled
+  }
+
+twice : Monad m => m Number -> m Number
+let twice m = do { x <- m; y <- m; return (x + y) }
+
+first_some : List (Option Number) -> Option Number
+let first_some options =
+  do {
+    let assert [first, ..._rest] = options
+    x <- first
+    return x
+  }
+
+chained : Result String Number -> Eff none none (Result String Number)
+let chained r =
+  let checked = do {
+    n <- r
+    Ok n
+    return (n + 1)
+  }
+  return checked

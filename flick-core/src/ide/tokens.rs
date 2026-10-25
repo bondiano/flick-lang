@@ -31,7 +31,7 @@ const PARAMETER: u32 = 6;
 const KEYWORD: u32 = 7;
 
 /// Nodes worth folding when they span several lines.
-const FOLDED: [K; 14] = [
+const FOLDED: [K; 15] = [
     K::LetDecl,
     K::TypeDecl,
     K::ServiceDecl,
@@ -42,6 +42,7 @@ const FOLDED: [K; 14] = [
     K::RecordType,
     K::ListExpr,
     K::TaskExpr,
+    K::DoExpr,
     K::SqlExpr,
     K::UiExpr,
     K::CliExpr,

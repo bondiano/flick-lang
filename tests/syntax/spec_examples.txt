@@ -26,6 +26,7 @@ ce831b060f823d82  05-types-and-classes:399  fresh_cell : forall a. Eff none none
 f42159967b1e64b5  05-types-and-classes:424  logged_none : Unit ->{Log; none} Option a
 5e483a0a0ce484e8  06-higher-order:8  normalize_names : List String -> List String
 7644f905482ebdd8  06-higher-order:47  pair_optional : Option a -> Option b -> Option (a, b)
+d072f3ce97d69db9  06-higher-order:60  pair_optional : Option a -> Option b -> Option (a, b)
 90c190d26dc0c631  07-errors-and-concurrency:12  type error NotFound = NotFound UserId
 91f550830e015b91  07-errors-and-concurrency:27  type error RetryExhausted e = RetryExhausted e Number
 234a19d9938bb3aa  07-errors-and-concurrency:53  service Clock =
