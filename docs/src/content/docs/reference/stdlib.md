@@ -33,6 +33,7 @@ and `Monad`.
 | Module | Contents |
 | - | - |
 | `List` | `map` (pure callback), `map_effect` (runtime callback, one element after another), `map_indexed`, `each_effect`, folds, `filter`, `find`, `sort` (stable, by `Ord`), `sort_by`, `get`, `slice`, `range`, `zip`, … |
+| `Seq` | lazy sequences that start over on each iteration: infinite `from`, `iterate`, `repeat`, `cycle`, `unfold`; `range`, `map`, `filter`, `flat_map`, `take`, `take_while`, `drop`, `zip`, `enumerate`, `scan`, `chunks`, `windows`, `find`, `first`, `to_list`, `fold`, `each_effect`; a `Monad` for `do`; `Stream.from_seq` streams one |
 | `Option`, `Result` | `map`, `bind`, `with_default` and conversions |
 | `NonEmpty` | lists with at least one element |
 | `Chunk` | Effect's `Chunk`, for repeated concatenation |

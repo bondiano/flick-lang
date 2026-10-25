@@ -267,6 +267,36 @@ foreign pure map2_eff from "@flick-lang/runtime" "map2Eff"
   arity 3
   retention call
 
+seq_of_list : List a -> Seq a
+foreign pure seq_of_list from "@flick-lang/runtime" "seqOfList"
+
+map_seq : forall c d a b. (a -> b)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+foreign pure map_seq from "@flick-lang/runtime" "seqMap"
+  arity 2
+  retention call
+
+flat_map_seq : forall c d a b. (a -> (Seq b)^d)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+foreign pure flat_map_seq from "@flick-lang/runtime" "seqFlatMap"
+  arity 2
+  retention call
+
+fold_seq : forall c a b. (b -> a -> b)^c -> (b -> (Seq a -> b)^c)^c
+foreign pure fold_seq from "@flick-lang/runtime" "seqFold"
+  arity 3
+  retention call
+
+map2_seq :
+  forall c d a b x. (a -> b -> x)^c ->
+    ((Seq a)^d -> ((Seq b)^d -> (Seq x)^(c + d))^(c + d))^c
+foreign pure map2_seq from "@flick-lang/runtime" "seqMap2"
+  arity 3
+  retention call
+
+append_seq : forall d a. (Seq a)^d -> ((Seq a)^d -> (Seq a)^d)^d
+foreign pure append_seq from "@flick-lang/runtime" "seqAppend"
+  arity 2
+  retention call
+
 instance Functor Option =
   map : forall c d a b. (a -> b)^c -> ((Option a)^d -> (Option b)^(c + d))^c
   let map f value =
@@ -410,6 +440,31 @@ instance Semigroup (List a) =
 instance Monoid (List a) =
   empty : List a
   let empty = []
+
+instance Functor Seq =
+  map : forall c d a b. (a -> b)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+  let map f = map_seq f
+
+instance Foldable Seq =
+  fold : forall c a b. (b -> a -> b)^c -> (b -> (Seq a -> b)^c)^c
+  let fold f = fold_seq f
+
+instance Applicative Seq =
+  pure : forall a. a -> Seq a
+  let pure x = seq_of_list [x]
+  map2 :
+    forall c d a b x. (a -> b -> x)^c -> ((Seq a)^d -> ((Seq b)^d -> (Seq x)^(c + d))^(c + d))^c
+  let map2 f = map2_seq f
+
+instance Monad Seq =
+  flat_map : forall c d a b. (a -> (Seq b)^d)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
+  let flat_map f xs = flat_map_seq f xs
+
+instance Alternative Seq =
+  nothing : forall a. Seq a
+  let nothing = seq_of_list []
+  or_else : forall a. Seq a -> Seq a -> Seq a
+  let or_else xs ys = append_seq xs ys
 
 instance Eq SchemaError =
   eq : SchemaError -> SchemaError -> Bool

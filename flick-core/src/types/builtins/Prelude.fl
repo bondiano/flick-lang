@@ -14,6 +14,9 @@ type Unknown
 /// and all. `Js.snapshot` turns supported data into an `Unknown`.
 type JsValue
 type List a
+
+/// A lazy sequence that starts over on each iteration: see the module `Seq`.
+type Seq a
 type Ref a
 type Redacted a
 type Schema a

@@ -43,6 +43,11 @@ from_list : List a -> Stream none none a
 foreign pure from_list from "@flick-lang/runtime/effect/Stream" "fromArray"
   reviewed "effect@4.0.5 sha256:6c43f74d4003ca81"
 
+/// The stream of the elements of the sequence, pulled as the stream runs.
+from_seq : forall d a. (Seq a)^d -> (Stream none none a)^d
+foreign pure from_seq from "@flick-lang/runtime/effect/Stream" "fromIterable"
+  retention call
+
 /// The elements of each list, one list after the other.
 from_lists : List (List a) -> Stream none none a
 foreign pure from_lists from "@flick-lang/runtime/effect/Stream" "fromArrays"

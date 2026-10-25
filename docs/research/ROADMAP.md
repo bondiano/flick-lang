@@ -328,9 +328,10 @@ component search (props : SearchProps) =
 - AC: `do` раскрывается в методы `Monad`/`Alternative` прелюдии по абсолютному пути (пользовательский `flat_map` не перехватывает); опровержимый образец после `<-` — ошибка с подсказкой `match`; эффектный вызов в продолжении — отдельный диагноз с исправлением «связать до `do`»; ошибки указывают на утверждение.
 - AC: фикстуры `tests/check` и `tests/run`: `Option`, `Result`, `List`, `Eff`, обобщённый `Monad m =>`.
 
-**D5. `Seq` и генераторы.** ⬜
-- AC: `Seq a` — повторно итерируемый объект (`[Symbol.iterator]`), захваты `(Seq a)^c`; обёртки над `effect/Iterable`: `from`, `iterate`, `repeat`, `cycle`, `unfold`, `range`, `range_by`, `map`, `filter`, `flat_map`, `take*`, `drop*`, `zip*`, `enumerate`, `scan`, `chunks`, `windows`, `to_list`, `fold`, `find`, `first`, `each_effect`, `fold_effect`; `List.to_seq`, `Stream.from_seq`; TS-проекция `Iterable<A>`.
-- AC: класс `Iterable` без рантайм-стоимости с инстансами `List`, `Seq`, `Chunk`, `HashSet`, `HashMap`; `Functor`/`Monad`/`Foldable` для `Seq`.
+**D5. `Seq` и генераторы.** ✅
+- AC: `Seq a` в прелюдии — повторно итерируемый объект (`[Symbol.iterator]` запускает генератор заново), захваты `(Seq a)^c`; модуль `Seq`: `from`, `iterate`, `repeat`, `cycle`, `unfold`, `range`, `range_by`, `append`, `map`, `filter`, `filter_map`, `flat_map`, `take*`, `drop*`, `zip*`, `enumerate`, `scan`, `chunks`, `windows`, `to_list`, `fold`, `any`, `all`, `find`, `first`, `each_effect`, `fold_effect`, `of_list`; `Stream.from_seq`; TS-проекция `Iterable<A>`; работает и с `effect = "none"`.
+- AC: `Functor`/`Foldable`/`Applicative`/`Monad`/`Alternative` для `Seq`; тест рантайма: повторная итерация, `take` не тянет лишнего.
+- Класс `Iterable` для источников `for` — в D6.
 
 **D6. `for` в IR.** ⬜
 - AC: узел IR `For` (клаузы `Bind`/`Let`/`Guard`, режим `Lazy`/`Strict`/`Effect`) проходит все проходы `opt/`; `Lazy` — один `function*` с вложенными `for…of`, `Strict` — цикл с `push` (индексный, если источник — `List`); опровержимый образец в `for` фильтрует; вложенный генератор определяется флагом IR, а не текстом.

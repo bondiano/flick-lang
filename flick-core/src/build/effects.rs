@@ -27,6 +27,7 @@ const BUILTINS: &[&str] = &[
     "Option",
     "Prelude",
     "Result",
+    "Seq",
     "String",
 ];
 

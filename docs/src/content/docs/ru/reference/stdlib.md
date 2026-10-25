@@ -35,6 +35,7 @@ title: "Стандартная библиотека"
 | Модуль | Содержимое |
 | - | - |
 | `List` | `map` (принимает чистую функцию), `map_effect` (принимает эффектную функцию и обрабатывает элементы последовательно), `map_indexed`, `each_effect`, свёртки, `filter`, `find`, `sort` (стабильная сортировка по `Ord`), `sort_by`, `get`, `slice`, `range`, `zip`, … |
+| `Seq` | ленивые последовательности, каждая итерация начинается заново: бесконечные `from`, `iterate`, `repeat`, `cycle`, `unfold`; `range`, `map`, `filter`, `flat_map`, `take`, `take_while`, `drop`, `zip`, `enumerate`, `scan`, `chunks`, `windows`, `find`, `first`, `to_list`, `fold`, `each_effect`; `Monad` для `do`; `Stream.from_seq` превращает её в поток |
 | `Option`, `Result` | `map`, `bind`, `with_default` и преобразования |
 | `NonEmpty` | списки как минимум с одним элементом |
 | `Chunk` | `Chunk` из Effect для многократной конкатенации |

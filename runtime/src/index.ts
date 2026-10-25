@@ -23,6 +23,7 @@ export * from "./stdlib/decimal.ts";
 export * from "./stdlib/file.ts";
 export * from "./stdlib/hash.ts";
 export * from "./stdlib/list.ts";
+export * from "./stdlib/seq.ts";
 export * from "./stdlib/misc.ts";
 export * from "./stdlib/snapshot.ts";
 export * from "./stdlib/testing.ts";

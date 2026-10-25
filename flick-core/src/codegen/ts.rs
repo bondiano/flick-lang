@@ -260,6 +260,7 @@ impl Projection<'_> {
             }
             match (name.as_str(), args.len()) {
                 ("List", 1) => return Ok(format!("ReadonlyArray<{}>", arg(0)?)),
+                ("Seq", 1) => return Ok(format!("Iterable<{}>", arg(0)?)),
                 ("Option", 1) => return Ok(format!("$Option.Option<{}>", arg(0)?)),
                 ("Result", 2) => return Ok(format!("$Result.Result<{}, {}>", arg(1)?, arg(0)?)),
                 ("Eff", 3) => {

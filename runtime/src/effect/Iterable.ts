@@ -1,5 +1,5 @@
-// Effect's `Iterable` for the bindings of the standard library. Flick has
-// no lazy iterables: the adapters take and give lists.
+// Effect's `Iterable` for the bindings of `List`: the adapters take and give
+// lists. Lazy sequences are `Seq`, in `core/seq.ts`.
 import { Iterable } from "effect";
 import type { Result } from "effect";
 

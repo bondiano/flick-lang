@@ -1,0 +1,46 @@
+// Lazy sequences: infinite ones end under `take`, every iteration starts
+// over, and `Seq` is a `Monad` for `do`.
+module App.Main exposing (main)
+
+line : Show a => Seq a -> String
+let line xs = show (Seq.to_list xs)
+
+collatz : Number -> Seq Number
+let collatz n =
+  Seq.iterate (fun x -> if x % 2 == 0 then x / 2 else 3 * x + 1) n
+  |> Seq.take_while (fun x -> x != 1)
+
+fibs : Seq Number
+let fibs = Seq.unfold (fun (a, b) -> Some (a, (b, a + b))) (0, 1)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let naturals = Seq.from 1
+  let squares = Seq.map (fun n -> n * n) naturals
+  Platform.stdout_line (line (Seq.take 5 squares))
+  Platform.stdout_line (line (Seq.take 5 squares))
+  Platform.stdout_line (line (Seq.take 10 fibs))
+  Platform.stdout_line (line (collatz 6))
+  Platform.stdout_line (line (Seq.take 7 (Seq.cycle [1, 2, 3])))
+  Platform.stdout_line (line (Seq.take 3 (Seq.repeat "x")))
+  Platform.stdout_line (line (Seq.range_by 10 0 (-3)))
+  Platform.stdout_line (line (Seq.zip (Seq.of_list ["a", "b", "c"]) naturals))
+  Platform.stdout_line (line (Seq.take 3 (Seq.enumerate (Seq.of_list ["x", "y", "z", "w"]))))
+  Platform.stdout_line (line (Seq.scan (fun acc x -> acc + x) 0 (Seq.range 1 5)))
+  Platform.stdout_line (line (Seq.chunks 2 (Seq.range 0 5)))
+  Platform.stdout_line (line (Seq.windows 3 (Seq.range 0 5)))
+  Platform.stdout_line (line (Seq.drop_while (fun x -> x < 3) (Seq.range 0 6)))
+  Platform.stdout_line (show (Seq.find (fun n -> n * n > 50) naturals))
+  Platform.stdout_line (show (Seq.first (Seq.filter (fun n -> n % 7 == 0) naturals)))
+  Platform.stdout_line (show (Seq.any (fun n -> n > 1000) naturals))
+  Platform.stdout_line (show (Seq.fold (fun acc x -> acc + x) 0 (Seq.range 1 101)))
+  let pairs = do {
+    x <- Seq.range 1 4
+    y <- Seq.of_list ["a", "b"]
+    if x != 2
+    pure (x, y)
+  }
+  Platform.stdout_line (line pairs)
+  Seq.each_effect (fun n -> Platform.stdout_line ("each " ++ show n)) (Seq.take 2 naturals)
+  let streamed = Stream.run_collect (Stream.from_seq (Seq.take 3 squares))
+  Platform.stdout_line (show streamed)

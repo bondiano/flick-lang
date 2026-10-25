@@ -13,6 +13,7 @@ module Stream exposing (
   make,
   from_list,
   from_lists,
+  from_seq,
   suspend,
   fail,
   fail_cause,

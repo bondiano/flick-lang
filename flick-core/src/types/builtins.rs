@@ -34,6 +34,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("List.Search", include_str!("builtins/List/Search.fl")),
     ("List.Transform", include_str!("builtins/List/Transform.fl")),
     ("List", include_str!("builtins/List.fl")),
+    ("Seq", include_str!("builtins/Seq.fl")),
     ("Chunk.Core", include_str!("builtins/Chunk/Core.fl")),
     ("Chunk.Ops", include_str!("builtins/Chunk/Ops.fl")),
     ("Chunk", include_str!("builtins/Chunk.fl")),
