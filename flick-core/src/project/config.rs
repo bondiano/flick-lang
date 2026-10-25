@@ -65,6 +65,8 @@ pub struct Build {
     pub labels: Labels,
     /// What runs effects: Effect, or nothing, so that only pure code builds.
     pub effect: Backend,
+    /// The module that renders and mounts views, instead of React.
+    pub ui: Option<String>,
 }
 
 impl Default for Build {
@@ -80,6 +82,7 @@ impl Default for Build {
             solver_depth: types::Limits::default().depth,
             labels: Labels::default(),
             effect: Backend::Effect,
+            ui: None,
         }
     }
 }

@@ -103,6 +103,7 @@ fn emit(source: &str, profile: &str) -> (Option<(String, Vec<build::Artifact>)>,
             out_dir: Path::new("/dist"),
             root: None,
             backend: Backend::Effect,
+            ui: None,
         };
         let (artifacts, problems) = build::emit(&compilation, &sources, &settings);
         let failed = problems.iter().any(|d| d.severity == Severity::Error);

@@ -360,6 +360,7 @@ pub fn artifacts(
         release: output.release,
         root: project.map(|p| p.root.as_path()),
         backend: project.map_or(Backend::Effect, |p| p.config.build.effect),
+        ui: project.and_then(|p| p.config.build.ui.as_deref()),
     };
     build::emit(compilation, sources, &settings)
 }

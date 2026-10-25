@@ -50,6 +50,9 @@ pub fn schema_aot_file(name: &str) -> String {
     }
 }
 
+/// The runtime modules `[build] ui` replaces.
+const UI_RENDERER: &[&str] = &["@flick-lang/runtime/ui", "@flick-lang/runtime/ui/react"];
+
 /// A file of the output, by its path relative to the output directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Artifact {
@@ -81,6 +84,9 @@ pub struct Settings<'a> {
     /// What runs effects: without Effect, compiled code imports the
     /// runtime's `core`.
     pub backend: Backend,
+    /// The module that renders and mounts views in place of React's; a
+    /// relative one is relative to the project's root.
+    pub ui: Option<&'a str>,
 }
 
 /// The opt-in outputs of a build.
@@ -148,12 +154,17 @@ pub fn emit(
             .or_else(|| provider(m).map(|(_, i, _)| i))
     };
     let foreign = |module: &str, spec: &str| {
+        // `[build] ui` stands for the renderer and the mount of `Ui` and `Action`
+        let (spec, dir) = match settings.ui {
+            Some(ui) if UI_RENDERER.contains(&spec) => (ui, settings.root.map(Path::to_path_buf)),
+            _ => (spec, (settings.source_dir)(module)),
+        };
         let relative = spec.starts_with("./") || spec.starts_with("../");
         if settings.backend == Backend::None && !relative {
             // a module without a version on `core` is reported by `effects::check`
             return effects::specifier(spec).unwrap_or_else(|| spec.to_owned());
         }
-        match (relative, (settings.source_dir)(module)) {
+        match (relative, dir) {
             (true, Some(dir)) => {
                 let target = normalize(&dir.join(spec));
                 let from = settings.out_dir.join(path(module));
