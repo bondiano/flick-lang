@@ -15,6 +15,18 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
+/// The clauses of a `for` and its element or `do` body.
+pub fn for_parts(node: &Node) -> (impl Iterator<Item = &Node>, Option<&Node>) {
+    let mut parts = node.nodes();
+    let clauses = parts.next().into_iter().flat_map(Node::nodes);
+    (clauses, parts.next())
+}
+
+/// Whether a `for` runs a `do` body instead of yielding elements.
+pub fn is_loop(node: &Node) -> bool {
+    node.has_token(K::DoKw)
+}
+
 /// The `for` of `[for …]`, a strict comprehension, if `list` is one.
 pub fn comprehension(list: &Node) -> Option<&Node> {
     let mut items = list.nodes();
@@ -26,6 +38,9 @@ pub fn comprehension(list: &Node) -> Option<&Node> {
 
 impl Checker<'_> {
     pub fn for_expr(&mut self, node: &Node, strict: bool, expected: Option<&Type>) -> Type {
+        if is_loop(node) {
+            return self.for_loop(node, expected);
+        }
         let mark = self.locals.len();
         let uses = self.uses_mark();
         let saved = mem::take(&mut self.runtime);
@@ -35,10 +50,7 @@ impl Checker<'_> {
             "the clauses of `for` run when the sequence is iterated, outside this function: bind the result of a runtime call with `let` before it"
         };
         let outer = mem::replace(&mut self.stage, Stage::pure(reason));
-        let clauses = node
-            .nodes()
-            .filter(|n| n.kind == K::Block)
-            .flat_map(Node::nodes);
+        let (clauses, element) = for_parts(node);
         for clause in clauses {
             self.for_clause(clause);
         }
@@ -49,7 +61,7 @@ impl Checker<'_> {
                 self.seq_item(e)
             }
         });
-        let item = match (node.nodes().filter(|n| n.kind != K::Block).last(), item) {
+        let item = match (element, item) {
             (Some(body), Some(item)) => {
                 self.check(body, &item);
                 item
@@ -67,6 +79,25 @@ impl Checker<'_> {
             let seq = Type::app(Type::prim("Seq"), item);
             self.close_over(seq, held, expected.cloned(), "sequence", self.span(node))
         }
+    }
+
+    /// `for { clauses } do body`: the body runs for each element, here and
+    /// now, so the clauses and the body may make runtime calls.
+    fn for_loop(&mut self, node: &Node, expected: Option<&Type>) -> Type {
+        let mark = self.locals.len();
+        let (clauses, body) = for_parts(node);
+        for clause in clauses {
+            self.for_clause(clause);
+        }
+        let unit = Type::prim("Unit");
+        if let Some(body) = body {
+            self.check(body, &unit);
+        }
+        self.locals.truncate(mark);
+        if let Some(expected) = expected {
+            self.expect(&unit, expected, self.span(node));
+        }
+        unit
     }
 
     fn for_clause(&mut self, clause: &Node) {

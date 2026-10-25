@@ -42,6 +42,11 @@ let counted path =
     [for n <- [1, 2] yield n + size file]
   }
 
+// The body of `for … do` is a statement, of type `Unit`.
+looped : List Number -> Unit
+let looped xs = for x <- xs do x + 1
+
 //~ FLICK-E001 @21:13-21:38 this is a runtime call, but the clauses of `for` run when the sequence
 //~ FLICK-C001 @26:28-26:30 no instance for `Iterable Option`; instances of `Iterable`: `Iterable
 //~ FLICK-G001 @34:5-34:44 this sequence uses `file`, which holds region `s`, but the expected ty
+//~ FLICK-T003 @47:32-47:37 expected `Unit`, found `Number`

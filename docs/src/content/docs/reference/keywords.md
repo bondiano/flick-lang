@@ -57,7 +57,7 @@ and [ffi.md](../ffi/).
 | `none` | the empty row in a type | `a ->{none; NotFound} b` |
 | `in` | binds a row in a SQL `from` or `join` clause | `join account in Accounts` |
 | `do` | statements sequenced through `Monad`: `x <- e` binds, `if c` guards | `do { x <- left; y <- right; pure (x, y) }` |
-| `for` `yield` | a lazy `Seq` of the elements `yield` gives, one generator; `[for …]` is a strict `List` | `[for x <- xs if x > 0 yield x * 2]` |
+| `for` `yield` | a lazy `Seq` of the elements `yield` gives, one generator; `[for …]` is a strict `List`; `for … do body` runs the body for each element | `[for x <- xs if x > 0 yield x * 2]` |
 
 ## Effects and resources
 

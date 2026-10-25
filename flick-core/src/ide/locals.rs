@@ -67,12 +67,14 @@ pub fn in_scope(root: &Node, offset: u32, text: &str) -> Vec<(String, (u32, u32)
                     }
                 }
             }
-            // the element of a `for` sees the names of all its clauses
-            K::ForExpr if child.kind != K::Block => {
-                let clauses = scope
+            // the element or body of a `for` sees the names of all its clauses
+            K::ForExpr
+                if scope
                     .nodes()
-                    .filter(|n| n.kind == K::Block)
-                    .flat_map(Node::nodes);
+                    .next()
+                    .is_some_and(|c| c.range() != child.range()) =>
+            {
+                let clauses = scope.nodes().take(1).flat_map(Node::nodes);
                 for clause in clauses.filter(|c| matches!(c.kind, K::LetDecl | K::BindStmt)) {
                     out.extend(let_binders(clause, text));
                 }

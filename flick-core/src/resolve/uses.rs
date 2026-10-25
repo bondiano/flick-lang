@@ -99,23 +99,21 @@ impl Walker<'_> {
             }
             K::ForExpr => {
                 // the names of the clauses scope over the clauses after them and the element
-                for part in node.nodes() {
-                    if part.kind != K::Block {
-                        self.walk(part);
+                let mut parts = node.nodes();
+                for clause in parts.next().into_iter().flat_map(Node::nodes) {
+                    if clause.kind == K::LetDecl {
+                        self.let_decl(clause);
                         continue;
                     }
-                    for clause in part.nodes() {
-                        if clause.kind == K::LetDecl {
-                            self.let_decl(clause);
-                            continue;
-                        }
-                        for child in clause.nodes() {
-                            self.walk(child);
-                        }
-                        if clause.kind == K::BindStmt {
-                            self.bind_patterns(clause);
-                        }
+                    for child in clause.nodes() {
+                        self.walk(child);
                     }
+                    if clause.kind == K::BindStmt {
+                        self.bind_patterns(clause);
+                    }
+                }
+                for rest in parts {
+                    self.walk(rest);
                 }
                 self.release(mark);
                 return;

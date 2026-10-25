@@ -395,7 +395,7 @@ atom        = name | Con { "." Con } ["." name] | Number | BigInt | String
             | "{" expr "with" field "=" block { … } "}"
             | "task" "{" block "}" | "ui" "{" block "}"
             | "do" "{" do_stmt { ";" | line break … } "}"
-            | "for" ("{" clause_list "}" | clause_list) "yield" expr
+            | "for" ("{" clause_list "}" | clause_list) ("yield" expr | "do" block)
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
             | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
@@ -421,7 +421,10 @@ cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
 `if c` пропускает элемент, если `c` ложно, `let` действует до конца; клаузы
 чистые. `[for … yield e]` — `for`, единственный в скобках, — строгий `List` тех
 же элементов, собранный циклом. Без фигурных скобок клаузы разделяются `;`,
-а `if` фильтра начинает новую.
+а `if` фильтра начинает новую. `do body` вместо `yield e` выполняет тело —
+блок типа `Unit` — для каждого элемента прямо на месте: клаузы и тело могут
+делать эффектные вызовы, их строки объединяются со строками функции, а цикл —
+это `for…of` внутри её вычисления.
 `<-` вне блока `do` или `for` — `FLICK-S013`; сравнение с отрицательным числом пишется
 `a < -1`.
 

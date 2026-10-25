@@ -127,6 +127,8 @@ fn at_operand_start(p: &Parser) -> bool {
                 | K::MatchKw
                 | K::TryKw
                 | K::IfKw
+                | K::DoKw
+                | K::ForKw
         )
 }
 
@@ -196,8 +198,6 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::LParen
         | K::LBracket
         | K::TaskKw
-        | K::DoKw
-        | K::ForKw
         | K::TodoKw
         | K::ScopeKw
         | K::ProvideKw
@@ -499,7 +499,8 @@ fn do_expr(p: &mut Parser) -> K {
 }
 
 /// `for { clauses } yield e`, or the clauses inline, separated by `;` or a
-/// guard's `if`: `[for x <- xs if x > 0 yield x]`.
+/// guard's `if`: `[for x <- xs if x > 0 yield x]`. `do body` instead of
+/// `yield e` runs the body for each element.
 fn for_expr(p: &mut Parser) -> K {
     p.bump();
     if p.at(K::LBrace) {
@@ -514,7 +515,13 @@ fn for_expr(p: &mut Parser) -> K {
         }
         p.complete(m, K::Block);
     }
-    if p.expect(K::YieldKw) {
+    if p.eat(K::DoKw) {
+        if p.at(K::LBrace) {
+            p.braces(K::Block, stmt, |_| false);
+        } else {
+            p.body(K::Block, stmt);
+        }
+    } else if p.expect(K::YieldKw) {
         expr(p);
     }
     K::ForExpr

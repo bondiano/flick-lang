@@ -59,7 +59,7 @@ title: Ключевые слова
 | `none` | Обозначает пустую строку в типе | `a ->{none; NotFound} b` |
 | `in` | Связывает имя со строкой таблицы в конструкции SQL `from` или `join` | `join account in Accounts` |
 | `do` | Утверждения через `Monad`: `x <- e` связывает, `if c` фильтрует | `do { x <- left; y <- right; pure (x, y) }` |
-| `for` `yield` | Ленивый `Seq` элементов, которые даёт `yield`, — один генератор; `[for …]` — строгий `List` | `[for x <- xs if x > 0 yield x * 2]` |
+| `for` `yield` | Ленивый `Seq` элементов, которые даёт `yield`, — один генератор; `[for …]` — строгий `List`; `for … do body` выполняет тело для каждого элемента | `[for x <- xs if x > 0 yield x * 2]` |
 
 ## Эффекты и ресурсы
 

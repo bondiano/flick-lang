@@ -344,8 +344,11 @@ component search (props : SearchProps) =
 - ✅ `FLICK-T029` `do` над Eff → `task` с `await` (`x <- e` → `let x = await e`, утверждение → `await`/`ignore await`, `pure v` → `v`); `T030` `x <- e; pure x` → `e` (safe); `T031` `Seq.to_list` бесконечной последовательности (`from`/`repeat`/`iterate`/`cycle` через `map`/`filter`/… без `take*`); `T032` `Seq.to_list (for …)` → `[for …]` (safe); `T033` `xs |> List.filter (fun x -> p) |> List.map (fun x -> e)` → `[for x <- xs if p yield e]` при одном имени параметра.
 - ⬜ цепочки `flat_map`/`match … None -> None` → `do`; исправление «связать эффект до `do`» (диагноз с подсказкой уже есть).
 
-**D9. Эффектный `for`.** ⬜
-- AC: `for { … } do body` в стадии времени выполнения — `for…of` внутри текущего `Effect.gen`, без генератора; строки тела объединяются со строкой функции; прерывание посреди цикла (тест).
+**D9. Эффектный `for`.** ✅
+- AC: `for { … } do body` / `for x <- xs do body` (тело — блок с отступом, в скобках или в строку) типа `Unit`; клаузы и тело могут делать эффектные вызовы, строки объединяются со строкой функции; в стадии времени выполнения — `for…of` с `yield*` внутри текущего `Effect.gen`, без генератора; прерывание посреди цикла (тест с `timeout_option`).
+- `do` больше не начинает аргумент (как `if`/`match`): `f (do { … })`.
+
+**D7** остаётся ⬜: ждёт C1 (стадия `Sync`).
 
 **D10. Applicative `do`.** ⬜
 - AC: `x <- a and y <- b` → `map2`, нужен только `Applicative`; ссылка между связками `and` — ошибка; `Validation` накапливает ошибки (D13).

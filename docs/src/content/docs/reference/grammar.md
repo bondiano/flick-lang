@@ -372,7 +372,7 @@ atom        = name | Con { "." Con } ["." name] | Number | BigInt | String
             | "{" expr "with" field "=" block { … } "}"
             | "task" "{" block "}" | "ui" "{" block "}"
             | "do" "{" do_stmt { ";" | line break … } "}"
-            | "for" ("{" clause_list "}" | clause_list) "yield" expr
+            | "for" ("{" clause_list "}" | clause_list) ("yield" expr | "do" block)
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
             | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
@@ -399,7 +399,10 @@ the clauses on each iteration. `x <- source` takes the elements of an
 `if c` skips the element unless `c`, and `let` scopes over the rest; the
 clauses are pure. `[for … yield e]`, a `for` alone in brackets, is the strict
 `List` of the same elements, built with a loop. Without braces the clauses
-are separated by `;`, and a guard's `if` starts a new one.
+are separated by `;`, and a guard's `if` starts a new one. `do body` in place
+of `yield e` runs the body, a `Unit` block, for each element right there:
+the clauses and the body may make runtime calls, which join the rows of the
+function, and the loop is a `for…of` inside its computation.
 `<-` outside a `do` or `for` block is `FLICK-S013`; a comparison with a negative number
 is written `a < -1`.
 

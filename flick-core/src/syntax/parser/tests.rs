@@ -281,3 +281,14 @@ fn for_takes_braced_or_inline_clauses_and_yields() {
     let src = "let s =\n  for {\n    x <- xs\n  }\n  yield x\n";
     assert!(sexp(src).contains("} yield (NameExpr x)"), "{}", sexp(src));
 }
+
+#[test]
+fn for_do_runs_a_body_inline_indented_or_braced() {
+    assert!(
+        sexp("let f xs = for x <- xs do log x")
+            .contains("do (Block (AppExpr (NameExpr log) (NameExpr x)))")
+    );
+    let src = "let f xs =\n  for { x <- xs } do\n    log x\n    log x\n";
+    assert!(sexp(src).contains("} do (Block (AppExpr"), "{}", sexp(src));
+    assert!(sexp("let f xs = for x <- xs do { log x; log x }").contains("do { (Block"));
+}

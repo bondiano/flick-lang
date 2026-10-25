@@ -61,7 +61,7 @@ pub use bindings::{LetParts, let_parts, signature_name};
 pub use builtins::{builtin_sources, builtins};
 pub use classes::Dict;
 pub(crate) use classes::{Match, match_type};
-pub use comprehension::comprehension;
+pub use comprehension::{comprehension, for_parts};
 pub use convert::is_type;
 pub use decls::class_defaults;
 pub use display::show_type;
