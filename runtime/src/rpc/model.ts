@@ -18,6 +18,8 @@ export interface Procedure {
   readonly success: AnySchema | null;
   readonly errors: ReadonlyArray<AnySchema>;
   readonly stream: boolean;
+  /** Run in order before the handler on `{ payload, headers }`; a failure answers instead. */
+  readonly middleware: ReadonlyArray<(call: unknown) => unknown>;
 }
 
 /** `Rpc.Group hs`. */
@@ -76,7 +78,7 @@ const with_ = (procedure: Procedure, change: Partial<Procedure>): Procedure => O
 
 /** `Rpc.make label`: a procedure without payload, success or errors. */
 export const rpcMake = (name: string): Procedure =>
-  Object.freeze({ name, payload: null, success: null, errors: [], stream: false });
+  Object.freeze({ name, payload: null, success: null, errors: [], stream: false, middleware: [] });
 
 export const rpcWithPayload = (codec: AnySchema, procedure: Procedure): Procedure => with_(procedure, { payload: codec });
 
@@ -91,6 +93,10 @@ export const rpcErrorCase = (codec: AnySchema): AnySchema => codec;
 
 export const rpcWithErrors = (cases: ReadonlyArray<AnySchema>, procedure: Procedure): Procedure =>
   with_(procedure, { errors: [...procedure.errors, ...cases] });
+
+/** `Rpc.with_middleware hook procedure`: `hook` runs after the hooks the procedure has. */
+export const rpcWithMiddleware = (hook: (call: unknown) => unknown, procedure: Procedure): Procedure =>
+  with_(procedure, { middleware: [...procedure.middleware, hook] });
 
 /** `Rpc.group`: a group without procedures. */
 export const rpcGroup: Group = /*#__PURE__*/ Object.freeze({ procedures: [] });

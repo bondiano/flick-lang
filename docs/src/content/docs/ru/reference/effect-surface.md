@@ -104,7 +104,9 @@ Effect помечает `effect/reactivity` как `@stability unstable` в 4.0.
 по WebSocket, а клиент обращается к ней с `transport = Rpc.websocket`;
 `listen_tcp` — по TCP в Node, с `Rpc.tcp` и сериализацией, которая делит
 поток на кадры; `serve_stdio` отвечает на вызовы через stdin и stdout, а
-`spawn` запускает такую программу и подключается к ней;
+`spawn` запускает такую программу и подключается к ней; `with_middleware`
+выполняет хук над payload и заголовками каждого вызова до обработчика, а
+`with_headers` добавляет заголовки к вызовам задачи;
 `connect` держит одно соединение, которое делят `call_on` и
 `call_stream_on`.
 

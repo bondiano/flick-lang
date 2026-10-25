@@ -83,3 +83,9 @@ export const rpcCallStreamOn = (connection: Client, procedure: Procedure, payloa
   Stream.unwrap(Effect.map(over(connection.context, procedure), (call) => Stream.mapError(streamed(call)(procedure.name, payload), clientFailure))).pipe(
     Stream.scoped,
   );
+
+/** `Rpc.with_headers input task`: the calls of `task` carry the headers too. */
+export const rpcWithHeaders =
+  (input: ReadonlyArray<readonly [string, string]>) =>
+  <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+    RpcClient.withHeaders(self, input);

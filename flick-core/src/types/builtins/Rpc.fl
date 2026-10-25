@@ -145,6 +145,20 @@ foreign pure with_errors from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithError
   arity 2
   reviewed "effect@4.0.5 sha256:04f66df479054dbe"
 
+/// What a hook of `with_middleware` gets: the decoded payload and the
+/// headers of the call, those of its HTTP request or WebSocket with those
+/// `with_headers` added (names in lower case).
+type alias Call p = { payload : p; headers : Http.Headers.Headers }
+
+/// Runs `hook` on each call before the handler, after the hooks the
+/// procedure has, with the services of `listen`; a typed failure of the hook
+/// is answered as one of the handler would be, so it is one of the
+/// procedure's errors.
+with_middleware : (Call p ->{r; e} Unit) -> Rpc l (p ->{r; e} s) -> Rpc l (p ->{r; e} s)
+foreign pure with_middleware from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithMiddleware"
+  arity 2
+  reviewed "effect@4.0.5 sha256:93976e18ef904486"
+
 /// A group with no procedures yet.
 group : Group {}
 foreign pure group from "@flick-lang/runtime/effect/rpc/Rpc" "rpcGroup"
@@ -277,3 +291,11 @@ spawn : forall s. Serialization -> String -> List String ->{Scope s; ClientError
 foreign effect spawn from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcSpawn"
   arity 3
   reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"
+
+/// Runs `task` with its calls carrying the headers too, which the hooks of
+/// `with_middleware` read: `authorization`, say.
+with_headers : forall c r e a. Http.Headers.Input -> (Eff r e a)^c ->{r; e} a
+foreign effect with_headers from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithHeaders"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:dcacf8ec37486efd"

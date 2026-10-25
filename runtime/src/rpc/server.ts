@@ -9,7 +9,7 @@ import * as NodeSocket from "@effect/platform-node/NodeSocket";
 import * as NodeSocketServer from "@effect/platform-node/NodeSocketServer";
 import { Effect, Exit, Fiber, Layer, Scope, Stdio, Stream } from "effect";
 import { RpcSerialization } from "effect/rpc/RpcSerialization";
-import { HttpRouter } from "effect/http";
+import { type Headers, HttpRouter } from "effect/http";
 import * as RpcClient from "effect/rpc/RpcClient";
 import * as RpcServer from "effect/rpc/RpcServer";
 
@@ -33,14 +33,25 @@ const isRoutePath = (path: string): path is `/${string}` => path.startsWith("/")
 const prepare = (group: Group, handlers: Readonly<Record<string, Handler>>) =>
   Effect.gen(function* () {
     const context = yield* Effect.context<unknown>();
-    const own: Record<string, (payload: unknown) => unknown> = {};
+    const own: Record<string, (payload: unknown, call: { readonly headers: Headers.Headers }) => unknown> = {};
     for (const procedure of group.procedures) {
       const handler = handlers[procedure.name];
       if (handler === undefined) return yield* Effect.die(new TypeError(`no handler for ${procedure.name}`));
-      // a handler runs with the services of `listen`; a stream's handler gives the stream as its result
+      // the hooks of the procedure, then the handler, with the services of `listen`
+      const handle = (payload: unknown, call: { readonly headers: Headers.Headers }) =>
+        Effect.provideContext(
+          Effect.andThen(
+            Effect.forEach(procedure.middleware, (hook) => toEffect(hook(Object.freeze({ payload, headers: call.headers }))), {
+              discard: true,
+            }),
+            handler(payload),
+          ),
+          context,
+        );
+      // a stream's handler gives the stream as its result
       own[procedure.name] = procedure.stream
-        ? (payload: unknown) => Stream.unwrap(Effect.provideContext(Effect.map(handler(payload), toStream), context))
-        : (payload: unknown) => Effect.provideContext(handler(payload), context);
+        ? (payload: unknown, call: { readonly headers: Headers.Headers }) => Stream.unwrap(Effect.map(handle(payload, call), toStream))
+        : handle;
     }
     const rpcs = effectGroup(group.procedures);
     const scope = yield* Scope.make();
@@ -76,6 +87,9 @@ const start = (transport: Served, options: ServeOptions, group: Group, handlers:
     const port = made.address._tag === "UnixPathAddress" ? 0 : made.address.port;
     return { port, scope } satisfies Server;
   });
+
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a hook is a runtime function of the checker's typing
+const toEffect = (value: unknown): Effect.Effect<unknown, unknown, unknown> => value as Effect.Effect<unknown, unknown, unknown>;
 
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the checker typed the handler's result as a stream
 const toStream = (value: unknown): Stream.Stream<unknown, unknown> => value as Stream.Stream<unknown, unknown>;
