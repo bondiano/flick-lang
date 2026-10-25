@@ -322,6 +322,28 @@ let page n =
   }
 ```
 
+### Server and client parity
+
+Server markup hydrates only if the client's first render draws the same
+thing. A view therefore reads each atom as the server would, both on the
+server and while its root hydrates, and renders again with the client's
+values once React has hydrated it.
+
+A browser state such as the URL has no value on a server. Its type,
+`Atom.Browser a`, is not an atom that `Atom.get` or `Atom.value` reads: give
+it the value the server renders with `Atom.on_server`, or read it with
+`Atom.client_only`, which is `None` on the server and while hydrating.
+`Atom.search_param name` is the URL's search parameter `name`; a write
+updates the URL.
+
+```flick
+query : Atom.Writable String
+let query = Atom.on_server "" (Atom.search_param "q")
+
+tab : Atom.Atom (Option String)
+let tab = Atom.client_only (Atom.search_param "tab")
+```
+
 ## Other React renderers
 
 `@flick-lang/runtime/ui` is the React DOM adapter.

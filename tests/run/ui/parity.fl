@@ -1,0 +1,64 @@
+// Atoms of the browser on a server and in a hydrating root: both render
+// the server's value, so hydration finds no mismatch, and then the root
+// renders the browser's.
+module App.Main exposing (main)
+
+serve_at : String -> String -> String ->{} Unit
+foreign sync serve_at from "./dom.mjs" "serveAt"
+  arity 3
+
+complaints : Unit ->{} String
+foreign sync complaints from "./dom.mjs" "complaints"
+  arity 0
+
+settle : Unit ->{} Unit
+foreign async settle from "./dom.mjs" "settle"
+  arity 0
+
+markup : Unit ->{} String
+foreign sync markup from "./dom.mjs" "markup"
+  arity 0
+
+query : Atom.Writable String
+let query = Atom.on_server "(none)" (Atom.search_param "q")
+
+seen : Atom.Atom (Option String)
+let seen = Atom.client_only (Atom.search_param "q")
+
+page : Ui.View Unit {Reactivity.Atom.Registry} none
+let page =
+  Ui.view (fun () ->
+    let client =
+      match Atom.get seen with
+      | None -> "server"
+      | Some q -> "client " ++ q
+    ui {
+      div
+        { class_name = "page" }
+        [
+          paragraph [text ("query " ++ Atom.value query)],
+          paragraph [text client],
+          Ui.field { bind = query; placeholder = "Query"; on_input = None },
+        ]
+    })
+
+report : Failure e ->{} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let server = provide Reactivity.Atom.layer { Ui.Server.render (Ui.render page ()) }
+  Platform.stdout_line server
+  serve_at "http://localhost/?q=hi" server ""
+  match Ui.Dom.container "app" with
+  | None -> Platform.stdout_line "no container"
+  | Some root ->
+    provide Reactivity.Atom.layer {
+      scope s {
+        let ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render page ()) })
+        settle ()
+        Platform.stdout_line (markup ())
+      }
+    }
+  Platform.stdout_line ("complaints: [" ++ complaints () ++ "]")

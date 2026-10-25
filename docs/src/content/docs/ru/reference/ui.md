@@ -325,6 +325,28 @@ let page n =
   }
 ```
 
+### Паритет сервера и клиента
+
+Серверная разметка гидратируется, только если первый рендер клиента рисует
+то же самое. Поэтому представление читает каждый атом так, как прочитал бы
+сервер, и на сервере, и пока его корень гидратируется, а после гидратации
+React рендерит его снова со значениями клиента.
+
+У состояния браузера, например URL, нет значения на сервере. Его тип
+`Atom.Browser a` — не атом, который читают `Atom.get` или `Atom.value`:
+задайте значение, которое рисует сервер, через `Atom.on_server`, или читайте
+его через `Atom.client_only`, который даёт `None` на сервере и во время
+гидратации. `Atom.search_param name` — параметр поиска `name` в URL; запись
+обновляет URL.
+
+```flick
+query : Atom.Writable String
+let query = Atom.on_server "" (Atom.search_param "q")
+
+tab : Atom.Atom (Option String)
+let tab = Atom.client_only (Atom.search_param "tab")
+```
+
 ## Другие рендереры React
 
 `@flick-lang/runtime/ui` — адаптер React DOM.

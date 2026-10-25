@@ -1,0 +1,4 @@
+<div class="page"><p>query (none)</p><p>server</p><input placeholder="Query" value="(none)"/></div>
+<div class="page"><p>query hi</p><p>client hi</p><input placeholder="Query" value="hi"></div>
+supervisor: interrupt
+complaints: []

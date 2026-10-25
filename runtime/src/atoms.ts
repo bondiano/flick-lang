@@ -2,7 +2,7 @@
 // a derived atom reads through. Both run synchronously (React renders and
 // Effect's registry computes in plain JS), so the effect of a read runs at
 // once with `runSync`, its reads going to the reader at hand.
-import { Cause, Effect } from "effect";
+import { Cause, Effect, Option } from "effect";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Atom from "effect/reactivity/Atom";
 
@@ -59,3 +59,13 @@ export const atomTask = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<object> => 
 /** `Atom.derived`: an atom `compute` computes, depending on the atoms it reads. */
 export const atomDerived = <A>(compute: (unit: undefined) => Effect.Effect<A, unknown, unknown>): Atom.Atom<A> =>
   Atom.readable((ctx) => runReading(compute(undefined), (atom) => ctx(atom)));
+
+/** `Atom.search_param`: the URL's search parameter `name`; a write updates the URL. */
+export const atomSearchParam = (name: string): Atom.Writable<string> => Atom.keepAlive(Atom.searchParam(name));
+
+/** `Atom.on_server`: the browser atom, read as `value` on a server and while a root hydrates. */
+export const atomOnServer = <A>(value: A, atom: Atom.Writable<A>): Atom.Writable<A> => Atom.withServerValue(atom, () => value);
+
+/** `Atom.client_only`: the browser atom's value, `None` on a server and while a root hydrates. */
+export const atomClientOnly = <A>(atom: Atom.Writable<A>): Atom.Atom<Option.Option<A>> =>
+  Atom.withServerValue(Atom.map(atom, Option.some), () => Option.none());

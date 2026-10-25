@@ -15,8 +15,11 @@ export const setup = () => {
 let errors = [];
 
 /** A page a server rendered: `markup` in the container, `state` after it; React's complaints are kept. */
-export const serve = (markup, state) => {
-  dom = new JSDOM(`<!doctype html><html><body><div id="app" data-flick-ssr>${markup}</div>${state}</body></html>`);
+export const serve = (markup, state) => serveAt("http://localhost/", markup, state);
+
+/** `serve` at the URL `url`. */
+export const serveAt = (url, markup, state) => {
+  dom = new JSDOM(`<!doctype html><html><body><div id="app" data-flick-ssr>${markup}</div>${state}</body></html>`, { url });
   Object.assign(globalThis, { window: dom.window, document: dom.window.document });
   root = dom.window.document.getElementById("app");
   console.error = (...args) => errors.push(args.join(" "));

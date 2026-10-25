@@ -33,6 +33,30 @@ serializable_family : PureCodec Json a -> (String -> Writable a) -> String -> Wr
 let serializable_family wire f =
   Reactivity.Atom.serializable_family "Atom.serializable_family" wire f
 
+/// A state the browser holds, such as the URL. A server has no browser, so
+/// a view reads one only through `on_server` or `client_only`, which say
+/// what the server renders; a root that hydrates server markup renders
+/// that too, then the browser's value.
+type Browser a
+
+/// The browser state `atom`, read as `value` on a server and while a root
+/// hydrates.
+on_server : a -> Browser a -> Writable a
+foreign pure on_server from "@flick-lang/runtime" "atomOnServer"
+  arity 2
+
+/// The value of the browser state `atom`: `None` on a server and while a
+/// root hydrates, `Some` after.
+client_only : Browser a -> Atom (Option a)
+foreign pure client_only from "@flick-lang/runtime" "atomClientOnly"
+  arity 1
+
+/// The search parameter `name` of the page's URL, `""` when it has none;
+/// a write updates the URL.
+search_param : String -> Browser String
+foreign pure search_param from "@flick-lang/runtime" "atomSearchParam"
+  arity 1
+
 /// An atom computed by `compute` from the atoms it reads, again when one
 /// of them changes.
 derived : (Unit ->{Read;} a) -> Atom a

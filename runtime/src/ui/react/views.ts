@@ -2,7 +2,7 @@
 // components do, so a program that renders none keeps none of this code.
 // They take the root's events and registry from React context.
 import { Cause, Effect, Option } from "effect";
-import type * as Atom from "effect/reactivity/Atom";
+import * as Atom from "effect/reactivity/Atom";
 import {
   type FunctionComponent,
   type ReactNode,
@@ -51,6 +51,17 @@ export const uiSuspended = (failed: (failure: Failure) => Ui, fallback: Ui, rend
 /** `Ui.named`: the component as React's tools show it. */
 export const uiNamed = (label: string, view: View): View => Object.freeze({ render: view.render, label });
 
+const unsubscribed = (): (() => void) => () => undefined;
+const onClient = (): boolean => false;
+const onServer = (): boolean => true;
+
+/**
+ * Whether the component renders on a server or hydrates server markup:
+ * it then reads the server values of atoms, as the server did, and React
+ * renders it again with the client's once hydrated.
+ */
+const serverSide = (): boolean => useSyncExternalStore(unsubscribed, onClient, onServer);
+
 const registryOf = (what: string) => {
   const registry = useContext(RegistryContext);
   if (registry === undefined) throw new Error(`${what}: render it with \`Ui.Dom.mount\` or \`Ui.Server.render\`, which provide the registry`);
@@ -67,9 +78,10 @@ const component = (view: View): FunctionComponent<object> => {
     const registry = registryOf("a view reads atoms");
     const bridge = useContext(BridgeContext);
     const [, rerender] = useReducer((n: number) => n + 1, 0);
+    const server = serverSide();
     const read = new Map<Atom.Atom<unknown>, unknown>();
     const node = runReading(view.render(props), (atom) => {
-      const value = registry.get(atom);
+      const value = server ? Atom.getServerValue(atom, registry) : registry.get(atom);
       read.set(atom, value);
       return value;
     });
@@ -116,7 +128,7 @@ const Field = ({ tag, bind, placeholder, input }: FieldState): ReactNode => {
   const bridge = useContext(BridgeContext);
   const subscribe = useCallback((changed: () => void) => registry.subscribe(bind, changed), [registry, bind]);
   const snapshot = (): string => registry.get(bind);
-  const value = useSyncExternalStore(subscribe, snapshot, snapshot);
+  const value = useSyncExternalStore(subscribe, snapshot, () => Atom.getServerValue(bind, registry));
   const listener = useMemo(() => (bridge === undefined || input === undefined ? undefined : bridge.listener(input)), [bridge]);
   useLayoutEffect(() => {
     if (listener !== undefined && input !== undefined) listener.update(input);

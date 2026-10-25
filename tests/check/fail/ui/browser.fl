@@ -1,0 +1,15 @@
+module App.Browser exposing (..)
+
+query : Atom.Browser String
+let query = Atom.search_param "q"
+
+read : Ui.View Unit {} none
+let read = Ui.view (fun () -> Ui.text (Atom.get query))
+//                                              ^^^^^ FLICK-T003 expected `Atom _`, found `Browser String`
+
+value : Ui.View Unit {} none
+let value = Ui.view (fun () -> Ui.text (Atom.value query))
+//                                                 ^^^^^ FLICK-T003 expected `Writable _`, found `Browser String`
+
+on_server : Ui.View Unit {} none
+let on_server = Ui.view (fun () -> Ui.text (Atom.value (Atom.on_server "" query)))
