@@ -20,7 +20,7 @@ title: "Стандартная библиотека"
 | Имя | Назначение |
 | - | - |
 | `Eq`, `Ord`, `Hash`, `Show` | каноническое равенство, полный порядок, хеширование, представление для вывода |
-| `Functor`, `Foldable`, `Traversable`, `Applicative`, `Monad` | классы для конструкторов типов `f : Type -> Type`: `map`, `fold`, `traverse`, `return`, `flat_map` |
+| `Functor`, `Foldable`, `Traversable`, `Applicative`, `Monad` | классы для конструкторов типов `f : Type -> Type`: `map`, `fold`, `traverse`, `pure`, `flat_map` |
 | `bind`, `bind_eff` | последовательное выполнение для любой монады и для `Eff` с объединением строк |
 | `from_result` | `Result (Errors e) a ->{; e} a` |
 | `parallel`, `parallel_all`, `parallel_results`, `parallel_exits`, `race_success`, `race_first`, `timeout`, `timeout_option` | структурированная конкурентность, см. [среду выполнения](../runtime/) |

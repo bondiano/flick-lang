@@ -7,7 +7,7 @@ let pair_optional left right =
   do {
     x <- left
     y <- right
-    return (x, y)
+    pure (x, y)
   }
 
 safe_div : Number -> Number -> Result String Number
@@ -19,7 +19,7 @@ let ratio a b c =
     x <- safe_div a b
     let doubled = x * 2
     y <- safe_div doubled c
-    return (y + 1)
+    pure (y + 1)
   }
 
 triples : Number -> List (Number, Number, Number)
@@ -30,11 +30,11 @@ let triples n =
     b <- range
     c <- range
     if a * a + b * b == c * c && a < b
-    return (a, b, c)
+    pure (a, b, c)
   }
 
 twice : Monad m => m Number -> m Number
-let twice m = do { x <- m; y <- m; return (x + y) }
+let twice m = do { x <- m; y <- m; pure (x + y) }
 
 main : Unit ->{; AppError} Unit
 let main () =
@@ -46,8 +46,8 @@ let main () =
   Platform.stdout_line (show (twice (Some 21)))
   Platform.stdout_line (show (twice [1, 2]))
   let eff = do {
-    x <- return 40
+    x <- pure 40
     task { Platform.stdout_line "inside" }
-    return (x + 2)
+    pure (x + 2)
   }
   Platform.stdout_line (show (await eff))

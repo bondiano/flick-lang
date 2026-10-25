@@ -322,7 +322,6 @@ component search (props : SearchProps) =
 **D3. `do`: синтаксис, типы, IR.** ✅ (вместе с D4)
 - AC: `do { … }`; утверждения `p <- e`, `let`, `let assert`, `if c` без `then`, выражение; `<-` — токен лексера (`a<-1` — `FLICK-S013` с подсказкой `a < -1`; отформатированный код всегда пишет `a < -1`); `do` без скобок — `FLICK-S010`.
 - AC: `flick fmt` идемпотентен, tree-sitter (`<-`), биндеры для unused/IDE, hover и сворачивание `do`; `reference/keywords.md`, `grammar.md` (en + ru).
-- AC: метод `Applicative.pure` называется `return` (знакомо императивщикам).
 - `for`/`yield` и их синтаксис — в D6/D9.
 
 **D4. Типизация `do`.** ✅ (в D3)
@@ -340,7 +339,7 @@ component search (props : SearchProps) =
 - AC: Sync-вызовы в теле `for … yield` выполняются при `next()` в контексте, захваченном при создании; строка ошибок `none`; Async/Scope — ошибка; повтор эффектов при повторной итерации задокументирован.
 
 **D8. Линты и исправления.** ⬜
-- AC: предупреждения с `fixes`: `do` над Eff → прямые вызовы; цепочки `flat_map`/`match … None -> None` → `do`; `List.filter |> List.map` → `[for …]`; `x <- e; return x` → `e`; `do` с одним `<-` → `map`; `to_list` бесконечного `Seq` без `take*`; `Seq.to_list (for …)` → `[for …]`; тест «до/после» на каждый.
+- AC: предупреждения с `fixes`: `do` над Eff → прямые вызовы; цепочки `flat_map`/`match … None -> None` → `do`; `List.filter |> List.map` → `[for …]`; `x <- e; pure x` → `e`; `do` с одним `<-` → `map`; `to_list` бесконечного `Seq` без `take*`; `Seq.to_list (for …)` → `[for …]`; тест «до/после» на каждый.
 
 **D9. Эффектный `for`.** ⬜
 - AC: `for { … } do body` в стадии времени выполнения — `for…of` внутри текущего `Effect.gen`, без генератора; строки тела объединяются со строкой функции; прерывание посреди цикла (тест).

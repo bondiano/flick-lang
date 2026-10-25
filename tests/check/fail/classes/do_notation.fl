@@ -7,7 +7,7 @@ let logged n =
   do {
     x <- Some n
     Platform.stdout_line "no"
-    return x
+    pure x
   }
 
 // A pattern after `<-` must match every value.
@@ -15,7 +15,7 @@ values : List (Option Number) -> List Number
 let values xs =
   do {
     Some x <- xs
-    return x
+    pure x
   }
 
 // The block ends with an expression, not a binding or a `let`.
@@ -44,6 +44,6 @@ let guarded n =
 //~ FLICK-E001 @9:5-9:30 this is a runtime call, but the rest of a `do` block is the pure funct
 //~ FLICK-T003 @9:5-9:30 expected `Option _`, found `Unit`
 //~ FLICK-T009 @17:5-17:11 this pattern does not match `None`; use `match` to handle every case
-//~ FLICK-T019 @25:5-25:12 a `do` block must end with an expression, not a binding: add `return x`
+//~ FLICK-T019 @25:5-25:12 a `do` block must end with an expression, not a binding: add `pure x`
 //~ FLICK-T019 @33:4-33:4 a `do` block must end with an expression: its value is the value of th
 //~ FLICK-C001 @40:5-40:7 no instance for `Alternative (Result String)`; instances of `Alternati

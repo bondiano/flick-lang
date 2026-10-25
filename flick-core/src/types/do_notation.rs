@@ -84,7 +84,7 @@ impl Checker<'_> {
                 self.error(
                     codes::T019,
                     self.span(first),
-                    "a `do` block must end with an expression, not a binding: add `return x` after it",
+                    "a `do` block must end with an expression, not a binding: add `pure x` after it",
                 );
                 Type::Error
             }

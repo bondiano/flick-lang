@@ -56,7 +56,7 @@ and [ffi.md](../ffi/).
 | `true` `false` | the two `Bool` values | `if ok then true else false` |
 | `none` | the empty row in a type | `a ->{none; NotFound} b` |
 | `in` | binds a row in a SQL `from` or `join` clause | `join account in Accounts` |
-| `do` | statements sequenced through `Monad`: `x <- e` binds, `if c` guards | `do { x <- left; y <- right; return (x, y) }` |
+| `do` | statements sequenced through `Monad`: `x <- e` binds, `if c` guards | `do { x <- left; y <- right; pure (x, y) }` |
 
 ## Effects and resources
 

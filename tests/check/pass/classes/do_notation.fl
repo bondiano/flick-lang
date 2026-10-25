@@ -13,7 +13,7 @@ let pairs left right =
   do {
     x <- left
     y <- right
-    return (x, y)
+    pure (x, y)
   }
 
 evens : List Number -> List Number
@@ -22,18 +22,18 @@ let evens xs =
     x <- xs
     if x % 2 == 0
     let doubled = x * 2
-    return doubled
+    pure doubled
   }
 
 twice : Monad m => m Number -> m Number
-let twice m = do { x <- m; y <- m; return (x + y) }
+let twice m = do { x <- m; y <- m; pure (x + y) }
 
 first_some : List (Option Number) -> Option Number
 let first_some options =
   do {
     let assert [first, ..._rest] = options
     x <- first
-    return x
+    pure x
   }
 
 chained : Result String Number -> Eff none none (Result String Number)
@@ -41,6 +41,6 @@ let chained r =
   let checked = do {
     n <- r
     Ok n
-    return (n + 1)
+    pure (n + 1)
   }
-  return checked
+  pure checked

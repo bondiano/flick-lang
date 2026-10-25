@@ -58,7 +58,7 @@ title: Ключевые слова
 | `true` `false` | Два значения типа `Bool` | `if ok then true else false` |
 | `none` | Обозначает пустую строку в типе | `a ->{none; NotFound} b` |
 | `in` | Связывает имя со строкой таблицы в конструкции SQL `from` или `join` | `join account in Accounts` |
-| `do` | Утверждения через `Monad`: `x <- e` связывает, `if c` фильтрует | `do { x <- left; y <- right; return (x, y) }` |
+| `do` | Утверждения через `Monad`: `x <- e` связывает, `if c` фильтрует | `do { x <- left; y <- right; pure (x, y) }` |
 
 ## Эффекты и ресурсы
 

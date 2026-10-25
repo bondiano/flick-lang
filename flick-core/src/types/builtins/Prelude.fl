@@ -74,7 +74,7 @@ class Functor f => Traversable (f : Type -> Type) =
   traverse : forall c a b r e. (a ->{r; e} b)^c -> (f a ->{r; e} f b)^c
 
 class Functor f => Applicative (f : Type -> Type) =
-  return : forall a. a -> f a
+  pure : forall a. a -> f a
   /// `f` of the values of both, in order: for `List`, every pair.
   map2 :
     forall c d a b x. (a -> b -> x)^c -> ((f a)^d -> ((f b)^d -> (f x)^(c + d))^(c + d))^c

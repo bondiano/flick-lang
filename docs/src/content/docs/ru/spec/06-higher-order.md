@@ -62,7 +62,7 @@ let pair_optional left right =
   do {
     x <- left
     y <- right
-    return (x, y)
+    pure (x, y)
   }
 ```
 
