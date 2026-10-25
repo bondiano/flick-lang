@@ -13,6 +13,7 @@
 | [effect-v4-reactivity.md](effect-v4-reactivity.md) | `effect/reactivity` (Atom, AtomRegistry, Hydration, AsyncResult, AtomRpc, AtomHttpApi), `@effect/atom-react`, rpc/http-api, observability, cli; §9 — 16 инвариантов для компилятора |
 | [typed-ui-prior-art.md](typed-ui-prior-art.md) | PureScript react-basic-hooks / halogen-hooks, Ur/Web, Koka, Scala CC, Effekt, Bonsai, Leptos, Lustre, ReScript, Feliz; §4 — синтез гарантий |
 | [flick-internals-for-ui.md](flick-internals-for-ui.md) | как Flick компилирует эффекты, E001, регионы, имена, Schema, сервер, CLI, тесты, ограничения |
+| [rescript-components.md](rescript-components.md) | ReScript JSX v4: `@react.component`, `componentWithProps`, свой JSX-модуль, memo, типы DOM и событий, ошибки props; §7–8 — что переносим в `component`/`setup`/`render` |
 | [bundle-and-output.md](bundle-and-output.md) | замеры бандла (rolldown), разбор выходного JS против ReScript; §4 — 8 улучшений с AC |
 
 Первоисточники верхнего уровня: <https://github.com/reatom/reatom/tree/v1001>, <https://v1001.reatom.dev/reference/react>,
@@ -152,7 +153,7 @@ component search (props : SearchProps) =
 - AC: стоимость метки атома (stack trace при создании) в release измерена; если заметна в профиле — в `all` release метка без стека.
 
 **C7. Компоненты: ключевые слова `component` / `setup` / `render` (§6.1).** ⬜
-- **C7a. 🆕 Разбор ReScript.** AC: записка `docs/research/rescript-components.md` с цитатами: `@react.component` и генерация типа props, `@react.componentWithProps`, generic JSX transform (`"jsx": {"module": …}` — свой JSX-модуль вместо React), `React.memo`/`memoCustomCompareProps`, как это сказывается на выходном JS и ошибках; вывод — что переносим в Flick (кастомизация рендерера/адаптера, props-тип, memo) и что нет.
+- **C7a. 🆕 Разбор ReScript.** ✅ [rescript-components.md](rescript-components.md): props — одна явная запись (как `@react.componentWithProps`), `key` — метаданные узла, метка на итоговом объекте React, адаптер = хост-примитивы + монтирование с проверяемым интерфейсом; не переносим props из аргументов, `make`/модуль на компонент, выбор рендерера в конфиге, `forwardRef`. AC: записка `docs/research/rescript-components.md` с цитатами: `@react.component` и генерация типа props, `@react.componentWithProps`, generic JSX transform (`"jsx": {"module": …}` — свой JSX-модуль вместо React), `React.memo`/`memoCustomCompareProps`, как это сказывается на выходном JS и ошибках; вывод — что переносим в Flick (кастомизация рендерера/адаптера, props-тип, memo) и что нет.
 - **C7b. Синтаксис.** AC: парсер/AST/`lower` для `component name (props : P) = setup … render …` (setup необязателен); `flick fmt` идемпотентен на фикстурах; tree-sitter-грамматика в `editors/` и семантические токены LSP знают ключевые слова; ошибки разбора по-человечески («`render` должен идти после `setup`»).
 - **C7c. Типы.** AC: `component` desugar'ится в `forall s. p ->{Setup s | r; e} (p ->{Atom.Read} Ui)^{s}` по образцу `Layer.from_build` (`Layer.fl:188`); setup не может быть условным по построению; `Atom.local` и `Action.*` разрешены в setup; hover LSP показывает тип экземпляра и регион.
 - **C7d. Рантайм.** AC: setup выполняется ровно один раз на смонтированный экземпляр, в т.ч. под StrictMode (тест в `runtime/test`), повторный mount не утекает fiber'ами; action экземпляра прерываются и ожидаются при unmount (перенесено из U1/U2); компонент получает метку C6.
@@ -263,7 +264,7 @@ B0…B9 ✅ ─ B7b ✅                       (замер, независимо)
 S1 ✅ ─ U1…U6 ✅ ─ U7 ✅ ─ U7b ✅ ─ U6b
         └─ R1…R4 ✅ ─ R5 ✅ ─ R6 ✅
 C2/C3/C4/C6 ✅ ─ C6b ✅
-C7a ─ C7b ─ C7c ─ C7d ─ C5            C1 (бенчмарк, может закрыться без реализации)
+C7a ✅ ─ C7b ─ C7c ─ C7d ─ C5            C1 (бенчмарк, может закрыться без реализации)
 U9 ✅ ─ U9b
 S2 ─ F1 ─ F2 ─ F3 ─ F4 ─ F5 ─ F6
 S3 ─ S4 ─ O1 ─ O2 ─ O3 ─ O4 ─ O5      (O2/O3 после C6b)
