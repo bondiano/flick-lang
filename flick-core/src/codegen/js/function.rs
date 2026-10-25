@@ -72,15 +72,20 @@ impl Gen<'_> {
             heads.push(name);
         }
         let vars: Vec<String> = (0..heads.len()).map(|i| format!("$l{i}")).collect();
+        let grouped = target.as_ref().and_then(|t| self.group_call(t, &heads));
         let tail = target
-            .filter(|_| params.iter().all(|p| !p.runtime))
+            .filter(|_| grouped.is_none() && params.iter().all(|p| !p.runtime))
             .map(|target| Tail {
-                target,
+                members: vec![(target, params.len())],
+                current: 0,
                 vars: vars.clone(),
                 binds: binds(params),
+                state: None,
             })
             .filter(|t| has_tail_call(body, t));
-        let stmts = if let Some(tail) = tail {
+        let stmts = if let Some(call) = grouped {
+            vec![format!("return {call};")]
+        } else if let Some(tail) = tail {
             let (inner, ()) = self.block(|g| {
                 for (head, var) in heads.iter().zip(&vars) {
                     let c = g.constant(head, var);
@@ -182,21 +187,27 @@ impl Gen<'_> {
                 self.tail_expr(rhs);
             }
             _ => {
-                if let Some(args) = self.tail.as_ref().and_then(|t| self_call(e, t)) {
-                    let (vars, binds) = self
+                if let Some((j, args)) = self.tail.as_ref().and_then(|t| self_call(e, &t.members)) {
+                    let (vars, binds, state) = self
                         .tail
                         .as_ref()
-                        .map(|t| (t.vars.clone(), t.binds.clone()))
+                        .map(|t| {
+                            let state = t.state.clone().filter(|_| j != t.current);
+                            (t.vars.clone(), t.binds.clone(), state)
+                        })
                         .unwrap_or_default();
                     // a parameter passed on unchanged keeps its variable
                     let changed: Vec<usize> = (0..args.len())
-                        .filter(|&i| !matches!(&args[i].kind, ExprKind::Local(n) if binds[i].as_ref() == Some(n)))
+                        .filter(|&i| !matches!(&args[i].kind, ExprKind::Local(n) if binds.get(i).is_some_and(|b| b.as_ref() == Some(n))))
                         .collect();
                     let args: Vec<&Expr> = changed.iter().map(|&i| args[i]).collect();
                     // the arguments read the parameters, never the loop variables
                     let js = self.ordered(&args);
                     for (&i, value) in changed.iter().zip(js) {
                         self.buf.push(format!("{} = {value};", vars[i]));
+                    }
+                    if let Some(state) = state {
+                        self.buf.push(format!("{state} = {j};"));
                     }
                     self.buf.push("continue;".to_owned());
                     return;
@@ -279,7 +290,7 @@ fn balanced_without_yield(js: &str) -> bool {
 }
 
 /// The local each parameter binds, if it is a name.
-fn binds(params: &[Param]) -> Vec<Option<String>> {
+pub(super) fn binds(params: &[Param]) -> Vec<Option<String>> {
     params
         .iter()
         .map(|p| match &p.pat {
@@ -289,8 +300,8 @@ fn binds(params: &[Param]) -> Vec<Option<String>> {
         .collect()
 }
 
-/// The arguments of a full pure call of the loop's function.
-fn self_call<'e>(e: &'e Expr, tail: &Tail) -> Option<Vec<&'e Expr>> {
+/// The member a full pure call of one of `members` calls, and its arguments.
+fn self_call<'e>(e: &'e Expr, members: &[(Target, usize)]) -> Option<(usize, Vec<&'e Expr>)> {
     let mut args = Vec::new();
     let mut head = e;
     while let ExprKind::App {
@@ -320,11 +331,20 @@ fn self_call<'e>(e: &'e Expr, tail: &Tail) -> Option<Vec<&'e Expr>> {
         _ => return None,
     };
     let target = Target { callee, dicts };
-    (target == tail.target && args.len() == tail.vars.len()).then_some(args)
+    let j = members
+        .iter()
+        .position(|(t, arity)| *t == target && *arity == args.len())?;
+    Some((j, args))
 }
 
-/// Whether a tail position of `body` jumps to `tail`.
+/// Whether a tail position of `body` jumps to a member of `tail`.
 fn has_tail_call(body: &Expr, tail: &Tail) -> bool {
+    !tail_callees(body, &tail.members).is_empty()
+}
+
+/// The members of `members` a tail position of `body` calls in full.
+pub(super) fn tail_callees(body: &Expr, members: &[(Target, usize)]) -> Vec<usize> {
+    let mut out = Vec::new();
     let mut pending = vec![body];
     while let Some(e) = pending.pop() {
         match &e.kind {
@@ -332,9 +352,8 @@ fn has_tail_call(body: &Expr, tail: &Tail) -> bool {
             ExprKind::If(_, t, f) => pending.extend([&**t, &**f]),
             ExprKind::Match(_, arms) => pending.extend(arms.iter().map(|a| &a.body)),
             ExprKind::Binary(BinOp::And | BinOp::Or, _, r) => pending.push(r),
-            _ if self_call(e, tail).is_some() => return true,
-            _ => {}
+            _ => out.extend(self_call(e, members).map(|(j, _)| j)),
         }
     }
-    false
+    out
 }

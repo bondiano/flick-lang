@@ -2,6 +2,7 @@
 //! before the code that runs at load time uses it.
 
 use std::collections::{BTreeSet, HashMap};
+use std::mem;
 
 use super::expr::arrow_body;
 use super::schema::{plan_uses, schema_names};
@@ -13,8 +14,16 @@ impl Gen<'_> {
     pub(super) fn items(&mut self, items: &[Item]) -> String {
         let order = self.order(items);
         let mut out = String::new();
+        let mut grouped = vec![false; self.groups.len()];
         for i in order {
             let item = &items[i];
+            // a group runs its members: it is defined before the first of them
+            if let Some(g) = self.groups.iter().position(|g| g.items.contains(&i))
+                && !mem::replace(&mut grouped[g], true)
+            {
+                out.push_str(&self.group(g, items));
+                out.push_str("\n\n");
+            }
             let mark = self.mark(item.span);
             let code = self.item(item);
             if !code.is_empty() {

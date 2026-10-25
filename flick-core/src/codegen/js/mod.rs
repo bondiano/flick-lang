@@ -7,6 +7,7 @@ mod binary;
 mod expr;
 mod foreign;
 mod function;
+mod group;
 mod items;
 mod labels;
 mod pattern;
@@ -144,6 +145,8 @@ pub fn relative(from: &str, to: &str) -> String {
 /// Removes the markers from `code`, recording where each one was.
 impl<'a> Gen<'a> {
     fn new(module: &'a Module, options: &'a Options<'a>) -> Self {
+        let groups = group::groups(&module.name, &module.items);
+        let grouped = group::grouped(&module.name, &module.items, &groups);
         Gen {
             module: &module.name,
             options,
@@ -160,6 +163,8 @@ impl<'a> Gen<'a> {
             generator: false,
             owner: None,
             tail: None,
+            groups,
+            grouped,
             annotations: HashMap::new(),
             workers: if options.release {
                 let interface = (options.interface)(&module.name);
@@ -224,12 +229,17 @@ fn finish(code: &str, spans: &[Span], names: &HashMap<usize, String>) -> Output 
     }
 }
 
-/// Where a self tail call jumps: the function, its loop variables and the
-/// local each parameter binds, if it is a name.
+/// Where a tail call jumps: the function, or the members of its group (see
+/// [`group`]), with their arity; the loop variables; the local each
+/// parameter of the member being emitted binds, if it is a name.
 struct Tail {
-    target: Target,
+    members: Vec<(Target, usize)>,
+    /// The member being emitted.
+    current: usize,
     vars: Vec<String>,
     binds: Vec<Option<String>>,
+    /// In a group, the variable naming the member that runs next.
+    state: Option<String>,
 }
 
 /// A function a tail call may jump to: its name and the dictionaries of its
@@ -271,6 +281,10 @@ struct Gen<'a> {
     /// The owner the next runtime call acquires into, from `Within`.
     owner: Option<String>,
     tail: Option<Tail>,
+    /// The groups of mutually tail-recursive functions of the module.
+    groups: Vec<group::Group>,
+    /// The group and member of each grouped function, by its global name.
+    grouped: HashMap<String, (usize, usize)>,
     /// Release: the top-level functions of the module with a worker taking
     /// all their arguments at once, by name, with its arity and whether its
     /// curried form is still needed.

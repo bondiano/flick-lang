@@ -1,5 +1,7 @@
-// Pure self tail recursion is a loop; runtime recursion runs through the
-// runtime without growing the JS stack.
+// Pure tail recursion is a loop: of a function itself, through its own
+// dictionaries, behind `&&` and `||`, and between the members of a `rec`
+// group. Runtime recursion runs through the runtime without growing the JS
+// stack.
 module App.Main exposing (main)
 
 sum_to : Number -> Number -> Number
@@ -12,9 +14,40 @@ let rec count_down cell n =
     Ref.set cell n
     count_down cell (n - 1)
 
+steps : Eq a => Number -> a -> Number
+let rec steps n x =
+  if n == 0 then 0 else if x == x then steps (n - 1) x else n
+
+all_below : Number -> Number -> Bool
+let rec all_below limit n =
+  n == 0 || n < limit && all_below limit (n - 1)
+
+rec {
+  is_even : Number -> Bool
+  let is_even n = if n == 0 then true else is_odd (n - 1)
+
+  is_odd : Number -> Bool
+  let is_odd n = if n == 0 then false else is_even (n - 1)
+}
+
+rec {
+  ping : Number -> Number -> Number
+  let ping acc n = if n == 0 then acc else pong (acc + 1) (n - 1)
+
+  pong : Number -> Number -> Number
+  let pong acc n = if n == 0 then acc else pang acc (n - 1)
+
+  pang : Number -> Number -> Number
+  let pang acc n = if n == 0 then acc else ping (acc + 2) (n - 1)
+}
+
 main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line (show (sum_to 0 1000000))
   let cell = Ref.make 0
   count_down cell 100000
   Platform.stdout_line (show (Ref.get cell))
+  Platform.stdout_line (show (steps 1000000 "a"))
+  Platform.stdout_line (show (all_below 2000000 1000000))
+  Platform.stdout_line (show (is_even 1000000) ++ " " ++ show (is_odd 1000001))
+  Platform.stdout_line (show (ping 0 1000000))
