@@ -55,7 +55,7 @@ fn expr_bp(p: &mut Parser, min_bp: u8) -> Option<Done> {
             p.error_at(
                 codes::S013,
                 span,
-                "`<-` binds only in a `do` block: bind with `let`, or write `a < -1` for a comparison"
+                "`<-` binds only in `do` and `for`: bind with `let`, or write `a < -1` for a comparison"
                     .into(),
             );
             p.bump();
@@ -197,6 +197,7 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::LBracket
         | K::TaskKw
         | K::DoKw
+        | K::ForKw
         | K::TodoKw
         | K::ScopeKw
         | K::ProvideKw
@@ -292,6 +293,7 @@ fn atom(p: &mut Parser) -> Option<Done> {
             K::SqlCapture
         }
         K::DoKw => do_expr(p),
+        K::ForKw => for_expr(p),
         K::TaskKw | K::UiKw => {
             let kind = if p.at(K::TaskKw) {
                 K::TaskExpr
@@ -494,6 +496,48 @@ fn do_expr(p: &mut Parser) -> K {
         );
     }
     K::DoExpr
+}
+
+/// `for { clauses } yield e`, or the clauses inline, separated by `;` or a
+/// guard's `if`: `[for x <- xs if x > 0 yield x]`.
+fn for_expr(p: &mut Parser) -> K {
+    p.bump();
+    if p.at(K::LBrace) {
+        p.braces(K::Block, do_stmt, |_| false);
+    } else {
+        let m = p.start();
+        loop {
+            for_clause(p);
+            if !(p.eat(K::Semi) || p.at(K::IfKw)) {
+                break;
+            }
+        }
+        p.complete(m, K::Block);
+    }
+    if p.expect(K::YieldKw) {
+        expr(p);
+    }
+    K::ForExpr
+}
+
+/// A clause of an inline `for`: a guard, a `let` or a binding.
+fn for_clause(p: &mut Parser) {
+    match p.current() {
+        K::IfKw => {
+            let m = p.start();
+            p.bump();
+            expr(p);
+            p.complete(m, K::GuardStmt);
+        }
+        K::LetKw => decl::let_decl(p),
+        _ => {
+            let m = p.start();
+            pattern::pattern(p);
+            p.expect(K::LArrow);
+            expr(p);
+            p.complete(m, K::BindStmt);
+        }
+    }
 }
 
 /// A statement of `do { … }`: `pattern <- e`, a guard `if c` without `then`,

@@ -162,7 +162,8 @@ impl Gen<'_> {
         if release && let Some(cases) = self.switch_cases(arms) {
             let mut body = Vec::new();
             for (case, arm) in cases.into_iter().zip(arms) {
-                let (stmts, ()) = self.block(|g| g.arm(subject, arm, true, emit));
+                let (stmts, ()) = self
+                    .block(|g| g.arm(subject, &arm.pat, arm.guard.as_ref(), &arm.body, true, emit));
                 let head = case.map_or("default:".to_owned(), |tag| format!("case {tag}:"));
                 body.push(format!("{head} {{\n{}}}", indent(&stmts)));
             }
@@ -171,7 +172,8 @@ impl Gen<'_> {
             for (i, arm) in arms.iter().enumerate() {
                 // the match is exhaustive: its last arm without a guard needs no test
                 let last = release && i + 1 == arms.len();
-                let (stmts, ()) = self.block(|g| g.arm(subject, arm, last, emit));
+                let (stmts, ()) = self
+                    .block(|g| g.arm(subject, &arm.pat, arm.guard.as_ref(), &arm.body, last, emit));
                 out.extend(stmts);
             }
         }
@@ -185,10 +187,17 @@ impl Gen<'_> {
     /// returns its handler, and no match returns `undefined`.
     pub(super) fn handlers(&mut self, subject: &str, arms: &[Arm]) {
         for arm in arms {
-            self.arm(subject, arm, false, |g, body| {
-                let handler = g.gen_block(body);
-                g.buf.push(format!("return {handler};"));
-            });
+            self.arm(
+                subject,
+                &arm.pat,
+                arm.guard.as_ref(),
+                &arm.body,
+                false,
+                |g, body| {
+                    let handler = g.gen_block(body);
+                    g.buf.push(format!("return {handler};"));
+                },
+            );
         }
         self.buf.push("return undefined;".to_owned());
     }
@@ -223,16 +232,20 @@ impl Gen<'_> {
     }
 
     /// An arm on `subject`; `exhaustive`, it matches whatever reaches it.
-    fn arm(
+    /// Runs `body` on `value` when `pat` matches `subject` and `guard`
+    /// holds, with the names the pattern binds.
+    pub(super) fn arm(
         &mut self,
         subject: &str,
-        arm: &Arm,
+        pat: &Pat,
+        guard: Option<&Expr>,
+        value: &Expr,
         exhaustive: bool,
         body: impl FnOnce(&mut Self, &Expr),
     ) {
         let mut t = Test::default();
-        self.test(&arm.pat, subject, &mut t);
-        if exhaustive && arm.guard.is_none() {
+        self.test(pat, subject, &mut t);
+        if exhaustive && guard.is_none() {
             t.conds.clear();
         }
         let (inner, ()) = self.block(|g| {
@@ -240,15 +253,15 @@ impl Gen<'_> {
                 let c = g.constant(name, path);
                 g.buf.push(c);
             }
-            match &arm.guard {
+            match guard {
                 Some(guard) => {
                     let saved = mem::replace(&mut g.generator, false);
                     let c = g.expr(guard);
                     g.generator = saved;
-                    let (b, ()) = g.block(|g| body(g, &arm.body));
+                    let (b, ()) = g.block(|g| body(g, value));
                     g.buf.push(format!("if ({c}) {{\n{}}}", indent(&b)));
                 }
-                None => body(g, &arm.body),
+                None => body(g, value),
             }
         });
         let mut block = Vec::new();

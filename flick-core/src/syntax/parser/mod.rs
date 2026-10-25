@@ -106,7 +106,10 @@ pub(crate) struct Parser<'t> {
 fn continues(kind: SyntaxKind) -> bool {
     (kind.is_binary_op() && kind != K::Minus)
         || kind.is_closer()
-        || matches!(kind, K::Pipe | K::ThenKw | K::ElseKw | K::WithKw)
+        || matches!(
+            kind,
+            K::Pipe | K::ThenKw | K::ElseKw | K::WithKw | K::YieldKw
+        )
 }
 
 impl<'t> Parser<'t> {

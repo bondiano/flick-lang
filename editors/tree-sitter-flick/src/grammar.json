@@ -304,6 +304,14 @@
         },
         {
           "type": "STRING",
+          "value": "for"
+        },
+        {
+          "type": "STRING",
+          "value": "yield"
+        },
+        {
+          "type": "STRING",
           "value": "do"
         }
       ]

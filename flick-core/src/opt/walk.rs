@@ -33,7 +33,10 @@ pub fn strict_uses(e: &Expr, name: &str) -> usize {
         | ExprKind::Provide(..)
         | ExprKind::Lift(..)
         | ExprKind::Abstract(..)
-        | ExprKind::CodecBlock(..) => 0,
+        | ExprKind::CodecBlock(..)
+        | ExprKind::Generate { strict: false, .. } => 0,
+        // the body runs once per element, maybe never
+        ExprKind::Each { source, .. } => strict_uses(source, name),
         ExprKind::If(c, _, _) => strict_uses(c, name),
         ExprKind::Match(s, _) | ExprKind::Try(s, _) => strict_uses(s, name),
         // `&&` and `||` may skip their right operand
@@ -73,6 +76,7 @@ pub fn size(e: &Expr) -> usize {
         ExprKind::Match(_, arms) | ExprKind::Try(_, arms) => {
             n += arms.iter().map(|a| pat_size(&a.pat)).sum::<usize>();
         }
+        ExprKind::Each { pat, .. } => n += pat_size(pat),
         ExprKind::Block(stmts, _) => {
             n += stmts
                 .iter()
@@ -118,8 +122,9 @@ pub fn droppable(e: &Expr) -> bool {
         | ExprKind::Label(_)
         | ExprKind::ServiceTag(_)
         | ExprKind::Lambda { .. }
-        // a task is a description: building it runs nothing
-        | ExprKind::Task(_) => true,
+        // a task or a sequence is a description: building it runs nothing
+        | ExprKind::Task(_)
+        | ExprKind::Generate { strict: false, .. } => true,
         ExprKind::Tuple(items) | ExprKind::List(items) => items.iter().all(droppable),
         ExprKind::Record(fields) => fields.iter().all(|(_, v)| droppable(v)),
         ExprKind::Field(inner, _) | ExprKind::Not(inner) | ExprKind::Neg(inner) => droppable(inner),
@@ -176,6 +181,7 @@ fn binders(e: &Expr, names: &mut HashMap<String, String>, suffix: &str) {
                 pat_binders(&arm.pat, names, suffix);
             }
         }
+        ExprKind::Each { pat, .. } => pat_binders(pat, names, suffix),
         ExprKind::Scope { owner, outer, .. } => {
             for name in owner.iter().chain(outer) {
                 fresh(names, name, suffix);
@@ -213,6 +219,7 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
                 apply_pat(&mut arm.pat, names);
             }
         }
+        ExprKind::Each { pat, .. } => apply_pat(pat, names),
         ExprKind::Scope { owner, outer, .. } => {
             for n in owner.iter_mut().chain(outer.iter_mut()) {
                 new(n);

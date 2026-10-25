@@ -7,6 +7,7 @@ mod binary;
 mod expr;
 mod foreign;
 mod function;
+mod generator;
 mod group;
 mod items;
 mod labels;
@@ -164,6 +165,7 @@ impl<'a> Gen<'a> {
             spans: Vec::new(),
             buf: Vec::new(),
             generator: false,
+            collector: None,
             owner: None,
             tail: None,
             groups,
@@ -286,6 +288,9 @@ struct Gen<'a> {
     buf: Vec<String>,
     /// Inside the generator of a runtime stage, where `yield*` runs a call.
     generator: bool,
+    /// The list a strict `[for …]` pushes its elements to; `None` in a lazy
+    /// one, which yields them.
+    collector: Option<String>,
     /// The owner the next runtime call acquires into, from `Within`.
     owner: Option<String>,
     tail: Option<Tail>,

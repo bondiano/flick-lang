@@ -56,7 +56,8 @@ impl Lower<'_> {
             K::NameExpr => return self.name(node),
             K::ParenExpr | K::AnnotExpr => return self.expr(children[0]),
             K::TupleExpr => ExprKind::Tuple(children.iter().map(|c| self.expr(c)).collect()),
-            K::ListExpr => ExprKind::List(children.iter().map(|c| self.expr(c)).collect()),
+            K::ListExpr => return self.list(node, &children),
+            K::ForExpr => return self.for_expr(node, false),
             K::FieldExpr => {
                 let label = self.token_text(node, K::Ident).unwrap_or_default();
                 ExprKind::Field(self.boxed(children[0]), label)

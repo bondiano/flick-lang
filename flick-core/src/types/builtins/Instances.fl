@@ -270,6 +270,10 @@ foreign pure map2_eff from "@flick-lang/runtime" "map2Eff"
 seq_of_list : List a -> Seq a
 foreign pure seq_of_list from "@flick-lang/runtime" "seqOfList"
 
+seq_of_list_held : forall d a. (List a)^d -> (Seq a)^d
+foreign pure seq_of_list_held from "@flick-lang/runtime" "seqOfList"
+  retention call
+
 map_seq : forall c d a b. (a -> b)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c
 foreign pure map_seq from "@flick-lang/runtime" "seqMap"
   arity 2
@@ -440,6 +444,14 @@ instance Semigroup (List a) =
 instance Monoid (List a) =
   empty : List a
   let empty = []
+
+instance Iterable List =
+  iter : forall d a. (List a)^d -> (Seq a)^d
+  let iter xs = seq_of_list_held xs
+
+instance Iterable Seq =
+  iter : forall d a. (Seq a)^d -> (Seq a)^d
+  let iter xs = xs
 
 instance Functor Seq =
   map : forall c d a b. (a -> b)^c -> ((Seq a)^d -> (Seq b)^(c + d))^c

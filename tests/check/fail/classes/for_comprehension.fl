@@ -1,0 +1,47 @@
+module App.ForErrors exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+
+size : File s -> Number
+let size _file = 1
+
+// The clauses run when the sequence is iterated: a runtime call there is an
+// error with the way out.
+logged : List Number -> Seq Number
+let logged xs =
+  for {
+    x <- xs
+    let _ = Platform.stdout_line "no"
+  } yield x
+
+// A source is `Iterable`; `Option` is not.
+from_option : Option Number -> List Number
+let from_option o = [for x <- o yield x]
+
+// A lazy sequence holds what it uses: one over a scoped file cannot leave
+// the scope.
+escaped : Path ->{FileSystem; OpenError} Seq Number
+let escaped path =
+  scope {
+    let file = FileSystem.open_scoped path
+    for { n <- [1, 2] } yield n + size file
+  }
+
+// The strict list is built inside the scope and holds only numbers.
+counted : Path ->{FileSystem; OpenError} List Number
+let counted path =
+  scope {
+    let file = FileSystem.open_scoped path
+    [for n <- [1, 2] yield n + size file]
+  }
+
+//~ FLICK-E001 @21:13-21:38 this is a runtime call, but the clauses of `for` run when the sequence
+//~ FLICK-C001 @26:28-26:30 no instance for `Iterable Option`; instances of `Iterable`: `Iterable
+//~ FLICK-G001 @34:5-34:44 this sequence uses `file`, which holds region `s`, but the expected ty

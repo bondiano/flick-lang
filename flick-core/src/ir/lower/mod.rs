@@ -4,6 +4,7 @@
 //! shadowing in the generated code.
 
 mod cli;
+mod comprehension;
 mod debug;
 mod do_notation;
 mod expr;

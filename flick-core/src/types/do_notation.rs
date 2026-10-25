@@ -170,7 +170,7 @@ impl Checker<'_> {
 
     /// A method of a Prelude class at `span`, instantiated, with the
     /// dictionary its class needs recorded there.
-    fn prelude_method(&mut self, name: &str, span: Span) -> Type {
+    pub(super) fn prelude_method(&mut self, name: &str, span: Span) -> Type {
         let entity = Entity {
             module: "Prelude".to_owned(),
             namespace: Namespace::Value,

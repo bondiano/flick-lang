@@ -142,6 +142,9 @@ impl Gen<'_> {
                 self.run(owner, &v)
             }
             ExprKind::Task(body) => self.gen_block(body),
+            ExprKind::Generate { .. } | ExprKind::Each { .. } | ExprKind::Yield(_) => {
+                self.generated(e)
+            }
             ExprKind::Scope { owner, outer, body } => {
                 self.scope(owner.as_deref(), outer.as_deref(), body)
             }
@@ -151,11 +154,7 @@ impl Gen<'_> {
             }
             ExprKind::Provide(layer, body) => self.provide(layer, body),
             ExprKind::CodecBlock(name, fields) => self.codec_block(name, fields),
-            ExprKind::Lift(inner, lift) => {
-                let v = self.expr(inner);
-                let f = self.lift(lift);
-                format!("({f})({v})")
-            }
+            ExprKind::Lift(inner, lift) => self.lifted(inner, lift),
         }
     }
 
@@ -438,6 +437,13 @@ impl Gen<'_> {
     }
 
     /// A JS function that turns a pure value into the runtime one `lift` describes.
+    /// `inner`, a pure function, adapted where a runtime one is expected.
+    fn lifted(&mut self, inner: &Expr, lift: &Lift) -> String {
+        let v = self.expr(inner);
+        let f = self.lift(lift);
+        format!("({f})({v})")
+    }
+
     fn lift(&mut self, lift: &Lift) -> String {
         match lift {
             Lift::Stage { lift, result } => {

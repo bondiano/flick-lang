@@ -41,7 +41,7 @@ title: "Грамматика Flick"
 module exposing import as let rec fun match with try if then else task await
 scope provide ignore todo echo type opaque refined where kind error service class
 instance deriving foreign from forall not none true false schema codec
-sql ui cli in when do
+sql ui cli in when for yield do
 ```
 
 Контекстные слова считаются обычными именами, кроме следующих позиций:
@@ -395,11 +395,14 @@ atom        = name | Con { "." Con } ["." name] | Number | BigInt | String
             | "{" expr "with" field "=" block { … } "}"
             | "task" "{" block "}" | "ui" "{" block "}"
             | "do" "{" do_stmt { ";" | line break … } "}"
+            | "for" ("{" clause_list "}" | clause_list) "yield" expr
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
             | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
             | "cli" String "{" cli_clause { cli_clause } "}"
 do_stmt     = or_pattern "<-" expr | "if" expr | statement
+clause_list = for_clause { ";" | line break | before "if" … for_clause }
+for_clause  = or_pattern "<-" expr | "if" expr | let_decl
 clause      = ("from" | "join" | "left_join") name "in" expr
             | clause_word expr { "," expr }
 cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
@@ -412,7 +415,14 @@ cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
 `let` действует до конца блока, а последнее утверждение — выражение монады
 блока. Образец после `<-` должен быть неопровержимым, а остаток блока — чистая
 функция: эффектный вызов в нём даёт `FLICK-E001` (см. [`do`, `for` и списковые выражения](../../spec/06-higher-order/#do-for-и-списковые-выражения)).
-`<-` вне блока `do` — `FLICK-S013`; сравнение с отрицательным числом пишется
+`for { x <- xs; if p x } yield e` — ленивый `Seq`: один генератор выполняет
+клаузы при каждой итерации. `x <- source` берёт элементы источника с
+`Iterable` (`List`, `Seq`) и пропускает те, что не подходят под образец,
+`if c` пропускает элемент, если `c` ложно, `let` действует до конца; клаузы
+чистые. `[for … yield e]` — `for`, единственный в скобках, — строгий `List` тех
+же элементов, собранный циклом. Без фигурных скобок клаузы разделяются `;`,
+а `if` фильтра начинает новую.
+`<-` вне блока `do` или `for` — `FLICK-S013`; сравнение с отрицательным числом пишется
 `a < -1`.
 
 `todo` (с необязательной строкой после него) — выражение любого типа, а

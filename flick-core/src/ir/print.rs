@@ -166,6 +166,17 @@ pub fn expr(e: &Expr) -> String {
         ExprKind::Ignore(e) => format!("(ignore {})", expr(e)),
         ExprKind::Await(e) => format!("(await {})", expr(e)),
         ExprKind::Task(e) => format!("(task {})", expr(e)),
+        ExprKind::Generate { body, strict } => {
+            format!("({} {})", if *strict { "list" } else { "seq" }, expr(body))
+        }
+        ExprKind::Each {
+            pat: p,
+            source,
+            body,
+        } => {
+            format!("(each {} <- {} {})", pat(p), expr(source), expr(body))
+        }
+        ExprKind::Yield(e) => format!("(yield {})", expr(e)),
         ExprKind::Scope { owner, outer, body } => format!(
             "(scope{}{} {})",
             owner.as_ref().map_or(String::new(), |o| format!(" {o}")),

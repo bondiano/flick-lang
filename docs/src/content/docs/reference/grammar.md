@@ -38,7 +38,7 @@ Qualified names are written without spaces around `.`: `Users.get`,
 module exposing import as let rec fun match with try if then else task await
 scope provide ignore todo echo type opaque refined where kind error service class
 instance deriving foreign from forall not none true false schema codec
-sql ui cli in when do
+sql ui cli in when for yield do
 ```
 
 Contextual words are ordinary names everywhere except in one position:
@@ -372,11 +372,14 @@ atom        = name | Con { "." Con } ["." name] | Number | BigInt | String
             | "{" expr "with" field "=" block { … } "}"
             | "task" "{" block "}" | "ui" "{" block "}"
             | "do" "{" do_stmt { ";" | line break … } "}"
+            | "for" ("{" clause_list "}" | clause_list) "yield" expr
             | "scope" [name] "{" block "}" | "provide" expr "{" block "}"
             | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
             | "cli" String "{" cli_clause { cli_clause } "}"
 do_stmt     = or_pattern "<-" expr | "if" expr | statement
+clause_list = for_clause { ";" | line break | before "if" … for_clause }
+for_clause  = or_pattern "<-" expr | "if" expr | let_decl
 clause      = ("from" | "join" | "left_join") name "in" expr
             | clause_word expr { "," expr }
 cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
@@ -390,7 +393,14 @@ nothing, `if c` without `then` is `if c then rest else nothing` of
 expression of the block's monad. The pattern after `<-` must be irrefutable,
 and the rest of the block is a pure function: a runtime call there is
 `FLICK-E001` (see [`do`, `for` and comprehensions](../../spec/06-higher-order/#do-for-and-comprehensions)).
-`<-` outside a `do` block is `FLICK-S013`; a comparison with a negative number
+`for { x <- xs; if p x } yield e` is a lazy `Seq`: one generator runs
+the clauses on each iteration. `x <- source` takes the elements of an
+`Iterable` source (`List`, `Seq`) and skips those the pattern does not match,
+`if c` skips the element unless `c`, and `let` scopes over the rest; the
+clauses are pure. `[for … yield e]`, a `for` alone in brackets, is the strict
+`List` of the same elements, built with a loop. Without braces the clauses
+are separated by `;`, and a guard's `if` starts a new one.
+`<-` outside a `do` or `for` block is `FLICK-S013`; a comparison with a negative number
 is written `a < -1`.
 
 `todo` (optionally followed by a string) is an expression of any type, and

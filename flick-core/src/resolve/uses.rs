@@ -97,6 +97,29 @@ impl Walker<'_> {
                 self.release(mark);
                 return;
             }
+            K::ForExpr => {
+                // the names of the clauses scope over the clauses after them and the element
+                for part in node.nodes() {
+                    if part.kind != K::Block {
+                        self.walk(part);
+                        continue;
+                    }
+                    for clause in part.nodes() {
+                        if clause.kind == K::LetDecl {
+                            self.let_decl(clause);
+                            continue;
+                        }
+                        for child in clause.nodes() {
+                            self.walk(child);
+                        }
+                        if clause.kind == K::BindStmt {
+                            self.bind_patterns(clause);
+                        }
+                    }
+                }
+                self.release(mark);
+                return;
+            }
             K::FunExpr | K::MatchArm => self.bind_patterns(node),
             K::ScopeExpr => {
                 let name = node.child_tokens().find(|t| t.kind == K::Ident);

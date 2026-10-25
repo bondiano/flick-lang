@@ -1,0 +1,42 @@
+// `for … yield` is one native generator over Iterable sources, `[for …]` a
+// strict loop; a pattern that does not match skips the element.
+module App.Main exposing (main)
+
+line : Show a => Seq a -> String
+let line xs = show (Seq.to_list xs)
+
+pythagorean : Seq (Number, Number, Number)
+let pythagorean =
+  for {
+    c <- Seq.from 1
+    b <- Seq.range 1 c
+    a <- Seq.range 1 b
+    if a * a + b * b == c * c
+  } yield (a, b, c)
+
+evens_squared : List Number -> List Number
+let evens_squared xs = [for x <- xs if x % 2 == 0 yield x * x]
+
+present : List (Option String) -> List String
+let present options = [for Some name <- options yield name]
+
+scaled : Number -> List Number -> Seq Number
+let scaled factor xs =
+  for {
+    x <- xs
+    let y = x * factor
+    if y > 5
+  } yield y
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (line (Seq.take 3 pythagorean))
+  Platform.stdout_line (show (evens_squared [1, 2, 3, 4, 5, 6]))
+  Platform.stdout_line (show (present [Some "a", None, Some "b"]))
+  let s = scaled 3 [1, 2, 3]
+  Platform.stdout_line (line s)
+  Platform.stdout_line (line s)
+  Platform.stdout_line
+    (show [for (k, v) <- [("a", 1), ("b", 2)]; i <- Seq.range 0 v yield k ++ show i])
+  let inside = for { n <- Seq.from 10 } yield n * 2
+  Platform.stdout_line (line (Seq.take 2 inside))

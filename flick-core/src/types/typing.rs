@@ -372,6 +372,7 @@ impl Checker<'_> {
         let head = match node.kind {
             K::TaskExpr => K::TaskKw,
             K::DoExpr => K::DoKw,
+            K::ForExpr => K::ForKw,
             K::ScopeExpr => K::ScopeKw,
             K::ProvideExpr => K::ProvideKw,
             K::TryExpr => K::TryKw,

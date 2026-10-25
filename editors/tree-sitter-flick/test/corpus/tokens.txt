@@ -140,3 +140,20 @@ do { x <- a; b < -1 }
     (operator)
     (operator)
     (number)))
+
+==================
+For comprehension
+==================
+
+[for x <- xs yield x]
+
+---
+
+(source_file
+  (brackets
+    (keyword)
+    (identifier)
+    (operator)
+    (identifier)
+    (keyword)
+    (identifier)))

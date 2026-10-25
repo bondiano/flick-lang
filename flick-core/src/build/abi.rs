@@ -230,7 +230,9 @@ impl Totality<'_> {
             | ExprKind::Lambda { .. }
             | ExprKind::Task(_)
             | ExprKind::Lift(..)
-            | ExprKind::Abstract(..) => false,
+            | ExprKind::Abstract(..)
+            // a sequence runs its clauses when it is iterated
+            | ExprKind::Generate { strict: false, .. } => false,
             ExprKind::App {
                 func, arg, runtime, ..
             } => *runtime || !self.total_call(e) || partial(func) || partial(arg),
@@ -262,7 +264,10 @@ impl Totality<'_> {
             | ExprKind::Scope { .. }
             | ExprKind::Within(..)
             | ExprKind::CodecBlock(..)
-            | ExprKind::Provide(..) => true,
+            | ExprKind::Provide(..)
+            | ExprKind::Generate { strict: true, .. }
+            | ExprKind::Each { .. }
+            | ExprKind::Yield(_) => true,
         }
     }
 

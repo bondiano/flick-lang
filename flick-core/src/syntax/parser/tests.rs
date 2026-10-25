@@ -264,3 +264,20 @@ fn larrow_outside_do_and_do_without_braces_are_errors() {
     assert_eq!(errors("let b = a < -1"), Vec::<String>::new());
     assert_eq!(errors("let f x =\n  do\n    x\n"), ["FLICK-S010 do"]);
 }
+
+#[test]
+fn for_takes_braced_or_inline_clauses_and_yields() {
+    assert_eq!(
+        sexp("let s = for { x <- xs; if x > 0 } yield x * 2"),
+        "(LetDecl let (VarPat s) = (Block (ForExpr for { (Block (BindStmt (VarPat x) <- (NameExpr xs)) ; \
+         (GuardStmt if (BinExpr (NameExpr x) > (Literal 0)))) } yield (BinExpr (NameExpr x) * (Literal 2)))))"
+    );
+    assert_eq!(
+        sexp("let l = [for x <- xs if p x; y <- ys yield (x, y)]"),
+        "(LetDecl let (VarPat l) = (Block (ListExpr [ (ForExpr for (Block (BindStmt (VarPat x) <- \
+         (NameExpr xs)) (GuardStmt if (AppExpr (NameExpr p) (NameExpr x))) ; (BindStmt (VarPat y) <- \
+         (NameExpr ys))) yield (TupleExpr ( (NameExpr x) , (NameExpr y) ))) ])))"
+    );
+    let src = "let s =\n  for {\n    x <- xs\n  }\n  yield x\n";
+    assert!(sexp(src).contains("} yield (NameExpr x)"), "{}", sexp(src));
+}

@@ -91,6 +91,11 @@ class Applicative f => Alternative (f : Type -> Type) =
   nothing : forall a. f a
   or_else : forall a. f a -> f a -> f a
 
+/// Sources of `x <- source` in `for`: containers JS iterates as they are,
+/// so `iter` costs nothing.
+class Iterable (f : Type -> Type) =
+  iter : forall d a. (f a)^d -> (Seq a)^d
+
 /// Values with an associative `combine`.
 class Semigroup a =
   combine : a -> a -> a

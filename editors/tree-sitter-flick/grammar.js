@@ -7,7 +7,7 @@ const KEYWORDS = [
   'todo', 'echo',
   'type', 'opaque', 'refined', 'where', 'kind', 'error', 'service', 'class',
   'instance', 'deriving', 'forall', 'not', 'none',
-  'schema', 'codec', 'sql', 'ui', 'cli', 'in', 'when', 'do',
+  'schema', 'codec', 'sql', 'ui', 'cli', 'in', 'when', 'for', 'yield', 'do',
 ];
 
 const OPERATORS = [

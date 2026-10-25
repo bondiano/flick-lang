@@ -86,6 +86,9 @@ fn inlinable(e: &Expr) -> bool {
     let here = !matches!(
         &e.kind,
         ExprKind::Match(..)
+            | ExprKind::Generate { .. }
+            | ExprKind::Each { .. }
+            | ExprKind::Yield(_)
             | ExprKind::Scope { .. }
             | ExprKind::Within(..)
             | ExprKind::Provide(..)

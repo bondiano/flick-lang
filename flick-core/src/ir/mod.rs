@@ -146,6 +146,21 @@ pub enum ExprKind {
     ServiceTag(String),
     /// `Record.label` at a known label.
     Label(String),
+    /// The elements `body` yields: a lazy `Seq` whose generator runs `body`
+    /// on each iteration, or with `strict` a `List` built at once.
+    Generate {
+        body: Box<Expr>,
+        strict: bool,
+    },
+    /// Runs `body` for each element of `source` that `pat` matches; only
+    /// inside a `Generate`.
+    Each {
+        pat: Pat,
+        source: Box<Expr>,
+        body: Box<Expr>,
+    },
+    /// An element of the enclosing `Generate`.
+    Yield(Box<Expr>),
     /// A constrained value given its dictionaries.
     Dicts(Box<Expr>, Vec<Dict>),
     /// A value checked against a constrained type: takes the dictionaries.
@@ -212,7 +227,13 @@ impl Expr {
             | ExprKind::Scope { body: inner, .. }
             | ExprKind::Within(_, inner)
             | ExprKind::Lift(inner, _)
-            | ExprKind::Lambda { body: inner, .. } => f(inner),
+            | ExprKind::Lambda { body: inner, .. }
+            | ExprKind::Generate { body: inner, .. }
+            | ExprKind::Yield(inner) => f(inner),
+            ExprKind::Each { source, body, .. } => {
+                f(source);
+                f(body);
+            }
             ExprKind::App {
                 func,
                 arg,
@@ -296,7 +317,13 @@ impl Expr {
             | ExprKind::Scope { body: inner, .. }
             | ExprKind::Within(_, inner)
             | ExprKind::Lift(inner, _)
-            | ExprKind::Lambda { body: inner, .. } => f(inner),
+            | ExprKind::Lambda { body: inner, .. }
+            | ExprKind::Generate { body: inner, .. }
+            | ExprKind::Yield(inner) => f(inner),
+            ExprKind::Each { source, body, .. } => {
+                f(source);
+                f(body);
+            }
             ExprKind::App {
                 func,
                 arg,

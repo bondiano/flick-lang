@@ -62,6 +62,8 @@ pub enum SyntaxKind {
     CliKw,
     InKw,
     WhenKw,
+    ForKw,
+    YieldKw,
     DoKw,
 
     // punctuation and operators
@@ -172,6 +174,8 @@ pub enum SyntaxKind {
     BindStmt,
     /// `if condition` without `then` in a `do` block: a guard through `Alternative`.
     GuardStmt,
+    /// `for { … } yield e`: a lazy `Seq`; in `[ ]` alone, a strict `List`.
+    ForExpr,
     ScopeExpr,
     ProvideExpr,
     SqlExpr,
@@ -309,6 +313,8 @@ pub fn keyword(text: &str) -> Option<SyntaxKind> {
         "cli" => K::CliKw,
         "in" => K::InKw,
         "when" => K::WhenKw,
+        "for" => K::ForKw,
+        "yield" => K::YieldKw,
         "do" => K::DoKw,
         _ => return None,
     })
@@ -346,6 +352,7 @@ pub fn describe(kind: SyntaxKind) -> &'static str {
         K::InKw => "`in`",
         K::WhereKw => "`where`",
         K::TypeKw => "`type`",
+        K::YieldKw => "`yield`",
         _ => "a token",
     }
 }
