@@ -18,7 +18,7 @@ Signatures the specification gives are declared word for word;
 | Name | What it is |
 | - | - |
 | `Eq`, `Ord`, `Hash`, `Show` | canonical equality, the total order, hashing, display |
-| `Functor`, `Foldable`, `Traversable`, `Applicative`, `Monad` | classes over `f : Type -> Type`: `map`, `fold`, `traverse`, `pure`, `flat_map` |
+| `Functor`, `Foldable`, `Traversable`, `Applicative`, `Monad` | classes over `f : Type -> Type`: `map`, `fold`, `traverse`, `return`, `flat_map` |
 | `bind`, `bind_eff` | sequencing for any monad, and for `Eff` with the rows joined |
 | `from_result` | `Result (Errors e) a ->{; e} a` |
 | `parallel`, `parallel_all`, `parallel_results`, `parallel_exits`, `race_success`, `race_first`, `timeout`, `timeout_option` | structured concurrency, see [runtime.md](../runtime/) |

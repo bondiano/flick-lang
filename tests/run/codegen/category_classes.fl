@@ -16,7 +16,7 @@ let main () =
   Platform.stdout_line (show (map2 (fun a b -> (a, b)) [1, 2] ["x", "y"]))
   Platform.stdout_line (show (add (Err "first" : Result String Number) (Err "second")))
   Platform.stdout_line (show (add (Ok 1 : Result String Number) (Ok 2)))
-  let sum = add (pure 20) (pure 22)
+  let sum = add (return 20) (return 22)
   Platform.stdout_line (show (await sum))
   Platform.stdout_line (show (or_else None (Some 3)))
   Platform.stdout_line (show (or_else (Some 1) (Some 3)))

@@ -289,8 +289,8 @@ instance Traversable Option =
     | Some x -> Some (f x)
 
 instance Applicative Option =
-  pure : forall a. a -> Option a
-  let pure x = Some x
+  return : forall a. a -> Option a
+  let return x = Some x
   map2 :
     forall c d a b x. (a -> b -> x)^c ->
       ((Option a)^d -> ((Option b)^d -> (Option x)^(c + d))^(c + d))^c
@@ -325,8 +325,8 @@ instance Traversable (Result e) =
     | Ok a -> Ok (f a)
 
 instance Applicative (Result e) =
-  pure : forall a. a -> Result e a
-  let pure x = Ok x
+  return : forall a. a -> Result e a
+  let return x = Ok x
   map2 :
     forall c d a b x. (a -> b -> x)^c ->
       ((Result e a)^d -> ((Result e b)^d -> (Result e x)^(c + d))^(c + d))^c
@@ -353,8 +353,8 @@ instance Traversable List =
   let traverse f xs = traverse_list f xs
 
 instance Applicative List =
-  pure : forall a. a -> List a
-  let pure x = [x]
+  return : forall a. a -> List a
+  let return x = [x]
   map2 :
     forall c d a b x. (a -> b -> x)^c -> ((List a)^d -> ((List b)^d -> (List x)^(c + d))^(c + d))^c
   let map2 f = map2_list f
@@ -368,8 +368,8 @@ instance Functor (Eff r e) =
   let map f eff = map_eff f eff
 
 instance Applicative (Eff r e) =
-  pure : forall a. a -> Eff r e a
-  let pure x = pure_eff x
+  return : forall a. a -> Eff r e a
+  let return x = pure_eff x
   map2 :
     forall c d a b x. (a -> b -> x)^c ->
       ((Eff r e a)^d -> ((Eff r e b)^d -> (Eff r e x)^(c + d))^(c + d))^c
