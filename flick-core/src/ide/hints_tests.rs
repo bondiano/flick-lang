@@ -127,7 +127,10 @@ foreign sync now from global \"Date.now\"
     let tokens = f.ide().semantic_tokens(f.file("App.Main"));
     let kind_at = |needle: &str| {
         let at = u32::try_from(text.find(needle).expect("occurs")).expect("small");
-        tokens.iter().find(|t| t.0 == at).map(|t| TOKEN_TYPES[t.2 as usize])
+        tokens
+            .iter()
+            .find(|t| t.0 == at)
+            .map(|t| TOKEN_TYPES[t.2 as usize])
     };
     assert_eq!(kind_at("pure"), Some("keyword"));
     assert_eq!(kind_at("sync"), Some("keyword"));

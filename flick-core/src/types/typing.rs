@@ -361,7 +361,9 @@ impl Checker<'_> {
 
     /// `record` is the record the field label at `span` belongs to.
     pub fn note_field(&mut self, span: Span, record: &Type) {
-        self.typing.pending_fields.push((range(span), record.clone()));
+        self.typing
+            .pending_fields
+            .push((range(span), record.clone()));
     }
 
     /// The type of an expression a keyword opens (`task`, `match`, `fun` …),
