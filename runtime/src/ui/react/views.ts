@@ -7,6 +7,7 @@ import {
   type FunctionComponent,
   type ReactNode,
   createElement,
+  Suspense,
   memo,
   useCallback,
   useContext,
@@ -18,8 +19,8 @@ import {
 
 import { isPending, runReading } from "../../atoms.ts";
 import { Failure } from "../../cause.ts";
-import { BridgeContext, RegistryContext, toReact } from "./render.ts";
-import { type Binding, type DomEvent, type Static, type Ui, element, inputSnapshot, uiComponent } from "./nodes.ts";
+import { BridgeContext, RegistryContext, StreamContext, toReact } from "./render.ts";
+import { type Binding, type DomEvent, type Static, type Ui, element, inputSnapshot, uiComponent, uiFragment } from "./nodes.ts";
 import type { Handler } from "./policies.ts";
 
 /**
@@ -30,6 +31,8 @@ export interface View {
   readonly render: (props: unknown) => Effect.Effect<Ui, unknown, unknown>;
   /** The name React's tools show, `Module.name`. */
   readonly label: string | undefined;
+  /** What a view of `Ui.suspended` shows while a task it read loads. */
+  readonly fallback?: Ui;
 }
 
 /** `Ui.view`: a component of `render`. */
@@ -40,16 +43,22 @@ export const uiView = (render: View["render"]): View => Object.freeze({ render, 
  * `fallback`) or a failed one (it shows `failed` of the failure).
  */
 export const uiSuspended = (failed: (failure: Failure) => Ui, fallback: Ui, render: View["render"]): View =>
-  uiView((props) =>
-    Effect.catchCause(render(props), (cause) => {
-      if (isPending(cause)) return Effect.succeed(fallback);
-      if (Cause.hasFails(cause)) return Effect.succeed(failed(new Failure(cause)));
-      return Effect.failCause(cause);
-    }),
-  );
+  Object.freeze({
+    render: (props: unknown) =>
+      Effect.catchCause(render(props), (cause) => {
+        if (!isPending(cause) && Cause.hasFails(cause)) return Effect.succeed(failed(new Failure(cause)));
+        return Effect.failCause(cause);
+      }),
+    label: undefined,
+    fallback,
+  });
 
 /** `Ui.named`: the component as React's tools show it. */
-export const uiNamed = (label: string, view: View): View => Object.freeze({ render: view.render, label });
+export const uiNamed = (label: string, view: View): View => Object.freeze({ ...view, label });
+
+/** The node `view` renders; while a task it read loads, `pending()`. */
+const draw = (view: View, props: unknown, read: (atom: Atom.Atom<unknown>) => unknown, pending: () => Ui): Ui =>
+  runReading(view.render(props), read, view.fallback === undefined ? undefined : pending);
 
 const unsubscribed = (): (() => void) => () => undefined;
 const onClient = (): boolean => false;
@@ -79,11 +88,17 @@ const component = (view: View): FunctionComponent<object> => {
     const bridge = useContext(BridgeContext);
     const [, rerender] = useReducer((n: number) => n + 1, 0);
     const server = serverSide();
+    const streaming = useContext(StreamContext);
     const read = new Map<Atom.Atom<unknown>, unknown>();
-    const node = runReading(view.render(props), (atom) => {
+    const reading = (atom: Atom.Atom<unknown>): unknown => {
       const value = server ? Atom.getServerValue(atom, registry) : registry.get(atom);
       read.set(atom, value);
       return value;
+    };
+    const node = draw(view, props, reading, () => {
+      // a streamed page shows the boundary's fallback and sends this view once a read atom changes
+      if (streaming !== undefined) throw streaming.wait([...read.keys()]);
+      return view.fallback ?? uiFragment([]);
     });
     // Subscribe after the commit; a write since the render renders again.
     useLayoutEffect(() => {
@@ -102,15 +117,23 @@ const component = (view: View): FunctionComponent<object> => {
   };
   const made = memo(render);
   made.displayName = view.label ?? "FlickView";
+  const fallback = view.fallback;
+  // a suspended view is a boundary on server and client alike, so streamed markup hydrates
+  const bounded =
+    fallback === undefined
+      ? made
+      : memo(({ props }: { readonly props: unknown }): ReactNode =>
+          createElement(Suspense, { fallback: toReact(useContext(BridgeContext), fallback) }, createElement(made, { props })),
+        );
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `memo` of a function component is one to render
-  const result = made as unknown as FunctionComponent<object>;
+  const result = bounded as unknown as FunctionComponent<object>;
   components.set(view, result);
   return result;
 };
 
 /** `Ui.render`: the component with these props. */
 export const uiRender = (view: View, props: unknown): Ui =>
-  uiComponent(component(view), { props }, (read) => runReading(view.render(props), read));
+  uiComponent(component(view), { props }, (read) => draw(view, props, read, () => view.fallback ?? uiFragment([])));
 
 interface FieldState {
   readonly tag: "input" | "textarea";

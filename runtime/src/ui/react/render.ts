@@ -1,6 +1,7 @@
 // A `Ui` as React elements: elements with event props take their listeners
 // from the root's bridge, and components (foreign ones, views, fields)
 // render as React components.
+import type * as Atom from "effect/reactivity/Atom";
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import { Fragment, type ReactNode, createContext, createElement, useLayoutEffect, useMemo } from "react";
 
@@ -44,6 +45,14 @@ const EventElement = ({ bridge, node }: { readonly bridge: Events; readonly node
 
 /** The registry views read atoms from: `Ui.Dom.mount` provides it. */
 export const RegistryContext = /*#__PURE__*/ createContext<AtomRegistry.AtomRegistry | undefined>(undefined);
+
+/** How a server streaming markup waits for a change of the atoms a suspended view read. */
+export interface Streaming {
+  readonly wait: (atoms: ReadonlyArray<Atom.Atom<unknown>>) => PromiseLike<void>;
+}
+
+/** Given by `Ui.Server.stream`: a suspended view then suspends while a task loads, and its markup follows later. */
+export const StreamContext = /*#__PURE__*/ createContext<Streaming | undefined>(undefined);
 
 /** The events of the root, for components that render a `Ui` of their own. */
 export const BridgeContext = /*#__PURE__*/ createContext<Events | undefined>(undefined);

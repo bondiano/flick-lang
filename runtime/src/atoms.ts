@@ -2,7 +2,7 @@
 // a derived atom reads through. Both run synchronously (React renders and
 // Effect's registry computes in plain JS), so the effect of a read runs at
 // once with `runSync`, its reads going to the reader at hand.
-import { Cause, Effect, Option } from "effect";
+import { Cause, Effect, Option, Schema } from "effect";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Atom from "effect/reactivity/Atom";
 
@@ -19,12 +19,20 @@ interface ReadImpl {
 /** The service `Atom.Read`. */
 export const ReadService = /*#__PURE__*/ service<ReadImpl>("Atom.Read");
 
-/** Runs `effect`, whose reads of atoms go to `read`, synchronously. */
-export const runReading = <A>(effect: Effect.Effect<A, unknown, unknown>, read: (atom: Atom.Atom<unknown>) => unknown): A => {
+/**
+ * Runs `effect`, whose reads of atoms go to `read`, synchronously; a read
+ * of a loading task under `Atom.ready` gives `pending()` when there is one.
+ */
+export const runReading = <A>(
+  effect: Effect.Effect<A, unknown, unknown>,
+  read: (atom: Atom.Atom<unknown>) => unknown,
+  pending?: () => A,
+): A => {
   const reading = Effect.provideService(effect, ReadService, { get: (atom) => Effect.sync(() => read(atom)) });
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Atom.Read` was its only service
   const exit = Effect.runSyncExit(reading as Effect.Effect<A, unknown>);
   if (exit._tag === "Success") return exit.value;
+  if (isPending(exit.cause) && pending !== undefined) return pending();
   if (isPending(exit.cause)) throw new Error("`Atom.await` read a task still loading outside `Ui.suspended`, which shows a fallback meanwhile");
   throw Cause.squash(exit.cause);
 };
@@ -53,6 +61,42 @@ const toAsync = <A, E>(result: AsyncResult.AsyncResult<A, E>): object =>
 
 /** `Atom.make`: a state whose value the registry keeps while it lives, read or not, so a write before the first read stays. */
 export const atomState = <A>(value: A): Atom.Writable<A> => Atom.keepAlive(flickState(value));
+
+/** Whether `value` is a loaded `Atom.Async`. */
+const isLoaded = (value: unknown): value is { readonly _0: unknown } => Reflect.get(Object(value), "_tag") === LOADED;
+
+/** Marks the task atoms of `Atom.serializable_task`, which hand over only a loaded value. */
+const TASK = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/Atom.serializable_task");
+
+/** Whether a server hands `value` of the serializable `atom` to the client: a task's only once loaded. */
+export const handedOver = (atom: Atom.Atom<unknown>, value: unknown): boolean => !Reflect.has(atom, TASK) || isLoaded(value);
+
+/**
+ * `Atom.serializable_task` under the key the compiler gives: a loaded
+ * result is coded by `codec`, and the client starts from it instead of
+ * running the task; one still loading or failed is not handed over.
+ */
+export const atomSerializableTask = <A>(key: string, codec: Schema.Codec<A, unknown>, atom: Atom.Atom<object>): Atom.Atom<object> => {
+  const json = Schema.toCodecJson(codec);
+  const encode = Schema.encodeSync(json);
+  const decode = Schema.decodeSync(json);
+  // as `Atom.serializable` marks an atom, with the coding of a loaded result
+  return Object.assign(Object.create(Object.getPrototypeOf(atom)), {
+    ...atom,
+    label: atom.label ?? [key, ""],
+    [TASK]: true,
+    [Atom.SerializableTypeId]: {
+      key,
+      encode: (value: unknown) => {
+        if (!isLoaded(value)) throw new Error(`the task atom \`${key}\` has no loaded value to hand over`);
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a loaded result holds the task's value
+        return encode(value._0 as A);
+      },
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the server encoded it with this codec
+      decode: (encoded: unknown) => Object.freeze({ _tag: LOADED, _0: decode(encoded as Schema.Json) }),
+    },
+  });
+};
 
 /** `Atom.task`: the atom of a task's result, run by the registry that first reads it. */
 export const atomTask = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<object> => Atom.map(Atom.make(task), toAsync);

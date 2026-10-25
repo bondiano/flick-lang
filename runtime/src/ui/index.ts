@@ -48,16 +48,36 @@ const domRenderer =
   };
 
 /**
- * The atoms `Ui.Server.state` wrote into the document for `container`, into `registry`.
- * The script is removed, so a later root does not write them over values
- * changed since.
+ * The atoms the server wrote into the document for `container`, by
+ * `Ui.Server.state` or in the scripts of `Ui.Server.stream`, into
+ * `registry`. Each script is removed, so a later root does not write its
+ * atoms over values changed since.
  */
 const hydrateState = (container: Element, registry: AtomRegistry.AtomRegistry): void => {
-  const script = container.ownerDocument.getElementById(`flick-state-${container.id}`);
-  if (script === null || script === undefined) return;
-  script.remove();
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Ui.Server.state` wrote these entries
-  Hydration.hydrate(registry, JSON.parse(script.textContent ?? "[]") as Array<Hydration.DehydratedAtom>);
+  const document = container.ownerDocument;
+  const streamed = Array.from(document.querySelectorAll("script[data-flick-state]")).filter(
+    (script) => script.getAttribute("data-flick-state") === container.id,
+  );
+  for (const script of [document.getElementById(`flick-state-${container.id}`), ...streamed]) {
+    if (script === null) continue;
+    script.remove();
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Ui.Server.state` and `Ui.Server.stream` wrote these entries
+    Hydration.hydrate(registry, JSON.parse(script.textContent ?? "[]") as Array<Hydration.DehydratedAtom>);
+  }
+};
+
+/**
+ * Hydrates the atoms of each script a streamed page adds to `container`
+ * after the root mounted, until the root unmounts: a script comes before
+ * the markup it holds the atoms of, and a mutation observer runs before
+ * React hydrates that markup.
+ */
+const hydrateStreamed = (container: Element, registry: AtomRegistry.AtomRegistry): (() => void) => {
+  const Observer = container.ownerDocument.defaultView?.MutationObserver;
+  if (Observer === undefined || !container.hasAttribute("data-flick-ssr")) return () => undefined;
+  const observer = new Observer(() => hydrateState(container, registry));
+  observer.observe(container, { childList: true });
+  return () => observer.disconnect();
 };
 
 /**
@@ -70,12 +90,16 @@ export const uiMount = <R>(
   supervisor: (failure: Failure) => Effect.Effect<unknown, unknown, R>,
   ui: Ui,
 ): Effect.Effect<never, unknown, unknown> =>
-  Effect.andThen(
-    Effect.flatMap(Effect.service(RegistryService), (record) =>
+  Effect.flatMap(Effect.service(RegistryService), (record) => {
+    const registry = nativeRegistry(record);
+    const mount = uiMountWith(domRenderer(container), supervisor, ui);
+    if (registry === undefined) return mount;
+    return Effect.acquireUseRelease(
       Effect.sync(() => {
-        const registry = nativeRegistry(record);
-        if (registry !== undefined) hydrateState(container, registry);
+        hydrateState(container, registry);
+        return hydrateStreamed(container, registry);
       }),
-    ),
-    uiMountWith(domRenderer(container), supervisor, ui),
-  );
+      () => mount,
+      (stop) => Effect.sync(stop),
+    );
+  });
