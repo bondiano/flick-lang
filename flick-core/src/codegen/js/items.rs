@@ -5,7 +5,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use super::expr::arrow_body;
 use super::schema::{plan_uses, schema_names};
-use super::{Gen, Target, indent, names};
+use super::{Callee, Gen, Target, indent, names};
 use crate::ir::{Expr, ExprKind, Item, ItemKind};
 use crate::types::{Constructor, Dict, InstanceInfo, Rep, companion_name, default_method};
 
@@ -39,7 +39,10 @@ impl Gen<'_> {
                         ..
                     },
             } if dicts.is_empty() && self.workers.contains_key(name) => {
-                let target = Target::Global(format!("{}.{name}", self.module));
+                let target = Target {
+                    callee: Callee::Global(format!("{}.{name}", self.module)),
+                    dicts: Vec::new(),
+                };
                 let (mut stmts, worker) =
                     self.block(|g| g.lambda(params, body, Some(target), true));
                 let id = names::ident(name);
@@ -58,7 +61,10 @@ impl Gen<'_> {
                 stmts.join("\n")
             }
             ItemKind::Value { name, dicts, body } => {
-                let target = Target::Global(format!("{}.{name}", self.module));
+                let target = Target {
+                    callee: Callee::Global(format!("{}.{name}", self.module)),
+                    dicts: dicts.clone(),
+                };
                 let (stmts, value) = self.block(|g| g.function(dicts, body, Some(target)));
                 let value = self.scoped(&stmts, value);
                 let value = self.labelled(name, value);

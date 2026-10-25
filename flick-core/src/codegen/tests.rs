@@ -162,3 +162,20 @@ fn a_tail_call_assigns_only_the_arguments_it_changes() {
     assert_eq!(find.matches("$l0 =").count(), 1, "{find}");
     assert!(find.contains("$l1 ="), "{find}");
 }
+
+#[test]
+fn a_constrained_function_loops_on_a_call_passing_its_own_dictionaries() {
+    let js = compile(
+        "module App.Loop exposing (..)\n\
+         elem : Eq a => a -> List a -> Bool\n\
+         let rec elem y xs =\n  match xs with\n  | [] -> false\n  | [x, ...rest] -> if x == y then true else elem y rest\n\
+         nest : forall a. Show a => Number -> a -> String\n\
+         let rec nest n x = if n == 0 then show x else nest (n - 1) [x]\n",
+    );
+    let elem = export_of(&js, "elem");
+    assert!(elem.contains("for (;;)"), "{elem}");
+    assert!(!elem.contains("elem($d0)"), "{elem}");
+    // polymorphic recursion passes another dictionary: a call, not a jump
+    let nest = export_of(&js, "nest");
+    assert!(!nest.contains("for (;;)"), "{nest}");
+}

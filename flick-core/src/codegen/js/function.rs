@@ -1,12 +1,13 @@
 //! Functions: one arrow per stage, the body at the last; a runtime stage is
 //! an `Effect.gen`. A pure function whose tail position calls itself with
-//! all its arguments is a loop.
+//! all its arguments, and its own dictionaries, is a loop.
 
 use std::mem;
 
 use super::expr::{arrow_body, unmarked};
-use super::{Gen, Tail, Target, indent, names};
+use super::{Callee, Gen, Tail, Target, indent, names};
 use crate::ir::{Expr, ExprKind, Lit, Param, Pat};
+use crate::types::Dict;
 
 impl Gen<'_> {
     /// A definition's value: a function of its dictionaries, if any, around
@@ -20,9 +21,7 @@ impl Gen<'_> {
         let mark = self.givens.len();
         let params = self.bind_givens(dicts);
         let body = match &value.kind {
-            ExprKind::Lambda { params, body } if dicts.is_empty() => {
-                self.lambda(params, body, target, false)
-            }
+            ExprKind::Lambda { params, body } => self.lambda(params, body, target, false),
             // a value: its statements go before it, unless dictionaries defer it
             _ if dicts.is_empty() => self.expr(value),
             _ => {
@@ -289,11 +288,22 @@ fn self_call<'e>(e: &'e Expr, tail: &Tail) -> Option<Vec<&'e Expr>> {
         head = func;
     }
     args.reverse();
-    let target = match &head.kind {
-        ExprKind::Local(name) => Target::Local(name.clone()),
-        ExprKind::Global { module, name } => Target::Global(format!("{module}.{name}")),
+    let mut dicts = Vec::new();
+    if let ExprKind::Dicts(inner, given) = &head.kind {
+        for d in given {
+            match d {
+                Dict::Given(name) => dicts.push(name.clone()),
+                _ => return None,
+            }
+        }
+        head = inner;
+    }
+    let callee = match &head.kind {
+        ExprKind::Local(name) => Callee::Local(name.clone()),
+        ExprKind::Global { module, name } => Callee::Global(format!("{module}.{name}")),
         _ => return None,
     };
+    let target = Target { callee, dicts };
     (target == tail.target && args.len() == tail.vars.len()).then_some(args)
 }
 

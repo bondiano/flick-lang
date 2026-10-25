@@ -232,8 +232,17 @@ struct Tail {
     binds: Vec<Option<String>>,
 }
 
+/// A function a tail call may jump to: its name and the dictionaries of its
+/// constraints, by the names `Dict::Given` gives them, which a call passes
+/// on.
 #[derive(Clone, PartialEq, Eq)]
-enum Target {
+struct Target {
+    callee: Callee,
+    dicts: Vec<String>,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+enum Callee {
     Local(String),
     Global(String),
 }
