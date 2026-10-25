@@ -50,6 +50,7 @@ mod schemas;
 mod services;
 mod sql;
 mod stub;
+mod sugar_lints;
 mod toplevel;
 mod ty;
 mod typing;
@@ -196,11 +197,13 @@ fn run(
         field_path: Vec::new(),
         holes: Vec::new(),
         hole_ok: false,
+        sugar: Vec::new(),
     };
     checker.typing.sql_dialect = options.sql;
     checker.module(module.tree);
     checker.report_holes();
     checker.fill(interface);
+    checker.sugar_lints(module.tree);
     let typing = checker.finish_typing();
     let mut evidence = checker.classes.evidence;
     evidence.sort_by_key(|(span, _)| (span.start, span.end));
@@ -295,6 +298,9 @@ struct Checker<'a> {
     operators: Vec<Operator>,
     /// `==` and `!=` with the type of their operands.
     equalities: Vec<(Type, Span)>,
+    /// The types of `do` blocks and of their expression statements, by
+    /// range, for the lints of `sugar_lints`.
+    sugar: Vec<(typing::Range, Type)>,
     recs: Vec<Rec>,
     top: toplevel::TopLevel<'a>,
     options: Options<'a>,

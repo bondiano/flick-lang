@@ -39,6 +39,7 @@ impl Checker<'_> {
         let mark = self.locals.len();
         let ty = self.do_rest(node, &statements, expected);
         self.locals.truncate(mark);
+        self.sugar.push((node.range(), ty.clone()));
         ty
     }
 
@@ -154,6 +155,9 @@ impl Checker<'_> {
             }
             Some(value) => self.check(value, &monadic),
             None => return Type::Error,
+        }
+        if statement.kind != K::BindStmt {
+            self.sugar.push((statement.range(), *monadic));
         }
         let body = |c: &mut Self, result: Option<Type>| c.do_rest(node, rest, result.as_ref());
         self.function_with(&[pattern], body, Some(&continuation), lambda);

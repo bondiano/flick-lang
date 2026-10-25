@@ -340,8 +340,9 @@ component search (props : SearchProps) =
 **D7. Sync-тело генератора.** ⬜ (после C1)
 - AC: Sync-вызовы в теле `for … yield` выполняются при `next()` в контексте, захваченном при создании; строка ошибок `none`; Async/Scope — ошибка; повтор эффектов при повторной итерации задокументирован.
 
-**D8. Линты и исправления.** ⬜
-- AC: предупреждения с `fixes`: `do` над Eff → прямые вызовы; цепочки `flat_map`/`match … None -> None` → `do`; `List.filter |> List.map` → `[for …]`; `x <- e; pure x` → `e`; `do` с одним `<-` → `map`; `to_list` бесконечного `Seq` без `take*`; `Seq.to_list (for …)` → `[for …]`; тест «до/после» на каждый.
+**D8. Линты и исправления.** 🔶 (5 из 7)
+- ✅ `FLICK-T029` `do` над Eff → `task` с `await` (`x <- e` → `let x = await e`, утверждение → `await`/`ignore await`, `pure v` → `v`); `T030` `x <- e; pure x` → `e` (safe); `T031` `Seq.to_list` бесконечной последовательности (`from`/`repeat`/`iterate`/`cycle` через `map`/`filter`/… без `take*`); `T032` `Seq.to_list (for …)` → `[for …]` (safe); `T033` `xs |> List.filter (fun x -> p) |> List.map (fun x -> e)` → `[for x <- xs if p yield e]` при одном имени параметра.
+- ⬜ цепочки `flat_map`/`match … None -> None` → `do`; исправление «связать эффект до `do`» (диагноз с подсказкой уже есть).
 
 **D9. Эффектный `for`.** ⬜
 - AC: `for { … } do body` в стадии времени выполнения — `for…of` внутри текущего `Effect.gen`, без генератора; строки тела объединяются со строкой функции; прерывание посреди цикла (тест).

@@ -1,0 +1,32 @@
+module App.Sugar exposing (..)
+
+// A binding only returned is the bound computation.
+firsts : Option Number -> Option Number
+let firsts o = do { x <- o; pure x }
+
+// A whole infinite sequence never ends.
+all_naturals : List Number
+let all_naturals = Seq.from 1 |> Seq.map (fun n -> n * 2) |> Seq.to_list
+
+// A forced `for` is a strict `[for …]`.
+forced : List Number -> List Number
+let forced xs = Seq.to_list (for { x <- xs } yield x + 1)
+
+// A filter piped into a map is one comprehension.
+piped : List Number -> List Number
+let piped xs = xs |> List.filter (fun x -> x > 1) |> List.map (fun x -> x * 10)
+
+// `do` over `Eff` is a `task` with direct calls.
+both : Eff none none Number
+let both =
+  do {
+    x <- pure 40
+    y <- pure 2
+    pure (x + y)
+  }
+
+//~ FLICK-T030 @5:21-5:27 binding a value only to return it: the bound computation is the same
+//~ FLICK-T031 @9:20-9:73 this sequence never ends, so `Seq.to_list` never returns: take a part
+//~ FLICK-T032 @13:17-13:58 `Seq.to_list` of a `for`: `[for …]` builds the list without a generato
+//~ FLICK-T033 @17:16-17:80 `List.filter` then `List.map` walk the list twice: `[for …]` does both
+//~ FLICK-T029 @22:3-22:5 `do` over `Eff`: a `task` with direct calls builds the same computatio

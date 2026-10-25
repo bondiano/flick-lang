@@ -33,7 +33,7 @@ let first_some options =
   do {
     let assert [first, ..._rest] = options
     x <- first
-    pure x
+    pure (x + 1)
   }
 
 chained : Result String Number -> Eff none none (Result String Number)

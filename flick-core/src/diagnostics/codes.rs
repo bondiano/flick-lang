@@ -155,6 +155,11 @@ codes! {
     T026 = Types 26, "`let assert` outside a block";
     T027 = Types 27, "`let assert` in a project with `[lint] no-let-assert`";
     T028 = Types 28, "`else ()` an `if` does not need";
+    T029 = Types 29, "`do` over `Eff`, which a `task` with direct calls says";
+    T030 = Types 30, "a binding of a `do` block only returned";
+    T031 = Types 31, "a whole infinite sequence";
+    T032 = Types 32, "`Seq.to_list` of a `for`, which `[for …]` builds";
+    T033 = Types 33, "`List.filter` then `List.map`, which `[for …]` says";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";
