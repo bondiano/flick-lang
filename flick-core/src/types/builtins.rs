@@ -314,6 +314,9 @@ const SOURCES: &[(&str, &str)] = &[
     // Effect: HttpApi
     ("HttpApi", include_str!("builtins/HttpApi.fl")),
     // end of Effect: HttpApi
+    // Effect: RPC (unstable in Effect 4.0.5)
+    ("Rpc", include_str!("builtins/Rpc.fl")),
+    // end of Effect: RPC
     // Effect: CLI
     ("Cli.Prompt", include_str!("builtins/Cli/Prompt.fl")),
     ("Cli", include_str!("builtins/Cli.fl")),

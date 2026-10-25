@@ -1,0 +1,6 @@
+[wrapped]
+Stream = "Rpc.with_stream 60a7d20a9e48db21"
+
+[excluded]
+ClientAbort = "internal to stream procedures"
+isStreamSchema = "TS-only: a type guard; Flick values are typed statically"

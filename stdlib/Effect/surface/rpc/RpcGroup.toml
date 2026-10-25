@@ -1,0 +1,11 @@
+[wrapped]
+make = "Rpc.add 2778a7f9eb6fd7f5"
+
+[excluded]
+Any = "TS-only: type-level machinery of Effect's RPC types; Flick's `Rpc` types carry the same information"
+HandlerFrom = "TS-only: type-level machinery of Effect's RPC types; Flick's `Rpc` types carry the same information"
+HandlerServices = "TS-only: type-level machinery of Effect's RPC types; Flick's `Rpc` types carry the same information"
+HandlersFrom = "TS-only: type-level machinery of Effect's RPC types; Flick's `Rpc` types carry the same information"
+HandlersServices = "TS-only: type-level machinery of Effect's RPC types; Flick's `Rpc` types carry the same information"
+RpcGroup = "TS-only: type-level machinery of Effect's RPC types; Flick's `Rpc` types carry the same information"
+Rpcs = "TS-only: type-level machinery of Effect's RPC types; Flick's `Rpc` types carry the same information"

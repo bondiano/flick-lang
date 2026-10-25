@@ -1,0 +1,23 @@
+[wrapped]
+toHttpEffect = "Rpc.listen 686bfd3f4471e7d1"
+
+[excluded]
+Protocol = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+RpcServer = "TS-only: type-level machinery of Effect's RPC types; Flick's `Rpc` types carry the same information"
+layer = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+layerHttp = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+layerProtocolHttp = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+layerProtocolSocketServer = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+layerProtocolStdio = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+layerProtocolWebsocket = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+layerProtocolWorkerRunner = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+make = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+makeNoSerialization = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+makeProtocolHttp = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+makeProtocolSocketServer = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+makeProtocolStdio = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+makeProtocolWebsocket = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+makeProtocolWithHttpEffect = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+makeProtocolWithHttpEffectWebsocket = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+makeProtocolWorkerRunner = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"
+toHttpEffectWebsocket = "`Rpc.listen` serves HTTP with NDJSON on Node; other protocols and servers are outside the first binding"

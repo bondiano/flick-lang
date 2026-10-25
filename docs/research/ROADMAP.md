@@ -73,7 +73,7 @@ component search (props : SearchProps) =
 **S1. `effect/reactivity`.** ✅ `6445878`
 - AC: `"effect/reactivity" = { modules = "reactivity" }`; каждый экспорт классифицирован `[wrapped]`/`[excluded]` с причиной; `*Unsafe`, guards, TS-only исключены; линтер покрытия зелёный; модули помечены unstable.
 
-**S2. `effect/rpc`.** ⬜ (сейчас `excluded = "RPC protocols are outside 0.1.0"`)
+**S2. `effect/rpc`.** ✅ (модуль `Rpc`: процедуры с кодеками, группа как запись обработчиков, `listen` по HTTP + NDJSON, `call`/`call_stream`; 169 экспортов классифицированы)
 - AC: `Rpc`, `RpcGroup`, `RpcClient`, `RpcServer`, `RpcSerialization` классифицированы; run-тест в `tests/run/stdlib/rpc/`: сервер и клиент на одном `RpcGroup`, unary и stream вызов; линтер покрытия зелёный.
 
 **S3. `effect/observability`.** ⬜

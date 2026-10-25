@@ -3,7 +3,7 @@ title: "Effect coverage"
 ---
 
 The standard library wraps the pinned Effect release (see [The boundary of the language core](../../spec/07-errors-and-concurrency/#the-boundary-of-the-language-core)): every public export of the entrypoints `effect`, `effect/cli`,
-`effect/http`, `effect/http-api` and `effect/reactivity` has a typed wrapper or an explicit
+`effect/http`, `effect/http-api`, `effect/reactivity` and `effect/rpc` has a typed wrapper or an explicit
 decision, and a linter in `cargo test` checks that nothing is lost when
 Effect moves.
 
@@ -12,7 +12,7 @@ Effect moves.
 `stdlib/Effect/snapshot.json` is the surface of the installed Effect, written
 by `node tools/dts-importer/index.mjs surface > stdlib/Effect/snapshot.json`
 (a Flick program: `pnpm -C tools/dts-importer build` first):
-every entrypoint of its `package.json`, and for the five wrapped ones each
+every entrypoint of its `package.json`, and for the six wrapped ones each
 export of each module as `Module.name` with its kind (`value`, `type` or
 `value+type`) and a fingerprint, 16 hex digits of the SHA-256 of its
 declarations printed without comments. A changed doc comment keeps the
@@ -88,6 +88,11 @@ its bindings: `Reactivity.Atom` (atoms, the service `Registry` that holds
 their values, and its `layer`) and `Reactivity.AsyncResult` (the value of an
 atom a task computes). Their API may change with any Effect release; the UI
 modules built on them are the stable surface.
+
+`effect/rpc` is unstable too, and so is `Rpc`: procedures described with
+codecs, a group whose type is the record of its handlers, `listen` serving
+it over HTTP with NDJSON until its scope closes, and `call` and
+`call_stream` calling a procedure of the same value.
 
 ## Bindings
 

@@ -16,7 +16,7 @@
 "effect/persistence" = { excluded = "persistence backends are outside 0.1.0" }
 "effect/process" = { excluded = "child processes are outside the 0.1.0 standard library" }
 "effect/reactivity" = { modules = "reactivity" }
-"effect/rpc" = { excluded = "RPC protocols are outside 0.1.0" }
+"effect/rpc" = { modules = "rpc" }
 "effect/schema" = { excluded = "Flick's Schema and codecs cover schemas; this entrypoint's extras are outside 0.1.0" }
 "effect/socket" = { excluded = "sockets are outside the 0.1.0 standard library" }
 "effect/sql" = { excluded = "Flick's SQL eDSL has its own PostgreSQL driver" }
