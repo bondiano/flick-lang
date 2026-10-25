@@ -3,8 +3,8 @@ module App.MadeInRender exposing (..)
 count : Atom.Writable Number
 let count = Atom.make 0
 
-draft : Number -> Atom.Writable String
-let draft = Atom.family (fun _ -> Atom.make "")
+drafts : Atom.Family Number (Atom.Writable String)
+let drafts = Atom.family (fun _ -> Atom.make "")
 
 remove : Action.Action (Number, Ui.ClickSnapshot) {Atom.Write} none
 let remove = Action.exhaust (fun (n, _) -> task { Atom.set count n })
@@ -46,7 +46,10 @@ let keyed =
     (fun id ->
       ui {
         fragment
-          [Ui.field { bind = draft id; placeholder = ""; on_input = None }, Ui.render inner ()]
+          [
+            Ui.field { bind = Atom.at drafts id; placeholder = ""; on_input = None },
+            Ui.render inner (),
+          ]
       })
 
 // a handler's task runs on an event, not while rendering
@@ -66,4 +69,4 @@ let handler =
 //~ FLICK-U006 @26:44-26:58 `Action.exhaust` while rendering
 //~ FLICK-U006 @36:48-36:55 `Ui.view` while rendering
 //~ FLICK-U006 @40:14-40:23 `Atom.make` while rendering
-//~ FLICK-U002 @57:7-61:11 `Ui.Event.exhaust` of a `fun` makes a handler on every render
+//~ FLICK-U002 @60:7-64:11 `Ui.Event.exhaust` of a `fun` makes a handler on every render

@@ -119,7 +119,10 @@ impl Checker<'_> {
                 continue;
             };
             let label = match self.bare(&ty).spine().0 {
-                Type::Con { module, name } if ATOMS.contains(&(module.as_str(), name.as_str())) => {
+                // a family is not an atom: its atoms are made later, by key
+                Type::Con { module, name }
+                    if name != "Family" && ATOMS.contains(&(module.as_str(), name.as_str())) =>
+                {
                     Label::Atom
                 }
                 Type::Con { module, name }
@@ -322,12 +325,13 @@ fn made(node: &Node, names: &HashMap<Range, Ref>, out: &mut Vec<(Range, String)>
 }
 
 /// The types of atoms, by module and name; a signature keeps the aliases.
-const ATOMS: [(&str, &str); 5] = [
+const ATOMS: [(&str, &str); 6] = [
     ("Reactivity.Atom", "Atom"),
     ("Reactivity.Atom", "Writable"),
     ("Atom", "Atom"),
     ("Atom", "Writable"),
     ("Atom", "Browser"),
+    ("Atom", "Family"),
 ];
 
 /// The declarations, those of each `rec` group one by one.

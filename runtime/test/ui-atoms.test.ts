@@ -8,7 +8,8 @@ import { JSDOM } from "jsdom";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 
-import { ReadService, atomDerived, atomFamily, atomState, label as compilerLabel } from "../src/index.ts";
+import { WriteService, atomLayer, nativeRegistry } from "../src/effect/reactivity/Atom.ts";
+import { ReadService, atomAt, atomDerived, atomFamily, atomForget, atomState, label as compilerLabel } from "../src/index.ts";
 import { type Renderer, type Ui, eventExhaust, uiFragment, uiNamed, uiRunWith, uiRender, uiText, uiView } from "../src/ui/react/index.ts";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>");
@@ -153,17 +154,50 @@ test("a state keeps a value written before anything read it", async () => {
   assert.equal(registry.get(count), 3);
 });
 
+type Id = { readonly id: number };
+const byId = { hash: (p: Id) => p.id % 2, $Eq: { eq: (a: Id) => (b: Id) => a.id === b.id } };
+
 test("a family gives the same atom for keys equal by Eq, and another for another key", () => {
-  const byId = { hash: (p: { readonly id: number }) => p.id % 2, $Eq: { eq: (a: { readonly id: number }) => (b: { readonly id: number }) => a.id === b.id } };
-  let made = 0;
-  const family = atomFamily(byId, (p: { readonly id: number }) => {
-    made += 1;
-    return atomState(p.id);
+  const family = atomFamily(byId, (p: Id) => atomState(p.id));
+  const first = atomAt(family, { id: 1 });
+  assert.equal(atomAt(family, { id: 1 }), first);
+  assert.notEqual(atomAt(family, { id: 3 }), first);
+});
+
+test("a forgotten key gets a new atom, and the registry drops the old state once nothing reads it", async () => {
+  const family = atomFamily(byId, (p: Id) => atomState(p.id));
+  const [old, kept] = [atomAt(family, { id: 1 }), atomAt(family, { id: 2 })];
+  const program = Effect.gen(function* () {
+    const registry = nativeRegistry(yield* Effect.service(WriteService));
+    assert.ok(registry !== undefined);
+    registry.set(old, 10);
+    registry.set(kept, 20);
+    yield* atomForget(family, { id: 1 });
+    yield* Effect.promise(() => tick());
+    return [registry.getNodes().has(old), registry.getNodes().has(kept)];
   });
-  const first = family({ id: 1 });
-  assert.equal(family({ id: 1 }), first);
-  assert.notEqual(family({ id: 3 }), first);
-  assert.equal(made, 2);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the layer provides the program's one service
+  assert.deepEqual(await Effect.runPromise(Effect.provide(program, atomLayer) as Effect.Effect<Array<boolean>>), [false, true]);
+  assert.notEqual(atomAt(family, { id: 1 }), old);
+  assert.equal(atomAt(family, { id: 2 }), kept);
+});
+
+test("a state forgotten while a view reads it goes when the view stops reading", async () => {
+  const family = atomFamily(byId, (p: Id) => atomState(p.id));
+  const old = atomAt(family, { id: 1 });
+  const program = Effect.gen(function* () {
+    const registry = nativeRegistry(yield* Effect.service(WriteService));
+    assert.ok(registry !== undefined);
+    const unsubscribe = registry.subscribe(old, () => undefined);
+    yield* atomForget(family, { id: 1 });
+    yield* Effect.promise(() => tick());
+    const whileRead = registry.getNodes().has(old);
+    unsubscribe();
+    yield* Effect.promise(() => tick());
+    return [whileRead, registry.getNodes().has(old)];
+  });
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the layer provides the program's one service
+  assert.deepEqual(await Effect.runPromise(Effect.provide(program, atomLayer) as Effect.Effect<Array<boolean>>), [true, false]);
 });
 
 test("the compiler's label names an atom, a view and an action, and keeps a name given by hand", () => {

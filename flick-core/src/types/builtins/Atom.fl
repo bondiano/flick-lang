@@ -135,10 +135,28 @@ let ready atom =
   | Failed failure -> Failure.rethrow failure
   | Loading -> pending ()
 
-/// One atom per key, made by `f` the first time and the same for every
-/// equal key after: a view makes the atoms of its items with it, not with
-/// `make` while it renders. Keys compare by `Eq` and `Hash`, so a key holds
-/// no function. The family keeps every atom it made.
-family : Hash k => (k -> a) -> k -> a
+/// Atoms by key: `at family key` makes the atom of `key` the first time
+/// and gives the same one for every equal key after, so a view takes the
+/// atoms of its items from a family, not from `make` while it renders. Keys
+/// compare by `Eq` and `Hash`, so a key holds no function. A family holds
+/// its atoms weakly: a state stays while a registry keeps its value, until
+/// `forget` lets it go.
+type Family k a
+
+/// The family of the atoms `f` makes.
+family : Hash k => (k -> a) -> Family k a
 foreign pure family from "@flick-lang/runtime" "atomFamily"
   arity 1
+
+/// The atom of `key`, made by the family's function the first time.
+at : Family k a -> k -> a
+foreign pure at from "@flick-lang/runtime" "atomAt"
+  arity 2
+
+/// Forgets the atom of `key`: the next `at` makes a new one, and the
+/// registry drops the old state's value once no view reads it. Forget the
+/// key of an item the program deletes, or its state stays as long as the
+/// registry does.
+forget : Family k a -> k ->{Write;} Unit
+foreign effect forget from "@flick-lang/runtime" "atomForget"
+  arity 2

@@ -131,19 +131,30 @@ service is `Atom.Read`. A write, another service or an error in it is
 `FLICK-U004`: write atoms in an action, run a task as `Atom.task` and read
 its result, or give failures a view with `Ui.suspended`.
 
-An atom is made once and keeps its identity. A top-level atom has one
-type: `let items = Atom.make []` would hold one list for every element
-type, so its type needs no variables, and `FLICK-U005` asks for the type of
-its value. Nothing is made while rendering either: an atom, an action or a
-view made in a render, which may run again at any time, would start over on
+An atom is made once and keeps its identity. A top-level atom has one type:
+`let items = Atom.make []` would hold one list for every element type, so
+its type needs no variables, and `FLICK-U005` asks for the type of its
+value. Nothing is made while rendering either: an atom, an action or a view
+made in a render, which may run again at any time, would start over on
 every render, so `FLICK-U006` refuses it. Make each with a top-level `let`,
-and one atom per key with `Atom.family`, which gives the same atom for an
-equal key; the key needs `Hash`, so it holds no function. The task of a
+and one atom per key with `Atom.family`: `Atom.at family key` gives the
+same atom for an equal key, which needs `Hash`, so it holds no function. A
+family holds its atoms weakly, but the registry keeps a state's value while
+it lives: `Atom.forget family key` lets the state of a deleted item go once
+no view reads it, and the next `Atom.at` makes a new one. The task of a
 handler runs on an event, not while rendering, and may make what it needs.
 
 ```flick
-draft : Number -> Atom.Writable String
-let draft = Atom.family (fun _ -> Atom.make "")
+drafts : Atom.Family Number (Atom.Writable String)
+let drafts = Atom.family (fun _ -> Atom.make "")
+
+remove : Action.Action (Number, Ui.ClickSnapshot) {Atom.Write} none
+let remove =
+  Action.exhaust (fun (id, _) ->
+    task {
+      Atom.update items (List.filter (fun i -> i != id))
+      Atom.forget drafts id
+    })
 ```
 
 `Ui.keyed id node` gives a dynamic sibling a stable identity. Keys are

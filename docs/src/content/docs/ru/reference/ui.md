@@ -139,13 +139,24 @@ let counter_view =
 представление, созданные в render, который может выполниться снова в любой
 момент, начинались бы заново при каждом рендере, поэтому `FLICK-U006` это
 запрещает. Создавайте их top-level `let`, а атом на ключ — через
-`Atom.family`, который для равного ключа даёт тот же атом; ключу нужен
-`Hash`, поэтому функций в нём нет. Задача обработчика выполняется по
-событию, а не во время рендера, и может создавать что нужно.
+`Atom.family`: `Atom.at family key` для равного ключа даёт тот же атом;
+ключу нужен `Hash`, поэтому функций в нём нет. Семейство держит атомы
+слабо, но реестр хранит значение состояния, пока жив сам: `Atom.forget
+family key` отпускает состояние удалённого элемента, как только его
+перестают читать, а следующий `Atom.at` создаст новое. Задача обработчика
+выполняется по событию, а не во время рендера, и может создавать что нужно.
 
 ```flick
-draft : Number -> Atom.Writable String
-let draft = Atom.family (fun _ -> Atom.make "")
+drafts : Atom.Family Number (Atom.Writable String)
+let drafts = Atom.family (fun _ -> Atom.make "")
+
+remove : Action.Action (Number, Ui.ClickSnapshot) {Atom.Write} none
+let remove =
+  Action.exhaust (fun (id, _) ->
+    task {
+      Atom.update items (List.filter (fun i -> i != id))
+      Atom.forget drafts id
+    })
 ```
 
 `Ui.keyed id node` задаёт стабильную идентичность динамического дочернего

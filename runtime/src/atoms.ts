@@ -8,7 +8,7 @@ import * as Atom from "effect/reactivity/Atom";
 
 import { Failure } from "./cause.ts";
 import type { HashDict } from "./data.ts";
-import { flickState } from "./effect/reactivity/Atom.ts";
+import { WriteService, flickState, nativeRegistry } from "./effect/reactivity/Atom.ts";
 import { service } from "./effects.ts";
 import { tag } from "./tags.ts";
 
@@ -71,24 +71,73 @@ export const label = <A extends object>(name: string, value: A): A => {
   return Object.freeze({ ...value, label: name });
 };
 
-/**
- * `Atom.family`: one atom per key, made by `f` the first time and the same
- * for every key equal by `Eq` after.
- */
-export const atomFamily = <K, A>(dHash: HashDict<K>, f: (key: K) => A): ((key: K) => A) => {
-  // shortcut: keeps every atom it made, unlike Effect's `Atom.family`, which forgets one no one holds; upgrade if families of many short-lived keys appear
-  const made = new Map<number, Array<readonly [K, A]>>();
-  return (key) => {
-    const hash = dHash.hash(key);
-    const bucket = made.get(hash) ?? [];
-    const known = bucket.find(([k]) => dHash.$Eq.eq(k)(key));
-    if (known !== undefined) return known[1];
-    const atom = f(key);
-    bucket.push([key, atom]);
-    made.set(hash, bucket);
-    return atom;
-  };
+interface Entry<K, A> {
+  readonly key: K;
+  readonly ref: { deref(): A | undefined };
+}
+
+/** `Atom.Family k a`: the atoms of each key, held weakly. */
+interface Family<K, A> {
+  readonly dHash: HashDict<K>;
+  readonly make: (key: K) => A;
+  readonly entries: Map<number, Array<Entry<K, A>>>;
+  readonly gone: FinalizationRegistry<Entry<K, A>> | undefined;
+}
+
+const forgetEntry = <K, A>(family: Family<K, A>, entry: Entry<K, A>): void => {
+  const hash = family.dHash.hash(entry.key);
+  const rest = (family.entries.get(hash) ?? []).filter((e) => e !== entry);
+  if (rest.length > 0) family.entries.set(hash, rest);
+  else family.entries.delete(hash);
 };
+
+const entryOf = <K, A>(family: Family<K, A>, key: K): Entry<K, A> | undefined =>
+  family.entries.get(family.dHash.hash(key))?.find((e) => family.dHash.$Eq.eq(e.key)(key));
+
+/** `Atom.family`: the atoms `make` makes, one per key equal by `Eq`. */
+export const atomFamily = <K, A>(dHash: HashDict<K>, make: (key: K) => A): Family<K, A> => {
+  const family: Family<K, A> = {
+    dHash,
+    make,
+    entries: new Map(),
+    // an atom nothing holds any more takes its entry with it
+    gone: typeof FinalizationRegistry === "undefined" ? undefined : new FinalizationRegistry((entry) => forgetEntry(family, entry)),
+  };
+  return family;
+};
+
+/** `Atom.at`: the atom of `key`, made the first time. */
+export const atomAt = <K, A>(family: Family<K, A>, key: K): A => {
+  const entry = entryOf(family, key);
+  const known = entry?.ref.deref();
+  if (known !== undefined) return known;
+  if (entry !== undefined) forgetEntry(family, entry);
+  const atom = family.make(key);
+  const weak = typeof atom === "object" && atom !== null && typeof WeakRef !== "undefined";
+  const made: Entry<K, A> = { key, ref: weak ? new WeakRef(atom) : { deref: () => atom } };
+  const hash = family.dHash.hash(key);
+  family.entries.set(hash, [...(family.entries.get(hash) ?? []), made]);
+  if (weak) family.gone?.register(atom, made);
+  return atom;
+};
+
+/**
+ * `Atom.forget`: the next `at` of `key` makes a new atom, and the registry
+ * drops the old state's value once nothing reads it.
+ */
+export const atomForget = <K, A>(family: Family<K, A>, key: K): Effect.Effect<void, never, unknown> =>
+  Effect.map(Effect.service(WriteService), (write) => {
+    const entry = entryOf(family, key);
+    if (entry === undefined) return;
+    forgetEntry(family, entry);
+    const atom = entry.ref.deref();
+    if (!Atom.isAtom(atom)) return;
+    // no `at` gives this atom again, so it need not outlive its readers
+    Reflect.set(atom, "keepAlive", false);
+    const registry = nativeRegistry(write);
+    // a last reader leaving removes the node; with none, this does
+    if (registry !== undefined) registry.mount(atom)();
+  });
 
 /** `Atom.search_param`: the URL's search parameter `name`; a write updates the URL. */
 export const atomSearchParam = (name: string): Atom.Writable<string> => Atom.keepAlive(Atom.searchParam(name));
