@@ -4,7 +4,7 @@ use std::{fs, io, process};
 use flick_core::build::{self, Artifact, Extras, Settings};
 use flick_core::codegen::Labels;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::config::{Build, Emit, Kind, MAIN_ENTRY, Profile};
+use flick_core::project::config::{Backend, Build, Emit, Kind, MAIN_ENTRY, Profile};
 use flick_core::project::{self, Compilation, Compiled, Project};
 use flick_core::source::{FileId, SourceMap};
 
@@ -359,6 +359,7 @@ pub fn artifacts(
         extras: output.extras,
         release: output.release,
         root: project.map(|p| p.root.as_path()),
+        backend: project.map_or(Backend::Effect, |p| p.config.build.effect),
     };
     build::emit(compilation, sources, &settings)
 }

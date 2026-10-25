@@ -6,11 +6,11 @@ use super::{Loader, Root};
 use crate::diagnostics::Diagnostic;
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
-use crate::project::config::Kind;
+use crate::project::config::{Backend, Kind};
 use crate::project::{Project, is_module_name, module_path};
 use crate::resolve::Interface;
 use crate::source::Span;
-use crate::types::{Effects, Type, show_type};
+use crate::types::{Effects, NO_EFFECTS, Type, show_type};
 
 /// How the runner starts `main`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,7 +116,16 @@ impl Loader<'_> {
                     return;
                 };
                 // no type when the module failed to check: that is reported already
-                if let Some(Err(message)) = main.scheme.as_ref().map(main_kind) {
+                let pure = project.config.build.effect == Backend::None;
+                let problem = main.scheme.as_ref().and_then(|t| match main_kind(t) {
+                    Err(message) => Some(message),
+                    Ok(MainKind::Effect) if pure => Some(format!(
+                        "entry `main` has type `{}`, but {NO_EFFECTS}: a runner calls `Unit -> Unit`",
+                        show_type(t)
+                    )),
+                    Ok(_) => None,
+                });
+                if let Some(message) = problem {
                     let defining = self.by_name.get(&main.entity.module).copied();
                     let at = main.at.zip(defining).map_or(span, |([start, end], d)| {
                         Span::new(self.modules[d].file, start, end)

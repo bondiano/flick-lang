@@ -1,0 +1,23 @@
+// The program of `pure.fl` built with `effect = "none"`: plain JavaScript
+// on `@flick-lang/runtime/core`, with no Effect in the bundle.
+module App.Main exposing (main)
+
+type Shape = Circle Number | Rect Number Number
+
+area : Shape -> Number
+let area s =
+  match s with
+  | Circle r -> 3.14 * r * r
+  | Rect w h -> w * h
+
+add : Number -> Number -> Number
+let add a b = a + b
+
+log : String -> Unit
+foreign pure log from global "console.log"
+
+main : Unit -> Unit
+let main () =
+  let a = area (Circle 2)
+  let b = area (Rect 3 4)
+  log (show (add a b))

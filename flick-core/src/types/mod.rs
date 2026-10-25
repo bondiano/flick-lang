@@ -61,6 +61,7 @@ pub(crate) use classes::{Match, match_type};
 pub use convert::is_type;
 pub use decls::class_defaults;
 pub use display::show_type;
+pub use effects::NO_EFFECTS;
 pub use env::{Abi, Form, Fundep, Instance, JsClass, Operation, Rep, TypeDef};
 pub use kinds::Kind;
 pub use patterns::is_pattern;
@@ -113,6 +114,8 @@ pub struct Options<'a> {
     pub limits: Limits,
     /// The SQL dialect of `sql table` and `sql { … }`.
     pub sql: &'static Dialect,
+    /// Whether runtime code may run: `false` under `effect = "none"`.
+    pub effects: bool,
 }
 
 /// Type-checks `module` and stores the types of its exports in `interface`.

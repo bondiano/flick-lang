@@ -20,6 +20,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 /** Programs and their gzip budgets in KB. */
 export const PROGRAMS = [
   { name: "pure", source: "tools/bundle-size/pure.fl", budget: 12 },
+  // the same program with `effect = "none"`, a project of its own: no Effect at all
+  { name: "none", source: "tools/bundle-size/none", budget: 2, effectFree: true },
   // UI programs render views on atoms: at most 81 KB and 18 KB for effect/reactivity (U8);
   // the registry keeps `Stream`, which `effect/reactivity` imports for stream atoms
   { name: "counter", source: "tests/run/ui/counter.fl", budget: 99, unused: ["effect/dist/Graph.js"] },
@@ -130,12 +132,17 @@ export const measure = async (entry) => {
   return { raw: raw.bytes, min: min.bytes, gzip: min.gzip, modules: min.modules, app: min.app };
 };
 
-/** Compiles `source` into `out` with `flick build`, labelling `labels` when given. */
+/**
+ * Compiles `source` into `out` with `flick build`, labelling `labels` when
+ * given; a directory is a project, built with its `flick.toml`.
+ */
 export const build = (flick, source, out, profile, labels) => {
   rmSync(out, { recursive: true, force: true });
   const options = labels === undefined ? [] : ["--labels", labels];
-  execFileSync(flick, ["build", path.join(root, source), "--out-dir", out, "--profile", profile, ...options, "--quiet", "--color", "never"], {
-    cwd: root,
+  const project = !source.endsWith(".fl");
+  const file = project ? [] : [path.join(root, source)];
+  execFileSync(flick, ["build", ...file, "--out-dir", out, "--profile", profile, ...options, "--quiet", "--color", "never"], {
+    cwd: project ? path.join(root, source) : root,
     stdio: ["ignore", "inherit", "inherit"],
   });
 };
@@ -170,6 +177,9 @@ const main = async () => {
     ...(r.unused ?? UNUSED).filter((m) => r.modules.some((id) => id.replaceAll("\\", "/").endsWith(m))).map(
       (m) => `${r.name} keeps ${m}, which it does not use`,
     ),
+    ...(r.effectFree && r.modules.some((id) => id.replaceAll("\\", "/").includes("/node_modules/effect/"))
+      ? [`${r.name} is built without effects, but its bundle keeps Effect`]
+      : []),
   ]);
   for (const e of errors) console.error(`error: ${e}`);
   if (errors.length > 0) process.exitCode = 1;

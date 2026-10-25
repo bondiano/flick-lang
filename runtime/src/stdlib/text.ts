@@ -21,23 +21,34 @@ export const logConsole = (level: string, message: string): void => {
   write(`${level}: ${message}\n`);
 };
 
-export const stringSplit = (separator: string, s: string): Array<string> => s.split(separator);
-export const stringJoin = (separator: string, parts: ReadonlyArray<string>): string => parts.join(separator);
-export const stringContains = (part: string, s: string): boolean => s.includes(part);
-export const stringStartsWith = (prefix: string, s: string): boolean => s.startsWith(prefix);
-export const stringEndsWith = (suffix: string, s: string): boolean => s.endsWith(suffix);
+export {
+  stringSplit,
+  stringJoin,
+  stringContains,
+  stringStartsWith,
+  stringEndsWith,
+  stringToUpper,
+  stringToLower,
+  stringSlice,
+  stringReplaceAll,
+  stringRepeat,
+  stringChars,
+  stringFromNumber,
+  bitAnd,
+  bitOr,
+  bitXor,
+  bitNot,
+  shiftLeft,
+  shiftRight,
+  shiftRightUnsigned,
+  bigintAbs,
+} from "../core/text.ts";
+
+// Option- and Result-making helpers: Effect's data here, plain data in `core/text.ts`
 export const stringIndexOf = (part: string, s: string): Option.Option<number> => {
   const i = s.indexOf(part);
   return i < 0 ? none : some(i);
 };
-export const stringToUpper = (s: string): string => s.toUpperCase();
-export const stringToLower = (s: string): string => s.toLowerCase();
-export const stringSlice = (start: number, end: number, s: string): string => s.slice(start, end);
-export const stringReplaceAll = (pattern: string, replacement: string, s: string): string =>
-  s.replaceAll(pattern, () => replacement);
-export const stringRepeat = (n: number, s: string): string => (Number.isInteger(n) && n >= 0 ? s.repeat(n) : "");
-export const stringChars = (s: string): Array<string> => Array.from(s);
-export const stringFromNumber = (n: number): string => (Object.is(n, -0) ? "-0" : String(n));
 
 /** The number `s` spells in JS syntax; blank and malformed text are `None`. */
 export const stringToNumber = (s: string): Option.Option<number> => {
@@ -78,14 +89,6 @@ export const intMul = /*#__PURE__*/ checked("mul_int", (a, b) => a * b);
 export const intDiv = /*#__PURE__*/ checked("div_int", (a, b) => Math.trunc(a / b));
 export const intRem = /*#__PURE__*/ checked("rem_int", (a, b) => a % b);
 
-export const bitAnd = (a: number, b: number): number => a & b;
-export const bitOr = (a: number, b: number): number => a | b;
-export const bitXor = (a: number, b: number): number => a ^ b;
-export const bitNot = (a: number): number => ~a;
-export const shiftLeft = (a: number, b: number): number => a << b;
-export const shiftRight = (a: number, b: number): number => a >> b;
-export const shiftRightUnsigned = (a: number, b: number): number => a >>> b;
-
 export const bigintFromNumber = (n: number): Option.Option<bigint> => (Number.isInteger(n) ? some(BigInt(n)) : none);
 
 export const bigintParse = (s: string): Option.Option<bigint> => {
@@ -93,8 +96,6 @@ export const bigintParse = (s: string): Option.Option<bigint> => {
   if (!/^[+-]?\d+$/.test(text)) return none;
   return some(BigInt(text));
 };
-
-export const bigintAbs = (n: bigint): bigint => (n < 0n ? -n : n);
 
 /** `BigInt.divide`: Effect's `BigInt.divide`, with the error of a zero divisor. */
 export const bigintDivide = (a: bigint, b: bigint): Result.Result<bigint, ArithmeticError> => {

@@ -78,5 +78,4 @@ export const recordProject = (labels: ReadonlyArray<string>, record: Fields): Fi
 export const recordMergeDisjoint = (_union: Erased, a: Fields, b: Fields): Fields => ({ ...a, ...b });
 export const recordLabels = (_labels: Erased, record: Fields): Array<string> => Object.keys(record).toSorted();
 
-export const numberStrictEqual = (a: number, b: number): boolean => a === b;
-export const numberSameValue = (a: number, b: number): boolean => Object.is(a, b);
+export { numberSameValue, numberStrictEqual } from "./core/text.ts";

@@ -182,6 +182,7 @@ mod tests {
             local: &local,
             limits: types::Limits::default(),
             sql: Default::default(),
+            effects: true,
         };
         let _ = types::check(
             &module,

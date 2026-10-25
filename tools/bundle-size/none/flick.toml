@@ -1,0 +1,8 @@
+schema-version = 1
+
+[project]
+kind = "app"
+entry = "App.Main"
+
+[build]
+effect = "none"

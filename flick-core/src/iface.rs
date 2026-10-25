@@ -295,6 +295,7 @@ mod tests {
             local: &local,
             limits: types::Limits::default(),
             sql: Default::default(),
+            effects: true,
         };
         diagnostics.extend(types::check(
             &module,

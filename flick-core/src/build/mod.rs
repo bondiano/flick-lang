@@ -3,6 +3,7 @@
 //! for an app the runner that starts `main`.
 
 mod abi;
+mod effects;
 
 pub use abi::interface;
 
@@ -15,7 +16,7 @@ use crate::codegen::{self, Labels, Options, sourcemap};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface;
 use crate::iface::{Interface, Namespace};
-use crate::project::config::MAIN_ENTRY;
+use crate::project::config::{Backend, MAIN_ENTRY};
 use crate::project::{Compilation, Compiled, MainKind, main_kind, normalize};
 use crate::resolve::{self, Module};
 use crate::source::{FileId, SourceMap, Span};
@@ -77,6 +78,9 @@ pub struct Settings<'a> {
     pub out_dir: &'a Path,
     /// The project's root: interfaces name their source relative to it.
     pub root: Option<&'a Path>,
+    /// What runs effects: without Effect, compiled code imports the
+    /// runtime's `core`.
+    pub backend: Backend,
 }
 
 /// The opt-in outputs of a build.
@@ -100,6 +104,16 @@ pub fn emit(
     settings: &Settings,
 ) -> (Vec<Artifact>, Vec<Diagnostic>) {
     let mut diagnostics = Vec::new();
+    if settings.backend == Backend::None {
+        // shortcut: a package's JS is built on Effect; allow one once its interface records how it was built
+        diagnostics.extend(compilation.packages.iter().map(|(module, package, ..)| {
+            let message = format!(
+                "`{module}` of `{package}` is built on Effect, but {}",
+                types::NO_EFFECTS
+            );
+            Diagnostic::new(codes::E008, Severity::Error, message)
+        }));
+    }
     let modules = &compilation.modules;
     let provider = |m: &str| {
         compilation
@@ -135,6 +149,10 @@ pub fn emit(
     };
     let foreign = |module: &str, spec: &str| {
         let relative = spec.starts_with("./") || spec.starts_with("../");
+        if settings.backend == Backend::None && !relative {
+            // a module without a version on `core` is reported by `effects::check`
+            return effects::specifier(spec).unwrap_or_else(|| spec.to_owned());
+        }
         match (relative, (settings.source_dir)(module)) {
             (true, Some(dir)) => {
                 let target = normalize(&dir.join(spec));
@@ -177,7 +195,7 @@ pub fn emit(
     for module in modules {
         imports.extend(compiled_module(&ctx, module, &mut out, &mut diagnostics));
     }
-    builtins(&ctx, imports, &mut out);
+    builtins(&ctx, imports, &mut out, &mut diagnostics);
     entry_runners(settings, modules, &path, &mut out, &mut diagnostics);
     (out, diagnostics)
 }
@@ -281,7 +299,12 @@ fn exports(
 /// The built-in modules the build's modules import, directly or through
 /// one another. `.d.ts` files of other modules may name the types of any
 /// built-in module, so with them every built-in module is written.
-fn builtins(ctx: &Context, imports: Vec<String>, out: &mut Vec<Artifact>) {
+fn builtins(
+    ctx: &Context,
+    imports: Vec<String>,
+    out: &mut Vec<Artifact>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     let dts = ctx.settings.extras.dts;
     let mut pending: Vec<String> = if dts {
         builtin_modules().iter().map(|m| m.name.clone()).collect()
@@ -295,6 +318,9 @@ fn builtins(ctx: &Context, imports: Vec<String>, out: &mut Vec<Artifact>) {
         };
         if !written.insert(name) {
             continue;
+        }
+        if ctx.settings.backend == Backend::None {
+            effects::check_builtin(&module.name, diagnostics);
         }
         let output = codegen::js(module, ctx.options);
         pending.extend(output.imports);
@@ -340,6 +366,9 @@ fn compiled_module(
         opt::optimize(&mut ir, &exported);
         ir
     });
+    if ctx.settings.backend == Backend::None {
+        effects::check(&module.ir, diagnostics);
+    }
     let output = codegen::js(optimized.as_ref().unwrap_or(&module.ir), ctx.options);
     let file = (ctx.path)(&module.name);
     let base = file.rsplit('/').next().unwrap_or(&file).to_owned();
@@ -563,6 +592,7 @@ pub fn builtin_modules() -> &'static [ir::Module] {
                     local: &local,
                     limits: types::Limits::default(),
                     sql: Default::default(),
+                    effects: true,
                 };
                 let (_, typing) = types::check_typed(
                     &module,

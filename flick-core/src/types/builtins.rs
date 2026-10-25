@@ -362,6 +362,7 @@ pub fn builtins() -> &'static [Interface] {
                 local: &local,
                 limits: super::Limits::default(),
                 sql: Default::default(),
+                effects: true,
             };
             diagnostics.extend(super::check(
                 &module,

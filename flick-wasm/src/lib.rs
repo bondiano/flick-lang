@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use flick_core::build::{self, Extras, Settings};
 use flick_core::diagnostics::render::render_json;
 use flick_core::diagnostics::{Diagnostic, Severity};
+use flick_core::project::config::Backend;
 use flick_core::project::{self, Host};
 use flick_core::source::{FileId, SourceMap};
 use serde_json::{Value, json};
@@ -101,6 +102,7 @@ fn emit(source: &str, profile: &str) -> (Option<(String, Vec<build::Artifact>)>,
             source_dir: &source_dir,
             out_dir: Path::new("/dist"),
             root: None,
+            backend: Backend::Effect,
         };
         let (artifacts, problems) = build::emit(&compilation, &sources, &settings);
         let failed = problems.iter().any(|d| d.severity == Severity::Error);

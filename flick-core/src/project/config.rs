@@ -63,6 +63,8 @@ pub struct Build {
     pub solver_depth: u32,
     /// What a release build labels `Module.name` for debugging tools.
     pub labels: Labels,
+    /// What runs effects: Effect, or nothing, so that only pure code builds.
+    pub effect: Backend,
 }
 
 impl Default for Build {
@@ -77,6 +79,7 @@ impl Default for Build {
             solver_steps: types::Limits::default().steps,
             solver_depth: types::Limits::default().depth,
             labels: Labels::default(),
+            effect: Backend::Effect,
         }
     }
 }
@@ -86,6 +89,15 @@ impl Default for Build {
 pub enum Profile {
     Debug,
     Release,
+}
+
+/// `[build] effect`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Backend {
+    Effect,
+    /// No runtime calls; the output imports no Effect.
+    None,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
