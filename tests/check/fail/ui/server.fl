@@ -1,0 +1,19 @@
+// Server markup reads the registry of a request: rendering needs one
+// provided, and nothing renders with it once its `provide` ends.
+module App.Main exposing (outside, after)
+
+count : Atom.Writable Number
+let count = Atom.make 0
+
+page : Ui none none
+let page = Ui.render (Ui.view (fun () -> Ui.text (show (Atom.value count)))) ()
+
+outside : Unit ->{} String
+let outside () = Ui.Server.render page
+//               ^^^^^^^^^^^^^^^^^^^^^ FLICK-E002 does not allow service `Registry`
+
+after : Unit ->{} String
+let after () =
+  provide Reactivity.Atom.layer { Atom.set count 1 }
+  Ui.Server.render page
+//^^^^^^^^^^^^^^^^^^^^^ FLICK-E002 does not allow service `Registry`

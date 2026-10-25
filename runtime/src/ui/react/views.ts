@@ -53,7 +53,7 @@ export const uiNamed = (label: string, view: View): View => Object.freeze({ rend
 
 const registryOf = (what: string) => {
   const registry = useContext(RegistryContext);
-  if (registry === undefined) throw new Error(`${what}: render it with \`Ui.Dom.mount\`, which provides the registry`);
+  if (registry === undefined) throw new Error(`${what}: render it with \`Ui.Dom.mount\` or \`Ui.Server.render\`, which provide the registry`);
   return registry;
 };
 
@@ -115,7 +115,8 @@ const Field = ({ tag, bind, placeholder, input }: FieldState): ReactNode => {
   const registry = registryOf("a field binds a state");
   const bridge = useContext(BridgeContext);
   const subscribe = useCallback((changed: () => void) => registry.subscribe(bind, changed), [registry, bind]);
-  const value = useSyncExternalStore(subscribe, () => registry.get(bind));
+  const snapshot = (): string => registry.get(bind);
+  const value = useSyncExternalStore(subscribe, snapshot, snapshot);
   const listener = useMemo(() => (bridge === undefined || input === undefined ? undefined : bridge.listener(input)), [bridge]);
   useLayoutEffect(() => {
     if (listener !== undefined && input !== undefined) listener.update(input);

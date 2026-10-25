@@ -18,6 +18,10 @@
       "types": "./dist/ui/react/index.d.ts",
       "default": "./dist/ui/react/index.js"
     },
+    "./ui/server": {
+      "types": "./dist/ui/server.d.ts",
+      "default": "./dist/ui/server.js"
+    },
     "./sql": {
       "types": "./dist/sql/index.d.ts",
       "default": "./dist/sql/index.js"

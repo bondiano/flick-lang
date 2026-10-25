@@ -1,0 +1,12 @@
+/// Server markup. Keep `react-dom/server` out of `Ui`, so client programs
+/// do not load it.
+module Ui.Server exposing (..)
+
+/// The markup of `ui`; a client root mounted on it with `Ui.Dom.mount`
+/// hydrates it. Its views read atoms from the provided registry: give each
+/// request its own with `provide Reactivity.Atom.layer { … }`, so requests
+/// rendered at once do not see each other's atoms, and nothing reads that
+/// registry once its `provide` ends. Handlers do not run here.
+render : forall c r e. (Ui r e)^c ->{Reactivity.Atom.Registry; none} String
+foreign effect render from "@flick-lang/runtime/ui/server" "uiServerRender"
+  retention call

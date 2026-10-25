@@ -1,0 +1,41 @@
+// Server markup with a registry per request: two requests render at once,
+// each with its own value of the same atom, and a field shows its state.
+module App.Main exposing (main)
+
+settle : Unit ->{} Unit
+foreign async settle from "./dom.mjs" "settle"
+  arity 0
+
+count : Atom.Writable Number
+let count = Atom.make 0
+
+name : Atom.Writable String
+let name = Atom.make ""
+
+page : Ui.View Unit {Reactivity.Atom.Registry} none
+let page =
+  Ui.view (fun () ->
+    ui {
+      div
+        { class_name = "page" }
+        [
+          paragraph [text ("count " ++ show (Atom.value count))],
+          Ui.field { bind = name; placeholder = "Name"; on_input = None },
+        ]
+    })
+
+request : Number ->{} String
+let request n =
+  provide Reactivity.Atom.layer {
+    Atom.set count n
+    Atom.set name ("user " ++ show n)
+    // the other request writes its own registry meanwhile
+    settle ()
+    Ui.Server.render (Ui.render page ())
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let (first, second) = parallel (task { request 1 }) (task { request 2 })
+  Platform.stdout_line first
+  Platform.stdout_line second

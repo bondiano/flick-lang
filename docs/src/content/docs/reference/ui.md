@@ -251,7 +251,24 @@ are no aliases in `Ui`.
 
 ## Server-rendered initial views
 
-Expose an initial-view function from Flick and evaluate its cold effect on
+`Ui.Server.render ui` gives the markup of `ui`, its views reading atoms from
+the provided registry. Give each request a registry of its own: requests
+rendered at once then never see each other's atoms, and since the registry
+is a service of the `provide`, nothing can render with it after the
+`provide` ends (`FLICK-E002`). Handlers do not run on the server.
+
+```flick
+request : Number ->{} String
+let request n =
+  provide Reactivity.Atom.layer {
+    Atom.set count n
+    Ui.Server.render (Ui.render counter_view ())
+  }
+```
+
+`Ui.Server` comes from `@flick-lang/runtime/ui/server`, so client programs
+do not load `react-dom/server`. A JavaScript host can instead
+expose an initial-view function from Flick and evaluate its cold effect on
 the server. Pass the resulting `Ui` to `uiRenderStatic` from
 `@flick-lang/runtime/ui/react`, then serialize that React node with
 `renderToString` from `react-dom/server`. Event bindings remain inert on

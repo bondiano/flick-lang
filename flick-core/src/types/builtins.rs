@@ -251,6 +251,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("Ui", include_str!("builtins/Ui.fl")),
     ("Ui.Event", include_str!("builtins/Ui/Event.fl")),
     ("Ui.Dom", include_str!("builtins/Ui/Dom.fl")),
+    ("Ui.Server", include_str!("builtins/Ui/Server.fl")),
     ("Action", include_str!("builtins/Action.fl")),
     // Effect: HTTP
     ("Http.Method", include_str!("builtins/Http/Method.fl")),
