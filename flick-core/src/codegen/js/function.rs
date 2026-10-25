@@ -6,7 +6,7 @@ use std::mem;
 
 use super::expr::{arrow_body, unmarked};
 use super::{Callee, Gen, Tail, Target, indent, names};
-use crate::ir::{Expr, ExprKind, Lit, Param, Pat};
+use crate::ir::{BinOp, Expr, ExprKind, Lit, Param, Pat};
 use crate::types::Dict;
 
 impl Gen<'_> {
@@ -71,10 +71,16 @@ impl Gen<'_> {
             };
             heads.push(name);
         }
-        let looping = target
-            .filter(|t| params.iter().all(|p| !p.runtime) && has_tail_call(body, t, params.len()));
-        let stmts = if let Some(target) = looping {
-            let vars: Vec<String> = (0..heads.len()).map(|i| format!("$l{i}")).collect();
+        let vars: Vec<String> = (0..heads.len()).map(|i| format!("$l{i}")).collect();
+        let tail = target
+            .filter(|_| params.iter().all(|p| !p.runtime))
+            .map(|target| Tail {
+                target,
+                vars: vars.clone(),
+                binds: binds(params),
+            })
+            .filter(|t| has_tail_call(body, t));
+        let stmts = if let Some(tail) = tail {
             let (inner, ()) = self.block(|g| {
                 for (head, var) in heads.iter().zip(&vars) {
                     let c = g.constant(head, var);
@@ -83,11 +89,7 @@ impl Gen<'_> {
                 for (pat, t) in &destructure {
                     g.destructure(pat, t);
                 }
-                g.tail = Some(Tail {
-                    target,
-                    vars: vars.clone(),
-                    binds: binds(params),
-                });
+                g.tail = Some(tail);
                 g.tail_expr(body);
                 g.tail = None;
             });
@@ -164,6 +166,20 @@ impl Gen<'_> {
                 let s = self.expr(scrutinee);
                 let s = self.spill(s);
                 self.arms(&s, arms, None);
+            }
+            // the right operand is in tail position: a jump there needs a statement
+            ExprKind::Binary(op @ (BinOp::And | BinOp::Or), lhs, rhs)
+                if self.tail.as_ref().is_some_and(|t| has_tail_call(rhs, t)) =>
+            {
+                let l = self.expr(lhs);
+                let (test, value) = if *op == BinOp::And {
+                    (format!("!{l}"), "false")
+                } else {
+                    (l, "true")
+                };
+                self.buf
+                    .push(format!("if ({test}) {{\n  return {value};\n}}"));
+                self.tail_expr(rhs);
             }
             _ => {
                 if let Some(args) = self.tail.as_ref().and_then(|t| self_call(e, t)) {
@@ -307,20 +323,16 @@ fn self_call<'e>(e: &'e Expr, tail: &Tail) -> Option<Vec<&'e Expr>> {
     (target == tail.target && args.len() == tail.vars.len()).then_some(args)
 }
 
-/// Whether a tail position of `body` calls `target` with `arity` arguments.
-fn has_tail_call(body: &Expr, target: &Target, arity: usize) -> bool {
-    let tail = Tail {
-        target: target.clone(),
-        vars: vec![String::new(); arity],
-        binds: Vec::new(),
-    };
+/// Whether a tail position of `body` jumps to `tail`.
+fn has_tail_call(body: &Expr, tail: &Tail) -> bool {
     let mut pending = vec![body];
     while let Some(e) = pending.pop() {
         match &e.kind {
             ExprKind::Block(_, result) => pending.push(result),
             ExprKind::If(_, t, f) => pending.extend([&**t, &**f]),
             ExprKind::Match(_, arms) => pending.extend(arms.iter().map(|a| &a.body)),
-            _ if self_call(e, &tail).is_some() => return true,
+            ExprKind::Binary(BinOp::And | BinOp::Or, _, r) => pending.push(r),
+            _ if self_call(e, tail).is_some() => return true,
             _ => {}
         }
     }

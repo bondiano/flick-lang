@@ -179,3 +179,26 @@ fn a_constrained_function_loops_on_a_call_passing_its_own_dictionaries() {
     let nest = export_of(&js, "nest");
     assert!(!nest.contains("for (;;)"), "{nest}");
 }
+
+#[test]
+fn the_right_operand_of_and_and_or_is_a_tail_position() {
+    let js = compile(
+        "module App.Loop exposing (..)\n\
+         all : (a -> Bool) -> List a -> Bool\n\
+         let rec all p xs =\n  match xs with\n  | [] -> true\n  | [x, ...rest] -> p x && all p rest\n\
+         any : (a -> Bool) -> List a -> Bool\n\
+         let rec any p xs =\n  match xs with\n  | [] -> false\n  | [x, ...rest] -> p x || any p rest\n",
+    );
+    let all = export_of(&js, "all");
+    assert!(
+        all.contains("if (!p(x)) {\n") && all.contains("return false;"),
+        "{all}"
+    );
+    assert!(!all.contains("all(p)"), "{all}");
+    let any = export_of(&js, "any");
+    assert!(
+        any.contains("if (p(x)) {\n") && any.contains("return true;"),
+        "{any}"
+    );
+    assert!(!any.contains("any(p)"), "{any}");
+}
