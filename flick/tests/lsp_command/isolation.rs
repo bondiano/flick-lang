@@ -232,6 +232,53 @@ fn standalone_documents_have_independent_contexts() {
     lsp.close();
 }
 
+#[test]
+fn standalone_imports_follow_unsaved_dependency_edits_and_close() {
+    let main = "module A exposing (answer)\nimport B exposing (value)\nlet answer = value\n";
+    let saved = "module B exposing (value)\nvalue : Number\nlet value = 1\n";
+    let unsaved = "module B exposing (value)\nvalue : String\nlet value = \"draft\"\n";
+    let dir = project(
+        "lsp_standalone_dependency",
+        &[("A.fl", main), ("B.fl", saved)],
+    );
+    let dependency = dir.join("B.fl");
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({ "textDocument": {
+        "uri": uri(&dependency), "languageId": "flick", "version": 1, "text": saved
+    } }),
+    );
+    let hover = |lsp: &mut Lsp| {
+        let reply = lsp.request(
+            "textDocument/hover",
+            &json!({ "textDocument": { "uri": uri(&dir.join("A.fl")) }, "position": at(main, "value\n") }),
+        );
+        reply["result"]["contents"]["value"]
+            .as_str()
+            .expect("imported value hover")
+            .to_owned()
+    };
+    let initial = hover(&mut lsp);
+    assert!(initial.contains("value : Number"), "{initial}");
+    lsp.notify(
+        "textDocument/didChange",
+        &json!({
+            "textDocument": { "uri": uri(&dependency), "version": 2 },
+            "contentChanges": [{ "text": unsaved }]
+        }),
+    );
+    let changed = hover(&mut lsp);
+    assert!(changed.contains("value : String"), "{changed}");
+    lsp.notify(
+        "textDocument/didClose",
+        &json!({ "textDocument": { "uri": uri(&dependency) } }),
+    );
+    let closed = hover(&mut lsp);
+    assert!(closed.contains("value : Number"), "{closed}");
+    lsp.close();
+}
+
 #[cfg(unix)]
 #[test]
 fn project_aliases_share_identity_without_duplicate_modules() {

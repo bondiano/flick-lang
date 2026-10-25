@@ -9,6 +9,10 @@ protocol; logs go to stderr. It runs the same analysis as `flick check` and
 `flick build` over the project the document belongs to (the nearest
 `flick.toml`), with the open buffers in place of the files.
 
+Hover and navigation follow unsaved edits in imported open modules, including
+standalone files without `flick.toml`. Closing an imported buffer restores its
+on-disk version for dependent requests.
+
 | Request | Answer |
 | - | - |
 | diagnostics | exactly those of `flick check`, with their `FLICK-` codes, at UTF-16 positions, published when a document is opened or saved; help lines follow the message, related spans (where an expected type came from) are `relatedInformation`, unused code is tagged `Unnecessary` |

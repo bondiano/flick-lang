@@ -303,7 +303,7 @@ impl Server {
         if builtin_index(&path).is_some() {
             match method {
                 "textDocument/didOpen" => self.refresh(&path),
-                "textDocument/didClose" => self.clear(&Context::of(&self.docs, &path)),
+                "textDocument/didClose" => self.clear(&Context::of(&self.docs, &path), &path),
                 _ => {}
             }
             return;
@@ -327,7 +327,11 @@ impl Server {
                 // like Gleam, diagnostics wait for a save so half-typed code
                 // is not flagged; requests re-analyze the new text lazily
                 let context = Context::of(&self.docs, &path);
-                if self.snapshot.as_ref().is_some_and(|s| s.context == context) {
+                if self
+                    .snapshot
+                    .as_ref()
+                    .is_some_and(|s| s.context == context || s.file(&path).is_some())
+                {
                     self.snapshot = None;
                 }
                 return;
@@ -340,7 +344,7 @@ impl Server {
                     .keys()
                     .any(|p| Context::of(&self.docs, p) == context)
                 {
-                    self.clear(&context);
+                    self.clear(&context, &path);
                     return;
                 }
             }
@@ -350,11 +354,11 @@ impl Server {
         self.refresh(&path);
     }
 
-    fn clear(&mut self, context: &Context) {
+    fn clear(&mut self, context: &Context, path: &Path) {
         if self
             .snapshot
             .as_ref()
-            .is_some_and(|s| s.context == *context)
+            .is_some_and(|s| s.context == *context || s.file(path).is_some())
         {
             self.snapshot = None;
         }
