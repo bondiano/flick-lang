@@ -68,7 +68,7 @@ let main () =
   | Some root ->
     provide Atom.layer {
       scope s {
-        let ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render page ()) })
+        let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render page ()) })
         settle ()
         Platform.stdout_line (text ())
         Platform.stdout_line ("state left: " ++ show (state_left ()))

@@ -110,7 +110,7 @@ let main () =
     provide Atom.layer {
     scope s {
       let log = open_raw "log"
-      let running =
+      let _running =
         Fiber.spawn
           s
           closed

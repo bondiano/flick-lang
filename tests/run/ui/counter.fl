@@ -71,7 +71,7 @@ let main () =
   | Some root ->
     provide Atom.layer {
       scope s {
-        let ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render counter ()) })
+        let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render counter ()) })
         settle ()
         Platform.stdout_line (text ())
         click "+1"
@@ -87,7 +87,7 @@ let main () =
       scope s {
         let custom = Atom.make 7
         let shown = Ui.view (fun () -> Ui.text ("custom " ++ show (Atom.value custom)))
-        let ui = Fiber.spawn s report (task { Ui.mount_with renderer report (Ui.render shown ()) })
+        let _ui = Fiber.spawn s report (task { Ui.mount_with renderer report (Ui.render shown ()) })
         settle ()
         Platform.stdout_line (text ())
       }
