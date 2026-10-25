@@ -294,10 +294,12 @@ impl<'a> Checker<'a> {
         }
         self.solve_rows();
         self.solve_classes(true);
+        let recs: Vec<usize> = members
+            .iter()
+            .filter_map(|&j| self.top.items[j].rec.take())
+            .collect();
+        self.finish_recs(&recs);
         for &j in &members {
-            if let Some(rec) = self.top.items[j].rec.take() {
-                self.finish_rec(rec);
-            }
             self.top.items[j].state = State::Done;
         }
         (

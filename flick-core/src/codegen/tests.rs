@@ -258,8 +258,8 @@ fn a_loop_walks_a_list_by_offset_unless_its_rest_escapes() {
          total : Number -> List Number -> Number\n\
          let rec total acc xs =\n  match xs with\n  | [] -> acc\n  | [x, ...rest] -> if x > 9 then acc + sum rest else total (acc + x) rest\n\
          rec {\n\
-         \x20 even_len : forall a. List a -> Bool\n  let even_len xs =\n    match xs with\n    | [] -> true\n    | [_, ...rest] -> odd_len rest\n\
-         \x20 odd_len : forall a. List a -> Bool\n  let odd_len xs =\n    match xs with\n    | [] -> false\n    | [_, ...rest] -> even_len rest\n\
+         \x20 even_len : List a -> Bool\n  let even_len xs =\n    match xs with\n    | [] -> true\n    | [_, ...rest] -> odd_len rest\n\
+         \x20 odd_len : List a -> Bool\n  let odd_len xs =\n    match xs with\n    | [] -> false\n    | [_, ...rest] -> even_len rest\n\
          }\n";
     for release in [false, true] {
         let js = compile_with(text, release, Labels::default()).code;

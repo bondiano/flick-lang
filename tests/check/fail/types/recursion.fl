@@ -23,8 +23,26 @@ let a = b + 1
 
 let b = a + 1
 
+rec {
+  wrap : List a -> Number
+  let wrap xs = match xs with | [] -> 0 | [x, ..._] -> unwrap [[x]]
+
+  unwrap : List b -> Number
+  let unwrap xs = match xs with | [] -> 0 | [_, ...rest] -> wrap rest
+}
+
+rec {
+  swap_a : (a, b) -> Number
+  let swap_a (x, y) = swap_b (y, x)
+
+  swap_b : (c, d) -> Number
+  let swap_b (x, y) = swap_a (x, y)
+}
+
 //~ FLICK-T015 @9:23-9:28 `depth` is used at type `Nested (List a) -> Number` inside
 //~ FLICK-T017 @12:14-12:18 `loop` uses itself: write `let rec` for a recursive function
 //~ FLICK-T017 @15:14-15:18 `ping`, `pong` use each other: define mutually recursive
 //~ FLICK-T012 @20:1-20:23 `xs` would be evaluated while it is being defined; only
 //~ FLICK-T012 @22:9-22:10 `a` and `b` would be evaluated while being defined; only
+//~ FLICK-T015 @28:56-28:62 `unwrap` is used at type `List (List a) -> Number` inside
+//~ FLICK-T015 @36:23-36:29 `swap_b` is used at type `(b, a) -> Number` inside
