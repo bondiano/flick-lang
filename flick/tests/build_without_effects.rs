@@ -2,7 +2,7 @@ mod common;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 
 use common::flick_in;
 use flick_core::build::runner_file;
@@ -131,7 +131,7 @@ fn copy_dir(from: &Path, to: &Path) {
 /// `@acme/text`, built with `effect` in its `flick.toml` and installed into
 /// an app at `dir/app` that builds with `app_effect`: `Text.Shout` is pure,
 /// `Text.Log` needs Effect.
-fn library_in_app(dir: &Path, effect: &str, app_effect: &str, main: &str) -> std::process::Output {
+fn library_in_app(dir: &Path, effect: &str, app_effect: &str, main: &str) -> Output {
     let _ = fs::remove_dir_all(dir);
     let lib = dir.join("lib");
     fs::create_dir_all(lib.join("src/Text")).expect("dir");

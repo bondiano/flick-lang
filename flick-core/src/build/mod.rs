@@ -213,13 +213,7 @@ pub fn emit(
     };
     // a built-in runner is written like any module the program imports
     let mut imports: Vec<String> = settings.runners.iter().map(|(_, r)| r.clone()).collect();
-    if settings.core_only {
-        imports.extend(core_modules(&ctx, compilation, &mut out));
-    } else {
-        for module in modules {
-            imports.extend(compiled_module(&ctx, module, &mut out, &mut diagnostics));
-        }
-    }
+    imports.extend(own_modules(&ctx, compilation, &mut out, &mut diagnostics));
     builtins(&ctx, imports, &mut out, &mut diagnostics);
     entry_runners(settings, modules, &path, &mut out, &mut diagnostics);
     (out, diagnostics)
@@ -277,6 +271,22 @@ fn entry_runners(
             }
         }
     }
+}
+
+/// The output of the program's own modules; what they import.
+fn own_modules(
+    ctx: &Context,
+    compilation: &Compilation,
+    out: &mut Vec<Artifact>,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Vec<String> {
+    if ctx.settings.core_only {
+        return core_modules(ctx, compilation, out);
+    }
+    let modules = compilation.modules.iter();
+    modules
+        .flat_map(|module| compiled_module(ctx, module, out, diagnostics))
+        .collect()
 }
 
 /// The build without Effect of a library's modules that need no Effect, nor
