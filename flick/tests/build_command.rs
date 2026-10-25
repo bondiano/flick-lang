@@ -262,3 +262,46 @@ fn build_stops_at_an_unresolved_name() {
     assert_eq!(out.status.code(), Some(1), "{out:?}");
     assert!(String::from_utf8_lossy(&out.stderr).contains("FLICK-R004"));
 }
+
+#[test]
+fn several_entries_build_a_runner_each() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("build_entries");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("src/App")).expect("dir");
+    fs::write(
+        dir.join("flick.toml"),
+        "schema-version = 1\n\n[project]\nkind = \"app\"\nentries = { server = \"App.Server\", cli = \"App\" }\n",
+    )
+    .expect("write");
+    fs::write(
+        dir.join("src/App/Server.fl"),
+        "module App.Server exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"serving\"\n",
+    )
+    .expect("write");
+    fs::write(
+        dir.join("src/App/Cli.fl"),
+        "module App.Cli exposing (main)\n\nmain : Unit -> Unit\nlet main () = ()\n",
+    )
+    .expect("write");
+    // a facade: its `main` is the one of App.Cli
+    fs::write(
+        dir.join("src/App.fl"),
+        "module App exposing (main)\n\nimport App.Cli exposing (main)\n",
+    )
+    .expect("write");
+    let out = flick_in(&dir, &["build"]);
+    assert!(out.status.success(), "{out:?}");
+    let server = fs::read_to_string(dir.join("dist/flick-server.js")).expect("server runner");
+    assert!(server.starts_with("#!/usr/bin/env node\n"), "{server}");
+    assert!(server.contains("from \"./App/Server.js\""), "{server}");
+    let cli = fs::read_to_string(dir.join("dist/flick-cli.js")).expect("cli runner");
+    // the facade's module has no `main` of its own to export
+    assert!(cli.contains("from \"./App/Cli.js\""), "{cli}");
+    assert!(cli.contains("main(undefined);"), "{cli}");
+    assert!(!dir.join("dist").join(runner_path(false)).exists());
+    let manifest = fs::read_to_string(dir.join("dist/package.json")).expect("manifest");
+    assert!(
+        manifest.contains("\"sideEffects\": [\"./flick-cli.js\", \"./flick-server.js\"]"),
+        "{manifest}"
+    );
+}

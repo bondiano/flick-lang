@@ -1,7 +1,7 @@
 // Pure tail recursion is a loop: of a function itself, through its own
 // dictionaries, behind `&&` and `||`, and between the members of a `rec`
-// group. Runtime recursion runs through the runtime without growing the JS
-// stack.
+// group. A loop walks a list by offset instead of copying its rest. Runtime
+// recursion runs through the runtime without growing the JS stack.
 module App.Main exposing (main)
 
 sum_to : Number -> Number -> Number
@@ -41,6 +41,33 @@ rec {
   let pang acc n = if n == 0 then acc else ping (acc + 2) (n - 1)
 }
 
+pairs : Number -> List Number -> Number
+let rec pairs acc xs =
+  match xs with
+  | [a, b, ...rest] -> pairs (acc + b - a) rest
+  | [a] -> acc + a
+  | _ -> acc
+
+restart : Number -> Number -> List Number -> Number
+let rec restart acc n xs =
+  match xs with
+  | [] -> if n == 0 then acc else restart acc (n - 1) [1, 2, 3]
+  | [x, ...rest] -> restart (acc + x) n rest
+
+rec {
+  even_len : forall a. List a -> Bool
+  let even_len xs =
+    match xs with
+    | [] -> true
+    | [_, ...rest] -> odd_len rest
+
+  odd_len : forall a. List a -> Bool
+  let odd_len xs =
+    match xs with
+    | [] -> false
+    | [_, ...rest] -> even_len rest
+}
+
 main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line (show (sum_to 0 1000000))
@@ -51,3 +78,7 @@ let main () =
   Platform.stdout_line (show (all_below 2000000 1000000))
   Platform.stdout_line (show (is_even 1000000) ++ " " ++ show (is_odd 1000001))
   Platform.stdout_line (show (ping 0 1000000))
+  let big = List.range 0 1000000
+  Platform.stdout_line (show (pairs 0 big) ++ " " ++ show (pairs 0 [1, 2, 3]))
+  Platform.stdout_line (show (restart 0 2 [10]))
+  Platform.stdout_line (show (even_len big) ++ " " ++ show (odd_len [1, 2, 3]))

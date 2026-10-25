@@ -14,6 +14,7 @@ mod pattern;
 mod release;
 mod schema;
 mod tidy;
+mod view;
 
 pub use release::{direct_methods, exported_worker};
 
@@ -165,6 +166,8 @@ impl<'a> Gen<'a> {
             tail: None,
             groups,
             grouped,
+            views: HashMap::new(),
+            rests: HashMap::new(),
             annotations: HashMap::new(),
             workers: if options.release {
                 let interface = (options.interface)(&module.name);
@@ -240,6 +243,9 @@ struct Tail {
     binds: Vec<Option<String>>,
     /// In a group, the variable naming the member that runs next.
     state: Option<String>,
+    /// The offset variable of each position holding a walked list (see
+    /// [`view`]).
+    offsets: Vec<Option<String>>,
 }
 
 /// A function a tail call may jump to: its name and the dictionaries of its
@@ -285,6 +291,12 @@ struct Gen<'a> {
     groups: Vec<group::Group>,
     /// The group and member of each grouped function, by its global name.
     grouped: HashMap<String, (usize, usize)>,
+    /// The walked lists in scope, by their JS name: the offset variable and
+    /// the loop position (see [`view`]).
+    views: HashMap<String, (String, usize)>,
+    /// The `...rest` of a walked list, by its local: the loop position and
+    /// the offset it starts at.
+    rests: HashMap<String, (usize, String)>,
     /// Release: the top-level functions of the module with a worker taking
     /// all their arguments at once, by name, with its arity and whether its
     /// curried form is still needed.

@@ -68,7 +68,7 @@ pub fn compile(explicit: Option<&str>) -> Result<Checked, Outcome> {
 fn output(dir: PathBuf, typescript: bool) -> Output {
     Output {
         out_dir: dir,
-        entry: None,
+        entries: Vec::new(),
         typescript,
         extras: Extras::default(),
         release: false,

@@ -29,7 +29,12 @@ pub struct InitArguments {
 
 #[derive(Args)]
 pub struct RunArguments {
-    /// The module whose `main` runs; by default `entry` of the project.
+    /// The entry of the project to run, a name of `entries`; needed when
+    /// it has several.
+    #[arg(value_name = "NAME")]
+    pub name: Option<String>,
+
+    /// The module whose `main` runs, instead of the project's entries.
     #[arg(long, value_name = "MODULE")]
     pub entry: Option<String>,
 

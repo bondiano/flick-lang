@@ -5,7 +5,7 @@
 use std::mem;
 
 use super::expr::{arrow_body, unmarked};
-use super::{Callee, Gen, Tail, Target, indent, names};
+use super::{Callee, Gen, Tail, Target, indent, names, view};
 use crate::ir::{BinOp, Expr, ExprKind, Lit, Param, Pat};
 use crate::types::Dict;
 
@@ -81,35 +81,14 @@ impl Gen<'_> {
                 vars: vars.clone(),
                 binds: binds(params),
                 state: None,
+                offsets: Vec::new(),
             })
             .filter(|t| has_tail_call(body, t));
         let stmts = if let Some(call) = grouped {
             vec![format!("return {call};")]
-        } else if let Some(tail) = tail {
-            let (inner, ()) = self.block(|g| {
-                for (head, var) in heads.iter().zip(&vars) {
-                    let c = g.constant(head, var);
-                    g.buf.push(c);
-                }
-                for (pat, t) in &destructure {
-                    g.destructure(pat, t);
-                }
-                g.tail = Some(tail);
-                g.tail_expr(body);
-                g.tail = None;
-            });
-            let loop_heads: Vec<String> = heads.iter().map(|h| format!("{h}$")).collect();
-            let init: Vec<String> = vars
-                .iter()
-                .zip(&loop_heads)
-                .map(|(v, h)| format!("{v} = {h}"))
-                .collect();
-            heads = loop_heads;
-            vec![format!(
-                "let {};\nfor (;;) {{\n{}}}",
-                init.join(", "),
-                indent(&inner)
-            )]
+        } else if let Some(mut tail) = tail {
+            tail.offsets = offsets(&view::positions(&[(params, body)], &tail.members));
+            self.looping(&mut heads, &destructure, body, tail)
         } else {
             let (stmts, ()) = self.block(|g| {
                 for (pat, t) in &destructure {
@@ -147,6 +126,45 @@ impl Gen<'_> {
         text
     }
 
+    /// The loop of a function jumping to `tail`: the heads become the
+    /// initial values of its variables.
+    fn looping(
+        &mut self,
+        heads: &mut Vec<String>,
+        destructure: &[(Pat, String)],
+        body: &Expr,
+        tail: Tail,
+    ) -> Vec<String> {
+        let (vars, offsets) = (tail.vars.clone(), tail.offsets.clone());
+        let (inner, ()) = self.block(|g| {
+            for (head, var) in heads.iter().zip(&vars) {
+                let c = g.constant(head, var);
+                g.buf.push(c);
+            }
+            for (pat, t) in destructure {
+                g.destructure(pat, t);
+            }
+            g.walk(heads, &offsets, |g| {
+                g.tail = Some(tail);
+                g.tail_expr(body);
+                g.tail = None;
+            });
+        });
+        let loop_heads: Vec<String> = heads.iter().map(|h| format!("{h}$")).collect();
+        let mut init: Vec<String> = vars
+            .iter()
+            .zip(&loop_heads)
+            .map(|(v, h)| format!("{v} = {h}"))
+            .collect();
+        init.extend(offsets.iter().flatten().map(|o| format!("{o} = 0")));
+        *heads = loop_heads;
+        vec![format!(
+            "let {};\nfor (;;) {{\n{}}}",
+            init.join(", "),
+            indent(&inner)
+        )]
+    }
+
     /// Emits `e` in tail position: its value is returned, a self tail call
     /// jumps to the next iteration.
     pub(super) fn tail_expr(&mut self, e: &Expr) {
@@ -168,8 +186,16 @@ impl Gen<'_> {
                 ));
             }
             ExprKind::Match(scrutinee, arms) => {
-                let s = self.expr(scrutinee);
-                let s = self.spill(s);
+                let s = match &scrutinee.kind {
+                    // a walked list is tested by its name, which has its offset
+                    ExprKind::Local(n) if self.views.contains_key(&names::ident(n)) => {
+                        names::ident(n)
+                    }
+                    _ => {
+                        let s = self.expr(scrutinee);
+                        self.spill(s)
+                    }
+                };
                 self.arms(&s, arms, None);
             }
             // the right operand is in tail position: a jump there needs a statement
@@ -188,16 +214,29 @@ impl Gen<'_> {
             }
             _ => {
                 if let Some((j, args)) = self.tail.as_ref().and_then(|t| self_call(e, &t.members)) {
-                    let (vars, binds, state) = self
+                    let (vars, binds, state, offsets) = self
                         .tail
                         .as_ref()
                         .map(|t| {
                             let state = t.state.clone().filter(|_| j != t.current);
-                            (t.vars.clone(), t.binds.clone(), state)
+                            (t.vars.clone(), t.binds.clone(), state, t.offsets.clone())
                         })
                         .unwrap_or_default();
+                    let offset = |i: usize| offsets.get(i).cloned().flatten();
+                    // the rest of a walked list passed on at its own position moves its offset
+                    let moves: Vec<(usize, String)> = (0..args.len())
+                        .filter(|&i| offset(i).is_some())
+                        .filter_map(|i| match &args[i].kind {
+                            ExprKind::Local(r) => match self.rests.get(r) {
+                                Some((pos, start)) if *pos == i => Some((i, start.clone())),
+                                _ => None,
+                            },
+                            _ => None,
+                        })
+                        .collect();
                     // a parameter passed on unchanged keeps its variable
                     let changed: Vec<usize> = (0..args.len())
+                        .filter(|&i| !moves.iter().any(|(m, _)| *m == i))
                         .filter(|&i| !matches!(&args[i].kind, ExprKind::Local(n) if binds.get(i).is_some_and(|b| b.as_ref() == Some(n))))
                         .collect();
                     let args: Vec<&Expr> = changed.iter().map(|&i| args[i]).collect();
@@ -205,6 +244,14 @@ impl Gen<'_> {
                     let js = self.ordered(&args);
                     for (&i, value) in changed.iter().zip(js) {
                         self.buf.push(format!("{} = {value};", vars[i]));
+                        if let Some(o) = offset(i) {
+                            self.buf.push(format!("{o} = 0;"));
+                        }
+                    }
+                    for (i, start) in moves {
+                        if let Some(o) = offset(i) {
+                            self.buf.push(format!("{o} = {start};"));
+                        }
                     }
                     if let Some(state) = state {
                         self.buf.push(format!("{state} = {j};"));
@@ -289,6 +336,15 @@ fn balanced_without_yield(js: &str) -> bool {
     parens == 0
 }
 
+/// The offset variable of each walked position.
+pub(super) fn offsets(walked: &[bool]) -> Vec<Option<String>> {
+    walked
+        .iter()
+        .enumerate()
+        .map(|(i, &w)| w.then(|| format!("$o{i}")))
+        .collect()
+}
+
 /// The local each parameter binds, if it is a name.
 pub(super) fn binds(params: &[Param]) -> Vec<Option<String>> {
     params
@@ -301,7 +357,10 @@ pub(super) fn binds(params: &[Param]) -> Vec<Option<String>> {
 }
 
 /// The member a full pure call of one of `members` calls, and its arguments.
-fn self_call<'e>(e: &'e Expr, members: &[(Target, usize)]) -> Option<(usize, Vec<&'e Expr>)> {
+pub(super) fn self_call<'e>(
+    e: &'e Expr,
+    members: &[(Target, usize)],
+) -> Option<(usize, Vec<&'e Expr>)> {
     let mut args = Vec::new();
     let mut head = e;
     while let ExprKind::App {

@@ -27,7 +27,8 @@ use std::collections::BTreeSet;
 use std::mem;
 
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Module, Pat, Stmt};
-use walk::{droppable, strict_uses, substitute, uses};
+pub(crate) use walk::uses;
+use walk::{droppable, strict_uses, substitute};
 
 /// Rounds of inlining: a body inlined in the first may inline again.
 const ROUNDS: usize = 2;

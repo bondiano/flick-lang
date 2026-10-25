@@ -12,7 +12,8 @@ use std::path::{Component, Path, PathBuf};
 
 pub use config::Config;
 pub use load::{
-    Analysis, Analyzed, Compilation, Compiled, analysis_fingerprint, analyze, check, compile,
+    Analysis, Analyzed, Compilation, Compiled, MainKind, analysis_fingerprint, analyze, check,
+    compile, main_kind,
 };
 pub use packages::project_name;
 use std::io;

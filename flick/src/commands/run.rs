@@ -11,8 +11,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command as Process, ExitCode};
 use std::sync::atomic::AtomicUsize;
 
-use flick_core::build::runner_path;
+use flick_core::build::runner_file;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
+use flick_core::project::config::MAIN_ENTRY;
 use flick_core::project::{self, Project, cache};
 use flick_core::source::SourceMap;
 #[cfg(unix)]
@@ -78,21 +79,55 @@ pub fn find_project(global: &GlobalArguments) -> Result<Project, (SourceMap, Vec
     }
 }
 
-/// Builds the app into a new generation; `Err` once diagnostics are shown.
+/// The entry `run` starts: `--entry` is `main`, else the one named, or the
+/// only one the project has.
+fn chosen_entry(project: &Project, options: &RunArguments) -> Result<String, String> {
+    if options.entry.is_some() {
+        return Ok(MAIN_ENTRY.to_owned());
+    }
+    let names: Vec<&str> = project
+        .config
+        .entries
+        .iter()
+        .map(|e| e.name.as_str())
+        .collect();
+    let listed = || {
+        names
+            .iter()
+            .map(|n| format!("`{n}`"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    match (&options.name, names.as_slice()) {
+        (_, []) => Err("a library has no `main` to run: give `--entry App.Main`".to_owned()),
+        (Some(name), _) if names.contains(&name.as_str()) => Ok(name.clone()),
+        (Some(name), _) => Err(format!(
+            "the project has no entry `{name}`; its entries: {}",
+            listed()
+        )),
+        (None, [only]) => Ok((*only).to_owned()),
+        (None, _) => Err(format!(
+            "the project has several entries; name the one to run: {}",
+            listed()
+        )),
+    }
+}
+
+/// Builds the app into a new generation, with the name of the entry to
+/// start; `Err` once diagnostics are shown.
 pub fn build_generation(
     project: &Project,
     options: &RunArguments,
     global: &GlobalArguments,
-) -> Result<PathBuf, u8> {
-    if options.entry.is_none() && project.config.entry.is_none() {
-        let d = Diagnostic::new(
-            codes::P007,
-            Severity::Error,
-            "a library has no `main` to run: give `--entry App.Main`",
-        );
-        report::render(global, &SourceMap::default(), &[d]);
-        return Err(2);
-    }
+) -> Result<(PathBuf, String), u8> {
+    let name = match chosen_entry(project, options) {
+        Ok(name) => name,
+        Err(message) => {
+            let d = Diagnostic::new(codes::P007, Severity::Error, message);
+            report::render(global, &SourceMap::default(), &[d]);
+            return Err(2);
+        }
+    };
     let dir = generations(&project.root);
     let next = fs::read_dir(&dir)
         .map(|entries| {
@@ -129,15 +164,20 @@ pub fn build_generation(
         let _ = fs::remove_dir_all(&generation);
         return Err(code.max(1));
     }
-    Ok(generation)
+    Ok((generation, name))
 }
 
-/// Starts the runner of `generation` and locks it.
-pub fn launch(generation: &Path, args: &[String], global: &GlobalArguments) -> Option<Running> {
+/// Starts the runner of the entry `name` in `generation` and locks it.
+pub fn launch(
+    generation: &Path,
+    name: &str,
+    args: &[String],
+    global: &GlobalArguments,
+) -> Option<Running> {
     let mut command = Process::new("node");
     command
         .arg("--enable-source-maps")
-        .arg(generation.join(runner_path(false)))
+        .arg(generation.join(runner_file(name, false)))
         .args(args);
     match child::spawn(&mut command, global, "application-stderr") {
         Ok(running) => {
@@ -165,11 +205,11 @@ pub fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
             return report::exit_code(&diagnostics);
         }
     };
-    let generation = match build_generation(&project, options, global) {
+    let (generation, name) = match build_generation(&project, options, global) {
         Ok(g) => g,
         Err(code) => return ExitCode::from(code),
     };
-    let Some(running) = launch(&generation, &options.args, global) else {
+    let Some(running) = launch(&generation, &name, &options.args, global) else {
         let _ = fs::remove_dir_all(&generation);
         return ExitCode::from(2);
     };
