@@ -65,6 +65,14 @@ impl Checker<'_> {
             if self.diagnostics.len() > reported {
                 continue;
             }
+            // an alias of a service or an error stands for it: the row holds what it names
+            let ty = match &kind {
+                Kind::ServiceRow | Kind::ErrorRow => match self.whnf(&ty) {
+                    Type::Error => ty,
+                    expanded => expanded,
+                },
+                _ => ty,
+            };
             let Some(label) = self.element_label(&ty, &kind, item) else {
                 continue;
             };

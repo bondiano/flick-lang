@@ -96,8 +96,9 @@ through it. `Atom.make value` is a state, `Atom.derived` an atom computed
 from the atoms it reads, and `Atom.set`/`Atom.update` write a state
 through the service `Atom.Write`, which the task of an action has and a
 render does not. `Atom.layer` provides one registry as both
-`Reactivity.Atom.Registry`, which roots and server markup read, and
-`Atom.Write`.
+`Atom.Registry`, which roots and server markup read, and `Atom.Write`;
+`Atom.Registry` is Effect's `Reactivity.Atom.Registry` under a shorter
+name, as an alias of a service stands for it in a row.
 
 A view is a component whose render reads atoms through the service
 `Atom.Read`. `Ui.Dom.mount` renders a `Ui` with the provided registry, and
@@ -250,7 +251,7 @@ still interrupts and joins them.
 ```flick
 mount :
   forall c r.
-  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Reactivity.Atom.Registry, Atom.Write | r; none} Never
+  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Atom.Registry, Atom.Write | r; none} Never
 ```
 
 `Ui.Dom.mount container supervisor ui` renders `ui` once; the views in it

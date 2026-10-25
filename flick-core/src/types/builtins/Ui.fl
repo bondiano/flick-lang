@@ -172,7 +172,7 @@ mount_with :
   forall c r.
   Renderer ->
     (Failure none ->{r; none} Unit)^c ->
-    Ui^c ->{Reactivity.Atom.Registry, Atom.Write | r; none}
+    Ui^c ->{Atom.Registry, Atom.Write | r; none}
     Never
 foreign effect mount_with from "@flick-lang/runtime/ui/react" "uiMountWith"
   retention call

@@ -110,8 +110,10 @@ SaveError} Unit` нельзя передать функцию обратного
 создаёт состояние, `Atom.derived` — атом, вычисляемый из прочитанных им
 атомов. `Atom.set` и `Atom.update` изменяют состояние через сервис
 `Atom.Write`: он доступен задаче действия, но не функции рендера.
-`Atom.layer` предоставляет один реестр сразу как `Reactivity.Atom.Registry`,
+`Atom.layer` предоставляет один реестр сразу как `Atom.Registry`,
 из которого читают корни и серверная разметка, и как `Atom.Write`.
+`Atom.Registry` — это `Reactivity.Atom.Registry` из Effect под коротким
+именем: псевдоним сервиса в строке эффектов означает сам сервис.
 
 Представление — компонент, функция рендера которого читает атомы через
 сервис `Atom.Read`. `Ui.Dom.mount` отображает `Ui` с предоставленным
@@ -274,7 +276,7 @@ let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 
 ```flick
 mount :
   forall c r.
-  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Reactivity.Atom.Registry, Atom.Write | r; none} Never
+  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Atom.Registry, Atom.Write | r; none} Never
 ```
 
 `Ui.Dom.mount container supervisor ui` отображает `ui` один раз; входящие

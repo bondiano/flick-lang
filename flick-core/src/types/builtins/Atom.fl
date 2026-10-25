@@ -24,9 +24,13 @@ service Write =
   current : forall a. Atom a ->{} a
   refresh : forall a. Atom a ->{} Unit
 
+/// The registry roots and server markup read atoms from: Effect's
+/// `Reactivity.Atom.Registry` under the name of this module.
+type alias Registry = Reactivity.Atom.Registry
+
 /// A fresh registry: the values of atoms, which views read and `Write`
 /// writes. Provide one per root, and on a server one per request.
-layer : Layer none none {Reactivity.Atom.Registry, Write}
+layer : Layer none none {Registry, Write}
 foreign pure layer from "@flick-lang/runtime/effect/reactivity/Atom" "atomLayer"
 
 /// A state holding `value`, whatever its type. A registry keeps its value
