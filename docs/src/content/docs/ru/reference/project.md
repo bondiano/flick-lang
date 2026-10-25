@@ -41,7 +41,8 @@ no-let-assert = false
 | `project.source-dir` | каталог исходных модулей | `"src"` |
 | `project.test-dir` | каталог тестовых модулей | `"test"` |
 | `project.entry` | модуль, экспортирующий `main`, свой или реэкспортированный: вход `main` с раннером `flick-main.js` | — |
-| `project.entries` | несколько входов, `{ server = "App.Server", cli = "App.Cli" }`: по раннеру `flick-<name>.js` на каждый; имена — строчные латинские буквы, цифры и `-`; вместо `entry` | — |
+| `project.entries` | несколько входов, `{ server = "App.Server", cli = "App.Cli" }`: по раннеру `flick-<name>.js` на каждый; вход со своим runner'ом — таблица, `web = { module = "App.Worker", runner = "Runner.Cloudflare" }`; имена — строчные латинские буквы, цифры и `-`; вместо `entry` | — |
+| `project.runner` | модуль, который запускает каждый вход без своего runner'а: экспортирует `type alias Main` — тип, который должен иметь `main` (иначе `FLICK-P026`), — и `run`, который принимает `main`; раннер экспортирует его результат как `default`; встроены `"Runner.Node"`, `"Runner.Browser"` и `"Runner.Cloudflare"` — Worker, чей `fetch` передаёт `main : Runner.Cloudflare.Fetch ->{; AppError} Http.ServerResponse.ServerResponse` запрос, привязки (`Runner.Cloudflare.var`, `binding`) и контекст (`wait_until`); другой может дать пакет; без него чистый `main` вызывается, а эффект выполняется как на Node | — |
 | `build.out-dir` | базовый каталог для артефактов сборки | `"dist"` |
 | `build.profile` | `"debug"` или `"release"` (см. [генерацию кода](../codegen/)); `--profile` у `build` и `test` переопределяет это значение | `"debug"` |
 | `build.emit` | `"js"` или `"ts"` | `"js"` |
@@ -51,6 +52,8 @@ no-let-assert = false
 | `build.solver-steps` | число шагов разрешения экземпляров классов для одного определения | `100000` |
 | `build.solver-depth` | глубина вложенности ограничений классов | `256` |
 | `build.labels` | что release-сборка помечает `Module.name` для инструментов отладки: `"all"` (атомы, представления, actions), `"components"` (представления и actions) или `"none"`; debug помечает всё; `flick build --labels` переопределяет | `"all"` |
+| `build.effect` | на чём выполняются эффекты: `"effect"`, или `"none"` для простого JavaScript, который импортирует только `@flick-lang/runtime/core`: тогда `main` — `Unit -> Unit`, вызов времени выполнения — `FLICK-E001`, а `task`, уточнённый тип, схема или встроенный модуль вне `Prelude`, `List`, `Option`, `Result`, `String`, `Number` и `Bool` — `FLICK-E008`. Библиотека на Effect дополнительно пишет в `_core/` своего вывода модули, которым Effect не нужен, и приложение с `"none"` импортирует их; модуль пакета без такой сборки — `FLICK-E008`, а библиотеку, собранную с `"none"`, нельзя импортировать на Effect (`FLICK-P027`) | `"effect"` |
+| `build.ui` | модуль, который рисует и монтирует представления вместо React: экспортирует все имена, которые `Ui` и `Action` берут из `@flick-lang/runtime/ui` и `@flick-lang/runtime/ui/react`; относительный путь — от корня проекта | React |
 | `sql.dialect` | диалект SQL для `sql table` и `sql { … }` (см. [запросы SQL](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` и `"oracle"` распознаются, но пока не поддерживаются | `"postgresql"` |
 | `lint.allow` | коды предупреждений, о которых не сообщается, например `"FLICK-T021"`; ошибки отключить нельзя | `[]` |
 | `lint.no-let-assert` | `true` делает каждый `let assert` ошибкой (`FLICK-T027`) в `flick check`, `build`, `test` и в редакторе | `false` |

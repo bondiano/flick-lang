@@ -25,6 +25,7 @@ pub fn interface(
         data: data(module, package),
         dictionaries: dictionaries(module),
         values: summaries(module, interface, interface_of),
+        core: None,
     });
     out.dependencies = imports
         .iter()

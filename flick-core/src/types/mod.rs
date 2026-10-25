@@ -61,6 +61,7 @@ pub(crate) use classes::{Match, match_type};
 pub use convert::is_type;
 pub use decls::class_defaults;
 pub use display::show_type;
+pub use effects::NO_EFFECTS;
 pub use env::{Abi, Form, Fundep, Instance, JsClass, Operation, Rep, TypeDef};
 pub use kinds::Kind;
 pub use patterns::is_pattern;
@@ -115,6 +116,8 @@ pub struct Options<'a> {
     pub sql: &'static Dialect,
     /// `[lint] no-let-assert`: every `let assert` is an error.
     pub no_let_assert: bool,
+    /// Whether runtime code may run: `false` under `effect = "none"`.
+    pub effects: bool,
 }
 
 /// Type-checks `module` and stores the types of its exports in `interface`.

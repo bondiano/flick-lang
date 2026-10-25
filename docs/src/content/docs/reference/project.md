@@ -40,7 +40,8 @@ no-let-assert = false
 | `project.source-dir` | directory of source modules | `"src"` |
 | `project.test-dir` | directory of test modules | `"test"` |
 | `project.entry` | module that exports `main`, its own or re-exported: the entry `main`, whose runner is `flick-main.js` | — |
-| `project.entries` | several entries, `{ server = "App.Server", cli = "App.Cli" }`: a runner `flick-<name>.js` each; names are lower-case letters, digits and `-`; instead of `entry` | — |
+| `project.entries` | several entries, `{ server = "App.Server", cli = "App.Cli" }`: a runner `flick-<name>.js` each; an entry with a runner of its own is a table, `web = { module = "App.Worker", runner = "Runner.Cloudflare" }`; names are lower-case letters, digits and `-`; instead of `entry` | — |
+| `project.runner` | the module that starts each entry without a runner of its own: it exports `type alias Main`, the type `main` must have (`FLICK-P026` otherwise), and `run`, which takes `main` and whose result the runner exports as `default`; built in are `"Runner.Node"`, `"Runner.Browser"` and `"Runner.Cloudflare"`, a Worker whose `fetch` gives `main : Runner.Cloudflare.Fetch ->{; AppError} Http.ServerResponse.ServerResponse` the request, the bindings (`Runner.Cloudflare.var`, `binding`) and the context (`wait_until`); a package may provide another; without one, a pure `main` is called and an effect runs as on Node | — |
 | `build.out-dir` | base directory of artifacts | `"dist"` |
 | `build.profile` | `"debug"` or `"release"` (see [codegen.md](../codegen/)); `--profile` of `build` and `test` overrides it | `"debug"` |
 | `build.emit` | `"js"` or `"ts"` | `"js"` |
@@ -50,6 +51,8 @@ no-let-assert = false
 | `build.solver-steps` | instance resolution steps per definition | `100000` |
 | `build.solver-depth` | depth of nested class constraints | `256` |
 | `build.labels` | what a release build labels `Module.name` for debugging tools: `"all"` (atoms, views, actions), `"components"` (views and actions) or `"none"`; debug labels all; `flick build --labels` overrides it | `"all"` |
+| `build.effect` | what runs effects: `"effect"`, or `"none"` for plain JavaScript that imports only `@flick-lang/runtime/core`: then `main` is `Unit -> Unit`, a runtime call is `FLICK-E001`, and a `task`, a refined type, a schema or a built-in module outside `Prelude`, `List`, `Option`, `Result`, `String`, `Number` and `Bool` is `FLICK-E008`. A library on Effect also writes, under `_core/` of its output, the modules that need no Effect, which an app with `"none"` imports; a module of a package without that is `FLICK-E008`, and a library built with `"none"` cannot be imported on Effect (`FLICK-P027`) | `"effect"` |
+| `build.ui` | the module that renders and mounts views in place of React: it exports every name `Ui` and `Action` bind from `@flick-lang/runtime/ui` and `@flick-lang/runtime/ui/react`; a relative path is relative to the project's root | React |
 | `sql.dialect` | the SQL dialect of `sql table` and `sql { … }` (see [sql.md](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` and `"oracle"` are recognized but not supported yet | `"postgresql"` |
 | `lint.allow` | warning codes not reported, such as `"FLICK-T021"`; errors cannot be turned off | `[]` |
 | `lint.no-let-assert` | `true` makes every `let assert` an error (`FLICK-T027`), in `flick check`, `build`, `test` and the editor | `false` |

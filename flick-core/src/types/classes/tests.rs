@@ -32,6 +32,7 @@ fn check_all(modules: &[(&str, &str)]) -> (Vec<String>, Vec<Dict>) {
             limits: Limits::default(),
             sql: Default::default(),
             no_let_assert: false,
+            effects: true,
         };
         let (more, evidence) =
             check_with_evidence(&module, &imported, builtins(), options, &mut interface);

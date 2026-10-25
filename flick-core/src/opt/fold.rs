@@ -3,6 +3,8 @@
 //! constant conditions chosen. A result that is not certain to match JS, or
 //! that JS would throw, stays a run-time computation.
 
+use std::fmt::Write as _;
+
 use crate::consteval::{self, Const};
 use crate::ir::{BinOp, Expr, ExprKind, Lit};
 use crate::syntax::kind::SyntaxKind as K;
@@ -78,7 +80,9 @@ fn json_string(s: &str) -> String {
             '\n' => out.push_str("\\n"),
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
-            c if c < ' ' => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c if c < ' ' => {
+                let _ = write!(out, "\\u{:04x}", c as u32);
+            }
             c => out.push(c),
         }
     }

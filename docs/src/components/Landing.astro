@@ -100,9 +100,9 @@ const sections = [
     </main>
     <footer class="home-footer"><Brand href={`${prefix}/`} label={text("Flick home", "Flick — главная")} /><p>{text("A small language. On a strong foundation.", "Язык семейства ML на основе Effect.")}</p><a href="https://github.com/bondiano/flick-lang"><Icon name="github" /> GitHub</a><a href="https://effect.website/">Effect <Icon name="northeast" size={16} /></a></footer>
     <script>
-      import { runMain } from "@flick-lang/runtime";
+      import { run } from "@flick-lang/runtime/runner/browser";
       import { main } from "../widgets/Hero.fl";
-      void runMain(main as Parameters<typeof runMain>[0]);
+      void run(main);
     </script>
   </body>
 </html>

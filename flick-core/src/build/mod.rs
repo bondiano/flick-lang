@@ -3,6 +3,7 @@
 //! for an app the runner that starts `main`.
 
 mod abi;
+pub mod effects;
 
 pub use abi::interface;
 
@@ -15,7 +16,7 @@ use crate::codegen::{self, Labels, Options, sourcemap};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface;
 use crate::iface::{Interface, Namespace};
-use crate::project::config::MAIN_ENTRY;
+use crate::project::config::{Backend, MAIN_ENTRY};
 use crate::project::{Compilation, Compiled, MainKind, main_kind, normalize};
 use crate::resolve::{self, Module};
 use crate::source::{FileId, SourceMap, Span};
@@ -49,6 +50,9 @@ pub fn schema_aot_file(name: &str) -> String {
     }
 }
 
+/// The runtime modules `[build] ui` replaces.
+const UI_RENDERER: &[&str] = &["@flick-lang/runtime/ui", "@flick-lang/runtime/ui/react"];
+
 /// A file of the output, by its path relative to the output directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Artifact {
@@ -77,6 +81,21 @@ pub struct Settings<'a> {
     pub out_dir: &'a Path,
     /// The project's root: interfaces name their source relative to it.
     pub root: Option<&'a Path>,
+    /// What runs effects: without Effect, compiled code imports the
+    /// runtime's `core`.
+    pub backend: Backend,
+    /// The module that renders and mounts views in place of React's; a
+    /// relative one is relative to the project's root.
+    pub ui: Option<&'a str>,
+    /// The module whose `run` starts an entry, by the entry's name; an entry
+    /// without one starts the default way.
+    pub runners: &'a [(String, String)],
+    /// The modules of a library on Effect that it also built without Effect,
+    /// under [`effects::CORE_DIR`].
+    pub core_modules: &'a [String],
+    /// Build, without Effect, only the modules that need no Effect, and no
+    /// interfaces: the part of a library under [`effects::CORE_DIR`].
+    pub core_only: bool,
 }
 
 /// The opt-in outputs of a build.
@@ -100,6 +119,9 @@ pub fn emit(
     settings: &Settings,
 ) -> (Vec<Artifact>, Vec<Diagnostic>) {
     let mut diagnostics = Vec::new();
+    if !settings.core_only {
+        effects::check_packages(&compilation.packages, settings.backend, &mut diagnostics);
+    }
     let modules = &compilation.modules;
     let provider = |m: &str| {
         compilation
@@ -114,7 +136,10 @@ pub fn emit(
         let file = format!("{}.{ext}", m.replace('.', "/"));
         match provider(m) {
             // a package's module sits next to its interface in `iface-dir`
-            Some((_, _, js)) => format!("npm:{js}.js"),
+            Some((_, interface, js)) => format!(
+                "npm:{}.js",
+                effects::package_path(&js, m, &interface, settings.backend)
+            ),
             None if is_builtin(m) => format!("{BUILTIN_DIR}/{file}"),
             None => file,
         }
@@ -134,8 +159,17 @@ pub fn emit(
             .or_else(|| provider(m).map(|(_, i, _)| i))
     };
     let foreign = |module: &str, spec: &str| {
+        // `[build] ui` stands for the renderer and the mount of `Ui` and `Action`
+        let (spec, dir) = match settings.ui {
+            Some(ui) if UI_RENDERER.contains(&spec) => (ui, settings.root.map(Path::to_path_buf)),
+            _ => (spec, (settings.source_dir)(module)),
+        };
         let relative = spec.starts_with("./") || spec.starts_with("../");
-        match (relative, (settings.source_dir)(module)) {
+        if settings.backend == Backend::None && !relative {
+            // a module without a version on `core` is reported by `effects::check`
+            return effects::specifier(spec).unwrap_or_else(|| spec.to_owned());
+        }
+        match (relative, dir) {
             (true, Some(dir)) => {
                 let target = normalize(&dir.join(spec));
                 let from = settings.out_dir.join(path(module));
@@ -163,7 +197,11 @@ pub fn emit(
         direct: &direct,
         labels: settings.extras.labels,
     };
-    let mut out = vec![package_json(settings)];
+    let mut out = if settings.core_only {
+        Vec::new()
+    } else {
+        vec![package_json(settings)]
+    };
     let ctx = Context {
         settings,
         sources,
@@ -173,11 +211,10 @@ pub fn emit(
         interface_of: &interface_of,
         any_interface: &any_interface,
     };
-    let mut imports = Vec::new();
-    for module in modules {
-        imports.extend(compiled_module(&ctx, module, &mut out, &mut diagnostics));
-    }
-    builtins(&ctx, imports, &mut out);
+    // a built-in runner is written like any module the program imports
+    let mut imports: Vec<String> = settings.runners.iter().map(|(_, r)| r.clone()).collect();
+    imports.extend(own_modules(&ctx, compilation, &mut out, &mut diagnostics));
+    builtins(&ctx, imports, &mut out, &mut diagnostics);
     entry_runners(settings, modules, &path, &mut out, &mut diagnostics);
     (out, diagnostics)
 }
@@ -191,12 +228,21 @@ fn entry_runners(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for (name, entry) in settings.entries {
+        let started_by = settings
+            .runners
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, r)| r.as_str());
         let module = modules.iter().find(|m| &m.name == entry);
         let main = module.and_then(|m| m.interface.find(Namespace::Value, "main"));
         // a re-exported `main` is imported from the module that defines it, whose output has it
         let defining = main.map_or(entry.as_str(), |e| e.entity.module.as_str());
-        // a project checked its entry already; a file built alone is checked here
-        match main.and_then(|e| Some(main_kind(e.scheme.as_ref()?))) {
+        // a project checked its entry already, against its runner if it has one;
+        // a file built alone is checked here
+        let kind = main
+            .filter(|_| started_by.is_none())
+            .and_then(|e| Some(main_kind(e.scheme.as_ref()?)));
+        match kind {
             Some(Err(message)) => {
                 let diagnostic = Diagnostic::new(codes::P026, Severity::Error, message);
                 let file = modules.iter().find(|m| m.name == defining).map(|m| m.file);
@@ -209,15 +255,103 @@ fn entry_runners(
             kind => {
                 let file = runner_file(name, settings.typescript);
                 let aot = settings.extras.schema_aot.then(|| schema_aot_file(name));
+                let start = match started_by {
+                    Some(module) => Start::Run(codegen::relative(&file, &path(module))),
+                    None => match kind.and_then(Result::ok) {
+                        Some(MainKind::Pure) => Start::Call,
+                        _ => Start::RunMain,
+                    },
+                };
                 out.push(runner(
                     &file,
                     &codegen::relative(&file, &path(defining)),
-                    kind.and_then(Result::ok).unwrap_or(MainKind::Effect),
+                    &start,
                     aot.as_deref(),
                 ));
             }
         }
     }
+}
+
+/// The output of the program's own modules; what they import.
+fn own_modules(
+    ctx: &Context,
+    compilation: &Compilation,
+    out: &mut Vec<Artifact>,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Vec<String> {
+    if ctx.settings.core_only {
+        return core_modules(ctx, compilation, out);
+    }
+    let modules = compilation.modules.iter();
+    modules
+        .flat_map(|module| compiled_module(ctx, module, out, diagnostics))
+        .collect()
+}
+
+/// The build without Effect of a library's modules that need no Effect, nor
+/// any module that needs it; what they import.
+fn core_modules(ctx: &Context, compilation: &Compilation, out: &mut Vec<Artifact>) -> Vec<String> {
+    let compiled: Vec<(&str, Vec<Artifact>, Vec<String>, bool)> = compilation
+        .modules
+        .iter()
+        .map(|module| {
+            let (mut artifacts, mut needs) = (Vec::new(), Vec::new());
+            let imports = compiled_module(ctx, module, &mut artifacts, &mut needs);
+            (module.name.as_str(), artifacts, imports, needs.is_empty())
+        })
+        .collect();
+    let package = |m: &str| compilation.packages.iter().find(|(module, ..)| module == m);
+    let mut core: HashSet<&str> = compiled.iter().filter(|c| c.3).map(|c| c.0).collect();
+    // a module is out with what it imports
+    loop {
+        let out_now: Vec<&str> = compiled
+            .iter()
+            .filter(|(name, _, imports, _)| {
+                core.contains(name)
+                    && !imports.iter().all(|i| match package(i) {
+                        Some((.., interface, _)) => effects::importable(interface, Backend::None),
+                        None if compilation.modules.iter().any(|m| &m.name == i) => {
+                            core.contains(i.as_str())
+                        }
+                        None => effects::in_core(i),
+                    })
+            })
+            .map(|c| c.0)
+            .collect();
+        if out_now.is_empty() {
+            break;
+        }
+        for name in out_now {
+            core.remove(name);
+        }
+    }
+    compiled
+        .into_iter()
+        .filter(|c| core.contains(c.0))
+        .flat_map(|(_, artifacts, imports, _)| {
+            out.extend(artifacts);
+            imports
+        })
+        .collect()
+}
+
+/// The modules of a library a build with `core_only` wrote.
+pub fn core_built(
+    artifacts: &[Artifact],
+    compilation: &Compilation,
+    typescript: bool,
+) -> Vec<String> {
+    let ext = if typescript { "ts" } else { "js" };
+    compilation
+        .modules
+        .iter()
+        .filter(|m| {
+            let file = format!("{}.{ext}", m.name.replace('.', "/"));
+            artifacts.iter().any(|a| a.path == file)
+        })
+        .map(|m| m.name.clone())
+        .collect()
 }
 
 /// `package.json` of the output. Top-level initialization is pure
@@ -281,7 +415,12 @@ fn exports(
 /// The built-in modules the build's modules import, directly or through
 /// one another. `.d.ts` files of other modules may name the types of any
 /// built-in module, so with them every built-in module is written.
-fn builtins(ctx: &Context, imports: Vec<String>, out: &mut Vec<Artifact>) {
+fn builtins(
+    ctx: &Context,
+    imports: Vec<String>,
+    out: &mut Vec<Artifact>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     let dts = ctx.settings.extras.dts;
     let mut pending: Vec<String> = if dts {
         builtin_modules().iter().map(|m| m.name.clone()).collect()
@@ -295,6 +434,9 @@ fn builtins(ctx: &Context, imports: Vec<String>, out: &mut Vec<Artifact>) {
         };
         if !written.insert(name) {
             continue;
+        }
+        if ctx.settings.backend == Backend::None {
+            effects::check_builtin(&module.name, diagnostics);
         }
         let output = codegen::js(module, ctx.options);
         pending.extend(output.imports);
@@ -340,6 +482,9 @@ fn compiled_module(
         opt::optimize(&mut ir, &exported);
         ir
     });
+    if ctx.settings.backend == Backend::None {
+        effects::check(&module.ir, diagnostics);
+    }
     let output = codegen::js(optimized.as_ref().unwrap_or(&module.ir), ctx.options);
     let file = (ctx.path)(&module.name);
     let base = file.rsplit('/').next().unwrap_or(&file).to_owned();
@@ -363,6 +508,9 @@ fn compiled_module(
         path: format!("{file}.map"),
         contents: map,
     });
+    if ctx.settings.core_only {
+        return output.imports;
+    }
     let mut built = interface(
         &module.ir,
         &module.interface,
@@ -375,6 +523,16 @@ fn compiled_module(
         .root
         .and_then(|root| module.path.strip_prefix(root).ok())
         .map(|p| p.to_string_lossy().replace('\\', "/"));
+    if let Some(abi) = &mut built.abi {
+        abi.core = if ctx.settings.backend == Backend::None {
+            Some(String::new())
+        } else {
+            ctx.settings
+                .core_modules
+                .contains(&module.name)
+                .then(|| effects::CORE_DIR.to_owned())
+        };
+    }
     if ctx.settings.extras.dts
         && let Some((text, refused)) =
             declarations(&module.name, ctx.any_interface, ctx.package, ctx.path)
@@ -412,27 +570,41 @@ fn compiled_module(
 /// file of compiled decoders `schema_aot` it collects the codecs the modules
 /// make while loading and installs those decoders, which `flick build`
 /// writes next to it.
-fn runner(file: &str, entry: &str, kind: MainKind, schema_aot: Option<&str>) -> Artifact {
-    let (run, start) = match kind {
-        MainKind::Pure => (None, "main(undefined);"),
-        MainKind::Effect => (Some("runMain"), "await runMain(main);"),
+fn runner(file: &str, entry: &str, start: &Start, schema_aot: Option<&str>) -> Artifact {
+    let (import, run) = match start {
+        Start::Call => (None, "main(undefined);"),
+        Start::RunMain => (
+            Some(("runMain", "@flick-lang/runtime")),
+            "await runMain(main);",
+        ),
+        // what `run` returns is what the host takes from the module, such as Cloudflare's `fetch`
+        Start::Run(module) => (Some(("run", module.as_str())), "export default run(main);"),
     };
+    let import = import.map_or(String::new(), |(name, module)| {
+        format!("import {{ {name} }} from \"{module}\";\n")
+    });
     let contents = if let Some(aot) = schema_aot {
-        let names = run.map_or(String::new(), |r| format!("{r}, "));
         format!(
-            "import {{ {names}enableSchemaAot, installSchemaAot }} from \"@flick-lang/runtime\";\n\nenableSchemaAot();\nconst {{ main }} = await import(\"{entry}\");\ninstallSchemaAot(await import(\"./{aot}\"));\n{start}\n"
+            "import {{ enableSchemaAot, installSchemaAot }} from \"@flick-lang/runtime\";\n{import}\nenableSchemaAot();\nconst {{ main }} = await import(\"{entry}\");\ninstallSchemaAot(await import(\"./{aot}\"));\n{run}\n"
         )
     } else {
-        let runtime = run.map_or(String::new(), |r| {
-            format!("import {{ {r} }} from \"@flick-lang/runtime\";\n")
-        });
-        format!("{runtime}import {{ main }} from \"{entry}\";\n\n{start}\n")
+        format!("{import}import {{ main }} from \"{entry}\";\n\n{run}\n")
     };
     // a runner is also a package's `bin`, which a shell starts with Node
     Artifact {
         path: file.to_owned(),
         contents: format!("#!/usr/bin/env node\n{contents}"),
     }
+}
+
+/// How the runner of an entry starts `main`.
+enum Start {
+    /// A pure `main`, called.
+    Call,
+    /// An effect, run by the runtime's Node runner.
+    RunMain,
+    /// By `run` of a runner module, at this path from the runner.
+    Run(String),
 }
 
 /// The module of compiled decoders an app's runner installs.
@@ -564,6 +736,7 @@ pub fn builtin_modules() -> &'static [ir::Module] {
                     limits: types::Limits::default(),
                     sql: Default::default(),
                     no_let_assert: false,
+                    effects: true,
                 };
                 let (_, typing) = types::check_typed(
                     &module,

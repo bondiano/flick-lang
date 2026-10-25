@@ -21,11 +21,11 @@ const markup = renderToString(uiRenderStatic(await Effect.runPromise(initialView
 </noscript>
 
 <script>
-  import { runMain } from "@flick-lang/runtime";
+  import { run } from "@flick-lang/runtime/runner/browser";
   import { main } from "../playground/Playground.fl";
   import { bindEditorScroll } from "../playground/highlight.ts";
 
-  void runMain(main as Parameters<typeof runMain>[0]);
+  void run(main);
   const root = document.getElementById("flick-playground");
   if (root !== null) {
     const dispose = bindEditorScroll(root);

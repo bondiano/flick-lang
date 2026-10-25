@@ -6,7 +6,7 @@
 use std::mem;
 
 use super::Checker;
-use super::effects::Site;
+use super::effects::{NO_EFFECTS, Site};
 use super::env::Form;
 use super::infer::eff;
 use super::ty::{Row, Type};
@@ -22,6 +22,11 @@ impl Checker<'_> {
         let Some(body) = node.nodes().next() else {
             return Type::Error;
         };
+        if !self.options.effects {
+            let span = self.keyword_span(node, K::TaskKw);
+            let message = format!("`task` makes an effect, but {NO_EFFECTS}");
+            self.error(codes::E008, span, message);
+        }
         let saved = mem::take(&mut self.runtime);
         let (uses, locals) = (self.uses_mark(), self.locals.len());
         let parts = expected.and_then(|t| Some((t.clone(), self.eff_parts(t)?)));

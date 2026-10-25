@@ -61,12 +61,13 @@ component search (props : SearchProps) =
 |---|---|---|---|
 | `Atom.Read` | render, `Atom.derived` | `Atom.get`/`value` с трекингом | ✅ |
 | `Atom.Write` | `Action`, задачи, setup | `set`, `update`, `modify`, `refresh` | ✅ `d37114c` |
-| `Setup s` | `setup` компонента | `Atom.local`, локальные action, финализаторы региона `s` | ⬜ C7 |
+| `Setup s` | `setup` компонента | `Atom.local`, локальные action, финализаторы региона `s`, `on_mount`/`watch`, `Ui.element` | ⬜ C7, C8, U10 |
+| `Dom` | action, задачи (клиент) | `focus`, `blur`, `scroll_into_view`, `measure` по handle | ⬜ U10 |
 | `Server` | серверный entry, `server fn` | request/cookies/DB-слои | ⬜ F1 |
 
 ## 3. Треки
 
-Нумерация: `S` — stdlib surface, `B` — бандл и выходной JS, `C` — компилятор/язык, `U` — UI-ядро, `R` — SSR, `F` — fullstack, `O` — observability, `L` — CLI. Внутри трека порядок = приоритет.
+Нумерация: `S` — stdlib surface, `B` — бандл и выходной JS, `C` — компилятор/язык, `U` — UI-ядро, `R` — SSR, `F` — fullstack, `O` — observability, `L` — CLI, `H` — хосты и бэкенды эффектов. Внутри трека порядок = приоритет.
 
 ### Трек S — снять исключения Effect-entrypoint'ов
 
@@ -164,6 +165,12 @@ component search (props : SearchProps) =
 - **C7d. Рантайм.** AC: setup выполняется ровно один раз на смонтированный экземпляр, в т.ч. под StrictMode (тест в `runtime/test`), повторный mount не утекает fiber'ами; action экземпляра прерываются и ожидаются при unmount (перенесено из U1/U2); компонент получает метку C6.
 - AC (всё C7): `Ui.view` либо выражается через `component` без setup, либо удаляется; плейграунд использует `component` хотя бы для одного виджета с локальным состоянием; `reference/ui.md` (en + ru).
 
+**C8. 🆕 Эффекты setup — `useEffect` без массива зависимостей.** ⬜ (после C7c/C7d)
+- AC: `Setup.on_mount task` в setup запускает задачу после commit (рантайм — `useLayoutEffect`) как fiber в регионе `s`; unmount прерывает и ожидает её; финализаторы задачи выполняются; под StrictMode (двойной mount) задача работает ровно один раз на живой экземпляр и не течёт fiber'ами (тест в `runtime/test`).
+- AC: `Setup.watch (fun () -> …) task` перезапускает задачу при изменении атомов, прочитанных в первом аргументе (`->{Atom.Read}`); зависимости отслеживаются, списка нет (prior-art §8); предыдущий запуск прерывается до следующего; рантайм — производный атом + `AtomRegistry.subscribe` за границей U9.
+- AC: строка задачи — `{Atom.Write | r; e}`, ошибки уходят супервизору корня, как у action; вне setup (render, top-level) — ошибка типов с подсказкой (`FLICK-U004`/`U006`).
+- AC: `reference/ui.md` (en + ru): пример подписки на внешний источник (таймер/`resize`) и сравнение с React `useEffect`.
+
 ### Трек U — реактивное UI-ядро
 
 **U1. Обёртки и React-биндинг.** ✅ `c0c5fe3`, `48d453e`, `e5ef204`
@@ -206,6 +213,12 @@ component search (props : SearchProps) =
 
 **U9c. 🆕 Реэкспорт модулей.** ✅ (синтаксис `exposing (.., X)` уже был; исправлены квалифицированные пути к сервисам `M.S.op`, `M.S.Impl`, `M.S` как значение; `Atom.Registry` — реэкспорт; реэкспортированный `main`/`tests` не делает модуль входом — пересмотреть в L6)
 - AC: модуль делает импортированную сущность (тип, ADT с конструкторами, сервис с операциями и `Impl`, значение) доступной по своему пути как ту же сущность; `Atom.Registry` — реэкспорт `Reactivity.Atom.Registry`, так что работают `Atom.Registry.get`, `Atom.Registry.Impl` и `Layer.succeed Atom.Registry`; `.iface`, кодген, LSP (goto/hover/completion) и `flick diff` знают реэкспорт; цикл реэкспорта — ошибка.
+
+**U10. 🆕 Handle DOM-элемента — `useRef` только для DOM.** ⬜ (после C8)
+- AC: `Ui.element : () ->{Setup s} (Ui.Element t)^{s}` создаётся только в setup и захватывает `^s` — handle не может стать top-level или пережить экземпляр (G001-фикстура); `t` — тег (`Input`, `Div`, …), привязка к узлу через `Host`/props (`element = input`) с проверкой тега типом.
+- AC: в render handle только передаётся, не читается; операции — задачи с сервисом `Dom` в строке: `Dom.focus`, `blur`, `scroll_into_view`, `measure` (`{ width; height; top; left }`); вызов из action или задачи C8; не смонтированный узел — типизированная ошибка (`Detached`), не `null`.
+- AC: сервер (`Ui.Server.*`) не предоставляет `Dom` — серверный рендер с DOM-операцией не тайпчекается; при гидрации handle привязывается к существующему узлу.
+- AC: плейграунд фокусирует поле через handle; `reference/ui.md` (en + ru) сравнивает с React `useRef` и Elm `Browser.Dom.focus` по id; тяжёлые императивные виджеты по-прежнему через `Ui.component` (это записано в reference).
 
 ### Трек R — SSR и шаблоны
 
@@ -270,6 +283,32 @@ component search (props : SearchProps) =
 
 **L5. `flick dev` для фронта.** ⬜ AC: решение записано: браузер — HMR модулей Vite с сохранением состояния реестра (атомы с метками C6 переживают замену); сервер — текущий перезапуск.
 
+### Трек H — хосты и бэкенды эффектов 🆕
+
+Цель: программа на Flick запускается на любом хосте (Node, браузер, Cloudflare Workers, свой), а Effect — бэкенд, который можно выключить так, что его нет в бандле.
+
+**H1. Тип `main` и чистый `main`.** ✅ `5f9281b`
+- AC: `main` — `Unit -> Unit` (вызывается без рантайма) или `Unit ->{; AppError} Unit`; другой тип, сервис в строке или ошибка не `AppError` — `FLICK-P026` при проверке, а не дефект при запуске.
+
+**H2. Runner'ы.** ✅ `bf7d437`, `8ea7afa`, `a1afb78`
+- AC: `[project] runner = "<модуль>"`; runner — Flick-модуль с `type alias Main` (тип `main`, проверяет checker, иначе `P026`) и `run`; раннер входа — `export default run(main)`.
+- AC: встроены `Runner.Node` (сигналы, код выхода), `Runner.Browser` (консоль, вход со страницы; виджеты сайта без кастов `runMain`), `Runner.Cloudflare` (`{ fetch }`, `main : Fetch ->{; AppError} ServerResponse` с запросом, привязками `var`/`binding` и `wait_until`); сторонний runner — пакет с таким модулем.
+- AC: вход `entries` может быть таблицей `{ module, runner }` со своим runner'ом; `[project] runner` — по умолчанию для остальных.
+
+**H3. `[build] effect = "none"`.** ✅ `c2cfa9b`, `64efe93`
+- AC: вызов времени выполнения — `E001`, `task`, уточнённый тип, схема и встроенный модуль без версии на `core` — `E008`; `main` — `Unit -> Unit`.
+- AC: вывод импортирует только `@flick-lang/runtime/core`, где нет ни одного импорта `effect` (тест); Option/Result — простые данные с полями Effect, привязки Prelude, List, Option, Result, String, Number, Bool сверены с Effect parity-тестами; программа `none` в `just bundle-size` — 0.4 KB gzip без `effect/dist/*`.
+- AC: библиотека на Effect пишет в `_core/` модули, которым Effect не нужен, и отмечает это в `.iface` (`abi.core`); приложение `none` импортирует их, модуль пакета без такой сборки — `E008`; библиотека, собранная только с `none`, в приложении на Effect — `P027` (её Option не Effect'овский, `==` их не сравнит).
+
+**H4. `[build] ui`.** ✅ `727e396`
+- AC: модуль вместо `@flick-lang/runtime/ui` и `ui/react` для привязок `Ui` и `Action`; относительный путь — от корня проекта.
+
+**H5. Сервисы runner'а.** ⬜
+- AC: runner объявляет сервисы, которые предоставляет сам (например, `Cloudflare.Env` вместо поля `env`), и `main` может держать их в строке; проверка `P026` вычитает их из строки.
+
+**H6. Пакеты на `core` без второй сборки.** ⬜ (исследование)
+- AC: решение записано: либо Option/Result Effect и `core` совместимы по `==` и хешу (тогда `_core/` не нужен), либо остаётся двойная сборка; замер, сколько весит `_core/` у пакетов из `examples/`.
+
 ## 4. Порядок и зависимости
 
 ```
@@ -282,6 +321,7 @@ U9 ✅ ─ U9b
 S2 ─ F1 ─ F2 ─ F3 ─ F4 ─ F5 ─ F6
 S3 ─ S4 ─ O1 ─ O2 ─ O3 ─ O4 ─ O5      (O2/O3 после C6b)
 L1 ─ L2 ─ L3 (после O1) ─ L4 ─ L5
+H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ─ H6     (H2 по входам — после L6 ✅)
 ```
 
 Вехи:

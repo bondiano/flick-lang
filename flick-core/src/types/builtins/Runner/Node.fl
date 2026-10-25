@@ -1,0 +1,11 @@
+/// The runner of a program on Node.js: `[project] runner = "Runner.Node"`.
+/// It runs `main` with `()` under the root owner; SIGINT and SIGTERM
+/// interrupt it, and the exit code tells how it ended.
+module Runner.Node exposing (Main, run)
+
+/// What `main` of an entry is.
+type alias Main = Unit ->{; AppError} Unit
+
+/// Starts `main`; the runner of the entry exports what it returns.
+run : Main -> Unknown
+foreign pure run from "@flick-lang/runtime/runner/node" "run"

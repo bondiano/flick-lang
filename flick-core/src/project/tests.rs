@@ -208,3 +208,83 @@ fn entry_main_is_pure_or_an_effect_a_runner_can_start() {
         );
     }
 }
+
+#[test]
+fn without_effects_nothing_runs_at_runtime() {
+    const APP: &str = "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n[build]\neffect = \"none\"\n";
+    let check = |body: &str| {
+        let source = format!("module App.Main exposing (main)\n\n{body}");
+        let host = memory(&[("flick.toml", APP), ("src/App/Main.fl", &source)]);
+        run(&host, &["src/App/Main.fl"])
+    };
+    assert_eq!(
+        check("main : Unit -> Unit\nlet main () = ()\n"),
+        Vec::<String>::new()
+    );
+    let wrong = [
+        (
+            "main : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"x\"\n",
+            "FLICK-E001 src/App/Main.fl `Platform.stdout_line",
+        ),
+        (
+            "main : Unit -> Unit\nlet main () =\n  let _ = task { 1 }\n  ()\n",
+            "FLICK-E008 src/App/Main.fl `task`",
+        ),
+        (
+            "main : Unit ->{; AppError} Unit\nlet main () = ()\n",
+            "FLICK-P026 src/App/Main.fl `main`",
+        ),
+    ];
+    for (body, expected) in wrong {
+        let diagnostics = check(body);
+        assert!(
+            diagnostics.iter().any(|d| d.starts_with(expected)),
+            "{body}: {diagnostics:?}"
+        );
+    }
+}
+
+#[test]
+fn a_runner_gives_the_type_of_main() {
+    let check = |runner: &str, main: &str| {
+        let config = format!(
+            "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"App.Main\"\nrunner = \"{runner}\"\n"
+        );
+        let source = format!("module App.Main exposing (main)\n\n{main}");
+        let host = memory(&[("flick.toml", &config), ("src/App/Main.fl", &source)]);
+        run(&host, &["src/App/Main.fl"])
+    };
+    let effect = "main : Unit ->{; AppError} Unit\nlet main () = ()\n";
+    let pure = "main : Unit -> Unit\nlet main () = ()\n";
+    assert_eq!(check("Runner.Node", effect), Vec::<String>::new());
+    assert_eq!(check("Runner.Browser", pure), Vec::<String>::new());
+    let wrong = [
+        (
+            "Runner.Node",
+            "main : Number -> Unit\nlet main _ = ()\n",
+            "FLICK-P026 src/App/Main.fl `main`: entry `main` is not a `Runner.Node.Main`",
+        ),
+        (
+            "Runner.Cloudflare",
+            effect,
+            "FLICK-P026 src/App/Main.fl `main`: entry `main` is not a `Runner.Cloudflare.Main`",
+        ),
+        (
+            "Runner.Nope",
+            effect,
+            "FLICK-P026 flick.toml `\"Runner.Nope\"`: runner `Runner.Nope` not found",
+        ),
+        (
+            "List",
+            effect,
+            "FLICK-P026 flick.toml `\"List\"`: runner `List` does not export `Main` and `run`",
+        ),
+    ];
+    for (runner, main, expected) in wrong {
+        let diagnostics = check(runner, main);
+        assert!(
+            matches!(&diagnostics[..], [d] if d.starts_with(expected)),
+            "{runner}: {diagnostics:?}"
+        );
+    }
+}

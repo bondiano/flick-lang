@@ -56,8 +56,10 @@ pub fn js(module: &Module, options: &Options) -> Output {
         };
         code.push_str(&projection.imports(&path));
     }
+    // the build may name another runtime for it, as for any foreign module
+    let runtime = (options.foreign)(&module.name, RUNTIME);
     if g.effect {
-        let _ = writeln!(code, "import {{ Effect }} from \"{RUNTIME}\";");
+        let _ = writeln!(code, "import {{ Effect }} from \"{runtime}\";");
     }
     // code inside a module is untyped: only exports carry types, so what it
     // imports is `any` in TypeScript
@@ -74,7 +76,7 @@ pub fn js(module: &Module, options: &Options) -> Output {
         }
     };
     if g.runtime {
-        let _ = writeln!(code, "import * as {} from \"{RUNTIME}\";", bound("$rt"));
+        let _ = writeln!(code, "import * as {} from \"{runtime}\";", bound("$rt"));
         untyped(&mut code, "$rt");
     }
     for (source, export, alias) in &g.foreign {

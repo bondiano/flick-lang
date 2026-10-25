@@ -160,6 +160,7 @@ codes! {
     E005 = Effects 5, "error payload holds a live value";
     E006 = Effects 6, "service operation is not a runtime function";
     E007 = Effects 7, "handler pattern is not an error";
+    E008 = Effects 8, "effect in a project built without effects";
     C001 = Classes 1, "no instance for a constraint";
     C002 = Classes 2, "ambiguous class constraint";
     C003 = Classes 3, "overlapping instances";
@@ -244,6 +245,7 @@ codes! {
     P024 = Project 24, "package with `todo` or `echo` left in it";
     P025 = Project 25, "cannot compare the API with a git revision";
     P026 = Project 26, "entry `main` has a type no runner starts";
+    P027 = Project 27, "package built only without Effect";
 }
 
 #[cfg(test)]

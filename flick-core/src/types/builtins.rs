@@ -61,6 +61,8 @@ const SOURCES: &[(&str, &str)] = &[
     ("Database", include_str!("builtins/Database.fl")),
     ("Test", include_str!("builtins/Test.fl")),
     ("Flick.Debug", include_str!("builtins/Flick/Debug.fl")),
+    ("Runner.Node", include_str!("builtins/Runner/Node.fl")),
+    ("Runner.Browser", include_str!("builtins/Runner/Browser.fl")),
     // Effect: values and classes
     ("RegExp", include_str!("builtins/RegExp.fl")),
     ("Combiner", include_str!("builtins/Combiner.fl")),
@@ -310,6 +312,10 @@ const SOURCES: &[(&str, &str)] = &[
         "Http.TraceContext",
         include_str!("builtins/Http/TraceContext.fl"),
     ),
+    (
+        "Runner.Cloudflare",
+        include_str!("builtins/Runner/Cloudflare.fl"),
+    ),
     // end of Effect: HTTP
     // Effect: HttpApi
     ("HttpApi", include_str!("builtins/HttpApi.fl")),
@@ -363,6 +369,7 @@ pub fn builtins() -> &'static [Interface] {
                 limits: super::Limits::default(),
                 sql: Default::default(),
                 no_let_assert: false,
+                effects: true,
             };
             diagnostics.extend(super::check(
                 &module,

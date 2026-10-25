@@ -52,16 +52,13 @@ const controlsHtml = renderToString(uiRenderStatic(await Effect.runPromise(contr
 </div>
 
 <script>
-  import { runMain } from "@flick-lang/runtime";
+  import { run } from "@flick-lang/runtime/runner/browser";
   import { main as controls } from "../widgets/Controls.fl";
   import { main as search } from "../widgets/Search.fl";
   import { mount } from "../widgets/Copy.fl";
 
-  type Main = Parameters<typeof runMain>[0];
-  type CopyInput = { id: string; source: string; ru: boolean };
-  const mountCopy = mount as (input: CopyInput) => ReturnType<Main>;
-  void runMain(controls as Main);
-  void runMain(search as Main);
+  void run(controls);
+  void run(search);
 
   // Mount Flick controls beside rendered code. The clipboard state and action are Flick.
   document.querySelectorAll<HTMLElement>(".expressive-code").forEach((block, i) => {
@@ -76,7 +73,7 @@ const controlsHtml = renderToString(uiRenderStatic(await Effect.runPromise(contr
     root.id = `flick-code-copy-${i}`;
     root.className = "flick-code-copy";
     block.append(root);
-    void runMain(() => mountCopy({ id: root.id, source, ru: document.documentElement.lang === "ru" }));
+    void run(mount, { id: root.id, source, ru: document.documentElement.lang === "ru" });
   });
 
   // Native keyboard events invoke the same Flick button as pointer input.

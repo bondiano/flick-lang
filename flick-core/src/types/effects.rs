@@ -17,6 +17,9 @@ use crate::source::Span;
 
 pub use solve::SubRow;
 
+/// Why nothing runs at runtime under `effect = "none"`.
+pub const NO_EFFECTS: &str = "the project builds with `effect = \"none\"`";
+
 /// The stage being checked.
 #[derive(Debug, Clone)]
 pub struct Stage {
@@ -68,8 +71,12 @@ impl Default for Stage {
 }
 
 impl Checker<'_> {
-    /// A stage that may need at most `services` and `errors`.
+    /// A stage that may need at most `services` and `errors`; a pure one
+    /// when the project builds without effects.
     pub fn bounded_stage(&mut self, services: Type, errors: Type, site: Site) -> Stage {
+        if !self.options.effects {
+            return Stage::pure(NO_EFFECTS);
+        }
         self.sites.push(site);
         Stage {
             pure: None,

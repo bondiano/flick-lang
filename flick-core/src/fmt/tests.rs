@@ -175,5 +175,8 @@ fn items_ending_a_line_end_with_their_separator() {
 
 #[test]
 fn keeps_a_rest_pattern_tight() {
-    assert_eq!(fmt("let [ x ,  ...  rest ] = xs\n"), "let [x, ...rest] = xs\n");
+    assert_eq!(
+        fmt("let [ x ,  ...  rest ] = xs\n"),
+        "let [x, ...rest] = xs\n"
+    );
 }

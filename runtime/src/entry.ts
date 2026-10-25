@@ -42,7 +42,7 @@ const describe = (u: unknown): string => {
  * `Cause.pretty` says the same with stack annotations, at the price of its
  * value formatter in every bundle.
  */
-const pretty = (cause: Cause.Cause<unknown>): string => {
+export const pretty = (cause: Cause.Cause<unknown>): string => {
   const failures = cause.reasons.flatMap((r) =>
     Cause.isFailReason(r) ? [describe(r.error)] : Cause.isDieReason(r) ? [describe(r.defect)] : [],
   );
@@ -53,7 +53,7 @@ const isAppError = (error: unknown): error is AppError =>
   typeof error === "object" && error !== null && Reflect.get(error, "_tag") === APP_ERROR;
 
 /** The exit code of `exit`, reporting what went wrong on stderr. */
-const conclude = (
+export const conclude = (
   exit: Exit.Exit<unknown, unknown>,
   signal: Signal | undefined,
   defects: ReadonlyArray<Cause.Cause<unknown>>,
@@ -75,6 +75,30 @@ const conclude = (
   return 1;
 };
 
+/** A `main` of the program: a function of its input, an effect or a plain value. */
+export type Main<I> = (input: I) => unknown;
+
+/** `main`, checked to be a function: a runner gets it from a module it cannot type. */
+export const asMain = <I>(main: unknown): Main<I> => {
+  if (typeof main !== "function") throw new TypeError("`main` is not a function");
+  return (input) => {
+    const result: unknown = Reflect.apply(main, undefined, [input]);
+    return result;
+  };
+};
+
+/** Runs `main` on `input` under the root owner; a pure `main` is done when it returns. */
+export const start = <I>(main: Main<I>, input: I): Fiber.Fiber<unknown, unknown> =>
+  Effect.runFork(
+    withOwner(() =>
+      Effect.suspend(() => {
+        const result = main(input);
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiler checked `main` needs no service
+        return Effect.isEffect(result) ? (result as Effect.Effect<unknown, unknown>) : Effect.succeed(result);
+      }),
+    ),
+  );
+
 /** What a test of the runner overrides. */
 export interface RunOptions {
   readonly capabilities?: ReadonlyArray<string>;
@@ -88,7 +112,7 @@ export interface RunOptions {
  * runtime supports. A shutdown that takes long is reported on stderr.
  */
 export const runMain = async (
-  main: (unit: undefined) => Effect.Effect<unknown, unknown>,
+  main: Main<undefined>,
   options: RunOptions = {},
 ): Promise<void> => {
   const problems = options.capabilities ?? versionProblems();
@@ -113,7 +137,7 @@ export const runMain = async (
   });
   // a fiber waiting on nothing but a signal must not let the process exit
   const keepAlive = setInterval(() => {}, 2 ** 30);
-  const fiber = Effect.runFork(withOwner(() => main(undefined)));
+  const fiber = start(main, undefined);
   run.fiber = fiber;
   const exit = await new Promise<Exit.Exit<unknown, unknown>>((resolve) => fiber.addObserver(resolve));
   clearTimeout(run.timer);

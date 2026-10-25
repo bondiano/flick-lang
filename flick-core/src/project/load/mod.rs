@@ -9,11 +9,13 @@ use std::path::{Path, PathBuf};
 
 mod entry;
 mod ide;
+mod runner;
 mod unknown;
 
 pub use entry::{MainKind, main_kind};
 pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze};
 
+use super::config::Backend;
 use super::packages::Packages;
 use super::{Host, Project, module_name, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
@@ -477,6 +479,7 @@ impl Loader<'_> {
                 .project
                 .map_or_else(Default::default, |p| p.config.sql_dialect),
             no_let_assert: self.project.is_some_and(|p| p.config.no_let_assert),
+            effects: build.is_none_or(|b| b.effect == Backend::Effect),
         };
         self.diagnostics
             .extend(loaded.parse.diagnostics.iter().cloned());
