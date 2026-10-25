@@ -4,3 +4,4 @@
 export * from "effect/rpc/Rpc";
 export * from "../../rpc/model.ts";
 export * from "../../rpc/client.ts";
+export * from "../../rpc/local.ts";

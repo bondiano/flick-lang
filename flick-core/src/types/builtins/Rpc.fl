@@ -159,6 +159,12 @@ foreign pure with_middleware from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithM
   arity 2
   reviewed "effect@4.0.5 sha256:93976e18ef904486"
 
+/// The server runs the handler to its end even when the client goes away
+/// or interrupts the call: for a write that must not stop halfway.
+uninterruptible : Rpc l f -> Rpc l f
+foreign pure uninterruptible from "@flick-lang/runtime/effect/rpc/Rpc" "rpcUninterruptible"
+  reviewed "effect@4.0.5 sha256:1a4870136a854e0f"
+
 /// A group with no procedures yet.
 group : Group {}
 foreign pure group from "@flick-lang/runtime/effect/rpc/Rpc" "rpcGroup"
@@ -299,3 +305,23 @@ foreign effect with_headers from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithHe
   arity 1
   retention call
   reviewed "effect@4.0.5 sha256:dcacf8ec37486efd"
+
+/// Calls the procedure of the group in memory, client and server joined
+/// without a transport: for tests of the handlers. The codecs do not run,
+/// so this does not test them; the hooks of `with_middleware` see no
+/// headers.
+call_local :
+  forall c l p r e s hs. Group hs -> hs^c -> Rpc l (p ->{r; e} s) -> p ->{r; e} s
+foreign effect call_local from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallLocal"
+  arity 4
+  retention call
+  reviewed "effect@4.0.5 sha256:0b1d15cf1be88aba"
+
+/// Calls the stream procedure of the group in memory, as `call_local`.
+call_stream_local :
+  forall c l p r e a hs.
+  Group hs -> hs^c -> Rpc l (p ->{r; e} Stream none none a) -> p -> (Stream r e a)^c
+foreign pure call_stream_local from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStreamLocal"
+  arity 4
+  retention owner
+  reviewed "effect@4.0.5 sha256:0b1d15cf1be88aba"

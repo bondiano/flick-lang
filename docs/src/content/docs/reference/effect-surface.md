@@ -101,7 +101,9 @@ Node, with `Rpc.tcp` and a serialization that frames its messages;
 `serve_stdio` answers calls on stdin and stdout, and `spawn` starts such a
 program and connects to it; `with_middleware` runs a hook on the payload
 and headers of each call before the handler, and `with_headers` adds
-headers to the calls of a task;
+headers to the calls of a task; `uninterruptible` makes the server run a
+handler to its end though its client goes; `call_local` and
+`call_stream_local` call a group in memory, for tests;
 `connect` keeps one connection
 that `call_on` and `call_stream_on` share.
 

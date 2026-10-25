@@ -1,0 +1,6 @@
+local: 42
+local error: not found -1
+local stream: [1, 2, 3]
+slow gave up
+steady gave up
+finished: steady
