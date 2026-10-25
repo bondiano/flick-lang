@@ -124,6 +124,21 @@ service is `Atom.Read`. A write, another service or an error in it is
 `FLICK-U004`: write atoms in an action, run a task as `Atom.task` and read
 its result, or give failures a view with `Ui.suspended`.
 
+An atom is made once and keeps its identity. A top-level atom has one
+type: `let items = Atom.make []` would hold one list for every element
+type, so its type needs no variables, and `FLICK-U005` asks for the type of
+its value. Nothing is made while rendering either: an atom, an action or a
+view made in a render, which may run again at any time, would start over on
+every render, so `FLICK-U006` refuses it. Make each with a top-level `let`,
+and one atom per key with `Atom.family`, which gives the same atom for an
+equal key; the key needs `Hash`, so it holds no function. The task of a
+handler runs on an event, not while rendering, and may make what it needs.
+
+```flick
+draft : Number -> Atom.Writable String
+let draft = Atom.family (fun _ -> Atom.make "")
+```
+
 `Ui.keyed id node` gives a dynamic sibling a stable identity. Keys are
 local to a sibling list and must be unique there. Reordering preserves both
 the React subtree and the event policy state of that key; it must not start

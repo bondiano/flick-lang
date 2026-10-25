@@ -36,7 +36,7 @@ impl Checker<'_> {
 
     /// `Ui.view render`: a handler made from a `fun` inside the render is
     /// a new closure on every render, so it is worth a warning; an action
-    /// declared at the top level, or `Action.with` data, is made once.
+    /// declared at the top level, with `Action.with` data, is made once.
     pub fn ui_render_handlers(&mut self, head: &Node, render: &Node) {
         let is_view = matches!(
             self.typing.names.get(&head.range()),
@@ -173,6 +173,118 @@ impl Checker<'_> {
         ty
     }
 
+    /// Atoms, actions and views made while rendering: a view renders again
+    /// at any time, and each render would make another one, losing its
+    /// state, its subscribers or its policy. A render is a `fun` or a
+    /// top-level function whose services are `Atom.Read` alone; the task of
+    /// a handler in it runs on an event, not while rendering.
+    pub fn made_in_render(&mut self, decls: &[&Node]) {
+        let heads: HashMap<Range, Type> = self
+            .typing
+            .pending_types
+            .iter()
+            .map(|(at, ty)| (*at, ty.clone()))
+            .collect();
+        let mut renders = Vec::new();
+        for decl in members(decls) {
+            if decl.kind != K::LetDecl {
+                continue;
+            }
+            let parts = let_parts(decl, self.text);
+            if let (Some(name), Some(body)) = (&parts.name, parts.body)
+                && !parts.params.is_empty()
+            {
+                let entity = self.env.entity(Namespace::Value, name);
+                let mut ty = self.env.value(&entity).cloned();
+                while let Some(t) = ty.take() {
+                    if self.reads_only(&t) {
+                        renders.push(body);
+                    } else if let Type::Fun { result, .. } = self.bare(&t) {
+                        ty = Some(*result);
+                    }
+                }
+            }
+            funs(
+                decl,
+                &mut |fun| {
+                    let keyword = fun.child_tokens().find(|t| t.kind == K::FunKw);
+                    keyword.and_then(|t| heads.get(&(t.start, t.end)).cloned())
+                },
+                &mut |fun, ty| {
+                    if self.reads_only(&ty) {
+                        renders.push(fun);
+                    }
+                },
+            );
+        }
+        let mut found = Vec::new();
+        for render in renders {
+            made(render, &self.typing.names, &mut found);
+        }
+        found.sort_unstable();
+        found.dedup();
+        for (range, what) in found {
+            self.error(
+                codes::U006,
+                Span::new(self.file, range.0, range.1),
+                format!("`{what}` while rendering makes another one on every render: make it once, with a top-level `let`, or one per key with `Atom.family`"),
+            );
+        }
+    }
+}
+
+/// Every `fun` under `node` with the type `head` finds for it.
+fn funs<'n>(
+    node: &'n Node,
+    head: &mut impl FnMut(&Node) -> Option<Type>,
+    found: &mut impl FnMut(&'n Node, Type),
+) {
+    if node.kind == K::FunExpr
+        && let Some(ty) = head(node)
+    {
+        found(node, ty);
+    }
+    for child in node.nodes() {
+        funs(child, head, found);
+    }
+}
+
+/// What makes an atom, an action or a view, by module and names.
+const MAKERS: [(&str, &[&str]); 3] = [
+    (
+        "Atom",
+        &[
+            "make",
+            "derived",
+            "task",
+            "serializable",
+            "serializable_family",
+            "on_server",
+            "client_only",
+            "search_param",
+            "family",
+        ],
+    ),
+    ("Action", &["exhaust", "latest", "queue", "concurrent"]),
+    ("Ui", &["view", "suspended", "named"]),
+];
+
+/// The names under `node` that make an atom, an action or a view, outside
+/// the tasks of handlers.
+fn made(node: &Node, names: &HashMap<Range, Ref>, out: &mut Vec<(Range, String)>) {
+    if node.kind == K::TaskExpr {
+        return;
+    }
+    if let Some(Ref::Value { module, name }) = names.get(&node.range())
+        && MAKERS
+            .iter()
+            .any(|(m, ns)| m == module && ns.contains(&name.as_str()))
+    {
+        out.push((node.range(), format!("{module}.{name}")));
+    }
+    for child in node.nodes() {
+        made(child, names, out);
+    }
 }
 
 /// The types of atoms, by module and name; a signature keeps the aliases.
@@ -237,8 +349,8 @@ impl Keyed {
     }
 }
 
-/// The applications of an event policy or action constructor to a `fun`
-/// under `node`: their spans and the constructor's name.
+/// The applications of an event policy to a `fun` under `node`: their
+/// spans and the policy's name. An action made there is `FLICK-U006`.
 fn handlers_of_lambdas(node: &Node, names: &HashMap<Range, Ref>, out: &mut Vec<(Range, String)>) {
     if node.kind == K::AppExpr {
         let parts: Vec<&Node> = node.nodes().collect();
@@ -246,7 +358,7 @@ fn handlers_of_lambdas(node: &Node, names: &HashMap<Range, Ref>, out: &mut Vec<(
             .first()
             .and_then(|head| match names.get(&head.range()) {
                 Some(Ref::Value { module, name })
-                    if matches!(module.as_str(), "Ui.Event" | "Action")
+                    if module == "Ui.Event"
                         && matches!(
                             name.as_str(),
                             "exhaust" | "latest" | "queue" | "concurrent"

@@ -201,6 +201,7 @@ codes! {
     U003 = Ui 3, "serializable atom without a key of its own";
     U004 = Ui 4, "render does more than read atoms";
     U005 = Ui 5, "atom of a type for every type";
+    U006 = Ui 6, "atom, action or view made while rendering";
     L001 = Cli 1, "name taken twice in a command";
     L002 = Cli 2, "default of an optional parameter";
     L003 = Cli 3, "positional argument of many values before the last";

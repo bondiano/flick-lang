@@ -64,7 +64,7 @@ pub struct Typing {
     pub types: HashMap<Range, Type>,
     /// The type each type name refers to: its module and name.
     pub type_names: HashMap<Range, (String, String)>,
-    pending_types: Vec<(Range, Type)>,
+    pub(crate) pending_types: Vec<(Range, Type)>,
     /// `sql table` declarations.
     pub sql_tables: Vec<SqlTable>,
     /// The dialect the SQL of the module was checked against.

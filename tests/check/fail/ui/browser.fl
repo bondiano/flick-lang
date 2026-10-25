@@ -11,5 +11,8 @@ value : Ui.View Unit {} none
 let value = Ui.view (fun () -> Ui.text (Atom.value query))
 //                                                 ^^^^^ FLICK-T003 expected `Writable _`, found `Browser String`
 
+served : Atom.Writable String
+let served = Atom.on_server "" query
+
 on_server : Ui.View Unit {} none
-let on_server = Ui.view (fun () -> Ui.text (Atom.value (Atom.on_server "" query)))
+let on_server = Ui.view (fun () -> Ui.text (Atom.value served))

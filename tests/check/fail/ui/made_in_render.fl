@@ -1,0 +1,69 @@
+module App.MadeInRender exposing (..)
+
+count : Atom.Writable Number
+let count = Atom.make 0
+
+draft : Number -> Atom.Writable String
+let draft = Atom.family (fun _ -> Atom.make "")
+
+remove : Action.Action (Number, Ui.ClickSnapshot) {Reactivity.Atom.Registry} none
+let remove = Action.exhaust (fun (n, _) -> task { Atom.set count n })
+
+states : Ui.View Number {Reactivity.Atom.Registry} none
+let states =
+  Ui.view (fun n ->
+    let local = Atom.make n
+    let twice = Atom.derived (fun () -> Atom.value local * 2)
+    ui { text (show (Atom.get twice)) })
+
+actions : Ui.View Number {Reactivity.Atom.Registry} none
+let actions =
+  Ui.view (fun n ->
+    ui {
+      fragment
+        [
+          button
+            { disabled = false; on_click = Action.exhaust (fun _ -> task { Atom.set count n }) }
+            [text "set"],
+          button { disabled = false; on_click = Action.with remove n } [text "remove"],
+        ]
+    })
+
+inner : Ui.View Unit {Reactivity.Atom.Registry} none
+let inner = Ui.view (fun () -> ui { text "inner" })
+
+views : Ui.View Unit none none
+let views = Ui.view (fun () -> ui { Ui.render (Ui.view (fun () -> ui { text "made" })) () })
+
+row : Number ->{Atom.Read;} Ui {Reactivity.Atom.Registry} none
+let row n =
+  let made = Atom.make ""
+  ui { Ui.field { bind = made; placeholder = ""; on_input = None } }
+
+keyed : Ui.View Number {Reactivity.Atom.Registry} none
+let keyed =
+  Ui.view
+    (fun id ->
+      ui {
+        fragment
+          [Ui.field { bind = draft id; placeholder = ""; on_input = None }, Ui.render inner ()]
+      })
+
+// a handler's task runs on an event, not while rendering
+handler : Ui.View Unit {Reactivity.Atom.Registry} none
+let handler =
+  Ui.view (fun () ->
+    let reset =
+      Ui.Event.exhaust (fun _ ->
+        task {
+          let fresh = Atom.make 0
+          Atom.set count (Atom.current fresh)
+        })
+    ui { button { disabled = false; on_click = reset } [text "reset"] })
+
+//~ FLICK-U006 @15:17-15:26 `Atom.make` while rendering makes another one on every render: make it once, with a top-level `let`, or one per key with `Atom.family`
+//~ FLICK-U006 @16:17-16:29 `Atom.derived` while rendering
+//~ FLICK-U006 @26:44-26:58 `Action.exhaust` while rendering
+//~ FLICK-U006 @36:48-36:55 `Ui.view` while rendering
+//~ FLICK-U006 @40:14-40:23 `Atom.make` while rendering
+//~ FLICK-U002 @57:7-61:11 `Ui.Event.exhaust` of a `fun` makes a handler on every render

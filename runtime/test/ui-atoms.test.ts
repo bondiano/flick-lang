@@ -8,7 +8,7 @@ import { JSDOM } from "jsdom";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 
-import { ReadService, atomDerived, atomState } from "../src/index.ts";
+import { ReadService, atomDerived, atomFamily, atomState } from "../src/index.ts";
 import { type Renderer, type Ui, uiFragment, uiNamed, uiRunWith, uiRender, uiText, uiView } from "../src/ui/react/index.ts";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>");
@@ -151,4 +151,17 @@ test("a state keeps a value written before anything read it", async () => {
   registry.set(count, 3);
   await tick();
   assert.equal(registry.get(count), 3);
+});
+
+test("a family gives the same atom for keys equal by Eq, and another for another key", () => {
+  const byId = { hash: (p: { readonly id: number }) => p.id % 2, $Eq: { eq: (a: { readonly id: number }) => (b: { readonly id: number }) => a.id === b.id } };
+  let made = 0;
+  const family = atomFamily(byId, (p: { readonly id: number }) => {
+    made += 1;
+    return atomState(p.id);
+  });
+  const first = family({ id: 1 });
+  assert.equal(family({ id: 1 }), first);
+  assert.notEqual(family({ id: 3 }), first);
+  assert.equal(made, 2);
 });

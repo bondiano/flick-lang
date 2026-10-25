@@ -116,3 +116,11 @@ let ready atom =
   | Loaded value -> value
   | Failed failure -> Failure.rethrow failure
   | Loading -> pending ()
+
+/// One atom per key, made by `f` the first time and the same for every
+/// equal key after: a view makes the atoms of its items with it, not with
+/// `make` while it renders. Keys compare by `Eq` and `Hash`, so a key holds
+/// no function. The family keeps every atom it made.
+family : Hash k => (k -> a) -> k -> a
+foreign pure family from "@flick-lang/runtime" "atomFamily"
+  arity 1

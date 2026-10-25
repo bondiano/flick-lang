@@ -92,6 +92,7 @@ impl<'a> Checker<'a> {
         self.solve_classes(true);
         self.check_instances(&declared);
         self.solve_rows();
+        self.made_in_render(&decls);
         self.recursion();
         self.unknown_types();
     }

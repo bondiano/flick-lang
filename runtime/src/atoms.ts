@@ -7,6 +7,7 @@ import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Atom from "effect/reactivity/Atom";
 
 import { Failure } from "./cause.ts";
+import type { HashDict } from "./data.ts";
 import { flickState } from "./effect/reactivity/Atom.ts";
 import { service } from "./effects.ts";
 import { tag } from "./tags.ts";
@@ -59,6 +60,25 @@ export const atomTask = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<object> => 
 /** `Atom.derived`: an atom `compute` computes, depending on the atoms it reads. */
 export const atomDerived = <A>(compute: (unit: undefined) => Effect.Effect<A, unknown, unknown>): Atom.Atom<A> =>
   Atom.readable((ctx) => runReading(compute(undefined), (atom) => ctx(atom)));
+
+/**
+ * `Atom.family`: one atom per key, made by `f` the first time and the same
+ * for every key equal by `Eq` after.
+ */
+export const atomFamily = <K, A>(dHash: HashDict<K>, f: (key: K) => A): ((key: K) => A) => {
+  // shortcut: keeps every atom it made, unlike Effect's `Atom.family`, which forgets one no one holds; upgrade if families of many short-lived keys appear
+  const made = new Map<number, Array<readonly [K, A]>>();
+  return (key) => {
+    const hash = dHash.hash(key);
+    const bucket = made.get(hash) ?? [];
+    const known = bucket.find(([k]) => dHash.$Eq.eq(k)(key));
+    if (known !== undefined) return known[1];
+    const atom = f(key);
+    bucket.push([key, atom]);
+    made.set(hash, bucket);
+    return atom;
+  };
+};
 
 /** `Atom.search_param`: the URL's search parameter `name`; a write updates the URL. */
 export const atomSearchParam = (name: string): Atom.Writable<string> => Atom.keepAlive(Atom.searchParam(name));
