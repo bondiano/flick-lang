@@ -36,6 +36,7 @@ const ROUNDS: usize = 2;
 pub fn optimize(module: &mut Module, exported: &dyn Fn(&str) -> bool) {
     let mut fresh = 0;
     for _ in 0..ROUNDS {
+        constants(module);
         let candidates = inline::candidates(&module.name, &module.items, exported);
         for item in &mut module.items {
             for body in bodies(item) {
@@ -209,6 +210,42 @@ fn dead(stmts: &mut Vec<Stmt>, result: &Expr) -> bool {
         }
     }
     stmts.len() != before
+}
+
+/// Replaces the uses of a top-level value of the module bound to a literal
+/// with the literal, as `ReScript` does; `unused_items` drops it if private.
+fn constants(module: &mut Module) {
+    let literals: Vec<(String, Expr)> = module
+        .items
+        .iter()
+        .filter_map(|item| match &item.kind {
+            ItemKind::Value { name, dicts, body }
+                if dicts.is_empty() && atom(body) && fold::constant(body).is_some() =>
+            {
+                Some((name.clone(), body.clone()))
+            }
+            _ => None,
+        })
+        .collect();
+    if literals.is_empty() {
+        return;
+    }
+    for item in &mut module.items {
+        for body in bodies(item) {
+            replace_globals(body, &module.name, &literals);
+        }
+    }
+}
+
+fn replace_globals(e: &mut Expr, module: &str, literals: &[(String, Expr)]) {
+    if let ExprKind::Global { module: m, name } = &e.kind
+        && m == module
+        && let Some((_, value)) = literals.iter().find(|(n, _)| n == name)
+    {
+        *e = Expr::new(value.kind.clone(), e.span);
+        return;
+    }
+    e.each_child_mut(&mut |c| replace_globals(c, module, literals));
 }
 
 /// Drops private top-level values nothing reaches whose definition shows

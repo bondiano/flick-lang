@@ -316,3 +316,13 @@ fn show_folds_as_the_runtime_spells_it() {
     assert!(js.contains("show(0.1)"), "{js}");
 }
 
+#[test]
+fn a_private_literal_constant_inlines_at_its_uses() {
+    let js = release(
+        "module App exposing (label)\n\n\
+         size : Number\nlet size = 128 * 2\n\n\
+         label : Unit -> String\nlet label () = \"w\" ++ show size\n",
+    );
+    assert!(js.contains("\"w256\""), "{js}");
+    assert!(!js.contains("const size"), "{js}");
+}
