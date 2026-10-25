@@ -87,6 +87,7 @@ impl<'a> Checker<'a> {
         }
         self.check_tables(&decls);
         self.atom_keys(&decls);
+        self.polymorphic_atoms(&decls);
         self.class_defaults(&decls);
         self.solve_classes(true);
         self.check_instances(&declared);

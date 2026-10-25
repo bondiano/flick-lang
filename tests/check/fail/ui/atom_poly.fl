@@ -1,0 +1,20 @@
+module App.AtomPoly exposing (..)
+
+let items = Atom.make []
+//          ^^^^^^^^^^^^ FLICK-U005 the atom `items` has the type `Writable (List a)` for every type its variables stand for
+
+nothing : Atom.Atom (Option a)
+let nothing = Atom.derived (fun () -> None)
+//            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-U005 give `nothing` the type of its value, without variables
+
+pair : (Atom.Writable (List a), Number)
+let pair = (Atom.make [], 0)
+//         ^^^^^^^^^^^^^^^^^ FLICK-U005 the atom `pair`
+
+numbers : Atom.Writable (List Number)
+let numbers = Atom.make []
+
+let count = Atom.make 0
+
+make_list : Unit -> Atom.Writable (List a)
+let make_list () = Atom.make []

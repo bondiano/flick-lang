@@ -7,6 +7,7 @@ use super::typing::Ref;
 use super::{Checker, Range, let_parts};
 use crate::consteval::{self, Const};
 use crate::diagnostics::codes;
+use crate::iface::Namespace;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -63,15 +64,7 @@ impl Checker<'_> {
     /// once, outside any function: anywhere else one key would name many
     /// atoms.
     pub fn atom_keys(&mut self, decls: &[&Node]) {
-        let members = decls.iter().flat_map(|d| match d.kind {
-            K::RecGroup => d
-                .nodes()
-                .filter(|n| n.kind == K::Members)
-                .flat_map(Node::nodes)
-                .collect(),
-            _ => vec![*d],
-        });
-        for decl in members {
+        for decl in members(decls) {
             let mut keyed = Keyed::default();
             keyed.walk(decl, false, &self.typing.names);
             if keyed.found.is_empty() {
@@ -109,6 +102,49 @@ impl Checker<'_> {
 }
 
 impl Checker<'_> {
+    /// A top-level value, not a function, holding an atom whose type has a
+    /// variable it quantifies: one atom would hold a value of every type the
+    /// variable stands for, each reader taking it for its own.
+    pub fn polymorphic_atoms(&mut self, decls: &[&Node]) {
+        for decl in members(decls) {
+            if decl.kind != K::LetDecl {
+                continue;
+            }
+            let parts = let_parts(decl, self.text);
+            let (Some(name), Some(body)) = (parts.name.clone(), parts.body) else {
+                continue;
+            };
+            if parts.is_function() {
+                continue;
+            }
+            let entity = self.env.entity(Namespace::Value, &name);
+            let ty = match self.env.value(&entity).cloned() {
+                Some(Type::Forall { body, .. }) => *body,
+                Some(ty) => ty,
+                None => continue,
+            };
+            // a variable of a top-level type is one it quantifies, written or not
+            let quantified = |t: &Type| t.contains(&mut |v| matches!(v, Type::Var(_)));
+            let polymorphic = ty.contains(&mut |t| match t.spine() {
+                (Type::Con { module, name }, args) => {
+                    ATOMS.contains(&(module.as_str(), name.as_str()))
+                        && args.into_iter().any(quantified)
+                }
+                _ => false,
+            });
+            if polymorphic {
+                let shown = self.show(&ty);
+                self.error(
+                    codes::U005,
+                    self.span(body),
+                    format!("the atom `{name}` has the type `{shown}` for every type its variables stand for, yet holds one value: give `{name}` the type of its value, without variables"),
+                );
+            }
+        }
+    }
+}
+
+impl Checker<'_> {
     /// Whether `ty` is a render: a function whose services are `Atom.Read`
     /// alone, as a view's render and a derived atom's computation are.
     pub(crate) fn reads_only(&mut self, ty: &Type) -> bool {
@@ -137,6 +173,27 @@ impl Checker<'_> {
         ty
     }
 
+}
+
+/// The types of atoms, by module and name; a signature keeps the aliases.
+const ATOMS: [(&str, &str); 5] = [
+    ("Reactivity.Atom", "Atom"),
+    ("Reactivity.Atom", "Writable"),
+    ("Atom", "Atom"),
+    ("Atom", "Writable"),
+    ("Atom", "Browser"),
+];
+
+/// The declarations, those of each `rec` group one by one.
+fn members<'n>(decls: &[&'n Node]) -> impl Iterator<Item = &'n Node> {
+    decls.iter().flat_map(|d| match d.kind {
+        K::RecGroup => d
+            .nodes()
+            .filter(|n| n.kind == K::Members)
+            .flat_map(Node::nodes)
+            .collect(),
+        _ => vec![*d],
+    })
 }
 
 /// The serializable atoms under a declaration: where each is named, and
