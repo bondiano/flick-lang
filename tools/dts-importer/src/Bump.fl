@@ -138,8 +138,6 @@ let run version package_dir root =
   let next = Surface.snapshot dir
   if next.version != version then
     App.fail (dir ++ " holds effect " ++ next.version ++ ", not " ++ version)
-  else
-    ()
   let file = Path.join [root, "stdlib/Effect/snapshot.json"]
   let old =
     match Json.parse (FileSystem.read_file_string file) with

@@ -11,7 +11,7 @@ transfer : Number -> TxRef.TxRef Number -> TxRef.TxRef Number ->{Tx.Transaction;
 let transfer amount src dst =
   TxRef.update (fun b -> b - amount) src
   TxRef.update (fun b -> b + amount) dst
-  if TxRef.get src < 0 then from_result (Err Broke) else ()
+  if TxRef.get src < 0 then from_result (Err Broke)
 
 main : Unit ->{; AppError} Unit
 let main () =
