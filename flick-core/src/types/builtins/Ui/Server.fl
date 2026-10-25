@@ -20,3 +20,12 @@ foreign effect render from "@flick-lang/runtime/ui/server" "uiServerRender"
 state : String ->{Reactivity.Atom.Registry; none} String
 foreign effect state from "@flick-lang/runtime/ui/server" "uiServerState"
   arity 1
+
+/// The HTML of `ui`, without React: a template for mail or any markup no
+/// client hydrates. Text and attribute values are escaped as `text` keeps
+/// markup in text; views read atoms as a server does, from a registry of
+/// this call alone, so the same `ui` always gives the same HTML. Handlers
+/// are left out, and a foreign component, which only React renders, is a
+/// defect.
+to_html : forall r e. Ui r e -> String
+foreign pure to_html from "@flick-lang/runtime/ui/html" "uiToHtml"

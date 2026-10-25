@@ -23,6 +23,13 @@ export const PROGRAMS = [
   { name: "counter", source: "tests/run/ui/counter.fl", budget: 99, unused: ["effect/dist/Graph.js"] },
   { name: "playground", source: "docs/src/playground/Playground.fl", budget: 110, unused: ["effect/dist/Graph.js"] },
   { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 99, unused: ["effect/dist/Graph.js"] },
+  // a template renders without `react-dom/server` (R6); its view is still a React component
+  {
+    name: "email",
+    source: "tests/run/ui/email.fl",
+    budget: 32,
+    unused: ["effect/dist/Graph.js", "react-dom/cjs/react-dom-server.browser.production.js", "react-dom/cjs/react-dom-server-legacy.browser.production.js"],
+  },
 ];
 
 /** Modules a tracked program does not use, unless it lists its own: a bundle that keeps one is an error. */

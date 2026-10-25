@@ -1,6 +1,7 @@
 // `Ui r e` values: inert descriptions of elements. Building one runs no
 // handler and touches no DOM; the bridge turns them into React elements.
 import { Option } from "effect";
+import type * as Atom from "effect/reactivity/Atom";
 import type { ComponentType } from "react";
 
 import { constructorName } from "../../tags.ts";
@@ -28,7 +29,13 @@ export type Ui =
   | { readonly kind: "text"; readonly value: string }
   | { readonly kind: "fragment"; readonly children: ReadonlyArray<Ui> }
   | { readonly kind: "keyed"; readonly key: string; readonly node: Ui }
-  | { readonly kind: "component"; readonly component: ComponentType<object>; readonly props: object }
+  | {
+      readonly kind: "component";
+      readonly component: ComponentType<object>;
+      readonly props: object;
+      /** How a component of the runtime (a view, a field) renders without React, for `Ui.Server.to_html`. */
+      readonly static?: Static;
+    }
   | {
       readonly kind: "element";
       readonly tag: string;
@@ -39,13 +46,16 @@ export type Ui =
       readonly html?: string;
     };
 
+/** A component's `Ui` for the props it was given, reading atoms through `read`. */
+export type Static = (read: (atom: Atom.Atom<unknown>) => unknown) => Ui;
+
 /** `Tab r e`. */
 export interface Tab {
   readonly label: string;
   readonly node: Ui;
 }
 
-const element = (
+export const element = (
   tag: string,
   attrs: Record<string, string | boolean | number>,
   events: Record<string, Binding>,
@@ -71,8 +81,8 @@ export const inputSnapshot = (event: DomEvent): unknown => {
 export const uiText = (value: string): Ui => Object.freeze({ kind: "text", value });
 export const uiFragment = (children: ReadonlyArray<Ui>): Ui => Object.freeze({ kind: "fragment", children });
 export const uiOptional = (node: Option.Option<Ui>): Ui => (Option.isSome(node) ? node.value : uiFragment([]));
-export const uiComponent = (component: ComponentType<object>, props: object): Ui =>
-  Object.freeze({ kind: "component", component, props });
+export const uiComponent = (component: ComponentType<object>, props: object, toUi?: Static): Ui =>
+  Object.freeze(toUi === undefined ? { kind: "component", component, props } : { kind: "component", component, props, static: toUi });
 export const uiKeyed = (key: string, node: Ui): Ui => Object.freeze({ kind: "keyed", key, node });
 interface ClassProps {
   readonly class_name: string;

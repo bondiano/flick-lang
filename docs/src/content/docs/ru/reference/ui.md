@@ -347,6 +347,23 @@ tab : Atom.Atom (Option String)
 let tab = Atom.client_only (Atom.search_param "tab")
 ```
 
+### Шаблоны без React
+
+`Ui.Server.to_html ui` даёт HTML `ui` без React — для писем и другой
+разметки, которую не гидрирует клиент. Это чистая функция: текст и значения
+атрибутов экранируются так же, как `text` оставляет разметку текстом,
+обработчики опускаются, а представления читают атомы как сервер, из реестра
+только этого вызова, поэтому один и тот же `ui` всегда даёт один и тот же
+HTML. Внешний компонент, который рисует только React, — дефект. Функция
+берётся из `@flick-lang/runtime/ui/html`, который не импортирует ни React,
+ни `react-dom/server`.
+
+```flick
+receipt : Order -> String
+let receipt order =
+  Ui.Server.to_html (ui { div { class_name = "mail" } [paragraph [text ("Спасибо, " ++ order.customer)]] })
+```
+
 ## Другие рендереры React
 
 `@flick-lang/runtime/ui` — адаптер React DOM.

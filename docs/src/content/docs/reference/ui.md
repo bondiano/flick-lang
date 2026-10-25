@@ -344,6 +344,23 @@ tab : Atom.Atom (Option String)
 let tab = Atom.client_only (Atom.search_param "tab")
 ```
 
+### Templates without React
+
+`Ui.Server.to_html ui` gives the HTML of `ui` without React, for mail and
+other markup no client hydrates. It is a pure function: text and attribute
+values are escaped as `text` keeps markup in text, handlers are left out,
+and views read atoms as a server does, from a registry of that call alone,
+so the same `ui` always gives the same HTML. A foreign component, which
+only React renders, is a defect. It comes from
+`@flick-lang/runtime/ui/html`, which imports neither React nor
+`react-dom/server`.
+
+```flick
+receipt : Order -> String
+let receipt order =
+  Ui.Server.to_html (ui { div { class_name = "mail" } [paragraph [text ("Thanks, " ++ order.customer)]] })
+```
+
 ## Other React renderers
 
 `@flick-lang/runtime/ui` is the React DOM adapter.

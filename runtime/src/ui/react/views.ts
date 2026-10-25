@@ -19,7 +19,7 @@ import {
 import { isPending, runReading } from "../../atoms.ts";
 import { Failure } from "../../cause.ts";
 import { BridgeContext, RegistryContext, toReact } from "./render.ts";
-import { type Binding, type DomEvent, type Ui, inputSnapshot, uiComponent } from "./nodes.ts";
+import { type Binding, type DomEvent, type Static, type Ui, element, inputSnapshot, uiComponent } from "./nodes.ts";
 import type { Handler } from "./policies.ts";
 
 /**
@@ -109,7 +109,8 @@ const component = (view: View): FunctionComponent<object> => {
 };
 
 /** `Ui.render`: the component with these props. */
-export const uiRender = (view: View, props: unknown): Ui => uiComponent(component(view), { props });
+export const uiRender = (view: View, props: unknown): Ui =>
+  uiComponent(component(view), { props }, (read) => runReading(view.render(props), read));
 
 interface FieldState {
   readonly tag: "input" | "textarea";
@@ -151,8 +152,9 @@ const field =
   (tag: "input" | "textarea") =>
   (props: FieldProps): Ui => {
     const input = Option.isSome(props.on_input) ? { handler: props.on_input.value, snapshot: inputSnapshot } : undefined;
+    const toUi: Static = (read) => element(tag, { placeholder: props.placeholder, value: String(read(props.bind)) }, {}, []);
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the field's props are its state
-    return uiComponent(Field as FunctionComponent<object>, { tag, bind: props.bind, placeholder: props.placeholder, input });
+    return uiComponent(Field as FunctionComponent<object>, { tag, bind: props.bind, placeholder: props.placeholder, input }, toUi);
   };
 
 /** `Ui.field`: an input showing `bind` and writing each keystroke to it at once. */

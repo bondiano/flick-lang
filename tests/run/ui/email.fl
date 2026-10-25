@@ -1,0 +1,39 @@
+// A mail template rendered without React: text and attributes escaped, a
+// view reading an atom as a server does, the same HTML on every call.
+module App.Main exposing (main)
+
+greeting : Atom.Writable String
+let greeting = Atom.make "Hello"
+
+type alias Order = { customer : String; items : List (String, Number) }
+
+line : (String, Number) -> Ui none none
+let line (name, count) = ui { item [text (name ++ " × " ++ show count)] }
+
+salutation : Ui.View String none none
+let salutation =
+  Ui.view (fun name -> ui { paragraph [text (Atom.value greeting ++ ", " ++ name ++ "!")] })
+
+email : Order -> Ui none none
+let email order =
+  let track = match Ui.safe_url "https://shop.example/orders?id=7&from=mail" with
+    | Some url -> ui { link { href = url } [text "Track your order"] }
+    | None -> Ui.empty
+  ui {
+    div
+      { class_name = "mail" }
+      [
+        Ui.with_host
+          { Ui.host with data = [("order", "7")]; aria_label = Some "Order \"7\"" }
+          (heading_at H2 [text "Your order"]),
+        Ui.render salutation order.customer,
+        list (List.map line order.items),
+        track,
+      ]
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let order = { customer = "<Ann & Bob>"; items = [("Tea", 2), ("Cup", 1)] }
+  Platform.stdout_line (Ui.Server.to_html (email order))
+  Platform.stdout_line (show (Ui.Server.to_html (email order) == Ui.Server.to_html (email order)))
