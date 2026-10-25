@@ -1,7 +1,7 @@
 // `Ui r e` values: inert descriptions of elements. Building one runs no
 // handler and touches no DOM; the bridge turns them into React elements.
 import { Option } from "effect";
-import type * as Atom from "effect/reactivity/Atom";
+import type * as Atom from "../../effect/reactivity/Atom.ts";
 import type { ComponentType } from "react";
 
 import { constructorName } from "../../tags.ts";

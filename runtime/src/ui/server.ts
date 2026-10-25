@@ -1,9 +1,9 @@
 // Server markup: a `Ui` rendered with the registry of one request. A
 // separate entry point, so client bundles do not keep `react-dom/server`.
 import { Effect, Stream } from "effect";
-import * as AsyncResult from "effect/reactivity/AsyncResult";
-import * as Atom from "effect/reactivity/Atom";
-import type * as AtomRegistry from "effect/reactivity/AtomRegistry";
+import * as AsyncResult from "../effect/reactivity/AsyncResult.ts";
+import * as Atom from "../effect/reactivity/Atom.ts";
+import type * as AtomRegistry from "../effect/reactivity/AtomRegistry.ts";
 import { createElement } from "react";
 import { renderToReadableStream, renderToString } from "react-dom/server";
 

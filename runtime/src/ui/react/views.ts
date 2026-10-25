@@ -2,7 +2,7 @@
 // components do, so a program that renders none keeps none of this code.
 // They take the root's events and registry from React context.
 import { Cause, Effect, Option } from "effect";
-import * as Atom from "effect/reactivity/Atom";
+import * as Atom from "../../effect/reactivity/Atom.ts";
 import {
   type FunctionComponent,
   type ReactNode,

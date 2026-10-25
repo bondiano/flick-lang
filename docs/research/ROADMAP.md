@@ -190,10 +190,13 @@ component search (props : SearchProps) =
 **U8. Бюджет.** ✅ `5daf143`, `20edc6a`
 - AC: counter на атомах ≤ 99 KB (B2 + 18), playground ≤ 110 KB gz; превышение валит `just bundle-size`.
 
-**U9. 🆕 Граница с `effect/reactivity` (§6.6, план отхода).** ⬜
+**U9. 🆕 Граница с `effect/reactivity` (§6.6, план отхода).** ✅ (рантайм и запись сделаны; пункт про `Atom.Registry` для пользователей не выполнен: `type alias` сервиса компилятор не поддерживает — сервис в строке остаётся `Reactivity.Atom.Registry`, отдельный пункт U9b)
 - AC: импорты `effect/reactivity/*` в `runtime/src` только в `atoms.ts` и `runtime/src/effect/reactivity/*`; `ui/index.ts`, `ui/server.ts`, `ui/react/*` ходят через них (сейчас импортируют `Hydration`, `Atom`, `AsyncResult` напрямую); проверка — тест/oxlint-правило `no-restricted-imports`.
 - AC: пользовательский код и плейграунд используют `Atom.*`/`Ui.*` (`Atom.layer`), а не `Reactivity.*`; `Reactivity.*` в `reference` помечен как низкоуровневый unstable.
 - AC: в `implementation-decisions.md` записано: остаёмся на `effect/reactivity`; условие пересмотра — бюджет U8 или ломающее изменение в Effect; замена реестра трогает только этот слой.
+
+**U9b. 🆕 Пользовательские сигнатуры без `Reactivity.*`.** ⬜
+- AC: пользователь пишет `{Atom.Write}` или `Atom.Registry` в строке эффектов вместо `Reactivity.Atom.Registry`: либо компилятор поддерживает псевдоним сервиса, либо `Ui.Dom.mount`/`Ui.Server.*` берут реестр из `Atom.Write` (тот же реестр в `Atom.layer`); фикстуры `tests/check/pass/ui/views.fl`, `tests/run/ui/serializable.fl` и `reference/ui.md` без `Reactivity.`.
 
 ### Трек R — SSR и шаблоны
 
@@ -261,7 +264,7 @@ S1 ✅ ─ U1…U6 ✅ ─ U7 ✅ ─ U7b ✅ ─ U6b
         └─ R1…R4 ✅ ─ R5 🔶 ─ R6 ✅
 C2/C3/C4/C6 ✅ ─ C6b ✅
 C7a ─ C7b ─ C7c ─ C7d ─ C5            C1 (бенчмарк, может закрыться без реализации)
-U9                                   (до любых изменений рантайма атомов)
+U9 ✅ ─ U9b
 S2 ─ F1 ─ F2 ─ F3 ─ F4 ─ F5 ─ F6
 S3 ─ S4 ─ O1 ─ O2 ─ O3 ─ O4 ─ O5      (O2/O3 после C6b)
 L1 ─ L2 ─ L3 (после O1) ─ L4 ─ L5

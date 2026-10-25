@@ -1,7 +1,7 @@
 // The DOM backend mounts synchronously once so event targets are immediately usable.
 import { Effect } from "effect";
-import type * as AtomRegistry from "effect/reactivity/AtomRegistry";
-import * as Hydration from "effect/reactivity/Hydration";
+import type * as AtomRegistry from "../effect/reactivity/AtomRegistry.ts";
+import * as Hydration from "../effect/reactivity/Hydration.ts";
 import { flushSync } from "react-dom";
 import { createRoot, hydrateRoot, type Root } from "react-dom/client";
 

@@ -1,8 +1,8 @@
 // Templates: a `Ui` as HTML without React, for mail and other markup no
 // client hydrates. A separate entry point that imports neither React nor
 // `react-dom/server`.
-import * as Atom from "effect/reactivity/Atom";
-import * as AtomRegistry from "effect/reactivity/AtomRegistry";
+import * as Atom from "../effect/reactivity/Atom.ts";
+import * as AtomRegistry from "../effect/reactivity/AtomRegistry.ts";
 
 import type { Ui } from "./react/nodes.ts";
 

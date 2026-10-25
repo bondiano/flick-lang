@@ -1,7 +1,7 @@
 // React-only rendering and event ownership. Adapters mount roots; this core
 // stops events first, then interrupts and joins tasks before its scope closes.
 import { Cause, Effect, Fiber } from "effect";
-import type * as AtomRegistry from "effect/reactivity/AtomRegistry";
+import type * as AtomRegistry from "../../effect/reactivity/AtomRegistry.ts";
 import { Component, type ReactNode, createElement } from "react";
 
 import type { Failure } from "../../cause.ts";

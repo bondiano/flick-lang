@@ -1,8 +1,8 @@
 // A `Ui` as React elements: elements with event props take their listeners
 // from the root's bridge, and components (foreign ones, views, fields)
 // render as React components.
-import type * as Atom from "effect/reactivity/Atom";
-import type * as AtomRegistry from "effect/reactivity/AtomRegistry";
+import type * as Atom from "../../effect/reactivity/Atom.ts";
+import type * as AtomRegistry from "../../effect/reactivity/AtomRegistry.ts";
 import { Fragment, type ReactNode, createContext, createElement, useLayoutEffect, useMemo } from "react";
 
 import type { Ui } from "./nodes.ts";

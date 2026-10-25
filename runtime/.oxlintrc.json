@@ -68,6 +68,36 @@
           }
         ]
       }
+    },
+    {
+      "files": [
+        "src/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "effect/reactivity",
+                  "effect/reactivity/*"
+                ],
+                "message": "reach effect/reactivity through src/effect/reactivity or src/atoms.ts, so swapping the registry stays in one layer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/atoms.ts",
+        "src/effect/reactivity/**"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
     }
   ]
 }
