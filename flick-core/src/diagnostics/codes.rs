@@ -150,6 +150,7 @@ codes! {
     T022 = Types 22, "`todo` left in the code";
     T023 = Types 23, "`echo` left in the code";
     T024 = Types 24, "type hole";
+    T025 = Types 25, "`else ()` an `if` does not need";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";

@@ -1,5 +1,6 @@
 //! FLICK-T021: a `let` annotation of the very type its value synthesizes
-//! on its own, as in `let kinds : List Kind = [Kind.a, Kind.b]`.
+//! on its own, as in `let kinds : List Kind = [Kind.a, Kind.b]`, and
+//! FLICK-T025: an `else ()` an `if` has without it.
 
 use super::Checker;
 use super::bindings::LetParts;
@@ -111,6 +112,38 @@ impl Checker<'_> {
                 "remove the annotation",
                 vec![Edit {
                     span: Span::new(self.file, pattern.range().1, end),
+                    replacement: String::new(),
+                }],
+            ),
+        );
+    }
+
+    /// The warning for an `else ()`, with the edit that deletes it; none when
+    /// a comment sits between the branches.
+    pub fn redundant_else(&mut self, node: &Node, children: &[&Node], otherwise: &Node) {
+        let unit = otherwise.kind == K::Block
+            && matches!(otherwise.nodes().collect::<Vec<_>>()[..], [n] if n.kind == K::UnitExpr);
+        let (Some(then), Some(keyword)) = (
+            children.get(1).filter(|_| unit),
+            node.child_tokens().find(|t| t.kind == K::ElseKw),
+        ) else {
+            return;
+        };
+        let (start, end) = (then.range().1, otherwise.range().1);
+        if self.text[start as usize..end as usize].contains("//") {
+            return;
+        }
+        self.diagnostics.push(
+            Diagnostic::new(
+                codes::T025,
+                Severity::Warning,
+                "`else ()` can be left out: an `if` without `else` is `Unit`",
+            )
+            .with_span(Span::new(self.file, keyword.start, end))
+            .with_safe_fix(
+                "remove `else ()`",
+                vec![Edit {
+                    span: Span::new(self.file, start, end),
                     replacement: String::new(),
                 }],
             ),

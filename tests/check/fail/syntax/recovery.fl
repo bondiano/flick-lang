@@ -8,8 +8,6 @@ let fine = 2
 
 let chained a b c = a < b < c
 
-let needs_else c = if c then 1
-
 let unclosed = [1, 2
 
 let after_all = 3
@@ -17,5 +15,4 @@ let after_all = 3
 //~ FLICK-S007 @3:16-3:16 expected an expression, found the end of the line
 //~ FLICK-S007 @5:17-5:18 expected a capitalized name, found `1`
 //~ FLICK-S007 @9:27-9:28 comparison operators do not chain
-//~ FLICK-S007 @11:31-11:31 expected `else`
-//~ FLICK-S008 @13:21-13:21 expected `]` to close `[`, found the end of the line
+//~ FLICK-S008 @11:21-11:21 expected `]` to close `[`, found the end of the line

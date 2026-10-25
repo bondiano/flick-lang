@@ -96,6 +96,16 @@ fn else_if_chains_and_try_with_at_block_column() {
 }
 
 #[test]
+fn if_without_else_ends_at_its_then_branch() {
+    let src = "let f x =\n  if a then\n    g x\n  h x\n";
+    assert_eq!(
+        sexp(src),
+        "(LetDecl let (VarPat f) (Params (VarPat x)) = (Block (IfExpr if (NameExpr a) then \
+         (Block (AppExpr (NameExpr g) (NameExpr x)))) (AppExpr (NameExpr h) (NameExpr x))))"
+    );
+}
+
+#[test]
 fn mid_line_braces_align_on_their_first_item() {
     let src = "let r = { a = 1\n          b = 2 }\n";
     assert_eq!(

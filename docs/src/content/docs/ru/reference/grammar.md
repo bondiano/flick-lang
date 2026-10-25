@@ -385,7 +385,7 @@ statement   = "let" … | signature | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
             | "match" expr "with" arm { arm }
             | "try" block "with" arm { arm }
-            | "if" expr "then" block "else" (if_expr | block)
+            | "if" expr "then" block [ "else" (if_expr | block) ]
             | operator expression over application (see the operator table)
 arm         = "|" or_pattern ["when" expr] "->" block
 application = postfix { postfix }
@@ -410,7 +410,7 @@ cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
 `echo` без операнда — функция, как в `x |> echo`. `_` — тип только в
 сигнатуре или аннотации.
 
-`if` — выражение с обязательной ветвью `else`. `ignore e` отбрасывает
+`if` — выражение; без `else` оно имеет тип `Unit`, как и его ветвь `then` (на `else ()` выдаётся предупреждение `FLICK-T025`). `ignore e` отбрасывает
 результат промежуточной инструкции, отличный от `Unit`
 (см. [Прямые эффектные вызовы](../../spec/03-direct-calls/)).
 `await e` один раз запускает сохранённый `Eff` в текущем файбере,

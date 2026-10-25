@@ -183,6 +183,27 @@ impl Checker<'_> {
         if let Some(condition) = children.first() {
             self.check(condition, &Type::prim("Bool"));
         }
+        let Some(&otherwise) = children.get(2) else {
+            let (unit, span) = (Type::prim("Unit"), self.span(node));
+            let keyword = node.child_tokens().find(|t| t.kind == K::IfKw);
+            let keyword = keyword.map_or(span, |t| self.token_span(t));
+            let why = |_: &str| "an `if` without `else` is `Unit`".to_string();
+            let since = self.diagnostics.len();
+            // one mismatch: of the whole `if` when its place wants a value
+            let fits = self.expect(&unit, expected, span);
+            self.explain_since(since, expected, keyword, why);
+            if let Some(then) = children.get(1) {
+                if fits {
+                    let since = self.diagnostics.len();
+                    self.check(then, &unit);
+                    self.explain_since(since, &unit, keyword, why);
+                } else {
+                    self.infer(then);
+                }
+            }
+            return;
+        };
+        self.redundant_else(node, &children, otherwise);
         // an inferred `if` takes the type of its `then` branch
         let open = matches!(self.store.resolve(expected), Type::Meta(_));
         if let Some(then) = children.get(1) {

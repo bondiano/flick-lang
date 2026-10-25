@@ -37,6 +37,16 @@ impl Lower<'_> {
         Box::new(self.expr(node))
     }
 
+    /// `if`, whose missing `else` is `()`.
+    fn if_expr(&mut self, children: &[&Node], span: Span) -> ExprKind {
+        let (condition, then) = (self.boxed(children[0]), self.boxed(children[1]));
+        let otherwise = children.get(2).map_or_else(
+            || Box::new(Expr::new(ExprKind::Lit(Lit::Unit), span)),
+            |e| self.boxed(e),
+        );
+        ExprKind::If(condition, then, otherwise)
+    }
+
     fn expr_kind(&mut self, node: &Node) -> Expr {
         let span = self.span(node);
         let children: Vec<&Node> = node.nodes().collect();
@@ -97,11 +107,7 @@ impl Lower<'_> {
                     None => Expr::new(ExprKind::Lit(Lit::Unit), span),
                 };
             }
-            K::IfExpr => ExprKind::If(
-                self.boxed(children[0]),
-                self.boxed(children[1]),
-                self.boxed(children[2]),
-            ),
+            K::IfExpr => self.if_expr(&children, span),
             K::MatchExpr => {
                 let scrutinee = self.boxed(children[0]);
                 ExprKind::Match(scrutinee, self.arms(node))

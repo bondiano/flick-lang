@@ -532,14 +532,13 @@ fn if_expr(p: &mut Parser) -> Done {
     expr(p);
     if p.expect(K::ThenKw) {
         p.body(K::Block, stmt);
+        // without `else` the `if` is `Unit`, which the checker requires of `then`
         if p.eat(K::ElseKw) {
             if p.at(K::IfKw) && !p.raw().line_start {
                 if_expr(p);
             } else {
                 p.body(K::Block, stmt);
             }
-        } else {
-            p.error_expected("`else`: `if` is an expression and needs both branches");
         }
     }
     p.complete(m, K::IfExpr)

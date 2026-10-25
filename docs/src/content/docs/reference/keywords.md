@@ -46,7 +46,7 @@ and [ffi.md](../ffi/).
 | Keyword | Meaning | Example |
 | - | - | - |
 | `fun` | an anonymous function | `fun x -> x + 1` |
-| `if` `then` `else` | a conditional expression; `else` is required | `if n == 0 then 1 else n` |
+| `if` `then` `else` | a conditional expression; without `else` it is `Unit` | `if n == 0 then 1 else n` |
 | `match` `with` | pattern matching | `match shape with \| Circle r -> r` |
 | `when` | a guard on a match arm | `\| Rect w h when w == h -> "square"` |
 | `with` | also the handlers of `try` and a record update | `{ user with name = "Ada" }` |
