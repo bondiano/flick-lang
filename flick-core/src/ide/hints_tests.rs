@@ -112,3 +112,28 @@ fn semantic_tokens_classify_names_and_folding_spans_blocks() {
     let matched = at("match shape");
     assert!(folds.iter().any(|(s, _)| *s == matched), "{folds:?}");
 }
+
+#[test]
+fn the_mode_of_a_foreign_binding_is_a_keyword() {
+    let text = "module App.Main exposing (double, now)
+
+double : Number -> Number
+foreign pure double from \"./double.js\" \"double\"
+
+now : Unit -> Number
+foreign sync now from global \"Date.now\"
+";
+    let f = fixture_of(&[("src/App/Main.fl", text)]);
+    let tokens = f.ide().semantic_tokens(f.file("App.Main"));
+    let kind_at = |needle: &str| {
+        let at = u32::try_from(text.find(needle).expect("occurs")).expect("small");
+        tokens
+            .iter()
+            .find(|t| t.0 == at)
+            .map(|t| TOKEN_TYPES[t.2 as usize])
+    };
+    assert_eq!(kind_at("pure"), Some("keyword"));
+    assert_eq!(kind_at("sync"), Some("keyword"));
+    assert_eq!(kind_at("global"), Some("keyword"));
+    assert_eq!(kind_at("double from"), Some("function"));
+}

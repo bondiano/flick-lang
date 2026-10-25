@@ -384,6 +384,10 @@
     "named": false
   },
   {
+    "type": "assert",
+    "named": false
+  },
+  {
     "type": "await",
     "named": false
   },
@@ -443,14 +447,6 @@
   },
   {
     "type": "forall",
-    "named": false
-  },
-  {
-    "type": "foreign",
-    "named": false
-  },
-  {
-    "type": "from",
     "named": false
   },
   {

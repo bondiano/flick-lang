@@ -381,18 +381,28 @@ impl Lower<'_> {
         let span = self.span(node);
         let mark = self.scope.len();
         let statements: Vec<&Node> = node.nodes().collect();
+        let block = self.statements(&statements, span);
+        self.scope.truncate(mark);
+        block
+    }
+
+    /// The statements of a block; a `let assert` takes the ones after it.
+    pub(super) fn statements(&mut self, statements: &[&Node], span: Span) -> Expr {
         let mut stmts = Vec::new();
         let mut result = None;
         for (i, statement) in statements.iter().enumerate() {
             let last = i + 1 == statements.len();
             match statement.kind {
                 K::Signature => {}
+                K::LetDecl if statement.has_token(K::AssertKw) => {
+                    result = Some(self.let_assert(statement, &statements[i + 1..], span));
+                    break;
+                }
                 K::LetDecl => stmts.push(self.local_let(statement)),
                 _ if last => result = Some(self.expr(statement)),
                 _ => stmts.push(Stmt::Expr(self.expr(statement))),
             }
         }
-        self.scope.truncate(mark);
         let result = result.unwrap_or_else(|| Expr::new(ExprKind::Lit(Lit::Unit), span));
         if stmts.is_empty() {
             return result;

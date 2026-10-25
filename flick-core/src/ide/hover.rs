@@ -178,7 +178,7 @@ impl Ide<'_> {
         if let Some((code, note, range)) = self.keyword(file, offset) {
             return Some((format!("```flick\n{code}\n```\n\n{note}"), range));
         }
-        if let Some(hover) = self.sql_hover(file, offset) {
+        if let Some(hover) = self.embedded_hover(file, offset) {
             return Some(hover);
         }
         let Some((symbol, range)) = self.symbol_at(file, offset) else {

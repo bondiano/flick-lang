@@ -73,6 +73,10 @@ pub struct Typing {
     /// The type each type name refers to: its module and name.
     pub type_names: HashMap<Range, (String, String)>,
     pub(crate) pending_types: Vec<(Range, Type)>,
+    /// The record each field label belongs to, at the label: in a field
+    /// access, a literal, an update and a record pattern.
+    pub fields: HashMap<Range, Type>,
+    pub(crate) pending_fields: Vec<(Range, Type)>,
     /// `sql table` declarations.
     pub sql_tables: Vec<SqlTable>,
     /// The dialect the SQL of the module was checked against.
@@ -355,6 +359,13 @@ impl Checker<'_> {
         self.typing.pending_types.push((range(span), ty.clone()));
     }
 
+    /// `record` is the record the field label at `span` belongs to.
+    pub fn note_field(&mut self, span: Span, record: &Type) {
+        self.typing
+            .pending_fields
+            .push((range(span), record.clone()));
+    }
+
     /// The type of an expression a keyword opens (`task`, `match`, `fun` …),
     /// recorded at the keyword so an editor can show it there.
     pub fn note_head(&mut self, node: &Node, ty: &Type) {
@@ -452,6 +463,10 @@ impl Checker<'_> {
         for (at, ty) in mem::take(&mut typing.pending_types) {
             let ty = self.named_skolems(&self.zonk(&ty));
             typing.types.insert(at, ty);
+        }
+        for (at, ty) in mem::take(&mut typing.pending_fields) {
+            let ty = self.named_skolems(&self.zonk(&ty));
+            typing.fields.insert(at, ty);
         }
         for (at, ty) in mem::take(&mut typing.pending_labels) {
             let ty = self.zonk(&ty);

@@ -23,6 +23,7 @@ pub enum SyntaxKind {
     AsKw,
     LetKw,
     RecKw,
+    AssertKw,
     FunKw,
     MatchKw,
     WithKw,
@@ -248,6 +249,10 @@ impl SyntaxKind {
     }
 }
 
+/// The words after `foreign` that say how a binding runs: keywords there
+/// only, names everywhere else.
+pub const FOREIGN_MODES: [&str; 5] = ["pure", "sync", "async", "effect", "blocked"];
+
 pub fn keyword(text: &str) -> Option<SyntaxKind> {
     use SyntaxKind as K;
     Some(match text {
@@ -257,6 +262,7 @@ pub fn keyword(text: &str) -> Option<SyntaxKind> {
         "as" => K::AsKw,
         "let" => K::LetKw,
         "rec" => K::RecKw,
+        "assert" => K::AssertKw,
         "fun" => K::FunKw,
         "match" => K::MatchKw,
         "with" => K::WithKw,

@@ -191,6 +191,7 @@ impl Checker<'_> {
                 continue;
             };
             let name = label.text(self.text).to_owned();
+            self.note_field(self.token_span(label), ty);
             if fields.iter().any(|(l, ..)| *l == name) {
                 self.duplicate_label(&name, self.token_span(label));
                 continue;

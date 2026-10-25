@@ -24,7 +24,7 @@ let value c = if c then 1
 discarded : Bool -> Unit
 let discarded c = if c then 2
 
-//~ FLICK-T025 @7:3-7:10 `else ()` can be left out: an `if` without `else` is `Unit`
-//~ FLICK-T025 @10:76-10:83 `else ()` can be left out: an `if` without `else` is `Unit`
+//~ FLICK-T028 @7:3-7:10 `else ()` can be left out: an `if` without `else` is `Unit`
+//~ FLICK-T028 @10:76-10:83 `else ()` can be left out: an `if` without `else` is `Unit`
 //~ FLICK-T003 @22:15-22:26 expected `Number`, found `Unit`
 //~ FLICK-T003 @25:29-25:30 expected `Unit`, found `Number`

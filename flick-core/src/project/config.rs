@@ -27,6 +27,8 @@ pub struct Config {
     pub sql_dialect: &'static Dialect,
     /// `[lint] allow`: warnings that are not reported.
     pub allow: Vec<Code>,
+    /// `[lint] no-let-assert`: every `let assert` is an error.
+    pub no_let_assert: bool,
 }
 
 /// An entry point of an app: its name and the module whose `main` it runs.
@@ -137,9 +139,12 @@ struct Raw {
 
 #[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[serde(rename_all = "kebab-case")]
 struct RawLint {
     #[serde(default)]
     allow: Vec<Spanned<String>>,
+    #[serde(default)]
+    no_let_assert: bool,
 }
 
 #[derive(Default, Deserialize)]
@@ -246,6 +251,7 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
         build: raw.build,
         sql_dialect,
         allow,
+        no_let_assert: raw.lint.no_let_assert,
     })
 }
 
@@ -419,6 +425,11 @@ mod tests {
             ("src", "test")
         );
         assert_eq!(lib.sql_dialect.name, "postgresql");
+        assert!(!lib.no_let_assert);
+        let strict = parse_text(
+            "schema-version = 1\n[project]\nkind = \"lib\"\n[lint]\nno-let-assert = true\n",
+        );
+        assert!(strict.expect("valid").no_let_assert);
         let components = parse_text(
             "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\nlabels = \"components\"\n",
         );

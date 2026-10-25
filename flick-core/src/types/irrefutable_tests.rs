@@ -77,6 +77,34 @@ fn a_list_literal_let_can_become_a_tuple() {
 }
 
 #[test]
+fn a_refutable_let_can_become_a_let_assert() {
+    assert_fix(
+        "f : List Number -> Number\nlet f xs =\n  let [x, ...rest] = xs\n  x\n",
+        "use `let assert`",
+        "f : List Number -> Number\nlet f xs =\n  let assert [x, ...rest] = xs\n  x\n",
+    );
+}
+
+#[test]
+fn an_assert_that_cannot_fail_becomes_a_let() {
+    let text = format!(
+        "{HEAD}f : (Number, Number) -> Number\nlet f pair =\n  let assert (a, b) = pair\n  a + b\n"
+    );
+    let d = check(&text)
+        .into_iter()
+        .find(|d| d.code.to_string() == "FLICK-T025")
+        .expect("T025");
+    let mut out = text.clone();
+    for edit in d.fixes[0].edits.iter().rev() {
+        out.replace_range(
+            edit.span.start as usize..edit.span.end as usize,
+            &edit.replacement,
+        );
+    }
+    assert_eq!(out, text.replace("let assert (a, b)", "let (a, b)"));
+}
+
+#[test]
 fn no_match_fix_without_a_rest_of_the_block() {
     let text = format!("{HEAD}f : Option Number -> Number\nlet f (Some n) = n\n");
     let fixes: Vec<_> = check(&text).into_iter().flat_map(|d| d.fixes).collect();

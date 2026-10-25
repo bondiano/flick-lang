@@ -14,6 +14,11 @@ export const flickTodo = (message: string): never => {
   throw new Error(message);
 };
 
+/** A failing `let assert`: its place and message, and the value it missed. */
+export const flickAssert = (message: string, value: unknown): never => {
+  throw new Error(`${message}: ${Formatter.format(value)}`);
+};
+
 /** `echo`: shows a value and where it was echoed, and returns it. */
 export const flickEcho = <A>(location: string, value: A): A => {
   stderrLine(`${location} ${Formatter.format(value)}`);

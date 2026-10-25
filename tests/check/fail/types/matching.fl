@@ -58,6 +58,13 @@ let head items =
   let [x, ...rest] = items
   x
 
+always : (Number, Number) -> Number
+let always pair =
+  let assert (a, b) = pair
+  a + b
+
+let assert [top] = [1]
+
 rests : List Number -> Number
 let rests items =
   match items with
@@ -74,5 +81,7 @@ let rests items =
 //~ FLICK-T009 @48:7-48:13 this pattern does not match `None`; use `match` to handle
 //~ FLICK-T009 @53:7-53:13 a list can have any length, but this pattern matches only lists of 2 items, not `[]`
 //~ FLICK-T009 @58:7-58:19 a list can have any length, but this pattern matches only lists of at least 1 item, not `[]`
-//~ FLICK-T009 @63:3-63:14 `match` does not cover every value: `[]` is not matched
-//~ FLICK-T010 @65:5-65:11 this arm is never reached
+//~ FLICK-T025 @63:7-63:13 `let assert` cannot fail, use `let`
+//~ FLICK-T026 @66:5-66:11 `let assert` is only for a block
+//~ FLICK-T009 @70:3-70:14 `match` does not cover every value: `[]` is not matched
+//~ FLICK-T010 @72:5-72:11 this arm is never reached

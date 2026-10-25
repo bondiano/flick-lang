@@ -57,4 +57,11 @@ import Effect.Log as Log
 
 Exporting a type does not automatically export its constructors; ADT constructors are listed explicitly or through `Type(..)`. The opaque representation is hidden, and a re-export preserves nominal identity. Instances take part in the canonical package graph regardless of import order. Cross-module cycles and first-class/functor modules are not part of the first version; within a file, explicitly marked recursive function groups and recursive nominal data are allowed. Transparent aliases must be acyclic.
 
-Top-level source initialization is pure. ESM is the primary output; effectful loading of a foreign module is expressed as a runtime binding, and a trusted pure module requires an explicit contract. The application specifies a single `main : Unit ->{; AppError} Unit`; the Layers it needs are provided explicitly inside it. The platform entry runner calls main and observes the final Exit. Importing a library does not start the application.
+Top-level source initialization is pure. ESM is the primary output;
+effectful loading of a foreign module is expressed as a runtime binding,
+and a trusted pure module requires an explicit contract. An application
+names one or more entry modules through `entry` or `entries`; each exports
+`main`. A pure entry is `Unit -> Unit` and is called directly. A runtime
+entry takes and returns `Unit`, requires no services and may fail only with
+`AppError`; its runner observes the final `Exit`. Required layers and other
+error handling belong inside `main`. Importing a library starts no entry.

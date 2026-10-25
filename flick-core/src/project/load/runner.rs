@@ -95,6 +95,7 @@ impl Loader<'_> {
             local: &|_| false,
             limits: types::Limits::default(),
             sql: Default::default(),
+            no_let_assert: false,
             effects: true,
         };
         diagnostics.extend(types::check(

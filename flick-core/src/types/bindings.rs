@@ -23,6 +23,8 @@ pub struct LetParts<'n> {
     pub header: Option<&'n Node>,
     pub body: Option<&'n Node>,
     pub rec: bool,
+    /// `let assert`: the pattern may miss, and the program fails when it does.
+    pub assert: bool,
 }
 
 impl LetParts<'_> {
@@ -41,8 +43,10 @@ impl LetParts<'_> {
 
 pub fn let_parts<'n>(decl: &'n Node, text: &str) -> LetParts<'n> {
     let pattern = decl.nodes().find(|n| is_pattern(n.kind));
+    let assert = decl.has_token(K::AssertKw);
+    // `let assert x = …` binds like a pattern, to be checked as one
     let name = pattern
-        .filter(|p| p.kind == K::VarPat)
+        .filter(|p| p.kind == K::VarPat && !assert)
         .and_then(|p| p.child_tokens().find(|t| t.kind == K::Ident))
         .map(|t| t.text(text).to_owned());
     LetParts {
@@ -56,6 +60,7 @@ pub fn let_parts<'n>(decl: &'n Node, text: &str) -> LetParts<'n> {
         header: decl.nodes().find(|n| is_type(n.kind)),
         body: decl.nodes().find(|n| n.kind == K::Block),
         rec: decl.has_token(K::RecKw),
+        assert,
     }
 }
 
@@ -209,7 +214,11 @@ impl Checker<'_> {
         self.store.lower(&ty);
         if let Some(pattern) = parts.pattern {
             let pat = self.bind_pattern(pattern, &ty);
-            self.irrefutable(&pat, pattern, rest.map(|rest| (decl, rest)));
+            if parts.assert {
+                self.let_assert(&pat, pattern, decl, rest);
+            } else {
+                self.irrefutable(&pat, pattern, rest.map(|rest| (decl, rest)));
+            }
         }
     }
 

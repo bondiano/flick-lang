@@ -1,6 +1,6 @@
 //! FLICK-T021: a `let` annotation of the very type its value synthesizes
 //! on its own, as in `let kinds : List Kind = [Kind.a, Kind.b]`, and
-//! FLICK-T025: an `else ()` an `if` has without it.
+//! FLICK-T028: an `else ()` an `if` has without it.
 
 use super::Checker;
 use super::bindings::LetParts;
@@ -135,7 +135,7 @@ impl Checker<'_> {
         }
         self.diagnostics.push(
             Diagnostic::new(
-                codes::T025,
+                codes::T028,
                 Severity::Warning,
                 "`else ()` can be left out: an `if` without `else` is `Unit`",
             )

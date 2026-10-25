@@ -230,3 +230,13 @@ fn list_patterns_end_with_a_rest() {
     assert_eq!(errors("let [...rest, x] = xs"), ["FLICK-S007 ,"]);
     assert_eq!(errors("let [...] = xs"), ["FLICK-S007 ]"]);
 }
+
+#[test]
+fn let_assert_takes_a_pattern_and_a_message() {
+    assert_eq!(
+        sexp("let assert Some x = v as \"no x\""),
+        "(LetDecl let assert (ConPat Some (VarPat x)) = (Block (NameExpr v)) as \"no x\")"
+    );
+    assert_eq!(errors("let rec assert f x = x"), ["FLICK-S007 assert"]);
+    assert_eq!(errors("let x = v as \"no\""), ["FLICK-S007 as"]);
+}

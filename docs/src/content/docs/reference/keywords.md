@@ -24,6 +24,7 @@ See [modules.md](../modules/).
 | - | - | - |
 | `let` | binds a value or a function, at the top level or in a block | `let total = a + b` |
 | `rec` | `let rec` lets a function call itself; `rec { … }` groups mutually recursive functions | `let rec go n = …` |
+| `assert` | `let assert` binds a pattern that may not match, and fails when it does not | `let assert [x, ..._] = xs as "no items"` |
 | `type` | declares an ADT, `type alias` a transparent alias | `type Shape = Circle Number \| Empty` |
 | `opaque` | hides a type's representation outside its module | `opaque type alias UserId = String` |
 | `refined` | a type whose values pass a predicate | `refined type Port = Number where fun n -> n > 0` |

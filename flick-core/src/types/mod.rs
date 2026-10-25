@@ -114,6 +114,8 @@ pub struct Options<'a> {
     pub limits: Limits,
     /// The SQL dialect of `sql table` and `sql { … }`.
     pub sql: &'static Dialect,
+    /// `[lint] no-let-assert`: every `let assert` is an error.
+    pub no_let_assert: bool,
     /// Whether runtime code may run: `false` under `effect = "none"`.
     pub effects: bool,
 }

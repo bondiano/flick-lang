@@ -221,6 +221,7 @@ decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
             | service | class | instance | foreign | sql_table
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
+            | "let" "assert" pattern [":" type] "=" block ["as" String]
 rec_group   = "rec" "{" { signature | let } "}"
 type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
             | ["opaque"] "type" "alias" Con { param } "=" type [deriving]
@@ -385,7 +386,7 @@ cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
 
 `todo` (optionally followed by a string) is an expression of any type, and
 `echo` without an operand is a function, as in `x |> echo`. `_` is a type
-only in a signature or annotation. `if` is an expression; without `else` it is `Unit`, and so must be its `then` branch (an `else ()` gets the warning `FLICK-T025`). `ignore e` discards a non-`Unit`
+only in a signature or annotation. `if` is an expression; without `else` it is `Unit`, and so must be its `then` branch (an `else ()` gets the warning `FLICK-T028`). `ignore e` discards a non-`Unit`
 result of an intermediate statement (see [Direct effectful calls](../../spec/03-direct-calls/)). `await e` runs a stored `Eff` once in
 the current fiber; `task { … }` builds a cold computation (see [Values of computations and their execution](../../spec/04-computations/)). In
 `provide e { … }` and `codec e { … }` the `{` ends the head expression.

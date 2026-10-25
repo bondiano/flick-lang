@@ -15,6 +15,14 @@
       "members": [
         {
           "type": "SYMBOL",
+          "name": "_foreign"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_from"
+        },
+        {
+          "type": "SYMBOL",
           "name": "parens"
         },
         {
@@ -156,6 +164,10 @@
         },
         {
           "type": "STRING",
+          "value": "assert"
+        },
+        {
+          "type": "STRING",
           "value": "fun"
         },
         {
@@ -252,14 +264,6 @@
         },
         {
           "type": "STRING",
-          "value": "foreign"
-        },
-        {
-          "type": "STRING",
-          "value": "from"
-        },
-        {
-          "type": "STRING",
           "value": "forall"
         },
         {
@@ -301,6 +305,89 @@
         {
           "type": "STRING",
           "value": "do"
+        }
+      ]
+    },
+    "_foreign": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "foreign"
+          },
+          "named": true,
+          "value": "keyword"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": "pure"
+                  },
+                  {
+                    "type": "STRING",
+                    "value": "sync"
+                  },
+                  {
+                    "type": "STRING",
+                    "value": "async"
+                  },
+                  {
+                    "type": "STRING",
+                    "value": "effect"
+                  },
+                  {
+                    "type": "STRING",
+                    "value": "blocked"
+                  }
+                ]
+              },
+              "named": true,
+              "value": "keyword"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "_from": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "from"
+          },
+          "named": true,
+          "value": "keyword"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "STRING",
+                "value": "global"
+              },
+              "named": true,
+              "value": "keyword"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
     },

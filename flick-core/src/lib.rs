@@ -47,6 +47,7 @@ pub fn check(sources: &source::SourceMap, file: source::FileId) -> Vec<diagnosti
         local: &local,
         limits: types::Limits::default(),
         sql: Default::default(),
+        no_let_assert: false,
         effects: true,
     };
     let mut diagnostics = parse.diagnostics;

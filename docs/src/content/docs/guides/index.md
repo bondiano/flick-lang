@@ -99,6 +99,33 @@ resources. A foreign promise that ignores cancellation is still awaited;
 a timeout is not a promise of immediate shutdown. These rules matter when
 binding a JavaScript resource or network client.
 
+## Call another process with a typed contract
+
+Start with the complete [RPC example](../reference/rpc/): describe a
+procedure with request, success and error codecs, add it to a group, then
+provide the exact handler record in a scope. Reuse that procedure value
+from the client.
+
+Choose the transport separately: HTTP for request/response calls,
+WebSocket for a shared message connection, TCP for Node peers, or
+`serve_stdio`/`spawn` for a child process. Start configuration from
+`Rpc.defaults` and `Rpc.call_defaults` so serialization and transport
+remain explicit. Test handler logic with `call_local`, but test codecs and
+headers through a real connection.
+
+## Find out where time and failures go
+
+Use [observability](../reference/observability/) to choose the signal before
+the destination: spans for a request's path, logs for events, metrics for
+aggregates. Provide an OTLP layer around the application for collector
+export, expose `Prometheus.route "/metrics"` for scraping, or connect a
+DevTools layer to inspect spans.
+
+**Watch for:** the combined OTLP layer takes a base URL; a single-signal
+layer takes its full endpoint. Configuration export is opt-in per signal.
+For CPU-bound recursion, read [code generation](../reference/codegen/):
+stack-safe loops avoid stack growth, not synchronous execution time.
+
 ## Build a browser interface
 
 **Goal:** mount a React-rendered Flick view and run event work under an

@@ -16,6 +16,7 @@
 
 (_ (keyword "let") . (identifier) @function)
 (_ (keyword "let") . (keyword "rec") . (identifier) @function)
+(_ (keyword) @_foreign . (keyword) . (identifier) @function (#eq? @_foreign "foreign"))
 
 ["(" ")" "[" "]" "{" "}"] @punctuation.bracket
 (operator ["," ";"]) @punctuation.delimiter

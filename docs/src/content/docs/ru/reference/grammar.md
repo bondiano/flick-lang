@@ -239,6 +239,7 @@ decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
             | service | class | instance | foreign | sql_table
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
+            | "let" "assert" pattern [":" type] "=" block ["as" String]
 rec_group   = "rec" "{" { signature | let } "}"
 type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
             | ["opaque"] "type" "alias" Con { param } "=" type [deriving]
@@ -410,7 +411,7 @@ cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
 `echo` без операнда — функция, как в `x |> echo`. `_` — тип только в
 сигнатуре или аннотации.
 
-`if` — выражение; без `else` оно имеет тип `Unit`, как и его ветвь `then` (на `else ()` выдаётся предупреждение `FLICK-T025`). `ignore e` отбрасывает
+`if` — выражение; без `else` оно имеет тип `Unit`, как и его ветвь `then` (на `else ()` выдаётся предупреждение `FLICK-T028`). `ignore e` отбрасывает
 результат промежуточной инструкции, отличный от `Unit`
 (см. [Прямые эффектные вызовы](../../spec/03-direct-calls/)).
 `await e` один раз запускает сохранённый `Eff` в текущем файбере,

@@ -1,5 +1,15 @@
 // Exhaustive `match`: every value of the scrutinee has an arm.
-module App.Matching exposing (describe, area, flags, pairs, lists, rests, prefixes, everything)
+module App.Matching exposing (
+  describe,
+  area,
+  flags,
+  pairs,
+  lists,
+  rests,
+  prefixes,
+  asserted,
+  everything,
+)
 
 type Shape =
   | Circle Number
@@ -55,6 +65,11 @@ let prefixes items =
   | [a] -> a
   | [a, b, ..._] -> a + b
   | [] -> 0
+
+asserted : List Number -> Number
+let asserted items =
+  let assert [x, ...rest] = items as "no items"
+  x + List.length rest
 
 everything : List Number -> List Number
 let everything items =
