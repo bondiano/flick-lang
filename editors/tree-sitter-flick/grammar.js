@@ -6,7 +6,7 @@ const KEYWORDS = [
   'try', 'if', 'then', 'else', 'task', 'await', 'scope', 'provide', 'ignore',
   'todo', 'echo',
   'type', 'opaque', 'refined', 'where', 'kind', 'error', 'service', 'class',
-  'instance', 'deriving', 'foreign', 'from', 'forall', 'not', 'none',
+  'instance', 'deriving', 'forall', 'not', 'none',
   'schema', 'codec', 'sql', 'ui', 'cli', 'in', 'when', 'do',
 ];
 
@@ -28,6 +28,8 @@ module.exports = grammar({
     source_file: $ => repeat($._token),
 
     _token: $ => choice(
+      $._foreign,
+      $._from,
       $.parens,
       $.brackets,
       $.braces,
@@ -48,6 +50,13 @@ module.exports = grammar({
     braces: $ => seq('{', repeat($._token), '}'),
 
     keyword: _ => choice(...KEYWORDS),
+
+    // the mode after `foreign` and `global` after `from` are keywords only there
+    _foreign: $ => seq(
+      alias('foreign', $.keyword),
+      optional(alias(choice('pure', 'sync', 'async', 'effect', 'blocked'), $.keyword)),
+    ),
+    _from: $ => seq(alias('from', $.keyword), optional(alias('global', $.keyword))),
     boolean: _ => choice('true', 'false'),
     operator: _ => choice(...OPERATORS),
 

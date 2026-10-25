@@ -450,14 +450,6 @@
     "named": false
   },
   {
-    "type": "foreign",
-    "named": false
-  },
-  {
-    "type": "from",
-    "named": false
-  },
-  {
     "type": "fun",
     "named": false
   },

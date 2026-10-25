@@ -75,11 +75,18 @@
           }
         },
         {
-          "match": "(?<![.\\w])(foreign)\\s+(pure|sync|async|effect)\\s+([a-z_][A-Za-z0-9_]*)",
+          "match": "(?<![.\\w])(foreign)\\s+(pure|sync|async|effect|blocked)\\s+([a-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": { "name": "keyword.other.flick" },
-            "2": { "name": "storage.modifier.flick" },
+            "2": { "name": "keyword.other.flick" },
             "3": { "name": "entity.name.function.flick" }
+          }
+        },
+        {
+          "match": "(?<![.\\w])(from)\\s+(global)\\b",
+          "captures": {
+            "1": { "name": "keyword.other.flick" },
+            "2": { "name": "keyword.other.flick" }
           }
         }
       ]

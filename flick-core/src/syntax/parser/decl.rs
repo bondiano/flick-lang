@@ -2,6 +2,7 @@
 
 use super::{Ctx, K, Parser, expr, pattern, types};
 use crate::diagnostics::codes;
+use crate::syntax::kind::FOREIGN_MODES;
 
 pub(super) fn source_file(p: &mut Parser) {
     let m = p.start();
@@ -440,7 +441,6 @@ fn instance_decl(p: &mut Parser) {
     p.complete(m, K::InstanceDecl);
 }
 
-const FOREIGN_MODES: [&str; 5] = ["pure", "sync", "async", "effect", "blocked"];
 const FOREIGN_META: [&str; 9] = [
     "arity",
     "this",

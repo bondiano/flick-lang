@@ -249,6 +249,10 @@ impl SyntaxKind {
     }
 }
 
+/// The words after `foreign` that say how a binding runs: keywords there
+/// only, names everywhere else.
+pub const FOREIGN_MODES: [&str; 5] = ["pure", "sync", "async", "effect", "blocked"];
+
 pub fn keyword(text: &str) -> Option<SyntaxKind> {
     use SyntaxKind as K;
     Some(match text {

@@ -5,11 +5,11 @@ use crate::iface::{Decl, Namespace};
 use crate::resolve::declarations;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
-use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::kind::{FOREIGN_MODES, SyntaxKind as K};
 use crate::types::{Ref, Type};
 
 /// The token types, in the order of the legend the server announces.
-pub const TOKEN_TYPES: [&str; 7] = [
+pub const TOKEN_TYPES: [&str; 8] = [
     "namespace",
     "type",
     "enumMember",
@@ -17,6 +17,7 @@ pub const TOKEN_TYPES: [&str; 7] = [
     "variable",
     "method",
     "parameter",
+    "keyword",
 ];
 
 const NAMESPACE: u32 = 0;
@@ -26,6 +27,8 @@ const FUNCTION: u32 = 3;
 const VARIABLE: u32 = 4;
 const METHOD: u32 = 5;
 const PARAMETER: u32 = 6;
+/// A word that is a keyword only where it stands: the mode of `foreign`.
+const KEYWORD: u32 = 7;
 
 /// Nodes worth folding when they span several lines.
 const FOLDED: [K; 14] = [
@@ -89,6 +92,7 @@ impl Ide<'_> {
             out.push((d.span.start, d.span.end, kind));
         }
         binders(&m.tree, &mut out);
+        foreign_modes(&m.tree, text, &mut out);
         out.sort_unstable();
         out.dedup_by_key(|t| t.0);
         out
@@ -149,6 +153,25 @@ fn binders(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
             out.push((t.start, t.end, PARAMETER));
         }
         binders(child, out);
+    }
+}
+
+/// `pure` of `foreign pure f from …`, and `global` of `from global`.
+fn foreign_modes(tree: &Node, text: &str, out: &mut Vec<(u32, u32, u32)>) {
+    for decl in tree.nodes().filter(|n| n.kind == K::ForeignDecl) {
+        let names: Vec<_> = decl.child_tokens().filter(|t| t.kind == K::Ident).collect();
+        if let [mode, _, ..] = names[..]
+            && FOREIGN_MODES.contains(&mode.text(text))
+        {
+            out.push((mode.start, mode.end, KEYWORD));
+        }
+        let global = decl
+            .nodes()
+            .flat_map(Node::child_tokens)
+            .find(|t| t.kind == K::Ident && t.text(text) == "global");
+        if let Some(t) = global {
+            out.push((t.start, t.end, KEYWORD));
+        }
     }
 }
 

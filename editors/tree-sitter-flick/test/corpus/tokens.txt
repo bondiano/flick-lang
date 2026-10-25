@@ -92,3 +92,31 @@ let assert Some x = v as "no x"
   (identifier)
   (keyword)
   (string))
+
+==================
+Foreign modes
+==================
+
+foreign pure double from "./d.js" "double"
+foreign sync now from global "Date.now"
+let pure = async
+
+---
+
+(source_file
+  (keyword)
+  (keyword)
+  (identifier)
+  (keyword)
+  (string)
+  (string)
+  (keyword)
+  (keyword)
+  (identifier)
+  (keyword)
+  (keyword)
+  (string)
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier))
