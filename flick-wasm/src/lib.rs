@@ -84,14 +84,16 @@ fn emit(source: &str, profile: &str) -> (Option<(String, Vec<build::Artifact>)>,
         let module = compilation.modules.iter().find(|m| m.path == path());
         let file = module.map(|m| format!("{}.js", m.name.replace('.', "/")));
         // like `flick build` without a project: a module with `main` gets the runner
-        let entry = module
+        let entries: Vec<(String, String)> = module
             .filter(|m| m.interface.exports_value("main"))
-            .map(|m| m.name.clone());
+            .map(|m| ("main".to_owned(), m.name.clone()))
+            .into_iter()
+            .collect();
         let source_path = |_: FileId| format!("file://{}", path().display());
         let source_dir = |_: &str| path().parent().map(Path::to_path_buf);
         let settings = Settings {
             package: None,
-            entry: entry.as_deref(),
+            entries: &entries,
             typescript: false,
             release: profile == "release",
             extras: Extras::default(),

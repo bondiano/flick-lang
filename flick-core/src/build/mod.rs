@@ -15,6 +15,7 @@ use crate::codegen::{self, Labels, Options, sourcemap};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface;
 use crate::iface::{Interface, Namespace};
+use crate::project::config::MAIN_ENTRY;
 use crate::project::{Compilation, Compiled, MainKind, main_kind, normalize};
 use crate::resolve::{self, Module};
 use crate::source::{FileId, SourceMap, Span};
@@ -23,12 +24,28 @@ use crate::{ir, opt, syntax, types};
 /// Directory of the built-in modules inside the output.
 pub const BUILTIN_DIR: &str = "_flick";
 
-/// The app launcher: a hyphen cannot occur in a module name.
+/// The launcher of the entry `main`, the one `entry` names: a hyphen
+/// cannot occur in a module name.
 pub const fn runner_path(typescript: bool) -> &'static str {
     if typescript {
         "flick-main.ts"
     } else {
         "flick-main.js"
+    }
+}
+
+/// The launcher of the entry `name`: `flick-<name>.js`.
+pub fn runner_file(name: &str, typescript: bool) -> String {
+    format!("flick-{name}.{}", if typescript { "ts" } else { "js" })
+}
+
+/// The compiled decoders the runner of the entry `name` installs: those of
+/// `main` keep the name a single entry always had.
+pub fn schema_aot_file(name: &str) -> String {
+    if name == MAIN_ENTRY {
+        SCHEMA_AOT.to_owned()
+    } else {
+        format!("schemas.{name}.aot.js")
     }
 }
 
@@ -42,8 +59,9 @@ pub struct Artifact {
 pub struct Settings<'a> {
     /// The package the project's modules belong to.
     pub package: Option<&'a str>,
-    /// The entry module of an app.
-    pub entry: Option<&'a str>,
+    /// The entry points of an app: a runner for each name, starting the
+    /// `main` of the module.
+    pub entries: &'a [(String, String)],
     pub typescript: bool,
     /// The release profile: the optimizer's passes before code generation.
     pub release: bool,
@@ -160,36 +178,60 @@ pub fn emit(
         imports.extend(compiled_module(&ctx, module, &mut out, &mut diagnostics));
     }
     builtins(&ctx, imports, &mut out);
-    if let Some(entry) = settings.entry {
-        let module = modules.iter().find(|m| m.name == entry);
+    entry_runners(settings, modules, &path, &mut out, &mut diagnostics);
+    (out, diagnostics)
+}
+
+/// The runner of each entry, or why `main` cannot be started.
+fn entry_runners(
+    settings: &Settings,
+    modules: &[Compiled],
+    path: &dyn Fn(&str) -> String,
+    out: &mut Vec<Artifact>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for (name, entry) in settings.entries {
+        let module = modules.iter().find(|m| &m.name == entry);
         let main = module.and_then(|m| m.interface.find(Namespace::Value, "main"));
+        // a re-exported `main` is imported from the module that defines it, whose output has it
+        let defining = main.map_or(entry.as_str(), |e| e.entity.module.as_str());
         // a project checked its entry already; a file built alone is checked here
         match main.and_then(|e| Some(main_kind(e.scheme.as_ref()?))) {
             Some(Err(message)) => {
                 let diagnostic = Diagnostic::new(codes::P026, Severity::Error, message);
-                let at = module.zip(main.and_then(|e| e.at));
+                let file = modules.iter().find(|m| m.name == defining).map(|m| m.file);
+                let at = file.zip(main.and_then(|e| e.at));
                 diagnostics.push(match at {
-                    Some((m, [start, end])) => diagnostic.with_span(Span::new(m.file, start, end)),
+                    Some((f, [start, end])) => diagnostic.with_span(Span::new(f, start, end)),
                     None => diagnostic,
                 });
             }
-            kind => out.push(runner(
-                runner_path(settings.typescript),
-                &path(entry),
-                kind.and_then(Result::ok).unwrap_or(MainKind::Effect),
-                settings.extras.schema_aot,
-            )),
+            kind => {
+                let file = runner_file(name, settings.typescript);
+                let aot = settings.extras.schema_aot.then(|| schema_aot_file(name));
+                out.push(runner(
+                    &file,
+                    &codegen::relative(&file, &path(defining)),
+                    kind.and_then(Result::ok).unwrap_or(MainKind::Effect),
+                    aot.as_deref(),
+                ));
+            }
         }
     }
-    (out, diagnostics)
 }
 
 /// `package.json` of the output. Top-level initialization is pure
 /// (spec 11): only the runner of an app runs anything when loaded.
 fn package_json(settings: &Settings) -> Artifact {
-    let side_effects = match settings.entry {
-        Some(_) => format!("[\"./{}\"]", runner_path(settings.typescript)),
-        None => "false".to_owned(),
+    let side_effects = if settings.entries.is_empty() {
+        "false".to_owned()
+    } else {
+        let runners: Vec<String> = settings
+            .entries
+            .iter()
+            .map(|(name, _)| format!("\"./{}\"", runner_file(name, settings.typescript)))
+            .collect();
+        format!("[{}]", runners.join(", "))
     };
     Artifact {
         path: "package.json".to_owned(),
@@ -365,29 +407,31 @@ fn compiled_module(
     output.imports
 }
 
-/// The runner of an app: starts `main` of the entry module at `entry`, a
-/// pure one by a plain call. With `schema_aot` it collects the codecs the
-/// modules make while loading and installs their compiled decoders, which
-/// `flick build` writes next to it.
-fn runner(file: &str, entry: &str, kind: MainKind, schema_aot: bool) -> Artifact {
+/// The runner of an entry: starts the `main` of the module at `entry`, a
+/// specifier relative to the runner, a pure one by a plain call. With the
+/// file of compiled decoders `schema_aot` it collects the codecs the modules
+/// make while loading and installs those decoders, which `flick build`
+/// writes next to it.
+fn runner(file: &str, entry: &str, kind: MainKind, schema_aot: Option<&str>) -> Artifact {
     let (run, start) = match kind {
         MainKind::Pure => (None, "main(undefined);"),
         MainKind::Effect => (Some("runMain"), "await runMain(main);"),
     };
-    let contents = if schema_aot {
+    let contents = if let Some(aot) = schema_aot {
         let names = run.map_or(String::new(), |r| format!("{r}, "));
         format!(
-            "import {{ {names}enableSchemaAot, installSchemaAot }} from \"@flick-lang/runtime\";\n\nenableSchemaAot();\nconst {{ main }} = await import(\"./{entry}\");\ninstallSchemaAot(await import(\"./{SCHEMA_AOT}\"));\n{start}\n"
+            "import {{ {names}enableSchemaAot, installSchemaAot }} from \"@flick-lang/runtime\";\n\nenableSchemaAot();\nconst {{ main }} = await import(\"{entry}\");\ninstallSchemaAot(await import(\"./{aot}\"));\n{start}\n"
         )
     } else {
         let runtime = run.map_or(String::new(), |r| {
             format!("import {{ {r} }} from \"@flick-lang/runtime\";\n")
         });
-        format!("{runtime}import {{ main }} from \"./{entry}\";\n\n{start}\n")
+        format!("{runtime}import {{ main }} from \"{entry}\";\n\n{start}\n")
     };
+    // a runner is also a package's `bin`, which a shell starts with Node
     Artifact {
         path: file.to_owned(),
-        contents,
+        contents: format!("#!/usr/bin/env node\n{contents}"),
     }
 }
 

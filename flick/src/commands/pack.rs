@@ -1,19 +1,20 @@
-//! `flick pack`: a release build of the project's modules (no runner) into
-//! a staging package, checked for completeness, and an npm tarball of it
-//! made by pnpm. Every module has its ESM and `.iface`, with `.d.ts` when
-//! the project emits them; each interface's dependencies have the
-//! fingerprints it was built against; every path the manifest's `exports`
-//! names exists. Importing the package runs nothing: a module's top level
-//! is pure and no runner is packed.
+//! `flick pack`: a release build of the project's modules into a staging
+//! package, checked for completeness, and an npm tarball of it made by
+//! pnpm. Every module has its ESM and `.iface`, with `.d.ts` when the
+//! project emits them; each interface's dependencies have the fingerprints
+//! it was built against; every path the manifest's `exports` names exists.
+//! Importing a module runs nothing, as its top level is pure; an app also
+//! packs the runner of each entry, which the manifest's `bin` names.
 
 use std::path::{Path, PathBuf};
 use std::process::Command as Process;
 use std::{env, fs};
 
-use flick_core::build::BUILTIN_DIR;
+use flick_core::build::{BUILTIN_DIR, runner_file};
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
 use flick_core::iface;
 use flick_core::project::cache;
+use flick_core::project::config::MAIN_ENTRY;
 use flick_core::source::SourceMap;
 
 use super::build::{BuildCommand, write};
@@ -61,9 +62,11 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
             watch: false,
         },
         project: Some(root.to_string_lossy().into_owned()),
-        entry: Some(String::new()),
+        // an app packs its runners, a library none
+        entry: None,
         generation: false,
     };
+    let runners = build.entries(&project);
     let outcome = build.run();
     if report::code(&outcome.diagnostics) != 0 {
         return outcome;
@@ -91,7 +94,7 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
             diagnostics: problems,
         };
     }
-    let manifest = match staged_manifest(root) {
+    let manifest = match staged_manifest(root, &runners) {
         Ok(m) => m,
         Err(outcome) => return outcome,
     };
@@ -231,8 +234,13 @@ fn relative(path: &Path, base: &Path) -> String {
         .into_owned()
 }
 
-/// The project's `package.json` with the fields of a Flick package.
-fn staged_manifest(root: &Path) -> Result<serde_json::Value, Outcome> {
+/// The project's `package.json` with the fields of a Flick package; the
+/// `bin` of an app names the runner of each entry, the only entry `main`
+/// under the package's name without its scope.
+fn staged_manifest(
+    root: &Path,
+    runners: &[(String, String)],
+) -> Result<serde_json::Value, Outcome> {
     let text = fs::read_to_string(root.join("package.json"))
         .map_err(|err| failure(codes::P020, format!("cannot read `package.json`: {err}")))?;
     let mut manifest: serde_json::Value = serde_json::from_str(&text)
@@ -249,6 +257,30 @@ fn staged_manifest(root: &Path) -> Result<serde_json::Value, Outcome> {
     object
         .entry("exports")
         .or_insert(serde_json::json!({ "./*": "./dist/*" }));
+    if !runners.is_empty() {
+        let package = object
+            .get("name")
+            .and_then(|n| n.as_str())
+            .unwrap_or_default();
+        let unscoped = package.rsplit('/').next().unwrap_or(package).to_owned();
+        let bin: serde_json::Map<String, serde_json::Value> = runners
+            .iter()
+            .map(|(name, _)| {
+                let command = if runners.len() == 1 && name == MAIN_ENTRY && !unscoped.is_empty() {
+                    unscoped.clone()
+                } else {
+                    name.clone()
+                };
+                (
+                    command,
+                    format!("./dist/{}", runner_file(name, false)).into(),
+                )
+            })
+            .collect();
+        object
+            .entry("bin")
+            .or_insert(serde_json::Value::Object(bin));
+    }
     object.remove("devDependencies");
     object.remove("scripts");
     Ok(manifest)

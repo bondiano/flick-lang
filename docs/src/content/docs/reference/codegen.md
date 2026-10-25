@@ -20,8 +20,8 @@ JS global has it, and an ignored parameter is `_`; release uses `$m_Ui` and
 | - | - |
 | `A/B.js`, `A/B.js.map` | module `A.B` and its source map |
 | `_flick/<Name>.js` | the built-in modules the program reaches (`Prelude`, `Platform`, …); with `--emit-dts`, all of them |
-| `flick-main.js` | for an app: runs `main` of the entry module through the runtime's entry runner |
-| `package.json` | `{ "type": "module", "sideEffects": ["./flick-main.js"] }`; `"sideEffects": false` without a runner |
+| `flick-main.js`, `flick-<name>.js` | for an app: the runner of each entry (`main` for `entry`, the names of `entries`), which starts the entry's `main`, imported from the module that defines it, through the runtime's entry runner |
+| `package.json` | `{ "type": "module", "sideEffects": ["./flick-main.js"] }`, listing every runner; `"sideEffects": false` without one |
 
 Module `Main` stays `Main.js`/`Main.ts`; the hyphenated launcher `flick-main.js`/`flick-main.ts` avoids case-insensitive filename collisions, and the old launcher name is no longer emitted.
 

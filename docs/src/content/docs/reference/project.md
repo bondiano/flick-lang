@@ -38,7 +38,8 @@ allow = ["FLICK-T021"]
 | `project.kind` | `"app"` or `"lib"`; required | — |
 | `project.source-dir` | directory of source modules | `"src"` |
 | `project.test-dir` | directory of test modules | `"test"` |
-| `project.entry` | module that exports `main`; required for `app` | — |
+| `project.entry` | module that exports `main`, its own or re-exported: the entry `main`, whose runner is `flick-main.js` | — |
+| `project.entries` | several entries, `{ server = "App.Server", cli = "App.Cli" }`: a runner `flick-<name>.js` each; names are lower-case letters, digits and `-`; instead of `entry` | — |
 | `build.out-dir` | base directory of artifacts | `"dist"` |
 | `build.profile` | `"debug"` or `"release"` (see [codegen.md](../codegen/)); `--profile` of `build` and `test` overrides it | `"debug"` |
 | `build.emit` | `"js"` or `"ts"` | `"js"` |
@@ -57,12 +58,34 @@ Errors in the configuration exit with code `2`:
 | - | - |
 | TOML syntax, an unknown key, a value of the wrong type or outside its set | `FLICK-P005` |
 | a `schema-version` other than `1`, or none | `FLICK-P006` |
-| `kind = "app"` without `entry` | `FLICK-P007` |
+| `kind = "app"` without `entry` or `entries`, or with an empty `entries` | `FLICK-P007` |
+| both `entry` and `entries`, or an entry name that is not one | `FLICK-P005` |
 | no project found, or `--project` names none | `FLICK-P008` |
-| `entry` is not a source module that exports `main` | `FLICK-P011` |
+| an entry is not a source module that exports `main` | `FLICK-P011` |
 | `sql.dialect` names a dialect that is not supported yet | `FLICK-P022` |
 | `sql.dialect` names no dialect; the message lists the known ones | `FLICK-P023` |
 | `lint.allow` names an unknown code | `FLICK-P005` |
+
+## Entry points
+
+An app's entries are the programs it builds: `flick build` writes a runner
+`flick-<name>.js` next to the modules for each, and the modules once, so two
+entries share what they import. A runner imports the entry's `main`, from the
+module that defines it when the entry re-exports it, and starts it; it begins
+with `#!/usr/bin/env node`, so `flick pack` names each runner in the
+package's `bin`, and the only entry `main` under the package's name.
+`flick run <name>` and `flick dev <name>` start one; with a single entry the
+name may be left out.
+
+```toml
+[project]
+kind = "app"
+entries = { server = "App.Server", migrate = "App.Migrate" }
+```
+
+Entries of a web page are something else: a bundler such as Vite takes
+JavaScript entry modules, which import the `.fl` modules they need (see
+[codegen.md](../codegen/)); `entries` are the programs the runtime starts.
 
 ## `flick check`
 

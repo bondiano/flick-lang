@@ -77,7 +77,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     let _ = fs::remove_dir_all(&out);
     let output = Output {
         out_dir: out.clone(),
-        entry: None,
+        entries: Vec::new(),
         typescript: false,
         extras: Extras::default(),
         release: release(options.profile, Some(&project.config.build)),

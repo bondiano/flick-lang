@@ -4,7 +4,7 @@ use std::{fs, io, process};
 use flick_core::build::{self, Artifact, Extras, Settings};
 use flick_core::codegen::Labels;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::config::{Build, Emit, Kind, Profile};
+use flick_core::project::config::{Build, Emit, Kind, MAIN_ENTRY, Profile};
 use flick_core::project::{self, Compilation, Compiled, Project};
 use flick_core::source::{FileId, SourceMap};
 
@@ -17,7 +17,8 @@ use crate::{cache, toolchain};
 pub struct BuildCommand {
     pub options: BuildArguments,
     pub project: Option<String>,
-    /// `run --entry`: the module whose `main` the runner starts.
+    /// `run --entry`: the module whose `main` the runner of the entry `main`
+    /// starts; empty for no runner.
     pub entry: Option<String>,
     /// A build into a run generation, which lives only while it runs: no
     /// manifest entry, and a cache key without its number.
@@ -80,23 +81,22 @@ impl Command for BuildCommand {
         }
         compilation.modules.retain(|c| !c.test);
         let modules = &compilation.modules;
-        let entry = match &project {
-            // an empty `--entry` builds no runner
-            _ if self.entry.is_some() => self.entry.clone().filter(|e| !e.is_empty()),
-            Some(p) if p.config.kind == Kind::App => p.config.entry.as_ref().map(|e| e.0.clone()),
-            Some(_) => None,
+        let entries = match &project {
+            Some(p) => self.entries(p),
+            None if self.entry.is_some() => self.entries_given(),
+            // files built alone: the one of them that exports `main`
             None => {
                 let mains: Vec<&Compiled> = modules
                     .iter()
                     .filter(|m| roots.contains(&m.path) && m.interface.exports_value("main"))
                     .collect();
                 match mains[..] {
-                    [only] => Some(only.name.clone()),
-                    _ => None,
+                    [only] => vec![(MAIN_ENTRY.to_owned(), only.name.clone())],
+                    _ => Vec::new(),
                 }
             }
         };
-        let output = self.output(&host, project.as_ref(), entry.as_deref());
+        let output = self.output(&host, project.as_ref(), entries);
         let (problems, artifacts) = emit(&host, &sources, project.as_ref(), &compilation, &output);
         let clean = diagnostics.is_empty() && problems.is_empty();
         diagnostics.extend(problems);
@@ -116,8 +116,39 @@ impl Command for BuildCommand {
 }
 
 impl BuildCommand {
+    /// The entries of the project's build, by name and module: `--entry`,
+    /// else those of an app; a library has none.
+    pub fn entries(&self, project: &Project) -> Vec<(String, String)> {
+        if self.entry.is_some() {
+            return self.entries_given();
+        }
+        match project.config.kind {
+            Kind::App => project
+                .config
+                .entries
+                .iter()
+                .map(|e| (e.name.clone(), e.module.clone()))
+                .collect(),
+            Kind::Lib => Vec::new(),
+        }
+    }
+
+    /// `--entry M` as the entry `main`; an empty one builds no runner.
+    fn entries_given(&self) -> Vec<(String, String)> {
+        self.entry
+            .iter()
+            .filter(|e| !e.is_empty())
+            .map(|e| (MAIN_ENTRY.to_owned(), e.clone()))
+            .collect()
+    }
+
     /// What the build writes where.
-    fn output(&self, host: &FsHost, project: Option<&Project>, entry: Option<&str>) -> Output {
+    fn output(
+        &self,
+        host: &FsHost,
+        project: Option<&Project>,
+        entries: Vec<(String, String)>,
+    ) -> Output {
         let out_dir = match (&self.options.out_dir, project) {
             (Some(dir), _) => host.cwd.join(dir),
             (None, Some(p)) => p.root.join(&p.config.build.out_dir),
@@ -131,7 +162,7 @@ impl BuildCommand {
         let config = project.map(|p| &p.config.build);
         Output {
             out_dir: project::normalize(&out_dir),
-            entry: entry.map(str::to_owned),
+            entries,
             typescript,
             extras: Extras {
                 dts: self.options.emit_dts || config.is_some_and(|b| b.emit_dts),
@@ -160,7 +191,7 @@ impl BuildCommand {
         let settings = format!(
             "{} {:?} {} {:?} {} {package}",
             out_dir.display(),
-            output.entry,
+            output.entries,
             output.typescript,
             output.extras,
             output.release
@@ -175,14 +206,7 @@ impl BuildCommand {
         roots: &[PathBuf],
         host: &FsHost,
     ) -> Option<Vec<Diagnostic>> {
-        let entry = match &self.entry {
-            Some(e) => Some(e.clone()).filter(|e| !e.is_empty()),
-            None => match project.config.kind {
-                Kind::App => project.config.entry.as_ref().map(|e| e.0.clone()),
-                Kind::Lib => None,
-            },
-        };
-        let output = self.output(host, Some(project), entry.as_deref());
+        let output = self.output(host, Some(project), self.entries(project));
         if output.extras.schema_aot {
             return None;
         }
@@ -215,7 +239,8 @@ pub fn release(profile: Option<ProfileArgument>, config: Option<&Build>) -> bool
 /// Where and what a build writes.
 pub struct Output {
     pub out_dir: PathBuf,
-    pub entry: Option<String>,
+    /// The entries a runner is written for, by name and module.
+    pub entries: Vec<(String, String)>,
     pub typescript: bool,
     pub extras: Extras,
     pub release: bool,
@@ -246,20 +271,22 @@ pub fn emit(
             break;
         }
     }
-    if let (true, Some(entry)) = (output.extras.schema_aot, output.entry.as_deref())
-        && diagnostics.is_empty()
-    {
+    let aot = if output.extras.schema_aot && diagnostics.is_empty() {
+        output.entries.as_slice()
+    } else {
+        &[]
+    };
+    for (name, entry) in aot {
         let ext = if output.typescript { "ts" } else { "js" };
         let module = out_dir.join(format!("{}.{ext}", entry.replace('.', "/")));
-        if let Err(reason) = compile_schemas(out_dir, &module) {
+        let file = build::schema_aot_file(name);
+        if let Err(reason) = compile_schemas(out_dir, &module, &file) {
             diagnostics.push(Diagnostic::new(
                 codes::P013,
                 Severity::Error,
-                format!(
-                    "cannot write the compiled decoders `{}`: {reason}",
-                    build::SCHEMA_AOT
-                ),
+                format!("cannot write the compiled decoders `{file}`: {reason}"),
             ));
+            break;
         }
     }
     (diagnostics, artifacts)
@@ -267,12 +294,12 @@ pub fn emit(
 
 /// Loads the app's modules on Node and writes the compiled decoders of the
 /// codecs they make, which the runner installs.
-fn compile_schemas(out_dir: &Path, module: &Path) -> Result<(), String> {
+fn compile_schemas(out_dir: &Path, module: &Path, file: &str) -> Result<(), String> {
     let script = "import { writeSchemaAot } from \"@flick-lang/runtime\";\nawait writeSchemaAot(process.argv[1], process.argv[2]);\n";
     let output = process::Command::new("node")
         .args(["--input-type=module", "-e", script])
         .arg(module)
-        .arg(out_dir.join(build::SCHEMA_AOT))
+        .arg(out_dir.join(file))
         .current_dir(out_dir)
         .output()
         .map_err(|err| format!("cannot run node: {err}"))?;
@@ -326,7 +353,7 @@ pub fn artifacts(
         source_dir: &source_dir,
         out_dir,
         package: package.as_deref(),
-        entry: output.entry.as_deref(),
+        entries: &output.entries,
         typescript: output.typescript,
         source_path: &source_path,
         extras: output.extras,

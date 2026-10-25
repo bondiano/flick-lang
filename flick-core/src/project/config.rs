@@ -1,6 +1,7 @@
 //! `flick.toml`: the schema version, `[project]`, `[build]` and `[sql]`. Unknown
 //! keys are errors so that a typo never silently means a default.
 
+use std::collections::BTreeMap;
 use std::ops;
 
 use serde::Deserialize;
@@ -18,14 +19,27 @@ pub struct Config {
     pub kind: Kind,
     pub source_dir: String,
     pub test_dir: String,
-    /// Entry module of an app, with the span of its value.
-    pub entry: Option<(String, Span)>,
+    /// The entry points of an app, by name: `entries`, or `entry` as the
+    /// one named `main`. Each builds a runner `flick-<name>.js`.
+    pub entries: Vec<Entry>,
     pub build: Build,
     /// `[sql] dialect`: what `sql table` and `sql { … }` are checked against.
     pub sql_dialect: &'static Dialect,
     /// `[lint] allow`: warnings that are not reported.
     pub allow: Vec<Code>,
 }
+
+/// An entry point of an app: its name and the module whose `main` it runs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Entry {
+    pub name: String,
+    pub module: String,
+    /// The span of the module's name in `flick.toml`.
+    pub span: Span,
+}
+
+/// The name of the entry `entry = "…"` defines.
+pub const MAIN_ENTRY: &str = "main";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -123,6 +137,7 @@ struct RawProject {
     #[serde(default = "test_dir")]
     test_dir: String,
     entry: Option<Spanned<String>>,
+    entries: Option<Spanned<BTreeMap<Spanned<String>, Spanned<String>>>>,
 }
 
 fn source_dir() -> String {
@@ -171,15 +186,15 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
     let raw: Raw = toml::from_str(text).map_err(invalid)?;
     let project_span = span(raw.project.span());
     let project = raw.project.into_inner();
-    let entry = project.entry.map(|e| (e.get_ref().clone(), span(e.span())));
-    if project.kind == Kind::App && entry.is_none() {
+    let entries = entries(project.entry, project.entries, &span)?;
+    if project.kind == Kind::App && entries.is_empty() {
         return Err(Diagnostic::error(
             codes::P007,
             "`kind = \"app\"` needs `entry`, the module that exports `main`",
             project_span,
         )
         .with_fix(
-            "name the entry module, e.g. `entry = \"App.Main\"`",
+            "name the entry module, e.g. `entry = \"App.Main\"`, or several with `entries = { server = \"App.Server\", cli = \"App.Cli\" }`",
             Vec::new(),
         ));
     }
@@ -206,11 +221,79 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
         kind: project.kind,
         source_dir: project.source_dir,
         test_dir: project.test_dir,
-        entry,
+        entries,
         build: raw.build,
         sql_dialect,
         allow,
     })
+}
+
+/// The entries `entry` or `entries` name; both, an empty table or a name
+/// that cannot name a runner's file is an error.
+#[allow(
+    clippy::type_complexity,
+    reason = "the raw TOML shapes of the two keys"
+)]
+fn entries(
+    entry: Option<Spanned<String>>,
+    entries: Option<Spanned<BTreeMap<Spanned<String>, Spanned<String>>>>,
+    span: &dyn Fn(ops::Range<usize>) -> Span,
+) -> Result<Vec<Entry>, Diagnostic> {
+    let entry = entry.map(|e| (e.get_ref().clone(), span(e.span())));
+    let entries = match (&entry, entries) {
+        (Some(_), Some(table)) => {
+            return Err(Diagnostic::error(
+                codes::P005,
+                "`entry` and `entries` both name entry points: keep `entries`, with the module of `entry` under a name",
+                span(table.span()),
+            ));
+        }
+        (Some((module, at)), None) => vec![Entry {
+            name: MAIN_ENTRY.to_owned(),
+            module: module.clone(),
+            span: *at,
+        }],
+        (None, Some(table)) => {
+            let table_span = span(table.span());
+            let entries: Vec<Entry> = table
+                .into_inner()
+                .into_iter()
+                .map(|(name, module)| Entry {
+                    name: name.get_ref().clone(),
+                    module: module.get_ref().clone(),
+                    span: span(module.span()),
+                })
+                .collect();
+            if let Some(bad) = entries.iter().find(|e| !is_entry_name(&e.name)) {
+                return Err(Diagnostic::error(
+                    codes::P005,
+                    format!(
+                        "`{}` is not an entry name: lower-case letters, digits and `-`, starting with a letter, as it names the file `flick-{}.js`",
+                        bad.name, bad.name
+                    ),
+                    table_span,
+                ));
+            }
+            if entries.is_empty() {
+                return Err(Diagnostic::error(
+                    codes::P007,
+                    "`entries` names no entry point",
+                    table_span,
+                ));
+            }
+            entries
+        }
+        (None, None) => Vec::new(),
+    };
+    Ok(entries)
+}
+
+/// Whether `name` can name an entry, and so the file of its runner.
+fn is_entry_name(name: &str) -> bool {
+    name.starts_with(|c: char| c.is_ascii_lowercase())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 /// The dialect `[sql] dialect` names, or why it cannot be used.
@@ -264,7 +347,12 @@ mod tests {
         )
         .expect("valid");
         assert_eq!(config.kind, Kind::App);
-        assert_eq!(config.entry.map(|e| e.0).as_deref(), Some("App.Main"));
+        let named: Vec<_> = config
+            .entries
+            .iter()
+            .map(|e| (e.name.as_str(), e.module.as_str()))
+            .collect();
+        assert_eq!(named, [("main", "App.Main")]);
         assert_eq!(config.build, Build::default());
         let lib = parse_text("schema-version = 1\n[project]\nkind = \"lib\"\n").expect("valid");
         assert_eq!(
@@ -276,6 +364,20 @@ mod tests {
             "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\nlabels = \"components\"\n",
         );
         assert_eq!(components.expect("valid").build.labels, Labels::Components);
+    }
+
+    #[test]
+    fn several_entries_by_name() {
+        let config = parse_text(
+            "schema-version = 1\n[project]\nkind = \"app\"\nentries = { server = \"App.Server\", cli-2 = \"App.Cli\" }\n",
+        )
+        .expect("valid");
+        let named: Vec<_> = config
+            .entries
+            .iter()
+            .map(|e| (e.name.as_str(), e.module.as_str()))
+            .collect();
+        assert_eq!(named, [("cli-2", "App.Cli"), ("server", "App.Server")]);
     }
 
     #[test]
@@ -325,6 +427,21 @@ mod tests {
                 "schema-version = 2\n[project]\nkind = \"lib\"\n",
                 codes::P006,
                 "2",
+            ),
+            (
+                "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"A\"\nentries = { b = \"B\" }\n",
+                codes::P005,
+                "{ b = \"B\" }",
+            ),
+            (
+                "schema-version = 1\n[project]\nkind = \"app\"\nentries = { Server = \"B\" }\n",
+                codes::P005,
+                "{ Server = \"B\" }",
+            ),
+            (
+                "schema-version = 1\n[project]\nkind = \"app\"\nentries = {}\n",
+                codes::P007,
+                "{}",
             ),
             ("[project]\nkind = \"lib\"\n", codes::P006, ""),
             (

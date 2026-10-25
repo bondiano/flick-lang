@@ -16,8 +16,8 @@ and `--help`; `flick help <command>` prints a command's help and
 | `init [--template app\|lib]` | the same files in the working directory; every file that exists is reported before anything is written (`FLICK-P019`) |
 | `check [paths] [--watch] [--fix]` | checks; without paths the source and test roots; `--fix` applies the fixes that keep the program's meaning (such as removing a type annotation the value already has, `FLICK-T021`) to those files and reports what is left |
 | `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts] [--emit-dts] [--schema-aot] [--out-dir] [--watch]` | writes ESM, source maps and `.iface` files |
-| `run [--entry M] [--profile] -- args` | builds JavaScript and runs `main` |
-| `dev [--entry M] [--profile] -- args` | rebuilds on changes and replaces the running app |
+| `run [name] [--entry M] [--profile] -- args` | builds JavaScript and runs the `main` of the entry `name` (the only one when left out) |
+| `dev [name] [--entry M] [--profile] -- args` | rebuilds on changes and replaces the running app |
 | `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile]` | runs the tests of the test root |
 | `fmt [paths] [--check] [--stdin --stdin-filepath f]` | formats; without paths the source and test roots |
 | `clean [--cache]` | removes the build artifacts; `--cache` also the build cache |
@@ -80,7 +80,8 @@ changed). `install --locked` without `pnpm-lock.yaml`, or with one out of
 date, is `FLICK-P017` with exit code 2.
 
 `pack` builds the project's modules in the release profile into a staging
-package without a runner, checks that every module has its `.iface` (and
+package, with the runner of each entry of an app, which the staged
+`package.json` names in `bin` (see [project.md](../project/#entry-points)), checks that every module has its `.iface` (and
 `.d.ts` with `emit-dts`), that interfaces in the package agree on each
 other's fingerprints and that the paths `exports` names exist
 (`FLICK-P020`), and writes the tarball with `pnpm pack`. The staged

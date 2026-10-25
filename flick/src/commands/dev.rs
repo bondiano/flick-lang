@@ -55,7 +55,7 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
         let now = stamp(&paths);
         if now != seen {
             seen = now;
-            if let Ok(generation) = build_generation(&project, options, global) {
+            if let Ok((generation, name)) = build_generation(&project, options, global) {
                 if let Some(old) = live.take() {
                     report::log(global, "dev: stopping the running version");
                     let code = old.stop(SIGTERM as usize);
@@ -74,7 +74,7 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
                     }
                 }
                 report::log(global, "dev: starting the new version");
-                live = launch(&generation, &options.args, global).map(|running| Live {
+                live = launch(&generation, &name, &options.args, global).map(|running| Live {
                     generation,
                     running,
                 });
