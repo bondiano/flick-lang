@@ -22,7 +22,7 @@ pub enum Const {
 }
 
 /// Largest integer below which every integer is an exact binary64.
-const EXACT: f64 = 9_007_199_254_740_992.0;
+pub(crate) const EXACT: f64 = 9_007_199_254_740_992.0;
 
 pub fn eval(node: &Node, src: &str) -> Option<Const> {
     let mut nodes = node.nodes();

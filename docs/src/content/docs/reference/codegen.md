@@ -218,7 +218,7 @@ corpus runs in both profiles against the same expectations.
 
 | Pass | What it does |
 | - | - |
-| constant folding | literal expressions with JS semantics bit for bit (`60 * 60 * 24` → `86400`); a branch of a constant condition; a result JS might compute differently (`2 ** 0.5`) or would throw (`1n / 0n`) stays a computation |
+| constant folding | literal expressions with JS semantics bit for bit (`60 * 60 * 24` → `86400`); `show` of a literal `Bool`, `String`, `BigInt` or integer `Number` (`"n" ++ show 5` → `"n5"`); a branch of a constant condition; a result JS might compute differently (`2 ** 0.5`) or would throw (`1n / 0n`) stays a computation |
 | inlining | a known full application of a small pure function of the module, or of a private one used once; the arguments are bound in order first; beta reduction of `(fun x -> …) a` |
 | propagation | a local bound to a literal or a name is replaced by it; a pure value that cannot throw moves to its one use when that use surely runs |
 | scalar replacement | a local record whose every use reads a field, or a local tuple only destructured, becomes one local per part: no object |

@@ -7,6 +7,7 @@ use crate::consteval::{self, Const};
 use crate::ir::{BinOp, Expr, ExprKind, Lit};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
+use crate::types::Dict;
 
 /// Folds `e` itself, its operands already folded; whether it changed.
 pub fn fold(e: &mut Expr) -> bool {
@@ -15,6 +16,15 @@ pub fn fold(e: &mut Expr) -> bool {
             .zip(constant(l).zip(constant(r)))
             .and_then(|(op, (l, r))| consteval::binary(op, l, r)),
         ExprKind::Not(inner) => constant(inner).and_then(|c| consteval::prefix(K::NotKw, c)),
+        ExprKind::App { func, arg, .. } => match &func.kind {
+            ExprKind::Method {
+                dict: Dict::Instance { module, name, args },
+                name: method,
+            } if module == "Instances" && args.is_empty() && method == "show" => {
+                constant(arg).and_then(|c| show(name, c)).map(Const::String)
+            }
+            _ => None,
+        },
         ExprKind::If(c, t, f) => match constant(c) {
             Some(Const::Bool(true)) => {
                 *e = (**t).clone();
@@ -35,6 +45,45 @@ pub fn fold(e: &mut Expr) -> bool {
         }
         None => false,
     }
+}
+
+/// `show` of a built-in instance as the runtime `show` spells it.
+fn show(instance: &str, c: Const) -> Option<String> {
+    Some(match (instance, c) {
+        // shortcut: integers only; Rust and JS spell other numbers differently (`1e21`)
+        ("Show Number", Const::Number(x)) if x.fract() == 0.0 && x.abs() < consteval::EXACT => {
+            if x == 0.0 && x.is_sign_negative() {
+                "-0".to_owned()
+            } else {
+                format!("{x}")
+            }
+        }
+        ("Show BigInt", Const::BigInt(x)) => format!("{x}n"),
+        ("Show Bool", Const::Bool(b)) => b.to_string(),
+        ("Show String", Const::String(s)) => json_string(&s),
+        _ => return None,
+    })
+}
+
+/// `JSON.stringify` of a string.
+fn json_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\u{8}' => out.push_str("\\b"),
+            '\u{c}' => out.push_str("\\f"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c < ' ' => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
 }
 
 fn token(op: BinOp) -> Option<K> {
