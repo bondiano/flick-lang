@@ -15,9 +15,9 @@ use crate::codegen::{self, Labels, Options, sourcemap};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface;
 use crate::iface::{Interface, Namespace};
-use crate::project::{Compilation, Compiled, normalize};
+use crate::project::{Compilation, Compiled, MainKind, main_kind, normalize};
 use crate::resolve::{self, Module};
-use crate::source::{FileId, SourceMap};
+use crate::source::{FileId, SourceMap, Span};
 use crate::{ir, opt, syntax, types};
 
 /// Directory of the built-in modules inside the output.
@@ -161,11 +161,25 @@ pub fn emit(
     }
     builtins(&ctx, imports, &mut out);
     if let Some(entry) = settings.entry {
-        out.push(runner(
-            runner_path(settings.typescript),
-            &path(entry),
-            settings.extras.schema_aot,
-        ));
+        let module = modules.iter().find(|m| m.name == entry);
+        let main = module.and_then(|m| m.interface.find(Namespace::Value, "main"));
+        // a project checked its entry already; a file built alone is checked here
+        match main.and_then(|e| Some(main_kind(e.scheme.as_ref()?))) {
+            Some(Err(message)) => {
+                let diagnostic = Diagnostic::new(codes::P026, Severity::Error, message);
+                let at = module.zip(main.and_then(|e| e.at));
+                diagnostics.push(match at {
+                    Some((m, [start, end])) => diagnostic.with_span(Span::new(m.file, start, end)),
+                    None => diagnostic,
+                });
+            }
+            kind => out.push(runner(
+                runner_path(settings.typescript),
+                &path(entry),
+                kind.and_then(Result::ok).unwrap_or(MainKind::Effect),
+                settings.extras.schema_aot,
+            )),
+        }
     }
     (out, diagnostics)
 }
@@ -351,18 +365,25 @@ fn compiled_module(
     output.imports
 }
 
-/// The runner of an app: starts `main` of the entry module at `entry`. With
-/// `schema_aot` it collects the codecs the modules make while loading and
-/// installs their compiled decoders, which `flick build` writes next to it.
-fn runner(file: &str, entry: &str, schema_aot: bool) -> Artifact {
+/// The runner of an app: starts `main` of the entry module at `entry`, a
+/// pure one by a plain call. With `schema_aot` it collects the codecs the
+/// modules make while loading and installs their compiled decoders, which
+/// `flick build` writes next to it.
+fn runner(file: &str, entry: &str, kind: MainKind, schema_aot: bool) -> Artifact {
+    let (run, start) = match kind {
+        MainKind::Pure => (None, "main(undefined);"),
+        MainKind::Effect => (Some("runMain"), "await runMain(main);"),
+    };
     let contents = if schema_aot {
+        let names = run.map_or(String::new(), |r| format!("{r}, "));
         format!(
-            "import {{ runMain, enableSchemaAot, installSchemaAot }} from \"@flick-lang/runtime\";\n\nenableSchemaAot();\nconst {{ main }} = await import(\"./{entry}\");\ninstallSchemaAot(await import(\"./{SCHEMA_AOT}\"));\nawait runMain(main);\n"
+            "import {{ {names}enableSchemaAot, installSchemaAot }} from \"@flick-lang/runtime\";\n\nenableSchemaAot();\nconst {{ main }} = await import(\"./{entry}\");\ninstallSchemaAot(await import(\"./{SCHEMA_AOT}\"));\n{start}\n"
         )
     } else {
-        format!(
-            "import {{ runMain }} from \"@flick-lang/runtime\";\nimport {{ main }} from \"./{entry}\";\n\nawait runMain(main);\n"
-        )
+        let runtime = run.map_or(String::new(), |r| {
+            format!("import {{ {r} }} from \"@flick-lang/runtime\";\n")
+        });
+        format!("{runtime}import {{ main }} from \"./{entry}\";\n\n{start}\n")
     };
     Artifact {
         path: file.to_owned(),

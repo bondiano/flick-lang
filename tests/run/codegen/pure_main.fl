@@ -1,0 +1,9 @@
+// A pure `main` is called by its runner with no effect runtime.
+module Main exposing (main)
+
+// console.log is not pure; this binding only shows the call happened
+say : String -> Unit
+foreign pure say from global "console.log"
+
+main : Unit -> Unit
+let main () = say "pure main ran"

@@ -177,3 +177,34 @@ fn normalize_is_lexical() {
     assert_eq!(normalize(Path::new("/a/./b/../c")), Path::new("/a/c"));
     assert_eq!(normalize(Path::new("../x")), Path::new("../x"));
 }
+
+#[test]
+fn entry_main_is_pure_or_an_effect_a_runner_can_start() {
+    const APP: &str = "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n";
+    let check = |main: &str| {
+        let source = format!(
+            "module App.Main exposing (main)\n\ntype error Boom = Boom\n\nservice Greeter =\n  greet : String ->{{}} String\n\n{main}"
+        );
+        let host = memory(&[("flick.toml", APP), ("src/App/Main.fl", &source)]);
+        run(&host, &["src/App/Main.fl"])
+    };
+    let unit = |row: &str| format!("main : Unit {row} Unit\nlet main () = ()\n");
+    assert_eq!(check(&unit("->")), Vec::<String>::new());
+    assert_eq!(check(&unit("->{; AppError}")), Vec::<String>::new());
+    assert_eq!(check(&unit("->{}")), Vec::<String>::new());
+    let wrong = [
+        (
+            "main : Number -> Unit\nlet main _ = ()\n",
+            "has type `Number -> Unit`",
+        ),
+        (&unit("->{Greeter;}"), "needs `{Greeter}`"),
+        (&unit("->{; Boom}"), "can fail with `{Boom}`"),
+    ];
+    for (main, message) in wrong {
+        let diagnostics = check(main);
+        assert!(
+            matches!(&diagnostics[..], [d] if d.starts_with("FLICK-P026 src/App/Main.fl `main`") && d.contains(message)),
+            "{main}: {diagnostics:?}"
+        );
+    }
+}

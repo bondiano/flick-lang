@@ -11,6 +11,7 @@ mod entry;
 mod ide;
 mod unknown;
 
+pub use entry::{MainKind, main_kind};
 pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze};
 
 use super::packages::Packages;
