@@ -123,7 +123,8 @@ them.
 
 `effect/devtools` is unstable, and so is `DevTools`: `DevTools.layer url`
 sends a program's spans over a WebSocket to the Effect DevTools listening
-at `url`.
+at `url`, and `DevTools.layer_with { url; headers }` sends headers with the
+handshake, on Node.
 
 ## Bindings
 

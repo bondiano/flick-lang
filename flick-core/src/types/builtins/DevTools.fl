@@ -9,3 +9,13 @@ module DevTools exposing (..)
 layer : String -> Layer none none none
 foreign pure layer from "@flick-lang/runtime/effect/devtools/DevTools" "devToolsLayer"
   reviewed "effect@4.0.5 sha256:8efdbda563d781dc"
+
+/// Where the DevTools listen, and the headers of the WebSocket's handshake:
+/// a token a proxy in front of them checks, say.
+type alias Options = { url : String; headers : List (String, String) }
+
+/// `layer` with handshake headers, which only Node's WebSocket sends.
+/// Node only.
+layer_with : Options -> Layer none none none
+foreign pure layer_with from "@flick-lang/runtime/effect/devtools/DevToolsNode" "devToolsLayerWith"
+  reviewed "effect@4.0.5 sha256:4d3f3adcabe3da54"

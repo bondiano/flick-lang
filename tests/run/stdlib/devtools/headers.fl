@@ -1,0 +1,38 @@
+// `DevTools.layer_with` sends its headers with the WebSocket's handshake.
+module App.Main exposing (main)
+
+start : Unit ->{} Number
+foreign async start from "./handshake.mjs" "start"
+  arity 0
+
+token : Unit ->{} String
+foreign async token from "./handshake.mjs" "token"
+  arity 0
+
+stop : Unit ->{} Unit
+foreign async stop from "./handshake.mjs" "stop"
+  arity 0
+
+options : Tracer.SpanOptions
+let options =
+  {
+    attributes = [];
+    links = [];
+    parent = None;
+    root = false;
+    kind_ = Tracer.internal;
+    sampled = None;
+    level = None;
+    captureStackTrace = false;
+    disablePropagation = false;
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let port = start ()
+  let devtools = { url = "ws://127.0.0.1:" ++ show port; headers = [("x-token", "secret")] }
+  provide (DevTools.layer_with devtools) {
+    Tracer.with_span "checkout" options (task { () })
+    Platform.stdout_line ("token: " ++ token ())
+  }
+  stop ()

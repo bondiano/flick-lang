@@ -127,7 +127,9 @@ fetch-клиентом. `Otlp.settings url service` и `layer_with`, `traces_wit
 маршрут `Http.Router`, который их отдаёт.
 
 `effect/devtools` нестабилен, как и `DevTools`: `DevTools.layer url` отправляет
-span'ы программы по WebSocket в Effect DevTools, которые слушают `url`.
+span'ы программы по WebSocket в Effect DevTools, которые слушают `url`, а
+`DevTools.layer_with { url; headers }` добавляет заголовки к рукопожатию
+(в Node).
 
 ## Привязки
 
