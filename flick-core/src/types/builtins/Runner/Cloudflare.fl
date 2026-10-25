@@ -1,0 +1,15 @@
+/// The runner of a Cloudflare Worker: `[project] runner = "Runner.Cloudflare"`.
+/// The runner of the entry exports `{ fetch }`, which answers each request
+/// with `main` run under its own root owner; a failure is a 500 response,
+/// reported on the console.
+module Runner.Cloudflare exposing (Main, run)
+
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+/// What `main` of an entry is: the response to a request.
+type alias Main = ServerRequest ->{; AppError} ServerResponse
+
+/// The Worker's handler of `main`.
+run : Main -> Unknown
+foreign pure run from "@flick-lang/runtime/runner/cloudflare" "run"

@@ -265,6 +265,11 @@ fn a_runner_gives_the_type_of_main() {
             "FLICK-P026 src/App/Main.fl `main`: entry `main` is not a `Runner.Node.Main`",
         ),
         (
+            "Runner.Cloudflare",
+            effect,
+            "FLICK-P026 src/App/Main.fl `main`: entry `main` is not a `Runner.Cloudflare.Main`",
+        ),
+        (
             "Runner.Nope",
             effect,
             "FLICK-P026 flick.toml `\"Runner.Nope\"`: runner `Runner.Nope` not found",

@@ -312,6 +312,10 @@ const SOURCES: &[(&str, &str)] = &[
         "Http.TraceContext",
         include_str!("builtins/Http/TraceContext.fl"),
     ),
+    (
+        "Runner.Cloudflare",
+        include_str!("builtins/Runner/Cloudflare.fl"),
+    ),
     // end of Effect: HTTP
     // Effect: HttpApi
     ("HttpApi", include_str!("builtins/HttpApi.fl")),

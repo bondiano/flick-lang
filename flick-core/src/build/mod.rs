@@ -227,8 +227,12 @@ fn entry_runners(
         let main = module.and_then(|m| m.interface.find(Namespace::Value, "main"));
         // a re-exported `main` is imported from the module that defines it, whose output has it
         let defining = main.map_or(entry.as_str(), |e| e.entity.module.as_str());
-        // a project checked its entry already; a file built alone is checked here
-        match main.and_then(|e| Some(main_kind(e.scheme.as_ref()?))) {
+        // a project checked its entry already, against its runner if it has one;
+        // a file built alone is checked here
+        let kind = main
+            .filter(|_| settings.runner.is_none())
+            .and_then(|e| Some(main_kind(e.scheme.as_ref()?)));
+        match kind {
             Some(Err(message)) => {
                 let diagnostic = Diagnostic::new(codes::P026, Severity::Error, message);
                 let file = modules.iter().find(|m| m.name == defining).map(|m| m.file);

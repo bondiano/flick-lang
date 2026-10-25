@@ -40,7 +40,7 @@ allow = ["FLICK-T021"]
 | `project.test-dir` | directory of test modules | `"test"` |
 | `project.entry` | module that exports `main`, its own or re-exported: the entry `main`, whose runner is `flick-main.js` | — |
 | `project.entries` | several entries, `{ server = "App.Server", cli = "App.Cli" }`: a runner `flick-<name>.js` each; names are lower-case letters, digits and `-`; instead of `entry` | — |
-| `project.runner` | the module that starts each entry: it exports `type alias Main`, the type `main` must have (`FLICK-P026` otherwise), and `run`, which takes `main` and whose result the runner exports as `default`; `"Runner.Node"` and `"Runner.Browser"` are built in, a package may provide another; without one, a pure `main` is called and an effect runs as on Node | — |
+| `project.runner` | the module that starts each entry: it exports `type alias Main`, the type `main` must have (`FLICK-P026` otherwise), and `run`, which takes `main` and whose result the runner exports as `default`; `"Runner.Node"`, `"Runner.Browser"` and `"Runner.Cloudflare"` (a Worker whose `fetch` answers with `main : Http.ServerRequest.ServerRequest ->{; AppError} Http.ServerResponse.ServerResponse`) are built in, a package may provide another; without one, a pure `main` is called and an effect runs as on Node | — |
 | `build.out-dir` | base directory of artifacts | `"dist"` |
 | `build.profile` | `"debug"` or `"release"` (see [codegen.md](../codegen/)); `--profile` of `build` and `test` overrides it | `"debug"` |
 | `build.emit` | `"js"` or `"ts"` | `"js"` |
