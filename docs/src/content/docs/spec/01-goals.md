@@ -23,6 +23,6 @@ title: "1. Goal and confirmed requirements"
 | Schema integrations | Extensible compilers/exporters; an unsupported wire contract produces an explicit diagnostic |
 | Checking type-level expressiveness | SQL and a typed UI eDSL as real tasks for rows, classes, callbacks and lifetime |
 
-Generic do, let\* and a single effect-polymorphic map are not part of the first version. Function blocks are indentation-based, while the special task/scope/sql/ui/cli blocks use curly braces; the last expression returns the result. The names task and await and an explicit entry point are fixed.
+A generic `do` over `Monad`, `for … yield` generators and `[for … yield]` comprehensions are sugar over ordinary calls; `let*` and a single effect-polymorphic map are not part of the language. Function blocks are indentation-based, while the special task/scope/sql/ui/cli blocks use curly braces; the last expression returns the result. The names task and await and an explicit entry point are fixed.
 
 The Flick frontend checks the program, the single Effect backend generates executable JS/TS, and the Content Mapper serves the TS projection and tool integration. Pure calls and Effect calls go through one typed IR. The source type system evolves independently of the expressiveness of TypeScript.

@@ -468,6 +468,6 @@ Capture rows give upper bounds; the result keeps the captures of the original de
 
 The ordinary `Monad (Eff r e)` fixes `r` and `e`; their explicit or inferred widening to a common row is allowed. Direct runtime calls use a separate built-in sequencing with joining of rows, without going through the `Monad` instance.
 
-The frontend computes the unions of requirements/errors for direct calls and preserves the captures of descriptions and callbacks. Indexed/graded abstractions and generic `do` are not part of the first version; HKT, `bind` and ordinary combinators are available.
+The frontend computes the unions of requirements/errors for direct calls and preserves the captures of descriptions and callbacks. Indexed/graded abstractions are not part of the first version. A generic `do` elaborates to the `Monad` and `Alternative` methods of the Prelude directly, whatever names are in scope; with `Monad (Eff r e)` it keeps the fixed rows, which is why direct calls stay the main style for Eff.
 
 **Decision for the type core:** MPTC/superclasses/FD with strict coverage and structural termination; package ownership by the class or the first nominal parameter; no overlap/orphans/local implicits; fixed row primitives; generalization of only provably pure constructions. Higher-rank callbacks are checked against explicit nested `forall`; this feature weakens neither coherence nor the state restrictions.

@@ -41,21 +41,20 @@ Partial application retains the callback and its `c`. After an eager traversal, 
 
 The alternative is an effect-polymorphic `map` whose effect depends on the callback. Then a calling convention has to be chosen for the cases where the callback returns an ordinary JS value or an Effect: specialization, a uniform representation or an additional abstraction. An example of such typing is in [Koka](https://koka-lang.github.io/koka/doc/book.html).
 
-## Working with Monad without a special do
+## `do`, `for` and comprehensions
 
 ```flick
 pair_optional : Option a -> Option b -> Option (a, b)
 let pair_optional left right =
-  match left with
-  | None -> None
-  | Some x ->
-    match right with
-    | None -> None
-    | Some y -> Some (x, y)
+  do {
+    x <- left
+    y <- right
+    pure (x, y)
+  }
 ```
 
-The same is expressed with ordinary `Option.bind` and `Option.map`. This is pure work with data; it does not need the Effect runtime. HKT and type classes are available without a generic `do`.
+`do` is sugar over the `Monad` of the Prelude: `p <- e` binds through `flat_map`, a bare expression is sequenced and discarded, `if c` is a guard through `Alternative`, and the last expression is the result. Continuations are pure functions, as `flat_map` requires: a runtime call inside a `do` over `Option` is an error that suggests binding it before the block. A refutable pattern after `<-` is an error; use `match`. `do` over `Eff` is allowed and gets a lint with a fix to direct calls, which join rows that `Monad (Eff r e)` keeps fixed.
 
-Generic `do` and `let*` are not part of the first version. Direct runtime calls use an ordinary `let`, cold descriptions use `task`, and running a stored description in the current fiber uses `await`. For user-defined monads, ordinary combinators remain.
+`for { x <- xs; if p x; y <- ys x } yield e` is a lazy `Seq` compiled to one native generator; `[for … yield e]` is the strict `List`, compiled to a loop. Inside `for`, a refutable pattern after `<-` skips the elements that do not match. The body of a generator is pure; a `Seq` keeps the captures of what it uses, since it runs later.
 
-The cost of the decision is more explicit code for parsers and user-defined monads. The gain is one main style of effectful code and no second set of elaboration rules in the first implementation.
+The cost is a second style next to direct calls; lints keep effectful code on direct calls. The gain is short code for `Option`, `Result`, lists, parsers and user-defined monads.

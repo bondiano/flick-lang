@@ -4,7 +4,7 @@ title: "2. Decisions of the first version"
 
 | Area | Accepted | Cost of the choice |
 | - | - | - |
-| Sequencing | Direct calls with let; task/await; no generic do | Ordinary combinators for user-defined monads |
+| Sequencing | Direct calls with let; task/await; `do` over `Monad` with pure continuations; `for` generators | Two styles: lints and fixes move `do` over Eff to direct calls |
 | Computation type | Eff r e a, result last | Source order differs from native TS order |
 | Classes | MPTC, superclasses, FD; canonical instances | Strict coverage/termination; some instance chains do not carry over |
 | Coherence | No overlap/orphans/local implicits; package ownership | Alternatives need wrappers or explicit dictionaries |
