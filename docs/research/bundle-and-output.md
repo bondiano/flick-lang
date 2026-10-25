@@ -177,6 +177,24 @@ Lower priority:
 - **R5, Option as `undefined`.** Not recommended: it conflicts with the Effect `Option` TS projection.
 - **R7, cross-module inlining.** Revisit after item 5.
 
+## 4a. Constructor tag hashes (B7b, measured 2026-10-25)
+
+Release bundles of `just bundle-size` re-bundled with the same rolldown
+options, gzip with and without the 12-hex hash of every tag literal
+(regex `#[0-9a-f]{12}` before a quote). Built-in tags the runtime computes
+from strings carry no hash literal and are not counted.
+
+| program | tag literals | gzip B | without hash B | saved B |
+|---|---|---|---|---|
+| pure | 3 | 11054 | 11030 | 24 |
+| counter | 0 | 100049 | 100049 | 0 |
+| playground | 17 | 108251 | 108113 | 138 |
+| atoms | 0 | 99844 | 99844 | 0 |
+| email | 1 | 31335 | 31321 | 14 |
+
+Below the 1 KB threshold the roadmap set: tags keep their hash
+(`implementation-decisions.md`, "Generated names").
+
 ## 5. Not verified
 
 - esbuild and webpack behaviour. Only rolldown 1.2.15 was used.
