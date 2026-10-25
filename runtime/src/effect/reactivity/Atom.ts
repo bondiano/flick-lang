@@ -3,7 +3,7 @@
 // alone, so a function or an effect as the value stays a value; the
 // registry is the Flick service `Reactivity.Atom.Registry`, whose operations
 // read and write through Effect's registry.
-import { type Context, type Duration, Effect, Layer } from "effect";
+import { type Context, type Duration, Effect, Layer, type Schema } from "effect";
 import * as Atom from "effect/reactivity/Atom";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 
@@ -29,6 +29,18 @@ export const flickMap = <A, B>(f: (a: A) => B, atom: Atom.Atom<A>): Atom.Atom<B>
 
 /** `Reactivity.Atom.with_label`: names the atom in debugging tools. */
 export const flickWithLabel = <T extends Atom.Atom<unknown>>(name: string, atom: T): T => Atom.withLabel(atom, name);
+
+/** `Reactivity.Atom.serializable`: the state under `key`, coded by a JSON codec for hydration. */
+export const flickSerializable = <A>(key: string, codec: Schema.Codec<A, unknown>, atom: Atom.Writable<A>): Atom.Writable<A> =>
+  Atom.serializable(atom, { key, schema: codec });
+
+/** `Reactivity.Atom.serializable_family`: one serializable state per key, under `prefix/key`. */
+export const flickSerializableFamily = <A>(
+  prefix: string,
+  codec: Schema.Codec<A, unknown>,
+  make: (key: string) => Atom.Writable<A>,
+): ((key: string) => Atom.Writable<A>) =>
+  Atom.family((key: string) => flickSerializable(`${prefix}/${key}`, codec, make(key)));
 
 /** `Reactivity.Atom.idle_ttl`: how long the value stays after nobody reads it. */
 export const flickIdleTtl = <T extends Atom.Atom<unknown>>(ttl: Duration.Duration, atom: T): T =>

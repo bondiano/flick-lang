@@ -1,0 +1,26 @@
+// Serializable atoms take their keys from the bindings that define them:
+// `Module.name`, and `Module.name/key` for each atom of a family.
+module App.Main exposing (main)
+
+dehydrated : Unit ->{Reactivity.Atom.Registry; none} String
+foreign effect dehydrated from "./hydration.mjs" "dehydrated"
+  arity 0
+
+count : Atom.Writable Number
+let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
+
+draft : String -> Atom.Writable String
+let draft = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.make "")
+
+local : Atom.Writable Number
+let local = Atom.make 7
+
+main : Unit ->{; AppError} Unit
+let main () =
+  provide Reactivity.Atom.layer {
+    Atom.set count 3
+    Atom.set (draft "intro") "hello"
+    Atom.set (draft "outro") "bye"
+    Atom.set local 8
+    Platform.stdout_line (dehydrated ())
+  }

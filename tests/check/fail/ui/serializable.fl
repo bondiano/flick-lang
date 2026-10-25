@@ -1,0 +1,32 @@
+module App.Serializable exposing (..)
+
+numbers : PureCodec Json Number
+let numbers = Codec.json Schema.number
+
+count : Atom.Writable Number
+let count = Atom.serializable numbers (Atom.make 0)
+
+piped : Atom.Writable Number
+let piped = Atom.make 0 |> Atom.serializable numbers
+
+drafts : String -> Atom.Writable String
+let drafts = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.make "")
+
+made : Number -> Atom.Writable Number
+let made n = Atom.serializable numbers (Atom.make n)
+//           ^^^^^^^^^^^^^^^^^ FLICK-U003 `Atom.serializable` takes its key from the top-level binding it defines
+
+inside : Atom.Writable Number
+let inside =
+  mk : Number -> Atom.Writable Number
+  let mk n = Atom.serializable numbers (Atom.make n)
+//           ^^^^^^^^^^^^^^^^^ FLICK-U003 `Atom.serializable` inside a function would give its key to every atom
+  mk 1
+
+partial : Atom.Writable Number -> Atom.Writable Number
+let partial = Atom.serializable numbers
+//            ^^^^^^^^^^^^^^^^^ FLICK-U003 `Atom.serializable` is applied to its codec and state where it is defined
+
+pair : (Atom.Writable Number, Atom.Writable Number)
+let pair = (Atom.serializable numbers (Atom.make 1), Atom.serializable numbers (Atom.make 2))
+//                                                   ^^^^^^^^^^^^^^^^^ FLICK-U003 a second serializable atom in `pair` would share its key `App.Serializable.pair`

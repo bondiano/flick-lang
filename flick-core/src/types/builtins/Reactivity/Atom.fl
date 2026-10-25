@@ -65,6 +65,18 @@ label_state : String -> Writable a -> Writable a
 foreign pure label_state from "@flick-lang/runtime/effect/reactivity/Atom" "flickWithLabel"
   reviewed "effect@4.0.5 sha256:dcf199329ec11958"
 
+/// The state under `key`, coded by `codec` for hydration: a registry
+/// keeps one value per key, so two atoms with one key share it. Prefer
+/// `Atom.serializable`, whose key the compiler gives.
+serializable : String -> PureCodec Json a -> Writable a -> Writable a
+foreign pure serializable from "@flick-lang/runtime/effect/reactivity/Atom" "flickSerializable"
+
+/// One serializable state per key, made by `f` the first time, under
+/// `prefix/key`.
+serializable_family : String -> PureCodec Json a -> (String -> Writable a) -> String -> Writable a
+foreign pure serializable_family from "@flick-lang/runtime/effect/reactivity/Atom" "flickSerializableFamily"
+  arity 3
+
 /// The atom with its value kept while the registry lives, read or not.
 keep_alive : Atom a -> Atom a
 foreign pure keep_alive from "@flick-lang/runtime/effect/reactivity/Atom" "keepAlive"

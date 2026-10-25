@@ -29,6 +29,7 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
         text: module.text,
         file: module.file,
         typing,
+        definition: String::new(),
         scope: Vec::new(),
         used: HashMap::new(),
         consumed: HashSet::new(),
@@ -74,6 +75,8 @@ struct Lower<'a> {
     text: &'a str,
     file: FileId,
     typing: &'a Typing,
+    /// The top-level value being lowered, which names its serializable atom.
+    definition: String,
     /// Locals in scope: the source name and its unique name.
     scope: Vec<(String, String)>,
     /// How often each source name was bound in the current definition.
@@ -150,6 +153,7 @@ impl Lower<'_> {
             K::LetDecl => {
                 self.fresh_definition();
                 let parts = let_parts(decl, self.text);
+                self.definition = parts.name.clone().unwrap_or_default();
                 let kind = match (&parts.name, parts.pattern) {
                     (Some(name), _) => ItemKind::Value {
                         name: name.clone(),

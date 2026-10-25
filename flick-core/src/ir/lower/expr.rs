@@ -209,6 +209,25 @@ impl Lower<'_> {
             Ref::Value { module, name } if module == "Record" && name == "label" => {
                 ExprKind::Label(self.typing.labels.get(&key).cloned().unwrap_or_default())
             }
+            Ref::Value { module, name }
+                if module == "Atom"
+                    && matches!(name.as_str(), "serializable" | "serializable_family") =>
+            {
+                // the key is the binding the check let it define
+                let key = format!("{}.{}", self.module, self.definition);
+                ExprKind::App {
+                    func: Box::new(Expr::new(
+                        ExprKind::Global {
+                            module: "Reactivity.Atom".to_owned(),
+                            name: name.clone(),
+                        },
+                        span,
+                    )),
+                    arg: Box::new(Expr::new(ExprKind::Lit(Lit::String(key)), span)),
+                    runtime: false,
+                    arg_first: false,
+                }
+            }
             Ref::Value { module, name } => ExprKind::Global {
                 module: module.clone(),
                 name: name.clone(),

@@ -1,9 +1,9 @@
 //! Checks of the UI library the types alone cannot state.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::typing::Ref;
-use super::{Checker, Range};
+use super::{Checker, Range, let_parts};
 use crate::consteval::{self, Const};
 use crate::diagnostics::codes;
 use crate::source::Span;
@@ -52,6 +52,98 @@ impl Checker<'_> {
                 span,
                 format!("`{what}` of a `fun` makes a handler on every render: declare an `Action` at the top level, or pass data with `Action.with`"),
             );
+        }
+    }
+}
+
+impl Checker<'_> {
+    /// `Atom.serializable` and `Atom.serializable_family` take their key
+    /// from the top-level binding they define, so each is applied there
+    /// once, outside any function: anywhere else one key would name many
+    /// atoms.
+    pub fn atom_keys(&mut self, decls: &[&Node]) {
+        let members = decls.iter().flat_map(|d| match d.kind {
+            K::RecGroup => d
+                .nodes()
+                .filter(|n| n.kind == K::Members)
+                .flat_map(Node::nodes)
+                .collect(),
+            _ => vec![*d],
+        });
+        for decl in members {
+            let mut keyed = Keyed::default();
+            keyed.walk(decl, false, &self.typing.names);
+            if keyed.found.is_empty() {
+                continue;
+            }
+            let binding = (decl.kind == K::LetDecl)
+                .then(|| let_parts(decl, self.text))
+                .filter(|p| !p.is_function())
+                .and_then(|p| p.name);
+            let mut defined = false;
+            for (range, name, in_function) in keyed.found {
+                let message = match &binding {
+                    None => format!(
+                        "`Atom.{name}` takes its key from the top-level binding it defines: define the atom with a top-level `let` without parameters"
+                    ),
+                    Some(_) if in_function => format!(
+                        "`Atom.{name}` inside a function would give its key to every atom the function makes: define the atom with a top-level `let`"
+                    ),
+                    Some(_) if !keyed.applied.contains(&range) => format!(
+                        "`Atom.{name}` is applied to its codec and state where it is defined, since the binding's name is its key"
+                    ),
+                    Some(b) if defined => format!(
+                        "a second serializable atom in `{b}` would share its key `{}.{b}`: define each with its own top-level `let`",
+                        self.env.module
+                    ),
+                    Some(_) => {
+                        defined = true;
+                        continue;
+                    }
+                };
+                self.error(codes::U003, Span::new(self.file, range.0, range.1), message);
+            }
+        }
+    }
+}
+
+/// The serializable atoms under a declaration: where each is named, and
+/// which are applied to their codec and state.
+#[derive(Default)]
+struct Keyed {
+    found: Vec<(Range, String, bool)>,
+    applied: HashSet<Range>,
+}
+
+impl Keyed {
+    fn walk(&mut self, node: &Node, in_function: bool, names: &HashMap<Range, Ref>) {
+        let parts: Vec<&Node> = node.nodes().collect();
+        match node.kind {
+            K::AppExpr if parts.len() == 3 => {
+                self.applied.insert(parts[0].range());
+            }
+            // `state |> Atom.serializable codec`
+            K::BinExpr if node.has_token(K::PipeGt) => {
+                if let Some(app) = parts.get(1).filter(|n| n.kind == K::AppExpr)
+                    && let [head, _] = app.nodes().collect::<Vec<_>>()[..]
+                {
+                    self.applied.insert(head.range());
+                }
+            }
+            _ => {}
+        }
+        if let Some(Ref::Value { module, name }) = names.get(&node.range())
+            && module == "Atom"
+            && matches!(name.as_str(), "serializable" | "serializable_family")
+            && self.found.last().is_none_or(|(r, ..)| *r != node.range())
+        {
+            self.found.push((node.range(), name.clone(), in_function));
+        }
+        let inner = in_function
+            || node.kind == K::FunExpr
+            || (node.kind == K::LetDecl && parts.iter().any(|n| n.kind == K::Params));
+        for child in parts {
+            self.walk(child, inner, names);
         }
     }
 }

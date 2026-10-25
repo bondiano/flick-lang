@@ -287,6 +287,24 @@ let request n =
 Этот путь используют шапка документации и Play/Transpile. Без атрибута
 обычное клиентское монтирование не меняется.
 
+### Сериализуемые атомы
+
+`Atom.serializable wire state` помечает состояние, значение которого сервер
+может передать клиенту, закодировав его JSON-кодеком `wire`. Ключ атома —
+имя определяющего его top-level-биндинга, `Module.name`; его подставляет
+компилятор. У атома из `Atom.serializable_family` ключ `Module.name/key`.
+В любом другом месте, например внутри функции, без применения к состоянию
+или дважды в одном биндинге, один ключ мог бы обозначать много атомов, и
+`FLICK-U003` это запрещает. `PureCodec` кодирует синхронно и без сервисов.
+
+```flick
+count : Atom.Writable Number
+let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
+
+draft : String -> Atom.Writable String
+let draft = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.make "")
+```
+
 ## Другие рендереры React
 
 `@flick-lang/runtime/ui` — адаптер React DOM.

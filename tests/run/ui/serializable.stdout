@@ -1,0 +1,3 @@
+App.Main.count = 3
+App.Main.draft/intro = "hello"
+App.Main.draft/outro = "bye"

@@ -21,6 +21,18 @@ make : a -> Writable a
 foreign pure make from "@flick-lang/runtime" "atomState"
   arity 1
 
+/// The state `atom`, coded by `wire` so a server can hand its value to
+/// the client. Its key is the name of the top-level binding it defines,
+/// `Module.name`, which the compiler gives; anywhere else it is an error.
+serializable : PureCodec Json a -> Writable a -> Writable a
+let serializable wire atom = Reactivity.Atom.serializable "Atom.serializable" wire atom
+
+/// One serializable state per key, made by `f` the first time: the key of
+/// each is `Module.name/key`.
+serializable_family : PureCodec Json a -> (String -> Writable a) -> String -> Writable a
+let serializable_family wire f =
+  Reactivity.Atom.serializable_family "Atom.serializable_family" wire f
+
 /// An atom computed by `compute` from the atoms it reads, again when one
 /// of them changes.
 derived : (Unit ->{Read;} a) -> Atom a
