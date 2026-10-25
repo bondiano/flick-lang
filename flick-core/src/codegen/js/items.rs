@@ -61,8 +61,10 @@ impl Gen<'_> {
                 let target = Target::Global(format!("{}.{name}", self.module));
                 let (stmts, value) = self.block(|g| g.function(dicts, body, Some(target)));
                 let value = self.scoped(&stmts, value);
+                let value = self.labelled(name, value);
                 let id = names::ident(name);
                 let code = self.export(&id, &value);
+                let code = self.named(code, &id, name, item.span);
                 match (self.options.workers)(self.module, name) {
                     Some(n) => format!("{code}\n{}", self.applying_worker(&id, n)),
                     None => code,

@@ -44,6 +44,7 @@ dialect = "postgresql"
 | `build.schema-aot` | логическое значение | `false` |
 | `build.solver-steps` | число шагов разрешения экземпляров классов на определение | `100000` |
 | `build.solver-depth` | глубина вложенных ограничений классов | `256` |
+| `build.labels` | что release-сборка помечает `Module.name` для инструментов отладки: `"all"` (атомы, представления, actions), `"components"` (представления и actions) или `"none"`; debug помечает всё | `"components"` |
 | `sql.dialect` | диалект SQL для `sql table` и `sql { … }` (см. [запросы SQL](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` и `"oracle"` распознаются, но пока не поддерживаются | `"postgresql"` |
 
 Ошибки конфигурации приводят к завершению с кодом `2`:

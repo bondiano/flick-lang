@@ -14,6 +14,8 @@ mod print;
 pub use lower::lower;
 pub use print::print;
 
+use std::collections::HashMap;
+
 use crate::source::Span;
 use crate::types::{Constructor, Dict, ForeignInfo, InstanceInfo, Lift, SchemaItem};
 
@@ -23,6 +25,16 @@ pub struct Module {
     /// Top-level definitions in source order; code generation orders them
     /// by what each one uses.
     pub items: Vec<Item>,
+    /// The top-level values debugging tools know by `Module.name`.
+    pub labels: HashMap<String, Label>,
+}
+
+/// What a labelled top-level value is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Label {
+    Atom,
+    /// A view or an action, labelled in release too by default.
+    Component,
 }
 
 #[derive(Debug, Clone)]

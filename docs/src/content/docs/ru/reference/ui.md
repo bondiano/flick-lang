@@ -105,7 +105,7 @@ let count = Atom.make 0
 
 counter_view : Ui.View Unit {Reactivity.Atom.Registry} none
 let counter_view =
-  Ui.named "App.Counter.counter_view" (Ui.view (fun () ->
+  Ui.view (fun () ->
     ui {
       button
         {
@@ -113,11 +113,15 @@ let counter_view =
           on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
         }
         [text (Atom.value count |> show)]
-    }))
+    })
 ```
 
-`Ui.render view props` вставляет представление в `Ui`; `Ui.named` — имя,
-которое показывают инструменты разработчика React. Представление
+`Ui.render view props` вставляет представление в `Ui`. Компилятор называет
+каждое top-level представление, action и атом `Module.name` — так их
+показывают инструменты разработчика React и Effect
+(`App.Counter.counter_view`); release-сборка сохраняет имена представлений
+и action, а атомов — при `[build] labels = "all"`. `Ui.named` даёт
+представлению другое имя. Представление
 подписывается на прочитанное после коммита React, а запись между его
 рендером и подпиской перерисовывает его снова. Представление вне
 `Ui.Dom.mount` падает с подсказкой, что делать. Render читает синхронно:

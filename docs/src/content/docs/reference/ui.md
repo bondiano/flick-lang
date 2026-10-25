@@ -104,7 +104,7 @@ let count = Atom.make 0
 
 counter_view : Ui.View Unit {Reactivity.Atom.Registry} none
 let counter_view =
-  Ui.named "App.Counter.counter_view" (Ui.view (fun () ->
+  Ui.view (fun () ->
     ui {
       button
         {
@@ -112,11 +112,14 @@ let counter_view =
           on_click = Ui.Event.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) });
         }
         [text (Atom.value count |> show)]
-    }))
+    })
 ```
 
-`Ui.render view props` places a view in a `Ui`; `Ui.named` is the name
-React's developer tools show. A view subscribes to what it read after React
+`Ui.render view props` places a view in a `Ui`. The compiler names each
+top-level view, action and atom `Module.name`, as React's developer tools
+and Effect's show it (`App.Counter.counter_view`); a release build keeps
+the names of views and actions, and of atoms with `[build] labels = "all"`.
+`Ui.named` gives a view another name. A view subscribes to what it read after React
 commits, and a write between its render and its subscription renders it
 again. Rendering a view outside `Ui.Dom.mount` fails with what to do. The
 render reads synchronously: like a derived atom's computation, its only

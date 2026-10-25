@@ -62,6 +62,16 @@ export const atomDerived = <A>(compute: (unit: undefined) => Effect.Effect<A, un
   Atom.readable((ctx) => runReading(compute(undefined), (atom) => ctx(atom)));
 
 /**
+ * The label the compiler gives a top-level atom, view or action,
+ * `Module.name`, which debugging tools show; one it has already stays.
+ */
+export const label = <A extends object>(name: string, value: A): A => {
+  if (Reflect.get(value, "label") !== undefined) return value;
+  if (Atom.isAtom(value)) return Atom.withLabel(value, name);
+  return Object.freeze({ ...value, label: name });
+};
+
+/**
  * `Atom.family`: one atom per key, made by `f` the first time and the same
  * for every key equal by `Eq` after.
  */

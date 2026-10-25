@@ -22,6 +22,8 @@ export interface Handler {
   readonly shared?: boolean;
   /** `Action.with base arg`: the action whose policy state it shares. */
   readonly base?: Handler;
+  /** The action's name, `Module.name`, which the compiler gives a top-level one. */
+  readonly label?: string;
 }
 
 const makeHandler = (policy: Policy, run: Handler["run"]): Handler => Object.freeze({ policy, run });

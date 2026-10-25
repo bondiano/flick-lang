@@ -39,6 +39,22 @@ pub struct Options<'a> {
     /// In release, whether a module exports the method of its instance as
     /// a constant (see [`direct_methods`]): by module, instance and method.
     pub direct: &'a dyn Fn(&str, &str, &str) -> bool,
+    /// In release, which top-level values keep their label; debug labels
+    /// every atom, view and action.
+    pub labels: Labels,
+}
+
+/// `[build] labels`: the top-level values a release build labels
+/// `Module.name` for debugging tools.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Labels {
+    /// Atoms, views and actions.
+    All,
+    /// Views and actions; an atom's label costs a stack trace when it is made.
+    #[default]
+    Components,
+    None,
 }
 
 /// A compiled module.
@@ -46,8 +62,9 @@ pub struct Options<'a> {
 pub struct Output {
     pub code: String,
     /// Each generated position, 0-based line and UTF-16 column, with the
-    /// source node it comes from.
-    pub mappings: Vec<(u32, u32, Span)>,
+    /// source node it comes from and, at the name of a top-level value, its
+    /// Flick name.
+    pub mappings: Vec<(u32, u32, Span, Option<String>)>,
     /// The Flick modules the code imports, types included.
     pub imports: Vec<String>,
 }

@@ -15,18 +15,25 @@ pub fn source_map(
     source_path: &dyn Fn(FileId) -> String,
 ) -> String {
     let mut files: BTreeMap<FileId, usize> = BTreeMap::new();
-    let mut names: Vec<String> = Vec::new();
-    for (_, _, span) in &output.mappings {
+    let mut paths: Vec<String> = Vec::new();
+    let mut names: Vec<&str> = Vec::new();
+    for (_, _, span, name) in &output.mappings {
         files.entry(span.file).or_insert_with(|| {
-            names.push(source_path(span.file));
-            names.len() - 1
+            paths.push(source_path(span.file));
+            paths.len() - 1
         });
+        if let Some(name) = name
+            && !names.contains(&name.as_str())
+        {
+            names.push(name);
+        }
     }
     let mut mappings = String::new();
     let mut line = 0;
     let (mut prev_col, mut prev_src, mut prev_line, mut prev_src_col) = (0i64, 0i64, 0i64, 0i64);
+    let mut prev_name = 0i64;
     let mut first = true;
-    for (gen_line, gen_col, span) in &output.mappings {
+    for (gen_line, gen_col, span, name) in &output.mappings {
         while line < *gen_line {
             mappings.push(';');
             line += 1;
@@ -58,12 +65,18 @@ pub fn source_map(
             vlq(delta, &mut mappings);
         }
         (prev_col, prev_src, prev_line, prev_src_col) = (gen_col, src, src_line, src_col);
+        if let Some(name) = name {
+            let index = names.iter().position(|n| n == name).unwrap_or(0);
+            let index = i64::try_from(index).unwrap_or(i64::MAX);
+            vlq(index - prev_name, &mut mappings);
+            prev_name = index;
+        }
     }
     let map = serde_json::json!({
         "version": 3,
         "file": file,
-        "sources": names,
-        "names": [],
+        "sources": paths,
+        "names": names,
         "mappings": mappings,
     });
     map.to_string() + "\n"

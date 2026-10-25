@@ -93,6 +93,7 @@ impl<'a> Checker<'a> {
         self.check_instances(&declared);
         self.solve_rows();
         self.made_in_render(&decls);
+        self.labelled(&decls);
         self.recursion();
         self.unknown_types();
     }

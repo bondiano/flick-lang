@@ -11,7 +11,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 
 use crate::codegen::ts::{Facade, Projection, declaration_file, facade_files};
-use crate::codegen::{self, Options, sourcemap};
+use crate::codegen::{self, Labels, Options, sourcemap};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface;
 use crate::iface::{Interface, Namespace};
@@ -70,6 +70,8 @@ pub struct Extras {
     pub promise_facade: bool,
     /// The runner of an app compiles pure codecs ahead of use.
     pub schema_aot: bool,
+    /// What a release build labels for debugging tools.
+    pub labels: Labels,
 }
 
 /// The output of a compilation, and what it could not write: exports
@@ -141,6 +143,7 @@ pub fn emit(
         release: settings.release,
         workers: &workers,
         direct: &direct,
+        labels: settings.extras.labels,
     };
     let mut out = vec![package_json(settings)];
     let ctx = Context {

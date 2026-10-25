@@ -1,8 +1,12 @@
-use super::{Options, js};
+use super::{Labels, Options, js};
 use crate::ir::tests::lower_text;
 use crate::types::{Constructor, Rep};
 
 fn compile(text: &str) -> String {
+    compile_with(text, false, Labels::default()).code
+}
+
+fn compile_with(text: &str, release: bool, labels: Labels) -> super::Output {
     let ir = lower_text("App", text).expect("lowers");
     let path = |m: &str| format!("{}.js", m.replace('.', "/"));
     let package = |m: &str| (m == "App.Users").then(|| "@acme/users".to_owned());
@@ -13,11 +17,46 @@ fn compile(text: &str) -> String {
         foreign: &foreign,
         typescript: false,
         interface: &|_| None,
-        release: false,
+        release,
         workers: &|_, _| None,
         direct: &|_, _, _| false,
+        labels,
     };
-    js(&ir, &options).code
+    js(&ir, &options)
+}
+
+#[test]
+fn top_level_atoms_views_and_actions_are_labelled_by_their_names() {
+    let text = "module App.Counter exposing (..)\n\
+         count : Atom.Writable Number\nlet count = Atom.make 0\n\
+         reset : Action.Action Ui.ClickSnapshot {Reactivity.Atom.Registry} none\n\
+         let reset = Action.exhaust (fun _ -> task { Atom.set count 0 })\n\
+         counter : Ui.View Unit {Reactivity.Atom.Registry} none\n\
+         let counter = Ui.view (fun () -> ui { button { disabled = false; on_click = reset } [text (show (Atom.value count))] })\n\
+         start : Number\nlet start = 0\n";
+    let labels = |release, labels| {
+        let code = compile_with(text, release, labels).code;
+        assert_eq!(
+            code.contains("$rt.label("),
+            labels != Labels::None || !release,
+            "{code}"
+        );
+        ["count", "reset", "counter", "start"]
+            .into_iter()
+            // a long call breaks after `$rt.label(`
+            .filter(|name| code.contains(&format!("\"App.Counter.{name}\"")))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(labels(false, Labels::None), ["count", "reset", "counter"]);
+    assert_eq!(labels(true, Labels::All), ["count", "reset", "counter"]);
+    assert_eq!(labels(true, Labels::Components), ["reset", "counter"]);
+    assert!(labels(true, Labels::None).is_empty());
+    let named: Vec<_> = compile_with(text, false, Labels::default())
+        .mappings
+        .into_iter()
+        .filter_map(|(.., name)| name)
+        .collect();
+    assert_eq!(named, ["count", "reset", "counter", "start"]);
 }
 
 #[test]

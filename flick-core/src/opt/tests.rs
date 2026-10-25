@@ -1,4 +1,4 @@
-use crate::codegen::{Options, js};
+use crate::codegen::{Labels, Options, js};
 use crate::ir::tests::check_text;
 
 /// The JS of a self-contained module in the release profile.
@@ -20,6 +20,7 @@ fn release_with(text: &str, workers: &dyn Fn(&str, &str) -> Option<usize>) -> St
         release: true,
         workers,
         direct: &|_, _, _| false,
+        labels: Labels::default(),
     };
     js(&ir, &options).code
 }
@@ -229,6 +230,7 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
         release: true,
         workers: &workers,
         direct: &direct,
+        labels: Labels::default(),
     };
     let js = js(&ir, &options).code;
     assert!(js.contains("$m_Instances.$i_Show_Number$show(n)"), "{js}");

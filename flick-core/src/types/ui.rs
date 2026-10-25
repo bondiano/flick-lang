@@ -8,6 +8,7 @@ use super::{Checker, Range, let_parts};
 use crate::consteval::{self, Const};
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
+use crate::ir::Label;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -102,6 +103,39 @@ impl Checker<'_> {
 }
 
 impl Checker<'_> {
+    /// The top-level atoms, views and actions, which the generated code
+    /// labels `Module.name` for debugging tools.
+    pub fn labelled(&mut self, decls: &[&Node]) {
+        for decl in members(decls) {
+            if decl.kind != K::LetDecl {
+                continue;
+            }
+            let parts = let_parts(decl, self.text);
+            let Some(name) = parts.name.clone().filter(|_| !parts.is_function()) else {
+                continue;
+            };
+            let entity = self.env.entity(Namespace::Value, &name);
+            let Some(ty) = self.env.value(&entity).cloned() else {
+                continue;
+            };
+            let label = match self.bare(&ty).spine().0 {
+                Type::Con { module, name } if ATOMS.contains(&(module.as_str(), name.as_str())) => {
+                    Label::Atom
+                }
+                Type::Con { module, name }
+                    if matches!(
+                        (module.as_str(), name.as_str()),
+                        ("Ui", "View" | "Handler") | ("Action", "Action")
+                    ) =>
+                {
+                    Label::Component
+                }
+                _ => continue,
+            };
+            self.typing.labelled.insert(name, label);
+        }
+    }
+
     /// A top-level value, not a function, holding an atom whose type has a
     /// variable it quantifies: one atom would hold a value of every type the
     /// variable stands for, each reader taking it for its own.

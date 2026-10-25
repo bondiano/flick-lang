@@ -8,8 +8,8 @@ import { JSDOM } from "jsdom";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 
-import { ReadService, atomDerived, atomFamily, atomState } from "../src/index.ts";
-import { type Renderer, type Ui, uiFragment, uiNamed, uiRunWith, uiRender, uiText, uiView } from "../src/ui/react/index.ts";
+import { ReadService, atomDerived, atomFamily, atomState, label as compilerLabel } from "../src/index.ts";
+import { type Renderer, type Ui, eventExhaust, uiFragment, uiNamed, uiRunWith, uiRender, uiText, uiView } from "../src/ui/react/index.ts";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>");
 Object.assign(globalThis, { window: dom.window, document: dom.window.document });
@@ -164,4 +164,16 @@ test("a family gives the same atom for keys equal by Eq, and another for another
   assert.equal(family({ id: 1 }), first);
   assert.notEqual(family({ id: 3 }), first);
   assert.equal(made, 2);
+});
+
+test("the compiler's label names an atom, a view and an action, and keeps a name given by hand", () => {
+  const atom = compilerLabel("App.Counter.count", atomState(0));
+  assert.equal(atom.label?.[0], "App.Counter.count");
+  assert.equal(atom.keepAlive, true);
+  const view = uiView(() => Effect.succeed(uiText("")));
+  assert.equal(compilerLabel("App.Counter.counter_view", view).label, "App.Counter.counter_view");
+  assert.equal(compilerLabel("App.Counter.counter_view", uiNamed("Counter", view)).label, "Counter");
+  const action = compilerLabel("App.Counter.reset", eventExhaust(() => Effect.void));
+  assert.equal(action.label, "App.Counter.reset");
+  assert.equal(action.policy.kind, "exhaust");
 });

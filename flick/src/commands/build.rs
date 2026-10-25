@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::{fs, io, process};
 
 use flick_core::build::{self, Artifact, Extras, Settings};
+use flick_core::codegen::Labels;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::{Build, Emit, Kind, Profile};
 use flick_core::project::{self, Compilation, Compiled, Project};
@@ -137,6 +138,7 @@ impl BuildCommand {
                 promise_facade: self.options.promise_facade
                     || config.is_some_and(|b| b.promise_facade),
                 schema_aot: self.options.schema_aot || config.is_some_and(|b| b.schema_aot),
+                labels: config.map_or_else(Labels::default, |b| b.labels),
             },
             release: release(self.options.profile, config),
         }

@@ -8,6 +8,7 @@ mod expr;
 mod foreign;
 mod function;
 mod items;
+mod labels;
 mod pattern;
 mod release;
 mod schema;
@@ -23,7 +24,7 @@ use std::mem;
 use super::ts::Projection;
 use super::{Options, Output, names};
 use crate::iface::{Interface, Namespace};
-use crate::ir::{ItemKind, Module};
+use crate::ir::{ItemKind, Label, Module};
 use crate::source::Span;
 use crate::types::Dict;
 
@@ -112,7 +113,7 @@ pub fn js(module: &Module, options: &Options) -> Output {
     if !options.release {
         code = tidy::layout(&code);
     }
-    let mut output = finish(&code, &g.spans);
+    let mut output = finish(&code, &g.spans, &g.names);
     output.imports = g.imports.into_iter().chain(typed.into_inner()).collect();
     output
 }
@@ -146,6 +147,8 @@ impl<'a> Gen<'a> {
         Gen {
             module: &module.name,
             options,
+            labels: &module.labels,
+            names: HashMap::new(),
             imports: BTreeSet::new(),
             foreign: Vec::new(),
             runtime: false,
@@ -190,7 +193,7 @@ impl<'a> Gen<'a> {
     }
 }
 
-fn finish(code: &str, spans: &[Span]) -> Output {
+fn finish(code: &str, spans: &[Span], names: &HashMap<usize, String>) -> Output {
     let mut out = String::with_capacity(code.len());
     let mut mappings = Vec::new();
     let (mut line, mut col) = (0u32, 0u32);
@@ -200,7 +203,7 @@ fn finish(code: &str, spans: &[Span]) -> Output {
             MARK_START => {
                 let id: String = chars.by_ref().take_while(|&c| c != MARK_END).collect();
                 if let Ok(id) = id.parse::<usize>() {
-                    mappings.push((line, col, spans[id]));
+                    mappings.push((line, col, spans[id], names.get(&id).cloned()));
                 }
             }
             '\n' => {
@@ -237,6 +240,10 @@ enum Target {
 struct Gen<'a> {
     module: &'a str,
     options: &'a Options<'a>,
+    /// The module's labelled top-level values (see [`Gen::labelled`]).
+    labels: &'a HashMap<String, Label>,
+    /// The Flick name at a marker, by its index in `spans`.
+    names: HashMap<usize, String>,
     /// Modules whose exports are used.
     imports: BTreeSet<String>,
     /// Foreign imports: specifier, export, alias.

@@ -12,6 +12,7 @@ use super::classes::Dict;
 use super::env::{Abi, Rep};
 use super::sql::dialect::Dialect;
 use super::ty::Type;
+use crate::ir::Label;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -49,6 +50,9 @@ pub struct Typing {
     pub givens: HashMap<Range, Vec<String>>,
     /// The label of each use of `Record.label`.
     pub labels: HashMap<Range, String>,
+    /// The top-level atoms, views and actions, which debugging tools know
+    /// by `Module.name`.
+    pub labelled: HashMap<String, Label>,
     /// Each `foreign`: its calling convention.
     pub foreigns: HashMap<Range, ForeignInfo>,
     /// Instances declared or derived in this module.

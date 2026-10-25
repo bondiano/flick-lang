@@ -6,6 +6,7 @@ use std::ops;
 use serde::Deserialize;
 use toml::{Spanned, de};
 
+use crate::codegen::Labels;
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
 use crate::source::{FileId, Span};
 use crate::types::{self, Dialect, dialect};
@@ -46,6 +47,8 @@ pub struct Build {
     /// Instance resolution budget per definition.
     pub solver_steps: u32,
     pub solver_depth: u32,
+    /// What a release build labels `Module.name` for debugging tools.
+    pub labels: Labels,
 }
 
 impl Default for Build {
@@ -59,6 +62,7 @@ impl Default for Build {
             schema_aot: false,
             solver_steps: types::Limits::default().steps,
             solver_depth: types::Limits::default().depth,
+            labels: Labels::default(),
         }
     }
 }
@@ -256,7 +260,7 @@ mod tests {
         let config = parse_text(
             "schema-version = 1\n[project]\nkind = \"app\"\nsource-dir = \"src\"\ntest-dir = \"test\"\n\
              entry = \"App.Main\"\n[build]\nout-dir = \"dist\"\nprofile = \"debug\"\nemit = \"js\"\n\
-             emit-dts = false\nschema-aot = false\n",
+             emit-dts = false\nschema-aot = false\nlabels = \"components\"\n",
         )
         .expect("valid");
         assert_eq!(config.kind, Kind::App);
@@ -268,6 +272,10 @@ mod tests {
             ("src", "test")
         );
         assert_eq!(lib.sql_dialect.name, "postgresql");
+        let all = parse_text(
+            "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\nlabels = \"all\"\n",
+        );
+        assert_eq!(all.expect("valid").build.labels, Labels::All);
     }
 
     #[test]
