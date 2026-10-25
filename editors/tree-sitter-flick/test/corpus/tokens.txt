@@ -74,3 +74,21 @@ let [x, ...rest] = xs
     (identifier))
   (operator)
   (identifier))
+
+==================
+Let assert
+==================
+
+let assert Some x = v as "no x"
+
+---
+
+(source_file
+  (keyword)
+  (keyword)
+  (constructor)
+  (identifier)
+  (operator)
+  (identifier)
+  (keyword)
+  (string))

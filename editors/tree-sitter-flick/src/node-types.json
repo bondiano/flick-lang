@@ -384,6 +384,10 @@
     "named": false
   },
   {
+    "type": "assert",
+    "named": false
+  },
+  {
     "type": "await",
     "named": false
   },

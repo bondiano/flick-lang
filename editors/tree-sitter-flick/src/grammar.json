@@ -156,6 +156,10 @@
         },
         {
           "type": "STRING",
+          "value": "assert"
+        },
+        {
+          "type": "STRING",
           "value": "fun"
         },
         {

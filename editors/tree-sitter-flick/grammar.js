@@ -2,7 +2,7 @@
 // compiler, so this tree only nests brackets and keeps every token flat.
 
 const KEYWORDS = [
-  'module', 'exposing', 'import', 'as', 'let', 'rec', 'fun', 'match', 'with',
+  'module', 'exposing', 'import', 'as', 'let', 'rec', 'assert', 'fun', 'match', 'with',
   'try', 'if', 'then', 'else', 'task', 'await', 'scope', 'provide', 'ignore',
   'todo', 'echo',
   'type', 'opaque', 'refined', 'where', 'kind', 'error', 'service', 'class',
