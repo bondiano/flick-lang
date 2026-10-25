@@ -80,9 +80,12 @@ export const atomSerializableTask = <A>(key: string, codec: Schema.Codec<A, unkn
   const json = Schema.toCodecJson(codec);
   const encode = Schema.encodeSync(json);
   const decode = Schema.decodeSync(json);
-  // as `Atom.serializable` marks an atom, with the coding of a loaded result
+  // as `Atom.serializable` marks an atom, with the coding of a loaded result; kept alive, so a
+  // hydrated result is not dropped, and the task run, before the first view subscribes
+  // oxlint-disable-next-line typescript/no-unsafe-return, typescript/no-unsafe-argument -- a copy of `atom` with its prototype
   return Object.assign(Object.create(Object.getPrototypeOf(atom)), {
     ...atom,
+    keepAlive: true,
     label: atom.label ?? [key, ""],
     [TASK]: true,
     [Atom.SerializableTypeId]: {

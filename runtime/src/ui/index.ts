@@ -76,7 +76,8 @@ const hydrateStreamed = (container: Element, registry: AtomRegistry.AtomRegistry
   const Observer = container.ownerDocument.defaultView?.MutationObserver;
   if (Observer === undefined || !container.hasAttribute("data-flick-ssr")) return () => undefined;
   const observer = new Observer(() => hydrateState(container, registry));
-  observer.observe(container, { childList: true });
+  // the stream's later chunks follow the container, which it rendered itself
+  observer.observe(container.parentNode ?? container.ownerDocument, { childList: true });
   return () => observer.disconnect();
 };
 

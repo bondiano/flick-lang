@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { after, test } from "node:test";
 
+import type { Effect as EffectModule } from "effect";
+import type { Atom } from "effect/reactivity/Atom";
 import { JSDOM } from "jsdom";
 
 // React's streamed markup finishes a boundary with inline scripts, so this
 // document runs them; React is imported only after it is the global window.
 const dom = new JSDOM("<!doctype html><html><body></body></html>", { runScripts: "dangerously", pretendToBeVisual: true });
 Object.assign(globalThis, { window: dom.window, document: dom.window.document });
+after(() => dom.window.close());
 
 const { Effect, Fiber, Schema, Stream } = await import("effect");
 const { RegistryService, flickLayer, flickSerializable } = await import("../src/effect/reactivity/Atom.ts");
@@ -16,15 +19,16 @@ const { uiMount } = await import("../src/ui/index.ts");
 const { uiFragment, uiRender, uiSuspended, uiText, uiView } = await import("../src/ui/react/index.ts");
 const { uiServerRender, uiServerStream } = await import("../src/ui/server.ts");
 
-type Atom<A> = import("effect/reactivity/Atom").Atom<A>;
+type Eff<A, E = never> = EffectModule.Effect<A, E>;
 
+const nothing = (): void => undefined;
 const tick = (ms = 5): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 const fields = (value: unknown): object => (typeof value === "object" && value !== null ? value : {});
 const read = <A>(atom: Atom<A>) => Effect.flatMap(Effect.service(ReadService), (reader) => reader.get(atom));
 
 /** `Atom.ready atom` as the Flick module has it, for a task that does not fail. */
 const ready = (atom: Atom<object>) =>
-  Effect.flatMap(read(atom), (value): Effect.Effect<unknown> =>
+  Effect.flatMap(read(atom), (value): Eff<unknown> =>
     constructorName(String(Reflect.get(fields(value), "_tag"))) === "Loaded"
       ? Effect.succeed(Reflect.get(fields(value), "_0"))
       : atomPending(),
@@ -32,7 +36,7 @@ const ready = (atom: Atom<object>) =>
 
 /** A page whose user loads until `release`; the number of runs of its task is counted. */
 const page = () => {
-  let release = (): void => undefined;
+  let release = nothing;
   const runs = { count: 0 };
   const task = Effect.flatMap(
     Effect.callback<void>((resume) => {
@@ -53,12 +57,17 @@ const page = () => {
   return { count, ui, runs, release: () => release() };
 };
 
-/** Appends `html` to `container` as a parser would, running its scripts. */
-const append = (container: Element, html: string): void => {
+/**
+ * Appends `html` to `container` as a parser would, running its scripts;
+ * like a browser's parser, it runs microtasks before each script.
+ */
+const append = async (container: Element, html: string): Promise<void> => {
   const template = dom.window.document.createElement("template");
   template.innerHTML = html;
   for (const node of Array.from(template.content.childNodes)) {
     if (node instanceof dom.window.HTMLScriptElement) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- each script waits for the microtasks before it, in order
+      await Promise.resolve();
       const script = dom.window.document.createElement("script");
       for (const { name, value } of Array.from(node.attributes)) script.setAttribute(name, value);
       script.text = node.text;
@@ -83,7 +92,7 @@ test("a streamed page sends a loading task's fallback, then its markup after its
     return chunks;
   });
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the layer provides the request's one service
-  const chunks = Array.from(await Effect.runPromise(Effect.provide(server, flickLayer(RegistryService)) as Effect.Effect<Iterable<string>>));
+  const chunks = Array.from(await Effect.runPromise(Effect.provide(server, flickLayer(RegistryService)) as Eff<Array<string>>));
   const at = (pattern: RegExp): number => chunks.findIndex((chunk) => pattern.test(chunk));
   assert.equal(chunks[0], '<script type="application/json" data-flick-state="app">[{"key":"App.count","value":5}]</script>');
   assert.match(chunks[1] ?? "", /count 5.*<!--\$\?-->.* waiting/);
@@ -95,24 +104,35 @@ test("a streamed page sends a loading task's fallback, then its markup after its
   // the client mounts on the shell; the rest arrives after
   const errors: Array<string> = [];
   const complain = console.error;
-  console.error = (...args: Array<unknown>) => errors.push(args.map(String).join(" "));
-  const container = dom.window.document.createElement("div");
-  container.id = "app";
-  container.setAttribute("data-flick-ssr", "");
-  dom.window.document.body.append(container);
-  append(container, chunks.slice(0, 2).join(""));
+  // the server's and the client's React share this process and its contexts, which a page never does
+  const shared = /multiple renderers concurrently rendering the same context provider/;
+  console.error = (...args: Array<unknown>) => {
+    const message = args.map(String).join(" ");
+    if (!shared.test(message)) errors.push(message);
+  };
+  // a document is still loading while its markup streams in; React client-renders a boundary still pending once it is not
+  let loading = true;
+  Object.defineProperty(dom.window.document, "readyState", { configurable: true, get: () => (loading ? "loading" : "complete") });
+  const body = dom.window.document.body;
+  await append(body, chunks.slice(0, 2).join(""));
+  const container = dom.window.document.getElementById("app");
+  assert.ok(container !== null, "the shell renders the container");
   const mounted = Effect.provide(uiMount(container, () => Effect.void, ui), flickLayer(RegistryService));
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the layer provides the root's one service
-  const fiber = Effect.runFork(mounted as Effect.Effect<never, unknown>);
-  await tick(20);
-  assert.equal(container.textContent, "count 5 waiting");
-  append(container, chunks.slice(2).join(""));
-  // React reveals a boundary at most every 300 ms
-  await tick(700);
-  await Effect.runPromise(Fiber.interrupt(fiber));
-  console.error = complain;
-  assert.equal(container.querySelector("[data-flick-state]"), null);
-  assert.match(container.textContent ?? "", /^count 5 hello ada/);
+  const fiber = Effect.runFork(mounted as Eff<never, unknown>);
+  try {
+    await tick(20);
+    assert.equal(container.textContent, "count 5 waiting");
+    await append(body, chunks.slice(2).join(""));
+    // React reveals a boundary at most every 300 ms
+    await tick(700);
+    assert.equal(body.querySelector("[data-flick-state]"), null);
+    assert.match(container.textContent ?? "", /^count 5 hello ada/);
+  } finally {
+    await Effect.runPromise(Fiber.interrupt(fiber));
+    console.error = complain;
+    loading = false;
+  }
   assert.equal(runs.count, 1, "the client starts from the server's value");
   assert.deepEqual(errors, []);
 });
@@ -120,6 +140,6 @@ test("a streamed page sends a loading task's fallback, then its markup after its
 test("a page rendered at once shows a loading task's fallback inside the boundary a streamed one has", async () => {
   const { ui } = page();
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the layer provides the request's one service
-  const markup = await Effect.runPromise(Effect.provide(uiServerRender(ui), flickLayer(RegistryService)) as Effect.Effect<string>);
+  const markup = await Effect.runPromise(Effect.provide(uiServerRender(ui), flickLayer(RegistryService)) as Eff<string>);
   assert.equal(markup, "count 0<!--$--> waiting<!--/$-->");
 });

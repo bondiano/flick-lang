@@ -58,14 +58,14 @@ export const uiServerState = (container: string): Effect.Effect<string, never, u
   withRegistry((registry) => script("id", container, entries(registry)));
 
 /**
- * `Ui.Server.stream`: the markup of `ui` for the container `container`, in
- * chunks as React renders them. A view of `Ui.suspended` that reads a
- * loading task is sent as its fallback, and its markup follows once the
- * task ends. The serializable atoms come in JSON scripts in the stream:
- * those of the shell after it, a serializable task's result as soon as it
+ * `Ui.Server.stream`: the container `<div id="container">` with the markup
+ * of `ui`, in chunks as React renders them. A view of `Ui.suspended` that
+ * reads a loading task is sent as its fallback, and its markup follows once
+ * the task ends. The serializable atoms come in JSON scripts in the stream:
+ * those of the shell before it, a serializable task's result as soon as it
  * loads, before the markup that shows it, so the client hydrates that
- * markup from the same value. The scripts stay inside the container, where
- * React's hydration passes over them.
+ * markup from the same value. The stream renders the container itself:
+ * React flushes no shell whose root is not an element.
  */
 export const uiServerStream = (container: string, ui: Ui): Stream.Stream<string, never, unknown> =>
   Stream.unwrap(
@@ -121,7 +121,11 @@ const markupOf = (registry: AtomRegistry.AtomRegistry, container: string, ui: Ui
       const tree = createElement(
         RegistryContext.Provider,
         { value: registry },
-        createElement(StreamContext.Provider, { value: streaming }, uiRenderStatic(ui)),
+        createElement(
+          "div",
+          { id: container, "data-flick-ssr": "" },
+          createElement(StreamContext.Provider, { value: streaming }, uiRenderStatic(ui)),
+        ),
       );
       try {
         // an error in a boundary after the shell fails the stream, as one in the shell does
@@ -129,8 +133,8 @@ const markupOf = (registry: AtomRegistry.AtomRegistry, container: string, ui: Ui
         send(entries(registry));
         const reader = react.pipeThrough(new TextDecoderStream()).getReader();
         for (;;) {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- chunks are read one after another
           const { done, value } = await reader.read();
-          console.log("REACT", done, value);
           if (done || failed) break;
           out.enqueue(value);
         }
