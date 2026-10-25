@@ -45,6 +45,16 @@ let set atom new_value = Reactivity.Atom.set atom new_value
 update : Writable a -> (a -> a) ->{Reactivity.Atom.Registry;} Unit
 let update atom f = Reactivity.Atom.update atom f
 
+/// Replaces the value of `atom` by the second part of `f` of it and gives
+/// the first.
+modify : Writable a -> (a -> (b, a)) ->{Reactivity.Atom.Registry;} b
+let modify atom f = Reactivity.Atom.modify atom f
+
+/// The value of the state `atom` now, in a task: a task reads without
+/// depending on what it read.
+current : Writable a ->{Reactivity.Atom.Registry;} a
+let current atom = Reactivity.Atom.get (readonly atom)
+
 /// The result of a task an atom runs: still loading, loaded, or failed.
 type Async a (e : ErrorRow) = Loading | Loaded a | Failed (Failure e)
 

@@ -7,7 +7,7 @@ import Results exposing (current_problems, diagnostic_label, output_pane)
 import State exposing (Model, Mode(..), Tab(..), profile_name, tr)
 import Toolbar exposing (choice, examples_view)
 
-result_pane : Ref Model -> Model -> Ui none none
+result_pane : Atom.Writable Model -> Model -> Ui {Reactivity.Atom.Registry} none
 let result_pane model m =
   ui {
     div { class_name = "fp-result" }
@@ -37,21 +37,19 @@ let result_pane model m =
       ]
   }
 
-notice : String -> String -> Ui none none
+notice : String -> String -> Ui {Reactivity.Atom.Registry} none
 let notice title detail =
   ui {
     div { class_name = "fp-notice" }
       [paragraph [text title], pre { class_name = "fp-failure-detail" } [text detail]]
   }
 
-view : Ref Model -> Model -> Ui none none
+view : Atom.Writable Model -> Model -> Ui {Reactivity.Atom.Registry} none
 let view model m =
   ui {
     div { class_name = if m.mode == Play then "fp fp-play" else "fp fp-transpile" }
       [
-        // Ui.Dom.run redraws after its own events, including this platform notification.
-        Ui.with_host { Ui.host with id = Some "fp-refresh"; class_name = Some "fp-refresh"; aria_hidden = Some true; tab_index = Some (-1) }
-          (button { disabled = false; on_click = Ui.Event.exhaust (fun _ -> task { () }) } []),
+        // a hidden button runs a compile under `latest`: a newer edit interrupts the one before
         Ui.with_host { Ui.host with id = Some "fp-compile"; class_name = Some "fp-refresh"; aria_hidden = Some true; tab_index = Some (-1) }
           (button
             { disabled = false; on_click = Ui.Event.latest (fun _ -> task { refresh model }) }

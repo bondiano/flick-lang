@@ -4,13 +4,11 @@ import { createRoot } from "react-dom/client";
 
 let dom;
 let root;
-let badgeRendersCount = 0;
 
 export const setup = () => {
   dom = new JSDOM('<!doctype html><html><body><div id="app"></div></body></html>');
   Object.assign(globalThis, { window: dom.window, document: dom.window.document });
   root = dom.window.document.getElementById("app");
-  badgeRendersCount = 0;
   return undefined;
 };
 
@@ -50,13 +48,10 @@ export const markup = () => root.innerHTML;
 
 /** A React component of the page, which Flick sees as an opaque `Ui.Component`. */
 export const Badge = (props) => {
-  badgeRendersCount += 1;
   return `badge: ${props.label}`;
 };
 
-export const badgeRenders = () => badgeRendersCount;
-
-/** A factory, not a root: `Ui.run_with` mounts it when the task starts. */
+/** A factory, not a root: `Ui.mount_with` mounts it when the task starts. */
 export const renderer = () => {
   const mounted = createRoot(root);
   return {

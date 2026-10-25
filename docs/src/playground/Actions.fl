@@ -53,17 +53,17 @@ foreign async run_build from "./compiler.ts" "run"
   catch JsError.from_js
   cancel signal
 
-update : Ref Model -> (Model -> Model) ->{} Unit
-let update model f = Ref.modify model (fun m -> ((), f m))
+update : Atom.Writable Model -> (Model -> Model) ->{Reactivity.Atom.Registry;} Unit
+let update model f = Atom.update model f
 
-syntax_failure : Ref Model -> String ->{} Unit
+syntax_failure : Atom.Writable Model -> String ->{Reactivity.Atom.Registry;} Unit
 let syntax_failure model message =
   update model (fun m ->
     { m with highlighting = false; source_tokens = []; debug_tokens = []; release_tokens = []; syntax_error = message })
 
-paint_source : Ref Model ->{} Unit
+paint_source : Atom.Writable Model ->{Reactivity.Atom.Registry;} Unit
 let paint_source model =
-  let m = Ref.get model
+  let m = Atom.current model
   if m.highlighting then
     let result = try Ok (highlight m.source "flick") with
       | JsError failure -> Err failure.message
@@ -72,9 +72,9 @@ let paint_source model =
     | Err message -> syntax_failure model message
   else ()
 
-paint_generated : Ref Model ->{} Unit
+paint_generated : Atom.Writable Model ->{Reactivity.Atom.Registry;} Unit
 let paint_generated model =
-  let m = Ref.get model
+  let m = Atom.current model
   if m.highlighting then
     let result =
       try Ok
@@ -89,9 +89,9 @@ let paint_generated model =
     | Err message -> syntax_failure model message
   else ()
 
-adopt_source : Ref Model ->{} Unit
+adopt_source : Atom.Writable Model ->{Reactivity.Atom.Registry;} Unit
 let adopt_source model =
-  let m = Ref.get model
+  let m = Atom.current model
   // A later example selection may not have committed its textarea yet.
   if m.revision == 0 && m.source == initial_source then
     let source = source_value ()
@@ -101,7 +101,7 @@ let adopt_source model =
     else ()
   else ()
 
-prepare_highlighting : Ref Model ->{} Unit
+prepare_highlighting : Atom.Writable Model ->{Reactivity.Atom.Registry;} Unit
 let prepare_highlighting model =
   let result = try Ok (load_highlighting ()) with
     | JsError failure -> Err failure.message
@@ -112,20 +112,18 @@ let prepare_highlighting model =
     update model (fun m -> { m with highlighting = true; syntax_error = "" })
     paint_source model
     paint_generated model
-  notify "fp-refresh"
 
-refresh : Ref Model ->{} Unit
+refresh : Atom.Writable Model ->{Reactivity.Atom.Registry;} Unit
 let refresh model =
-  let m = Ref.get model
+  let m = Atom.current model
   if m.version == "" then
     ()
   else
     update model (fun m ->
       { m with checking = true; compiled = empty_compiled; debug_tokens = []; release_tokens = []; compile_error = "" })
-    notify "fp-refresh"
     let result = try Ok (compile m.source) with
       | JsError failure -> Err failure.message
-    let current = Ref.get model
+    let current = Atom.current model
     if current.source != m.source then
       ()
     else
@@ -138,12 +136,11 @@ let refresh model =
           { m with checking = false; compiled = compiled; tab = if errors current > 0 then Problems else m.tab })
         paint_generated model
 
-load_compiler : Ref Model ->{} Unit
+load_compiler : Atom.Writable Model ->{Reactivity.Atom.Registry;} Unit
 let load_compiler model =
   update
     model
     (fun m -> { m with loading = true; checking = false; load_error = ""; compile_error = "" })
-  notify "fp-refresh"
   let result = try Ok (load ()) with
     | JsError failure -> Err failure.message
   match result with
@@ -153,40 +150,37 @@ let load_compiler model =
     update model (fun m -> { m with loading = false; checking = true; version = version })
     adopt_source model
     notify "fp-compile"
-  notify "fp-refresh"
 
-edit : Ref Model -> String ->{} Unit
+edit : Atom.Writable Model -> String ->{Reactivity.Atom.Registry;} Unit
 let edit model source =
   update model (fun m -> { m with source = source })
   paint_source model
   notify "fp-compile"
 
-choose : Ref Model -> Example ->{} Unit
+choose : Atom.Writable Model -> Example ->{Reactivity.Atom.Registry;} Unit
 let choose model example =
   update model (fun m ->
     { m with revision = m.revision + 1; execution = empty_execution; tab = Output })
   edit model example.source
 
 // `latest` on the same button aborts and joins the worker before this Stop action.
-run_program : Ref Model ->{} Unit
+run_program : Atom.Writable Model ->{Reactivity.Atom.Registry;} Unit
 let run_program model =
-  let m = Ref.get model
+  let m = Atom.current model
   if m.running then
     update model (fun m ->
       { m with running = false; execution = { empty_execution with status = "stopped" } })
   else
     update model (fun m ->
       { m with running = true; tab = Output; execution = empty_execution; ran_source = m.source; ran_profile = m.profile })
-    notify "fp-refresh"
     let execution =
       try timeout 10000 (task { run_build m.source (profile_name m.profile) }) with
       | TimeoutError -> { empty_execution with status = "timeout" }
       | JsError failure -> { empty_execution with status = "failure"; detail = failure.message }
     update model (fun m -> { m with running = false; execution = execution })
 
-report : Ref Model -> Failure e ->{} Unit
+report : Atom.Writable Model -> Failure e ->{Reactivity.Atom.Registry;} Unit
 let report model failure =
   let message = RawCause.describe (Failure.inspect failure)
   update model (fun m -> { m with fault = message; running = false; loading = false })
-  notify "fp-refresh"
   Platform.stderr_line message

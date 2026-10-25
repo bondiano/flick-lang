@@ -1,4 +1,4 @@
-/// React DOM roots. Keep DOM imports out of `Ui`, so `Ui.run_with` also
+/// React DOM roots. Keep DOM imports out of `Ui`, so `Ui.mount_with` also
 /// works with renderers that do not install `react-dom` or provide a document.
 module Ui.Dom exposing (..)
 
@@ -11,23 +11,14 @@ foreign sync container from "@flick-lang/runtime/ui" "uiContainer"
   arity 1
   nullable
 
-/// Renders pure `view` of the contents of `model` into `container` with
-/// React. After handler tasks end, React coalesces pending model changes;
-/// an unchanged model identity skips `view`. Each event runs a task of its
-/// handler with the services here; a failure goes to `supervisor`, and so
-/// does an event a full policy rejects. It runs until the fiber running it
-/// is interrupted: then events stop at once, React unmounts, the handler
-/// tasks are interrupted and joined, and only then it ends. A failure of
-/// `supervisor` itself ends it as a defect.
-run :
-  forall c r e m.
-  Container -> (Failure e ->{r; none} Unit)^c -> Ref m -> (m -> (Ui r e)^c)^c ->{r; none} Never
-foreign effect run from "@flick-lang/runtime/ui" "uiRun"
-  retention call
-
 /// Renders `ui` into `container` with React. The views in it read atoms
 /// from the provided registry, and each renders again only when an atom it
-/// read changes. Events, `supervisor` and shutdown work as in `run`.
+/// read changes. Each event runs a task of its handler with the services
+/// here; a failure goes to `supervisor`, and so does an event a full policy
+/// rejects. It runs until the fiber running it is interrupted: then events
+/// stop at once, React unmounts, the handler tasks are interrupted and
+/// joined, and only then it ends. A failure of `supervisor` itself ends it
+/// as a defect. Markup a server rendered into `container` is hydrated.
 mount :
   forall c r e.
   Container ->

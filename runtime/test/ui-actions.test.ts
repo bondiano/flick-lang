@@ -37,7 +37,7 @@ const mount = (ui: Ui) => {
       }),
     unmount: () => root?.unmount(),
   });
-  const fiber = Effect.runFork(uiRunWith(renderer, () => Effect.void, { value: ui }, (node: Ui) => node));
+  const fiber = Effect.runFork(uiRunWith(renderer, () => Effect.void, ui));
   const click = (at: number): void => {
     const button = container.querySelectorAll("button")[at];
     assert.ok(button, "a button is rendered");

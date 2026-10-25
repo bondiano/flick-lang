@@ -1,6 +1,6 @@
 // One whole UI path with React 19 in jsdom: a generic select inside typed
 // children (panel slots, non-empty tabs, an optional footer) renders as a
-// pure view of the model; choosing an item runs a task under its policy, a
+// view of the state; choosing an item runs a task under its policy, a
 // refused choice goes to the supervisor, and closing the scope unmounts at
 // once but releases the scope's resource only after the running task's
 // write has finished, which it can only do once the root has closed.
@@ -58,15 +58,18 @@ people : List User
 let people = [{ id = 1; name = "Ada" }, { id = 2; name = "Mallory" }, { id = 3; name = "Carol" }]
 
 // The handler task: nothing of it runs while rendering.
-save : Ref (Option User) -> String -> User ->{; Refused} Unit
+save : Atom.Writable (Option User) -> String -> User ->{Reactivity.Atom.Registry; Refused} Unit
 let save model log user =
   if user.name == "Mallory" then from_result (Err (Refused user.name))
   else
     let line = user.name ++ " saved to " ++ log
     if user.name == "Carol" then write_on_release line else Platform.stdout_line line
-    Ref.set model (Some user)
+    Atom.set model (Some user)
 
-directory : Ref (Option User) -> String -> Option User -> Ui none {Refused}
+directory : Atom.Writable (Option User) ->
+  String ->
+  Option User ->
+  Ui {Reactivity.Atom.Registry} {Refused}
 let directory model log selected =
   ui {
     tabs
@@ -100,17 +103,23 @@ let closed failure =
 main : Unit ->{; AppError} Unit
 let main () =
   setup ()
-  let model = Ref.make None
+  let model = Atom.make None
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
   | Some root ->
+    provide Reactivity.Atom.layer {
     scope s {
       let log = open_raw "log"
       let running =
         Fiber.spawn
           s
           closed
-          (task { Ui.Dom.run root report model (fun selected -> directory model log selected) })
+          (task {
+            Ui.Dom.mount
+              root
+              report
+              (Ui.render (Ui.view (fun () -> directory model log (Atom.value model))) ())
+          })
       settle ()
       Platform.stdout_line (markup ())
       choose "Ada"
@@ -121,5 +130,6 @@ let main () =
       choose "Carol"
       settle ()
       Platform.stdout_line "closing"
+    }
     }
     Platform.stdout_line ("after the scope: [" ++ text () ++ "]")

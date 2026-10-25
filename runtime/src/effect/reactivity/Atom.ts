@@ -7,6 +7,8 @@ import { type Context, type Duration, Effect, Layer } from "effect";
 import * as Atom from "effect/reactivity/Atom";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 
+import { service } from "../../effects.ts";
+
 export * from "effect/reactivity/Atom";
 
 /** `Reactivity.Atom.state`: a writable atom holding `value`. */
@@ -51,6 +53,9 @@ const impl = (registry: AtomRegistry.AtomRegistry) => ({
       ),
   refresh: <A>(atom: Atom.Atom<A>) => Effect.sync(() => registry.refresh(atom)),
 });
+
+/** The service `Reactivity.Atom.Registry`. */
+export const RegistryService = /*#__PURE__*/ service<ReturnType<typeof impl>>("Reactivity.Atom.Registry");
 
 /** Effect's registry behind each implementation of the service, for views that subscribe. */
 const natives = new WeakMap<object, AtomRegistry.AtomRegistry>();

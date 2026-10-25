@@ -5,11 +5,10 @@ import Dom exposing (configuration)
 import State exposing (Configuration, initial_model)
 import View exposing (view)
 
-initial_view : Configuration ->{} Ui none none
+initial_view : Configuration ->{} Ui {Reactivity.Atom.Registry} none
 let initial_view config =
   let initial = initial_model config
-  let model = Ref.make initial
-  view model initial
+  view (Atom.make initial) initial
 
 main : Unit ->{; AppError} Unit
 let main () =
@@ -17,10 +16,12 @@ let main () =
   match Ui.Dom.container "flick-playground" with
   | None -> App.fail "The page has no element flick-playground"
   | Some root ->
-    let model = Ref.make initial
-    // Background completions must notify an already-mounted root.
-    ignore (parallel
-      (task { ignore (Ui.Dom.run root (report model) model (fun m -> view model m)) })
-      (task {
-        ignore (parallel (task { load_compiler model }) (task { prepare_highlighting model }))
-      }))
+    let model = Atom.make initial
+    let app = Ui.render (Ui.view (fun () -> view model (Atom.value model))) ()
+    provide Reactivity.Atom.layer {
+      ignore (parallel
+        (task { ignore (Ui.Dom.mount root (report model) app) })
+        (task {
+          ignore (parallel (task { load_compiler model }) (task { prepare_highlighting model }))
+        }))
+    }

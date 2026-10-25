@@ -19,11 +19,11 @@ close_search : Unit ->{} Unit
 foreign sync close_search from "./browser.ts" "closeSearch"
   arity 0
 
-find : Ref Model -> String ->{} Unit
+find : Atom.Writable Model -> String ->{Reactivity.Atom.Registry;} Unit
 let find model query =
-  let m = Ref.get model
+  let m = Atom.current model
   if String.trim query == "" then
-    Ref.set model { m with query = query; hits = []; problem = "" }
+    Atom.set model { m with query = query; hits = []; problem = "" }
   else
     let found = try Ok (search query) with
       | JsError failure ->
@@ -33,10 +33,10 @@ let find model query =
           else
             "Search is unavailable. Reload the page and try again.") ++ " " ++ failure.message)
     match found with
-    | Ok hits -> Ref.set model { m with query = query; hits = hits; problem = "" }
-    | Err problem -> Ref.set model { m with query = query; hits = []; problem = problem }
+    | Ok hits -> Atom.set model { m with query = query; hits = hits; problem = "" }
+    | Err problem -> Atom.set model { m with query = query; hits = []; problem = problem }
 
-hit : Hit -> Ui none none
+hit : Hit -> Ui {Reactivity.Atom.Registry} none
 let hit result =
   ui {
     item
@@ -44,7 +44,7 @@ let hit result =
         paragraph [text result.excerpt]]
   }
 
-view : Ref Model -> Model -> Ui none none
+view : Atom.Writable Model -> Model -> Ui {Reactivity.Atom.Registry} none
 let view model m =
   let prefix = if m.ru then "/ru" else ""
   ui {
@@ -111,5 +111,9 @@ let main () =
   match Ui.Dom.container "flick-search-root" with
   | None -> App.fail "Missing search container"
   | Some root ->
-    let model = Ref.make { ru = ru; query = ""; hits = []; problem = "" }
-    ignore (Ui.Dom.run root report model (fun m -> view model m))
+    let model = Atom.make { ru = ru; query = ""; hits = []; problem = "" }
+    provide Reactivity.Atom.layer {
+      ignore (
+        Ui.Dom.mount root report (Ui.render (Ui.view (fun () -> view model (Atom.value model))) ())
+      )
+    }

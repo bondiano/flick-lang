@@ -44,8 +44,8 @@ let view_reads model n = ui { paragraph [text (show (Ref.get model))] }
 narrow_supervisor : Failure none ->{} Unit
 let narrow_supervisor failure = ()
 
-refusing : Ref Number -> Number -> Ui none {Refused}
-let refusing model n =
+refusing : Number -> Ui none {Refused}
+let refusing n =
   ui {
     button
       {
@@ -55,9 +55,9 @@ let refusing model n =
       []
   }
 
-run_narrow : Ui.Dom.Container -> Ref Number ->{} Never
-let run_narrow root model = Ui.Dom.run root narrow_supervisor model (fun n -> refusing model n)
-//                                                                            ^^^^^^^^^^^^^^^^ FLICK-T003 `Refused` is in the row, which the expected type does not allow
+run_narrow : Ui.Dom.Container ->{Reactivity.Atom.Registry;} Never
+let run_narrow root = Ui.Dom.mount root narrow_supervisor (refusing 0)
+//                                                         ^^^^^^^^^^ FLICK-T003 `Refused` is in the row, which the expected type does not allow
 
 // hold the button inside the scope, or open the file inside the task
 escaping : File.Path ->{File.FileSystem; File.OpenError} Ui {File.FileSystem} {File.ReadError}

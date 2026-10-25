@@ -148,7 +148,7 @@ let load_two first_id second_id =
   Тесты: `tests/check/fail/sql/queries.fl`; `tests/check/pass/sql/balances.fl`; `tests/run/sql/queries.fl`; `runtime/test/sql.test.ts`; `flick/tests/sql_postgres.rs` (`queries_against_postgres`); `tests/postgres/app.fl`; `flick-core/src/ide/tests.rs` (`captures_in_sql_are_names_of_the_program`); `tests/check/fail/sql/balances.fl`.
 
 - [x] Curried generic combinators сохраняют captures исходного container, callback и partial application; wrappers и iface не стирают lifetime.
-  Тесты: `tests/check/fail/ui/props.fl`; `runtime/test/ui.test.ts`; `tests/run/ui/counter.fl`; `tests/check/pass/ui/save_button.fl`; `tests/run/ui/directory.fl`; `tests/check/fail/ui/children.fl`.
+  Тесты: `tests/check/fail/ui/props.fl`; `runtime/test/ui-roots.test.ts`; `tests/run/ui/counter.fl`; `tests/check/pass/ui/save_button.fl`; `tests/run/ui/directory.fl`; `tests/check/fail/ui/children.fl`.
 
 - [x] CLI использует один Rust checker: `check` и `build` не запускают приложение, не выполняют эффектную инициализацию foreign modules и не устанавливают зависимости; `run`, `dev` и `test` собирают исполняемый JS.
   Тесты: `flick/tests/cli_project.rs` (`check_and_build_run_no_code_of_the_program`); `flick/tests/lsp_command.rs` (`diagnostics_match_flick_check_in_utf16`); `flick/tests/wasm_demo.rs` (`the_demo_compiles_a_module_as_flick_build_does`); `flick/tests/cli_run.rs` (`run_builds_javascript_even_for_a_typescript_project`, `dev_replaces_the_app_only_after_its_shutdown`); `flick/tests/test_command.rs` (`outcomes_are_reported_apart`).

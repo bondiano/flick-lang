@@ -112,13 +112,14 @@ explicit policy.
 2. Provide a DOM container and use `Ui.Dom.container` to find it. The UI
    adapter uses React 19 and React DOM, which are application-installed
    optional peer dependencies of the runtime.
-3. Keep the model in a `Ref` and write a pure view returning `Ui r e`.
-   Building the view runs no handler and performs no DOM access. Read the
-   model through the value passed to the view, not `Ref.get` during render.
+3. Keep the state in atoms (`Atom.make`) and write views with `Ui.view`:
+   a view's render reads atoms with `Atom.value` and returns `Ui r e`.
+   It runs no handler and performs no DOM access.
 4. Choose an event policy deliberately: `Ui.Event.exhaust`, `latest`,
-   bounded `queue`, or bounded `concurrent`. Update the model inside the
-   event task, not while constructing the view.
-5. Start `Ui.Dom.run container supervisor model view` in the intended lifetime.
+   bounded `queue`, or bounded `concurrent`. Write atoms inside the event
+   task, not while rendering a view.
+5. Inside `provide Reactivity.Atom.layer { … }`, start
+   `Ui.Dom.mount container supervisor ui` in the intended lifetime.
    It runs until interrupted, and routes handler failures to its supervisor.
    A scope that owns the root waits for handler cleanup before releasing
    resources.

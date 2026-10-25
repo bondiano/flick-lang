@@ -25,7 +25,7 @@ const mount = (ui: Ui, registry: AtomRegistry.AtomRegistry) => {
       }),
     unmount: () => root?.unmount(),
   });
-  const fiber = Effect.runFork(uiRunWith(renderer, () => Effect.void, { value: ui }, (node: Ui) => node, registry));
+  const fiber = Effect.runFork(uiRunWith(renderer, () => Effect.void, ui, registry));
   return { container, stop: () => Effect.runPromise(Fiber.interrupt(fiber)) };
 };
 

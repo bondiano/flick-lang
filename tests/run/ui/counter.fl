@@ -1,6 +1,7 @@
-// A counter mounted with React 19 in jsdom: changed models refresh the
-// view, lazy children use Flick's Eq, failures reach the supervisor, text
-// stays text, and both DOM and custom renderer scopes unmount their roots.
+// A counter on atoms mounted with React 19 in jsdom: actions write its
+// state and the view renders again, a foreign component renders inside it,
+// failures reach the supervisor, text stays text, and both DOM and custom
+// renderer scopes unmount their roots.
 module App.Main exposing (main)
 
 type error Refused = Refused String
@@ -26,49 +27,37 @@ markup : Unit ->{} String
 foreign sync markup from "./dom.mjs" "markup"
   arity 0
 
-badge_renders : Unit ->{} Number
-foreign sync badge_renders from "./dom.mjs" "badgeRenders"
-  arity 0
-
 renderer : Ui.Renderer
 foreign pure renderer from "./dom.mjs" "renderer"
 
 badge : Ui.Component { label : String }
 foreign pure badge from "./dom.mjs" "Badge"
 
-type BadgeModel = BadgeModel { label : String; revision : Number }
+count : Atom.Writable Number
+let count = Atom.make 0
 
-// Revisions do not affect this view; equality must use this dictionary.
-instance Eq BadgeModel =
-  eq : BadgeModel -> BadgeModel -> Bool
-  let eq (BadgeModel a) (BadgeModel b) = a.label == b.label
+increment : Action.Action Ui.ClickSnapshot {Reactivity.Atom.Registry} {Refused}
+let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
 
-badge_view : forall r e. BadgeModel -> Ui r e
-let badge_view (BadgeModel m) = Ui.component badge { label = m.label }
+refuse : Action.Action Ui.ClickSnapshot {Reactivity.Atom.Registry} {Refused}
+let refuse = Action.latest (fun _ -> task { from_result (Err (Refused "no")) })
 
-counter : Ref Number -> Number -> Ui none {Refused}
-let counter model n =
-  ui {
-    div
-      { class_name = "counter" }
-      [
-        heading [text ("count " ++ show n)],
-        button
-          {
-            disabled = false;
-            on_click = Ui.Event.exhaust (fun _ -> task { Ref.set model (n + 1) });
-          }
-          [text "+1"],
-        button
-          {
-            disabled = false;
-            on_click = Ui.Event.latest (fun _ -> task { from_result (Err (Refused "no")) });
-          }
-          [text "refuse"],
-        paragraph [text "<b>bold?</b>"],
-        lazy_view badge_view (BadgeModel { label = "new"; revision = n }),
-      ]
-  }
+counter : Ui.View Unit {Reactivity.Atom.Registry} {Refused}
+let counter =
+  Ui.named
+    "App.Main.counter"
+    (Ui.view (fun () ->
+      ui {
+        div
+          { class_name = "counter" }
+          [
+            heading [text ("count " ++ show (Atom.value count))],
+            button { disabled = false; on_click = increment } [text "+1"],
+            button { disabled = false; on_click = refuse } [text "refuse"],
+            paragraph [text "<b>bold?</b>"],
+            Ui.component badge { label = "new" },
+          ]
+      }))
 
 report : Failure e ->{} Unit
 let report failure =
@@ -77,35 +66,30 @@ let report failure =
 main : Unit ->{; AppError} Unit
 let main () =
   setup ()
-  let model = Ref.make 0
-  let found = Ui.Dom.container "app"
-  match found with
+  match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
   | Some root ->
-    scope s {
-      let ui =
-        Fiber.spawn s report (task { Ui.Dom.run root report model (fun n -> counter model n) })
-      settle ()
-      Platform.stdout_line (text ())
-      click "+1"
-      settle ()
-      click "+1"
-      settle ()
-      Platform.stdout_line (text ())
-      Platform.stdout_line ("lazy badge renders: " ++ show (badge_renders ()))
-      click "refuse"
-      settle ()
-      Platform.stdout_line (markup ())
+    provide Reactivity.Atom.layer {
+      scope s {
+        let ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render counter ()) })
+        settle ()
+        Platform.stdout_line (text ())
+        click "+1"
+        settle ()
+        click "+1"
+        settle ()
+        Platform.stdout_line (text ())
+        click "refuse"
+        settle ()
+        Platform.stdout_line (markup ())
+      }
+      Platform.stdout_line ("after the scope: [" ++ text () ++ "]")
+      scope s {
+        let custom = Atom.make 7
+        let shown = Ui.view (fun () -> Ui.text ("custom " ++ show (Atom.value custom)))
+        let ui = Fiber.spawn s report (task { Ui.mount_with renderer report (Ui.render shown ()) })
+        settle ()
+        Platform.stdout_line (text ())
+      }
+      Platform.stdout_line ("after renderer scope: [" ++ text () ++ "]")
     }
-    Platform.stdout_line ("after the scope: [" ++ text () ++ "]")
-    scope s {
-      let custom = Ref.make 7
-      let ui =
-        Fiber.spawn
-          s
-          report
-          (task { Ui.run_with renderer report custom (fun n -> Ui.text ("custom " ++ show n)) })
-      settle ()
-      Platform.stdout_line (text ())
-    }
-    Platform.stdout_line ("after renderer scope: [" ++ text () ++ "]")

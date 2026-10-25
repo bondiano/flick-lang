@@ -53,7 +53,7 @@ const counting = (label: string, atom: Atom.Atom<number>, renders: Array<string>
 
 const mount = (ui: Ui, registry: AtomRegistry.AtomRegistry) => {
   const { container, renderer } = domRoot();
-  const fiber = Effect.runFork(uiRunWith(renderer, () => Effect.void, { value: ui }, (node: Ui) => node, registry));
+  const fiber = Effect.runFork(uiRunWith(renderer, () => Effect.void, ui, registry));
   return { container, stop: () => Effect.runPromise(Fiber.interrupt(fiber)) };
 };
 
@@ -139,7 +139,7 @@ test("a view without a registry fails with what to do", async (t) => {
   const { renderer } = domRoot();
   const failures: Array<string> = [];
   const view = uiView(() => Effect.succeed(uiText("x")));
-  const fiber = Effect.runFork(uiRunWith(renderer, () => Effect.void, { value: uiRender(view, undefined) }, (node: Ui) => node));
+  const fiber = Effect.runFork(uiRunWith(renderer, () => Effect.void, uiRender(view, undefined)));
   const exit = await Effect.runPromise(Fiber.await(fiber));
   if (exit._tag === "Failure") failures.push(String(exit.cause));
   assert.match(failures.join(""), /Ui\.Dom\.mount/);

@@ -2,10 +2,10 @@
 // stops events first, then interrupts and joins tasks before its scope closes.
 import { Cause, Effect, Fiber } from "effect";
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry";
-import { Component, type ReactNode, createElement, memo } from "react";
+import { Component, type ReactNode, createElement } from "react";
 
-import type { Cell } from "../../builtins.ts";
 import type { Failure } from "../../cause.ts";
+import { RegistryService, nativeRegistry } from "../../effect/reactivity/Atom.ts";
 import type { Ui } from "./nodes.ts";
 import { Bridge } from "./policies.ts";
 import { BridgeContext, RegistryContext, toReact } from "./render.ts";
@@ -56,12 +56,17 @@ class RenderBoundary extends Component<
   }
 }
 
-/** Runs a pure view through a React renderer; task completions request batched renders only when the model changes. */
-export const uiRunWith = <M, R>(
+/**
+ * Renders `ui` through a React renderer, once: the views in it render again
+ * by themselves when the atoms they read change, reading them from
+ * `registry`. Events run as tasks of the root under their policies; when
+ * the fiber running the root is interrupted, events stop, React unmounts,
+ * and the tasks are interrupted and joined.
+ */
+export const uiRunWith = <R>(
   renderer: Renderer,
   supervisor: (failure: Failure) => Effect.Effect<unknown, unknown, R>,
-  model: Cell<M>,
-  view: (model: M) => Ui,
+  ui: Ui,
   registry?: AtomRegistry.AtomRegistry,
 ): Effect.Effect<never, unknown, R> =>
   Effect.uninterruptibleMask((restore) =>
@@ -75,28 +80,19 @@ export const uiRunWith = <M, R>(
         failure = cause;
         resumeFailure?.(cause);
       };
-      let rendered = false;
-      let previous: M | undefined;
-      const render = (): void => {
-        const current = model.value;
-        if (!bridge.accepting || failure !== undefined || (rendered && Object.is(previous, current))) return;
-        previous = current;
-        rendered = true;
+      // a task's end changes nothing the root draws: views follow their atoms
+      const bridge = new Bridge(context, supervisor, () => undefined, broken);
+      const run = Effect.gen(function* () {
+        root = yield* Effect.sync(renderer);
         try {
           const tree = createElement(BridgeContext.Provider, {
             value: bridge,
-            children: createElement(RenderBoundary, { broken, children: createElement(View, { value: current }) }),
+            children: createElement(RenderBoundary, { broken, children: toReact(bridge, ui) }),
           });
-          root?.render(registry === undefined ? tree : createElement(RegistryContext.Provider, { value: registry }, tree));
+          root.render(registry === undefined ? tree : createElement(RegistryContext.Provider, { value: registry }, tree));
         } catch (error) {
           broken(Cause.die(error));
         }
-      };
-      const bridge = new Bridge(context, supervisor, render, broken);
-      const View = memo(({ value }: { readonly value: M }): ReactNode => toReact(bridge, view(value)));
-      const run = Effect.gen(function* () {
-        root = yield* Effect.sync(renderer);
-        render();
         return yield* restore(
           Effect.callback<never, unknown>((resume) => {
             resumeFailure = (cause) => resume(Effect.failCause(cause));
@@ -116,3 +112,18 @@ export const uiRunWith = <M, R>(
       );
     }),
   );
+
+/**
+ * `Ui.mount_with`: `uiRunWith` with the registry of the provided
+ * `Reactivity.Atom.Registry`.
+ */
+export const uiMountWith = <R>(
+  renderer: Renderer,
+  supervisor: (failure: Failure) => Effect.Effect<unknown, unknown, R>,
+  ui: Ui,
+): Effect.Effect<never, unknown, unknown> =>
+  Effect.flatMap(Effect.service(RegistryService), (record) => {
+    const registry = nativeRegistry(record);
+    if (registry === undefined) return Effect.die(new Error("`Reactivity.Atom.Registry` was not built by its `layer`"));
+    return uiRunWith(renderer, supervisor, ui, registry);
+  });

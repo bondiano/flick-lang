@@ -1,0 +1,14 @@
+// Views on atoms through a renderer of the program's own: no React DOM.
+module App.Views exposing (..)
+
+count : Atom.Writable Number
+let count = Atom.make 1
+
+count_view : Ui.View Unit none none
+let count_view = Ui.view (fun () -> Ui.text ("count " ++ show (Atom.value count)))
+
+app : Ui none none
+let app = Ui.render count_view ()
+
+run : Ui.Renderer ->{Reactivity.Atom.Registry; none} Never
+let run renderer = Ui.mount_with renderer (fun _ -> ()) app

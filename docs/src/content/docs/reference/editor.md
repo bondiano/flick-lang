@@ -23,7 +23,7 @@ protocol; logs go to stderr. It runs the same analysis as `flick check` and
 Hover resolves source bindings, not just the public export list. Private
 helpers such as a view or an error reporter show their written signatures
 and documentation without making them public. The `ignore` keyword shows its
-discard type at that use (for example `Never -> Unit` around `Ui.Dom.run`);
+discard type at that use (for example `Never -> Unit` around `Ui.Dom.mount`);
 discarding a result does not discard the expression's effects or errors.
 The [Gleam language server reference](https://gleam.run/documentation/language-server-reference/)
 is the behavior reference for symbol hover and navigation, not a claim of

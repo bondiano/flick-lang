@@ -11,7 +11,7 @@ foreign async copy_text from "./browser.ts" "copyText"
   arity 1
   catch JsError.from_js
 
-view : Input -> Ref Model -> Model -> Ui none none
+view : Input -> Atom.Writable Model -> Model -> Ui {Reactivity.Atom.Registry} none
 let view input model m =
   let label =
     if m.problem != "" then
@@ -29,7 +29,7 @@ let view input model m =
         { disabled = false; on_click = Ui.Event.latest (fun _ -> task {
             let problem = try (copy_text input.source |> fun _ -> "") with
               | JsError failure -> failure.message
-            Ref.set model { copied = problem == ""; problem = problem }
+            Atom.set model { copied = problem == ""; problem = problem }
           }) }
         [icon (if m.copied then "check" else "copy"),
           span { class_name = "sr-only" } [text label]])
@@ -43,5 +43,10 @@ let mount input =
   match Ui.Dom.container input.id with
   | None -> App.fail "Missing code copy container"
   | Some root ->
-    let model = Ref.make { copied = false; problem = "" }
-    ignore (Ui.Dom.run root report model (fun m -> view input model m))
+    let model = Atom.make { copied = false; problem = "" }
+    provide Reactivity.Atom.layer {
+      ignore (Ui.Dom.mount
+        root
+        report
+        (Ui.render (Ui.view (fun () -> view input model (Atom.value model))) ()))
+    }

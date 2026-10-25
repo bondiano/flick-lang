@@ -18,11 +18,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 /** Programs and their gzip budgets in KB. */
 export const PROGRAMS = [
   { name: "pure", source: "tools/bundle-size/pure.fl", budget: 12 },
-  { name: "counter", source: "tests/run/ui/counter.fl", budget: 81 },
-  // typed host attributes (U5) moved what the playground's own `dom.ts` did into the runtime
-  { name: "playground", source: "docs/src/playground/Playground.fl", budget: 91.5 },
-  // views on atoms: at most the counter's budget and 18 KB for effect/reactivity (U8);
-  // its atoms keep `Stream`, which `effect/reactivity` needs for stream atoms
+  // UI programs render views on atoms: at most 81 KB and 18 KB for effect/reactivity (U8);
+  // the registry keeps `Stream`, which `effect/reactivity` imports for stream atoms
+  { name: "counter", source: "tests/run/ui/counter.fl", budget: 99, unused: ["effect/dist/Graph.js"] },
+  { name: "playground", source: "docs/src/playground/Playground.fl", budget: 105.5, unused: ["effect/dist/Graph.js"] },
   { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 99, unused: ["effect/dist/Graph.js"] },
 ];
 

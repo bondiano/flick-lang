@@ -224,7 +224,7 @@ fn hover_covers_private_functions_and_ignore() {
 /// Reports a background failure.
 report : Failure e ->{} Unit
 let report failure = Platform.stderr_line (RawCause.describe (Failure.inspect failure))
-view : Ref Number -> Number -> Ui none none
+view : Atom.Writable Number -> Number -> Ui none none
 let view model m = Ui.text (show m)
 let seed = 0
 main : Unit ->{; AppError} Unit
@@ -232,8 +232,10 @@ let main () =
   match Ui.Dom.container "playground" with
   | None -> App.fail "missing root"
   | Some root ->
-    let model = Ref.make seed
-    ignore (Ui.Dom.run root report model (fun m -> view model m))
+    let model = Atom.make seed
+    provide Reactivity.Atom.layer {
+      ignore (Ui.Dom.mount root report (Ui.render (Ui.view (fun () -> view model (Atom.value model))) ()))
+    }
 "#;
     let dir = project(
         "lsp_private_hover",
@@ -246,10 +248,10 @@ let main () =
     let diagnostics = lsp.diagnostics(&uri(&file));
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     for (needle, expected) in [
-        ("report model", "report : Failure e ->{} Unit"),
+        ("report (Ui", "report : Failure e ->{} Unit"),
         (
-            "view model m))",
-            "view : Ref Number -> Number -> Ui none none",
+            "view model (Atom",
+            "view : Atom.Writable Number -> Number -> Ui none none",
         ),
         ("seed\n", "seed : Number"),
         ("seed =", "seed : Number"),
@@ -274,7 +276,7 @@ let main () =
     }
     let report = lsp.request(
         "textDocument/hover",
-        &json!({ "textDocument": doc, "position": at(source, "report model") }),
+        &json!({ "textDocument": doc, "position": at(source, "report (Ui") }),
     );
     assert!(
         report["result"]["contents"]["value"]
@@ -282,7 +284,7 @@ let main () =
             .is_some_and(|s| s.contains("Reports a background failure.")),
         "{report}"
     );
-    for name in ["report model", "view model m))"] {
+    for name in ["report (Ui", "view model (Atom"] {
         let definition = lsp.request(
             "textDocument/definition",
             &json!({ "textDocument": doc, "position": at(source, name) }),

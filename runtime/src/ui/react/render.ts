@@ -1,15 +1,14 @@
 // A `Ui` as React elements: elements with event props take their listeners
-// from the root's bridge, lazy views compare their models, and components
-// (foreign ones, views, fields) render as React components.
+// from the root's bridge, and components (foreign ones, views, fields)
+// render as React components.
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry";
-import { Fragment, type ReactNode, createContext, createElement, memo, useLayoutEffect, useMemo } from "react";
+import { Fragment, type ReactNode, createContext, createElement, useLayoutEffect, useMemo } from "react";
 
 import type { Ui } from "./nodes.ts";
 import type { Bridge, Listener } from "./policies.ts";
 
 export type Events = Pick<Bridge<never>, "listener">;
 type ElementNode = Extract<Ui, { readonly kind: "element" }>;
-type LazyNode = Extract<Ui, { readonly kind: "lazy" }>;
 
 const EventElement = ({ bridge, node }: { readonly bridge: Events; readonly node: ElementNode }): ReactNode => {
   const listeners = useMemo(() => new Map<string, Listener>(), [bridge]);
@@ -43,14 +42,6 @@ const EventElement = ({ bridge, node }: { readonly bridge: Events; readonly node
   return createElement(node.tag, props);
 };
 
-const LazyView = /*#__PURE__*/ memo(
-  ({ bridge, node }: { readonly bridge: Events | undefined; readonly node: LazyNode }): ReactNode => toReact(bridge, node.view(node.model)),
-  (before, after) =>
-    before.bridge === after.bridge &&
-    before.node.view === after.node.view &&
-    after.node.equal(before.node.model, after.node.model),
-);
-
 /** The registry views read atoms from: `Ui.Dom.mount` provides it. */
 export const RegistryContext = /*#__PURE__*/ createContext<AtomRegistry.AtomRegistry | undefined>(undefined);
 
@@ -61,7 +52,6 @@ export const toReact = (bridge: Events | undefined, node: Ui): ReactNode => {
   if (node.kind === "text") return node.value;
   if (node.kind === "fragment") return createElement(Fragment, null, ...children(bridge, node.children));
   if (node.kind === "keyed") return createElement(Fragment, { key: node.key }, toReact(bridge, node.node));
-  if (node.kind === "lazy") return createElement(LazyView, { bridge, node });
   if (node.kind === "component") return createElement(node.component, node.props);
   if (bridge !== undefined && Object.keys(node.events).length > 0) return createElement(EventElement, { bridge, node });
   const props: Record<string, unknown> = { ...node.attrs };

@@ -47,10 +47,10 @@ effect_source : String
 let effect_source =
   "import { Console, Effect } from \"effect\"\n\nconst main = Console.log(\"Hello, effects.\")\n\nEffect.runPromise(main)\n"
 
-token : String -> String -> Ui none none
+token : String -> String -> Ui {Reactivity.Atom.Registry} none
 let token category value = Ui.span { class_name = "token-" ++ category } [Ui.text value]
 
-snippet : Bool -> Ui none none
+snippet : Bool -> Ui {Reactivity.Atom.Registry} none
 let snippet effect =
   ui {
     pre { class_name = "hero-source" }
@@ -86,10 +86,10 @@ let snippet effect =
               "\"Hello, effects.\""])
   }
 
-run_example : Ref Model ->{} Unit
+run_example : Atom.Writable Model ->{Reactivity.Atom.Registry;} Unit
 let run_example model =
-  let m = Ref.get model
-  Ref.set model { m with running = true; failed = false; output = "" }
+  let m = Atom.current model
+  Atom.set model { m with running = true; failed = false; output = "" }
   notify "flick-hero-refresh"
   let executed = try Ok (timeout 10000 (task { execute source })) with
     | JsError _ ->
@@ -121,12 +121,12 @@ let run_example model =
             "Не удалось запустить пример. Попробуйте Play."
           else
             "The example could not run. Try Play.")
-  let current = Ref.get model
+  let current = Atom.current model
   match result with
-  | Ok output -> Ref.set model { current with running = false; output = output; failed = false }
-  | Err message -> Ref.set model { current with running = false; output = message; failed = true }
+  | Ok output -> Atom.set model { current with running = false; output = output; failed = false }
+  | Err message -> Atom.set model { current with running = false; output = message; failed = true }
 
-view : Ref Model -> Model -> Ui none none
+view : Atom.Writable Model -> Model -> Ui {Reactivity.Atom.Registry} none
 let view model m =
   let status =
     if m.running then
@@ -149,7 +149,7 @@ let view model m =
                       Ui.Event.latest
                         (fun _ ->
                           task {
-                            Ref.modify
+                            Atom.modify
                               model
                               (fun current -> ((), { current with effect = false; copied = false }))
                           });
@@ -164,7 +164,7 @@ let view model m =
                       Ui.Event.latest
                         (fun _ ->
                           task {
-                            Ref.modify
+                            Atom.modify
                               model
                               (fun current -> ((), { current with effect = true; copied = false }))
                           });
@@ -178,7 +178,7 @@ let view model m =
                         copy_text (if m.effect then effect_source else source) |> fun _ -> true
                       ) with
                       | JsError _ -> false
-                    Ref.modify model (fun current -> ((), { current with copied = copied; failed = not copied; output = if copied then current.output else (if m.ru then "Буфер обмена недоступен. Выделите код вручную." else "Clipboard unavailable. Select the code manually.") }))
+                    Atom.modify model (fun current -> ((), { current with copied = copied; failed = not copied; output = if copied then current.output else (if m.ru then "Буфер обмена недоступен. Выделите код вручную." else "Clipboard unavailable. Select the code manually.") }))
                   }) } [icon (if m.copied then "check" else "copy")])]],
         div { class_name = "hero-editor-file" }
           [span { class_name = "hero-filename" } [text (if m.effect then "main.ts" else "main.fl")],
@@ -221,6 +221,10 @@ let main () =
   | None -> App.fail "Missing homepage example container"
   | Some root ->
     let model =
-      Ref.make
+      Atom.make
         { ru = ru; effect = false; running = false; output = ""; failed = false; copied = false }
-    ignore (Ui.Dom.run root report model (fun m -> view model m))
+    provide Reactivity.Atom.layer {
+      ignore (
+        Ui.Dom.mount root report (Ui.render (Ui.view (fun () -> view model (Atom.value model))) ())
+      )
+    }

@@ -16,7 +16,7 @@ open_search : Unit ->{} Unit
 foreign sync open_search from "./browser.ts" "openSearch"
   arity 0
 
-view : Ref Model -> Model -> Ui none none
+view : Atom.Writable Model -> Model -> Ui {Reactivity.Atom.Registry} none
 let view model m =
   let search_label = if m.ru then "Поиск" else "Search"
   let theme_label = if m.ru then "Переключить тему" else "Toggle color theme"
@@ -37,7 +37,7 @@ let view model m =
               { disabled = false; on_click = Ui.Event.latest (fun _ -> task {
                   let dark = not m.dark
                   set_dark dark
-                  Ref.set model { m with dark = dark }
+                  Atom.set model { m with dark = dark }
                 }) }
               [span { class_name = "theme-light-icon" } [icon "moon"],
                 span { class_name = "theme-dark-icon" } [icon "sun"]])],
@@ -49,10 +49,10 @@ let view model m =
       ]
   }
 
-shell : Bool ->{} Ui none none
+shell : Bool ->{} Ui {Reactivity.Atom.Registry} none
 let shell ru =
   let initial = { ru = ru; dark = false }
-  let model = Ref.make initial
+  let model = Atom.make initial
   view model initial
 
 report : Failure e ->{} Unit
@@ -64,5 +64,9 @@ let main () =
   match Ui.Dom.container "flick-site-controls" with
   | None -> App.fail "Missing site controls container"
   | Some root ->
-    let model = Ref.make initial
-    ignore (Ui.Dom.run root report model (fun m -> view model m))
+    let model = Atom.make initial
+    provide Reactivity.Atom.layer {
+      ignore (
+        Ui.Dom.mount root report (Ui.render (Ui.view (fun () -> view model (Atom.value model))) ())
+      )
+    }
