@@ -98,14 +98,14 @@
     "names": {
       "patterns": [
         { "name": "entity.name.type.flick", "match": "\\b[A-Z][A-Za-z0-9_]*\\b" },
-        { "name": "variable.other.member.flick", "match": "(?<=\\.)[a-z_][A-Za-z0-9_]*\\b" },
+        { "name": "variable.other.member.flick", "match": "(?<!\\.\\.)(?<=\\.)[a-z_][A-Za-z0-9_]*\\b" },
         { "name": "variable.other.flick", "match": "\\b[a-z_][A-Za-z0-9_]*\\b" }
       ]
     },
     "operators": {
       "patterns": [
         { "name": "punctuation.separator.flick", "match": "[,;]" },
-        { "name": "keyword.operator.flick", "match": "\\.\\.|->|=>|==|\\|>|\\|\\||&&|!=|<=|>=|\\+\\+|\\*\\*|[:.=|<>+\\-*/%^]" }
+        { "name": "keyword.operator.flick", "match": "\\.\\.\\.|\\.\\.|->|=>|==|\\|>|\\|\\||&&|!=|<=|>=|\\+\\+|\\*\\*|[:.=|<>+\\-*/%^]" }
       ]
     }
   }

@@ -56,3 +56,21 @@ let rec go = HashSet.with 0x1Fn 1.5e-3 true
   (number)
   (number)
   (boolean))
+
+==================
+Rest pattern
+==================
+
+let [x, ...rest] = xs
+
+---
+
+(source_file
+  (keyword)
+  (brackets
+    (identifier)
+    (operator)
+    (operator)
+    (identifier))
+  (operator)
+  (identifier))
