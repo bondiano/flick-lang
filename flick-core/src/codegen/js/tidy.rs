@@ -122,6 +122,18 @@ impl Scan {
         self.chars[start..=end].iter().collect()
     }
 
+    /// The word ending at `end` when it can be a keyword: a property such as
+    /// `dict.return` is not one.
+    fn keyword(&self, end: usize) -> String {
+        let word = self.word(end);
+        let start = end + 1 - word.chars().count();
+        if start > 0 && self.chars[start - 1] == '.' {
+            String::new()
+        } else {
+            word
+        }
+    }
+
     fn starts_with(&self, at: usize, text: &str) -> bool {
         text.chars()
             .enumerate()
@@ -183,7 +195,7 @@ fn redundant(scan: &Scan, open: usize, close: usize) -> bool {
         ';' | '{' | '}' => next == Some(';') && !block_like,
         '>' => prev > 0 && scan.chars[prev - 1] == '=' && !block_like,
         '=' => prev > 0 && scan.chars[prev - 1].is_whitespace(),
-        c if is_ident(c) => matches!(scan.word(prev).as_str(), "return" | "throw"),
+        c if is_ident(c) => matches!(scan.keyword(prev).as_str(), "return" | "throw"),
         _ => false,
     }
 }
@@ -287,7 +299,7 @@ impl Layout<'_> {
                 let head = head.trim();
                 !(head.starts_with("case ") || head == "default" || head.chars().all(is_ident))
             }
-            c if is_ident(c) => scan.word(prev) == "return",
+            c if is_ident(c) => scan.keyword(prev) == "return",
             _ => false,
         }
     }
@@ -472,6 +484,8 @@ mod tests {
             ("return (() => 1)();", "return (() => 1)();"),
             ("return a * (b + c);", "return a * (b + c);"),
             ("const s = \"(x)\";", "const s = \"(x)\";"),
+            // a property named like a keyword is called, not returned
+            ("f(d.return(20));", "f(d.return(20));"),
         ];
         for (js, tidy) in cases {
             assert_eq!(parens(js), tidy, "{js}");
