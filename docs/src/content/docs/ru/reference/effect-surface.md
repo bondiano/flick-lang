@@ -122,7 +122,9 @@ fetch-клиентом. `Otlp.settings url service` и `layer_with`, `traces_wit
 `Otlp.from_config` экспортирует то, что говорит конфигурация `OTEL_`
 текущего `ConfigProvider`; сигнал отправляется, только если его
 `OTEL_<SIGNAL>_EXPORTER` называет `otlp`.
-`Prometheus.format` выдаёт записанные метрики в текстовом формате Prometheus.
+`Prometheus.format` выдаёт записанные метрики в текстовом формате Prometheus,
+`format_with` — с префиксом или переименованными, а `Prometheus.route path` —
+маршрут `Http.Router`, который их отдаёт.
 
 `effect/devtools` нестабилен, как и `DevTools`: `DevTools.layer url` отправляет
 span'ы программы по WebSocket в Effect DevTools, которые слушают `url`.

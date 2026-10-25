@@ -116,8 +116,10 @@ version and attributes, request headers, gzip, protobuf (`Otlp.protobuf`,
 bundled only where named), export intervals, batch size and shutdown
 timeout. `Otlp.from_config` exports what the `OTEL_` configuration of the
 provided `ConfigProvider` says, a signal only when its
-`OTEL_<SIGNAL>_EXPORTER` names `otlp`. `Prometheus.format` gives the recorded metrics in Prometheus's text
-format.
+`OTEL_<SIGNAL>_EXPORTER` names `otlp`. `Prometheus.format` gives the
+recorded metrics in Prometheus's text format, `format_with` with a prefix or
+renamed, and `Prometheus.route path` is an `Http.Router` route answering
+them.
 
 `effect/devtools` is unstable, and so is `DevTools`: `DevTools.layer url`
 sends a program's spans over a WebSocket to the Effect DevTools listening

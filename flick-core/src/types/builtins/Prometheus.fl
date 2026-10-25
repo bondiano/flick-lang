@@ -1,5 +1,5 @@
 /// The metrics a program records, in Prometheus's text format, for a
-/// `/metrics` route to answer. The module is unstable, as Effect marks
+/// `/metrics` route to answer: `route` is that route. The module is unstable, as Effect marks
 /// `effect/observability`.
 module Prometheus exposing (..)
 
@@ -8,3 +8,24 @@ format : Unit ->{} String
 foreign effect format from "@flick-lang/runtime/effect/observability/PrometheusMetrics" "prometheusFormat"
   arity 0
   reviewed "effect@4.0.5 sha256:f7c1d415fcfb2b6e"
+
+/// A prefix for every metric's name, and a renaming of each.
+type alias FormatOptions = { prefix : Option String; rename : Option (String -> String) }
+
+/// The metrics recorded so far, named as `options` say.
+format_with : FormatOptions -> Unit ->{} String
+foreign effect format_with from "@flick-lang/runtime/effect/observability/PrometheusMetrics" "prometheusFormatWith"
+  arity 2
+  reviewed "effect@4.0.5 sha256:f7c1d415fcfb2b6e"
+
+/// A route of `Http.Router` answering GET at `path` with the metrics, as
+/// Prometheus scrapes them.
+route : String -> Http.Router.Route r e
+let route path =
+  Http.Router.route
+    (Some Http.Method.GET)
+    path
+    (fun _ ->
+      Http.ServerResponse.text
+        (format ())
+        { Http.ServerResponse.defaults with contentType = Some "text/plain; version=0.0.4; charset=utf-8" })
