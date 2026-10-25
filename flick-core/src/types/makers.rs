@@ -21,6 +21,7 @@ const MAKERS: [(&str, &[&str]); 3] = [
             "task",
             "serializable",
             "serializable_family",
+            "serializable_task",
             "on_server",
             "client_only",
             "search_param",

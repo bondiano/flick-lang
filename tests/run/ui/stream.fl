@@ -1,0 +1,89 @@
+// A page streamed from the server: its shell carries the fallback of a
+// suspended view while a serializable task loads, the task's value and
+// markup follow, and the client mounted on the shell hydrates them without
+// running the task again or a hydration mismatch.
+module App.Main exposing (main)
+
+later : Unit ->{} String
+foreign async later from "./stream.mjs" "later"
+  arity 0
+
+task_runs : Unit ->{} Number
+foreign sync task_runs from "./stream.mjs" "taskRuns"
+  arity 0
+
+stream_shell : String ->{} Unit
+foreign async stream_shell from "./stream.mjs" "streamShell"
+  arity 1
+
+stream_rest : Unit ->{} Unit
+foreign async stream_rest from "./stream.mjs" "streamRest"
+  arity 0
+
+settle : Unit ->{} Unit
+foreign async settle from "./stream.mjs" "settle"
+  arity 0
+
+text : Unit ->{} String
+foreign sync text from "./stream.mjs" "text"
+  arity 0
+
+complaints : Unit ->{} String
+foreign sync complaints from "./stream.mjs" "complaints"
+  arity 0
+
+close : Unit ->{} Unit
+foreign sync close from "./stream.mjs" "close"
+  arity 0
+
+count : Atom.Writable Number
+let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
+
+user : Atom.Atom (Atom.Async String none)
+let user = Atom.serializable_task (Codec.json Schema.string) (Atom.task (task { later () }))
+
+counter : Ui.View Unit
+let counter = Ui.view (fun () -> Ui.text ("count " ++ show (Atom.value count)))
+
+greeting : Ui.View Unit
+let greeting =
+  Ui.suspended
+    (fun _ -> Ui.text " failed")
+    (Ui.text " waiting")
+    (fun () -> Ui.text (" hello " ++ Atom.ready user))
+
+page : Ui
+let page = Ui.fragment [Ui.render counter (), Ui.render greeting ()]
+
+report : Failure e ->{} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let chunks =
+    provide Atom.layer {
+      Atom.set count 5
+      Stream.run_collect (Ui.Server.stream "app" page)
+    }
+  let joined = String.join "" chunks
+  Platform.stdout_line
+    ("fallback and markup: "
+      ++ show (String.contains " waiting" joined && String.contains " hello ada" joined))
+  Platform.stdout_line ("server runs: " ++ show (task_runs ()))
+  stream_shell (String.join "<!--chunk-->" chunks)
+  match Ui.Dom.container "app" with
+  | None -> Platform.stdout_line "no container"
+  | Some root ->
+    provide Atom.layer {
+      scope s {
+        let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report page })
+        settle ()
+        Platform.stdout_line (text ())
+        stream_rest ()
+        Platform.stdout_line (text ())
+      }
+    }
+  Platform.stdout_line ("task runs: " ++ show (task_runs ()))
+  Platform.stdout_line ("complaints: [" ++ complaints () ++ "]")
+  close ()

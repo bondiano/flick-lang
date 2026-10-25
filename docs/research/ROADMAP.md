@@ -212,7 +212,7 @@ component search (props : SearchProps) =
 **R4. Паритет сервер/клиент.** ✅ `c047a70`
 - AC: view читает серверное значение до гидрации; `Atom.Browser a` требует `Atom.on_server` или `Atom.client_only`; e2e и docs-тест без hydration mismatch.
 
-**R5. Стриминг.** 🔶 (незакоммичено: `renderToReadableStream`, скрипты `data-flick-state`, `MutationObserver` в `ui/index.ts`)
+**R5. Стриминг.** ✅ `56f3a4a`, `d9d43ba` + этот пункт (`Ui.Server.stream`, `Atom.serializable_task`, e2e `tests/run/ui/stream.fl`; поток сам рендерит контейнер — React 19.3 не отдаёт оболочку без host-элемента в корне)
 - AC: `Ui.Server.stream` в `Ui/Server.fl` поверх `renderToReadableStream`; значения task-атомов дописываются чанками-скриптами перед своей разметкой; клиент гидрирует их до гидрации разметки (тест `runtime/test/ui-stream.test.ts`).
 - 🆕 AC (§6.3, правило C): стриминг откладывает только поддеревья внутри `Ui.suspended`; task-атом, прочитанный вне границы, рендерится как `Loading` в первом чанке без ожидания; тест на это.
 - AC: размер клиентского бандла не меняется (`just bundle-size`); e2e: страница стримится, гидрируется без mismatch, task не запускается на клиенте повторно.
@@ -261,7 +261,7 @@ component search (props : SearchProps) =
 ```
 B0…B9 ✅ ─ B7b ✅                       (замер, независимо)
 S1 ✅ ─ U1…U6 ✅ ─ U7 ✅ ─ U7b ✅ ─ U6b
-        └─ R1…R4 ✅ ─ R5 🔶 ─ R6 ✅
+        └─ R1…R4 ✅ ─ R5 ✅ ─ R6 ✅
 C2/C3/C4/C6 ✅ ─ C6b ✅
 C7a ─ C7b ─ C7c ─ C7d ─ C5            C1 (бенчмарк, может закрыться без реализации)
 U9 ✅ ─ U9b

@@ -135,6 +135,17 @@ let ready atom =
   | Failed failure -> Failure.rethrow failure
   | Loading -> pending ()
 
+/// The task atom `atom`, whose loaded value `wire` codes so a server can
+/// hand it to the client: the client starts from it instead of running
+/// the task again. One still loading or failed is not handed over. Its key
+/// is the name of the top-level binding it defines, as for `serializable`.
+serializable_task : PureCodec Json a -> Atom (Async a e) -> Atom (Async a e)
+let serializable_task wire atom = serializable_task_at "Atom.serializable_task" wire atom
+
+/// `serializable_task` under the key the compiler gives.
+serializable_task_at : String -> PureCodec Json a -> Atom (Async a e) -> Atom (Async a e)
+foreign pure serializable_task_at from "@flick-lang/runtime" "atomSerializableTask"
+
 /// Atoms by key: `at family key` makes the atom of `key` the first time
 /// and gives the same one for every equal key after, so a view takes the
 /// atoms of its items from a family, not from `make` while it renders. Keys

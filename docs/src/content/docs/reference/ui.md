@@ -385,6 +385,29 @@ tab : Atom.Atom (Option String)
 let tab = Atom.client_only (Atom.search_param "tab")
 ```
 
+### Streaming
+
+`Ui.Server.stream "app" ui` renders the container `<div id="app"
+data-flick-ssr>` itself, in chunks as React renders them, for a response to
+stream. A view of `Ui.suspended` that reads a loading task is sent as its
+fallback, and its markup follows once the task ends; a task read outside
+`Ui.suspended` is sent as `Loading`, and the stream does not wait for it.
+Serializable atoms come in JSON scripts in the stream: the shell's before
+it, and a serializable task's value before the markup that shows it.
+`Atom.serializable_task wire task` marks a task atom whose loaded value the
+server hands over this way, keyed like `Atom.serializable`; the client
+starts from that value instead of running the task again. `Ui.Dom.mount` on
+the container hydrates the scripts that arrive after it mounted, as they
+arrive.
+
+```flick
+user : Atom.Atom (Atom.Async String none)
+let user = Atom.serializable_task (Codec.json Schema.string) (Atom.task (task { fetch_name () }))
+
+chunks : Unit ->{} List String
+let chunks () = provide Atom.layer { Stream.run_collect (Ui.Server.stream "app" page) }
+```
+
 ### Templates without React
 
 `Ui.Server.to_html ui` gives the HTML of `ui` without React, for mail and

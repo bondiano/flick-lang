@@ -143,3 +143,15 @@ test("a page rendered at once shows a loading task's fallback inside the boundar
   const markup = await Effect.runPromise(Effect.provide(uiServerRender(ui), flickLayer(RegistryService)) as Eff<string>);
   assert.equal(markup, "count 0<!--$--> waiting<!--/$-->");
 });
+
+test("a task read outside a suspended view streams as loading and is not waited for", async () => {
+  // a task that never ends: the stream must end without it
+  const user = atomTask(Effect.never);
+  const status = uiView(() =>
+    Effect.map(read(user), (value) => uiText(constructorName(String(Reflect.get(fields(value), "_tag"))))),
+  );
+  const server = Stream.runCollect(uiServerStream("app", uiRender(status, undefined)));
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the layer provides the request's one service
+  const chunks = Array.from(await Effect.runPromise(Effect.provide(server, flickLayer(RegistryService)) as Eff<Array<string>>));
+  assert.equal(chunks.join(""), '<div id="app" data-flick-ssr="">Loading</div>');
+});

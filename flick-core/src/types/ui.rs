@@ -62,7 +62,7 @@ impl Checker<'_> {
 }
 
 impl Checker<'_> {
-    /// `Atom.serializable` and `Atom.serializable_family` take their key
+    /// `Atom.serializable`, `serializable_family` and `serializable_task` take their key
     /// from the top-level binding they define, so each is applied there
     /// once, outside any function: anywhere else one key would name many
     /// atoms.
@@ -342,7 +342,10 @@ impl Keyed {
         }
         if let Some(Ref::Value { module, name }) = names.get(&node.range())
             && module == "Atom"
-            && matches!(name.as_str(), "serializable" | "serializable_family")
+            && matches!(
+                name.as_str(),
+                "serializable" | "serializable_family" | "serializable_task"
+            )
             && self.found.last().is_none_or(|(r, ..)| *r != node.range())
         {
             self.found.push((node.range(), name.clone(), in_function));
