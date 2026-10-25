@@ -115,7 +115,18 @@ impl Loader<'_> {
                     }
                     return;
                 };
+                let defining = self.by_name.get(&main.entity.module).copied();
+                let at = main.at.zip(defining).map_or(span, |([start, end], d)| {
+                    Span::new(self.modules[d].file, start, end)
+                });
                 // no type when the module failed to check: that is reported already
+                if let Some((runner, runner_at)) = &project.config.runner
+                    && main.scheme.is_some()
+                {
+                    let module = main.entity.module.clone();
+                    self.check_runner(&module, at, (runner, *runner_at), interfaces);
+                    return;
+                }
                 let pure = project.config.build.effect == Backend::None;
                 let problem = main.scheme.as_ref().and_then(|t| match main_kind(t) {
                     Err(message) => Some(message),
@@ -126,10 +137,6 @@ impl Loader<'_> {
                     Ok(_) => None,
                 });
                 if let Some(message) = problem {
-                    let defining = self.by_name.get(&main.entity.module).copied();
-                    let at = main.at.zip(defining).map_or(span, |([start, end], d)| {
-                        Span::new(self.modules[d].file, start, end)
-                    });
                     self.diagnostics
                         .push(Diagnostic::error(codes::P026, message, at));
                 }

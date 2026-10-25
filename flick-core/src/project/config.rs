@@ -22,6 +22,10 @@ pub struct Config {
     /// The entry points of an app, by name: `entries`, or `entry` as the
     /// one named `main`. Each builds a runner `flick-<name>.js`.
     pub entries: Vec<Entry>,
+    /// `runner`: the module whose `run` starts each entry and whose `Main`
+    /// is the type of its `main`, with the span of its name; without one, a
+    /// pure `main` is called and an effect is run on Node or in a browser.
+    pub runner: Option<(String, Span)>,
     pub build: Build,
     /// `[sql] dialect`: what `sql table` and `sql { … }` are checked against.
     pub sql_dialect: &'static Dialect,
@@ -153,6 +157,7 @@ struct RawProject {
     test_dir: String,
     entry: Option<Spanned<String>>,
     entries: Option<Spanned<BTreeMap<Spanned<String>, Spanned<String>>>>,
+    runner: Option<Spanned<String>>,
 }
 
 fn source_dir() -> String {
@@ -237,6 +242,9 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
         source_dir: project.source_dir,
         test_dir: project.test_dir,
         entries,
+        runner: project
+            .runner
+            .map(|r| (r.get_ref().clone(), span(r.span()))),
         build: raw.build,
         sql_dialect,
         allow,

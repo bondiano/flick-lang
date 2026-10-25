@@ -361,6 +361,7 @@ pub fn artifacts(
         root: project.map(|p| p.root.as_path()),
         backend: project.map_or(Backend::Effect, |p| p.config.build.effect),
         ui: project.and_then(|p| p.config.build.ui.as_deref()),
+        runner: project.and_then(|p| p.config.runner.as_ref().map(|r| r.0.as_str())),
     };
     build::emit(compilation, sources, &settings)
 }

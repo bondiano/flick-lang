@@ -61,6 +61,8 @@ const SOURCES: &[(&str, &str)] = &[
     ("Database", include_str!("builtins/Database.fl")),
     ("Test", include_str!("builtins/Test.fl")),
     ("Flick.Debug", include_str!("builtins/Flick/Debug.fl")),
+    ("Runner.Node", include_str!("builtins/Runner/Node.fl")),
+    ("Runner.Browser", include_str!("builtins/Runner/Browser.fl")),
     // Effect: values and classes
     ("RegExp", include_str!("builtins/RegExp.fl")),
     ("Combiner", include_str!("builtins/Combiner.fl")),

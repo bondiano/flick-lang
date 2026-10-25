@@ -87,6 +87,8 @@ pub struct Settings<'a> {
     /// The module that renders and mounts views in place of React's; a
     /// relative one is relative to the project's root.
     pub ui: Option<&'a str>,
+    /// The module whose `run` starts each entry, if not the default one.
+    pub runner: Option<&'a str>,
 }
 
 /// The opt-in outputs of a build.
@@ -202,7 +204,8 @@ pub fn emit(
         interface_of: &interface_of,
         any_interface: &any_interface,
     };
-    let mut imports = Vec::new();
+    // a built-in runner is written like any module the program imports
+    let mut imports: Vec<String> = settings.runner.into_iter().map(str::to_owned).collect();
     for module in modules {
         imports.extend(compiled_module(&ctx, module, &mut out, &mut diagnostics));
     }
@@ -238,10 +241,17 @@ fn entry_runners(
             kind => {
                 let file = runner_file(name, settings.typescript);
                 let aot = settings.extras.schema_aot.then(|| schema_aot_file(name));
+                let start = match settings.runner {
+                    Some(module) => Start::Run(codegen::relative(&file, &path(module))),
+                    None => match kind.and_then(Result::ok) {
+                        Some(MainKind::Pure) => Start::Call,
+                        _ => Start::RunMain,
+                    },
+                };
                 out.push(runner(
                     &file,
                     &codegen::relative(&file, &path(defining)),
-                    kind.and_then(Result::ok).unwrap_or(MainKind::Effect),
+                    &start,
                     aot.as_deref(),
                 ));
             }
@@ -452,27 +462,41 @@ fn compiled_module(
 /// file of compiled decoders `schema_aot` it collects the codecs the modules
 /// make while loading and installs those decoders, which `flick build`
 /// writes next to it.
-fn runner(file: &str, entry: &str, kind: MainKind, schema_aot: Option<&str>) -> Artifact {
-    let (run, start) = match kind {
-        MainKind::Pure => (None, "main(undefined);"),
-        MainKind::Effect => (Some("runMain"), "await runMain(main);"),
+fn runner(file: &str, entry: &str, start: &Start, schema_aot: Option<&str>) -> Artifact {
+    let (import, run) = match start {
+        Start::Call => (None, "main(undefined);"),
+        Start::RunMain => (
+            Some(("runMain", "@flick-lang/runtime")),
+            "await runMain(main);",
+        ),
+        // what `run` returns is what the host takes from the module, such as Cloudflare's `fetch`
+        Start::Run(module) => (Some(("run", module.as_str())), "export default run(main);"),
     };
+    let import = import.map_or(String::new(), |(name, module)| {
+        format!("import {{ {name} }} from \"{module}\";\n")
+    });
     let contents = if let Some(aot) = schema_aot {
-        let names = run.map_or(String::new(), |r| format!("{r}, "));
         format!(
-            "import {{ {names}enableSchemaAot, installSchemaAot }} from \"@flick-lang/runtime\";\n\nenableSchemaAot();\nconst {{ main }} = await import(\"{entry}\");\ninstallSchemaAot(await import(\"./{aot}\"));\n{start}\n"
+            "import {{ enableSchemaAot, installSchemaAot }} from \"@flick-lang/runtime\";\n{import}\nenableSchemaAot();\nconst {{ main }} = await import(\"{entry}\");\ninstallSchemaAot(await import(\"./{aot}\"));\n{run}\n"
         )
     } else {
-        let runtime = run.map_or(String::new(), |r| {
-            format!("import {{ {r} }} from \"@flick-lang/runtime\";\n")
-        });
-        format!("{runtime}import {{ main }} from \"{entry}\";\n\n{start}\n")
+        format!("{import}import {{ main }} from \"{entry}\";\n\n{run}\n")
     };
     // a runner is also a package's `bin`, which a shell starts with Node
     Artifact {
         path: file.to_owned(),
         contents: format!("#!/usr/bin/env node\n{contents}"),
     }
+}
+
+/// How the runner of an entry starts `main`.
+enum Start {
+    /// A pure `main`, called.
+    Call,
+    /// An effect, run by the runtime's Node runner.
+    RunMain,
+    /// By `run` of a runner module, at this path from the runner.
+    Run(String),
 }
 
 /// The module of compiled decoders an app's runner installs.

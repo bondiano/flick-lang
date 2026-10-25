@@ -38,6 +38,7 @@ dialect = "postgresql"
 | `project.test-dir` | каталог тестовых модулей | `"test"` |
 | `project.entry` | модуль, экспортирующий `main`, свой или реэкспортированный: вход `main` с раннером `flick-main.js` | — |
 | `project.entries` | несколько входов, `{ server = "App.Server", cli = "App.Cli" }`: по раннеру `flick-<name>.js` на каждый; имена — строчные латинские буквы, цифры и `-`; вместо `entry` | — |
+| `project.runner` | модуль, который запускает каждый вход: экспортирует `type alias Main` — тип, который должен иметь `main` (иначе `FLICK-P026`), — и `run`, который принимает `main`; раннер экспортирует его результат как `default`; встроены `"Runner.Node"` и `"Runner.Browser"`, другой может дать пакет; без него чистый `main` вызывается, а эффект выполняется как на Node | — |
 | `build.out-dir` | базовый каталог для артефактов сборки | `"dist"` |
 | `build.profile` | `"debug"` или `"release"` (см. [генерацию кода](../codegen/)); `--profile` у `build` и `test` переопределяет это значение | `"debug"` |
 | `build.emit` | `"js"` или `"ts"` | `"js"` |

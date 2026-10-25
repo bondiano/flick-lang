@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 
 mod entry;
 mod ide;
+mod runner;
 mod unknown;
 
 pub use entry::{MainKind, main_kind};

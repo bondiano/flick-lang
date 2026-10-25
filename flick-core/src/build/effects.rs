@@ -84,7 +84,10 @@ mod tests {
 
     #[test]
     fn builtins_without_effects_bind_only_core_and_import_each_other() {
-        for (name, source) in builtin_sources().iter().filter(|(n, _)| BUILTINS.contains(n)) {
+        for (name, source) in builtin_sources()
+            .iter()
+            .filter(|(n, _)| BUILTINS.contains(n))
+        {
             for line in source.lines() {
                 if let Some(spec) = line
                     .strip_prefix("foreign ")
