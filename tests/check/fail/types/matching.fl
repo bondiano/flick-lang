@@ -48,6 +48,22 @@ let refutable value =
   let Some n = value
   n
 
+pair : Number
+let pair =
+  let [x, y] = [1, 2]
+  x + y
+
+head : List Number -> Number
+let head items =
+  let [x, ...rest] = items
+  x
+
+rests : List Number -> Number
+let rests items =
+  match items with
+  | [x, ...rest] -> x
+  | [x, y] -> x + y
+
 //~ FLICK-T009 @7:3-7:14 `match` does not cover every value: `None` is not matched
 //~ FLICK-T009 @12:3-12:14 `match` does not cover every value: `Rect _ _` is not
 //~ FLICK-T009 @18:3-18:14 `match` does not cover every value: `Some None` is not
@@ -56,3 +72,7 @@ let refutable value =
 //~ FLICK-T010 @38:5-38:9 this arm is never reached: the arms above match every value
 //~ FLICK-T018 @43:5-43:11 constructor `Rect` takes 2 argument(s), but the pattern
 //~ FLICK-T009 @48:7-48:13 this pattern does not match `None`; use `match` to handle
+//~ FLICK-T009 @53:7-53:13 a list can have any length, but this pattern matches only lists of 2 items, not `[]`
+//~ FLICK-T009 @58:7-58:19 a list can have any length, but this pattern matches only lists of at least 1 item, not `[]`
+//~ FLICK-T009 @63:3-63:14 `match` does not cover every value: `[]` is not matched
+//~ FLICK-T010 @65:5-65:11 this arm is never reached

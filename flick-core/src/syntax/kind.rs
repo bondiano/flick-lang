@@ -75,6 +75,7 @@ pub enum SyntaxKind {
     Colon,
     Dot,
     DotDot,
+    DotDotDot,
     Eq,
     Arrow,
     FatArrow,
@@ -187,6 +188,8 @@ pub enum SyntaxKind {
     RecordPatField,
     AnnotPat,
     OrPat,
+    /// `...rest` closing a list pattern; not a pattern by itself.
+    RestPat,
 
     // nodes: types and kinds
     NameType,

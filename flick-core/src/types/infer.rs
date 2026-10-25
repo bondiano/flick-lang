@@ -275,7 +275,7 @@ impl Checker<'_> {
                 None => (self.fresh(), None),
             };
             let pat = self.bind_pattern(param, &ty);
-            self.irrefutable(&pat, param);
+            self.irrefutable(&pat, param, None);
             stages.push((ty, effects));
         }
         let name = (node.kind == K::LetDecl)

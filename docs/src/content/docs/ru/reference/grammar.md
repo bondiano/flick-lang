@@ -480,11 +480,14 @@ pattern      = Con { "." Con } { atom_pattern } | atom_pattern
 atom_pattern = "_" | name | Con | ["-"] Number | ["-"] BigInt | String | "true" | "false"
              | "()" | "(" or_pattern ")" | "(" or_pattern ":" type ")"
              | "(" or_pattern "," or_pattern { "," or_pattern } ")"
-             | "[" [or_pattern { "," or_pattern }] "]"
+             | "[" [list_item { "," list_item }] "]"
+list_item    = or_pattern | "..." (name | "_")
              | "{" field ["=" or_pattern] { ";" | line break … } "}"
 ```
 
 Поле образца записи без `= pattern` связывает переменную с именем поля.
+`...rest` может стоять только последним в образце списка и связывает
+остаток списка.
 Образцы с альтернативами и условия ветвей следуют правилам Rust
 (см. [Варианты, условия веток и альтернативные образцы](../../spec/08-typescript-and-ffi/#варианты-условия-веток-и-альтернативные-образцы)).
 Все альтернативы связывают одни и те же имена. Одно имя нельзя связать

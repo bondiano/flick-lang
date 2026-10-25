@@ -1,6 +1,7 @@
 //! Patterns of `let`, `fun` parameters and match arms.
 
 use super::{Ctx, Done, K, Parser, expr, types};
+use crate::diagnostics::codes;
 
 /// Alternatives `p | q | …` of a match arm or a parenthesized pattern.
 pub(super) fn or_pattern(p: &mut Parser) -> Option<Done> {
@@ -75,9 +76,7 @@ pub(super) fn atom_pattern(p: &mut Parser) -> Option<Done> {
         }
         K::LParen => paren_pattern(p),
         K::LBracket => {
-            p.delimited(K::RBracket, |p| {
-                or_pattern(p);
-            });
+            p.delimited(K::RBracket, list_pattern_item);
             K::ListPat
         }
         K::LBrace => {
@@ -98,6 +97,30 @@ pub(super) fn atom_pattern(p: &mut Parser) -> Option<Done> {
     };
     p.leave();
     Some(p.complete(m, kind))
+}
+
+/// An item of a list pattern: a pattern, or `...name` / `..._` last.
+fn list_pattern_item(p: &mut Parser) {
+    if !p.at(K::DotDotDot) {
+        or_pattern(p);
+        return;
+    }
+    let m = p.start();
+    p.bump();
+    if matches!(p.current(), K::Ident | K::Underscore) {
+        atom_pattern(p);
+    } else {
+        p.error_expected("a name or `_` after `...`");
+    }
+    p.complete(m, K::RestPat);
+    if p.at(K::Comma) && p.nth(1) != K::RBracket {
+        let span = p.here_span();
+        p.error_at(
+            codes::S007,
+            span,
+            "`...rest` must be the last item of a list pattern".to_owned(),
+        );
+    }
 }
 
 fn paren_pattern(p: &mut Parser) -> K {

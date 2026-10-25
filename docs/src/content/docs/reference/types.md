@@ -134,6 +134,11 @@ warning `FLICK-T010`. A constructor pattern takes exactly the constructor's
 arguments (`FLICK-T018`). Patterns in `let` and in parameters must match every
 value. A record pattern lists some of the fields.
 
+A list pattern `[a, b]` matches only lists of that length, and `[a, b, ...rest]`
+only lists of at least that length, so `[] | [x, ...rest]` covers every list.
+A list can have any length, so a list pattern in `let` is an error unless it is
+`[...all]`: use `match`, or a tuple when the length is fixed.
+
 ## Numbers and operators
 
 There are no implicit conversions (see [Schema and standard data types](../../spec/09-schema/)).

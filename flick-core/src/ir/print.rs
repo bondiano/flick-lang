@@ -234,7 +234,9 @@ pub fn pat(p: &Pat) -> String {
         Pat::Bind(n) => n.clone(),
         Pat::Lit(l) => lit(l),
         Pat::Tuple(items) => format!("({})", pats(items, ", ")),
-        Pat::List(items) => format!("[{}]", pats(items, ", ")),
+        Pat::List(items, None) => format!("[{}]", pats(items, ", ")),
+        Pat::List(items, Some(rest)) if items.is_empty() => format!("[...{}]", pat(rest)),
+        Pat::List(items, Some(rest)) => format!("[{}, ...{}]", pats(items, ", "), pat(rest)),
         Pat::Record(fields) => {
             let fields: Vec<String> = fields
                 .iter()

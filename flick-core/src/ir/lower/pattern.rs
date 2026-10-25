@@ -34,7 +34,16 @@ impl Lower<'_> {
             }
             K::UnitPat => Pat::Lit(Lit::Unit),
             K::TuplePat => Pat::Tuple(children.iter().map(|c| self.pattern(c)).collect()),
-            K::ListPat => Pat::List(children.iter().map(|c| self.pattern(c)).collect()),
+            K::ListPat => {
+                let (rest, items): (Vec<&Node>, Vec<&Node>) =
+                    children.iter().partition(|c| c.kind == K::RestPat);
+                Pat::List(
+                    items.iter().map(|c| self.pattern(c)).collect(),
+                    rest.first()
+                        .and_then(|r| r.nodes().next())
+                        .map(|r| Box::new(self.pattern(r))),
+                )
+            }
             K::RecordPat => Pat::Record(
                 node.nodes()
                     .filter(|n| n.kind == K::RecordPatField)

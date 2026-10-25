@@ -92,8 +92,11 @@ fn pat_size(p: &Pat) -> usize {
     match p {
         Pat::Wild | Pat::Bind(_) => 0,
         Pat::Lit(_) => 1,
-        Pat::Tuple(items) | Pat::List(items) | Pat::Con(_, items) | Pat::Or(items) => {
+        Pat::Tuple(items) | Pat::Con(_, items) | Pat::Or(items) => {
             1 + items.iter().map(pat_size).sum::<usize>()
+        }
+        Pat::List(items, rest) => {
+            1 + items.iter().chain(rest.as_deref()).map(pat_size).sum::<usize>()
         }
         Pat::Record(fields) => 1 + fields.iter().map(|(_, p)| pat_size(p)).sum::<usize>(),
     }
@@ -224,8 +227,13 @@ fn apply_pat(p: &mut Pat, names: &HashMap<String, String>) {
             }
         }
         Pat::Wild | Pat::Lit(_) => {}
-        Pat::Tuple(items) | Pat::List(items) | Pat::Con(_, items) | Pat::Or(items) => {
+        Pat::Tuple(items) | Pat::Con(_, items) | Pat::Or(items) => {
             for i in items {
+                apply_pat(i, names);
+            }
+        }
+        Pat::List(items, rest) => {
+            for i in items.iter_mut().chain(rest.as_deref_mut()) {
                 apply_pat(i, names);
             }
         }

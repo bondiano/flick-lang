@@ -36,6 +36,9 @@ pub enum Ctor {
     Tuple(usize),
     /// A list literal pattern of this length.
     List(usize),
+    /// A list pattern `[a, b, ...rest]` with this many items before the rest:
+    /// lists of at least that length.
+    ListRest(usize),
     /// A `Number`, `BigInt` or `String` literal, by its value.
     Literal(String),
 }
@@ -121,11 +124,19 @@ impl Checker<'_> {
             K::ListPat => {
                 let item = self.fresh();
                 self.pattern_type(&Type::app(Type::prim("List"), item.clone()), ty, node);
-                let args = children
-                    .iter()
-                    .map(|c| self.bind_pattern(c, &item))
-                    .collect();
-                Pat::Ctor(Ctor::List(children.len()), args)
+                let (rest, items): (Vec<&Node>, Vec<&Node>) =
+                    children.iter().partition(|c| c.kind == K::RestPat);
+                let args = items.iter().map(|c| self.bind_pattern(c, &item)).collect();
+                let list = Type::app(Type::prim("List"), item);
+                for r in rest.iter().flat_map(|r| r.nodes()) {
+                    self.bind_pattern(r, &list);
+                }
+                let ctor = if rest.is_empty() {
+                    Ctor::List(items.len())
+                } else {
+                    Ctor::ListRest(items.len())
+                };
+                Pat::Ctor(ctor, args)
             }
             K::RecordPat => self.record_pattern(node, ty),
             K::AnnotPat => {

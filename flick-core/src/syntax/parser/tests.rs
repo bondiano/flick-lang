@@ -210,3 +210,13 @@ fn sql_captures_take_a_name_a_field_path_or_parentheses() {
         ["FLICK-S007 x", "FLICK-S007 $"]
     );
 }
+
+#[test]
+fn list_patterns_end_with_a_rest() {
+    assert_eq!(
+        sexp("let [x, ...rest] = xs"),
+        "(LetDecl let (ListPat [ (VarPat x) , (RestPat ... (VarPat rest)) ]) = (Block (NameExpr xs)))"
+    );
+    assert_eq!(errors("let [...rest, x] = xs"), ["FLICK-S007 ,"]);
+    assert_eq!(errors("let [...] = xs"), ["FLICK-S007 ]"]);
+}

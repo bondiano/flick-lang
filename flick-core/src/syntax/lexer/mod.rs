@@ -205,7 +205,8 @@ impl Lexer<'_> {
     /// Length and kind of the operator or delimiter at `pos`, if any.
     fn punct(&self) -> Option<(usize, SyntaxKind)> {
         use SyntaxKind as K;
-        const TABLE: [(&str, SyntaxKind); 33] = [
+        const TABLE: [(&str, SyntaxKind); 34] = [
+            ("...", K::DotDotDot),
             ("..", K::DotDot),
             ("->", K::Arrow),
             ("=>", K::FatArrow),

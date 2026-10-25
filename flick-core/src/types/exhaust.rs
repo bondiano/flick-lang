@@ -86,19 +86,62 @@ impl Checker<'_> {
         })
     }
 
-    /// A pattern of `let` or of a parameter must match every value.
-    pub fn irrefutable(&mut self, pat: &Pat, node: &Node) {
+    /// A pattern of `let` or of a parameter must match every value. `value`
+    /// is the expression a `let` binds, for the fix of a list pattern.
+    pub fn irrefutable(&mut self, pat: &Pat, node: &Node, value: Option<&Node>) {
         if *pat == Pat::Wild {
             return;
         }
-        if let Some(witness) = self.useful(&[vec![pat.clone()]], &[Pat::Wild]) {
-            let shown = self.show_pat(&witness[0], false);
-            self.error(
-                codes::T009,
-                self.span(node),
-                format!("this pattern does not match `{shown}`; use `match` to handle every case"),
-            );
+        let Some(witness) = self.useful(&[vec![pat.clone()]], &[Pat::Wild]) else {
+            return;
+        };
+        let shown = self.show_pat(&witness[0], false);
+        let items = |n: usize| if n == 1 { "1 item".to_owned() } else { format!("{n} items") };
+        let message = match pat {
+            Pat::Ctor(Ctor::List(n), _) => format!(
+                "a list can have any length, but this pattern matches only lists of {}, \
+                 not `{shown}`; use `match` to handle every length, or a tuple if the length is fixed",
+                items(*n)
+            ),
+            Pat::Ctor(Ctor::ListRest(n), _) => format!(
+                "a list can have any length, but this pattern matches only lists of at least {}, \
+                 not `{shown}`; use `match` to handle every length",
+                items(*n)
+            ),
+            _ => format!("this pattern does not match `{shown}`; use `match` to handle every case"),
+        };
+        let diagnostic = diagnostics::Diagnostic::error(codes::T009, message, self.span(node));
+        self.diagnostics.push(match self.tuple_fix(node, value) {
+            Some(edits) => diagnostic.with_fix("use a tuple", edits),
+            None => diagnostic,
+        });
+    }
+
+    /// `let [a, b] = [x, y]` becomes `let (a, b) = (x, y)`.
+    fn tuple_fix(&self, pattern: &Node, value: Option<&Node>) -> Option<Vec<diagnostics::Edit>> {
+        let value = value?;
+        let n = pattern.nodes().count();
+        let fits = pattern.kind == K::ListPat
+            && value.kind == K::ListExpr
+            && n >= 2
+            && value.nodes().count() == n
+            && pattern.nodes().all(|c| c.kind != K::RestPat);
+        if !fits {
+            return None;
         }
+        let edit = |at: u32, text: &str| diagnostics::Edit {
+            span: Span::new(self.file, at, at + 1),
+            replacement: text.to_owned(),
+        };
+        Some(
+            [pattern, value]
+                .iter()
+                .flat_map(|n| {
+                    let (start, end) = n.range();
+                    [edit(start, "("), edit(end - 1, ")")]
+                })
+                .collect(),
+        )
     }
 
     /// Whether `pat` matches every value of its type.
@@ -119,6 +162,26 @@ impl Checker<'_> {
                     .collect();
                 self.useful(&rows, &v)
             }),
+            Pat::Ctor(Ctor::ListRest(m), args) => {
+                let heads = rows.iter().filter_map(|r| match &r[0] {
+                    Pat::Ctor(c, _) => Some(c),
+                    _ => None,
+                });
+                let all = list_ctors(heads.chain(iter::once(&Ctor::ListRest(*m))))?;
+                all.iter()
+                    .filter(|(c, _)| covers(&Ctor::ListRest(*m), c))
+                    .find_map(|(ctor, arity)| {
+                        let specialized = specialize(&rows, ctor, *arity);
+                        let v: Vec<Pat> = args
+                            .iter()
+                            .cloned()
+                            .chain(iter::repeat_n(Pat::Wild, arity - m))
+                            .chain(rest.iter().cloned())
+                            .collect();
+                        let witness = self.useful(&specialized, &v)?;
+                        Some(rebuild(ctor, witness, *arity))
+                    })
+            }
             Pat::Ctor(ctor, args) => {
                 let specialized = specialize(&rows, ctor, args.len());
                 let v: Vec<Pat> = args.iter().chain(rest).cloned().collect();
@@ -160,9 +223,12 @@ impl Checker<'_> {
                 seen.push(c);
             }
         }
-        let all = seen.first().and_then(|c| self.constructors(c));
+        let all = seen
+            .first()
+            .and_then(|c| list_ctors(seen.iter().copied()).or_else(|| self.constructors(c)));
+        let covered = |c: &Ctor| seen.iter().any(|s| covers(s, c));
         if let Some(all) = &all
-            && all.iter().all(|(c, _)| seen.contains(&c))
+            && all.iter().all(|(c, _)| covered(c))
         {
             return all.iter().find_map(|(ctor, arity)| {
                 let specialized = specialize(rows, ctor, *arity);
@@ -182,7 +248,7 @@ impl Checker<'_> {
         let missing = match (&all, seen.first()) {
             (Some(all), _) => all
                 .iter()
-                .find(|(c, _)| !seen.contains(&c))
+                .find(|(c, _)| !covered(c))
                 .map_or(Pat::Wild, |(c, arity)| {
                     Pat::Ctor(c.clone(), vec![Pat::Wild; *arity])
                 }),
@@ -204,7 +270,7 @@ impl Checker<'_> {
             Ctor::Bool(_) => Some(vec![(Ctor::Bool(false), 0), (Ctor::Bool(true), 0)]),
             Ctor::Unit => Some(vec![(Ctor::Unit, 0)]),
             Ctor::Tuple(n) => Some(vec![(Ctor::Tuple(*n), *n)]),
-            Ctor::List(_) | Ctor::Literal(_) => None,
+            Ctor::List(_) | Ctor::ListRest(_) | Ctor::Literal(_) => None,
             Ctor::Variant { module, ty, .. } => {
                 let names = match &self.env.type_def(module, ty)?.form {
                     Form::Adt { constructors, .. } => constructors.clone(),
@@ -251,6 +317,8 @@ impl Checker<'_> {
             Pat::Ctor(Ctor::Literal(text), _) => text.clone(),
             Pat::Ctor(Ctor::Tuple(_), args) => format!("({})", self.show_pats(args)),
             Pat::Ctor(Ctor::List(_), args) => format!("[{}]", self.show_pats(args)),
+            Pat::Ctor(Ctor::ListRest(_), args) if args.is_empty() => "[..._]".to_owned(),
+            Pat::Ctor(Ctor::ListRest(_), args) => format!("[{}, ..._]", self.show_pats(args)),
             Pat::Record(fields) => {
                 let shown: Vec<String> = fields
                     .iter()
@@ -307,13 +375,46 @@ fn specialize(rows: &[Vec<Pat>], ctor: &Ctor, arity: usize) -> Vec<Vec<Pat>> {
     rows.iter()
         .filter_map(|row| {
             let args = match &row[0] {
-                Pat::Ctor(c, args) if c == ctor => args.clone(),
+                Pat::Ctor(c, args) if covers(c, ctor) => {
+                    let mut args = args.clone();
+                    args.resize(arity, Pat::Wild);
+                    args
+                }
                 Pat::Wild => vec![Pat::Wild; arity],
                 _ => return None,
             };
             Some(args.into_iter().chain(row[1..].iter().cloned()).collect())
         })
         .collect()
+}
+
+/// Whether the constructor of a pattern matches every value of `ctor`:
+/// `[a, ...rest]` matches the lists of one item and more.
+fn covers(head: &Ctor, ctor: &Ctor) -> bool {
+    match (head, ctor) {
+        (Ctor::ListRest(m), Ctor::List(n) | Ctor::ListRest(n)) => n >= m,
+        _ => head == ctor,
+    }
+}
+
+/// The lengths a list's patterns tell apart, once one has a rest: each
+/// length up to the longest pattern, then every longer list together.
+fn list_ctors<'c>(heads: impl Iterator<Item = &'c Ctor>) -> Option<Vec<(Ctor, usize)>> {
+    let (mut exact, mut rest) = (0, None);
+    for head in heads {
+        match head {
+            Ctor::List(n) => exact = exact.max(n + 1),
+            Ctor::ListRest(m) => rest = Some(rest.unwrap_or(0).max(*m)),
+            _ => {}
+        }
+    }
+    let longest = exact.max(rest?);
+    Some(
+        (0..longest)
+            .map(|n| (Ctor::List(n), n))
+            .chain(iter::once((Ctor::ListRest(longest), longest)))
+            .collect(),
+    )
 }
 
 /// Labels the record patterns of the first column mention, sorted.

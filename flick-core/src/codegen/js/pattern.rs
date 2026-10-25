@@ -29,11 +29,15 @@ impl Gen<'_> {
                     self.test(item, &format!("{subject}[{i}]"), t);
                 }
             }
-            Pat::List(items) => {
+            Pat::List(items, rest) => {
+                let op = if rest.is_some() { ">=" } else { "===" };
                 t.conds
-                    .push(format!("{subject}.length === {}", items.len()));
+                    .push(format!("{subject}.length {op} {}", items.len()));
                 for (i, item) in items.iter().enumerate() {
                     self.test(item, &format!("{subject}[{i}]"), t);
+                }
+                if let Some(rest) = rest {
+                    self.test(rest, &format!("{subject}.slice({})", items.len()), t);
                 }
             }
             Pat::Record(fields) => {

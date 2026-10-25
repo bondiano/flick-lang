@@ -56,6 +56,7 @@ fn numbers_follow_js_grammar_without_dot_forms() {
     }
     assert_eq!(kinds("xs.len").0.len(), 3);
     assert_eq!(kinds("(..)").0[1].0, K::DotDot);
+    assert_eq!(kinds("[...r]").0[1].0, K::DotDotDot);
 }
 
 #[test]

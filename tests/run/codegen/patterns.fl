@@ -19,6 +19,18 @@ let first xs =
   | [None, Some (1 | 2)] -> -1
   | _ -> 0
 
+sum : List Number -> Number
+let rec sum xs =
+  match xs with
+  | [] -> 0
+  | [x, ...rest] -> x + sum rest
+
+split : List Number -> String
+let split xs =
+  match xs with
+  | [a, b, ...rest] -> show (a + b) ++ " " ++ show rest
+  | _ -> "short"
+
 area : { w : Number; h : Number } -> Number
 let area { w; h = height } = w * height
 
@@ -36,6 +48,8 @@ let main () =
       ++ classify Empty)
   Platform.stdout_line (show [first [Some 5], first [Some 6, None], first [None, Some 2], first []])
   Platform.stdout_line (show (area { w = 3; h = 4 }))
+  Platform.stdout_line (show (sum [1, 2, 3, 4]))
+  Platform.stdout_line (split [1] ++ ", " ++ split [1, 2] ++ ", " ++ split [1, 2, 3])
   let (a, (b, c)) = (1, (2, 3))
   Platform.stdout_line (show (a + b + c))
   let words = ["a"] ++ ["b", "c"]

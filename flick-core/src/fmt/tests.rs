@@ -172,3 +172,8 @@ fn items_ending_a_line_end_with_their_separator() {
     "#);
     assert_eq!(fmt(&out), out, "trailing separators are idempotent");
 }
+
+#[test]
+fn keeps_a_rest_pattern_tight() {
+    assert_eq!(fmt("let [ x ,  ...  rest ] = xs\n"), "let [x, ...rest] = xs\n");
+}

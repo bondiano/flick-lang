@@ -1,5 +1,5 @@
 // Exhaustive `match`: every value of the scrutinee has an arm.
-module App.Matching exposing (describe, area, flags, pairs, lists)
+module App.Matching exposing (describe, area, flags, pairs, lists, rests, prefixes, everything)
 
 type Shape =
   | Circle Number
@@ -42,6 +42,24 @@ let lists items =
   | [x] -> x
   | [x, y] -> x + y
   | _ -> -1
+
+rests : List Number -> Number
+let rec rests items =
+  match items with
+  | [] -> 0
+  | [x, ...rest] -> x + rests rest
+
+prefixes : List Number -> Number
+let prefixes items =
+  match items with
+  | [a] -> a
+  | [a, b, ..._] -> a + b
+  | [] -> 0
+
+everything : List Number -> List Number
+let everything items =
+  let [...all] = items
+  all
 
 labels : { label : String; size : Number } -> String
 let labels value =

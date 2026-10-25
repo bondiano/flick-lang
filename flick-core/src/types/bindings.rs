@@ -208,7 +208,11 @@ impl Checker<'_> {
         self.store.lower(&ty);
         if let Some(pattern) = parts.pattern {
             let pat = self.bind_pattern(pattern, &ty);
-            self.irrefutable(&pat, pattern);
+            let value = parts.body.and_then(|b| match b.nodes().collect::<Vec<_>>()[..] {
+                [only] => Some(only),
+                _ => None,
+            });
+            self.irrefutable(&pat, pattern, value);
         } else {
             let _ = decl;
         }

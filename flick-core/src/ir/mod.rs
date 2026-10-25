@@ -409,7 +409,8 @@ pub enum Pat {
     /// A literal; `Number` and `BigInt` may be negative.
     Lit(Lit),
     Tuple(Vec<Pat>),
-    List(Vec<Pat>),
+    /// Items, then the pattern of the rest of a `[a, ...rest]`.
+    List(Vec<Pat>, Option<Box<Pat>>),
     /// Fields a record pattern mentions.
     Record(Vec<(String, Pat)>),
     Con(Constructor, Vec<Pat>),
@@ -480,8 +481,13 @@ impl Pat {
         match self {
             Pat::Bind(name) => out.push(name),
             Pat::Wild | Pat::Lit(_) => {}
-            Pat::Tuple(items) | Pat::List(items) | Pat::Con(_, items) => {
+            Pat::Tuple(items) | Pat::Con(_, items) => {
                 for p in items {
+                    p.binders(out);
+                }
+            }
+            Pat::List(items, rest) => {
+                for p in items.iter().chain(rest.as_deref()) {
                     p.binders(out);
                 }
             }
@@ -506,7 +512,8 @@ impl Pat {
             Pat::Tuple(items) => items.iter().all(Pat::irrefutable),
             Pat::Record(fields) => fields.iter().all(|(_, p)| p.irrefutable()),
             Pat::Or(alternatives) => alternatives.iter().any(Pat::irrefutable),
-            Pat::Lit(_) | Pat::List(_) | Pat::Con(..) => false,
+            Pat::List(items, rest) => items.is_empty() && rest.is_some(),
+            Pat::Lit(_) | Pat::Con(..) => false,
         }
     }
 }

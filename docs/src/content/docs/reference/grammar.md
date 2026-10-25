@@ -446,12 +446,14 @@ pattern      = Con { "." Con } { atom_pattern } | atom_pattern
 atom_pattern = "_" | name | Con | ["-"] Number | ["-"] BigInt | String | "true" | "false"
              | "()" | "(" or_pattern ")" | "(" or_pattern ":" type ")"
              | "(" or_pattern "," or_pattern { "," or_pattern } ")"
-             | "[" [or_pattern { "," or_pattern }] "]"
+             | "[" [list_item { "," list_item }] "]"
+list_item    = or_pattern | "..." (name | "_")
              | "{" field ["=" or_pattern] { ";" | line break … } "}"
 ```
 
 A record pattern field without `= pattern` binds a variable named like the
-field. Or-patterns and guards follow Rust's rules (see [Variants, guards and or-patterns](../../spec/08-typescript-and-ffi/#variants-guards-and-or-patterns)): every alternative binds the same names, a name is bound at
+field. `...rest` may only be the last item of a list pattern; it binds the
+rest of the list. Or-patterns and guards follow Rust's rules (see [Variants, guards and or-patterns](../../spec/08-typescript-and-ffi/#variants-guards-and-or-patterns)): every alternative binds the same names, a name is bound at
 most once per pattern or per function's parameters (`FLICK-S012`), and a
 guard `when e` covers the whole arm. A `|` at the start of a line inside an
 arm's pattern continues the or-pattern; after `->` it starts the next arm.
