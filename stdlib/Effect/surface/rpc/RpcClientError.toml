@@ -1,0 +1,5 @@
+[wrapped]
+RpcClientError = "Rpc.call a6603e6ab501ddbe"
+
+[excluded]
+RpcClientDefect = "a defect of the client, which `Rpc.call` reports as a defect"

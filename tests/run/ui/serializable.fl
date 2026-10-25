@@ -2,7 +2,7 @@
 // `Module.name`, and `Module.name/key` for each atom of a family.
 module App.Main exposing (main)
 
-dehydrated : Unit ->{Reactivity.Atom.Registry; none} String
+dehydrated : Unit ->{Atom.Registry; none} String
 foreign effect dehydrated from "./hydration.mjs" "dehydrated"
   arity 0
 

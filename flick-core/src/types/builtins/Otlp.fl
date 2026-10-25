@@ -1,0 +1,29 @@
+/// Exporters of OpenTelemetry's protocol over HTTP with JSON: a program
+/// provides one, and its spans, log records or metrics are sent to the
+/// collector in batches, the rest when the layer's scope closes. The module
+/// is unstable, as Effect marks `effect/observability`.
+module Otlp exposing (..)
+
+/// Where the exporter sends and the service it names in what it sends.
+type alias Options = { url : String; service_name : String }
+
+/// Traces, logs and metrics, sent under `url` (`http://localhost:4318`) to
+/// `/v1/traces`, `/v1/logs` and `/v1/metrics`.
+layer : Options -> Layer none none none
+foreign pure layer from "@flick-lang/runtime/effect/observability/Otlp" "otlpLayer"
+  reviewed "effect@4.0.5 sha256:d572158125d5099d"
+
+/// Spans, sent to `url` (`http://localhost:4318/v1/traces`).
+traces : Options -> Layer none none none
+foreign pure traces from "@flick-lang/runtime/effect/observability/Otlp" "otlpTraces"
+  reviewed "effect@4.0.5 sha256:b9be076a3b681501"
+
+/// Log records, sent to `url` (`http://localhost:4318/v1/logs`).
+logs : Options -> Layer none none none
+foreign pure logs from "@flick-lang/runtime/effect/observability/Otlp" "otlpLogs"
+  reviewed "effect@4.0.5 sha256:84bff042d5561fc1"
+
+/// Metrics, sent to `url` (`http://localhost:4318/v1/metrics`).
+metrics : Options -> Layer none none none
+foreign pure metrics from "@flick-lang/runtime/effect/observability/Otlp" "otlpMetrics"
+  reviewed "effect@4.0.5 sha256:03304a237d1ab870"

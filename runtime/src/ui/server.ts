@@ -110,12 +110,14 @@ const markupOf = (registry: AtomRegistry.AtomRegistry, container: string, ui: Ui
         watched.set(atom, off);
       };
       const streaming = {
-        wait: (atoms: ReadonlyArray<Atom.Atom<unknown>>): Promise<void> =>
+        wait: (read: ReadonlyMap<Atom.Atom<unknown>, unknown>): Promise<void> =>
           new Promise<void>((resolve) => {
-            for (const atom of atoms) {
+            for (const [atom, value] of read) {
               watch(atom);
-              waiting.set(atom, [...(waiting.get(atom) ?? []), resolve]);
+              // a change between the read and the subscription would not call it
+              if (!Object.is(Atom.getServerValue(atom, registry), value)) return resolve();
             }
+            for (const atom of read.keys()) waiting.set(atom, [...(waiting.get(atom) ?? []), resolve]);
           }),
       };
       const tree = createElement(

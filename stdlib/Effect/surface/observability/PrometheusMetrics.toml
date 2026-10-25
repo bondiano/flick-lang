@@ -1,0 +1,9 @@
+[wrapped]
+format = "Prometheus.format f7c1d415fcfb2b6e"
+
+[excluded]
+FormatOptions = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
+HttpOptions = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
+MetricNameMapper = "TS-only: type-level machinery of Effect's OTLP types; Flick's layers carry no exported data types"
+formatUnsafe = "`Prometheus.format` gives the text a route answers; the synchronous form and the router layer are outside the first binding"
+layerHttp = "`Prometheus.format` gives the text a route answers; the synchronous form and the router layer are outside the first binding"

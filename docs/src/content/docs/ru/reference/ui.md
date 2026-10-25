@@ -110,8 +110,10 @@ SaveError} Unit` нельзя передать функцию обратного
 создаёт состояние, `Atom.derived` — атом, вычисляемый из прочитанных им
 атомов. `Atom.set` и `Atom.update` изменяют состояние через сервис
 `Atom.Write`: он доступен задаче действия, но не функции рендера.
-`Atom.layer` предоставляет один реестр сразу как `Reactivity.Atom.Registry`,
+`Atom.layer` предоставляет один реестр сразу как `Atom.Registry`,
 из которого читают корни и серверная разметка, и как `Atom.Write`.
+`Atom.Registry` — это `Reactivity.Atom.Registry` из Effect под коротким
+именем: псевдоним сервиса в строке эффектов означает сам сервис.
 
 Представление — компонент, функция рендера которого читает атомы через
 сервис `Atom.Read`. `Ui.Dom.mount` отображает `Ui` с предоставленным
@@ -274,7 +276,7 @@ let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 
 ```flick
 mount :
   forall c r.
-  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Reactivity.Atom.Registry, Atom.Write | r; none} Never
+  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Atom.Registry, Atom.Write | r; none} Never
 ```
 
 `Ui.Dom.mount container supervisor ui` отображает `ui` один раз; входящие
@@ -416,6 +418,29 @@ let query = Atom.on_server "" (Atom.search_param "q")
 
 tab : Atom.Atom (Option String)
 let tab = Atom.client_only (Atom.search_param "tab")
+```
+
+### Потоковый рендер
+
+`Ui.Server.stream "app" ui` сам отображает контейнер `<div id="app"
+data-flick-ssr>` и отдаёт разметку частями, по мере того как её рендерит
+React, — для потокового ответа. Представление `Ui.suspended`, читающее
+загружающуюся задачу, сначала уходит как его заглушка, а разметка следует,
+когда задача завершится; задача, прочитанная вне `Ui.suspended`, уходит как
+`Loading`, и поток её не ждёт. Сериализуемые атомы идут в потоке
+JSON-скриптами: атомы оболочки — перед ней, значение сериализуемой задачи —
+перед разметкой, которая его показывает. `Atom.serializable_task wire task`
+помечает атом задачи, загруженное значение которого сервер так передаёт; ключ
+тот же, что у `Atom.serializable`, и клиент начинает с этого значения, не
+запуская задачу снова. `Ui.Dom.mount` на контейнере гидрирует скрипты,
+пришедшие после монтирования, по мере их прихода.
+
+```flick
+user : Atom.Atom (Atom.Async String none)
+let user = Atom.serializable_task (Codec.json Schema.string) (Atom.task (task { fetch_name () }))
+
+chunks : Unit ->{} List String
+let chunks () = provide Atom.layer { Stream.run_collect (Ui.Server.stream "app" page) }
 ```
 
 ### Шаблоны без React

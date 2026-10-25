@@ -98,7 +98,7 @@ const component = (view: View): FunctionComponent<object> => {
     const node = draw(view, props, reading, () => {
       // a streamed page shows the boundary's fallback and sends this view once a read atom changes
       // oxlint-disable-next-line typescript/only-throw-error -- React suspends a render that throws a promise
-      if (streaming !== undefined) throw streaming.wait([...read.keys()]);
+      if (streaming !== undefined) throw streaming.wait(read);
       return view.fallback ?? uiFragment([]);
     });
     // Subscribe after the commit; a write since the render renders again.

@@ -1,0 +1,123 @@
+/// Typed remote procedure calls over Effect's RPC, served over HTTP with
+/// NDJSON. A procedure is described with codecs, procedures form a group,
+/// and the type of the group is the record of handlers it needs, so
+/// `listen` takes exactly one handler per procedure and a missing or extra
+/// one is a type error naming the procedure. `call` and `call_stream` call
+/// a procedure from the same value. The module is unstable, as Effect marks
+/// `effect/rpc`.
+module Rpc exposing (..)
+
+import Stream.Core exposing (Stream)
+
+/// A procedure named `l`, whose handler has the type `f`: `p ->{r; e} s`.
+/// The handler's errors `e` are those of the signature given to the
+/// procedure; `with_errors` says how each is coded.
+type Rpc (l : Symbol) f
+
+/// A typed error of a procedure: its JSON codec.
+type ErrorCase
+
+/// A group whose handlers form the record `hs`.
+type Group hs
+
+/// A running server of region `s`; it stops when the scope that started it
+/// closes, after the calls it is serving.
+type Server (s : Region)
+
+/// Where the server listens, and the path of its procedures.
+type alias ServeOptions = { host : String; port : Number; path : String }
+
+/// The server could not start.
+type error ServeError = ServeError String
+  deriving Eq, Show
+
+/// A call that could not be sent or whose answer did not decode.
+type error ClientError = ClientError String
+  deriving Eq, Show
+
+/// A procedure named `l` with no parts yet: its handler takes `Unit` and
+/// answers `Unit`.
+make : forall l r e. Record.Label l -> Rpc l (Unit ->{r; e} Unit)
+foreign pure make from "@flick-lang/runtime/effect/rpc/Rpc" "rpcMake"
+  reviewed "effect@4.0.5 sha256:04f66df479054dbe"
+
+/// The payload, coded as JSON.
+with_payload :
+  forall l p r e s p2. PureCodec Json p2 -> Rpc l (p ->{r; e} s) -> Rpc l (p2 ->{r; e} s)
+foreign pure with_payload from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithPayload"
+  arity 2
+  reviewed "effect@4.0.5 sha256:04f66df479054dbe"
+
+/// The success, coded as JSON.
+with_success :
+  forall l p r e s s2. PureCodec Json s2 -> Rpc l (p ->{r; e} s) -> Rpc l (p ->{r; e} s2)
+foreign pure with_success from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithSuccess"
+  arity 2
+  reviewed "effect@4.0.5 sha256:04f66df479054dbe"
+
+/// The success as a stream of elements, each coded as JSON and sent as it
+/// comes; a failure of the handler fails the stream.
+with_stream :
+  forall l p r e s a.
+  PureCodec Json a -> Rpc l (p ->{r; e} s) -> Rpc l (p ->{r; e} Stream none none a)
+foreign pure with_stream from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithStream"
+  arity 2
+  reviewed "effect@4.0.5 sha256:60a7d20a9e48db21"
+
+/// A typed error with its codec: `error_case (Codec.json (schema NotFound))`.
+error_case : PureCodec Json t -> ErrorCase
+foreign pure error_case from "@flick-lang/runtime/effect/rpc/Rpc" "rpcErrorCase"
+  reviewed "effect@4.0.5 sha256:04f66df479054dbe"
+
+/// How the typed errors of the handler are coded. An error no case has is
+/// a defect of the call.
+with_errors : List ErrorCase -> Rpc l f -> Rpc l f
+foreign pure with_errors from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithErrors"
+  arity 2
+  reviewed "effect@4.0.5 sha256:04f66df479054dbe"
+
+/// A group with no procedures yet.
+group : Group {}
+foreign pure group from "@flick-lang/runtime/effect/rpc/Rpc" "rpcGroup"
+  reviewed "effect@4.0.5 sha256:2778a7f9eb6fd7f5"
+
+/// The group with the procedure: its handler becomes a field of the group.
+add :
+  (Record.Lacks l hs, Record.UnionDisjoint hs (Record.Field l f) out) =>
+  Rpc l f -> Group hs -> Group out
+foreign pure add from "@flick-lang/runtime/effect/rpc/Rpc" "rpcAdd"
+  arity 2
+  reviewed "effect@4.0.5 sha256:2778a7f9eb6fd7f5"
+
+/// Serves the group with these handlers, one per procedure, at `path`,
+/// until the scope owning region `s` closes: then it stops accepting, lets
+/// the calls it serves finish and runs their finalizers. The handlers run
+/// with the services here.
+listen : forall c s r hs. ServeOptions -> Group hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
+foreign effect listen from "@flick-lang/runtime/effect/rpc/Rpc" "rpcListen"
+  arity 3
+  retention owner
+  reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"
+
+/// The port the server listens on: the one asked for, or the one the system
+/// chose for port 0.
+port : Server s -> Number
+foreign pure port from "@flick-lang/runtime/effect/rpc/Rpc" "rpcPort"
+  retention call
+  reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"
+
+/// Calls the procedure at `url` (`http://127.0.0.1:8080/rpc`): the success,
+/// a declared error as the typed failure, or `ClientError`.
+call : forall l p r e s. String -> Rpc l (p ->{r; e} s) -> p ->{; ClientError | e} s
+foreign effect call from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCall"
+  arity 3
+  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+
+/// Calls the stream procedure at `url`: its elements as they come, a
+/// declared error as the stream's failure, or `ClientError`.
+call_stream :
+  forall l p r e a.
+  String -> Rpc l (p ->{r; e} Stream none none a) -> p -> Stream none {ClientError | e} a
+foreign pure call_stream from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStream"
+  arity 3
+  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"

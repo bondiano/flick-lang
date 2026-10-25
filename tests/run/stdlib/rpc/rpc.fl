@@ -1,0 +1,69 @@
+// Typed RPC on a real Node server: the server and its client come from the
+// same procedures, a unary call answers its success or its declared error,
+// a stream call gets its elements as they come, and a call to a server that
+// is not there is a `ClientError`.
+module App.Main exposing (main)
+
+import Stream.Core exposing (Stream)
+
+type alias User = { id : Number; name : String }
+  deriving Schema
+
+type error NotFound = NotFound { id : Number }
+  deriving Schema
+
+get_user : Rpc.Rpc "get_user" (Number ->{r; NotFound} User)
+let get_user =
+  Rpc.make (Record.label : Record.Label "get_user")
+    |> Rpc.with_payload (Codec.json Schema.number)
+    |> Rpc.with_success (Codec.json (schema User))
+    |> Rpc.with_errors [Rpc.error_case (Codec.json (schema NotFound))]
+
+count_to : Rpc.Rpc "count_to" (Number ->{r;} Stream none none Number)
+let count_to =
+  Rpc.make (Record.label : Record.Label "count_to")
+    |> Rpc.with_payload (Codec.json Schema.number)
+    |> Rpc.with_stream (Codec.json Schema.number)
+
+type alias Handlers r =
+  {
+    get_user : Number ->{r; NotFound} User;
+    count_to : Number ->{r;} Stream none none Number;
+  }
+
+users : Rpc.Group (Handlers r)
+let users = Rpc.group |> Rpc.add get_user |> Rpc.add count_to
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let handlers : Handlers none =
+    {
+      get_user = fun id ->
+        if id == 1 then { id = 1; name = "Ada" } else from_result (Err (NotFound { id = id }));
+      count_to = fun n -> Stream.from_list (List.range 1 (n + 1));
+    }
+  let options : Rpc.ServeOptions = { host = "127.0.0.1"; port = 0; path = "/rpc" }
+  let result =
+    try
+      scope s {
+        let server = Rpc.listen options users handlers
+        let url = "http://127.0.0.1:" ++ show (Rpc.port server) ++ "/rpc"
+        let ada = Rpc.call url get_user 1
+        Platform.stdout_line ("got " ++ ada.name)
+        let missing =
+          try (Rpc.call url get_user 9).name with
+          | NotFound e -> "not found " ++ show e.id
+        Platform.stdout_line missing
+        let counted = Stream.run_collect (Rpc.call_stream url count_to 3)
+        Platform.stdout_line ("counted " ++ show counted)
+      }
+    with
+    | Rpc.ServeError message -> Platform.stdout_line ("serve: " ++ message)
+    | Rpc.ClientError message -> Platform.stdout_line ("client: " ++ message)
+    | NotFound e -> Platform.stdout_line ("not found " ++ show e.id)
+  result
+  let gone =
+    try (Rpc.call "http://127.0.0.1:9/rpc" get_user 1).name with
+    | Rpc.ClientError _ -> "no server"
+    | NotFound _ -> "not found"
+  Platform.stdout_line gone

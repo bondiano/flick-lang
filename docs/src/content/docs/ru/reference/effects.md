@@ -233,7 +233,13 @@ let clock_layer =
   Layer.succeed Clock clock_impl
 ```
 
-## Слои и `provide`
+`type alias` сервиса или ошибки означает в строке эффектов сам сервис или
+ошибку, поэтому модуль может дать сервису другого модуля своё имя:
+после `type alias Registry = Reactivity.Atom.Registry` строка
+`->{Atom.Registry;}` та же, что `->{Reactivity.Atom.Registry;}`. Псевдоним
+чего-то другого в строке — ошибка (`FLICK-T002`). Псевдоним — имя типа,
+а не пространство имён: как псевдоним типа данных не открывает его
+конструкторы, так псевдоним сервиса не открывает его операции и `S.Impl`.
 
 `Layer inputs errors outputs` создаёт сервисы `outputs`, используя сервисы
 `inputs`, и может завершиться с ошибками `errors`. В `provide layer { body }`

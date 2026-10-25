@@ -215,15 +215,23 @@ impl Lower<'_> {
             }
             Ref::Value { module, name }
                 if module == "Atom"
-                    && matches!(name.as_str(), "serializable" | "serializable_family") =>
+                    && matches!(
+                        name.as_str(),
+                        "serializable" | "serializable_family" | "serializable_task"
+                    ) =>
             {
                 // the key is the binding the check let it define
                 let key = format!("{}.{}", self.module, self.definition);
+                let (module, name) = if name == "serializable_task" {
+                    ("Atom", "serializable_task_at".to_owned())
+                } else {
+                    ("Reactivity.Atom", name.clone())
+                };
                 ExprKind::App {
                     func: Box::new(Expr::new(
                         ExprKind::Global {
-                            module: "Reactivity.Atom".to_owned(),
-                            name: name.clone(),
+                            module: module.to_owned(),
+                            name,
                         },
                         span,
                     )),

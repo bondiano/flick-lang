@@ -24,9 +24,13 @@ service Write =
   current : forall a. Atom a ->{} a
   refresh : forall a. Atom a ->{} Unit
 
+/// The registry roots and server markup read atoms from: Effect's
+/// `Reactivity.Atom.Registry` under the name of this module.
+type alias Registry = Reactivity.Atom.Registry
+
 /// A fresh registry: the values of atoms, which views read and `Write`
 /// writes. Provide one per root, and on a server one per request.
-layer : Layer none none {Reactivity.Atom.Registry, Write}
+layer : Layer none none {Registry, Write}
 foreign pure layer from "@flick-lang/runtime/effect/reactivity/Atom" "atomLayer"
 
 /// A state holding `value`, whatever its type. A registry keeps its value
@@ -134,6 +138,17 @@ let ready atom =
   | Loaded value -> value
   | Failed failure -> Failure.rethrow failure
   | Loading -> pending ()
+
+/// The task atom `atom`, whose loaded value `wire` codes so a server can
+/// hand it to the client: the client starts from it instead of running
+/// the task again. One still loading or failed is not handed over. Its key
+/// is the name of the top-level binding it defines, as for `serializable`.
+serializable_task : PureCodec Json a -> Atom (Async a e) -> Atom (Async a e)
+let serializable_task wire atom = serializable_task_at "Atom.serializable_task" wire atom
+
+/// `serializable_task` under the key the compiler gives.
+serializable_task_at : String -> PureCodec Json a -> Atom (Async a e) -> Atom (Async a e)
+foreign pure serializable_task_at from "@flick-lang/runtime" "atomSerializableTask"
 
 /// Atoms by key: `at family key` makes the atom of `key` the first time
 /// and gives the same one for every equal key after, so a view takes the

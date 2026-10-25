@@ -2,12 +2,14 @@
 /// do not load it.
 module Ui.Server exposing (..)
 
+import Stream.Core exposing (Stream)
+
 /// The markup of `ui`; a client root mounted on it with `Ui.Dom.mount`
 /// hydrates it. Its views read atoms from the provided registry: give each
 /// request its own with `provide Atom.layer { … }`, so requests
 /// rendered at once do not see each other's atoms, and nothing reads that
 /// registry once its `provide` ends. Handlers do not run here.
-render : forall c. Ui^c ->{Reactivity.Atom.Registry; none} String
+render : forall c. Ui^c ->{Atom.Registry; none} String
 foreign effect render from "@flick-lang/runtime/ui/server" "uiServerRender"
   retention call
 
@@ -17,9 +19,22 @@ foreign effect render from "@flick-lang/runtime/ui/server" "uiServerRender"
 /// that container writes them into its registry before its first render,
 /// so the client starts from the server's values. An atom whose value its
 /// codec does not encode is a defect naming its key.
-state : String ->{Reactivity.Atom.Registry; none} String
+state : String ->{Atom.Registry; none} String
 foreign effect state from "@flick-lang/runtime/ui/server" "uiServerState"
   arity 1
+
+/// The container `<div id="container" data-flick-ssr>` with the markup of
+/// `ui`, in chunks as React renders them, for a response to stream. A view
+/// of `Ui.suspended` that reads a loading task is sent as its fallback, and
+/// its markup follows once the task ends; a task read outside one is sent
+/// as `Loading` and not waited for. The serializable atoms come in JSON
+/// scripts: the shell's before it, a serializable task's value before the
+/// markup that shows it, so `Ui.Dom.mount` on the container hydrates that
+/// markup from the server's values. Run it inside the `provide` of the
+/// request's registry.
+stream : String -> Ui -> Stream {Atom.Registry} none String
+foreign pure stream from "@flick-lang/runtime/ui/server" "uiServerStream"
+  arity 2
 
 /// The HTML of `ui`, without React: a template for mail or any markup no
 /// client hydrates. Text and attribute values are escaped as `text` keeps

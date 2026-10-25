@@ -1,0 +1,19 @@
+[wrapped]
+layerNdjson = "Rpc.listen c72ee8574fb6c140"
+
+[excluded]
+CodecFor = "TS-only: type-level machinery of Effect's RPC types; Flick's `Rpc` types carry the same information"
+MaxBufferSizeExceeded = "`Rpc` speaks NDJSON; other serializations are outside the first binding"
+Parser = "TS-only: type-level machinery of Effect's RPC types; Flick's `Rpc` types carry the same information"
+RpcSerialization = "`Rpc` speaks NDJSON; other serializations are outside the first binding"
+StreamOptions = "TS-only: type-level machinery of Effect's RPC types; Flick's `Rpc` types carry the same information"
+json = "`Rpc` speaks NDJSON; other serializations are outside the first binding"
+jsonRpc = "`Rpc` speaks NDJSON; other serializations are outside the first binding"
+layerJson = "`Rpc` speaks NDJSON; other serializations are outside the first binding"
+layerJsonRpc = "`Rpc` speaks NDJSON; other serializations are outside the first binding"
+layerNdJsonRpc = "`Rpc` speaks NDJSON; other serializations are outside the first binding"
+layerNdjsonWith = "`Rpc` speaks NDJSON; other serializations are outside the first binding"
+layerSchemaBinary = "`Rpc` speaks NDJSON; other serializations are outside the first binding"
+makeNdjson = "`Rpc` speaks NDJSON; other serializations are outside the first binding"
+ndJsonRpc = "`Rpc` speaks NDJSON; other serializations are outside the first binding"
+ndjson = "`Rpc` speaks NDJSON; other serializations are outside the first binding"

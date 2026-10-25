@@ -1,0 +1,15 @@
+// An alias in a row must stand for a service or an error.
+module App.Aliases exposing (..)
+
+type alias Count = Number
+
+type alias Name = String
+
+counting : Unit ->{Count;} Number
+let counting () = 1
+
+naming : Unit ->{; Name} Number
+let naming () = 1
+
+//~ FLICK-T002 @8:20-8:25 `Count` has kind Type, but a Service is expected here
+//~ FLICK-T002 @11:20-11:24 `String` is not an error

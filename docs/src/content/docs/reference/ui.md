@@ -96,8 +96,9 @@ through it. `Atom.make value` is a state, `Atom.derived` an atom computed
 from the atoms it reads, and `Atom.set`/`Atom.update` write a state
 through the service `Atom.Write`, which the task of an action has and a
 render does not. `Atom.layer` provides one registry as both
-`Reactivity.Atom.Registry`, which roots and server markup read, and
-`Atom.Write`.
+`Atom.Registry`, which roots and server markup read, and `Atom.Write`;
+`Atom.Registry` is Effect's `Reactivity.Atom.Registry` under a shorter
+name, as an alias of a service stands for it in a row.
 
 A view is a component whose render reads atoms through the service
 `Atom.Read`. `Ui.Dom.mount` renders a `Ui` with the provided registry, and
@@ -250,7 +251,7 @@ still interrupts and joins them.
 ```flick
 mount :
   forall c r.
-  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Reactivity.Atom.Registry, Atom.Write | r; none} Never
+  Ui.Dom.Container -> (Failure none ->{r; none} Unit)^c -> Ui^c ->{Atom.Registry, Atom.Write | r; none} Never
 ```
 
 `Ui.Dom.mount container supervisor ui` renders `ui` once; the views in it
@@ -383,6 +384,29 @@ let query = Atom.on_server "" (Atom.search_param "q")
 
 tab : Atom.Atom (Option String)
 let tab = Atom.client_only (Atom.search_param "tab")
+```
+
+### Streaming
+
+`Ui.Server.stream "app" ui` renders the container `<div id="app"
+data-flick-ssr>` itself, in chunks as React renders them, for a response to
+stream. A view of `Ui.suspended` that reads a loading task is sent as its
+fallback, and its markup follows once the task ends; a task read outside
+`Ui.suspended` is sent as `Loading`, and the stream does not wait for it.
+Serializable atoms come in JSON scripts in the stream: the shell's before
+it, and a serializable task's value before the markup that shows it.
+`Atom.serializable_task wire task` marks a task atom whose loaded value the
+server hands over this way, keyed like `Atom.serializable`; the client
+starts from that value instead of running the task again. `Ui.Dom.mount` on
+the container hydrates the scripts that arrive after it mounted, as they
+arrive.
+
+```flick
+user : Atom.Atom (Atom.Async String none)
+let user = Atom.serializable_task (Codec.json Schema.string) (Atom.task (task { fetch_name () }))
+
+chunks : Unit ->{} List String
+let chunks () = provide Atom.layer { Stream.run_collect (Ui.Server.stream "app" page) }
 ```
 
 ### Templates without React

@@ -46,9 +46,9 @@ const EventElement = ({ bridge, node }: { readonly bridge: Events; readonly node
 /** The registry views read atoms from: `Ui.Dom.mount` provides it. */
 export const RegistryContext = /*#__PURE__*/ createContext<AtomRegistry.AtomRegistry | undefined>(undefined);
 
-/** How a server streaming markup waits for a change of the atoms a suspended view read. */
+/** How a server streaming markup waits for a change of the atoms a suspended view read, with the values it read. */
 export interface Streaming {
-  readonly wait: (atoms: ReadonlyArray<Atom.Atom<unknown>>) => PromiseLike<void>;
+  readonly wait: (read: ReadonlyMap<Atom.Atom<unknown>, unknown>) => PromiseLike<void>;
 }
 
 /** Given by `Ui.Server.stream`: a suspended view then suspends while a task loads, and its markup follows later. */

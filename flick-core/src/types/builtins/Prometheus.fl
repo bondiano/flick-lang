@@ -1,0 +1,10 @@
+/// The metrics a program records, in Prometheus's text format, for a
+/// `/metrics` route to answer. The module is unstable, as Effect marks
+/// `effect/observability`.
+module Prometheus exposing (..)
+
+/// The metrics recorded so far.
+format : Unit ->{} String
+foreign effect format from "@flick-lang/runtime/effect/observability/PrometheusMetrics" "prometheusFormat"
+  arity 0
+  reviewed "effect@4.0.5 sha256:f7c1d415fcfb2b6e"

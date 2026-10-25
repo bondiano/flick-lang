@@ -1,0 +1,38 @@
+// The DevTools client: a span made inside `DevTools.layer` reaches a
+// DevTools server listening on a local port.
+module App.Main exposing (main)
+
+start : Unit ->{} Number
+foreign async start from "./server.mjs" "start"
+  arity 0
+
+got : String ->{} Bool
+foreign async got from "./server.mjs" "got"
+  arity 1
+
+stop : Unit ->{} Unit
+foreign async stop from "./server.mjs" "stop"
+  arity 0
+
+options : Tracer.SpanOptions
+let options =
+  {
+    attributes = [];
+    links = [];
+    parent = None;
+    root = false;
+    kind_ = Tracer.internal;
+    sampled = None;
+    level = None;
+    captureStackTrace = false;
+    disablePropagation = false;
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let port = start ()
+  provide (DevTools.layer ("ws://127.0.0.1:" ++ show port)) {
+    Tracer.with_span "checkout" options (task { () })
+    Platform.stdout_line ("checkout: " ++ show (got "checkout"))
+  }
+  stop ()
