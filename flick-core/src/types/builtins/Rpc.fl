@@ -259,3 +259,21 @@ foreign pure call_stream_on from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallSt
   arity 3
   retention owner
   reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+
+/// Answers the calls of the messages on stdin on stdout until stdin ends:
+/// a program another starts with `spawn`, as editors start language
+/// servers. Nothing else may write to stdout meanwhile. Node only.
+serve_stdio :
+  forall c r hs. Serialization -> Group hs -> (hs^c ->{Stdio.Stdio | r; none} Unit)^c
+foreign effect serve_stdio from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcServeStdio"
+  arity 3
+  retention call
+  reviewed "effect@4.0.5 sha256:8aea91f3d781cae8"
+
+/// Starts `command` with `args` and connects to it over its stdin and
+/// stdout, which its `serve_stdio` answers; its stderr is the program's.
+/// The end of the scope stops it. Node only.
+spawn : forall s. Serialization -> String -> List String ->{Scope s; ClientError} Client s
+foreign effect spawn from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcSpawn"
+  arity 3
+  reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"

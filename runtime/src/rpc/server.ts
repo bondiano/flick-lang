@@ -1,20 +1,26 @@
 // `Rpc.listen`: a group served on Node's HTTP server for as long as the
 // Flick scope that started it. A separate entry point from the client, so a
 // program that only calls procedures loads no Node server.
+import { spawn } from "node:child_process";
+import { Duplex } from "node:stream";
+
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
 import * as NodeSocketServer from "@effect/platform-node/NodeSocketServer";
-import { Effect, Exit, Layer, Scope, Stream } from "effect";
+import { Effect, Exit, Fiber, Layer, Scope, Stdio, Stream } from "effect";
 import { RpcSerialization } from "effect/rpc/RpcSerialization";
 import { HttpRouter } from "effect/http";
 import * as RpcClient from "effect/rpc/RpcClient";
 import * as RpcServer from "effect/rpc/RpcServer";
 
 import { nodeHttp } from "../host.ts";
+import { service } from "../effects.ts";
+import { nativeStdio } from "../effect/Stdio.ts";
 import { acquireRelease } from "../owner.ts";
 import { Socket, SocketServer } from "effect/socket";
 
-import { effectGroup, type Group, type RpcError, type Serialization, type Server, type ServeOptions, serveError, type Transport } from "./model.ts";
+import type { Client } from "./client.ts";
+import { clientError, effectGroup, type Group, type RpcError, type Serialization, type Server, type ServeOptions, serveError, type Transport } from "./model.ts";
 
 type Handler = (payload: unknown) => Effect.Effect<unknown, unknown, unknown>;
 
@@ -133,3 +139,55 @@ export const rpcTcp: Transport = (url, serialization) => {
   const socket = Layer.effect(Socket.Socket, NodeSocket.makeNet({ host: hostname, port: Number(port) }));
   return RpcClient.layerProtocolSocket().pipe(Layer.provide([socket, serialization]));
 };
+
+const FlickStdio = /*#__PURE__*/ service("Stdio.Stdio");
+
+/**
+ * `Rpc.serve_stdio serialization group handlers`: the calls of the messages
+ * on stdin, answered on stdout, until stdin ends.
+ */
+export const rpcServeStdio = (serialization: Serialization, group: Group, handlers: Readonly<Record<string, Handler>>) =>
+  Effect.gen(function* () {
+    const stdio = nativeStdio(yield* Effect.service(FlickStdio));
+    if (stdio === undefined) return yield* Effect.die(new Error("`Rpc.serve_stdio` needs the `Stdio` of `Stdio.node`"));
+    const { rpcs, scope, handled } = yield* prepare(group, handlers);
+    // the protocol interrupts the fiber that built it once stdin ends and stdout is written
+    const serving = Effect.scoped(
+      Effect.flatMap(Layer.build(RpcServer.layerProtocolStdio), (protocol) =>
+        RpcServer.make(rpcs).pipe(Effect.provideContext(handled), Effect.provideContext(protocol)),
+      ),
+    ).pipe(Effect.provideService(Stdio.Stdio, stdio), Effect.provide(serialization));
+    yield* Fiber.await(yield* Effect.forkChild(serving));
+    return yield* Scope.close(scope, Exit.void);
+  });
+
+/**
+ * `Rpc.spawn serialization command args`: a connection to a child process
+ * whose stdin and stdout carry the messages; the scope's end kills it.
+ */
+export const rpcSpawn = (serialization: Serialization, command: string, args: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const pipe = yield* Effect.acquireRelease(
+      Effect.try({
+        try: () => {
+          const child = spawn(command, [...args], { stdio: ["pipe", "pipe", "inherit"] });
+          const duplex = Duplex.from({ readable: child.stdout, writable: child.stdin });
+          // closing the pipes below is the end the scope asks for, not a failure
+          duplex.on("error", () => undefined);
+          return { child, duplex };
+        },
+        catch: (error) => clientError(error instanceof Error ? error.message : `cannot start ${command}`),
+      }),
+      // the pipes too, or they keep this process alive
+      ({ child, duplex }) =>
+        Effect.sync(() => {
+          duplex.destroy();
+          child.kill();
+        }),
+    );
+    const socket = yield* NodeSocket.fromDuplex(Effect.succeed(pipe.duplex));
+    const context = yield* Layer.build(
+      RpcClient.layerProtocolSocket().pipe(Layer.provide([Layer.succeed(Socket.Socket, socket), serialization])),
+    );
+    return { context } satisfies Client;
+  });
