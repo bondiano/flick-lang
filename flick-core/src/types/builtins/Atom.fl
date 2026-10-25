@@ -15,9 +15,11 @@ type alias Writable a = Reactivity.Atom.Writable a
 service Read =
   get : forall a. Atom a ->{} a
 
-/// A state holding `value`, whatever its type.
+/// A state holding `value`, whatever its type. A registry keeps its value
+/// while it lives, read or not, so a write before the first read stays.
 make : a -> Writable a
-let make value = Reactivity.Atom.state value
+foreign pure make from "@flick-lang/runtime" "atomState"
+  arity 1
 
 /// An atom computed by `compute` from the atoms it reads, again when one
 /// of them changes.

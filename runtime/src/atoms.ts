@@ -7,6 +7,7 @@ import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Atom from "effect/reactivity/Atom";
 
 import { Failure } from "./cause.ts";
+import { flickState } from "./effect/reactivity/Atom.ts";
 import { service } from "./effects.ts";
 import { tag } from "./tags.ts";
 
@@ -48,6 +49,9 @@ const toAsync = <A, E>(result: AsyncResult.AsyncResult<A, E>): object =>
     onSuccess: (s) => Object.freeze({ _tag: LOADED, _0: s.value }),
     onFailure: (f) => Object.freeze({ _tag: FAILED, _0: new Failure(f.cause) }),
   });
+
+/** `Atom.make`: a state whose value the registry keeps while it lives, read or not, so a write before the first read stays. */
+export const atomState = <A>(value: A): Atom.Writable<A> => Atom.keepAlive(flickState(value));
 
 /** `Atom.task`: the atom of a task's result, run by the registry that first reads it. */
 export const atomTask = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<object> => Atom.map(Atom.make(task), toAsync);

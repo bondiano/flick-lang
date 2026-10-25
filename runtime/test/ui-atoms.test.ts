@@ -8,7 +8,7 @@ import { JSDOM } from "jsdom";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 
-import { ReadService, atomDerived } from "../src/index.ts";
+import { ReadService, atomDerived, atomState } from "../src/index.ts";
 import { type Renderer, type Ui, uiFragment, uiNamed, uiRunWith, uiRender, uiText, uiView } from "../src/ui/react/index.ts";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>");
@@ -143,4 +143,12 @@ test("a view without a registry fails with what to do", async (t) => {
   const exit = await Effect.runPromise(Fiber.await(fiber));
   if (exit._tag === "Failure") failures.push(String(exit.cause));
   assert.match(failures.join(""), /Ui\.Dom\.mount/);
+});
+
+test("a state keeps a value written before anything read it", async () => {
+  const registry = AtomRegistry.make();
+  const count = atomState(0);
+  registry.set(count, 3);
+  await tick();
+  assert.equal(registry.get(count), 3);
 });
