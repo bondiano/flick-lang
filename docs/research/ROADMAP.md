@@ -61,7 +61,8 @@ component search (props : SearchProps) =
 |---|---|---|---|
 | `Atom.Read` | render, `Atom.derived` | `Atom.get`/`value` с трекингом | ✅ |
 | `Atom.Write` | `Action`, задачи, setup | `set`, `update`, `modify`, `refresh` | ✅ `d37114c` |
-| `Setup s` | `setup` компонента | `Atom.local`, локальные action, финализаторы региона `s` | ⬜ C7 |
+| `Setup s` | `setup` компонента | `Atom.local`, локальные action, финализаторы региона `s`, `on_mount`/`watch`, `Ui.element` | ⬜ C7, C8, U10 |
+| `Dom` | action, задачи (клиент) | `focus`, `blur`, `scroll_into_view`, `measure` по handle | ⬜ U10 |
 | `Server` | серверный entry, `server fn` | request/cookies/DB-слои | ⬜ F1 |
 
 ## 3. Треки
@@ -164,6 +165,12 @@ component search (props : SearchProps) =
 - **C7d. Рантайм.** AC: setup выполняется ровно один раз на смонтированный экземпляр, в т.ч. под StrictMode (тест в `runtime/test`), повторный mount не утекает fiber'ами; action экземпляра прерываются и ожидаются при unmount (перенесено из U1/U2); компонент получает метку C6.
 - AC (всё C7): `Ui.view` либо выражается через `component` без setup, либо удаляется; плейграунд использует `component` хотя бы для одного виджета с локальным состоянием; `reference/ui.md` (en + ru).
 
+**C8. 🆕 Эффекты setup — `useEffect` без массива зависимостей.** ⬜ (после C7c/C7d)
+- AC: `Setup.on_mount task` в setup запускает задачу после commit (рантайм — `useLayoutEffect`) как fiber в регионе `s`; unmount прерывает и ожидает её; финализаторы задачи выполняются; под StrictMode (двойной mount) задача работает ровно один раз на живой экземпляр и не течёт fiber'ами (тест в `runtime/test`).
+- AC: `Setup.watch (fun () -> …) task` перезапускает задачу при изменении атомов, прочитанных в первом аргументе (`->{Atom.Read}`); зависимости отслеживаются, списка нет (prior-art §8); предыдущий запуск прерывается до следующего; рантайм — производный атом + `AtomRegistry.subscribe` за границей U9.
+- AC: строка задачи — `{Atom.Write | r; e}`, ошибки уходят супервизору корня, как у action; вне setup (render, top-level) — ошибка типов с подсказкой (`FLICK-U004`/`U006`).
+- AC: `reference/ui.md` (en + ru): пример подписки на внешний источник (таймер/`resize`) и сравнение с React `useEffect`.
+
 ### Трек U — реактивное UI-ядро
 
 **U1. Обёртки и React-биндинг.** ✅ `c0c5fe3`, `48d453e`, `e5ef204`
@@ -206,6 +213,12 @@ component search (props : SearchProps) =
 
 **U9c. 🆕 Реэкспорт модулей.** ✅ (синтаксис `exposing (.., X)` уже был; исправлены квалифицированные пути к сервисам `M.S.op`, `M.S.Impl`, `M.S` как значение; `Atom.Registry` — реэкспорт; реэкспортированный `main`/`tests` не делает модуль входом — пересмотреть в L6)
 - AC: модуль делает импортированную сущность (тип, ADT с конструкторами, сервис с операциями и `Impl`, значение) доступной по своему пути как ту же сущность; `Atom.Registry` — реэкспорт `Reactivity.Atom.Registry`, так что работают `Atom.Registry.get`, `Atom.Registry.Impl` и `Layer.succeed Atom.Registry`; `.iface`, кодген, LSP (goto/hover/completion) и `flick diff` знают реэкспорт; цикл реэкспорта — ошибка.
+
+**U10. 🆕 Handle DOM-элемента — `useRef` только для DOM.** ⬜ (после C8)
+- AC: `Ui.element : () ->{Setup s} (Ui.Element t)^{s}` создаётся только в setup и захватывает `^s` — handle не может стать top-level или пережить экземпляр (G001-фикстура); `t` — тег (`Input`, `Div`, …), привязка к узлу через `Host`/props (`element = input`) с проверкой тега типом.
+- AC: в render handle только передаётся, не читается; операции — задачи с сервисом `Dom` в строке: `Dom.focus`, `blur`, `scroll_into_view`, `measure` (`{ width; height; top; left }`); вызов из action или задачи C8; не смонтированный узел — типизированная ошибка (`Detached`), не `null`.
+- AC: сервер (`Ui.Server.*`) не предоставляет `Dom` — серверный рендер с DOM-операцией не тайпчекается; при гидрации handle привязывается к существующему узлу.
+- AC: плейграунд фокусирует поле через handle; `reference/ui.md` (en + ru) сравнивает с React `useRef` и Elm `Browser.Dom.focus` по id; тяжёлые императивные виджеты по-прежнему через `Ui.component` (это записано в reference).
 
 ### Трек R — SSR и шаблоны
 
