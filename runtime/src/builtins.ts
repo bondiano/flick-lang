@@ -1,5 +1,5 @@
 // Implementations of the `foreign` declarations of the built-in modules.
-import { Effect, type Option, Result } from "effect";
+import { Effect, Formatter, type Option, Result } from "effect";
 
 import { type Tagged, none } from "./data.ts";
 import { writeStderr, writeStdout } from "./host.ts";
@@ -8,6 +8,17 @@ import { tag } from "./tags.ts";
 export const stdoutLine = (text: string): void => writeStdout(`${text}\n`);
 
 export const stderrLine = (text: string): void => writeStderr(`${text}\n`);
+
+/** `todo`: code not written yet fails when it runs. */
+export const flickTodo = (message: string): never => {
+  throw new Error(message);
+};
+
+/** `echo`: shows a value and where it was echoed, and returns it. */
+export const flickEcho = <A>(location: string, value: A): A => {
+  stderrLine(`${location} ${Formatter.format(value)}`);
+  return value;
+};
 
 export const APP_ERROR = /*#__PURE__*/ tag("Prelude.AppError.AppError");
 

@@ -32,8 +32,11 @@ fn check_exit_codes_and_json_stream() {
     assert_eq!(
         codes,
         [
+            "FLICK-R013",
             "FLICK-S010",
             "FLICK-S010",
+            "FLICK-T001",
+            "FLICK-R013",
             "FLICK-S010",
             "FLICK-S010",
             "FLICK-S010",

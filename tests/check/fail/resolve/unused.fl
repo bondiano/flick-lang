@@ -1,0 +1,37 @@
+module App.Unused exposing (net, Shape(..), first, area, sum_with)
+
+import List exposing (map, filter)
+//                         ^^^^^^ FLICK-R012 `filter` is imported but never used
+import String
+//     ^^^^^^ FLICK-R012 `String` is imported but never used
+import Number exposing (abs)
+
+type Shape = Circle Number | Square Number
+
+net : Number -> Number
+let net price = helper price 0.8
+
+helper : Number -> Number -> Number
+let helper p rate = p * rate
+
+// private values that only use each other are still unused
+gross : Number -> Number
+let gross price = Number.abs price
+//  ^^^^^ FLICK-R014 `gross` is never used
+
+area : Shape -> Number
+let area shape = match shape with
+  | Circle _radius -> 3
+  | Square s -> s * s
+
+first : (a, b) -> { name : String } -> List a
+let first (a, b) { name } = map (fun x -> a) []
+//            ^ FLICK-R013 `b` is never used
+//                 ^^^^ FLICK-R013 `name` is never used
+//                                   ^ FLICK-R013 `x` is never used
+
+sum_with : List Number -> List Number
+let sum_with xs =
+  let unused = 1
+//    ^^^^^^ FLICK-R013 `unused` is never used
+  List.map (fun x -> abs x) xs

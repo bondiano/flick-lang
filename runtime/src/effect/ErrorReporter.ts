@@ -1,10 +1,9 @@
 // Effect's `ErrorReporter` for the bindings of the standard library: each
 // report goes to a Flick event listener as a record.
-import { inspect } from "node:util";
-
 import { Effect, ErrorReporter, type LogLevel } from "effect";
 
 import { type Failure, RawCause, nativeCause } from "../cause.ts";
+import { inspect } from "../host.ts";
 import type { Listener } from "../stdlib/callbacks.ts";
 
 export * from "effect/ErrorReporter";

@@ -46,6 +46,7 @@ pub(crate) fn check_text(
     );
     diagnostics.extend(parse.diagnostics);
     diagnostics.extend(more);
+    diagnostics.retain(|d| !d.unnecessary());
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }

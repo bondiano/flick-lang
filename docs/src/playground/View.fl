@@ -100,7 +100,7 @@ let view model m =
                   (tr
                     m.locale
                     "The playground encountered an error. Reload the page to recover."
-                    "Ошибка песочницы. Обновите страницу, чтобы восстановить работу.")
+                    "В редакторе произошла ошибка. Обновите страницу, чтобы продолжить.")
                   m.fault)
             else empty,
             if m.syntax_error != "" then
@@ -109,7 +109,7 @@ let view model m =
                   [notice
                     (tr m.locale
                       "Highlighting is unavailable. Editing and compilation still work."
-                      "Подсветка недоступна. Редактирование и компиляция продолжают работать.")
+                      "Не удалось включить подсветку. Код по-прежнему можно редактировать и компилировать.")
                     m.syntax_error])
             else empty,
             div { class_name = "fp-panes" } [source_pane model m, result_pane model m],

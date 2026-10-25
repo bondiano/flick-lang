@@ -2,9 +2,9 @@
 // `Cli.Prompt.Tty`. The runner reads one key press each time a prompt waits
 // for one, so a key the prompt does not need stays with the service for the
 // next prompt; Effect's own runner would read ahead from a queue.
-import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
-import * as NodePath from "@effect/platform-node/NodePath";
-import * as NodeTerminal from "@effect/platform-node/NodeTerminal";
+
+
+
 import {
   type Cause,
   type Context,
@@ -18,6 +18,7 @@ import {
 } from "effect";
 import { Prompt } from "effect/cli";
 
+import { nodeModule } from "../host.ts";
 import { constructorName, tag } from "../tags.ts";
 
 const QUIT = /*#__PURE__*/ Object.freeze({ _tag: tag("Terminal.QuitError.QuitError") });
@@ -35,7 +36,7 @@ export const promptNode = <I>(key: Context.Key<I, TtyImpl>): Layer.Layer<I> =>
   Layer.effect(
     key,
     Effect.gen(function* () {
-      const terminal = yield* NodeTerminal.make();
+      const terminal = yield* nodeModule("@effect/platform-node/NodeTerminal").make();
       const input = yield* terminal.readInput;
       return {
         read_key: () => Effect.mapError(Queue.take(input), () => QUIT),
@@ -124,7 +125,11 @@ export const promptRun = <I>(
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every prompt is Effect's tree of these three nodes
     runOp(prompt as unknown as Op, tty).pipe(
       Effect.provide(
-        Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, Layer.succeed(Terminal.Terminal, terminalOf(tty))),
+        Layer.mergeAll(
+          nodeModule("@effect/platform-node/NodeFileSystem").layer,
+          nodeModule("@effect/platform-node/NodePath").layer,
+          Layer.succeed(Terminal.Terminal, terminalOf(tty)),
+        ),
       ),
     ),
   );

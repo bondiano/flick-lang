@@ -76,7 +76,7 @@ This documentation site uses the workspace integration itself. See the [integrat
 
 ## Editors and syntax tools
 
-The native language server runs with `flick lsp --stdio`. It provides diagnostics, source-type hover, definition and references, completion, formatting and rename for supported project symbols. Built-in library definitions open as real read-only `.fl` files; browsing them does not make them editable project sources.
+The native language server runs with `flick lsp --stdio`. It provides diagnostics with quick fixes, source-type hover, definition, type definition and references, completion, signature help, refactors, document and workspace symbols, semantic highlighting, folding, inlay type hints, formatting and rename for supported project symbols. Built-in library definitions open as real read-only `.fl` files; browsing them does not make them editable project sources.
 
 - **VS Code:** `editors/vscode/` contains the TextMate grammar and language-server client. The repository's setup uses a local extension; `flick.path` selects the executable.
 - **Zed:** `editors/zed/` contains the extension and tree-sitter integration. Its launcher tries an explicit `lsp.flick.binary.path`, then the worktree's `PATH`, then a release matching the extension version, with an offline cache. A local path avoids depending on a matching downloadable release.

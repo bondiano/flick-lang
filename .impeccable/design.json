@@ -428,16 +428,16 @@
       "css": ".ds-destination { display:flex; justify-content:space-between; align-items:center; padding:2rem 0; gap:2rem; color:var(--sl-color-text, #373740); text-decoration:none; border-top:1px solid var(--sl-color-hairline, #e0e0e8); font-family:var(--sl-font, Geist, sans-serif); line-height:1.6; } .ds-destination h3 { font-size:1.75rem; color:var(--sl-color-white, #101016); margin:0.2rem 0 0.7rem; font-weight:600; letter-spacing:-0.025em; } .ds-destination p { margin:0; max-width:44ch; font-size:1rem; } .ds-destination > svg { flex-shrink:0; } .ds-destination:hover h3, .ds-destination:hover > svg { color:var(--sl-color-accent-high, #584dd0); } .ds-destination:focus-visible { outline:2px solid var(--sl-color-accent-high, #584dd0); outline-offset:4px; } @media(max-width:40rem) { .ds-destination { padding:1.6rem 0; } }"
     },
     {
-      "name": "Geometric Flick brand",
+      "name": "Flick woodpecker brand",
       "kind": "custom",
-      "description": "Exact SVG paths from Brand.astro, including the separate violet spark; no icon package or image URL.",
-      "html": "<a class=\"ds-brand\" href=\"/\" aria-label=\"Flick home\"><svg viewBox=\"0 0 56 54\" width=\"49\" height=\"48\" fill=\"none\" aria-hidden=\"true\"><g fill=\"currentColor\" transform=\"translate(0 9)\"><path d=\"M0 18v-3C0 6 6 0 15 0h17l-4 7H15C9 7 4 11 0 18Z\"/><path d=\"M0 44V27c0-6 5-10 11-10h21l-4 7H14l-4 4v7Z\"/></g><path class=\"ds-brand-spark\" d=\"M46 0c1.4 6.2 3.8 8.6 10 10-6.2 1.4-8.6 3.8-10 10-1.4-6.2-3.8-8.6-10-10 6.2-1.4 8.6-3.8 10-10Z\"/></svg><span>flick</span></a>",
-      "css": ".ds-brand { display:inline-flex; flex-shrink:0; align-items:center; gap:0.8rem; color:var(--sl-color-white, #101016); text-decoration:none; min-height:44px; font-family:var(--sl-font, Geist, sans-serif); } .ds-brand span { font-size:2.35rem; line-height:1; font-weight:760; letter-spacing:-0.035em; } .ds-brand-spark { fill:var(--sl-color-accent-high, #584dd0); } .ds-brand:focus-visible { outline:2px solid var(--sl-color-accent-high, #584dd0); outline-offset:4px; } @media(max-width:49.99rem) { .ds-brand { gap:0.5rem; } .ds-brand svg { width:38px; height:39px; } .ds-brand span { font-size:1.85rem; } }"
+      "description": "The approved violet woodpecker/f with a coral beak and crest, angular eye and three-tip wing; shared outlined wordmarks provide light and dark ink without changing the bird.",
+      "html": "<a class=\"ds-brand\" href=\"/\" aria-label=\"Flick home\"><img class=\"ds-brand-light\" src=\"/flick-wordmark.svg\" width=\"600\" height=\"240\" alt=\"\" aria-hidden=\"true\"/><img class=\"ds-brand-dark\" src=\"/flick-wordmark-dark.svg\" width=\"600\" height=\"240\" alt=\"\" aria-hidden=\"true\"/></a>",
+      "css": ".ds-brand { display:inline-flex; flex-shrink:0; align-items:center; width:150px; min-height:44px; text-decoration:none; } .ds-brand img { display:block; width:100%; height:auto; } .ds-brand .ds-brand-dark { display:none; } :root[data-theme='dark'] .ds-brand-light { display:none; } :root[data-theme='dark'] .ds-brand-dark { display:block; } .ds-brand:focus-visible { outline:2px solid var(--sl-color-accent-high, #584dd0); outline-offset:4px; } @media(max-width:49.99rem) { .ds-brand { width:125px; min-width:0; flex-shrink:1; } }"
     }
   ],
   "narrative": {
     "northStar": "Signal",
-    "overview": "Signal is a cool-paper engineering editorial: precise graphite geometry, violet emphasis, generous breathing room, and code with a real job to do. The owner-approved world is confident without becoming a dashboard or a decorative card collection. The geometric F and violet spark carry the identity; the drifting dot field is the signature atmospheric material.\n\nThe visual language stays shared while density follows the task. Persuade surfaces give the headline and working code room to lead. Read surfaces quiet the decoration and prioritize navigation, line length, and document hierarchy. Operate surfaces spend their width on source, diagnostics, output, and generated JavaScript. These are different applications of the same system, not a requirement to reuse the homepage composition everywhere.",
+    "overview": "Signal is a cool-paper engineering editorial: precise graphite geometry, violet emphasis, generous breathing room, and code with a real job to do. The owner-approved world is confident without becoming a dashboard or a decorative card collection. The sharp violet woodpecker/f with a coral beak and crest carries the identity; the drifting dot field remains the signature atmospheric material.\n\nThe visual language stays shared while density follows the task. Persuade surfaces give the headline and working code room to lead. Read surfaces quiet the decoration and prioritize navigation, line length, and document hierarchy. Operate surfaces spend their width on source, diagnostics, output, and generated JavaScript. These are different applications of the same system, not a requirement to reuse the homepage composition everywhere.",
     "keyCharacteristics": [
       "Cool paper, graphite text, and restrained violet signals.",
       "Geist editorial hierarchy paired with practical monospace code.",
@@ -465,7 +465,7 @@
     "dos": [
       "**Do** reuse semantic theme properties so controls, code, and reading surfaces respond together to theme changes.",
       "**Do** keep reading measures bounded and allow Play and Transpile the wider workspace.",
-      "**Do** preserve the graphite geometric F, separate violet spark, fine rules, and restrained corners.",
+      "**Do** preserve the approved woodpecker/f silhouette, angular eye, three-tip horizontal wing, coral accents and shallow relief; keep the fine rules and restrained corners.",
       "**Do** keep source whitespace, keyboard focus, localized labels, and explicit recovery feedback intact.",
       "**Do** author custom widget state and behavior in Flick, leaving platform interoperability and mounting at the JavaScript/TypeScript boundary.",
       "**Do** honor system reduced-motion preferences; animate the wave as one group only."

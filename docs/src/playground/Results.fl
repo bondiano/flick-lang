@@ -31,7 +31,7 @@ let problems_pane locale diagnostics =
     div { class_name = "fp-diagnostics" }
       [
         match diagnostics with
-        | [] -> paragraph [text (tr locale "No diagnostics." "Диагностик нет.")]
+        | [] -> paragraph [text (tr locale "No diagnostics." "Ошибок и предупреждений нет.")]
         | items -> list (List.map (problem locale) items),
       ]
   }
@@ -45,7 +45,7 @@ let current_problems m =
           (tr
             m.locale
             "Diagnostics appear when the compiler is ready."
-            "Диагностика появится после загрузки компилятора."),
+            "Результаты проверки появятся после загрузки компилятора."),
       ]
   else if m.checking then
     Ui.paragraph [Ui.text (tr m.locale "Checking source…" "Проверка кода…")]
@@ -56,7 +56,7 @@ let current_problems m =
           (tr
             m.locale
             "Restore the compiler above to check this source."
-            "Восстановите компилятор выше, чтобы проверить код."),
+            "Повторите загрузку или компиляцию с помощью кнопки выше, чтобы проверить код."),
       ]
   else
     problems_pane m.locale (generated m).diagnostics
@@ -92,7 +92,10 @@ let output_pane m =
             [
               text
                 (if m.running then
-                  tr m.locale "Running in an isolated worker…" "Выполняется в отдельном worker…"
+                  tr
+                    m.locale
+                    "Running in an isolated worker…"
+                    "Программа выполняется в отдельном потоке…"
                 else
                   tr m.locale "Your program’s output goes here." "Здесь появится вывод программы."),
             ],
@@ -103,7 +106,7 @@ let output_pane m =
                   tr
                     m.locale
                     "Output appears when the program ends. Stop it at any time; the limit is 10 seconds."
-                    "Вывод появится после завершения. Можно остановить программу; лимит — 10 секунд."
+                    "Вывод появится после завершения программы. Её можно остановить кнопкой выше; через 10 секунд она остановится автоматически."
                 else
                   tr
                     m.locale

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Flick</title>
+  <desc id="desc">A sharp violet woodpecker forming a lowercase f, with a coral beak and crest, an angular eye and a three-feather wing.</desc>
+  <defs>
+    <linearGradient id="body" x1="120" y1="60" x2="225" y2="636" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8f70f4"/>
+      <stop offset=".42" stop-color="#6550d8"/>
+      <stop offset="1" stop-color="#4936b7"/>
+    </linearGradient>
+    <linearGradient id="crown" x1="126" y1="24" x2="170" y2="145" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a184fc"/>
+      <stop offset="1" stop-color="#805de5"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="180" y1="290" x2="231" y2="415" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7d62ed"/>
+      <stop offset="1" stop-color="#5742cc"/>
+    </linearGradient>
+    <linearGradient id="coral" x1="273" y1="132" x2="282" y2="181" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ed83b8"/>
+      <stop offset="1" stop-color="#d45091"/>
+    </linearGradient>
+    <linearGradient id="crest" x1="45" y1="24" x2="89" y2="107" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ed83b8"/>
+      <stop offset="1" stop-color="#ca5aa6"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="28" y1="24" x2="245" y2="603" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f1d8ff" stop-opacity=".85"/>
+      <stop offset=".45" stop-color="#b09aff" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#b09aff" stop-opacity=".12"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(105.5 9) scale(.75)">
+    <path d="M272 132 350 154 236 182Z" fill="url(#coral)"/>
+    <path d="m273 133 75 21-109 27" fill="none" stroke="#f3a0ca" stroke-opacity=".55" stroke-width="1.5"/>
+    <path d="M26 24 184 43C222 48 248 83 272 132L236 182C197 200 165 236 168 294L196 402C184 494 125 579 58 636 69 529 64 467 50 385 36 302 39 245 63 192 73 168 86 149 99 135L32 80 96 85Z" fill="url(#body)"/>
+    <path d="M26 24 184 43C222 48 248 83 272 132L174 110 96 85Z" fill="url(#crown)"/>
+    <path d="m26 24 43 7 26 24-32-2Zm6 56 35 2 18 23-25-4Z" fill="url(#crest)"/>
+    <path d="M26 24 184 43C222 48 248 83 272 132M32 80l64 5M99 135C86 149 73 168 63 192 39 245 36 302 50 385 64 467 69 529 58 636" fill="none" stroke="url(#edge)" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="m174 110 72 21-36 13C197 140 187 126 174 110Z" fill="#fffaff"/>
+    <path d="m218 123 28 8-36 13Z" fill="#171424"/>
+    <path d="m172 108 75 23" fill="none" stroke="#4d3298" stroke-opacity=".75" stroke-width="2"/>
+    <path d="M124 292C204 300 297 310 374 313 347 336 318 349 281 347L351 354C326 377 290 389 238 382L299 394C269 411 230 417 196 409 144 406 108 369 94 321 92 311 100 295 124 292Z" fill="#2e1b8d" fill-opacity=".18" transform="translate(0 3)"/>
+    <path d="M124 292C204 300 297 310 374 313 347 336 318 349 281 347L351 354C326 377 290 389 238 382L299 394C269 411 230 417 196 409 144 406 108 369 94 321 92 311 100 295 124 292Z" fill="url(#wing)"/>
+    <path d="M124 292C204 300 297 310 374 313" fill="none" stroke="#c6b4ff" stroke-opacity=".7" stroke-width="1.7"/>
+    <path d="m281 347 70 7m-113 28 61 12" fill="none" stroke="#4933ae" stroke-opacity=".3" stroke-width="1.5"/>
+  </g>
+</svg>

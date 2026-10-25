@@ -53,6 +53,8 @@ pub enum Commands {
     Deps(DepsArguments),
     /// Build a release package and an npm tarball of it.
     Pack(OutDirArguments),
+    /// Compare the public API with a git revision and name the version bump.
+    Diff(DiffArguments),
     /// Static schemas of codecs.
     #[command(subcommand)]
     Schema(SchemaCommands),

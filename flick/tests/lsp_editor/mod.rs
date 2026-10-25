@@ -1,4 +1,5 @@
 mod completion;
+mod features;
 mod quick_fix;
 mod sql_table;
 
@@ -245,8 +246,12 @@ let main () =
     let doc = json!({ "uri": uri(&file) });
     let mut lsp = Lsp::start(&dir);
     lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": source } }));
+    // only unused-code warnings, which carry the `Unnecessary` tag
     let diagnostics = lsp.diagnostics(&uri(&file));
-    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    assert!(
+        diagnostics.iter().all(|d| d["tags"] == json!([1])),
+        "{diagnostics:?}"
+    );
     for (needle, expected) in [
         ("report (Ui", "report : Failure e ->{} Unit"),
         (

@@ -20,6 +20,7 @@ mod classes;
 pub mod cli;
 mod codecs;
 mod convert;
+mod debug;
 mod decls;
 mod display;
 mod effects;
@@ -33,6 +34,7 @@ mod infer;
 mod instances;
 mod kinds;
 mod makers;
+mod origin;
 mod patterns;
 mod qualified;
 mod records;
@@ -43,6 +45,7 @@ mod rows;
 mod schemas;
 mod services;
 mod sql;
+mod stub;
 mod toplevel;
 mod ty;
 mod typing;
@@ -180,14 +183,48 @@ fn run(
         typing: Typing::default(),
         predicates: HashMap::new(),
         field_path: Vec::new(),
+        holes: Vec::new(),
+        hole_ok: false,
     };
     checker.typing.sql_dialect = options.sql;
     checker.module(module.tree);
+    checker.report_holes();
     checker.fill(interface);
     let typing = checker.finish_typing();
     let mut evidence = checker.classes.evidence;
     evidence.sort_by_key(|(span, _)| (span.start, span.end));
     (checker.diagnostics, typing, evidence)
+}
+
+/// The diagnostics of checking a module with syntax errors that do not
+/// touch the code the parser could not read, where the checker only guessed.
+pub fn beside_syntax_errors(tree: &Node, checked: Vec<Diagnostic>) -> Vec<Diagnostic> {
+    fn errors(node: &Node, out: &mut Vec<(u32, u32)>) {
+        for child in node.nodes() {
+            if child.kind == K::Error {
+                out.push(child.range());
+            } else {
+                errors(child, out);
+            }
+        }
+    }
+    let mut broken = Vec::new();
+    errors(tree, &mut broken);
+    // a type the checker could not finish is no news while code is missing
+    let unfinished = |text: &str| text.contains("?`") || text.contains("? ");
+    let guessed = |d: &Diagnostic| {
+        d.code == codes::T013
+            || unfinished(&d.message)
+            || d.fixes.iter().any(|f| unfinished(&f.message))
+    };
+    checked
+        .into_iter()
+        .filter(|d| {
+            (broken.is_empty() || !guessed(d))
+                && d.span
+                    .is_none_or(|s| !broken.iter().any(|(b, e)| s.start <= *e && *b <= s.end))
+        })
+        .collect()
 }
 
 /// A value in scope inside a declaration.
@@ -254,6 +291,10 @@ struct Checker<'a> {
     /// The fields of the record literals around the value being checked,
     /// outermost first: where a nested record's field is missing.
     field_path: Vec<String>,
+    /// Each `_` written in a type, and the variable that stands for it.
+    holes: Vec<(Span, Type)>,
+    /// Whether the type being converted may have holes.
+    hole_ok: bool,
 }
 
 impl Checker<'_> {

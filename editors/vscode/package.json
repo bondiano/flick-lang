@@ -6,6 +6,7 @@
   "publisher": "bondiano",
   "license": "MIT",
   "private": true,
+  "icon": "icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/bondiano/flick-lang"
@@ -43,6 +44,7 @@
         "editor.tabSize": 2,
         "editor.detectIndentation": false,
         "editor.formatOnSave": true,
+        "editor.semanticHighlighting.enabled": true,
         "editor.defaultFormatter": "bondiano.flick"
       }
     },

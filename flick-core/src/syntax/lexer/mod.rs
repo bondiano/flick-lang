@@ -187,6 +187,15 @@ impl Lexer<'_> {
             .split_whitespace()
             .collect();
         let word = &self.text[start..self.pos];
+        // the debugging keywords stay usable as labels: `{ echo = … }`
+        if matches!(word, "todo" | "echo") {
+            let rest = self.text[self.pos..].trim_start_matches(' ');
+            if rest.starts_with(':') && !rest.starts_with("::")
+                || rest.starts_with('=') && !rest.starts_with("==") && !rest.starts_with("=>")
+            {
+                return true;
+            }
+        }
         matches!(
             before[..],
             [.., "foreign", "pure" | "sync" | "async" | "effect"]

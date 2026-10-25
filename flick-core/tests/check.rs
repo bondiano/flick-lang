@@ -8,6 +8,7 @@
 use std::path::{Path, PathBuf};
 use std::{fmt, fs, io};
 
+use flick_core::diagnostics::codes::Area;
 use flick_core::diagnostics::{Diagnostic, codes};
 use flick_core::project::{self, Host};
 use flick_core::source;
@@ -126,16 +127,39 @@ fn to_pos(file: &SourceFile, start: u32, end: u32) -> Pos {
     }
 }
 
+/// Warnings about unused code, checked only in files that mention the
+/// code: fixtures of other rules bind names they never use.
+const UNUSED: [&str; 3] = ["FLICK-R012", "FLICK-R013", "FLICK-R014"];
+
+/// Unused-code warnings, and in syntax fixtures every diagnostic of a later
+/// phase, count only in files that mention their code.
+fn opted_out(sources: &SourceMap, d: &Diagnostic) -> bool {
+    let code = d.code.to_string();
+    let Some(file) = d.span.map(|s| sources.get(s.file)) else {
+        return false;
+    };
+    let syntax_fixture = file.path.contains("fail/syntax/") && d.code.area != Area::Syntax;
+    (UNUSED.contains(&code.as_str()) || syntax_fixture) && !file.text.contains(&code)
+}
+
 /// Matches diagnostics against expectations; returns the diff lines.
 fn diff(sources: &SourceMap, actual: &[&Diagnostic], expected: Vec<Expected>) -> Vec<String> {
     let mut missing = expected;
     let mut unexpected = Vec::new();
-    for d in actual {
+    for d in actual.iter().filter(|d| !opted_out(sources, d)) {
         let pos = d.span.map(|s| to_pos(sources.get(s.file), s.start, s.end));
         let code = d.code.to_string();
+        // help lines read as the message they explain: `message: help`
+        let text = d
+            .fixes
+            .iter()
+            .filter(|f| f.edits.is_empty())
+            .fold(d.message.clone(), |text, f| {
+                format!("{text}: {}", f.message)
+            });
         let hit = missing
             .iter()
-            .position(|e| e.code == code && e.pos == pos && d.message.contains(&e.message));
+            .position(|e| e.code == code && e.pos == pos && text.contains(&e.message));
         match hit {
             Some(i) => {
                 missing.remove(i);
@@ -143,7 +167,7 @@ fn diff(sources: &SourceMap, actual: &[&Diagnostic], expected: Vec<Expected>) ->
             None => unexpected.push(Expected {
                 code,
                 pos,
-                message: d.message.clone(),
+                message: text,
             }),
         }
     }
@@ -297,6 +321,10 @@ fn check_project(dir: &Path) -> Vec<String> {
         Ok(None) => vec![],
         Err(diagnostic) => vec![diagnostic],
     };
+    let diagnostics: Vec<Diagnostic> = diagnostics
+        .into_iter()
+        .filter(|d| !opted_out(&sources, d))
+        .collect();
     let mut files: Vec<PathBuf> = Vec::new();
     fixtures(dir, &mut files);
     files.push(dir.join("flick.toml"));

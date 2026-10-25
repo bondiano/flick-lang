@@ -393,6 +393,17 @@ fn pack_writes_a_complete_package_that_runs_nothing_on_import() {
     assert_eq!(out.status.code(), Some(1), "{out:?}");
     assert!(String::from_utf8_lossy(&out.stderr).contains("FLICK-P020"));
     assert!(!dir.join("artifacts/acme-broken-1.0.0.tgz").exists());
+
+    // `todo` and `echo` stay out of packages
+    fs::write(dir.join("package.json"), manifest).expect("write");
+    let unfinished = source.replace("\"Hello, \" ++ name", "echo (todo \"greet\")");
+    fs::write(dir.join("src/Lib/Greeting.fl"), unfinished).expect("write");
+    let out = run(&dir, &["pack", "--out-dir", "artifacts"]);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    for code in ["FLICK-T022", "FLICK-T023", "FLICK-P024"] {
+        assert!(stderr.contains(code), "{code} in {stderr}");
+    }
 }
 
 #[test]

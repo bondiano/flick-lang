@@ -119,11 +119,13 @@ pub(super) fn at_atom_start(p: &Parser) -> bool {
 
 fn app(p: &mut Parser) -> Option<Done> {
     let head = capture(p)?;
-    if !at_atom_start(p) {
+    // `List _`: a hole is an argument too, though not a constructor field
+    let at_arg = |p: &Parser| at_atom_start(p) || p.at(K::Underscore);
+    if !at_arg(p) {
         return Some(head);
     }
     let m = p.precede(head);
-    while at_atom_start(p) {
+    while at_arg(p) {
         capture(p);
     }
     Some(p.complete(m, K::AppType))
@@ -184,6 +186,10 @@ fn atom(p: &mut Parser) -> Option<Done> {
             }
         }
         K::LBrace => brace_type(p),
+        K::Underscore => {
+            p.bump();
+            K::HoleType
+        }
         _ => {
             p.error_expected("a type");
             K::Error

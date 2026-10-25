@@ -1,4 +1,4 @@
-module Hero exposing (main)
+module Hero exposing (main, initial_view)
 
 import Elements exposing (attributes, icon)
 import JsError exposing (JsError(..))
@@ -6,6 +6,7 @@ import JsError exposing (JsError(..))
 type alias Line = { stream : String; text : String }
 type alias Model = {
   ru : Bool;
+  ready : Bool;
   effect : Bool;
   running : Bool;
   output : String;
@@ -129,22 +130,25 @@ let run_example model =
 view : Atom.Writable Model -> Model -> Ui {Atom.Write} none
 let view model m =
   let status =
-    if m.running then
-      if m.ru then "Загружаем и запускаем…" else "Compiling and running…"
+    if not m.ready then
+      if m.ru then "Загрузка примера…" else "Loading the live example…"
+    else if m.running then
+      if m.ru then "Компиляция и запуск…" else "Compiling and running…"
     else if m.output != "" then m.output
     else if m.effect then
       if m.ru then "Тот же результат. Другой синтаксис." else "Same result. Different syntax."
     else
-      if m.ru then "Настоящий Flick. Прямо в браузере." else "Real Flick. Right in your browser."
+      if m.ru then "Нажмите «Запустить Flick», чтобы выполнить пример." else "Real Flick. Right in your browser."
   ui {
-    div { class_name = "hero-editor" }
+    attributes [("aria-busy", if m.ready then "false" else "true")]
+      (div { class_name = "hero-editor" }
       [
         div { class_name = "hero-editor-tabs" }
           [span { class_name = if m.effect then "hero-tab" else "hero-tab is-active" }
               [attributes [("aria-pressed", if m.effect then "false" else "true")]
                 (button
                   {
-                    disabled = false;
+                    disabled = not m.ready;
                     on_click =
                       Ui.Event.latest
                         (fun _ ->
@@ -159,7 +163,7 @@ let view model m =
               [attributes [("aria-pressed", if m.effect then "true" else "false")]
                 (button
                   {
-                    disabled = false;
+                    disabled = not m.ready;
                     on_click =
                       Ui.Event.latest
                         (fun _ ->
@@ -172,7 +176,7 @@ let view model m =
                   [text "Effect"])],
             span { class_name = "hero-copy" }
               [attributes [("aria-label", if m.copied then (if m.ru then "Скопировано" else "Copied") else (if m.ru then "Копировать пример" else "Copy example"))]
-                (button { disabled = false; on_click = Ui.Event.latest (fun _ -> task {
+                (button { disabled = not m.ready; on_click = Ui.Event.latest (fun _ -> task {
                     let copied =
                       try (
                         copy_text (if m.effect then effect_source else source) |> fun _ -> true
@@ -184,9 +188,9 @@ let view model m =
           [span { class_name = "hero-filename" } [text (if m.effect then "main.ts" else "main.fl")],
             span
               { class_name = "hero-runtime-note" }
-              [text (if m.ru then "На рантайме Effect" else "On the Effect runtime")],
+              [text (if m.ru then "На основе Effect" else "On the Effect runtime")],
             span { class_name = "hero-run" }
-              [button { disabled = m.running; on_click = Ui.Event.exhaust (fun _ -> task { run_example model }) }
+              [button { disabled = not m.ready || m.running; on_click = Ui.Event.exhaust (fun _ -> task { run_example model }) }
                 [
                   text
                     (if m.running then
@@ -199,7 +203,7 @@ let view model m =
           [attributes [("aria-hidden", "true")] (pre { class_name = "hero-lines" } [text "1\n2\n3\n4\n5"]),
             attributes
               [
-                ("tabIndex", "0"),
+                ("tabIndex", if m.ready then "0" else "-1"),
                 ("aria-label", if m.effect then "Effect TypeScript example" else "Flick example"),
               ]
               (snippet m.effect)],
@@ -208,23 +212,32 @@ let view model m =
             [span { class_name = "status-dot" } [], text status]),
         attributes [("id", "flick-hero-refresh"), ("hidden", "hidden"), ("tabIndex", "-1")]
           (button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { () }) } []),
-      ]
+      ])
   }
+
+initial_model : Bool -> Model
+let initial_model ru =
+  { ru = ru; ready = false; effect = false; running = false; output = ""; failed = false; copied = false }
+
+initial_view : Bool ->{} Ui {Atom.Write} none
+let initial_view ru =
+  let initial = initial_model ru
+  view (Atom.make initial) initial
 
 report : Failure e ->{} Unit
 let report failure = Platform.stderr_line (RawCause.describe (Failure.inspect failure))
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let ru = is_russian ()
+  let initial = initial_model (is_russian ())
   match Ui.Dom.container "flick-hero" with
   | None -> App.fail "Missing homepage example container"
   | Some root ->
-    let model =
-      Atom.make
-        { ru = ru; effect = false; running = false; output = ""; failed = false; copied = false }
+    let model = Atom.make initial
+    let app = Ui.render (Ui.view (fun () -> view model (Atom.value model))) ()
     provide Atom.layer {
-      ignore (
-        Ui.Dom.mount root report (Ui.render (Ui.view (fun () -> view model (Atom.value model))) ())
-      )
+      // the first render, synchronous, shows the server's markup; ready renders again
+      ignore (parallel
+        (task { ignore (Ui.Dom.mount root report app) })
+        (task { Atom.set model { initial with ready = true } }))
     }

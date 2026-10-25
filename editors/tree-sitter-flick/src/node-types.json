@@ -418,6 +418,10 @@
     "extra": true
   },
   {
+    "type": "echo",
+    "named": false
+  },
+  {
     "type": "else",
     "named": false
   },
@@ -560,6 +564,10 @@
   },
   {
     "type": "then",
+    "named": false
+  },
+  {
+    "type": "todo",
     "named": false
   },
   {

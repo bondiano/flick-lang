@@ -71,6 +71,18 @@ discards is not run: write `ignore (await t)` to run `t` and drop its result.
 
 See [effects.md](../effects/#task-and-await) and [regions.md](../regions/).
 
+## Debugging
+
+| Keyword | Meaning | Example |
+| - | - | - |
+| `todo` | code not written yet: any type, fails when it runs | `todo "parse the header"` |
+| `echo` | writes a value and its place to stderr, and returns it | `echo (total rows)`, `rows \|> echo` |
+
+Both check anywhere and leave a warning (`FLICK-T022`, `FLICK-T023`);
+`flick pack` refuses a package that still has them (`FLICK-P024`). `echo`
+is not an effect: it is for debugging, like a breakpoint. Both stay usable
+as record labels: `{ echo = … }`.
+
 ## Embedded languages
 
 | Keyword | Meaning | Example |

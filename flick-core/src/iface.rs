@@ -300,6 +300,7 @@ mod tests {
             options,
             &mut interface,
         ));
+        diagnostics.retain(|d| !d.unnecessary());
         assert!(diagnostics.is_empty(), "{diagnostics:?}");
         interface
     }

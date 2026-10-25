@@ -35,9 +35,11 @@ downloads that exact release, not the latest one.
 ## Language server
 
 `flick lsp --stdio` serves diagnostics (errors and warnings, as `flick
-check` reports them, on every change), hover with the source type and the
+check` reports them, when a document is opened or saved), hover with the source type and the
 `///` documentation of public and private values (including inferred locals
-and the `ignore` keyword), definition, references, completion, rename and formatting (see
+and the `ignore` keyword), definition, type definition, references, completion,
+signature help, rename, quick fixes and refactors, document and workspace
+symbols, semantic tokens, folding, inlay hints and formatting (see
 `docs/src/content/docs/reference/editor.md`). Both editors format on save
 with it: VS Code through the extension's defaults, Zed by its default
 `format_on_save` with the language server as formatter.

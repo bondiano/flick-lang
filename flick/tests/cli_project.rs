@@ -219,6 +219,7 @@ fn a_wrong_pnpm_or_a_missing_lockfile_changes_nothing() {
         manifest
     );
     assert!(!dir.join("pnpm-lock.yaml").exists());
+    assert!(!dir.join("node_modules/left-pad").exists());
 
     let pinned = format!(
         "{{ \"name\": \"locked\", \"packageManager\": \"pnpm@{}\" }}\n",
@@ -230,10 +231,21 @@ fn a_wrong_pnpm_or_a_missing_lockfile_changes_nothing() {
     );
     let out = flick_in(&dir, &["--diagnostics", "json", "install", "--locked"]);
     assert_eq!(code(&out), Some(2), "{out:?}");
-    for line in stderr(&out).lines() {
-        let event: serde_json::Value = serde_json::from_str(line).expect("NDJSON");
-        assert_eq!(event["schema-version"], 1);
-    }
+    let events: Vec<serde_json::Value> = stderr(&out)
+        .lines()
+        .map(|l| serde_json::from_str(l).expect("NDJSON"))
+        .collect();
+    assert!(events.iter().all(|e| e["schema-version"] == 1));
+    assert!(
+        events.iter().any(|e| e["code"] == "FLICK-P017"),
+        "{events:?}"
+    );
+    assert_eq!(
+        fs::read_to_string(dir.join("package.json")).expect("kept"),
+        pinned
+    );
+    assert!(!dir.join("pnpm-lock.yaml").exists());
+    assert!(!dir.join("node_modules/left-pad").exists());
 }
 
 #[test]
@@ -250,7 +262,7 @@ fn a_stale_lockfile_is_refused_and_pnpm_speaks_ndjson() {
             ("flick.toml", APP),
             ("package.json", &manifest),
             ("pnpm-lock.yaml", lock),
-            ("pnpm-workspace.yaml", "packages: []\n"),
+            ("pnpm-workspace.yaml", "packages: []\npmOnFail: download\n"),
         ],
     );
     let out = flick_in(&dir, &["--diagnostics", "json", "install", "--locked"]);
@@ -269,10 +281,49 @@ fn a_stale_lockfile_is_refused_and_pnpm_speaks_ndjson() {
         "{events:?}"
     );
     assert_eq!(
+        fs::read_to_string(dir.join("package.json")).expect("kept"),
+        manifest
+    );
+    assert_eq!(
         fs::read_to_string(dir.join("pnpm-lock.yaml")).expect("kept"),
         lock
     );
     assert!(!dir.join("node_modules/left-pad").exists());
+}
+
+#[test]
+fn the_pinned_pnpm_installs_offline_and_keeps_a_frozen_lockfile() {
+    let manifest = format!(
+        "{{ \"name\": \"local\", \"packageManager\": \"pnpm@{}\", \"dependencies\": {{ \"fixture-dep\": \"file:./fixture-dep\" }} }}\n",
+        pnpm_version()
+    );
+    let dependency = "{ \"name\": \"fixture-dep\", \"version\": \"1.0.0\" }\n";
+    let dir = project(
+        "cli_pnpm_install",
+        &[
+            ("flick.toml", APP),
+            ("package.json", &manifest),
+            ("pnpm-workspace.yaml", "packages: []\npmOnFail: download\n"),
+            ("fixture-dep/package.json", dependency),
+        ],
+    );
+    let out = flick_in(&dir, &["install", "--offline"]);
+    assert_eq!(code(&out), Some(0), "{out:?}");
+    assert_eq!(
+        fs::read_to_string(dir.join("node_modules/fixture-dep/package.json")).expect("installed"),
+        dependency
+    );
+    let lock = fs::read_to_string(dir.join("pnpm-lock.yaml")).expect("lockfile");
+    let out = flick_in(&dir, &["install", "--locked", "--offline"]);
+    assert_eq!(code(&out), Some(0), "{out:?}");
+    assert_eq!(
+        fs::read_to_string(dir.join("package.json")).expect("kept"),
+        manifest
+    );
+    assert_eq!(
+        fs::read_to_string(dir.join("pnpm-lock.yaml")).expect("kept"),
+        lock
+    );
 }
 
 #[test]
@@ -332,6 +383,12 @@ fn the_installed_runtime_and_effect_are_in_the_cache_key() {
 
 fn pnpm_version() -> String {
     process::Command::new("pnpm")
+        .env("npm_config_manage_package_manager_versions", "false")
+        .env("PNPM_CONFIG_PM_ON_FAIL", "ignore")
+        .env("COREPACK_ENABLE_PROJECT_SPEC", "0")
+        .env("COREPACK_ENABLE_AUTO_PIN", "0")
+        .env("COREPACK_ENABLE_NETWORK", "0")
+        .env("COREPACK_DEFAULT_TO_LATEST", "0")
         .arg("--version")
         .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())

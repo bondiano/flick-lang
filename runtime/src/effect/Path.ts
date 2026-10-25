@@ -1,8 +1,9 @@
 // Effect's `Path` for the bindings of the standard library: the Flick
 // service `Path.Path` built from an Effect `Path`.
-import * as NodePath from "@effect/platform-node/NodePath";
+
 import { type Context, Effect, Layer, Path, PlatformError } from "effect";
 
+import { nodeModule } from "../host.ts";
 import { mapError } from "./PlatformError.ts";
 
 export * from "effect/Path";
@@ -43,4 +44,5 @@ const build = <I>(tag: Context.Key<I, Impl>, layer: Layer.Layer<Path.Path>): Lay
 export const flickLayer = <I>(tag: Context.Key<I, Impl>): Layer.Layer<I> => build(tag, Path.layer);
 
 /** `Path.node`: the paths of Node.js. */
-export const flickNode = <I>(tag: Context.Key<I, Impl>): Layer.Layer<I> => build(tag, NodePath.layer);
+export const flickNode = <I>(tag: Context.Key<I, Impl>): Layer.Layer<I> =>
+  Layer.suspend(() => build(tag, nodeModule("@effect/platform-node/NodePath").layer));

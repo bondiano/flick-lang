@@ -204,6 +204,14 @@
         },
         {
           "type": "STRING",
+          "value": "todo"
+        },
+        {
+          "type": "STRING",
+          "value": "echo"
+        },
+        {
+          "type": "STRING",
           "value": "type"
         },
         {

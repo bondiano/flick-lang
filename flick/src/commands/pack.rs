@@ -17,6 +17,7 @@ use flick_core::project::cache;
 use flick_core::source::SourceMap;
 
 use super::build::{BuildCommand, write};
+use super::diff;
 use super::run::find_project;
 use crate::args::{
     BuildArguments, EmitArgument, GlobalArguments, OutDirArguments, ProfileArgument,
@@ -66,7 +67,22 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
     if report::code(&outcome.diagnostics) != 0 {
         return outcome;
     }
+    if let Some(diagnostics) = debugging_left(&outcome.diagnostics) {
+        return Outcome {
+            sources: outcome.sources,
+            diagnostics,
+        };
+    }
     report::render(global, &outcome.sources, &outcome.diagnostics);
+    // a warning, not a refusal: the version in `package.json` is the author's call
+    if let Some(tag) = diff::latest_tag(root)
+        && let Ok(changes) = diff::changes_since(root, &tag)
+        && diff::breaking(&changes)
+    {
+        eprintln!(
+            "warning: the public API breaks importers since {tag}; `flick diff {tag}` lists the changes"
+        );
+    }
     let problems = incomplete(&stage.join("dist"), dts);
     if !problems.is_empty() {
         return Outcome {
@@ -109,6 +125,27 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
         ),
         Err(err) => failure(codes::P016, format!("cannot run pnpm: {err}")),
     }
+}
+
+/// The `todo`s and `echo`s a package must not ship, as errors.
+fn debugging_left(built: &[Diagnostic]) -> Option<Vec<Diagnostic>> {
+    let mut diagnostics: Vec<Diagnostic> = built
+        .iter()
+        .filter(|d| [codes::T022, codes::T023].contains(&d.code))
+        .map(|d| Diagnostic {
+            severity: Severity::Error,
+            ..d.clone()
+        })
+        .collect();
+    if diagnostics.is_empty() {
+        return None;
+    }
+    diagnostics.push(Diagnostic::new(
+        codes::P024,
+        Severity::Error,
+        "a package cannot have `todo` or `echo` left in it",
+    ));
+    Some(diagnostics)
 }
 
 fn global_path(dir: &str) -> PathBuf {

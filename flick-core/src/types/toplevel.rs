@@ -350,6 +350,17 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// Where the top-level declaration being checked ends.
+    pub fn current_end(&self) -> Option<u32> {
+        self.top.current.map(|i| self.top.items[i].decl.range().1)
+    }
+
+    /// The span of the signature of this module's top-level value `name`.
+    pub fn signature_span(&self, name: &str) -> Option<Span> {
+        let i = *self.top.by_name.get(name)?;
+        self.top.items[i].sig.map(|sig| self.span(sig))
+    }
+
     /// The type of a top-level value of this module at a use.
     pub fn top_value(&mut self, name: &str, span: Span) -> Type {
         let entity = self.env.entity(Namespace::Value, name);

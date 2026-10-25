@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use std::iter;
 
 use super::{Ide, locals};
+use crate::diagnostics::Edit;
 use crate::iface::{Export, Interface, Namespace};
 use crate::resolve::declarations;
 use crate::source::FileId;
@@ -32,6 +33,17 @@ pub struct Completion {
     pub kind: CompletionKind,
     /// The source type, when known.
     pub detail: Option<String>,
+    /// The `///` documentation, as Markdown.
+    pub documentation: Option<String>,
+    /// A snippet to insert instead of the label, `$1`-style placeholders
+    /// for the arguments of a function.
+    pub snippet: Option<String>,
+    /// Where the item goes in the list: locals first, auto-imports last.
+    pub sort: u8,
+    /// The module that defines a top-level name.
+    pub module: Option<String>,
+    /// More edits, such as the `import` an auto-import needs.
+    pub edits: Vec<Edit>,
 }
 
 pub(super) fn item(label: &str, kind: CompletionKind, detail: Option<String>) -> Completion {
@@ -39,8 +51,19 @@ pub(super) fn item(label: &str, kind: CompletionKind, detail: Option<String>) ->
         label: label.to_owned(),
         kind,
         detail,
+        documentation: None,
+        snippet: None,
+        sort: 0,
+        module: None,
+        edits: Vec::new(),
     }
 }
+
+/// The sort groups of names in scope.
+const LOCAL: u8 = 0;
+const OWN: u8 = 1;
+const IMPORTED: u8 = 2;
+const PRELUDE_NAMES: u8 = 3;
 
 impl Ide<'_> {
     /// Completions at `offset` of `file`. With `dotted`, `offset` is the end
@@ -49,10 +72,15 @@ impl Ide<'_> {
         if let Some(items) = self.sql_complete(file, offset, dotted) {
             return items;
         }
-        if dotted {
-            return self.after_dot(file, offset);
-        }
-        self.complete_names(file, offset)
+        let mut items = if dotted {
+            self.after_dot(file, offset)
+        } else {
+            let mut items = self.complete_names(file, offset);
+            items.extend(self.auto_imports(file, offset, &items));
+            items
+        };
+        self.enrich(&mut items);
+        items
     }
 
     pub(super) fn complete_names(&self, file: FileId, offset: u32) -> Vec<Completion> {
@@ -61,8 +89,9 @@ impl Ide<'_> {
         };
         let text = &self.sources.get(file).text;
         let mut out: BTreeMap<String, Completion> = BTreeMap::new();
-        let mut add = |c: Completion| {
-            out.entry(c.label.clone()).or_insert(c);
+        let mut add = |sort: u8, c: Completion| {
+            out.entry(c.label.clone())
+                .or_insert(Completion { sort, ..c });
         };
         for (name, binder) in locals::in_scope(&m.tree, offset, text).into_iter().rev() {
             let ty = m
@@ -71,10 +100,10 @@ impl Ide<'_> {
                 .iter()
                 .find(|(r, _)| r.0 == binder.0)
                 .map(|(_, t)| show_type(t));
-            add(item(&name, CompletionKind::Local, ty));
+            add(LOCAL, item(&name, CompletionKind::Local, ty));
         }
         for c in exports(&m.interface) {
-            add(c);
+            add(OWN, c);
         }
         for d in declarations(&m.tree, text, file) {
             let kind = match d.namespace {
@@ -82,18 +111,27 @@ impl Ide<'_> {
                 Namespace::Constructor => CompletionKind::Constructor,
                 Namespace::Type => CompletionKind::Type,
             };
-            add(item(&d.name, kind, None));
+            add(
+                OWN,
+                Completion {
+                    module: Some(m.name.clone()),
+                    ..item(&d.name, kind, None)
+                },
+            );
         }
         for import in m.tree.nodes().filter(|n| n.kind == K::ImportDecl) {
             let Some(path) = import.nodes().find(|n| n.kind == K::ModulePath) else {
                 continue;
             };
             let module: String = path.text(text).split_whitespace().collect();
-            add(item(
-                module.rsplit('.').next().unwrap_or(&module),
-                CompletionKind::Module,
-                None,
-            ));
+            add(
+                IMPORTED,
+                item(
+                    module.rsplit('.').next().unwrap_or(&module),
+                    CompletionKind::Module,
+                    None,
+                ),
+            );
             let Some(interface) = self.interface(&module) else {
                 continue;
             };
@@ -118,13 +156,13 @@ impl Ide<'_> {
                             .is_some_and(|p| x.strip_suffix("(..)") == Some(p.as_str()))
                 });
                 if all || named {
-                    add(completion(e));
+                    add(IMPORTED, completion(e));
                 }
             }
         }
         if let Some(prelude) = self.interface(PRELUDE) {
             for c in exports(&prelude) {
-                add(c);
+                add(PRELUDE_NAMES, c);
             }
         }
         out.into_values().collect()
@@ -209,7 +247,7 @@ impl Ide<'_> {
 
 /// The values, constructors and types an interface exports, without the
 /// companions of types.
-fn exports(interface: &Interface) -> Vec<Completion> {
+pub(super) fn exports(interface: &Interface) -> Vec<Completion> {
     interface
         .exports
         .iter()
@@ -224,7 +262,10 @@ fn completion(e: &Export) -> Completion {
         Namespace::Constructor => CompletionKind::Constructor,
         Namespace::Type => CompletionKind::Type,
     };
-    item(&e.entity.name, kind, e.scheme.as_ref().map(show_type))
+    Completion {
+        module: Some(e.entity.module.clone()),
+        ..item(&e.entity.name, kind, e.scheme.as_ref().map(show_type))
+    }
 }
 
 /// The operations of a service the module declares, with their signatures.

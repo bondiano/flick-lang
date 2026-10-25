@@ -2,7 +2,7 @@
 export const sidebar = [
   {
     label: "Learn",
-    translations: { ru: "Изучение" },
+    translations: { ru: "Изучение Flick" },
     items: [{ slug: "learn" }, { slug: "start/getting-started" }, { slug: "learn/flick-and-effect" }],
   },
   {
@@ -12,6 +12,7 @@ export const sidebar = [
   },
   {
     label: "API",
+    translations: { ru: "Справочник" },
     items: [
       { slug: "api" },
       {
@@ -21,7 +22,7 @@ export const sidebar = [
       },
       {
         label: "Runtime",
-        translations: { ru: "Рантайм" },
+        translations: { ru: "Среда выполнения" },
         items: ["stdlib", "effect-surface", "runtime"].map((f) => ({ slug: `reference/${f}` })),
       },
     ],

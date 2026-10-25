@@ -1,11 +1,10 @@
 // Effect's `Logger` for the bindings of the standard library, and the
 // adapters where a Flick value differs from what Effect takes.
-import { inspect } from "node:util";
-
 import { type Duration, Effect, FileSystem, type Layer, Logger, type LogLevel, Option } from "effect";
 
 import { RawCause } from "../cause.ts";
 import type { Data } from "../data.ts";
+import { inspect } from "../host.ts";
 import { tag } from "../tags.ts";
 import { effectFileSystem, openFlag } from "./FileSystem.ts";
 import { mapError } from "./PlatformError.ts";

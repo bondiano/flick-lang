@@ -1,0 +1,14 @@
+module App.Broken exposing (user, total, label)
+
+// a syntax error in one definition leaves the others checked
+user : { name : String; age : Number }
+let user = { name = "Ada"; age = }
+//                               ^ FLICK-S007
+
+total : Number
+let total = 1 + "two"
+//              ^^^^^ FLICK-T003 expected `Number`, found `String`
+
+label : String
+let label = totl
+//          ^^^^ FLICK-T001 cannot find value `totl`

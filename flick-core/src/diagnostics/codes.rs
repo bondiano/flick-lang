@@ -123,6 +123,9 @@ codes! {
     R009 = Resolve 9, "definition shadows an imported name";
     R010 = Resolve 10, "ambiguous name";
     R011 = Resolve 11, "invalid export";
+    R012 = Resolve 12, "unused import";
+    R013 = Resolve 13, "unused variable";
+    R014 = Resolve 14, "unused private definition";
     T001 = Types 1, "unknown name";
     T002 = Types 2, "kind mismatch";
     T003 = Types 3, "type mismatch";
@@ -144,6 +147,9 @@ codes! {
     T019 = Types 19, "block without a result expression";
     T020 = Types 20, "representation of a type that does not fit it";
     T021 = Types 21, "annotation of a type the value already has";
+    T022 = Types 22, "`todo` left in the code";
+    T023 = Types 23, "`echo` left in the code";
+    T024 = Types 24, "type hole";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";
@@ -232,6 +238,8 @@ codes! {
     P021 = Project 21, "application cleanup failed";
     P022 = Project 22, "SQL dialect not supported yet";
     P023 = Project 23, "unknown SQL dialect";
+    P024 = Project 24, "package with `todo` or `echo` left in it";
+    P025 = Project 25, "cannot compare the API with a git revision";
 }
 
 #[cfg(test)]

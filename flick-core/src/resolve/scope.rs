@@ -72,6 +72,14 @@ impl<'a> Scope<'a> {
         scope
     }
 
+    pub fn module(&self) -> &'a Module<'a> {
+        self.module
+    }
+
+    pub fn imports(&self) -> &[(&'a Import, Option<Interface>)] {
+        &self.imports
+    }
+
     /// Two imports under one qualifier, e.g. `import A as M` and `import M`.
     fn check_qualifiers(&self, diagnostics: &mut Vec<Diagnostic>) {
         let mut by_qualifier: BTreeMap<&str, Vec<&Import>> = BTreeMap::new();
@@ -362,6 +370,7 @@ impl<'a> Scope<'a> {
             qualifier,
             name,
             span,
+            ..
         } = reference;
         if let Some(reason) = self.blocked(reference) {
             diagnostics.push(

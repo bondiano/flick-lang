@@ -2,14 +2,16 @@
 //! the runner in Node with source maps and compares stdout, stderr and exit
 //! code with `<name>.stdout` (required), `<name>.stderr` (default empty) or
 //! `<name>.stderr.contains` (lines stderr must contain), and `<name>.exit`
-//! (default `0`).
+//! (default `0`). Cases run in parallel, `FLICK_E2E_JOBS` at a time
+//! (default: the number of CPUs).
 
-use std::cell::Cell;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
-use std::{env, fs};
+use std::{env, fs, thread};
 
 use flick_core::build::runner_path;
 
@@ -34,8 +36,8 @@ fn compare(what: &str, expected: &str, actual: &str) -> Option<String> {
 }
 
 /// Builds and runs one case, as JS or as TypeScript, in a profile; returns
-/// the mismatch report, if any.
-fn run_case(case: &Path, out_dir: &Path, emit: &str, profile: &str) -> Option<String> {
+/// the mismatch report, if any, and how long the build took.
+fn run_case(case: &Path, out_dir: &Path, emit: &str, profile: &str) -> (Option<String>, Duration) {
     let _ = fs::remove_dir_all(out_dir);
     let started = Instant::now();
     let build = Command::new(env!("CARGO_BIN_EXE_flick"))
@@ -49,12 +51,13 @@ fn run_case(case: &Path, out_dir: &Path, emit: &str, profile: &str) -> Option<St
         .arg(profile)
         .output()
         .expect("flick runs");
-    BUILD_TIME.with(|t| t.set(t.get() + started.elapsed()));
+    let build_time = started.elapsed();
     if !build.status.success() {
-        return Some(format!(
+        let report = format!(
             "  build failed:\n{}",
             String::from_utf8_lossy(&build.stderr)
-        ));
+        );
+        return (Some(report), build_time);
     }
     let output = Command::new("node")
         .arg("--enable-source-maps")
@@ -92,7 +95,46 @@ fn run_case(case: &Path, out_dir: &Path, emit: &str, profile: &str) -> Option<St
     .into_iter()
     .flatten()
     .collect();
-    (!problems.is_empty()).then(|| problems.join("\n"))
+    (
+        (!problems.is_empty()).then(|| problems.join("\n")),
+        build_time,
+    )
+}
+
+/// How many cases run at once.
+fn jobs() -> usize {
+    env::var("FLICK_E2E_JOBS")
+        .ok()
+        .and_then(|j| j.parse().ok())
+        .filter(|&j| j > 0)
+        .unwrap_or_else(|| thread::available_parallelism().map_or(1, usize::from))
+}
+
+/// Runs `f` on each of `items` on `jobs` threads; the results keep the
+/// order of `items`.
+fn parallel<T: Sync, R: Send>(items: &[T], jobs: usize, f: impl Fn(&T) -> R + Sync) -> Vec<R> {
+    let next = AtomicUsize::new(0);
+    let results: Mutex<Vec<Option<R>>> = Mutex::new(items.iter().map(|_| None).collect());
+    thread::scope(|s| {
+        for _ in 0..jobs.min(items.len()) {
+            s.spawn(|| {
+                loop {
+                    let i = next.fetch_add(1, Ordering::Relaxed);
+                    let Some(item) = items.get(i) else {
+                        break;
+                    };
+                    let result = f(item);
+                    results.lock().expect("no worker panicked")[i] = Some(result);
+                }
+            });
+        }
+    });
+    results
+        .into_inner()
+        .expect("no worker panicked")
+        .into_iter()
+        .map(|r| r.expect("every item ran"))
+        .collect()
 }
 
 #[test]
@@ -114,20 +156,22 @@ fn run_cases() {
     let out_root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("e2e");
     let mut report = Vec::new();
     let mut times = Vec::new();
+    let jobs = jobs();
     // release must agree with the debug reference: same stdout, stderr and exit
     for (emit, profile) in [("js", "debug"), ("ts", "debug"), ("js", "release")] {
-        BUILD_TIME.with(|t| t.set(Duration::ZERO));
-        for case in &paths {
+        let results = parallel(&paths, jobs, |case| {
             let rel = case.strip_prefix(&root).expect("case under root");
             let out_dir = out_root
                 .join(profile)
                 .join(emit)
                 .join(rel.with_extension(""));
-            if let Some(p) = run_case(case, &out_dir, emit, profile) {
-                report.push(format!("{} ({emit}, {profile}):\n{p}", rel.display()));
-            }
-        }
-        times.push(BUILD_TIME.with(Cell::get));
+            let (problem, built) = run_case(case, &out_dir, emit, profile);
+            let problem = problem.map(|p| format!("{} ({emit}, {profile}):\n{p}", rel.display()));
+            (problem, built)
+        });
+        // the sum of the builds: with the same jobs in both profiles it compares them
+        times.push(results.iter().map(|(_, built)| *built).sum::<Duration>());
+        report.extend(results.into_iter().filter_map(|(problem, _)| problem));
     }
     report.extend(typecheck(&repo, &out_root.join("debug/ts")));
     assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));
@@ -175,10 +219,6 @@ assert.equal(app.app.kind, "component");
         .output()
         .expect("Node is installed");
     assert!(imported.status.success(), "{imported:?}");
-}
-
-thread_local! {
-    static BUILD_TIME: Cell<Duration> = const { Cell::new(Duration::ZERO) };
 }
 
 /// How much longer the release builds of the corpus may take than the debug
@@ -272,14 +312,13 @@ fn passing_fixtures_compile_to_valid_js() {
     let mut paths = Vec::new();
     cases(&root, &mut paths);
     let out_root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("fixtures");
-    let mut report = Vec::new();
-    for case in paths {
+    let report: Vec<String> = parallel(&paths, jobs(), |case| {
         let rel = case.strip_prefix(&root).expect("case under root");
         let out_dir = out_root.join(rel.with_extension(""));
         let _ = fs::remove_dir_all(&out_dir);
         let build = Command::new(env!("CARGO_BIN_EXE_flick"))
             .arg("build")
-            .arg(&case)
+            .arg(case)
             .arg("--out-dir")
             .arg(&out_dir)
             .output()
@@ -287,26 +326,29 @@ fn passing_fixtures_compile_to_valid_js() {
         let stderr = String::from_utf8_lossy(&build.stderr);
         // blocks compiled by later phases are reported, not miscompiled
         if !build.status.success() && !stderr.contains("FLICK-P012") {
-            report.push(format!("{}: {stderr}", rel.display()));
-            continue;
+            return vec![format!("{}: {stderr}", rel.display())];
         }
         let mut files = Vec::new();
         scripts(&out_dir, &mut files);
-        for file in files {
-            let check = Command::new("node")
-                .arg("--check")
-                .arg(&file)
-                .output()
-                .expect("node");
-            if !check.status.success() {
-                report.push(format!(
-                    "{}: {}",
-                    file.display(),
-                    String::from_utf8_lossy(&check.stderr)
-                ));
-            }
-        }
-    }
+        files
+            .iter()
+            .filter_map(|file| {
+                let check = Command::new("node")
+                    .arg("--check")
+                    .arg(file)
+                    .output()
+                    .expect("node");
+                (!check.status.success()).then(|| {
+                    format!(
+                        "{}: {}",
+                        file.display(),
+                        String::from_utf8_lossy(&check.stderr)
+                    )
+                })
+            })
+            .collect()
+    })
+    .concat();
     assert!(report.is_empty(), "{}", report.join("\n"));
 }
 

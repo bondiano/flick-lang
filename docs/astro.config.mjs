@@ -16,15 +16,44 @@ const local = ["release", "debug"]
 /** The TextMate grammar of the VS Code extension highlights `flick` blocks. */
 const grammar = JSON.parse(readFileSync(new URL("../editors/vscode/syntaxes/flick.tmLanguage.json", import.meta.url), "utf8"));
 
+const output = {
+  // Effect's cyclic modules must keep their execution order across chunks.
+  strictExecutionOrder: true,
+  codeSplitting: {
+    groups: [{ name: "vendor", test: /node_modules/, maxSize: 400_000 }],
+  },
+};
+
 export default defineConfig({
   site: "https://flick-lang.dev",
   output: "static",
+  vite: {
+    environments: {
+      client: { build: { rolldownOptions: { output } } },
+    },
+    worker: {
+      format: "es",
+      rolldownOptions: { output },
+    },
+  },
   integrations: [
     flick({ binary: process.env.FLICK_BIN ?? local ?? "flick" }),
     starlight({
       title: "Flick",
       description: "An ML language with higher-kinded types, typed effects and regions, on Effect",
-      favicon: "/favicon.svg",
+      favicon: "/favicon.ico",
+      head: [
+        { tag: "link", attrs: { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" } },
+        { tag: "link", attrs: { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" } },
+        { tag: "meta", attrs: { property: "og:image", content: "https://flick-lang.dev/social.png" } },
+        { tag: "meta", attrs: { property: "og:image:type", content: "image/png" } },
+        { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
+        { tag: "meta", attrs: { property: "og:image:height", content: "630" } },
+        { tag: "meta", attrs: { property: "og:image:alt", content: "Flick" } },
+        { tag: "meta", attrs: { name: "twitter:image", content: "https://flick-lang.dev/social.png" } },
+        { tag: "meta", attrs: { name: "twitter:image:alt", content: "Flick" } },
+      ],
+      disable404Route: true,
       defaultLocale: "root",
       locales: {
         root: { label: "English", lang: "en" },

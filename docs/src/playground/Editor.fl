@@ -20,13 +20,16 @@ let generated_pane m =
       != "" then tr
         m.locale
         "Compilation failed. See the error above."
-        "Компиляция не удалась. Подробности выше."
+        "Не удалось скомпилировать код. Сообщение об ошибке — выше."
     else if errors result
       > 0 then tr
         m.locale
         "Fix the diagnostics below to generate JavaScript."
-        "Исправьте ошибки ниже, чтобы получить JavaScript."
-    else tr m.locale "This module emits no JavaScript." "Этот модуль не создаёт JavaScript."
+        "Чтобы получить JavaScript, исправьте ошибки, указанные ниже."
+    else tr
+      m.locale
+      "This module emits no JavaScript."
+      "Для этого модуля JavaScript не генерируется."
   Ui.with_host { Ui.host with tab_index = Some 0; aria_label = Some (tr m.locale "Generated JavaScript" "Сгенерированный JavaScript") }
     (Ui.pre { class_name = "fp-generated-code" }
       (if result.code == "" then [Ui.text hint]
@@ -70,7 +73,7 @@ let source_pane model m =
                 (tr
                   m.locale
                   "Checked on every edit · compiled locally"
-                  "Проверка при каждом изменении · локальная компиляция"),
+                  "Проверка после каждого изменения · компиляция в браузере"),
             ]),
       ]
   }

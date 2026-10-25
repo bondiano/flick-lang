@@ -43,7 +43,10 @@ diagnostics without a span are annotated in `flick.toml`. A project without
 annotations must check cleanly.
 
 Columns count characters, not bytes. `text` is optional and must be a
-substring of the diagnostic message. Codes must be registered in
+substring of the diagnostic message, with each help line appended as
+`: help`. Warnings about unused code (`FLICK-R012`–`R014`) count only in
+files that mention their code: fixtures of other rules bind names they never
+use. Codes must be registered in
 `flick-core/src/diagnostics/codes.rs`.
 
 ## E2E programs — `tests/run/`
@@ -59,8 +62,11 @@ to it:
 | `<name>.stderr.contains` | instead of `<name>.stderr`: lines stderr must contain |
 | `<name>.exit` | `0` |
 
-Every case runs twice: compiled to JS and compiled with `--emit ts`, whose
-`flick-main.ts` Node runs directly; afterwards `tsc --noEmit` (strict) checks all of
+Every case runs three times: compiled to JS, compiled with `--emit ts`, whose
+`flick-main.ts` Node runs directly, and compiled to JS in the release
+profile, which must behave as the debug build. Within each pass the cases
+run in parallel, `FLICK_E2E_JOBS` at a time (default: the number of CPUs;
+`FLICK_E2E_JOBS=1` runs them one by one). Afterwards `tsc --noEmit` (strict) checks all of
 the TypeScript output. Output goes to `target/tmp/e2e/` and imports `@flick-lang/runtime` from the
 workspace. A foreign module next to a case (`./tags.mjs`) is imported from
 there. `just e2e` also builds every `tests/check/pass/**` fixture and runs

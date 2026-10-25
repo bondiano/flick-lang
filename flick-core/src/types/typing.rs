@@ -67,7 +67,8 @@ pub struct Typing {
     /// The type of each name in an expression and of each variable a
     /// pattern binds, for editors; at a keyword that opens an expression
     /// (`task`, `match`, `fun` …) the type of the whole expression, at
-    /// `ignore` and `await` the type of the operand.
+    /// `ignore` and `await` the type of the operand, at `|>` the type after
+    /// the stage.
     pub types: HashMap<Range, Type>,
     /// The type each type name refers to: its module and name.
     pub type_names: HashMap<Range, (String, String)>,

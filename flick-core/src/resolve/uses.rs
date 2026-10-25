@@ -1,10 +1,11 @@
 //! References to top-level names in declarations: every name that is not
-//! bound locally by a parameter, pattern, `let` or `scope`.
+//! bound locally by a parameter, pattern, `let` or `scope`; and the local
+//! names nothing refers to.
 
 use super::Namespace;
 use super::defs::{binders, is_pattern};
 use crate::source::{FileId, Span};
-use crate::syntax::cst::Node;
+use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 
 #[derive(Debug)]
@@ -14,27 +15,53 @@ pub(super) struct Reference {
     pub qualifier: Option<String>,
     pub name: String,
     pub span: Span,
+    /// Index of the top-level declaration it is in.
+    pub top: usize,
 }
 
-pub(super) fn references(tree: &Node, text: &str, file: FileId) -> Vec<Reference> {
+/// A local name bound and never used.
+#[derive(Debug)]
+pub(super) struct Unused {
+    pub name: String,
+    pub span: Span,
+    /// Bound by a record pattern field without `=`: `{ name }`.
+    pub punned: bool,
+}
+
+pub(super) fn references(tree: &Node, text: &str, file: FileId) -> (Vec<Reference>, Vec<Unused>) {
     let mut walker = Walker {
         text,
         file,
         locals: Vec::new(),
         out: Vec::new(),
+        unused: Vec::new(),
+        top: 0,
     };
-    walker.walk(tree);
-    walker.out
+    for (i, decl) in tree.nodes().enumerate() {
+        walker.top = i;
+        walker.walk(decl);
+    }
+    (walker.out, walker.unused)
+}
+
+struct Local<'a> {
+    name: &'a str,
+    /// `None` for a name whose uses are not counted: a top-level `let`, a
+    /// region of `scope`.
+    binder: Option<(Token, bool)>,
+    used: bool,
 }
 
 struct Walker<'a> {
     text: &'a str,
     file: FileId,
-    locals: Vec<&'a str>,
+    locals: Vec<Local<'a>>,
     out: Vec<Reference>,
+    unused: Vec<Unused>,
+    top: usize,
 }
 
-impl<'a> Walker<'a> {
+impl Walker<'_> {
     fn walk(&mut self, node: &Node) {
         let mark = self.locals.len();
         match node.kind {
@@ -47,6 +74,7 @@ impl<'a> Walker<'a> {
             K::NameExpr | K::ConPat => self.reference(node, Namespace::Constructor),
             K::NameType => self.reference(node, Namespace::Type),
             K::LetDecl => {
+                // a top-level or member `let`: its names are not locals
                 self.let_decl(node);
                 self.locals.truncate(mark);
                 return;
@@ -60,20 +88,51 @@ impl<'a> Walker<'a> {
                         self.walk(child);
                     }
                 }
-                self.locals.truncate(mark);
+                self.release(mark);
                 return;
             }
             K::FunExpr | K::MatchArm => self.bind_patterns(node),
             K::ScopeExpr => {
                 let name = node.child_tokens().find(|t| t.kind == K::Ident);
-                self.locals.extend(name.map(|t| t.text(self.text)));
+                self.locals.extend(name.map(|t| Local {
+                    name: t.text(self.text),
+                    binder: None,
+                    used: false,
+                }));
             }
             _ => {}
         }
         for child in node.nodes() {
             self.walk(child);
         }
-        self.locals.truncate(mark);
+        self.release(mark);
+    }
+
+    /// Leaves the scope of the locals above `mark`, noting those never used.
+    fn release(&mut self, mark: usize) {
+        for local in self.locals.drain(mark..) {
+            if let (Some((token, punned)), false) = (local.binder, local.used)
+                && !local.name.starts_with('_')
+            {
+                self.unused.push(Unused {
+                    name: local.name.to_owned(),
+                    span: Span::new(self.file, token.start, token.end),
+                    punned,
+                });
+            }
+        }
+    }
+
+    fn bind(&mut self, pattern: &Node) {
+        let mut names = Vec::new();
+        binders(pattern, &mut names);
+        let mut puns = Vec::new();
+        punned(pattern, &mut puns);
+        self.locals.extend(names.into_iter().map(|t| Local {
+            name: t.text(self.text),
+            binder: Some((t, puns.contains(&t.start))),
+            used: false,
+        }));
     }
 
     /// The `$name` captures of a `sql { … }` block: names of the program.
@@ -89,14 +148,19 @@ impl<'a> Walker<'a> {
 
     /// Walks a `let`, then leaves the names it binds in scope.
     fn let_decl(&mut self, node: &Node) {
-        let mut names = Vec::new();
-        if let Some(pattern) = node.nodes().find(|n| is_pattern(n.kind)) {
-            binders(pattern, &mut names);
-        }
-        let names: Vec<&'a str> = names.iter().map(|t| t.text(self.text)).collect();
+        let pattern = node.nodes().find(|n| is_pattern(n.kind));
         let mark = self.locals.len();
-        if node.has_token(K::RecKw) {
-            self.locals.extend(&names);
+        if node.has_token(K::RecKw)
+            && let Some(pattern) = pattern
+        {
+            // a recursive function's own calls do not count as uses
+            let mut names = Vec::new();
+            binders(pattern, &mut names);
+            self.locals.extend(names.into_iter().map(|t| Local {
+                name: t.text(self.text),
+                binder: None,
+                used: false,
+            }));
         }
         for params in node.nodes().filter(|n| n.kind == K::Params) {
             self.bind_patterns(params);
@@ -104,16 +168,16 @@ impl<'a> Walker<'a> {
         for child in node.nodes() {
             self.walk(child);
         }
-        self.locals.truncate(mark);
-        self.locals.extend(names);
+        self.release(mark);
+        if let Some(pattern) = pattern {
+            self.bind(pattern);
+        }
     }
 
     fn bind_patterns(&mut self, node: &Node) {
-        let mut names = Vec::new();
         for pattern in node.nodes().filter(|n| is_pattern(n.kind)) {
-            binders(pattern, &mut names);
+            self.bind(pattern);
         }
-        self.locals.extend(names.iter().map(|t| t.text(self.text)));
     }
 
     /// `name`, `Con`, `M.name`, `M.N.Con`; a lowercase type name is a type
@@ -139,14 +203,39 @@ impl<'a> Walker<'a> {
         } else {
             Namespace::Value
         };
-        if qualifier.is_empty() && self.locals.contains(&name) {
-            return;
+        if qualifier.is_empty() {
+            // every binder of the name in scope counts as used: the branches
+            // of an or-pattern bind it once each
+            let mut found = false;
+            for local in self.locals.iter_mut().filter(|l| l.name == name) {
+                local.used = true;
+                found = true;
+            }
+            if found {
+                return;
+            }
         }
         self.out.push(Reference {
             namespace,
             qualifier: (!qualifier.is_empty()).then(|| qualifier.join(".")),
             name: name.to_owned(),
             span,
+            top: self.top,
         });
+    }
+}
+
+/// Starts of the names bound by record pattern fields without `=`.
+fn punned(pattern: &Node, out: &mut Vec<u32>) {
+    if pattern.kind == K::RecordPatField && !pattern.has_token(K::Eq) {
+        out.extend(
+            pattern
+                .child_tokens()
+                .find(|t| t.kind == K::Ident)
+                .map(|t| t.start),
+        );
+    }
+    for child in pattern.nodes().filter(|n| is_pattern(n.kind)) {
+        punned(child, out);
     }
 }

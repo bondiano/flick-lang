@@ -2,6 +2,8 @@
 //! kinds on the way: every position decides the kind it expects, and the
 //! kinds of type variables follow from where they are used.
 
+use std::mem;
+
 use super::Checker;
 use super::env::{Form, Found};
 use super::kinds::Kind;
@@ -49,7 +51,9 @@ impl Checker<'_> {
     /// whether the signature starts with a `forall` that binds all of them.
     pub fn signature(&mut self, node: &Node) -> (Type, bool) {
         let mark = self.tyvars.len();
+        let hole_ok = mem::replace(&mut self.hole_ok, true);
         let ty = self.ty(node, &Kind::Type, Free::Quantify);
+        self.hole_ok = hole_ok;
         let new: Vec<Binder> = self.tyvars[mark..]
             .iter()
             .map(|v| Binder {
@@ -89,7 +93,9 @@ impl Checker<'_> {
     /// A local type annotation; its unknown variables are inferred.
     pub fn annotation(&mut self, node: &Node) -> Type {
         let mark = self.tyvars.len();
+        let hole_ok = mem::replace(&mut self.hole_ok, true);
         let ty = self.ty(node, &Kind::Type, Free::Fresh);
+        self.hole_ok = hole_ok;
         self.tyvars.truncate(mark);
         self.default_kinds(&ty)
     }
@@ -146,6 +152,7 @@ impl Checker<'_> {
                 (ty, kind)
             }
             K::UnitType => (Type::prim("Unit"), Kind::Type),
+            K::HoleType => self.hole(span, expected),
             K::TupleType => (
                 Type::Tuple(
                     children

@@ -13,7 +13,7 @@ import { RegistryContext, uiRenderStatic } from "./react/render.ts";
 
 /**
  * `Ui.Server.render`: the markup of `ui`, its views reading the atoms of
- * the provided registry. Each `provide Reactivity.Atom.layer` is a registry
+ * the provided registry. Each `provide Atom.layer` is a registry
  * of its own, so requests rendered in parallel do not see each other's atoms.
  */
 export const uiServerRender = (ui: Ui): Effect.Effect<string, never, unknown> =>

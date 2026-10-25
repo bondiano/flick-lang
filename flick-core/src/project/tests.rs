@@ -43,6 +43,7 @@ fn run(host: &Memory, roots: &[&str]) -> Vec<String> {
     let roots: Vec<PathBuf> = roots.iter().map(|r| Path::new("/p").join(r)).collect();
     check(host, &mut sources, project.as_ref(), &roots)
         .iter()
+        .filter(|d| !d.unnecessary())
         .map(|d| {
             let at = d.span.map_or(String::new(), |s| {
                 let file = sources.get(s.file);

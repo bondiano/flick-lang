@@ -144,3 +144,10 @@ let area shape =
   | Line
   | Point -> 0
   | Labeled { name = "origin" | "zero" } -> 0
+
+let debugging x =
+  let y = echo (x + 1)
+  let z = [y] |> echo
+  todo "finish"
+
+let unfinished = todo

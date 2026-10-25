@@ -1,8 +1,9 @@
 // Effect's `Stdio` for the bindings of the standard library: the Flick
 // service `Stdio.Stdio` built from an Effect `Stdio`.
-import * as NodeStdio from "@effect/platform-node/NodeStdio";
+
 import { type Context, Effect, Layer, Stdio, Stream } from "effect";
 
+import { nodeModule } from "../host.ts";
 import { mapError } from "./PlatformError.ts";
 
 export * from "effect/Stdio";
@@ -34,4 +35,8 @@ export const flickNode = <I>(key: Context.Key<I, Impl>): Layer.Layer<I> =>
       natives.set(record, stdio);
       return record;
     }),
-  ).pipe(Layer.provide(NodeStdio.layer));
+  ).pipe(
+    Layer.provide(
+      Layer.suspend(() => nodeModule("@effect/platform-node/NodeStdio").layer),
+    ),
+  );

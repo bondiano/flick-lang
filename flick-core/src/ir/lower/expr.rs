@@ -58,6 +58,10 @@ impl Lower<'_> {
             }
             K::AppExpr => return self.apply(children[0], &children[1..]),
             K::BinExpr => return self.binary(node, &children),
+            K::TodoExpr => return self.todo(node),
+            K::PrefixExpr if node.has_token(K::EchoKw) => {
+                return self.echo(node, children.first().copied());
+            }
             K::PrefixExpr => {
                 let operand = self.boxed(children[0]);
                 match node.child_tokens().next().map(|t| t.kind) {

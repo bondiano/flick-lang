@@ -1,0 +1,4 @@
+module App.HoleAlias exposing (Boxes)
+
+type alias Boxes = List _
+//                      ^ FLICK-T024 `_` stands for a type only in a signature or an annotation
