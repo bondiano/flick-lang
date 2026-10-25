@@ -199,7 +199,7 @@ component search (props : SearchProps) =
 **U9b. 🆕 Пользовательские сигнатуры без `Reactivity.*`.** ✅ (псевдонимы сервисов и ошибок раскрываются в строках эффектов; `Atom.Registry`; реэкспорт — U9c)
 - AC: пользователь пишет `{Atom.Write}` или `Atom.Registry` в строке эффектов вместо `Reactivity.Atom.Registry`: либо компилятор поддерживает псевдоним сервиса, либо `Ui.Dom.mount`/`Ui.Server.*` берут реестр из `Atom.Write` (тот же реестр в `Atom.layer`); фикстуры `tests/check/pass/ui/views.fl`, `tests/run/ui/serializable.fl` и `reference/ui.md` без `Reactivity.`.
 
-**U9c. 🆕 Реэкспорт модулей.** ⬜
+**U9c. 🆕 Реэкспорт модулей.** ✅ (синтаксис `exposing (.., X)` уже был; исправлены квалифицированные пути к сервисам `M.S.op`, `M.S.Impl`, `M.S` как значение; `Atom.Registry` — реэкспорт; реэкспортированный `main`/`tests` не делает модуль входом — пересмотреть в L6)
 - AC: модуль делает импортированную сущность (тип, ADT с конструкторами, сервис с операциями и `Impl`, значение) доступной по своему пути как ту же сущность; `Atom.Registry` — реэкспорт `Reactivity.Atom.Registry`, так что работают `Atom.Registry.get`, `Atom.Registry.Impl` и `Layer.succeed Atom.Registry`; `.iface`, кодген, LSP (goto/hover/completion) и `flick diff` знают реэкспорт; цикл реэкспорта — ошибка.
 
 ### Трек R — SSR и шаблоны
@@ -258,6 +258,11 @@ component search (props : SearchProps) =
 **L2. Шаблон.** ⬜ AC: `flick new --template cli`; `flick run -- --help` выводит сгенерированную справку.
 **L3. Observability в CLI.** ⬜ AC: флаг `--trace` включает OTLP (O1); `GlobalFlag.LogLevel` подключён.
 **L4. Терминальный UI (исследование).** ⬜ AC: записка о рендерере атомов в терминал (Ink через `Ui.mount_with` или свой) с замером веса и решением.
+**L6. 🆕 Несколько точек входа.** ⬜ (после S2–S4)
+- AC: `[project] entries = { server = "App.Server", cli = "App.Cli" }` (`entry` — сокращение для одного); сборка пишет раннер на каждый вход (`flick-server.js`, …) в один каталог, общие модули — один раз; `flick run <name>`, `flick dev <name>`; `flick pack` даёт `"bin"` с каждым входом; e2e-тест на два входа.
+- AC: решение о реэкспортированном `main`: раннер импортирует `main` из модуля-источника, так что фасад (`entry = "App"`) может быть входом, — либо запрет остаётся; записано в `implementation-decisions.md`.
+- AC: в `reference/project.md` описано, что веб-входы (Vite/rolldown) — это JS-модули, импортирующие `.fl`, а `entries` — раннеры приложения.
+
 **L5. `flick dev` для фронта.** ⬜ AC: решение записано: браузер — HMR модулей Vite с сохранением состояния реестра (атомы с метками C6 переживают замену); сервер — текущий перезапуск.
 
 ## 4. Порядок и зависимости

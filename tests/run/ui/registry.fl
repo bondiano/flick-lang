@@ -1,0 +1,17 @@
+// `Atom.Registry` is Effect's `Reactivity.Atom.Registry`, re-exported: its
+// operations are reached through `Atom`'s path, and the layer of `Atom`
+// provides it.
+module App.Main exposing (main)
+
+count : Atom.Writable Number
+let count = Atom.make 1
+
+read : Unit ->{Atom.Registry;} Number
+let read () = Atom.Registry.get (Atom.readonly count)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  provide Atom.layer {
+    Atom.set count 2
+    Platform.stdout_line ("count " ++ show (read ()))
+  }

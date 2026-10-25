@@ -210,8 +210,11 @@ impl Interface {
             .find(|e| e.entity.namespace == namespace && e.entity.name == name)
     }
 
+    /// Whether the module exports its own value `name`: a re-exported one
+    /// is another module's, so it is not, say, this module's `main`.
     pub fn exports_value(&self, name: &str) -> bool {
-        self.find(Namespace::Value, name).is_some()
+        self.find(Namespace::Value, name)
+            .is_some_and(|e| e.entity.module == self.module)
     }
 
     /// Exported members of type `parent`.

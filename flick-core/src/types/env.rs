@@ -388,6 +388,21 @@ impl Env {
         }
     }
 
+    /// The type `path` names: an unqualified one in scope, or `M.T`, `T` as
+    /// the module of the import `M` exports it, re-exported or its own.
+    pub fn find_type(&self, path: &str) -> Found {
+        let Some((qualifier, name)) = path.rsplit_once('.') else {
+            return self.find(Namespace::Type, path);
+        };
+        match self.qualified_module(qualifier) {
+            Some((_, Some(interface))) => interface
+                .find(Namespace::Type, name)
+                .map_or(Found::Missing, |e| Found::Entity(e.entity.clone())),
+            Some((_, None)) => Found::Unknown,
+            None => Found::Missing,
+        }
+    }
+
     /// Every unqualified name in `namespace`: candidates for a misspelt one.
     pub fn names(&self, namespace: Namespace) -> impl Iterator<Item = &str> {
         self.scope

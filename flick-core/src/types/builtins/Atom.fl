@@ -2,8 +2,12 @@
 /// provides (`Atom.layer`) holds the values of the atoms read through it.
 /// A view reads atoms through `Read` while it renders and renders again
 /// only when one of them changes; a derived atom does the same for its
-/// value. The task of an action writes them through `Write`.
-module Atom exposing (..)
+/// value. The task of an action writes them through `Write`. `Registry`,
+/// which roots and server markup read atoms from, is Effect's
+/// `Reactivity.Atom.Registry`, re-exported.
+module Atom exposing (.., Registry)
+
+import Reactivity.Atom exposing (Registry)
 
 /// A value to read.
 type alias Atom a = Reactivity.Atom.Atom a
@@ -23,10 +27,6 @@ service Write =
   modify : forall a b. Writable a -> (a -> (b, a)) ->{} b
   current : forall a. Atom a ->{} a
   refresh : forall a. Atom a ->{} Unit
-
-/// The registry roots and server markup read atoms from: Effect's
-/// `Reactivity.Atom.Registry` under the name of this module.
-type alias Registry = Reactivity.Atom.Registry
 
 /// A fresh registry: the values of atoms, which views read and `Write`
 /// writes. Provide one per root, and on a server one per request.

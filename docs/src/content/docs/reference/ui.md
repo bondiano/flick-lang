@@ -97,8 +97,8 @@ from the atoms it reads, and `Atom.set`/`Atom.update` write a state
 through the service `Atom.Write`, which the task of an action has and a
 render does not. `Atom.layer` provides one registry as both
 `Atom.Registry`, which roots and server markup read, and `Atom.Write`;
-`Atom.Registry` is Effect's `Reactivity.Atom.Registry` under a shorter
-name, as an alias of a service stands for it in a row.
+`Atom.Registry` is Effect's `Reactivity.Atom.Registry`, which `Atom`
+re-exports.
 
 A view is a component whose render reads atoms through the service
 `Atom.Read`. `Ui.Dom.mount` renders a `Ui` with the provided registry, and

@@ -49,12 +49,36 @@ impl Checker<'_> {
         span: Span,
     ) -> Type {
         // a service in scope with this operation wins over a module of its name
-        let operation = match self.env.find(Namespace::Type, qualifier) {
+        let operation = match self.env.find_type(qualifier) {
             super::env::Found::Entity(e) => self.env.type_def(&e.module, &e.name).is_some_and(
                 |d| matches!(&d.form, super::env::Form::Service { operations, .. } if operations.iter().any(|o| o.name == name)),
             ),
             _ => false,
         };
+        // `M.S`: a service of the module named as a value, which has no constructor `S`
+        let no_constructor = namespace == Namespace::Constructor
+            && self
+                .env
+                .qualified_module(qualifier)
+                .and_then(|(_, i)| i)
+                .is_some_and(|i| i.find(namespace, name).is_none());
+        if no_constructor {
+            let path = format!("{qualifier}.{name}");
+            if let super::env::Found::Entity(e) = self.env.find_type(&path)
+                && let Some(tag) = self.service_tag(&path)
+            {
+                self.record_name(span, Ref::ServiceTag(format!("{}.{}", e.module, e.name)));
+                return tag;
+            }
+            if let super::env::Found::Entity(_) = self.env.find_type(&path) {
+                self.error(
+                    codes::T001,
+                    span,
+                    format!("`{path}` is a type, not a constructor or a service"),
+                );
+                return Type::Error;
+            }
+        }
         if !operation && let Some((_, interface)) = self.env.qualified_module(qualifier) {
             // a name the module does not export is reported by name resolution
             let entity = interface
@@ -86,7 +110,7 @@ impl Checker<'_> {
             return ty;
         }
         // `Email.parse`: a companion of a type
-        if let super::env::Found::Entity(e) = self.env.find(Namespace::Type, qualifier) {
+        if let super::env::Found::Entity(e) = self.env.find_type(qualifier) {
             let entity = Entity {
                 module: e.module.clone(),
                 namespace: Namespace::Value,
@@ -103,24 +127,24 @@ impl Checker<'_> {
 
     /// `Service.operation`, or the error for a qualifier that names nothing.
     fn service_member(&mut self, qualifier: &str, name: &str, span: Span) -> Type {
-        let service = match self.env.find(Namespace::Type, qualifier) {
+        let service = match self.env.find_type(qualifier) {
             super::env::Found::Entity(e) => self
                 .env
                 .type_def(&e.module, &e.name)
                 .cloned()
-                .map(|d| (e.module, d)),
+                .map(|d| (e.module, e.name, d)),
             super::env::Found::Unknown => return Type::Error,
             super::env::Found::Missing => None,
         };
-        match service.map(|(module, d)| (module, d.form)) {
-            Some((module, super::env::Form::Service { params, operations })) => {
+        match service.map(|(module, service, d)| (module, service, d.form)) {
+            Some((module, service, super::env::Form::Service { params, operations })) => {
                 if let Some(op) = operations.iter().find(|o| o.name == name) {
-                    let ty = self.operation_type(&module, qualifier, params.len(), &op.ty, span);
+                    let ty = self.operation_type(&module, &service, params.len(), &op.ty, span);
                     let stages = self.arrow_stages(&ty);
                     self.record_name(
                         span,
                         Ref::Operation {
-                            service: format!("{module}.{qualifier}"),
+                            service: format!("{module}.{service}"),
                             name: name.to_owned(),
                             stages,
                         },

@@ -1,0 +1,31 @@
+// Imports only the re-exporting module: the service and the data type reached
+// through its path are those of App.Clock, operations, `Impl`, constructors
+// and the service as a value included.
+module App.Main exposing (..)
+
+import App.Time
+
+impl : App.Time.Clock.Impl
+let impl = App.Time.fixed 3
+
+layer : Layer none none {App.Time.Clock}
+let layer = Layer.succeed App.Time.Clock impl
+
+now : Unit ->{App.Time.Clock;} Number
+let now () = App.Time.Clock.now ()
+
+tick : Unit ->{App.Time.Clock;} App.Time.Tick
+let tick () = App.Time.Tick (now ())
+
+seconds : App.Time.Tick -> Number
+let seconds t =
+  match t with
+  | App.Time.Tick n -> n
+
+run : Unit ->{} Number
+let run () = provide layer { seconds (tick ()) + seconds (App.Time.ticks 1) }
+
+// a type that is neither a constructor nor a service is no value
+not_a_value : Unit
+let not_a_value = ignore App.Time.Seconds
+//                       ^^^^^^^^^^^^^^^^ FLICK-T001 `App.Time.Seconds` is a type, not a constructor or a service

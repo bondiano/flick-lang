@@ -1,0 +1,12 @@
+// The origin of the service and the data type the next module re-exports.
+module App.Clock exposing (Clock, Tick(..), Seconds, ticks)
+
+service Clock =
+  now : Unit ->{} Number
+
+type Tick = Tick Number
+
+type alias Seconds = Number
+
+ticks : Number -> Tick
+let ticks n = Tick n
