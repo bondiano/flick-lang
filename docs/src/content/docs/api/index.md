@@ -34,6 +34,8 @@ Built-in modules are Flick interfaces over the runtime adapter and its Effect fo
 | [Effect coverage](../reference/effect-surface/) | How the pinned Effect surface is classified and exposed, including explicit exclusions. Do not assume every Effect API is directly available in Flick. |
 | [Schemas and codecs](../reference/schema/) | Refinements, schema derivation, validation, wire codecs and JSON Schema export. |
 | [Typed HTTP APIs](../reference/http-api/) | Endpoint descriptions, request/response codecs, handlers, clients and API documents. |
+| [Typed RPC](../reference/rpc/) | Procedures with codecs, groups of handlers, servers and clients over HTTP, WebSocket, TCP and standard streams, middleware and in-memory tests. |
+| [Observability](../reference/observability/) | Spans, log records and metrics, and where they go: OTLP export, Prometheus routes and the Effect DevTools. |
 | [SQL](../reference/sql/) | PostgreSQL table declarations, checked query syntax, nullability, parameters and database operations. |
 | [User interfaces](../reference/ui/) | The `ui` syntax, React rendering, properties, events and component contracts. |
 | [Command-line applications](../reference/cli-dsl/) | The `cli` syntax, flags, arguments, subcommands and handlers. This is the application library, not the compiler's CLI. |

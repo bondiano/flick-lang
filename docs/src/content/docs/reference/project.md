@@ -64,6 +64,7 @@ Errors in the configuration exit with code `2`:
 | both `entry` and `entries`, or an entry name that is not one | `FLICK-P005` |
 | no project found, or `--project` names none | `FLICK-P008` |
 | an entry is not a source module that exports `main` | `FLICK-P011` |
+| an entry `main` does not take and return `Unit`, needs a service or can fail with an error other than `AppError` | `FLICK-P026` |
 | `sql.dialect` names a dialect that is not supported yet | `FLICK-P022` |
 | `sql.dialect` names no dialect; the message lists the known ones | `FLICK-P023` |
 | `lint.allow` names an unknown code | `FLICK-P005` |
@@ -78,6 +79,17 @@ with `#!/usr/bin/env node`, so `flick pack` names each runner in the
 package's `bin`, and the only entry `main` under the package's name.
 `flick run <name>` and `flick dev <name>` start one; with a single entry the
 name may be left out.
+
+Every entry exports `main : Unit -> Unit` or a runtime function taking and
+returning `Unit`, requiring no services and failing only with `AppError`
+(an empty error row is valid too). Provide required layers and handle other
+errors inside `main`, not in the launcher.
+
+A pure `main` is called directly. Normally its launcher imports no runtime;
+`schema-aot = true` still imports the schema installation helpers.
+A runtime `main` is started through the entry runner, which observes its
+final `Exit` (see [code generation](../codegen/)). Invalid signatures produce
+`FLICK-P026` during project checking, or during a standalone file build.
 
 ```toml
 [project]

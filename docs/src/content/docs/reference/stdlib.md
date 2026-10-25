@@ -53,6 +53,9 @@ and `Monad`.
 | `Events` | `queue` policies and the `log_failures` supervisor |
 | `Ui`, `Ui.Event` | user interfaces rendered with React, see [ui.md](../ui/) |
 | `Sql`, `Database` | typed PostgreSQL queries and the `Database` service, see [sql.md](../sql/) |
+| `Rpc` | typed remote procedure calls — procedures with codecs, groups, servers and clients over HTTP, WebSocket, TCP and standard streams, see [rpc.md](../rpc/) |
+| `Metric`, `Tracer` | metrics of the program's registry and spans around its tasks, see [observability.md](../observability/) |
+| `Otlp`, `Prometheus`, `DevTools` | where spans, log records and metrics go: an OTLP collector, a Prometheus route, the Effect DevTools, see [observability.md](../observability/) |
 | `JsError` | `JsError.from_js`, the error of a foreign throw or rejection, see [ffi.md](../ffi/) |
 | `Fiber`, `Failure`, `Exit`, `RawCause` | children of a scope and outcomes |
 | `Test`, `Gen` | tests and generators, see below |

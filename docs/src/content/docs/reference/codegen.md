@@ -20,7 +20,7 @@ JS global has it, and an ignored parameter is `_`; release uses `$m_Ui` and
 | - | - |
 | `A/B.js`, `A/B.js.map` | module `A.B` and its source map |
 | `_flick/<Name>.js` | the built-in modules the program reaches (`Prelude`, `Platform`, …); with `--emit-dts`, all of them |
-| `flick-main.js`, `flick-<name>.js` | for an app: the runner of each entry (`main` for `entry`, the names of `entries`), which starts the entry's `main`, imported from the module that defines it, through the runtime's entry runner |
+| `flick-main.js`, `flick-<name>.js` | the launcher for each app entry: imports its `main` from the defining module and starts it through the runtime, or calls a pure `main` directly; without schema AOT, a pure launcher needs no runtime import |
 | `package.json` | `{ "type": "module", "sideEffects": ["./flick-main.js"] }`, listing every runner; `"sideEffects": false` without one |
 
 Module `Main` stays `Main.js`/`Main.ts`; the hyphenated launcher `flick-main.js`/`flick-main.ts` avoids case-insensitive filename collisions, and the old launcher name is no longer emitted.
@@ -123,8 +123,72 @@ constants first.
 | `provide layer { body }` | `$rt.provide(layer, body)`: the layer is built before the body |
 | `scope [s] { body }` | `$rt.scope((s) => body)`: a lexical owner with a two-phase close, see [runtime.md](../runtime/) |
 | a call acquiring into an outer `scope` | `$rt.within(owner, call)`, the owner of that scope's region |
-| pure self tail call | a loop over the parameters |
+| a supported pure tail call | a loop over parameters, including mutually recursive top-level functions; see below |
+| an eligible tail-recursive list walk | an array and an offset, not a copy of the remaining list on every step |
 | runtime recursion | through `yield*`, without growing the JS stack |
+
+## Recursion: stack safety is not the whole cost
+
+A call is in tail position when its result is returned without further
+work. `sum (acc + x) rest` below is a tail call; `x + sum 0 rest` is not,
+because the addition still has to run after the call returns.
+
+```flick
+sum : Number -> List Number -> Number
+let rec sum acc xs =
+  match xs with
+  | [] -> acc
+  | [x, ...rest] -> sum (acc + x) rest
+```
+
+Both debug and release lower the recursive call to a loop. The next
+arguments are evaluated from the current iteration's bindings, then
+assigned directly; an unchanged argument needs no assignment. This keeps
+argument swaps correct without an extra set of per-iteration temporaries.
+The right operand of `&&` or `||` is also a tail position when the whole
+expression is returned: short-circuiting stays intact.
+
+Because a Flick list is a JS array, stack safety alone would not make
+`sum` efficient. Copying `rest` with `slice` on every step copies a
+quadratic number of elements. For this traversal the compiler keeps the
+original array and advances an offset: matching reads the remaining length
+and indexes relative to that offset. The walk is linear, without allocating
+a new tail array on each iteration.
+
+This transformation is deliberately narrow: the list parameter must only
+be matched in tail position, and `rest` must only be passed to the same
+list position of the next loop jump. Passing a different list resets the
+offset to zero. A tail returned to a caller or otherwise escaping the loop
+still needs its own array; the representation of `List` has not changed.
+
+### Mutual recursion and dictionaries
+
+Pure top-level functions whose tail calls form a cycle share a loop with a
+member selector. Each public function enters that loop at its own member:
+
+```flick
+rec {
+  is_even : Number -> Bool
+  let is_even n = if n == 0 then true else is_odd (n - 1)
+
+  is_odd : Number -> Bool
+  let is_odd n = if n == 0 then false else is_even (n - 1)
+}
+```
+
+These parity functions expect a non-negative integer; the loop transform
+does not add input validation or make other inputs terminate.
+
+The back-and-forth calls become member changes in a `for (;;) switch`
+loop, not a JS frame per step. A constrained function can also loop on a
+self call that passes exactly its own class dictionaries. A recursive call
+with different dictionaries remains a call; this is not a general promise
+to eliminate every recursive call.
+
+A pure loop is synchronous: stack safety does not make a long computation
+cooperative or cancellable. Runtime recursion instead runs through Effect
+steps, preserving scheduling and interruption.
+
 
 ## Services
 
@@ -230,12 +294,12 @@ corpus runs in both profiles against the same expectations.
 | matches and constructors | the last arm of a `match` without a guard is not tested, since the match is exhaustive; three or more arms that are constructors with only bound fields, the last one possibly any binding, are a `switch (x._tag)` with `default` last; a tagged constructor applied to all its fields is the object it builds, `{ _tag: "Rect#…", _0: 3, _1: 4 }` |
 
 A function whose first stage computes or runs something gets no worker:
-joining the stages would move that work after the next argument. Pure
-self tail recursion is a loop in both profiles; a runtime recursion stays a
-chain of `Effect.gen` or `Effect.suspend` steps, so it yields to the scheduler and can be
-interrupted. Nothing reassociates arithmetic (`(a + b) + c`), folds `x * 0`,
-runs or memoizes a task, merges two `Layer` builds, moves a service lookup
-across `provide` or drops a schema check.
+joining the stages would move that work after the next argument. The loop
+lowerings above are available in both profiles; runtime recursion stays a
+chain of `Effect.gen` or `Effect.suspend` steps. Nothing reassociates
+arithmetic (`(a + b) + c`), folds `x * 0`, runs or memoizes a task,
+merges two `Layer` builds, moves a service lookup across `provide` or
+drops a schema check.
 
 ## Not compiled yet
 

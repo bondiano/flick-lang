@@ -97,7 +97,16 @@ The cache accounts for the sources, the compiler and language version, the norma
 
 ## Running and safe restart
 
-`run` calls a single external platform runner. The entry type remains `main : Unit ->{; AppError} Unit`; dependencies and Layers are provided explicitly inside `main`. The CLI does not turn every direct call or `await` into a separate runtime launch. Command-line arguments are available through an explicit platform API. A normal return of `Unit`, a typed `AppError`, a defect and interruption all end the run by closing its root owner; the command's result is known only after cleanup. The test runner follows the same order for each test.
+`run <name>` starts the selected entry through one external platform
+runner; the name may be omitted when there is only one entry. A pure
+`main : Unit -> Unit` is called directly. A runtime entry takes and returns
+`Unit`, requires no services and may fail only with `AppError`; dependencies
+and layers are provided inside `main`. The CLI does not turn each direct
+call or `await` into a separate runtime launch. Command-line arguments are
+available through an explicit platform API. In a runtime entry, a normal
+return, typed `AppError`, defect or interruption closes the root owner;
+the command's result is known only after cleanup. The test runner follows
+the same cleanup order for each test.
 
 `dev` can check and build the next version while the current one is running, preserving the isolation of generations described above. If the build fails, the current version keeps running. After a successful build, the runner closes admission of the old version, requests interruption, waits for the join of child fibers and the quiescence of registered foreign work, then completes the LIFO finalizers. The new version starts only after shutdown is confirmed complete; a cleanup error stops the automatic restart.
 

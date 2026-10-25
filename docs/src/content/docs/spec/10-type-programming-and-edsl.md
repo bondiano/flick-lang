@@ -352,7 +352,14 @@ let main () =
   }
 ```
 
-A command remains an ordinary value: the entry point is still the single `main : Unit ->{; AppError} Unit`, and exit codes and the order of cleanup follow the general rules of section 12. Cancellation by SIGINT interrupts the handler, and its resources are closed under the owner contract of section 7. Captures pass through the handler just as through UI callbacks: a command whose handler captured a resource of a closed scope cannot be returned from that scope. Interactive prompts (`Cli.Prompt`) are ordinary effectful functions inside the handler, not clauses of the block.
+A command remains an ordinary value: the entry that runs it is an ordinary
+runtime `main`, and an application may expose several named entries.
+Exit codes and cleanup order follow the general rules of section 12.
+SIGINT interrupts the handler, whose resources close under the owner
+contract of section 7. Captures pass through the handler just as through UI
+callbacks: a command capturing a scoped resource cannot escape that scope.
+Interactive prompts (`Cli.Prompt`) are ordinary effectful functions inside
+the handler, not clauses of the block.
 
 ## What SQL and UI add to design validation
 
