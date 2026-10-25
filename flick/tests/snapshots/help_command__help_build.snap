@@ -23,5 +23,6 @@ Options:
       --schema-aot                 Compile pure codecs ahead of use in the app's runner
       --profile <PROFILE>          `debug`, the reference lowering, or `release`, optimized; by default `build.profile` of the project [possible values: debug, release]
       --warnings-as-errors         Treat warnings as errors
+      --labels <LABELS>            Which top-level values a release build labels `Module.name`; by default `build.labels` of the project [possible values: all, components, none]
       --watch                      Build again whenever a source file changes; a failed build keeps the last output
   -h, --help                       Print help

@@ -114,6 +114,7 @@ pub fn build_generation(
             promise_facade: false,
             schema_aot: false,
             profile: options.profile,
+            labels: None,
             watch: false,
         },
         project: Some(project.root.to_string_lossy().into_owned()),

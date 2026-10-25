@@ -146,7 +146,7 @@ component search (props : SearchProps) =
 **C6. Метки от компилятора.** ✅ `e5ef204` (умолчание меняется в C6b)
 - AC: каждый top-level атом, action и view — `$rt.label("Mod.name", …)`; ручное имя сохраняется; `[build] labels = "all" | "components" | "none"`; source map заполняет `names`.
 
-**C6b. 🆕 Метки по умолчанию `all` (§6.4).** ⬜
+**C6b. 🆕 Метки по умолчанию `all` (§6.4).** ✅ (замер: метки атомов стоят 0–7 B gzip; `withLabel` со стектрейсом ≈16 мкс на атом в Node — оставлен)
 - AC: `Labels::default()` = `All` (`flick-core/src/project/config.rs`), тест конфигурации и `reference/project.md` (en + ru) обновлены; `components` и `none` остаются.
 - AC: `just bundle-size` собирает playground и counter также с `labels = "components"` и печатает разницу; бюджеты пересчитаны под `all` и записаны с замером в коммите.
 - AC: стоимость метки атома (stack trace при создании) в release измерена; если заметна в профиле — в `all` release метка без стека.
@@ -259,7 +259,7 @@ component search (props : SearchProps) =
 B0…B9 ✅ ─ B7b                        (замер, независимо)
 S1 ✅ ─ U1…U6 ✅ ─ U7 🔶 ─ U7b ─ U6b
         └─ R1…R4 ✅ ─ R5 🔶 ─ R6 ✅
-C2/C3/C4/C6 ✅ ─ C6b
+C2/C3/C4/C6 ✅ ─ C6b ✅
 C7a ─ C7b ─ C7c ─ C7d ─ C5            C1 (бенчмарк, может закрыться без реализации)
 U9                                   (до любых изменений рантайма атомов)
 S2 ─ F1 ─ F2 ─ F3 ─ F4 ─ F5 ─ F6

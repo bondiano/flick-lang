@@ -45,7 +45,7 @@ dialect = "postgresql"
 | `build.schema-aot` | логическое значение | `false` |
 | `build.solver-steps` | число шагов разрешения экземпляров классов для одного определения | `100000` |
 | `build.solver-depth` | глубина вложенности ограничений классов | `256` |
-| `build.labels` | что release-сборка помечает `Module.name` для инструментов отладки: `"all"` (атомы, представления, actions), `"components"` (представления и actions) или `"none"`; debug помечает всё | `"components"` |
+| `build.labels` | что release-сборка помечает `Module.name` для инструментов отладки: `"all"` (атомы, представления, actions), `"components"` (представления и actions) или `"none"`; debug помечает всё; `flick build --labels` переопределяет | `"all"` |
 | `sql.dialect` | диалект SQL для `sql table` и `sql { … }` (см. [запросы SQL](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` и `"oracle"` распознаются, но пока не поддерживаются | `"postgresql"` |
 
 Ошибки конфигурации приводят к завершению с кодом `2`:

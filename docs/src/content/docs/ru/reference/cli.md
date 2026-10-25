@@ -15,7 +15,7 @@ title: "Командная строка"
 | `new <dir> [--template app\|lib]` | создаёт проект: `flick.toml`, `package.json`, пример модуля и его тест |
 | `init [--template app\|lib]` | создаёт те же файлы в рабочем каталоге; перед записью сообщает обо всех файлах, которые уже существуют (`FLICK-P019`) |
 | `check [paths] [--watch] [--fix]` | проверяет код; если пути не указаны, проверяет корневые каталоги исходников и тестов; `--fix` применяет к этим файлам исправления, не меняющие смысла программы (например, убирает избыточную аннотацию типа, `FLICK-T021`), и сообщает об оставшихся проблемах |
-| `build [paths] [--profile] [--emit js\|ts] [--emit-dts] [--schema-aot] [--out-dir] [--watch]` | записывает ESM, карты исходников и файлы `.iface` |
+| `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts] [--emit-dts] [--schema-aot] [--out-dir] [--watch]` | записывает ESM, карты исходников и файлы `.iface` |
 | `run [--entry M] [--profile] -- args` | собирает JavaScript и запускает `main` |
 | `dev [--entry M] [--profile] -- args` | пересобирает при изменениях и заменяет работающее приложение |
 | `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile]` | запускает тесты из корневого каталога тестов |

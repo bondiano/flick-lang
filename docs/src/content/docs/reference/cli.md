@@ -15,7 +15,7 @@ and `--help`; `flick help <command>` prints a command's help and
 | `new <dir> [--template app\|lib]` | creates a project: `flick.toml`, `package.json`, an example module and its test |
 | `init [--template app\|lib]` | the same files in the working directory; every file that exists is reported before anything is written (`FLICK-P019`) |
 | `check [paths] [--watch] [--fix]` | checks; without paths the source and test roots; `--fix` applies the fixes that keep the program's meaning (such as removing a type annotation the value already has, `FLICK-T021`) to those files and reports what is left |
-| `build [paths] [--profile] [--emit js\|ts] [--emit-dts] [--schema-aot] [--out-dir] [--watch]` | writes ESM, source maps and `.iface` files |
+| `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts] [--emit-dts] [--schema-aot] [--out-dir] [--watch]` | writes ESM, source maps and `.iface` files |
 | `run [--entry M] [--profile] -- args` | builds JavaScript and runs `main` |
 | `dev [--entry M] [--profile] -- args` | rebuilds on changes and replaces the running app |
 | `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile]` | runs the tests of the test root |

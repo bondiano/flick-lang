@@ -178,6 +178,11 @@ pub struct BuildArguments {
     #[arg(long, value_enum)]
     pub profile: Option<ProfileArgument>,
 
+    /// Which top-level values a release build labels `Module.name`; by
+    /// default `build.labels` of the project.
+    #[arg(long, value_enum)]
+    pub labels: Option<LabelsArgument>,
+
     /// Build again whenever a source file changes; a failed build keeps the
     /// last output.
     #[arg(long)]
@@ -188,6 +193,13 @@ pub struct BuildArguments {
 pub enum ProfileArgument {
     Debug,
     Release,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum LabelsArgument {
+    All,
+    Components,
+    None,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]

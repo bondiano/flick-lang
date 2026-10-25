@@ -50,9 +50,9 @@ pub struct Options<'a> {
 #[serde(rename_all = "lowercase")]
 pub enum Labels {
     /// Atoms, views and actions.
+    #[default]
     All,
     /// Views and actions; an atom's label costs a stack trace when it is made.
-    #[default]
     Components,
     None,
 }

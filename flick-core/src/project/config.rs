@@ -260,7 +260,7 @@ mod tests {
         let config = parse_text(
             "schema-version = 1\n[project]\nkind = \"app\"\nsource-dir = \"src\"\ntest-dir = \"test\"\n\
              entry = \"App.Main\"\n[build]\nout-dir = \"dist\"\nprofile = \"debug\"\nemit = \"js\"\n\
-             emit-dts = false\nschema-aot = false\nlabels = \"components\"\n",
+             emit-dts = false\nschema-aot = false\nlabels = \"all\"\n",
         )
         .expect("valid");
         assert_eq!(config.kind, Kind::App);
@@ -272,10 +272,10 @@ mod tests {
             ("src", "test")
         );
         assert_eq!(lib.sql_dialect.name, "postgresql");
-        let all = parse_text(
-            "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\nlabels = \"all\"\n",
+        let components = parse_text(
+            "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\nlabels = \"components\"\n",
         );
-        assert_eq!(all.expect("valid").build.labels, Labels::All);
+        assert_eq!(components.expect("valid").build.labels, Labels::Components);
     }
 
     #[test]

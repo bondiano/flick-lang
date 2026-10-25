@@ -57,6 +57,7 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
             promise_facade: project.config.build.promise_facade,
             schema_aot: false,
             profile: Some(ProfileArgument::Release),
+            labels: None,
             watch: false,
         },
         project: Some(root.to_string_lossy().into_owned()),

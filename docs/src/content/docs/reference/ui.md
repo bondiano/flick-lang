@@ -122,7 +122,7 @@ let counter_view =
 `Ui.render view props` places a view in a `Ui`. The compiler names each
 top-level view, action and atom `Module.name`, as React's developer tools
 and Effect's show it (`App.Counter.counter_view`); a release build keeps
-the names of views and actions, and of atoms with `[build] labels = "all"`.
+them all, or only those of views and actions with `[build] labels = "components"`.
 `Ui.named` gives a view another name. A view subscribes to what it read after React
 commits, and a write between its render and its subscription renders it
 again. Rendering a view outside `Ui.Dom.mount` fails with what to do. The

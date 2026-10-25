@@ -2,7 +2,9 @@
 // each emitted `flick-main.js` for the browser with rolldown (minified, React
 // in production mode), prints raw/min/gzip sizes and fails when a gzip size
 // exceeds its budget, a bundle keeps a module none of them uses, or a
-// release bundle is larger than the debug one. Host
+// release bundle is larger than the debug one. It also prints what labelling
+// atoms costs: release with `labels = "all"`, the default, against
+// `"components"`. Host
 // foreign modules (`.ts`/`.mjs` beside the source) are not Flick output and
 // stay external.
 import { execFileSync } from "node:child_process";
@@ -121,10 +123,11 @@ export const measure = async (entry) => {
   return { raw: raw.bytes, min: min.bytes, gzip: min.gzip, modules: min.modules, app: min.app };
 };
 
-/** Compiles `source` into `out` with `flick build`. */
-export const build = (flick, source, out, profile) => {
+/** Compiles `source` into `out` with `flick build`, labelling `labels` when given. */
+export const build = (flick, source, out, profile, labels) => {
   rmSync(out, { recursive: true, force: true });
-  execFileSync(flick, ["build", path.join(root, source), "--out-dir", out, "--profile", profile, "--quiet", "--color", "never"], {
+  const options = labels === undefined ? [] : ["--labels", labels];
+  execFileSync(flick, ["build", path.join(root, source), "--out-dir", out, "--profile", profile, ...options, "--quiet", "--color", "never"], {
     cwd: root,
     stdio: ["ignore", "inherit", "inherit"],
   });
@@ -143,12 +146,16 @@ const main = async () => {
       build(flick, program.source, out, profile);
       sizes[profile] = await measure(path.join(out, "flick-main.js"));
     }
-    rows.push({ ...program, ...sizes.release, debug: sizes.debug });
+    const components = path.join(base, "components", program.name);
+    build(flick, program.source, components, "release", "components");
+    sizes.components = await measure(path.join(components, "flick-main.js"));
+    rows.push({ ...program, ...sizes.release, debug: sizes.debug, components: sizes.components });
   }
-  console.log("| program | raw KB | min KB | gzip KB | budget KB | app min KB (debug) |");
-  console.log("|---|---|---|---|---|---|");
+  console.log("| program | raw KB | min KB | gzip KB | budget KB | app min KB (debug) | atom labels gzip B |");
+  console.log("|---|---|---|---|---|---|---|");
   for (const r of rows) {
-    console.log(`| ${r.name} | ${kb(r.raw)} | ${kb(r.min)} | ${kb(r.gzip)} | ${r.budget} | ${kb(r.app)} (${kb(r.debug.app)}) |`);
+    const labels = r.gzip - r.components.gzip;
+    console.log(`| ${r.name} | ${kb(r.raw)} | ${kb(r.min)} | ${kb(r.gzip)} | ${r.budget} | ${kb(r.app)} (${kb(r.debug.app)}) | ${labels} |`);
   }
   const errors = rows.flatMap((r) => [
     ...(r.gzip > r.budget * 1024 ? [`${r.name} is ${kb(r.gzip)} KB gzip, over its budget of ${r.budget} KB`] : []),

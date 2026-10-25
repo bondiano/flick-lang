@@ -9,7 +9,7 @@ use flick_core::project::{self, Compilation, Compiled, Project};
 use flick_core::source::{FileId, SourceMap};
 
 use super::check::select;
-use crate::args::{BuildArguments, EmitArgument, ProfileArgument};
+use crate::args::{BuildArguments, EmitArgument, LabelsArgument, ProfileArgument};
 use crate::command::{Command, Outcome};
 use crate::sources::FsHost;
 use crate::{cache, toolchain};
@@ -138,7 +138,12 @@ impl BuildCommand {
                 promise_facade: self.options.promise_facade
                     || config.is_some_and(|b| b.promise_facade),
                 schema_aot: self.options.schema_aot || config.is_some_and(|b| b.schema_aot),
-                labels: config.map_or_else(Labels::default, |b| b.labels),
+                labels: match self.options.labels {
+                    Some(LabelsArgument::All) => Labels::All,
+                    Some(LabelsArgument::Components) => Labels::Components,
+                    Some(LabelsArgument::None) => Labels::None,
+                    None => config.map_or_else(Labels::default, |b| b.labels),
+                },
             },
             release: release(self.options.profile, config),
         }
