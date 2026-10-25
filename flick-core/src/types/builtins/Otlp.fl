@@ -1,6 +1,7 @@
-/// Exporters of OpenTelemetry's protocol over HTTP with JSON: a program
-/// provides one, and its spans, log records or metrics are sent to the
-/// collector in batches, the rest when the layer's scope closes. The module
+/// Exporters of OpenTelemetry's protocol over HTTP: a program provides one,
+/// and its spans, log records or metrics are sent to the collector in
+/// batches, the rest when the layer's scope closes. `Options` sends JSON
+/// with Effect's defaults; `Settings` and the `_with` layers say the rest. The module
 /// is unstable, as Effect marks `effect/observability`.
 module Otlp exposing (..)
 
@@ -27,3 +28,86 @@ foreign pure logs from "@flick-lang/runtime/effect/observability/Otlp" "otlpLogs
 metrics : Options -> Layer none none none
 foreign pure metrics from "@flick-lang/runtime/effect/observability/Otlp" "otlpMetrics"
   reviewed "effect@4.0.5 sha256:03304a237d1ab870"
+
+/// How the exporters write what they send.
+type Serialization
+
+/// OTLP's JSON, the default.
+json : Serialization
+foreign pure json from "@flick-lang/runtime/effect/observability/Otlp" "otlpJson"
+  reviewed "effect@4.0.5 sha256:83cbfbfb44846be1"
+
+/// OTLP's protobuf: smaller, and only a program that names it bundles it.
+protobuf : Serialization
+foreign pure protobuf from "@flick-lang/runtime/effect/observability/Otlp" "otlpProtobuf"
+  reviewed "effect@4.0.5 sha256:926974a98b1e4f51"
+
+/// Everything an exporter can be told: the service's version and resource
+/// attributes, headers of each request (an API key, say), gzip for bodies
+/// of 1 KB or more, the serialization, how often a batch is sent, how many
+/// records a batch holds, and how long the end of the scope waits for the
+/// last one.
+type alias Settings =
+  {
+    url : String;
+    service_name : String;
+    service_version : Option String;
+    attributes : List (String, String);
+    headers : List (String, String);
+    gzip : Bool;
+    serialization : Serialization;
+    export_interval : Option Duration.Duration;
+    max_batch_size : Option Number;
+    shutdown_timeout : Option Duration.Duration;
+  }
+
+/// The settings of `url` and `service_name`, everything else Effect's
+/// default: JSON, no gzip, no headers or attributes.
+settings : String -> String -> Settings
+let settings url service_name =
+  {
+    url = url;
+    service_name = service_name;
+    service_version = None;
+    attributes = [];
+    headers = [];
+    gzip = false;
+    serialization = json;
+    export_interval = None;
+    max_batch_size = None;
+    shutdown_timeout = None;
+  }
+
+/// `layer` as `settings` say.
+layer_with : Settings -> Layer none none none
+foreign pure layer_with from "@flick-lang/runtime/effect/observability/Otlp" "otlpLayerWith"
+  reviewed "effect@4.0.5 sha256:d572158125d5099d"
+
+/// `traces` as `settings` say.
+traces_with : Settings -> Layer none none none
+foreign pure traces_with from "@flick-lang/runtime/effect/observability/Otlp" "otlpTracesWith"
+  reviewed "effect@4.0.5 sha256:b9be076a3b681501"
+
+/// `logs` as `settings` say.
+logs_with : Settings -> Layer none none none
+foreign pure logs_with from "@flick-lang/runtime/effect/observability/Otlp" "otlpLogsWith"
+  reviewed "effect@4.0.5 sha256:84bff042d5561fc1"
+
+/// `metrics` as `settings` say; `max_batch_size` does not apply.
+metrics_with : Settings -> Layer none none none
+foreign pure metrics_with from "@flick-lang/runtime/effect/observability/Otlp" "otlpMetricsWith"
+  reviewed "effect@4.0.5 sha256:03304a237d1ab870"
+
+/// Traces, logs and metrics as the current configuration says, in JSON:
+/// a signal is exported only when `OTEL_TRACES_EXPORTER`,
+/// `OTEL_LOGS_EXPORTER` or `OTEL_METRICS_EXPORTER` names `otlp`; then
+/// `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_<SIGNAL>_ENDPOINT`),
+/// `_HEADERS`, `_COMPRESSION` and `_TIMEOUT`, the batch settings
+/// `OTEL_BSP_*`, `OTEL_BLRP_*` and `OTEL_METRIC_EXPORT_*`, and the resource
+/// `OTEL_SERVICE_NAME`, `OTEL_SERVICE_VERSION` and `OTEL_RESOURCE_ATTRIBUTES`
+/// apply. `service`, when given, names the service instead. The
+/// configuration is the provided `ConfigProvider`, the process's
+/// environment by default.
+from_config : Option String -> Layer none none none
+foreign pure from_config from "@flick-lang/runtime/effect/observability/Otlp" "otlpFromConfig"
+  reviewed "effect@4.0.5 sha256:c36eb5f55d8fd9d9"

@@ -212,13 +212,14 @@ let clock_layer =
   Layer.succeed Clock clock_impl
 ```
 
-A `type alias` of a service or of an error stands for it in a row, so a
-module can give a service of another module a name of its own:
-`type alias Registry = Reactivity.Atom.Registry` makes `->{Atom.Registry;}`
-the same row as `->{Reactivity.Atom.Registry;}`. An alias of anything else
-in a row is an error (`FLICK-T002`). An alias names a type, not a namespace:
-as an alias of a data type does not open its constructors, an alias of a
-service does not open its operations or `S.Impl`.
+A `type alias` of a service or of an error stands for it in a row:
+`type alias Time = Clock` makes `->{Time;}` the same row as `->{Clock;}`.
+An alias of anything else in a row is an error (`FLICK-T002`). An alias
+names a type, not a namespace: as an alias of a data type does not open its
+constructors, an alias of a service does not open its operations or
+`S.Impl`. A [re-export](../modules/) does: `Atom.Registry`, which `Atom`
+re-exports from `Reactivity.Atom`, is that service, so `Atom.Registry.get`,
+`Atom.Registry.Impl` and `Layer.succeed Atom.Registry impl` all work.
 
 ## Layers and `provide`
 

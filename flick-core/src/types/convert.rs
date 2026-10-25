@@ -414,8 +414,8 @@ impl Checker<'_> {
         self.typing
             .type_names
             .insert((node.range().0, node.range().1), named);
-        let ty = if self.service_module(&qualifier, name).is_some() {
-            Type::con(&module, &format!("{qualifier}.{name}"))
+        let ty = if let Some((_, service)) = self.service_module(&qualifier, name) {
+            Type::con(&module, &format!("{service}.{name}"))
         } else {
             Type::con(&module, name)
         };
@@ -455,8 +455,9 @@ impl Checker<'_> {
                     return None;
                 }
             }
-        } else if let Some(module) = self.service_module(qualifier, name) {
-            module
+        } else if let Some((module, service)) = self.service_module(qualifier, name) {
+            let def = self.env.type_def(&module, &format!("{service}.{name}"))?.clone();
+            return Some((module, def));
         } else {
             let Some((_, interface)) = self.env.qualified_module(qualifier) else {
                 let guess =
@@ -487,32 +488,27 @@ impl Checker<'_> {
             };
             export.entity.module.clone()
         };
-        let def = match self.env.type_def(&module, name) {
-            Some(def) => def.clone(),
-            None => self
-                .env
-                .type_def(&module, &format!("{qualifier}.{name}"))?
-                .clone(),
-        };
+        let def = self.env.type_def(&module, name)?.clone();
         Some((module, def))
     }
 
-    /// The module of the service `S` in `S.Impl`: a service in scope wins
-    /// over a module of its name, as it does for `S.operation`.
-    fn service_module(&self, qualifier: &str, name: &str) -> Option<String> {
+    /// The module and the name of the service `S` in `S.Impl` or `M.S.Impl`:
+    /// a service in scope wins over a module of its name, as it does for
+    /// `S.operation`.
+    fn service_module(&self, qualifier: &str, name: &str) -> Option<(String, String)> {
         if name != "Impl" {
             return None;
         }
-        let Found::Entity(entity) = self.env.find(Namespace::Type, qualifier) else {
+        let Found::Entity(entity) = self.env.find_type(qualifier) else {
             return None;
         };
         matches!(
             self.env
-                .type_def(&entity.module, qualifier)
+                .type_def(&entity.module, &entity.name)
                 .map(|d| &d.form),
             Some(Form::Service { .. })
         )
-        .then_some(entity.module)
+        .then_some((entity.module, entity.name))
     }
 }
 

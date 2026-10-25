@@ -1,0 +1,62 @@
+// Middleware and headers: a hook refuses a call without `authorization`
+// with a declared error, and passes one whose task adds the header with
+// `Rpc.with_headers`, over HTTP and over WebSocket.
+module App.Main exposing (main)
+
+type error Unauthorized = Unauthorized { reason : String }
+  deriving Schema
+
+authorized : Rpc.Call Unit ->{; Unauthorized} Unit
+let authorized call =
+  match Http.Headers.get "authorization" call.headers with
+  | Some _ -> ()
+  | None -> from_result (Err (Unauthorized { reason = "no authorization" }))
+
+me : Rpc.Rpc "me" (Unit ->{r; Unauthorized} String)
+let me =
+  Rpc.make (Record.label : Record.Label "me")
+    |> Rpc.with_success (Codec.json Schema.string)
+    |> Rpc.with_errors [Rpc.error_case (Codec.json (schema Unauthorized))]
+    |> Rpc.with_middleware (fun call -> ignore call.payload)
+    |> Rpc.with_middleware authorized
+
+type alias Handlers r = { me : Unit ->{r; Unauthorized} String }
+
+group : Rpc.Group (Handlers r)
+let group = Rpc.group |> Rpc.add me
+
+handlers : Handlers none
+let handlers = { me = fun () -> "ada" }
+
+attempt : Rpc.CallOptions -> String ->{} String
+let attempt options url =
+  let without =
+    try Rpc.call_with options url me () with
+    | Unauthorized e -> "refused: " ++ e.reason
+    | Rpc.ClientError message -> "client: " ++ message
+  let with_header =
+    try
+      Rpc.with_headers
+        [("authorization", "Bearer ada")]
+        (task { Rpc.call_with options url me () })
+    with
+    | Unauthorized e -> "refused: " ++ e.reason
+    | Rpc.ClientError message -> "client: " ++ message
+  without ++ "; " ++ with_header
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let result =
+    try
+      scope s {
+        let http = Rpc.listen Rpc.defaults group handlers
+        let http_url = "http://127.0.0.1:" ++ show (Rpc.port http) ++ "/rpc"
+        Platform.stdout_line ("http: " ++ attempt Rpc.call_defaults http_url)
+        let sockets = Rpc.listen_websocket Rpc.defaults group handlers
+        let ws_url = "ws://127.0.0.1:" ++ show (Rpc.port sockets) ++ "/rpc"
+        Platform.stdout_line
+          ("websocket: " ++ attempt { Rpc.call_defaults with transport = Rpc.websocket } ws_url)
+      }
+    with
+    | Rpc.ServeError message -> Platform.stdout_line ("serve: " ++ message)
+  result

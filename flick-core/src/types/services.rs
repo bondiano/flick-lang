@@ -121,11 +121,12 @@ impl Checker<'_> {
         require(ty, &format!("{module}.{name}"), &service)
     }
 
-    /// A service named as a value, as `Layer.succeed` takes it.
-    pub fn service_tag(&mut self, name: &str) -> Option<Type> {
-        let super::env::Found::Entity(entity) = self.env.find(Namespace::Type, name) else {
+    /// A service named as a value, `S` or `M.S`, as `Layer.succeed` takes it.
+    pub fn service_tag(&mut self, path: &str) -> Option<Type> {
+        let super::env::Found::Entity(entity) = self.env.find_type(path) else {
             return None;
         };
+        let name = &entity.name;
         let Some(Form::Service { params, .. }) = self
             .env
             .type_def(&entity.module, name)

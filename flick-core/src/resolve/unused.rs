@@ -55,9 +55,11 @@ impl Scope<'_> {
                 .flatten()
                 .map(|i| i.name.as_str()),
         );
+        // `M.S.op` uses the import `M` too: count each prefix of a qualifier
         let qualifiers: BTreeSet<&str> = references
             .iter()
             .filter_map(|r| r.qualifier.as_deref())
+            .flat_map(|q| q.match_indices('.').map(|(i, _)| &q[..i]).chain([q]))
             .collect();
         for (import, interface) in self.imports() {
             let Some(interface) = interface else {

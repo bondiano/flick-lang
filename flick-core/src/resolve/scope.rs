@@ -387,8 +387,12 @@ impl<'a> Scope<'a> {
                 .iter()
                 .filter(|(import, _)| import.qualifier() == qualifier)
                 .find_map(|(_, interface)| interface.as_ref());
+            // `M.S` names a service of the module as a value: the checker tells it from a constructor
+            let typed = *namespace == Namespace::Constructor
+                && interface.is_some_and(|i| i.find(Namespace::Type, name).is_some());
             if let Some(interface) = interface
                 && interface.find(*namespace, name).is_none()
+                && !typed
             {
                 diagnostics.push(not_exported(interface, name, *span));
             }

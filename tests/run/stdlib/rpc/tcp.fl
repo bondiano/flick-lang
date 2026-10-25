@@ -1,0 +1,76 @@
+// RPC over TCP: a unary call, a declared error and a stream on one
+// connection after another, one connection several calls share, a
+// serialization that does not frame its messages refused, and a call to a
+// port nothing listens on a `ClientError`.
+module App.Main exposing (main)
+
+import Stream.Core exposing (Stream)
+
+type error NotFound = NotFound { id : Number }
+  deriving Schema
+
+double : Rpc.Rpc "double" (Number ->{r; NotFound} Number)
+let double =
+  Rpc.make (Record.label : Record.Label "double")
+    |> Rpc.with_payload (Codec.json Schema.number)
+    |> Rpc.with_success (Codec.json Schema.number)
+    |> Rpc.with_errors [Rpc.error_case (Codec.json (schema NotFound))]
+
+count_to : Rpc.Rpc "count_to" (Number ->{r;} Stream none none Number)
+let count_to =
+  Rpc.make (Record.label : Record.Label "count_to")
+    |> Rpc.with_payload (Codec.json Schema.number)
+    |> Rpc.with_stream (Codec.json Schema.number)
+
+type alias Handlers r =
+  { double : Number ->{r; NotFound} Number; count_to : Number ->{r;} Stream none none Number }
+
+group : Rpc.Group (Handlers r)
+let group = Rpc.group |> Rpc.add double |> Rpc.add count_to
+
+handlers : Handlers none
+let handlers =
+  {
+    double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2;
+    count_to = fun n -> Stream.from_list (List.range 1 (n + 1));
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let options = { Rpc.call_defaults with transport = Rpc.tcp }
+  let result =
+    try
+      scope s {
+        let server = Rpc.listen_tcp Rpc.defaults group handlers
+        let url = "tcp://127.0.0.1:" ++ show (Rpc.port server)
+        Platform.stdout_line ("call: " ++ show (Rpc.call_with options url double 21))
+        let refused =
+          try show (Rpc.call_with options url double (0 - 1)) with
+          | NotFound e -> "not found " ++ show e.id
+        Platform.stdout_line ("error: " ++ refused)
+        let counted = Stream.run_collect (Rpc.call_stream_with options url count_to 3)
+        Platform.stdout_line ("stream: " ++ show counted)
+        let connection = Rpc.connect options url
+        let first = Rpc.call_on connection double 1
+        let second = Rpc.call_on connection double 2
+        Platform.stdout_line ("connection: " ++ show first ++ ", " ++ show second)
+      }
+    with
+    | Rpc.ServeError message -> Platform.stdout_line ("serve: " ++ message)
+    | Rpc.ClientError message -> Platform.stdout_line ("client: " ++ message)
+    | NotFound e -> Platform.stdout_line ("not found " ++ show e.id)
+  result
+  let unframed =
+    try
+      scope s {
+        let _ = Rpc.listen_tcp { Rpc.defaults with serialization = Rpc.json } group handlers
+        "listening"
+      }
+    with
+    | Rpc.ServeError _ -> "refused unframed"
+  Platform.stdout_line unframed
+  let gone =
+    try show (Rpc.call_with options "tcp://127.0.0.1:9" double 1) with
+    | Rpc.ClientError _ -> "no server"
+    | NotFound _ -> "not found"
+  Platform.stdout_line gone

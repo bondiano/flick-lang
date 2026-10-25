@@ -309,10 +309,30 @@ impl Checker<'_> {
     fn constructor(&mut self, qualifier: &str, name: &str, node: &Node) -> Option<iface::Entity> {
         if !qualifier.is_empty() {
             let found = self.env.qualified_module(qualifier).map(|(_, interface)| {
-                interface
-                    .and_then(|i| i.find(Namespace::Constructor, name))
-                    .map(|e| e.entity.clone())
+                interface.map(|i| {
+                    let entity = i.find(Namespace::Constructor, name).map(|e| e.entity.clone());
+                    let guess = closest(
+                        name,
+                        i.exports
+                            .iter()
+                            .filter(|e| e.entity.namespace == Namespace::Constructor)
+                            .map(|e| e.entity.name.as_str()),
+                    )
+                    .map(|g| format!("{qualifier}.{g}"));
+                    (entity, guess)
+                })
             });
+            // a module that was checked but exports no such constructor: say so, or nothing records the pattern
+            if let Some(Some((None, guess))) = &found {
+                self.error_guess(
+                    codes::T001,
+                    self.name_span(node),
+                    format!("`{qualifier}` does not export constructor `{name}`"),
+                    guess.as_deref(),
+                );
+                return None;
+            }
+            let found = found.map(|f| f.and_then(|(entity, _)| entity));
             if found.is_none() {
                 let guess =
                     closest(qualifier, self.env.qualifier_names()).map(|g| format!("{g}.{name}"));

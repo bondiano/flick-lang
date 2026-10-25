@@ -1,0 +1,8 @@
+"1.2.0": true
+"blue": true
+application/json identity secret: true
+/v2/traces application/x-protobuf: true
+refund: true
+/v3/traces application/json gzip: true
+restock: true
+audit: true

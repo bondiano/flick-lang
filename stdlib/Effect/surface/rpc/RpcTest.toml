@@ -1,2 +1,2 @@
-[excluded]
-makeClient = "Flick tests call a server started on port 0 with `Rpc.call`"
+[wrapped]
+makeClient = "Rpc.call_local 0b1d15cf1be88aba"

@@ -1,0 +1,79 @@
+// OTLP exporters as `Otlp.Settings` say: the service's version and
+// attributes and a header reach the collector, protobuf is sent as
+// protobuf, and gzip compresses a body of 1 KB or more.
+module App.Main exposing (main)
+
+start : Unit ->{} Number
+foreign async start from "./receiver.mjs" "start"
+  arity 0
+
+received : Unit ->{} String
+foreign sync received from "./receiver.mjs" "received"
+  arity 0
+
+meta : Unit ->{} String
+foreign sync meta from "./receiver.mjs" "meta"
+  arity 0
+
+stop : Unit ->{} Unit
+foreign async stop from "./receiver.mjs" "stop"
+  arity 0
+
+span : List (String, String) -> Tracer.SpanOptions
+let span attributes =
+  {
+    attributes = attributes;
+    links = [];
+    parent = None;
+    root = false;
+    kind_ = Tracer.internal;
+    sampled = None;
+    level = None;
+    captureStackTrace = false;
+    disablePropagation = false;
+  }
+
+millis : Number -> Option Duration.Duration
+let millis n =
+  match Duration.millis n with
+  | Ok d -> Some d
+  | Err _ -> None
+
+has : String -> String -> String
+let has text needle = needle ++ ": " ++ show (String.contains needle text)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let base = "http://127.0.0.1:" ++ show (start ())
+  let described =
+    {
+      Otlp.settings (base ++ "/v1/traces") "shop" with
+      service_version = Some "1.2.0";
+      attributes = [("deploy", "blue")];
+      headers = [("x-api-key", "secret")];
+    }
+  provide (Otlp.traces_with described) {
+    Tracer.with_span "checkout" (span []) (task { () })
+  }
+  Platform.stdout_line (has (received ()) "\"1.2.0\"")
+  Platform.stdout_line (has (received ()) "\"blue\"")
+  Platform.stdout_line (has (meta ()) "application/json identity secret")
+  let binary = { Otlp.settings (base ++ "/v2/traces") "shop" with serialization = Otlp.protobuf }
+  provide (Otlp.traces_with binary) { Tracer.with_span "refund" (span []) (task { () }) }
+  Platform.stdout_line (has (meta ()) "/v2/traces application/x-protobuf")
+  Platform.stdout_line (has (received ()) "refund")
+  let packed = { Otlp.settings (base ++ "/v3/traces") "shop" with gzip = true }
+  let long = String.repeat 2000 "x"
+  provide (Otlp.traces_with packed) {
+    Tracer.with_span "restock" (span [("note", long)]) (task { () })
+  }
+  Platform.stdout_line (has (meta ()) "/v3/traces application/json gzip")
+  Platform.stdout_line (has (received ()) "restock")
+  let all = { Otlp.settings base "shop" with export_interval = millis 50 }
+  provide (Otlp.logs_with { all with url = base ++ "/v4/logs" }) { () }
+  provide (Otlp.metrics_with { all with url = base ++ "/v4/metrics" }) { () }
+  provide (Otlp.layer_with { all with max_batch_size = Some 10; shutdown_timeout = millis 1000 }) {
+    Tracer.with_span "audit" (span []) (task { () })
+  }
+  Platform.stdout_line (has (received ()) "audit")
+  stop ()

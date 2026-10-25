@@ -2,10 +2,11 @@
 //! before the code that runs at load time uses it.
 
 use std::collections::{BTreeSet, HashMap};
+use std::mem;
 
 use super::expr::arrow_body;
 use super::schema::{plan_uses, schema_names};
-use super::{Gen, Target, indent, names};
+use super::{Callee, Gen, Target, indent, names};
 use crate::ir::{Expr, ExprKind, Item, ItemKind};
 use crate::types::{Constructor, Dict, InstanceInfo, Rep, companion_name, default_method};
 
@@ -13,8 +14,16 @@ impl Gen<'_> {
     pub(super) fn items(&mut self, items: &[Item]) -> String {
         let order = self.order(items);
         let mut out = String::new();
+        let mut grouped = vec![false; self.groups.len()];
         for i in order {
             let item = &items[i];
+            // a group runs its members: it is defined before the first of them
+            if let Some(g) = self.groups.iter().position(|g| g.items.contains(&i))
+                && !mem::replace(&mut grouped[g], true)
+            {
+                out.push_str(&self.group(g, items));
+                out.push_str("\n\n");
+            }
             let mark = self.mark(item.span);
             let code = self.item(item);
             if !code.is_empty() {
@@ -39,7 +48,10 @@ impl Gen<'_> {
                         ..
                     },
             } if dicts.is_empty() && self.workers.contains_key(name) => {
-                let target = Target::Global(format!("{}.{name}", self.module));
+                let target = Target {
+                    callee: Callee::Global(format!("{}.{name}", self.module)),
+                    dicts: Vec::new(),
+                };
                 let (mut stmts, worker) =
                     self.block(|g| g.lambda(params, body, Some(target), true));
                 let id = names::ident(name);
@@ -58,7 +70,10 @@ impl Gen<'_> {
                 stmts.join("\n")
             }
             ItemKind::Value { name, dicts, body } => {
-                let target = Target::Global(format!("{}.{name}", self.module));
+                let target = Target {
+                    callee: Callee::Global(format!("{}.{name}", self.module)),
+                    dicts: dicts.clone(),
+                };
                 let (stmts, value) = self.block(|g| g.function(dicts, body, Some(target)));
                 let value = self.scoped(&stmts, value);
                 let value = self.labelled(name, value);

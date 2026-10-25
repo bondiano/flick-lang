@@ -91,18 +91,40 @@ modules built on them are the stable surface.
 
 `effect/rpc` is unstable too, and so is `Rpc`: procedures described with
 codecs, a group whose type is the record of its handlers, `listen` serving
-it over HTTP with NDJSON until its scope closes, and `call` and
-`call_stream` calling a procedure of the same value.
+it over HTTP until its scope closes, and `call` and `call_stream` calling a
+procedure of the same value. Messages are NDJSON unless `ServeOptions` and
+`call_with` / `call_stream_with` choose `json`, `json_rpc`, `ndjson_rpc` or
+`binary` (Effect's frames, which only a program that names it bundles).
+`listen_websocket` serves the same group over WebSocket, which a client
+reaches with `transport = Rpc.websocket`, and `listen_tcp` over TCP on
+Node, with `Rpc.tcp` and a serialization that frames its messages;
+`serve_stdio` answers calls on stdin and stdout, and `spawn` starts such a
+program and connects to it; `with_middleware` runs a hook on the payload
+and headers of each call before the handler, and `with_headers` adds
+headers to the calls of a task; `uninterruptible` makes the server run a
+handler to its end though its client goes; `call_local` and
+`call_stream_local` call a group in memory, for tests;
+`connect` keeps one connection
+that `call_on` and `call_stream_on` share.
 
 `effect/observability` is unstable as well, and so are `Otlp` and
 `Prometheus`. `Otlp.layer`, `traces`, `logs` and `metrics` export spans, log
 records and metrics with OpenTelemetry's protocol over HTTP with JSON, each
-bringing its own fetch client; `Prometheus.format` gives the recorded
-metrics in Prometheus's text format.
+bringing its own fetch client; `Otlp.settings url service` and
+`layer_with`, `traces_with`, `logs_with` and `metrics_with` add the service's
+version and attributes, request headers, gzip, protobuf (`Otlp.protobuf`,
+bundled only where named), export intervals, batch size and shutdown
+timeout. `Otlp.from_config` exports what the `OTEL_` configuration of the
+provided `ConfigProvider` says, a signal only when its
+`OTEL_<SIGNAL>_EXPORTER` names `otlp`. `Prometheus.format` gives the
+recorded metrics in Prometheus's text format, `format_with` with a prefix or
+renamed, and `Prometheus.route path` is an `Http.Router` route answering
+them.
 
 `effect/devtools` is unstable, and so is `DevTools`: `DevTools.layer url`
 sends a program's spans over a WebSocket to the Effect DevTools listening
-at `url`.
+at `url`, and `DevTools.layer_with { url; headers }` sends headers with the
+handshake, on Node.
 
 ## Bindings
 

@@ -1,12 +1,13 @@
 //! Functions: one arrow per stage, the body at the last; a runtime stage is
 //! an `Effect.gen`. A pure function whose tail position calls itself with
-//! all its arguments is a loop.
+//! all its arguments, and its own dictionaries, is a loop.
 
 use std::mem;
 
 use super::expr::{arrow_body, unmarked};
-use super::{Gen, Tail, Target, indent, names};
-use crate::ir::{Expr, ExprKind, Lit, Param, Pat};
+use super::{Callee, Gen, Tail, Target, indent, names};
+use crate::ir::{BinOp, Expr, ExprKind, Lit, Param, Pat};
+use crate::types::Dict;
 
 impl Gen<'_> {
     /// A definition's value: a function of its dictionaries, if any, around
@@ -20,9 +21,7 @@ impl Gen<'_> {
         let mark = self.givens.len();
         let params = self.bind_givens(dicts);
         let body = match &value.kind {
-            ExprKind::Lambda { params, body } if dicts.is_empty() => {
-                self.lambda(params, body, target, false)
-            }
+            ExprKind::Lambda { params, body } => self.lambda(params, body, target, false),
             // a value: its statements go before it, unless dictionaries defer it
             _ if dicts.is_empty() => self.expr(value),
             _ => {
@@ -72,10 +71,21 @@ impl Gen<'_> {
             };
             heads.push(name);
         }
-        let looping = target
-            .filter(|t| params.iter().all(|p| !p.runtime) && has_tail_call(body, t, params.len()));
-        let stmts = if let Some(target) = looping {
-            let vars: Vec<String> = (0..heads.len()).map(|i| format!("$l{i}")).collect();
+        let vars: Vec<String> = (0..heads.len()).map(|i| format!("$l{i}")).collect();
+        let grouped = target.as_ref().and_then(|t| self.group_call(t, &heads));
+        let tail = target
+            .filter(|_| grouped.is_none() && params.iter().all(|p| !p.runtime))
+            .map(|target| Tail {
+                members: vec![(target, params.len())],
+                current: 0,
+                vars: vars.clone(),
+                binds: binds(params),
+                state: None,
+            })
+            .filter(|t| has_tail_call(body, t));
+        let stmts = if let Some(call) = grouped {
+            vec![format!("return {call};")]
+        } else if let Some(tail) = tail {
             let (inner, ()) = self.block(|g| {
                 for (head, var) in heads.iter().zip(&vars) {
                     let c = g.constant(head, var);
@@ -84,10 +94,7 @@ impl Gen<'_> {
                 for (pat, t) in &destructure {
                     g.destructure(pat, t);
                 }
-                g.tail = Some(Tail {
-                    target,
-                    vars: vars.clone(),
-                });
+                g.tail = Some(tail);
                 g.tail_expr(body);
                 g.tail = None;
             });
@@ -165,17 +172,42 @@ impl Gen<'_> {
                 let s = self.spill(s);
                 self.arms(&s, arms, None);
             }
+            // the right operand is in tail position: a jump there needs a statement
+            ExprKind::Binary(op @ (BinOp::And | BinOp::Or), lhs, rhs)
+                if self.tail.as_ref().is_some_and(|t| has_tail_call(rhs, t)) =>
+            {
+                let l = self.expr(lhs);
+                let (test, value) = if *op == BinOp::And {
+                    (format!("!{l}"), "false")
+                } else {
+                    (l, "true")
+                };
+                self.buf
+                    .push(format!("if ({test}) {{\n  return {value};\n}}"));
+                self.tail_expr(rhs);
+            }
             _ => {
-                if let Some(args) = self.tail.as_ref().and_then(|t| self_call(e, t)) {
-                    let js = self.ordered(&args);
-                    let temps: Vec<String> = js.into_iter().map(|j| self.spill(j)).collect();
-                    let vars = self
+                if let Some((j, args)) = self.tail.as_ref().and_then(|t| self_call(e, &t.members)) {
+                    let (vars, binds, state) = self
                         .tail
                         .as_ref()
-                        .map(|t| t.vars.clone())
+                        .map(|t| {
+                            let state = t.state.clone().filter(|_| j != t.current);
+                            (t.vars.clone(), t.binds.clone(), state)
+                        })
                         .unwrap_or_default();
-                    for (var, value) in vars.iter().zip(temps) {
-                        self.buf.push(format!("{var} = {value};"));
+                    // a parameter passed on unchanged keeps its variable
+                    let changed: Vec<usize> = (0..args.len())
+                        .filter(|&i| !matches!(&args[i].kind, ExprKind::Local(n) if binds.get(i).is_some_and(|b| b.as_ref() == Some(n))))
+                        .collect();
+                    let args: Vec<&Expr> = changed.iter().map(|&i| args[i]).collect();
+                    // the arguments read the parameters, never the loop variables
+                    let js = self.ordered(&args);
+                    for (&i, value) in changed.iter().zip(js) {
+                        self.buf.push(format!("{} = {value};", vars[i]));
+                    }
+                    if let Some(state) = state {
+                        self.buf.push(format!("{state} = {j};"));
                     }
                     self.buf.push("continue;".to_owned());
                     return;
@@ -257,8 +289,19 @@ fn balanced_without_yield(js: &str) -> bool {
     parens == 0
 }
 
-/// The arguments of a full pure call of the loop's function.
-fn self_call<'e>(e: &'e Expr, tail: &Tail) -> Option<Vec<&'e Expr>> {
+/// The local each parameter binds, if it is a name.
+pub(super) fn binds(params: &[Param]) -> Vec<Option<String>> {
+    params
+        .iter()
+        .map(|p| match &p.pat {
+            Pat::Bind(n) => Some(n.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The member a full pure call of one of `members` calls, and its arguments.
+fn self_call<'e>(e: &'e Expr, members: &[(Target, usize)]) -> Option<(usize, Vec<&'e Expr>)> {
     let mut args = Vec::new();
     let mut head = e;
     while let ExprKind::App {
@@ -272,29 +315,45 @@ fn self_call<'e>(e: &'e Expr, tail: &Tail) -> Option<Vec<&'e Expr>> {
         head = func;
     }
     args.reverse();
-    let target = match &head.kind {
-        ExprKind::Local(name) => Target::Local(name.clone()),
-        ExprKind::Global { module, name } => Target::Global(format!("{module}.{name}")),
+    let mut dicts = Vec::new();
+    if let ExprKind::Dicts(inner, given) = &head.kind {
+        for d in given {
+            match d {
+                Dict::Given(name) => dicts.push(name.clone()),
+                _ => return None,
+            }
+        }
+        head = inner;
+    }
+    let callee = match &head.kind {
+        ExprKind::Local(name) => Callee::Local(name.clone()),
+        ExprKind::Global { module, name } => Callee::Global(format!("{module}.{name}")),
         _ => return None,
     };
-    (target == tail.target && args.len() == tail.vars.len()).then_some(args)
+    let target = Target { callee, dicts };
+    let j = members
+        .iter()
+        .position(|(t, arity)| *t == target && *arity == args.len())?;
+    Some((j, args))
 }
 
-/// Whether a tail position of `body` calls `target` with `arity` arguments.
-fn has_tail_call(body: &Expr, target: &Target, arity: usize) -> bool {
-    let tail = Tail {
-        target: target.clone(),
-        vars: vec![String::new(); arity],
-    };
+/// Whether a tail position of `body` jumps to a member of `tail`.
+fn has_tail_call(body: &Expr, tail: &Tail) -> bool {
+    !tail_callees(body, &tail.members).is_empty()
+}
+
+/// The members of `members` a tail position of `body` calls in full.
+pub(super) fn tail_callees(body: &Expr, members: &[(Target, usize)]) -> Vec<usize> {
+    let mut out = Vec::new();
     let mut pending = vec![body];
     while let Some(e) = pending.pop() {
         match &e.kind {
             ExprKind::Block(_, result) => pending.push(result),
             ExprKind::If(_, t, f) => pending.extend([&**t, &**f]),
             ExprKind::Match(_, arms) => pending.extend(arms.iter().map(|a| &a.body)),
-            _ if self_call(e, &tail).is_some() => return true,
-            _ => {}
+            ExprKind::Binary(BinOp::And | BinOp::Or, _, r) => pending.push(r),
+            _ => out.extend(self_call(e, members).map(|(j, _)| j)),
         }
     }
-    false
+    out
 }

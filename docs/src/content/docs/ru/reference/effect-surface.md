@@ -95,18 +95,41 @@ Effect помечает `effect/reactivity` как `@stability unstable` в 4.0.
 выпуском Effect; стабильная поверхность — построенные на них модули UI.
 
 `effect/rpc` тоже нестабилен, как и `Rpc`: процедуры описываются кодеками,
-тип группы — запись её обработчиков, `listen` обслуживает группу по HTTP
-с NDJSON, пока не закроется её область, а `call` и `call_stream` вызывают
-процедуру того же значения.
+тип группы — запись её обработчиков, `listen` обслуживает группу по HTTP,
+пока не закроется её область, а `call` и `call_stream` вызывают процедуру
+того же значения. Сообщения пишутся в NDJSON, если `ServeOptions` и
+`call_with` / `call_stream_with` не выбирают `json`, `json_rpc`, `ndjson_rpc`
+или `binary` (бинарные кадры Effect, которые попадают в бандл, только если
+программа их называет). `listen_websocket` обслуживает ту же группу
+по WebSocket, а клиент обращается к ней с `transport = Rpc.websocket`;
+`listen_tcp` — по TCP в Node, с `Rpc.tcp` и сериализацией, которая делит
+поток на кадры; `serve_stdio` отвечает на вызовы через stdin и stdout, а
+`spawn` запускает такую программу и подключается к ней; `with_middleware`
+выполняет хук над payload и заголовками каждого вызова до обработчика, а
+`with_headers` добавляет заголовки к вызовам задачи; `uninterruptible`
+заставляет сервер довести обработчик до конца, даже если клиент ушёл;
+`call_local` и `call_stream_local` вызывают группу в памяти — для тестов;
+`connect` держит одно соединение, которое делят `call_on` и
+`call_stream_on`.
 
 `effect/observability` тоже нестабилен, как и `Otlp` и `Prometheus`.
 `Otlp.layer`, `traces`, `logs` и `metrics` экспортируют span'ы, записи журнала
 и метрики по протоколу OpenTelemetry через HTTP с JSON, каждый со своим
-fetch-клиентом; `Prometheus.format` выдаёт записанные метрики в текстовом
-формате Prometheus.
+fetch-клиентом. `Otlp.settings url service` и `layer_with`, `traces_with`,
+`logs_with`, `metrics_with` добавляют версию и атрибуты сервиса, заголовки
+запросов, gzip, protobuf (`Otlp.protobuf` попадает в бандл, только если его
+назвать), интервалы отправки, размер пачки и таймаут завершения.
+`Otlp.from_config` экспортирует то, что говорит конфигурация `OTEL_`
+текущего `ConfigProvider`; сигнал отправляется, только если его
+`OTEL_<SIGNAL>_EXPORTER` называет `otlp`.
+`Prometheus.format` выдаёт записанные метрики в текстовом формате Prometheus,
+`format_with` — с префиксом или переименованными, а `Prometheus.route path` —
+маршрут `Http.Router`, который их отдаёт.
 
 `effect/devtools` нестабилен, как и `DevTools`: `DevTools.layer url` отправляет
-span'ы программы по WebSocket в Effect DevTools, которые слушают `url`.
+span'ы программы по WebSocket в Effect DevTools, которые слушают `url`, а
+`DevTools.layer_with { url; headers }` добавляет заголовки к рукопожатию
+(в Node).
 
 ## Привязки
 

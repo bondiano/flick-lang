@@ -138,3 +138,105 @@ fn debug_imports_a_module_by_its_own_name_unless_taken() {
     assert!(js.contains("import * as $m_Option from"), "{js}");
     assert!(js.contains("export const line = (_) =>"), "{js}");
 }
+
+/// The body of the exported `name` in `js`, up to the next export.
+fn export_of<'a>(js: &'a str, name: &str) -> &'a str {
+    let start = js
+        .find(&format!("export const {name} "))
+        .unwrap_or_else(|| panic!("no {name} in {js}"));
+    let rest = &js[start + 1..];
+    &js[start..start + 1 + rest.find("\nexport ").unwrap_or(rest.len())]
+}
+
+#[test]
+fn a_tail_call_assigns_only_the_arguments_it_changes() {
+    let js = compile(
+        "module App.Loop exposing (..)\n\
+         find : (a -> Bool) -> List a -> Option a\n\
+         let rec find p xs =\n  match xs with\n  | [] -> None\n  | [x, ...rest] -> if p x then Some x else find p (List.drop 1 rest)\n",
+    );
+    let find = export_of(&js, "find");
+    assert!(find.contains("for (;;)"), "{find}");
+    assert!(!find.contains("const $t"), "{find}");
+    // only the initialization sets `p`
+    assert_eq!(find.matches("$l0 =").count(), 1, "{find}");
+    assert!(find.contains("$l1 ="), "{find}");
+}
+
+#[test]
+fn a_constrained_function_loops_on_a_call_passing_its_own_dictionaries() {
+    let js = compile(
+        "module App.Loop exposing (..)\n\
+         elem : Eq a => a -> List a -> Bool\n\
+         let rec elem y xs =\n  match xs with\n  | [] -> false\n  | [x, ...rest] -> if x == y then true else elem y rest\n\
+         nest : forall a. Show a => Number -> a -> String\n\
+         let rec nest n x = if n == 0 then show x else nest (n - 1) [x]\n",
+    );
+    let elem = export_of(&js, "elem");
+    assert!(elem.contains("for (;;)"), "{elem}");
+    assert!(!elem.contains("elem($d0)"), "{elem}");
+    // polymorphic recursion passes another dictionary: a call, not a jump
+    let nest = export_of(&js, "nest");
+    assert!(!nest.contains("for (;;)"), "{nest}");
+}
+
+#[test]
+fn the_right_operand_of_and_and_or_is_a_tail_position() {
+    let js = compile(
+        "module App.Loop exposing (..)\n\
+         all : (a -> Bool) -> List a -> Bool\n\
+         let rec all p xs =\n  match xs with\n  | [] -> true\n  | [x, ...rest] -> p x && all p rest\n\
+         any : (a -> Bool) -> List a -> Bool\n\
+         let rec any p xs =\n  match xs with\n  | [] -> false\n  | [x, ...rest] -> p x || any p rest\n",
+    );
+    let all = export_of(&js, "all");
+    assert!(
+        all.contains("if (!p(x)) {\n") && all.contains("return false;"),
+        "{all}"
+    );
+    assert!(!all.contains("all(p)"), "{all}");
+    let any = export_of(&js, "any");
+    assert!(
+        any.contains("if (p(x)) {\n") && any.contains("return true;"),
+        "{any}"
+    );
+    assert!(!any.contains("any(p)"), "{any}");
+}
+
+#[test]
+fn mutually_tail_recursive_functions_run_as_one_loop() {
+    let text = "module App.Parity exposing (..)\n\
+         rec {\n\
+         \x20 is_even : Number -> Bool\n  let is_even n = if n == 0 then true else is_odd (n - 1)\n\
+         \x20 is_odd : Number -> Bool\n  let is_odd n = if n == 0 then false else is_even (n - 1)\n\
+         }\n\
+         rec {\n\
+         \x20 a : Number -> Number -> Number\n  let a acc n = if n == 0 then acc else b (acc + 1) (n - 1)\n\
+         \x20 b : Number -> Number -> Number\n  let b acc n = if n == 0 then acc else c acc (n - 1)\n\
+         \x20 c : Number -> Number -> Number\n  let c acc n = if n == 0 then acc else a (a 0 acc) (n - 1)\n\
+         }\n";
+    for release in [false, true] {
+        let js = compile_with(text, release, Labels::default()).code;
+        let parity = js.split("export const").next().unwrap_or_default();
+        assert!(parity.contains("const is_even$rec = ($f, $l0) =>"), "{js}");
+        assert!(
+            parity.contains("switch ($f)") && parity.contains("$f = 1;"),
+            "{js}"
+        );
+        assert!(!parity.contains("is_odd("), "{js}");
+        let group = &js[js.find("const a$rec").expect("a group")..];
+        let group = &group[..group.find("\nexport").unwrap_or(group.len())];
+        // the inner `a 0 acc` is not in tail position: it calls the member
+        let inner = if release { "a$2(0, acc)" } else { "a(0)(acc)" };
+        assert!(
+            group.contains("$f = 2;") && group.contains(inner),
+            "{group}"
+        );
+        let calls_a = if release {
+            "a$rec(0, acc, n)"
+        } else {
+            "(n) => a$rec(0, acc, n)"
+        };
+        assert!(js.contains(calls_a), "{js}");
+    }
+}

@@ -24,8 +24,77 @@ type Group hs
 /// closes, after the calls it is serving.
 type Server (s : Region)
 
-/// Where the server listens, and the path of its procedures.
-type alias ServeOptions = { host : String; port : Number; path : String }
+/// How messages are written on the wire.
+type Serialization
+
+/// JSON, one message a line: a stream's elements come as they are sent.
+/// The default.
+ndjson : Serialization
+foreign pure ndjson from "@flick-lang/runtime/effect/rpc/Rpc" "rpcNdjson"
+  reviewed "effect@4.0.5 sha256:c72ee8574fb6c140"
+
+/// One JSON document: over HTTP the messages of a call come together, so a
+/// stream's elements come once it ends.
+json : Serialization
+foreign pure json from "@flick-lang/runtime/effect/rpc/Rpc" "rpcJson"
+  reviewed "effect@4.0.5 sha256:868b3e8b899a14b1"
+
+/// JSON-RPC 2.0 documents, for clients that speak it.
+json_rpc : Serialization
+foreign pure json_rpc from "@flick-lang/runtime/effect/rpc/Rpc" "rpcJsonRpc"
+  reviewed "effect@4.0.5 sha256:e6046c0ea4f44ba8"
+
+/// JSON-RPC 2.0, one message a line.
+ndjson_rpc : Serialization
+foreign pure ndjson_rpc from "@flick-lang/runtime/effect/rpc/Rpc" "rpcNdjsonRpc"
+  reviewed "effect@4.0.5 sha256:a78d50601c4030fb"
+
+/// Effect's binary frames, laid out by the codecs: smaller than JSON, but
+/// both ends must be Effect's, and it adds to a bundle.
+binary : Serialization
+foreign pure binary from "@flick-lang/runtime/effect/rpc/Rpc" "rpcBinary"
+  reviewed "effect@4.0.5 sha256:5d78f3975991bfc4"
+
+/// Where the server listens, the path of its procedures and how it writes
+/// its messages.
+type alias ServeOptions = {
+  host : String;
+  port : Number;
+  path : String;
+  serialization : Serialization;
+}
+
+/// `127.0.0.1`, a port the system chooses, `/rpc` and `ndjson`.
+defaults : ServeOptions
+let defaults = { host = "127.0.0.1"; port = 0; path = "/rpc"; serialization = ndjson }
+
+/// How a client reaches a server.
+type Transport
+
+/// A POST per call over fetch: a server of `listen`.
+http : Transport
+foreign pure http from "@flick-lang/runtime/effect/rpc/Rpc" "rpcHttp"
+  reviewed "effect@4.0.5 sha256:8da7c46726693970"
+
+/// The messages of calls over the global WebSocket: a server of
+/// `listen_websocket`. Only a program that names it bundles it.
+websocket : Transport
+foreign pure websocket from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWebsocket"
+  reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"
+
+/// The messages of calls over a TCP connection to `tcp://host:port`, opened
+/// on the first call: a server of `listen_tcp`. Node only.
+tcp : Transport
+foreign pure tcp from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcTcp"
+  reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"
+
+/// How a client writes its messages, as its server does, and how it
+/// reaches the server.
+type alias CallOptions = { serialization : Serialization; transport : Transport }
+
+/// `ndjson` over `http`.
+call_defaults : CallOptions
+let call_defaults = { serialization = ndjson; transport = http }
 
 /// The server could not start.
 type error ServeError = ServeError String
@@ -76,6 +145,26 @@ foreign pure with_errors from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithError
   arity 2
   reviewed "effect@4.0.5 sha256:04f66df479054dbe"
 
+/// What a hook of `with_middleware` gets: the decoded payload and the
+/// headers of the call, those of its HTTP request or WebSocket with those
+/// `with_headers` added (names in lower case).
+type alias Call p = { payload : p; headers : Http.Headers.Headers }
+
+/// Runs `hook` on each call before the handler, after the hooks the
+/// procedure has, with the services of `listen`; a typed failure of the hook
+/// is answered as one of the handler would be, so it is one of the
+/// procedure's errors.
+with_middleware : (Call p ->{r; e} Unit) -> Rpc l (p ->{r; e} s) -> Rpc l (p ->{r; e} s)
+foreign pure with_middleware from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithMiddleware"
+  arity 2
+  reviewed "effect@4.0.5 sha256:93976e18ef904486"
+
+/// The server runs the handler to its end even when the client goes away
+/// or interrupts the call: for a write that must not stop halfway.
+uninterruptible : Rpc l f -> Rpc l f
+foreign pure uninterruptible from "@flick-lang/runtime/effect/rpc/Rpc" "rpcUninterruptible"
+  reviewed "effect@4.0.5 sha256:1a4870136a854e0f"
+
 /// A group with no procedures yet.
 group : Group {}
 foreign pure group from "@flick-lang/runtime/effect/rpc/Rpc" "rpcGroup"
@@ -94,30 +183,145 @@ foreign pure add from "@flick-lang/runtime/effect/rpc/Rpc" "rpcAdd"
 /// the calls it serves finish and runs their finalizers. The handlers run
 /// with the services here.
 listen : forall c s r hs. ServeOptions -> Group hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
-foreign effect listen from "@flick-lang/runtime/effect/rpc/Rpc" "rpcListen"
+foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
   arity 3
   retention owner
   reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"
 
+/// As `listen`, each client a WebSocket at `path` whose messages carry its
+/// calls: `ws://127.0.0.1:8080/rpc`. Every serialization streams over it.
+listen_websocket :
+  forall c s r hs. ServeOptions -> Group hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
+foreign effect listen_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenWebsocket"
+  arity 3
+  retention owner
+  reviewed "effect@4.0.5 sha256:9aaac4b7a11d7595"
+
+/// As `listen`, each client a TCP connection to `host` and `port` whose
+/// messages carry its calls: `tcp://127.0.0.1:8080`. Only a serialization
+/// that frames its messages (`ndjson`, `ndjson_rpc`, `binary`) fits a byte
+/// stream; another is `ServeError`. Node only.
+listen_tcp :
+  forall c s r hs. ServeOptions -> Group hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
+foreign effect listen_tcp from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenTcp"
+  arity 3
+  retention owner
+  reviewed "effect@4.0.5 sha256:32acbc4cf74e10ac"
+
 /// The port the server listens on: the one asked for, or the one the system
 /// chose for port 0.
 port : Server s -> Number
-foreign pure port from "@flick-lang/runtime/effect/rpc/Rpc" "rpcPort"
+foreign pure port from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcPort"
   retention call
   reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"
 
-/// Calls the procedure at `url` (`http://127.0.0.1:8080/rpc`): the success,
-/// a declared error as the typed failure, or `ClientError`.
+/// Calls the procedure at `url` (`http://127.0.0.1:8080/rpc`, or
+/// `ws://…` over `websocket`) as `options` says: the success, a declared
+/// error as the typed failure, or `ClientError`.
+call_with :
+  forall l p r e s. CallOptions -> String -> Rpc l (p ->{r; e} s) -> p ->{; ClientError | e} s
+foreign effect call_with from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCall"
+  arity 4
+  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+
+/// `call_with call_defaults`.
 call : forall l p r e s. String -> Rpc l (p ->{r; e} s) -> p ->{; ClientError | e} s
-foreign effect call from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCall"
+foreign effect call from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallNdjson"
   arity 3
   reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
 
-/// Calls the stream procedure at `url`: its elements as they come, a
-/// declared error as the stream's failure, or `ClientError`.
+/// Calls the stream procedure at `url` writing as `options` says: its
+/// elements as they come, a declared error as the stream's failure, or
+/// `ClientError`.
+call_stream_with :
+  forall l p r e a.
+  CallOptions ->
+    String ->
+    Rpc l (p ->{r; e} Stream none none a) ->
+    p ->
+    Stream none {ClientError | e} a
+foreign pure call_stream_with from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStream"
+  arity 4
+  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+
+/// `call_stream_with call_defaults`.
 call_stream :
   forall l p r e a.
   String -> Rpc l (p ->{r; e} Stream none none a) -> p -> Stream none {ClientError | e} a
-foreign pure call_stream from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStream"
+foreign pure call_stream from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStreamNdjson"
   arity 3
   reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+
+/// A connection to a server that calls share until the scope owning region
+/// `s` closes.
+type Client (s : Region)
+
+/// Connects to the server at `url` as `options` says, as `call_with` would
+/// for one call: a WebSocket stays open, and HTTP keeps its connections
+/// alive.
+connect : forall s. CallOptions -> String ->{Scope s; ClientError} Client s
+foreign effect connect from "@flick-lang/runtime/effect/rpc/Rpc" "rpcConnect"
+  arity 2
+  reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"
+
+/// Calls the procedure over the connection.
+call_on : forall s l p r e x. Client s -> Rpc l (p ->{r; e} x) -> p ->{; ClientError | e} x
+foreign effect call_on from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallOn"
+  arity 3
+  retention call
+  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+
+/// Calls the stream procedure over the connection.
+call_stream_on :
+  forall s l p r e a.
+  Client s -> Rpc l (p ->{r; e} Stream none none a) -> p -> (Stream none {ClientError | e} a)^{s}
+foreign pure call_stream_on from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStreamOn"
+  arity 3
+  retention owner
+  reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
+
+/// Answers the calls of the messages on stdin on stdout until stdin ends:
+/// a program another starts with `spawn`, as editors start language
+/// servers. Nothing else may write to stdout meanwhile. Node only.
+serve_stdio :
+  forall c r hs. Serialization -> Group hs -> (hs^c ->{Stdio.Stdio | r; none} Unit)^c
+foreign effect serve_stdio from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcServeStdio"
+  arity 3
+  retention call
+  reviewed "effect@4.0.5 sha256:8aea91f3d781cae8"
+
+/// Starts `command` with `args` and connects to it over its stdin and
+/// stdout, which its `serve_stdio` answers; its stderr is the program's.
+/// The end of the scope stops it. Node only.
+spawn : forall s. Serialization -> String -> List String ->{Scope s; ClientError} Client s
+foreign effect spawn from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcSpawn"
+  arity 3
+  reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"
+
+/// Runs `task` with its calls carrying the headers too, which the hooks of
+/// `with_middleware` read: `authorization`, say.
+with_headers : forall c r e a. Http.Headers.Input -> (Eff r e a)^c ->{r; e} a
+foreign effect with_headers from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithHeaders"
+  arity 1
+  retention call
+  reviewed "effect@4.0.5 sha256:dcacf8ec37486efd"
+
+/// Calls the procedure of the group in memory, client and server joined
+/// without a transport: for tests of the handlers. The codecs do not run,
+/// so this does not test them; the hooks of `with_middleware` see no
+/// headers.
+call_local :
+  forall c l p r e s hs. Group hs -> hs^c -> Rpc l (p ->{r; e} s) -> p ->{r; e} s
+foreign effect call_local from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallLocal"
+  arity 4
+  retention call
+  reviewed "effect@4.0.5 sha256:0b1d15cf1be88aba"
+
+/// Calls the stream procedure of the group in memory, as `call_local`.
+call_stream_local :
+  forall c l p r e a hs.
+  Group hs -> hs^c -> Rpc l (p ->{r; e} Stream none none a) -> p -> (Stream r e a)^c
+foreign pure call_stream_local from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStreamLocal"
+  arity 4
+  retention owner
+  reviewed "effect@4.0.5 sha256:0b1d15cf1be88aba"

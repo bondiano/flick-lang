@@ -3,7 +3,7 @@
 
 use std::mem;
 
-use super::{Gen, Target, indent, names, tidy};
+use super::{Callee, Gen, Target, indent, names, tidy};
 use crate::ir::{Arm, Expr, ExprKind, Lit, Pat, Stmt};
 use crate::types::{Constructor, Dict, Lift, Rep};
 
@@ -406,7 +406,10 @@ impl Gen<'_> {
                 dicts,
                 value,
             } => {
-                let target = rec.then(|| Target::Local(name.clone()));
+                let target = rec.then(|| Target {
+                    callee: Callee::Local(name.clone()),
+                    dicts: dicts.clone(),
+                });
                 let f = self.function(dicts, value, target);
                 self.buf.push(self.constant(&names::ident(name), &f));
             }

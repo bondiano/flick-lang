@@ -1,0 +1,5 @@
+ndjson: 42, not found -1, [1, 2, 3]
+json: 42, not found -1, [1, 2, 3]
+json_rpc: 42, not found -1, [1, 2, 3]
+ndjson_rpc: 42, not found -1, [1, 2, 3]
+binary: 42, not found -1, [1, 2, 3]
