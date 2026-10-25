@@ -110,8 +110,12 @@ that `call_on` and `call_stream_on` share.
 `effect/observability` is unstable as well, and so are `Otlp` and
 `Prometheus`. `Otlp.layer`, `traces`, `logs` and `metrics` export spans, log
 records and metrics with OpenTelemetry's protocol over HTTP with JSON, each
-bringing its own fetch client; `Prometheus.format` gives the recorded
-metrics in Prometheus's text format.
+bringing its own fetch client; `Otlp.settings url service` and
+`layer_with`, `traces_with`, `logs_with` and `metrics_with` add the service's
+version and attributes, request headers, gzip, protobuf (`Otlp.protobuf`,
+bundled only where named), export intervals, batch size and shutdown
+timeout. `Prometheus.format` gives the recorded metrics in Prometheus's text
+format.
 
 `effect/devtools` is unstable, and so is `DevTools`: `DevTools.layer url`
 sends a program's spans over a WebSocket to the Effect DevTools listening

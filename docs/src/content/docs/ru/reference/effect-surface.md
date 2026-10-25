@@ -115,8 +115,11 @@ Effect помечает `effect/reactivity` как `@stability unstable` в 4.0.
 `effect/observability` тоже нестабилен, как и `Otlp` и `Prometheus`.
 `Otlp.layer`, `traces`, `logs` и `metrics` экспортируют span'ы, записи журнала
 и метрики по протоколу OpenTelemetry через HTTP с JSON, каждый со своим
-fetch-клиентом; `Prometheus.format` выдаёт записанные метрики в текстовом
-формате Prometheus.
+fetch-клиентом. `Otlp.settings url service` и `layer_with`, `traces_with`,
+`logs_with`, `metrics_with` добавляют версию и атрибуты сервиса, заголовки
+запросов, gzip, protobuf (`Otlp.protobuf` попадает в бандл, только если его
+назвать), интервалы отправки, размер пачки и таймаут завершения.
+`Prometheus.format` выдаёт записанные метрики в текстовом формате Prometheus.
 
 `effect/devtools` нестабилен, как и `DevTools`: `DevTools.layer url` отправляет
 span'ы программы по WebSocket в Effect DevTools, которые слушают `url`.
