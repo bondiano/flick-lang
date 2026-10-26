@@ -1,6 +1,6 @@
 # Роадмап: реактивный UI, fullstack на Effect, CLI, observability, бандл
 
-Статус: рабочий, обновлён 2026-10-25 (решения §6 приняты, статусы сверены с историей `hetzner/flick-lang` до `d524e92`).
+Статус: рабочий, обновлён 2026-10-26. Решения §6 приняты; исходная сверка статусов реализации — история `hetzner/flick-lang` до `d524e92`. Замечания ревью среза `4a96533` перенесены в трек Q (§7), без нового прогона кода.
 Язык не в релизе, поэтому языковые изменения допустимы и deprecated-релизов не делаем.
 
 Обозначения: ✅ сделано (коммит), 🔶 частично / в работе, ⬜ не начато, 🆕 добавлено при обновлении 2026-10-25.
@@ -67,7 +67,7 @@ component search (props : SearchProps) =
 
 ## 3. Треки
 
-Нумерация: `S` — stdlib surface, `B` — бандл и выходной JS, `C` — компилятор/язык, `U` — UI-ядро, `R` — SSR, `F` — fullstack, `O` — observability, `L` — CLI, `H` — хосты и бэкенды эффектов. Внутри трека порядок = приоритет.
+Нумерация: `S` — stdlib surface, `B` — бандл и выходной JS, `C` — компилятор/язык, `U` — UI-ядро, `R` — SSR, `F` — fullstack, `O` — observability, `L` — CLI, `H` — хосты и бэкенды эффектов, `D` — сахар прямого стиля, `Q` — замечания ревью (§7). Внутри трека порядок = приоритет, кроме Q: там сохранена нумерация ревью, порядок исправления — §7.3.
 
 ### Трек S — снять исключения Effect-entrypoint'ов
 
@@ -391,7 +391,7 @@ D1 ✅ ─ D2 ─ D3 ─ D4 ─ D5 ─ D6 ─ D9 ─ D11 ─ D10 ─ D13 ─ D12
 3. «SSR» — 🔶: R1–R4, R6, U7 ✅; осталось R5, U9.
 4. «Fullstack» — ⬜: S2, F1–F3, O1–O3.
 
-Ближайшее: закоммитить R5 (с правилом §6.3), C6b, U7b, U9, B7b; затем C7a → C7b.
+Ближайшее: Q17–Q28 (§7); прежние P1 из Q1–Q16 сохраняют приоритет. F2 — после F1/F6. Вехи выше требуют сверки с реализованными R5/U9/L6 и D-треком; отметка реализации не закрывает связанные замечания ревью.
 
 ## 5. Риски
 
@@ -416,3 +416,187 @@ D1 ✅ ─ D2 ─ D3 ─ D4 ─ D5 ─ D6 ─ D9 ─ D11 ─ D10 ─ D13 ─ D12
 5. **Хэши тегов:** сначала замер; при выигрыше < 1 KB gz — оставить хэш и закрыть записью; иначе голое имя при уникальности, хэш для кодеков/Schema и библиотек (B7b).
 6. **Остаёмся на `effect/reactivity`**; свой реестр — только план отхода за границей U9.
 7. **Обобщённый `do` над `Monad`, генераторы `for` и списковые выражения** (трек D) отменяют решение «без обобщённого `do`»: продолжения `do` чистые, `do` над Eff разрешён с линтом и исправлением в прямой стиль; `for … yield` — один нативный `function*`, тело чистое, Sync — после C1; `[for … yield]` — строгий цикл; fusion обязателен.
+
+## 7. Корректирующий трек Q — ревью языка
+
+Срез `4a96533`: 10 коммитов после `3f1c7c3`, язык 0.7, Effect 4.0.5. `P1` — нарушенный контракт/блокер; `P2` — ограничение; `[INFERENCE]` — не исполнено.
+
+Все Q1–Q28 открыты; Qn соответствует пункту n исходного ревью. Ниже сохранены наблюдения, причины и требования к исправлению. Статусы реализации в §3 не означают выполнения AC, нарушенных этими пунктами.
+
+**Итог ревью:** полезные C1/D7/D10–D14 реализованы, но найдены 12 новых пунктов **Q17–Q28**. Release не эквивалентен debug. Прежние **Q1–Q16** не закрыты.
+
+| Сценарий | Новое | Открытая граница |
+|---|---|---|
+| Node / Effect | Result ?, Validation, Monoids | DI, SQL ownership/отмена, TestClock |
+| SPA | Sync-render, чтение атомов в for | Lifetime, controls, корректность Sync |
+| Fullstack | Чистая накопительная валидация | Auth, server/client isolation, F5 |
+| TS / Effect host | Явный Sync ABI | Native projections, service keys, v3 bridge |
+
+`and` над Eff последовательный, не parallel. `->{}` не pure; none допускает defects/interruption. Task холодный, чтение Eff не должно его запускать. Exact records/сигнатуры требуют hints; FFI — доверенная граница.
+
+### 7.1. Прежние пункты Q1–Q16
+
+Пункты Q1–Q16 — доказательства `3f1c7c3`, не новый прогон. По ревью, причины в diff до `4a96533` не устранены; Sync-граница Q7 проверена на `4a96533`.
+
+**Q1. P1 — Serving теряет DI-требования**
+[listen](../../flick-core/src/types/builtins/HttpApi.fl#L276-L284) не связывает r с handlers. Users без Layer компилируется; RPC — Service not found, HTTP — 500. Учитывать r handlers/middleware на serving boundary; без Layer — compile error.
+
+**Q2. P1 — HttpOnly login даёт ложную ошибку**
+Chromium сохранил cookie после 200, но [HttpApi.call требует скрытый Set-Cookie](../../runtime/src/httpapi/client.ts#L166-L178). Отделить server extras от client success: login и session работают без раскрытия секрета JS.
+
+**Q3. P1 — Controlled fields не принимают Host**
+`with_host (field …)` компилируется, импорт JS падает: component вместо element. [FieldProps](../../flick-core/src/types/builtins/Ui.fl#L262-L282) не имеет Host. Нужны id/ARIA на input/textarea, сохранение caret/IME/reset/SSR.
+
+**Q4. P1 — Публичный реэкспорт теряется**
+Barrel с pair собирается, но JS export отсутствует, TS2305. [Dts](../../flick-core/src/codegen/ts/dts.rs#L20-L25) отбрасывает чужой defining module. Value/type re-exports должны сохранять identity во Flick/JS/TS.
+
+**Q5. P2 — Поздний generic теряет inference**
+`pair(1)("x")` имеет `[number,unknown]`: [оба generic на первой стадии](../../flick-core/src/codegen/ts.rs#L80-L135). Вводить B на своей стадии, включая поздние R/E, без смены ABI.
+
+**Q6. P1 — Reference противоречит контрактам**
+[UI-пример](../src/content/docs/reference/ui.md#L12-L31) с Users/SaveError даёт E002; save_button fixture проходит. [MVU-план](../src/content/docs/reference/ui.md#L525-L539) противоречит atom-first; DSL назван any вопреки T003. Нужны проверяемые EN/RU-примеры.
+
+**Q7. P1 — Неполная Effect/TS-граница**
+Eff сохраняет fiber/service/error identity. Stream работает в runtime, но [TS brand](../../flick-core/src/codegen/ts.rs#L259-L297) даёт TS2739; нет typed key для пользовательского service. Нужны native projections/adapters без any и потери regions. v3 требует bridge с другим owner/fiber.
+
+Новое: [Sync export](../../flick-core/src/codegen/ts.rs#L154-L163) — `(undefined)=>number` с ambient reader; прямой вызов падает. `syncReading`, `$rt.sync`, native provider проверены. Row-polymorphic аналог остаётся Effect: стадия фиксируется при записи стрелки, позднее уточнение строки ABI не меняет.
+
+**Q8. P1 — Error row не гарантирует wire-codecs**
+NotFound без with_errors принимается и становится 500 — [заявленный fallback](../../flick-core/src/types/builtins/HttpApi.fl#L177-L188). Проверять полноту codecs по error row: новый Conflict без codec отвергается до запуска. AC для S2/F2.
+
+**Q9. P1 — Нет SQL-транзакционной композиции**
+Первая запись пережила CHECK-ошибку второй; при pool=1 чужой ROLLBACK отменил успешную запись B. [Запросы отдельно берут connection](../../runtime/src/sql/pg.ts#L138-L184). Нужен scoped transaction с commit/rollback и изоляцией callers; raw BEGIN/Tx.atomically не замена. До F3/F6.
+
+**Q10. P2 — Непоследовательные captures builders**
+[Stream callbacks](../../flick-core/src/types/builtins/Stream/Transform.fl#L1-L4) отвергают scoped subscription даже при локальном потреблении (G001). Объединять captures callback/source без ослабления запрета утечки; D7 этого не решает.
+
+D15 [фиксирует ограничение](../src/content/docs/contributing/implementation-decisions.md#L54-L76): пользовательские Applicative/Monad и трансформеры невыразимы из-за captures type variables/constructor fields. MonadError Result/Option и 23 property-определения — не полный MTL.
+
+**Q11. P1 — Нет instance lifetime**
+[Action.with](../../runtime/src/ui/react/policies.ts#L56-L65) делит policy между аргументами; unmount не закрывает root-owned задачи. Нужны instance actions/watch и interrupt-and-wait: изоляция редакторов, drafts при reorder, StrictMode без утечек. C7/C5/C8 → U10.
+
+**Q12. P1 — Раздельные HTTP-контуры и auth**
+HttpApi/Rpc имеют свои listeners; [Unit-hook middleware](../../runtime/src/rpc/handlers.ts#L23-L40) не передаёт CurrentUser через provide. Нужна обёртка next handler: один origin, изоляция concurrent tenants, неверные credentials не запускают handler. S2b открыт.
+
+**Q13. P1 — F1/F6 не замкнуты**
+L6/H2 и Vite есть; server/client isolation и общий dev workflow — нет. Нужны authenticated CRUD/shared contract, server/client isolation без утечки секретов, один dev command. L5 сохраняет draft без размножения watchers; F2 после prerequisites.
+
+**Q14. P2 — Loader переносит только success**
+[serializable_task](../../flick-core/src/types/builtins/Atom.fl#L142-L151) передаёт Loaded, не Failed. `[INFERENCE]` SSR 401/404 могут повторить запрос. F3/F4 должны переносить публичный Result, не Failure со стеком/секретами. Validation не закрывает F5: нужны field paths, accessible controls, async cancellation/lifecycle.
+
+**Q15. P2 — Нет виртуального времени тестов**
+[effect_test](../../flick-core/src/types/builtins/Test.fl#L44-L59) даёт scope, не Clock; effect/testing исключён. Нужен scoped TestClock: advance, изоляция и cleanup без реального backoff. Gen.function не заменяет это.
+
+**Q16. P1 — Отмена не ограничивает PostgreSQL**
+[Finalizer](../../runtime/src/sql/pg.ts#L149-L162) ждёт socket end, не backend. Pool=8 не предотвратил 39 backend и 53300; восстановление — после sleepers. Нужны server-side cancellation/deadlines, admission control и явная commit ambiguity. Rollback не обещан.
+
+### 7.2. Новые воспроизведённые дефекты Q17–Q28
+
+Ниже — срез `4a96533`, JS/debug и JS/release; пункт Q24 — checker.
+
+**Q17. P1 — Sync-композиция генерирует невалидный JS**
+Runtime-вызов `read_more (Atom.current count)`, где `read_more : Number ->{Atom.Read;} Number`, собирается, но импорт падает с SyntaxError. [Wrapper](../../flick-core/src/codegen/js/expr.rs#L178-L200) помещает `yield*` в обычную стрелку `() => read_more(yield* …)`.
+
+Вычислять callee/arguments до wrapper. Контроли с отдельными let работают; ошибка блокирует весь модуль.
+
+**Q18. P1 — Atom.Read запускает Eff-значение**
+`Atom.make (task { …; 41 })` через derived/Atom.value выполняет задачу при чтении; await полученного Number даёт TypeError. Atom.current сохраняет Eff холодным.
+
+[syncOperation](../../runtime/src/sync.ts#L36-L46) путает ABI и данные через `Effect.isEffect(result)`. Нормализовать ABI провайдера, не значение. Чтение не должно выполнять скрытые сервисы/ошибки.
+
+**Q19. P1 — Lazy Seq выпускает закрытый reader**
+Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq, полученный внутри provide Atom.layer, разрешено обойти снаружи; результат — `registry is disposed`. Внутренний обход и строгий List дали `[8]`.
+
+[Captures](../../flick-core/src/types/comprehension.rs#L100-L115) не включают lifetime неявного [reader context](../../runtime/src/sync.ts#L59-L75). Утечку нужно отвергать, не продлевать жизнь registry.
+
+**Q20. P1 — await/scope обходят Sync-only for**
+В `{Atom.Read;}` принимаются `for n <- [1] yield await task { Effect.never () }` и `for n <- [1] yield scope { n }`. Оба падают с AsyncFiberError; await перед for работает.
+
+[call_effects](../../flick-core/src/types/effects.rs#L184-L199) проверяет стадию, но await/scope вызывают perform напрямую. Применять ограничение ко всем исполняющим Runtime конструкциям, как требует D7.
+
+**Q21. P1 — Option ? нарушает выведенный тип**
+`value : Number; let value = (fun () -> (None : Option Number)? + 1) ()` принимается, экспортируя None вместо Number. [function_with](../../flick-core/src/types/infer.rs#L357-L378) игнорирует неудачную unify результата, навязанного `?`, с телом. Нужна ошибка типов; корректное тело с Some возвращает None.
+
+**Q22. P1 — and принимает скаляр как контейнер**
+`do { x <- 1 and y <- Some 2; pure (x + y) } : Option Number` даёт None. Обычный `map2 (fun x y -> x + y) 1 (Some 2)` отвергается с T003; корректная группа — Some 3.
+
+[Первая unify](../../flick-core/src/types/applicative_do.rs#L71-L81) игнорирует ошибку. Проверять первый operand как остальные: sugar не обходит типобезопасность.
+
+**Q23. P1 — and удаляет локальный pure**
+`do { pure <- Some (fun n -> Some (n + 10)) and x <- Some 1; pure x }` даёт Some 1; последовательные `<-` — Some 11.
+
+[prelude_pure вызывается до binding patterns](../../flick-core/src/types/applicative_do.rs#L62-L66), принимая локальную функцию за sugar. Разрешать callee в правильном lexical scope.
+
+**Q24. P2 — Квалификация pure требует лишний Monad**
+Для `both : Applicative f => f Number -> f Number -> f Number` терминальный `pure (x+y)` после and принимается; `Prelude.pure (x+y)` или `(pure (x+y))` дают C001: нужен Monad f. Validation намеренно не Monad.
+
+[Сравнивается текст](../../flick-core/src/types/applicative_do.rs#L214-L227). Распознавать resolved method и прозрачные скобки, сохраняя shadowing.
+
+**Q25. P2 — Конечный range перестаёт продвигаться**
+`Seq.take 3 (9007199254740992..9007199254740992)` дал три копии вместо одной; `[7..7]` корректен. Полный сбор большого диапазона не запускался.
+
+В [seqRangeTo](../../runtime/src/core/seq.ts#L26-L29) `i++` не меняет этот Number. Завершать достигнутый endpoint и обрабатывать непродвигающийся шаг.
+
+**Q26. P1 — Fusion выносит return None из callback**
+`Seq.map (fun x -> Some ((if x == 2 then None else Some x)? + 1)) (for x <- [1,2,3] yield x)` даёт в debug `[Some 2,None,Some 4]`, в release `[Some 2]`. С Seq.to_list внутри функции release возвращает None вместо List.
+
+[Function::of](../../flick-core/src/opt/fuse.rs#L39-L68) переносит Unwrap через границу функции. Оставить callback-вызов, переиспользовав exits-защиту beta-reducer.
+
+**Q27. P2 — Fractional take меняется в release**
+`Seq.take 1.5 (for x <- [1,2,3,4] yield x)` отдаёт четыре элемента в debug, два в release; 0.5 — четыре против одного. Целые, NaN/Infinity, порядок take/filter совпали.
+
+[Runtime](../../runtime/src/core/seq.ts#L87-L95) ждёт `--left === 0`, [fusion](../../flick-core/src/codegen/js/generator.rs#L90-L98) — `++count >= n`. Определить единый контракт count; публичный Number не требует целого.
+
+**Q28. P1 — Fusion меняет eager evaluation и defects**
+`Seq.first (for x <- [for y <- [1n,0n] yield 1n/y] yield x)` меняется с Division by zero на Some 1n. `List.map (fun x -> 2n ** (0n-x)) [for y <- [1n,0n] yield 1n/y]` меняет ошибку деления на `undefined must be positive`.
+
+[nested](../../flick-core/src/opt/fuse.rs#L204-L228) делает строгий source ленивым; [List fusion](../../flick-core/src/opt/fuse.rs#L138-L158) смешивает producer/callback. Pure не total: сохранить eager-порядок либо доказать безопасность перестановки.
+
+### 7.3. Приоритеты и проверка закрытия
+
+Сначала **Q17–Q28**: отметки C1/D7/D10–D12/D14 не доказывают выполнение AC type safety/стадии/debug=release. Прежние P1 сохраняют приоритет; F2 после F1/F6.
+
+C1 уже реализован; сохранить B-бюджеты и измерять compiled consumers: C1/D14 microbenchmarks — ручные JS-модели. Сверить устаревшие вехи §4 с R5/U9/L6 и D-треком; добавить SQL/cancellation AC. Не строить второй Effect runtime.
+
+### 7.4. PostgreSQL и нагрузка: сохранённый baseline
+
+**Исторические измерения `3f1c7c3`, не срез `4a96533` и не новый прогон при переносе.** Локально: M4 Max/16 CPU/64 GiB, Node 24.18.0, Effect 4.0.5; JS/release (`flick build … --emit js --profile release`). PostgreSQL 17.11, `postgres:17-alpine`, Docker 4 CPU/2 GiB, loopback, fsync/synchronous_commit=on, max_connections=40, pool=8. Production не использовался.
+
+- Точный `tests/postgres/app.fl` + schema/stdout: 15 строк совпали; CRUD, joins/NULL, BigDecimal, constraint 23514, DecodeError при drift. Injection-looking параметр остался данными, таблица цела.
+- Отдельно: 512 конкурентных atomic increments одного ключа (c=32) дали 512 разных результатов и итог 512. Частичный commit/чужой rollback — **Q9**, отмена/overload — **Q16**.
+- HTTP Schema echo, HTTP SQL `UPDATE value=value+1 RETURNING value` (ключ на worker), unary RPC через Flick `Rpc.call`. HTTP-генератор — fetch; разные клиенты, не сравнение транспортов.
+- Closed-loop, без retries, deadline 5 с: прогрев каждого пути 10 с при c=16; затем по 3×10 с для каждой пары путь/c; SQL soak 60 с. Клиент/сервер на одном Mac. Таблица: медианы трёх прогонов, не pooled percentiles; soak — один.
+
+| Путь | c | req/s | p50, мс | p95, мс | p99, мс |
+|---|---:|---:|---:|---:|---:|
+| HTTP echo | 1 | 657 | 1.48 | 1.93 | 2.23 |
+| HTTP echo | 16 | 8258 | 2.00 | 2.44 | 4.46 |
+| HTTP echo | 64 | 20271 | 2.73 | 6.16 | 7.08 |
+| HTTP SQL | 1 | 217 | 4.51 | 5.96 | 7.57 |
+| HTTP SQL | 16 | 2521 | 5.90 | 8.50 | 12.75 |
+| HTTP SQL | 64 | 5041 | 11.63 | 22.28 | 27.12 |
+| RPC echo | 1 | 580 | 1.69 | 2.20 | 2.88 |
+| RPC echo | 16 | 5009 | 2.32 | 7.57 | 9.29 |
+| RPC echo | 64 | 4727 | 10.48 | 18.58 | 87.75 |
+| HTTP SQL, 60 с | 64 | 4619 | 11.76 | 26.89 | 37.36 |
+
+Штатный профиль, включая прогрев/soak: **1 842 275** ответов без status/schema/transport ошибок и таймаутов; проверены id. Все **532 648** успешных инкрементов совпали с изменением БД; в soak — 277 270, максимум 8 наблюдавшихся DB connections. Разброс SQL — 2.1×; локальный ориентир, не production capacity/SLO.
+
+| Память Node-сервера, MiB | До soak | Пик (1 Гц) | Через ~38 с idle |
+|---|---:|---:|---:|
+| RSS | 252.4 | 331.5 | 207.0 |
+| heapUsed | 118.8 | 199.5 | 94.5 |
+
+Soak: server CPU ≈0.36 ядра; отсутствие утечек не доказано. SIGTERM во время `pg_sleep(3)`: ответ 200, процесс завершился за 2.97 с (exit 143), listener закрыт, DB sessions=0. Аварийный abort-профиль **Q16** не включён в «ошибок нет».
+
+Abort baseline: 6×64 запросов, pool=8/DB max=40; 263 отмены, 121 HTTP 500/53300 и два 500 обычного bump. После sleepers сервис восстановился.
+
+### 7.5. Проверка среза ревью
+
+Проверки ниже выполнены в сессии ревью на `4a96533`, не при переносе в ROADMAP.
+
+`cargo build -p flick`, `pnpm -C runtime build` прошли. Fixtures `codegen/{question,applicative_do,ranges,fusion}`, `stdlib/monoids`, `ui/{sync,sync_for}` из tests/run: JS/debug, JS/release, TS/debug — **21 исполнение**, stdout совпал. `examples/mtl` run дал три ожидаемых результата; property suite не запускался.
+
+Одноразовые consumers подтвердили **Q17–Q23,Q25–Q28** в обоих JS-профилях; **Q24** — C001. Chromium/JS-release: три клика → count 3, lift 12, Seq `[4,5,6]`; browser errors нет, interruption удалил root.
+
+Не проверены полный suite, TS/release, v3 host, comparative benchmarks и повторная PostgreSQL-нагрузка. Старые browser/HTTP/TS/SQL-доказательства — baseline. Временные пробы удалены в сессии ревью; тогда изменён только отчёт.
