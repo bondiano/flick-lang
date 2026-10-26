@@ -22,7 +22,7 @@ let me =
 
 type alias Handlers r = { me : Unit ->{r; Unauthorized} String }
 
-group : Rpc.Group (Handlers r)
+group : Rpc.Group r (Handlers r)
 let group = Rpc.group |> Rpc.add me
 
 handlers : Handlers none

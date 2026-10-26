@@ -1,0 +1,39 @@
+// The handlers' services are what serving needs: an API or a group whose
+// handler asks for `Users` cannot be served where no layer provides it.
+module App.ServingServices exposing (http, rpc)
+
+service Users =
+  count : Unit ->{} Number
+
+ping : HttpApi.Endpoint "ping" (HttpApi.Request Unit Unit Unit Unit ->{r;} Unit)
+let ping = HttpApi.endpoint HttpApi.Get "/ping" (Record.label : Record.Label "ping")
+
+total : Rpc.Rpc "total" (Unit ->{r;} Unit)
+let total = Rpc.make (Record.label : Record.Label "total")
+
+http : Unit ->{; HttpApi.ServeError} Unit
+let http () =
+  let options : HttpApi.ServeOptions =
+    { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }
+  let api =
+    HttpApi.api "app"
+      |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "app") |> HttpApi.add ping)
+  scope s {
+    let _server =
+      HttpApi.listen options api { app = { ping = fun _ -> ignore (Users.count ()) } }
+    ()
+  }
+
+rpc : Unit ->{; Rpc.ServeError} Unit
+let rpc () =
+  scope s {
+    let _server =
+      Rpc.listen
+        Rpc.defaults
+        (Rpc.group |> Rpc.add total)
+        { total = fun () -> ignore (Users.count ()) }
+    ()
+  }
+
+//~ FLICK-E002 @21:3-21:8 does not allow service `Users`
+//~ FLICK-C001 @33:23-33:30 does not hold

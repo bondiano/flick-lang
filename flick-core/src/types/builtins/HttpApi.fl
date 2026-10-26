@@ -40,11 +40,13 @@ type KeyLocation = InHeader | InQuery | InCookie
 /// The document's version, description and servers.
 type alias Info = { version : String; description : String; servers : List String }
 
-/// A group named `n` whose handlers form the record `hs`.
-type Group (n : Symbol) hs
+/// A group named `n` whose handlers form the record `hs`; `r` is what the
+/// handlers need, together.
+type Group (n : Symbol) (r : ServiceRow) hs
 
-/// An API whose groups form the record `gs` of their handler records.
-type Api gs
+/// An API whose groups form the record `gs` of their handler records; `r`
+/// is what their handlers need, which serving it needs.
+type Api (r : ServiceRow) gs
 
 /// A running server of region `s`; it stops when the scope that started it
 /// closes, after the requests it is serving.
@@ -242,25 +244,28 @@ foreign pure describe from "@flick-lang/runtime/effect/http-api/HttpApi" "httpAp
   reviewed "effect@4.0.5 sha256:d6a2b6875e10e51e"
 
 /// A group with no endpoints yet.
-group : Record.Label n -> Group n {}
+group : Record.Label n -> Group n r {}
 foreign pure group from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiGroup"
   reviewed "effect@4.0.5 sha256:34e655ec9d775e22"
 
 /// The group with the endpoint: its handler becomes a field of the group.
 add :
-  (Record.Lacks l hs, Record.UnionDisjoint hs (Record.Field l f) out) =>
-  Endpoint l f -> Group n hs -> Group n out
+  (
+    Record.Lacks l hs,
+    Record.UnionDisjoint hs (Record.Field l (Request p q h b ->{r; e} s)) out,
+  ) =>
+  Endpoint l (Request p q h b ->{r; e} s) -> Group n r hs -> Group n r out
 foreign pure add from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiAdd"
   arity 2
   reviewed "effect@4.0.5 sha256:722ba5ecbebad307"
 
 /// An API with no groups yet; `name` is the title of its document.
-api : String -> Api {}
+api : String -> Api r {}
 foreign pure api from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiMake"
   reviewed "effect@4.0.5 sha256:722ba5ecbebad307"
 
 /// The document's version, description and servers.
-info : Info -> Api gs -> Api gs
+info : Info -> Api r gs -> Api r gs
 foreign pure info from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiInfo"
   arity 2
   reviewed "effect@4.0.5 sha256:6c74cdf7ba47ec83"
@@ -268,7 +273,7 @@ foreign pure info from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiInf
 /// The API with the group: its handlers become a field of the API.
 add_group :
   (Record.Lacks n gs, Record.UnionDisjoint gs (Record.Field n hs) out) =>
-  Group n hs -> Api gs -> Api out
+  Group n r hs -> Api r gs -> Api r out
 foreign pure add_group from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiAddGroup"
   arity 2
   reviewed "effect@4.0.5 sha256:722ba5ecbebad307"
@@ -277,7 +282,7 @@ foreign pure add_group from "@flick-lang/runtime/effect/http-api/HttpApi" "httpA
 /// owning region `s` closes: then it stops accepting, lets the requests it
 /// serves finish and runs their finalizers. A request that does not decode
 /// is 400 with the issues; the handlers run with the services here.
-listen : forall c s r gs. ServeOptions -> Api gs -> (gs^c ->{Scope s | r; ServeError} Server s)^c
+listen : forall c s r gs. ServeOptions -> Api r gs -> (gs^c ->{Scope s | r; ServeError} Server s)^c
 foreign effect listen from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiListen"
   arity 3
   retention owner
@@ -307,7 +312,7 @@ foreign pure url from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiUrl"
 
 /// The API as OpenAPI 3.1 JSON, every schema written by the strict
 /// exporter, or the error naming `group.endpoint.part -> field`.
-openapi : Api gs -> Result Codec.ExportError String
+openapi : Api r gs -> Result Codec.ExportError String
 foreign pure openapi from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiOpenApi"
   reviewed "effect@4.0.5 sha256:38e741b3195d9f08"
 

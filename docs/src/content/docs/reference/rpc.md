@@ -47,7 +47,7 @@ type alias Handlers r =
     count_to : Number ->{r;} Stream none none Number;
   }
 
-users : Rpc.Group (Handlers r)
+users : Rpc.Group r (Handlers r)
 let users = Rpc.group |> Rpc.add get_user |> Rpc.add count_to
 
 handlers : Handlers none

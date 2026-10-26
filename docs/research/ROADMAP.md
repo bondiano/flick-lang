@@ -439,7 +439,7 @@ D1 ✅ ─ D2 ─ D3 ─ D4 ─ D5 ─ D6 ─ D9 ─ D11 ─ D10 ─ D13 ─ D12
 
 Пункты Q1–Q16 — доказательства `3f1c7c3`, не новый прогон. По ревью, причины в diff до `4a96533` не устранены; Sync-граница Q7 проверена на `4a96533`.
 
-**Q1. P1 — Serving теряет DI-требования**
+**Q1. P1 — Serving теряет DI-требования** ✅ (строка сервисов в типах: `HttpApi.Group n r hs`, `HttpApi.Api r gs`, `Rpc.Group r hs`; `add` унифицирует `r` обработчика эндпоинта/процедуры с группой, `listen`/`listen_websocket`/`listen_tcp`/`handler`/`serve_stdio`/`call_local` требуют её; `tests/check/fail/stdlib/serving_services.fl`)
 [listen](../../flick-core/src/types/builtins/HttpApi.fl#L276-L284) не связывает r с handlers. Users без Layer компилируется; RPC — Service not found, HTTP — 500. Учитывать r handlers/middleware на serving boundary; без Layer — compile error.
 
 **Q2. P1 — HttpOnly login даёт ложную ошибку**

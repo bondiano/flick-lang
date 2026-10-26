@@ -48,7 +48,7 @@ type alias Handlers r =
     steady : Unit ->{r;} Unit;
   }
 
-group : Rpc.Group (Handlers r)
+group : Rpc.Group r (Handlers r)
 let group =
   Rpc.group |> Rpc.add double |> Rpc.add count_to |> Rpc.add slow |> Rpc.add steady
 

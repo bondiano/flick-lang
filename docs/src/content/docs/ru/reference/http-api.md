@@ -26,7 +26,7 @@ let get_user =
     |> HttpApi.with_success 200 (Codec.json (schema User))
     |> HttpApi.with_errors [HttpApi.error_case 404 (Codec.json (schema NotFound))]
 
-api : HttpApi.Api { users : { get_user : HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User } }
+api : HttpApi.Api r { users : { get_user : HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User } }
 let api =
   HttpApi.api "Users"
     |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "users") |> HttpApi.add get_user)
@@ -41,7 +41,10 @@ let api =
 (`{ path; query; headers; payload }`), ответ имеет статус 204.
 Сигнатура эндпоинта задаёт тип обработчика. Его строка сервисов `r`
 остаётся открытой, а строка ошибок `e` перечисляет типизированные ошибки,
-которыми он может завершиться.
+которыми он может завершиться. Группа и API несут сервисы всех своих
+обработчиков, `HttpApi.Group n r hs` и `HttpApi.Api r gs`, и `listen` их
+требует: обработчик, которому нужен сервис без слоя в месте вызова, не
+компилируется.
 
 | Комбинатор | Назначение |
 | - | - |

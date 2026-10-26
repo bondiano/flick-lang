@@ -77,7 +77,7 @@ type alias Handlers r =
     login : HttpApi.Request Unit Unit Unit Unit ->{r;} ((String, Count), Redacted String);
   }
 
-api : HttpApi.Api { bodies : Handlers r }
+api : HttpApi.Api r { bodies : Handlers r }
 let api =
   HttpApi.api "Bodies"
     |> HttpApi.add_group

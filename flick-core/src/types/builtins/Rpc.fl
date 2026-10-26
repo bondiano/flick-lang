@@ -19,8 +19,9 @@ type Rpc (l : Symbol) f
 /// A typed error of a procedure: its JSON codec.
 type ErrorCase
 
-/// A group whose handlers form the record `hs`.
-type Group hs
+/// A group whose handlers form the record `hs`; `r` is what the handlers
+/// need, together, which serving the group needs.
+type Group (r : ServiceRow) hs
 
 /// A running server of region `s`; it stops when the scope that started it
 /// closes, after the calls it is serving.
@@ -168,14 +169,14 @@ foreign pure uninterruptible from "@flick-lang/runtime/effect/rpc/Rpc" "rpcUnint
   reviewed "effect@4.0.5 sha256:1a4870136a854e0f"
 
 /// A group with no procedures yet.
-group : Group {}
+group : Group r {}
 foreign pure group from "@flick-lang/runtime/effect/rpc/Rpc" "rpcGroup"
   reviewed "effect@4.0.5 sha256:2778a7f9eb6fd7f5"
 
 /// The group with the procedure: its handler becomes a field of the group.
 add :
-  (Record.Lacks l hs, Record.UnionDisjoint hs (Record.Field l f) out) =>
-  Rpc l f -> Group hs -> Group out
+  (Record.Lacks l hs, Record.UnionDisjoint hs (Record.Field l (p ->{r; e} s)) out) =>
+  Rpc l (p ->{r; e} s) -> Group r hs -> Group r out
 foreign pure add from "@flick-lang/runtime/effect/rpc/Rpc" "rpcAdd"
   arity 2
   reviewed "effect@4.0.5 sha256:2778a7f9eb6fd7f5"
@@ -184,7 +185,9 @@ foreign pure add from "@flick-lang/runtime/effect/rpc/Rpc" "rpcAdd"
 /// until the scope owning region `s` closes: then it stops accepting, lets
 /// the calls it serves finish and runs their finalizers. The handlers run
 /// with the services here.
-listen : forall c s r hs. ServeOptions -> Group hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
+listen : forall c s r hs. ServeOptions ->
+  Group r hs ->
+  (hs^c ->{Scope s | r; ServeError} Server s)^c
 foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
   arity 3
   retention owner
@@ -193,7 +196,7 @@ foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
 /// As `listen`, each client a WebSocket at `path` whose messages carry its
 /// calls: `ws://127.0.0.1:8080/rpc`. Every serialization streams over it.
 listen_websocket :
-  forall c s r hs. ServeOptions -> Group hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
+  forall c s r hs. ServeOptions -> Group r hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
 foreign effect listen_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenWebsocket"
   arity 3
   retention owner
@@ -204,7 +207,7 @@ foreign effect listen_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "r
 /// that frames its messages (`ndjson`, `ndjson_rpc`, `binary`) fits a byte
 /// stream; another is `ServeError`. Node only.
 listen_tcp :
-  forall c s r hs. ServeOptions -> Group hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
+  forall c s r hs. ServeOptions -> Group r hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
 foreign effect listen_tcp from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenTcp"
   arity 3
   retention owner
@@ -223,7 +226,7 @@ foreign pure port from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcPort"
 /// owning it closes, the calls it serves finish and run their finalizers.
 handler :
   forall c s r hs.
-  Serialization -> Group hs -> (hs^c ->{Scope s | r;} (ServerRequest ->{} ServerResponse)^{s})^c
+  Serialization -> Group r hs -> (hs^c ->{Scope s | r;} (ServerRequest ->{} ServerResponse)^{s})^c
 foreign effect handler from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandler"
   arity 3
   retention owner
@@ -233,7 +236,7 @@ foreign effect handler from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandler
 /// for a `GET` route.
 handler_websocket :
   forall c s r hs.
-  Serialization -> Group hs -> (hs^c ->{Scope s | r;} (ServerRequest ->{} ServerResponse)^{s})^c
+  Serialization -> Group r hs -> (hs^c ->{Scope s | r;} (ServerRequest ->{} ServerResponse)^{s})^c
 foreign effect handler_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandlerWebsocket"
   arity 3
   retention owner
@@ -308,7 +311,7 @@ foreign pure call_stream_on from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallSt
 /// a program another starts with `spawn`, as editors start language
 /// servers. Nothing else may write to stdout meanwhile. Node only.
 serve_stdio :
-  forall c r hs. Serialization -> Group hs -> (hs^c ->{Stdio.Stdio | r; none} Unit)^c
+  forall c r hs. Serialization -> Group r hs -> (hs^c ->{Stdio.Stdio | r; none} Unit)^c
 foreign effect serve_stdio from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcServeStdio"
   arity 3
   retention call
@@ -335,7 +338,7 @@ foreign effect with_headers from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithHe
 /// so this does not test them; the hooks of `with_middleware` see no
 /// headers.
 call_local :
-  forall c l p r e s hs. Group hs -> hs^c -> Rpc l (p ->{r; e} s) -> p ->{r; e} s
+  forall c l p r e s hs. Group r hs -> hs^c -> Rpc l (p ->{r; e} s) -> p ->{r; e} s
 foreign effect call_local from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallLocal"
   arity 4
   retention call
@@ -344,7 +347,7 @@ foreign effect call_local from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallLoca
 /// Calls the stream procedure of the group in memory, as `call_local`.
 call_stream_local :
   forall c l p r e a hs.
-  Group hs -> hs^c -> Rpc l (p ->{r; e} Stream none none a) -> p -> (Stream r e a)^c
+  Group r hs -> hs^c -> Rpc l (p ->{r; e} Stream none none a) -> p -> (Stream r e a)^c
 foreign pure call_stream_local from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStreamLocal"
   arity 4
   retention owner

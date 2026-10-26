@@ -57,7 +57,7 @@ type alias Handlers r =
     login : HttpApi.Request Unit Unit Unit NewUser ->{r;} String;
   }
 
-users : HttpApi.Group "users" (Handlers r)
+users : HttpApi.Group "users" r (Handlers r)
 let users =
   HttpApi.group (Record.label : Record.Label "users")
     |> HttpApi.add get_user
@@ -67,7 +67,7 @@ let users =
     |> HttpApi.add echo_text
     |> HttpApi.add login
 
-api : HttpApi.Api { users : Handlers r }
+api : HttpApi.Api r { users : Handlers r }
 let api =
   HttpApi.api "Users"
     |> HttpApi.info
@@ -123,7 +123,7 @@ let upload =
   HttpApi.endpoint HttpApi.Post "/files" (Record.label : Record.Label "upload")
     |> HttpApi.with_payload (Codec.json (schema Upload))
 
-files : HttpApi.Api { files : { upload : HttpApi.Request Unit Unit Unit Upload ->{r;} Unit } }
+files : HttpApi.Api r { files : { upload : HttpApi.Request Unit Unit Unit Upload ->{r;} Unit } }
 let files =
   HttpApi.api "Files"
   |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "files") |> HttpApi.add upload)

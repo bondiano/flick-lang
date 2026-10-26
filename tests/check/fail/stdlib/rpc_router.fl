@@ -6,7 +6,7 @@ import Http.ServerResponse exposing (ServerResponse)
 
 // A route over the handler of `Rpc.handler` holds the region of its scope,
 // so it cannot outlive it.
-escaped : Rpc.Group {} ->{} Route none none
+escaped : Rpc.Group none {} ->{} Route none none
 let escaped group =
   scope s {
     rpc : (ServerRequest ->{} ServerResponse)^{s}

@@ -25,7 +25,7 @@ let get_user =
     |> HttpApi.with_success 200 (Codec.json (schema User))
     |> HttpApi.with_errors [HttpApi.error_case 404 (Codec.json (schema NotFound))]
 
-api : HttpApi.Api { users : { get_user : HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User } }
+api : HttpApi.Api r { users : { get_user : HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User } }
 let api =
   HttpApi.api "Users"
     |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "users") |> HttpApi.add get_user)
@@ -37,7 +37,9 @@ let api =
 `Request Unit Unit Unit Unit` (`{ path; query; headers; payload }`) and
 answers 204. The signature of the endpoint names the handler's type: its
 services `r` stay open, and its errors `e` are the typed errors the handler
-may fail with.
+may fail with. A group and an API carry the services of all their handlers,
+`HttpApi.Group n r hs` and `HttpApi.Api r gs`, and `listen` needs them: a
+handler that asks for a service no layer provides there does not compile.
 
 | Combinator | |
 | - | - |
