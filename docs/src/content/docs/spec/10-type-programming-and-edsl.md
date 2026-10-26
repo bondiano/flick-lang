@@ -204,7 +204,7 @@ let save_button props =
   }
 ```
 
-JSX `<...>` is not added in the first version; `ui { ... }` and ordinary Ui functions build one representation: the block only opens the names of the `Ui` module (a local binding wins, then the name `Ui`, then the module's names) and yields the same typed IR. This keeps the ML syntax and uniform rules for props/callbacks. [ReScript components](https://rescript-lang.org/docs/react/components-and-props/) serve as an example of a typed façade over React; Flick's surface syntax was chosen independently.
+JSX `<...>` is not added in the first version; `ui { ... }` and ordinary Ui functions build one representation. The block opens the names of the `Ui` module (a local binding wins, then a name of `Ui`, then the module's names) and treats applying a `Ui.Component p` to props as `Ui.component value props`, including `props |> value`. Other values and calls keep their ordinary types. Both forms yield the same typed IR, retaining the ML syntax and uniform props/callback checks. [ReScript components](https://rescript-lang.org/docs/react/components-and-props/) serve as an example of a typed façade over React; Flick's surface syntax was chosen independently.
 
 The first renderer is the **React adapter**. A custom reconciler/DOM renderer, SSR, hydration, React Server Components and the full hooks model are outside the first version. The adapter preserves React's component boundaries, key/ref and lifecycle; the optimizer does not replace a component with an arbitrary direct function call. The runtime state of the bridge lives outside the pure component body.
 

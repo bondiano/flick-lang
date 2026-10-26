@@ -1,0 +1,33 @@
+module App.Components exposing (..)
+
+type alias Props = { label : String }
+
+type Component p = Component p
+
+outside : Ui.Component Props -> Props -> Ui
+let outside badge props = badge props
+//~ FLICK-T003 @8:27-8:38 not a function
+
+wrong : Ui.Component Props -> Ui
+let wrong badge = ui { badge { label = 1 } }
+//~ FLICK-T003 @12:40-12:41 expected `String`, found `Number`
+
+missing : Ui.Component Props -> Ui
+let missing badge = ui { badge {} }
+//~ FLICK-T003 @16:32-16:34 field `label` is missing
+
+extra : Ui.Component Props -> Ui
+let extra badge = ui { badge { label = "ok"; extra = true } }
+//~ FLICK-T003 @20:30-20:60 the value has field `extra`
+
+bare : Ui.Component Props -> Ui
+let bare badge = ui { badge }
+//~ FLICK-T003 @24:18-24:30 expected `Ui`, found `Component Props`
+
+unrelated : Component Props -> Props -> Ui
+let unrelated badge props = ui { badge props }
+//~ FLICK-T003 @28:34-28:45 not a function
+
+captured : forall c. (Ui.Component Props)^c -> Props -> Ui
+let captured badge props = ui { badge props }
+//~ FLICK-G001 @32:33-32:38 holds `c`

@@ -30,6 +30,9 @@ foreign pure renderer from "./dom.mjs" "renderer"
 badge : Ui.Component { label : String }
 foreign pure badge from "./dom.mjs" "Badge"
 
+badge_for : Unit -> Ui.Component { label : String }
+let badge_for () = badge
+
 count : Atom.Writable Number
 let count = Atom.make 0
 
@@ -45,6 +48,7 @@ let counter =
     "App.Main.counter"
     (Ui.view (fun () ->
       ui {
+        let widgets = { badge = badge }
         div
           { class_name = "counter" }
           [
@@ -52,7 +56,9 @@ let counter =
             button { disabled = false; on_click = increment } [text "+1"],
             button { disabled = false; on_click = refuse } [text "refuse"],
             paragraph [text "<b>bold?</b>"],
-            Ui.component badge { label = "new" },
+            badge { label = "new" },
+            badge_for () { label = "returned" },
+            ({ label = "piped" } |> (if true then widgets.badge else badge)),
           ]
       }))
 

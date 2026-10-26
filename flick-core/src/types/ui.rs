@@ -14,6 +14,30 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
 impl Checker<'_> {
+    /// A foreign component takes props only inside `ui`, through `Ui.component`.
+    pub fn ui_callable(&mut self, ty: &Type, call: Range, span: Span) -> Type {
+        let target = self.whnf(ty);
+        if self.ui > 0
+            && matches!(
+                &target,
+                Type::App { head, .. }
+                    if matches!(head.as_ref(), Type::Con { module, name }
+                        if module == "Ui" && name == "Component")
+            )
+        {
+            self.expect(ty, &target, span);
+            self.typing.ui_components.insert(call);
+            if let Type::App { arg, .. } = target {
+                return Type::Fun {
+                    param: arg,
+                    effects: None,
+                    result: Box::new(Type::prim("Ui")),
+                };
+            }
+        }
+        target
+    }
+
     /// `queue c` and `concurrent c` of `Ui.Event` or `Action` with a
     /// constant `c`: the capacity or limit must be a positive integer.
     pub fn ui_capacity(&mut self, head: &Node, arg: &Node) {

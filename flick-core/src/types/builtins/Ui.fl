@@ -2,7 +2,8 @@
 /// of their events; building one runs no handler and reads no state.
 /// `Ui.Dom.mount` renders it with React and runs each event as a task under
 /// the policy of its handler (`Action`, `Ui.Event`). Inside `ui { … }` the
-/// names of this module need no `Ui.`.
+/// names of this module need no `Ui.`, and a `Component p` takes its props
+/// directly: `badge props` means `Ui.component badge props`.
 module Ui exposing (..)
 
 /// What handles DOM events with snapshot `s`: a task per event under a
@@ -214,6 +215,8 @@ foreign pure tabs from "@flick-lang/runtime/ui/react" "uiTabs"
   retention call
 
 /// A foreign component with its props, which React gets as they are.
+/// Inside `ui { … }`, `value props` inserts this operation automatically
+/// when `value` has type `Component p`; the component itself stays opaque.
 component : forall p. Component p -> p -> Ui
 foreign pure component from "@flick-lang/runtime/ui/react" "uiComponent"
 
