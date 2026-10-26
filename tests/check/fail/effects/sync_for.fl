@@ -18,6 +18,19 @@ let pure_reads () = for { n <- [1, 2] } yield n + Atom.value count
 unread : Unit ->{Log;} List Number
 let unread () = [for n <- [1, 2] yield n + Atom.value count]
 
+// `await` and `scope` run on the Effect runtime too
+awaited : Unit ->{Atom.Read;} Seq Number
+let awaited () = for n <- [1] yield await task { n }
+
+scoped : Unit ->{Atom.Read;} Seq Number
+let scoped () = for n <- [1] yield scope { n }
+
+provided : Unit ->{Atom.Read;} Seq Number
+let provided () = for n <- [1] yield provide Layer.empty { n }
+
 //~ FLICK-E001 @11:39-11:49 only Sync calls
 //~ FLICK-E001 @15:51-15:67 outside this function
 //~ FLICK-E002 @19:18-19:60 does not allow service `Read`
+//~ FLICK-E001 @23:37-23:53 only Sync calls
+//~ FLICK-E001 @26:36-26:41 only Sync calls
+//~ FLICK-E001 @29:38-29:45 only Sync calls

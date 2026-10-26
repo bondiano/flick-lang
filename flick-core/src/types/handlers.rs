@@ -144,7 +144,9 @@ impl Checker<'_> {
             );
         }
         let span = self.keyword_span(node, K::ProvideKw);
-        self.perform(&inputs, &errors, span);
+        if self.runtime_allowed(span) {
+            self.perform(&inputs, &errors, span);
+        }
         let provided = self.store.normalize(&outputs).entries;
         let needed = self.fresh();
         let mut stage = self.stage.clone();

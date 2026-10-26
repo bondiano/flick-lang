@@ -509,7 +509,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 
 [Captures](../../flick-core/src/types/comprehension.rs#L100-L115) не включают lifetime неявного [reader context](../../runtime/src/sync.ts#L59-L75). Утечку нужно отвергать, не продлевать жизнь registry.
 
-**Q20. P1 — await/scope обходят Sync-only for**
+**Q20. P1 — await/scope обходят Sync-only for** ✅ (`runtime_allowed` — общая проверка стадии для runtime-вызова, `await`, `scope` и `provide`; `tests/check/fail/effects/sync_for.fl`)
 В `{Atom.Read;}` принимаются `for n <- [1] yield await task { Effect.never () }` и `for n <- [1] yield scope { n }`. Оба падают с AsyncFiberError; await перед for работает.
 
 [call_effects](../../flick-core/src/types/effects.rs#L184-L199) проверяет стадию, но await/scope вызывают perform напрямую. Применять ограничение ко всем исполняющим Runtime конструкциям, как требует D7.

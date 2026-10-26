@@ -22,7 +22,9 @@ impl Checker<'_> {
             .find(|t| t.kind == K::ScopeKw)
             .map_or_else(|| self.span(node), |t| self.token_span(t));
         let empty = Type::empty_row();
-        self.perform(&empty, &empty, span);
+        if self.runtime_allowed(span) {
+            self.perform(&empty, &empty, span);
+        }
         let name = node.child_tokens().find(|t| t.kind == K::Ident);
         self.store.level += 1;
         let region = self.store.skolem(name.map_or("s", |n| n.text(self.text)));

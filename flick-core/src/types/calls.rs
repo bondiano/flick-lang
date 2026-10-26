@@ -361,7 +361,10 @@ impl Checker<'_> {
                     );
                     return Type::Error;
                 }
-                self.perform(&services, &errors, self.span(node));
+                let span = self.span(node);
+                if self.runtime_allowed(span) {
+                    self.perform(&services, &errors, span);
+                }
                 result
             }
             _ => {

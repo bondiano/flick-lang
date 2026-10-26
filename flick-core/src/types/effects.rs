@@ -184,19 +184,29 @@ impl Checker<'_> {
     /// A call of `effects` at `span`: performed and recorded for code
     /// generation, unless the stage allows Sync calls alone.
     pub fn call_effects(&mut self, effects: &Effects, span: Span) {
-        if let Some(reason) = self.stage.only_sync.filter(|_| !effects.sync) {
-            self.stage.runtime = true;
-            if !self.diagnostics.iter().any(|d| d.span == Some(span)) {
-                self.error(
-                    codes::E001,
-                    span,
-                    format!("this is a runtime call, but {reason}"),
-                );
-            }
+        if !effects.sync && !self.runtime_allowed(span) {
             return;
         }
         self.perform(&effects.services, &effects.errors, span);
         self.record_call(effects, super::typing::range(span));
+    }
+
+    /// Whether a construct that runs on the Effect runtime (a runtime
+    /// call, `await`, `scope`, `provide`) may run at `span`; reports it
+    /// where the stage allows Sync calls alone.
+    pub fn runtime_allowed(&mut self, span: Span) -> bool {
+        let Some(reason) = self.stage.only_sync else {
+            return true;
+        };
+        self.stage.runtime = true;
+        if !self.diagnostics.iter().any(|d| d.span == Some(span)) {
+            self.error(
+                codes::E001,
+                span,
+                format!("this is a runtime call, but {reason}"),
+            );
+        }
+        false
     }
 
     /// Records the application or pipe at `range` as a call of `effects`.
