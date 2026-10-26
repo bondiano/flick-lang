@@ -58,7 +58,9 @@ Contextual words are ordinary names everywhere except in one position:
   column of a `sql table` (see [sql.md](../sql/));
 - CLI clause words at the start of a clause inside `cli { … }`: `description`,
   `flag`, `arg`, `subcommand`, `handle`;
-- `and` between the bindings of a `do` group, `x <- a and y <- b`.
+- `and` between the bindings of a `do` group, `x <- a and y <- b`;
+- `component` before the name of a top-level declaration, and `setup` and
+  `render` at the start of its sections (see [ui.md](../ui/#components)).
 
 ### Number literals
 
@@ -222,11 +224,12 @@ item        = name | Con | Con "(..)" | ".."
 ModulePath  = Con { "." Con }
 
 decl        = signature | let | rec_group | type_decl | kind_decl | error_decl
-            | service | class | instance | foreign | sql_table
+            | service | class | instance | foreign | sql_table | component
 signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
             | "let" "assert" pattern [":" type] "=" block ["as" String]
 rec_group   = "rec" "{" { signature | let } "}"
+component   = "component" name atom_pattern "=" ["setup" block] "render" block
 type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
             | ["opaque"] "type" "alias" Con { param } "=" type [deriving]
             | "refined" "type" Con { param } "=" type "where" expr [deriving]

@@ -1,0 +1,27 @@
+// `component` without `setup` is a view of its props: one renders inside
+// another with `Ui.render`, and both read atoms as views do.
+module App.Main exposing (main)
+
+greeting : Atom.Writable String
+let greeting = Atom.make "Hello"
+
+type alias Person = { name : String; tags : List String }
+
+component salutation (name : String) =
+  render ui { paragraph [text (Atom.value greeting ++ ", " ++ name ++ "!")] }
+
+component card (person : Person) =
+  render
+    ui {
+      div
+        { class_name = "card" }
+        [
+          Ui.render salutation person.name,
+          list (List.map (fun t -> ui { item [text t] }) person.tags),
+        ]
+    }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line
+    (Ui.Server.to_html (Ui.render card { name = "Ada"; tags = ["math", "engines"] }))

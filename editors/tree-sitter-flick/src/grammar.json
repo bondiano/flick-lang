@@ -23,6 +23,14 @@
         },
         {
           "type": "SYMBOL",
+          "name": "_component"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_section"
+        },
+        {
+          "type": "SYMBOL",
           "name": "parens"
         },
         {
@@ -396,6 +404,56 @@
               "type": "BLANK"
             }
           ]
+        }
+      ]
+    },
+    "_component": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "component"
+          },
+          "named": true,
+          "value": "keyword"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "identifier"
+        }
+      ]
+    },
+    "_section": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "="
+          },
+          "named": true,
+          "value": "operator"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "setup"
+              },
+              {
+                "type": "STRING",
+                "value": "render"
+              }
+            ]
+          },
+          "named": true,
+          "value": "keyword"
         }
       ]
     },

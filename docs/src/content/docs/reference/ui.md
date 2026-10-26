@@ -169,6 +169,28 @@ local to a sibling list and must be unique there. Reordering preserves both
 the React subtree and the event policy state of that key; it must not start
 another task for a busy `exhaust` handler.
 
+### Components
+
+`component name (props : P) = render e` declares a view of its props: it
+is `let name = Ui.view (fun (props : P) -> e)`, with the type `Ui.View P`,
+and `Ui.render name props` places it. The props are one pattern, usually a
+record with its type. The render goes on the line of `=` or on a line of
+its own:
+
+```flick
+component badge (props : { label : String }) = render ui { text props.label }
+
+component card (person : { name : String; label : String }) =
+  render
+    ui { div { class_name = "card" } [text person.name, Ui.render badge { label = person.label }] }
+```
+
+A `setup` section before `render` will hold the state of each mounted
+instance; until its types arrive it is `FLICK-S002`, and its state lives in
+top-level atoms. A `render` before `setup`, a second section of a kind or a
+missing `render` is `FLICK-S014`. The words `component`, `setup` and
+`render` stay names everywhere else, as in `Ui.render`.
+
 ## Tasks in views
 
 `Atom.task t` is an atom of the result of the task `t`, run by the registry

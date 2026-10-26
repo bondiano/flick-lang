@@ -1,6 +1,6 @@
 //! Module header, imports and declarations.
 
-use super::{Ctx, K, Parser, expr, pattern, types};
+use super::{Ctx, K, Parser, Sep, expr, pattern, types};
 use crate::diagnostics::codes;
 use crate::syntax::kind::FOREIGN_MODES;
 
@@ -22,6 +22,8 @@ fn top_decl(p: &mut Parser) {
         K::InstanceKw => instance_decl(p),
         K::ForeignKw => foreign_decl(p),
         K::SqlKw if p.nth(1) == K::Ident => sql_table(p),
+        // `component name`: the word is a name everywhere else
+        K::Ident if p.at_word("component") && p.nth(1) == K::Ident => component_decl(p),
         _ => member(p),
     }
 }
@@ -126,6 +128,82 @@ pub(super) fn signature(p: &mut Parser) {
     p.bump();
     types::type_(p);
     p.complete(m, K::Signature);
+}
+
+/// `component name (props : P) = [setup block] render block`: a `LetDecl`
+/// whose body is one `ComponentExpr`. The sections go on the line of `=`
+/// or on lines of their own at one column.
+fn component_decl(p: &mut Parser) {
+    let m = p.start();
+    p.bump_as(K::ComponentKw);
+    let name = p.start();
+    p.expect(K::Ident);
+    p.complete(name, K::VarPat);
+    let body = p.start();
+    let component = p.start();
+    if pattern::at_atom_start(p) {
+        pattern::atom_pattern(p);
+    } else {
+        p.error_expected("the props of the component, `(props : P)`");
+    }
+    if p.expect(K::Eq) {
+        let aligned = p.raw().line_start && p.sep().is_none();
+        if aligned {
+            p.push_aligned_here();
+        }
+        sections(p, aligned);
+        if aligned {
+            p.pop();
+        }
+    }
+    p.complete(component, K::ComponentExpr);
+    p.complete(body, K::Block);
+    p.complete(m, K::LetDecl);
+}
+
+/// The `setup` and `render` sections of a component, in order; after the
+/// first, each starts a line of its own when they are `aligned`.
+fn sections(p: &mut Parser, aligned: bool) {
+    let (mut setup, mut render) = (false, false);
+    loop {
+        let word = p.raw();
+        let section = word.kind == K::Ident && matches!(p.text_of(word), "setup" | "render");
+        match p.sep() {
+            Some(Sep::Next) if aligned && section => p.sep_taken = Some(p.pos),
+            Some(_) => break,
+            None => {}
+        }
+        let (kind, out_of_order) = if p.at_word("setup") {
+            let message = if render {
+                "`render` must come after `setup`: move `setup` above it"
+            } else {
+                "a component has one `setup` section"
+            };
+            (K::SetupKw, (setup || render).then_some(message))
+        } else if p.at_word("render") {
+            (
+                K::RenderKw,
+                render.then_some("a component has one `render` section"),
+            )
+        } else {
+            break;
+        };
+        if let Some(message) = out_of_order {
+            p.error_at(codes::S014, p.span(word.start, word.end), message.into());
+        }
+        setup |= kind == K::SetupKw;
+        render |= kind == K::RenderKw;
+        p.bump_as(kind);
+        p.body(K::Block, expr::stmt);
+    }
+    if !render {
+        let span = p.here_span();
+        p.error_at(
+            codes::S014,
+            span,
+            "a component ends with its `render` section: `render ui { … }`".into(),
+        );
+    }
 }
 
 /// `let [rec] name params [: T] = body`, `let pattern [: T] = body`, or

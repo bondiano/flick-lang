@@ -83,6 +83,17 @@
           }
         },
         {
+          "match": "^(component)\\s+([a-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.flick" },
+            "2": { "name": "entity.name.function.flick" }
+          }
+        },
+        {
+          "match": "(?:^\\s+|(?<==)\\s*)(setup|render)\\b(?!\\s*[=:])",
+          "captures": { "1": { "name": "keyword.other.flick" } }
+        },
+        {
           "match": "(?<![.\\w])(from)\\s+(global)\\b",
           "captures": {
             "1": { "name": "keyword.other.flick" },

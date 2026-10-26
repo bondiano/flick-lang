@@ -190,6 +190,29 @@ let remove =
 React и состояние политики событий этого ключа. Например, если `exhaust`
 уже выполняет задачу, ещё одна не запускается.
 
+### Компоненты
+
+`component name (props : P) = render e` объявляет представление своих
+props: это `let name = Ui.view (fun (props : P) -> e)` с типом
+`Ui.View P`, и `Ui.render name props` его вставляет. Props — один образец,
+обычно запись со своим типом. Рендер пишется в строке `=` или на своей
+строке:
+
+```flick
+component badge (props : { label : String }) = render ui { text props.label }
+
+component card (person : { name : String; label : String }) =
+  render
+    ui { div { class_name = "card" } [text person.name, Ui.render badge { label = person.label }] }
+```
+
+Секция `setup` перед `render` будет хранить состояние каждого
+смонтированного экземпляра; пока её типов нет, она — `FLICK-S002`,
+а состояние живёт в атомах верхнего уровня. `render` перед `setup`,
+повтор секции или отсутствие `render` — `FLICK-S014`. Слова `component`,
+`setup` и `render` остаются именами во всех других местах, как в
+`Ui.render`.
+
 ## Задачи в представлениях
 
 `Atom.task t` — атом результата задачи `t`. Задачу запускает реестр,

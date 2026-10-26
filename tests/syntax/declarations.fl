@@ -107,3 +107,11 @@ let area shape =
   | Circle _ r -> Number.pi * r ** 2
   | Rect { origin = _; size } -> size.x * size.y
   | Empty -> 0
+
+component badge (props : { label : String }) = render ui { text props.label }
+
+component counter (props : { start : Number }) =
+  setup
+    let count = Atom.local props.start
+  render
+    ui { text (show (Atom.get count)) }

@@ -1,0 +1,10 @@
+module App.ComponentSetup exposing (..)
+
+// The state of a component's own instance waits for `Setup s`.
+component counter (start : Number) =
+  setup
+    ignore start
+  render
+    ui { text (show start) }
+
+//~ FLICK-S002 @5:3-5:8 a component's `setup` is not supported yet: keep its state in top-level atoms

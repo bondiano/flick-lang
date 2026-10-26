@@ -126,7 +126,7 @@ impl Walker<'_> {
                 self.release(mark);
                 return;
             }
-            K::FunExpr | K::MatchArm => self.bind_patterns(node),
+            K::FunExpr | K::ComponentExpr | K::MatchArm => self.bind_patterns(node),
             K::ScopeExpr => {
                 let name = node.child_tokens().find(|t| t.kind == K::Ident);
                 self.locals.extend(name.map(|t| Local {

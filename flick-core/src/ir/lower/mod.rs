@@ -9,6 +9,7 @@ mod comprehension;
 mod debug;
 mod do_notation;
 mod expr;
+mod lambda;
 mod pattern;
 mod question;
 mod ranges;

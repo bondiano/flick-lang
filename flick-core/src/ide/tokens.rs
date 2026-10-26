@@ -94,6 +94,7 @@ impl Ide<'_> {
         }
         binders(&m.tree, &mut out);
         foreign_modes(&m.tree, text, &mut out);
+        contextual_keywords(&m.tree, &mut out);
         out.sort_unstable();
         out.dedup_by_key(|t| t.0);
         out
@@ -173,6 +174,19 @@ fn foreign_modes(tree: &Node, text: &str, out: &mut Vec<(u32, u32, u32)>) {
         if let Some(t) = global {
             out.push((t.start, t.end, KEYWORD));
         }
+    }
+}
+
+/// Words the parser made keywords where they stand: `and` of a `do` group,
+/// `component`, `setup` and `render`.
+fn contextual_keywords(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
+    for t in node.child_tokens() {
+        if matches!(t.kind, K::AndKw | K::ComponentKw | K::SetupKw | K::RenderKw) {
+            out.push((t.start, t.end, KEYWORD));
+        }
+    }
+    for child in node.nodes() {
+        contextual_keywords(child, out);
     }
 }
 

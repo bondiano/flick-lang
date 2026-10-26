@@ -191,3 +191,29 @@ Ranges
   (number)
   (operator)
   (number))
+
+==================
+Components
+==================
+
+component badge (p : P) = render text p
+let render = Ui.render
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (parens
+    (identifier)
+    (operator)
+    (constructor))
+  (operator)
+  (keyword)
+  (identifier)
+  (identifier)
+  (keyword)
+  (identifier)
+  (operator)
+  (constructor)
+  (member))

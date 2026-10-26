@@ -83,7 +83,7 @@ pub fn in_scope(root: &Node, offset: u32, text: &str) -> Vec<(String, (u32, u32)
                     out.extend(let_binders(clause, text));
                 }
             }
-            K::FunExpr | K::MatchArm => {
+            K::FunExpr | K::ComponentExpr | K::MatchArm => {
                 for p in scope.nodes().filter(|n| is_pattern(n.kind)).filter(before) {
                     binders(p, &mut out, text);
                 }

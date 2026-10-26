@@ -4,8 +4,8 @@ title: "Keywords"
 
 Every reserved word of Flick, what it introduces and where it is described in
 full. A keyword cannot be used as a name. The words that are keywords only in
-one position (`alias`, `unboxed`, the foreign modes, the SQL and CLI clause
-words) are listed in [grammar.md](../grammar/#keywords).
+one position (`alias`, `unboxed`, `component`, `setup`, `render`, the
+foreign modes, the SQL and CLI clause words) are listed in [grammar.md](../grammar/#keywords).
 
 ## Modules
 

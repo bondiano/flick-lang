@@ -20,6 +20,7 @@ mod calls;
 mod classes;
 pub mod cli;
 mod codecs;
+mod component;
 mod comprehension;
 mod convert;
 mod debug;

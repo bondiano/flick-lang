@@ -161,7 +161,7 @@ component search (props : SearchProps) =
 
 **C7. Компоненты: ключевые слова `component` / `setup` / `render` (§6.1).** ⬜
 - **C7a. 🆕 Разбор ReScript.** ✅ [rescript-components.md](rescript-components.md): props — одна явная запись (как `@react.componentWithProps`), `key` — метаданные узла, метка на итоговом объекте React, адаптер = хост-примитивы + монтирование с проверяемым интерфейсом; не переносим props из аргументов, `make`/модуль на компонент, выбор рендерера в конфиге, `forwardRef`. AC: записка `docs/research/rescript-components.md` с цитатами: `@react.component` и генерация типа props, `@react.componentWithProps`, generic JSX transform (`"jsx": {"module": …}` — свой JSX-модуль вместо React), `React.memo`/`memoCustomCompareProps`, как это сказывается на выходном JS и ошибках; вывод — что переносим в Flick (кастомизация рендерера/адаптера, props-тип, memo) и что нет.
-- **C7b. Синтаксис.** AC: парсер/AST/`lower` для `component name (props : P) = setup … render …` (setup необязателен); `flick fmt` идемпотентен на фикстурах; tree-sitter-грамматика в `editors/` и семантические токены LSP знают ключевые слова; ошибки разбора по-человечески («`render` должен идти после `setup`»).
+- **C7b. Синтаксис.** ✅ (контекстные `component`/`setup`/`render`: `LetDecl` с телом `ComponentExpr`, без `setup` — `Ui.view (fun props -> render)` с меткой C6; `setup` разбирается и форматируется, проверка — `FLICK-S002` до C7c; порядок секций — `FLICK-S014`; tree-sitter: `component` и секция после `=`, остальное — токены LSP) AC: парсер/AST/`lower` для `component name (props : P) = setup … render …` (setup необязателен); `flick fmt` идемпотентен на фикстурах; tree-sitter-грамматика в `editors/` и семантические токены LSP знают ключевые слова; ошибки разбора по-человечески («`render` должен идти после `setup`»).
 - **C7c. Типы.** AC: `component` desugar'ится в `forall s. p ->{Setup s | r; e} (p ->{Atom.Read} Ui)^{s}` по образцу `Layer.from_build` (`Layer.fl:188`); setup не может быть условным по построению; `Atom.local` и `Action.*` разрешены в setup; hover LSP показывает тип экземпляра и регион.
 - **C7d. Рантайм.** AC: setup выполняется ровно один раз на смонтированный экземпляр, в т.ч. под StrictMode (тест в `runtime/test`), повторный mount не утекает fiber'ами; action экземпляра прерываются и ожидаются при unmount (перенесено из U1/U2); компонент получает метку C6.
 - AC (всё C7): `Ui.view` либо выражается через `component` без setup, либо удаляется; плейграунд использует `component` хотя бы для одного виджета с локальным состоянием; `reference/ui.md` (en + ru).
@@ -391,7 +391,7 @@ D1 ✅ ─ D2 ─ D3 ─ D4 ─ D5 ─ D6 ─ D9 ─ D11 ─ D10 ─ D13 ─ D12
 3. «SSR» — 🔶: R1–R4, R6, U7 ✅; осталось R5, U9.
 4. «Fullstack» — ⬜: S2, F1–F3, O1–O3.
 
-Ближайшее: закоммитить R5 (с правилом §6.3), C6b, U7b, U9, B7b; затем C7a → C7b.
+Ближайшее: C7c (типы `Setup s`, имена `setup` видны в `render`) → C7d; затем C8, U10, C5.
 
 ## 5. Риски
 

@@ -30,6 +30,8 @@ module.exports = grammar({
     _token: $ => choice(
       $._foreign,
       $._from,
+      $._component,
+      $._section,
       $.parens,
       $.brackets,
       $.braces,
@@ -57,6 +59,11 @@ module.exports = grammar({
       optional(alias(choice('pure', 'sync', 'async', 'effect', 'blocked'), $.keyword)),
     ),
     _from: $ => seq(alias('from', $.keyword), optional(alias('global', $.keyword))),
+    // `component name` declares a component; elsewhere the words are names.
+    // shortcut: `setup`/`render` are keywords only right after `=`, so a
+    // `render` after a `setup` block is left to the language server's tokens
+    _component: $ => seq(alias('component', $.keyword), $.identifier),
+    _section: $ => seq(alias('=', $.operator), alias(choice('setup', 'render'), $.keyword)),
     boolean: _ => choice('true', 'false'),
     operator: _ => choice(...OPERATORS),
 
