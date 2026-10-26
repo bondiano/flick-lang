@@ -472,7 +472,7 @@ NotFound без with_errors принимается и становится 500 �
 
 D15 [фиксирует ограничение](../src/content/docs/contributing/implementation-decisions.md#L54-L76): пользовательские Applicative/Monad и трансформеры невыразимы из-за captures type variables/constructor fields. MonadError Result/Option и 23 property-определения — не полный MTL.
 
-**Q11. P1 — Нет instance lifetime**
+**Q11. P1 — Нет instance lifetime** ✅ (экземпляр — C7d: setup один раз, action экземпляра прерываются при unmount; `Action.with` — своё состояние политики на элемент, сохраняется при перестановке с ключами; задачи обработчика элемента по-прежнему принадлежат корню, чтобы сохранение пережило закрытый диалог; watch — C8)
 [Action.with](../../runtime/src/ui/react/policies.ts#L56-L65) делит policy между аргументами; unmount не закрывает root-owned задачи. Нужны instance actions/watch и interrupt-and-wait: изоляция редакторов, drafts при reorder, StrictMode без утечек. C7/C5/C8 → U10.
 
 **Q12. P1 — Раздельные HTTP-контуры и auth**

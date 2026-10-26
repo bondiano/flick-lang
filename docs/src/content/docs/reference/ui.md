@@ -256,8 +256,9 @@ let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 
 ```
 
 `Action.with action arg` gives an action its argument as data: each element
-of a list passes its item, `on_click = Action.with remove item`, and they all
-share the policy state of `remove`. A handler made from a `fun` inside a
+of a list passes its item, `on_click = Action.with remove item`, and each
+element has a policy state of its own, kept when a keyed list reorders: an
+`exhaust` save of one item does not ignore the save of another. A handler made from a `fun` inside a
 view's render is a new closure on every render; it works, but
 `FLICK-U002` warns about it.
 

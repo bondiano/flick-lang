@@ -113,7 +113,7 @@ test("a latest action interrupts its task started from another element", async (
   await stop();
 });
 
-test("`Action.with` passes its data and shares the policy of its action", async () => {
+test("`Action.with` passes its data and gives each element a policy state of its own", async () => {
   const seen: Array<unknown> = [];
   const log: Array<string> = [];
   const tasks = gated(log);
@@ -125,12 +125,8 @@ test("`Action.with` passes its data and shares the policy of its action", async 
   await tick();
   click(1);
   click(0);
+  click(1);
   await tick();
-  assert.deepEqual(seen, ["b"], "the second button waits for the shared exhaust policy");
-  tasks.release();
-  await tick();
-  click(0);
-  await tick();
-  assert.deepEqual(seen, ["b", "a"]);
+  assert.deepEqual(seen, ["b", "a"], "each button's exhaust policy ignores only its own second click");
   await stop();
 });

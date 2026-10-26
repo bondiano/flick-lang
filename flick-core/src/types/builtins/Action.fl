@@ -34,7 +34,9 @@ foreign pure concurrent from "@flick-lang/runtime/ui/react" "actionConcurrent"
 
 /// `action` with `arg` paired with each snapshot: data, not a closure, so
 /// a view gives each element its argument without making a handler per
-/// render. It shares the policy state of `action`.
+/// render. Each element that uses it has a policy state of its own, kept
+/// when a keyed list reorders: the editor of one item does not wait for
+/// another's.
 with : forall c a s. (Action (a, s))^c -> a -> (Action s)^c
 foreign pure with from "@flick-lang/runtime/ui/react" "actionWith"
   retention call
