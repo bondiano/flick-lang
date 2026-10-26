@@ -25,8 +25,13 @@ let both =
     pure (x + y)
   }
 
+// Nested binds are one `do`.
+chained : Option Number -> Option Number -> Option Number
+let chained a b = Option.bind (fun x -> Option.bind (fun y -> Some (x + y)) b) a
+
 //~ FLICK-T030 @5:21-5:27 binding a value only to return it: the bound computation is the same
 //~ FLICK-T031 @9:20-9:73 this sequence never ends, so `Seq.to_list` never returns: take a part
 //~ FLICK-T032 @13:17-13:58 `Seq.to_list` of a `for`: `[for …]` builds the list without a generato
 //~ FLICK-T033 @17:16-17:80 `List.filter` then `List.map` walk the list twice: `[for …]` does both
 //~ FLICK-T029 @22:3-22:5 `do` over `Eff`: a `task` with direct calls builds the same computatio
+//~ FLICK-T035 @30:19-30:81 a chain of `flat_map`: `do` binds each value in turn

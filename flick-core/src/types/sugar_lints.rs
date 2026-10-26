@@ -3,7 +3,10 @@
 //! `x <- e; pure x` (`e`), T031 a whole infinite `Seq`, T032
 //! `Seq.to_list` of a `for` (`[for …]`) and T033 `List.filter` piped into
 //! `List.map` (`[for …]`), T034 a `match` that fails with the error of a
-//! `Result` (`?`). They run once the module is solved.
+//! `Result` (`?`), T035 a chain of `flat_map` (`do`, in [`chains`]). They
+//! run once the module is solved.
+
+mod chains;
 
 use super::Checker;
 use super::ty::Type;
@@ -34,6 +37,7 @@ impl Checker<'_> {
             K::DoExpr => {
                 self.do_over_eff(node);
                 self.returned_binding(node);
+                self.bind_before(node);
             }
             K::AppExpr => {
                 let children: Vec<&Node> = node.nodes().collect();
@@ -51,8 +55,17 @@ impl Checker<'_> {
             }
             _ => {}
         }
+        let bare = matches!(node.kind, K::Block | K::LetDecl | K::ParenExpr);
         for child in node.nodes() {
-            self.sugar_lints(child);
+            self.lint_child(child, bare);
+        }
+    }
+
+    /// The lints of `child`, a chain of `flat_map` first.
+    fn lint_child(&mut self, child: &Node, bare: bool) {
+        match self.bind_chain(child, bare) {
+            Some(parts) => parts.into_iter().for_each(|p| self.lint_child(p, true)),
+            None => self.sugar_lints(child),
         }
     }
 

@@ -161,6 +161,7 @@ codes! {
     T032 = Types 32, "`Seq.to_list` of a `for`, which `[for …]` builds";
     T033 = Types 33, "`List.filter` then `List.map`, which `[for …]` says";
     T034 = Types 34, "a `match` that fails with the error of a `Result`, which `?` says";
+    T035 = Types 35, "a chain of `flat_map`, which `do` says";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";
