@@ -1,0 +1,150 @@
+// The laws of the Prelude's classes as properties over random values and
+// functions, for the built-in instances, `Seq`, the wrappers of `Monoids`
+// and `Validation`; and the sugar against the code it stands for.
+module Mtl.LawsTest exposing (tests)
+
+import Monoids exposing (Sum(..), Product(..), First(..), Last(..))
+import Validation exposing (Validation)
+import Mtl.Calc exposing (Expr(..), eval)
+
+ints : Gen.Gen Number
+let ints = Gen.int (0 - 50) 50
+
+lists : Gen.Gen (List Number)
+let lists = Gen.list 6 ints
+
+options : Gen.Gen (Option Number)
+let options = Gen.map (fun (some, x) -> if some then Some x else None) (Gen.pair Gen.bool ints)
+
+results : Gen.Gen (Result String Number)
+let results =
+  Gen.map (fun (ok, x) -> if ok then Ok x else Err ("e" ++ show x)) (Gen.pair Gen.bool ints)
+
+/// A function into `Option`, the same result for the same argument.
+to_options : Gen.Gen (Number -> Option Number)
+let to_options = Gen.function options
+
+to_lists : Gen.Gen (Number -> List Number)
+let to_lists = Gen.function (Gen.list 3 ints)
+
+to_results : Gen.Gen (Number -> Result String Number)
+let to_results = Gen.function results
+
+triple : Gen.Gen a -> Gen.Gen b -> Gen.Gen c -> Gen.Gen (a, b, c)
+let triple ga gb gc = Gen.map (fun ((a, b), c) -> (a, b, c)) (Gen.pair (Gen.pair ga gb) gc)
+
+functor_laws : List Test.Test
+let functor_laws =
+  [
+    Test.property "map id is id (Option)" options (fun o -> Test.equal o (map (fun x -> x) o)),
+    Test.property "map id is id (List)" lists (fun xs -> Test.equal xs (map (fun x -> x) xs)),
+    Test.property "map composes (Result)" results (fun r ->
+      Test.equal (map (fun x -> (x + 1) * 2) r) (map (fun x -> x * 2) (map (fun x -> x + 1) r))),
+  ]
+
+monad_laws : List Test.Test
+let monad_laws =
+  [
+    Test.property "left identity (Option)" (Gen.pair ints to_options) (fun (x, f) ->
+      Test.equal (f x) (flat_map f (pure x))),
+    Test.property
+      "right identity (List)"
+      lists
+      (fun xs -> Test.equal xs (flat_map (fun x -> pure x) xs)),
+    Test.property "associativity (List)" (triple lists to_lists to_lists) (fun (xs, f, g) ->
+      Test.equal (flat_map g (flat_map f xs)) (flat_map (fun x -> flat_map g (f x)) xs)),
+    Test.property "associativity (Result)" (triple results to_results to_results) (fun (r, f, g) ->
+      Test.equal (flat_map g (flat_map f r)) (flat_map (fun x -> flat_map g (f x)) r)),
+    Test.property "associativity (Seq)" (triple lists to_lists to_lists) (fun (xs, f, g) ->
+      let s = Seq.of_list xs
+      f2 : Number -> Seq Number
+      let f2 x = Seq.of_list (f x)
+      g2 : Number -> Seq Number
+      let g2 x = Seq.of_list (g x)
+      Test.equal
+        (Seq.to_list (flat_map g2 (flat_map f2 s)))
+        (Seq.to_list (flat_map (fun x -> flat_map g2 (f2 x)) s))),
+    Test.property "map2 is flat_map then map (Option)" (Gen.pair options options) (fun (a, b) ->
+      Test.equal (map2 (fun x y -> x - y) a b) (flat_map (fun x -> map (fun y -> x - y) b) a)),
+  ]
+
+monoid_laws : List Test.Test
+let monoid_laws =
+  [
+    Test.property "combine is associative (Sum)" (triple ints ints ints) (fun (a, b, c) ->
+      Test.equal
+        (combine (Sum a) (combine (Sum b) (Sum c)))
+        (combine (combine (Sum a) (Sum b)) (Sum c))),
+    Test.property "empty is neutral (Product)" ints (fun a ->
+      Test.all
+        [
+          Test.equal (Product a) (combine empty (Product a)),
+          Test.equal (Product a) (combine (Product a) empty),
+        ]),
+    Test.property
+      "combine is associative (First)"
+      (triple options options options)
+      (fun (a, b, c) ->
+      Test.equal
+        (combine (First a) (combine (First b) (First c)))
+        (combine (combine (First a) (First b)) (First c))),
+    Test.property "empty is neutral (Last)" options (fun a ->
+      Test.all
+        [
+          Test.equal (Last a) (combine empty (Last a)),
+          Test.equal (Last a) (combine (Last a) empty),
+        ]),
+    Test.property "combine is associative (List)" (triple lists lists lists) (fun (a, b, c) ->
+      Test.equal (combine a (combine b c)) (combine (combine a b) c)),
+    Test.property "fold_map Sum is the sum" lists (fun xs ->
+      Test.equal (Sum (List.sum xs)) (fold_map Sum xs)),
+  ]
+
+validated : Number -> Validation (List String) Number
+let validated n = if n < 0 then Validation.invalid [show n] else Validation.valid n
+
+sugar : List Test.Test
+let sugar =
+  [
+    Test.property "do is flat_map" (Gen.pair options to_options) (fun (o, f) ->
+      Test.equal
+        (flat_map (fun x -> map (fun y -> x + y) (f x)) o)
+        (do { x <- o; y <- f x; pure (x + y) })),
+    Test.property "an and group is map2" (Gen.pair options options) (fun (a, b) ->
+      Test.equal (map2 (fun x y -> x * y) a b) (do { x <- a and y <- b; pure (x * y) })),
+    Test.property "a Validation group collects every error" (Gen.pair ints ints) (fun (a, b) ->
+      let errors = List.filter (fun n -> n < 0) [a, b]
+      let expected = if List.is_empty errors then Ok (a + b) else Err (List.map show errors)
+      Test.equal
+        expected
+        (Validation.to_result (do { x <- validated a and y <- validated b; pure (x + y) }))),
+    Test.property "[for] is filter then map" lists (fun xs ->
+      Test.equal
+        (List.map (fun x -> x * 3) (List.filter (fun x -> x > 0) xs))
+        [for x <- xs if x > 0 yield x * 3]),
+    Test.property "a fused chain is the chain" lists (fun xs ->
+      let chained =
+        Seq.to_list (Seq.map (fun x -> x + 1) (Seq.filter (fun x -> x % 2 == 0) (Seq.of_list xs)))
+      Test.equal
+        chained
+        (Seq.to_list
+          (Seq.map (fun x -> x + 1) (Seq.filter (fun x -> x % 2 == 0) (for { x <- xs } yield x))))),
+    Test.property "a..<b is Seq.range" (Gen.pair ints ints) (fun (a, b) ->
+      Test.equal (Seq.to_list (Seq.range a b)) [a..<b]),
+    Test.property "a sequence iterates again the same" (Gen.pair ints (Gen.int 0 5)) (fun (k, n) ->
+      let s = Seq.take n (k..)
+      Test.all
+        [Test.equal (Seq.to_list s) (Seq.to_list s), Test.equal (Seq.to_list s) [k..<k + n]]),
+    Test.property "eval in Result fails on a zero divisor" (Gen.pair ints ints) (fun (a, b) ->
+      let expected = if b == 0 then Err ("division of " ++ show a ++ " by zero") else Ok (a / b)
+      Test.equal expected (eval (Div (Num a) (Num b)))),
+  ]
+
+tests : List Test.Test
+let tests =
+  [
+    Test.group "Functor" functor_laws,
+    Test.group "Monad" monad_laws,
+    Test.group "Monoid" monoid_laws,
+    Test.group "sugar" sugar,
+  ]

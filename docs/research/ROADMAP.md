@@ -365,7 +365,7 @@ component search (props : SearchProps) =
 **D14. Fusion.** ✅ (`tools/fusion-bench`: `for` + `filter` + `map` в список — 177 → 10 мкс на 1000 элементов, ×17; `for` с Sync-телом не сливается)
 - AC: проход `opt/fuse.rs` (release) сливает `Seq.map/filter/flat_map/take/to_list` и `List.map/filter` над `For` в тот же цикл, `For` над `For` — во вложенные клаузы; комбинаторы распознаются по foreign-биндингу; сливаются только чистые функции; debug и release дают одинаковый вывод; бенчмарк в `tools/`.
 
-**D15. MTL и законы.** ⬜
+**D15. MTL и законы.** 🔶 (`examples/mtl`: `MonadError` с FD над `Result`/`Option`, калькулятор на `do`, 23 property-теста законов и сахара, `Gen.function`; трансформеры невыразимы — проверка захватов, см. `implementation-decisions.md` «Экземпляры пользовательских типов»)
 - AC: `examples/mtl/`: `Identity`, `StateT`, `ReaderT`, `WriterT`, `ExceptT`, `MonadState`/`MonadReader`/`MonadWriter`/`MonadError` с FD, `MonadTrans`; программа на `do` поверх `Identity` и `Eff`; невыразимое записано в `implementation-decisions.md`.
 - AC: property-тесты (`Test.property`) законов `Functor`/`Applicative`/`Monad`/`Semigroup`/`Monoid` для инстансов прелюдии, `Seq`, обёрток и трансформеров; эквивалентность сахара и ручных цепочек, fused и не-fused.
 

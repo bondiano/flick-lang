@@ -136,7 +136,7 @@ let tests =
 | - | - |
 | `Test.test name check` | pure: `check ()` is an `Assertion` |
 | `Test.effect_test name task` | the task runs in a scope of its own, which owns what it acquires; `Test.expect` fails it on an assertion |
-| `Test.property name gen check` | `check` on 100 values of `gen`, drawn from the run's seed |
+| `Test.property name gen check` | `check` on 100 values of `gen`, drawn from the run's seed; `Gen.function result` (for a `Hash` argument) draws pure functions, as a law over functions needs |
 | `Test.group name tests` | `name >` before the names of `tests` |
 
 `flick test` builds the project with its test root into `.flick/test/` and

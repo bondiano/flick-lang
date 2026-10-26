@@ -50,3 +50,27 @@ open. The decisions below are taken and described in the reference.
 | CLI eDSL | See [CLI eDSL](../../spec/10-type-programming-and-edsl/#cli-edsl-flags-arguments-and-subcommands). A block `cli "name" { … }` with the clauses `description`, `flag`, `arg`, `subcommand` and `handle`; it elaborates into the library functions `Cli.*` over `effect/cli`, which are usable directly (see [CLI eDSL](../../reference/cli-dsl/) and the [grammar](../../reference/grammar/#expressions)) |
 | Class methods | A method is declared by a plain signature `name : T` (there is no `val` keyword; the old form is `FLICK-S010`). A default method is its signature with a `let name … =` right below it in the class body; an instance may leave it out. A signature without a `let` is an abstract method, which an instance must define (`FLICK-C011` otherwise; see [Instances](../../reference/classes/#instances)) |
 | Packages with Flick modules | A package declares `"flick": { "iface-dir": "<dir>" }` in its `package.json`; module `A.B` is described by `<dir>/A/B.iface`. `flick build` writes the files and `flick pack` the field, not the user. Installation is pnpm only (`flick install`/`add`); Flick reads the installed tree of the project's direct dependencies (see [Packages](../../reference/project/#packages) and [Location in a package](../../reference/iface/#location-in-a-package)) |
+
+## Instances of user types
+
+Found writing the MTL example (`examples/mtl`, roadmap D15). A program can
+declare classes with functional dependencies over the built-in monads
+(`MonadError e m | m -> e` for `Result e` and `Option`) and write `do`
+programs over them, but it cannot yet give its own types instances of
+`Applicative` or `Monad`, so the transformers `Identity`, `StateT`,
+`ReaderT`, `WriterT` and `ExceptT` are not expressible. The capture checker
+rejects them for two reasons:
+
+- the stage of `map2` after its first container holds that container, and
+  a value of `(f a)^d` holds `d` and the captures of its elements `a`; the
+  signature allows `c + d`, and a capture row cannot name a type variable
+  (`^(c + d + a)` is `FLICK-T002`), so a curried `map2` written in Flick is
+  `FLICK-G001`. The built-in instances call foreign functions instead;
+- a constructor's fields carry no captures, so a type such as
+  `StateT (s -> m (a, s))` cannot hold the closure its `map` or
+  `flat_map` builds over `f`.
+
+Both need the type system to change: capture rows over the captures of a
+type variable, or types with a capture parameter. Until then the laws of
+the built-in instances and the sugar are checked as property tests in
+`examples/mtl/test`, with `Gen.function` for random pure functions.

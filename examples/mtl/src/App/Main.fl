@@ -1,0 +1,17 @@
+module App.Main exposing (main)
+
+import Mtl.Calc exposing (Expr(..), eval, eval_or)
+
+shown : Result String Number -> String
+let shown result =
+  match result with
+  | Ok n -> "= " ++ show n
+  | Err message -> "error: " ++ message
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let good = Add (Num 1) (Div (Num 10) (Num 4))
+  let bad = Add (Num 1) (Div (Num 10) (Neg (Num 0)))
+  Platform.stdout_line (shown (eval good))
+  Platform.stdout_line (shown (eval bad))
+  Platform.stdout_line (shown (eval_or 0 bad))

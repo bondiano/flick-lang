@@ -4,7 +4,7 @@
 import { Cause, Effect, Exit, Fiber } from "effect";
 
 import { describeCause } from "../cause.ts";
-import type { Tagged } from "../data.ts";
+import type { HashDict, Tagged } from "../data.ts";
 import { item } from "../internal.ts";
 import { ownedExits } from "../owner.ts";
 import { tag } from "../tags.ts";
@@ -57,6 +57,17 @@ export const genMap =
   <A, B>(f: (a: A) => B, gen: Gen<A>): Gen<B> =>
   (rng) =>
     f(gen(rng));
+
+/**
+ * `Gen.function`: a pure function whose result for an argument is drawn
+ * from `gen` with a seed of the argument's hash, the same each call.
+ */
+export const genFunction =
+  <A, B>(dHash: HashDict<A>, gen: Gen<B>): Gen<(a: A) => B> =>
+  (rng) => {
+    const seed = Math.floor(rng() * 2 ** 32);
+    return (a) => gen(random(seed ^ dHash.hash(a)));
+  };
 
 /** mulberry32: a small seeded generator, enough for test data. */
 const random = (seed: number): Rng => {
