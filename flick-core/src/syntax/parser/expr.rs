@@ -212,16 +212,23 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
     }
 }
 
-/// An atom followed by `.field` accesses written without spaces.
+/// An atom followed by `.field` accesses and `?`, written without spaces.
 pub(super) fn postfix(p: &mut Parser) -> Option<Done> {
     let mut lhs = atom(p)?;
-    while p.at(K::Dot) && p.adjacent() {
-        let m = p.precede(lhs);
-        p.bump();
-        p.expect(K::Ident);
-        lhs = p.complete(m, K::FieldExpr);
+    loop {
+        if p.at(K::Dot) && p.adjacent() {
+            let m = p.precede(lhs);
+            p.bump();
+            p.expect(K::Ident);
+            lhs = p.complete(m, K::FieldExpr);
+        } else if p.at(K::Question) && p.adjacent() {
+            let m = p.precede(lhs);
+            p.bump();
+            lhs = p.complete(m, K::QuestionExpr);
+        } else {
+            return Some(lhs);
+        }
     }
-    Some(lhs)
 }
 
 /// Whether `.Name` or `.name` directly continues a qualified path.

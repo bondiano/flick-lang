@@ -2,7 +2,8 @@
 //! each with its rewrite: FLICK-T029 `do` over `Eff` (a `task`), T030
 //! `x <- e; pure x` (`e`), T031 a whole infinite `Seq`, T032
 //! `Seq.to_list` of a `for` (`[for …]`) and T033 `List.filter` piped into
-//! `List.map` (`[for …]`). They run once the module is solved.
+//! `List.map` (`[for …]`), T034 a `match` that fails with the error of a
+//! `Result` (`?`). They run once the module is solved.
 
 use super::Checker;
 use super::ty::Type;
@@ -40,6 +41,7 @@ impl Checker<'_> {
                     self.forced(node, head, last);
                 }
             }
+            K::MatchExpr => self.rethrowing_match(node),
             K::BinExpr if node.has_token(K::PipeGt) => {
                 let children: Vec<&Node> = node.nodes().collect();
                 if let [lhs, rhs] = children[..] {
@@ -228,6 +230,76 @@ impl Checker<'_> {
             .push(warning.with_fix("write it as `[for …]`", vec![self.edit(start, end, &list)]));
     }
 
+    /// T034: `match r with | Ok x -> x | Err e -> from_result (Err e)` is `r?`.
+    fn rethrowing_match(&mut self, node: &Node) {
+        let mut parts = node.nodes();
+        let Some(scrutinee) = parts.next() else {
+            return;
+        };
+        let arms: Vec<_> = parts
+            .filter(|n| n.kind == K::MatchArm)
+            .map(|arm| self.arm_parts(arm))
+            .collect();
+        let [Some(first), Some(second)] = &arms[..] else {
+            return;
+        };
+        let ((("Ok", x, value), ("Err", e, failure)) | (("Err", e, failure), ("Ok", x, value))) =
+            (first, second)
+        else {
+            return;
+        };
+        if self.source_of(value).trim() != x || !self.rethrows(failure, e) {
+            return;
+        }
+        let source = self.source_of(scrutinee).trim();
+        let operand = match unparen(scrutinee).kind {
+            K::NameExpr | K::FieldExpr | K::QuestionExpr | K::ParenExpr => source.to_owned(),
+            _ => format!("({source})"),
+        };
+        let (start, end) = node.range();
+        let warning = Diagnostic::new(
+            codes::T034,
+            Severity::Warning,
+            "this `match` fails with the error of the `Result`: `?` says the same",
+        )
+        .with_span(self.span(node));
+        self.diagnostics.push(warning.with_safe_fix(
+            "write it with `?`",
+            vec![self.edit(start, end, &format!("{operand}?"))],
+        ));
+    }
+
+    /// The constructor of an arm `| C x -> body` without a guard, its one
+    /// variable and its body.
+    fn arm_parts<'n>(&self, arm: &'n Node) -> Option<(&str, String, &'n Node)> {
+        let mut parts = arm.nodes();
+        let (pattern, body) = (parts.next()?, parts.next()?);
+        if pattern.kind != K::ConPat || body.kind != K::Block {
+            return None;
+        }
+        let con = pattern.child_tokens().find(|t| t.kind == K::Con)?;
+        let vars: Vec<&Node> = pattern.nodes().collect();
+        let statements: Vec<&Node> = body.nodes().collect();
+        let ([var], [value]) = (&vars[..], &statements[..]) else {
+            return None;
+        };
+        (var.kind == K::VarPat).then(|| {
+            let con = &self.text[con.start as usize..con.end as usize];
+            (con, self.source_of(var).trim().to_owned(), unparen(value))
+        })
+    }
+
+    /// Whether `failure` is `from_result (Err e)` of the Prelude.
+    fn rethrows(&self, failure: &Node, e: &str) -> bool {
+        let parts: Vec<&Node> = failure.nodes().collect();
+        let (K::AppExpr, [head, arg]) = (failure.kind, &parts[..]) else {
+            return false;
+        };
+        matches!(self.typing.names.get(&head.range()),
+            Some(Ref::Value { module, name }) if module == "Prelude" && name == "from_result")
+            && words(self.source_of(unparen(arg))) == format!("Err {e}")
+    }
+
     /// The function argument of `List.name f`, as written.
     fn list_call<'n>(&self, node: &'n Node, name: &str) -> Option<&'n Node> {
         let parts: Vec<&Node> = node.nodes().collect();
@@ -303,6 +375,11 @@ fn block_statements(node: &Node) -> impl Iterator<Item = &Node> {
     node.nodes()
         .filter(|n| n.kind == K::Block)
         .flat_map(Node::nodes)
+}
+
+/// `text` with its whitespace runs as single spaces.
+fn words(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn unparen(node: &Node) -> &Node {

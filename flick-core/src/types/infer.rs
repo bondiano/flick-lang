@@ -6,7 +6,6 @@ use std::mem;
 
 use super::Checker;
 use super::convert::is_type;
-use super::effects::{Site, Stage};
 use super::regions::Held;
 use super::ty::Type;
 use crate::diagnostics::codes;
@@ -143,6 +142,7 @@ impl Checker<'_> {
                 ty
             }
             K::FieldExpr => self.field(node, children[0]),
+            K::QuestionExpr => self.question(node, children[0]),
             K::AppExpr => self.apply(children[0], &children[1..]),
             K::BinExpr => self.binary(node, &children),
             K::PrefixExpr => self.prefix(node, &children),
@@ -340,38 +340,21 @@ impl Checker<'_> {
             }
             stages.push((ty, effects));
         }
-        let name = (node.kind == K::LetDecl)
-            .then(|| super::bindings::let_parts(node, self.text).name)
-            .flatten();
         let inferred = last.is_none();
-        let stage = match last {
-            Some(None) => Stage::pure(match &name {
-                Some(name) => format!("`{name}` is pure: its signature has `->`, not `->{{…}}`"),
-                None if matches!(node.kind, K::DoExpr | K::BindStmt) => {
-                    "the rest of a `do` block is the pure function of `flat_map`: bind the result of \
-                     a runtime call with `let` before the `do`"
-                        .to_owned()
-                }
-                None => {
-                    "this function must be pure: the expected type has `->`, not `->{…}`".to_owned()
-                }
-            }),
-            Some(Some(effects)) => {
-                let site = match (name, expected) {
-                    (Some(name), _) => Site::Signature(name),
-                    (None, Some(expected)) => Site::Expected(expected.clone()),
-                    (None, None) => Site::Inferred,
-                };
-                let sync = effects.sync;
-                let mut stage = self.bounded_stage(effects.services, effects.errors, site);
-                stage.sync = sync && stage.pure.is_none();
-                stage
-            }
+        let mut stage = match last {
+            Some(effects) => self.body_stage(effects.as_deref(), node, expected),
             None => self.open_stage(),
         };
+        // `o?` in the body returns from this function, so it fixes the result type
+        let inferred_result = rest.is_none();
+        let returns = rest.clone().unwrap_or_else(|| self.fresh());
+        stage.returns = Some(returns.clone());
         let outer = mem::replace(&mut self.stage, stage);
         let result = body(self, rest);
         let inner = mem::replace(&mut self.stage, outer);
+        if inferred_result {
+            let _ = self.unify(&returns, &result);
+        }
         if inferred && let Some(stage) = stages.last_mut() {
             stage.1 = Self::stage_effects(&inner);
         }

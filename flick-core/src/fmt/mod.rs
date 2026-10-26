@@ -142,7 +142,7 @@ fn space(a: Tok, b: Tok) -> bool {
     let tight_braces = |t: Tok| matches!(t.parent, K::EffectAnnot | K::RowType);
     match (ak, bk) {
         (K::LParen | K::LBracket | K::Caret | K::Dollar | K::DotDotDot, _)
-        | (_, K::RParen | K::RBracket | K::Comma | K::Semi | K::Caret | K::Dot)
+        | (_, K::RParen | K::RBracket | K::Comma | K::Semi | K::Caret | K::Dot | K::Question)
         | (K::LBrace, K::RBrace) => false,
         (K::Dot, _) => a.parent == K::ForallType,
         (K::Arrow, K::LBrace) if b.parent == K::EffectAnnot => false,

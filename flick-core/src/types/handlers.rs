@@ -63,6 +63,7 @@ impl Checker<'_> {
         let raised = self.fresh();
         let mut stage = self.stage.clone();
         stage.errors = raised.clone();
+        stage.returns = None;
         let outer = mem::replace(&mut self.stage, stage);
         if let Some(body) = nodes.next() {
             self.check(body, &ty);
@@ -72,6 +73,8 @@ impl Checker<'_> {
         self.stage.calls = inner.calls;
         let mut handled: Vec<(String, Type)> = Vec::new();
         let mut all = false;
+        // the handlers run in a JS function of their own
+        let returns = self.stage.returns.take();
         for arm in nodes.filter(|n| n.kind == K::MatchArm) {
             let error = self.fresh();
             let (pat, guarded, span) = self.arm(arm, &error, &ty);
@@ -104,6 +107,7 @@ impl Checker<'_> {
                 }
             }
         }
+        self.stage.returns = returns;
         if !all && self.stage.pure.is_none() {
             handled.sort_by(|a, b| a.0.cmp(&b.0));
             let rest = Type::Row(Row {
@@ -145,6 +149,7 @@ impl Checker<'_> {
         let needed = self.fresh();
         let mut stage = self.stage.clone();
         stage.services = needed.clone();
+        stage.returns = None;
         let outer = mem::replace(&mut self.stage, stage);
         let ty = match (children.get(1), expected) {
             (Some(body), Some(expected)) => {

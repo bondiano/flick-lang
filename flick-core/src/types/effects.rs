@@ -14,6 +14,8 @@ use super::Checker;
 use super::ty::{Effects, Type};
 use crate::diagnostics::codes;
 use crate::source::Span;
+use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
 
 pub use solve::SubRow;
 
@@ -36,6 +38,10 @@ pub struct Stage {
     pub sync: bool,
     /// Why runtime calls are not allowed in this Sync stage, if they are not.
     pub only_sync: Option<&'static str>,
+    /// The result type of the function whose body this is, which `o?`
+    /// returns `None` of; `None` where the code runs in a JS function of
+    /// its own (`task`, `scope`, a lazy `for` …).
+    pub returns: Option<Type>,
     /// Runtime calls so far, to tell whether an argument ran one.
     pub calls: usize,
     /// How many `scope`s were open when the stage began: those opened
@@ -64,6 +70,7 @@ impl Stage {
             runtime: false,
             sync: false,
             only_sync: None,
+            returns: None,
             calls: 0,
             scopes: 0,
         }
@@ -92,8 +99,47 @@ impl Checker<'_> {
             runtime: false,
             sync: false,
             only_sync: None,
+            returns: None,
             calls: 0,
             scopes: self.regions.open.len(),
+        }
+    }
+
+    /// The stage of a function's body whose last parameter has an arrow of
+    /// `effects`: pure, or bounded by its rows.
+    pub(super) fn body_stage(
+        &mut self,
+        effects: Option<&Effects>,
+        node: &Node,
+        expected: Option<&Type>,
+    ) -> Stage {
+        let name = (node.kind == K::LetDecl)
+            .then(|| super::bindings::let_parts(node, self.text).name)
+            .flatten();
+        match effects {
+            None => Stage::pure(match &name {
+                Some(name) => format!("`{name}` is pure: its signature has `->`, not `->{{…}}`"),
+                None if matches!(node.kind, K::DoExpr | K::BindStmt) => {
+                    "the rest of a `do` block is the pure function of `flat_map`: bind the result of \
+                     a runtime call with `let` before the `do`"
+                        .to_owned()
+                }
+                None => {
+                    "this function must be pure: the expected type has `->`, not `->{…}`".to_owned()
+                }
+            }),
+            Some(effects) => {
+                let site = match (name, expected) {
+                    (Some(name), _) => Site::Signature(name),
+                    (None, Some(expected)) => Site::Expected(expected.clone()),
+                    (None, None) => Site::Inferred,
+                };
+                let sync = effects.sync;
+                let mut stage =
+                    self.bounded_stage(effects.services.clone(), effects.errors.clone(), site);
+                stage.sync = sync && stage.pure.is_none();
+                stage
+            }
         }
     }
 

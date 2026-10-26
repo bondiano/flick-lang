@@ -115,7 +115,7 @@ let examples =
 ### Operators and punctuation
 
 ```text
-( ) [ ] { } , ; : . .. = -> <- => | ^ _
+( ) [ ] { } , ; : . .. = -> <- => | ^ _ ?
 |> || && == != < <= > >= ++ + - * / % ** not
 ```
 
@@ -135,7 +135,7 @@ There are no user-defined operators. From weakest to strongest:
 | 8 | `**` | right |
 | 9 | prefix `-`, `not`, `await`, `ignore`, `echo` | — |
 | 10 | function application `f x y` | left |
-| 11 | `.field`, `Module.name` | left |
+| 11 | `.field`, `Module.name`, postfix `?` | left |
 
 `-x ** 2` is `-(x ** 2)`; `-a * b` is `(-a) * b`; `await f x` is
 `await (f x)`. Bitwise operations are the functions `Number.bit_*`.
@@ -364,7 +364,7 @@ expr        = "fun" atom_pattern { atom_pattern } "->" block
             | operator expression over application (see the operator table)
 arm         = "|" or_pattern ["when" expr] "->" block
 application = postfix { postfix }
-postfix     = atom { "." name }
+postfix     = atom { "." name | "?" }           // no space before either
 atom        = name | Con { "." Con } ["." name] | Number | BigInt | String
             | "true" | "false" | "()" | "(" expr ")" | "(" expr ":" type ")"
             | "(" expr "," expr { "," expr } ")" | "[" [expr { "," expr } [","]] "]"
@@ -397,7 +397,8 @@ and the rest of the block is a pure function: a runtime call there is
 the clauses on each iteration. `x <- source` takes the elements of an
 `Iterable` source (`List`, `Seq`) and skips those the pattern does not match,
 `if c` skips the element unless `c`, and `let` scopes over the rest; the
-clauses are pure. `[for … yield e]`, a `for` alone in brackets, is the strict
+clauses make Sync calls at most (`Atom.Read`), reading the services of the
+stage that builds the sequence. `[for … yield e]`, a `for` alone in brackets, is the strict
 `List` of the same elements, built with a loop. Without braces the clauses
 are separated by `;`, and a guard's `if` starts a new one. `do body` in place
 of `yield e` runs the body, a `Unit` block, for each element right there:
@@ -405,6 +406,14 @@ the clauses and the body may make runtime calls, which join the rows of the
 function, and the loop is a `for…of` inside its computation.
 `<-` outside a `do` or `for` block is `FLICK-S013`; a comparison with a negative number
 is written `a < -1`.
+
+Postfix `e?`, written right after its operand, unwraps it. On a
+`Result (Errors e) a` in a runtime function it is `from_result e`: the value,
+or a failure with the error, which joins the function's errors. On an
+`Option a` in a function returning an `Option` it is the value of `Some`, and
+a `None` returns `None` from the function at once. Elsewhere it is an error
+(inside `task`, `scope`, `provide`, `try` and `for`, which run on their own,
+too). `f x?` is `f (x?)`; write `(f x)?`.
 
 `todo` (optionally followed by a string) is an expression of any type, and
 `echo` without an operand is a function, as in `x |> echo`. `_` is a type

@@ -52,6 +52,7 @@ impl Checker<'_> {
         let needed = self.fresh();
         let mut stage = self.stage.clone();
         stage.services = needed.clone();
+        stage.returns = None;
         let outer = mem::replace(&mut self.stage, stage);
         let body = node.nodes().next();
         let ty = match (body, expected) {

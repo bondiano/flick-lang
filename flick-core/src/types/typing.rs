@@ -35,6 +35,8 @@ pub struct Typing {
     pub runtime: HashSet<Range>,
     /// Those whose stage runs a Sync call.
     pub sync: HashSet<Range>,
+    /// What each postfix `?` does.
+    pub questions: HashMap<Range, super::Question>,
     /// Lazy `for`s whose body makes Sync calls: each step runs with the
     /// services of the stage that built the sequence.
     pub sync_generators: HashSet<Range>,

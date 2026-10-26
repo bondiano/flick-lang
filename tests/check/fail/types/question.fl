@@ -1,0 +1,35 @@
+module App.Question exposing (..)
+
+type error Invalid = Invalid String
+
+parse : String -> Result Invalid Number
+let parse s = Err (Invalid s)
+
+// a pure function has no errors to fail with
+pure_sum : String -> Number
+let pure_sum s = (parse s)? + 1
+
+// `None` returns from a function whose result is not an `Option`
+counted : Option Number -> Number
+let counted o = o? + 1
+
+// a `task` runs on its own: there is no function to return from
+later : Option Number -> Eff none none (Option Number)
+let later o = task { Some (o? + 1) }
+
+// neither an `Option` nor a `Result`
+odd : Number -> Option Number
+let odd n = Some n?
+
+// a `match` failing with the error is `?`
+total : String ->{; Invalid} Number
+let total s =
+  match parse s with
+  | Ok n -> n
+  | Err e -> from_result (Err e)
+
+//~ FLICK-E001 @10:18-10:28 needs a runtime stage with errors
+//~ FLICK-T003 @14:17-14:19 but that function returns `Number`: in a runtime function, fail instead
+//~ FLICK-T003 @18:28-18:30 this code runs on its own
+//~ FLICK-T003 @22:18-22:20 `?` takes an `Option` or a `Result`, but this has type `Number`
+//~ FLICK-T034 @27:3-29:33 `?` says the same

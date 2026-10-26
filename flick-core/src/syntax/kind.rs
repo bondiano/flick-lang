@@ -103,6 +103,8 @@ pub enum SyntaxKind {
     StarStar,
     Caret,
     Dollar,
+    /// Postfix `?`: the value of an `Option` or a `Result`, or an early exit.
+    Question,
     Underscore,
     /// A character that starts no token.
     Unknown,
@@ -148,6 +150,8 @@ pub enum SyntaxKind {
     NameExpr,
     Path,
     FieldExpr,
+    /// `e?`.
+    QuestionExpr,
     AppExpr,
     BinExpr,
     PrefixExpr,
@@ -341,6 +345,7 @@ pub fn describe(kind: SyntaxKind) -> &'static str {
         K::Eq => "`=`",
         K::Arrow => "`->`",
         K::LArrow => "`<-`",
+        K::Question => "`?`",
         K::Pipe => "`|`",
         K::Eof => "end of file",
         K::LayoutSep => "a new line",

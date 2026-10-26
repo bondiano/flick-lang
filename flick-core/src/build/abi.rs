@@ -266,6 +266,7 @@ impl Totality<'_> {
             | ExprKind::CodecBlock(..)
             | ExprKind::Provide(..)
             | ExprKind::Generate { strict: true, .. }
+            | ExprKind::Unwrap(_)
             | ExprKind::Each { .. }
             | ExprKind::Yield(_) => true,
         }

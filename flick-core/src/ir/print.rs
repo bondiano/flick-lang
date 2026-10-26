@@ -171,6 +171,7 @@ pub fn expr(e: &Expr) -> String {
         ExprKind::Update(r, f) => format!("{{{} with {}}}", expr(r), fields(f)),
         ExprKind::Field(r, l) => format!("{}.{l}", expr(r)),
         ExprKind::Binary(op, l, r) => format!("({} {} {})", expr(l), op.symbol(), expr(r)),
+        ExprKind::Unwrap(e) => format!("{}?", expr(e)),
         ExprKind::Not(e) => format!("(not {})", expr(e)),
         ExprKind::Neg(e) => format!("(-{})", expr(e)),
         ExprKind::Ignore(e) => format!("(ignore {})", expr(e)),

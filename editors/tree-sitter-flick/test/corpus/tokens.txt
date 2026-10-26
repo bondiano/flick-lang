@@ -157,3 +157,20 @@ For comprehension
     (identifier)
     (keyword)
     (identifier)))
+
+==================
+Postfix question
+==================
+
+(parse s)? + o?
+
+---
+
+(source_file
+  (parens
+    (identifier)
+    (identifier))
+  (operator)
+  (operator)
+  (identifier)
+  (operator))

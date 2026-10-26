@@ -9,6 +9,7 @@ mod debug;
 mod do_notation;
 mod expr;
 mod pattern;
+mod question;
 mod sql;
 
 use std::collections::{HashMap, HashSet};

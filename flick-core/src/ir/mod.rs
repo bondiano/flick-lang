@@ -195,6 +195,8 @@ pub enum ExprKind {
     Field(Box<Expr>, String),
     Binary(BinOp, Box<Expr>, Box<Expr>),
     Not(Box<Expr>),
+    /// `o?`: the value of the `Some`; a `None` returns from the function.
+    Unwrap(Box<Expr>),
     Neg(Box<Expr>),
     Ignore(Box<Expr>),
     Await(Box<Expr>),
@@ -224,6 +226,7 @@ impl Expr {
             | ExprKind::Abstract(_, inner)
             | ExprKind::Field(inner, _)
             | ExprKind::Not(inner)
+            | ExprKind::Unwrap(inner)
             | ExprKind::Neg(inner)
             | ExprKind::Ignore(inner)
             | ExprKind::Await(inner)
@@ -314,6 +317,7 @@ impl Expr {
             | ExprKind::Abstract(_, inner)
             | ExprKind::Field(inner, _)
             | ExprKind::Not(inner)
+            | ExprKind::Unwrap(inner)
             | ExprKind::Neg(inner)
             | ExprKind::Ignore(inner)
             | ExprKind::Await(inner)

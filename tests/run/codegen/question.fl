@@ -1,0 +1,43 @@
+// Postfix `?`: on an `Option` in a function returning one, `None` returns
+// at once; on a `Result` in a runtime function, an `Err` fails with its
+// error.
+module App.Main exposing (main)
+
+type error Invalid = Invalid String
+
+half : Number -> Option Number
+let half n = if n % 2 == 0 then Some (n / 2) else None
+
+quarter : Number -> Option Number
+let quarter n = half (half n)?
+
+// an early `None` skips the rest, even inside an expression
+labelled : Number -> Option String
+let labelled n =
+  let q = quarter n
+  Some ("q = " ++ show q? ++ ", h = " ++ show (half n)?)
+
+parse : String -> Result Invalid Number
+let parse s =
+  match String.to_number s with
+  | Some n -> Ok n
+  | None -> Err (Invalid s)
+
+sum : String -> String ->{; Invalid} Number
+let sum a b = (parse a)? + (parse b)?
+
+summed : String -> String ->{} String
+let summed a b =
+  try
+    show (sum a b)
+  with
+  | Invalid s -> "invalid " ++ s
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (show (quarter 8))
+  Platform.stdout_line (show (quarter 6))
+  Platform.stdout_line (show (labelled 12))
+  Platform.stdout_line (show (labelled 6))
+  Platform.stdout_line (summed "1" "2")
+  Platform.stdout_line (summed "1" "x")

@@ -80,6 +80,18 @@ fn simple(p: &Pat) -> bool {
     matches!(p, Pat::Bind(_) | Pat::Wild | Pat::Lit(Lit::Unit))
 }
 
+/// Whether `e` has an `o?` of its own function, outside nested ones.
+fn exits(e: &Expr) -> bool {
+    if matches!(e.kind, ExprKind::Unwrap(_)) {
+        return true;
+    }
+    let mut found = false;
+    if !matches!(e.kind, ExprKind::Lambda { .. }) {
+        e.each_child(&mut |c| found |= exits(c));
+    }
+    found
+}
+
 /// Whether a body is plain pure code: nothing that depends on where it
 /// runs (owners, handlers, services, dictionaries of its definition). A
 /// `match` stays a call too: in an expression it becomes statements, which
@@ -103,6 +115,7 @@ fn inlinable(e: &Expr) -> bool {
             | ExprKind::Lift(..)
             | ExprKind::CodecBlock(..)
             | ExprKind::Operation { .. }
+            | ExprKind::Unwrap(_)
             | ExprKind::App {
                 stage: Stage::Sync | Stage::Runtime,
                 ..
@@ -230,6 +243,8 @@ pub fn beta(e: &mut Expr) -> bool {
     if params
         .first()
         .is_none_or(|p| p.stage != Stage::Pure || !simple(&p.pat))
+        // an `o?` returns from the function it is in, not from the one around
+        || (params.len() == 1 && exits(body))
     {
         return false;
     }

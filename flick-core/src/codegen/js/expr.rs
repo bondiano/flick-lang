@@ -129,6 +129,7 @@ impl Gen<'_> {
             }
             ExprKind::Binary(op, lhs, rhs) => self.binary(e.span, *op, lhs, rhs),
             ExprKind::Not(inner) => format!("(!{})", self.expr(inner)),
+            ExprKind::Unwrap(inner) => self.unwrap(inner),
             ExprKind::Neg(inner) => format!("(-{})", self.expr(inner)),
             ExprKind::Ignore(inner) => {
                 let v = self.expr(inner);
@@ -373,6 +374,15 @@ impl Gen<'_> {
             indent(&stmts)
         );
         self.run(None, &tried)
+    }
+
+    /// `o?`: the value of the `Some`, after returning a `None` at once.
+    fn unwrap(&mut self, option: &Expr) -> String {
+        let v = self.expr(option);
+        let v = self.spill(v);
+        self.buf
+            .push(format!("if ({v}._tag === \"None\") return {v};"));
+        format!("{v}.value")
     }
 
     /// A record literal, or `{ base with … }`.
