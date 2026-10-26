@@ -65,7 +65,7 @@ fn with_result(kind: &Kind, result: Kind) -> Kind {
 /// Whether the arrows of `ty`, stage by stage, include a runtime one.
 pub fn has_runtime_arrow(ty: &Type) -> bool {
     match ty {
-        Type::Forall { body, .. } => has_runtime_arrow(body),
+        Type::Forall { body, .. } | Type::Captured { ty: body, .. } => has_runtime_arrow(body),
         Type::Fun {
             effects, result, ..
         } => effects.is_some() || has_runtime_arrow(result),
@@ -91,6 +91,10 @@ fn require(ty: Type, label: &str, service: &Type) -> Type {
                 e
             }),
             result: Box::new(require(*result, label, service)),
+        },
+        Type::Captured { ty, captures } => Type::Captured {
+            ty: Box::new(require(*ty, label, service)),
+            captures,
         },
         other => other,
     }

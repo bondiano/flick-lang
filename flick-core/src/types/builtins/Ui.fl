@@ -277,13 +277,13 @@ type alias Rect = { width : Number; height : Number; top : Number; left : Number
 /// to the tasks of its handlers and instances; a server renders without it.
 service Document =
   /// Moves the keyboard focus to the node.
-  focus : forall t. Element t ->{; Detached} Unit
+  focus : forall t d. (Element t)^d ->{; Detached} Unit
   /// Takes the keyboard focus away from the node.
-  blur : forall t. Element t ->{; Detached} Unit
+  blur : forall t d. (Element t)^d ->{; Detached} Unit
   /// Scrolls the page until the node is in view.
-  scroll_into_view : forall t. Element t ->{; Detached} Unit
+  scroll_into_view : forall t d. (Element t)^d ->{; Detached} Unit
   /// The node's place on the page.
-  measure : forall t. Element t ->{; Detached} Rect
+  measure : forall t d. (Element t)^d ->{; Detached} Rect
 
 /// A fresh element, not bound to a node yet.
 handle : Unit -> Element t
@@ -291,49 +291,50 @@ foreign pure handle from "@flick-lang/runtime/ui/react" "uiElementHandle"
   arity 1
 
 /// An element of the instance whose setup makes it.
-element : forall s t. Unit ->{Setup s;} Element t
+element : forall s t. Unit ->{Setup s;} (Element t)^{s}
 let element () = Setup.own (handle ())
 
 /// `input props` whose node is `element`'s.
-input_at : forall c. Element Input -> InputProps c -> Ui^c
+input_at : forall c d. (Element Input)^d -> InputProps c -> Ui^(c + d)
 foreign pure input_at from "@flick-lang/runtime/ui/react" "uiInputAt"
   retention call
 
 /// `textarea props` whose node is `element`'s.
-textarea_at : forall c. Element Textarea -> InputProps c -> Ui^c
+textarea_at : forall c d. (Element Textarea)^d -> InputProps c -> Ui^(c + d)
 foreign pure textarea_at from "@flick-lang/runtime/ui/react" "uiTextareaAt"
   retention call
 
 /// `button props children` whose node is `element`'s.
-button_at : forall c. Element Button -> ButtonProps c -> List (Ui^c) -> Ui^c
+button_at : forall c d. (Element Button)^d -> ButtonProps c -> List (Ui^c) -> Ui^(c + d)
 foreign pure button_at from "@flick-lang/runtime/ui/react" "uiButtonAt"
   retention call
 
 /// `div props children` whose node is `element`'s.
-div_at : forall c. Element Div -> ElementProps -> List (Ui^c) -> Ui^c
+div_at : forall c d. (Element Div)^d -> ElementProps -> List (Ui^c) -> Ui^(c + d)
 foreign pure div_at from "@flick-lang/runtime/ui/react" "uiDivAt"
   retention call
 
 /// Moves the keyboard focus to `element`'s node.
-focus : forall t. Element t ->{Document; Detached} Unit
+focus : forall t d. (Element t)^d ->{Document; Detached} Unit
 let focus element = Document.focus element
 
 /// Takes the keyboard focus away from `element`'s node.
-blur : forall t. Element t ->{Document; Detached} Unit
+blur : forall t d. (Element t)^d ->{Document; Detached} Unit
 let blur element = Document.blur element
 
 /// Scrolls the page until `element`'s node is in view.
-scroll_into_view : forall t. Element t ->{Document; Detached} Unit
+scroll_into_view : forall t d. (Element t)^d ->{Document; Detached} Unit
 let scroll_into_view element = Document.scroll_into_view element
 
 /// Where `element`'s node is on the page.
-measure : forall t. Element t ->{Document; Detached} Rect
+measure : forall t d. (Element t)^d ->{Document; Detached} Rect
 let measure element = Document.measure element
 
 /// The component whose instances run `setup` once, when they mount, and
 /// render with what it made: `component … setup … render …`. What the
 /// setup makes has the instance's region `s`, so it cannot leave it.
-stateful : forall c p. (forall s. p ->{Setup s;} (p ->{Atom.Read;} Ui^c)^{s | c})^c -> (View p)^c
+stateful : forall c p. (forall s. p ->{Setup s;} (p ->{Atom.Read;} Ui^{s | c})^{s | c})^c ->
+  (View p)^c
 foreign pure stateful from "@flick-lang/runtime/ui/react" "uiStateful"
   retention call
 

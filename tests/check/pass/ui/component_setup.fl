@@ -3,7 +3,7 @@
 // need `Setup s` too.
 module App.ComponentSetup exposing (..)
 
-counted : forall s. Number ->{Setup s;} Atom.Writable Number
+counted : forall s. Number ->{Setup s;} (Atom.Writable Number)^{s}
 let counted start = Atom.local (start + 1)
 
 component counter (start : Number) =

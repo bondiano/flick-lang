@@ -36,7 +36,7 @@ component once (start : Number) =
 
 // a render has no `Ui.Document`, nor does a server: the DOM is reached by tasks
 component grabbing () =
-  let field : Ui.Element Ui.Input = Ui.element ()
+  let field : (Ui.Element Ui.Input)^c = Ui.element ()
   ui {
     let _focused = try Ui.focus field with | Ui.Detached -> ()
     text "grab"

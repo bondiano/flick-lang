@@ -12,7 +12,7 @@ import { StrictMode, createElement } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import { atomState, syncOperation } from "../src/index.ts";
+import { atomLocal, atomState, syncOperation } from "../src/index.ts";
 import {
   SetupService,
   actionExhaust,
@@ -30,6 +30,10 @@ import {
 /** `Setup.start work` as a Flick setup calls it: a Sync call of `Setup`. */
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the operation takes one argument
 const start = syncOperation(SetupService, "start", 1) as (work: unknown) => void;
+
+/** `Setup.own value`. */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the operation takes one argument
+const own = syncOperation(SetupService, "own", 1) as <A>(value: A) => A;
 
 /** A counter whose setup makes its own count and its action. */
 const counter = (registry: AtomRegistry.AtomRegistry, setups: { count: number }) =>
@@ -188,5 +192,32 @@ test("watch runs again when what it read changes, after the previous run stopped
   registry.set(query, "c");
   await tick();
   assert.deepEqual(log, ["run a", "stop a", "run b", "stop b"]);
+  await stop(fiber);
+});
+
+test("an instance's own atom lives while it is mounted, StrictMode included, and is forgotten after", async () => {
+  const root = container();
+  const registry = AtomRegistry.make();
+  const shown = Atom.make(true);
+  let made: Atom.Writable<number> | undefined;
+  const silent = uiStateful(() => {
+    const count = own(atomLocal(0));
+    made = count;
+    // the render never reads it: only the instance holds it
+    const add = actionExhaust(() => Effect.sync(() => registry.update(count, (n) => n + 1)));
+    return () => uiButton({ disabled: false, on_click: add }, [uiText("add")]);
+  });
+  const page = uiView(() => (get(shown) ? uiRender(silent, undefined) : uiText("gone")));
+  const fiber = Effect.runFork(uiRunWith(strict(root), logging([]), uiRender(page, undefined), registry));
+  await tick();
+  click(root);
+  await tick();
+  click(root);
+  await tick();
+  assert.ok(made);
+  assert.equal(registry.get(made), 2);
+  registry.set(shown, false);
+  await tick(30);
+  assert.equal(registry.getNodes().has(made), false);
   await stop(fiber);
 });

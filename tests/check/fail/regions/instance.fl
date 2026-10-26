@@ -1,0 +1,44 @@
+// What an instance owns holds its region: an atom or an element of it
+// cannot be stored where something outside the instance reads it, and an
+// atom cannot keep a value that holds a scope's resource past the scope.
+module App.Instance exposing (..)
+
+type File (s : Region)
+
+service Files =
+  open : forall s. String ->{Scope s;} File s
+  read : forall s. File s ->{} String
+
+latest : Atom.Writable (Atom.Writable Number)
+let latest = Atom.make (Atom.make 0)
+
+focused : Atom.Writable (Ui.Element Ui.Input)
+let focused = Atom.make (Ui.handle ())
+
+nothing : Unit ->{Files;} String
+let nothing () = ""
+
+reader : Atom.Writable (Unit ->{Files;} String)
+let reader = Atom.make nothing
+
+component counter () =
+  let count = Atom.local 0
+  let field = Ui.element ()
+  let _kept = Ui.on_mount (task { Atom.set latest count })
+  let _shown = Ui.on_mount (task { Atom.set focused field })
+  ui {
+    input_at
+      field
+      { value = ""; placeholder = ""; on_input = Ui.Event.latest (fun _ -> task { () }) }
+  }
+
+keep : Unit ->{Files, Atom.Write;} Unit
+let keep () =
+  scope s {
+    let file = Files.open "notes"
+    Atom.set reader (fun () -> Files.read file)
+  }
+
+//~ FLICK-G001 @27:51-27:56 holds `s`
+//~ FLICK-G001 @28:53-28:58 holds `s`
+//~ FLICK-G001 @39:22-39:47 uses `file`, which holds region `s`

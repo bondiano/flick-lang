@@ -276,8 +276,15 @@ with `Browser.Dom.focus` and a string id instead, which no type checks.
 A widget that drives the DOM imperatively stays a foreign component,
 `Ui.component`.
 
-A function that makes the state of an instance says so in its signature,
-`Number ->{Setup s;} Atom.Writable Number`, and is called from a setup. The
+What an instance owns holds its region: `Atom.local` gives
+`(Atom.Writable a)^{s}` and `Ui.element` `(Ui.Element t)^{s}`, so neither
+can be stored where something outside the instance reads it
+(`FLICK-G001`), and the registry forgets an instance's atoms when it
+unmounts. The atom functions borrow what they take, `(Atom.Writable a)^d`,
+so they read and write such an atom. A function that makes the state of an
+instance says so in its signature,
+`Number ->{Setup s;} (Atom.Writable Number)^{s}`, and is called from a
+setup; an annotation names the capture too, `(Ui.Element Ui.Input)^c`. The
 word `component` stays a name everywhere else.
 
 ## Tasks in views

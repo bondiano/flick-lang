@@ -66,23 +66,32 @@ interface SetupImpl {
 /** The service `Setup s` of an instance's setup, a Sync one. */
 export const SetupService = /*#__PURE__*/ service<SetupImpl>("Prelude.Setup");
 
-/** What an instance renders with: its view, the actions its setup made and its work. */
+/**
+ * What an instance renders with: its view, the actions its setup made, its
+ * work, and the atoms it owns, which the registry keeps while it is mounted.
+ */
 interface Instance {
   readonly view: View;
   readonly actions: ReadonlyArray<Handler>;
   readonly work: ReadonlyArray<Lifecycle>;
+  readonly atoms: ReadonlyArray<Atom.Atom<unknown>>;
 }
 
 /** The instance `setup` makes with these first props. */
 const setUp = (setup: (props: unknown) => (props: unknown) => Ui, props: unknown, view: View): Instance => {
   const work: Array<Lifecycle> = [];
-  const impl: SetupImpl = { own: (value) => value, start: (w) => void work.push(w), [syncAbi]: true };
+  const atoms: Array<Atom.Atom<unknown>> = [];
+  const own = (value: unknown): unknown => {
+    if (Atom.isAtom(value)) atoms.push(value);
+    return value;
+  };
+  const impl: SetupImpl = { own, start: (w) => void work.push(w), [syncAbi]: true };
   const [render, actions] = instanceActions(() => syncIn(Context.make(SetupService, impl), () => setup(props)));
-  return { view: { ...view, render }, actions, work };
+  return { view: { ...view, render }, actions, work, atoms };
 };
 
 const instanceOf = (view: View, props: unknown): Instance =>
-  view.setup === undefined ? { view, actions: [], work: [] } : setUp(view.setup, props, view);
+  view.setup === undefined ? { view, actions: [], work: [], atoms: [] } : setUp(view.setup, props, view);
 
 /** Starts `work` as tasks of the root; the result stops them. */
 const interrupt = (fiber: Fiber.Fiber<unknown, unknown> | undefined): void => {
@@ -186,15 +195,18 @@ const component = (view: View): FunctionComponent<object> => {
     // set up once per instance: StrictMode calls a state's initializer twice, not a ref's
     const ref = useRef<Instance | undefined>(undefined);
     ref.current ??= instanceOf(view, props);
-    const { view: own, actions, work } = ref.current;
+    const { view: own, actions, work, atoms } = ref.current;
     useLayoutEffect(() => {
-      if (bridge === undefined) return undefined;
+      // the registry forgets the instance's atoms once it unmounts
+      const held = atoms.map((atom) => registry.mount(atom));
+      if (bridge === undefined) return () => held.forEach((release) => release());
       const stops = work.map((w) => begin(bridge, registry, w));
       return () => {
         for (const stop of stops) stop();
         bridge.release(actions);
+        for (const release of held) release();
       };
-    }, [bridge, registry, actions, work]);
+    }, [bridge, registry, actions, work, atoms]);
     const read = new Map<Atom.Atom<unknown>, unknown>();
     const reading = (atom: Atom.Atom<unknown>): unknown => {
       const value = server ? Atom.getServerValue(atom, registry) : registry.get(atom);

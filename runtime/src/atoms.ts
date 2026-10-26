@@ -83,6 +83,12 @@ const toAsync = <A, E>(result: AsyncResult.AsyncResult<A, E>): object =>
 /** `Atom.make`: a state whose value the registry keeps while it lives, read or not, so a write before the first read stays. */
 export const atomState = <A>(value: A): Atom.Writable<A> => Atom.keepAlive(flickState(value));
 
+/**
+ * `Atom.fresh`: a state the registry forgets once nothing holds it; the
+ * instance of `Atom.local` holds it while it is mounted.
+ */
+export const atomLocal = <A>(value: A): Atom.Writable<A> => flickState(value);
+
 /** Whether `value` is a loaded `Atom.Async`. */
 const isLoaded = (value: unknown): value is { readonly _0: unknown } => Reflect.get(Object(value), "_tag") === LOADED;
 

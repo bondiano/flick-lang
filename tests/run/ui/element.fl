@@ -21,7 +21,7 @@ foreign sync focused from "./dom.mjs" "focused"
 
 component search () =
   let field = Ui.element ()
-  let unbound : Ui.Element Ui.Div = Ui.element ()
+  let unbound : (Ui.Element Ui.Div)^c = Ui.element ()
   let focus =
     Action.exhaust (fun _ ->
       task {

@@ -120,6 +120,8 @@ impl Checker<'_> {
                 .into_iter()
                 .filter(|(label, _)| bound.get(label).is_none())
                 .map(|(_, atom)| atom)
+                // a region never solved comes from an error reported already
+                .filter(|atom| !matches!(self.store.resolve(atom), Type::Meta(_)))
                 .collect();
             if let Some(atom) = lacking.first() {
                 self.report_hold(&hold, atom, &bound);
