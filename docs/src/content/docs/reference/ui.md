@@ -209,6 +209,37 @@ When an instance unmounts, the events of the actions its setup made stop
 and their tasks are interrupted; the root still waits for those tasks
 when it closes.
 
+#### Work of an instance
+
+`Ui.on_mount task` in a setup runs `task` once the instance mounts, as a
+task of the root: its unmount interrupts it and waits for it, its
+finalizers run, and a defect goes to the root's supervisor.
+`Ui.watch read run` runs `run` of what `read` computes, and again whenever
+an atom `read` read changes, interrupting the previous run first. Both are
+React's `useEffect` without a dependency list: `on_mount` runs once per
+instance, `watch` tracks the atoms it read. Under StrictMode the replayed
+mount stops the first run before the second starts, and a server renders
+without starting either. Their tasks write atoms (`{Atom.Write}`), as an
+action's do.
+
+```flick
+component clock () =
+  setup
+    let seconds = Atom.local 0
+    let second = Result.with_default Duration.zero (Duration.seconds 1)
+    let _ticking =
+      Ui.on_mount
+        (task {
+          Effect.forever
+            (task {
+              Effect.sleep second
+              Atom.update seconds (fun n -> n + 1)
+            })
+        })
+  render
+    ui { text (show (Atom.value seconds)) }
+```
+
 A function that makes the state of an instance says so in its signature,
 `Number ->{Setup s;} Atom.Writable Number`, and is called from a setup. A
 `render` before `setup`, a second section of a kind or a missing `render` is

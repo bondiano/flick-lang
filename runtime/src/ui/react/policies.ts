@@ -227,20 +227,35 @@ export class Bridge<R> {
   }
 
   private start(slot: Slot, handler: Handler, snapshot: unknown): void {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the checker gave the handlers the services of their root
-    const task = Effect.suspend(() => handler.run(snapshot) as Effect.Effect<unknown, unknown, R>);
-    const fiber = Effect.runFork(Effect.provideContext(task, this.context));
-    slot.running.add(fiber);
+    this.fork(
+      Effect.suspend(() => handler.run(snapshot)),
+      (fiber) => slot.running.add(fiber),
+      (fiber) => {
+        slot.running.delete(fiber);
+        if (!this.accepting) return;
+        this.settled();
+        if (slot.binding !== undefined && slot.running.size === 0) this.next(slot);
+      },
+    );
+  }
+
+  /**
+   * Runs `task` as a task of the root, with its services; a failure other
+   * than an interruption goes to the supervisor. `started` sees the fiber
+   * before it can end, `ended` after.
+   */
+  fork(task: Effect.Effect<unknown, unknown>, started?: (fiber: Task) => void, ended?: (fiber: Task) => void): Task {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the checker gave the tasks the services of their root
+    const fiber = Effect.runFork(Effect.provideContext(task as Effect.Effect<unknown, unknown, R>, this.context));
+    started?.(fiber);
     this.tasks.add(fiber);
     fiber.addObserver((exit) => {
-      slot.running.delete(fiber);
       this.tasks.delete(fiber);
       // an interruption is the policy's or the root's own doing
       if (Exit.isFailure(exit) && !Cause.hasInterruptsOnly(exit.cause)) this.supervise(exit.cause);
-      if (!this.accepting) return;
-      this.settled();
-      if (slot.binding !== undefined && slot.running.size === 0) this.next(slot);
+      ended?.(fiber);
     });
+    return fiber;
   }
 
   /** An event a full policy rejects: an infrastructure defect, not an error of `e`. */

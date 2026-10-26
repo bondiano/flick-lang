@@ -8,7 +8,7 @@ import { Fragment, type ReactNode, createContext, createElement, useLayoutEffect
 import type { Ui } from "./nodes.ts";
 import type { Bridge, Listener } from "./policies.ts";
 
-export type Events = Pick<Bridge<never>, "listener" | "release">;
+export type Events = Pick<Bridge<never>, "listener" | "release" | "fork">;
 type ElementNode = Extract<Ui, { readonly kind: "element" }>;
 
 const EventElement = ({ bridge, node }: { readonly bridge: Events; readonly node: ElementNode }): ReactNode => {

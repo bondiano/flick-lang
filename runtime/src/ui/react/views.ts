@@ -1,8 +1,9 @@
 // Views and fields on atoms: React components a `Ui` holds as foreign
 // components do, so a program that renders none keeps none of this code.
 // They take the root's events and registry from React context.
-import { Cause, Context, Effect, Option } from "effect";
+import { Cause, Context, Effect, Fiber, Option } from "effect";
 import * as Atom from "../../effect/reactivity/Atom.ts";
+import type * as AtomRegistry from "../../effect/reactivity/AtomRegistry.ts";
 import {
   type FunctionComponent,
   type ReactNode,
@@ -18,11 +19,11 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import { isPending, runReading, syncReading } from "../../atoms.ts";
+import { atomDerived, isPending, runReading, syncReading } from "../../atoms.ts";
 import { Failure } from "../../cause.ts";
 import { service } from "../../effects.ts";
 import { syncAbi, syncIn } from "../../sync.ts";
-import { BridgeContext, RegistryContext, StreamContext, toReact } from "./render.ts";
+import { BridgeContext, type Events, RegistryContext, StreamContext, toReact } from "./render.ts";
 import { type Binding, type DomEvent, type Static, type Ui, element, inputSnapshot, uiComponent, uiFragment } from "./nodes.ts";
 import { type Handler, instanceActions } from "./policies.ts";
 
@@ -41,30 +42,72 @@ export interface View {
   readonly setup?: (props: unknown) => (props: unknown) => Ui;
 }
 
+/** `Lifecycle`: work of an instance from its mount to its unmount. */
+type Lifecycle =
+  | { readonly kind: "mount"; readonly task: Effect.Effect<unknown, unknown> }
+  | { readonly kind: "watch"; readonly read: (unit: undefined) => unknown; readonly run: (value: unknown) => Effect.Effect<unknown, unknown> };
+
+/** `Ui.mounted`. */
+export const uiMounted = (task: Effect.Effect<unknown, unknown>): Lifecycle => ({ kind: "mount", task });
+
+/** `Ui.watched`. */
+export const uiWatched = (read: (unit: undefined) => unknown, run: (value: unknown) => Effect.Effect<unknown, unknown>): Lifecycle => ({
+  kind: "watch",
+  read,
+  run,
+});
+
 interface SetupImpl {
   readonly own: (value: unknown) => unknown;
+  readonly start: (work: Lifecycle) => void;
   readonly [syncAbi]: true;
 }
 
 /** The service `Setup s` of an instance's setup, a Sync one. */
 export const SetupService = /*#__PURE__*/ service<SetupImpl>("Prelude.Setup");
 
-const instance: SetupImpl = { own: (value) => value, [syncAbi]: true };
-
-/** The render `setup` makes for an instance with these first props, and the actions it made. */
-const setUp = (setup: (props: unknown) => (props: unknown) => Ui, props: unknown) =>
-  instanceActions(() => syncIn(Context.make(SetupService, instance), () => setup(props)));
-
-/** What an instance renders with: its view and the actions its setup made. */
+/** What an instance renders with: its view, the actions its setup made and its work. */
 interface Instance {
   readonly view: View;
   readonly actions: ReadonlyArray<Handler>;
+  readonly work: ReadonlyArray<Lifecycle>;
 }
 
-const instanceOf = (view: View, props: unknown): Instance => {
-  if (view.setup === undefined) return { view, actions: [] };
-  const [render, actions] = setUp(view.setup, props);
-  return { view: { ...view, render }, actions };
+/** The instance `setup` makes with these first props. */
+const setUp = (setup: (props: unknown) => (props: unknown) => Ui, props: unknown, view: View): Instance => {
+  const work: Array<Lifecycle> = [];
+  const impl: SetupImpl = { own: (value) => value, start: (w) => void work.push(w), [syncAbi]: true };
+  const [render, actions] = instanceActions(() => syncIn(Context.make(SetupService, impl), () => setup(props)));
+  return { view: { ...view, render }, actions, work };
+};
+
+const instanceOf = (view: View, props: unknown): Instance =>
+  view.setup === undefined ? { view, actions: [], work: [] } : setUp(view.setup, props, view);
+
+/** Starts `work` as tasks of the root; the result stops them. */
+const interrupt = (fiber: Fiber.Fiber<unknown, unknown> | undefined): void => {
+  if (fiber !== undefined) Effect.runFork(Fiber.interrupt(fiber));
+};
+
+const begin = (bridge: Events, registry: AtomRegistry.AtomRegistry, work: Lifecycle): (() => void) => {
+  if (work.kind === "mount") {
+    const fiber = bridge.fork(work.task);
+    return () => interrupt(fiber);
+  }
+  let current: Fiber.Fiber<unknown, unknown> | undefined;
+  const unsubscribe = registry.subscribe(
+    atomDerived(work.read),
+    (value) => {
+      const previous = current;
+      const stopped = previous === undefined ? Effect.void : Fiber.interrupt(previous);
+      current = bridge.fork(Effect.andThen(stopped, Effect.suspend(() => work.run(value))));
+    },
+    { immediate: true },
+  );
+  return () => {
+    unsubscribe();
+    interrupt(current);
+  };
 };
 
 /**
@@ -73,7 +116,14 @@ const instanceOf = (view: View, props: unknown): Instance => {
  * on each render.
  */
 export const uiStateful = (setup: (props: unknown) => (props: unknown) => Ui): View =>
-  Object.freeze({ render: (props: unknown) => setUp(setup, props)[0](props), setup, label: undefined });
+  Object.freeze({
+    render: (props: unknown) => {
+      const { render } = setUp(setup, props, { render: () => uiFragment([]), label: undefined }).view;
+      return render(props);
+    },
+    setup,
+    label: undefined,
+  });
 
 /** `Ui.view`: a component of the Sync `render`. */
 export const uiView = (render: (props: unknown) => Ui): View => Object.freeze({ render, label: undefined });
@@ -136,8 +186,15 @@ const component = (view: View): FunctionComponent<object> => {
     // set up once per instance: StrictMode calls a state's initializer twice, not a ref's
     const ref = useRef<Instance | undefined>(undefined);
     ref.current ??= instanceOf(view, props);
-    const { view: own, actions } = ref.current;
-    useLayoutEffect(() => () => bridge?.release(actions), [bridge, actions]);
+    const { view: own, actions, work } = ref.current;
+    useLayoutEffect(() => {
+      if (bridge === undefined) return undefined;
+      const stops = work.map((w) => begin(bridge, registry, w));
+      return () => {
+        for (const stop of stops) stop();
+        bridge.release(actions);
+      };
+    }, [bridge, registry, actions, work]);
     const read = new Map<Atom.Atom<unknown>, unknown>();
     const reading = (atom: Atom.Atom<unknown>): unknown => {
       const value = server ? Atom.getServerValue(atom, registry) : registry.get(atom);

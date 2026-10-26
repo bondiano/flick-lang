@@ -29,6 +29,13 @@ component counter (start : Number) =
   render
     ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
 
+// a server renders without mounting: its work never starts there
+component mounted () =
+  setup
+    let _started = Ui.on_mount (task { Platform.stdout_line "mounted on a server" })
+  render
+    ui { text "rendered" }
+
 main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line
@@ -36,4 +43,5 @@ let main () =
   provide Atom.layer {
     Platform.stdout_line (Ui.Server.render (Ui.render counter 41))
     Platform.stdout_line (Ui.Server.render (Ui.render counter 1))
+    Platform.stdout_line (Ui.Server.render (Ui.render mounted ()))
   }

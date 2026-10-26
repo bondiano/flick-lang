@@ -255,6 +255,37 @@ stateful : forall c p. (forall s. p ->{Setup s;} (p ->{Atom.Read;} Ui^c)^{s | c}
 foreign pure stateful from "@flick-lang/runtime/ui/react" "uiStateful"
   retention call
 
+/// `task` as work of an instance: it starts after the instance mounts,
+/// and its unmount interrupts it.
+mounted : forall c. (Eff {Atom.Write} none Unit)^c -> Lifecycle^c
+foreign pure mounted from "@flick-lang/runtime/ui/react" "uiMounted"
+  retention call
+
+/// Runs `task` in a component's `setup` once the instance mounts, as a
+/// task of the root: its unmount interrupts it and waits for it, and a
+/// defect goes to the root's supervisor. React's `useEffect` without
+/// dependencies, run once per instance.
+on_mount : forall s c. (Eff {Atom.Write} none Unit)^c ->{Setup s;} Unit
+let on_mount work = Setup.start (mounted work)
+
+/// `run` of what `read` reads as work of an instance, again whenever it
+/// changes.
+watched : forall c a. (Unit ->{Atom.Read;} a)^c ->
+  (a -> (Eff {Atom.Write} none Unit)^c)^c ->
+  Lifecycle^c
+foreign pure watched from "@flick-lang/runtime/ui/react" "uiWatched"
+  retention call
+
+/// Runs `run` of the value `read` computes in a component's `setup` once
+/// the instance mounts, and again whenever an atom `read` read changes; it
+/// interrupts the previous run and waits for it first, and the unmount
+/// interrupts the last one. The dependencies are the atoms read, not a
+/// list.
+watch : forall s c a. (Unit ->{Atom.Read;} a)^c ->
+  (a -> (Eff {Atom.Write} none Unit)^c)^c ->{Setup s;}
+  Unit
+let watch read run = Setup.start (watched read run)
+
 /// The component named `name` in React's developer tools.
 named : forall c p. String -> (View p)^c -> (View p)^c
 foreign pure named from "@flick-lang/runtime/ui/react" "uiNamed"

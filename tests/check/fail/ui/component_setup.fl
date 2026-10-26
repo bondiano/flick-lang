@@ -21,7 +21,13 @@ component counter (start : Number) =
     let other = Atom.make 0
     ui { text (show (Atom.value count + Atom.value other)) }
 
+component ticking (n : Number) =
+  render
+    let _started = Ui.on_mount (task { Platform.stdout_line "tick" })
+    ui { text (show n) }
+
 //~ FLICK-E001 @7:11-7:23 module initialization is pure
 //~ FLICK-E002 @10:16-10:28 does not allow service `Setup _`
-//~ FLICK-U004 @14:17-14:29 make the instance's state in the component's `setup`
+//~ FLICK-U004 @14:17-14:29 call it in a component's `setup`
 //~ FLICK-U006 @21:17-21:26 while rendering makes another one
+//~ FLICK-U004 @26:20-26:70 service `Setup _` is not allowed here

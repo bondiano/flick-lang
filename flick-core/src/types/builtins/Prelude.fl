@@ -37,6 +37,10 @@ type ServiceTag (r : ServiceRow)
 /// provides. It has no operations of its own.
 service Scope (s : Region)
 
+/// Work of a component instance that runs while it is mounted, which
+/// `Ui.on_mount` and `Ui.watch` describe.
+type Lifecycle
+
 /// The setup of a component instance, region `s`: it runs once when the
 /// instance mounts, and what it makes lives as long as the instance.
 service Setup (s : Region) =
@@ -44,6 +48,8 @@ service Setup (s : Region) =
   // shortcut: the result does not hold `s` yet, so an atom of the instance
   // may leave it; C5 qualifies it once the atom API takes `(Writable a)^d`.
   own : forall a. a ->{} a
+  /// Runs `work` from the instance's mount to its unmount.
+  start : forall c. Lifecycle^c ->{} Unit
 
 /// The implementation record of the one service of `r`:
 /// `ServiceImpl {Clock}` is `Clock.Impl`.

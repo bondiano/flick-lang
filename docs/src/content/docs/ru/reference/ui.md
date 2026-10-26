@@ -230,6 +230,37 @@ StrictMode в React. Когда экземпляр размонтируется,
 созданных его setup, прекращаются, а их задачи прерываются; корень при
 закрытии всё равно дожидается этих задач.
 
+#### Работа экземпляра
+
+`Ui.on_mount task` в setup запускает `task`, когда экземпляр смонтирован,
+как задачу корня: его unmount прерывает её и дожидается, её финализаторы
+выполняются, а дефект уходит супервизору корня. `Ui.watch read run`
+запускает `run` от того, что вычисляет `read`, и снова при каждом
+изменении атома, который `read` прочитал, сначала прервав предыдущий
+запуск. Оба — это `useEffect` из React без списка зависимостей:
+`on_mount` выполняется один раз на экземпляр, `watch` следит за
+прочитанными атомами. Под StrictMode повторный mount останавливает первый
+запуск до начала второго, а сервер рендерит, не запуская ни одного. Их
+задачи пишут атомы (`{Atom.Write}`), как задачи action.
+
+```flick
+component clock () =
+  setup
+    let seconds = Atom.local 0
+    let second = Result.with_default Duration.zero (Duration.seconds 1)
+    let _ticking =
+      Ui.on_mount
+        (task {
+          Effect.forever
+            (task {
+              Effect.sleep second
+              Atom.update seconds (fun n -> n + 1)
+            })
+        })
+  render
+    ui { text (show (Atom.value seconds)) }
+```
+
 Функция, которая создаёт состояние экземпляра, говорит об этом в
 сигнатуре, `Number ->{Setup s;} Atom.Writable Number`, и вызывается из
 setup. `render` перед `setup`, повтор секции или отсутствие `render` —

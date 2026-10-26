@@ -12,14 +12,30 @@ import { StrictMode, createElement } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import { atomState } from "../src/index.ts";
-import { actionExhaust, uiButton, uiFragment, uiRender, uiRunWith, uiStateful, uiText, uiView } from "../src/ui/react/index.ts";
+import { atomState, syncOperation } from "../src/index.ts";
+import {
+  SetupService,
+  actionExhaust,
+  uiButton,
+  uiFragment,
+  uiMounted,
+  uiRender,
+  uiRunWith,
+  uiStateful,
+  uiText,
+  uiView,
+  uiWatched,
+} from "../src/ui/react/index.ts";
+
+/** `Setup.start work` as a Flick setup calls it: a Sync call of `Setup`. */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the operation takes one argument
+const start = syncOperation(SetupService, "start", 1) as (work: unknown) => void;
 
 /** A counter whose setup makes its own count and its action. */
 const counter = (registry: AtomRegistry.AtomRegistry, setups: { count: number }) =>
-  uiStateful((start) => {
+  uiStateful((first) => {
     setups.count++;
-    const count = atomState(Number(start));
+    const count = atomState(Number(first));
     const add = actionExhaust(() => Effect.sync(() => registry.update(count, (n) => n + 1)));
     return () => uiButton({ disabled: false, on_click: add }, [uiText(`${get(count)}`)]);
   });
@@ -95,4 +111,82 @@ test("a root that closes waits for the tasks an unmounted instance interrupted",
   // the interruption takes 10 ms to finish; the root closes meanwhile
   await stop(fiber);
   assert.deepEqual(log, ["start 1", "stopped 1"]);
+});
+
+/** A StrictMode root in `root` whose renders commit at once. */
+const strict = (root: Element) => () => {
+  const renderer = createRoot(root);
+  return {
+    render: (node: Parameters<typeof renderer.render>[0]) => flushSync(() => renderer.render(createElement(StrictMode, null, node))),
+    unmount: () => renderer.unmount(),
+  };
+};
+
+test("on_mount runs once per live instance under StrictMode, and its unmount interrupts it", async () => {
+  const root = container();
+  const registry = AtomRegistry.make();
+  const shown = Atom.make(true);
+  const log: Array<string> = [];
+  let running = 0;
+  const ticking = uiStateful(() => {
+    start(
+      uiMounted(
+        Effect.acquireUseRelease(
+          Effect.sync(() => void log.push(`mounted ${++running}`)),
+          () => Effect.never,
+          () => Effect.sync(() => void log.push(`released ${running--}`)),
+        ),
+      ),
+    );
+    return () => uiText("tick");
+  });
+  const page = uiView(() => (get(shown) ? uiRender(ticking, undefined) : uiText("gone")));
+  const fiber = Effect.runFork(uiRunWith(strict(root), logging(log), uiRender(page, undefined), registry));
+  await tick();
+  // StrictMode's replay stopped the first run before the second began
+  assert.equal(running, 1);
+  assert.deepEqual(log, ["mounted 1", "released 1", "mounted 1"]);
+  registry.set(shown, false);
+  await tick();
+  assert.equal(running, 0);
+  assert.equal(root.textContent, "gone");
+  await stop(fiber);
+  assert.deepEqual(log, ["mounted 1", "released 1", "mounted 1", "released 1"]);
+});
+
+test("watch runs again when what it read changes, after the previous run stopped", async () => {
+  const root = container();
+  const registry = AtomRegistry.make();
+  const query = Atom.make("a");
+  const shown = Atom.make(true);
+  const log: Array<string> = [];
+  const searching = uiStateful(() => {
+    start(
+      uiWatched(
+        () => get(query),
+        (value) =>
+          Effect.onInterrupt(
+            Effect.andThen(
+              Effect.sync(() => void log.push(`run ${String(value)}`)),
+              Effect.never,
+            ),
+            () => Effect.sync(() => void log.push(`stop ${String(value)}`)),
+          ),
+      ),
+    );
+    return () => uiText("search");
+  });
+  const page = uiView(() => (get(shown) ? uiRender(searching, undefined) : uiText("gone")));
+  const fiber = mount(root, uiRender(page, undefined), log, registry);
+  await tick();
+  assert.deepEqual(log, ["run a"]);
+  registry.set(query, "b");
+  await tick();
+  assert.deepEqual(log, ["run a", "stop a", "run b"]);
+  registry.set(shown, false);
+  await tick();
+  registry.set(query, "c");
+  await tick();
+  assert.deepEqual(log, ["run a", "stop a", "run b", "stop b"]);
+  await stop(fiber);
 });
