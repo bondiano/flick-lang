@@ -13,6 +13,7 @@ import { HttpRouter } from "effect/http";
 import * as RpcClient from "effect/rpc/RpcClient";
 import * as RpcServer from "effect/rpc/RpcServer";
 
+import { toHandler } from "../effect/http/handler.ts";
 import { nodeHttp } from "../host.ts";
 import { service } from "../effects.ts";
 import { nativeStdio } from "../effect/Stdio.ts";
@@ -32,14 +33,21 @@ const framed = (serialization: Serialization): boolean =>
 /** How the server takes calls: a POST per call, or the messages of a WebSocket. */
 type Served = "http" | "websocket";
 
-const start = (transport: Served, options: ServeOptions, group: Group, handlers: Readonly<Record<string, Handler>>) =>
+/** Effect's HTTP app of the group with `handlers`, and the scope its calls run in. */
+const appOf = (transport: Served, serialization: Serialization, group: Group, handlers: Readonly<Record<string, Handler>>) =>
   Effect.gen(function* () {
     const { rpcs, scope, handled } = yield* prepare(group, handlers);
     const app = yield* (transport === "http" ? RpcServer.toHttpEffect(rpcs) : RpcServer.toHttpEffectWebsocket(rpcs)).pipe(
       Effect.provideContext(handled),
-      Effect.provide(options.serialization),
+      Effect.provide(serialization),
       Effect.provideService(Scope.Scope, scope),
     );
+    return { app, scope };
+  });
+
+const start = (transport: Served, options: ServeOptions, group: Group, handlers: Readonly<Record<string, Handler>>) =>
+  Effect.gen(function* () {
+    const { app, scope } = yield* appOf(transport, options.serialization, group, handlers);
     const router = yield* HttpRouter.make;
     const path: `/${string}` = isRoutePath(options.path) ? options.path : `/${options.path}`;
     yield* router.add(transport === "http" ? "POST" : "GET", path, app);
@@ -70,6 +78,20 @@ export const rpcListenWebsocket = (
   acquireRelease(start("websocket", options, group, handlers), (server) => Scope.close(server.scope, Exit.void));
 
 export const rpcPort = (server: Server): number => server.port;
+
+/** The Flick handler of `Rpc.handler`: the group's calls, owned by the innermost scope. */
+const handlerOf =
+  (transport: Served) => (serialization: Serialization, group: Group, handlers: Readonly<Record<string, Handler>>) =>
+    Effect.map(
+      acquireRelease(appOf(transport, serialization, group, handlers), ({ scope }) => Scope.close(scope, Exit.void)),
+      ({ app }) => toHandler(Effect.scoped(app)),
+    );
+
+/** `Rpc.handler serialization group handlers`: a POST per call, for a route. */
+export const rpcHandler = handlerOf("http");
+
+/** `Rpc.handler_websocket serialization group handlers`: a WebSocket per client, for a `GET` route. */
+export const rpcHandlerWebsocket = handlerOf("websocket");
 
 
 /** The TCP server of `listen_tcp`: messages framed on each connection. */

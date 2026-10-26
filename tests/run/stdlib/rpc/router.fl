@@ -1,0 +1,65 @@
+// A group served by `Http.Router` beside an ordinary route on one
+// `Http.Server`: the handler of `Rpc.handler` holds the region of the scope
+// that made it, and the router takes it as a route.
+module App.Main exposing (main)
+
+import Http.ClientError exposing (HttpClientError)
+import Http.Router exposing (RouteContext)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+import Stream.Core exposing (Stream)
+
+double : Rpc.Rpc "double" (Number ->{r;} Number)
+let double =
+  Rpc.make (Record.label : Record.Label "double")
+    |> Rpc.with_payload (Codec.json Schema.number)
+    |> Rpc.with_success (Codec.json Schema.number)
+
+count_to : Rpc.Rpc "count_to" (Number ->{r;} Stream none none Number)
+let count_to =
+  Rpc.make (Record.label : Record.Label "count_to")
+    |> Rpc.with_payload (Codec.json Schema.number)
+    |> Rpc.with_stream (Codec.json Schema.number)
+
+type alias Handlers r =
+  { double : Number ->{r;} Number; count_to : Number ->{r;} Stream none none Number }
+
+numbers : Rpc.Group (Handlers r)
+let numbers = Rpc.group |> Rpc.add double |> Rpc.add count_to
+
+hello : ServerRequest ->{RouteContext;} ServerResponse
+let hello _ =
+  let name = Option.with_default "nobody" (Http.Router.param "name")
+  Http.ServerResponse.text ("hello " ++ name) Http.ServerResponse.defaults
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let handlers : Handlers none =
+    { double = fun n -> n * 2; count_to = fun n -> Stream.from_list (List.range 1 (n + 1)) }
+  provide (Layer.merge Http.FetchClient.layer Http.Server.layer_services) {
+    try
+      scope s {
+        rpc : (ServerRequest ->{} ServerResponse)^{s}
+        let rpc = Rpc.handler Rpc.ndjson numbers handlers
+        app : (ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse)^{s}
+        let app =
+          Http.Router.router Http.Router.config
+            [
+              Http.Router.route (Some Http.Method.POST) "/rpc" (fun request -> rpc request),
+              Http.Router.route (Some Http.Method.GET) "/hello/:name" hello,
+            ]
+        let options : Http.Server.ServeOptions =
+          { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None }
+        let server = Http.Server.serve options app
+        let base = Http.Server.format_address (Http.Server.address server)
+        Platform.stdout_line ("doubled " ++ show (Rpc.call (base ++ "/rpc") double 21))
+        let counted = Stream.run_collect (Rpc.call_stream (base ++ "/rpc") count_to 3)
+        Platform.stdout_line ("counted " ++ show counted)
+        let greeting = Http.ClientResponse.text (Http.Client.get (base ++ "/hello/ada"))
+        Platform.stdout_line greeting
+      }
+    with
+    | Http.ServerError.ServeError _ -> Platform.stdout_line "serve failed"
+    | Rpc.ClientError message -> Platform.stdout_line ("client: " ++ message)
+    | HttpClientError _ -> Platform.stdout_line "http client failed"
+  }

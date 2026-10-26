@@ -141,6 +141,37 @@ node dist/rpc-demo/flick-main.js
 предоставьте `Stdio.node`. Оставьте stdout только для сообщений протокола;
 диагностику пишите в stderr.
 
+### Рядом с другими маршрутами
+
+`Rpc.handler serialization group handlers` отдаёт группу как HTTP-обработчик
+(POST-запрос на вызов), который `Http.Router` монтирует как обычный маршрут;
+`handler_websocket` — то же для `GET`-маршрута с WebSocket. Обработчик
+держит регион `s` области, в которой создан, как и маршруты и
+маршрутизатор над ним: возврат любого из них за пределы этой области —
+`FLICK-G001`.
+
+```flick
+serve_both : Http.Server.ServeOptions -> Handlers none ->{
+  Http.Platform.HttpPlatform,
+  Http.Etag.Generator;
+  Http.ServerError.ServeError
+}
+  Unit
+let serve_both options handlers =
+  scope s {
+    rpc : (ServerRequest ->{} ServerResponse)^{s}
+    let rpc = Rpc.handler Rpc.ndjson users handlers
+    let app =
+      Http.Router.router Http.Router.config
+        [
+          Http.Router.route (Some Http.Method.POST) "/rpc" (fun request -> rpc request),
+          Http.Router.route (Some Http.Method.GET) "/hello/:name" hello,
+        ]
+    let server = Http.Server.serve options app
+    Platform.stdout_line (Http.Server.format_address (Http.Server.address server))
+  }
+```
+
 Серверы Node живут за отдельной точкой входа: браузерная программа,
 которая только вызывает процедуры, не втягивает HTTP-сервер и
 сокет-сервер Node.

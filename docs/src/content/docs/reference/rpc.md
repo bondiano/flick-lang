@@ -137,6 +137,37 @@ when `port = 0`. `Rpc.defaults` selects `127.0.0.1`, port `0`, `/rpc` and
 provide `Stdio.node`. Reserve stdout exclusively for protocol messages;
 write diagnostics to stderr.
 
+### Beside other routes
+
+`Rpc.handler serialization group handlers` serves the group as an HTTP
+handler, a POST per call, that `Http.Router` mounts like any other route;
+`handler_websocket` is the same for a `GET` route of WebSockets. The
+handler holds the region `s` of the scope that made it, and so do the
+routes and the router over it: one of them returned out of that scope is
+`FLICK-G001`.
+
+```flick
+serve_both : Http.Server.ServeOptions -> Handlers none ->{
+  Http.Platform.HttpPlatform,
+  Http.Etag.Generator;
+  Http.ServerError.ServeError
+}
+  Unit
+let serve_both options handlers =
+  scope s {
+    rpc : (ServerRequest ->{} ServerResponse)^{s}
+    let rpc = Rpc.handler Rpc.ndjson users handlers
+    let app =
+      Http.Router.router Http.Router.config
+        [
+          Http.Router.route (Some Http.Method.POST) "/rpc" (fun request -> rpc request),
+          Http.Router.route (Some Http.Method.GET) "/hello/:name" hello,
+        ]
+    let server = Http.Server.serve options app
+    Platform.stdout_line (Http.Server.format_address (Http.Server.address server))
+  }
+```
+
 The Node servers live behind their own entry point: a browser program
 that only calls procedures pulls in no Node HTTP or socket server.
 

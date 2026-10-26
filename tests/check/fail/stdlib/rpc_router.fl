@@ -1,0 +1,17 @@
+module App.RpcRouter exposing (..)
+
+import Http.Router exposing (Route)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+// A route over the handler of `Rpc.handler` holds the region of its scope,
+// so it cannot outlive it.
+escaped : Rpc.Group {} ->{} Route none none
+let escaped group =
+  scope s {
+    rpc : (ServerRequest ->{} ServerResponse)^{s}
+    let rpc = Rpc.handler Rpc.ndjson group {}
+    Http.Router.route (Some Http.Method.POST) "/rpc" (fun request -> rpc request)
+  }
+
+//~ FLICK-G001 @14:5-14:82 this value holds region `s`, but the expected type `Route none none` holds no captures

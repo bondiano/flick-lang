@@ -7,6 +7,8 @@
 /// `effect/rpc`.
 module Rpc exposing (..)
 
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
 import Stream.Core exposing (Stream)
 
 /// A procedure named `l`, whose handler has the type `f`: `p ->{r; e} s`.
@@ -214,6 +216,28 @@ port : Server s -> Number
 foreign pure port from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcPort"
   retention call
   reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"
+
+/// The group with these handlers as an HTTP handler, a POST per call, for a
+/// route of `Http.Router` beside others: `Http.Router.route (Some POST)
+/// "/rpc" (fun request -> rpc request)`. It holds region `s`: when the scope
+/// owning it closes, the calls it serves finish and run their finalizers.
+handler :
+  forall c s r hs.
+  Serialization -> Group hs -> (hs^c ->{Scope s | r;} (ServerRequest ->{} ServerResponse)^{s})^c
+foreign effect handler from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandler"
+  arity 3
+  retention owner
+  reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"
+
+/// As `handler`, each client a WebSocket whose messages carry its calls,
+/// for a `GET` route.
+handler_websocket :
+  forall c s r hs.
+  Serialization -> Group hs -> (hs^c ->{Scope s | r;} (ServerRequest ->{} ServerResponse)^{s})^c
+foreign effect handler_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandlerWebsocket"
+  arity 3
+  retention owner
+  reviewed "effect@4.0.5 sha256:9aaac4b7a11d7595"
 
 /// Calls the procedure at `url` (`http://127.0.0.1:8080/rpc`, or
 /// `ws://…` over `websocket`) as `options` says: the success, a declared
