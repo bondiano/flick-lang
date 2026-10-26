@@ -75,10 +75,17 @@ impl Checker<'_> {
             let Some((a, b, x, fa, fb, fx)) = self.map2_parts(span) else {
                 return Type::Error;
             };
-            let _ = self.unify(&fa, &acc);
+            if i > 0 {
+                let _ = self.unify(&fa, &acc);
+            }
             if let Some(value) = values.get(i + 1) {
                 let at = parts[i + 1].1.map_or(span, |v| self.span(v));
                 self.expect(value, &fb, at);
+            }
+            // checked like the others, once the second shows the container
+            if i == 0 && self.unify(&fa, &acc).is_err() {
+                let at = parts[0].1.map_or(span, |v| self.span(v));
+                self.expect(&acc, &fa, at);
             }
             if i == 0 {
                 items.push(a);

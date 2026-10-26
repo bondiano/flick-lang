@@ -11,5 +11,10 @@ let dependent a = do { x <- a and y <- lookup x; pure (x + y) }
 ending : Option Number -> Option Number
 let ending a = do { x <- a and y <- a }
 
+// each operand is a container, the first as the others
+scalar : Option Number
+let scalar = do { x <- 1 and y <- Some 2; pure (x + y) }
+
 //~ FLICK-T001 @8:47-8:48 `x` is bound by another binding of this `and` group
 //~ FLICK-T019 @12:21-12:38 must end with an expression
+//~ FLICK-T003 @16:24-16:25 expected `Option _`, found `Number`

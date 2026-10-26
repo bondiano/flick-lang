@@ -517,7 +517,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 **Q21. P1 — Option ? нарушает выведенный тип** ✅ (несовпадение результата, навязанного `?`, с телом — T003; `tests/check/fail/types/question.fl`)
 `value : Number; let value = (fun () -> (None : Option Number)? + 1) ()` принимается, экспортируя None вместо Number. [function_with](../../flick-core/src/types/infer.rs#L357-L378) игнорирует неудачную unify результата, навязанного `?`, с телом. Нужна ошибка типов; корректное тело с Some возвращает None.
 
-**Q22. P1 — and принимает скаляр как контейнер**
+**Q22. P1 — and принимает скаляр как контейнер** ✅ (первый операнд проверяется через `expect`, как остальные, после второго, который задаёт контейнер; `tests/check/fail/types/applicative_do.fl`)
 `do { x <- 1 and y <- Some 2; pure (x + y) } : Option Number` даёт None. Обычный `map2 (fun x y -> x + y) 1 (Some 2)` отвергается с T003; корректная группа — Some 3.
 
 [Первая unify](../../flick-core/src/types/applicative_do.rs#L71-L81) игнорирует ошибку. Проверять первый operand как остальные: sugar не обходит типобезопасность.
