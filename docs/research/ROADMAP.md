@@ -527,7 +527,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 
 [prelude_pure вызывается до binding patterns](../../flick-core/src/types/applicative_do.rs#L62-L66), принимая локальную функцию за sugar. Разрешать callee в правильном lexical scope.
 
-**Q24. P2 — Квалификация pure требует лишний Monad**
+**Q24. P2 — Квалификация pure требует лишний Monad** ✅ (`Prelude.pure` разрешается через квалификатор модуля, скобки вокруг `pure e` прозрачны; `tests/run/codegen/applicative_do.fl`)
 Для `both : Applicative f => f Number -> f Number -> f Number` терминальный `pure (x+y)` после and принимается; `Prelude.pure (x+y)` или `(pure (x+y))` дают C001: нужен Monad f. Validation намеренно не Monad.
 
 [Сравнивается текст](../../flick-core/src/types/applicative_do.rs#L214-L227). Распознавать resolved method и прозрачные скобки, сохраняя shadowing.

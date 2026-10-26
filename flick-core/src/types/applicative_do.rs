@@ -28,13 +28,20 @@ pub fn group_key(group: &Node) -> (u32, u32) {
     (group.range().0, group.range().0)
 }
 
-/// The argument `e` of a last statement `pure e`, as written.
-pub fn pure_argument(statement: &Node) -> Option<&Node> {
+/// The head and the argument `e` of a last statement `pure e`, as
+/// written, in parentheses or not.
+fn pure_parts(statement: &Node) -> Option<(&Node, &Node)> {
+    let statement = super::sugar_lints::unparen(statement);
     let parts: Vec<&Node> = statement.nodes().collect();
     match (statement.kind, &parts[..]) {
-        (K::AppExpr, [head, value]) if head.kind == K::NameExpr => Some(value),
+        (K::AppExpr, [head, value]) if head.kind == K::NameExpr => Some((head, value)),
         _ => None,
     }
+}
+
+/// The argument `e` of a last statement `pure e`, as written.
+pub fn pure_argument(statement: &Node) -> Option<&Node> {
+    pure_parts(statement).map(|(_, value)| value)
 }
 
 impl Checker<'_> {
@@ -225,19 +232,26 @@ impl Checker<'_> {
     /// Whether `statement` is `pure e` of the Prelude's `Applicative`,
     /// not of a `pure` the group binds in `bound`.
     fn prelude_pure(&self, statement: &Node, bound: &[String]) -> bool {
-        let Some(head) = statement
-            .nodes()
-            .next()
-            .filter(|_| pure_argument(statement).is_some())
-        else {
+        let Some((head, _)) = pure_parts(statement) else {
             return false;
         };
-        let name = &self.text[head.range().0 as usize..head.range().1 as usize];
-        name == "pure"
-            && !bound.iter().any(|b| b == "pure")
-            && !self.locals.iter().any(|l| l.name == "pure")
-            && matches!(self.env.find(Namespace::Value, "pure"),
-                Found::Entity(e) if e.module == "Prelude")
+        let name: String = self.text[head.range().0 as usize..head.range().1 as usize]
+            .split_whitespace()
+            .collect();
+        match name.rsplit_once('.') {
+            Some((qualifier, "pure")) => self
+                .env
+                .qualified_module(qualifier)
+                .is_some_and(|(module, _)| module == "Prelude"),
+            Some(_) => false,
+            None => {
+                name == "pure"
+                    && !bound.iter().any(|b| b == "pure")
+                    && !self.locals.iter().any(|l| l.name == "pure")
+                    && matches!(self.env.find(Namespace::Value, "pure"),
+                        Found::Entity(e) if e.module == "Prelude")
+            }
+        }
     }
 
     /// A value of a group naming what another binding of it binds: the

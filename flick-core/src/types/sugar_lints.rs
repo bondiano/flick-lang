@@ -398,7 +398,7 @@ fn words(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn unparen(node: &Node) -> &Node {
+pub(super) fn unparen(node: &Node) -> &Node {
     match node.kind {
         K::ParenExpr => node.nodes().next().map_or(node, unparen),
         _ => node,
