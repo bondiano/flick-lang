@@ -217,3 +217,36 @@ let render = Ui.render
   (operator)
   (constructor)
   (member))
+
+==================
+Component sections on their lines
+==================
+
+component c (p : P) =
+  setup
+    let n = render p
+  render ui { text n }
+r#"raw"#
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (parens
+    (identifier)
+    (operator)
+    (constructor))
+  (operator)
+  (keyword)
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (identifier)
+  (keyword)
+  (keyword)
+  (braces
+    (identifier)
+    (identifier))
+  (raw_string))
