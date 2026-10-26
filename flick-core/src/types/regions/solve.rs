@@ -136,9 +136,10 @@ impl Checker<'_> {
     /// The region `atom` as a diagnostic names it, and the scope it ends with.
     fn describe(&self, atom: &Type) -> (String, Option<Span>) {
         match atom {
-            Type::Skolem(s) if self.regions.lent.contains(s) => {
-                ("the reader of a lazy `for` that reads atoms".to_owned(), None)
-            }
+            Type::Skolem(s) if self.regions.lent.contains(s) => (
+                "the reader of a lazy `for` that reads atoms".to_owned(),
+                None,
+            ),
             Type::Skolem(s) => {
                 let name = self.store.skolem_name(*s);
                 match self.scope_of(*s) {

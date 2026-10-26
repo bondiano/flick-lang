@@ -419,7 +419,11 @@ impl Checker<'_> {
     /// The region of the reader the innermost function lends to a lazy
     /// `for` at `span`.
     pub fn reader_region(&mut self, span: Span) -> Type {
-        let level = self.regions.readers.last().map_or(self.store.level, |r| r.level);
+        let level = self
+            .regions
+            .readers
+            .last()
+            .map_or(self.store.level, |r| r.level);
         if let Some(Reader {
             region: Some((id, _)),
             ..
@@ -438,7 +442,7 @@ impl Checker<'_> {
     }
 
     /// `ty` qualified with the reader `region` too.
-    pub fn read_through(&self, ty: Type, region: &Type) -> Type {
+    pub fn read_through(ty: Type, region: &Type) -> Type {
         let label = capture_label(region).expect("a skolem has a label");
         qualify(ty, vec![(label, region.clone())])
     }

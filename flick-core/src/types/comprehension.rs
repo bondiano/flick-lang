@@ -118,7 +118,7 @@ impl Checker<'_> {
         let seq = Type::app(Type::prim("Seq"), item);
         let seq = self.close_over(seq, held, expected.cloned(), "sequence", self.span(node));
         match region {
-            Some(region) if expected.is_none() => self.read_through(seq, &region),
+            Some(region) if expected.is_none() => Self::read_through(seq, &region),
             _ => seq,
         }
     }

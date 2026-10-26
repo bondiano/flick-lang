@@ -61,16 +61,12 @@ impl Function {
         let span = arg.span;
         match self {
             Function::Lambda(Pat::Bind(name), body) => Expr::new(
-                ExprKind::Block(
-                    vec![Stmt::Let(Pat::Bind(name.clone()), arg)],
-                    body.clone(),
-                ),
+                ExprKind::Block(vec![Stmt::Let(Pat::Bind(name.clone()), arg)], body.clone()),
                 span,
             ),
-            Function::Lambda(_, body) => Expr::new(
-                ExprKind::Block(vec![Stmt::Expr(arg)], body.clone()),
-                span,
-            ),
+            Function::Lambda(_, body) => {
+                Expr::new(ExprKind::Block(vec![Stmt::Expr(arg)], body.clone()), span)
+            }
             Function::Bound(name) => Expr::new(
                 ExprKind::App {
                     func: Box::new(Expr::new(ExprKind::Local(name.clone()), span)),
@@ -270,7 +266,7 @@ fn total(body: &Expr) -> bool {
         ExprKind::Block(stmts, tail) => {
             stmts.iter().all(|s| match s {
                 Stmt::Let(_, v) | Stmt::Expr(v) => droppable(v),
-                _ => false,
+                Stmt::Fun { .. } => false,
             }) && total(tail)
         }
         _ => droppable(body),

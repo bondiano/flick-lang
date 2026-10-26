@@ -180,8 +180,8 @@ impl Gen<'_> {
             let js = self.ordered(&[func, arg]);
             (js[0].clone(), js[1].clone())
         };
-        let [f, a] = <[String; 2]>::try_from(self.before_sync(stage, vec![f, a]))
-            .expect("two operands");
+        let [f, a] =
+            <[String; 2]>::try_from(self.before_sync(stage, vec![f, a])).expect("two operands");
         // `(x) => (y)` ends with `)` too, yet needs parentheses to be called
         let call_like = tidy::is_call(&f);
         let f = if atomic(&f) || call_like {

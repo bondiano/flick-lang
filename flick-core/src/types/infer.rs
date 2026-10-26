@@ -368,7 +368,9 @@ impl Checker<'_> {
             self.error(
                 codes::T003,
                 self.span(node),
-                format!("`?` in this function returns `{returns}`, but its body has type `{result}`"),
+                format!(
+                    "`?` in this function returns `{returns}`, but its body has type `{result}`"
+                ),
             );
         }
         if inferred && let Some(stage) = stages.last_mut() {
