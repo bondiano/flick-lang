@@ -204,6 +204,11 @@ component counter (start : Number) =
     ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
 ```
 
+The setup runs once per mounted instance, under React's StrictMode too.
+When an instance unmounts, the events of the actions its setup made stop
+and their tasks are interrupted; the root still waits for those tasks
+when it closes.
+
 A function that makes the state of an instance says so in its signature,
 `Number ->{Setup s;} Atom.Writable Number`, and is called from a setup. A
 `render` before `setup`, a second section of a kind or a missing `render` is

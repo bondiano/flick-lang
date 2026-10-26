@@ -25,16 +25,38 @@ let problem locale diagnostic =
       ]
   }
 
-problems_pane : Locale -> List Diagnostic -> Ui
-let problems_pane locale diagnostics =
-  ui {
-    div { class_name = "fp-diagnostics" }
-      [
-        match diagnostics with
-        | [] -> paragraph [text (tr locale "No diagnostics." "Ошибок и предупреждений нет.")]
-        | items -> list (List.map (problem locale) items),
-      ]
-  }
+type alias Problems = { locale : Locale; diagnostics : List Diagnostic }
+
+// each pane keeps its own filter, which the model does not need to know
+component problems_pane (props : Problems) =
+  setup
+    let errors_only = Atom.local false
+    let toggle = Action.exhaust (fun _ -> task { Atom.update errors_only (fun on -> not on) })
+  render
+    let only = Atom.value errors_only
+    let shown =
+      if only then
+        List.filter (fun d -> d.severity == "error") props.diagnostics
+      else
+        props.diagnostics
+    ui {
+      div { class_name = "fp-diagnostics" }
+        [
+          Ui.with_host { Ui.host with class_name = Some "fp-filter" }
+            (button { disabled = props.diagnostics == []; on_click = toggle }
+              [
+                text
+                  (if only then
+                    tr props.locale "Show all" "Показать все"
+                  else
+                    tr props.locale "Errors only" "Только ошибки"),
+              ]),
+          match shown with
+          | [] ->
+            paragraph [text (tr props.locale "No diagnostics." "Ошибок и предупреждений нет.")]
+          | items -> list (List.map (problem props.locale) items),
+        ]
+    }
 
 current_problems : Model -> Ui
 let current_problems m =
@@ -59,7 +81,7 @@ let current_problems m =
             "Повторите загрузку или компиляцию с помощью кнопки выше, чтобы проверить код."),
       ]
   else
-    problems_pane m.locale (generated m).diagnostics
+    Ui.render problems_pane { locale = m.locale; diagnostics = (generated m).diagnostics }
 
 execution_status : Model -> String
 let execution_status m =
@@ -142,7 +164,7 @@ let output_pane m =
             (div { class_name = if m.execution.status == "exit" && m.execution.detail == "0" then "fp-exit" else "fp-exit fp-bad" }
               [text (execution_status m ++ " · " ++ profile_name m.ran_profile)]),
           if m.execution.status == "failure" then pre { class_name = "fp-failure-detail" } [text m.execution.detail] else empty,
-          if m.execution.status == "invalid" then problems_pane m.locale m.execution.diagnostics else empty,
+          if m.execution.status == "invalid" then Ui.render problems_pane { locale = m.locale; diagnostics = m.execution.diagnostics } else empty,
           if m.source != m.ran_source || m.profile != m.ran_profile then
             div
               { class_name = "fp-stale" }

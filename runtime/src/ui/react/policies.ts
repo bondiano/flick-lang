@@ -44,7 +44,26 @@ export const eventConcurrent = (limit: number, run: Handler["run"]): Handler =>
 export const eventPreventDefault = (decide: (snapshot: unknown) => boolean, inner: Handler): Handler =>
   Object.freeze({ ...inner, prevent: decide });
 
-const makeAction = (policy: Policy, run: Handler["run"]): Handler => Object.freeze({ policy, run, shared: true });
+/** The actions the setup of the instance at hand makes, while it runs. */
+let made: Array<Handler> | undefined;
+
+const makeAction = (policy: Policy, run: Handler["run"]): Handler => {
+  const action: Handler = Object.freeze({ policy, run, shared: true });
+  made?.push(action);
+  return action;
+};
+
+/** What `setup` returns, and the actions it made: those of an instance. */
+export const instanceActions = <A>(setup: () => A): readonly [A, ReadonlyArray<Handler>] => {
+  const saved = made;
+  const actions: Array<Handler> = [];
+  made = actions;
+  try {
+    return [setup(), actions];
+  } finally {
+    made = saved;
+  }
+};
 
 export const actionExhaust = (run: Handler["run"]): Handler => makeAction({ kind: "exhaust" }, run);
 export const actionLatest = (run: Handler["run"]): Handler => makeAction({ kind: "latest" }, run);
@@ -150,6 +169,22 @@ export class Bridge<R> {
       },
       close: () => undefined,
     };
+  }
+
+  /**
+   * The instance that made `actions` unmounts: their events stop and their
+   * tasks are interrupted. A task stays among the root's until it ends, so
+   * the root's teardown still waits for it.
+   */
+  release(actions: ReadonlyArray<Handler>): void {
+    for (const action of actions) {
+      const slot = this.actions.get(action);
+      if (slot === undefined) continue;
+      this.actions.delete(action);
+      slot.binding = undefined;
+      slot.waiting.length = 0;
+      for (const task of slot.running) Effect.runFork(Fiber.interrupt(task));
+    }
   }
 
   private dispatch(slot: Slot, { handler, snapshot: take }: Binding, event: DomEvent): void {

@@ -225,6 +225,11 @@ component counter (start : Number) =
     ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
 ```
 
+Setup выполняется один раз на смонтированный экземпляр, в том числе под
+StrictMode в React. Когда экземпляр размонтируется, события action,
+созданных его setup, прекращаются, а их задачи прерываются; корень при
+закрытии всё равно дожидается этих задач.
+
 Функция, которая создаёт состояние экземпляра, говорит об этом в
 сигнатуре, `Number ->{Setup s;} Atom.Writable Number`, и вызывается из
 setup. `render` перед `setup`, повтор секции или отсутствие `render` —

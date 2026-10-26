@@ -14,7 +14,7 @@ import {
   useLayoutEffect,
   useMemo,
   useReducer,
-  useState,
+  useRef,
   useSyncExternalStore,
 } from "react";
 
@@ -24,7 +24,7 @@ import { service } from "../../effects.ts";
 import { syncAbi, syncIn } from "../../sync.ts";
 import { BridgeContext, RegistryContext, StreamContext, toReact } from "./render.ts";
 import { type Binding, type DomEvent, type Static, type Ui, element, inputSnapshot, uiComponent, uiFragment } from "./nodes.ts";
-import type { Handler } from "./policies.ts";
+import { type Handler, instanceActions } from "./policies.ts";
 
 /**
  * `View p r e`: a component whose render reads atoms through `Atom.Read`.
@@ -51,9 +51,21 @@ export const SetupService = /*#__PURE__*/ service<SetupImpl>("Prelude.Setup");
 
 const instance: SetupImpl = { own: (value) => value, [syncAbi]: true };
 
-/** The render `setup` makes for an instance with these first props. */
-const setUp = (setup: (props: unknown) => (props: unknown) => Ui, props: unknown): ((props: unknown) => Ui) =>
-  syncIn(Context.make(SetupService, instance), () => setup(props));
+/** The render `setup` makes for an instance with these first props, and the actions it made. */
+const setUp = (setup: (props: unknown) => (props: unknown) => Ui, props: unknown) =>
+  instanceActions(() => syncIn(Context.make(SetupService, instance), () => setup(props)));
+
+/** What an instance renders with: its view and the actions its setup made. */
+interface Instance {
+  readonly view: View;
+  readonly actions: ReadonlyArray<Handler>;
+}
+
+const instanceOf = (view: View, props: unknown): Instance => {
+  if (view.setup === undefined) return { view, actions: [] };
+  const [render, actions] = setUp(view.setup, props);
+  return { view: { ...view, render }, actions };
+};
 
 /**
  * `Ui.stateful`: a component whose instances render with what `setup`
@@ -61,7 +73,7 @@ const setUp = (setup: (props: unknown) => (props: unknown) => Ui, props: unknown
  * on each render.
  */
 export const uiStateful = (setup: (props: unknown) => (props: unknown) => Ui): View =>
-  Object.freeze({ render: (props: unknown) => setUp(setup, props)(props), setup, label: undefined });
+  Object.freeze({ render: (props: unknown) => setUp(setup, props)[0](props), setup, label: undefined });
 
 /** `Ui.view`: a component of the Sync `render`. */
 export const uiView = (render: (props: unknown) => Ui): View => Object.freeze({ render, label: undefined });
@@ -121,7 +133,11 @@ const component = (view: View): FunctionComponent<object> => {
     const server = serverSide();
     const streaming = useContext(StreamContext);
     // React keeps the first state of an instance: its setup runs once
-    const [own] = useState(() => (view.setup === undefined ? view : { ...view, render: setUp(view.setup, props) }));
+    // set up once per instance: StrictMode calls a state's initializer twice, not a ref's
+    const ref = useRef<Instance | undefined>(undefined);
+    ref.current ??= instanceOf(view, props);
+    const { view: own, actions } = ref.current;
+    useLayoutEffect(() => () => bridge?.release(actions), [bridge, actions]);
     const read = new Map<Atom.Atom<unknown>, unknown>();
     const reading = (atom: Atom.Atom<unknown>): unknown => {
       const value = server ? Atom.getServerValue(atom, registry) : registry.get(atom);
