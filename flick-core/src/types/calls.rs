@@ -149,8 +149,7 @@ impl Checker<'_> {
                         self.early_argument(head, arg);
                     }
                     if let Some(e) = effects {
-                        self.perform(&e.services, &e.errors, span);
-                        self.record_call(&e, super::typing::range(span));
+                        self.call_effects(&e, span);
                     }
                     params.push(*param);
                     ty = self.instantiate(&result, span);
@@ -304,8 +303,7 @@ impl Checker<'_> {
                 if let Some(e) = effects {
                     let (start, _) = lhs.range();
                     let (_, end) = rhs.range();
-                    self.perform(&e.services, &e.errors, Span::new(self.file, start, end));
-                    self.record_call(&e, (start, end));
+                    self.call_effects(&e, Span::new(self.file, start, end));
                 }
                 let span = Span::new(self.file, lhs.range().0, rhs.range().1);
                 self.instantiate(&result, span)

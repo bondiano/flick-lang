@@ -11,14 +11,14 @@ use crate::ir::{Expr, ExprKind, Lit, Pat};
 impl Gen<'_> {
     /// A `Generate`, or a loop or yield of one emitted for what it does.
     pub(super) fn generated(&mut self, e: &Expr) -> String {
-        if let ExprKind::Generate { body, strict } = &e.kind {
-            return self.generate(body, *strict);
+        if let ExprKind::Generate { body, strict, sync } = &e.kind {
+            return self.generate(body, *strict, *sync);
         }
         self.discard(e);
         "undefined".to_owned()
     }
 
-    fn generate(&mut self, body: &Expr, strict: bool) -> String {
+    fn generate(&mut self, body: &Expr, strict: bool, sync: bool) -> String {
         let tail = self.tail.take();
         let result = if strict {
             let out = self.temp();
@@ -28,13 +28,23 @@ impl Gen<'_> {
             self.collector = saved;
             out
         } else {
-            // the clauses are pure: the generator runs no Effect
+            // the clauses run no Effect: Sync calls at most, with the
+            // services of the stage here, which each step of a `seqIn` reads
             let generator = mem::replace(&mut self.generator, false);
-            let saved = self.collector.take();
+            let saved = (self.collector.take(), mem::replace(&mut self.sync, sync));
             let (stmts, ()) = self.block(|g| g.discard(body));
-            self.collector = saved;
+            (self.collector, self.sync) = saved;
             self.generator = generator;
-            format!("{}(function* () {{\n{}}})", self.rt("seq"), indent(&stmts))
+            let function = format!("function* () {{\n{}}}", indent(&stmts));
+            if !sync {
+                format!("{}({function})", self.rt("seq"))
+            } else if self.generator {
+                let context = format!("(yield* {})", self.rt("fiberContext"));
+                format!("{}({context}, {function})", self.rt("seqIn"))
+            } else {
+                let context = format!("{}()", self.rt("syncContext"));
+                format!("{}({context}, {function})", self.rt("seqIn"))
+            }
         };
         self.tail = tail;
         result

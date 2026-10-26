@@ -1,0 +1,41 @@
+// Sync calls in the body of `for`: a lazy sequence reads, at each step, the
+// atoms of the reader that built it, and a strict list reads them at once.
+module App.Main exposing (main)
+
+first : Atom.Writable Number
+let first = Atom.make 1
+
+second : Atom.Writable Number
+let second = Atom.make 2
+
+tens : Unit ->{Atom.Read;} Seq Number
+let tens () = for { atom <- [first, second] } yield Atom.value atom * 10
+
+page : Ui.View Unit
+let page =
+  Ui.view (fun () ->
+    let values = tens ()
+    ui {
+      fragment
+        [
+          text (show (Seq.to_list values)),
+          text (show (Seq.to_list values)),
+          fragment [for atom <- [first, second] yield text (show (Atom.value atom))],
+        ]
+    })
+
+// a runtime render: the sequence reads the fiber's reader
+suspended : Ui.View Unit
+let suspended =
+  Ui.suspended (fun _ -> ui { text "failed" }) (ui { text "loading" }) (fun () ->
+    let doubled = for { atom <- [first, second] } yield Atom.value atom * 2
+    ui { text (show (Seq.fold (fun a b -> a + b) 0 doubled)) })
+
+main : Unit ->{; AppError} Unit
+let main () =
+  provide Atom.layer {
+    Platform.stdout_line (Ui.Server.render (Ui.render page ()))
+    Atom.set second 5
+    Platform.stdout_line (Ui.Server.render (Ui.render page ()))
+    Platform.stdout_line (Ui.Server.render (Ui.render suspended ()))
+  }

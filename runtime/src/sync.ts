@@ -4,6 +4,8 @@
 // calls it (a render, a derived atom), by `sync` inside a fiber.
 import { Context, Effect } from "effect";
 
+import { type Seq, seq } from "./core/seq.ts";
+
 let current: Context.Context<never> = Context.empty();
 
 /** Calls `f` with `context` as the services of its Sync calls. */
@@ -47,3 +49,28 @@ export const syncOperation = <S extends object>(tag: Context.Service<S, S>, name
     args.length === arity ? call(args) : (a: unknown) => collect([...args, a]);
   return arity === 0 ? call([]) : collect([]);
 };
+
+/** The services the Sync stage at hand reads. */
+export const syncContext = (): Context.Context<never> => current;
+
+/** The services of the fiber, for a sequence whose steps read them later. */
+export const fiberContext: Effect.Effect<Context.Context<never>> = /*#__PURE__*/ Effect.context();
+
+/**
+ * The sequence of a `for` whose body makes Sync calls: each step runs with
+ * `context`, the services of the stage that built it, so iterating it
+ * again reads them again.
+ */
+export const seqIn = <A>(context: Context.Context<never>, gen: () => Iterator<A>): Seq<A> =>
+  seq(function* () {
+    const steps = gen();
+    try {
+      for (;;) {
+        const step = syncIn(context, () => steps.next());
+        if (step.done === true) return;
+        yield step.value;
+      }
+    } finally {
+      syncIn(context, () => steps.return?.());
+    }
+  });

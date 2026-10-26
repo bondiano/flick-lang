@@ -34,6 +34,8 @@ pub struct Stage {
     pub runtime: bool,
     /// The stage is Sync: its calls run at once (see [`super::ty::Stage`]).
     pub sync: bool,
+    /// Why runtime calls are not allowed in this Sync stage, if they are not.
+    pub only_sync: Option<&'static str>,
     /// Runtime calls so far, to tell whether an argument ran one.
     pub calls: usize,
     /// How many `scope`s were open when the stage began: those opened
@@ -61,6 +63,7 @@ impl Stage {
             site: 0,
             runtime: false,
             sync: false,
+            only_sync: None,
             calls: 0,
             scopes: 0,
         }
@@ -88,6 +91,7 @@ impl Checker<'_> {
             site: self.sites.len() - 1,
             runtime: false,
             sync: false,
+            only_sync: None,
             calls: 0,
             scopes: self.regions.open.len(),
         }
@@ -131,8 +135,26 @@ impl Checker<'_> {
         self.sub_row(errors, &bound_errors, site, span, true);
     }
 
+    /// A call of `effects` at `span`: performed and recorded for code
+    /// generation, unless the stage allows Sync calls alone.
+    pub fn call_effects(&mut self, effects: &Effects, span: Span) {
+        if let Some(reason) = self.stage.only_sync.filter(|_| !effects.sync) {
+            self.stage.runtime = true;
+            if !self.diagnostics.iter().any(|d| d.span == Some(span)) {
+                self.error(
+                    codes::E001,
+                    span,
+                    format!("this is a runtime call, but {reason}"),
+                );
+            }
+            return;
+        }
+        self.perform(&effects.services, &effects.errors, span);
+        self.record_call(effects, super::typing::range(span));
+    }
+
     /// Records the application or pipe at `range` as a call of `effects`.
-    pub fn record_call(&mut self, effects: &Effects, range: super::typing::Range) {
+    fn record_call(&mut self, effects: &Effects, range: super::typing::Range) {
         if effects.sync {
             self.typing.sync.insert(range);
         } else {

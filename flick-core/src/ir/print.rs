@@ -176,8 +176,13 @@ pub fn expr(e: &Expr) -> String {
         ExprKind::Ignore(e) => format!("(ignore {})", expr(e)),
         ExprKind::Await(e) => format!("(await {})", expr(e)),
         ExprKind::Task(e) => format!("(task {})", expr(e)),
-        ExprKind::Generate { body, strict } => {
-            format!("({} {})", if *strict { "list" } else { "seq" }, expr(body))
+        ExprKind::Generate { body, strict, sync } => {
+            let kind = match (strict, sync) {
+                (true, _) => "list",
+                (false, false) => "seq",
+                (false, true) => "seq~",
+            };
+            format!("({kind} {})", expr(body))
         }
         ExprKind::Each {
             pat: p,

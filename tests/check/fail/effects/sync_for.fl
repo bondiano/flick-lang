@@ -1,0 +1,23 @@
+module App.SyncFor exposing (..)
+
+count : Atom.Writable Number
+let count = Atom.make 0
+
+service Log =
+  keep : Number ->{} Bool
+
+// a runtime call may suspend, so it does not run at a step of a sequence
+logged : Unit ->{Atom.Read, Log;} Seq Number
+let logged () = for { n <- [1, 2]; if Log.keep n } yield n
+
+// a pure function has no reader to lend
+pure_reads : Unit -> Seq Number
+let pure_reads () = for { n <- [1, 2] } yield n + Atom.value count
+
+// the stage that builds it needs `Atom.Read`
+unread : Unit ->{Log;} List Number
+let unread () = [for n <- [1, 2] yield n + Atom.value count]
+
+//~ FLICK-E001 @11:39-11:49 only Sync calls
+//~ FLICK-E001 @15:51-15:67 outside this function
+//~ FLICK-E002 @19:18-19:60 does not allow service `Read`

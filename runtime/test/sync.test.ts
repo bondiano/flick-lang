@@ -5,7 +5,7 @@ import { test } from "node:test";
 
 import { Context, Effect } from "effect";
 
-import { runIn, service, sync, syncIn, syncOperation } from "../src/index.ts";
+import { runIn, seqIn, service, sync, syncIn, syncOperation } from "../src/index.ts";
 
 interface NameImpl {
   readonly name: (greeting: string) => unknown;
@@ -31,4 +31,23 @@ test("inside a fiber a Sync call reads the fiber's services, and a runtime call 
     impl,
   );
   assert.equal(Effect.runSync(program), "yo Cy, ran");
+});
+
+test("each step of a Sync sequence reads the context it was built with, again on each iteration", () => {
+  let names = ["Ann"];
+  const context = Context.make(Name, { name: (g: string) => `${g} ${names.join("+")}` });
+  let ran = 0;
+  const steps = seqIn(context, function* () {
+    ran++;
+    yield greet("hi");
+    yield greet("bye");
+  });
+  assert.deepEqual([...steps], ["hi Ann", "bye Ann"]);
+  names = ["Ann", "Bob"];
+  // a step outside any context still reads the one the sequence holds
+  for (const first of steps) {
+    assert.equal(first, "hi Ann+Bob");
+    break;
+  }
+  assert.equal(ran, 2);
 });

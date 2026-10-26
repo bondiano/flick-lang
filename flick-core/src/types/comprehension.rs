@@ -1,19 +1,32 @@
 //! `for { clauses } yield e`: each `p <- source` takes the elements of an
 //! `Iterable` source and skips those `p` does not match, a guard `if c`
 //! skips the element unless `c`, and `let` scopes over the rest. The body
-//! runs when the sequence is iterated, so it is pure; a lazy `Seq` holds
-//! what it uses, a strict `[for …]` is a `List` built at once.
+//! runs when the sequence is iterated, so it makes Sync calls alone, reading
+//! the services of the stage that built it; a lazy `Seq` holds what it
+//! uses, a strict `[for …]` is a `List` built at once.
 
 use std::mem;
 
 use super::Checker;
 use super::do_notation::bind_key;
-use super::effects::Stage;
-use super::ty::Type;
+use super::effects::{Site, Stage};
+use super::ty::{Row, Type};
 use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+
+/// The services of a stage that reads atoms.
+fn reader() -> Type {
+    let read = Type::Con {
+        module: "Atom".to_owned(),
+        name: "Read".to_owned(),
+    };
+    Type::Row(Row {
+        entries: vec![("Atom.Read".to_owned(), read)],
+        tail: None,
+    })
+}
 
 /// The clauses of a `for` and its element or `do` body.
 pub fn for_parts(node: &Node) -> (impl Iterator<Item = &Node>, Option<&Node>) {
@@ -44,12 +57,27 @@ impl Checker<'_> {
         let mark = self.locals.len();
         let uses = self.uses_mark();
         let saved = mem::take(&mut self.runtime);
-        let reason = if strict {
-            "a `[for …]` list is built from pure clauses: bind the result of a runtime call with `let` before it"
+        let (reason, sync_reason) = if strict {
+            (
+                "a `[for …]` list is built from pure clauses: bind the result of a runtime call with `let` before it",
+                "a `[for …]` list makes Sync calls alone (`->{Atom.Read;}`): bind the result of a runtime call with `let` before it",
+            )
         } else {
-            "the clauses of `for` run when the sequence is iterated, outside this function: bind the result of a runtime call with `let` before it"
+            (
+                "the clauses of `for` run when the sequence is iterated, outside this function: bind the result of a runtime call with `let` before it",
+                "the clauses of `for` run when the sequence is iterated, where only Sync calls (`->{Atom.Read;}`) run: bind the result of a runtime call with `let` before it",
+            )
         };
-        let outer = mem::replace(&mut self.stage, Stage::pure(reason));
+        // a stage that may read atoms lends its reader to the clauses
+        let stage = if self.stage.pure.is_none() {
+            let mut stage = self.bounded_stage(reader(), Type::empty_row(), Site::Inferred);
+            stage.sync = stage.pure.is_none();
+            stage.only_sync = Some(sync_reason);
+            stage
+        } else {
+            Stage::pure(reason)
+        };
+        let outer = mem::replace(&mut self.stage, stage);
         let (clauses, element) = for_parts(node);
         for clause in clauses {
             self.for_clause(clause);
@@ -69,8 +97,15 @@ impl Checker<'_> {
             (Some(body), None) => self.infer(body),
             (None, _) => Type::Error,
         };
-        self.stage = outer;
+        let inner = mem::replace(&mut self.stage, outer);
         self.runtime = saved;
+        if inner.sync && inner.calls > 0 {
+            let span = self.span(node);
+            self.perform(&reader(), &Type::empty_row(), span);
+            if !strict {
+                self.typing.sync_generators.insert(node.range());
+            }
+        }
         let held = self.held_since(uses, mark);
         self.locals.truncate(mark);
         if strict {

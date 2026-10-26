@@ -32,7 +32,8 @@ impl Lower<'_> {
             return body;
         }
         let body = Box::new(body);
-        Expr::new(ExprKind::Generate { body, strict }, span)
+        let sync = self.typing.sync_generators.contains(&node.range());
+        Expr::new(ExprKind::Generate { body, strict, sync }, span)
     }
 
     fn clauses(

@@ -1,0 +1,12 @@
+// Sync calls in `for`: a lazy sequence and a strict list read atoms where
+// the stage that builds them may.
+module App.SyncFor exposing (..)
+
+count : Atom.Writable Number
+let count = Atom.make 0
+
+offsets : Unit ->{Atom.Read;} Seq Number
+let offsets () = for { n <- [1, 2]; if n > Atom.value count } yield n + Atom.value count
+
+listed : Unit ->{Atom.Read, Atom.Write;} List Number
+let listed () = [for n <- [1, 2] yield n + Atom.value count]
