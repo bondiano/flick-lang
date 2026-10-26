@@ -1,5 +1,6 @@
 // `component` without `setup` is a view of its props: one renders inside
-// another with `Ui.render`, and both read atoms as views do.
+// another with `Ui.render`, and both read atoms as views do. With `setup`,
+// each instance makes its own state once and renders with it.
 module App.Main exposing (main)
 
 greeting : Atom.Writable String
@@ -21,7 +22,18 @@ component card (person : Person) =
         ]
     }
 
+component counter (start : Number) =
+  setup
+    let count = Atom.local (start + 1)
+    let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
+  render
+    ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
+
 main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line
     (Ui.Server.to_html (Ui.render card { name = "Ada"; tags = ["math", "engines"] }))
+  provide Atom.layer {
+    Platform.stdout_line (Ui.Server.render (Ui.render counter 41))
+    Platform.stdout_line (Ui.Server.render (Ui.render counter 1))
+  }

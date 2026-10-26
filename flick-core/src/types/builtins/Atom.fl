@@ -39,6 +39,11 @@ make : a -> Writable a
 foreign pure make from "@flick-lang/runtime" "atomState"
   arity 1
 
+/// A state of the component instance whose `setup` makes it, holding
+/// `value` first: each instance has its own.
+local : forall s a. a ->{Setup s;} Writable a
+let local value = Setup.own (make value)
+
 /// The state `atom`, coded by `wire` so a server can hand its value to
 /// the client. Its key is the name of the top-level binding it defines,
 /// `Module.name`, which the compiler gives; anywhere else it is an error.

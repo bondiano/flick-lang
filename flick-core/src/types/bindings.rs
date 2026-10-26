@@ -71,15 +71,29 @@ pub fn signature_name<'t>(sig: &Node, text: &'t str) -> Option<&'t str> {
         .map(|t| t.text(text))
 }
 
+/// What follows the statements of a block as its value.
+pub type Tail<'f, C> = &'f mut dyn FnMut(&mut C, Option<&Type>) -> Type;
+
 impl Checker<'_> {
     pub fn block(&mut self, node: &Node, expected: Option<&Type>) -> Type {
+        self.block_then(node, expected, None)
+    }
+
+    /// The statements of the block `node`, then `tail` in their scope as
+    /// its value when given: the setup of a component and its render.
+    pub fn block_then(
+        &mut self,
+        node: &Node,
+        expected: Option<&Type>,
+        mut tail: Option<Tail<'_, Self>>,
+    ) -> Type {
         let mark = self.locals.len();
         let statements: Vec<&Node> = node.nodes().collect();
         let mut result = None;
         let mut i = 0;
         while i < statements.len() {
             let statement = statements[i];
-            let last = i + 1 == statements.len();
+            let last = i + 1 == statements.len() && tail.is_none();
             match statement.kind {
                 K::Signature => {
                     let name = signature_name(statement, self.text);
@@ -107,6 +121,9 @@ impl Checker<'_> {
                 _ => self.statement(statement),
             }
             i += 1;
+        }
+        if let Some(tail) = tail.as_mut() {
+            result = Some(tail(self, expected));
         }
         self.locals.truncate(mark);
         result.unwrap_or_else(|| {

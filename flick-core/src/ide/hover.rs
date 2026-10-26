@@ -64,6 +64,16 @@ impl Ide<'_> {
             K::MatchKw => ("match … with", "The value of the arm that matches."),
             K::IfKw => ("if … then … else …", "The value of the branch taken."),
             K::FunKw => ("fun … -> …", "An anonymous function."),
+            K::SetupKw => (
+                "setup",
+                "Runs once per instance of the component, when it mounts: what \
+                 it makes has the instance's region `s` and lives with it.",
+            ),
+            K::RenderKw => (
+                "render",
+                "Renders the instance; React renders it again when an atom it \
+                 read changes, or its props.",
+            ),
             K::UiKw => (
                 "ui { … }",
                 "Describes a user interface; building it runs no handler.",

@@ -243,6 +243,8 @@ impl Checker<'_> {
                     }
                 }
             }
+            // a component's render is one by construction; its setup runs once
+            renders.extend(components(decl).filter_map(|c| super::component_parts(c).render));
             funs(
                 decl,
                 &mut |fun| {
@@ -275,6 +277,19 @@ impl Checker<'_> {
             );
         }
     }
+}
+
+/// The `component` expressions under `node`.
+fn components(node: &Node) -> impl Iterator<Item = &Node> {
+    let mut found = Vec::new();
+    let mut stack = vec![node];
+    while let Some(n) = stack.pop() {
+        if n.kind == K::ComponentExpr {
+            found.push(n);
+        }
+        stack.extend(n.nodes());
+    }
+    found.into_iter()
 }
 
 /// Every `fun` under `node` with the type `head` finds for it.

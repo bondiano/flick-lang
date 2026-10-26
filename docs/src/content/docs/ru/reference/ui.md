@@ -206,12 +206,30 @@ component card (person : { name : String; label : String }) =
     ui { div { class_name = "card" } [text person.name, Ui.render badge { label = person.label }] }
 ```
 
-Секция `setup` перед `render` будет хранить состояние каждого
-смонтированного экземпляра; пока её типов нет, она — `FLICK-S002`,
-а состояние живёт в атомах верхнего уровня. `render` перед `setup`,
-повтор секции или отсутствие `render` — `FLICK-S014`. Слова `component`,
-`setup` и `render` остаются именами во всех других местах, как в
-`Ui.render`.
+Секция `setup` перед `render` создаёт состояние каждого экземпляра. Она
+выполняется один раз, когда экземпляр монтируется, с сервисом `Setup s`
+региона экземпляра `s`; её имена видны в `render`, который выполняется на
+каждом рендере с ними. `Atom.local` создаёт атом экземпляра, а
+конструкторы `Action` — его action; рендер, который их создаёт, —
+`FLICK-U006`, а `Atom.local` вне setup — ошибка эффектов. Компонент — это
+`Ui.stateful (fun props -> setup; fun props -> render)` с типом
+`forall s. P ->{Setup s} (P ->{Atom.Read} Ui)^{s}`: setup видит первые
+props, рендер — текущие. Наведение на `setup` показывает этот тип.
+
+```flick
+component counter (start : Number) =
+  setup
+    let count = Atom.local start
+    let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
+  render
+    ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
+```
+
+Функция, которая создаёт состояние экземпляра, говорит об этом в
+сигнатуре, `Number ->{Setup s;} Atom.Writable Number`, и вызывается из
+setup. `render` перед `setup`, повтор секции или отсутствие `render` —
+`FLICK-S014`. Слова `component`, `setup` и `render` остаются именами во
+всех других местах, как в `Ui.render`.
 
 ## Задачи в представлениях
 

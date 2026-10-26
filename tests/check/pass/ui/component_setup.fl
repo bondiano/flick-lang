@@ -1,0 +1,23 @@
+// A component's `setup` runs once per instance: it makes the instance's own
+// state and actions, which every render reads, and may call helpers that
+// need `Setup s` too.
+module App.ComponentSetup exposing (..)
+
+counted : forall s. Number ->{Setup s;} Atom.Writable Number
+let counted start = Atom.local (start + 1)
+
+component counter (start : Number) =
+  setup
+    let count = counted start
+    let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
+  render
+    ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
+
+type alias Labelled = { label : String; start : Number }
+
+// the props are the first ones in `setup`, the current ones in `render`
+component labelled (props : Labelled) =
+  setup
+    let count = Atom.local props.start
+  render
+    ui { paragraph [text (props.label ++ show (Atom.value count))] }

@@ -305,6 +305,18 @@ impl Lower<'_> {
         stages: Option<Vec<Stage>>,
         span: Span,
     ) -> Expr {
+        self.function_with(params, |l| l.expr(body), stages, span)
+    }
+
+    /// [`Self::function`] whose body `body` lowers, with the parameters in
+    /// scope.
+    fn function_with(
+        &mut self,
+        params: &[&Node],
+        body: impl FnOnce(&mut Self) -> Expr,
+        stages: Option<Vec<Stage>>,
+        span: Span,
+    ) -> Expr {
         let mark = self.scope.len();
         let stages = stages.unwrap_or_default();
         let params = params
@@ -315,7 +327,7 @@ impl Lower<'_> {
                 stage,
             })
             .collect();
-        let body = self.expr(body);
+        let body = body(self);
         self.scope.truncate(mark);
         Expr::new(
             ExprKind::Lambda {

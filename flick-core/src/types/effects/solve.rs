@@ -271,9 +271,11 @@ impl Checker<'_> {
             .services
             .iter()
             .any(|s| matches!(s.rsplit('.').next(), Some("Write" | "Registry")));
+        let setup = e.services.iter().any(|s| s.contains("Setup"));
         let fixes = [
+            setup.then_some("make the instance's state in the component's `setup`, which runs once per instance"),
             writes.then_some("write atoms in an `Action`, which runs on an event"),
-            (!writes && !e.services.is_empty())
+            (!writes && !setup && !e.services.is_empty())
                 .then_some("run the task as `Atom.task` and read its result"),
             (!e.errors.is_empty()).then_some(
                 "handle the failure here, or render with `Ui.suspended`, which gives it a view",

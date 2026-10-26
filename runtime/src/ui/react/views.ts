@@ -1,7 +1,7 @@
 // Views and fields on atoms: React components a `Ui` holds as foreign
 // components do, so a program that renders none keeps none of this code.
 // They take the root's events and registry from React context.
-import { Cause, Effect, Option } from "effect";
+import { Cause, Context, Effect, Option } from "effect";
 import * as Atom from "../../effect/reactivity/Atom.ts";
 import {
   type FunctionComponent,
@@ -14,11 +14,14 @@ import {
   useLayoutEffect,
   useMemo,
   useReducer,
+  useState,
   useSyncExternalStore,
 } from "react";
 
 import { isPending, runReading, syncReading } from "../../atoms.ts";
 import { Failure } from "../../cause.ts";
+import { service } from "../../effects.ts";
+import { syncAbi, syncIn } from "../../sync.ts";
 import { BridgeContext, RegistryContext, StreamContext, toReact } from "./render.ts";
 import { type Binding, type DomEvent, type Static, type Ui, element, inputSnapshot, uiComponent, uiFragment } from "./nodes.ts";
 import type { Handler } from "./policies.ts";
@@ -34,7 +37,31 @@ export interface View {
   readonly label: string | undefined;
   /** What a view of `Ui.suspended` shows while a task it read loads. */
   readonly fallback?: Ui;
+  /** `Ui.stateful`: makes the render of an instance, once per instance. */
+  readonly setup?: (props: unknown) => (props: unknown) => Ui;
 }
+
+interface SetupImpl {
+  readonly own: (value: unknown) => unknown;
+  readonly [syncAbi]: true;
+}
+
+/** The service `Setup s` of an instance's setup, a Sync one. */
+export const SetupService = /*#__PURE__*/ service<SetupImpl>("Prelude.Setup");
+
+const instance: SetupImpl = { own: (value) => value, [syncAbi]: true };
+
+/** The render `setup` makes for an instance with these first props. */
+const setUp = (setup: (props: unknown) => (props: unknown) => Ui, props: unknown): ((props: unknown) => Ui) =>
+  syncIn(Context.make(SetupService, instance), () => setup(props));
+
+/**
+ * `Ui.stateful`: a component whose instances render with what `setup`
+ * made for them; rendered without an instance, as on a server, it sets up
+ * on each render.
+ */
+export const uiStateful = (setup: (props: unknown) => (props: unknown) => Ui): View =>
+  Object.freeze({ render: (props: unknown) => setUp(setup, props)(props), setup, label: undefined });
 
 /** `Ui.view`: a component of the Sync `render`. */
 export const uiView = (render: (props: unknown) => Ui): View => Object.freeze({ render, label: undefined });
@@ -93,13 +120,15 @@ const component = (view: View): FunctionComponent<object> => {
     const [, rerender] = useReducer((n: number) => n + 1, 0);
     const server = serverSide();
     const streaming = useContext(StreamContext);
+    // React keeps the first state of an instance: its setup runs once
+    const [own] = useState(() => (view.setup === undefined ? view : { ...view, render: setUp(view.setup, props) }));
     const read = new Map<Atom.Atom<unknown>, unknown>();
     const reading = (atom: Atom.Atom<unknown>): unknown => {
       const value = server ? Atom.getServerValue(atom, registry) : registry.get(atom);
       read.set(atom, value);
       return value;
     };
-    const node = draw(view, props, reading, () => {
+    const node = draw(own, props, reading, () => {
       // a streamed page shows the boundary's fallback and sends this view once a read atom changes
       // oxlint-disable-next-line typescript/only-throw-error -- React suspends a render that throws a promise
       if (streaming !== undefined) throw streaming.wait(read);

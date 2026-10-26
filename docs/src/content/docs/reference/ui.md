@@ -185,11 +185,30 @@ component card (person : { name : String; label : String }) =
     ui { div { class_name = "card" } [text person.name, Ui.render badge { label = person.label }] }
 ```
 
-A `setup` section before `render` will hold the state of each mounted
-instance; until its types arrive it is `FLICK-S002`, and its state lives in
-top-level atoms. A `render` before `setup`, a second section of a kind or a
-missing `render` is `FLICK-S014`. The words `component`, `setup` and
-`render` stay names everywhere else, as in `Ui.render`.
+A `setup` section before `render` makes the state of each instance. It
+runs once, when the instance mounts, with the service `Setup s` of the
+instance's region `s`; its names are in scope in `render`, which runs on
+every render with them. `Atom.local` makes an atom of the instance and the
+`Action` makers make its actions there; a render that makes one is
+`FLICK-U006`, and `Atom.local` outside a setup is an effect error. The
+component is `Ui.stateful (fun props -> setup; fun props -> render)`, of the
+type `forall s. P ->{Setup s} (P ->{Atom.Read} Ui)^{s}`: the setup sees the
+first props, the render the current ones. Hovering `setup` shows that type.
+
+```flick
+component counter (start : Number) =
+  setup
+    let count = Atom.local start
+    let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
+  render
+    ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
+```
+
+A function that makes the state of an instance says so in its signature,
+`Number ->{Setup s;} Atom.Writable Number`, and is called from a setup. A
+`render` before `setup`, a second section of a kind or a missing `render` is
+`FLICK-S014`. The words `component`, `setup` and `render` stay names
+everywhere else, as in `Ui.render`.
 
 ## Tasks in views
 

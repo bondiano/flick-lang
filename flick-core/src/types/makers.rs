@@ -5,9 +5,11 @@
 
 use std::collections::HashMap;
 
+use super::ty::Type;
 use super::typing::Ref;
 use super::ui::members;
 use super::{Checker, Range, let_parts};
+use crate::iface::Namespace;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -43,6 +45,14 @@ impl Checker<'_> {
             let (Some(name), Some(body)) = (parts.name, parts.body) else {
                 continue;
             };
+            // what a component's setup makes, it makes once per instance
+            let setup = self
+                .env
+                .value(&self.env.entity(Namespace::Value, &name))
+                .is_some_and(needs_setup);
+            if setup {
+                continue;
+            }
             if syntactic {
                 functions.push((name, body));
             } else if let Some(alias) = alias(body)
@@ -136,4 +146,21 @@ pub fn exported_makers(makers: &HashMap<String, String>, exported: &[&str]) -> V
         .collect();
     names.sort();
     names
+}
+
+/// Whether a stage of `ty` needs the service `Setup` of a component.
+fn needs_setup(ty: &Type) -> bool {
+    let mut found = false;
+    ty.visit(&mut |t| {
+        if let Type::Fun {
+            effects: Some(effects),
+            ..
+        } = t
+        {
+            effects.services.visit(&mut |s| {
+                found |= matches!(s, Type::Row(row) if row.entries.iter().any(|(l, _)| l == "Prelude.Setup"));
+            });
+        }
+    });
+    found
 }

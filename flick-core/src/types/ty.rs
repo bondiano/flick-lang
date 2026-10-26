@@ -82,7 +82,7 @@ pub struct Effects {
 }
 
 /// Services whose operations run at once, without the Effect runtime.
-pub const SYNC_SERVICES: [&str; 1] = ["Atom.Read"];
+pub const SYNC_SERVICES: [&str; 2] = ["Atom.Read", "Prelude.Setup"];
 
 /// How a stage of a function runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -1,1 +1,3 @@
 <div class="card"><p>Hello, Ada!</p><ul><li>math</li><li>engines</li></ul></div>
+<button type="button">42</button>
+<button type="button">2</button>

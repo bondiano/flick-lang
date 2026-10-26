@@ -37,6 +37,14 @@ type ServiceTag (r : ServiceRow)
 /// provides. It has no operations of its own.
 service Scope (s : Region)
 
+/// The setup of a component instance, region `s`: it runs once when the
+/// instance mounts, and what it makes lives as long as the instance.
+service Setup (s : Region) =
+  /// `value`, which belongs to the instance from now on.
+  // shortcut: the result does not hold `s` yet, so an atom of the instance
+  // may leave it; C5 qualifies it once the atom API takes `(Writable a)^d`.
+  own : forall a. a ->{} a
+
 /// The implementation record of the one service of `r`:
 /// `ServiceImpl {Clock}` is `Clock.Impl`.
 type ServiceImpl (r : ServiceRow)

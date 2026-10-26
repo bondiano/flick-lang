@@ -1,11 +1,27 @@
+// `Setup s` belongs to a component's `setup`: a render, a top-level value
+// and a function without it in its signature cannot make an instance's
+// state, and a render makes no atom of its own.
 module App.ComponentSetup exposing (..)
 
-// The state of a component's own instance waits for `Setup s`; the names of
-// `setup` are already in scope in `render`.
+top : Atom.Writable Number
+let top = Atom.local 0
+
+helper : Number ->{} Atom.Writable Number
+let helper n = Atom.local n
+
+component plain (n : Number) =
+  render
+    let again = Atom.local n
+    ui { text (show (Atom.value again)) }
+
 component counter (start : Number) =
   setup
-    let count = start + 1
+    let count = Atom.local start
   render
-    ui { text (show count) }
+    let other = Atom.make 0
+    ui { text (show (Atom.value count + Atom.value other)) }
 
-//~ FLICK-S002 @6:3-6:8 a component's `setup` is not supported yet: keep its state in top-level atoms
+//~ FLICK-E001 @7:11-7:23 module initialization is pure
+//~ FLICK-E002 @10:16-10:28 does not allow service `Setup _`
+//~ FLICK-U004 @14:17-14:29 make the instance's state in the component's `setup`
+//~ FLICK-U006 @21:17-21:26 while rendering makes another one

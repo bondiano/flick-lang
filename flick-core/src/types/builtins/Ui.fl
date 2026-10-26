@@ -248,6 +248,13 @@ view : forall c p. (p ->{Atom.Read;} Ui^c)^c -> (View p)^c
 foreign pure view from "@flick-lang/runtime/ui/react" "uiView"
   retention call
 
+/// The component whose instances run `setup` once, when they mount, and
+/// render with what it made: `component … setup … render …`. What the
+/// setup makes has the instance's region `s`, so it cannot leave it.
+stateful : forall c p. (forall s. p ->{Setup s;} (p ->{Atom.Read;} Ui^c)^{s | c})^c -> (View p)^c
+foreign pure stateful from "@flick-lang/runtime/ui/react" "uiStateful"
+  retention call
+
 /// The component named `name` in React's developer tools.
 named : forall c p. String -> (View p)^c -> (View p)^c
 foreign pure named from "@flick-lang/runtime/ui/react" "uiNamed"
