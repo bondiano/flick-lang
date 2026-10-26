@@ -98,6 +98,14 @@ metrics_with : Settings -> Layer none none none
 foreign pure metrics_with from "@flick-lang/runtime/effect/observability/Otlp" "otlpMetricsWith"
   reviewed "effect@4.0.5 sha256:03304a237d1ab870"
 
+/// A tracer sending spans to `url` (`http://localhost:4318/v1/traces`) in
+/// batches, for `Tracer.with_tracer`: unlike `traces`, only the tasks given
+/// it trace there. It holds region `s`, and the spans left are sent when
+/// the scope owning it closes.
+tracer : forall s. Options ->{Scope s;} Tracer.Tracer^{s}
+foreign effect tracer from "@flick-lang/runtime/effect/observability/Otlp" "otlpTracer"
+  reviewed "effect@4.0.5 sha256:d1c64b3295e045bb"
+
 /// Traces, logs and metrics as the current configuration says, in JSON:
 /// a signal is exported only when `OTEL_TRACES_EXPORTER`,
 /// `OTEL_LOGS_EXPORTER` or `OTEL_METRICS_EXPORTER` names `otlp`; then

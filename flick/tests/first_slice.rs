@@ -1,11 +1,9 @@
 //! The `examples/first-slice` project: services with a test and an external
 //! implementation, layers provided in `main`, and two loads in parallel.
-//! Each test works on a copy in the target directory, which resolves
-//! `@flick-lang/runtime` from the workspace and keeps the example clean.
+//! Each test works on a copy in the target directory (`common::example`).
 
 mod common;
 
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use common::flick_in;
@@ -16,32 +14,8 @@ const LOGS: [&str; 2] = ["[log] Loaded Ada Lovelace", "[log] Loaded Grace Hopper
 /// The other lines of a run, in order.
 const RESULTS: [&str; 2] = ["Ada Lovelace and Grace Hopper", "not found: \"u3\""];
 
-/// Copies `from` into `to`, leaving out build output and installed packages.
-fn copy(from: &Path, to: &Path) {
-    fs::create_dir_all(to).expect("dir");
-    for entry in fs::read_dir(from).expect("read dir") {
-        let entry = entry.expect("entry");
-        let name = entry.file_name();
-        if ["dist", ".flick", "node_modules"].contains(&name.to_string_lossy().as_ref()) {
-            continue;
-        }
-        let path = entry.path();
-        if path.is_dir() {
-            copy(&path, &to.join(&name));
-        } else {
-            fs::copy(&path, to.join(&name)).expect("copy");
-        }
-    }
-}
-
 fn example(name: &str) -> PathBuf {
-    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/first-slice");
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
-        .join("first_slice")
-        .join(name);
-    let _ = fs::remove_dir_all(&dir);
-    copy(&source, &dir);
-    dir
+    common::example("first-slice", &format!("first_slice/{name}"))
 }
 
 fn success(dir: &Path, args: &[&str]) -> String {

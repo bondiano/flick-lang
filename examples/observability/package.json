@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "@flick-lang/runtime": "0.1.0",
+    "effect": "4.0.5"
+  },
+  "flick": {
+    "compiler": "0.1.0"
+  },
+  "name": "observability",
+  "packageManager": "pnpm@12.14.0",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0"
+}

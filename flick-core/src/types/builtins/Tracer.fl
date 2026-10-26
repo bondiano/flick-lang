@@ -129,8 +129,9 @@ native_tracer : Tracer
 foreign pure native_tracer from "@flick-lang/runtime/effect/Tracer" "nativeTracer"
   reviewed "effect@4.0.5 sha256:c95d10bdbe12721c"
 
-/// Runs `task` with the tracer making its spans.
-with_tracer : forall c r e a. Tracer -> (Eff r e a)^c ->{r; e} a
+/// Runs `task` with the tracer making its spans; a tracer of a scope, such
+/// as `Otlp.tracer`'s, only inside it.
+with_tracer : forall c d r e a. Tracer^d -> (Eff r e a)^c ->{r; e} a
 foreign effect with_tracer from "@flick-lang/runtime/effect/Tracer" "flickWithTracer"
   arity 1
   retention call

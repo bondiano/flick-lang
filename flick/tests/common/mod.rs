@@ -56,6 +56,36 @@ pub fn project(name: &str, files: &[(&str, &str)]) -> path::PathBuf {
     dir
 }
 
+/// A copy of `examples/<example>` at `name` in the target's temporary
+/// directory, without its build output and installed packages: it resolves
+/// `@flick-lang/runtime` from the workspace and keeps the example clean.
+#[allow(dead_code, reason = "not every test file uses it")]
+pub fn example(example: &str, name: &str) -> path::PathBuf {
+    fn copy(from: &path::Path, to: &path::Path) {
+        fs::create_dir_all(to).expect("dir");
+        for entry in fs::read_dir(from).expect("read dir") {
+            let entry = entry.expect("entry");
+            let name = entry.file_name();
+            if ["dist", ".flick", "node_modules"].contains(&name.to_string_lossy().as_ref()) {
+                continue;
+            }
+            let path = entry.path();
+            if path.is_dir() {
+                copy(&path, &to.join(&name));
+            } else {
+                fs::copy(&path, to.join(&name)).expect("copy");
+            }
+        }
+    }
+    let source = path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples")
+        .join(example);
+    let dir = path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    let _ = fs::remove_dir_all(&dir);
+    copy(&source, &dir);
+    dir
+}
+
 /// An app project's `flick.toml`.
 #[allow(dead_code, reason = "not every test file uses it")]
 pub const APP: &str = "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n";

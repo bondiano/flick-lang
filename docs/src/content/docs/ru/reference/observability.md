@@ -119,6 +119,24 @@ let observe_checkout () =
 protobuf вместо `Otlp.json`; этот сериализатор попадает в бандл, только
 если программа его использует.
 
+### Трейсер области
+
+`Otlp.tracer options` создаёт трейсер в текущей области вместо слоя:
+`Tracer.with_tracer` отдаёт его одной задаче, так что в его сервис идут
+только её спаны, а оставшиеся отправляются при закрытии области. Трейсер
+держит регион области и не может её пережить. URL — полный адрес трасс,
+как у `traces`. `examples/observability` экспортирует оформление заказа
+через `Otlp.layer` и аудит через `Otlp.tracer` в локальный коллектор.
+
+```flick
+audit : Unit ->{} Unit
+let audit () =
+  scope {
+    let tracer = Otlp.tracer { url = "http://localhost:4318/v1/traces"; service_name = "audit" }
+    Tracer.with_tracer tracer (task { Tracer.with_span "audit" span_options (task { () }) })
+  }
+```
+
 ### Конфигурация развёртывания
 
 `Otlp.from_config None` читает текущий `ConfigProvider` (по умолчанию —

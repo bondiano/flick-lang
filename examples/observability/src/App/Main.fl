@@ -1,0 +1,55 @@
+/// A shop that reports to an OpenTelemetry collector: the spans, log records
+/// and metrics of a checkout go out through `Otlp.layer`, and an audit
+/// traces through a tracer of its own with `Tracer.with_tracer`. The
+/// collector is `OTEL_EXPORTER_OTLP_ENDPOINT`, `http://localhost:4318` by
+/// default.
+module App.Main exposing (main)
+
+/// Where the collector listens.
+endpoint : Unit ->{; Config.ConfigError} String
+let endpoint () =
+  Config.get
+    (Config.with_default "http://localhost:4318" (Config.string "OTEL_EXPORTER_OTLP_ENDPOINT"))
+
+/// A span with one attribute.
+span : String -> String -> Tracer.SpanOptions
+let span key value =
+  {
+    attributes = [(key, value)];
+    links = [];
+    parent = None;
+    root = false;
+    kind_ = Tracer.internal;
+    sampled = None;
+    level = None;
+    captureStackTrace = false;
+    disablePropagation = false;
+  }
+
+orders : Metric.Counter
+let orders = Metric.counter "orders" { description = None; attributes = []; incremental = true }
+
+/// One order: a span around the payment, its log record and the counter.
+checkout : String ->{} Unit
+let checkout user =
+  Tracer.with_span "checkout" (span "user" user) (task {
+    Tracer.with_span "pay" (span "amount" "42") (task { Effect.log ("paid by " ++ user) })
+    Metric.update 1 orders
+  })
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let url =
+    try endpoint () with
+    | Config.ConfigError message ->
+      from_result (Err (AppError { message = message; details = None }))
+  provide (Otlp.layer { url = url; service_name = "flick-shop" }) {
+    checkout "ada"
+    checkout "grace"
+  }
+  // only the tasks given the audit tracer trace to its service
+  scope {
+    let audit = Otlp.tracer { url = url ++ "/v1/traces"; service_name = "flick-audit" }
+    Tracer.with_tracer audit (task { Tracer.with_span "audit" (span "orders" "2") (task { () }) })
+  }
+  Platform.stdout_line ("sent to " ++ url)

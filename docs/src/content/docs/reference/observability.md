@@ -118,6 +118,25 @@ applies to traces and logs, not metrics. With `gzip = true`, bodies of at
 least 1 KB are compressed. `Otlp.protobuf` selects protobuf instead of
 `Otlp.json`; only programs that name it bundle that serializer.
 
+### A tracer of a scope
+
+`Otlp.tracer options` makes a tracer in the current scope instead of a
+layer: `Tracer.with_tracer` gives it to one task, so only that task's
+spans go to its service, and the spans left are sent when the scope
+closes. It holds the scope's region and cannot outlive it. The URL is the
+full trace endpoint, as for `traces`. `examples/observability` exports a
+checkout with `Otlp.layer` and an audit with `Otlp.tracer` to a local
+collector.
+
+```flick
+audit : Unit ->{} Unit
+let audit () =
+  scope {
+    let tracer = Otlp.tracer { url = "http://localhost:4318/v1/traces"; service_name = "audit" }
+    Tracer.with_tracer tracer (task { Tracer.with_span "audit" span_options (task { () }) })
+  }
+```
+
 ### Deployment configuration
 
 `Otlp.from_config None` reads the current `ConfigProvider` (the process

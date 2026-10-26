@@ -1,9 +1,10 @@
 // Effect's `effect/observability` OTLP exporters for the standard library:
 // each layer brings the fetch client and the JSON serialization it sends
 // with, so a Flick program provides it as it is.
-import { type Duration, Layer, Option } from "effect";
+import { type Duration, Effect, Layer, Option } from "effect";
 import { FetchHttpClient } from "effect/http";
 import * as Otlp from "effect/observability/Otlp";
+import * as OtlpExporter from "effect/observability/OtlpExporter";
 import * as OtlpLogger from "effect/observability/OtlpLogger";
 import * as OtlpMetrics from "effect/observability/OtlpMetrics";
 import * as OtlpSerialization from "effect/observability/OtlpSerialization";
@@ -28,6 +29,13 @@ export const otlpLayer = (options: Options) =>
 /** `Otlp.traces`: spans, sent to `url`. */
 export const otlpTraces = (options: Options) =>
   Layer.provide(OtlpTracer.layer({ url: options.url, resource: resource(options) }), transport);
+
+/** `Otlp.tracer`: a tracer sending spans to `url`, flushed when the current scope closes. */
+export const otlpTracer = (options: Options) =>
+  Effect.provide(
+    OtlpTracer.make({ url: options.url, resource: resource(options) }),
+    Layer.merge(transport, OtlpExporter.layerFlusher),
+  );
 
 /** `Otlp.logs`: log records, sent to `url`. */
 export const otlpLogs = (options: Options) =>

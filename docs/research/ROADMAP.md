@@ -265,7 +265,7 @@ component search (props : SearchProps) =
 
 ### Трек O — observability (после S3, C6)
 
-**O1. Экспорт.** ⬜ AC: `Otlp.layer` из Flick, пример в `examples/` с локальным коллектором; `with_tracer` принимает OTLP-трейсер.
+**O1. Экспорт.** ✅ (`Otlp.tracer : Options ->{Scope s;} Tracer^{s}`, `with_tracer` принимает `Tracer^d`; пример `examples/observability` с e2e `flick/tests/examples.rs` на локальном приёмнике; run-тест `observability/tracer.fl`) AC: `Otlp.layer` из Flick, пример в `examples/` с локальным коллектором; `with_tracer` принимает OTLP-трейсер.
 **O2. Именованные span'ы action.** ⬜ AC: каждый запуск `Action` — span с меткой C6 и атрибутами политики; отклонение/прерывание — события span'а.
 **O3. Причинность записей.** ⬜ AC: запись атома несёт место в исходнике и id span'а/fiber'а; dev-логгер печатает «атом ← action ← событие ← span»; с `labels = "all"` (C6b) работает и в release.
 **O4. DevTools.** ⬜ AC: `flick dev --devtools` подключает `DevTools.layer`; видны span'ы action и записи атомов с метками.
