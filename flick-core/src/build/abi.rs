@@ -232,7 +232,11 @@ impl Totality<'_> {
             | ExprKind::Lift(..)
             | ExprKind::Abstract(..)
             // a sequence runs its clauses when it is iterated
-            | ExprKind::Generate { strict: false, .. } => false,
+            | ExprKind::Generate {
+                strict: false,
+                limit: None,
+                ..
+            } => false,
             ExprKind::App {
                 func, arg, stage, ..
             } => *stage != Stage::Pure || !self.total_call(e) || partial(func) || partial(arg),
@@ -265,7 +269,7 @@ impl Totality<'_> {
             | ExprKind::Within(..)
             | ExprKind::CodecBlock(..)
             | ExprKind::Provide(..)
-            | ExprKind::Generate { strict: true, .. }
+            | ExprKind::Generate { .. }
             | ExprKind::Unwrap(_)
             | ExprKind::Each { .. }
             | ExprKind::Yield(_) => true,

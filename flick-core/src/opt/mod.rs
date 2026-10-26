@@ -6,6 +6,7 @@
 //! - [`fold`]: literal expressions with exact JS semantics, constant branches;
 //! - alias and constant propagation, and moving a pure value that cannot
 //!   throw to its one use;
+//! - [`fuse`]: `Seq` and `List` combinators of a `for` run in its loop;
 //! - [`sroa`]: temporary records and tuples split into their parts;
 //! - dead code: unused pure bindings and private top-level values.
 //!
@@ -16,6 +17,7 @@
 //! runtime call: only pure code is rewritten.
 
 mod fold;
+mod fuse;
 mod inline;
 mod sroa;
 mod walk;
@@ -42,6 +44,7 @@ pub fn optimize(module: &mut Module, exported: &dyn Fn(&str) -> bool) {
         for item in &mut module.items {
             for body in bodies(item) {
                 inline::inline(body, &module.name, &candidates, &mut fresh);
+                fuse::fuse(body, &mut fresh);
                 simplify(body);
             }
         }

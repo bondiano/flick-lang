@@ -76,7 +76,7 @@ fn refs<'a>(e: &'a Expr, module: &str, out: &mut HashMap<&'a str, usize>) {
     e.each_child(&mut |c| refs(c, module, out));
 }
 
-fn simple(p: &Pat) -> bool {
+pub(super) fn simple(p: &Pat) -> bool {
     matches!(p, Pat::Bind(_) | Pat::Wild | Pat::Lit(Lit::Unit))
 }
 

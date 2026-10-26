@@ -177,13 +177,21 @@ pub fn expr(e: &Expr) -> String {
         ExprKind::Ignore(e) => format!("(ignore {})", expr(e)),
         ExprKind::Await(e) => format!("(await {})", expr(e)),
         ExprKind::Task(e) => format!("(task {})", expr(e)),
-        ExprKind::Generate { body, strict, sync } => {
+        ExprKind::Generate {
+            body,
+            strict,
+            sync,
+            limit,
+        } => {
             let kind = match (strict, sync) {
                 (true, _) => "list",
                 (false, false) => "seq",
                 (false, true) => "seq~",
             };
-            format!("({kind} {})", expr(body))
+            let limit = limit
+                .as_deref()
+                .map_or(String::new(), |l| format!(" take {}", expr(l)));
+            format!("({kind}{limit} {})", expr(body))
         }
         ExprKind::Each {
             pat: p,

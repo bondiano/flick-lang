@@ -155,6 +155,9 @@ pub enum ExprKind {
         /// A lazy one whose body makes Sync calls: each step reads the
         /// services of the stage that built it.
         sync: bool,
+        /// A lazy one that ends after this many elements (`Seq.take` fused),
+        /// evaluated when it is built.
+        limit: Option<Box<Expr>>,
     },
     /// Runs `body` for each element of `source` that `pat` matches; only
     /// inside a `Generate`.
@@ -235,8 +238,13 @@ impl Expr {
             | ExprKind::Within(_, inner)
             | ExprKind::Lift(inner, _)
             | ExprKind::Lambda { body: inner, .. }
-            | ExprKind::Generate { body: inner, .. }
             | ExprKind::Yield(inner) => f(inner),
+            ExprKind::Generate { body, limit, .. } => {
+                if let Some(limit) = limit {
+                    f(limit);
+                }
+                f(body);
+            }
             ExprKind::Each { source, body, .. } => {
                 f(source);
                 f(body);
@@ -326,8 +334,13 @@ impl Expr {
             | ExprKind::Within(_, inner)
             | ExprKind::Lift(inner, _)
             | ExprKind::Lambda { body: inner, .. }
-            | ExprKind::Generate { body: inner, .. }
             | ExprKind::Yield(inner) => f(inner),
+            ExprKind::Generate { body, limit, .. } => {
+                if let Some(limit) = limit {
+                    f(limit);
+                }
+                f(body);
+            }
             ExprKind::Each { source, body, .. } => {
                 f(source);
                 f(body);

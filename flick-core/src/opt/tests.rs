@@ -326,3 +326,33 @@ fn a_private_literal_constant_inlines_at_its_uses() {
     assert!(js.contains("\"w256\""), "{js}");
     assert!(!js.contains("const size"), "{js}");
 }
+
+#[test]
+fn combinators_of_a_for_fuse_into_its_loop() {
+    let js = release(
+        "module App exposing (chain, listed, firsts, nested)\n\n\
+         chain : List Number -> List Number\n\
+         let chain xs = Seq.to_list (Seq.map (fun x -> x * 10) (Seq.filter (fun x -> x > 1) (for { x <- xs } yield x)))\n\n\
+         listed : List Number -> List Number\n\
+         let listed xs = List.map (fun y -> y + 1) (List.filter (fun y -> y > 2) [for x <- xs yield x * 2])\n\n\
+         firsts : Seq Number\nlet firsts = Seq.take 3 (Seq.flat_map (fun x -> Seq.of_list [x, x]) (for { x <- Seq.from 1 } yield x))\n\n\
+         nested : List Number -> List (Number, Number)\n\
+         let nested xs = [for { x <- for { y <- xs; if y > 0 } yield y * 2; z <- [1, 2] } yield (x, z)]\n",
+    );
+    insta::assert_snapshot!(js);
+}
+
+#[test]
+fn a_known_function_fuses_and_a_sync_for_is_left() {
+    let js = release(
+        "module App exposing (doubled, read)\n\n\
+         double : Number -> Number\nlet double x = x * 2\n\n\
+         doubled : List Number -> List Number\nlet doubled xs = List.map double [for x <- xs yield x + 1]\n\n\
+         count : Atom.Writable Number\nlet count = Atom.make 1\n\n\
+         read : Unit ->{Atom.Read;} List Number\n\
+         let read () = Seq.to_list (Seq.map double (for { x <- [1, 2] } yield x + Atom.value count))\n",
+    );
+    assert!(js.contains("$t1.push((x + 1) * 2);"), "{js}");
+    // its steps read the services it captured, so they stay in its generator
+    assert!(js.contains("$m_Seq.map(double)($rt.seqIn("), "{js}");
+}

@@ -1,0 +1,37 @@
+// Fusion: in release, combinators of a `for` run in its loop. Debug and
+// release print the same: laziness, order and every rule are kept.
+module App.Main exposing (main)
+
+double : Number -> Number
+let double x = x * 2
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let xs = [1, 2, 3, 4]
+  // map, filter and to_list into one strict loop
+  Platform.stdout_line
+    (show
+      (Seq.to_list
+        (Seq.map (fun x -> x * 10) (Seq.filter (fun x -> x > 1) (for { x <- xs } yield x)))))
+  // a named function is bound once, not inlined
+  Platform.stdout_line (show (Seq.to_list (Seq.map double (for { x <- xs } yield x + 1))))
+  // flat_map nests a loop
+  Platform.stdout_line
+    (show
+      (
+        Seq.to_list (Seq.flat_map (fun x -> Seq.of_list [x, x]) (for { x <- xs; if x < 3 } yield x))
+      ))
+  // take ends an endless `for` after its count, again on each iteration
+  let firsts = Seq.take 3 (Seq.map double (for { x <- Seq.from 1 } yield x))
+  Platform.stdout_line (show (Seq.to_list firsts) ++ show (Seq.to_list firsts))
+  Platform.stdout_line (show (Seq.to_list (Seq.take 0 (for { x <- xs } yield x))))
+  // List.map and List.filter of a `[for …]`
+  Platform.stdout_line
+    (show (List.map (fun x -> x + 1) (List.filter (fun x -> x % 2 == 0) [for x <- xs yield x * 3])))
+  // two yields: the lambda is bound, not copied
+  Platform.stdout_line
+    (show (List.map (fun x -> x - 1) [for x <- xs yield if x > 2 then x else 0 - x]))
+  // a `for` over a `for` nests its clauses
+  Platform.stdout_line
+    (show [for { x <- for { y <- xs; if y > 2 } yield y * 2; z <- [1, 2] } yield (x, z)])
+  Platform.stdout_line (show [for { x <- [for y <- xs yield y + 100] } yield x])

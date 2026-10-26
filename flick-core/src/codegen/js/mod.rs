@@ -167,6 +167,7 @@ impl<'a> Gen<'a> {
             buf: Vec::new(),
             generator: false,
             sync: false,
+            limit: None,
             collector: None,
             owner: None,
             tail: None,
@@ -299,6 +300,8 @@ struct Gen<'a> {
     /// The list a strict `[for …]` pushes its elements to; `None` in a lazy
     /// one, which yields them.
     collector: Option<String>,
+    /// The limit of the lazy `for` being emitted and its count of elements.
+    limit: Option<(String, String)>,
     /// The owner the next runtime call acquires into, from `Within`.
     owner: Option<String>,
     tail: Option<Tail>,

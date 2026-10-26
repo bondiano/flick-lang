@@ -11,29 +11,47 @@ use crate::ir::{Expr, ExprKind, Lit, Pat};
 impl Gen<'_> {
     /// A `Generate`, or a loop or yield of one emitted for what it does.
     pub(super) fn generated(&mut self, e: &Expr) -> String {
-        if let ExprKind::Generate { body, strict, sync } = &e.kind {
-            return self.generate(body, *strict, *sync);
+        if let ExprKind::Generate {
+            body,
+            strict,
+            sync,
+            limit,
+        } = &e.kind
+        {
+            return self.generate(body, *strict, *sync, limit.as_deref());
         }
         self.discard(e);
         "undefined".to_owned()
     }
 
-    fn generate(&mut self, body: &Expr, strict: bool, sync: bool) -> String {
+    fn generate(&mut self, body: &Expr, strict: bool, sync: bool, limit: Option<&Expr>) -> String {
         let tail = self.tail.take();
         let result = if strict {
             let out = self.temp();
             self.buf.push(format!("const {out} = [];"));
-            let saved = self.collector.replace(out.clone());
+            let saved = (self.collector.replace(out.clone()), self.limit.take());
             self.discard(body);
-            self.collector = saved;
+            (self.collector, self.limit) = saved;
             out
         } else {
             // the clauses run no Effect: Sync calls at most, with the
             // services of the stage here, which each step of a `seqIn` reads
+            // with a limit, a count of the elements yielded ends it
+            let limit = limit.map(|l| {
+                let n = self.expr(l);
+                (self.spill(n), self.temp())
+            });
             let generator = mem::replace(&mut self.generator, false);
-            let saved = (self.collector.take(), mem::replace(&mut self.sync, sync));
-            let (stmts, ()) = self.block(|g| g.discard(body));
-            (self.collector, self.sync) = saved;
+            let saved = (
+                self.collector.take(),
+                mem::replace(&mut self.sync, sync),
+                mem::replace(&mut self.limit, limit.clone()),
+            );
+            let (mut stmts, ()) = self.block(|g| g.discard(body));
+            if let Some((n, count)) = &limit {
+                stmts.insert(0, format!("let {count} = 0;\nif ({n} <= 0) return;"));
+            }
+            (self.collector, self.sync, self.limit) = saved;
             self.generator = generator;
             let function = format!("function* () {{\n{}}}", indent(&stmts));
             if !sync {
@@ -76,6 +94,9 @@ impl Gen<'_> {
                     None => format!("yield {v};"),
                 };
                 self.buf.push(stmt);
+                if let Some((n, count)) = &self.limit {
+                    self.buf.push(format!("if (++{count} >= {n}) return;"));
+                }
             }
             ExprKind::If(c, t, f) => {
                 let c = self.expr(c);

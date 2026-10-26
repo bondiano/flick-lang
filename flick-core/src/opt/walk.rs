@@ -124,7 +124,11 @@ pub fn droppable(e: &Expr) -> bool {
         | ExprKind::Lambda { .. }
         // a task or a sequence is a description: building it runs nothing
         | ExprKind::Task(_)
-        | ExprKind::Generate { strict: false, .. } => true,
+        | ExprKind::Generate {
+            strict: false,
+            limit: None,
+            ..
+        } => true,
         ExprKind::Tuple(items) | ExprKind::List(items) => items.iter().all(droppable),
         ExprKind::Record(fields) => fields.iter().all(|(_, v)| droppable(v)),
         ExprKind::Field(inner, _) | ExprKind::Not(inner) | ExprKind::Neg(inner) => droppable(inner),

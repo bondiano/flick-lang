@@ -362,7 +362,7 @@ component search (props : SearchProps) =
 **D13. Map/Set и моноиды.** ✅ (модули `Monoids`, `Validation`; `fold_map` берёт функцию без захватов — шаг `fold` их не держит)
 - AC: `HashMap.from_seq`/`to_seq`, `HashSet.from_seq`; `Sum`, `Product`, `First`, `Last`, `Min`, `Max`; `Foldable.fold_map`; `Validation e a`.
 
-**D14. Fusion.** ⬜
+**D14. Fusion.** ✅ (`tools/fusion-bench`: `for` + `filter` + `map` в список — 177 → 10 мкс на 1000 элементов, ×17; `for` с Sync-телом не сливается)
 - AC: проход `opt/fuse.rs` (release) сливает `Seq.map/filter/flat_map/take/to_list` и `List.map/filter` над `For` в тот же цикл, `For` над `For` — во вложенные клаузы; комбинаторы распознаются по foreign-биндингу; сливаются только чистые функции; debug и release дают одинаковый вывод; бенчмарк в `tools/`.
 
 **D15. MTL и законы.** ⬜
