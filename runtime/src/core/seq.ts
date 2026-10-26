@@ -24,7 +24,7 @@ export const seqFrom = (n: number): Seq<number> =>
 
 export const seqRangeBy = (start: number, end: number, step: number): Seq<number> =>
   seq(function* () {
-    if (!(step > 0 || step < 0)) return;
+    if (step === 0 || Number.isNaN(step)) return;
     for (let i = start; step > 0 ? i < end : i > end; ) {
       yield i;
       if (i + step === i) return;
