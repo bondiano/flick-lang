@@ -4,6 +4,7 @@
 cfd4deeeb00ff9b0  03-direct-calls:8  load_name : UserId ->{Users, Log; NotFound} String
 593814cb393c3a84  03-direct-calls:43  render : Show a => a -> String
 0e0762aff3749216  03-direct-calls:65  greet : String -> String -> String
+77b958aa32b4da08  03-direct-calls:87  doubled : Unit ->{Atom.Read;} Number
 6c70dbf125707c4a  04-computations:17  load_user : UserId ->{Users; NotFound} User
 1f4fb3d7472f358e  04-computations:37  load_twice :
 5490665b39c55003  04-computations:78  load_name_pair : UserId -> UserId ->{Users; NotFound} (String, String)
