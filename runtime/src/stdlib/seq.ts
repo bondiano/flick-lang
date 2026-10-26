@@ -11,6 +11,7 @@ export {
   seqFrom,
   seqRangeBy,
   seqRange,
+  seqRangeTo,
   seqIterate,
   seqRepeat,
   seqCycle,

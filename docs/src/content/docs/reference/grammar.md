@@ -116,7 +116,7 @@ let examples =
 ### Operators and punctuation
 
 ```text
-( ) [ ] { } , ; : . .. = -> <- => | ^ _ ?
+( ) [ ] { } , ; : . .. ..< = -> <- => | ^ _ ?
 |> || && == != < <= > >= ++ + - * / % ** not
 ```
 
@@ -130,6 +130,7 @@ There are no user-defined operators. From weakest to strongest:
 | 2 | `\|\|` | right |
 | 3 | `&&` | right |
 | 4 | `==` `!=` `<` `<=` `>` `>=` | none: `a < b < c` is an error |
+| 4½ | `a..b`, `a..<b`, `a..` | none: `a..b..c` is an error |
 | 5 | `++` | right |
 | 6 | `+` `-` | left |
 | 7 | `*` `/` `%` (`%` is the JS remainder) | left |
@@ -139,7 +140,12 @@ There are no user-defined operators. From weakest to strongest:
 | 11 | `.field`, `Module.name`, postfix `?` | left |
 
 `-x ** 2` is `-(x ** 2)`; `-a * b` is `(-a) * b`; `await f x` is
-`await (f x)`. Bitwise operations are the functions `Number.bit_*`.
+`await (f x)`; `0..n - 1` is `0..(n - 1)`, and `i < 0..n` compares with the range.
+A range is a `Seq Number`: `a..b` counts from `a` up to `b` inclusive
+(`Seq.range_to`), `a..<b` stops before `b` (`Seq.range`), and `a..` never
+ends (`Seq.from`). Alone in brackets, `[a..b]` is the `List` of the same
+numbers; `[a..]` is an error. The number before `..` ends there: `1..5` is
+a range, `1.5` a number. Bitwise operations are the functions `Number.bit_*`.
 
 ## Layout
 

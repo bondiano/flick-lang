@@ -11,6 +11,7 @@ mod do_notation;
 mod expr;
 mod pattern;
 mod question;
+mod ranges;
 mod sql;
 
 use std::collections::{HashMap, HashSet};

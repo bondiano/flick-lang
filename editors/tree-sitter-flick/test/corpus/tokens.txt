@@ -174,3 +174,20 @@ Postfix question
   (operator)
   (identifier)
   (operator))
+
+==================
+Ranges
+==================
+
+[1..n] 0..<3
+
+---
+
+(source_file
+  (brackets
+    (number)
+    (operator)
+    (identifier))
+  (number)
+  (operator)
+  (number))

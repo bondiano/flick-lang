@@ -61,6 +61,11 @@ impl Checker<'_> {
                     self.check(child, item);
                 }
             }
+            (K::ListExpr, _) if super::range_list(node).is_some() => {
+                let range = super::range_list(node).expect("checked");
+                let actual = self.range_expr(range, true);
+                self.expect(&actual, expected, self.span(node));
+            }
             (K::ListExpr, _) if super::comprehension(node).is_some() => {
                 let strict = super::comprehension(node).expect("checked");
                 let actual = self.for_expr(strict, true, Some(expected));
@@ -120,6 +125,10 @@ impl Checker<'_> {
             K::ParenExpr => self.infer(children[0]),
             K::UnitExpr => Type::prim("Unit"),
             K::TupleExpr => Type::Tuple(children.iter().map(|c| self.infer(c)).collect()),
+            K::RangeExpr => self.range_expr(node, false),
+            K::ListExpr if super::range_list(node).is_some() => {
+                self.range_expr(super::range_list(node).expect("checked"), true)
+            }
             K::ListExpr if super::comprehension(node).is_some() => {
                 let strict = super::comprehension(node).expect("checked");
                 self.for_expr(strict, true, None)

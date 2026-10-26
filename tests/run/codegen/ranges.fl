@@ -1,0 +1,25 @@
+// Ranges: `a..b` up to `b`, `a..<b` before it, `a..` without end, each a
+// `Seq`; alone in brackets, a `List`. `..` binds looser than arithmetic and
+// tighter than comparisons; `exposing (..)`, `...rest` and `1.5` stay.
+module App.Main exposing (..)
+
+type alias Point = { x : Number; y : Number }
+
+rest : List Number -> List Number
+let rest xs =
+  match xs with
+  | [_, ...others] -> others
+  | _ -> []
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let n = 4
+  Platform.stdout_line (show [1..5])
+  Platform.stdout_line (show [0..<n])
+  Platform.stdout_line (show (Seq.to_list (Seq.take 3 (10..))))
+  Platform.stdout_line (show [n - 2..n * 2])
+  Platform.stdout_line (show [for { x <- 1..3; y <- x..<3 } yield (x, y)])
+  Platform.stdout_line (show [3..1])
+  Platform.stdout_line (show (rest [1..4]))
+  let p = { x = 1.5; y = 2 }
+  Platform.stdout_line (show [1..p.y] ++ show p.x)

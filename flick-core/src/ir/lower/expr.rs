@@ -58,6 +58,7 @@ impl Lower<'_> {
             K::TupleExpr => ExprKind::Tuple(children.iter().map(|c| self.expr(c)).collect()),
             K::ListExpr => return self.list(node, &children),
             K::ForExpr => return self.for_expr(node, false),
+            K::RangeExpr => return self.range(node, false),
             K::QuestionExpr => return self.question(node, children[0]),
             K::FieldExpr => {
                 let label = self.token_text(node, K::Ident).unwrap_or_default();

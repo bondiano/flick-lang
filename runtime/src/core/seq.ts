@@ -23,6 +23,11 @@ export const seqRangeBy = (start: number, end: number, step: number): Seq<number
 
 export const seqRange = (start: number, end: number): Seq<number> => seqRangeBy(start, end, 1);
 
+export const seqRangeTo = (start: number, end: number): Seq<number> =>
+  seq(function* () {
+    for (let i = start; i <= end; i++) yield i;
+  });
+
 export const seqIterate = <A>(f: (a: A) => A, x: A): Seq<A> =>
   seq(function* () {
     for (let v = x; ; v = f(v)) yield v;

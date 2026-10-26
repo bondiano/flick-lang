@@ -80,6 +80,8 @@ pub enum SyntaxKind {
     Colon,
     Dot,
     DotDot,
+    /// `..<` of a range without its end.
+    DotDotLt,
     DotDotDot,
     Eq,
     Arrow,
@@ -154,6 +156,8 @@ pub enum SyntaxKind {
     FieldExpr,
     /// `e?`.
     QuestionExpr,
+    /// `a..b`, `a..<b`, `a..`.
+    RangeExpr,
     AppExpr,
     BinExpr,
     PrefixExpr,

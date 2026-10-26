@@ -145,6 +145,8 @@ fn space(a: Tok, b: Tok) -> bool {
         | (_, K::RParen | K::RBracket | K::Comma | K::Semi | K::Caret | K::Dot | K::Question)
         | (K::LBrace, K::RBrace) => false,
         (K::Dot, _) => a.parent == K::ForallType,
+        (K::DotDot | K::DotDotLt, _) if a.parent == K::RangeExpr => false,
+        (_, K::DotDot | K::DotDotLt) if b.parent == K::RangeExpr => false,
         (K::Arrow, K::LBrace) if b.parent == K::EffectAnnot => false,
         (K::LBrace, _) => !tight_braces(a),
         (_, K::RBrace) => !tight_braces(b),

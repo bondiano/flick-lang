@@ -57,6 +57,12 @@ fn numbers_follow_js_grammar_without_dot_forms() {
     assert_eq!(kinds("xs.len").0.len(), 3);
     assert_eq!(kinds("(..)").0[1].0, K::DotDot);
     assert_eq!(kinds("[...r]").0[1].0, K::DotDotDot);
+    // a range: the number ends before `..`, and `1.5` stays one number
+    let range = |src| kinds(src).0.iter().map(|t| t.0).collect::<Vec<_>>();
+    assert_eq!(range("1..5"), [K::Number, K::DotDot, K::Number]);
+    assert_eq!(range("0..<n"), [K::Number, K::DotDotLt, K::Ident]);
+    assert_eq!(range("1.5..2.5"), [K::Number, K::DotDot, K::Number]);
+    assert!(kinds("1..").1.is_empty());
 }
 
 #[test]

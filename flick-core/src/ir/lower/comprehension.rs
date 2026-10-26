@@ -7,13 +7,16 @@ use crate::ir::{Expr, ExprKind, Lit, Pat};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{comprehension, for_parts};
+use crate::types::{comprehension, for_parts, range_list};
 
 impl Lower<'_> {
     /// `[a, b]`, or the strict list of a lone `[for …]`.
     pub(super) fn list(&mut self, node: &Node, items: &[&Node]) -> Expr {
         if let Some(strict) = comprehension(node) {
             return self.for_expr(strict, true);
+        }
+        if let Some(range) = range_list(node) {
+            return self.range(range, true);
         }
         let items = items.iter().map(|c| self.expr(c)).collect();
         Expr::new(ExprKind::List(items), self.span(node))

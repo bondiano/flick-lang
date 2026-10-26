@@ -38,6 +38,9 @@ fn infix(kind: K) -> Option<(u8, u8)> {
 /// Operand of a prefix operator: binds tighter than `*`, looser than `**`.
 const PREFIX_OPERAND: u8 = 18;
 
+/// A range binds looser than `++` and arithmetic, tighter than comparisons.
+const RANGE: (u8, u8) = (9, 10);
+
 fn is_comparison(kind: K) -> bool {
     matches!(kind, K::EqEq | K::NotEq | K::Lt | K::Le | K::Gt | K::Ge)
 }
@@ -62,6 +65,27 @@ fn expr_bp(p: &mut Parser, min_bp: u8) -> Option<Done> {
             expr_bp(p, 0);
             lhs = Some(p.complete(m, K::Error));
             break;
+        }
+        if matches!(op, K::DotDot | K::DotDotLt) {
+            if RANGE.0 < min_bp {
+                break;
+            }
+            let m = p.precede(done);
+            p.bump();
+            // `a..` has no end; `a..<` needs one
+            if op == K::DotDotLt || at_operand_start(p) {
+                expr_bp(p, RANGE.1);
+            }
+            lhs = Some(p.complete(m, K::RangeExpr));
+            if matches!(p.current(), K::DotDot | K::DotDotLt) {
+                let span = p.here_span();
+                p.error_at(
+                    codes::S007,
+                    span,
+                    "ranges do not chain: a range is `a..b`, `a..<b` or `a..`".into(),
+                );
+            }
+            continue;
         }
         let Some((left, right)) = infix(op) else {
             break;

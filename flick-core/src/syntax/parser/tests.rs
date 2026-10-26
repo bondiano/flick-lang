@@ -272,6 +272,23 @@ fn and_joins_bindings_of_a_do_group_only() {
 }
 
 #[test]
+fn ranges_bind_between_comparisons_and_arithmetic() {
+    assert_eq!(
+        sexp("let r = 0..n - 1"),
+        "(LetDecl let (VarPat r) = (Block (RangeExpr (Literal 0) .. (BinExpr (NameExpr n) - (Literal 1)))))"
+    );
+    assert!(
+        sexp("let b = i < 0..<n")
+            .contains("(BinExpr (NameExpr i) < (RangeExpr (Literal 0) ..< (NameExpr n)))")
+    );
+    assert_eq!(
+        sexp("let s = f (1..)"),
+        "(LetDecl let (VarPat s) = (Block (AppExpr (NameExpr f) (ParenExpr ( (RangeExpr (Literal 1) ..) )))))"
+    );
+    assert_eq!(errors("let r = 1..2..3"), ["FLICK-S007 .."]);
+}
+
+#[test]
 fn larrow_outside_do_and_do_without_braces_are_errors() {
     assert_eq!(errors("let f x =\n  y <- load x\n  y\n"), ["FLICK-S013 <-"]);
     assert_eq!(errors("let b = a < -1"), Vec::<String>::new());

@@ -17,6 +17,11 @@ range : Number -> Number -> Seq Number
 foreign pure range from "@flick-lang/runtime" "seqRange"
   arity 2
 
+/// The numbers from `start` up to `end`, `end` too: what `start..end` is.
+range_to : Number -> Number -> Seq Number
+foreign pure range_to from "@flick-lang/runtime" "seqRangeTo"
+  arity 2
+
 /// From `from` by `step` while short of `until`; nothing when `step` is 0.
 range_by : Number -> Number -> Number -> Seq Number
 foreign pure range_by from "@flick-lang/runtime" "seqRangeBy"
