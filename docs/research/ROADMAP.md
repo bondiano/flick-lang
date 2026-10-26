@@ -532,7 +532,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 
 [Сравнивается текст](../../flick-core/src/types/applicative_do.rs#L214-L227). Распознавать resolved method и прозрачные скобки, сохраняя shadowing.
 
-**Q25. P2 — Конечный range перестаёт продвигаться**
+**Q25. P2 — Конечный range перестаёт продвигаться** ✅ (`seqRangeTo`/`seqRangeBy`/`seqFrom`/`listRange` кончаются на достигнутом конце или на шаге, который не меняет число; `runtime/test/seq.test.ts`)
 `Seq.take 3 (9007199254740992..9007199254740992)` дал три копии вместо одной; `[7..7]` корректен. Полный сбор большого диапазона не запускался.
 
 В [seqRangeTo](../../runtime/src/core/seq.ts#L26-L29) `i++` не меняет этот Number. Завершать достигнутый endpoint и обрабатывать непродвигающийся шаг.

@@ -100,7 +100,11 @@ export const listRepeat = <A>(n: number, x: A): Array<A> => Array.from({ length:
 
 export const listRange = (from: number, until: number): Array<number> => {
   const out: Array<number> = [];
-  for (let x = from; x < until; x++) out.push(x);
+  for (let x = from; x < until; x++) {
+    out.push(x);
+    // past 2^53 the step may not change `x`
+    if (x + 1 === x) break;
+  }
   return out;
 };
 

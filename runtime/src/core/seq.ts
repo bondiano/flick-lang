@@ -10,22 +10,37 @@ export const seq = <A>(gen: () => Iterator<A>): Seq<A> => ({ [Symbol.iterator]: 
 
 export const seqOfList = <A>(xs: ReadonlyArray<A>): Seq<A> => xs;
 
+// Past 2^53 a step may not change a number: a range ends there instead
+// of yielding it again forever.
+
 export const seqFrom = (n: number): Seq<number> =>
   seq(function* () {
-    for (let i = n; ; i++) yield i;
+    for (let i = n; ; ) {
+      yield i;
+      if (i + 1 === i) return;
+      i += 1;
+    }
   });
 
 export const seqRangeBy = (start: number, end: number, step: number): Seq<number> =>
   seq(function* () {
-    if (step > 0) for (let i = start; i < end; i += step) yield i;
-    else if (step < 0) for (let i = start; i > end; i += step) yield i;
+    if (!(step > 0 || step < 0)) return;
+    for (let i = start; step > 0 ? i < end : i > end; ) {
+      yield i;
+      if (i + step === i) return;
+      i += step;
+    }
   });
 
 export const seqRange = (start: number, end: number): Seq<number> => seqRangeBy(start, end, 1);
 
 export const seqRangeTo = (start: number, end: number): Seq<number> =>
   seq(function* () {
-    for (let i = start; i <= end; i++) yield i;
+    for (let i = start; i <= end; ) {
+      yield i;
+      if (i === end || i + 1 === i) return;
+      i += 1;
+    }
   });
 
 export const seqIterate = <A>(f: (a: A) => A, x: A): Seq<A> =>
