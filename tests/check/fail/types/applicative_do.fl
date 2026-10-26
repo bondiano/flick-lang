@@ -1,0 +1,15 @@
+module App.ApplicativeDo exposing (..)
+
+lookup : Number -> Option Number
+let lookup n = Some n
+
+// the bindings of a group run independently: `x` is not in scope beside it
+dependent : Option Number -> Option Number
+let dependent a = do { x <- a and y <- lookup x; pure (x + y) }
+
+// a group cannot end the block
+ending : Option Number -> Option Number
+let ending a = do { x <- a and y <- a }
+
+//~ FLICK-T001 @8:47-8:48 `x` is bound by another binding of this `and` group
+//~ FLICK-T019 @12:21-12:38 must end with an expression

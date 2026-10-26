@@ -188,7 +188,7 @@ fn at_sql_clause(p: &Parser) -> bool {
 
 pub(super) fn at_arg_start(p: &Parser) -> bool {
     match p.current() {
-        K::Ident => !(p.sql_depth > 0 && at_sql_clause(p)),
+        K::Ident => !(at_and(p) || p.sql_depth > 0 && at_sql_clause(p)),
         K::Con
         | K::Number
         | K::BigInt
@@ -563,14 +563,31 @@ fn do_stmt(p: &mut Parser) {
         expr(p);
         p.complete(m, K::GuardStmt);
     } else if !p.at(K::LetKw) && ahead(p, K::LArrow) {
-        let m = p.start();
-        pattern::pattern(p);
-        p.expect(K::LArrow);
-        expr(p);
-        p.complete(m, K::BindStmt);
+        let first = bind_stmt(p);
+        if at_and(p) {
+            let m = p.precede(first);
+            while at_and(p) {
+                p.bump_as(K::AndKw);
+                bind_stmt(p);
+            }
+            p.complete(m, K::BindGroup);
+        }
     } else {
         stmt(p);
     }
+}
+
+fn bind_stmt(p: &mut Parser) -> Done {
+    let m = p.start();
+    pattern::pattern(p);
+    p.expect(K::LArrow);
+    expr(p);
+    p.complete(m, K::BindStmt)
+}
+
+/// Whether the word `and` joins another binding to a `do` group here.
+fn at_and(p: &Parser) -> bool {
+    p.at_word("and") && ahead(p, K::LArrow)
 }
 
 /// Whether `kind` comes before the current statement ends, outside brackets.

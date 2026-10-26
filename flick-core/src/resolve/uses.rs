@@ -90,6 +90,14 @@ impl Walker<'_> {
                             self.walk(part);
                         }
                         self.bind_patterns(child);
+                    } else if child.kind == K::BindGroup {
+                        // `p <- a and q <- b`: neither value sees `p` or `q`
+                        for part in child.nodes().flat_map(Node::nodes) {
+                            self.walk(part);
+                        }
+                        for bind in child.nodes() {
+                            self.bind_patterns(bind);
+                        }
                     } else {
                         self.walk(child);
                     }

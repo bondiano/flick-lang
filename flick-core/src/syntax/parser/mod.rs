@@ -277,7 +277,13 @@ impl<'t> Parser<'t> {
 
     fn bump(&mut self) {
         debug_assert_ne!(self.raw().kind, K::Eof, "bump at end of file");
-        self.events.push(Event::Token);
+        self.events.push(Event::Token(None));
+        self.pos += 1;
+    }
+
+    /// Consumes the current token as `kind`: a word that is a keyword here.
+    fn bump_as(&mut self, kind: SyntaxKind) {
+        self.events.push(Event::Token(Some(kind)));
         self.pos += 1;
     }
 

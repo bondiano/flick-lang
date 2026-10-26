@@ -57,7 +57,8 @@ Contextual words are ordinary names everywhere except in one position:
 - `table` right after `sql` at the top level, and `via` after the type of a
   column of a `sql table` (see [sql.md](../sql/));
 - CLI clause words at the start of a clause inside `cli { … }`: `description`,
-  `flag`, `arg`, `subcommand`, `handle`.
+  `flag`, `arg`, `subcommand`, `handle`;
+- `and` between the bindings of a `do` group, `x <- a and y <- b`.
 
 ### Number literals
 
@@ -377,7 +378,8 @@ atom        = name | Con { "." Con } ["." name] | Number | BigInt | String
             | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
             | "cli" String "{" cli_clause { cli_clause } "}"
-do_stmt     = or_pattern "<-" expr | "if" expr | statement
+do_stmt     = bind { "and" bind } | "if" expr | statement
+bind        = or_pattern "<-" expr
 clause_list = for_clause { ";" | line break | before "if" … for_clause }
 for_clause  = or_pattern "<-" expr | "if" expr | let_decl
 clause      = ("from" | "join" | "left_join") name "in" expr
@@ -393,6 +395,9 @@ nothing, `if c` without `then` is `if c then rest else nothing` of
 expression of the block's monad. The pattern after `<-` must be irrefutable,
 and the rest of the block is a pure function: a runtime call there is
 `FLICK-E001` (see [`do`, `for` and comprehensions](../../spec/06-higher-order/#do-for-and-comprehensions)).
+`p <- a and q <- b` binds both independently through `map2` of
+`Applicative`: neither value sees `p` or `q`, and a group followed only by
+`pure e` needs no `Monad`. `and` is a word only there; elsewhere it is a name.
 `for { x <- xs; if p x } yield e` is a lazy `Seq`: one generator runs
 the clauses on each iteration. `x <- source` takes the elements of an
 `Iterable` source (`List`, `Seq`) and skips those the pattern does not match,

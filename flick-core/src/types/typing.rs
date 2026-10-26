@@ -35,6 +35,9 @@ pub struct Typing {
     pub runtime: HashSet<Range>,
     /// Those whose stage runs a Sync call.
     pub sync: HashSet<Range>,
+    /// The `and` groups of `do` followed only by `pure e`, whose last
+    /// `map2` computes `e`.
+    pub applicative: HashSet<Range>,
     /// What each postfix `?` does.
     pub questions: HashMap<Range, super::Question>,
     /// Lazy `for`s whose body makes Sync calls: each step runs with the

@@ -40,6 +40,10 @@ pub fn in_scope(root: &Node, offset: u32, text: &str) -> Vec<(String, (u32, u32)
                 for statement in scope.nodes().filter(before) {
                     if matches!(statement.kind, K::LetDecl | K::BindStmt) {
                         out.extend(let_binders(statement, text));
+                    } else if statement.kind == K::BindGroup {
+                        for bind in statement.nodes() {
+                            out.extend(let_binders(bind, text));
+                        }
                     }
                 }
             }

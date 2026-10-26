@@ -259,6 +259,19 @@ fn do_blocks_bind_guard_and_sequence() {
 }
 
 #[test]
+fn and_joins_bindings_of_a_do_group_only() {
+    assert_eq!(
+        sexp("let p = do { x <- a and (y, z) <- f b; pure (x + y) }"),
+        "(LetDecl let (VarPat p) = (Block (DoExpr do { (Block (BindGroup (BindStmt (VarPat x) <- \
+         (NameExpr a)) and (BindStmt (TuplePat ( (VarPat y) , (VarPat z) )) <- (AppExpr (NameExpr f) \
+         (NameExpr b)))) ; (AppExpr (NameExpr pure) (ParenExpr ( (BinExpr (NameExpr x) + (NameExpr y)) )))) })))"
+    );
+    // elsewhere `and` is a name
+    assert!(sexp("let q = do { x <- Bool.and a b; and x y }").contains("(NameExpr and)"));
+    assert!(sexp("let r = do { x <- f (g and h); pure x }").contains("(NameExpr and)"));
+}
+
+#[test]
 fn larrow_outside_do_and_do_without_braces_are_errors() {
     assert_eq!(errors("let f x =\n  y <- load x\n  y\n"), ["FLICK-S013 <-"]);
     assert_eq!(errors("let b = a < -1"), Vec::<String>::new());

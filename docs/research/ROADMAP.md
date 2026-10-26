@@ -350,7 +350,7 @@ component search (props : SearchProps) =
 - `do` больше не начинает аргумент (как `if`/`match`): `f (do { … })`.
 
 
-**D10. Applicative `do`.** ⬜
+**D10. Applicative `do`.** ✅ (`and` — ключевое слово только между связками `do`; `Validation` — в D13)
 - AC: `x <- a and y <- b` → `map2`, нужен только `Applicative`; ссылка между связками `and` — ошибка; `Validation` накапливает ошибки (D13).
 
 **D11. Постфиксный `?`.** ✅ (исправление — `FLICK-T034`)

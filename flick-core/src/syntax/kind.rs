@@ -65,6 +65,8 @@ pub enum SyntaxKind {
     ForKw,
     YieldKw,
     DoKw,
+    /// `and` between the bindings of a `do` group, a keyword only there.
+    AndKw,
 
     // punctuation and operators
     LParen,
@@ -176,6 +178,8 @@ pub enum SyntaxKind {
     DoExpr,
     /// `pattern <- expr` in a `do` block.
     BindStmt,
+    /// `p <- a and q <- b`: bindings that run independently (`map2`).
+    BindGroup,
     /// `if condition` without `then` in a `do` block: a guard through `Alternative`.
     GuardStmt,
     /// `for { … } yield e`: a lazy `Seq`; in `[ ]` alone, a strict `List`.

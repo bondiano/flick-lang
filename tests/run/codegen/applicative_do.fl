@@ -1,0 +1,41 @@
+// `and` in `do`: bindings that run independently, combined with `map2`.
+// Followed only by `pure e`, the block needs `Applicative` alone.
+module App.Main exposing (main)
+
+pair : Option Number -> Option String -> Option String
+let pair n s = do { x <- n and y <- s; pure (y ++ show x) }
+
+// every combination, in order
+grid : List Number -> List String -> List String
+let grid xs ys = do { x <- xs and y <- ys and z <- [true, false]; pure (y ++ show x ++ show z) }
+
+// any `Applicative`
+both : Applicative f => f Number -> f Number -> f Number
+let both a b = do { x <- a and y <- b; pure (x + y) }
+
+// a group followed by more statements is `flat_map` over its tuple
+chained : Option Number -> Option Number -> Option Number
+let chained a b =
+  do {
+    (x, w) <- Option.map (fun v -> (v, v * 10)) a and y <- b
+    if x < y
+    pure (x + y + w)
+  }
+
+ticks : Eff none none Number
+let ticks =
+  do {
+    x <- task { Platform.stdout_line "first"; 1 } and y <- task { Platform.stdout_line "second"; 2 }
+    pure (x + y)
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (show (pair (Some 1) (Some "a")))
+  Platform.stdout_line (show (pair None (Some "a")))
+  Platform.stdout_line (show (grid [1, 2] ["a", "b"]))
+  Platform.stdout_line (show (both (Some 2) (Some 3)))
+  Platform.stdout_line (show (both [1, 2] [10, 20]))
+  Platform.stdout_line (show (chained (Some 1) (Some 2)))
+  Platform.stdout_line (show (chained (Some 3) (Some 2)))
+  Platform.stdout_line (show (await ticks))

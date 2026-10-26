@@ -25,7 +25,7 @@ impl Lower<'_> {
         expr
     }
 
-    fn do_rest(&mut self, statements: &[&Node], span: Span) -> Expr {
+    pub(super) fn do_rest(&mut self, statements: &[&Node], span: Span) -> Expr {
         let Some((&first, rest)) = statements.split_first() else {
             return Expr::new(ExprKind::Lit(Lit::Unit), span);
         };
@@ -51,6 +51,8 @@ impl Lower<'_> {
                     span,
                 )
             }
+            K::BindGroup if rest.is_empty() => Expr::new(ExprKind::Lit(Lit::Unit), span),
+            K::BindGroup => self.do_group(first, rest, span),
             _ if rest.is_empty() => self.expr(first),
             _ => {
                 let mut children = first.nodes();
@@ -93,7 +95,7 @@ impl Lower<'_> {
     }
 
     /// The method `name` through the dictionary the checker recorded at `key`.
-    fn prelude_method(&mut self, key: Range, name: &str) -> Expr {
+    pub(super) fn prelude_method(&mut self, key: Range, name: &str) -> Expr {
         let span = Span::new(self.file, key.0, key.1);
         let mut dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();
         assert!(

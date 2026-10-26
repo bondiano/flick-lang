@@ -12,7 +12,9 @@ pub(super) enum Event {
         kind: Option<SyntaxKind>,
         forward_parent: Option<usize>,
     },
-    Token,
+    /// The next token, as the given kind when the parser read a word as a
+    /// keyword only there (`and` of a `do` group).
+    Token(Option<SyntaxKind>),
     Finish,
 }
 
@@ -78,7 +80,7 @@ pub(super) fn build(raw: &[RawToken], mut events: Vec<Event>) -> Node {
                     });
                 }
             }
-            Event::Token => {
+            Event::Token(kind) => {
                 trivia(&mut stack, &mut next);
                 let t = raw[next];
                 stack
@@ -86,7 +88,7 @@ pub(super) fn build(raw: &[RawToken], mut events: Vec<Event>) -> Node {
                     .expect("token inside a node")
                     .children
                     .push(Element::Token(Token {
-                        kind: t.kind,
+                        kind: kind.unwrap_or(t.kind),
                         start: t.start,
                         end: t.end,
                     }));

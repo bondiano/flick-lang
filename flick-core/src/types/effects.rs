@@ -119,7 +119,7 @@ impl Checker<'_> {
         match effects {
             None => Stage::pure(match &name {
                 Some(name) => format!("`{name}` is pure: its signature has `->`, not `->{{…}}`"),
-                None if matches!(node.kind, K::DoExpr | K::BindStmt) => {
+                None if matches!(node.kind, K::DoExpr | K::BindStmt | K::BindGroup) => {
                     "the rest of a `do` block is the pure function of `flat_map`: bind the result of \
                      a runtime call with `let` before the `do`"
                         .to_owned()

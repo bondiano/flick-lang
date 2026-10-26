@@ -60,7 +60,8 @@ sql ui cli in when for yield do
 - `table` сразу после `sql` на верхнем уровне и `via` после типа столбца
   `sql table` (см. [SQL](../sql/));
 - слова предложений CLI в начале предложения внутри `cli { … }`: `description`,
-  `flag`, `arg`, `subcommand`, `handle`.
+  `flag`, `arg`, `subcommand`, `handle`;
+- `and` между связками группы `do`, `x <- a and y <- b`.
 
 ### Числовые литералы
 
@@ -400,7 +401,8 @@ atom        = name | Con { "." Con } ["." name] | Number | BigInt | String
             | "codec" postfix "{" field "=" block … "}" | "schema" Con { "." Con }
             | "sql" [name] "{" clause { clause } "}"
             | "cli" String "{" cli_clause { cli_clause } "}"
-do_stmt     = or_pattern "<-" expr | "if" expr | statement
+do_stmt     = bind { "and" bind } | "if" expr | statement
+bind        = or_pattern "<-" expr
 clause_list = for_clause { ";" | line break | before "if" … for_clause }
 for_clause  = or_pattern "<-" expr | "if" expr | let_decl
 clause      = ("from" | "join" | "left_join") name "in" expr
@@ -415,6 +417,10 @@ cli_clause  = ("flag" | "arg") name { String } ":" type ["=" expr]
 `let` действует до конца блока, а последнее утверждение — выражение монады
 блока. Образец после `<-` должен быть неопровержимым, а остаток блока — чистая
 функция: эффектный вызов в нём даёт `FLICK-E001` (см. [`do`, `for` и списковые выражения](../../spec/06-higher-order/#do-for-и-списковые-выражения)).
+`p <- a and q <- b` связывает оба значения независимо через `map2` из
+`Applicative`: ни одно из них не видит `p` и `q`, а группе, за которой идёт
+только `pure e`, `Monad` не нужен. `and` — ключевое слово только там; в других
+местах это имя.
 `for { x <- xs; if p x } yield e` — ленивый `Seq`: один генератор выполняет
 клаузы при каждой итерации. `x <- source` берёт элементы источника с
 `Iterable` (`List`, `Seq`) и пропускает те, что не подходят под образец,

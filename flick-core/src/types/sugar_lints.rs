@@ -65,7 +65,10 @@ impl Checker<'_> {
             return;
         }
         let statements: Vec<&Node> = block_statements(node).collect();
-        if statements.iter().any(|s| s.kind == K::GuardStmt) {
+        if statements
+            .iter()
+            .any(|s| matches!(s.kind, K::GuardStmt | K::BindGroup))
+        {
             return;
         }
         let Some(keyword) = node.child_tokens().find(|t| t.kind == K::DoKw) else {

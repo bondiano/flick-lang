@@ -13,6 +13,7 @@
 //! the types and kinds of the exports.
 
 mod abi;
+mod applicative_do;
 mod bindings;
 mod builtins;
 mod calls;
@@ -58,6 +59,7 @@ mod typing;
 mod ui;
 mod unify;
 
+pub use applicative_do::{and_keys, group_key, pure_argument};
 pub use bindings::{LetParts, let_parts, signature_name};
 pub use builtins::{builtin_sources, builtins};
 pub use classes::Dict;

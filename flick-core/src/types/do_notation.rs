@@ -43,7 +43,12 @@ impl Checker<'_> {
         ty
     }
 
-    fn do_rest(&mut self, node: &Node, statements: &[&Node], expected: Option<&Type>) -> Type {
+    pub(super) fn do_rest(
+        &mut self,
+        node: &Node,
+        statements: &[&Node],
+        expected: Option<&Type>,
+    ) -> Type {
         let Some((&first, rest)) = statements.split_first() else {
             let end = node.range().1;
             self.error(
@@ -81,7 +86,7 @@ impl Checker<'_> {
                 let _ = self.unify(&nothing, &ty);
                 ty
             }
-            K::BindStmt if rest.is_empty() => {
+            K::BindStmt | K::BindGroup if rest.is_empty() => {
                 self.error(
                     codes::T019,
                     self.span(first),
@@ -96,6 +101,7 @@ impl Checker<'_> {
                 }
                 None => self.infer(first),
             },
+            K::BindGroup => self.do_group(node, first, rest, expected),
             _ => self.do_bind(node, first, rest, expected),
         }
     }

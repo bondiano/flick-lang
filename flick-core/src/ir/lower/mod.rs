@@ -3,6 +3,7 @@
 //! renamed apart within each top-level definition, so a name never needs
 //! shadowing in the generated code.
 
+mod applicative_do;
 mod cli;
 mod comprehension;
 mod debug;
