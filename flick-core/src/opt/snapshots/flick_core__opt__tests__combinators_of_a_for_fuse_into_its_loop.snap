@@ -28,7 +28,7 @@ export const listed = (xs) => {
 
 export const firsts = /*#__PURE__*/ $rt.seq(function* () {
   let $t3 = 0;
-  if (3 <= 0) return;
+  if (!(3 > 0)) return;
   for (const x$1 of $m_Seq.from(1)) {
     for (const $fuse3 of $m_Seq.of_list([x$1, x$1])) {
       yield $fuse3;

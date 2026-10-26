@@ -25,6 +25,18 @@ let main () =
   let firsts = Seq.take 3 (Seq.map double (for { x <- Seq.from 1 } yield x))
   Platform.stdout_line (show (Seq.to_list firsts) ++ show (Seq.to_list firsts))
   Platform.stdout_line (show (Seq.to_list (Seq.take 0 (for { x <- xs } yield x))))
+  // a fractional count is truncated, as by List.take, fused or not
+  let half = 0.5
+  Platform.stdout_line
+    (show
+      [
+        Seq.to_list (Seq.take 1.5 (for x <- xs yield x)),
+        Seq.to_list (Seq.take half (for x <- xs yield x)),
+        Seq.to_list (Seq.take (0 / 0) (for x <- xs yield x)),
+        Seq.to_list (Seq.take 2.5 (Seq.of_list xs)),
+        Seq.to_list (Seq.drop 2.5 (Seq.of_list xs)),
+        List.take 1.5 xs,
+      ])
   // List.map and List.filter of a `[for …]`
   Platform.stdout_line
     (show (List.map (fun x -> x + 1) (List.filter (fun x -> x % 2 == 0) [for x <- xs yield x * 3])))

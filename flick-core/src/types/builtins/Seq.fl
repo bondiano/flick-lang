@@ -73,7 +73,8 @@ foreign pure flat_map from "@flick-lang/runtime" "seqFlatMap"
   arity 2
   retention call
 
-/// At most `n` elements; pulls none after the `n`-th, so it ends an infinite sequence.
+/// At most `n` elements, `n` truncated as by `List.take`; pulls none
+/// after the last, so it ends an infinite sequence.
 take : forall d a. Number -> ((Seq a)^d -> (Seq a)^d)
 foreign pure take from "@flick-lang/runtime" "seqTake"
   arity 2
@@ -84,6 +85,7 @@ foreign pure take_while from "@flick-lang/runtime" "seqTakeWhile"
   arity 2
   retention call
 
+/// Without the first `n` elements, `n` truncated as by `List.drop`.
 drop : forall d a. Number -> ((Seq a)^d -> (Seq a)^d)
 foreign pure drop from "@flick-lang/runtime" "seqDrop"
   arity 2

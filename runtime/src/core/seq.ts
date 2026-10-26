@@ -98,11 +98,11 @@ export const seqFlatMap = <A, B>(f: (a: A) => Seq<B>, xs: Seq<A>): Seq<B> =>
     for (const x of xs) yield* f(x);
   });
 
-/** At most `n` elements, pulling none after the `n`-th. */
+/** At most `n` elements, `n` truncated as by `List.take`, pulling none after the last. */
 export const seqTake = <A>(n: number, xs: Seq<A>): Seq<A> =>
   seq(function* () {
-    if (n <= 0) return;
-    let left = n;
+    let left = Math.trunc(n);
+    if (!(left > 0)) return;
     for (const x of xs) {
       yield x;
       if (--left === 0) return;
@@ -119,7 +119,7 @@ export const seqTakeWhile = <A>(p: (a: A) => boolean, xs: Seq<A>): Seq<A> =>
 
 export const seqDrop = <A>(n: number, xs: Seq<A>): Seq<A> =>
   seq(function* () {
-    let skip = n;
+    let skip = Math.trunc(n);
     for (const x of xs) {
       if (skip > 0) skip--;
       else yield x;

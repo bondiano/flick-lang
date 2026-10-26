@@ -542,7 +542,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 
 [Function::of](../../flick-core/src/opt/fuse.rs#L39-L68) переносит Unwrap через границу функции. Оставить callback-вызов, переиспользовав exits-защиту beta-reducer.
 
-**Q27. P2 — Fractional take меняется в release**
+**Q27. P2 — Fractional take меняется в release** ✅ (контракт — усечение, как у `List.take`: `seqTake`/`seqDrop` и предел fusion берут `Math.trunc(n)`, NaN — ноль; `tests/run/codegen/fusion.fl`)
 `Seq.take 1.5 (for x <- [1,2,3,4] yield x)` отдаёт четыре элемента в debug, два в release; 0.5 — четыре против одного. Целые, NaN/Infinity, порядок take/filter совпали.
 
 [Runtime](../../runtime/src/core/seq.ts#L87-L95) ждёт `--left === 0`, [fusion](../../flick-core/src/codegen/js/generator.rs#L90-L98) — `++count >= n`. Определить единый контракт count; публичный Number не требует целого.

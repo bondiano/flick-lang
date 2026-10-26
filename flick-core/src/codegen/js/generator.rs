@@ -37,8 +37,11 @@ impl Gen<'_> {
             // the clauses run no Effect: Sync calls at most, with the
             // services of the stage here, which each step of a `seqIn` reads
             // with a limit, a count of the elements yielded ends it
+            // `n` truncated, as `Seq.take` and `List.take` count it
             let limit = limit.map(|l| {
                 let n = self.expr(l);
+                let whole = n.parse::<f64>().is_ok_and(|n| n.fract() == 0.0);
+                let n = if whole { n } else { format!("Math.trunc({n})") };
                 (self.spill(n), self.temp())
             });
             let generator = mem::replace(&mut self.generator, false);
@@ -49,7 +52,7 @@ impl Gen<'_> {
             );
             let (mut stmts, ()) = self.block(|g| g.discard(body));
             if let Some((n, count)) = &limit {
-                stmts.insert(0, format!("let {count} = 0;\nif ({n} <= 0) return;"));
+                stmts.insert(0, format!("let {count} = 0;\nif (!({n} > 0)) return;"));
             }
             (self.collector, self.sync, self.limit) = saved;
             self.generator = generator;
