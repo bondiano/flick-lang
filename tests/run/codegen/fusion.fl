@@ -5,6 +5,17 @@ module App.Main exposing (main)
 double : Number -> Number
 let double x = x * 2
 
+// `?` in a combinator's lambda returns from the lambda, fused or not
+unwrapped : Unit -> Option (List (Option Number))
+let unwrapped () =
+  Some
+    (Seq.to_list
+      (
+        Seq.map
+          (fun x -> Some ((if x == 2 then None else Some x)? + 1))
+          (for x <- [1, 2, 3] yield x)
+      ))
+
 main : Unit ->{; AppError} Unit
 let main () =
   let xs = [1, 2, 3, 4]
@@ -47,3 +58,4 @@ let main () =
   Platform.stdout_line
     (show [for { x <- for { y <- xs; if y > 2 } yield y * 2; z <- [1, 2] } yield (x, z)])
   Platform.stdout_line (show [for { x <- [for y <- xs yield y + 100] } yield x])
+  Platform.stdout_line (show (unwrapped ()))

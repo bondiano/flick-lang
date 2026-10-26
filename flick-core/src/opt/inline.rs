@@ -81,7 +81,7 @@ pub(super) fn simple(p: &Pat) -> bool {
 }
 
 /// Whether `e` has an `o?` of its own function, outside nested ones.
-fn exits(e: &Expr) -> bool {
+pub(super) fn exits(e: &Expr) -> bool {
     if matches!(e.kind, ExprKind::Unwrap(_)) {
         return true;
     }

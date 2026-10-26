@@ -537,7 +537,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 
 В [seqRangeTo](../../runtime/src/core/seq.ts#L26-L29) `i++` не меняет этот Number. Завершать достигнутый endpoint и обрабатывать непродвигающийся шаг.
 
-**Q26. P1 — Fusion выносит return None из callback**
+**Q26. P1 — Fusion выносит return None из callback** ✅ (лямбда с собственным `o?` не встраивается в цикл, а связывается и вызывается — та же проверка `exits`, что у beta-редукции; `tests/run/codegen/fusion.fl`)
 `Seq.map (fun x -> Some ((if x == 2 then None else Some x)? + 1)) (for x <- [1,2,3] yield x)` даёт в debug `[Some 2,None,Some 4]`, в release `[Some 2]`. С Seq.to_list внутри функции release возвращает None вместо List.
 
 [Function::of](../../flick-core/src/opt/fuse.rs#L39-L68) переносит Unwrap через границу функции. Оставить callback-вызов, переиспользовав exits-защиту beta-reducer.

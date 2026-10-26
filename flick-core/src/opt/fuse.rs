@@ -16,7 +16,7 @@
 
 use std::mem;
 
-use super::inline::simple;
+use super::inline::{exits, simple};
 use crate::ir::{Expr, ExprKind, Lit, Pat, Stage, Stmt};
 use crate::source::Span;
 
@@ -43,6 +43,8 @@ impl Function {
             && let [param] = &params[..]
             && param.stage == Stage::Pure
             && simple(&param.pat)
+            // its `o?` returns from the lambda, not from the loop's function
+            && !exits(body)
         {
             return Function::Lambda(param.pat.clone(), body.clone());
         }
