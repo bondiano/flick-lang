@@ -1,7 +1,7 @@
 //! `todo`, `echo` and `let assert`: calls of `Flick.Debug` told where they are.
 
 use super::Lower;
-use crate::ir::{Arm, Expr, ExprKind, Lit, Pat};
+use crate::ir::{Arm, Expr, ExprKind, Lit, Pat, Stage};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -92,7 +92,7 @@ fn apply(func: Expr, arg: Expr, span: Span) -> Expr {
         ExprKind::App {
             func: Box::new(func),
             arg: Box::new(arg),
-            runtime: false,
+            stage: Stage::Pure,
             arg_first: false,
         },
         span,

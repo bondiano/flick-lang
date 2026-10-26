@@ -152,7 +152,9 @@ impl Projection<'_> {
             } => {
                 let param = self.ty(param, vars)?;
                 let result = match effects {
+                    // a Sync function returns its value, read in the context the runtime set
                     None => self.ty(result, vars)?,
+                    Some(e) if e.sync => self.ty(result, vars)?,
                     Some(e) => {
                         let a = self.ty(result, vars)?;
                         let e_row = self.row(&e.errors, vars)?;

@@ -75,4 +75,21 @@ For an anonymous lambda, the kind of each arrow and both rows are inferred, or i
 
 A pure body or callback is allowed in an expected runtime position through a checked lift node in the IR: the backend defers the body and wraps its result in Effect. This is an adaptation of the representation, not an equality of arrows. Lift does not run a returned `Eff` value and does not remove an additional layer. The reverse conversion of a runtime call into a pure one by empty rows is forbidden; captures are preserved by lift.
 
+## Sync stages
+
+A runtime arrow whose services are a closed row of synchronous services, today `Atom.Read` alone, and whose errors are empty is a *Sync* stage: `Atom a ->{Atom.Read;} a`, the render of `Ui.view`, the computation of `Atom.derived`. Its body compiles to a plain JS function without `Effect.gen`; its calls of other Sync functions and of the operations of `Atom.Read` are plain calls, which read the services of the context the runtime set around the call (the reader of a render or a derived atom). The stage is decided where the arrow is written, so a row variable solved to `Atom.Read` later, as in `forall r. (a ->{r} b) -> …`, keeps the runtime stage its function was compiled with. A foreign function returns an Effect, so its arrows are never Sync.
+
+```flick
+doubled : Unit ->{Atom.Read;} Number
+let doubled () = Atom.value count * 2
+
+twice : (Unit ->{r; e} Number) -> Unit ->{r; e} Number
+let twice f () = f () + f ()
+
+quadrupled : Unit ->{Atom.Read;} Number
+let quadrupled () = twice doubled ()
+```
+
+The lift of the previous section covers every pair of stages: a pure function is called as a Sync one is; a Sync function in a runtime position becomes an Effect that calls it with the fiber's services (`doubled` above); a runtime function in a Sync position, or a runtime call in a Sync stage (`twice doubled ()`), runs its effect at once with the services of the context. A runtime call there that suspends is a defect, as a render that awaits is today. Sync functions of the same type unify only with Sync ones.
+
 New free type variables in a function signature are implicitly universally quantified; the kind is inferred from the position. In a nested signature, the variable names of the outer signature denote the same variables. The signature is checked and does not cancel the value restriction, the invariance of mutable containers or lifetime restrictions. Polymorphic recursion is allowed only with an explicitly written full `forall` on the recursive function: the checker checks the body against the signature but does not infer it. Instantiation remains predicative. The type of an instance method is checked against the class signature after substituting its parameters; new requirements on the calling code cannot be added silently.

@@ -32,6 +32,8 @@ pub struct Stage {
     pub site: usize,
     /// A runtime call ran at this stage.
     pub runtime: bool,
+    /// The stage is Sync: its calls run at once (see [`super::ty::Stage`]).
+    pub sync: bool,
     /// Runtime calls so far, to tell whether an argument ran one.
     pub calls: usize,
     /// How many `scope`s were open when the stage began: those opened
@@ -58,6 +60,7 @@ impl Stage {
             errors: Type::empty_row(),
             site: 0,
             runtime: false,
+            sync: false,
             calls: 0,
             scopes: 0,
         }
@@ -84,6 +87,7 @@ impl Checker<'_> {
             errors,
             site: self.sites.len() - 1,
             runtime: false,
+            sync: false,
             calls: 0,
             scopes: self.regions.open.len(),
         }
@@ -101,6 +105,7 @@ impl Checker<'_> {
             Box::new(Effects {
                 services: stage.services.clone(),
                 errors: stage.errors.clone(),
+                sync: false,
             })
         })
     }
@@ -124,6 +129,15 @@ impl Checker<'_> {
         let site = self.stage.site;
         self.sub_row(services, &bound_services, site, span, false);
         self.sub_row(errors, &bound_errors, site, span, true);
+    }
+
+    /// Records the application or pipe at `range` as a call of `effects`.
+    pub fn record_call(&mut self, effects: &Effects, range: super::typing::Range) {
+        if effects.sync {
+            self.typing.sync.insert(range);
+        } else {
+            self.typing.runtime.insert(range);
+        }
     }
 
     /// Requires the row `actual` to be part of `declared`.

@@ -117,11 +117,7 @@ for (const [tag, field] of [["input", uiField], ["textarea", uiFieldArea]] as co
     const { run, release } = gated(log);
     let calls = 0;
     const handler = eventQueue(1, () => run(++calls));
-    const view = uiView(() =>
-      Effect.map(get(enabled), (active) =>
-        field({ bind: query, placeholder: "", on_input: active ? Option.some(handler) : Option.none() }),
-      ),
-    );
+    const view = uiView(() => field({ bind: query, placeholder: "", on_input: get(enabled) ? Option.some(handler) : Option.none() }));
     const { container, stop } = mount(uiRender(view, undefined), registry);
     try {
       await tick();
@@ -174,11 +170,10 @@ for (const [tag, field] of [["input", uiField], ["textarea", uiFieldArea]] as co
     const revision = Atom.make(0);
     const log: Array<string> = [];
     const { run, release } = gated(log);
-    const view = uiView(() =>
-      Effect.map(get(revision), (current) =>
-        field({ bind: query, placeholder: "", on_input: Option.some(eventQueue(1, () => run(current))) }),
-      ),
-    );
+    const view = uiView(() => {
+      const current = get(revision);
+      return field({ bind: query, placeholder: "", on_input: Option.some(eventQueue(1, () => run(current))) });
+    });
     const { container, stop } = mount(uiRender(view, undefined), registry);
     try {
       await tick();

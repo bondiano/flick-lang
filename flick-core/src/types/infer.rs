@@ -362,7 +362,10 @@ impl Checker<'_> {
                     (None, Some(expected)) => Site::Expected(expected.clone()),
                     (None, None) => Site::Inferred,
                 };
-                self.bounded_stage(effects.services, effects.errors, site)
+                let sync = effects.sync;
+                let mut stage = self.bounded_stage(effects.services, effects.errors, site);
+                stage.sync = sync && stage.pure.is_none();
+                stage
             }
             None => self.open_stage(),
         };
@@ -393,7 +396,10 @@ impl Checker<'_> {
         result: Type,
         span: source::Span,
     ) -> Type {
-        let modes = stages.iter().map(|(_, e)| e.is_some()).collect();
+        let modes = stages
+            .iter()
+            .map(|(_, e)| super::ty::stage_of(e.as_deref()))
+            .collect();
         self.typing.stages.insert(super::typing::range(span), modes);
         let mut ty = result;
         for (i, ((param, effects), (held, expected))) in

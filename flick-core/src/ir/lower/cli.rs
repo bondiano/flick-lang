@@ -131,7 +131,7 @@ impl Lower<'_> {
         let app = ExprKind::App {
             func: Box::new(func),
             arg: Box::new(arg),
-            runtime: self.typing.runtime.contains(&key),
+            stage: self.call_stage(key),
             arg_first,
         };
         let dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();

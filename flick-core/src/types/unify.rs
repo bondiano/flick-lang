@@ -423,7 +423,7 @@ impl Checker<'_> {
             ) => {
                 match (e1, e2) {
                     (None, None) => {}
-                    (Some(e1), Some(e2)) => {
+                    (Some(e1), Some(e2)) if e1.sync == e2.sync => {
                         self.unify(&e1.services, &e2.services)?;
                         self.unify(&e1.errors, &e2.errors)?;
                     }

@@ -3,9 +3,13 @@ import { test } from "node:test";
 
 import { Effect, Option } from "effect";
 
-import { ReadService, atomState } from "../src/index.ts";
+import { ReadService, atomState, syncOperation } from "../src/index.ts";
 import { eventExhaust, uiButton, uiComponent, uiDiv, uiField, uiFieldArea, uiFragment, uiHtml, uiInput, uiRender, uiText, uiView } from "../src/ui/react/index.ts";
 import { uiToHtml } from "../src/ui/html.ts";
+
+/** `Atom.get` as a Flick render calls it: a Sync operation of `Atom.Read`. */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the operation takes the atom
+const get = syncOperation(ReadService, "get", 1) as (atom: unknown) => unknown;
 
 const handler = eventExhaust(() => Effect.void);
 const Widget = () => null;
@@ -28,7 +32,7 @@ test("text and attribute values are escaped, booleans written as React writes th
 test("views and fields read atoms from a registry of the call, and a text area's value is its content", () => {
   const name = atomState("<Ann>");
   const view = uiView((greeting) =>
-    Effect.map(Effect.flatMap(Effect.service(ReadService), (read) => read.get(name)), (n) => uiText(`${String(greeting)} ${String(n)}`)),
+    uiText(`${String(greeting)} ${String(get(name))}`),
   );
   const ui = uiFragment([
     uiRender(view, "Hi"),

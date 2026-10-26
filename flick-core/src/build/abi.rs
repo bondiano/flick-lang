@@ -8,7 +8,7 @@ use crate::codegen::{instance_export, qualified_id, tag};
 use crate::iface::{
     Abi, ConstructorAbi, Data, Dictionary, Interface, Namespace, Summary, fingerprint,
 };
-use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Module, Stmt};
+use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Module, Stage, Stmt};
 use crate::types::Rep;
 
 /// The interface with its ABI and dependency fingerprints. When `imports`
@@ -112,7 +112,7 @@ fn summaries(
                     ExprKind::Lambda { params, body } => (
                         params
                             .iter()
-                            .map(|p| if p.runtime { '!' } else { '.' })
+                            .map(|p| if p.stage == Stage::Pure { '.' } else { '!' })
                             .collect(),
                         &**body,
                     ),
@@ -234,8 +234,8 @@ impl Totality<'_> {
             // a sequence runs its clauses when it is iterated
             | ExprKind::Generate { strict: false, .. } => false,
             ExprKind::App {
-                func, arg, runtime, ..
-            } => *runtime || !self.total_call(e) || partial(func) || partial(arg),
+                func, arg, stage, ..
+            } => *stage != Stage::Pure || !self.total_call(e) || partial(func) || partial(arg),
             ExprKind::Binary(op, l, r) => {
                 matches!(op, BinOp::Div | BinOp::Rem | BinOp::Pow) || partial(l) || partial(r)
             }

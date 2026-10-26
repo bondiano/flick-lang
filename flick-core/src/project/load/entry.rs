@@ -48,7 +48,9 @@ pub fn main_kind(t: &Type) -> Result<MainKind, String> {
     let Some(effects) = effects else {
         return Ok(MainKind::Pure);
     };
-    let Effects { services, errors } = effects.as_ref();
+    let Effects {
+        services, errors, ..
+    } = effects.as_ref();
     match services {
         Type::Var(_) => {}
         Type::Row(row) if row.entries.is_empty() => {}

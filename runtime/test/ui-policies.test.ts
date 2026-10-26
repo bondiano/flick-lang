@@ -133,14 +133,13 @@ test("removing an event drops its waiting queue but started tasks remain owned u
   let n = 0;
   const toggle = eventExhaust(() => Effect.sync(() => registry.update(visible, (v) => !v)));
   const queued = eventQueue(1, () => run(++n));
-  const view = uiView(() =>
-    Effect.map(get(visible), (shown) =>
-      uiFragment([
-        uiButton({ disabled: false, on_click: toggle }, []),
-        ...(shown ? [uiKeyed("task", uiButton({ disabled: false, on_click: queued }, []))] : []),
-      ]),
-    ),
-  );
+  const view = uiView(() => {
+    const shown = get(visible);
+    return uiFragment([
+      uiButton({ disabled: false, on_click: toggle }, []),
+      ...(shown ? [uiKeyed("task", uiButton({ disabled: false, on_click: queued }, []))] : []),
+    ]);
+  });
   const root = container();
   const fiber = mount(root, uiRender(view, undefined), log, registry);
   await tick();

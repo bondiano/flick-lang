@@ -9,7 +9,7 @@ import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 
 import { WriteService, atomLayer, nativeRegistry } from "../src/effect/reactivity/Atom.ts";
-import { ReadService, atomAt, atomDerived, atomFamily, atomForget, atomState, label as compilerLabel } from "../src/index.ts";
+import { ReadService, atomAt, atomDerived, atomFamily, atomForget, atomState, label as compilerLabel, syncOperation } from "../src/index.ts";
 import { type Renderer, type Ui, eventExhaust, uiFragment, uiNamed, uiRunWith, uiRender, uiText, uiView } from "../src/ui/react/index.ts";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>");
@@ -35,21 +35,20 @@ const domRoot = (): { container: Element; renderer: Renderer } => {
   };
 };
 
-/** `Atom.get atom` as a Flick render does it: through `Atom.Read`. */
-const get = <A>(atom: Atom.Atom<A>): Effect.Effect<A> =>
+/** `Atom.get atom` as a Flick render does it: a Sync call of `Atom.Read`. */
+const get = <A>(atom: Atom.Atom<A>): A =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the read gives the atom's own value
-  Effect.flatMap(Effect.service(ReadService), (read) => read.get(atom)) as Effect.Effect<A>;
+  (syncOperation(ReadService, "get", 1) as (atom: Atom.Atom<A>) => A)(atom);
 
 /** A view showing `atom`, counting its renders. */
 const counting = (label: string, atom: Atom.Atom<number>, renders: Array<string>) =>
   uiNamed(
     label,
-    uiView(() =>
-      Effect.map(get(atom), (n) => {
-        renders.push(label);
-        return uiText(`${label}=${n}`);
-      }),
-    ),
+    uiView(() => {
+      const n = get(atom);
+      renders.push(label);
+      return uiText(`${label}=${n}`);
+    }),
   );
 
 const mount = (ui: Ui, registry: AtomRegistry.AtomRegistry) => {
@@ -78,7 +77,7 @@ test("a view renders again only when an atom it read changes", async () => {
 test("a derived atom read in a view follows the atoms it reads", async () => {
   const registry = AtomRegistry.make();
   const count = Atom.make(2);
-  const doubled = atomDerived(() => Effect.map(get(count), (n) => n * 2));
+  const doubled = atomDerived(() => get(count) * 2);
   const renders: Array<string> = [];
   const { container, stop } = mount(uiRender(counting("App.Doubled", doubled, renders), undefined), registry);
   await tick();
@@ -118,16 +117,15 @@ test("a write between a render and its subscription renders again", async () => 
   const registry = AtomRegistry.make();
   const count = Atom.make(0);
   let wrote = false;
-  const view = uiView(() =>
-    Effect.map(get(count), (n) => {
-      // the first render writes before the view has subscribed
-      if (!wrote) {
-        wrote = true;
-        registry.set(count, 7);
-      }
-      return uiText(`n=${n}`);
-    }),
-  );
+  const view = uiView(() => {
+    const n = get(count);
+    // the first render writes before the view has subscribed
+    if (!wrote) {
+      wrote = true;
+      registry.set(count, 7);
+    }
+    return uiText(`n=${n}`);
+  });
   const { container, stop } = mount(uiRender(view, undefined), registry);
   await tick();
   assert.equal(container.textContent, "n=7");
@@ -139,7 +137,7 @@ test("a view without a registry fails with what to do", async (t) => {
   t.mock.method(console, "error", () => undefined);
   const { renderer } = domRoot();
   const failures: Array<string> = [];
-  const view = uiView(() => Effect.succeed(uiText("x")));
+  const view = uiView(() => uiText("x"));
   const fiber = Effect.runFork(uiRunWith(renderer, () => Effect.void, uiRender(view, undefined)));
   const exit = await Effect.runPromise(Fiber.await(fiber));
   if (exit._tag === "Failure") failures.push(String(exit.cause));
@@ -204,7 +202,7 @@ test("the compiler's label names an atom, a view and an action, and keeps a name
   const atom = compilerLabel("App.Counter.count", atomState(0));
   assert.equal(atom.label?.[0], "App.Counter.count");
   assert.equal(atom.keepAlive, true);
-  const view = uiView(() => Effect.succeed(uiText("")));
+  const view = uiView(() => uiText(""));
   assert.equal(compilerLabel("App.Counter.counter_view", view).label, "App.Counter.counter_view");
   assert.equal(compilerLabel("App.Counter.counter_view", uiNamed("Counter", view)).label, "Counter");
   const action = compilerLabel("App.Counter.reset", eventExhaust(() => Effect.void));

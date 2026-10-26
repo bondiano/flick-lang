@@ -9,7 +9,7 @@ make_request : UserId -> Eff {Users} {NotFound} User
 get_user : UserId ->{Users; NotFound} User
 ```
 
-`make_request` purely builds a description. `get_user` performs the operation when called, in the source semantics. Both functions may have the same TS representation `(id) => Effect<User, E, R>`, so this distinction must be kept in the typed IR and in module interfaces. It cannot be recovered from the generated TS type alone.
+`make_request` purely builds a description. `get_user` performs the operation when called, in the source semantics. Both functions may have the same TS representation `(id) => Effect<User, E, R>`, so this distinction must be kept in the typed IR and in module interfaces. It cannot be recovered from the generated TS type alone. A Sync function (`->{Atom.Read;}`, [section 3](../03-direct-calls/#sync-stages)) is a third kind: it performs its reads when called, yet its representation is `(id) => User`, without an Effect.
 
 ## Task and running a stored value
 

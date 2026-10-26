@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::mem;
 
 use super::walk::{rename, size};
-use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Param, Pat, Stmt};
+use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Param, Pat, Stage, Stmt};
 
 /// The size budget of a body inlined at every use, in IR nodes: no bigger
 /// than the call it replaces, give or take.
@@ -32,7 +32,9 @@ pub fn candidates(module: &str, items: &[Item], exported: &dyn Fn(&str) -> bool)
         .filter_map(|item| match &item.kind {
             ItemKind::Value { name, dicts, body } if dicts.is_empty() => match &body.kind {
                 ExprKind::Lambda { params, body }
-                    if params.iter().all(|p| !p.runtime && simple(&p.pat))
+                    if params
+                        .iter()
+                        .all(|p| p.stage == Stage::Pure && simple(&p.pat))
                         && (size(body) <= SMALL
                             || (size(body) <= ONCE
                                 && !exported(name)
@@ -101,7 +103,10 @@ fn inlinable(e: &Expr) -> bool {
             | ExprKind::Lift(..)
             | ExprKind::CodecBlock(..)
             | ExprKind::Operation { .. }
-            | ExprKind::App { runtime: true, .. }
+            | ExprKind::App {
+                stage: Stage::Sync | Stage::Runtime,
+                ..
+            }
     );
     let mut children = true;
     e.each_child(&mut |c| children &= inlinable(c));
@@ -160,7 +165,7 @@ fn full_application(
     while let ExprKind::App {
         func,
         arg,
-        runtime: false,
+        stage: Stage::Pure,
         arg_first: false,
     } = &head.kind
     {
@@ -196,15 +201,14 @@ pub fn beta(e: &mut Expr) -> bool {
         let stmts = mem::take(stmts);
         let value = mem::replace(&mut **value, Expr::new(ExprKind::Lit(Lit::Unit), e.span));
         let span = e.span;
-        let ExprKind::App { arg, runtime, .. } =
-            mem::replace(&mut e.kind, ExprKind::Lit(Lit::Unit))
+        let ExprKind::App { arg, stage, .. } = mem::replace(&mut e.kind, ExprKind::Lit(Lit::Unit))
         else {
             unreachable!("matched above")
         };
         let app = ExprKind::App {
             func: Box::new(value),
             arg,
-            runtime,
+            stage,
             arg_first: false,
         };
         *e = Expr::new(ExprKind::Block(stmts, Box::new(Expr::new(app, span))), span);
@@ -213,7 +217,7 @@ pub fn beta(e: &mut Expr) -> bool {
     let ExprKind::App {
         func,
         arg,
-        runtime: false,
+        stage: Stage::Pure,
         ..
     } = &mut e.kind
     else {
@@ -223,7 +227,10 @@ pub fn beta(e: &mut Expr) -> bool {
     let ExprKind::Lambda { params, body } = &mut func.kind else {
         return false;
     };
-    if params.first().is_none_or(|p| p.runtime || !simple(&p.pat)) {
+    if params
+        .first()
+        .is_none_or(|p| p.stage != Stage::Pure || !simple(&p.pat))
+    {
         return false;
     }
     let first = params.remove(0);

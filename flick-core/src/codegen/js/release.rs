@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 use super::names;
-use crate::ir::{Expr, ExprKind, Item, ItemKind};
+use crate::ir::{Expr, ExprKind, Item, ItemKind, Stage};
 
 /// The name and arity of the worker `name$n` a top-level `item` exports in
 /// release when the module exports it: a function of two or more
@@ -18,7 +18,7 @@ pub fn exported_worker(item: &Item) -> Option<(&str, usize)> {
             ExprKind::Lambda { params, .. } => (
                 name,
                 params.len(),
-                params.iter().rev().skip(1).all(|p| !p.runtime),
+                params.iter().rev().skip(1).all(|p| p.stage == Stage::Pure),
             ),
             _ => return None,
         },
@@ -54,7 +54,9 @@ pub(super) fn workers(
             ItemKind::Value { name, dicts, body } if dicts.is_empty() => match &body.kind {
                 ExprKind::Lambda { params, .. }
                     if params.len() >= 2
-                        && params[..params.len() - 1].iter().all(|p| !p.runtime) =>
+                        && params[..params.len() - 1]
+                            .iter()
+                            .all(|p| p.stage == Stage::Pure) =>
                 {
                     let by_arity: Option<&HashMap<usize, usize>> = calls.get(name.as_str());
                     let refs = by_arity.map_or(0, |b| b.values().sum::<usize>());

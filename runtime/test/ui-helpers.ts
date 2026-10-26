@@ -10,7 +10,7 @@ import type * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 
-import { type Failure, ReadService, describeReport, failureInspect } from "../src/index.ts";
+import { type Failure, ReadService, describeReport, failureInspect, syncOperation } from "../src/index.ts";
 import { type Renderer, type Ui, uiRunWith } from "../src/ui/react/index.ts";
 
 export { dom };
@@ -68,9 +68,9 @@ export const mount = (root: Element, ui: Ui, log: Array<string> = [], registry?:
 
 export const stop = (fiber: Fiber.Fiber<unknown, unknown>): Promise<unknown> => Effect.runPromise(Fiber.interrupt(fiber));
 
-/** `Atom.get atom` as a Flick render does it: through `Atom.Read`. */
-export const get = <A>(atom: Atom.Atom<A>): Effect.Effect<A> =>
+/** `Atom.get atom` as a Flick render does it: a Sync call of `Atom.Read`. */
+export const get = <A>(atom: Atom.Atom<A>): A =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the read gives the atom's own value
-  Effect.flatMap(Effect.service(ReadService), (read) => read.get(atom)) as Effect.Effect<A>;
+  (syncOperation(ReadService, "get", 1) as (atom: Atom.Atom<A>) => A)(atom);
 
 export { Atom };

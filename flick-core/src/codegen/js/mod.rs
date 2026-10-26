@@ -11,6 +11,7 @@ mod generator;
 mod group;
 mod items;
 mod labels;
+mod lift;
 mod pattern;
 mod release;
 mod schema;
@@ -165,6 +166,7 @@ impl<'a> Gen<'a> {
             spans: Vec::new(),
             buf: Vec::new(),
             generator: false,
+            sync: false,
             collector: None,
             owner: None,
             tail: None,
@@ -267,6 +269,10 @@ enum Callee {
     Global(String),
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each flag is a separate fact about the code being emitted"
+)]
 struct Gen<'a> {
     module: &'a str,
     options: &'a Options<'a>,
@@ -288,6 +294,8 @@ struct Gen<'a> {
     buf: Vec<String>,
     /// Inside the generator of a runtime stage, where `yield*` runs a call.
     generator: bool,
+    /// Inside a Sync stage, where calls run at once.
+    sync: bool,
     /// The list a strict `[for …]` pushes its elements to; `None` in a lazy
     /// one, which yields them.
     collector: Option<String>,

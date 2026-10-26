@@ -13,7 +13,7 @@ after(() => dom.window.close());
 
 const { Effect, Fiber, Schema, Stream } = await import("effect");
 const { RegistryService, flickLayer, flickSerializable } = await import("../src/effect/reactivity/Atom.ts");
-const { ReadService, atomPending, atomSerializableTask, atomState, atomTask } = await import("../src/index.ts");
+const { ReadService, atomPending, atomSerializableTask, atomState, atomTask, syncOperation } = await import("../src/index.ts");
 const { constructorName } = await import("../src/tags.ts");
 const { uiMount } = await import("../src/ui/index.ts");
 const { uiFragment, uiRender, uiSuspended, uiText, uiView } = await import("../src/ui/react/index.ts");
@@ -24,7 +24,11 @@ type Eff<A, E = never> = EffectModule.Effect<A, E>;
 const nothing = (): void => undefined;
 const tick = (ms = 5): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 const fields = (value: unknown): object => (typeof value === "object" && value !== null ? value : {});
-const read = <A>(atom: Atom<A>) => Effect.flatMap(Effect.service(ReadService), (reader) => reader.get(atom));
+/** A read in a runtime render (under `Ui.suspended`). */
+const read = <A>(atom: Atom<A>) => Effect.map(Effect.service(ReadService), (reader) => reader.get(atom));
+/** `Atom.get` as a Sync render calls it. */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the operation takes the atom
+const get = syncOperation(ReadService, "get", 1) as (atom: unknown) => unknown;
 
 /** `Atom.ready atom` as the Flick module has it, for a task that does not fail. */
 const ready = (atom: Atom<object>) =>
@@ -47,7 +51,7 @@ const page = () => {
   );
   const count = flickSerializable("App.count", Schema.Number, atomState(0));
   const user = atomSerializableTask("App.user", Schema.String, atomTask(task));
-  const counter = uiView(() => Effect.map(read(count), (n) => uiText(`count ${String(n)}`)));
+  const counter = uiView(() => uiText(`count ${String(get(count))}`));
   const greeting = uiSuspended(
     () => uiText(" failed"),
     uiText(" waiting"),
@@ -147,9 +151,7 @@ test("a page rendered at once shows a loading task's fallback inside the boundar
 test("a task read outside a suspended view streams as loading and is not waited for", async () => {
   // a task that never ends: the stream must end without it
   const user = atomTask(Effect.never);
-  const status = uiView(() =>
-    Effect.map(read(user), (value) => uiText(constructorName(String(Reflect.get(fields(value), "_tag"))))),
-  );
+  const status = uiView(() => uiText(constructorName(String(Reflect.get(fields(get(user)), "_tag")))));
   const server = Stream.runCollect(uiServerStream("app", uiRender(status, undefined)));
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the layer provides the request's one service
   const chunks = Array.from(await Effect.runPromise(Effect.provide(server, flickLayer(RegistryService)) as Eff<Array<string>>));

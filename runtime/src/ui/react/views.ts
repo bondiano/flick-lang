@@ -17,7 +17,7 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import { isPending, runReading } from "../../atoms.ts";
+import { isPending, runReading, syncReading } from "../../atoms.ts";
 import { Failure } from "../../cause.ts";
 import { BridgeContext, RegistryContext, StreamContext, toReact } from "./render.ts";
 import { type Binding, type DomEvent, type Static, type Ui, element, inputSnapshot, uiComponent, uiFragment } from "./nodes.ts";
@@ -28,21 +28,22 @@ import type { Handler } from "./policies.ts";
  * React renders it again only when an atom it read changes, or its props.
  */
 export interface View {
-  readonly render: (props: unknown) => Effect.Effect<Ui, unknown, unknown>;
+  /** Sync (`Ui.view`), or an effect when it may fail (`Ui.suspended`). */
+  readonly render: (props: unknown) => Ui | Effect.Effect<Ui, unknown, unknown>;
   /** The name React's tools show, `Module.name`. */
   readonly label: string | undefined;
   /** What a view of `Ui.suspended` shows while a task it read loads. */
   readonly fallback?: Ui;
 }
 
-/** `Ui.view`: a component of `render`. */
-export const uiView = (render: View["render"]): View => Object.freeze({ render, label: undefined });
+/** `Ui.view`: a component of the Sync `render`. */
+export const uiView = (render: (props: unknown) => Ui): View => Object.freeze({ render, label: undefined });
 
 /**
  * `Ui.suspended`: a view whose render may read a loading task (it shows
  * `fallback`) or a failed one (it shows `failed` of the failure).
  */
-export const uiSuspended = (failed: (failure: Failure) => Ui, fallback: Ui, render: View["render"]): View =>
+export const uiSuspended = (failed: (failure: Failure) => Ui, fallback: Ui, render: (props: unknown) => Effect.Effect<Ui, unknown, unknown>): View =>
   Object.freeze({
     render: (props: unknown) =>
       Effect.catchCause(render(props), (cause) => {
@@ -57,8 +58,11 @@ export const uiSuspended = (failed: (failure: Failure) => Ui, fallback: Ui, rend
 export const uiNamed = (label: string, view: View): View => Object.freeze({ ...view, label });
 
 /** The node `view` renders; while a task it read loads, `pending()`. */
-const draw = (view: View, props: unknown, read: (atom: Atom.Atom<unknown>) => unknown, pending: () => Ui): Ui =>
-  runReading(view.render(props), read, view.fallback === undefined ? undefined : pending);
+const draw = (view: View, props: unknown, read: (atom: Atom.Atom<unknown>) => unknown, pending: () => Ui): Ui => {
+  const pendingOr = view.fallback === undefined ? undefined : pending;
+  const drawn = syncReading(() => view.render(props), read, pendingOr);
+  return Effect.isEffect(drawn) ? runReading(drawn, read, pendingOr) : drawn;
+};
 
 const unsubscribed = (): (() => void) => () => undefined;
 const onClient = (): boolean => false;

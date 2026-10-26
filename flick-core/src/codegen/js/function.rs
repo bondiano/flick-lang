@@ -6,7 +6,7 @@ use std::mem;
 
 use super::expr::{arrow_body, unmarked};
 use super::{Callee, Gen, Tail, Target, indent, names, view};
-use crate::ir::{BinOp, Expr, ExprKind, Lit, Param, Pat};
+use crate::ir::{BinOp, Expr, ExprKind, Lit, Param, Pat, Stage};
 use crate::types::Dict;
 
 impl Gen<'_> {
@@ -48,9 +48,16 @@ impl Gen<'_> {
         target: Option<Target>,
         uncurried: bool,
     ) -> String {
-        let saved = (mem::take(&mut self.buf), self.generator, self.tail.take());
-        let last_runtime = params.last().is_some_and(|p| p.runtime);
+        let saved = (
+            mem::take(&mut self.buf),
+            self.generator,
+            self.sync,
+            self.tail.take(),
+        );
+        let last = params.last().map_or(Stage::Pure, |p| p.stage);
+        let last_runtime = last == Stage::Runtime;
         self.generator = last_runtime;
+        self.sync = last == Stage::Sync;
         let mut heads = Vec::new();
         let mut destructure = Vec::new();
         for (i, p) in params.iter().enumerate() {
@@ -74,7 +81,7 @@ impl Gen<'_> {
         let vars: Vec<String> = (0..heads.len()).map(|i| format!("$l{i}")).collect();
         let grouped = target.as_ref().and_then(|t| self.group_call(t, &heads));
         let tail = target
-            .filter(|_| grouped.is_none() && params.iter().all(|p| !p.runtime))
+            .filter(|_| grouped.is_none() && params.iter().all(|p| p.stage == Stage::Pure))
             .map(|target| Tail {
                 members: vec![(target, params.len())],
                 current: 0,
@@ -117,12 +124,12 @@ impl Gen<'_> {
             text = format!("{} {text}", self.arrow(&heads.join(", ")));
         }
         for (i, head) in heads.iter().enumerate().rev().filter(|_| !uncurried) {
-            if i + 1 < params.len() && params[i].runtime {
+            if i + 1 < params.len() && params[i].stage == Stage::Runtime {
                 text = format!("{}({text})", self.effect("succeed"));
             }
             text = format!("{} {text}", self.arrow(head));
         }
-        (self.buf, self.generator, self.tail) = saved;
+        (self.buf, self.generator, self.sync, self.tail) = saved;
         text
     }
 
@@ -366,7 +373,7 @@ pub(super) fn self_call<'e>(
     while let ExprKind::App {
         func,
         arg,
-        runtime: false,
+        stage: Stage::Pure,
         arg_first: false,
     } = &head.kind
     {

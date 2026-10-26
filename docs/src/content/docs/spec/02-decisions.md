@@ -25,4 +25,4 @@ title: "2. Decisions of the first version"
 | Optimization | Debug baseline and typed release passes from ReScript approaches | Proofs that observable contracts are preserved are needed |
 | CLI | `flick`, `.fl`, `flick.toml`, one pnpm lockfile; check/build/run/dev/test/fmt and FFI/Schema tools | The commands share one checker; runtime and interface versions are checked explicitly |
 
-All the listed decisions belong to the first version. Pure `a -> b`, runtime `a ->{r; e} b` and runtime without requirements/errors `a ->{} b` are distinguished in the checker and the IR. Static guarantees hold for checked source and truthful trusted bindings; native Effect and the Content Mapper do not prove them automatically.
+All the listed decisions belong to the first version. Pure `a -> b`, runtime `a ->{r; e} b` and runtime without requirements/errors `a ->{} b` are distinguished in the checker and the IR; a runtime arrow of `Atom.Read` alone without errors is a Sync stage, a plain JS function (stages Pure, Sync, Runtime). Static guarantees hold for checked source and truthful trusted bindings; native Effect and the Content Mapper do not prove them automatically.

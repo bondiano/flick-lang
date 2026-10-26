@@ -8,7 +8,7 @@ use std::mem;
 
 use super::function::{binds, offsets, tail_callees};
 use super::{Callee, Gen, Tail, Target, indent, names, view};
-use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Param, Pat};
+use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Param, Pat, Stage};
 
 /// Mutually tail-recursive functions of a module.
 pub(super) struct Group {
@@ -30,7 +30,9 @@ fn function(item: &Item) -> Option<(&str, &[Param], &Expr)> {
                     kind: ExprKind::Lambda { params, body },
                     ..
                 },
-        } if dicts.is_empty() && params.iter().all(|p| !p.runtime) => Some((name, params, body)),
+        } if dicts.is_empty() && params.iter().all(|p| p.stage == Stage::Pure) => {
+            Some((name, params, body))
+        }
         _ => None,
     }
 }

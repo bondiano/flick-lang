@@ -5,7 +5,7 @@
 
 use super::Lower;
 use super::expr::with_dicts;
-use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stmt};
+use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage, Stmt};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -74,7 +74,7 @@ impl Lower<'_> {
                     ExprKind::Lambda {
                         params: vec![Param {
                             pat,
-                            runtime: false,
+                            stage: Stage::Pure,
                         }],
                         body: Box::new(body),
                     },
@@ -83,7 +83,7 @@ impl Lower<'_> {
                 let app = |func, arg| ExprKind::App {
                     func: Box::new(func),
                     arg: Box::new(arg),
-                    runtime: false,
+                    stage: Stage::Pure,
                     arg_first: false,
                 };
                 let partial = Expr::new(app(flat_map, continuation), at);

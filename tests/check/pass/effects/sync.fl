@@ -1,0 +1,31 @@
+// Sync stages: functions of `Atom.Read` alone pass where runtime ones are
+// expected and back, lifted.
+module App.Sync exposing (..)
+
+count : Atom.Writable Number
+let count = Atom.make 0
+
+doubled : Unit ->{Atom.Read;} Number
+let doubled () = Atom.value count * 2
+
+twice : (Unit ->{r; e} Number) -> Unit ->{r; e} Number
+let twice f () = f () + f ()
+
+// a Sync function as a runtime argument, and the runtime result run at once
+quadrupled : Unit ->{Atom.Read;} Number
+let quadrupled () = twice doubled ()
+
+counted : Unit ->{Atom.Read | r; e} Number
+let counted () = Atom.value count
+
+// a runtime function where a Sync one is expected
+halves : Atom.Atom Number
+let halves = Atom.derived counted
+
+// and a pure one
+constant : Atom.Atom Number
+let constant = Atom.derived (fun () -> 1)
+
+// a runtime stage calls a Sync function
+logged : Unit ->{Atom.Read, Atom.Write;} Unit
+let logged () = Atom.set count (doubled ())

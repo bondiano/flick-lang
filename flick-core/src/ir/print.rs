@@ -3,7 +3,7 @@
 
 use std::fmt::Write;
 
-use super::{Arm, Expr, ExprKind, ForeignMode, ItemKind, Lit, Module, Pat, Stmt};
+use super::{Arm, Expr, ExprKind, ForeignMode, ItemKind, Lit, Module, Pat, Stage, Stmt};
 use crate::types::{Dict, Lift};
 
 pub fn print(module: &Module) -> String {
@@ -90,11 +90,21 @@ pub fn dict(d: &Dict) -> String {
     }
 }
 
+/// `!` after a runtime stage, `~` after a Sync one.
+fn mark(stage: Stage) -> &'static str {
+    match stage {
+        Stage::Pure => "",
+        Stage::Sync => "~",
+        Stage::Runtime => "!",
+    }
+}
+
 fn lift(l: &Lift) -> String {
     match l {
-        Lift::Stage { lift: here, result } => {
+        Lift::Stage { from, to, result } => {
             let inner = result.as_deref().map_or(String::new(), lift);
-            format!("({}{inner})", if *here { "!" } else { "." })
+            let here = if from == to { "." } else { mark(*to) };
+            format!("({here}{inner})")
         }
         Lift::Eff(inner) => format!("eff{}", lift(inner)),
     }
@@ -130,10 +140,10 @@ pub fn expr(e: &Expr) -> String {
         ExprKind::App {
             func,
             arg,
-            runtime,
+            stage,
             arg_first,
         } => {
-            let bang = if *runtime { "!" } else { "" };
+            let bang = mark(*stage);
             if *arg_first {
                 format!("({} |>{bang} {})", expr(arg), expr(func))
             } else {
@@ -143,7 +153,7 @@ pub fn expr(e: &Expr) -> String {
         ExprKind::Lambda { params, body } => {
             let params: Vec<String> = params
                 .iter()
-                .map(|p| format!("{}{}", pat(&p.pat), if p.runtime { "!" } else { "" }))
+                .map(|p| format!("{}{}", pat(&p.pat), mark(p.stage)))
                 .collect();
             format!("(fun {} -> {})", params.join(" "), expr(body))
         }

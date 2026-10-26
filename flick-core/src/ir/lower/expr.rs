@@ -1,7 +1,7 @@
 //! Expressions, blocks and match arms.
 
 use super::Lower;
-use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stmt};
+use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -244,7 +244,7 @@ impl Lower<'_> {
                         span,
                     )),
                     arg: Box::new(Expr::new(ExprKind::Lit(Lit::String(key)), span)),
-                    runtime: false,
+                    stage: Stage::Pure,
                     arg_first: false,
                 }
             }
@@ -286,7 +286,7 @@ impl Lower<'_> {
             let app = ExprKind::App {
                 func: Box::new(func),
                 arg: Box::new(arg),
-                runtime: self.typing.runtime.contains(&key),
+                stage: self.call_stage(key),
                 arg_first: false,
             };
             let dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();
@@ -296,6 +296,17 @@ impl Lower<'_> {
     }
 
     /// `call`, acquiring into the owner the checker chose for it.
+    /// The stage of the call the application or pipe at `key` makes.
+    pub(super) fn call_stage(&self, key: Range) -> Stage {
+        if self.typing.runtime.contains(&key) {
+            Stage::Runtime
+        } else if self.typing.sync.contains(&key) {
+            Stage::Sync
+        } else {
+            Stage::Pure
+        }
+    }
+
     fn within(&self, key: Range, call: Expr) -> Expr {
         let Some(owner) = self.typing.owners.get(&key) else {
             return call;
@@ -341,7 +352,7 @@ impl Lower<'_> {
                 let app = ExprKind::App {
                     func: rhs,
                     arg: lhs,
-                    runtime: self.typing.runtime.contains(&key),
+                    stage: self.call_stage(key),
                     arg_first: true,
                 };
                 let dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();

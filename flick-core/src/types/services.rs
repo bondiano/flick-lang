@@ -87,6 +87,7 @@ fn require(ty: Type, label: &str, service: &Type) -> Type {
                     entries: vec![(label.to_owned(), service.clone())],
                     tail: Some(Box::new(e.services)),
                 });
+                e.sync = super::ty::sync_rows(&e.services, &e.errors);
                 e
             }),
             result: Box::new(require(*result, label, service)),

@@ -74,6 +74,69 @@ pub struct Binder {
 pub struct Effects {
     pub services: Type,
     pub errors: Type,
+    /// Whether the stage is [`Stage::Sync`]: decided where the arrow is
+    /// written (see [`Effects::new`]), so a row variable solved later to
+    /// `Atom.Read` keeps the runtime stage its function was compiled with.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sync: bool,
+}
+
+/// Services whose operations run at once, without the Effect runtime.
+pub const SYNC_SERVICES: [&str; 1] = ["Atom.Read"];
+
+/// How a stage of a function runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Stage {
+    /// `->`: at once, with nothing.
+    Pure,
+    /// `->{S;}` with only [`SYNC_SERVICES`] and no errors: at once, reading
+    /// the services of the context the runtime has set.
+    Sync,
+    /// Any other `->{r; e}`: an Effect.
+    Runtime,
+}
+
+impl Effects {
+    /// The rows of an arrow as written: Sync when its services are a closed
+    /// row of [`SYNC_SERVICES`] and its errors none.
+    pub fn new(services: Type, errors: Type) -> Effects {
+        let sync = sync_rows(&services, &errors);
+        Effects {
+            services,
+            errors,
+            sync,
+        }
+    }
+
+    pub fn stage(&self) -> Stage {
+        if self.sync {
+            Stage::Sync
+        } else {
+            Stage::Runtime
+        }
+    }
+}
+
+/// The stage of an arrow with `effects`.
+pub fn stage_of(effects: Option<&Effects>) -> Stage {
+    effects.map_or(Stage::Pure, Effects::stage)
+}
+
+/// The labels of a row without a variable or a meta in it.
+fn closed_labels(row: &Type) -> Option<Vec<&str>> {
+    let Type::Row(r) = row else { return None };
+    let mut labels: Vec<&str> = r.entries.iter().map(|(l, _)| l.as_str()).collect();
+    if let Some(tail) = &r.tail {
+        labels.extend(closed_labels(tail)?);
+    }
+    Some(labels)
+}
+
+/// Whether `services` and `errors` make a Sync stage.
+pub fn sync_rows(services: &Type, errors: &Type) -> bool {
+    closed_labels(services)
+        .is_some_and(|l| !l.is_empty() && l.iter().all(|l| SYNC_SERVICES.contains(l)))
+        && closed_labels(errors).is_some_and(|l| l.is_empty())
 }
 
 /// Entries sorted by label, each label once. A field row labels entries with
@@ -217,6 +280,7 @@ impl Type {
                     Box::new(Effects {
                         services: f(&e.services),
                         errors: f(&e.errors),
+                        sync: e.sync,
                     })
                 }),
                 result: Box::new(f(result)),

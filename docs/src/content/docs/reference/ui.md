@@ -130,7 +130,9 @@ them all, or only those of views and actions with `[build] labels = "components"
 commits, and a write between its render and its subscription renders it
 again. Rendering a view outside `Ui.Dom.mount` fails with what to do. The
 render reads synchronously: like a derived atom's computation, its only
-service is `Atom.Read`. A write, another service or an error in it is
+service is `Atom.Read`. So it is a Sync stage: it compiles to a plain
+function, and `Atom.get` in it is a direct call, without an Effect. A
+write, another service or an error in it is
 `FLICK-U004`: write atoms in an action, run a task as `Atom.task` and read
 its result, or give failures a view with `Ui.suspended`.
 

@@ -73,7 +73,7 @@ pub use patterns::is_pattern;
 pub use schemas::{companion_name, witness_entity};
 pub(crate) use sql::base_type;
 pub use sql::dialect::{self, Dialect};
-pub use ty::{Binder, Effects, PRELUDE, Row, Type};
+pub use ty::{Binder, Effects, PRELUDE, Row, SYNC_SERVICES, Stage, Type, stage_of};
 pub use typing::{
     CodecBlock, Constructor, ForeignInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref,
     SchemaItem, SchemaPlan, SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue, Typing,

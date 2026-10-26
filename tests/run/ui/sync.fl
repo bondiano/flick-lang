@@ -1,0 +1,51 @@
+// Sync stages: a render reads atoms by plain calls; a Sync function passes
+// where a runtime one is expected and back, and a runtime function (rows
+// with variables) runs at once where a render calls it.
+module App.Main exposing (main)
+
+count : Atom.Writable Number
+let count = Atom.make 3
+
+doubled : Unit ->{Atom.Read;} Number
+let doubled () = Atom.value count * 2
+
+twice : (Unit ->{r; e} Number) -> Unit ->{r; e} Number
+let twice f () = f () + f ()
+
+labelled : Number ->{Atom.Read; e} String
+let labelled n = "n = " ++ show (Atom.value count + n)
+
+plus_one : Unit ->{Atom.Read | r; e} Number
+let plus_one () = Atom.value count + 1
+
+next : Atom.Atom Number
+let next = Atom.derived plus_one
+
+total : Atom.Atom Number
+let total = Atom.derived (fun () -> Atom.get next + doubled ())
+
+page : Ui.View Unit
+let page =
+  Ui.view (fun () ->
+    ui {
+      paragraph
+        [
+          text (show (twice doubled ())),
+          text (labelled 1),
+          text (show (Atom.get total)),
+        ]
+    })
+
+failing : Ui.View Unit
+let failing =
+  Ui.suspended (fun _ -> ui { text "failed" }) (ui { text "loading" }) (fun () ->
+    ui { text (show (doubled ())) })
+
+main : Unit ->{; AppError} Unit
+let main () =
+  provide Atom.layer {
+    Platform.stdout_line (Ui.Server.render (Ui.render page ()))
+    Atom.set count 5
+    Platform.stdout_line (Ui.Server.render (Ui.render page ()))
+    Platform.stdout_line (Ui.Server.render (Ui.render failing ()))
+  }

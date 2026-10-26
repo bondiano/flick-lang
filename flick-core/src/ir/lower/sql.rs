@@ -3,7 +3,7 @@
 //! the names, kinds and codecs the checker settled.
 
 use super::Lower;
-use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit};
+use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Stage};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::types::{SqlForm, SqlValue, companion_name};
@@ -144,7 +144,7 @@ fn call(name: &str, arg: Expr, span: Span) -> Expr {
         ExprKind::App {
             func: Box::new(func),
             arg: Box::new(arg),
-            runtime: false,
+            stage: Stage::Pure,
             arg_first: false,
         },
         span,

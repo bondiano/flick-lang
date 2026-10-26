@@ -14,7 +14,7 @@ mod sql;
 use std::collections::{HashMap, HashSet};
 use std::iter;
 
-use super::{Expr, ExprKind, Foreign, ForeignMode, Item, ItemKind, Lit, Module, Param};
+use super::{Expr, ExprKind, Foreign, ForeignMode, Item, ItemKind, Lit, Module, Param, Stage};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve;
 use crate::source::{FileId, Span};
@@ -298,17 +298,17 @@ impl Lower<'_> {
         &mut self,
         params: &[&Node],
         body: &Node,
-        stages: Option<Vec<bool>>,
+        stages: Option<Vec<Stage>>,
         span: Span,
     ) -> Expr {
         let mark = self.scope.len();
-        let stages = stages.unwrap_or_else(|| vec![false; params.len()]);
+        let stages = stages.unwrap_or_default();
         let params = params
             .iter()
-            .zip(stages.iter().copied().chain(iter::repeat(false)))
-            .map(|(p, runtime)| Param {
+            .zip(stages.iter().copied().chain(iter::repeat(Stage::Pure)))
+            .map(|(p, stage)| Param {
                 pat: self.pattern(p),
-                runtime,
+                stage,
             })
             .collect();
         let body = self.expr(body);

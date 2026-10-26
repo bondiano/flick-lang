@@ -1,8 +1,9 @@
 // Reading atoms from Flick: `Atom.Read` is the service a view's render or
 // a derived atom reads through. Both run synchronously (React renders and
-// Effect's registry computes in plain JS), so the effect of a read runs at
-// once with `runSync`, its reads going to the reader at hand.
-import { Cause, Effect, Option, Schema } from "effect";
+// Effect's registry computes in plain JS): a render of `Atom.Read` alone is
+// a Sync function, called with the reader at hand as its context; one that
+// may fail, as under `Ui.suspended`, an effect run at once with `runSync`.
+import { Cause, Context, Effect, Option, Schema } from "effect";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Atom from "effect/reactivity/Atom";
 
@@ -10,14 +11,17 @@ import { Failure } from "./cause.ts";
 import type { HashDict } from "./data.ts";
 import { WriteService, flickState, nativeRegistry } from "./effect/reactivity/Atom.ts";
 import { service } from "./effects.ts";
+import { syncIn } from "./sync.ts";
 import { tag } from "./tags.ts";
 
 interface ReadImpl {
-  readonly get: (atom: Atom.Atom<unknown>) => Effect.Effect<unknown>;
+  readonly get: (atom: Atom.Atom<unknown>) => unknown;
 }
 
-/** The service `Atom.Read`. */
+/** The service `Atom.Read`, a Sync one: `get` returns the value. */
 export const ReadService = /*#__PURE__*/ service<ReadImpl>("Atom.Read");
+
+const STILL_LOADING = "`Atom.await` read a task still loading outside `Ui.suspended`, which shows a fallback meanwhile";
 
 /**
  * Runs `effect`, whose reads of atoms go to `read`, synchronously; a read
@@ -28,13 +32,27 @@ export const runReading = <A>(
   read: (atom: Atom.Atom<unknown>) => unknown,
   pending?: () => A,
 ): A => {
-  const reading = Effect.provideService(effect, ReadService, { get: (atom) => Effect.sync(() => read(atom)) });
+  const reading = Effect.provideService(effect, ReadService, { get: read });
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Atom.Read` was its only service
   const exit = Effect.runSyncExit(reading as Effect.Effect<A, unknown>);
   if (exit._tag === "Success") return exit.value;
   if (isPending(exit.cause) && pending !== undefined) return pending();
-  if (isPending(exit.cause)) throw new Error("`Atom.await` read a task still loading outside `Ui.suspended`, which shows a fallback meanwhile");
+  if (isPending(exit.cause)) throw new Error(STILL_LOADING);
   throw Cause.squash(exit.cause);
+};
+
+/**
+ * Calls the Sync `render`, whose reads of atoms go to `read`; a read of a
+ * loading task gives `pending()` when there is one.
+ */
+export const syncReading = <A>(render: () => A, read: (atom: Atom.Atom<unknown>) => unknown, pending?: () => A): A => {
+  try {
+    return syncIn(Context.make(ReadService, { get: read }), render);
+  } catch (defect) {
+    if (defect !== PENDING) throw defect;
+    if (pending !== undefined) return pending();
+    throw new Error(STILL_LOADING, { cause: defect });
+  }
 };
 
 /** What `Atom.await` dies with while its task loads: a view of `Ui.suspended` shows its fallback. */
@@ -104,9 +122,9 @@ export const atomSerializableTask = <A>(key: string, codec: Schema.Codec<A, unkn
 /** `Atom.task`: the atom of a task's result, run by the registry that first reads it. */
 export const atomTask = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<object> => Atom.map(Atom.make(task), toAsync);
 
-/** `Atom.derived`: an atom `compute` computes, depending on the atoms it reads. */
-export const atomDerived = <A>(compute: (unit: undefined) => Effect.Effect<A, unknown, unknown>): Atom.Atom<A> =>
-  Atom.readable((ctx) => runReading(compute(undefined), (atom) => ctx(atom)));
+/** `Atom.derived`: an atom the Sync `compute` computes, depending on the atoms it reads. */
+export const atomDerived = <A>(compute: (unit: undefined) => A): Atom.Atom<A> =>
+  Atom.readable((ctx) => syncReading(() => compute(undefined), (atom) => ctx(atom)));
 
 /**
  * The label the compiler gives a top-level atom, view or action,

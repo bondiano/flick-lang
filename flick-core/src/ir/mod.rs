@@ -17,6 +17,7 @@ pub use print::print;
 use std::collections::HashMap;
 
 use crate::source::Span;
+pub use crate::types::Stage;
 use crate::types::{Constructor, Dict, ForeignInfo, InstanceInfo, Lift, SchemaItem};
 
 #[derive(Debug, Clone)]
@@ -140,7 +141,7 @@ pub enum ExprKind {
     Operation {
         service: String,
         name: String,
-        stages: Vec<bool>,
+        stages: Vec<Stage>,
     },
     /// A service named as a value.
     ServiceTag(String),
@@ -165,12 +166,12 @@ pub enum ExprKind {
     Dicts(Box<Expr>, Vec<Dict>),
     /// A value checked against a constrained type: takes the dictionaries.
     Abstract(Vec<String>, Box<Expr>),
-    /// One stage: `func` applied to `arg`; `runtime` runs the call. With
+    /// One stage: `func` applied to `arg`, a call of `stage`. With
     /// `arg_first` (`arg |> func`) the argument is evaluated first.
     App {
         func: Box<Expr>,
         arg: Box<Expr>,
-        runtime: bool,
+        stage: Stage,
         arg_first: bool,
     },
     /// A function of one or more stages; the body runs at the last one.
@@ -395,8 +396,8 @@ impl Expr {
 #[derive(Debug, Clone)]
 pub struct Param {
     pub pat: Pat,
-    /// Whether the arrow of this parameter is runtime.
-    pub runtime: bool,
+    /// The stage of the arrow of this parameter.
+    pub stage: Stage,
 }
 
 #[derive(Debug, Clone)]

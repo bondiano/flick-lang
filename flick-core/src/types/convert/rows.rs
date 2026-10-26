@@ -21,7 +21,7 @@ impl Checker<'_> {
         };
         let services = side(self, Kind::ServiceRow);
         let errors = side(self, Kind::ErrorRow);
-        Effects { services, errors }
+        Effects::new(services, errors)
     }
 
     /// A row: `none`, `r`, `r1 + r2`, `A, B`, `A, B | r`, in braces or not.

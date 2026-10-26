@@ -45,7 +45,7 @@ test("a task's write renders the view that read the state again", async () => {
   const registry = AtomRegistry.make();
   const count = Atom.make(0);
   const add = eventExhaust(() => Effect.sync(() => registry.update(count, (n) => n + 1)));
-  const view = uiView(() => Effect.map(get(count), (n) => uiButton({ disabled: false, on_click: add }, [uiText(`clicked ${n}`)])));
+  const view = uiView(() => uiButton({ disabled: false, on_click: add }, [uiText(`clicked ${get(count)}`)]));
   const root = container();
   const fiber = mount(root, uiRender(view, undefined), [], registry);
   await tick();
@@ -135,7 +135,7 @@ test("a renderer opens only when run and retains live listeners through StrictMo
   let opened = 0;
   let closed = 0;
   const add = eventExhaust(() => Effect.sync(() => registry.update(count, (n) => n + 1)));
-  const view = uiView(() => Effect.map(get(count), (n) => uiButton({ disabled: false, on_click: add }, [uiText(`${n}`)])));
+  const view = uiView(() => uiButton({ disabled: false, on_click: add }, [uiText(`${get(count)}`)]));
   const program = uiRunWith(
     () => {
       opened++;
@@ -167,11 +167,9 @@ test("a renderer opens only when run and retains live listeners through StrictMo
 test("an initial view defect fails the root and removes its mount", async (t) => {
   t.mock.method(console, "error", () => undefined);
   const root = container();
-  const broken = uiView(() =>
-    Effect.sync((): Ui => {
-      throw new Error("initial view broke");
-    }),
-  );
+  const broken = uiView((): Ui => {
+    throw new Error("initial view broke");
+  });
   const exit = await Effect.runPromise(Fiber.await(mount(root, uiRender(broken, undefined), [], AtomRegistry.make())));
   assert.ok(Exit.isFailure(exit));
   assert.match(defectOf(exit), /initial view broke/);
@@ -188,15 +186,13 @@ test("a later render defect unmounts and joins event tasks before the outer scop
     Effect.onInterrupt(() => Effect.promise(() => tick()).pipe(Effect.map(() => void log.push(`task stopped, mounted ${root.childNodes.length > 0}`)))),
   );
   const breaking = eventExhaust(() => Effect.sync(() => registry.set(broken, true)));
-  const view = uiView(() =>
-    Effect.map(get(broken), (now) => {
-      if (now) throw new Error("later view broke");
-      return uiFragment([
-        uiButton({ disabled: false, on_click: eventExhaust(() => task) }, []),
-        uiButton({ disabled: false, on_click: breaking }, []),
-      ]);
-    }),
-  );
+  const view = uiView(() => {
+    if (get(broken)) throw new Error("later view broke");
+    return uiFragment([
+      uiButton({ disabled: false, on_click: eventExhaust(() => task) }, []),
+      uiButton({ disabled: false, on_click: breaking }, []),
+    ]);
+  });
   const program = scope(() =>
     Effect.gen(function* () {
       yield* Effect.acquireRelease(Effect.void, () => Effect.sync(() => log.push("resource released")));

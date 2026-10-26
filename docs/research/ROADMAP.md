@@ -132,11 +132,12 @@ component search (props : SearchProps) =
 
 ### Трек C — язык и компилятор
 
-**C1. Стадия `Sync`.** ⬜ (рендер сейчас идёт через `runSync` в `runtime/src/atoms.ts`)
+**C1. Стадия `Sync`.** ✅ (замер `runtime/bench/render-stage.ts`: тело рендера с тремя чтениями 16.7 → 2.8 мкс, SSR 500 view 15.7 → 6.8 мс, −57 %)
 - AC: `Param.runtime: bool` → `Stage { Pure, Sync, Runtime }`; render-тело с `{Atom.Read}` компилируется без `Effect.gen` и без `runSync`, `Atom.get` — прямой вызов.
 - AC: check-фикстуры: `{Atom.Read}` передаётся в параметр `->{r; e}` с автоматическим lift.
 - AC: бенчмарк рендера (до/после) в `runtime/test` или `tools/`; если выигрыш < 10 % и бандл не меньше — пункт закрывается записью в `implementation-decisions.md` без реализации.
 - AC: spec 03/04 и `02-decisions.md` обновлены (en + ru), если реализовано.
+- Сделано: стадия решается там, где записана стрелка (`Effects.sync`), поэтому переменная строки, решённая позже в `Atom.Read`, остаётся Runtime. Lift покрывает все пары стадий: Sync → Runtime (`$rt.sync`), Runtime → Sync (`$rt.runIn`), эффектный вызов в Sync — сразу (`runIn`). Foreign со Sync-стрелкой — `FLICK-F001`.
 
 **C2. `Read`/`Write` и правило рендера.** ✅ `869dcf0`, `d37114c`
 - AC: `Atom.get` требует `Atom.Read`, запись — `Atom.Write`; render и `Atom.derived` не могут писать, использовать другие сервисы или падать — `FLICK-U004` с подсказкой (action / `Atom.task` / `Ui.suspended`).
@@ -376,7 +377,7 @@ B0…B9 ✅ ─ B7b ✅                       (замер, независимо)
 S1 ✅ ─ U1…U6 ✅ ─ U7 ✅ ─ U7b ✅ ─ U6b
         └─ R1…R4 ✅ ─ R5 ✅ ─ R6 ✅
 C2/C3/C4/C6 ✅ ─ C6b ✅
-C7a ✅ ─ C7b ─ C7c ─ C7d ─ C5            C1 (бенчмарк, может закрыться без реализации)
+C7a ✅ ─ C7b ─ C7c ─ C7d ─ C5            C1 ✅
 U9 ✅ ─ U9b
 S2 ─ F1 ─ F2 ─ F3 ─ F4 ─ F5 ─ F6
 S3 ─ S4 ─ O1 ─ O2 ─ O3 ─ O4 ─ O5      (O2/O3 после C6b)
@@ -387,7 +388,7 @@ D1 ✅ ─ D2 ─ D3 ─ D4 ─ D5 ─ D6 ─ D9 ─ D11 ─ D10 ─ D13 ─ D12
 
 Вехи:
 1. «Видно в DevTools и меньше бандл» — ✅ (B0–B9, S1, S5, U1, C6).
-2. «Типы гарантируют» — 🔶: C2–C4, U2–U6 ✅; осталось C7a–d, C5, U6b, U7b, C1.
+2. «Типы гарантируют» — 🔶: C1–C4, U2–U6 ✅; осталось C7a–d, C5, U6b, U7b.
 3. «SSR» — 🔶: R1–R4, R6, U7 ✅; осталось R5, U9.
 4. «Fullstack» — ⬜: S2, F1–F3, O1–O3.
 

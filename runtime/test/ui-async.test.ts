@@ -9,7 +9,7 @@ import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 
-import { ReadService, atomPending, atomTask, failureRethrow } from "../src/index.ts";
+import { ReadService, atomPending, atomTask, failureRethrow, runIn } from "../src/index.ts";
 import { constructorName } from "../src/tags.ts";
 import { type Renderer, type Ui, uiRender, uiRunWith, uiSuspended, uiText, uiView } from "../src/ui/react/index.ts";
 
@@ -35,15 +35,14 @@ const fields = (value: unknown): object => (typeof value === "object" && value !
 
 /** `Atom.ready atom` as the Flick module has it. */
 const ready = (atom: Atom.Atom<object>) =>
-  Effect.flatMap(Effect.service(ReadService), (read) =>
-    Effect.flatMap(read.get(atom), (value): Effect.Effect<unknown, unknown> => {
-      const name = constructorName(String(Reflect.get(fields(value), "_tag")));
-      if (name === "Loaded") return Effect.succeed(Reflect.get(fields(value), "_0"));
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Failed` holds a `Failure`
-      if (name === "Failed") return failureRethrow(Reflect.get(fields(value), "_0") as Parameters<typeof failureRethrow>[0]);
-      return atomPending();
-    }),
-  );
+  Effect.flatMap(Effect.service(ReadService), (read): Effect.Effect<unknown, unknown> => {
+    const value = read.get(atom);
+    const name = constructorName(String(Reflect.get(fields(value), "_tag")));
+    if (name === "Loaded") return Effect.succeed(Reflect.get(fields(value), "_0"));
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Failed` holds a `Failure`
+    if (name === "Failed") return failureRethrow(Reflect.get(fields(value), "_0") as Parameters<typeof failureRethrow>[0]);
+    return atomPending();
+  });
 
 const noop = (): void => undefined;
 
@@ -98,7 +97,11 @@ test("a plain view that reads a loading task fails with what to do", async (t) =
   t.mock.method(console, "error", () => undefined);
   const registry = AtomRegistry.make();
   const { task } = gated(Effect.succeed("x"));
-  const view = uiView(() => Effect.map(ready(atomTask(task)), () => uiText("never")));
+  // a plain view runs the runtime `ready` at once, as compiled Flick does
+  const view = uiView(() => {
+    runIn(ready(atomTask(task)));
+    return uiText("never");
+  });
   const { fiber } = mount(uiRender(view, undefined), registry);
   const exit = await Effect.runPromise(Fiber.await(fiber));
   assert.match(exit._tag === "Failure" ? String(exit.cause) : "", /Ui\.suspended/);

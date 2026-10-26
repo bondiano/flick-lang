@@ -8,9 +8,13 @@ import * as Atom from "effect/reactivity/Atom";
 import { renderToString } from "react-dom/server";
 
 import { RegistryService, flickLayer } from "../src/effect/reactivity/Atom.ts";
-import { ReadService } from "../src/index.ts";
+import { ReadService, syncOperation } from "../src/index.ts";
 import { uiMount } from "../src/ui/index.ts";
 import { type Ui, eventLatest, uiButton, uiFragment, uiRender, uiRenderStatic, uiText, uiTextarea, uiView } from "../src/ui/react/index.ts";
+
+/** `Atom.get` as a Flick render calls it: a Sync operation of `Atom.Read`. */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the operation takes the atom
+const get = syncOperation(ReadService, "get", 1) as (atom: unknown) => unknown;
 
 const container = (): Element => {
   const div = dom.window.document.createElement("div");
@@ -45,7 +49,7 @@ test("hydration keeps text and focus entered before startup, then handles each e
       uiButton({ disabled: false, on_click: add }, [uiText(`clicked ${n}`)]),
     ]);
   const view = uiView(() =>
-    Effect.map(Effect.flatMap(Effect.service(ReadService), (read) => read.get(count)), (n) => tree(Number(n))),
+    tree(Number(get(count))),
   );
   // the server renders the same elements the view renders on the client
   root.innerHTML = renderToString(uiRenderStatic(tree(0)));
@@ -76,7 +80,7 @@ test("hydration keeps text and focus entered before startup, then handles each e
 test("each root hydrates the state script of its own container into its own registry", async () => {
   const count = Atom.serializable(Atom.make(0), { key: "count", schema: Schema.Number });
   const view = uiView(() =>
-    Effect.map(Effect.flatMap(Effect.service(ReadService), (read) => read.get(count)), (n) => uiText(`count ${String(n)}`)),
+    uiText(`count ${String(get(count))}`),
   );
   const roots = ["first", "second"].map((id, n) => {
     const root = container();

@@ -16,6 +16,7 @@ export * from "./entry.ts";
 export * from "./layer.ts";
 export * from "./owner.ts";
 export * from "./race.ts";
+export * from "./sync.ts";
 export * from "./schema/arbitrary.ts";
 export * from "./schema/index.ts";
 export * from "./stdlib/callbacks.ts";

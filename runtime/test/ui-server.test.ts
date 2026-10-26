@@ -5,15 +5,19 @@ import { Cause, Effect, Exit, Option, Schema } from "effect";
 import * as Atom from "effect/reactivity/Atom";
 
 import { RegistryService, flickLayer } from "../src/effect/reactivity/Atom.ts";
-import { ReadService, atomState } from "../src/index.ts";
+import { ReadService, atomState, syncOperation } from "../src/index.ts";
 import { uiField, uiRender, uiText, uiView } from "../src/ui/react/index.ts";
 import { uiServerRender, uiServerState } from "../src/ui/server.ts";
+
+/** `Atom.get` as a Flick render calls it: a Sync operation of `Atom.Read`. */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the operation takes the atom
+const get = syncOperation(ReadService, "get", 1) as (atom: unknown) => unknown;
 
 test("requests rendered at once each read the atoms of their own registry", async () => {
   const count = atomState(0);
   const name = atomState("");
   const view = uiView(() =>
-    Effect.map(Effect.flatMap(Effect.service(ReadService), (read) => read.get(count)), (n) => uiText(`count ${String(n)}`)),
+    uiText(`count ${String(get(count))}`),
   );
   const page = uiRender(view, undefined);
   const request = (n: number) =>

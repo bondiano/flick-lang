@@ -11,7 +11,7 @@ use super::Checker;
 use super::classes::Dict;
 use super::env::{Abi, Rep};
 use super::sql::dialect::Dialect;
-use super::ty::Type;
+use super::ty::{Stage, Type, stage_of};
 use crate::ir::Label;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -33,10 +33,12 @@ pub struct Typing {
     /// Applications `f a1 … ai` (from `f` to `ai`) and pipes `x |> f` whose
     /// stage runs a runtime call.
     pub runtime: HashSet<Range>,
-    /// Functions written with parameters, `fun` and `let`: whether the arrow
-    /// of each parameter is runtime.
-    pub stages: HashMap<Range, Vec<bool>>,
-    /// Pure functions accepted where a runtime one is expected.
+    /// Those whose stage runs a Sync call.
+    pub sync: HashSet<Range>,
+    /// Functions written with parameters, `fun` and `let`: the stage of the
+    /// arrow of each parameter.
+    pub stages: HashMap<Range, Vec<Stage>>,
+    /// Functions accepted where one of another stage is expected.
     pub lifts: HashMap<Range, Lift>,
     /// `++` on lists rather than strings.
     pub list_concat: HashSet<Range>,
@@ -116,7 +118,7 @@ pub enum Ref {
     Operation {
         service: String,
         name: String,
-        stages: Vec<bool>,
+        stages: Vec<Stage>,
     },
     /// A service named as a value: `Layer.succeed Clock …`.
     ServiceTag(String),
@@ -289,12 +291,14 @@ pub struct Owner {
     pub outside: bool,
 }
 
-/// How a pure value becomes the runtime one its position expects.
+/// How a function becomes the one of another stage its position expects.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Lift {
-    /// A function: whether this stage turns runtime, and how its result lifts.
+    /// A function: the stage of this stage and the one expected, and how its
+    /// result lifts.
     Stage {
-        lift: bool,
+        from: Stage,
+        to: Stage,
         result: Option<Box<Lift>>,
     },
     /// The result of an `Eff`.
@@ -399,9 +403,8 @@ impl Checker<'_> {
         self.typing.pending_labels.push((range(span), ty));
     }
 
-    /// The arrows of a function type with aliases expanded: whether each
-    /// stage is runtime.
-    pub fn arrow_stages(&self, ty: &Type) -> Vec<bool> {
+    /// The arrows of a function type with aliases expanded: the stage of each.
+    pub fn arrow_stages(&self, ty: &Type) -> Vec<Stage> {
         let mut out = Vec::new();
         let mut ty = match ty {
             Type::Forall { body, .. } => (**body).clone(),
@@ -411,7 +414,7 @@ impl Checker<'_> {
             effects, result, ..
         } = self.whnf_captured(&ty).0
         {
-            out.push(effects.is_some());
+            out.push(stage_of(effects.as_deref()));
             ty = *result;
         }
         out
@@ -433,9 +436,11 @@ impl Checker<'_> {
                     ..
                 },
             ) => {
-                let lift = e1.is_none() && e2.is_some();
+                let (from, to) = (stage_of(e1.as_deref()), stage_of(e2.as_deref()));
+                // a pure function is called as a Sync one is
+                let lift = from != to && (from, to) != (Stage::Pure, Stage::Sync);
                 let result = self.lift(r1, r2).map(Box::new);
-                (lift || result.is_some()).then_some(Lift::Stage { lift, result })
+                (lift || result.is_some()).then_some(Lift::Stage { from, to, result })
             }
             _ => match (self.eff_parts(&a), self.eff_parts(&e)) {
                 (Some((_, _, r1)), Some((_, _, r2))) => {

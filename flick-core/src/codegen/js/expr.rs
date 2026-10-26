@@ -4,8 +4,8 @@
 use std::mem;
 
 use super::{Callee, Gen, Target, indent, names, tidy};
-use crate::ir::{Arm, Expr, ExprKind, Lit, Pat, Stmt};
-use crate::types::{Constructor, Dict, Lift, Rep};
+use crate::ir::{Arm, Expr, ExprKind, Lit, Pat, Stage, Stmt};
+use crate::types::{Constructor, Dict, Rep};
 
 /// Whether moving the evaluation of `js` later is unobservable: a name, a
 /// property of a module namespace, or a literal.
@@ -72,12 +72,13 @@ impl Gen<'_> {
                 name,
                 stages,
             } => {
-                let arity = stages
-                    .iter()
-                    .position(|&r| r)
-                    .map_or(stages.len(), |i| i + 1);
+                let first = stages.iter().position(|&s| s != Stage::Pure);
+                let arity = first.map_or(stages.len(), |i| i + 1);
                 let tag = self.service_ref(service);
-                let op = self.rt("operation");
+                let op = match first.map(|i| stages[i]) {
+                    Some(Stage::Sync) => self.rt("syncOperation"),
+                    _ => self.rt("operation"),
+                };
                 format!("{op}({tag}, {}, {arity})", names::string(name))
             }
             ExprKind::ServiceTag(key) => self.service_ref(key),
@@ -91,9 +92,9 @@ impl Gen<'_> {
             ExprKind::App {
                 func,
                 arg,
-                runtime,
+                stage,
                 arg_first,
-            } => self.app(e, func, arg, *runtime, *arg_first),
+            } => self.app(e, func, arg, *stage, *arg_first),
             ExprKind::Lambda { params, body } => self.lambda(params, body, None, false),
             ExprKind::Block(stmts, result) => {
                 for stmt in stmts {
@@ -158,7 +159,7 @@ impl Gen<'_> {
         }
     }
 
-    fn app(&mut self, e: &Expr, func: &Expr, arg: &Expr, runtime: bool, arg_first: bool) -> String {
+    fn app(&mut self, e: &Expr, func: &Expr, arg: &Expr, stage: Stage, arg_first: bool) -> String {
         if let Some(value) = self.constructed(e) {
             return value;
         }
@@ -166,11 +167,7 @@ impl Gen<'_> {
             let owner = self.owner.take();
             let js = self.ordered(&args);
             let call = format!("{}{worker}({})", self.mark(e.span), js.join(", "));
-            return if runtime {
-                self.run(owner, &call)
-            } else {
-                call
-            };
+            return self.call(stage, owner, call);
         }
         let owner = self.owner.take();
         let (f, a) = if arg_first {
@@ -189,11 +186,16 @@ impl Gen<'_> {
             format!("({f})")
         };
         let call = format!("{}{f}({a})", self.mark(e.span));
-        if runtime {
-            assert!(self.generator, "a runtime call runs inside a runtime stage");
-            self.run(owner, &call)
-        } else {
-            call
+        self.call(stage, owner, call)
+    }
+
+    /// The JS call `call` of `stage` made at the current stage: a Sync one
+    /// in a generator runs with the fiber's services.
+    fn call(&mut self, stage: Stage, owner: Option<String>, call: String) -> String {
+        match stage {
+            Stage::Sync if self.generator => format!("(yield* {}(() => {call}))", self.rt("sync")),
+            Stage::Pure | Stage::Sync => call,
+            Stage::Runtime => self.run(owner, &call),
         }
     }
 
@@ -223,11 +225,11 @@ impl Gen<'_> {
         while let ExprKind::App {
             func,
             arg,
-            runtime,
+            stage,
             arg_first: false,
         } = &head.kind
         {
-            if *runtime && !last {
+            if *stage == Stage::Runtime && !last {
                 return None;
             }
             last = false;
@@ -261,7 +263,7 @@ impl Gen<'_> {
         while let ExprKind::App {
             func,
             arg,
-            runtime: false,
+            stage: Stage::Pure,
             arg_first: false,
         } = &head.kind
         {
@@ -291,10 +293,21 @@ impl Gen<'_> {
     }
 
     /// `yield*` of the effect `js`, in `owner` when a `Within` gave one.
+    /// Runs the effect `js`: in a generator with `yield*`, in a Sync stage
+    /// at once with the services of the context.
     fn run(&mut self, owner: Option<String>, js: &str) -> String {
-        match owner {
-            Some(owner) => format!("(yield* {}({owner}, {js}))", self.rt("within")),
-            None => format!("(yield* {js})"),
+        let js = match owner {
+            Some(owner) => format!("{}({owner}, {js})", self.rt("within")),
+            None => js.to_owned(),
+        };
+        if self.generator {
+            format!("(yield* {js})")
+        } else {
+            assert!(
+                self.sync,
+                "a runtime call runs inside a runtime or Sync stage"
+            );
+            format!("{}({js})", self.rt("runIn"))
         }
     }
 
@@ -303,7 +316,7 @@ impl Gen<'_> {
         let layer = self.spill(layer);
         let body = self.gen_block(body);
         let provide = self.rt("provide");
-        format!("(yield* {provide}({layer}, {body}))")
+        self.run(None, &format!("{provide}({layer}, {body})"))
     }
 
     fn scope(&mut self, owner: Option<&str>, outer: Option<&str>, body: &Expr) -> String {
@@ -314,7 +327,8 @@ impl Gen<'_> {
         };
         let body = self.gen_block(body);
         let scope = self.rt("scope");
-        format!("(yield* {scope}({} {body}))", self.arrow(&params))
+        let scoped = format!("{scope}({} {body})", self.arrow(&params));
+        self.run(None, &scoped)
     }
 
     /// A value that takes the dictionaries `shown` before it is computed.
@@ -346,18 +360,19 @@ impl Gen<'_> {
     }
 
     fn try_expr(&mut self, body: &Expr, arms: &[Arm]) -> String {
-        if !self.generator {
+        if !self.generator && !self.sync {
             return self.expr(body);
         }
         let body = self.gen_block(body);
         let error = self.temp();
         let (stmts, ()) = self.block(|g| g.handlers(&error, arms));
         let try_with = self.rt("tryWith");
-        format!(
-            "(yield* {try_with}({body}, {} {{\n{}}}))",
+        let tried = format!(
+            "{try_with}({body}, {} {{\n{}}})",
             self.arrow(&error),
             indent(&stmts)
-        )
+        );
+        self.run(None, &tried)
     }
 
     /// A record literal, or `{ base with … }`.
@@ -434,35 +449,6 @@ impl Gen<'_> {
     fn service_ref(&mut self, key: &str) -> String {
         let (module, name) = key.rsplit_once('.').unwrap_or(("", key));
         self.global(module, &names::service(name))
-    }
-
-    /// A JS function that turns a pure value into the runtime one `lift` describes.
-    /// `inner`, a pure function, adapted where a runtime one is expected.
-    fn lifted(&mut self, inner: &Expr, lift: &Lift) -> String {
-        let v = self.expr(inner);
-        let f = self.lift(lift);
-        format!("({f})({v})")
-    }
-
-    fn lift(&mut self, lift: &Lift) -> String {
-        match lift {
-            Lift::Stage { lift, result } => {
-                let inner = result.as_deref().map(|r| self.lift(r));
-                let call = "$f($x)";
-                let body = match (lift, inner) {
-                    (true, None) => format!("{}(() => {call})", self.effect("sync")),
-                    (true, Some(r)) => format!("{}(() => ({r})({call}))", self.effect("sync")),
-                    (false, Some(r)) => format!("{}({call}, {r})", self.effect("map")),
-                    (false, None) => call.to_owned(),
-                };
-                format!("{} {} {body}", self.arrow("$f"), self.arrow("$x"))
-            }
-            Lift::Eff(inner) => {
-                let inner = self.lift(inner);
-                let map = self.effect("map");
-                format!("{} {map}($e, {inner})", self.arrow("$e"))
-            }
-        }
     }
 }
 
