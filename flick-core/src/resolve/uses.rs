@@ -80,27 +80,15 @@ impl Walker<'_> {
                 return;
             }
             K::Block => {
-                // a `let` scopes over the statements after it
-                for child in node.nodes() {
-                    if child.kind == K::LetDecl {
-                        self.let_decl(child);
-                    } else if child.kind == K::BindStmt {
-                        // `p <- e` of a `do` block: `e` cannot see `p`
-                        for part in child.nodes() {
-                            self.walk(part);
-                        }
-                        self.bind_patterns(child);
-                    } else if child.kind == K::BindGroup {
-                        // `p <- a and q <- b`: neither value sees `p` or `q`
-                        for part in child.nodes().flat_map(Node::nodes) {
-                            self.walk(part);
-                        }
-                        for bind in child.nodes() {
-                            self.bind_patterns(bind);
-                        }
-                    } else {
-                        self.walk(child);
-                    }
+                self.statements(node);
+                self.release(mark);
+                return;
+            }
+            // the props, then the names of `setup` scope over `render`
+            K::ComponentExpr => {
+                self.bind_patterns(node);
+                for block in node.nodes().filter(|n| n.kind == K::Block) {
+                    self.statements(block);
                 }
                 self.release(mark);
                 return;
@@ -126,7 +114,7 @@ impl Walker<'_> {
                 self.release(mark);
                 return;
             }
-            K::FunExpr | K::ComponentExpr | K::MatchArm => self.bind_patterns(node),
+            K::FunExpr | K::MatchArm => self.bind_patterns(node),
             K::ScopeExpr => {
                 let name = node.child_tokens().find(|t| t.kind == K::Ident);
                 self.locals.extend(name.map(|t| Local {
@@ -141,6 +129,31 @@ impl Walker<'_> {
             self.walk(child);
         }
         self.release(mark);
+    }
+
+    /// The statements of a block: a `let` scopes over those after it.
+    fn statements(&mut self, node: &Node) {
+        for child in node.nodes() {
+            if child.kind == K::LetDecl {
+                self.let_decl(child);
+            } else if child.kind == K::BindStmt {
+                // `p <- e` of a `do` block: `e` cannot see `p`
+                for part in child.nodes() {
+                    self.walk(part);
+                }
+                self.bind_patterns(child);
+            } else if child.kind == K::BindGroup {
+                // `p <- a and q <- b`: neither value sees `p` or `q`
+                for part in child.nodes().flat_map(Node::nodes) {
+                    self.walk(part);
+                }
+                for bind in child.nodes() {
+                    self.bind_patterns(bind);
+                }
+            } else {
+                self.walk(child);
+            }
+        }
     }
 
     /// Leaves the scope of the locals above `mark`, noting those never used.

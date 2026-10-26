@@ -1,10 +1,11 @@
 module App.ComponentSetup exposing (..)
 
-// The state of a component's own instance waits for `Setup s`.
+// The state of a component's own instance waits for `Setup s`; the names of
+// `setup` are already in scope in `render`.
 component counter (start : Number) =
   setup
-    ignore start
+    let count = start + 1
   render
-    ui { text (show start) }
+    ui { text (show count) }
 
-//~ FLICK-S002 @5:3-5:8 a component's `setup` is not supported yet: keep its state in top-level atoms
+//~ FLICK-S002 @6:3-6:8 a component's `setup` is not supported yet: keep its state in top-level atoms
