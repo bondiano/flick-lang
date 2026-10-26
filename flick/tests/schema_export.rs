@@ -31,7 +31,7 @@ let upload =
     |> HttpApi.with_path item_json
     |> HttpApi.with_payload upload_json
 
-api : HttpApi.Api { files : { upload : HttpApi.Request Item Unit Unit Upload ->{r;} Unit } }
+api : HttpApi.Api r { files : { upload : HttpApi.Request Item Unit Unit Upload ->{r;} Unit } }
 let api = HttpApi.api "Files" |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "files") |> HttpApi.add upload)
 "#;
 
