@@ -522,7 +522,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 
 [Первая unify](../../flick-core/src/types/applicative_do.rs#L71-L81) игнорирует ошибку. Проверять первый operand как остальные: sugar не обходит типобезопасность.
 
-**Q23. P1 — and удаляет локальный pure**
+**Q23. P1 — and удаляет локальный pure** ✅ (`pure`, связанный паттернами группы, не сахар; `tests/run/codegen/applicative_do.fl`)
 `do { pure <- Some (fun n -> Some (n + 10)) and x <- Some 1; pure x }` даёт Some 1; последовательные `<-` — Some 11.
 
 [prelude_pure вызывается до binding patterns](../../flick-core/src/types/applicative_do.rs#L62-L66), принимая локальную функцию за sugar. Разрешать callee в правильном lexical scope.

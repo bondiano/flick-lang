@@ -59,9 +59,13 @@ impl Checker<'_> {
             .map(|(_, v)| v.map_or(Type::Error, |v| self.infer(v)))
             .collect();
         self.unbound_in_group(since, &parts);
+        let mut bound = Vec::new();
+        for pattern in parts.iter().filter_map(|(p, _)| *p) {
+            binders(pattern, self.text, &mut bound);
+        }
         let applicative = match rest {
             [last] => self
-                .prelude_pure(last)
+                .prelude_pure(last, &bound)
                 .then(|| pure_argument(last))
                 .flatten(),
             _ => None,
@@ -218,8 +222,9 @@ impl Checker<'_> {
         Some((*a, *b, *x, *fa, *fb, fx))
     }
 
-    /// Whether `statement` is `pure e` of the Prelude's `Applicative`.
-    fn prelude_pure(&self, statement: &Node) -> bool {
+    /// Whether `statement` is `pure e` of the Prelude's `Applicative`,
+    /// not of a `pure` the group binds in `bound`.
+    fn prelude_pure(&self, statement: &Node, bound: &[String]) -> bool {
         let Some(head) = statement
             .nodes()
             .next()
@@ -229,6 +234,7 @@ impl Checker<'_> {
         };
         let name = &self.text[head.range().0 as usize..head.range().1 as usize];
         name == "pure"
+            && !bound.iter().any(|b| b == "pure")
             && !self.locals.iter().any(|l| l.name == "pure")
             && matches!(self.env.find(Namespace::Value, "pure"),
                 Found::Entity(e) if e.module == "Prelude")

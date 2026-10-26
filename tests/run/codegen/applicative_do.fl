@@ -29,6 +29,10 @@ let ticks =
     pure (x + y)
   }
 
+// a `pure` the group binds is a function of the block, not the Prelude's
+shadowed : Option Number
+let shadowed = do { pure <- Some (fun n -> Some (n + 10)) and x <- Some 1; pure x }
+
 main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line (show (pair (Some 1) (Some "a")))
@@ -39,3 +43,4 @@ let main () =
   Platform.stdout_line (show (chained (Some 1) (Some 2)))
   Platform.stdout_line (show (chained (Some 3) (Some 2)))
   Platform.stdout_line (show (await ticks))
+  Platform.stdout_line (show shadowed)
