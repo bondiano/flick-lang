@@ -499,7 +499,7 @@ Runtime-вызов `read_more (Atom.current count)`, где `read_more : Number 
 
 Вычислять callee/arguments до wrapper. Контроли с отдельными let работают; ошибка блокирует весь модуль.
 
-**Q18. P1 — Atom.Read запускает Eff-значение**
+**Q18. P1 — Atom.Read запускает Eff-значение** ✅ (ABI задаёт провайдер: JS-реализация Sync-сервиса помечена `syncAbi` и отдаёт значение как есть, у `S.Impl` из Flick эффект последней стадии исполняется; `tests/run/ui/sync_data.fl`, `runtime/test/sync.test.ts`)
 `Atom.make (task { …; 41 })` через derived/Atom.value выполняет задачу при чтении; await полученного Number даёт TypeError. Atom.current сохраняет Eff холодным.
 
 [syncOperation](../../runtime/src/sync.ts#L36-L46) путает ABI и данные через `Effect.isEffect(result)`. Нормализовать ABI провайдера, не значение. Чтение не должно выполнять скрытые сервисы/ошибки.

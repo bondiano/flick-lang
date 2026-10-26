@@ -1,0 +1,23 @@
+// An atom whose value is an Eff: reading it gives the task, cold; only
+// await runs it.
+module App.Main exposing (main)
+
+job : Atom.Writable (Eff {} none Number)
+let job = Atom.make (task { Platform.stdout_line "ran"; 41 })
+
+held : Atom.Atom (Eff {} none Number)
+let held = Atom.derived (fun () -> Atom.value job)
+
+page : Ui.View Unit
+let page =
+  Ui.view (fun () ->
+    let _job = Atom.get held
+    ui { text "read" })
+
+main : Unit ->{; AppError} Unit
+let main () =
+  provide Atom.layer {
+    Platform.stdout_line (Ui.Server.render (Ui.render page ()))
+    let n = await (Atom.current job)
+    Platform.stdout_line (show (n + 1))
+  }

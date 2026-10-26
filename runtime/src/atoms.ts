@@ -11,12 +11,15 @@ import { Failure } from "./cause.ts";
 import type { HashDict } from "./data.ts";
 import { WriteService, flickState, nativeRegistry } from "./effect/reactivity/Atom.ts";
 import { service } from "./effects.ts";
-import { syncIn } from "./sync.ts";
+import { syncAbi, syncIn } from "./sync.ts";
 import { tag } from "./tags.ts";
 
 interface ReadImpl {
   readonly get: (atom: Atom.Atom<unknown>) => unknown;
+  readonly [syncAbi]?: true;
 }
+
+const reader = (read: (atom: Atom.Atom<unknown>) => unknown): ReadImpl => ({ get: read, [syncAbi]: true });
 
 /** The service `Atom.Read`, a Sync one: `get` returns the value. */
 export const ReadService = /*#__PURE__*/ service<ReadImpl>("Atom.Read");
@@ -32,7 +35,7 @@ export const runReading = <A>(
   read: (atom: Atom.Atom<unknown>) => unknown,
   pending?: () => A,
 ): A => {
-  const reading = Effect.provideService(effect, ReadService, { get: read });
+  const reading = Effect.provideService(effect, ReadService, reader(read));
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Atom.Read` was its only service
   const exit = Effect.runSyncExit(reading as Effect.Effect<A, unknown>);
   if (exit._tag === "Success") return exit.value;
@@ -47,7 +50,7 @@ export const runReading = <A>(
  */
 export const syncReading = <A>(render: () => A, read: (atom: Atom.Atom<unknown>) => unknown, pending?: () => A): A => {
   try {
-    return syncIn(Context.make(ReadService, { get: read }), render);
+    return syncIn(Context.make(ReadService, reader(read)), render);
   } catch (defect) {
     if (defect !== PENDING) throw defect;
     if (pending !== undefined) return pending();

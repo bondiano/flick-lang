@@ -29,21 +29,28 @@ export const runIn = <A>(effect: Effect.Effect<A, unknown, unknown>): A =>
   Effect.runSyncWith(current)(effect as Effect.Effect<A>);
 
 /**
+ * Marks an implementation of a Sync service written in JS: its operations
+ * return their values. One written in Flick, as `S.Impl`, has runtime
+ * functions, whose effects run at once; a value that is an `Eff` is data.
+ */
+export const syncAbi: unique symbol = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/syncAbi");
+
+/**
  * `S.op` of a Sync service: a function of the operation's arguments that
- * calls the implementation in the current context; an implementation
- * written as runtime functions has its effect run at once.
+ * calls the implementation in the current context.
  */
 export const syncOperation = <S extends object>(tag: Context.Service<S, S>, name: keyof S, arity: number): unknown => {
   const call = (args: ReadonlyArray<unknown>): unknown => {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the checker allows the call only where the service is
-    const impl = Context.getUnsafe(current as Context.Context<S>, tag);
+    const impl: S & { readonly [syncAbi]?: true } = Context.getUnsafe(current as Context.Context<S>, tag);
     let result: unknown = impl[name];
     for (const a of args) {
       if (typeof result !== "function") throw new TypeError("the operation takes fewer arguments");
       const next: unknown = Reflect.apply(result, undefined, [a]);
       result = next;
     }
-    return Effect.isEffect(result) ? runIn(result) : result;
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a Flick implementation's last stage is an Effect
+    return impl[syncAbi] === true ? result : runIn(result as Effect.Effect<unknown>);
   };
   const collect = (args: ReadonlyArray<unknown>): unknown =>
     args.length === arity ? call(args) : (a: unknown) => collect([...args, a]);
