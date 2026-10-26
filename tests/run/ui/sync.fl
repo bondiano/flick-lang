@@ -21,6 +21,19 @@ let plus_one () = Atom.value count + 1
 next : Atom.Atom Number
 let next = Atom.derived plus_one
 
+// a runtime argument of a Sync call runs before the call
+ident : Number ->{r; e} Number
+let ident n = n
+
+read_more : Number ->{Atom.Read;} Number
+let read_more n = Atom.value count + n
+
+more : Unit ->{Atom.Read | r; e} Number
+let more () = read_more (ident 1)
+
+later : Atom.Atom Number
+let later = Atom.derived more
+
 total : Atom.Atom Number
 let total = Atom.derived (fun () -> Atom.get next + doubled ())
 
@@ -33,6 +46,7 @@ let page =
           text (show (twice doubled ())),
           text (labelled 1),
           text (show (Atom.get total)),
+          text (show (Atom.get later)),
         ]
     })
 

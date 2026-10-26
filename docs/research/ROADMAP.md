@@ -494,7 +494,7 @@ L6/H2 и Vite есть; server/client isolation и общий dev workflow — �
 
 Ниже — срез `4a96533`, JS/debug и JS/release; пункт Q24 — checker.
 
-**Q17. P1 — Sync-композиция генерирует невалидный JS**
+**Q17. P1 — Sync-композиция генерирует невалидный JS** ✅ (операнды Sync-вызова в генераторе, где есть `yield*`, становятся константами до `$rt.sync`; `tests/run/ui/sync.fl`)
 Runtime-вызов `read_more (Atom.current count)`, где `read_more : Number ->{Atom.Read;} Number`, собирается, но импорт падает с SyntaxError. [Wrapper](../../flick-core/src/codegen/js/expr.rs#L178-L200) помещает `yield*` в обычную стрелку `() => read_more(yield* …)`.
 
 Вычислять callee/arguments до wrapper. Контроли с отдельными let работают; ошибка блокирует весь модуль.

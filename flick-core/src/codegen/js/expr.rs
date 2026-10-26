@@ -167,6 +167,7 @@ impl Gen<'_> {
         if let Some((worker, args)) = self.worker_call(e) {
             let owner = self.owner.take();
             let js = self.ordered(&args);
+            let js = self.before_sync(stage, js);
             let call = format!("{}{worker}({})", self.mark(e.span), js.join(", "));
             return self.call(stage, owner, call);
         }
@@ -179,6 +180,8 @@ impl Gen<'_> {
             let js = self.ordered(&[func, arg]);
             (js[0].clone(), js[1].clone())
         };
+        let [f, a] = <[String; 2]>::try_from(self.before_sync(stage, vec![f, a]))
+            .expect("two operands");
         // `(x) => (y)` ends with `)` too, yet needs parentheses to be called
         let call_like = tidy::is_call(&f);
         let f = if atomic(&f) || call_like {
@@ -188,6 +191,16 @@ impl Gen<'_> {
         };
         let call = format!("{}{f}({a})", self.mark(e.span));
         self.call(stage, owner, call)
+    }
+
+    /// The operands of a Sync call in a generator as constants when one
+    /// yields: `$rt.sync` wraps the call in an arrow, where `yield*` is
+    /// not allowed.
+    fn before_sync(&mut self, stage: Stage, js: Vec<String>) -> Vec<String> {
+        if stage != Stage::Sync || !self.generator || !js.iter().any(|j| j.contains("yield")) {
+            return js;
+        }
+        js.into_iter().map(|j| self.spill(j)).collect()
     }
 
     /// The JS call `call` of `stage` made at the current stage: a Sync one
