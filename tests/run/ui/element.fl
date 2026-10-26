@@ -1,0 +1,70 @@
+// A component's setup makes an element, its render binds it to an input,
+// and a task of its action focuses the input through `Ui.Document`; an
+// element bound to no node is `Detached`.
+module App.Main exposing (main)
+
+setup : Unit ->{} Unit
+foreign sync setup from "./dom.mjs" "setup"
+  arity 0
+
+click : String ->{} Unit
+foreign sync click from "./dom.mjs" "click"
+  arity 1
+
+settle : Unit ->{} Unit
+foreign async settle from "./dom.mjs" "settle"
+  arity 0
+
+focused : Unit ->{} String
+foreign sync focused from "./dom.mjs" "focused"
+  arity 0
+
+component search () =
+  let field = Ui.element ()
+  let unbound : Ui.Element Ui.Div = Ui.element ()
+  let focus =
+    Action.exhaust (fun _ ->
+      task {
+        try Ui.focus field with
+        | Ui.Detached -> Platform.stdout_line "not mounted"
+      })
+  let lost =
+    Action.exhaust (fun _ ->
+      task {
+        try Ui.focus unbound with
+        | Ui.Detached -> Platform.stdout_line "detached"
+      })
+  ui {
+    div
+      { class_name = "search" }
+      [
+        input_at
+          field
+          { value = ""; placeholder = "find"; on_input = Ui.Event.latest (fun _ -> task { () }) },
+        button { disabled = false; on_click = focus } [text "focus"],
+        button { disabled = false; on_click = lost } [text "lost"],
+      ]
+  }
+
+report : Failure e ->{} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  setup ()
+  match Ui.Dom.container "app" with
+  | None -> Platform.stdout_line "no container"
+  | Some root ->
+    provide Atom.layer {
+      scope s {
+        let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render search ()) })
+        settle ()
+        Platform.stdout_line (focused ())
+        click "focus"
+        settle ()
+        Platform.stdout_line (focused ())
+        click "lost"
+        settle ()
+      }
+    }

@@ -242,6 +242,40 @@ component clock () =
   ui { text (show (Atom.value seconds)) }
 ```
 
+#### Elements of an instance
+
+`Ui.element ()` in a setup makes an element of the instance, of a tag
+type: `Ui.Input`, `Ui.Textarea`, `Ui.Button` or `Ui.Div`. A render binds it
+to a node with `input_at element props`, `textarea_at`, `button_at` or
+`div_at`, so the type checks the tag; it only passes the element on. A task
+of an action, `Ui.on_mount` or `Ui.watch` reaches the node through the
+service `Ui.Document`, which a root provides: `Ui.focus`, `Ui.blur`,
+`Ui.scroll_into_view` and `Ui.measure` (`{ width; height; top; left }`). An
+element with no mounted node fails with the error `Ui.Detached`, not a
+`null`: before its instance renders, after it unmounts, or under a
+renderer without a DOM. A render, and a server, have no `Ui.Document`, so a
+DOM operation there is a type error; a hydrated element binds to the node
+the server rendered.
+
+```flick
+component search () =
+  let field = Ui.element ()
+  let focus = Action.exhaust (fun _ -> task { try Ui.focus field with | Ui.Detached -> () })
+  ui {
+    div
+      { class_name = "search" }
+      [
+        input_at field { value = ""; placeholder = "find"; on_input = Ui.Event.latest (fun _ -> task { () }) },
+        button { disabled = false; on_click = focus } [text "focus"],
+      ]
+  }
+```
+
+It is React's `useRef` for the DOM alone, typed by tag; Elm reaches a node
+with `Browser.Dom.focus` and a string id instead, which no type checks.
+A widget that drives the DOM imperatively stays a foreign component,
+`Ui.component`.
+
 A function that makes the state of an instance says so in its signature,
 `Number ->{Setup s;} Atom.Writable Number`, and is called from a setup. The
 word `component` stays a name everywhere else.

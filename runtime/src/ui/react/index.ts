@@ -1,16 +1,18 @@
 // React-only rendering and event ownership. Adapters mount roots; this core
 // stops events first, then interrupts and joins tasks before its scope closes.
-import { Cause, Effect, Fiber } from "effect";
+import { Cause, Context, Effect, Fiber } from "effect";
 import type * as AtomRegistry from "../../effect/reactivity/AtomRegistry.ts";
 import { Component, type ReactNode, createElement } from "react";
 
 import type { Failure } from "../../cause.ts";
 import { RegistryService, nativeRegistry } from "../../effect/reactivity/Atom.ts";
+import { DocumentService, document } from "./document.ts";
 import type { Ui } from "./nodes.ts";
 import { Bridge } from "./policies.ts";
 import { BridgeContext, RegistryContext, toReact } from "./render.ts";
 
 export * from "./nodes.ts";
+export { DocumentService } from "./document.ts";
 export { type Events, uiRenderStatic } from "./render.ts";
 export * from "./views.ts";
 export {
@@ -81,7 +83,9 @@ export const uiRunWith = <R>(
         resumeFailure?.(cause);
       };
       // a task's end changes nothing the root draws: views follow their atoms
-      const bridge = new Bridge(context, supervisor, () => undefined, broken);
+      // its handlers and instances reach the nodes of its elements
+      const live = Context.add(context, DocumentService, document);
+      const bridge = new Bridge(live, supervisor, () => undefined, broken);
       const run = Effect.gen(function* () {
         root = yield* Effect.sync(renderer);
         try {

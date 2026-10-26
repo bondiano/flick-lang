@@ -22,6 +22,7 @@ const EventElement = ({ bridge, node }: { readonly bridge: Events; readonly node
     }
     props[name] = listener.callback;
   }
+  if (node.handle !== undefined) props["ref"] = node.handle.ref;
   // Publish new closures only after React commits; an abandoned render cannot change a live listener.
   useLayoutEffect(() => {
     for (const [name, listener] of listeners) {
@@ -64,6 +65,7 @@ export const toReact = (bridge: Events | undefined, node: Ui): ReactNode => {
   if (node.kind === "component") return createElement(node.component, node.props);
   if (bridge !== undefined && Object.keys(node.events).length > 0) return createElement(EventElement, { bridge, node });
   const props: Record<string, unknown> = { ...node.attrs };
+  if (node.handle !== undefined) props["ref"] = node.handle.ref;
   if (node.html === undefined) return createElement(node.tag, props, ...children(bridge, node.children));
   props["dangerouslySetInnerHTML"] = { __html: node.html };
   return createElement(node.tag, props);

@@ -1,0 +1,4 @@
+body
+input
+detached
+supervisor: interrupt

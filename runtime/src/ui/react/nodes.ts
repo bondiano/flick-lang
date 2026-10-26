@@ -44,7 +44,29 @@ export type Ui =
       readonly children: ReadonlyArray<Ui>;
       /** Trusted HTML, inserted as it is. */
       readonly html?: string;
+      /** `Ui.input_at element …` and the like: the element whose node this is. */
+      readonly handle?: ElementHandle;
     };
+
+/** `Ui.Element t`: the node of an element once React mounts it. */
+export interface ElementHandle {
+  node: unknown;
+  /** The ref React gives the node, the same across renders. */
+  readonly ref: (node: unknown) => void;
+}
+
+/** `Ui.handle`: a fresh element, bound to no node yet. */
+export const uiElementHandle = (_unit: undefined): ElementHandle => {
+  const handle: ElementHandle = {
+    node: null,
+    ref: (node) => {
+      handle.node = node;
+    },
+  };
+  return handle;
+};
+
+const at = (handle: ElementHandle, node: Ui): Ui => (node.kind === "element" ? Object.freeze({ ...node, handle }) : node);
 
 /** A component's `Ui` for the props it was given, reading atoms through `read`. */
 export type Static = (read: (atom: Atom.Atom<unknown>) => unknown) => Ui;
@@ -253,3 +275,16 @@ export const uiWithHost = (host: Host, node: Ui): Ui => {
 /** `Ui.heading_at`: a heading of the level `H1` … `H6`. */
 export const uiHeadingAt = (level: { readonly _tag: string }, children: ReadonlyArray<Ui>): Ui =>
   element(constructorName(level._tag).toLowerCase(), {}, {}, children);
+
+/** `Ui.input_at`. */
+export const uiInputAt = (handle: ElementHandle, props: InputProps): Ui => at(handle, uiInput(props));
+
+/** `Ui.textarea_at`. */
+export const uiTextareaAt = (handle: ElementHandle, props: InputProps): Ui => at(handle, uiTextarea(props));
+
+/** `Ui.button_at`. */
+export const uiButtonAt = (handle: ElementHandle, props: ButtonProps, children: ReadonlyArray<Ui>): Ui =>
+  at(handle, uiButton(props, children));
+
+/** `Ui.div_at`. */
+export const uiDivAt = (handle: ElementHandle, props: ClassProps, children: ReadonlyArray<Ui>): Ui => at(handle, uiDiv(props, children));

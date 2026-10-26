@@ -41,14 +41,20 @@ syntax_nodes : List SyntaxToken -> List Ui
 let syntax_nodes tokens =
   List.map (fun token -> Ui.span { class_name = token.class_name } [Ui.text token.text]) tokens
 
-source_pane : Atom.Writable Model -> Model -> Ui
-let source_pane model m =
+type alias Source = { model : Atom.Writable Model; m : Model }
+
+// the file name focuses the editor, as an editor's tab does
+component source_pane (props : Source) =
+  let editor = Ui.element ()
+  let edit_here = Action.exhaust (fun _ -> task { try Ui.focus editor with | Ui.Detached -> () })
   ui {
+    let m = props.m
     div { class_name = "fp-source" }
       [
         div { class_name = "fp-pane-header" }
           [
-            span { class_name = "fp-file" } [text "Main.fl"],
+            Ui.with_host { Ui.host with class_name = Some "fp-file" }
+              (button { disabled = false; on_click = edit_here } [text "Main.fl"]),
             span { class_name = "fp-pane-note" } [text (tr m.locale "Flick source" "Код на Flick")],
           ],
         div
@@ -59,11 +65,13 @@ let source_pane model m =
                 (if m.highlighting then syntax_nodes m.source_tokens else [text m.source])),
             keyed (show m.revision)
               (Ui.with_host { Ui.host with aria_label = Some (tr m.locale "Flick source code" "Исходный код Flick"); aria_describedby = Some "fp-source-hint"; auto_capitalize = Some false; auto_correct = Some false; wrap = Some false }
-                (textarea
+                (textarea_at
+                  editor
                   {
                     value = m.source;
                     placeholder = "module Main exposing (main)";
-                    on_input = Ui.Event.latest (fun snapshot -> task { edit model snapshot.value });
+                    on_input =
+                      Ui.Event.latest (fun snapshot -> task { edit props.model snapshot.value });
                   })),
           ],
         Ui.with_host { Ui.host with id = Some "fp-source-hint" }

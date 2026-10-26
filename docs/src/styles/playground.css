@@ -151,6 +151,7 @@
 }
 
 .fp-file { font-weight: 650; }
+.fp .fp-file { padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 650; cursor: text; }
 .fp-file, .fp-pane-note, .fp-pane-footer, .fp-diagnostic-code, .fp-diagnostic-at {
   font-family: var(--__sl-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-variant-numeric: tabular-nums;

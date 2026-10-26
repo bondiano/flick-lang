@@ -8,6 +8,9 @@ let root;
 export const setup = () => {
   dom = new JSDOM('<!doctype html><html><body><div id="app"></div></body></html>');
   Object.assign(globalThis, { window: dom.window, document: dom.window.document });
+  // react-dom loaded before this document existed, so it takes the old IE
+  // input-event path on focus, which calls these
+  Object.assign(dom.window.HTMLElement.prototype, { attachEvent: () => undefined, detachEvent: () => undefined });
   root = dom.window.document.getElementById("app");
   return undefined;
 };
@@ -79,3 +82,6 @@ export const renderer = () => {
     unmount: () => mounted.unmount(),
   };
 };
+
+/** The tag of the element that has the keyboard focus. */
+export const focused = () => dom.window.document.activeElement?.tagName.toLowerCase() ?? "none";

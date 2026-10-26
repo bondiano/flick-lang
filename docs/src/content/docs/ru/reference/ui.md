@@ -262,6 +262,39 @@ component clock () =
   ui { text (show (Atom.value seconds)) }
 ```
 
+#### Элементы экземпляра
+
+`Ui.element ()` в setup создаёт элемент экземпляра с типом тега:
+`Ui.Input`, `Ui.Textarea`, `Ui.Button` или `Ui.Div`. Рендер привязывает его
+к узлу через `input_at element props`, `textarea_at`, `button_at` или
+`div_at`, так что тег проверяет тип; сам рендер элемент только передаёт.
+Задача action, `Ui.on_mount` или `Ui.watch` обращается к узлу через сервис
+`Ui.Document`, который даёт корень: `Ui.focus`, `Ui.blur`,
+`Ui.scroll_into_view` и `Ui.measure` (`{ width; height; top; left }`).
+Элемент без смонтированного узла — ошибка `Ui.Detached`, а не `null`: до
+рендера экземпляра, после его unmount или с рендерером без DOM. У рендера
+и у сервера нет `Ui.Document`, поэтому DOM-операция там — ошибка типов;
+при гидрации элемент привязывается к узлу, который отрендерил сервер.
+
+```flick
+component search () =
+  let field = Ui.element ()
+  let focus = Action.exhaust (fun _ -> task { try Ui.focus field with | Ui.Detached -> () })
+  ui {
+    div
+      { class_name = "search" }
+      [
+        input_at field { value = ""; placeholder = "find"; on_input = Ui.Event.latest (fun _ -> task { () }) },
+        button { disabled = false; on_click = focus } [text "focus"],
+      ]
+  }
+```
+
+Это `useRef` из React только для DOM и с типом тега; Elm обращается к
+узлу через `Browser.Dom.focus` по строковому id, который тип не
+проверяет. Виджет, который императивно управляет DOM, по-прежнему
+подключается как внешний компонент, `Ui.component`.
+
 Функция, которая создаёт состояние экземпляра, говорит об этом в
 сигнатуре, `Number ->{Setup s;} Atom.Writable Number`, и вызывается из
 setup. Слово `component` остаётся именем во всех других местах.

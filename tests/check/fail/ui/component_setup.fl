@@ -34,9 +34,18 @@ component once (start : Number) =
   let shown = Atom.value count
   ui { text (show shown) }
 
+// a render has no `Ui.Document`, nor does a server: the DOM is reached by tasks
+component grabbing () =
+  let field : Ui.Element Ui.Input = Ui.element ()
+  ui {
+    let _focused = try Ui.focus field with | Ui.Detached -> ()
+    text "grab"
+  }
+
 //~ FLICK-E001 @8:11-8:23 module initialization is pure
 //~ FLICK-E002 @11:16-11:28 does not allow service `Setup _`
 //~ FLICK-U004 @15:17-15:29 before a component's last expression
 //~ FLICK-U006 @22:17-22:26 while rendering makes another one
 //~ FLICK-U004 @28:20-28:70 service `Setup _` is not allowed here
 //~ FLICK-E002 @34:15-34:31 a component's setup runs once per instance
+//~ FLICK-U004 @41:24-41:38 reach the DOM in a task

@@ -112,7 +112,9 @@ let view model m =
                       "Не удалось включить подсветку. Код по-прежнему можно редактировать и компилировать.")
                     m.syntax_error])
             else empty,
-            div { class_name = "fp-panes" } [source_pane model m, result_pane model m],
+            div
+              { class_name = "fp-panes" }
+              [Ui.render source_pane { model = model; m = m }, result_pane model m],
             if m.mode == Transpile then
               div { class_name = "fp-transpile-diagnostics" }
                 [

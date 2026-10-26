@@ -10,25 +10,27 @@ module Action exposing (..)
 type alias Action s = Ui.Handler s
 
 /// Ignores events while the task of an earlier one runs.
-exhaust : forall c s. (s -> (Eff {Atom.Write} none Unit)^c)^c -> (Action s)^c
+exhaust : forall c s. (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c -> (Action s)^c
 foreign pure exhaust from "@flick-lang/runtime/ui/react" "actionExhaust"
   retention call
 
 /// Interrupts the running task, waits until it stopped, then runs the last
 /// event; one event waits at most.
-latest : forall c s. (s -> (Eff {Atom.Write} none Unit)^c)^c -> (Action s)^c
+latest : forall c s. (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c -> (Action s)^c
 foreign pure latest from "@flick-lang/runtime/ui/react" "actionLatest"
   retention call
 
 /// Runs events one by one, `capacity` of them waiting at most; an event
 /// that finds the queue full is rejected and reported to the supervisor.
-queue : forall c s. Number -> (s -> (Eff {Atom.Write} none Unit)^c)^c -> (Action s)^c
+queue : forall c s. Number -> (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c -> (Action s)^c
 foreign pure queue from "@flick-lang/runtime/ui/react" "actionQueue"
   retention call
 
 /// Runs at most `limit` tasks at once; an event beyond that is rejected
 /// and reported to the supervisor.
-concurrent : forall c s. Number -> (s -> (Eff {Atom.Write} none Unit)^c)^c -> (Action s)^c
+concurrent : forall c s. Number ->
+  (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c ->
+  (Action s)^c
 foreign pure concurrent from "@flick-lang/runtime/ui/react" "actionConcurrent"
   retention call
 
