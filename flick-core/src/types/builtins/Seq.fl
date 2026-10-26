@@ -130,43 +130,45 @@ foreign pure windows from "@flick-lang/runtime" "seqWindows"
   retention call
 
 /// All the elements: never ends on an infinite sequence.
-to_list : Seq a -> List a
+to_list : forall d a. (Seq a)^d -> List a
 foreign pure to_list from "@flick-lang/runtime" "seqToList"
+  retention call
 
 /// Folds from the first element; never ends on an infinite sequence.
-fold : forall c a b. (b -> a -> b)^c -> (b -> (Seq a -> b)^c)^c
+fold : forall c d a b. (b -> a -> b)^c -> (b -> ((Seq a)^d -> b)^c)^c
 foreign pure fold from "@flick-lang/runtime" "seqFold"
   arity 3
   retention call
 
 /// Stops at the first element that satisfies `p`.
-any : forall c a. (a -> Bool)^c -> (Seq a -> Bool)^c
+any : forall c d a. (a -> Bool)^c -> ((Seq a)^d -> Bool)^c
 foreign pure any from "@flick-lang/runtime" "seqAny"
   arity 2
   retention call
 
 /// Stops at the first element that does not satisfy `p`.
-all : forall c a. (a -> Bool)^c -> (Seq a -> Bool)^c
+all : forall c d a. (a -> Bool)^c -> ((Seq a)^d -> Bool)^c
 foreign pure all from "@flick-lang/runtime" "seqAll"
   arity 2
   retention call
 
 /// The first element that satisfies `p`.
-find : forall c a. (a -> Bool)^c -> (Seq a -> Option a)^c
+find : forall c d a. (a -> Bool)^c -> ((Seq a)^d -> Option a)^c
 foreign pure find from "@flick-lang/runtime" "seqFind"
   arity 2
   retention call
 
-first : Seq a -> Option a
+first : forall d a. (Seq a)^d -> Option a
 foreign pure first from "@flick-lang/runtime" "seqFirst"
+  retention call
 
 /// Runs a runtime function on each element in order, for what it does.
-each_effect : forall c a r e. (a ->{r; e} Unit)^c -> (Seq a ->{r; e} Unit)^c
+each_effect : forall c d a r e. (a ->{r; e} Unit)^c -> ((Seq a)^d ->{r; e} Unit)^c
 foreign effect each_effect from "@flick-lang/runtime" "seqEachEffect"
   retention call
 
 /// Folds from the first element with a runtime function.
-fold_effect : forall c a b r e. (b -> a ->{r; e} b)^c -> (b -> (Seq a ->{r; e} b)^c)^c
+fold_effect : forall c d a b r e. (b -> a ->{r; e} b)^c -> (b -> ((Seq a)^d ->{r; e} b)^c)^c
 foreign effect fold_effect from "@flick-lang/runtime" "seqFoldEffect"
   retention call
 

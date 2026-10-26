@@ -5,8 +5,12 @@ module App.SyncFor exposing (..)
 count : Atom.Writable Number
 let count = Atom.make 0
 
-offsets : Unit ->{Atom.Read;} Seq Number
-let offsets () = for { n <- [1, 2]; if n > Atom.value count } yield n + Atom.value count
+offsets : Unit ->{Atom.Read;} Number
+let offsets () =
+  Seq.fold
+    (fun a b -> a + b)
+    0
+    (for { n <- [1, 2]; if n > Atom.value count } yield n + Atom.value count)
 
 listed : Unit ->{Atom.Read, Atom.Write;} List Number
 let listed () = [for n <- [1, 2] yield n + Atom.value count]

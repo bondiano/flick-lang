@@ -99,20 +99,27 @@ impl Checker<'_> {
         };
         let inner = mem::replace(&mut self.stage, outer);
         self.runtime = saved;
+        let mut held = self.held_since(uses, mark);
+        let mut region = None;
         if inner.sync && inner.calls > 0 {
             let span = self.span(node);
             self.perform(&reader(), &Type::empty_row(), span);
             if !strict {
                 self.typing.sync_generators.insert(node.range());
+                let reader = self.reader_region(span);
+                held.push((None, reader.clone()));
+                region = Some(reader);
             }
         }
-        let held = self.held_since(uses, mark);
         self.locals.truncate(mark);
         if strict {
-            Type::app(Type::prim("List"), item)
-        } else {
-            let seq = Type::app(Type::prim("Seq"), item);
-            self.close_over(seq, held, expected.cloned(), "sequence", self.span(node))
+            return Type::app(Type::prim("List"), item);
+        }
+        let seq = Type::app(Type::prim("Seq"), item);
+        let seq = self.close_over(seq, held, expected.cloned(), "sequence", self.span(node));
+        match region {
+            Some(region) if expected.is_none() => self.read_through(seq, &region),
+            _ => seq,
         }
     }
 

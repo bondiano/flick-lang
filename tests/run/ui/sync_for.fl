@@ -8,13 +8,10 @@ let first = Atom.make 1
 second : Atom.Writable Number
 let second = Atom.make 2
 
-tens : Unit ->{Atom.Read;} Seq Number
-let tens () = for { atom <- [first, second] } yield Atom.value atom * 10
-
 page : Ui.View Unit
 let page =
   Ui.view (fun () ->
-    let values = tens ()
+    let values = for { atom <- [first, second] } yield Atom.value atom * 10
     ui {
       fragment
         [

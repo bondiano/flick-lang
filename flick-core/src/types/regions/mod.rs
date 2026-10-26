@@ -42,6 +42,20 @@ pub struct State {
     /// Calls inside a `scope` that need `Scope`, until their innermost
     /// scope ends.
     pub needs: Vec<Need>,
+    /// The functions around the expression being checked, innermost last,
+    /// with the reader each lends to its lazy `for`s.
+    pub readers: Vec<Reader>,
+    /// Every reader region made so far, for diagnostics.
+    pub lent: Vec<u32>,
+}
+
+/// A function's reader: the services it reads atoms through, which end
+/// when it returns, so a lazy `for` that reads them cannot leave it.
+#[derive(Debug, Clone)]
+pub struct Reader {
+    pub level: u32,
+    /// The region, once a `for` needs it, and that `for`.
+    pub region: Option<(u32, Span)>,
 }
 
 #[derive(Debug, Clone)]
@@ -391,6 +405,75 @@ impl Checker<'_> {
             span,
         });
         self.subsume(&a, &e, span)
+    }
+
+    /// Starts the reader of a function whose body is checked next.
+    pub fn begin_reader(&mut self) {
+        let level = self.store.level;
+        self.regions.readers.push(Reader {
+            level,
+            region: None,
+        });
+    }
+
+    /// The region of the reader the innermost function lends to a lazy
+    /// `for` at `span`.
+    pub fn reader_region(&mut self, span: Span) -> Type {
+        let level = self.regions.readers.last().map_or(self.store.level, |r| r.level);
+        if let Some(Reader {
+            region: Some((id, _)),
+            ..
+        }) = self.regions.readers.last()
+        {
+            return Type::Skolem(*id);
+        }
+        let region = self.store.skolem_at("reader", level);
+        if let Type::Skolem(id) = &region {
+            self.regions.lent.push(*id);
+            if let Some(reader) = self.regions.readers.last_mut() {
+                reader.region = Some((*id, span));
+            }
+        }
+        region
+    }
+
+    /// `ty` qualified with the reader `region` too.
+    pub fn read_through(&self, ty: Type, region: &Type) -> Type {
+        let label = capture_label(region).expect("a skolem has a label");
+        qualify(ty, vec![(label, region.clone())])
+    }
+
+    /// Ends the innermost function's reader, reporting its `result` if it
+    /// holds the reader.
+    pub fn end_reader(&mut self, result: &Type, span: Span) {
+        let Some(Reader {
+            region: Some((id, at)),
+            ..
+        }) = self.regions.readers.pop()
+        else {
+            return;
+        };
+        let mut found = false;
+        self.zonk(result)
+            .visit(&mut |t| found |= *t == Type::Skolem(id));
+        if !found {
+            return;
+        }
+        let head = self.show(result);
+        self.diagnostics.push(
+            diagnostics::Diagnostic::error(
+                codes::G002,
+                format!(
+                    "the result has type `{head}`, a sequence whose clauses read atoms through this function's reader, so it cannot leave the function"
+                ),
+                span,
+            )
+            .with_related(at, "the sequence reads atoms here")
+            .with_fix(
+                "build a list with `[for …]`, or iterate the sequence in this function",
+                Vec::new(),
+            ),
+        );
     }
 
     /// The scope whose region is the skolem `s`.

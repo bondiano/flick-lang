@@ -69,9 +69,14 @@ impl Store {
     }
 
     pub fn skolem(&mut self, name: &str) -> Type {
+        self.skolem_at(name, self.level)
+    }
+
+    /// A rigid variable of the code at `level`, around the current one.
+    pub fn skolem_at(&mut self, name: &str, level: u32) -> Type {
         self.skolems.push(Skolem {
             name: name.to_owned(),
-            level: self.level,
+            level,
         });
         Type::Skolem(id(self.skolems.len() - 1))
     }

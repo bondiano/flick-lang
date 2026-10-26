@@ -136,6 +136,9 @@ impl Checker<'_> {
     /// The region `atom` as a diagnostic names it, and the scope it ends with.
     fn describe(&self, atom: &Type) -> (String, Option<Span>) {
         match atom {
+            Type::Skolem(s) if self.regions.lent.contains(s) => {
+                ("the reader of a lazy `for` that reads atoms".to_owned(), None)
+            }
             Type::Skolem(s) => {
                 let name = self.store.skolem_name(*s);
                 match self.scope_of(*s) {
@@ -168,7 +171,17 @@ impl Checker<'_> {
         }) {
             return;
         }
+        let reader = matches!(atom, Type::Skolem(s) if self.regions.lent.contains(s));
         let diagnostic = match hold.expected.as_ref().filter(|_| hold.written) {
+            None if reader => Diagnostic::error(
+                codes::G002,
+                format!("{subject}, so it cannot leave the function whose atoms it reads"),
+                hold.span,
+            )
+            .with_fix(
+                "build a list with `[for …]`, or iterate the sequence in that function",
+                Vec::new(),
+            ),
             None => Diagnostic::error(
                 codes::G002,
                 format!("{subject}, so it cannot leave the `scope` that owns the region"),
@@ -192,10 +205,14 @@ impl Checker<'_> {
                     hold.span,
                 )
                 .with_fix(
-                    format!(
-                        "add the region to the qualifier: `T^{{{}}}`",
-                        self.show(atom)
-                    ),
+                    if reader {
+                        "build a list with `[for …]`, or iterate the sequence in the function that builds it".to_owned()
+                    } else {
+                        format!(
+                            "add the region to the qualifier: `T^{{{}}}`",
+                            self.show(atom)
+                        )
+                    },
                     Vec::new(),
                 )
             }

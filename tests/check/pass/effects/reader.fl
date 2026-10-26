@@ -1,0 +1,22 @@
+// A lazy `for` that reads atoms is iterated in the function that builds
+// it, passed to a function that consumes it, or built as a list.
+module App.Reader exposing (..)
+
+count : Atom.Writable Number
+let count = Atom.make 7
+
+summed : Atom.Atom Number
+let summed =
+  Atom.derived
+    (fun () -> Seq.fold (fun a b -> a + b) 0 (for n <- [1, 2] yield Atom.value count + n))
+
+listed : Atom.Atom (List Number)
+let listed = Atom.derived (fun () -> [for n <- [1] yield Atom.value count + n])
+
+local : Unit ->{Atom.Read;} List Number
+let local () =
+  let xs = for n <- [1, 2] yield Atom.value count + n
+  Seq.to_list xs
+
+plain : Unit -> Seq Number
+let plain () = for n <- [1, 2] yield n

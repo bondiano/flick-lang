@@ -504,7 +504,7 @@ Runtime-вызов `read_more (Atom.current count)`, где `read_more : Number 
 
 [syncOperation](../../runtime/src/sync.ts#L36-L46) путает ABI и данные через `Effect.isEffect(result)`. Нормализовать ABI провайдера, не значение. Чтение не должно выполнять скрытые сервисы/ошибки.
 
-**Q19. P1 — Lazy Seq выпускает закрытый reader**
+**Q19. P1 — Lazy Seq выпускает закрытый reader** ✅ (ленивый `for` с чтением атомов держит регион reader функции, которая его строит: выход результатом, замыканием или в атом — G001/G002 с подсказкой `[for …]`; потребители `Seq` (`to_list`, `fold`, `any`, `all`, `find`, `first`, `each_effect`, `fold_effect`, `from_seq`) принимают `(Seq a)^d`; хелпер, возвращающий читающий `Seq`, теперь ошибка; `tests/check/{fail/regions,pass/effects}/reader.fl`)
 Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq, полученный внутри provide Atom.layer, разрешено обойти снаружи; результат — `registry is disposed`. Внутренний обход и строгий List дали `[8]`.
 
 [Captures](../../flick-core/src/types/comprehension.rs#L100-L115) не включают lifetime неявного [reader context](../../runtime/src/sync.ts#L59-L75). Утечку нужно отвергать, не продлевать жизнь registry.

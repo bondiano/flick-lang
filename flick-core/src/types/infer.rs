@@ -296,6 +296,7 @@ impl Checker<'_> {
         let mark = self.locals.len();
         let givens = self.classes.givens.len();
         let uses = self.uses_mark();
+        self.begin_reader();
         let mut rest = expected.cloned();
         let mut stages = Vec::new();
         // per stage: the locals below it, which it may close over, and its
@@ -376,6 +377,7 @@ impl Checker<'_> {
         self.classes.givens.truncate(givens);
         self.runtime = saved;
         let span = self.span(node);
+        self.end_reader(&result, span);
         self.curry(stages, closures, unknown.as_ref(), result, span)
     }
 
