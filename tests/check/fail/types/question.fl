@@ -28,8 +28,13 @@ let total s =
   | Ok n -> n
   | Err e -> from_result (Err e)
 
+// the body of a function whose `?` returns `None` is an `Option` too
+value : Number
+let value = (fun () -> (None : Option Number)? + 1) ()
+
 //~ FLICK-E001 @10:18-10:28 needs a runtime stage with errors
 //~ FLICK-T003 @14:17-14:19 but that function returns `Number`: in a runtime function, fail instead
 //~ FLICK-T003 @18:28-18:30 this code runs on its own
 //~ FLICK-T003 @22:18-22:20 `?` takes an `Option` or a `Result`, but this has type `Number`
 //~ FLICK-T034 @27:3-29:33 `?` says the same
+//~ FLICK-T003 @33:14-33:51 but its body has type `Number`

@@ -514,7 +514,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 
 [call_effects](../../flick-core/src/types/effects.rs#L184-L199) проверяет стадию, но await/scope вызывают perform напрямую. Применять ограничение ко всем исполняющим Runtime конструкциям, как требует D7.
 
-**Q21. P1 — Option ? нарушает выведенный тип**
+**Q21. P1 — Option ? нарушает выведенный тип** ✅ (несовпадение результата, навязанного `?`, с телом — T003; `tests/check/fail/types/question.fl`)
 `value : Number; let value = (fun () -> (None : Option Number)? + 1) ()` принимается, экспортируя None вместо Number. [function_with](../../flick-core/src/types/infer.rs#L357-L378) игнорирует неудачную unify результата, навязанного `?`, с телом. Нужна ошибка типов; корректное тело с Some возвращает None.
 
 **Q22. P1 — and принимает скаляр как контейнер**

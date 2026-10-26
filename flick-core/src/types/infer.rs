@@ -363,8 +363,13 @@ impl Checker<'_> {
         let outer = mem::replace(&mut self.stage, stage);
         let result = body(self, rest);
         let inner = mem::replace(&mut self.stage, outer);
-        if inferred_result {
-            let _ = self.unify(&returns, &result);
+        if inferred_result && self.unify(&returns, &result).is_err() {
+            let (returns, result) = (self.show(&returns), self.show(&result));
+            self.error(
+                codes::T003,
+                self.span(node),
+                format!("`?` in this function returns `{returns}`, but its body has type `{result}`"),
+            );
         }
         if inferred && let Some(stage) = stages.last_mut() {
             stage.1 = Self::stage_effects(&inner);
