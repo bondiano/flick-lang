@@ -547,7 +547,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 
 [Runtime](../../runtime/src/core/seq.ts#L87-L95) ждёт `--left === 0`, [fusion](../../flick-core/src/codegen/js/generator.rs#L90-L98) — `++count >= n`. Определить единый контракт count; публичный Number не требует целого.
 
-**Q28. P1 — Fusion меняет eager evaluation и defects**
+**Q28. P1 — Fusion меняет eager evaluation и defects** ✅ (строгий `[for …]` сливается с потребителем, только если его тело или callback не может бросить — `droppable` по источникам, условиям и элементам; ленивые цепочки как были; `opt/tests.rs`)
 `Seq.first (for x <- [for y <- [1n,0n] yield 1n/y] yield x)` меняется с Division by zero на Some 1n. `List.map (fun x -> 2n ** (0n-x)) [for y <- [1n,0n] yield 1n/y]` меняет ошибку деления на `undefined must be positive`.
 
 [nested](../../flick-core/src/opt/fuse.rs#L204-L228) делает строгий source ленивым; [List fusion](../../flick-core/src/opt/fuse.rs#L138-L158) смешивает producer/callback. Pure не total: сохранить eager-порядок либо доказать безопасность перестановки.

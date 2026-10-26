@@ -356,3 +356,20 @@ fn a_known_function_fuses_and_a_sync_for_is_left() {
     // its steps read the services it captured, so they stay in its generator
     assert!(js.contains("$m_Seq.map(double)($rt.seqIn("), "{js}");
 }
+
+#[test]
+fn a_strict_for_that_may_throw_is_built_before_its_consumer() {
+    let js = release(
+        "module App exposing (first, powers, sums)\n\n\
+         first : Option BigInt\n\
+         let first = Seq.first (for x <- [for y <- [1n, 0n] yield 1n / y] yield x)\n\n\
+         powers : List BigInt\n\
+         let powers = List.map (fun x -> 2n ** (0n - x)) [for y <- [1n, 0n] yield 1n / y]\n\n\
+         sums : List BigInt -> List BigInt\n\
+         let sums xs = List.map (fun x -> 2n ** x) [for y <- xs yield y + 1n]\n",
+    );
+    // the divisions run, in order, before anything reads the list
+    assert_eq!(js.matches(".push(1n / y)").count(), 2, "{js}");
+    // a producer that cannot throw still fuses with a callback that may
+    assert!(js.contains(".push(2n ** (y + 1n))"), "{js}");
+}

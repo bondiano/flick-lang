@@ -8,15 +8,18 @@
 //! - a `for` over a `for` (or a `[for …]`) nests the clauses of the inner
 //!   one, without a generator inside a generator.
 //!
-//! The functions of the combinators are pure (their arrows are `->`), so
-//! running them per element, between the clauses, changes nothing one can
-//! observe. A `for` whose body makes Sync calls is left as it is: its steps
-//! read the services it captured. Combinators are recognized by the
+//! A lazy `for` and a lazy combinator already run per element, so fusing
+//! them keeps the order of evaluation. A strict `[for …]` builds its whole
+//! list first: pure code is not total (`1n / 0n` throws), so its clauses
+//! are interleaved with the code that consumes the list only when one side
+//! cannot throw. A `for` whose body makes Sync calls is left as it is: its
+//! steps read the services it captured. Combinators are recognized by the
 //! binding they refer to, not by the name in scope.
 
 use std::mem;
 
 use super::inline::{exits, simple};
+use super::walk::droppable;
 use crate::ir::{Expr, ExprKind, Lit, Pat, Stage, Stmt};
 use crate::source::Span;
 
@@ -144,6 +147,10 @@ fn combinator(e: &mut Expr, fresh: &mut usize) -> bool {
     if !fusable(args[1], !lazy) {
         return false;
     }
+    // the callback would run before the rest of a strict list is built
+    if !lazy && !generated_total(args[1]) && !lambda_total(args[0]) {
+        return false;
+    }
     let name = name.to_owned();
     let mut generate = mem::replace(&mut *args.pop().expect("two"), unit(span));
     let f = mem::replace(&mut *args.pop().expect("two"), unit(span));
@@ -207,14 +214,16 @@ fn nested(e: &mut Expr) -> bool {
     let ExprKind::Each { pat, source, body } = &mut e.kind else {
         return false;
     };
-    let inner_ok = matches!(
-        &source.kind,
+    // a strict inner list is built before the outer clauses run
+    let inner_ok = match &source.kind {
         ExprKind::Generate {
             sync: false,
             limit: None,
-            ..
-        }
-    );
+            strict,
+            body,
+        } => !*strict || total(body),
+        _ => false,
+    };
     if !inner_ok || !matches!(pat, Pat::Bind(_) | Pat::Wild) {
         return false;
     }
@@ -238,6 +247,34 @@ fn nested(e: &mut Expr) -> bool {
     });
     *e = inner;
     true
+}
+
+/// Whether the elements of the `for` `e` are computed by code that cannot
+/// throw or diverge.
+fn generated_total(e: &Expr) -> bool {
+    matches!(&e.kind, ExprKind::Generate { body, .. } if total(body))
+}
+
+/// Whether `f` is a lambda whose body cannot throw or diverge.
+fn lambda_total(f: &Expr) -> bool {
+    matches!(&f.kind, ExprKind::Lambda { body, .. } if droppable(body))
+}
+
+/// Whether the body of a `for` evaluates nothing that can throw or
+/// diverge: its sources, guards, bindings and elements.
+fn total(body: &Expr) -> bool {
+    match &body.kind {
+        ExprKind::Yield(value) => droppable(value),
+        ExprKind::Each { source, body, .. } => droppable(source) && total(body),
+        ExprKind::If(c, t, f) => droppable(c) && total(t) && total(f),
+        ExprKind::Block(stmts, tail) => {
+            stmts.iter().all(|s| match s {
+                Stmt::Let(_, v) | Stmt::Expr(v) => droppable(v),
+                _ => false,
+            }) && total(tail)
+        }
+        _ => droppable(body),
+    }
 }
 
 fn yield_of(value: Expr) -> Expr {
