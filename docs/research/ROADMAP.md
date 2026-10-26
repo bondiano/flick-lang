@@ -359,7 +359,7 @@ component search (props : SearchProps) =
 **D12. Диапазоны.** ⬜
 - AC: `a..b`, `a..<b`, `a..` → `Seq`; `[a..b]` — `List`; `exposing (..)`, `...rest`, `1.5`, `x.field` разбираются как раньше (фикстуры).
 
-**D13. Map/Set и моноиды.** ⬜
+**D13. Map/Set и моноиды.** ✅ (модули `Monoids`, `Validation`; `fold_map` берёт функцию без захватов — шаг `fold` их не держит)
 - AC: `HashMap.from_seq`/`to_seq`, `HashSet.from_seq`; `Sum`, `Product`, `First`, `Last`, `Min`, `Max`; `Foldable.fold_map`; `Validation e a`.
 
 **D14. Fusion.** ⬜

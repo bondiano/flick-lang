@@ -55,6 +55,15 @@ from_list : EqHash.EqHash w k -> List (k, v) -> HashMap w k v
 foreign pure from_list from "@flick-lang/runtime/effect/HashMap" "flickFromList"
   reviewed "effect@4.0.5 sha256:23d7203eb4ffb168"
 
+/// The map of the pairs of a sequence, such as a `for` that yields them,
+/// as `from_list` builds it: `HashMap.from_seq EqHash.canonical (for { … } yield (k, v))`.
+from_seq : EqHash.EqHash w k -> Seq (k, v) -> HashMap w k v
+let from_seq witness pairs = from_list witness (Seq.to_list pairs)
+
+/// The entries as a sequence, in no particular order: a source of `for`.
+to_seq : HashMap w k v -> Seq (k, v)
+let to_seq map = Seq.of_list (to_list map)
+
 /// Whether the map has no entries.
 is_empty : HashMap w k v -> Bool
 foreign pure is_empty from "@flick-lang/runtime/effect/HashMap" "flickIsEmpty"

@@ -105,6 +105,16 @@ export const resultMap2 = <A, B, C, E>(
   y: Result.Result<B, E>,
 ): Result.Result<C, E> =>
   x._tag === "Failure" ? Result.fail(x.failure) : y._tag === "Failure" ? Result.fail(y.failure) : ok(f(x.success, y.success));
+/** `map2` of a `Validation`: the errors of both, combined, or `f` of both values. */
+export const validationMap2 = <A, B, C, E>(
+  combine: (a: E, b: E) => E,
+  f: (a: A, b: B) => C,
+  x: Result.Result<A, E>,
+  y: Result.Result<B, E>,
+): Result.Result<C, E> => {
+  if (x._tag === "Failure") return Result.fail(y._tag === "Failure" ? combine(x.failure, y.failure) : x.failure);
+  return y._tag === "Failure" ? Result.fail(y.failure) : ok(f(x.success, y.success));
+};
 export const bindEff = <A, B, E, R, E2, R2>(
   eff: Effect.Effect<A, E, R>,
   f: (a: A) => Effect.Effect<B, E2, R2>,

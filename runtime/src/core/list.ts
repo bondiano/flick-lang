@@ -1,6 +1,6 @@
 // Lists, non-empty lists and mutable JS arrays, without Effect. A callback
 // comes adapted to its JS arity, `f(a, b)`.
-import { EQ, LT, type Option, type Ordering, type Result, none, ok, some } from "./data.ts";
+import { EQ, LT, type Option, type Ordering, type Result, err, none, ok, some } from "./data.ts";
 import { item } from "../internal.ts";
 
 type List<A> = ReadonlyArray<A>;
@@ -40,6 +40,17 @@ export const optionMap2 = <A, B, C>(f: (a: A, b: B) => C, x: Option<A>, y: Optio
 
 export const resultMap2 = <A, B, C, E>(f: (a: A, b: B) => C, x: Result<A, E>, y: Result<B, E>): Result<C, E> =>
   x._tag === "Failure" ? x : y._tag === "Failure" ? y : ok(f(x.success, y.success));
+
+/** `map2` of a `Validation`: the errors of both, combined, or `f` of both values. */
+export const validationMap2 = <A, B, C, E>(
+  combine: (a: E, b: E) => E,
+  f: (a: A, b: B) => C,
+  x: Result<A, E>,
+  y: Result<B, E>,
+): Result<C, E> => {
+  if (x._tag === "Failure") return y._tag === "Failure" ? err(combine(x.failure, y.failure)) : x;
+  return y._tag === "Failure" ? y : ok(f(x.success, y.success));
+};
 
 export const listFind = <A>(p: (a: A) => boolean, xs: List<A>): Option<A> => {
   for (const x of xs) if (p(x)) return some(x);

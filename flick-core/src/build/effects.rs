@@ -28,8 +28,10 @@ const BUILTINS: &[&str] = &[
     "Option",
     "Prelude",
     "Result",
+    "Monoids",
     "Seq",
     "String",
+    "Validation",
 ];
 
 /// The modules of `@flick-lang/runtime/effect/` that `core` has too, with

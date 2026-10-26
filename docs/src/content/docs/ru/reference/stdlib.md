@@ -20,7 +20,8 @@ title: "Стандартная библиотека"
 | Имя | Назначение |
 | - | - |
 | `Eq`, `Ord`, `Hash`, `Show` | каноническое равенство, полный порядок, хеширование, представление для вывода |
-| `Functor`, `Foldable`, `Traversable`, `Applicative`, `Monad` | классы для конструкторов типов `f : Type -> Type`: `map`, `fold`, `traverse`, `pure`, `flat_map` |
+| `Functor`, `Foldable`, `Traversable`, `Applicative`, `Monad` | классы для конструкторов типов `f : Type -> Type`: `map`, `fold` и `fold_map`, `traverse`, `pure` и `map2`, `flat_map` |
+| `Semigroup`, `Monoid`, `Alternative` | `combine` и `empty` (`String`, `List a`, обёртки из `Monoids`), `nothing` и `or_else` |
 | `bind`, `bind_eff` | последовательное выполнение для любой монады и для `Eff` с объединением строк |
 | `from_result` | `Result (Errors e) a ->{; e} a` |
 | `parallel`, `parallel_all`, `parallel_results`, `parallel_exits`, `race_success`, `race_first`, `timeout`, `timeout_option` | структурированная конкурентность, см. [среду выполнения](../runtime/) |
@@ -36,6 +37,8 @@ title: "Стандартная библиотека"
 | - | - |
 | `List` | `map` (принимает чистую функцию), `map_effect` (принимает эффектную функцию и обрабатывает элементы последовательно), `map_indexed`, `each_effect`, свёртки, `filter`, `find`, `sort` (стабильная сортировка по `Ord`), `sort_by`, `get`, `slice`, `range`, `zip`, … |
 | `Seq` | ленивые последовательности, каждая итерация начинается заново: бесконечные `from`, `iterate`, `repeat`, `cycle`, `unfold`; `range`, `map`, `filter`, `flat_map`, `take`, `take_while`, `drop`, `zip`, `enumerate`, `scan`, `chunks`, `windows`, `find`, `first`, `to_list`, `fold`, `each_effect`; `Monad` для `do`; `Stream.from_seq` превращает её в поток |
+| `Monoids` | `Sum` и `Product` чисел, `First` и `Last` от `Option`, `Min` и `Max` по `Ord`: `fold_map Sum xs` говорит, как складывать числа |
+| `Validation` | `Validation e a` — `Result`, у которого `map2` объединяет ошибки обоих значений через их `Semigroup`: группа `and` в `do` сообщает обо всех ошибках; `valid`, `invalid`, `from_result`, `to_result` |
 | `Option`, `Result` | `map`, `bind`, `with_default` и преобразования |
 | `NonEmpty` | списки как минимум с одним элементом |
 | `Chunk` | `Chunk` из Effect для многократной конкатенации |
@@ -103,6 +106,8 @@ title: "Стандартная библиотека"
 классов (`w` — это `EqHash.Canonical`). Вызов `EqHash.with eq
 hash body` создаёт свидетельство с новой идентичностью и передаёт его в `body`.
 Из `body` нельзя вернуть само свидетельство или значение, в типе которого упоминается его идентичность.
+`HashMap.from_seq` и `HashSet.from_seq` строят коллекцию из последовательности,
+например из `for`, а `to_seq` возвращает элементы как источник для `for`.
 
 Вставка и поиск используют свидетельство самой коллекции. Вызов `HashSet.union`
 для множеств с разными свидетельствами приводит к ошибке типов.

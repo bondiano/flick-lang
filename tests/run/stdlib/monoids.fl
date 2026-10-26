@@ -1,0 +1,36 @@
+// The wrappers of `Monoids` choose how `fold_map` combines; maps and sets
+// are built from a `for`; a `Validation` in an `and` group collects every
+// error where a `Result` would stop at the first.
+module App.Main exposing (main)
+
+import Monoids exposing (Sum, Product, First, Last, Min, Max)
+import Validation exposing (Validation)
+
+type alias Form = { name : String; age : Number }
+
+nonempty : String -> Validation (List String) String
+let nonempty s = if s == "" then Validation.invalid ["empty name"] else Validation.valid s
+
+adult : Number -> Validation (List String) Number
+let adult n = if n < 18 then Validation.invalid ["too young: " ++ show n] else Validation.valid n
+
+form : String -> Number -> Validation (List String) Form
+let form name age = do { n <- nonempty name and a <- adult age; pure { name = n; age = a } }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let xs = [3, 1, 4, 1, 5]
+  Platform.stdout_line (show (fold_map Sum xs))
+  Platform.stdout_line (show (fold_map Product xs))
+  Platform.stdout_line (show (fold_map (fun x -> First (Some x)) xs))
+  Platform.stdout_line (show (fold_map (fun x -> Last (Some x)) xs))
+  Platform.stdout_line (show (combine (Min 3) (Min 1)) ++ " " ++ show (combine (Max 3) (Max 1)))
+  Platform.stdout_line (show (fold_map Sum (Some 7)))
+  let squares = HashMap.from_seq EqHash.canonical (for { x <- xs } yield (x, x * x))
+  Platform.stdout_line (show (HashMap.size squares))
+  let total = Seq.fold (fun acc (_, v) -> acc + v) 0 (HashMap.to_seq squares)
+  Platform.stdout_line (show total)
+  let seen = HashSet.from_seq EqHash.canonical (for { x <- xs; if x > 1 } yield x)
+  Platform.stdout_line (show (List.sort (HashSet.to_list seen)))
+  Platform.stdout_line (show (Validation.to_result (form "Ann" 30)))
+  Platform.stdout_line (show (Validation.to_result (form "" 12)))

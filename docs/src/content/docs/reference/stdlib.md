@@ -18,7 +18,8 @@ Signatures the specification gives are declared word for word;
 | Name | What it is |
 | - | - |
 | `Eq`, `Ord`, `Hash`, `Show` | canonical equality, the total order, hashing, display |
-| `Functor`, `Foldable`, `Traversable`, `Applicative`, `Monad` | classes over `f : Type -> Type`: `map`, `fold`, `traverse`, `pure`, `flat_map` |
+| `Functor`, `Foldable`, `Traversable`, `Applicative`, `Monad` | classes over `f : Type -> Type`: `map`, `fold` and `fold_map`, `traverse`, `pure` and `map2`, `flat_map` |
+| `Semigroup`, `Monoid`, `Alternative` | `combine` and `empty` (`String`, `List a`, the wrappers of `Monoids`), `nothing` and `or_else` |
 | `bind`, `bind_eff` | sequencing for any monad, and for `Eff` with the rows joined |
 | `from_result` | `Result (Errors e) a ->{; e} a` |
 | `parallel`, `parallel_all`, `parallel_results`, `parallel_exits`, `race_success`, `race_first`, `timeout`, `timeout_option` | structured concurrency, see [runtime.md](../runtime/) |
@@ -35,6 +36,8 @@ and `Monad`.
 | `List` | `map` (pure callback), `map_effect` (runtime callback, one element after another), `map_indexed`, `each_effect`, folds, `filter`, `find`, `sort` (stable, by `Ord`), `sort_by`, `get`, `slice`, `range`, `zip`, … |
 | `Seq` | lazy sequences that start over on each iteration: infinite `from`, `iterate`, `repeat`, `cycle`, `unfold`; `range`, `map`, `filter`, `flat_map`, `take`, `take_while`, `drop`, `zip`, `enumerate`, `scan`, `chunks`, `windows`, `find`, `first`, `to_list`, `fold`, `each_effect`; a `Monad` for `do`; `Stream.from_seq` streams one |
 | `Option`, `Result` | `map`, `bind`, `with_default` and conversions |
+| `Monoids` | `Sum` and `Product` of numbers, `First` and `Last` of an `Option`, `Min` and `Max` by `Ord`: `fold_map Sum xs` says how numbers combine |
+| `Validation` | `Validation e a`, a `Result` whose `map2` combines the errors of both with their `Semigroup`: an `and` group of `do` reports every error; `valid`, `invalid`, `from_result`, `to_result` |
 | `NonEmpty` | lists with at least one element |
 | `Chunk` | Effect's `Chunk`, for repeated concatenation |
 | `Js.Array` | mutable JS arrays, behind runtime operations; lists are copied in and out |
@@ -96,7 +99,9 @@ A `HashSet w a` or `HashMap w k v` keeps the witness of equality and hashing
 it was made with, and its identity `w` is part of the type. `HashSet.empty`
 uses the canonical instances (`w` is `EqHash.Canonical`); `EqHash.with eq
 hash body` makes a witness of a fresh identity and passes it to `body`,
-which cannot return anything mentioning it. Insertion and lookup use the
+which cannot return anything mentioning it. `HashMap.from_seq` and
+`HashSet.from_seq` build one from a sequence, such as a `for`, and
+`to_seq` gives the elements back as a source of `for`. Insertion and lookup use the
 set's own witness, and `HashSet.union` of sets of two witnesses is a type
 error: `HashSet.rehash witness set` moves a set to another witness first.
 

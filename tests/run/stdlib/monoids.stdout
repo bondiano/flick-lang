@@ -1,0 +1,11 @@
+Sum 14
+Product 60
+First (Some 3)
+Last (Some 5)
+Min 1 Max 3
+Sum 7
+4
+51
+[3, 4, 5]
+Ok { age = 30, name = "Ann" }
+Err ["empty name", "too young: 12"]

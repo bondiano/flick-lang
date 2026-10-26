@@ -70,6 +70,11 @@ class Functor (f : Type -> Type) =
 /// Containers folded from the first element to the last.
 class Foldable (f : Type -> Type) =
   fold : forall c a b. (b -> a -> b)^c -> (b -> (f a -> b)^c)^c
+  /// The elements, each mapped by `f`, combined from `empty`.
+  // shortcut: `f` captures nothing, since the step of `fold` it is called in
+  // may not hold a capture; give it `^c` when stages of `fold` may.
+  fold_map : forall a m. Monoid m => (a -> m) -> f a -> m
+  let fold_map f xs = fold (fun acc x -> combine acc (f x)) empty xs
 
 /// Containers whose elements a runtime function maps, one after another
 /// from the first.
