@@ -130,7 +130,7 @@ impl Checker<'_> {
         let mut params = Vec::new();
         for (i, arg) in args.iter().enumerate() {
             let span = Span::new(self.file, head.range().0, arg.range().1);
-            match self.whnf(&ty) {
+            match self.ui_callable(&ty, (span.start, span.end), self.span(head)) {
                 Type::Fun {
                     param,
                     effects,
@@ -293,7 +293,8 @@ impl Checker<'_> {
     fn pipe(&mut self, lhs: &Node, rhs: &Node) -> Type {
         let arg = self.infer(lhs);
         let function = self.infer(rhs);
-        match self.whnf(&function) {
+        let call = (lhs.range().0, rhs.range().1);
+        match self.ui_callable(&function, call, self.span(rhs)) {
             Type::Fun {
                 param,
                 effects,

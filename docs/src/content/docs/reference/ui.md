@@ -47,9 +47,10 @@ checked as written, so these qualifiers are never inferred. A component whose
 callbacks never hold scoped resources can drop both of them.
 
 `ui { … }` is a block in which the names `Ui` exports need no `Ui.`: a local
-binding still wins, then a name of `Ui`, then the module's own names. It
-adds nothing else, so `ui { button … [text …] }` and `Ui.button … [Ui.text
-…]` compile to the same IR.
+binding still wins, then a name of `Ui`, then the module's own names.
+Ordinary calls such as `ui { button … [text …] }` compile to the same IR
+as `Ui.button … [Ui.text …]`. Applying a value of type `Ui.Component p`
+to props inside the block also inserts `Ui.component` automatically.
 
 ## Elements and props
 
@@ -72,7 +73,7 @@ an error. A key is metadata, given with `Ui.keyed`, never a prop.
 | `select (SelectProps a c)` | `ul role="listbox"`; choosing an item runs `on_change` with it | items through `render_item` |
 | `panel { header; body; footer }` | `section` with `header`, `main`, `footer` | named places |
 | `tabs { selected } (NonEmpty Tab)` | a tab list and the selected panel | `Tab`s from `tab label ui` |
-| `component c props` | a foreign React component | its props |
+| `c props` where `c : Ui.Component p` | a foreign React component | its props |
 
 `text` is `String -> Ui`, so it sits among the children of
 any element. `SafeUrl` comes only from `Ui.safe_url`, which accepts relative
@@ -80,6 +81,21 @@ URLs and the schemes `http`, `https` and `mailto` and refuses control
 characters; `SanitizedHtml` only from `Ui.trusted_html`, the program's own
 word. A `String` is neither. A foreign component is a `Ui.Component p` bound
 with `foreign pure`; React renders it, Flick never calls it.
+
+Inside `ui`, write `badge props` instead of `Ui.component badge props`:
+
+```flick
+badge : Ui.Component { label : String }
+foreign pure badge from "./badge.mjs" "Badge"
+
+example : Ui
+let example = ui { div { class_name = "badges" } [badge { label = "new" }] }
+```
+
+This also works for local bindings, record fields, values returned by
+functions and pipes (`props |> badge`). Only application is shorthand:
+a bare `badge` keeps its `Ui.Component` type. Props and capture checks
+are unchanged. Outside `ui`, use `Ui.component badge props`.
 
 `with_host attrs node` puts host attributes on an element: `id`,
 `class_name`, `role`, `aria_label`, `aria_describedby`, `aria_hidden`,

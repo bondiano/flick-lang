@@ -93,7 +93,7 @@ impl Lower<'_> {
             K::ComponentExpr => return self.component(node, &children),
             K::SqlExpr => return self.sql_block(node),
             K::CliExpr => return self.cli_block(node),
-            // `ui { … }` only opens the names of `Ui`, which the checker resolved
+            // `Ui` names and implicit component applications were resolved by the checker.
             K::UiExpr => {
                 return match children.iter().find(|n| n.kind == K::Block) {
                     Some(body) => self.block(body),
@@ -274,6 +274,7 @@ impl Lower<'_> {
         for arg in args {
             let key = (start, arg.range().1);
             let span = Span::new(self.file, key.0, key.1);
+            func = self.ui_callable(func, key);
             let arg = self.expr(arg);
             let app = ExprKind::App {
                 func: Box::new(func),
@@ -285,6 +286,26 @@ impl Lower<'_> {
             func = with_dicts(self.within(key, Expr::new(app, span)), dicts);
         }
         func
+    }
+
+    fn ui_callable(&self, func: Expr, key: Range) -> Expr {
+        if !self.typing.ui_components.contains(&key) {
+            return func;
+        }
+        let span = func.span;
+        let component = ExprKind::Global {
+            module: "Ui".to_owned(),
+            name: "component".to_owned(),
+        };
+        Expr::new(
+            ExprKind::App {
+                func: Box::new(Expr::new(component, span)),
+                arg: Box::new(func),
+                stage: Stage::Pure,
+                arg_first: false,
+            },
+            span,
+        )
     }
 
     /// `call`, acquiring into the owner the checker chose for it.
@@ -320,7 +341,12 @@ impl Lower<'_> {
             .find(|t| t.kind.is_binary_op())
             .map(|t| t.kind);
         let lhs = self.boxed(children[0]);
-        let rhs = self.boxed(children[1]);
+        let rhs = self.expr(children[1]);
+        let rhs = Box::new(if op == Some(K::PipeGt) {
+            self.ui_callable(rhs, key)
+        } else {
+            rhs
+        });
         if let (Some(kind @ (K::EqEq | K::NotEq)), Some(&identity)) =
             (op, self.typing.identity_eq.get(&key))
         {

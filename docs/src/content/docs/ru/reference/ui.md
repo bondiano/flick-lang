@@ -56,9 +56,10 @@ SaveError} Unit` нельзя передать функцию обратного
 
 В блоке `ui { … }` имена из `Ui` доступны без префикса `Ui.`.
 При поиске имени сначала учитывается локальная привязка, затем экспорт
-из `Ui`, затем имена текущего модуля. Другой семантики у блока нет:
-`ui { button … [text …] }` и `Ui.button … [Ui.text
-…]` компилируются в одно и то же промежуточное представление.
+из `Ui`, затем имена текущего модуля. Обычные вызовы
+`ui { button … [text …] }` и `Ui.button … [Ui.text …]` компилируются
+в одно промежуточное представление. При применении значения типа
+`Ui.Component p` к свойствам блок также автоматически вставляет `Ui.component`.
 
 ## Элементы и свойства
 
@@ -82,7 +83,7 @@ SaveError} Unit` нельзя передать функцию обратного
 | `select (SelectProps a c)` | `ul role="listbox"`; выбор элемента запускает `on_change` с этим элементом | элементы через `render_item` |
 | `panel { header; body; footer }` | `section` с `header`, `main`, `footer` | задаются именованными полями |
 | `tabs { selected } (NonEmpty Tab)` | список вкладок и выбранная панель | значения `Tab` из `tab label ui` |
-| `component c props` | внешний компонент React | его свойства |
+| `c props`, где `c : Ui.Component p` | внешний компонент React | его свойства |
 
 `text` имеет тип `String -> Ui`, поэтому его можно
 включить в список дочерних элементов любого элемента.
@@ -94,6 +95,22 @@ SaveError} Unit` нельзя передать функцию обратного
 
 Внешний компонент имеет тип `Ui.Component p` и привязывается через
 `foreign pure`. Его отображает React; Flick никогда не вызывает его сам.
+
+Внутри `ui` вместо `Ui.component badge props` достаточно `badge props`:
+
+```flick
+badge : Ui.Component { label : String }
+foreign pure badge from "./badge.mjs" "Badge"
+
+example : Ui
+let example = ui { div { class_name = "badges" } [badge { label = "new" }] }
+```
+
+Это работает и для локальных привязок, полей записей, значений,
+возвращённых функциями, и конвейеров (`props |> badge`). Сокращается
+только применение: само `badge` сохраняет тип `Ui.Component`.
+Проверки свойств и захватов не меняются. Вне `ui` нужен
+`Ui.component badge props`.
 
 `with_host attrs node` задаёт элементу атрибуты хоста: `id`,
 `class_name`, `role`, `aria_label`, `aria_describedby`, `aria_hidden`,

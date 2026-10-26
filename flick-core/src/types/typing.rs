@@ -35,6 +35,8 @@ pub struct Typing {
     pub runtime: HashSet<Range>,
     /// Those whose stage runs a Sync call.
     pub sync: HashSet<Range>,
+    /// Applications inside `ui` whose function is an opaque `Ui.Component`.
+    pub ui_components: HashSet<Range>,
     /// The `and` groups of `do` followed only by `pure e`, whose last
     /// `map2` computes `e`.
     pub applicative: HashSet<Range>,
