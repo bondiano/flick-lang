@@ -90,10 +90,6 @@
           }
         },
         {
-          "match": "(?:^\\s+|(?<==)\\s*)(setup|render)\\b(?!\\s*[=:])",
-          "captures": { "1": { "name": "keyword.other.flick" } }
-        },
-        {
           "match": "(?<![.\\w])(from)\\s+(global)\\b",
           "captures": {
             "1": { "name": "keyword.other.flick" },

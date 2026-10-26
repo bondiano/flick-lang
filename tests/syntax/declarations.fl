@@ -108,10 +108,8 @@ let area shape =
   | Rect { origin = _; size } -> size.x * size.y
   | Empty -> 0
 
-component badge (props : { label : String }) = render ui { text props.label }
+component badge (props : { label : String }) = ui { text props.label }
 
 component counter (props : { start : Number }) =
-  setup
-    let count = Atom.local props.start
-  render
-    ui { text (show (Atom.get count)) }
+  let count = Atom.local props.start
+  ui { text (show (Atom.get count)) }

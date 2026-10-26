@@ -192,37 +192,40 @@ React и состояние политики событий этого ключ�
 
 ### Компоненты
 
-`component name (props : P) = render e` объявляет представление своих
-props: это `let name = Ui.view (fun (props : P) -> e)` с типом
-`Ui.View P`, и `Ui.render name props` его вставляет. Props — один образец,
-обычно запись со своим типом. Рендер пишется в строке `=` или на своей
-строке:
+`component name (props : P) = body` объявляет представление своих props с
+типом `Ui.View P`, которое вставляет `Ui.render name props`. Props — один
+образец, обычно запись со своим типом. Тело — блок: его последнее
+выражение рендерит компонент, снова при каждом изменении прочитанного
+атома или props. Тело из одного этого выражения — это
+`let name = Ui.view (fun (props : P) -> e)`:
 
 ```flick
-component badge (props : { label : String }) = render ui { text props.label }
+component badge (props : { label : String }) = ui { text props.label }
 
 component card (person : { name : String; label : String }) =
-  render
-    ui { div { class_name = "card" } [text person.name, Ui.render badge { label = person.label }] }
+  ui { div { class_name = "card" } [text person.name, Ui.render badge { label = person.label }] }
 ```
 
-Секция `setup` перед `render` создаёт состояние каждого экземпляра. Она
+Операторы перед последним выражением — setup каждого экземпляра. Он
 выполняется один раз, когда экземпляр монтируется, с сервисом `Setup s`
-региона экземпляра `s`; её имена видны в `render`, который выполняется на
-каждом рендере с ними. `Atom.local` создаёт атом экземпляра, а
-конструкторы `Action` — его action; рендер, который их создаёт, —
-`FLICK-U006`, а `Atom.local` вне setup — ошибка эффектов. Компонент — это
+региона экземпляра `s`, а его имена видны в последнем выражении, которое
+рендерит с ними. `Atom.local` создаёт атом экземпляра, а конструкторы
+`Action` — его action; рендер, который их создаёт, — `FLICK-U006`, а
+`Atom.local` вне setup — ошибка эффектов. Setup выполняется один раз,
+поэтому атомы в нём не читаются: их читает рендер (`ui { let n = … }` —
+тоже блок) или `Atom.derived`, созданный в setup. Компонент — это
 `Ui.stateful (fun props -> setup; fun props -> render)` с типом
 `forall s. P ->{Setup s} (P ->{Atom.Read} Ui)^{s}`: setup видит первые
-props, рендер — текущие. Наведение на `setup` показывает этот тип.
+props, рендер — текущие. Наведение на `component` показывает этот тип.
 
 ```flick
 component counter (start : Number) =
-  setup
-    let count = Atom.local start
-    let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
-  render
-    ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
+  let count = Atom.local start
+  let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
+  ui {
+    let n = Atom.value count
+    button { on_click = bump; disabled = false } [text (show n)]
+  }
 ```
 
 Setup выполняется один раз на смонтированный экземпляр, в том числе под
@@ -245,27 +248,23 @@ StrictMode в React. Когда экземпляр размонтируется,
 
 ```flick
 component clock () =
-  setup
-    let seconds = Atom.local 0
-    let second = Result.with_default Duration.zero (Duration.seconds 1)
-    let _ticking =
-      Ui.on_mount
-        (task {
-          Effect.forever
-            (task {
-              Effect.sleep second
-              Atom.update seconds (fun n -> n + 1)
-            })
-        })
-  render
-    ui { text (show (Atom.value seconds)) }
+  let seconds = Atom.local 0
+  let second = Result.with_default Duration.zero (Duration.seconds 1)
+  let _ticking =
+    Ui.on_mount
+      (task {
+        Effect.forever
+          (task {
+            Effect.sleep second
+            Atom.update seconds (fun n -> n + 1)
+          })
+      })
+  ui { text (show (Atom.value seconds)) }
 ```
 
 Функция, которая создаёт состояние экземпляра, говорит об этом в
 сигнатуре, `Number ->{Setup s;} Atom.Writable Number`, и вызывается из
-setup. `render` перед `setup`, повтор секции или отсутствие `render` —
-`FLICK-S014`. Слова `component`, `setup` и `render` остаются именами во
-всех других местах, как в `Ui.render`.
+setup. Слово `component` остаётся именем во всех других местах.
 
 ## Задачи в представлениях
 

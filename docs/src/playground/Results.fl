@@ -29,34 +29,32 @@ type alias Problems = { locale : Locale; diagnostics : List Diagnostic }
 
 // each pane keeps its own filter, which the model does not need to know
 component problems_pane (props : Problems) =
-  setup
-    let errors_only = Atom.local false
-    let toggle = Action.exhaust (fun _ -> task { Atom.update errors_only (fun on -> not on) })
-  render
+  let errors_only = Atom.local false
+  let toggle = Action.exhaust (fun _ -> task { Atom.update errors_only (fun on -> not on) })
+  ui {
     let only = Atom.value errors_only
     let shown =
       if only then
         List.filter (fun d -> d.severity == "error") props.diagnostics
       else
         props.diagnostics
-    ui {
-      div { class_name = "fp-diagnostics" }
-        [
-          Ui.with_host { Ui.host with class_name = Some "fp-filter" }
-            (button { disabled = props.diagnostics == []; on_click = toggle }
-              [
-                text
-                  (if only then
-                    tr props.locale "Show all" "Показать все"
-                  else
-                    tr props.locale "Errors only" "Только ошибки"),
-              ]),
-          match shown with
-          | [] ->
-            paragraph [text (tr props.locale "No diagnostics." "Ошибок и предупреждений нет.")]
-          | items -> list (List.map (problem props.locale) items),
-        ]
-    }
+    div { class_name = "fp-diagnostics" }
+      [
+        Ui.with_host { Ui.host with class_name = Some "fp-filter" }
+          (button { disabled = props.diagnostics == []; on_click = toggle }
+            [
+              text
+                (if only then
+                  tr props.locale "Show all" "Показать все"
+                else
+                  tr props.locale "Errors only" "Только ошибки"),
+            ]),
+        match shown with
+        | [] ->
+          paragraph [text (tr props.locale "No diagnostics." "Ошибок и предупреждений нет.")]
+        | items -> list (List.map (problem props.locale) items),
+      ]
+  }
 
 current_problems : Model -> Ui
 let current_problems m =

@@ -1,6 +1,7 @@
-// `Setup s` belongs to a component's `setup`: a render, a top-level value
-// and a function without it in its signature cannot make an instance's
-// state, and a render makes no atom of its own.
+// `Setup s` belongs to a component's setup, the statements before its last
+// expression: a render, a top-level value and a function without it in its
+// signature cannot make an instance's state. The setup runs once, so it
+// reads no atom, and a render makes no atom of its own.
 module App.ComponentSetup exposing (..)
 
 top : Atom.Writable Number
@@ -10,24 +11,32 @@ helper : Number ->{} Atom.Writable Number
 let helper n = Atom.local n
 
 component plain (n : Number) =
-  render
+  ui {
     let again = Atom.local n
-    ui { text (show (Atom.value again)) }
+    text (show (Atom.value again))
+  }
 
 component counter (start : Number) =
-  setup
-    let count = Atom.local start
-  render
+  let count = Atom.local start
+  ui {
     let other = Atom.make 0
-    ui { text (show (Atom.value count + Atom.value other)) }
+    text (show (Atom.value count + Atom.value other))
+  }
 
 component ticking (n : Number) =
-  render
+  ui {
     let _started = Ui.on_mount (task { Platform.stdout_line "tick" })
-    ui { text (show n) }
+    text (show n)
+  }
 
-//~ FLICK-E001 @7:11-7:23 module initialization is pure
-//~ FLICK-E002 @10:16-10:28 does not allow service `Setup _`
-//~ FLICK-U004 @14:17-14:29 call it in a component's `setup`
-//~ FLICK-U006 @21:17-21:26 while rendering makes another one
-//~ FLICK-U004 @26:20-26:70 service `Setup _` is not allowed here
+component once (start : Number) =
+  let count = Atom.local start
+  let shown = Atom.value count
+  ui { text (show shown) }
+
+//~ FLICK-E001 @8:11-8:23 module initialization is pure
+//~ FLICK-E002 @11:16-11:28 does not allow service `Setup _`
+//~ FLICK-U004 @15:17-15:29 before a component's last expression
+//~ FLICK-U006 @22:17-22:26 while rendering makes another one
+//~ FLICK-U004 @28:20-28:70 service `Setup _` is not allowed here
+//~ FLICK-E002 @34:15-34:31 a component's setup runs once per instance

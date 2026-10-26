@@ -547,26 +547,19 @@ fn hover_on_a_derived_class_shows_the_instance_it_makes() {
 }
 
 #[test]
-fn hover_on_the_sections_of_a_component_shows_its_instance() {
+fn hover_on_component_shows_its_instance() {
     let source = "module App.Main exposing (counter)\n\n\
-                  component counter (start : Number) =\n  setup\n    let count = Atom.local start\n  \
-                  render\n    ui { text (show (Atom.value count)) }\n";
+                  component counter (start : Number) =\n  let count = Atom.local start\n  \
+                  ui { text (show (Atom.value count)) }\n";
     let f = fixture_of(&[("src/App/Main.fl", source)]);
     let ide = f.ide();
     let main = f.file("App.Main");
-    let hover = |needle: &str| {
-        ide.hover(main, f.at("App.Main", needle, 0) + 1)
-            .unwrap_or_else(|| panic!("hover {needle}"))
-            .0
-    };
-    let setup = hover("setup");
+    let hover = ide
+        .hover(main, f.at("App.Main", "component", 0) + 1)
+        .expect("hover component")
+        .0;
     assert!(
-        setup.contains("setup : Number ->{Setup s; none} Number ->{Read; none} Ui"),
-        "{setup}"
-    );
-    let render = hover("render");
-    assert!(
-        render.contains("render : Number ->{Read; none} Ui"),
-        "{render}"
+        hover.contains("component : Number ->{Setup s; none} Number ->{Read; none} Ui"),
+        "{hover}"
     );
 }

@@ -18,7 +18,7 @@ const OPERATORS = [
 module.exports = grammar({
   name: 'flick',
 
-  externals: $ => [$.block_comment, $.raw_string, $.multiline_string, $._section_start],
+  externals: $ => [$.block_comment, $.raw_string, $.multiline_string],
 
   extras: $ => [/\s/, $.doc_comment, $.line_comment, $.block_comment],
 
@@ -31,7 +31,6 @@ module.exports = grammar({
       $._foreign,
       $._from,
       $._component,
-      alias($._section_start, $.keyword),
       $.parens,
       $.brackets,
       $.braces,
@@ -59,17 +58,8 @@ module.exports = grammar({
       optional(alias(choice('pure', 'sync', 'async', 'effect', 'blocked'), $.keyword)),
     ),
     _from: $ => seq(alias('from', $.keyword), optional(alias('global', $.keyword))),
-    // `component name (props) = …` declares a component; elsewhere the words
-    // are names. `setup` and `render` are its sections right after its `=`,
-    // or first on a line that ends after them (the scanner's `_section_start`).
-    _component: $ => prec.right(seq(
-      alias('component', $.keyword),
-      $.identifier,
-      optional(seq(
-        $.parens,
-        optional(seq(alias('=', $.operator), optional(alias(choice('setup', 'render'), $.keyword)))),
-      )),
-    )),
+    // `component name` declares a component; elsewhere the word is a name
+    _component: $ => seq(alias('component', $.keyword), $.identifier),
     boolean: _ => choice('true', 'false'),
     operator: _ => choice(...OPERATORS),
 

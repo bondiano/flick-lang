@@ -83,15 +83,10 @@ pub fn in_scope(root: &Node, offset: u32, text: &str) -> Vec<(String, (u32, u32)
                     out.extend(let_binders(clause, text));
                 }
             }
-            // the props, then in `render` the names `setup` binds
+            // the props; its body is a block like any other
             K::ComponentExpr => {
-                for part in scope.nodes().filter(before) {
-                    if part.kind == K::Block {
-                        let lets = part.nodes().filter(|s| s.kind == K::LetDecl);
-                        out.extend(lets.flat_map(|s| let_binders(s, text)));
-                    } else if is_pattern(part.kind) {
-                        binders(part, &mut out, text);
-                    }
+                for p in scope.nodes().filter(|n| is_pattern(n.kind)).filter(before) {
+                    binders(p, &mut out, text);
                 }
             }
             K::FunExpr | K::MatchArm => {
@@ -121,7 +116,7 @@ mod tests {
 
     #[test]
     fn render_sees_the_props_and_the_names_of_setup() {
-        let text = "component c (p : P) =\n  setup\n    let n = p\n  render\n    ui { text n }\n";
+        let text = "component c (p : P) =\n  let n = p\n  ui { text n }\n";
         let mut sources = SourceMap::default();
         let file = sources.add("C.fl", text.to_owned());
         let tree = parse(text, file).tree;

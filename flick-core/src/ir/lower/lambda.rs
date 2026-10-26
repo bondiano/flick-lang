@@ -24,12 +24,12 @@ impl Lower<'_> {
         self.function(&params, body, stages, span)
     }
 
-    /// `Ui.view (fun props -> render)`, or with a setup `Ui.stateful (fun
-    /// props -> setup; fun props -> render)`.
+    /// `Ui.view (fun props -> body)`, or with setup statements before the
+    /// render `Ui.stateful (fun props -> setup; fun props -> render)`.
     pub(super) fn component(&mut self, node: &Node, children: &[&Node]) -> Expr {
         let span = self.span(node);
         let parts = component_parts(node);
-        let (Some(setup), Some(render)) = (parts.setup, parts.render) else {
+        let (Some(body), Some(render), true) = (parts.body, parts.render, parts.has_setup()) else {
             let render = self.lambda(node, children);
             return Self::ui_call("view", render, span);
         };
@@ -39,9 +39,9 @@ impl Lower<'_> {
         let setup = self.function_with(
             &props,
             |l| {
-                let statements: Vec<&Node> = setup.nodes().collect();
+                let statements: Vec<&Node> = body.nodes().collect();
                 let mut stmts = Vec::new();
-                for statement in statements {
+                for statement in &statements[..statements.len() - 1] {
                     match statement.kind {
                         K::Signature => {}
                         K::LetDecl => stmts.push(l.local_let(statement)),

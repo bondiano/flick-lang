@@ -66,7 +66,7 @@ pub use bindings::{LetParts, let_parts, signature_name};
 pub use builtins::{builtin_sources, builtins};
 pub use classes::Dict;
 pub(crate) use classes::{Match, match_type};
-pub use component::parts as component_parts;
+pub use component::{instance_key as component_instance, parts as component_parts};
 pub use comprehension::{comprehension, for_parts};
 pub use convert::is_type;
 pub use decls::class_defaults;

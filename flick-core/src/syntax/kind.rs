@@ -67,11 +67,9 @@ pub enum SyntaxKind {
     DoKw,
     /// `and` between the bindings of a `do` group, a keyword only there.
     AndKw,
-    /// `component`, `setup` and `render` of a component declaration,
-    /// keywords only there.
+    /// `component` before the name of a component declaration, a keyword
+    /// only there.
     ComponentKw,
-    SetupKw,
-    RenderKw,
 
     // punctuation and operators
     LParen,
@@ -193,9 +191,9 @@ pub enum SyntaxKind {
     GuardStmt,
     /// `for { … } yield e`: a lazy `Seq`; in `[ ]` alone, a strict `List`.
     ForExpr,
-    /// The body of `component name (props : P) = [setup …] render …`: its
-    /// props pattern, then a `Block` per section, as a `fun` lists its
-    /// parameters then its body.
+    /// The body of `component name (props : P) = body`: its props pattern,
+    /// then the `Block` of its setup statements and render, as a `fun`
+    /// lists its parameters then its body.
     ComponentExpr,
     ScopeExpr,
     ProvideExpr,

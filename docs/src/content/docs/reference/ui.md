@@ -171,37 +171,41 @@ another task for a busy `exhaust` handler.
 
 ### Components
 
-`component name (props : P) = render e` declares a view of its props: it
-is `let name = Ui.view (fun (props : P) -> e)`, with the type `Ui.View P`,
-and `Ui.render name props` places it. The props are one pattern, usually a
-record with its type. The render goes on the line of `=` or on a line of
-its own:
+`component name (props : P) = body` declares a view of its props, of the
+type `Ui.View P`, which `Ui.render name props` places. The props are one
+pattern, usually a record with its type. The body is a block: its last
+expression renders the component, again whenever an atom it read changes or
+its props do. A body that is that expression alone is
+`let name = Ui.view (fun (props : P) -> e)`:
 
 ```flick
-component badge (props : { label : String }) = render ui { text props.label }
+component badge (props : { label : String }) = ui { text props.label }
 
 component card (person : { name : String; label : String }) =
-  render
-    ui { div { class_name = "card" } [text person.name, Ui.render badge { label = person.label }] }
+  ui { div { class_name = "card" } [text person.name, Ui.render badge { label = person.label }] }
 ```
 
-A `setup` section before `render` makes the state of each instance. It
-runs once, when the instance mounts, with the service `Setup s` of the
-instance's region `s`; its names are in scope in `render`, which runs on
-every render with them. `Atom.local` makes an atom of the instance and the
+The statements before the last expression are the setup of each instance.
+It runs once, when the instance mounts, with the service `Setup s` of the
+instance's region `s`, and its names are in scope in the last expression,
+which renders with them. `Atom.local` makes an atom of the instance and the
 `Action` makers make its actions there; a render that makes one is
-`FLICK-U006`, and `Atom.local` outside a setup is an effect error. The
-component is `Ui.stateful (fun props -> setup; fun props -> render)`, of the
-type `forall s. P ->{Setup s} (P ->{Atom.Read} Ui)^{s}`: the setup sees the
-first props, the render the current ones. Hovering `setup` shows that type.
+`FLICK-U006`, and `Atom.local` outside a setup is an effect error. The setup
+runs once, so it reads no atom: the render does, `ui { let n = … }` being a
+block too, or an `Atom.derived` made in the setup does. The component is
+`Ui.stateful (fun props -> setup; fun props -> render)`, of the type
+`forall s. P ->{Setup s} (P ->{Atom.Read} Ui)^{s}`: the setup sees the
+first props, the render the current ones. Hovering `component` shows that
+type.
 
 ```flick
 component counter (start : Number) =
-  setup
-    let count = Atom.local start
-    let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
-  render
-    ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
+  let count = Atom.local start
+  let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
+  ui {
+    let n = Atom.value count
+    button { on_click = bump; disabled = false } [text (show n)]
+  }
 ```
 
 The setup runs once per mounted instance, under React's StrictMode too.
@@ -224,27 +228,23 @@ action's do.
 
 ```flick
 component clock () =
-  setup
-    let seconds = Atom.local 0
-    let second = Result.with_default Duration.zero (Duration.seconds 1)
-    let _ticking =
-      Ui.on_mount
-        (task {
-          Effect.forever
-            (task {
-              Effect.sleep second
-              Atom.update seconds (fun n -> n + 1)
-            })
-        })
-  render
-    ui { text (show (Atom.value seconds)) }
+  let seconds = Atom.local 0
+  let second = Result.with_default Duration.zero (Duration.seconds 1)
+  let _ticking =
+    Ui.on_mount
+      (task {
+        Effect.forever
+          (task {
+            Effect.sleep second
+            Atom.update seconds (fun n -> n + 1)
+          })
+      })
+  ui { text (show (Atom.value seconds)) }
 ```
 
 A function that makes the state of an instance says so in its signature,
-`Number ->{Setup s;} Atom.Writable Number`, and is called from a setup. A
-`render` before `setup`, a second section of a kind or a missing `render` is
-`FLICK-S014`. The words `component`, `setup` and `render` stay names
-everywhere else, as in `Ui.render`.
+`Number ->{Setup s;} Atom.Writable Number`, and is called from a setup. The
+word `component` stays a name everywhere else.
 
 ## Tasks in views
 

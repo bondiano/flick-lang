@@ -9,32 +9,27 @@ let greeting = Atom.make "Hello"
 type alias Person = { name : String; tags : List String }
 
 component salutation (name : String) =
-  render ui { paragraph [text (Atom.value greeting ++ ", " ++ name ++ "!")] }
+  ui { paragraph [text (Atom.value greeting ++ ", " ++ name ++ "!")] }
 
 component card (person : Person) =
-  render
-    ui {
-      div
-        { class_name = "card" }
-        [
-          Ui.render salutation person.name,
-          list (List.map (fun t -> ui { item [text t] }) person.tags),
-        ]
-    }
+  ui {
+    div
+      { class_name = "card" }
+      [
+        Ui.render salutation person.name,
+        list (List.map (fun t -> ui { item [text t] }) person.tags),
+      ]
+  }
 
 component counter (start : Number) =
-  setup
-    let count = Atom.local (start + 1)
-    let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
-  render
-    ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
+  let count = Atom.local (start + 1)
+  let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
+  ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
 
 // a server renders without mounting: its work never starts there
 component mounted () =
-  setup
-    let _started = Ui.on_mount (task { Platform.stdout_line "mounted on a server" })
-  render
-    ui { text "rendered" }
+  let _started = Ui.on_mount (task { Platform.stdout_line "mounted on a server" })
+  ui { text "rendered" }
 
 main : Unit ->{; AppError} Unit
 let main () =

@@ -7,48 +7,40 @@ counted : forall s. Number ->{Setup s;} Atom.Writable Number
 let counted start = Atom.local (start + 1)
 
 component counter (start : Number) =
-  setup
-    let count = counted start
-    let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
-  render
-    ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
+  let count = counted start
+  let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
+  ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
 
 type alias Labelled = { label : String; start : Number }
 
 // the props are the first ones in `setup`, the current ones in `render`
 component labelled (props : Labelled) =
-  setup
-    let count = Atom.local props.start
-  render
-    ui { paragraph [text (props.label ++ show (Atom.value count))] }
+  let count = Atom.local props.start
+  ui { paragraph [text (props.label ++ show (Atom.value count))] }
 
 query : Atom.Writable String
 let query = Atom.make ""
 
 // work of the instance while it is mounted: once, and whenever `query` changes
 component search () =
-  setup
-    let found = Atom.local 0
-    let _mounted = Ui.on_mount (task { Atom.set found 0 })
-    let _watched =
-      Ui.watch (fun () -> Atom.value query) (fun q -> task { Atom.set found (String.length q) })
-  render
-    ui { text (show (Atom.value found)) }
+  let found = Atom.local 0
+  let _mounted = Ui.on_mount (task { Atom.set found 0 })
+  let _watched =
+    Ui.watch (fun () -> Atom.value query) (fun q -> task { Atom.set found (String.length q) })
+  ui { text (show (Atom.value found)) }
 
 // an outside source: a timer the instance starts once it mounts and stops
 // when it unmounts
 component clock () =
-  setup
-    let seconds = Atom.local 0
-    let second = Result.with_default Duration.zero (Duration.seconds 1)
-    let _ticking =
-      Ui.on_mount
-        (task {
-          Effect.forever
-            (task {
-              Effect.sleep second
-              Atom.update seconds (fun n -> n + 1)
-            })
-        })
-  render
-    ui { text (show (Atom.value seconds)) }
+  let seconds = Atom.local 0
+  let second = Result.with_default Duration.zero (Duration.seconds 1)
+  let _ticking =
+    Ui.on_mount
+      (task {
+        Effect.forever
+          (task {
+            Effect.sleep second
+            Atom.update seconds (fun n -> n + 1)
+          })
+      })
+  ui { text (show (Atom.value seconds)) }

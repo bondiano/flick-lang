@@ -139,10 +139,10 @@ foreign sync now from global \"Date.now\"
 }
 
 #[test]
-fn the_words_of_a_component_are_keywords_there_only() {
+fn component_is_a_keyword_there_only() {
     let text = "module App.Main exposing (badge)
 
-component badge (render : String) = render ui { text render }
+component badge (render : String) = ui { text render }
 ";
     let f = fixture_of(&[("src/App/Main.fl", text)]);
     let tokens = f.ide().semantic_tokens(f.file("App.Main"));
@@ -154,7 +154,6 @@ component badge (render : String) = render ui { text render }
             .map(|t| TOKEN_TYPES[t.2 as usize])
     };
     assert_eq!(kind_at("component"), Some("keyword"));
-    assert_eq!(kind_at("render ui"), Some("keyword"));
     assert_eq!(kind_at("render :"), Some("parameter"));
     assert_eq!(kind_at("render }"), Some("variable"));
 }

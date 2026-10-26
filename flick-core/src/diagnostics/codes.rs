@@ -113,7 +113,6 @@ codes! {
     S011 = Syntax 11, "unknown foreign metadata";
     S012 = Syntax 12, "inconsistent pattern bindings";
     S013 = Syntax 13, "`<-` outside a `do` block";
-    S014 = Syntax 14, "the sections of a component out of order";
     R001 = Resolve 1, "module name does not match the file path";
     R002 = Resolve 2, "two files declare the same module";
     R003 = Resolve 3, "unknown module";

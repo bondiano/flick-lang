@@ -79,8 +79,8 @@ impl Checker<'_> {
         self.block_then(node, expected, None)
     }
 
-    /// The statements of the block `node`, then `tail` in their scope as
-    /// its value when given: the setup of a component and its render.
+    /// The block `node`, whose last statement `tail` checks in the scope of
+    /// the others when given: the setup of a component and its render.
     pub fn block_then(
         &mut self,
         node: &Node,
@@ -93,7 +93,7 @@ impl Checker<'_> {
         let mut i = 0;
         while i < statements.len() {
             let statement = statements[i];
-            let last = i + 1 == statements.len() && tail.is_none();
+            let last = i + 1 == statements.len();
             match statement.kind {
                 K::Signature => {
                     let name = signature_name(statement, self.text);
@@ -109,6 +109,10 @@ impl Checker<'_> {
                     }
                 }
                 K::LetDecl => self.local_let(statement, None, &statements[i + 1..]),
+                _ if last && tail.is_some() => {
+                    let tail = tail.as_mut().expect("a tail");
+                    result = Some(tail(self, expected));
+                }
                 _ if last => {
                     result = Some(match expected {
                         Some(expected) => {
@@ -121,9 +125,6 @@ impl Checker<'_> {
                 _ => self.statement(statement),
             }
             i += 1;
-        }
-        if let Some(tail) = tail.as_mut() {
-            result = Some(tail(self, expected));
         }
         self.locals.truncate(mark);
         result.unwrap_or_else(|| {

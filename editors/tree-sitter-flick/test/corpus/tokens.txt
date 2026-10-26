@@ -196,7 +196,9 @@ Ranges
 Components
 ==================
 
-component badge (p : P) = render text p
+component counter (p : P) =
+  let n = render p
+  ui { text n }
 let render = Ui.render
 
 ---
@@ -211,42 +213,15 @@ let render = Ui.render
   (operator)
   (keyword)
   (identifier)
+  (operator)
   (identifier)
+  (identifier)
+  (keyword)
+  (braces
+    (identifier)
+    (identifier))
   (keyword)
   (identifier)
   (operator)
   (constructor)
   (member))
-
-==================
-Component sections on their lines
-==================
-
-component c (p : P) =
-  setup
-    let n = render p
-  render ui { text n }
-r#"raw"#
-
----
-
-(source_file
-  (keyword)
-  (identifier)
-  (parens
-    (identifier)
-    (operator)
-    (constructor))
-  (operator)
-  (keyword)
-  (keyword)
-  (identifier)
-  (operator)
-  (identifier)
-  (identifier)
-  (keyword)
-  (keyword)
-  (braces
-    (identifier)
-    (identifier))
-  (raw_string))

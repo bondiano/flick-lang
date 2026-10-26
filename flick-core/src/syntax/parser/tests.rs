@@ -381,33 +381,22 @@ fn unicode_comment_columns_preserve_record_layout() {
 }
 
 #[test]
-fn a_component_is_a_let_of_its_props_and_sections() {
+fn a_component_is_a_let_of_its_props_and_body() {
     assert_eq!(
-        sexp("component label (p : P) = render text p.name\n"),
+        sexp("component label (p : P) = text p.name\n"),
         "(LetDecl component (VarPat label) (Block (ComponentExpr (AnnotPat ( (VarPat p) : \
-         (NameType P) )) = render (Block (AppExpr (NameExpr text) (FieldExpr (NameExpr p) . name))))))"
+         (NameType P) )) = (Block (AppExpr (NameExpr text) (FieldExpr (NameExpr p) . name))))))"
     );
-    let src =
-        "component counter (p : P) =\n  setup\n    let n = 1\n  render\n    show n\nlet x = 1\n";
+    let src = "component counter (p : P) =\n  let n = 1\n  show n\nlet x = 1\n";
     assert_eq!(
         sexp(src),
         "(LetDecl component (VarPat counter) (Block (ComponentExpr (AnnotPat ( (VarPat p) : \
-         (NameType P) )) = setup (Block (LetDecl let (VarPat n) = (Block (Literal 1)))) render \
-         (Block (AppExpr (NameExpr show) (NameExpr n))))))\n(LetDecl let (VarPat x) = (Block (Literal 1)))"
+         (NameType P) )) = (Block (LetDecl let (VarPat n) = (Block (Literal 1))) \
+         (AppExpr (NameExpr show) (NameExpr n))))))\n(LetDecl let (VarPat x) = (Block (Literal 1)))"
     );
-    // the words stay names elsewhere
+    // the word stays a name elsewhere
     assert_eq!(
         errors("let render component setup = component setup\n"),
         Vec::<String>::new()
     );
-}
-
-#[test]
-fn component_sections_out_of_order_are_errors() {
-    let src = "component c (p : P) =\n  render\n    p\n  setup\n    let n = 1\n";
-    assert_eq!(errors(src), ["FLICK-S014 setup"]);
-    let src = "component c (p : P) =\n  setup\n    let n = 1\n";
-    assert_eq!(errors(src), ["FLICK-S014 "]);
-    let src = "component c (p : P) =\n  render\n    p\n  render\n    p\n";
-    assert_eq!(errors(src), ["FLICK-S014 render"]);
 }

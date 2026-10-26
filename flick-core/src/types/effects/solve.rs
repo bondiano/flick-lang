@@ -249,6 +249,21 @@ impl Checker<'_> {
         {
             return self.render_excess(e, &list);
         }
+        if let Site::Expected(ty) = &self.sites[e.site]
+            && self.setup_only(&ty.clone())
+        {
+            let diagnostic = Diagnostic::error(
+                codes::E002,
+                format!("a component's setup runs once per instance, so {list} is not allowed in it"),
+                e.span,
+            )
+            .with_fix(
+                "read atoms in the component's last expression, its render, as `ui { let x = … }`, or make an `Atom.derived` here",
+                Vec::new(),
+            );
+            self.diagnostics.push(diagnostic);
+            return;
+        }
         let (bound, needer) = match &self.sites[e.site] {
             Site::Signature(name) => (format!("the signature of `{name}`"), "its body"),
             Site::Expected(ty) => (format!("the expected type `{}`", self.show(ty)), "this"),
@@ -273,7 +288,7 @@ impl Checker<'_> {
             .any(|s| matches!(s.rsplit('.').next(), Some("Write" | "Registry")));
         let setup = e.services.iter().any(|s| s.contains("Setup"));
         let fixes = [
-            setup.then_some("call it in a component's `setup`, which runs once per instance"),
+            setup.then_some("call it before a component's last expression, in its setup, which runs once per instance"),
             writes.then_some("write atoms in an `Action`, which runs on an event"),
             (!writes && !setup && !e.services.is_empty())
                 .then_some("run the task as `Atom.task` and read its result"),

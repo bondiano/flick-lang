@@ -203,6 +203,25 @@ impl Checker<'_> {
                 .eq(["Atom.Read"])
     }
 
+    /// Whether `ty` is the setup of a component: a function whose services
+    /// are `Setup` alone.
+    pub(crate) fn setup_only(&mut self, ty: &Type) -> bool {
+        let Type::Fun {
+            effects: Some(effects),
+            ..
+        } = self.bare(ty)
+        else {
+            return false;
+        };
+        let services = self.store.normalize(&effects.services);
+        services.tails.is_empty()
+            && services
+                .entries
+                .iter()
+                .map(|(l, _)| l.as_str())
+                .eq(["Prelude.Setup"])
+    }
+
     /// `ty` resolved, without its captures and quantifiers.
     pub(super) fn bare(&self, ty: &Type) -> Type {
         let mut ty = self.store.resolve(ty);

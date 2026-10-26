@@ -62,8 +62,8 @@ sql ui cli in when for yield do
 - слова предложений CLI в начале предложения внутри `cli { … }`: `description`,
   `flag`, `arg`, `subcommand`, `handle`;
 - `and` между связками группы `do`, `x <- a and y <- b`;
-- `component` перед именем объявления верхнего уровня, а `setup` и `render`
-  в начале его секций (см. [ui.md](../ui/#компоненты)).
+- `component` перед именем объявления верхнего уровня (см.
+  [ui.md](../ui/#компоненты)).
 
 ### Числовые литералы
 
@@ -249,7 +249,7 @@ signature   = name ":" type
 let         = "let" ["rec"] (name { atom_pattern } | pattern) [":" type] "=" block
             | "let" "assert" pattern [":" type] "=" block ["as" String]
 rec_group   = "rec" "{" { signature | let } "}"
-component   = "component" name atom_pattern "=" ["setup" block] "render" block
+component   = "component" name atom_pattern "=" block
 type_decl   = ["opaque"] "type" Con { param } ["=" variants] [deriving]
             | ["opaque"] "type" "alias" Con { param } "=" type [deriving]
             | "refined" "type" Con { param } "=" type "where" expr [deriving]

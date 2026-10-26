@@ -181,7 +181,7 @@ fn foreign_modes(tree: &Node, text: &str, out: &mut Vec<(u32, u32, u32)>) {
 /// `component`, `setup` and `render`.
 fn contextual_keywords(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
     for t in node.child_tokens() {
-        if matches!(t.kind, K::AndKw | K::ComponentKw | K::SetupKw | K::RenderKw) {
+        if matches!(t.kind, K::AndKw | K::ComponentKw) {
             out.push((t.start, t.end, KEYWORD));
         }
     }
