@@ -3,21 +3,25 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { Ajv2020 } from "ajv/dist/2020.js";
-import { Result } from "effect";
+import { Effect, Option, Redacted, Result } from "effect";
 
 import {
   httpApiAdd,
   httpApiAddGroup,
+  httpApiCall,
   httpApiEndpoint,
   httpApiErrorCase,
   httpApiGroup,
+  httpApiKey,
   httpApiMake,
   httpApiOpenApi,
+  httpApiSecuritySetCookie,
   httpApiWithErrors,
   httpApiWithPath,
   httpApiWithPayload,
   httpApiWithQuery,
   httpApiWithSuccess,
+  httpApiWithTextSuccess,
 } from "../src/httpapi/index.ts";
 import { schemaJsonCodec, schemaNumber, schemaRecord, schemaString, schemaUnknown } from "../src/index.ts";
 
@@ -56,4 +60,33 @@ test("a field without a strict form is an ExportError naming group, endpoint and
   const result = httpApiOpenApi(api(json([["data", schemaUnknown]])));
   assert.ok(Result.isFailure(result));
   assert.match(result.failure._0, /^users\.create_user\.payload\.data -> JSON Schema: /);
+});
+
+const respond = (headers: HeadersInit): void => {
+  globalThis.fetch = () => Promise.resolve(new Response("hi", { status: 200, headers }));
+};
+
+/** The text and the cookie a login `call` succeeds with. */
+const loggedIn = (endpoint: Parameters<typeof httpApiCall>[1]) => {
+  const request = { path: undefined, query: undefined, headers: undefined, payload: undefined };
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a text success with a cookie, needing no service
+  const call = httpApiCall("http://api.test", endpoint, request) as Effect.Effect<readonly [string, Option.Option<Redacted.Redacted>]>;
+  return Effect.runPromise(call);
+};
+
+test("a login whose cookie the response hides, as a browser hides HttpOnly ones, succeeds without it", async () => {
+  const session = httpApiKey("session", { key: "sid", location: { _tag: "InCookie#0" } });
+  const login = httpApiSecuritySetCookie(session, httpApiWithTextSuccess(200, schemaString, httpApiEndpoint(post, "/login", "login")));
+  const original = globalThis.fetch;
+  try {
+    respond({});
+    const [greeting, hidden] = await loggedIn(login);
+    assert.equal(greeting, "hi");
+    assert.ok(Option.isNone(hidden));
+    respond({ "set-cookie": "sid=s3cret; Secure; HttpOnly" });
+    const [, shown] = await loggedIn(login);
+    assert.equal(Option.map(shown, Redacted.value).pipe(Option.getOrUndefined), "s3cret");
+  } finally {
+    globalThis.fetch = original;
+  }
 });

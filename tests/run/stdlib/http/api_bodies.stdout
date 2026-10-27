@@ -5,4 +5,4 @@ parts: title=notes, doc:a.txt=file text
 chunks: ["abcd"]
 ticks: [{ n = 1 }, { n = 2 }]
 events: [{ data = "two\nlines", event = "note", id = Some "7" }]
-login: hi 3 <redacted> true
+login: hi 3 Some <redacted> true

@@ -403,12 +403,15 @@ foreign pure with_success_headers from "@flick-lang/runtime/effect/http-api/Http
   reviewed "effect@4.0.5 sha256:478331636310bbe4"
 
 /// The success with the value of the cookie of the security, an `api_key`
-/// `InCookie`, set `Secure` and `HttpOnly`.
+/// `InCookie`, set `Secure` and `HttpOnly` when the handler gives one. A
+/// client gets the value only where the response shows `Set-Cookie`: a
+/// browser keeps an `HttpOnly` cookie from scripts, so `call` there succeeds
+/// with `None` and the browser sends the cookie on later requests.
 security_set_cookie :
   forall l p q h b r e s.
   Security ->
     Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b ->{r; e} (s, Redacted String))
+    Endpoint l (Request p q h b ->{r; e} (s, Option (Redacted String)))
 foreign pure security_set_cookie from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiSecuritySetCookie"
   arity 2
   reviewed "effect@4.0.5 sha256:f7064c514e82a9c6"

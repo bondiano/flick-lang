@@ -89,9 +89,10 @@ export const unwrapExtras = (
         const headers = strings(yield* codecEncode(extra.codec, added));
         steps.push((r) => Effect.succeed(HttpServerResponse.setHeaders(r, headers)));
       } else {
-        steps.push((r) =>
-          HttpServerResponse.setCookie(r, extra.key, Redacted.value(typed<Redacted.Redacted>(added)), { secure: true, httpOnly: true }),
-        );
+        const cookie = typed<Option.Option<Redacted.Redacted>>(added);
+        if (Option.isSome(cookie)) {
+          steps.push((r) => HttpServerResponse.setCookie(r, extra.key, Redacted.value(cookie.value), { secure: true, httpOnly: true }));
+        }
       }
     }
     const apply = (response: Response) =>

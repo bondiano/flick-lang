@@ -172,10 +172,10 @@ const withExtras = (endpoint: Endpoint, r: Received, value: unknown): Effect.Eff
         (x) => undecoded(r.status, x),
       );
     }
+    // a browser hides `Set-Cookie`, and an HttpOnly cookie, from scripts: the call still succeeds
     const cookie = r.headers.getSetCookie().map((c) => c.split(";")[0] ?? "").find((c) => c.startsWith(`${extra.key}=`));
-    return cookie === undefined
-      ? Effect.fail(clientError(r.status, `the response sets no cookie ${extra.key}`))
-      : Effect.succeed([inner, Redacted.make(decodeURIComponent(cookie.slice(extra.key.length + 1)))] as const);
+    const shown = Option.map(Option.fromUndefinedOr(cookie), (c) => Redacted.make(decodeURIComponent(c.slice(extra.key.length + 1))));
+    return Effect.succeed([inner, shown] as const);
   });
 
 /** `HttpApi.call base endpoint request`. */
