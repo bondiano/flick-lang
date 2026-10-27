@@ -26,11 +26,12 @@ export const PROGRAMS = [
   { name: "pure", source: "tools/bundle-size/pure.fl", budget: 12 },
   // the same program with `effect = "none"`, a project of its own: no Effect at all
   { name: "none", source: "tools/bundle-size/none", budget: 2, effectFree: true },
-  // UI programs render views on atoms: at most 81 KB and 18 KB for effect/reactivity (U8);
+  // UI programs render views on atoms: at most 81 KB and 18 KB for effect/reactivity (U8),
+  // and 5 KB for the spans of actions and the debug log of writes;
   // the registry keeps `Stream`, which `effect/reactivity` imports for stream atoms
-  { name: "counter", source: "tests/run/ui/counter.fl", budget: 99, unused: ["effect/dist/Graph.js"] },
-  { name: "playground", source: "docs/src/playground/Playground.fl", budget: 110, unused: ["effect/dist/Graph.js"] },
-  { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 99, unused: ["effect/dist/Graph.js"] },
+  { name: "counter", source: "tests/run/ui/counter.fl", budget: 104, unused: ["effect/dist/Graph.js"] },
+  { name: "playground", source: "docs/src/playground/Playground.fl", budget: 112, unused: ["effect/dist/Graph.js"] },
+  { name: "atoms", source: "tests/run/ui/atoms.fl", budget: 104, unused: ["effect/dist/Graph.js"] },
   // a browser client of a procedure keeps no Node server
   {
     name: "rpc",

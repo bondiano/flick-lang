@@ -1,6 +1,7 @@
 //! Expressions, blocks and match arms.
 
 use super::Lower;
+use super::atoms::completed;
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -213,32 +214,8 @@ impl Lower<'_> {
             Ref::Value { module, name } if module == "Record" && name == "label" => {
                 ExprKind::Label(self.typing.labels.get(&key).cloned().unwrap_or_default())
             }
-            Ref::Value { module, name }
-                if module == "Atom"
-                    && matches!(
-                        name.as_str(),
-                        "serializable" | "serializable_family" | "serializable_task"
-                    ) =>
-            {
-                // the key is the binding the check let it define
-                let key = format!("{}.{}", self.module, self.definition);
-                let (module, name) = if name == "serializable_task" {
-                    ("Atom", "serializable_task_at".to_owned())
-                } else {
-                    ("Reactivity.Atom", name.clone())
-                };
-                ExprKind::App {
-                    func: Box::new(Expr::new(
-                        ExprKind::Global {
-                            module: module.to_owned(),
-                            name,
-                        },
-                        span,
-                    )),
-                    arg: Box::new(Expr::new(ExprKind::Lit(Lit::String(key)), span)),
-                    stage: Stage::Pure,
-                    arg_first: false,
-                }
+            Ref::Value { module, name } if module == "Atom" && completed(name) => {
+                self.atom_call(name, node, span)
             }
             Ref::Value { module, name } => ExprKind::Global {
                 module: module.clone(),

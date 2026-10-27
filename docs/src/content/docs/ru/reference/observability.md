@@ -174,6 +174,29 @@ let make_metrics_app () =
 в `Http.Server.serve` внутри области. Маршрут читает текущие значения
 при каждом опросе; сам он ничего не отправляет серверу Prometheus.
 
+## Действия UI и записи атомов
+
+Каждая задача, которую запускает action или обработчик события
+смонтированного корня, — спан с именем метки action
+(`App.Counter.increment`; `Ui.event` для обработчика без метки). Его
+атрибуты — `flick.action.policy`, `flick.action.capacity` или
+`flick.action.limit`, если они есть у политики, `flick.event` (`click`,
+`input`, ...) и `flick.fiber`. Событие, которое политика отклонила, пока
+идёт задача action, — событие `rejected` спана этой задачи; прерванная
+задача получает событие `interrupted`.
+
+Корень, смонтированный под `References.with_minimum_log_level
+LogLevel.Debug`, пишет в лог на уровне debug каждую запись атома и её
+причину:
+
+```text
+atom App.count ← action App.increment ← event click ← span 5f2c… (fiber #12) at App:14
+```
+
+Место, `Module:line`, компилятор передаёт каждому `Atom.set`,
+`Atom.update` и `Atom.modify`. Имена — это метки, которые release-сборка
+сохраняет при `labels = "all"`. У записи вне action причина — `task`.
+
 ## DevTools
 
 Вызов `DevTools.layer url` отправляет спаны программы, как только они

@@ -287,3 +287,14 @@ fn a_loop_walks_a_list_by_offset_unless_its_rest_escapes() {
         assert!(export_of(&js, "sum").contains("slice(1)"), "{js}");
     }
 }
+
+#[test]
+fn an_atom_write_names_its_place() {
+    let text = "module App.Counter exposing (..)\n\
+         count : Atom.Writable Number\nlet count = Atom.make 0\n\
+         reset : Action.Action Ui.ClickSnapshot\n\
+         let reset = Action.exhaust (fun _ -> task {\n  Atom.set count 0\n  Atom.update count (fun n -> n + 1)\n})\n";
+    let code = compile(text);
+    assert!(code.contains("set_at(\"App.Counter:6\")"), "{code}");
+    assert!(code.contains("update_at(\"App.Counter:7\")"), "{code}");
+}

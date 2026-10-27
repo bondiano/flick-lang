@@ -174,6 +174,27 @@ Build the router from runtime code, then pass its handler to
 `Http.Server.serve` inside a scope. The route reports current registry
 values on each scrape; it does not push to a Prometheus server.
 
+## UI actions and atom writes
+
+Each task an action or an event handler of a mounted root runs is a span,
+named by the action's label (`App.Counter.increment`; `Ui.event` for a
+handler with none). Its attributes are `flick.action.policy`,
+`flick.action.capacity` or `flick.action.limit` where the policy has one,
+`flick.event` (`click`, `input`, ...) and `flick.fiber`. An event the policy
+turns away, while a task of the action runs, is a `rejected` event of that
+task's span; an interrupted task gets an `interrupted` event.
+
+A root mounted under `References.with_minimum_log_level LogLevel.Debug`
+logs every atom write at the debug level, with its cause:
+
+```text
+atom App.count ← action App.increment ← event click ← span 5f2c… (fiber #12) at App:14
+```
+
+The compiler gives each `Atom.set`, `Atom.update` and `Atom.modify` its
+place, `Module:line`. The names are labels, which release builds keep with
+`labels = "all"`. A write outside any action shows `task` as its cause.
+
 ## DevTools
 
 `DevTools.layer url` sends a program's spans, as they start and end, over

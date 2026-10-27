@@ -3,7 +3,7 @@
 // alone, so a function or an effect as the value stays a value; the
 // registry is the Flick service `Reactivity.Atom.Registry`, whose operations
 // read and write through Effect's registry.
-import { Context, type Duration, Effect, Layer, type Schema } from "effect";
+import { Context, type Duration, Effect, Layer, LogLevel, Option, type Schema, type Tracer } from "effect";
 import * as Atom from "effect/reactivity/Atom";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 
@@ -49,6 +49,35 @@ export const flickIdleTtl = <T extends Atom.Atom<unknown>>(ttl: Duration.Duratio
 /** `Reactivity.Atom.readonly`: a writable atom as an atom to read. */
 export const flickReadonly = <A>(atom: Atom.Writable<A>): Atom.Atom<A> => atom;
 
+/** `atom ← action ← event ← span (fiber) at place`, from the span of the task that writes. */
+const describeWrite = (atom: Atom.Atom<unknown>, span: Option.Option<Tracer.Span>, place: string): string => {
+  const name = atom.label?.[0] ?? "an atom";
+  const cause = Option.match(span, {
+    onNone: () => "task",
+    onSome: (s) => {
+      const event = s.attributes.get("flick.event");
+      const fiber = s.attributes.get("flick.fiber");
+      return [
+        `action ${s.name}`,
+        ...(typeof event === "string" ? [`event ${event}`] : []),
+        `span ${s.spanId}${typeof fiber === "number" ? ` (fiber #${fiber})` : ""}`,
+      ].join(" ← ");
+    },
+  });
+  return `atom ${name} ← ${cause}${place === "" ? "" : ` at ${place}`}`;
+};
+
+/** `write` of `atom` at `place`, which a fiber that logs debug logs with its cause. */
+const traced = <A>(atom: Atom.Atom<unknown>, place: string, write: Effect.Effect<A>): Effect.Effect<A> =>
+  Effect.flatMap(LogLevel.isEnabled("Debug"), (debug) =>
+    debug
+      ? Effect.option(Effect.currentSpan).pipe(
+          Effect.flatMap((span) => Effect.logDebug(describeWrite(atom, span, place))),
+          Effect.andThen(write),
+        )
+      : write,
+  );
+
 /** The operations of `Reactivity.Atom.Registry` over Effect's registry. */
 const impl = (registry: AtomRegistry.AtomRegistry) => ({
   get: <A>(atom: Atom.Atom<A>) => Effect.sync(() => registry.get(atom)),
@@ -75,11 +104,26 @@ const natives = new WeakMap<object, AtomRegistry.AtomRegistry>();
 /** The registry of an implementation of `Reactivity.Atom.Registry`. */
 export const nativeRegistry = (record: object): AtomRegistry.AtomRegistry | undefined => natives.get(record);
 
-/** The service `Atom.Write`: the writes of `Reactivity.Atom.Registry`, and its reads without tracking. */
+/**
+ * The service `Atom.Write`: the writes of `Reactivity.Atom.Registry`, each
+ * at its place in the source, and its reads without tracking.
+ */
 const writeImpl = (record: ReturnType<typeof impl>) => ({
-  set: record.set,
-  update: record.update,
-  modify: record.modify,
+  set:
+    (place: string) =>
+    <A>(atom: Atom.Writable<A>) =>
+    (value: A) =>
+      traced(atom, place, record.set(atom)(value)),
+  update:
+    (place: string) =>
+    <A>(atom: Atom.Writable<A>) =>
+    (f: (a: A) => A) =>
+      traced(atom, place, record.update(atom)(f)),
+  modify:
+    (place: string) =>
+    <A, B>(atom: Atom.Writable<A>) =>
+    (f: (a: A) => readonly [B, A]): Effect.Effect<B> =>
+      traced(atom, place, record.modify<A, B>(atom)(f)),
   current: record.get,
   refresh: record.refresh,
 });

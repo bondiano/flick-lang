@@ -20,11 +20,13 @@ service Read =
   get : forall a d. (Atom a)^d ->{} a
 
 /// Writing atoms: the task of an action, or a request on a server, writes
-/// states through it; a render, whose only service is `Read`, cannot.
+/// states through it; a render, whose only service is `Read`, cannot. A
+/// write names its place in the source, `Module:line`, which a debug log
+/// of it shows; `""` is none.
 service Write =
-  set : forall a d. (Writable a)^d -> a ->{} Unit
-  update : forall a d. (Writable a)^d -> (a -> a) ->{} Unit
-  modify : forall a b d. (Writable a)^d -> (a -> (b, a)) ->{} b
+  set : forall a d. String -> (Writable a)^d -> a ->{} Unit
+  update : forall a d. String -> (Writable a)^d -> (a -> a) ->{} Unit
+  modify : forall a b d. String -> (Writable a)^d -> (a -> (b, a)) ->{} b
   current : forall a d. (Atom a)^d ->{} a
   refresh : forall a d. (Atom a)^d ->{} Unit
 
@@ -107,16 +109,28 @@ let value atom = Read.get (readonly atom)
 
 /// Replaces the value of `atom`; whoever read it renders or computes again.
 set : forall d a. (Writable a)^d -> a ->{Write;} Unit
-let set atom new_value = Write.set atom new_value
+let set atom new_value = Write.set "" atom new_value
 
 /// Replaces the value of `atom` by `f` of it.
 update : forall d a. (Writable a)^d -> (a -> a) ->{Write;} Unit
-let update atom f = Write.update atom f
+let update atom f = Write.update "" atom f
 
 /// Replaces the value of `atom` by the second part of `f` of it and gives
 /// the first.
 modify : forall d a b. (Writable a)^d -> (a -> (b, a)) ->{Write;} b
-let modify atom f = Write.modify atom f
+let modify atom f = Write.modify "" atom f
+
+/// `set` at `place`: the compiler calls it for `set` with its place.
+set_at : forall d a. String -> (Writable a)^d -> a ->{Write;} Unit
+let set_at place atom new_value = Write.set place atom new_value
+
+/// `update` at `place`.
+update_at : forall d a. String -> (Writable a)^d -> (a -> a) ->{Write;} Unit
+let update_at place atom f = Write.update place atom f
+
+/// `modify` at `place`.
+modify_at : forall d a b. String -> (Writable a)^d -> (a -> (b, a)) ->{Write;} b
+let modify_at place atom f = Write.modify place atom f
 
 /// The value of the state `atom` now, in a task: a task reads without
 /// depending on what it read.

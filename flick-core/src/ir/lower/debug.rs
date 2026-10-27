@@ -76,7 +76,7 @@ impl Lower<'_> {
     }
 
     /// `Module:line` of a node.
-    fn location(&self, node: &Node) -> String {
+    pub(super) fn location(&self, node: &Node) -> String {
         let start = node.range().0 as usize;
         let line = self.text[..start].matches('\n').count() + 1;
         format!("{}:{line}", self.module)
