@@ -153,8 +153,25 @@ impl Checker<'_> {
             K::RecordPat => self.record_pattern(node, ty),
             K::AnnotPat => {
                 let annotated = children.get(1).map_or(Type::Error, |t| self.annotation(t));
-                self.pattern_type(&annotated, ty, node);
-                self.bind_pattern(children[0], &annotated)
+                // a written type without a qualifier names the value's type; what
+                // it may capture stays the position's, as in `fun (p : T) -> …`
+                // given to a callback of `forall v. a^v -> b`
+                let (bare, captures) = self.whnf_captured(ty);
+                match captures {
+                    Some(captures) if self.whnf_captured(&annotated).1.is_none() => {
+                        self.pattern_type(&annotated, &bare, node);
+                        let held = Type::Captured {
+                            ty: Box::new(annotated),
+                            captures: Box::new(captures),
+                            value: false,
+                        };
+                        self.bind_pattern(children[0], &held)
+                    }
+                    _ => {
+                        self.pattern_type(&annotated, ty, node);
+                        self.bind_pattern(children[0], &annotated)
+                    }
+                }
             }
             K::OrPat => self.or_pattern(&children, ty),
             K::ConPat => self.constructor_pattern(node, &children, ty),

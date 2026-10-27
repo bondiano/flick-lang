@@ -79,7 +79,10 @@ impl Checker<'_> {
             .iter()
             .take(arity)
             .map(|p| {
-                let n = self.arrow_stages(p).len();
+                // a stage that runs gives its value, not more arguments to take
+                let stages = self.arrow_stages(p);
+                let n =
+                    (stages.iter().position(|s| *s != Stage::Pure)).map_or(stages.len(), |i| i + 1);
                 (n > 0).then_some(n)
             })
             .collect();

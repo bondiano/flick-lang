@@ -38,11 +38,11 @@ let main () =
   logged (Logger.layer replace [Logger.with_console_error simple]) (fun () -> Log.info "to stderr")
   let checks =
     Logger.make (fun (o : Logger.Options) -> o.date > 0)
-  let seen = Ref.make []
+  let seen : Ref (List Bool) = Ref.make []
   let collect = { window = ms 1; flush = fun outputs -> Ref.set seen (Ref.get seen ++ outputs) }
   logged (Logger.batched collect replace checks) (fun () -> Log.info "batched")
   Platform.stdout_line ("batched " ++ show (Ref.get seen))
-  let formats = Ref.make []
+  let formats : Ref (List Bool) = Ref.make []
   let keep = { window = ms 1; flush = fun outputs -> Ref.set formats (Ref.get formats ++ outputs) }
   logged
     (Logger.batched keep replace (Logger.map (contains "message=formatted") Logger.format_simple))

@@ -50,7 +50,9 @@ let picker title props =
         header = heading [text title];
         body = select props;
         footer =
-          Option.map (fun item -> paragraph [text ("chosen " ++ props.key item)]) props.selected;
+          match props.selected with
+          | Some item -> Some (paragraph [text ("chosen " ++ props.key item)])
+          | None -> None;
       }
   }
 

@@ -18,6 +18,14 @@ sleep : Number ->{} Unit
 foreign async sleep from "./marks.mjs" "sleep"
   arity 1
 
+start : String ->{} Unit
+foreign sync start from "./marks.mjs" "start"
+  arity 1
+
+started : String ->{} Unit
+foreign async started from "./marks.mjs" "started"
+  arity 1
+
 type error NotFound = NotFound { id : Number }
   deriving Schema
 
@@ -58,9 +66,11 @@ let handlers =
     double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2;
     count_to = fun n -> Stream.from_list (List.range 1 (n + 1));
     slow = fun () ->
+      start "slow"
       sleep 100
       mark "slow";
     steady = fun () ->
+      start "steady"
       sleep 100
       mark "steady";
   }
@@ -80,20 +90,16 @@ let main () =
       scope s {
         let server = Rpc.listen Rpc.defaults group handlers
         let url = "http://127.0.0.1:" ++ show (Rpc.port server) ++ "/rpc"
-        let slow_answer =
-          try
-            timeout 20 (task { Rpc.call url slow () })
-            "slow answered"
-          with
-          | TimeoutError -> "slow gave up"
-        Platform.stdout_line slow_answer
-        let steady_answer =
-          try
-            timeout 20 (task { Rpc.call url steady () })
-            "steady answered"
-          with
-          | TimeoutError -> "steady gave up"
-        Platform.stdout_line steady_answer
+        // the client gives up once the handler runs, not on a timer the
+        // request might not beat
+        let slow_call = Fiber.spawn s (fun _ -> ()) (task { Rpc.call url slow () })
+        started "slow"
+        Fiber.interrupt slow_call
+        Platform.stdout_line "slow gave up"
+        let steady_call = Fiber.spawn s (fun _ -> ()) (task { Rpc.call url steady () })
+        started "steady"
+        Fiber.interrupt steady_call
+        Platform.stdout_line "steady gave up"
         sleep 300
       }
     with
