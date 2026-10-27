@@ -12,12 +12,13 @@ import Http.ServerResponse exposing (ServerResponse)
 import Stream.Core exposing (Stream)
 
 /// A procedure named `l`, whose handler has the type `f`: `p ->{r; e} s`.
-/// The handler's errors `e` are those of the signature given to the
-/// procedure; `with_errors` says how each is coded.
+/// The handler's errors `e` are those `with_errors` gives a codec: none
+/// until then.
 type Rpc (l : Symbol) f
 
-/// A typed error of a procedure: its JSON codec.
-type ErrorCase
+/// The typed errors `e` of a procedure, each with its JSON codec:
+/// `errors |> error_case (Codec.json (schema NotFound))`.
+type ErrorCases (e : ErrorRow)
 
 /// A group whose handlers form the record `hs`; `r` is what the handlers
 /// need, together, which serving the group needs.
@@ -109,7 +110,7 @@ type error ClientError = ClientError String
 
 /// A procedure named `l` with no parts yet: its handler takes `Unit` and
 /// answers `Unit`.
-make : forall l r e. Record.Label l -> Rpc l (Unit ->{r; e} Unit)
+make : forall l r. Record.Label l -> Rpc l (Unit ->{r; none} Unit)
 foreign pure make from "@flick-lang/runtime/effect/rpc/Rpc" "rpcMake"
   reviewed "effect@4.0.5 sha256:04f66df479054dbe"
 
@@ -136,14 +137,21 @@ foreign pure with_stream from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithStrea
   arity 2
   reviewed "effect@4.0.5 sha256:60a7d20a9e48db21"
 
-/// A typed error with its codec: `error_case (Codec.json (schema NotFound))`.
-error_case : PureCodec Json t -> ErrorCase
+/// No typed error.
+errors : ErrorCases none
+foreign pure errors from "@flick-lang/runtime/effect/rpc/Rpc" "rpcErrors"
+
+/// The cases and the error `t`, coded with this codec.
+error_case : forall t e. PureCodec Json t -> ErrorCases e -> ErrorCases {t | e}
 foreign pure error_case from "@flick-lang/runtime/effect/rpc/Rpc" "rpcErrorCase"
+  arity 2
   reviewed "effect@4.0.5 sha256:04f66df479054dbe"
 
-/// How the typed errors of the handler are coded. An error no case has is
-/// a defect of the call.
-with_errors : List ErrorCase -> Rpc l f -> Rpc l f
+/// More typed errors of the handler, each coded as its case says: a
+/// handler failing with an error no case has is a type error, not a defect.
+with_errors : forall l p r e s e2. ErrorCases e2 ->
+  Rpc l (p ->{r; e} s) ->
+  Rpc l (p ->{r; e + e2} s)
 foreign pure with_errors from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithErrors"
   arity 2
   reviewed "effect@4.0.5 sha256:04f66df479054dbe"

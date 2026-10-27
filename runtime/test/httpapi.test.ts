@@ -11,6 +11,7 @@ import {
   httpApiCall,
   httpApiEndpoint,
   httpApiErrorCase,
+  httpApiErrors,
   httpApiGroup,
   httpApiKey,
   httpApiMake,
@@ -32,7 +33,7 @@ const post = { _tag: "Post#0" };
 const api = (payload: typeof schemaString) => {
   const user = json([["id", schemaString], ["name", schemaString]]);
   const getUser = httpApiWithErrors(
-    [httpApiErrorCase(404, json([["id", schemaString]]))],
+    httpApiErrorCase(404, json([["id", schemaString]]), httpApiErrors),
     httpApiWithSuccess(200, user, httpApiWithQuery(json([["limit", schemaNumber]]), httpApiWithPath(json([["id", schemaString]]), httpApiEndpoint(get, "/users/:id", "get_user")))),
   );
   const create = httpApiWithSuccess(201, user, httpApiWithPayload(payload, httpApiEndpoint(post, "/users", "create_user")));

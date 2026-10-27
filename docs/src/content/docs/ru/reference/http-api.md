@@ -24,7 +24,7 @@ let get_user =
   HttpApi.endpoint HttpApi.Get "/users/:id" (Record.label : Record.Label "get_user")
     |> HttpApi.with_path (Codec.json (schema UserPath))
     |> HttpApi.with_success 200 (Codec.json (schema User))
-    |> HttpApi.with_errors [HttpApi.error_case 404 (Codec.json (schema NotFound))]
+    |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 404 (Codec.json (schema NotFound)))
 
 api : HttpApi.Api r { users : { get_user : HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User } }
 let api =
@@ -54,14 +54,18 @@ let api =
 | `with_payload codec` | задаёт кодек тела JSON |
 | `with_text_payload`, `with_form_payload codec` | задают текстовое тело или форму в URL-кодировке |
 | `with_success status codec`, `with_text_success status` | задают статус и тело успешного ответа |
-| `with_errors [error_case status codec, …]` | задаёт способ отправки каждой типизированной ошибки |
+| `with_errors (errors \|> error_case status codec \|> …)` | задаёт типизированные ошибки обработчика и способ отправки каждой |
 | `with_security scheme` | задаёт `bearer name`, `basic name` или `api_key name { key; location }`: без учётных данных возвращается 401 |
 | `with_middleware hook` | добавляет эффектную функцию, которая получает декодированный запрос перед обработчиком |
 | `describe`, `deprecate`, `hide` | добавляют краткое описание, пометку об устаревании или исключают эндпоинт из документа |
 
-Ошибка `HttpApi.HttpError { status; message }` всегда отправляется
-с указанным в ней статусом. `http_error status` объявляет её в документе API
-и в описании клиента.
+Эндпоинт создаётся без типизированных ошибок: обработчик может завершиться
+только ошибкой, для которой `with_errors` задал вариант. Обработчик
+с ошибкой без варианта, например новой `Conflict`, — ошибка типов ещё
+до запуска. `HttpApi.HttpError { status; message }` отправляется
+с указанным в ней статусом там, где её объявляет `http_error status`.
+Обработчик потоковой формы может завершиться и ошибкой потока
+`MultipartError`; она отправляется с указанным в ней статусом.
 
 ## Обслуживание запросов
 
@@ -78,8 +82,6 @@ let server = HttpApi.listen options api { users = { get_user = find_user } }
 (`field \`ping\` is missing from \`users\``). Если часть запроса не удалось
 декодировать, сервер отвечает статусом 400 с `{ error, issues }`.
 Для каждой проблемы передаются путь и сообщение, но не входные данные.
-Ошибка, не объявленная ни одним вариантом, приводит к ответу 500
-и записывается в журнал.
 
 `options` задаёт хост и порт (0 — любой свободный порт), а также пути
 для документа OpenAPI, Swagger UI и Scalar. Для них используется тот же

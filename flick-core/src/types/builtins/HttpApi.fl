@@ -16,16 +16,17 @@ type Method = Get | Post | Put | Patch | Delete | Head | Options | Query
 type alias Request p q h b = { path : p; query : q; headers : h; payload : b }
 
 /// An endpoint named `l`, whose handler has the type `f`:
-/// `Request p q h b ->{r; e} s`. The handler's errors `e` are those of the
-/// signature given to the endpoint; `with_errors` says how each is sent.
+/// `Request p q h b ->{r; e} s`. The handler's errors `e` are those
+/// `with_errors` gives a status and a codec: none until then.
 type Endpoint (l : Symbol) f
 
-/// A typed error of an endpoint: its status and its JSON codec.
-type ErrorCase
+/// The typed errors `e` of an endpoint, each with its status and its JSON
+/// codec: `errors |> error_case 404 (Codec.json (schema NotFound))`.
+type ErrorCases (e : ErrorRow)
 
-/// An error that carries its own status: sent as `{ message }` with it,
-/// whatever the endpoint declares; `http_error` declares one for the
-/// document and the client.
+/// An error that carries its own status: sent as `{ message }` with it.
+/// `http_error` declares it with a status for the document and the client;
+/// a handler fails with it only where an endpoint declares it.
 type error HttpError = HttpError { status : Number; message : String }
   deriving Eq, Show, Schema
 
@@ -75,10 +76,10 @@ type error ClientError = ClientError { status : Number; message : String }
 
 /// An endpoint at `path` (`/users/:id`) with no parts yet: its handler takes
 /// a request of `Unit`s and answers 204 without a body.
-endpoint : forall l r e. Method ->
+endpoint : forall l r. Method ->
   String ->
   Record.Label l ->
-  Endpoint l (Request Unit Unit Unit Unit ->{r; e} Unit)
+  Endpoint l (Request Unit Unit Unit Unit ->{r; none} Unit)
 foreign pure endpoint from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiEndpoint"
   arity 3
   reviewed "effect@4.0.5 sha256:88888dac75ad2046"
@@ -176,22 +177,30 @@ foreign pure with_success from "@flick-lang/runtime/effect/http-api/HttpApi" "ht
   arity 3
   reviewed "effect@4.0.5 sha256:dcff7c76f16ea23b"
 
-/// A typed error with its status: `error_case 404 NotFound.json`.
-error_case : Number -> PureCodec Json t -> ErrorCase
+/// No typed error.
+errors : ErrorCases none
+foreign pure errors from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiErrors"
+
+/// The cases and the error `t`, sent with this status and codec.
+error_case : forall t e. Number -> PureCodec Json t -> ErrorCases e -> ErrorCases {t | e}
 foreign pure error_case from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiErrorCase"
-  arity 2
+  arity 3
   reviewed "effect@4.0.5 sha256:722ba5ecbebad307"
 
-/// How the typed errors of the handler are sent. An error no case has is
-/// sent as 500 and reported.
-with_errors : List ErrorCase -> Endpoint l f -> Endpoint l f
+/// More typed errors of the handler, each sent as its case says: a handler
+/// failing with an error no case has is a type error, not a 500.
+with_errors :
+  forall l p q h b r e s e2.
+  ErrorCases e2 ->
+    Endpoint l (Request p q h b ->{r; e} s) ->
+    Endpoint l (Request p q h b ->{r; e + e2} s)
 foreign pure with_errors from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithErrors"
   arity 2
   reviewed "effect@4.0.5 sha256:722ba5ecbebad307"
 
-/// `HttpError`s of this status, for the document and the client.
-http_error : Number -> ErrorCase
-let http_error status = error_case status (Codec.json (schema HttpError))
+/// The cases and `HttpError`s of this status, for the document and the client.
+http_error : forall e. Number -> ErrorCases e -> ErrorCases {HttpError | e}
+let http_error status cases = error_case status (Codec.json (schema HttpError)) cases
 
 /// A bearer token in `Authorization`, under the scheme name `name`.
 bearer : String -> Security
@@ -336,12 +345,15 @@ foreign pure with_multipart_payload from "@flick-lang/runtime/effect/http-api/Ht
   reviewed "effect@4.0.5 sha256:f777c853d129da86"
 
 /// The body as the parts of a form, read as the handler streams them; a
-/// client sends the parts of its stream.
+/// client sends the parts of its stream. The handler may fail with the
+/// stream's `MultipartError`, sent with the status it names.
 with_multipart_stream_payload :
   forall l p q h b r e s.
   Endpoint l (Request p q h b ->{r; e} s) ->
     Endpoint l (
-      Request p q h (Stream none {Http.Multipart.MultipartError} Http.Multipart.Part) ->{r; e} s
+      Request p q h (Stream none {Http.Multipart.MultipartError} Http.Multipart.Part) ->{
+        r; Http.Multipart.MultipartError | e
+      } s
     )
 foreign pure with_multipart_stream_payload from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithMultipartStreamPayload"
   reviewed "effect@4.0.5 sha256:007eacb6e7e077d7"

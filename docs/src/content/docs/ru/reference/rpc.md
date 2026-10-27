@@ -35,7 +35,7 @@ let get_user =
   Rpc.make (Record.label : Record.Label "get_user")
     |> Rpc.with_payload (Codec.json Schema.number)
     |> Rpc.with_success (Codec.json (schema User))
-    |> Rpc.with_errors [Rpc.error_case (Codec.json (schema NotFound))]
+    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema NotFound)))
 
 count_to : Rpc.Rpc "count_to" (Number ->{r;} Stream none none Number)
 let count_to =
@@ -93,14 +93,15 @@ node dist/rpc-demo/flick-main.js
 Вызов `Rpc.make label` создаёт процедуру с именем `l`, обработчик которой
 принимает и возвращает `Unit`. Сигнатура процедуры задаёт тип обработчика:
 строка сервисов `r` остаётся открытой, а ошибки `e` — это те, что
-объявлены через `with_errors`.
+объявлены через `with_errors`. До этого ошибок нет, поэтому обработчик
+с ошибкой без варианта — ошибка типов.
 
 | Комбинатор | |
 | - | - |
 | `with_payload codec` | запрос, кодируемый как JSON |
 | `with_success codec` | ответ вызова |
 | `with_stream codec` | ответ как поток: каждый элемент кодируется и отправляется по мере появления; ошибка обработчика завершает поток ошибкой |
-| `with_errors [error_case codec, …]` | как отправляется каждая типизированная ошибка; ошибка, для которой нет случая, — дефект вызова |
+| `with_errors (errors \|> error_case codec \|> …)` | задаёт типизированные ошибки обработчика и способ отправки каждой |
 | `with_middleware hook` | перехватчик перед обработчиком при каждом вызове, см. ниже |
 | `uninterruptible` | сервер доводит обработчик до конца, даже когда клиент исчез или прервал вызов: для записи, которая не должна оборваться на середине |
 

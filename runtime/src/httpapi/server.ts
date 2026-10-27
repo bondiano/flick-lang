@@ -84,13 +84,15 @@ const isHttpError = (error: unknown): error is { readonly _0: { readonly status:
 /**
  * The response of a typed error: the first declared case whose codec has
  * the value, with its status; an `HttpError` always with its own status,
- * as `{ message }` when no case declares it; anything else 500.
+ * as `{ message }` when no case declares it; a streamed form's
+ * `MultipartError` with the status it names; anything else 500.
  */
 const failed = (endpoint: Endpoint, error: unknown): Effect.Effect<HttpServerResponse.HttpServerResponse, never, unknown> => {
   const found = endpoint.errors.find((e) => Schema.is(e.codec)(error));
   const own = isHttpError(error) ? error._0 : undefined;
   if (found === undefined) {
     if (own !== undefined) return Effect.succeed(HttpServerResponse.jsonUnsafe({ message: own.message }, { status: own.status }));
+    if (multipartStatusOf(error) !== undefined) return Effect.succeed(badRequest(error));
     return Effect.as(Effect.logError(`${endpoint.name}: an undeclared error`), internal());
   }
   return Effect.match(codecEncode(found.codec, error), {

@@ -16,7 +16,7 @@ me : Rpc.Rpc "me" (Unit ->{r; Unauthorized} String)
 let me =
   Rpc.make (Record.label : Record.Label "me")
     |> Rpc.with_success (Codec.json Schema.string)
-    |> Rpc.with_errors [Rpc.error_case (Codec.json (schema Unauthorized))]
+    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema Unauthorized)))
     |> Rpc.with_middleware (fun call -> ignore call.payload)
     |> Rpc.with_middleware authorized
 

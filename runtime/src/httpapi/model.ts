@@ -11,7 +11,7 @@ export type Security =
   | { readonly kind: "basic"; readonly name: string }
   | { readonly kind: "apiKey"; readonly name: string; readonly key: string; readonly in: "header" | "query" | "cookie" };
 
-/** `HttpApi.ErrorCase`: a typed error with its status and codec. */
+/** One of `HttpApi.ErrorCases`: a typed error with its status and codec. */
 export interface ErrorCase {
   readonly status: number;
   readonly codec: AnySchema;
@@ -169,7 +169,11 @@ export const httpApiSecuritySetCookie = (security: Security, e: Endpoint): Endpo
 export const httpApiWithErrors = (errors: ReadonlyArray<ErrorCase>, e: Endpoint): Endpoint =>
   update(e, { errors: [...e.errors, ...errors] });
 export const httpApiDescribe = (description: string, e: Endpoint): Endpoint => update(e, { description });
-export const httpApiErrorCase = (status: number, codec: AnySchema): ErrorCase => Object.freeze({ status, codec });
+/** `HttpApi.errors`: no case. */
+export const httpApiErrors: ReadonlyArray<ErrorCase> = Object.freeze([]);
+/** `HttpApi.error_case status codec cases`. */
+export const httpApiErrorCase = (status: number, codec: AnySchema, cases: ReadonlyArray<ErrorCase>): ReadonlyArray<ErrorCase> =>
+  Object.freeze([...cases, Object.freeze({ status, codec })]);
 
 export const httpApiWithSecurity = (security: Security, e: Endpoint): Endpoint =>
   update(e, { security: [...e.security, security] });

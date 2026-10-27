@@ -90,8 +90,12 @@ export const rpcWithSuccess = (codec: AnySchema, procedure: Procedure): Procedur
 export const rpcWithStream = (codec: AnySchema, procedure: Procedure): Procedure =>
   with_(procedure, { success: codec, stream: true });
 
-/** `Rpc.error_case codec`: the codec is the case. */
-export const rpcErrorCase = (codec: AnySchema): AnySchema => codec;
+/** `Rpc.errors`: no case. */
+export const rpcErrors: ReadonlyArray<AnySchema> = Object.freeze([]);
+
+/** `Rpc.error_case codec cases`: a case is its codec. */
+export const rpcErrorCase = (codec: AnySchema, cases: ReadonlyArray<AnySchema>): ReadonlyArray<AnySchema> =>
+  Object.freeze([...cases, codec]);
 
 export const rpcWithErrors = (cases: ReadonlyArray<AnySchema>, procedure: Procedure): Procedure =>
   with_(procedure, { errors: [...procedure.errors, ...cases] });

@@ -38,7 +38,7 @@ let get_user =
   HttpApi.endpoint HttpApi.Get "/users/:id" (Record.label : Record.Label "get_user")
     |> HttpApi.with_path user_path
     |> HttpApi.with_success 200 (Codec.json (schema User))
-    |> HttpApi.with_errors [HttpApi.error_case 404 (Codec.json (schema NotFound))]
+    |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 404 (Codec.json (schema NotFound)))
 
 create_user : HttpApi.Endpoint "create_user" (HttpApi.Request Unit Unit Unit NewUser ->{r;} User)
 let create_user =
@@ -93,7 +93,7 @@ let me =
     |> HttpApi.with_security
       (HttpApi.api_key "key" { key = "x-api-key"; location = HttpApi.InHeader })
     |> HttpApi.with_security (HttpApi.basic "password")
-    |> HttpApi.with_errors [HttpApi.http_error 401, HttpApi.http_error 403]
+    |> HttpApi.with_errors (HttpApi.errors |> HttpApi.http_error 401 |> HttpApi.http_error 403)
     |> HttpApi.with_middleware (fun request ->
       if String.starts_with "Bearer " request.headers.authorization then ()
       else from_result (Err (HttpApi.HttpError { status = 401; message = "not a bearer token" })))

@@ -33,7 +33,7 @@ let get_user =
   Rpc.make (Record.label : Record.Label "get_user")
     |> Rpc.with_payload (Codec.json Schema.number)
     |> Rpc.with_success (Codec.json (schema User))
-    |> Rpc.with_errors [Rpc.error_case (Codec.json (schema NotFound))]
+    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema NotFound)))
 
 count_to : Rpc.Rpc "count_to" (Number ->{r;} Stream none none Number)
 let count_to =
@@ -90,14 +90,15 @@ also releases the listener.
 `Rpc.make label` starts a procedure named `l` whose handler takes and
 answers `Unit`; the signature of the procedure names the handler's type:
 its services `r` stay open, and its errors `e` are those it declares with
-`with_errors`.
+`with_errors`: none until then, so a handler failing with an error no case
+has is a type error.
 
 | Combinator | |
 | - | - |
 | `with_payload codec` | the request, coded as JSON |
 | `with_success codec` | the answer of a call |
 | `with_stream codec` | the answer as a stream, each element coded and sent as it comes; a failure of the handler fails the stream |
-| `with_errors [error_case codec, …]` | how each typed error is sent; an error no case declares is a defect of the call |
+| `with_errors (errors \|> error_case codec \|> …)` | the typed errors the handler may fail with, and how each is sent |
 | `with_middleware hook` | a hook before the handler on each call, see below |
 | `uninterruptible` | the server runs the handler to its end even when its client goes away or interrupts the call: for a write that must not stop halfway |
 

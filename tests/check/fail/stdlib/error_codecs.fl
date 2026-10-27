@@ -1,0 +1,54 @@
+// A handler fails only with the errors its endpoint or procedure gives a
+// case: an error without a codec is refused before anything runs, not
+// sent as a 500 or a defect.
+module App.ErrorCodecs exposing (..)
+
+type error NotFound = NotFound { id : Number }
+  deriving Schema
+
+type error Conflict = Conflict { id : Number }
+  deriving Schema
+
+lookup : Number ->{; NotFound, Conflict} Number
+let lookup id = if id < 0 then from_result (Err (Conflict { id = id })) else id
+
+http : Unit ->{; HttpApi.ServeError} Unit
+let http () =
+  let options : HttpApi.ServeOptions =
+    { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }
+  let find =
+    HttpApi.endpoint HttpApi.Get "/find" (Record.label : Record.Label "find")
+      |> HttpApi.with_errors
+        (HttpApi.errors |> HttpApi.error_case 404 (Codec.json (schema NotFound)))
+  let api =
+    HttpApi.api "app"
+      |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "app") |> HttpApi.add find)
+  scope s {
+    let _server = HttpApi.listen options api { app = { find = fun _ -> ignore (lookup 1) } }
+    ()
+  }
+
+rpc : Unit ->{; Rpc.ServeError} Unit
+let rpc () =
+  let find =
+    Rpc.make (Record.label : Record.Label "find")
+      |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema NotFound)))
+  scope s {
+    let _server =
+      Rpc.listen Rpc.defaults (Rpc.group |> Rpc.add find) { find = fun () -> ignore (lookup 1) }
+    ()
+  }
+
+// no case at all: the handler may fail with nothing
+bare : Unit ->{; Rpc.ServeError} Unit
+let bare () =
+  let find = Rpc.make (Record.label : Record.Label "find")
+  scope s {
+    let _server =
+      Rpc.listen Rpc.defaults (Rpc.group |> Rpc.add find) { find = fun () -> ignore (lookup 1) }
+    ()
+  }
+
+//~ FLICK-E002 @27:80-27:88 does not allow error `Conflict`
+//~ FLICK-C001 @38:45-38:52 Conflict, NotFound
+//~ FLICK-C001 @48:45-48:52 Conflict, NotFound

@@ -23,7 +23,7 @@ let get_user =
   HttpApi.endpoint HttpApi.Get "/users/:id" (Record.label : Record.Label "get_user")
     |> HttpApi.with_path (Codec.json (schema UserPath))
     |> HttpApi.with_success 200 (Codec.json (schema User))
-    |> HttpApi.with_errors [HttpApi.error_case 404 (Codec.json (schema NotFound))]
+    |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 404 (Codec.json (schema NotFound)))
 
 api : HttpApi.Api r { users : { get_user : HttpApi.Request UserPath Unit Unit Unit ->{r; NotFound} User } }
 let api =
@@ -49,13 +49,17 @@ handler that asks for a service no layer provides there does not compile.
 | `with_payload codec` | a JSON body |
 | `with_text_payload`, `with_form_payload codec` | a plain-text body, a URL-encoded form |
 | `with_success status codec`, `with_text_success status` | the status and body of a success |
-| `with_errors [error_case status codec, …]` | how each typed error is sent |
+| `with_errors (errors \|> error_case status codec \|> …)` | the typed errors the handler may fail with, and how each is sent |
 | `with_security scheme` | `bearer name`, `basic name` or `api_key name { key; location }`: 401 without credentials |
 | `with_middleware hook` | a runtime function on the decoded request before the handler |
 | `describe`, `deprecate`, `hide` | the summary, deprecation, absence from the document |
 
-`HttpApi.HttpError { status; message }` is always sent with its own status;
-`http_error status` declares it for the document and the client.
+An endpoint starts with no typed error: its handler fails only with the
+errors `with_errors` gives a case, so a handler failing with an error no
+case has, a new `Conflict` say, is a type error before anything runs.
+`HttpApi.HttpError { status; message }` is sent with its own status where
+`http_error status` declares it. A streamed form's handler may also fail
+with the stream's `MultipartError`, sent with the status it names.
 
 ## Serving
 
@@ -68,8 +72,7 @@ accepting, lets the requests in flight finish and runs their finalizers.
 A missing or extra handler is a type error naming the endpoint and its
 group (`field \`ping\` is missing from \`users\``). A request whose parts do
 not decode is answered 400 with `{ error, issues }` — the path and message of
-each issue, never the input. An error no case declares is 500 and is
-logged. `options` give the host and port (0 for any) and the paths of the
+each issue, never the input. `options` give the host and port (0 for any) and the paths of the
 OpenAPI document, Swagger UI and Scalar, which all serve the document
 `HttpApi.openapi` writes.
 

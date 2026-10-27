@@ -13,7 +13,7 @@ let double =
   Rpc.make (Record.label : Record.Label "double")
     |> Rpc.with_payload (Codec.json Schema.number)
     |> Rpc.with_success (Codec.json Schema.number)
-    |> Rpc.with_errors [Rpc.error_case (Codec.json (schema NotFound))]
+    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema NotFound)))
 
 count_to : Rpc.Rpc "count_to" (Number ->{r;} Stream none none Number)
 let count_to =
