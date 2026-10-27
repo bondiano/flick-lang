@@ -18,7 +18,13 @@ import { RegistryContext, StreamContext, uiRenderStatic } from "./react/render.t
  * of its own, so requests rendered in parallel do not see each other's atoms.
  */
 export const uiServerRender = (ui: Ui): Effect.Effect<string, never, unknown> =>
-  withRegistry((registry) => renderToString(createElement(RegistryContext.Provider, { value: registry }, uiRenderStatic(ui))));
+  Effect.withSpan(
+    withRegistry((registry) => renderToString(createElement(RegistryContext.Provider, { value: registry }, uiRenderStatic(ui)))),
+    RENDER_SPAN,
+  );
+
+/** The span of a render on the server, a child of the request's. */
+const RENDER_SPAN = "flick.render";
 
 /** The entry of the serializable `atom` whose value is `value`, if a server hands it over. */
 const entryOf = (key: string, atom: Atom.Atom<unknown>, value: unknown): Array<{ key: string; value: unknown }> => {
@@ -68,10 +74,13 @@ export const uiServerState = (container: string): Effect.Effect<string, never, u
  * React flushes no shell whose root is not an element.
  */
 export const uiServerStream = (container: string, ui: Ui): Stream.Stream<string, never, unknown> =>
-  Stream.unwrap(
-    withRegistry((registry) =>
-      Stream.orDie(Stream.fromReadableStream({ evaluate: () => markupOf(registry, container, ui), onError: (cause) => cause })),
+  Stream.withSpan(
+    Stream.unwrap(
+      withRegistry((registry) =>
+        Stream.orDie(Stream.fromReadableStream({ evaluate: () => markupOf(registry, container, ui), onError: (cause) => cause })),
+      ),
     ),
+    RENDER_SPAN,
   );
 
 const markupOf = (registry: AtomRegistry.AtomRegistry, container: string, ui: Ui): ReadableStream<string> => {

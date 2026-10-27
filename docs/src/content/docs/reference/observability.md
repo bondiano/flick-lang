@@ -195,6 +195,16 @@ The compiler gives each `Atom.set`, `Atom.update` and `Atom.modify` its
 place, `Module:line`. The names are labels, which release builds keep with
 `labels = "all"`. A write outside any action shows `task` as its cause.
 
+## Server renders and server functions
+
+A request's trace goes on in what serves it. Effect's HTTP server opens a
+span per request, a child of the `traceparent` the request carries;
+`Ui.Server.render` and `Ui.Server.stream` run as a `flick.render` span
+under it. A [server function](../server-fn/) call carries the caller's
+trace in `traceparent`, and the server runs it as a span named after it,
+`App.Shop.place`, in that trace: a page's render and the server functions
+its handler calls are one trace with the browser's request.
+
 ## DevTools
 
 `DevTools.layer url` sends a program's spans, as they start and end, over

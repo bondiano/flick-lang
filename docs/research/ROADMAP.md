@@ -270,7 +270,7 @@ component search (props : SearchProps) =
 **O2. Именованные span'ы action.** ✅ (`Bridge.start` — `useSpan` с меткой action, без метки — `Ui.event`; атрибуты `flick.action.policy`, `capacity`/`limit`, `flick.event`, `flick.fiber`; события `rejected` (exhaust, вытесненный latest, полная очередь, предел concurrent) — на span'ах идущих задач, `interrupted`; `Action.with` сохраняет метку; `runtime/test/ui-spans.test.ts`) AC: каждый запуск `Action` — span с меткой C6 и атрибутами политики; отклонение/прерывание — события span'а.
 **O3. Причинность записей.** ✅ (записи `Atom.Write` при уровне Debug пишут `Effect.logDebug` «atom App.count ← action App.go ← event click ← span <id> (fiber #n) at App:14»; место даёт компилятор: lowering переписывает `Atom.set/update/modify` в `*_at "Module:line"`, операции `Atom.Write` принимают место первым аргументом (стек не годится: задача собирается лениво, кадра `.fl` в нём нет); имена — метки C6b, так что и в release) AC: запись атома несёт место в исходнике и id span'а/fiber'а; dev-логгер печатает «атом ← action ← событие ← span»; с `labels = "all"` (C6b) работает и в release.
 **O4. DevTools.** ✅ (`flick run/dev --devtools[=url]` запускает Node с `--import @flick-lang/runtime/runner/devtools`: модуль отдаёт `runMain` обёртку с `DevTools.layer` и уровнем Debug, так что записи атомов — события span'ов; собранные программы этого кода не несут, бюджеты B не меняются; `runtime/test/entry.test.ts`, e2e `flick/tests/cli_devtools.rs`) AC: `flick dev --devtools` подключает `DevTools.layer`; видны span'ы action и записи атомов с метками.
-**O5. SSR-трейсинг.** ⬜ AC: trace context запроса продолжается в рендере и server fn; клиентский вызов server fn пробрасывает `traceparent`.
+**O5. SSR-трейсинг.** ✅ (`Ui.Server.render`/`stream` — спан `flick.render` под спаном запроса HTTP-сервера Effect, который читает `traceparent`; вызов `server fn` идёт через HttpClient Effect и несёт `traceparent`, сервер выполняет его спаном `Module.name` в том же трейсе; `tests/run/stdlib/server/trace.fl` на локальном коллекторе: страница, вызов из обработчика и вызов клиента — по одному трейсу) AC: trace context запроса продолжается в рендере и server fn; клиентский вызов server fn пробрасывает `traceparent`.
 
 ### Трек L — CLI (основа: `Cli.fl`, блок `cli`, `Cli/Prompt.fl`)
 
@@ -380,7 +380,7 @@ C2/C3/C4/C6 ✅ ─ C6b ✅
 C7a ✅ ─ C7b ✅ ─ C7c ✅ ─ C7d ✅ ─ C5 ✅            C1 ✅
 U9 ✅ ─ U9b ✅
 S2 ✅ ─ F1 ✅ ─ F2 ✅ ─ F3 ✅ ─ F4 ─ F5 ─ F6
-S3 ✅ ─ S4 ✅ ─ O1 ✅ ─ O2 ✅ ─ O3 ✅ ─ O4 ✅ ─ O5
+S3 ✅ ─ S4 ✅ ─ O1 ✅ ─ O2 ✅ ─ O3 ✅ ─ O4 ✅ ─ O5 ✅
 L1 ✅ ─ L2 ✅ ─ L3 ✅ ─ L4 ─ L5
 H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ─ H6     (H2 по входам — после L6 ✅)
 D1 ✅ ─ D2 ─ D3 ─ D4 ─ D5 ─ D6 ─ D9 ─ D11 ─ D10 ─ D13 ─ D12 ─ D14 ─ D8   (D15 — с D4/D5; D7 ✅ после C1)
@@ -390,7 +390,7 @@ D1 ✅ ─ D2 ─ D3 ─ D4 ─ D5 ─ D6 ─ D9 ─ D11 ─ D10 ─ D13 ─ D12
 1. «Видно в DevTools и меньше бандл» — ✅ (B0–B9, S1, S5, U1, C6).
 2. «Типы гарантируют» — ✅: C1–C8, U2–U6, U6b, U7b.
 3. «SSR» — ✅: R1–R6, U7, U9.
-4. «Fullstack» — 🔶: S2, O1–O3, F1 ✅; осталось F2–F3.
+4. «Fullstack» — ✅: S2, O1–O5, F1–F3 (открыты Q12/Q13, F4–F6).
 
 Ближайшее: Q17–Q28 (§7); прежние P1 из Q1–Q16 сохраняют приоритет. F2 — после F1/F6. Вехи выше требуют сверки с реализованными R5/U9/L6 и D-треком; отметка реализации не закрывает связанные замечания ревью. Трек C закрыт до F-трека; дальше — Q1.
 

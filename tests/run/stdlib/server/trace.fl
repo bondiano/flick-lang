@@ -1,0 +1,105 @@
+// The trace of a request goes on in what serves it: a page rendered on the
+// server and a server function called from it are in the trace of the
+// request, and a call of a server function carries its caller's trace.
+module App.Main exposing (main)
+
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+start : Unit ->{} Number
+foreign async start from "./traces.mjs" "start"
+  arity 0
+
+stop : Unit ->{} Unit
+foreign async stop from "./traces.mjs" "stop"
+  arity 0
+
+shares : String -> String ->{} Bool
+foreign sync shares from "./traces.mjs" "shares"
+  arity 2
+
+names : Unit ->{} String
+foreign sync names from "./traces.mjs" "names"
+  arity 0
+
+set_env : String -> String ->{} Unit
+foreign sync set_env from "../cli/env.mjs" "set"
+  arity 2
+
+options : Tracer.SpanOptions
+let options =
+  {
+    attributes = [];
+    links = [];
+    parent = None;
+    root = false;
+    kind_ = Tracer.internal;
+    sampled = None;
+    level = None;
+    captureStackTrace = false;
+    disablePropagation = false;
+  }
+
+stock : String ->{Server.Server;} Number
+server fn stock item = String.length item
+
+/// The page: the stock of tea, asked of the server function, then rendered.
+page : ServerRequest ->{Server.Server;} ServerResponse
+let page _ =
+  let count =
+    try stock "tea" with
+    | Rpc.ClientError _ -> 0
+  let html = provide Atom.layer { Ui.Server.render (ui { text (show count) }) }
+  Http.ServerResponse.text html Http.ServerResponse.defaults
+
+same : String -> String ->{} String
+let same a b = a ++ " and " ++ b ++ " in one trace: " ++ show (shares a b)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let collector = "http://127.0.0.1:" ++ show (start ())
+  let layers =
+    Layer.merge Server.node (Layer.merge Http.FetchClient.layer Http.Server.layer_services)
+  provide (Otlp.traces { url = collector ++ "/v1/traces"; service_name = "shop" }) {
+    provide layers {
+      try
+        scope s {
+          functions : (ServerRequest ->{} ServerResponse)^{s}
+          let functions = Server.handler [server stock]
+          app : (
+            ServerRequest ->{Server.Server; Http.ServerError.HttpServerError} ServerResponse
+          )^{s}
+          let app =
+            Http.Router.router Http.Router.config
+              [
+                Http.Router.route
+                  (Some Http.Method.POST)
+                  Server.path
+                  (fun request -> functions request),
+                Http.Router.route (Some Http.Method.GET) "/page" page,
+              ]
+          let server_options : Http.Server.ServeOptions =
+            { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None }
+          let server = Http.Server.serve server_options app
+          let base = Http.Server.format_address (Http.Server.address server)
+          set_env "FLICK_SERVER_URL" base
+          Tracer.with_span "visit" options (task {
+            let _ = Http.ClientResponse.text (Http.Client.get (base ++ "/page"))
+            ()
+          })
+          Tracer.with_span "call" options (task {
+            let _ = stock "cake"
+            ()
+          })
+        }
+      with
+      | Http.ServerError.ServeError _ -> Platform.stdout_line "serve failed"
+      | Http.ClientError.HttpClientError _ -> Platform.stdout_line "client failed"
+      | Rpc.ClientError message -> Platform.stdout_line ("rpc: " ++ message)
+    }
+  }
+  Platform.stdout_line (names ())
+  Platform.stdout_line (same "visit" "flick.render")
+  Platform.stdout_line (same "visit" "App.Main.stock")
+  Platform.stdout_line (same "call" "App.Main.stock")
+  stop ()
