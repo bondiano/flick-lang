@@ -462,10 +462,10 @@ Eff сохраняет fiber/service/error identity. Stream работает в 
 
 Новое: [Sync export](../../flick-core/src/codegen/ts.rs#L154-L163) — `(undefined)=>number` с ambient reader; прямой вызов падает. `syncReading`, `$rt.sync`, native provider проверены. Row-polymorphic аналог остаётся Effect: стадия фиксируется при записи стрелки, позднее уточнение строки ABI не меняет.
 
-**Q8. P1 — Error row не гарантирует wire-codecs**
+**Q8. P1 — Error row не гарантирует wire-codecs** ✅ (строка ошибок допускает переменную типа как элемент: `{t | e}` — метка `~t` следует за элементом и становится `Module.Name`, когда `t` решена; одноимённые элементы с разными аргументами унифицируются, а не отбрасываются. `HttpApi`/`Rpc`: `ErrorCases e`, `errors : ErrorCases none`, `error_case … : ErrorCases e -> ErrorCases {t | e}`, `with_errors` добавляет `e2` к строке обработчика; эндпоинт и процедура начинаются без ошибок, так что ошибка без codec — E002/C001 до запуска, а не 500. `with_multipart_stream_payload` добавляет `MultipartError`, сервер отвечает её статусом; `tests/check/{pass,fail}/effects/variable_entries.fl`, `tests/check/fail/stdlib/error_codecs.fl`)
 NotFound без with_errors принимается и становится 500 — [заявленный fallback](../../flick-core/src/types/builtins/HttpApi.fl#L177-L188). Проверять полноту codecs по error row: новый Conflict без codec отвергается до запуска. AC для S2/F2.
 
-Блокер: `List ErrorCase` не несёт типов, а строка ошибок ключуется именем конструктора — `Cases {t | e}` с переменной `t` отвергается (T002). Нужна переменная типа как элемент строки ошибок либо ограничение «у каждого члена строки есть codec»; решение по дизайну до кода.
+Осталось: элемент-переменная, решённая не-error типом (`t := Number`), отвергается, но сообщением E002 о строке `{none; Number}`, а не T002 «is not an error» — store не видит форм типов.
 
 **Q9. P1 — Нет SQL-транзакционной композиции**
 Первая запись пережила CHECK-ошибку второй; при pool=1 чужой ROLLBACK отменил успешную запись B. [Запросы отдельно берут connection](../../runtime/src/sql/pg.ts#L138-L184). Нужен scoped transaction с commit/rollback и изоляцией callers; raw BEGIN/Tx.atomically не замена. До F3/F6.
@@ -554,6 +554,12 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 `Seq.first (for x <- [for y <- [1n,0n] yield 1n/y] yield x)` меняется с Division by zero на Some 1n. `List.map (fun x -> 2n ** (0n-x)) [for y <- [1n,0n] yield 1n/y]` меняет ошибку деления на `undefined must be positive`.
 
 [nested](../../flick-core/src/opt/fuse.rs#L204-L228) делает строгий source ленивым; [List fusion](../../flick-core/src/opt/fuse.rs#L138-L158) смешивает producer/callback. Pure не total: сохранить eager-порядок либо доказать безопасность перестановки.
+
+### 7.2a. Регрессии checker'а регионов после `3353662`
+
+Срез `3353662` (переписан checker захватов) оставил красными 11 check- и 9 e2e-фикстур; исправлено в коде: заблокированная capture-строка растёт, когда другой нет (снова G001 по записанной границе); значение, чей тип не подошёл, сообщается один раз — типом; T003/T007/T008 печатают типы без выведенных квалификаторов; инстанцированная `^c` — хвост, который может остаться пустым (абстрактные типы и функции в `Ref` снова проходят); типы унифицируются раньше квалификаторов; аргументы kind `ErrorRow` не считаются захватами; foreign-колбэк разворачивается только по чистым стадиям (`Ui.stateful`); аннотированный параметр rank-2 колбэка сохраняет захват позиции; подсказка G001 для переменной типа не просит невозможный квалификатор. `ref_capacity`/`qualifiers` — новое поведение верно, фикстуры обновлены; `rpc/local` ждёт старта обработчика вместо таймера.
+
+Осталось: запись с замыканием над ячейкой неизвестного ещё типа, переданная туда, где захватов нет, до решения типа (`logger.fl`, `Logger.batched` с `o` из третьего аргумента) — T003; нужен отложенный hold со span в `unify_captured`. В фикстуре тип ячейки указан.
 
 ### 7.3. Приоритеты и проверка закрытия
 
