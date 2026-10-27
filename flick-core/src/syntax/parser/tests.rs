@@ -414,7 +414,9 @@ fn a_server_fn_is_a_let_and_server_names_its_implementation() {
     );
     // the word stays a name elsewhere
     assert_eq!(
-        errors("let f server fn = server\nlet g server = (server)\n"),
+        errors(
+            "let f server fn = server\nlet g server = (server)\nlet h = call server double 21\n"
+        ),
         Vec::<String>::new()
     );
 }

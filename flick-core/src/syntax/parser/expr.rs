@@ -180,7 +180,7 @@ fn app(p: &mut Parser) -> Option<Done> {
     }
     let m = p.precede(head);
     while at_arg_start(p) {
-        postfix(p);
+        argument(p);
     }
     Some(p.complete(m, K::AppExpr))
 }
@@ -236,9 +236,25 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
     }
 }
 
+/// An argument of an application, where `server` is a name: `f server x`.
+fn argument(p: &mut Parser) -> Option<Done> {
+    if !p.at_word("server") {
+        return postfix(p);
+    }
+    let m = p.start();
+    p.bump();
+    let name = p.complete(m, K::NameExpr);
+    accesses(p, name)
+}
+
 /// An atom followed by `.field` accesses and `?`, written without spaces.
 pub(super) fn postfix(p: &mut Parser) -> Option<Done> {
-    let mut lhs = atom(p)?;
+    let lhs = atom(p)?;
+    accesses(p, lhs)
+}
+
+/// `lhs` followed by `.field` accesses and `?`.
+fn accesses(p: &mut Parser, mut lhs: Done) -> Option<Done> {
     loop {
         if p.at(K::Dot) && p.adjacent() {
             let m = p.precede(lhs);
@@ -281,7 +297,7 @@ pub(super) fn con_path(p: &mut Parser) {
 }
 
 /// A name, or `server name`: the implementation of a server function. The
-/// word is a name everywhere else.
+/// word is a name everywhere else, an argument `f server x` among it.
 fn name_or_server(p: &mut Parser) -> K {
     if !(p.at_word("server") && matches!(p.nth(1), K::Ident | K::Con)) {
         p.bump();
