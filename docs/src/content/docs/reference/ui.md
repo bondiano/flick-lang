@@ -473,8 +473,10 @@ do not load `react-dom/server`. A JavaScript host can instead
 expose an initial-view function from Flick and evaluate its cold effect on
 the server. Pass the resulting `Ui` to `uiRenderStatic` from
 `@flick-lang/runtime/ui/react`, then serialize that React node with
-`renderToString` from `react-dom/server`. Event bindings remain inert on
-the server; the application does not need a second HTML implementation.
+`renderToString` from `react-dom/server`. Its views and fields read atoms
+as a server does, each call from a registry of its own. Event bindings
+remain inert on the server; the application does not need a second HTML
+implementation.
 
 Mark its container with `data-flick-ssr`. `Ui.Dom.mount` then uses
 `hydrateRoot` instead of clearing the existing HTML. Server and client

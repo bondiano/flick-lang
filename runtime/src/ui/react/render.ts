@@ -2,8 +2,8 @@
 // from the root's bridge, and components (foreign ones, views, fields)
 // render as React components.
 import type * as Atom from "../../effect/reactivity/Atom.ts";
-import type * as AtomRegistry from "../../effect/reactivity/AtomRegistry.ts";
-import { Fragment, type ReactNode, createContext, createElement, useLayoutEffect, useMemo } from "react";
+import * as AtomRegistry from "../../effect/reactivity/AtomRegistry.ts";
+import { Fragment, type ReactNode, createContext, createElement, useContext, useLayoutEffect, useMemo } from "react";
 
 import type { Ui } from "./nodes.ts";
 import type { Bridge, Listener } from "./policies.ts";
@@ -73,6 +73,19 @@ export const toReact = (bridge: Events | undefined, node: Ui): ReactNode => {
 
 const children = (bridge: Events | undefined, nodes: ReadonlyArray<Ui>): Array<ReactNode> => nodes.map((node) => toReact(bridge, node));
 
-/** The same inert view for server markup; event bindings are attached by the client root. */
-export const uiRenderStatic = (node: Ui): ReactNode => toReact(undefined, node);
+/** A registry of its own for a static render when no provider is above it. */
+const WithRegistry = ({ node }: { readonly node: Ui }): ReactNode => {
+  const given = useContext(RegistryContext);
+  // like `Ui.Server.to_html`: a registry of this call alone, so the same `ui` gives the same markup
+  const registry = useMemo(() => given ?? AtomRegistry.make(), [given]);
+  return createElement(RegistryContext.Provider, { value: registry }, toReact(undefined, node));
+};
+
+/**
+ * The same inert view for server markup; event bindings are attached by the
+ * client root. Its views and fields read atoms as a server does, from a
+ * registry of this call alone, unless a provider above gives one, as
+ * `Ui.Server.render` and `Ui.Server.stream` do with a request's registry.
+ */
+export const uiRenderStatic = (node: Ui): ReactNode => createElement(WithRegistry, { node });
 

@@ -76,6 +76,14 @@ test("hydration keeps text and focus entered before startup, then handles each e
   }
 });
 
+test("a cold initial view renders statically, reading atoms from a registry of the call", () => {
+  const count = Atom.make(41);
+  const view = uiView(() => uiFragment([uiText(`count ${Number(get(count)) + 1}`)]));
+  // the docs pattern: `uiRenderStatic` and `renderToString`, with no registry of `Ui.Dom.mount` or `Ui.Server.render`
+  const markup = renderToString(uiRenderStatic(uiRender(view, undefined)));
+  assert.match(markup, /count 42/);
+});
+
 
 test("each root hydrates the state script of its own container into its own registry", async () => {
   const count = Atom.serializable(Atom.make(0), { key: "count", schema: Schema.Number });
