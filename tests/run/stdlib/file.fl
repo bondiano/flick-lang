@@ -1,0 +1,23 @@
+// The errors of `File.node` are the Flick errors `File.ReadError` and
+// `File.WriteError`: a handler matches them by constructor.
+module App.Main exposing (main)
+
+read : String ->{File.FileSystem;} String
+let read path =
+  try File.read_text path with
+  | File.ReadError _ -> "read: no file"
+
+write : String ->{File.FileSystem;} String
+let write path =
+  try
+    File.write_text path "x"
+    "written"
+  with
+  | File.WriteError _ -> "write: no directory"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  provide File.node {
+    Platform.stdout_line (read "/nonexistent/flick/file.txt")
+    Platform.stdout_line (write "/nonexistent/flick/file.txt")
+  }
