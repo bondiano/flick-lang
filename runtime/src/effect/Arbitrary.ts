@@ -29,6 +29,14 @@ export const flickArray = <A>(options: ArrayOptions, self: Arbitrary.Arbitrary<A
     maxLength: Option.getOrUndefined(options.maxLength),
   });
 
+/** `Arbitrary.zip4`: `all` over four generators, whose values are a tuple. */
+export const flickZip4 = <A, B, C, D>(
+  first: Arbitrary.Arbitrary<A>,
+  second: Arbitrary.Arbitrary<B>,
+  third: Arbitrary.Arbitrary<C>,
+  fourth: Arbitrary.Arbitrary<D>,
+): Arbitrary.Arbitrary<[A, B, C, D]> => Arbitrary.all([first, second, third, fourth]);
+
 /** `Arbitrary.SchemaOptions a`. */
 interface SchemaOptions<A> {
   readonly shrink: Option.Option<(value: A) => ReadonlyArray<A>>;

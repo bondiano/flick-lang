@@ -37,11 +37,7 @@ ints : Arbitrary.Arbitrary Number
 let ints = Arbitrary.from_schema (Codec.to_schema integer_json)
 
 samples : Arbitrary.Arbitrary (Number, Number, Number, Number)
-let samples =
-  Arbitrary.flat_map (fun n ->
-    Arbitrary.flat_map (fun a ->
-      Arbitrary.flat_map (fun b ->
-        Arbitrary.map (fun branch -> (n, a, b, branch)) ints) ints) ints) ints
+let samples = Arbitrary.zip4 ints ints ints ints
 
 require_passed : Arbitrary.CheckResult e a ->{; Test.AssertionFailed} Unit
 let require_passed result =

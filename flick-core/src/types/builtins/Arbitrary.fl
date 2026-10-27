@@ -79,6 +79,11 @@ all : List (Arbitrary a) -> Arbitrary (List a)
 foreign pure all from "@flick-lang/runtime/effect/Arbitrary" "all"
   reviewed "effect@4.0.5 sha256:bd5b1360a00c3f03"
 
+/// Four values, one of each generator, drawn and shrunk independently.
+zip4 : Arbitrary a -> Arbitrary b -> Arbitrary c -> Arbitrary d -> Arbitrary (a, b, c, d)
+foreign pure zip4 from "@flick-lang/runtime/effect/Arbitrary" "flickZip4"
+  reviewed "effect@4.0.5 sha256:bd5b1360a00c3f03"
+
 /// Each value mapped by `f`.
 map : (a -> b) -> Arbitrary a -> Arbitrary b
 foreign pure map from "@flick-lang/runtime/effect/Arbitrary" "map"

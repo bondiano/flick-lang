@@ -90,6 +90,16 @@ let run () =
   Platform.stdout_line ("flat_map and all: " ++ show (List.all (fun p -> match p with
     | [a, b] -> b == a + 1
     | _ -> false) pairs))
+  let zipped =
+    Arbitrary.sample
+      (seeded 5)
+      (Arbitrary.zip4
+        digits
+        (Arbitrary.constant "x")
+        (Arbitrary.constant true)
+        (Arbitrary.constant 2))
+  Platform.stdout_line ("zip4: " ++ show (List.all (fun z -> match z with
+    | (n, s, b, k) -> n >= 0 && n <= 9 && s == "x" && b && k == 2) zipped))
   let shrinking : Arbitrary.SchemaOptions Number = { shrink = None }
   Platform.stdout_line
     ("from_schema_with: "
