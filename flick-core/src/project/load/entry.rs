@@ -10,7 +10,7 @@ use crate::project::config::{self, Backend, Kind};
 use crate::project::{Project, is_module_name, module_path};
 use crate::resolve::Interface;
 use crate::source::Span;
-use crate::types::{Effects, NO_EFFECTS, Type, show_type};
+use crate::types::{self, Effects, NO_EFFECTS, Type, show_type};
 
 /// How the runner starts `main`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,8 +92,8 @@ impl Loader<'_> {
         entry: &config::Entry,
         interfaces: &[Option<Interface>],
     ) {
-        let (span, runner) = (entry.span, entry.runner.as_ref());
-        let entry = entry.module.as_str();
+        let (span, runner, client) = (entry.span, entry.runner.as_ref(), entry.client);
+        let (name, entry) = (entry.name.as_str(), entry.module.as_str());
         let error = |message: String| Diagnostic::error(codes::P011, message, span);
         if !is_module_name(entry) {
             self.diagnostics
@@ -122,6 +122,21 @@ impl Loader<'_> {
                 let at = main.at.zip(defining).map_or(span, |([start, end], d)| {
                     Span::new(self.modules[d].file, start, end)
                 });
+                if client && let Some(path) = self.server_path(&main.entity.module, interfaces) {
+                    let message = format!(
+                        "client entry `{name}` reaches `Server`: {}",
+                        path.iter()
+                            .map(|v| format!("`{v}`"))
+                            .collect::<Vec<_>>()
+                            .join(" → ")
+                    );
+                    self.diagnostics.push(
+                        Diagnostic::error(codes::E009, message, at).with_fix(
+                            "call what needs `Server` from a server entry, and reach it from the client over HTTP or RPC",
+                            Vec::new(),
+                        ),
+                    );
+                }
                 // no type when the module failed to check: that is reported already
                 if let Some((runner, runner_at)) = runner
                     && main.scheme.is_some()
@@ -155,5 +170,34 @@ impl Loader<'_> {
                 shown.display()
             ))),
         }
+    }
+
+    /// How `main` of `module` reaches `Server`, value by value, from the
+    /// paths the interfaces record; `None` when it does not.
+    fn server_path(&self, module: &str, interfaces: &[Option<Interface>]) -> Option<Vec<String>> {
+        let interface_of = |m: &str| {
+            let own = self.by_name.get(m).and_then(|&i| interfaces[i].as_ref());
+            own.or_else(|| self.from_packages.get(m))
+                .or_else(|| types::builtins().iter().find(|i| i.module == m))
+        };
+        let (mut module, mut name) = (module.to_owned(), "main".to_owned());
+        let mut path = vec![format!("{module}.{name}")];
+        // a value whose own type needs `Server` lists no path: it ends there
+        while let Some((_, hops)) =
+            interface_of(&module).and_then(|i| i.servers.iter().find(|(n, _)| *n == name))
+        {
+            for hop in hops {
+                match hop.rsplit_once('.') {
+                    Some((m, n)) => (module, name) = (m.to_owned(), n.to_owned()),
+                    None => name.clone_from(hop),
+                }
+                path.push(format!("{module}.{name}"));
+            }
+            let last_is_local = hops.last().is_none_or(|h| !h.contains('.'));
+            if last_is_local || path.len() > 64 {
+                break;
+            }
+        }
+        (path.len() > 1).then_some(path)
     }
 }

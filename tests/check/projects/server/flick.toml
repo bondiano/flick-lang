@@ -1,0 +1,5 @@
+schema-version = 1
+
+[project]
+kind = "app"
+entries = { api = "App.Api", web = { module = "App.Web", target = "client" }, home = { module = "App.Home", target = "client" } }

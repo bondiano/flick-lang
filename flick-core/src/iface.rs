@@ -123,6 +123,10 @@ pub struct Interface {
     /// a render must not call.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub makers: Vec<String>,
+    /// The exported values that reach `Server`, each with its path to it:
+    /// names of this module, then an imported one whose interface goes on.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub servers: Vec<(String, Vec<String>)>,
 }
 
 /// The ABI of a compiled module.

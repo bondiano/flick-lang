@@ -1,0 +1,11 @@
+// The server entry: it provides `Server` and runs what needs it.
+module App.Api exposing (main)
+
+import App.Db
+import App.Shared
+
+main : Unit ->{; AppError} Unit
+let main () =
+  provide Server.node {
+    Console.log (App.Shared.greeting (App.Db.lookup "1"))
+  }

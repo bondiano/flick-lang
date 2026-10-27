@@ -51,6 +51,7 @@ mod regions;
 mod report;
 mod rows;
 mod schemas;
+mod server;
 mod services;
 mod sql;
 mod stub;

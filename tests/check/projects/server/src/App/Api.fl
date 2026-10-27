@@ -1,0 +1,9 @@
+// A server entry may reach `Server`.
+module App.Api exposing (main)
+
+import App.Page
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let _ = App.Page.load "k"
+  ()

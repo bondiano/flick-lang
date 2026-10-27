@@ -1,0 +1,9 @@
+// A client entry that uses only what does not reach `Server`.
+module App.Home exposing (main)
+
+import App.Page
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let _ = App.Page.title
+  ()

@@ -1,0 +1,7 @@
+// What only the server does; its module stays out of the client bundle.
+module App.Db exposing (lookup)
+
+import Server exposing (Server)
+
+lookup : String ->{Server;} String
+let lookup key = "row " ++ key

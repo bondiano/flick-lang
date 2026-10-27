@@ -1,0 +1,11 @@
+// A page that runs the server's code itself, providing `Server`: its type
+// does not show it, the path does.
+module App.Page exposing (load, title)
+
+import App.Db
+
+load : String ->{} String
+let load key = provide Server.node { App.Db.query key }
+
+title : String
+let title = "home"

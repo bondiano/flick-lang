@@ -26,6 +26,7 @@ impl Checker<'_> {
             .map(|e| e.entity.name.as_str())
             .collect();
         interface.makers = super::makers::exported_makers(&self.typing.makers, &exported);
+        interface.servers = super::server::exported_servers(&self.typing.servers, &exported);
         for export in &mut interface.exports {
             let entity = &export.entity;
             if entity.module != self.env.module {

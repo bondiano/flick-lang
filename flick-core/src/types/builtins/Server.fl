@@ -1,0 +1,10 @@
+/// What only a server does: a function that needs `Server` is unreachable
+/// from a client entry, `target = "client"` in `flick.toml` (`FLICK-E009`).
+module Server exposing (..)
+
+/// The server a program runs on; it has no operations of its own.
+service Server
+
+/// Provides `Server` to a server entry.
+node : Layer none none {Server}
+let node = Layer.succeed Server {}

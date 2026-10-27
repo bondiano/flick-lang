@@ -1,0 +1,5 @@
+// What both sides know: a greeting, by name.
+module App.Shared exposing (greeting)
+
+greeting : String -> String
+let greeting name = "hello, " ++ name

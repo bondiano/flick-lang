@@ -1,0 +1,7 @@
+// What only the server can do.
+module App.Db exposing (query)
+
+import Server exposing (Server)
+
+query : String ->{Server;} String
+let query key = key

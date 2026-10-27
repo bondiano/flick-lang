@@ -1,5 +1,6 @@
 // The bundle budget: builds the tracked programs with `flick build`, bundles
-// each emitted `flick-main.js` for the browser with rolldown (minified, React
+// each emitted `flick-main.js`, or `flick-<entry>.js` of a project's
+// client entry, for the browser with rolldown (minified, React
 // in production mode), prints raw/min/gzip sizes and fails when a gzip size
 // exceeds its budget, a bundle keeps a module none of them uses, or a
 // release bundle is larger than the debug one. It also prints what labelling
@@ -16,6 +17,9 @@ import { gzipSync } from "node:zlib";
 import { rolldown } from "rolldown";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+
+/** Modules a tracked program does not use, unless it lists its own: a bundle that keeps one is an error. */
+const UNUSED = ["effect/dist/Graph.js", "effect/dist/Stream.js"];
 
 /** Programs and their gzip budgets in KB. */
 export const PROGRAMS = [
@@ -41,10 +45,15 @@ export const PROGRAMS = [
     budget: 32,
     unused: ["effect/dist/Graph.js", "react-dom/cjs/react-dom-server.browser.production.js", "react-dom/cjs/react-dom-server-legacy.browser.production.js"],
   },
+  // the client entry of a project with a server entry keeps no server module (F1)
+  {
+    name: "fullstack",
+    source: "tools/bundle-size/fullstack",
+    entry: "web",
+    budget: 12,
+    unused: [...UNUSED, "App/Db.js", "App/Api.js", "Server.js"],
+  },
 ];
-
-/** Modules a tracked program does not use, unless it lists its own: a bundle that keeps one is an error. */
-const UNUSED = ["effect/dist/Graph.js", "effect/dist/Stream.js"];
 
 const host = (id) => id.startsWith("node:") || id === "jsdom" || (/^\.\.?\//.test(id) && /\.(m?ts|mjs)$/.test(id));
 
@@ -121,7 +130,7 @@ export const measure = async (entry) => {
       for (const [source, n] of attribute(chunk.code, chunk.map)) {
         const file = path.resolve(dir, source);
         const own = file.startsWith(dir + path.sep) && !file.includes(`${path.sep}_flick${path.sep}`);
-        if (own && path.basename(file) !== "flick-main.js") app += n;
+        if (own && !/^flick-[a-z0-9-]+\.js$/.test(path.basename(file))) app += n;
       }
     }
     return { bytes: Buffer.byteLength(code), gzip: gzipSync(code).length, modules, app };
@@ -147,6 +156,9 @@ export const build = (flick, source, out, profile, labels) => {
   });
 };
 
+/** The emitted runner a program's bundle starts from. */
+const runner = (program) => `flick-${program.entry ?? "main"}.js`;
+
 const kb = (bytes) => (bytes / 1024).toFixed(1);
 
 const main = async () => {
@@ -158,11 +170,11 @@ const main = async () => {
     for (const profile of ["debug", "release"]) {
       const out = path.join(base, profile, program.name);
       build(flick, program.source, out, profile);
-      sizes[profile] = await measure(path.join(out, "flick-main.js"));
+      sizes[profile] = await measure(path.join(out, runner(program)));
     }
     const components = path.join(base, "components", program.name);
     build(flick, program.source, components, "release", "components");
-    sizes.components = await measure(path.join(components, "flick-main.js"));
+    sizes.components = await measure(path.join(components, runner(program)));
     rows.push({ ...program, ...sizes.release, debug: sizes.debug, components: sizes.components });
   }
   console.log("| program | raw KB | min KB | gzip KB | budget KB | app min KB (debug) | atom labels gzip B |");

@@ -1,0 +1,7 @@
+// The client entry: only the shared module, no `Server` on its way.
+module App.Web exposing (main)
+
+import App.Shared
+
+main : Unit ->{; AppError} Unit
+let main () = Console.log (App.Shared.greeting "web")

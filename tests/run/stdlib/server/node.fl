@@ -1,0 +1,13 @@
+// A server entry provides `Server` and runs what needs it.
+module App.ServerNode exposing (main)
+
+import Server exposing (Server)
+
+query : String ->{Server;} String
+let query key = "row " ++ key
+
+main : Unit ->{; AppError} Unit
+let main () =
+  provide Server.node {
+    Console.log (query "1")
+  }

@@ -43,6 +43,9 @@ pub struct Entry {
     /// the project's; without one, a pure `main` is called and an effect is
     /// run as on Node.
     pub runner: Option<(String, Span)>,
+    /// `target = "client"`: the entry runs in a browser, so nothing it
+    /// reaches needs `Server`.
+    pub client: bool,
 }
 
 /// The name of the entry `entry = "…"` defines.
@@ -282,6 +285,7 @@ fn entries(
             module: module.clone(),
             span: *at,
             runner,
+            client: false,
         }],
         (None, Some(table)) => {
             let table_span = span(table.span());
@@ -314,8 +318,9 @@ fn entries(
     Ok(entries)
 }
 
-/// The entry `name` of `entries`: its module, or `{ module, runner }` with a
-/// runner of its own instead of the project's `runner`.
+/// The entry `name` of `entries`: its module, or `{ module, runner, target }`
+/// with a runner of its own instead of the project's `runner`, and
+/// `target = "client"` for one that runs in a browser.
 fn entry_point(
     name: String,
     value: &Spanned<toml::Value>,
@@ -326,22 +331,32 @@ fn entry_point(
     let invalid = || {
         Diagnostic::error(
             codes::P005,
-            format!("entry `{name}` is a module name, or `{{ module = \"…\", runner = \"…\" }}`"),
+            format!(
+                "entry `{name}` is a module name, or `{{ module = \"…\", runner = \"…\", target = \"server\" | \"client\" }}`"
+            ),
             at,
         )
     };
     let text = |v: Option<&toml::Value>| v.and_then(toml::Value::as_str).map(str::to_owned);
-    let (module, runner) = match value.get_ref() {
-        toml::Value::String(module) => (module.clone(), runner.cloned()),
+    let (module, runner, client) = match value.get_ref() {
+        toml::Value::String(module) => (module.clone(), runner.cloned(), false),
         toml::Value::Table(table) => {
-            if table.keys().any(|k| k != "module" && k != "runner") {
+            if table
+                .keys()
+                .any(|k| !["module", "runner", "target"].contains(&k.as_str()))
+            {
                 return Err(invalid());
             }
+            let client = match table.get("target").map(toml::Value::as_str) {
+                None | Some(Some("server")) => false,
+                Some(Some("client")) => true,
+                Some(_) => return Err(invalid()),
+            };
             let own = match table.get("runner") {
                 Some(r) => Some((text(Some(r)).ok_or_else(invalid)?, at)),
                 None => runner.cloned(),
             };
-            (text(table.get("module")).ok_or_else(invalid)?, own)
+            (text(table.get("module")).ok_or_else(invalid)?, own, client)
         }
         _ => return Err(invalid()),
     };
@@ -350,6 +365,7 @@ fn entry_point(
         module,
         span: at,
         runner,
+        client,
     })
 }
 
@@ -393,190 +409,5 @@ fn offset(n: usize) -> u32 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::source::SourceMap;
-
-    fn parse_text(text: &str) -> Result<Config, Diagnostic> {
-        let mut sources = SourceMap::default();
-        let file = sources.add("flick.toml", text);
-        parse(text, file)
-    }
-
-    #[test]
-    fn spec_example_parses_with_defaults() {
-        let config = parse_text(
-            "schema-version = 1\n[project]\nkind = \"app\"\nsource-dir = \"src\"\ntest-dir = \"test\"\n\
-             entry = \"App.Main\"\n[build]\nout-dir = \"dist\"\nprofile = \"debug\"\nemit = \"js\"\n\
-             emit-dts = false\nschema-aot = false\nlabels = \"all\"\n",
-        )
-        .expect("valid");
-        assert_eq!(config.kind, Kind::App);
-        let named: Vec<_> = config
-            .entries
-            .iter()
-            .map(|e| (e.name.as_str(), e.module.as_str()))
-            .collect();
-        assert_eq!(named, [("main", "App.Main")]);
-        assert_eq!(config.build, Build::default());
-        let lib = parse_text("schema-version = 1\n[project]\nkind = \"lib\"\n").expect("valid");
-        assert_eq!(
-            (lib.source_dir.as_str(), lib.test_dir.as_str()),
-            ("src", "test")
-        );
-        assert_eq!(lib.sql_dialect.name, "postgresql");
-        assert!(!lib.no_let_assert);
-        let strict = parse_text(
-            "schema-version = 1\n[project]\nkind = \"lib\"\n[lint]\nno-let-assert = true\n",
-        );
-        assert!(strict.expect("valid").no_let_assert);
-        let components = parse_text(
-            "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\nlabels = \"components\"\n",
-        );
-        assert_eq!(components.expect("valid").build.labels, Labels::Components);
-    }
-
-    #[test]
-    fn several_entries_by_name() {
-        let config = parse_text(
-            "schema-version = 1\n[project]\nkind = \"app\"\nentries = { server = \"App.Server\", cli-2 = \"App.Cli\" }\n",
-        )
-        .expect("valid");
-        let named: Vec<_> = config
-            .entries
-            .iter()
-            .map(|e| (e.name.as_str(), e.module.as_str()))
-            .collect();
-        assert_eq!(named, [("cli-2", "App.Cli"), ("server", "App.Server")]);
-    }
-
-    #[test]
-    fn an_entry_takes_its_runner_or_the_project_s() {
-        let config = parse_text(
-            "schema-version = 1\n[project]\nkind = \"app\"\nrunner = \"Runner.Node\"\nentries = { web = { module = \"App.Web\", runner = \"Runner.Cloudflare\" }, cli = \"App.Cli\" }\n",
-        )
-        .expect("valid");
-        let runners: Vec<_> = config
-            .entries
-            .iter()
-            .map(|e| (e.module.as_str(), e.runner.as_ref().map(|r| r.0.as_str())))
-            .collect();
-        assert_eq!(
-            runners,
-            [
-                ("App.Cli", Some("Runner.Node")),
-                ("App.Web", Some("Runner.Cloudflare"))
-            ]
-        );
-        let err = parse_text(
-            "schema-version = 1\n[project]\nkind = \"app\"\nentries = { web = { module = \"App.Web\", host = \"x\" } }\n",
-        )
-        .expect_err("unknown key");
-        assert!(
-            err.message.starts_with("entry `web` is a module name"),
-            "{}",
-            err.message
-        );
-    }
-
-    #[test]
-    fn sql_dialect() {
-        let pg = parse_text(
-            "schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\ndialect = \"postgresql\"\n",
-        )
-        .expect("valid");
-        assert_eq!(pg.sql_dialect, &dialect::POSTGRESQL);
-        let err = parse_text(
-            "schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\ndialect = \"oracle\"\n",
-        )
-        .expect_err("unsupported");
-        assert_eq!(
-            err.message,
-            "the SQL dialect `oracle` is not supported yet; supported: `postgresql`"
-        );
-        let err = parse_text(
-            "schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\ndialect = \"postgres\"\n",
-        )
-        .expect_err("unknown");
-        assert_eq!(
-            err.message,
-            "unknown SQL dialect `postgres`; known: `postgresql`, `mysql`, `sqlite`, `clickhouse`, `oracle`"
-        );
-    }
-
-    #[test]
-    fn rejects_with_spans() {
-        let cases = [
-            (
-                "schema-version = 1\n[project]\nkind = \"lib\"\nsrc = \"x\"\n",
-                codes::P005,
-                "src",
-            ),
-            (
-                "schema-version = 1\n[project]\nkind = \"tool\"\n",
-                codes::P005,
-                "\"tool\"",
-            ),
-            (
-                "schema-version = 1\n[project]\nkind = \"app\"\n",
-                codes::P007,
-                "",
-            ),
-            (
-                "schema-version = 2\n[project]\nkind = \"lib\"\n",
-                codes::P006,
-                "2",
-            ),
-            (
-                "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"A\"\nentries = { b = \"B\" }\n",
-                codes::P005,
-                "{ b = \"B\" }",
-            ),
-            (
-                "schema-version = 1\n[project]\nkind = \"app\"\nentries = { Server = \"B\" }\n",
-                codes::P005,
-                "{ Server = \"B\" }",
-            ),
-            (
-                "schema-version = 1\n[project]\nkind = \"app\"\nentries = {}\n",
-                codes::P007,
-                "{}",
-            ),
-            ("[project]\nkind = \"lib\"\n", codes::P006, ""),
-            (
-                "schema-version = 1\n[build]\nprofile = \"fast\"\n[project]\nkind = \"lib\"\n",
-                codes::P005,
-                "\"fast\"",
-            ),
-            ("schema-version = 1\n[project\n", codes::P005, ""),
-            (
-                "schema-version = 1\n[project]\nkind = \"lib\"\n[lint]\nallow = [\"FLICK-T999\"]\n",
-                codes::P005,
-                "\"FLICK-T999\"",
-            ),
-            (
-                "schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\ndialect = \"mysql\"\n",
-                codes::P022,
-                "\"mysql\"",
-            ),
-            (
-                "schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\ndialect = \"pg\"\n",
-                codes::P023,
-                "\"pg\"",
-            ),
-            (
-                "schema-version = 1\n[project]\nkind = \"lib\"\n[sql]\nname = \"x\"\n",
-                codes::P005,
-                "name",
-            ),
-        ];
-        for (text, code, spanned) in cases {
-            let err = parse_text(text).expect_err(text);
-            assert_eq!(err.code, code, "{text}: {}", err.message);
-            if !spanned.is_empty() {
-                let span = err.span.expect("has a span");
-                assert_eq!(&text[span.range()], spanned, "{text}");
-            }
-        }
-    }
-}
+#[path = "config_tests.rs"]
+mod tests;

@@ -1,0 +1,13 @@
+// A client entry reaches `Server` through a local value and another module.
+module App.Web exposing (main)
+
+import App.Page
+
+page : Unit ->{} String
+let page () = App.Page.load "k"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let _ = page ()
+  ()
+//~ FLICK-E009 @10:5-10:9 client entry `web` reaches `Server`: `App.Web.main` → `App.Web.page` → `App.Page.load` → `Server.node`
