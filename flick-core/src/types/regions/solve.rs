@@ -157,7 +157,11 @@ impl Checker<'_> {
     /// child that may outlive what it holds, and every error that would
     /// carry a region.
     pub fn report_regions(&mut self) {
-        for hold in mem::take(&mut self.regions.holds) {
+        let mut holds = mem::take(&mut self.regions.holds);
+        // a written bound names the failure exactly; reporting it first lets
+        // it cover an inferred one at the same span
+        holds.sort_by_key(|hold| !hold.written);
+        for hold in holds {
             let (actual, bound) = (self.hidden(&hold), self.bound_of(&hold));
             if bound.tails.contains(&Type::Error) || actual.tails.contains(&Type::Error) {
                 continue;
