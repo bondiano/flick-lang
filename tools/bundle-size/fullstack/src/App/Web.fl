@@ -1,7 +1,11 @@
-// The client entry: only the shared module, no `Server` on its way.
+// The client entry: the shared module and the call of a server function,
+// no `Server` on its way.
 module App.Web exposing (main)
 
+import App.Remote
 import App.Shared
 
 main : Unit ->{; AppError} Unit
-let main () = Console.log (App.Shared.greeting "web")
+let main () =
+  try Console.log (App.Shared.greeting (App.Remote.lookup "1")) with
+  | Rpc.ClientError message -> App.fail message

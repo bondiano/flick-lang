@@ -46,13 +46,22 @@ export const PROGRAMS = [
     budget: 32,
     unused: ["effect/dist/Graph.js", "react-dom/cjs/react-dom-server.browser.production.js", "react-dom/cjs/react-dom-server-legacy.browser.production.js"],
   },
-  // the client entry of a project with a server entry keeps no server module (F1)
+  // the client entry of a project with a server entry keeps no server module (F1), and of a
+  // server function only its call: not its body, what the body uses or the Node server (F2)
   {
     name: "fullstack",
     source: "tools/bundle-size/fullstack",
     entry: "web",
-    budget: 12,
-    unused: [...UNUSED, "App/Db.js", "App/Api.js", "Server.js"],
+    // the call of a server function is an RPC client over fetch, as the `rpc` program's
+    budget: 52,
+    unused: [
+      "effect/dist/Graph.js",
+      "App/Db.js",
+      "App/Api.js",
+      "effect/server/FunctionsNode.js",
+      "rpc/server.js",
+      "platform-node/dist/NodeHttpServer.js",
+    ],
   },
 ];
 

@@ -1,0 +1,5 @@
+schema-version = 1
+
+[project]
+kind = "app"
+entries = { api = "App.Main", web = { module = "App.Web", target = "client" }, leak = { module = "App.Leak", target = "client" } }

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::mem;
 
 use super::Checker;
-use super::bindings::{let_parts, signature_name};
+use super::bindings::{let_parts, pattern_names, signature_name};
 use super::convert::is_type;
 use super::ty::Type;
 use crate::diagnostics::{Diagnostic, Edit, codes};
@@ -93,6 +93,7 @@ impl<'a> Checker<'a> {
         self.check_instances(&declared);
         self.solve_rows();
         self.makers(&decls);
+        self.server_fns(&decls);
         self.servers(&decls);
         self.made_in_render(&decls);
         self.labelled(&decls);
@@ -226,7 +227,7 @@ impl<'a> Checker<'a> {
             let mut names = Vec::new();
             match (&parts.name, parts.pattern) {
                 (Some(name), _) => names.push(name.clone()),
-                (None, Some(pattern)) => binders(pattern, self.text, &mut names),
+                (None, Some(pattern)) => pattern_names(pattern, self.text, &mut names),
                 _ => {}
             }
             (names, parts.is_function())
@@ -238,7 +239,10 @@ impl<'a> Checker<'a> {
         for name in &names {
             self.env.declare(Namespace::Value, name);
             self.top.by_name.insert(name.clone(), index);
-            if let Some((scheme, _)) = &scheme {
+            if super::server_fn::is_server_fn(decl) {
+                // the body is checked against the signature, callers see the call
+                self.declare_server_fn(decl, name, scheme.as_ref().map(|(s, _)| s));
+            } else if let Some((scheme, _)) = &scheme {
                 let entity = self.env.entity(Namespace::Value, name);
                 self.env.set_value(entity, scheme.clone());
             }
@@ -356,6 +360,12 @@ impl<'a> Checker<'a> {
     /// Where the top-level declaration being checked ends.
     pub fn current_end(&self) -> Option<u32> {
         self.top.current.map(|i| self.top.items[i].decl.range().1)
+    }
+
+    /// The type the signature of this module's top-level value `name` gives.
+    pub(super) fn signed_type(&self, name: &str) -> Option<Type> {
+        let i = *self.top.by_name.get(name)?;
+        self.top.items[i].scheme.as_ref().map(|(s, _)| s.clone())
     }
 
     /// The span of the signature of this module's top-level value `name`.
@@ -497,26 +507,4 @@ fn foreign_name<'t>(decl: &Node, text: &'t str) -> Option<&'t str> {
         .filter(|t| t.kind == K::Ident)
         .nth(1)
         .map(|t| t.text(text))
-}
-
-fn binders(pattern: &Node, text: &str, out: &mut Vec<String>) {
-    match pattern.kind {
-        K::VarPat => out.extend(
-            pattern
-                .child_tokens()
-                .find(|t| t.kind == K::Ident)
-                .map(|t| t.text(text).to_owned()),
-        ),
-        K::RecordPatField if !pattern.has_token(K::Eq) => out.extend(
-            pattern
-                .child_tokens()
-                .find(|t| t.kind == K::Ident)
-                .map(|t| t.text(text).to_owned()),
-        ),
-        _ => {
-            for child in pattern.nodes() {
-                binders(child, text, out);
-            }
-        }
-    }
 }

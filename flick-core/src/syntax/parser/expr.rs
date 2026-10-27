@@ -280,6 +280,24 @@ pub(super) fn con_path(p: &mut Parser) {
     }
 }
 
+/// A name, or `server name`: the implementation of a server function. The
+/// word is a name everywhere else.
+fn name_or_server(p: &mut Parser) -> K {
+    if !(p.at_word("server") && matches!(p.nth(1), K::Ident | K::Con)) {
+        p.bump();
+        return K::NameExpr;
+    }
+    p.bump_as(K::ServerKw);
+    let name = p.start();
+    if p.at(K::Ident) {
+        p.bump();
+    } else {
+        con_path(p);
+    }
+    p.complete(name, K::NameExpr);
+    K::ServerExpr
+}
+
 /// `todo` and the string that says what it stands for.
 fn todo(p: &mut Parser) -> K {
     p.bump();
@@ -290,10 +308,7 @@ fn todo(p: &mut Parser) -> K {
 fn atom(p: &mut Parser) -> Option<Done> {
     let m = p.start();
     let kind = match p.current() {
-        K::Ident => {
-            p.bump();
-            K::NameExpr
-        }
+        K::Ident => name_or_server(p),
         K::Con => {
             con_path(p);
             K::NameExpr

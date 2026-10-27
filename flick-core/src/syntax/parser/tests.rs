@@ -400,3 +400,21 @@ fn a_component_is_a_let_of_its_props_and_body() {
         Vec::<String>::new()
     );
 }
+
+#[test]
+fn a_server_fn_is_a_let_and_server_names_its_implementation() {
+    assert_eq!(
+        sexp("server fn place order = order\n"),
+        "(LetDecl server fn (VarPat place) (Params (VarPat order)) = (Block (NameExpr order)))"
+    );
+    assert_eq!(
+        sexp("let x = [server place, server Api.place]\n"),
+        "(LetDecl let (VarPat x) = (Block (ListExpr [ (ServerExpr server (NameExpr place)) , \
+         (ServerExpr server (NameExpr Api . place)) ])))"
+    );
+    // the word stays a name elsewhere
+    assert_eq!(
+        errors("let f server fn = server\nlet g server = (server)\n"),
+        Vec::<String>::new()
+    );
+}

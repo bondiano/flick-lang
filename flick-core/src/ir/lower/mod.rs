@@ -14,6 +14,7 @@ mod lambda;
 mod pattern;
 mod question;
 mod ranges;
+mod server_fn;
 mod sql;
 
 use std::collections::{HashMap, HashSet};
@@ -26,6 +27,7 @@ use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
+use crate::types::server_fn::is_server_fn;
 use crate::types::{
     Constructor, Range, Rep, Typing, class_defaults, default_method, is_type, let_parts,
 };
@@ -159,6 +161,9 @@ impl Lower<'_> {
     fn item(&mut self, decl: &Node, items: &mut Vec<Item>) {
         let span = self.span(decl);
         match decl.kind {
+            K::LetDecl if is_server_fn(decl) => {
+                self.server_fn(decl, span, items);
+            }
             K::LetDecl => {
                 self.fresh_definition();
                 let parts = let_parts(decl, self.text);

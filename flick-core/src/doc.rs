@@ -156,6 +156,18 @@ pub fn page(interface: &Interface, text: &str) -> String {
         if let Some(reason) = &e.blocked {
             let _ = writeln!(out, "\nBlocked: {reason}");
         }
+        let implementation = format!("{name}$server");
+        if interface
+            .exports
+            .iter()
+            .any(|x| x.entity.name == implementation)
+        {
+            let _ = writeln!(
+                out,
+                "\nServer function: a public endpoint, `POST /_flick/fn`. Anyone who reaches \
+                 the server can call it with any payload, so it checks who calls itself."
+            );
+        }
         doc(name, &mut out);
     }
     out

@@ -1,0 +1,10 @@
+// A client entry cannot take the implementation of a server function.
+module App.Leak exposing (main)
+
+import App.Api
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let _ = [server App.Api.place]
+  ()
+//~ FLICK-E009 @7:5-7:9 client entry `leak` reaches `Server`: `App.Leak.main` → `server App.Api.place`

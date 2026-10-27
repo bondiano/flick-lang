@@ -438,3 +438,26 @@ fn binders(scheme: &Type) -> Vec<super::ty::Binder> {
         _ => Vec::new(),
     }
 }
+
+/// The names a top-level pattern binds, a field pun among them.
+pub(super) fn pattern_names(pattern: &Node, text: &str, out: &mut Vec<String>) {
+    match pattern.kind {
+        K::VarPat => out.extend(
+            pattern
+                .child_tokens()
+                .find(|t| t.kind == K::Ident)
+                .map(|t| t.text(text).to_owned()),
+        ),
+        K::RecordPatField if !pattern.has_token(K::Eq) => out.extend(
+            pattern
+                .child_tokens()
+                .find(|t| t.kind == K::Ident)
+                .map(|t| t.text(text).to_owned()),
+        ),
+        _ => {
+            for child in pattern.nodes() {
+                pattern_names(child, text, out);
+            }
+        }
+    }
+}

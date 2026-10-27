@@ -1,0 +1,72 @@
+---
+title: "Server functions"
+---
+
+A `server fn` is a function that runs on the server and that any code,
+the browser included, calls by its name. The compiler makes the endpoint,
+the client call and the codecs of what crosses the network from one
+declaration, so the two sides cannot disagree.
+
+```flick
+module App.Shop exposing (Order, OutOfStock, place)
+
+type alias Order = { item : String; count : Number }
+  deriving Schema
+
+type error OutOfStock = OutOfStock String
+  deriving Schema
+
+/// Up to three of an item.
+place : Order ->{Server.Server, App.Db.Db; OutOfStock} String
+server fn place order =
+  if order.count > 3 then from_result (Err (OutOfStock order.item))
+  else App.Db.save order
+```
+
+The signature right above `server fn` is what the server runs: one
+parameter, the services it needs and its errors. Callers see another type:
+
+```flick
+place : Order ->{; Rpc.ClientError, OutOfStock} String
+```
+
+The call needs no service, so a client entry may reach it
+(`target = "client"`, see `FLICK-E009`), and it
+is a task like any other: `Atom.task (task { place order })`, or the body of
+an action. A declared error comes back as itself; `Rpc.ClientError` says
+the call did not reach the server or its answer did not decode. A call goes
+to the page's origin in a browser and to `FLICK_SERVER_URL` elsewhere, at
+`Server.path` (`/_flick/fn`).
+
+## Serving
+
+`server place` is the implementation, a `Server.Function r` whose row `r`
+holds `Server` and what the body needs. `Server.handler` serves a list of
+them on one route; a client entry that names `server place` reaches
+`Server` and is refused.
+
+```flick
+serve : forall s. Unit ->{Scope s, Server.Server, App.Db.Db;} (ServerRequest ->{} ServerResponse)^{s}
+let serve () = Server.handler [server App.Shop.place]
+```
+
+Mount the handler on `Http.Router` as a POST of `Server.path`:
+
+```flick
+let route functions =
+  Http.Router.route (Some Http.Method.POST) Server.path (fun request -> functions request)
+```
+
+## What crosses the network
+
+The payload, the success and each error travel as JSON, so each has a
+Schema witness: a record or tuple of witnessed types, `List`, `Option`, a
+type that derives `Schema`. The compiler checks this where the function is
+declared (`FLICK-E010`), together with the rest of the shape: one parameter
+(pass a record for more), no type variables, the errors listed.
+
+## A public endpoint
+
+Every `server fn` is a public endpoint: anyone who reaches the server can
+call it with any payload, not only the program's own pages. Check who
+calls inside the function. `flick doc` marks each one so.

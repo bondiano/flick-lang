@@ -1,0 +1,29 @@
+// A `server fn`: callers get a call that may fail with `Rpc.ClientError`
+// and needs nothing, a task-atom can run it, and `server name` gives the
+// implementation that `Server.handler` serves with what it needs.
+module App.Shop exposing (..)
+
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+type alias Order = { item : String; count : Number }
+  deriving Schema
+
+type error OutOfStock = OutOfStock String
+  deriving Schema
+
+place : Order ->{Server.Server; OutOfStock} String
+server fn place order =
+  if order.count > 3 then from_result (Err (OutOfStock order.item)) else order.item
+
+stock : Unit ->{Server.Server;} List String
+server fn stock () = ["tea", "cake"]
+
+call : Order ->{; Rpc.ClientError, OutOfStock} String
+let call = place
+
+listing : Atom.Atom (Atom.Async (List String) {Rpc.ClientError})
+let listing = Atom.task (task { stock () })
+
+serve : forall s. Unit ->{Scope s, Server.Server;} (ServerRequest ->{} ServerResponse)^{s}
+let serve () = Server.handler [server place, server stock]

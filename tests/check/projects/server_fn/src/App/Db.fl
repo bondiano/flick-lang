@@ -1,0 +1,5 @@
+// What only the server can do.
+module App.Db exposing (save)
+
+save : String ->{Server.Server;} String
+let save item = item

@@ -126,7 +126,11 @@ impl Loader<'_> {
                     let message = format!(
                         "client entry `{name}` reaches `Server`: {}",
                         path.iter()
-                            .map(|v| format!("`{v}`"))
+                            // the implementation of a server function is how a program names it
+                            .map(|v| match v.strip_suffix("$server") {
+                                Some(f) => format!("`server {f}`"),
+                                None => format!("`{v}`"),
+                            })
                             .collect::<Vec<_>>()
                             .join(" → ")
                     );

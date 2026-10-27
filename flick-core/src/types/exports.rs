@@ -17,6 +17,7 @@ impl Checker<'_> {
             .cloned()
             .collect();
         self.export_companions(interface);
+        self.export_server_fns(interface);
         let exported: Vec<&str> = interface
             .exports
             .iter()
@@ -62,6 +63,33 @@ impl Checker<'_> {
                         d
                     });
                 }
+            }
+        }
+    }
+
+    /// The implementation `f$server` of each exported server function.
+    fn export_server_fns(&self, interface: &mut Interface) {
+        let values: Vec<String> = interface
+            .exports
+            .iter()
+            .filter(|e| {
+                e.entity.namespace == Namespace::Value && e.entity.module == self.env.module
+            })
+            .map(|e| e.entity.name.clone())
+            .collect();
+        for value in values {
+            let name = super::companion_name(&value, super::server_fn::IMPLEMENTATION);
+            let entity = self.env.entity(Namespace::Value, &name);
+            if self.env.value(&entity).is_some() {
+                interface.exports.push(Export {
+                    entity,
+                    decl: Decl::Let,
+                    parent: None,
+                    scheme: None,
+                    definition: None,
+                    blocked: None,
+                    at: None,
+                });
             }
         }
     }

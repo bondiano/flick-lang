@@ -74,8 +74,11 @@ pub struct Typing {
     pub foreigns: HashMap<Range, ForeignInfo>,
     /// Instances declared or derived in this module.
     pub instances: Vec<InstanceInfo>,
-    /// Witnesses of the types that derive `Schema`.
+    /// Witnesses of the types that derive `Schema`, and of what each
+    /// server function sends.
     pub schemas: Vec<SchemaItem>,
+    /// The server functions whose witnesses are all known.
+    pub server_fns: Vec<ServerFn>,
     /// `codec` blocks: the fields' labels in the order written.
     pub codecs: HashMap<Range, CodecBlock>,
     /// The type of each name in an expression and of each variable a
@@ -171,6 +174,14 @@ pub struct ForeignInfo {
     /// For each JS argument: the number of arguments of the JS function a
     /// callback is adapted to.
     pub callbacks: Vec<Option<usize>>,
+}
+
+/// A `server fn`: its declaration, its name and how many errors it sends.
+#[derive(Debug, Clone)]
+pub struct ServerFn {
+    pub decl: Range,
+    pub name: String,
+    pub errors: usize,
 }
 
 /// The witness `T$schema` of a type that derives `Schema`.

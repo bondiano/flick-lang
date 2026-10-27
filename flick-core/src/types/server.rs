@@ -21,7 +21,10 @@ impl Checker<'_> {
     /// whose interface goes on, or none when its own type needs `Server`.
     pub fn servers(&mut self, decls: &[&Node]) {
         let mut values: Vec<(String, &Node)> = Vec::new();
-        for decl in members(decls).filter(|d| d.kind == K::LetDecl) {
+        // a server function's body is its implementation, `name$server`
+        for decl in
+            members(decls).filter(|d| d.kind == K::LetDecl && !super::server_fn::is_server_fn(d))
+        {
             let parts = let_parts(decl, self.text);
             let (Some(name), Some(body)) = (parts.name, parts.body) else {
                 continue;

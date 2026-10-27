@@ -54,7 +54,8 @@ impl Lower<'_> {
         let kind = match node.kind {
             K::Literal => ExprKind::Lit(self.literal(node)),
             K::UnitExpr => ExprKind::Lit(Lit::Unit),
-            K::NameExpr => return self.name(node),
+            // the checker resolved `server name` to the implementation
+            K::NameExpr | K::ServerExpr => return self.name(node),
             K::ParenExpr | K::AnnotExpr => return self.expr(children[0]),
             K::TupleExpr => ExprKind::Tuple(children.iter().map(|c| self.expr(c)).collect()),
             K::ListExpr => return self.list(node, &children),

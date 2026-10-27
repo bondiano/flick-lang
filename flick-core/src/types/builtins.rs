@@ -64,7 +64,6 @@ const SOURCES: &[(&str, &str)] = &[
     ("Database", include_str!("builtins/Database.fl")),
     ("Test", include_str!("builtins/Test.fl")),
     ("Flick.Debug", include_str!("builtins/Flick/Debug.fl")),
-    ("Server", include_str!("builtins/Server.fl")),
     ("Runner.Node", include_str!("builtins/Runner/Node.fl")),
     ("Runner.Browser", include_str!("builtins/Runner/Browser.fl")),
     // Effect: values and classes
@@ -326,6 +325,7 @@ const SOURCES: &[(&str, &str)] = &[
     // end of Effect: HttpApi
     // Effect: RPC (unstable in Effect 4.0.5)
     ("Rpc", include_str!("builtins/Rpc.fl")),
+    ("Server", include_str!("builtins/Server.fl")),
     // end of Effect: RPC
     // Effect: observability (unstable in Effect 4.0.5)
     ("Otlp", include_str!("builtins/Otlp.fl")),

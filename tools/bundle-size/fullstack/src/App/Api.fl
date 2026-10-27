@@ -1,11 +1,17 @@
-// The server entry: it provides `Server` and runs what needs it.
+// The server entry: it provides `Server`, runs what needs it and serves
+// the server functions.
 module App.Api exposing (main)
 
 import App.Db
+import App.Remote
 import App.Shared
 
 main : Unit ->{; AppError} Unit
 let main () =
   provide Server.node {
     Console.log (App.Shared.greeting (App.Db.lookup "1"))
+    scope {
+      let _ = Server.handler [server App.Remote.lookup]
+      ()
+    }
   }

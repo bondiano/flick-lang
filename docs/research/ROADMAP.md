@@ -249,7 +249,7 @@ component search (props : SearchProps) =
 **F1. Сервис `Server` и разделение бандлов.** ✅ (модуль `Server`: сервис без операций и слой `Server.node`; вход `target = "client"` в `flick.toml`; что достаёт до `Server` — тип со `Server` в строке или имя такого значения — считается до неподвижной точки, путь хранится в `.iface` (`servers`); `FLICK-E009` с путём `main → … → Server.node`; фикстура `tests/check/projects/server`, run-тест `tests/run/stdlib/server/node.fl`; `just bundle-size` — программа `fullstack`, клиентский `flick-web.js` без `App/Db.js` и `Server.js`; значение со `Server`, переданное как аргумент или через словарь класса, пути не даёт)
 - AC: функция со `Server` в строке недостижима из клиентского entry (ошибка с путём вызова); клиентский бандл не содержит серверных модулей (проверка в `just bundle-size`).
 
-**F2. `server fn`.** ⬜
+**F2. `server fn`.** ✅ (контекстное слово: `server fn name x = body` — `LetDecl` с сигнатурой над ним, которую выполняет сервер, `P ->{r; e} S`; имя — клиентский вызов `P ->{; Rpc.ClientError | e} S` поверх `Rpc` (NDJSON, POST на `Server.path`, `/_flick/fn`, адрес — origin страницы или `FLICK_SERVER_URL`), годится для `Atom.task`/action; `server name` — реализация `Server.Function {Server, r | t}` для `Server.handler`, клиентский вход до неё не дотягивается (E009 с путём `server App.Api.place`); параметр, результат и ошибки — свидетели Schema, иначе `FLICK-E010` (как и обобщённая сигнатура, неперечисленные ошибки, `server x` не для server fn); `flick doc` помечает публичный endpoint; `reference/server-fn.md`; бандл `fullstack` — вызов без тела, `Db` и Node-сервера, 50 KB как у `rpc`. Не сделано: вызов на сервере (SSR) идёт по HTTP, а не в процессе; auth — Q12; один параметр — запись)
 - AC: компилируется в `HttpApi`/`Rpc` endpoint и клиентскую заглушку; аргументы и результат требуют кодека; ошибки `e` восстанавливаются типизированно; на клиенте вызов — `Action`/task-атом; в документации каждый `server fn` помечен как публичный endpoint.
 
 **F3. Запросы и мутации.** ⬜
@@ -379,7 +379,7 @@ S1 ✅ ─ U1…U6 ✅ ─ U7 ✅ ─ U7b ✅ ─ U6b ✅
 C2/C3/C4/C6 ✅ ─ C6b ✅
 C7a ✅ ─ C7b ✅ ─ C7c ✅ ─ C7d ✅ ─ C5 ✅            C1 ✅
 U9 ✅ ─ U9b ✅
-S2 ✅ ─ F1 ✅ ─ F2 ─ F3 ─ F4 ─ F5 ─ F6
+S2 ✅ ─ F1 ✅ ─ F2 ✅ ─ F3 ─ F4 ─ F5 ─ F6
 S3 ✅ ─ S4 ✅ ─ O1 ✅ ─ O2 ✅ ─ O3 ✅ ─ O4 ✅ ─ O5
 L1 ✅ ─ L2 ✅ ─ L3 ✅ ─ L4 ─ L5
 H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ─ H6     (H2 по входам — после L6 ✅)

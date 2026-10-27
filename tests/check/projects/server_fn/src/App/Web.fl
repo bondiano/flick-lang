@@ -1,0 +1,13 @@
+// A client entry calls a server function by its name: the call needs no
+// `Server`.
+module App.Web exposing (main)
+
+import App.Api
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try
+    let _ = App.Api.place { item = "tea" }
+    ()
+  with
+  | Rpc.ClientError message -> App.fail message

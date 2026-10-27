@@ -1,0 +1,33 @@
+// What a `server fn` sends crosses the network: its signature says it, and
+// each part of it has a Schema witness.
+module App.ServerFn exposing (..)
+
+type alias Order = { item : String }
+  deriving Schema
+
+type alias Secret = { check : String -> Bool }
+
+type error Missing = Missing String
+
+server fn unsigned x = x
+
+pick : forall a. a ->{Server.Server;} a
+server fn pick x = x
+
+keep : Secret ->{Server.Server;} String
+server fn keep secret = if secret.check "" then "yes" else "no"
+
+find : Order ->{Server.Server; Missing} String
+server fn find order = order.item
+
+local : Order -> String
+let local order = order.item
+
+served : List (Server.Function {Server.Server})
+let served = [server local]
+//~ FLICK-T004 @12:1-12:25 function `unsigned` needs a signature right above its `let`
+//~ FLICK-T013 @12:1-12:25 the type of `unsigned` is not fully known (`_ -> _`) and can
+//~ FLICK-E010 @15:1-15:21 server fn `pick`
+//~ FLICK-E010 @18:1-18:64 server fn `keep` sends its payload as JSON, but a field of t
+//~ FLICK-E010 @21:1-21:34 server fn `find` sends its error `Missing` as JSON, but a fi
+//~ FLICK-E010 @27:15-27:27 `local` is not a server fn

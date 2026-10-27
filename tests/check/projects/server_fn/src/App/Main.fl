@@ -1,0 +1,13 @@
+// The server entry serves the implementation of `place`.
+module App.Main exposing (main)
+
+import App.Api
+
+main : Unit ->{; AppError} Unit
+let main () =
+  provide Server.node {
+    scope {
+      let _ = Server.handler [server App.Api.place]
+      ()
+    }
+  }

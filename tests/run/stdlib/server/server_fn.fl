@@ -1,0 +1,63 @@
+// A `server fn` served by `Server.handler` on `Http.Router`, called by its
+// name: the success, a declared error as itself, and `ClientError` when no
+// server answers.
+module App.Main exposing (main)
+
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+set_env : String -> String ->{} Unit
+foreign sync set_env from "../cli/env.mjs" "set"
+  arity 2
+
+type alias Order = { item : String; count : Number }
+  deriving Schema
+
+type error OutOfStock = OutOfStock String
+  deriving Schema
+
+/// Up to three of an item.
+place : Order ->{Server.Server; OutOfStock} String
+server fn place order =
+  if order.count > 3 then
+    from_result (Err (OutOfStock order.item))
+  else
+    "placed " ++ show order.count ++ " " ++ order.item
+
+/// What the client sees of a call.
+shown : Order ->{} String
+let shown order =
+  try place order with
+  | OutOfStock item -> "out of stock: " ++ item
+  | Rpc.ClientError _ -> "no server"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  set_env "FLICK_SERVER_URL" "http://127.0.0.1:1"
+  Platform.stdout_line (shown { item = "tea"; count = 1 })
+  provide (
+    Layer.merge Server.node (Layer.merge Http.FetchClient.layer Http.Server.layer_services)
+  ) {
+    try
+      scope s {
+        functions : (ServerRequest ->{} ServerResponse)^{s}
+        let functions = Server.handler [server place]
+        app : (ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse)^{s}
+        let app =
+          Http.Router.router Http.Router.config
+            [
+              Http.Router.route
+                (Some Http.Method.POST)
+                Server.path
+                (fun request -> functions request),
+            ]
+        let options : Http.Server.ServeOptions =
+          { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None }
+        let server = Http.Server.serve options app
+        set_env "FLICK_SERVER_URL" (Http.Server.format_address (Http.Server.address server))
+        Platform.stdout_line (shown { item = "tea"; count = 2 })
+        Platform.stdout_line (shown { item = "cake"; count = 5 })
+      }
+    with
+    | Http.ServerError.ServeError _ -> Platform.stdout_line "serve failed"
+  }

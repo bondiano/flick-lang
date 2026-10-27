@@ -330,6 +330,20 @@ pub fn companion_name(ty: &str, member: &str) -> String {
     format!("{ty}${member}")
 }
 
+impl Checker<'_> {
+    /// The witness plan of a value of type `ty` the module sends, named
+    /// `what` in a message.
+    pub(super) fn plan_of(&self, ty: &Type, what: &str) -> Result<SchemaPlan, (String, String)> {
+        let module = self.env.module.clone();
+        let ctx = PlanContext {
+            params: &[],
+            group: &[],
+            module: &module,
+        };
+        self.plan(ty, what, &ctx)
+    }
+}
+
 /// Whether a `deriving` clause of `decl` names `Schema`.
 fn derives_schema(decl: &Node, text: &str) -> bool {
     decl.nodes()

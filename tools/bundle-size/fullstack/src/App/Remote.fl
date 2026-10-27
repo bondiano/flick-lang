@@ -1,0 +1,7 @@
+// A server function: the client bundle has its call, not its body or `Db`.
+module App.Remote exposing (lookup)
+
+import App.Db
+
+lookup : String ->{Server.Server;} String
+server fn lookup key = App.Db.lookup key

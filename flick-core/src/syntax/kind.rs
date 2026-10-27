@@ -70,6 +70,11 @@ pub enum SyntaxKind {
     /// `component` before the name of a component declaration, a keyword
     /// only there.
     ComponentKw,
+    /// `server` before `fn` or before the name of a server function, a
+    /// keyword only there.
+    ServerKw,
+    /// `fn` after `server`, a keyword only there.
+    FnKw,
 
     // punctuation and operators
     LParen,
@@ -195,6 +200,8 @@ pub enum SyntaxKind {
     /// then the `Block` of its setup statements and render, as a `fun`
     /// lists its parameters then its body.
     ComponentExpr,
+    /// `server name`: the implementation of the server function `name`.
+    ServerExpr,
     ScopeExpr,
     ProvideExpr,
     SqlExpr,

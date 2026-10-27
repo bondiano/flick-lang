@@ -1,0 +1,10 @@
+// Server functions over what only the server can do.
+module App.Api exposing (Order, place)
+
+import App.Db
+
+type alias Order = { item : String }
+  deriving Schema
+
+place : Order ->{Server.Server;} String
+server fn place order = App.Db.save order.item
