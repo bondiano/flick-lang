@@ -214,3 +214,29 @@ let box value = value
         }
     }
 }
+
+#[test]
+fn signature_hover_keeps_the_written_lines() {
+    let source = "module App.Range exposing (between)
+
+/// A range check.
+between : {
+  /// The lower bound.
+  minimum : Number;
+  maximum : Number;
+} ->
+  Bool
+let between _ = true
+";
+    let f = fixture_of(&[("src/App/Range.fl", source)]);
+    let ide = f.ide();
+    let file = f.file("App.Range");
+    let at = u32::try_from(source.find("between :").expect("signature")).expect("small");
+    let (markdown, _) = ide.hover(file, at + 1).expect("hover");
+    assert!(
+        markdown.starts_with(
+            "```flick\nbetween : {\n  /// The lower bound.\n  minimum : Number;\n  maximum : Number;\n} ->\n  Bool\n```"
+        ),
+        "{markdown}"
+    );
+}

@@ -11,6 +11,25 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{Form, TypeDef, component_instance, show_type};
 
+/// `node` as its source lays it out, one written line per line, its
+/// continuation lines dedented by the indentation of its first line.
+fn as_written(node: &Node, text: &str) -> String {
+    let (start, end) = node.range();
+    let line_start = text[..start as usize].rfind('\n').map_or(0, |i| i + 1);
+    let indent = text[line_start..start as usize]
+        .chars()
+        .take_while(|c| c.is_whitespace())
+        .count();
+    let mut lines = text[start as usize..end as usize].lines();
+    let first = lines.next().unwrap_or_default().trim_end().to_owned();
+    lines.fold(first, |mut acc, line| {
+        let cut = line.len() - line.trim_start().len();
+        acc.push('\n');
+        acc.push_str(line[cut.min(indent)..].trim_end());
+        acc
+    })
+}
+
 impl Ide<'_> {
     /// The signature of a top-level value as its source writes it.
     fn signature(&self, module: &str, name: &str) -> Option<String> {
@@ -21,13 +40,7 @@ impl Ide<'_> {
                     .next()
                     .is_some_and(|t| t.text(&source.text) == name)
         })?;
-        let ty = sig.nodes().next()?;
-        Some(
-            ty.text(&source.text)
-                .split_whitespace()
-                .collect::<Vec<_>>()
-                .join(" "),
-        )
+        Some(as_written(sig.nodes().next()?, &source.text))
     }
 
     /// A keyword at `offset` that opens an expression: the type of the whole
@@ -217,13 +230,7 @@ impl Ide<'_> {
                     .last()
                     .map_or(range.1, |n| n.range().1);
             }
-            let (start, end) = decl.range();
-            return Some(
-                source.text[start as usize..end as usize]
-                    .split_whitespace()
-                    .collect::<Vec<_>>()
-                    .join(" "),
-            );
+            return Some(as_written(decl, &source.text));
         }
         let definition = definition?;
         Some(match &definition.form {
@@ -314,8 +321,7 @@ impl Ide<'_> {
                     .filter(|n| n.kind == K::Members)
                     .flat_map(Node::nodes)
                     .find(|s| tree::name_of(s, K::Ident, &source.text) == Some(name.as_str()))?;
-                let ty = sig.nodes().next()?.text(&source.text);
-                let ty = ty.split_whitespace().collect::<Vec<_>>().join(" ");
+                let ty = as_written(sig.nodes().next()?, &source.text);
                 (
                     format!("{service}.{name} : {ty}"),
                     Some(format!("an operation of `{service}`")),
