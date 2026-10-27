@@ -350,3 +350,86 @@ fn dotted_and_underscored_module_types_have_distinct_namespaces() {
         String::from_utf8_lossy(&tsc.stderr),
     );
 }
+
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn a_barrel_re_exports_what_it_exposes_from_its_modules() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("dts_barrel");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("src/Lib")).expect("dir");
+    fs::write(
+        dir.join("flick.toml"),
+        "schema-version = 1\n\n[project]\nkind = \"lib\"\n",
+    )
+    .expect("write");
+    fs::write(dir.join("package.json"), "{\"type\":\"module\"}\n").expect("write");
+    fs::write(
+        dir.join("src/Lib/Pair.fl"),
+        "module Lib.Pair exposing (pair, Box(..), Point)\n\
+         type Box = Box Number\n\
+         type alias Point = { x : Number; y : Number }\n\
+         pair : a -> b -> (a, b)\nlet pair x y = (x, y)\n",
+    )
+    .expect("write");
+    fs::write(
+        dir.join("src/Lib.fl"),
+        "module Lib exposing (pair, Box(..), Point)\n\
+         import Lib.Pair exposing (pair, Box(..), Point)\n",
+    )
+    .expect("write");
+    let build = flick_in(&dir, &["build", "--emit-dts"]);
+    assert!(build.status.success(), "{build:?}");
+    fs::write(
+        dir.join("consumer.ts"),
+        "import { pair, Box } from './dist/Lib.js';\n\
+         import type { Point } from './dist/Lib.js';\n\
+         import type { Box as Own } from './dist/Lib/Pair.js';\n\
+         const both: number = pair(1)('x')[0];\n\
+         const box: Own = Box(2);\nconst p: Point = { x: 1, y: 2 };\n\
+         export { both, box, p };\n",
+    )
+    .expect("write");
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    fs::write(
+        dir.join("tsconfig.json"),
+        serde_json::json!({
+            "compilerOptions": {
+                "strict": true, "noEmit": true, "module": "nodenext",
+                "moduleResolution": "nodenext", "target": "es2022",
+                "lib": ["es2022", "dom", "esnext.disposable"], "types": ["node"],
+                "typeRoots": [repo.join("runtime/node_modules/@types")],
+            },
+            "files": ["consumer.ts"],
+        })
+        .to_string(),
+    )
+    .expect("write");
+    let tsc = Command::new(repo.join("node_modules/.bin/tsc"))
+        .arg("-p")
+        .arg(&dir)
+        .output()
+        .expect("tsc");
+    assert!(
+        tsc.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&tsc.stdout),
+        String::from_utf8_lossy(&tsc.stderr),
+    );
+    // the barrel's values are the defining module's, not copies
+    let node = Command::new("node")
+        .arg("--input-type=module")
+        .arg("-e")
+        .arg(
+            "import * as barrel from './dist/Lib.js';\n\
+             import * as own from './dist/Lib/Pair.js';\n\
+             console.log(barrel.pair === own.pair, barrel.Box === own.Box, barrel.pair(1)('x'));",
+        )
+        .current_dir(&dir)
+        .output()
+        .expect("node");
+    assert_eq!(
+        String::from_utf8_lossy(&node.stdout),
+        "true true [ 1, 'x' ]\n",
+        "{node:?}"
+    );
+}

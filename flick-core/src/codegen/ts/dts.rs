@@ -3,9 +3,9 @@
 
 use std::fmt::Write;
 
-use super::{Projection, Vars, generic};
+use super::{Projection, Vars, generic, reexports};
 use crate::codegen::names;
-use crate::iface::{Decl, Interface, Namespace};
+use crate::iface::{Decl, Export, Interface, Namespace};
 use crate::types::{Kind, Type};
 
 /// The declaration file of the module `projection` is for: its types and
@@ -44,12 +44,29 @@ pub fn declaration_file(
             values.push(format!("export declare const {name}: {ty};"));
         }
     }
+    // a re-export names what the defining module's own file declares
+    let value = |export: &Export| {
+        let scheme = export.scheme.as_ref();
+        scheme.is_some_and(|scheme| {
+            Projection::new(&export.entity.module, projection.lookup, projection.package)
+                .value(scheme)
+                .is_ok()
+        })
+    };
+    let ty = |export: &Export| {
+        (projection.lookup)(&export.entity.module).is_some_and(|interface| {
+            Projection::new(&export.entity.module, projection.lookup, projection.package)
+                .declares(&interface, export)
+        })
+    };
+    let (barrel, _) = reexports(projection.module, interface, path, &value, &ty);
     let mut out = projection.imports(path);
     out.push('\n');
     for line in types.iter().chain(&values) {
         out.push_str(line);
         out.push('\n');
     }
+    out.push_str(&barrel);
     (out, refused)
 }
 

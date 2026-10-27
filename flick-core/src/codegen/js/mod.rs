@@ -25,7 +25,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write;
 use std::mem;
 
-use super::ts::Projection;
+use super::ts::{Projection, reexports};
 use super::{Options, Output, names};
 use crate::iface::{Interface, Namespace};
 use crate::ir::{ItemKind, Label, Module};
@@ -115,12 +115,25 @@ pub fn js(module: &Module, options: &Options) -> Output {
         code.push_str("\n\n");
     }
     code.push_str(&body);
+    // a module exposing what it imports: JS consumers find it here too
+    let mut barrel = Vec::new();
+    if let Some(interface) = (options.interface)(&module.name) {
+        let path = |m: &str| relative(&here, &(options.path)(m));
+        let (lines, modules) = reexports(&module.name, &interface, &path, &|_| true, &|_| {
+            options.typescript
+        });
+        code.push_str(&lines);
+        barrel = modules;
+    }
     let mut code = tidy::parens(&code);
     if !options.release {
         code = tidy::layout(&code);
     }
     let mut output = finish(&code, &g.spans, &g.names);
-    output.imports = g.imports.into_iter().chain(typed.into_inner()).collect();
+    output.imports = (g.imports.into_iter())
+        .chain(typed.into_inner())
+        .chain(barrel)
+        .collect();
     output
 }
 

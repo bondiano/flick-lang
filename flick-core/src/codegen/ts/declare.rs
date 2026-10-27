@@ -18,9 +18,7 @@ impl Projection<'_> {
                 continue;
             }
             let name = &export.entity.name;
-            if self.module == PRELUDE
-                && (PRIMITIVES.iter().any(|(n, _)| n == name) || NATIVE.contains(&name.as_str()))
-            {
+            if self.native(name) {
                 continue;
             }
             match self.declaration(interface, export) {
@@ -30,6 +28,19 @@ impl Projection<'_> {
             }
         }
         (out, refused)
+    }
+
+    /// Whether this module's declaration file has the type `export`, so a
+    /// module re-exporting it can `export type` it from here.
+    pub(super) fn declares(&self, interface: &Interface, export: &Export) -> bool {
+        !self.native(&export.entity.name)
+            && matches!(self.declaration(interface, export), Ok(Some(_)))
+    }
+
+    /// A Prelude type TypeScript or Effect has, never declared.
+    fn native(&self, name: &str) -> bool {
+        self.module == PRELUDE
+            && (PRIMITIVES.iter().any(|(n, _)| *n == name) || NATIVE.contains(&name))
     }
 
     fn declaration(
