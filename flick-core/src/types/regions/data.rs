@@ -1,6 +1,6 @@
 //! Whole-value bounds on generic data and constructor fields.
 
-use super::{Hold, Visible, capture_mismatch};
+use super::{Hold, Visible};
 use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::types::Checker;
@@ -209,11 +209,7 @@ impl Checker<'_> {
     pub fn subsume_bound(&mut self, actual: &Type, expected: &Type, span: Span) -> Option<Unified> {
         let mark = self.regions.holds.len();
         let fits = self.subsume_bound_at(actual, expected, span)?;
-        // a value whose type does not fit is reported once, by the type
-        if fits.as_ref().is_err_and(|m| !capture_mismatch(m)) {
-            self.regions.holds.truncate(mark);
-        }
-        Some(fits)
+        Some(self.held_fits(fits, mark, actual, expected, span))
     }
 
     fn subsume_bound_at(&mut self, actual: &Type, expected: &Type, span: Span) -> Option<Unified> {

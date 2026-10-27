@@ -24,5 +24,4 @@ let held path =
     let collect = { flush = fun outputs -> ignore (file, Ref.set seen (Ref.get seen ++ outputs)) }
     take collect
   }
-//~ FLICK-T003 @25:10-25:17
 //~ FLICK-G001 @25:10-25:17 this value holds region `s`, but the expected type `Batch String` holds no captures

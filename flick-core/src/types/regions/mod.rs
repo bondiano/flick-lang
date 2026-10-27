@@ -60,6 +60,9 @@ pub struct State {
     pub deferring: Option<Span>,
     /// Qualifiers to compare at the end, and where they were.
     pub deferred: Vec<(Type, Type, Span)>,
+    /// Values that hold captures their position does not allow: reported
+    /// at the end, unless the hold on them named what escapes.
+    pub held: Vec<(Mismatch, Type, Type, Span)>,
 }
 
 /// A function's reader: the services it reads atoms through, which end

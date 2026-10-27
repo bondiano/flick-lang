@@ -10,8 +10,28 @@ impl Checker<'_> {
     pub fn show(&self, t: &Type) -> String {
         let mut out = String::new();
         let printer = Printer { store: &self.store };
-        printer.print(&self.zonk(t), Prec::Top, &mut out);
+        printer.print(&self.held_now(&self.zonk(t)), Prec::Top, &mut out);
         out
+    }
+
+    /// `t` with each qualifier as what it holds now.
+    fn held_now(&self, t: &Type) -> Type {
+        match t {
+            Type::Captured {
+                ty,
+                captures,
+                value,
+            } => Type::Captured {
+                ty: Box::new(self.held_now(ty)),
+                captures: Box::new(self.expanded(captures)),
+                value: *value,
+            },
+            Type::Bounded { ty, captures } => Type::Bounded {
+                ty: Box::new(self.held_now(ty)),
+                captures: Box::new(self.expanded(captures)),
+            },
+            _ => t.map_children(&mut |child| self.held_now(child)),
+        }
     }
 }
 

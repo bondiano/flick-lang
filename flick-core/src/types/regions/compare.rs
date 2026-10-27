@@ -6,7 +6,7 @@ use super::{Hold, Visible, capture_mismatch};
 use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::types::Checker;
-use crate::types::ty::Type;
+use crate::types::ty::{Norm, Type, capture_label};
 use crate::types::unify::{Mismatch, Unified};
 
 impl Checker<'_> {
@@ -36,6 +36,7 @@ impl Checker<'_> {
                 let right = cb.unwrap_or_else(Type::empty_row);
                 // the types first: what they solve decides what a qualifier holds
                 self.unify(&a, &b)?;
+                let (left, right) = (self.expanded(&left), self.expanded(&right));
                 match self.unify(&left, &right) {
                     Err(mismatch) if self.unknown_captures(&mismatch) => {
                         let span = self.regions.deferring.expect("checked");
@@ -62,18 +63,59 @@ impl Checker<'_> {
             })
     }
 
-    /// Compares the qualifiers deferred until their types were inferred.
+    /// A capture row whose entries are what they hold now: the entry of a
+    /// type variable since solved to a type is that type's captures.
+    pub fn expanded(&self, row: &Type) -> Type {
+        let norm = self.store.normalize(row);
+        let atom = |t: &Type| capture_label(&self.store.resolve(t)).is_some();
+        if norm
+            .entries
+            .iter()
+            .all(|(label, t)| !label.starts_with('^') || atom(t))
+        {
+            return row.clone();
+        }
+        let mut out = Norm::default();
+        for (label, t) in norm.entries {
+            if !label.starts_with('^') || atom(&t) {
+                out.entries.push((label, t));
+                continue;
+            }
+            match self.store.resolve(&t) {
+                row @ (Type::Row(_) | Type::Union(..)) => {
+                    self.capture_row_filtered(&row, &mut out, false);
+                }
+                other => self.collect_captures(&other, &mut out),
+            }
+        }
+        out.entries.sort_by(|a, b| a.0.cmp(&b.0));
+        out.entries.dedup_by(|a, b| a.0 == b.0);
+        out.tails.extend(norm.tails);
+        out.into_type()
+    }
+
+    /// Whether a region diagnostic already covers `span`.
+    fn hold_reported(&self, span: Span) -> bool {
+        self.diagnostics.iter().any(|d| {
+            [codes::G001, codes::G002].contains(&d.code)
+                && d.span
+                    .is_some_and(|s| s.start <= span.start && span.end <= s.end)
+        })
+    }
+
+    /// Compares the qualifiers deferred until their types were inferred, and
+    /// reports the captures no hold named.
     pub fn compare_deferred(&mut self) {
         for (left, right, span) in mem::take(&mut self.regions.deferred) {
-            let reported = self.diagnostics.iter().any(|d| {
-                [codes::G001, codes::G002].contains(&d.code)
-                    && d.span
-                        .is_some_and(|s| s.start <= span.start && span.end <= s.end)
-            });
             if let Err(mismatch) = self.unify(&left, &right)
-                && !reported
+                && !self.hold_reported(span)
             {
                 self.mismatch(&mismatch, &left, &right, span);
+            }
+        }
+        for (mismatch, actual, expected, span) in mem::take(&mut self.regions.held) {
+            if !self.hold_reported(span) {
+                self.mismatch(&mismatch, &actual, &expected, span);
             }
         }
     }
@@ -115,10 +157,31 @@ impl Checker<'_> {
             None => a,
         };
         let fits = self.subsume(&a, &e, span);
-        // a value whose type does not fit is reported once, by the type
-        if fits.as_ref().is_err_and(|m| !capture_mismatch(m)) {
-            self.regions.holds.truncate(mark);
+        self.held_fits(fits, mark, actual, expected, span)
+    }
+
+    /// The outcome of subsuming a value its holds since `mark` are about.
+    pub fn held_fits(
+        &mut self,
+        fits: Unified,
+        mark: usize,
+        actual: &Type,
+        expected: &Type,
+        span: Span,
+    ) -> Unified {
+        match fits {
+            // what a value holds beyond its position is the hold's to name
+            Err(mismatch) if capture_mismatch(&mismatch) => {
+                let held = (mismatch, actual.clone(), expected.clone(), span);
+                self.regions.held.push(held);
+                Ok(())
+            }
+            // a value whose type does not fit is reported once, by the type
+            Err(mismatch) => {
+                self.regions.holds.truncate(mark);
+                Err(mismatch)
+            }
+            Ok(()) => Ok(()),
         }
-        fits
     }
 }
