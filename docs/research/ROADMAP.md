@@ -193,7 +193,7 @@ component search (props : SearchProps) =
 **U6. Async в render — opt-in Suspense (§6.3).** ✅ `e8324e1`
 - AC: `Atom.task` даёт `Atom.Async a e` (`Loading`, `Loaded a`, `Failed (Failure e)`), match исчерпывающий; `Ui.suspended failed fallback render` + `Atom.ready` — opt-in, каждая ошибка обязана иметь место (`failed`); `Atom.ready` вне `Ui.suspended` — дефект с подсказкой.
 
-**U6b. 🆕 Хелпер «как Suspense», без смены умолчания.** ⬜
+**U6b. 🆕 Хелпер «как Suspense», без смены умолчания.** ✅ (`Ui.awaiting failed fallback render : View (Atom (Async a e))` — тело на Flick через `Ui.suspended`, атом приходит props: замыкание над атомом с переменной `a` не проходит проверку захватов; `suspended` получил захват `^c`, как `Ui.view`; e2e `tests/run/ui/awaiting.fl`)
 - AC: однострочная форма для простых экранов, например `Ui.awaiting task (fun value -> ui)` / `Ui.suspended_with default_failed fallback render`, сводится к `Ui.suspended` и не вводит новый механизм; пример в `reference/ui.md` сравнивает с ручным `match`.
 - AC: тип по-прежнему требует обработчик ошибки `e` (или `e = Never`); тест рантайма: loading → loaded → failed.
 - AC: никакой неявной приостановки: `Atom.get` на task-атоме по-прежнему даёт `Atom.Async`.
@@ -203,7 +203,7 @@ component search (props : SearchProps) =
 - **U7b. 🆕 `Ui r e` → `Ui`.** ✅ (строка обработчика фиксирована: `{Atom.Write}`, без ошибок; `mount` требует `Atom.Write`, супервизор получает `Failure none`; `FLICK-U001` проверяет и `Action.queue/concurrent`) AC: после U2/U3 параметры `r e` у `Ui` ничего не несут (обработчики — action со своей строкой) — тип схлопнут до `Ui` во всех builtins, тестах, docs и плейграунде; если какой-то параметр всё же нужен — записка с причиной в `implementation-decisions.md`, и он остаётся один. Deprecated-алиасов не оставляем.
 
 **U8. Бюджет.** ✅ `5daf143`, `20edc6a`
-- AC: counter на атомах ≤ 99 KB (B2 + 18), playground ≤ 110 KB gz; превышение валит `just bundle-size`.
+- AC: counter на атомах ≤ 99 KB (B2 + 18), playground ≤ 110 KB gz; превышение валит `just bundle-size`. После O2/O3 (span'ы action и debug-лог записей, ≈4,4 KB) бюджеты — 104 / 112 KB.
 
 **U9. 🆕 Граница с `effect/reactivity` (§6.6, план отхода).** ✅ (рантайм и запись сделаны; пункт про `Atom.Registry` для пользователей не выполнен: `type alias` сервиса компилятор не поддерживает — сервис в строке остаётся `Reactivity.Atom.Registry`, отдельный пункт U9b)
 - AC: импорты `effect/reactivity/*` в `runtime/src` только в `atoms.ts` и `runtime/src/effect/reactivity/*`; `ui/index.ts`, `ui/server.ts`, `ui/react/*` ходят через них (сейчас импортируют `Hydration`, `Atom`, `AsyncResult` напрямую); проверка — тест/oxlint-правило `no-restricted-imports`.
@@ -267,8 +267,8 @@ component search (props : SearchProps) =
 ### Трек O — observability (после S3, C6)
 
 **O1. Экспорт.** ✅ (`Otlp.tracer : Options ->{Scope s;} Tracer^{s}`, `with_tracer` принимает `Tracer^d`; пример `examples/observability` с e2e `flick/tests/examples.rs` на локальном приёмнике; run-тест `observability/tracer.fl`) AC: `Otlp.layer` из Flick, пример в `examples/` с локальным коллектором; `with_tracer` принимает OTLP-трейсер.
-**O2. Именованные span'ы action.** ⬜ AC: каждый запуск `Action` — span с меткой C6 и атрибутами политики; отклонение/прерывание — события span'а.
-**O3. Причинность записей.** ⬜ AC: запись атома несёт место в исходнике и id span'а/fiber'а; dev-логгер печатает «атом ← action ← событие ← span»; с `labels = "all"` (C6b) работает и в release.
+**O2. Именованные span'ы action.** ✅ (`Bridge.start` — `useSpan` с меткой action, без метки — `Ui.event`; атрибуты `flick.action.policy`, `capacity`/`limit`, `flick.event`, `flick.fiber`; события `rejected` (exhaust, вытесненный latest, полная очередь, предел concurrent) — на span'ах идущих задач, `interrupted`; `Action.with` сохраняет метку; `runtime/test/ui-spans.test.ts`) AC: каждый запуск `Action` — span с меткой C6 и атрибутами политики; отклонение/прерывание — события span'а.
+**O3. Причинность записей.** ✅ (записи `Atom.Write` при уровне Debug пишут `Effect.logDebug` «atom App.count ← action App.go ← event click ← span <id> (fiber #n) at App:14»; место даёт компилятор: lowering переписывает `Atom.set/update/modify` в `*_at "Module:line"`, операции `Atom.Write` принимают место первым аргументом (стек не годится: задача собирается лениво, кадра `.fl` в нём нет); имена — метки C6b, так что и в release) AC: запись атома несёт место в исходнике и id span'а/fiber'а; dev-логгер печатает «атом ← action ← событие ← span»; с `labels = "all"` (C6b) работает и в release.
 **O4. DevTools.** ⬜ AC: `flick dev --devtools` подключает `DevTools.layer`; видны span'ы action и записи атомов с метками.
 **O5. SSR-трейсинг.** ⬜ AC: trace context запроса продолжается в рендере и server fn; клиентский вызов server fn пробрасывает `traceparent`.
 
@@ -374,13 +374,13 @@ component search (props : SearchProps) =
 
 ```
 B0…B9 ✅ ─ B7b ✅                       (замер, независимо)
-S1 ✅ ─ U1…U6 ✅ ─ U7 ✅ ─ U7b ✅ ─ U6b
+S1 ✅ ─ U1…U6 ✅ ─ U7 ✅ ─ U7b ✅ ─ U6b ✅
         └─ R1…R4 ✅ ─ R5 ✅ ─ R6 ✅
 C2/C3/C4/C6 ✅ ─ C6b ✅
 C7a ✅ ─ C7b ✅ ─ C7c ✅ ─ C7d ✅ ─ C5 ✅            C1 ✅
 U9 ✅ ─ U9b
 S2 ✅ ─ F1 ✅ ─ F2 ─ F3 ─ F4 ─ F5 ─ F6
-S3 ─ S4 ─ O1 ─ O2 ─ O3 ─ O4 ─ O5      (O2/O3 после C6b)
+S3 ─ S4 ─ O1 ✅ ─ O2 ✅ ─ O3 ✅ ─ O4 ─ O5
 L1 ─ L2 ─ L3 (после O1) ─ L4 ─ L5
 H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ─ H6     (H2 по входам — после L6 ✅)
 D1 ✅ ─ D2 ─ D3 ─ D4 ─ D5 ─ D6 ─ D9 ─ D11 ─ D10 ─ D13 ─ D12 ─ D14 ─ D8   (D15 — с D4/D5; D7 ✅ после C1)
@@ -388,9 +388,9 @@ D1 ✅ ─ D2 ─ D3 ─ D4 ─ D5 ─ D6 ─ D9 ─ D11 ─ D10 ─ D13 ─ D12
 
 Вехи:
 1. «Видно в DevTools и меньше бандл» — ✅ (B0–B9, S1, S5, U1, C6).
-2. «Типы гарантируют» — 🔶: C1–C8, U2–U6, U7b ✅; осталось U6b.
-3. «SSR» — 🔶: R1–R4, R6, U7 ✅; осталось R5, U9.
-4. «Fullstack» — 🔶: S2, O1, F1 ✅; осталось F2–F3, O2–O3.
+2. «Типы гарантируют» — ✅: C1–C8, U2–U6, U6b, U7b.
+3. «SSR» — ✅: R1–R6, U7, U9.
+4. «Fullstack» — 🔶: S2, O1–O3, F1 ✅; осталось F2–F3.
 
 Ближайшее: Q17–Q28 (§7); прежние P1 из Q1–Q16 сохраняют приоритет. F2 — после F1/F6. Вехи выше требуют сверки с реализованными R5/U9/L6 и D-треком; отметка реализации не закрывает связанные замечания ревью. Трек C закрыт до F-трека; дальше — Q1.
 
