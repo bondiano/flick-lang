@@ -1,0 +1,20 @@
+default:
+Info checkout
+--log-level debug:
+Info checkout
+Debug details
+--trace:
+Info checkout
+/v1/traces: true
+"name":"shop": true
+"shop-cli": true
+without TraceFlag:
+DESCRIPTION
+  Checks out
+
+USAGE
+  shop [flags]
+
+GLOBAL FLAGS
+  --help, -h    Show help information
+CliError: Unrecognized flag: --trace in command shop

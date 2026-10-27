@@ -10,3 +10,4 @@ GLOBAL FLAGS
   --wizard                                                            Start wizard mode for a command
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT

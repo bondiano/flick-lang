@@ -18,7 +18,7 @@ import {
 } from "effect/cli";
 
 import type { Tagged } from "../data.ts";
-import { nodeModule } from "../host.ts";
+import { env, nodeModule } from "../host.ts";
 import { constructorName, tag } from "../tags.ts";
 import { type FlickFormatter, type FlickHelpDoc, fromEffectDoc, toEffectFormatter, withHelp } from "./output.ts";
 import type { Command as Spec, Param, Source } from "./spec.ts";
@@ -100,6 +100,35 @@ const action = (a: Spec["actions"][number]): GlobalFlag.GlobalFlag<boolean> =>
       present ? Effect.asVoid(a.run({ commandPath: context.commandPath, version: context.version })) : Effect.void,
   });
 
+/** `--trace`: whether the handler sends its telemetry over OTLP. */
+const TRACE = /*#__PURE__*/ GlobalFlag.Setting("trace")({
+  flag: Flag.withDefault(
+    Flag.withDescription(Flag.Boolean("trace"), "Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT"),
+    false,
+  ),
+});
+
+/**
+ * The handler of command `name`: under `--trace` a span of that name, with
+ * OTLP provided; the exporter loads only then and flushes as it ends.
+ */
+const traced = (name: string, handler: Effect.Effect<unknown, unknown, unknown>): Effect.Effect<void, unknown, unknown> =>
+  Effect.flatMap(Effect.serviceOption(TRACE), (trace) =>
+    Option.getOrElse(trace, () => false)
+      ? Effect.flatMap(
+          Effect.promise(() => import("../effect/observability/Otlp.ts")),
+          ({ otlpLayer }) =>
+            Effect.provide(
+              Effect.asVoid(Effect.withSpan(handler, name)),
+              otlpLayer({
+                url: env("OTEL_EXPORTER_OTLP_ENDPOINT") ?? "http://localhost:4318",
+                service_name: env("OTEL_SERVICE_NAME") ?? name,
+              }),
+            ),
+        )
+      : Effect.asVoid(handler),
+  );
+
 /**
  * Effect's command of a Flick command, its subcommands included. The flags
  * of a command with subcommands are shared flags: Effect parses them before
@@ -136,7 +165,7 @@ const command = (spec: Spec): Command.Command.Any => {
   };
   const handler = spec.handler;
   if (handler === null) return finish(Command.make(spec.name, config));
-  return finish(Command.make(spec.name, config, (options) => Effect.asVoid(handler(options))));
+  return finish(Command.make(spec.name, config, (options) => traced(spec.name, handler(options))));
 };
 
 /** What went wrong: Effect asks for the help of a command with the errors that caused it. */
@@ -152,6 +181,12 @@ const BUILT_INS: Readonly<Record<string, CliConfig.CliConfig.Service["builtIns"]
   CompletionsFlag: GlobalFlag.Completions,
   LogLevelFlag: GlobalFlag.LogLevel,
 };
+
+const TRACE_FLAG = "TraceFlag";
+
+/** The command of `spec` with `--trace`, a flag of Flick's rather than Effect's, when `trace`. */
+const root = (spec: Spec, trace: boolean): Command.Command.Any =>
+  trace ? Command.withGlobalFlags(command(spec), [TRACE]) : command(spec);
 
 /** `Cli.Settings`. */
 export interface Settings {
@@ -176,12 +211,15 @@ export const cliRunWith = (
   spec: Spec,
   args: ReadonlyArray<string>,
 ): Effect.Effect<void, unknown, unknown> =>
-  Command.runWith(command(spec), { version: settings.version, renderErrors: false })(args).pipe(
+  Command.runWith(root(spec, settings.builtIns.some((b) => constructorName(b._tag) === TRACE_FLAG)), {
+    version: settings.version,
+    renderErrors: false,
+  })(args).pipe(
     Effect.catchIf(CliError.isCliError, (error) => Effect.fail(cliError(error))),
     Effect.provide(services(settings)),
   );
 
-const ALL = /*#__PURE__*/ Object.keys(BUILT_INS).map((name) => ({ _tag: tag(`Cli.BuiltIn.${name}`) }));
+const ALL = /*#__PURE__*/ [...Object.keys(BUILT_INS), TRACE_FLAG].map((name) => ({ _tag: tag(`Cli.BuiltIn.${name}`) }));
 
 /** `Cli.run command args`, with `version` for `--version`. */
 export const cliRunVersion = (
@@ -199,7 +237,7 @@ const printed = (
   formatter: CliOutput.Formatter,
 ): Effect.Effect<string, never, unknown> =>
   Effect.flatMap(TestConsole.make, (console) =>
-    Command.runWith(command(spec), { version: "0.0.0", renderErrors: false })(args).pipe(
+    Command.runWith(root(spec, true), { version: "0.0.0", renderErrors: false })(args).pipe(
       Effect.ignore,
       Effect.provideService(Console.Console, console),
       Effect.provide(

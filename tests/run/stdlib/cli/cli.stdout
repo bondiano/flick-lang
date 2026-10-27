@@ -23,6 +23,7 @@ GLOBAL FLAGS
   --wizard                                                            Start wizard mode for a command
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 CliError: Invalid value for flag --times: "abc". Expected: not a number: abc
 $ --color blue Ada
 DESCRIPTION
@@ -45,6 +46,7 @@ GLOBAL FLAGS
   --wizard                                                            Start wizard mode for a command
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 CliError: Invalid value for flag --color: "blue". Expected: expected one of red, green-light, got blue
 $ --nope Ada
 DESCRIPTION
@@ -67,6 +69,7 @@ GLOBAL FLAGS
   --wizard                                                            Start wizard mode for a command
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 CliError: Unrecognized flag: --nope in command greet
 $ 
 DESCRIPTION
@@ -89,6 +92,7 @@ GLOBAL FLAGS
   --wizard                                                            Start wizard mode for a command
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 CliError: Missing required argument: name
 $ 1 2 3.5
 6.5
@@ -108,6 +112,7 @@ GLOBAL FLAGS
   --wizard                                                            Start wizard mode for a command
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 CliError: Missing required argument: numbers
 $ greet Cy
 Hello, CyNone
@@ -131,6 +136,7 @@ GLOBAL FLAGS
   --wizard                                                            Start wizard mode for a command
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 
 SUBCOMMANDS
   greet    Prints a greeting
@@ -157,6 +163,7 @@ GLOBAL FLAGS
   --wizard                                                            Start wizard mode for a command
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 $ --help
 DESCRIPTION
   Project tools
@@ -173,6 +180,7 @@ GLOBAL FLAGS
   --wizard                                                            Start wizard mode for a command
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 
 SUBCOMMANDS
   greet    Prints a greeting

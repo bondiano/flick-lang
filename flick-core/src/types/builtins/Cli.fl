@@ -358,13 +358,17 @@ foreign effect completions from "@flick-lang/runtime/cli" "cliCompletions"
 
 /// The flags every command line has unless `Settings` leave them out:
 /// `--help`, `--version`, `--wizard` (asks for each value on the terminal),
-/// `--completions <shell>` and `--log-level <level>` (the handler's minimum).
-type BuiltIn = HelpFlag | VersionFlag | WizardFlag | CompletionsFlag | LogLevelFlag
+/// `--completions <shell>`, `--log-level <level>` (the handler's minimum)
+/// and `--trace`: the handler runs as a span named after its command, and
+/// its spans, logs and metrics go over OTLP to `OTEL_EXPORTER_OTLP_ENDPOINT`
+/// (`http://localhost:4318` by default) as service `OTEL_SERVICE_NAME`
+/// (the command's name by default).
+type BuiltIn = HelpFlag | VersionFlag | WizardFlag | CompletionsFlag | LogLevelFlag | TraceFlag
   deriving Eq, Show
 
-/// Every built-in flag, in Effect's order.
+/// Every built-in flag: Effect's, in its order, then `--trace`.
 builtins : List BuiltIn
-let builtins = [HelpFlag, VersionFlag, WizardFlag, CompletionsFlag, LogLevelFlag]
+let builtins = [HelpFlag, VersionFlag, WizardFlag, CompletionsFlag, LogLevelFlag, TraceFlag]
 
 /// How `run_with` runs: the text of `--version`, the built-in flags, and the
 /// formatter of help (`None`: Effect's, colored on a terminal).

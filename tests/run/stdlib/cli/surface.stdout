@@ -32,6 +32,7 @@ GLOBAL FLAGS
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
   --license                                                           Prints the license
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 
 EXAMPLES
   # Deploys to prod in eu
@@ -64,6 +65,7 @@ GLOBAL FLAGS
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
   --license                                                           Prints the license
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 
 EXAMPLES
   # Deploys to prod in eu
@@ -96,6 +98,7 @@ GLOBAL FLAGS
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
   --license                                                           Prints the license
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 
 EXAMPLES
   # Deploys to prod in eu
@@ -128,6 +131,7 @@ GLOBAL FLAGS
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
   --license                                                           Prints the license
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 
 EXAMPLES
   # Deploys to prod in eu
@@ -165,6 +169,7 @@ GLOBAL FLAGS
   --wizard                                                            Start wizard mode for a command
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 CliError: Invalid value for flag --dir: "$TMP/missing". Expected: Path does not exist: $TMP/missing
 $ --dir $TMP --notes $TMP/missing.txt word
 USAGE
@@ -186,6 +191,7 @@ GLOBAL FLAGS
   --wizard                                                            Start wizard mode for a command
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 CliError: Invalid value for flag --notes: "$TMP/missing.txt". Expected: File does not exist: $TMP/missing.txt
 $ --dir $TMP
 USAGE
@@ -207,6 +213,7 @@ GLOBAL FLAGS
   --wizard                                                            Start wizard mode for a command
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 CliError: Missing required argument: rest
 files ok
 $ --version
@@ -217,11 +224,11 @@ $ --completions fish
 usage deploy [flags] <target> flags ["env:key=value", "level:string", "color:[=string]", "at:string", "tags:string", "owner:string"] args ["target:string"]
 CliError: Unrecognized flag: --completions in command deploy
 parse Ok 12 Ok ("a", "b=c") extra true
-settings 0.0.0 [HelpFlag, VersionFlag, WizardFlag, CompletionsFlag, LogLevelFlag] true
+settings 0.0.0 [HelpFlag, VersionFlag, WizardFlag, CompletionsFlag, LogLevelFlag, TraceFlag] true
 deploy v9.9.9
 help_doc usage tool deploy [flags] <target> flags ["env:key=value", "level:string", "color:[=string]", "at:string", "tags:string", "owner:string"] args ["target:string"]
 examples ["deploy -e region=eu prod / Some \"Deploys to prod in eu\"", "deploy prod / None"]
-global flags ["help", "version", "wizard", "completions", "log-level", "license"]
+global flags ["help", "version", "wizard", "completions", "log-level", "trace", "license"]
 subcommands [["deploy Some \"d\" Some \"Ships it\""]]
 groups [None]
 DESCRIPTION
@@ -248,6 +255,7 @@ GLOBAL FLAGS
   --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
   --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
   --license                                                           Prints the license
+  --trace                                                             Send spans, logs and metrics to OTEL_EXPORTER_OTLP_ENDPOINT
 
 EXAMPLES
   # Deploys to prod in eu

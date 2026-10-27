@@ -126,7 +126,12 @@ let main () =
 `--help`, `--version` and `--completions bash|zsh|fish|powershell` print to
 stdout and run no handler. `--wizard` asks for the command's flags and
 arguments one at a time, then runs it; `--log-level debug` (any level from
-`all` to `none`) sets the minimum level of the program's log. Invalid input — an unknown flag, a missing argument, a value
+`all` to `none`) sets the minimum level of the program's log. `--trace`
+runs the handler as a span named after its command and sends its spans,
+logs and metrics over OTLP to `OTEL_EXPORTER_OTLP_ENDPOINT`
+(`http://localhost:4318` by default) as the service `OTEL_SERVICE_NAME`
+(the command's name by default); without it nothing loads the exporter.
+`Cli.run_with` with `builtIns` leaving out `Cli.TraceFlag` removes it. Invalid input — an unknown flag, a missing argument, a value
 `Cli.Value` refuses — prints the command's help and fails with
 `Cli.CliError` and Effect's text; no handler runs, and `App.fail` turns it
 into exit code 1. The flags of a command with subcommands come before the
