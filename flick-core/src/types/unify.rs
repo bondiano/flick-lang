@@ -181,7 +181,7 @@ impl Store {
             tail = inner.tail.map(|t| *t);
         }
         entries.sort_by(|a, b| a.0.cmp(&b.0));
-        entries.dedup_by(|a, b| a.0 == b.0);
+        entries.dedup();
         Row {
             entries,
             tail: tail.map(Box::new),
@@ -195,7 +195,8 @@ impl Store {
         let mut norm = Norm::default();
         self.collect_row(t, &mut norm);
         norm.entries.sort_by(|a, b| a.0.cmp(&b.0));
-        norm.entries.dedup_by(|a, b| a.0 == b.0);
+        // the same name with other arguments stays, for unification to compare
+        norm.entries.dedup();
         norm
     }
 
@@ -274,12 +275,17 @@ impl Store {
     }
 }
 
-/// The current label of a row entry: a capture row entry follows its element.
+/// The current label of a row entry: a capture row entry, and a type
+/// variable of an error row, follow their element.
 fn relabel(label: &str, t: &Type) -> String {
-    match label.starts_with('^').then(|| super::ty::capture_label(t)) {
-        Some(Some(label)) => label,
-        _ => label.to_owned(),
-    }
+    let current = if label.starts_with('^') {
+        super::ty::capture_label(t)
+    } else if label.starts_with('~') {
+        super::ty::error_label(t)
+    } else {
+        None
+    };
+    current.unwrap_or_else(|| label.to_owned())
 }
 
 impl Checker<'_> {

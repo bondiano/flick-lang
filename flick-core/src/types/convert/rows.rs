@@ -29,11 +29,15 @@ impl Checker<'_> {
         let items: Vec<&Node> = node.nodes().filter(|n| is_type(n.kind)).collect();
         let tail = node.nodes().find(|n| n.kind == K::RowTail);
         let kind = self.row_kind(&items, kind, node);
+        // `{t | e}` and `{NotFound, t}`: beside other elements, a variable of
+        // an error row is an element, the error type it will stand for
+        let element_variable = kind == Kind::ErrorRow && (items.len() > 1 || tail.is_some());
         let single_row = |item: &Node| {
             item.kind == K::UnionType
                 || (item.kind == K::NameType && item.has_token(K::NoneKw))
                 || (item.kind == K::NameType
                     && kind != Kind::CaptureRow
+                    && !element_variable
                     && item
                         .child_tokens()
                         .next()
@@ -156,6 +160,7 @@ impl Checker<'_> {
                 Some(format!("{module}.{name}"))
             }
             _ if *kind == Kind::CaptureRow => ty::capture_label(ty),
+            _ if *kind == Kind::ErrorRow => ty::error_label(ty),
             Type::Var(name) => Some(name.clone()),
             Type::Skolem(s) => Some(self.store.skolem_name(*s).to_owned()),
             _ => None,

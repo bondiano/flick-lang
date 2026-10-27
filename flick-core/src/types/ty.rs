@@ -219,6 +219,19 @@ pub fn capture_label(t: &Type) -> Option<String> {
     }
 }
 
+/// The label of a type variable as an element of an error row, `{t | e}`.
+/// It follows the element until the variable stands for an error type,
+/// which is then labelled by its name like any other.
+pub fn error_label(t: &Type) -> Option<String> {
+    match t.spine().0 {
+        Type::Con { module, name } => Some(format!("{module}.{name}")),
+        Type::Var(name) => Some(format!("~{name}")),
+        Type::Skolem(s) => Some(format!("~'{s}")),
+        Type::Meta(m) => Some(format!("~?{m}")),
+        _ => None,
+    }
+}
+
 impl Type {
     pub fn con(module: &str, name: &str) -> Type {
         Type::Con {

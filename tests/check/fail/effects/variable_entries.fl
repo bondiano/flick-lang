@@ -1,0 +1,34 @@
+// What a row with a type variable element covers, and nothing more.
+module App.VariableEntries exposing (..)
+
+type error NotFound = NotFound String
+
+type error Conflict = Conflict String
+
+type Covered (e : ErrorRow)
+
+nothing : Covered none
+foreign pure nothing from "./covered.mjs" "nothing"
+
+cover : forall t e. t -> Covered e -> Covered {t | e}
+foreign pure cover from "./covered.mjs" "cover"
+  arity 2
+
+handle : forall e. Covered e -> (Unit ->{; e} Number) -> Unit
+foreign pure handle from "./covered.mjs" "handle"
+  arity 2
+
+either : Unit ->{; NotFound, Conflict} Number
+let either _ = from_result (Err (Conflict "x"))
+
+uncovered : Unit
+let uncovered = handle nothing either
+
+half : Unit
+let half = handle (nothing |> cover (NotFound "")) either
+
+wrong : Covered {Conflict}
+let wrong = nothing |> cover (NotFound "")
+//~ FLICK-E002 @25:32-25:38 does not allow errors `Conflict`, `NotFound`
+//~ FLICK-E002 @28:52-28:58 does not allow error `Conflict`
+//~ FLICK-T003 @31:13-31:43 expected `Covered {Conflict}`, found `Covered {NotFound}`

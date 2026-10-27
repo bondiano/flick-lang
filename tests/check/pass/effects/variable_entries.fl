@@ -1,0 +1,47 @@
+// A type variable as an element of an error row: `{t | e}` adds the error
+// that `t` stands for, so a value can say which errors it covers.
+module App.VariableEntries exposing (..)
+
+type error NotFound = NotFound String
+
+type error Conflict = Conflict String
+
+type error Invalid e = Invalid (Errors e)
+
+/// Errors a handler may fail with, one witness each.
+type Covered (e : ErrorRow)
+
+nothing : Covered none
+foreign pure nothing from "./covered.mjs" "nothing"
+
+cover : forall t e. t -> Covered e -> Covered {t | e}
+foreign pure cover from "./covered.mjs" "cover"
+  arity 2
+
+handle : forall e. Covered e -> (Unit ->{; e} Number) -> Unit
+foreign pure handle from "./covered.mjs" "handle"
+  arity 2
+
+missing : Unit ->{; NotFound} Number
+let missing _ = from_result (Err (NotFound "x"))
+
+either : Unit ->{; NotFound, Conflict} Number
+let either _ = from_result (Err (Conflict "x"))
+
+one : Unit
+let one = handle (nothing |> cover (NotFound "")) missing
+
+two : Unit
+let two = handle (nothing |> cover (NotFound "") |> cover (Conflict "")) either
+
+// the order of the covers does not matter
+swapped : Unit
+let swapped = handle (nothing |> cover (Conflict "") |> cover (NotFound "")) either
+
+// a handler that fails with fewer errors than are covered
+fewer : Unit
+let fewer = handle (nothing |> cover (NotFound "") |> cover (Conflict "")) missing
+
+// the shape a signature states, before anything is covered
+covering : forall e. Covered e -> Covered {NotFound | e}
+let covering covered = cover (NotFound "") covered

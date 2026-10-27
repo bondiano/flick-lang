@@ -91,7 +91,7 @@ impl Printer<'_> {
                 if row
                     .entries
                     .iter()
-                    .all(|(l, _)| l.contains('.') || l.starts_with('^')) =>
+                    .all(|(l, _)| l.contains('.') || l.starts_with(['^', '~'])) =>
             {
                 if row.entries.is_empty() && row.tail.is_none() {
                     out.push_str("none");

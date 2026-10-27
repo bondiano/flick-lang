@@ -31,6 +31,8 @@ impl Checker<'_> {
             self.capture_row(left, &mut left_norm);
             self.capture_row(right, &mut right_norm);
         }
+        self.merge_same_names(&mut left_norm)?;
+        self.merge_same_names(&mut right_norm)?;
         let (left, right) = (left_norm, right_norm);
         let (mut only_left, mut only_right) = (Vec::new(), Vec::new());
         let (mut i, mut j) = (0, 0);
@@ -71,6 +73,7 @@ impl Checker<'_> {
         if tails_left.contains(&Type::Error) || tails_right.contains(&Type::Error) {
             return Ok(());
         }
+        self.pair_variable(&mut only_left, &mut only_right, &tails_left, &tails_right)?;
         let missing = |only: &[(String, Type)], left| {
             only.first().map_or(Ok(()), |(label, _)| {
                 Err(Mismatch::Label {
@@ -109,6 +112,51 @@ impl Checker<'_> {
                 Err(Mismatch::Types(left.into_type(), right.into_type()))
             }
         }
+    }
+}
+
+impl Checker<'_> {
+    /// A closed row whose one unmatched element is a type variable, `{t}`
+    /// against `{NotFound}`: the variable is that element.
+    fn pair_variable(
+        &mut self,
+        only_left: &mut Vec<(String, Type)>,
+        only_right: &mut Vec<(String, Type)>,
+        tails_left: &[Type],
+        tails_right: &[Type],
+    ) -> Unified {
+        let variable =
+            |only: &[(String, Type)]| matches!(only, [(label, _)] if label.starts_with('~'));
+        let pair = match (&only_left[..], &only_right[..]) {
+            ([(_, l)], [(_, r)])
+                if variable(only_left) && tails_left.is_empty()
+                    || variable(only_right) && tails_right.is_empty() =>
+            {
+                Some((l.clone(), r.clone()))
+            }
+            _ => None,
+        };
+        if let Some((l, r)) = pair {
+            self.unify(&l, &r)?;
+            only_left.clear();
+            only_right.clear();
+        }
+        Ok(())
+    }
+
+    /// Unifies the elements of a row that have one name: `ValidationError a`
+    /// and `ValidationError b` once a variable became the first.
+    fn merge_same_names(&mut self, norm: &mut Norm) -> Unified {
+        let mut i = 1;
+        while i < norm.entries.len() {
+            if norm.entries[i].0 == norm.entries[i - 1].0 {
+                let (kept, same) = (norm.entries[i - 1].1.clone(), norm.entries.remove(i).1);
+                self.unify(&kept, &same)?;
+            } else {
+                i += 1;
+            }
+        }
+        Ok(())
     }
 }
 
