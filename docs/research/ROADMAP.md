@@ -442,19 +442,19 @@ D1 ✅ ─ D2 ─ D3 ─ D4 ─ D5 ─ D6 ─ D9 ─ D11 ─ D10 ─ D13 ─ D12
 **Q1. P1 — Serving теряет DI-требования** ✅ (строка сервисов в типах: `HttpApi.Group n r hs`, `HttpApi.Api r gs`, `Rpc.Group r hs`; `add` унифицирует `r` обработчика эндпоинта/процедуры с группой, `listen`/`listen_websocket`/`listen_tcp`/`handler`/`serve_stdio`/`call_local` требуют её; `tests/check/fail/stdlib/serving_services.fl`)
 [listen](../../flick-core/src/types/builtins/HttpApi.fl#L276-L284) не связывает r с handlers. Users без Layer компилируется; RPC — Service not found, HTTP — 500. Учитывать r handlers/middleware на serving boundary; без Layer — compile error.
 
-**Q2. P1 — HttpOnly login даёт ложную ошибку**
+**Q2. P1 — HttpOnly login даёт ложную ошибку** ✅ (значение cookie `security_set_cookie` — `Option (Redacted String)`: сервер ставит его при `Some`, `call` при скрытом `Set-Cookie` успешен с `None`, браузер шлёт cookie сам; `runtime/test/httpapi.test.ts`, `tests/run/stdlib/http/api_bodies.fl`)
 Chromium сохранил cookie после 200, но [HttpApi.call требует скрытый Set-Cookie](../../runtime/src/httpapi/client.ts#L166-L178). Отделить server extras от client success: login и session работают без раскрытия секрета JS.
 
-**Q3. P1 — Controlled fields не принимают Host**
+**Q3. P1 — Controlled fields не принимают Host** ✅ (`with_host` над `field`/`field_area` кладёт атрибуты на сам input/textarea: узел поля несёт `hosted`, повторный `with_host` дополняет; caret, сброс состояния и SSR сохраняют их; `runtime/test/ui-fields.test.ts`, `tests/run/ui/host_field.fl`)
 `with_host (field …)` компилируется, импорт JS падает: component вместо element. [FieldProps](../../flick-core/src/types/builtins/Ui.fl#L262-L282) не имеет Host. Нужны id/ARIA на input/textarea, сохранение caret/IME/reset/SSR.
 
-**Q4. P1 — Публичный реэкспорт теряется**
+**Q4. P1 — Публичный реэкспорт теряется** ✅ (модуль, экспортирующий импортированное, пишет `export { … } from` модуля-владельца в JS/TS и `.d.ts`, типы без значения — `export type`; identity та же, что у владельца; `flick/tests/dts_command.rs`)
 Barrel с pair собирается, но JS export отсутствует, TS2305. [Dts](../../flick-core/src/codegen/ts/dts.rs#L20-L25) отбрасывает чужой defining module. Value/type re-exports должны сохранять identity во Flick/JS/TS.
 
 **Q5. P2 — Поздний generic теряет inference**
 `pair(1)("x")` имеет `[number,unknown]`: [оба generic на первой стадии](../../flick-core/src/codegen/ts.rs#L80-L135). Вводить B на своей стадии, включая поздние R/E, без смены ABI.
 
-**Q6. P1 — Reference противоречит контрактам**
+**Q6. P1 — Reference противоречит контрактам** ✅ (пример `save_button` EN/RU — обработчик с `Atom.Write`, дословно код фикстуры `tests/check/pass/ui/save_button.fl`, сверку держит `ui_reference_example_is_a_checked_fixture`; MVU-план заменён atom-first: цикла `Msg → update` нет и не планируется; `Ui.text` в spec/10 больше не «полиморфна по строкам»)
 [UI-пример](../src/content/docs/reference/ui.md#L12-L31) с Users/SaveError даёт E002; save_button fixture проходит. [MVU-план](../src/content/docs/reference/ui.md#L525-L539) противоречит atom-first; DSL назван any вопреки T003. Нужны проверяемые EN/RU-примеры.
 
 **Q7. P1 — Неполная Effect/TS-граница**
@@ -464,6 +464,8 @@ Eff сохраняет fiber/service/error identity. Stream работает в 
 
 **Q8. P1 — Error row не гарантирует wire-codecs**
 NotFound без with_errors принимается и становится 500 — [заявленный fallback](../../flick-core/src/types/builtins/HttpApi.fl#L177-L188). Проверять полноту codecs по error row: новый Conflict без codec отвергается до запуска. AC для S2/F2.
+
+Блокер: `List ErrorCase` не несёт типов, а строка ошибок ключуется именем конструктора — `Cases {t | e}` с переменной `t` отвергается (T002). Нужна переменная типа как элемент строки ошибок либо ограничение «у каждого члена строки есть codec»; решение по дизайну до кода.
 
 **Q9. P1 — Нет SQL-транзакционной композиции**
 Первая запись пережила CHECK-ошибку второй; при pool=1 чужой ROLLBACK отменил успешную запись B. [Запросы отдельно берут connection](../../runtime/src/sql/pg.ts#L138-L184). Нужен scoped transaction с commit/rollback и изоляцией callers; raw BEGIN/Tx.atomically не замена. До F3/F6.
