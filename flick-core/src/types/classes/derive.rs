@@ -255,7 +255,10 @@ impl<'n> Checker<'_> {
                 dicts.push(Dict::Error);
                 continue;
             }
-            let (shown, class) = (self.show(field), class.clone().unwrap_or_default());
+            // the field's type as written: its implicit capture row is not
+            // part of what the reader declared
+            let (bare, _) = self.whnf_captured(field);
+            let (shown, class) = (self.show(&bare), class.clone().unwrap_or_default());
             let name = &d.instance.name;
             self.diagnostics.push(
                 Diagnostic::error(
