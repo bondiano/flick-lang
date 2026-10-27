@@ -467,7 +467,8 @@ let host =
   }
 
 /// The element `node` with the host attributes `attrs`; `data` names are
-/// lowercase letters, digits and hyphens, written `data-<name>`. A node
+/// lowercase letters, digits and hyphens, written `data-<name>`. On a
+/// `field` or `field_area` they go on its input or text area. Another node
 /// that is not an element is a defect.
 with_host : forall c. Host -> Ui^c -> Ui^c
 foreign pure with_host from "@flick-lang/runtime/ui/react" "uiWithHost"

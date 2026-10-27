@@ -1,0 +1,15 @@
+// Host attributes on a bound field land on its input: an id a label points
+// at, and ARIA, the same in server HTML.
+module App.Main exposing (main)
+
+name : Atom.Writable String
+let name = Atom.make "Ann"
+
+form : Ui
+let form =
+  let field = Ui.field { bind = name; placeholder = "Name"; on_input = None }
+  let hinted = Ui.with_host { Ui.host with id = Some "name"; aria_describedby = Some "hint" } field
+  Ui.with_host { Ui.host with aria_label = Some "Your name" } hinted
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (Ui.Server.to_html form)

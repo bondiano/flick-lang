@@ -24,7 +24,7 @@ import { Failure } from "../../cause.ts";
 import { service } from "../../effects.ts";
 import { syncAbi, syncIn } from "../../sync.ts";
 import { BridgeContext, type Events, RegistryContext, StreamContext, toReact } from "./render.ts";
-import { type Binding, type DomEvent, type Static, type Ui, element, inputSnapshot, uiComponent, uiFragment } from "./nodes.ts";
+import { type Attrs, type Binding, type DomEvent, type Static, type Ui, element, inputSnapshot, uiComponent, uiFragment } from "./nodes.ts";
 import { type Handler, instanceActions } from "./policies.ts";
 
 /**
@@ -259,6 +259,8 @@ interface FieldState {
   readonly bind: Atom.Writable<string>;
   readonly placeholder: string;
   readonly input: Binding | undefined;
+  /** Host attributes of the element, from `Ui.with_host`. */
+  readonly attrs: Attrs;
 }
 
 /**
@@ -266,7 +268,7 @@ interface FieldState {
  * change goes to it synchronously, inside the DOM callback, so React keeps
  * the caret and an IME composition intact; `on_input` then runs as a task.
  */
-const Field = ({ tag, bind, placeholder, input }: FieldState): ReactNode => {
+const Field = ({ tag, bind, placeholder, input, attrs }: FieldState): ReactNode => {
   const registry = registryOf("a field binds a state");
   const bridge = useContext(BridgeContext);
   const subscribe = useCallback((changed: () => void) => registry.subscribe(bind, changed), [registry, bind]);
@@ -282,7 +284,7 @@ const Field = ({ tag, bind, placeholder, input }: FieldState): ReactNode => {
     registry.set(bind, event.target.value);
     listener?.callback(event);
   };
-  return createElement(tag, { value, placeholder, onChange, ...(tag === "textarea" ? { spellCheck: false } : {}) });
+  return createElement(tag, { ...attrs, value, placeholder, onChange, ...(tag === "textarea" ? { spellCheck: false } : {}) });
 };
 
 interface FieldProps {
@@ -291,14 +293,24 @@ interface FieldProps {
   readonly on_input: Option.Option<Handler>;
 }
 
+const fieldWith = (tag: "input" | "textarea", props: FieldProps, attrs: Attrs): Ui => {
+  const input = Option.isSome(props.on_input) ? { handler: props.on_input.value, snapshot: inputSnapshot } : undefined;
+  const toUi: Static = (read) => element(tag, { ...attrs, placeholder: props.placeholder, value: String(read(props.bind)) }, {}, []);
+  const state: FieldState = { tag, bind: props.bind, placeholder: props.placeholder, input, attrs };
+  return Object.freeze({
+    kind: "component",
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the field's props are its state
+    component: Field as FunctionComponent<object>,
+    props: state,
+    static: toUi,
+    hosted: (add: (attrs: Attrs) => Attrs) => fieldWith(tag, props, add(attrs)),
+  });
+};
+
 const field =
   (tag: "input" | "textarea") =>
-  (props: FieldProps): Ui => {
-    const input = Option.isSome(props.on_input) ? { handler: props.on_input.value, snapshot: inputSnapshot } : undefined;
-    const toUi: Static = (read) => element(tag, { placeholder: props.placeholder, value: String(read(props.bind)) }, {}, []);
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the field's props are its state
-    return uiComponent(Field as FunctionComponent<object>, { tag, bind: props.bind, placeholder: props.placeholder, input }, toUi);
-  };
+  (props: FieldProps): Ui =>
+    fieldWith(tag, props, {});
 
 /** `Ui.field`: an input showing `bind` and writing each keystroke to it at once. */
 export const uiField = /*#__PURE__*/ field("input");

@@ -25,6 +25,8 @@ export interface DomEvent {
   preventDefault(): void;
 }
 
+export type Attrs = Readonly<Record<string, string | boolean | number>>;
+
 export type Ui =
   | { readonly kind: "text"; readonly value: string }
   | { readonly kind: "fragment"; readonly children: ReadonlyArray<Ui> }
@@ -35,11 +37,13 @@ export type Ui =
       readonly props: object;
       /** How a component of the runtime (a view, a field) renders without React, for `Ui.Server.to_html`. */
       readonly static?: Static;
+      /** A component rendering one element (a field): the same one whose element's attributes go through `add`, for `Ui.with_host`. */
+      readonly hosted?: (add: (attrs: Attrs) => Attrs) => Ui;
     }
   | {
       readonly kind: "element";
       readonly tag: string;
-      readonly attrs: Readonly<Record<string, string | boolean | number>>;
+      readonly attrs: Attrs;
       readonly events: Readonly<Record<string, Binding>>;
       readonly children: ReadonlyArray<Ui>;
       /** Trusted HTML, inserted as it is. */
@@ -246,10 +250,9 @@ interface Host {
 
 const onOff = (on: boolean): string => (on ? "on" : "off");
 
-/** `Ui.with_host`: the element with these host attributes. */
-export const uiWithHost = (host: Host, node: Ui): Ui => {
-  if (node.kind !== "element") throw new TypeError("host attributes go on an element, not on a " + node.kind);
-  const attrs: Record<string, string | boolean | number> = { ...node.attrs };
+/** `attrs` with the host attributes `host` sets. */
+const hostAttrs = (host: Host, base: Attrs): Attrs => {
+  const attrs: Record<string, string | boolean | number> = { ...base };
   const put = <A>(name: string, value: Option.Option<A>, write: (a: A) => string | number): void => {
     if (Option.isSome(value)) attrs[name] = write(value.value);
   };
@@ -269,7 +272,14 @@ export const uiWithHost = (host: Host, node: Ui): Ui => {
     if (!/^[a-z][a-z0-9-]*$/.test(name)) throw new RangeError(`\`data-${name}\` is not an attribute name: use lowercase letters, digits and hyphens`);
     attrs[`data-${name}`] = value;
   }
-  return Object.freeze({ ...node, attrs: Object.freeze(attrs) });
+  return Object.freeze(attrs);
+};
+
+/** `Ui.with_host`: the element, or the field, with these host attributes. */
+export const uiWithHost = (host: Host, node: Ui): Ui => {
+  if (node.kind === "component" && node.hosted !== undefined) return node.hosted((attrs) => hostAttrs(host, attrs));
+  if (node.kind !== "element") throw new TypeError("host attributes go on an element, not on a " + node.kind);
+  return Object.freeze({ ...node, attrs: hostAttrs(host, node.attrs) });
 };
 
 /** `Ui.heading_at`: a heading of the level `H1` … `H6`. */

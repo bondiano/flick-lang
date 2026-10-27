@@ -10,7 +10,8 @@ import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 
-import { type Renderer, type Ui, eventLatest, eventQueue, uiField, uiFieldArea, uiRender, uiRunWith, uiView } from "../src/ui/react/index.ts";
+import { uiToHtml } from "../src/ui/html.ts";
+import { type Renderer, type Ui, eventLatest, eventQueue, uiField, uiFieldArea, uiRender, uiRunWith, uiView, uiWithHost } from "../src/ui/react/index.ts";
 
 const tick = (ms = 5): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -88,6 +89,31 @@ test("a write to the state from elsewhere shows in the field", async () => {
   await tick();
   assert.equal(inputOf(container).value, "");
   await stop();
+});
+
+test("host attributes reach the bound element, which keeps the caret and follows a reset", async () => {
+  const none = { id: Option.none(), class_name: Option.none(), role: Option.none(), aria_label: Option.none(), aria_describedby: Option.none(), aria_hidden: Option.none(), aria_pressed: Option.none(), aria_live: Option.none(), tab_index: Option.none(), data: [], auto_capitalize: Option.none(), auto_correct: Option.none(), wrap: Option.none() };
+  const registry = AtomRegistry.make();
+  const name = Atom.make("abc");
+  const labelled = uiWithHost({ ...none, id: Option.some("name"), aria_describedby: Option.some("hint") }, uiField({ bind: name, placeholder: "", on_input: Option.none() }));
+  const field = uiWithHost({ ...none, aria_label: Option.some("Name"), auto_capitalize: Option.some(false) }, labelled);
+  const { container, stop } = mount(field, registry);
+  await tick();
+  const input = inputOf(container);
+  assert.deepEqual(
+    ["id", "aria-describedby", "aria-label", "autocapitalize"].map((a) => input.getAttribute(a)),
+    ["name", "hint", "Name", "off"],
+  );
+  type(input, "axbc", 2);
+  assert.equal(registry.get(name), "axbc");
+  assert.equal(input.selectionStart, 2);
+  flushSync(() => registry.set(name, ""));
+  await tick();
+  assert.equal(inputOf(container).value, "");
+  assert.equal(inputOf(container).id, "name");
+  await stop();
+  const area = uiWithHost({ ...none, id: Option.some("bio") }, uiFieldArea({ bind: Atom.make("x"), placeholder: "", on_input: Option.none() }));
+  assert.equal(uiToHtml(area), '<textarea id="bio" placeholder="">x</textarea>');
 });
 
 test("`on_input` runs as a task after the state has the text", async () => {
