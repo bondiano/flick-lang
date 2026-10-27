@@ -11,6 +11,7 @@ mod inspect;
 mod pack;
 mod run;
 mod scaffold;
+mod summary;
 mod test;
 mod tools;
 

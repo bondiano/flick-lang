@@ -15,7 +15,7 @@ title: "Командная строка"
 | `new <dir> [--template app\|cli\|lib]` | создаёт проект: `flick.toml`, `package.json`, пример модуля и его тест; `cli` делает `main` [блоком `cli`](../cli-dsl/) |
 | `init [--template app\|cli\|lib]` | создаёт те же файлы в рабочем каталоге; перед записью сообщает обо всех файлах, которые уже существуют (`FLICK-P019`) |
 | `check [paths] [--watch] [--fix]` | проверяет код; если пути не указаны, проверяет корневые каталоги исходников и тестов; `--fix` применяет к этим файлам исправления, не меняющие смысла программы (например, убирает избыточную аннотацию типа, `FLICK-T021`), и сообщает об оставшихся проблемах |
-| `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts] [--emit-dts] [--schema-aot] [--out-dir] [--watch]` | записывает ESM, карты исходников и файлы `.iface` |
+| `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts] [--emit-dts] [--schema-aot] [--out-dir] [--watch]` | записывает ESM, карты исходников и файлы `.iface`; затем, если нет `--quiet` и `--diagnostics json`, сообщает в stderr, сколько модулей скомпилировано и какой раннер запускает каждый вход, либо сколько найдено ошибок и где |
 | `build [paths] --inputs` | выводит консервативный JSON-инвентарь входов (`key`, `files`, `roots`, `modules`), не записывая артефакты и кеш |
 | `run [name] [--entry M] [--profile] [--devtools[=url]] -- args` | собирает JavaScript и запускает `main` входа `name` (единственного, если имя не указано); `--devtools` отправляет его спаны в Effect DevTools ([наблюдаемость](../observability/#devtools)) |
 | `dev [name] [--entry M] [--profile] [--devtools[=url]] -- args` | пересобирает при изменениях и заменяет работающее приложение |

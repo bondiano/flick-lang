@@ -6,6 +6,7 @@
 //! Importing a module runs nothing, as its top level is pure; an app also
 //! packs the runner of each entry, which the manifest's `bin` names.
 
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::process::Command as Process;
 use std::{env, fs};
@@ -66,6 +67,7 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
         // an app packs its runners, a library none
         entry: None,
         generation: false,
+        built: RefCell::default(),
     };
     let runners = build.entries(&project);
     let outcome = build.run();

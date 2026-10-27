@@ -12,6 +12,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+anstyle = "1"
 clap = { version = "4", features = ["derive", "string"] }
 flick-core = { path = "../flick-core" }
 serde_json = "1"

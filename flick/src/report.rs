@@ -19,17 +19,19 @@ pub fn render(global: &GlobalArguments, sources: &SourceMap, diagnostics: &[Diag
     };
     let out = match global.diagnostics {
         DiagnosticsFormat::Json => renderers::render_json(sources, diagnostics),
-        DiagnosticsFormat::Human => {
-            let color = match global.color {
-                Color::Always => true,
-                Color::Never => false,
-                Color::Auto => io::stderr().is_terminal() && env::var_os("NO_COLOR").is_none(),
-            };
-            renderers::render_human(sources, diagnostics, color)
-        }
+        DiagnosticsFormat::Human => renderers::render_human(sources, diagnostics, color(global)),
     };
     // stderr closed: nothing useful left to do with the error
     let _ = io::stderr().lock().write_all(out.as_bytes());
+}
+
+/// Whether human output on stderr is colored.
+pub fn color(global: &GlobalArguments) -> bool {
+    match global.color {
+        Color::Always => true,
+        Color::Never => false,
+        Color::Auto => io::stderr().is_terminal() && env::var_os("NO_COLOR").is_none(),
+    }
 }
 
 /// Warnings as errors, for `--warnings-as-errors`.

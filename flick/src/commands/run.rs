@@ -5,6 +5,7 @@
 //! child. `run` and `dev` always build
 //! JavaScript, whatever `emit` the project chooses.
 
+use std::cell::RefCell;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::{Command as Process, ExitCode};
@@ -197,6 +198,7 @@ pub fn build_generation(
         project: Some(project.root.to_string_lossy().into_owned()),
         entry: options.entry.clone(),
         generation: true,
+        built: RefCell::default(),
     };
     let outcome = build.run();
     report::render(global, &outcome.sources, &outcome.diagnostics);

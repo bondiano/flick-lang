@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use std::{fs, io, process};
 
 use flick_core::build::{self, Artifact, Extras, Settings};
@@ -9,6 +11,7 @@ use flick_core::project::{self, Compilation, Compiled, Project};
 use flick_core::source::{FileId, SourceMap};
 
 use super::check::select;
+use super::summary::{self, Built};
 use crate::args::{BuildArguments, EmitArgument, LabelsArgument, ProfileArgument};
 use crate::command::{Command, Outcome};
 use crate::sources::FsHost;
@@ -23,6 +26,8 @@ pub struct BuildCommand {
     /// A build into a run generation, which lives only while it runs: no
     /// manifest entry, and a cache key without its number.
     pub generation: bool,
+    /// What the last run wrote, for its summary.
+    pub built: RefCell<Option<Built>>,
 }
 
 impl BuildCommand {
@@ -32,11 +37,36 @@ impl BuildCommand {
             project,
             entry: None,
             generation: false,
+            built: RefCell::default(),
         }
+    }
+
+    fn record(&self, output: &BuildPlan, modules: Option<usize>, modules_of: &[(String, String)]) {
+        let runners = modules_of
+            .iter()
+            .map(|(name, module)| {
+                (
+                    module.clone(),
+                    output
+                        .out_dir
+                        .join(build::runner_file(name, output.typescript)),
+                )
+            })
+            .collect();
+        *self.built.borrow_mut() = Some(Built {
+            modules,
+            out_dir: output.out_dir.clone(),
+            runners,
+        });
     }
 }
 
 impl Command for BuildCommand {
+    fn summary(&self, outcome: &Outcome, took: Duration, color: bool) -> Option<String> {
+        let built = self.built.borrow();
+        Some(summary::text(built.as_ref(), outcome, took, color))
+    }
+
     fn run(&self) -> Outcome {
         let mut sources = SourceMap::default();
         let host = FsHost::new();
@@ -67,6 +97,7 @@ impl Command for BuildCommand {
                 diagnostics: vec![problem],
             };
         }
+        *self.built.borrow_mut() = None;
         let cached = project.as_ref().and_then(|p| self.cached(p, &roots, &host));
         if let Some(diagnostics) = cached {
             return Outcome {
@@ -100,6 +131,7 @@ impl Command for BuildCommand {
             }
         };
         let output = self.plan(&host, project.as_ref(), entries);
+        self.record(&output, Some(modules.len()), &output.entries);
         let mut emitted = artifacts(&host, &sources, project.as_ref(), &compilation, &output);
         self.publish(project.as_ref(), &output, &mut emitted);
         let clean = diagnostics.is_empty() && emitted.diagnostics.is_empty();
@@ -213,6 +245,7 @@ impl BuildCommand {
             return None;
         }
         let artifacts = cache::load(&project.root, &self.key(project, roots, &output))?;
+        self.record(&output, None, &output.entries);
         let mut emitted = Emission {
             artifacts,
             diagnostics: Vec::new(),
