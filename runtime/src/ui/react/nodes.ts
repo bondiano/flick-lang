@@ -16,6 +16,7 @@ export interface Binding {
 
 /** The part of a React synthetic event the bridge reads. */
 export interface DomEvent {
+  readonly type: string;
   readonly target: unknown;
   readonly button?: number;
   readonly altKey?: boolean;
