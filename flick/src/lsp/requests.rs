@@ -125,8 +125,11 @@ impl Server {
                 .type_definition(file, offset)
                 .map_or(Ok(Value::Null), |l| location(snapshot, &l)),
             "textDocument/definition" => ide
-                .symbol_at(file, offset)
-                .and_then(|(symbol, _)| ide.definition(&symbol))
+                .field_definition(file, offset)
+                .or_else(|| {
+                    ide.symbol_at(file, offset)
+                        .and_then(|(symbol, _)| ide.definition(&symbol))
+                })
                 .map_or(Ok(Value::Null), |l| location(snapshot, &l)),
             "textDocument/references" => {
                 let Some((symbol, _)) = ide.symbol_at(file, offset) else {

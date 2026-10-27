@@ -162,9 +162,13 @@ foreign pure less_than_or_equal_to from "@flick-lang/runtime/effect/Schema" "isL
 
 /// Between the bounds; each excluded when its flag is set.
 between : {
+  /// The lower bound.
   minimum : Number;
+  /// The upper bound.
   maximum : Number;
+  /// Whether the lower bound itself is excluded.
   exclusiveMinimum : Bool;
+  /// Whether the upper bound itself is excluded.
   exclusiveMaximum : Bool;
 } ->
   Check Number
@@ -218,9 +222,13 @@ foreign pure less_than_or_equal_to_bigint from "@flick-lang/runtime/effect/Schem
 
 /// Between the bounds; each excluded when its flag is set.
 between_bigint : {
+  /// The lower bound.
   minimum : BigInt;
+  /// The upper bound.
   maximum : BigInt;
+  /// Whether the lower bound itself is excluded.
   exclusiveMinimum : Bool;
+  /// Whether the upper bound itself is excluded.
   exclusiveMaximum : Bool;
 } ->
   Check BigInt
@@ -250,9 +258,13 @@ foreign pure less_than_or_equal_to_decimal from "@flick-lang/runtime/effect/Sche
 /// Between the bounds; each excluded when its flag is set.
 between_decimal :
   {
+    /// The lower bound.
     minimum : BigDecimal.BigDecimal;
+    /// The upper bound.
     maximum : BigDecimal.BigDecimal;
+    /// Whether the lower bound itself is excluded.
     exclusiveMinimum : Bool;
+    /// Whether the upper bound itself is excluded.
     exclusiveMaximum : Bool;
   } ->
   Check BigDecimal.BigDecimal

@@ -3,7 +3,7 @@
 
 use std::fmt::Write;
 
-use super::{Ide, tree};
+use super::{Ide, Location, tree};
 use crate::doc;
 use crate::iface::Namespace;
 use crate::source::FileId;
@@ -11,9 +11,10 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{Form, Ref, Type, show_type};
 
-/// Where a field is written: its declaration, type and comment.
+/// Where a field is written: its declaration, label, type and comment.
 struct Declared {
     module: String,
+    label: (u32, u32),
     owner: Option<String>,
     written: String,
     doc: Option<String>,
@@ -29,24 +30,47 @@ impl Ide<'_> {
 
     /// Markdown for the field label at `offset`, and its range.
     fn field_hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
-        let m = self.module(file)?;
-        let text = self.text(file);
         if let Some(hover) = self.declared_field(file, offset) {
             return Some(hover);
         }
-        let (range, record) = tree::innermost(m.typing.fields.iter(), offset)?;
-        let label = &text[range.0 as usize..range.1 as usize];
-        let mut fields = Vec::new();
-        self.record_fields(file, record, &mut fields, 0);
-        let mut labels: Vec<&str> = fields.iter().map(|(l, _)| l.as_str()).collect();
-        labels.sort_unstable();
-        let declared = self.field_of(file, offset, record, label, &labels);
+        let (range, fields, declared) = self.field_at(file, offset)?;
+        let label = &self.text(file)[range.0 as usize..range.1 as usize];
         let ty = fields
             .iter()
             .find(|(l, _)| l == label)
             .map(|(_, t)| show_type(t))
             .or_else(|| declared.as_ref().map(|d| d.written.clone()))?;
         Some((describe(label, &ty, declared.as_ref()), range))
+    }
+
+    /// Where the field label at `offset` is declared: its record type's field.
+    pub fn field_definition(&self, file: FileId, offset: u32) -> Option<Location> {
+        let declared = self.field_at(file, offset)?.2?;
+        let (start, end) = declared.label;
+        Some(Location {
+            target: self.source(&declared.module)?.target,
+            start,
+            end,
+        })
+    }
+
+    /// The field label at `offset`: its range, its record's fields and
+    /// where it is written.
+    #[allow(clippy::type_complexity)]
+    fn field_at(
+        &self,
+        file: FileId,
+        offset: u32,
+    ) -> Option<((u32, u32), Vec<(String, Type)>, Option<Declared>)> {
+        let m = self.module(file)?;
+        let (range, record) = tree::innermost(m.typing.fields.iter(), offset)?;
+        let label = &self.text(file)[range.0 as usize..range.1 as usize];
+        let mut fields = Vec::new();
+        self.record_fields(file, record, &mut fields, 0);
+        let mut labels: Vec<&str> = fields.iter().map(|(l, _)| l.as_str()).collect();
+        labels.sort_unstable();
+        let declared = self.field_of(file, offset, record, label, &labels);
+        Some((range, fields, declared))
     }
 
     /// A field in a record type as written: `{ name : String }`.
@@ -238,6 +262,10 @@ fn written(module: &str, path: &[&Node], field: &Node, text: &str) -> Declared {
         .rev()
         .nth(1)
         .and_then(|parent| doc::leading_doc(parent, field, text));
+    let label = field
+        .child_tokens()
+        .find(|t| t.kind == K::Ident)
+        .map_or_else(|| field.range(), |t| (t.start, t.end));
     let owner = path.iter().rev().find_map(|n| match n.kind {
         K::Variant | K::TypeDecl => tree::name_of(n, K::Con, text),
         K::Signature | K::ForeignDecl => tree::name_of(n, K::Ident, text),
@@ -245,6 +273,7 @@ fn written(module: &str, path: &[&Node], field: &Node, text: &str) -> Declared {
     });
     Declared {
         module: module.to_owned(),
+        label,
         owner: owner.map(str::to_owned),
         written,
         doc,

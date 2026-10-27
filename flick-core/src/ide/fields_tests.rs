@@ -1,4 +1,6 @@
 use super::super::tests::fixture_of;
+use crate::ide::{Location, Target};
+use crate::types::builtin_sources;
 
 const MAIN: &str = "module App.Main exposing (..)
 
@@ -36,6 +38,10 @@ let area s =
 
 page : Ui.View Unit
 let page = Ui.view (fun () -> ui { div { class_name = \"page\" } [] })
+
+small : Check Number
+let small =
+  Check.between { minimum = 0; maximum = 5; exclusiveMinimum = false; exclusiveMaximum = false }
 ";
 
 fn hover(needle: &str, nth: usize) -> String {
@@ -57,6 +63,40 @@ fn a_field_shows_its_type_comment_and_record() {
 }
 
 #[test]
+fn a_field_leads_to_its_declaration() {
+    let f = fixture_of(&[("src/App/Main.fl", MAIN)]);
+    let ide = f.ide();
+    let file = f.file("App.Main");
+    let declared = f.at("App.Main", "age", 0);
+    // an access, a literal, an update and a pattern
+    for nth in 1..5 {
+        let at = ide
+            .field_definition(file, f.at("App.Main", "age", nth) + 1)
+            .unwrap_or_else(|| panic!("age {nth}"));
+        assert_eq!(
+            at,
+            Location {
+                target: Target::File(file),
+                start: declared,
+                end: declared + 3
+            }
+        );
+    }
+    for (label, module) in [("class_name", "Ui"), ("maximum", "Check")] {
+        let at = ide
+            .field_definition(file, f.at("App.Main", label, 0) + 1)
+            .unwrap_or_else(|| panic!("{label}"));
+        assert_eq!(at.target, Target::Builtin(module.into()), "{label}");
+        let text = builtin_sources()
+            .iter()
+            .find(|(n, _)| *n == module)
+            .expect("builtin")
+            .1;
+        assert_eq!(&text[at.start as usize..at.end as usize], label);
+    }
+}
+
+#[test]
 fn a_constructor_shows_its_comment() {
     assert!(hover("Circle r", 0).contains("A round one, by its radius."));
 }
@@ -72,6 +112,14 @@ fn a_prop_of_an_element_shows_its_comment() {
     assert!(
         shown.ends_with("field of `ElementProps` from `Ui`"),
         "{shown}"
+    );
+}
+
+#[test]
+fn a_field_of_a_signature_shows_its_comment() {
+    assert_eq!(
+        hover("maximum", 0),
+        "```flick\nmaximum : Number\n```\n\nThe upper bound.\n\nfield of `between` from `Check`"
     );
 }
 
