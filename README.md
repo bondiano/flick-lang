@@ -128,6 +128,15 @@ The 60-minute plan completes all three tasks with zero minutes left. A
 The 25-minute plan retains `docs` and five minutes, then exits nonzero because
 `lint` does not fit.
 
+[`examples/cli-tool`](./examples/cli-tool/README.md) is a notes CLI from one
+`cli` block: subcommands, the notes file from `NOTES_FILE`, a wizard that asks
+for the first note, and `--completions`.
+
+```sh
+flick run --project examples/cli-tool -- add buy milk
+flick run --project examples/cli-tool -- list
+```
+
 <details>
 <summary>Documentation-site development</summary>
 

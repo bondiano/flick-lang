@@ -1,0 +1,94 @@
+/// A notes CLI: subcommands, the notes file from the environment, a wizard
+/// that asks for the first note, and shell completions.
+module App.Main exposing (main, first_note)
+
+import App.Notes as Notes
+
+/// `NOTES_FILE`, or `notes.txt` in the working directory.
+notes_file : Unit ->{; AppError} String
+let notes_file () =
+  try Config.get (Config.with_default "notes.txt" (Config.string "NOTES_FILE")) with
+  | Config.ConfigError message -> App.fail message
+
+/// The notes of the file; none when it does not exist yet.
+load : String ->{File.FileSystem;} List String
+let load path =
+  try Notes.parse (File.read_text path) with
+  | File.ReadError _ -> []
+
+save : String -> List String ->{File.FileSystem; AppError} Unit
+let save path notes =
+  try File.write_text path (Notes.render notes) with
+  | File.WriteError message -> App.fail message
+
+add_command : Cli.Command {File.FileSystem} {AppError}
+let add_command =
+  cli "add" {
+    description "Add a note"
+    /// The words of the note
+    arg words : NonEmpty.NonEmpty String
+    handle fun { words } ->
+      let path = notes_file ()
+      save path (Notes.add (String.join " " (NonEmpty.to_list words)) (load path))
+  }
+
+list_command : Cli.Command {File.FileSystem} {AppError}
+let list_command =
+  cli "list" {
+    description "List the notes, numbered"
+    handle fun _ ->
+      for line <- Notes.listing (load (notes_file ())) do
+        Platform.stdout_line line
+  }
+
+done_command : Cli.Command {File.FileSystem} {AppError}
+let done_command =
+  cli "done" {
+    description "Remove the note with this number"
+    /// The number `list` shows
+    arg number : Number
+    handle fun { number } ->
+      let path = notes_file ()
+      match Notes.remove number (load path) with
+      | Some notes -> save path notes
+      | None -> App.fail ("there is no note " ++ show number)
+  }
+
+/// The wizard's question: the first note, which must not be empty.
+first_note : Cli.Prompt.Prompt String
+let first_note =
+  Cli.Prompt.text
+    {
+      message = "Your first note?";
+      default = None;
+      validate =
+        Some (fun text -> if String.trim text == "" then Err "a note needs words" else Ok text);
+    }
+
+init_command : Cli.Command {File.FileSystem} {AppError}
+let init_command =
+  cli "init" {
+    description "Start a notes file, asking for its first note"
+    handle fun _ ->
+      let note =
+        try provide Cli.Prompt.node { Cli.Prompt.run first_note } with
+        | Terminal.QuitError -> App.fail "cancelled"
+      save (notes_file ()) [note]
+  }
+
+command : Cli.Command {File.FileSystem} {AppError}
+let command =
+  cli "notes" {
+    description "Keep notes in a file, NOTES_FILE or notes.txt"
+    subcommand init_command
+    subcommand add_command
+    subcommand list_command
+    subcommand done_command
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  provide File.node {
+    try Cli.run_version "0.1.0" command (Platform.args ()) with
+    | Cli.CliError message -> App.fail message
+  }

@@ -1,0 +1,23 @@
+/// The notes file: one note per line. Pure, so the CLI only reads and
+/// writes text.
+module App.Notes exposing (parse, render, add, remove, listing)
+
+parse : String -> List String
+let parse text = List.filter (fun line -> line != "") (List.map String.trim (String.lines text))
+
+render : List String -> String
+let render notes = String.join "" (List.map (fun note -> note ++ "\n") notes)
+
+add : String -> List String -> List String
+let add note notes = notes ++ [note]
+
+/// The notes without the one numbered `n`, counting from 1; `None` when
+/// there is none.
+remove : Number -> List String -> Option (List String)
+let remove n notes =
+  if n < 1 || n > List.length notes then None
+  else Some (List.take (n - 1) notes ++ List.drop n notes)
+
+/// The notes numbered from 1, a line each.
+listing : List String -> List String
+let listing notes = List.map_indexed (fun i note -> show (i + 1) ++ ". " ++ note) notes

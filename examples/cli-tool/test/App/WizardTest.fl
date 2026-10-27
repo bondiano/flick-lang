@@ -1,0 +1,47 @@
+/// The wizard's question on a terminal that types a script of keys.
+module App.WizardTest exposing (tests)
+
+import App.Main exposing (first_note)
+import Cli.Prompt exposing (Tty)
+
+press : String -> Option String -> Terminal.UserInput
+let press name input =
+  { input = input; key = { name = name; ctrl = false; meta = false; shift = false } }
+
+/// `text` typed, then return.
+typing : String -> List Terminal.UserInput
+let typing text = List.map (fun c -> press c (Some c)) (String.chars text) ++ [press "return" None]
+
+/// A terminal that plays `keys`, then quits.
+terminal : Ref (List Terminal.UserInput) -> Layer none none {Tty}
+let terminal keys =
+  Layer.succeed Tty {
+    read_key = fun () ->
+      match List.head (Ref.get keys) with
+      | Some key ->
+        Ref.update keys (List.drop 1)
+        key
+      | None -> from_result (Err Terminal.QuitError);
+    display = fun _ -> ();
+    columns = fun () -> 80;
+    rows = fun () -> 24;
+  }
+
+/// The answer to `first_note` when the keys are `keys`.
+answer : List Terminal.UserInput ->{; Terminal.QuitError} String
+let answer keys =
+  let script = Ref.make keys
+  provide (terminal script) { Cli.Prompt.run first_note }
+
+tests : List Test.Test
+let tests = [
+  Test.effect_test
+    "the wizard takes the typed note"
+    (task { Test.expect (Test.equal "buy milk" (answer (typing "buy milk"))) }),
+  Test.effect_test
+    "a blank note is refused until there are words"
+    (task {
+      let keys = typing "  " ++ List.repeat 2 (press "backspace" None) ++ typing "tea"
+      Test.expect (Test.equal "tea" (answer keys))
+    }),
+]

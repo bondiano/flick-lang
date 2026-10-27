@@ -1,6 +1,7 @@
 //! The projects of `examples/` beyond the first slice, each on a copy in the
 //! target directory (`common::example`). `examples/observability` runs with
-//! the local collector of the observability run tests in its environment.
+//! the local collector of the observability run tests in its environment;
+//! `examples/cli-tool` with `NOTES_FILE` set.
 
 mod common;
 
@@ -158,5 +159,55 @@ fn the_mtl_planner_runs_pure_transformers_and_validates_cli_minutes() {
     assert_eq!(
         String::from_utf8(out.stdout).expect("utf-8 stdout"),
         capabilities
+    );
+}
+
+#[test]
+fn the_cli_tool_example_checks_and_is_formatted() {
+    let dir = common::example("cli-tool", "examples/cli-tool-check");
+    success(&dir, &["check", "--warnings-as-errors"]);
+    success(&dir, &["fmt", "--check"]);
+}
+
+#[test]
+#[ignore = "needs Node and the installed runtime"]
+fn the_cli_tool_example_keeps_notes_in_the_file_of_its_environment() {
+    let dir = common::example("cli-tool", "examples/cli-tool-run");
+    success(&dir, &["test"]);
+    let notes = dir.join("elsewhere.txt");
+    let notes_cli = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_flick"))
+            .args(["run", "--"])
+            .args(args)
+            .current_dir(&dir)
+            .env("NOTES_FILE", &notes)
+            .output()
+            .expect("flick runs")
+    };
+    for args in [
+        &["add", "buy", "milk"][..],
+        &["add", "call", "mom"],
+        &["done", "1"],
+    ] {
+        let out = notes_cli(args);
+        assert!(out.status.success(), "{args:?} failed: {out:?}");
+    }
+    let list = notes_cli(&["list"]);
+    assert_eq!(String::from_utf8_lossy(&list.stdout), "1. call mom\n");
+    assert_eq!(
+        fs::read_to_string(&notes).expect("the notes file"),
+        "call mom\n"
+    );
+    assert!(
+        !dir.join("notes.txt").exists(),
+        "NOTES_FILE chooses the file"
+    );
+    let missing = notes_cli(&["done", "9"]);
+    assert_eq!(missing.status.code(), Some(1), "{missing:?}");
+    assert!(String::from_utf8_lossy(&missing.stderr).contains("there is no note 9"));
+    let completions = notes_cli(&["--completions", "bash"]);
+    assert!(
+        String::from_utf8_lossy(&completions.stdout).contains("notes"),
+        "{completions:?}"
     );
 }
