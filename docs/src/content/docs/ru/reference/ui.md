@@ -341,6 +341,29 @@ component search () =
 представление обязано задать их отображение. `Atom.ready` для ещё не
 загруженной задачи в обычном `Ui.view` — дефект с объяснением.
 
+`Ui.awaiting failed fallback render` — такое представление для одной
+задачи, атом которой передаётся как props: короткому экрану не нужны ни
+`match`, ни `Atom.ready`. Представление сбоя по-прежнему обязательно; для
+задачи `Async a none` оно не вызывается.
+
+```flick
+user : Atom.Atom (Atom.Async String {Offline})
+let user = Atom.task (task { fetch_name () })
+
+// три случая вручную
+user_view : Ui.View Unit
+let user_view =
+  Ui.view (fun () ->
+    match Atom.get user with
+    | Atom.Loading -> ui { text "…" }
+    | Atom.Loaded name -> ui { text name }
+    | Atom.Failed _ -> ui { text "offline" })
+
+// то же через `Ui.awaiting`, рендер — `Ui.render awaited user`
+awaited : Ui.View (Atom.Atom (Atom.Async String {Offline}))
+let awaited = Ui.awaiting (fun _ -> ui { text "offline" }) (ui { text "…" }) (fun name -> ui { text name })
+```
+
 ## Поля, привязанные к состоянию
 
 `Ui.field { bind = query; placeholder = "Найти"; on_input = None }` — поле

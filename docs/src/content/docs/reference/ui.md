@@ -319,6 +319,28 @@ The errors `Atom.ready` raises are in the render's error row `x`, so a task
 that can fail needs that view to have somewhere to put them. `Atom.ready`
 in a plain `Ui.view` of a task still loading is a defect that says so.
 
+`Ui.awaiting failed fallback render` is that view for one task, the atom
+given as its props: a short screen needs no `match` and no `Atom.ready`.
+Its failure view is still required; a task of `Async a none` never calls it.
+
+```flick
+user : Atom.Atom (Atom.Async String {Offline})
+let user = Atom.task (task { fetch_name () })
+
+// matching the three cases by hand
+user_view : Ui.View Unit
+let user_view =
+  Ui.view (fun () ->
+    match Atom.get user with
+    | Atom.Loading -> ui { text "…" }
+    | Atom.Loaded name -> ui { text name }
+    | Atom.Failed _ -> ui { text "offline" })
+
+// the same with `Ui.awaiting`, rendered as `Ui.render awaited user`
+awaited : Ui.View (Atom.Atom (Atom.Async String {Offline}))
+let awaited = Ui.awaiting (fun _ -> ui { text "offline" }) (ui { text "…" }) (fun name -> ui { text name })
+```
+
 ## Fields bound to a state
 
 `Ui.field { bind = query; placeholder = "Find"; on_input = None }` is an

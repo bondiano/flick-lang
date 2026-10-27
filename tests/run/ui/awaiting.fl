@@ -1,0 +1,57 @@
+// `Ui.awaiting` over two tasks held by gates: both wait, then one loads,
+// then the other fails, each view showing its fallback, value or failure.
+module App.Main exposing (main)
+
+type error Offline = Offline
+  deriving Show
+
+setup : Unit ->{} Unit
+foreign sync setup from "./dom.mjs" "setup"
+  arity 0
+
+settle : Unit ->{} Unit
+foreign async settle from "./dom.mjs" "settle"
+  arity 0
+
+text : Unit ->{} String
+foreign sync text from "./dom.mjs" "text"
+  arity 0
+
+report : Failure e ->{} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  setup ()
+  let name_gate : Deferred.Deferred none String = Deferred.make ()
+  let offline_gate : Deferred.Deferred {Offline} String = Deferred.make ()
+  let name = Atom.task (task { Deferred.await_ name_gate })
+  let offline = Atom.task (task { Deferred.await_ offline_gate })
+  let name_view =
+    Ui.awaiting
+      (fun _ -> ui { text "[failed]" })
+      (ui { text "[waiting]" })
+      (fun n -> ui { text ("[" ++ n ++ "]") })
+  let offline_view =
+    Ui.awaiting
+      (fun _ -> ui { text "[offline]" })
+      (ui { text "[waiting]" })
+      (fun n -> ui { text ("[" ++ n ++ "]") })
+  match Ui.Dom.container "app" with
+  | None -> Platform.stdout_line "no container"
+  | Some root ->
+    provide Atom.layer {
+      scope s {
+        let app = ui { fragment [Ui.render name_view name, Ui.render offline_view offline] }
+        let _mounted = Fiber.spawn s report (task { Ui.Dom.mount root report app })
+        settle ()
+        Platform.stdout_line (text ())
+        let _ = Deferred.complete_with (task { "ada" }) name_gate
+        settle ()
+        Platform.stdout_line (text ())
+        let _ = Deferred.complete_with (task { from_result (Err Offline) }) offline_gate
+        settle ()
+        Platform.stdout_line (text ())
+      }
+    }
