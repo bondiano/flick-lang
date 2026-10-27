@@ -1,0 +1,13 @@
+let command = cli "plan" {
+  description "Plan tasks"
+  flag overhead "o" : Option Number
+  arg tasks : List String
+  handle fun { overhead; tasks } ->
+    let description = List.length tasks
+    ignore (overhead, description)
+}
+let parent = cli "tool" { subcommand command }
+let value = description
+//          ^ variable
+let member = Cli.flag
+//               ^ property

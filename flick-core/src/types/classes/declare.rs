@@ -1,13 +1,14 @@
 //! Instance declarations and their coherence: one canonical instance per
-//! constraint, without overlap or orphans, with strict coverage of
-//! functional dependencies and a context that shrinks, so resolution ends.
+//! constraint, without overlap or orphans, with context-assisted coverage of
+//! functional dependencies and structurally shrinking instance contexts.
 //! Instances are known before any definition is checked; their methods,
 //! superclasses and derived fields are checked after.
 
-use super::matching::{Subst, rename, resolve, unify_heads};
+use std::collections::HashSet;
+
 use super::prims::PRIMITIVES;
 use super::solve::Outcome;
-use super::{ClassInfo, Dict, RECORD, split, vars};
+use super::{Dict, RECORD, split, vars};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve;
 use crate::source::Span;
@@ -194,19 +195,41 @@ impl<'n> Checker<'_> {
         }
         self.ownership(instance, &cm, &cn, args.first(), span);
         self.terminates(instance, span);
+        let rules = if info.fundeps.is_empty() {
+            Vec::new()
+        } else {
+            self.coverage_rules(&instance.context)
+        };
         for fd in &info.fundeps {
-            let from: Vec<String> = fd.from.iter().flat_map(|&i| vars(&args[i])).collect();
+            let mut covered: HashSet<String> =
+                fd.from.iter().flat_map(|&i| vars(&args[i])).collect();
+            loop {
+                let mut changed = false;
+                for (from, to) in &rules {
+                    if from.iter().all(|v| covered.contains(v)) {
+                        for v in to {
+                            if !covered.contains(v) {
+                                covered.insert(v.clone());
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+                if !changed {
+                    break;
+                }
+            }
             let uncovered = fd
                 .to
                 .iter()
                 .flat_map(|&j| vars(&args[j]))
-                .find(|v| !from.contains(v));
+                .find(|v| !covered.contains(v));
             if let Some(v) = uncovered {
                 let dep = fundep_text(&info.params, fd);
                 self.error(
                     codes::C005,
                     span,
-                    format!("`{v}` in `{name}` is determined by `{dep}`, so it must appear in the types that determine it"),
+                    format!("`{v}` in `{name}` is required by `{dep}` but is not determined by the head or its context"),
                 );
                 return false;
             }
@@ -218,82 +241,57 @@ impl<'n> Checker<'_> {
         true
     }
 
-    /// Reports another instance of the class that this one overlaps or
-    /// disagrees with on a functional dependency.
-    fn conflicts(
-        &mut self,
-        instance: &Instance,
-        info: &ClassInfo,
-        args: &[Type],
-        span: Span,
-    ) -> bool {
-        let name = &instance.name;
-        let class = split(&instance.head).map(|(k, _)| k);
-        let others: Vec<Instance> = self
-            .env
-            .instances
-            .iter()
-            .filter(|i| split(&i.head).map(|(k, _)| k) == class)
-            .cloned()
-            .collect();
-        for other in others {
-            let names: Vec<String> = other.vars.iter().map(|v| v.name.clone()).collect();
-            let theirs = rename(&other.head, &names);
-            let Some((_, theirs)) = split(&theirs) else {
-                continue;
+    /// Type-variable dependencies from the context and its superclasses.
+    fn coverage_rules(&self, context: &[Type]) -> Vec<(Vec<String>, Vec<String>)> {
+        fn visit(
+            checker: &Checker<'_>,
+            constraint: &Type,
+            path: &mut Vec<(String, String)>,
+            rules: &mut Vec<(Vec<String>, Vec<String>)>,
+        ) {
+            let constraint = checker.canon(constraint);
+            let Some(((module, name), args)) = split(&constraint) else {
+                return;
             };
-            let from = |other: &Instance| {
-                if other.module == self.env.module {
-                    String::new()
-                } else {
-                    format!(" of module `{}`", other.module)
+            if path.iter().any(|(m, n)| m == module && n == name) {
+                return;
+            }
+            let Some(info) = checker.class_info(module, name) else {
+                return;
+            };
+            let variables = |positions: &[usize]| {
+                let mut out = Vec::new();
+                for &i in positions {
+                    for v in vars(args.get(i)?) {
+                        if !out.contains(&v) {
+                            out.push(v);
+                        }
+                    }
                 }
+                Some(out)
             };
             for fd in &info.fundeps {
-                let mut subst = Subst::new();
-                let same = fd
-                    .from
-                    .iter()
-                    .all(|&i| unify_heads(&args[i], theirs[i], &mut subst));
-                if same
-                    && !fd
-                        .to
-                        .iter()
-                        .all(|&j| unify_heads(&args[j], theirs[j], &mut subst))
-                {
-                    let dep = fundep_text(&info.params, fd);
-                    self.error(
-                        codes::C004,
-                        span,
-                        format!(
-                            "`{name}` and `{}`{} break the functional dependency `{dep}`: the same types determine different ones",
-                            other.name,
-                            from(&other)
-                        ),
-                    );
-                    return true;
+                let (Some(from), Some(to)) = (variables(&fd.from), variables(&fd.to)) else {
+                    continue;
+                };
+                let rule = (from, to);
+                if !rules.contains(&rule) {
+                    rules.push(rule);
                 }
             }
-            let mut subst = Subst::new();
-            if theirs
-                .iter()
-                .zip(args)
-                .all(|(a, b)| unify_heads(a, b, &mut subst))
-            {
-                let common = self.show(&resolve(&instance.head, &subst));
-                self.error(
-                    codes::C003,
-                    span,
-                    format!(
-                        "`{name}` overlaps `{}`{}: both apply to `{common}`, and instances may not overlap",
-                        other.name,
-                        from(&other)
-                    ),
-                );
-                return true;
+            path.push((module.to_owned(), name.to_owned()));
+            for superclass in checker.supers_of(&constraint) {
+                visit(checker, &superclass, path, rules);
             }
+            path.pop();
         }
-        false
+
+        let mut rules = Vec::new();
+        let mut path = Vec::new();
+        for constraint in context {
+            visit(self, constraint, &mut path, &mut rules);
+        }
+        rules
     }
 
     /// Only the package of the class or of the nominal type at the head of
@@ -337,7 +335,7 @@ impl<'n> Checker<'_> {
 
     /// Every variable of the context is in the head, and every context
     /// constraint is smaller than the head without repeating a variable more
-    /// often, so resolution ends.
+    /// often. Resolution also has a step/depth budget.
     fn terminates(&mut self, instance: &Instance, span: Span) {
         let head_vars = vars(&instance.head);
         let size = |c: &Type| {
@@ -419,7 +417,7 @@ impl<'n> Checker<'_> {
 }
 
 /// `a b -> c` with the class's parameter names.
-fn fundep_text(params: &[String], fd: &env::Fundep) -> String {
+pub(super) fn fundep_text(params: &[String], fd: &env::Fundep) -> String {
     let names = |is: &[usize]| {
         is.iter()
             .map(|&i| params.get(i).map_or("?", String::as_str))

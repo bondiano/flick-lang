@@ -1,0 +1,90 @@
+/// Share a read-only environment through an inner computation using `r -> m a`.
+///
+/// `run` supplies the environment; every action in a `do` block sees it.
+/// `local` changes the environment for one nested action, not its siblings.
+/// Unlike `StateT`, `map2` has no state dependency between its operands:
+/// both receive the same environment, so only `Applicative m` is required.
+/// Their combination follows the inner `m`'s `map2` semantics.
+module Mtl.ReaderT exposing (ReaderT(..), run)
+
+import Mtl.Classes exposing (
+  MonadTrans(..),
+  MonadState(..),
+  MonadReader(..),
+  MonadWriter(..),
+  MonadError(..),
+)
+
+/// A delayed computation that reads an environment and returns an action in `m`.
+type ReaderT r (m : Type -> Type) a = ReaderT (r -> m a)
+
+/// Supply the environment and remove this layer, yielding `m a`.
+run :
+  forall c d r m a. (ReaderT r m a)^c ->
+    (r^d -> (m a)^(c + d))^c
+let run (ReaderT read) environment = read environment
+
+instance Functor m => Functor (ReaderT r m) =
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((ReaderT r m a)^d -> (ReaderT r m b)^(c + d))^c
+  let map f (ReaderT read) = ReaderT (fun environment -> map f (read environment))
+
+instance Applicative m => Applicative (ReaderT r m) =
+  pure : forall c a. a^c -> (ReaderT r m a)^c
+  let pure value = ReaderT (fun _ -> pure value)
+  map2 :
+    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+      ((ReaderT r m a)^d -> ((ReaderT r m b)^d -> (ReaderT r m x)^(c + d))^(c + d))^c
+  let map2 f left right =
+    ReaderT (fun environment -> map2 f (run left environment) (run right environment))
+
+instance Monad m => Monad (ReaderT r m) =
+  flat_map :
+    forall c d a b. (forall v. a^v -> (ReaderT r m b)^(c + v))^c ->
+      ((ReaderT r m a)^d -> (ReaderT r m b)^(c + d))^c
+  let flat_map f action =
+    ReaderT (fun environment -> do {
+      value <- run action environment
+      run (f value) environment
+    })
+
+instance MonadTrans (ReaderT r) =
+  lift : forall c m a. Monad m => (m a)^c -> (ReaderT r m a)^c
+  let lift action = ReaderT (fun _ -> action)
+
+instance Monad m => MonadReader (ReaderT r m) r =
+  ask : ReaderT r m r
+  let ask = ReaderT (fun environment -> pure environment)
+  local :
+    forall c d a. (forall v. r^v -> r^(c + v))^c ->
+      ((ReaderT r m a)^d -> (ReaderT r m a)^(c + d))^c
+  let local update action = ReaderT (fun environment -> run action (update environment))
+  reader : forall c a. (forall v. r^v -> a)^c -> (ReaderT r m a)^c
+  let reader project = ReaderT (fun environment -> pure (project environment))
+
+instance MonadState m s => MonadState (ReaderT r m) s =
+  get : ReaderT r m s
+  let get = lift get
+  put : forall c. s^c -> (ReaderT r m Unit)^c
+  let put value = lift (put value)
+  state : forall c a. (forall v. s^v -> (a, s)^(c + v))^c -> (ReaderT r m a)^c
+  let state step = lift (state step)
+
+instance MonadWriter m w => MonadWriter (ReaderT r m) w =
+  tell : forall c. w^c -> (ReaderT r m Unit)^c
+  let tell output = lift (tell output)
+  listen : forall c a. (ReaderT r m a)^c -> (ReaderT r m (a, w))^c
+  let listen action = ReaderT (fun environment -> listen (run action environment))
+  pass : forall c d a. (ReaderT r m (a, (w -> w)^c))^d -> (ReaderT r m a)^(c + d)
+  let pass action = ReaderT (fun environment -> pass (run action environment))
+  writer : forall c a. (a, w)^c -> (ReaderT r m a)^c
+  let writer value = lift (writer value)
+
+instance MonadError m e => MonadError (ReaderT r m) e =
+  throw_error : forall c a. e^c -> (ReaderT r m a)^c
+  let throw_error failure = lift (throw_error failure)
+  catch_error :
+    forall c d a. (forall v. e^v -> (ReaderT r m a)^(c + v))^c ->
+      ((ReaderT r m a)^d -> (ReaderT r m a)^(c + d))^c
+  let catch_error handler action =
+    ReaderT (fun environment ->
+      catch_error (fun failure -> run (handler failure) environment) (run action environment))

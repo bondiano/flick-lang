@@ -4,11 +4,12 @@
 //! the region's scope ends before the qualified value does, reports what it
 //! lacks.
 
-use std::mem;
+use std::{collections::HashSet, mem};
 
 use super::{Hold, Visible};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
+use crate::types::kinds::Kind;
 use crate::types::ty::{Norm, Row, Type};
 use crate::types::{Checker, ty};
 
@@ -34,13 +35,18 @@ impl Checker<'_> {
         out.entries.dedup_by(|a, b| a.0 == b.0);
         let late;
         let visible = match &hold.visible {
-            Visible::Late(ty) => {
+            Visible::Late(ty) | Visible::Refined(ty) => {
                 late = self.visible_in(ty);
                 &late
             }
             Visible::Now(labels) => labels,
         };
         out.entries.retain(|(label, _)| !visible.contains(label));
+        if matches!(hold.visible, Visible::Refined(_)) {
+            out.entries
+                .retain(|(_, atom)| self.atom_kind(atom, &[]) == Some(Kind::Region));
+            out.tails.clear();
+        }
         out
     }
 
@@ -52,6 +58,40 @@ impl Checker<'_> {
         out
     }
 
+    /// Upper bounds decide which side of an inferred union may retain an atom.
+    fn blocked_capture_rows(&self, label: &str) -> HashSet<u32> {
+        let mut blocked = HashSet::new();
+        loop {
+            let mut changed = false;
+            for hold in &self.regions.holds {
+                let visible = match &hold.visible {
+                    Visible::Now(labels) => labels.iter().any(|l| l == label),
+                    Visible::Late(ty) | Visible::Refined(ty) => {
+                        self.visible_in(ty).iter().any(|l| l == label)
+                    }
+                };
+                let bound = self.bound_of(hold);
+                if visible
+                    || bound.get(label).is_some()
+                    || bound.tails.iter().any(|t| {
+                        matches!(t, Type::Meta(m) if !blocked.contains(m))
+                            || matches!(t, Type::Error)
+                    })
+                {
+                    continue;
+                }
+                for tail in self.hidden(hold).tails {
+                    if let Type::Meta(m) = tail {
+                        changed |= blocked.insert(m);
+                    }
+                }
+            }
+            if !changed {
+                return blocked;
+            }
+        }
+    }
+
     /// Adds to qualifiers not inferred yet what their values hold; `true`
     /// when one grew.
     pub fn grow_holds(&mut self) -> bool {
@@ -59,24 +99,31 @@ impl Checker<'_> {
         for i in 0..self.regions.holds.len() {
             let hold = &self.regions.holds[i];
             let (actual, bound) = (self.hidden(hold), self.bound_of(hold));
-            let Some(m) = bound.tails.iter().find_map(|t| match t {
-                Type::Meta(m) => Some(*m),
-                _ => None,
-            }) else {
+            if !bound.tails.iter().any(|t| matches!(t, Type::Meta(_))) {
                 continue;
-            };
+            }
             for (label, atom) in actual.entries {
                 if bound.get(&label).is_some() {
                     continue;
                 }
-                let rest = self.store.fresh_beside(m);
-                let row = Type::Row(Row {
-                    entries: vec![(label, atom)],
-                    tail: Some(Box::new(rest)),
-                });
-                // a region whose scope ends before the qualifier does stays out
-                if self.bind(m, &row).is_ok() {
-                    changed = true;
+                let blocked = self.blocked_capture_rows(&label);
+                let mut grew = false;
+                for m in bound.tails.iter().filter_map(|t| match t {
+                    Type::Meta(m) if !blocked.contains(m) => Some(*m),
+                    _ => None,
+                }) {
+                    let rest = self.store.fresh_beside(m);
+                    let row = Type::Row(Row {
+                        entries: vec![(label.clone(), atom.clone())],
+                        tail: Some(Box::new(rest)),
+                    });
+                    if self.bind(m, &row).is_ok() {
+                        changed = true;
+                        grew = true;
+                        break;
+                    }
+                }
+                if grew {
                     break;
                 }
             }
@@ -263,15 +310,10 @@ impl Checker<'_> {
                 None => {
                     owner_scope.is_some()
                         || o.givens.iter().any(|g| match g.spine().1[..] {
-                            [c, s] => {
-                                self.store.resolve(s) == owner
-                                    && self
-                                        .captures_of(&Type::Captured {
-                                            ty: Box::new(Type::prim("Unit")),
-                                            captures: Box::new(c.clone()),
-                                        })
-                                        .get(&label)
-                                        .is_some()
+                            [c, s] if self.store.resolve(s) == owner => {
+                                let mut allowed = Norm::default();
+                                self.capture_row(c, &mut allowed);
+                                allowed.get(&label).is_some()
                             }
                             _ => false,
                         })

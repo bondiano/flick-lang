@@ -127,10 +127,12 @@ fn walk<'a>(node: &'a Node, f: &mut dyn FnMut(&'a Node, Option<&'a Node>)) {
     }
 }
 
-/// A type without its `forall`.
-fn strip(t: &Type) -> &Type {
+/// Inspect a type through quantifiers and capture proofs, without changing it.
+pub(super) fn strip(t: &Type) -> &Type {
     match t {
-        Type::Forall { body, .. } => strip(body),
+        Type::Forall { body, .. }
+        | Type::Captured { ty: body, .. }
+        | Type::Bounded { ty: body, .. } => strip(body),
         _ => t,
     }
 }

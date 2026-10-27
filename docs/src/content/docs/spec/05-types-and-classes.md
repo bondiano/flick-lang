@@ -40,12 +40,12 @@ In the position of a single row, the following are used: `none`, a variable `r`,
 class Functor (f : Type -> Type) =
   map :
     forall c d a b.
-    (a -> b)^c -> ((f a)^d -> (f b)^(c + d))^c
+    (forall v. a^v -> b)^c -> ((f a)^d -> (f b)^(c + d))^c
 
 instance Functor Option =
   map :
     forall c d a b.
-    (a -> b)^c ->
+    (forall v. a^v -> b)^c ->
     ((Option a)^d -> (Option b)^(c + d))^c
   let map f value =
     match value with
@@ -53,7 +53,7 @@ instance Functor Option =
     | Some x -> Some (f x)
 ```
 
-The ordinary `Functor.map` takes a pure callback. `c` bounds its captures, `d` the captures of the input container; the result conservatively keeps `c + d`, because an abstract f may defer the application and retain the input/callback. Partial application for now stores only the callback. Option computes it immediately and satisfies the broader contract by weakening the upper bound. `Eff r e` creates a cold description and preserves captures. The eager List.map has a more precise contract in section 6.
+The ordinary `Functor.map` takes a pure callback. `c` bounds its captures, `d` the captures of the input container; the result conservatively keeps `c + d`, because an abstract `f` may defer the application and retain the input/callback. `v` bounds each callback argument independently: a transformer can receive its state or environment later, when run. Partial application stores only the callback. `Option` applies it immediately; `Eff r e` creates a cold description.
 
 ## Choosing instances and dictionaries
 
@@ -252,7 +252,9 @@ let empty_users =
 
 The expected `UserSet` also determines `User`. Without the dependency the method would have the type `Collection c a => c`, where `a` is not fixed by the result; a separate basis for choosing the dictionary unambiguously would be required.
 
-The pair `Collection UserSet User` and `Collection UserSet String` violates the FD. The reverse direction is not promised: one `User` can be stored in different collections. After expanding aliases and normalizing built-in row expressions, the variables of the determined part of an instance must occur in the determining part — strict coverage. If the determining positions of two heads unify, their determined positions must agree. Context constraints do not serve as a way around coverage or as a means of choosing between conflicting heads.
+The pair `Collection UserSet User` and `Collection UserSet String` violates the FD. The reverse direction is not promised: one `User` can be stored in different collections. After expanding aliases and normalizing built-in row expressions, coverage starts with the variables of the determining head arguments and closes over dependencies in the context and its instantiated superclasses. A dependency contributes its outputs only when all its inputs are covered; every determined head variable must belong to this least fixed point. Each head dependency is checked independently, so unrelated constraints and unseeded cycles do not help.
+
+Context-assisted coverage permits capability lifting, not context-based selection. Instances are selected by their complete heads before their contexts are solved. Incompatible FD outputs are rejected, as are overlapping heads. For otherwise non-overlapping heads whose determining positions unify, the determined positions must already be equal under that determining substitution alone; contexts cannot justify additional output bindings. Context variables must still occur in the head, each constraint must be structurally smaller, and variable occurrences may not increase. These restrictions do not prove unbounded termination of FD improvement: every resolution and improvement retry consumes the configured step/depth budget, and exhaustion is `FLICK-C009`, never success.
 
 A multiparameter class need not have a functional dependency. For `Convert String Email` and `Convert String UserId`, the dependency `input -> output` is precisely wrong: String allows both results.
 
@@ -470,4 +472,4 @@ The ordinary `Monad (Eff r e)` fixes `r` and `e`; their explicit or inferred wid
 
 The frontend computes the unions of requirements/errors for direct calls and preserves the captures of descriptions and callbacks. Indexed/graded abstractions are not part of the first version. A generic `do` elaborates to the `Monad` and `Alternative` methods of the Prelude directly, whatever names are in scope; with `Monad (Eff r e)` it keeps the fixed rows, which is why direct calls stay the main style for Eff.
 
-**Decision for the type core:** MPTC/superclasses/FD with strict coverage and structural termination; package ownership by the class or the first nominal parameter; no overlap/orphans/local implicits; fixed row primitives; generalization of only provably pure constructions. Higher-rank callbacks are checked against explicit nested `forall`; this feature weakens neither coherence nor the state restrictions.
+**Decision for the type core:** MPTC/superclasses/FD with context-assisted coverage, structural context restrictions and budgeted resolution; coherent head-only selection; package ownership by the class or the first nominal parameter; no overlap/orphans/local implicits; fixed row primitives; generalization of only provably pure constructions. Higher-rank callbacks are checked against explicit nested `forall`; this feature weakens neither coherence nor the state restrictions.

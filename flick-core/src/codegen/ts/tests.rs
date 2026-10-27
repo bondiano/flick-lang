@@ -67,7 +67,7 @@ fn unit_never_and_empty_rows_have_distinct_typescript_types() {
          type error Oops = Oops\n\
          skip : Unit -> Unit\nlet skip u = u\n\
          absurd : Never -> Number\nlet absurd n = 1\n\
-         quiet : Eff none none Unit\nlet quiet = task { () }\n\
+         quiet : Eff none none Unit\nlet quiet = Effect.void\n\
          failing : Eff none {Oops} Never\nlet failing = task { from_result (Err Oops) }\n",
     );
     for expected in [
@@ -78,4 +78,68 @@ fn unit_never_and_empty_rows_have_distinct_typescript_types() {
     ] {
         assert!(out.contains(expected), "{expected}\n{out}");
     }
+}
+
+#[test]
+fn capture_projection_preserves_outer_data_binders_but_not_stored_regions() {
+    use crate::types::{Binder, Kind, Type};
+
+    let lookup = |m: &str| types::builtins().iter().find(|i| i.module == m).cloned();
+    let package = |_: &str| None;
+    let projection = Projection::new("App.Shapes", &lookup, &package);
+    let binder = |name: &str, kind| Binder {
+        name: name.to_owned(),
+        kind,
+    };
+    let scheme = |vars, body| Type::Forall {
+        vars,
+        constraints: Vec::new(),
+        body: Box::new(body),
+    };
+    let qualified = |ty, captures| Type::Captured {
+        ty: Box::new(ty),
+        captures: Box::new(captures),
+        value: false,
+    };
+    let a = Type::Var("a".to_owned());
+    let c = Type::Var("c".to_owned());
+    let nested = scheme(
+        vec![binder("b", Kind::Type)],
+        Type::pure_fun(
+            Type::Var("b".to_owned()),
+            Type::Bounded {
+                ty: Box::new(a.clone()),
+                captures: Box::new(Type::Union(Box::new(a.clone()), Box::new(c.clone()))),
+            },
+        ),
+    );
+    let scope_free = scheme(
+        vec![binder("a", Kind::Type), binder("c", Kind::CaptureRow)],
+        qualified(Type::pure_fun(a, nested), c.clone()),
+    );
+    assert_eq!(
+        projection.value(&scope_free),
+        Ok("<A>(arg: A) => (<B>(arg: B) => A)".to_owned())
+    );
+
+    let stored = Type::app(
+        Type::prim("Ref"),
+        qualified(
+            Type::pure_fun(Type::prim("Number"), Type::prim("Number")),
+            Type::Var("r".to_owned()),
+        ),
+    );
+    let scoped = scheme(
+        vec![binder("r", Kind::Region), binder("c", Kind::CaptureRow)],
+        qualified(Type::pure_fun(Type::prim("Unit"), stored), c),
+    );
+    assert!(projection.value(&scoped).is_err());
+    assert!(
+        projection
+            .value(&qualified(
+                Type::prim("Number"),
+                Type::Var("unknown".to_owned()),
+            ))
+            .is_err()
+    );
 }

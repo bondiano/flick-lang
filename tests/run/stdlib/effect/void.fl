@@ -1,0 +1,16 @@
+module App.Main exposing (main)
+
+empty : Eff none none Unit
+let empty = Effect.void
+
+twice : Eff none none Unit ->{} (Unit, Unit)
+let twice computation =
+  let first : Unit = await computation
+  let second : Unit = await computation
+  (first, second)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line ("await: " ++ show (twice empty))
+  Platform.stdout_line ("zip: " ++ show (Effect.zip empty empty))
+  Platform.stdout_line ("all: " ++ show (Effect.all Effect.Sequential [empty, empty]))

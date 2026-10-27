@@ -18,13 +18,25 @@ impl Checker<'_> {
 
     /// Unifies two types of a row kind: rows, unions and row variables.
     pub fn unify_row_types(&mut self, left: &Type, right: &Type) -> Unified {
-        let left = self.store.normalize(left);
-        let right = self.store.normalize(right);
+        let mut left_norm = self.store.normalize(left);
+        let mut right_norm = self.store.normalize(right);
+        if left_norm
+            .entries
+            .iter()
+            .chain(&right_norm.entries)
+            .any(|(label, _)| label.starts_with('^'))
+        {
+            left_norm = Norm::default();
+            right_norm = Norm::default();
+            self.capture_row(left, &mut left_norm);
+            self.capture_row(right, &mut right_norm);
+        }
+        let (left, right) = (left_norm, right_norm);
         let (mut only_left, mut only_right) = (Vec::new(), Vec::new());
         let (mut i, mut j) = (0, 0);
         while i < left.entries.len() || j < right.entries.len() {
             let order = match (left.entries.get(i), right.entries.get(j)) {
-                (Some(l), Some(r)) => l.0.cmp(&r.0),
+                (Some(left_field), Some(right_field)) => left_field.0.cmp(&right_field.0),
                 (Some(_), None) => Ordering::Less,
                 (None, _) => Ordering::Greater,
             };

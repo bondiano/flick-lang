@@ -6,7 +6,7 @@
 /// caching, logs, spans and metrics.
 module Effect exposing (
   Concurrency(..), ValidationError(..),
-  sleep, retry, retry_or_else, repeat, repeat_or_else, schedule, schedule_from, die,
+  void, sleep, retry, retry_or_else, repeat, repeat_or_else, schedule, schedule_from, die,
   fail_cause_sync, never, yield_now, yield_now_with, exit, zip, zip_with, delay, timed,
   timeout_or_else, forever, eventually, replicate, replicate_effect, when_, resource_auto,
   for_each, all, partition, validate, filter, filter_map, filter_map_effect, find_first,

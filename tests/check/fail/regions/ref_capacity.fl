@@ -1,0 +1,10 @@
+// A zero-capture cell cannot acquire captures through a later write.
+module App.RefCapacity exposing (..)
+
+unsafe : forall a. a -> a^{} -> a ->{} (Eff none none Unit)^{}
+let unsafe exemplar empty full =
+  ignore exemplar
+  let ref = Ref.make empty
+  Ref.set ref full
+  task { ignore (Ref.get ref) }
+//~ FLICK-G001 @8:15-8:19 this value holds `a`, but the expected type

@@ -211,7 +211,7 @@ let view model m =
           (div { class_name = if m.failed then "hero-editor-status is-error" else "hero-editor-status" }
             [span { class_name = "status-dot" } [], text status]),
         attributes [("id", "flick-hero-refresh"), ("hidden", "hidden"), ("tabIndex", "-1")]
-          (button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { () }) } []),
+          (button { disabled = false; on_click = Ui.Event.latest (fun _ -> Effect.void) } []),
       ])
   }
 

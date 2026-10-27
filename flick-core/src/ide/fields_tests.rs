@@ -74,3 +74,41 @@ fn a_prop_of_an_element_shows_its_comment() {
         "{shown}"
     );
 }
+
+#[test]
+fn a_codec_label_shows_its_decoded_field_type() {
+    let source = "module App.Main exposing (..)
+
+refined type Email = String where Checks.email
+  deriving Schema
+
+type alias Profile = {
+  email : Email;
+  nickname : Option String;
+} deriving Schema
+
+profile_schema : Schema Profile
+let profile_schema = schema Profile
+
+profile_json : PureCodec Json Profile
+let profile_json = codec profile_schema {
+  email = field \"email_address\" Email.json;
+  nickname = field \"nickname\" (option_as_null String.json);
+}
+";
+    let f = fixture_of(&[("src/App/Main.fl", source)]);
+    let ide = f.ide();
+    let file = f.file("App.Main");
+    for (label, ty) in [("email", "Email"), ("nickname", "Option String")] {
+        let start = f.at("App.Main", &format!("{label} ="), 0);
+        let end = start + u32::try_from(label.len()).expect("small");
+        for offset in start..end {
+            let (shown, range) = ide.hover(file, offset).expect("codec field hover");
+            assert_eq!(
+                shown,
+                format!("```flick\n{label} : {ty}\n```\n\nfield of `Profile` from `App.Main`")
+            );
+            assert_eq!(range, (start, end));
+        }
+    }
+}

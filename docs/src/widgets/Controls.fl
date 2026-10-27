@@ -44,7 +44,7 @@ let view model m =
         span { class_name = "icon-control mobile-menu-control" }
           [attributes [("aria-label", if m.ru then "Навигация" else "Navigation"), ("popoverTarget", "flick-navigation")]
             (button
-              { disabled = false; on_click = Ui.Event.latest (fun _ -> task { () }) }
+              { disabled = false; on_click = Ui.Event.latest (fun _ -> Effect.void) }
               [icon "menu"])],
       ]
   }

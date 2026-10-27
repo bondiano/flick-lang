@@ -59,7 +59,7 @@ let main () =
     Metric.update 1 checkouts
   }
   provide (Otlp.layer { url = base; service_name = "shop" }) {
-    Tracer.with_span "refund" options (task { () })
+    Tracer.with_span "refund" options Effect.void
   }
   let all = received ()
   Platform.stdout_line (has all "/v1/logs")

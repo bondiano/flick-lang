@@ -3,6 +3,7 @@
 
 use super::tests::fixture_of;
 use super::{TOKEN_TYPES, Target};
+use crate::diagnostics::Diagnostic;
 
 const SHAPES: &str = "module App.Shapes exposing (..)
 
@@ -72,6 +73,41 @@ fn signature_help_marks_the_argument_being_written() {
     assert_eq!(help.active, 1);
     let (s, e) = help.params[1];
     assert_eq!(&help.label[s as usize..e as usize], "Number");
+}
+
+#[test]
+fn signature_help_and_function_tokens_follow_captured_arrow_stages() {
+    let text = "module App.Main exposing (..)
+
+wrap : forall c. (Number -> Number)^c -> (Number -> Number)^c
+let wrap f = f
+
+apply : forall c. (Number -> Number)^c -> Number
+let apply f = wrap f 2
+";
+    let f = fixture_of(&[("src/App/Main.fl", text)]);
+    let ide = f.ide();
+    assert!(
+        ide.analysis.diagnostics.iter().all(Diagnostic::unnecessary),
+        "{:?}",
+        ide.analysis.diagnostics
+    );
+    let file = f.file("App.Main");
+    let help = ide
+        .signature_help(file, f.at("App.Main", "2", 0))
+        .expect("captured result is another function stage");
+    assert_eq!(help.params.len(), 2);
+    assert_eq!(help.active, 1);
+    let (start, end) = help.params[1];
+    assert_eq!(&help.label[start as usize..end as usize], "Number");
+    let call = f.at("App.Main", "wrap f 2", 0);
+    assert_eq!(
+        ide.semantic_tokens(file)
+            .iter()
+            .find(|token| token.0 == call)
+            .map(|token| TOKEN_TYPES[token.2 as usize]),
+        Some("function")
+    );
 }
 
 #[test]

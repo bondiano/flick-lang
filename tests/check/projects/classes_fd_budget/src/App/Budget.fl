@@ -1,0 +1,13 @@
+// Liberal coverage still resolves within the project's finite step budget.
+module App.Budget exposing (unbounded)
+
+class Grow a b | a -> b =
+  grow : a -> b
+
+instance Grow a b => Grow a (List b) =
+  grow : a -> List b
+  let grow value = [grow value]
+
+unbounded : Unit
+let unbounded = ignore (grow 0)
+//                      ^^^^ FLICK-C009 exceeds the budget of 10 steps

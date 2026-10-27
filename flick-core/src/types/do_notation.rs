@@ -83,7 +83,7 @@ impl Checker<'_> {
                 let (start, end) = guard_key(first);
                 let nothing = self.prelude_method("nothing", Span::new(self.file, start, end));
                 let ty = self.do_rest(node, rest, expected);
-                let _ = self.unify(&nothing, &ty);
+                self.expect(&nothing, &ty, self.span(first));
                 ty
             }
             K::BindStmt | K::BindGroup if rest.is_empty() => {

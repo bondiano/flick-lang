@@ -7,9 +7,7 @@
 use std::mem;
 
 use super::matching::{Match, Subst, match_type};
-use super::{Dict, RECORD, Wanted, has_metas, split, vars};
-use crate::diagnostics::{Diagnostic, Severity, codes};
-use crate::source::Span;
+use super::{Dict, RECORD, has_metas, split, vars};
 use crate::types::Checker;
 use crate::types::env::Instance;
 use crate::types::ty::Type;
@@ -36,20 +34,25 @@ impl Checker<'_> {
         let mut pending = mem::take(&mut self.classes.wanted);
         loop {
             let mut left = Vec::new();
-            let mut solved = false;
-            for w in pending {
+            let mut progress = false;
+            for mut w in pending {
                 let givens = self.closure(&w.givens);
                 let c = self.canon(&w.constraint);
-                match self.entail(&c, &givens, &mut Vec::new()) {
+                progress |= c != w.constraint;
+                w.constraint = c;
+                match self.entail(&w.constraint, &givens, &mut Vec::new()) {
                     Outcome::Solved(dict) => {
-                        solved = true;
+                        progress = true;
                         self.record_dict(w.span, w.order, dict.clone());
                         self.classes.evidence.push((w.span, dict));
                     }
                     outcome => left.push((w, outcome)),
                 }
             }
-            if !solved || left.is_empty() {
+            progress |= left
+                .iter()
+                .any(|(w, _)| self.canon(&w.constraint) != w.constraint);
+            if !progress || left.is_empty() {
                 if report {
                     self.report_classes(left);
                 } else {
@@ -70,31 +73,47 @@ impl Checker<'_> {
 
     /// The assumptions with their superclasses, transitively.
     pub fn closure(&self, givens: &[Type]) -> Vec<(Type, Dict)> {
-        let mut out: Vec<(Type, Dict)> = Vec::new();
-        let mut stack: Vec<(Type, Dict)> = givens
-            .iter()
-            .map(|g| {
-                let g = self.canon(g);
-                let shown = self.show(&g);
-                (g, Dict::Given(shown))
-            })
-            .collect();
-        while let Some((g, dict)) = stack.pop() {
+        fn visit(
+            checker: &Checker<'_>,
+            g: Type,
+            dict: Dict,
+            path: &mut Vec<(String, String)>,
+            out: &mut Vec<(Type, Dict)>,
+        ) {
             if out.iter().any(|(x, _)| *x == g) {
-                continue;
+                return;
             }
-            for s in self.supers_of(&g) {
-                let s = self.canon(&s);
+            let Some(((module, name), _)) = split(&g) else {
+                out.push((g, dict));
+                return;
+            };
+            if path.iter().any(|(m, n)| m == module && n == name) {
+                return;
+            }
+            path.push((module.to_owned(), name.to_owned()));
+            let supers = checker.supers_of(&g);
+            let index = out.len();
+            out.push((g, dict));
+            for s in supers.into_iter().rev() {
+                let s = checker.canon(&s);
                 let class = split(&s)
                     .map(|((_, n), _)| n.to_owned())
                     .unwrap_or_default();
                 let dict = Dict::Super {
-                    dict: Box::new(dict.clone()),
+                    dict: Box::new(out[index].1.clone()),
                     class,
                 };
-                stack.push((s, dict));
+                visit(checker, s, dict, path, out);
             }
-            out.push((g, dict));
+            path.pop();
+        }
+
+        let mut out = Vec::new();
+        let mut path = Vec::new();
+        for g in givens.iter().rev() {
+            let g = self.canon(g);
+            let shown = self.show(&g);
+            visit(self, g, Dict::Given(shown), &mut path, &mut out);
         }
         out
     }
@@ -144,7 +163,7 @@ impl Checker<'_> {
             if improved == *c {
                 return Outcome::Solved(Dict::Error);
             }
-            return self.entail_one(&improved, givens, chain);
+            return self.entail(&improved, givens, chain);
         }
         let outcome = if module == RECORD {
             self.primitive(c, &name, &args, givens, chain)
@@ -226,7 +245,7 @@ impl Checker<'_> {
         }
         if self.improve_by_instances(&instances, class, args) {
             let c = self.canon(c);
-            return self.entail_one(&c, givens, chain);
+            return self.entail(&c, givens, chain);
         }
         // an assumption may still apply once the unknown types are known
         unknown |= givens
@@ -246,24 +265,44 @@ impl Checker<'_> {
         givens: &Givens,
         chain: &mut Vec<Type>,
     ) -> Outcome {
-        let mut args = Vec::new();
-        let mut stuck = false;
-        for context in &instance.context {
-            let c = self.settled(context.substitute(subst));
-            match self.entail(&c, givens, chain) {
-                Outcome::Solved(dict) => args.push(dict),
-                Outcome::Stuck => stuck = true,
-                other => return other,
+        let mut contexts: Vec<(Type, Option<Dict>)> = instance
+            .context
+            .iter()
+            .map(|context| (context.substitute(subst), None))
+            .collect();
+        loop {
+            let mut progress = false;
+            let mut stuck = false;
+            for (context, dict) in &mut contexts {
+                if dict.is_some() {
+                    continue;
+                }
+                let c = self.canon(context);
+                progress |= c != *context;
+                *context = c;
+                match self.entail(context, givens, chain) {
+                    Outcome::Solved(solved) => {
+                        *dict = Some(solved);
+                        progress = true;
+                    }
+                    Outcome::Stuck => stuck = true,
+                    other => return other,
+                }
+            }
+            if !stuck {
+                return Outcome::Solved(Dict::Instance {
+                    module: instance.module.clone(),
+                    name: instance.name.clone(),
+                    args: contexts.into_iter().filter_map(|(_, dict)| dict).collect(),
+                });
+            }
+            progress |= contexts
+                .iter()
+                .any(|(context, dict)| dict.is_none() && self.canon(context) != *context);
+            if !progress {
+                return Outcome::Stuck;
             }
         }
-        if stuck {
-            return Outcome::Stuck;
-        }
-        Outcome::Solved(Dict::Instance {
-            module: instance.module.clone(),
-            name: instance.name.clone(),
-            args,
-        })
     }
 
     /// An instance whose head matches the determining arguments of a
@@ -291,6 +330,12 @@ impl Checker<'_> {
                         _ => false,
                     });
                 if !determined {
+                    continue;
+                }
+                if fd.to.iter().any(|&j| match (pattern.get(j), args.get(j)) {
+                    (Some(p), Some(t)) => match_type(p, t, &mut subst) == Match::No,
+                    _ => true,
+                }) {
                     continue;
                 }
                 let mut changed = false;
@@ -350,137 +395,6 @@ impl Checker<'_> {
         }
         let class = split(c).map(|((_, n), _)| n.to_owned()).unwrap_or_default();
         Outcome::Solved(Dict::Structural { class, fields })
-    }
-
-    fn report_classes(&mut self, left: Vec<(Wanted, Outcome)>) {
-        let mut budget = false;
-        for (w, outcome) in left {
-            if self.explained(w.span) {
-                continue;
-            }
-            let constraint = self.canon(&w.constraint);
-            match outcome {
-                Outcome::Missing(part, reason) => {
-                    self.missing(&constraint, &part, reason.as_deref(), w.span);
-                }
-                Outcome::Stuck => {
-                    let shown = self.show(&constraint);
-                    let candidates = self.candidates(&constraint);
-                    self.diagnostics.push(
-                        Diagnostic::error(
-                            codes::C002,
-                            format!("cannot choose an instance for `{shown}`: a type in it is not known here; {candidates}"),
-                            w.span,
-                        )
-                        .with_fix("annotate the type of the value", Vec::new()),
-                    );
-                }
-                Outcome::Budget(chain) if !budget => {
-                    budget = true;
-                    self.over_budget(&constraint, &chain, w.span);
-                }
-                _ => {}
-            }
-        }
-    }
-
-    /// An error inside or around `span` already explains a failure there.
-    fn explained(&self, span: Span) -> bool {
-        self.diagnostics.iter().any(|d| {
-            d.severity == Severity::Error
-                && d.span.is_some_and(|s| {
-                    s.file == span.file && s.start <= span.end && span.start <= s.end
-                })
-        })
-    }
-
-    fn missing(&mut self, constraint: &Type, part: &Type, reason: Option<&str>, span: Span) {
-        let (whole, shown) = (self.show(constraint), self.show(part));
-        let rigid = part.contains(&mut |t| matches!(t, Type::Skolem(_) | Type::Var(_)));
-        let mut message = match (&reason, rigid) {
-            (Some(reason), _) => format!("`{shown}` does not hold: {reason}"),
-            (None, true) => format!("cannot deduce `{shown}` from the constraints in scope"),
-            (None, false) => format!("no instance for `{shown}`"),
-        };
-        if whole != shown {
-            message = format!("{message}, needed for `{whole}`");
-        }
-        let mut diagnostic = if reason.is_none() && !rigid {
-            let candidates = self.candidates(part);
-            Diagnostic::error(codes::C001, format!("{message}; {candidates}"), span)
-        } else {
-            Diagnostic::error(codes::C001, message, span)
-        };
-        if rigid && reason.is_none() {
-            diagnostic =
-                diagnostic.with_fix(format!("add `{shown} =>` to the signature"), Vec::new());
-        }
-        self.diagnostics.push(diagnostic);
-    }
-
-    /// The instances of the class of `c`, for a diagnostic.
-    fn candidates(&self, c: &Type) -> String {
-        let Some((class, _)) = split(c) else {
-            return String::new();
-        };
-        let names: Vec<String> = self
-            .env
-            .instances
-            .iter()
-            .filter(|i| split(&i.head).is_some_and(|(k, _)| k == class))
-            .map(|i| format!("`{}`", i.name))
-            .collect();
-        match names.len() {
-            0 => format!("`{}` has no instances", class.1),
-            n if n <= 6 => format!("instances of `{}`: {}", class.1, names.join(", ")),
-            n => format!(
-                "instances of `{}`: {}, and {} more",
-                class.1,
-                names[..5].join(", "),
-                n - 5
-            ),
-        }
-    }
-
-    fn over_budget(&mut self, constraint: &Type, chain: &[Type], span: Span) {
-        let limits = self.options.limits;
-        let what = if chain.len() > limits.depth as usize {
-            format!("{} nested constraints", limits.depth)
-        } else {
-            format!("{} steps", limits.steps)
-        };
-        let short = |t: &Type| {
-            let s = self.show(t);
-            match s.char_indices().nth(60) {
-                Some((i, _)) => format!("`{}…`", &s[..i]),
-                None => format!("`{s}`"),
-            }
-        };
-        let mut links: Vec<String> = chain.iter().take(3).map(short).collect();
-        if chain.len() > 5 {
-            links.push("…".to_owned());
-        }
-        links.extend(
-            chain
-                .iter()
-                .skip(3.max(chain.len().saturating_sub(2)))
-                .map(short),
-        );
-        let shown = short(constraint);
-        self.diagnostics.push(
-            Diagnostic::error(
-                codes::C009,
-                format!(
-                    "resolving {shown} exceeds the budget of {what}: {}",
-                    links.join(" -> ")
-                ),
-                span,
-            )
-            .with_fix(
-                "simplify the types involved, or raise `solver-steps` or `solver-depth` in `[build]` of `flick.toml`",
-                Vec::new(),
-            ),
-        );
     }
 }
 

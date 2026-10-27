@@ -3,7 +3,7 @@
 module App.Functor exposing (Functor(..), twice, double_all, later)
 
 class Functor (f : Type -> Type) =
-  map : (a -> b) -> f a -> f b
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((f a)^d -> (f b)^(c + d))^c
 
 // Without a signature the method takes the class one.
 instance Functor Option =
@@ -13,7 +13,7 @@ instance Functor Option =
     | Some x -> Some (f x)
 
 instance Functor (Eff r e) =
-  map : (a -> b) -> Eff r e a -> Eff r e b
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((Eff r e a)^d -> (Eff r e b)^(c + d))^c
   let map f eff = task { f (await eff) }
 
 twice : Functor f => f Number -> f Number

@@ -21,7 +21,7 @@ let tabs_of_nodes = Ui.tabs { selected = 0 } (NonEmpty.singleton (Ui.text "a"))
 input_children : Ui
 let input_children =
   Ui.input
-    { value = ""; placeholder = ""; on_input = Ui.Event.latest (fun _ -> task { () }) }
+    { value = ""; placeholder = ""; on_input = Ui.Event.latest (fun _ -> Effect.void) }
     [Ui.text "x"]
 //~ FLICK-T003 @23:3-25:18 this is not a function: it has type `Ui`,
 

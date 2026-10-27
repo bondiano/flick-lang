@@ -65,7 +65,9 @@ fn with_result(kind: &Kind, result: Kind) -> Kind {
 /// Whether the arrows of `ty`, stage by stage, include a runtime one.
 pub fn has_runtime_arrow(ty: &Type) -> bool {
     match ty {
-        Type::Forall { body, .. } | Type::Captured { ty: body, .. } => has_runtime_arrow(body),
+        Type::Forall { body, .. }
+        | Type::Captured { ty: body, .. }
+        | Type::Bounded { ty: body, .. } => has_runtime_arrow(body),
         Type::Fun {
             effects, result, ..
         } => effects.is_some() || has_runtime_arrow(result),
@@ -76,6 +78,28 @@ pub fn has_runtime_arrow(ty: &Type) -> bool {
 /// `ty` with the service `label` needed at every runtime arrow of its stages.
 fn require(ty: Type, label: &str, service: &Type) -> Type {
     match ty {
+        Type::Captured {
+            ty,
+            captures,
+            value,
+        } => Type::Captured {
+            ty: Box::new(require(*ty, label, service)),
+            captures,
+            value,
+        },
+        Type::Bounded { ty, captures } => Type::Bounded {
+            ty: Box::new(require(*ty, label, service)),
+            captures,
+        },
+        Type::Forall {
+            vars,
+            constraints,
+            body,
+        } => Type::Forall {
+            vars,
+            constraints,
+            body: Box::new(require(*body, label, service)),
+        },
         Type::Fun {
             param,
             effects,
@@ -91,10 +115,6 @@ fn require(ty: Type, label: &str, service: &Type) -> Type {
                 e
             }),
             result: Box::new(require(*result, label, service)),
-        },
-        Type::Captured { ty, captures } => Type::Captured {
-            ty: Box::new(require(*ty, label, service)),
-            captures,
         },
         other => other,
     }
@@ -212,12 +232,27 @@ impl Checker<'_> {
     }
 
     fn live_part(&self, ty: &Type, seen: &mut Vec<(String, String)>) -> Option<Type> {
-        if let Type::Fun {
-            effects: Some(_), ..
-        }
-        | Type::Captured { .. } = ty
-        {
-            return Some(ty.clone());
+        let normalized = self.bound_head(ty);
+        let ty = &normalized;
+        match ty {
+            Type::Bounded { ty, .. } => return self.live_part(ty, seen),
+            Type::Captured {
+                ty: inner,
+                captures,
+                ..
+            } => {
+                let mut held = super::ty::Norm::default();
+                self.capture_row(captures, &mut held);
+                return if held.entries.is_empty() && held.tails.is_empty() {
+                    self.live_part(inner, seen)
+                } else {
+                    Some(ty.clone())
+                };
+            }
+            Type::Fun {
+                effects: Some(_), ..
+            } => return Some(ty.clone()),
+            _ => {}
         }
         let (head, args) = ty.spine();
         if let Type::Con { module, name } = head {
@@ -241,7 +276,15 @@ impl Checker<'_> {
             if !seen.contains(&key) {
                 seen.push(key);
                 let inner = match self.env.type_def(module, name).map(|d| &d.form) {
-                    Some(Form::Alias { body, .. }) => vec![body.clone()],
+                    Some(Form::Alias { params, body, .. }) => vec![
+                        body.substitute(
+                            &params
+                                .iter()
+                                .cloned()
+                                .zip(args.iter().map(|a| (*a).clone()))
+                                .collect::<Vec<_>>(),
+                        ),
+                    ],
                     Some(Form::Adt { constructors, .. }) => constructors
                         .iter()
                         .filter_map(|c| {
@@ -251,7 +294,7 @@ impl Checker<'_> {
                                 name: c.clone(),
                             })
                         })
-                        .cloned()
+                        .flat_map(|scheme| self.constructor_payloads(scheme, &args, ty))
                         .collect(),
                     _ => Vec::new(),
                 };
@@ -270,5 +313,30 @@ impl Checker<'_> {
             }
         });
         found
+    }
+
+    /// A constructor's result and quantified capture row are metadata, not
+    /// stored payloads; specialize its actual fields before checking them.
+    fn constructor_payloads(&self, scheme: &Type, args: &[&Type], data: &Type) -> Vec<Type> {
+        let mut current = scheme.clone();
+        if let Type::Forall { vars, body, .. } = current {
+            let mut subst: Vec<(String, Type)> = vars
+                .iter()
+                .zip(args)
+                .map(|(v, a)| (v.name.clone(), (*a).clone()))
+                .collect();
+            if vars.len() > args.len()
+                && let Some(capture) = vars.last().filter(|v| v.kind == Kind::CaptureRow)
+            {
+                subst.push((capture.name.clone(), self.captures_of(data).into_type()));
+            }
+            current = body.substitute(&subst);
+        }
+        let mut payloads = Vec::new();
+        while let Type::Fun { param, result, .. } = self.whnf(&current) {
+            payloads.push(*param);
+            current = *result;
+        }
+        payloads
     }
 }

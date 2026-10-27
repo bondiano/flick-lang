@@ -1,6 +1,6 @@
 //! Semantic tokens, which say what each name is, and folding ranges.
 
-use super::{Ide, tree};
+use super::{Ide, hints::strip, tree};
 use crate::iface::{Decl, Namespace};
 use crate::resolve::declarations;
 use crate::source::FileId;
@@ -27,7 +27,7 @@ const FUNCTION: u32 = 3;
 const VARIABLE: u32 = 4;
 const METHOD: u32 = 5;
 const PARAMETER: u32 = 6;
-/// A word that is a keyword only where it stands: the mode of `foreign`.
+/// A word that is a keyword only where it stands.
 const KEYWORD: u32 = 7;
 
 /// Nodes worth folding when they span several lines.
@@ -126,11 +126,7 @@ impl Ide<'_> {
 }
 
 fn is_function(ty: Option<&Type>) -> bool {
-    match ty {
-        Some(Type::Forall { body, .. }) => is_function(Some(body)),
-        Some(Type::Fun { .. }) => true,
-        _ => false,
-    }
+    ty.is_some_and(|ty| matches!(strip(ty), Type::Fun { .. }))
 }
 
 /// The module path before a qualified name: `List` of `List.map`.
@@ -177,9 +173,17 @@ fn foreign_modes(tree: &Node, text: &str, out: &mut Vec<(u32, u32, u32)>) {
     }
 }
 
-/// Words the parser made keywords where they stand: `and` of a `do` group,
-/// `component`, `setup` and `render`.
+/// Contextual keywords and the names of CLI flags and arguments.
 fn contextual_keywords(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
+    if node.kind == K::CliClause {
+        let mut tokens = node.child_tokens();
+        if let Some(word) = tokens.next() {
+            out.push((word.start, word.end, KEYWORD));
+        }
+        if let Some(name) = tokens.next().filter(|t| t.kind == K::Ident) {
+            out.push((name.start, name.end, PARAMETER));
+        }
+    }
     for t in node.child_tokens() {
         if matches!(t.kind, K::AndKw | K::ComponentKw) {
             out.push((t.start, t.end, KEYWORD));

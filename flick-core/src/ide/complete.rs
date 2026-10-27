@@ -69,7 +69,10 @@ impl Ide<'_> {
     /// Completions at `offset` of `file`. With `dotted`, `offset` is the end
     /// of what comes before a `.`.
     pub fn complete(&self, file: FileId, offset: u32, dotted: bool) -> Vec<Completion> {
-        if let Some(items) = self.sql_complete(file, offset, dotted) {
+        if let Some(items) = self
+            .cli_complete(file, offset, dotted)
+            .or_else(|| self.sql_complete(file, offset, dotted))
+        {
             return items;
         }
         let mut items = if dotted {
@@ -220,10 +223,10 @@ impl Ide<'_> {
 
     /// The known fields of a record type, through transparent aliases.
     fn fields(&self, ty: &Type, out: &mut Vec<(String, Type)>, depth: u32) {
-        let ty = match ty {
-            Type::Captured { ty, .. } => ty,
-            other => other,
-        };
+        let mut ty = ty;
+        while let Type::Captured { ty: inner, .. } | Type::Bounded { ty: inner, .. } = ty {
+            ty = inner;
+        }
         match ty {
             Type::Record(row) => out.extend(row.entries.iter().cloned()),
             Type::App { .. } | Type::Con { .. } if depth < 8 => {

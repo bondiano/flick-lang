@@ -31,6 +31,15 @@ impl Checker<'_> {
     /// The type of a value or constructor reference, instantiated.
     pub fn name(&mut self, node: &Node) -> Type {
         let ty = self.name_type(node);
+        let ty = self.value_bound(ty);
+        let ty = if matches!(self.typing.names.get(&node.range()), Some(Ref::Local)) {
+            ty
+        } else {
+            Type::Bounded {
+                ty: Box::new(ty),
+                captures: Box::new(Type::empty_row()),
+            }
+        };
         self.note_type(self.span(node), &ty);
         ty
     }
@@ -138,7 +147,7 @@ impl Checker<'_> {
                 } => {
                     let calls = self.stage.calls;
                     let since = self.diagnostics.len();
-                    self.check(arg, &param);
+                    let argument = self.check_value(arg, &param);
                     self.explain_argument(since, head, i, &param);
                     if i == 0 {
                         self.refined_constant(head, arg);
@@ -152,7 +161,8 @@ impl Checker<'_> {
                         self.call_effects(&e, span);
                     }
                     params.push(*param);
-                    ty = self.instantiate(&result, span);
+                    let result = self.instantiate(&result, span);
+                    ty = self.application_result(result, &ty, &argument);
                 }
                 Type::Error => {
                     unknown.push(self.infer(arg));
@@ -307,7 +317,8 @@ impl Checker<'_> {
                     self.call_effects(&e, Span::new(self.file, start, end));
                 }
                 let span = Span::new(self.file, lhs.range().0, rhs.range().1);
-                self.instantiate(&result, span)
+                let result = self.instantiate(&result, span);
+                self.application_result(result, &function, &arg)
             }
             Type::Error => Type::Error,
             meta @ Type::Meta(_) => {

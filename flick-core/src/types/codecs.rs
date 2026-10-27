@@ -88,7 +88,7 @@ impl Checker<'_> {
                 return Type::Error;
             }
         };
-        let (rows, given) = self.codec_fields(&fields, &record);
+        let (rows, given) = self.codec_fields(&fields, &record, &decoded);
         let missing: Vec<String> = record
             .entries
             .iter()
@@ -120,11 +120,15 @@ impl Checker<'_> {
         &mut self,
         fields: &[(String, &Node, &Node)],
         record: &Row,
+        decoded: &Type,
     ) -> (Vec<Type>, Vec<String>) {
         let mut rows = Vec::new();
         let mut given: Vec<String> = Vec::new();
         let mut wires: Vec<String> = Vec::new();
         for (label, field, value) in fields {
+            if let Some(token) = field.child_tokens().find(|t| t.kind == K::Ident) {
+                self.note_field(self.token_span(token), decoded);
+            }
             let Some(ty) = record.get(label).cloned() else {
                 self.error(
                     codes::D004,

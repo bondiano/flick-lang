@@ -1,13 +1,15 @@
 //! Classes and instances: superclasses and functional dependencies of a
-//! class, coherence of instances (no overlap, no orphans, strict coverage,
-//! structural termination), the instance solver with its budget, the row
-//! primitives and the structural instances of records, and `deriving`.
+//! class, coherence of instances (no overlap, no orphans, context-assisted
+//! coverage, structural context restrictions), the budgeted instance solver,
+//! the row primitives and structural instances of records, and `deriving`.
 //! Rules: `docs/src/content/docs/reference/classes.md`.
 
+mod coherence;
 mod declare;
 mod derive;
 mod matching;
 mod prims;
+mod report;
 mod solve;
 
 use std::collections::HashMap;

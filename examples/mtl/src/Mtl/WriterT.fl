@@ -1,0 +1,82 @@
+/// Add ordered output to an inner computation without changing its execution policy.
+module Mtl.WriterT exposing (WriterT(..), run)
+
+import Mtl.Classes exposing (
+  MonadTrans(..),
+  MonadState(..),
+  MonadReader(..),
+  MonadWriter(..),
+  MonadError(..),
+)
+
+type WriterT w (m : Type -> Type) a = WriterT (m (a, w))
+
+run : forall c w m a. (WriterT w m a)^c -> (m (a, w))^c
+let run (WriterT action) = action
+
+instance Functor m => Functor (WriterT w m) =
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((WriterT w m a)^d -> (WriterT w m b)^(c + d))^c
+  let map f (WriterT action) = WriterT (map (fun (value, output) -> (f value, output)) action)
+
+instance (Monoid w, Applicative m) => Applicative (WriterT w m) =
+  pure : forall c a. a^c -> (WriterT w m a)^c
+  let pure value = WriterT (pure (value, empty))
+  map2 :
+    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+      ((WriterT w m a)^d -> ((WriterT w m b)^d -> (WriterT w m x)^(c + d))^(c + d))^c
+  let map2 f (WriterT left) (WriterT right) =
+    WriterT (map2 (fun (a, prefix) (b, suffix) -> (f a b, combine prefix suffix)) left right)
+
+instance (Monoid w, Monad m) => Monad (WriterT w m) =
+  flat_map :
+    forall c d a b. (forall v. a^v -> (WriterT w m b)^(c + v))^c ->
+      ((WriterT w m a)^d -> (WriterT w m b)^(c + d))^c
+  let flat_map f (WriterT action) =
+    WriterT (do {
+      (value, prefix) <- action
+      (next, suffix) <- run (f value)
+      pure (next, combine prefix suffix)
+    })
+
+instance Monoid w => MonadTrans (WriterT w) =
+  lift : forall c m a. Monad m => (m a)^c -> (WriterT w m a)^c
+  let lift action = WriterT (map (fun value -> (value, empty)) action)
+
+instance (Monoid w, MonadState m s) => MonadState (WriterT w m) s =
+  get : WriterT w m s
+  let get = lift get
+  put : forall c. s^c -> (WriterT w m Unit)^c
+  let put next = lift (put next)
+  state : forall c a. (forall v. s^v -> (a, s)^(c + v))^c -> (WriterT w m a)^c
+  let state step = lift (state step)
+
+instance (Monoid w, MonadReader m r) => MonadReader (WriterT w m) r =
+  ask : WriterT w m r
+  let ask = lift ask
+  local : forall c d a. (forall v. r^v -> r^(c + v))^c ->
+    ((WriterT w m a)^d -> (WriterT w m a)^(c + d))^c
+  let local update (WriterT action) = WriterT (local update action)
+  reader : forall c a. (forall v. r^v -> a)^c -> (WriterT w m a)^c
+  let reader project = lift (reader project)
+
+instance (Monoid w, Monad m) => MonadWriter (WriterT w m) w =
+  tell : forall c. w^c -> (WriterT w m Unit)^c
+  let tell output = WriterT (pure ((), output))
+  listen : forall c a. (WriterT w m a)^c -> (WriterT w m (a, w))^c
+  let listen (WriterT action) =
+    WriterT (map (fun (value, output) -> ((value, output), output)) action)
+  pass : forall c d a. (WriterT w m (a, (w -> w)^c))^d -> (WriterT w m a)^(c + d)
+  let pass (WriterT action) =
+    finish : ((a, (w -> w)^c), w) -> (a, w)
+    let finish ((value, modify), output) = (value, modify output)
+    WriterT (map finish action)
+  writer : forall c a. (a, w)^c -> (WriterT w m a)^c
+  let writer pair = WriterT (pure pair)
+
+instance (Monoid w, MonadError m e) => MonadError (WriterT w m) e =
+  throw_error : forall c a. e^c -> (WriterT w m a)^c
+  let throw_error problem = lift (throw_error problem)
+  catch_error : forall c d a. (forall v. e^v -> (WriterT w m a)^(c + v))^c ->
+    ((WriterT w m a)^d -> (WriterT w m a)^(c + d))^c
+  let catch_error handle (WriterT action) =
+    WriterT (catch_error (fun problem -> run (handle problem)) action)

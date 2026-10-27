@@ -53,19 +53,19 @@ let main () =
       headers = [("x-api-key", "secret")];
     }
   provide (Otlp.traces_with described) {
-    Tracer.with_span "checkout" (span []) (task { () })
+    Tracer.with_span "checkout" (span []) Effect.void
   }
   Platform.stdout_line (has (received ()) "\"1.2.0\"")
   Platform.stdout_line (has (received ()) "\"blue\"")
   Platform.stdout_line (has (meta ()) "application/json identity secret")
   let binary = { Otlp.settings (base ++ "/v2/traces") "shop" with serialization = Otlp.protobuf }
-  provide (Otlp.traces_with binary) { Tracer.with_span "refund" (span []) (task { () }) }
+  provide (Otlp.traces_with binary) { Tracer.with_span "refund" (span []) Effect.void }
   Platform.stdout_line (has (meta ()) "/v2/traces application/x-protobuf")
   Platform.stdout_line (has (received ()) "refund")
   let packed = { Otlp.settings (base ++ "/v3/traces") "shop" with gzip = true }
   let long = String.repeat 2000 "x"
   provide (Otlp.traces_with packed) {
-    Tracer.with_span "restock" (span [("note", long)]) (task { () })
+    Tracer.with_span "restock" (span [("note", long)]) Effect.void
   }
   Platform.stdout_line (has (meta ()) "/v3/traces application/json gzip")
   Platform.stdout_line (has (received ()) "restock")
@@ -73,7 +73,7 @@ let main () =
   provide (Otlp.logs_with { all with url = base ++ "/v4/logs" }) { () }
   provide (Otlp.metrics_with { all with url = base ++ "/v4/metrics" }) { () }
   provide (Otlp.layer_with { all with max_batch_size = Some 10; shutdown_timeout = millis 1000 }) {
-    Tracer.with_span "audit" (span []) (task { () })
+    Tracer.with_span "audit" (span []) Effect.void
   }
   Platform.stdout_line (has (received ()) "audit")
   stop ()

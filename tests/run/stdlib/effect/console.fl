@@ -43,7 +43,7 @@ let main () =
       Console.time "timer"
       Console.time_log "timer" "is running"
     }
-    Console.with_time "with_time" (task { () })
+    Console.with_time "with_time" Effect.void
     Console.clear ()
     Console.log "to stderr"
   })

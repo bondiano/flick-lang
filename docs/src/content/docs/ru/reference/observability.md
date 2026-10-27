@@ -133,7 +133,7 @@ audit : Unit ->{} Unit
 let audit () =
   scope {
     let tracer = Otlp.tracer { url = "http://localhost:4318/v1/traces"; service_name = "audit" }
-    Tracer.with_tracer tracer (task { Tracer.with_span "audit" span_options (task { () }) })
+    Tracer.with_tracer tracer (task { Tracer.with_span "audit" span_options Effect.void })
   }
 ```
 

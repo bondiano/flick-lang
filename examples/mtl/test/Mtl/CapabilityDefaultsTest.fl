@@ -1,0 +1,63 @@
+module Mtl.CapabilityDefaultsTest exposing (tests)
+
+import Mtl.Classes exposing (MonadState(..), MonadReader(..), MonadWriter(..))
+import Mtl.Identity as Identity exposing (Identity)
+import App.Capabilities as Capabilities exposing (Stack)
+
+type Defaults a = Defaults (Stack Identity a)
+
+unwrap : forall c a. (Defaults a)^c -> (Stack Identity a)^c
+let unwrap (Defaults action) = action
+
+instance Functor Defaults =
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((Defaults a)^d -> (Defaults b)^(c + d))^c
+  let map f (Defaults action) = Defaults (map f action)
+
+instance Applicative Defaults =
+  pure : forall c a. a^c -> (Defaults a)^c
+  let pure value = Defaults (pure value)
+  map2 :
+    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+      ((Defaults a)^d -> ((Defaults b)^d -> (Defaults x)^(c + d))^(c + d))^c
+  let map2 f (Defaults left) (Defaults right) = Defaults (map2 f left right)
+
+instance Monad Defaults =
+  flat_map :
+    forall c d a b. (forall v. a^v -> (Defaults b)^(c + v))^c ->
+      ((Defaults a)^d -> (Defaults b)^(c + d))^c
+  let flat_map f (Defaults action) = Defaults (flat_map (fun value -> unwrap (f value)) action)
+
+// Omit state, reader and writer so this wrapper executes the class defaults.
+instance MonadState Defaults Number =
+  get : Defaults Number
+  let get = Defaults get
+  put : forall c. Number^c -> (Defaults Unit)^c
+  let put next = Defaults (put next)
+
+instance MonadReader Defaults Number =
+  ask : Defaults Number
+  let ask = Defaults ask
+  local : forall c d a. (forall v. Number^v -> Number^(c + v))^c ->
+    ((Defaults a)^d -> (Defaults a)^(c + d))^c
+  let local update (Defaults action) = Defaults (local update action)
+
+instance MonadWriter Defaults (List String) =
+  let tell output = Defaults (tell output)
+  listen : forall c a. (Defaults a)^c -> (Defaults (a, List String))^c
+  let listen (Defaults action) = Defaults (listen action)
+  pass : forall c d a. (Defaults (a, (List String -> List String)^c))^d -> (Defaults a)^(c + d)
+  let pass (Defaults action) = Defaults (pass action)
+
+tests : List Test.Test
+let tests = [
+  Test.test "state, reader and writer execute their class default bodies" (fun () ->
+    action : Defaults (Number, Number)
+    let action = do {
+      old_state <- state (fun old -> (old, old + 2))
+      environment_value <- reader (fun environment -> environment + 1)
+      writer_value <- writer (environment_value, ["default"])
+      pure (old_state, writer_value)
+    }
+    Test.equal ((Ok (10, 4), ["default"]), 12)
+      (Identity.run (Capabilities.run 3 10 (unwrap action)))),
+]

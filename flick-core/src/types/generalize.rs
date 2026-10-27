@@ -84,13 +84,27 @@ impl Checker<'_> {
             })
             .collect();
         let written = |t: &Type| self.written(&replace_metas(t, &subst));
-        let body = written(&ty);
+        // a capture row cannot name a type variable, and the written signature
+        // implies its projections through the stages' parameters
+        let types: Vec<String> = subst
+            .iter()
+            .filter(|(m, _)| matches!(kind_of(&ty, *m), Kind::Type))
+            .filter_map(|(_, v)| match v {
+                Type::Var(name) => Some(name.clone()),
+                _ => None,
+            })
+            .collect();
+        let names: Vec<&str> = types.iter().map(String::as_str).collect();
+        let body = without_value_captures(&written(&ty), &names);
         if constraints.is_empty() {
             return body;
         }
         Type::Forall {
             vars: Vec::new(),
-            constraints: constraints.iter().map(written).collect(),
+            constraints: constraints
+                .iter()
+                .map(|c| without_value_captures(&written(c), &names))
+                .collect(),
             body: Box::new(body),
         }
     }
@@ -143,6 +157,48 @@ impl Checker<'_> {
     }
 }
 
+/// Drops capture-row entries that only restate a type variable: a written
+/// signature implies them and the source cannot name them.
+pub fn without_value_captures(t: &Type, types: &[&str]) -> Type {
+    match t {
+        Type::Captured {
+            ty,
+            captures,
+            value,
+        } => Type::Captured {
+            ty: Box::new(without_value_captures(ty, types)),
+            captures: Box::new(without_value_row(captures, types)),
+            value: *value,
+        },
+        Type::Bounded { ty, captures } => Type::Bounded {
+            ty: Box::new(without_value_captures(ty, types)),
+            captures: Box::new(without_value_row(captures, types)),
+        },
+        other => other.map_children(&mut |c| without_value_captures(c, types)),
+    }
+}
+
+fn without_value_row(row: &Type, types: &[&str]) -> Type {
+    let projection =
+        |atom: &Type| matches!(atom, Type::Var(name) if types.contains(&name.as_str()));
+    match row {
+        Type::Row(r) => Type::Row(super::ty::Row {
+            entries: r
+                .entries
+                .iter()
+                .filter(|(_, atom)| !projection(atom))
+                .cloned()
+                .collect(),
+            tail: r.tail.clone(),
+        }),
+        Type::Union(a, b) => Type::Union(
+            Box::new(without_value_row(a, types)),
+            Box::new(without_value_row(b, types)),
+        ),
+        other => other.clone(),
+    }
+}
+
 /// The unknowns of `t`, in order of appearance.
 fn metas_of(t: &Type) -> Vec<u32> {
     let mut metas = Vec::new();
@@ -183,7 +239,9 @@ fn kind_of(ty: &Type, m: u32) -> Kind {
         Type::Record(row) if row.tail.as_deref().is_some_and(is) => {
             kind = Kind::Row(Box::new(Kind::Type));
         }
-        Type::Captured { captures, .. } if is(captures) => kind = Kind::CaptureRow,
+        Type::Captured { captures, .. } | Type::Bounded { captures, .. } if is(captures) => {
+            kind = Kind::CaptureRow;
+        }
         Type::Fun {
             effects: Some(e), ..
         } => {

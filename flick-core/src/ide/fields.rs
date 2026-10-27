@@ -20,9 +20,10 @@ struct Declared {
 }
 
 impl Ide<'_> {
-    /// Hover on what the checker types beside names: SQL, field labels.
+    /// Hover on what the checker types beside names: CLI, SQL, field labels.
     pub(super) fn embedded_hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
-        self.sql_hover(file, offset)
+        self.cli_hover(file, offset)
+            .or_else(|| self.sql_hover(file, offset))
             .or_else(|| self.field_hover(file, offset))
     }
 
@@ -68,10 +69,10 @@ impl Ide<'_> {
     /// The fields of a record type, through transparent aliases, the local
     /// ones of `file` too.
     fn record_fields(&self, file: FileId, ty: &Type, out: &mut Vec<(String, Type)>, depth: u32) {
-        let ty = match ty {
-            Type::Captured { ty, .. } => ty,
-            other => other,
-        };
+        let mut ty = ty;
+        while let Type::Captured { ty: inner, .. } | Type::Bounded { ty: inner, .. } = ty {
+            ty = inner;
+        }
         match ty {
             Type::Record(row) => out.extend(row.entries.iter().cloned()),
             Type::App { .. } | Type::Con { .. } if depth < 8 => {

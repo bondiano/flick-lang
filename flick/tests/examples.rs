@@ -4,6 +4,8 @@
 
 mod common;
 
+use flick_core::build::runner_path;
+use std::fs;
 use std::path::Path;
 use std::process::Command;
 
@@ -73,4 +75,88 @@ fn the_observability_example_reports_to_a_local_collector() {
     ] {
         assert!(got.contains(needle), "the collector lacks {needle}: {got}");
     }
+}
+
+#[test]
+#[ignore = "needs Node and the installed runtime"]
+fn the_mtl_planner_runs_pure_transformers_and_validates_cli_minutes() {
+    let dir = common::example("mtl", "examples/mtl-run");
+    let capabilities = concat!(
+        "identity ok=5 state=15 log=begin,done\n",
+        "identity error=negative state=10 log=begin\n",
+        "eff ok=5 state=15 log=begin,done\n",
+        "eff error=negative state=10 log=begin\n",
+    );
+    let cases: &[(&[&str], i32)] = &[
+        (&["plan", "--budget", "60", "docs", "tests", "lint"], 0),
+        (
+            &["plan", "--budget", "36", "--overhead", "3", "docs", "lint"],
+            0,
+        ),
+        (&["plan", "--budget", "25", "docs", "lint", "tests"], 1),
+        (&["plan", "--budget", "60", "docs", "missing", "lint"], 1),
+        (&["plan", "--budget", "0"], 0),
+        (&["plan", "--budget", "9007199254740991"], 0),
+        (&["plan", "--budget", "-1"], 1),
+        (&["plan", "--budget", "1.5"], 1),
+        (&["plan", "--budget", "NaN"], 1),
+        (&["plan", "--budget", "Infinity"], 1),
+        (&["plan", "--budget", "9007199254740992"], 1),
+        (&["plan", "--budget", "60", "--overhead", "-1"], 1),
+    ];
+    for profile in ["debug", "release"] {
+        success(
+            &dir,
+            &["test", "--profile", profile, "--seed", "7", "--jobs", "1"],
+        );
+        let run = ["run", "--entry", "App.Capabilities", "--profile", profile];
+        let out = flick_in(&dir, &run);
+        assert!(out.status.success(), "{run:?} failed: {out:?}");
+        assert_eq!(
+            String::from_utf8(out.stdout).expect("utf-8 stdout"),
+            capabilities,
+            "{run:?}"
+        );
+        for (args, expected) in cases {
+            let mut run = vec!["run", "--profile", profile, "--"];
+            run.extend_from_slice(args);
+            let out = flick_in(&dir, &run);
+            assert_eq!(out.status.code(), Some(*expected), "{run:?}: {out:?}");
+        }
+    }
+
+    let ts_dir = common::example("mtl", "examples/mtl-capabilities-ts");
+    let manifest = ts_dir.join("flick.toml");
+    let contents = fs::read_to_string(&manifest).expect("example manifest");
+    fs::write(
+        &manifest,
+        contents.replace("entry = \"App.Main\"", "entry = \"App.Capabilities\""),
+    )
+    .expect("TypeScript copy's entry");
+    success(
+        &ts_dir,
+        &[
+            "build",
+            "--emit",
+            "ts",
+            "--profile",
+            "debug",
+            "--out-dir",
+            "dist-ts",
+        ],
+    );
+    let out = Command::new("node")
+        .arg("--enable-source-maps")
+        .arg(ts_dir.join("dist-ts").join(runner_path(true)))
+        .current_dir(&ts_dir)
+        .output()
+        .expect("`node` is on PATH (Node.js >= 24.18.0)");
+    assert!(
+        out.status.success(),
+        "TypeScript capabilities failed: {out:?}"
+    );
+    assert_eq!(
+        String::from_utf8(out.stdout).expect("utf-8 stdout"),
+        capabilities
+    );
 }

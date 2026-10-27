@@ -1,0 +1,5 @@
+component badge (p : P) = render p
+//        ^ function
+
+let shown = if visible then badge else badge
+//             ^ variable

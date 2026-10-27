@@ -1,0 +1,110 @@
+/// Add domain errors; inner failures remain failures of the inner computation.
+module Mtl.ExceptT exposing (ExceptT(..), run, from_result)
+
+import Mtl.Classes exposing (
+  MonadTrans(..),
+  MonadState(..),
+  MonadReader(..),
+  MonadWriter(..),
+  MonadError(..),
+)
+
+type ExceptT e (m : Type -> Type) a = ExceptT (m (Result e a))
+
+run : forall c e m a. (ExceptT e m a)^c -> (m (Result e a))^c
+let run (ExceptT action) = action
+
+from_result : forall c e m a. Applicative m => (Result e a)^c -> (ExceptT e m a)^c
+let from_result value = ExceptT (pure value)
+
+instance Functor m => Functor (ExceptT e m) =
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((ExceptT e m a)^d -> (ExceptT e m b)^(c + d))^c
+  let map f (ExceptT action) = ExceptT (map (Result.map f) action)
+
+instance Monad m => Applicative (ExceptT e m) =
+  pure : forall c a. a^c -> (ExceptT e m a)^c
+  let pure value = ExceptT (pure (Ok value))
+  map2 :
+    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+      ((ExceptT e m a)^d -> ((ExceptT e m b)^d -> (ExceptT e m x)^(c + d))^(c + d))^c
+  let map2 f left right =
+    ExceptT (do {
+      first <- run left
+      match first with
+      | Err problem -> pure (Err problem)
+      | Ok a -> do {
+          second <- run right
+          pure (map (f a) second)
+        }
+    })
+
+instance Monad m => Monad (ExceptT e m) =
+  flat_map :
+    forall c d a b. (forall v. a^v -> (ExceptT e m b)^(c + v))^c ->
+      ((ExceptT e m a)^d -> (ExceptT e m b)^(c + d))^c
+  let flat_map f action =
+    ExceptT (do {
+      result <- run action
+      match result with
+      | Err problem -> pure (Err problem)
+      | Ok value -> run (f value)
+    })
+
+instance MonadTrans (ExceptT e) =
+  lift : forall c m a. Monad m => (m a)^c -> (ExceptT e m a)^c
+  let lift action = ExceptT (map Ok action)
+
+instance MonadState m s => MonadState (ExceptT e m) s =
+  get : ExceptT e m s
+  let get = lift get
+  put : forall c. s^c -> (ExceptT e m Unit)^c
+  let put next = lift (put next)
+  state : forall c a. (forall v. s^v -> (a, s)^(c + v))^c -> (ExceptT e m a)^c
+  let state step = lift (state step)
+
+instance MonadReader m r => MonadReader (ExceptT e m) r =
+  ask : ExceptT e m r
+  let ask = lift ask
+  local : forall c d a. (forall v. r^v -> r^(c + v))^c ->
+    ((ExceptT e m a)^d -> (ExceptT e m a)^(c + d))^c
+  let local update (ExceptT action) = ExceptT (local update action)
+  reader : forall c a. (forall v. r^v -> a)^c -> (ExceptT e m a)^c
+  let reader project = lift (reader project)
+
+instance MonadWriter m w => MonadWriter (ExceptT e m) w =
+  tell : forall c. w^c -> (ExceptT e m Unit)^c
+  let tell output = lift (tell output)
+  listen : forall c a. (ExceptT e m a)^c -> (ExceptT e m (a, w))^c
+  let listen (ExceptT action) =
+    ExceptT
+      (
+        map
+          (fun (result, output) -> Result.map (fun value -> (value, output)) result)
+          (listen action)
+      )
+  pass : forall c d a. (ExceptT e m (a, (w -> w)^c))^d -> (ExceptT e m a)^(c + d)
+  let pass (ExceptT action) =
+    adapt : Result e (a, (w -> w)^c) -> (Result e a, (w -> w)^c)
+    let adapt result =
+      match result with
+      | Err problem ->
+        unchanged : (w -> w)^c
+        let unchanged output = output
+        (Err problem, unchanged)
+      | Ok (value, modify) -> (Ok value, modify)
+    ExceptT (pass (map adapt action))
+  writer : forall c a. (a, w)^c -> (ExceptT e m a)^c
+  let writer pair = lift (writer pair)
+
+instance Monad m => MonadError (ExceptT e m) e =
+  throw_error : forall c a. e^c -> (ExceptT e m a)^c
+  let throw_error problem = ExceptT (pure (Err problem))
+  catch_error : forall c d a. (forall v. e^v -> (ExceptT e m a)^(c + v))^c ->
+    ((ExceptT e m a)^d -> (ExceptT e m a)^(c + d))^c
+  let catch_error handle (ExceptT action) =
+    ExceptT (do {
+      result <- action
+      match result with
+      | Err problem -> run (handle problem)
+      | Ok value -> pure (Ok value)
+    })

@@ -8,7 +8,7 @@ cfd4deeeb00ff9b0  03-direct-calls:8  load_name : UserId ->{Users, Log; NotFound}
 6c70dbf125707c4a  04-computations:17  load_user : UserId ->{Users; NotFound} User
 1f4fb3d7472f358e  04-computations:37  load_twice :
 5490665b39c55003  04-computations:78  load_name_pair : UserId -> UserId ->{Users; NotFound} (String, String)
-7250ff6a1fbd12e3  05-types-and-classes:40  class Functor (f : Type -> Type) =
+589f6dc98bbfef4f  05-types-and-classes:42  class Functor (f : Type -> Type) =
 351c17a8bae37ce1  05-types-and-classes:63  class Show a =
 872c8247235efbb4  05-types-and-classes:119  apply_twice :
 74a14e74a12990e3  05-types-and-classes:133  decode_pair :

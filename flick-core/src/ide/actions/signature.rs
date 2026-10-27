@@ -4,7 +4,7 @@ use super::super::{Ide, tree};
 use super::{Action, edit, indent_at, line_start};
 use crate::source::FileId;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::show_type;
+use crate::types::{Kind, Type, show_type, without_value_captures};
 
 impl Ide<'_> {
     /// For the header of a `let name = …` with no signature above it; a
@@ -29,7 +29,18 @@ impl Ide<'_> {
         if signed {
             return None;
         }
-        let shown = show_type(m.typing.types.get(&(name.start, name.end))?);
+        let ty = m.typing.types.get(&(name.start, name.end))?;
+        // a capture row cannot name a type variable; the written signature
+        // implies those projections through the parameters
+        let types: Vec<&str> = match ty {
+            Type::Forall { vars, .. } => vars
+                .iter()
+                .filter(|v| matches!(v.kind, Kind::Type))
+                .map(|v| v.name.as_str())
+                .collect(),
+            _ => Vec::new(),
+        };
+        let shown = show_type(&without_value_captures(ty, &types));
         // a type the checker did not finish has holes; it is no signature
         if shown
             .split(|c: char| !c.is_alphanumeric() && c != '_')

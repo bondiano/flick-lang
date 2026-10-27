@@ -64,9 +64,12 @@ impl Checker<'_> {
             _ => {
                 let actual = self.infer(node);
                 let actual = self.zonk(&actual);
-                let exact = actual == self.zonk(expected)
+                let expected = self.zonk(expected);
+                // Whole-value proofs may differ without changing identity or captures.
+                let exact = self.capture_identity(&actual) == self.capture_identity(&expected)
+                    && self.captures_of(&actual) == self.captures_of(&expected)
                     && !actual.contains(&mut |t| matches!(t, Type::Meta(_) | Type::Error));
-                self.expect(&actual, expected, self.span(node));
+                self.expect(&actual, &expected, self.span(node));
                 exact
             }
         };

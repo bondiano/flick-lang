@@ -1,6 +1,8 @@
 //! TypeScript declarations of the types a module exports.
 
-use super::{NATIVE, PRELUDE, PRIMITIVES, Projection, Vars, generic, key, params, type_args};
+use super::{
+    NATIVE, PRELUDE, PRIMITIVES, Projection, Vars, generic, key, params, type_args, uncaptured,
+};
 use crate::codegen::names;
 use crate::iface::{Decl, Export, Interface, Namespace};
 use crate::types::{Constructor, Form, Kind, Rep, Type};
@@ -119,18 +121,26 @@ impl Projection<'_> {
         let mut cases = Vec::new();
         for c in constructors {
             let scheme = c.scheme.as_ref().ok_or("a constructor has no type")?;
-            let (vars, mut ty) = match scheme {
-                Type::Forall { vars, body, .. } => (vars.clone(), (**body).clone()),
-                other => (Vec::new(), other.clone()),
+            let (vars, ty) = match scheme {
+                Type::Forall { vars, body, .. } => (vars.as_slice(), &**body),
+                other => (&[][..], other),
             };
             let scope: Vars = vars
                 .iter()
-                .map(|b| (b.name.clone(), Some(generic(&b.name))))
+                .map(|b| {
+                    let ts = match b.kind {
+                        Kind::Region => None,
+                        Kind::CaptureRow => Some("never".to_owned()),
+                        _ => Some(generic(&b.name)),
+                    };
+                    (b.name.clone(), ts)
+                })
                 .collect();
+            let mut ty = uncaptured(ty, &scope)?;
             let mut fields = Vec::new();
             while let Type::Fun { param, result, .. } = ty {
-                fields.push(self.ty(&param, &scope)?);
-                ty = *result;
+                fields.push(self.ty(param, &scope)?);
+                ty = uncaptured(result, &scope)?;
             }
             if params.is_empty() {
                 params = ty

@@ -75,7 +75,7 @@ impl Ide<'_> {
         // the word around `offset`, which may be its start or its end
         let ident = |c: char| c.is_ascii_alphanumeric() || c == '_';
         let at = offset as usize;
-        let start = text[..at].rfind(|c: char| !ident(c)).map_or(0, |i| i + 1);
+        let start = text[..at].trim_end_matches(ident).len();
         let end = text[at..]
             .find(|c: char| !ident(c))
             .map_or(text.len(), |i| at + i);

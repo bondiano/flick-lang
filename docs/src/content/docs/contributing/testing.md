@@ -2,9 +2,16 @@
 title: "Testing"
 ---
 
+Install the dependency checker used locally and in CI:
+
+```sh
+cargo install cargo-machete --version 0.9.2 --locked
+```
+
 | Command | What runs |
 | - | - |
-| `just check` | fmt, clippy (`-D warnings`, also for `wasm32`), `cargo test --workspace` |
+| `just lint` | fmt, clippy (`-D warnings`, also for `wasm32`), `cargo machete` (unused Rust dependencies) |
+| `just check` | `just lint`, `cargo test --workspace` |
 | `just e2e` | `pnpm install --frozen-lockfile`, runtime tests, `tests/run/**` on Node, `flick test` on sample projects |
 | `just bundle-size` | release builds of `tools/bundle-size/pure.fl`, `tests/run/ui/counter.fl`, `tests/run/ui/atoms.fl` and the playground, bundled for the browser with rolldown; fails when a gzip size exceeds its budget in `tools/bundle-size/index.mjs` |
 

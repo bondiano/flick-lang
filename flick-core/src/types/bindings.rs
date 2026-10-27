@@ -259,6 +259,7 @@ impl Checker<'_> {
             Some(c) => Type::Captured {
                 ty: Box::new(body),
                 captures: Box::new(c.clone()),
+                value: false,
             },
             None => body,
         };

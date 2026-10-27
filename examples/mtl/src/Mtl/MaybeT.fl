@@ -1,0 +1,120 @@
+/// Add early exit to an inner computation `m` by storing `m (Option a)`.
+///
+/// `Some` continues a `do` block; `None` skips its remaining actions.
+/// The `Applicative` instance also needs `Monad m`: `map2` runs the left
+/// action first and inspects its result before deciding whether to run the right.
+/// Inner effects already performed are not undone. In particular, putting
+/// `MaybeT` outside `StateT` preserves the state reached before `None`.
+module Mtl.MaybeT exposing (MaybeT(..), run, from_option)
+
+import Mtl.Classes exposing (
+  MonadTrans(..),
+  MonadState(..),
+  MonadReader(..),
+  MonadWriter(..),
+  MonadError(..),
+)
+
+/// An inner action producing either a value or an early-exit marker.
+type MaybeT (m : Type -> Type) a = MaybeT (m (Option a))
+
+/// Remove this layer to expose the inner `m (Option a)` action.
+run : forall c m a. (MaybeT m a)^c -> (m (Option a))^c
+let run (MaybeT action) = action
+
+/// Embed an option: `None` stops the outer workflow, while `Some` continues it.
+from_option : forall c m a. Applicative m => (Option a)^c -> (MaybeT m a)^c
+let from_option value = MaybeT (pure value)
+
+instance Functor m => Functor (MaybeT m) =
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((MaybeT m a)^d -> (MaybeT m b)^(c + d))^c
+  let map f (MaybeT action) = MaybeT (map (Option.map f) action)
+
+instance Monad m => Applicative (MaybeT m) =
+  pure : forall c a. a^c -> (MaybeT m a)^c
+  let pure value = MaybeT (pure (Some value))
+  map2 :
+    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+      ((MaybeT m a)^d -> ((MaybeT m b)^d -> (MaybeT m x)^(c + d))^(c + d))^c
+  let map2 f left right =
+    MaybeT (do {
+      first <- run left
+      match first with
+      | None -> pure None
+      | Some a -> do {
+          second <- run right
+          pure (map (f a) second)
+        }
+    })
+
+instance Monad m => Monad (MaybeT m) =
+  flat_map :
+    forall c d a b. (forall v. a^v -> (MaybeT m b)^(c + v))^c ->
+      ((MaybeT m a)^d -> (MaybeT m b)^(c + d))^c
+  let flat_map f value =
+    MaybeT (do {
+      optional <- run value
+      match optional with
+      | None -> pure None
+      | Some a -> run (f a)
+    })
+
+instance MonadTrans MaybeT =
+  lift : forall c m a. Monad m => (m a)^c -> (MaybeT m a)^c
+  let lift action = MaybeT (map Some action)
+
+instance MonadState m s => MonadState (MaybeT m) s =
+  get : MaybeT m s
+  let get = lift get
+
+  put : forall c. s^c -> (MaybeT m Unit)^c
+  let put next = lift (put next)
+
+  state : forall c a. (forall v. s^v -> (a, s)^(c + v))^c -> (MaybeT m a)^c
+  let state step = lift (state step)
+
+instance MonadReader m r => MonadReader (MaybeT m) r =
+  ask : MaybeT m r
+  let ask = lift ask
+
+  local : forall c d a. (forall v. r^v -> r^(c + v))^c ->
+    ((MaybeT m a)^d -> (MaybeT m a)^(c + d))^c
+  let local update (MaybeT action) = MaybeT (local update action)
+
+  reader : forall c a. (forall v. r^v -> a)^c -> (MaybeT m a)^c
+  let reader project = lift (reader project)
+
+instance MonadWriter m w => MonadWriter (MaybeT m) w =
+  tell : forall c. w^c -> (MaybeT m Unit)^c
+  let tell output = lift (tell output)
+
+  listen : forall c a. (MaybeT m a)^c -> (MaybeT m (a, w))^c
+  let listen (MaybeT action) =
+    finish : (Option a, w) -> Option (a, w)
+    let finish (optional, output) = match optional with
+      | None -> None
+      | Some value -> Some (value, output)
+    MaybeT (map finish (listen action))
+
+  pass : forall c d a. (MaybeT m (a, (w -> w)^c))^d -> (MaybeT m a)^(c + d)
+  let pass (MaybeT action) =
+    adapt : Option (a, (w -> w)^c) -> (Option a, (w -> w)^c)
+    let adapt optional = match optional with
+      | None ->
+        unchanged : (w -> w)^c
+        let unchanged output = output
+        (None, unchanged)
+      | Some (value, update) -> (Some value, update)
+    MaybeT (pass (map adapt action))
+
+  writer : forall c a. (a, w)^c -> (MaybeT m a)^c
+  let writer value = lift (writer value)
+
+instance MonadError m e => MonadError (MaybeT m) e =
+  throw_error : forall c a. e^c -> (MaybeT m a)^c
+  let throw_error problem = lift (throw_error problem)
+
+  catch_error : forall c d a. (forall v. e^v -> (MaybeT m a)^(c + v))^c ->
+    ((MaybeT m a)^d -> (MaybeT m a)^(c + d))^c
+  let catch_error handler (MaybeT action) =
+    MaybeT (catch_error (fun problem -> run (handler problem)) action)

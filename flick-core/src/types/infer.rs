@@ -15,21 +15,41 @@ use crate::syntax::kind::SyntaxKind as K;
 
 impl Checker<'_> {
     pub fn check(&mut self, node: &Node, expected: &Type) {
-        let target = self.whnf(expected);
+        self.check_value(node, expected);
+    }
+
+    #[allow(clippy::too_many_lines)]
+    pub(super) fn check_value(&mut self, node: &Node, expected: &Type) -> Type {
+        let (target, captures) = self.whnf_captured(expected);
         if let Type::Forall { .. } = target {
             self.store.level += 1;
             let mark = self.classes.givens.len();
             let (body, _, givens) = self.skolemize(&target);
+            let body = match captures {
+                Some(captures) if matches!(self.bound_head(expected), Type::Bounded { .. }) => {
+                    Type::Bounded {
+                        ty: Box::new(body),
+                        captures: Box::new(captures),
+                    }
+                }
+                Some(captures) => Type::Captured {
+                    ty: Box::new(body),
+                    captures: Box::new(captures),
+                    value: false,
+                },
+                None => body,
+            };
             self.record_givens(self.span(node), &givens);
             self.classes.givens.extend(givens);
             self.check(node, &body);
             self.classes.givens.truncate(mark);
             self.store.level -= 1;
-            return;
+            return expected.clone();
         }
         let children: Vec<&Node> = node.nodes().collect();
+        let mut actual_type = None;
         match (node.kind, &target) {
-            (K::ParenExpr, _) => self.check(children[0], expected),
+            (K::ParenExpr, _) => actual_type = Some(self.check_value(children[0], expected)),
             (K::Block, _) => {
                 self.block(node, Some(expected));
             }
@@ -57,8 +77,27 @@ impl Checker<'_> {
                 self.sql_expr(node, Some(expected));
             }
             (K::TupleExpr, Type::Tuple(items)) if items.len() == children.len() => {
+                let captures = self.whnf_captured(expected).1;
+                let mut held = Vec::new();
                 for (child, item) in children.iter().zip(items) {
-                    self.check(child, item);
+                    let item = captures
+                        .as_ref()
+                        .map_or_else(|| item.clone(), |c| self.data_field(item, c));
+                    let actual = self.check_value(child, &item);
+                    if captures.is_some() {
+                        held.push((None, actual));
+                    }
+                }
+                if let Some(bound) = captures {
+                    self.hold(super::regions::Hold {
+                        held,
+                        visible: super::regions::Visible::Now(Vec::new()),
+                        bound,
+                        expected: Some(expected.clone()),
+                        written: false,
+                        what: "value",
+                        span: self.span(node),
+                    });
                 }
             }
             (K::ListExpr, _) if super::range_list(node).is_some() => {
@@ -75,14 +114,41 @@ impl Checker<'_> {
                 let actual = self.for_expr(node, false, Some(expected));
                 self.expect(&actual, expected, self.span(node));
             }
-            (K::ListExpr, _) if self.list_item(&target).is_some() => {
-                let item = self.list_item(&target).expect("checked");
+            (K::ListExpr, _) if self.list_item(expected).is_some() => {
+                let item = self.list_item(expected).expect("checked");
+                let mut held = Vec::new();
                 for child in children {
-                    self.check(child, &item);
+                    let actual = self.check_value(child, &item);
+                    if captures.is_some() {
+                        held.push((None, actual));
+                    }
+                }
+                if let Some(bound) = captures {
+                    self.hold(super::regions::Hold {
+                        held,
+                        visible: super::regions::Visible::Now(Vec::new()),
+                        bound,
+                        expected: Some(expected.clone()),
+                        written: false,
+                        what: "value",
+                        span: self.span(node),
+                    });
                 }
             }
             (K::RecordExpr, Type::Record(row)) => {
                 let row = self.store.zonk_row(row);
+                let row = if let Some(captures) = self.whnf_captured(expected).1 {
+                    super::ty::Row {
+                        entries: row
+                            .entries
+                            .into_iter()
+                            .map(|(n, t)| (n, self.data_field(&t, &captures)))
+                            .collect(),
+                        tail: row.tail,
+                    }
+                } else {
+                    row
+                };
                 let actual = self.record(node, Some(&row));
                 self.expect(&actual, expected, self.span(node));
             }
@@ -95,9 +161,11 @@ impl Checker<'_> {
             _ => {
                 let actual = self.infer(node);
                 self.expect(&actual, expected, self.span(node));
+                actual_type = Some(actual);
             }
         }
         self.note_head(node, expected);
+        actual_type.unwrap_or_else(|| expected.clone())
     }
 
     /// The body of a polymorphic type with rigid variables, its class
@@ -124,7 +192,11 @@ impl Checker<'_> {
             K::NameExpr => self.name(node),
             K::ParenExpr => self.infer(children[0]),
             K::UnitExpr => Type::prim("Unit"),
-            K::TupleExpr => Type::Tuple(children.iter().map(|c| self.infer(c)).collect()),
+            K::TupleExpr => {
+                let tuple = Type::Tuple(children.iter().map(|c| self.infer(c)).collect());
+                let captures = self.captures_of(&tuple);
+                self.data_value(&tuple, captures)
+            }
             K::RangeExpr => self.range_expr(node, false),
             K::ListExpr if super::range_list(node).is_some() => {
                 self.range_expr(super::range_list(node).expect("checked"), true)
@@ -136,10 +208,14 @@ impl Checker<'_> {
             K::ForExpr => self.for_expr(node, false, None),
             K::ListExpr => {
                 let item = self.fresh();
+                let mut captures = super::ty::Norm::default();
                 for child in children {
-                    self.check(child, &item);
+                    let actual = self.check_value(child, &item);
+                    let held = self.captures_of(&actual);
+                    captures.entries.extend(held.entries);
+                    captures.tails.extend(held.tails);
                 }
-                Type::app(Type::prim("List"), item)
+                self.data_value(&Type::app(Type::prim("List"), item), captures)
             }
             K::AnnotExpr => {
                 let ty = children
@@ -190,8 +266,13 @@ impl Checker<'_> {
     }
 
     pub fn list_item(&self, t: &Type) -> Option<Type> {
-        match self.whnf(t) {
-            Type::App { head, arg } if self.whnf(&head).is_prim("List") => Some(*arg),
+        let (bare, captures) = self.whnf_captured(t);
+        match bare {
+            Type::App { head, arg } if self.whnf(&head).is_prim("List") => Some(
+                captures
+                    .as_ref()
+                    .map_or_else(|| *arg.clone(), |c| self.data_field(&arg, c)),
+            ),
             _ => None,
         }
     }
@@ -306,14 +387,18 @@ impl Checker<'_> {
         let mut unknown: Option<(usize, Type)> = None;
         // the arrow the expected type gives the last stage
         let mut last = None;
+        let level = self.store.level;
         for param in params {
             let target = rest.as_ref().map(|t| self.whnf(t));
-            let known = rest
-                .clone()
-                .filter(|_| !matches!(target, Some(Type::Meta(_))));
+            let known = rest.clone().filter(|t| {
+                !matches!(target, Some(Type::Meta(_))) || self.whnf_captured(t).1.is_some()
+            });
             closures.push((self.locals.len(), known));
             let target = match target {
-                Some(t @ Type::Forall { .. }) => Some(self.assume(&t)),
+                Some(t @ Type::Forall { .. }) => {
+                    self.store.level += 1;
+                    Some(self.assume(&t))
+                }
                 other => other,
             };
             last = None;
@@ -385,7 +470,9 @@ impl Checker<'_> {
         self.runtime = saved;
         let span = self.span(node);
         self.end_reader(&result, span);
-        self.curry(stages, closures, unknown.as_ref(), result, span)
+        let result = self.curry(stages, closures, unknown.as_ref(), result, span);
+        self.store.level = level;
+        result
     }
 
     /// The arrows of a function's stages around its result; each stage is a

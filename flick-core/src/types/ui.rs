@@ -249,7 +249,10 @@ impl Checker<'_> {
     /// `ty` resolved, without its captures and quantifiers.
     pub(super) fn bare(&self, ty: &Type) -> Type {
         let mut ty = self.store.resolve(ty);
-        while let Type::Captured { ty: inner, .. } | Type::Forall { body: inner, .. } = ty {
+        while let Type::Captured { ty: inner, .. }
+        | Type::Bounded { ty: inner, .. }
+        | Type::Forall { body: inner, .. } = ty
+        {
             ty = self.store.resolve(&inner);
         }
         ty

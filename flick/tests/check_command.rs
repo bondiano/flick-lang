@@ -58,7 +58,32 @@ fn color_flag_controls_ansi() {
 
 #[test]
 fn fix_removes_annotations_the_values_already_have() {
-    let text = "module App.Kinds exposing (..)\n\ntype Kind = A | B\n\nlet kinds : List Kind = [A, B]\n\nlet none : List Kind = []\n";
+    let text = r#"module App.Kinds exposing (..)
+
+type Kind = A | B
+
+let kinds : List Kind = [A, B]
+
+let none : List Kind = []
+
+type alias Id = String
+
+let id : Id = "x"
+
+type Callback = Callback (Unit -> Number)
+
+let free : Callback^{} = Callback (fun () -> 1)
+
+widen : forall c. Unit -> Callback^c
+let widen () =
+  let value : Callback^c = free
+  value
+
+make_cell : Unit ->{} Ref (Option (Callback^{}))
+let make_cell () =
+  let cell : Ref (Option (Callback^{})) = Ref.make None
+  cell
+"#;
     let dir = common::project(
         "check_fix",
         &[

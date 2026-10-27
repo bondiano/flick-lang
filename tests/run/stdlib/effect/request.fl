@@ -70,7 +70,7 @@ let with_options =
   RequestResolver.make_with {
     batchKey = fun entry -> id_of entry % 2;
     preCheck = None;
-    delay = task { () };
+    delay = Effect.void;
     collectWhile = fun entries -> List.length entries < 10;
     runAll = fun entries key ->
       Platform.stdout_line ("key " ++ show key ++ " batch of " ++ show (NonEmpty.length entries))

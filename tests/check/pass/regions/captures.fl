@@ -12,10 +12,10 @@ foreign sync read_all from "./files.js" "readAll"
   retention call
 
 class Functor (f : Type -> Type) =
-  map : forall c d a b. (a -> b)^c -> ((f a)^d -> (f b)^(c + d))^c
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((f a)^d -> (f b)^(c + d))^c
 
 instance Functor Option =
-  map : forall c d a b. (a -> b)^c -> ((Option a)^d -> (Option b)^(c + d))^c
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((Option a)^d -> (Option b)^(c + d))^c
   let map f value =
     match value with
     | None -> None

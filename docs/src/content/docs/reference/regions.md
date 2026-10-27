@@ -60,16 +60,27 @@ returns when the caller's scope does.
 ## Captures
 
 A resource has its region in its type: `File s`, and also `List (File s)`
-or a nominal `Wrapper s` around one. A closure or a `task` holds the values
-it uses, and with them their regions, which its own type may not show.
-Such hidden captures are written as a qualifier:
+or a nominal `Wrapper s` around one. A closure, `task` or constructor can
+also retain values whose regions its type does not show.
 
-| Type | Holds |
+| Type | Bound |
 | - | - |
-| `T^{s, t}` | at most the regions `s` and `t` beyond what `T` shows |
+| `T^{s, t}` | at most the regions `s` and `t` in the qualified part |
 | `T^c` | at most the capture row `c` (kind `CaptureRow`) |
-| `T^(c + d)` | at most both |
-| `T` | nothing beyond what `T` shows |
+| `T^(c + d)` | at most the union of both rows |
+| `T` | no extra hidden captures; captures exposed by `T` remain |
+
+For a generic value, `a^c` bounds the **whole value**, not just captures
+beyond `a`. At a value boundary, `(f a)^c` likewise bounds parameter-held
+captures when `f` resolves to data that stores only its parameters.
+Functions and types with hidden storage, such as `StateT`, instead retain
+a hidden-capture qualifier. Explicit stored qualifications are part of
+type identity, not bounds that may be discarded.
+
+`Ref.make : forall c a. a^c ->{} Ref (a^c)` puts the stable capture capacity
+in the invariant payload type. Widening a cell alias's outer value bound
+cannot widen that inner bound to admit shorter-lived replacements.
+The distinction survives [`.iface` schema 2](../iface/#types-and-kinds).
 
 ```flick
 read_later : forall s. File s -> (Eff none {ReadError} String)^{s}
@@ -77,18 +88,19 @@ let read_later file =
   task { File.read_all file }
 ```
 
-A qualifier is an upper bound: a wider one is accepted, a narrower one than
-what the value holds is `FLICK-G001`. Mentioning `s` in a parameter type
-does not make a function hold `s`; using a value of it does. What a type
-shows is held openly and needs no qualifier: `fun () -> file` has type
+A bound can be wider than what a value holds; a narrower bound is
+`FLICK-G001`. `a^none` means a generic value holds no captures, not that
+substitution can erase a concrete `File s` or a closure's stored qualifier.
+For a concrete type, regions already exposed in it remain even under
+`^none`. Merely mentioning `s` in a parameter type does not make a function
+hold `s`; using a value of it does. For example, `fun () -> file` has type
 `Unit -> File s`.
 
-Each stage of a curried function holds the parameters before it, as its
-partial application does, and a signature says so without a qualifier:
-`File s -> String -> String` is read as `File s -> (String -> String)^{s}`,
-in `.iface` too. Only regions and capture rows are added this way; what a
-value of a type variable holds is not known from the signature, so a stage
-that hides one needs `a^c -> (b -> b)^c`.
+Each stage of a curried function retains earlier parameters, including
+their generic value captures. `File s -> String -> String` is read as
+`File s -> (String -> String)^{s}`; `a -> b -> a` also retains the first
+value's captures in its second stage. These projections survive `.iface`
+serialization. Use `a^c -> (b -> b)^c` to name the bound explicitly.
 
 Locals are inferred: a closure without an expected type gets the qualifier
 of what it uses, and a local signature need not name the regions its
@@ -98,11 +110,11 @@ keeps its qualifiers for importers.
 | Construct | Holds |
 | - | - |
 | `fun`, `task` | the locals it uses |
-| a stage of a curried function | the regions of the parameters before it, and the locals it uses |
+| a stage of a curried function | earlier parameters' value captures and the locals it uses |
 | record, tuple, list, constructor | what its parts hold |
-| `T^c` for a type variable `a^c` | at most `c`, whatever `a` stands for |
-| type variable `a` without a qualifier | what `a` stands for: generic code that hides a value of `a` in a closure needs `a^c` |
-| `Eff r e a`, a function | only its qualifier |
+| type variable `a^c` | the whole value holds at most `c`, without erasing concrete regions or stored qualifiers |
+| type variable `a` without a qualifier | what the substituted type holds; curried stages retain its capture projection |
+| `Eff r e a`, a function | hidden captures from its qualifier, not from a future result alone |
 
 A function that takes a callback declares the callback's captures and keeps
 them in what it returns, as `map_effect` does:
@@ -112,8 +124,22 @@ map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
 foreign sync map_effect from "./list.js" "mapEffect"
 ```
 
-The parts of a value matched by a pattern have their own types: a
-constructor's fields are checked against their types when it is built.
+Prelude's `map`, `map2` and `flat_map` callbacks quantify an input capture
+bound **per invocation**, independently of the container's bound `d`:
+`(forall v. a^v -> b)^c` for `map`,
+`(forall u v. a^u -> (b^v -> x)^(c + u))^c` for `map2`, and
+`(forall v. a^v -> (m b)^(c + v))^c` for `flat_map`.
+The second stage of `map2` retains its first input. This matters for
+`StateT` and `ReaderT`: state or environment supplied when running may
+hold regions not present when the computation was built.
+`pure : forall c a. a^c -> (f a)^c` preserves its input bound too.
+See the [user-defined transformer instances](../../contributing/implementation-decisions/#instances-of-user-types).
+
+Constructors retain field captures. Pattern matching and record/tuple/list
+projection propagate the enclosing bound to extracted values, including
+closure fields; applying a delayed field also retains the supplied input's
+captures. Explicit field qualifications are preserved, not overwritten by
+the enclosing bound. Primitive fields such as `Number` gain no captures.
 
 ## What cannot leave a scope
 
@@ -121,8 +147,8 @@ constructor's fields are checked against their types when it is built.
 | - | - |
 | the value of the scope, directly or inside data | its type may not mention the region (`FLICK-G002`) |
 | a closure or `task` returned or stored | its qualifier may not hold the region (`FLICK-G002`, or `FLICK-G001` against a written type) |
-| a nominal or opaque wrapper | the region stays among its type arguments |
-| a cell or binding from outside the scope | its type may not come to mention the region; mutable storage keeps its captures exactly (`T003`) |
+| a nominal or opaque wrapper | a visible region or hidden field capture cannot be erased |
+| a cell or binding from outside the scope | its type may not come to mention the region; mutable storage and its qualified element types are invariant (`FLICK-T003`), even when a value bound could otherwise widen |
 | an error | its payload holds no region, even when a handler inside the scope catches it (`FLICK-E005`); `type error E (s : Region) = E (File s)` is rejected where it is declared |
 | a foreign function | its signature is its retention contract: what it keeps is in its result's qualifier |
 
@@ -149,5 +175,5 @@ child that holds a shorter region is `FLICK-G003`.
 
 | Construct | Today |
 | - | - |
-| capture-polymorphic signatures of the standard library | written by hand in each module until the library exists |
+| foreign retention contracts | signatures are written and reviewed by hand; the checker does not inspect foreign bodies |
 | a region variable unified late with another region in a capture row | the two are kept apart, which may reject a program |

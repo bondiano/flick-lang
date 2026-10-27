@@ -40,6 +40,13 @@ text. The handler gets an exact record with a field per `flag` and `arg`,
 named after the clause; on the command line `dry_run` is `--dry-run`, an
 alias of one character `-n`, a longer one `--name`.
 
+Inside a `cli` block, the language server completes all five clause words
+with syntax, help and insertion snippets. Hover a clause word for its
+syntax and help, or a declared flag or argument name for its written type
+and `///` documentation. Clause words and parameter names are highlighted
+contextually; types, defaults and handler expressions keep ordinary Flick
+completion.
+
 | Type | Behaviour | Combinator |
 | - | - | - |
 | `Bool` | a switch, `false` when absent | `Cli.switch` |

@@ -11,6 +11,8 @@
 //! allows none. These constraints are solved with the effect rows, once the
 //! declaration is inferred (see [`solve`]).
 
+mod compare;
+mod data;
 mod scopes;
 mod solve;
 
@@ -18,7 +20,7 @@ pub use solve::Outlives;
 
 use super::Checker;
 use super::kinds::Kind;
-use super::ty::{Norm, Row, Type, capture_label};
+use super::ty::{Norm, Type, capture_label};
 use super::typing::Range;
 use crate::diagnostics;
 use crate::diagnostics::codes;
@@ -47,6 +49,8 @@ pub struct State {
     pub readers: Vec<Reader>,
     /// Every reader region made so far, for diagnostics.
     pub lent: Vec<u32>,
+    /// Kinds of rigid signature variables, including nested `forall`s.
+    pub rigid_kinds: Vec<(u32, Kind)>,
 }
 
 /// A function's reader: the services it reads atoms through, which end
@@ -89,6 +93,8 @@ pub type Held = Vec<(Option<String>, Type)>;
 pub enum Visible {
     /// Those of a closure's own type, once inferred.
     Late(Type),
+    /// A refinement may forget an abstract upper bound, never a concrete region.
+    Refined(Type),
     /// Those of an expected type as written, before the value's type is
     /// unified into it: `a^c` shows nothing of what `a` stands for.
     Now(Vec<String>),
@@ -113,8 +119,8 @@ pub struct Hold {
 impl Checker<'_> {
     /// What a value of `t` may hold, as a capture row: regions and type
     /// variables as entries, capture rows not inferred yet as tails. A
-    /// function or an `Eff` holds only what its qualifier says; data holds
-    /// what its parts hold.
+    /// qualifier bounds abstract reachable captures; concrete region
+    /// dependencies remain visible even beneath a bound.
     pub fn captures_of(&self, t: &Type) -> Norm {
         let mut out = Norm::default();
         self.collect_captures(t, &mut out);
@@ -124,16 +130,31 @@ impl Checker<'_> {
     }
 
     fn collect_captures(&self, t: &Type, out: &mut Norm) {
-        let (t, qualifier) = self.whnf_captured(t);
-        if let Some(row) = qualifier {
-            self.capture_row(&row, out);
-            // a variable qualified with `^c` holds at most `c`
-            if matches!(t, Type::Var(_) | Type::Skolem(_) | Type::Meta(_)) {
-                return;
-            }
-        }
+        self.collect_bounded_captures(t, out, false);
+    }
+
+    fn collect_bounded_captures(&self, t: &Type, out: &mut Norm, bounded: bool) {
+        let t = self.qualified_head(t);
         match &t {
-            Type::Var(_) | Type::Skolem(_) => push_atom(out, &t),
+            Type::Bounded { ty, captures } => {
+                if data::scalar(&self.whnf(ty)) {
+                    return;
+                }
+                self.capture_row_filtered(captures, out, false);
+                self.collect_bounded_captures(ty, out, true);
+            }
+            Type::Captured { ty, captures, .. } => {
+                if data::scalar(&self.whnf(ty)) {
+                    return;
+                }
+                self.capture_row_filtered(captures, out, bounded);
+                self.collect_bounded_captures(ty, out, true);
+            }
+            Type::Var(_) | Type::Skolem(_) | Type::Meta(_) => {
+                if !bounded || matches!(self.atom_kind(&t, &[]), Some(Kind::Region)) {
+                    push_atom(out, &t);
+                }
+            }
             Type::App { .. } => {
                 let (head, args) = t.spine();
                 let opaque = ["Eff", "Layer", "ServiceTag", "ServiceImpl", "Errors"];
@@ -142,16 +163,33 @@ impl Checker<'_> {
                 }
                 for arg in args {
                     match self.store.resolve(arg) {
-                        row @ (Type::Row(_) | Type::Union(..)) => self.capture_row(&row, out),
-                        _ => self.collect_captures(arg, out),
+                        row @ (Type::Row(_) | Type::Union(..)) => {
+                            self.capture_row_filtered(&row, out, bounded);
+                        }
+                        _ => self.collect_bounded_captures(arg, out, bounded),
                     }
                 }
             }
-            Type::Tuple(items) => items.iter().for_each(|i| self.collect_captures(i, out)),
+            Type::Tuple(items) => items
+                .iter()
+                .for_each(|i| self.collect_bounded_captures(i, out, bounded)),
             Type::Record(row) => row
                 .entries
                 .iter()
-                .for_each(|(_, t)| self.collect_captures(t, out)),
+                .for_each(|(_, t)| self.collect_bounded_captures(t, out, bounded)),
+            Type::Fun { param, result, .. } => {
+                if bounded {
+                    self.zonk(&t).visit(&mut |t| {
+                        if matches!(self.atom_kind(t, &[]), Some(Kind::Region)) {
+                            push_atom(out, t);
+                        }
+                    });
+                } else {
+                    self.collect_bounded_captures(param, out, false);
+                    self.collect_bounded_captures(result, out, false);
+                }
+            }
+            Type::Forall { body, .. } => self.collect_bounded_captures(body, out, bounded),
             _ => {}
         }
     }
@@ -159,32 +197,45 @@ impl Checker<'_> {
     /// Adds the regions of a capture row; its rigid variables count as
     /// entries, so `{s | c}` and `{s, c}` are the same set.
     pub fn capture_row(&self, row: &Type, out: &mut Norm) {
+        self.capture_row_filtered(row, out, false);
+        out.entries.sort_by(|a, b| a.0.cmp(&b.0));
+        out.entries.dedup_by(|a, b| a.0 == b.0);
+    }
+
+    fn capture_row_filtered(&self, row: &Type, out: &mut Norm, bounded: bool) {
         let norm = self.store.normalize(row);
         for (label, t) in &norm.entries {
             if label.starts_with('^') {
-                push_atom(out, t);
+                match self.store.resolve(t) {
+                    row @ (Type::Row(_) | Type::Union(..)) => {
+                        self.capture_row_filtered(&row, out, bounded);
+                    }
+                    other => self.collect_bounded_captures(&other, out, bounded),
+                }
             }
         }
         for tail in norm.tails {
             match tail {
-                Type::Var(_) | Type::Skolem(_) => push_atom(out, &tail),
-                Type::Meta(_) | Type::Error if !out.tails.contains(&tail) => out.tails.push(tail),
+                Type::Var(_) | Type::Skolem(_)
+                    if !bounded || matches!(self.atom_kind(&tail, &[]), Some(Kind::Region)) =>
+                {
+                    push_atom(out, &tail);
+                }
+                Type::Meta(_) if !bounded && !out.tails.contains(&tail) => out.tails.push(tail),
+                Type::Error if !out.tails.contains(&tail) => out.tails.push(tail),
                 _ => {}
             }
         }
     }
 
-    /// A signature as it is checked: each stage of a curried function holds
-    /// the regions of the parameters before it, as its partial application
-    /// does, so `File s -> String -> String` is
-    /// `File s -> (String -> String)^{s}`. What a stage's type shows anyway
-    /// is left out; a type variable's captures are not known here, so a stage
-    /// that hides them still needs `a^c`.
+    /// A curried stage retains earlier parameters. Include projections of
+    /// generic value captures as well as regions, so partial application
+    /// has the same whole-value bound as an explicitly written closure.
     pub fn implicit_captures(&self, t: &Type) -> Type {
-        self.stages(t, &mut Vec::new(), &[])
+        self.stages(t, &mut Vec::new(), &Type::empty_row())
     }
 
-    fn stages(&self, t: &Type, kinds: &mut Vec<(String, Kind)>, held: &[(String, Type)]) -> Type {
+    fn stages(&self, t: &Type, kinds: &mut Vec<(String, Kind)>, held: &Type) -> Type {
         match t {
             Type::Forall {
                 vars,
@@ -201,26 +252,42 @@ impl Checker<'_> {
                     body: Box::new(body),
                 }
             }
-            Type::Captured { ty, captures } => Type::Captured {
-                ty: Box::new(self.stages(ty, kinds, held)),
-                captures: captures.clone(),
-            },
+            Type::Captured { ty, captures, .. } | Type::Bounded { ty, captures } => {
+                let ty = Box::new(self.stages(ty, kinds, captures));
+                if matches!(t, Type::Bounded { .. }) {
+                    Type::Bounded {
+                        ty,
+                        captures: captures.clone(),
+                    }
+                } else {
+                    Type::Captured {
+                        ty,
+                        captures: captures.clone(),
+                        value: matches!(t, Type::Captured { value: true, .. }),
+                    }
+                }
+            }
             Type::Fun {
                 param,
                 effects,
                 result,
             } => {
-                let param = self.stages(param, kinds, &[]);
-                let mut held = held.to_vec();
-                for (label, atom) in self.captures_of(&param).entries {
-                    if self.is_region(&atom, kinds) && !held.iter().any(|(l, _)| *l == label) {
-                        held.push((label, atom));
-                    }
-                }
+                let param = self.stages(param, kinds, &Type::empty_row());
+                let mut captures = self.captures_of(&param);
+                captures.entries.retain(|(_, atom)| {
+                    matches!(
+                        self.atom_kind(atom, kinds),
+                        None | Some(Kind::Type | Kind::Region | Kind::CaptureRow)
+                    )
+                });
+                let held = Type::Union(Box::new(held.clone()), Box::new(captures.into_type()));
+                let explicit = self.whnf_captured(result).1.is_some();
                 let mut result = self.stages(result, kinds, &held);
-                if matches!(self.whnf(&result), Type::Fun { .. }) {
-                    let visible = self.visible_in(&result);
-                    held.retain(|(label, _)| !visible.contains(label));
+                let retained = self.store.normalize(&held);
+                if !explicit
+                    && matches!(self.whnf(&result), Type::Fun { .. })
+                    && (!retained.entries.is_empty() || !retained.tails.is_empty())
+                {
                     result = qualify(result, held);
                 }
                 Type::Fun {
@@ -229,12 +296,26 @@ impl Checker<'_> {
                     result: Box::new(result),
                 }
             }
-            other => other.map_children(&mut |c| self.stages(c, kinds, &[])),
+            other => {
+                let expanded = self.qualified_head(other);
+                if matches!(expanded, Type::Fun { .. }) {
+                    self.stages(&expanded, kinds, held)
+                } else {
+                    other.map_children(&mut |c| self.stages(c, kinds, &Type::empty_row()))
+                }
+            }
         }
     }
 
     /// Whether `atom` is a region or a capture row, not a type variable.
     fn is_region(&self, atom: &Type, kinds: &[(String, Kind)]) -> bool {
+        matches!(
+            self.atom_kind(atom, kinds),
+            Some(Kind::Region | Kind::CaptureRow)
+        )
+    }
+
+    fn atom_kind(&self, atom: &Type, kinds: &[(String, Kind)]) -> Option<Kind> {
         let kind = match atom {
             Type::Var(name) => kinds
                 .iter()
@@ -245,18 +326,17 @@ impl Checker<'_> {
                     let v = self.tyvars.iter().rev().find(|v| v.name == *name)?;
                     Some(v.kind.clone())
                 }),
-            Type::Skolem(_) => self
-                .tyvars
+            Type::Skolem(s) => self
+                .regions
+                .rigid_kinds
                 .iter()
                 .rev()
-                .find(|v| v.ty == *atom)
-                .map(|v| v.kind.clone()),
+                .find(|(id, _)| id == s)
+                .map(|(_, kind)| kind.clone())
+                .or_else(|| self.scope_of(*s).map(|_| Kind::Region)),
             _ => None,
         };
-        matches!(
-            kind.map(|k| self.kinds.resolve(&k)),
-            Some(Kind::Region | Kind::CaptureRow)
-        )
+        kind.map(|k| self.kinds.resolve(&k))
     }
 
     /// The regions and variables a type mentions anywhere.
@@ -309,21 +389,60 @@ impl Checker<'_> {
         if held.is_empty() {
             return ty;
         }
+        if let Some(expected) = &expected
+            && matches!(self.bound_head(expected), Type::Bounded { .. })
+        {
+            let identity = self.capture_identity(expected);
+            let (bare, captures) = self.whnf_captured(&identity);
+            if !matches!(bare, Type::Meta(_)) {
+                let visible = if captures.is_some() {
+                    Visible::Now(Vec::new())
+                } else {
+                    Visible::Late(identity.clone())
+                };
+                self.hold(Hold {
+                    held: held.clone(),
+                    visible,
+                    bound: captures.unwrap_or_else(Type::empty_row),
+                    expected: Some(identity),
+                    written: true,
+                    what,
+                    span,
+                });
+            }
+        }
         let (bound, qualified) = if let Some(e) = &expected {
-            let bound = self.whnf_captured(e).1.unwrap_or_else(Type::empty_row);
-            (bound, ty.clone())
+            let captures = self.whnf_captured(e).1;
+            let qualified = match &captures {
+                Some(captures) => Type::Captured {
+                    ty: Box::new(ty.clone()),
+                    captures: Box::new(captures.clone()),
+                    value: false,
+                },
+                None => ty.clone(),
+            };
+            (captures.unwrap_or_else(Type::empty_row), qualified)
         } else {
             let row = self.fresh();
             let qualified = Type::Captured {
                 ty: Box::new(ty.clone()),
                 captures: Box::new(row.clone()),
+                value: false,
             };
             (row, qualified)
         };
         let written = expected.is_some() && !matches!(self.store.resolve(&bound), Type::Meta(_));
+        let visible = if expected
+            .as_ref()
+            .is_none_or(|e| self.whnf_captured(e).1.is_some())
+        {
+            Visible::Now(Vec::new())
+        } else {
+            Visible::Late(ty)
+        };
         self.hold(Hold {
             held,
-            visible: Visible::Late(ty),
+            visible,
             bound,
             expected,
             written,
@@ -348,63 +467,8 @@ impl Checker<'_> {
         Type::Captured {
             ty: Box::new(ty),
             captures: Box::new(captures),
+            value: false,
         }
-    }
-
-    /// Unifies types of which at least one has a capture qualifier: the
-    /// qualifiers are equal, as in mutable storage.
-    pub fn unify_captured(
-        &mut self,
-        (a, ca): (Type, Option<Type>),
-        (b, cb): (Type, Option<Type>),
-    ) -> super::unify::Unified {
-        let captured = |t: &Type, c: &Option<Type>| match c {
-            Some(c) => Type::Captured {
-                ty: Box::new(t.clone()),
-                captures: Box::new(c.clone()),
-            },
-            None => t.clone(),
-        };
-        match (&a, &b) {
-            (Type::Error, _) | (_, Type::Error) => Ok(()),
-            (Type::Meta(m), _) if ca.is_none() => self.bind(*m, &captured(&b, &cb)),
-            (_, Type::Meta(m)) if cb.is_none() => self.bind(*m, &captured(&a, &ca)),
-            _ => {
-                let empty = Type::empty_row();
-                self.unify(ca.as_ref().unwrap_or(&empty), cb.as_ref().unwrap_or(&empty))?;
-                self.unify(&a, &b)
-            }
-        }
-    }
-
-    /// Subsumption where a qualifier is involved: a value fits a position
-    /// whose qualifier covers what it holds; a bare position takes no
-    /// capture its type does not show.
-    pub fn subsume_captured(
-        &mut self,
-        (actual, (a, ca)): (&Type, (Type, Option<Type>)),
-        (expected, (e, ce)): (&Type, (Type, Option<Type>)),
-        span: Span,
-    ) -> super::unify::Unified {
-        match (&a, &e) {
-            (Type::Error, _) | (_, Type::Error) => return Ok(()),
-            (_, Type::Meta(_)) if ce.is_none() => return self.unify(actual, expected),
-            (Type::Meta(_), _) if ca.is_none() => return self.unify(actual, expected),
-            _ => {}
-        }
-        let visible = Visible::Now(self.visible_in(&e));
-        let bound = ce.unwrap_or_else(Type::empty_row);
-        let written = !matches!(self.store.resolve(&bound), Type::Meta(_));
-        self.hold(Hold {
-            held: vec![(None, actual.clone())],
-            visible,
-            bound,
-            expected: Some(expected.clone()),
-            written,
-            what: "value",
-            span,
-        });
-        self.subsume(&a, &e, span)
     }
 
     /// Starts the reader of a function whose body is checked next.
@@ -444,7 +508,10 @@ impl Checker<'_> {
     /// `ty` qualified with the reader `region` too.
     pub fn read_through(ty: Type, region: &Type) -> Type {
         let label = capture_label(region).expect("a skolem has a label");
-        qualify(ty, vec![(label, region.clone())])
+        qualify(
+            ty,
+            Type::Row(super::ty::Row::closed(vec![(label, region.clone())])),
+        )
     }
 
     /// Ends the innermost function's reader, reporting its `result` if it
@@ -479,7 +546,6 @@ impl Checker<'_> {
             ),
         );
     }
-
     /// The scope whose region is the skolem `s`.
     pub fn scope_of(&self, s: u32) -> Option<&Scope> {
         self.regions.scopes.iter().find(|scope| scope.region == s)
@@ -507,31 +573,22 @@ impl Checker<'_> {
 }
 
 /// `t` with `held` added to its qualifier.
-fn qualify(t: Type, mut held: Vec<(String, Type)>) -> Type {
-    if held.is_empty() {
-        return t;
-    }
-    let (ty, captures) = match t {
-        Type::Captured { ty, captures } => match *captures {
-            Type::Row(row) => {
-                for entry in row.entries {
-                    if !held.iter().any(|(l, _)| *l == entry.0) {
-                        held.push(entry);
-                    }
-                }
-                (ty, row.tail)
-            }
-            other => (ty, Some(Box::new(other))),
+fn qualify(t: Type, held: Type) -> Type {
+    match t {
+        Type::Captured {
+            ty,
+            captures,
+            value,
+        } => Type::Captured {
+            ty,
+            captures: Box::new(Type::Union(captures, Box::new(held))),
+            value,
         },
-        other => (Box::new(other), None),
-    };
-    held.sort_by(|a, b| a.0.cmp(&b.0));
-    Type::Captured {
-        ty,
-        captures: Box::new(Type::Row(Row {
-            entries: held,
-            tail: captures,
-        })),
+        other => Type::Captured {
+            ty: Box::new(other),
+            captures: Box::new(held),
+            value: false,
+        },
     }
 }
 

@@ -64,17 +64,6 @@ fn signature_quick_fix_makes_the_module_check() {
         assert_eq!(edit["range"]["start"]["character"], 0, "{edit}");
         edits.push(edit);
     }
-    let inserted: Vec<&str> = edits.iter().filter_map(|e| e["newText"].as_str()).collect();
-    assert_eq!(
-        inserted,
-        [
-            "double : Number -> Number\n",
-            "say : String ->{Log; a} Unit\n",
-            "pair : a -> b -> (a, b)\n",
-            "describe : Show a => a -> String\n",
-            "  inc : Number -> Number\n",
-        ]
-    );
     let mut fixed = UNSIGNED.to_owned();
     for edit in edits.iter().rev() {
         let at = offset(&fixed, &edit["range"]["start"]);

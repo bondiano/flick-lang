@@ -413,19 +413,23 @@ impl Checker<'_> {
         self.typing.pending_labels.push((range(span), ty));
     }
 
-    /// The arrows of a function type with aliases expanded: the stage of each.
+    /// The runtime arrows, through aliases, quantifiers and capture qualifiers.
     pub fn arrow_stages(&self, ty: &Type) -> Vec<Stage> {
         let mut out = Vec::new();
-        let mut ty = match ty {
-            Type::Forall { body, .. } => (**body).clone(),
-            other => other.clone(),
-        };
-        while let Type::Fun {
-            effects, result, ..
-        } = self.whnf_captured(&ty).0
-        {
-            out.push(stage_of(effects.as_deref()));
-            ty = *result;
+        let mut ty = ty.clone();
+        loop {
+            match self.qualified_head(&ty) {
+                Type::Forall { body, .. }
+                | Type::Captured { ty: body, .. }
+                | Type::Bounded { ty: body, .. } => ty = *body,
+                Type::Fun {
+                    effects, result, ..
+                } => {
+                    out.push(stage_of(effects.as_deref()));
+                    ty = *result;
+                }
+                _ => break,
+            }
         }
         out
     }

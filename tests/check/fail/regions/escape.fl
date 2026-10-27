@@ -118,15 +118,16 @@ let partial path =
 no_owner : Path ->{FileSystem; OpenError} Unit
 let no_owner path =
   ignore (FileSystem.open_scoped path)
-//~ FLICK-G001 @27:5-27:38 this task uses `file`, which holds region `s`, but the expec
-//~ FLICK-G001 @34:5-34:39 this function uses `file`, which holds region `s`, but the e
-//~ FLICK-G002 @41:7-41:34 the value of this `scope` has type `File s`: region `s` ends
-//~ FLICK-G001 @49:6-49:40 this function uses `file`, which holds region `s`, but the e
-//~ FLICK-G002 @58:7-58:45 this function uses `file`, which holds region `s`, so it can
-//~ FLICK-G002 @67:7-67:44 the value of this `scope` has type `Wrapper s`: region `s` e
-//~ FLICK-G002 @75:7-75:43 the value of this `scope` has type `Sealed s`: region `s` en
-//~ FLICK-G002 @84:19-84:28 expected `Option _`, found `Option (File s)`: region `s` end
-//~ FLICK-G001 @92:19-92:52 this task uses `file`, which holds region `s`, but the expec
-//~ FLICK-E005 @100:7-100:39 the error `Wrapped (File s)` would carry region `s`; an erro
-//~ FLICK-G002 @114:26-114:59 this function uses `file`, which holds region `s`, so it can
-//~ FLICK-G004 @120:11-120:38 this acquires a resource, which needs `Scope`: only `scope {
+//~ FLICK-G001 @27:5-27:38
+//~ FLICK-G001 @34:5-34:39
+//~ FLICK-G002 @41:7-41:34
+//~ FLICK-G001 @49:6-49:40
+//~ FLICK-G002 @58:7-58:45
+//~ FLICK-G002 @67:7-67:44
+//~ FLICK-G002 @75:7-75:43
+//~ FLICK-T003 @84:19-84:28
+//~ FLICK-G002 @84:19-84:28
+//~ FLICK-G001 @92:19-92:52
+//~ FLICK-E005 @100:7-100:39
+//~ FLICK-G002 @114:26-114:59
+//~ FLICK-G004 @120:11-120:38

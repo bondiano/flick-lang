@@ -1,0 +1,59 @@
+// Context coverage does not invent a seed, reverse an FD or relax C007.
+module App.FdCoverage exposing (..)
+
+type Wrap a = Wrap a
+type alias Erased a = Number
+
+class Base a b | a -> b
+class Reverse a b | b -> a
+class Noise a b
+class Join a b c | a b -> c
+class Global a | -> a
+
+class NoContext key output | key -> output
+instance NoContext (Wrap a) b
+
+class Unrelated key output | key -> output
+instance Noise a b => Unrelated (Wrap a) b
+
+class WrongWay key output | key -> output
+instance Reverse a b => WrongWay (Wrap a) b
+
+class Disconnected key left right | key -> left right
+instance (Base b c, Base c b) => Disconnected (Wrap a) b c
+
+class Partial key left right | key -> left right
+instance Join a b c => Partial (Wrap a) b c
+
+class Independent left right output | left -> output, right -> output
+instance Base a c => Independent (Wrap a) (Wrap b) c
+
+class Erasure key output | key -> output
+instance Base a b => Erasure (Wrap (Erased a)) (a, b)
+
+class Own key output | key -> output, output -> key
+instance Own (Wrap a) b
+
+instance Global a
+
+class Missing key
+instance Noise a b => Missing (Wrap a)
+
+class EqualSize left right
+instance Noise a b => EqualSize a b
+
+class Occurrences key
+instance Noise a a => Occurrences (Wrap a)
+
+//~ FLICK-C005 @14:1-14:30
+//~ FLICK-C005 @17:1-17:43
+//~ FLICK-C005 @20:1-20:44
+//~ FLICK-C005 @23:1-23:59
+//~ FLICK-C005 @26:1-26:44
+//~ FLICK-C005 @29:1-29:53
+//~ FLICK-C005 @32:1-32:54
+//~ FLICK-C005 @35:1-35:24
+//~ FLICK-C005 @37:1-37:18
+//~ FLICK-C007 @40:1-40:39
+//~ FLICK-C007 @43:1-43:36
+//~ FLICK-C007 @46:1-46:43

@@ -32,7 +32,7 @@ main : Unit ->{; AppError} Unit
 let main () =
   let port = start ()
   provide (DevTools.layer ("ws://127.0.0.1:" ++ show port)) {
-    Tracer.with_span "checkout" options (task { () })
+    Tracer.with_span "checkout" options Effect.void
     Platform.stdout_line ("checkout: " ++ show (got "checkout"))
   }
   stop ()

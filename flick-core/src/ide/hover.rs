@@ -3,13 +3,13 @@
 
 use std::fmt::Write;
 
-use super::{Ide, Symbol, tree};
+use super::{Ide, Symbol, Target, navigate::Source, tree};
 use crate::doc;
-use crate::iface::Namespace;
+use crate::iface::{Entity, Namespace};
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Form, component_instance, show_type};
+use crate::types::{Form, TypeDef, component_instance, show_type};
 
 impl Ide<'_> {
     /// The signature of a top-level value as its source writes it.
@@ -188,6 +188,58 @@ impl Ide<'_> {
         Some((format!("```flick\n{name} : {}\n```", show_type(ty)), range))
     }
 
+    fn type_hover(
+        &self,
+        file: FileId,
+        entity: &Entity,
+        source: Option<&Source>,
+        definition: Option<&TypeDef>,
+        range: &mut (u32, u32),
+    ) -> Option<String> {
+        let local_alias = self
+            .analysis
+            .module(&entity.module)
+            .is_some_and(|m| m.typing.aliases.contains_key(&entity.name));
+        let public_alias = definition.is_some_and(|d| matches!(&d.form, Form::Alias { .. }));
+        if (local_alias || public_alias)
+            && let Some(source) = source
+            && let Some(decl) = source.tree.nodes().find(|d| {
+                d.kind == K::TypeDecl
+                    && tree::name_of(d, K::Con, &source.text) == Some(entity.name.as_str())
+            })
+        {
+            if source.target == Target::File(file)
+                && decl.child_tokens().any(|t| (t.start, t.end) == *range)
+            {
+                range.1 = decl
+                    .nodes()
+                    .filter(|n| n.kind == K::TypeParam)
+                    .last()
+                    .map_or(range.1, |n| n.range().1);
+            }
+            let (start, end) = decl.range();
+            return Some(
+                source.text[start as usize..end as usize]
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            );
+        }
+        let definition = definition?;
+        Some(match &definition.form {
+            Form::Alias { params, body, .. } => {
+                let params = params.iter().fold(String::new(), |mut acc, p| {
+                    let _ = write!(acc, " {p}");
+                    acc
+                });
+                format!("type alias {}{params} = {}", entity.name, show_type(body))
+            }
+            Form::Error => format!("type error {}", entity.name),
+            Form::Service { .. } => format!("service {}", entity.name),
+            _ => format!("type {} : {}", entity.name, definition.kind),
+        })
+    }
+
     /// Markdown for the symbol at `offset`, and the range it covers.
     pub fn hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
         if let Some((code, note, range)) = self.keyword(file, offset) {
@@ -196,7 +248,7 @@ impl Ide<'_> {
         if let Some(hover) = self.embedded_hover(file, offset) {
             return Some(hover);
         }
-        let Some((symbol, range)) = self.symbol_at(file, offset) else {
+        let Some((symbol, mut range)) = self.symbol_at(file, offset) else {
             return self.typed_hover(file, offset);
         };
         let (code, note) = match &symbol {
@@ -217,19 +269,15 @@ impl Ide<'_> {
             Symbol::Entity(e) => {
                 let interface = self.interface(&e.module)?;
                 let export = interface.find(e.namespace, &e.name);
-                let code = match (e.namespace, export.and_then(|e| e.definition.as_ref())) {
-                    (Namespace::Type, Some(def)) => match &def.form {
-                        Form::Alias { params, body, .. } => {
-                            let params = params.iter().fold(String::new(), |mut acc, p| {
-                                let _ = write!(acc, " {p}");
-                                acc
-                            });
-                            format!("type alias {}{params} = {}", e.name, show_type(body))
-                        }
-                        Form::Error => format!("type error {}", e.name),
-                        Form::Service { .. } => format!("service {}", e.name),
-                        _ => format!("type {} : {}", e.name, def.kind),
-                    },
+                let source = self.source(&e.module);
+                let code = match e.namespace {
+                    Namespace::Type => self.type_hover(
+                        file,
+                        e,
+                        source.as_ref(),
+                        export.and_then(|e| e.definition.as_ref()),
+                        &mut range,
+                    )?,
                     _ => match (
                         self.signature(&e.module, &e.name),
                         export.and_then(|e| e.scheme.as_ref()),
@@ -243,9 +291,7 @@ impl Ide<'_> {
                         }
                     },
                 };
-                let doc = self
-                    .source(&e.module)
-                    .and_then(|source| doc::comments(&source.text).remove(&e.name));
+                let doc = source.and_then(|source| doc::comments(&source.text).remove(&e.name));
                 let from = format!("from `{}`", e.module);
                 let note = doc.map_or(from.clone(), |d| format!("{d}\n\n{from}"));
                 match self.derived(file, range, &e.module, &e.name) {

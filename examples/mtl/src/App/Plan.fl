@@ -1,0 +1,53 @@
+/// A pure planner: ReaderT supplies configuration, StateT records accepted tasks,
+/// and outer MaybeT stops at the first rejected task without losing that state.
+module App.Plan exposing (Config, PlanState, catalog, default_config, plan)
+
+import Mtl.Identity as Identity exposing (Identity)
+import Mtl.MaybeT as MaybeT exposing (MaybeT)
+import Mtl.StateT as StateT exposing (StateT)
+import Mtl.ReaderT as ReaderT exposing (ReaderT)
+import Mtl.Classes exposing (ask, get, put)
+
+type alias Config = { budget : Number; overhead : Number }
+
+type alias PlanState = { remaining : Number; completed : List String }
+
+type alias Planner a = MaybeT (StateT PlanState (ReaderT Config Identity)) a
+
+catalog : List (String, Number)
+let catalog = [("docs", 20), ("tests", 30), ("lint", 10)]
+
+default_config : Config
+let default_config = { budget = 60; overhead = 0 }
+
+schedule : String -> Planner Unit
+let schedule name =
+  do {
+    config <- ask
+    state <- get
+    minutes <- MaybeT.from_option
+      (map
+        (fun (_, duration) -> duration)
+        (List.find (fun (candidate, _) -> candidate == name) catalog))
+    MaybeT.from_option
+      (if minutes <= state.remaining - config.overhead then Some () else None)
+    // Commit only after both checks; a rejected task consumes no time.
+    put {
+      remaining = state.remaining - config.overhead - minutes;
+      completed = state.completed ++ [name];
+    }
+  }
+
+workflow : List String -> Planner Unit
+let rec workflow tasks =
+  match tasks with
+  | [] -> pure ()
+  | [name, ...rest] -> do { schedule name; workflow rest }
+
+plan : Config -> List String -> (Option (List String), PlanState)
+let plan config tasks =
+  let initial = { remaining = config.budget; completed = [] }
+  // Remove the outer wrapper first, then supply state and configuration.
+  let (result, state) =
+    Identity.run (ReaderT.run (StateT.run (MaybeT.run (workflow tasks)) initial) config)
+  (map (fun _ -> state.completed) result, state)

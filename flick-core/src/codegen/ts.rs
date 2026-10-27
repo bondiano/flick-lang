@@ -10,7 +10,7 @@ use std::fmt::Write;
 
 use super::names;
 use crate::iface::{Interface, Namespace};
-use crate::types::{Form, Kind, PRELUDE, Row, Type, TypeDef, passes_dictionary};
+use crate::types::{Form, Kind, PRELUDE, Type, TypeDef, passes_dictionary};
 
 /// The runtime package generated code imports.
 const RUNTIME: &str = "@flick-lang/runtime";
@@ -53,8 +53,8 @@ pub struct Projection<'a> {
     pub used: RefCell<BTreeSet<String>>,
 }
 
-/// Type parameters in scope: Flick name to TypeScript name; `None` for one
-/// TypeScript cannot take (a region or capture row, erased).
+/// Type parameters in scope: Flick name to TypeScript name; regions have
+/// `None`, and capture rows specialize to the empty row (`never`).
 type Vars = HashMap<String, Option<String>>;
 
 impl Projection<'_> {
@@ -78,6 +78,10 @@ impl Projection<'_> {
 
     /// The type of a value of type `scheme`.
     pub fn value(&self, scheme: &Type) -> Result<String, String> {
+        self.value_in(scheme, &Vars::new())
+    }
+
+    fn value_in(&self, scheme: &Type, outer: &Vars) -> Result<String, String> {
         let (vars, constraints, body) = match scheme {
             Type::Forall {
                 vars,
@@ -86,12 +90,13 @@ impl Projection<'_> {
             } => (vars.as_slice(), constraints.as_slice(), &**body),
             other => (&[][..], &[][..], other),
         };
-        let mut scope = Vars::new();
+        let mut scope = outer.clone();
         let mut generics = Vec::new();
         for binder in vars {
             let ts = match binder.kind {
                 Kind::Type | Kind::ErrorRow | Kind::ServiceRow => Some(generic(&binder.name)),
-                Kind::Region | Kind::CaptureRow => None,
+                Kind::Region => None,
+                Kind::CaptureRow => Some("never".to_owned()),
                 _ => {
                     return Err(format!(
                         "type variable `{}` of kind `{}` has no TypeScript form; export a concrete façade",
@@ -99,16 +104,21 @@ impl Projection<'_> {
                     ));
                 }
             };
-            if let Some(ts) = &ts {
+            if let Some(ts) = &ts
+                && binder.kind != Kind::CaptureRow
+            {
                 generics.push(ts.clone());
             }
             scope.insert(binder.name.clone(), ts);
         }
+        let body = uncaptured(body, &scope)?;
         let function = matches!(body, Type::Fun { .. }) || !constraints.is_empty();
         if !function {
             // a polymorphic constant: `forall a. List a` is `ReadonlyArray<never>`
-            for ts in scope.values_mut().flatten() {
-                "never".clone_into(ts);
+            for binder in vars {
+                if let Some(Some(ts)) = scope.get_mut(&binder.name) {
+                    "never".clone_into(ts);
+                }
             }
             generics.clear();
         }
@@ -187,19 +197,9 @@ impl Projection<'_> {
                     format!("{{ {} }}", fields.join("; "))
                 })
             }
-            Type::Captured { ty, captures } => {
-                if matches!(&**captures, Type::Row(Row { entries, tail: None }) if entries.is_empty())
-                {
-                    self.ty(ty, vars)
-                } else {
-                    Err(
-                        "a value holding a scope's capabilities has no bare TypeScript export"
-                            .to_owned(),
-                    )
-                }
-            }
+            Type::Captured { .. } | Type::Bounded { .. } => self.ty(uncaptured(t, vars)?, vars),
             Type::Forall { .. } => {
-                let inner = self.value(t)?;
+                let inner = self.value_in(t, vars)?;
                 Ok(format!("({inner})"))
             }
             Type::Row(_) | Type::Union(..) => self.row(t, vars),
@@ -367,6 +367,30 @@ impl Projection<'_> {
             );
         }
         out
+    }
+}
+fn uncaptured<'a>(mut t: &'a Type, vars: &Vars) -> Result<&'a Type, String> {
+    while let Type::Captured { ty, captures, .. } | Type::Bounded { ty, captures } = t {
+        if !empty_captures(captures, vars) {
+            return Err(
+                "a value holding a scope's capabilities has no bare TypeScript export".to_owned(),
+            );
+        }
+        t = ty;
+    }
+    Ok(t)
+}
+
+fn empty_captures(t: &Type, vars: &Vars) -> bool {
+    match t {
+        Type::Row(row) => {
+            row.entries.iter().all(|(_, t)| empty_captures(t, vars))
+                && row.tail.as_deref().is_none_or(|t| empty_captures(t, vars))
+        }
+        Type::Union(a, b) => empty_captures(a, vars) && empty_captures(b, vars),
+        // TypeScript type parameters contain only scope-free data.
+        Type::Var(name) => matches!(vars.get(name), Some(Some(_))),
+        _ => false,
     }
 }
 

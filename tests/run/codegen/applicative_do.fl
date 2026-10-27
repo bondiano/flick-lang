@@ -19,14 +19,25 @@ let chained a b =
   do {
     (x, w) <- Option.map (fun v -> (v, v * 10)) a and y <- b
     if x < y
-    pure (x + y + w)
+    z <- Some (x + y + w)
+    Some z
+  }
+
+carry : forall c a. a^c -> (Option (a, a))^c
+let carry value =
+  do {
+    kept <- Some value and n <- Some 2
+    _ <- Some n
+    Some (kept, value)
   }
 
 ticks : Eff none none Number
 let ticks =
   do {
     x <- task { Platform.stdout_line "first"; 1 } and y <- task { Platform.stdout_line "second"; 2 }
-    pure (x + y)
+    z <- task { Platform.stdout_line "third"; x + y }
+    task { Platform.stdout_line "after" }
+    pure z
   }
 
 // a `pure` the group binds is a function of the block, not the Prelude's
@@ -49,6 +60,10 @@ let main () =
   Platform.stdout_line (show (both [1, 2] [10, 20]))
   Platform.stdout_line (show (chained (Some 1) (Some 2)))
   Platform.stdout_line (show (chained (Some 3) (Some 2)))
+  Platform.stdout_line (show (chained None (Some 2)))
+  Platform.stdout_line (show (chained (Some 1) None))
+  Platform.stdout_line
+    (show (Option.map (fun (first, second) -> first () + second ()) (carry (fun () -> 7))))
   Platform.stdout_line (show (await ticks))
   Platform.stdout_line (show shadowed)
   Platform.stdout_line (show (qualified (Some 1) (Some 2)))

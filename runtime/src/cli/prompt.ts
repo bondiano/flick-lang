@@ -83,9 +83,9 @@ const runLoop = (loop: Loop, tty: TtyImpl): Effect.Effect<unknown, unknown, unkn
         loop.events === undefined
           ? (yield* tty.read_key(undefined))
           : yield* Effect.raceFirst(
-              key,
-              Effect.map(Queue.take(loop.events), (value) => ({ _tag: "Event", value })),
-            );
+            key,
+            Effect.map(Queue.take(loop.events), (value) => ({ _tag: "Event", value })),
+          );
       action = yield* loop.process(input, state);
       if (action._tag === "Beep") continue;
       clear = yield* loop.clear(state, action);

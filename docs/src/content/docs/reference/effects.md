@@ -139,6 +139,12 @@ count against `r` and `e`. `await t` runs `t` once in the current fiber and
 removes exactly one layer: awaiting `Eff r e (Eff r2 e2 a)` gives an
 `Eff r2 e2 a`. Awaiting something that is not an `Eff` is `FLICK-T003`.
 
+`Effect.void : Eff none none Unit` is a reusable cold computation that succeeds
+with `()`, needs no services and has no expected errors. Use it when an `Eff`
+argument should do nothing; `()` alone is a value, not a computation.
+`await Effect.void` runs it, and the same value can be awaited again or passed
+to consumers such as `Effect.all Effect.Sequential [Effect.void, Effect.void]`.
+
 A function that takes an `Eff` decides when it runs. A runtime call written
 as its argument has already run when the function starts: the warning
 `FLICK-E003` suggests passing `task { … }` instead.

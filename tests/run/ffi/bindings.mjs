@@ -46,6 +46,7 @@ export const sum = (...xs) => xs.reduce((a, b) => a + b, 0);
 
 /** Calls a two-argument callback as JS does. */
 export const combine = (f, a, b) => f(a, b);
+export const combineThree = (f, a, b, c) => f(a, b, c);
 
 export const sameCallback = (left, right) => left === right;
 

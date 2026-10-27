@@ -98,7 +98,8 @@ pub fn block<'n>(node: &'n Node, text: &str) -> Block<'n> {
 fn clause<'n>(node: &'n Node, text: &str) -> Option<Clause<'n>> {
     let mut tokens = node.child_tokens();
     let word = tokens.next()?;
-    let expr = node.nodes().next();
+    // Missing types and expressions are empty recovery nodes at 0..0.
+    let expr = node.nodes().next().filter(|n| n.range().1 > word.end);
     match word.text(text) {
         "description" => Some(Clause::Description(word, expr?)),
         "handle" => Some(Clause::Handle(word, expr?)),
@@ -109,9 +110,8 @@ fn clause<'n>(node: &'n Node, text: &str) -> Option<Clause<'n>> {
                 .child_tokens()
                 .filter(|t| t.kind == K::String)
                 .collect();
-            let mut nodes = node.nodes();
-            let ty = nodes.next()?;
-            let default = nodes.next();
+            let ty = expr?;
+            let default = node.nodes().nth(1).filter(|n| n.range().1 > word.end);
             Some(Clause::Param(Param {
                 flag: w == "flag",
                 word,

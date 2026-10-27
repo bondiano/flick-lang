@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::types::{Instance, Type, TypeDef};
 
 /// Bumped on every change of the schema.
-pub const IFACE_VERSION: u32 = 1;
+pub const IFACE_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -341,6 +341,27 @@ mod tests {
         insta::assert_snapshot!(json);
         let back = read(json.as_bytes(), "App.Shapes").expect("valid");
         assert_eq!(write(&back), json);
+    }
+
+    #[test]
+    fn capture_qualification_kind_round_trips() {
+        for value in [false, true] {
+            let mut interface =
+                interface_of("module App.Shapes exposing (answer)\nlet answer = 42\n");
+            let scheme = &mut interface.exports[0].scheme;
+            *scheme = Some(Type::Captured {
+                ty: Box::new(scheme.take().expect("answer has a type")),
+                captures: Box::new(Type::empty_row()),
+                value,
+            });
+            let json = write(&interface);
+            let encoded: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+            assert_eq!(encoded["exports"][0]["type"]["captured"]["value"], value);
+            assert_eq!(
+                read(json.as_bytes(), "App.Shapes").expect("valid interface"),
+                interface
+            );
+        }
     }
 
     #[test]

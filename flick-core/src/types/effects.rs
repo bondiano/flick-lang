@@ -259,11 +259,20 @@ impl Checker<'_> {
     /// its position allows: runtime arrows and `Eff` are covariant in their
     /// rows and results, and a pure function passes for a runtime one.
     pub fn subsume(&mut self, actual: &Type, expected: &Type, span: Span) -> super::unify::Unified {
+        if let Some(result) = self.subsume_bound(actual, expected, span) {
+            return result;
+        }
         let (a, e) = (self.whnf_captured(actual), self.whnf_captured(expected));
         if a.1.is_some() || e.1.is_some() {
             return self.subsume_captured((actual, a), (expected, e), span);
         }
         let (a, e) = (a.0, e.0);
+        if matches!((&a, &e), (Type::Fun { .. }, Type::Fun { .. })) {
+            let (left, right) = (self.implicit_captures(&a), self.implicit_captures(&e));
+            if left != a || right != e {
+                return self.subsume(&left, &right, span);
+            }
+        }
         match (&a, &e) {
             (
                 Type::Fun {
@@ -288,8 +297,9 @@ impl Checker<'_> {
                     }
                     (None, _) => {}
                 }
-                self.unify(p1, p2)?;
-                self.subsume(r1, r2, span)
+                self.subsume(p2, p1, span)?;
+                let result = self.value_bound((**r1).clone());
+                self.subsume(&result, r2, span)
             }
             _ => match (self.eff_parts(&a), self.eff_parts(&e)) {
                 (Some((s1, e1, r1)), Some((s2, e2, r2))) => {

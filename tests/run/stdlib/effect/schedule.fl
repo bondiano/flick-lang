@@ -139,7 +139,7 @@ let main () =
       from_result (Err (Flaky 0))
     })
   Platform.stdout_line ("repeat_or_else: " ++ show recovered)
-  Platform.stdout_line ("schedule: " ++ show (Effect.schedule (Schedule.recurs 2) (task { () })))
+  Platform.stdout_line ("schedule: " ++ show (Effect.schedule (Schedule.recurs 2) Effect.void))
   Platform.stdout_line
     ("schedule_from: "
       ++ show (Effect.schedule_from 5 (Schedule.passthrough (Schedule.recurs 1)) (task { 6 })))

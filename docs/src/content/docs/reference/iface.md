@@ -11,11 +11,11 @@ Until 0.1.0 the schema grows with the compiler: every change bumps
 `iface-version`, and a compiler rejects any version but its own with
 `FLICK-P010`. Release 0.1.0 freezes the version it ships with.
 
-## Version 5
+## Version 2
 
 ```json
 {
-  "iface-version": 1,
+  "iface-version": 2,
   "language": "0.7",
   "module": "App.Shapes",
   "exports": [
@@ -30,6 +30,9 @@ Until 0.1.0 the schema grows with the compiler: every change bumps
   ]
 }
 ```
+
+Rebuild dependencies written with an older schema; changing the version
+number by hand cannot recover missing capture information.
 
 | Field | Meaning |
 | - | - |
@@ -119,8 +122,17 @@ capture row with `^` and the region variable.
 | `{ x : T \| r }` | `{ "record": { "entries": [["x", T]], "tail": r } }` |
 | `{Users \| r}`, `none` | `{ "row": { "entries": [["App.Users.Users", …]], "tail": r } }`, `{ "row": { "entries": [] } }` |
 | `r1 + r2` | `{ "union": [r1, r2] }` |
-| `T^{s}` | `{ "captured": { "ty": T, "captures": { "row": { "entries": [["^s", { "var": "s" }]] } } } }` |
+| hidden qualifier `T^{s}` | `{ "captured": { "ty": T, "captures": { "row": { "entries": [["^s", { "var": "s" }]] } }, "value": false } }` |
+| whole generic bound `a^c` | `{ "bounded": { "ty": { "var": "a" }, "captures": { "var": "c" } } }` |
 | `forall a. C a => T` | `{ "forall": { "vars": [{ "name": "a", "kind": K }], "constraints": [C a], "body": T } }` |
+
+`bounded` refines a complete generic value's capture bound while preserving
+the underlying type and its qualifications. `captured` retains a hidden or
+stored qualifier. Its required `value` flag is `false` for an explicit or
+stored qualification and `true` when classification is deferred to a value
+boundary, for example while a higher-kinded head is unresolved. Importers
+must preserve both tags and the flag: replacing them with one qualifier or
+dropping a zero row can lose capture soundness. See [Regions and captures](../regions/).
 
 Kinds are `"type"`, `"service-row"`, `"error-row"`, `"capture-row"`,
 `"symbol"`, `"region"`, `"constraint"`, `"service"` (an element of a service

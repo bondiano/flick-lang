@@ -78,14 +78,12 @@ class Show a =
 /// Containers whose elements a pure function maps. A container may apply
 /// the function later, so the result keeps the captures of both.
 class Functor (f : Type -> Type) =
-  map : forall c d a b. (a -> b)^c -> ((f a)^d -> (f b)^(c + d))^c
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((f a)^d -> (f b)^(c + d))^c
 
 /// Containers folded from the first element to the last.
 class Foldable (f : Type -> Type) =
-  fold : forall c a b. (b -> a -> b)^c -> (b -> (f a -> b)^c)^c
+  fold : forall c a b. (b -> a -> b)^c -> (b^c -> (f a -> b)^c)^c
   /// The elements, each mapped by `f`, combined from `empty`.
-  // shortcut: `f` captures nothing, since the step of `fold` it is called in
-  // may not hold a capture; give it `^c` when stages of `fold` may.
   fold_map : forall a m. Monoid m => (a -> m) -> f a -> m
   let fold_map f xs = fold (fun acc x -> combine acc (f x)) empty xs
 
@@ -95,13 +93,16 @@ class Functor f => Traversable (f : Type -> Type) =
   traverse : forall c a b r e. (a ->{r; e} b)^c -> (f a ->{r; e} f b)^c
 
 class Functor f => Applicative (f : Type -> Type) =
-  pure : forall a. a -> f a
+  pure : forall c a. a^c -> (f a)^c
   /// `f` of the values of both, in order: for `List`, every pair.
   map2 :
-    forall c d a b x. (a -> b -> x)^c -> ((f a)^d -> ((f b)^d -> (f x)^(c + d))^(c + d))^c
+    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+      ((f a)^d -> ((f b)^d -> (f x)^(c + d))^(c + d))^c
 
 class Applicative m => Monad (m : Type -> Type) =
-  flat_map : forall c d a b. (a -> (m b)^d)^c -> ((m a)^d -> (m b)^(c + d))^c
+  flat_map :
+    forall c d a b. (forall v. a^v -> (m b)^(c + v))^c ->
+      ((m a)^d -> (m b)^(c + d))^c
 
 /// Applicative containers with a choice: `nothing` holds no value, and
 /// `or_else` keeps the first that holds one (`List` keeps both).

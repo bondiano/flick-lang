@@ -14,6 +14,11 @@ impl Checker<'_> {
     /// record stays linear.
     fn known_field(&self, record: &Type, label: &str) -> Option<Type> {
         let record = self.store.resolve(record);
+        if let Type::Captured { ty, captures, .. } | Type::Bounded { ty, captures } = &record {
+            return self
+                .known_field(ty, label)
+                .map(|field| self.data_field(&field, captures));
+        }
         let (head, args) = record.spine();
         let (row, subst) = match head {
             Type::Record(row) => (row, Vec::new()),
@@ -120,7 +125,12 @@ impl Checker<'_> {
         for span in labels {
             self.note_field(span, &declared);
         }
-        record
+        if expected.is_none() {
+            let captures = self.captures_of(&record);
+            self.data_value(&record, captures)
+        } else {
+            record
+        }
     }
 
     /// `{ r with f = v }` replaces existing fields with values of the same type.

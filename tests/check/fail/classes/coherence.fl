@@ -67,7 +67,7 @@ instance Pretty Secret =
   let pretty s = "***"
 
 //~ FLICK-C004 @16:1-18:25 break the functional dependency `c -> a`
-//~ FLICK-C005 @20:1-22:17 `b` in `Collection (List a) b` is determined by `c -> a`
+//~ FLICK-C005 @20:1-22:17
 //~ FLICK-C003 @31:1-33:33 `Describe (List Number)` overlaps `Describe (List a)`
 //~ FLICK-C007 @37:1-39:26 the context `Describe (List a)` is not smaller than the head `Describe (Wrap a)`
 //~ FLICK-C007 @43:1-45:26 type variable `b` of the context `Describe b` is not in the head

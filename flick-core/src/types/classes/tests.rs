@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 
+mod fd_coherence;
+mod fd_resolution;
+
 use super::Dict;
-use crate::iface::Interface;
+use crate::diagnostics::Diagnostic;
+use crate::iface::{self, Interface};
 use crate::resolve::{self, Module};
 use crate::source::SourceMap;
 use crate::syntax;
@@ -9,10 +13,10 @@ use crate::types::{Limits, Options, builtins, check_with_evidence};
 
 /// Checks `modules` in order, each seeing the interfaces of those before;
 /// returns the diagnostics and dictionaries of the last one.
-fn check_all(modules: &[(&str, &str)]) -> (Vec<String>, Vec<Dict>) {
+fn check_all(modules: &[(&str, &str)]) -> (Vec<Diagnostic>, Vec<Dict>) {
     let mut done: HashMap<String, Interface> = HashMap::new();
     let mut last = (Vec::new(), Vec::new());
-    for (name, text) in modules {
+    for (index, (name, text)) in modules.iter().enumerate() {
         let mut sources = SourceMap::default();
         let file = sources.add(format!("{name}.fl"), *text);
         let parse = syntax::parse(text, file);
@@ -26,6 +30,7 @@ fn check_all(modules: &[(&str, &str)]) -> (Vec<String>, Vec<Dict>) {
         };
         let imported = |m: &str| done.get(m).cloned();
         let (mut interface, mut diagnostics) = resolve::resolve(&module, &imported);
+        diagnostics.extend(parse.diagnostics);
         let local = |_: &str| true;
         let options = Options {
             local: &local,
@@ -37,11 +42,15 @@ fn check_all(modules: &[(&str, &str)]) -> (Vec<String>, Vec<Dict>) {
         let (more, evidence) =
             check_with_evidence(&module, &imported, builtins(), options, &mut interface);
         diagnostics.extend(more);
-        last = (
-            diagnostics.iter().map(|d| d.message.clone()).collect(),
-            evidence.into_iter().map(|(_, d)| d).collect(),
-        );
-        done.insert((*name).to_owned(), interface);
+        diagnostics.retain(|d| !d.unnecessary());
+        if index + 1 < modules.len() {
+            assert!(diagnostics.is_empty(), "{name}: {diagnostics:?}");
+            let encoded = iface::write(&interface);
+            let decoded = iface::read(encoded.as_bytes(), name).expect("interface round trip");
+            assert_eq!(decoded, interface);
+            done.insert((*name).to_owned(), decoded);
+        }
+        last = (diagnostics, evidence.into_iter().map(|(_, d)| d).collect());
     }
     last
 }
@@ -107,8 +116,13 @@ fn an_instance_is_seen_through_the_modules_that_depend_on_it() {
     let (diagnostics, _) = check_all(&[SHAPES, PRETTY, middle, ("App.Main", main)]);
     assert_eq!(diagnostics.len(), 1, "{diagnostics:?}");
     assert!(
-        diagnostics[0].contains("no instance for `Pretty Number`"),
+        diagnostics[0]
+            .message
+            .contains("no instance for `Pretty Number`"),
         "{diagnostics:?}"
     );
-    assert!(diagnostics[0].contains("`Pretty Shape`"), "{diagnostics:?}");
+    assert!(
+        diagnostics[0].message.contains("`Pretty Shape`"),
+        "{diagnostics:?}"
+    );
 }

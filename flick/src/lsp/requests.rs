@@ -81,6 +81,7 @@ impl Server {
             .snapshot
             .as_ref()
             .is_some_and(|s| s.context == context && s.file(path).is_some());
+        tracing::debug!(cached = fresh, "selecting analysis snapshot");
         if !fresh {
             self.snapshot = Some(analyze(&self.docs, path));
         }
@@ -250,6 +251,7 @@ impl Server {
                 .any(|d| d.code.area == Area::Syntax && d.span.is_some_and(|s| s.file == file)),
         };
         if broken && let Some(replacement) = completion_recovery(&text, word, cursor) {
+            tracing::debug!(word, cursor, "repairing syntax for completion");
             let mut docs = self.docs.clone();
             docs.insert(
                 path.clone(),
@@ -300,6 +302,7 @@ impl Server {
                 item
             })
             .collect();
+        tracing::debug!(items = items.len(), dotted, "completion ready");
         Ok(Value::Array(items))
     }
 }

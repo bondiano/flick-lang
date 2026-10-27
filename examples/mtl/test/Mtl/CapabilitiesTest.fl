@@ -1,0 +1,270 @@
+module Mtl.CapabilitiesTest exposing (tests)
+
+import Mtl.Classes exposing (..)
+import Mtl.Identity as Identity exposing (Identity)
+import Mtl.MaybeT as MaybeT exposing (MaybeT)
+import Mtl.StateT as StateT exposing (StateT)
+import Mtl.ReaderT as ReaderT exposing (ReaderT)
+import Mtl.WriterT as WriterT exposing (WriterT)
+import Mtl.ExceptT as ExceptT exposing (ExceptT)
+import App.Capabilities as Capabilities exposing (Stack)
+
+state_probe : forall m. MonadState m Number => m (List Number)
+let state_probe = do {
+  first <- get
+  same <- get
+  put first
+  restored <- get
+  put 7
+  seven <- get
+  put 7
+  put 9
+  nine <- get
+  old <- state (fun before -> (before, before + 2))
+  final <- get
+  pure [first, same, restored, seven, nine, old, final]
+}
+
+reader_probe : forall m. MonadReader m Number => m (List Number)
+let reader_probe = do {
+  before <- ask
+  inside <- local (fun n -> n + 10) ask
+  after <- ask
+  projected <- reader (fun n -> n * 2)
+  mapped <- map (fun n -> n * 2) ask
+  unchanged <- local (fun n -> n) ask
+  nested <- local (fun n -> n + 10) (local (fun n -> n * 2) ask)
+  composed <- local (fun n -> (n + 10) * 2) ask
+  pure [before, inside, after, projected, mapped, unchanged, nested, composed]
+}
+
+writer_probe : forall m. MonadWriter m (List String) => m ((Number, List String), Number)
+let writer_probe = do {
+  tell []
+  tell ["prefix"]
+  heard <- listen (do {
+    tell ["a"]
+    writer (7, ["b"])
+  })
+  changed <- pass (do {
+    tell ["c"]
+    tell ["d"]
+    pure (9, List.reverse)
+  })
+  tell ["suffix"]
+  pure (heard, changed)
+}
+
+error_probe : forall m. MonadError m String => m (Number, Number)
+let error_probe = do {
+  recovered <- catch_error
+    (fun problem -> pure (if problem == "bad" then 7 else 0))
+    (do { _ <- throw_error "bad"; pure 99 })
+  successful <- catch_error (fun _ -> throw_error "unexpected handler") (pure 8)
+  pure (recovered, successful)
+}
+
+state_cells : List Test.Test
+let state_cells = [
+  Test.test "MaybeT inherits every State operation" (fun () ->
+    action : MaybeT (StateT Number Identity) (List Number)
+    let action = state_probe
+    Test.equal (Some [3, 3, 3, 7, 9, 9, 11], 11)
+      (Identity.run (StateT.run (MaybeT.run action) 3))),
+  Test.test "StateT supplies every native State operation" (fun () ->
+    action : StateT Number Identity (List Number)
+    let action = state_probe
+    Test.equal ([3, 3, 3, 7, 9, 9, 11], 11)
+      (Identity.run (StateT.run action 3))),
+  Test.test "ReaderT inherits every State operation" (fun () ->
+    action : ReaderT String (StateT Number Identity) (List Number)
+    let action = state_probe
+    Test.equal ([3, 3, 3, 7, 9, 9, 11], 11)
+      (Identity.run (StateT.run (ReaderT.run action "scope") 3))),
+  Test.test "WriterT inherits every State operation without output" (fun () ->
+    action : WriterT (List String) (StateT Number Identity) (List Number)
+    let action = state_probe
+    Test.equal (([3, 3, 3, 7, 9, 9, 11], []), 11)
+      (Identity.run (StateT.run (WriterT.run action) 3))),
+  Test.test "ExceptT inherits every State operation" (fun () ->
+    action : ExceptT String (StateT Number Identity) (List Number)
+    let action = state_probe
+    Test.equal (Ok [3, 3, 3, 7, 9, 9, 11], 11)
+      (Identity.run (StateT.run (ExceptT.run action) 3))),
+]
+
+reader_cells : List Test.Test
+let reader_cells = [
+  Test.test "MaybeT inherits every Reader operation" (fun () ->
+    action : MaybeT (ReaderT Number Identity) (List Number)
+    let action = reader_probe
+    Test.equal (Some [5, 15, 5, 10, 10, 5, 30, 30])
+      (Identity.run (ReaderT.run (MaybeT.run action) 5))),
+  Test.test "StateT inherits every Reader operation without changing state" (fun () ->
+    action : StateT Number (ReaderT Number Identity) (List Number)
+    let action = reader_probe
+    Test.equal ([5, 15, 5, 10, 10, 5, 30, 30], 3)
+      (Identity.run (ReaderT.run (StateT.run action 3) 5))),
+  Test.test "ReaderT supplies every native Reader operation" (fun () ->
+    action : ReaderT Number Identity (List Number)
+    let action = reader_probe
+    Test.equal [5, 15, 5, 10, 10, 5, 30, 30]
+      (Identity.run (ReaderT.run action 5))),
+  Test.test "WriterT inherits every Reader operation without output" (fun () ->
+    action : WriterT (List String) (ReaderT Number Identity) (List Number)
+    let action = reader_probe
+    Test.equal ([5, 15, 5, 10, 10, 5, 30, 30], [])
+      (Identity.run (ReaderT.run (WriterT.run action) 5))),
+  Test.test "ExceptT inherits every Reader operation" (fun () ->
+    action : ExceptT String (ReaderT Number Identity) (List Number)
+    let action = reader_probe
+    Test.equal (Ok [5, 15, 5, 10, 10, 5, 30, 30])
+      (Identity.run (ReaderT.run (ExceptT.run action) 5))),
+]
+
+writer_cells : List Test.Test
+let writer_cells = [
+  Test.test "MaybeT inherits every Writer operation" (fun () ->
+    action : MaybeT (WriterT (List String) Identity) ((Number, List String), Number)
+    let action = writer_probe
+    Test.equal (Some ((7, ["a", "b"]), 9), ["prefix", "a", "b", "d", "c", "suffix"])
+      (Identity.run (WriterT.run (MaybeT.run action)))),
+  Test.test "StateT inherits every Writer operation and preserves state" (fun () ->
+    action : StateT Number (WriterT (List String) Identity) ((Number, List String), Number)
+    let action = writer_probe
+    Test.equal ((((7, ["a", "b"]), 9), 3), ["prefix", "a", "b", "d", "c", "suffix"])
+      (Identity.run (WriterT.run (StateT.run action 3)))),
+  Test.test "ReaderT inherits every Writer operation" (fun () ->
+    action : ReaderT Number (WriterT (List String) Identity) ((Number, List String), Number)
+    let action = writer_probe
+    Test.equal (((7, ["a", "b"]), 9), ["prefix", "a", "b", "d", "c", "suffix"])
+      (Identity.run (WriterT.run (ReaderT.run action 5)))),
+  Test.test "WriterT supplies every native Writer operation" (fun () ->
+    action : WriterT (List String) Identity ((Number, List String), Number)
+    let action = writer_probe
+    Test.equal (((7, ["a", "b"]), 9), ["prefix", "a", "b", "d", "c", "suffix"])
+      (Identity.run (WriterT.run action))),
+  Test.test "ExceptT inherits every Writer operation" (fun () ->
+    action : ExceptT String (WriterT (List String) Identity) ((Number, List String), Number)
+    let action = writer_probe
+    Test.equal (Ok ((7, ["a", "b"]), 9), ["prefix", "a", "b", "d", "c", "suffix"])
+      (Identity.run (WriterT.run (ExceptT.run action)))),
+]
+
+error_cells : List Test.Test
+let error_cells = [
+  Test.test "MaybeT inherits throw and catch" (fun () ->
+    action : MaybeT (ExceptT String Identity) (Number, Number)
+    let action = error_probe
+    Test.equal (Ok (Some (7, 8)))
+      (Identity.run (ExceptT.run (MaybeT.run action)))),
+  Test.test "StateT inherits throw and catch" (fun () ->
+    action : StateT Number (ExceptT String Identity) (Number, Number)
+    let action = error_probe
+    Test.equal (Ok ((7, 8), 3))
+      (Identity.run (ExceptT.run (StateT.run action 3)))),
+  Test.test "ReaderT inherits throw and catch" (fun () ->
+    action : ReaderT Number (ExceptT String Identity) (Number, Number)
+    let action = error_probe
+    Test.equal (Ok (7, 8))
+      (Identity.run (ExceptT.run (ReaderT.run action 5)))),
+  Test.test "WriterT inherits throw and catch without inventing output" (fun () ->
+    action : WriterT (List String) (ExceptT String Identity) (Number, Number)
+    let action = error_probe
+    Test.equal (Ok ((7, 8), []))
+      (Identity.run (ExceptT.run (WriterT.run action)))),
+  Test.test "ExceptT supplies native throw and catch" (fun () ->
+    action : ExceptT String Identity (Number, Number)
+    let action = error_probe
+    Test.equal (Ok (7, 8)) (Identity.run (ExceptT.run action))),
+]
+
+run_state : Number -> StateT Number Identity a -> (a, Number)
+let run_state initial action = Identity.run (StateT.run action initial)
+
+run_reader : Number -> ReaderT Number Identity a -> a
+let run_reader environment action = Identity.run (ReaderT.run action environment)
+
+run_writer : WriterT (List String) Identity a -> (a, List String)
+let run_writer action = Identity.run (WriterT.run action)
+
+laws : List Test.Test
+let laws = [
+  Test.property "State get/get, put-back, put/get, final put and state coherence"
+    (Gen.pair (Gen.int (0 - 20) 20) (Gen.int (0 - 20) 20)) (fun (initial, next) ->
+      twice : StateT Number Identity (Number, Number)
+      let twice = do { first <- get; second <- get; pure (first, second) }
+      once : StateT Number Identity (Number, Number)
+      let once = map (fun value -> (value, value)) get
+      put_back : StateT Number Identity Unit
+      let put_back = do { before <- get; put before }
+      put_get : StateT Number Identity Number
+      let put_get = do { put next; get }
+      put_value : StateT Number Identity Number
+      let put_value = do { put next; pure next }
+      last_put : StateT Number Identity Number
+      let last_put = do { put initial; put next; get }
+      combined : StateT Number Identity Number
+      let combined = state (fun before -> (before * 2, before + next))
+      expanded : StateT Number Identity Number
+      let expanded = do { before <- get; put (before + next); pure (before * 2) }
+      Test.all [
+        Test.equal (run_state initial once) (run_state initial twice),
+        Test.equal ((), initial) (run_state initial put_back),
+        Test.equal (run_state initial put_value) (run_state initial put_get),
+        Test.equal (run_state initial put_get) (run_state initial last_put),
+        Test.equal (run_state initial expanded) (run_state initial combined),
+      ]),
+  Test.property "Reader local identity/composition and reader coherence"
+    (Gen.int (0 - 20) 20) (fun environment ->
+      action : ReaderT Number Identity Number
+      let action = reader (fun n -> n * 3 + 1)
+      let nested = local (fun n -> n + 10) (local (fun n -> n * 2) action)
+      let composed = local (fun n -> (n + 10) * 2) action
+      mapped : ReaderT Number Identity Number
+      let mapped = map (fun n -> n * 3 + 1) ask
+      Test.all [
+        Test.equal (run_reader environment action)
+          (run_reader environment (local (fun n -> n) action)),
+        Test.equal (run_reader environment composed) (run_reader environment nested),
+        Test.equal (run_reader environment mapped) (run_reader environment action),
+      ]),
+  Test.property "Writer empty/ordered tell and writer coherence" (Gen.int (0 - 20) 20) (fun value ->
+    quiet : WriterT (List String) Identity Number
+    let quiet = do { tell []; pure value }
+    ordered : WriterT (List String) Identity Number
+    let ordered = do { tell ["a"]; tell ["b"]; pure value }
+    together : WriterT (List String) Identity Number
+    let together = do { tell ["a", "b"]; pure value }
+    written : WriterT (List String) Identity Number
+    let written = writer (value, ["a", "b"])
+    Test.all [
+      Test.equal (value, []) (run_writer quiet),
+      Test.equal (value, ["a", "b"]) (run_writer ordered),
+      Test.equal (run_writer together) (run_writer ordered),
+      Test.equal (run_writer together) (run_writer written),
+      Test.equal ((value, ["a", "b"]), ["a", "b"]) (run_writer (listen written)),
+    ]),
+  Test.test "full-stack workflow uses the actual generic lift and runner" (fun () ->
+    base : Identity Unit
+    let base = pure ()
+    successful : Stack Identity Number
+    let successful = do { Capabilities.lift_base base; Capabilities.workflow 2 }
+    failed : Stack Identity Number
+    let failed = do { Capabilities.lift_base base; Capabilities.workflow (0 - 1) }
+    Test.all [
+      Test.equal ((Ok 5, ["begin", "done"]), 15)
+        (Identity.run (Capabilities.run 3 10 successful)),
+      Test.equal ((Err "negative", ["begin"]), 10)
+        (Identity.run (Capabilities.run 3 10 failed)),
+    ]),
+]
+
+tests : List Test.Test
+let tests = [
+  Test.group "State capability matrix" state_cells,
+  Test.group "Reader capability matrix" reader_cells,
+  Test.group "Writer capability matrix" writer_cells,
+  Test.group "Error capability matrix" error_cells,
+  Test.group "capability laws and full stack" laws,
+]

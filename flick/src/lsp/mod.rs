@@ -5,6 +5,7 @@
 //! check` reports, positions converted to UTF-16.
 
 mod features;
+mod logging;
 mod protocol;
 mod requests;
 
@@ -13,14 +14,16 @@ use std::env;
 use std::fs;
 use std::io::{self, BufReader};
 use std::path::{MAIN_SEPARATOR, Path, PathBuf};
-use std::process::ExitCode;
+use std::process::{self, ExitCode};
 use std::sync::LazyLock;
+use std::time::Instant;
 
 use flick_core::diagnostics::{Diagnostic, Severity};
 use flick_core::project::{self, Analysis, Analyzed, Compilation, Host};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::{resolve, syntax, types};
 use serde_json::{Value, json};
+use tracing::{debug, debug_span, error, info, info_span, warn};
 
 use crate::sources;
 
@@ -114,8 +117,18 @@ impl Snapshot {
 
 /// Analyzes the project of `path` with `docs` over the files.
 pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path) -> Snapshot {
+    let started = Instant::now();
+    let _span =
+        debug_span!("analysis", path = %path.display(), open_documents = docs.len()).entered();
     if let Some(index) = builtin_index(path) {
-        return analyze_builtin(&canonical(path), index);
+        let snapshot = analyze_builtin(&canonical(path), index);
+        debug!(
+            modules = snapshot.analysis.modules.len(),
+            diagnostics = snapshot.analysis.diagnostics.len(),
+            elapsed = ?started.elapsed(),
+            "built-in analysis completed"
+        );
+        return snapshot;
     }
     let host = Overlay {
         docs: docs
@@ -169,6 +182,13 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path) -> Snapshot {
     roots.retain(|root| seen.insert(canonical(root)));
     let analysis = project::analyze(&host, &mut sources, found.as_ref(), &roots);
     let root = found.map_or(dir, |p| p.root);
+    debug!(
+        root = %root.display(),
+        modules = analysis.modules.len(),
+        diagnostics = analysis.diagnostics.len(),
+        elapsed = ?started.elapsed(),
+        "analysis completed"
+    );
     Snapshot {
         analysis,
         sources,
@@ -251,6 +271,12 @@ pub struct Server {
 }
 
 pub fn serve() -> ExitCode {
+    logging::init();
+    info!(
+        version = env!("CARGO_PKG_VERSION"),
+        pid = process::id(),
+        "language server started"
+    );
     let mut server = Server {
         docs: HashMap::new(),
         snapshot: None,
@@ -262,36 +288,66 @@ pub fn serve() -> ExitCode {
     loop {
         let message = match protocol::read(&mut input) {
             Ok(Some(m)) => m,
-            Ok(None) => return ExitCode::from(u8::from(!shut_down)),
+            Ok(None) => {
+                info!(
+                    shutdown = shut_down,
+                    reason = "eof",
+                    "language server stopped"
+                );
+                return ExitCode::from(u8::from(!shut_down));
+            }
             Err(err) => {
-                eprintln!("flick lsp: {err}");
+                error!(error = %err, "cannot read protocol message");
                 return ExitCode::FAILURE;
             }
         };
         let method = message["method"].as_str().unwrap_or("");
         let params = &message["params"];
+        let _span = info_span!(
+            "lsp.message",
+            method,
+            id = %message["id"],
+            uri = params["textDocument"]["uri"].as_str(),
+            line = params["position"]["line"].as_u64(),
+            character = params["position"]["character"].as_u64(),
+        )
+        .entered();
+        let started = Instant::now();
+        debug!("message received");
         match (method, message.get("id")) {
-            ("exit", _) => return ExitCode::from(u8::from(!shut_down)),
+            ("exit", _) => {
+                info!(
+                    shutdown = shut_down,
+                    reason = "exit",
+                    "language server stopped"
+                );
+                return ExitCode::from(u8::from(!shut_down));
+            }
             ("shutdown", Some(id)) => {
+                info!("shutdown requested");
                 shut_down = true;
                 server.send(&protocol::response(id, &Value::Null));
             }
             (_, Some(id)) => {
                 let reply = match server.request(method, params) {
                     Ok(result) => protocol::response(id, &result),
-                    Err((code, text)) => protocol::error(id, code, &text),
+                    Err((code, text)) => {
+                        warn!(code, error = %text, "request failed");
+                        protocol::error(id, code, &text)
+                    }
                 };
                 server.send(&reply);
             }
             (_, None) => server.notify(method, params),
         }
+        debug!(elapsed = ?started.elapsed(), "message handled");
     }
 }
 
 impl Server {
     fn send(&mut self, message: &Value) {
         if let Err(err) = protocol::write(&mut self.out, message) {
-            eprintln!("flick lsp: cannot write: {err}");
+            error!(error = %err, "cannot write protocol message");
         }
     }
 

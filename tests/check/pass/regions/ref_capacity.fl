@@ -1,0 +1,51 @@
+// Reads and writes preserve capacity; a callback need not fit the cell
+// when it computes a copy-only value instead of storing its captures.
+module App.RefCapacity exposing (..)
+
+type Handle (s : Region)
+
+make_capacity : forall c a. a^c ->{} Ref (a^c)
+let make_capacity value = Ref.make value
+
+read_capacity : forall c a. (Ref a)^c ->{} a^c
+let read_capacity ref = Ref.get ref
+
+write_capacity : forall c a. (Ref a)^c -> (a^c ->{} a^c)^c
+let write_capacity ref value =
+  Ref.set ref value
+  ignore (Ref.get_and_set ref value)
+  Ref.set_and_get ref value
+
+update_capacity : forall c d a. (Ref a)^c -> ((a^c -> a^c)^d ->{} a^c)^c
+let update_capacity ref f =
+  Ref.update ref f
+  ignore (Ref.get_and_update ref f)
+  Ref.update_and_get ref f
+
+partial_capacity : forall c d a. (Ref a)^c -> ((a^c -> (Option a)^c)^d ->{} a^c)^c
+let partial_capacity ref f =
+  Ref.update_some ref f
+  ignore (Ref.get_and_update_some ref f)
+  Ref.update_some_and_get ref f
+
+copy_only_updates : forall s. Handle s ->{} (Ref Number)^{}
+let copy_only_updates handle =
+  let ref = Ref.make 0
+  Ref.update ref (fun current ->
+    ignore handle
+    current + 1)
+  Ref.update_some ref (fun current ->
+    ignore handle
+    Some (current + 1))
+  let next = Ref.modify ref (fun current ->
+    ignore handle
+    (current + 1, current + 1))
+  Ref.set ref next
+  ref
+
+log_updates : Unit ->{} (List String)^{}
+let log_updates () =
+  let ref = Ref.make []
+  Ref.update ref (fun lines -> lines ++ ["first"])
+  Ref.update_some ref (fun lines -> Some (lines ++ ["second"]))
+  Ref.get ref

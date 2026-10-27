@@ -241,19 +241,28 @@ Defaults, normalization, partial transformations and effectful lookup do not get
 `Ref` is conveniently provided by ordinary library functions. The language must understand their runtime arrow and apply the generalization rule from section 5.
 
 ```text
-Ref.make : a ->{} Ref a
-Ref.get : Ref a ->{} a
+Ref.make : forall c a. a^c ->{} Ref (a^c)
+Ref.get : forall c a. (Ref a)^c ->{} a^c
 
 Ref.set :
   forall c a.
-  (Ref a)^c -> (a ->{} Unit)^c
+  (Ref a)^c -> (a^c ->{} Unit)^c
 
 Ref.modify :
-  forall c d a b.
-  (Ref a)^c -> ((a -> (b, a))^d ->{} b)^c
+  forall c d x a b.
+  (Ref a)^c -> ((a^c -> (b^x, a^c))^d ->{} b^x)^c
 ```
 
-Ref is invariant in its contents. A partial application of set/modify holds the cell and its captures; a runtime write additionally checks the lifetime of the contents.
+`make` records `c` in the invariant type argument `a^c`: it is the cell's
+stable capacity for captures, not only a bound on its current value.
+The receivers of `get`, `set` and `modify` still use the outer `(Ref a)^c`.
+Widening that outer bound on an alias cannot widen the stored payload type
+or permit a replacement with shorter-lived captures.
+
+`d` bounds the callback's captures, not what it writes; `x` independently
+bounds the returned result `b^x`. A callback may use a scoped value to compute
+a copy without storing it. A partial application of `set` or `modify` holds
+the cell and its captures; every write must preserve the invariant payload type.
 
 ```flick
 increment : Ref Number ->{} Number

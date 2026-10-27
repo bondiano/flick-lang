@@ -124,6 +124,7 @@ impl Checker<'_> {
 
     /// Converts a type of kind `expected`, keeping the variables it brings
     /// into scope for the caller to collect.
+    #[allow(clippy::too_many_lines)]
     pub fn ty(&mut self, node: &Node, expected: &Kind, free: Free) -> Type {
         let span = self.span(node);
         let children: Vec<&Node> = node.nodes().collect();
@@ -199,12 +200,17 @@ impl Checker<'_> {
                     return base;
                 };
                 let captures = self.capture(capture, free);
-                if matches!(&captures, Type::Row(r) if r.entries.is_empty() && r.tail.is_none()) {
-                    return base;
-                }
-                return Type::Captured {
-                    ty: Box::new(base),
-                    captures: Box::new(captures),
+                return if matches!(&base, Type::Var(_) | Type::Meta(_) | Type::Skolem(_)) {
+                    Type::Bounded {
+                        ty: Box::new(base),
+                        captures: Box::new(captures),
+                    }
+                } else {
+                    Type::Captured {
+                        ty: Box::new(base),
+                        captures: Box::new(captures),
+                        value: false,
+                    }
                 };
             }
             K::ForallType => return self.forall(node, &children, expected, free),

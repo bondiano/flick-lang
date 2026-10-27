@@ -3,6 +3,7 @@
 //! Positions are UTF-8 byte offsets; the language server converts them.
 
 mod actions;
+mod cli;
 mod complete;
 mod enrich;
 mod fields;
@@ -128,9 +129,12 @@ impl Ide<'_> {
         if let Some(symbol) = self.module_at(m, offset) {
             return Some(symbol);
         }
-        if let Some((range, r)) = tree::innermost(m.typing.names.iter(), offset) {
-            let node = tree::find(&m.tree, range)?;
-            let token = tree::last_name(node)?;
+        if let Some((range, r)) = tree::innermost(m.typing.names.iter(), offset)
+            && let Some(node) = tree::find(&m.tree, range)
+            && let Some(token) = tree::last_name(node)
+            && token.start <= offset
+            && offset <= token.end
+        {
             let at = (token.start, token.end);
             let symbol = match r {
                 Ref::Local => {
@@ -191,24 +195,47 @@ impl Ide<'_> {
             {
                 continue;
             }
-            if !matches!(node.kind, K::NameExpr | K::NameType | K::ModulePath) {
+            if !matches!(
+                node.kind,
+                K::NameExpr | K::NameType | K::ModulePath | K::ImportDecl
+            ) {
                 continue;
             }
             let mut names: Vec<_> = node
                 .child_tokens()
                 .filter(|t| matches!(t.kind, K::Con | K::Ident))
                 .collect();
-            if node.kind != K::ModulePath {
+            if matches!(node.kind, K::NameExpr | K::NameType) {
                 names.pop();
             }
             if !names.iter().any(|t| t.start <= offset && offset < t.end) {
                 continue;
             }
-            let module = names
-                .iter()
-                .map(|t| t.text(text))
-                .collect::<Vec<_>>()
-                .join(".");
+            let module = if node.kind == K::ImportDecl {
+                node.nodes()
+                    .find(|n| n.kind == K::ModulePath)?
+                    .text(text)
+                    .split_whitespace()
+                    .collect()
+            } else {
+                let qualifier = names
+                    .iter()
+                    .map(|t| t.text(text))
+                    .collect::<Vec<_>>()
+                    .join(".");
+                if node.kind == K::ModulePath {
+                    qualifier
+                } else {
+                    m.tree
+                        .nodes()
+                        .find(|n| {
+                            n.kind == K::ImportDecl
+                                && tree::name_of(n, K::Con, text) == Some(qualifier.as_str())
+                        })
+                        .and_then(|n| n.nodes().find(|p| p.kind == K::ModulePath))
+                        .map_or(qualifier, |p| p.text(text).split_whitespace().collect())
+                }
+            };
             if self.interface(&module).is_some() {
                 return Some((
                     Symbol::Module(module),
@@ -280,5 +307,9 @@ fn entity(module: &str, namespace: Namespace, name: &str) -> Symbol {
 }
 #[cfg(test)]
 mod hints_tests;
+#[cfg(test)]
+mod hover_tests;
+#[cfg(test)]
+mod pattern_tests;
 #[cfg(test)]
 mod tests;

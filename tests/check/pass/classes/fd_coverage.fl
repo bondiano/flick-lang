@@ -1,0 +1,57 @@
+// Coverage closes over context FDs, including instantiated superclasses.
+module App.FdCoverage exposing (..)
+
+type Wrap a = Wrap a
+type Pair a b = Pair a b
+type Ground = Ground
+type alias Wrapped a = Wrap a
+
+class Base a b | a -> b
+class Base a b => Middle a b
+class Middle a b => Top a b
+class (Base a b, Base c d) => Branches a b c d
+class Join a b c | a b -> c
+class Global a | -> a
+
+class Covered key output | key -> output
+instance Base a b => Covered (Wrap a) b
+
+class SuperCovered key output | key -> output
+instance Top a b => SuperCovered (Wrap a) b
+
+// Both applications of Base must survive superclass traversal.
+class Both key left right | key -> left right
+instance Branches a b c d => Both (Pair a c) b d
+
+class Multi key output | key -> output
+instance Join a b c => Multi (Pair a b) c
+
+// Empty variable sets fire for empty and ground determining arguments.
+class EmptyCovered key output | key -> output
+instance Global b => EmptyCovered (Wrap Ground) b
+
+class GroundCovered key output | key -> output
+instance Base Number b => GroundCovered (Wrap Ground) b
+
+class Constant output | -> output
+instance Global b => Constant (List b)
+
+class Structured key output | key -> output
+instance Base a b => Structured (Wrap a) (List b)
+
+class AliasCovered key output | key -> output
+instance Base a b => AliasCovered (Wrapped a) b
+
+class Repeated key output | key -> output
+instance Base a b => Repeated (Wrap a) (b, b)
+
+// A seeded cycle reaches a finite fixed point.
+class Seeded key left right | key -> left right
+instance (Base a b, Base b c, Base c b) => Seeded (Wrap a) b c
+
+// Each head FD starts with its own determining variables.
+class Independent left right output | left -> output, right -> output
+instance (Base a c, Base b c) => Independent (Wrap a) (Wrap b) c
+
+class GroundOnly key output | key -> output
+instance GroundOnly Number String

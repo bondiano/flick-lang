@@ -5,6 +5,8 @@
 mod common;
 #[path = "lsp_command/isolation.rs"]
 mod isolation;
+#[path = "lsp_command/logging.rs"]
+mod logging;
 mod lsp_editor;
 
 use std::fmt::Write as _;

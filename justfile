@@ -8,6 +8,7 @@ lint:
     cargo fmt --all --check
     cargo clippy --workspace --all-targets -- -D warnings
     cargo clippy -p flick-wasm --target wasm32-unknown-unknown -- -D warnings
+    cargo machete
 
 # Format everything
 fmt:

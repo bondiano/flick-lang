@@ -53,24 +53,64 @@ open. The decisions below are taken and described in the reference.
 
 ## Instances of user types
 
-Found writing the MTL example (`examples/mtl`, roadmap D15). A program can
-declare classes with functional dependencies over the built-in monads
-(`MonadError e m | m -> e` for `Result e` and `Option`) and write `do`
-programs over them, but it cannot yet give its own types instances of
-`Applicative` or `Monad`, so the transformers `Identity`, `StateT`,
-`ReaderT`, `WriterT` and `ExceptT` are not expressible. The capture checker
-rejects them for two reasons:
+The [MTL example](https://github.com/bondiano/flick-lang/tree/main/examples/mtl)
+defines `Functor`, `Applicative` and `Monad` instances in Flick for
+[Identity](https://github.com/bondiano/flick-lang/blob/main/examples/mtl/src/Mtl/Identity.fl),
+[MaybeT](https://github.com/bondiano/flick-lang/blob/main/examples/mtl/src/Mtl/MaybeT.fl),
+[StateT](https://github.com/bondiano/flick-lang/blob/main/examples/mtl/src/Mtl/StateT.fl),
+[ReaderT](https://github.com/bondiano/flick-lang/blob/main/examples/mtl/src/Mtl/ReaderT.fl),
+[WriterT](https://github.com/bondiano/flick-lang/blob/main/examples/mtl/src/Mtl/WriterT.fl)
+and [ExceptT](https://github.com/bondiano/flick-lang/blob/main/examples/mtl/src/Mtl/ExceptT.fl).
+They use ordinary constructors, pattern matching and `do`; no transformer
+primitive or foreign implementation is needed.
 
-- the stage of `map2` after its first container holds that container, and
-  a value of `(f a)^d` holds `d` and the captures of its elements `a`; the
-  signature allows `c + d`, and a capture row cannot name a type variable
-  (`^(c + d + a)` is `FLICK-T002`), so a curried `map2` written in Flick is
-  `FLICK-G001`. The built-in instances call foreign functions instead;
-- a constructor's fields carry no captures, so a type such as
-  `StateT (s -> m (a, s))` cannot hold the closure its `map` or
-  `flat_map` builds over `f`.
+Three capture rules make these instances expressible:
 
-Both need the type system to change: capture rows over the captures of a
-type variable, or types with a capture parameter. Until then the laws of
-the built-in instances and the sugar are checked as property tests in
-`examples/mtl/test`, with `Gen.function` for random pure functions.
+- A generic bound `a^c` bounds the complete value, including its existing
+  qualifications; it does not add `c` to an otherwise unknown capture set.
+  A function or nominal wrapper may still need a hidden-capture qualifier.
+- Curried stages retain generic values as well as named regions.
+  Constructors retain their fields' captures, and patterns project the
+  enclosing bound back to fields, including delayed computations.
+- Prelude callbacks are capture-polymorphic per invocation: for example,
+  `flat_map` takes `(forall v. a^v -> (m b)^(c + v))^c`.
+  `v` is independent of the computation's bound `d`: a `StateT` state or
+  `ReaderT` environment can arrive only when the computation is run.
+
+These are bounds, not erasure: concrete scoped regions and explicit stored
+qualifications survive substitution, and mutable storage stays invariant.
+See [Regions and captures](../../reference/regions/).
+
+To use the layers, follow [App.Plan](https://github.com/bondiano/flick-lang/blob/main/examples/mtl/src/App/Plan.fl):
+
+```flick
+type alias Planner a = MaybeT (StateT PlanState (ReaderT Config Identity)) a
+```
+
+Its `do` program imports `ask`, `get` and `put` from `Mtl.Classes`; inherited
+capability instances cross the intervening layers automatically. The shared
+`MonadTrans.lift` deliberately reaches an explicitly typed inner action.
+Run the stack from outside in: `MaybeT.run`, `StateT.run` with initial state,
+`ReaderT.run` with configuration, then `Identity.run`. Failure preserves the
+state of completed steps; the default planner CLI remains unchanged.
+
+`MonadState`, `MonadReader`, `MonadWriter` and `MonadError` put the monad first,
+with an FD from it to the capability's payload. Coverage closes determining
+head variables over the context's dependencies and instantiated superclasses.
+Coherent selection still uses complete heads, never context search; structural
+context restrictions and solver budgets remain mandatory. Each transformer
+owns its instances, and the outermost repeated native capability wins.
+
+`pass` stores a rank-1 `(w -> w)^c` modifier independently of the action bound;
+putting a polymorphic `forall` inside its tuple would require impredicative
+instantiation. Explicit local reshape annotations retain this stored qualifier.
+Actual later-supplied state/environment captures still reach the result.
+`catch_error` is handler-first and catches domain errors, not typed Eff errors,
+defects or interruption. StateT outside ExceptT restarts the handler at entry
+state; WriterT outside ExceptT cannot return a failed output pair. Reversing
+those layers preserves the state or log before the domain error.
+
+The D15 example includes all five MonadTrans instances, the 20 capability
+paths, laws and an `App.Capabilities` workflow over Identity and a cold Eff base.
+This is the enumerated D15 set, not all Haskell transformers. No transformer
+primitive, quantified MonadTrans superclass or Eff runtime adapter is needed.

@@ -32,7 +32,7 @@ let main () =
   let port = start ()
   let devtools = { url = "ws://127.0.0.1:" ++ show port; headers = [("x-token", "secret")] }
   provide (DevTools.layer_with devtools) {
-    Tracer.with_span "checkout" options (task { () })
+    Tracer.with_span "checkout" options Effect.void
     Platform.stdout_line ("token: " ++ token ())
   }
   stop ()

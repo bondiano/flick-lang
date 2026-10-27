@@ -133,13 +133,14 @@ impl Store {
                     Type::Row(row)
                 }
             }
-            // a qualifier that came out empty is no qualifier
-            Type::Captured { ty, captures } => match self.zonk(captures) {
-                Type::Row(row) if row.entries.is_empty() && row.tail.is_none() => self.zonk(ty),
-                captures => Type::Captured {
-                    ty: Box::new(self.zonk(ty)),
-                    captures: Box::new(captures),
-                },
+            Type::Captured {
+                ty,
+                captures,
+                value,
+            } => Type::Captured {
+                ty: Box::new(self.zonk(ty)),
+                captures: Box::new(self.zonk(captures)),
+                value: *value,
             },
             _ => t.map_children(&mut |c| self.zonk(c)),
         }
@@ -279,22 +280,41 @@ impl Checker<'_> {
 
     /// [`Self::whnf`], and the capture row of the qualifiers taken off.
     pub fn whnf_captured(&self, t: &Type) -> (Type, Option<Type>) {
-        let mut t = self.store.resolve(t);
+        let mut t = self.qualified_head(t);
         let mut captures: Option<Type> = None;
         for _ in 0..64 {
-            if let Type::Captured { ty, captures: c } = t {
-                captures = Some(match captures {
-                    Some(outer) => Type::Union(Box::new(outer), c),
-                    None => *c,
-                });
-                t = self.store.resolve(&ty);
-                continue;
+            match t {
+                Type::Captured {
+                    ty, captures: c, ..
+                }
+                | Type::Bounded { ty, captures: c } => {
+                    captures = Some(match captures {
+                        Some(outer) => Type::Union(Box::new(outer), c),
+                        None => *c,
+                    });
+                    t = self.qualified_head(&ty);
+                }
+                _ => break,
             }
+        }
+        (t, captures)
+    }
+
+    /// Head reduction without erasing the distinction between hidden
+    /// captures and a refinement of a complete generic type.
+    pub fn qualified_head(&self, t: &Type) -> Type {
+        let mut t = self.store.resolve(t);
+        for _ in 0..64 {
             if let Some(reduced) = self.project(&t) {
                 t = self.store.resolve(&reduced);
                 continue;
             }
             let (head, args) = t.spine();
+            let resolved = self.store.resolve(head);
+            if resolved != *head {
+                t = Type::apps(resolved, args.into_iter().cloned());
+                continue;
+            }
             let Type::Con { module, name } = head else {
                 break;
             };
@@ -311,13 +331,12 @@ impl Checker<'_> {
                 .cloned()
                 .zip(args.iter().map(|a| (*a).clone()))
                 .collect();
-            let expanded = Type::apps(
+            t = self.store.resolve(&Type::apps(
                 body.substitute(&subst),
                 args[params.len()..].iter().map(|a| (*a).clone()),
-            );
-            t = self.store.resolve(&expanded);
+            ));
         }
-        (t, captures)
+        t
     }
 
     /// The fixed projections of a row into a type, once the row is known
@@ -381,13 +400,68 @@ impl Checker<'_> {
         })
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn unify(&mut self, a: &Type, b: &Type) -> Unified {
-        if self.same_application(a, b) {
+        let (mut left, mut right) = (self.bound_head(a), self.bound_head(b));
+        if matches!(&left, Type::Captured { value: true, .. })
+            || matches!(&right, Type::Captured { value: true, .. })
+        {
+            let (x, y) = (self.whnf(&left), self.whnf(&right));
+            if let (Type::App { head: x, .. }, Type::App { head: y, .. }) = (&x, &y)
+                && (matches!(self.store.resolve(x), Type::Meta(_))
+                    || matches!(self.store.resolve(y), Type::Meta(_)))
+            {
+                self.unify(x, y)?;
+                (left, right) = (self.bound_head(a), self.bound_head(b));
+            }
+        }
+        match (&left, &right) {
+            (
+                Type::Bounded {
+                    ty: x,
+                    captures: cx,
+                },
+                Type::Bounded {
+                    ty: y,
+                    captures: cy,
+                },
+            ) => {
+                self.unify(cx, cy)?;
+                let (x, y) = (self.capture_identity(x), self.capture_identity(y));
+                return self.unify(&x, &y);
+            }
+            (Type::Bounded { .. } | Type::Captured { .. }, Type::Meta(m)) => {
+                return self.bind(*m, &left);
+            }
+            (Type::Meta(m), Type::Bounded { .. } | Type::Captured { .. }) => {
+                return self.bind(*m, &right);
+            }
+            (Type::Bounded { ty, captures }, other) | (other, Type::Bounded { ty, captures }) => {
+                // A function holds what its qualifier says, not its parameter
+                // or result types; only data holds the captures its parts show.
+                let held = if matches!(self.whnf(other), Type::Fun { .. }) {
+                    Type::empty_row()
+                } else {
+                    self.captures_of(other).into_type()
+                };
+                self.unify(captures, &held)?;
+                let identity = self.capture_identity(ty);
+                return self.unify(&identity, other);
+            }
+            _ => {}
+        }
+        if self.same_application(&left, &right) {
             return Ok(());
         }
-        let ((a, ca), (b, cb)) = (self.whnf_captured(a), self.whnf_captured(b));
+        let ((a, ca), (b, cb)) = (self.whnf_captured(&left), self.whnf_captured(&right));
         if ca.is_some() || cb.is_some() {
             return self.unify_captured((a, ca), (b, cb));
+        }
+        if matches!((&a, &b), (Type::Fun { .. }, Type::Fun { .. })) {
+            let (left, right) = (self.implicit_captures(&a), self.implicit_captures(&b));
+            if left != a || right != b {
+                return self.unify(&left, &right);
+            }
         }
         if let Some(result) = self
             .unify_errors(&a, &b)
@@ -501,7 +575,16 @@ impl Checker<'_> {
     /// class constraints become constraints to solve, required at `span`.
     pub fn instantiate(&mut self, t: &Type, span: Span) -> Type {
         match self.store.resolve(t) {
-            Type::Captured { ty, captures } => Type::Captured {
+            Type::Captured {
+                ty,
+                captures,
+                value,
+            } => Type::Captured {
+                ty: Box::new(self.instantiate(&ty, span)),
+                captures,
+                value,
+            },
+            Type::Bounded { ty, captures } => Type::Bounded {
                 ty: Box::new(self.instantiate(&ty, span)),
                 captures,
             },
@@ -534,7 +617,13 @@ impl Checker<'_> {
             } => {
                 let subst: Vec<(String, Type)> = vars
                     .iter()
-                    .map(|v| (v.name.clone(), self.store.skolem(&v.name)))
+                    .map(|v| {
+                        let ty = self.store.skolem(&v.name);
+                        if let Type::Skolem(s) = &ty {
+                            self.regions.rigid_kinds.push((*s, v.kind.clone()));
+                        }
+                        (v.name.clone(), ty)
+                    })
                     .collect();
                 let (body, mut more, mut givens) = self.skolemize(&body.substitute(&subst));
                 more.splice(0..0, subst.iter().cloned());

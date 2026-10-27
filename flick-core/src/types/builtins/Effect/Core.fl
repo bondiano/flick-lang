@@ -6,6 +6,12 @@ module Effect.Core exposing (..)
 /// `n`, or all of them.
 type Concurrency = Sequential | Bounded Number | Unbounded
 
+/// A reusable cold task that succeeds with `()`, requires no services and
+/// has no expected errors. Use it instead of an empty `task` body.
+void : Eff none none Unit
+foreign pure void from "@flick-lang/runtime/effect/Effect" "void"
+  reviewed "effect@4.0.5 sha256:f4001e59cfd15a7d"
+
 /// Suspends the fiber for the duration.
 sleep : Duration.Duration ->{} Unit
 foreign effect sleep from "@flick-lang/runtime/effect/Effect" "sleep"

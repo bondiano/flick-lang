@@ -2,9 +2,16 @@
 title: "Тестирование"
 ---
 
+Установите проверку зависимостей, используемую локально и в CI:
+
+```sh
+cargo install cargo-machete --version 0.9.2 --locked
+```
+
 | Команда | Что запускается |
 | - | - |
-| `just check` | fmt, clippy (`-D warnings`, в том числе для `wasm32`), `cargo test --workspace` |
+| `just lint` | fmt, clippy (`-D warnings`, в том числе для `wasm32`), `cargo machete` (неиспользуемые зависимости Rust) |
+| `just check` | `just lint`, `cargo test --workspace` |
 | `just e2e` | `pnpm install --frozen-lockfile`, тесты среды выполнения, `tests/run/**` на Node, `flick test` на примерах проектов |
 | `just bundle-size` | release-сборки `tools/bundle-size/pure.fl`, `tests/run/ui/counter.fl`, `tests/run/ui/atoms.fl` и плейграунда, собранные для браузера через rolldown; падает, если размер в gzip превышает бюджет из `tools/bundle-size/index.mjs` |
 

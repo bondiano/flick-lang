@@ -72,11 +72,27 @@ Instances are canonical. The checker rejects an instance when:
 | Rule | Code |
 | - | - |
 | its head unifies with another instance's, after aliases are expanded; the context does not choose | `FLICK-C003` |
-| two heads agree on the determining types of a dependency but not on the determined ones | `FLICK-C004` |
-| a variable of the determined part does not appear in the determining part (strict coverage) | `FLICK-C005` |
+| determining arguments unify but the determined arguments disagree, or a non-overlapping pair needs further output bindings to agree | `FLICK-C004` |
+| a determined variable is not covered by the determining head arguments and the context's dependencies | `FLICK-C005` |
 | neither the class nor the nominal type at the head of its first type belongs to this package | `FLICK-C006` |
 | a context variable is not in the head, or a context constraint is not smaller than the head or repeats a variable more often | `FLICK-C007` |
 | it is for a row primitive, or for `Eq`, `Ord`, `Hash`, `Show` of a record or tuple | `FLICK-C012` |
+
+Coverage starts with the variables in a dependency's determining head
+arguments. The checker repeatedly adds variables determined by the instance
+context and its instantiated superclasses, only when all inputs of that
+dependency are covered. Each dependency of the instance head is checked
+independently; unrelated constraints and unseeded cycles add nothing.
+Aliases are expanded first. This admits ordinary capability lifting:
+
+```flick
+instance MonadState m s => MonadState (ReaderT r m) s
+```
+
+The head determines `m`, and the context's `m -> s` determines `s`.
+Context-assisted coverage does not allow context-based instance selection.
+Heads alone must be coherent: for non-overlapping heads whose determining
+arguments unify, their outputs must be equal under that substitution alone.
 
 Ownership goes by package: a project's source and test modules are one
 package, each dependency another, the built-in modules a third. A transparent
@@ -115,8 +131,10 @@ is generalized keeps the variables of unsolved constraints monomorphic.
 | resolution exceeds its budget; the message shows the chain of constraints | `FLICK-C009` |
 
 The budget is per definition: `solver-steps` (100 000) and `solver-depth`
-(256 nested constraints) in `[build]` of `flick.toml`. Running out is never a
-success.
+(256 nested constraints) in `[build]` of `flick.toml`. Structural context
+restrictions still apply, but context-assisted FD improvement is not a proof
+of unbounded termination. Every resolution and improvement retry consumes
+the budget; running out is never a success.
 
 ## Records and tuples
 

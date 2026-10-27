@@ -3,7 +3,7 @@ source: flick-core/src/build/mod.rs
 expression: json
 ---
 {
-  "iface-version": 1,
+  "iface-version": 2,
   "language": "0.7",
   "module": "App.Shapes",
   "exports": [
@@ -40,9 +40,19 @@ expression: json
             }
           },
           "result": {
-            "con": {
-              "module": "App.Shapes",
-              "name": "Shape"
+            "captured": {
+              "ty": {
+                "con": {
+                  "module": "App.Shapes",
+                  "name": "Shape"
+                }
+              },
+              "captures": {
+                "row": {
+                  "entries": []
+                }
+              },
+              "value": false
             }
           }
         }
@@ -75,9 +85,19 @@ expression: json
                 }
               },
               "result": {
-                "con": {
-                  "module": "App.Shapes",
-                  "name": "Shape"
+                "captured": {
+                  "ty": {
+                    "con": {
+                      "module": "App.Shapes",
+                      "name": "Shape"
+                    }
+                  },
+                  "captures": {
+                    "row": {
+                      "entries": []
+                    }
+                  },
+                  "value": false
                 }
               }
             }

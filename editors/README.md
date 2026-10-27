@@ -28,6 +28,12 @@ to `file:///path/to/flick-lang` while developing). Then run
 
 After changing `grammar.js` or `src/scanner.c`, run `just tree-sitter`
 (needs the `tree-sitter` CLI) and commit the regenerated `src/`.
+The command also checks `test/highlight` assertions against Zed's
+`highlights.scm`; parser corpus tests alone do not validate that query.
+The `cli` clause words (`description`, `flag`, `arg`, …) still highlight as
+plain variables: a keyword capture on the same identifier collides with the
+generic identifier rule, so precise coloring belongs to the language server's
+semantic tokens instead.
 
 The `Release` workflow publishes `flick` archives for macOS, Linux and Windows
 (aarch64 and x86_64) when a `v*` tag is pushed. The tag must match the versions
@@ -39,7 +45,8 @@ downloads that exact release, not the latest one.
 `flick lsp --stdio` serves diagnostics (errors and warnings, as `flick
 check` reports them, when a document is opened or saved), hover with the source type and the
 `///` documentation of public and private values (including inferred locals
-and the `ignore` keyword), definition, type definition, references, completion,
+and the `ignore` keyword), generic type aliases and decoded `codec` fields,
+definition, type definition, references, completion,
 signature help, rename, quick fixes and refactors, document and workspace
 symbols, semantic tokens, folding, inlay hints and formatting (see
 `docs/src/content/docs/reference/editor.md`). Both editors format on save

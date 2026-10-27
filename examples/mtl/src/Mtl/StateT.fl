@@ -1,0 +1,114 @@
+/// Thread state through an inner computation using `s -> m (a, s)`.
+///
+/// Each action receives the preceding action's final state. `map2` therefore
+/// needs `Monad m`, even for an applicative `and` group: the left action must
+/// finish before the right action can receive its state.
+/// `run` supplies the initial state and exposes both the result and final state
+/// inside `m`; an inner failure can still prevent that pair from being returned.
+module Mtl.StateT exposing (StateT(..), run)
+
+import Mtl.Classes exposing (
+  MonadTrans(..),
+  MonadState(..),
+  MonadReader(..),
+  MonadWriter(..),
+  MonadError(..),
+)
+
+/// A delayed state transition returning a value and the next state inside `m`.
+type StateT s (m : Type -> Type) a = StateT (s -> m (a, s))
+
+/// Supply the initial state and remove this layer, yielding `m (a, s)`.
+run :
+  forall c d s m a. (StateT s m a)^c ->
+    (s^d -> (m (a, s))^(c + d))^c
+let run (StateT step) state = step state
+
+instance Functor m => Functor (StateT s m) =
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((StateT s m a)^d -> (StateT s m b)^(c + d))^c
+  let map f (StateT step) =
+    StateT (fun state -> map (fun (value, next) -> (f value, next)) (step state))
+
+instance Monad m => Applicative (StateT s m) =
+  pure : forall c a. a^c -> (StateT s m a)^c
+  let pure value = StateT (fun state -> pure (value, state))
+  map2 :
+    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+      ((StateT s m a)^d -> ((StateT s m b)^d -> (StateT s m x)^(c + d))^(c + d))^c
+  let map2 f left right =
+    StateT (fun state -> do {
+      (a, next) <- run left state
+      (b, final) <- run right next
+      pure (f a b, final)
+    })
+
+instance Monad m => Monad (StateT s m) =
+  flat_map :
+    forall c d a b. (forall v. a^v -> (StateT s m b)^(c + v))^c ->
+      ((StateT s m a)^d -> (StateT s m b)^(c + d))^c
+  let flat_map f action =
+    StateT (fun state -> do {
+      (value, next) <- run action state
+      run (f value) next
+    })
+
+instance MonadTrans (StateT s) =
+  lift : forall c m a. Monad m => (m a)^c -> (StateT s m a)^c
+  let lift action =
+    StateT (fun current -> do {
+      value <- action
+      pure (value, current)
+    })
+
+instance Monad m => MonadState (StateT s m) s =
+  get : StateT s m s
+  let get = StateT (fun current -> pure (current, current))
+
+  put : forall c. s^c -> (StateT s m Unit)^c
+  let put next = StateT (fun _ -> pure ((), next))
+
+  state : forall c a. (forall v. s^v -> (a, s)^(c + v))^c -> (StateT s m a)^c
+  let state step = StateT (fun current -> pure (step current))
+
+instance MonadReader m r => MonadReader (StateT s m) r =
+  ask : StateT s m r
+  let ask = lift ask
+
+  local : forall c d a. (forall v. r^v -> r^(c + v))^c ->
+    ((StateT s m a)^d -> (StateT s m a)^(c + d))^c
+  let local update action =
+    StateT (fun current -> local update (run action current))
+
+  reader : forall c a. (forall v. r^v -> a)^c -> (StateT s m a)^c
+  let reader project = lift (reader project)
+
+instance MonadWriter m w => MonadWriter (StateT s m) w =
+  tell : forall c. w^c -> (StateT s m Unit)^c
+  let tell output = lift (tell output)
+
+  listen : forall c a. (StateT s m a)^c -> (StateT s m (a, w))^c
+  let listen action =
+    StateT (fun current ->
+      finish : ((a, s), w) -> ((a, w), s)
+      let finish ((value, next), output) = ((value, output), next)
+      map finish (listen (run action current)))
+
+  pass : forall c d a. (StateT s m (a, (w -> w)^c))^d -> (StateT s m a)^(c + d)
+  let pass action =
+    StateT (fun current ->
+      adapt : ((a, (w -> w)^c), s) -> ((a, s), (w -> w)^c)
+      let adapt ((value, update), next) = ((value, next), update)
+      pass (map adapt (run action current)))
+
+  writer : forall c a. (a, w)^c -> (StateT s m a)^c
+  let writer value = lift (writer value)
+
+instance MonadError m e => MonadError (StateT s m) e =
+  throw_error : forall c a. e^c -> (StateT s m a)^c
+  let throw_error problem = lift (throw_error problem)
+
+  catch_error : forall c d a. (forall v. e^v -> (StateT s m a)^(c + v))^c ->
+    ((StateT s m a)^d -> (StateT s m a)^(c + d))^c
+  let catch_error handler action =
+    StateT (fun current ->
+      catch_error (fun problem -> run (handler problem) current) (run action current))

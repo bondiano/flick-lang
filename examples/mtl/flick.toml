@@ -8,5 +8,5 @@ test-dir = "test"
 
 [build]
 out-dir = "dist"
-profile = "debug"
+profile = "release"
 emit = "js"

@@ -74,6 +74,7 @@ pub use display::show_type;
 pub use do_notation::{bind_key, guard_key};
 pub use effects::NO_EFFECTS;
 pub use env::{Abi, Form, Fundep, Instance, JsClass, Operation, Rep, TypeDef};
+pub use generalize::without_value_captures;
 pub use kinds::Kind;
 pub use patterns::is_pattern;
 pub use question::Question;

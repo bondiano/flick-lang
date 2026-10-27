@@ -40,6 +40,13 @@ The [Gleam language server reference](https://gleam.run/documentation/language-s
 is the behavior reference for symbol hover and navigation, not a claim of
 complete feature parity.
 
+Type-alias hover includes generic parameters and the written definition, even
+for private aliases. On the declaration name, its hover range includes the
+parameters (`Planner a`); navigation and semantic tokens still target `Planner`.
+Hover on a label inside `codec` shows the decoded record field's type, such as
+`email : Email` or `nickname : Option String`, rather than its field codec.
+These signatures use a `flick` code block for editor syntax highlighting.
+
 Hover on `sql table` shows the row type and the type of `Name$table` in
 column order; on the name, the row type and the SQL table; on the table
 name string, the table it names; on a column's SQL type, the Flick type the
@@ -55,6 +62,27 @@ temporary directory, keyed by content and read-only. Opening them checks
 them as library sources, without adding them to the application's project.
 Both `textDocument/prepareRename` and `textDocument/rename` reject these
 read-only documents rather than returning edits to the cached source.
+
+### Logging
+
+LSP logs use `tracing-subscriber` on stderr, with UTC timestamps and no ANSI
+escapes. The default `info` level reports startup, shutdown and failures.
+Enable request and analysis details with:
+
+```sh
+RUST_LOG=flick::lsp=debug flick lsp --stdio
+```
+
+Debug events include the method, request ID, document URI and position,
+elapsed time, snapshot reuse, and module, diagnostic and completion counts.
+Request failures include their JSON-RPC error code. Panics include the active
+request context and a captured backtrace without requiring `RUST_BACKTRACE`.
+`RUST_LOG=off` disables ordinary logs; panics still use Rust's default report.
+
+In Zed, set `lsp.flick.binary.env` to
+`{ "RUST_LOG": "flick::lsp=debug" }`. Logs never go to protocol stdout.
+Normal events omit document bodies and raw RPC payloads, but a panic message
+can contain a source excerpt: check logs before sharing them.
 
 ## Zed
 

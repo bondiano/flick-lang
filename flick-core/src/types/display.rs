@@ -107,7 +107,9 @@ impl Printer<'_> {
                 out.push_str(" + ");
                 self.print(b, Prec::App, out);
             }),
-            Type::Captured { ty, captures } => self.print_captured(ty, captures, prec, out),
+            Type::Captured { ty, captures, .. } | Type::Bounded { ty, captures } => {
+                self.print_captured(ty, captures, prec, out);
+            }
             Type::Forall {
                 vars,
                 constraints,
@@ -234,6 +236,7 @@ mod tests {
         let t = Type::Captured {
             ty: Box::new(Type::prim("Int")),
             captures: Box::new(Type::Meta(207)),
+            value: false,
         };
         assert_eq!(show_type(&t), "Int");
     }

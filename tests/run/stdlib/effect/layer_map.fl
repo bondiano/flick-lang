@@ -66,7 +66,7 @@ let reports () =
             ++ show report.severity
             ++ " "
             ++ show (String.contains "reported" report.message))
-        let _ = Deferred.complete_with (task { () }) done
+        let _ = Deferred.complete_with Effect.void done
         ()
       })
     let reporter = ErrorReporter.make listener

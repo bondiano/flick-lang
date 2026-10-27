@@ -83,7 +83,7 @@ impl Checker<'_> {
         let mut result = None;
         for (i, key) in and_keys(group).into_iter().enumerate() {
             let span = Span::new(self.file, key.0, key.1);
-            let Some((a, b, x, fa, fb, fx)) = self.map2_parts(span) else {
+            let Some((a, b, x, fa, fb, fx, captures)) = self.map2_parts(span) else {
                 return Type::Error;
             };
             if i > 0 {
@@ -106,16 +106,21 @@ impl Checker<'_> {
             items.push(b);
             let last = i + 2 == values.len();
             if last && applicative.is_some() {
-                result = Some((x, fx.clone()));
+                result = Some((x, fx.clone(), captures));
             } else {
+                let _ = self.unify(&captures, &Type::empty_row());
                 let _ = self.unify(&x, &Type::Tuple(items.clone()));
             }
             acc = fx;
         }
         let patterns: Vec<Option<&Node>> = parts.iter().map(|(p, _)| *p).collect();
-        if let (Some(value), Some((x, fx))) = (applicative, result) {
+        if let (Some(value), Some((x, fx, captures))) = (applicative, result) {
             self.typing.applicative.insert(group.range());
-            let function = curried(&items, x);
+            let function = self.implicit_captures(&Type::Captured {
+                ty: Box::new(curried(&items, x)),
+                captures: Box::new(captures),
+                value: false,
+            });
             let body = |c: &mut Self, result: Option<Type>| match result {
                 Some(result) => {
                     c.check(value, &result);
@@ -168,29 +173,61 @@ impl Checker<'_> {
         if let Some(expected) = expected {
             self.expect(&ty, expected, self.span(group));
         }
-        let Type::Fun {
-            param: tuple,
-            result: rest_ty,
-            ..
-        } = self.whnf(&continuation)
-        else {
-            return Type::Error;
-        };
-        let _ = self.unify(&tuple, &Type::Tuple(items.to_vec()));
-        let rest_ty = self.instantiate(&rest_ty, span);
-        let function = curried(items, rest_ty);
+        let continuation = self.group_continuation(&continuation, items);
+        let function = self.implicit_captures(&continuation);
         let body = |c: &mut Self, result: Option<Type>| c.do_rest(node, rest, result.as_ref());
         self.function_with(patterns, body, Some(&function), group);
         ty
     }
 
-    /// `(a, b, x, f a, f b, f x)` of `map2 : (a -> b -> x) -> f a -> f b -> f x`
+    /// Project the tuple argument without moving its capture binders out of scope.
+    fn group_continuation(&mut self, continuation: &Type, items: &[Type]) -> Type {
+        match self.qualified_head(continuation) {
+            Type::Forall {
+                vars,
+                constraints,
+                body,
+            } => Type::Forall {
+                vars,
+                constraints,
+                body: Box::new(self.group_continuation(&body, items)),
+            },
+            Type::Captured {
+                ty,
+                captures,
+                value,
+            } => Type::Captured {
+                ty: Box::new(self.group_continuation(&ty, items)),
+                captures,
+                value,
+            },
+            Type::Bounded { ty, captures } => Type::Bounded {
+                ty: Box::new(self.group_continuation(&ty, items)),
+                captures,
+            },
+            Type::Fun { param, result, .. } => {
+                let (tuple, captures) = self.whnf_captured(&param);
+                let _ = self.unify(&tuple, &Type::Tuple(items.to_vec()));
+                items.iter().rev().fold(*result, |result, item| {
+                    let item = captures
+                        .as_ref()
+                        .map_or_else(|| item.clone(), |captures| self.data_field(item, captures));
+                    Type::pure_fun(item, result)
+                })
+            }
+            other => other,
+        }
+    }
+
+    /// The value types, containers and callback captures of `map2`,
     /// instantiated at `span`, whose dictionary is recorded there.
-    fn map2_parts(&mut self, span: Span) -> Option<(Type, Type, Type, Type, Type, Type)> {
+    fn map2_parts(&mut self, span: Span) -> Option<(Type, Type, Type, Type, Type, Type, Type)> {
         let method = self.prelude_method("map2", span);
         let Type::Fun { param, result, .. } = self.whnf(&method) else {
             return None;
         };
+        let captures = self.whnf_captured(&param).1.unwrap_or_else(Type::empty_row);
+        let param = self.instantiate(&param, span);
         let Type::Fun {
             param: a,
             result: bx,
@@ -226,7 +263,15 @@ impl Checker<'_> {
             return None;
         };
         let fx = self.instantiate(&fx, span);
-        Some((*a, *b, *x, *fa, *fb, fx))
+        Some((
+            self.capture_identity(&a),
+            self.capture_identity(&b),
+            *x,
+            *fa,
+            *fb,
+            fx,
+            captures,
+        ))
     }
 
     /// Whether `statement` is `pure e` of the Prelude's `Applicative`,

@@ -1,3 +1,5 @@
+mod aliases;
+mod cli;
 mod completion;
 mod features;
 mod quick_fix;

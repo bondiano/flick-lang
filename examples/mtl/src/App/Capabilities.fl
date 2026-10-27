@@ -1,0 +1,77 @@
+/// The same capability-polymorphic workflow over pure and effectful bases.
+module App.Capabilities exposing (main, Stack, workflow, lift_base, run)
+
+import Mtl.Classes exposing (..)
+import Mtl.Identity as Identity exposing (Identity)
+import Mtl.ReaderT as ReaderT exposing (ReaderT)
+import Mtl.StateT as StateT exposing (StateT)
+import Mtl.WriterT as WriterT exposing (WriterT)
+import Mtl.ExceptT as ExceptT exposing (ExceptT)
+
+type alias Stack (m : Type -> Type) a =
+  ExceptT String (WriterT (List String) (StateT Number (ReaderT Number m))) a
+
+workflow : forall m.
+  (MonadState m Number, MonadReader m Number,
+    MonadWriter m (List String), MonadError m String) => Number -> m Number
+let workflow input = do {
+  tell ["begin"]
+  if input < 0 then throw_error "negative" else do {
+    environment <- ask
+    let value = input + environment
+    before <- get
+    put (before + value)
+    tell ["done"]
+    pure value
+  }
+}
+
+lift_base : forall c m a. Monad m => (m a)^c -> (Stack m a)^c
+let lift_base action =
+  reading : (ReaderT Number m a)^c
+  let reading = lift action
+  changing : (StateT Number (ReaderT Number m) a)^c
+  let changing = lift reading
+  writing : (WriterT (List String) (StateT Number (ReaderT Number m)) a)^c
+  let writing = lift changing
+  lift writing
+
+run : forall c m a. Number -> Number -> (Stack m a)^c ->
+  (m ((Result String a, List String), Number))^c
+let run environment initial action =
+  ReaderT.run (StateT.run (WriterT.run (ExceptT.run action)) initial) environment
+
+format : ((Result String Number, List String), Number) -> String
+let format ((result, output), final) =
+  let outcome = match result with
+    | Ok value -> "ok=" ++ show value
+    | Err problem -> "error=" ++ problem
+  outcome ++ " state=" ++ show final ++ " log=" ++ String.join "," output
+
+identity_run : Number -> ((Result String Number, List String), Number)
+let identity_run input =
+  base : Identity Unit
+  let base = pure ()
+  action : Stack Identity Number
+  let action = do { lift_base base; workflow input }
+  Identity.run (run 3 10 action)
+
+eff_run : Number ->{; AppError} ((Result String Number, List String), Number)
+let eff_run input =
+  let counter = Ref.make 0
+  base : Eff none none Unit
+  let base = task { Ref.update counter (fun n -> n + 1) }
+  action : Stack (Eff none none) Number
+  let action = do { lift_base base; workflow input }
+  let suspended = run 3 10 action
+  if Ref.get counter != 0 then App.fail "lifted base action ran before await"
+  let observed = await suspended
+  if Ref.get counter != 1 then App.fail "lifted base action did not run exactly once"
+  observed
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line ("identity " ++ format (identity_run 2))
+  Platform.stdout_line ("identity " ++ format (identity_run (0 - 1)))
+  Platform.stdout_line ("eff " ++ format (eff_run 2))
+  Platform.stdout_line ("eff " ++ format (eff_run (0 - 1)))

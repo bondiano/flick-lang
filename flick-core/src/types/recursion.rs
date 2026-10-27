@@ -105,10 +105,31 @@ impl Checker<'_> {
     /// the variables by name.
     fn open(&mut self, t: &Type) -> (Type, Vec<(String, Type)>) {
         match self.store.resolve(t) {
-            Type::Captured { ty, captures } => {
+            Type::Captured {
+                ty,
+                captures,
+                value,
+            } => {
                 let (ty, vars) = self.open(&ty);
                 let ty = Box::new(ty);
-                (Type::Captured { ty, captures }, vars)
+                (
+                    Type::Captured {
+                        ty,
+                        captures,
+                        value,
+                    },
+                    vars,
+                )
+            }
+            Type::Bounded { ty, captures } => {
+                let (ty, vars) = self.open(&ty);
+                (
+                    Type::Bounded {
+                        ty: Box::new(ty),
+                        captures,
+                    },
+                    vars,
+                )
             }
             Type::Forall { vars, body, .. } => {
                 let subst: Vec<(String, Type)> = vars

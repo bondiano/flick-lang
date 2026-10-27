@@ -1,0 +1,204 @@
+module Mtl.CapabilityOrdersTest exposing (tests)
+
+import Mtl.Classes exposing (..)
+import Mtl.Identity as Identity exposing (Identity)
+import Mtl.MaybeT as MaybeT exposing (MaybeT)
+import Mtl.StateT as StateT exposing (StateT)
+import Mtl.ReaderT as ReaderT exposing (ReaderT)
+import Mtl.WriterT as WriterT exposing (WriterT)
+import Mtl.ExceptT as ExceptT exposing (ExceptT)
+
+reader_catch_probe : forall m. (MonadReader m Number, MonadError m String) =>
+  m (Number, (String, Number), (String, Number), Number)
+let reader_catch_probe =
+  failed : m (String, Number)
+  let failed = do { environment <- ask; throw_error (show environment) }
+  do {
+    before <- ask
+    local_outside <- local (fun n -> n + 10)
+      (catch_error (fun problem -> do { environment <- ask; pure (problem, environment) }) failed)
+    catch_outside <- catch_error
+      (fun problem -> do { environment <- ask; pure (problem, environment) })
+      (local (fun n -> n + 10) failed)
+    after <- ask
+    pure (before, local_outside, catch_outside, after)
+  }
+
+order : List Test.Test
+let order = [
+  Test.test "StateT catch restarts the handler at entry state" (fun () ->
+    action : StateT Number (ExceptT String Identity) Number
+    let action = catch_error (fun _ -> get) (do { put 1; throw_error "bad" })
+    Test.equal (Ok (0, 0)) (Identity.run (ExceptT.run (StateT.run action 0)))),
+  Test.test "ExceptT catch observes state retained below the error" (fun () ->
+    action : ExceptT String (StateT Number Identity) Number
+    let action = catch_error (fun _ -> get) (do { put 1; throw_error "bad" })
+    Test.equal (Ok 1, 1) (Identity.run (StateT.run (ExceptT.run action) 0))),
+  Test.test "WriterT catch has no failed output pair to retain" (fun () ->
+    action : WriterT (List String) (ExceptT String Identity) Number
+    let action = catch_error
+      (fun _ -> do { tell ["recovered"]; pure 9 })
+      (do { tell ["before"]; throw_error "bad" })
+    Test.equal (Ok (9, ["recovered"])) (Identity.run (ExceptT.run (WriterT.run action)))),
+  Test.test "ExceptT catch retains output emitted below the error" (fun () ->
+    action : ExceptT String (WriterT (List String) Identity) Number
+    let action = catch_error
+      (fun _ -> do { tell ["recovered"]; pure 9 })
+      (do { tell ["before"]; throw_error "bad" })
+    Test.equal (Ok 9, ["before", "recovered"]) (Identity.run (WriterT.run (ExceptT.run action)))),
+  Test.test
+    "ReaderT catch shares the environment and local placement controls the handler"
+    (fun () ->
+    action : ReaderT Number (ExceptT String Identity) (
+      Number,
+      (String, Number),
+      (String, Number),
+      Number,
+    )
+    let action = reader_catch_probe
+    Test.equal (Ok (5, ("15", 15), ("15", 5), 5))
+      (Identity.run (ExceptT.run (ReaderT.run action 5)))),
+  Test.test "ExceptT local changes the handler only when outside catch" (fun () ->
+    action : ExceptT String (ReaderT Number Identity) (
+      Number,
+      (String, Number),
+      (String, Number),
+      Number,
+    )
+    let action = reader_catch_probe
+    Test.equal (Ok (5, ("15", 15), ("15", 5), 5))
+      (Identity.run (ReaderT.run (ExceptT.run action) 5))),
+  Test.test "MaybeT None is not an inherited error" (fun () ->
+    action : MaybeT (ExceptT String Identity) Number
+    let action = catch_error (fun _ -> throw_error "handler invoked") (MaybeT.from_option None)
+    Test.equal (Ok None) (Identity.run (ExceptT.run (MaybeT.run action)))),
+  Test.test "a catch does not catch its handler's rethrow" (fun () ->
+    action : ExceptT String Identity Number
+    let action =
+      catch_error (fun problem -> throw_error (problem ++ ":handler")) (throw_error "bad")
+    Test.equal (Err "bad:handler") (Identity.run (ExceptT.run action))),
+  Test.test "throw skips the continuation and retains only preceding state" (fun () ->
+    action : ExceptT String (StateT Number Identity) Number
+    let action = do { put 1; _ <- throw_error "bad"; put 99; pure 0 }
+    Test.equal (Err "bad", 1) (Identity.run (StateT.run (ExceptT.run action) 0))),
+]
+
+failure_output : List Test.Test
+let failure_output = [
+  Test.test "MaybeT failure and listen retain the underlying ordered output" (fun () ->
+    action : MaybeT (WriterT (List String) Identity) Number
+    let action = do {
+      tell ["a"]
+      tell ["b"]
+      _ <- MaybeT.from_option (None : Option Unit)
+      tell ["unreachable"]
+      pure 9
+    }
+    Test.all [
+      Test.equal (None, ["a", "b"]) (Identity.run (WriterT.run (MaybeT.run action))),
+      Test.equal (None, ["a", "b"]) (Identity.run (WriterT.run (MaybeT.run (listen action)))),
+    ]),
+  Test.test "MaybeT pass uses identity on None rather than dropping its output" (fun () ->
+    action : MaybeT (WriterT (List String) Identity) (Number, List String -> List String)
+    let action = do {
+      tell ["a"]
+      tell ["b"]
+      _ <- MaybeT.from_option (None : Option Unit)
+      pure (9, List.reverse)
+    }
+    Test.equal (None, ["a", "b"]) (Identity.run (WriterT.run (MaybeT.run (pass action))))),
+  Test.test "ExceptT failure and listen retain the underlying ordered output" (fun () ->
+    action : ExceptT String (WriterT (List String) Identity) Number
+    let action = do {
+      tell ["a"]
+      tell ["b"]
+      _ <- throw_error "bad"
+      tell ["unreachable"]
+      pure 9
+    }
+    Test.all [
+      Test.equal (Err "bad", ["a", "b"]) (Identity.run (WriterT.run (ExceptT.run action))),
+      Test.equal (Err "bad", ["a", "b"]) (Identity.run (WriterT.run (ExceptT.run (listen action)))),
+    ]),
+  Test.test "ExceptT pass uses identity on Err rather than dropping its output" (fun () ->
+    action : ExceptT String (WriterT (List String) Identity) (Number, List String -> List String)
+    let action = do {
+      tell ["a"]
+      tell ["b"]
+      _ <- throw_error "bad"
+      pure (9, List.reverse)
+    }
+    Test.equal (Err "bad", ["a", "b"]) (Identity.run (WriterT.run (ExceptT.run (pass action))))),
+  Test.test "WriterT outside a failed MaybeT has no output pair" (fun () ->
+    absent : MaybeT Identity Unit
+    let absent = MaybeT.from_option None
+    action : WriterT (List String) (MaybeT Identity) Number
+    let action = do { tell ["before"]; lift absent; writer (9, ["unreachable"]) }
+    Test.equal None (Identity.run (MaybeT.run (WriterT.run action)))),
+  Test.test "WriterT outside a failed ExceptT has no output pair" (fun () ->
+    failed : ExceptT String Identity Unit
+    let failed = throw_error "bad"
+    action : WriterT (List String) (ExceptT String Identity) Number
+    let action = do { tell ["before"]; lift failed; writer (9, ["unreachable"]) }
+    Test.equal (Err "bad") (Identity.run (ExceptT.run (WriterT.run action)))),
+]
+
+repeated : List Test.Test
+let repeated = [
+  Test.test "native outer State wins and typed lift reaches inner State" (fun () ->
+    inner_get : StateT Number Identity Number
+    let inner_get = get
+    inner_put : Number -> StateT Number Identity Unit
+    let inner_put = put
+    action : StateT Number (StateT Number Identity) (Number, Number, Number, Number)
+    let action = do {
+      outer_before <- get
+      put (outer_before + 1)
+      inner_before <- lift inner_get
+      lift (inner_put (inner_before + 10))
+      outer_after <- get
+      inner_after <- lift inner_get
+      pure (outer_before, outer_after, inner_before, inner_after)
+    }
+    Test.equal (((3, 4, 100, 110), 4), 110)
+      (Identity.run (StateT.run (StateT.run action 3) 100))),
+  Test.test "native outer Reader wins and typed lift reaches inner Reader" (fun () ->
+    inner_ask : ReaderT Number Identity Number
+    let inner_ask = ask
+    action : ReaderT Number (ReaderT Number Identity) (Number, Number, Number, Number)
+    let action = do {
+      outer <- ask
+      inner <- lift inner_ask
+      changed_outer <- local (fun n -> n + 10) ask
+      unchanged_inner <- local (fun n -> n + 10) (lift inner_ask)
+      pure (outer, inner, changed_outer, unchanged_inner)
+    }
+    Test.equal (5, 20, 15, 20) (Identity.run (ReaderT.run (ReaderT.run action 5) 20))),
+  Test.test "native outer Writer wins and typed lift reaches inner Writer" (fun () ->
+    inner_tell : WriterT (List String) Identity Unit
+    let inner_tell = tell ["inner"]
+    action : WriterT (List String) (WriterT (List String) Identity) Number
+    let action = do { tell ["outer"]; lift inner_tell; pure 9 }
+    Test.equal ((9, ["outer"]), ["inner"]) (Identity.run (WriterT.run (WriterT.run action)))),
+  Test.test "native outer Error wins and typed lift bypasses its catch" (fun () ->
+    outer : ExceptT String (ExceptT String Identity) Number
+    let outer = throw_error "outer"
+    recovered : ExceptT String (ExceptT String Identity) Number
+    let recovered = catch_error (fun _ -> pure 7) outer
+    inner : ExceptT String Identity Number
+    let inner = throw_error "inner"
+    lifted : ExceptT String (ExceptT String Identity) Number
+    let lifted = catch_error (fun _ -> pure 99) (lift inner)
+    Test.all [
+      Test.equal (Ok (Err "outer")) (Identity.run (ExceptT.run (ExceptT.run outer))),
+      Test.equal (Ok (Ok 7)) (Identity.run (ExceptT.run (ExceptT.run recovered))),
+      Test.equal (Err "inner") (Identity.run (ExceptT.run (ExceptT.run lifted))),
+    ]),
+]
+
+tests : List Test.Test
+let tests = [
+  Test.group "capability handler ordering" order,
+  Test.group "failure preserves only observable output" failure_output,
+  Test.group "repeated capability selection" repeated,
+]

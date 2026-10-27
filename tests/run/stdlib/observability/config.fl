@@ -41,7 +41,7 @@ let main () =
       { preserveEmptyStrings = false }
       [("OTEL_EXPORTER_OTLP_ENDPOINT", base)]
   provide (ConfigProvider.layer quiet) {
-    provide (Otlp.from_config None) { Tracer.with_span "ignored" span (task { () }) }
+    provide (Otlp.from_config None) { Tracer.with_span "ignored" span Effect.void }
   }
   Platform.stdout_line
     ("without an exporter, sent: " ++ show (String.contains "ignored" (received ())))
@@ -54,14 +54,14 @@ let main () =
         ("OTEL_SERVICE_NAME", "shop"),
       ]
   provide (ConfigProvider.layer env) {
-    provide (Otlp.from_config None) { Tracer.with_span "checkout" span (task { () }) }
+    provide (Otlp.from_config None) { Tracer.with_span "checkout" span Effect.void }
   }
   let got = received ()
   Platform.stdout_line (has got "/v1/traces")
   Platform.stdout_line (has got "\"checkout\"")
   Platform.stdout_line (has got "\"shop\"")
   provide (ConfigProvider.layer env) {
-    provide (Otlp.from_config (Some "store")) { Tracer.with_span "named" span (task { () }) }
+    provide (Otlp.from_config (Some "store")) { Tracer.with_span "named" span Effect.void }
   }
   Platform.stdout_line (has (received ()) "\"store\"")
   stop ()

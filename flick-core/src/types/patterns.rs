@@ -49,17 +49,9 @@ pub fn is_pattern(kind: K) -> bool {
 
 impl Checker<'_> {
     /// Checks `node` against `ty` and brings its names into scope. A
-    /// constructor's fields were checked against their types when it was
-    /// built, so the parts of a qualified value have their own types.
+    /// data qualifier bounds its fields too, including callback fields.
+    #[allow(clippy::too_many_lines)]
     pub fn bind_pattern(&mut self, node: &Node, ty: &Type) -> Pat {
-        if let (bare, Some(_)) = self.whnf_captured(ty)
-            && !matches!(
-                node.kind,
-                K::VarPat | K::WildcardPat | K::ParenPat | K::AnnotPat | K::OrPat
-            )
-        {
-            return self.bind_pattern(node, &bare);
-        }
         let children: Vec<&Node> = node.nodes().collect();
         let span = self.span(node);
         match node.kind {
@@ -106,28 +98,48 @@ impl Checker<'_> {
                 Pat::Ctor(Ctor::Unit, Vec::new())
             }
             K::TuplePat => {
-                let items: Vec<Type> = match self.whnf(ty) {
-                    Type::Tuple(items) if items.len() == children.len() => items,
+                let (bare, captures) = self.whnf_captured(ty);
+                let items: Vec<Type> = match &bare {
+                    Type::Tuple(items) if items.len() == children.len() => items.clone(),
                     _ => {
                         let items: Vec<Type> = children.iter().map(|_| self.fresh()).collect();
-                        self.pattern_type(&Type::Tuple(items.clone()), ty, node);
+                        self.pattern_type(&Type::Tuple(items.clone()), &bare, node);
                         items
                     }
                 };
                 let args = children
                     .iter()
                     .zip(&items)
-                    .map(|(c, t)| self.bind_pattern(c, t))
+                    .map(|(c, t)| {
+                        let t = captures
+                            .as_ref()
+                            .map_or_else(|| t.clone(), |captures| self.data_field(t, captures));
+                        self.bind_pattern(c, &t)
+                    })
                     .collect();
                 Pat::Ctor(Ctor::Tuple(children.len()), args)
             }
             K::ListPat => {
-                let item = self.fresh();
-                self.pattern_type(&Type::app(Type::prim("List"), item.clone()), ty, node);
+                let (bare, captures) = self.whnf_captured(ty);
+                let item = self.list_item(&bare).unwrap_or_else(|| self.fresh());
+                self.pattern_type(&Type::app(Type::prim("List"), item.clone()), &bare, node);
+                let projected = captures
+                    .as_ref()
+                    .map_or_else(|| item.clone(), |captures| self.data_field(&item, captures));
                 let (rest, items): (Vec<&Node>, Vec<&Node>) =
                     children.iter().partition(|c| c.kind == K::RestPat);
-                let args = items.iter().map(|c| self.bind_pattern(c, &item)).collect();
+                let args = items
+                    .iter()
+                    .map(|c| self.bind_pattern(c, &projected))
+                    .collect();
                 let list = Type::app(Type::prim("List"), item);
+                let list = match captures {
+                    Some(captures) => Type::Bounded {
+                        ty: Box::new(list),
+                        captures: Box::new(captures),
+                    },
+                    None => list,
+                };
                 for r in rest.iter().flat_map(|r| r.nodes()) {
                     self.bind_pattern(r, &list);
                 }
@@ -211,10 +223,15 @@ impl Checker<'_> {
             },
             tail: Some(Box::new(rest)),
         });
-        self.pattern_type(&shape, ty, node);
+        let (bare, captures) = self.whnf_captured(ty);
+        self.pattern_type(&shape, &bare, node);
         let mut pats: Vec<(String, Pat)> = fields
             .into_iter()
             .map(|(label, field_ty, pattern)| {
+                let field_ty = captures.as_ref().map_or_else(
+                    || field_ty.clone(),
+                    |captures| self.data_field(&field_ty, captures),
+                );
                 let pat = if let Some(p) = pattern {
                     self.bind_pattern(p, &field_ty)
                 } else {
@@ -248,7 +265,35 @@ impl Checker<'_> {
             return Pat::Wild;
         };
         let scheme = self.env.value(&entity).cloned().unwrap_or(Type::Error);
-        let mut current = self.instantiate(&scheme, self.span(node));
+        let captures = self.captures_of(ty).into_type();
+        let adt_params = self.env.parent(&entity).and_then(|(module, name)| {
+            let def = self.env.type_def(&module, &name)?;
+            if !matches!(def.form, super::env::Form::Adt { .. }) {
+                return None;
+            }
+            let (mut arity, mut kind) = (0, &def.kind);
+            while let super::kinds::Kind::Arrow(_, result) = kind {
+                arity += 1;
+                kind = result;
+            }
+            Some(arity)
+        });
+        let mut current = if let Type::Forall { vars, body, .. } = &scheme
+            && let Some(arity) = adt_params
+        {
+            let subst: Vec<(String, Type)> = vars
+                .iter()
+                .map(|v| (v.name.clone(), self.fresh()))
+                .collect();
+            if vars.len() > arity
+                && let Some((_, capture)) = subst.last()
+            {
+                let _ = self.unify(capture, &captures);
+            }
+            self.instantiate(&body.substitute(&subst), self.span(node))
+        } else {
+            self.instantiate(&scheme, self.span(node))
+        };
         let mut params = Vec::new();
         while let Type::Fun { param, result, .. } = self.whnf(&current) {
             params.push(*param);
@@ -269,7 +314,7 @@ impl Checker<'_> {
             }
             return Pat::Wild;
         }
-        self.pattern_type(&current, ty, node);
+        self.pattern_type(&self.whnf(&current), &self.whnf(ty), node);
         let mut args_pats = Vec::new();
         for (arg, param) in args
             .iter()

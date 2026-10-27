@@ -1,0 +1,32 @@
+/// The pure base for transformer stacks: `Identity a` holds only an `a`.
+///
+/// Its ordinary Prelude `Functor`, `Applicative` and `Monad` instances apply
+/// callbacks directly. `map2` combines its left and right values in that order;
+/// there is no extra effect, environment or state to interpret.
+/// Finish a stack with `run` after removing its transformer layers.
+module Mtl.Identity exposing (Identity(..), run)
+
+/// A value with no additional computation context.
+type Identity a = Identity a
+
+/// Remove the base wrapper, preserving the value's captures.
+run : forall c a. (Identity a)^c -> a^c
+let run (Identity value) = value
+
+instance Functor Identity =
+  map : forall c d a b. (forall v. a^v -> b)^c -> ((Identity a)^d -> (Identity b)^(c + d))^c
+  let map f (Identity value) = Identity (f value)
+
+instance Applicative Identity =
+  pure : forall c a. a^c -> (Identity a)^c
+  let pure value = Identity value
+  map2 :
+    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+      ((Identity a)^d -> ((Identity b)^d -> (Identity x)^(c + d))^(c + d))^c
+  let map2 f (Identity left) (Identity right) = Identity (f left right)
+
+instance Monad Identity =
+  flat_map :
+    forall c d a b. (forall v. a^v -> (Identity b)^(c + v))^c ->
+      ((Identity a)^d -> (Identity b)^(c + d))^c
+  let flat_map f (Identity value) = f value

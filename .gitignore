@@ -10,3 +10,6 @@ node_modules/
 /site/.vitepress/cache/
 /site/.vitepress/dist/
 /editors/zed/target/
+
+# omp agent plans
+/.omp/

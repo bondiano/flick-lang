@@ -48,6 +48,48 @@ fn comments_doc_comments_and_strings_offer_no_completion() {
 }
 
 #[test]
+fn completion_after_multibyte_characters_preserves_auto_imports() {
+    let helpers =
+        "module App.Helpers exposing (shout)\n\nshout : String -> String\nlet shout s = s\n";
+    let main = "module App.Main exposing (go)\n\nlet go = 0\n";
+    let dir = project(
+        "lsp_completion_unicode",
+        &[
+            ("flick.toml", LIB),
+            ("src/App/Helpers.fl", helpers),
+            ("src/App/Main.fl", main),
+        ],
+    );
+    let file = dir.join("src/App/Main.fl");
+    let doc = json!({ "uri": uri(&file) });
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": main } }));
+    for (version, (separator, prefix)) in ['д', '界', '🦀']
+        .into_iter()
+        .flat_map(|c| ["", "sho"].map(|prefix| (c, prefix)))
+        .enumerate()
+    {
+        let text = format!("module App.Main exposing (go)\n\nlet go = {separator}{prefix}\n");
+        lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri(&file), "version": version + 2 }, "contentChanges": [{ "text": text }] }));
+        let reply = lsp.request(
+            "textDocument/completion",
+            &json!({ "textDocument": doc, "position": position(&text, text.len() - 1) }),
+        );
+        let shout = reply["result"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{reply}"))
+            .iter()
+            .find(|item| item["label"] == "shout");
+        assert_eq!(
+            shout.map(|item| item["insertText"].as_str().expect("snippet")),
+            (!prefix.is_empty()).then_some("App.Helpers.shout ${1:s}"),
+            "{separator}{prefix}: {reply}"
+        );
+    }
+    lsp.close();
+}
+
+#[test]
 fn completions_carry_docs_snippets_order_and_imports() {
     let helpers = "module App.Helpers exposing (shout)\n\nshout : String -> String\nlet shout s = s ++ \"!\"\n";
     let main = "module App.Main exposing (go)\n\nimport String\n\ngo : Number -> String\nlet go count =\n  sho\n";

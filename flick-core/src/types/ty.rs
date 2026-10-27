@@ -39,9 +39,18 @@ pub enum Type {
     Row(Row),
     /// `r1 + r2`.
     Union(Box<Type>, Box<Type>),
-    /// `T^c`: a value of `T` that may also hold the regions of the capture
-    /// row `c`; a bare type holds none beyond what its own type shows.
+    /// `T^c`: a qualifier on a value's captures or a stored type qualification.
+    /// A bare type permits only captures exposed by its complete type.
     Captured {
+        ty: Box<Type>,
+        captures: Box<Type>,
+        /// Interpreted at a value boundary after inference, rather than as
+        /// an explicitly declared or stored type qualification.
+        value: bool,
+    },
+    /// A capture bound on a complete generic type, not an extra hidden
+    /// qualifier. Substitution must keep the underlying type's qualifiers.
+    Bounded {
         ty: Box<Type>,
         captures: Box<Type>,
     },
@@ -166,7 +175,7 @@ impl Row {
 }
 
 /// A row taken apart by [`Store::normalize`](super::unify::Store::normalize).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Norm {
     /// Sorted by label, each label once.
     pub entries: Vec<(String, Type)>,
@@ -289,7 +298,16 @@ impl Type {
             Type::Record(r) => Type::Record(row(r, f)),
             Type::Row(r) => Type::Row(row(r, f)),
             Type::Union(a, b) => Type::Union(Box::new(f(a)), Box::new(f(b))),
-            Type::Captured { ty, captures } => Type::Captured {
+            Type::Captured {
+                ty,
+                captures,
+                value,
+            } => Type::Captured {
+                ty: Box::new(f(ty)),
+                captures: Box::new(f(captures)),
+                value: *value,
+            },
+            Type::Bounded { ty, captures } => Type::Bounded {
                 ty: Box::new(f(ty)),
                 captures: Box::new(f(captures)),
             },
@@ -336,7 +354,11 @@ impl Type {
             }
             Type::Tuple(items) => items.iter().for_each(f),
             Type::Record(r) | Type::Row(r) => row(r, f),
-            Type::Union(a, b) | Type::Captured { ty: a, captures: b } => {
+            Type::Union(a, b)
+            | Type::Captured {
+                ty: a, captures: b, ..
+            }
+            | Type::Bounded { ty: a, captures: b } => {
                 f(a);
                 f(b);
             }
@@ -397,5 +419,33 @@ impl Type {
         let mut found = false;
         self.visit(&mut |t| found |= pred(t));
         found
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Type;
+
+    #[test]
+    fn substitution_preserves_capture_qualification_kind() {
+        for value in [false, true] {
+            let ty = Type::Captured {
+                ty: Box::new(Type::Var("a".into())),
+                captures: Box::new(Type::Var("c".into())),
+                value,
+            };
+            let substituted = ty.substitute(&[
+                ("a".into(), Type::prim("Number")),
+                ("c".into(), Type::empty_row()),
+            ]);
+            assert_eq!(
+                substituted,
+                Type::Captured {
+                    ty: Box::new(Type::prim("Number")),
+                    captures: Box::new(Type::empty_row()),
+                    value,
+                }
+            );
+        }
     }
 }

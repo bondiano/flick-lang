@@ -87,10 +87,11 @@ problem or discuss a change.
 | [`flick`](./flick/) | The `flick` command-line tool |
 | [`flick-wasm`](./flick-wasm/) | The same compiler core, built for the browser |
 
-Development also uses [`just`](https://just.systems/):
+Development also uses [`just`](https://just.systems/) and `cargo-machete`:
 
 ```sh
-just lint   # fmt --check + clippy -D warnings
+cargo install cargo-machete --version 0.9.2 --locked
+just lint   # fmt --check + clippy -D warnings + cargo machete
 just test
 just check  # lint + test
 just e2e    # runtime tests + compiled programs on Node
@@ -98,6 +99,34 @@ just bundle-size  # browser bundles against their gzip budgets
 ```
 
 `examples/first-slice` is a complete project (services, layers, tests); run `flick run` or `flick test` inside it.
+
+[`examples/mtl`](./examples/mtl/README.md) walks through writing a task-time planner using custom
+[`MaybeT`](./examples/mtl/src/Mtl/MaybeT.fl) (short-circuit on `None`),
+[`StateT`](./examples/mtl/src/Mtl/StateT.fl) (remaining time and completed tasks),
+[`ReaderT`](./examples/mtl/src/Mtl/ReaderT.fl) (shared configuration), and
+[`Identity`](./examples/mtl/src/Mtl/Identity.fl) (pure base).
+The [domain plan](./examples/mtl/src/App/Plan.fl) stacks
+`MaybeT (StateT PlanState (ReaderT Config Identity))`: stopping preserves the
+completed prefix and remaining time, rather than rolling state back.
+It has no `Eff` base; the [Platform/Cli shell](./examples/mtl/src/App/Main.fl)
+handles I/O, and the Cli runtime is still Effect-backed, not dependency-free.
+The [example guide](./examples/mtl/README.md) explains the wrappers, instances,
+explicit lifts and run order, with a runnable CLI walkthrough. Compare
+[`mtl`](https://github.com/haskell/mtl) and the
+[Haskell transformer tutorial](https://mmhaskell.com/monads/transformers).
+
+```sh
+flick run --project examples/mtl -- catalog
+flick run --project examples/mtl -- plan --budget 60 docs tests lint
+flick run --project examples/mtl -- plan --budget 36 --overhead 3 docs lint
+flick run --project examples/mtl -- plan --budget 25 docs lint
+flick test --project examples/mtl
+```
+
+The 60-minute plan completes all three tasks with zero minutes left. A
+36-minute plan also fits `docs lint` when each task adds three minutes of overhead.
+The 25-minute plan retains `docs` and five minutes, then exits nonzero because
+`lint` does not fit.
 
 <details>
 <summary>Documentation-site development</summary>
