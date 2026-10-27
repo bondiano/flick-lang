@@ -29,6 +29,19 @@ export const flickArray = <A>(options: ArrayOptions, self: Arbitrary.Arbitrary<A
     maxLength: Option.getOrUndefined(options.maxLength),
   });
 
+/** `Arbitrary.zip2`: `all` over two generators, whose values are a tuple. */
+export const flickZip2 = <A, B>(
+  first: Arbitrary.Arbitrary<A>,
+  second: Arbitrary.Arbitrary<B>,
+): Arbitrary.Arbitrary<[A, B]> => Arbitrary.all([first, second]);
+
+/** `Arbitrary.zip3`: `all` over three generators, whose values are a tuple. */
+export const flickZip3 = <A, B, C>(
+  first: Arbitrary.Arbitrary<A>,
+  second: Arbitrary.Arbitrary<B>,
+  third: Arbitrary.Arbitrary<C>,
+): Arbitrary.Arbitrary<[A, B, C]> => Arbitrary.all([first, second, third]);
+
 /** `Arbitrary.zip4`: `all` over four generators, whose values are a tuple. */
 export const flickZip4 = <A, B, C, D>(
   first: Arbitrary.Arbitrary<A>,

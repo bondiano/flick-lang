@@ -4,6 +4,8 @@ list lengths in bounds: true
 filter evens: true
 filter_map: true
 flat_map and all: true
+zip2: true
+zip3: true
 zip4: true
 from_schema_with: 3
 check: passed 50, report None
