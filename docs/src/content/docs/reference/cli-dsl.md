@@ -123,8 +123,10 @@ let main () =
   | Cli.CliError message -> App.fail message
 ```
 
-`--help`, `--version` and `--completions bash|zsh|fish` print to stdout and
-run no handler. Invalid input — an unknown flag, a missing argument, a value
+`--help`, `--version` and `--completions bash|zsh|fish|powershell` print to
+stdout and run no handler. `--wizard` asks for the command's flags and
+arguments one at a time, then runs it; `--log-level debug` (any level from
+`all` to `none`) sets the minimum level of the program's log. Invalid input — an unknown flag, a missing argument, a value
 `Cli.Value` refuses — prints the command's help and fails with
 `Cli.CliError` and Effect's text; no handler runs, and `App.fail` turns it
 into exit code 1. The flags of a command with subcommands come before the

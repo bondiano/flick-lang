@@ -43,7 +43,7 @@ schema-aot = false
 
 | Command | Purpose and contract |
 | - | - |
-| `flick new <directory> --template app` | Create a new directory with the configuration, `package.json` and an example application. `--template lib` creates a library. |
+| `flick new <directory> --template app` | Create a new directory with the configuration, `package.json` and an example application. `--template cli` creates a command-line application whose `main` is a `cli` block, `--template lib` a library. |
 | `flick init --template app` | Add the same skeleton to the current directory; existing files are not overwritten, and a conflict is shown before writing. |
 | `flick check [paths...]` | Check syntax, kinds, types, effects, instances, captures, imports and `.iface`. Without arguments it checks the project's sources and tests. |
 | `flick build` | Check the project and emit ESM, source maps and native interfaces into the directory of the selected profile. |

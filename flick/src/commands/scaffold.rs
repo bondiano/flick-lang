@@ -23,7 +23,7 @@ pub struct ScaffoldCommand {
 
 /// The files of a project named `name`.
 fn files(name: &str, template: Template) -> Vec<(&'static str, String)> {
-    let app = template == Template::App;
+    let app = template != Template::Lib;
     let project = if app {
         "kind = \"app\"\nentry = \"App.Main\"\n"
     } else {
@@ -47,7 +47,12 @@ fn files(name: &str, template: Template) -> Vec<(&'static str, String)> {
         (".gitignore", "node_modules/\ndist/\n.flick/\n".to_owned()),
     ];
     if app {
-        out.push(("src/App/Main.fl", MAIN.to_owned()));
+        let main = if template == Template::Cli {
+            CLI_MAIN.replace("NAME", name)
+        } else {
+            MAIN.to_owned()
+        };
+        out.push(("src/App/Main.fl", main));
         out.push((
             "src/App/Greeting.fl",
             GREETING.replace("Lib.Greeting", "App.Greeting"),
@@ -71,6 +76,29 @@ main : Unit ->{; AppError} Unit
 let main () =
   let name = Platform.args () |> List.head |> Option.with_default \"world\"
   Platform.stdout_line (greet name)
+";
+
+const CLI_MAIN: &str = "module App.Main exposing (main)
+
+import App.Greeting exposing (greet)
+
+command : Cli.Command none none
+let command =
+  cli \"NAME\" {
+    description \"Prints a greeting\"
+    /// Print in capitals
+    flag loud : Bool
+    /// Who to greet
+    arg name : String = \"world\"
+    handle fun { loud; name } ->
+      let text = greet name
+      Platform.stdout_line (if loud then String.to_upper text else text)
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try Cli.run_version \"0.1.0\" command (Platform.args ()) with
+  | Cli.CliError message -> App.fail message
 ";
 
 const GREETING: &str = "module Lib.Greeting exposing (greet)
@@ -140,6 +168,7 @@ impl Command for ScaffoldCommand {
 fn kind(template: Template) -> &'static str {
     match template {
         Template::App => "app",
+        Template::Cli => "command-line app",
         Template::Lib => "library",
     }
 }

@@ -7,6 +7,8 @@ use super::ProfileArgument;
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Template {
     App,
+    /// An application whose `main` parses its command line with a `cli` block.
+    Cli,
     Lib,
 }
 
@@ -15,7 +17,8 @@ pub struct NewArguments {
     /// The directory to create.
     pub directory: String,
 
-    /// An application with `main`, or a library.
+    /// An application with `main`, a command-line application, or a
+    /// library.
     #[arg(long, value_enum, default_value_t = Template::App)]
     pub template: Template,
 }

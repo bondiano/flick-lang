@@ -275,7 +275,7 @@ component search (props : SearchProps) =
 ### Трек L — CLI (основа: `Cli.fl`, блок `cli`, `Cli/Prompt.fl`)
 
 **L1. Примеры.** ✅ (`examples/cli-tool` — заметки: подкоманды `init`/`add`/`list`/`done`, файл из `NOTES_FILE` через `Config`, мастер `init` на `Cli.Prompt.text` с проверкой, встроенные `--completions`; тесты мастера на поддельном `Tty`; `flick/tests/examples.rs` гоняет команды с `NOTES_FILE`. Попутно: ошибки `File.node` несли старый формат тега, `try … with File.ReadError` их не ловил — исправлено) AC: `examples/cli-tool` (подкоманды, конфиг/env, prompt-мастер, completions), запускается в e2e.
-**L2. Шаблон.** ⬜ AC: `flick new --template cli`; `flick run -- --help` выводит сгенерированную справку.
+**L2. Шаблон.** ✅ (`flick new/init --template cli`: `main` — блок `cli` с флагом и аргументом по умолчанию, `Cli.run_version`; `flick/tests/cli_template.rs` — check/fmt/test и `run -- --help`; в `cli-dsl.md` дописаны `--wizard`, `--log-level`, PowerShell) AC: `flick new --template cli`; `flick run -- --help` выводит сгенерированную справку.
 **L3. Observability в CLI.** ⬜ AC: флаг `--trace` включает OTLP (O1); `GlobalFlag.LogLevel` подключён.
 **L4. Терминальный UI (исследование).** ⬜ AC: записка о рендерере атомов в терминал (Ink через `Ui.mount_with` или свой) с замером веса и решением.
 **L6. 🆕 Несколько точек входа.** ✅ (`entries`, раннер `flick-<name>.js` на вход, `flick run/dev <name>`, `bin` в `pack`; реэкспортированный `main` разрешён — раннер импортирует его из модуля-источника)
@@ -381,7 +381,7 @@ C7a ✅ ─ C7b ✅ ─ C7c ✅ ─ C7d ✅ ─ C5 ✅            C1 ✅
 U9 ✅ ─ U9b ✅
 S2 ✅ ─ F1 ✅ ─ F2 ─ F3 ─ F4 ─ F5 ─ F6
 S3 ✅ ─ S4 ✅ ─ O1 ✅ ─ O2 ✅ ─ O3 ✅ ─ O4 ✅ ─ O5
-L1 ✅ ─ L2 ─ L3 (после O1) ─ L4 ─ L5
+L1 ✅ ─ L2 ✅ ─ L3 (после O1) ─ L4 ─ L5
 H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ─ H6     (H2 по входам — после L6 ✅)
 D1 ✅ ─ D2 ─ D3 ─ D4 ─ D5 ─ D6 ─ D9 ─ D11 ─ D10 ─ D13 ─ D12 ─ D14 ─ D8   (D15 — с D4/D5; D7 ✅ после C1)
 ```

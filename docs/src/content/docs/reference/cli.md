@@ -12,8 +12,8 @@ and `--help`; `flick help <command>` prints a command's help and
 
 | Command | What it does |
 | - | - |
-| `new <dir> [--template app\|lib]` | creates a project: `flick.toml`, `package.json`, an example module and its test |
-| `init [--template app\|lib]` | the same files in the working directory; every file that exists is reported before anything is written (`FLICK-P019`) |
+| `new <dir> [--template app\|cli\|lib]` | creates a project: `flick.toml`, `package.json`, an example module and its test; `cli` makes `main` a [`cli` block](../cli-dsl/) |
+| `init [--template app\|cli\|lib]` | the same files in the working directory; every file that exists is reported before anything is written (`FLICK-P019`) |
 | `check [paths] [--watch] [--fix]` | checks; without paths the source and test roots; `--fix` applies the fixes that keep the program's meaning (such as removing a type annotation the value already has, `FLICK-T021`) to those files and reports what is left |
 | `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts] [--emit-dts] [--schema-aot] [--out-dir] [--watch]` | writes ESM, source maps and `.iface` files |
 | `build [paths] --inputs` | prints a conservative JSON input inventory (`key`, `files`, `roots`, `modules`) without writing build artifacts or cache entries |
