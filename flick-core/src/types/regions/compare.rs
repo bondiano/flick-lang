@@ -1,6 +1,6 @@
 //! Capture-qualified type equality and value subsumption.
 
-use super::{Hold, Visible};
+use super::{Hold, Visible, capture_mismatch};
 use crate::source::Span;
 use crate::types::Checker;
 use crate::types::ty::Type;
@@ -31,8 +31,9 @@ impl Checker<'_> {
                 // are compared by the types themselves below.
                 let left = ca.unwrap_or_else(Type::empty_row);
                 let right = cb.unwrap_or_else(Type::empty_row);
-                self.unify(&left, &right)?;
-                self.unify(&a, &b)
+                // the types first: what they solve decides what a qualifier holds
+                self.unify(&a, &b)?;
+                self.unify(&left, &right)
             }
         }
     }
@@ -59,6 +60,7 @@ impl Checker<'_> {
         };
         let bound = ce.unwrap_or_else(Type::empty_row);
         let written = !matches!(self.store.resolve(&bound), Type::Meta(_));
+        let mark = self.regions.holds.len();
         self.hold(Hold {
             held: vec![(None, actual.clone())],
             visible,
@@ -72,6 +74,11 @@ impl Checker<'_> {
             Some(_) => self.bounded_callable(a, &self.captures_of(actual).into_type()),
             None => a,
         };
-        self.subsume(&a, &e, span)
+        let fits = self.subsume(&a, &e, span);
+        // a value whose type does not fit is reported once, by the type
+        if fits.as_ref().is_err_and(|m| !capture_mismatch(m)) {
+            self.regions.holds.truncate(mark);
+        }
+        fits
     }
 }

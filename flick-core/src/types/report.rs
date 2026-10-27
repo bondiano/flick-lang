@@ -36,9 +36,17 @@ impl Checker<'_> {
 
     /// Qualifiers that must be equal, as in mutable storage, differ.
     fn capture_mismatch(&mut self, head: &str, label: &str, left: bool, span: Span) {
-        let region = match label.strip_prefix("^'").and_then(|n| n.parse().ok()) {
-            Some(skolem) => self.store.skolem_name(skolem).to_owned(),
-            None => label.trim_start_matches(['^', '?']).to_owned(),
+        // a meta label names what the meta has become since
+        let element = match label.strip_prefix("^?").and_then(|n| n.parse().ok()) {
+            Some(meta) => self.store.resolve(&Type::Meta(meta)),
+            None => match label.strip_prefix("^'").and_then(|n| n.parse().ok()) {
+                Some(skolem) => Type::Skolem(skolem),
+                None => Type::Var(label.trim_start_matches('^').to_owned()),
+            },
+        };
+        let region = match element {
+            Type::Skolem(skolem) => self.store.skolem_name(skolem).to_owned(),
+            other => self.show(&other),
         };
         let detail = if left {
             "the value holds it, but the expected type does not allow it"
@@ -53,12 +61,31 @@ impl Checker<'_> {
         );
     }
 
+    /// The two types of a mismatch as shown: a type mismatch names the
+    /// types, only a capture mismatch is about qualifiers.
+    fn mismatch_types(
+        &self,
+        mismatch: &Mismatch,
+        actual: &Type,
+        expected: &Type,
+    ) -> (String, String) {
+        let captures = matches!(mismatch, Mismatch::Label { label, .. } if label.starts_with('^'));
+        let shown = |t: &Type| {
+            if captures {
+                self.show(t)
+            } else {
+                self.show(&uncaptured(&self.zonk(t)))
+            }
+        };
+        (shown(actual), shown(expected))
+    }
+
     pub fn mismatch(&mut self, mismatch: &Mismatch, actual: &Type, expected: &Type, span: Span) {
-        let (expected, actual) = (self.show(expected), self.show(actual));
+        let (actual, expected) = self.mismatch_types(mismatch, actual, expected);
         let head = format!("expected `{expected}`, found `{actual}`");
         match mismatch {
             Mismatch::Types(a, b) => {
-                let (a, b) = (self.zonk(a), self.zonk(b));
+                let (a, b) = (uncaptured(&self.zonk(a)), uncaptured(&self.zonk(b)));
                 let rigid = |t: &Type| matches!(t, Type::Skolem(_));
                 if rigid(&a) || rigid(&b) {
                     let (var, other) = if rigid(&b) { (&b, &a) } else { (&a, &b) };
@@ -152,5 +179,13 @@ impl Checker<'_> {
                 );
             }
         }
+    }
+}
+
+/// `ty` without capture qualifiers at any depth.
+fn uncaptured(ty: &Type) -> Type {
+    match ty {
+        Type::Captured { ty, .. } | Type::Bounded { ty, .. } => uncaptured(ty),
+        other => other.map_children(&mut uncaptured),
     }
 }

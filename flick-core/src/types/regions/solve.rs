@@ -107,11 +107,15 @@ impl Checker<'_> {
                     continue;
                 }
                 let blocked = self.blocked_capture_rows(&label);
-                let mut grew = false;
-                for m in bound.tails.iter().filter_map(|t| match t {
-                    Type::Meta(m) if !blocked.contains(m) => Some(*m),
+                let metas = bound.tails.iter().filter_map(|t| match t {
+                    Type::Meta(m) => Some(*m),
                     _ => None,
-                }) {
+                });
+                // blocking only chooses among the rows: with every one
+                // blocked, the first still grows, and its bound reports
+                let (open, shut): (Vec<u32>, Vec<u32>) = metas.partition(|m| !blocked.contains(m));
+                let mut grew = false;
+                for m in open.into_iter().chain(shut) {
                     let rest = self.store.fresh_beside(m);
                     let row = Type::Row(Row {
                         entries: vec![(label.clone(), atom.clone())],
@@ -261,6 +265,11 @@ impl Checker<'_> {
                 .with_fix(
                     if reader {
                         "build a list with `[for …]`, or iterate the sequence in the function that builds it".to_owned()
+                    } else if !self.is_region(atom, &[]) {
+                        format!(
+                            "a qualifier names regions, not the type variable `{}`: build the value without what holds it, such as with `match` instead of a callback that uses it",
+                            self.show(atom)
+                        )
                     } else {
                         format!(
                             "add the region to the qualifier: `T^{{{}}}`",

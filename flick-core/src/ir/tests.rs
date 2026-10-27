@@ -132,5 +132,5 @@ fn both_forms_of_save_button_lower_to_the_same_ir() {
             .expect("defined")
     };
     assert!(body("save_button").contains("Ui.button"));
-    assert_eq!(body("save_button"), body("save_button_ui"));
+    assert_eq!(body("save_button"), body("save_button_calls"));
 }

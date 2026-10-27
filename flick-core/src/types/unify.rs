@@ -6,8 +6,11 @@
 //! shallower level may not be bound to it: that would let the rigid type escape
 //! its scope.
 
+use std::collections::HashSet;
+
 use super::Checker;
 use super::env::Form;
+use super::kinds::Kind;
 use super::ty::{Norm, Row, Type};
 use crate::source::Span;
 
@@ -27,6 +30,8 @@ struct Skolem {
 pub struct Store {
     metas: Vec<MetaState>,
     skolems: Vec<Skolem>,
+    /// The variables that stand for a capture row: an instantiated `^c`.
+    capture_rows: HashSet<u32>,
     pub level: u32,
 }
 
@@ -59,6 +64,20 @@ impl Store {
     pub fn fresh(&mut self) -> Type {
         self.metas.push(MetaState::Open { level: self.level });
         Type::Meta(id(self.metas.len() - 1))
+    }
+
+    /// A variable for a capture row of a quantified `^c`.
+    pub fn fresh_capture_row(&mut self) -> Type {
+        let row = self.fresh();
+        if let Type::Meta(m) = row {
+            self.capture_rows.insert(m);
+        }
+        row
+    }
+
+    /// Whether `m` stands for a capture row, not a type whose captures count.
+    pub fn is_capture_row(&self, m: u32) -> bool {
+        self.capture_rows.contains(&m)
     }
 
     /// A variable of the level of `m`, to extend what `m` stands for.
@@ -595,7 +614,14 @@ impl Checker<'_> {
             } => {
                 let subst: Vec<(String, Type)> = vars
                     .iter()
-                    .map(|v| (v.name.clone(), self.fresh()))
+                    .map(|v| {
+                        let meta = if matches!(v.kind, Kind::CaptureRow) {
+                            self.store.fresh_capture_row()
+                        } else {
+                            self.fresh()
+                        };
+                        (v.name.clone(), meta)
+                    })
                     .collect();
                 for c in &constraints {
                     self.want(c.substitute(&subst), span);

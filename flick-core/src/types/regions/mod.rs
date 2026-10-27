@@ -22,6 +22,7 @@ use super::Checker;
 use super::kinds::Kind;
 use super::ty::{Norm, Type, capture_label};
 use super::typing::Range;
+use super::unify::Mismatch;
 use crate::diagnostics;
 use crate::diagnostics::codes;
 use crate::source::Span;
@@ -150,6 +151,12 @@ impl Checker<'_> {
                 self.capture_row_filtered(captures, out, bounded);
                 self.collect_bounded_captures(ty, out, true);
             }
+            // a capture row not inferred yet is a tail: it may still be empty
+            Type::Meta(m) if self.store.is_capture_row(*m) => {
+                if !out.tails.contains(&t) {
+                    out.tails.push(t.clone());
+                }
+            }
             Type::Var(_) | Type::Skolem(_) | Type::Meta(_) => {
                 if !bounded || matches!(self.atom_kind(&t, &[]), Some(Kind::Region)) {
                     push_atom(out, &t);
@@ -161,7 +168,26 @@ impl Checker<'_> {
                 if opaque.iter().any(|n| head.is_prim(n)) {
                     return;
                 }
+                let kinds = match head {
+                    Type::Con { module, name } => self
+                        .env
+                        .type_def(module, name)
+                        .map(|d| self.kinds.resolve(&d.kind)),
+                    _ => None,
+                };
+                let mut kind = kinds.as_ref();
                 for arg in args {
+                    let param = match kind {
+                        Some(Kind::Arrow(param, rest)) => {
+                            kind = Some(rest);
+                            Some(&**param)
+                        }
+                        _ => None,
+                    };
+                    // an error cannot carry a region, so its row holds none
+                    if matches!(param, Some(Kind::ErrorRow)) {
+                        continue;
+                    }
                     match self.store.resolve(arg) {
                         row @ (Type::Row(_) | Type::Union(..)) => {
                             self.capture_row_filtered(&row, out, bounded);
@@ -602,6 +628,12 @@ fn qualify(t: Type, held: Type) -> Type {
             value: false,
         },
     }
+}
+
+/// Whether types differ only in what they capture: the hold, not the type,
+/// says what escapes.
+fn capture_mismatch(mismatch: &Mismatch) -> bool {
+    matches!(mismatch, Mismatch::Label { label, .. } if label.starts_with('^'))
 }
 
 fn push_atom(out: &mut Norm, t: &Type) {

@@ -26,7 +26,7 @@ narrow : forall s t. File s -> File t ->{FileSystem; ReadError} String
 let narrow first second =
   with_first first (fun () -> FileSystem.read_all second)
 
-forget : a -> (Unit -> Unit)
+forget : a -> (Unit -> Unit)^{}
 let forget value = fun () -> ignore value
 
 invariant : forall s. Ref (Unit ->{} String) -> Ref ((Unit ->{} String)^{s}) -> Unit

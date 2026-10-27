@@ -22,4 +22,4 @@ let scalar = do { x <- 1 and y <- Some 2; pure (x + y) }
 // the monadic tail after an `and` group must still match the block's type
 wrong_tail : Option Number
 let wrong_tail = do { _ <- Some 1 and _ <- Some 2; Some "wrong" }
-//~ FLICK-T003 expected `Number`, found `String`
+//~ FLICK-T003 @24:52-24:64 expected `Option Number`, found `Option String`
