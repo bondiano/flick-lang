@@ -505,13 +505,25 @@ impl Checker<'_> {
         region
     }
 
-    /// `ty` qualified with the reader `region` too.
-    pub fn read_through(ty: Type, region: &Type) -> Type {
+    /// `ty` qualified with the reader `region` too. An inferred qualifier is
+    /// the sequence's own: it already holds what it reads.
+    pub fn read_through(&mut self, ty: Type, region: &Type) -> Type {
         let label = capture_label(region).expect("a skolem has a label");
-        qualify(
-            ty,
-            Type::Row(super::ty::Row::closed(vec![(label, region.clone())])),
-        )
+        let held = Type::Row(super::ty::Row::closed(vec![(label, region.clone())]));
+        let inferred = match &ty {
+            Type::Captured { captures, .. } => match **captures {
+                Type::Meta(m) if matches!(self.store.resolve(captures), Type::Meta(_)) => Some(m),
+                _ => None,
+            },
+            _ => None,
+        };
+        match inferred {
+            Some(m) => {
+                self.store.set(m, held);
+                ty
+            }
+            None => qualify(ty, held),
+        }
     }
 
     /// Ends the innermost function's reader, reporting its `result` if it

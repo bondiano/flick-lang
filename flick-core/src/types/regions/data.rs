@@ -266,6 +266,11 @@ impl Checker<'_> {
         let arg = self.captures_of(argument);
         captures.entries.extend(arg.entries);
         captures.tails.extend(arg.tails);
+        // A reader region is the lending function's own, not data a result
+        // stores; its holds report every escape.
+        captures
+            .entries
+            .retain(|(_, atom)| !matches!(atom, Type::Skolem(s) if self.regions.lent.contains(s)));
         Type::Bounded {
             ty: Box::new(result),
             captures: Box::new(captures.into_type()),
