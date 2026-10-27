@@ -4,6 +4,7 @@ import { test } from "node:test";
 
 import { Effect } from "effect";
 
+import { devToolsListen } from "../src/effect/devtools/DevToolsServer.ts";
 import { appFail, capabilities, runMain, stdoutLine, versionProblems } from "../src/index.ts";
 
 const fixture = new URL("../fixtures/entry.ts", import.meta.url).pathname;
@@ -141,4 +142,16 @@ test("runMain reports a defect by its stack and a typed failure by its JSON", as
   assert.doesNotMatch(defect ?? "", /Generator\.next/);
   assert.equal(failure, '{"_tag":"Refused#0","_0":"no"}\n');
   assert.equal(plain, "plain\n");
+});
+
+test("FLICK_DEVTOOLS sends the spans and the debug log to the DevTools", async () => {
+  const server = await devToolsListen();
+  try {
+    const r = await run("devtools", { env: { FLICK_DEVTOOLS: `ws://127.0.0.1:${server.port}` } });
+    assert.equal(r.code, 0);
+    assert.match(r.stdout, /DEBUG .*atom App\.count\ndone\n$/);
+    assert.deepEqual([server.spans, server.events], [["App.go"], ["atom App.count"]]);
+  } finally {
+    await server.close();
+  }
 });

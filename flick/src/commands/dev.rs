@@ -72,7 +72,7 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
                     }
                 }
                 report::log(global, "dev: starting the new version");
-                live = launch(&generation, &name, &options.args, global).map(|running| Live {
+                live = launch(&generation, &name, options, global).map(|running| Live {
                     generation,
                     running,
                 });

@@ -27,9 +27,12 @@ const programs: Readonly<Record<string, () => Effect.Effect<unknown, unknown>>> 
         yield* Effect.sleep(20);
       }),
     ),
+  devtools: () => Effect.withSpan(Effect.andThen(Effect.logDebug("atom App.count"), say("done")), "App.go"),
 };
 
 const name = process.argv[2] ?? "";
+// as `flick run --devtools` preloads it
+if (name === "devtools") await import("../src/runner/devtools.ts");
 const program = programs[name] ?? (() => Effect.void);
 await runMain(
   program,

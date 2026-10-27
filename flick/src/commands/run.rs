@@ -212,14 +212,20 @@ pub fn build_generation(
 pub fn launch(
     generation: &Generation,
     name: &str,
-    args: &[String],
+    options: &RunArguments,
     global: &GlobalArguments,
 ) -> Option<Running> {
     let mut command = Process::new("node");
+    command.arg("--enable-source-maps");
+    if let Some(url) = &options.devtools {
+        // the runtime's module that hands `runMain` the DevTools layer
+        command
+            .args(["--import", "@flick-lang/runtime/runner/devtools"])
+            .env("FLICK_DEVTOOLS", url);
+    }
     command
-        .arg("--enable-source-maps")
         .arg(generation.path().join(runner_file(name, false)))
-        .args(args);
+        .args(&options.args);
     match child::spawn(&mut command, global, "application-stderr") {
         Ok(running) => {
             let _ = write(
@@ -253,7 +259,7 @@ pub fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
         Ok(g) => g,
         Err(code) => return ExitCode::from(code),
     };
-    let Some(running) = launch(&generation, &name, &options.args, global) else {
+    let Some(running) = launch(&generation, &name, options, global) else {
         return ExitCode::from(2);
     };
     let code = finish(running, &signals);

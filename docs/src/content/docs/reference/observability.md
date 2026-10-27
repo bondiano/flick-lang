@@ -204,5 +204,12 @@ is `ws://localhost:34437`), which must already listen.
 handshake — a token a proxy in front of the DevTools checks, say; only
 Node's WebSocket sends them.
 
+`flick run --devtools` and `flick dev --devtools` need no code: they
+provide `DevTools.layer` to the whole of `main`, at
+`ws://localhost:34437` or the URL given (`--devtools=ws://host:port`),
+with the minimum log level at Debug. The DevTools then show the spans of
+actions and, as events of those spans, the log of each atom write. If no
+DevTools listen, the program runs as without the flag.
+
 `Otlp`, `Prometheus`, `DevTools` and [RPC](../rpc/) wrap Effect modules
 marked unstable; use matching compiler and runtime versions.

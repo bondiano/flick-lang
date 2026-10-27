@@ -87,17 +87,30 @@ export const asMain = <I>(main: unknown): Main<I> => {
   };
 };
 
+type Around = (program: Effect.Effect<unknown, unknown>) => Effect.Effect<unknown, unknown>;
+
+let around: Around | undefined;
+
+/**
+ * Runs every `main` that `start` starts inside `f`: what a module preloaded
+ * with `node --import` gives, such as the DevTools of `flick run
+ * --devtools`. Built programs never call it, so they carry no layer code.
+ */
+export const aroundMain = (f: Around): void => {
+  around = f;
+};
+
 /** Runs `main` on `input` under the root owner; a pure `main` is done when it returns. */
-export const start = <I>(main: Main<I>, input: I): Fiber.Fiber<unknown, unknown> =>
-  Effect.runFork(
-    withOwner(() =>
-      Effect.suspend(() => {
-        const result = main(input);
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiler checked `main` needs no service
-        return Effect.isEffect(result) ? (result as Effect.Effect<unknown, unknown>) : Effect.succeed(result);
-      }),
-    ),
+export const start = <I>(main: Main<I>, input: I): Fiber.Fiber<unknown, unknown> => {
+  const program = withOwner(() =>
+    Effect.suspend(() => {
+      const result = main(input);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiler checked `main` needs no service
+      return Effect.isEffect(result) ? (result as Effect.Effect<unknown, unknown>) : Effect.succeed(result);
+    }),
   );
+  return Effect.runFork(around === undefined ? program : around(program));
+};
 
 /** What a test of the runner overrides. */
 export interface RunOptions {

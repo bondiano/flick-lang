@@ -17,8 +17,8 @@ and `--help`; `flick help <command>` prints a command's help and
 | `check [paths] [--watch] [--fix]` | checks; without paths the source and test roots; `--fix` applies the fixes that keep the program's meaning (such as removing a type annotation the value already has, `FLICK-T021`) to those files and reports what is left |
 | `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts] [--emit-dts] [--schema-aot] [--out-dir] [--watch]` | writes ESM, source maps and `.iface` files |
 | `build [paths] --inputs` | prints a conservative JSON input inventory (`key`, `files`, `roots`, `modules`) without writing build artifacts or cache entries |
-| `run [name] [--entry M] [--profile] -- args` | builds JavaScript and runs the `main` of the entry `name` (the only one when left out) |
-| `dev [name] [--entry M] [--profile] -- args` | rebuilds on changes and replaces the running app |
+| `run [name] [--entry M] [--profile] [--devtools[=url]] -- args` | builds JavaScript and runs the `main` of the entry `name` (the only one when left out); `--devtools` sends its spans to the Effect DevTools ([observability](../observability/#devtools)) |
+| `dev [name] [--entry M] [--profile] [--devtools[=url]] -- args` | rebuilds on changes and replaces the running app |
 | `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile]` | runs the tests of the test root |
 | `fmt [paths] [--check] [--stdin --stdin-filepath f]` | formats; without paths the source and test roots |
 | `clean [--cache]` | removes the build artifacts; `--cache` also the build cache |

@@ -17,8 +17,8 @@ title: "Командная строка"
 | `check [paths] [--watch] [--fix]` | проверяет код; если пути не указаны, проверяет корневые каталоги исходников и тестов; `--fix` применяет к этим файлам исправления, не меняющие смысла программы (например, убирает избыточную аннотацию типа, `FLICK-T021`), и сообщает об оставшихся проблемах |
 | `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts] [--emit-dts] [--schema-aot] [--out-dir] [--watch]` | записывает ESM, карты исходников и файлы `.iface` |
 | `build [paths] --inputs` | выводит консервативный JSON-инвентарь входов (`key`, `files`, `roots`, `modules`), не записывая артефакты и кеш |
-| `run [name] [--entry M] [--profile] -- args` | собирает JavaScript и запускает `main` входа `name` (единственного, если имя не указано) |
-| `dev [name] [--entry M] [--profile] -- args` | пересобирает при изменениях и заменяет работающее приложение |
+| `run [name] [--entry M] [--profile] [--devtools[=url]] -- args` | собирает JavaScript и запускает `main` входа `name` (единственного, если имя не указано); `--devtools` отправляет его спаны в Effect DevTools ([наблюдаемость](../observability/#devtools)) |
+| `dev [name] [--entry M] [--profile] [--devtools[=url]] -- args` | пересобирает при изменениях и заменяет работающее приложение |
 | `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile]` | запускает тесты из корневого каталога тестов |
 | `fmt [paths] [--check] [--stdin --stdin-filepath f]` | форматирует код; если пути не указаны, обрабатывает корневые каталоги исходников и тестов |
 | `clean [--cache]` | удаляет артефакты сборки; с `--cache` — также кеш сборки |

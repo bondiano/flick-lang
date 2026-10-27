@@ -42,6 +42,11 @@ pub struct RunArguments {
     #[arg(long, value_enum)]
     pub profile: Option<ProfileArgument>,
 
+    /// Sends the spans of the application, and the debug log of its atom
+    /// writes, to the Effect `DevTools` listening at this URL.
+    #[arg(long, value_name = "URL", num_args = 0..=1, default_missing_value = "ws://localhost:34437")]
+    pub devtools: Option<String>,
+
     /// Arguments of the application, after `--`.
     #[arg(last = true)]
     pub args: Vec<String>,
