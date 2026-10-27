@@ -52,6 +52,14 @@ pub struct State {
     pub lent: Vec<u32>,
     /// Kinds of rigid signature variables, including nested `forall`s.
     pub rigid_kinds: Vec<(u32, Kind)>,
+    /// What the type variable elements of error rows, `{t | e}`, were
+    /// instantiated to, and where: each must be an error type.
+    pub error_elements: Vec<(Type, Span)>,
+    /// The span of the value being subsumed: qualifiers that wait for the
+    /// captures of a type not inferred yet are compared once it is.
+    pub deferring: Option<Span>,
+    /// Qualifiers to compare at the end, and where they were.
+    pub deferred: Vec<(Type, Type, Span)>,
 }
 
 /// A function's reader: the services it reads atoms through, which end

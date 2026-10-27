@@ -9,6 +9,7 @@ use std::{collections::HashSet, mem};
 use super::{Hold, Visible};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
+use crate::types::env::Form;
 use crate::types::kinds::Kind;
 use crate::types::ty::{Norm, Row, Type};
 use crate::types::{Checker, ty};
@@ -182,11 +183,36 @@ impl Checker<'_> {
                 self.report_hold(&hold, atom, &bound);
             }
         }
+        // after the holds: what a qualifier holds too much is theirs to name
+        self.compare_deferred();
         for o in mem::take(&mut self.regions.outlives) {
             self.check_outlives(&o);
         }
         for (errors, span) in mem::take(&mut self.regions.raised) {
             self.check_raised(&errors, span);
+        }
+        for (element, span) in mem::take(&mut self.regions.error_elements) {
+            let element = self.zonk(&element);
+            if !self.may_be_error(&element) {
+                let shown = self.show(&element);
+                self.error(
+                    codes::T002,
+                    span,
+                    format!("`{shown}` is not an error: an error row holds types declared with `type error`"),
+                );
+            }
+        }
+    }
+
+    /// Whether `t` is, or may still become, an error type: a variable
+    /// passes, as its callers are checked where they name it.
+    pub fn may_be_error(&self, t: &Type) -> bool {
+        match t.spine().0 {
+            Type::Con { module, name } => matches!(
+                self.env.type_def(module, name).map(|d| &d.form),
+                Some(Form::Error)
+            ),
+            _ => true,
         }
     }
 

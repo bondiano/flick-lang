@@ -1,0 +1,15 @@
+// A closure over a cell whose contents are not inferred yet fits a
+// position without captures: the qualifiers are compared once the type is
+// known, here from the record's later use.
+module App.LateCaptures exposing (..)
+
+type alias Batch o = { flush : List o ->{} Unit }
+
+take : Batch String -> Unit
+let take _ = ()
+
+collected : Unit ->{} Unit
+let collected () =
+  let seen = Ref.make []
+  let collect = { flush = fun outputs -> Ref.set seen (Ref.get seen ++ outputs) }
+  take collect

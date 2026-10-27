@@ -598,6 +598,22 @@ impl Checker<'_> {
 
     /// The body of a polymorphic type with fresh variables for its own; its
     /// class constraints become constraints to solve, required at `span`.
+    /// Records the type variable elements of error rows in `t`, as the
+    /// signature wrote them (`~t`), to check that each is an error type.
+    fn error_elements(&mut self, t: &Type, span: Span) {
+        let mut found = Vec::new();
+        t.visit(&mut |t| {
+            if let Type::Row(row) = t {
+                let elements = row
+                    .entries
+                    .iter()
+                    .filter(|(label, _)| label.starts_with('~'));
+                found.extend(elements.map(|(_, element)| (element.clone(), span)));
+            }
+        });
+        self.regions.error_elements.extend(found);
+    }
+
     pub fn instantiate(&mut self, t: &Type, span: Span) -> Type {
         match self.store.resolve(t) {
             Type::Captured {
@@ -632,7 +648,9 @@ impl Checker<'_> {
                 for c in &constraints {
                     self.want(c.substitute(&subst), span);
                 }
-                self.instantiate(&body.substitute(&subst), span)
+                let body = body.substitute(&subst);
+                self.error_elements(&body, span);
+                self.instantiate(&body, span)
             }
             other => other,
         }

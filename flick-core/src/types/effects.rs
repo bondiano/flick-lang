@@ -259,6 +259,13 @@ impl Checker<'_> {
     /// its position allows: runtime arrows and `Eff` are covariant in their
     /// rows and results, and a pure function passes for a runtime one.
     pub fn subsume(&mut self, actual: &Type, expected: &Type, span: Span) -> super::unify::Unified {
+        let outer = self.regions.deferring.replace(span);
+        let fits = self.subsume_at(actual, expected, span);
+        self.regions.deferring = outer;
+        fits
+    }
+
+    fn subsume_at(&mut self, actual: &Type, expected: &Type, span: Span) -> super::unify::Unified {
         if let Some(result) = self.subsume_bound(actual, expected, span) {
             return result;
         }

@@ -1,10 +1,13 @@
 //! Capture-qualified type equality and value subsumption.
 
+use std::mem;
+
 use super::{Hold, Visible, capture_mismatch};
+use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::types::Checker;
 use crate::types::ty::Type;
-use crate::types::unify::Unified;
+use crate::types::unify::{Mismatch, Unified};
 
 impl Checker<'_> {
     /// Unifies types of which at least one has a capture qualifier: the
@@ -33,7 +36,44 @@ impl Checker<'_> {
                 let right = cb.unwrap_or_else(Type::empty_row);
                 // the types first: what they solve decides what a qualifier holds
                 self.unify(&a, &b)?;
-                self.unify(&left, &right)
+                match self.unify(&left, &right) {
+                    Err(mismatch) if self.unknown_captures(&mismatch) => {
+                        let span = self.regions.deferring.expect("checked");
+                        self.regions.deferred.push((left, right, span));
+                        Ok(())
+                    }
+                    other => other,
+                }
+            }
+        }
+    }
+
+    /// Whether qualifiers differ only by the captures of a type not inferred
+    /// yet, inside a subsumption that can compare them once it is.
+    fn unknown_captures(&self, mismatch: &Mismatch) -> bool {
+        let Mismatch::Label { label, .. } = mismatch else {
+            return false;
+        };
+        let meta = label.strip_prefix("^?").and_then(|m| m.parse().ok());
+        self.regions.deferring.is_some()
+            && meta.is_some_and(|m| {
+                !self.store.is_capture_row(m)
+                    && matches!(self.store.resolve(&Type::Meta(m)), Type::Meta(_))
+            })
+    }
+
+    /// Compares the qualifiers deferred until their types were inferred.
+    pub fn compare_deferred(&mut self) {
+        for (left, right, span) in mem::take(&mut self.regions.deferred) {
+            let reported = self.diagnostics.iter().any(|d| {
+                [codes::G001, codes::G002].contains(&d.code)
+                    && d.span
+                        .is_some_and(|s| s.start <= span.start && span.end <= s.end)
+            });
+            if let Err(mismatch) = self.unify(&left, &right)
+                && !reported
+            {
+                self.mismatch(&mismatch, &left, &right, span);
             }
         }
     }

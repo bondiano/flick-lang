@@ -166,6 +166,10 @@ impl Checker<'_> {
             let actual = self.actual(i);
             let c = self.subrows[i].clone();
             let declared = self.store.normalize(&c.declared);
+            // a declared element that is no error is reported as such, once
+            if c.errors && declared.entries.iter().any(|(_, t)| !self.may_be_error(t)) {
+                continue;
+            }
             let mut lacking = Vec::new();
             for (label, ty) in &actual.entries {
                 match declared.get(label) {
