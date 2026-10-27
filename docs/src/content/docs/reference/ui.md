@@ -14,7 +14,7 @@ type alias SaveButtonProps c =
   {
     label : String;
     disabled : Bool;
-    on_save : (Unit ->{Users; SaveError} Unit)^c;
+    on_save : (Unit ->{Atom.Write;} Unit)^c;
   }
 
 save_button : SaveButtonProps c -> Ui^c
@@ -36,10 +36,11 @@ variable of a signature it is quantified over the whole signature, so
 `forall c.` can be left out ([types](../types/)).
 
 The two `^c` are what let `save_button` accept any callback. A function type
-without a qualifier holds no regions. So with `on_save : Unit ->{Users;
-SaveError} Unit`, a callback that uses a `File s` from an enclosing `scope`
+without a qualifier holds no regions. So with `on_save : Unit ->{Atom.Write;} Unit`, a callback that uses a `File s` from an enclosing `scope`
 is rejected where it is passed (`FLICK-G001`), even when the `Ui` never
-leaves the scope. With `^c` on the field the callback may hold anything, and
+leaves the scope. A callback that needs a service, such as saving through
+`Users`, provides it and handles its errors inside, writing the outcome to
+an atom. With `^c` on the field the callback may hold anything, and
 `^c` on the result keeps those captures in the `Ui`, so a `Ui` that holds a
 region still cannot leave its scope. A qualifier on the result alone does not
 help, since the field would still allow no captures. A top-level signature is
@@ -596,13 +597,14 @@ other HTML helpers remain DOM-specific; non-DOM surfaces need their own
 typed primitives and event snapshots, or foreign React components through
 `Ui.component`. Do not import the DOM entry point in a non-DOM adapter.
 
-## Elm-like, not yet a full TEA program
+## Atoms, not a TEA program
 
-The current API has views over atoms and supervised Effect handlers. It does not yet provide a serialized `Msg → update` loop,
-commands returned by `init`/`update`, or model-driven subscription
-start/stop. See the [prioritized gaps](#prioritized-gaps) below. Effects,
-fibers, scopes and event concurrency policies already exist; a future MVU
-API should reuse them rather than introduce another asynchronous runtime.
+The state of a Flick UI is in atoms: a view renders from the atoms it reads,
+and a handler is a supervised task that writes them. There is no
+`Msg → update` loop, and none is planned: what Elm puts in commands is a
+task of an action, run by the Effect fibers, scopes and event policies that
+already exist. Sources that write atoms on their own, Elm's subscriptions,
+are among the [prioritized gaps](#prioritized-gaps) below.
 
 ### Comparison with Elmish
 
@@ -665,13 +667,11 @@ does not create another backend.
 
 | Priority | Capability | Minimum contract and reason |
 | - | - | - |
-| P1 | Renderer-independent MVU program | `init`, pure `update`, stable `dispatch` and a serialized message queue, including reentrant dispatch. Views do not write atoms directly; DOM, Native, Ink and R3F share one loop. |
-| P1 | Commands from `init`/`update` | Run existing Effect tasks and map results to messages, reusing supervision and interrupt/join. Do not build a second `Cmd` runtime over Effect. |
-| P1 | Model-driven keyed subscriptions | Diff/start/stop subscriptions by stable identity, reject late events and use scope-owned cleanup. Timers, sockets, terminal input and animation sources must update the model without waiting for a UI handler to finish. |
+| P1 | Keyed subscriptions of atoms | Start and stop sources by stable identity, reject late events and use scope-owned cleanup. Timers, sockets, terminal input and animation sources write atoms without waiting for a UI handler to finish. |
 | P1 | Typed host primitives and events | Separate HTML constructors from renderer-specific `View`/`Text`, Ink host nodes and R3F scene nodes. Styles, numeric props and event snapshots must not assume DOM `target.value` or `preventDefault`. |
-| P1 | Real Native / Ink / R3F adapters | Build on `Renderer` and host primitives: registration/mounting, updates, synchronous detachment and resource shutdown. Define R3F's MVU/frame-loop/invalidation relationship explicitly; do not send 60 messages per second unnecessarily. |
+| P1 | Real Native / Ink / R3F adapters | Build on `Renderer` and host primitives: registration/mounting, updates, synchronous detachment and resource shutdown. Define R3F's frame-loop/invalidation relationship with atoms explicitly; do not send 60 messages per second unnecessarily. |
 | P2 | Typed React interop | Foreign-component children/slots, scoped refs, Context/providers and lifecycle with defined resource release. Currently only opaque `Ui.component` with props is available. |
-| P2 | MVU diagnostics and development | Message/model tracing, replay of pure updates and state-preserving HMR. Build on the MVU contract, not on a global mutable singleton. |
+| P2 | Atom diagnostics and development | Tracing of atom writes and actions, and state-preserving HMR. Build on the registry of the root, not on a global mutable singleton. |
 
 Existing Effect, fibers/scopes, bounded event
 policies, supervision, escaping checks and the safe text channel are not

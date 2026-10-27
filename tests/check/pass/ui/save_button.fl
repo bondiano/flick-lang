@@ -1,6 +1,7 @@
-// The two forms of `save_button`: the `Ui` functions and the `ui { … }`
-// block, which only opens the names of `Ui`. A handler writes atoms and
-// nothing else, so `save` provides `Users` and handles `SaveError` itself.
+// The two forms of `save_button`: the `ui { … }` block, as the UI reference
+// shows it word for word, and the `Ui` functions the block only opens. A
+// handler writes atoms and nothing else, so `save` provides `Users` and
+// handles `SaveError` itself.
 // Then the two ways a handler may use a scoped file: open it inside the
 // task, or keep the UI in the scope.
 module App.SaveButton exposing (..)
@@ -17,29 +18,8 @@ type alias SaveButtonProps c =
     on_save : (Unit ->{Atom.Write;} Unit)^c;
   }
 
-failure : Atom.Writable (Option String)
-let failure = Atom.make None
-
-save : Layer none none {Users} -> String -> Unit ->{Atom.Write;} Unit
-let save users name () =
-  provide users {
-    try Users.save name with
-    | SaveError reason -> Atom.set failure (Some reason)
-  }
-
 save_button : SaveButtonProps c -> Ui^c
 let save_button props =
-  Ui.button
-    {
-      disabled = props.disabled;
-      on_click = Ui.Event.exhaust (fun _ ->
-        task { props.on_save () }
-      );
-    }
-    [Ui.text props.label]
-
-save_button_ui : SaveButtonProps c -> Ui^c
-let save_button_ui props =
   ui {
     button
       {
@@ -49,6 +29,27 @@ let save_button_ui props =
         );
       }
       [text props.label]
+  }
+
+save_button_calls : SaveButtonProps c -> Ui^c
+let save_button_calls props =
+  Ui.button
+    {
+      disabled = props.disabled;
+      on_click = Ui.Event.exhaust (fun _ ->
+        task { props.on_save () }
+      );
+    }
+    [Ui.text props.label]
+
+failure : Atom.Writable (Option String)
+let failure = Atom.make None
+
+save : Layer none none {Users} -> String -> Unit ->{Atom.Write;} Unit
+let save users name () =
+  provide users {
+    try Users.save name with
+    | SaveError reason -> Atom.set failure (Some reason)
   }
 
 type alias User = { id : Number; name : String }

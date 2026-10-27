@@ -265,7 +265,7 @@ React cleanup synchronously closes event intake and removes registrations. The a
 
 ### Content safety and interop
 
-`Ui.text : String -> Ui` (polymorphic over strings so that it can stand among the children of any element) inserts text through a safe text channel. URLs and raw HTML have separate policies and opaque types, for example SafeUrl and SanitizedHtml. Their constructors validate the input or are explicitly trusted; a plain String cast does not create a proof of safety. This is a separation of channels, not a promise to automatically prove the entire HTML grammar, accessibility and the correctness of the application.
+`Ui.text : String -> Ui` (a `Ui` has no rows, so it stands among the children of any element) inserts text through a safe text channel. URLs and raw HTML have separate policies and opaque types, for example SafeUrl and SanitizedHtml. Their constructors validate the input or are explicitly trusted; a plain String cast does not create a proof of safety. This is a separation of channels, not a promise to automatically prove the entire HTML grammar, accessibility and the correctness of the application.
 
 A `.d.ts` can give the props shape of a foreign component, but does not prove purity, retention and cancellation. A foreign component is stored as an opaque renderer component; a pure source builder does not execute it. The adapter sets the callback/lifetime policy and the owner. The supported part of the React ecosystem that is imported goes through the same FFI pipeline; unrepresentable guarantees are not erased.
 

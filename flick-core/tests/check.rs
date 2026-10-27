@@ -241,6 +241,27 @@ fn check_fixtures() {
     );
 }
 
+/// The first example of the UI reference, in English and Russian, is code of
+/// a passing fixture: the page shows what the checker accepts.
+#[test]
+fn ui_reference_example_is_a_checked_fixture() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let fixture =
+        fs::read_to_string(repo.join("tests/check/pass/ui/save_button.fl")).expect("fixture");
+    for page in ["reference/ui.md", "ru/reference/ui.md"] {
+        let text = fs::read_to_string(repo.join("docs/src/content/docs").join(page)).expect(page);
+        let example = text
+            .split("```flick\n")
+            .nth(1)
+            .and_then(|rest| rest.split("```").next())
+            .unwrap_or_else(|| panic!("{page} has no flick example"));
+        assert!(
+            fixture.contains(example),
+            "the first example of {page} is not in save_button.fl:\n{example}"
+        );
+    }
+}
+
 #[test]
 fn parses_caret_and_explicit_annotations() {
     let text = "let x = 1\n//  ^^^ FLICK-S002 bad thing\n//~ FLICK-P001 no span\n//~ FLICK-S001 @1:1-2:3\n";
