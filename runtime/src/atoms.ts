@@ -3,7 +3,7 @@
 // Effect's registry computes in plain JS): a render of `Atom.Read` alone is
 // a Sync function, called with the reader at hand as its context; one that
 // may fail, as under `Ui.suspended`, an effect run at once with `runSync`.
-import { Cause, Context, Effect, Option, Schema } from "effect";
+import { Cause, Context, Effect, Option, Schema, type Stream } from "effect";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Atom from "effect/reactivity/Atom";
 
@@ -130,6 +130,48 @@ export const atomSerializableTask = <A>(key: string, codec: Schema.Codec<A, unkn
 
 /** `Atom.task`: the atom of a task's result, run by the registry that first reads it. */
 export const atomTask = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<object> => Atom.map(Atom.make(task), toAsync);
+
+/** The refreshes of the queries each registry has read, by key. */
+const queries = new WeakMap<object, Map<string, Set<() => void>>>();
+
+/** `atom`, run anew in a registry when a mutation of one of `keys` succeeds there. */
+const keyed = (keys: ReadonlyArray<string>, atom: Atom.Atom<object>): Atom.Atom<object> =>
+  Atom.readable((get) => {
+    const byKey = queries.get(get.registry) ?? new Map<string, Set<() => void>>();
+    queries.set(get.registry, byKey);
+    const refresh = (): void => get.refresh(atom);
+    for (const key of keys) {
+      const refreshes = byKey.get(key) ?? new Set();
+      byKey.set(key, refreshes.add(refresh));
+    }
+    get.addFinalizer(() => {
+      for (const key of keys) byKey.get(key)?.delete(refresh);
+    });
+    return get(atom);
+  });
+
+/** `Atom.query keys task`: a task atom that a mutation of one of `keys` runs anew. */
+export const atomQuery = <A, E>(keys: ReadonlyArray<string>, task: Effect.Effect<A, E>): Atom.Atom<object> =>
+  keyed(keys, atomTask(task));
+
+/** `Atom.query_stream keys stream`: the latest element of `stream`, which a mutation of one of `keys` starts anew. */
+export const atomQueryStream = <A, E>(keys: ReadonlyArray<string>, stream: Stream.Stream<A, E>): Atom.Atom<object> =>
+  keyed(keys, Atom.map(Atom.make(stream), toAsync));
+
+/** `Atom.mutation keys f payload`: `f payload`, then, when it succeeds, the queries of `keys` run anew. */
+export const atomMutation = <P>(
+  keys: ReadonlyArray<string>,
+  f: (payload: P) => Effect.Effect<unknown, unknown, unknown>,
+  payload: P,
+): Effect.Effect<unknown, unknown, unknown> =>
+  Effect.tap(f(payload), () =>
+    Effect.map(Effect.service(WriteService), (write) => {
+      const registry = nativeRegistry(write);
+      const byKey = registry === undefined ? undefined : queries.get(registry);
+      const refreshes = new Set(keys.flatMap((key) => [...(byKey?.get(key) ?? [])]));
+      for (const refresh of refreshes) refresh();
+    }),
+  );
 
 /** `Atom.derived`: an atom the Sync `compute` computes, depending on the atoms it reads. */
 export const atomDerived = <A>(compute: (unit: undefined) => A): Atom.Atom<A> =>

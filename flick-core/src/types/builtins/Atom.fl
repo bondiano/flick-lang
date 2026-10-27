@@ -150,6 +150,25 @@ type Async a (e : ErrorRow) = Loading | Loaded a | Failed (Failure e)
 task : Eff none e a -> Atom (Async a e)
 foreign pure task from "@flick-lang/runtime" "atomTask"
 
+/// A task atom that a `mutation` of one of `keys` runs anew, in the
+/// registry where it succeeds: the list of orders a placed order changes.
+query : List String -> Eff none e a -> Atom (Async a e)
+foreign pure query from "@flick-lang/runtime" "atomQuery"
+  arity 2
+
+/// The latest element of `stream`, `Loading` until the first; a
+/// `mutation` of one of `keys` starts it anew. It has no mutation of its
+/// own: what changes it comes through the stream.
+query_stream : List String -> Stream.Core.Stream none e a -> Atom (Async a e)
+foreign pure query_stream from "@flick-lang/runtime" "atomQueryStream"
+  arity 2
+
+/// `f`, after which, when it succeeds, every `query` of one of `keys` the
+/// registry reads runs anew: `let place = Atom.mutation ["orders"] Shop.place`.
+mutation : forall p r e s. List String -> (p ->{r; e} s) -> p ->{Write | r; e} s
+foreign effect mutation from "@flick-lang/runtime" "atomMutation"
+  arity 3
+
 /// What `ready` does while a task loads: a view of `Ui.suspended` shows
 /// its fallback, any other reader fails.
 pending : Unit ->{} a

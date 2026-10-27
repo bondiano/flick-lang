@@ -1,0 +1,82 @@
+// Queries and mutations: a mutation runs anew the queries of its keys that
+// the registry reads, not the others, and only when it succeeds; a stream
+// query shows its latest element.
+module App.Main exposing (main)
+
+type error Refused = Refused
+  deriving Show
+
+setup : Unit ->{} Unit
+foreign sync setup from "./dom.mjs" "setup"
+  arity 0
+
+settle : Unit ->{} Unit
+foreign async settle from "./dom.mjs" "settle"
+  arity 0
+
+text : Unit ->{} String
+foreign sync text from "./dom.mjs" "text"
+  arity 0
+
+/// The `n`-th run of a query, counted per name.
+run_of : String ->{} Number
+foreign sync run_of from "./query.mjs" "run"
+  arity 1
+
+orders : Atom.Atom (Atom.Async Number none)
+let orders = Atom.query ["orders"] (task { run_of "orders" })
+
+stock : Atom.Atom (Atom.Async Number none)
+let stock = Atom.query ["stock"] (task { run_of "stock" })
+
+/// The latest element of a stream.
+latest : Atom.Atom (Atom.Async Number none)
+let latest = Atom.query_stream ["stock"] (Stream.from_list [7, 8])
+
+shown : Atom.Atom (Atom.Async Number none) ->{Atom.Read;} String
+let shown atom =
+  match Atom.get atom with
+  | Atom.Loaded n -> show n
+  | _ -> "-"
+
+counts : Ui.View Unit
+let counts =
+  Ui.view
+    (fun () ->
+      ui {
+        text ("orders " ++ shown orders ++ " stock " ++ shown stock ++ " latest " ++ shown latest)
+      })
+
+place : Bool ->{; Refused} Unit
+let place ok = if ok then () else from_result (Err Refused)
+
+/// A placed order changes the orders, not the stock.
+placed : Bool ->{Atom.Write; Refused} Unit
+let placed = Atom.mutation ["orders"] place
+
+report : Failure e ->{} Unit
+let report _ = ()
+
+main : Unit ->{; AppError} Unit
+let main () =
+  setup ()
+  match Ui.Dom.container "app" with
+  | None -> Platform.stdout_line "no container"
+  | Some root ->
+    provide Atom.layer {
+      scope s {
+        let _mounted =
+          Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render counts ()) })
+        settle ()
+        Platform.stdout_line (text ())
+        try
+          placed true
+          settle ()
+          Platform.stdout_line ("after a placed order: " ++ text ())
+          placed false
+        with
+        | Refused -> Platform.stdout_line "refused"
+        settle ()
+        Platform.stdout_line ("after a refused one: " ++ text ())
+      }
+    }

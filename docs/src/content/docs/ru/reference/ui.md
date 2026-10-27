@@ -364,6 +364,27 @@ awaited : Ui.View (Atom.Atom (Atom.Async String {Offline}))
 let awaited = Ui.awaiting (fun _ -> ui { text "offline" }) (ui { text "…" }) (fun name -> ui { text name })
 ```
 
+### Запросы и мутации
+
+`Atom.query keys t` — это `Atom.task t`, который заново запускает мутация
+одного из ключей `keys`. `Atom.mutation keys f` — это `f`, после успеха
+которой реестр заново запускает все прочитанные им запросы этих ключей;
+неудачная мутация ничего не меняет. Запросы других ключей сохраняют
+значение. `Atom.query_stream keys s` показывает последний элемент потока
+`s` и перезапускает его после такой мутации; своей мутации у него нет.
+Поверх [серверной функции](../server-fn/):
+
+```flick
+orders : Atom.Atom (Atom.Async (List Order) {Rpc.ClientError})
+let orders = Atom.query ["orders"] (task { Shop.orders () })
+
+place : Order ->{Atom.Write; Rpc.ClientError, OutOfStock} String
+let place = Atom.mutation ["orders"] Shop.place
+```
+
+Запрос — атом задачи: `Atom.serializable_task` передаёт его загруженное
+значение из серверного рендера клиенту под именем привязки.
+
 ## Поля, привязанные к состоянию
 
 `Ui.field { bind = query; placeholder = "Найти"; on_input = None }` — поле

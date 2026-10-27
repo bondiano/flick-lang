@@ -341,6 +341,26 @@ awaited : Ui.View (Atom.Atom (Atom.Async String {Offline}))
 let awaited = Ui.awaiting (fun _ -> ui { text "offline" }) (ui { text "…" }) (fun name -> ui { text name })
 ```
 
+### Queries and mutations
+
+`Atom.query keys t` is `Atom.task t` that a mutation of one of `keys` runs
+anew. `Atom.mutation keys f` is `f` that, when it succeeds, runs anew every
+query of those keys its registry reads; one that fails changes nothing.
+Queries of other keys keep their value. `Atom.query_stream keys s` shows
+the latest element of the stream `s` and starts it anew on such a
+mutation; it has no mutation of its own. Over a [server function](../server-fn/):
+
+```flick
+orders : Atom.Atom (Atom.Async (List Order) {Rpc.ClientError})
+let orders = Atom.query ["orders"] (task { Shop.orders () })
+
+place : Order ->{Atom.Write; Rpc.ClientError, OutOfStock} String
+let place = Atom.mutation ["orders"] Shop.place
+```
+
+A query is a task atom: `Atom.serializable_task` hands its loaded value
+from a server render to the client under the binding's name.
+
 ## Fields bound to a state
 
 `Ui.field { bind = query; placeholder = "Find"; on_input = None }` is an

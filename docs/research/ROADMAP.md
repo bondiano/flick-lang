@@ -252,7 +252,7 @@ component search (props : SearchProps) =
 **F2. `server fn`.** ✅ (контекстное слово: `server fn name x = body` — `LetDecl` с сигнатурой над ним, которую выполняет сервер, `P ->{r; e} S`; имя — клиентский вызов `P ->{; Rpc.ClientError | e} S` поверх `Rpc` (NDJSON, POST на `Server.path`, `/_flick/fn`, адрес — origin страницы или `FLICK_SERVER_URL`), годится для `Atom.task`/action; `server name` — реализация `Server.Function {Server, r | t}` для `Server.handler`, клиентский вход до неё не дотягивается (E009 с путём `server App.Api.place`); параметр, результат и ошибки — свидетели Schema, иначе `FLICK-E010` (как и обобщённая сигнатура, неперечисленные ошибки, `server x` не для server fn); `flick doc` помечает публичный endpoint; `reference/server-fn.md`; бандл `fullstack` — вызов без тела, `Db` и Node-сервера, 50 KB как у `rpc`. Не сделано: вызов на сервере (SSR) идёт по HTTP, а не в процессе; auth — Q12; один параметр — запись)
 - AC: компилируется в `HttpApi`/`Rpc` endpoint и клиентскую заглушку; аргументы и результат требуют кодека; ошибки `e` восстанавливаются типизированно; на клиенте вызов — `Action`/task-атом; в документации каждый `server fn` помечен как публичный endpoint.
 
-**F3. Запросы и мутации.** ⬜
+**F3. Запросы и мутации.** ✅ (`Atom.query keys task`, `Atom.query_stream keys stream` (без своей мутации), `Atom.mutation keys f` — после успеха `f` перезапускает прочитанные реестром запросы тех же ключей, неудача ничего не трогает; механизм `withReactivity` повторён в `atoms.ts` (реестр-локальная карта ключей), а не через `AtomRpc`/`AtomHttpApi`: тем нужен свой клиент на группу, а `server fn` — обычная задача; `serializable_task` над `query` получает ключ привязки — R3; `tests/run/ui/query.fl`, `tests/check/pass/ui/query.fl`)
 - AC: поверх `AtomRpc`/`AtomHttpApi`; query инвалидируется мутацией с тем же `reactivityKeys` (тест); stream-запрос — отдельный тип без `mutation`; `serializationKey` участвует в R3.
 
 **F4. Маршруты.** ⬜
@@ -379,7 +379,7 @@ S1 ✅ ─ U1…U6 ✅ ─ U7 ✅ ─ U7b ✅ ─ U6b ✅
 C2/C3/C4/C6 ✅ ─ C6b ✅
 C7a ✅ ─ C7b ✅ ─ C7c ✅ ─ C7d ✅ ─ C5 ✅            C1 ✅
 U9 ✅ ─ U9b ✅
-S2 ✅ ─ F1 ✅ ─ F2 ✅ ─ F3 ─ F4 ─ F5 ─ F6
+S2 ✅ ─ F1 ✅ ─ F2 ✅ ─ F3 ✅ ─ F4 ─ F5 ─ F6
 S3 ✅ ─ S4 ✅ ─ O1 ✅ ─ O2 ✅ ─ O3 ✅ ─ O4 ✅ ─ O5
 L1 ✅ ─ L2 ✅ ─ L3 ✅ ─ L4 ─ L5
 H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ─ H6     (H2 по входам — после L6 ✅)
