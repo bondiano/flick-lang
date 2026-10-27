@@ -10,7 +10,7 @@ use std::fmt::Write;
 
 use super::names;
 use crate::iface::{Decl, Export, Interface, Namespace};
-use crate::types::{Form, Kind, PRELUDE, Type, TypeDef, passes_dictionary};
+use crate::types::{Form, Kind, PRELUDE, Type, TypeDef, builtin_sources, passes_dictionary};
 
 /// The runtime package generated code imports.
 const RUNTIME: &str = "@flick-lang/runtime";
@@ -381,6 +381,12 @@ pub fn reexports(
     value: &dyn Fn(&Export) -> bool,
     ty: &dyn Fn(&Export) -> bool,
 ) -> (String, Vec<String>) {
+    // Flick code names a built-in value by its defining module, and a
+    // built-in barrel such as `List` re-exporting each part would pull in
+    // parts a program does not use, some of them on Effect
+    if builtin_sources().iter().any(|(name, _)| *name == module) {
+        return (String::new(), Vec::new());
+    }
     let mut from: BTreeMap<&str, (BTreeSet<String>, BTreeSet<String>)> = BTreeMap::new();
     for export in &interface.exports {
         let entity = &export.entity;
