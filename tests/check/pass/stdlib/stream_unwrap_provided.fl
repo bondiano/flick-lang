@@ -1,0 +1,25 @@
+// A stream unwrapped from a task and provided in place: the task and the
+// stream both need the service the layer gives.
+module App.StreamUnwrapProvided exposing (..)
+
+service Greeter =
+  greet : String ->{} String
+
+greeter : Layer none none {Greeter}
+let greeter = Layer.succeed Greeter { greet = fun name -> "hello " ++ name }
+
+greeted : String -> Stream.Stream none none String
+let greeted first =
+  let made = task {
+    let _ = Greeter.greet first
+    Stream.map_effect (fun name -> Greeter.greet name) (Stream.make [first, "bob"])
+  }
+  Stream.provide_ greeter (Stream.unwrap made)
+
+written : String -> Stream.Stream none none String
+let written first =
+  let made : Eff {Greeter} none (Stream.Stream {Greeter} none String) = task {
+    let _ = Greeter.greet first
+    Stream.map_effect (fun name -> Greeter.greet name) (Stream.make [first, "bob"])
+  }
+  Stream.provide_ greeter (Stream.unwrap made)
