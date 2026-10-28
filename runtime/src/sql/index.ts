@@ -8,7 +8,8 @@ import type { SchemaError } from "../schema/issues.ts";
 import type { AnySchema } from "../schema/schemas.ts";
 import type { Column } from "./values.ts";
 
-export { databaseOf, pgLayer } from "./pg.ts";
+export { DatabaseService, databaseOf, pgLayer, pgTransaction } from "./pg.ts";
+export type { Cancel } from "./pg.ts";
 export type { PgClient, PgPool } from "./pg.ts";
 
 /** What a `sql table` block compiles to. */

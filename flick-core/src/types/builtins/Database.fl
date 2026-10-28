@@ -15,13 +15,43 @@ let query q = Database.run_query q
 execute : forall a. Sql.Query Sql.Pg a ->{Database; Sql.EncodeError, Sql.DbError} Number
 let execute q = Database.run_execute q
 
-/// Where and how many connections at most.
-type alias PgConfig = { connection_string : String; max_connections : Number }
+/// `body` as one transaction on one connection: committed when it
+/// succeeds, rolled back when it fails or is interrupted; what other
+/// callers run meanwhile takes other connections and sees none of it until
+/// the commit. Inside another transaction it is a savepoint: its failure
+/// undoes only its own writes, and the outer transaction goes on. A commit
+/// whose answer is lost, as when the connection breaks, fails with the code
+/// `"commit_unknown"`: the transaction may or may not have happened.
+transaction : forall c r e a. (Eff {Database | r} e a)^c ->{Database | r; Sql.DbError | e} a
+foreign effect transaction from "@flick-lang/runtime/sql" "pgTransaction"
+  retention call
+
+/// Where, how many connections at most, how long a statement may run
+/// before the server ends it (`57014`), and how long a query waits for a
+/// connection of the pool before it fails.
+type alias PgConfig = {
+  connection_string : String;
+  max_connections : Number;
+  statement_timeout_ms : Option Number;
+  acquire_timeout_ms : Option Number;
+}
+
+/// A pool of 10 connections to `url`, without timeouts.
+config : String -> PgConfig
+let config url =
+  {
+    connection_string = url;
+    max_connections = 10;
+    statement_timeout_ms = None;
+    acquire_timeout_ms = None;
+  }
 
 pg_layer : ServiceTag {Database} -> PgConfig -> Layer none none {Database}
 foreign pure pg_layer from "@flick-lang/runtime/sql" "pgLayer"
 
-/// A pool of PostgreSQL connections. An interrupted query is not rolled
-/// back; its connection is closed, never returned to the pool.
+/// A pool of PostgreSQL connections. An interrupted query is cancelled on
+/// the server and its connection closed, never returned to the pool, so
+/// its backend is free when the interruption completes; outside a
+/// transaction, what it wrote is not rolled back.
 pg : PgConfig -> Layer none none {Database}
 let pg config = pg_layer Database config

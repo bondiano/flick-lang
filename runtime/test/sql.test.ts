@@ -4,10 +4,13 @@ import { test } from "node:test";
 import { BigDecimal, Effect, Exit, Fiber, Option } from "effect";
 
 import {
+  type Cancel,
+  DatabaseService,
   type PgClient,
   type PgPool,
   type Template,
   databaseOf,
+  pgTransaction,
   sqlBind,
   sqlIdentifier,
   sqlRawIdent,
@@ -167,4 +170,93 @@ test("raw SQL takes identifiers only checked and values only as placeholders", a
   const { pool, calls } = fakePool(() => rows([], [25]));
   await Effect.runPromise(databaseOf(pool).run_execute(raw));
   assert.deepEqual(calls[0]?.values, ["'; --"]);
+});
+
+/** An answer with no rows, as BEGIN, COMMIT or an UPDATE give. */
+const done = () => Promise.resolve({ rows: [], fields: [], rowCount: 1 });
+
+/** Runs `body` in a transaction of `pool`, its database the transaction's. */
+const transaction = <A, E, R>(pool: PgPool, body: Effect.Effect<A, E, R>, cancel?: Cancel) =>
+  Effect.provideService(pgTransaction(body), DatabaseService, databaseOf(pool, cancel));
+
+const lookup = Effect.flatMap(Effect.service(DatabaseService), (db) => db.run_query(sqlBind(byName, { name: "x" })));
+
+test("a transaction runs its queries on one connection, then commits", async () => {
+  const { pool, log, calls } = fakePool((call) => (call.text.startsWith("SELECT") ? rows([["1", "x"]]) : done()));
+  const exit = await Effect.runPromiseExit(transaction(pool, Effect.andThen(lookup, lookup)));
+  assert.ok(Exit.isSuccess(exit), String(exit));
+  assert.deepEqual(calls.map((c) => c.text.split(" ")[0]), ["BEGIN", "SELECT", "SELECT", "COMMIT"]);
+  assert.deepEqual(log, ["connect", "released"]);
+});
+
+test("a failed query rolls the transaction back", async () => {
+  const violation = Object.assign(new Error("check"), { code: "23514" });
+  let selects = 0;
+  const { pool, calls } = fakePool((call) => {
+    if (!call.text.startsWith("SELECT")) return done();
+    selects += 1;
+    return selects === 2 ? Promise.reject(violation) : rows([["1", "x"]]);
+  });
+  const exit = await Effect.runPromiseExit(transaction(pool, Effect.andThen(lookup, lookup)));
+  const [error] = errorsOf(exit);
+  assert.ok(error !== undefined && "code" in error._0);
+  assert.equal(error._0.code, "23514");
+  assert.deepEqual(calls.map((c) => c.text.split(" ")[0]), ["BEGIN", "SELECT", "SELECT", "ROLLBACK"]);
+});
+
+test("a nested transaction is a savepoint whose failure the outer one survives", async () => {
+  const { pool, calls } = fakePool((call) => (call.text.startsWith("SELECT") ? rows([["1", "x"]]) : done()));
+  const outer = Effect.gen(function* () {
+    const nested = yield* Effect.service(DatabaseService);
+    // the inner transaction runs on the outer's database: a savepoint
+    yield* Effect.exit(Effect.provideService(pgTransaction(Effect.andThen(lookup, Effect.fail("no"))), DatabaseService, nested));
+    return yield* lookup;
+  });
+  const exit = await Effect.runPromiseExit(transaction(pool, outer));
+  assert.ok(Exit.isSuccess(exit), String(exit));
+  assert.deepEqual(
+    calls.map((c) => c.text),
+    [
+      "BEGIN",
+      "SAVEPOINT flick_savepoint_1",
+      byName.text,
+      "ROLLBACK TO SAVEPOINT flick_savepoint_1",
+      "RELEASE SAVEPOINT flick_savepoint_1",
+      byName.text,
+      "COMMIT",
+    ],
+  );
+});
+
+test("an interrupted query is cancelled on the server before its connection closes", async () => {
+  const started = Promise.withResolvers<void>();
+  const pending = Promise.withResolvers<never>();
+  const { pool, log } = fakePool(() => {
+    started.resolve();
+    return pending.promise;
+  });
+  const cancel: Cancel = () => {
+    log.push("cancel");
+    pending.reject(Object.assign(new Error("canceling statement due to user request"), { code: "57014" }));
+    return Promise.resolve(true);
+  };
+  const exit = await Effect.runPromise(
+    Effect.gen(function* () {
+      const fiber = yield* Effect.forkDetach(databaseOf(pool, cancel).run_query(sqlBind(byName, { name: "x" })));
+      yield* Effect.promise(() => started.promise);
+      yield* Fiber.interrupt(fiber);
+      log.push("interrupted");
+      return yield* Fiber.await(fiber);
+    }),
+  );
+  assert.ok(Exit.hasInterrupts(exit));
+  assert.deepEqual(log, ["connect", "cancel", "destroying", "closed", "interrupted"]);
+});
+
+test("a commit whose answer is lost is commit_unknown", async () => {
+  const { pool } = fakePool((call) => (call.text === "COMMIT" ? Promise.reject(new Error("Connection terminated")) : done()));
+  const exit = await Effect.runPromiseExit(transaction(pool, Effect.void));
+  const [error] = errorsOf(exit);
+  assert.ok(error !== undefined && "code" in error._0);
+  assert.equal(error._0.code, "commit_unknown");
 });

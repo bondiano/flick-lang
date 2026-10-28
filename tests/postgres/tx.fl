@@ -1,0 +1,177 @@
+// Against a real PostgreSQL: a transaction commits or rolls back as one,
+// callers on one connection do not undo each other, a nested transaction
+// is a savepoint, an interrupted query frees its backend at once, and a
+// statement timeout ends a slow query. Run by `flick/tests/sql_postgres.rs`.
+module App.Tx exposing (main)
+
+import Sql exposing (Pg, EncodeError, DbError, DecodeError)
+import Database exposing (Database)
+import BigDecimal exposing (BigDecimal)
+
+type UserId = UserId BigInt
+  deriving Show
+
+user_id : PureCodec BigInt UserId
+let user_id = Sql.codec (fun n -> Ok (UserId n)) (fun (UserId n) -> n)
+
+sql table Users "users" {
+  id : bigint primary key generated always as UserId via user_id
+  name : text not null as String
+  email : text as String
+}
+
+sql table Accounts "accounts" {
+  id : bigint primary key generated always as BigInt
+  user_id : bigint not null as UserId via user_id
+  balance : numeric not null default as BigDecimal
+}
+
+type error Abandoned = Abandoned
+
+type alias Count = { n : Number }
+  deriving Schema
+
+add_user : Sql.Template Pg { name : String } { id : UserId }
+let add_user =
+  sql p { insert_into Users; values { name = p.name }; returning { id = Users.id } }
+
+open_account : Sql.Template Pg { owner : UserId; balance : BigDecimal } { id : BigInt }
+let open_account =
+  sql p {
+    insert_into Accounts
+    values { user_id = p.owner; balance = p.balance }
+    returning { id = Accounts.id }
+  }
+
+deposit : Sql.Template Pg { account : BigInt; amount : BigDecimal } { balance : BigDecimal }
+let deposit =
+  sql p {
+    update Accounts
+    set { balance = Accounts.balance + p.amount }
+    where Accounts.id == p.account
+    returning { balance = Accounts.balance }
+  }
+
+balance_of : Sql.Template Pg { account : BigInt } { balance : BigDecimal }
+let balance_of = sql p { from a in Accounts; where a.id == p.account; select a.balance }
+
+/// A query that sleeps on the server, until it is cancelled.
+sleeper : Sql.Query Pg Unknown
+let sleeper = Sql.unsafe_query [Sql.unsafe_text "select pg_sleep(30)"] (Codec.json Schema.unknown)
+
+/// Backends still running the sleeper.
+sleeping : Sql.Query Pg Count
+let sleeping =
+  Sql.unsafe_query
+    [
+      Sql.unsafe_text
+        "select count(*)::int as n from pg_stat_activity where query = 'select pg_sleep(30)' and state = 'active'",
+    ]
+    (Codec.json (schema Count))
+
+put : BigInt -> BigInt ->{Database; EncodeError, DbError, DecodeError} Unit
+let put account amount =
+  ignore (
+    Database.query (Sql.bind deposit { account = account; amount = BigDecimal.from_integer amount })
+  )
+
+balance : BigInt ->{Database; EncodeError, DbError, DecodeError} String
+let balance account =
+  match Database.query (Sql.bind balance_of { account = account }) with
+  | [row] -> show row.balance
+  | _ -> "missing"
+
+/// An account of a new user, holding 10.
+account : String ->{Database; EncodeError, DbError, DecodeError} BigInt
+let account name =
+  match Database.query (Sql.bind add_user { name = name }) with
+  | [user] ->
+    match Database.query
+      (Sql.bind open_account { owner = user.id; balance = BigDecimal.from_integer 10n }) with
+    | [opened] -> opened.id
+    | _ -> 0n
+  | _ -> 0n
+
+run : Unit ->{Database; EncodeError, DbError, DecodeError} Unit
+let run () =
+  // the second write breaks the check: the first goes too
+  let a = account "atomic"
+  let refused =
+    try
+      Database.transaction (task {
+        put a 5n
+        put a (-100n)
+        "committed"
+      })
+    with
+    | DbError e -> "rolled back " ++ e.code
+  Platform.stdout_line (refused ++ ", balance " ++ balance a)
+  // one connection: a caller that rolls back does not undo another's commit
+  let b = account "isolated"
+  let outcomes =
+    parallel_all
+      2
+      [
+        task { try Database.transaction (task { put b 1n; "kept" }) with | Abandoned -> "?" },
+        task {
+          try Database.transaction (task {
+            put b 2n
+            from_result (Err Abandoned)
+          }) with
+          | Abandoned -> "abandoned"
+        },
+      ]
+  Platform.stdout_line (show outcomes ++ ", balance " ++ balance b)
+  // a savepoint: the inner failure undoes only its writes
+  let c = account "nested"
+  Database.transaction (task {
+    put c 3n
+    let inner =
+      try Database.transaction (task {
+        put c 4n
+        from_result (Err Abandoned)
+      }) with
+      | Abandoned -> "inner undone"
+    Platform.stdout_line inner
+  })
+  Platform.stdout_line ("balance " ++ balance c)
+
+/// Twenty sleepers interrupted on a pool of two: none keeps a backend.
+cancelled : Unit ->{Database; EncodeError, DbError, DecodeError} Unit
+let cancelled () =
+  let stopped =
+    parallel_all
+      20
+      (List.map
+        (fun _ -> task { timeout_option 200 (task { Database.query sleeper }) })
+        (List.range 0 20))
+  Platform.stdout_line ("interrupted: " ++ show (List.length (List.filter Option.is_none stopped)))
+  match Database.query sleeping with
+  | [count] -> Platform.stdout_line ("still sleeping: " ++ show count.n)
+  | _ -> Platform.stdout_line "no count"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  match Platform.env "DATABASE_URL" with
+  | None -> App.fail "DATABASE_URL is not set"
+  | Some url ->
+    let one = { Database.config url with max_connections = 1 }
+    let two = { Database.config url with max_connections = 2 }
+    let quick = { Database.config url with statement_timeout_ms = Some 200 }
+    let text =
+      try
+        provide Database.pg one { run () }
+        provide Database.pg two { cancelled () }
+        provide Database.pg quick {
+          try
+            ignore (Database.query sleeper)
+            "not timed out"
+          with
+          | DbError e -> "deadline " ++ e.code
+        }
+      with
+      | DecodeError e -> "DecodeError " ++ e.column ++ ": " ++ e.message
+      | DbError e -> "DbError " ++ e.code ++ " " ++ e.message
+      | EncodeError e -> "EncodeError " ++ e.parameter
+      | Abandoned -> "abandoned"
+    Platform.stdout_line text

@@ -196,7 +196,7 @@ let main () =
   match Platform.env "DATABASE_URL" with
   | None -> App.fail "DATABASE_URL is not set"
   | Some url ->
-    let layer = Database.pg { connection_string = url; max_connections = 2 }
+    let layer = Database.pg { Database.config url with max_connections = 2 }
     let text =
       try
         provide layer {
