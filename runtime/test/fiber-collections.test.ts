@@ -12,9 +12,9 @@ const options = { propagateInterruption: false, startImmediately: true };
 
 /** How each collection is made and how it runs a task. */
 const collections = [
-  ["FiberSet", () => Effect.map(FiberSet.flickMake(), (set) => (task: Effect.Effect<void>) => FiberSet.flickRun(options)(task)(set))],
+  ["FiberSet", () => Effect.map(FiberSet.flickMake<void, never>(), (set) => (task: Effect.Effect<void>) => FiberSet.flickRun(options)(task)(set))],
   ["FiberMap", () => Effect.map(FiberMap.flickMake<string, void, never>(), (map) => (task: Effect.Effect<void>) => FiberMap.flickRun({ ...options, onlyIfMissing: false })("k")(task)(map))],
-  ["FiberHandle", () => Effect.map(FiberHandle.flickMake(), (handle) => (task: Effect.Effect<void>) => FiberHandle.flickRun({ ...options, onlyIfMissing: false })(task)(handle))],
+  ["FiberHandle", () => Effect.map(FiberHandle.flickMake<void, never>(), (handle) => (task: Effect.Effect<void>) => FiberHandle.flickRun({ ...options, onlyIfMissing: false })(task)(handle))],
 ] as const;
 
 for (const [name, make] of collections) {
