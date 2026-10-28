@@ -5,6 +5,7 @@
 use std::collections::HashSet;
 use std::mem;
 
+use super::classes::split;
 use super::env::{Form, TypeDef};
 use super::ty::Type;
 use super::typing::Identity;
@@ -65,16 +66,19 @@ impl Checker<'_> {
             }
             let ty = self.whnf(&op.ty);
             let (head, _) = ty.spine();
-            // on a type variable, the methods of its `Numeric` constraint
-            if op.domain == Domain::Numeric && matches!(head, Type::Skolem(_)) {
-                self.want_under(
-                    numeric_class("Numeric", ty.clone()),
-                    op.span,
-                    op.givens.clone(),
-                );
-                self.typing
-                    .generic_numeric
-                    .insert(super::typing::range(op.span));
+            // on a type variable, the methods of its `Numeric` constraint; a
+            // comparison without one, its `Ord`
+            if op.domain != Domain::Concat && matches!(head, Type::Skolem(_)) {
+                let key = super::typing::range(op.span);
+                if op.domain == Domain::Numeric || numeric_given(&op.givens, &ty) {
+                    let class = numeric_class("Numeric", ty.clone());
+                    self.want_under(class, op.span, op.givens.clone());
+                    self.typing.generic_numeric.insert(key);
+                } else {
+                    let class = Type::app(Type::prim("Ord"), ty.clone());
+                    self.want_under(class, op.span, op.givens.clone());
+                    self.typing.generic_ordered.insert(key);
+                }
                 continue;
             }
             let allowed = op.domain.names();
@@ -214,6 +218,13 @@ impl Checker<'_> {
             .numeric
             .insert(super::typing::range(literal.span), num);
     }
+}
+
+/// Whether `givens` hold a numeric class of `ty`.
+fn numeric_given(givens: &[Type], ty: &Type) -> bool {
+    givens.iter().any(|g| {
+        split(g).is_some_and(|((module, _), args)| module == "Numeric" && args.first() == Some(&ty))
+    })
 }
 
 /// The constraint `class ty` of the closed numeric classes.

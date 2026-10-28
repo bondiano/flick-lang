@@ -2,7 +2,7 @@
 
 use super::Lower;
 use super::atoms::completed;
-use super::numeric::{apply, arith_method, arith_of};
+use super::numeric::{apply, arith_of};
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
 use crate::numeric::{Arith, Num};
 use crate::source::Span;
@@ -355,11 +355,8 @@ impl Lower<'_> {
             };
             return Expr::new(ExprKind::Binary(op, lhs, rhs), span);
         }
-        if self.typing.generic_numeric.contains(&key)
-            && let Some(method) = op.and_then(arith_method)
-        {
-            let method = self.prelude_method(key, method);
-            return apply(method, [lhs, rhs], span);
+        if let Some(generic) = op.and_then(|op| self.generic_binary(key, op, &lhs, &rhs, span)) {
+            return generic;
         }
         let op = match op {
             Some(K::PipeGt) => {

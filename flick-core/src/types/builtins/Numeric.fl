@@ -15,6 +15,10 @@ class Ord a => Numeric a =
   negate : a -> a
   from_int : Int -> a
   to_float : a -> Float
+  lt : a -> a -> Bool
+  le : a -> a -> Bool
+  gt : a -> a -> Bool
+  ge : a -> a -> Bool
 
 class Numeric a => Integer a =
   to_bigint : a -> BigInt
@@ -47,6 +51,14 @@ instance Numeric Int =
   let from_int n = n
   to_float : Int -> Float
   let to_float n = Int.to_float n
+  lt : Int -> Int -> Bool
+  let lt a b = a < b
+  le : Int -> Int -> Bool
+  let le a b = a <= b
+  gt : Int -> Int -> Bool
+  let gt a b = a > b
+  ge : Int -> Int -> Bool
+  let ge a b = a >= b
 
 instance Numeric Float =
   add : Float -> Float -> Float
@@ -67,6 +79,14 @@ instance Numeric Float =
   let from_int n = Int.to_float n
   to_float : Float -> Float
   let to_float x = x
+  lt : Float -> Float -> Bool
+  let lt a b = a < b
+  le : Float -> Float -> Bool
+  let le a b = a <= b
+  gt : Float -> Float -> Bool
+  let gt a b = a > b
+  ge : Float -> Float -> Bool
+  let ge a b = a >= b
 
 instance Numeric BigInt =
   add : BigInt -> BigInt -> BigInt
@@ -87,6 +107,14 @@ instance Numeric BigInt =
   let from_int n = bigint_of n
   to_float : BigInt -> Float
   let to_float n = float_of_bigint n
+  lt : BigInt -> BigInt -> Bool
+  let lt a b = a < b
+  le : BigInt -> BigInt -> Bool
+  let le a b = a <= b
+  gt : BigInt -> BigInt -> Bool
+  let gt a b = a > b
+  ge : BigInt -> BigInt -> Bool
+  let ge a b = a >= b
 
 instance Integer Int =
   to_bigint : Int -> BigInt

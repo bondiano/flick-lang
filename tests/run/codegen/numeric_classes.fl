@@ -17,6 +17,12 @@ let half x = x * 0.5
 average : Floating a => List a -> a
 let average xs = List.sum xs / Numeric.from_int (List.length xs)
 
+max_of : Numeric a => a -> a -> a
+let max_of a b = if a > b then a else b
+
+before : Ord a => a -> a -> Bool
+let before a b = a < b
+
 main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line (show (double 21))
@@ -30,3 +36,8 @@ let main () =
   Platform.stdout_line (show (List.product [2n, 3n, 7n]))
   Platform.stdout_line (show (half 3))
   Platform.stdout_line (show (average [1, 2, 4]))
+  Platform.stdout_line (show (max_of 3 7))
+  Platform.stdout_line (show (max_of 2.5 1.5))
+  Platform.stdout_line (show (max_of 2n 9n))
+  Platform.stdout_line (show (before "a" "b"))
+  Platform.stdout_line (show (before 3 2))

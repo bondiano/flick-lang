@@ -74,6 +74,19 @@ instance (Eq e, Eq a) => Eq (Result e a) =
     | (Err a, Err b) -> eq a b
     | _ -> false
 
+/// `x < y` on a type variable with `Ord`: what its comparison operators call.
+ord_lt : Ord a => a -> a -> Bool
+let ord_lt x y = compare x y == LT
+
+ord_le : Ord a => a -> a -> Bool
+let ord_le x y = compare x y != GT
+
+ord_gt : Ord a => a -> a -> Bool
+let ord_gt x y = compare x y == GT
+
+ord_ge : Ord a => a -> a -> Bool
+let ord_ge x y = compare x y != LT
+
 instance Ord Int =
   compare : Int -> Int -> Ordering
   let compare x y = compare_prim x y

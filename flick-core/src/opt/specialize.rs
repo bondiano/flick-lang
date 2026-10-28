@@ -1,22 +1,42 @@
-//! Specialization over the closed numeric classes. A function of the module
-//! called with instances of `Numeric`, `Integer` or `Floating` gets a copy
-//! for them, and a method of a known numeric instance becomes the operator
-//! of its type: the copy is then as plain as code written for that type,
-//! and small enough to inline. The classes are closed, so the copies are
-//! finitely many.
+//! Specialization over the closed numeric classes. A function called with
+//! instances of `Numeric`, `Integer` or `Floating` gets a copy in the calling
+//! module for them, whether it is of this module or another of the build,
+//! and a method of a known numeric instance becomes the operator of its
+//! type: the copy is then as plain as code written for that type, and small
+//! enough to inline. The classes are closed, so the copies are finitely many.
 
 use std::collections::{HashMap, HashSet};
 
 use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Lit, Module};
 use crate::numeric::{Arith, Num};
+use crate::source::Span;
 use crate::types::Dict;
+
+use super::Generics;
 
 const NUMERIC: &str = "Numeric";
 
-/// Copies the generic functions of `module` for the numeric instances they
-/// are called with, until no call is left to copy for.
-pub fn specialize(module: &mut Module) {
-    let generic: HashMap<String, (Vec<String>, Expr)> = module
+/// A generic function by module and name: its dictionary parameters and body.
+type Generic = (Vec<String>, Expr);
+
+/// A copy still to make, for `dicts`, named `copy`; one of another module
+/// takes the place of its first call, `at`, as the source of its code.
+struct Pending {
+    generic: Generic,
+    dicts: Vec<Dict>,
+    copy: String,
+    at: Option<Span>,
+}
+
+fn respan(e: &mut Expr, span: Span) {
+    e.span = span;
+    e.each_child_mut(&mut |c| respan(c, span));
+}
+
+/// Copies the generic functions `module` calls with numeric instances, its
+/// own and those `generics` offers, until no call is left to copy for.
+pub fn specialize(module: &mut Module, generics: Generics) {
+    let own: HashMap<String, Generic> = module
         .items
         .iter()
         .filter_map(|item| match &item.kind {
@@ -26,23 +46,39 @@ pub fn specialize(module: &mut Module) {
             _ => None,
         })
         .collect();
-    if generic.is_empty() {
-        return;
-    }
+    let mut found: HashMap<(String, String), Option<Generic>> = HashMap::new();
+    let mut find = |m: &str, name: &str| -> Option<Generic> {
+        if m == module.name {
+            return own.get(name).cloned();
+        }
+        found
+            .entry((m.to_owned(), name.to_owned()))
+            .or_insert_with(|| generics(m, name))
+            .clone()
+    };
     let mut made: HashSet<String> = HashSet::new();
-    let mut pending: Vec<(String, Vec<Dict>, String)> = Vec::new();
+    let mut pending: Vec<Pending> = Vec::new();
+    let this = module.name.clone();
     for item in &mut module.items {
         for body in super::bodies(item) {
-            calls(body, &module.name, &generic, &mut made, &mut pending);
+            calls(body, &this, &mut find, &mut made, &mut pending);
         }
     }
     // a copy may call another generic function, or itself, with instances
-    while let Some((name, dicts, copy)) = pending.pop() {
-        let (params, body) = &generic[&name];
+    while let Some(Pending {
+        generic: (params, body),
+        dicts,
+        copy,
+        at,
+    }) = pending.pop()
+    {
         let given: Vec<(&str, &Dict)> = params.iter().map(String::as_str).zip(&dicts).collect();
         let mut body = body.clone();
+        if let Some(span) = at {
+            respan(&mut body, span);
+        }
         instantiate(&mut body, &given);
-        calls(&mut body, &module.name, &generic, &mut made, &mut pending);
+        calls(&mut body, &this, &mut find, &mut made, &mut pending);
         let span = body.span;
         module.items.push(Item {
             kind: ItemKind::Value {
@@ -55,34 +91,71 @@ pub fn specialize(module: &mut Module) {
     }
 }
 
-/// Points each call of a generic function of `module` with numeric instances
-/// at its copy for them, recording a copy still to make.
+/// The parameters and body of the function `name` of `module` when it
+/// takes dictionaries and its body names only what `exported` allows of
+/// `module`, so a copy in another module can reach all it uses.
+pub fn names_only(module: &Module, name: &str, exported: &dyn Fn(&str) -> bool) -> Option<Generic> {
+    let (dicts, body) = module.items.iter().find_map(|item| match &item.kind {
+        ItemKind::Value {
+            name: n,
+            dicts,
+            body,
+        } if n == name && !dicts.is_empty() => Some((dicts, body)),
+        _ => None,
+    })?;
+    let mut reachable = true;
+    visit(body, &mut |e| {
+        if let ExprKind::Global { module: m, name } = &e.kind {
+            reachable &= *m != module.name || exported(name);
+        }
+    });
+    reachable.then(|| (dicts.clone(), body.clone()))
+}
+
+fn visit<'a>(e: &'a Expr, f: &mut dyn FnMut(&'a Expr)) {
+    f(e);
+    e.each_child(&mut |c| visit(c, f));
+}
+
+/// Points each call of a generic function with numeric instances at its
+/// copy for them in `module`, recording a copy still to make.
 fn calls(
     e: &mut Expr,
     module: &str,
-    generic: &HashMap<String, (Vec<String>, Expr)>,
+    find: &mut dyn FnMut(&str, &str) -> Option<Generic>,
     made: &mut HashSet<String>,
-    pending: &mut Vec<(String, Vec<Dict>, String)>,
+    pending: &mut Vec<Pending>,
 ) {
-    e.each_child_mut(&mut |c| calls(c, module, generic, made, pending));
+    e.each_child_mut(&mut |c| calls(c, module, find, made, pending));
     let ExprKind::Dicts(inner, dicts) = &e.kind else {
         return;
     };
     let ExprKind::Global { module: m, name } = &inner.kind else {
         return;
     };
-    if m != module || !generic.contains_key(name) {
-        return;
-    }
     let Some(dicts) = dicts.iter().map(known).collect::<Option<Vec<Dict>>>() else {
         return;
     };
+    let Some(generic) = find(m, name) else {
+        return;
+    };
     let suffix: Vec<String> = dicts.iter().map(instance_suffix).collect();
-    let copy = format!("{name}${}", suffix.join("$"));
-    if made.insert(copy.clone()) {
-        pending.push((name.clone(), dicts, copy.clone()));
-    }
+    let owner = if m == module {
+        String::new()
+    } else {
+        format!("{}$", m.replace('.', "$"))
+    };
+    let copy = format!("{owner}{name}${}", suffix.join("$"));
     let span = inner.span;
+    if made.insert(copy.clone()) {
+        let at = (m != module).then_some(span);
+        pending.push(Pending {
+            generic,
+            dicts,
+            copy: copy.clone(),
+            at,
+        });
+    }
     *e = Expr::new(
         ExprKind::Global {
             module: module.to_owned(),
@@ -168,8 +241,9 @@ pub fn operator(e: &mut Expr) -> bool {
                 arg: lhs,
                 ..
             } => match method_of(method) {
-                Some((num, name)) => arith(name)
-                    .map(|op| ExprKind::Binary(BinOp::Arith(op, num), lhs.clone(), arg.clone())),
+                Some((num, name)) => {
+                    binary(name, num).map(|op| ExprKind::Binary(op, lhs.clone(), arg.clone()))
+                }
                 None => None,
             },
             _ => match method_of(func) {
@@ -207,14 +281,20 @@ fn method_of(e: &Expr) -> Option<(Num, &str)> {
     Some((Num::of(instance.rsplit(' ').next()?)?, name.as_str()))
 }
 
-fn arith(method: &str) -> Option<Arith> {
+/// The operator a binary method of `Numeric` is on `num`.
+fn binary(method: &str, num: Num) -> Option<BinOp> {
+    let arith = |a| BinOp::Arith(a, num);
     Some(match method {
-        "add" => Arith::Add,
-        "sub" => Arith::Sub,
-        "mul" => Arith::Mul,
-        "div" => Arith::Div,
-        "rem" => Arith::Rem,
-        "pow" => Arith::Pow,
+        "add" => arith(Arith::Add),
+        "sub" => arith(Arith::Sub),
+        "mul" => arith(Arith::Mul),
+        "div" => arith(Arith::Div),
+        "rem" => arith(Arith::Rem),
+        "pow" => arith(Arith::Pow),
+        "lt" => BinOp::Lt,
+        "le" => BinOp::Le,
+        "gt" => BinOp::Gt,
+        "ge" => BinOp::Ge,
         _ => return None,
     })
 }

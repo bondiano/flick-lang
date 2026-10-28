@@ -54,8 +54,9 @@ pub struct Typing {
     pub lifts: HashMap<Range, Lift>,
     /// The numeric type of arithmetic and integer literals.
     pub numeric: HashMap<Range, Num>,
-    /// Arithmetic and number literals on a type variable: class methods.
+    /// Operators on a type variable, by `Numeric` or by `Ord`.
     pub generic_numeric: HashSet<Range>,
+    pub generic_ordered: HashSet<Range>,
     /// `++` on lists rather than strings.
     pub list_concat: HashSet<Range>,
     /// `==` and `!=` that JS `===` decides: on the values themselves, or on
@@ -212,7 +213,7 @@ pub struct SchemaItem {
 /// How a witness is built from the witnesses of its parts.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SchemaPlan {
-    /// `Float`, `String`, `Bool`, `BigInt`, `Unit`, `Never`, `Unknown`.
+    /// A primitive: `Int`, `Float`, `String`, `Bool`, `Unit`, ….
     Prim(String),
     List(Box<SchemaPlan>),
     Option(Box<SchemaPlan>),

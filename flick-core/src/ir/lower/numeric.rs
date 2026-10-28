@@ -2,6 +2,7 @@
 //! variable the methods of its numeric class.
 
 use super::Lower;
+use super::expr::with_dicts;
 use crate::ir::{Expr, ExprKind, Stage};
 use crate::numeric::{self, Arith, Num};
 use crate::source::Span;
@@ -10,6 +11,36 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Range;
 
 impl Lower<'_> {
+    /// `lhs op rhs` on a type variable, by the methods of its `Numeric` or
+    /// the comparisons of its `Ord`.
+    pub(super) fn generic_binary(
+        &mut self,
+        key: Range,
+        op: K,
+        lhs: &Expr,
+        rhs: &Expr,
+        span: Span,
+    ) -> Option<Expr> {
+        let args = [Box::new(lhs.clone()), Box::new(rhs.clone())];
+        if self.typing.generic_numeric.contains(&key) {
+            let method = self.prelude_method(key, arith_method(op)?);
+            return Some(apply(method, args, span));
+        }
+        if self.typing.generic_ordered.contains(&key) {
+            let global = ExprKind::Global {
+                module: "Instances".to_owned(),
+                name: ord_function(op)?.to_owned(),
+            };
+            let dicts = self.typing.dicts.get(&key).cloned().unwrap_or_default();
+            return Some(apply(
+                with_dicts(Expr::new(global, span), dicts),
+                args,
+                span,
+            ));
+        }
+        None
+    }
+
     /// A number literal on a type variable, made by its class's method.
     pub(super) fn generic_literal(&mut self, node: &Node, span: Span) -> Expr {
         let text = node.child_tokens().next().map_or("", |t| t.text(self.text));
@@ -56,8 +87,8 @@ pub(super) fn arith_of(op: K) -> Option<Arith> {
     })
 }
 
-/// The method of `Numeric` an arithmetic operator on a type variable calls.
-pub(super) fn arith_method(op: K) -> Option<&'static str> {
+/// The method of `Numeric` an operator on a type variable calls.
+fn arith_method(op: K) -> Option<&'static str> {
     Some(match op {
         K::Plus => "add",
         K::Minus => "sub",
@@ -65,6 +96,22 @@ pub(super) fn arith_method(op: K) -> Option<&'static str> {
         K::Slash => "div",
         K::Percent => "rem",
         K::StarStar => "pow",
+        K::Lt => "lt",
+        K::Le => "le",
+        K::Gt => "gt",
+        K::Ge => "ge",
+        _ => return None,
+    })
+}
+
+/// The function of `Instances` a comparison on a type variable with only
+/// `Ord` calls.
+fn ord_function(op: K) -> Option<&'static str> {
+    Some(match op {
+        K::Lt => "ord_lt",
+        K::Le => "ord_le",
+        K::Gt => "ord_gt",
+        K::Ge => "ord_ge",
         _ => return None,
     })
 }

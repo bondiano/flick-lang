@@ -206,6 +206,7 @@ pub fn emit(
         vec![package_json(settings)]
     };
     let ctx = Context {
+        modules: &compilation.modules,
         settings,
         sources,
         options: &options,
@@ -533,8 +534,20 @@ fn builtins(
     }
 }
 
+/// The function `name` of `module`, a module of the build or a built-in one,
+/// with its dictionary parameters and body for the optimizer to copy.
+fn generic_of(modules: &[Compiled], module: &str, name: &str) -> Option<(Vec<String>, ir::Expr)> {
+    if let Some(m) = modules.iter().find(|m| m.name == module) {
+        return opt::names_only(&m.ir, name, &|n| m.interface.exports_value(n));
+    }
+    let ir = builtin_modules().iter().find(|m| m.name == module)?;
+    let interface = types::builtins().iter().find(|i| i.module == module)?;
+    opt::names_only(ir, name, &|n| interface.exports_value(n))
+}
+
 /// What the compilation of every module shares.
 struct Context<'a> {
+    modules: &'a [Compiled],
     settings: &'a Settings<'a>,
     sources: &'a SourceMap,
     options: &'a Options<'a>,
@@ -556,7 +569,8 @@ fn compiled_module(
     let optimized = ctx.settings.release.then(|| {
         let mut ir = module.ir.clone();
         let exported = |name: &str| module.interface.exports_value(name);
-        opt::optimize(&mut ir, &exported);
+        let generics = |m: &str, name: &str| generic_of(ctx.modules, m, name);
+        opt::optimize(&mut ir, &exported, &generics);
         ir
     });
     if ctx.settings.backend == Backend::None {

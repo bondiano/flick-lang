@@ -32,16 +32,23 @@ use std::collections::BTreeSet;
 use std::mem;
 
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Module, Pat, Stmt};
+pub use specialize::names_only;
 pub(crate) use walk::uses;
 use walk::{droppable, strict_uses, substitute};
 
 /// Rounds of inlining: a body inlined in the first may inline again.
 const ROUNDS: usize = 2;
 
-/// Optimizes `module` in place; `exported` tells the values importers see.
-pub fn optimize(module: &mut Module, exported: &dyn Fn(&str) -> bool) {
+/// The functions with dictionaries of the other modules of the build, by
+/// module and name: their dictionary parameters and body, when the body
+/// names only what its module exports.
+pub type Generics<'a> = &'a dyn Fn(&str, &str) -> Option<(Vec<String>, Expr)>;
+
+/// Optimizes `module` in place; `exported` tells the values importers see,
+/// `generics` what [`specialize`] may copy from other modules.
+pub fn optimize(module: &mut Module, exported: &dyn Fn(&str) -> bool, generics: Generics) {
     let mut fresh = 0;
-    specialize::specialize(module);
+    specialize::specialize(module, generics);
     for _ in 0..ROUNDS {
         constants(module);
         let candidates = inline::candidates(&module.name, &module.items, exported);

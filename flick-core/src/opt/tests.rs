@@ -1,5 +1,15 @@
+use crate::build::builtin_modules;
 use crate::codegen::{Labels, Options, js};
+use crate::ir::Expr;
 use crate::ir::tests::check_text;
+use crate::types::builtins;
+
+/// A generic function of a built-in module, as a build offers it.
+fn builtin_generic(module: &str, name: &str) -> Option<(Vec<String>, Expr)> {
+    let ir = builtin_modules().iter().find(|m| m.name == module)?;
+    let interface = builtins().iter().find(|i| i.module == module)?;
+    super::names_only(ir, name, &|n| interface.exports_value(n))
+}
 
 /// The JS of a self-contained module in the release profile.
 fn release(text: &str) -> String {
@@ -9,7 +19,11 @@ fn release(text: &str) -> String {
 /// `release` where `workers` names the workers modules export.
 fn release_with(text: &str, workers: &dyn Fn(&str, &str) -> Option<usize>) -> String {
     let (mut ir, interface) = check_text("App", text).expect("lowers");
-    super::optimize(&mut ir, &|name| interface.exports_value(name));
+    super::optimize(
+        &mut ir,
+        &|name| interface.exports_value(name),
+        &builtin_generic,
+    );
     let path = |m: &str| format!("{}.js", m.replace('.', "/"));
     let options = Options {
         path: &path,
@@ -220,7 +234,11 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
          both : String -> String\nlet both s = join s s\n",
     )
     .expect("lowers");
-    super::optimize(&mut ir, &|name| interface.exports_value(name));
+    super::optimize(
+        &mut ir,
+        &|name| interface.exports_value(name),
+        &builtin_generic,
+    );
     let options = Options {
         path: &|m| format!("{}.js", m.replace('.', "/")),
         package: &|_| None,
@@ -395,4 +413,15 @@ fn a_numeric_function_is_copied_for_the_instances_it_is_called_with() {
         js.contains("return [Math.imul(3, i) + 1 | 0, 2 * f + 1];"),
         "{js}"
     );
+}
+
+#[test]
+fn a_numeric_function_of_another_module_is_copied_too() {
+    let js = release(
+        "module App exposing (total)\n\n\
+         total : List Int -> Int\nlet total xs = List.sum xs\n",
+    );
+    assert!(js.contains("List$Core$sum$Numeric_Int"), "{js}");
+    assert!(js.contains("total + x | 0"), "{js}");
+    assert!(!js.contains("$i_Numeric_Int"), "{js}");
 }

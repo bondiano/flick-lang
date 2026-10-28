@@ -20,3 +20,9 @@ let centre = mean [1, 2, 3]
 
 wide : BigInt
 let wide = widen 41
+
+larger : Numeric a => a -> a -> a
+let larger a b = if a >= b then a else b
+
+earlier : Ord a => a -> a -> Bool
+let earlier a b = a <= b
