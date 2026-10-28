@@ -116,3 +116,46 @@ fn standalone_inventory_uses_the_compilers_header_based_import_root() {
             .contains(&serde_json::json!(dir.join("Shared.fl")))
     );
 }
+
+#[test]
+fn a_sibling_of_an_external_root_is_part_of_the_cache_key() {
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("build_inputs_sibling_cache");
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("src")).expect("project dir");
+    fs::create_dir_all(root.join("scratch")).expect("scratch dir");
+    fs::write(
+        root.join("flick.toml"),
+        "schema-version = 1\n\n[project]\nkind = \"lib\"\nsource-dir = \"src\"\n",
+    )
+    .expect("config");
+    fs::write(
+        root.join("scratch/External.fl"),
+        "module External exposing (value)\n\nimport Helper\n\nvalue : Number\nlet value = Helper.n\n",
+    )
+    .expect("external");
+    let helper = root.join("scratch/Helper.fl");
+    let set = |n: u8| {
+        fs::write(
+            &helper,
+            format!("module Helper exposing (n)\n\nn : Number\nlet n = {n}{n}{n}\n"),
+        )
+        .expect("helper");
+    };
+    let built = || {
+        let out = flick_in(&root, &["build", "scratch/External.fl"]);
+        let js = fs::read_to_string(root.join("dist/Helper.js")).unwrap_or_default();
+        (out.status.success(), js)
+    };
+    set(1);
+    let (ok, js) = built();
+    assert!(ok && js.contains("111"), "{js}");
+    // a cache hit would hand back the first artifacts
+    set(2);
+    let (ok, js) = built();
+    assert!(ok && js.contains("222"), "{js}");
+    fs::remove_file(&helper).expect("delete");
+    assert!(!built().0, "a deleted sibling is not a cache hit");
+    set(3);
+    let (ok, js) = built();
+    assert!(ok && js.contains("333"), "{js}");
+}

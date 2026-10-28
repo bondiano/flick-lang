@@ -6,7 +6,7 @@ mod dev;
 mod diff;
 mod ffi;
 mod fmt;
-mod inputs;
+pub(crate) mod inputs;
 mod inspect;
 mod pack;
 mod run;

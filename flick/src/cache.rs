@@ -13,6 +13,7 @@ use flick_core::project::cache::{self, Key, Manifest};
 use flick_core::project::{self, Project};
 use flick_core::source::SourceMap;
 
+use crate::commands::inputs::{declared_name, sibling_root};
 use crate::toolchain;
 
 /// Files under `dir`, recursively, in a stable order.
@@ -89,6 +90,20 @@ pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
         files_under(&root, &mut files);
     }
     files.extend(roots.iter().cloned());
+    // a module outside the project's roots imports its siblings, which the loader finds
+    let project_roots = [project.source_root(), project.test_root()];
+    for root in roots
+        .iter()
+        .filter(|r| !project_roots.iter().any(|p| r.starts_with(p)))
+    {
+        if let Some(name) = fs::read_to_string(root)
+            .ok()
+            .as_deref()
+            .and_then(declared_name)
+        {
+            files_under(&sibling_root(root, &name), &mut files);
+        }
+    }
     files.retain(|p| p.extension().is_some_and(|e| e == "fl"));
     files.extend(
         [project::CONFIG_FILE, "package.json", "pnpm-lock.yaml"]

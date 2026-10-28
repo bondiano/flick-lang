@@ -589,7 +589,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 - Причина/изменение: [rpcSpawn](../../runtime/src/rpc/server.ts#L163-L181) оборачивает синхронный spawn, но ошибка ChildProcess приходит асинхронно. Acquisition должен дождаться spawn/error, отдать ошибку через ClientError и корректно снять listeners/закрыть pipes; пустой error-listener не исправляет контракт.
 - AC: запуск отсутствующего executable возвращает ClientError, родительский процесс остаётся жив, ресурсы очищены; успешный запуск и обмен с helper сохраняются.
 
-**Q33. P2 — Cache не учитывает импорты рядом с внешним корневым файлом**
+**Q33. P2 — Cache не учитывает импорты рядом с внешним корневым файлом** ✅ (`cache::input_files` добавляет файлы корня-соседа каждого выбранного файла вне корней проекта; корень считает общая `inputs::sibling_root` по имени модуля из заголовка, как `--inputs` и загрузчик; `flick/tests/build_inputs.rs`: изменение, удаление и новое создание Helper не дают попадания в кэш)
 - Наблюдение: `scratch/External.fl` импортирует соседний Helper вне настроенного src; после изменения только Helper с `1` на `2` повторный `flick build scratch/External.fl` отдаёт cache hit и `1`, cold build — `2`. Конкурентное сохранение не требуется: это не Q31.
 - Причина/изменение: [cache inputs](../../flick/src/cache.rs#L68-L85) не включают sibling import root, поддержанный loader. Переиспользовать [поиск внешних корней](../../flick/src/commands/inputs.rs#L46-L70), чтобы loader, `--inputs` и cache согласованно учитывали входы.
 - AC: изменение, создание и удаление sibling dependency инвалидируют cache; результат и диагностики cached/cold сборок совпадают.

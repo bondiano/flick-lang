@@ -11,6 +11,30 @@ use crate::command::Outcome;
 use crate::sources::{self, FsHost};
 use crate::{cache, toolchain};
 
+/// The import root a module file outside the project's roots establishes:
+/// the directory its module name's path starts in, where its siblings are.
+pub fn sibling_root(path: &Path, name: &str) -> PathBuf {
+    let tail = project::module_path(name);
+    let root = path
+        .to_str()
+        .and_then(|p| p.strip_suffix(tail.to_str()?))
+        .map_or_else(
+            || path.parent().unwrap_or(Path::new("/")).to_path_buf(),
+            PathBuf::from,
+        );
+    project::normalize(&root)
+}
+
+/// The module name `text` declares in its header, if any.
+pub fn declared_name(text: &str) -> Option<String> {
+    let mut sources = SourceMap::default();
+    let file = sources.add("", text);
+    let parse = syntax::parse(text, file);
+    resolve::module_syntax(&parse.tree, text, file)
+        .header
+        .map(|header| header.name)
+}
+
 /// The conservative source roots and other inputs used by the native compiler.
 pub fn describe(
     host: &FsHost,
@@ -44,16 +68,7 @@ pub fn describe(
             })
             .unwrap_or_default();
         if !roots.iter().any(|root| path.starts_with(root)) {
-            // Standalone module paths establish their own sibling import root.
-            let tail = project::module_path(&name);
-            let root = path
-                .to_str()
-                .and_then(|p| p.strip_suffix(tail.to_str()?))
-                .map_or_else(
-                    || path.parent().unwrap_or(Path::new("/")).to_path_buf(),
-                    PathBuf::from,
-                );
-            roots.push(project::normalize(&root));
+            roots.push(sibling_root(path, &name));
         }
         modules.push(serde_json::json!({ "path": path, "name": name }));
     }
