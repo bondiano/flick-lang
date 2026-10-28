@@ -1,13 +1,15 @@
 //! The changes of a package's public API between two versions, by the
 //! interfaces of its modules, and the version bump they call for, as Elm's
 //! `elm diff` classifies them: a removed or changed export breaks
-//! importers, an added one does not.
+//! importers, an added one does not. A module's instances are its API too:
+//! an importer sees each one, so removing one, or making its context
+//! stronger, breaks code that used it.
 
 use std::collections::BTreeMap;
 use std::fmt;
 
 use crate::iface::{Export, Interface, Namespace};
-use crate::types::show_type;
+use crate::types::{Instance, show_type};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Change {
@@ -58,7 +60,7 @@ pub fn diff(old: &[Interface], new: &[Interface]) -> Vec<ModuleChanges> {
             let changes = match (old.get(module), new.get(module)) {
                 (Some(_), None) => vec![Change::Removed(format!("module {module}"))],
                 (None, Some(_)) => vec![Change::Added(format!("module {module}"))],
-                (Some(o), Some(n)) => exports(o, n),
+                (Some(o), Some(n)) => [exports(o, n), instances(o, n)].concat(),
                 (None, None) => Vec::new(),
             };
             (!changes.is_empty()).then(|| ModuleChanges {
@@ -133,6 +135,46 @@ fn exports(old: &Interface, new: &Interface) -> Vec<Change> {
         new.iter()
             .filter(|(k, _)| !old.contains_key(*k))
             .map(|(_, n)| Change::Added(label(n))),
+    );
+    out
+}
+
+/// The instances the module declares, compared by head and context: a move
+/// in the source is no change.
+fn instances(old: &Interface, new: &Interface) -> Vec<Change> {
+    let own = |i: &Interface| -> BTreeMap<String, Vec<String>> {
+        i.instances
+            .iter()
+            .filter(|inst| inst.module == i.module)
+            .map(|inst: &Instance| {
+                let mut context: Vec<String> = inst.context.iter().map(show_type).collect();
+                context.sort();
+                (show_type(&inst.head), context)
+            })
+            .collect()
+    };
+    let (old, new) = (own(old), own(new));
+    let mut out = Vec::new();
+    for (head, was) in &old {
+        let name = format!("instance {head}");
+        match new.get(head) {
+            None => out.push(Change::Removed(name)),
+            // a constraint fewer takes nothing from an importer
+            Some(now) if now.iter().all(|c| was.contains(c)) && now != was => {
+                out.push(Change::Added(format!("{name} with fewer constraints")));
+            }
+            Some(now) if now != was => out.push(Change::Changed {
+                name,
+                was: was.join(", "),
+                now: now.join(", "),
+            }),
+            Some(_) => {}
+        }
+    }
+    out.extend(
+        new.keys()
+            .filter(|head| !old.contains_key(*head))
+            .map(|head| Change::Added(format!("instance {head}"))),
     );
     out
 }
@@ -229,5 +271,43 @@ mod tests {
         assert_eq!(next_version("1.2.3", Bump::Major).as_deref(), Some("2.0.0"));
         assert_eq!(next_version("0.2.3", Bump::Major).as_deref(), Some("0.3.0"));
         assert_eq!(next_version("1.2.3", Bump::Patch).as_deref(), Some("1.2.4"));
+    }
+
+    #[test]
+    fn a_removed_instance_or_a_stronger_context_is_major() {
+        let thing = "module Lib exposing (..)\n\ntype Thing = Thing\n\ntype Box a = Box a\n\n";
+        let base = interface(&format!(
+            "{thing}instance Show Thing =\n  let show _ = \"thing\"\n\ninstance Show (Box a) =\n  let show _ = \"box\"\n"
+        ));
+        let removed = interface(&format!(
+            "{thing}instance Show (Box a) =\n  let show _ = \"box\"\n"
+        ));
+        let changes = diff(slice::from_ref(&base), &[removed]);
+        assert_eq!(
+            changes[0].changes,
+            [Change::Removed("instance Show Thing".into())]
+        );
+        assert_eq!(bump(&changes), Bump::Major);
+        assert_eq!(
+            next_version("1.2.3", bump(&changes)).as_deref(),
+            Some("2.0.0")
+        );
+        let stronger = interface(&format!(
+            "{thing}instance Show Thing =\n  let show _ = \"thing\"\n\ninstance Show a => Show (Box a) =\n  let show (Box x) = show x\n"
+        ));
+        assert_eq!(
+            bump(&diff(slice::from_ref(&base), slice::from_ref(&stronger))),
+            Bump::Major
+        );
+        // the reverse takes a constraint away: importers lose nothing
+        assert_eq!(
+            bump(&diff(slice::from_ref(&stronger), slice::from_ref(&base))),
+            Bump::Minor
+        );
+        // the same instances in another order are the same API
+        let moved = interface(&format!(
+            "{thing}instance Show (Box a) =\n  let show _ = \"box\"\n\ninstance Show Thing =\n  let show _ = \"thing\"\n"
+        ));
+        assert_eq!(bump(&diff(slice::from_ref(&base), &[moved])), Bump::Patch);
     }
 }
