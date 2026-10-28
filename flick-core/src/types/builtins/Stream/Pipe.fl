@@ -118,13 +118,10 @@ foreign pure pipe_through_channel_or_fail from "@flick-lang/runtime/effect/Strea
 /// failure with those of the next steps as the plan says; with
 /// `preventFallback`, a failure after the first element is not retried.
 /// `on_event` sees each attempt.
-with_execution_plan :
-  forall c p r e a r2 e2.
-  ExecutionPlan.ExecutionPlan p r2 e2 (Errors e) ->
-    Bool ->
-    (ExecutionPlan.Event e ->{r;} Unit) ->
-    (Stream (p + r) e a)^c ->
-    (Stream (r + r2) (e + e2) a)^c
+with_execution_plan : forall c p r e a r2 e2. ExecutionPlan.ExecutionPlan p r2 e2 (Errors e) ->
+  Bool ->
+  (ExecutionPlan.Event e ->{r;} Unit)^c ->
+  ((Stream (p + r) e a)^c -> (Stream (r + r2) (e + e2) a)^c)^c
 foreign pure with_execution_plan from "@flick-lang/runtime/effect/Stream" "flickStreamWithExecutionPlan"
   arity 3
   retention call

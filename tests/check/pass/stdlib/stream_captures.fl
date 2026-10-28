@@ -1,0 +1,22 @@
+// A stream whose callbacks hold a scoped value is used inside its scope:
+// the stream holds the callback's region, and consuming it there is fine.
+module App.StreamCaptures exposing (..)
+
+/// Each element plus the next value of a subscription.
+summed : PubSub.PubSub Number ->{} List Number
+let summed hub =
+  scope {
+    let sub = PubSub.subscribe hub
+    Stream.run_collect (Stream.map_effect (fun n -> PubSub.take sub + n) (Stream.range 1 2))
+  }
+
+/// A pipeline of several builders over the same scoped value.
+filtered : PubSub.PubSub Number ->{} List Number
+let filtered hub =
+  scope {
+    let sub = PubSub.subscribe hub
+    Stream.range 1 5
+      |> Stream.filter_effect (fun n -> PubSub.take sub > n)
+      |> Stream.tap (fun n -> PubSub.take sub + n)
+      |> Stream.run_collect
+  }
