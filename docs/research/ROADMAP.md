@@ -15,6 +15,7 @@
 | [flick-internals-for-ui.md](flick-internals-for-ui.md) | как Flick компилирует эффекты, E001, регионы, имена, Schema, сервер, CLI, тесты, ограничения |
 | [rescript-components.md](rescript-components.md) | ReScript JSX v4: `@react.component`, `componentWithProps`, свой JSX-модуль, memo, типы DOM и событий, ошибки props; §7–8 — что переносим в `component`/`setup`/`render` |
 | [bundle-and-output.md](bundle-and-output.md) | замеры бандла (rolldown), разбор выходного JS против ReScript; §4 — 8 улучшений с AC |
+| [core-option-equality.md](core-option-equality.md) | равенство и хеш `Option`/`Result` `core` и Effect, импорты сборок, размер `_core/`; решение H6 |
 
 Первоисточники верхнего уровня: <https://github.com/reatom/reatom/tree/v1001>, <https://v1001.reatom.dev/reference/react>,
 <https://effect.website/docs/v4/api/atom-react>, `effect@4.0.5` (`dist/reactivity/*.d.ts`), <https://github.com/megamaddu/purescript-react-basic-hooks>.
@@ -308,7 +309,7 @@ component search (props : SearchProps) =
 **H5. Сервисы runner'а.** ⬜
 - AC: runner объявляет сервисы, которые предоставляет сам (например, `Cloudflare.Env` вместо поля `env`), и `main` может держать их в строке; проверка `P026` вычитает их из строки.
 
-**H6. Пакеты на `core` без второй сборки.** ⬜ (исследование)
+**H6. Пакеты на `core` без второй сборки.** ✅ (исследование, [core-option-equality.md](core-option-equality.md): двойная сборка остаётся — `Equal.equals(Option.some(1), {_tag:"Some",value:1})` ложно, хеши разные, `Option.isOption` простого объекта ложно; к тому же Effect-сборка модуля импортирует `effect`, так что и при совместимых данных приложение `none` её не возьмёт; `_core/` у `@flick-lang/dts-importer` — 5.8 KB против 44 KB модулей, 13%; в `examples/` пакетов нет; строка «Библиотеки без Effect» в `implementation-decisions.md`)
 - AC: решение записано: либо Option/Result Effect и `core` совместимы по `==` и хешу (тогда `_core/` не нужен), либо остаётся двойная сборка; замер, сколько весит `_core/` у пакетов из `examples/`.
 
 ### Трек D — сахар прямого стиля 🆕
@@ -382,7 +383,7 @@ U9 ✅ ─ U9b ✅
 S2 ✅ ─ F1 ✅ ─ F2 ✅ ─ F3 ✅ ─ F4 ─ F5 ─ F6
 S3 ✅ ─ S4 ✅ ─ O1 ✅ ─ O2 ✅ ─ O3 ✅ ─ O4 ✅ ─ O5 ✅
 L1 ✅ ─ L2 ✅ ─ L3 ✅ ─ L4 ─ L5
-H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ─ H6     (H2 по входам — после L6 ✅)
+H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ─ H6 ✅     (H2 по входам — после L6 ✅)
 D1 ✅ ─ D2 ✅ ─ D3 ✅ ─ D4 ✅ ─ D5 ✅ ─ D6 ✅ ─ D9 ✅ ─ D11 ✅ ─ D10 ✅ ─ D13 ✅ ─ D12 ✅ ─ D14 ✅ ─ D8 ✅   (D15 ✅ — с D4/D5; D7 ✅ после C1)
 ```
 
