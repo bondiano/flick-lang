@@ -1,0 +1,69 @@
+// One server, one origin: the routes of an `HttpApi` share a router with
+// the page and the calls of `server fn`, and their handlers run with the
+// services where the routes are made.
+module App.Main exposing (main)
+
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+hello : HttpApi.Endpoint "hello" (HttpApi.Request Unit Unit Unit Unit ->{r;} String)
+let hello =
+  HttpApi.endpoint HttpApi.Get "/api/hello" (Record.label : Record.Label "hello")
+    |> HttpApi.with_success 200 (Codec.json Schema.string)
+
+api : HttpApi.Api r { greet : { hello : HttpApi.Request Unit Unit Unit Unit ->{r;} String } }
+let api =
+  HttpApi.api "Greet"
+  |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "greet") |> HttpApi.add hello)
+
+/// The service the API's handler reads.
+service Greeting =
+  word : Unit ->{} String
+
+twice : String ->{Server.Server;} String
+server fn twice word = word ++ word
+
+page : ServerRequest ->{Server.Server;} ServerResponse
+let page _ = Http.ServerResponse.text "page" Http.ServerResponse.defaults
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let layers =
+    Layer.merge
+      (Layer.succeed Greeting { word = fun () -> "hi" })
+      (Layer.merge Server.node (Layer.merge Http.FetchClient.layer Http.Server.layer_services))
+  provide layers {
+    try
+      scope s {
+        functions : (ServerRequest ->{} ServerResponse)^{s}
+        let functions = Server.handler [server twice]
+        app : (ServerRequest ->{Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
+        let app =
+          Http.Router.router Http.Router.config
+            [
+              Http.Router.route
+                (Some Http.Method.POST)
+                Server.path
+                (fun request -> functions request),
+              Http.Router.route (Some Http.Method.GET) "/" page,
+                HttpApi.route "/api/*" api { greet = { hello = fun _ -> Greeting.word () } },
+            ]
+        let options : Http.Server.ServeOptions =
+          { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None }
+        let server = Http.Server.serve options app
+        let base = Http.Server.format_address (Http.Server.address server)
+        Platform.stdout_line ("page: " ++ Http.ClientResponse.text (Http.Client.get (base ++ "/")))
+        Platform.stdout_line
+          ("api: " ++ Http.ClientResponse.text (Http.Client.get (base ++ "/api/hello")))
+        let call =
+          "{\"_tag\":\"Request\",\"id\":\"1\",\"tag\":\"App.Main.twice\",\"payload\":\"ho\",\"headers\":[]}\n"
+        let request =
+          Http.ClientRequest.body_text call (Some "application/ndjson")
+            (Http.ClientRequest.post (base ++ Server.path))
+        let answer = Http.ClientResponse.text (Http.Client.execute request)
+        Platform.stdout_line ("server fn: " ++ show (String.contains "hoho" answer))
+      }
+    with
+    | Http.ServerError.ServeError _ -> Platform.stdout_line "serve failed"
+    | Http.ClientError.HttpClientError _ -> Platform.stdout_line "client failed"
+  }

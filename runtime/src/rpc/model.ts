@@ -1,7 +1,7 @@
 // `Rpc` values: procedures and groups as frozen data, made into Effect's
 // `Rpc` and `RpcGroup` when served or called. The codecs are Flick's (Effect
 // Schema codecs of the JSON wire form), so they are the RPC schemas as they are.
-import { type Layer, Schema, type Scope } from "effect";
+import { type Context, type Layer, Schema, type Scope } from "effect";
 import * as Rpc from "effect/rpc/Rpc";
 import type * as RpcClient from "effect/rpc/RpcClient";
 import * as RpcGroup from "effect/rpc/RpcGroup";
@@ -22,6 +22,14 @@ export interface Procedure {
   readonly middleware: ReadonlyArray<(call: unknown) => unknown>;
   /** Whether the server runs the handler to its end though the client goes. */
   readonly uninterruptible: boolean;
+  /** Run after the hooks on `{ payload, headers }`: the service it makes is the handler's, a failure answers instead. */
+  readonly auth?: Auth;
+}
+
+/** The service `tag` a call's `check` makes for its handler. */
+export interface Auth {
+  readonly tag: Context.Key<unknown, unknown>;
+  readonly check: (call: unknown) => unknown;
 }
 
 /** `Rpc.Group hs`. */
@@ -104,6 +112,10 @@ export const rpcWithErrors = (cases: ReadonlyArray<AnySchema>, procedure: Proced
 export const rpcWithMiddleware = (hook: (call: unknown) => unknown, procedure: Procedure): Procedure =>
   with_(procedure, { middleware: [...procedure.middleware, hook] });
 
+/** `Rpc.with_auth tag check procedure`. */
+export const rpcWithAuth = (service: Context.Key<unknown, unknown>, check: (call: unknown) => unknown, procedure: Procedure): Procedure =>
+  with_(procedure, { auth: { tag: service, check } });
+
 /** `Rpc.uninterruptible procedure`. */
 export const rpcUninterruptible = (procedure: Procedure): Procedure => with_(procedure, { uninterruptible: true });
 
@@ -113,6 +125,13 @@ export const rpcGroup: Group = /*#__PURE__*/ Object.freeze({ procedures: [] });
 /** `Rpc.add`, after the dictionaries of its record constraints. */
 export const rpcAdd = (_lacks: unknown, _union: unknown, procedure: Procedure, group: Group): Group =>
   Object.freeze({ procedures: [...group.procedures, procedure] });
+
+/** `Rpc.authenticated tag group`: every procedure makes the service `tag` for its handler with `with_auth`. */
+export const rpcAuthenticated = (service: Context.Key<unknown, unknown>, group: Group): Group => {
+  const missing = group.procedures.find((p) => p.auth?.tag !== service);
+  if (missing !== undefined) throw new TypeError(`the procedure ${missing.name} has no \`with_auth\` making ${service.key}`);
+  return group;
+};
 
 /** Effect's `Rpc` of `procedure`. */
 const effectRpc = (procedure: Procedure) => {

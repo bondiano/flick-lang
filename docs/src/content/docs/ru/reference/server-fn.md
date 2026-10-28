@@ -77,5 +77,37 @@ let route functions =
 
 Каждый `server fn` — публичный endpoint: его может вызвать с любым
 параметром кто угодно, кто дотянется до сервера, а не только страницы
-программы. Проверяйте, кто вызывает, внутри функции. `flick doc` помечает
-каждую такую функцию.
+программы. `flick doc` помечает каждую такую функцию.
+
+## Кто вызывает
+
+Функция, у которой среди ошибок есть `Server.Unauthorized`, защищена: её
+реализация — `Server.Guarded`, и `Server.handler` принимает её только
+через `Server.authenticated`. Тот на каждом вызове проверяет заголовки и
+передаёт функции сервис, который сделала проверка; если проверка падает с
+`Server.Unauthorized`, вызов получает эту ошибку, а тело не выполняется.
+
+```flick
+service Session =
+  user : Unit ->{} String
+
+whoami : Unit ->{Server.Server, Session; Server.Unauthorized} String
+server fn whoami () = Session.user ()
+
+check : Http.Headers.Headers ->{; Server.Unauthorized} Session.Impl
+let check headers =
+  match Http.Headers.get "cookie" headers with
+  | Some cookie -> { user = fun () -> cookie }
+  | None -> from_result (Err Server.Unauthorized)
+
+let functions =
+  Server.handler (Server.authenticated Session check [server whoami] ++ [server open_door])
+```
+
+Вызывающий обрабатывает `Server.Unauthorized` как любую объявленную
+ошибку. У каждого вызова своя сессия, одновременные вызовы не видят чужих.
+Вызов в памяти при рендере страницы несёт заголовки запроса страницы,
+включая cookie. Передать защищённую функцию в `Server.handler` напрямую —
+ошибка типов, как и функцию, которой нужен `Session`, но без
+`Server.Unauthorized`, под `authenticated`: сессию тогда пришлось бы давать
+тому, кто её обслуживает.

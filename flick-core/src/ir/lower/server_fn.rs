@@ -104,7 +104,7 @@ impl Lower<'_> {
             );
         }
         let served = apply(
-            server("function", span),
+            server(if info.guarded { "guarded" } else { "function" }, span),
             vec![
                 self.global(&procedure, span),
                 self.global(&implementation, span),

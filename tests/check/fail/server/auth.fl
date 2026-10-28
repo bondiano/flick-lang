@@ -1,0 +1,27 @@
+// A guarded `server fn` is served only through `Server.authenticated`, and
+// one that needs a session without listing `Server.Unauthorized` leaves
+// the session to whoever serves it.
+module App.Auth exposing (..)
+
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+service Session =
+  user : Unit ->{} String
+
+whoami : Unit ->{Server.Server, Session; Server.Unauthorized} String
+server fn whoami () = Session.user ()
+
+leaky : Unit ->{Server.Server, Session;} String
+server fn leaky () = Session.user ()
+
+check : Http.Headers.Headers ->{; Server.Unauthorized} Session.Impl
+let check _ = from_result (Err Server.Unauthorized)
+
+unguarded : forall s. Unit ->{Scope s, Server.Server;} (ServerRequest ->{} ServerResponse)^{s}
+let unguarded () = Server.handler [server whoami]
+
+unlisted : forall s. Unit ->{Scope s, Server.Server;} (ServerRequest ->{} ServerResponse)^{s}
+let unlisted () = Server.handler (Server.authenticated Session check [server leaky])
+//~ FLICK-T003 @22:36-22:49 expected `Function _`, found `Guarded {Session, Server | _}`
+//~ FLICK-T003 @25:71-25:83 expected `Guarded {Session | _}`, found `Function {Session, Server | _}`

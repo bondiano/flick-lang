@@ -27,17 +27,20 @@ export const prepare = (group: Group, handlers: Readonly<Record<string, Handler>
     for (const procedure of group.procedures) {
       const handler = handlers[procedure.name];
       if (handler === undefined) return yield* Effect.die(new TypeError(`no handler for ${procedure.name}`));
-      // the hooks of the procedure, then the handler, with the services of `listen`
-      const handle = (payload: unknown, call: { readonly headers: Headers.Headers }) =>
-        Effect.provideContext(
-          Effect.andThen(
-            Effect.forEach(procedure.middleware, (hook) => toEffect(hook(Object.freeze({ payload, headers: call.headers }))), {
-              discard: true,
-            }),
-            handler(payload),
-          ),
+      const auth = procedure.auth;
+      // the hooks of the procedure, then its check, then the handler with the service the check made for this
+      // call alone, with the services of `listen`
+      const handle = (payload: unknown, call: { readonly headers: Headers.Headers }) => {
+        const seen = Object.freeze({ payload, headers: call.headers });
+        const run =
+          auth === undefined
+            ? handler(payload)
+            : Effect.flatMap(toEffect(auth.check(seen)), (impl) => Effect.provideService(handler(payload), auth.tag, impl));
+        return Effect.provideContext(
+          Effect.andThen(Effect.forEach(procedure.middleware, (hook) => toEffect(hook(seen)), { discard: true }), run),
           context,
         );
+      };
       // a stream's handler gives the stream as its result; `uninterruptible` asks the server to run it so
       const run = procedure.stream
         ? (payload: unknown, call: { readonly headers: Headers.Headers }) => Stream.unwrap(Effect.map(handle(payload, call), toStream))

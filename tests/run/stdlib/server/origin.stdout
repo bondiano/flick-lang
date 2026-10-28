@@ -1,0 +1,3 @@
+page: page
+api: "hi"
+server fn: true

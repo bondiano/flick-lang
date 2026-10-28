@@ -19,6 +19,28 @@ let node = Layer.succeed Server {}
 /// it needs, `Server` among it.
 type Function (r : ServiceRow)
 
+/// The implementation of a `server fn` that lists `Unauthorized` among its
+/// errors: it runs for a caller `authenticated` lets in, so `handler`
+/// serves it only through that.
+type Guarded (r : ServiceRow)
+
+/// A call `authenticated` turns away: its credentials prove no one. The
+/// body of the function does not run, and the caller gets this error.
+type error Unauthorized = Unauthorized
+  deriving Eq, Show, Schema
+
+/// The implementations of `functions`, each run with the service `tag`
+/// that `check` makes from the headers of its call: from a cookie or an
+/// `authorization` header, say. A call `check` fails with `Unauthorized`
+/// does not run the function. Each call has its own: concurrent callers do
+/// not see each other's.
+authenticated : forall a r. ServiceTag a ->
+  (Http.Headers.Headers ->{r; Unauthorized} ServiceImpl a) ->
+  List (Guarded (a + r)) ->
+  List (Function r)
+foreign pure authenticated from "@flick-lang/runtime/effect/server/Functions" "serverAuthenticated"
+  arity 3
+
 /// How the calls of a `server fn` go: the compiler makes one for each from
 /// its name and the witnesses of its payload, success and errors.
 type Procedure
@@ -49,4 +71,10 @@ foreign effect call from "@flick-lang/runtime/effect/server/Functions" "serverCa
 /// The implementation of a procedure, made by the compiler.
 function : forall p r e s. Procedure -> (p ->{r; e} s) -> Function r
 foreign pure function from "@flick-lang/runtime/effect/server/Functions" "serverFunction"
+  arity 2
+
+/// The implementation of a procedure whose errors have `Unauthorized`,
+/// made by the compiler.
+guarded : forall p r e s. Procedure -> (p ->{r; e} s) -> Guarded r
+foreign pure guarded from "@flick-lang/runtime/effect/server/Functions" "serverFunction"
   arity 2

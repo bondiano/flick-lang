@@ -184,6 +184,8 @@ pub struct ServerFn {
     /// How many parameters it takes; several are sent as one tuple.
     pub params: usize,
     pub errors: usize,
+    /// Whether it lists `Server.Unauthorized`, so `Server.authenticated` serves it.
+    pub guarded: bool,
 }
 
 /// The witness `T$schema` of a type that derives `Schema`.

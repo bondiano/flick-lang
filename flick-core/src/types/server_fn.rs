@@ -26,6 +26,14 @@ pub const IMPLEMENTATION: &str = "server";
 pub const PAYLOAD: &str = "payload";
 pub const SUCCESS: &str = "success";
 
+/// The row label of the error of a call `Server.authenticated` turns away.
+const UNAUTHORIZED: &str = "Server.Unauthorized";
+
+/// Whether a server function failing with `errors` is guarded.
+fn guarded(errors: &[(String, Type)]) -> bool {
+    errors.iter().any(|(l, _)| l == UNAUTHORIZED)
+}
+
 /// The witness member of the `i`-th error of a server function.
 pub fn error_member(i: usize) -> String {
     format!("error{i}")
@@ -95,6 +103,11 @@ fn parts(scheme: &Type) -> Result<Parts, &'static str> {
 fn call_types(scheme: &Type) -> Result<(Type, Type), &'static str> {
     let parts = parts(scheme)?;
     let client_error = Type::con("Rpc", "ClientError");
+    let kind = if guarded(&parts.errors) {
+        "Guarded"
+    } else {
+        "Function"
+    };
     let mut errors = parts.errors;
     errors.extend(error_label(&client_error).map(|l| (l, client_error)));
     let mut params = parts.params.into_iter().rev();
@@ -125,7 +138,7 @@ fn call_types(scheme: &Type) -> Result<(Type, Type), &'static str> {
             kind: Kind::ServiceRow,
         }],
         constraints: Vec::new(),
-        body: Box::new(Type::app(Type::con("Server", "Function"), Type::Row(row))),
+        body: Box::new(Type::app(Type::con("Server", kind), Type::Row(row))),
     };
     Ok((call, implementation))
 }
@@ -185,6 +198,7 @@ impl Checker<'_> {
                 continue;
             };
             let params = parts.params.len();
+            let is_guarded = guarded(&parts.errors);
             if named.params.len() != params {
                 // its implementation takes the parameters as one payload
                 self.error(
@@ -228,6 +242,7 @@ impl Checker<'_> {
                     name: name.clone(),
                     params,
                     errors,
+                    guarded: is_guarded,
                 });
             }
             // the implementation needs `Server`; the call does not

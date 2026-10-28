@@ -170,6 +170,20 @@ foreign pure with_middleware from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithM
   arity 2
   reviewed "effect@4.0.5 sha256:93976e18ef904486"
 
+/// Runs the handler with the service `tag` that `check` makes from each
+/// call, after the hooks of `with_middleware`: from its `authorization`
+/// header, say. A typed failure of `check` is answered as one of the
+/// handler would be, and the handler does not run. Each call has its own,
+/// so concurrent callers do not see each other's; over a WebSocket the
+/// headers are the connection's. `authenticated` takes the service off
+/// what serving the group needs.
+with_auth : forall a l p r e s. ServiceTag a ->
+  (Call p ->{r; e} ServiceImpl a) ->
+  Rpc l (p ->{a + r; e} s) ->
+  Rpc l (p ->{a + r; e} s)
+foreign pure with_auth from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithAuth"
+  arity 3
+
 /// The server runs the handler to its end even when the client goes away
 /// or interrupts the call: for a write that must not stop halfway.
 uninterruptible : Rpc l f -> Rpc l f
@@ -180,6 +194,13 @@ foreign pure uninterruptible from "@flick-lang/runtime/effect/rpc/Rpc" "rpcUnint
 group : Group r {}
 foreign pure group from "@flick-lang/runtime/effect/rpc/Rpc" "rpcGroup"
   reviewed "effect@4.0.5 sha256:2778a7f9eb6fd7f5"
+
+/// The group, served without the service `tag`: each of its procedures
+/// makes it per call with `with_auth`. A procedure without one is a defect
+/// when the group is made.
+authenticated : forall a r hs. ServiceTag a -> Group (a + r) hs -> Group r hs
+foreign pure authenticated from "@flick-lang/runtime/effect/rpc/Rpc" "rpcAuthenticated"
+  arity 2
 
 /// The group with the procedure: its handler becomes a field of the group.
 add :

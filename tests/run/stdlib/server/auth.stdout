@@ -1,0 +1,7 @@
+ada over HTTP: true
+bob over HTTP: true
+eve over HTTP: true
+page for ada: hello ada
+page for eve: sign in
+open: open
+body runs: 3

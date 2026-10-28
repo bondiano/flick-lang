@@ -77,5 +77,39 @@ listed.
 ## A public endpoint
 
 Every `server fn` is a public endpoint: anyone who reaches the server can
-call it with any payload, not only the program's own pages. Check who
-calls inside the function. `flick doc` marks each one so.
+call it with any payload, not only the program's own pages. `flick doc`
+marks each one so.
+
+## Who calls
+
+A function that lists `Server.Unauthorized` among its errors is guarded:
+its implementation is a `Server.Guarded`, which `Server.handler` takes only
+through `Server.authenticated`. That runs a check on the headers of each
+call and gives the function the service the check makes; a check that
+fails with `Server.Unauthorized` answers the call with it, and the body
+does not run.
+
+```flick
+service Session =
+  user : Unit ->{} String
+
+whoami : Unit ->{Server.Server, Session; Server.Unauthorized} String
+server fn whoami () = Session.user ()
+
+check : Http.Headers.Headers ->{; Server.Unauthorized} Session.Impl
+let check headers =
+  match Http.Headers.get "cookie" headers with
+  | Some cookie -> { user = fun () -> cookie }
+  | None -> from_result (Err Server.Unauthorized)
+
+let functions =
+  Server.handler (Server.authenticated Session check [server whoami] ++ [server open_door])
+```
+
+The caller handles `Server.Unauthorized` as any declared error. Each call
+has its own session, so concurrent callers do not see each other's. A call
+made in memory while a page renders carries the headers of the page's
+request, cookie included. Passing a guarded function to `Server.handler`
+directly is a type error, and so is a function that needs `Session`
+without listing `Server.Unauthorized` under `authenticated`: the session
+would be left to whoever serves it.

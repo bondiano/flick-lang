@@ -229,6 +229,35 @@ const start = (options: ServeOptions, api: Api, handlers: Handlers) =>
     return { port, scope } satisfies Server;
   });
 
+/** A route per endpoint of `api`, whose handler runs with the services here. */
+const routesOf = (api: Api, handlers: Handlers) =>
+  Effect.gen(function* () {
+    const context = yield* Effect.context<unknown>();
+    const routes: Array<HttpRouter.Route<unknown, unknown>> = [];
+    for (const group of api.groups) {
+      for (const endpoint of group.endpoints) {
+        const handler = handlers[group.name]?.[endpoint.name];
+        if (handler === undefined) return yield* Effect.die(new TypeError(`no handler for ${group.name}.${endpoint.name}`));
+        const method = endpoint.method === "HEAD" ? "*" : endpoint.method;
+        routes.push(HttpRouter.route(method, routePath(endpoint.path), route(endpoint, handler, context)));
+      }
+    }
+    return routes;
+  });
+
+/**
+ * `HttpApi.route path api handlers`: one route of `Http.Router` at `path`
+ * that serves every endpoint, so the API shares a server and an origin
+ * with the pages and the RPC; a request no endpoint takes is 404.
+ */
+export const httpApiRoute = (path: string, api: Api, handlers: Handlers) =>
+  Effect.gen(function* () {
+    const router = yield* HttpRouter.make;
+    yield* router.addAll(yield* routesOf(api, handlers));
+    const served = Effect.catch(router.asHttpEffect(), () => Effect.succeed(HttpServerResponse.empty({ status: 404 })));
+    return HttpRouter.route("*", routePath(path), served);
+  });
+
 /** `HttpApi.listen options api handlers`, owned by the innermost scope. */
 export const httpApiListen = (options: ServeOptions, api: Api, handlers: Handlers): Effect.Effect<Server, ServeError, unknown> =>
   acquireRelease(start(options, api, handlers), (server) => Scope.close(server.scope, Exit.void));

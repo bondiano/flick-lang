@@ -87,6 +87,12 @@ let server = HttpApi.listen options api { users = { get_user = find_user } }
 для документа OpenAPI, Swagger UI и Scalar. Для них используется тот же
 документ, который возвращает `HttpApi.openapi`.
 
+`HttpApi.route "/api/*" api handlers` обслуживает API на сервере
+`Http.Router`: один маршрут по этому шаблону пути рядом со страницами и
+вызовами `server fn`, на одном origin. Он декодирует и отвечает так же, как
+`listen`, на запрос, который не принял ни один эндпоинт, отвечает 404, а
+обработчики работают с сервисами того места, где создан маршрут.
+
 ## Клиенты и документы
 
 `HttpApi.call base endpoint request` кодирует запрос кодеками эндпоинта

@@ -297,6 +297,16 @@ foreign effect listen from "@flick-lang/runtime/effect/http-api/HttpApi" "httpAp
   retention owner
   reviewed "effect@4.0.5 sha256:39cb432d1b06d567"
 
+/// One route of `Http.Router` at the path pattern (`/api/*`) that serves
+/// the API with these handlers: the API shares a server and an origin with
+/// the pages and the RPC. It decodes and answers as `listen` does, a
+/// request no endpoint takes is 404, and the handlers run with the
+/// services here.
+route : forall c r gs q f. String -> Api r gs -> (gs^c ->{r;} (Http.Router.Route q f)^c)^c
+foreign effect route from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiRoute"
+  arity 3
+  retention call
+
 /// The port the server listens on: the one asked for, or the one the system
 /// chose for port 0.
 port : Server s -> Number

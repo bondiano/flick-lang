@@ -220,6 +220,27 @@ let require_authorization_header call =
   | None -> from_result (Err (Unauthorized { reason = "no authorization" }))
 ```
 
+`Rpc.with_auth tag check` makes a service for the handler from each call,
+after the hooks: the session an `authorization` header names, say. A
+typed failure of `check` is answered as the handler's would be, and the
+handler does not run; each call has its own service, so concurrent callers
+do not see each other's. `Rpc.authenticated tag group` takes the service
+off what serving the group needs; a procedure of the group without
+`with_auth` for it is a defect when the group is made. Over a WebSocket the
+headers are the connection's.
+
+```flick
+me : Rpc.Rpc "me" (Unit ->{Session; Unauthorized} String)
+let me =
+  Rpc.make (Record.label : Record.Label "me")
+    |> Rpc.with_success (Codec.json Schema.string)
+    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema Unauthorized)))
+    |> Rpc.with_auth Session check
+
+group : Rpc.Group none { me : Unit ->{Session; Unauthorized} String }
+let group = Rpc.authenticated Session (Rpc.group |> Rpc.add me)
+```
+
 Use `Rpc.uninterruptible` only when a handler must finish after client
 cancellation. It can delay server shutdown; it does not make a write atomic
 or protect it from process termination. Transactionality still belongs in

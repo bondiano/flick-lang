@@ -227,6 +227,27 @@ let require_authorization_header call =
   | None -> from_result (Err (Unauthorized { reason = "no authorization" }))
 ```
 
+`Rpc.with_auth tag check` на каждом вызове после хуков делает сервис для
+обработчика: например, сессию, которую называет заголовок `authorization`.
+Типизированная ошибка `check` отправляется как ошибка обработчика, и
+обработчик не запускается; у каждого вызова свой сервис, одновременные
+вызовы не видят чужих. `Rpc.authenticated tag group` убирает этот сервис
+из того, что нужно для обслуживания группы; процедура группы без
+`with_auth` для него — дефект при создании группы. У WebSocket заголовки
+общие для соединения.
+
+```flick
+me : Rpc.Rpc "me" (Unit ->{Session; Unauthorized} String)
+let me =
+  Rpc.make (Record.label : Record.Label "me")
+    |> Rpc.with_success (Codec.json Schema.string)
+    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema Unauthorized)))
+    |> Rpc.with_auth Session check
+
+group : Rpc.Group none { me : Unit ->{Session; Unauthorized} String }
+let group = Rpc.authenticated Session (Rpc.group |> Rpc.add me)
+```
+
 Используйте `Rpc.uninterruptible`, только если обработчик должен закончить
 работу после отмены клиентом. Это может задержать остановку сервера,
 но не делает запись атомарной и не защищает от завершения процесса.

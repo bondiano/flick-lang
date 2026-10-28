@@ -1,0 +1,59 @@
+// A procedure's handler runs with the session `Rpc.with_auth` makes from
+// each call: its `authorization` header names who calls, a call without
+// one gets the declared error and the handler does not run, and serving
+// the group needs no session.
+module App.Main exposing (main)
+
+type error Unauthorized = Unauthorized
+  deriving Schema
+
+/// Who calls.
+service Session =
+  user : Unit ->{} String
+
+session : String -> Session.Impl
+let session name =
+  { user = fun () -> name }
+
+/// The session the `authorization` header names.
+check : Rpc.Call Unit ->{; Unauthorized} Session.Impl
+let check call =
+  match Http.Headers.get "authorization" call.headers with
+  | Some "Bearer ada" -> session "ada"
+  | Some "Bearer bob" -> session "bob"
+  | _ -> from_result (Err Unauthorized)
+
+me : Rpc.Rpc "me" (Unit ->{Session; Unauthorized} String)
+let me =
+  Rpc.make (Record.label : Record.Label "me")
+    |> Rpc.with_success (Codec.json Schema.string)
+    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema Unauthorized)))
+    |> Rpc.with_auth Session check
+
+type alias Handlers = { me : Unit ->{Session; Unauthorized} String }
+
+group : Rpc.Group none Handlers
+let group = Rpc.authenticated Session (Rpc.group |> Rpc.add me)
+
+handlers : Handlers
+let handlers = { me = fun () -> Session.user () }
+
+/// A call of `me` as `token`.
+as_user : String -> String ->{} String
+let as_user url token =
+  try Rpc.with_headers [("authorization", token)] (task { Rpc.call url me () }) with
+  | Unauthorized -> "refused"
+  | Rpc.ClientError message -> "client: " ++ message
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try
+    scope s {
+      let http = Rpc.listen Rpc.defaults group handlers
+      let url = "http://127.0.0.1:" ++ show (Rpc.port http) ++ "/rpc"
+      Platform.stdout_line (as_user url "Bearer ada")
+      Platform.stdout_line (as_user url "Bearer bob")
+      Platform.stdout_line (as_user url "Bearer eve")
+    }
+  with
+  | Rpc.ServeError message -> Platform.stdout_line ("serve: " ++ message)

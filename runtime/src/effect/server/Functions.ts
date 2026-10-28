@@ -4,7 +4,7 @@
 // mounted in this process, a call made here (rendering a page on the
 // server) runs in memory instead. Serving is `./FunctionsNode.ts`, which
 // needs Node.
-import { Effect } from "effect";
+import { type Context, Effect } from "effect";
 
 import { env } from "../../host.ts";
 import { rpcCallNdjson } from "../../rpc/client.ts";
@@ -12,6 +12,7 @@ import {
   clientError,
   type Procedure,
   rpcMake,
+  rpcWithAuth,
   rpcWithErrors,
   rpcWithPayload,
   rpcWithSuccess,
@@ -72,6 +73,16 @@ export const serverCall = (procedure: Procedure, payload: unknown): Effect.Effec
       ? Effect.fail(clientError(`no server for ${procedure.name}: set FLICK_SERVER_URL`))
       : rpcCallNdjson(new URL(PATH, url).href, procedure, payload);
   });
+
+/** `Server.authenticated tag check functions`: each run with the service `check` makes from its call's headers. */
+export const serverAuthenticated = (
+  tag: Context.Key<unknown, unknown>,
+  check: (headers: unknown) => unknown,
+  functions: ReadonlyArray<ServerFunction>,
+): ReadonlyArray<ServerFunction> =>
+  functions.map((f) =>
+    serverFunction(rpcWithAuth(tag, (call) => check(Reflect.get(Object(call), "headers")), f.procedure), f.run),
+  );
 
 /** `Server.function procedure run`. */
 export const serverFunction = (procedure: Procedure, run: Handler): ServerFunction =>

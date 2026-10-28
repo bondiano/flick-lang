@@ -76,6 +76,12 @@ each issue, never the input. `options` give the host and port (0 for any) and th
 OpenAPI document, Swagger UI and Scalar, which all serve the document
 `HttpApi.openapi` writes.
 
+`HttpApi.route "/api/*" api handlers` serves the API on a server of
+`Http.Router` instead: one route at that path pattern, beside the pages and
+the calls of `server fn`, on one origin. It decodes and answers as `listen`
+does, a request no endpoint takes is 404, and the handlers run with the
+services where the route is made.
+
 ## Clients and documents
 
 `HttpApi.call base endpoint request` encodes the request with the endpoint's
