@@ -19,7 +19,7 @@ test:
     cargo test --workspace
 
 # Install the JS runtime, check its pinned Effect, run compiled programs on Node
-e2e:
+e2e: docs-wasm
     cargo build -p flick
     pnpm install --frozen-lockfile
     pnpm -r typecheck
@@ -36,6 +36,19 @@ bundle-size:
 lsp-bench file="examples/mtl/src/Mtl/StateT.fl" +positions="24:5":
     cargo build --release -p flick
     node tools/lsp-bench/index.mjs target/release/flick {{file}} {{positions}}
+
+# Hold the language server to a long open/edit/close session and print its resident memory (Linux)
+lsp-soak file="examples/mtl/src/Mtl/StateT.fl" cycles="400":
+    cargo build --release -p flick
+    node tools/lsp-bench/soak.mjs target/release/flick {{file}} {{cycles}}
+
+# Closed-loop HTTP load on the SSR server of tools/load/ssr (release): path is render, stream or html
+load-ssr path="render" port="3918":
+    cargo build -p flick
+    cd tools/load/ssr && ../../../target/debug/flick build
+    PORT={{port}} node tools/load/ssr/dist/flick-main.js & pid=$!; sleep 2; \
+      node tools/load/index.mjs --url "http://127.0.0.1:{{port}}/{{path}}/{id}" --expect 'request {id}' --pid $pid; \
+      status=$?; kill $pid; exit $status
 
 # Run SQL queries against PostgreSQL in Docker (after `just e2e` installs the runtime)
 e2e-postgres:

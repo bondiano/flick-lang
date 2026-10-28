@@ -74,7 +74,10 @@ fn projection_and_executable_share_the_analysis() {
         };
         for module in &analysis.modules {
             let text = &sources.get(module.file).text;
-            let projected = projection::project(module, text, &fingerprint, &lookup, &|_| None);
+            let projected =
+                projection::project(module, text, &fingerprint, &lookup, &|_| None, &|m| {
+                    projection::relative(&module.name, m)
+                });
             assert!(
                 projected
                     .text

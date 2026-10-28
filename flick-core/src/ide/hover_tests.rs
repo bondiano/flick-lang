@@ -494,3 +494,36 @@ let save path =
         "{markdown}"
     );
 }
+
+#[test]
+fn generated_url_companion_hover_keeps_its_type_and_navigation() {
+    let source = "module App.Pages exposing (home)
+
+/// Pages of this application.
+type Page = Home | User Float
+  deriving Schema, Url
+
+home : String
+let home = Route.print Page.url Home
+";
+    let f = fixture_of(&[("src/App/Pages.fl", source)]);
+    let ide = f.ide();
+    assert!(
+        ide.analysis.diagnostics.iter().all(Diagnostic::unnecessary),
+        "{:?}",
+        ide.analysis.diagnostics
+    );
+    let file = f.file("App.Pages");
+    let start = f.at("App.Pages", "Page.url", 0) + 5;
+    let (markdown, range) = ide.hover(file, start + 1).expect("companion hover");
+    assert!(markdown.contains("Page.url : Url Page"), "{markdown}");
+    for docs in ["deriving Url", "Route.print", "Route.parse"] {
+        assert!(markdown.contains(docs), "{markdown}");
+    }
+    assert_eq!(range, (start, start + 3));
+    let (symbol, _) = ide.symbol_at(file, start + 1).expect("companion symbol");
+    let definition = ide.definition(&symbol).expect("companion definition");
+    let declared = f.at("App.Pages", "Page =", 0);
+    assert_eq!(definition.target, Target::File(file));
+    assert_eq!((definition.start, definition.end), (declared, declared + 4));
+}

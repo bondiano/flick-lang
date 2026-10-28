@@ -162,7 +162,12 @@ fn run_cases() {
     let mut times = Vec::new();
     let jobs = jobs();
     // release must agree with the debug reference: same stdout, stderr and exit
-    for (emit, profile) in [("js", "debug"), ("ts", "debug"), ("js", "release")] {
+    for (emit, profile) in [
+        ("js", "debug"),
+        ("ts", "debug"),
+        ("js", "release"),
+        ("ts", "release"),
+    ] {
         let results = parallel(&paths, jobs, |case| {
             let rel = case.strip_prefix(&root).expect("case under root");
             let out_dir = out_root
@@ -178,6 +183,7 @@ fn run_cases() {
         report.extend(results.into_iter().filter_map(|(problem, _)| problem));
     }
     report.extend(typecheck(&repo, &out_root.join("debug/ts")));
+    report.extend(typecheck(&repo, &out_root.join("release/ts")));
     assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));
     metrics(&out_root, times[0], times[2]);
 }

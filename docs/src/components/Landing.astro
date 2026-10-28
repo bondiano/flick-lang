@@ -6,7 +6,7 @@ import SignalWave from "./SignalWave.astro";
 import Brand from "./Brand.astro";
 import Icon from "./Icon.astro";
 import { Effect } from "@flick-lang/runtime";
-import { uiRenderStatic, type Ui } from "@flick-lang/runtime/ui/react";
+import { uiRenderStatic } from "@flick-lang/runtime/ui/react";
 import { renderToString } from "react-dom/server";
 import { initial_view } from "../widgets/Hero.fl";
 
@@ -16,8 +16,7 @@ const prefix = ru ? "/ru" : "";
 const text = (en: string, russian: string) => ru ? russian : en;
 const title = text("Flick — Less ceremony. More effect.", "Flick — ML-язык на основе Effect");
 const description = text("An ML-family language with higher-kinded types, typed effects and regions, compiled to JavaScript on Effect. Learn Flick and try it in your browser.", "Flick — язык семейства ML с типами высших порядков, типизированными эффектами и проверкой времени жизни ресурсов. Компилируется в JavaScript и использует Effect.");
-const initialView = initial_view as (ru: boolean) => Effect.Effect<Ui>;
-const heroHtml = renderToString(uiRenderStatic(await Effect.runPromise(initialView(ru))));
+const heroHtml = renderToString(uiRenderStatic(await Effect.runPromise(initial_view(ru))));
 const features = [
   { icon: "code", title: text("Inference that follows you", "Типы данных и вывод типов"), body: text("Model with variants, compose with higher-kinded types, and let inference connect the details. Types work for you, not the other way around.", "Описывайте данные вариантными типами, а общие операции — через конструкторы типов. Компилятор выводит типы выражений и проверяет их по сигнатурам."), href: "/reference/types/" },
   { icon: "effects", title: text("Effects in the signature", "Эффекты видны в сигнатуре"), body: text("Know what a function needs and how it can fail. Write direct calls; the compiler handles the Effect sequencing.", "Сигнатура показывает, какие сервисы нужны функции и какие ошибки она может вернуть. Вызывайте функции напрямую — компилятор свяжет операции через Effect."), href: "/reference/effects/" },

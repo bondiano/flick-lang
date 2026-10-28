@@ -99,7 +99,8 @@ procedure of the same value. Messages are NDJSON unless `ServeOptions` and
 reaches with `transport = Rpc.websocket`, and `listen_tcp` over TCP on
 Node, with `Rpc.tcp` and a serialization that frames its messages;
 `serve_stdio` answers calls on stdin and stdout, and `spawn` starts such a
-program and connects to it; `with_middleware` runs a hook on the payload
+program and connects to it; `serve_worker`/`worker` do the same for a
+Web Worker and `serve_node_worker`/`node_worker` for a Node worker thread; `with_middleware` runs a hook on the payload
 and headers of each call before the handler, and `with_headers` adds
 headers to the calls of a task; `uninterruptible` makes the server run a
 handler to its end though its client goes; `call_local` and

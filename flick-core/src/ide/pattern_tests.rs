@@ -108,3 +108,76 @@ let unqualified box =
         assert!(!edits.contains(&(file, binder)), "{edits:?}");
     }
 }
+
+#[test]
+fn private_route_constructor_patterns_show_types_and_documentation() {
+    let source = "module App.Pages exposing (profile)
+
+type error NotFound = NotFound
+  deriving Schema
+
+type Page =
+  /// The landing page.
+  | Home
+  /// A user profile by numeric identifier.
+  | User Float
+  deriving Schema, Url
+
+page : Atom.Writable Page
+let page = Atom.route Page.url Home
+
+name : Float ->{; NotFound} String
+let name id =
+  if id == 404 then from_result (Err NotFound) else show id
+
+profile : Atom.Atom (Atom.Async String {NotFound})
+let profile =
+  Atom.serializable_result
+    (Codec.json Schema.string)
+    (Codec.json (schema NotFound))
+    (Atom.loader page (fun p -> task {
+      match p with
+      | Home -> \"home\"
+      | User 404 ->
+        let _ = name 404
+        from_result (Err NotFound)
+      | User id -> name id
+    }))
+";
+    let f = fixture_of(&[("src/App/Pages.fl", source)]);
+    let ide = f.ide();
+    assert!(
+        ide.analysis.diagnostics.iter().all(Diagnostic::unnecessary),
+        "{:?}",
+        ide.analysis.diagnostics
+    );
+    let file = f.file("App.Pages");
+    for (pattern, name, ty, docs) in [
+        ("Home ->", "Home", "Page", "The landing page."),
+        (
+            "User 404",
+            "User",
+            "Float -> Page",
+            "A user profile by numeric identifier.",
+        ),
+        (
+            "User id ->",
+            "User",
+            "Float -> Page",
+            "A user profile by numeric identifier.",
+        ),
+    ] {
+        let start = f.at("App.Pages", pattern, 0);
+        let (markdown, range) = ide.hover(file, start + 1).expect("constructor hover");
+        assert!(markdown.contains(&format!("{name} : {ty}")), "{markdown}");
+        assert!(markdown.contains(docs), "{markdown}");
+        assert_eq!(
+            range,
+            (start, start + u32::try_from(name.len()).expect("small"))
+        );
+    }
+    let start = f.at("App.Pages", "id -> name", 0);
+    let (markdown, range) = ide.hover(file, start + 1).expect("payload binder hover");
+    assert!(markdown.contains("id : Float"), "{markdown}");
+    assert_eq!(range, (start, start + 2));
+}

@@ -109,19 +109,19 @@ pub fn doctor(global: &GlobalArguments) -> Outcome {
         ),
     }
     installed(root.as_deref(), &mut line);
-    // the adapter is verified against one typescript-go release
+    // the mapper is verified against one TypeScript release
     let mapper = root
         .as_deref()
         .and_then(|r| toolchain::installed(r, "typescript"));
     let detail = match mapper {
         Some(v) if v == toolchain::TYPESCRIPT_GO => {
-            format!("typescript-go {v}, the adapter's release")
+            format!("typescript {v}, the mapper's release")
         }
         Some(v) => format!(
-            "typescript {v}: the adapter is verified against {}",
+            "typescript {v}: the mapper is verified against {}",
             toolchain::TYPESCRIPT_GO
         ),
-        None => "typescript-go not installed: editors use `flick lsp` only".to_owned(),
+        None => "typescript not installed: editors use `flick lsp` only".to_owned(),
     };
     line(None, "Content Mapper", detail);
     Outcome {

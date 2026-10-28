@@ -23,7 +23,7 @@ pub use dev::dev;
 pub use diff::diff;
 pub use ffi::{FfiCheckCommand, FfiImportCommand};
 pub use fmt::FmtCommand;
-pub use inspect::{doc, inspect, schema_export};
+pub use inspect::{doc, inspect, interface_of, projection_of, schema_export};
 pub use pack::pack;
 pub use run::run;
 pub use scaffold::ScaffoldCommand;

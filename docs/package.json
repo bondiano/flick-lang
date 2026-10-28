@@ -9,6 +9,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
+    "typecheck": "astro check",
     "test": "node --test test/*.test.ts"
   },
   "dependencies": {
@@ -19,5 +20,13 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "shiki": "4.5.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.12",
+    "@flick-lang/content-mapper": "workspace:*",
+    "@types/jsdom": "28.0.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "6.0.3"
   }
 }

@@ -4,7 +4,7 @@
 //! higher-kinded variable, a region, an open record) is refused with the
 //! reason, never written as `any`.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::Write;
 
@@ -14,6 +14,9 @@ use crate::types::{Form, Kind, PRELUDE, Type, TypeDef, builtin_sources, passes_d
 
 /// The runtime package generated code imports.
 const RUNTIME: &str = "@flick-lang/runtime";
+
+/// The runtime module whose `Ui` a Flick `Ui` value is.
+const RUNTIME_UI: &str = "@flick-lang/runtime/ui/react";
 
 /// Prelude types TypeScript has natively.
 const PRIMITIVES: &[(&str, &str)] = &[
@@ -45,6 +48,7 @@ const NATIVE: &[&str] = &[
     "Schema",
     "PureCodec",
     "Codec",
+    "Ui",
 ];
 
 pub struct Projection<'a> {
@@ -55,6 +59,8 @@ pub struct Projection<'a> {
     pub package: &'a dyn Fn(&str) -> Option<String>,
     /// Other modules whose types are referenced.
     pub used: RefCell<BTreeSet<String>>,
+    /// Whether the runtime `Ui` is referenced.
+    ui: Cell<bool>,
 }
 
 /// Type parameters in scope: Flick name to TypeScript name; regions have
@@ -72,6 +78,7 @@ impl Projection<'_> {
             lookup,
             package,
             used: RefCell::new(BTreeSet::new()),
+            ui: Cell::new(false),
         }
     }
 
@@ -275,6 +282,10 @@ impl Projection<'_> {
             }
             match (name.as_str(), args.len()) {
                 ("List", 1) => return Ok(format!("ReadonlyArray<{}>", arg(0)?)),
+                ("Ui", 0) => {
+                    self.ui.set(true);
+                    return Ok("$Ui".to_owned());
+                }
                 ("Seq", 1) => return Ok(format!("Iterable<{}>", arg(0)?)),
                 ("Option", 1) => return Ok(format!("$Option.Option<{}>", arg(0)?)),
                 ("Result", 2) => return Ok(format!("$Result.Result<{}, {}>", arg(1)?, arg(0)?)),
@@ -371,6 +382,9 @@ impl Projection<'_> {
         let mut out = format!(
             "import type {{ Effect as $Effect, Option as $Option, Result as $Result, Layer as $Layer, Schema as $Schema, Stream as $Stream, Context as $Context }} from \"{RUNTIME}\";\n"
         );
+        if self.ui.get() {
+            let _ = writeln!(out, "import type {{ Ui as $Ui }} from \"{RUNTIME_UI}\";");
+        }
         for module in self.used.borrow().iter() {
             let _ = writeln!(
                 out,

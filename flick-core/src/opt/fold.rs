@@ -59,20 +59,75 @@ pub fn fold(e: &mut Expr) -> bool {
 /// `show` of a built-in instance as the runtime `show` spells it.
 fn show(instance: &str, c: Const) -> Option<String> {
     Some(match (instance, c) {
-        // shortcut: integers only; Rust and JS spell other numbers differently (`1e21`)
-        ("Show Float", Const::Number(x)) if x.fract() == 0.0 && x.abs() < consteval::EXACT => {
-            if x == 0.0 && x.is_sign_negative() {
-                "-0".to_owned()
-            } else {
-                format!("{x}")
-            }
-        }
+        ("Show Float", Const::Number(x)) => js_number(x),
         ("Show Int", Const::Number(x)) => format!("{x}"),
         ("Show BigInt", Const::BigInt(x)) => format!("{x}n"),
         ("Show Bool", Const::Bool(b)) => b.to_string(),
         ("Show String", Const::String(s)) => json_string(&s),
         _ => return None,
     })
+}
+
+/// JS `String(x)`, but `-0` for negative zero like the runtime `show`.
+/// Rust's `{:e}` gives the same shortest digits; only the layout differs.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    reason = "at most 17 digits, and each cast follows its range check"
+)]
+fn js_number(x: f64) -> String {
+    if x.is_nan() {
+        return "NaN".to_owned();
+    }
+    let sign = if x.is_sign_negative() { "-" } else { "" };
+    if x.is_infinite() {
+        return format!("{sign}Infinity");
+    }
+    if x == 0.0 {
+        return format!("{sign}0");
+    }
+    let sci = format!("{:e}", x.abs());
+    let (mantissa, exp) = sci.split_once('e').unwrap_or((&sci, "0"));
+    let digits = even_tie(x.abs(), mantissa.replace('.', ""), exp);
+    let k = digits.len() as i32;
+    // the decimal point sits after `n` digits
+    let n = exp.parse::<i32>().unwrap_or(0) + 1;
+    let body = if k <= n && n <= 21 {
+        format!("{digits}{}", "0".repeat((n - k) as usize))
+    } else if 0 < n && n <= 21 {
+        let (int, frac) = digits.split_at(n as usize);
+        format!("{int}.{frac}")
+    } else if -6 < n && n <= 0 {
+        format!("0.{}{digits}", "0".repeat((-n) as usize))
+    } else {
+        let (first, rest) = digits.split_at(1);
+        let dot = if rest.is_empty() { "" } else { "." };
+        let e = n - 1;
+        format!(
+            "{first}{dot}{rest}e{}{}",
+            if e < 0 { "-" } else { "+" },
+            e.abs()
+        )
+    };
+    format!("{sign}{body}")
+}
+
+/// Rust breaks an exact tie between two shortest spellings upwards, JS
+/// towards the even one: `…562.25` is `…562.3` in Rust, `…562.2` in JS.
+fn even_tie(x: f64, digits: String, exp: &str) -> String {
+    let Some(last) = digits.bytes().last().filter(|d| d % 2 == 1) else {
+        return digits;
+    };
+    let mut lower = digits[..digits.len() - 1].to_owned();
+    lower.push(char::from(last - 1));
+    // 800 places hold every digit of any f64 exactly
+    let exact = format!("{x:.800e}");
+    let (exact, exact_exp) = exact.split_once('e').unwrap_or((&exact, ""));
+    let exact = exact.replace('.', "");
+    let tie = exact_exp == exp && exact.trim_end_matches('0') == format!("{lower}5");
+    let reads_back = format!("{}.{}e{exp}", &lower[..1], &lower[1..]).parse() == Ok(x);
+    if tie && reads_back { lower } else { digits }
 }
 
 /// `JSON.stringify` of a string.
@@ -132,7 +187,8 @@ fn int(e: &Expr) -> Option<i32> {
     }
 }
 
-/// The value of a literal, or of a negated number literal.
+/// The value of a literal, a negated number literal, or `Float.infinity`
+/// and `Float.nan`.
 pub fn constant(e: &Expr) -> Option<Const> {
     match &e.kind {
         ExprKind::Lit(Lit::Number(n)) => literal::number_value(n).map(Const::Number),
@@ -140,6 +196,11 @@ pub fn constant(e: &Expr) -> Option<Const> {
         ExprKind::Lit(Lit::String(s)) => Some(Const::String(s.clone())),
         ExprKind::Lit(Lit::Bool(b)) => Some(Const::Bool(*b)),
         ExprKind::Neg(_, inner) => consteval::prefix(K::Minus, constant(inner)?),
+        ExprKind::Global { module, name } if module == "Float" => match name.as_str() {
+            "infinity" => Some(Const::Number(f64::INFINITY)),
+            "nan" => Some(Const::Number(f64::NAN)),
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -151,7 +212,12 @@ fn expr(c: &Const, at: &Expr) -> Option<Expr> {
     // negating a literal is exact on every numeric type
     let negated = |l: Lit| Expr::new(ExprKind::Neg(Num::Float, Box::new(lit(l))), at.span);
     Some(match c {
-        Const::Number(x) if !x.is_finite() => return None,
+        // JS globals, never shadowed: generated code reserves both names
+        Const::Number(x) if x.is_nan() => lit(Lit::Number("NaN".to_owned())),
+        Const::Number(x) if x.is_infinite() && *x < 0.0 => {
+            negated(Lit::Number("Infinity".to_owned()))
+        }
+        Const::Number(x) if x.is_infinite() => lit(Lit::Number("Infinity".to_owned())),
         Const::Number(x) if x.is_sign_negative() => negated(Lit::Number(number_text(-x))),
         Const::Number(x) => lit(Lit::Number(number_text(*x))),
         Const::BigInt(x) if *x < 0 => negated(Lit::BigInt(format!("{}n", x.checked_neg()?))),

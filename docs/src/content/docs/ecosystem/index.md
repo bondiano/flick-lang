@@ -72,6 +72,8 @@ export default defineConfig({ integrations: [flick()] });
 
 The same package exports `flickVite` from `@flick-lang/astro/vite` for a Vite configuration. The plugin resolves its compiler from the `binary` option, then `FLICK_BIN`, then `flick` on `PATH`; its other options are `profile` and `outDir`. It requests JavaScript explicitly and obtains source roots, configuration and dependency inputs from `flick build --inputs`, including imports outside the entry's directory. Only simultaneous SSR/client builds are coalesced; completed-build caching belongs to the compiler. Source creation, deletion and configuration changes invalidate the import. Restart the host after replacing the compiler binary. Vite resolves the generated runtime and foreign JavaScript imports, so those dependencies must be available to the host project.
 
+For editors, the integration writes `Name.d.fl.ts` beside each `.fl` file of `srcDir` when Astro starts and again after each build of an import (`flick content-mapper --declarations`; `declarations: false` turns it off). With `allowArbitraryExtensions` in `tsconfig.json`, TypeScript, including the TypeScript of Astro's language server inside `.astro` files, types `import { main } from "./App.fl"` by the module's signatures instead of `Record<string, unknown>`. Ignore `*.d.fl.ts` and `.flick/` in Git. In `.ts` files TypeScript 7.1 can read the modules directly through the [Content Mapper](../reference/editor/#content-mapper).
+
 This documentation site uses the workspace integration itself. See the [integration source](https://github.com/bondiano/flick-lang/tree/main/tools/astro-flick) before adopting it outside the checkout: it is private workspace tooling, not a documented public npm install.
 
 ## Editors and syntax tools

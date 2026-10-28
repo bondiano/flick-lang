@@ -1,0 +1,67 @@
+// RPC over a worker thread: the program starts itself in a thread with the
+// argument `worker`, which answers calls until the client's scope closes
+// it, and calls it: a unary call, a declared error and a stream.
+module App.Main exposing (main)
+
+import Stream.Core exposing (Stream)
+
+script : Unit ->{} String
+foreign sync script from "./worker.mjs" "script"
+  arity 0
+
+type error NotFound = NotFound { id : Float }
+  deriving Schema
+
+double : Rpc.Rpc "double" (Float ->{r; NotFound} Float)
+let double =
+  Rpc.make (Record.label : Record.Label "double")
+    |> Rpc.with_payload (Codec.json Schema.number)
+    |> Rpc.with_success (Codec.json Schema.number)
+    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema NotFound)))
+
+count_to : Rpc.Rpc "count_to" (Float ->{r;} Stream none none Float)
+let count_to =
+  Rpc.make (Record.label : Record.Label "count_to")
+    |> Rpc.with_payload (Codec.json Schema.number)
+    |> Rpc.with_stream (Codec.json Schema.number)
+
+type alias Handlers r =
+  { double : Float ->{r; NotFound} Float; count_to : Float ->{r;} Stream none none Float }
+
+group : Rpc.Group r (Handlers r)
+let group = Rpc.group |> Rpc.add double |> Rpc.add count_to
+
+handlers : Handlers none
+let handlers =
+  {
+    double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2;
+    count_to =
+      fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
+  }
+
+serve : Unit ->{} Unit
+let serve () = Rpc.serve_node_worker group handlers
+
+call : Unit ->{; AppError} Unit
+let call () =
+  try
+    scope s {
+      let server = Rpc.node_worker (script ()) ["worker"]
+      Platform.stdout_line ("call: " ++ show (Rpc.call_on server double 21))
+      let refused =
+        try show (Rpc.call_on server double (0 - 1)) with
+        | NotFound e -> "not found " ++ show e.id
+      Platform.stdout_line ("error: " ++ refused)
+      let counted = Stream.run_collect (Rpc.call_stream_on server count_to 3)
+      Platform.stdout_line ("stream: " ++ show counted)
+    }
+    Platform.stdout_line "closed"
+  with
+  | Rpc.ClientError message -> Platform.stdout_line ("client: " ++ message)
+  | NotFound e -> Platform.stdout_line ("not found " ++ show e.id)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  match Platform.args () with
+  | ["worker"] -> serve ()
+  | _ -> call ()

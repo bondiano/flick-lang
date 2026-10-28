@@ -6,13 +6,13 @@
 
 mod features;
 mod logging;
-mod protocol;
+pub mod protocol;
 mod requests;
 
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
-use std::io::{self, BufReader};
+use std::io::{self, BufReader, Write};
 use std::path::{MAIN_SEPARATOR, Path, PathBuf};
 use std::process::{self, ExitCode};
 use std::sync::LazyLock;
@@ -274,7 +274,7 @@ pub struct Server {
     caches: Caches,
     /// Each context clears only the diagnostics it previously published.
     published: HashMap<Context, HashSet<PathBuf>>,
-    out: io::Stdout,
+    out: Box<dyn Write>,
 }
 
 pub fn serve() -> ExitCode {
@@ -290,7 +290,7 @@ pub fn serve() -> ExitCode {
         snapshot: None,
         caches: Caches::new(),
         published: HashMap::new(),
-        out: io::stdout(),
+        out: Box::new(io::stdout()),
     };
     let mut input = BufReader::new(io::stdin().lock());
     let mut shut_down = false;
@@ -427,6 +427,12 @@ impl Server {
         {
             self.snapshot = None;
         }
+        // a project keeps its cache for the next document opened in it; a
+        // standalone file's goes with its last document, or every file ever
+        // opened would stay in memory
+        if let Context::Standalone(_) = context {
+            self.caches.remove(context);
+        }
         if let Some(files) = self.published.remove(context) {
             let others = self.release(files);
             for open in others {
@@ -562,3 +568,6 @@ pub fn lsp_diagnostic(sources: &SourceMap, d: &Diagnostic) -> Value {
         "tags": if d.unnecessary() { json!([1]) } else { json!([]) },
     })
 }
+
+#[cfg(test)]
+mod tests;

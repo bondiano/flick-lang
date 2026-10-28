@@ -1,0 +1,11 @@
+schema-version = 1
+
+[project]
+kind = "app"
+entry = "Load.Server"
+source-dir = "src"
+
+[build]
+out-dir = "dist"
+profile = "release"
+emit = "js"

@@ -4,12 +4,14 @@
 
 use std::fmt::Write;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command as Process;
 
 use flick_core::build::Extras;
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
-use flick_core::project::{self, Compilation, Project, cache};
+use flick_core::iface::Interface;
+use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, Project, cache};
+use flick_core::projection::Projected;
 use flick_core::source::SourceMap;
 use flick_core::types::builtins;
 use flick_core::{doc, ir, projection, syntax};
@@ -148,30 +150,48 @@ fn projected(explicit: Option<&str>, module: &str) -> Option<String> {
     let (project, roots) = select(&host, &mut sources, explicit, &[]).ok()?;
     let analysis = project::analyze(&host, &mut sources, project.as_ref(), &roots);
     let analyzed = analysis.module(module)?;
+    let root = project.as_ref().map(|p| p.root.as_path());
+    let text = &sources.get(analyzed.file).text;
+    let specifier = |m: &str| projection::relative(module, m);
+    let projected = projection_of(&host, &analysis, root, analyzed, text, &specifier);
+    serde_json::to_string_pretty(&projected).ok()
+}
+
+/// The projection of `module` of `analysis`, whose project is at `root`:
+/// the modules it refers to by their interfaces, its imports at
+/// `specifier`'s paths.
+pub fn projection_of(
+    host: &impl Host,
+    analysis: &Analysis,
+    root: Option<&Path>,
+    module: &Analyzed,
+    text: &str,
+    specifier: &dyn Fn(&str) -> String,
+) -> Projected {
     let fingerprint = project::analysis_fingerprint(&analysis.compilation);
-    let lookup = |m: &str| {
-        analysis
-            .module(m)
-            .map(|a| a.interface.clone())
-            .or_else(|| {
-                analysis
-                    .compilation
-                    .package_modules
-                    .iter()
-                    .find(|p| p.module == m)
-                    .map(|p| p.interface.clone())
-            })
-            .or_else(|| builtins().iter().find(|i| i.module == m).cloned())
-    };
-    let root = project.as_ref().map(|p| p.root.clone());
+    let lookup = |m: &str| interface_of(analysis, m);
     let package = |m: &str| {
         let own = analysis.module(m).is_some();
-        let name = root.as_ref().and_then(|r| project::project_name(&host, r));
+        let name = root.and_then(|r| project::project_name(host, r));
         own.then_some(name).flatten()
     };
-    let text = &sources.get(analyzed.file).text;
-    let projected = projection::project(analyzed, text, &fingerprint, &lookup, &package);
-    serde_json::to_string_pretty(&projected).ok()
+    projection::project(module, text, &fingerprint, &lookup, &package, specifier)
+}
+
+/// The interface of `module`: the analysis's own, a package's or a built-in.
+pub fn interface_of(analysis: &Analysis, module: &str) -> Option<Interface> {
+    analysis
+        .module(module)
+        .map(|a| a.interface.clone())
+        .or_else(|| {
+            analysis
+                .compilation
+                .package_modules
+                .iter()
+                .find(|p| p.module == module)
+                .map(|p| p.interface.clone())
+        })
+        .or_else(|| builtins().iter().find(|i| i.module == module).cloned())
 }
 
 pub fn doc(options: &OutDirArguments, explicit: Option<&str>) -> Outcome {

@@ -21,5 +21,5 @@
 "effect/socket" = { excluded = "sockets are outside the 0.1.0 standard library" }
 "effect/sql" = { excluded = "Flick's SQL eDSL has its own PostgreSQL driver" }
 "effect/testing" = { excluded = "Flick tests run through `flick test` and the Test module; `Test.clock_test` provides a TestClock and `Test.adjust`/`Test.set_time` move it" }
-"effect/workers" = { excluded = "worker threads are outside the 0.1.0 standard library" }
+"effect/workers" = { excluded = "the worker platforms come from `@effect/platform-node` and `@effect/platform-browser` inside `Rpc.worker` and `Rpc.node_worker`; workers outside RPC are outside 0.1.0" }
 "effect/workflow" = { excluded = "durable workflows are outside 0.1.0" }

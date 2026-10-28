@@ -79,7 +79,10 @@ component search (props : SearchProps) =
 **S2. `effect/rpc`.** ✅ (модуль `Rpc`: процедуры с кодеками, группа как запись обработчиков, `listen` по HTTP + NDJSON, `call`/`call_stream`; 169 экспортов классифицированы; + клиент без Node-сервера, сериализации `ndjson`/`json`/`json_rpc`/`ndjson_rpc`/`binary`, WebSocket: `listen_websocket`, `Rpc.websocket`, `connect`/`call_on`; TCP: `listen_tcp`, `Rpc.tcp`; stdio: `serve_stdio`, `spawn`; `with_middleware`, `with_headers`; `uninterruptible`, `call_local`; обработчик для `Http.Router` — S2b ✅)
 - AC: `Rpc`, `RpcGroup`, `RpcClient`, `RpcServer`, `RpcSerialization` классифицированы; run-тест в `tests/run/stdlib/rpc/`: сервер и клиент на одном `RpcGroup`, unary и stream вызов; линтер покрытия зелёный.
 
-- Отложено: RPC через workers (нужны несколько точек входа компилятора и `@effect/platform-browser`).
+**S2c. 🆕 RPC через workers.** ✅ (`Rpc.worker url` — модульный Web Worker через `@effect/platform-browser`, `Rpc.node_worker path args` — worker_threads; `serve_worker`/`serve_node_worker group handlers` отвечают внутри worker'а, пока клиент его не закроет; сообщения — structured clone, без сериализации; worker — отдельный вход `entries` (L6); один worker на клиент — shortcut; `serve_stdio` и worker'ы делят `serveOn` в `runtime/src/rpc/handlers.ts`)
+- AC: `RpcClient.layerProtocolWorker` и `RpcServer.layerProtocolWorkerRunner` классифицированы `[wrapped]`, причины исключения `effect/workers` и `RpcWorker` переписаны; линтер покрытия зелёный.
+- AC: e2e `tests/run/stdlib/rpc/worker.fl` (программа запускает себя в потоке): unary, объявленная ошибка, stream, закрытие; debug = release, TS.
+- AC: браузер — проект с входами `app` и `worker` (`target = "client"`, `Runner.Browser`), бандл Vite, headless Chromium: `call: 42`, `stream: [1, 2, 3]`, `closed`, без ошибок в консоли; Node-кода в бандле нет. Проверено вручную 2026-10-28, автоматического браузерного теста в репозитории нет.
 
 **S2b. 🆕 RPC в маршрутизаторе Flick.** ✅ (`Rpc.handler`/`handler_websocket serialization group handlers` — HTTP-обработчик `^{s}`; `route`/`prefix_route`/`router` переносят захват обработчика `^c` на значение; e2e `tests/run/stdlib/rpc/router.fl`, G001 `tests/check/fail/stdlib/rpc_router.fl`)
 - AC: `Rpc.handler`/`handler_websocket` монтируются в `Http.Router.route`; для этого `route`/`router` принимают обработчик с захватом региона сервера (`^s`), фикстура G001 на утечку; тест: группа на `Http.Server.serve` рядом с обычными маршрутами.
@@ -174,6 +177,12 @@ component search (props : SearchProps) =
 - AC: `Setup.watch (fun () -> …) task` перезапускает задачу при изменении атомов, прочитанных в первом аргументе (`->{Atom.Read}`); зависимости отслеживаются, списка нет (prior-art §8); предыдущий запуск прерывается до следующего; рантайм — производный атом + `AtomRegistry.subscribe` за границей U9.
 - AC: строка задачи — `{Atom.Write | r; e}`, ошибки уходят супервизору корня, как у action; вне setup (render, top-level) — ошибка типов с подсказкой (`FLICK-U004`/`U006`).
 - AC: `reference/ui.md` (en + ru): пример подписки на внешний источник (таймер/`resize`) и сравнение с React `useEffect`.
+
+**C9. 🆕 TS/release.** ✅ (2026-10-28: профиль `(ts, release)` в матрице `flick/tests/e2e.rs`; правок компилятора не понадобилось)
+- AC: весь `tests/run` (185 файлов `.fl`, после перехода на Int/Float) собирается `--emit ts --profile release`, stdout/stderr/exit совпадают с эталоном, `tsc --noEmit` на TypeScript 7.1.0-beta чист по 3525 файлам release-вывода, как и по debug.
+
+**C10. 🆕 Content Mapper TypeScript 7.1 и Astro в IDE.** ✅ (`flick content-mapper` — stdio JSON-RPC `initialize`/`openProject`/`transform`/`closeProject`, проекция по несохранённому тексту через анализ LSP, позиции UTF-8, имена — `Verbatim`, типы — `Atom` без правок; свои модули импортируются как `.fl`, встроенные и пакетные — из `.flick/projections`; `@flick-lang/content-mapper` — манифест `typescript.contentMapper` и запуск `flick`; `flick content-mapper --declarations paths` пишет `Name.d.fl.ts` для TypeScript без маппера — Astro-интеграция делает это на старте и после каждой сборки `.fl`)
+- AC: `tools/content-mapper/test/smoke.test.mjs` — `tsc --runExternalCode` принимает верный вызов и даёт TS2345 на неверном через номинальный тип из соседнего `.fl`; `flick/tests/content_mapper.rs` — сессия JSON-RPC, несохранённый экспорт виден, verbatim-спаны совпадают по тексту; `.d.fl.ts` проверены `tsc` 7.1 и 5.9 с `allowArbitraryExtensions`; `tools/astro-flick/test/vite.test.mjs` — декларации после `astro:config:setup` и после `load`.
 
 ### Трек U — реактивное UI-ядро
 
@@ -380,10 +389,11 @@ S1 ✅ ─ U1…U6 ✅ ─ U7 ✅ ─ U7b ✅ ─ U6b ✅
         └─ R1…R4 ✅ ─ R5 ✅ ─ R6 ✅
 C2/C3/C4/C6 ✅ ─ C6b ✅
 C7a ✅ ─ C7b ✅ ─ C7c ✅ ─ C7d ✅ ─ C5 ✅            C1 ✅
-U9 ✅ ─ U9b ✅
+U9 ✅ ─ U9b ✅ ─ U9c ✅
+S2 ✅ ─ S2b ✅ ─ S2c ✅ (после L6)
 S2 ✅ ─ F1 ✅ ─ F2 ✅ ─ F3 ✅ ─ F4 ✅ ─ F5 ✅ ─ F6 ✅
 S3 ✅ ─ S4 ✅ ─ O1 ✅ ─ O2 ✅ ─ O3 ✅ ─ O4 ✅ ─ O5 ✅
-L1 ✅ ─ L2 ✅ ─ L3 ✅ ─ L4 ✅ ─ L5 ✅
+L1 ✅ ─ L2 ✅ ─ L3 ✅ ─ L4 ✅ ─ L5 ✅ ─ L6 ✅
 H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ✅ ─ H6 ✅     (H2 по входам — после L6 ✅)
 D1 ✅ ─ D2 ✅ ─ D3 ✅ ─ D4 ✅ ─ D5 ✅ ─ D6 ✅ ─ D9 ✅ ─ D11 ✅ ─ D10 ✅ ─ D13 ✅ ─ D12 ✅ ─ D14 ✅ ─ D8 ✅   (D15 ✅ — с D4/D5; D7 ✅ после C1)
 ```
@@ -392,9 +402,10 @@ D1 ✅ ─ D2 ✅ ─ D3 ✅ ─ D4 ✅ ─ D5 ✅ ─ D6 ✅ ─ D9 ✅ ─ D11
 1. «Видно в DevTools и меньше бандл» — ✅ (B0–B9, S1, S5, U1, C6).
 2. «Типы гарантируют» — ✅: C1–C8, U2–U6, U6b, U7b.
 3. «SSR» — ✅: R1–R6, U7, U9.
-4. «Fullstack» — ✅: S2, O1–O5, F1–F6, Q12–Q14.
+4. «Fullstack» — ✅: S2, S2b, S2c, O1–O5, F1–F6, Q9, Q12–Q14, Q16.
+5. «CLI, хосты и прямой стиль» — ✅: L1–L6, H1–H6, D1–D15.
 
-Ближайший блок по архитектурному ревью: **Q29–Q32 (P1)**, затем **Q33–Q36 (P2)** (§7). Прежние открытые P1 сохраняют приоритет; индивидуальные отметки выполнения Q1–Q28 не сбрасываются. Отметка реализации вехи не закрывает связанные замечания ревью.
+Открытых пунктов треков и ревью нет: Q1–Q36 закрыты (§7.3), RPC через workers сделан (S2c). Проверки, которые ревью не выполняло, — §7.6 и §7.7. Отметка реализации вехи не закрывает связанные замечания ревью.
 
 ## 5. Риски
 
@@ -471,6 +482,7 @@ NotFound без with_errors принимается и становится 500 �
 
 **Q9. P1 — Нет SQL-транзакционной композиции** ✅ (`Database.transaction body`: тело на одном соединении между `BEGIN` и `COMMIT`, сервис `Database` внутри привязан к этому соединению; неудача или прерывание — `ROLLBACK` (при прерывании соединение закрывается, сервер откатывает сам), вложенная транзакция — `SAVEPOINT`/`RELEASE`/`ROLLBACK TO`; другие вызывающие берут другие соединения; `runtime/test/sql.test.ts` на поддельном пуле и `tests/postgres/tx.fl` на настоящем PostgreSQL: CHECK второй записи откатывает первую, при pool=1 откат одного не отменяет коммит другого, точка сохранения)
 Первая запись пережила CHECK-ошибку второй; при pool=1 чужой ROLLBACK отменил успешную запись B. [Запросы отдельно берут connection](../../runtime/src/sql/pg.ts#L138-L184). Нужен scoped transaction с commit/rollback и изоляцией callers; raw BEGIN/Tx.atomically не замена. До F3/F6.
+- AC: `tests/postgres/tx.fl` на PostgreSQL (`just e2e-postgres`, `transactions_and_cancellation_against_postgres`): CHECK (`23514`) второй записи откатывает первую; при pool=1 откат одного вызывающего не отменяет коммит другого; неудача вложенной транзакции откатывает только её (`ROLLBACK TO SAVEPOINT`); `runtime/test/sql.test.ts` фиксирует порядок `BEGIN`/`SAVEPOINT`/`RELEASE`/`COMMIT` на поддельном пуле.
 
 **Q10. P2 — Непоследовательные captures builders** ✅ (47 построителей `Stream` в `Transform`/`Combine`/`Errors`/`Pipe` (и поля-колбэки записей `map_both`, `tap_both`, `throttle`) — форма `Run.fl`: колбэк и поток делят захват `c`, частичное применение тоже его держит, `(a -> b)^c -> ((Stream r e a)^c -> (Stream r e b)^c)^c`; checker не менялся; локальное потребление потока с колбэком над подпиской проходит (`tests/check/pass/stdlib/stream_captures.fl`), а возврат такого потока из `scope` — по-прежнему G001 (`leaked`, `escaped`, `broadcast` в `tests/check/fail/stdlib/stream.fl`); полный e2e зелёный)
 [Stream callbacks](../../flick-core/src/types/builtins/Stream/Transform.fl#L1-L4) отвергают scoped subscription даже при локальном потреблении (G001). Объединять captures callback/source без ослабления запрета утечки; D7 этого не решает.
@@ -494,6 +506,7 @@ L6/H2 и Vite есть; server/client isolation и общий dev workflow — �
 
 **Q16. P1 — Отмена не ограничивает PostgreSQL** ✅ (прерванный запрос отменяется на сервере CancelRequest протокола по отдельному сокету (`processID`/`secretKey`, без места в пуле), прерывание ждёт до 5 с его остановки и закрывает соединение; `PgConfig` получил `statement_timeout_ms` (сервер завершает оператор, `57014`) и `acquire_timeout_ms` (ожидание соединения пула), `Database.config url` — значения по умолчанию; коммит неотменяем, потерянный ответ — `DbError "commit_unknown"`, откат не обещан; `tests/postgres/tx.fl`: 20 прерванных `pg_sleep` при pool=2 не оставляют ни одного спящего backend (без отмены — 2), дедлайн — `57014`; shortcut: CancelRequest только по TCP без TLS)
 [Finalizer](../../runtime/src/sql/pg.ts#L149-L162) ждёт socket end, не backend. Pool=8 не предотвратил 39 backend и 53300; восстановление — после sleepers. Нужны server-side cancellation/deadlines, admission control и явная commit ambiguity. Rollback не обещан.
+- AC: `tests/postgres/tx.fl`: 20 прерванных `pg_sleep` при pool=2 — 0 спящих backend после прерывания; `statement_timeout_ms` даёт `DbError` с кодом `57014`; `runtime/test/sql.test.ts`: прерывание отменяет запрос на сервере (`57014`), потерянный ответ на `COMMIT` — `commit_unknown`. `acquire_timeout_ms` тестом не покрыт.
 
 ### 7.2. Новые воспроизведённые дефекты Q17–Q28
 
@@ -613,7 +626,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 
 Q1–Q36 закрыты (Q5, Q7, Q9, Q10, Q15, Q16 и Q29–Q36 — пачкой 2026-10-28). Q17–Q28 уже имеют отметки выполнения: не переоткрывать их по историческим наблюдениям; при изменении соответствующих границ сохранять AC type safety/стадии/debug=release.
 
-C1 уже реализован; сохранить B-бюджеты и измерять compiled consumers: C1/D14 microbenchmarks — ручные JS-модели. Сверить устаревшие вехи §4 с R5/U9/L6 и D-треком; добавить SQL/cancellation AC. Не строить второй Effect runtime.
+C1 уже реализован; сохранить B-бюджеты и измерять compiled consumers: C1/D14 microbenchmarks — ручные JS-модели. Не строить второй Effect runtime. Вехи §4 сверены с S2b/S2c/U9c/L6 и D-треком, у Q9/Q16 есть AC (2026-10-28).
 
 ### 7.4. PostgreSQL и нагрузка: сохранённый baseline
 
@@ -668,3 +681,31 @@ Abort baseline: 6×64 запросов, pool=8/DB max=40; 263 отмены, 121 
 Среда: macOS arm64, Cargo 1.94.1, Node 24.18.0, pnpm 12.14.0. Разрушительные сценарии выполнялись на одноразовых файлах вне репозитория; временные пробы удалены.
 
 Не проверены полный Rust/TS suite, lint, полная корректность checker/optimizer, browser/WASM и UI, SSR под нагрузкой, реальные PostgreSQL/RPC deployments, Windows/Linux, длительный рост heap LSP, конкурентные publishers и публикация пакетов. Ограничения прежнего ревью (§7.5) сохраняют свой исторический контекст. Код найденных дефектов этим обновлением не изменён.
+
+Решение 2026-10-28 по непроверенному: хост v3 (§7.5) — отклонён, в план не входит; TS/release — делается (C9). Рост heap LSP и SSR под нагрузкой проверены — §7.7.
+
+### 7.7. Рост heap LSP и SSR под нагрузкой (2026-10-28)
+
+Среда: Linux 6.6 (WSL2), Ryzen 9 9950X3D/32 потока/30 GiB, Node 24.21.0, release-сборка. На машине параллельно шли сборки другой сессии (load average 16–20), поэтому req/s и хвосты задержек — шумный ориентир, а не baseline; выводы о памяти и ошибках от шума не зависят.
+
+**LSP.** `just lsp-soak` (`tools/lsp-bench/soak.mjs`): 400 циклов open/change/close одного файла, затем 400 разных standalone-копий `examples/mtl/src/Mtl/StateT.fl`. До исправления RSS одного файла стоял на 38.3 MiB, а разные копии росли линейно 38.3 → 49.3 MiB (~30 KiB на закрытый файл): карта `caches` LSP держала `ModuleCache` каждого когда-либо открытого standalone-контекста. Исправлено (`c9dbb29`): закрытие последнего документа standalone-контекста удаляет его кэш, проектный кэш остаётся. После — 38.3 MiB на всех 800 циклах. Регрессия: `flick/src/lsp/tests.rs` (без исправления падает).
+
+**SSR.** `tools/load/ssr` — `Http.Router` + `Http.Server.serve`, страница из 50 строк, реестр на запрос: `/render/:id` (`Ui.Server.render`), `/stream/:id` (`Ui.Server.stream`, чанки собираются в ответ), `/html/:id` (`Ui.Server.to_html`, без React). Генератор `tools/load/index.mjs` (`just load-ssr`): closed-loop fetch, id в URL и проверка, что ответ содержит именно его (`request <id>`) — чужой id = общий реестр. Прогрев 10 с при c=16, по 3×10 с на c (медианы), soak 60 с при c=64, 30 с простоя.
+
+| Путь | c | req/s | p50, мс | p95, мс | p99, мс |
+|---|---:|---:|---:|---:|---:|
+| render | 1 | 1502 | 0.59 | 0.99 | 1.90 |
+| render | 16 | 3962 | 3.23 | 9.11 | 15.12 |
+| render | 64 | 7036 | 7.53 | 16.87 | 25.48 |
+| render, soak 60 с | 64 | 6913 | 7.74 | 17.20 | 25.02 |
+| stream | 1 | 1252 | 0.70 | 1.15 | 1.73 |
+| stream | 16 | 3799 | 3.11 | 8.97 | 13.39 |
+| stream | 64 | 3772 | 14.52 | 30.82 | 41.58 |
+| stream, soak 60 с | 64 | 2865 | 18.59 | 48.29 | 71.26 |
+| html, soak 30 с | 64 | 20835 | 2.45 | 9.20 | 11.76 |
+
+- Ошибок нет ни на одном пути: 846 548 (render), 471 014 (stream), 1 567 448 (html) ответов без status/transport/timeout, ни одного чужого id — реестр на запрос изолирован под нагрузкой.
+- Память: render 380 → 382 MiB (soak), html 323 → 338 MiB. stream вырос 405 → 572 MiB за первый soak и не вернулся после простоя; три повторных раунда по 30 с на отдельном сервере вышли на плато 431.8 MiB без роста — это удержанная V8 куча, не линейная утечка.
+- `stream` при c=64 вдвое медленнее `render` и с длинным хвостом (p99 до сотен мс в шумных раундах): цена `renderToReadableStream` и подписки на атомы-задачи на каждый запрос. `to_html` без React — самый быстрый путь; его первые прогоны в полном профиле совпали с установкой пакетов и отброшены, в таблице — повтор в тишине.
+- Не проверены: стриминг чанков по сети (сервер собирает чанки в один ответ), SSR с гидратацией и задачами, ожидающими I/O, долгий soak дольше минуты.
+

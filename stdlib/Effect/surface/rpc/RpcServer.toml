@@ -1,6 +1,7 @@
 [wrapped]
 layerProtocolSocketServer = "Rpc.listen_tcp 32acbc4cf74e10ac"
 layerProtocolStdio = "Rpc.serve_stdio 8aea91f3d781cae8"
+layerProtocolWorkerRunner = "Rpc.serve_node_worker a3c91b37d4a12a3f"
 toHttpEffect = "Rpc.listen 686bfd3f4471e7d1"
 toHttpEffectWebsocket = "Rpc.listen_websocket 9aaac4b7a11d7595"
 
@@ -11,7 +12,6 @@ layer = "`Rpc` serves HTTP, WebSocket, TCP and standard streams on Node; this pr
 layerHttp = "`Rpc` serves HTTP, WebSocket, TCP and standard streams on Node; this protocol or server is outside the binding"
 layerProtocolHttp = "`Rpc` serves HTTP, WebSocket, TCP and standard streams on Node; this protocol or server is outside the binding"
 layerProtocolWebsocket = "`Rpc` serves HTTP, WebSocket, TCP and standard streams on Node; this protocol or server is outside the binding"
-layerProtocolWorkerRunner = "`Rpc` serves HTTP, WebSocket, TCP and standard streams on Node; this protocol or server is outside the binding"
 make = "`Rpc` serves HTTP, WebSocket, TCP and standard streams on Node; this protocol or server is outside the binding"
 makeNoSerialization = "`Rpc` serves HTTP, WebSocket, TCP and standard streams on Node; this protocol or server is outside the binding"
 makeProtocolHttp = "`Rpc` serves HTTP, WebSocket, TCP and standard streams on Node; this protocol or server is outside the binding"

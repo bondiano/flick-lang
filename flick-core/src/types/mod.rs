@@ -59,6 +59,7 @@ pub mod server_fn;
 mod services;
 mod settle;
 mod sql;
+mod sql_plan;
 mod stub;
 mod sugar_lints;
 mod toplevel;
