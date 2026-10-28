@@ -178,6 +178,12 @@ component search (props : SearchProps) =
 - AC: строка задачи — `{Atom.Write | r; e}`, ошибки уходят супервизору корня, как у action; вне setup (render, top-level) — ошибка типов с подсказкой (`FLICK-U004`/`U006`).
 - AC: `reference/ui.md` (en + ru): пример подписки на внешний источник (таймер/`resize`) и сравнение с React `useEffect`.
 
+**C9. 🆕 TS/release.** ✅ (2026-10-28: профиль `(ts, release)` в матрице `flick/tests/e2e.rs`; правок компилятора не понадобилось)
+- AC: весь `tests/run` (183 кейса) собирается `--emit ts --profile release`, stdout/stderr/exit совпадают с эталоном, `tsc --noEmit` на TypeScript 7.1.0-beta чист по 3236 файлам release-вывода, как и по debug.
+
+**C10. 🆕 Content Mapper TypeScript 7.1 и Astro в IDE.** ✅ (`flick content-mapper` — stdio JSON-RPC `initialize`/`openProject`/`transform`/`closeProject`, проекция по несохранённому тексту через анализ LSP, позиции UTF-8, имена — `Verbatim`, типы — `Atom` без правок; свои модули импортируются как `.fl`, встроенные и пакетные — из `.flick/projections`; `@flick-lang/content-mapper` — манифест `typescript.contentMapper` и запуск `flick`; `flick content-mapper --declarations paths` пишет `Name.d.fl.ts` для TypeScript без маппера — Astro-интеграция делает это на старте и после каждой сборки `.fl`)
+- AC: `tools/content-mapper/test/smoke.test.mjs` — `tsc --runExternalCode` принимает верный вызов и даёт TS2345 на неверном через номинальный тип из соседнего `.fl`; `flick/tests/content_mapper.rs` — сессия JSON-RPC, несохранённый экспорт виден, verbatim-спаны совпадают по тексту; `.d.fl.ts` проверены `tsc` 7.1 и 5.9 с `allowArbitraryExtensions`; `tools/astro-flick/test/vite.test.mjs` — декларации после `astro:config:setup` и после `load`.
+
 ### Трек U — реактивное UI-ядро
 
 **U1. Обёртки и React-биндинг.** ✅ `c0c5fe3`, `48d453e`, `e5ef204`
