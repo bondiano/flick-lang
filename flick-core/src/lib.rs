@@ -4,6 +4,7 @@
 
 pub mod api_diff;
 pub mod build;
+mod clock;
 pub mod codegen;
 pub mod consteval;
 pub mod diagnostics;

@@ -25,7 +25,7 @@ use flick_core::{resolve, syntax, types};
 use serde_json::{Value, json};
 use tracing::{debug, debug_span, error, info, info_span, warn};
 
-use crate::sources;
+use crate::{builtins, sources};
 
 static BUILTIN_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     let temp = env::temp_dir();
@@ -279,6 +279,7 @@ pub struct Server {
 
 pub fn serve() -> ExitCode {
     logging::init();
+    builtins::prepare();
     info!(
         version = env!("CARGO_PKG_VERSION"),
         pid = process::id(),

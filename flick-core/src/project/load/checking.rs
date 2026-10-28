@@ -6,7 +6,10 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use tracing::debug;
+
 use super::{Analyzed, Loaded, Loader};
+use crate::clock::timed;
 use crate::diagnostics::{Diagnostic, Severity};
 use crate::ir;
 use crate::project::Project;
@@ -145,7 +148,7 @@ impl Checking<'_> {
             None => self.from_packages.get(name).cloned(),
         };
         let Some(cache) = self.cache else {
-            return (self.check(loaded, &lookup), None);
+            return (self.timed(loaded, &lookup), None);
         };
         let key = Key {
             file: loaded.file,
@@ -179,10 +182,18 @@ impl Checking<'_> {
                         redeclare(&mut output.exported, &interface);
                     }
                 }
+                debug!(module = %loaded.name, "module reused");
                 (output, Some(key))
             }
-            _ => (self.check(loaded, &lookup), Some(key)),
+            _ => (self.timed(loaded, &lookup), Some(key)),
         }
+    }
+
+    /// [`Checking::check`], logging how long it took.
+    fn timed(&self, loaded: &Loaded, lookup: &dyn Fn(&str) -> Option<Interface>) -> Output {
+        let (output, elapsed) = timed(|| self.check(loaded, lookup));
+        debug!(module = %loaded.name, ?elapsed, "module checked");
+        output
     }
 
     fn check(&self, loaded: &Loaded, lookup: &dyn Fn(&str) -> Option<Interface>) -> Output {

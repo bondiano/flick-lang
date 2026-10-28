@@ -201,6 +201,7 @@ dependencies = [
  "serde_json",
  "strsim",
  "toml",
+ "tracing",
 ]
 
 [[package]]

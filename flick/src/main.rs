@@ -77,6 +77,8 @@ fn main() -> ExitCode {
             | Commands::Deps(_)
             | Commands::Explain(_)
             | Commands::Doctor
+            // after its logging starts
+            | Commands::Lsp(_)
     ) {
         builtins::prepare();
     }
