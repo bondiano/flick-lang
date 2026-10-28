@@ -1,0 +1,93 @@
+// The server the SSR load runs hit: one page of 50 rows rendered per
+// request with a registry of its own, as markup (`/render/:id`), as the
+// chunks of a stream (`/stream/:id`) and without React (`/html/:id`). Each
+// page shows its request's id from an atom, so a page with another
+// request's id is a registry shared across requests. Serves on `PORT`
+// until it is stopped.
+module Load.Server exposing (main)
+
+import Http.Router exposing (RouteContext)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+request : Atom.Writable String
+let request = Atom.make ""
+
+rows : List Number
+let rows = List.range 1 51
+
+page : Ui.View Unit
+let page =
+  Ui.view (fun () ->
+    ui {
+      div
+        { class_name = "page" }
+        [
+          heading [text ("request " ++ Atom.value request)],
+          div
+            { class_name = "rows" }
+            (List.map (fun n -> paragraph [text ("row " ++ show n)]) rows),
+        ]
+    })
+
+id : Unit ->{RouteContext;} String
+let id () = Option.with_default "none" (Http.Router.param "id")
+
+render : ServerRequest ->{RouteContext;} ServerResponse
+let render _ =
+  let n = id ()
+  Http.ServerResponse.html
+    (provide Atom.layer {
+      Atom.set request n
+      Ui.Server.render (Ui.render page ())
+    })
+
+streamed : ServerRequest ->{RouteContext;} ServerResponse
+let streamed _ =
+  let n = id ()
+  let chunks =
+    provide Atom.layer {
+      Atom.set request n
+      Stream.run_collect (Ui.Server.stream "app" (Ui.render page ()))
+    }
+  Http.ServerResponse.html (String.join "" chunks)
+
+html : ServerRequest ->{RouteContext;} ServerResponse
+let html _ =
+  let n = id ()
+  Http.ServerResponse.html
+    (Ui.Server.to_html
+      (ui {
+        div
+          { class_name = "page" }
+          [
+            heading [text ("request " ++ n)],
+            div
+              { class_name = "rows" }
+              (List.map (fun r -> paragraph [text ("row " ++ show r)]) rows),
+          ]
+      }))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let port = Option.with_default 3000 (Option.bind String.to_number (Platform.env "PORT"))
+  provide Http.Server.layer_services {
+    try
+      scope s {
+        app : ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse
+        let app =
+          Http.Router.router Http.Router.config
+            [
+              Http.Router.route (Some Http.Method.GET) "/render/:id" render,
+              Http.Router.route (Some Http.Method.GET) "/stream/:id" streamed,
+              Http.Router.route (Some Http.Method.GET) "/html/:id" html,
+            ]
+        let listening =
+          Http.Server.serve { host = "127.0.0.1"; port = port; gracefulShutdownTimeout = None } app
+        Platform.stdout_line
+          ("listening on " ++ Http.Server.format_address (Http.Server.address listening))
+        Deferred.await_ (Deferred.make ())
+      }
+    with
+    | Http.ServerError.ServeError _ -> App.fail ("cannot listen on port " ++ show port)
+  }
