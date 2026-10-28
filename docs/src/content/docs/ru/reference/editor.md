@@ -139,9 +139,33 @@ panic может включать фрагмент исходника: пров�
 
 ## Content Mapper
 
-`tools/content-mapper` передаёт проекцию в typescript-go через API TypeScript 7.
-Его работа проверена с TypeScript 7.0.2. Адаптер предоставляет проекции как
-виртуальную файловую систему и сопоставляет позиции в обоих направлениях,
-чтобы TypeScript отвечал на запросы по доступному ему представлению модуля Flick.
-Этот компонент необязателен: `flick doctor` сообщает о нём, а модуль проверки
-типов Flick от него не зависит.
+TypeScript 7.1 проверяет `.ts` и `.tsx`, импортирующие модуль Flick, по
+типам этого модуля через Content Mapper: `@flick-lang/content-mapper`
+(`tools/content-mapper`) запускает `flick content-mapper` (`FLICK_BIN`,
+иначе `flick` из PATH), и тот отвечает на каждый `.fl`, до которого дошёл
+TypeScript, его проекцией, построенной по несохранённому тексту редактора.
+Подключение в `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": { "module": "esnext", "moduleResolution": "bundler", "strict": true },
+  "contentMappers": [{ "package": "@flick-lang/content-mapper", "extensions": [".fl"] }]
+}
+```
+
+```ts
+import { greet } from "./src/App/Greeting.fl";
+greet(1); // error TS2345, как велит сигнатура Flick
+```
+
+Маппер — отдельная программа, поэтому `tsc` запускает его только с
+`--runExternalCode`, а VS Code (с TypeScript 7.1) — только в доверенном
+workspace; `js/ts.contentMappers.enabled` его отключает. Hover, переход к
+определению и ссылки переходят из TypeScript в исходник `.fl` по картам
+соответствия; переименование и исправления — только по точным, чтобы правка
+никогда не переписала текст Flick через тип. Модули проекта импортируют
+`.fl` друг друга, и маппер проецирует их тоже; у встроенных модулей и
+модулей пакетов нет `.fl`-файла, поэтому их проекции записываются в
+`.flick/projections` проекта. Маппер необязателен: `flick doctor` сравнивает
+установленный TypeScript с проверенным релизом (7.1.0-beta), а проверка
+типов Flick от маппера не зависит.

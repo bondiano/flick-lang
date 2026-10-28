@@ -134,8 +134,33 @@ the projection with its maps as JSON (format version 1).
 
 ## Content Mapper
 
-`tools/content-mapper` adapts the projection to typescript-go through the
-TypeScript 7 API, verified against TypeScript 7.0.2: it serves the
-projections as a virtual file system and maps positions both ways, so
-TypeScript answers what it sees of a Flick module. It is optional: `flick
-doctor` reports it, and the Flick checker never depends on it.
+TypeScript 7.1 checks a `.ts` or `.tsx` file that imports a Flick module
+against the module's types through a Content Mapper: `@flick-lang/content-mapper`
+(`tools/content-mapper`) starts `flick content-mapper` (`FLICK_BIN`, else
+`flick` on the PATH), which answers each `.fl` file TypeScript reaches with
+its projection, made from the editor's unsaved text. Name it in
+`tsconfig.json`:
+
+```json
+{
+  "compilerOptions": { "module": "esnext", "moduleResolution": "bundler", "strict": true },
+  "contentMappers": [{ "package": "@flick-lang/content-mapper", "extensions": [".fl"] }]
+}
+```
+
+```ts
+import { greet } from "./src/App/Greeting.fl";
+greet(1); // error TS2345, as the Flick signature says
+```
+
+A mapper is a program of its own, so `tsc` runs it only with
+`--runExternalCode`, and VS Code (with TypeScript 7.1) only in a trusted
+workspace; `js/ts.contentMappers.enabled` turns it off. Hover, go to
+definition and references cross from TypeScript into the `.fl` source
+through the span maps; rename and code actions only through exact ones, so a
+fix never rewrites Flick text through a type. Modules of the project import
+each other's `.fl` files, which the mapper projects in turn; built-in and
+package modules have no `.fl` file, so their projections are written under
+`.flick/projections` of the project. The mapper is optional: `flick
+doctor` reports the installed TypeScript against the release it is
+verified with (7.1.0-beta), and the Flick checker never depends on it.

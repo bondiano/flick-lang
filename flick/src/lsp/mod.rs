@@ -6,7 +6,7 @@
 
 mod features;
 mod logging;
-mod protocol;
+pub mod protocol;
 mod requests;
 
 use std::collections::{HashMap, HashSet};

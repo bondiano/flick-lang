@@ -69,6 +69,9 @@ pub enum Commands {
     Inspect(InspectArguments),
     /// Run the language server.
     Lsp(LspArguments),
+    /// Serve TypeScript's Content Mapper requests for `.fl` files on
+    /// stdio; `@flick-lang/content-mapper` starts it.
+    ContentMapper,
 }
 
 #[derive(Subcommand)]

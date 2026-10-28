@@ -454,7 +454,9 @@ fn the_projection_maps_names_exactly_and_comes_from_the_analysis() {
     let text = &f.sources.get(module.file).text;
     let fingerprint = analysis_fingerprint(&f.analysis.compilation);
     let lookup = |m: &str| ide.interface(m);
-    let projected = projection::project(module, text, &fingerprint, &lookup, &|_| None);
+    let projected = projection::project(module, text, &fingerprint, &lookup, &|_| None, &|m| {
+        projection::relative(&module.name, m)
+    });
     assert!(
         projected
             .text

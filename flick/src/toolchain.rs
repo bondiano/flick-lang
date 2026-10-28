@@ -12,8 +12,9 @@ pub const RUNTIME: &str = "0.1.0";
 pub const EFFECT: &str = "4.0.5";
 pub const PNPM: &str = "12.14.0";
 pub const NODE: &str = "24.18.0";
-/// The typescript-go release the Content Mapper adapter is verified against.
-pub const TYPESCRIPT_GO: &str = "7.0.2";
+/// The TypeScript release `flick content-mapper` is verified against: the
+/// first with Content Mappers.
+pub const TYPESCRIPT_GO: &str = "7.1.0-beta";
 /// React of the `fullstack` template, the version the runtime is tested with.
 pub const REACT: &str = "19.3.1";
 /// Vite of the `fullstack` template.

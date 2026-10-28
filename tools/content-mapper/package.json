@@ -1,15 +1,20 @@
 {
   "name": "@flick-lang/content-mapper",
   "version": "0.1.0",
-  "description": "Flick's editor projection for typescript-go: virtual .flick.ts files and their span maps",
+  "description": "Flick modules for TypeScript 7.1: a Content Mapper that projects each .fl file into declarations TypeScript checks against",
   "license": "MIT",
   "private": true,
   "type": "module",
-  "exports": "./index.mjs",
+  "files": ["bin.mjs"],
+  "typescript": {
+    "contentMapper": {
+      "exec": ["node", "./bin.mjs"]
+    }
+  },
   "scripts": {
     "test": "node --test"
   },
-  "dependencies": {
-    "typescript": "7.0.2"
+  "devDependencies": {
+    "typescript": "7.1.0-beta"
   }
 }

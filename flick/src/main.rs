@@ -18,6 +18,7 @@ mod child;
 mod command;
 mod commands;
 mod lsp;
+mod mapper;
 mod report;
 mod sources;
 mod toolchain;
@@ -150,5 +151,6 @@ fn main() -> ExitCode {
         Commands::Doctor => report(commands::doctor(global), global),
         Commands::Inspect(o) => report(commands::inspect(&o, project), global),
         Commands::Lsp(_) => lsp::serve(),
+        Commands::ContentMapper => mapper::serve(),
     }
 }

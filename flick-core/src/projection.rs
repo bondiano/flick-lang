@@ -53,9 +53,43 @@ pub fn project(
     analysis: &str,
     lookup: &dyn Fn(&str) -> Option<Interface>,
     package: &dyn Fn(&str) -> Option<String>,
+    specifier: &dyn Fn(&str) -> String,
 ) -> Projected {
-    let interface = &module.interface;
-    let projection = Projection::new(&module.name, lookup, package);
+    let signature = |name: &str| signature(module, text, name);
+    render(
+        &module.interface,
+        &signature,
+        analysis,
+        lookup,
+        package,
+        specifier,
+    )
+}
+
+/// The projection of a module known by its interface alone, a built-in or
+/// a package's: its declarations map to no source.
+pub fn project_interface(
+    interface: &Interface,
+    analysis: &str,
+    lookup: &dyn Fn(&str) -> Option<Interface>,
+    package: &dyn Fn(&str) -> Option<String>,
+    specifier: &dyn Fn(&str) -> String,
+) -> Projected {
+    let mut projected = render(interface, &|_| None, analysis, lookup, package, specifier);
+    projected.mappings.clear();
+    projected
+}
+
+fn render(
+    interface: &Interface,
+    signature: &dyn Fn(&str) -> Option<[u32; 2]>,
+    analysis: &str,
+    lookup: &dyn Fn(&str) -> Option<Interface>,
+    package: &dyn Fn(&str) -> Option<String>,
+    specifier: &dyn Fn(&str) -> String,
+) -> Projected {
+    let name = &interface.module;
+    let projection = Projection::new(name, lookup, package);
     let (types, _) = projection.declarations(interface);
     let mut body = String::new();
     let mut pending: Vec<(usize, [u32; 2], bool)> = Vec::new();
@@ -74,7 +108,7 @@ pub fn project(
         let entity = &export.entity;
         let value = matches!(entity.namespace, Namespace::Value | Namespace::Constructor);
         if !value
-            || entity.module != module.name
+            || entity.module != *name
             || export.decl == Decl::Method
             || entity.name.contains('$')
         {
@@ -95,15 +129,14 @@ pub fn project(
             pending.push((start, at, ident == entity.name));
             pending.push((start + ident.len(), at, ident == entity.name));
         }
-        if let Some(sig) = signature(module, text, &entity.name) {
+        if let Some(sig) = signature(&entity.name) {
             pending.push((ty_start, sig, false));
             pending.push((ty_start + ty.len(), sig, false));
         }
     }
-    let path = |m: &str| relative(&module.name, m);
     let header = format!(
         "// flick-analysis {analysis}\n{}\n",
-        projection.imports(&path)
+        projection.imports(specifier)
     );
     let shift = u32::try_from(header.len()).unwrap_or(0);
     let mappings = pending
@@ -123,8 +156,8 @@ pub fn project(
         .collect();
     Projected {
         version: VERSION,
-        module: module.name.clone(),
-        file: file_of(&module.name),
+        module: name.clone(),
+        file: file_of(name),
         analysis: analysis.to_owned(),
         text: header + &body,
         mappings,
@@ -147,8 +180,8 @@ fn signature(module: &Analyzed, text: &str, name: &str) -> Option<[u32; 2]> {
     Some([s, e])
 }
 
-/// The specifier of `to`'s projection from `from`'s.
-fn relative(from: &str, to: &str) -> String {
+/// The specifier of `to`'s projection from `from`'s, both under one root.
+pub fn relative(from: &str, to: &str) -> String {
     let depth = from.matches('.').count();
     let up = if depth == 0 {
         "./".to_owned()
