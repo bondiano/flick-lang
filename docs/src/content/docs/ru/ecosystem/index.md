@@ -127,6 +127,16 @@ export default defineConfig({ integrations: [flick()] });
 Зависимости среды выполнения и внешнего JavaScript разрешает Vite,
 поэтому установите их в проекте.
 
+Для редакторов интеграция пишет `Name.d.fl.ts` рядом с каждым `.fl` из
+`srcDir` при запуске Astro и заново после каждой сборки импорта
+(`flick content-mapper --declarations`; `declarations: false` отключает).
+С `allowArbitraryExtensions` в `tsconfig.json` TypeScript — в том числе
+TypeScript языкового сервера Astro внутри `.astro` — типизирует
+`import { main } from "./App.fl"` по сигнатурам модуля, а не как
+`Record<string, unknown>`. Добавьте `*.d.fl.ts` и `.flick/` в `.gitignore`.
+В файлах `.ts` TypeScript 7.1 читает модули напрямую через
+[Content Mapper](../reference/editor/#content-mapper).
+
 Этот сайт использует локальную интеграцию из того же рабочего пространства.
 Перед подключением в другом проекте изучите
 [её исходники](https://github.com/bondiano/flick-lang/tree/main/tools/astro-flick).

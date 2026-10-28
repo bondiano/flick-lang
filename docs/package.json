@@ -19,5 +19,8 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "shiki": "4.5.0"
+  },
+  "devDependencies": {
+    "@flick-lang/content-mapper": "workspace:*"
   }
 }

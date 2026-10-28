@@ -1,6 +1,24 @@
 {
   "extends": "astro/tsconfigs/strict",
-  "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist"],
-  "compilerOptions": { "types": ["@flick-lang/astro/client"] }
+  "include": [
+    ".astro/types.d.ts",
+    "**/*"
+  ],
+  "exclude": [
+    "dist"
+  ],
+  "compilerOptions": {
+    "types": [
+      "@flick-lang/astro/client"
+    ],
+    "allowArbitraryExtensions": true
+  },
+  "contentMappers": [
+    {
+      "package": "@flick-lang/content-mapper",
+      "extensions": [
+        ".fl"
+      ]
+    }
+  ]
 }

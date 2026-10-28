@@ -205,6 +205,10 @@ importers:
       shiki:
         specifier: 4.5.0
         version: 4.5.0
+    devDependencies:
+      '@flick-lang/content-mapper':
+        specifier: workspace:*
+        version: link:../tools/content-mapper
 
   editors/vscode:
     dependencies:
@@ -282,7 +286,7 @@ importers:
         version: 1.2.15
 
   tools/content-mapper:
-    dependencies:
+    devDependencies:
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta

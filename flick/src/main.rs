@@ -151,6 +151,9 @@ fn main() -> ExitCode {
         Commands::Doctor => report(commands::doctor(global), global),
         Commands::Inspect(o) => report(commands::inspect(&o, project), global),
         Commands::Lsp(_) => lsp::serve(),
-        Commands::ContentMapper => mapper::serve(),
+        Commands::ContentMapper(o) => match o.declarations {
+            Some(paths) => mapper::declarations(&paths),
+            None => mapper::serve(),
+        },
     }
 }

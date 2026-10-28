@@ -8,10 +8,22 @@ import { promisify } from "node:util";
 const compile = promisify(execFile);
 
 /**
+ * Writes `Name.d.fl.ts` beside each `.fl` file under `paths`: the types of
+ * `import … from "./Name.fl"` for editors whose TypeScript runs no Content
+ * Mapper, as Astro's. Types are a convenience, so a failure only warns.
+ */
+export const declare = (binary, paths, warn = console.warn) =>
+  compile(binary, ["content-mapper", "--declarations", ...paths], { encoding: "utf8" }).then(
+    () => undefined,
+    (error) => warn(`flick: no declarations for ${paths.join(", ")}: ${error.stderr || error.message}`),
+  );
+
+/**
  * @param {{ binary?: string, profile?: "debug" | "release", outDir?: string }} options
  * `binary` is the `flick` CLI (`FLICK_BIN`, else `flick` on the PATH);
  * `profile` is by default `release` for `vite build` and `debug` otherwise;
- * `outDir` holds the builds (by default `<vite cache>/flick`).
+ * `outDir` holds the builds (by default `<vite cache>/flick`);
+ * `declarations: false` stops writing `Name.d.fl.ts` beside each import.
  */
 export const flickVite = (options = {}) => {
   const binary = options.binary ?? process.env.FLICK_BIN ?? "flick";
@@ -51,6 +63,7 @@ export const flickVite = (options = {}) => {
             ["build", file, "--emit", "js", "--out-dir", out, "--profile", profile, "--color", "never"],
             { cwd: path.dirname(file), encoding: "utf8" },
           );
+          if (options.declarations !== false) await declare(binary, [file]);
           return path.join(out, `${name.replaceAll(".", "/")}.js`);
         }).finally(() => builds.delete(key));
         builds.set(key, { inputs, output });

@@ -2,3 +2,6 @@ dist/
 .astro/
 # the playground's compiler, built by `just docs-wasm`
 src/playground/wasm/
+# types of the .fl imports for editors, written by @flick-lang/astro
+*.d.fl.ts
+.flick/

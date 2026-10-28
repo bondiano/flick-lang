@@ -14,7 +14,7 @@ import { flickVite } from "../vite.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, "../../..");
-const binary = path.join(repo, "target/debug/flick");
+const binary = process.env.FLICK_BIN ?? path.join(repo, "target/debug/flick");
 const run = promisify(execFile);
 
 const fixture = (t, name) => {
@@ -126,7 +126,7 @@ test("concurrent SSR/client loads share only the in-flight real compiler build",
 const { appendFileSync } = require("node:fs");
 const { spawnSync } = require("node:child_process");
 const args = process.argv.slice(2);
-appendFileSync(${JSON.stringify(log)}, args.includes("--inputs") ? "inputs\\n" : "build\\n");
+appendFileSync(${JSON.stringify(log)}, args.includes("--inputs") ? "inputs\\n" : args[0] === "content-mapper" ? "declarations\\n" : "build\\n");
 const child = spawnSync(${JSON.stringify(binary)}, args, { stdio: "inherit" });
 if (child.error) throw child.error;
 process.exit(child.status ?? 1);
@@ -135,9 +135,9 @@ process.exit(child.status ?? 1);
   const [ssr, client] = await Promise.all([load(plugin, file), load(plugin, `${file}?import`)]);
   assert.equal(ssr.code, client.code);
   assert.equal((await imported(ssr.code)).answer, 42);
-  assert.deepEqual(readFileSync(log, "utf8").trim().split("\n"), ["inputs", "build"]);
+  assert.deepEqual(readFileSync(log, "utf8").trim().split("\n"), ["inputs", "build", "declarations"]);
   assert.equal((await load(plugin, file)).code, ssr.code);
-  assert.deepEqual(readFileSync(log, "utf8").trim().split("\n"), ["inputs", "build", "inputs", "build"]);
+  assert.deepEqual(readFileSync(log, "utf8").trim().split("\n"), ["inputs", "build", "declarations", "inputs", "build", "declarations"]);
 });
 
 test("a failed build can be retried after the compiler becomes available", async (t) => {
@@ -252,3 +252,24 @@ const label = state.label?.[0] ?? "none";
     await server.stop();
   }
 });
+
+test("editors get the types of each import beside it, before and after a build", async (t) => {
+  const dir = fixture(t, "declarations");
+  const { file } = project(dir);
+  const declared = path.join(dir, "src/Ui/Widget.d.fl.ts");
+  const warnings = [];
+  await flick({ binary }).hooks["astro:config:setup"]({
+    config: { srcDir: pathToFileURL(path.join(dir, "src/")) },
+    updateConfig: () => undefined,
+    logger: { warn: (message) => warnings.push(message) },
+  });
+  assert.deepEqual(warnings, []);
+  assert.match(readFileSync(declared, "utf8"), /export declare const answer: number;/);
+  // every module of the source directory, and a built-in from the project's projections
+  assert.match(readFileSync(path.join(dir, "src/Shared.d.fl.ts"), "utf8"), /export declare const answer: number;/);
+  assert.match(readFileSync(declared, "utf8"), /from "\.\.\/\.\.\/\.flick\/projections\/Reactivity\/Atom\.flick\.ts"/);
+  rmSync(declared);
+  await load(flickVite({ binary, outDir: path.join(dir, "out") }), file);
+  assert.match(readFileSync(declared, "utf8"), /export declare const answer: number;/);
+});
+
