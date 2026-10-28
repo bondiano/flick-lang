@@ -172,6 +172,7 @@ codes! {
     E008 = Effects 8, "effect in a project built without effects";
     E009 = Effects 9, "client entry reaches `Server`";
     E010 = Effects 10, "`server fn` that cannot cross the network";
+    E011 = Effects 11, "guarded `server fn` served the wrong way";
     C001 = Classes 1, "no instance for a constraint";
     C002 = Classes 2, "ambiguous class constraint";
     C003 = Classes 3, "overlapping instances";

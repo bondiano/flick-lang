@@ -86,6 +86,8 @@ let route functions =
 через `Server.authenticated`. Тот на каждом вызове проверяет заголовки и
 передаёт функции сервис, который сделала проверка; если проверка падает с
 `Server.Unauthorized`, вызов получает эту ошибку, а тело не выполняется.
+Защищённая функция без `Server.authenticated` или `Server.authenticated`
+над функцией без `Server.Unauthorized` в ошибках — это `FLICK-E011`.
 
 ```flick
 service Session =

@@ -87,7 +87,8 @@ its implementation is a `Server.Guarded`, which `Server.handler` takes only
 through `Server.authenticated`. That runs a check on the headers of each
 call and gives the function the service the check makes; a check that
 fails with `Server.Unauthorized` answers the call with it, and the body
-does not run.
+does not run. Serving a guarded function without `Server.authenticated`, or
+guarding one that does not list `Server.Unauthorized`, is `FLICK-E011`.
 
 ```flick
 service Session =

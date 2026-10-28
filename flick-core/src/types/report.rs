@@ -3,7 +3,7 @@
 use super::Checker;
 use super::ty::Type;
 use super::unify::Mismatch;
-use crate::diagnostics::{Code, Diagnostic, codes};
+use crate::diagnostics::{Code, Diagnostic, Edit, codes};
 use crate::source::Span;
 
 impl Checker<'_> {
@@ -99,6 +99,9 @@ impl Checker<'_> {
                     );
                     return;
                 }
+                if self.served_wrong(&a, &b, span) {
+                    return;
+                }
                 let errors = |t: &Type| t.spine().0.is_prim("Errors");
                 let detail = match (&a, &b) {
                     (Type::Fun { effects: e1, .. }, Type::Fun { effects: e2, .. })
@@ -179,6 +182,90 @@ impl Checker<'_> {
                 );
             }
         }
+    }
+}
+
+impl Checker<'_> {
+    /// E011: a `Server.Guarded` where a `Server.Function` goes, or the other
+    /// way round; `false` when the mismatch is something else.
+    fn served_wrong(&mut self, actual: &Type, expected: &Type, span: Span) -> bool {
+        let server = |t: &Type| match t.spine().0 {
+            Type::Con { module, name } if module == "Server" => Some(name.clone()),
+            _ => None,
+        };
+        let (Some(actual), Some(expected)) = (server(actual), server(expected)) else {
+            return false;
+        };
+        // `server name` names the server fn; another expression does not
+        let text = &self.text[span.start as usize..span.end as usize];
+        let name = text
+            .strip_prefix("server")
+            .map(str::trim)
+            .filter(|n| !n.contains(char::is_whitespace));
+        let named = name.map_or_else(
+            || "this server fn".to_owned(),
+            |n| format!("server fn `{n}`"),
+        );
+        let d = match (actual.as_str(), expected.as_str()) {
+            ("Guarded", "Function") => Diagnostic::error(
+                codes::E011,
+                format!(
+                    "{named} lists `Server.Unauthorized`, so only `Server.authenticated` serves it"
+                ),
+                span,
+            )
+            .with_fix(
+                "serve it through `Server.authenticated Service check [...]`",
+                Vec::new(),
+            ),
+            ("Function", "Guarded") => {
+                let d = Diagnostic::error(
+                    codes::E011,
+                    format!(
+                        "{named} does not list `Server.Unauthorized`, so `Server.authenticated` cannot guard it"
+                    ),
+                    span,
+                );
+                let edit = name.and_then(|n| self.unauthorized_edit(n));
+                d.with_fix(
+                    "list `Server.Unauthorized` among its errors",
+                    edit.into_iter().collect(),
+                )
+            }
+            _ => return false,
+        };
+        self.diagnostics.push(d);
+        true
+    }
+
+    /// The edit that adds `Server.Unauthorized` to the errors of the last
+    /// arrow of the signature of this module's `name`.
+    fn unauthorized_edit(&self, name: &str) -> Option<Edit> {
+        let sig = self.signature_span(name)?;
+        let text = &self.text[sig.start as usize..sig.end as usize];
+        let open = text.rfind("->{")?;
+        let close = open + text[open..].find('}')?;
+        let semi = open + text[open..close].find(';')?;
+        let listed = !text[semi + 1..close].trim().is_empty();
+        let at = sig.start + u32::try_from(close).ok()?;
+        let at = if listed {
+            at
+        } else {
+            sig.start + u32::try_from(semi).ok()? + 1
+        };
+        Some(Edit {
+            span: Span {
+                file: sig.file,
+                start: at,
+                end: at,
+            },
+            replacement: if listed {
+                ", Server.Unauthorized"
+            } else {
+                " Server.Unauthorized"
+            }
+            .to_owned(),
+        })
     }
 }
 

@@ -23,5 +23,5 @@ let unguarded () = Server.handler [server whoami]
 
 unlisted : forall s. Unit ->{Scope s, Server.Server;} (ServerRequest ->{} ServerResponse)^{s}
 let unlisted () = Server.handler (Server.authenticated Session check [server leaky])
-//~ FLICK-T003 @22:36-22:49 expected `Function _`, found `Guarded {Session, Server | _}`
-//~ FLICK-T003 @25:71-25:83 expected `Guarded {Session | _}`, found `Function {Session, Server | _}`
+//~ FLICK-E011 @22:36-22:49 server fn `whoami` lists `Server.Unauthorized`, so only `Server.authenticated` serves it
+//~ FLICK-E011 @25:71-25:83 server fn `leaky` does not list `Server.Unauthorized`, so `Server.authenticated` cannot guard it
