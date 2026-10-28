@@ -307,13 +307,41 @@ fn show_folds_as_the_runtime_spells_it() {
     let js = release(
         "module App exposing (shown, fraction)\n\n\
          shown : String\nlet shown = show true ++ show \"a\\n\\\"\" ++ show 12n ++ show (-0.0)\n\n\
-         fraction : String\nlet fraction = show 0.1\n",
+         fraction : String\nlet fraction = show (10.0 + 10.01) ++ \" \" ++ show (1000000000.0 * 1000000000000.0) \
+         ++ \" \" ++ show (1.0 / 10000000.0) ++ \" \" ++ show 1658206780088562.25\n",
     );
     assert!(
         js.contains(r#"export const shown = "true\"a\\n\\\"\"12n-0";"#),
         "{js}"
     );
-    assert!(js.contains("show(0.1)"), "{js}");
+    // an exact tie spells the even digit, as JS does
+    assert!(
+        js.contains(
+            r#"export const fraction = "20.009999999999998 1e+21 1e-7 1658206780088562.2";"#
+        ),
+        "{js}"
+    );
+}
+
+#[test]
+fn non_finite_floats_fold_to_the_js_globals() {
+    let js = release(
+        "module App exposing (shown, named, sum, neg)\n\n\
+         shown : String\nlet shown = show (1.0 / 0.0) ++ show (-1.0 / 0.0) ++ show (0.0 / 0.0)\n\n\
+         named : String\nlet named = show Float.infinity ++ show Float.nan\n\n\
+         sum : Float\nlet sum = Float.infinity + 1.0\n\n\
+         neg : Float\nlet neg = 0.0 - 1.0 / 0.0\n",
+    );
+    assert!(
+        js.contains(r#"export const shown = "Infinity-InfinityNaN";"#),
+        "{js}"
+    );
+    assert!(
+        js.contains(r#"export const named = "InfinityNaN";"#),
+        "{js}"
+    );
+    assert!(js.contains("export const sum = Infinity;"), "{js}");
+    assert!(js.contains("export const neg = -Infinity;"), "{js}");
 }
 
 #[test]
