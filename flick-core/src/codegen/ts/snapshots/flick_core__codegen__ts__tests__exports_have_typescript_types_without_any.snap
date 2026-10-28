@@ -14,7 +14,7 @@ identity: <A>(arg: A) => A
 area: (arg: Shape) => number
 origin: { readonly x: number; readonly y: number }
 empty: ReadonlyArray<never>
-pair: <A, B>(arg: A) => (arg: B) => readonly [A, B]
+pair: <A>(arg: A) => <B>(arg: B) => readonly [A, B]
 load: (arg: string) => $Effect.Effect<{ readonly x: number; readonly y: number }, NotFound, Users>
 later: (arg: string) => $Effect.Effect<{ readonly x: number; readonly y: number }, NotFound, Users>
 first: <A>(arg: ReadonlyArray<A>) => $Option.Option<A>

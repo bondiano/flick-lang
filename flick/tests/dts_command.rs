@@ -385,8 +385,11 @@ fn a_barrel_re_exports_what_it_exposes_from_its_modules() {
          import type { Point } from './dist/Lib.js';\n\
          import type { Box as Own } from './dist/Lib/Pair.js';\n\
          const both: number = pair(1)('x')[0];\n\
+         const second: string = pair(1)('x')[1];\n\
+         // @ts-expect-error the second is a string, not a number\n\
+         const wrong: number = pair(1)('x')[1];\n\
          const box: Own = Box(2);\nconst p: Point = { x: 1, y: 2 };\n\
-         export { both, box, p };\n",
+         export { both, second, wrong, box, p };\n",
     )
     .expect("write");
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");

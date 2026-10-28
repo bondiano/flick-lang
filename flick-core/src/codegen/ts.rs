@@ -91,7 +91,7 @@ impl Projection<'_> {
             other => (&[][..], &[][..], other),
         };
         let mut scope = outer.clone();
-        let mut generics = Vec::new();
+        let mut generics: Vec<(String, String)> = Vec::new();
         for binder in vars {
             let ts = match binder.kind {
                 Kind::Type | Kind::ErrorRow | Kind::ServiceRow => Some(generic(&binder.name)),
@@ -107,7 +107,7 @@ impl Projection<'_> {
             if let Some(ts) = &ts
                 && binder.kind != Kind::CaptureRow
             {
-                generics.push(ts.clone());
+                generics.push((binder.name.clone(), ts.clone()));
             }
             scope.insert(binder.name.clone(), ts);
         }
@@ -122,8 +122,11 @@ impl Projection<'_> {
             }
             generics.clear();
         }
+        if constraints.iter().all(|c| !passes_dictionary(c)) && !generics.is_empty() {
+            return self.staged(body, &scope, &generics);
+        }
         let mut ty = self.ty(body, &scope)?;
-        // all dictionaries come at once, before the first parameter
+        // all dictionaries come at once, before the first parameter, with every type parameter
         let mut dicts = Vec::new();
         for constraint in constraints {
             if passes_dictionary(constraint) {
@@ -141,7 +144,8 @@ impl Projection<'_> {
         if generics.is_empty() {
             Ok(ty)
         } else {
-            Ok(format!("<{}>{ty}", generics.join(", ")))
+            let names: Vec<&str> = generics.iter().map(|(_, ts)| ts.as_str()).collect();
+            Ok(format!("<{}>{ty}", names.join(", ")))
         }
     }
 
@@ -497,6 +501,7 @@ fn key(label: &str) -> String {
 
 mod declare;
 mod dts;
+mod stages;
 
 pub use dts::{Facade, declaration_file, facade_files};
 #[cfg(test)]

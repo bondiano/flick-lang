@@ -453,7 +453,7 @@ Chromium сохранил cookie после 200, но [HttpApi.call требуе
 **Q4. P1 — Публичный реэкспорт теряется** ✅ (модуль, экспортирующий импортированное, пишет `export { … } from` модуля-владельца в JS/TS и `.d.ts`, типы без значения — `export type`; identity та же, что у владельца; `flick/tests/dts_command.rs`)
 Barrel с pair собирается, но JS export отсутствует, TS2305. [Dts](../../flick-core/src/codegen/ts/dts.rs#L20-L25) отбрасывает чужой defining module. Value/type re-exports должны сохранять identity во Flick/JS/TS.
 
-**Q5. P2 — Поздний generic теряет inference**
+**Q5. P2 — Поздний generic теряет inference** ✅ (`codegen/ts/stages.rs`: параметр типа стоит на первой стадии, чей параметр его упоминает, упомянутые только в результате (в том числе R/E) — на последней; JS не меняется; функции со словарями классов по-прежнему получают все параметры вместе со словарями; `pair: <A>(arg: A) => <B>(arg: B) => readonly [A, B]` (снапшот), tsc в `flick/tests/dts_command.rs`: `pair(1)('x')[1]` — `string`)
 `pair(1)("x")` имеет `[number,unknown]`: [оба generic на первой стадии](../../flick-core/src/codegen/ts.rs#L80-L135). Вводить B на своей стадии, включая поздние R/E, без смены ABI.
 
 **Q6. P1 — Reference противоречит контрактам** ✅ (пример `save_button` EN/RU — обработчик с `Atom.Write`, дословно код фикстуры `tests/check/pass/ui/save_button.fl`, сверку держит `ui_reference_example_is_a_checked_fixture`; MVU-план заменён atom-first: цикла `Msg → update` нет и не планируется; `Ui.text` в spec/10 больше не «полиморфна по строкам»)
