@@ -227,6 +227,7 @@ codes! {
     D006 = Schema 6, "constant fails the check of its refined type";
     D007 = Schema 7, "codec block over a schema that is not a record";
     D008 = Schema 8, "codec has no strict JSON Schema";
+    D009 = Schema 9, "type has no URL form";
     Q001 = Sql 1, "unknown column";
     Q002 = Sql 2, "unknown table alias";
     Q003 = Sql 3, "ambiguous column";

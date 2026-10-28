@@ -186,8 +186,8 @@ impl<'n> Checker<'_> {
                 {
                     out.push((CLI.to_owned(), "Value".to_owned()));
                 }
-                // a schema witness, not a class: see `types::schemas`
-                Some((module, _)) if module == PRELUDE && *last == "Schema" => {}
+                // witnesses, not classes: see `types::schemas`
+                Some((module, _)) if module == PRELUDE && matches!(*last, "Schema" | "Url") => {}
                 None => {}
                 Some(_) => self.error(
                     codes::C013,

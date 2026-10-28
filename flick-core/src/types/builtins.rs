@@ -62,6 +62,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("Gen", include_str!("builtins/Gen.fl")),
     ("Checks", include_str!("builtins/Checks.fl")),
     ("Schema", include_str!("builtins/Schema.fl")),
+    ("Route", include_str!("builtins/Route.fl")),
     ("Codec", include_str!("builtins/Codec.fl")),
     ("Json", include_str!("builtins/Json.fl")),
     ("Sql", include_str!("builtins/Sql.fl")),

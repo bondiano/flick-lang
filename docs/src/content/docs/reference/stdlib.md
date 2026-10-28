@@ -38,6 +38,7 @@ and `Monad`.
 | `Option`, `Result` | `map`, `bind`, `with_default` and conversions |
 | `Monoids` | `Sum` and `Product` of numbers, `First` and `Last` of an `Option`, `Min` and `Max` by `Ord`: `fold_map Sum xs` says how numbers combine |
 | `Validation` | `Validation e a`, a `Result` whose `map2` combines the errors of both with their `Semigroup`: an `and` group of `do` reports every error; `valid`, `invalid`, `from_result`, `to_result` |
+| `Route` | URLs of a type that derives `Url`: `print` and `parse`; `Atom.route` holds the current page (see [Routes](../route/)) |
 | `NonEmpty` | lists with at least one element |
 | `Chunk` | Effect's `Chunk`, for repeated concatenation |
 | `Js.Array` | mutable JS arrays, behind runtime operations; lists are copied in and out |

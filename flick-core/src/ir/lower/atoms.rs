@@ -10,7 +10,13 @@ use crate::syntax::cst::Node;
 pub(super) fn completed(name: &str) -> bool {
     matches!(
         name,
-        "serializable" | "serializable_family" | "serializable_task" | "set" | "update" | "modify"
+        "serializable"
+            | "serializable_family"
+            | "serializable_task"
+            | "serializable_result"
+            | "set"
+            | "update"
+            | "modify"
     )
 }
 
@@ -21,9 +27,9 @@ impl Lower<'_> {
             // a write names its place, which a debug log of it shows
             "set" | "update" | "modify" => ("Atom", format!("{name}_at"), self.location(node)),
             // the key is the binding the check let it define
-            "serializable_task" => (
+            "serializable_task" | "serializable_result" => (
                 "Atom",
-                "serializable_task_at".to_owned(),
+                format!("{name}_at"),
                 format!("{}.{}", self.module, self.definition),
             ),
             _ => (

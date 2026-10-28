@@ -1,0 +1,68 @@
+// URLs of a type that derives `Url`: a constructor is a path, its fields
+// segments and a final record the query; printing and parsing round-trip,
+// and a URL whose field fails its refined check parses to `None`.
+module App.Main exposing (main)
+
+refined type Slug = String where Checks.non_empty
+  deriving Eq, Show, Schema
+
+type Page =
+  | Home
+  | User Number
+  | UserPost Number Slug
+  | Search { q : String; page : Option Number; exact : Bool }
+  | Settings
+  deriving Eq, Show, Schema, Url
+
+/// Whether every text of the page is well-formed Unicode, which a URL can carry.
+encodable : Page -> Bool
+foreign pure encodable from "./route.mjs" "encodable"
+
+checking : Arbitrary.CheckOptions
+let checking =
+  {
+    runs = Some 200;
+    size = None;
+    maxDiscards = None;
+    maxShrinks = None;
+    seed = Some 11;
+    replay = None;
+  }
+
+parsed : String -> String
+let parsed url = url ++ " -> " ++ show (Route.parse Page.url url)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  match Slug.parse "hello world" with
+  | Err _ -> App.fail "a slug"
+  | Ok slug ->
+    let pages = [
+      Home,
+      User 42,
+      UserPost 7 slug,
+      Search { q = "a&b"; page = None; exact = true },
+      Search { q = ""; page = Some 2; exact = false },
+      Settings,
+    ]
+    for page <- pages do
+      Platform.stdout_line (Route.print Page.url page)
+    let urls = [
+      "/",
+      "/user/42",
+      "/user/x",
+      "/user-post/7/",
+      "/search?q=atoms&exact=false",
+      "/search?exact=true",
+      "https://example.com/settings#top",
+      "/nope",
+    ]
+    for url <- urls do
+      Platform.stdout_line (parsed url)
+    let round_trip =
+      Arbitrary.check
+        checking
+        (fun p -> Route.parse Page.url (Route.print Page.url p) == Some p)
+        (Arbitrary.filter encodable (Arbitrary.from_schema (schema Page)))
+    Platform.stdout_line
+      ("round trip: " ++ Option.with_default "passed" (Arbitrary.format_check_failure round_trip))

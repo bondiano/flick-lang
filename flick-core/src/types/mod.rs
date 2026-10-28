@@ -85,7 +85,7 @@ pub use kinds::Kind;
 pub use patterns::is_pattern;
 pub use question::Question;
 pub use ranges::range_list;
-pub use schemas::{companion_name, witness_entity};
+pub use schemas::{UrlRoute, companion_name, witness_entity};
 pub(crate) use sql::base_type;
 pub use sql::dialect::{self, Dialect};
 pub use ty::{Binder, Effects, PRELUDE, Row, SYNC_SERVICES, Stage, Type, stage_of};

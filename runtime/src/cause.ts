@@ -110,6 +110,9 @@ export const failurePrimary = (failure: Failure): Option.Option<unknown> => {
 
 export const failureRawCause = (failure: Failure): RawCause => new RawCause(causeOf(failure));
 
+/** The native cause of a `Failure`, for the runtime only. */
+export const failureCause = (failure: Failure): Cause.Cause<unknown> => causeOf(failure);
+
 /** `Failure.rethrow`: fails with the original cause, unchanged. */
 export const failureRethrow = (failure: Failure): Effect.Effect<never, unknown> => Effect.failCause(causeOf(failure));
 

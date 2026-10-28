@@ -8,10 +8,11 @@ import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Atom from "effect/reactivity/Atom";
 import * as Reactivity from "effect/reactivity/Reactivity";
 
-import { Failure } from "./cause.ts";
+import { Failure, failureCause } from "./cause.ts";
 import type { HashDict } from "./data.ts";
-import { WriteService, flickState, nativeRegistry, taskAtom } from "./effect/reactivity/Atom.ts";
+import { WriteService, flickState, nativeRegistry, taskAtom, taskAtomOf } from "./effect/reactivity/Atom.ts";
 import { service } from "./effects.ts";
+import { type UrlCodec, routeParse, routePrint } from "./route.ts";
 import { syncAbi, syncIn } from "./sync.ts";
 import { tag } from "./tags.ts";
 
@@ -93,11 +94,25 @@ export const atomLocal = <A>(value: A): Atom.Writable<A> => flickState(value);
 /** Whether `value` is a loaded `Atom.Async`. */
 const isLoaded = (value: unknown): value is { readonly _0: unknown } => Reflect.get(Object(value), "_tag") === LOADED;
 
-/** Marks the task atoms of `Atom.serializable_task`, which hand over only a loaded value. */
+/** The one typed error of a failed `Atom.Async`, none for a defect, an interruption or several errors. */
+const publicError = (value: unknown): Option.Option<unknown> => {
+  if (Reflect.get(Object(value), "_tag") !== FAILED) return Option.none();
+  const failure: unknown = Reflect.get(Object(value), "_0");
+  if (!(failure instanceof Failure)) return Option.none();
+  const [reason, ...rest] = failureCause(failure).reasons;
+  return reason !== undefined && rest.length === 0 && Cause.isFailReason(reason) ? Option.some(reason.error) : Option.none();
+};
+
+/**
+ * Marks the task atoms of `Atom.serializable_task`, which hand over only a
+ * loaded value, and of `Atom.serializable_result`, which also hand over a
+ * failure of one typed error: the mark is whether it does.
+ */
 const TASK = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/Atom.serializable_task");
 
-/** Whether a server hands `value` of the serializable `atom` to the client: a task's only once loaded. */
-export const handedOver = (atom: Atom.Atom<unknown>, value: unknown): boolean => !Reflect.has(atom, TASK) || isLoaded(value);
+/** Whether a server hands `value` of the serializable `atom` to the client: a task's only once loaded, or failed with a coded error. */
+export const handedOver = (atom: Atom.Atom<unknown>, value: unknown): boolean =>
+  !Reflect.has(atom, TASK) || isLoaded(value) || (Reflect.get(atom, TASK) === true && Option.isSome(publicError(value)));
 
 /**
  * Marks the atoms of `Atom.query` with how a hydrated result reaches their
@@ -106,18 +121,53 @@ export const handedOver = (atom: Atom.Atom<unknown>, value: unknown): boolean =>
  */
 const QUERY = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/Atom.query");
 
-const isHydrate = (value: unknown): value is (result: unknown) => void => typeof value === "function";
+const isHydrate = (value: unknown): value is (result: Effect.Effect<unknown, unknown>) => void => typeof value === "function";
+
+/** What `Atom.serializable_result` sends: the value or the error. */
+interface Wire {
+  readonly ok?: unknown;
+  readonly err?: unknown;
+}
 
 /**
  * `Atom.serializable_task` under the key the compiler gives: a loaded
  * result is coded by `codec`, and the client starts from it instead of
- * running the task; one still loading or failed is not handed over.
+ * running the task; one still loading or failed is not handed over. With
+ * `errors`, a failure of one typed error is handed over as well, coded by it,
+ * never a defect or a stack.
  */
-export const atomSerializableTask = <A>(key: string, codec: Schema.Codec<A, unknown>, atom: Atom.Atom<object>): Atom.Atom<object> => {
+export const atomSerializableTask = <A>(
+  key: string,
+  codec: Schema.Codec<A, unknown>,
+  atom: Atom.Atom<object>,
+  errors?: Schema.Codec<unknown, unknown>,
+): Atom.Atom<object> => {
   const hydrate: unknown = Reflect.get(atom, QUERY);
   const json = Schema.toCodecJson(codec);
   const encode = Schema.encodeSync(json);
   const decode = Schema.decodeSync(json);
+  const errorJson = errors === undefined ? undefined : Schema.toCodecJson(errors);
+  const encodeValue = (value: unknown): unknown => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a loaded result holds the task's value
+    if (isLoaded(value)) return errorJson === undefined ? encode(value._0 as A) : { ok: encode(value._0 as A) };
+    const error = publicError(value);
+    if (errorJson !== undefined && Option.isSome(error)) return { err: Schema.encodeSync(errorJson)(error.value) };
+    throw new Error(`the task atom \`${key}\` has no loaded value to hand over`);
+  };
+  const decodeValue = (encoded: unknown): object => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the server encoded it with these codecs
+    const wire = (errorJson === undefined ? { ok: encoded } : encoded) as Wire;
+    if (errorJson !== undefined && "err" in wire) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the server encoded it with this codec
+      const error = Schema.decodeSync(errorJson)(wire.err as Schema.Json);
+      if (isHydrate(hydrate)) hydrate(Effect.fail(error));
+      return Object.freeze({ _tag: FAILED, _0: new Failure(Cause.fail(error)) });
+    }
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the server encoded it with this codec
+    const value = decode(wire.ok as Schema.Json);
+    if (isHydrate(hydrate)) hydrate(Effect.succeed(value));
+    return Object.freeze({ _tag: LOADED, _0: value });
+  };
   // as `Atom.serializable` marks an atom, with the coding of a loaded result; kept alive, so a
   // hydrated result is not dropped, and the task run, before the first view subscribes
   // oxlint-disable-next-line typescript/no-unsafe-return, typescript/no-unsafe-argument -- a copy of `atom` with its prototype
@@ -125,39 +175,57 @@ export const atomSerializableTask = <A>(key: string, codec: Schema.Codec<A, unkn
     ...atom,
     keepAlive: true,
     label: atom.label ?? [key, ""],
-    [TASK]: true,
-    [Atom.SerializableTypeId]: {
-      key,
-      encode: (value: unknown) => {
-        if (!isLoaded(value)) throw new Error(`the task atom \`${key}\` has no loaded value to hand over`);
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a loaded result holds the task's value
-        return encode(value._0 as A);
-      },
-      decode: (encoded: unknown) => {
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the server encoded it with this codec
-        const value = decode(encoded as Schema.Json);
-        if (isHydrate(hydrate)) hydrate(value);
-        return Object.freeze({ _tag: LOADED, _0: value });
-      },
-    },
+    [TASK]: errorJson !== undefined,
+    [Atom.SerializableTypeId]: { key, encode: encodeValue, decode: decodeValue },
   });
 };
+
+/** `Atom.serializable_result` under the key the compiler gives: `serializable_task` that also hands over a typed failure. */
+export const atomSerializableResult = <A>(
+  key: string,
+  codec: Schema.Codec<A, unknown>,
+  errors: Schema.Codec<unknown, unknown>,
+  atom: Atom.Atom<object>,
+): Atom.Atom<object> => atomSerializableTask(key, codec, atom, errors);
 
 /** `Atom.task`: the atom of a task's result, run by the registry that first reads it. */
 export const atomTask = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<object> => Atom.map(taskAtom(task), toAsync);
 
 /** `Atom.query keys task`: a task atom that a mutation of one of `keys` runs anew. */
 export const atomQuery = <A, E>(keys: ReadonlyArray<string>, task: Effect.Effect<A, E>): Atom.Atom<object> => {
-  let hydrated: Option.Option<A> = Option.none();
+  let hydrated: Option.Option<Effect.Effect<A, E>> = Option.none();
   const first = Effect.suspend(() => {
     const value = hydrated;
     hydrated = Option.none();
-    return Option.isSome(value) ? Effect.succeed(value.value) : task;
+    return Option.isSome(value) ? value.value : task;
   });
-  const hydrate = (value: A): void => {
-    hydrated = Option.some(value);
+  const hydrate = (result: Effect.Effect<A, E>): void => {
+    hydrated = Option.some(result);
   };
   return Object.assign(Atom.withReactivity(keys)(atomTask(first)), { [QUERY]: hydrate });
+};
+
+/**
+ * `Atom.loader route load`: the task atom of `load` of the route's value,
+ * run anew when the route changes. A hydrated result is its first run's, and
+ * reading the route there makes later changes run it.
+ */
+export const atomLoader = <R, A, E>(route: Atom.Atom<R>, load: (value: R) => Effect.Effect<A, E>): Atom.Atom<object> => {
+  let hydrated: Option.Option<Effect.Effect<A, E>> = Option.none();
+  const result = Atom.map(
+    taskAtomOf((get) => {
+      const value = get(route);
+      const seeded = hydrated;
+      hydrated = Option.none();
+      return Option.isSome(seeded) ? seeded.value : load(value);
+    }),
+    toAsync,
+  );
+  const hydrate = (seed: Effect.Effect<A, E>): void => {
+    hydrated = Option.some(seed);
+  };
+  // a hydrated value is the initial one of `result`, which still builds and so reads the route
+  return Object.assign(Atom.transform(result, (get) => get(result), { initialValueTarget: result }), { [QUERY]: hydrate });
 };
 
 /** `Atom.query_stream keys stream`: the latest element of `stream`, which a mutation of one of `keys` starts anew. */
@@ -268,6 +336,54 @@ export const atomForget = <K, A>(family: Family<K, A>, key: K): Effect.Effect<vo
 
 /** `Atom.search_param`: the URL's search parameter `name`; a write updates the URL. */
 export const atomSearchParam = (name: string): Atom.Writable<string> => Atom.keepAlive(Atom.searchParam(name));
+
+/** The browser's URL, none on a server. */
+const location = (): string | undefined => (typeof window === "undefined" ? undefined : window.location.href);
+
+/** The URL a server renders, which `Atom.serving` sets in a request's registry. */
+const requestUrl = /*#__PURE__*/ Atom.keepAlive(Atom.make<string | undefined>(undefined));
+
+/** `Atom.serving url`: the URL the registry renders, which `Atom.route` reads on a server. */
+export const atomServing = (url: string): Effect.Effect<void, never, unknown> =>
+  Effect.map(Effect.service(WriteService), (write) => nativeRegistry(write)?.set(requestUrl, url));
+
+/**
+ * `Atom.route url fallback`: the value of the page's URL, `fallback` when no
+ * route matches; a write pushes the value's URL to the history. A server, and
+ * a root while it hydrates, read the URL `Atom.serving` gave, else the
+ * browser's location.
+ */
+export const atomRoute = <A>(codec: UrlCodec, fallback: A): Atom.Writable<A> => {
+  // the same URL gives the same value: a server's stream compares what a view read by identity
+  let last: { readonly url: string | undefined; readonly value: A } | undefined;
+  const parse = (url: string | undefined): A => {
+    if (last !== undefined && last.url === url) return last.value;
+    const parsed = url === undefined ? undefined : routeParse(codec, url);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `parse` gives a value of the route type
+    const value = parsed === undefined ? fallback : (parsed as A);
+    last = { url, value };
+    return value;
+  };
+  const atom = Atom.writable<A, A>(
+    (get) => {
+      const served = get(requestUrl);
+      if (served !== undefined || typeof window === "undefined") return parse(served);
+      const update = () => get.setSelf(parse(location()));
+      window.addEventListener("popstate", update);
+      get.addFinalizer(() => window.removeEventListener("popstate", update));
+      return parse(location());
+    },
+    (ctx, value) => {
+      if (typeof window !== "undefined") {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a value of the route type
+        const url = routePrint(codec, value as Readonly<Record<string, unknown>>);
+        if (url !== window.location.pathname + window.location.search) window.history.pushState(null, "", url);
+      }
+      ctx.setSelf(value);
+    },
+  );
+  return Atom.keepAlive(Atom.withServerValue(atom, (get) => parse(get(requestUrl) ?? location())));
+};
 
 /** `Atom.on_server`: the browser atom, read as `value` on a server and while a root hydrates. */
 export const atomOnServer = <A>(value: A, atom: Atom.Writable<A>): Atom.Writable<A> => Atom.withServerValue(atom, () => value);

@@ -20,6 +20,9 @@ use super::ty::{Binder, Type};
 use super::typing::{SchemaItem, SchemaPlan, range};
 
 mod plan;
+mod url;
+
+pub use url::UrlRoute;
 
 use crate::diagnostics::codes;
 use crate::iface::{Entity, Namespace};
@@ -75,8 +78,14 @@ impl Checker<'_> {
                     Type::pure_fun(this.clone(), base.clone()),
                 );
             }
-            if derives_schema(decl, self.text) {
+            if derives(decl, self.text, "Schema") {
                 deriving.push((decl, name));
+            } else if derives(decl, self.text, "Url") {
+                self.error(
+                    codes::D009,
+                    self.span(decl),
+                    format!("`{name}`: a type that derives `Url` derives `Schema` too"),
+                );
             }
         }
         // witnesses first, so that plans may refer to any type of the group
@@ -104,11 +113,27 @@ impl Checker<'_> {
                         );
                         self.companion(name, "json", &[], codec);
                     }
+                    let url = if derives(decl, self.text, "Url") {
+                        match self.url_routes(name, &plan, params.len()) {
+                            Ok(routes) => {
+                                let ty = Type::app(Type::prim("Url"), Type::con(&module, name));
+                                self.companion(name, "url", &[], ty);
+                                Some(routes)
+                            }
+                            Err((path, message)) => {
+                                self.error(codes::D009, span, format!("`{path}`: {message}"));
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    };
                     self.typing.schemas.push(SchemaItem {
                         ty: name.clone(),
                         decl: range(self.span(decl)),
                         witnesses: params.len(),
                         plan,
+                        url,
                     });
                 }
                 Err((path, message)) => {
@@ -344,12 +369,12 @@ impl Checker<'_> {
     }
 }
 
-/// Whether a `deriving` clause of `decl` names `Schema`.
-fn derives_schema(decl: &Node, text: &str) -> bool {
+/// Whether a `deriving` clause of `decl` names `witness`.
+fn derives(decl: &Node, text: &str, witness: &str) -> bool {
     decl.nodes()
         .filter(|n| n.kind == K::DerivingClause)
         .flat_map(Node::child_tokens)
-        .any(|t| t.kind == K::Con && t.text(text) == "Schema")
+        .any(|t| t.kind == K::Con && t.text(text) == witness)
 }
 
 /// A check exporters and the compiler know: `Checks.email`.

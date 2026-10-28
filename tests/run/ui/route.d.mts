@@ -1,0 +1,9 @@
+export declare const name: (id: number) => Promise<string>;
+export declare const loads: () => number;
+export declare const open: (url: string, joined: string) => Promise<undefined>;
+export declare const back: () => Promise<undefined>;
+export declare const path: () => string;
+export declare const settle: () => Promise<undefined>;
+export declare const text: () => string;
+export declare const complaints: () => string;
+export declare const close: () => undefined;

@@ -1,0 +1,15 @@
+/
+/user/42
+/user-post/7/hello%20world
+/search?exact=true&q=a%26b
+/search?exact=false&page=2&q=
+/settings
+/ -> Some Home
+/user/42 -> Some User 42
+/user/x -> None
+/user-post/7/ -> None
+/search?q=atoms&exact=false -> Some Search { exact = false, page = None, q = "atoms" }
+/search?exact=true -> None
+https://example.com/settings#top -> Some Settings
+/nope -> None
+round trip: passed

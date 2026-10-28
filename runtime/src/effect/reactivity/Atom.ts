@@ -19,12 +19,16 @@ export * from "effect/reactivity/Atom";
  */
 const callers = new WeakMap<AtomRegistry.AtomRegistry, Context.Context<never>>();
 
-/** The atom of `task`, run with what its registry's layer was built with; its scope is the atom's. */
-export const taskAtom = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<AsyncResult.AsyncResult<A, E>> =>
+/** The atom of the task `make` gives, run with what its registry's layer was built with; its scope is the atom's. */
+export const taskAtomOf = <A, E>(make: (get: Atom.AtomContext) => Effect.Effect<A, E>): Atom.Atom<AsyncResult.AsyncResult<A, E>> =>
   Atom.make((get) => {
+    const task = make(get);
     const caller = callers.get(get.registry);
     return caller === undefined ? task : Effect.provideContext(task, caller);
   });
+
+/** The atom of `task`. */
+export const taskAtom = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<AsyncResult.AsyncResult<A, E>> => taskAtomOf(() => task);
 
 /** Records what the tasks of `registry` run with. */
 const recordCaller = (registry: AtomRegistry.AtomRegistry) =>

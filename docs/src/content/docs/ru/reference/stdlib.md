@@ -39,6 +39,7 @@ title: "Стандартная библиотека"
 | `Seq` | ленивые последовательности, каждая итерация начинается заново: бесконечные `from`, `iterate`, `repeat`, `cycle`, `unfold`; `range`, `map`, `filter`, `flat_map`, `take`, `take_while`, `drop`, `zip`, `enumerate`, `scan`, `chunks`, `windows`, `find`, `first`, `to_list`, `fold`, `each_effect`; `Monad` для `do`; `Stream.from_seq` превращает её в поток |
 | `Monoids` | `Sum` и `Product` чисел, `First` и `Last` от `Option`, `Min` и `Max` по `Ord`: `fold_map Sum xs` говорит, как складывать числа |
 | `Validation` | `Validation e a` — `Result`, у которого `map2` объединяет ошибки обоих значений через их `Semigroup`: группа `and` в `do` сообщает обо всех ошибках; `valid`, `invalid`, `from_result`, `to_result` |
+| `Route` | URL типа с `deriving Url`: `print` и `parse`; текущую страницу держит `Atom.route` (см. [Маршруты](../route/)) |
 | `Option`, `Result` | `map`, `bind`, `with_default` и преобразования |
 | `NonEmpty` | списки как минимум с одним элементом |
 | `Chunk` | `Chunk` из Effect для многократной конкатенации |

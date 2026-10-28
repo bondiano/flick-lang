@@ -64,6 +64,7 @@ export const raceSuccess = /*#__PURE__*/ needsEffect("raceSuccess");
 export const refinedParse = /*#__PURE__*/ needsEffect("refinedParse");
 export const schemaAdt = /*#__PURE__*/ needsEffect("schemaAdt");
 export const schemaJsonCodec = /*#__PURE__*/ needsEffect("schemaJsonCodec");
+export const routeCodec = /*#__PURE__*/ needsEffect("routeCodec");
 export const schemaList = /*#__PURE__*/ needsEffect("schemaList");
 export const schemaOption = /*#__PURE__*/ needsEffect("schemaOption");
 export const schemaRedacted = /*#__PURE__*/ needsEffect("schemaRedacted");

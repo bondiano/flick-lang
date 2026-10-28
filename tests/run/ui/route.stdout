@@ -1,0 +1,9 @@
+http://localhost/user/42 served, loads 1
+hydrated: User 42: user 42, loads 1
+/user/7: User 7: user 7, loads 2
+/user/42: User 42: user 42, loads 3
+supervisor: interrupt
+http://localhost/user/404 served, loads 4
+hydrated: not found, loads 4
+supervisor: interrupt
+complaints: []

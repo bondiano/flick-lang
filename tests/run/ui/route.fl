@@ -1,0 +1,116 @@
+// A page whose route is its URL: the server renders the requested URL with
+// its loader's data, the client hydrates both without loading again, a write
+// of the route navigates and loads, the back button returns, and a typed
+// failure of the loader reaches the client as it is.
+module App.Main exposing (main)
+
+type error NotFound = NotFound
+  deriving Show, Schema
+
+type Page = Home | User Number
+  deriving Eq, Show, Schema, Url
+
+name : Number ->{} String
+foreign async name from "./route.mjs" "name"
+  arity 1
+
+loads : Unit ->{} Number
+foreign sync loads from "./route.mjs" "loads"
+  arity 0
+
+open : String -> String ->{} Unit
+foreign async open from "./route.mjs" "open"
+  arity 2
+
+back : Unit ->{} Unit
+foreign async back from "./route.mjs" "back"
+  arity 0
+
+path : Unit ->{} String
+foreign sync path from "./route.mjs" "path"
+  arity 0
+
+settle : Unit ->{} Unit
+foreign async settle from "./route.mjs" "settle"
+  arity 0
+
+text : Unit ->{} String
+foreign sync text from "./route.mjs" "text"
+  arity 0
+
+complaints : Unit ->{} String
+foreign sync complaints from "./route.mjs" "complaints"
+  arity 0
+
+close : Unit ->{} Unit
+foreign sync close from "./route.mjs" "close"
+  arity 0
+
+page : Atom.Writable Page
+let page = Atom.route Page.url Home
+
+profile : Atom.Atom (Atom.Async String {NotFound})
+let profile =
+  Atom.serializable_result
+    (Codec.json Schema.string)
+    (Codec.json (schema NotFound))
+    (Atom.loader page (fun p -> task {
+      match p with
+      | Home -> "home"
+      | User 404 ->
+        let _ = name 404
+        from_result (Err NotFound)
+      | User id -> name id
+    }))
+
+view : Ui.View Unit
+let view =
+  Ui.suspended
+    (fun _ -> Ui.text "not found")
+    (Ui.text "loading")
+    (fun () -> Ui.text (show (Atom.value page) ++ ": " ++ Atom.ready profile))
+
+report : Failure e ->{} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+/// The page the server streams for `url`.
+served : String ->{} String
+let served url =
+  let chunks =
+    provide Atom.layer {
+      Atom.serving url
+      Stream.run_collect (Ui.Server.stream "app" (Ui.render view ()))
+    }
+  String.join "" chunks
+
+/// Opens the server's page for `url` and mounts the client on it.
+visit : String -> (Unit ->{Atom.Write;} Unit) ->{} Unit
+let visit url after =
+  open url (served url)
+  Platform.stdout_line (url ++ " served, loads " ++ show (loads ()))
+  match Ui.Dom.container "app" with
+  | None -> Platform.stdout_line "no container"
+  | Some root ->
+    provide Atom.layer {
+      scope s {
+        let _ui =
+          Fiber.spawn s report (task { Ui.Dom.mount root (fun _ -> ()) (Ui.render view ()) })
+        settle ()
+        Platform.stdout_line ("hydrated: " ++ text () ++ ", loads " ++ show (loads ()))
+        after ()
+      }
+    }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  visit "http://localhost/user/42" (fun () ->
+    Atom.set page (User 7)
+    settle ()
+    Platform.stdout_line (path () ++ ": " ++ text () ++ ", loads " ++ show (loads ()))
+    back ()
+    settle ()
+    Platform.stdout_line (path () ++ ": " ++ text () ++ ", loads " ++ show (loads ())))
+  visit "http://localhost/user/404" (fun () -> ())
+  Platform.stdout_line ("complaints: [" ++ complaints () ++ "]")
+  close ()

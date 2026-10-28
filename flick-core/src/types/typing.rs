@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::mem;
 
 use super::Checker;
+use super::UrlRoute;
 use super::classes::Dict;
 use super::env::{Abi, Rep};
 use super::sql::dialect::Dialect;
@@ -197,6 +198,8 @@ pub struct SchemaItem {
     /// How many witnesses of its parameters it takes.
     pub witnesses: usize,
     pub plan: SchemaPlan,
+    /// The routes of `T$url` when the type derives `Url`.
+    pub url: Option<Vec<UrlRoute>>,
 }
 
 /// How a witness is built from the witnesses of its parts.

@@ -1,0 +1,25 @@
+/// URLs of a route type. A type that derives `Url` (and `Schema`) maps each
+/// constructor to a path: its name in kebab case is the first segment
+/// (`Home` and `Index` are `/`), its fields of type `String`, `Number`,
+/// `Bool` or a refined type over them the segments after it, and a final
+/// record field the query, where an `Option` field may be missing.
+///
+/// ```flick
+/// type Page = Home | User Number | Search { q : String; page : Option Number }
+///   deriving (Schema, Url)
+///
+/// Route.print Page$url (User 42)           -- "/user/42"
+/// Route.parse Page$url "/search?q=atoms"   -- Some (Search { q = "atoms"; page = None })
+/// ```
+module Route exposing (print, parse)
+
+/// The path and query of a value. Text is percent-encoded as UTF-8; a
+/// lone surrogate, which has no UTF-8 form, prints as U+FFFD.
+print : Url a -> a -> String
+foreign pure print from "@flick-lang/runtime" "routePrint"
+
+/// The value whose URL is `text`, ignoring its origin and fragment; `None`
+/// when no constructor matches or a field is not valid.
+parse : Url a -> String -> Option a
+foreign pure parse from "@flick-lang/runtime" "routeParse"
+  nullable

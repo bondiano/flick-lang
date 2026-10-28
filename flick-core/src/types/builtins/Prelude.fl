@@ -20,6 +20,8 @@ type Seq a
 type Ref a
 type Redacted a
 type Schema a
+/// The URLs of a type that derives `Url`: see the module `Route`.
+type Url a
 type PureCodec i a
 type Eff (r : ServiceRow) (e : ErrorRow) a
 type Layer (ri : ServiceRow) (e : ErrorRow) (ro : ServiceRow)

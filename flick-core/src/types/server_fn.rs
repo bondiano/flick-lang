@@ -225,6 +225,7 @@ impl Checker<'_> {
                         decl: range(self.span(decl)),
                         witnesses: 0,
                         plan,
+                        url: None,
                     }),
                     Err((_, message)) => {
                         complete = false;

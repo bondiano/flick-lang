@@ -3,7 +3,7 @@
 
 use super::{Gen, names};
 use crate::ir::Expr;
-use crate::types::{Constructor, Rep, SchemaItem, SchemaPlan, companion_name};
+use crate::types::{Constructor, Rep, SchemaItem, SchemaPlan, UrlRoute, companion_name};
 
 impl Gen<'_> {
     /// `T$check`, `T$parse` and `T$value` of a refined type.
@@ -35,7 +35,50 @@ impl Gen<'_> {
             let json = format!("{}({name})", self.rt("schemaJsonCodec"));
             out.push(self.export(&companion_name(&item.ty, "json"), &json));
         }
+        if let Some(routes) = &item.url {
+            let url = self.url(&name, &item.ty, routes);
+            out.push(self.export(&companion_name(&item.ty, "url"), &url));
+        }
         out.join("\n")
+    }
+
+    /// `T$url`: per constructor its tag, path, segment witnesses and query.
+    fn url(&mut self, schema: &str, ty: &str, routes: &[UrlRoute]) -> String {
+        let package = (self.options.package)(self.module);
+        let routes: Vec<String> = routes
+            .iter()
+            .map(|r| {
+                let constructor = Constructor {
+                    module: self.module.to_owned(),
+                    ty: ty.to_owned(),
+                    name: r.constructor.clone(),
+                    arity: r.segments.len() + usize::from(r.query.is_some()),
+                    rep: Rep::Tagged,
+                };
+                let tag = names::tag(&constructor, package.as_deref());
+                let segments: Vec<String> = r.segments.iter().map(|p| self.plan(p)).collect();
+                let query = r.query.as_ref().map_or("null".to_owned(), |query| {
+                    let fields: Vec<String> = query
+                        .iter()
+                        .map(|(l, p, optional)| {
+                            format!("[{}, {}, {optional}]", names::string(l), self.plan(p))
+                        })
+                        .collect();
+                    format!("[{}]", fields.join(", "))
+                });
+                format!(
+                    "[{}, {}, [{}], {query}]",
+                    names::string(&tag),
+                    names::string(&r.path),
+                    segments.join(", ")
+                )
+            })
+            .collect();
+        format!(
+            "{}({schema}, [{}])",
+            self.rt("routeCodec"),
+            routes.join(", ")
+        )
     }
 
     fn plan(&mut self, plan: &SchemaPlan) -> String {
@@ -172,6 +215,9 @@ pub fn schema_names(item: &SchemaItem) -> Vec<String> {
     let mut out = vec![companion_name(&item.ty, "schema")];
     if matches!(item.plan, SchemaPlan::Refined { .. }) {
         out.push(companion_name(&item.ty, "json"));
+    }
+    if item.url.is_some() {
+        out.push(companion_name(&item.ty, "url"));
     }
     out
 }

@@ -1,6 +1,6 @@
 //! Checks of the UI library the types alone cannot state.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use super::ty::Type;
 use super::typing::Ref;
@@ -86,7 +86,7 @@ impl Checker<'_> {
 }
 
 impl Checker<'_> {
-    /// `Atom.serializable`, `serializable_family` and `serializable_task` take their key
+    /// `Atom.serializable`, `serializable_family`, `serializable_task` and `serializable_result` take their key
     /// from the top-level binding they define, so each is applied there
     /// once, outside any function: anywhere else one key would name many
     /// atoms.
@@ -110,7 +110,7 @@ impl Checker<'_> {
                     Some(_) if in_function => format!(
                         "`Atom.{name}` inside a function would give its key to every atom the function makes: define the atom with a top-level `let`"
                     ),
-                    Some(_) if !keyed.applied.contains(&range) => format!(
+                    Some(_) if keyed.applied.get(&range) != Some(&key_arity(&name)) => format!(
                         "`Atom.{name}` is applied to its codec and state where it is defined, since the binding's name is its key"
                     ),
                     Some(b) if defined => format!(
@@ -376,27 +376,35 @@ pub(super) fn members<'n>(decls: &[&'n Node]) -> impl Iterator<Item = &'n Node> 
     })
 }
 
+/// The arguments of a serializable maker: its codecs and its state.
+fn key_arity(name: &str) -> usize {
+    if name == "serializable_result" { 3 } else { 2 }
+}
+
 /// The serializable atoms under a declaration: where each is named, and
 /// which are applied to their codec and state.
 #[derive(Default)]
 struct Keyed {
     found: Vec<(Range, String, bool)>,
-    applied: HashSet<Range>,
+    /// The heads of applications and how many arguments each is given.
+    applied: HashMap<Range, usize>,
 }
 
 impl Keyed {
     fn walk(&mut self, node: &Node, in_function: bool, names: &HashMap<Range, Ref>) {
         let parts: Vec<&Node> = node.nodes().collect();
         match node.kind {
-            K::AppExpr if parts.len() == 3 => {
-                self.applied.insert(parts[0].range());
+            // a piped application already counted its piped argument
+            K::AppExpr => {
+                let given = self.applied.entry(parts[0].range()).or_default();
+                *given = (*given).max(parts.len() - 1);
             }
-            // `state |> Atom.serializable codec`
+            // `state |> Atom.serializable codec`: the piped state is the last argument
             K::BinExpr if node.has_token(K::PipeGt) => {
                 if let Some(app) = parts.get(1).filter(|n| n.kind == K::AppExpr)
-                    && let [head, _] = app.nodes().collect::<Vec<_>>()[..]
+                    && let Some(head) = app.nodes().next()
                 {
-                    self.applied.insert(head.range());
+                    self.applied.insert(head.range(), app.nodes().count());
                 }
             }
             _ => {}
@@ -405,7 +413,10 @@ impl Keyed {
             && module == "Atom"
             && matches!(
                 name.as_str(),
-                "serializable" | "serializable_family" | "serializable_task"
+                "serializable"
+                    | "serializable_family"
+                    | "serializable_task"
+                    | "serializable_result"
             )
             && self.found.last().is_none_or(|(r, ..)| *r != node.range())
         {

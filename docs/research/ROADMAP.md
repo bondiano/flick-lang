@@ -257,7 +257,7 @@ component search (props : SearchProps) =
 **F3. Запросы и мутации.** ✅ (`Atom.query keys task`, `Atom.query_stream keys stream` (без своей мутации), `Atom.mutation keys f` — после успеха `f` перезапускает прочитанные реестром запросы тех же ключей, неудача ничего не трогает; через механизм Effect: `Atom.withReactivity` и `Reactivity` реестра (тот же экземпляр, что у `AtomRpc`, через общую memo map), мутация инвалидирует ключи одной пачкой (`Atom.batch`), так что запрос нескольких ключей перезапускается один раз; сам `AtomRpc`/`AtomHttpApi` не взят: его `mutation` — атом с записью payload, а не функция с типизированной ошибкой, а `serializationKey` переносит и Failure (Q14); `serializable_task` над `query` получает ключ привязки — R3, гидратированный запрос не перезапускается, а мутация его ключа перезапускает (`tests/run/ui/stream.fl`); `tests/run/ui/query.fl`, `tests/check/pass/ui/query.fl`)
 - AC: на механизме инвалидации Effect (`Reactivity`, общий с `AtomRpc`/`AtomHttpApi`); query инвалидируется мутацией с тем же `reactivityKeys` (тест); stream-запрос — отдельный тип без `mutation`; `serializationKey` участвует в R3.
 
-**F4. Маршруты.** ⬜
+**F4. Маршруты.** ✅ (`deriving Url` поверх свидетеля Schema: конструктор в kebab-case — первый сегмент, `Home`/`Index` — `/`, поля — сегменты `String`/`Number`/`Bool`/уточнённые, последнее поле-запись — query с `Option`-параметрами, иначе `FLICK-D009` с путём поля; компаньон `T.url : Url T`, модуль `Route` (`print`, `parse`), разбор проверяется схемой типа; `Atom.route url fallback` — `location`, `popstate`, запись — `pushState`; на сервере URL кладёт `Atom.serving`, разбор мемоизирован по URL, иначе стрим не сходится; `Atom.loader route load` — task-атом, перезапускаемый при смене маршрута, гидрированный результат — его первый запуск через `initialValueTarget`; `tests/run/schema/route.fl` (round-trip `Arbitrary.check` по 200 значениям; одиночный суррогат печатается как U+FFFD), `tests/run/ui/route.fl` (SSR `/user/42` без повторной загрузки, переход, «назад», `NotFound` с сервера), `tests/check/fail/schema/url.fl`; `reference/route.md`)
 - AC: `Route` ADT ↔ URL с выведенным парсером/принтером (round-trip property-тест); `Atom.route` с server value из запроса; loader маршрута гидрируется.
 
 **F5. Формы.** ⬜
@@ -381,7 +381,7 @@ S1 ✅ ─ U1…U6 ✅ ─ U7 ✅ ─ U7b ✅ ─ U6b ✅
 C2/C3/C4/C6 ✅ ─ C6b ✅
 C7a ✅ ─ C7b ✅ ─ C7c ✅ ─ C7d ✅ ─ C5 ✅            C1 ✅
 U9 ✅ ─ U9b ✅
-S2 ✅ ─ F1 ✅ ─ F2 ✅ ─ F3 ✅ ─ F4 ─ F5 ─ F6
+S2 ✅ ─ F1 ✅ ─ F2 ✅ ─ F3 ✅ ─ F4 ✅ ─ F5 ─ F6
 S3 ✅ ─ S4 ✅ ─ O1 ✅ ─ O2 ✅ ─ O3 ✅ ─ O4 ✅ ─ O5 ✅
 L1 ✅ ─ L2 ✅ ─ L3 ✅ ─ L4 ✅ ─ L5
 H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ✅ ─ H6 ✅     (H2 по входам — после L6 ✅)
@@ -486,7 +486,7 @@ HttpApi/Rpc имеют свои listeners; [Unit-hook middleware](../../runtime/
 **Q13. P1 — F1/F6 не замкнуты**
 L6/H2 и Vite есть; server/client isolation и общий dev workflow — нет. Нужны authenticated CRUD/shared contract, server/client isolation без утечки секретов, один dev command. L5 сохраняет draft без размножения watchers; F2 после prerequisites.
 
-**Q14. P2 — Loader переносит только success**
+**Q14. P2 — Loader переносит только success** ✅ (`Atom.serializable_result wire error_wire atom` передаёт и неудачу с одной типизированной ошибкой, закодированной её кодеком; дефект, прерывание и несколько ошибок не передаются — клиент запускает задачу сам; запрос гидрируется и неудачей, `tests/run/ui/route.fl`; поля форм — в F5)
 [serializable_task](../../flick-core/src/types/builtins/Atom.fl#L142-L151) передаёт Loaded, не Failed. `[INFERENCE]` SSR 401/404 могут повторить запрос. F3/F4 должны переносить публичный Result, не Failure со стеком/секретами. Validation не закрывает F5: нужны field paths, accessible controls, async cancellation/lifecycle.
 
 **Q15. P2 — Нет виртуального времени тестов**

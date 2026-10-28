@@ -88,6 +88,20 @@ search_param : String -> Browser String
 foreign pure search_param from "@flick-lang/runtime" "atomSearchParam"
   arity 1
 
+/// The page as a value of a type that derives `Url`: the browser's URL
+/// parsed by `url`, `fallback` when no route matches. A write navigates:
+/// it pushes the value's URL to the history, and the back button gives
+/// the earlier value. A server reads the URL `serving` gave its registry,
+/// so the markup and the hydrating root agree.
+route : Url a -> a -> Writable a
+foreign pure route from "@flick-lang/runtime" "atomRoute"
+  arity 2
+
+/// The URL the registry renders, which `route` reads on a server: a
+/// handler sets the request's URL before it renders the page.
+serving : String ->{Write;} Unit
+foreign effect serving from "@flick-lang/runtime" "atomServing"
+
 /// An atom computed by `compute` from the atoms it reads, again when one
 /// of them changes.
 derived : (Unit ->{Read;} a) -> Atom a
@@ -156,6 +170,14 @@ query : List String -> Eff none e a -> Atom (Async a e)
 foreign pure query from "@flick-lang/runtime" "atomQuery"
   arity 2
 
+/// The task atom of `load` of the route's value, run anew when the route
+/// changes: a page's data. Made serializable, the result a server loaded
+/// for the requested URL is where the client starts.
+loader : forall d r e a. (Writable r)^d -> (r -> Eff none e a) -> (Atom (Async a e))^d
+foreign pure loader from "@flick-lang/runtime" "atomLoader"
+  arity 2
+  retention call
+
 /// The latest element of `stream`, `Loading` until the first; a
 /// `mutation` of one of `keys` starts it anew. It has no mutation of its
 /// own: what changes it comes through the stream.
@@ -194,6 +216,25 @@ let serializable_task wire atom = serializable_task_at "Atom.serializable_task" 
 /// `serializable_task` under the key the compiler gives.
 serializable_task_at : String -> PureCodec Json a -> Atom (Async a e) -> Atom (Async a e)
 foreign pure serializable_task_at from "@flick-lang/runtime" "atomSerializableTask"
+
+/// `serializable_task` whose failure of one typed error, coded by
+/// `error_wire`, is handed over too: the client shows the server's
+/// `NotFound` instead of asking again. A defect or an interruption is never
+/// handed over, so no stack or secret leaves the server; the client runs
+/// the task again.
+serializable_result :
+  PureCodec Json a -> PureCodec Json x -> Atom (Async a {x | none}) -> Atom (Async a {x | none})
+let serializable_result wire error_wire atom =
+  serializable_result_at "Atom.serializable_result" wire error_wire atom
+
+/// `serializable_result` under the key the compiler gives.
+serializable_result_at :
+  String ->
+    PureCodec Json a ->
+    PureCodec Json x ->
+    Atom (Async a {x | none}) ->
+    Atom (Async a {x | none})
+foreign pure serializable_result_at from "@flick-lang/runtime" "atomSerializableResult"
 
 /// Atoms by key: `at family key` makes the atom of `key` the first time
 /// and gives the same one for every equal key after, so a view takes the
