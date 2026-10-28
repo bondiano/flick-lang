@@ -354,6 +354,38 @@ foreign effect spawn from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcSpawn"
   arity 3
   reviewed "effect@4.0.5 sha256:c3de3399064bf5e6"
 
+/// Answers the calls of the page that started this Web Worker until it
+/// closes the worker: the program of the module `worker` starts. Messages
+/// travel by structured clone, so it takes no serialization.
+serve_worker : forall c r hs. Group r hs -> (hs^c ->{r; none} Unit)^c
+foreign effect serve_worker from "@flick-lang/runtime/effect/rpc/Rpc" "rpcServeWorker"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:a3c91b37d4a12a3f"
+
+/// Starts a module Web Worker from `url` and connects to it; its
+/// `serve_worker` answers. The end of the scope closes it. Browsers only.
+worker : forall s. String ->{Scope s; ClientError} Client s
+foreign effect worker from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWorker"
+  arity 1
+  reviewed "effect@4.0.5 sha256:5a2bb17815a939f5"
+
+/// Answers the calls of the thread that started this worker thread until it
+/// closes it, as `serve_worker` in a browser. Node only.
+serve_node_worker : forall c r hs. Group r hs -> (hs^c ->{r; none} Unit)^c
+foreign effect serve_node_worker from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcServeNodeWorker"
+  arity 2
+  retention call
+  reviewed "effect@4.0.5 sha256:a3c91b37d4a12a3f"
+
+/// Starts a worker thread running the script at `path` with `args` and
+/// connects to it; its `serve_node_worker` answers. The end of the scope
+/// closes it. Node only.
+node_worker : forall s. String -> List String ->{Scope s; ClientError} Client s
+foreign effect node_worker from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcNodeWorker"
+  arity 2
+  reviewed "effect@4.0.5 sha256:5a2bb17815a939f5"
+
 /// Runs `task` with its calls carrying the headers too, which the hooks of
 /// `with_middleware` read: `authorization`, say.
 with_headers : forall c r e a. Http.Headers.Input -> (Eff r e a)^c ->{r; e} a

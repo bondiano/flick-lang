@@ -1,9 +1,10 @@
 // The handlers of a group as Effect's server runs them: each with the
 // services of the caller, its procedure's hooks first. Shared by the Node
 // servers and the in-memory client, so it loads nothing of Node.
-import { Effect, Scope, Stream } from "effect";
+import { Effect, Exit, Fiber, Layer, Scope, Stream } from "effect";
 import type { Headers } from "effect/http";
 import * as Rpc from "effect/rpc/Rpc";
+import * as RpcServer from "effect/rpc/RpcServer";
 
 import { effectGroup, type Group } from "./model.ts";
 
@@ -56,3 +57,18 @@ export const prepare = (group: Group, handlers: Readonly<Record<string, Handler>
     return { rpcs, scope, handled };
   });
 
+
+/**
+ * Serves `group` with `handlers` on the protocol `layer` builds, until the
+ * protocol interrupts the fiber that built it: stdin's end, or a worker's
+ * parent closing it.
+ */
+export const serveOn = <E>(layer: Layer.Layer<RpcServer.Protocol, E>, group: Group, handlers: Readonly<Record<string, Handler>>) =>
+  Effect.gen(function* () {
+    const { rpcs, scope, handled } = yield* prepare(group, handlers);
+    const serving = Effect.scoped(
+      Effect.flatMap(Layer.build(layer), (protocol) => RpcServer.make(rpcs).pipe(Effect.provideContext(handled), Effect.provideContext(protocol))),
+    );
+    yield* Fiber.await(yield* Effect.forkChild(serving));
+    return yield* Scope.close(scope, Exit.void);
+  });

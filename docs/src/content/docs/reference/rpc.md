@@ -126,6 +126,8 @@ WebSocket support can be removed from a browser bundle.
 | `listen_websocket …` | each client a WebSocket at `path` whose messages carry its calls (`ws://127.0.0.1:8080/rpc`); every serialization streams over it |
 | `listen_tcp …` | each client a TCP connection to `host` and `port` (`tcp://127.0.0.1:8080`). Node only. Only a serialization that frames its messages (`ndjson`, `ndjson_rpc`, `binary`) fits a byte stream; another is a `ServeError`, since TCP may split a document across reads |
 | `serve_stdio serialization group handlers` | answers the calls of the messages on stdin on stdout until stdin ends, as editors run language servers; nothing else may write to stdout meanwhile. Node only |
+| `serve_worker group handlers` | answers the calls of the page that started this Web Worker until it closes the worker |
+| `serve_node_worker group handlers` | the same in a Node worker thread. Node only |
 
 The `listen` functions run on Node and acquire a `Server s` in `Scope s`.
 Closing that scope stops admission and closes calls and their finalizers.
@@ -137,6 +139,37 @@ when `port = 0`. `Rpc.defaults` selects `127.0.0.1`, port `0`, `/rpc` and
 `serve_stdio` instead runs until stdin ends and needs the `Stdio` service:
 provide `Stdio.node`. Reserve stdout exclusively for protocol messages;
 write diagnostics to stderr.
+
+### In a worker
+
+A worker is an entry of its own in `flick.toml`, whose `main` serves the
+group; the program that starts the worker calls it with `Rpc.worker` (a
+module Web Worker from a URL) or `Rpc.node_worker` (a Node worker thread
+from a script path and arguments). Messages travel by structured clone,
+so neither side names a serialization; the codecs of the procedures still
+run. The worker runs until the end of the client's scope closes it.
+
+```toml
+[project]
+runner = "Runner.Browser"
+entries = { app = { module = "App.Page", target = "client" }, worker = { module = "App.Worker", target = "client" } }
+```
+
+```flick
+// App.Worker
+main : Unit ->{; AppError} Unit
+let main () = Rpc.serve_worker group handlers
+
+// App.Page: the bundler serves the runner of the worker entry at ./worker.js
+main : Unit ->{; AppError} Unit
+let main () =
+  scope s {
+    let server = Rpc.worker "./worker.js"
+    Platform.stdout_line (show (Rpc.call_on server double 21))
+  }
+```
+
+A client starts one worker; calls over it share that worker.
 
 ### Beside other routes
 
@@ -183,6 +216,8 @@ that only calls procedures pulls in no Node HTTP or socket server.
 | `connect options url` | one connection in a scope that calls share until it closes: a WebSocket stays open, HTTP keeps its connections alive |
 | `call_on client procedure payload`, `call_stream_on …` | a call over a connected client |
 | `spawn serialization command args` | starts a child process and connects to it over its stdin and stdout, which its `serve_stdio` answers; its stderr is the program's, and the end of the scope stops the child. Node only |
+| `worker url` | starts a module Web Worker from `url` and connects to it; its `serve_worker` answers, and the end of the scope closes it |
+| `node_worker path args` | starts a Node worker thread running the script at `path` with `args`; its `serve_node_worker` answers. Node only |
 
 `CallOptions` names the serialization and the transport: `Rpc.http` (a
 POST per call, the default), `Rpc.websocket` (the messages of calls over

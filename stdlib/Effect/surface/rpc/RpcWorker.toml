@@ -1,5 +1,5 @@
 [excluded]
-InitialMessage = "worker transports are outside the 0.1.0 standard library"
-initialMessage = "worker transports are outside the 0.1.0 standard library"
-layerInitialMessage = "worker transports are outside the 0.1.0 standard library"
-makeInitialMessage = "worker transports are outside the 0.1.0 standard library"
+InitialMessage = "`Rpc.worker` sends no initial message; a worker gets its arguments from its script or URL"
+initialMessage = "`Rpc.worker` sends no initial message; a worker gets its arguments from its script or URL"
+layerInitialMessage = "`Rpc.worker` sends no initial message; a worker gets its arguments from its script or URL"
+makeInitialMessage = "`Rpc.worker` sends no initial message; a worker gets its arguments from its script or URL"

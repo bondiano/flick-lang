@@ -214,6 +214,9 @@ importers:
 
   runtime:
     dependencies:
+      '@effect/platform-browser':
+        specifier: 4.0.5
+        version: 4.0.5(effect@4.0.5)
       '@effect/platform-node':
         specifier: 4.0.5
         version: 4.0.5(effect@4.0.5)(redis@6.3.0)
@@ -545,6 +548,11 @@ packages:
   '@ctrl/tinycolor@4.2.1':
     resolution: {integrity: sha512-Vh5uy9Y1JBMId6J1f68TMXnZrTCvNdo9Fu2k0d1YnJngR+sM5kWTKl441c/3TFs+cG0NWOjRWgQ/iaWhbYx+7A==}
     engines: {node: '>=14'}
+
+  '@effect/platform-browser@4.0.5':
+    resolution: {integrity: sha512-o3H75xA91nkgIWOcp0XouIxxWxJEOFkTf7gG4qkQtZfy0tq46hJBI0U8jrUqsPruo2vCCNfM0yCoj5AG7F5BMQ==}
+    peerDependencies:
+      effect: ^4.0.5
 
   '@effect/platform-node-shared@4.0.5':
     resolution: {integrity: sha512-a8rCdEkfZBGe9C6bsIjxVZuRp73svIyK5IHwHdDAVsvZXjrbkxusfI+rZ8WlX31RP1mKizwI/E72GQTNfdMWHw==}
@@ -2746,6 +2754,10 @@ snapshots:
   '@csstools/css-tokenizer@4.0.2': {}
 
   '@ctrl/tinycolor@4.2.1': {}
+
+  '@effect/platform-browser@4.0.5(effect@4.0.5)':
+    dependencies:
+      effect: 4.0.5
 
   '@effect/platform-node-shared@4.0.5(effect@4.0.5)':
     dependencies:

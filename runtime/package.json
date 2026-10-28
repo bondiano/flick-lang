@@ -62,6 +62,7 @@
     "test": "tsc -p tsconfig.build.json && node --test"
   },
   "dependencies": {
+    "@effect/platform-browser": "4.0.5",
     "@effect/platform-node": "4.0.5",
     "effect": "4.0.5"
   },

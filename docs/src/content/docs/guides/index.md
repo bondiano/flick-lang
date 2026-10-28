@@ -108,7 +108,8 @@ from the client.
 
 Choose the transport separately: HTTP for request/response calls,
 WebSocket for a shared message connection, TCP for Node peers, or
-`serve_stdio`/`spawn` for a child process. Start configuration from
+`serve_stdio`/`spawn` for a child process, or `serve_worker`/`worker` for
+a Web Worker. Start configuration from
 `Rpc.defaults` and `Rpc.call_defaults` so serialization and transport
 remain explicit. Test handler logic with `call_local`, but test codecs and
 headers through a real connection.

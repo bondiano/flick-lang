@@ -2,6 +2,7 @@
 CurrentHeaders = "Rpc.with_headers 09670cb44a5c3c45"
 layerProtocolHttp = "Rpc.call 8da7c46726693970"
 layerProtocolSocket = "Rpc.websocket c3de3399064bf5e6"
+layerProtocolWorker = "Rpc.node_worker 5a2bb17815a939f5"
 make = "Rpc.call 9e1b2aef57533a72"
 withHeaders = "Rpc.with_headers dcacf8ec37486efd"
 
@@ -10,7 +11,6 @@ ConnectionHooks = "`Rpc` calls over HTTP, WebSocket and TCP; this transport, hea
 FromGroup = "TS-only: type-level machinery of Effect's RPC types; Flick's `Rpc` types carry the same information"
 Protocol = "`Rpc` calls over HTTP, WebSocket and TCP; this transport, headers and connection hooks are outside the binding"
 RpcClient = "TS-only: type-level machinery of Effect's RPC types; Flick's `Rpc` types carry the same information"
-layerProtocolWorker = "`Rpc` calls over HTTP, WebSocket and TCP; this transport, headers and connection hooks are outside the binding"
 makeNoSerialization = "`Rpc` calls over HTTP, WebSocket and TCP; this transport, headers and connection hooks are outside the binding"
 makeProtocolHttp = "`Rpc` calls over HTTP, WebSocket and TCP; this transport, headers and connection hooks are outside the binding"
 makeProtocolSocket = "`Rpc` calls over HTTP, WebSocket and TCP; this transport, headers and connection hooks are outside the binding"

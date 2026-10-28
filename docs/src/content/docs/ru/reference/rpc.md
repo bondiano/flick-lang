@@ -129,6 +129,8 @@ node dist/rpc-demo/flick-main.js
 | `listen_websocket …` | каждому клиенту — WebSocket по пути `path`, сообщения которого переносят его вызовы (`ws://127.0.0.1:8080/rpc`); каждый формат потоковый |
 | `listen_tcp …` | каждому клиенту — TCP-соединение с `host` и `port` (`tcp://127.0.0.1:8080`). Только Node. Байтовому потоку подходит только формат с разбивкой на сообщения (`ndjson`, `ndjson_rpc`, `binary`); иначе — `ServeError`, потому что TCP может разрезать документ между чтениями |
 | `serve_stdio serialization group handlers` | отвечает на вызовы из сообщений stdin в stdout, пока stdin не закончится, как языковые серверы в редакторах; больше ничего не может писать в stdout в это время. Только Node |
+| `serve_worker group handlers` | отвечает на вызовы страницы, запустившей этот Web Worker, пока она его не закроет |
+| `serve_node_worker group handlers` | то же в потоке worker_threads Node. Только Node |
 
 Функции `listen` работают на Node и получают `Server s` в `Scope s`.
 Закрытие области прекращает приём новых вызовов и закрывает текущие
@@ -141,6 +143,37 @@ node dist/rpc-demo/flick-main.js
 `serve_stdio` работает до окончания stdin и требует сервис `Stdio`:
 предоставьте `Stdio.node`. Оставьте stdout только для сообщений протокола;
 диагностику пишите в stderr.
+
+### В worker'е
+
+Worker — отдельный вход в `flick.toml`, чей `main` обслуживает группу;
+программа, которая его запускает, вызывает его через `Rpc.worker`
+(модульный Web Worker по URL) или `Rpc.node_worker` (поток worker_threads
+Node по пути скрипта и аргументам). Сообщения передаются structured clone,
+поэтому ни одна сторона не выбирает сериализацию; кодеки процедур всё
+равно работают. Worker живёт, пока конец области клиента его не закроет.
+
+```toml
+[project]
+runner = "Runner.Browser"
+entries = { app = { module = "App.Page", target = "client" }, worker = { module = "App.Worker", target = "client" } }
+```
+
+```flick
+// App.Worker
+main : Unit ->{; AppError} Unit
+let main () = Rpc.serve_worker group handlers
+
+// App.Page: бандлер отдаёт раннер входа worker по адресу ./worker.js
+main : Unit ->{; AppError} Unit
+let main () =
+  scope s {
+    let server = Rpc.worker "./worker.js"
+    Platform.stdout_line (show (Rpc.call_on server double 21))
+  }
+```
+
+Клиент запускает один worker; вызовы через него делят этот worker.
 
 ### Рядом с другими маршрутами
 
@@ -188,6 +221,8 @@ let serve_both options handlers =
 | `connect options url` | одно соединение в области, общее для вызовов до её закрытия: WebSocket остаётся открытым, HTTP переиспользует соединения |
 | `call_on client procedure payload`, `call_stream_on …` | вызов через подключённый клиент |
 | `spawn serialization command args` | запускает дочерний процесс и соединяется с ним через его stdin и stdout, на которые отвечает его `serve_stdio`; его stderr — stderr программы, закрытие области останавливает потомка. Только Node |
+| `worker url` | запускает модульный Web Worker из `url` и соединяется с ним; отвечает его `serve_worker`, закрытие области закрывает worker |
+| `node_worker path args` | запускает поток worker_threads Node со скриптом `path` и аргументами `args`; отвечает его `serve_node_worker`. Только Node |
 
 `CallOptions` называет формат сообщений и транспорт: `Rpc.http`
 (POST-запрос на вызов, по умолчанию), `Rpc.websocket` (сообщения вызовов

@@ -3,11 +3,14 @@
 // program that only calls procedures loads no Node server.
 import { type ChildProcess, spawn } from "node:child_process";
 import { Duplex } from "node:stream";
+import { Worker } from "node:worker_threads";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
 import * as NodeSocketServer from "@effect/platform-node/NodeSocketServer";
-import { Effect, Exit, Fiber, Layer, Scope, Stdio } from "effect";
+import * as NodeWorker from "@effect/platform-node/NodeWorker";
+import * as NodeWorkerRunner from "@effect/platform-node/NodeWorkerRunner";
+import { Effect, Exit, Layer, Scope, Stdio } from "effect";
 import { RpcSerialization } from "effect/rpc/RpcSerialization";
 import { HttpRouter } from "effect/http";
 import * as RpcClient from "effect/rpc/RpcClient";
@@ -21,7 +24,7 @@ import { Socket, SocketServer } from "effect/socket";
 
 import type { Client } from "./client.ts";
 import { type Served, appOf } from "./handler.ts";
-import { type Handler, prepare } from "./handlers.ts";
+import { type Handler, prepare, serveOn } from "./handlers.ts";
 import { clientError, type Group, type RpcError, type Serialization, type Server, type ServeOptions, serveError, type Transport } from "./model.ts";
 
 const isRoutePath = (path: string): path is `/${string}` => path.startsWith("/");
@@ -117,16 +120,31 @@ export const rpcServeStdio = (serialization: Serialization, group: Group, handle
   Effect.gen(function* () {
     const stdio = nativeStdio(yield* Effect.service(FlickStdio));
     if (stdio === undefined) return yield* Effect.die(new Error("`Rpc.serve_stdio` needs the `Stdio` of `Stdio.node`"));
-    const { rpcs, scope, handled } = yield* prepare(group, handlers);
     // the protocol interrupts the fiber that built it once stdin ends and stdout is written
-    const serving = Effect.scoped(
-      Effect.flatMap(Layer.build(RpcServer.layerProtocolStdio), (protocol) =>
-        RpcServer.make(rpcs).pipe(Effect.provideContext(handled), Effect.provideContext(protocol)),
-      ),
-    ).pipe(Effect.provideService(Stdio.Stdio, stdio), Effect.provide(serialization));
-    yield* Fiber.await(yield* Effect.forkChild(serving));
-    return yield* Scope.close(scope, Exit.void);
+    const layer = RpcServer.layerProtocolStdio.pipe(Layer.provide([Layer.succeed(Stdio.Stdio, stdio), serialization]));
+    return yield* serveOn(layer, group, handlers);
   });
+
+/**
+ * `Rpc.serve_node_worker group handlers`: the calls of the parent thread,
+ * answered until it closes this worker.
+ */
+export const rpcServeNodeWorker = (group: Group, handlers: Readonly<Record<string, Handler>>) =>
+  serveOn(RpcServer.layerProtocolWorkerRunner.pipe(Layer.provide(NodeWorkerRunner.layer), Layer.orDie), group, handlers);
+
+/**
+ * `Rpc.node_worker path args`: a connection to a worker thread running the
+ * script at `path` with `args`, whose `serve_node_worker` answers; the
+ * scope's end closes it.
+ */
+export const rpcNodeWorker = (path: string, args: ReadonlyArray<string>) =>
+  Effect.map(
+    Layer.build(
+      // shortcut: one worker per client; a pool size becomes a parameter when a program needs one
+      RpcClient.layerProtocolWorker({ size: 1 }).pipe(Layer.provide(NodeWorker.layer(() => new Worker(path, { argv: [...args] })))),
+    ),
+    (context): Client => ({ context }),
+  ).pipe(Effect.mapError((error) => clientError(`cannot start ${path}: ${error.message}`)));
 
 /**
  * The child of `command`, once it started: a failure to start, such as a
