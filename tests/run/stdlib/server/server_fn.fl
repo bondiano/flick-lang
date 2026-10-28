@@ -66,7 +66,8 @@ let main () =
           "{\"_tag\":\"Request\",\"id\":\"1\",\"tag\":\"App.Main.label\",\"payload\":[\"tea\",2],\"headers\":[]}\n"
         let request =
           Http.ClientRequest.body_text call (Some "application/ndjson")
-            (Http.ClientRequest.post (Http.Server.format_address (Http.Server.address server) ++ Server.path))
+            (Http.ClientRequest.post
+              (Http.Server.format_address (Http.Server.address server) ++ Server.path))
         let answer = Http.ClientResponse.text (Http.Client.execute request)
         Platform.stdout_line ("over HTTP: " ++ show (String.contains "tea x2" answer))
       }

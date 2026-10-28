@@ -48,7 +48,15 @@ let counts =
   Ui.view
     (fun () ->
       ui {
-        text ("orders " ++ shown orders ++ " stock " ++ shown stock ++ " latest " ++ shown latest ++ " both " ++ shown both)
+        text
+          ("orders "
+            ++ shown orders
+            ++ " stock "
+            ++ shown stock
+            ++ " latest "
+            ++ shown latest
+            ++ " both "
+            ++ shown both)
       })
 
 place : Bool ->{; Refused} Unit

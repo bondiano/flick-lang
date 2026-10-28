@@ -62,7 +62,8 @@ let page _ =
       (fun _ -> Ui.text "no price")
       (Ui.text "...")
       (fun () -> Ui.text (show count ++ " at " ++ show (Atom.ready priced)))
-  let chunks = provide Atom.layer { Stream.run_collect (Ui.Server.stream "app" (Ui.render shown ())) }
+  let chunks =
+    provide Atom.layer { Stream.run_collect (Ui.Server.stream "app" (Ui.render shown ())) }
   Http.ServerResponse.text (String.join "" chunks) Http.ServerResponse.defaults
 
 same : String -> String ->{} String

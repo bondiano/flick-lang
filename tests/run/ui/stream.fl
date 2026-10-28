@@ -44,7 +44,8 @@ user : Atom.Atom (Atom.Async String none)
 let user = Atom.serializable_task (Codec.json Schema.string) (Atom.task (task { later () }))
 
 stock : Atom.Atom (Atom.Async String none)
-let stock = Atom.serializable_task (Codec.json Schema.string) (Atom.query ["stock"] (task { later () }))
+let stock =
+  Atom.serializable_task (Codec.json Schema.string) (Atom.query ["stock"] (task { later () }))
 
 restocked : Unit ->{Atom.Write;} Unit
 let restocked = Atom.mutation ["stock"] (fun () -> ())
