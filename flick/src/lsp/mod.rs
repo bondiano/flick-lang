@@ -428,10 +428,38 @@ impl Server {
             self.snapshot = None;
         }
         if let Some(files) = self.published.remove(context) {
-            for file in files {
-                self.send(&publish(&file, &[]));
+            let others = self.release(files);
+            for open in others {
+                self.refresh(&open);
             }
         }
+    }
+
+    /// Empties the diagnostics of `files` no longer published for a context,
+    /// except those another live context also publishes: an open document of
+    /// each such context, whose analysis publishes them again.
+    fn release(&mut self, files: impl IntoIterator<Item = PathBuf>) -> Vec<PathBuf> {
+        let mut others = Vec::new();
+        for file in files {
+            let owner = self
+                .published
+                .iter()
+                .find(|(_, published)| published.contains(&file))
+                .map(|(context, _)| context.clone());
+            let open = owner.and_then(|owner| {
+                self.docs
+                    .keys()
+                    .find(|doc| Context::of(&self.docs, doc) == owner)
+                    .cloned()
+            });
+            match open {
+                Some(open) => others.push(open),
+                None => self.send(&publish(&file, &[])),
+            }
+        }
+        others.sort();
+        others.dedup();
+        others
     }
 
     /// Re-analyzes and publishes this context's diagnostics.
@@ -456,16 +484,14 @@ impl Server {
             by_file.entry(path.to_path_buf()).or_default();
         }
         let current: HashSet<_> = by_file.keys().cloned().collect();
-        let mut messages = Vec::new();
-        for stale in self
+        let stale: Vec<PathBuf> = self
             .published
-            .get(&snapshot.context)
+            .insert(snapshot.context.clone(), current)
             .into_iter()
             .flatten()
-            .filter(|file| !current.contains(*file))
-        {
-            messages.push(publish(stale, &[]));
-        }
+            .filter(|file| !by_file.contains_key(file))
+            .collect();
+        let mut messages = Vec::new();
         for (file, diagnostics) in &by_file {
             let list: Vec<Value> = diagnostics
                 .iter()
@@ -473,10 +499,16 @@ impl Server {
                 .collect();
             messages.push(publish(file, &list));
         }
-        self.published.insert(snapshot.context.clone(), current);
+        let context = snapshot.context.clone();
         self.snapshot = Some(snapshot);
         for m in messages {
             self.send(&m);
+        }
+        // another context still showing a stale file publishes it again, once
+        for open in self.release(stale) {
+            if Context::of(&self.docs, &open) != context {
+                self.refresh(&open);
+            }
         }
     }
 }

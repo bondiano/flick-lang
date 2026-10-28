@@ -357,3 +357,69 @@ fn project_aliases_share_identity_without_duplicate_modules() {
     assert_eq!(reports[0]["diagnostics"], json!([]));
     lsp.close();
 }
+
+#[test]
+fn closing_a_standalone_document_keeps_what_another_open_one_reports() {
+    let dir = project(
+        "lsp_standalone_overlap",
+        &[
+            (
+                "A.fl",
+                "module A exposing (twice)\n\nimport B\n\ntwice : Number\nlet twice = B.n\n",
+            ),
+            (
+                "B.fl",
+                "module B exposing (n)\n\nn : Number\nlet n = \"x\"\n",
+            ),
+            ("C.fl", "module C exposing (c)\n\nc : Number\nlet c = 1\n"),
+        ],
+    );
+    let (a, b, c) = (dir.join("A.fl"), dir.join("B.fl"), dir.join("C.fl"));
+    let mut lsp = Lsp::start(&dir);
+    let open = |lsp: &mut Lsp, path: &Path| {
+        let text = fs::read_to_string(path).expect("source");
+        lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(path), "languageId": "flick", "version": 1, "text": text } }));
+        lsp.publications()
+    };
+    // what a client shows for `path`: the last report for it
+    let shown = |reports: &[Value], path: &Path| -> Option<usize> {
+        reports
+            .iter()
+            .rev()
+            .find(|r| r["uri"] == uri(path))
+            .map(|r| r["diagnostics"].as_array().map_or(0, Vec::len))
+    };
+    open(&mut lsp, &a);
+    let reports = open(&mut lsp, &b);
+    assert!(shown(&reports, &b).is_some_and(|n| n > 0), "{reports:?}");
+    // a save of A analyzes its context again: B's error stays
+    lsp.notify(
+        "textDocument/didSave",
+        &json!({ "textDocument": { "uri": uri(&a) } }),
+    );
+    let reports = lsp.publications();
+    assert!(shown(&reports, &b).is_none_or(|n| n > 0), "{reports:?}");
+    // a context that shares nothing with B does not touch it
+    open(&mut lsp, &c);
+    lsp.notify(
+        "textDocument/didClose",
+        &json!({ "textDocument": { "uri": uri(&c) } }),
+    );
+    let reports = lsp.publications();
+    assert!(shown(&reports, &b).is_none_or(|n| n > 0), "{reports:?}");
+    // closing A leaves B open and erroneous
+    lsp.notify(
+        "textDocument/didClose",
+        &json!({ "textDocument": { "uri": uri(&a) } }),
+    );
+    let reports = lsp.publications();
+    assert!(shown(&reports, &b).is_none_or(|n| n > 0), "{reports:?}");
+    // the last owner gone, its errors go
+    lsp.notify(
+        "textDocument/didClose",
+        &json!({ "textDocument": { "uri": uri(&b) } }),
+    );
+    let reports = lsp.publications();
+    assert_eq!(shown(&reports, &b), Some(0), "{reports:?}");
+    lsp.close();
+}
