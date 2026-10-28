@@ -2,6 +2,7 @@
 //! with its rows, captures and constraints, never a TypeScript helper.
 
 use std::fmt::Write;
+use std::ptr;
 
 use super::{Ide, Symbol, Target, navigate::Source, tree};
 use crate::doc;
@@ -9,7 +10,7 @@ use crate::iface::{Entity, Namespace};
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Form, TypeDef, component_instance, show_type};
+use crate::types::{Form, Ref, TypeDef, component_instance, show_type};
 
 /// `node` as its source lays it out, one written line per line, its
 /// continuation lines dedented by the indentation of its first line.
@@ -28,6 +29,28 @@ fn as_written(node: &Node, text: &str) -> String {
         acc.push_str(line[cut.min(indent)..].trim_end());
         acc
     })
+}
+
+fn documentation(source: &Source, name: &str) -> Option<String> {
+    source
+        .tree
+        .nodes()
+        .filter(|n| n.kind == K::ClassDecl)
+        .find_map(|class| {
+            let members = class.nodes().find(|n| n.kind == K::Members)?;
+            let signature = members.nodes().find(|n| {
+                n.kind == K::Signature && tree::name_of(n, K::Ident, &source.text) == Some(name)
+            })?;
+            doc::leading_doc(members, signature, &source.text).or_else(|| {
+                // The first member's leading trivia precedes the Members node.
+                if ptr::eq(members.nodes().next()?, signature) {
+                    doc::leading_doc(class, members, &source.text)
+                } else {
+                    None
+                }
+            })
+        })
+        .or_else(|| doc::comments(&source.text).remove(name))
 }
 
 impl Ide<'_> {
@@ -298,7 +321,7 @@ impl Ide<'_> {
                         }
                     },
                 };
-                let doc = source.and_then(|source| doc::comments(&source.text).remove(&e.name));
+                let doc = source.and_then(|source| documentation(&source, &e.name));
                 let from = format!("from `{}`", e.module);
                 let note = doc.map_or(from.clone(), |d| format!("{d}\n\n{from}"));
                 match self.derived(file, range, &e.module, &e.name) {
@@ -331,10 +354,20 @@ impl Ide<'_> {
                 module,
                 instance,
                 method,
-            } => (
-                method.clone(),
-                Some(format!("from `instance {instance}` in `{module}`")),
-            ),
+            } => {
+                let m = self.module(file)?;
+                let (_, reference) = tree::innermost(m.typing.names.iter(), offset)?;
+                let Ref::Method { module: owner, .. } = reference else {
+                    return None;
+                };
+                let (_, ty) = tree::innermost(m.typing.types.iter(), offset)?;
+                let mut note = self
+                    .source(owner)
+                    .and_then(|source| documentation(&source, method))
+                    .map_or_else(String::new, |doc| format!("{doc}\n\n"));
+                let _ = write!(note, "from `instance {instance}` in `{module}`");
+                (format!("{method} : {}", show_type(ty)), Some(note))
+            }
         };
         let mut text = format!("```flick\n{code}\n```");
         if let Some(note) = note {

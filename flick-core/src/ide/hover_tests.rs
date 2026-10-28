@@ -240,3 +240,92 @@ let between _ = true
         "{markdown}"
     );
 }
+
+#[test]
+fn class_method_hover_keeps_types_and_docs_after_instance_selection() {
+    let classes = "module App.Classes exposing (MonadReader(..), MonadState(..))
+
+class MonadReader (m : Type -> Type) r | m -> r =
+  /// Reads the environment.
+  ask : m r
+
+class MonadState (m : Type -> Type) s | m -> s =
+  /// Reads the state.
+  get : m s
+  /// Replaces the state.
+  put : s -> m Unit
+";
+    let boxed = "module App.Box exposing (Box(..))
+
+import App.Classes exposing (MonadReader, MonadState)
+
+type Box a = Box a
+
+instance MonadReader Box String =
+  let ask = Box \"environment\"
+
+instance MonadState Box Number =
+  let get = Box 1
+  let put _ = Box ()
+";
+    let main = "module App.Main exposing (..)
+
+import App.Classes exposing (MonadState, ask, get, put)
+import App.Box exposing (Box)
+
+environment : Box String
+let environment = ask
+
+current : Box Number
+let current = get
+
+saved : Box Unit
+let saved = put 2
+
+generic : MonadState m s => m s
+let generic = get
+";
+    let f = fixture_of(&[
+        ("src/App/Classes.fl", classes),
+        ("src/App/Box.fl", boxed),
+        ("src/App/Main.fl", main),
+    ]);
+    let ide = f.ide();
+    assert!(
+        ide.analysis.diagnostics.iter().all(Diagnostic::unnecessary),
+        "{:?}",
+        ide.analysis.diagnostics
+    );
+    let file = f.file("App.Main");
+    for (name, nth, ty, docs, resolved) in [
+        ("ask", 1, "Box String", "Reads the environment.", true),
+        ("get", 1, "Box Number", "Reads the state.", true),
+        ("put", 1, "Number -> Box Unit", "Replaces the state.", true),
+        (
+            "get",
+            2,
+            "forall m s. MonadState m s => m s",
+            "Reads the state.",
+            false,
+        ),
+    ] {
+        let start = f.at("App.Main", name, nth);
+        let (markdown, range) = ide.hover(file, start + 1).expect("method hover");
+        assert!(markdown.contains(&format!("{name} : {ty}")), "{markdown}");
+        assert!(markdown.contains(docs), "{markdown}");
+        assert_eq!(
+            range,
+            (start, start + u32::try_from(name.len()).expect("small"))
+        );
+        if resolved {
+            assert!(markdown.contains("instance "), "{markdown}");
+            let (symbol, _) = ide.symbol_at(file, start + 1).expect("method symbol");
+            let definition = ide.definition(&symbol).expect("instance method definition");
+            assert_eq!(definition.target, Target::File(f.file("App.Box")));
+            assert_eq!(
+                definition.start,
+                f.at("App.Box", &format!("let {name}"), 0) + 4
+            );
+        }
+    }
+}
