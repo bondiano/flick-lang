@@ -13,7 +13,7 @@ const greeting = `module Lib.Greeting exposing (greet, badge, Visit, visits)
 
 import Lib.Names exposing (Badge(..))
 
-type alias Visit = { name : String; count : Number }
+type alias Visit = { name : String; count : Int }
 
 badge : String -> Badge
 let badge name = Badge name

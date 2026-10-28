@@ -52,7 +52,7 @@ const project = (dir) => {
   const shared = path.join(dir, "src/Shared.fl");
   const config = path.join(dir, "flick.toml");
   const settings = (labels, sourceDir = "src") => `schema-version = 1\n[project]\nkind = "lib"\nsource-dir = "${sourceDir}"\n[build]\nemit = "ts"\nlabels = "${labels}"\n`;
-  const answer = (n) => `module Shared exposing (answer)\n\nanswer : Number\nlet answer = ${n}\n`;
+  const answer = (n) => `module Shared exposing (answer)\n\nanswer : Int\nlet answer = ${n}\n`;
   writeFileSync(config, settings("none"));
   writeFileSync(shared, answer(1));
   writeFileSync(file, `module Ui.Widget exposing (answer, state)
@@ -60,10 +60,10 @@ const project = (dir) => {
 import Shared
 import Reactivity.Atom as Atom
 
-answer : Number
+answer : Int
 let answer = Shared.answer
 
-state : Atom.Writable Number
+state : Atom.Writable Int
 let state = Atom.state answer
 `);
   return { file, shared, config, settings, answer };
@@ -109,7 +109,7 @@ test("JS output follows project-wide source and configuration changes", async (t
   assert.notEqual(third.code, second.code);
   assert.deepEqual(await observed(third.code), { answer: 2, label: "Ui.Widget.state" });
   const added = path.join(dir, "src/Added.fl");
-  writeFileSync(added, "module Added exposing (answer)\n\nanswer : Number\nlet answer = 3\n");
+  writeFileSync(added, "module Added exposing (answer)\n\nanswer : Int\nlet answer = 3\n");
   const fourth = await load(plugin, file);
   assert.notEqual(fourth.code, third.code, "new files change the compiler's input identity");
   rmSync(added);
@@ -119,7 +119,7 @@ test("JS output follows project-wide source and configuration changes", async (t
 test("concurrent SSR/client loads share only the in-flight real compiler build", async (t) => {
   const dir = fixture(t, "single-flight");
   const file = path.join(dir, "Shared.fl");
-  writeFileSync(file, "module Shared exposing (answer)\n\nanswer : Number\nlet answer = 42\n");
+  writeFileSync(file, "module Shared exposing (answer)\n\nanswer : Int\nlet answer = 42\n");
   const log = path.join(dir, "calls");
   const compiler = path.join(dir, "flick");
   writeFileSync(compiler, `#!/usr/bin/env node
@@ -159,7 +159,7 @@ test("host build and dev profiles override project settings and respect an expli
     mkdirSync(root);
     writeFileSync(path.join(root, "flick.toml"), `schema-version = 1\n[project]\nkind = "lib"\nsource-dir = "."\n[build]\nprofile = "${configured}"\nlabels = "none"\n`);
     const file = path.join(root, "Profile.fl");
-    writeFileSync(file, "module Profile exposing (state)\n\nimport Reactivity.Atom as Atom\n\nstate : Atom.Writable Number\nlet state = Atom.state 1\n");
+    writeFileSync(file, "module Profile exposing (state)\n\nimport Reactivity.Atom as Atom\n\nstate : Atom.Writable Int\nlet state = Atom.state 1\n");
     const plugin = flickVite({ binary, profile });
     plugin.configResolved({ command, cacheDir: path.join(root, "cache") });
     const built = await imported((await load(plugin, file)).code);

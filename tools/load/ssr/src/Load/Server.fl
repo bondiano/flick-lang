@@ -13,7 +13,7 @@ import Http.ServerResponse exposing (ServerResponse)
 request : Atom.Writable String
 let request = Atom.make ""
 
-rows : List Number
+rows : List Int
 let rows = List.range 1 51
 
 page : Ui.View Unit

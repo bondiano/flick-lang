@@ -9,24 +9,24 @@ script : Unit ->{} String
 foreign sync script from "./worker.mjs" "script"
   arity 0
 
-type error NotFound = NotFound { id : Number }
+type error NotFound = NotFound { id : Float }
   deriving Schema
 
-double : Rpc.Rpc "double" (Number ->{r; NotFound} Number)
+double : Rpc.Rpc "double" (Float ->{r; NotFound} Float)
 let double =
   Rpc.make (Record.label : Record.Label "double")
     |> Rpc.with_payload (Codec.json Schema.number)
     |> Rpc.with_success (Codec.json Schema.number)
     |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema NotFound)))
 
-count_to : Rpc.Rpc "count_to" (Number ->{r;} Stream none none Number)
+count_to : Rpc.Rpc "count_to" (Float ->{r;} Stream none none Float)
 let count_to =
   Rpc.make (Record.label : Record.Label "count_to")
     |> Rpc.with_payload (Codec.json Schema.number)
     |> Rpc.with_stream (Codec.json Schema.number)
 
 type alias Handlers r =
-  { double : Number ->{r; NotFound} Number; count_to : Number ->{r;} Stream none none Number }
+  { double : Float ->{r; NotFound} Float; count_to : Float ->{r;} Stream none none Float }
 
 group : Rpc.Group r (Handlers r)
 let group = Rpc.group |> Rpc.add double |> Rpc.add count_to
@@ -35,7 +35,8 @@ handlers : Handlers none
 let handlers =
   {
     double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2;
-    count_to = fun n -> Stream.from_list (List.range 1 (n + 1));
+    count_to =
+      fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
   }
 
 serve : Unit ->{} Unit
