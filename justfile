@@ -37,6 +37,11 @@ lsp-bench file="examples/mtl/src/Mtl/StateT.fl" +positions="24:5":
     cargo build --release -p flick
     node tools/lsp-bench/index.mjs target/release/flick {{file}} {{positions}}
 
+# Hold the language server to a long open/edit/close session and print its resident memory (Linux)
+lsp-soak file="examples/mtl/src/Mtl/StateT.fl" cycles="400":
+    cargo build --release -p flick
+    node tools/lsp-bench/soak.mjs target/release/flick {{file}} {{cycles}}
+
 # Run SQL queries against PostgreSQL in Docker (after `just e2e` installs the runtime)
 e2e-postgres:
     cargo test -p flick --test sql_postgres -- --ignored

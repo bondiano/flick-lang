@@ -5,10 +5,11 @@
 //   node tools/lsp-bench/index.mjs <flick binary> <file.fl> <line:character>...
 //
 // Lines and characters are zero-based, as in LSP.
-import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+
+import { connect } from "./client.mjs";
 
 const [binary, file, ...positions] = process.argv.slice(2);
 if (!binary || !file || positions.length === 0) {
@@ -17,38 +18,8 @@ if (!binary || !file || positions.length === 0) {
 }
 const uri = pathToFileURL(resolve(file)).href;
 const text = readFileSync(file, "utf8");
-const server = spawn(binary, ["lsp", "--stdio"], { stdio: ["pipe", "pipe", "ignore"] });
-
-let buffer = Buffer.alloc(0);
-const waiting = [];
-server.stdout.on("data", (chunk) => {
-  buffer = Buffer.concat([buffer, chunk]);
-  for (;;) {
-    const end = buffer.indexOf("\r\n\r\n");
-    if (end < 0) return;
-    const length = Number(/content-length: *(\d+)/i.exec(buffer.subarray(0, end).toString())[1]);
-    if (buffer.length < end + 4 + length) return;
-    const message = JSON.parse(buffer.subarray(end + 4, end + 4 + length).toString());
-    buffer = buffer.subarray(end + 4 + length);
-    const i = waiting.findIndex((w) => w.matches(message));
-    if (i >= 0) waiting.splice(i, 1)[0].resolve(message);
-  }
-});
-
-const send = (message) => {
-  const body = JSON.stringify({ jsonrpc: "2.0", ...message });
-  server.stdin.write(`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
-};
-const expect = (matches) => new Promise((resolve) => waiting.push({ matches, resolve }));
-let id = 0;
-const request = (method, params) => {
-  const current = ++id;
-  const reply = expect((m) => m.id === current);
-  send({ id: current, method, params });
-  return reply;
-};
-const diagnostics = () =>
-  expect((m) => m.method === "textDocument/publishDiagnostics" && m.params.uri === uri);
+const { server, send, request, diagnostics: published } = connect(binary);
+const diagnostics = () => published(uri);
 const timed = async (label, work) => {
   const started = performance.now();
   const result = await work();
