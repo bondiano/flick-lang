@@ -142,12 +142,17 @@ const markupOf = (registry: AtomRegistry.AtomRegistry, container: string, ui: Ui
         // an error in a boundary after the shell fails the stream, as one in the shell does
         const react = await renderToReadableStream(tree, { onError: fail });
         send(entries(registry));
-        const reader = react.pipeThrough(new TextDecoderStream()).getReader();
+        // decoded here, not by a `TextDecoderStream`: closing one makes an error per response
+        const decoder = new TextDecoder();
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- React's stream is of bytes, typed `any`
+        const reader = (react as ReadableStream<Uint8Array>).getReader();
         for (;;) {
           // oxlint-disable-next-line eslint/no-await-in-loop -- chunks are read one after another
           const { done, value } = await reader.read();
-          if (done || failed) break;
-          out.enqueue(value);
+          if (failed) break;
+          const text = done ? decoder.decode() : decoder.decode(value, { stream: true });
+          if (text !== "") out.enqueue(text);
+          if (done) break;
         }
         if (!failed) out.close();
       } catch (error) {
