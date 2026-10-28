@@ -24,17 +24,17 @@ foreign pure predicate from "@flick-lang/runtime/effect/Schema" "flickMakeFilter
   reviewed "effect@4.0.5 sha256:7eab283772e9e378"
 
 /// At least `n` UTF-16 code units.
-min_length : Float -> Check String
+min_length : Int -> Check String
 foreign pure min_length from "@flick-lang/runtime/effect/Schema" "isMinLength"
   reviewed "effect@4.0.5 sha256:f1d7a04512c67b3e"
 
 /// At most `n` UTF-16 code units.
-max_length : Float -> Check String
+max_length : Int -> Check String
 foreign pure max_length from "@flick-lang/runtime/effect/Schema" "isMaxLength"
   reviewed "effect@4.0.5 sha256:24a60bba09eeaf98"
 
 /// Between `low` and `high` UTF-16 code units, inclusive.
-length_between : Float -> Float -> Check String
+length_between : Int -> Int -> Check String
 foreign pure length_between from "@flick-lang/runtime/effect/Schema" "isBetweenLength"
   reviewed "effect@4.0.5 sha256:3c385000227a76d5"
 
@@ -44,17 +44,17 @@ foreign pure non_empty from "@flick-lang/runtime/effect/Schema" "flickIsNonEmpty
   reviewed "effect@4.0.5 sha256:dd1c00c7ac8cd7c4"
 
 /// At least `n` code points.
-min_code_points : Float -> Check String
+min_code_points : Int -> Check String
 foreign pure min_code_points from "@flick-lang/runtime/effect/Schema" "isMinCodePoints"
   reviewed "effect@4.0.5 sha256:48921469629e24a9"
 
 /// At most `n` code points.
-max_code_points : Float -> Check String
+max_code_points : Int -> Check String
 foreign pure max_code_points from "@flick-lang/runtime/effect/Schema" "isMaxCodePoints"
   reviewed "effect@4.0.5 sha256:99e66dd2ec37f435"
 
 /// Between `low` and `high` code points, inclusive.
-code_points_between : Float -> Float -> Check String
+code_points_between : Int -> Int -> Check String
 foreign pure code_points_between from "@flick-lang/runtime/effect/Schema" "isBetweenCodePoints"
   reviewed "effect@4.0.5 sha256:f5ae99b4fba2c9fd"
 
@@ -105,7 +105,7 @@ foreign pure uncapitalized from "@flick-lang/runtime/effect/Schema" "flickIsUnca
   reviewed "effect@4.0.5 sha256:882ff1774bfbe675"
 
 /// A UUID, of the version given or of any.
-uuid : Option Float -> Check String
+uuid : Option Int -> Check String
 foreign pure uuid from "@flick-lang/runtime/effect/Schema" "isUUID"
   optional 0
   reviewed "effect@4.0.5 sha256:842233f83770db63"
@@ -303,12 +303,12 @@ foreign pure multiple_of_by from "@flick-lang/runtime/effect/Schema" "flickMakeI
   reviewed "effect@4.0.5 sha256:7341632612f22be7"
 
 /// At least `n` elements.
-min_items : Float -> Check (List a)
+min_items : Int -> Check (List a)
 foreign pure min_items from "@flick-lang/runtime/effect/Schema" "isMinLength"
   reviewed "effect@4.0.5 sha256:f1d7a04512c67b3e"
 
 /// At most `n` elements.
-max_items : Float -> Check (List a)
+max_items : Int -> Check (List a)
 foreign pure max_items from "@flick-lang/runtime/effect/Schema" "isMaxLength"
   reviewed "effect@4.0.5 sha256:24a60bba09eeaf98"
 
@@ -323,33 +323,33 @@ foreign pure unique_keys from "@flick-lang/runtime/effect/Schema" "flickIsUnique
   reviewed "effect@4.0.5 sha256:0c3e4dca300f2abb"
 
 /// A set of at least `n` elements.
-min_size : Float -> Check (HashSet.HashSet w a)
+min_size : Int -> Check (HashSet.HashSet w a)
 foreign pure min_size from "@flick-lang/runtime/effect/Schema" "flickIsMinSize"
   reviewed "effect@4.0.5 sha256:28eb708b257fc422"
 
 /// A set of at most `n` elements.
-max_size : Float -> Check (HashSet.HashSet w a)
+max_size : Int -> Check (HashSet.HashSet w a)
 foreign pure max_size from "@flick-lang/runtime/effect/Schema" "flickIsMaxSize"
   reviewed "effect@4.0.5 sha256:59f38203b45a8bef"
 
 /// A set of `low` to `high` elements, inclusive.
-size_between : Float -> Float -> Check (HashSet.HashSet w a)
+size_between : Int -> Int -> Check (HashSet.HashSet w a)
 foreign pure size_between from "@flick-lang/runtime/effect/Schema" "flickIsBetweenSize"
   reviewed "effect@4.0.5 sha256:46dcb2c6d6c788d6"
 
 /// At least `n` keys in the object of a `Codec.entries` codec.
-min_properties : Float -> PureCodec Json (List (String, v)) -> PureCodec Json (List (String, v))
+min_properties : Int -> PureCodec Json (List (String, v)) -> PureCodec Json (List (String, v))
 foreign pure min_properties from "@flick-lang/runtime/effect/Schema" "flickIsMinProperties"
   reviewed "effect@4.0.5 sha256:de473f1b0c84478c"
 
 /// At most `n` keys in the object of a `Codec.entries` codec.
-max_properties : Float -> PureCodec Json (List (String, v)) -> PureCodec Json (List (String, v))
+max_properties : Int -> PureCodec Json (List (String, v)) -> PureCodec Json (List (String, v))
 foreign pure max_properties from "@flick-lang/runtime/effect/Schema" "flickIsMaxProperties"
   reviewed "effect@4.0.5 sha256:0073940e582a44a2"
 
 /// `low` to `high` keys in the object of a `Codec.entries` codec.
-properties_between : Float ->
-  Float ->
+properties_between : Int ->
+  Int ->
   PureCodec Json (List (String, v)) ->
   PureCodec Json (List (String, v))
 foreign pure properties_between from "@flick-lang/runtime/effect/Schema" "flickIsBetweenProperties"

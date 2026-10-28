@@ -205,17 +205,17 @@ foreign pure hex_string from "@flick-lang/runtime/effect/Schema" "flickStringFro
 
 /// Bytes, each a whole number from 0 to 255, as base64 JSON text; encoding
 /// another number is a `SchemaError`.
-bytes_base64 : PureCodec Json (List Float)
+bytes_base64 : PureCodec Json (List Int)
 foreign pure bytes_base64 from "@flick-lang/runtime/effect/Schema" "flickBytesFromBase64"
   reviewed "effect@4.0.5 sha256:3ba856cf6e36bc12"
 
 /// Bytes as URL-safe base64 JSON text.
-bytes_base64url : PureCodec Json (List Float)
+bytes_base64url : PureCodec Json (List Int)
 foreign pure bytes_base64url from "@flick-lang/runtime/effect/Schema" "flickBytesFromBase64Url"
   reviewed "effect@4.0.5 sha256:bb23107359dfe500"
 
 /// Bytes as hexadecimal JSON text, `"0a0b"`.
-bytes_hex : PureCodec Json (List Float)
+bytes_hex : PureCodec Json (List Int)
 foreign pure bytes_hex from "@flick-lang/runtime/effect/Schema" "flickBytesFromHex"
   reviewed "effect@4.0.5 sha256:e355fc2b69a96c0e"
 

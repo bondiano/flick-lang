@@ -8,24 +8,26 @@ let line label value () = Platform.stdout_line (label ++ ": " ++ value)
 digit : Int -> String
 let digit n = String.slice n (n + 1) "0123456789abcdef"
 
-hex : List Float -> String
-let hex bytes =
-  String.join
-    ""
-    (List.map (fun b -> digit (Int.truncate (b / 16)) ++ digit (Int.truncate (b % 16))) bytes)
+hex : List Int -> String
+let hex bytes = String.join "" (List.map (fun b -> digit (b / 16) ++ digit (b % 16)) bytes)
 
 /// The bytes of ASCII text.
-ascii : String -> List Float
-let ascii text =
-  List.filter_map (fun c -> Option.map Int.to_float (String.char_code_at 0 c)) (String.chars text)
+ascii : String -> List Int
+let ascii text = List.filter_map (fun c -> String.char_code_at 0 c) (String.chars text)
 
 within : Float -> Float -> Float -> Bool
 let within low high n = n >= low && n <= high
 
+within_int : Int -> Int -> Int -> Bool
+let within_int low high n = n >= low && n <= high
+
 checks : Unit ->{Crypto.Crypto; Crypto.CryptoError} Unit
 let checks () =
   let bytes = Crypto.random_bytes 16
-  line "random_bytes" (show (List.length bytes) ++ " " ++ show (List.all (within 0 255) bytes)) ()
+  line
+    "random_bytes"
+    (show (List.length bytes) ++ " " ++ show (List.all (within_int 0 255) bytes))
+    ()
   let sha256 = Crypto.Sha256
   line "sha-256" (hex (Crypto.digest sha256 (ascii "abc"))) ()
   line "sha-1" (hex (Crypto.digest Crypto.Sha1 (ascii "abc"))) ()
@@ -40,13 +42,19 @@ let checks () =
   let i = Crypto.random_int ()
   line
     "random"
-    (show (within 0 1 r) ++ " " ++ show (b || not b) ++ " " ++ show (Float.is_safe_integer i))
+    (show (within 0 1 r)
+      ++ " "
+      ++ show (b || not b)
+      ++ " "
+      ++ show (Float.is_safe_integer (Int.to_float i)))
     ()
   let between = Crypto.random_between 5 6
   let die = Crypto.random_int_between 1 6
   line
     "between"
-    (show (within 5 6 between) ++ " " ++ show (within 1 6 die && Float.is_integer die))
+    (show (within 5 6 between)
+      ++ " "
+      ++ show (within_int 1 6 die && Float.is_integer (Int.to_float die)))
     ()
   line "shuffle" (show (List.sort (Crypto.random_shuffle [3, 1, 2]))) ()
   let v4 = Crypto.random_uuid_v4 ()

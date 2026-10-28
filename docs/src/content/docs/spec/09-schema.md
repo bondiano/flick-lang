@@ -281,7 +281,7 @@ Canonical Eq/Hash over the contents of a Ref are absent in the first version: a 
 
 ```flick
 class Eq a => Hash a =
-  hash : a -> Float
+  hash : a -> Int
 ```
 
 The law: if `eq x y`, the hashes coincide. The converse is false: collisions are allowed. Derived `Eq` and `Hash` must use the same semantics of fields. Typing a user-defined instance does not prove this law. [Effect Hash](https://effect.website/docs/v4/trait/hash).

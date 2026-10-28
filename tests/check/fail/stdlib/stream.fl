@@ -20,7 +20,7 @@ let broadcast source =
   }
 
 /// A stream whose callback holds a scoped value holds its region too.
-leaked : PubSub.PubSub Float ->{} Stream.Stream none none Float
+leaked : PubSub.PubSub Int ->{} Stream.Stream none none Int
 let leaked hub =
   scope {
     let sub = PubSub.subscribe hub

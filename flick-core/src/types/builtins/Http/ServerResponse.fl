@@ -13,7 +13,7 @@ type ServerResponse
 /// of its body; `defaults` sets none of them (status 200).
 type alias Options =
   {
-    status : Option Float;
+    status : Option Int;
     statusText : Option String;
     headers : Option Http.Headers.Input;
     cookies : Option Http.Cookies.Cookies;
@@ -37,7 +37,7 @@ foreign pure redirect from "@flick-lang/runtime/effect/http/HttpServerResponse" 
   reviewed "effect@4.0.5 sha256:d94c578f44354790"
 
 /// A body of the bytes.
-uint8_array : List Float -> Options -> ServerResponse
+uint8_array : List Int -> Options -> ServerResponse
 foreign pure uint8_array from "@flick-lang/runtime/effect/http/HttpServerResponse" "flickUint8Array"
   arity 2
   reviewed "effect@4.0.5 sha256:c3153f9d552b4137"
@@ -50,7 +50,7 @@ foreign pure text from "@flick-lang/runtime/effect/http/HttpServerResponse" "fli
 
 /// A body of the stream's chunks of bytes, sent as they come;
 /// `application/octet-stream` unless the options set a content type.
-stream : forall e. Stream none e (List Float) -> Options -> ServerResponse
+stream : forall e. Stream none e (List Int) -> Options -> ServerResponse
 foreign pure stream from "@flick-lang/runtime/effect/http/HttpServerResponse" "flickStream"
   arity 2
   reviewed "effect@4.0.5 sha256:261a610a1e39cd04"
@@ -89,7 +89,7 @@ foreign pure form_data from "@flick-lang/runtime/effect/http/HttpServerResponse"
   reviewed "effect@4.0.5 sha256:000e4376e0cacf03"
 
 /// The status code.
-status : ServerResponse -> Float
+status : ServerResponse -> Int
 foreign pure status from "@flick-lang/runtime/effect/http/HttpServerResponse" "flickStatus"
   reviewed "effect@4.0.5 sha256:21b98bd151affbd4"
 
@@ -188,7 +188,7 @@ foreign pure set_body from "@flick-lang/runtime/effect/http/HttpServerResponse" 
   reviewed "effect@4.0.5 sha256:b64802a31c2ba0d8"
 
 /// The status, and the status text if given.
-set_status : Float -> Option String -> ServerResponse -> ServerResponse
+set_status : Int -> Option String -> ServerResponse -> ServerResponse
 foreign pure set_status from "@flick-lang/runtime/effect/http/HttpServerResponse" "setStatus"
   arity 2
   optional 1

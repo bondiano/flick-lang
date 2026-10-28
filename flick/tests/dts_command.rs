@@ -452,7 +452,7 @@ fn streams_services_and_sync_exports_cross_into_effect_typescript() {
     fs::write(
         dir.join("src/Lib/Bridge.fl"),
         "module Lib.Bridge exposing (numbers, Greeter, greet, count, doubled)\n\n\
-         numbers : Stream.Stream none none Float\nlet numbers = Stream.range 1 3\n\n\
+         numbers : Stream.Stream none none Int\nlet numbers = Stream.range 1 3\n\n\
          service Greeter =\n  hello : String ->{} String\n\n\
          greet : String ->{Greeter;} String\nlet greet name = Greeter.hello name\n\n\
          count : Atom.Writable Float\nlet count = Atom.make 21\n\n\

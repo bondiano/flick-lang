@@ -44,7 +44,7 @@ let main () =
   let lengths =
     EqHash.with
       (fun a b -> String.length a == String.length b)
-      (fun s -> Int.to_float (String.length s))
+      (fun s -> String.length s)
       (fun w ->
         List.sort
           (HashSet.to_list (HashSet.map w (fun n -> String.repeat (Int.truncate n) "x") odd)))

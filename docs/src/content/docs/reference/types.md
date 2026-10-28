@@ -204,7 +204,15 @@ let mean xs = List.sum xs / Numeric.from_int (List.length xs)
 ```
 
 `List.sum` and `List.product` take any `Numeric`. Without the constraint,
-`x + 1` on a type variable is `FLICK-C001`.
+`x + 1` on a type variable is `FLICK-C001`. `< <= > >=` on a type variable
+with a numeric class use its `lt`, `le`, `gt`, `ge`, which mean what the
+operators mean on its type (NaN is unordered); with only `Ord a`, they
+compare by `compare`.
+
+Counts, sizes, indices, hashes and calendar parts are `Int` throughout the
+standard library (`List.length`, `HashMap.size`, `Hash.hash`, `Queue.size`,
+`Schedule.recurs`, the parts of a `DateTime`); milliseconds, epochs, byte
+sizes and measurements stay `Float`, as 32 bits do not hold them.
 
 ## Blocks
 

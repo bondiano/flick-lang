@@ -11,7 +11,7 @@ type Subscription (s : Region) a
 /// The bound of a hub: at most `capacity` messages not yet taken by every
 /// subscriber, and the last `replay` messages for a new subscriber
 /// (`None`: none).
-type alias Bounds = { capacity : Float; replay : Option Float }
+type alias Bounds = { capacity : Int; replay : Option Int }
 
 /// A hub whose `publish` waits while it is full.
 bounded : Bounds ->{} PubSub a
@@ -30,17 +30,17 @@ foreign effect sliding from "@flick-lang/runtime/effect/PubSub" "flickSliding"
 
 /// A hub without a bound, replaying the last `replay` messages to a new
 /// subscriber.
-unbounded : { replay : Option Float } ->{} PubSub a
+unbounded : { replay : Option Int } ->{} PubSub a
 foreign effect unbounded from "@flick-lang/runtime/effect/PubSub" "flickUnbounded"
   reviewed "effect@4.0.5 sha256:398cb9c12c4ab36a"
 
 /// The capacity of the hub.
-capacity : PubSub a -> Float
+capacity : PubSub a -> Int
 foreign pure capacity from "@flick-lang/runtime/effect/PubSub" "capacity"
   reviewed "effect@4.0.5 sha256:6136c6828646c64a"
 
 /// The number of messages not yet taken by every subscriber.
-size : PubSub a ->{} Float
+size : PubSub a ->{} Int
 foreign effect size from "@flick-lang/runtime/effect/PubSub" "size"
   reviewed "effect@4.0.5 sha256:529827bbc5a2cc78"
 
@@ -109,21 +109,21 @@ foreign effect take_all from "@flick-lang/runtime/effect/PubSub" "takeAll"
   reviewed "effect@4.0.5 sha256:c7dc5dc478fced97"
 
 /// At most `max` of the messages there are, without waiting.
-take_up_to : forall s a. Float -> Subscription s a ->{} List a
+take_up_to : forall s a. Int -> Subscription s a ->{} List a
 foreign effect take_up_to from "@flick-lang/runtime/effect/PubSub" "takeUpTo"
   arity 1
   retention call
   reviewed "effect@4.0.5 sha256:f29fc6302c5293f5"
 
 /// At least `min` and at most `max` messages, waiting for `min`.
-take_between : forall s a. Float -> Float -> Subscription s a ->{} List a
+take_between : forall s a. Int -> Int -> Subscription s a ->{} List a
 foreign effect take_between from "@flick-lang/runtime/effect/PubSub" "takeBetween"
   arity 2
   retention call
   reviewed "effect@4.0.5 sha256:42d1896fef0497f1"
 
 /// The number of messages waiting for the subscriber.
-remaining : forall s a. Subscription s a ->{} Float
+remaining : forall s a. Subscription s a ->{} Int
 foreign effect remaining from "@flick-lang/runtime/effect/PubSub" "remaining"
   retention call
   reviewed "effect@4.0.5 sha256:ce959e5af55fbdb8"

@@ -12,7 +12,7 @@ foreign effect run_collect from "@flick-lang/runtime/effect/Channel" "runCollect
   reviewed "effect@4.0.5 sha256:a579a781daa25c53"
 
 /// The number of elements.
-run_count : forall r e i o d c. (Channel r e i o d none Unit)^c ->{r; e} Float
+run_count : forall r e i o d c. (Channel r e i o d none Unit)^c ->{r; e} Int
 foreign effect run_count from "@flick-lang/runtime/effect/Channel" "runCount"
   retention call
   reviewed "effect@4.0.5 sha256:92bd1128b972ff79"
@@ -75,9 +75,9 @@ foreign effect run_for_each_while from "@flick-lang/runtime/effect/Channel" "run
 
 /// The bytes of all the chunks, concatenated.
 mk_uint8_array : forall r e i d c. (
-  Channel r e i (NonEmpty.NonEmpty (List Float)) d none Unit
+  Channel r e i (NonEmpty.NonEmpty (List Int)) d none Unit
 )^c ->{r; e}
-  List Float
+  List Int
 foreign effect mk_uint8_array from "@flick-lang/runtime/effect/Channel" "flickMkUint8Array"
   retention call
   reviewed "effect@4.0.5 sha256:55b163c5f42bdbee"
@@ -125,9 +125,9 @@ foreign effect to_queue_array from "@flick-lang/runtime/effect/Channel" "flickTo
 /// whether the hub shuts down when the channel ends.
 type alias HubOptions =
   {
-    capacity : Option Float;
+    capacity : Option Int;
     strategy : Option Queue.Strategy;
-    replay : Option Float;
+    replay : Option Int;
     shutdownOnEnd : Bool;
   }
 

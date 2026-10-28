@@ -78,3 +78,18 @@ export const flickMatchPair =
       onNanos: (a, b) => options.onNanos(a)(b),
       onInfinity: (a, b) => options.onInfinity(a)(b),
     });
+
+const saturate = (n: number): number => Math.min(Math.max(n, -0x80000000), 0x7fffffff);
+
+/** `Duration.parts` as Flick `Int`s: a part beyond 32 bits, as those of `infinity` are, saturates. */
+export const parts = (self: Duration.Duration): ReturnType<typeof Duration.parts> => {
+  const p = Duration.parts(self);
+  return {
+    days: saturate(p.days),
+    hours: saturate(p.hours),
+    minutes: saturate(p.minutes),
+    seconds: saturate(p.seconds),
+    millis: saturate(p.millis),
+    nanos: saturate(p.nanos),
+  };
+};

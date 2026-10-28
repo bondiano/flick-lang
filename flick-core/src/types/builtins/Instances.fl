@@ -8,7 +8,7 @@ foreign pure eq_prim from "@flick-lang/runtime" "equals"
 compare_prim : a -> a -> Ordering
 foreign pure compare_prim from "@flick-lang/runtime" "compare"
 
-hash_prim : a -> Float
+hash_prim : a -> Int
 foreign pure hash_prim from "@flick-lang/runtime" "hash"
 
 show_prim : a -> String
@@ -20,7 +20,7 @@ foreign pure eq_list from "@flick-lang/runtime" "listEquals"
 compare_list : (a -> a -> Ordering) -> List a -> List a -> Ordering
 foreign pure compare_list from "@flick-lang/runtime" "listCompare"
 
-hash_list : (a -> Float) -> List a -> Float
+hash_list : (a -> Int) -> List a -> Int
 foreign pure hash_list from "@flick-lang/runtime" "listHash"
 
 show_list : (a -> String) -> List a -> String
@@ -125,35 +125,35 @@ instance Ord a => Ord (Option a) =
     | _ -> GT
 
 instance Hash Int =
-  hash : Int -> Float
+  hash : Int -> Int
   let hash x = hash_prim x
 
 instance Hash Float =
-  hash : Float -> Float
+  hash : Float -> Int
   let hash x = hash_prim x
 
 instance Hash BigInt =
-  hash : BigInt -> Float
+  hash : BigInt -> Int
   let hash x = hash_prim x
 
 instance Hash String =
-  hash : String -> Float
+  hash : String -> Int
   let hash x = hash_prim x
 
 instance Hash Bool =
-  hash : Bool -> Float
+  hash : Bool -> Int
   let hash x = hash_prim x
 
 instance Hash Unit =
-  hash : Unit -> Float
+  hash : Unit -> Int
   let hash _x = 0
 
 instance Hash a => Hash (List a) =
-  hash : List a -> Float
+  hash : List a -> Int
   let hash xs = hash_list hash xs
 
 instance Hash a => Hash (Option a) =
-  hash : Option a -> Float
+  hash : Option a -> Int
   let hash x =
     match x with
     | Some a -> hash a
@@ -215,21 +215,21 @@ instance (Ord e, Ord a) => Ord (Result e a) =
     | _ -> GT
 
 instance (Hash e, Hash a) => Hash (Result e a) =
-  hash : Result e a -> Float
+  hash : Result e a -> Int
   let hash x =
     match x with
     | Ok a -> hash a
     | Err e -> 1 + hash e
 
 instance Hash Ordering =
-  hash : Ordering -> Float
+  hash : Ordering -> Int
   let hash x = hash_prim x
 
 instance Ord Ordering =
   compare : Ordering -> Ordering -> Ordering
   let compare x y = compare_prim (rank x) (rank y)
 
-rank : Ordering -> Float
+rank : Ordering -> Int
 let rank o =
   match o with
   | LT -> 0

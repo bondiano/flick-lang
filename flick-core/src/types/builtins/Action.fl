@@ -22,13 +22,13 @@ foreign pure latest from "@flick-lang/runtime/ui/react" "actionLatest"
 
 /// Runs events one by one, `capacity` of them waiting at most; an event
 /// that finds the queue full is rejected and reported to the supervisor.
-queue : forall c s. Float -> (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c -> (Action s)^c
+queue : forall c s. Int -> (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c -> (Action s)^c
 foreign pure queue from "@flick-lang/runtime/ui/react" "actionQueue"
   retention call
 
 /// Runs at most `limit` tasks at once; an event beyond that is rejected
 /// and reported to the supervisor.
-concurrent : forall c s. Float ->
+concurrent : forall c s. Int ->
   (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c ->
   (Action s)^c
 foreign pure concurrent from "@flick-lang/runtime/ui/react" "actionConcurrent"

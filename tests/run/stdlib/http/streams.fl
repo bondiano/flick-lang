@@ -9,7 +9,7 @@ import Http.ServerError exposing (HttpServerError)
 ok : Http.ServerResponse.Options
 let ok = Http.ServerResponse.defaults
 
-hello : Stream.Stream none none (List Float)
+hello : Stream.Stream none none (List Int)
 let hello = Stream.Platform.encode_text (Stream.from_list ["hel", "lo"])
 
 form_type : String

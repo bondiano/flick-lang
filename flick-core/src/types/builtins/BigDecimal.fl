@@ -231,7 +231,7 @@ instance Ord BigDecimal =
   let compare x y = compare_decimal x y
 
 instance Hash BigDecimal =
-  hash : BigDecimal -> Float
+  hash : BigDecimal -> Int
   let hash x = hash (to_string_normal x)
 
 instance Show BigDecimal =

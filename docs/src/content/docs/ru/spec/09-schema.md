@@ -291,7 +291,7 @@ let increment counter =
 
 ```flick
 class Eq a => Hash a =
-  hash : a -> Float
+  hash : a -> Int
 ```
 
 Закон: если `eq x y`, то хеши совпадают. Обратное неверно: коллизии допустимы. Автоматически построенные `Eq` и `Hash` должны одинаково трактовать поля. Проверка типов пользовательского экземпляра класса не доказывает этот закон. [Effect Hash](https://effect.website/docs/v4/trait/hash).

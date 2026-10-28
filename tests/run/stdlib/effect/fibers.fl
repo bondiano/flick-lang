@@ -2,7 +2,7 @@
 // `FiberHandle`, races, caching, the scheduler and execution plans.
 module App.Main exposing (main)
 
-type error Boom = Boom Float
+type error Boom = Boom Int
   deriving Show
 
 service Greeter =

@@ -3,7 +3,7 @@
 module App.StreamCaptures exposing (..)
 
 /// Each element plus the next value of a subscription.
-summed : PubSub.PubSub Float ->{} List Float
+summed : PubSub.PubSub Int ->{} List Int
 let summed hub =
   scope {
     let sub = PubSub.subscribe hub
@@ -11,7 +11,7 @@ let summed hub =
   }
 
 /// A pipeline of several builders over the same scoped value.
-filtered : PubSub.PubSub Float ->{} List Float
+filtered : PubSub.PubSub Int ->{} List Int
 let filtered hub =
   scope {
     let sub = PubSub.subscribe hub

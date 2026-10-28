@@ -42,7 +42,7 @@ foreign pure member from "@flick-lang/runtime" "hashSetMember"
   reviewed "effect@4.0.5 sha256:38bc7a908c24a15d"
 
 /// The number of elements.
-size : HashSet w a -> Float
+size : HashSet w a -> Int
 foreign pure size from "@flick-lang/runtime" "hashSetSize"
   reviewed "effect@4.0.5 sha256:baf9439a9d5ec5ce"
 

@@ -8,7 +8,7 @@ type HashRing a
 
 /// An empty ring identifying nodes by `key`; `baseWeight` (default 128) is
 /// the number of points a node of weight 1 takes on the ring.
-make : { baseWeight : Option Float } -> (a -> String) -> HashRing a
+make : { baseWeight : Option Int } -> (a -> String) -> HashRing a
 foreign pure make from "@flick-lang/runtime/effect/HashRing" "flickMake"
   reviewed "effect@4.0.5 sha256:b3f579cc8b7cb11f"
 
@@ -39,6 +39,6 @@ foreign pure get from "@flick-lang/runtime/effect/HashRing" "flickGet"
 
 /// The node of each of `count` shards, spread by weight; `None` for an
 /// empty ring.
-get_shards : Float -> HashRing a -> Option (List a)
+get_shards : Int -> HashRing a -> Option (List a)
 foreign pure get_shards from "@flick-lang/runtime/effect/HashRing" "flickGetShards"
   reviewed "effect@4.0.5 sha256:0511a769213f28e7"

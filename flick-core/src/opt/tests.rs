@@ -80,11 +80,11 @@ fn a_full_application_calls_the_worker_and_a_partial_one_keeps_the_closure() {
 fn a_canonical_instance_is_called_directly_and_a_witness_stays_chosen() {
     let js = release(
         "module App exposing (..)\n\n\
-         type Shape = Circle Float | Square Float\n\n\
+         type Shape = Circle Int | Square Int\n\n\
          instance Show Shape =\n  let show s =\n    match s with\n    | Circle _ -> \"circle\"\n    | Square _ -> \"square\"\n\n\
          label : Shape -> String\nlet label s = show s\n\n\
-         by_size : Shape -> Float\nlet by_size s =\n  match s with\n  | Circle r -> r\n  | Square r -> r\n\n\
-         count : List Shape -> Float\n\
+         by_size : Shape -> Int\nlet by_size s =\n  match s with\n  | Circle r -> r\n  | Square r -> r\n\n\
+         count : List Shape -> Int\n\
          let count shapes =\n  EqHash.with (fun a b -> by_size a == by_size b) by_size (fun witness ->\n    HashSet.size (HashSet.from_list witness shapes)\n  )\n",
     );
     assert!(

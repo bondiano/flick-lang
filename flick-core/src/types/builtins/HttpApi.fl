@@ -27,7 +27,7 @@ type ErrorCases (e : ErrorRow)
 /// An error that carries its own status: sent as `{ message }` with it.
 /// `http_error` declares it with a status for the document and the client;
 /// a handler fails with it only where an endpoint declares it.
-type error HttpError = HttpError { status : Float; message : String }
+type error HttpError = HttpError { status : Int; message : String }
   deriving Eq, Show, Schema
 
 /// How a client proves who it is: a scheme of the OpenAPI document, which
@@ -71,7 +71,7 @@ type error ServeError = ServeError String
 
 /// A request that could not be sent or a response that is neither the
 /// success nor a declared error; `status` is 0 when nothing came back.
-type error ClientError = ClientError { status : Float; message : String }
+type error ClientError = ClientError { status : Int; message : String }
   deriving Eq, Show
 
 /// An endpoint at `path` (`/users/:id`) with no parts yet: its handler takes
@@ -152,7 +152,7 @@ foreign pure with_form_payload from "@flick-lang/runtime/effect/http-api/HttpApi
 
 text_success :
   forall l p q h b r e s.
-  Float ->
+  Int ->
     PureCodec Json String ->
     Endpoint l (Request p q h b ->{r; e} s) ->
     Endpoint l (Request p q h b ->{r; e} String)
@@ -163,13 +163,13 @@ foreign pure text_success from "@flick-lang/runtime/effect/http-api/HttpApi" "ht
 /// The success as plain text, with its status.
 with_text_success :
   forall l p q h b r e s.
-  Float -> Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h b ->{r; e} String)
+  Int -> Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h b ->{r; e} String)
 let with_text_success status endpoint = text_success status (Codec.json Schema.string) endpoint
 
 /// The success: its status and its JSON body.
 with_success :
   forall l p q h b r e s s2.
-  Float ->
+  Int ->
     PureCodec Json s2 ->
     Endpoint l (Request p q h b ->{r; e} s) ->
     Endpoint l (Request p q h b ->{r; e} s2)
@@ -182,7 +182,7 @@ errors : ErrorCases none
 foreign pure errors from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiErrors"
 
 /// The cases and the error `t`, sent with this status and codec.
-error_case : forall t e. Float -> PureCodec Json t -> ErrorCases e -> ErrorCases {t | e}
+error_case : forall t e. Int -> PureCodec Json t -> ErrorCases e -> ErrorCases {t | e}
 foreign pure error_case from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiErrorCase"
   arity 3
   reviewed "effect@4.0.5 sha256:722ba5ecbebad307"
@@ -199,7 +199,7 @@ foreign pure with_errors from "@flick-lang/runtime/effect/http-api/HttpApi" "htt
   reviewed "effect@4.0.5 sha256:722ba5ecbebad307"
 
 /// The cases and `HttpError`s of this status, for the document and the client.
-http_error : forall e. Float -> ErrorCases e -> ErrorCases {HttpError | e}
+http_error : forall e. Int -> ErrorCases e -> ErrorCases {HttpError | e}
 let http_error status cases = error_case status (Codec.json (schema HttpError)) cases
 
 /// A bearer token in `Authorization`, under the scheme name `name`.
@@ -338,7 +338,7 @@ foreign pure openapi from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApi
 /// The body as bytes, `application/octet-stream`.
 with_bytes_payload :
   forall l p q h b r e s. Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h (List Float) ->{r; e} s)
+    Endpoint l (Request p q h (List Int) ->{r; e} s)
 foreign pure with_bytes_payload from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithBytesPayload"
   reviewed "effect@4.0.5 sha256:f68406c2b4703e1e"
 
@@ -370,9 +370,9 @@ foreign pure with_multipart_stream_payload from "@flick-lang/runtime/effect/http
 
 /// The success as bytes, with its status.
 with_bytes_success :
-  forall l p q h b r e s. Float ->
+  forall l p q h b r e s. Int ->
     Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b ->{r; e} List Float)
+    Endpoint l (Request p q h b ->{r; e} List Int)
 foreign pure with_bytes_success from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithBytesSuccess"
   arity 2
   reviewed "effect@4.0.5 sha256:f68406c2b4703e1e"
@@ -381,9 +381,9 @@ foreign pure with_bytes_success from "@flick-lang/runtime/effect/http-api/HttpAp
 /// whole body as one chunk.
 with_stream_success :
   forall l p q h b r e s.
-  Float ->
+  Int ->
     Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b ->{r; e} Stream none none (List Float))
+    Endpoint l (Request p q h b ->{r; e} Stream none none (List Int))
 foreign pure with_stream_success from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithStreamSuccess"
   arity 2
   reviewed "effect@4.0.5 sha256:98b0f8d5ab912444"
@@ -392,7 +392,7 @@ foreign pure with_stream_success from "@flick-lang/runtime/effect/http-api/HttpA
 /// client reads the events of the whole body.
 with_sse_success :
   forall l p q h b r e s a.
-  Float ->
+  Int ->
     PureCodec Json a ->
     Endpoint l (Request p q h b ->{r; e} s) ->
     Endpoint l (Request p q h b ->{r; e} Stream none none a)
@@ -406,7 +406,7 @@ type alias SseEvent = { id : Option String; event : String; data : String }
 /// The success as Server-Sent Events of the elements.
 with_sse_events_success :
   forall l p q h b r e s.
-  Float ->
+  Int ->
     Endpoint l (Request p q h b ->{r; e} s) ->
     Endpoint l (Request p q h b ->{r; e} Stream none none SseEvent)
 foreign pure with_sse_events_success from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithSseEventsSuccess"

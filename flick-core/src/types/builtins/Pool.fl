@@ -18,8 +18,8 @@ make :
   forall s r e a.
   {
     acquire : Eff r e a;
-    size : Float;
-    concurrency : Option Float;
+    size : Int;
+    concurrency : Option Int;
     targetUtilization : Option Float;
   } ->{Scope s | r;}
   Pool s e a
@@ -32,9 +32,9 @@ make_with_ttl :
   forall s r e a.
   {
     acquire : Eff r e a;
-    min : Float;
-    max : Float;
-    concurrency : Option Float;
+    min : Int;
+    max : Int;
+    concurrency : Option Int;
     targetUtilization : Option Float;
     timeToLive : Duration.Duration;
     timeToLiveStrategy : Option TimeToLiveStrategy;

@@ -11,8 +11,8 @@ type Prompt a
 service Tty =
   read_key : Unit ->{; Terminal.QuitError} Terminal.UserInput
   display : String ->{} Unit
-  columns : Unit ->{} Float
-  rows : Unit ->{} Float
+  columns : Unit ->{} Int
+  rows : Unit ->{} Int
 
 node_of : ServiceTag {Tty} -> Layer none none {Tty}
 foreign pure node_of from "@flick-lang/runtime/cli" "promptNode"
@@ -105,16 +105,16 @@ foreign pure list from "@flick-lang/runtime/cli" "promptList"
 type alias IntOptions =
   {
     message : String;
-    default : Option Float;
-    min : Option Float;
-    max : Option Float;
-    incrementBy : Option Float;
-    decrementBy : Option Float;
-    validate : Option (Float -> Result String Float);
+    default : Option Int;
+    min : Option Int;
+    max : Option Int;
+    incrementBy : Option Int;
+    decrementBy : Option Int;
+    validate : Option (Int -> Result String Int);
   }
 
 /// An integer.
-int : IntOptions -> Prompt Float
+int : IntOptions -> Prompt Int
 foreign pure int from "@flick-lang/runtime/cli" "promptInt"
   reviewed "effect@4.0.5 sha256:85daa1430ff41c31"
 
@@ -128,7 +128,7 @@ type alias NumberOptions =
     incrementBy : Option Float;
     decrementBy : Option Float;
     validate : Option (Float -> Result String Float);
-    precision : Option Float;
+    precision : Option Int;
   }
 
 /// A number with a fractional part.
@@ -200,7 +200,7 @@ type alias FileOptions =
     message : Option String;
     startingPath : Option String;
     default : Option String;
-    maxPerPage : Option Float;
+    maxPerPage : Option Int;
     filter : Option (String -> Bool);
   }
 
@@ -215,7 +215,7 @@ type alias SelectChoice a =
 
 /// A selection among `choices`, `maxPerPage` at a time.
 type alias SelectOptions a =
-  { message : Option String; choices : List (SelectChoice a); maxPerPage : Option Float }
+  { message : Option String; choices : List (SelectChoice a); maxPerPage : Option Int }
 
 /// One of the choices, moved to with the arrow keys.
 select : SelectOptions a -> Prompt a
@@ -227,7 +227,7 @@ type alias AutoCompleteOptions a =
   {
     message : String;
     choices : List (SelectChoice a);
-    maxPerPage : Option Float;
+    maxPerPage : Option Int;
     filterLabel : Option String;
     filterPlaceholder : Option String;
     emptyMessage : Option String;
@@ -244,8 +244,8 @@ type alias MultiSelectOptions =
     selectAll : Option String;
     selectNone : Option String;
     inverseSelection : Option String;
-    min : Option Float;
-    max : Option Float;
+    min : Option Int;
+    max : Option Int;
   }
 
 /// Any of the choices, toggled with space.

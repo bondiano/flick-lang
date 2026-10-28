@@ -129,7 +129,7 @@ foreign pure filter_or_fail from "@flick-lang/runtime/effect/http/HttpClient" "f
   reviewed "effect@4.0.5 sha256:c16573096365ba37"
 
 /// The client failing with a `StatusCodeError` for a status `f` refuses.
-filter_status : (Float -> Bool) -> Client r e -> Client r (e + {HttpClientError})
+filter_status : (Int -> Bool) -> Client r e -> Client r (e + {HttpClientError})
 foreign pure filter_status from "@flick-lang/runtime/effect/http/HttpClient" "flickFilterStatus"
   arity 2
   reviewed "effect@4.0.5 sha256:cc30e67e212b858c"
@@ -177,7 +177,7 @@ foreign pure retry from "@flick-lang/runtime/effect/http/HttpClient" "retry"
 /// The client sending a request again, at most `times` more times, after a
 /// transport failure or a response of a transient status; a `Retry-After`
 /// header delays the next try.
-retry_transient : RetryOn -> Float -> Client r e -> Client r e
+retry_transient : RetryOn -> Int -> Client r e -> Client r e
 foreign pure retry_transient from "@flick-lang/runtime/effect/http/HttpClient" "flickRetryTransient"
   arity 3
   reviewed "effect@4.0.5 sha256:791853420f219777"
@@ -215,7 +215,7 @@ foreign pure with_scope from "@flick-lang/runtime/effect/http/HttpClient" "withS
   reviewed "effect@4.0.5 sha256:d35002632b8689ef"
 
 /// The client following redirects, at most the number or 10 times.
-follow_redirects : Option Float -> Client r e -> Client r e
+follow_redirects : Option Int -> Client r e -> Client r e
 foreign pure follow_redirects from "@flick-lang/runtime/effect/http/HttpClient" "followRedirects"
   arity 1
   optional 0

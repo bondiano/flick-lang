@@ -28,7 +28,7 @@ foreign pure maximum_bipartite_matching from "@flick-lang/runtime/effect/Graph" 
 
 /// The number of edges from `source` to each node it reaches.
 unweighted_distances :
-  NodeIndex -> ReachabilityConfig -> Graph n e k -> Result GraphError (List (NodeIndex, Float))
+  NodeIndex -> ReachabilityConfig -> Graph n e k -> Result GraphError (List (NodeIndex, Int))
 foreign pure unweighted_distances from "@flick-lang/runtime/effect/Graph" "flickUnweightedDistances"
   reviewed "effect@4.0.5 sha256:ed62d3ebcccaf514"
 

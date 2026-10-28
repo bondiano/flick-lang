@@ -12,22 +12,22 @@ type Strategy = Suspend | Dropping | Sliding
 
 /// A queue of `capacity` messages (`None`: unbounded) with the strategy
 /// for a full queue (`None`: `Suspend`).
-make : { capacity : Option Float; strategy : Option Strategy } ->{} Queue e a
+make : { capacity : Option Int; strategy : Option Strategy } ->{} Queue e a
 foreign effect make from "@flick-lang/runtime/effect/Queue" "flickMake"
   reviewed "effect@4.0.5 sha256:009d8cb446c6e86d"
 
 /// A queue of `capacity` messages whose `offer` waits for room.
-bounded : Float ->{} Queue e a
+bounded : Int ->{} Queue e a
 foreign effect bounded from "@flick-lang/runtime/effect/Queue" "bounded"
   reviewed "effect@4.0.5 sha256:d7c89540c619f6b3"
 
 /// A queue of `capacity` messages that drops the oldest to make room.
-sliding : Float ->{} Queue e a
+sliding : Int ->{} Queue e a
 foreign effect sliding from "@flick-lang/runtime/effect/Queue" "sliding"
   reviewed "effect@4.0.5 sha256:3236daafd99c18df"
 
 /// A queue of `capacity` messages that drops new ones while full.
-dropping : Float ->{} Queue e a
+dropping : Int ->{} Queue e a
 foreign effect dropping from "@flick-lang/runtime/effect/Queue" "dropping"
   reviewed "effect@4.0.5 sha256:e8890cc4127ac82e"
 
@@ -99,13 +99,13 @@ foreign effect collect from "@flick-lang/runtime/effect/Queue" "collect"
 
 /// Takes `n` messages, waiting for them, or what is left of an ended
 /// queue; `None` once it is empty.
-take_n : Float -> Queue e a ->{; e} Option (List a)
+take_n : Int -> Queue e a ->{; e} Option (List a)
 foreign effect take_n from "@flick-lang/runtime/effect/Queue" "flickTakeN"
   arity 1
   reviewed "effect@4.0.5 sha256:9738231cc25a25cf"
 
 /// Takes at least `min` and at most `max` messages, as `take_n` does.
-take_between : Float -> Float -> Queue e a ->{; e} Option (List a)
+take_between : Int -> Int -> Queue e a ->{; e} Option (List a)
 foreign effect take_between from "@flick-lang/runtime/effect/Queue" "flickTakeBetween"
   arity 2
   reviewed "effect@4.0.5 sha256:171bd6b4aaaa6bb8"
@@ -139,7 +139,7 @@ foreign effect await_ from "@flick-lang/runtime/effect/Queue" "await"
   reviewed "effect@4.0.5 sha256:6d927f44cb6bdc97"
 
 /// The number of messages in the queue.
-size : Queue e a ->{} Float
+size : Queue e a ->{} Int
 foreign effect size from "@flick-lang/runtime/effect/Queue" "size"
   reviewed "effect@4.0.5 sha256:a649f69a2297e842"
 

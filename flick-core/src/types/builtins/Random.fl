@@ -15,8 +15,8 @@ foreign effect next_boolean from "@flick-lang/runtime/effect/Random" "flickNextB
   arity 0
   reviewed "effect@4.0.5 sha256:a67565a1f6dd2738"
 
-/// A safe integer.
-next_int : Unit ->{} Float
+/// An `Int`, over its whole 32-bit range.
+next_int : Unit ->{} Int
 foreign effect next_int from "@flick-lang/runtime/effect/Random" "flickNextInt"
   arity 0
   reviewed "effect@4.0.5 sha256:1a7a2fb0fb70f2ba"
@@ -27,7 +27,7 @@ foreign effect next_between from "@flick-lang/runtime/effect/Random" "nextBetwee
   reviewed "effect@4.0.5 sha256:aa6a35c1f1be26d2"
 
 /// An integer in [min, max], or [min, max) with `halfOpen`.
-next_int_between : { halfOpen : Option Bool } -> Float -> Float ->{} Float
+next_int_between : { halfOpen : Option Bool } -> Int -> Int ->{} Int
 foreign effect next_int_between from "@flick-lang/runtime/effect/Random" "flickNextIntBetween"
   reviewed "effect@4.0.5 sha256:f366445a68ad45fc"
 

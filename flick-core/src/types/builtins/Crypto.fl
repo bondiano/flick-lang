@@ -29,24 +29,24 @@ type DigestAlgorithm = Sha1 | Sha256 | Sha384 | Sha512
 
 /// Cryptographically strong randomness and digests.
 service Crypto =
-  random_bytes : Float ->{; CryptoError} List Float
-  digest : DigestAlgorithm -> List Float ->{; CryptoError} List Float
+  random_bytes : Int ->{; CryptoError} List Int
+  digest : DigestAlgorithm -> List Int ->{; CryptoError} List Int
   random : Unit ->{} Float
   random_boolean : Unit ->{} Bool
-  random_int : Unit ->{} Float
+  random_int : Unit ->{} Int
   random_between : Float -> Float ->{} Float
-  random_int_between : Float -> Float ->{} Float
+  random_int_between : Int -> Int ->{} Int
   random_shuffle : forall a. List a ->{} List a
   random_uuid_v4 : Unit ->{; CryptoError} String
   random_uuid_v7 : Unit ->{; CryptoError} String
   random_ulid : Unit ->{; CryptoError} String
 
-/// `size` random bytes; the size must be a non-negative safe integer.
-random_bytes : Float ->{Crypto; CryptoError} List Float
+/// `size` random bytes; the size must not be negative.
+random_bytes : Int ->{Crypto; CryptoError} List Int
 let random_bytes size = Crypto.random_bytes size
 
 /// The digest of the bytes by the algorithm.
-digest : DigestAlgorithm -> List Float ->{Crypto; CryptoError} List Float
+digest : DigestAlgorithm -> List Int ->{Crypto; CryptoError} List Int
 let digest algorithm data = Crypto.digest algorithm data
 
 /// A random number from 0 up to 1.
@@ -57,8 +57,8 @@ let random () = Crypto.random ()
 random_boolean : Unit ->{Crypto;} Bool
 let random_boolean () = Crypto.random_boolean ()
 
-/// A random safe integer.
-random_int : Unit ->{Crypto;} Float
+/// A random `Int`, over its whole 32-bit range.
+random_int : Unit ->{Crypto;} Int
 let random_int () = Crypto.random_int ()
 
 /// A random number from `min` up to `max`.
@@ -66,7 +66,7 @@ random_between : Float -> Float ->{Crypto;} Float
 let random_between min max = Crypto.random_between min max
 
 /// A random integer from `min` to `max`, both included.
-random_int_between : Float -> Float ->{Crypto;} Float
+random_int_between : Int -> Int ->{Crypto;} Int
 let random_int_between min max = Crypto.random_int_between min max
 
 /// The list in a random order.
@@ -85,10 +85,10 @@ let random_uuid_v7 () = Crypto.random_uuid_v7 ()
 random_ulid : Unit ->{Crypto; CryptoError} String
 let random_ulid () = Crypto.random_ulid ()
 
-system_random_bytes : Float ->{; CryptoError} List Float
+system_random_bytes : Int ->{; CryptoError} List Int
 foreign effect system_random_bytes from "@flick-lang/runtime/effect/Crypto" "flickRandomBytes"
 
-system_digest : DigestAlgorithm -> List Float ->{; CryptoError} List Float
+system_digest : DigestAlgorithm -> List Int ->{; CryptoError} List Int
 foreign effect system_digest from "@flick-lang/runtime/effect/Crypto" "flickDigest"
 
 system_random : Unit ->{} Float
@@ -99,14 +99,14 @@ system_random_boolean : Unit ->{} Bool
 foreign effect system_random_boolean from "@flick-lang/runtime/effect/Crypto" "flickRandomBoolean"
   arity 0
 
-system_random_int : Unit ->{} Float
+system_random_int : Unit ->{} Int
 foreign effect system_random_int from "@flick-lang/runtime/effect/Crypto" "flickRandomInt"
   arity 0
 
 system_random_between : Float -> Float ->{} Float
 foreign effect system_random_between from "@flick-lang/runtime/effect/Crypto" "flickRandomBetween"
 
-system_random_int_between : Float -> Float ->{} Float
+system_random_int_between : Int -> Int ->{} Int
 foreign effect system_random_int_between from "@flick-lang/runtime/effect/Crypto" "flickRandomIntBetween"
 
 system_random_shuffle : List a ->{} List a

@@ -199,7 +199,22 @@ const intOptions = (o: FlickInt): Prompt.IntOptions => ({
   ...check(o.validate),
 });
 
-export const promptInt = (o: FlickInt) => Prompt.Int(intOptions(o));
+/** `Cli.Prompt.int`: the bounds default to those of Flick's 32-bit `Int` and hold before `validate` runs. */
+export const promptInt = (o: FlickInt) => {
+  const min = Option.getOrElse(o.min, () => -0x80000000);
+  const max = Option.getOrElse(o.max, () => 0x7fffffff);
+  const validate = Option.getOrUndefined(o.validate);
+  return Prompt.Int({
+    ...intOptions(o),
+    min,
+    max,
+    validate: (n) => {
+      if (n < min) return Effect.fail(`${n} must be greater than or equal to ${min}`);
+      if (n > max) return Effect.fail(`${n} must be less than or equal to ${max}`);
+      return validate === undefined ? Effect.succeed(n) : effectOf(validate(n));
+    },
+  });
+};
 export const promptNumber = (o: FlickInt & { readonly precision: Opt<number> }) =>
   Prompt.Number({ ...intOptions(o), ...some("precision", o.precision) });
 

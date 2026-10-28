@@ -26,7 +26,7 @@ foreign pure empty from "@flick-lang/runtime/effect/http/HttpBody" "empty"
   reviewed "effect@4.0.5 sha256:23013c68fed14abf"
 
 /// The bytes, of the content type or `application/octet-stream`.
-uint8_array : List Float -> Option String -> Body
+uint8_array : List Int -> Option String -> Body
 foreign pure uint8_array from "@flick-lang/runtime/effect/http/HttpBody" "flickUint8Array"
   arity 2
   reviewed "effect@4.0.5 sha256:4503999043e25898"
@@ -79,7 +79,7 @@ foreign pure to_text from "@flick-lang/runtime/effect/http/HttpBody" "flickToTex
 
 /// The chunks of bytes of the stream, of the content type or
 /// `application/octet-stream`, and of the length if it is known.
-stream : forall e. Stream none e (List Float) -> Option String -> Option Float -> Body
+stream : forall e. Stream none e (List Int) -> Option String -> Option Float -> Body
 foreign pure stream from "@flick-lang/runtime/effect/http/HttpBody" "flickStream"
   arity 3
   reviewed "effect@4.0.5 sha256:52e3ba8e5568e864"

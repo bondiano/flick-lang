@@ -13,11 +13,11 @@ type Step (p : ServiceRow) (r : ServiceRow) (e : ErrorRow) i
 
 /// Which attempt of the plan runs: counted from 1, and the index of its
 /// step from 0.
-type alias Metadata = { attempt : Float; stepIndex : Float }
+type alias Metadata = { attempt : Int; stepIndex : Int }
 
 /// An attempt of the plan: counted from 1 overall and within its step, and
 /// the index of its step from 0.
-type alias Attempt = { attempt : Float; stepAttempt : Float; stepIndex : Float }
+type alias Attempt = { attempt : Int; stepAttempt : Int; stepIndex : Int }
 
 /// What happens while a plan runs a task: an attempt starts, succeeds after
 /// a duration, or fails after a duration with a failure of the task.
@@ -31,7 +31,7 @@ step : Layer r e p -> Step p r e i
 foreign pure step from "@flick-lang/runtime/effect/ExecutionPlan" "flickStep"
 
 /// The step tried up to `n` times.
-with_attempts : Float -> Step p r e i -> Step p r e i
+with_attempts : Int -> Step p r e i -> Step p r e i
 foreign pure with_attempts from "@flick-lang/runtime/effect/ExecutionPlan" "flickWithAttempts"
   arity 1
 

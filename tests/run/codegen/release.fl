@@ -35,11 +35,11 @@ let size_of s =
   | Circle r -> r
   | Square r -> r
 
-distinct : List Shape -> (Float, Float)
+distinct : List Shape -> (Int, Int)
 let distinct shapes =
   let canonical = HashSet.size (HashSet.from_list EqHash.canonical shapes)
   let by_size =
-    EqHash.with (fun a b -> size_of a == size_of b) size_of (fun witness ->
+    EqHash.with (fun a b -> size_of a == size_of b) (fun s -> hash (size_of s)) (fun witness ->
       HashSet.size (HashSet.from_list witness shapes)
     )
   (canonical, by_size)

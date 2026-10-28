@@ -84,7 +84,7 @@ foreign pure flatten_array from "@flick-lang/runtime/effect/Channel" "flattenArr
 /// (`None`: all), buffering `bufferSize` elements (`None`: Effect's
 /// default); with `switch`, a new channel beyond the limit interrupts the
 /// oldest.
-type alias MergeOptions = { concurrency : Option Float; bufferSize : Option Float; switch : Bool }
+type alias MergeOptions = { concurrency : Option Int; bufferSize : Option Int; switch : Bool }
 
 /// The elements of the channels the channel emits, run concurrently.
 merge_all :
@@ -251,13 +251,13 @@ foreign pure split_lines from "@flick-lang/runtime/effect/Channel" "splitLines"
 /// Decodes chunks of bytes (numbers from 0 to 255) as text in the
 /// encoding, such as `"utf-8"`.
 decode_text : String ->
-  Channel none e (NonEmpty.NonEmpty (List Float)) (NonEmpty.NonEmpty String) d e d
+  Channel none e (NonEmpty.NonEmpty (List Int)) (NonEmpty.NonEmpty String) d e d
 foreign pure decode_text from "@flick-lang/runtime/effect/Channel" "flickDecodeText"
   reviewed "effect@4.0.5 sha256:cd214c5b67f6a503"
 
 /// Encodes chunks of text as UTF-8 bytes.
 encode_text : Unit ->
-  Channel none e (NonEmpty.NonEmpty String) (NonEmpty.NonEmpty (List Float)) d e d
+  Channel none e (NonEmpty.NonEmpty String) (NonEmpty.NonEmpty (List Int)) d e d
 foreign pure encode_text from "@flick-lang/runtime/effect/Channel" "flickEncodeText"
   arity 0
   reviewed "effect@4.0.5 sha256:5757f49f7bab9a06"

@@ -32,6 +32,7 @@ type Defs = Map<string, JsonSchema | null>;
 /** The JSON Schema keywords of the checks the exporter knows. */
 const KNOWN: Readonly<Record<string, JsonSchema>> = {
   email: { format: "email" },
+  int: { type: "integer", minimum: -0x80000000, maximum: 0x7fffffff },
   non_empty: { minLength: 1 },
   positive: { exclusiveMinimum: 0 },
 };

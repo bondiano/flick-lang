@@ -10,7 +10,7 @@ type TxQueue a (e : ErrorRow)
 
 /// A new queue of at most `capacity` elements; an offer to a full one
 /// waits.
-bounded : Float ->{} TxQueue a e
+bounded : Int ->{} TxQueue a e
 foreign effect bounded from "@flick-lang/runtime/effect/TxQueue" "bounded"
   reviewed "effect@4.0.5 sha256:c064fa0cd99fd61c"
 
@@ -22,13 +22,13 @@ foreign effect unbounded from "@flick-lang/runtime/effect/TxQueue" "unbounded"
 
 /// A new queue of at most `capacity` elements; an offer to a full one
 /// drops the new element.
-dropping : Float ->{} TxQueue a e
+dropping : Int ->{} TxQueue a e
 foreign effect dropping from "@flick-lang/runtime/effect/TxQueue" "dropping"
   reviewed "effect@4.0.5 sha256:15171b76e7f8b0c8"
 
 /// A new queue of at most `capacity` elements; an offer to a full one
 /// drops the oldest element.
-sliding : Float ->{} TxQueue a e
+sliding : Int ->{} TxQueue a e
 foreign effect sliding from "@flick-lang/runtime/effect/TxQueue" "sliding"
   reviewed "effect@4.0.5 sha256:cb3e0a001ce280e2"
 
@@ -62,13 +62,13 @@ foreign effect take_all from "@flick-lang/runtime/effect/TxQueue" "takeAll"
   reviewed "effect@4.0.5 sha256:4308b512040656d0"
 
 /// Removes `n` elements, waiting for them.
-take_n : Float -> TxQueue a e ->{Tx.Transaction; e} List a
+take_n : Int -> TxQueue a e ->{Tx.Transaction; e} List a
 foreign effect take_n from "@flick-lang/runtime/effect/TxQueue" "takeN"
   arity 1
   reviewed "effect@4.0.5 sha256:d3ca973702ca1dfd"
 
 /// Removes at least `min` and at most `max` elements, waiting for `min`.
-take_between : Float -> Float -> TxQueue a e ->{Tx.Transaction; e} List a
+take_between : Int -> Int -> TxQueue a e ->{Tx.Transaction; e} List a
 foreign effect take_between from "@flick-lang/runtime/effect/TxQueue" "takeBetween"
   arity 2
   reviewed "effect@4.0.5 sha256:d937babda2d00f7d"
@@ -79,7 +79,7 @@ foreign effect peek from "@flick-lang/runtime/effect/TxQueue" "peek"
   reviewed "effect@4.0.5 sha256:98e107efe3222e19"
 
 /// The number of elements.
-size : TxQueue a e ->{Tx.Transaction;} Float
+size : TxQueue a e ->{Tx.Transaction;} Int
 foreign effect size from "@flick-lang/runtime/effect/TxQueue" "size"
   reviewed "effect@4.0.5 sha256:4f107de686c5ad9d"
 

@@ -16,7 +16,7 @@ type ByteUnit =
 /// unit or the largest fitting one of the binary or the decimal units.
 type alias FormatOptions =
   {
-    precision : Option Float;
+    precision : Option Int;
     trailingZeros : Option Bool;
     binary : Bool;
     unit : Option ByteUnit;
@@ -40,7 +40,7 @@ instance Ord ByteSize =
   let compare x y = compare (to_bigint x) (to_bigint y)
 
 instance Hash ByteSize =
-  hash : ByteSize -> Float
+  hash : ByteSize -> Int
   let hash x = hash (to_bigint x)
 
 instance Show ByteSize =

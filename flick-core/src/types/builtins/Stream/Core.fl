@@ -13,7 +13,7 @@ type Stream (r : ServiceRow) (e : ErrorRow) a
 type HaltStrategy = Left | Right | Both | Either
 
 /// How many elements a source puts in one chunk when it is not told.
-default_chunk_size : Float
+default_chunk_size : Int
 foreign pure default_chunk_size from "@flick-lang/runtime/effect/Stream" "DefaultChunkSize"
   reviewed "effect@4.0.5 sha256:328d7eb584c7877e"
 
@@ -188,7 +188,7 @@ foreign pure iterate from "@flick-lang/runtime/effect/Stream" "iterate"
   reviewed "effect@4.0.5 sha256:7cf45f347b48d70d"
 
 /// The integers from `min` to `max`, both included.
-range : Float -> Float -> Stream none none Float
+range : Int -> Int -> Stream none none Int
 foreign pure range from "@flick-lang/runtime/effect/Stream" "range"
   arity 2
   reviewed "effect@4.0.5 sha256:e258f35819bf3d82"

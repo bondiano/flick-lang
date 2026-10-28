@@ -75,7 +75,7 @@ class Eq a => Ord a =
 
 /// Equal values have equal hashes.
 class Eq a => Hash a =
-  hash : a -> Float
+  hash : a -> Int
 
 class Show a =
   show : a -> String
@@ -179,7 +179,7 @@ foreign effect parallel from "@flick-lang/runtime" "parallel"
 
 /// Runs every task, at most `limit` at a time; `limit` must be a positive
 /// finite integer. The results keep the order of the input.
-parallel_all : forall c r e a. Float -> List ((Eff r e a)^c) ->{r; e} List a
+parallel_all : forall c r e a. Int -> List ((Eff r e a)^c) ->{r; e} List a
 foreign effect parallel_all from "@flick-lang/runtime" "parallelAll"
   retention call
 

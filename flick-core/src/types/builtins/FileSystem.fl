@@ -94,7 +94,7 @@ service FileSystem =
   make_temp_file_scoped : forall s. TempFileOptions ->{Scope s; PlatformError.PlatformError} String
   open : forall s. OpenOptions -> String ->{Scope s; PlatformError.PlatformError} File s
   read_directory : Bool -> String ->{; PlatformError.PlatformError} List String
-  read_file : String ->{; PlatformError.PlatformError} List Float
+  read_file : String ->{; PlatformError.PlatformError} List Int
   read_file_string : String ->{; PlatformError.PlatformError} String
   read_link : String ->{; PlatformError.PlatformError} String
   real_path : String ->{; PlatformError.PlatformError} String
@@ -104,7 +104,7 @@ service FileSystem =
   symlink : String -> String ->{; PlatformError.PlatformError} Unit
   truncate : Option Float -> String ->{; PlatformError.PlatformError} Unit
   utimes : Float -> Float -> String ->{; PlatformError.PlatformError} Unit
-  write_file : WriteOptions -> String -> List Float ->{; PlatformError.PlatformError} Unit
+  write_file : WriteOptions -> String -> List Int ->{; PlatformError.PlatformError} Unit
   write_file_string : WriteOptions -> String -> String ->{; PlatformError.PlatformError} Unit
 
 /// Fails unless the path exists and allows what the options ask.
@@ -179,7 +179,7 @@ read_directory : Bool -> String ->{FileSystem; PlatformError.PlatformError} List
 let read_directory recursive path = FileSystem.read_directory recursive path
 
 /// The bytes of the file.
-read_file : String ->{FileSystem; PlatformError.PlatformError} List Float
+read_file : String ->{FileSystem; PlatformError.PlatformError} List Int
 let read_file path = FileSystem.read_file path
 
 /// The file as UTF-8 text.
@@ -219,7 +219,7 @@ utimes : Float -> Float -> String ->{FileSystem; PlatformError.PlatformError} Un
 let utimes atime mtime path = FileSystem.utimes atime mtime path
 
 /// Writes the bytes to the file.
-write_file : WriteOptions -> String -> List Float ->{FileSystem; PlatformError.PlatformError} Unit
+write_file : WriteOptions -> String -> List Int ->{FileSystem; PlatformError.PlatformError} Unit
 let write_file options path bytes = FileSystem.write_file options path bytes
 
 /// Writes the text to the file as UTF-8.
@@ -253,7 +253,7 @@ foreign effect sync from "@flick-lang/runtime/effect/FileSystem" "flickSync"
 read_alloc : forall s. Float ->
   Option BigInt ->
   File s ->{; PlatformError.PlatformError}
-  Option (List Float)
+  Option (List Int)
 foreign effect read_alloc from "@flick-lang/runtime/effect/FileSystem" "flickReadAlloc"
   arity 3
   retention call
@@ -267,14 +267,14 @@ foreign effect file_truncate from "@flick-lang/runtime/effect/FileSystem" "flick
   reviewed "effect@4.0.5 sha256:e5908aede5e43a55"
 
 /// Writes some of the bytes at the position; how many it wrote.
-write : forall s. List Float -> File s ->{; PlatformError.PlatformError} Float
+write : forall s. List Int -> File s ->{; PlatformError.PlatformError} Float
 foreign effect write from "@flick-lang/runtime/effect/FileSystem" "flickWrite"
   arity 2
   retention call
   reviewed "effect@4.0.5 sha256:e5908aede5e43a55"
 
 /// Writes all the bytes at the position.
-write_all : forall s. List Float -> File s ->{; PlatformError.PlatformError} Unit
+write_all : forall s. List Int -> File s ->{; PlatformError.PlatformError} Unit
 foreign effect write_all from "@flick-lang/runtime/effect/FileSystem" "flickWriteAll"
   arity 2
   retention call

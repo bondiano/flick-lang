@@ -78,6 +78,7 @@ let overflow = Ui.Event.queue 0 (fun _ -> task { Atom.set saved "x" })
 too_many : Ui.Handler Ui.ClickSnapshot
 let too_many = Ui.Event.concurrent 1.5 (fun _ -> task { Atom.set saved "x" })
 //                                 ^^^ FLICK-U001 the limit
+//                                 ^^^ FLICK-T003 expected `Int`, found `Float`
 
 action_overflow : Action.Action Ui.ClickSnapshot
 let action_overflow = Action.queue 0 (fun _ -> task { Atom.set saved "x" })

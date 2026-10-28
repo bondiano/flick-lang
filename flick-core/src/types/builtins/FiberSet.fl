@@ -42,7 +42,7 @@ foreign effect clear from "@flick-lang/runtime/effect/FiberSet" "clear"
   reviewed "effect@4.0.5 sha256:84d569b250f4f0fa"
 
 /// How many children are running.
-size : FiberSet s e a ->{} Float
+size : FiberSet s e a ->{} Int
 foreign effect size from "@flick-lang/runtime/effect/FiberSet" "size"
   retention call
   reviewed "effect@4.0.5 sha256:39bcfa8eedf749bc"

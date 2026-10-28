@@ -71,7 +71,8 @@ export const jsonNumber: Schema.Codec<number> = /*#__PURE__*/ Schema.Number.anno
 
 const int32 = /*#__PURE__*/ Schema.makeFilter((n: number) => (n | 0) === n, {
   message: "expected an Int, an integer from -2147483648 to 2147483647",
-});
+  "flick/known": "int",
+} satisfies Notes);
 
 export const jsonInt: Schema.Codec<number> = /*#__PURE__*/ Schema.Number.annotate({ expected: "an Int" }).check(int32);
 

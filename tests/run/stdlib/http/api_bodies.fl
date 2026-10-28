@@ -17,7 +17,7 @@ type alias Count = { total : String }
 
 type alias Parts = Stream none {MultipartError} Part
 
-bytes : HttpApi.Endpoint "bytes" (HttpApi.Request Unit Unit Unit (List Float) ->{r;} List Float)
+bytes : HttpApi.Endpoint "bytes" (HttpApi.Request Unit Unit Unit (List Int) ->{r;} List Int)
 let bytes =
   HttpApi.endpoint HttpApi.Post "/bytes" (Record.label : Record.Label "bytes")
     |> HttpApi.with_bytes_payload
@@ -36,7 +36,7 @@ let parts =
     |> HttpApi.with_text_success 200
 
 chunks : HttpApi.Endpoint "chunks" (
-  HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none (List Float)
+  HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none (List Int)
 )
 let chunks =
   HttpApi.endpoint HttpApi.Get "/chunks" (Record.label : Record.Label "chunks")
@@ -68,10 +68,10 @@ let login =
 
 type alias Handlers r =
   {
-    bytes : HttpApi.Request Unit Unit Unit (List Float) ->{r;} List Float;
+    bytes : HttpApi.Request Unit Unit Unit (List Int) ->{r;} List Int;
     form : HttpApi.Request Unit Unit Unit Note ->{r;} String;
     parts : HttpApi.Request Unit Unit Unit Parts ->{r; MultipartError} String;
-    chunks : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none (List Float);
+    chunks : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none (List Int);
     ticks : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none Tick;
     events : HttpApi.Request Unit Unit Unit Unit ->{r;} Stream none none HttpApi.SseEvent;
     login : HttpApi.Request Unit Unit Unit Unit ->{r;} ((String, Count), Option (Redacted String));
@@ -106,7 +106,7 @@ let upload =
   let text =
     (task {
       [[102, 105, 108, 101], [32, 116, 101, 120, 116]]
-    } : Eff none {MultipartError} (List (List Float)))
+    } : Eff none {MultipartError} (List (List Int)))
   let file =
     File
       {

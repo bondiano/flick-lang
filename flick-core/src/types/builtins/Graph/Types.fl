@@ -32,10 +32,10 @@ undirected_kind : Kind Undirected
 let undirected_kind = Kind "undirected"
 
 /// A node's index: stable while the node is in the graph, never reused.
-type alias NodeIndex = Float
+type alias NodeIndex = Int
 
 /// An edge's index: stable while the edge is in the graph, never reused.
-type alias EdgeIndex = Float
+type alias EdgeIndex = Int
 
 /// An edge: its endpoints and data.
 type alias Edge e = { source : NodeIndex; target : NodeIndex; data : e }
@@ -91,14 +91,14 @@ type alias IdentityOptions n e ni ei = {
 
 /// Within `radius` steps (default 1) of a node, along `direction` (default
 /// outgoing).
-type alias NeighborhoodConfig = { radius : Option Float; direction : Option TraversalDirection }
+type alias NeighborhoodConfig = { radius : Option Int; direction : Option TraversalDirection }
 
 /// The edges reachability follows (default outgoing).
 type alias ReachabilityConfig = { direction : Option TraversalDirection }
 
 /// Where a search starts, which edges it follows and how many steps.
 type alias SearchConfig =
-  { start : Option (List NodeIndex); direction : Option TraversalDirection; radius : Option Float }
+  { start : Option (List NodeIndex); direction : Option TraversalDirection; radius : Option Int }
 
 /// Where a topological order starts (default: the nodes without incoming edges).
 type alias TopoConfig = { initials : Option (List NodeIndex) }
@@ -146,12 +146,12 @@ type alias AstarConfig e n =
   { source : NodeIndex; target : NodeIndex; cost : e -> Float; heuristic : n -> n -> Float }
 
 /// The endpoints of the paths, and at most how many (default all).
-type alias SimplePathsConfig = { source : NodeIndex; target : NodeIndex; limit : Option Float }
+type alias SimplePathsConfig = { source : NodeIndex; target : NodeIndex; limit : Option Int }
 
 /// The endpoints, the cost of each edge, and at most how many paths
 /// (default all).
 type alias AllShortestPathsConfig e =
-  { source : NodeIndex; target : NodeIndex; cost : e -> Float; limit : Option Float }
+  { source : NodeIndex; target : NodeIndex; cost : e -> Float; limit : Option Int }
 
 /// Distances, paths (`None` where none exists), edges and edge data of the
 /// shortest path between each pair of nodes, by source then target.

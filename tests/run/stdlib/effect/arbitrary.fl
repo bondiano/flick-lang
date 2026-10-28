@@ -5,7 +5,7 @@ module App.Main exposing (main)
 
 type error TooBig = TooBig Float
 
-seeded : Float -> Arbitrary.SampleOptions
+seeded : Int -> Arbitrary.SampleOptions
 let seeded n = { count = Some n; size = None; maxDiscards = None; seed = Some 42 }
 
 checking : Arbitrary.CheckOptions

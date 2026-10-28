@@ -11,14 +11,14 @@ let ms5 = Result.with_default Duration.zero (Duration.millis 5)
 ms1000 : Duration.Duration
 let ms1000 = Result.with_default Duration.zero (Duration.millis 1000)
 
-line : (String, List Float) ->{} Unit
+line : Show a => (String, List a) ->{} Unit
 let line (label, xs) = Platform.stdout_line (label ++ ": " ++ show xs)
 
 lists : (String, List (List Float)) ->{} Unit
 let lists (label, xs) = Platform.stdout_line (label ++ ": " ++ show xs)
 
 nums : Stream.Stream none none Float
-let nums = Stream.range 1 6
+let nums = Stream.map Int.to_float (Stream.range 1 6)
 
 chunked : Stream.Stream none none Float
 let chunked = Stream.from_lists [[1, 2], [3, 4, 5]]

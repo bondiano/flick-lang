@@ -32,7 +32,7 @@ let order a b = compare a b
 tree_text : Tree Float -> String
 let tree_text tree = show tree
 
-port_hash : Port -> Float
+port_hash : Port -> Int
 let port_hash port = hash port
 
 ids : List UserId -> String

@@ -31,7 +31,7 @@ foreign effect transaction from "@flick-lang/runtime/sql" "pgTransaction"
 /// connection of the pool before it fails.
 type alias PgConfig = {
   connection_string : String;
-  max_connections : Float;
+  max_connections : Int;
   statement_timeout_ms : Option Float;
   acquire_timeout_ms : Option Float;
 }

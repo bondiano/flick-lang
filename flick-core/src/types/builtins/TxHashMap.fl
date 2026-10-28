@@ -47,7 +47,7 @@ foreign effect clear from "@flick-lang/runtime/effect/TxHashMap" "flickClear"
   reviewed "effect@4.0.5 sha256:4ba6b0ec9b7a0b72"
 
 /// The number of entries.
-size : TxHashMap w k v ->{Tx.Transaction;} Float
+size : TxHashMap w k v ->{Tx.Transaction;} Int
 foreign effect size from "@flick-lang/runtime/effect/TxHashMap" "flickSize"
   reviewed "effect@4.0.5 sha256:ec154c2738f70495"
 
@@ -122,12 +122,12 @@ foreign effect set_many from "@flick-lang/runtime/effect/TxHashMap" "flickSetMan
   reviewed "effect@4.0.5 sha256:f331295e244ffdff"
 
 /// `get` with the key's hash, which must be the witness's hash of it.
-get_hash : k -> Float -> TxHashMap w k v ->{Tx.Transaction;} Option v
+get_hash : k -> Int -> TxHashMap w k v ->{Tx.Transaction;} Option v
 foreign effect get_hash from "@flick-lang/runtime/effect/TxHashMap" "flickGetHash"
   reviewed "effect@4.0.5 sha256:2c9f09e061f628d3"
 
 /// `has` with the key's hash, which must be the witness's hash of it.
-has_hash : k -> Float -> TxHashMap w k v ->{Tx.Transaction;} Bool
+has_hash : k -> Int -> TxHashMap w k v ->{Tx.Transaction;} Bool
 foreign effect has_hash from "@flick-lang/runtime/effect/TxHashMap" "flickHasHash"
   reviewed "effect@4.0.5 sha256:8c5c148986f01cae"
 

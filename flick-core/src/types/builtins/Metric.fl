@@ -69,7 +69,7 @@ type alias SummaryOptions =
     description : Option String;
     attributes : Attributes;
     maxAge : Duration.Duration;
-    maxSize : Float;
+    maxSize : Int;
     quantiles : List Float;
   }
 
@@ -194,13 +194,13 @@ foreign pure boundaries_from_iterable from "@flick-lang/runtime/effect/Metric" "
   reviewed "effect@4.0.5 sha256:d7a4be7a6128c37d"
 
 /// `count - 1` boundaries `width` apart after `start`, then `Infinity`.
-linear_boundaries : { start : Float; width : Float; count : Float } -> List Float
+linear_boundaries : { start : Float; width : Float; count : Int } -> List Float
 foreign pure linear_boundaries from "@flick-lang/runtime/effect/Metric" "linearBoundaries"
   reviewed "effect@4.0.5 sha256:358b9c160fbab6d8"
 
 /// `count - 1` boundaries from `start`, each `factor` times the one before,
 /// then `Infinity`.
-exponential_boundaries : { start : Float; factor : Float; count : Float } -> List Float
+exponential_boundaries : { start : Float; factor : Float; count : Int } -> List Float
 foreign pure exponential_boundaries from "@flick-lang/runtime/effect/Metric" "exponentialBoundaries"
   reviewed "effect@4.0.5 sha256:06bb01033a19c1c9"
 

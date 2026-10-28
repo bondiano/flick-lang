@@ -15,7 +15,7 @@ make :
   forall s k r e a.
   {
     lookup : k ->{r; e} a;
-    capacity : Float;
+    capacity : Int;
     timeToLive : Option Duration.Duration;
   } ->{Scope s | r;}
   ScopedCache s k e a
@@ -28,7 +28,7 @@ make_with :
   forall s k r e a.
   {
     lookup : k ->{r; e} a;
-    capacity : Float;
+    capacity : Int;
     timeToLive : Option (Exit e a -> k -> Duration.Duration);
   } ->{Scope s | r;}
   ScopedCache s k e a
@@ -100,7 +100,7 @@ foreign effect invalidate_all from "@flick-lang/runtime/effect/ScopedCache" "inv
   reviewed "effect@4.0.5 sha256:5455eb215e13d5aa"
 
 /// The number of cached keys.
-size : forall s k e a. ScopedCache s k e a ->{} Float
+size : forall s k e a. ScopedCache s k e a ->{} Int
 foreign effect size from "@flick-lang/runtime/effect/ScopedCache" "size"
   retention call
   reviewed "effect@4.0.5 sha256:9ccf109c88ed2682"

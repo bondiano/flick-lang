@@ -20,7 +20,7 @@ foreign pure js_number from global "Number"
 js_text : JsValue -> String
 foreign pure js_text from global "String"
 
-line : (String, List Float) ->{} Unit
+line : Show a => (String, List a) ->{} Unit
 let line (label, xs) = Platform.stdout_line (label ++ ": " ++ show xs)
 
 /// Counts down from `n`, built by recursion.
@@ -40,7 +40,7 @@ let bump calls =
   }
 
 /// Records `n`, going on while it is below 5.
-record : Ref (List Float) -> Float ->{} Bool
+record : Ref (List Int) -> Int ->{} Bool
 let record seen n =
   Ref.set seen (Ref.get seen ++ [n])
   n < 5
@@ -50,7 +50,8 @@ let main () =
   line ("make", (Stream.run_collect (Stream.make [1, 2, 3])))
   line ("from_list", (Stream.run_collect (Stream.from_list [4, 5])))
   line ("from_lists", (Stream.run_collect (Stream.from_lists [[1], [2, 3]])))
-  line ("empty", (Stream.run_collect Stream.empty))
+  let nothing : List Float = Stream.run_collect Stream.empty
+  line ("empty", nothing)
   line ("range", (Stream.run_collect (Stream.range 1 5)))
   line ("countdown", (Stream.run_collect (countdown 3)))
   line ("iterate", (Stream.run_collect (Stream.take 4 (Stream.iterate 1 (fun n -> n * 2)))))
@@ -135,7 +136,7 @@ let main () =
   line ("never", [Stream.run_count (Stream.take 0 Stream.never)])
   line ("default_chunk_size", [Stream.default_chunk_size])
   line ("run_count", [Stream.run_count (Stream.range 1 4)])
-  line ("run_sum", [Stream.run_sum (Stream.range 1 4)])
+  line ("run_sum", [Stream.run_sum (Stream.map Int.to_float (Stream.range 1 4))])
   line ("run_head", (Option.to_list (Stream.run_head (Stream.range 7 9))))
   line ("run_last", (Option.to_list (Stream.run_last (Stream.range 7 9))))
   line ("run_fold", [Stream.run_fold 0 (fun acc n -> acc * 10 + n) (Stream.range 1 3)])

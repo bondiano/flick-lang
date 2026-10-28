@@ -6,11 +6,11 @@ type error Boom = Boom Float
 service Greeter =
   greet : String ->{} String
 
-line : String -> List Float ->{} Unit
+line : Show a => String -> List a ->{} Unit
 let line label xs = Platform.stdout_line (label ++ ": " ++ show xs)
 
 nums : Stream.Stream none none Float
-let nums = Stream.range 1 5
+let nums = Stream.map Int.to_float (Stream.range 1 5)
 
 failing : Stream.Stream none {Boom} Float
 let failing = Stream.concat (Stream.fail (Boom 3)) (Stream.make [1, 2])

@@ -20,7 +20,7 @@ let flaky calls failures =
   }
 
 /// The attempt a step's metadata names, read through both record types.
-attempt_of : Schedule.Metadata o i -> Float
+attempt_of : Schedule.Metadata o i -> Int
 let attempt_of m =
   let input : Schedule.InputMetadata i =
     {

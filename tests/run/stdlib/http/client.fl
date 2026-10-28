@@ -10,7 +10,7 @@ import Http.ClientResponse exposing (ClientResponse)
 type alias Item = { label : String; size : Float }
   deriving Schema
 
-type error Refused = Refused Float
+type error Refused = Refused Int
   deriving Show
 
 ok : Http.ServerResponse.Options

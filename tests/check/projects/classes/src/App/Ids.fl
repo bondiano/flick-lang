@@ -9,7 +9,7 @@ instance Eq ExternalId =
   let eq a b = true
 
 instance Hash ExternalId =
-  hash : ExternalId -> Float
+  hash : ExternalId -> Int
   let hash id = 0
 
 // a nominal wrapper of this package may have them
@@ -20,7 +20,7 @@ instance Eq LocalExternalId =
   let eq a b = true
 
 instance Hash LocalExternalId =
-  hash : LocalExternalId -> Float
+  hash : LocalExternalId -> Int
   let hash id = 0
 
 type LocalEmail = LocalEmail String

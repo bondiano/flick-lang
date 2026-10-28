@@ -107,17 +107,17 @@ foreign pure some from "@flick-lang/runtime/cli" "multiSome"
   reviewed "effect@4.0.5 sha256:5e88f4ac77db4501"
 
 /// At least `min` values.
-at_least : Float -> Multi a (List a)
+at_least : Int -> Multi a (List a)
 foreign pure at_least from "@flick-lang/runtime/cli" "multiAtLeast"
   reviewed "effect@4.0.5 sha256:e42e6aa23f7e9d05"
 
 /// At most `max` values.
-at_most : Float -> Multi a (List a)
+at_most : Int -> Multi a (List a)
 foreign pure at_most from "@flick-lang/runtime/cli" "multiAtMost"
   reviewed "effect@4.0.5 sha256:b24c3438bc79d4eb"
 
 /// From `min` to `max` values.
-between : Float -> Float -> Multi a (List a)
+between : Int -> Int -> Multi a (List a)
 foreign pure between from "@flick-lang/runtime/cli" "multiBetween"
   arity 2
   reviewed "effect@4.0.5 sha256:a93023741eb028ac"
@@ -337,7 +337,7 @@ foreign pure default_formatter from "@flick-lang/runtime/cli" "cliDefaultFormatt
   reviewed "effect@4.0.5 sha256:381e2a39c3f920ba"
 
 /// The columns `text` takes in a terminal, without its ANSI escapes.
-display_width : String -> Float
+display_width : String -> Int
 foreign pure display_width from "@flick-lang/runtime/cli" "cliDisplayWidth"
   reviewed "effect@4.0.5 sha256:2a6f63717edc3afe"
 

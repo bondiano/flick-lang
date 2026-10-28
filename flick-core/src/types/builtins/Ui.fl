@@ -17,7 +17,7 @@ type Handler s
 type alias ClickSnapshot =
   {
     /// The mouse button: 0 the main one, 1 the wheel, 2 the secondary one.
-    button : Float;
+    button : Int;
     /// Whether Alt (Option) was held.
     alt : Bool;
     /// Whether Control was held.
@@ -72,7 +72,7 @@ type alias LinkProps =
 type alias TabsProps =
   {
     /// The tab shown, counting from 0.
-    selected : Float;
+    selected : Int;
   }
 
 /// The props of `button`.
@@ -436,7 +436,7 @@ type alias Host =
     /// `aria-live`: how changes inside the element are announced.
     aria_live : Option Live;
     /// `tabindex`: 0 puts the element in the tab order, -1 takes it out.
-    tab_index : Option Float;
+    tab_index : Option Int;
     /// `data-*` attributes, by the name after `data-`: lowercase letters,
     /// digits and hyphens.
     data : List (String, String);

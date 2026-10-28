@@ -58,7 +58,8 @@ export const flickDigest = (
 
 export const flickRandom = (): Effect.Effect<number> => system.random;
 export const flickRandomBoolean = (): Effect.Effect<boolean> => system.randomBoolean;
-export const flickRandomInt = (): Effect.Effect<number> => system.randomInt;
+// Flick's `Int` is 32-bit, so the draw is over that range rather than the safe integers.
+export const flickRandomInt = (): Effect.Effect<number> => system.randomIntBetween(-0x80000000, 0x7fffffff);
 export const flickRandomBetween = (min: number, max: number): Effect.Effect<number> => system.randomBetween(min, max);
 export const flickRandomIntBetween = (min: number, max: number): Effect.Effect<number> => system.randomIntBetween(min, max);
 export const flickRandomShuffle = <A>(xs: ReadonlyArray<A>): Effect.Effect<Array<A>> => system.randomShuffle(xs);

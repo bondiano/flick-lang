@@ -129,7 +129,7 @@ foreign pure values from "@flick-lang/runtime/effect/Record" "values"
   reviewed "effect@4.0.5 sha256:a1a0ac144ab23772"
 
 /// How many keys the dictionary has.
-size : ReadonlyRecord a -> Float
+size : ReadonlyRecord a -> Int
 foreign pure size from "@flick-lang/runtime/effect/Record" "size"
   reviewed "effect@4.0.5 sha256:26ab4b926e6db68b"
 

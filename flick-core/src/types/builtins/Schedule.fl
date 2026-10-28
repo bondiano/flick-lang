@@ -11,7 +11,7 @@ type Schedule (r : ServiceRow) (e : ErrorRow) i o
 type alias InputMetadata i =
   {
     input : i;
-    attempt : Float;
+    attempt : Int;
     start : Float;
     now : Float;
     elapsed : Float;
@@ -24,7 +24,7 @@ type alias Metadata o i =
     input : i;
     output : o;
     duration : Duration.Duration;
-    attempt : Float;
+    attempt : Int;
     start : Float;
     now : Float;
     elapsed : Float;
@@ -32,7 +32,7 @@ type alias Metadata o i =
   }
 
 /// Recurs forever, `n` counting the recurrences from 0, without a delay.
-forever : Schedule none none i Float
+forever : Schedule none none i Int
 foreign pure forever from "@flick-lang/runtime/effect/Schedule" "forever"
   reviewed "effect@4.0.5 sha256:c296114690c174ba"
 
@@ -48,22 +48,22 @@ foreign pure identity from "@flick-lang/runtime/effect/Schedule" "identity"
   reviewed "effect@4.0.5 sha256:4001f6d8df3e47b3"
 
 /// Recurs `times` times, outputting the count.
-recurs : Float -> Schedule none none i Float
+recurs : Int -> Schedule none none i Int
 foreign pure recurs from "@flick-lang/runtime/effect/Schedule" "recurs"
   reviewed "effect@4.0.5 sha256:fe26cb8d8389966e"
 
 /// Recurs forever, each step the duration after the previous one ended.
-spaced : Duration.Duration -> Schedule none none i Float
+spaced : Duration.Duration -> Schedule none none i Int
 foreign pure spaced from "@flick-lang/runtime/effect/Schedule" "spaced"
   reviewed "effect@4.0.5 sha256:498f22b480d2397e"
 
 /// Recurs on a fixed interval from the start, whatever each step took.
-fixed : Duration.Duration -> Schedule none none i Float
+fixed : Duration.Duration -> Schedule none none i Int
 foreign pure fixed from "@flick-lang/runtime/effect/Schedule" "fixed"
   reviewed "effect@4.0.5 sha256:3689434f455bd8d0"
 
 /// Recurs at the ends of consecutive windows of the interval.
-windowed : Duration.Duration -> Schedule none none i Float
+windowed : Duration.Duration -> Schedule none none i Int
 foreign pure windowed from "@flick-lang/runtime/effect/Schedule" "windowed"
   reviewed "effect@4.0.5 sha256:62d032b6b1c5d5f9"
 
@@ -124,7 +124,7 @@ foreign pure min from "@flick-lang/runtime/effect/Schedule" "min"
 
 /// Stops after the duration has elapsed or the number of outputs, whichever
 /// comes first; `None` leaves that bound out.
-up_to : { duration : Option Duration.Duration; times : Option Float } ->
+up_to : { duration : Option Duration.Duration; times : Option Int } ->
   Schedule r e i o ->
   Schedule r e i o
 foreign pure up_to from "@flick-lang/runtime/effect/Schedule" "flickUpTo"

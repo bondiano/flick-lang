@@ -143,7 +143,7 @@ let semaphores () =
   let three = Semaphore.with_permits_if_available sem 3 (task { "three" })
   Platform.stdout_line ("permits: " ++ show (taken, more, one, released, all) ++ " " ++ show three)
 
-capacity_of : PartitionedSemaphore.PartitionedSemaphore k -> Float
+capacity_of : PartitionedSemaphore.PartitionedSemaphore k -> Int
 let capacity_of sem = PartitionedSemaphore.capacity sem
 
 partitions : Unit ->{} Unit

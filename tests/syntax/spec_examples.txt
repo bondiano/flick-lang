@@ -52,7 +52,7 @@ f0e9d4dc677fa1bf  08-typescript-and-ffi:239  hypot : Float -> Float -> Float
 593c0cc261ad3287  09-schema:122  type alias Preferences = {
 f8e0f9b586154cb0  09-schema:169  type Tree a =
 4fe0a456611fab95  09-schema:278  increment : Ref Float ->{} Float
-12896561710e24bd  09-schema:293  class Eq a => Hash a =
+db39cdea80dbbc7c  09-schema:293  class Eq a => Hash a =
 e28dd24856e76943  10-type-programming-and-edsl:69  type alias BalanceRow =
 1838791670c05b74  10-type-programming-and-edsl:103  deferred_balances :
 b3787233ce690f3a  10-type-programming-and-edsl:167  type alias SaveButtonProps c =

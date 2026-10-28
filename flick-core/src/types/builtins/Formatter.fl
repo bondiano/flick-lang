@@ -9,6 +9,6 @@ foreign pure format from "@flick-lang/runtime/effect/Formatter" "format"
   reviewed "effect@4.0.5 sha256:e11f1775ecc1e146"
 
 /// The data as JSON text, indented by `indent` spaces (0 for one line).
-format_json : Float -> Unknown -> String
+format_json : Int -> Unknown -> String
 foreign pure format_json from "@flick-lang/runtime/effect/Formatter" "flickFormatJson"
   reviewed "effect@4.0.5 sha256:a883240b23b23332"

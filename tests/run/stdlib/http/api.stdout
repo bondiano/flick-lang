@@ -340,7 +340,9 @@ docs: 200 text/html true; 200 text/html true
                               "type": "string"
                             },
                             "status": {
-                              "type": "number"
+                              "type": "integer",
+                              "minimum": -2147483648,
+                              "maximum": 2147483647
                             }
                           },
                           "required": [
@@ -380,7 +382,9 @@ docs: 200 text/html true; 200 text/html true
                               "type": "string"
                             },
                             "status": {
-                              "type": "number"
+                              "type": "integer",
+                              "minimum": -2147483648,
+                              "maximum": 2147483647
                             }
                           },
                           "required": [

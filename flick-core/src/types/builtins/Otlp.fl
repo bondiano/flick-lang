@@ -57,7 +57,7 @@ type alias Settings =
     gzip : Bool;
     serialization : Serialization;
     export_interval : Option Duration.Duration;
-    max_batch_size : Option Float;
+    max_batch_size : Option Int;
     shutdown_timeout : Option Duration.Duration;
   }
 

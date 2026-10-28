@@ -5,7 +5,7 @@ module App.Main exposing (main)
 type error Boom = Boom String
 
 service Scale =
-  factor : Unit ->{} Float
+  factor : Unit ->{} Int
 
 writable : Unit ->{} Channel.WritableStream Float
 foreign sync writable from "./channel_js.mjs" "writable"
@@ -204,7 +204,7 @@ let failures () =
               failing
           ))
     )
-  say (ended "or_else" (run (Sink.or_else (fun e -> Sink.count) failing)))
+  say (ended "or_else" (run (Sink.or_else (fun e -> Sink.map Int.to_float Sink.count) failing)))
   let caught = Ref.make None
   say
     (ended

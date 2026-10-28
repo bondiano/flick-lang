@@ -2,7 +2,7 @@
 // clock is checked by properties; random draws under `with_seed` repeat.
 module App.Main exposing (main)
 
-draws : Unit ->{} (Float, Bool, Float, Float, Float, List Float, String)
+draws : Unit ->{} (Float, Bool, Int, Float, Int, List Float, String)
 let draws () =
   let x = Random.next ()
   let b = Random.next_boolean ()
@@ -42,7 +42,7 @@ let main () =
       ++ show
         (
           x >= 0 && x < 1,
-          Float.is_safe_integer i,
+          Float.is_safe_integer (Int.to_float i),
           between >= 10 && between < 20,
           die >= 1 && die <= 6,
           List.sort_by compare order,

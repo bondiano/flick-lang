@@ -52,7 +52,7 @@ foreign pure has from "@flick-lang/runtime/effect/Trie" "has"
   reviewed "effect@4.0.5 sha256:f32218615f90e46d"
 
 /// The number of entries.
-size : Trie v -> Float
+size : Trie v -> Int
 foreign pure size from "@flick-lang/runtime/effect/Trie" "size"
   reviewed "effect@4.0.5 sha256:5ab09b0aa12d105d"
 

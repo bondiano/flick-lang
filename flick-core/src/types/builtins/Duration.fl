@@ -12,12 +12,12 @@ type error DurationError = DurationError String
 /// A finite duration split into whole units, largest first.
 type alias Parts =
   {
-    days : Float;
-    hours : Float;
-    minutes : Float;
-    seconds : Float;
-    millis : Float;
-    nanos : Float;
+    days : Int;
+    hours : Int;
+    minutes : Int;
+    seconds : Int;
+    millis : Int;
+    nanos : Int;
   }
 
 /// `n` nanoseconds; an error when negative.
@@ -131,7 +131,8 @@ to_hr_time : Duration -> Option (Float, Float)
 foreign pure to_hr_time from "@flick-lang/runtime/effect/Duration" "flickToHrTime"
   reviewed "effect@4.0.5 sha256:63bc9d9037f64175"
 
-/// The duration's parts: days, hours, minutes, seconds, millis, nanos.
+/// The duration's parts: days, hours, minutes, seconds, millis, nanos; a
+/// part beyond `Int`, as every part of `infinity` is, saturates at its bound.
 parts : Duration -> Parts
 foreign pure parts from "@flick-lang/runtime/effect/Duration" "parts"
   reviewed "effect@4.0.5 sha256:2a19728d3ce685f7"

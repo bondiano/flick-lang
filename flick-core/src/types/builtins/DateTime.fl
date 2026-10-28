@@ -22,27 +22,27 @@ type TimeUnit = Millisecond | Second | Minute | Hour | Day | Week | Month | Year
 /// The parts of a date-time; `weekDay` counts from Sunday, 0.
 type alias Parts =
   {
-    millisecond : Float;
-    second : Float;
-    minute : Float;
-    hour : Float;
-    day : Float;
-    weekDay : Float;
-    month : Float;
-    year : Float;
+    millisecond : Int;
+    second : Int;
+    minute : Int;
+    hour : Int;
+    day : Int;
+    weekDay : Int;
+    month : Int;
+    year : Int;
   }
 
 /// Some of the parts; `None` keeps a part as it is.
 type alias PartialParts =
   {
-    millisecond : Option Float;
-    second : Option Float;
-    minute : Option Float;
-    hour : Option Float;
-    day : Option Float;
-    weekDay : Option Float;
-    month : Option Float;
-    year : Option Float;
+    millisecond : Option Int;
+    second : Option Int;
+    minute : Option Int;
+    hour : Option Int;
+    day : Option Int;
+    weekDay : Option Int;
+    month : Option Int;
+    year : Option Int;
   }
 
 /// How to place a date-time in a zone: keep the instant (the default) or,
@@ -277,17 +277,17 @@ foreign pure subtract_duration from "@flick-lang/runtime/effect/DateTime" "subtr
 
 /// The start of the unit the date-time is in; weeks start on
 /// `weekStartsOn` (0 for Sunday, the default).
-start_of : { weekStartsOn : Option Float } -> TimeUnit -> DateTime -> DateTime
+start_of : { weekStartsOn : Option Int } -> TimeUnit -> DateTime -> DateTime
 foreign pure start_of from "@flick-lang/runtime/effect/DateTime" "flickStartOf"
   reviewed "effect@4.0.5 sha256:fff7007ef6df8081"
 
 /// The last millisecond of the unit the date-time is in.
-end_of : { weekStartsOn : Option Float } -> TimeUnit -> DateTime -> DateTime
+end_of : { weekStartsOn : Option Int } -> TimeUnit -> DateTime -> DateTime
 foreign pure end_of from "@flick-lang/runtime/effect/DateTime" "flickEndOf"
   reviewed "effect@4.0.5 sha256:41295efe9bf681ba"
 
 /// The nearer of the start of the unit and the start of the next one.
-nearest : { weekStartsOn : Option Float } -> TimeUnit -> DateTime -> DateTime
+nearest : { weekStartsOn : Option Int } -> TimeUnit -> DateTime -> DateTime
 foreign pure nearest from "@flick-lang/runtime/effect/DateTime" "flickNearest"
   reviewed "effect@4.0.5 sha256:b5a6cb1d9fc31a9d"
 

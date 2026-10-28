@@ -294,7 +294,7 @@ service Clock =
   now : Unit ->{} Float
 
 class Eq a => Hash a =
-  hash : a -> Float
+  hash : a -> Int
 
 class Collection c a | c -> a =
   empty : c

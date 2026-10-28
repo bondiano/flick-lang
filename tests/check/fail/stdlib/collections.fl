@@ -9,11 +9,11 @@ let loaded xs = List.map load xs
 //                       ^^^^ FLICK-T003 a pure function
 
 /// Sets of two witnesses do not mix without `rehash`.
-mixed : HashSet.HashSet EqHash.Canonical String -> Float
+mixed : HashSet.HashSet EqHash.Canonical String -> Int
 let mixed canonical =
   EqHash.with
     (fun a b -> a == b)
-    (fun s -> Int.to_float (String.length s))
+    (fun s -> String.length s)
     (fun witness -> HashSet.size (HashSet.union canonical (HashSet.with witness)))
 //                                                         ^^^^^^^^^^^^^^^^^^^^ FLICK-T003 found `HashSet w String`
 

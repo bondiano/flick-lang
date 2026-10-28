@@ -13,7 +13,7 @@ class Show a =
   show : a -> String
 
 class Eq a => Hash a =
-  hash : a -> Float
+  hash : a -> Int
 
 class Collection c a | c -> a =
   empty : c

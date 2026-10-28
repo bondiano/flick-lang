@@ -62,7 +62,7 @@ template_text : forall d p r. Template d p r -> String
 foreign pure template_text from "@flick-lang/runtime/sql" "sqlTemplateText"
 
 /// How many parameters a query passes beside its text.
-parameter_count : forall d r. Query d r -> Float
+parameter_count : forall d r. Query d r -> Int
 foreign pure parameter_count from "@flick-lang/runtime/sql" "sqlParameterCount"
 
 /// A checked SQL identifier: letters, digits and `_`, not starting with a

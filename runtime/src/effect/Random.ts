@@ -6,7 +6,8 @@ export * from "effect/Random";
 
 export const flickNext = (): Effect.Effect<number> => Random.next;
 export const flickNextBoolean = (): Effect.Effect<boolean> => Random.nextBoolean;
-export const flickNextInt = (): Effect.Effect<number> => Random.nextInt;
+// Flick's `Int` is 32-bit, so the draw is over that range rather than the safe integers.
+export const flickNextInt = (): Effect.Effect<number> => Random.nextIntBetween(-0x80000000, 0x7fffffff);
 
 /** `Random.next_int_between`: the options record with an `Option` field. */
 export const flickNextIntBetween = (

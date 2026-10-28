@@ -12,17 +12,17 @@ type Subscription (s : Region) a
 
 /// A new hub that holds at most `capacity` elements a subscriber has not
 /// taken; a publish to a full one waits.
-bounded : Float ->{} TxPubSub a
+bounded : Int ->{} TxPubSub a
 foreign effect bounded from "@flick-lang/runtime/effect/TxPubSub" "bounded"
   reviewed "effect@4.0.5 sha256:1a3bc6a2a1facbbf"
 
 /// A new bounded hub that drops what a full one is given.
-dropping : Float ->{} TxPubSub a
+dropping : Int ->{} TxPubSub a
 foreign effect dropping from "@flick-lang/runtime/effect/TxPubSub" "dropping"
   reviewed "effect@4.0.5 sha256:e556246504ee8df7"
 
 /// A new bounded hub that drops the oldest element when it is full.
-sliding : Float ->{} TxPubSub a
+sliding : Int ->{} TxPubSub a
 foreign effect sliding from "@flick-lang/runtime/effect/TxPubSub" "sliding"
   reviewed "effect@4.0.5 sha256:2dbb9dc4eb92256a"
 
@@ -33,12 +33,12 @@ foreign effect unbounded from "@flick-lang/runtime/effect/TxPubSub" "unbounded"
   reviewed "effect@4.0.5 sha256:25fdbb53af6e9157"
 
 /// The bound it was made with.
-capacity : TxPubSub a -> Float
+capacity : TxPubSub a -> Int
 foreign pure capacity from "@flick-lang/runtime/effect/TxPubSub" "capacity"
   reviewed "effect@4.0.5 sha256:f245cdaa1143da88"
 
 /// The most elements a subscriber has not taken yet.
-size : TxPubSub a ->{Tx.Transaction;} Float
+size : TxPubSub a ->{Tx.Transaction;} Int
 foreign effect size from "@flick-lang/runtime/effect/TxPubSub" "size"
   reviewed "effect@4.0.5 sha256:c888a453afec8f90"
 
@@ -110,7 +110,7 @@ foreign effect take_all from "@flick-lang/runtime/effect/TxQueue" "takeAll"
   reviewed "effect@4.0.5 sha256:4308b512040656d0"
 
 /// The number of elements waiting in the subscription.
-pending : forall s a. Subscription s a ->{Tx.Transaction;} Float
+pending : forall s a. Subscription s a ->{Tx.Transaction;} Int
 foreign effect pending from "@flick-lang/runtime/effect/TxQueue" "size"
   retention call
   reviewed "effect@4.0.5 sha256:4f107de686c5ad9d"

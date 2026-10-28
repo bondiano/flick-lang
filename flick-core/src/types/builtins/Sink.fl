@@ -121,7 +121,7 @@ foreign pure fold_array from "@flick-lang/runtime/effect/Sink" "foldArray"
   reviewed "effect@4.0.5 sha256:73d9fabd4f46bd4e"
 
 /// Folds at most `max` elements.
-fold_until : (Unit -> s) -> Float -> (s -> i ->{r; e} s) -> Sink r e i i s
+fold_until : (Unit -> s) -> Int -> (s -> i ->{r; e} s) -> Sink r e i i s
 foreign pure fold_until from "@flick-lang/runtime/effect/Sink" "foldUntil"
   arity 3
   reviewed "effect@4.0.5 sha256:c42b0503c09f43b1"
@@ -206,7 +206,7 @@ foreign pure map_leftover from "@flick-lang/runtime/effect/Sink" "mapLeftover"
   reviewed "effect@4.0.5 sha256:507338b396bffc52"
 
 /// The first `n` elements; the rest is left over.
-take : Float -> Sink none none i i (List i)
+take : Int -> Sink none none i i (List i)
 foreign pure take from "@flick-lang/runtime/effect/Sink" "take"
   reviewed "effect@4.0.5 sha256:59d6cdc21738adca"
 
@@ -290,7 +290,7 @@ foreign pure sum from "@flick-lang/runtime/effect/Sink" "sum"
   reviewed "effect@4.0.5 sha256:3c72b4897d00d627"
 
 /// The number of elements.
-count : Sink none none i l Float
+count : Sink none none i l Int
 foreign pure count from "@flick-lang/runtime/effect/Sink" "count"
   reviewed "effect@4.0.5 sha256:cb35f8ae5a6e4132"
 

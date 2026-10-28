@@ -7,7 +7,7 @@ module ConfigProvider exposing (..)
 type ConfigProvider
 
 /// A segment of a path: a key, or an index into an array.
-untagged type Segment = Key String | Index Float
+untagged type Segment = Key String | Index Int
   deriving Eq, Show
 
 /// Where a value is, from the root of the provider.
@@ -15,7 +15,7 @@ type alias Path = List Segment
 
 /// What a provider finds at a path: a value, a record with its keys, or an
 /// array with its length; a record or an array may have a value too.
-type Node = ValueNode String | RecordNode (List String) (Option String) | ArrayNode Float (
+type Node = ValueNode String | RecordNode (List String) (Option String) | ArrayNode Int (
   Option String
 )
   deriving Eq, Show
@@ -39,7 +39,7 @@ make_record : List String -> Option String -> Node
 let make_record keys value = RecordNode keys value
 
 /// An array of the length, and maybe a value.
-make_array : Float -> Option String -> Node
+make_array : Int -> Option String -> Node
 let make_array length value = ArrayNode length value
 
 /// A provider that asks `load` for the node at each path; `None` when the

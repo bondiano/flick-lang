@@ -70,7 +70,7 @@ foreign effect clear from "@flick-lang/runtime/effect/FiberMap" "clear"
   reviewed "effect@4.0.5 sha256:8f198f7500242507"
 
 /// How many children are running.
-size : FiberMap s k e a ->{} Float
+size : FiberMap s k e a ->{} Int
 foreign effect size from "@flick-lang/runtime/effect/FiberMap" "size"
   retention call
   reviewed "effect@4.0.5 sha256:42ae4b52db567a98"
