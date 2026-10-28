@@ -178,7 +178,6 @@ const SOURCES: &[(&str, &str)] = &[
     ("Stdio", include_str!("builtins/Stdio.fl")),
     ("Logger", include_str!("builtins/Logger.fl")),
     ("ConfigProvider", include_str!("builtins/ConfigProvider.fl")),
-    ("Config", include_str!("builtins/Config.fl")),
     ("Metric", include_str!("builtins/Metric.fl")),
     ("Tracer", include_str!("builtins/Tracer.fl")),
     // end of Effect: platform and observability
@@ -332,6 +331,8 @@ const SOURCES: &[(&str, &str)] = &[
     // Effect: RPC (unstable in Effect 4.0.5)
     ("Rpc", include_str!("builtins/Rpc.fl")),
     ("Server", include_str!("builtins/Server.fl")),
+    // after `Server`: a secret is read only on a server
+    ("Config", include_str!("builtins/Config.fl")),
     // end of Effect: RPC
     // Effect: observability (unstable in Effect 4.0.5)
     ("Otlp", include_str!("builtins/Otlp.fl")),

@@ -11,7 +11,7 @@ import * as RpcTest from "effect/rpc/RpcTest";
 import { acquireRelease } from "../../owner.ts";
 import { type Handler, prepare } from "../../rpc/handlers.ts";
 import { type Group, type Procedure, rpcNdjson } from "../../rpc/model.ts";
-import { rpcHandler } from "../../rpc/server.ts";
+import { rpcHandler } from "../../rpc/handler.ts";
 import { codecDecode, codecEncode } from "../../schema/index.ts";
 import type { AnySchema } from "../../schema/schemas.ts";
 

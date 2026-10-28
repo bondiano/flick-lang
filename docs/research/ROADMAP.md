@@ -263,7 +263,7 @@ component search (props : SearchProps) =
 **F5. Формы.** ✅ (`deriving Form` на записи с `Schema`: поля `String`/`Number`/`Bool`/уточнённые или `Option` их, иначе `FLICK-D010`; компаньоны `T.form : Form T` и `T.fields` — запись `Form.Field`, опечатка в поле — обычная `T003`; модуль `Form`: `draft` (атомы текста и ошибки на поле), `input` (подпись, `aria-label`, `aria-describedby` на ошибку-alert, `aria-invalid` — новое поле `Ui.Host`), `validate` (текст читается как тип поля, запись проверяется схемой со всеми ошибками, `errors: "all"` только здесь, ошибки ложатся по первому сегменту пути, фокус на первое неверное поле в порядке страницы), `report`; асинхронная проверка — `Ui.Event.latest`, новый ввод её прерывает; `tests/run/ui/form.fl`, `tests/check/fail/schema/form.fl`; `reference/form.md`)
 - AC: `deriving Form` из record-типа; валидация — derived; ошибки кодека маппятся на пути полей; async-валидатор прерывается при новом вводе.
 
-**F6. Шаблон проекта.** ⬜ (сейчас `flick new --template app|lib`)
+**F6. Шаблон проекта.** ✅ (`flick new/init --template fullstack`: входы `server` (`Runner.Node`, слушает `PORT`) и `web` (`Runner.Browser`, `target = "client"`), общий модуль `App.Api` из `server fn` — чтение всем, запись под `Server.authenticated` по cookie `session`, хранилище `App.Store` — сервис только сервера, страница: `Atom.query`/`mutation` и форма F5, Vite с `@flick-lang/astro` и прокси `/_flick`; `flick dev` без имени запускает все неклиентские входы и Vite для клиентских; тест — `flick/tests/cli_fullstack.rs` (check, fmt, `flick dev` отвечает на вызовы, запись без сессии — `Unauthorized`), а не `e2e.rs`, который гоняет только фикстуры; `@flick-lang/astro` пока `private` и не публикуется, как и рантайм — релиз npm-пакетов не собирает)
 - AC: `flick new --template fullstack` — сервер + клиент + общий модуль API; `flick dev` поднимает оба; e2e в `flick/tests/e2e.rs`.
 
 ### Трек O — observability (после S3, C6)
@@ -285,7 +285,7 @@ component search (props : SearchProps) =
 - AC: решение о реэкспортированном `main`: раннер импортирует `main` из модуля-источника, так что фасад (`entry = "App"`) может быть входом, — либо запрет остаётся; записано в `implementation-decisions.md`.
 - AC: в `reference/project.md` описано, что веб-входы (Vite/rolldown) — это JS-модули, импортирующие `.fl`, а `entries` — раннеры приложения.
 
-**L5. `flick dev` для фронта.** ⬜ AC: решение записано: браузер — HMR модулей Vite с сохранением состояния реестра (атомы с метками C6 переживают замену); сервер — текущий перезапуск.
+**L5. `flick dev` для фронта.** ✅ (решение и реализация, строка «Разработка страниц» в `implementation-decisions.md`: скрипт входа страницы принимает свою замену, `hotDispose` из `Runner.Browser` снимает значения помеченных состояний смонтированных корней и прерывает старую программу, её финализаторы размонтируют корни, так что наблюдатели не множатся; `hotCarry` — новый корень начинает с этих значений; тексты черновика формы помечены `Type.field`; хуки — в `hot.ts`, раннер браузера React не тянет; проверено вручную в headless Chromium: черновик пережил правку `Web.fl`, корень один; сервер — прежний перезапуск) AC: решение записано: браузер — HMR модулей Vite с сохранением состояния реестра (атомы с метками C6 переживают замену); сервер — текущий перезапуск.
 
 ### Трек H — хосты и бэкенды эффектов 🆕
 
@@ -381,9 +381,9 @@ S1 ✅ ─ U1…U6 ✅ ─ U7 ✅ ─ U7b ✅ ─ U6b ✅
 C2/C3/C4/C6 ✅ ─ C6b ✅
 C7a ✅ ─ C7b ✅ ─ C7c ✅ ─ C7d ✅ ─ C5 ✅            C1 ✅
 U9 ✅ ─ U9b ✅
-S2 ✅ ─ F1 ✅ ─ F2 ✅ ─ F3 ✅ ─ F4 ✅ ─ F5 ✅ ─ F6
+S2 ✅ ─ F1 ✅ ─ F2 ✅ ─ F3 ✅ ─ F4 ✅ ─ F5 ✅ ─ F6 ✅
 S3 ✅ ─ S4 ✅ ─ O1 ✅ ─ O2 ✅ ─ O3 ✅ ─ O4 ✅ ─ O5 ✅
-L1 ✅ ─ L2 ✅ ─ L3 ✅ ─ L4 ✅ ─ L5
+L1 ✅ ─ L2 ✅ ─ L3 ✅ ─ L4 ✅ ─ L5 ✅
 H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ✅ ─ H6 ✅     (H2 по входам — после L6 ✅)
 D1 ✅ ─ D2 ✅ ─ D3 ✅ ─ D4 ✅ ─ D5 ✅ ─ D6 ✅ ─ D9 ✅ ─ D11 ✅ ─ D10 ✅ ─ D13 ✅ ─ D12 ✅ ─ D14 ✅ ─ D8 ✅   (D15 ✅ — с D4/D5; D7 ✅ после C1)
 ```
@@ -392,7 +392,7 @@ D1 ✅ ─ D2 ✅ ─ D3 ✅ ─ D4 ✅ ─ D5 ✅ ─ D6 ✅ ─ D9 ✅ ─ D11
 1. «Видно в DevTools и меньше бандл» — ✅ (B0–B9, S1, S5, U1, C6).
 2. «Типы гарантируют» — ✅: C1–C8, U2–U6, U6b, U7b.
 3. «SSR» — ✅: R1–R6, U7, U9.
-4. «Fullstack» — ✅: S2, O1–O5, F1–F3, Q12 (открыты Q13, F4–F6).
+4. «Fullstack» — ✅: S2, O1–O5, F1–F6, Q12–Q14.
 
 Ближайшее: Q17–Q28 (§7); прежние P1 из Q1–Q16 сохраняют приоритет. F2 — после F1/F6. Вехи выше требуют сверки с реализованными R5/U9/L6 и D-треком; отметка реализации не закрывает связанные замечания ревью. Трек C закрыт до F-трека; дальше — Q1.
 
@@ -483,7 +483,7 @@ D15 снимает прежнее ограничение пользовател�
 **Q12. P1 — Раздельные HTTP-контуры и auth** ✅ (обёртка следующего обработчика — в `prepare`, общем для Rpc, `Server.handler` и вызовов в памяти: после хуков проверка делает сервис, который получает только этот вызов (`provideService` поверх сервисов `listen`), неудача проверки отвечает типизированной ошибкой, а обработчик не запускается; `server fn` с `Server.Unauthorized` в ошибках — `Server.Guarded`, его обслуживает только `Server.authenticated Session check`, вызывающий ловит `Server.Unauthorized`; Rpc — `with_auth` на процедуре и `authenticated` на группе; SSR-вызов в памяти несёт заголовки запроса страницы (cookie); один origin — `HttpApi.route` для `Http.Router` рядом с `Rpc.handler` и `Server.handler`; тесты `tests/run/stdlib/server/{auth,origin}.fl`, `tests/run/stdlib/rpc/auth.fl`, `tests/check/fail/server/auth.fl`, изоляция одновременных вызовов — `runtime/test/rpc-auth.test.ts`; у WebSocket заголовки общие для соединения)
 HttpApi/Rpc имеют свои listeners; [Unit-hook middleware](../../runtime/src/rpc/handlers.ts#L23-L40) не передаёт CurrentUser через provide. Нужна обёртка next handler: один origin, изоляция concurrent tenants, неверные credentials не запускают handler. S2b открыт.
 
-**Q13. P1 — F1/F6 не замкнуты**
+**Q13. P1 — F1/F6 не замкнуты** ✅ (общий контракт и CRUD с auth — шаблон F6; секреты: `Config.redacted` требует `Server.Server`, клиентский вход, читающий секрет, — `E009` (`tests/check/projects/server`, вход `admin`); одна команда — `flick dev`; черновик переживает замену модуля — L5; попутно `Server.handler` больше не тянет в браузер `@effect/platform-node`: обработчик RPC вынесен в `rpc/handler.ts` без Node, иначе Vite dev, не вытряхивающий импорты, падал на общей странице)
 L6/H2 и Vite есть; server/client isolation и общий dev workflow — нет. Нужны authenticated CRUD/shared contract, server/client isolation без утечки секретов, один dev command. L5 сохраняет draft без размножения watchers; F2 после prerequisites.
 
 **Q14. P2 — Loader переносит только success** ✅ (`Atom.serializable_result wire error_wire atom` передаёт и неудачу с одной типизированной ошибкой, закодированной её кодеком; дефект, прерывание и несколько ошибок не передаются — клиент запускает задачу сам; запрос гидрируется и неудачей, `tests/run/ui/route.fl`; поля форм — в F5)

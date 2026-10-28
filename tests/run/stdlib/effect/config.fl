@@ -69,7 +69,7 @@ let main () =
   Platform.stdout_line (read (Config.number "NAN") show)
   Platform.stdout_line (read (Config.finite "NAN") show)
   Platform.stdout_line (read (Config.int "RATIO") show)
-  Platform.stdout_line (read (Config.redacted "SECRET") show)
+  Platform.stdout_line (read (provide Server.node { Config.redacted "SECRET" }) show)
   Platform.stdout_line (read (Config.duration "TIMEOUT") Duration.format)
   Platform.stdout_line (read (Config.byte_size "SIZE") show)
   Platform.stdout_line (read (Config.log_level "LEVEL") show)

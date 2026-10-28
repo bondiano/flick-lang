@@ -4,8 +4,13 @@
 //! (SIGTERM: the runner interrupts `main`, joins its fibers and runs its
 //! finalizers) and starts the new one only after that shutdown ends; a
 //! shutdown that fails stops the restarts, and its cause stays on stderr.
+//!
+//! A project with several entries, none named, runs each that is not a
+//! client's, and Vite for its pages: the bundler builds the client's
+//! modules itself and replaces them in the page as they change.
 
-use std::process::ExitCode;
+use std::path::Path;
+use std::process::{Command as Process, ExitCode};
 use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::Duration;
@@ -14,28 +19,60 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::source::SourceMap;
 use signal_hook::consts::SIGTERM;
 
-use super::run::{Generation, build_generation, find_project, launch};
+use super::run::{Generation, build_into_generation, dev_entries, find_project, launch};
 use super::test::{watch_snapshot, watched_roots};
 use crate::args::{GlobalArguments, RunArguments};
 use crate::child::{self, Running};
 use crate::report;
 
-/// A running generation.
+/// A running generation: a process per entry it started.
 struct Live {
     generation: Generation,
-    running: Running,
+    running: Vec<Running>,
 }
 
 impl Live {
     /// Stops the app the way a signal does and removes its generation once
-    /// it has ended; the app's exit code.
+    /// every process has ended; the first exit code that is not a clean
+    /// stop, else the first.
     fn stop(mut self, signal: usize) -> u8 {
-        child::send(self.running.child.id(), signal);
-        let code = self.running.child.wait().map_or(1, child::code);
-        self.running.drain();
+        for running in &self.running {
+            child::send(running.child.id(), signal);
+        }
+        let codes: Vec<u8> = self
+            .running
+            .iter_mut()
+            .map(|running| {
+                let code = running.child.wait().map_or(1, child::code);
+                running.drain();
+                code
+            })
+            .collect();
         drop(self.generation);
-        code
+        let clean = |code: &&u8| **code == 0 || usize::from(**code) == 128 + signal;
+        codes
+            .iter()
+            .find(|code| !clean(code))
+            .or(codes.first())
+            .copied()
+            .unwrap_or(0)
     }
+}
+
+/// Vite in the project's `node_modules`, serving its pages; `None` with a
+/// note when it is not installed.
+fn vite(root: &Path, global: &GlobalArguments) -> Option<Running> {
+    let bin = root.join("node_modules/.bin/vite");
+    if !bin.exists() {
+        report::log(
+            global,
+            "dev: the client entries need Vite: install it with `pnpm install`",
+        );
+        return None;
+    }
+    let mut command = Process::new(bin);
+    command.current_dir(root);
+    child::spawn(&mut command, global, "vite-stderr").ok()
 }
 
 pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
@@ -47,6 +84,20 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
             return report::exit_code(&diagnostics);
         }
     };
+    let names = match dev_entries(&project, options) {
+        Ok(names) => names,
+        Err(message) => {
+            let d = Diagnostic::new(codes::P007, Severity::Error, message);
+            report::render(global, &SourceMap::default(), &[d]);
+            return ExitCode::from(2);
+        }
+    };
+    let several = options.name.is_none() && options.entry.is_none();
+    let mut pages = if several && project.config.entries.iter().any(|e| e.client) {
+        vite(&project.root, global)
+    } else {
+        None
+    };
     let paths = watched_roots(&project);
     let mut live: Option<Live> = None;
     let mut seen = None;
@@ -54,7 +105,7 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
         let now = watch_snapshot(&paths);
         if seen.as_ref() != Some(&now) {
             seen = Some(now);
-            if let Ok((generation, name)) = build_generation(&project, options, global) {
+            if let Ok(generation) = build_into_generation(&project, options, global) {
                 if let Some(old) = live.take() {
                     report::log(global, "dev: stopping the running version");
                     let code = old.stop(SIGTERM as usize);
@@ -72,7 +123,11 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
                     }
                 }
                 report::log(global, "dev: starting the new version");
-                live = launch(&generation, &name, options, global).map(|running| Live {
+                let running: Vec<Running> = names
+                    .iter()
+                    .filter_map(|name| launch(&generation, name, options, global))
+                    .collect();
+                live = (!running.is_empty()).then_some(Live {
                     generation,
                     running,
                 });
@@ -82,20 +137,30 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
         }
         let signal = signals.load(Ordering::Relaxed);
         if signal != 0 {
+            if let Some(mut pages) = pages.take() {
+                child::send(pages.child.id(), signal);
+                let _ = pages.child.wait();
+                pages.drain();
+            }
             return ExitCode::from(
                 live.map_or(128 + u8::try_from(signal).unwrap_or(0), |l| l.stop(signal)),
             );
         }
-        if let Some(l) = &mut live
-            && let Ok(Some(status)) = l.running.child.try_wait()
-        {
+        // one entry ending stops the version, which a change starts again
+        let ended = live.as_mut().and_then(|l| {
+            l.running
+                .iter_mut()
+                .find_map(|r| r.child.try_wait().ok().flatten())
+        });
+        if let Some(status) = ended {
             let code = child::code(status);
             report::log(
                 global,
                 &format!("dev: the app ended with exit code {code}; waiting for a change"),
             );
-            let mut ended = live.take().expect("live");
-            ended.running.drain();
+            if let Some(l) = live.take() {
+                l.stop(SIGTERM as usize);
+            }
         }
         thread::sleep(Duration::from_millis(200));
     }

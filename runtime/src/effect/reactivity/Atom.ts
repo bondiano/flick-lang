@@ -177,3 +177,29 @@ export const flickLayer = <I>(key: Context.Key<I, ReturnType<typeof impl>>): Lay
       return record;
     }),
   ).pipe(Layer.provide(AtomRegistry.layer));
+
+/** The labelled states, by label: a module replaced in development finds the new one of each. */
+const states = /*#__PURE__*/ new Map<string, WeakRef<Atom.Writable<unknown>>>();
+
+/** The labelled states `registry` holds and their values. */
+export const statesOf = (registry: AtomRegistry.AtomRegistry): Map<string, unknown> => {
+  const values = new Map<string, unknown>();
+  registry.getNodes().forEach((node) => {
+    const name: unknown = Array.isArray(node.atom.label) ? node.atom.label[0] : undefined;
+    if (typeof name === "string" && states.get(name)?.deref() === node.atom) values.set(name, node.value());
+  });
+  return values;
+};
+
+/** Gives the labelled states of `values` their values in `registry`. */
+export const seedStates = (registry: AtomRegistry.AtomRegistry, values: ReadonlyMap<string, unknown>): void => {
+  for (const [name, value] of values) {
+    const atom = states.get(name)?.deref();
+    if (atom !== undefined) registry.set(atom, value);
+  }
+};
+
+/** Records the labelled state `atom` under `name`. */
+export const keepState = (name: string, atom: Atom.Writable<unknown>): void => {
+  states.set(name, new WeakRef(atom));
+};

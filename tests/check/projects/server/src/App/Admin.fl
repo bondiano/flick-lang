@@ -1,0 +1,8 @@
+// A client entry may not even describe a secret: reading one needs `Server`.
+module App.Admin exposing (main)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let _ = provide Server.node { Config.redacted "DB_PASSWORD" }
+  ()
+//~ FLICK-E009 @5:5-5:9 client entry `admin` reaches `Server`: `App.Admin.main` → `Server.node`: call what needs `Server` from a server entry, and reach it from the client over HTTP or RPC

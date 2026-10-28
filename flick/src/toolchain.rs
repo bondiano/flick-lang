@@ -14,6 +14,10 @@ pub const PNPM: &str = "12.14.0";
 pub const NODE: &str = "24.18.0";
 /// The typescript-go release the Content Mapper adapter is verified against.
 pub const TYPESCRIPT_GO: &str = "7.0.2";
+/// React of the `fullstack` template, the version the runtime is tested with.
+pub const REACT: &str = "19.3.1";
+/// Vite of the `fullstack` template.
+pub const VITE: &str = "8.3.5";
 
 /// The version of an installed package, from `root/node_modules`.
 pub fn installed(root: &Path, package: &str) -> Option<String> {

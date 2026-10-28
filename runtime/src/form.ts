@@ -3,7 +3,7 @@
 // record with its schema reporting every issue, and puts each issue on the
 // field its path starts with.
 import { Effect, Option, Result } from "effect";
-import { atomState } from "./atoms.ts";
+import { atomState, label as labelled } from "./atoms.ts";
 import { WriteService, nativeRegistry } from "./effect/reactivity/Atom.ts";
 import { coerce } from "./route.ts";
 import { type AnySchema, schemaValidateAll } from "./schema/index.ts";
@@ -32,12 +32,15 @@ export interface Draft {
   readonly errors: ReadonlyMap<string, Writable<Option.Option<string>>>;
 }
 
-/** `Form.draft spec`: empty texts and no errors. */
+/**
+ * `Form.draft spec`: empty texts and no errors. The texts are labelled
+ * `Type.field`, so a module replaced in development keeps what was typed.
+ */
 export const formDraft = (spec: FormSpec): Draft =>
   Object.freeze({
     spec,
-    texts: new Map(spec.fields.map(([label]) => [label, atomState("")])),
-    errors: new Map(spec.fields.map(([label]) => [label, atomState(Option.none<string>())])),
+    texts: new Map(spec.fields.map(([field]) => [field, labelled(`${spec.name}.${field}`, atomState(""))])),
+    errors: new Map(spec.fields.map(([field]) => [field, atomState(Option.none<string>())])),
   });
 
 const atomOf = <A>(atoms: ReadonlyMap<string, A>, field: string): A => {

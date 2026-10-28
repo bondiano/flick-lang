@@ -118,9 +118,12 @@ port : String -> Config Number
 foreign pure port from "@flick-lang/runtime/effect/Config" "Port"
   reviewed "effect@4.0.5 sha256:6f4a843a0c07b659"
 
-/// Text kept out of logs and output.
-redacted : String -> Config (Redacted String)
-foreign pure redacted from "@flick-lang/runtime/effect/Config" "Redacted"
+/// A secret: text kept out of logs and output. Only a server reads one, so
+/// it needs `Server.Server`: a client entry that reaches it is
+/// `FLICK-E009`, and neither the secret's name nor its value is in a
+/// browser's bundle.
+redacted : String ->{Server.Server;} Config (Redacted String)
+foreign effect redacted from "@flick-lang/runtime/effect/Config" "flickRedacted"
   reviewed "effect@4.0.5 sha256:39cdab7425a475a8"
 
 /// A duration as Effect writes it: `10 seconds`, `5 millis`.

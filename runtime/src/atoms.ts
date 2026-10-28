@@ -10,7 +10,7 @@ import * as Reactivity from "effect/reactivity/Reactivity";
 
 import { Failure, failureCause } from "./cause.ts";
 import type { HashDict } from "./data.ts";
-import { WriteService, flickState, nativeRegistry, taskAtom, taskAtomOf } from "./effect/reactivity/Atom.ts";
+import { WriteService, flickState, keepState, nativeRegistry, taskAtom, taskAtomOf } from "./effect/reactivity/Atom.ts";
 import { service } from "./effects.ts";
 import { type UrlCodec, routeParse, routePrint } from "./route.ts";
 import { syncAbi, syncIn } from "./sync.ts";
@@ -262,7 +262,11 @@ export const atomDerived = <A>(compute: (unit: undefined) => A): Atom.Atom<A> =>
  */
 export const label = <A extends object>(name: string, value: A): A => {
   if (Reflect.get(value, "label") !== undefined) return value;
-  if (Atom.isAtom(value)) return Atom.withLabel(value, name);
+  if (Atom.isAtom(value)) {
+    const labelled = Atom.withLabel(value, name);
+    if (Atom.isWritable(labelled)) keepState(name, labelled);
+    return labelled;
+  }
   return Object.freeze({ ...value, label: name });
 };
 

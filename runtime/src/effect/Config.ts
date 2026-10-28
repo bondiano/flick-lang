@@ -31,6 +31,9 @@ export const flickOrElse =
 export const flickFail = (message: string): Config.Config<never> =>
   Config.fail(new ConfigProvider.SourceError({ message }));
 
+/** `Config.redacted`: an effect, so only code that may run on the server describes a secret. */
+export const flickRedacted = (name: string): Effect.Effect<Config.Config<unknown>> => Effect.succeed(Config.Redacted(name));
+
 /** `Config.url`: the normalized text of the URL. */
 export const flickUrl = (name: string): Config.Config<string> => Config.map(Config.URL(name), (url) => url.href);
 

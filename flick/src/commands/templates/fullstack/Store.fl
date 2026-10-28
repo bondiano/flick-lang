@@ -1,0 +1,23 @@
+// What only the server keeps: the todos, in memory while it runs. Its
+// module is out of the browser's bundle: a client entry that reached it
+// would be `FLICK-E009`.
+module App.Store exposing (Store, memory)
+
+import App.Todo exposing (Todo)
+
+service Store =
+  all : Unit ->{} List Todo
+  add : String ->{} Todo
+
+/// A store that forgets everything when the server stops.
+memory : Unit ->{} Store.Impl
+let memory () =
+  let todos = Ref.make []
+  {
+    all = fun () -> Ref.get todos;
+    add =
+      fun title ->
+        Ref.modify todos (fun items ->
+          let item = { id = List.length items + 1; title = title }
+          (item, items ++ [item]));
+  }

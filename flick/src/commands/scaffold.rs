@@ -12,7 +12,35 @@ use flick_core::source::SourceMap;
 use super::build::write;
 use crate::args::Template;
 use crate::command::{Command, Outcome};
-use crate::toolchain::{COMPILER, EFFECT, PNPM, RUNTIME};
+use crate::toolchain::{COMPILER, EFFECT, PNPM, REACT, RUNTIME, VITE};
+
+/// The entries of the `fullstack` template: a server, and a page that Vite
+/// serves in development.
+const FULLSTACK_ENTRIES: &str = "kind = \"app\"\nrunner = \"Runner.Node\"\nentries = { server = \"App.Server\", web = { module = \"App.Web\", runner = \"Runner.Browser\", target = \"client\" } }\n";
+
+/// The sources of the `fullstack` template; `NAME` is the project's.
+const FULLSTACK: [(&str, &str); 8] = [
+    (
+        "src/App/Todo.fl",
+        include_str!("templates/fullstack/Todo.fl"),
+    ),
+    (
+        "src/App/Store.fl",
+        include_str!("templates/fullstack/Store.fl"),
+    ),
+    ("src/App/Api.fl", include_str!("templates/fullstack/Api.fl")),
+    (
+        "src/App/Server.fl",
+        include_str!("templates/fullstack/Server.fl"),
+    ),
+    ("src/App/Web.fl", include_str!("templates/fullstack/Web.fl")),
+    ("src/main.js", include_str!("templates/fullstack/main.js")),
+    ("index.html", include_str!("templates/fullstack/index.html")),
+    (
+        "vite.config.mjs",
+        include_str!("templates/fullstack/vite.config.mjs"),
+    ),
+];
 
 pub struct ScaffoldCommand {
     pub dir: PathBuf,
@@ -24,15 +52,15 @@ pub struct ScaffoldCommand {
 /// The files of a project named `name`.
 fn files(name: &str, template: Template) -> Vec<(&'static str, String)> {
     let app = template != Template::Lib;
-    let project = if app {
-        "kind = \"app\"\nentry = \"App.Main\"\n"
-    } else {
-        "kind = \"lib\"\n"
+    let project = match template {
+        Template::Lib => "kind = \"lib\"\n",
+        Template::Fullstack => FULLSTACK_ENTRIES,
+        Template::App | Template::Cli => "kind = \"app\"\nentry = \"App.Main\"\n",
     };
     let config = format!(
         "schema-version = 1\n\n[project]\n{project}source-dir = \"src\"\ntest-dir = \"test\"\n\n[build]\nout-dir = \"dist\"\nprofile = \"debug\"\nemit = \"js\"\n"
     );
-    let package = serde_json::json!({
+    let mut package = serde_json::json!({
         "name": name,
         "version": "0.1.0",
         "private": app,
@@ -41,12 +69,25 @@ fn files(name: &str, template: Template) -> Vec<(&'static str, String)> {
         "dependencies": { "@flick-lang/runtime": RUNTIME, "effect": EFFECT },
         "flick": { "compiler": COMPILER },
     });
+    if template == Template::Fullstack {
+        let dependencies = &mut package["dependencies"];
+        dependencies["react"] = REACT.into();
+        dependencies["react-dom"] = REACT.into();
+        package["devDependencies"] =
+            serde_json::json!({ "@flick-lang/astro": RUNTIME, "vite": VITE });
+    }
     let mut out = vec![
         ("flick.toml", config),
         ("package.json", format!("{package:#}\n")),
         (".gitignore", "node_modules/\ndist/\n.flick/\n".to_owned()),
     ];
-    if app {
+    if template == Template::Fullstack {
+        out.extend(
+            FULLSTACK
+                .iter()
+                .map(|(path, text)| (*path, text.replace("NAME", name))),
+        );
+    } else if app {
         let main = if template == Template::Cli {
             CLI_MAIN.replace("NAME", name)
         } else {
@@ -169,6 +210,7 @@ fn kind(template: Template) -> &'static str {
     match template {
         Template::App => "app",
         Template::Cli => "command-line app",
+        Template::Fullstack => "full-stack app",
         Template::Lib => "library",
     }
 }

@@ -5,7 +5,8 @@ import type * as AtomRegistry from "../../effect/reactivity/AtomRegistry.ts";
 import { Component, type ReactNode, createElement } from "react";
 
 import type { Failure } from "../../cause.ts";
-import { RegistryService, nativeRegistry } from "../../effect/reactivity/Atom.ts";
+import { hotHooks } from "../../hot.ts";
+import { RegistryService, nativeRegistry, seedStates, statesOf } from "../../effect/reactivity/Atom.ts";
 import { DocumentService, document } from "./document.ts";
 import type { Ui } from "./nodes.ts";
 import { Bridge } from "./policies.ts";
@@ -58,6 +59,23 @@ class RenderBoundary extends Component<
   }
 }
 
+/** The registries of the mounted roots, which a module replacement in development reads. */
+const mounted = new Set<AtomRegistry.AtomRegistry>();
+
+/** The states the next root starts from, kept across a module replacement. */
+let carried: ReadonlyMap<string, unknown> | undefined;
+
+hotHooks(
+  () => {
+    const states = new Map<string, unknown>();
+    for (const registry of mounted) for (const [name, value] of statesOf(registry)) states.set(name, value);
+    return states;
+  },
+  (states) => {
+    carried = states;
+  },
+);
+
 /**
  * Renders `ui` through a React renderer, once: the views in it render again
  * by themselves when the atoms they read change, reading them from
@@ -87,6 +105,11 @@ export const uiRunWith = <R>(
       const live = Context.add(context, DocumentService, document);
       const bridge = new Bridge(live, supervisor, () => undefined, broken);
       const run = Effect.gen(function* () {
+        if (registry !== undefined) {
+          if (carried !== undefined) seedStates(registry, carried);
+          carried = undefined;
+          mounted.add(registry);
+        }
         root = yield* Effect.sync(renderer);
         try {
           const tree = createElement(BridgeContext.Provider, {
@@ -108,6 +131,7 @@ export const uiRunWith = <R>(
         run,
         Effect.gen(function* () {
           bridge.accepting = false;
+          if (registry !== undefined) mounted.delete(registry);
           const unmounted = yield* Effect.exit(Effect.sync(() => root?.unmount()));
           yield* Fiber.interruptAll([...bridge.tasks]);
           yield* Fiber.awaitAll([...bridge.supervisors]);

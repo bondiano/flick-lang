@@ -6,7 +6,8 @@
 //! JavaScript, whatever `emit` the project chooses.
 
 use std::cell::RefCell;
-use std::io::ErrorKind;
+use std::fs::OpenOptions;
+use std::io::{ErrorKind, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::{Command as Process, ExitCode};
 use std::sync::atomic::AtomicUsize;
@@ -22,7 +23,7 @@ use rustix::io::Errno;
 #[cfg(unix)]
 use rustix::process::{Pid, test_kill_process};
 
-use super::build::{BuildCommand, write};
+use super::build::BuildCommand;
 use crate::args::{BuildArguments, EmitArgument, GlobalArguments, RunArguments};
 use crate::child::{self, Running};
 use crate::command::Command;
@@ -83,10 +84,12 @@ pub fn locked(generation: &Path) -> bool {
         Err(err) if err.kind() == ErrorKind::NotFound => return false,
         _ => return true,
     }
-    let Ok(pid) = fs::read_to_string(lock) else {
+    let Ok(pids) = fs::read_to_string(lock) else {
         return true;
     };
-    process_alive(&pid)
+    // one line per process of the generation: `flick dev` starts each server entry
+    let mut pids = pids.lines().filter(|p| !p.trim().is_empty()).peekable();
+    pids.peek().is_none() || pids.any(process_alive)
 }
 
 fn process_alive(pid: &str) -> bool {
@@ -155,6 +158,21 @@ fn chosen_entry(project: &Project, options: &RunArguments) -> Result<String, Str
     }
 }
 
+/// The entries `flick dev` starts: the one `run` would, or, when a
+/// project with several is not given one, each that is not a client's,
+/// which a bundler serves instead.
+pub fn dev_entries(project: &Project, options: &RunArguments) -> Result<Vec<String>, String> {
+    let entries = &project.config.entries;
+    if options.entry.is_some() || options.name.is_some() || entries.len() <= 1 {
+        return chosen_entry(project, options).map(|name| vec![name]);
+    }
+    Ok(entries
+        .iter()
+        .filter(|e| !e.client)
+        .map(|e| e.name.clone())
+        .collect())
+}
+
 /// Builds the app into a new generation, with the name of the entry to
 /// start; `Err` once diagnostics are shown.
 pub fn build_generation(
@@ -170,6 +188,15 @@ pub fn build_generation(
             return Err(2);
         }
     };
+    build_into_generation(project, options, global).map(|generation| (generation, name))
+}
+
+/// Builds the app into a new generation; `Err` once diagnostics are shown.
+pub fn build_into_generation(
+    project: &Project,
+    options: &RunArguments,
+    global: &GlobalArguments,
+) -> Result<Generation, u8> {
     let generation = match Generation::reserve(&project.root) {
         Ok(generation) => generation,
         Err(err) => {
@@ -207,7 +234,7 @@ pub fn build_generation(
     if failed {
         return Err(code.max(1));
     }
-    Ok((generation, name))
+    Ok(generation)
 }
 
 /// Starts the runner and records its child PID for cleanup after an orphaned CLI.
@@ -230,10 +257,7 @@ pub fn launch(
         .args(&options.args);
     match child::spawn(&mut command, global, "application-stderr") {
         Ok(running) => {
-            let _ = write(
-                &generation.path().join(".lock"),
-                &running.child.id().to_string(),
-            );
+            let _ = append_pid(&generation.path().join(".lock"), running.child.id());
             Some(running)
         }
         Err(err) => {
@@ -274,6 +298,12 @@ fn finish(running: Running, signals: &AtomicUsize) -> u8 {
         Ok(status) => child::code(status),
         Err(_) => 1,
     }
+}
+
+/// Adds `pid` to the processes the lock of a generation records.
+fn append_pid(lock: &Path, pid: u32) -> io::Result<()> {
+    let mut file = OpenOptions::new().create(true).append(true).open(lock)?;
+    writeln!(file, "{pid}")
 }
 
 #[cfg(test)]

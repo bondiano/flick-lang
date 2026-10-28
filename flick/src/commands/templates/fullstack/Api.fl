@@ -1,0 +1,19 @@
+// The contract the server and the browser share. A `server fn` runs on the
+// server; in the browser its name is a call over HTTP, with the same types.
+module App.Api exposing (Session, list, add)
+
+import App.Store exposing (Store)
+import App.Todo exposing (Todo)
+
+/// Who calls: what `Server.authenticated` makes of a call's cookie.
+service Session =
+  user : Unit ->{} String
+
+/// Every todo: anyone may read them.
+list : Unit ->{Server.Server, Store;} List Todo
+server fn list () = Store.all ()
+
+/// Adds a todo, for a signed-in caller only: a call without a session gets
+/// `Server.Unauthorized`, and this does not run.
+add : String ->{Server.Server, Store, Session; Server.Unauthorized} Todo
+server fn add title = Store.add (Session.user () ++ ": " ++ title)

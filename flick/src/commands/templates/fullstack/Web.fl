@@ -1,0 +1,61 @@
+// The browser entry: the todos the server lists, and a form that adds one.
+// It reaches the server only through the calls of `App.Api`.
+module App.Web exposing (main)
+
+import App.Api
+import App.Todo exposing (Todo)
+
+refined type Title = String where Checks.non_empty
+  deriving Eq, Show, Schema
+
+type alias NewTodo = { title : Title }
+  deriving Schema, Form
+
+todos : Atom.Atom (Atom.Async (List Todo) {Rpc.ClientError})
+let todos = Atom.query ["todos"] (task { App.Api.list () })
+
+add : String ->{Atom.Write; Server.Unauthorized, Rpc.ClientError} Todo
+let add title = Atom.mutation ["todos"] App.Api.add title
+
+new_todo : Form.Draft NewTodo
+let new_todo = Form.draft NewTodo.form
+
+send : Action.Action Ui.ClickSnapshot
+let send =
+  Action.exhaust (fun _ -> task {
+    match Form.validate new_todo with
+    | None -> ()
+    | Some entered ->
+      let problem =
+        try
+          let _ = add (Title.value entered.title)
+          None
+        with
+        | Server.Unauthorized -> Some "sign in to add a todo"
+        | Rpc.ClientError message -> Some message
+      Form.report new_todo NewTodo.fields.title problem
+  })
+
+list_view : Ui.View (Atom.Atom (Atom.Async (List Todo) {Rpc.ClientError}))
+let list_view =
+  Ui.awaiting
+    (fun _ -> Ui.text "cannot reach the server")
+    (Ui.text "loading")
+    (fun items -> Ui.fragment (List.map (fun item -> Ui.paragraph [Ui.text item.title]) items))
+
+page : Ui
+let page =
+  Ui.fragment
+    [
+      Form.input new_todo NewTodo.fields.title "New todo" None,
+      Ui.button { disabled = false; on_click = send } [Ui.text "Add"],
+      Ui.render list_view todos,
+    ]
+
+main : Unit ->{; AppError} Unit
+let main () =
+  match Ui.Dom.container "app" with
+  | None -> App.fail "the page has no #app"
+  | Some root ->
+    let _ = provide Atom.layer { Ui.Dom.mount root (fun _ -> ()) page }
+    ()

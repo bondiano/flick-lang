@@ -39,6 +39,10 @@ the call did not reach the server or its answer did not decode. A call goes
 to the page's origin in a browser and to `FLICK_SERVER_URL` elsewhere, at
 `Server.path` (`/_flick/fn`).
 
+Secrets stay on the server the same way: `Config.redacted` needs
+`Server.Server`, so a client entry that would read a password or a key is
+`FLICK-E009`, and neither its name nor its value is in the page's bundle.
+
 While `Server.handler` serves a function in a process, a call of it made
 in that process, as a page rendered on the server makes, runs in memory:
 with the handler's services, the headers of the request being served, and
