@@ -5,8 +5,9 @@
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use super::{Compilation, Loaded, Mode, Root, run};
+use super::{Compilation, Loaded, Mode, ModuleCache, Root, run};
 use crate::diagnostics::Diagnostic;
 use crate::iface::{Interface, fingerprint};
 use crate::ir;
@@ -22,12 +23,12 @@ pub struct Analyzed {
     pub file: FileId,
     pub test: bool,
     pub tree: Node,
-    pub typing: Typing,
+    pub typing: Arc<Typing>,
     pub interface: Interface,
 }
 
 impl Analyzed {
-    pub(super) fn new(loaded: &Loaded, typing: Typing, interface: Interface) -> Self {
+    pub(super) fn new(loaded: &Loaded, typing: Arc<Typing>, interface: Interface) -> Self {
         Analyzed {
             name: loaded.name.clone(),
             path: loaded.path.clone(),
@@ -65,7 +66,25 @@ pub fn analyze(
     project: Option<&Project>,
     roots: &[PathBuf],
 ) -> Analysis {
-    let (diagnostics, compilation, modules) = run(host, sources, project, roots, Mode::Analyze);
+    let (diagnostics, compilation, modules) =
+        run(host, sources, project, roots, Mode::Analyze, None);
+    Analysis {
+        modules,
+        compilation,
+        diagnostics,
+    }
+}
+
+/// [`analyze`], reusing and updating what `cache` holds of earlier runs.
+pub fn analyze_with(
+    host: &dyn Host,
+    sources: &mut SourceMap,
+    project: Option<&Project>,
+    roots: &[PathBuf],
+    cache: &mut ModuleCache,
+) -> Analysis {
+    let (diagnostics, compilation, modules) =
+        run(host, sources, project, roots, Mode::Analyze, Some(cache));
     Analysis {
         modules,
         compilation,

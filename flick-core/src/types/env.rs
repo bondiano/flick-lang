@@ -3,6 +3,7 @@
 //! entity a plain or qualified name refers to in the current module.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 
@@ -10,6 +11,11 @@ use super::kinds::Kind;
 use super::ty::{Binder, PRELUDE, Type};
 use crate::iface::{Entity, Export, Interface, Namespace};
 use crate::resolve::{ItemKind, ModuleSyntax};
+
+mod shared;
+
+pub use shared::Builtins;
+use shared::learn_exports;
 
 /// Kind and definition of a named type constructor, as `.iface` stores it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -166,9 +172,12 @@ pub enum Found {
     Missing,
 }
 
-#[derive(Debug, Default)]
-pub struct Env {
+/// A module's environment: its own and imported knowledge over the shared
+/// [`Builtins`], which every lookup falls back to.
+#[derive(Debug)]
+pub struct Env<'b> {
     pub module: String,
+    builtins: &'b Builtins,
     types: HashMap<(String, String), TypeDef>,
     values: HashMap<Entity, Type>,
     /// Type of a constructor's parent, by constructor entity.
@@ -177,53 +186,48 @@ pub struct Env {
     scope: HashMap<(Namespace, String), Entity>,
     /// Names from `exposing (..)` imports.
     open: HashMap<(Namespace, String), Entity>,
-    prelude: HashMap<(Namespace, String), Entity>,
+    /// Whether the prelude's names are in scope: everywhere but the prelude.
+    prelude: bool,
     /// Names the checker cannot attribute: two imports bring them as
     /// different entities (name resolution reports that), or they come from
     /// a module that could not be loaded.
     ambiguous: HashSet<(Namespace, String)>,
-    /// Import qualifiers and built-in modules, by qualifier.
+    /// Import qualifiers, by qualifier; built-in modules are their own.
     qualifiers: HashMap<String, String>,
     /// The qualifiers of the module's imports.
     imported: HashSet<String>,
     interfaces: HashMap<String, Option<Interface>>,
     /// Some open import could not be loaded, so a missing name may exist.
     open_unknown: bool,
-    /// Every instance this module sees: of the modules it depends on,
-    /// however they are imported, and its own.
-    pub instances: Vec<Instance>,
-    /// Names of the built-in modules.
-    pub builtin: Vec<String>,
+    /// The instances this module sees beyond the built-in ones: of the
+    /// modules it depends on, however they are imported, and its own.
+    instances: Vec<Instance>,
 }
 
-impl Env {
+impl<'b> Env<'b> {
     /// The environment of `module` before its own declarations are added.
     pub fn new(
         module: &str,
         syntax: &ModuleSyntax,
         imported: &dyn Fn(&str) -> Option<Interface>,
-        builtins: &[Interface],
-    ) -> Env {
+        builtins: &'b Builtins,
+    ) -> Env<'b> {
         let mut env = Env {
             module: module.to_owned(),
-            ..Env::default()
+            builtins,
+            types: HashMap::new(),
+            values: HashMap::new(),
+            parents: HashMap::new(),
+            scope: HashMap::new(),
+            open: HashMap::new(),
+            prelude: module != PRELUDE,
+            ambiguous: HashSet::new(),
+            qualifiers: HashMap::new(),
+            imported: HashSet::new(),
+            interfaces: HashMap::new(),
+            open_unknown: false,
+            instances: Vec::new(),
         };
-        for interface in builtins {
-            env.builtin.push(interface.module.clone());
-            env.qualifiers
-                .insert(interface.module.clone(), interface.module.clone());
-            env.learn(interface);
-            if interface.module == PRELUDE && module != PRELUDE {
-                for export in &interface.exports {
-                    env.prelude.insert(
-                        (export.entity.namespace, export.entity.name.clone()),
-                        export.entity.clone(),
-                    );
-                }
-            }
-            env.interfaces
-                .insert(interface.module.clone(), Some(interface.clone()));
-        }
         for import in &syntax.imports {
             let interface = imported(&import.module);
             env.qualifiers
@@ -284,32 +288,39 @@ impl Env {
     /// Records the types and instances an interface carries.
     fn learn(&mut self, interface: &Interface) {
         for instance in &interface.instances {
+            let known = |i: &Instance| i.module == instance.module && i.name == instance.name;
             if !self
-                .instances
-                .iter()
-                .any(|i| i.module == instance.module && i.name == instance.name)
+                .builtins
+                .seen
+                .contains(&(instance.module.clone(), instance.name.clone()))
+                && !self.instances.iter().any(known)
             {
                 self.instances.push(instance.clone());
             }
         }
-        for export in &interface.exports {
-            let entity = &export.entity;
-            if let Some(def) = &export.definition {
-                if let Some(implementation) = super::services::impl_def(def) {
-                    let name = format!("{}.Impl", entity.name);
-                    self.types
-                        .insert((entity.module.clone(), name), implementation);
-                }
-                self.types
-                    .insert((entity.module.clone(), entity.name.clone()), def.clone());
-            }
-            if let Some(scheme) = &export.scheme {
-                self.values.insert(entity.clone(), scheme.clone());
-            }
-            if let Some(parent) = &export.parent {
-                self.parents.insert(entity.clone(), parent.clone());
-            }
-        }
+        learn_exports(
+            &mut self.types,
+            &mut self.values,
+            &mut self.parents,
+            interface,
+        );
+    }
+
+    /// Every instance this module sees: the built-in ones, then those of the
+    /// modules it depends on, however they are imported, and its own.
+    pub fn instances(&self) -> impl Iterator<Item = &Instance> {
+        self.builtins.instances.iter().chain(&self.instances)
+    }
+
+    /// The instances beyond the built-in ones, which an interface carries.
+    pub fn own_instances(&self) -> impl Iterator<Item = &Instance> {
+        self.instances
+            .iter()
+            .filter(|i| !self.builtins.contains(&i.module))
+    }
+
+    pub fn add_instance(&mut self, instance: Instance) {
+        self.instances.push(instance);
     }
 
     pub fn entity(&self, namespace: Namespace, name: &str) -> Entity {
@@ -321,7 +332,10 @@ impl Env {
     }
 
     pub fn type_def(&self, module: &str, name: &str) -> Option<&TypeDef> {
-        self.types.get(&(module.to_owned(), name.to_owned()))
+        let key = (module.to_owned(), name.to_owned());
+        self.types
+            .get(&key)
+            .or_else(|| self.builtins.types.get(&key))
     }
 
     pub fn define_type(&mut self, name: &str, def: TypeDef) {
@@ -364,12 +378,17 @@ impl Env {
     }
 
     pub fn value(&self, entity: &Entity) -> Option<&Type> {
-        self.values.get(entity)
+        self.values
+            .get(entity)
+            .or_else(|| self.builtins.values.get(entity))
     }
 
     /// The type a constructor builds, by its entity.
     pub fn parent(&self, entity: &Entity) -> Option<(String, String)> {
-        let parent = self.parents.get(entity)?;
+        let parent = self
+            .parents
+            .get(entity)
+            .or_else(|| self.builtins.parents.get(entity))?;
         Some((entity.module.clone(), parent.clone()))
     }
 
@@ -381,7 +400,7 @@ impl Env {
         match self.scope.get(&key).or_else(|| self.open.get(&key)) {
             Some(entity) => Found::Entity(entity.clone()),
             None if self.open_unknown => Found::Unknown,
-            None => match self.prelude.get(&key) {
+            None => match self.prelude_names().get(&key) {
                 Some(entity) => Found::Entity(entity.clone()),
                 None => Found::Missing,
             },
@@ -408,14 +427,26 @@ impl Env {
         self.scope
             .keys()
             .chain(self.open.keys())
-            .chain(self.prelude.keys())
+            .chain(self.prelude_names().keys())
             .filter(move |(n, _)| *n == namespace)
             .map(|(_, name)| name.as_str())
     }
 
     /// Every import qualifier and built-in module name.
     pub fn qualifier_names(&self) -> impl Iterator<Item = &str> {
-        self.qualifiers.keys().map(String::as_str)
+        self.qualifiers
+            .keys()
+            .chain(self.builtins.interfaces.keys())
+            .map(String::as_str)
+    }
+
+    fn prelude_names(&self) -> &HashMap<(Namespace, String), Entity> {
+        static NONE: LazyLock<HashMap<(Namespace, String), Entity>> = LazyLock::new(HashMap::new);
+        if self.prelude {
+            &self.builtins.prelude
+        } else {
+            &NONE
+        }
     }
 
     /// The module a qualifier names, and its interface if it was loaded.
@@ -438,21 +469,42 @@ impl Env {
 
     /// The shortest qualifier that names `module`.
     pub fn qualifier_of(&self, module: &str) -> Option<&str> {
+        let builtin = self
+            .builtins
+            .interfaces
+            .get_key_value(module)
+            .filter(|(q, _)| !self.qualifiers.contains_key(*q))
+            .map(|(q, _)| q.as_str());
         self.qualifiers
             .iter()
             .filter(|(_, m)| *m == module)
             .map(|(q, _)| q.as_str())
+            .chain(builtin)
             .min_by_key(|q| (q.len(), *q))
     }
 
     /// The interface of an imported or built-in module.
     pub fn interface(&self, module: &str) -> Option<&Interface> {
-        self.interfaces.get(module).and_then(Option::as_ref)
+        match self.interfaces.get(module) {
+            Some(interface) => interface.as_ref(),
+            None => self.builtins.interfaces.get(module),
+        }
     }
 
     pub fn qualified_module(&self, qualifier: &str) -> Option<(&str, Option<&Interface>)> {
-        let module = self.qualifiers.get(qualifier)?;
-        let interface = self.interfaces.get(module).and_then(Option::as_ref);
+        let module = match self.qualifiers.get(qualifier) {
+            Some(module) => module.as_str(),
+            None => self
+                .builtins
+                .interfaces
+                .get_key_value(qualifier)?
+                .0
+                .as_str(),
+        };
+        let interface = match self.interfaces.get(module) {
+            Some(interface) => interface.as_ref(),
+            None => self.builtins.interfaces.get(module),
+        };
         Some((module, interface))
     }
 }

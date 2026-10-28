@@ -12,6 +12,7 @@ use crate::commands::{
 };
 
 mod args;
+mod builtins;
 mod cache;
 mod child;
 mod command;
@@ -63,6 +64,22 @@ fn main() -> ExitCode {
     let args = CommandArguments::parse();
     let global = &args.global;
     let project = global.project.as_deref();
+    if !matches!(
+        args.cmd,
+        Commands::Fmt(_)
+            | Commands::New(_)
+            | Commands::Init(_)
+            | Commands::Clean(_)
+            | Commands::Install(_)
+            | Commands::Add(_)
+            | Commands::Remove(_)
+            | Commands::Update(_)
+            | Commands::Deps(_)
+            | Commands::Explain(_)
+            | Commands::Doctor
+    ) {
+        builtins::prepare();
+    }
     match args.cmd {
         Commands::Check(options) => {
             let watching = options.watch;

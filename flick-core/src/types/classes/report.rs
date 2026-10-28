@@ -81,8 +81,7 @@ impl Checker<'_> {
         };
         let names: Vec<String> = self
             .env
-            .instances
-            .iter()
+            .instances()
             .filter(|i| split(&i.head).is_some_and(|(k, _)| k == class))
             .map(|i| format!("`{}`", i.name))
             .collect();

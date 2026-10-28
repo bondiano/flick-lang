@@ -83,7 +83,7 @@ impl Server {
             .is_some_and(|s| s.context == context && s.file(path).is_some());
         tracing::debug!(cached = fresh, "selecting analysis snapshot");
         if !fresh {
-            self.snapshot = Some(analyze(&self.docs, path));
+            self.snapshot = Some(analyze(&self.docs, path, &mut self.caches));
         }
         self.snapshot.as_ref().expect("analyzed")
     }
@@ -238,11 +238,11 @@ impl Server {
             let dot = word - 1;
             let mut docs = self.docs.clone();
             docs.insert(path.clone(), format!("{}{}", &text[..dot], &text[cursor..]));
-            (analyze(&docs, &path), dot)
+            (analyze(&docs, &path, &mut self.caches), dot)
         } else {
             let mut docs = self.docs.clone();
             docs.insert(path.clone(), text.clone());
-            (analyze(&docs, &path), word)
+            (analyze(&docs, &path, &mut self.caches), word)
         };
         // a file with syntax errors is analyzed, but completes better repaired
         let broken = match snapshot.file(&path) {
@@ -260,7 +260,7 @@ impl Server {
                 path.clone(),
                 format!("{}{replacement}{}", &text[..word], &text[cursor..]),
             );
-            snapshot = analyze(&docs, &path);
+            snapshot = analyze(&docs, &path, &mut self.caches);
         }
         let Some(file) = snapshot.file(&path) else {
             return Ok(json!([]));

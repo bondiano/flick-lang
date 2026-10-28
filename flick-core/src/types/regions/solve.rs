@@ -59,55 +59,38 @@ impl Checker<'_> {
         out
     }
 
-    /// Upper bounds decide which side of an inferred union may retain an atom.
-    fn blocked_capture_rows(&self, label: &str) -> HashSet<u32> {
-        let mut blocked = HashSet::new();
-        loop {
-            let mut changed = false;
-            for hold in &self.regions.holds {
-                let visible = match &hold.visible {
-                    Visible::Now(labels) => labels.iter().any(|l| l == label),
-                    Visible::Late(ty) | Visible::Refined(ty) => {
-                        self.visible_in(ty).iter().any(|l| l == label)
-                    }
-                };
-                let bound = self.bound_of(hold);
-                if visible
-                    || bound.get(label).is_some()
-                    || bound.tails.iter().any(|t| {
-                        matches!(t, Type::Meta(m) if !blocked.contains(m))
-                            || matches!(t, Type::Error)
-                    })
-                {
-                    continue;
-                }
-                for tail in self.hidden(hold).tails {
-                    if let Type::Meta(m) = tail {
-                        changed |= blocked.insert(m);
-                    }
-                }
-            }
-            if !changed {
-                return blocked;
-            }
-        }
+    /// Each hold as solving reads it, until a qualifier is bound.
+    fn summaries(&self) -> Vec<Summary> {
+        self.regions
+            .holds
+            .iter()
+            .map(|hold| Summary {
+                visible: match &hold.visible {
+                    Visible::Now(labels) => labels.clone(),
+                    Visible::Late(ty) | Visible::Refined(ty) => self.visible_in(ty),
+                },
+                bound: self.bound_of(hold),
+                hidden: self.hidden(hold),
+            })
+            .collect()
     }
 
     /// Adds to qualifiers not inferred yet what their values hold; `true`
     /// when one grew.
     pub fn grow_holds(&mut self) -> bool {
         let mut changed = false;
-        for i in 0..self.regions.holds.len() {
-            let hold = &self.regions.holds[i];
-            let (actual, bound) = (self.hidden(hold), self.bound_of(hold));
+        let mut summaries = self.summaries();
+        for i in 0..summaries.len() {
+            let Summary { bound, hidden, .. } = &summaries[i];
             if !bound.tails.iter().any(|t| matches!(t, Type::Meta(_))) {
                 continue;
             }
-            for (label, atom) in actual.entries {
+            let (bound, actual) = (bound.clone(), hidden.entries.clone());
+            for (label, atom) in actual {
                 if bound.get(&label).is_some() {
                     continue;
                 }
-                let blocked = self.blocked_capture_rows(&label);
+                let blocked = blocked_capture_rows(&summaries, &label);
                 let metas = bound.tails.iter().filter_map(|t| match t {
                     Type::Meta(m) => Some(*m),
                     _ => None,
@@ -129,6 +112,7 @@ impl Checker<'_> {
                     }
                 }
                 if grew {
+                    summaries = self.summaries();
                     break;
                 }
             }
@@ -398,6 +382,39 @@ impl Checker<'_> {
                 );
                 return;
             }
+        }
+    }
+}
+
+/// What a hold shows, may hold and holds beyond what it shows.
+struct Summary {
+    visible: Vec<String>,
+    bound: Norm,
+    hidden: Norm,
+}
+
+/// Upper bounds decide which side of an inferred union may retain an atom.
+fn blocked_capture_rows(summaries: &[Summary], label: &str) -> HashSet<u32> {
+    let mut blocked = HashSet::new();
+    loop {
+        let mut changed = false;
+        for summary in summaries {
+            if summary.visible.iter().any(|l| l == label)
+                || summary.bound.get(label).is_some()
+                || summary.bound.tails.iter().any(|t| {
+                    matches!(t, Type::Meta(m) if !blocked.contains(m)) || matches!(t, Type::Error)
+                })
+            {
+                continue;
+            }
+            for tail in &summary.hidden.tails {
+                if let Type::Meta(m) = tail {
+                    changed |= blocked.insert(*m);
+                }
+            }
+        }
+        if !changed {
+            return blocked;
         }
     }
 }

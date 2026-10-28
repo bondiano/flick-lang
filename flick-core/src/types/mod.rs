@@ -68,7 +68,8 @@ mod unify;
 
 pub use applicative_do::{and_keys, group_key, pure_argument};
 pub use bindings::{LetParts, let_parts, signature_name};
-pub use builtins::{builtin_sources, builtins};
+use builtins::builtin_env;
+pub use builtins::{builtin_sources, builtins, install_builtins};
 pub use classes::Dict;
 pub(crate) use classes::{Match, match_type};
 pub use component::{instance_key as component_instance, parts as component_parts};
@@ -95,9 +96,10 @@ pub use typing::{
 };
 
 use convert::TyVar;
-use env::Env;
+use env::{Builtins, Env};
 use kinds::KindStore;
 use std::collections::HashMap;
+use std::ptr;
 use unify::Store;
 
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
@@ -202,6 +204,24 @@ fn run(
     module: &Module,
     imported: &dyn Fn(&str) -> Option<Interface>,
     builtins: &[Interface],
+    options: Options,
+    interface: &mut Interface,
+) -> (Vec<Diagnostic>, Typing, Vec<(Span, Dict)>) {
+    let owned;
+    let builtins = if ptr::eq(builtins, self::builtins()) {
+        builtin_env()
+    } else {
+        owned = Builtins::new(builtins);
+        &owned
+    };
+    run_in(module, imported, builtins, options, interface)
+}
+
+/// [`run`] over built-in modules already learned.
+fn run_in(
+    module: &Module,
+    imported: &dyn Fn(&str) -> Option<Interface>,
+    builtins: &Builtins,
     options: Options,
     interface: &mut Interface,
 ) -> (Vec<Diagnostic>, Typing, Vec<(Span, Dict)>) {
@@ -316,7 +336,7 @@ struct Operator {
 struct Checker<'a> {
     file: FileId,
     text: &'a str,
-    env: Env,
+    env: Env<'a>,
     store: Store,
     kinds: KindStore,
     diagnostics: Vec<Diagnostic>,

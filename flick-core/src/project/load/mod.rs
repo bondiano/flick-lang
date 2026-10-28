@@ -7,16 +7,19 @@ use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
+mod checking;
+#[cfg(test)]
+mod checking_tests;
 mod entry;
 mod ide;
 mod packages;
 mod runner;
 mod unknown;
 
+pub use checking::ModuleCache;
 pub use entry::{MainKind, main_kind};
-pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze};
+pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_with};
 
-use super::config::Backend;
 use super::packages::Packages;
 use super::{Host, Project, module_name, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
@@ -70,6 +73,8 @@ struct Loader<'a> {
     lowered: Option<Vec<Option<ir::Module>>>,
     /// With `Some`, what editors need of each module that parses.
     ide: Option<Vec<Analyzed>>,
+    /// With `Some`, the outputs of earlier runs to reuse.
+    cache: Option<&'a mut ModuleCache>,
 }
 
 /// The modules of a build and the package modules they use.
@@ -108,7 +113,7 @@ pub fn check(
     project: Option<&Project>,
     roots: &[PathBuf],
 ) -> Vec<Diagnostic> {
-    run(host, sources, project, roots, Mode::Check).0
+    run(host, sources, project, roots, Mode::Check, None).0
 }
 
 /// [`check`], also lowering every module to the IR when nothing has errors.
@@ -118,7 +123,7 @@ pub fn compile(
     project: Option<&Project>,
     roots: &[PathBuf],
 ) -> (Vec<Diagnostic>, Compilation) {
-    let (diagnostics, compilation, _) = run(host, sources, project, roots, Mode::Compile);
+    let (diagnostics, compilation, _) = run(host, sources, project, roots, Mode::Compile, None);
     (diagnostics, compilation)
 }
 
@@ -128,6 +133,7 @@ fn run(
     project: Option<&Project>,
     roots: &[PathBuf],
     mode: Mode,
+    cache: Option<&mut ModuleCache>,
 ) -> (Vec<Diagnostic>, Compilation, Vec<Analyzed>) {
     let mut diagnostics = Vec::new();
     let packages = project.map_or_else(Packages::default, |p| {
@@ -145,6 +151,7 @@ fn run(
         diagnostics,
         lowered: (mode != Mode::Check).then(Vec::new),
         ide: (mode == Mode::Analyze).then(Vec::new),
+        cache,
     };
     let mut roots: Vec<(Root, PathBuf)> = roots
         .iter()
@@ -166,6 +173,10 @@ fn run(
         lowered.resize_with(loader.modules.len(), || None);
     }
     let interfaces = loader.resolve_all(&edges);
+    if let Some(cache) = &mut loader.cache {
+        // modules no longer loaded are dropped
+        cache.retain_loaded(&loader.modules);
+    }
     loader.check_entry(&interfaces);
     loader.check_packages();
     let failed = loader
@@ -417,86 +428,5 @@ impl Loader<'_> {
                 ),
             );
         }
-    }
-
-    /// Resolves every module after the modules it imports; an import that
-    /// closes a cycle sees no interface.
-    fn resolve_all(&mut self, edges: &[Vec<usize>]) -> Vec<Option<Interface>> {
-        let mut interfaces: Vec<Option<Interface>> = vec![None; self.modules.len()];
-        let mut visiting = vec![false; self.modules.len()];
-        for i in 0..self.modules.len() {
-            self.resolve_one(i, edges, &mut interfaces, &mut visiting);
-        }
-        interfaces
-    }
-
-    fn resolve_one(
-        &mut self,
-        i: usize,
-        edges: &[Vec<usize>],
-        interfaces: &mut Vec<Option<Interface>>,
-        visiting: &mut Vec<bool>,
-    ) {
-        if interfaces[i].is_some() || visiting[i] {
-            return;
-        }
-        visiting[i] = true;
-        for &j in &edges[i] {
-            self.resolve_one(j, edges, interfaces, visiting);
-        }
-        let loaded = &self.modules[i];
-        let module = resolve::Module {
-            name: &loaded.name,
-            file: loaded.file,
-            text: &self.sources.get(loaded.file).text,
-            tree: &loaded.parse.tree,
-            syntax: &loaded.syntax,
-        };
-        let lookup = |name: &str| match self.by_name.get(name) {
-            Some(&j) => interfaces[j].clone(),
-            None => self.from_packages.get(name).cloned(),
-        };
-        let (mut interface, diagnostics) = resolve::resolve(&module, &lookup);
-        let local = |name: &str| self.by_name.contains_key(name);
-        let build = self.project.map(|p| &p.config.build);
-        let options = types::Options {
-            local: &local,
-            limits: build.map_or_else(types::Limits::default, |b| types::Limits {
-                steps: b.solver_steps,
-                depth: b.solver_depth,
-            }),
-            sql: self
-                .project
-                .map_or_else(Default::default, |p| p.config.sql_dialect),
-            no_let_assert: self.project.is_some_and(|p| p.config.no_let_assert),
-            thresholds: self
-                .project
-                .map_or_else(Default::default, |p| p.config.thresholds),
-            effects: build.is_none_or(|b| b.effect == Backend::Effect),
-        };
-        self.diagnostics
-            .extend(loaded.parse.diagnostics.iter().cloned());
-        let resolved = !diagnostics.iter().any(|d| d.severity == Severity::Error);
-        self.diagnostics.extend(diagnostics);
-        // a module with syntax errors is checked for its other errors, but keeps
-        // untyped exports: importers trust them
-        let broken = !loaded.parse.diagnostics.is_empty();
-        let untyped = broken.then(|| interface.clone());
-        let (checked, typing) =
-            types::check_typed(&module, &lookup, types::builtins(), options, &mut interface);
-        let checked = types::beside_syntax_errors(&loaded.parse.tree, checked);
-        let clean = !broken && resolved && !checked.iter().any(|d| d.severity == Severity::Error);
-        self.diagnostics.extend(checked);
-        if clean && let Some(lowered) = &mut self.lowered {
-            match ir::lower(&module, &typing) {
-                Ok(ir) => lowered[i] = Some(ir),
-                Err(d) => self.diagnostics.extend(d),
-            }
-        }
-        if let Some(ide) = &mut self.ide {
-            ide.push(Analyzed::new(loaded, typing, interface.clone()));
-        }
-        interfaces[i] = Some(untyped.unwrap_or(interface));
-        visiting[i] = false;
     }
 }

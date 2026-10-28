@@ -229,8 +229,7 @@ impl Checker<'_> {
     ) -> Outcome {
         let instances: Vec<Instance> = self
             .env
-            .instances
-            .iter()
+            .instances()
             .filter(|i| split(&i.head).is_some_and(|(k, _)| k == class))
             .cloned()
             .collect();

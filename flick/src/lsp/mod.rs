@@ -19,7 +19,7 @@ use std::sync::LazyLock;
 use std::time::Instant;
 
 use flick_core::diagnostics::{Diagnostic, Severity};
-use flick_core::project::{self, Analysis, Analyzed, Compilation, Host};
+use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, ModuleCache};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::{resolve, syntax, types};
 use serde_json::{Value, json};
@@ -68,7 +68,7 @@ impl Host for Overlay<'_> {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-enum Context {
+pub enum Context {
     Project(PathBuf),
     Standalone(PathBuf),
     Builtin(PathBuf),
@@ -115,8 +115,12 @@ impl Snapshot {
     }
 }
 
-/// Analyzes the project of `path` with `docs` over the files.
-pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path) -> Snapshot {
+/// What each context kept of its earlier analyses.
+pub type Caches = HashMap<Context, ModuleCache>;
+
+/// Analyzes the project of `path` with `docs` over the files, reusing the
+/// modules that did not change since the context's earlier analyses.
+pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path, caches: &mut Caches) -> Snapshot {
     let started = Instant::now();
     let _span =
         debug_span!("analysis", path = %path.display(), open_documents = docs.len()).entered();
@@ -180,7 +184,8 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path) -> Snapshot {
     roots.sort();
     let mut seen = HashSet::new();
     roots.retain(|root| seen.insert(canonical(root)));
-    let analysis = project::analyze(&host, &mut sources, found.as_ref(), &roots);
+    let cache = caches.entry(context.clone()).or_default();
+    let analysis = project::analyze_with(&host, &mut sources, found.as_ref(), &roots, cache);
     let root = found.map_or(dir, |p| p.root);
     debug!(
         root = %root.display(),
@@ -251,7 +256,7 @@ fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
                 file,
                 test: false,
                 tree: parsed.tree,
-                typing,
+                typing: typing.into(),
                 interface,
             }],
             compilation: Compilation::default(),
@@ -266,6 +271,7 @@ fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
 pub struct Server {
     docs: HashMap<PathBuf, String>,
     snapshot: Option<Snapshot>,
+    caches: Caches,
     /// Each context clears only the diagnostics it previously published.
     published: HashMap<Context, HashSet<PathBuf>>,
     out: io::Stdout,
@@ -281,6 +287,7 @@ pub fn serve() -> ExitCode {
     let mut server = Server {
         docs: HashMap::new(),
         snapshot: None,
+        caches: Caches::new(),
         published: HashMap::new(),
         out: io::stdout(),
     };
@@ -428,7 +435,7 @@ impl Server {
 
     /// Re-analyzes and publishes this context's diagnostics.
     fn refresh(&mut self, path: &Path) {
-        let snapshot = analyze(&self.docs, path);
+        let snapshot = analyze(&self.docs, path, &mut self.caches);
         let mut by_file: HashMap<PathBuf, Vec<&Diagnostic>> = HashMap::new();
         for d in &snapshot.analysis.diagnostics {
             if let Some(span) = d.span {

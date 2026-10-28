@@ -237,7 +237,7 @@ impl<'n> Checker<'_> {
         if self.conflicts(instance, &info, &args, span) {
             return false;
         }
-        self.env.instances.push(instance.clone());
+        self.env.add_instance(instance.clone());
         true
     }
 

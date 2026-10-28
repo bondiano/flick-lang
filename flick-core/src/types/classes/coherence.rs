@@ -23,8 +23,7 @@ impl Checker<'_> {
         let class = split(&instance.head).map(|(k, _)| k);
         let others: Vec<Instance> = self
             .env
-            .instances
-            .iter()
+            .instances()
             .filter(|i| split(&i.head).map(|(k, _)| k) == class)
             .cloned()
             .collect();

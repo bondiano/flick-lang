@@ -4,6 +4,7 @@
 
 use std::sync::OnceLock;
 
+use super::env::Builtins;
 use crate::iface::Interface;
 use crate::resolve::{self, Module};
 use crate::source::SourceMap;
@@ -345,11 +346,13 @@ pub fn builtin_sources() -> &'static [(&'static str, &'static str)] {
     SOURCES
 }
 
+static BUILTINS: OnceLock<Vec<Interface>> = OnceLock::new();
+
 /// Interfaces of the built-in modules.
 pub fn builtins() -> &'static [Interface] {
-    static BUILTINS: OnceLock<Vec<Interface>> = OnceLock::new();
     BUILTINS.get_or_init(|| {
         let mut done: Vec<Interface> = Vec::new();
+        let mut known = Builtins::default();
         for &(name, text) in SOURCES {
             let mut sources = SourceMap::default();
             let file = sources.add(format!("<builtin>/{name}.fl"), text);
@@ -376,21 +379,31 @@ pub fn builtins() -> &'static [Interface] {
                 thresholds: super::Thresholds::default(),
                 effects: true,
             };
-            diagnostics.extend(super::check(
-                &module,
-                &imported,
-                &done,
-                options,
-                &mut interface,
-            ));
+            let (checked, _, _) =
+                super::run_in(&module, &imported, &known, options, &mut interface);
+            diagnostics.extend(checked);
             assert!(
                 diagnostics.is_empty(),
                 "built-in module {name} does not check: {diagnostics:?}"
             );
+            known.add(&interface);
             done.push(interface);
         }
         done
     })
+}
+
+/// Uses `interfaces`, saved from an earlier [`builtins`] of the same
+/// sources, instead of checking the built-in modules again; false once
+/// they are already in use.
+pub fn install_builtins(interfaces: Vec<Interface>) -> bool {
+    BUILTINS.set(interfaces).is_ok()
+}
+
+/// What every module knows of the built-in modules.
+pub(super) fn builtin_env() -> &'static Builtins {
+    static ENV: OnceLock<Builtins> = OnceLock::new();
+    ENV.get_or_init(|| Builtins::new(builtins()))
 }
 
 #[cfg(test)]
