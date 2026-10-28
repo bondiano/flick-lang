@@ -452,3 +452,47 @@ fn several_entries_build_a_runner_each() {
         "{manifest}"
     );
 }
+
+#[test]
+fn an_output_directory_holding_the_project_is_refused_before_anything_is_written() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("build_out_dir_overlap");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("src/App")).expect("dir");
+    fs::write(
+        dir.join("flick.toml"),
+        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n",
+    )
+    .expect("write");
+    let manifest = "{ \"name\": \"@acme/kept\", \"private\": true }\n";
+    fs::write(dir.join("package.json"), manifest).expect("write");
+    fs::write(
+        dir.join("src/App/Main.fl"),
+        "module App.Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n",
+    )
+    .expect("write");
+    for out_dir in [".", "..", "src"] {
+        let out = flick_in(&dir, &["build", "--out-dir", out_dir]);
+        assert!(!out.status.success(), "{out_dir}: {out:?}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains("FLICK-P028"),
+            "{out_dir}: {out:?}"
+        );
+        assert_eq!(
+            fs::read_to_string(dir.join("package.json")).expect("manifest"),
+            manifest
+        );
+        assert!(!dir.join("App").exists() && !dir.join("src/App/Main.js").exists());
+    }
+    // a directory of its own builds and cleans as before
+    assert!(
+        flick_in(&dir, &["build", "--out-dir", "out"])
+            .status
+            .success()
+    );
+    assert!(dir.join("out/App/Main.js").exists());
+    assert!(flick_in(&dir, &["clean"]).status.success());
+    assert_eq!(
+        fs::read_to_string(dir.join("package.json")).expect("manifest"),
+        manifest
+    );
+}

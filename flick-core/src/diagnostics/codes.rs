@@ -282,6 +282,7 @@ codes! {
     P025 = Project 25, "cannot compare the API with a git revision";
     P026 = Project 26, "entry `main` has a type no runner starts";
     P027 = Project 27, "package built only without Effect";
+    P028 = Project 28, "output directory holds the project's files";
 }
 
 #[cfg(test)]
