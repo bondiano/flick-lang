@@ -55,23 +55,15 @@ pub enum ItemKind {
         body: Expr,
     },
     /// `let (a, b) = …`.
-    Destructure {
-        pattern: Pat,
-        body: Expr,
-    },
+    Destructure { pattern: Pat, body: Expr },
+    /// A binding to a JS function; only the JS backend emits it.
     Foreign(Foreign),
     /// A constructor of a type or error declared here.
     Constructor(Constructor),
     /// `service S`: its key is `Module.S`.
-    Service {
-        name: String,
-        key: String,
-    },
+    Service { name: String, key: String },
     /// A refined type `name`: its check `T$check`, and `T$parse`, `T$value`.
-    Refined {
-        name: String,
-        check: Expr,
-    },
+    Refined { name: String, check: Expr },
     /// The witness `T$schema` of a type deriving `Schema`, a function of
     /// `witnesses` witnesses; a refined type also gets `T$json`.
     Schema(SchemaItem),
@@ -83,6 +75,7 @@ pub enum ItemKind {
     },
 }
 
+/// A `foreign` declaration: a JS calling convention, not a portable one.
 #[derive(Debug, Clone)]
 pub struct Foreign {
     pub name: String,
@@ -444,8 +437,10 @@ pub struct Arm {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Lit {
-    /// Source text of a JS numeric literal.
-    Number(String),
+    Int(i32),
+    Float(f64),
+    /// Decimal or `0x`/`0o`/`0b` digits with an optional `-`, without `_`
+    /// or a suffix: its size is not bounded.
     BigInt(String),
     String(String),
     Bool(bool),

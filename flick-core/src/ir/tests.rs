@@ -136,3 +136,22 @@ fn both_forms_of_save_button_lower_to_the_same_ir() {
     assert!(body("save_button").contains("Ui.button"));
     assert_eq!(body("save_button"), body("save_button_calls"));
 }
+
+#[test]
+fn ir_does_not_depend_on_a_backend() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/ir");
+    let mut dirs = vec![root];
+    while let Some(dir) = dirs.pop() {
+        for entry in fs::read_dir(dir).expect("ir dir") {
+            let path = entry.expect("entry").path();
+            if path.is_dir() {
+                dirs.push(path);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                let text = fs::read_to_string(&path).expect("utf-8");
+                // split so that this file does not match itself
+                let codegen = concat!("codegen", "::");
+                assert!(!text.contains(codegen), "{} uses codegen", path.display());
+            }
+        }
+    }
+}

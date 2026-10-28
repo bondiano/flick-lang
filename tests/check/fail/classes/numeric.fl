@@ -13,6 +13,10 @@ let unconstrained x = x + x
 integral : Numeric a => a -> a
 let integral x = x * 0.5
 
+huge : Numeric a => a -> a
+let huge x = x + 3000000000
+
 //~ FLICK-C012 @7:1-8:18 `Numeric` is closed
 //~ FLICK-C001 @11:23-11:28 cannot deduce `Numeric a` from the constraints in scope
 //~ FLICK-C001 @14:22-14:25 cannot deduce `Floating a` from the constraints in scope
+//~ FLICK-T003 @17:18-17:28 this number does not fit in `Int`

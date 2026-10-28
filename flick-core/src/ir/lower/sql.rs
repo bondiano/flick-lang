@@ -98,7 +98,15 @@ impl Lower<'_> {
         match &v.form {
             SqlForm::Kind(kind) => fields.push(("kind", string(kind, span))),
             SqlForm::Column(table, column) => {
-                fields.push(("table", lit(Lit::Number(table.to_string()), span)));
+                fields.push((
+                    "table",
+                    lit(
+                        Lit::Int(
+                            i32::try_from(*table).expect("a query joins fewer than 2^31 tables"),
+                        ),
+                        span,
+                    ),
+                ));
                 fields.push(("column", string(column, span)));
             }
         }

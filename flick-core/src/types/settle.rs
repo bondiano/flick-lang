@@ -166,6 +166,15 @@ impl Checker<'_> {
             // on a type variable, a method of its `Numeric` or `Floating`
             // constraint makes the value
             Type::Skolem(_) if !literal.pattern => {
+                // `from_int` takes an `Int`
+                if !literal.fractional && !literal.value.is_some_and(|v| Num::Int.holds(v)) {
+                    self.error(
+                        codes::T003,
+                        literal.span,
+                        "this number does not fit in `Int`",
+                    );
+                    return;
+                }
                 let class = if literal.fractional {
                     "Floating"
                 } else {

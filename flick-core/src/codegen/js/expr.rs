@@ -3,8 +3,8 @@
 
 use std::mem;
 
-use super::{Callee, Gen, Target, indent, names, tidy};
-use crate::ir::{Arm, Expr, ExprKind, Lit, Pat, Stage, Stmt};
+use super::{Callee, Gen, Target, indent, literal, names, tidy};
+use crate::ir::{Arm, Expr, ExprKind, Pat, Stage, Stmt};
 use crate::numeric::Num;
 use crate::types::{Constructor, Dict, Rep};
 
@@ -71,7 +71,7 @@ impl Gen<'_> {
 
     pub(super) fn expr(&mut self, e: &Expr) -> String {
         match &e.kind {
-            ExprKind::Lit(lit) => literal(lit),
+            ExprKind::Lit(lit) => literal::literal(lit),
             ExprKind::Local(name) => names::ident(name),
             ExprKind::Global { module, name } => self.global(module, &names::ident(name)),
             ExprKind::Method { dict, name } => match self.direct_method(dict, name) {
@@ -506,15 +506,6 @@ pub fn arrow_body(stmts: &[String], value: &str) -> String {
         }
     } else {
         format!("{{\n{}  return {value};\n}}", indent(stmts))
-    }
-}
-
-pub fn literal(lit: &Lit) -> String {
-    match lit {
-        Lit::Number(n) | Lit::BigInt(n) => n.clone(),
-        Lit::String(s) => names::string(s),
-        Lit::Bool(b) => b.to_string(),
-        Lit::Unit => "undefined".to_owned(),
     }
 }
 

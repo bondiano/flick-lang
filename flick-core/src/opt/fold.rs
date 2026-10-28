@@ -47,7 +47,11 @@ pub fn fold(e: &mut Expr) -> bool {
         },
         _ => None,
     };
-    match folded.and_then(|c| expr(&c, e)) {
+    let num = match &e.kind {
+        ExprKind::Binary(BinOp::Arith(_, num), ..) | ExprKind::Neg(num, _) => *num,
+        _ => Num::Float,
+    };
+    match folded.map(|c| expr(&c, num, e)) {
         Some(value) => {
             *e = value;
             true
@@ -191,8 +195,9 @@ fn int(e: &Expr) -> Option<i32> {
 /// and `Float.nan`.
 pub fn constant(e: &Expr) -> Option<Const> {
     match &e.kind {
-        ExprKind::Lit(Lit::Number(n)) => literal::number_value(n).map(Const::Number),
-        ExprKind::Lit(Lit::BigInt(n)) => literal::bigint_value(n).map(Const::BigInt),
+        ExprKind::Lit(Lit::Int(n)) => Some(Const::Number((*n).into())),
+        ExprKind::Lit(Lit::Float(x)) => Some(Const::Number(*x)),
+        ExprKind::Lit(Lit::BigInt(n)) => literal::bigint_digits_value(n).map(Const::BigInt),
         ExprKind::Lit(Lit::String(s)) => Some(Const::String(s.clone())),
         ExprKind::Lit(Lit::Bool(b)) => Some(Const::Bool(*b)),
         ExprKind::Neg(_, inner) => consteval::prefix(K::Minus, constant(inner)?),
@@ -205,36 +210,18 @@ pub fn constant(e: &Expr) -> Option<Const> {
     }
 }
 
-/// `c` as an expression at the place of `at`: a literal, negated when the
-/// value is negative (`-0` included), so the text stays a JS literal.
-fn expr(c: &Const, at: &Expr) -> Option<Expr> {
-    let lit = |l: Lit| Expr::new(ExprKind::Lit(l), at.span);
-    // negating a literal is exact on every numeric type
-    let negated = |l: Lit| Expr::new(ExprKind::Neg(Num::Float, Box::new(lit(l))), at.span);
-    Some(match c {
-        // JS globals, never shadowed: generated code reserves both names
-        Const::Number(x) if x.is_nan() => lit(Lit::Number("NaN".to_owned())),
-        Const::Number(x) if x.is_infinite() && *x < 0.0 => {
-            negated(Lit::Number("Infinity".to_owned()))
-        }
-        Const::Number(x) if x.is_infinite() => lit(Lit::Number("Infinity".to_owned())),
-        Const::Number(x) if x.is_sign_negative() => negated(Lit::Number(number_text(-x))),
-        Const::Number(x) => lit(Lit::Number(number_text(*x))),
-        Const::BigInt(x) if *x < 0 => negated(Lit::BigInt(format!("{}n", x.checked_neg()?))),
-        Const::BigInt(x) => lit(Lit::BigInt(format!("{x}n"))),
-        Const::String(s) => lit(Lit::String(s.clone())),
-        Const::Bool(b) => lit(Lit::Bool(*b)),
-    })
-}
-
-/// The shorter of the plain and the exponent spelling; both read back as
-/// exactly `x`.
-fn number_text(x: f64) -> String {
-    let plain = format!("{x}");
-    let exponent = format!("{x:e}");
-    if exponent.len() < plain.len() {
-        exponent
-    } else {
-        plain
-    }
+/// `c` as a literal at the place of `at`; a number is of type `num`.
+fn expr(c: &Const, num: Num, at: &Expr) -> Expr {
+    let lit = match c {
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "an `Int` result is folded in 32 bits"
+        )]
+        Const::Number(x) if num == Num::Int => Lit::Int(*x as i32),
+        Const::Number(x) => Lit::Float(*x),
+        Const::BigInt(x) => Lit::BigInt(x.to_string()),
+        Const::String(s) => Lit::String(s.clone()),
+        Const::Bool(b) => Lit::Bool(*b),
+    };
+    Expr::new(ExprKind::Lit(lit), at.span)
 }

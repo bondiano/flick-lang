@@ -23,7 +23,7 @@ impl Gen<'_> {
             Pat::Bind(name) => t.binds.push((names::ident(name), subject.to_owned())),
             Pat::Lit(lit) => t
                 .conds
-                .push(format!("{subject} === {}", super::expr::literal(lit))),
+                .push(format!("{subject} === {}", super::literal::literal(lit))),
             Pat::Tuple(items) => {
                 for (i, item) in items.iter().enumerate() {
                     self.test(item, &format!("{subject}[{i}]"), t);

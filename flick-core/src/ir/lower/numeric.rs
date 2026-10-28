@@ -3,6 +3,7 @@
 
 use super::Lower;
 use super::expr::with_dicts;
+use super::literals::number;
 use crate::ir::{Expr, ExprKind, Stage};
 use crate::numeric::{self, Arith, Num};
 use crate::source::Span;
@@ -44,12 +45,15 @@ impl Lower<'_> {
     /// A number literal on a type variable, made by its class's method.
     pub(super) fn generic_literal(&mut self, node: &Node, span: Span) -> Expr {
         let text = node.child_tokens().next().map_or("", |t| t.text(self.text));
-        let make = if numeric::is_integer_literal(text) {
-            "from_int"
+        let (make, num) = if numeric::is_integer_literal(text) {
+            ("from_int", Num::Int)
         } else {
-            "from_float"
+            ("from_float", Num::Float)
         };
-        let lit = Box::new(Expr::new(ExprKind::Lit(self.literal(node)), span));
+        let lit = Box::new(Expr::new(
+            ExprKind::Lit(number(Some(num), text, false)),
+            span,
+        ));
         let make = self.prelude_method(node.range(), make);
         apply(make, [lit], span)
     }

@@ -1,0 +1,42 @@
+// Number literals keep their value whatever their spelling: a radix, `_`,
+// an exponent, a sign in a pattern, and a `BigInt` wider than 128 bits.
+module App.Main exposing (main)
+
+import Numeric exposing (Numeric)
+
+sign : Int -> String
+let sign n =
+  match n with
+  | -2147483648 -> "min"
+  | -1 -> "minus one"
+  | 0 -> "zero"
+  | _ -> "other"
+
+small : BigInt -> String
+let small n =
+  match n with
+  | -0xffn -> "minus 255"
+  | 1_000n -> "thousand"
+  | _ -> "other"
+
+twice : Numeric a => a -> a
+let twice x = x * 2
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (show 0xff)
+  Platform.stdout_line (show 1_000_000)
+  Platform.stdout_line (show (0b1010 : Float))
+  Platform.stdout_line (show 1e21)
+  Platform.stdout_line (show 1.50)
+  Platform.stdout_line (show (-2147483648))
+  Platform.stdout_line (show (-2147483647 - 1))
+  Platform.stdout_line (sign (-2147483648))
+  Platform.stdout_line (sign (0 - 1))
+  Platform.stdout_line (small (0 - 255))
+  Platform.stdout_line (small 1000)
+  Platform.stdout_line (show 0x1_0000_0000_0000_0000_0000_0000_0000_0000n)
+  Platform.stdout_line (show (twice 0x10))
+  Platform.stdout_line (show (twice 1.25))
+  Platform.stdout_line (show (twice 0o17n))
+  Platform.stdout_line (show (1.0e2 * -0.5))

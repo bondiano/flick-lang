@@ -301,11 +301,14 @@ fn binary(method: &str, num: Num) -> Option<BinOp> {
 
 /// `from_int` or `from_float` of a literal, as a literal of the type.
 fn literal(num: Num, arg: &Expr) -> Option<ExprKind> {
-    let ExprKind::Lit(Lit::Number(text)) = &arg.kind else {
+    let ExprKind::Lit(lit) = &arg.kind else {
         return None;
     };
-    Some(ExprKind::Lit(match num {
-        Num::BigInt => Lit::BigInt(format!("{text}n")),
-        Num::Int | Num::Float => Lit::Number(text.clone()),
+    Some(ExprKind::Lit(match (num, lit) {
+        (Num::Int, Lit::Int(n)) => Lit::Int(*n),
+        (Num::Float, Lit::Int(n)) => Lit::Float((*n).into()),
+        (Num::BigInt, Lit::Int(n)) => Lit::BigInt(n.to_string()),
+        (Num::Float, Lit::Float(x)) => Lit::Float(*x),
+        _ => return None,
     }))
 }

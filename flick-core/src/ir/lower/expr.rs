@@ -4,11 +4,10 @@ use super::Lower;
 use super::atoms::completed;
 use super::numeric::{apply, arith_of};
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
-use crate::numeric::{Arith, Num};
+use crate::numeric::Arith;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::literal;
 use crate::types::{Dict, Identity, Range, Ref, is_pattern, let_parts};
 
 impl Lower<'_> {
@@ -81,6 +80,9 @@ impl Lower<'_> {
             K::TodoExpr => return self.todo(node),
             K::PrefixExpr if node.has_token(K::EchoKw) => {
                 return self.echo(node, children.first().copied());
+            }
+            K::PrefixExpr if self.negative_int(node, &children) => {
+                ExprKind::Lit(self.signed_literal(children[0], true))
             }
             K::PrefixExpr => {
                 let operand = self.boxed(children[0]);
@@ -182,24 +184,6 @@ impl Lower<'_> {
                 ExprKind::CodecBlock(name, fields)
             }
             _ => ExprKind::Lit(Lit::Unit),
-        }
-    }
-
-    pub(super) fn literal(&self, node: &Node) -> Lit {
-        let Some(token) = node.child_tokens().next() else {
-            return Lit::Unit;
-        };
-        let text = token.text(self.text);
-        match token.kind {
-            K::Number if self.typing.numeric.get(&node.range()) == Some(&Num::BigInt) => {
-                Lit::BigInt(format!("{text}n"))
-            }
-            K::Number => Lit::Number(text.to_owned()),
-            K::BigInt => Lit::BigInt(text.to_owned()),
-            K::String => Lit::String(literal::string_value(text)),
-            K::TrueKw => Lit::Bool(true),
-            K::FalseKw => Lit::Bool(false),
-            _ => Lit::Unit,
         }
     }
 

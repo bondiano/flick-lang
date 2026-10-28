@@ -2,6 +2,7 @@
 //! share the unique names the first alternative binds.
 
 use super::Lower;
+use super::literals::number;
 use crate::ir::{Lit, Pat};
 use crate::numeric::Num;
 use crate::syntax::cst::Node;
@@ -23,17 +24,18 @@ impl Lower<'_> {
                 let Some(last) = tokens.last() else {
                     return Pat::Wild;
                 };
-                let sign = if tokens.len() > 1 { "-" } else { "" };
+                let negative = tokens.len() > 1;
                 let text = last.text(self.text);
                 Pat::Lit(match last.kind {
                     K::TrueKw => Lit::Bool(true),
                     K::FalseKw => Lit::Bool(false),
                     K::String => Lit::String(literal::string_value(text)),
-                    K::BigInt => Lit::BigInt(format!("{sign}{text}")),
-                    _ if self.typing.numeric.get(&node.range()) == Some(&Num::BigInt) => {
-                        Lit::BigInt(format!("{sign}{text}n"))
-                    }
-                    _ => Lit::Number(format!("{sign}{text}")),
+                    K::BigInt => number(Some(Num::BigInt), text, negative),
+                    _ => number(
+                        self.typing.numeric.get(&node.range()).copied(),
+                        text,
+                        negative,
+                    ),
                 })
             }
             K::UnitPat => Pat::Lit(Lit::Unit),

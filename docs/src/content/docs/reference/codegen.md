@@ -39,7 +39,7 @@ A module that has no runtime stage imports no `Effect` at all.
 | Source value | JS |
 | - | - |
 | `Unit`, `()` | `undefined` |
-| `Int`, `Float`, `BigInt`, `String`, `Bool` | the JS primitive; number literals keep their JS spelling, an integer literal of a `BigInt` gets `n` |
+| `Int`, `Float`, `BigInt`, `String`, `Bool` | the JS primitive; a number literal is printed from its value (`0xff` and `1_000` become `255` and `1000`, a negative one is parenthesized), a `BigInt` one keeps its radix and gets `n` |
 
 `Int` arithmetic keeps a value in 32 bits: `a + b` is `(a + b \| 0)`, `a * b`
 is `Math.imul(a, b)`, and `/`, `%` and `**` are runtime calls that truncate

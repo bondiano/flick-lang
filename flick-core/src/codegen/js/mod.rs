@@ -13,6 +13,7 @@ mod group;
 mod items;
 mod labels;
 mod lift;
+mod literal;
 mod pattern;
 mod release;
 mod schema;

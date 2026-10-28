@@ -100,12 +100,19 @@ pub fn number_value(text: &str) -> Option<f64> {
 
 /// The value of a `BigInt` token (`…n`), if it fits in 128 bits.
 pub fn bigint_value(text: &str) -> Option<i128> {
-    let digits: String = text
-        .strip_suffix('n')?
-        .chars()
-        .filter(|&c| c != '_')
-        .collect();
-    let (base, rest) = radix(&digits).unwrap_or((10, &digits));
+    text.strip_suffix('n')?;
+    bigint_digits_value(&bigint_digits(text))
+}
+
+/// The digits of an integer token, with no `_` and no `n` suffix.
+pub fn bigint_digits(text: &str) -> String {
+    let text = text.strip_suffix('n').unwrap_or(text);
+    text.chars().filter(|&c| c != '_').collect()
+}
+
+/// The value of [`bigint_digits`], if it fits in 128 bits.
+pub fn bigint_digits_value(digits: &str) -> Option<i128> {
+    let (base, rest) = radix(digits).unwrap_or((10, digits));
     i128::from_str_radix(rest, base).ok()
 }
 
