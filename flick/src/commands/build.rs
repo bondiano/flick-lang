@@ -147,6 +147,7 @@ impl Command for BuildCommand {
         if let Some(p) = &project
             && clean
             && !output.extras.schema_aot
+            && cache::read_unchanged(p, &roots, &host.cwd, &sources)
         {
             cache::store(&p.root, &self.key(p, &roots, &output), &emitted.artifacts);
         }

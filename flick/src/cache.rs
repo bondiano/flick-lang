@@ -11,6 +11,7 @@ use std::{env, fs, io};
 use flick_core::build::Artifact;
 use flick_core::project::cache::{self, Key, Manifest};
 use flick_core::project::{self, Project};
+use flick_core::source::SourceMap;
 
 use crate::toolchain;
 
@@ -62,6 +63,23 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str) -> String {
         );
     }
     key.finish()
+}
+
+/// Whether each input the compiler read still has the bytes it compiled.
+/// The key is computed from the disk after the build, so a file saved
+/// meanwhile would file the artifacts under sources they were not built
+/// from; such a build is not cached. Display paths are relative to `cwd`.
+pub fn read_unchanged(
+    project: &Project,
+    roots: &[PathBuf],
+    cwd: &Path,
+    sources: &SourceMap,
+) -> bool {
+    let inputs: HashSet<PathBuf> = input_files(project, roots).into_iter().collect();
+    sources.files().all(|file| {
+        let path = project::normalize(&cwd.join(&file.path));
+        !inputs.contains(&path) || fs::read(&path).is_ok_and(|bytes| bytes == file.text.as_bytes())
+    })
 }
 
 /// Files that affect a build, including absent manifests whose creation matters.
@@ -194,4 +212,56 @@ pub fn manifest(root: &Path) -> Manifest {
         .ok()
         .and_then(|t| serde_json::from_str(&t).ok())
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use flick_core::project::{self, discover};
+    use flick_core::source::SourceMap;
+
+    use super::read_unchanged;
+    use crate::sources::FsHost;
+
+    #[test]
+    fn a_source_saved_after_it_was_read_keeps_the_build_out_of_the_cache() {
+        let root = std::env::temp_dir().join(format!("flick-cache-race-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("src/App")).expect("dir");
+        fs::write(
+            root.join("flick.toml"),
+            "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n",
+        )
+        .expect("write");
+        let helper = root.join("src/App/Helper.fl");
+        fs::write(
+            &helper,
+            "module App.Helper exposing (n)\n\nn : Number\nlet n = 1\n",
+        )
+        .expect("write");
+        fs::write(
+            root.join("src/App/Main.fl"),
+            "module App.Main exposing (main)\n\nimport App.Helper\n\nmain : Unit -> Unit\nlet main () =\n  let _ = App.Helper.n\n  ()\n",
+        )
+        .expect("write");
+        let host = FsHost::new();
+        let mut sources = SourceMap::default();
+        let project = discover(&host, &mut sources, &root, None)
+            .expect("project")
+            .expect("found");
+        let roots = [root.join("src/App/Main.fl")];
+        let (diagnostics, _) = project::compile(&host, &mut sources, Some(&project), &roots);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        assert!(sources.files().any(|f| f.path.ends_with("Helper.fl")));
+        assert!(read_unchanged(&project, &roots, &host.cwd, &sources));
+        // the editor saves the helper after the compiler read it
+        fs::write(
+            &helper,
+            "module App.Helper exposing (n)\n\nn : Number\nlet n = 2\n",
+        )
+        .expect("write");
+        assert!(!read_unchanged(&project, &roots, &host.cwd, &sources));
+        let _ = fs::remove_dir_all(&root);
+    }
 }

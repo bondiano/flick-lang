@@ -99,6 +99,11 @@ impl SourceMap {
     pub fn get(&self, id: FileId) -> &SourceFile {
         &self.files[id.0 as usize]
     }
+
+    /// The files in the order they were added.
+    pub fn files(&self) -> impl Iterator<Item = &SourceFile> {
+        self.files.iter()
+    }
 }
 
 fn offset(n: usize) -> u32 {
