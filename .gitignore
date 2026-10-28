@@ -5,6 +5,7 @@ node_modules/
 /tools/dts-importer/dist/
 /tools/dts-importer/.flick/
 /tools/bundle-size/none/.flick/
+/tools/bundle-size/fullstack/.flick/
 # the playground's compiler, built by `just site-wasm`
 /site/.vitepress/wasm/
 /site/.vitepress/cache/
