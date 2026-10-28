@@ -20,6 +20,6 @@
 "effect/schema" = { excluded = "Flick's Schema and codecs cover schemas; this entrypoint's extras are outside 0.1.0" }
 "effect/socket" = { excluded = "sockets are outside the 0.1.0 standard library" }
 "effect/sql" = { excluded = "Flick's SQL eDSL has its own PostgreSQL driver" }
-"effect/testing" = { excluded = "Flick tests run through `flick test` and the Test module" }
+"effect/testing" = { excluded = "Flick tests run through `flick test` and the Test module; `Test.clock_test` provides a TestClock and `Test.adjust`/`Test.set_time` move it" }
 "effect/workers" = { excluded = "worker threads are outside the 0.1.0 standard library" }
 "effect/workflow" = { excluded = "durable workflows are outside 0.1.0" }

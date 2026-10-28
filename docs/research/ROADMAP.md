@@ -489,7 +489,7 @@ L6/H2 и Vite есть; server/client isolation и общий dev workflow — �
 **Q14. P2 — Loader переносит только success** ✅ (`Atom.serializable_result wire error_wire atom` передаёт и неудачу с одной типизированной ошибкой, закодированной её кодеком; дефект, прерывание и несколько ошибок не передаются — клиент запускает задачу сам; запрос гидрируется и неудачей, `tests/run/ui/route.fl`; поля форм — в F5)
 [serializable_task](../../flick-core/src/types/builtins/Atom.fl#L142-L151) передаёт Loaded, не Failed. `[INFERENCE]` SSR 401/404 могут повторить запрос. F3/F4 должны переносить публичный Result, не Failure со стеком/секретами. Validation не закрывает F5: нужны field paths, accessible controls, async cancellation/lifecycle.
 
-**Q15. P2 — Нет виртуального времени тестов**
+**Q15. P2 — Нет виртуального времени тестов** ✅ (`Test.clock_test` — `effect_test` с собственным `TestClock` Effect на каждый запуск; `Test.adjust`/`Test.set_time` требуют сервис `Test.VirtualTime`, так что двигать часы можно только в таком тесте; обычный `effect_test` по-прежнему на живых часах, иначе существующие тесты со сном зависли бы; `flick/tests/test_command.rs::clock_tests_run_on_virtual_time`: сон в час завершается после `adjust` без реального ожидания, у каждого теста часы с нуля)
 [effect_test](../../flick-core/src/types/builtins/Test.fl#L44-L59) даёт scope, не Clock; effect/testing исключён. Нужен scoped TestClock: advance, изоляция и cleanup без реального backoff. Gen.function не заменяет это.
 
 **Q16. P1 — Отмена не ограничивает PostgreSQL**
