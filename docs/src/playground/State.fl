@@ -96,7 +96,7 @@ let profile_name profile = if profile == Debug then "debug" else "release"
 generated : Model -> Generated
 let generated m = if m.profile == Debug then m.compiled.debug else m.compiled.release
 
-errors : Generated -> Float
+errors : Generated -> Int
 let errors result = List.length (List.filter (fun d -> d.severity == "error") result.diagnostics)
 
 status : Model -> String
