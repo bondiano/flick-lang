@@ -14,6 +14,7 @@ let env =
     ("RATIO", "0.5"),
     ("NAN", "NaN"),
     ("COUNT", "3"),
+    ("BIG", "3000000000"),
     ("SECRET", "hunter2"),
     ("TIMEOUT", "10 seconds"),
     ("SIZE", "2 KiB"),
@@ -40,9 +41,8 @@ let server =
     |> Config.flat_map
       (fun host -> Config.port "PORT" |> Config.map (fun port -> { host = host; port = port }))
 
-even : Float ->{; Config.ConfigError} Float
-let even n =
-  if Float.floor (n / 2) * 2 == n then n else from_result (Err (Config.ConfigError "odd"))
+even : Int ->{; Config.ConfigError} Int
+let even n = if n % 2 == 0 then n else from_result (Err (Config.ConfigError "odd"))
 
 /// A provider of our own: `NAME` is a value, `LIST` an array of two.
 own : ConfigProvider.ConfigProvider
@@ -65,10 +65,18 @@ let main () =
   Platform.stdout_line (read server (fun s -> s.host ++ ":" ++ show s.port))
   Platform.stdout_line (read (Config.boolean "DEBUG") show)
   Platform.stdout_line
-    (read (Config.all [Config.number "RATIO", Config.finite "RATIO", Config.int "COUNT"]) show)
+    (read
+      (Config.all
+        [
+          Config.number "RATIO",
+          Config.finite "RATIO",
+          Config.map Int.to_float (Config.int "COUNT"),
+        ])
+      show)
   Platform.stdout_line (read (Config.number "NAN") show)
   Platform.stdout_line (read (Config.finite "NAN") show)
   Platform.stdout_line (read (Config.int "RATIO") show)
+  Platform.stdout_line (read (Config.int "BIG") show)
   Platform.stdout_line (read (provide Server.node { Config.redacted "SECRET" }) show)
   Platform.stdout_line (read (Config.duration "TIMEOUT") Duration.format)
   Platform.stdout_line (read (Config.byte_size "SIZE") show)

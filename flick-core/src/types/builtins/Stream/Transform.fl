@@ -424,7 +424,8 @@ foreign pure debounce from "@flick-lang/runtime/effect/Stream" "debounce"
 
 /// The chunks paced to `units` of `cost` per `duration`, with `burst`
 /// units more at once (`None`: 0); `Shape` delays a chunk over the budget,
-/// `Enforce` (the default) drops it.
+/// `Enforce` (the default) drops it. Costs and units are Floats: a budget
+/// can be fractional.
 throttle : forall c r e a. {
   cost : (NonEmpty.NonEmpty a -> Float)^c;
   units : Float;

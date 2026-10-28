@@ -39,7 +39,7 @@ let work dir =
   FileSystem.rename (dir ++ "/c.txt") (dir ++ "/d.txt")
   FileSystem.chmod 0o600 (dir ++ "/d.txt")
   let d = FileSystem.stat (dir ++ "/d.txt")
-  line "chmod" (show (Int.bit_and (Int.truncate d.mode) 0o777 == 0o600))
+  line "chmod" (show (Int.bit_and d.mode 0o777 == 0o600))
   match (d.uid, d.gid) with
   | (Some uid, Some gid) -> FileSystem.chown uid gid (dir ++ "/d.txt")
   | _ -> ()

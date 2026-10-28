@@ -104,8 +104,8 @@ foreign pure finite from "@flick-lang/runtime/effect/Config" "Finite"
   reviewed "effect@4.0.5 sha256:b62ed692a3a5d63c"
 
 /// An integer.
-int : String -> Config Float
-foreign pure int from "@flick-lang/runtime/effect/Config" "Int"
+int : String -> Config Int
+foreign pure int from "@flick-lang/runtime/effect/Config" "flickInt"
   reviewed "effect@4.0.5 sha256:5af3d6e83a058045"
 
 /// `true`, `false`, `yes`, `no`, `on`, `off`, `1` or `0`.

@@ -245,7 +245,7 @@ string_tree : Schema a -> PureCodec Json a
 foreign pure string_tree from "@flick-lang/runtime/effect/Schema" "flickStringTree"
   reviewed "effect@4.0.5 sha256:884914a3fb66bd42"
 
-/// A non-negative safe integer.
+/// A non-negative safe integer: a Float, since it goes past the bounds of `Int`.
 natural : PureCodec Json Float
 foreign pure natural from "@flick-lang/runtime/effect/Schema" "Natural"
   reviewed "effect@4.0.5 sha256:4bdca78e545f95dc"

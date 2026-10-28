@@ -55,7 +55,7 @@ type alias BatchOptions o = { window : Duration.Duration; flush : List o ->{} Un
 type alias FileOptions =
   {
     flag : Option FileSystem.OpenFlag;
-    mode : Option Float;
+    mode : Option Int;
     batchWindow : Option Duration.Duration;
   }
 

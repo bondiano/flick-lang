@@ -106,7 +106,8 @@ foreign effect yield_now from "@flick-lang/runtime/effect/Effect" "flickYieldNow
   arity 0
   reviewed "effect@4.0.5 sha256:c167d26106a1fa95"
 
-/// `yield_now` with the priority of the scheduler's task.
+/// `yield_now` with the priority of the scheduler's task, a Float as the
+/// scheduler takes it.
 yield_now_with : Float ->{} Unit
 foreign effect yield_now_with from "@flick-lang/runtime/effect/Effect" "yieldNowWith"
   reviewed "effect@4.0.5 sha256:7e82b2a2a9eb9a63"

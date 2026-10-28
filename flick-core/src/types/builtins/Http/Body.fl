@@ -90,7 +90,7 @@ type alias FileOptions =
   {
     offset : Option ByteSize.ByteSize;
     bytesToRead : Option ByteSize.ByteSize;
-    chunkSize : Option Float;
+    chunkSize : Option Int;
     contentType : Option String;
   }
 

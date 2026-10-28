@@ -37,6 +37,9 @@ export const flickRedacted = (name: string): Effect.Effect<Config.Config<unknown
 /** `Config.url`: the normalized text of the URL. */
 export const flickUrl = (name: string): Config.Config<string> => Config.map(Config.URL(name), (url) => url.href);
 
+/** `Config.int`: an integer within Flick's 32-bit `Int`. */
+export const flickInt = (name: string): Config.Config<number> => Config.schema(Schema.Int.check(Schema.isInt32()), name);
+
 /** `Config.date`: milliseconds since the epoch. */
 export const flickDate = (name: string): Config.Config<number> => Config.map(Config.Date(name), (d) => d.getTime());
 

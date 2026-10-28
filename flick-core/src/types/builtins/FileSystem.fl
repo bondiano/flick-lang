@@ -49,7 +49,7 @@ type alias Info =
     birthtime : Option Float;
     dev : BigInt;
     ino : Option BigInt;
-    mode : Float;
+    mode : Int;
     nlink : Option BigInt;
     uid : Option Float;
     gid : Option Float;
@@ -62,23 +62,23 @@ type alias Info =
 type alias AccessOptions = { ok : Bool; readable : Bool; writable : Bool }
 type alias CopyOptions = { overwrite : Bool; preserveTimestamps : Bool }
 type alias GlobOptions = { root : Option String; exclude : List String }
-type alias MakeDirectoryOptions = { recursive : Bool; mode : Option Float }
+type alias MakeDirectoryOptions = { recursive : Bool; mode : Option Int }
 type alias TempDirectoryOptions = { directory : Option String; prefix : Option String }
 type alias TempFileOptions = {
   directory : Option String;
   prefix : Option String;
   suffix : Option String;
 }
-type alias OpenOptions = { flag : Option OpenFlag; mode : Option Float; noFollow : Bool }
+type alias OpenOptions = { flag : Option OpenFlag; mode : Option Int; noFollow : Bool }
 type alias RemoveOptions = { recursive : Bool; force : Bool }
-type alias WriteOptions = { flag : Option OpenFlag; mode : Option Float }
+type alias WriteOptions = { flag : Option OpenFlag; mode : Option Int }
 
 /// The operations of Effect's `FileSystem`; the functions below call them.
 service FileSystem =
   access : AccessOptions -> String ->{; PlatformError.PlatformError} Unit
   copy : CopyOptions -> String -> String ->{; PlatformError.PlatformError} Unit
   copy_file : String -> String ->{; PlatformError.PlatformError} Unit
-  chmod : Float -> String ->{; PlatformError.PlatformError} Unit
+  chmod : Int -> String ->{; PlatformError.PlatformError} Unit
   chown : Float -> Float -> String ->{; PlatformError.PlatformError} Unit
   glob : GlobOptions -> String ->{; PlatformError.PlatformError} List String
   exists : String ->{; PlatformError.PlatformError} Bool
@@ -120,7 +120,7 @@ copy_file : String -> String ->{FileSystem; PlatformError.PlatformError} Unit
 let copy_file from_path to_path = FileSystem.copy_file from_path to_path
 
 /// Sets the permission bits of the path.
-chmod : Float -> String ->{FileSystem; PlatformError.PlatformError} Unit
+chmod : Int -> String ->{FileSystem; PlatformError.PlatformError} Unit
 let chmod mode path = FileSystem.chmod mode path
 
 /// Sets the owner: `chown uid gid path`.
@@ -250,7 +250,7 @@ foreign effect sync from "@flick-lang/runtime/effect/FileSystem" "flickSync"
 
 /// Reads at most `size` bytes from the position, or from the current one;
 /// `None` at the end of the file.
-read_alloc : forall s. Float ->
+read_alloc : forall s. Int ->
   Option BigInt ->
   File s ->{; PlatformError.PlatformError}
   Option (List Int)
@@ -267,7 +267,7 @@ foreign effect file_truncate from "@flick-lang/runtime/effect/FileSystem" "flick
   reviewed "effect@4.0.5 sha256:e5908aede5e43a55"
 
 /// Writes some of the bytes at the position; how many it wrote.
-write : forall s. List Int -> File s ->{; PlatformError.PlatformError} Float
+write : forall s. List Int -> File s ->{; PlatformError.PlatformError} Int
 foreign effect write from "@flick-lang/runtime/effect/FileSystem" "flickWrite"
   arity 2
   retention call

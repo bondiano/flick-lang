@@ -42,7 +42,7 @@ type alias CompressionOptions =
   {
     algorithms : List Http.Platform.CompressionAlgorithm;
     minSize : Option Float;
-    levels : List (Http.Platform.CompressionAlgorithm, Float);
+    levels : List (Http.Platform.CompressionAlgorithm, Int);
   }
 
 /// Logs each request with its method, URL and status, and its failure.
