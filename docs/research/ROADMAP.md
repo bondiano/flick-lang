@@ -260,7 +260,7 @@ component search (props : SearchProps) =
 **F4. Маршруты.** ✅ (`deriving Url` поверх свидетеля Schema: конструктор в kebab-case — первый сегмент, `Home`/`Index` — `/`, поля — сегменты `String`/`Number`/`Bool`/уточнённые, последнее поле-запись — query с `Option`-параметрами, иначе `FLICK-D009` с путём поля; компаньон `T.url : Url T`, модуль `Route` (`print`, `parse`), разбор проверяется схемой типа; `Atom.route url fallback` — `location`, `popstate`, запись — `pushState`; на сервере URL кладёт `Atom.serving`, разбор мемоизирован по URL, иначе стрим не сходится; `Atom.loader route load` — task-атом, перезапускаемый при смене маршрута, гидрированный результат — его первый запуск через `initialValueTarget`; `tests/run/schema/route.fl` (round-trip `Arbitrary.check` по 200 значениям; одиночный суррогат печатается как U+FFFD), `tests/run/ui/route.fl` (SSR `/user/42` без повторной загрузки, переход, «назад», `NotFound` с сервера), `tests/check/fail/schema/url.fl`; `reference/route.md`)
 - AC: `Route` ADT ↔ URL с выведенным парсером/принтером (round-trip property-тест); `Atom.route` с server value из запроса; loader маршрута гидрируется.
 
-**F5. Формы.** ⬜
+**F5. Формы.** ✅ (`deriving Form` на записи с `Schema`: поля `String`/`Number`/`Bool`/уточнённые или `Option` их, иначе `FLICK-D010`; компаньоны `T.form : Form T` и `T.fields` — запись `Form.Field`, опечатка в поле — обычная `T003`; модуль `Form`: `draft` (атомы текста и ошибки на поле), `input` (подпись, `aria-label`, `aria-describedby` на ошибку-alert, `aria-invalid` — новое поле `Ui.Host`), `validate` (текст читается как тип поля, запись проверяется схемой со всеми ошибками, `errors: "all"` только здесь, ошибки ложатся по первому сегменту пути, фокус на первое неверное поле в порядке страницы), `report`; асинхронная проверка — `Ui.Event.latest`, новый ввод её прерывает; `tests/run/ui/form.fl`, `tests/check/fail/schema/form.fl`; `reference/form.md`)
 - AC: `deriving Form` из record-типа; валидация — derived; ошибки кодека маппятся на пути полей; async-валидатор прерывается при новом вводе.
 
 **F6. Шаблон проекта.** ⬜ (сейчас `flick new --template app|lib`)
@@ -381,7 +381,7 @@ S1 ✅ ─ U1…U6 ✅ ─ U7 ✅ ─ U7b ✅ ─ U6b ✅
 C2/C3/C4/C6 ✅ ─ C6b ✅
 C7a ✅ ─ C7b ✅ ─ C7c ✅ ─ C7d ✅ ─ C5 ✅            C1 ✅
 U9 ✅ ─ U9b ✅
-S2 ✅ ─ F1 ✅ ─ F2 ✅ ─ F3 ✅ ─ F4 ✅ ─ F5 ─ F6
+S2 ✅ ─ F1 ✅ ─ F2 ✅ ─ F3 ✅ ─ F4 ✅ ─ F5 ✅ ─ F6
 S3 ✅ ─ S4 ✅ ─ O1 ✅ ─ O2 ✅ ─ O3 ✅ ─ O4 ✅ ─ O5 ✅
 L1 ✅ ─ L2 ✅ ─ L3 ✅ ─ L4 ✅ ─ L5
 H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ✅ ─ H6 ✅     (H2 по входам — после L6 ✅)

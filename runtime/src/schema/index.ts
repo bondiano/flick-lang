@@ -169,6 +169,12 @@ export const codecEncodeResult = (codec: AnySchema, value: unknown): Result.Resu
 export const schemaValidate = (schema: AnySchema, input: unknown): Result.Result<unknown, SchemaError> =>
   isPure(schema) ? resultOf(fromExit(Schema.decodeUnknownExit(schema)(input, OPTIONS), false)) : notPure();
 
+/** `schemaValidate` reporting every issue, not the first: a form shows an error on each field. */
+export const schemaValidateAll = (schema: AnySchema, input: unknown): Result.Result<unknown, SchemaError> =>
+  isPure(schema)
+    ? resultOf(fromExit(Schema.decodeUnknownExit(schema)(input, { ...OPTIONS, errors: "all" }), false))
+    : notPure();
+
 /** `Codec.json schema`: the canonical JSON codec, compiled when installed. */
 export const schemaJsonCodec = (schema: AnySchema): AnySchema => registerCodec(jsonOf(schema));
 

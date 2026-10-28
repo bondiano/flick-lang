@@ -19,9 +19,11 @@ use super::kinds::Kind;
 use super::ty::{Binder, Type};
 use super::typing::{SchemaItem, SchemaPlan, range};
 
+mod form;
 mod plan;
 mod url;
 
+pub use form::FormField;
 pub use url::UrlRoute;
 
 use crate::diagnostics::codes;
@@ -80,12 +82,18 @@ impl Checker<'_> {
             }
             if derives(decl, self.text, "Schema") {
                 deriving.push((decl, name));
-            } else if derives(decl, self.text, "Url") {
-                self.error(
-                    codes::D009,
-                    self.span(decl),
-                    format!("`{name}`: a type that derives `Url` derives `Schema` too"),
-                );
+            } else {
+                for (witness, code) in [("Url", codes::D009), ("Form", codes::D010)] {
+                    if derives(decl, self.text, witness) {
+                        self.error(
+                            code,
+                            self.span(decl),
+                            format!(
+                                "`{name}`: a type that derives `{witness}` derives `Schema` too"
+                            ),
+                        );
+                    }
+                }
             }
         }
         // witnesses first, so that plans may refer to any type of the group
@@ -113,27 +121,19 @@ impl Checker<'_> {
                         );
                         self.companion(name, "json", &[], codec);
                     }
-                    let url = if derives(decl, self.text, "Url") {
-                        match self.url_routes(name, &plan, params.len()) {
-                            Ok(routes) => {
-                                let ty = Type::app(Type::prim("Url"), Type::con(&module, name));
-                                self.companion(name, "url", &[], ty);
-                                Some(routes)
-                            }
-                            Err((path, message)) => {
-                                self.error(codes::D009, span, format!("`{path}`: {message}"));
-                                None
-                            }
-                        }
-                    } else {
-                        None
-                    };
+                    let url = derives(decl, self.text, "Url")
+                        .then(|| self.declare_url(name, &plan, params.len(), span))
+                        .flatten();
+                    let form = derives(decl, self.text, "Form")
+                        .then(|| self.declare_form(name, &plan, span))
+                        .flatten();
                     self.typing.schemas.push(SchemaItem {
                         ty: name.clone(),
                         decl: range(self.span(decl)),
                         witnesses: params.len(),
                         plan,
                         url,
+                        form,
                     });
                 }
                 Err((path, message)) => {

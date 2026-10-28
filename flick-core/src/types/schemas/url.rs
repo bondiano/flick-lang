@@ -3,8 +3,11 @@
 //! and a final record field the query. A segment is text, a number, a
 //! boolean or a refined type over them, which the type's schema checks.
 
+use crate::diagnostics::codes;
+use crate::source::Span;
 use crate::types::Checker;
 use crate::types::env::Form;
+use crate::types::ty::Type;
 use crate::types::typing::SchemaPlan;
 
 /// A constructor of a type that derives `Url`.
@@ -21,6 +24,27 @@ pub struct UrlRoute {
 }
 
 impl Checker<'_> {
+    /// `T$url` of a type that derives `Url`, or `FLICK-D009` at `span`.
+    pub(super) fn declare_url(
+        &mut self,
+        name: &str,
+        plan: &SchemaPlan,
+        witnesses: usize,
+        span: Span,
+    ) -> Option<Vec<UrlRoute>> {
+        match self.url_routes(name, plan, witnesses) {
+            Ok(routes) => {
+                let this = Type::con(&self.env.module, name);
+                self.companion(name, "url", &[], Type::app(Type::prim("Url"), this));
+                Some(routes)
+            }
+            Err((path, message)) => {
+                self.error(codes::D009, span, format!("`{path}`: {message}"));
+                None
+            }
+        }
+    }
+
     /// The routes of `name`'s constructors from its witness plan, or the
     /// path and reason of a field without a URL form.
     pub(super) fn url_routes(
@@ -94,7 +118,7 @@ impl Checker<'_> {
     }
 
     /// Text, a number, a boolean, or a refined type, whose schema checks it.
-    fn is_scalar(&self, plan: &SchemaPlan) -> bool {
+    pub(super) fn is_scalar(&self, plan: &SchemaPlan) -> bool {
         match plan {
             SchemaPlan::Prim(p) => matches!(p.as_str(), "String" | "Number" | "Bool"),
             SchemaPlan::Refined { base, .. } => self.is_scalar(base),

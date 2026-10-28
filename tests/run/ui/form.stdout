@@ -1,0 +1,12 @@
+not sent
+form-Signup-name: invalid=true, label=Name, error="not a valid Name"
+form-Signup-age: invalid=true, label=Age, error="expected a number, got string"
+focused: form-Signup-name
+checked root
+form-Signup-name: invalid=true, label=Name, error="taken"
+checked Ada
+sent "Ada", 36, None
+form-Signup-name: invalid=false, label=Name, error=""
+form-Signup-age: invalid=false, label=Age, error=""
+form-Signup-nick: invalid=false, label=Nickname, error=""
+supervisor: interrupt

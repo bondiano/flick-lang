@@ -39,6 +39,28 @@ impl Gen<'_> {
             let url = self.url(&name, &item.ty, routes);
             out.push(self.export(&companion_name(&item.ty, "url"), &url));
         }
+        if let Some(fields) = &item.form {
+            let specs: Vec<String> = fields
+                .iter()
+                .map(|(l, p, optional)| {
+                    format!("[{}, {}, {optional}]", names::string(l), self.plan(p))
+                })
+                .collect();
+            let form = format!(
+                "{}({name}, {}, [{}])",
+                self.rt("formSpec"),
+                names::string(&item.ty),
+                specs.join(", ")
+            );
+            out.push(self.export(&companion_name(&item.ty, "form"), &form));
+            // a field is its label at run time
+            let labels: Vec<String> = fields
+                .iter()
+                .map(|(l, ..)| format!("{}: {}", names::string(l), names::string(l)))
+                .collect();
+            let record = format!("{{ {} }}", labels.join(", "));
+            out.push(self.export(&companion_name(&item.ty, "fields"), &record));
+        }
         out.join("\n")
     }
 
@@ -218,6 +240,10 @@ pub fn schema_names(item: &SchemaItem) -> Vec<String> {
     }
     if item.url.is_some() {
         out.push(companion_name(&item.ty, "url"));
+    }
+    if item.form.is_some() {
+        out.push(companion_name(&item.ty, "form"));
+        out.push(companion_name(&item.ty, "fields"));
     }
     out
 }

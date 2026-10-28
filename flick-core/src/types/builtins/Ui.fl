@@ -430,6 +430,8 @@ type alias Host =
     /// `aria-hidden`: whether assistive technology skips the element.
     aria_hidden : Option Bool;
     /// `aria-pressed`: whether a toggle button is on.
+    /// The `aria-invalid` attribute: the value fails its check.
+    aria_invalid : Option Bool;
     aria_pressed : Option Bool;
     /// `aria-live`: how changes inside the element are announced.
     aria_live : Option Live;
@@ -457,6 +459,7 @@ let host =
     aria_label = None;
     aria_describedby = None;
     aria_hidden = None;
+    aria_invalid = None;
     aria_pressed = None;
     aria_live = None;
     tab_index = None;

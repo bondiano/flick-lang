@@ -23,8 +23,8 @@ export const routeCodec = (schema: AnySchema, routes: ReadonlyArray<Route>): Url
 
 type Fields = Readonly<Record<string, unknown>>;
 
-/** A segment or parameter as the field's type: text, else a number or a boolean. */
-const coerce = (schema: AnySchema, text: string): Option.Option<unknown> => {
+/** Text as a value of `schema`: the text itself, else a number or a boolean. */
+export const coerce = (schema: AnySchema, text: string): Option.Option<unknown> => {
   const number = text.trim() === "" ? Number.NaN : Number(text);
   const candidates: ReadonlyArray<unknown> = [
     text,

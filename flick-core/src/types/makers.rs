@@ -14,7 +14,7 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
 /// The makers of the library, by module and names.
-const MAKERS: [(&str, &[&str]); 3] = [
+const MAKERS: [(&str, &[&str]); 4] = [
     (
         "Atom",
         &[
@@ -35,6 +35,7 @@ const MAKERS: [(&str, &[&str]); 3] = [
     ),
     ("Action", &["exhaust", "latest", "queue", "concurrent"]),
     ("Ui", &["view", "suspended", "named"]),
+    ("Form", &["draft"]),
 ];
 
 impl Checker<'_> {

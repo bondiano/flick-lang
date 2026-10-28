@@ -226,6 +226,7 @@ impl Checker<'_> {
                         witnesses: 0,
                         plan,
                         url: None,
+                        form: None,
                     }),
                     Err((_, message)) => {
                         complete = false;

@@ -14,6 +14,7 @@ const none = {
   aria_label: Option.none(),
   aria_describedby: Option.none(),
   aria_hidden: Option.none(),
+  aria_invalid: Option.none(),
   aria_pressed: Option.none(),
   aria_live: Option.none(),
   tab_index: Option.none(),

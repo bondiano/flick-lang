@@ -8,7 +8,7 @@ export const sidebar = [
   {
     label: "Guides",
     translations: { ru: "Руководства" },
-    items: [{ slug: "guides" }, ...["ui", "cli-dsl", "http-api", "rpc", "server-fn", "route", "observability", "schema", "sql", "ffi"].map((f) => ({ slug: `reference/${f}` }))],
+    items: [{ slug: "guides" }, ...["ui", "cli-dsl", "http-api", "rpc", "server-fn", "route", "form", "observability", "schema", "sql", "ffi"].map((f) => ({ slug: `reference/${f}` }))],
   },
   {
     label: "API",

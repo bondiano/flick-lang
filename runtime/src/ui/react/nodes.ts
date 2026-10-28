@@ -240,6 +240,7 @@ interface Host {
   readonly aria_label: Option.Option<string>;
   readonly aria_describedby: Option.Option<string>;
   readonly aria_hidden: Option.Option<boolean>;
+  readonly aria_invalid: Option.Option<boolean>;
   readonly aria_pressed: Option.Option<boolean>;
   readonly aria_live: Option.Option<{ readonly _tag: string }>;
   readonly tab_index: Option.Option<number>;
@@ -263,6 +264,7 @@ const hostAttrs = (host: Host, base: Attrs): Attrs => {
   put("aria-label", host.aria_label, String);
   put("aria-describedby", host.aria_describedby, String);
   put("aria-hidden", host.aria_hidden, String);
+  put("aria-invalid", host.aria_invalid, String);
   put("aria-pressed", host.aria_pressed, String);
   put("aria-live", host.aria_live, (live) => constructorName(live._tag).toLowerCase());
   put("tabIndex", host.tab_index, (n) => n);

@@ -115,7 +115,7 @@ let example = ui { div { class_name = "badges" } [badge { label = "new" }] }
 
 `with_host attrs node` задаёт элементу атрибуты хоста: `id`,
 `class_name`, `role`, `aria_label`, `aria_describedby`, `aria_hidden`,
-`aria_pressed`, `aria_live` (`Polite`, `Assertive`, `Off`), `tab_index`,
+`aria_invalid`, `aria_pressed`, `aria_live` (`Polite`, `Assertive`, `Off`), `tab_index`,
 `data` (пары, которые записываются как `data-<name>`) и подсказки для ввода
 текста `auto_capitalize`, `auto_correct` и `wrap`. Каждый атрибут
 типизирован и необязателен:

@@ -92,7 +92,7 @@ test("a write to the state from elsewhere shows in the field", async () => {
 });
 
 test("host attributes reach the bound element, which keeps the caret and follows a reset", async () => {
-  const none = { id: Option.none(), class_name: Option.none(), role: Option.none(), aria_label: Option.none(), aria_describedby: Option.none(), aria_hidden: Option.none(), aria_pressed: Option.none(), aria_live: Option.none(), tab_index: Option.none(), data: [], auto_capitalize: Option.none(), auto_correct: Option.none(), wrap: Option.none() };
+  const none = { id: Option.none(), class_name: Option.none(), role: Option.none(), aria_label: Option.none(), aria_describedby: Option.none(), aria_hidden: Option.none(), aria_invalid: Option.none(), aria_pressed: Option.none(), aria_live: Option.none(), tab_index: Option.none(), data: [], auto_capitalize: Option.none(), auto_correct: Option.none(), wrap: Option.none() };
   const registry = AtomRegistry.make();
   const name = Atom.make("abc");
   const labelled = uiWithHost({ ...none, id: Option.some("name"), aria_describedby: Option.some("hint") }, uiField({ bind: name, placeholder: "", on_input: Option.none() }));

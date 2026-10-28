@@ -8,11 +8,11 @@ use std::collections::{HashMap, HashSet};
 use std::mem;
 
 use super::Checker;
-use super::UrlRoute;
 use super::classes::Dict;
 use super::env::{Abi, Rep};
 use super::sql::dialect::Dialect;
 use super::ty::{Stage, Type, stage_of};
+use super::{FormField, UrlRoute};
 use crate::ir::Label;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -200,6 +200,8 @@ pub struct SchemaItem {
     pub plan: SchemaPlan,
     /// The routes of `T$url` when the type derives `Url`.
     pub url: Option<Vec<UrlRoute>>,
+    /// The fields of `T$form` when the type derives `Form`.
+    pub form: Option<Vec<FormField>>,
 }
 
 /// How a witness is built from the witnesses of its parts.

@@ -100,7 +100,7 @@ are unchanged. Outside `ui`, use `Ui.component badge props`.
 
 `with_host attrs node` puts host attributes on an element: `id`,
 `class_name`, `role`, `aria_label`, `aria_describedby`, `aria_hidden`,
-`aria_pressed`, `aria_live` (`Polite`, `Assertive`, `Off`), `tab_index`,
+`aria_invalid`, `aria_pressed`, `aria_live` (`Polite`, `Assertive`, `Off`), `tab_index`,
 `data` (pairs written `data-<name>`), and the text-entry hints
 `auto_capitalize`, `auto_correct` and `wrap`. Each is typed and optional:
 `with_host { host with role = Some "status" } (span { class_name = "s" } […])`.

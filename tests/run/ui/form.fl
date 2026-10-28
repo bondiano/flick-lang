@@ -1,0 +1,111 @@
+// A form of a record type: sending it empty puts each field's first issue
+// under its input, marks the inputs invalid and focuses the first; sending
+// it filled in gives the record, an empty optional field `None`. A check of
+// the name on input is interrupted when the user types again.
+module App.Main exposing (main)
+
+refined type Name = String where Checks.non_empty
+  deriving Eq, Show, Schema
+
+type alias Signup = { name : Name; age : Number; nick : Option String }
+  deriving Schema, Form
+
+setup : Unit ->{} Unit
+foreign sync setup from "./form.mjs" "setup"
+  arity 0
+
+type_into : String -> String ->{} Unit
+foreign sync type_into from "./form.mjs" "type"
+  arity 2
+
+click : String ->{} Unit
+foreign sync click from "./form.mjs" "click"
+  arity 1
+
+describe : String ->{} String
+foreign sync describe from "./form.mjs" "describe"
+  arity 1
+
+focused : Unit ->{} String
+foreign sync focused from "./form.mjs" "focused"
+  arity 0
+
+log : String ->{} Unit
+foreign sync log from "./form.mjs" "log"
+  arity 1
+
+taken : String ->{} Bool
+foreign async taken from "./form.mjs" "taken"
+  arity 1
+
+settle : Unit ->{} Unit
+foreign async settle from "./form.mjs" "settle"
+  arity 0
+
+signup : Form.Draft Signup
+let signup = Form.draft Signup.form
+
+send : Action.Action Ui.ClickSnapshot
+let send =
+  Action.exhaust (fun _ -> task {
+    match Form.validate signup with
+    | None -> log "not sent"
+    | Some s ->
+      log
+        ("sent " ++ show (Name.value s.name) ++ ", " ++ show s.age ++ ", " ++ show s.nick)
+  })
+
+/// The name is checked on the server as the user types; typing again interrupts it.
+check_name : Ui.Handler Ui.InputSnapshot
+let check_name =
+  Ui.Event.latest (fun input -> task {
+    let message = if taken input.value then Some "taken" else None
+    log ("checked " ++ input.value)
+    Form.report signup Signup.fields.name message
+  })
+
+page : Ui
+let page =
+  Ui.fragment
+    [
+      Form.input signup Signup.fields.name "Name" (Some check_name),
+      Form.input signup Signup.fields.age "Age" None,
+      Form.input signup Signup.fields.nick "Nickname" None,
+      Ui.button { disabled = false; on_click = send } [Ui.text "Send"],
+    ]
+
+report : Failure e ->{} Unit
+let report failure =
+  Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  setup ()
+  let name = Form.id signup Signup.fields.name
+  let age = Form.id signup Signup.fields.age
+  match Ui.Dom.container "app" with
+  | None -> Platform.stdout_line "no container"
+  | Some root ->
+    provide Atom.layer {
+      scope s {
+        let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report page })
+        settle ()
+        click "Send"
+        settle ()
+        Platform.stdout_line (describe name)
+        Platform.stdout_line (describe age)
+        Platform.stdout_line ("focused: " ++ focused ())
+        type_into name "roo"
+        type_into name "root"
+        settle ()
+        Platform.stdout_line (describe name)
+        type_into name "Ada"
+        type_into age "36"
+        settle ()
+        click "Send"
+        settle ()
+        Platform.stdout_line (describe name)
+        Platform.stdout_line (describe age)
+        Platform.stdout_line (describe (Form.id signup Signup.fields.nick))
+      }
+    }
