@@ -68,8 +68,10 @@ transform = "a raw transform of the atom's read; `readable` and `map` derive ato
 windowFocusSignal = "a browser signal; bound with server values for rendering on the server (R4)"
 withEquality = "an atom keeps Effect's `Equal` of its values; a custom equality is not bound"
 withFallback = "`AsyncResult` fallbacks come with its ADT (U6)"
-withReactivity = "reactive keys invalidate queries; the fullstack track binds them (F3)"
 withRefresh = "a custom refresh hook; `refresh` reruns a task atom"
 withServerValue = "server rendering binds server values (R4)"
 withServerValueInitial = "server rendering binds server values (R4)"
 writable = "a write callback mutates through `WriteContext`; Flick writes a `state` atom with `set`, `update` and `modify`"
+
+[language]
+withReactivity = "`Atom.query`/`Atom.query_stream`: a task or stream atom a mutation of its keys runs anew"

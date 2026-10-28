@@ -29,6 +29,10 @@ let orders = Atom.query ["orders"] (task { run_of "orders" })
 stock : Atom.Atom (Atom.Async Number none)
 let stock = Atom.query ["stock"] (task { run_of "stock" })
 
+/// A query of both keys.
+both : Atom.Atom (Atom.Async Number none)
+let both = Atom.query ["orders", "stock"] (task { run_of "both" })
+
 /// The latest element of a stream.
 latest : Atom.Atom (Atom.Async Number none)
 let latest = Atom.query_stream ["stock"] (Stream.from_list [7, 8])
@@ -44,7 +48,7 @@ let counts =
   Ui.view
     (fun () ->
       ui {
-        text ("orders " ++ shown orders ++ " stock " ++ shown stock ++ " latest " ++ shown latest)
+        text ("orders " ++ shown orders ++ " stock " ++ shown stock ++ " latest " ++ shown latest ++ " both " ++ shown both)
       })
 
 place : Bool ->{; Refused} Unit
@@ -53,6 +57,10 @@ let place ok = if ok then () else from_result (Err Refused)
 /// A placed order changes the orders, not the stock.
 placed : Bool ->{Atom.Write; Refused} Unit
 let placed = Atom.mutation ["orders"] place
+
+/// A delivery changes both: a query of both keys runs once.
+delivered : Unit ->{Atom.Write;} Unit
+let delivered = Atom.mutation ["orders", "stock"] (fun () -> ())
 
 report : Failure e ->{} Unit
 let report _ = ()
@@ -78,5 +86,8 @@ let main () =
         | Refused -> Platform.stdout_line "refused"
         settle ()
         Platform.stdout_line ("after a refused one: " ++ text ())
+        delivered ()
+        settle ()
+        Platform.stdout_line ("after a delivery: " ++ text ())
       }
     }

@@ -1,7 +1,8 @@
 // A page streamed from the server: its shell carries the fallback of a
 // suspended view while a serializable task loads, the task's value and
 // markup follow, and the client mounted on the shell hydrates them without
-// running the task again or a hydration mismatch.
+// running the task again or a hydration mismatch. A query hydrates the same
+// way, and a mutation of its key runs it anew on the client.
 module App.Main exposing (main)
 
 later : Unit ->{} String
@@ -42,6 +43,12 @@ let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
 user : Atom.Atom (Atom.Async String none)
 let user = Atom.serializable_task (Codec.json Schema.string) (Atom.task (task { later () }))
 
+stock : Atom.Atom (Atom.Async String none)
+let stock = Atom.serializable_task (Codec.json Schema.string) (Atom.query ["stock"] (task { later () }))
+
+restocked : Unit ->{Atom.Write;} Unit
+let restocked = Atom.mutation ["stock"] (fun () -> ())
+
 counter : Ui.View Unit
 let counter = Ui.view (fun () -> Ui.text ("count " ++ show (Atom.value count)))
 
@@ -50,7 +57,7 @@ let greeting =
   Ui.suspended
     (fun _ -> Ui.text " failed")
     (Ui.text " waiting")
-    (fun () -> Ui.text (" hello " ++ Atom.ready user))
+    (fun () -> Ui.text (" hello " ++ Atom.ready user ++ " " ++ Atom.ready stock))
 
 page : Ui
 let page = Ui.fragment [Ui.render counter (), Ui.render greeting ()]
@@ -82,6 +89,9 @@ let main () =
         Platform.stdout_line (text ())
         stream_rest ()
         Platform.stdout_line (text ())
+        Platform.stdout_line ("hydrated runs: " ++ show (task_runs ()))
+        restocked ()
+        settle ()
       }
     }
   Platform.stdout_line ("task runs: " ++ show (task_runs ()))

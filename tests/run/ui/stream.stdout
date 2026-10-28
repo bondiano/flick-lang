@@ -1,7 +1,8 @@
 fallback and markup: true
-server runs: 1
+server runs: 2
 count 5 waiting
-count 5 hello ada
+count 5 hello ada ada
+hydrated runs: 2
 supervisor: interrupt
-task runs: 1
+task runs: 3
 complaints: []

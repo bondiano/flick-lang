@@ -1,9 +1,11 @@
 [excluded]
-Reactivity = "reactive keys invalidate queries; the fullstack track binds them (F3)"
+Reactivity = "the registry's `Reactivity` is internal: `Atom.query` registers with it and `Atom.mutation` invalidates"
 TypeId = "TS-only: a type id or a type guard; Flick values are typed statically"
-invalidate = "reactive keys invalidate queries; the fullstack track binds them (F3)"
-layer = "reactive keys invalidate queries; the fullstack track binds them (F3)"
-make = "reactive keys invalidate queries; the fullstack track binds them (F3)"
-mutation = "reactive keys invalidate queries; the fullstack track binds them (F3)"
-query = "reactive keys invalidate queries; the fullstack track binds them (F3)"
-stream = "reactive keys invalidate queries; the fullstack track binds them (F3)"
+make = "the registry's `Reactivity` is internal: `Atom.query` registers with it and `Atom.mutation` invalidates"
+mutation = "the registry's `Reactivity` is internal: `Atom.query` registers with it and `Atom.mutation` invalidates"
+query = "the registry's `Reactivity` is internal: `Atom.query` registers with it and `Atom.mutation` invalidates"
+stream = "the registry's `Reactivity` is internal: `Atom.query` registers with it and `Atom.mutation` invalidates"
+
+[language]
+invalidate = "`Atom.mutation keys f`: a success of `f` invalidates the queries of `keys`"
+layer = "the registry builds it for `Atom.query` and `Atom.mutation`"

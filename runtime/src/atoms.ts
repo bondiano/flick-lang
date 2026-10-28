@@ -6,6 +6,7 @@
 import { Cause, Context, Effect, Option, Schema, type Stream } from "effect";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Atom from "effect/reactivity/Atom";
+import * as Reactivity from "effect/reactivity/Reactivity";
 
 import { Failure } from "./cause.ts";
 import type { HashDict } from "./data.ts";
@@ -99,11 +100,19 @@ const TASK = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/Atom.serializable_tas
 export const handedOver = (atom: Atom.Atom<unknown>, value: unknown): boolean => !Reflect.has(atom, TASK) || isLoaded(value);
 
 /**
+ * Marks the atoms of `Atom.query` with how a hydrated result reaches their
+ * task: its first run gives the result instead of running, as a task atom's
+ * hydrated value is not run again.
+ */
+const QUERY = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/Atom.query");
+
+/**
  * `Atom.serializable_task` under the key the compiler gives: a loaded
  * result is coded by `codec`, and the client starts from it instead of
  * running the task; one still loading or failed is not handed over.
  */
 export const atomSerializableTask = <A>(key: string, codec: Schema.Codec<A, unknown>, atom: Atom.Atom<object>): Atom.Atom<object> => {
+  const hydrate: unknown = Reflect.get(atom, QUERY);
   const json = Schema.toCodecJson(codec);
   const encode = Schema.encodeSync(json);
   const decode = Schema.decodeSync(json);
@@ -122,8 +131,12 @@ export const atomSerializableTask = <A>(key: string, codec: Schema.Codec<A, unkn
         // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a loaded result holds the task's value
         return encode(value._0 as A);
       },
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the server encoded it with this codec
-      decode: (encoded: unknown) => Object.freeze({ _tag: LOADED, _0: decode(encoded as Schema.Json) }),
+      decode: (encoded: unknown) => {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the server encoded it with this codec
+        const value = decode(encoded as Schema.Json);
+        if (typeof hydrate === "function") hydrate(value);
+        return Object.freeze({ _tag: LOADED, _0: value });
+      },
     },
   });
 };
@@ -131,32 +144,26 @@ export const atomSerializableTask = <A>(key: string, codec: Schema.Codec<A, unkn
 /** `Atom.task`: the atom of a task's result, run by the registry that first reads it. */
 export const atomTask = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<object> => Atom.map(Atom.make(task), toAsync);
 
-/** The refreshes of the queries each registry has read, by key. */
-const queries = new WeakMap<object, Map<string, Set<() => void>>>();
-
-/** `atom`, run anew in a registry when a mutation of one of `keys` succeeds there. */
-const keyed = (keys: ReadonlyArray<string>, atom: Atom.Atom<object>): Atom.Atom<object> =>
-  Atom.readable((get) => {
-    const byKey = queries.get(get.registry) ?? new Map<string, Set<() => void>>();
-    queries.set(get.registry, byKey);
-    const refresh = (): void => get.refresh(atom);
-    for (const key of keys) {
-      const refreshes = byKey.get(key) ?? new Set();
-      byKey.set(key, refreshes.add(refresh));
-    }
-    get.addFinalizer(() => {
-      for (const key of keys) byKey.get(key)?.delete(refresh);
-    });
-    return get(atom);
-  });
-
 /** `Atom.query keys task`: a task atom that a mutation of one of `keys` runs anew. */
-export const atomQuery = <A, E>(keys: ReadonlyArray<string>, task: Effect.Effect<A, E>): Atom.Atom<object> =>
-  keyed(keys, atomTask(task));
+export const atomQuery = <A, E>(keys: ReadonlyArray<string>, task: Effect.Effect<A, E>): Atom.Atom<object> => {
+  let hydrated: Option.Option<A> = Option.none();
+  const first = Effect.suspend(() => {
+    const value = hydrated;
+    hydrated = Option.none();
+    return Option.isSome(value) ? Effect.succeed(value.value) : task;
+  });
+  const hydrate = (value: A): void => {
+    hydrated = Option.some(value);
+  };
+  return Object.assign(Atom.withReactivity(keys)(atomTask(first)), { [QUERY]: hydrate });
+};
 
 /** `Atom.query_stream keys stream`: the latest element of `stream`, which a mutation of one of `keys` starts anew. */
 export const atomQueryStream = <A, E>(keys: ReadonlyArray<string>, stream: Stream.Stream<A, E>): Atom.Atom<object> =>
-  keyed(keys, Atom.map(Atom.make(stream), toAsync));
+  Atom.withReactivity(keys)(Atom.map(Atom.make(stream), toAsync));
+
+// the registry's `Reactivity`, the one `withReactivity` registers queries with: both build it with the registry's memo map
+const reactive = /*#__PURE__*/ Atom.runtime(Reactivity.layer);
 
 /** `Atom.mutation keys f payload`: `f payload`, then, when it succeeds, the queries of `keys` run anew. */
 export const atomMutation = <P>(
@@ -167,9 +174,11 @@ export const atomMutation = <P>(
   Effect.tap(f(payload), () =>
     Effect.map(Effect.service(WriteService), (write) => {
       const registry = nativeRegistry(write);
-      const byKey = registry === undefined ? undefined : queries.get(registry);
-      const refreshes = new Set(keys.flatMap((key) => [...(byKey?.get(key) ?? [])]));
-      for (const refresh of refreshes) refresh();
+      if (registry === undefined) return;
+      const built = registry.get(reactive);
+      if (!AsyncResult.isSuccess(built)) return;
+      // one batch, so a query of several of the keys runs anew once
+      Atom.batch(() => Context.get(built.value, Reactivity.Reactivity).invalidateUnsafe(keys));
     }),
   );
 
