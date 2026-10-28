@@ -10,7 +10,7 @@ use toml::{Spanned, de};
 use crate::codegen::Labels;
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
 use crate::source::{FileId, Span};
-use crate::types::{self, Dialect, dialect};
+use crate::types::{self, Dialect, Thresholds, dialect};
 
 pub const SCHEMA_VERSION: i64 = 1;
 
@@ -29,6 +29,9 @@ pub struct Config {
     pub allow: Vec<Code>,
     /// `[lint] no-let-assert`: every `let assert` is an error.
     pub no_let_assert: bool,
+    /// `[lint] max-function-lines`, `max-nesting`, `max-complexity`,
+    /// `max-params`.
+    pub thresholds: Thresholds,
 }
 
 /// An entry point of an app: its name and the module whose `main` it runs.
@@ -148,6 +151,10 @@ struct RawLint {
     allow: Vec<Spanned<String>>,
     #[serde(default)]
     no_let_assert: bool,
+    max_function_lines: Option<Spanned<i64>>,
+    max_nesting: Option<Spanned<i64>>,
+    max_complexity: Option<Spanned<i64>>,
+    max_params: Option<Spanned<i64>>,
 }
 
 #[derive(Default, Deserialize)]
@@ -246,6 +253,28 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
             })
         })
         .collect::<Result<_, _>>()?;
+    let threshold = |raw: &Option<Spanned<i64>>, key: &str, default: u32| match raw {
+        None => Ok(default),
+        Some(n) => u32::try_from(*n.get_ref())
+            .ok()
+            .filter(|&n| n > 0)
+            .ok_or_else(|| {
+                let message = format!("`[lint] {key}` is a positive integer");
+                Diagnostic::error(codes::P005, message, span(n.span()))
+            }),
+    };
+    let defaults = Thresholds::default();
+    let lint = &raw.lint;
+    let thresholds = Thresholds {
+        function_lines: threshold(
+            &lint.max_function_lines,
+            "max-function-lines",
+            defaults.function_lines,
+        )?,
+        nesting: threshold(&lint.max_nesting, "max-nesting", defaults.nesting)?,
+        complexity: threshold(&lint.max_complexity, "max-complexity", defaults.complexity)?,
+        params: threshold(&lint.max_params, "max-params", defaults.params)?,
+    };
     Ok(Config {
         kind: project.kind,
         source_dir: project.source_dir,
@@ -255,6 +284,7 @@ pub fn parse(text: &str, file: FileId) -> Result<Config, Diagnostic> {
         sql_dialect,
         allow,
         no_let_assert: raw.lint.no_let_assert,
+        thresholds,
     })
 }
 

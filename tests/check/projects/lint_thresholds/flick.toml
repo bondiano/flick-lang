@@ -1,0 +1,10 @@
+schema-version = 1
+
+[project]
+kind = "lib"
+
+[lint]
+max-function-lines = 3
+max-nesting = 1
+max-complexity = 2
+max-params = 1

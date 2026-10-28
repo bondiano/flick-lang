@@ -162,6 +162,10 @@ codes! {
     T033 = Types 33, "`List.filter` then `List.map`, which `[for …]` says";
     T034 = Types 34, "a `match` that fails with the error of a `Result`, which `?` says";
     T035 = Types 35, "a chain of `flat_map`, which `do` says";
+    T036 = Types 36, "function longer than `[lint] max-function-lines`";
+    T037 = Types 37, "nesting deeper than `[lint] max-nesting`";
+    T038 = Types 38, "function more complex than `[lint] max-complexity`";
+    T039 = Types 39, "function with more parameters than `[lint] max-params`";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";
@@ -224,6 +228,7 @@ codes! {
     U004 = Ui 4, "render does more than read atoms";
     U005 = Ui 5, "atom of a type for every type";
     U006 = Ui 6, "atom, action or view made while rendering";
+    U007 = Ui 7, "function that reads atoms to build a `Ui`, which a `component` says";
     L001 = Cli 1, "name taken twice in a command";
     L002 = Cli 2, "default of an optional parameter";
     L003 = Cli 3, "positional argument of many values before the last";

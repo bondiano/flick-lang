@@ -795,6 +795,7 @@ pub fn builtin_modules() -> &'static [ir::Module] {
                     limits: types::Limits::default(),
                     sql: Default::default(),
                     no_let_assert: false,
+                    thresholds: types::Thresholds::default(),
                     effects: true,
                 };
                 let (_, typing) = types::check_typed(

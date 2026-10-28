@@ -37,6 +37,7 @@ pub(crate) fn check_text(
         limits: types::Limits::default(),
         sql: Default::default(),
         no_let_assert: false,
+        thresholds: types::Thresholds::default(),
         effects: true,
     };
     let (more, typing) = types::check_typed(

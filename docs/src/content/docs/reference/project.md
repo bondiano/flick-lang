@@ -31,6 +31,10 @@ dialect = "postgresql"
 [lint]
 allow = ["FLICK-T021"]
 no-let-assert = false
+max-function-lines = 60
+max-nesting = 4
+max-complexity = 10
+max-params = 5
 ```
 
 | Key | Values | Default |
@@ -56,6 +60,10 @@ no-let-assert = false
 | `sql.dialect` | the SQL dialect of `sql table` and `sql { … }` (see [sql.md](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` and `"oracle"` are recognized but not supported yet | `"postgresql"` |
 | `lint.allow` | warning codes not reported, such as `"FLICK-T021"`; errors cannot be turned off | `[]` |
 | `lint.no-let-assert` | `true` makes every `let assert` an error (`FLICK-T027`), in `flick check`, `build`, `test` and the editor | `false` |
+| `lint.max-function-lines` | lines of a function body past which `FLICK-T036` warns | `60` |
+| `lint.max-nesting` | how deep `if`, `match`, `fun`, `do`, `task` and `for` nest before `FLICK-T037` warns | `4` |
+| `lint.max-complexity` | branches of a function (cyclomatic complexity) past which `FLICK-T038` warns | `10` |
+| `lint.max-params` | parameters of a function past which `FLICK-T039` warns | `5` |
 
 Errors in the configuration exit with code `2`:
 

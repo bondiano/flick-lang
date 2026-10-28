@@ -1,0 +1,23 @@
+// Lowered `[lint]` thresholds, and a function that reads atoms to build a `Ui`.
+module App.Shape exposing (..)
+
+long : Number -> Number
+let long n =
+  let a = n + 1
+  let b = a + 1
+  let c = b + 1
+  c
+//~ FLICK-T036 @5:5-5:9 `long` is 4 lines long, more than 3
+
+pair : Number -> Number -> Number
+let pair a b = if a > b then (if a > 0 then a else b) else b
+//~ FLICK-T038 @13:5-13:9 `pair` has a complexity of 3, more than 2
+//~ FLICK-T039 @13:5-13:9 `pair` takes 2 parameters, more than 1
+//~ FLICK-T037 @13:31-13:33 nested 2 levels deep, more than 1
+
+count : Atom.Writable Number
+let count = Atom.make 0
+
+label : Unit ->{Atom.Read;} Ui
+let label () = Ui.text (show (Atom.value count))
+//~ FLICK-U007 @22:5-22:10 `label` reads atoms to build a `Ui`

@@ -313,7 +313,12 @@ fn hover_and_completion_answer_quickly_on_a_2000_line_module() {
         let _ = writeln!(big, "  let x{i} = x{} + {i}", i - 1);
     }
     big += "  x1999\n";
-    let dir = project("lsp_big", &[("flick.toml", LIB), ("src/App/Big.fl", &big)]);
+    // one function of 2000 lines, longer than `max-function-lines`
+    let config = format!("{LIB}\n[lint]\nallow = [\"FLICK-T036\"]\n");
+    let dir = project(
+        "lsp_big",
+        &[("flick.toml", &config), ("src/App/Big.fl", &big)],
+    );
     let file = dir.join("src/App/Big.fl");
     let mut lsp = Lsp::start(&dir);
     lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": big } }));

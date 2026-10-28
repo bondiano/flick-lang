@@ -38,6 +38,7 @@ mod infer;
 mod instances;
 mod irrefutable;
 mod kinds;
+mod lints;
 mod makers;
 mod origin;
 mod patterns;
@@ -121,6 +122,26 @@ impl Default for Limits {
     }
 }
 
+/// `[lint]` thresholds: a function past one gets a warning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Thresholds {
+    pub function_lines: u32,
+    pub nesting: u32,
+    pub complexity: u32,
+    pub params: u32,
+}
+
+impl Default for Thresholds {
+    fn default() -> Self {
+        Thresholds {
+            function_lines: 60,
+            nesting: 4,
+            complexity: 10,
+            params: 5,
+        }
+    }
+}
+
 /// What checking a module needs beyond its imports.
 #[derive(Clone, Copy)]
 pub struct Options<'a> {
@@ -132,6 +153,7 @@ pub struct Options<'a> {
     pub sql: &'static Dialect,
     /// `[lint] no-let-assert`: every `let assert` is an error.
     pub no_let_assert: bool,
+    pub thresholds: Thresholds,
     /// Whether runtime code may run: `false` under `effect = "none"`.
     pub effects: bool,
 }

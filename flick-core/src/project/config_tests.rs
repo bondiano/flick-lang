@@ -1,5 +1,6 @@
 use super::*;
 use crate::source::SourceMap;
+use crate::types::Thresholds;
 
 fn parse_text(text: &str) -> Result<Config, Diagnostic> {
     let mut sources = SourceMap::default();
@@ -199,4 +200,30 @@ fn rejects_with_spans() {
             assert_eq!(&text[span.range()], spanned, "{text}");
         }
     }
+}
+
+#[test]
+fn lint_thresholds_default_and_override() {
+    let lib = |lint: &str| {
+        parse_text(&format!(
+            "schema-version = 1\n[project]\nkind = \"lib\"\n[lint]\n{lint}"
+        ))
+    };
+    assert_eq!(lib("").expect("valid").thresholds, Thresholds::default());
+    let set = lib("max-function-lines = 30\nmax-nesting = 3\nmax-complexity = 7\nmax-params = 4\n");
+    assert_eq!(
+        set.expect("valid").thresholds,
+        Thresholds {
+            function_lines: 30,
+            nesting: 3,
+            complexity: 7,
+            params: 4,
+        }
+    );
+    let zero = lib("max-nesting = 0\n").expect_err("not positive");
+    assert_eq!(zero.code, codes::P005);
+    assert!(
+        zero.message
+            .contains("`[lint] max-nesting` is a positive integer")
+    );
 }

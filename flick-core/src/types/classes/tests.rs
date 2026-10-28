@@ -9,7 +9,7 @@ use crate::iface::{self, Interface};
 use crate::resolve::{self, Module};
 use crate::source::SourceMap;
 use crate::syntax;
-use crate::types::{Limits, Options, builtins, check_with_evidence};
+use crate::types::{Limits, Options, Thresholds, builtins, check_with_evidence};
 
 /// Checks `modules` in order, each seeing the interfaces of those before;
 /// returns the diagnostics and dictionaries of the last one.
@@ -37,6 +37,7 @@ fn check_all(modules: &[(&str, &str)]) -> (Vec<Diagnostic>, Vec<Dict>) {
             limits: Limits::default(),
             sql: Default::default(),
             no_let_assert: false,
+            thresholds: Thresholds::default(),
             effects: true,
         };
         let (more, evidence) =

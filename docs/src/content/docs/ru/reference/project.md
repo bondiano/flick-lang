@@ -32,6 +32,10 @@ dialect = "postgresql"
 [lint]
 allow = ["FLICK-T021"]
 no-let-assert = false
+max-function-lines = 60
+max-nesting = 4
+max-complexity = 10
+max-params = 5
 ```
 
 | Ключ | Значения | По умолчанию |
@@ -57,6 +61,10 @@ no-let-assert = false
 | `sql.dialect` | диалект SQL для `sql table` и `sql { … }` (см. [запросы SQL](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` и `"oracle"` распознаются, но пока не поддерживаются | `"postgresql"` |
 | `lint.allow` | коды предупреждений, о которых не сообщается, например `"FLICK-T021"`; ошибки отключить нельзя | `[]` |
 | `lint.no-let-assert` | `true` делает каждый `let assert` ошибкой (`FLICK-T027`) в `flick check`, `build`, `test` и в редакторе | `false` |
+| `lint.max-function-lines` | сколько строк может занимать тело функции, дальше — `FLICK-T036` | `60` |
+| `lint.max-nesting` | насколько глубоко вкладываются `if`, `match`, `fun`, `do`, `task` и `for`, дальше — `FLICK-T037` | `4` |
+| `lint.max-complexity` | сколько ветвлений может быть в функции (цикломатическая сложность), дальше — `FLICK-T038` | `10` |
+| `lint.max-params` | сколько параметров может быть у функции, дальше — `FLICK-T039` | `5` |
 
 Ошибки конфигурации приводят к завершению с кодом `2`:
 

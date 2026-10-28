@@ -469,6 +469,9 @@ impl Loader<'_> {
                 .project
                 .map_or_else(Default::default, |p| p.config.sql_dialect),
             no_let_assert: self.project.is_some_and(|p| p.config.no_let_assert),
+            thresholds: self
+                .project
+                .map_or_else(Default::default, |p| p.config.thresholds),
             effects: build.is_none_or(|b| b.effect == Backend::Effect),
         };
         self.diagnostics

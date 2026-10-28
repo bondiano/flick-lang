@@ -33,6 +33,7 @@ const FOLLOWS: [&str; 8] = [
 
 impl Checker<'_> {
     pub(super) fn sugar_lints(&mut self, node: &Node) {
+        self.shape_lints(node);
         match node.kind {
             K::DoExpr => {
                 self.do_over_eff(node);

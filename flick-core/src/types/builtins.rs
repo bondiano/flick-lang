@@ -373,6 +373,13 @@ pub fn builtins() -> &'static [Interface] {
                 limits: super::Limits::default(),
                 sql: Default::default(),
                 no_let_assert: false,
+                // a built-in module may be one long table of its values
+                thresholds: super::Thresholds {
+                    function_lines: u32::MAX,
+                    nesting: u32::MAX,
+                    complexity: u32::MAX,
+                    params: u32::MAX,
+                },
                 effects: true,
             };
             diagnostics.extend(super::check(

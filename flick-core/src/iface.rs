@@ -305,6 +305,7 @@ mod tests {
             limits: types::Limits::default(),
             sql: Default::default(),
             no_let_assert: false,
+            thresholds: types::Thresholds::default(),
             effects: true,
         };
         diagnostics.extend(types::check(
