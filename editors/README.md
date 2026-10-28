@@ -67,6 +67,10 @@ Hover on a resolved class method keeps its inferred type and the class member's
 implementation in that instance.
 Hover on `..` inside `Type(..)` or `Class(..)` lists the imported or exported
 constructors or methods, with their full signatures and available documentation.
+Constructor patterns keep their signatures and available `///` documentation
+even for private constructors; payload binders show their own inferred types.
+Generated companions such as `Page.url` show their value type and purpose on
+the member name, while definition still opens the owning type.
 
 Built-in module definitions open as real read-only `.fl` files in both
 editors. The server writes its embedded sources to a content-keyed system

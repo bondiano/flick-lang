@@ -87,9 +87,9 @@ pub struct Typing {
     pub server_fns: Vec<ServerFn>,
     /// `codec` blocks: the fields' labels in the order written.
     pub codecs: HashMap<Range, CodecBlock>,
-    /// The type of each name in an expression and of each variable a
-    /// pattern binds, for editors; at a keyword that opens an expression
-    /// (`task`, `match`, `fun` …) the type of the whole expression, at
+    /// The type of each name in an expression or constructor pattern and
+    /// of each variable a pattern binds, for editors; at a keyword that opens
+    /// an expression (`task`, `match`, `fun` …) the type of the whole expression, at
     /// `ignore` and `await` the type of the operand, at `|>` the type after
     /// the stage.
     pub types: HashMap<Range, Type>,
