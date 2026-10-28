@@ -11,8 +11,7 @@ interface Props {
 }
 
 const { mode, locale } = Astro.props;
-const initialView = initial_view as (config: { mode: string; locale: string }) => Effect.Effect<Ui>;
-const markup = renderToString(uiRenderStatic(await Effect.runPromise(initialView({ mode, locale }))));
+const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view({ mode, locale })) as unknown as Ui));
 ---
 
 <div id="flick-playground" class="not-content flick-playground-shell" data-mode={mode} data-locale={locale} data-flick-ssr data-pagefind-ignore set:html={markup}></div>

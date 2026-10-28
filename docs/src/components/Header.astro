@@ -19,8 +19,7 @@ const links = [
   [ru ? "Изучение" : "Learn", "/learn/"], [ru ? "Руководства" : "Guides", "/guides/"], [ru ? "Справочник" : "API", "/api/"], [ru ? "Экосистема" : "Ecosystem", "/ecosystem/"],
 ];
 const sidebar = route?.hasSidebar ? route.sidebar : undefined;
-const controlView = shell as (ru: boolean) => Effect.Effect<Ui>;
-const controlsHtml = renderToString(uiRenderStatic(await Effect.runPromise(controlView(ru))));
+const controlsHtml = renderToString(uiRenderStatic(await Effect.runPromise(shell(ru)) as unknown as Ui));
 ---
 <div class="site-header" data-pagefind-ignore>
   <Brand href={`${prefix}/`} label={ru ? "Flick — главная" : "Flick home"} />

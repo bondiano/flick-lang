@@ -19,7 +19,7 @@ test:
     cargo test --workspace
 
 # Install the JS runtime, check its pinned Effect, run compiled programs on Node
-e2e:
+e2e: docs-wasm
     cargo build -p flick
     pnpm install --frozen-lockfile
     pnpm -r typecheck
