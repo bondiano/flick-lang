@@ -13,6 +13,8 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{Form, Ref, TypeDef, component_instance, show_type};
 
+mod companions;
+
 /// `node` as its source lays it out, one written line per line, its
 /// continuation lines dedented by the indentation of its first line.
 fn as_written(node: &Node, text: &str) -> String {
@@ -378,6 +380,9 @@ impl Ide<'_> {
             return Some(hover);
         }
         if let Some(hover) = self.exposing_hover(file, offset) {
+            return Some(hover);
+        }
+        if let Some(hover) = self.companion_hover(file, offset) {
             return Some(hover);
         }
         self.symbol_hover(file, offset)

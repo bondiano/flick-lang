@@ -295,6 +295,7 @@ impl Checker<'_> {
             return Pat::Wild;
         };
         let scheme = self.env.value(&entity).cloned().unwrap_or(Type::Error);
+        self.note_type(self.name_span(node), &scheme);
         let captures = self.captures_of(ty).into_type();
         let adt_params = self.env.parent(&entity).and_then(|(module, name)| {
             let def = self.env.type_def(&module, &name)?;

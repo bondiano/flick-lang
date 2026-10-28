@@ -53,6 +53,13 @@ Hover on a label inside `codec` shows the decoded record field's type, such as
 `email : Email` or `nickname : Option String`, rather than its field codec.
 These signatures use a `flick` code block for editor syntax highlighting.
 
+Constructor names in patterns (`Home`, `User 404`, `User id`) show their
+signatures and available `///` documentation even when the constructors are
+private. Payload binders keep their own inferred types, such as `id : Float`.
+Hover on `url` in `Page.url` shows `Page.url : Url Page` and explains the
+generated URL codec and its use with `Route.print` and `Route.parse`.
+Definition still leads to the declaration of `Page`.
+
 Hover on `sql table` shows the row type and the type of `Name$table` in
 column order; on the name, the row type and the SQL table; on the table
 name string, the table it names; on a column's SQL type, the Flick type the
