@@ -106,6 +106,8 @@ export const handedOver = (atom: Atom.Atom<unknown>, value: unknown): boolean =>
  */
 const QUERY = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/Atom.query");
 
+const isHydrate = (value: unknown): value is (result: unknown) => void => typeof value === "function";
+
 /**
  * `Atom.serializable_task` under the key the compiler gives: a loaded
  * result is coded by `codec`, and the client starts from it instead of
@@ -134,7 +136,7 @@ export const atomSerializableTask = <A>(key: string, codec: Schema.Codec<A, unkn
       decode: (encoded: unknown) => {
         // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the server encoded it with this codec
         const value = decode(encoded as Schema.Json);
-        if (typeof hydrate === "function") hydrate(value);
+        if (isHydrate(hydrate)) hydrate(value);
         return Object.freeze({ _tag: LOADED, _0: value });
       },
     },

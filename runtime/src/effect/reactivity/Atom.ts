@@ -28,7 +28,7 @@ export const taskAtom = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<AsyncResult
 
 /** Records what the tasks of `registry` run with. */
 const recordCaller = (registry: AtomRegistry.AtomRegistry) =>
-  Effect.map(Effect.context<never>(), (context) => {
+  Effect.map(Effect.context(), (context) => {
     callers.set(registry, Context.omit(Scope.Scope)(context));
   });
 

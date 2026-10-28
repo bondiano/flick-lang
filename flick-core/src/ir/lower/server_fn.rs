@@ -37,15 +37,8 @@ impl Lower<'_> {
         self.fresh_definition();
         self.definition.clone_from(&name);
         let mut body = self.definition(decl);
-        if info.params > 1
-            && let ExprKind::Lambda { params, .. } = &mut body.kind
-        {
-            let stage = params.last().map_or(Stage::Runtime, |p| p.stage);
-            let pats = params.drain(..).map(|p| p.pat).collect();
-            params.push(Param {
-                pat: Pat::Tuple(pats),
-                stage,
-            });
+        if info.params > 1 {
+            tupled(&mut body);
         }
         let implementation = companion_name(&name, "impl");
         let procedure = companion_name(&name, "procedure");
@@ -72,36 +65,7 @@ impl Lower<'_> {
         );
         let mut call = apply(server("call", span), vec![self.global(&procedure, span)]);
         if info.params > 1 {
-            let names: Vec<String> = (0..info.params).map(|_| self.hidden("$p")).collect();
-            let payload = names
-                .iter()
-                .map(|n| Expr::new(ExprKind::Local(n.clone()), span))
-                .collect();
-            let ran = Expr::new(
-                ExprKind::App {
-                    func: Box::new(call),
-                    arg: Box::new(Expr::new(ExprKind::Tuple(payload), span)),
-                    stage: Stage::Runtime,
-                    arg_first: false,
-                },
-                span,
-            );
-            let last = names.len() - 1;
-            let params = names
-                .into_iter()
-                .enumerate()
-                .map(|(i, n)| Param {
-                    pat: Pat::Bind(n),
-                    stage: if i == last { Stage::Runtime } else { Stage::Pure },
-                })
-                .collect();
-            call = Expr::new(
-                ExprKind::Lambda {
-                    params,
-                    body: Box::new(ran),
-                },
-                span,
-            );
+            call = self.gathering(call, info.params, span);
         }
         let served = apply(
             server(if info.guarded { "guarded" } else { "function" }, span),
@@ -127,6 +91,45 @@ impl Lower<'_> {
         }
     }
 
+    /// `fun p0 … pn -> call (p0, …, pn)`: the call of a server function of
+    /// `params` parameters, sent as one tuple.
+    fn gathering(&mut self, call: Expr, params: usize, span: Span) -> Expr {
+        let names: Vec<String> = (0..params).map(|_| self.hidden("$p")).collect();
+        let payload = names
+            .iter()
+            .map(|n| Expr::new(ExprKind::Local(n.clone()), span))
+            .collect();
+        let ran = Expr::new(
+            ExprKind::App {
+                func: Box::new(call),
+                arg: Box::new(Expr::new(ExprKind::Tuple(payload), span)),
+                stage: Stage::Runtime,
+                arg_first: false,
+            },
+            span,
+        );
+        let last = params - 1;
+        let params = names
+            .into_iter()
+            .enumerate()
+            .map(|(i, n)| Param {
+                pat: Pat::Bind(n),
+                stage: if i == last {
+                    Stage::Runtime
+                } else {
+                    Stage::Pure
+                },
+            })
+            .collect();
+        Expr::new(
+            ExprKind::Lambda {
+                params,
+                body: Box::new(ran),
+            },
+            span,
+        )
+    }
+
     fn global(&self, name: &str, span: Span) -> Expr {
         Expr::new(
             ExprKind::Global {
@@ -135,6 +138,19 @@ impl Lower<'_> {
             },
             span,
         )
+    }
+}
+
+/// The body of a server function of several parameters, taking them as one
+/// tuple, the stage of the last.
+fn tupled(body: &mut Expr) {
+    if let ExprKind::Lambda { params, .. } = &mut body.kind {
+        let stage = params.last().map_or(Stage::Runtime, |p| p.stage);
+        let pats = params.drain(..).map(|p| p.pat).collect();
+        params.push(Param {
+            pat: Pat::Tuple(pats),
+            stage,
+        });
     }
 }
 

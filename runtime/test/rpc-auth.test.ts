@@ -15,7 +15,8 @@ const refused = { _tag: "Refused" };
 const me = rpcWithAuth(
   Session,
   (call) => {
-    const user = Reflect.get(Reflect.get(Object(call), "headers"), "authorization");
+    const headers: unknown = Reflect.get(Object(call), "headers");
+    const user: unknown = Reflect.get(Object(headers), "authorization");
     return typeof user === "string" ? Effect.succeed({ user }) : Effect.fail(refused);
   },
   rpcWithErrors([Schema.Struct({ _tag: Schema.Literal("Refused") })], rpcWithSuccess(Schema.String, rpcMake("me"))),
