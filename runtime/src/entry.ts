@@ -100,14 +100,19 @@ export const aroundMain = (f: Around): void => {
   around = f;
 };
 
-/** Runs `main` on `input` under the root owner; a pure `main` is done when it returns. */
-export const start = <I>(main: Main<I>, input: I): Fiber.Fiber<unknown, unknown> => {
+/**
+ * Runs `main` on `input` under the root owner; a pure `main` is done when it
+ * returns. `provide` gives the services the runner provides to this call.
+ */
+export const start = <I>(main: Main<I>, input: I, provide: Around = (program) => program): Fiber.Fiber<unknown, unknown> => {
   const program = withOwner(() =>
-    Effect.suspend(() => {
-      const result = main(input);
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiler checked `main` needs no service
-      return Effect.isEffect(result) ? (result as Effect.Effect<unknown, unknown>) : Effect.succeed(result);
-    }),
+    provide(
+      Effect.suspend(() => {
+        const result = main(input);
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiler checked `main` needs no service but the runner's
+        return Effect.isEffect(result) ? (result as Effect.Effect<unknown, unknown>) : Effect.succeed(result);
+      }),
+    ),
   );
   return Effect.runFork(around === undefined ? program : around(program));
 };

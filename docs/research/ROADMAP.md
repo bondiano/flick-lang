@@ -307,7 +307,7 @@ component search (props : SearchProps) =
 **H4. `[build] ui`.** ✅ `727e396`
 - AC: модуль вместо `@flick-lang/runtime/ui` и `ui/react` для привязок `Ui` и `Action`; относительный путь — от корня проекта.
 
-**H5. Сервисы runner'а.** ⬜
+**H5. Сервисы runner'а.** ✅ (`Runner.Cloudflare.Env` — сервис с `var`/`binding`, поле `env` из `Fetch` убрано, `Main = Fetch ->{Env; AppError} ServerResponse`; runner предоставляет его каждому запросу через необязательный `provide` у `start` в `entry.ts`; вычитать ничего не пришлось: `subsume` ковариантен, так что `main` может требовать любое подмножество сервисов `Main`, а чужой сервис — `P026`; `project::tests::main_may_need_the_services_its_runner_provides`, e2e `flick/tests/build_runner.rs`)
 - AC: runner объявляет сервисы, которые предоставляет сам (например, `Cloudflare.Env` вместо поля `env`), и `main` может держать их в строке; проверка `P026` вычитает их из строки.
 
 **H6. Пакеты на `core` без второй сборки.** ✅ (исследование, [core-option-equality.md](core-option-equality.md): двойная сборка остаётся — `Equal.equals(Option.some(1), {_tag:"Some",value:1})` ложно, хеши разные, `Option.isOption` простого объекта ложно; к тому же Effect-сборка модуля импортирует `effect`, так что и при совместимых данных приложение `none` её не возьмёт; `_core/` у `@flick-lang/dts-importer` — 5.8 KB против 44 KB модулей, 13%; в `examples/` пакетов нет; строка «Библиотеки без Effect» в `implementation-decisions.md`)
@@ -384,7 +384,7 @@ U9 ✅ ─ U9b ✅
 S2 ✅ ─ F1 ✅ ─ F2 ✅ ─ F3 ✅ ─ F4 ─ F5 ─ F6
 S3 ✅ ─ S4 ✅ ─ O1 ✅ ─ O2 ✅ ─ O3 ✅ ─ O4 ✅ ─ O5 ✅
 L1 ✅ ─ L2 ✅ ─ L3 ✅ ─ L4 ✅ ─ L5
-H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ─ H6 ✅     (H2 по входам — после L6 ✅)
+H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ✅ ─ H6 ✅     (H2 по входам — после L6 ✅)
 D1 ✅ ─ D2 ✅ ─ D3 ✅ ─ D4 ✅ ─ D5 ✅ ─ D6 ✅ ─ D9 ✅ ─ D11 ✅ ─ D10 ✅ ─ D13 ✅ ─ D12 ✅ ─ D14 ✅ ─ D8 ✅   (D15 ✅ — с D4/D5; D7 ✅ после C1)
 ```
 

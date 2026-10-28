@@ -55,14 +55,14 @@ fn the_node_runner_runs_main() {
 
 const WORKER: &str = "module App.Worker exposing (main)
 
-import Runner.Cloudflare exposing (Fetch)
+import Runner.Cloudflare exposing (Fetch, Env)
 import Http.ServerResponse exposing (ServerResponse)
 
-main : Fetch ->{; AppError} ServerResponse
+main : Fetch ->{Env; AppError} ServerResponse
 let main event =
   if Http.ServerRequest.url event.request == \"/boom\" then App.fail \"boom\"
   else
-    let greeting = Option.with_default \"hello\" (Runner.Cloudflare.var \"GREETING\" event.env)
+    let greeting = Option.with_default \"hello\" (Runner.Cloudflare.var \"GREETING\")
     Runner.Cloudflare.wait_until event.context (task { Platform.stdout_line \"after the response\" })
     Http.ServerResponse.text (greeting ++ \" from \" ++ Http.ServerRequest.url event.request) Http.ServerResponse.defaults
 ";

@@ -290,6 +290,39 @@ fn a_runner_gives_the_type_of_main() {
 }
 
 #[test]
+fn main_may_need_the_services_its_runner_provides() {
+    let check = |main: &str| {
+        let config = "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"App.Main\"\nrunner = \"Runner.Cloudflare\"\n";
+        let source = format!(
+            "module App.Main exposing (main)\n\nimport Runner.Cloudflare exposing (Fetch, Env)\nimport Http.ServerResponse exposing (ServerResponse)\n\nservice Other\n\n{main}"
+        );
+        let host = memory(&[("flick.toml", config), ("src/App/Main.fl", &source)]);
+        run(&host, &["src/App/Main.fl"])
+    };
+    let answer = "Http.ServerResponse.text \"hi\" Http.ServerResponse.defaults";
+    for services in ["Env", ""] {
+        assert_eq!(
+            check(&format!(
+                "main : Fetch ->{{{services}; AppError}} ServerResponse\nlet main _ = {answer}\n"
+            )),
+            Vec::<String>::new(),
+            "{services}"
+        );
+    }
+    let reads = format!(
+        "main : Fetch ->{{Env; AppError}} ServerResponse\nlet main _ =\n  let _ = Runner.Cloudflare.var \"KEY\"\n  {answer}\n"
+    );
+    assert_eq!(check(&reads), Vec::<String>::new());
+    let diagnostics = check(&format!(
+        "main : Fetch ->{{Env, Other; AppError}} ServerResponse\nlet main _ = {answer}\n"
+    ));
+    assert!(
+        matches!(&diagnostics[..], [d] if d.starts_with("FLICK-P026 src/App/Main.fl `main`: entry `main` is not a `Runner.Cloudflare.Main`")),
+        "{diagnostics:?}"
+    );
+}
+
+#[test]
 fn a_package_dependency_still_conflicts_with_a_later_local_import() {
     use crate::iface::{self, Interface};
 
