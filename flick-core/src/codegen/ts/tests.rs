@@ -143,3 +143,26 @@ fn capture_projection_preserves_outer_data_binders_but_not_stored_regions() {
             .is_err()
     );
 }
+
+#[test]
+fn ui_is_the_runtime_ui_imported_only_where_used() {
+    let lookup = |m: &str| types::builtins().iter().find(|i| i.module == m).cloned();
+    let package = |_: &str| None;
+    let path = |m: &str| m.to_owned();
+    let projection = Projection::new("App.Shapes", &lookup, &package);
+    assert_eq!(
+        projection.value(&types::Type::prim("Float")),
+        Ok("number".to_owned())
+    );
+    assert!(!projection.imports(&path).contains("$Ui"));
+    let view = types::Type::pure_fun(types::Type::prim("Bool"), types::Type::prim("Ui"));
+    assert_eq!(
+        projection.value(&view),
+        Ok("(arg: boolean) => $Ui".to_owned())
+    );
+    assert!(
+        projection
+            .imports(&path)
+            .contains("import type { Ui as $Ui } from \"@flick-lang/runtime/ui/react\";")
+    );
+}

@@ -1,7 +1,7 @@
 ---
 import "../styles/playground.css";
 import { Effect } from "@flick-lang/runtime";
-import { uiRenderStatic, type Ui } from "@flick-lang/runtime/ui/react";
+import { uiRenderStatic } from "@flick-lang/runtime/ui/react";
 import { renderToString } from "react-dom/server";
 import { initial_view } from "../playground/Playground.fl";
 
@@ -11,7 +11,7 @@ interface Props {
 }
 
 const { mode, locale } = Astro.props;
-const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view({ mode, locale })) as unknown as Ui));
+const markup = renderToString(uiRenderStatic(await Effect.runPromise(initial_view({ mode, locale }))));
 ---
 
 <div id="flick-playground" class="not-content flick-playground-shell" data-mode={mode} data-locale={locale} data-flick-ssr data-pagefind-ignore set:html={markup}></div>
