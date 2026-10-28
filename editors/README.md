@@ -65,6 +65,8 @@ with it: VS Code through the extension's defaults, Zed by its default
 Hover on a resolved class method keeps its inferred type and the class member's
 `///` documentation alongside the selected instance. Definition still opens the
 implementation in that instance.
+Hover on `..` inside `Type(..)` or `Class(..)` lists the imported or exported
+constructors or methods, with their full signatures and available documentation.
 
 Built-in module definitions open as real read-only `.fl` files in both
 editors. The server writes its embedded sources to a content-keyed system

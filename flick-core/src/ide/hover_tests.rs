@@ -329,3 +329,93 @@ let generic = get
         }
     }
 }
+
+#[test]
+fn member_exposure_hover_lists_visible_signatures_in_imports_and_exports() {
+    let domain = "module App.Domain exposing (MonadError(..), Box(..), Token, Visible, unrelated)
+
+class MonadError (m : Type -> Type) e | m -> e =
+  /// Raises a domain error.
+  throw_error : forall c a. e^c -> (m a)^c
+  /// Handles a domain error.
+  catch_error : forall c d a. (forall v. e^v -> (m a)^(c + v))^c ->
+    ((m a)^d -> (m a)^(c + d))^c
+
+type Box a = Empty | Box a
+type Token = Visible | Hidden
+
+unrelated : Number
+let unrelated = 42
+";
+    let public = "module App.Public exposing (MonadError(..), Box(..), Token(..))
+
+import App.Domain as D exposing (MonadError(..), Box(..), Token(..))
+";
+    let main = "module App.Main
+
+import App.Public as P exposing (MonadError(..), Box(..), Token(..))
+";
+    let f = fixture_of(&[
+        ("src/App/Domain.fl", domain),
+        ("src/App/Public.fl", public),
+        ("src/App/Main.fl", main),
+    ]);
+    let ide = f.ide();
+    assert!(
+        ide.analysis.diagnostics.iter().all(Diagnostic::unnecessary),
+        "{:?}",
+        ide.analysis.diagnostics
+    );
+    for (module, source) in [
+        ("App.Domain", domain),
+        ("App.Public", public),
+        ("App.Main", main),
+    ] {
+        let file = f.file(module);
+        for (name, signatures) in [
+            (
+                "MonadError",
+                &[
+                    "throw_error : forall ",
+                    "MonadError m e => e^c -> (m a)^c",
+                    "catch_error : forall ",
+                    "((m a)^d -> (m a)^(c + d))^c",
+                    "Raises a domain error.",
+                    "Handles a domain error.",
+                ][..],
+            ),
+            (
+                "Box",
+                &[
+                    "Empty : forall a. Box a",
+                    "Box : forall a captures. a^captures -> (Box a)^{captures}",
+                ][..],
+            ),
+            ("Token", &["Visible : Token"][..]),
+        ] {
+            for (start, _) in source.match_indices(&format!("{name}(..)")) {
+                let dots = u32::try_from(start + name.len() + 1).expect("small");
+                for offset in dots..dots + 2 {
+                    let (markdown, range) = ide.hover(file, offset).expect("member list hover");
+                    assert_eq!(range, (dots, dots + 2));
+                    for signature in signatures {
+                        assert!(markdown.contains(signature), "{module}: {markdown}");
+                    }
+                    for hidden in ["Hidden", "unrelated :"] {
+                        assert!(!markdown.contains(hidden), "{markdown}");
+                    }
+                    if name != "MonadError" {
+                        assert!(!markdown.contains("throw_error :"), "{markdown}");
+                    }
+                    if name != "Box" {
+                        assert!(!markdown.contains("Empty :"), "{markdown}");
+                    }
+                }
+                let name_at = u32::try_from(start + 1).expect("small");
+                let (_, range) = ide.hover(file, name_at).expect("ordinary type hover");
+                assert_eq!(range, (name_at - 1, dots - 1));
+                assert!(ide.hover(file, dots + 2).is_none(), "closing parenthesis");
+            }
+        }
+    }
+}
