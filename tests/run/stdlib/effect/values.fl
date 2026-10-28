@@ -3,8 +3,8 @@
 module App.Main exposing (main)
 
 type alias Point = {
-  x : Number;
-  y : Number;
+  x : Float;
+  y : Float;
 } deriving Schema
 
 type alias Shape = {
@@ -18,13 +18,13 @@ let line label value () = Platform.stdout_line (label ++ ": " ++ value)
 corner : Optic.Lens Shape Point
 let corner = Optic.make_lens (fun s -> s.corner) (fun p s -> { name = s.name; corner = p })
 
-x_of : Optic.Lens Point Number
+x_of : Optic.Lens Point Float
 let x_of = Optic.make_lens (fun p -> p.x) (fun x p -> { x = x; y = p.y })
 
-positive : Optic.Prism Number Number
+positive : Optic.Prism Float Float
 let positive = Optic.make_prism (fun n -> if n > 0 then Ok n else Err "not positive") (fun n -> n)
 
-even_x : Optic.Optional Point Number
+even_x : Optic.Optional Point Float
 let even_x =
   Optic.make_optional
     (fun p -> if p.x % 2 == 0 then Ok p.x else Err "odd x")
@@ -33,7 +33,7 @@ let even_x =
 shape : Shape
 let shape = { name = "box"; corner = { x = 2; y = 5 } }
 
-result : Result SchemaError Number -> String
+result : Result SchemaError Float -> String
 let result r =
   match r with
   | Ok n -> show n
@@ -119,10 +119,10 @@ let main () =
       ++ " "
       ++ show (Optic.set some_prism 2))
     ()
-  let none_prism : Optic.Prism (Option Number) Unit = Optic.none ()
+  let none_prism : Optic.Prism (Option Float) Unit = Optic.none ()
   line "none" (show (Optic.set none_prism ())) ()
-  let ok_prism : Optic.Prism (Result String Number) Number = Optic.success ()
-  let err_prism : Optic.Prism (Result String Number) String = Optic.failure ()
+  let ok_prism : Optic.Prism (Result String Float) Float = Optic.success ()
+  let err_prism : Optic.Prism (Result String Float) String = Optic.failure ()
   line
     "result"
     (show (Optic.set ok_prism 1)
@@ -138,7 +138,7 @@ let main () =
       ++ " "
       ++ result (Optic.get_result (Optic.prism_optional small) 30))
     ()
-  let all : Optic.Traversal (List Number) Number =
+  let all : Optic.Traversal (List Float) Float =
     Optic.traversal (Optic.lens_optional (Optic.iso_lens (Optic.id ())))
   line
     "traversal"

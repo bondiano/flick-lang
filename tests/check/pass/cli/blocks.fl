@@ -8,7 +8,7 @@ let greet =
     /// Print in capitals
     flag loud : Bool
     /// How many times
-    flag times "n" : Number = 1
+    flag times "n" : Int = 1
     flag greeting : Option String
     flag tag "t" : List String
     arg name : String

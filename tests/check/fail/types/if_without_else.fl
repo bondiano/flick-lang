@@ -18,7 +18,7 @@ let kept c =
 quiet : Bool ->{a; b} Unit
 let quiet c = if c then Console.log "c"
 
-value : Bool -> Number
+value : Bool -> Float
 let value c = if c then 1
 
 discarded : Bool -> Unit
@@ -26,5 +26,5 @@ let discarded c = if c then 2
 
 //~ FLICK-T028 @7:3-7:10 `else ()` can be left out: an `if` without `else` is `Unit`
 //~ FLICK-T028 @10:76-10:83 `else ()` can be left out: an `if` without `else` is `Unit`
-//~ FLICK-T003 @22:15-22:26 expected `Number`, found `Unit`
-//~ FLICK-T003 @25:29-25:30 expected `Unit`, found `Number`
+//~ FLICK-T003 @22:15-22:26 expected `Float`, found `Unit`
+//~ FLICK-T003 @25:29-25:30 expected `Unit`, found `Int`

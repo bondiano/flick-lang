@@ -10,7 +10,7 @@ let outside badge props = badge props
 
 wrong : Ui.Component Props -> Ui
 let wrong badge = ui { badge { label = 1 } }
-//~ FLICK-T003 @12:40-12:41 expected `String`, found `Number`
+//~ FLICK-T003 @12:40-12:41 expected `String`, found `Int`
 
 missing : Ui.Component Props -> Ui
 let missing badge = ui { badge {} }

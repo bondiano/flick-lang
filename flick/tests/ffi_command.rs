@@ -280,7 +280,7 @@ fn identity_binding(
     let wrong = format!("{module_specifier}@{version} intentionally-wrong-fingerprint");
     let reviewed = format!(
         "module Ffi.Reviewed exposing (answer)\n\n\
-         answer : Unit ->{{}} Number\n\
+         answer : Unit ->{{}} Float\n\
          foreign sync answer from \"{module_specifier}\" \"answer\"\n  arity 0\n  reviewed \"{wrong}\"\n"
     );
     let reviewed_path = dir.join("src/Ffi/Reviewed.fl");

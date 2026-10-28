@@ -139,7 +139,7 @@ let example = ui { div { class_name = "badges" } [badge { label = "new" }] }
 прочитанный им атом, а не атом соседнего представления:
 
 ```flick
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.make 0
 
 counter_view : Ui.View Unit
@@ -190,10 +190,10 @@ let counter_view =
 и может создавать всё, что ей нужно.
 
 ```flick
-drafts : Atom.Family Number (Atom.Writable String)
+drafts : Atom.Family Float (Atom.Writable String)
 let drafts = Atom.family (fun _ -> Atom.make "")
 
-remove : Action.Action (Number, Ui.ClickSnapshot)
+remove : Action.Action (Float, Ui.ClickSnapshot)
 let remove =
   Action.exhaust (fun (id, _) ->
     task {
@@ -237,7 +237,7 @@ component card (person : { name : String; label : String }) =
 props, рендер — текущие. Наведение на `component` показывает этот тип.
 
 ```flick
-component counter (start : Number) =
+component counter (start : Float) =
   let count = Atom.local start
   let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
   ui {
@@ -319,7 +319,7 @@ component search () =
 (`FLICK-G001`), а реестр забывает атомы экземпляра при его unmount. Функции
 атомов заимствуют то, что принимают, `(Atom.Writable a)^d`, поэтому читают
 и пишут такой атом. Функция, которая создаёт состояние экземпляра,
-говорит об этом в сигнатуре, `Number ->{Setup s;} (Atom.Writable Number)^{s}`,
+говорит об этом в сигнатуре, `Float ->{Setup s;} (Atom.Writable Float)^{s}`,
 и вызывается из setup; аннотация тоже называет захват,
 `(Ui.Element Ui.Input)^c`. Слово `component` остаётся именем во всех других
 местах.
@@ -513,7 +513,7 @@ let main () =
 нельзя (`FLICK-E002`). На сервере обработчики не запускаются.
 
 ```flick
-request : Number ->{} String
+request : Float ->{} String
 let request n =
   provide Atom.layer {
     Atom.set count n
@@ -553,7 +553,7 @@ let request n =
 кодирует синхронно и без сервисов.
 
 ```flick
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
 
 draft : String -> Atom.Writable String
@@ -572,7 +572,7 @@ let draft = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.m
 пропущенное значение.
 
 ```flick
-page : Number ->{} String
+page : Float ->{} String
 let page n =
   provide Atom.layer {
     Atom.set count n

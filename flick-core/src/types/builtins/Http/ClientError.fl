@@ -11,7 +11,7 @@ type alias RequestDetails = {
 
 /// The request and the status of the response a failure is about.
 type alias ResponseDetails =
-  { method : Http.Method.Method; url : String; status : Number; description : Option String }
+  { method : Http.Method.Method; url : String; status : Float; description : Option String }
 
 /// Why a request failed: before a response came (`TransportError`, the
 /// body could not be encoded, the URL is invalid) or because of the
@@ -30,7 +30,7 @@ type error HttpClientError = HttpClientError ClientErrorReason
   deriving Eq, Show
 
 /// The status of the response, for a failure that has one.
-status : HttpClientError -> Option Number
+status : HttpClientError -> Option Float
 let status failure =
   match failure with
   | HttpClientError (StatusCodeError d) -> Some d.status

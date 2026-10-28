@@ -40,13 +40,13 @@ fn discarded_state_is_inferred_through_native_lifted_and_given_dictionaries() {
     let body = r"
 type Config = Config
 
-native : StateT Number Identity Unit
+native : StateT Float Identity Unit
 let native = do { _ <- get; pure () }
 
-lifted : ReaderT Config (MaybeT (StateT Number Identity)) Unit
+lifted : ReaderT Config (MaybeT (StateT Float Identity)) Unit
 let lifted = do { _ <- get; pure () }
 
-type alias Stack a = ReaderT Config (MaybeT (StateT Number Identity)) a
+type alias Stack a = ReaderT Config (MaybeT (StateT Float Identity)) a
 aliased : Stack Unit
 let aliased = do { _ <- get; pure () }
 
@@ -108,8 +108,8 @@ class Outer a b c | a -> b c =
   outer : a -> (b, c)
 class Waiting a b c | a -> b =
   waiting : a -> b
-instance AB Number String =
-  ab : Number -> String
+instance AB Float String =
+  ab : Float -> String
   let ab _ = "number"
 instance BC String Bool =
   bc : String -> Bool
@@ -121,7 +121,7 @@ instance Ready Bool
 #[test]
 fn context_refinement_retries_earlier_constraints_without_reordering_dictionaries() {
     let bc = instance("App.Relations", "BC String Bool", vec![]);
-    let ab = instance("App.Relations", "AB Number String", vec![]);
+    let ab = instance("App.Relations", "AB Float String", vec![]);
     for (context, args) in [
         ("BC b c, AB a b", vec![bc.clone(), ab.clone()]),
         ("AB a b, BC b c", vec![ab.clone(), bc.clone()]),
@@ -143,7 +143,7 @@ instance ({context}) => Outer (Wrap a) b c =
         ] {
             let main = format!(
                 "module App.Main exposing (observed)\n{imports}\n\
-                 observed : Unit\nlet observed = ignore (outer (Wrap 0))\n"
+                 observed : Unit\nlet observed = ignore (outer (Wrap 0.0))\n"
             );
             let (diagnostics, dicts) =
                 check_all(&[RELATIONS, ("App.Outer", &outer), ("App.Main", &main)]);
@@ -174,7 +174,7 @@ let siblings value = ()
 import App.Outer exposing (..)
 import App.Relations exposing (..)
 observed : Unit
-let observed = siblings 0
+let observed = siblings 0.0
 ";
     let (diagnostics, dicts) = check_all(&[RELATIONS, outer, ("App.Main", main)]);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -187,7 +187,7 @@ let observed = siblings 0
                 "Waiting (Wrap a) b c",
                 vec![
                     instance("App.Relations", "Ready Bool", vec![]),
-                    instance("App.Relations", "AB Number String", vec![]),
+                    instance("App.Relations", "AB Float String", vec![]),
                 ],
             ),
         ]
@@ -206,8 +206,8 @@ class Structured key output | key -> output =
   collect : key -> output
 class Repeated key left right | key -> left right =
   repeat : key -> (left, right)
-instance Base Number Number =
-  base : Number -> Number
+instance Base Float Float =
+  base : Float -> Float
   let base value = value
 instance Base a s => Structured (Wrap a) (List s) =
   collect : Wrap a -> List s
@@ -221,12 +221,12 @@ instance Base a s => Repeated (Wrap a) s s =
 import App.Structured exposing (..)
 observed : Unit
 let observed =
-  ignore (collect (Wrap 0))
-  ignore (repeat (Wrap 0))
+  ignore (collect (Wrap 0.0))
+  ignore (repeat (Wrap 0.0))
 ";
     let (diagnostics, dicts) = check_all(&[library, ("App.Main", main)]);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
-    let leaf = instance("App.Structured", "Base Number Number", vec![]);
+    let leaf = instance("App.Structured", "Base Float Float", vec![]);
     assert_eq!(
         dicts,
         vec![

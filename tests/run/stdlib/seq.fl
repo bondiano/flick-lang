@@ -5,12 +5,12 @@ module App.Main exposing (main)
 line : Show a => Seq a -> String
 let line xs = show (Seq.to_list xs)
 
-collatz : Number -> Seq Number
+collatz : Float -> Seq Float
 let collatz n =
   Seq.iterate (fun x -> if x % 2 == 0 then x / 2 else 3 * x + 1) n
   |> Seq.take_while (fun x -> x != 1)
 
-fibs : Seq Number
+fibs : Seq Float
 let fibs = Seq.unfold (fun (a, b) -> Some (a, (b, a + b))) (0, 1)
 
 main : Unit ->{; AppError} Unit

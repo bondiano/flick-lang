@@ -1,14 +1,14 @@
 // An alias in a row must stand for a service or an error.
 module App.Aliases exposing (..)
 
-type alias Count = Number
+type alias Count = Float
 
 type alias Name = String
 
-counting : Unit ->{Count;} Number
+counting : Unit ->{Count;} Float
 let counting () = 1
 
-naming : Unit ->{; Name} Number
+naming : Unit ->{; Name} Float
 let naming () = 1
 
 //~ FLICK-T002 @8:20-8:25 `Count` has kind Type, but a Service is expected here

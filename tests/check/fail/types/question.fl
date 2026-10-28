@@ -2,39 +2,39 @@ module App.Question exposing (..)
 
 type error Invalid = Invalid String
 
-parse : String -> Result Invalid Number
+parse : String -> Result Invalid Float
 let parse s = Err (Invalid s)
 
 // a pure function has no errors to fail with
-pure_sum : String -> Number
+pure_sum : String -> Float
 let pure_sum s = (parse s)? + 1
 
 // `None` returns from a function whose result is not an `Option`
-counted : Option Number -> Number
+counted : Option Float -> Float
 let counted o = o? + 1
 
 // a `task` runs on its own: there is no function to return from
-later : Option Number -> Eff none none (Option Number)
+later : Option Float -> Eff none none (Option Float)
 let later o = task { Some (o? + 1) }
 
 // neither an `Option` nor a `Result`
-odd : Number -> Option Number
+odd : Float -> Option Float
 let odd n = Some n?
 
 // a `match` failing with the error is `?`
-total : String ->{; Invalid} Number
+total : String ->{; Invalid} Float
 let total s =
   match parse s with
   | Ok n -> n
   | Err e -> from_result (Err e)
 
 // the body of a function whose `?` returns `None` is an `Option` too
-value : Number
-let value = (fun () -> (None : Option Number)? + 1) ()
+value : Float
+let value = (fun () -> (None : Option Float)? + 1) ()
 
 //~ FLICK-E001 @10:18-10:28 needs a runtime stage with errors
-//~ FLICK-T003 @14:17-14:19 but that function returns `Number`: in a runtime function, fail instead
+//~ FLICK-T003 @14:17-14:19 but that function returns `Float`: in a runtime function, fail instead
 //~ FLICK-T003 @18:28-18:30 this code runs on its own
-//~ FLICK-T003 @22:18-22:20 `?` takes an `Option` or a `Result`, but this has type `Number`
+//~ FLICK-T003 @22:18-22:20 `?` takes an `Option` or a `Result`, but this has type `Float`
 //~ FLICK-T034 @27:3-29:33 `?` says the same
-//~ FLICK-T003 @33:14-33:51 but its body has type `Number`
+//~ FLICK-T003 @33:14-33:50 but its body has type `Float`

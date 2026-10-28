@@ -3,7 +3,7 @@
 module App.Streams exposing (..)
 
 /// The stream of a subscription holds its region.
-escaped : PubSub.PubSub Number ->{} Stream.Stream none none Number
+escaped : PubSub.PubSub Float ->{} Stream.Stream none none Float
 let escaped hub =
   scope {
     let sub = PubSub.subscribe hub
@@ -12,7 +12,7 @@ let escaped hub =
   }
 
 /// So does a stream that a scope broadcasts.
-broadcast : Stream.Stream none none Number ->{} Stream.Stream none none Number
+broadcast : Stream.Stream none none Float ->{} Stream.Stream none none Float
 let broadcast source =
   scope {
     Stream.broadcast { capacity = None; strategy = None; replay = None } source
@@ -20,7 +20,7 @@ let broadcast source =
   }
 
 /// A stream whose callback holds a scoped value holds its region too.
-leaked : PubSub.PubSub Number ->{} Stream.Stream none none Number
+leaked : PubSub.PubSub Float ->{} Stream.Stream none none Float
 let leaked hub =
   scope {
     let sub = PubSub.subscribe hub

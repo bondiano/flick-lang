@@ -70,7 +70,7 @@ impl Checker<'_> {
                 if !self.is_scalar(segment) {
                     return Err((
                         at(i),
-                        "a segment is a `String`, a `Number`, a `Bool` or a refined type over them"
+                        "a segment is a `String`, a `Float`, a `Bool` or a refined type over them"
                             .to_owned(),
                     ));
                 }
@@ -120,7 +120,7 @@ impl Checker<'_> {
     /// Text, a number, a boolean, or a refined type, whose schema checks it.
     pub(super) fn is_scalar(&self, plan: &SchemaPlan) -> bool {
         match plan {
-            SchemaPlan::Prim(p) => matches!(p.as_str(), "String" | "Number" | "Bool"),
+            SchemaPlan::Prim(p) => matches!(p.as_str(), "String" | "Int" | "Float" | "Bool"),
             SchemaPlan::Refined { base, .. } => self.is_scalar(base),
             SchemaPlan::Named {
                 module, ty, args, ..

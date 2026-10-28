@@ -6,9 +6,9 @@ service Log =
   info : String ->{} Unit
 
 service Users =
-  get : Number ->{} String
+  get : Float ->{} String
 
-run : Number ->{Users, Log; none} String
+run : Float ->{Users, Log; none} String
 let run id =
   let name = Users.get id
   Log.info name

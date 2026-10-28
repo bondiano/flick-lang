@@ -1,7 +1,7 @@
 // Services and errors other modules see only through this module's interface.
 module App.Users exposing (User, UserId, Users, NotFound(..), users_layer)
 
-type alias UserId = Number
+type alias UserId = Float
 
 type alias User = { id : UserId; name : String }
 

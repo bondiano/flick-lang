@@ -71,7 +71,7 @@ fn project(name: &str) -> PathBuf {
     fs::write(dir.join("package.json"), "{ \"name\": \"@acme/sample\" }\n").expect("write");
     fs::write(
         dir.join("src/App/Lib.fl"),
-        "module App.Lib exposing (one)\n\none : Number\nlet one = 1\n",
+        "module App.Lib exposing (one)\n\none : Float\nlet one = 1\n",
     )
     .expect("write");
     fs::write(dir.join("test/Test/Sample.fl"), SUITE).expect("write");
@@ -152,7 +152,7 @@ fn filter_jobs_and_the_human_reporter() {
 
 const SLOW: &str = r#"module Test.Slow exposing (tests)
 
-sleep : Number ->{} Unit
+sleep : Float ->{} Unit
 foreign async sleep from "./sleep.mjs" "sleep"
 
 tests : List Test.Test
@@ -222,7 +222,7 @@ fn watch_runs_again_after_the_previous_run_cleaned_up() {
     thread::sleep(Duration::from_millis(300));
     fs::write(
         dir.join("src/App/Lib.fl"),
-        "module App.Lib exposing (one)\n\none : Number\nlet one = 2\n",
+        "module App.Lib exposing (one)\n\none : Float\nlet one = 2\n",
     )
     .expect("write");
     let text = wait_for(&out, "acquired", 2);

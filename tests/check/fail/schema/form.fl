@@ -2,7 +2,7 @@ module App.Form exposing (..)
 
 type alias Signup = { name : String; tags : List String }
   deriving Schema, Form
-//~ FLICK-D010 @4:3-4:24 `Signup.tags`: a form field is a `String`, a `Number`, a `Bool`, a refined type over them or an `Option` of one
+//~ FLICK-D010 @4:3-4:24 `Signup.tags`: a form field is a `String`, a `Float`, a `Bool`, a refined type over them or an `Option` of one
 
 type alias Login = { user : String }
   deriving Schema, Form

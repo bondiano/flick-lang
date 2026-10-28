@@ -10,10 +10,10 @@ let pair_optional left right =
     pure (x, y)
   }
 
-safe_div : Number -> Number -> Result String Number
+safe_div : Float -> Float -> Result String Float
 let safe_div a b = if b == 0 then Err "divide by zero" else Ok (a / b)
 
-ratio : Number -> Number -> Number -> Result String Number
+ratio : Float -> Float -> Float -> Result String Float
 let ratio a b c =
   do {
     x <- safe_div a b
@@ -22,7 +22,7 @@ let ratio a b c =
     pure (y + 1)
   }
 
-triples : Number -> List (Number, Number, Number)
+triples : Int -> List (Int, Int, Int)
 let triples n =
   let range = List.range 1 n
   do {
@@ -33,7 +33,7 @@ let triples n =
     pure (a, b, c)
   }
 
-twice : Monad m => m Number -> m Number
+twice : Monad m => m Float -> m Float
 let twice m = do { x <- m; y <- m; pure (x + y) }
 
 main : Unit ->{; AppError} Unit

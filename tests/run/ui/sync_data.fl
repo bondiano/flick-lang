@@ -2,10 +2,10 @@
 // await runs it.
 module App.Main exposing (main)
 
-job : Atom.Writable (Eff {} none Number)
+job : Atom.Writable (Eff {} none Float)
 let job = Atom.make (task { Platform.stdout_line "ran"; 41 })
 
-held : Atom.Atom (Eff {} none Number)
+held : Atom.Atom (Eff {} none Float)
 let held = Atom.derived (fun () -> Atom.value job)
 
 page : Ui.View Unit

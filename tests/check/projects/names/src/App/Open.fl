@@ -3,7 +3,7 @@ module App.Open exposing (go)
 import App.Right exposing (..)
 import App.Left exposing (..)
 
-go : Number
+go : Float
 let go =
   let size = 0
   find + size

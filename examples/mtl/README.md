@@ -106,7 +106,7 @@ receives a typed record:
 | `flag overhead "o" : Option Minutes` | Optional `--overhead` / `-o`; the handler uses zero when absent |
 | `arg tasks : List String` | Zero or more task names, in order |
 
-`Minutes` is a refined `Number` with `Number.is_safe_integer n && n >= 0`;
+`Minutes` is a refined `Float` with `Float.is_safe_integer n && n >= 0`;
 `deriving Cli.Value` reuses the CLI parser and checks that predicate. Missing
 budget, negative or fractional minutes, infinity and unsafe integers fail
 before the planner runs. `--help` and `plan --help` also run no planner.
@@ -141,7 +141,7 @@ types and Prelude instances, not compiler-recognized transformer types.
 | [`ExceptT e m a`](src/Mtl/ExceptT.fl) | `m (Result e a)` | Stop on a domain `Err`; continue on `Ok a` |
 
 Here `m : Type -> Type` is the inner computation type. For example, fixing the
-state and inner computation gives `StateT Number Identity : Type -> Type`, which
+state and inner computation gives `StateT Float Identity : Type -> Type`, which
 can itself be the `m` of another transformer.
 
 Each module exports its constructor and a `run` function. `run` removes **one**
@@ -157,7 +157,7 @@ import Mtl.Classes exposing (lift, get, put, state, ask, local, reader, tell, li
 ```
 
 ```flick
-tick : StateT Number Identity Number
+tick : StateT Float Identity Float
 let tick = do {
   before <- get
   put (before + 1)
@@ -174,7 +174,7 @@ state returned alongside it.
 ### Reader: ask and temporarily change the environment
 
 ```flick
-reader_example : ReaderT Number Identity (Number, Number, Number)
+reader_example : ReaderT Float Identity (Float, Float, Float)
 let reader_example = do {
   before <- ask
   inside <- local (fun n -> n + 10) ask
@@ -348,8 +348,8 @@ preserves its log. `local f (catch_error h action)` also affects the handler;
 `catch_error h (local f action)` does not.
 
 [`App.Capabilities`](src/App/Capabilities.fl) uses a capability-polymorphic
-workflow over `ExceptT String (WriterT (List String) (StateT Number
-(ReaderT Number m)))`. It runs independently over Identity and a cold Eff base,
+workflow over `ExceptT String (WriterT (List String) (StateT Float
+(ReaderT Float m)))`. It runs independently over Identity and a cold Eff base,
 checking the lifted effect executes exactly once:
 
 ```text

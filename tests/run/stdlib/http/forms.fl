@@ -5,7 +5,7 @@ module App.Main exposing (main)
 type alias Note = { title : String; tag : List String }
   deriving Schema
 
-type alias Point = { x : Number }
+type alias Point = { x : Float }
   deriving Schema
 
 json_of : PureCodec Json a -> Codec none none Json a

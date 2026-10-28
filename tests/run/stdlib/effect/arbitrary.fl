@@ -3,9 +3,9 @@
 // typed error of the property, or run out of values.
 module App.Main exposing (main)
 
-type error TooBig = TooBig Number
+type error TooBig = TooBig Float
 
-seeded : Number -> Arbitrary.SampleOptions
+seeded : Float -> Arbitrary.SampleOptions
 let seeded n = { count = Some n; size = None; maxDiscards = None; seed = Some 42 }
 
 checking : Arbitrary.CheckOptions
@@ -20,9 +20,9 @@ let checking =
   }
 
 /// Effect generates within the bounds its checks state.
-digit_json : PureCodec Json Number
+digit_json : PureCodec Json Float
 let digit_json =
-  Number.json_finite
+  Float.json_finite
     |> Check.apply Check.int
     |> Check.apply
       (
@@ -30,7 +30,7 @@ let digit_json =
           { minimum = 0; maximum = 9; exclusiveMinimum = false; exclusiveMaximum = false }
       )
 
-digits : Arbitrary.Arbitrary Number
+digits : Arbitrary.Arbitrary Float
 let digits = Arbitrary.map (fun n -> n) (Arbitrary.from_schema (Codec.to_schema digit_json))
 
 describe : Show a => Arbitrary.CheckResult e a -> String
@@ -52,10 +52,10 @@ let describe result =
   | Arbitrary.Exhausted r -> "exhausted after " ++ show r.discards ++ " discards"
   | Arbitrary.ReplayMismatch reason -> "replay mismatch " ++ reason
 
-below_five : Number ->{} Bool
+below_five : Float ->{} Bool
 let below_five n = n < 5
 
-small : Number ->{; TooBig} Bool
+small : Float ->{; TooBig} Bool
 let small n = if n > 3 then from_result (Err (TooBig n)) else true
 
 run : Unit ->{; Arbitrary.SampleError} Unit
@@ -73,9 +73,9 @@ let run () =
     ("list lengths in bounds: "
       ++ show (List.all (fun xs -> List.length xs >= 1 && List.length xs <= 3) lists))
   let evens =
-    Arbitrary.sample (seeded 10) (Arbitrary.filter (fun n -> n == 2 * Number.floor (n / 2)) digits)
+    Arbitrary.sample (seeded 10) (Arbitrary.filter (fun n -> n == 2 * Float.floor (n / 2)) digits)
   Platform.stdout_line
-    ("filter evens: " ++ show (List.all (fun n -> n == 2 * Number.floor (n / 2)) evens))
+    ("filter evens: " ++ show (List.all (fun n -> n == 2 * Float.floor (n / 2)) evens))
   let tens =
     Arbitrary.sample
       (seeded 10)
@@ -109,7 +109,7 @@ let run () =
         (Arbitrary.constant 2))
   Platform.stdout_line ("zip4: " ++ show (List.all (fun z -> match z with
     | (n, s, b, k) -> n >= 0 && n <= 9 && s == "x" && b && k == 2) zipped))
-  let shrinking : Arbitrary.SchemaOptions Number = { shrink = None }
+  let shrinking : Arbitrary.SchemaOptions Float = { shrink = None }
   Platform.stdout_line
     ("from_schema_with: "
       ++ show

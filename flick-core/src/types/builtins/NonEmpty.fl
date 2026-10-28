@@ -56,7 +56,7 @@ to_list : NonEmpty a -> List a
 foreign pure to_list from "@flick-lang/runtime" "identity"
 
 /// How many elements the list has.
-length : NonEmpty a -> Number
+length : NonEmpty a -> Int
 foreign pure length from "@flick-lang/runtime" "listLength"
 
 /// Applies a pure function to each element.
@@ -80,18 +80,18 @@ foreign pure append from "@flick-lang/runtime/effect/Array" "append"
   reviewed "effect@4.0.5 sha256:1242e48aa3d7a343"
 
 /// `f 0`, …, `f (n - 1)`, with at least `f 0`: `n` is taken as at least 1.
-make_by : forall c a. Number -> (Number -> a)^c -> NonEmpty a
+make_by : forall c a. Int -> (Int -> a)^c -> NonEmpty a
 foreign pure make_by from "@flick-lang/runtime/effect/Array" "makeBy"
   retention call
   reviewed "effect@4.0.5 sha256:e70091e0cb298790"
 
 /// `[start, start + 1, …, end]`, end included; `[start]` when `end < start`.
-range : Number -> Number -> NonEmpty Number
+range : Int -> Int -> NonEmpty Int
 foreign pure range from "@flick-lang/runtime/effect/Array" "range"
   reviewed "effect@4.0.5 sha256:70c8b487a3250c87"
 
 /// `n` copies of `x`, at least one.
-replicate : Number -> a -> NonEmpty a
+replicate : Int -> a -> NonEmpty a
 foreign pure replicate from "@flick-lang/runtime/effect/Array" "replicate"
   arity 1
   reviewed "effect@4.0.5 sha256:a084315d5431a079"
@@ -138,7 +138,7 @@ foreign pure set_last from "@flick-lang/runtime/effect/Array" "setLastNonEmpty"
   reviewed "effect@4.0.5 sha256:6396c05198797d00"
 
 /// The first `n` elements, at least one, and the rest.
-split_at : Number -> NonEmpty a -> (NonEmpty a, List a)
+split_at : Int -> NonEmpty a -> (NonEmpty a, List a)
 foreign pure split_at from "@flick-lang/runtime/effect/Array" "splitAtNonEmpty"
   arity 1
   reviewed "effect@4.0.5 sha256:d8c2c97507679d50"

@@ -42,7 +42,7 @@ The sources below describe existing mechanisms. The status of decisions about Fl
 
 - [Higher-rank polymorphism GHC](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rank_polymorphism.html) — annotated polymorphic arguments and the limits of inference.
 
-- [ECMAScript numeric types](https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html) — the exact semantics of Number and BigInt.
+- [ECMAScript numeric types](https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html) — the exact semantics of Float and BigInt.
 
 - [Effect Cause](https://effect.website/docs/v4/data-types/cause) and [the verified source snapshot](https://github.com/Effect-TS/effect/tree/81fc8d9c7855d0f31bf493f379ec7bc2a6150a6f) — the reference for runtime contracts; changing the dependency requires re-verification.
 

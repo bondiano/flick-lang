@@ -9,7 +9,7 @@ service Files =
   open : forall s. String ->{Scope s;} File s
   read : forall s. File s ->{} String
 
-latest : Atom.Writable (Atom.Writable Number)
+latest : Atom.Writable (Atom.Writable Float)
 let latest = Atom.make (Atom.make 0)
 
 focused : Atom.Writable (Ui.Element Ui.Input)

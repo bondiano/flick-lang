@@ -5,22 +5,22 @@ module App.Main exposing (main)
 line : String -> String ->{} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
-even : Predicate.Predicate Number
-let even n = n - 2 * Number.floor (n / 2) == 0
+even : Predicate.Predicate Float
+let even n = n - 2 * Float.floor (n / 2) == 0
 
-big : Predicate.Predicate Number
+big : Predicate.Predicate Float
 let big n = n > 10
 
 /// Passes even numbers, halved; fails with the odd ones as text.
-halve : Filter.Filter Number Number String
+halve : Filter.Filter Float Float String
 let halve n = if even n then Ok (n / 2) else Err ("odd " ++ show n)
 
 /// Passes numbers below 100.
-small : Filter.Filter Number Number String
+small : Filter.Filter Float Float String
 let small n = if n < 100 then Ok n else Err ("big " ++ show n)
 
 /// A runtime filter: it may read a cell.
-checked : Ref Number -> Filter.FilterEffect none none Number Number String
+checked : Ref Float -> Filter.FilterEffect none none Float Float String
 let checked limit = Filter.make_effect (fun n -> if n <= Ref.get limit then Ok n else Err "over")
 
 table : (Bool -> Bool -> Bool) -> List Bool
@@ -64,7 +64,7 @@ let main () =
       (
         List.map (Predicate.every [big, even]) ns,
         List.map (Predicate.some [big, even]) ns,
-        List.map (Predicate.map_input String.length even) ["ab", "abc"],
+        List.map (Predicate.map_input (fun s -> Int.to_float (String.length s)) even) ["ab", "abc"],
       ))
   line
     "filter"
@@ -119,7 +119,7 @@ let main () =
         List.map (Filter.to_result (halve |> Filter.compose_passthrough halve)) ns,
       ))
   let limit = Ref.make 7
-  decide : Filter.FilterEffect none none Number Number String
+  decide : Filter.FilterEffect none none Float Float String
   let decide = checked limit
   let first = decide 5
   Ref.set limit 3
@@ -143,4 +143,4 @@ let main () =
         identity 3,
       ))
   let never : List Never = []
-  line "absurd" (show (List.map (fun n -> (Function.absurd n : Number)) never))
+  line "absurd" (show (List.map (fun n -> (Function.absurd n : Float)) never))

@@ -1,5 +1,5 @@
 // What the server and the browser both know: a todo.
 module App.Todo exposing (Todo)
 
-type alias Todo = { id : Number; title : String }
+type alias Todo = { id : Int; title : String }
   deriving Schema

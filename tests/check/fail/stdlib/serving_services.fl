@@ -3,7 +3,7 @@
 module App.ServingServices exposing (http, rpc)
 
 service Users =
-  count : Unit ->{} Number
+  count : Unit ->{} Float
 
 ping : HttpApi.Endpoint "ping" (HttpApi.Request Unit Unit Unit Unit ->{r;} Unit)
 let ping = HttpApi.endpoint HttpApi.Get "/ping" (Record.label : Record.Label "ping")

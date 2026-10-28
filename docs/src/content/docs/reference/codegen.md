@@ -39,7 +39,12 @@ A module that has no runtime stage imports no `Effect` at all.
 | Source value | JS |
 | - | - |
 | `Unit`, `()` | `undefined` |
-| `Number`, `BigInt`, `String`, `Bool` | the JS primitive; number literals keep their JS spelling |
+| `Int`, `Float`, `BigInt`, `String`, `Bool` | the JS primitive; number literals keep their JS spelling, an integer literal of a `BigInt` gets `n` |
+
+`Int` arithmetic keeps a value in 32 bits: `a + b` is `(a + b \| 0)`, `a * b`
+is `Math.imul(a, b)`, and `/`, `%` and `**` are runtime calls that truncate
+and divide by zero to `0`. `/` and `%` on `BigInt` are runtime calls too,
+for the zero divisor.
 | tuple, `List` | dense array |
 | record | plain object with exactly its fields, in the order written |
 | ADT value | `{ _tag, _0, _1, … }`, fields in declaration order |
@@ -60,7 +65,7 @@ never mistaken for `Option`.
 `unboxed type` and `untagged type` name the representation of a variant
 type for code across the FFI, in every profile. An unboxed type has one
 constructor with one field and is that field; an untagged type is the one
-field of each constructor, which must differ in JS type — `Number`,
+field of each constructor, which must differ in JS type — `Float`,
 `String`, `Bool`, `BigInt`, or one list or tuple (`FLICK-T020` otherwise).
 A pattern tests `typeof` or `Array.isArray` instead of `_tag`; derived
 `Eq`, `Ord`, `Hash` and `Show` follow the representation; `deriving Schema`
@@ -72,16 +77,16 @@ of the field types.
 unboxed type UserId = UserId String
   deriving Eq, Show, Schema
 
-untagged type Key = ByNumber Number | ByName String | ByPath (List String)
+untagged type Key = ByNumber Float | ByName String | ByPath (List String)
 ```
 
 `opaque unboxed type Token = Token String` hides the constructor from
 importers as `opaque type` does, and keeps the string itself at run time.
 
 `==` is canonical structural equality: SameValueZero on numbers, so
-`NaN == NaN` and `0 == -0`; `Number.strict_equal` is `===` and
-`Number.same_value` is `Object.is`. `<`, `<=`, `>`, `>=` are the JS
-operators; `Ord Number` (`compare`) is the total order with NaN last.
+`NaN == NaN` and `0 == -0`; `Float.strict_equal` is `===` and
+`Float.same_value` is `Object.is`. `<`, `<=`, `>`, `>=` are the JS
+operators; `Ord Float` (`compare`) is the total order with NaN last.
 Where the operands are `String`, `Bool` or `BigInt`, `==` is `===`; on a
 type whose constructors have no fields it is `a._tag === b._tag`.
 
@@ -134,7 +139,7 @@ work. `sum (acc + x) rest` below is a tail call; `x + sum 0 rest` is not,
 because the addition still has to run after the call returns.
 
 ```flick
-sum : Number -> List Number -> Number
+sum : Float -> List Float -> Float
 let rec sum acc xs =
   match xs with
   | [] -> acc
@@ -168,10 +173,10 @@ member selector. Each public function enters that loop at its own member:
 
 ```flick
 rec {
-  is_even : Number -> Bool
+  is_even : Float -> Bool
   let is_even n = if n == 0 then true else is_odd (n - 1)
 
-  is_odd : Number -> Bool
+  is_odd : Float -> Bool
   let is_odd n = if n == 0 then false else is_even (n - 1)
 }
 ```
@@ -201,13 +206,13 @@ directly. `Layer.succeed S impl` builds the layer.
 
 A definition with class constraints takes their dictionaries first:
 `render : Show a => a -> String` is `(dShow) => (value) => …`; a use passes
-them, `render(<Show Number>)(1)`. A dictionary is an object of the class's
+them, `render(<Show Int>)(1)`. A dictionary is an object of the class's
 methods with a getter per superclass (`$Eq` of an `Ord` dictionary). An
 instance with a context is a function of the context's dictionaries. Derived
 instances and the compiler-owned instances of records and tuples are built
 by the runtime from the dictionaries of their fields. A higher-rank argument
 with a constraint is a function of its dictionaries. The dictionary of
-`instance Show Number` is `$i_Show_Number`; a head that is not names
+`instance Show Float` is `$i_Show_Float`; a head that is not names
 separated by spaces, `Show (List a)`, adds a hash: `$i_Show_List_a_19082212`.
 
 ## Foreign functions
@@ -238,7 +243,7 @@ exported values with their projected types (see [Public TypeScript interfaces](.
 
 | Flick | TypeScript |
 | - | - |
-| `Number`, `String`, `Bool`, `BigInt`, `Unit`, `Never`, `Unknown` | `number`, `string`, `boolean`, `bigint`, `undefined`, `never`, `unknown` |
+| `Int`, `Float`, `String`, `Bool`, `BigInt`, `Unit`, `Never`, `Unknown` | `number`, `number`, `string`, `boolean`, `bigint`, `undefined`, `never`, `unknown` |
 | `List a`, `(a, b)`, `{ x : a }` | `ReadonlyArray<A>`, `readonly [A, B]`, `{ readonly x: A }` |
 | `Option a`, `Result e a` | Effect `Option.Option<A>`, `Result.Result<A, E>` |
 | `a -> b` | `(arg: A) => B`, one arrow per stage |
@@ -287,7 +292,7 @@ corpus runs in both profiles against the same expectations.
 
 | Pass | What it does |
 | - | - |
-| constant folding | literal expressions with JS semantics bit for bit (`60 * 60 * 24` → `86400`); `show` of a literal `Bool`, `String`, `BigInt` or integer `Number` (`"n" ++ show 5` → `"n5"`); a branch of a constant condition; a result JS might compute differently (`2 ** 0.5`) or would throw (`1n / 0n`) stays a computation |
+| constant folding | literal expressions with JS semantics bit for bit (`60 * 60 * 24` → `86400`); `show` of a literal `Bool`, `String`, `BigInt` or integer `Float` (`"n" ++ show 5` → `"n5"`); a branch of a constant condition; a result JS might compute differently (`2 ** 0.5`) or would throw (`2n ** -1n`) stays a computation; `Int` arithmetic folds with its wrap-around |
 | inlining | a known full application of a small pure function of the module, or of a private one used once; the arguments are bound in order first; beta reduction of `(fun x -> …) a` |
 | propagation | a local bound to a literal or a name is replaced by it, and so is a top-level value of the module bound to a literal; a pure value that cannot throw moves to its one use when that use surely runs |
 | fusion | `Seq.map`, `Seq.filter`, `Seq.flat_map` and `Seq.take` of a lazy `for`, and `List.map`, `List.filter` of a strict one, run in its loop; `Seq.to_list` of a lazy `for` is the strict one, a loop pushing into an array; a `for` over a `for` nests the inner clauses. Their functions are pure, so running them between the clauses is not observable; a known lambda is applied in place, another function is bound once before the loop. A `for` whose body makes Sync calls stays as it is. A pipeline of a `for`, a filter and a map to a list is one loop: 17× faster than the generators of debug (`tools/fusion-bench`) |

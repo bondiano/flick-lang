@@ -3,13 +3,13 @@ use super::*;
 const SOURCE: &str = "module App.Notes exposing (..)
 
 /// Doubles a number; see dou
-double : Number -> Number
+double : Float -> Float
 let double n = n * 2 // calls dou
 /* block about dou */
 label : String
 let label = \"dou\"
 
-value : Number
+value : Float
 let value = dou
 ";
 
@@ -92,7 +92,7 @@ fn completion_after_multibyte_characters_preserves_auto_imports() {
 #[test]
 fn completions_carry_docs_snippets_order_and_imports() {
     let helpers = "module App.Helpers exposing (shout)\n\nshout : String -> String\nlet shout s = s ++ \"!\"\n";
-    let main = "module App.Main exposing (go)\n\nimport String\n\ngo : Number -> String\nlet go count =\n  sho\n";
+    let main = "module App.Main exposing (go)\n\nimport String\n\ngo : Float -> String\nlet go count =\n  sho\n";
     let dir = project(
         "lsp_completion_rich",
         &[

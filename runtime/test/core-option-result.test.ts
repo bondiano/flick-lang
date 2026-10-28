@@ -74,7 +74,7 @@ const coverage: ReadonlyArray<readonly [string, string, Module]> = [
   ["Option.fl", "Option", CoreOption],
   ["Result.fl", "Result", CoreResult],
   ["Bool.fl", "Boolean", CoreBoolean],
-  ["Number.fl", "Number", CoreNumber],
+  ["Float.fl", "Number", CoreNumber],
 ];
 
 test("core exports exactly the names the .fl files bind", () => {

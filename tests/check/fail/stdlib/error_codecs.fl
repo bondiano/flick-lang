@@ -3,13 +3,13 @@
 // sent as a 500 or a defect.
 module App.ErrorCodecs exposing (..)
 
-type error NotFound = NotFound { id : Number }
+type error NotFound = NotFound { id : Float }
   deriving Schema
 
-type error Conflict = Conflict { id : Number }
+type error Conflict = Conflict { id : Float }
   deriving Schema
 
-lookup : Number ->{; NotFound, Conflict} Number
+lookup : Float ->{; NotFound, Conflict} Float
 let lookup id = if id < 0 then from_result (Err (Conflict { id = id })) else id
 
 http : Unit ->{; HttpApi.ServeError} Unit

@@ -10,7 +10,7 @@ declaration, so the two sides cannot disagree.
 ```flick
 module App.Shop exposing (Order, OutOfStock, place)
 
-type alias Order = { item : String; count : Number }
+type alias Order = { item : String; count : Float }
   deriving Schema
 
 type error OutOfStock = OutOfStock String
@@ -25,7 +25,7 @@ server fn place order =
 
 The signature right above `server fn` is what the server runs: its
 parameters, the services it needs and its errors. Only the last arrow runs:
-`String -> Number ->{Server.Server;} String` takes two parameters. Callers see another type:
+`String -> Float ->{Server.Server;} String` takes two parameters. Callers see another type:
 
 ```flick
 place : Order ->{; Rpc.ClientError, OutOfStock} String

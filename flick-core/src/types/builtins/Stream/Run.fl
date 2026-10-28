@@ -12,13 +12,13 @@ foreign effect run_collect from "@flick-lang/runtime/effect/Stream" "runCollect"
   reviewed "effect@4.0.5 sha256:c5ab88400187ac59"
 
 /// The number of elements.
-run_count : forall c r e a. (Stream r e a)^c ->{r; e} Number
+run_count : forall c r e a. (Stream r e a)^c ->{r; e} Float
 foreign effect run_count from "@flick-lang/runtime/effect/Stream" "runCount"
   retention call
   reviewed "effect@4.0.5 sha256:0dd55d94628aa779"
 
 /// The sum of the elements.
-run_sum : forall c r e. (Stream r e Number)^c ->{r; e} Number
+run_sum : forall c r e. (Stream r e Float)^c ->{r; e} Float
 foreign effect run_sum from "@flick-lang/runtime/effect/Stream" "runSum"
   retention call
   reviewed "effect@4.0.5 sha256:5dd277444cbb44f0"
@@ -89,7 +89,7 @@ foreign effect mk_string from "@flick-lang/runtime/effect/Stream" "mkString"
   reviewed "effect@4.0.5 sha256:99d1bb18ca2caca5"
 
 /// The chunks of bytes joined.
-mk_bytes : forall c r e. (Stream r e (List Number))^c ->{r; e} List Number
+mk_bytes : forall c r e. (Stream r e (List Float))^c ->{r; e} List Float
 foreign effect mk_bytes from "@flick-lang/runtime/effect/Stream" "flickMkBytes"
   retention call
   reviewed "effect@4.0.5 sha256:020da65d1649388a"
@@ -116,7 +116,7 @@ foreign effect run_into_queue from "@flick-lang/runtime/effect/Stream" "runIntoQ
 to_pubsub :
   forall s c r e a.
   Fiber.Outlives c s =>
-  { capacity : Option Number; strategy : Option Queue.Strategy; replay : Option Number } ->
+  { capacity : Option Float; strategy : Option Queue.Strategy; replay : Option Float } ->
   (Stream r e a)^c ->{Scope s | r;}
   PubSub.PubSub a
 foreign effect to_pubsub from "@flick-lang/runtime/effect/Stream" "flickToPubSub"
@@ -130,7 +130,7 @@ foreign effect to_pubsub from "@flick-lang/runtime/effect/Stream" "flickToPubSub
 to_queue :
   forall s c r e a.
   Fiber.Outlives c s =>
-  { capacity : Option Number; strategy : Option Queue.Strategy } ->
+  { capacity : Option Float; strategy : Option Queue.Strategy } ->
     (Stream r e a)^c ->{Scope s | r;}
     Queue.Queue e a
 foreign effect to_queue from "@flick-lang/runtime/effect/Stream" "flickToQueue"

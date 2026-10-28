@@ -8,7 +8,7 @@ foreign sync start from "./raw.mjs" "start"
 wait : JsValue ->{} String
 foreign async wait from "./raw.mjs" "wait"
 
-ms : Number -> Duration.Duration
+ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
 slow : HttpApi.Endpoint "slow" (HttpApi.Request Unit Unit Unit Unit ->{r;} Unit)

@@ -5,7 +5,7 @@ module App.Main exposing (main)
 line : Show a => Seq a -> String
 let line xs = show (Seq.to_list xs)
 
-pythagorean : Seq (Number, Number, Number)
+pythagorean : Seq (Int, Int, Int)
 let pythagorean =
   for {
     c <- Seq.from 1
@@ -14,13 +14,13 @@ let pythagorean =
     if a * a + b * b == c * c
   } yield (a, b, c)
 
-evens_squared : List Number -> List Number
+evens_squared : List Float -> List Float
 let evens_squared xs = [for x <- xs if x % 2 == 0 yield x * x]
 
 present : List (Option String) -> List String
 let present options = [for Some name <- options yield name]
 
-scaled : Number -> List Number -> Seq Number
+scaled : Float -> List Float -> Seq Float
 let scaled factor xs =
   for {
     x <- xs

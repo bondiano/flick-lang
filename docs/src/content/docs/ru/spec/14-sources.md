@@ -42,7 +42,7 @@ title: "14. Источники"
 
 - [Полиморфизм высших рангов в GHC](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rank_polymorphism.html) — аннотированные полиморфные аргументы и ограничения вывода типов.
 
-- [Числовые типы ECMAScript](https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html) — точная семантика Number и BigInt.
+- [Числовые типы ECMAScript](https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html) — точная семантика Float и BigInt.
 
 - [Effect Cause](https://effect.website/docs/v4/data-types/cause) и [проверенный снимок исходного кода](https://github.com/Effect-TS/effect/tree/81fc8d9c7855d0f31bf493f379ec7bc2a6150a6f) — основа контрактов среды выполнения; изменения зависимости требуют повторной проверки.
 

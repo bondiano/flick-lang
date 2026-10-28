@@ -13,13 +13,13 @@ fn record_module(fields: usize) -> String {
     let names: Vec<String> = (0..fields).map(|i| format!("f{i}")).collect();
     let mut out = String::from("module App.Big exposing (total, make)\n\ntype alias Big = {\n");
     for name in &names {
-        let _ = writeln!(out, "  {name} : Number");
+        let _ = writeln!(out, "  {name} : Float");
     }
     out.push_str("}\n\nmake : Unit -> Big\nlet make () =\n  {\n");
     for (i, name) in names.iter().enumerate() {
         let _ = writeln!(out, "    {name} = {i}");
     }
-    out.push_str("  }\n\ntotal : Big -> Number\nlet total big =\n  0");
+    out.push_str("  }\n\ntotal : Big -> Float\nlet total big =\n  0");
     for name in &names {
         let _ = write!(out, " + big.{name}");
     }
@@ -29,7 +29,7 @@ fn record_module(fields: usize) -> String {
 
 fn long_function(lines: usize) -> String {
     let mut out =
-        String::from("module App.Long exposing (run)\n\nrun : Number -> Number\nlet run x0 =\n");
+        String::from("module App.Long exposing (run)\n\nrun : Float -> Float\nlet run x0 =\n");
     for i in 1..lines {
         let _ = writeln!(out, "  let x{i} = x{} + {i}", i - 1);
     }

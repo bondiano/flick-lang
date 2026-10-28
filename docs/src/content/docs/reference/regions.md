@@ -139,7 +139,7 @@ Constructors retain field captures. Pattern matching and record/tuple/list
 projection propagate the enclosing bound to extracted values, including
 closure fields; applying a delayed field also retains the supplied input's
 captures. Explicit field qualifications are preserved, not overwritten by
-the enclosing bound. Primitive fields such as `Number` gain no captures.
+the enclosing bound. Primitive fields such as `Float` gain no captures.
 
 ## What cannot leave a scope
 

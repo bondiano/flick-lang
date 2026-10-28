@@ -19,4 +19,4 @@ Struct = "a record's `Eq` instance; per-field equivalences through `Equivalence.
 EquivalenceTypeLambda = "TS-only: the type lambda of the HKT encoding; Flick has kinds"
 Date = "invariant: a JS `Date` is mutable shared state outside `Ref`; Flick has no type for it"
 Record = "TS-only: an equivalence of string-keyed JS dictionary objects; Flick has no such type (records have fixed fields, maps are `HashMap`)"
-strictEqual = "invariant: `===` on any value observes object identity, which Flick values do not have; `Number.strict_equal` is `===` on numbers"
+strictEqual = "invariant: `===` on any value observes object identity, which Flick values do not have; `Float.strict_equal` is `===` on numbers"

@@ -5,7 +5,7 @@
 module App.Do exposing (pairs, evens, twice, first_some, flat_map, chained)
 
 /// Not the method: `do` does not call it.
-flat_map : Number -> Number
+flat_map : Float -> Float
 let flat_map n = n
 
 pairs : Option a -> Option b -> Option (a, b)
@@ -16,7 +16,7 @@ let pairs left right =
     pure (x, y)
   }
 
-evens : List Number -> List Number
+evens : List Float -> List Float
 let evens xs =
   do {
     x <- xs
@@ -25,10 +25,10 @@ let evens xs =
     pure doubled
   }
 
-twice : Monad m => m Number -> m Number
+twice : Monad m => m Float -> m Float
 let twice m = do { x <- m; y <- m; pure (x + y) }
 
-first_some : List (Option Number) -> Option Number
+first_some : List (Option Float) -> Option Float
 let first_some options =
   do {
     let assert [first, ..._rest] = options
@@ -36,7 +36,7 @@ let first_some options =
     pure (x + 1)
   }
 
-chained : Result String Number -> Eff none none (Result String Number)
+chained : Result String Float -> Eff none none (Result String Float)
 let chained r =
   let checked = do {
     n <- r

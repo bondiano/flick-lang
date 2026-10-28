@@ -6,26 +6,26 @@ import Mtl.ExceptT as ExceptT exposing (ExceptT)
 import Mtl.StateT as StateT exposing (StateT(..))
 import Mtl.Classes exposing (lift)
 
-ints : Gen.Gen Number
-let ints = Gen.int (0 - 20) 20
+ints : Gen.Gen Float
+let ints = Gen.map Int.to_float (Gen.int (0 - 20) 20)
 
 logs : Gen.Gen (List String)
 let logs = Gen.list 3 (Gen.map (fun n -> "log:" ++ show n) ints)
 
-writer_values : Gen.Gen (Number, List String)
+writer_values : Gen.Gen (Float, List String)
 let writer_values = Gen.pair ints logs
 
-writer_functions : Gen.Gen ((Number -> Number), List String)
+writer_functions : Gen.Gen ((Float -> Float), List String)
 let writer_functions = Gen.pair (Gen.function ints) logs
 
-to_writes : Gen.Gen (Number -> (Number, List String))
+to_writes : Gen.Gen (Float -> (Float, List String))
 let to_writes = Gen.function writer_values
 
-results : Gen.Gen (Result String Number)
+results : Gen.Gen (Result String Float)
 let results =
   Gen.map (fun (ok, n) -> if ok then Ok n else Err ("domain:" ++ show n)) (Gen.pair Gen.bool ints)
 
-to_results : Gen.Gen (Number -> Result String Number)
+to_results : Gen.Gen (Float -> Result String Float)
 let to_results = Gen.function results
 
 triple : Gen.Gen a -> Gen.Gen b -> Gen.Gen c -> Gen.Gen (a, b, c)
@@ -82,9 +82,9 @@ let writer_laws = [
       ]),
   Test.property "WriterT Monad identities, associativity and map2-bind coherence"
     (triple writer_values to_writes to_writes) (fun ((n, output), raw_f, raw_g) ->
-      f : Number -> WriterT (List String) Identity Number
+      f : Float -> WriterT (List String) Identity Float
       let f x = make_writer (raw_f x)
-      g : Number -> WriterT (List String) Identity Number
+      g : Float -> WriterT (List String) Identity Float
       let g x = make_writer (raw_g x)
       let action = make_writer (n, output)
       let other = g n
@@ -100,8 +100,8 @@ let writer_laws = [
       ]),
   Test.property "WriterT lift preserves pure and bind without adding output"
     (Gen.pair ints (Gen.function ints)) (fun (n, raw_f) ->
-      let base = (pure n : Identity Number)
-      f : Number -> Identity Number
+      let base = (pure n : Identity Float)
+      f : Float -> Identity Float
       let f x = pure (raw_f x)
       Test.all [
         Test.equal (n, []) (run_writer (lift base)),
@@ -128,9 +128,9 @@ let except_laws = [
     (triple results (Gen.pair Gen.bool (Gen.function ints)) (Gen.pair Gen.bool (Gen.function ints)))
     (fun (value, (left_ok, f), (right_ok, g)) ->
       let action = ExceptT.from_result value
-      u : ExceptT String Identity (Number -> Number)
+      u : ExceptT String Identity (Float -> Float)
       let u = ExceptT.from_result (if left_ok then Ok f else Err "left")
-      v : ExceptT String Identity (Number -> Number)
+      v : ExceptT String Identity (Float -> Float)
       let v = ExceptT.from_result (if right_ok then Ok g else Err "right")
       let n = match value with | Ok x -> x | Err _ -> 3
       Test.all [
@@ -157,9 +157,9 @@ let except_laws = [
       ]),
   Test.property "ExceptT Monad identities, associativity and map2-bind coherence include failures"
     (triple results to_results to_results) (fun (value, raw_f, raw_g) ->
-      f : Number -> ExceptT String Identity Number
+      f : Float -> ExceptT String Identity Float
       let f x = ExceptT.from_result (raw_f x)
-      g : Number -> ExceptT String Identity Number
+      g : Float -> ExceptT String Identity Float
       let g x = ExceptT.from_result (raw_g x)
       let action = ExceptT.from_result value
       let n = match value with | Ok x -> x | Err _ -> 3
@@ -176,8 +176,8 @@ let except_laws = [
       ]),
   Test.property "ExceptT lift preserves pure and bind"
     (Gen.pair ints (Gen.function ints)) (fun (n, raw_f) ->
-      let base = (pure n : Identity Number)
-      f : Number -> Identity Number
+      let base = (pure n : Identity Float)
+      f : Float -> Identity Float
       let f x = pure (raw_f x)
       Test.all [
         Test.equal (Ok n) (run_except (lift base)),
@@ -188,7 +188,7 @@ let except_laws = [
       ]),
 ]
 
-record : String -> Number -> StateT (List String) Identity Number
+record : String -> Float -> StateT (List String) Identity Float
 let record label n = StateT (fun seen -> pure (n, seen ++ [label]))
 
 run_recorded_writer : WriterT (List String) (StateT (List String) Identity) a ->
@@ -214,22 +214,22 @@ let behavior = [
   Test.test
     "WriterT map, map2 and bind execute each base action once without duplicating logs"
     (fun () ->
-    logged : String -> Number -> WriterT (List String) (StateT (List String) Identity) Number
+    logged : String -> Float -> WriterT (List String) (StateT (List String) Identity) Float
     let logged label n = WriterT (map (fun value -> (value, [label])) (record label n))
-    action : WriterT (List String) (StateT (List String) Identity) Number
+    action : WriterT (List String) (StateT (List String) Identity) Float
     let action = do {
       a <- map (fun n -> n + 1) (logged "a" 1) and b <- logged "b" 2
       c <- logged "c" 3
       pure (a + b + c)
     }
-    lifted : WriterT (List String) (StateT (List String) Identity) Number
+    lifted : WriterT (List String) (StateT (List String) Identity) Float
     let lifted = lift (record "base" 9)
     Test.all [
       Test.equal ((7, ["a", "b", "c"]), ["a", "b", "c"]) (run_recorded_writer action),
       Test.equal ((9, []), ["base"]) (run_recorded_writer lifted),
     ]),
   Test.test "WriterT preserves inner failures instead of manufacturing a value-log pair" (fun () ->
-    failed : WriterT (List String) (Result String) Number
+    failed : WriterT (List String) (Result String) Float
     let failed = lift (Err "offline")
     Test.all [
       Test.equal (Err "offline") (WriterT.run failed),
@@ -240,11 +240,11 @@ let behavior = [
   Test.test
     "ExceptT map2 skips the right action and bind skips its continuation on a left Err"
     (fun () ->
-    failed : ExceptT String (StateT (List String) Identity) Number
+    failed : ExceptT String (StateT (List String) Identity) Float
     let failed = ExceptT.from_result (Err "domain")
-    prefix : ExceptT String (StateT (List String) Identity) Number
+    prefix : ExceptT String (StateT (List String) Identity) Float
     let prefix = do { _ <- lift (record "left" 0); failed }
-    right : ExceptT String (StateT (List String) Identity) Number
+    right : ExceptT String (StateT (List String) Identity) Float
     let right = lift (record "right" 8)
     Test.all [
       Test.equal
@@ -258,9 +258,9 @@ let behavior = [
         (run_recorded_except (map2 (fun a b -> a + b) right prefix)),
     ]),
   Test.test "ExceptT successful map2 and bind retain ordered once-only base transitions" (fun () ->
-    left : ExceptT String (StateT (List String) Identity) Number
+    left : ExceptT String (StateT (List String) Identity) Float
     let left = lift (record "left" 4)
-    right : ExceptT String (StateT (List String) Identity) Number
+    right : ExceptT String (StateT (List String) Identity) Float
     let right = lift (record "right" 7)
     Test.all [
       Test.equal
@@ -272,9 +272,9 @@ let behavior = [
           (flat_map (fun n -> map (fun m -> n + m) (lift (record "continuation" 7))) left)),
     ]),
   Test.test "ExceptT distinguishes an inner Err offline from the domain Ok Err domain" (fun () ->
-    offline : ExceptT String (Result String) Number
+    offline : ExceptT String (Result String) Float
     let offline = lift (Err "offline")
-    domain : ExceptT String (Result String) Number
+    domain : ExceptT String (Result String) Float
     let domain = ExceptT.from_result (Err "domain")
     Test.all [
       Test.equal (Err "offline") (ExceptT.run offline),

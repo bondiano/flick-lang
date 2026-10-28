@@ -28,16 +28,16 @@ instance Monad Defaults =
   let flat_map f (Defaults action) = Defaults (flat_map (fun value -> unwrap (f value)) action)
 
 // Omit state, reader and writer so this wrapper executes the class defaults.
-instance MonadState Defaults Number =
-  get : Defaults Number
+instance MonadState Defaults Float =
+  get : Defaults Float
   let get = Defaults get
-  put : forall c. Number^c -> (Defaults Unit)^c
+  put : forall c. Float^c -> (Defaults Unit)^c
   let put next = Defaults (put next)
 
-instance MonadReader Defaults Number =
-  ask : Defaults Number
+instance MonadReader Defaults Float =
+  ask : Defaults Float
   let ask = Defaults ask
-  local : forall c d a. (forall v. Number^v -> Number^(c + v))^c ->
+  local : forall c d a. (forall v. Float^v -> Float^(c + v))^c ->
     ((Defaults a)^d -> (Defaults a)^(c + d))^c
   let local update (Defaults action) = Defaults (local update action)
 
@@ -51,7 +51,7 @@ instance MonadWriter Defaults (List String) =
 tests : List Test.Test
 let tests = [
   Test.test "state, reader and writer execute their class default bodies" (fun () ->
-    action : Defaults (Number, Number)
+    action : Defaults (Float, Float)
     let action = do {
       old_state <- state (fun old -> (old, old + 2))
       environment_value <- reader (fun environment -> environment + 1)

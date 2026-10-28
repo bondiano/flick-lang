@@ -4,16 +4,16 @@ module App.Main exposing (main)
 line : String -> String ->{} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
-even : Number -> Bool
-let even n = n - 2 * Number.floor (n / 2) == 0
+even : Float -> Bool
+let even n = n - 2 * Float.floor (n / 2) == 0
 
-half : Number -> Result String Number
+half : Float -> Result String Float
 let half n = if even n then Ok (n / 2) else Err ("odd " ++ show n)
 
 main : Unit ->{; AppError} Unit
 let main () =
   let c = Chunk.from_list [3, 1, 4, 1, 5, 9, 2, 6]
-  let nothing : Chunk.Chunk Number = Chunk.empty
+  let nothing : Chunk.Chunk Float = Chunk.empty
   line
     "build"
     (show

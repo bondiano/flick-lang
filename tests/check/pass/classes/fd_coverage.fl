@@ -31,7 +31,7 @@ class EmptyCovered key output | key -> output
 instance Global b => EmptyCovered (Wrap Ground) b
 
 class GroundCovered key output | key -> output
-instance Base Number b => GroundCovered (Wrap Ground) b
+instance Base Float b => GroundCovered (Wrap Ground) b
 
 class Constant output | -> output
 instance Global b => Constant (List b)
@@ -54,4 +54,4 @@ class Independent left right output | left -> output, right -> output
 instance (Base a c, Base b c) => Independent (Wrap a) (Wrap b) c
 
 class GroundOnly key output | key -> output
-instance GroundOnly Number String
+instance GroundOnly Float String

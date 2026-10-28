@@ -2,11 +2,11 @@
 // `tsc --strict` checks against the generated code.
 module App.Main exposing (..)
 
-type Shape = Circle Number | Rect Number Number
+type Shape = Circle Float | Rect Float Float
 
 type Tree a = Leaf | Node (Tree a) a (Tree a)
 
-type alias Point = { x : Number; y : Number }
+type alias Point = { x : Float; y : Float }
 
 // a string in JS, and to TypeScript an opaque brand
 opaque unboxed type Token = Token String
@@ -19,7 +19,7 @@ service Users =
 identity : a -> a
 let identity x = x
 
-area : Shape -> Number
+area : Shape -> Float
 let area shape =
   match shape with
   | Circle r -> r * r
@@ -34,7 +34,7 @@ let empty = []
 pair : a -> b -> (a, b)
 let pair a b = (a, b)
 
-size : Tree a -> Number
+size : Tree a -> Float
 let rec size tree =
   match tree with
   | Leaf -> 0
@@ -49,7 +49,7 @@ let first xs =
   | [x] -> Some x
   | _ -> None
 
-parse : String -> Result NotFound Number
+parse : String -> Result NotFound Float
 let parse text = if text == "one" then Ok 1 else Err (NotFound text)
 
 load : String ->{Users; NotFound} Point

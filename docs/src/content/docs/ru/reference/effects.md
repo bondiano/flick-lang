@@ -71,7 +71,7 @@ let both left right =
 по вызовам в теле переданной функции:
 
 ```flick
-log_all : List Number ->{Log; none} Unit
+log_all : List Float ->{Log; none} Unit
 let log_all numbers =
   each (fun n -> Log.info "number") numbers
 ```
@@ -127,7 +127,7 @@ log_line : String ->{Log;} Unit
 что две пустые строки.
 
 `none` — не тип. Это не `Unit` (одно значение), не `Never` (нет значений)
-и не `None` из `Option`. Записи `x : none` и `none -> Number` вызывают
+и не `None` из `Option`. Записи `x : none` и `none -> Float` вызывают
 `FLICK-T002`, как и `Eff Unit Unit a`: у `Unit` кинд `Type`, а не кинд
 строки. Внутри строки `none`, как и переменная строки, обозначает строку
 целиком. Поэтому `{Log, none}` вызывает `FLICK-T002`; нужно писать `{Log}`.
@@ -175,7 +175,7 @@ log_line : String ->{Log;} Unit
 в том числе если они входят в состав других типов.
 
 У ошибки могут быть параметры типа. Например, `type error RetryExhausted e =
-RetryExhausted e Number` сохраняет последнюю причину, а `type error SendFailed a =
+RetryExhausted e Float` сохраняет последнюю причину, а `type error SendFailed a =
 SendFailed a` возвращает значение, которое не удалось отправить.
 Строка различает ошибки по имени, а не по аргументам, поэтому содержит
 не более одной `RetryExhausted`. Если в одной строке встречаются две такие
@@ -228,7 +228,7 @@ let checked result =
 
 ```flick
 service Clock =
-  now : Unit ->{} Number
+  now : Unit ->{} Float
 
 clock_impl : Clock.Impl
 let clock_impl =

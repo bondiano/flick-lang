@@ -151,7 +151,7 @@ The first dialect is **PostgreSQL**. Table metadata explicitly specifies SQL typ
 
 Outside the safe subset, a separately named unsafe/raw API with an explicit result decoder is available.
 
-SQL bigint maps to BigInt, decimal to BigDecimal; Number is allowed only through an explicitly checked range/precision. SQL NULL is an expression index and an Option on output; a source Option as a domain value does not replace this index. Schema drift and response mismatch yield DecodeError, parameter encoding yields EncodeError, and driver/server/constraint failures yield DbError with inert diagnostics. Defects and interruption keep the common runtime contract.
+SQL bigint maps to BigInt, decimal to BigDecimal; Float is allowed only through an explicitly checked range/precision. SQL NULL is an expression index and an Option on output; a source Option as a domain value does not replace this index. Schema drift and response mismatch yield DecodeError, parameter encoding yields EncodeError, and driver/server/constraint failures yield DbError with inert diagnostics. Defects and interruption keep the common runtime contract.
 
 Cancellation does not promise to roll back SQL that has already been executed. The driver does not return the connection to the pool until a coordinated drain/close/quiescence. Types do not prove that the database is up to date, permissions, plan cost, transaction isolation or the number of rows without a separate cardinality contract.
 
@@ -281,7 +281,7 @@ let greet =
     /// Print in capital letters
     flag loud : Bool
     /// How many times to repeat
-    flag times "n" : Number = 1
+    flag times "n" : Float = 1
     /// Whom the greeting is addressed to
     arg name : String
     handle fun { loud; times; name } ->
@@ -305,7 +305,7 @@ The clause words are contextual: they are special only at the start of a clause 
 
 ### Options as an exact record
 
-Elaboration infers an exact record of options: one field per each `flag` and `arg` in declaration order, the field name being the clause name. In the example, the handler receives `{ loud : Bool; times : Number; name : String }`; a typo in the record pattern or an access to a nonexistent field is an ordinary type error. The name on the command line is obtained from the field name by replacing `_` with `-`: `dry_run` → `--dry-run`. An additional name of one character gives the short form `-n`, a longer one gives `--name`; hyphens are not written in the string.
+Elaboration infers an exact record of options: one field per each `flag` and `arg` in declaration order, the field name being the clause name. In the example, the handler receives `{ loud : Bool; times : Float; name : String }`; a typo in the record pattern or an access to a nonexistent field is an ordinary type error. The name on the command line is obtained from the field name by replacing `_` with `-`: `dry_run` → `--dry-run`. An additional name of one character gives the short form `-n`, a longer one gives `--name`; hyphens are not written in the string.
 
 The type of the value determines both parsing and multiplicity:
 
@@ -317,7 +317,7 @@ The type of the value determines both parsing and multiplicity:
 | `List T` | A repeatable flag (0 or more); for `arg`, a variable-length tail, only in the last position |
 | `NonEmpty T` | Like `List T`, but at least one value |
 
-`T` needs an instance of the class `Cli.Value T`, which parses a string into a typed error. The library provides instances for `String`, `Number` (rejects NaN and the empty string), `BigInt`, `Path`, `Duration` and `Redacted String`; a `Redacted` value is not printed in help, errors and logs. `deriving Cli.Value` builds an instance for an ADT of nullary constructors — a choice among the constructor names in kebab-case — and for a refined type if the base type has an instance: parsing calls `T.parse`. A default is a pure expression of type `T`; in help it is shown through `Show T` if such an instance exists.
+`T` needs an instance of the class `Cli.Value T`, which parses a string into a typed error. The library provides instances for `String`, `Float` (rejects NaN and the empty string), `BigInt`, `Path`, `Duration` and `Redacted String`; a `Redacted` value is not printed in help, errors and logs. `deriving Cli.Value` builds an instance for an ADT of nullary constructors — a choice among the constructor names in kebab-case — and for a refined type if the base type has an instance: parsing calls `T.parse`. A default is a pure expression of type `T`; in help it is shown through `Show T` if such an instance exists.
 
 ### Subcommands and the handler
 

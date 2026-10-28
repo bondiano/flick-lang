@@ -14,12 +14,12 @@ title: "1. Goal and confirmed requirements"
 | Effect in the arrow | `a -> b` for a pure call; `a ->{r; e} b` for a runtime call |
 | Uniform function style | A full signature directly above every named function |
 | Higher-rank callbacks | Polymorphic function parameters with an explicit nested `forall` |
-| JavaScript numbers | `Number` and `BigInt` with the corresponding JS arithmetic; BigDecimal and other special types are separate |
+| JavaScript numbers | `Float` and `BigInt` with the corresponding JS arithmetic; BigDecimal and other special types are separate |
 | Full Schema deriving | Generation for the whole supported data language, including generics and recursion, with explicit policies and extensions |
 | Values of computations | `task { ... }` creates an Eff; `await` runs it in the current fiber; application startup lives in the entry point |
 | Static resource safety | Forbids scope-dependent values and bound tasks from escaping; fresh regions, transitive captures and two-phase closing are chosen |
 | Access to the JS ecosystem | Explicit bindings and a fixed ABI; generation of bindings from a checkable subset of `.d.ts` |
-| Optimization | Suitable passes and techniques from ReScript, preserving the chosen semantics of Effect and Number |
+| Optimization | Suitable passes and techniques from ReScript, preserving the chosen semantics of Effect and Float |
 | Schema integrations | Extensible compilers/exporters; an unsupported wire contract produces an explicit diagnostic |
 | Checking type-level expressiveness | SQL and a typed UI eDSL as real tasks for rows, classes, callbacks and lifetime |
 

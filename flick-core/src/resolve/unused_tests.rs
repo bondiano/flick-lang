@@ -23,19 +23,19 @@ const HEAD: &str = "module Probe exposing (f)\n";
 
 #[test]
 fn removing_an_import_item_keeps_the_list_well_formed() {
-    let body = "f : Number -> Number\nlet f x = abs x\n";
+    let body = "f : Float -> Float\nlet f x = abs x\n";
     let cases = [
         (
-            "import Number exposing (abs, floor)\n",
-            "import Number exposing (abs)\n",
+            "import Float exposing (abs, floor)\n",
+            "import Float exposing (abs)\n",
         ),
         (
-            "import Number exposing (floor, abs)\n",
-            "import Number exposing (abs)\n",
+            "import Float exposing (floor, abs)\n",
+            "import Float exposing (abs)\n",
         ),
         (
-            "import Number exposing (abs, floor, ceil)\n",
-            "import Number exposing (abs, ceil)\n",
+            "import Float exposing (abs, floor, ceil)\n",
+            "import Float exposing (abs, ceil)\n",
         ),
     ];
     for (import, want) in cases {
@@ -43,38 +43,38 @@ fn removing_an_import_item_keeps_the_list_well_formed() {
         assert_eq!(fixed(&text, "FLICK-R012"), format!("{HEAD}{want}{body}"));
     }
     let text = format!(
-        "{HEAD}import Number exposing (floor)\n{}",
-        body.replace("abs x", "Number.abs x")
+        "{HEAD}import Float exposing (floor)\n{}",
+        body.replace("abs x", "Float.abs x")
     );
     assert_eq!(
         fixed(&text, "FLICK-R012"),
         format!(
-            "{HEAD}import Number\n{}",
-            body.replace("abs x", "Number.abs x")
+            "{HEAD}import Float\n{}",
+            body.replace("abs x", "Float.abs x")
         )
     );
 }
 
 #[test]
 fn removing_an_unused_import_or_value_deletes_its_lines() {
-    let text = format!("{HEAD}import String\nf : Number -> Number\nlet f x = x\n");
+    let text = format!("{HEAD}import String\nf : Float -> Float\nlet f x = x\n");
     assert_eq!(
         fixed(&text, "FLICK-R012"),
-        format!("{HEAD}f : Number -> Number\nlet f x = x\n")
+        format!("{HEAD}f : Float -> Float\nlet f x = x\n")
     );
     let text = format!(
-        "{HEAD}f : Number -> Number\nlet f x = x\n\ng : Number\nlet g = 1\n\nh : Number\nlet h = 2\n"
+        "{HEAD}f : Float -> Float\nlet f x = x\n\ng : Float\nlet g = 1\n\nh : Float\nlet h = 2\n"
     );
     assert_eq!(
         fixed(&text, "FLICK-R014"),
-        format!("{HEAD}f : Number -> Number\nlet f x = x\n\nh : Number\nlet h = 2\n")
+        format!("{HEAD}f : Float -> Float\nlet f x = x\n\nh : Float\nlet h = 2\n")
     );
 }
 
 #[test]
 fn an_unused_variable_is_renamed_with_an_underscore() {
-    let text = format!("{HEAD}f : (Number, Number) -> Number\nlet f (x, y) = x\n");
+    let text = format!("{HEAD}f : (Float, Float) -> Float\nlet f (x, y) = x\n");
     assert!(fixed(&text, "FLICK-R013").contains("let f (x, _y) = x"));
-    let text = format!("{HEAD}f : {{ a : Number; b : Number }} -> Number\nlet f {{ a; b }} = a\n");
+    let text = format!("{HEAD}f : {{ a : Float; b : Float }} -> Float\nlet f {{ a; b }} = a\n");
     assert!(fixed(&text, "FLICK-R013").contains("let f { a; b = _b } = a"));
 }

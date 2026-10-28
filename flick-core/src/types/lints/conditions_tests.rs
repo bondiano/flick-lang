@@ -1,6 +1,6 @@
 use crate::types::lint_tests::{HEAD, assert_fix, fixed};
 
-const CMP: &str = "f : Number -> Number -> Bool\n";
+const CMP: &str = "f : Float -> Float -> Bool\n";
 const FLAG: &str = "f : Bool -> String\n";
 
 #[test]
@@ -32,18 +32,18 @@ fn an_if_not_swaps_its_branches() {
 #[test]
 fn an_if_alone_in_an_else_joins_the_chain() {
     assert_fix(
-        "f : Number -> String\nlet f n =\n  if n > 0 then \"+\"\n  else\n    if n < 0 then \"-\" else \"0\"\n",
+        "f : Float -> String\nlet f n =\n  if n > 0 then \"+\"\n  else\n    if n < 0 then \"-\" else \"0\"\n",
         "FLICK-T042",
-        "f : Number -> String\nlet f n =\n  if n > 0 then \"+\"\n  else if n < 0 then \"-\" else \"0\"\n",
+        "f : Float -> String\nlet f n =\n  if n > 0 then \"+\"\n  else if n < 0 then \"-\" else \"0\"\n",
     );
 }
 
 #[test]
 fn a_literal_moves_to_the_right_of_a_comparison() {
     assert_fix(
-        "f : Number -> Bool\nlet f n = 10 >= n\n",
+        "f : Float -> Bool\nlet f n = 10 >= n\n",
         "FLICK-T043",
-        "f : Number -> Bool\nlet f n = n <= 10\n",
+        "f : Float -> Bool\nlet f n = n <= 10\n",
     );
     let both = format!("{HEAD}f : Bool\nlet f = 1 == 2\n");
     assert_eq!(fixed(&both, "FLICK-T043"), None);
@@ -51,10 +51,10 @@ fn a_literal_moves_to_the_right_of_a_comparison() {
 
 #[test]
 fn a_known_condition_keeps_its_branch_only_on_request() {
-    let text = format!("{HEAD}f : Number\nlet f = if 1 > 2 then 1 else 2\n");
+    let text = format!("{HEAD}f : Float\nlet f = if 1 > 2 then 1 else 2\n");
     assert_eq!(
         fixed(&text, "FLICK-T045").as_deref(),
-        Some(format!("{HEAD}f : Number\nlet f = 2\n").as_str())
+        Some(format!("{HEAD}f : Float\nlet f = 2\n").as_str())
     );
 }
 

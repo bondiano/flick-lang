@@ -7,24 +7,24 @@ use crate::diagnostics::Diagnostic;
 
 const SHAPES: &str = "module App.Shapes exposing (..)
 
-type Shape = Circle Number | Rect Number Number | Empty
+type Shape = Circle Float | Rect Float Float | Empty
 ";
 
 const MAIN: &str = "module App.Main exposing (add3, area, doubled)
 
 import App.Shapes exposing (..)
 
-add3 : Number -> Number -> Number -> Number
+add3 : Float -> Float -> Float -> Float
 let add3 a b c = a + b + c
 
-area : Shape -> Number
+area : Shape -> Float
 let area shape =
   let base = add3 1 2 3
   match shape with
   | Circle r -> r * base
   | _ -> 0
 
-doubled : List Number -> List Number
+doubled : List Float -> List Float
 let doubled xs =
   xs
     |> List.map (fun x -> x * 2)
@@ -68,21 +68,21 @@ fn signature_help_marks_the_argument_being_written() {
         .ide()
         .signature_help(f.file("App.Main"), at("2 3") + 1)
         .expect("help");
-    assert_eq!(help.label, "add3 : Number -> Number -> Number -> Number");
+    assert_eq!(help.label, "add3 : Float -> Float -> Float -> Float");
     assert_eq!(help.params.len(), 3);
     assert_eq!(help.active, 1);
     let (s, e) = help.params[1];
-    assert_eq!(&help.label[s as usize..e as usize], "Number");
+    assert_eq!(&help.label[s as usize..e as usize], "Float");
 }
 
 #[test]
 fn signature_help_and_function_tokens_follow_captured_arrow_stages() {
     let text = "module App.Main exposing (..)
 
-wrap : forall c. (Number -> Number)^c -> (Number -> Number)^c
+wrap : forall c. (Float -> Float)^c -> (Float -> Float)^c
 let wrap f = f
 
-apply : forall c. (Number -> Number)^c -> Number
+apply : forall c. (Float -> Float)^c -> Float
 let apply f = wrap f 2
 ";
     let f = fixture_of(&[("src/App/Main.fl", text)]);
@@ -99,7 +99,7 @@ let apply f = wrap f 2
     assert_eq!(help.params.len(), 2);
     assert_eq!(help.active, 1);
     let (start, end) = help.params[1];
-    assert_eq!(&help.label[start as usize..end as usize], "Number");
+    assert_eq!(&help.label[start as usize..end as usize], "Float");
     let call = f.at("App.Main", "wrap f 2", 0);
     assert_eq!(
         ide.semantic_tokens(file)
@@ -122,7 +122,7 @@ fn type_definition_and_inlay_hints_come_from_the_checker() {
     let hints: Vec<String> = ide.inlay_hints(main).into_iter().map(|(_, l)| l).collect();
     assert_eq!(
         hints,
-        [": Number", " : List Number", " : List Number"],
+        [": Float", " : List Float", " : List Float"],
         "{hints:?}"
     );
 }
@@ -153,10 +153,10 @@ fn semantic_tokens_classify_names_and_folding_spans_blocks() {
 fn the_mode_of_a_foreign_binding_is_a_keyword() {
     let text = "module App.Main exposing (double, now)
 
-double : Number -> Number
+double : Float -> Float
 foreign pure double from \"./double.js\" \"double\"
 
-now : Unit -> Number
+now : Unit -> Float
 foreign sync now from global \"Date.now\"
 ";
     let f = fixture_of(&[("src/App/Main.fl", text)]);

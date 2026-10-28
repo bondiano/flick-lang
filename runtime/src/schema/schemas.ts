@@ -69,6 +69,12 @@ const finite = /*#__PURE__*/ Schema.makeFilter((n: number) => Number.isFinite(n)
 /** A JSON number: finite both ways. */
 export const jsonNumber: Schema.Codec<number> = /*#__PURE__*/ Schema.Number.annotate({ expected: "a finite number" }).check(finite);
 
+const int32 = /*#__PURE__*/ Schema.makeFilter((n: number) => (n | 0) === n, {
+  message: "expected an Int, an integer from -2147483648 to 2147483647",
+});
+
+export const jsonInt: Schema.Codec<number> = /*#__PURE__*/ Schema.Number.annotate({ expected: "an Int" }).check(int32);
+
 const digits = /*#__PURE__*/ Schema.makeFilter((s: string) => /^-?\d+$/.test(s), {
   message: "expected a string of digits",
   "flick/pattern": "^-?[0-9]+$",
@@ -87,6 +93,7 @@ const jsonUnit = /*#__PURE__*/ mapped(
   () => null,
 )(Schema.Null);
 
+export const schemaInt: AnySchema = /*#__PURE__*/ withJson(Schema.Number.check(int32), () => jsonInt);
 export const schemaNumber: AnySchema = /*#__PURE__*/ withJson(Schema.Number, () => jsonNumber);
 export const schemaString: AnySchema = /*#__PURE__*/ withJson(Schema.String, () => Schema.String);
 export const schemaBool: AnySchema = /*#__PURE__*/ withJson(Schema.Boolean, () => Schema.Boolean);

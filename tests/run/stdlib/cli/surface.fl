@@ -275,7 +275,7 @@ let main () =
   with_settings ["--help"]
   with_settings ["--completions", "fish"]
   let defaults : Cli.Settings = Cli.settings
-  let number : Result String Number = parsed "12"
+  let number : Result String Float = parsed "12"
   let pair : Result String (String, String) = parsed "a=b=c"
   Platform.stdout_line
     ("parse "

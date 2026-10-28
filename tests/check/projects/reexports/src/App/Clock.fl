@@ -2,11 +2,11 @@
 module App.Clock exposing (Clock, Tick(..), Seconds, ticks)
 
 service Clock =
-  now : Unit ->{} Number
+  now : Unit ->{} Float
 
-type Tick = Tick Number
+type Tick = Tick Float
 
-type alias Seconds = Number
+type alias Seconds = Float
 
-ticks : Number -> Tick
+ticks : Float -> Tick
 let ticks n = Tick n

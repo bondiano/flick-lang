@@ -3,5 +3,5 @@ module App.Time exposing (Clock, Tick(..), Seconds, ticks, fixed)
 
 import App.Clock exposing (Clock, Tick(..), Seconds, ticks)
 
-fixed : Number -> Clock.Impl
+fixed : Float -> Clock.Impl
 let fixed n = { now = fun () -> n }

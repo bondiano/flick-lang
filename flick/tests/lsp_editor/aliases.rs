@@ -9,16 +9,16 @@ type ReaderT r (m : Type -> Type) a
 type StateT s (m : Type -> Type) a
 type MaybeT (m : Type -> Type) a
 
-type alias Config = { budget : Number; overhead : Number }
-type alias PlanState = { remaining : Number; completed : List String }
+type alias Config = { budget : Float; overhead : Float }
+type alias PlanState = { remaining : Float; completed : List String }
 
 /// Optional plans share configuration and thread their remaining budget.
 type alias Planner a = MaybeT (StateT PlanState (ReaderT Config Identity)) a
 
-plan : Planner Number -> Planner Number
+plan : Planner Float -> Planner Float
 let plan value = value
 
-pair : Pair String Number -> Pair String Number
+pair : Pair String Float -> Pair String Float
 let pair value = value
 ";
 

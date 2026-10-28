@@ -2,17 +2,17 @@
 // the error to the caller, and a defect is not a typed failure.
 module App.Main exposing (main)
 
-type error NotFound = NotFound Number
+type error NotFound = NotFound Float
 
 type error Denied = Denied String
 
-find : Number ->{; NotFound, Denied} String
+find : Float ->{; NotFound, Denied} String
 let find id =
   if id == 1 then "one"
   else if id == 2 then from_result (Err (NotFound id))
   else from_result (Err (Denied "no"))
 
-lookup : Number ->{; Denied} String
+lookup : Float ->{; Denied} String
 let lookup id =
   try
     find id
@@ -20,7 +20,7 @@ let lookup id =
   | NotFound n when n > 5 -> "big"
   | NotFound n -> "missing " ++ show n
 
-outer : Number ->{} String
+outer : Float ->{} String
 let outer id =
   try
     lookup id

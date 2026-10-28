@@ -7,36 +7,36 @@ import Monoids exposing (Sum(..), Product(..), First(..), Last(..), Min(..), Max
 import Validation exposing (Validation)
 import Mtl.ApplicativeLaws
 
-ints : Gen.Gen Number
-let ints = Gen.int (0 - 50) 50
+ints : Gen.Gen Float
+let ints = Gen.map Int.to_float (Gen.int (0 - 50) 50)
 
-lists : Gen.Gen (List Number)
+lists : Gen.Gen (List Float)
 let lists = Gen.list 6 ints
 
-options : Gen.Gen (Option Number)
+options : Gen.Gen (Option Float)
 let options = Gen.map (fun (some, x) -> if some then Some x else None) (Gen.pair Gen.bool ints)
 
-results : Gen.Gen (Result String Number)
+results : Gen.Gen (Result String Float)
 let results =
   Gen.map (fun (ok, x) -> if ok then Ok x else Err ("e" ++ show x)) (Gen.pair Gen.bool ints)
 
-functions : Gen.Gen (Number -> Number)
+functions : Gen.Gen (Float -> Float)
 let functions = Gen.function ints
 
 strings : Gen.Gen String
 let strings = Gen.map (fun n -> "s" ++ show n ++ ";") ints
 
-validations : Gen.Gen (Validation (List String) Number)
+validations : Gen.Gen (Validation (List String) Float)
 let validations = Gen.map validated ints
 
 /// A function into `Option`, the same result for the same argument.
-to_options : Gen.Gen (Number -> Option Number)
+to_options : Gen.Gen (Float -> Option Float)
 let to_options = Gen.function options
 
-to_lists : Gen.Gen (Number -> List Number)
+to_lists : Gen.Gen (Float -> List Float)
 let to_lists = Gen.function (Gen.list 3 ints)
 
-to_results : Gen.Gen (Number -> Result String Number)
+to_results : Gen.Gen (Float -> Result String Float)
 let to_results = Gen.function results
 
 triple : Gen.Gen a -> Gen.Gen b -> Gen.Gen c -> Gen.Gen (a, b, c)
@@ -123,9 +123,9 @@ let monad_laws =
       Test.equal values (Seq.to_list (flat_map (fun x -> pure x) (Seq.of_list values)))),
     Test.property "associativity (Seq)" (triple lists to_lists to_lists) (fun (values, f, g) ->
       let sequence = Seq.of_list values
-      f2 : Number -> Seq Number
+      f2 : Float -> Seq Float
       let f2 x = Seq.of_list (f x)
-      g2 : Number -> Seq Number
+      g2 : Float -> Seq Float
       let g2 x = Seq.of_list (g x)
       Test.equal
         (Seq.to_list (flat_map g2 (flat_map f2 sequence)))
@@ -215,7 +215,7 @@ let monoid_laws =
       Test.equal (Sum (List.sum values)) (fold_map Sum values)),
   ]
 
-validated : Number -> Validation (List String) Number
+validated : Float -> Validation (List String) Float
 let validated n = if n < 0 then Validation.invalid [show n] else Validation.valid n
 
 sugar : List Test.Test
@@ -244,9 +244,15 @@ let sugar =
         chained
         (Seq.to_list
           (Seq.map (fun x -> x + 1) (Seq.filter (fun x -> x % 2 == 0) (for { x <- xs } yield x))))),
-    Test.property "a..<b is Seq.range" (Gen.pair ints ints) (fun (a, b) ->
+    Test.property
+      "a..<b is Seq.range"
+      (Gen.pair (Gen.int (0 - 50) 50) (Gen.int (0 - 50) 50))
+      (fun (a, b) ->
       Test.equal (Seq.to_list (Seq.range a b)) [a..<b]),
-    Test.property "a sequence iterates again the same" (Gen.pair ints (Gen.int 0 5)) (fun (k, n) ->
+    Test.property
+      "a sequence iterates again the same"
+      (Gen.pair (Gen.int (0 - 50) 50) (Gen.int 0 5))
+      (fun (k, n) ->
       let s = Seq.take n (k..)
       Test.all
         [Test.equal (Seq.to_list s) (Seq.to_list s), Test.equal (Seq.to_list s) [k..<k + n]]),

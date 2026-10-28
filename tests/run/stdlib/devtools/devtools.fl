@@ -2,7 +2,7 @@
 // DevTools server listening on a local port.
 module App.Main exposing (main)
 
-start : Unit ->{} Number
+start : Unit ->{} Float
 foreign async start from "./server.mjs" "start"
   arity 0
 

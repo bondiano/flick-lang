@@ -1,4 +1,4 @@
-// `Number` is a JS number: NaN, both infinities and signed zero survive, and
+// `Float` is a JS number: NaN, both infinities and signed zero survive, and
 // `==` is SameValueZero.
 module App.Main exposing (main)
 
@@ -7,22 +7,22 @@ let line b = show b
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let nan = 0 / 0
-  let zero = 0
-  let negative_zero = -0
+  let nan = 0.0 / 0.0
+  let zero = 0.0
+  let negative_zero = -0.0
   Platform.stdout_line (show nan)
-  Platform.stdout_line (show (1 / 0))
-  Platform.stdout_line (show (-1 / 0))
+  Platform.stdout_line (show (1.0 / 0.0))
+  Platform.stdout_line (show (-1.0 / 0.0))
   Platform.stdout_line (show negative_zero)
   Platform.stdout_line (show (0.1 + 0.2))
-  Platform.stdout_line (show (5 % -3))
+  Platform.stdout_line (show (5.0 % -3.0))
   Platform.stdout_line (show (2 ** 0.5))
-  Platform.stdout_line (show (9007199254740993))
+  Platform.stdout_line (show (9007199254740993 : Float))
   Platform.stdout_line (line (nan == nan))
   Platform.stdout_line (line (zero == negative_zero))
-  Platform.stdout_line (line (Number.strict_equal nan nan))
-  Platform.stdout_line (line (Number.strict_equal zero negative_zero))
-  Platform.stdout_line (line (Number.same_value nan nan))
-  Platform.stdout_line (line (Number.same_value zero negative_zero))
+  Platform.stdout_line (line (Float.strict_equal nan nan))
+  Platform.stdout_line (line (Float.strict_equal zero negative_zero))
+  Platform.stdout_line (line (Float.same_value nan nan))
+  Platform.stdout_line (line (Float.same_value zero negative_zero))
   Platform.stdout_line (line (nan < 1 || nan >= 1))
   Platform.stdout_line (show (compare nan (1 / 0)))

@@ -3,7 +3,7 @@
 // protobuf, and gzip compresses a body of 1 KB or more.
 module App.Main exposing (main)
 
-start : Unit ->{} Number
+start : Unit ->{} Float
 foreign async start from "./receiver.mjs" "start"
   arity 0
 
@@ -33,7 +33,7 @@ let span attributes =
     disablePropagation = false;
   }
 
-millis : Number -> Option Duration.Duration
+millis : Float -> Option Duration.Duration
 let millis n =
   match Duration.millis n with
   | Ok d -> Some d

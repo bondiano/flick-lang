@@ -28,7 +28,7 @@ type ReaderT r (m : Type -> Type) a = ReaderT
 class State (m : Type -> Type) s | m -> s
 ";
     let lifting = "instance State m s => State (ReaderT r m) s\n";
-    let concrete = "instance State (ReaderT Config Identity) Number\n";
+    let concrete = "instance State (ReaderT Config Identity) Float\n";
     for instances in [
         format!("{lifting}{concrete}"),
         format!("{concrete}{lifting}"),
@@ -43,7 +43,7 @@ fn one_determining_monad_cannot_have_two_concrete_states() {
 type Identity a = Identity a
 class State (m : Type -> Type) s | m -> s
 ";
-    let number = "instance State Identity Number\n";
+    let number = "instance State Identity Float\n";
     let string = "instance State Identity String\n";
     for instances in [format!("{number}{string}"), format!("{string}{number}")] {
         rejects(&format!("{header}{instances}"), codes::C004);
@@ -58,8 +58,8 @@ class Base a s | a -> s =
   base : a -> s
 class Marked a s tag | a -> s =
   marked : a -> tag -> s
-instance Base Number Number =
-  base : Number -> Number
+instance Base Float Float =
+  base : Float -> Float
   let base value = value
 ";
 
@@ -68,8 +68,8 @@ const LEFT: &str = r"instance Base a s => Marked (Wrap a) s LeftTag =
   let marked (Wrap value) _ = base value
 ";
 
-const RIGHT: &str = r#"instance Marked (Wrap Number) String RightTag =
-  marked : Wrap Number -> RightTag -> String
+const RIGHT: &str = r#"instance Marked (Wrap Float) String RightTag =
+  marked : Wrap Float -> RightTag -> String
   let marked _ _ = "right"
 "#;
 
@@ -95,8 +95,8 @@ fn an_unknown_determining_monad_is_not_defaulted_to_an_instance() {
 type Identity a = Identity a
 class State (m : Type -> Type) s | m -> s =
   get : m s
-instance State Identity Number =
-  get : Identity Number
+instance State Identity Float =
+  get : Identity Float
   let get = Identity 0
 ambiguous : Unit
 let ambiguous = ignore get

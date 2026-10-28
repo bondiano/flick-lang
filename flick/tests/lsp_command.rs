@@ -24,7 +24,7 @@ const LIB: &str = "schema-version = 1\n\n[project]\nkind = \"lib\"\n";
 const DOMAIN: &str = "module App.Domain exposing (User, greet)
 
 /// Someone to greet.
-type alias User = { name : String; age : Number }
+type alias User = { name : String; age : Float }
 
 /// The greeting of a user.
 greet : User -> String
@@ -250,7 +250,7 @@ fn hover_definition_completion_rename_and_formatting() {
         local["result"]["contents"]["value"]
             .as_str()
             .expect("hover")
-            .contains("count : Number"),
+            .contains("count : Int"),
         "{local}"
     );
 
@@ -308,7 +308,7 @@ fn hover_definition_completion_rename_and_formatting() {
 #[test]
 fn hover_and_completion_answer_quickly_on_a_2000_line_module() {
     let mut big =
-        String::from("module App.Big exposing (run)\n\nrun : Number -> Number\nlet run x0 =\n");
+        String::from("module App.Big exposing (run)\n\nrun : Float -> Float\nlet run x0 =\n");
     for i in 1..2000 {
         let _ = writeln!(big, "  let x{i} = x{} + {i}", i - 1);
     }
@@ -333,7 +333,7 @@ fn hover_and_completion_answer_quickly_on_a_2000_line_module() {
         hover["result"]["contents"]["value"]
             .as_str()
             .expect("hover")
-            .contains("x1999 : Number")
+            .contains("x1999 : Float")
     );
     let completion = lsp.request(
         "textDocument/completion",

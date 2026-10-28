@@ -2,7 +2,7 @@
 // how levels compare.
 module App.Main exposing (main)
 
-type alias Row = { name : String; size : Number }
+type alias Row = { name : String; size : Float }
 
 levels : List LogLevel.Severity
 let levels =

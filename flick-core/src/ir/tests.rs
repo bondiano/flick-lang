@@ -91,16 +91,16 @@ fn ir_makes_stages_dictionaries_and_lifts_explicit() {
     let ir = lower_text(
         "App",
         "module App exposing (..)\n\
-         type error NotFound = NotFound Number\n\
-         service Users =\n  get : Number ->{; NotFound} String\n\
-         type Shape = Circle Number | Square Number\n  deriving Eq\n\
+         type error NotFound = NotFound Float\n\
+         service Users =\n  get : Float ->{; NotFound} String\n\
+         type Shape = Circle Float | Square Float\n  deriving Eq\n\
          render : Show a => a -> String\nlet render value = show value\n\
-         load : Number ->{Users; none} String\n\
+         load : Float ->{Users; none} String\n\
          let load id =\n  let name = try Users.get id with\n    | NotFound _ -> \"?\"\n  Platform.stdout_line (render 1 ++ name)\n  name\n\
-         twice : (Number ->{} Number) -> Number ->{} Number\nlet twice f x = f (f x)\n\
-         inc : Number -> Number\nlet inc x = x + 1\n\
-         run : Unit ->{} Number\nlet run () = twice inc 1\n\
-         pick : Option Number -> Number\nlet pick o =\n  match o with\n  | Some (1 | 2) -> 0\n  | Some n when n > 3 -> n\n  | _ -> -1\n",
+         twice : (Float ->{} Float) -> Float ->{} Float\nlet twice f x = f (f x)\n\
+         inc : Float -> Float\nlet inc x = x + 1\n\
+         run : Unit ->{} Float\nlet run () = twice inc 1\n\
+         pick : Option Float -> Float\nlet pick o =\n  match o with\n  | Some (1 | 2) -> 0\n  | Some n when n > 3 -> n\n  | _ -> -1\n",
     )
     .expect("lowers");
     insta::assert_snapshot!(super::print(&ir));

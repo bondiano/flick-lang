@@ -9,21 +9,21 @@ of_list : List a -> Seq a
 foreign pure of_list from "@flick-lang/runtime" "seqOfList"
 
 /// `n`, `n + 1`, … without end.
-from : Number -> Seq Number
+from : Int -> Seq Int
 foreign pure from from "@flick-lang/runtime" "seqFrom"
 
 /// `[from, from + 1, …]` below `until`, as `List.range`.
-range : Number -> Number -> Seq Number
+range : Int -> Int -> Seq Int
 foreign pure range from "@flick-lang/runtime" "seqRange"
   arity 2
 
 /// The numbers from `start` up to `end`, `end` too: what `start..end` is.
-range_to : Number -> Number -> Seq Number
+range_to : Int -> Int -> Seq Int
 foreign pure range_to from "@flick-lang/runtime" "seqRangeTo"
   arity 2
 
 /// From `from` by `step` while short of `until`; nothing when `step` is 0.
-range_by : Number -> Number -> Number -> Seq Number
+range_by : Int -> Int -> Int -> Seq Int
 foreign pure range_by from "@flick-lang/runtime" "seqRangeBy"
   arity 3
 
@@ -75,7 +75,7 @@ foreign pure flat_map from "@flick-lang/runtime" "seqFlatMap"
 
 /// At most `n` elements, `n` truncated as by `List.take`; pulls none
 /// after the last, so it ends an infinite sequence.
-take : forall d a. Number -> ((Seq a)^d -> (Seq a)^d)
+take : forall d a. Int -> ((Seq a)^d -> (Seq a)^d)
 foreign pure take from "@flick-lang/runtime" "seqTake"
   arity 2
   retention call
@@ -86,7 +86,7 @@ foreign pure take_while from "@flick-lang/runtime" "seqTakeWhile"
   retention call
 
 /// Without the first `n` elements, `n` truncated as by `List.drop`.
-drop : forall d a. Number -> ((Seq a)^d -> (Seq a)^d)
+drop : forall d a. Int -> ((Seq a)^d -> (Seq a)^d)
 foreign pure drop from "@flick-lang/runtime" "seqDrop"
   arity 2
   retention call
@@ -109,7 +109,7 @@ foreign pure zip_with from "@flick-lang/runtime" "seqZipWith"
   retention call
 
 /// Each element with its index from 0.
-enumerate : forall d a. (Seq a)^d -> (Seq (Number, a))^d
+enumerate : forall d a. (Seq a)^d -> (Seq (Int, a))^d
 foreign pure enumerate from "@flick-lang/runtime" "seqEnumerate"
   retention call
 
@@ -120,13 +120,13 @@ foreign pure scan from "@flick-lang/runtime" "seqScan"
   retention call
 
 /// Lists of `n` elements, the last one shorter; nothing when `n` is not positive.
-chunks : forall d a. Number -> ((Seq a)^d -> (Seq (List a))^d)
+chunks : forall d a. Int -> ((Seq a)^d -> (Seq (List a))^d)
 foreign pure chunks from "@flick-lang/runtime" "seqChunks"
   arity 2
   retention call
 
 /// Every run of `n` neighbouring elements, from the first.
-windows : forall d a. Number -> ((Seq a)^d -> (Seq (List a))^d)
+windows : forall d a. Int -> ((Seq a)^d -> (Seq (List a))^d)
 foreign pure windows from "@flick-lang/runtime" "seqWindows"
   arity 2
   retention call

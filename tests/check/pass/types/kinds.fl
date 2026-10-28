@@ -11,7 +11,7 @@ kind Nullability = NonNull | Nullable
 type Js (n : Nullability) a
 
 service Clock =
-  now : Unit ->{} Number
+  now : Unit ->{} Float
 
 type error Timeout
 
@@ -35,7 +35,7 @@ foreign pure nullable from "./kinds.js" "nullable"
 errors : Errors {Timeout} -> Unit
 foreign pure errors from "./kinds.js" "errors"
 
-higher : m Number -> (m Number)^c
+higher : m Float -> (m Float)^c
 foreign pure higher from "./kinds.js" "higher"
 
 fields : { name : String | rest } -> String

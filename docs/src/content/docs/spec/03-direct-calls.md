@@ -80,13 +80,13 @@ A pure body or callback is allowed in an expected runtime position through a che
 A runtime arrow whose services are a closed row of synchronous services, today `Atom.Read` alone, and whose errors are empty is a *Sync* stage: `Atom a ->{Atom.Read;} a`, the render of `Ui.view`, the computation of `Atom.derived`. Its body compiles to a plain JS function without `Effect.gen`; its calls of other Sync functions and of the operations of `Atom.Read` are plain calls, which read the services of the context the runtime set around the call (the reader of a render or a derived atom). The stage is decided where the arrow is written, so a row variable solved to `Atom.Read` later, as in `forall r. (a ->{r} b) -> …`, keeps the runtime stage its function was compiled with. A foreign function returns an Effect, so its arrows are never Sync.
 
 ```flick
-doubled : Unit ->{Atom.Read;} Number
+doubled : Unit ->{Atom.Read;} Float
 let doubled () = Atom.value count * 2
 
-twice : (Unit ->{r; e} Number) -> Unit ->{r; e} Number
+twice : (Unit ->{r; e} Float) -> Unit ->{r; e} Float
 let twice f () = f () + f ()
 
-quadrupled : Unit ->{Atom.Read;} Number
+quadrupled : Unit ->{Atom.Read;} Float
 let quadrupled () = twice doubled ()
 ```
 

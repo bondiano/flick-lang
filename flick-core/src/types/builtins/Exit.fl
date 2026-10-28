@@ -34,7 +34,7 @@ foreign pure die from "@flick-lang/runtime/effect/Exit" "flickDie"
   reviewed "effect@4.0.5 sha256:a14827959be45d5c"
 
 /// An interruption, by the fiber of the id if one is given.
-interrupt : Option Number -> Exit e a
+interrupt : Option Float -> Exit e a
 foreign pure interrupt from "@flick-lang/runtime/effect/Exit" "flickInterrupt"
   reviewed "effect@4.0.5 sha256:eed2b084a58a13f5"
 

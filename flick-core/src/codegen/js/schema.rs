@@ -109,7 +109,8 @@ impl Gen<'_> {
         match plan {
             SchemaPlan::Prim(name) => {
                 let f = match name.as_str() {
-                    "Number" => "schemaNumber",
+                    "Float" => "schemaNumber",
+                    "Int" => "schemaInt",
                     "String" => "schemaString",
                     "Bool" => "schemaBool",
                     "BigInt" => "schemaBigint",

@@ -26,7 +26,7 @@ impl Host for Memory {
 
 const LIB: &str = "schema-version = 1\n[project]\nkind = \"lib\"\n";
 const USE: &str =
-    "module A.Use exposing (y)\nimport A.Base exposing (x)\ny : Number\nlet y = x + 1\n";
+    "module A.Use exposing (y)\nimport A.Base exposing (x)\ny : Float\nlet y = x + 1\n";
 
 fn host(base: &str) -> Memory {
     Memory(BTreeMap::from([
@@ -77,18 +77,18 @@ fn levels_follow_imports_and_reject_cycles() {
 fn an_edit_that_keeps_the_interface_rechecks_only_its_module() {
     let mut cache = ModuleCache::default();
     let (first, _) = analyzed(
-        &host("module A.Base exposing (x)\nx : Number\nlet x = 1\n"),
+        &host("module A.Base exposing (x)\nx : Float\nlet x = 1\n"),
         Some(&mut cache),
     );
     let (again, _) = analyzed(
-        &host("module A.Base exposing (x)\nx : Number\nlet x = 1\n"),
+        &host("module A.Base exposing (x)\nx : Float\nlet x = 1\n"),
         Some(&mut cache),
     );
     assert!(Arc::ptr_eq(&first["A.Base"], &again["A.Base"]));
     assert!(Arc::ptr_eq(&first["A.Use"], &again["A.Use"]));
 
     // a longer body moves nothing importers check
-    let edited = host("module A.Base exposing (x)\n\nx : Number\nlet x = 1 + 2\n");
+    let edited = host("module A.Base exposing (x)\n\nx : Float\nlet x = 1 + 2\n");
     let (warm, diagnostics) = analyzed(&edited, Some(&mut cache));
     assert!(!Arc::ptr_eq(&again["A.Base"], &warm["A.Base"]));
     assert!(Arc::ptr_eq(&again["A.Use"], &warm["A.Use"]));
@@ -99,7 +99,7 @@ fn an_edit_that_keeps_the_interface_rechecks_only_its_module() {
 fn a_changed_interface_rechecks_its_importers() {
     let mut cache = ModuleCache::default();
     let (first, _) = analyzed(
-        &host("module A.Base exposing (x)\nx : Number\nlet x = 1\n"),
+        &host("module A.Base exposing (x)\nx : Float\nlet x = 1\n"),
         Some(&mut cache),
     );
     let edited = host("module A.Base exposing (x)\nx : String\nlet x = \"one\"\n");

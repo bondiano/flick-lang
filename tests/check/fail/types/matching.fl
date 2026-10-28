@@ -1,71 +1,71 @@
 module App.Matching exposing (..)
 
-type Shape = Circle Number | Rect Number Number | Empty
+type Shape = Circle Float | Rect Float Float | Empty
 
-partial : Option Number -> Number
+partial : Option Float -> Float
 let partial value =
   match value with
   | Some n -> n
 
-shapes : Shape -> Number
+shapes : Shape -> Float
 let shapes shape =
   match shape with
   | Circle r -> r
   | Rect w h when w == h -> w
 
-nested : Option (Option Bool) -> Number
+nested : Option (Option Bool) -> Float
 let nested value =
   match value with
   | Some (Some true) -> 1
   | None -> 0
 
-numbers : Number -> String
+numbers : Float -> String
 let numbers n =
   match n with
   | 0 -> "zero"
   | 1 -> "one"
 
-lists : List Number -> Number
+lists : List Float -> Float
 let lists items =
   match items with
   | [] -> 0
   | [x] -> x
 
-redundant : Bool -> Number
+redundant : Bool -> Float
 let redundant b =
   match b with
   | _ -> 0
   | true -> 1
 
-arity : Shape -> Number
+arity : Shape -> Float
 let arity shape =
   match shape with
   | Rect w -> w
   | _ -> 0
 
-refutable : Option Number -> Number
+refutable : Option Float -> Float
 let refutable value =
   let Some n = value
   n
 
-pair : Number
+pair : Float
 let pair =
   let [x, y] = [1, 2]
   x + y
 
-head : List Number -> Number
+head : List Float -> Float
 let head items =
   let [x, ...rest] = items
   x
 
-always : (Number, Number) -> Number
+always : (Float, Float) -> Float
 let always pair =
   let assert (a, b) = pair
   a + b
 
 let assert [top] = [1]
 
-rests : List Number -> Number
+rests : List Float -> Float
 let rests items =
   match items with
   | [x, ...rest] -> x

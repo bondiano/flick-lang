@@ -1,5 +1,5 @@
 /// HTTP status codes by name: `from_literal NotFound` is 404. A status is a
-/// `Number` everywhere else in `Http`.
+/// `Float` everywhere else in `Http`.
 module Http.Status exposing (..)
 
 /// The names of the status codes Effect knows; `OK` and `Ok` are both 200.
@@ -69,7 +69,7 @@ type Literal =
   deriving Eq, Show
 
 /// The status code of the name.
-from_literal : Literal -> Number
+from_literal : Literal -> Float
 let from_literal literal =
   match literal with
   | Continue -> 100

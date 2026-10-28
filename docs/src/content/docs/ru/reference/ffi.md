@@ -9,11 +9,11 @@ title: "Внешние функции"
 описывают передачу аргументов и обработку результата.
 
 ```flick
-hypot : Number -> Number -> Number
+hypot : Float -> Float -> Float
 foreign pure hypot from global "Math.hypot"
   arity 2
 
-now_millis : Unit ->{} Number
+now_millis : Unit ->{} Float
 foreign sync now_millis from global "Date.now"
   arity 0
 
@@ -119,12 +119,12 @@ Node.js `@flick-lang/dts-importer` или скрипт из `FLICK_DTS_IMPORTER`
 явно запрошен через `--select`, импорт тоже завершается ошибкой.
 
 Импортёр не выводит свойства, которых нет в объявлении.
-Обычный вызов получает режим `sync` (`Unit ->{} Number` для
+Обычный вызов получает режим `sync` (`Unit ->{} Float` для
 `nextId(): number`); чистота `pure` не выводится.
 
 | TypeScript | Flick |
 | - | - |
-| `string`, `number`, `boolean`, `bigint` | `String`, `Number`, `Bool`, `BigInt` |
+| `string`, `number`, `boolean`, `bigint` | `String`, `Float`, `Bool`, `BigInt` |
 | результат `void`, `undefined` | `Unit` |
 | `any`, `unknown` | `JsValue`; отклоняется при `strict = true` |
 | `T[]`, `[A, B]` | `List T`, `(A, B)` |

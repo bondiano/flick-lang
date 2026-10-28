@@ -13,7 +13,7 @@ class Show a =
   show : a -> String
 
 class Eq a => Hash a =
-  hash : a -> Number
+  hash : a -> Float
 
 class Collection c a | c -> a =
   empty : c
@@ -62,8 +62,8 @@ class Pretty a =
   verbose : a -> String
   let verbose x = "<" ++ pretty x ++ ">"
 
-instance Pretty Number =
-  pretty : Number -> String
+instance Pretty Float =
+  pretty : Float -> String
   let pretty n = show n
 ```
 
@@ -166,7 +166,7 @@ type level is a string: `"name"`, of kind `Symbol`.
 Extending an open record needs `Lacks` for its row in the signature:
 
 ```flick
-tag : Record.Lacks "tag" { id : Number | r } => { id : Number | r } -> { id : Number; tag : String | r }
+tag : Record.Lacks "tag" { id : Float | r } => { id : Float | r } -> { id : Float; tag : String | r }
 let tag value = Record.extend (Record.label : Record.Label "tag") "t" value
 ```
 

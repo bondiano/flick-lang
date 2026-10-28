@@ -324,19 +324,19 @@ mod tests {
     fn schema_is_pinned_and_round_trips() {
         let interface = interface_of(
             "module App.Shapes exposing (Shape(..), Id, Size, Mode(..), Show(..), Collection(..), area, now, Pair, Clock, NotFound(..), Port, Box, wrap, later)\n\
-             type Shape = Circle Number | Square Number\n  deriving Eq\n\
+             type Shape = Circle Float | Square Float\n  deriving Eq\n\
              opaque type Id = Id String\n\
-             type alias Size = Number\n\
+             type alias Size = Float\n\
              kind Mode = Small | Big\n\
              class Show a =\n  show : a -> String\n\
              class Eq a => Collection c a | c -> a =\n  empty : c\n\
              instance Show Shape =\n  show : Shape -> String\n  let show s = \"shape\"\n\
-             area : Shape -> Number\nlet area s = 0\n\
-             now : Unit ->{} Number\nforeign sync now from global \"Date.now\"\n\
+             area : Shape -> Float\nlet area s = 0\n\
+             now : Unit ->{} Float\nforeign sync now from global \"Date.now\"\n\
              type Pair\n\
-             service Clock =\n  tick : Unit ->{} Number\n\
+             service Clock =\n  tick : Unit ->{} Float\n\
              type error NotFound = NotFound String\n\
-             refined type Port = Number where fun n -> n > 0\n\
+             refined type Port = Float where fun n -> n > 0\n\
              type alias Box (f : Type -> Type) a = { value : f a; size : Size }\n\
              wrap : f a -> Box f a\nlet wrap value = { value = value; size = 1 }\n\
              later : forall s. Handle s -> (Unit -> Handle s)^{s}\nlet later h = fun () -> h\n\

@@ -8,22 +8,22 @@ constant : a -> Gen a
 foreign pure constant from "@flick-lang/runtime" "genConstant"
 
 /// A number in `[low, high)`.
-number : Number -> Number -> Gen Number
+number : Float -> Float -> Gen Float
 foreign pure number from "@flick-lang/runtime" "genNumber"
 
 /// An integer in `[low, high]`.
-int : Number -> Number -> Gen Number
+int : Int -> Int -> Gen Int
 foreign pure int from "@flick-lang/runtime" "genInt"
 
 bool : Gen Bool
 foreign pure bool from "@flick-lang/runtime" "genBool"
 
 /// A string of printable ASCII, at most `max` long.
-string : Number -> Gen String
+string : Int -> Gen String
 foreign pure string from "@flick-lang/runtime" "genString"
 
 /// A list at most `max` long.
-list : Number -> Gen a -> Gen (List a)
+list : Int -> Gen a -> Gen (List a)
 foreign pure list from "@flick-lang/runtime" "genList"
 
 /// One of the values; the list must not be empty.

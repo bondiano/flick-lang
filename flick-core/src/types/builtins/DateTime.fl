@@ -22,27 +22,27 @@ type TimeUnit = Millisecond | Second | Minute | Hour | Day | Week | Month | Year
 /// The parts of a date-time; `weekDay` counts from Sunday, 0.
 type alias Parts =
   {
-    millisecond : Number;
-    second : Number;
-    minute : Number;
-    hour : Number;
-    day : Number;
-    weekDay : Number;
-    month : Number;
-    year : Number;
+    millisecond : Float;
+    second : Float;
+    minute : Float;
+    hour : Float;
+    day : Float;
+    weekDay : Float;
+    month : Float;
+    year : Float;
   }
 
 /// Some of the parts; `None` keeps a part as it is.
 type alias PartialParts =
   {
-    millisecond : Option Number;
-    second : Option Number;
-    minute : Option Number;
-    hour : Option Number;
-    day : Option Number;
-    weekDay : Option Number;
-    month : Option Number;
-    year : Option Number;
+    millisecond : Option Float;
+    second : Option Float;
+    minute : Option Float;
+    hour : Option Float;
+    day : Option Float;
+    weekDay : Option Float;
+    month : Option Float;
+    year : Option Float;
   }
 
 /// How to place a date-time in a zone: keep the instant (the default) or,
@@ -86,7 +86,7 @@ foreign pure from_parts from "@flick-lang/runtime/effect/DateTime" "flickFromPar
   reviewed "effect@4.0.5 sha256:0f92e12e08d886ef"
 
 /// The UTC date-time `n` seconds after 1970-01-01.
-from_epoch_seconds : Number -> Result DateTimeError DateTime
+from_epoch_seconds : Float -> Result DateTimeError DateTime
 foreign pure from_epoch_seconds from "@flick-lang/runtime/effect/DateTime" "flickFromEpochSeconds"
   reviewed "effect@4.0.5 sha256:9efb17052ac67760"
 
@@ -138,7 +138,7 @@ foreign pure set_zone from "@flick-lang/runtime/effect/DateTime" "flickSetZone"
   reviewed "effect@4.0.5 sha256:b89bb06b303864e7"
 
 /// The date-time at the offset, in milliseconds.
-set_zone_offset : ZoneOptions -> Number -> DateTime -> Result DateTimeError DateTime
+set_zone_offset : ZoneOptions -> Float -> DateTime -> Result DateTimeError DateTime
 foreign pure set_zone_offset from "@flick-lang/runtime/effect/DateTime" "flickSetZoneOffset"
   reviewed "effect@4.0.5 sha256:3fbaa0c1ee44dca8"
 
@@ -157,7 +157,7 @@ let set_zone_current t =
   | Err _ -> t
 
 /// The zone at a fixed offset from UTC, in milliseconds.
-zone_make_offset : Number -> TimeZone
+zone_make_offset : Float -> TimeZone
 foreign pure zone_make_offset from "@flick-lang/runtime/effect/DateTime" "zoneMakeOffset"
   reviewed "effect@4.0.5 sha256:60aeb3e0972bf05f"
 
@@ -191,7 +191,7 @@ layer_current_zone : TimeZone -> Layer none none {CurrentTimeZone}
 let layer_current_zone zone = Layer.succeed CurrentTimeZone { current_zone = fun () -> zone }
 
 /// Provides the zone at the offset, in milliseconds.
-layer_current_zone_offset : Number -> Layer none none {CurrentTimeZone}
+layer_current_zone_offset : Float -> Layer none none {CurrentTimeZone}
 let layer_current_zone_offset offset = layer_current_zone (zone_make_offset offset)
 
 /// Provides the zone of the IANA id, when it is one.
@@ -203,17 +203,17 @@ layer_current_zone_local : Layer none none {CurrentTimeZone}
 let layer_current_zone_local = Layer.succeed CurrentTimeZone { current_zone = zone_make_local }
 
 /// The milliseconds since 1970-01-01 UTC.
-to_epoch_millis : DateTime -> Number
+to_epoch_millis : DateTime -> Float
 foreign pure to_epoch_millis from "@flick-lang/runtime/effect/DateTime" "toEpochMillis"
   reviewed "effect@4.0.5 sha256:e5ba4e1f4f6368a4"
 
 /// The whole seconds since 1970-01-01 UTC.
-to_epoch_seconds : DateTime -> Number
+to_epoch_seconds : DateTime -> Float
 foreign pure to_epoch_seconds from "@flick-lang/runtime/effect/DateTime" "toEpochSeconds"
   reviewed "effect@4.0.5 sha256:9014f104b325355a"
 
 /// The epoch milliseconds mapped by `f`, keeping the zone.
-map_epoch_millis : (Number -> Number) -> DateTime -> DateTime
+map_epoch_millis : (Float -> Float) -> DateTime -> DateTime
 foreign pure map_epoch_millis from "@flick-lang/runtime/effect/DateTime" "mapEpochMillis"
   arity 1
   reviewed "effect@4.0.5 sha256:6d92a84dbde1f3ba"
@@ -244,7 +244,7 @@ foreign pure remove_time from "@flick-lang/runtime/effect/DateTime" "removeTime"
   reviewed "effect@4.0.5 sha256:8961ea0bd3046530"
 
 /// The offset of a zoned date-time, in milliseconds; `None` for UTC.
-zoned_offset : DateTime -> Option Number
+zoned_offset : DateTime -> Option Float
 foreign pure zoned_offset from "@flick-lang/runtime/effect/DateTime" "flickZonedOffset"
   reviewed "effect@4.0.5 sha256:e9e947a43ebd3c03"
 
@@ -254,12 +254,12 @@ foreign pure zoned_offset_iso from "@flick-lang/runtime/effect/DateTime" "flickZ
   reviewed "effect@4.0.5 sha256:85e4c097d4433710"
 
 /// `t |> add Day 3`: time units move the instant, calendar units the wall clock.
-add : TimeUnit -> Number -> DateTime -> DateTime
+add : TimeUnit -> Float -> DateTime -> DateTime
 foreign pure add from "@flick-lang/runtime/effect/DateTime" "flickAdd"
   reviewed "effect@4.0.5 sha256:f67cee9e0ee26661"
 
 /// `t |> subtract Month 1`, as `add` does.
-subtract : TimeUnit -> Number -> DateTime -> DateTime
+subtract : TimeUnit -> Float -> DateTime -> DateTime
 foreign pure subtract from "@flick-lang/runtime/effect/DateTime" "flickSubtract"
   reviewed "effect@4.0.5 sha256:e36504dec048e62d"
 
@@ -277,17 +277,17 @@ foreign pure subtract_duration from "@flick-lang/runtime/effect/DateTime" "subtr
 
 /// The start of the unit the date-time is in; weeks start on
 /// `weekStartsOn` (0 for Sunday, the default).
-start_of : { weekStartsOn : Option Number } -> TimeUnit -> DateTime -> DateTime
+start_of : { weekStartsOn : Option Float } -> TimeUnit -> DateTime -> DateTime
 foreign pure start_of from "@flick-lang/runtime/effect/DateTime" "flickStartOf"
   reviewed "effect@4.0.5 sha256:fff7007ef6df8081"
 
 /// The last millisecond of the unit the date-time is in.
-end_of : { weekStartsOn : Option Number } -> TimeUnit -> DateTime -> DateTime
+end_of : { weekStartsOn : Option Float } -> TimeUnit -> DateTime -> DateTime
 foreign pure end_of from "@flick-lang/runtime/effect/DateTime" "flickEndOf"
   reviewed "effect@4.0.5 sha256:41295efe9bf681ba"
 
 /// The nearer of the start of the unit and the start of the next one.
-nearest : { weekStartsOn : Option Number } -> TimeUnit -> DateTime -> DateTime
+nearest : { weekStartsOn : Option Float } -> TimeUnit -> DateTime -> DateTime
 foreign pure nearest from "@flick-lang/runtime/effect/DateTime" "flickNearest"
   reviewed "effect@4.0.5 sha256:b5a6cb1d9fc31a9d"
 

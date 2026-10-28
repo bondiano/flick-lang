@@ -4,38 +4,38 @@
 // chosen witness stays chosen, and unused runtime calls still run.
 module App.Main exposing (main)
 
-type Shape = Circle Number | Square Number
+type Shape = Circle Float | Square Float
   deriving Eq, Hash, Show
 
-noisy : Number ->{} Number
+noisy : Float ->{} Float
 let noisy n =
   Platform.stdout_line ("argument " ++ show n)
   n
 
-first_stage : Number ->{} (Number -> Number)
+first_stage : Float ->{} (Float -> Float)
 let first_stage x =
   Platform.stdout_line ("first stage " ++ show x)
   fun y -> x + y
 
-scale : Number -> Number -> Number
+scale : Float -> Float -> Float
 let scale factor n =
   let pair = (factor, n)
   let (f, m) = pair
   f * m + 1
 
-triple : Number -> Number
+triple : Float -> Float
 let triple = scale 3
 
-spin : Number ->{} Number
+spin : Float ->{} Float
 let rec spin n = spin (n + 1)
 
-size_of : Shape -> Number
+size_of : Shape -> Float
 let size_of s =
   match s with
   | Circle r -> r
   | Square r -> r
 
-distinct : List Shape -> (Number, Number)
+distinct : List Shape -> (Float, Float)
 let distinct shapes =
   let canonical = HashSet.size (HashSet.from_list EqHash.canonical shapes)
   let by_size =

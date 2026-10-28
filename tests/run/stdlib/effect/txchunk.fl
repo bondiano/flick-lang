@@ -3,7 +3,7 @@ module App.Main exposing (main)
 
 type error Stop = Stop
 
-contents : TxChunk.TxChunk Number ->{Tx.Transaction;} List Number
+contents : TxChunk.TxChunk Float ->{Tx.Transaction;} List Float
 let contents chunk = Chunk.to_list (TxChunk.get chunk)
 
 main : Unit ->{; AppError} Unit

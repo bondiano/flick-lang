@@ -1,6 +1,6 @@
 //! Differential test of compile-time evaluation against Node: random literal
 //! expressions are folded in Rust and evaluated as JS, and every folded value
-//! must equal the JS one exactly (Number compared by bits, NaN as NaN).
+//! must equal the JS one exactly (Float compared by bits, NaN as NaN).
 //! Needs `node` on PATH; run by `just e2e`.
 
 use std::fmt::Write as _;
@@ -90,7 +90,15 @@ fn gen_expr(rng: &mut Rng, ty: Ty, depth: u32) -> (String, String) {
         }
         Ty::BigInt => {
             let op = rng.pick(&["+", "-", "*", "/", "%", "**"]);
-            bin(rng, op, op, Ty::BigInt, Ty::BigInt)
+            let (fa, ja) = gen_expr(rng, Ty::BigInt, depth - 1);
+            let (fb, jb) = gen_expr(rng, Ty::BigInt, depth - 1);
+            // `/` and `%` by zero are zero in Flick, where JS throws
+            let js = match op {
+                "/" => format!("bdiv({ja}, {jb})"),
+                "%" => format!("brem({ja}, {jb})"),
+                _ => format!("(({ja}) {op} ({jb}))"),
+            };
+            (format!("({fa} {op} {fb})"), js)
         }
         Ty::String if leaf => {
             let s = rng.pick(&[
@@ -192,6 +200,8 @@ fn folding_matches_node() {
 
     let mut script = String::from(
         "const svz = (a, b) => a === b || (a !== a && b !== b);\n\
+         const bdiv = (a, b) => (b === 0n ? 0n : a / b);\n\
+         const brem = (a, b) => (b === 0n ? 0n : a % b);\n\
          const bits = (n) => { const b = new DataView(new ArrayBuffer(8)); b.setFloat64(0, n); \
          return b.getBigUint64(0).toString(16).padStart(16, '0'); };\n\
          const show = (v) => typeof v === 'number' ? (Number.isNaN(v) ? 'NaN' : bits(v)) \

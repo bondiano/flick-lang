@@ -51,7 +51,7 @@ let main () =
   Platform.stdout_line ("cleared: " ++ show (Tx.atomically (task { elements a })))
   let q = TxPriorityQueue.from_iterable [5, 1, 4]
   let made = TxPriorityQueue.make [9, 8]
-  let empty : TxPriorityQueue.TxPriorityQueue Number = TxPriorityQueue.empty ()
+  let empty : TxPriorityQueue.TxPriorityQueue Float = TxPriorityQueue.empty ()
   let ordered = Tx.atomically (task {
       TxPriorityQueue.offer 3 q
       TxPriorityQueue.offer_all [2, 6] q

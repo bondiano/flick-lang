@@ -8,22 +8,22 @@ type alias Row = {
   nullable : Option String;
   missing : Option String;
   nullish : Option String;
-  tagged : Option Number;
-  quota : Number;
+  tagged : Option Float;
+  quota : Float;
 } deriving Schema
 
-row_json : Ref Number -> PureCodec Json Row
+row_json : Ref Float -> PureCodec Json Row
 let row_json calls =
   codec (schema Row) {
     required = field "required" String.json;
     nullable = field "nullable" (option_as_null String.json);
     missing = optional_field "missing" String.json;
     nullish = field "nullish" (option_as_nullish String.json);
-    tagged = field "tagged" (Codec.tagged_option Number.json_finite);
-    quota = field "quota" Number.json_finite |> on_missing (fun () -> count calls);
+    tagged = field "tagged" (Codec.tagged_option Float.json_finite);
+    quota = field "quota" Float.json_finite |> on_missing (fun () -> count calls);
   }
 
-count : Ref Number -> Number
+count : Ref Float -> Float
 foreign pure count from "./count.mjs" "count"
 
 decode : PureCodec Json Row -> String -> String

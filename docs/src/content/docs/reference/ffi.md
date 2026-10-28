@@ -7,11 +7,11 @@ signature is the contract; the mode says how the call runs, and metadata
 lines below the declaration adapt the call.
 
 ```flick
-hypot : Number -> Number -> Number
+hypot : Float -> Float -> Float
 foreign pure hypot from global "Math.hypot"
   arity 2
 
-now_millis : Unit ->{} Number
+now_millis : Unit ->{} Float
 foreign sync now_millis from global "Date.now"
   arity 0
 
@@ -106,11 +106,11 @@ a replacement import path.
 Using a `foreign blocked` value is `FLICK-F005`; the other exports of the
 package stay usable, and asking for a blocked export with `--select` is an
 error too. Nothing is inferred that a declaration cannot show: a call is
-`sync` (`Unit ->{} Number` for `nextId(): number`), never `pure`.
+`sync` (`Unit ->{} Float` for `nextId(): number`), never `pure`.
 
 | TypeScript | Flick |
 | - | - |
-| `string`, `number`, `boolean`, `bigint` | `String`, `Number`, `Bool`, `BigInt` |
+| `string`, `number`, `boolean`, `bigint` | `String`, `Float`, `Bool`, `BigInt` |
 | `void`, `undefined` result | `Unit` |
 | `any`, `unknown` | `JsValue`; refused with `strict = true` |
 | `T[]`, `[A, B]` | `List T`, `(A, B)` |

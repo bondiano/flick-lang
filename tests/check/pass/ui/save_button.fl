@@ -52,7 +52,7 @@ let save users name () =
     | SaveError reason -> Atom.set failure (Some reason)
   }
 
-type alias User = { id : Number; name : String }
+type alias User = { id : Float; name : String }
 
 users : Ui.SelectProps User c -> Ui^c
 let users props = Ui.select props
@@ -73,7 +73,7 @@ let reader path =
       [text "read"]
   }
 
-held_in_scope : File.Path ->{File.FileSystem; File.OpenError} Number
+held_in_scope : File.Path ->{File.FileSystem; File.OpenError} Int
 let held_in_scope path =
   scope {
     let file = File.open_scoped path

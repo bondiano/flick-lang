@@ -12,7 +12,7 @@ let describe shape =
 load : UserId ->{Users; none} String
 let load id =
   let user : User = Users.get id
-  let boxed : Box Option Number = wrap (Some 1)
+  let boxed : Box Option Float = wrap (Some 1)
   let one = first [user]
   user.name
 
@@ -21,7 +21,7 @@ leak : String -> UserId
 let leak raw = raw
 //             ^^^ FLICK-T003 expected `UserId`, found `String`
 
-partial : Shape -> Number
+partial : Shape -> Float
 let partial shape =
   match shape with
 //^^^^^^^^^^^ FLICK-T009 `Square _` is not matched
@@ -29,8 +29,8 @@ let partial shape =
 
 wrong_arg : Unit -> String
 let wrong_arg () = Text.trim 1
-//                           ^ FLICK-T003 expected `String`, found `Number`
+//                           ^ FLICK-T003 expected `String`, found `Int`
 
-no_field : User -> Number
+no_field : User -> Float
 let no_field user = user.age
 //                  ^^^^^^^^ FLICK-T003 has no field `age`

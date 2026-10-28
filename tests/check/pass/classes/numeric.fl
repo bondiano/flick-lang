@@ -1,0 +1,22 @@
+// The closed numeric classes: one function for every numeric type.
+module App.NumericClasses exposing (..)
+
+import Numeric exposing (Floating, Integer, Numeric)
+
+square : Numeric a => a -> a
+let square x = x * x
+
+mean : Floating a => List a -> a
+let mean xs = List.sum xs / Numeric.from_int (List.length xs)
+
+widen : Integer a => a -> BigInt
+let widen n = Numeric.to_bigint n + 1n
+
+squares : (Int, Float, BigInt)
+let squares = (square 3, square 1.5, square 4n)
+
+centre : Float
+let centre = mean [1, 2, 3]
+
+wide : BigInt
+let wide = widen 41

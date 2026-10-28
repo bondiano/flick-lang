@@ -37,7 +37,7 @@ never written.
 | SQL type | Flick type |
 | - | - |
 | `bigint`, `int8`, `bigserial` | `BigInt` |
-| `integer`, `int`, `int4`, `smallint`, `int2`, `serial`, `real`, `double precision`, `float8` | `Number` |
+| `integer`, `int`, `int4`, `smallint`, `int2`, `serial`, `real`, `double precision`, `float8` | `Float` |
 | `numeric`, `decimal` | `BigDecimal` |
 | `text`, `varchar`, `character varying`, `uuid`, `date`, `timestamp`, `timestamptz` | `String` |
 | `boolean`, `bool` | `Bool` |
@@ -45,7 +45,7 @@ never written.
 
 A column of another type needs `via codec`, a `PureCodec` from the Flick
 type of its SQL type (`FLICK-Q011` otherwise). `Sql.codec decode encode`
-makes one; `decode` may refuse a value with a `SchemaError`. A `Number` never
+makes one; `decode` may refuse a value with a `SchemaError`. A `Float` never
 holds a `bigint` or a `numeric` without such a checked codec.
 
 The compiler never connects to a database: tables are written, or generated
@@ -102,7 +102,7 @@ order whatever order they are written in:
 | `having e` | a condition on groups |
 | `select { label = e; … }`, `select a.x, b.y`, `select a` | the results; written as a list each takes its column's name, an alias alone selects all its columns |
 | `order_by e, asc e, desc e` | ordering |
-| `limit e`, `offset e` | `Number`s |
+| `limit e`, `offset e` | `Float`s |
 | `union (sql { … })`, `union_all (sql { … })` | a query with the same results in the same order |
 | `insert_into T`, `values { column = e; … }` | an insert |
 | `update T`, `set { column = e; … }`, `where e` | an update |
@@ -113,7 +113,7 @@ In an insert, update or delete the table's name is its alias: `Users.id`.
 
 Expressions are columns (`alias.column`, or `column` when exactly one table
 has it: `FLICK-Q003` otherwise), parameters, captures, literals, `== != < <= > >=`,
-`&&`, `||`, `not`, `+ - * / %` on `Number`, `BigInt` and `BigDecimal`, `++` on
+`&&`, `||`, `not`, `+ - * / %` on `Float`, `BigInt` and `BigDecimal`, `++` on
 `String`, and the functions:
 
 | Function | Meaning |

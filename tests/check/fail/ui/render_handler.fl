@@ -1,12 +1,12 @@
 module App.RenderHandler exposing (..)
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.make 0
 
-remove : Action.Action (Number, Ui.ClickSnapshot)
+remove : Action.Action (Float, Ui.ClickSnapshot)
 let remove = Action.exhaust (fun (n, _) -> task { Atom.set count n })
 
-counter : Ui.View Number
+counter : Ui.View Float
 let counter =
   Ui.view (fun n ->
     ui {

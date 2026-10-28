@@ -4,7 +4,7 @@ title: "9. Schema and standard data types"
 
 ## The boundary between the language core and the library
 
-The core defines pure/runtime, nominal types, HKT, classes, captures and full deriving Schema. `Schema`, `Ref`, `Option`, `Result`, `Redacted`, `BigDecimal`, `Duration` and `Chunk` are library types with the native Effect ABI. In the first version only plain Number and BigInt have special literals; Schema/SQL/UI have a chosen DSL, and the other modules use ordinary functions.
+The core defines pure/runtime, nominal types, HKT, classes, captures and full deriving Schema. `Schema`, `Ref`, `Option`, `Result`, `Redacted`, `BigDecimal`, `Duration` and `Chunk` are library types with the native Effect ABI. In the first version only numbers (`Int`, `Float`, `BigInt`) have special literals; Schema/SQL/UI have a chosen DSL, and the other modules use ordinary functions.
 
 | Source type | Representation in Effect and TS |
 | - | - |
@@ -119,7 +119,7 @@ If the application distinguishes missing from null, a separate ADT or another ex
 ```flick
 type alias Preferences = {
   nickname : Option String;
-  quota : Number;
+  quota : Float;
 } deriving Schema
 
 preferences_json : PureCodec Json Preferences
@@ -127,12 +127,12 @@ let preferences_json =
   codec (schema Preferences) {
     nickname = optional_field "nickname" String.json;
     quota =
-      field "quota" Number.json_finite
+      field "quota" Float.json_finite
       |> on_missing (fun () -> 0);
   }
 ```
 
-`optional_field` and `on_missing` are accepted DSL names. A missing quota gets 0 by exactly one call of the pure factory per corresponding decode; null and an invalid value are not replaced by the default. Number.json_finite rejects a non-finite value on encode too. To exclude it in the domain, the field is declared with a refinement type.
+`optional_field` and `on_missing` are accepted DSL names. A missing quota gets 0 by exactly one call of the pure factory per corresponding decode; null and an invalid value are not replaced by the default. Float.json_finite rejects a non-finite value on encode too. To exclude it in the domain, the field is declared with a refinement type.
 
 A constructor default, a decode default and omission on encode are independent policies. `on_missing` takes a pure factory; a separate `on_missing_effect` adds its services to `rd`, and expected errors are explicitly represented as SchemaError. Encode does not omit a value because it equals the default, without a separate policy. An effectful default does not give a PureCodec/Schema certificate. [Effect constructor defaults](https://effect.website/docs/v4/schema/default-constructors).
 
@@ -170,7 +170,7 @@ let tree_schema item_schema =
   schema Tree item_schema
 
 type alias PairOf f = {
-  count : f Number;
+  count : f Float;
   label : f String;
 } deriving Schema
 
@@ -265,7 +265,7 @@ a copy without storing it. A partial application of `set` or `modify` holds
 the cell and its captures; every write must preserve the invariant payload type.
 
 ```flick
-increment : Ref Number ->{} Number
+increment : Ref Float ->{} Float
 let increment counter =
   Ref.modify counter (fun current ->
     let next = current + 1
@@ -281,7 +281,7 @@ Canonical Eq/Hash over the contents of a Ref are absent in the first version: a 
 
 ```flick
 class Eq a => Hash a =
-  hash : a -> Number
+  hash : a -> Float
 ```
 
 The law: if `eq x y`, the hashes coincide. The converse is false: collisions are allowed. Derived `Eq` and `Hash` must use the same semantics of fields. Typing a user-defined instance does not prove this law. [Effect Hash](https://effect.website/docs/v4/trait/hash).
@@ -327,26 +327,27 @@ Redacted.reveal : Redacted a ->{} a
 
 The canonical Effect `Redacted` is used, whose contents external code can erase through `wipeUnsafe`. Therefore creation and reading in the source API are conservatively runtime: creation allocates a standalone erasable object, and reading depends on its current state. Merely freezing the JS wrapper does not prove immutability of the hidden contents. Erasure through FFI is also runtime; reading an erased value gives a defect unless the adapter explicitly translates it into a declared error. Automatic pure Eq/Hash over the contents are not provided. [Effect Redacted](https://effect.website/docs/v4/data-types/redacted).
 
-## The JavaScript numeric model
+## The numeric model
 
-The decision is made: ordinary numbers follow JavaScript. The source uses `Number` with the direct representation of the JS `number`; for arbitrary integers there is a separate `BigInt`. `BigDecimal`, `Duration` and other special types remain library types with their own operations.
+The decision is made: there are three numeric types with one meaning on every backend. `Int` is a 32-bit signed integer, `Float` is IEEE 754 binary64 (the JS `number`), `BigInt` is an integer of any size. `BigDecimal`, `Duration` and other special types remain library types with their own operations. Operators are fixed and resolved by the operand type after inference; there is no class hierarchy behind them.
 
 | Aspect | Contract |
 | - | - |
-| `Number` | IEEE 754 binary64, including NaN, both infinities and signed zero |
-| Literals | An ordinary numeric literal has type `Number`; the suffix `n` explicitly selects `BigInt` |
-| Arithmetic | JS rounding, overflow, division and remainder; no promise of exact integer arithmetic for all of Number |
-| Safe integers | `SafeInteger` is a refinement, not a different representation; ordinary addition does not preserve it automatically |
-| Bitwise operations | Follow the JS width conversions and must have explicitly described operations |
-| `BigInt` | A separate numeric domain; no implicit mixing with Number |
-| Cross-type coercions | The JS number representation does not require implicit addition of a string and a number or loose equality |
-| JSON | The Number domain is wider than JSON; a finite codec rejects an unsupported value, a lossless codec uses an explicit tagged/string form |
+| `Int` | Two's complement, 32 bits; `+ - *` and `**` wrap around; `/` truncates toward zero; `/` and `%` by zero are 0; `min / -1` is `min` |
+| `Float` | IEEE 754 binary64, including NaN, both infinities and signed zero; JS rounding, division and remainder |
+| `BigInt` | Integers of any size; `/` truncates; `/` and `%` by zero are 0; a negative power is a defect |
+| Literals | An integer literal is of the numeric type its use requires, else `Int`, and must fit that type; a literal with a fraction or exponent is `Float`; the suffix `n` selects `BigInt` |
+| Checked forms | `Int.checked_add`, `checked_div`, … return `Result Int.ArithmeticError Int`; `Int.unsafe_div` and `unsafe_rem` are a defect on zero |
+| Bitwise operations | Named functions of `Int` on its 32 bits |
+| Cross-type coercions | None, implicit or by `==`; `Int.to_float`, `Int.from_float` and `Int.truncate` convert explicitly |
+| JS representation | `Int` and `Float` are a JS `number`, `BigInt` a JS `bigint`; a foreign `Int` is trusted to be one |
+| JSON | `Int.json` accepts integers in range; the Float domain is wider than JSON: a finite codec rejects an unsupported value, a lossless codec uses an explicit tagged/string form |
 
-The model corresponds to [ECMAScript Number and BigInt](https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html). Domain errors of BigInt primitives, for example division by zero, keep JS exceptions; when executed inside Effect these are defects. For a recoverable variant the library provides a checked operation with Result or a declared typed error. Neither ordinary `Number` division by zero nor NaN should be silently turned into a typed error.
+A backend implements `Int` as its native 32-bit integer, with the zero-divisor and `min / -1` cases checked so that no division traps. Another fixed-width type is one more row of the compiler's numeric table and one more form in each backend. Neither ordinary `Float` division by zero nor NaN is silently turned into a typed error.
 
-`Finite`, `SafeInteger`, `NonNegative` are possible refinements for data boundaries. Their arithmetic returns `Number` until an operation separately guarantees preservation of the constraint. `Schema Number` reflects the whole chosen domain; the JSON restriction is set by the codec. Native [JSON.stringify converts non-finite numbers to null](https://tc39.es/ecma262/multipage/structured-data.html), so it cannot be used as a "lossless Number codec".
+`Finite`, `SafeInteger`, `NonNegative` are possible refinements for data boundaries. Their arithmetic returns `Float` until an operation separately guarantees preservation of the constraint. `Schema Float` reflects the whole chosen domain; the JSON restriction is set by the codec. Native [JSON.stringify converts non-finite numbers to null](https://tc39.es/ecma262/multipage/structured-data.html), so it cannot be used as a "lossless Float codec".
 
-### Eq, Hash and Ord for Number
+### Eq, Hash and Ord for Float
 
 | Equality | NaN equals NaN | +0 equals -0 | Cost |
 | - | - | - | - |
@@ -354,20 +355,20 @@ The model corresponds to [ECMAScript Number and BigInt](https://tc39.es/ecma262/
 | `Object.is` | Yes | No | A consistent hash and an adapter relative to canonical Effect equality are needed |
 | Canonical Effect equality: chosen | Yes | Yes | A separate function is needed for exact JS `===` |
 
-The canonical `Eq Number` and the operator `==` use SameValueZero: NaN equals NaN, +0 equals -0. This matches the checked [Effect Equal](https://github.com/Effect-TS/effect/blob/81fc8d9c7855d0f31bf493f379ec7bc2a6150a6f/packages/effect/src/Equal.ts#L187-L205); the [native Hash.number](https://github.com/Effect-TS/effect/blob/81fc8d9c7855d0f31bf493f379ec7bc2a6150a6f/packages/effect/src/Hash.ts#L311-L350) is consistent with it. `Number.strict_equal` provides JS `===`, `Number.same_value` provides Object.is. Hash is not a stable external identifier across runtime versions.
+The canonical `Eq Float` and the operator `==` use SameValueZero: NaN equals NaN, +0 equals -0. This matches the checked [Effect Equal](https://github.com/Effect-TS/effect/blob/81fc8d9c7855d0f31bf493f379ec7bc2a6150a6f/packages/effect/src/Equal.ts#L187-L205); the [native Hash.number](https://github.com/Effect-TS/effect/blob/81fc8d9c7855d0f31bf493f379ec7bc2a6150a6f/packages/effect/src/Hash.ts#L311-L350) is consistent with it. `Float.strict_equal` provides JS `===`, `Float.same_value` provides Object.is. Hash is not a stable external identifier across runtime versions.
 
-`Ord Number.compare` defines a total order: −Infinity < finite numbers < +Infinity < NaN; signed zeros compare as EQ, all NaNs as EQ. `compare x y = EQ` is equivalent to canonical Eq. Generic sorting and `Ord.less` use this order. The primitive Number/BigInt `<`, `<=`, `>`, `>=` keep JS semantics: for example, any such comparison of a Number with NaN is false. This is an explicit distinction between numeric operators and a lawful Ord, not a hidden change of JS arithmetic.
+`Ord Float.compare` defines a total order: −Infinity < finite numbers < +Infinity < NaN; signed zeros compare as EQ, all NaNs as EQ. `compare x y = EQ` is equivalent to canonical Eq. Generic sorting and `Ord.less` use this order. The primitive Float/BigInt `<`, `<=`, `>`, `>=` keep JS semantics: for example, any such comparison of a Float with NaN is false. This is an explicit distinction between numeric operators and a lawful Ord, not a hidden change of JS arithmetic.
 
 Even if Eq considers +0 and -0 equal, the compiler is not entitled to replace one with the other everywhere: arithmetic can distinguish them. Collection equality is not permission for any substitution transformation.
 
 ## BigDecimal and Duration
 
-BigDecimal is a separate native Effect type with an integer coefficient and a scale. The first version does not introduce `dec` literals and does not overload Number arithmetic. Values are created from a string or a pair of BigInt/checked scale; the path through Number explicitly acknowledges the binary64 rounding that has already happened. [Effect BigDecimal](https://effect.website/docs/v4/data-types/bigdecimal).
+BigDecimal is a separate native Effect type with an integer coefficient and a scale. The first version does not introduce `dec` literals and does not overload Float arithmetic. Values are created from a string or a pair of BigInt/checked scale; the path through Float explicitly acknowledges the binary64 rounding that has already happened. [Effect BigDecimal](https://effect.website/docs/v4/data-types/bigdecimal).
 
-The source decimal API has no hidden global precision. Exact addition/subtraction/multiplication preserve a finite decimal result; an unrepresentable scale gives a checked DecimalError. `divide_to_scale` necessarily takes a finite integer safe-integer scale and a rounding policy: TowardZero, Floor, Ceiling, HalfEven, HalfAwayFromZero or Exact. Division by zero is a DecimalError; Exact rejects a result that requires rounding. The result is `Result DecimalError BigDecimal`, and the native representation is preserved. The adapter computes the quotient/remainder without an intermediate Number; native division with its own defaults is not substituted for this contract. Unsafe native operations remain explicitly named bindings.
+The source decimal API has no hidden global precision. Exact addition/subtraction/multiplication preserve a finite decimal result; an unrepresentable scale gives a checked DecimalError. `divide_to_scale` necessarily takes a finite integer safe-integer scale and a rounding policy: TowardZero, Floor, Ceiling, HalfEven, HalfAwayFromZero or Exact. Division by zero is a DecimalError; Exact rejects a result that requires rounding. The result is `Result DecimalError BigDecimal`, and the native representation is preserved. The adapter computes the quotient/remainder without an intermediate Float; native division with its own defaults is not substituted for this contract. Unsafe native operations remain explicitly named bindings.
 
-Duration is a native non-negative duration, including the explicitly chosen `Duration.infinity`; it is not a timestamp or a calendar period. The first version uses ordinary checked constructors nanos(BigInt), millis(Number), seconds(Number), without `ms`/`s` literals. A negative value, NaN, an implicit infinity and overflow in unit conversion give `Result DurationError Duration`. The exact nanosecond form starts from BigInt; Number-based forms keep the chosen JS rounding and do not promise greater precision. A lossy conversion to Number is named explicitly; infinity is not silently turned into a finite number. [Effect Duration](https://effect.website/docs/v4/data-types/duration).
+Duration is a native non-negative duration, including the explicitly chosen `Duration.infinity`; it is not a timestamp or a calendar period. The first version uses ordinary checked constructors nanos(BigInt), millis(Float), seconds(Float), without `ms`/`s` literals. A negative value, NaN, an implicit infinity and overflow in unit conversion give `Result DurationError Duration`. The exact nanosecond form starts from BigInt; Float-based forms keep the chosen JS rounding and do not promise greater precision. A lossy conversion to Float is named explicitly; infinity is not silently turned into a finite number. [Effect Duration](https://effect.website/docs/v4/data-types/duration).
 
-For BigDecimal/Duration, consistent native Schema, Eq, Hash, Ord and Show are available through checked adapters. Special literals and numeric operator overloading are deferred beyond the first version. Checked library constructors leave a single numeric syntax for Number/BigInt and do not require a new runtime.
+For BigDecimal/Duration, consistent native Schema, Eq, Hash, Ord and Show are available through checked adapters. Special literals and numeric operator overloading are deferred beyond the first version. Checked library constructors leave a single numeric syntax for Float/BigInt and do not require a new runtime.
 
 The first target release includes full deriving Schema, explicit codecs, nominal refinements with a runtime check, native Effect types, a library Ref, the Eq/Hash bridge and runtime access to Redacted. A compiler spike may implement these mechanisms in stages, but completeness of deriving remains a language requirement.

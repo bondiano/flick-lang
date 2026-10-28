@@ -28,7 +28,7 @@ sql table Accounts "accounts" {
 
 type error Abandoned = Abandoned
 
-type alias Count = { n : Number }
+type alias Count = { n : Float }
   deriving Schema
 
 add_user : Sql.Template Pg { name : String } { id : UserId }

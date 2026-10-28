@@ -3,9 +3,9 @@
 // `Struct` and `Tuple`.
 module App.Main exposing (main)
 
-type alias Stats = { hits : Number; tags : List String }
+type alias Stats = { hits : Float; tags : List String }
 
-sum : Combiner.Combiner Number
+sum : Combiner.Combiner Float
 let sum = Combiner.make (fun a b -> a + b)
 
 main : Unit ->{; AppError} Unit

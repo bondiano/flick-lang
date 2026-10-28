@@ -9,8 +9,8 @@ class Pretty a =
   framed : Show b => (a, b) -> String
   let framed (x, tag) = show tag ++ ": " ++ verbose x
 
-instance Pretty Number =
-  pretty : Number -> String
+instance Pretty Float =
+  pretty : Float -> String
   let pretty n = show n
 
 instance Pretty Bool =

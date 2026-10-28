@@ -2,7 +2,7 @@
 // or-patterns with bindings and guards.
 module App.Main exposing (main)
 
-type Shape = Circle Number | Rect Number Number | Empty
+type Shape = Circle Float | Rect Float Float | Empty
 
 classify : Shape -> String
 let classify shape =
@@ -12,26 +12,26 @@ let classify shape =
   | Circle _ | Rect _ _ -> "shape"
   | Empty -> "empty"
 
-first : List (Option Number) -> Number
+first : List (Option Float) -> Float
 let first xs =
   match xs with
   | [Some n, _] | [Some n] -> n
   | [None, Some (1 | 2)] -> -1
   | _ -> 0
 
-sum : List Number -> Number
+sum : List Float -> Float
 let rec sum xs =
   match xs with
   | [] -> 0
   | [x, ...rest] -> x + sum rest
 
-split : List Number -> String
+split : List Float -> String
 let split xs =
   match xs with
   | [a, b, ...rest] -> show (a + b) ++ " " ++ show rest
   | _ -> "short"
 
-area : { w : Number; h : Number } -> Number
+area : { w : Float; h : Float } -> Float
 let area { w; h = height } = w * height
 
 main : Unit ->{; AppError} Unit

@@ -149,14 +149,14 @@ impl Checker<'_> {
         let t = self.qualified_head(t);
         match &t {
             Type::Bounded { ty, captures } => {
-                if data::scalar(&self.whnf(ty)) {
+                if self.scalar(ty) {
                     return;
                 }
                 self.capture_row_filtered(captures, out, false);
                 self.collect_bounded_captures(ty, out, true);
             }
             Type::Captured { ty, captures, .. } => {
-                if data::scalar(&self.whnf(ty)) {
+                if self.scalar(ty) {
                     return;
                 }
                 self.capture_row_filtered(captures, out, bounded);
@@ -168,6 +168,8 @@ impl Checker<'_> {
                     out.tails.push(t.clone());
                 }
             }
+            // an integer literal's type is a number, which captures nothing
+            Type::Meta(m) if self.store.is_numeric(*m) => {}
             Type::Var(_) | Type::Skolem(_) | Type::Meta(_) => {
                 if !bounded || matches!(self.atom_kind(&t, &[]), Some(Kind::Region)) {
                     push_atom(out, &t);

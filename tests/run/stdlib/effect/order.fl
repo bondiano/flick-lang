@@ -2,7 +2,7 @@
 // `Ordering`, `Equivalence`, `Combiner`, `Reducer` and `Hash`.
 module App.Main exposing (main)
 
-type alias Person = { name : String; age : Number }
+type alias Person = { name : String; age : Float }
 
 by_age : Order.Order Person
 let by_age = Order.map_input (fun p -> p.age) compare

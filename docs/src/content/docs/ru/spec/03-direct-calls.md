@@ -84,13 +84,13 @@ let hello =
 Эффектная стрелка, у которой строка сервисов закрыта и состоит из синхронных сервисов (сейчас это только `Atom.Read`), а строка ошибок пуста, — *синхронная* стадия (Sync): `Atom a ->{Atom.Read;} a`, render у `Ui.view`, вычисление `Atom.derived`. Её тело компилируется в обычную JS-функцию без `Effect.gen`. Вызовы других Sync-функций и операций `Atom.Read` — обычные вызовы: они читают сервисы контекста, который среда выполнения установила вокруг вызова (читателя рендера или производного атома). Стадия определяется там, где стрелка записана. Поэтому переменная строки, которая позже решилась в `Atom.Read`, как в `forall r. (a ->{r} b) -> …`, сохраняет эффектную стадию, с которой скомпилирована её функция. Внешняя (foreign) функция возвращает Effect, поэтому её стрелки никогда не Sync.
 
 ```flick
-doubled : Unit ->{Atom.Read;} Number
+doubled : Unit ->{Atom.Read;} Float
 let doubled () = Atom.value count * 2
 
-twice : (Unit ->{r; e} Number) -> Unit ->{r; e} Number
+twice : (Unit ->{r; e} Float) -> Unit ->{r; e} Float
 let twice f () = f () + f ()
 
-quadrupled : Unit ->{Atom.Read;} Number
+quadrupled : Unit ->{Atom.Read;} Float
 let quadrupled () = twice doubled ()
 ```
 

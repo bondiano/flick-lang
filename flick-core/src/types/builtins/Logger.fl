@@ -15,7 +15,7 @@ type alias Options = {
   message : List String;
   logLevel : LogLevel.LogLevel;
   cause : RawCause;
-  date : Number;
+  date : Float;
 }
 
 /// What `format_structured` makes of a message; `spans` are the log spans
@@ -28,7 +28,7 @@ type alias Structured =
     message : List String;
     cause : Option String;
     annotations : List (String, String);
-    spans : List (String, Number);
+    spans : List (String, Float);
   }
 
 /// Whether a layer keeps the loggers already installed.
@@ -38,7 +38,7 @@ type alias LayerOptions = { mergeWithExisting : Bool }
 /// `formatDate` the time, and for which console.
 type alias PrettyOptions = {
   colors : Option Bool;
-  formatDate : Option (Number -> String);
+  formatDate : Option (Float -> String);
   mode : PrettyMode;
 }
 
@@ -46,7 +46,7 @@ type PrettyMode = Auto | Browser | Tty
   deriving Eq, Show
 
 /// The options of `console_pretty_tty` and `console_pretty_browser`.
-type alias PrettyConsoleOptions = { colors : Bool; formatDate : Option (Number -> String) }
+type alias PrettyConsoleOptions = { colors : Bool; formatDate : Option (Float -> String) }
 
 /// How `batched` collects: the window of a batch and what runs on it.
 type alias BatchOptions o = { window : Duration.Duration; flush : List o ->{} Unit }
@@ -55,7 +55,7 @@ type alias BatchOptions o = { window : Duration.Duration; flush : List o ->{} Un
 type alias FileOptions =
   {
     flag : Option FileSystem.OpenFlag;
-    mode : Option Number;
+    mode : Option Float;
     batchWindow : Option Duration.Duration;
   }
 

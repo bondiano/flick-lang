@@ -27,7 +27,7 @@ let parse_profile input =
 
 type alias Preferences = {
   nickname : Option String;
-  quota : Number;
+  quota : Float;
 } deriving Schema
 
 preferences_json : PureCodec Json Preferences
@@ -35,7 +35,7 @@ let preferences_json =
   codec (schema Preferences) {
     nickname = optional_field "nickname" String.json;
     quota =
-      field "quota" Number.json_finite
+      field "quota" Float.json_finite
       |> on_missing (fun () -> 0);
   }
 
@@ -49,7 +49,7 @@ let tree_schema item_schema =
   schema Tree item_schema
 
 type alias PairOf f = {
-  count : f Number;
+  count : f Float;
   label : f String;
 } deriving Schema
 
@@ -58,7 +58,7 @@ pair_of_schema :
 let pair_of_schema make_schema =
   schema PairOf make_schema
 
-type Phantom a = Phantom Number
+type Phantom a = Phantom Float
   deriving Schema
 
 phantom : Schema (Phantom String)

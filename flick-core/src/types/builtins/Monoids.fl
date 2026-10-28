@@ -1,12 +1,12 @@
 /// Wrappers that choose how values combine through `Semigroup` and
 /// `Monoid`: `Sum` adds, `Product` multiplies, `First` and `Last` keep the
 /// first or the last value present, `Min` and `Max` keep the least or the
-/// greatest. A `Number` has no instance of its own, since adding and
+/// greatest. A `Float` has no instance of its own, since adding and
 /// multiplying would both claim it: `fold_map Sum xs` says which.
 module Monoids exposing (..)
 
 /// Numbers combined by `+`, from `0`.
-unboxed type Sum = Sum Number
+unboxed type Sum = Sum Float
   deriving Eq, Show
 
 instance Semigroup Sum =
@@ -18,7 +18,7 @@ instance Monoid Sum =
   let empty = Sum 0
 
 /// Numbers combined by `*`, from `1`.
-unboxed type Product = Product Number
+unboxed type Product = Product Float
   deriving Eq, Show
 
 instance Semigroup Product =

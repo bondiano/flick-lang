@@ -18,14 +18,14 @@ cover : forall t e. t -> Covered e -> Covered {t | e}
 foreign pure cover from "./covered.mjs" "cover"
   arity 2
 
-handle : forall e. Covered e -> (Unit ->{; e} Number) -> Unit
+handle : forall e. Covered e -> (Unit ->{; e} Float) -> Unit
 foreign pure handle from "./covered.mjs" "handle"
   arity 2
 
-missing : Unit ->{; NotFound} Number
+missing : Unit ->{; NotFound} Float
 let missing _ = from_result (Err (NotFound "x"))
 
-either : Unit ->{; NotFound, Conflict} Number
+either : Unit ->{; NotFound, Conflict} Float
 let either _ = from_result (Err (Conflict "x"))
 
 one : Unit

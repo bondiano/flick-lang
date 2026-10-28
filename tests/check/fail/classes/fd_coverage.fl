@@ -2,7 +2,7 @@
 module App.FdCoverage exposing (..)
 
 type Wrap a = Wrap a
-type alias Erased a = Number
+type alias Erased a = Float
 
 class Base a b | a -> b
 class Reverse a b | b -> a

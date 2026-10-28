@@ -59,19 +59,19 @@ import Mtl.StateT as StateT exposing (StateT(..))
 import Mtl.ReaderT as ReaderT exposing (ReaderT(..))
 import Mtl.WriterT as WriterT exposing (WriterT(..))
 import Mtl.ExceptT as ExceptT exposing (ExceptT(..))
-type alias Log = List (Unit -> Number)
-type alias HeldLog (c : CaptureRow) = List ((Unit -> Number)^c)
+type alias Log = List (Unit -> Float)
+type alias HeldLog (c : CaptureRow) = List ((Unit -> Float)^c)
 type Handle (s : Region)
 type error OpenError = OpenError String
 service Files =
   open_scoped : forall s. Unit ->{Scope s; OpenError} Handle s
-touch : forall s. Handle s -> Number
+touch : forall s. Handle s -> Float
 let touch handle =
   ignore handle
   1
-consume_log : forall c. HeldLog c -> Number
+consume_log : forall c. HeldLog c -> Float
 let consume_log output =
-  apply : (Unit -> Number)^c -> Number
+  apply : (Unit -> Float)^c -> Float
   let apply read = read ()
   List.sum (List.map apply output)
 
@@ -106,19 +106,19 @@ fn rejects(body: &str, allowed: &[Code]) -> Vec<Diagnostic> {
 #[test]
 fn actual_mtl_interfaces_allow_construction_run_and_consumption_within_scope() {
     accepts(
-        r"inside : Unit ->{Files; OpenError} Number
+        r"inside : Unit ->{Files; OpenError} Float
 let inside () =
   scope resource {
     let handle = Files.open_scoped ()
-    optional : MaybeT Identity Number
+    optional : MaybeT Identity Float
     let optional = map (fun _ -> touch handle) (pure ())
-    transition : StateT Number Identity Number
+    transition : StateT Float Identity Float
     let transition = state (fun old -> (touch handle, old + 1))
-    projection : ReaderT Number Identity Number
+    projection : ReaderT Float Identity Float
     let projection = reader (fun environment -> environment + touch handle)
-    output : WriterT (HeldLog {resource}) Identity Number
+    output : WriterT (HeldLog {resource}) Identity Float
     let output = writer (2, [fun () -> touch handle])
-    failed : ExceptT ((Unit -> Number)^{resource}) Identity Number
+    failed : ExceptT ((Unit -> Float)^{resource}) Identity Float
     let failed = throw_error (fun () -> touch handle)
     let recovered = catch_error (fun read -> pure (read ())) failed
     let maybe_value = match Identity.run (MaybeT.run optional) with
@@ -172,9 +172,9 @@ let leak () =
 #[test]
 fn except_error_data_and_returned_except_actions_cannot_escape() {
     for (result, projection) in [
-        ("ExceptT (Unit -> Number) Identity Unit", "action"),
+        ("ExceptT (Unit -> Float) Identity Unit", "action"),
         (
-            "Result (Unit -> Number) Unit",
+            "Result (Unit -> Float) Unit",
             "Identity.run (ExceptT.run action)",
         ),
     ] {
@@ -184,7 +184,7 @@ fn except_error_data_and_returned_except_actions_cannot_escape() {
 let leak () =
   scope {{
     let handle = Files.open_scoped ()
-    action : ExceptT (Unit -> Number) Identity Unit
+    action : ExceptT (Unit -> Float) Identity Unit
     let action = throw_error (fun () -> touch handle)
     {projection}
   }}
@@ -199,15 +199,15 @@ let leak () =
 fn other_actual_transformers_preserve_captures_in_returned_computations() {
     for (result, action) in [
         (
-            "MaybeT Identity (Unit -> Number)",
+            "MaybeT Identity (Unit -> Float)",
             "pure (fun () -> touch handle)",
         ),
         (
-            "StateT Number Identity Number",
+            "StateT Float Identity Float",
             "state (fun old -> (touch handle, old + 1))",
         ),
         (
-            "ReaderT Number Identity Number",
+            "ReaderT Float Identity Float",
             "reader (fun environment -> environment + touch handle)",
         ),
     ] {
@@ -230,21 +230,21 @@ let leak () =
 fn actual_transformer_run_projections_preserve_captures() {
     for (action_type, projection) in [
         (
-            "MaybeT Identity (Unit -> Number)",
+            "MaybeT Identity (Unit -> Float)",
             "match Identity.run (MaybeT.run action) with\n    | None -> fun () -> 0\n    | Some read -> read",
         ),
         (
-            "StateT Number Identity (Unit -> Number)",
+            "StateT Float Identity (Unit -> Float)",
             "let (read, _) = Identity.run (StateT.run action 0)\n    read",
         ),
         (
-            "ReaderT Unit Identity (Unit -> Number)",
+            "ReaderT Unit Identity (Unit -> Float)",
             "Identity.run (ReaderT.run action ())",
         ),
     ] {
         rejects(
             &format!(
-                r"leak : Unit ->{{Files; OpenError}} Unit -> Number
+                r"leak : Unit ->{{Files; OpenError}} Unit -> Float
 let leak () =
   scope {{
     let handle = Files.open_scoped ()
@@ -295,17 +295,17 @@ let leak () =
 fn native_and_inherited_catch_projections_cannot_erase_error_captures() {
     for (action_type, projection) in [
         (
-            "ExceptT (Unit -> Number) Identity (Unit -> Number)",
+            "ExceptT (Unit -> Float) Identity (Unit -> Float)",
             "Identity.run (ExceptT.run recovered)",
         ),
         (
-            "ReaderT Unit (ExceptT (Unit -> Number) Identity) (Unit -> Number)",
+            "ReaderT Unit (ExceptT (Unit -> Float) Identity) (Unit -> Float)",
             "Identity.run (ExceptT.run (ReaderT.run recovered ()))",
         ),
     ] {
         rejects(
             &format!(
-                r"leak : Unit ->{{Files; OpenError}} Unit -> Number
+                r"leak : Unit ->{{Files; OpenError}} Unit -> Float
 let leak () =
   scope {{
     let handle = Files.open_scoped ()
@@ -327,15 +327,15 @@ let leak () =
 fn partially_applied_operations_retain_scoped_callbacks() {
     for (result, operation) in [
         (
-            "(ReaderT (Unit -> Number) Identity Number -> ReaderT (Unit -> Number) Identity Number)",
+            "(ReaderT (Unit -> Float) Identity Float -> ReaderT (Unit -> Float) Identity Float)",
             "local (fun _ -> fun () -> touch handle)",
         ),
         (
-            "(ExceptT String Identity Number -> ExceptT String Identity Number)",
+            "(ExceptT String Identity Float -> ExceptT String Identity Float)",
             "catch_error (fun _ -> pure (touch handle))",
         ),
         (
-            "(Unit -> Identity Number)",
+            "(Unit -> Identity Float)",
             "ReaderT.run (ReaderT (fun () -> Identity (touch handle)))",
         ),
     ] {
@@ -357,7 +357,7 @@ let leak () =
 #[test]
 fn native_pass_preserves_captures_of_a_stored_modifier() {
     for (result, observation, escapes) in [
-        ("Number", "consume_log output", false),
+        ("Float", "consume_log output", false),
         ("Log", "output", true),
     ] {
         let source = format!(
@@ -391,7 +391,7 @@ let observe () =
 #[test]
 fn lifted_pass_tracks_a_modifier_supplied_by_a_later_reader_environment() {
     for (result, observation, escapes) in [
-        ("Number", "consume_log output", false),
+        ("Float", "consume_log output", false),
         ("Log", "output", true),
     ] {
         let source = format!(
@@ -432,7 +432,7 @@ let observe () =
 #[test]
 fn lifted_pass_tracks_a_log_supplied_by_a_later_reader_environment() {
     for (result, observation, escapes) in [
-        ("Number", "consume_log output", false),
+        ("Float", "consume_log output", false),
         ("Log", "output", true),
     ] {
         let source = format!(
@@ -505,7 +505,7 @@ let store () =
 fn mutable_actual_transformer_payload_bounds_remain_invariant() {
     for payload in [
         "WriterT Log Identity Unit",
-        "ExceptT (Unit -> Number) Identity Unit",
+        "ExceptT (Unit -> Float) Identity Unit",
     ] {
         rejects(
             &format!(
@@ -551,33 +551,33 @@ let children () =
 fn every_generic_lift_preserves_the_base_actions_captures() {
     for (transformed, qualified, observation) in [
         (
-            "MaybeT Identity (Unit -> Number)",
-            "MaybeT Identity ((Unit -> Number)^{resource})",
+            "MaybeT Identity (Unit -> Float)",
+            "MaybeT Identity ((Unit -> Float)^{resource})",
             "match Identity.run (MaybeT.run action) with\n    | None -> 0\n    | Some read -> read ()",
         ),
         (
-            "StateT Number Identity (Unit -> Number)",
-            "StateT Number Identity ((Unit -> Number)^{resource})",
+            "StateT Float Identity (Unit -> Float)",
+            "StateT Float Identity ((Unit -> Float)^{resource})",
             "let (read, _) = Identity.run (StateT.run action 0)\n    read ()",
         ),
         (
-            "ReaderT Unit Identity (Unit -> Number)",
-            "ReaderT Unit Identity ((Unit -> Number)^{resource})",
+            "ReaderT Unit Identity (Unit -> Float)",
+            "ReaderT Unit Identity ((Unit -> Float)^{resource})",
             "(Identity.run (ReaderT.run action ())) ()",
         ),
         (
-            "WriterT (List String) Identity (Unit -> Number)",
-            "WriterT (List String) Identity ((Unit -> Number)^{resource})",
+            "WriterT (List String) Identity (Unit -> Float)",
+            "WriterT (List String) Identity ((Unit -> Float)^{resource})",
             "let (read, _) = Identity.run (WriterT.run action)\n    read ()",
         ),
         (
-            "ExceptT String Identity (Unit -> Number)",
-            "ExceptT String Identity ((Unit -> Number)^{resource})",
+            "ExceptT String Identity (Unit -> Float)",
+            "ExceptT String Identity ((Unit -> Float)^{resource})",
             "match Identity.run (ExceptT.run action) with\n    | Err _ -> 0\n    | Ok read -> read ()",
         ),
     ] {
         for escapes in [false, true] {
-            let result = if escapes { transformed } else { "Number" };
+            let result = if escapes { transformed } else { "Float" };
             let projection = if escapes { "action" } else { observation };
             let action_type = if escapes { transformed } else { qualified };
             let source = format!(

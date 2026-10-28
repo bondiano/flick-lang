@@ -37,7 +37,7 @@ let use_tasks () =
   Ref.set numbers (Some 42)
   Ref.set names (Some "Ada")
 
-increment : Ref Number ->{} Number
+increment : Ref Float ->{} Float
 let increment counter =
   Ref.modify counter (fun current ->
     let next = current + 1
@@ -45,7 +45,7 @@ let increment counter =
   )
 
 // a pure value is generalized without a signature
-empty_pair : (List Number, List String)
+empty_pair : (List Float, List String)
 let empty_pair =
   let empty = []
   (empty, empty)

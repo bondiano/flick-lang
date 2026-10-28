@@ -1,0 +1,97 @@
+/// Operations on `Int`, the 32-bit signed integers, beyond the operators.
+/// The operators wrap around (`2147483647 + 1 == -2147483648`), `/` drops
+/// the fraction, and `/` and `%` by zero are 0; the checked forms report
+/// overflow and division by zero instead.
+module Int exposing (..)
+
+/// The error of a checked integer operation.
+type error ArithmeticError = ArithmeticError String
+  deriving Eq, Show
+
+min_value : Int
+let min_value = -2147483648
+
+max_value : Int
+let max_value = 2147483647
+
+to_string : Int -> String
+foreign pure to_string from "@flick-lang/runtime" "stringFromNumber"
+
+/// The `Int` the decimal digits spell, with an optional sign; `None` for
+/// other text and for numbers out of range.
+parse : String -> Option Int
+foreign pure parse from "@flick-lang/runtime" "intParse"
+
+/// The same number as a `Float`; every `Int` is exact.
+to_float : Int -> Float
+foreign pure to_float from global "Number"
+
+/// `n` when it is a whole number in the range of `Int`.
+from_float : Float -> Option Int
+foreign pure from_float from "@flick-lang/runtime" "intFromFloat"
+
+/// `n` with its fraction dropped, wrapped around into `Int`; NaN and the
+/// infinities are 0.
+truncate : Float -> Int
+foreign pure truncate from "@flick-lang/runtime" "intTruncate"
+
+/// `abs min_value` wraps around to `min_value`.
+abs : Int -> Int
+foreign pure abs from "@flick-lang/runtime" "intAbs"
+
+min : Int -> Int -> Int
+let min a b = if a <= b then a else b
+
+max : Int -> Int -> Int
+let max a b = if a >= b then a else b
+
+checked_add : Int -> Int -> Result ArithmeticError Int
+foreign pure checked_add from "@flick-lang/runtime" "intCheckedAdd"
+
+checked_sub : Int -> Int -> Result ArithmeticError Int
+foreign pure checked_sub from "@flick-lang/runtime" "intCheckedSub"
+
+checked_mul : Int -> Int -> Result ArithmeticError Int
+foreign pure checked_mul from "@flick-lang/runtime" "intCheckedMul"
+
+/// Division dropping the fraction; division by zero and
+/// `min_value / -1` are errors.
+checked_div : Int -> Int -> Result ArithmeticError Int
+foreign pure checked_div from "@flick-lang/runtime" "intCheckedDiv"
+
+checked_rem : Int -> Int -> Result ArithmeticError Int
+foreign pure checked_rem from "@flick-lang/runtime" "intCheckedRem"
+
+/// `a / b`, a defect when `b` is 0.
+unsafe_div : Int -> Int -> Int
+foreign pure unsafe_div from "@flick-lang/runtime" "intUnsafeDiv"
+
+/// `a % b`, a defect when `b` is 0.
+unsafe_rem : Int -> Int -> Int
+foreign pure unsafe_rem from "@flick-lang/runtime" "intUnsafeRem"
+
+bit_and : Int -> Int -> Int
+foreign pure bit_and from "@flick-lang/runtime" "bitAnd"
+
+bit_or : Int -> Int -> Int
+foreign pure bit_or from "@flick-lang/runtime" "bitOr"
+
+bit_xor : Int -> Int -> Int
+foreign pure bit_xor from "@flick-lang/runtime" "bitXor"
+
+bit_not : Int -> Int
+foreign pure bit_not from "@flick-lang/runtime" "bitNot"
+
+shift_left : Int -> Int -> Int
+foreign pure shift_left from "@flick-lang/runtime" "shiftLeft"
+
+shift_right : Int -> Int -> Int
+foreign pure shift_right from "@flick-lang/runtime" "shiftRight"
+
+/// The shift that fills with zeros, its 32 bits read back as an `Int`.
+shift_right_unsigned : Int -> Int -> Int
+foreign pure shift_right_unsigned from "@flick-lang/runtime" "shiftRightUnsignedInt"
+
+/// A JSON number that is an `Int`.
+json : PureCodec Json Int
+foreign pure json from "@flick-lang/runtime" "codecInt"

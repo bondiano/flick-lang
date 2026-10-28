@@ -7,6 +7,7 @@ use std::fmt::Write as _;
 
 use crate::consteval::{self, Const};
 use crate::ir::{BinOp, Expr, ExprKind, Lit};
+use crate::numeric::{self, Arith, Num};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 use crate::types::Dict;
@@ -14,9 +15,15 @@ use crate::types::Dict;
 /// Folds `e` itself, its operands already folded; whether it changed.
 pub fn fold(e: &mut Expr) -> bool {
     let folded = match &e.kind {
+        ExprKind::Binary(BinOp::Arith(op, Num::Int), l, r) => int(l)
+            .zip(int(r))
+            .map(|(l, r)| Const::Number(numeric::int_arith(*op, l, r).into())),
         ExprKind::Binary(op, l, r) => token(*op)
             .zip(constant(l).zip(constant(r)))
             .and_then(|(op, (l, r))| consteval::binary(op, l, r)),
+        ExprKind::Neg(Num::Int, inner) => {
+            int(inner).map(|x| Const::Number(x.wrapping_neg().into()))
+        }
         ExprKind::Not(inner) => constant(inner).and_then(|c| consteval::prefix(K::NotKw, c)),
         ExprKind::App { func, arg, .. } => match &func.kind {
             ExprKind::Method {
@@ -53,13 +60,14 @@ pub fn fold(e: &mut Expr) -> bool {
 fn show(instance: &str, c: Const) -> Option<String> {
     Some(match (instance, c) {
         // shortcut: integers only; Rust and JS spell other numbers differently (`1e21`)
-        ("Show Number", Const::Number(x)) if x.fract() == 0.0 && x.abs() < consteval::EXACT => {
+        ("Show Float", Const::Number(x)) if x.fract() == 0.0 && x.abs() < consteval::EXACT => {
             if x == 0.0 && x.is_sign_negative() {
                 "-0".to_owned()
             } else {
                 format!("{x}")
             }
         }
+        ("Show Int", Const::Number(x)) => format!("{x}"),
         ("Show BigInt", Const::BigInt(x)) => format!("{x}n"),
         ("Show Bool", Const::Bool(b)) => b.to_string(),
         ("Show String", Const::String(s)) => json_string(&s),
@@ -101,14 +109,27 @@ fn token(op: BinOp) -> Option<K> {
         BinOp::Gt => K::Gt,
         BinOp::Ge => K::Ge,
         BinOp::Concat => K::PlusPlus,
-        BinOp::Add => K::Plus,
-        BinOp::Sub => K::Minus,
-        BinOp::Mul => K::Star,
-        BinOp::Div => K::Slash,
-        BinOp::Rem => K::Percent,
-        BinOp::Pow => K::StarStar,
+        BinOp::Arith(Arith::Add, _) => K::Plus,
+        BinOp::Arith(Arith::Sub, _) => K::Minus,
+        BinOp::Arith(Arith::Mul, _) => K::Star,
+        BinOp::Arith(Arith::Div, _) => K::Slash,
+        BinOp::Arith(Arith::Rem, _) => K::Percent,
+        BinOp::Arith(Arith::Pow, _) => K::StarStar,
         BinOp::ListConcat => return None,
     })
+}
+
+/// The value of an `Int` constant.
+fn int(e: &Expr) -> Option<i32> {
+    match constant(e)? {
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "the value is checked to be an i32"
+        )]
+        #[allow(clippy::float_cmp, reason = "an i32 is exact in f64")]
+        Const::Number(x) if f64::from(x as i32) == x => Some(x as i32),
+        _ => None,
+    }
 }
 
 /// The value of a literal, or of a negated number literal.
@@ -118,7 +139,7 @@ pub fn constant(e: &Expr) -> Option<Const> {
         ExprKind::Lit(Lit::BigInt(n)) => literal::bigint_value(n).map(Const::BigInt),
         ExprKind::Lit(Lit::String(s)) => Some(Const::String(s.clone())),
         ExprKind::Lit(Lit::Bool(b)) => Some(Const::Bool(*b)),
-        ExprKind::Neg(inner) => consteval::prefix(K::Minus, constant(inner)?),
+        ExprKind::Neg(_, inner) => consteval::prefix(K::Minus, constant(inner)?),
         _ => None,
     }
 }
@@ -127,7 +148,8 @@ pub fn constant(e: &Expr) -> Option<Const> {
 /// value is negative (`-0` included), so the text stays a JS literal.
 fn expr(c: &Const, at: &Expr) -> Option<Expr> {
     let lit = |l: Lit| Expr::new(ExprKind::Lit(l), at.span);
-    let negated = |l: Lit| Expr::new(ExprKind::Neg(Box::new(lit(l))), at.span);
+    // negating a literal is exact on every numeric type
+    let negated = |l: Lit| Expr::new(ExprKind::Neg(Num::Float, Box::new(lit(l))), at.span);
     Some(match c {
         Const::Number(x) if !x.is_finite() => return None,
         Const::Number(x) if x.is_sign_negative() => negated(Lit::Number(number_text(-x))),

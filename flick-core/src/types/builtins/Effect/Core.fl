@@ -4,7 +4,7 @@ module Effect.Core exposing (..)
 
 /// How many tasks of a collection run at once: one after another, at most
 /// `n`, or all of them.
-type Concurrency = Sequential | Bounded Number | Unbounded
+type Concurrency = Sequential | Bounded Float | Unbounded
 
 /// A reusable cold task that succeeds with `()`, requires no services and
 /// has no expected errors. Use it instead of an empty `task` body.
@@ -107,7 +107,7 @@ foreign effect yield_now from "@flick-lang/runtime/effect/Effect" "flickYieldNow
   reviewed "effect@4.0.5 sha256:c167d26106a1fa95"
 
 /// `yield_now` with the priority of the scheduler's task.
-yield_now_with : Number ->{} Unit
+yield_now_with : Float ->{} Unit
 foreign effect yield_now_with from "@flick-lang/runtime/effect/Effect" "yieldNowWith"
   reviewed "effect@4.0.5 sha256:7e82b2a2a9eb9a63"
 
@@ -170,7 +170,7 @@ foreign effect eventually from "@flick-lang/runtime/effect/Effect" "eventually"
   reviewed "effect@4.0.5 sha256:0a54a91084aa5c5e"
 
 /// `n` copies of `task`, none of them run yet.
-replicate : Number -> Eff r e a -> List (Eff r e a)
+replicate : Float -> Eff r e a -> List (Eff r e a)
 foreign pure replicate from "@flick-lang/runtime/effect/Effect" "replicate"
   arity 1
   reviewed "effect@4.0.5 sha256:5ed109e83142a878"
@@ -178,7 +178,7 @@ foreign pure replicate from "@flick-lang/runtime/effect/Effect" "replicate"
 /// Runs `task` `n` times, as many at once as `concurrency` lets; the
 /// results in order.
 replicate_effect :
-  forall c r e a. Concurrency -> Number -> (Eff r e a)^c ->{r; e} List a
+  forall c r e a. Concurrency -> Float -> (Eff r e a)^c ->{r; e} List a
 foreign effect replicate_effect from "@flick-lang/runtime/effect/Effect" "flickReplicateEffect"
   arity 2
   retention call

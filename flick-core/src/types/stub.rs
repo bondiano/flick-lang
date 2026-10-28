@@ -72,7 +72,7 @@ mod tests {
     /// `text` after the first fix of the diagnostic with `code`.
     fn fixed(body: &str, code: &str) -> String {
         let text = format!(
-            "module Probe exposing (..)\n\ntype Tri = A | B Number | C Number Number\n\n{body}\n"
+            "module Probe exposing (..)\n\ntype Tri = A | B Float | C Float Float\n\n{body}\n"
         );
         let mut sources = SourceMap::default();
         let file = sources.add("Probe.fl", text.clone());
@@ -91,11 +91,11 @@ mod tests {
     #[test]
     fn a_missing_function_is_defined_after_its_caller() {
         let out = fixed(
-            "f : Number -> String\nlet f n = describe n \"x\"",
+            "f : Float -> String\nlet f n = describe n \"x\"",
             "FLICK-T001",
         );
         assert!(
-            out.ends_with("let f n = describe n \"x\"\n\ndescribe : Number -> String -> _\nlet describe n arg2 = todo\n"),
+            out.ends_with("let f n = describe n \"x\"\n\ndescribe : Float -> String -> _\nlet describe n arg2 = todo\n"),
             "{out}"
         );
     }
@@ -103,7 +103,7 @@ mod tests {
     #[test]
     fn a_non_exhaustive_match_gets_the_missing_arms() {
         let out = fixed(
-            "f : Tri -> Number\nlet f t =\n  match t with\n  | A -> 0",
+            "f : Tri -> Float\nlet f t =\n  match t with\n  | A -> 0",
             "FLICK-T009",
         );
         assert!(

@@ -17,7 +17,7 @@ Scope: what the compiler and runtime already do that a move to Reatom-like atoms
 ```js
 // foreign pure hypot from global "Math.hypot"  arity 2
 export const hypot = ($a0) => ($a1) => globalThis.Math.hypot($a0, $a1);
-// foreign sync now_millis from global "Date.now"  arity 0     (Unit ->{} Number)
+// foreign sync now_millis from global "Date.now"  arity 0     (Unit ->{} Float)
 export const now_millis = ($a0) => Effect.sync(() => globalThis.Date.now());
 // foreign effect fetch_user from "./users.js" "fetchUser"     (String ->{; AppError} String)
 export const fetch_user = ($a0) => Effect.suspend(() => $f_fetch_user($a0));
@@ -34,10 +34,10 @@ export const greet = (name) => Effect.gen(function* () {      // String ->{Log; 
   (yield* $rt.operation($s_Log, "info", 1)(name));
   return ("hi " + name);
 });
-export const render_count = (cell) => Effect.gen(function* () {  // Ref Number ->{} String
+export const render_count = (cell) => Effect.gen(function* () {  // Ref Float ->{} String
   return label((yield* $m_Ref.get(cell)));
 });
-export const view = (n) => { return Effect.gen(function* () { return label(n); }); };  // Number -> Eff none none String
+export const view = (n) => { return Effect.gen(function* () { return label(n); }); };  // Float -> Eff none none String
 ```
 
 **Could a `Read`-only render compile to plain sync calls?** Not today. Any non-pure arrow is `runtime=true` and becomes `Effect.gen`. The IR does not know which rows a stage has: `Expr` is just `{kind, span}` (`ir/mod.rs:105-108`). There are three ways to get there:

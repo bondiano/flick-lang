@@ -1,11 +1,11 @@
 // Top-level values whose pipelines need temporaries: each gets its own.
 module App.Pipelines exposing (a, b)
 
-inc : Number -> Number
+inc : Float -> Float
 let inc x = x + 1
 
-a : Number
+a : Float
 let a = 1 |> inc |> inc
 
-b : Number
+b : Float
 let b = 2 |> inc |> inc

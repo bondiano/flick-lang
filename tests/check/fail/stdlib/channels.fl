@@ -9,7 +9,7 @@ service Files =
   read : forall s. File s ->{} String
 
 /// A channel of a subscription holds its region and cannot leave its scope.
-escaped : PubSub.PubSub Number ->{} Unit
+escaped : PubSub.PubSub Float ->{} Unit
 let escaped hub =
   let channel = scope { Channel.from_subscription (PubSub.subscribe hub) }
 //                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-G002 region `s` ends with its `scope`

@@ -9,8 +9,8 @@ type alias Loop = Loop
 
 type alias A = { next : Option B }
 //         ^ FLICK-R007 type alias `A` is cyclic: A -> B -> C -> A
-type alias B = (Number, C)
+type alias B = (Float, C)
 type alias C = List A
 
 // an opaque type is nominal: it may refer to itself
-opaque type alias Stream = Option (Number, Stream)
+opaque type alias Stream = Option (Float, Stream)

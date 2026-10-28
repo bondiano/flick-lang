@@ -7,7 +7,7 @@ title: "5. The HKT type core and type classes"
 The representation of a computation is `Eff requirements errors result`. The result comes last so that `Eff r e` is a constructor of kind `Type -> Type`.
 
 ```text
-Unit, Never, Number, BigInt : Type
+Unit, Never, Float, BigInt : Type
 Option, List, Ref, Redacted, Schema : Type -> Type
 Result, PureCodec : Type -> Type -> Type
 
@@ -113,11 +113,11 @@ Higher-rank callbacks are part of the language from the start. A nested `forall`
 | Capture checking and skolem escape | A full signature does not allow hiding a mutable alias or passing off a fixed type as an arbitrary one |
 | Scope of the first version | Nested `forall` in annotated function types; general higher-rank inference and impredicativity are not promised |
 
-A simple example: one callback is called at `Number` and at `String` in the same body.
+A simple example: one callback is called at `Float` and at `String` in the same body.
 
 ```flick
 apply_twice :
-  (forall a. a -> a) -> (Number, String)
+  (forall a. a -> a) -> (Float, String)
 let apply_twice transform =
   (transform 42, transform "hello")
 
@@ -311,10 +311,10 @@ Suppose two rules are declared:
 
 ```text
 Show a => Show (List a)
-Show (List Number)
+Show (List Float)
 ```
 
-Both fit `List Number`. Priority for the more specific instance looks convenient, but the compiler must decide which behavior an already compiled generic function gets and whether specialization may choose a different implementation.
+Both fit `List Float`. Priority for the more specific instance looks convenient, but the compiler must decide which behavior an already compiled generic function gets and whether specialization may choose a different implementation.
 
 [GHC describes the relation of overlap to specialization](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/instances.html#overlapping-instances). In the Flick optimizer, several dictionaries of one type require keeping the concretely chosen dictionary. Without overlap it is easier to obtain a direct method call and then apply inlining.
 
@@ -341,7 +341,7 @@ Chosen: canonical implicit instances, nominal wrappers and explicit alternative 
 
 ## Generalization in the presence of Ref
 
-Generalization means that the type of a binding can be instantiated anew at each use. For `identity : forall a. a -> a`, two calls can independently choose `Number` and `String`. A single mutable cell must keep one content type. An explicit `forall` signature cannot make unsafe sharing of state acceptable.
+Generalization means that the type of a binding can be instantiated anew at each use. For `identity : forall a. a -> a`, two calls can independently choose `Float` and `String`. A single mutable cell must keep one content type. An explicit `forall` signature cannot make unsafe sharing of state acceptable.
 
 ```flick
 invalid : Unit ->{} String
@@ -353,7 +353,7 @@ let invalid () =
   | None -> ""
 ```
 
-The program must be rejected: the write `Some 42` fixes the cell's content as `Option Number`, while `String.trim` requires `String`. If `cell` were given `forall a. Ref (Option a)`, the write and the read could choose different types for one object. The problem of polymorphic mutable cells and the relaxed value restriction is discussed in the [OCaml manual](https://ocaml.org/manual/5.4/polymorphism.html).
+The program must be rejected: the write `Some 42` fixes the cell's content as `Option Float`, while `String.trim` requires `String`. If `cell` were given `forall a. Ref (Option a)`, the write and the read could choose different types for one object. The problem of polymorphic mutable cells and the relaxed value restriction is discussed in the [OCaml manual](https://ocaml.org/manual/5.4/polymorphism.html).
 
 | Generalization rule | Implementation cost | Cost for the program author |
 | - | - | - |
@@ -377,7 +377,7 @@ let use_separate_cells () =
   Ref.set names (Some "Ada")
 ```
 
-The value of the function `make_empty` is polymorphic: creating the closure is pure. Each runtime call allocates a new cell; `numbers` itself is monomorphic and stores only `Option Number`, and `names` only `Option String`. This distinction preserves the useful polymorphism of factories without allowing the type of already created state to change.
+The value of the function `make_empty` is polymorphic: creating the closure is pure. Each runtime call allocates a new cell; `numbers` itself is monomorphic and stores only `Option Float`, and `names` only `Option String`. This distinction preserves the useful polymorphism of factories without allowing the type of already created state to change.
 
 ### Generalization in three small examples
 
@@ -428,13 +428,13 @@ let logged_none () =
   Log.info "created an empty result"
   None
 
-use_logged_none : Unit ->{Log; none} (Option Number, Option String)
+use_logged_none : Unit ->{Log; none} (Option Float, Option String)
 let use_logged_none () =
   let empty = logged_none ()
   (empty, empty)
 ```
 
-Under the conservative ban on generalizing runtime results, `empty` gets one unknown type `Option a`; it cannot be used in a pair at once as `Option Number` and `Option String`. The relaxed value restriction can generalize `a` in the covariant immutable `Option a`, keeping a single `Log.info` call. This is additional expressiveness, not a way to perform logging purely.
+Under the conservative ban on generalizing runtime results, `empty` gets one unknown type `Option a`; it cannot be used in a pair at once as `Option Float` and `Option String`. The relaxed value restriction can generalize `a` in the covariant immutable `Option a`, keeping a single `Log.info` call. This is additional expressiveness, not a way to perform logging purely.
 
 | Position of the variable | Example | Consequence for the relaxed value restriction |
 | - | - | - |

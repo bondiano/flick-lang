@@ -42,7 +42,7 @@ type TransformStream a b
 type AsyncIterable a d
 
 /// How many elements Effect puts in one chunk by default.
-default_chunk_size : Number
+default_chunk_size : Float
 foreign pure default_chunk_size from "@flick-lang/runtime/effect/Channel" "DefaultChunkSize"
   reviewed "effect@4.0.5 sha256:328d7eb584c7877e"
 
@@ -52,7 +52,7 @@ foreign pure from_list from "@flick-lang/runtime/effect/Channel" "fromArray"
   reviewed "effect@4.0.5 sha256:c9d127266b1bbe58"
 
 /// Emits the list in chunks of at most `size` elements.
-from_list_chunked : Number -> List o -> Channel none none i (NonEmpty.NonEmpty o) Unit ie id
+from_list_chunked : Float -> List o -> Channel none none i (NonEmpty.NonEmpty o) Unit ie id
 foreign pure from_list_chunked from "@flick-lang/runtime/effect/Channel" "flickFromListChunked"
   arity 1
   reviewed "effect@4.0.5 sha256:bc67202f83eefba0"
@@ -187,11 +187,11 @@ foreign pure identity from "@flick-lang/runtime/effect/Channel" "identity"
 
 /// A queue's options: `capacity` messages (`None`: unbounded) and what a
 /// full queue does (`None`: `Suspend`).
-type alias Buffer = { capacity : Option Number; strategy : Option Queue.Strategy }
+type alias Buffer = { capacity : Option Float; strategy : Option Queue.Strategy }
 
 /// Emits what `f` offers to the queue it gets, until `f` ends or fails
 /// the queue; `f` runs as long as the channel does.
-callback : { bufferSize : Option Number; strategy : Option Queue.Strategy } ->
+callback : { bufferSize : Option Float; strategy : Option Queue.Strategy } ->
   (Queue.Queue e o ->{r; e} x) ->
   Channel r e i o Unit ie id
 foreign pure callback from "@flick-lang/runtime/effect/Channel" "flickCallback"
@@ -200,7 +200,7 @@ foreign pure callback from "@flick-lang/runtime/effect/Channel" "flickCallback"
 
 /// `callback`, a chunk of the messages there are at a time.
 callback_array :
-  { bufferSize : Option Number; strategy : Option Queue.Strategy } ->
+  { bufferSize : Option Float; strategy : Option Queue.Strategy } ->
   (Queue.Queue e o ->{r; e} x) -> Channel r e i (NonEmpty.NonEmpty o) Unit ie id
 foreign pure callback_array from "@flick-lang/runtime/effect/Channel" "flickCallbackArray"
   arity 2

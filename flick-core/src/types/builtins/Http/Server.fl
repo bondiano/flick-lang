@@ -16,14 +16,14 @@ import Http.ServerResponse exposing (ServerResponse)
 type Server (s : Region)
 
 /// Where a server listens.
-type Address = TcpAddress String Number | UnixAddress String
+type Address = TcpAddress String Float | UnixAddress String
   deriving Eq, Show
 
 /// Where `serve` listens: a host and a port (0: one the system picks), and
 /// how long closing waits for running requests.
 type alias ServeOptions = {
   host : String;
-  port : Number;
+  port : Float;
   gracefulShutdownTimeout : Option Duration.Duration;
 }
 

@@ -38,10 +38,10 @@ let wider file = fun () -> read_all file
 shown : forall s. Handle s -> Unit -> Handle s
 let shown file () = file
 
-reader : forall s. Handle s -> (List Number ->{; ReadError} List String)^{s}
+reader : forall s. Handle s -> (List Float ->{; ReadError} List String)^{s}
 let reader file = map_effect (fun n -> read_all file)
 
-labels : forall s. Handle s -> (Option Number -> Option (Handle s))^{s}
+labels : forall s. Handle s -> (Option Float -> Option (Handle s))^{s}
 let labels file = map (fun n -> file)
 
 // A stage holds the parameters before it without a written qualifier.

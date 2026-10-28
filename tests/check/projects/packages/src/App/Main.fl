@@ -5,5 +5,5 @@ import Old.Api
 import Web.Fetch
 //     ^^^^^^^^^ FLICK-P009 cannot find module `Web.Fetch`
 
-x : Number
+x : Float
 let x = 1

@@ -3,16 +3,16 @@
 // that function, by its result, a closure or an atom.
 module App.Reader exposing (..)
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.make 7
 
-leaked : Atom.Atom (Seq Number)
+leaked : Atom.Atom (Seq Float)
 let leaked = Atom.derived (fun () -> for n <- [1] yield Atom.value count + n)
 
-signed : Unit ->{Atom.Read;} Seq Number
+signed : Unit ->{Atom.Read;} Seq Float
 let signed () = for n <- [1] yield Atom.value count + n
 
-held : Atom.Atom (Unit -> List Number)
+held : Atom.Atom (Unit -> List Float)
 let held =
   Atom.derived (fun () ->
     let xs = for n <- [1] yield Atom.value count + n

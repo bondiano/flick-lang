@@ -25,7 +25,7 @@ trap : Unit ->{} JsValue
 foreign sync trap from "./bindings.mjs" "trap"
   arity 0
 
-deep : Number ->{} JsValue
+deep : Float ->{} JsValue
 foreign sync deep from "./bindings.mjs" "deep"
 
 outcome : JsValue ->{} String

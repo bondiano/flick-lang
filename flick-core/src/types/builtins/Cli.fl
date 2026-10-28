@@ -35,11 +35,18 @@ instance Value Bool =
     | "false" -> Ok false
     | _ -> Err ("not true or false: " ++ text)
 
-instance Value Number =
-  parse : String ->{} Result String Number
+instance Value Int =
+  parse : String ->{} Result String Int
   let parse text =
-    match Number.parse text with
-    | Some n -> if Number.is_nan n then Err ("not a number: " ++ text) else Ok n
+    match Int.parse text with
+    | Some n -> Ok n
+    | None -> Err ("not an Int: " ++ text)
+
+instance Value Float =
+  parse : String ->{} Result String Float
+  let parse text =
+    match Float.parse text with
+    | Some n -> if Float.is_nan n then Err ("not a number: " ++ text) else Ok n
     | None -> Err ("not a number: " ++ text)
 
 instance Value BigInt =
@@ -100,17 +107,17 @@ foreign pure some from "@flick-lang/runtime/cli" "multiSome"
   reviewed "effect@4.0.5 sha256:5e88f4ac77db4501"
 
 /// At least `min` values.
-at_least : Number -> Multi a (List a)
+at_least : Float -> Multi a (List a)
 foreign pure at_least from "@flick-lang/runtime/cli" "multiAtLeast"
   reviewed "effect@4.0.5 sha256:e42e6aa23f7e9d05"
 
 /// At most `max` values.
-at_most : Number -> Multi a (List a)
+at_most : Float -> Multi a (List a)
 foreign pure at_most from "@flick-lang/runtime/cli" "multiAtMost"
   reviewed "effect@4.0.5 sha256:b24c3438bc79d4eb"
 
 /// From `min` to `max` values.
-between : Number -> Number -> Multi a (List a)
+between : Float -> Float -> Multi a (List a)
 foreign pure between from "@flick-lang/runtime/cli" "multiBetween"
   arity 2
   reviewed "effect@4.0.5 sha256:a93023741eb028ac"
@@ -330,7 +337,7 @@ foreign pure default_formatter from "@flick-lang/runtime/cli" "cliDefaultFormatt
   reviewed "effect@4.0.5 sha256:381e2a39c3f920ba"
 
 /// The columns `text` takes in a terminal, without its ANSI escapes.
-display_width : String -> Number
+display_width : String -> Float
 foreign pure display_width from "@flick-lang/runtime/cli" "cliDisplayWidth"
   reviewed "effect@4.0.5 sha256:2a6f63717edc3afe"
 

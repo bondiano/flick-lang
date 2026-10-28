@@ -3,10 +3,10 @@
 // closes.
 module App.Main exposing (main)
 
-ms : Number -> Duration.Duration
+ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
-counts : TxReentrantLock.TxReentrantLock ->{Tx.Transaction;} (Number, Number, Bool, Bool, Bool)
+counts : TxReentrantLock.TxReentrantLock ->{Tx.Transaction;} (Float, Float, Bool, Bool, Bool)
 let counts lock =
   (
     TxReentrantLock.read_locks lock,
@@ -16,7 +16,7 @@ let counts lock =
     TxReentrantLock.write_locked lock,
   )
 
-permits : TxSemaphore.TxSemaphore ->{} Number
+permits : TxSemaphore.TxSemaphore ->{} Float
 let permits sem = Tx.atomically (task { TxSemaphore.available sem })
 
 main : Unit ->{; AppError} Unit

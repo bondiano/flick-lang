@@ -7,8 +7,8 @@ class Pretty a =
   verbose : a -> String
   let verbose x = "<" ++ pretty x ++ ">"
 
-instance Pretty Number =
-  pretty : Number -> String
+instance Pretty Float =
+  pretty : Float -> String
   let pretty n = show n
 
 instance Pretty Bool =
@@ -18,4 +18,4 @@ instance Pretty Bool =
   let verbose b = "the answer is " ++ pretty b
 
 both : (String, String)
-let both = (verbose 1, verbose true)
+let both = (verbose 1.5, verbose true)

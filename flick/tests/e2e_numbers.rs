@@ -1,4 +1,4 @@
-//! Number semantics: random arithmetic over NaN, infinities, signed zeros
+//! Float semantics: random arithmetic over NaN, infinities, signed zeros
 //! and fractions gives, compiled from Flick, exactly the value the same
 //! expression has in JS.
 
@@ -8,16 +8,17 @@ use std::process::Command;
 
 use flick_core::build::runner_path;
 
+// written as fractions in Flick, so every expression is a `Float`
 const ATOMS: [(&str, &str); 9] = [
-    ("0", "0"),
-    ("(-0)", "(-0)"),
-    ("1", "1"),
+    ("0.0", "0"),
+    ("(-0.0)", "(-0)"),
+    ("1.0", "1"),
     ("2.5", "2.5"),
-    ("3", "3"),
+    ("3.0", "3"),
     ("1e308", "1e308"),
     ("0.1", "0.1"),
-    ("(0 / 0)", "(0 / 0)"),
-    ("(1 / 0)", "(1 / 0)"),
+    ("(0.0 / 0.0)", "(0 / 0)"),
+    ("(1.0 / 0.0)", "(1 / 0)"),
 ];
 const OPS: [&str; 6] = ["+", "-", "*", "/", "%", "**"];
 

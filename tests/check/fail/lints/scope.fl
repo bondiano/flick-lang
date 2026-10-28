@@ -1,33 +1,33 @@
 // Names and arms that hide something.
 module App.Scope exposing (..)
 
-type Shape = Circle Number | Square Number | Dot
+type Shape = Circle Float | Square Float | Dot
 
-area : Shape -> Number
+area : Shape -> Float
 let area shape = match shape with
   | Circle r -> r * r
   | _ -> 0
 
-total : Number -> Number
+total : Float -> Float
 let total n =
   let m = n + 1
-  f : Number -> Number
+  f : Float -> Float
   let f = fun m -> m * 2
   let n = n + m
   let m = 2
   f (n + m)
 
-outer : Number -> Number
+outer : Float -> Float
 let outer n =
-  double : Number -> Number
+  double : Float -> Float
   let double x =
     let twice = x * 2
     twice
-  add : Number -> Number
+  add : Float -> Float
   let add x = x + n
   add (double n)
 
-pick : Option Number -> Number
+pick : Option Float -> Float
 let pick x = match x with
   | Some x -> x + 1
   | None -> 0

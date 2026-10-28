@@ -5,25 +5,25 @@ module App.Main exposing (main)
 
 type error Invalid = Invalid String
 
-half : Number -> Option Number
+half : Float -> Option Float
 let half n = if n % 2 == 0 then Some (n / 2) else None
 
-quarter : Number -> Option Number
+quarter : Float -> Option Float
 let quarter n = half (half n)?
 
 // an early `None` skips the rest, even inside an expression
-labelled : Number -> Option String
+labelled : Float -> Option String
 let labelled n =
   let q = quarter n
   Some ("q = " ++ show q? ++ ", h = " ++ show (half n)?)
 
-parse : String -> Result Invalid Number
+parse : String -> Result Invalid Float
 let parse s =
   match String.to_number s with
   | Some n -> Ok n
   | None -> Err (Invalid s)
 
-sum : String -> String ->{; Invalid} Number
+sum : String -> String ->{; Invalid} Float
 let sum a b = (parse a)? + (parse b)?
 
 summed : String -> String ->{} String

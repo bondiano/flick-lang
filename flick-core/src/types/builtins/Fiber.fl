@@ -61,7 +61,7 @@ foreign effect interrupt from "@flick-lang/runtime/effect/Fiber" "flickInterrupt
   reviewed "effect@4.0.5 sha256:b4dea4597062574b"
 
 /// `interrupt`, naming the fiber id of the interruption.
-interrupt_as : Option Number -> Fiber e a ->{} Unit
+interrupt_as : Option Float -> Fiber e a ->{} Unit
 foreign effect interrupt_as from "@flick-lang/runtime/effect/Fiber" "flickInterruptAs"
   arity 1
   reviewed "effect@4.0.5 sha256:463d52162c7cfb42"
@@ -72,7 +72,7 @@ foreign effect interrupt_all from "@flick-lang/runtime/effect/Fiber" "flickInter
   reviewed "effect@4.0.5 sha256:1dcaa52c1653c261"
 
 /// `interrupt_all`, naming the fiber id of the interruption.
-interrupt_all_as : Number -> List (Fiber e a) ->{} Unit
+interrupt_all_as : Float -> List (Fiber e a) ->{} Unit
 foreign effect interrupt_all_as from "@flick-lang/runtime/effect/Fiber" "flickInterruptAllAs"
   arity 1
   reviewed "effect@4.0.5 sha256:77c88f3e42b05419"

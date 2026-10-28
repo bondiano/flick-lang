@@ -1,22 +1,22 @@
 // JS sees the same values in the debug and the optimized release build: a
 // task is a native Effect, a curried function or a partial application is
-// adapted to one JS call of both arguments, and a computed Number keeps its
+// adapted to one JS call of both arguments, and a computed Float keeps its
 // sign, NaN and infinity.
 module App.Main exposing (main)
 
-is_effect : Eff none none Number -> Bool
+is_effect : Eff none none Float -> Bool
 foreign pure is_effect from "./effect_abi.mjs" "isEffect"
 
-run_sync : Eff none none Number -> Number
+run_sync : Eff none none Float -> Float
 foreign pure run_sync from "./effect_abi.mjs" "runSync"
 
-stages : (Number -> Number -> Number) -> String
+stages : (Float -> Float -> Float) -> String
 foreign pure stages from "./effect_abi.mjs" "stages"
 
-bits : Number -> String
+bits : Float -> String
 foreign pure bits from "./effect_abi.mjs" "bits"
 
-add : Number -> Number -> Number
+add : Float -> Float -> Float
 let add x y = x * 10 + y
 
 main : Unit ->{; AppError} Unit

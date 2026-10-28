@@ -46,7 +46,8 @@ title: "Стандартная библиотека"
 | `Chunk` | `Chunk` из Effect для многократной конкатенации |
 | `Js.Array` | изменяемые массивы JS, доступные через эффектные операции; списки копируются на входе и выходе |
 | `String` | `split`, `join`, `slice`, `index_of`, `to_number`, … над кодовыми единицами UTF-16 |
-| `Number` | `strict_equal` (`===`), `same_value` (`Object.is`), округление, `parse`, побитовые `bit_*` и `shift_*`, проверяемые целочисленные операции `add_int`, `div_int`, …, возвращающие `Result ArithmeticError Number` |
+| `Int` | `to_float`, `from_float`, `truncate`, `parse`, побитовые `bit_*` и `shift_*`, проверяемые `checked_add`, `checked_div`, …, возвращающие `Result ArithmeticError Int`, и `unsafe_div`, `unsafe_rem` |
+| `Float` | `strict_equal` (`===`), `same_value` (`Object.is`), округление, `parse`, `is_nan`, `is_finite`, … |
 | `BigInt` | преобразования и проверяемые `divide`, `remainder` |
 | `Ref` | `make`, `get`, `set`, `modify` и `same` для проверки идентичности; без `Eq` и `Hash` |
 | `Redacted` | эффектные `make`, `reveal`; `show` выводит `<redacted>` |
@@ -76,7 +77,7 @@ title: "Стандартная библиотека"
 
 ## Числа
 
-`Ord Number` задаёт полный порядок: `-Infinity` < конечные числа < `Infinity` <
+`Ord Float` задаёт полный порядок: `-Infinity` < конечные числа < `Infinity` <
 `NaN`. Нули с разными знаками равны, как и все значения NaN.
 Поэтому `List.sort` помещает `NaN` в конец.
 Операторы `<`, `<=`, `>`, `>=` сохраняют семантику JS.
@@ -96,7 +97,7 @@ title: "Стандартная библиотека"
 
 Если делитель нулевой или масштаб не является безопасным целым числом,
 функция тоже возвращает `DecimalError`. Вызовы `Duration.millis (-1)`,
-`Duration.millis Number.nan` и преобразование с переполнением дают
+`Duration.millis Float.nan` и преобразование с переполнением дают
 `Err (DurationError …)`. Неограниченная длительность задаётся как
 `Duration.infinity`; для неё `Duration.to_millis` возвращает `None`.
 
@@ -117,7 +118,7 @@ hash body` создаёт свидетельство с новой иденти�
 с помощью `HashSet.rehash witness set`.
 
 ```flick
-case_blind : Number
+case_blind : Float
 let case_blind =
   EqHash.with
     (fun a b -> String.to_lower a == String.to_lower b)

@@ -62,7 +62,7 @@ Contextual words are ordinary names everywhere except in one position:
 - `component` before the name of a top-level declaration (see
   [ui.md](../ui/#components)).
 
-### Number literals
+### Float literals
 
 The grammar of JavaScript `NumericLiteral`, so a literal means exactly the JS
 number (see [Schema and standard data types](../../spec/09-schema/)):
@@ -143,11 +143,11 @@ There are no user-defined operators. From weakest to strongest:
 
 `-x ** 2` is `-(x ** 2)`; `-a * b` is `(-a) * b`; `await f x` is
 `await (f x)`; `0..n - 1` is `0..(n - 1)`, and `i < 0..n` compares with the range.
-A range is a `Seq Number`: `a..b` counts from `a` up to `b` inclusive
+A range is a `Seq Float`: `a..b` counts from `a` up to `b` inclusive
 (`Seq.range_to`), `a..<b` stops before `b` (`Seq.range`), and `a..` never
 ends (`Seq.from`). Alone in brackets, `[a..b]` is the `List` of the same
 numbers; `[a..]` is an error. The number before `..` ends there: `1..5` is
-a range, `1.5` a number. Bitwise operations are the functions `Number.bit_*`.
+a range, `1.5` a number. Bitwise operations are the functions `Float.bit_*`.
 
 ## Layout
 
@@ -186,7 +186,7 @@ let load_view id =
   Log.info view.title
   view
 
-classify : Number -> String
+classify : Float -> String
 let classify n =
   if n < 0 then
     "negative"
@@ -195,7 +195,7 @@ let classify n =
   else
     "positive"
 
-total : List Number -> Number
+total : List Float -> Float
 let total xs =
   xs
   |> List.filter (fun x -> x > 0)
@@ -254,11 +254,11 @@ metadata    = indented lines: meta_name { atom }
 ```
 
 The right-hand side of `type` is always a list of variants, so
-`type Wrapper = Wrap Number` is an ADT with one constructor; a transparent
+`type Wrapper = Wrap Float` is an ADT with one constructor; a transparent
 alias, a record type included, is written `type alias`. `alias` is a keyword
 only right after `type`. A field of a variant is an atomic type, as in a
 constructor pattern: `Some (List a)`, `Handler (a -> b)`, and
-`Circle (Point, Number)` has one tuple field where `Circle Point Number` has
+`Circle (Point, Float)` has one tuple field where `Circle Point Float` has
 two. Writing `of` before the fields is `FLICK-S010`.
 
 `type error E` declares an error; its one constructor is named `E` too, and an
@@ -276,14 +276,14 @@ import App.Geometry exposing (Point)
 import Effect.Log as Log
 
 type Shape =
-  | Circle Point Number
+  | Circle Point Float
   | Rect { origin : Point; size : Point }
   | Empty
   deriving Eq, Show
 
 opaque type alias UserId = String
 
-refined type Port = Number where fun n -> n > 0 && n < 65536
+refined type Port = Float where fun n -> n > 0 && n < 65536
   deriving Eq, Hash
 
 kind Nullability = NonNull | Nullable
@@ -291,10 +291,10 @@ kind Nullability = NonNull | Nullable
 type error NotFound = NotFound UserId
 
 service Clock =
-  now : Unit ->{} Number
+  now : Unit ->{} Float
 
 class Eq a => Hash a =
-  hash : a -> Number
+  hash : a -> Float
 
 class Collection c a | c -> a =
   empty : c
@@ -312,10 +312,10 @@ foreign async read_text from "./fs.js" "readText"
   cancel signal
 
 rec {
-  is_even : Number -> Bool
+  is_even : Float -> Bool
   let is_even n = if n == 0 then true else is_odd (n - 1)
 
-  is_odd : Number -> Bool
+  is_odd : Float -> Bool
   let is_odd n = if n == 0 then false else is_even (n - 1)
 }
 ```
@@ -375,7 +375,7 @@ expr        = "fun" atom_pattern { atom_pattern } "->" block
 arm         = "|" or_pattern ["when" expr] "->" block
 application = postfix { postfix }
 postfix     = atom { "." name | "?" }           // no space before either
-atom        = name | Con { "." Con } ["." name] | Number | BigInt | String
+atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "true" | "false" | "()" | "(" expr ")" | "(" expr ":" type ")"
             | "(" expr "," expr { "," expr } ")" | "[" [expr { "," expr } [","]] "]"
             | "{" "}" | "{" field "=" block { ";" | line break … } "}"
@@ -489,7 +489,7 @@ let deploy =
 ```text
 or_pattern   = pattern { "|" pattern }
 pattern      = Con { "." Con } { atom_pattern } | atom_pattern
-atom_pattern = "_" | name | Con | ["-"] Number | ["-"] BigInt | String | "true" | "false"
+atom_pattern = "_" | name | Con | ["-"] Float | ["-"] BigInt | String | "true" | "false"
              | "()" | "(" or_pattern ")" | "(" or_pattern ":" type ")"
              | "(" or_pattern "," or_pattern { "," or_pattern } ")"
              | "[" [list_item { "," list_item }] "]"

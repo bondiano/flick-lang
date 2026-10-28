@@ -11,21 +11,21 @@ foreign pure find_last from "@flick-lang/runtime/effect/Array" "findLast"
   reviewed "effect@4.0.5 sha256:3e1ffdb3d63e475f"
 
 /// The index of the last element that satisfies `p`.
-find_last_index : forall c a. (a -> Bool)^c -> (List a -> Option Number)^c
+find_last_index : forall c a. (a -> Bool)^c -> (List a -> Option Int)^c
 foreign pure find_last_index from "@flick-lang/runtime/effect/Array" "findLastIndex"
   arity 1
   retention call
   reviewed "effect@4.0.5 sha256:60671cf447ac27fe"
 
 /// The first element that satisfies `p`, with its index.
-find_first_with_index : forall c a. (a -> Bool)^c -> (List a -> Option (a, Number))^c
+find_first_with_index : forall c a. (a -> Bool)^c -> (List a -> Option (a, Int))^c
 foreign pure find_first_with_index from "@flick-lang/runtime/effect/Array" "findFirstWithIndex"
   arity 1
   retention call
   reviewed "effect@4.0.5 sha256:2c3ff7b37d76bcd1"
 
 /// How many elements satisfy `p`.
-count_by : forall c a. (a -> Bool)^c -> (List a -> Number)^c
+count_by : forall c a. (a -> Bool)^c -> (List a -> Int)^c
 foreign pure count_by from "@flick-lang/runtime/effect/Array" "countBy"
   arity 1
   retention call

@@ -10,5 +10,5 @@ foreign pure email from "@flick-lang/runtime" "checkEmail"
 non_empty : String -> Bool
 foreign pure non_empty from "@flick-lang/runtime" "checkNonEmpty"
 
-positive : Number -> Bool
+positive : Float -> Bool
 foreign pure positive from "@flick-lang/runtime" "checkPositive"

@@ -57,6 +57,7 @@ mod schemas;
 mod server;
 pub mod server_fn;
 mod services;
+mod settle;
 mod sql;
 mod stub;
 mod sugar_lints;
@@ -104,6 +105,7 @@ use unify::Store;
 
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
 use crate::iface::Interface;
+use crate::numeric::Num;
 use crate::resolve::Module;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Node, Token};
@@ -241,6 +243,8 @@ fn run_in(
         sites: Vec::new(),
         subrows: Vec::new(),
         operators: Vec::new(),
+        literals: Vec::new(),
+        signatures: Vec::new(),
         equalities: Vec::new(),
         recs: Vec::new(),
         top: toplevel::TopLevel::default(),
@@ -329,8 +333,53 @@ struct Operator {
     ty: Type,
     span: Span,
     op: &'static str,
-    /// Types the operator accepts, by built-in name; `List` means any list.
-    allowed: &'static [&'static str],
+    domain: Domain,
+    /// The class constraints in scope where it is written.
+    givens: Vec<Type>,
+}
+
+/// The operand types an operator accepts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Domain {
+    /// The numeric types: arithmetic.
+    Numeric,
+    /// The numeric types and `String`: comparisons.
+    Ordered,
+    /// `String` and any list: `++`.
+    Concat,
+}
+
+impl Domain {
+    /// The built-in types it accepts, by name; `List` means any list. An
+    /// operand type nothing determined becomes the first.
+    fn names(self) -> Vec<&'static str> {
+        let numeric = Num::ALL.into_iter().map(Num::name);
+        match self {
+            Domain::Numeric => numeric.collect(),
+            Domain::Ordered => numeric.chain(["String"]).collect(),
+            Domain::Concat => vec!["String", "List"],
+        }
+    }
+
+    fn allows(self, head: &Type) -> bool {
+        self.names().iter().any(|name| head.is_prim(name))
+    }
+}
+
+/// A number literal, whose type is any numeric type, a `Float` one when it
+/// has a fraction: the one inference settles, else `Int` or `Float`.
+#[derive(Debug, Clone)]
+struct NumLiteral {
+    ty: Type,
+    span: Span,
+    /// The integer it spells; `None` when the digits do not fit 128 bits
+    /// or it has a fraction.
+    value: Option<i128>,
+    fractional: bool,
+    /// A literal pattern, which a type variable cannot match.
+    pattern: bool,
+    /// The class constraints in scope where it is written.
+    givens: Vec<Type>,
 }
 
 struct Checker<'a> {
@@ -354,6 +403,8 @@ struct Checker<'a> {
     /// Row constraints of the declaration being checked.
     subrows: Vec<effects::SubRow>,
     operators: Vec<Operator>,
+    literals: Vec<NumLiteral>,
+    signatures: Vec<bindings::PendingSignature>,
     /// `==` and `!=` with the type of their operands.
     equalities: Vec<(Type, Span)>,
     /// The types of `do` blocks and of their expression statements, by

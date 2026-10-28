@@ -3,7 +3,7 @@
 // or refuses what decoding decides beyond the wire type.
 module App.Main exposing (main)
 
-type alias Tagged = { label : String; size : Number }
+type alias Tagged = { label : String; size : Float }
   deriving Schema
 
 issues : SchemaError -> String
@@ -38,14 +38,14 @@ let exported c =
 line : String -> String ->{} Unit
 let line name text = Platform.stdout_line (name ++ ": " ++ text)
 
-ms : Number -> Duration.Duration
+ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
 fallback : SchemaError -> Result SchemaError String
 let fallback _ = Ok "fallback"
 
 zero_wire : SchemaError -> Result SchemaError Json
-let zero_wire _ = Codec.encode_result Number.json_finite 0
+let zero_wire _ = Codec.encode_result Float.json_finite 0
 
 late_value : SchemaError ->{; SchemaError} String
 let late_value _ = "late"
@@ -53,14 +53,14 @@ let late_value _ = "late"
 late_zero : SchemaError ->{; SchemaError} Json
 let late_zero e = from_result (zero_wire e)
 
-small_enough : Number ->{; SchemaError} Bool
+small_enough : Float ->{; SchemaError} Bool
 let small_enough n = n < 10
 
 check_input : String ->{} String
 let check_input text =
   try
     match Json.parse text with
-    | Ok input -> show (Codec.decode (Codec.check_effect small_enough Number.json_finite) input)
+    | Ok input -> show (Codec.decode (Codec.check_effect small_enough Float.json_finite) input)
     | Err _ -> "not JSON"
   with
   | SchemaError found -> issues (SchemaError found)
@@ -77,17 +77,17 @@ let main () =
         ++ " | "
         ++ round "\"c\"" (Codec.literals ["a", "b"])
     )
-  line "entries" (round "{\"x\": 1, \"y\": 2}" (Codec.entries Number.json_finite))
+  line "entries" (round "{\"x\": 1, \"y\": 2}" (Codec.entries Float.json_finite))
   line
     "non_empty_list"
-    (round "[1, 2]" (Codec.non_empty_list Number.json_finite)
+    (round "[1, 2]" (Codec.non_empty_list Float.json_finite)
       ++ " | "
-      ++ round "[]" (Codec.non_empty_list Number.json_finite))
+      ++ round "[]" (Codec.non_empty_list Float.json_finite))
   line
     "list_ensure"
-    (round "3" (Codec.list_ensure Number.json_finite)
+    (round "3" (Codec.list_ensure Float.json_finite)
       ++ " | "
-      ++ round "[3, 4]" (Codec.list_ensure Number.json_finite))
+      ++ round "[3, 4]" (Codec.list_ensure Float.json_finite))
   line "trim" (round "\"  a b \"" Codec.trim)
   line "to_lower_case" (round "\"AbC\"" Codec.to_lower_case)
   line "to_upper_case" (round "\"AbC\"" Codec.to_upper_case)
@@ -111,9 +111,9 @@ let main () =
     (round "\"a%20b\"" Codec.uri_component ++ " | " ++ round "\"%\"" Codec.uri_component)
   line
     "json_string"
-    (round "\"[1,2]\"" (Codec.json_string (Codec.list Number.json_finite))
+    (round "\"[1,2]\"" (Codec.json_string (Codec.list Float.json_finite))
       ++ " | "
-      ++ round "\"[\"" (Codec.json_string (Codec.list Number.json_finite)))
+      ++ round "\"[\"" (Codec.json_string (Codec.list Float.json_finite)))
   line "split" (round "\"a,b,c\"" (Codec.split ","))
   line "split_key_value" (round "\"a=1&b=2\"" (Codec.split_key_value "&" "="))
   line "natural" (round "3" Codec.natural ++ " | " ++ round "-1" Codec.natural)
@@ -140,7 +140,7 @@ let main () =
   line "catch_decoding" (round "1" (Codec.catch_decoding fallback String.json))
   line
     "catch_encoding"
-    (match Codec.encode_result (Codec.catch_encoding zero_wire Number.json_finite) Number.nan with
+    (match Codec.encode_result (Codec.catch_encoding zero_wire Float.json_finite) Float.nan with
     | Ok json -> Json.stringify json
     | Err e -> issues e)
   let late = Codec.catch_decoding_effect late_value String.json
@@ -152,9 +152,9 @@ let main () =
     with
     | SchemaError found -> issues (SchemaError found)
   line "catch_decoding_effect" decoded
-  let late_wire = Codec.catch_encoding_effect late_zero Number.json_finite
+  let late_wire = Codec.catch_encoding_effect late_zero Float.json_finite
   let written =
-    try Json.stringify (Codec.encode late_wire Number.nan) with
+    try Json.stringify (Codec.encode late_wire Float.nan) with
     | SchemaError found -> issues (SchemaError found)
   line "catch_encoding_effect" written
   line "check_effect" (check_input "3" ++ " | " ++ check_input "12")
@@ -178,7 +178,7 @@ let main () =
       | Err e -> issues e)
     | Err _ -> "not JSON")
   line "Chunk.json" (match Json.parse "[1, 2]" with
-    | Ok input -> (match Codec.decode_result (Chunk.json Number.json_finite) input with
+    | Ok input -> (match Codec.decode_result (Chunk.json Float.json_finite) input with
       | Ok c -> show (Chunk.to_list c)
       | Err e -> issues e)
     | Err _ -> "not JSON")
@@ -189,7 +189,7 @@ let main () =
     | Err _ -> "not JSON")
   line "HashMap.json" (match Json.parse "[[\"a\", 1], [\"b\", 2]]" with
     | Ok input ->
-      (match Codec.decode_result (HashMap.json String.json Number.json_finite) input with
+      (match Codec.decode_result (HashMap.json String.json Float.json_finite) input with
       | Ok m -> show (HashMap.get "b" m) ++ " size " ++ show (HashMap.size m)
       | Err e -> issues e)
     | Err _ -> "not JSON")

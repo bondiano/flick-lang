@@ -2,19 +2,19 @@ use super::*;
 
 const SOURCE: &str = "module App.Geo exposing (Shape(..), area, scaled)
 
-type Shape = Circle Number | Square Number
+type Shape = Circle Float | Square Float
 
-add3 : Number -> Number -> Number -> Number
+add3 : Float -> Float -> Float -> Float
 let add3 a b c = a + b + c
 
-area : Shape -> Number
+area : Shape -> Float
 let area shape =
   let base = add3 1 2 3
   match shape with
   | Circle r -> r * base
   | Square s -> s * s
 
-scaled : List Number -> List Number
+scaled : List Float -> List Float
 let scaled xs =
   xs
     |> List.map (fun x -> x * 2)
@@ -85,13 +85,13 @@ fn outline_tokens_folding_hints_and_signature_help() {
         .iter()
         .filter_map(|h| h["label"].as_str())
         .collect();
-    assert_eq!(labels, [": Number", " : List Number"], "{hints}");
+    assert_eq!(labels, [": Float", " : List Float"], "{hints}");
 
     let help = lsp.request("textDocument/signatureHelp", &json!({ "textDocument": doc, "position": position(SOURCE, SOURCE.find("2 3").expect("call") + 1) }));
     assert_eq!(help["result"]["activeParameter"], 1, "{help}");
     assert_eq!(
         help["result"]["signatures"][0]["label"],
-        "add3 : Number -> Number -> Number -> Number"
+        "add3 : Float -> Float -> Float -> Float"
     );
 
     let typedef = lsp.request(

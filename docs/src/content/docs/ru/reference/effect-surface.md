@@ -147,7 +147,7 @@ span'ы программы по WebSocket в Effect DevTools, которые с�
 
 ```flick
 /// Recurs forever, each step the duration after the previous one ended.
-spaced : Duration.Duration -> Schedule none none i Number
+spaced : Duration.Duration -> Schedule none none i Float
 foreign pure spaced from "@flick-lang/runtime/effect/Schedule" "spaced"
   reviewed "effect@4.0.5 sha256:498f22b480d2397e"
 

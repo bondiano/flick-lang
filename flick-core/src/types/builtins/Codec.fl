@@ -174,12 +174,12 @@ foreign pure snake_to_camel from "@flick-lang/runtime/effect/Schema" "flickSnake
   reviewed "effect@4.0.5 sha256:90535e9d31c899a1"
 
 /// A number as a JSON string, read by JS `Number` (`"abc"` is `NaN`).
-number_from_string : PureCodec Json Number
+number_from_string : PureCodec Json Float
 foreign pure number_from_string from "@flick-lang/runtime/effect/Schema" "NumberFromString"
   reviewed "effect@4.0.5 sha256:b18c8f34d7117585"
 
 /// A finite number as a JSON string; other text is an error.
-finite_from_string : PureCodec Json Number
+finite_from_string : PureCodec Json Float
 foreign pure finite_from_string from "@flick-lang/runtime/effect/Schema" "flickFiniteFromString"
   reviewed "effect@4.0.5 sha256:6798a7c30aa830e8"
 
@@ -205,17 +205,17 @@ foreign pure hex_string from "@flick-lang/runtime/effect/Schema" "flickStringFro
 
 /// Bytes, each a whole number from 0 to 255, as base64 JSON text; encoding
 /// another number is a `SchemaError`.
-bytes_base64 : PureCodec Json (List Number)
+bytes_base64 : PureCodec Json (List Float)
 foreign pure bytes_base64 from "@flick-lang/runtime/effect/Schema" "flickBytesFromBase64"
   reviewed "effect@4.0.5 sha256:3ba856cf6e36bc12"
 
 /// Bytes as URL-safe base64 JSON text.
-bytes_base64url : PureCodec Json (List Number)
+bytes_base64url : PureCodec Json (List Float)
 foreign pure bytes_base64url from "@flick-lang/runtime/effect/Schema" "flickBytesFromBase64Url"
   reviewed "effect@4.0.5 sha256:bb23107359dfe500"
 
 /// Bytes as hexadecimal JSON text, `"0a0b"`.
-bytes_hex : PureCodec Json (List Number)
+bytes_hex : PureCodec Json (List Float)
 foreign pure bytes_hex from "@flick-lang/runtime/effect/Schema" "flickBytesFromHex"
   reviewed "effect@4.0.5 sha256:e355fc2b69a96c0e"
 
@@ -246,12 +246,12 @@ foreign pure string_tree from "@flick-lang/runtime/effect/Schema" "flickStringTr
   reviewed "effect@4.0.5 sha256:884914a3fb66bd42"
 
 /// A non-negative safe integer.
-natural : PureCodec Json Number
+natural : PureCodec Json Float
 foreign pure natural from "@flick-lang/runtime/effect/Schema" "Natural"
   reviewed "effect@4.0.5 sha256:4bdca78e545f95dc"
 
 /// A port number: an integer from 0 to 65535.
-port : PureCodec Json Number
+port : PureCodec Json Float
 foreign pure port from "@flick-lang/runtime/effect/Schema" "Port"
   reviewed "effect@4.0.5 sha256:89ee76825ff9a5bc"
 

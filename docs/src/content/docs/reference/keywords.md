@@ -25,13 +25,13 @@ See [modules.md](../modules/).
 | `let` | binds a value or a function, at the top level or in a block | `let total = a + b` |
 | `rec` | `let rec` lets a function call itself; `rec { … }` groups mutually recursive functions | `let rec go n = …` |
 | `assert` | `let assert` binds a pattern that may not match, and fails when it does not | `let assert [x, ..._] = xs as "no items"` |
-| `type` | declares an ADT, `type alias` a transparent alias | `type Shape = Circle Number \| Empty` |
+| `type` | declares an ADT, `type alias` a transparent alias | `type Shape = Circle Float \| Empty` |
 | `opaque` | hides a type's representation outside its module | `opaque type alias UserId = String` |
-| `refined` | a type whose values pass a predicate | `refined type Port = Number where fun n -> n > 0` |
+| `refined` | a type whose values pass a predicate | `refined type Port = Float where fun n -> n > 0` |
 | `where` | the predicate of a `refined` type; a filter in `sql { … }` | `where user.id == params.id` |
 | `kind` | declares a kind with its type-level constructors | `kind Nullability = NonNull \| Nullable` |
 | `error` | `type error` declares an expected error with a nominal identity | `type error NotFound = NotFound UserId` |
-| `service` | declares the operations of a service, looked up at run time | `service Clock = now : Unit ->{} Number` |
+| `service` | declares the operations of a service, looked up at run time | `service Clock = now : Unit ->{} Float` |
 | `class` | declares a type class | `class Named a = name : a -> String` |
 | `instance` | implements a class for a type | `instance Named User = let name u = u.name` |
 | `deriving` | asks the compiler for instances | `deriving Eq, Show, Schema` |
@@ -107,13 +107,13 @@ with what the keyword does:
 
 | Hover on | Shows |
 | - | - |
-| `task` | `task { … } : Eff {Store} {StoreError} Number`: the computation the block builds |
-| `scope` | `scope { … } : Number`: the value the block returns once its resources are released |
+| `task` | `task { … } : Eff {Store} {StoreError} Float`: the computation the block builds |
+| `scope` | `scope { … } : Float`: the value the block returns once its resources are released |
 | `provide`, `try` | the value of the block, with the services or errors it removes |
 | `match`, `if` | `match … with : String`: the value of the arm or branch taken |
-| `fun` | `fun … -> … : Number -> Number`: the function |
+| `fun` | `fun … -> … : Float -> Float`: the function |
 | `sql`, `codec`, `cli`, `ui`, `schema` | the value the block builds, such as `sql { … } : Template Pg {} { label : String }` |
-| `await` | `await … : Number`: the result, with the `Eff` it runs |
-| `ignore` | `ignore : Eff {Store} {StoreError} Number -> Unit`: the type of what is discarded, with a warning when it is an `Eff` that is not run |
+| `await` | `await … : Float`: the result, with the `Eff` it runs |
+| `ignore` | `ignore : Eff {Store} {StoreError} Float -> Unit`: the type of what is discarded, with a warning when it is an `Eff` that is not run |
 
 Other keywords show nothing on hover; the names around them show their types.

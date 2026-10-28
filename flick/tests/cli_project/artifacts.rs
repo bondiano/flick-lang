@@ -2,8 +2,8 @@ use super::*;
 
 #[test]
 fn cache_identity_keeps_selected_roots_separate_from_available_sources() {
-    let a = "module A exposing (answer)\nanswer : Number\nlet answer = 1\n";
-    let b = "module B exposing (answer)\nanswer : Number\nlet answer = 2\n";
+    let a = "module A exposing (answer)\nanswer : Float\nlet answer = 1\n";
+    let b = "module B exposing (answer)\nanswer : Float\nlet answer = 2\n";
     let dir = project(
         "cli_cache_selected_roots",
         &[("flick.toml", LIB), ("src/A.fl", a), ("src/B.fl", b)],
@@ -26,7 +26,7 @@ fn cache_identity_keeps_selected_roots_separate_from_available_sources() {
             ("src/A.fl", a),
             (
                 "src/B.fl",
-                "module B exposing (answer)\nanswer : Number\nlet answer = \"wrong\"\n",
+                "module B exposing (answer)\nanswer : Float\nlet answer = \"wrong\"\n",
             ),
         ],
     );

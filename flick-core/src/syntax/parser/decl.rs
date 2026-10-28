@@ -313,7 +313,7 @@ fn variant(p: &mut Parser) {
             p.error_at(
                 codes::S010,
                 p.span(of.start, of.end),
-                "Flick has no `of` before constructor fields: write `Circle Number`, `Rect Number Number`".into(),
+                "Flick has no `of` before constructor fields: write `Circle Float`, `Rect Float Float`".into(),
             );
             p.bump();
         }

@@ -11,18 +11,18 @@ let impl = App.Time.fixed 3
 layer : Layer none none {App.Time.Clock}
 let layer = Layer.succeed App.Time.Clock impl
 
-now : Unit ->{App.Time.Clock;} Number
+now : Unit ->{App.Time.Clock;} Float
 let now () = App.Time.Clock.now ()
 
 tick : Unit ->{App.Time.Clock;} App.Time.Tick
 let tick () = App.Time.Tick (now ())
 
-seconds : App.Time.Tick -> Number
+seconds : App.Time.Tick -> Float
 let seconds t =
   match t with
   | App.Time.Tick n -> n
 
-run : Unit ->{} Number
+run : Unit ->{} Float
 let run () = provide layer { seconds (tick ()) + seconds (App.Time.ticks 1) }
 
 // a type that is neither a constructor nor a service is no value

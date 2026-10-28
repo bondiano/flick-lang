@@ -14,7 +14,7 @@ let markup x =
 
 let fine = 1
 
-type Shape = Circle of Number | Empty
+type Shape = Circle of Float | Empty
 
 class Show a =
   val show : a -> String
@@ -22,5 +22,5 @@ class Show a =
 //~ FLICK-S010 @4:3-4:5 a `do` block takes braces
 //~ FLICK-S010 @9:3-9:7 Flick has no `let*` binding operators
 //~ FLICK-S010 @13:3-13:4 Flick has no JSX `<…>`
-//~ FLICK-S010 @17:21-17:23 Flick has no `of` before constructor fields: write `Circle Number`, `Rect Number
+//~ FLICK-S010 @17:21-17:23 Flick has no `of` before constructor fields: write `Circle Float`, `Rect Float
 //~ FLICK-S010 @20:3-20:6 Flick has no `val`: a class method is a plain signature `name : T`

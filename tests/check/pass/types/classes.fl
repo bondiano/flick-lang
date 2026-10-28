@@ -11,7 +11,7 @@ class Show a => Pretty a =
 class Functor (f : Type -> Type) =
   map : (a -> b) -> f a -> f b
 
-type Shape = Circle Number | Empty
+type Shape = Circle Float | Empty
 
 instance Show Shape =
   show : Shape -> String
@@ -39,7 +39,7 @@ let render value =
   show value
 
 service Repo a =
-  find : Number ->{} Option a
+  find : Float ->{} Option a
 
-lookup : Number ->{Repo String; none} Option String
+lookup : Float ->{Repo String; none} Option String
 let lookup id = Repo.find id

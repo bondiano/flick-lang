@@ -31,7 +31,7 @@ foreign pure from_string from "@flick-lang/runtime" "decimalFromString"
   reviewed "effect@4.0.5 sha256:3565dfd8fc758141"
 
 /// `coefficient × 10^-scale`; the scale must be a safe integer.
-from_bigint : BigInt -> Number -> Result DecimalError BigDecimal
+from_bigint : BigInt -> Float -> Result DecimalError BigDecimal
 foreign pure from_bigint from "@flick-lang/runtime" "decimalFromBigInt"
   reviewed "effect@4.0.5 sha256:0f9eaa78f8124757"
 
@@ -41,7 +41,7 @@ foreign pure from_integer from "@flick-lang/runtime" "decimalFromInteger"
   reviewed "effect@4.0.5 sha256:23a4a03e29f07231"
 
 /// The decimal a finite number holds after binary rounding.
-from_number : Number -> Result DecimalError BigDecimal
+from_number : Float -> Result DecimalError BigDecimal
 foreign pure from_number from "@flick-lang/runtime" "decimalFromNumber"
   reviewed "effect@4.0.5 sha256:59106a68968c7119"
 
@@ -51,7 +51,7 @@ foreign pure to_string from "@flick-lang/runtime" "decimalToString"
   reviewed "effect@4.0.5 sha256:b7b8e9a3bc6c2ac2"
 
 /// The number of digits after the point the decimal keeps.
-scale : BigDecimal -> Number
+scale : BigDecimal -> Float
 foreign pure scale from "@flick-lang/runtime" "decimalScale"
 
 /// The exact sum.
@@ -73,7 +73,7 @@ foreign pure multiply from "@flick-lang/runtime" "decimalMultiply"
 /// `mode`; `Exact` fails when rounding is needed, and so does a zero
 /// divisor.
 divide_to_scale :
-  Number -> RoundingMode -> BigDecimal -> BigDecimal -> Result DecimalError BigDecimal
+  Float -> RoundingMode -> BigDecimal -> BigDecimal -> Result DecimalError BigDecimal
 foreign pure divide_to_scale from "@flick-lang/runtime" "decimalDivideToScale"
 
 /// The same value without trailing zeros in its coefficient.
@@ -83,7 +83,7 @@ foreign pure normalize from "@flick-lang/runtime/effect/BigDecimal" "normalize"
 
 /// The value at `scale` digits after the point, cutting digits toward zero;
 /// the scale must be a safe integer.
-set_scale : Number -> BigDecimal -> Result DecimalError BigDecimal
+set_scale : Float -> BigDecimal -> Result DecimalError BigDecimal
 foreign pure set_scale from "@flick-lang/runtime/effect/BigDecimal" "flickScale"
   reviewed "effect@4.0.5 sha256:a83472f08ea851cd"
 
@@ -200,22 +200,22 @@ foreign pure is_positive from "@flick-lang/runtime/effect/BigDecimal" "isPositiv
 
 /// Rounded to `scale` digits after the point by `mode`; `Exact` fails when a
 /// digit would be lost, and the scale must be a safe integer.
-round : Number -> RoundingMode -> BigDecimal -> Result DecimalError BigDecimal
+round : Float -> RoundingMode -> BigDecimal -> Result DecimalError BigDecimal
 foreign pure round from "@flick-lang/runtime/effect/BigDecimal" "flickRound"
   reviewed "effect@4.0.5 sha256:b17f93cdbdcb8e0d"
 
 /// Cut toward zero to `scale` digits after the point.
-truncate : Number -> BigDecimal -> Result DecimalError BigDecimal
+truncate : Float -> BigDecimal -> Result DecimalError BigDecimal
 foreign pure truncate from "@flick-lang/runtime/effect/BigDecimal" "flickTruncate"
   reviewed "effect@4.0.5 sha256:7a332d19963ee0fe"
 
 /// Rounded up to `scale` digits after the point.
-ceil : Number -> BigDecimal -> Result DecimalError BigDecimal
+ceil : Float -> BigDecimal -> Result DecimalError BigDecimal
 foreign pure ceil from "@flick-lang/runtime/effect/BigDecimal" "flickCeil"
   reviewed "effect@4.0.5 sha256:1c953425ea5ddcfd"
 
 /// Rounded down to `scale` digits after the point.
-floor : Number -> BigDecimal -> Result DecimalError BigDecimal
+floor : Float -> BigDecimal -> Result DecimalError BigDecimal
 foreign pure floor from "@flick-lang/runtime/effect/BigDecimal" "flickFloor"
   reviewed "effect@4.0.5 sha256:4022beb25f56c30a"
 
@@ -231,7 +231,7 @@ instance Ord BigDecimal =
   let compare x y = compare_decimal x y
 
 instance Hash BigDecimal =
-  hash : BigDecimal -> Number
+  hash : BigDecimal -> Float
   let hash x = hash (to_string_normal x)
 
 instance Show BigDecimal =

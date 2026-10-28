@@ -57,7 +57,7 @@ In the example, to_view compiles to a pure TS function, load_view returns a nati
 
 5. The `Users` service with a test implementation and an external one.
 
-6. Generation of executable code, Number/BigInt semantics and explicit FFI callback families.
+6. Generation of executable code, Float/BigInt semantics and explicit FFI callback families.
 
 7. A scoped resource, escape checking through task/closure, and one concurrent-execution operation with the correct completion order.
 
@@ -111,7 +111,7 @@ In the example, to_view compiles to a pure TS function, load_view returns a nati
 - [x] A higher-rank callback is applied to different types; a faulty monomorphic implementation is rejected; class dictionaries and external rows are not lost.
   Tests: `tests/check/pass/types/higher_rank.fl`; `tests/check/fail/types/higher_rank.fl`; `tests/run/codegen/classes.fl`; `tests/run/codegen/higher_rank.fl`; `flick/tests/e2e.rs` (`run_cases`).
 
-- [x] Number preserves NaN, infinity, signed zero and the JS rounding order in the reference and the optimized codegen.
+- [x] Float preserves NaN, infinity, signed zero and the JS rounding order in the reference and the optimized codegen.
   Tests: `flick/tests/e2e_numbers.rs` (`numbers_match_js`); `tests/run/codegen/numbers.fl`; `flick/tests/e2e.rs` (`run_cases`); `flick-core/tests/consteval_node.rs` (`folding_matches_node`); `flick-core/src/consteval/tests.rs` (`folds_number_arithmetic_with_js_semantics`); `flick-core/src/opt/tests.rs` (`literal_expressions_fold_with_js_semantics`, `forbidden_transformations_stay_out`).
 
 - [x] Deriving Schema works for generic, higher-kinded, recursive and mutually recursive data; unsupported automatic serialization gets a precise diagnostic.
@@ -197,7 +197,7 @@ In the example, to_view compiles to a pure TS function, load_view returns a nati
 
 - [x] Higher-rank callbacks with an explicit nested `forall` in full signatures.
 
-- [x] Numbers: Number/BigInt and JS arithmetic; the BigInt suffix is n. Canonical Eq is SameValueZero; total Ord with NaN last, numeric relations keep JS semantics.
+- [x] Numbers: Float/BigInt and JS arithmetic; the BigInt suffix is n. Canonical Eq is SameValueZero; total Ord with NaN last, numeric relations keep JS semantics.
 
 - [x] `task { ... }` creates an `Eff`; `await task` runs it in the current fiber; the application is started in the entry point.
 
@@ -249,7 +249,7 @@ In the example, to_view compiles to a pure TS function, load_view returns a nati
 
 - [x] Runtime: native recovery; opaque Failure/Exit/RawCause, inert reports, region-free typed payloads; structured supervision and native race/timeout. The release optimizer preserves handlers, owner, Cause, service context, cancellation and finalizers.
 
-- [x] Data and FFI: List = dense immutable JS array; exact structural records; canonical Eq/Hash and total Number Ord; fixed ADT layout; four callback families; source iface and a limited TS façade. Modules: explicit exports, acyclic file graph, ESM; the Flick compiler is a Rust core, iface is versioned JSON.
+- [x] Data and FFI: List = dense immutable JS array; exact structural records; canonical Eq/Hash and total Float Ord; fixed ADT layout; four callback families; source iface and a limited TS façade. Modules: explicit exports, acyclic file graph, ESM; the Flick compiler is a Rust core, iface is versioned JSON.
 
 **Outside the first version:** generic do/let\*, effect-polymorphic map, associated types and user type families, overlap/local implicits, variance generalization, linear ownership/early close, nursery and detached scoped timeout, a full TS importer, decimal/duration literals, cyclic-graph codecs, additional SQL dialects and complex SQL extensions, JSX, a custom UI renderer, SSR/hydration/RSC and the full hooks model. This is a scope boundary, not a list of unanswered questions.
 

@@ -13,7 +13,7 @@ module App.Signup exposing (..)
 refined type Name = String where Checks.non_empty
   deriving Eq, Show, Schema
 
-type alias Signup = { name : Name; age : Number; nick : Option String }
+type alias Signup = { name : Name; age : Float; nick : Option String }
   deriving Schema, Form
 
 signup : Form.Draft Signup
@@ -49,7 +49,7 @@ let page =
 ## What a type derives
 
 A record type (a `type alias` of a record) that derives `Form` derives
-`Schema` too. Each field is typed from text: a `String`, a `Number`, a
+`Schema` too. Each field is typed from text: a `String`, a `Float`, a
 `Bool`, a refined type over one of them, or an `Option` of one, which is
 `None` when its input is empty. Any other field is `FLICK-D010`, which names
 the field.

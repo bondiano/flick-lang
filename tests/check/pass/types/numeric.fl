@@ -1,0 +1,41 @@
+// An integer literal is any numeric type its use asks for, else `Int`; a
+// literal with a fraction or an exponent is a `Float`.
+module App.Numeric exposing (..)
+
+count : Int
+let count = 3
+
+ratio : Float
+let ratio = 3
+
+big : BigInt
+let big = 3 + 4n
+
+mixed : Float
+let mixed = 1 + 0.5
+
+smallest : Int
+let smallest = -2147483648
+
+halves : List Float
+let halves = [1, 2.5, 3]
+
+total : Int
+let total =
+  let n = 10
+  n / 3 + n % 3
+
+as_float : Float -> Float
+let as_float x = x * 2
+
+scaled : Float
+let scaled = as_float 4
+
+is_zero : Int -> Bool
+let is_zero n =
+  match n with
+  | 0 -> true
+  | _ -> false
+
+span : List Int
+let span = [1..3]

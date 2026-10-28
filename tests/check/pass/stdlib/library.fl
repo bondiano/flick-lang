@@ -2,7 +2,7 @@
 // import, classes over type constructors, `bind` for any monad.
 module App.Library exposing (..)
 
-increment : Ref Number ->{} Number
+increment : Ref Float ->{} Float
 let increment counter =
   Ref.modify counter (fun current ->
     let next = current + 1
@@ -13,20 +13,20 @@ pair_optional : Option a -> Option b -> Option (a, b)
 let pair_optional left right =
   bind left (fun x -> Option.map (fun y -> (x, y)) right)
 
-doubled : Functor f => f Number -> f Number
+doubled : Functor f => f Float -> f Float
 let doubled values = map (fun n -> n * 2) values
 
-total : List Number -> Number
+total : List Float -> Float
 let total xs = fold (fun acc x -> acc + x) 0 xs
 
-halves : List Number ->{; Number.ArithmeticError} List Number
-let halves xs = traverse (fun x -> from_result (Number.div_int x 2)) xs
+halves : List Int ->{; Int.ArithmeticError} List Int
+let halves xs = traverse (fun x -> from_result (Int.checked_div x 2)) xs
 
-chained : Eff none none Number -> Eff none {Number.ArithmeticError} Number
-let chained eff = bind_eff eff (fun n -> task { from_result (Number.div_int n 2) })
+chained : Eff none none Int -> Eff none {Int.ArithmeticError} Int
+let chained eff = bind_eff eff (fun n -> task { from_result (Int.checked_div n 2) })
 
 sorted : List String
 let sorted = List.sort ["b", "a"]
 
-ages : HashMap.HashMap EqHash.Canonical String Number
+ages : HashMap.HashMap EqHash.Canonical String Float
 let ages = HashMap.insert "ada" 36 HashMap.empty

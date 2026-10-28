@@ -1,0 +1,32 @@
+// A function over any numeric type takes its class: on a type variable with
+// `Numeric`, the operators and integer literals use the instance's methods,
+// and a literal with a fraction needs `Floating`.
+module App.Main exposing (main)
+
+import Numeric exposing (Floating, Numeric)
+
+double : Numeric a => a -> a
+let double x = x + x
+
+offset : Numeric a => a -> a
+let offset x = -x + 10
+
+half : Floating a => a -> a
+let half x = x * 0.5
+
+average : Floating a => List a -> a
+let average xs = List.sum xs / Numeric.from_int (List.length xs)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (show (double 21))
+  Platform.stdout_line (show (double 1.5))
+  Platform.stdout_line (show (double 2n))
+  Platform.stdout_line (show (double 2147483647))
+  Platform.stdout_line (show (offset 3))
+  Platform.stdout_line (show (offset 0.5))
+  Platform.stdout_line (show (List.sum [1, 2, 3]))
+  Platform.stdout_line (show (List.sum [0.5, 0.25]))
+  Platform.stdout_line (show (List.product [2n, 3n, 7n]))
+  Platform.stdout_line (show (half 3))
+  Platform.stdout_line (show (average [1, 2, 4]))

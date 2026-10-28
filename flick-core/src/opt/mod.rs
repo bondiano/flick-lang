@@ -1,6 +1,8 @@
 //! The release optimizer: typed IR passes that keep every observable
 //! contract of the debug lowering. Rules: `docs/src/content/docs/reference/codegen.md`.
 //!
+//! - [`specialize`]: a copy of a function of the module for the numeric
+//!   instances it is called with, whose methods become operators;
 //! - [`inline`]: known full applications of small pure functions of the
 //!   module, and beta reduction;
 //! - [`fold`]: literal expressions with exact JS semantics, constant branches;
@@ -19,6 +21,7 @@
 mod fold;
 mod fuse;
 mod inline;
+mod specialize;
 mod sroa;
 mod walk;
 
@@ -38,6 +41,7 @@ const ROUNDS: usize = 2;
 /// Optimizes `module` in place; `exported` tells the values importers see.
 pub fn optimize(module: &mut Module, exported: &dyn Fn(&str) -> bool) {
     let mut fresh = 0;
+    specialize::specialize(module);
     for _ in 0..ROUNDS {
         constants(module);
         let candidates = inline::candidates(&module.name, &module.items, exported);
@@ -76,7 +80,7 @@ pub fn simplify(e: &mut Expr) {
 fn pass(e: &mut Expr) -> bool {
     let mut changed = false;
     e.each_child_mut(&mut |c| changed |= pass(c));
-    changed |= fold::fold(e) | inline::beta(e);
+    changed |= specialize::operator(e) | fold::fold(e) | inline::beta(e);
     if let ExprKind::Block(stmts, result) = &mut e.kind {
         changed |= flatten(stmts, result);
         changed |= sroa::split(stmts, result);
@@ -138,7 +142,7 @@ fn atom(e: &Expr) -> bool {
     match &e.kind {
         ExprKind::Lit(Lit::String(s)) => s.len() <= 32,
         ExprKind::Lit(_) | ExprKind::Local(_) | ExprKind::Global { .. } | ExprKind::Con(_) => true,
-        ExprKind::Neg(inner) => matches!(inner.kind, ExprKind::Lit(_)),
+        ExprKind::Neg(_, inner) => matches!(inner.kind, ExprKind::Lit(_)),
         _ => false,
     }
 }

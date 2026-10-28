@@ -3,15 +3,15 @@
 // need `Setup s` too.
 module App.ComponentSetup exposing (..)
 
-counted : forall s. Number ->{Setup s;} (Atom.Writable Number)^{s}
+counted : forall s. Float ->{Setup s;} (Atom.Writable Float)^{s}
 let counted start = Atom.local (start + 1)
 
-component counter (start : Number) =
+component counter (start : Float) =
   let count = counted start
   let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
   ui { button { on_click = bump; disabled = false } [text (show (Atom.value count))] }
 
-type alias Labelled = { label : String; start : Number }
+type alias Labelled = { label : String; start : Float }
 
 // the props are the first ones in `setup`, the current ones in `render`
 component labelled (props : Labelled) =

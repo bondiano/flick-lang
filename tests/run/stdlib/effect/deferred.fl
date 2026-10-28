@@ -2,7 +2,7 @@
 // many), `Latch`, `Semaphore` and `PartitionedSemaphore`.
 module App.Main exposing (main)
 
-type error Boom = Boom Number
+type error Boom = Boom Float
   deriving Show
 
 /// A short delay that lets the other fibers run.
@@ -13,7 +13,7 @@ unexpected : Failure e ->{} Unit
 let unexpected failure = Platform.stdout_line "unexpected failure"
 
 /// How awaiting `d` ends.
-outcome : Deferred.Deferred {Boom} Number ->{} String
+outcome : Deferred.Deferred {Boom} Float ->{} String
 let outcome d =
   try
     "ok " ++ show (Deferred.await_ d)
@@ -21,7 +21,7 @@ let outcome d =
   | Boom n -> "boom " ++ show n
 
 /// How the task `Deferred.poll` gives ends.
-outcome_of : Eff none {Boom} Number ->{} String
+outcome_of : Eff none {Boom} Float ->{} String
 let outcome_of t =
   try
     show (await t)
@@ -29,9 +29,9 @@ let outcome_of t =
   | Boom n -> "boom " ++ show n
 
 /// A fresh deferred completed by `complete`, and how awaiting it ends.
-completed : (Deferred.Deferred {Boom} Number ->{} Bool) ->{} String
+completed : (Deferred.Deferred {Boom} Float ->{} Bool) ->{} String
 let completed complete =
-  let d : Deferred.Deferred {Boom} Number = Deferred.make ()
+  let d : Deferred.Deferred {Boom} Float = Deferred.make ()
   let first = complete d
   let again = Deferred.succeed 0 d
   show (first, again) ++ " " ++ outcome d
@@ -48,7 +48,7 @@ let deferreds () =
     Ref.update runs (fun n -> n + 1)
     Ref.get runs
   }
-  let shared : Deferred.Deferred {Boom} Number = Deferred.make ()
+  let shared : Deferred.Deferred {Boom} Float = Deferred.make ()
   let _ = Deferred.complete_with counted shared
   Platform.stdout_line ("complete_with: " ++ outcome shared ++ ", " ++ outcome shared)
   let exits = parallel_exits [task { 6 }, task { from_result (Err (Boom 7)) }]
@@ -60,10 +60,10 @@ let deferreds () =
     Platform.stdout_line ("fail_cause: " ++ completed (Deferred.fail_cause failure))
     Platform.stdout_line
       ("fail_cause_sync: " ++ completed (Deferred.fail_cause_sync (fun () -> failure)))) failures
-  let into : Deferred.Deferred {Boom} Number = Deferred.make ()
+  let into : Deferred.Deferred {Boom} Float = Deferred.make ()
   let fed = task { 8 } |> Deferred.into into
   Platform.stdout_line ("into: " ++ show fed ++ " " ++ outcome into)
-  let pending : Deferred.Deferred {Boom} Number = Deferred.make ()
+  let pending : Deferred.Deferred {Boom} Float = Deferred.make ()
   let polled = match Deferred.poll pending with
     | None -> "none"
     | Some _ -> "some"
@@ -73,8 +73,8 @@ let deferreds () =
     | None -> "none"
     | Some t -> "some " ++ outcome_of t
   Platform.stdout_line ("poll: " ++ later ++ ", done " ++ show (Deferred.is_done pending))
-  let stopped : Deferred.Deferred {Boom} Number = Deferred.make ()
-  let stopped_too : Deferred.Deferred {Boom} Number = Deferred.make ()
+  let stopped : Deferred.Deferred {Boom} Float = Deferred.make ()
+  let stopped_too : Deferred.Deferred {Boom} Float = Deferred.make ()
   let interrupted = (Deferred.interrupt stopped, Deferred.interrupt_with 7 stopped_too)
   let seen = parallel_exits [task { Deferred.await_ stopped }, task { Deferred.await_ stopped_too }]
   Platform.stdout_line
@@ -143,7 +143,7 @@ let semaphores () =
   let three = Semaphore.with_permits_if_available sem 3 (task { "three" })
   Platform.stdout_line ("permits: " ++ show (taken, more, one, released, all) ++ " " ++ show three)
 
-capacity_of : PartitionedSemaphore.PartitionedSemaphore k -> Number
+capacity_of : PartitionedSemaphore.PartitionedSemaphore k -> Float
 let capacity_of sem = PartitionedSemaphore.capacity sem
 
 partitions : Unit ->{} Unit

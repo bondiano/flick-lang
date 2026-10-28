@@ -227,9 +227,9 @@ fn hover_covers_private_functions_and_ignore() {
 /// Reports a background failure.
 report : Failure e ->{} Unit
 let report failure = Platform.stderr_line (RawCause.describe (Failure.inspect failure))
-view : Atom.Writable Number -> Number -> Ui
+view : Atom.Writable Float -> Float -> Ui
 let view model m = Ui.text (show m)
-let seed = 0
+let seed = 0.0
 main : Unit ->{; AppError} Unit
 let main () =
   match Ui.Dom.container "playground" with
@@ -258,10 +258,10 @@ let main () =
         ("report (Ui", "report : Failure e ->{} Unit"),
         (
             "view model (Atom",
-            "view : Atom.Writable Number -> Number -> Ui",
+            "view : Atom.Writable Float -> Float -> Ui",
         ),
-        ("seed\n", "seed : Number"),
-        ("seed =", "seed : Number"),
+        ("seed\n", "seed : Float"),
+        ("seed =", "seed : Float"),
         ("ignore (", "ignore : Never -> Unit"),
     ] {
         let hover = lsp.request(

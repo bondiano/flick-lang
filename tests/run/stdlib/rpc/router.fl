@@ -9,20 +9,20 @@ import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 import Stream.Core exposing (Stream)
 
-double : Rpc.Rpc "double" (Number ->{r;} Number)
+double : Rpc.Rpc "double" (Float ->{r;} Float)
 let double =
   Rpc.make (Record.label : Record.Label "double")
     |> Rpc.with_payload (Codec.json Schema.number)
     |> Rpc.with_success (Codec.json Schema.number)
 
-count_to : Rpc.Rpc "count_to" (Number ->{r;} Stream none none Number)
+count_to : Rpc.Rpc "count_to" (Float ->{r;} Stream none none Float)
 let count_to =
   Rpc.make (Record.label : Record.Label "count_to")
     |> Rpc.with_payload (Codec.json Schema.number)
     |> Rpc.with_stream (Codec.json Schema.number)
 
 type alias Handlers r =
-  { double : Number ->{r;} Number; count_to : Number ->{r;} Stream none none Number }
+  { double : Float ->{r;} Float; count_to : Float ->{r;} Stream none none Float }
 
 numbers : Rpc.Group r (Handlers r)
 let numbers = Rpc.group |> Rpc.add double |> Rpc.add count_to
@@ -35,7 +35,11 @@ let hello _ =
 main : Unit ->{; AppError} Unit
 let main () =
   let handlers : Handlers none =
-    { double = fun n -> n * 2; count_to = fun n -> Stream.from_list (List.range 1 (n + 1)) }
+    {
+      double = fun n -> n * 2;
+      count_to =
+        fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
+    }
   provide (Layer.merge Http.FetchClient.layer Http.Server.layer_services) {
     try
       scope s {

@@ -64,7 +64,7 @@ fn standalone_main_preserves_exports_and_runs_in_all_emit_profiles() {
     fs::create_dir_all(&dir).expect("dir");
     fs::write(
         dir.join("Main.fl"),
-        "module Main exposing (answer, main)\n\nanswer : Number\nlet answer = 42\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"ran main\"\n",
+        "module Main exposing (answer, main)\n\nanswer : Float\nlet answer = 42\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"ran main\"\n",
     )
     .expect("write");
     for (emit, profile) in [("js", "debug"), ("ts", "debug"), ("js", "release")] {
@@ -117,7 +117,7 @@ fn build_reports_what_it_cannot_write() {
     fs::create_dir_all(&dir).expect("dir");
     fs::write(
         dir.join("Lib.fl"),
-        "module Lib exposing (one)\none : Number\nlet one = 1\n",
+        "module Lib exposing (one)\none : Float\nlet one = 1\n",
     )
     .expect("write");
     // a file where the output directory should be
@@ -297,13 +297,13 @@ fn dotted_and_underscored_modules_run_in_all_emit_profiles() {
         fs::write(
             dir.join("src")
                 .join(format!("{}.fl", module.replace('.', "/"))),
-            format!("module {module} exposing (value)\nvalue : Number\nlet value = {value}\n"),
+            format!("module {module} exposing (value)\nvalue : Float\nlet value = {value}\n"),
         )
         .expect("write");
     }
     fs::write(
         dir.join("src/Main.fl"),
-        "module Main exposing (answer)\nimport Foo.Bar\nimport Foo_Bar\nanswer : Number\nlet answer = Foo.Bar.value + Foo_Bar.value\n",
+        "module Main exposing (answer)\nimport Foo.Bar\nimport Foo_Bar\nanswer : Float\nlet answer = Foo.Bar.value + Foo_Bar.value\n",
     )
     .expect("write");
     for (emit, profile) in [("js", "debug"), ("ts", "debug"), ("js", "release")] {
@@ -337,7 +337,7 @@ fn dotted_and_underscored_modules_run_in_all_emit_profiles() {
 
 const AOT_APP: &str = r#"module Main exposing (main)
 
-type alias Point = { x : Number; y : Number }
+type alias Point = { x : Float; y : Float }
   deriving Schema
 
 point_json : PureCodec Json Point
@@ -402,7 +402,7 @@ fn build_stops_at_an_unresolved_name() {
     fs::create_dir_all(&dir).expect("dir");
     fs::write(
         dir.join("Lib.fl"),
-        "module Lib exposing (one)\nimport List\none : Number\nlet one = List.nope 1\n",
+        "module Lib exposing (one)\nimport List\none : Float\nlet one = List.nope 1\n",
     )
     .expect("write");
     let out = flick_in(&dir, &["build", "Lib.fl"]);

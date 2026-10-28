@@ -13,9 +13,9 @@ use common::flick_in;
 
 const SHAPES: &str = r#"module Lib.Shapes exposing (..)
 
-type Shape = Circle Number | Rect Number Number
+type Shape = Circle Float | Rect Float Float
 
-type alias Point = { x : Number; y : Number }
+type alias Point = { x : Float; y : Float }
   deriving Schema
 
 type error NotFound = NotFound String
@@ -29,7 +29,7 @@ instance Describe Shape =
   describe : Shape -> String
   let describe shape = "a shape"
 
-area : Shape -> Number
+area : Shape -> Float
 let area shape =
   match shape with
   | Circle r -> r * r
@@ -47,27 +47,27 @@ let identity_of x = x
 described : Describe a => a -> String
 let described x = describe x
 
-find : String ->{; NotFound} Number
+find : String ->{; NotFound} Float
 let find name = if name == "one" then 1 else from_result (Err (NotFound name))
 
-broken : Number ->{} Number
+broken : Float ->{} Float
 let broken n = n + crash ()
 
-crash : Unit ->{} Number
+crash : Unit ->{} Float
 foreign sync crash from "./crash.mjs" "crash"
   arity 0
 
-later : Number -> Eff none none Number
+later : Float -> Eff none none Float
 let later n = task { n + 1 }
 
-waiting : Number ->{} Number
+waiting : Float ->{} Float
 let waiting n =
   scope {
     ignore (Resource.acquire_release (task { n }) (fun _ -> cleanup ()))
     pause n
   }
 
-pause : Number ->{} Number
+pause : Float ->{} Float
 foreign async pause from "./crash.mjs" "pause"
   arity 1
   cancel signal
@@ -76,7 +76,7 @@ cleanup : Unit ->{} Unit
 foreign async cleanup from "./crash.mjs" "cleanup"
   arity 0
 
-maybe : List Number -> Option Number
+maybe : List Float -> Option Float
 let maybe xs =
   match xs with
   | [x] -> Some x
@@ -85,7 +85,7 @@ let maybe xs =
 
 const HKT: &str = r"module Lib.Abstract exposing (twice)
 
-twice : Functor f => f Number -> f Number
+twice : Functor f => f Float -> f Float
 let twice values = map (fun n -> n * 2) values
 ";
 
@@ -297,7 +297,7 @@ fn dotted_and_underscored_module_types_have_distinct_namespaces() {
         fs::write(
             dir.join("src")
                 .join(format!("{}.fl", module.replace('.', "/"))),
-            format!("module {module} exposing (Token(..))\ntype Token = Token Number | Empty\n"),
+            format!("module {module} exposing (Token(..))\ntype Token = Token Float | Empty\n"),
         )
         .expect("write");
     }
@@ -366,8 +366,8 @@ fn a_barrel_re_exports_what_it_exposes_from_its_modules() {
     fs::write(
         dir.join("src/Lib/Pair.fl"),
         "module Lib.Pair exposing (pair, Box(..), Point)\n\
-         type Box = Box Number\n\
-         type alias Point = { x : Number; y : Number }\n\
+         type Box = Box Float\n\
+         type alias Point = { x : Float; y : Float }\n\
          pair : a -> b -> (a, b)\nlet pair x y = (x, y)\n",
     )
     .expect("write");
@@ -452,11 +452,11 @@ fn streams_services_and_sync_exports_cross_into_effect_typescript() {
     fs::write(
         dir.join("src/Lib/Bridge.fl"),
         "module Lib.Bridge exposing (numbers, Greeter, greet, count, doubled)\n\n\
-         numbers : Stream.Stream none none Number\nlet numbers = Stream.range 1 3\n\n\
+         numbers : Stream.Stream none none Float\nlet numbers = Stream.range 1 3\n\n\
          service Greeter =\n  hello : String ->{} String\n\n\
          greet : String ->{Greeter;} String\nlet greet name = Greeter.hello name\n\n\
-         count : Atom.Writable Number\nlet count = Atom.make 21\n\n\
-         doubled : Unit ->{Atom.Read;} Number\nlet doubled () = Atom.value count * 2\n",
+         count : Atom.Writable Float\nlet count = Atom.make 21\n\n\
+         doubled : Unit ->{Atom.Read;} Float\nlet doubled () = Atom.value count * 2\n",
     )
     .expect("write");
     let build = flick_in(&dir, &["build", "--emit-dts"]);

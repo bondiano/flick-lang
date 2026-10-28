@@ -72,7 +72,7 @@ impl Checker<'_> {
                         codes::T020,
                         span,
                         format!(
-                            "the field `{shown}` of `{c}` has no JS type of its own: an `untagged type` holds `Number`, `String`, `Bool`, `BigInt` or one list or tuple"
+                            "the field `{shown}` of `{c}` has no JS type of its own: an `untagged type` holds `Float`, `String`, `Bool`, `BigInt` or one list or tuple"
                         ),
                     );
                     return;
@@ -118,7 +118,7 @@ impl Checker<'_> {
         let Type::Con { module, name } = t.spine().0 else {
             return None;
         };
-        if t.is_prim("Number") {
+        if t.is_prim("Int") || t.is_prim("Float") {
             return Some(JsClass::Number);
         }
         if t.is_prim("String") {

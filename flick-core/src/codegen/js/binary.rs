@@ -3,6 +3,7 @@
 
 use super::{Gen, indent, tidy};
 use crate::ir::{BinOp, Expr, ExprKind};
+use crate::numeric::{Arith, Num};
 use crate::source::Span;
 
 impl Gen<'_> {
@@ -10,13 +11,14 @@ impl Gen<'_> {
         // an operand that binds tighter needs no parentheses; on the right an
         // equal one keeps them, as `a + (b + c)` may round otherwise, unless
         // the operator is associative: `&&`, `||`, string `++`, or right `**`
-        let p = tidy::precedence(op);
+        let p = tidy::operand_precedence(op);
         let binds = |e: &Expr, right: bool| match &e.kind {
             ExprKind::Binary(inner, ..) => {
                 let q = tidy::precedence(*inner);
                 let associative =
                     *inner == op && matches!(op, BinOp::And | BinOp::Or | BinOp::Concat);
-                q > p || (q == p && (associative || right == (op == BinOp::Pow)))
+                let pow = matches!(op, BinOp::Arith(Arith::Pow, _));
+                q > p || (q == p && (associative || right == pow))
             }
             _ => false,
         };
@@ -56,6 +58,15 @@ impl Gen<'_> {
             BinOp::NotEq => format!("!{}({l}, {r})", self.rt("equals")),
             BinOp::ListConcat => format!("({l}).concat({r})"),
             BinOp::Concat => format!("({l} + {r})"),
+            BinOp::Arith(arith @ (Arith::Add | Arith::Sub), Num::Int) => {
+                format!("({l} {} {r} | 0)", arith.symbol())
+            }
+            BinOp::Arith(Arith::Mul, Num::Int) => format!("Math.imul({l}, {r})"),
+            BinOp::Arith(Arith::Div, Num::Int) => format!("{}({l}, {r})", self.rt("divInt")),
+            BinOp::Arith(Arith::Rem, Num::Int) => format!("{}({l}, {r})", self.rt("remInt")),
+            BinOp::Arith(Arith::Pow, Num::Int) => format!("{}({l}, {r})", self.rt("powInt")),
+            BinOp::Arith(Arith::Div, Num::BigInt) => format!("{}({l}, {r})", self.rt("divBigInt")),
+            BinOp::Arith(Arith::Rem, Num::BigInt) => format!("{}({l}, {r})", self.rt("remBigInt")),
             _ => format!("({l} {} {r})", op.symbol()),
         }
     }

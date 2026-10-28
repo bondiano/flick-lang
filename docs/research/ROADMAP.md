@@ -35,7 +35,7 @@
 Сейчас (✅, `c0c5fe3`…`d37114c`):
 
 ```flick
-count : Writable Number                    // метка "App.Counter.count"
+count : Writable Float                    // метка "App.Counter.count"
 let count = Atom.make 0
 
 increment : Action.Action ClickSnapshot {Atom.Write} {}
@@ -266,10 +266,10 @@ component search (props : SearchProps) =
 **F3. Запросы и мутации.** ✅ (`Atom.query keys task`, `Atom.query_stream keys stream` (без своей мутации), `Atom.mutation keys f` — после успеха `f` перезапускает прочитанные реестром запросы тех же ключей, неудача ничего не трогает; через механизм Effect: `Atom.withReactivity` и `Reactivity` реестра (тот же экземпляр, что у `AtomRpc`, через общую memo map), мутация инвалидирует ключи одной пачкой (`Atom.batch`), так что запрос нескольких ключей перезапускается один раз; сам `AtomRpc`/`AtomHttpApi` не взят: его `mutation` — атом с записью payload, а не функция с типизированной ошибкой, а `serializationKey` переносит и Failure (Q14); `serializable_task` над `query` получает ключ привязки — R3, гидратированный запрос не перезапускается, а мутация его ключа перезапускает (`tests/run/ui/stream.fl`); `tests/run/ui/query.fl`, `tests/check/pass/ui/query.fl`)
 - AC: на механизме инвалидации Effect (`Reactivity`, общий с `AtomRpc`/`AtomHttpApi`); query инвалидируется мутацией с тем же `reactivityKeys` (тест); stream-запрос — отдельный тип без `mutation`; `serializationKey` участвует в R3.
 
-**F4. Маршруты.** ✅ (`deriving Url` поверх свидетеля Schema: конструктор в kebab-case — первый сегмент, `Home`/`Index` — `/`, поля — сегменты `String`/`Number`/`Bool`/уточнённые, последнее поле-запись — query с `Option`-параметрами, иначе `FLICK-D009` с путём поля; компаньон `T.url : Url T`, модуль `Route` (`print`, `parse`), разбор проверяется схемой типа; `Atom.route url fallback` — `location`, `popstate`, запись — `pushState`; на сервере URL кладёт `Atom.serving`, разбор мемоизирован по URL, иначе стрим не сходится; `Atom.loader route load` — task-атом, перезапускаемый при смене маршрута, гидрированный результат — его первый запуск через `initialValueTarget`; `tests/run/schema/route.fl` (round-trip `Arbitrary.check` по 200 значениям; одиночный суррогат печатается как U+FFFD), `tests/run/ui/route.fl` (SSR `/user/42` без повторной загрузки, переход, «назад», `NotFound` с сервера), `tests/check/fail/schema/url.fl`; `reference/route.md`)
+**F4. Маршруты.** ✅ (`deriving Url` поверх свидетеля Schema: конструктор в kebab-case — первый сегмент, `Home`/`Index` — `/`, поля — сегменты `String`/`Float`/`Bool`/уточнённые, последнее поле-запись — query с `Option`-параметрами, иначе `FLICK-D009` с путём поля; компаньон `T.url : Url T`, модуль `Route` (`print`, `parse`), разбор проверяется схемой типа; `Atom.route url fallback` — `location`, `popstate`, запись — `pushState`; на сервере URL кладёт `Atom.serving`, разбор мемоизирован по URL, иначе стрим не сходится; `Atom.loader route load` — task-атом, перезапускаемый при смене маршрута, гидрированный результат — его первый запуск через `initialValueTarget`; `tests/run/schema/route.fl` (round-trip `Arbitrary.check` по 200 значениям; одиночный суррогат печатается как U+FFFD), `tests/run/ui/route.fl` (SSR `/user/42` без повторной загрузки, переход, «назад», `NotFound` с сервера), `tests/check/fail/schema/url.fl`; `reference/route.md`)
 - AC: `Route` ADT ↔ URL с выведенным парсером/принтером (round-trip property-тест); `Atom.route` с server value из запроса; loader маршрута гидрируется.
 
-**F5. Формы.** ✅ (`deriving Form` на записи с `Schema`: поля `String`/`Number`/`Bool`/уточнённые или `Option` их, иначе `FLICK-D010`; компаньоны `T.form : Form T` и `T.fields` — запись `Form.Field`, опечатка в поле — обычная `T003`; модуль `Form`: `draft` (атомы текста и ошибки на поле), `input` (подпись, `aria-label`, `aria-describedby` на ошибку-alert, `aria-invalid` — новое поле `Ui.Host`), `validate` (текст читается как тип поля, запись проверяется схемой со всеми ошибками, `errors: "all"` только здесь, ошибки ложатся по первому сегменту пути, фокус на первое неверное поле в порядке страницы), `report`; асинхронная проверка — `Ui.Event.latest`, новый ввод её прерывает; `tests/run/ui/form.fl`, `tests/check/fail/schema/form.fl`; `reference/form.md`)
+**F5. Формы.** ✅ (`deriving Form` на записи с `Schema`: поля `String`/`Float`/`Bool`/уточнённые или `Option` их, иначе `FLICK-D010`; компаньоны `T.form : Form T` и `T.fields` — запись `Form.Field`, опечатка в поле — обычная `T003`; модуль `Form`: `draft` (атомы текста и ошибки на поле), `input` (подпись, `aria-label`, `aria-describedby` на ошибку-alert, `aria-invalid` — новое поле `Ui.Host`), `validate` (текст читается как тип поля, запись проверяется схемой со всеми ошибками, `errors: "all"` только здесь, ошибки ложатся по первому сегменту пути, фокус на первое неверное поле в порядке страницы), `report`; асинхронная проверка — `Ui.Event.latest`, новый ввод её прерывает; `tests/run/ui/form.fl`, `tests/check/fail/schema/form.fl`; `reference/form.md`)
 - AC: `deriving Form` из record-типа; валидация — derived; ошибки кодека маппятся на пути полей; async-валидатор прерывается при новом вводе.
 
 **F6. Шаблон проекта.** ✅ (`flick new/init --template fullstack`: входы `server` (`Runner.Node`, слушает `PORT`) и `web` (`Runner.Browser`, `target = "client"`), общий модуль `App.Api` из `server fn` — чтение всем, запись под `Server.authenticated` по cookie `session`, хранилище `App.Store` — сервис только сервера, страница: `Atom.query`/`mutation` и форма F5, Vite с `@flick-lang/astro` и прокси `/_flick`; `flick dev` без имени запускает все неклиентские входы и Vite для клиентских; тест — `flick/tests/cli_fullstack.rs` (check, fmt, `flick dev` отвечает на вызовы, запись без сессии — `Unauthorized`), а не `e2e.rs`, который гоняет только фикстуры; `@flick-lang/astro` пока `private` и не публикуется, как и рантайм — релиз npm-пакетов не собирает)
@@ -310,7 +310,7 @@ component search (props : SearchProps) =
 
 **H3. `[build] effect = "none"`.** ✅ `c2cfa9b`, `64efe93`
 - AC: вызов времени выполнения — `E001`, `task`, уточнённый тип, схема и встроенный модуль без версии на `core` — `E008`; `main` — `Unit -> Unit`.
-- AC: вывод импортирует только `@flick-lang/runtime/core`, где нет ни одного импорта `effect` (тест); Option/Result — простые данные с полями Effect, привязки Prelude, List, Option, Result, String, Number, Bool сверены с Effect parity-тестами; программа `none` в `just bundle-size` — 0.4 KB gzip без `effect/dist/*`.
+- AC: вывод импортирует только `@flick-lang/runtime/core`, где нет ни одного импорта `effect` (тест); Option/Result — простые данные с полями Effect, привязки Prelude, List, Option, Result, String, Float, Bool сверены с Effect parity-тестами; программа `none` в `just bundle-size` — 0.4 KB gzip без `effect/dist/*`.
 - AC: библиотека на Effect пишет в `_core/` модули, которым Effect не нужен, и отмечает это в `.iface` (`abi.core`); приложение `none` импортирует их, модуль пакета без такой сборки — `E008`; библиотека, собранная только с `none`, в приложении на Effect — `P027` (её Option не Effect'овский, `==` их не сравнит).
 
 **H4. `[build] ui`.** ✅ `727e396`
@@ -330,7 +330,7 @@ component search (props : SearchProps) =
 - AC: `spec/01,02,05,06` (en + ru) описывают `do` над `Monad` с чистыми продолжениями, `for … yield` и `[for … yield]` вместо «без обобщённого `do`».
 
 **D2. Классы прелюдии.** ✅
-- AC: `Semigroup`, `Monoid` (инстансы `String`, `List a`; у `Number` нет — обёртки D13), `Alternative` (`nothing`, `or_else`; `Option`, `List`), `Applicative.map2` во всех инстансах (foreign: каррированное тело на Flick не проходит проверку захватов — замыкание держит `f a`).
+- AC: `Semigroup`, `Monoid` (инстансы `String`, `List a`; у `Float` нет — обёртки D13), `Alternative` (`nothing`, `or_else`; `Option`, `List`), `Applicative.map2` во всех инстансах (foreign: каррированное тело на Flick не проходит проверку захватов — замыкание держит `f a`).
 
 **D3. `do`: синтаксис, типы, IR.** ✅ (вместе с D4)
 - AC: `do { … }`; утверждения `p <- e`, `let`, `let assert`, `if c` без `then`, выражение; `<-` — токен лексера (`a<-1` — `FLICK-S013` с подсказкой `a < -1`; отформатированный код всегда пишет `a < -1`); `do` без скобок — `FLICK-S010`.
@@ -478,7 +478,7 @@ Eff сохраняет fiber/service/error identity. Stream работает в 
 **Q8. P1 — Error row не гарантирует wire-codecs** ✅ (строка ошибок допускает переменную типа как элемент: `{t | e}` — метка `~t` следует за элементом и становится `Module.Name`, когда `t` решена; одноимённые элементы с разными аргументами унифицируются, а не отбрасываются. `HttpApi`/`Rpc`: `ErrorCases e`, `errors : ErrorCases none`, `error_case … : ErrorCases e -> ErrorCases {t | e}`, `with_errors` добавляет `e2` к строке обработчика; эндпоинт и процедура начинаются без ошибок, так что ошибка без codec — E002/C001 до запуска, а не 500. `with_multipart_stream_payload` добавляет `MultipartError`, сервер отвечает её статусом; `tests/check/{pass,fail}/effects/variable_entries.fl`, `tests/check/fail/stdlib/error_codecs.fl`)
 NotFound без with_errors принимается и становится 500 — [заявленный fallback](../../flick-core/src/types/builtins/HttpApi.fl#L177-L188). Проверять полноту codecs по error row: новый Conflict без codec отвергается до запуска. AC для S2/F2.
 
-Элемент-переменная, решённая не-error типом (`error_case 404 (Codec.json Schema.number)`), — T002 «`Number` is not an error» на вызове: инстанцирование записывает элементы `~t`, а `report_regions` проверяет их формы; E002 о той же строке не дублируется.
+Элемент-переменная, решённая не-error типом (`error_case 404 (Codec.json Schema.number)`), — T002 «`Float` is not an error» на вызове: инстанцирование записывает элементы `~t`, а `report_regions` проверяет их формы; E002 о той же строке не дублируется.
 
 **Q9. P1 — Нет SQL-транзакционной композиции** ✅ (`Database.transaction body`: тело на одном соединении между `BEGIN` и `COMMIT`, сервис `Database` внутри привязан к этому соединению; неудача или прерывание — `ROLLBACK` (при прерывании соединение закрывается, сервер откатывает сам), вложенная транзакция — `SAVEPOINT`/`RELEASE`/`ROLLBACK TO`; другие вызывающие берут другие соединения; `runtime/test/sql.test.ts` на поддельном пуле и `tests/postgres/tx.fl` на настоящем PostgreSQL: CHECK второй записи откатывает первую, при pool=1 откат одного не отменяет коммит другого, точка сохранения)
 Первая запись пережила CHECK-ошибку второй; при pool=1 чужой ROLLBACK отменил успешную запись B. [Запросы отдельно берут connection](../../runtime/src/sql/pg.ts#L138-L184). Нужен scoped transaction с commit/rollback и изоляцией callers; raw BEGIN/Tx.atomically не замена. До F3/F6.
@@ -513,12 +513,12 @@ L6/H2 и Vite есть; server/client isolation и общий dev workflow — �
 Ниже — срез `4a96533`, JS/debug и JS/release; пункт Q24 — checker.
 
 **Q17. P1 — Sync-композиция генерирует невалидный JS** ✅ (операнды Sync-вызова в генераторе, где есть `yield*`, становятся константами до `$rt.sync`; `tests/run/ui/sync.fl`)
-Runtime-вызов `read_more (Atom.current count)`, где `read_more : Number ->{Atom.Read;} Number`, собирается, но импорт падает с SyntaxError. [Wrapper](../../flick-core/src/codegen/js/expr.rs#L178-L200) помещает `yield*` в обычную стрелку `() => read_more(yield* …)`.
+Runtime-вызов `read_more (Atom.current count)`, где `read_more : Float ->{Atom.Read;} Float`, собирается, но импорт падает с SyntaxError. [Wrapper](../../flick-core/src/codegen/js/expr.rs#L178-L200) помещает `yield*` в обычную стрелку `() => read_more(yield* …)`.
 
 Вычислять callee/arguments до wrapper. Контроли с отдельными let работают; ошибка блокирует весь модуль.
 
 **Q18. P1 — Atom.Read запускает Eff-значение** ✅ (ABI задаёт провайдер: JS-реализация Sync-сервиса помечена `syncAbi` и отдаёт значение как есть, у `S.Impl` из Flick эффект последней стадии исполняется; `tests/run/ui/sync_data.fl`, `runtime/test/sync.test.ts`)
-`Atom.make (task { …; 41 })` через derived/Atom.value выполняет задачу при чтении; await полученного Number даёт TypeError. Atom.current сохраняет Eff холодным.
+`Atom.make (task { …; 41 })` через derived/Atom.value выполняет задачу при чтении; await полученного Float даёт TypeError. Atom.current сохраняет Eff холодным.
 
 [syncOperation](../../runtime/src/sync.ts#L36-L46) путает ABI и данные через `Effect.isEffect(result)`. Нормализовать ABI провайдера, не значение. Чтение не должно выполнять скрытые сервисы/ошибки.
 
@@ -533,10 +533,10 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 [call_effects](../../flick-core/src/types/effects.rs#L184-L199) проверяет стадию, но await/scope вызывают perform напрямую. Применять ограничение ко всем исполняющим Runtime конструкциям, как требует D7.
 
 **Q21. P1 — Option ? нарушает выведенный тип** ✅ (несовпадение результата, навязанного `?`, с телом — T003; `tests/check/fail/types/question.fl`)
-`value : Number; let value = (fun () -> (None : Option Number)? + 1) ()` принимается, экспортируя None вместо Number. [function_with](../../flick-core/src/types/infer.rs#L357-L378) игнорирует неудачную unify результата, навязанного `?`, с телом. Нужна ошибка типов; корректное тело с Some возвращает None.
+`value : Float; let value = (fun () -> (None : Option Float)? + 1) ()` принимается, экспортируя None вместо Float. [function_with](../../flick-core/src/types/infer.rs#L357-L378) игнорирует неудачную unify результата, навязанного `?`, с телом. Нужна ошибка типов; корректное тело с Some возвращает None.
 
 **Q22. P1 — and принимает скаляр как контейнер** ✅ (первый операнд проверяется через `expect`, как остальные, после второго, который задаёт контейнер; `tests/check/fail/types/applicative_do.fl`)
-`do { x <- 1 and y <- Some 2; pure (x + y) } : Option Number` даёт None. Обычный `map2 (fun x y -> x + y) 1 (Some 2)` отвергается с T003; корректная группа — Some 3.
+`do { x <- 1 and y <- Some 2; pure (x + y) } : Option Float` даёт None. Обычный `map2 (fun x y -> x + y) 1 (Some 2)` отвергается с T003; корректная группа — Some 3.
 
 [Первая unify](../../flick-core/src/types/applicative_do.rs#L71-L81) игнорирует ошибку. Проверять первый operand как остальные: sugar не обходит типобезопасность.
 
@@ -546,14 +546,14 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 [prelude_pure вызывается до binding patterns](../../flick-core/src/types/applicative_do.rs#L62-L66), принимая локальную функцию за sugar. Разрешать callee в правильном lexical scope.
 
 **Q24. P2 — Квалификация pure требует лишний Monad** ✅ (`Prelude.pure` разрешается через квалификатор модуля, скобки вокруг `pure e` прозрачны; `tests/run/codegen/applicative_do.fl`)
-Для `both : Applicative f => f Number -> f Number -> f Number` терминальный `pure (x+y)` после and принимается; `Prelude.pure (x+y)` или `(pure (x+y))` дают C001: нужен Monad f. Validation намеренно не Monad.
+Для `both : Applicative f => f Float -> f Float -> f Float` терминальный `pure (x+y)` после and принимается; `Prelude.pure (x+y)` или `(pure (x+y))` дают C001: нужен Monad f. Validation намеренно не Monad.
 
 [Сравнивается текст](../../flick-core/src/types/applicative_do.rs#L214-L227). Распознавать resolved method и прозрачные скобки, сохраняя shadowing.
 
 **Q25. P2 — Конечный range перестаёт продвигаться** ✅ (`seqRangeTo`/`seqRangeBy`/`seqFrom`/`listRange` кончаются на достигнутом конце или на шаге, который не меняет число; `runtime/test/seq.test.ts`)
 `Seq.take 3 (9007199254740992..9007199254740992)` дал три копии вместо одной; `[7..7]` корректен. Полный сбор большого диапазона не запускался.
 
-В [seqRangeTo](../../runtime/src/core/seq.ts#L26-L29) `i++` не меняет этот Number. Завершать достигнутый endpoint и обрабатывать непродвигающийся шаг.
+В [seqRangeTo](../../runtime/src/core/seq.ts#L26-L29) `i++` не меняет этот Float. Завершать достигнутый endpoint и обрабатывать непродвигающийся шаг.
 
 **Q26. P1 — Fusion выносит return None из callback** ✅ (лямбда с собственным `o?` не встраивается в цикл, а связывается и вызывается — та же проверка `exits`, что у beta-редукции; `tests/run/codegen/fusion.fl`)
 `Seq.map (fun x -> Some ((if x == 2 then None else Some x)? + 1)) (for x <- [1,2,3] yield x)` даёт в debug `[Some 2,None,Some 4]`, в release `[Some 2]`. С Seq.to_list внутри функции release возвращает None вместо List.
@@ -563,7 +563,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 **Q27. P2 — Fractional take меняется в release** ✅ (контракт — усечение, как у `List.take`: `seqTake`/`seqDrop` и предел fusion берут `Math.trunc(n)`, NaN — ноль; `tests/run/codegen/fusion.fl`)
 `Seq.take 1.5 (for x <- [1,2,3,4] yield x)` отдаёт четыре элемента в debug, два в release; 0.5 — четыре против одного. Целые, NaN/Infinity, порядок take/filter совпали.
 
-[Runtime](../../runtime/src/core/seq.ts#L87-L95) ждёт `--left === 0`, [fusion](../../flick-core/src/codegen/js/generator.rs#L90-L98) — `++count >= n`. Определить единый контракт count; публичный Number не требует целого.
+[Runtime](../../runtime/src/core/seq.ts#L87-L95) ждёт `--left === 0`, [fusion](../../flick-core/src/codegen/js/generator.rs#L90-L98) — `++count >= n`. Определить единый контракт count; публичный Float не требует целого.
 
 **Q28. P1 — Fusion меняет eager evaluation и defects** ✅ (строгий `[for …]` сливается с потребителем, только если его тело или callback не может бросить — `droppable` по источникам, условиям и элементам; ленивые цепочки как были; `opt/tests.rs`)
 `Seq.first (for x <- [for y <- [1n,0n] yield 1n/y] yield x)` меняется с Division by zero на Some 1n. `List.map (fun x -> 2n ** (0n-x)) [for y <- [1n,0n] yield 1n/y]` меняет ошибку деления на `undefined must be positive`.

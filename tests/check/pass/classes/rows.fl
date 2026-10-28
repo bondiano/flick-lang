@@ -2,13 +2,13 @@
 // carries them as assumptions of the signature.
 module App.Rows exposing (..)
 
-with_id : { name : String; id : Number }
+with_id : { name : String; id : Float }
 let with_id = Record.extend (Record.label : Record.Label "id") 1 { name = "n" }
 
-merged : { a : Number; b : String; c : Bool }
+merged : { a : Float; b : String; c : Bool }
 let merged = Record.merge_disjoint { a = 1; c = true } { b = "b" }
 
-age : Number
+age : Float
 let age = Record.get (Record.label : Record.Label "age") { age = 3; name = "n" }
 
 projected : { name : String }
@@ -20,8 +20,8 @@ let without = Record.remove (Record.label : Record.Label "age") { age = 3; name 
 names : List String
 let names = Record.labels { b = 1; a = 2 }
 
-tag : Record.Lacks "tag" { id : Number | r } => { id : Number | r } ->
-  { id : Number; tag : String | r }
+tag : Record.Lacks "tag" { id : Float | r } => { id : Float | r } ->
+  { id : Float; tag : String | r }
 let tag value = Record.extend (Record.label : Record.Label "tag") "t" value
 
 name_of : Record.HasField "name" r String => r -> String
@@ -32,8 +32,8 @@ let user_name = name_of { name = "n"; age = 1 }
 
 type Proxy a = Proxy
 
-mapped : Record.Map Option { a : Number; b : String } out => Proxy out -> Proxy out
+mapped : Record.Map Option { a : Float; b : String } out => Proxy out -> Proxy out
 let mapped proxy = proxy
 
-options : Proxy { a : Option Number; b : Option String }
+options : Proxy { a : Option Float; b : Option String }
 let options = mapped Proxy

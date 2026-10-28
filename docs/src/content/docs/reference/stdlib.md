@@ -44,7 +44,8 @@ and `Monad`.
 | `Chunk` | Effect's `Chunk`, for repeated concatenation |
 | `Js.Array` | mutable JS arrays, behind runtime operations; lists are copied in and out |
 | `String` | `split`, `join`, `slice`, `index_of`, `to_number`, … over UTF-16 code units |
-| `Number` | `strict_equal` (`===`), `same_value` (`Object.is`), rounding, `parse`, bitwise `bit_*` and `shift_*`, checked integer operations `add_int`, `div_int`, … returning `Result ArithmeticError Number` |
+| `Int` | `to_float`, `from_float`, `truncate`, `parse`, bitwise `bit_*` and `shift_*`, checked `checked_add`, `checked_div`, … returning `Result ArithmeticError Int`, and `unsafe_div`, `unsafe_rem` |
+| `Float` | `strict_equal` (`===`), `same_value` (`Object.is`), rounding, `parse`, `is_nan`, `is_finite`, … |
 | `BigInt` | conversions and checked `divide`, `remainder` |
 | `Ref` | `make`, `get`, `set`, `modify`, and `same` for identity; no `Eq` or `Hash` |
 | `Redacted` | `make`, `reveal` (runtime); `show` prints `<redacted>` |
@@ -73,7 +74,7 @@ a linter checks, see [effect-surface.md](../effect-surface/).
 
 ## Numbers
 
-`Ord Number` is a total order: `-Infinity` < finite numbers < `Infinity` <
+`Ord Float` is a total order: `-Infinity` < finite numbers < `Infinity` <
 `NaN`, signed zeros equal and all NaNs equal, so `List.sort` puts `NaN` last.
 The operators `<`, `<=`, `>`, `>=` keep their JS meaning.
 
@@ -91,7 +92,7 @@ without a global precision:
 | `Exact` | `DecimalError` | `DecimalError` | `DecimalError` | `DecimalError` |
 
 A zero divisor and a scale that is not a safe integer are `DecimalError`
-too. `Duration.millis (-1)`, `Duration.millis Number.nan` and a conversion
+too. `Duration.millis (-1)`, `Duration.millis Float.nan` and a conversion
 that overflows are `Err (DurationError …)`; an unbounded duration is
 `Duration.infinity`, and `Duration.to_millis` gives `None` for it.
 
@@ -108,7 +109,7 @@ set's own witness, and `HashSet.union` of sets of two witnesses is a type
 error: `HashSet.rehash witness set` moves a set to another witness first.
 
 ```flick
-case_blind : Number
+case_blind : Float
 let case_blind =
   EqHash.with
     (fun a b -> String.to_lower a == String.to_lower b)

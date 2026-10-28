@@ -14,12 +14,12 @@ type error CronParseError = CronParseError String
 /// zone is required, so matching never depends on the machine's zone.
 type alias Fields =
   {
-    seconds : Option (List Number);
-    minutes : List Number;
-    hours : List Number;
-    days : List Number;
-    months : List Number;
-    weekdays : List Number;
+    seconds : Option (List Float);
+    minutes : List Float;
+    hours : List Float;
+    days : List Float;
+    months : List Float;
+    weekdays : List Float;
     and : Option Bool;
     tz : DateTime.TimeZone;
   }
@@ -56,7 +56,7 @@ foreign pure prev from "@flick-lang/runtime/effect/Cron" "flickPrev"
   reviewed "effect@4.0.5 sha256:918047eefaa443f0"
 
 /// The first `n` matching date-times after `now`.
-sequence : Number -> DateTime.DateTime -> Cron -> List DateTime.DateTime
+sequence : Float -> DateTime.DateTime -> Cron -> List DateTime.DateTime
 foreign pure sequence from "@flick-lang/runtime/effect/Cron" "flickSequence"
   reviewed "effect@4.0.5 sha256:b5ba16bdd3820ae7"
 

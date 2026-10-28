@@ -10,7 +10,7 @@ title: "Серверные функции"
 ```flick
 module App.Shop exposing (Order, OutOfStock, place)
 
-type alias Order = { item : String; count : Number }
+type alias Order = { item : String; count : Float }
   deriving Schema
 
 type error OutOfStock = OutOfStock String
@@ -25,7 +25,7 @@ server fn place order =
 
 Сигнатура прямо над `server fn` описывает то, что выполняет сервер:
 параметры, нужные сервисы и ошибки. Выполняется только последняя стрелка:
-`String -> Number ->{Server.Server;} String` принимает два параметра. Вызывающий код видит другой тип:
+`String -> Float ->{Server.Server;} String` принимает два параметра. Вызывающий код видит другой тип:
 
 ```flick
 place : Order ->{; Rpc.ClientError, OutOfStock} String

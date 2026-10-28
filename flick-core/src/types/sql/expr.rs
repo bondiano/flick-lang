@@ -308,7 +308,7 @@ impl Checker<'_> {
         }
     }
 
-    /// Arithmetic needs `Number`, `BigInt` or `BigDecimal`.
+    /// Arithmetic needs `Float`, `BigInt` or `BigDecimal`.
     fn sql_numeric(&mut self, v: &Val, node: &Node, op: &str) {
         let ty = self.whnf(&self.zonk(&v.ty));
         if !matches!(ty, Type::Meta(_) | Type::Error) && numeric(&ty).is_none() {
@@ -316,7 +316,7 @@ impl Checker<'_> {
             self.error(
                 codes::Q010,
                 self.span(node),
-                format!("`{op}` in SQL takes `Number`, `BigInt` or `BigDecimal`, not `{shown}`"),
+                format!("`{op}` in SQL takes `Float`, `BigInt` or `BigDecimal`, not `{shown}`"),
             );
         }
     }
@@ -496,7 +496,7 @@ impl Checker<'_> {
                     self.error(
                         codes::Q010,
                         self.span(arg),
-                        format!("`{name}` takes `Number`, `BigInt` or `BigDecimal`, not `{shown}`"),
+                        format!("`{name}` takes `Float`, `BigInt` or `BigDecimal`, not `{shown}`"),
                     );
                     return Val::error();
                 };
@@ -549,7 +549,7 @@ pub fn column_of(alias: &Alias, column: &str) -> Val {
 pub fn numeric(ty: &Type) -> Option<&'static str> {
     match ty {
         Type::Con { module, name } => match (module.as_str(), name.as_str()) {
-            ("Prelude", "Number") => Some("number"),
+            ("Prelude", "Int" | "Float") => Some("number"),
             ("Prelude", "BigInt") => Some("bigint"),
             ("BigDecimal", "BigDecimal") => Some("numeric"),
             _ => None,

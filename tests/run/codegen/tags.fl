@@ -2,7 +2,7 @@
 // name: a user `Some` is not the native `Option`.
 module App.Main exposing (main)
 
-type Choice = Some Number | Empty
+type Choice = Some Float | Empty
 
 tag_of : a -> String
 foreign pure tag_of from "./tags.mjs" "tagOf"

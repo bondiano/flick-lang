@@ -405,7 +405,7 @@ fn check_and_build_run_no_code_of_the_program() {
         "import {{ writeFileSync }} from \"node:fs\";\nwriteFileSync({:?}, \"loaded\");\nexport const now = () => 1;\n",
         witness.display().to_string()
     );
-    let main = "module App.Main exposing (main)\n\nnow : Unit ->{} Number\nforeign sync now from \"./effect.mjs\" \"now\"\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (show (now ()))\n";
+    let main = "module App.Main exposing (main)\n\nnow : Unit ->{} Float\nforeign sync now from \"./effect.mjs\" \"now\"\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (show (now ()))\n";
     let dir = project(
         "cli_effects",
         &[
@@ -425,7 +425,7 @@ const LIB: &str = "schema-version = 1\n\n[project]\nkind = \"lib\"\n";
 const API: &str = "module Lib.Api exposing (Shape(..), Store, Named, measure, keep, fetch)
 
 /// A shape.
-type Shape = Circle Number | Square Number
+type Shape = Circle Float | Square Float
 
 /// Where things are kept.
 service Store =
@@ -437,14 +437,14 @@ class Named a =
   name : a -> String
 
 /// The area.
-measure : Shape -> Number
+measure : Shape -> Float
 let measure s =
   match s with
   | Circle r -> r * r * 3
   | Square a -> a * a
 
 /// Keeps a callback that holds `c`.
-keep : forall c. (Unit -> Number)^c -> (Unit -> Number)^c
+keep : forall c. (Unit -> Float)^c -> (Unit -> Float)^c
 let keep f = f
 
 /// Puts every name.
@@ -461,13 +461,13 @@ fn doc_shows_source_types_kinds_constraints_effects_and_captures() {
     for expected in [
         "### `Shape`",
         "Kind: `Type`",
-        "Circle : Number -> Shape",
+        "Circle : Float -> Shape",
         "A shape.",
         "service Store =",
         "put : String ->{none; StoreError} Unit",
         "class Named a =",
         "fetch : forall a. Named a => List a ->{Store; StoreError} Unit",
-        "keep : forall c. (Unit -> Number)^c -> (Unit -> Number)^c",
+        "keep : forall c. (Unit -> Float)^c -> (Unit -> Float)^c",
         "The area.",
     ] {
         assert!(page.contains(expected), "`{expected}` in\n{page}");

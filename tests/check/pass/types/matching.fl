@@ -12,18 +12,18 @@ module App.Matching exposing (
 )
 
 type Shape =
-  | Circle Number
-  | Rect Number Number
+  | Circle Float
+  | Rect Float Float
   | Empty
 
-describe : Option Number -> String
+describe : Option Float -> String
 let describe value =
   match value with
   | Some 0 -> "zero"
   | Some _ -> "number"
   | None -> "nothing"
 
-area : Shape -> Number
+area : Shape -> Float
 let area shape =
   match shape with
   | Circle r -> r * r * 3
@@ -31,21 +31,21 @@ let area shape =
   | Rect w h -> w * h
   | Empty -> 0
 
-flags : (Bool, Bool) -> Number
+flags : (Bool, Bool) -> Float
 let flags pair =
   match pair with
   | (true, true) -> 3
   | (true, false) | (false, true) -> 1
   | (false, false) -> 0
 
-pairs : Result String (Option Number) -> Number
+pairs : Result String (Option Float) -> Float
 let pairs value =
   match value with
   | Ok (Some n) -> n
   | Ok None -> 0
   | Err _ -> -1
 
-lists : List Number -> Number
+lists : List Float -> Float
 let lists items =
   match items with
   | [] -> 0
@@ -53,35 +53,35 @@ let lists items =
   | [x, y] -> x + y
   | _ -> -1
 
-rests : List Number -> Number
+rests : List Float -> Float
 let rec rests items =
   match items with
   | [] -> 0
   | [x, ...rest] -> x + rests rest
 
-prefixes : List Number -> Number
+prefixes : List Float -> Float
 let prefixes items =
   match items with
   | [a] -> a
   | [a, b, ..._] -> a + b
   | [] -> 0
 
-asserted : List Number -> Number
+asserted : List Int -> Int
 let asserted items =
   let assert [x, ...rest] = items as "no items"
   x + List.length rest
 
-everything : List Number -> List Number
+everything : List Float -> List Float
 let everything items =
   let [...all] = items
   all
 
-labels : { label : String; size : Number } -> String
+labels : { label : String; size : Float } -> String
 let labels value =
   match value with
   | { label = "big" } -> "big"
   | { size = 0 } -> "empty"
   | _ -> "other"
 
-unit : Unit -> Number
+unit : Unit -> Float
 let unit () = 0

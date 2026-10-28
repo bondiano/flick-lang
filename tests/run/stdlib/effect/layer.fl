@@ -37,7 +37,7 @@ let recovered =
       | BootError m -> Platform.stdout_line ("tap_error " ++ m))
     |> Layer.catch (fun _ -> fallback)
 
-counting : Ref Number -> Layer none none {Config}
+counting : Ref Float -> Layer none none {Config}
 let counting count =
   Layer.effect Config (task {
     Ref.update count (fun n -> n + 1)

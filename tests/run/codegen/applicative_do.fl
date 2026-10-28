@@ -2,19 +2,19 @@
 // Followed only by `pure e`, the block needs `Applicative` alone.
 module App.Main exposing (main)
 
-pair : Option Number -> Option String -> Option String
+pair : Option Float -> Option String -> Option String
 let pair n s = do { x <- n and y <- s; pure (y ++ show x) }
 
 // every combination, in order
-grid : List Number -> List String -> List String
+grid : List Float -> List String -> List String
 let grid xs ys = do { x <- xs and y <- ys and z <- [true, false]; pure (y ++ show x ++ show z) }
 
 // any `Applicative`
-both : Applicative f => f Number -> f Number -> f Number
+both : Applicative f => f Float -> f Float -> f Float
 let both a b = do { x <- a and y <- b; pure (x + y) }
 
 // a group followed by more statements is `flat_map` over its tuple
-chained : Option Number -> Option Number -> Option Number
+chained : Option Float -> Option Float -> Option Float
 let chained a b =
   do {
     (x, w) <- Option.map (fun v -> (v, v * 10)) a and y <- b
@@ -31,7 +31,7 @@ let carry value =
     Some (kept, value)
   }
 
-ticks : Eff none none Number
+ticks : Eff none none Float
 let ticks =
   do {
     x <- task { Platform.stdout_line "first"; 1 } and y <- task { Platform.stdout_line "second"; 2 }
@@ -41,14 +41,14 @@ let ticks =
   }
 
 // a `pure` the group binds is a function of the block, not the Prelude's
-shadowed : Option Number
+shadowed : Option Float
 let shadowed = do { pure <- Some (fun n -> Some (n + 10)) and x <- Some 1; pure x }
 
 // `pure` qualified or in parentheses needs `Applicative` alone too
-qualified : Applicative f => f Number -> f Number -> f Number
+qualified : Applicative f => f Float -> f Float -> f Float
 let qualified fa fb = do { x <- fa and y <- fb; Prelude.pure (x + y) }
 
-wrapped : Applicative f => f Number -> f Number -> f Number
+wrapped : Applicative f => f Float -> f Float -> f Float
 let wrapped fa fb = do { x <- fa and y <- fb; (pure (x + y)) }
 
 main : Unit ->{; AppError} Unit

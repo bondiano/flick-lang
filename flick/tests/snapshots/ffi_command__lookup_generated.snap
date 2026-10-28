@@ -24,7 +24,7 @@ foreign async lookup from "lookup-lib" "lookup"
   nullable
 
 /// lookup-lib@1.0.0 sha256:db17cdc95b77b6ade2401f2dcfd47a44c2c190acab5c55821ac141d0e62ad094
-next_id : Unit ->{} Number
+next_id : Unit ->{} Float
 foreign sync next_id from "lookup-lib" "nextId"
   arity 0
 

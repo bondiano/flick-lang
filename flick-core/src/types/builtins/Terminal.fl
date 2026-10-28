@@ -15,17 +15,17 @@ type error QuitError
 
 /// The operations of Effect's `Terminal`; the functions below call them.
 service Terminal =
-  columns : Unit ->{} Number
-  rows : Unit ->{} Number
+  columns : Unit ->{} Float
+  rows : Unit ->{} Float
   read_line : Unit ->{; QuitError} String
   display : String ->{; PlatformError.PlatformError} Unit
 
 /// The width of the terminal in characters; 0 when stdout is not one.
-columns : Unit ->{Terminal;} Number
+columns : Unit ->{Terminal;} Float
 let columns () = Terminal.columns ()
 
 /// The height of the terminal in lines; 0 when stdout is not one.
-rows : Unit ->{Terminal;} Number
+rows : Unit ->{Terminal;} Float
 let rows () = Terminal.rows ()
 
 /// The next line of input.

@@ -42,7 +42,7 @@ foreign effect has from "@flick-lang/runtime/effect/TxHashSet" "flickHas"
   reviewed "effect@4.0.5 sha256:5738fa8bdfd16a60"
 
 /// The number of elements.
-size : TxHashSet w a ->{Tx.Transaction;} Number
+size : TxHashSet w a ->{Tx.Transaction;} Float
 foreign effect size from "@flick-lang/runtime/effect/TxHashSet" "flickSize"
   reviewed "effect@4.0.5 sha256:5e8b3c8d93666d26"
 

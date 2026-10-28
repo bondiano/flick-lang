@@ -29,9 +29,9 @@ fn release_with(text: &str, workers: &dyn Fn(&str, &str) -> Option<usize>) -> St
 fn sum_pair_allocates_no_object() {
     let js = release(
         "module App exposing (sum_pair, total)\n\n\
-         sum_pair : Number -> Number -> Number\n\
+         sum_pair : Float -> Float -> Float\n\
          let sum_pair left right =\n  let pair = { left = left; right = right }\n  pair.left + pair.right\n\n\
-         total : Number -> Number\nlet total n = sum_pair n 1\n",
+         total : Float -> Float\nlet total n = sum_pair n 1\n",
     );
     insta::assert_snapshot!(js);
 }
@@ -40,12 +40,12 @@ fn sum_pair_allocates_no_object() {
 fn a_full_application_calls_the_worker_and_a_partial_one_keeps_the_closure() {
     let js = release(
         "module App exposing (add, both, inc, staged, first)\n\n\
-         add : Number -> Number -> Number\nlet add left right =\n  if left > right then left - right else left + right\n\n\
-         both : Number -> Number\nlet both x = add x 2\n\n\
-         inc : Number -> Number\nlet inc = add 1\n\n\
-         staged : Number -> Number -> Number\n\
-         let staged x =\n  let checked = 10 / x\n  fun y -> checked + y\n\n\
-         first : Number -> Number\nlet first y = staged 0 y\n",
+         add : Float -> Float -> Float\nlet add left right =\n  if left > right then left - right else left + right\n\n\
+         both : Float -> Float\nlet both x = add x 2\n\n\
+         inc : Float -> Float\nlet inc = add 1\n\n\
+         staged : BigInt -> BigInt -> BigInt\n\
+         let staged x =\n  let checked = 2n ** x\n  fun y -> checked + y\n\n\
+         first : BigInt -> BigInt\nlet first y = staged (-1n) y\n",
     );
     assert!(js.contains("const add$2 = (left, right) =>"), "{js}");
     assert!(
@@ -59,18 +59,18 @@ fn a_full_application_calls_the_worker_and_a_partial_one_keeps_the_closure() {
     // the first stage of `staged` computes: no worker joins its stages
     assert!(!js.contains("staged$2"), "{js}");
     // inlined, the first stage still runs before the second gets its argument
-    assert!(js.contains("const checked$i1 = 10 / 0;"), "{js}");
+    assert!(js.contains("const checked$i1 = 2n ** (-1n);"), "{js}");
 }
 
 #[test]
 fn a_canonical_instance_is_called_directly_and_a_witness_stays_chosen() {
     let js = release(
         "module App exposing (..)\n\n\
-         type Shape = Circle Number | Square Number\n\n\
+         type Shape = Circle Float | Square Float\n\n\
          instance Show Shape =\n  let show s =\n    match s with\n    | Circle _ -> \"circle\"\n    | Square _ -> \"square\"\n\n\
          label : Shape -> String\nlet label s = show s\n\n\
-         by_size : Shape -> Number\nlet by_size s =\n  match s with\n  | Circle r -> r\n  | Square r -> r\n\n\
-         count : List Shape -> Number\n\
+         by_size : Shape -> Float\nlet by_size s =\n  match s with\n  | Circle r -> r\n  | Square r -> r\n\n\
+         count : List Shape -> Float\n\
          let count shapes =\n  EqHash.with (fun a b -> by_size a == by_size b) by_size (fun witness ->\n    HashSet.size (HashSet.from_list witness shapes)\n  )\n",
     );
     assert!(
@@ -86,13 +86,13 @@ fn forbidden_transformations_stay_out() {
     let js = release(
         "module App exposing (..)\n\n\
          type error Boom = Boom String\n\n\
-         service Clock =\n  now : Unit ->{} Number\n\n\
-         sum : Number -> Number -> Number -> Number\nlet sum a b c = (a + b) + c\n\n\
-         zero : Number -> Number\nlet zero x = x * 0\n\n\
-         twice : Eff none none Number -> Unit ->{} Number\nlet twice t () =\n  let a = await t\n  let b = await t\n  a + b\n\n\
+         service Clock =\n  now : Unit ->{} Float\n\n\
+         sum : Float -> Float -> Float -> Float\nlet sum a b c = (a + b) + c\n\n\
+         zero : Float -> Float\nlet zero x = x * 0\n\n\
+         twice : Eff none none Float -> Unit ->{} Float\nlet twice t () =\n  let a = await t\n  let b = await t\n  a + b\n\n\
          layers : Unit -> (Layer none none {Clock}, Layer none none {Clock})\n\
          let layers () =\n  (Layer.succeed Clock { now = fun () -> 1 }, Layer.succeed Clock { now = fun () -> 1 })\n\n\
-         read : Layer none none {Clock} -> Unit ->{} Number\n\
+         read : Layer none none {Clock} -> Unit ->{} Float\n\
          let read layer () =\n  provide layer {\n    Clock.now ()\n  }\n\n\
          checked : Unknown -> Unit\nlet checked input =\n  let decoded = Codec.decode_result (Codec.json Schema.number) input\n  ()\n",
     );
@@ -114,14 +114,14 @@ fn forbidden_transformations_stay_out() {
 fn literal_expressions_fold_with_js_semantics() {
     let js = release(
         "module App exposing (..)\n\n\
-         day : Number\nlet day = 60 * 60 * 24\n\n\
+         day : Float\nlet day = 60 * 60 * 24\n\n\
          text : String\nlet text = \"Hello, \" ++ \"world\"\n\n\
          sum : Bool\nlet sum = 0.1 + 0.2 == 0.3\n\n\
-         minus_zero : Number\nlet minus_zero = 0 * -1\n\n\
+         minus_zero : Float\nlet minus_zero = 0 * -1\n\n\
          big : BigInt\nlet big = 2n ** 100n\n\n\
          by_zero : BigInt\nlet by_zero = 1n / 0n\n\n\
-         rounded : Number\nlet rounded = 2 ** 0.5\n\n\
-         pick : Number\nlet pick = if 1 < 2 then 10 else 20\n",
+         rounded : Float\nlet rounded = 2 ** 0.5\n\n\
+         pick : Float\nlet pick = if 1 < 2 then 10 else 20\n",
     );
     for expected in [
         "export const day = 86400;",
@@ -129,7 +129,7 @@ fn literal_expressions_fold_with_js_semantics() {
         "export const sum = false;",
         "export const minus_zero = -0;",
         "export const big = 1267650600228229401496703205376n;",
-        "export const by_zero = 1n / 0n;",
+        "export const by_zero = 0n;",
         "export const rounded = 2 ** 0.5;",
         "export const pick = 10;",
     ] {
@@ -141,8 +141,8 @@ fn literal_expressions_fold_with_js_semantics() {
 fn unused_pure_code_is_dropped_and_effects_stay() {
     let js = release(
         "module App exposing (main)\n\n\
-         helper : Number -> Number\nlet helper x = x * 2 + 1\n\n\
-         unused : Number -> Number\nlet unused x = x\n\n\
+         helper : Float -> Float\nlet helper x = x * 2 + 1\n\n\
+         unused : Float -> Float\nlet unused x = x\n\n\
          main : Unit ->{Log.Log; none} Unit\n\
          let main () =\n  let later = task { Log.info \"never run\" }\n  let ignored = Log.info \"runs\"\n  ignore (helper 2)\n",
     );
@@ -155,8 +155,8 @@ fn unused_pure_code_is_dropped_and_effects_stay() {
 fn a_lone_tail_effect_needs_no_generator() {
     let js = release(
         "module App exposing (once, twice, nested)\n\n\
-         once : Number ->{} Unit\nlet once n = Platform.stdout_line (show n)\n\n\
-         twice : Number ->{} Unit\n\
+         once : Float ->{} Unit\nlet once n = Platform.stdout_line (show n)\n\n\
+         twice : Float ->{} Unit\n\
          let twice n =\n  Platform.stdout_line (show n)\n  Platform.stdout_line (show n)\n\n\
          nested : Unit ->{} Unit\nlet nested () = Platform.stdout_line (show (Platform.env \"HOME\"))\n",
     );
@@ -176,7 +176,7 @@ fn exported_workers_take_full_applications_across_modules() {
     };
     let js = release_with(
         "module App exposing (add, view)\n\n\
-         add : Number -> Number -> Number\nlet add a b = a + b\n\n\
+         add : Float -> Float -> Float\nlet add a b = a + b\n\n\
          view : Unit -> Ui\nlet view () = Ui.div { class_name = \"x\" } []\n",
         &workers,
     );
@@ -196,12 +196,12 @@ fn equality_whose_identity_decides_is_strict() {
     let js = release(
         "module App exposing (same)\n\n\
          type Locale = En | Ru\n\n\
-         same : String -> Locale -> Number -> Bool -> Bool\n\
+         same : String -> Locale -> Float -> Bool -> Bool\n\
          let same s l n b = s == \"a\" && l != Ru && n == 1 && b == true\n",
     );
     assert!(js.contains("s === \"a\" &&"), "{js}");
     assert!(js.contains("&& l._tag !== Ru._tag &&"), "{js}");
-    // SameValueZero on Number stays the runtime's
+    // SameValueZero on Float stays the runtime's
     assert!(js.contains("$rt.equals(n, 1)"), "{js}");
     assert!(js.contains("&& b === true"), "{js}");
 }
@@ -209,13 +209,13 @@ fn equality_whose_identity_decides_is_strict() {
 #[test]
 fn known_instances_and_plain_foreigns_are_called_directly() {
     let direct = |m: &str, instance: &str, method: &str| {
-        (m, instance, method) == ("Instances", "Show Number", "show")
+        (m, instance, method) == ("Instances", "Show Float", "show")
     };
     let workers = |_: &str, _: &str| None;
     let (mut ir, interface) = check_text(
         "App",
         "module App exposing (label, both)\n\n\
-         label : Number -> String\nlet label n = show n\n\n\
+         label : Float -> String\nlet label n = show n\n\n\
          join : String -> String -> String\nforeign pure join from \"./x.mjs\" \"join\"\n\n\
          both : String -> String\nlet both s = join s s\n",
     )
@@ -233,7 +233,7 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
         labels: Labels::default(),
     };
     let js = js(&ir, &options).code;
-    assert!(js.contains("$m_Instances.$i_Show_Number$show(n)"), "{js}");
+    assert!(js.contains("$m_Instances.$i_Show_Float$show(n)"), "{js}");
     assert!(!js.contains(".show("), "{js}");
     assert!(js.contains("$f_join(s, s)"), "{js}");
 }
@@ -242,12 +242,12 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
 fn matches_switch_on_tags_and_skip_the_last_test() {
     let js = release(
         "module App exposing (area, name, unit)\n\n\
-         type Shape = Circle Number | Rect Number Number | Dot\n\n\
-         area : Shape -> Number\n\
+         type Shape = Circle Float | Rect Float Float | Dot\n\n\
+         area : Shape -> Float\n\
          let area s =\n  match s with\n  | Circle r -> r * r\n  | Rect w h -> w * h\n  | Dot -> 0\n\n\
          name : Shape -> String\n\
          let name s =\n  match s with\n  | Circle _ -> \"circle\"\n  | _ -> \"other\"\n\n\
-         unit : Unit -> Number\nlet unit () = area (Rect 2 3)\n",
+         unit : Unit -> Float\nlet unit () = area (Rect 2 3)\n",
     );
     assert!(js.contains("switch (s._tag) {"), "{js}");
     assert!(js.contains("case \"Circle#"), "{js}");
@@ -263,7 +263,7 @@ fn a_worker_names_each_ignored_parameter_apart() {
     let workers = |m: &str, name: &str| ((m, name) == ("App", "first")).then_some(3);
     let js = release_with(
         "module App exposing (first)\n\n\
-         first : Number -> String -> Bool -> Number\nlet first n _ _ = n\n",
+         first : Float -> String -> Bool -> Float\nlet first n _ _ = n\n",
         &workers,
     );
     assert!(
@@ -306,7 +306,7 @@ fn show_of_a_literal_folds_into_the_string() {
 fn show_folds_as_the_runtime_spells_it() {
     let js = release(
         "module App exposing (shown, fraction)\n\n\
-         shown : String\nlet shown = show true ++ show \"a\\n\\\"\" ++ show 12n ++ show (-0)\n\n\
+         shown : String\nlet shown = show true ++ show \"a\\n\\\"\" ++ show 12n ++ show (-0.0)\n\n\
          fraction : String\nlet fraction = show 0.1\n",
     );
     assert!(
@@ -320,7 +320,7 @@ fn show_folds_as_the_runtime_spells_it() {
 fn a_private_literal_constant_inlines_at_its_uses() {
     let js = release(
         "module App exposing (label)\n\n\
-         size : Number\nlet size = 128 * 2\n\n\
+         size : Float\nlet size = 128 * 2\n\n\
          label : Unit -> String\nlet label () = \"w\" ++ show size\n",
     );
     assert!(js.contains("\"w256\""), "{js}");
@@ -331,12 +331,12 @@ fn a_private_literal_constant_inlines_at_its_uses() {
 fn combinators_of_a_for_fuse_into_its_loop() {
     let js = release(
         "module App exposing (chain, listed, firsts, nested)\n\n\
-         chain : List Number -> List Number\n\
+         chain : List Float -> List Float\n\
          let chain xs = Seq.to_list (Seq.map (fun x -> x * 10) (Seq.filter (fun x -> x > 1) (for { x <- xs } yield x)))\n\n\
-         listed : List Number -> List Number\n\
+         listed : List Float -> List Float\n\
          let listed xs = List.map (fun y -> y + 1) (List.filter (fun y -> y > 2) [for x <- xs yield x * 2])\n\n\
-         firsts : Seq Number\nlet firsts = Seq.take 3 (Seq.flat_map (fun x -> Seq.of_list [x, x]) (for { x <- Seq.from 1 } yield x))\n\n\
-         nested : List Number -> List (Number, Number)\n\
+         firsts : Seq Int\nlet firsts = Seq.take 3 (Seq.flat_map (fun x -> Seq.of_list [x, x]) (for { x <- Seq.from 1 } yield x))\n\n\
+         nested : List Float -> List (Float, Float)\n\
          let nested xs = [for { x <- for { y <- xs; if y > 0 } yield y * 2; z <- [1, 2] } yield (x, z)]\n",
     );
     insta::assert_snapshot!(js);
@@ -346,10 +346,10 @@ fn combinators_of_a_for_fuse_into_its_loop() {
 fn a_known_function_fuses_and_a_sync_for_is_left() {
     let js = release(
         "module App exposing (doubled, read)\n\n\
-         double : Number -> Number\nlet double x = x * 2\n\n\
-         doubled : List Number -> List Number\nlet doubled xs = List.map double [for x <- xs yield x + 1]\n\n\
-         count : Atom.Writable Number\nlet count = Atom.make 1\n\n\
-         read : Unit ->{Atom.Read;} List Number\n\
+         double : Float -> Float\nlet double x = x * 2\n\n\
+         doubled : List Float -> List Float\nlet doubled xs = List.map double [for x <- xs yield x + 1]\n\n\
+         count : Atom.Writable Float\nlet count = Atom.make 1\n\n\
+         read : Unit ->{Atom.Read;} List Float\n\
          let read () = Seq.to_list (Seq.map double (for { x <- [1, 2] } yield x + Atom.value count))\n",
     );
     assert!(js.contains("$t1.push((x + 1) * 2);"), "{js}");
@@ -362,14 +362,37 @@ fn a_strict_for_that_may_throw_is_built_before_its_consumer() {
     let js = release(
         "module App exposing (first, powers, sums)\n\n\
          first : Option BigInt\n\
-         let first = Seq.first (for x <- [for y <- [1n, 0n] yield 1n / y] yield x)\n\n\
+         let first = Seq.first (for x <- [for y <- [1n, 0n] yield 2n ** (0n - y)] yield x)\n\n\
          powers : List BigInt\n\
-         let powers = List.map (fun x -> 2n ** (0n - x)) [for y <- [1n, 0n] yield 1n / y]\n\n\
+         let powers = List.map (fun x -> 2n ** (0n - x)) [for y <- [1n, 0n] yield 2n ** (0n - y)]\n\n\
          sums : List BigInt -> List BigInt\n\
          let sums xs = List.map (fun x -> 2n ** x) [for y <- xs yield y + 1n]\n",
     );
-    // the divisions run, in order, before anything reads the list
-    assert_eq!(js.matches(".push(1n / y)").count(), 2, "{js}");
+    // the negative powers run, in order, before anything reads the list
+    assert_eq!(js.matches(".push(2n ** (0n - y))").count(), 2, "{js}");
     // a producer that cannot throw still fuses with a callback that may
     assert!(js.contains(".push(2n ** (y + 1n))"), "{js}");
+}
+
+#[test]
+fn a_numeric_function_is_copied_for_the_instances_it_is_called_with() {
+    let js = release(
+        "module App exposing (both)\n\n\
+         import Numeric exposing (Numeric)\n\n\
+         scale : Numeric a => a -> a -> a\nlet scale k x = k * x + 1\n\n\
+         both : (Int, Float) -> (Int, Float)\nlet both (i, f) = (scale 3 i, scale 2 f)\n",
+    );
+    assert!(
+        js.contains("scale$Numeric_Int = (k) => (x) => Math.imul(k, x) + 1 | 0"),
+        "{js}"
+    );
+    assert!(
+        js.contains("scale$Numeric_Float = (k) => (x) => k * x + 1"),
+        "{js}"
+    );
+    // inlined, the copies leave plain arithmetic at the calls
+    assert!(
+        js.contains("return [Math.imul(3, i) + 1 | 0, 2 * f + 1];"),
+        "{js}"
+    );
 }

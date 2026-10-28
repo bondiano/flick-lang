@@ -28,8 +28,8 @@ instance Describe a => Describe (List a) =
   describe : List a -> String
   let describe items = "list"
 
-instance Describe (List Number) =
-  describe : List Number -> String
+instance Describe (List Float) =
+  describe : List Float -> String
   let describe items = "numbers"
 
 type Wrap a = Wrap a
@@ -49,9 +49,9 @@ class Second a => First a
 class First a => Second a
 
 // two aliases of one form share the structural instance
-type alias Point = { x : Number; y : Number }
+type alias Point = { x : Float; y : Float }
 
-type alias Coords = { y : Number; x : Number }
+type alias Coords = { y : Float; x : Float }
 
 instance Eq Point =
   eq : Point -> Point -> Bool
@@ -68,7 +68,7 @@ instance Pretty Secret =
 
 //~ FLICK-C004 @16:1-18:25 break the functional dependency `c -> a`
 //~ FLICK-C005 @20:1-22:17
-//~ FLICK-C003 @31:1-33:33 `Describe (List Number)` overlaps `Describe (List a)`
+//~ FLICK-C003 @31:1-33:33 `Describe (List Float)` overlaps `Describe (List a)`
 //~ FLICK-C007 @37:1-39:26 the context `Describe (List a)` is not smaller than the head `Describe (Wrap a)`
 //~ FLICK-C007 @43:1-45:26 type variable `b` of the context `Describe b` is not in the head
 //~ FLICK-C008 @47:1-47:26 the superclasses of `First` lead back to it: First -> Second -> First

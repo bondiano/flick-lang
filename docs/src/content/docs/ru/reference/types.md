@@ -16,7 +16,7 @@ title: "Кинды и типы"
 
 | Тип | Кинд |
 | - | - |
-| `Unit`, `Never`, `Bool`, `Number`, `BigInt`, `String`, `Unknown`, `Ordering` | `Type` |
+| `Unit`, `Never`, `Bool`, `Int`, `Float`, `BigInt`, `String`, `Unknown`, `Ordering` | `Type` |
 | `List`, `Option`, `Ref`, `Redacted`, `Schema` | `Type -> Type` |
 | `Result`, `PureCodec` | `Type -> Type -> Type` |
 | `ServiceTag`, `ServiceImpl` | `ServiceRow -> Type` |
@@ -62,7 +62,7 @@ type Js (n : Nullability) a
 Три кинда строк эффектов не смешиваются: строка сервисов содержит сервисы,
 строка ошибок — типы, объявленные с `error`, строка захватов — регионы.
 `none` обозначает пустую строку любого кинда строк, а не тип.
-`Eff Unit Unit a`, `Option` без аргумента и `Number String` вызывают `FLICK-T002`.
+`Eff Unit Unit a`, `Option` без аргумента и `Float String` вызывают `FLICK-T002`.
 
 ## Сигнатуры
 
@@ -96,7 +96,7 @@ let compose f g x =
 черновика; в объявлении типа её быть не может.
 
 ```flick
-swap : (Number, String) -> _
+swap : (Float, String) -> _
 let swap (a, b) = (b, a)
 ```
 
@@ -115,7 +115,7 @@ let swap (a, b) = (b, a)
 
 ```flick
 apply_twice :
-  (forall a. a -> a) -> (Number, String)
+  (forall a. a -> a) -> (Float, String)
 let apply_twice transform =
   (transform 42, transform "hello")
 ```
@@ -174,15 +174,58 @@ let name value = value.name
 
 | Операторы | Операнды | Результат |
 | - | - | - |
-| `+ - * / % **`, префиксный `-` | оба `Number` или оба `BigInt` | тот же тип |
+| `+ - * / % **`, префиксный `-` | оба `Int`, оба `Float` или оба `BigInt` | тот же тип |
 | `++` | оба `String` или оба `List a` | тот же тип |
-| `< <= > >=` | оба `Number`, `BigInt` или `String` | `Bool` |
+| `< <= > >=` | оба `Int`, `Float`, `BigInt` или `String` | `Bool` |
 | `== !=` | одного типа | `Bool` |
 | `&& \|\|`, `not` | `Bool` | `Bool` |
 | `x \|> f` | `f x` | результат `f` |
 
-`1 + 1n` и `"a" ++ 1` вызывают `FLICK-T003`. Если тип операнда не следует
-из других условий, выбирается `Number`, а для `++` — `String`.
+`1.5 + 1n` и `"a" ++ 1` вызывают `FLICK-T003`. Если тип операнда не следует
+из других условий, выбирается `Int`, а для `++` — `String`. Диапазоны `a..b`,
+`a..<b` и `a..` считают в `Int`.
+
+Числовых типов три, неявных преобразований между ними нет:
+
+| Тип | Значения | Арифметика |
+| - | - | - |
+| `Int` | 32-битные целые со знаком | по модулю 2³²: `2147483647 + 1 == -2147483648`; `/` отбрасывает дробную часть (`7 / 2 == 3`, `-7 / 2 == -3`); `/` и `%` на ноль дают `0` |
+| `Float` | IEEE 754 binary64, число JS | `0.0 / 0.0` — NaN, `1.0 / 0.0` — `Infinity`; `==` — SameValueZero |
+| `BigInt` | целые любого размера | `/` отбрасывает дробную часть; `/` и `%` на ноль дают `0n` |
+
+Правила одинаковы на любом бэкенде. `Int.checked_add`, `Int.checked_div` и
+остальные проверяемые операции возвращают `Result Int.ArithmeticError Int`
+вместо переполнения или нуля; `Int.unsafe_div` и `Int.unsafe_rem` при нулевом
+делителе дают дефект. Преобразования: `Int.to_float`, `Int.from_float`
+(`None`, если число не целое или вне диапазона) и `Int.truncate`.
+
+Целочисленный литерал (`3`, `0xFF`, `1_000`) получает тот числовой тип,
+которого требует его использование, а если ничто не требует — `Int`:
+`let ratio : Float = 3` и `3 + 0.5` дают `Float`, `3 + 4n` — `BigInt`.
+Литерал с дробной частью или экспонентой (`3.0`, `1e3`) — `Float`. Литерал
+вне диапазона своего типа вызывает `FLICK-T003`. Если тип литерала решает
+только ограничение класса, берётся первый из `Int`, `Float`, `BigInt`, для
+которого есть подходящий инстанс.
+
+Одна функция для всех числовых типов пишется через закрытые классы модуля
+`Numeric`: `Numeric a` (`Int`, `Float`, `BigInt`), `Integer a` (`Int`,
+`BigInt`) и `Floating a` (`Float`). На переменной типа с таким ограничением
+операторы и целочисленные литералы используют его методы (`add`, `div`,
+`from_int`, …); литералу с дробной частью нужен `Floating`. Все инстансы
+объявлены в самом модуле, программа не может объявить свой (`FLICK-C012`).
+
+```flick
+import Numeric exposing (Floating, Numeric)
+
+square : Numeric a => a -> a
+let square x = x * x
+
+mean : Floating a => List a -> a
+let mean xs = List.sum xs / Numeric.from_int (List.length xs)
+```
+
+`List.sum` и `List.product` принимают любой `Numeric`. Без ограничения
+`x + 1` на переменной типа вызывает `FLICK-C001`.
 
 ## Блоки
 
@@ -209,7 +252,7 @@ let name value = value.name
 ```flick
 type Nested a = Flat a | Nest (Nested (List a))
 
-depth : forall a. Nested a -> Number
+depth : forall a. Nested a -> Float
 let rec depth value =
   match value with
   | Flat _ -> 0

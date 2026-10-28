@@ -69,7 +69,11 @@ fn folds_comparisons_bools_strings_and_bigints() {
     assert_eq!(value("7n / -2n"), Some(Const::BigInt(-3)));
     assert_eq!(value("-7n % 2n"), Some(Const::BigInt(-1)));
     assert_eq!(value("2n ** 100n"), Some(Const::BigInt(1 << 100)));
-    assert_eq!(value("1n / 0n"), None, "throws at run time");
+    assert_eq!(
+        value("1n / 0n"),
+        Some(Const::BigInt(0)),
+        "zero by the operator"
+    );
     assert_eq!(value("2n ** -1n"), None, "throws at run time");
 }
 

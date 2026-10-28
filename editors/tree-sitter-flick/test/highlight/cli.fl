@@ -1,6 +1,6 @@
 let command = cli "plan" {
   description "Plan tasks"
-  flag overhead "o" : Option Number
+  flag overhead "o" : Option Float
   arg tasks : List String
   handle fun { overhead; tasks } ->
     let description = List.length tasks

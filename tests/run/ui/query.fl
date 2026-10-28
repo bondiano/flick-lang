@@ -19,25 +19,25 @@ foreign sync text from "./dom.mjs" "text"
   arity 0
 
 /// The `n`-th run of a query, counted per name.
-run_of : String ->{} Number
+run_of : String ->{} Float
 foreign sync run_of from "./query.mjs" "run"
   arity 1
 
-orders : Atom.Atom (Atom.Async Number none)
+orders : Atom.Atom (Atom.Async Float none)
 let orders = Atom.query ["orders"] (task { run_of "orders" })
 
-stock : Atom.Atom (Atom.Async Number none)
+stock : Atom.Atom (Atom.Async Float none)
 let stock = Atom.query ["stock"] (task { run_of "stock" })
 
 /// A query of both keys.
-both : Atom.Atom (Atom.Async Number none)
+both : Atom.Atom (Atom.Async Float none)
 let both = Atom.query ["orders", "stock"] (task { run_of "both" })
 
 /// The latest element of a stream.
-latest : Atom.Atom (Atom.Async Number none)
+latest : Atom.Atom (Atom.Async Float none)
 let latest = Atom.query_stream ["stock"] (Stream.from_list [7, 8])
 
-shown : Atom.Atom (Atom.Async Number none) ->{Atom.Read;} String
+shown : Atom.Atom (Atom.Async Float none) ->{Atom.Read;} String
 let shown atom =
   match Atom.get atom with
   | Atom.Loaded n -> show n

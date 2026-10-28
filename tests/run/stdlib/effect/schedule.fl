@@ -1,9 +1,9 @@
 // Schedules from Effect's `Schedule`, run by `Effect.repeat` and `Effect.retry`.
 module App.Main exposing (main)
 
-type error Flaky = Flaky Number
+type error Flaky = Flaky Float
 
-ms : Number -> Duration.Duration
+ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
 /// Throws: a defect, not a typed failure.
@@ -11,7 +11,7 @@ explode : String ->{} JsValue
 foreign sync explode from global "JSON.parse"
 
 /// Fails with `Flaky n` on the first `failures` calls, counting them.
-flaky : Ref Number -> Number -> Eff none {Flaky} String
+flaky : Ref Float -> Float -> Eff none {Flaky} String
 let flaky calls failures =
   task {
     let n = Ref.get calls + 1
@@ -20,7 +20,7 @@ let flaky calls failures =
   }
 
 /// The attempt a step's metadata names, read through both record types.
-attempt_of : Schedule.Metadata o i -> Number
+attempt_of : Schedule.Metadata o i -> Float
 let attempt_of m =
   let input : Schedule.InputMetadata i =
     {
@@ -38,7 +38,7 @@ limited : Schedule.Schedule r e i o -> Schedule.Schedule r e i o
 let limited schedule = Schedule.up_to { duration = None; times = Some 2 } schedule
 
 /// How many times `schedule` runs a task that counts its runs.
-count : Schedule.Schedule none none Number o ->{} Number
+count : Schedule.Schedule none none Float o ->{} Float
 let count schedule =
   let calls = Ref.make 0
   let _ =
@@ -48,7 +48,7 @@ let count schedule =
     })
   Ref.get calls
 
-delays : Schedule.Schedule none none Number Duration.Duration ->{} List String
+delays : Schedule.Schedule none none Float Duration.Duration ->{} List String
 let delays schedule =
   let seen = Ref.make []
   let traced =

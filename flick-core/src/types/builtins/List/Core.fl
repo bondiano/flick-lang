@@ -2,7 +2,7 @@
 module List.Core exposing (..)
 
 /// `map` with each element's index.
-map_indexed : forall c a b. (Number -> a -> b)^c -> (List a -> List b)^c
+map_indexed : forall c a b. (Int -> a -> b)^c -> (List a -> List b)^c
 foreign pure map_indexed from "@flick-lang/runtime" "listMapIndexed"
   arity 2
   retention call
@@ -61,7 +61,7 @@ foreign pure find from "@flick-lang/runtime" "listFind"
   retention call
 
 /// The index of the first element that satisfies `p`.
-find_index : forall c a. (a -> Bool)^c -> (List a -> Option Number)^c
+find_index : forall c a. (a -> Bool)^c -> (List a -> Option Int)^c
 foreign pure find_index from "@flick-lang/runtime" "listFindIndex"
   reviewed "effect@4.0.5 sha256:74e1ef30d4775390"
   arity 2
@@ -126,7 +126,7 @@ let minimum xs =
     xs
 
 /// How many elements the list has.
-length : List a -> Number
+length : List a -> Int
 foreign pure length from "@flick-lang/runtime" "listLength"
   reviewed "effect@4.0.5 sha256:e3bc0aabe62baf6c"
 
@@ -135,12 +135,12 @@ is_empty : List a -> Bool
 let is_empty xs = length xs == 0
 
 /// The element at `index`, counting from 0.
-get : Number -> List a -> Option a
+get : Int -> List a -> Option a
 foreign pure get from "@flick-lang/runtime" "listGet"
   reviewed "effect@4.0.5 sha256:2c896b5ea54dbe9a"
 
 /// The list with the element at `index` replaced; out of range, unchanged.
-set : Number -> a -> List a -> List a
+set : Int -> a -> List a -> List a
 foreign pure set from "@flick-lang/runtime" "listSet"
 
 /// The first element.
@@ -156,16 +156,16 @@ singleton : a -> List a
 let singleton x = [x]
 
 /// `n` copies of `x`.
-repeat : Number -> a -> List a
+repeat : Int -> a -> List a
 foreign pure repeat from "@flick-lang/runtime" "listRepeat"
   reviewed "effect@4.0.5 sha256:163da23fbce2ffe9"
 
 /// `[from, from + 1, …]` below `until`.
-range : Number -> Number -> List Number
+range : Int -> Int -> List Int
 foreign pure range from "@flick-lang/runtime" "listRange"
 
 /// The list of `f 0`, …, `f (n - 1)`.
-initialize : forall c a. Number -> (Number -> a)^c -> List a
+initialize : forall c a. Int -> (Int -> a)^c -> List a
 foreign pure initialize from "@flick-lang/runtime" "listInitialize"
   reviewed "effect@4.0.5 sha256:e33643fd5390dc62"
   retention call
@@ -185,17 +185,17 @@ foreign pure concat from "@flick-lang/runtime" "listConcat"
   reviewed "effect@4.0.5 sha256:79a7557ec647ea64"
 
 /// The first `n` elements.
-take : Number -> List a -> List a
+take : Int -> List a -> List a
 foreign pure take from "@flick-lang/runtime" "listTake"
   reviewed "effect@4.0.5 sha256:12fb0eb32a21c379"
 
 /// Every element but the first `n`.
-drop : Number -> List a -> List a
+drop : Int -> List a -> List a
 foreign pure drop from "@flick-lang/runtime" "listDrop"
   reviewed "effect@4.0.5 sha256:1e7b70fa9118de64"
 
 /// The elements from `start` up to `end`, as JS `slice`: it copies only them.
-slice : Number -> Number -> List a -> List a
+slice : Int -> Int -> List a -> List a
 foreign pure slice from "@flick-lang/runtime" "listSlice"
 
 /// The pairs of the elements at each index of both, as long as the shorter.
@@ -209,9 +209,9 @@ foreign pure unzip from "@flick-lang/runtime" "listUnzip"
   reviewed "effect@4.0.5 sha256:fc08e4a943b8119d"
 
 /// The sum of the numbers.
-sum : List Number -> Number
+sum : Numeric.Numeric a => List a -> a
 let sum xs = fold_left (fun total x -> total + x) 0 xs
 
 /// The product of the numbers.
-product : List Number -> Number
+product : Numeric.Numeric a => List a -> a
 let product xs = fold_left (fun total x -> total * x) 1 xs

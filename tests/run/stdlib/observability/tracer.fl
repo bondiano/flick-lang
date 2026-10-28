@@ -3,7 +3,7 @@
 // outside it stays with the native tracer.
 module App.Main exposing (main)
 
-start : Unit ->{} Number
+start : Unit ->{} Float
 foreign async start from "./receiver.mjs" "start"
   arity 0
 

@@ -94,7 +94,10 @@ impl Checker<'_> {
         let arg = |i: usize| self.plan(args[i], path, ctx);
         if module == PRELUDE {
             match (name.as_str(), args.len()) {
-                ("Number" | "String" | "Bool" | "BigInt" | "Unit" | "Never" | "Unknown", 0) => {
+                (
+                    "Int" | "Float" | "String" | "Bool" | "BigInt" | "Unit" | "Never" | "Unknown",
+                    0,
+                ) => {
                     return Ok(SchemaPlan::Prim(name.clone()));
                 }
                 ("List", 1) => return Ok(SchemaPlan::List(Box::new(arg(0)?))),

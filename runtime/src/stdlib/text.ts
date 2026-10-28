@@ -34,6 +34,15 @@ export {
   stringRepeat,
   stringChars,
   stringFromNumber,
+  divInt,
+  remInt,
+  powInt,
+  divBigInt,
+  remBigInt,
+  intUnsafeDiv,
+  intUnsafeRem,
+  intTruncate,
+  intAbs,
   bitAnd,
   bitOr,
   bitXor,
@@ -41,6 +50,7 @@ export {
   shiftLeft,
   shiftRight,
   shiftRightUnsigned,
+  shiftRightUnsignedInt,
   bigintAbs,
 } from "../core/text.ts";
 
@@ -58,36 +68,43 @@ export const stringToNumber = (s: string): Option.Option<number> => {
   return Number.isNaN(n) && text !== "NaN" ? none : some(n);
 };
 
-const ARITHMETIC = /*#__PURE__*/ tag("Number.ArithmeticError.ArithmeticError");
+const ARITHMETIC = /*#__PURE__*/ tag("Int.ArithmeticError.ArithmeticError");
 
-/** `Number.ArithmeticError`. */
+/** `Int.ArithmeticError`. */
 export type ArithmeticError = Tagged<typeof ARITHMETIC, string>;
 
 const arithmetic = (message: string): Result.Result<never, ArithmeticError> => err({ _tag: ARITHMETIC, _0: message });
+
+export const intFromFloat = (n: number): Option.Option<number> => ((n | 0) === n ? some(n + 0) : none);
+
+/** The `Int` the decimal digits spell, with an optional sign. */
+export const intParse = (s: string): Option.Option<number> => {
+  const text = s.trim();
+  if (!/^[+-]?\d+$/.test(text)) return none;
+  const n = Number(text);
+  return (n | 0) === n ? some(n + 0) : none;
+};
 
 export const numberSafeInteger = (n: number): Option.Option<number> => (Number.isSafeInteger(n) ? some(n) : none);
 
 type Checked = (a: number, b: number) => Result.Result<number, ArithmeticError>;
 
-/** A checked integer operation: operands and result must be safe integers. */
+/** A checked `Int` operation: the result must be an `Int`. */
 const checked =
   (name: string, f: (a: number, b: number) => number): Checked =>
   (a, b) => {
-    if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b)) {
-      return arithmetic(`${name}: ${a} and ${b} must be safe integers`);
-    }
-    if ((name === "div_int" || name === "rem_int") && b === 0) {
-      return arithmetic(`${name}: division by zero`);
+    if ((name === "checked_div" || name === "checked_rem") && b === 0) {
+      return arithmetic(`Int.${name}: division by zero`);
     }
     const r = f(a, b);
-    return Number.isSafeInteger(r) ? ok(r + 0) : arithmetic(`${name}: ${r} is not a safe integer`);
+    return (r | 0) === r ? ok(r + 0) : arithmetic(`Int.${name}: ${r} does not fit in Int`);
   };
 
-export const intAdd = /*#__PURE__*/ checked("add_int", (a, b) => a + b);
-export const intSub = /*#__PURE__*/ checked("sub_int", (a, b) => a - b);
-export const intMul = /*#__PURE__*/ checked("mul_int", (a, b) => a * b);
-export const intDiv = /*#__PURE__*/ checked("div_int", (a, b) => Math.trunc(a / b));
-export const intRem = /*#__PURE__*/ checked("rem_int", (a, b) => a % b);
+export const intCheckedAdd = /*#__PURE__*/ checked("checked_add", (a, b) => a + b);
+export const intCheckedSub = /*#__PURE__*/ checked("checked_sub", (a, b) => a - b);
+export const intCheckedMul = /*#__PURE__*/ checked("checked_mul", (a, b) => a * b);
+export const intCheckedDiv = /*#__PURE__*/ checked("checked_div", (a, b) => Math.trunc(a / b));
+export const intCheckedRem = /*#__PURE__*/ checked("checked_rem", (a, b) => a % b);
 
 export const bigintFromNumber = (n: number): Option.Option<bigint> => (Number.isInteger(n) ? some(BigInt(n)) : none);
 

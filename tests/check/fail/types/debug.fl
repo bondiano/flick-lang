@@ -1,25 +1,25 @@
 module App.Debug exposing (render, total, piped, swap, names, label)
 
-render : List Number -> String
+render : List Float -> String
 let render _rows = todo "render the rows"
 //                 ^^^^^^^^^^^^^^^^^^^^^^ FLICK-T022 `todo` is left in the code
 
-total : List Number -> Number
-let total xs = echo (Number.sum_all xs)
+total : List Float -> Float
+let total xs = echo (Float.sum_all xs)
 //             ^^^^ FLICK-T023 `echo` is left in the code
 
-piped : Number -> Number
-let piped x = x |> echo |> Number.abs
+piped : Float -> Float
+let piped x = x |> echo |> Float.abs
 //                 ^^^^ FLICK-T023 `echo` is left in the code
 
-swap : (Number, String) -> _
-//                         ^ FLICK-T024 `_` is `(String, Number)`
+swap : (Float, String) -> _
+//                        ^ FLICK-T024 `_` is `(String, Float)`
 let swap (a, b) = (b, a)
 
-names : Number -> List _
-//                     ^ FLICK-T024 `_` is `Number`
+names : Float -> List _
+//                    ^ FLICK-T024 `_` is `Float`
 let names n = [n]
 
 // the keywords stay labels
-label : { echo : Number; todo : String }
+label : { echo : Float; todo : String }
 let label = { echo = 1; todo = "x" }

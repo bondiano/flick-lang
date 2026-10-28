@@ -1,6 +1,6 @@
 use crate::types::lint_tests::{HEAD, assert_fix, fixed};
 
-const SIG: &str = "f : Option Number -> Option Number -> Option Number\n";
+const SIG: &str = "f : Option Float -> Option Float -> Option Float\n";
 
 #[test]
 fn nested_binds_become_one_do() {
@@ -29,7 +29,7 @@ fn matches_that_pass_the_failure_on_are_steps() {
         "FLICK-T035",
         &format!("{SIG}let f a b =\n  do {{ x <- a; y <- b; Some (x - y) }}\n"),
     );
-    let result = "g : Result String Number -> Result String Number\n";
+    let result = "g : Result String Float -> Result String Float\n";
     assert_fix(
         &format!(
             "{result}let g r =\n  match r with\n  | Err e -> Err e\n  | Ok x -> Result.bind (fun y -> Ok (x + y)) (Ok 1)\n"
@@ -59,26 +59,26 @@ fn one_step_is_left_alone() {
 }
 
 const LOOK: &str =
-    "look : Number ->{} Option Number\nlet look n =\n  Platform.stdout_line \"look\"\n  Some n\n\n";
+    "look : Float ->{} Option Float\nlet look n =\n  Platform.stdout_line \"look\"\n  Some n\n\n";
 
 #[test]
 fn a_runtime_call_in_a_do_is_bound_before_it() {
     assert_fix(
         &format!(
-            "{LOOK}h : Number ->{{}} Option Number\nlet h n =\n  do {{\n    x <- Some n\n    y <- look 2\n    pure (x + y)\n  }}\n"
+            "{LOOK}h : Float ->{{}} Option Float\nlet h n =\n  do {{\n    x <- Some n\n    y <- look 2\n    pure (x + y)\n  }}\n"
         ),
         "FLICK-E001",
         &format!(
-            "{LOOK}h : Number ->{{}} Option Number\nlet h n =\n  let result = look 2\n  do {{\n    x <- Some n\n    y <- result\n    pure (x + y)\n  }}\n"
+            "{LOOK}h : Float ->{{}} Option Float\nlet h n =\n  let result = look 2\n  do {{\n    x <- Some n\n    y <- result\n    pure (x + y)\n  }}\n"
         ),
     );
     assert_fix(
         &format!(
-            "{LOOK}h : Number ->{{}} Option Number\nlet h n =\n  do {{\n    x <- Some n\n    Platform.stdout_line \"no\"\n    pure x\n  }}\n"
+            "{LOOK}h : Float ->{{}} Option Float\nlet h n =\n  do {{\n    x <- Some n\n    Platform.stdout_line \"no\"\n    pure x\n  }}\n"
         ),
         "FLICK-E001",
         &format!(
-            "{LOOK}h : Number ->{{}} Option Number\nlet h n =\n  Platform.stdout_line \"no\"\n  do {{\n    x <- Some n\n    pure x\n  }}\n"
+            "{LOOK}h : Float ->{{}} Option Float\nlet h n =\n  Platform.stdout_line \"no\"\n  do {{\n    x <- Some n\n    pure x\n  }}\n"
         ),
     );
 }
@@ -86,7 +86,7 @@ fn a_runtime_call_in_a_do_is_bound_before_it() {
 #[test]
 fn a_call_on_a_bound_variable_stays() {
     let text = format!(
-        "{HEAD}{LOOK}h : Number ->{{}} Option Number\nlet h n =\n  do {{\n    x <- Some n\n    y <- look x\n    pure (x + y)\n  }}\n"
+        "{HEAD}{LOOK}h : Float ->{{}} Option Float\nlet h n =\n  do {{\n    x <- Some n\n    y <- look x\n    pure (x + y)\n  }}\n"
     );
     assert_eq!(fixed(&text, "FLICK-E001"), None);
 }

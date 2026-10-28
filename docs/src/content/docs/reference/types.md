@@ -13,7 +13,7 @@ import, and a local definition of the same name hides them.
 
 | Type | Kind |
 | - | - |
-| `Unit`, `Never`, `Bool`, `Number`, `BigInt`, `String`, `Unknown`, `Ordering` | `Type` |
+| `Unit`, `Never`, `Bool`, `Int`, `Float`, `BigInt`, `String`, `Unknown`, `Ordering` | `Type` |
 | `List`, `Option`, `Ref`, `Redacted`, `Schema` | `Type -> Type` |
 | `Result`, `PureCodec` | `Type -> Type -> Type` |
 | `ServiceTag`, `ServiceImpl` | `ServiceRow -> Type` |
@@ -54,7 +54,7 @@ type Js (n : Nullability) a
 The three effect-row kinds do not mix: a service row holds services, an error
 row holds types declared with `error`, a capture row holds regions. `none` is
 the empty row of any row kind and is not a type. `Eff Unit Unit a`, `Option`
-used without its argument and `Number String` are `FLICK-T002`.
+used without its argument and `Float String` are `FLICK-T002`.
 
 ## Signatures
 
@@ -85,7 +85,7 @@ and reports it (`FLICK-T024`), with a fix that writes the inferred type in.
 A hole is for drafting; a type declaration cannot have one.
 
 ```flick
-swap : (Number, String) -> _
+swap : (Float, String) -> _
 let swap (a, b) = (b, a)
 ```
 
@@ -101,7 +101,7 @@ signature into the argument, so one callback can be used at several types:
 
 ```flick
 apply_twice :
-  (forall a. a -> a) -> (Number, String)
+  (forall a. a -> a) -> (Float, String)
 let apply_twice transform =
   (transform 42, transform "hello")
 ```
@@ -150,19 +150,61 @@ an error (`FLICK-T027`).
 
 ## Numbers and operators
 
-There are no implicit conversions (see [Schema and standard data types](../../spec/09-schema/)).
+There are three numeric types, and no implicit conversions between them (see
+[Schema and standard data types](../../spec/09-schema/)):
+
+| Type | Values | Arithmetic |
+| - | - | - |
+| `Int` | 32-bit signed integers | wraps around: `2147483647 + 1 == -2147483648`; `/` drops the fraction (`7 / 2 == 3`, `-7 / 2 == -3`); `/` and `%` by zero are `0` |
+| `Float` | IEEE 754 binary64, a JS number | `0.0 / 0.0` is NaN, `1.0 / 0.0` is `Infinity`; `==` is SameValueZero |
+| `BigInt` | integers of any size | `/` drops the fraction; `/` and `%` by zero are `0n` |
+
+The same rules hold on every backend. `Int.checked_add`, `Int.checked_div`
+and the others return `Result Int.ArithmeticError Int` instead of wrapping or
+giving `0`; `Int.unsafe_div` and `Int.unsafe_rem` are a defect on a zero
+divisor. `Int.to_float`, `Int.from_float` (`None` unless whole and in range)
+and `Int.truncate` convert.
+
+A number literal written as an integer (`3`, `0xFF`, `1_000`) is of any
+numeric type its use asks for, and `Int` when nothing does: `let ratio :
+Float = 3` and `3 + 0.5` are `Float`, `3 + 4n` is `BigInt`. A literal with a
+fraction or an exponent (`3.0`, `1e3`) is a `Float`. An integer literal out
+of the range of its type is `FLICK-T003`. When a class constraint is all that
+decides a literal's type, it is the first of `Int`, `Float`, `BigInt` with a
+matching instance.
 
 | Operators | Operands | Result |
 | - | - | - |
-| `+ - * / % **`, prefix `-` | both `Number` or both `BigInt` | the same type |
+| `+ - * / % **`, prefix `-` | both `Int`, both `Float` or both `BigInt` | the same type |
 | `++` | both `String` or both `List a` | the same type |
-| `< <= > >=` | both `Number`, `BigInt` or `String` | `Bool` |
+| `< <= > >=` | both `Int`, `Float`, `BigInt` or `String` | `Bool` |
 | `== !=` | the same type | `Bool` |
 | `&& \|\|`, `not` | `Bool` | `Bool` |
 | `x \|> f` | `f x` | the result of `f` |
 
-`1 + 1n` and `"a" ++ 1` are `FLICK-T003`. An operand nothing else determines
-is `Number` (`String` for `++`).
+`1.5 + 1n` and `"a" ++ 1` are `FLICK-T003`. An operand nothing else
+determines is `Int` (`String` for `++`). Ranges `a..b`, `a..<b` and `a..`
+count in `Int`.
+
+One function serves every numeric type through the closed classes of the
+module `Numeric`: `Numeric a` (`Int`, `Float`, `BigInt`), `Integer a` (`Int`,
+`BigInt`) and `Floating a` (`Float`). On a type variable with one of them,
+the operators and integer literals use its methods (`add`, `div`,
+`from_int`, …); a literal with a fraction needs `Floating`. The module has
+every instance, and a program cannot declare another (`FLICK-C012`).
+
+```flick
+import Numeric exposing (Floating, Numeric)
+
+square : Numeric a => a -> a
+let square x = x * x
+
+mean : Floating a => List a -> a
+let mean xs = List.sum xs / Numeric.from_int (List.length xs)
+```
+
+`List.sum` and `List.product` take any `Numeric`. Without the constraint,
+`x + 1` on a type variable is `FLICK-C001`.
 
 ## Blocks
 
@@ -187,7 +229,7 @@ of `List b -> Bool` called from `even_len` of `List a -> Bool` on a
 ```flick
 type Nested a = Flat a | Nest (Nested (List a))
 
-depth : forall a. Nested a -> Number
+depth : forall a. Nested a -> Float
 let rec depth value =
   match value with
   | Flat _ -> 0

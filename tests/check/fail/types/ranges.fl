@@ -1,12 +1,12 @@
 module App.Ranges exposing (..)
 
 // a strict list of an endless range never ends
-endless : List Number
+endless : List Int
 let endless = [1..]
 
 // ranges count numbers
-letters : Seq Number
+letters : Seq Int
 let letters = "a"..3
 
 //~ FLICK-T003 @5:16-5:19 `[a..]` would never end
-//~ FLICK-T003 @9:15-9:18 expected `Number`, found `String`
+//~ FLICK-T003 @9:15-9:18 expected `Int`, found `String`

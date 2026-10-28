@@ -6,7 +6,7 @@ module App.Main exposing (main)
 concat_all : Monoid a => List a -> a
 let concat_all xs = List.fold_left (fun acc x -> combine acc x) empty xs
 
-add : Applicative f => f Number -> f Number -> f Number
+add : Applicative f => f Float -> f Float -> f Float
 let add x y = map2 (fun a b -> a + b) x y
 
 main : Unit ->{; AppError} Unit
@@ -14,14 +14,14 @@ let main () =
   Platform.stdout_line (show (add (Some 1) (Some 2)))
   Platform.stdout_line (show (add (Some 1) None))
   Platform.stdout_line (show (map2 (fun a b -> (a, b)) [1, 2] ["x", "y"]))
-  Platform.stdout_line (show (add (Err "first" : Result String Number) (Err "second")))
-  Platform.stdout_line (show (add (Ok 1 : Result String Number) (Ok 2)))
+  Platform.stdout_line (show (add (Err "first" : Result String Float) (Err "second")))
+  Platform.stdout_line (show (add (Ok 1 : Result String Float) (Ok 2)))
   let sum = add (pure 20) (pure 22)
   Platform.stdout_line (show (await sum))
   Platform.stdout_line (show (or_else None (Some 3)))
   Platform.stdout_line (show (or_else (Some 1) (Some 3)))
   Platform.stdout_line (show (or_else [1] [2, 3]))
-  Platform.stdout_line (show (or_else (nothing : Option Number) nothing))
+  Platform.stdout_line (show (or_else (nothing : Option Float) nothing))
   Platform.stdout_line (concat_all ["ab", "cd", "ef"])
   Platform.stdout_line (show (concat_all [[1], [], [2, 3]]))
   Platform.stdout_line (show (concat_all ([] : List String)))

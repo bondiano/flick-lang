@@ -7,17 +7,17 @@ module TxSemaphore exposing (..)
 type TxSemaphore
 
 /// A new semaphore with `permits` permits, all available.
-make : Number ->{} TxSemaphore
+make : Float ->{} TxSemaphore
 foreign effect make from "@flick-lang/runtime/effect/TxSemaphore" "make"
   reviewed "effect@4.0.5 sha256:2af85729593201e3"
 
 /// The permits not taken.
-available : TxSemaphore ->{Tx.Transaction;} Number
+available : TxSemaphore ->{Tx.Transaction;} Float
 foreign effect available from "@flick-lang/runtime/effect/TxSemaphore" "available"
   reviewed "effect@4.0.5 sha256:40ef92ab43ddbefd"
 
 /// The permits it was made with.
-capacity : TxSemaphore ->{Tx.Transaction;} Number
+capacity : TxSemaphore ->{Tx.Transaction;} Float
 foreign effect capacity from "@flick-lang/runtime/effect/TxSemaphore" "capacity"
   reviewed "effect@4.0.5 sha256:3b6a87231e7852b2"
 
@@ -27,7 +27,7 @@ foreign effect acquire from "@flick-lang/runtime/effect/TxSemaphore" "acquire"
   reviewed "effect@4.0.5 sha256:2e202954494190c8"
 
 /// Takes `n` permits, waiting for them.
-acquire_n : Number -> TxSemaphore ->{Tx.Transaction;} Unit
+acquire_n : Float -> TxSemaphore ->{Tx.Transaction;} Unit
 foreign effect acquire_n from "@flick-lang/runtime/effect/TxSemaphore" "acquireN"
   arity 1
   reviewed "effect@4.0.5 sha256:a268ae4fe41af93f"
@@ -38,7 +38,7 @@ foreign effect try_acquire from "@flick-lang/runtime/effect/TxSemaphore" "tryAcq
   reviewed "effect@4.0.5 sha256:15c8b6ce0c0f30fe"
 
 /// Takes `n` permits if they are available.
-try_acquire_n : Number -> TxSemaphore ->{Tx.Transaction;} Bool
+try_acquire_n : Float -> TxSemaphore ->{Tx.Transaction;} Bool
 foreign effect try_acquire_n from "@flick-lang/runtime/effect/TxSemaphore" "tryAcquireN"
   arity 1
   reviewed "effect@4.0.5 sha256:df6fb8d93d0949fb"
@@ -49,7 +49,7 @@ foreign effect release from "@flick-lang/runtime/effect/TxSemaphore" "release"
   reviewed "effect@4.0.5 sha256:51911ac4011c61ab"
 
 /// Gives back `n` permits.
-release_n : Number -> TxSemaphore ->{Tx.Transaction;} Unit
+release_n : Float -> TxSemaphore ->{Tx.Transaction;} Unit
 foreign effect release_n from "@flick-lang/runtime/effect/TxSemaphore" "releaseN"
   arity 1
   reviewed "effect@4.0.5 sha256:3b656b3d1a23f8ab"
@@ -62,7 +62,7 @@ foreign effect with_permit from "@flick-lang/runtime/effect/TxSemaphore" "withPe
   reviewed "effect@4.0.5 sha256:dd3edbbad1400f0e"
 
 /// Runs `body` holding `n` permits.
-with_permits : forall c r e a. TxSemaphore -> Number -> ((Eff r e a)^c ->{r; e} a)^c
+with_permits : forall c r e a. TxSemaphore -> Float -> ((Eff r e a)^c ->{r; e} a)^c
 foreign effect with_permits from "@flick-lang/runtime/effect/TxSemaphore" "withPermits"
   arity 2
   retention call

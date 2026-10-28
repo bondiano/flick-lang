@@ -2,7 +2,7 @@
 // a codec, failing with the program's `SchemaError`.
 module App.Main exposing (main)
 
-type alias Point = { x : Number; y : Number }
+type alias Point = { x : Float; y : Float }
   deriving Schema
 
 point : Codec none none Json Point

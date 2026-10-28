@@ -8,8 +8,10 @@ use std::mem;
 
 use super::matching::{Match, Subst, match_type};
 use super::{Dict, RECORD, has_metas, split, vars};
+use crate::numeric::{Num, default_num};
 use crate::types::Checker;
 use crate::types::env::Instance;
+use crate::types::generalize::replace_metas;
 use crate::types::ty::Type;
 
 #[derive(Debug, Clone)]
@@ -52,9 +54,18 @@ impl Checker<'_> {
             progress |= left
                 .iter()
                 .any(|(w, _)| self.canon(&w.constraint) != w.constraint);
+            if !progress && report {
+                let open: Vec<Type> = left.iter().map(|(w, _)| w.constraint.clone()).collect();
+                if self.default_numeric(&open) {
+                    pending = left.into_iter().map(|(w, _)| w).collect();
+                    continue;
+                }
+            }
             if !progress || left.is_empty() {
                 if report {
                     self.report_classes(left);
+                    // the operators and literals the classes held back
+                    self.settle_operators();
                 } else {
                     self.classes.wanted.extend(left.into_iter().map(|(w, _)| w));
                 }
@@ -62,6 +73,57 @@ impl Checker<'_> {
             }
             pending = left.into_iter().map(|(w, _)| w).collect();
         }
+    }
+
+    /// Gives each integer literal's type that `wanted` leaves open the first
+    /// numeric type every one of them has an instance for, else `Int`;
+    /// whether there was one.
+    fn default_numeric(&mut self, wanted: &[Type]) -> bool {
+        let wanted: Vec<Type> = wanted.iter().map(|c| self.zonk(c)).collect();
+        let mut open = Vec::new();
+        for c in &wanted {
+            c.visit(&mut |t| {
+                if let Type::Meta(m) = t
+                    && self.store.is_numeric(*m)
+                    && !open.contains(m)
+                {
+                    open.push(*m);
+                }
+            });
+        }
+        for &m in &open {
+            let fractional = self.store.is_fractional(m);
+            let fits = |num: &Num| {
+                if fractional && !num.fractional() {
+                    return false;
+                }
+                let ty = Type::prim(num.name());
+                wanted
+                    .iter()
+                    .filter(|c| c.contains(&mut |t| *t == Type::Meta(m)))
+                    .all(|c| self.may_have_instance(&replace_metas(c, &[(m, ty.clone())])))
+            };
+            let fallback = default_num(fractional);
+            let num = Num::ALL.iter().find(|n| fits(n)).unwrap_or(&fallback);
+            let _ = self.unify(&Type::Meta(m), &Type::prim(num.name()));
+        }
+        !open.is_empty()
+    }
+
+    /// Whether an instance head matches `c`, or its class has no declared
+    /// instances to rule it out.
+    fn may_have_instance(&self, c: &Type) -> bool {
+        let Some((class, args)) = split(c) else {
+            return true;
+        };
+        let args: Vec<Type> = args.into_iter().cloned().collect();
+        let mut instances = self
+            .env
+            .instances()
+            .filter(|i| split(&i.head).is_some_and(|(k, _)| k == class))
+            .peekable();
+        instances.peek().is_none()
+            || instances.any(|i| head_match(&i.head, &args, &mut Subst::new()) != Match::No)
     }
 
     /// Whether `c` follows from `givens` and the instances in scope.

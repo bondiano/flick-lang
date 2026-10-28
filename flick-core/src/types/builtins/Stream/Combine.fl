@@ -34,8 +34,8 @@ foreign pure flat_map from "@flick-lang/runtime/effect/Stream" "flatMap"
 /// `flat_map` running at most `concurrency` inner streams at once (`None`:
 /// no bound), with a buffer of `bufferSize` elements of each.
 flat_map_par : forall c r e a r2 e2 b. {
-  concurrency : Option Number;
-  bufferSize : Option Number;
+  concurrency : Option Float;
+  bufferSize : Option Float;
 } ->
   (a -> Stream r2 e2 b)^c ->
   ((Stream r e a)^c -> (Stream (r + r2) (e + e2) b)^c)^c
@@ -201,7 +201,7 @@ foreign pure merge_right from "@flick-lang/runtime/effect/Stream" "mergeRight"
 /// The elements of all the streams as they come, at most `concurrency` of
 /// them at once (`None`: all).
 merge_all :
-  forall c r e a. { concurrency : Option Number; bufferSize : Option Number } ->
+  forall c r e a. { concurrency : Option Float; bufferSize : Option Float } ->
     List ((Stream r e a)^c) ->
     (Stream r e a)^c
 foreign pure merge_all from "@flick-lang/runtime/effect/Stream" "flickMergeAll"
@@ -283,7 +283,7 @@ foreign pure zip_flatten from "@flick-lang/runtime/effect/Stream" "zipFlatten"
   reviewed "effect@4.0.5 sha256:0b16e685ace04836"
 
 /// Each element with its index from 0.
-zip_with_index : forall c r e a. (Stream r e a)^c -> (Stream r e (a, Number))^c
+zip_with_index : forall c r e a. (Stream r e a)^c -> (Stream r e (a, Float))^c
 foreign pure zip_with_index from "@flick-lang/runtime/effect/Stream" "zipWithIndex"
   retention call
   reviewed "effect@4.0.5 sha256:59c03101aa945b3e"
@@ -409,9 +409,9 @@ foreign pure group_by_key from "@flick-lang/runtime/effect/Stream" "groupByKey"
 /// (`None`: no bound) with the strategy for a full buffer (`None`:
 /// `Suspend`), and the last `replay` elements for a late one.
 type alias Split = {
-  capacity : Option Number;
+  capacity : Option Float;
   strategy : Option Queue.Strategy;
-  replay : Option Number;
+  replay : Option Float;
 }
 
 /// A stream that consumers in the scope of region `s` may each run: the
@@ -429,7 +429,7 @@ foreign effect broadcast from "@flick-lang/runtime/effect/Stream" "flickBroadcas
 /// `n` streams that each see every element of the source, which runs once
 /// as a child of the scope of region `s`.
 broadcast_n :
-  forall s c r e a. Fiber.Outlives c s => Number ->
+  forall s c r e a. Fiber.Outlives c s => Float ->
     Split ->
     (Stream r e a)^c ->{Scope s | r;}
     List ((Stream none e a)^{s})

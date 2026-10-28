@@ -280,7 +280,7 @@ impl Lexer<'_> {
         SyntaxKind::BlockComment
     }
 
-    /// Number of `#` of a raw string opening at `pos` (`r"` or `r#…#"`).
+    /// Float of `#` of a raw string opening at `pos` (`r"` or `r#…#"`).
     fn raw_string_start(&self) -> Option<usize> {
         let hashes = self.src[self.pos + 1..]
             .iter()

@@ -1,13 +1,13 @@
 // Effect's `HashSet` through Flick's sets, which keep their witness.
 module App.Main exposing (main)
 
-sorted : HashSet.HashSet w Number -> List Number
+sorted : HashSet.HashSet w Float -> List Float
 let sorted s = List.sort (HashSet.to_list s)
 
-odd : HashSet.HashSet EqHash.Canonical Number
+odd : HashSet.HashSet EqHash.Canonical Float
 let odd = HashSet.from_list EqHash.canonical [1, 3, 5, 7]
 
-small : HashSet.HashSet EqHash.Canonical Number
+small : HashSet.HashSet EqHash.Canonical Float
 let small = HashSet.insert 2 (HashSet.insert 1 HashSet.empty)
 
 main : Unit ->{; AppError} Unit
@@ -44,6 +44,8 @@ let main () =
   let lengths =
     EqHash.with
       (fun a b -> String.length a == String.length b)
-      (fun s -> String.length s)
-      (fun w -> List.sort (HashSet.to_list (HashSet.map w (fun n -> String.repeat n "x") odd)))
+      (fun s -> Int.to_float (String.length s))
+      (fun w ->
+        List.sort
+          (HashSet.to_list (HashSet.map w (fun n -> String.repeat (Int.truncate n) "x") odd)))
   Platform.stdout_line ("map into a witness: " ++ show lengths)

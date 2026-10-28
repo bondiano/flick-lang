@@ -9,6 +9,7 @@ use crate::diagnostics::codes;
 use crate::diagnostics::suggest::closest;
 use crate::iface;
 use crate::iface::Namespace;
+use crate::numeric;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
@@ -39,7 +40,7 @@ pub enum Ctor {
     /// A list pattern `[a, b, ...rest]` with this many items before the rest:
     /// lists of at least that length.
     ListRest(usize),
-    /// A `Number`, `BigInt` or `String` literal, by its value.
+    /// A `Float`, `BigInt` or `String` literal, by its value.
     Literal(String),
 }
 
@@ -74,7 +75,19 @@ impl Checker<'_> {
                 let Some(last) = tokens.last() else {
                     return Pat::Wild;
                 };
-                let lit = super::infer::literal_type(Some(last.kind));
+                let lit = if last.kind == K::Number {
+                    let text = last.text(self.text);
+                    let negative = tokens.len() > 1;
+                    if numeric::is_integer_literal(text) {
+                        let value =
+                            numeric::integer_value(text).map(|v| if negative { -v } else { v });
+                        self.number_literal(self.span(node), value, false, true)
+                    } else {
+                        Type::prim("Float")
+                    }
+                } else {
+                    super::infer::literal_type(Some(last.kind))
+                };
                 self.pattern_type(&lit, ty, node);
                 let negative = tokens.len() > 1;
                 let text = last.text(self.text);

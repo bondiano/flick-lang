@@ -7,16 +7,16 @@ let say label parts () = Platform.stdout_line (label ++ ": " ++ List.join " " pa
 line : String -> String ->{} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
-even : Number -> Bool
-let even n = n - 2 * Number.floor (n / 2) == 0
+even : Float -> Bool
+let even n = n - 2 * Float.floor (n / 2) == 0
 
-half : Number -> Result String Number
+half : Float -> Result String Float
 let half n = if even n then Ok (n / 2) else Err ("odd " ++ show n)
 
 main : Unit ->{; AppError} Unit
 let main () =
   let xs = [3, 1, 4, 1, 5, 9, 2, 6]
-  let nothing : List Number = List.empty
+  let nothing : List Float = List.empty
   line
     "slices"
     (show
@@ -169,16 +169,19 @@ let main () =
         List.initialize 3 (fun i -> i * i),
         List.singleton 1,
       ))
-  matched : List Number -> String
+  matched : List Float -> String
   let matched =
     List.match_
       { onEmpty = fun () -> "empty"; onNonEmpty = fun ne -> "first " ++ show (NonEmpty.head ne) }
   line "match" (show (matched nothing, matched xs))
-  left : List Number -> Number
-  let left = List.match_left { onEmpty = fun () -> 0; onNonEmpty = fun h t -> h + List.length t }
-  right : List Number -> Number
+  left : List Float -> Float
+  let left =
+    List.match_left
+      { onEmpty = fun () -> 0; onNonEmpty = fun h t -> h + Int.to_float (List.length t) }
+  right : List Float -> Float
   let right =
-    List.match_right { onEmpty = fun () -> 0; onNonEmpty = fun i l -> List.length i * 100 + l }
+    List.match_right
+      { onEmpty = fun () -> 0; onNonEmpty = fun i l -> Int.to_float (List.length i) * 100 + l }
   line "match_lr" (show (left xs, right xs, left nothing, right nothing))
   line
     "core"

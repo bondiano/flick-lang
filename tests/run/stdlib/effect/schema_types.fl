@@ -149,8 +149,8 @@ let main () =
     | Ok xs -> show xs
     | Err e -> issues e))
   Platform.stdout_line ("bytes 300: " ++ wire (Codec.encode_result Codec.bytes_base64 [1, 300]))
-  graph_json : PureCodec Json (Graph.DirectedGraph String Number)
-  let graph_json = Graph.json Graph.directed_kind String.json Number.json
+  graph_json : PureCodec Json (Graph.DirectedGraph String Float)
+  let graph_json = Graph.json Graph.directed_kind String.json Float.json
   let g_text =
     "{\"type\": \"directed\", \"nodes\": [{\"index\": 0, \"data\": \"a\"}, {\"index\": 1, \"data\": \"b\"}], \"edges\": [{\"index\": 0, \"source\": 0, \"target\": 1, \"data\": 3}]}"
   Platform.stdout_line ("Graph.json: " ++ rt g_text graph_json)

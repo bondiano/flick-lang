@@ -18,17 +18,17 @@ foreign async lookup from "lookup-lib" "lookup"
   nullable
 
 /// lookup-lib@1.0.0 sha256:bb
-next_id : Unit ->{} Number
+next_id : Unit ->{} Float
 foreign sync next_id from "lookup-lib" "nextId"
   arity 0
 
 /// lookup-lib@1.0.0 sha256:cc
-parse_1 : String ->{} Number
+parse_1 : String ->{} Float
 foreign sync parse_1 from "lookup-lib" "parse"
   arity 1
 
 /// lookup-lib@1.0.0 sha256:cc
-parse_2 : String -> Number ->{} Number
+parse_2 : String -> Float ->{} Float
 foreign sync parse_2 from "lookup-lib" "parse"
   arity 2
 

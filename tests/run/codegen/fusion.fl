@@ -2,11 +2,11 @@
 // release print the same: laziness, order and every rule are kept.
 module App.Main exposing (main)
 
-double : Number -> Number
+double : Int -> Int
 let double x = x * 2
 
 // `?` in a combinator's lambda returns from the lambda, fused or not
-unwrapped : Unit -> Option (List (Option Number))
+unwrapped : Unit -> Option (List (Option Float))
 let unwrapped () =
   Some
     (Seq.to_list
@@ -41,12 +41,12 @@ let main () =
   Platform.stdout_line
     (show
       [
-        Seq.to_list (Seq.take 1.5 (for x <- xs yield x)),
-        Seq.to_list (Seq.take half (for x <- xs yield x)),
+        Seq.to_list (Seq.take (Int.truncate 1.5) (for x <- xs yield x)),
+        Seq.to_list (Seq.take (Int.truncate half) (for x <- xs yield x)),
         Seq.to_list (Seq.take (0 / 0) (for x <- xs yield x)),
-        Seq.to_list (Seq.take 2.5 (Seq.of_list xs)),
-        Seq.to_list (Seq.drop 2.5 (Seq.of_list xs)),
-        List.take 1.5 xs,
+        Seq.to_list (Seq.take (Int.truncate 2.5) (Seq.of_list xs)),
+        Seq.to_list (Seq.drop (Int.truncate 2.5) (Seq.of_list xs)),
+        List.take (Int.truncate 1.5) xs,
       ])
   // List.map and List.filter of a `[for …]`
   Platform.stdout_line

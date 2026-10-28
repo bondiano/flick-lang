@@ -2,28 +2,28 @@
 // expected and back, lifted.
 module App.Sync exposing (..)
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.make 0
 
-doubled : Unit ->{Atom.Read;} Number
+doubled : Unit ->{Atom.Read;} Float
 let doubled () = Atom.value count * 2
 
-twice : (Unit ->{r; e} Number) -> Unit ->{r; e} Number
+twice : (Unit ->{r; e} Float) -> Unit ->{r; e} Float
 let twice f () = f () + f ()
 
 // a Sync function as a runtime argument, and the runtime result run at once
-quadrupled : Unit ->{Atom.Read;} Number
+quadrupled : Unit ->{Atom.Read;} Float
 let quadrupled () = twice doubled ()
 
-counted : Unit ->{Atom.Read | r; e} Number
+counted : Unit ->{Atom.Read | r; e} Float
 let counted () = Atom.value count
 
 // a runtime function where a Sync one is expected
-halves : Atom.Atom Number
+halves : Atom.Atom Float
 let halves = Atom.derived counted
 
 // and a pure one
-constant : Atom.Atom Number
+constant : Atom.Atom Float
 let constant = Atom.derived (fun () -> 1)
 
 // a runtime stage calls a Sync function

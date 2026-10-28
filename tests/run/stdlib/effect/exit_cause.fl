@@ -2,13 +2,13 @@
 // typed failure, a defect and an interruption stay apart.
 module App.Main exposing (main)
 
-type error Boom = Boom Number
+type error Boom = Boom Float
   deriving Show
 
 type error Other = Other String
   deriving Show
 
-type alias Ex = Exit {Boom} Number
+type alias Ex = Exit {Boom} Float
 
 span_options : Tracer.SpanOptions
 let span_options =

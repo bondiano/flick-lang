@@ -21,14 +21,14 @@ let load_optional id =
 
 Если `Users.get` имеет тип `Users.get : UserId ->{Users; NotFound} User`, то `load_optional` возвращает `Option User`, по-прежнему требует `{Users}`, но больше не содержит выбранных ожидаемых ошибок в своей строке ошибок. Полная причина завершения, нативный Cause, может содержать дополнительные сбои для диагностики. Их данные нельзя считать значениями остаточной строки `e`.
 
-Ошибка может иметь параметры. `type error RetryExhausted e = RetryExhausted e Number` хранит последнюю причину после исчерпания попыток, а `type error SendFailed a = SendFailed a` возвращает значение, которое не удалось отправить. Строка ошибок различает элементы по номинальному имени `Module.Name`, а не по аргументам типа. Поэтому в одной строке может быть не больше одного элемента с данным именем. Аргументы двух `RetryExhausted` в одной строке унифицируются: совместное присутствие `RetryExhausted DbError` и `RetryExhausted String` приводит к ошибке типов.
+Ошибка может иметь параметры. `type error RetryExhausted e = RetryExhausted e Float` хранит последнюю причину после исчерпания попыток, а `type error SendFailed a = SendFailed a` возвращает значение, которое не удалось отправить. Строка ошибок различает элементы по номинальному имени `Module.Name`, а не по аргументам типа. Поэтому в одной строке может быть не больше одного элемента с данным именем. Аргументы двух `RetryExhausted` в одной строке унифицируются: совместное присутствие `RetryExhausted DbError` и `RetryExhausted String` приводит к ошибке типов.
 
 Проекция в TypeScript следует тому же правилу: `_tag` не зависит от аргументов типа, `RetryExhausted<E>` встречается в объединении ошибок `Effect` не более одного раза, а `catchTag` однозначно сужает тип. Java и OCaml по той же причине запрещают параметризованные исключения; во Flick параметры допустимы, потому что строка хранит один элемент на имя.
 
 ```flick
-type error RetryExhausted e = RetryExhausted e Number
+type error RetryExhausted e = RetryExhausted e Float
 
-retry : Number -> Eff r e a ->{r; RetryExhausted (Errors e)} a
+retry : Float -> Eff r e a ->{r; RetryExhausted (Errors e)} a
 ```
 
 Обработчик может удалить ошибку из строки, только если полностью покрывает её номинальный вариант. Условие ветки или образец, который подходит лишь части данных ошибки, оставляет её в строке. Требования и ошибки самого обработчика добавляются к результату. Удаление из строки относится к выбранной ожидаемой ошибке и не доказывает, что такой же тег отсутствует среди вторичных сбоев в полной причине завершения.
@@ -53,7 +53,7 @@ retry : Number -> Eff r e a ->{r; RetryExhausted (Errors e)} a
 
 ```flick
 service Clock =
-  now : Unit ->{} Number
+  now : Unit ->{} Float
 
 clock_impl : Clock.Impl
 let clock_impl =

@@ -40,6 +40,6 @@ let main () =
   Platform.stdout_line (show third)
   Platform.stdout_line (duration (Duration.millis 1500))
   Platform.stdout_line (duration (Duration.millis (-1)))
-  Platform.stdout_line (duration (Duration.millis Number.nan))
+  Platform.stdout_line (duration (Duration.millis Float.nan))
   Platform.stdout_line (duration (Duration.minutes 1e308))
   Platform.stdout_line (show (Duration.to_millis Duration.infinity))

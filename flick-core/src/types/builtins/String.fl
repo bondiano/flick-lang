@@ -23,7 +23,7 @@ foreign pure trim_end from "@flick-lang/runtime/effect/String" "trimEnd"
   reviewed "effect@4.0.5 sha256:ef16ec68a58eebfe"
 
 /// The number of UTF-16 code units, as JS `length`.
-length : String -> Number
+length : String -> Int
 foreign pure length from "@flick-lang/runtime/effect/String" "length"
   reviewed "effect@4.0.5 sha256:d05e61e9b6fba063"
 
@@ -65,13 +65,13 @@ foreign pure ends_with from "@flick-lang/runtime/effect/String" "endsWith"
   reviewed "effect@4.0.5 sha256:936a9f770078d3a9"
 
 /// The position of the first occurrence of `part`.
-index_of : String -> String -> Option Number
+index_of : String -> String -> Option Int
 foreign pure index_of from "@flick-lang/runtime/effect/String" "indexOf"
   arity 1
   reviewed "effect@4.0.5 sha256:18b4858888e9b6c8"
 
 /// The position of the last occurrence of `part`.
-last_index_of : String -> String -> Option Number
+last_index_of : String -> String -> Option Int
 foreign pure last_index_of from "@flick-lang/runtime/effect/String" "lastIndexOf"
   arity 1
   reviewed "effect@4.0.5 sha256:b0a4f2b8af72794a"
@@ -111,50 +111,50 @@ foreign pure uncapitalize from "@flick-lang/runtime/effect/String" "uncapitalize
 
 /// The code units from `start` up to `end`, as JS `slice`: negative
 /// positions count from the end.
-slice : Number -> Number -> String -> String
+slice : Int -> Int -> String -> String
 foreign pure slice from "@flick-lang/runtime/effect/String" "slice"
   arity 2
   reviewed "effect@4.0.5 sha256:2afeb2b09199b119"
 
 /// The code units between `start` and `end`, as JS `substring`: negative
 /// positions are 0, and the two may come in either order.
-substring : Number -> Number -> String -> String
+substring : Int -> Int -> String -> String
 foreign pure substring from "@flick-lang/runtime/effect/String" "substring"
   arity 2
   reviewed "effect@4.0.5 sha256:f0c7d2f6278e477f"
 
 /// The first `n` code units.
-take_left : Number -> String -> String
+take_left : Int -> String -> String
 foreign pure take_left from "@flick-lang/runtime/effect/String" "takeLeft"
   arity 1
   reviewed "effect@4.0.5 sha256:5ffe31526eda0022"
 
 /// The last `n` code units.
-take_right : Number -> String -> String
+take_right : Int -> String -> String
 foreign pure take_right from "@flick-lang/runtime/effect/String" "takeRight"
   arity 1
   reviewed "effect@4.0.5 sha256:8d0623f636ca14de"
 
 /// The code unit at `index`; a negative one counts from the end.
-at : Number -> String -> Option String
+at : Int -> String -> Option String
 foreign pure at from "@flick-lang/runtime/effect/String" "at"
   arity 1
   reviewed "effect@4.0.5 sha256:b3182b49326861cf"
 
 /// The code unit at `index`, which must be in range.
-char_at : Number -> String -> Option String
+char_at : Int -> String -> Option String
 foreign pure char_at from "@flick-lang/runtime/effect/String" "charAt"
   arity 1
   reviewed "effect@4.0.5 sha256:6e382d7bbf76817d"
 
 /// The UTF-16 code unit at `index`, as a number.
-char_code_at : Number -> String -> Option Number
+char_code_at : Int -> String -> Option Int
 foreign pure char_code_at from "@flick-lang/runtime/effect/String" "charCodeAt"
   arity 1
   reviewed "effect@4.0.5 sha256:d2d0b683e654ff12"
 
 /// The code point starting at `index`.
-code_point_at : Number -> String -> Option Number
+code_point_at : Int -> String -> Option Int
 foreign pure code_point_at from "@flick-lang/runtime/effect/String" "codePointAt"
   arity 1
   reviewed "effect@4.0.5 sha256:90d15a40a2969fcd"
@@ -171,19 +171,19 @@ foreign pure normalize from "@flick-lang/runtime/effect/String" "flickNormalize"
   reviewed "effect@4.0.5 sha256:ab5c139c9fcc7593"
 
 /// Padded at the start with `fill`, repeated and cut, up to `length`.
-pad_start : Number -> String -> String -> String
+pad_start : Int -> String -> String -> String
 foreign pure pad_start from "@flick-lang/runtime/effect/String" "padStart"
   arity 2
   reviewed "effect@4.0.5 sha256:71969f32fb003e59"
 
 /// Padded at the end with `fill`, repeated and cut, up to `length`.
-pad_end : Number -> String -> String -> String
+pad_end : Int -> String -> String -> String
 foreign pure pad_end from "@flick-lang/runtime/effect/String" "padEnd"
   arity 2
   reviewed "effect@4.0.5 sha256:d19b7af946daf38f"
 
 /// The string `n` times; a negative `n` counts as 0, a fraction is cut.
-repeat : Number -> String -> String
+repeat : Int -> String -> String
 foreign pure repeat from "@flick-lang/runtime/effect/String" "repeat"
   arity 1
   reviewed "effect@4.0.5 sha256:b43e515bdbfde4c6"
@@ -283,11 +283,11 @@ chars : String -> List String
 foreign pure chars from "@flick-lang/runtime" "stringChars"
 
 /// The number in JS syntax; `-0` is `"-0"`.
-from_number : Number -> String
+from_number : Float -> String
 foreign pure from_number from "@flick-lang/runtime" "stringFromNumber"
 
 /// The number a whole string spells in JS syntax, if any.
-to_number : String -> Option Number
+to_number : String -> Option Float
 foreign pure to_number from "@flick-lang/runtime" "stringToNumber"
 
 /// A JSON string.

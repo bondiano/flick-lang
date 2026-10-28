@@ -24,6 +24,7 @@ export const service = (key: string): Readonly<{ key: string }> => Object.freeze
 export const bindEff = /*#__PURE__*/ needsEffect("bindEff");
 export const codecBlock = /*#__PURE__*/ needsEffect("codecBlock");
 export const codecIgnoreExtra = /*#__PURE__*/ needsEffect("codecIgnoreExtra");
+export const codecInt = /*#__PURE__*/ needsEffect("codecInt");
 export const codecNumberFinite = /*#__PURE__*/ needsEffect("codecNumberFinite");
 export const codecNumberLossless = /*#__PURE__*/ needsEffect("codecNumberLossless");
 export const codecOptionNull = /*#__PURE__*/ needsEffect("codecOptionNull");

@@ -94,17 +94,17 @@ foreign pure non_empty_string from "@flick-lang/runtime/effect/Config" "NonEmpty
   reviewed "effect@4.0.5 sha256:f2b55c37d91915c2"
 
 /// A number, `NaN` and the infinities included.
-number : String -> Config Number
+number : String -> Config Float
 foreign pure number from "@flick-lang/runtime/effect/Config" "Number"
   reviewed "effect@4.0.5 sha256:91ad251b68b38893"
 
 /// A finite number.
-finite : String -> Config Number
+finite : String -> Config Float
 foreign pure finite from "@flick-lang/runtime/effect/Config" "Finite"
   reviewed "effect@4.0.5 sha256:b62ed692a3a5d63c"
 
 /// An integer.
-int : String -> Config Number
+int : String -> Config Float
 foreign pure int from "@flick-lang/runtime/effect/Config" "Int"
   reviewed "effect@4.0.5 sha256:5af3d6e83a058045"
 
@@ -114,7 +114,7 @@ foreign pure boolean from "@flick-lang/runtime/effect/Config" "Boolean"
   reviewed "effect@4.0.5 sha256:35edacb881ff2db8"
 
 /// An integer port from 1 to 65535.
-port : String -> Config Number
+port : String -> Config Float
 foreign pure port from "@flick-lang/runtime/effect/Config" "Port"
   reviewed "effect@4.0.5 sha256:6f4a843a0c07b659"
 
@@ -147,7 +147,7 @@ foreign pure url from "@flick-lang/runtime/effect/Config" "flickUrl"
   reviewed "effect@4.0.5 sha256:858378adaa2a402c"
 
 /// A date, as milliseconds since the epoch.
-date : String -> Config Number
+date : String -> Config Float
 foreign pure date from "@flick-lang/runtime/effect/Config" "flickDate"
   reviewed "effect@4.0.5 sha256:8ad6b40a1a9ddd1d"
 

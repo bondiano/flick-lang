@@ -334,8 +334,8 @@ mod tests {
     fn suggestion(definition: &str) -> String {
         let text = format!(
             "module Probe exposing (..)\n\
-             type error NotFound = NotFound Number\n\
-             service Users =\n  get : Number ->{{; NotFound}} String\n\
+             type error NotFound = NotFound Float\n\
+             service Users =\n  get : Float ->{{; NotFound}} String\n\
              {definition}\n"
         );
         let mut sources = SourceMap::default();
@@ -360,15 +360,15 @@ mod tests {
         );
         assert_eq!(
             suggestion("let f = fun x -> task { Users.get x }"),
-            "add `f : Number -> Eff {Users} {NotFound} String`"
+            "add `f : Float -> Eff {Users} {NotFound} String`"
         );
         assert_eq!(
             suggestion("let f = fun x -> Users.get x"),
-            "add `f : Number ->{Users; NotFound} String`"
+            "add `f : Float ->{Users; NotFound} String`"
         );
         assert_eq!(
             suggestion("let f = fun x -> fun y -> Users.get (x + y)"),
-            "add `f : Number -> Number ->{Users; NotFound} String`"
+            "add `f : Float -> Float ->{Users; NotFound} String`"
         );
     }
 }

@@ -6,10 +6,10 @@ module App.Main exposing (main)
 type error Closed = Closed String
   deriving Show
 
-ms : Number -> Duration.Duration
+ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
-fill : List Number -> TxQueue.TxQueue Number {Closed} ->{Tx.Transaction;} List Number
+fill : List Float -> TxQueue.TxQueue Float {Closed} ->{Tx.Transaction;} List Float
 let fill xs q = TxQueue.offer_all xs q
 
 /// A failure of `Closed`, as a child's exit gives it.
@@ -73,7 +73,7 @@ let main () =
   Platform.stdout_line
     ("fail: " ++ show failed ++ ", " ++ after ++ ", open/closing/done/shutdown " ++ show flags)
   Tx.atomically (task { TxQueue.await_completion f })
-  let c : TxQueue.TxQueue Number {Closed} = TxQueue.unbounded ()
+  let c : TxQueue.TxQueue Float {Closed} = TxQueue.unbounded ()
   let caused = match closed_failure "cause" with
     | Some failure -> Tx.atomically (task { TxQueue.fail_cause failure c })
     | None -> false

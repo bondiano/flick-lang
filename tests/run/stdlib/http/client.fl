@@ -7,10 +7,10 @@ import Http.ClientError exposing (HttpClientError)
 import Http.ClientRequest exposing (ClientRequest)
 import Http.ClientResponse exposing (ClientResponse)
 
-type alias Item = { label : String; size : Number }
+type alias Item = { label : String; size : Float }
   deriving Schema
 
-type error Refused = Refused Number
+type error Refused = Refused Float
   deriving Show
 
 ok : Http.ServerResponse.Options
@@ -223,7 +223,7 @@ let responses () =
       (ignore_extra_fields
         (
           codec (schema Whole) {
-            status = field "status" Number.json;
+            status = field "status" Float.json;
             body = field "body" item_json;
           }
         ))
@@ -232,7 +232,7 @@ let responses () =
       ++ (show
         (Http.ClientResponse.schema_no_body
           (Codec.general
-            (ignore_extra_fields (codec (schema Status) { status = field "status" Number.json })))
+            (ignore_extra_fields (codec (schema Status) { status = field "status" Float.json })))
           it)))
   let it2 = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/item")
   Platform.stdout_line ("schema_json: " ++ (show (Http.ClientResponse.schema_json whole it2)))
@@ -398,10 +398,10 @@ let combinators () =
 type alias Typed = { contentType : String }
   deriving Schema
 
-type alias Status = { status : Number }
+type alias Status = { status : Float }
   deriving Schema
 
-type alias Whole = { status : Number; body : Item }
+type alias Whole = { status : Float; body : Item }
   deriving Schema
 
 type alias Pairs = { a : List String }

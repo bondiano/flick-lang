@@ -3,21 +3,21 @@ module App.Recursion exposing (depth, countdown, is_even, sum, even_len, first_e
 
 type Nested a = Flat a | Nest (Nested (List a))
 
-depth : forall a. Nested a -> Number
+depth : forall a. Nested a -> Float
 let rec depth value =
   match value with
   | Flat _ -> 0
   | Nest inner -> 1 + depth inner
 
-countdown : Number -> List Number
+countdown : Float -> List Float
 let rec countdown n =
   if n <= 0 then [] else [n] ++ countdown (n - 1)
 
 rec {
-  is_even : Number -> Bool
+  is_even : Float -> Bool
   let is_even n = if n == 0 then true else is_odd (n - 1)
 
-  is_odd : Number -> Bool
+  is_odd : Float -> Bool
   let is_odd n = if n == 0 then false else is_even (n - 1)
 }
 
@@ -51,9 +51,9 @@ rec {
     | [_, ...rest] -> first_even p rest
 }
 
-sum : List Number -> Number
+sum : List Float -> Float
 let sum items =
-  go : List Number -> Number -> Number
+  go : List Float -> Float -> Float
   let rec go rest acc =
     match rest with
     | [] -> acc

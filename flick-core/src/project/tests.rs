@@ -56,11 +56,10 @@ fn run(host: &Memory, roots: &[&str]) -> Vec<String> {
 
 #[test]
 fn diagnostics_do_not_depend_on_import_order() {
-    let left = "module A.Left exposing (..)\nfind : Number\nlet find = 1\ntype T = | T\n";
-    let right = "module A.Right exposing (..)\nfind : Number\nlet find = 2\ntype T = | T\n";
-    let main = |imports: &str| {
-        format!("module A.Main exposing (x)\n{imports}\nx : Number\nlet x = find\n")
-    };
+    let left = "module A.Left exposing (..)\nfind : Float\nlet find = 1\ntype T = | T\n";
+    let right = "module A.Right exposing (..)\nfind : Float\nlet find = 2\ntype T = | T\n";
+    let main =
+        |imports: &str| format!("module A.Main exposing (x)\n{imports}\nx : Float\nlet x = find\n");
     let orders = [
         "import A.Left exposing (..)\nimport A.Right exposing (..)\nimport A.Left as Q\nimport A.Right as Q exposing (T)\nimport A.Left exposing (T)",
         "import A.Right as Q exposing (T)\nimport A.Left exposing (T)\nimport A.Right exposing (..)\nimport A.Left as Q\nimport A.Left exposing (..)",
@@ -93,11 +92,11 @@ fn named_paths_still_check_their_imports() {
         ("flick.toml", LIB),
         (
             "src/A/Main.fl",
-            "module A.Main exposing (x)\nimport A.Util exposing (y)\nx : Number\nlet x = y\n",
+            "module A.Main exposing (x)\nimport A.Util exposing (y)\nx : Float\nlet x = y\n",
         ),
         (
             "src/A/Util.fl",
-            "module A.Util exposing (y, z)\ny : Number\nlet y = 1\n",
+            "module A.Util exposing (y, z)\ny : Float\nlet y = 1\n",
         ),
         ("src/A/Unrelated.fl", "module A.Unrelated exposing (nope)\n"),
     ]);
@@ -115,15 +114,15 @@ fn test_modules_see_sources_but_not_the_reverse() {
         ("flick.toml", LIB),
         (
             "src/A/Lib.fl",
-            "module A.Lib exposing (f)\nimport A.Helper\nf : Number\nlet f = 1\n",
+            "module A.Lib exposing (f)\nimport A.Helper\nf : Float\nlet f = 1\n",
         ),
         (
             "test/A/Helper.fl",
-            "module A.Helper exposing (h)\nh : Number\nlet h = 1\n",
+            "module A.Helper exposing (h)\nh : Float\nlet h = 1\n",
         ),
         (
             "test/A/LibTest.fl",
-            "module A.LibTest exposing (t)\nimport A.Lib exposing (f)\nimport A.Helper exposing (h)\nt : Number\nlet t = f\n",
+            "module A.LibTest exposing (t)\nimport A.Lib exposing (f)\nimport A.Helper exposing (h)\nt : Float\nlet t = f\n",
         ),
     ]);
     let result = run(&host, &["test/A/LibTest.fl", "src/A/Lib.fl"]);
@@ -138,15 +137,15 @@ fn without_a_project_imports_resolve_from_the_module_root() {
     let host = memory(&[
         (
             "lib/A/Main.fl",
-            "module A.Main exposing (x)\nimport A.Util exposing (y)\nx : Number\nlet x = y\n",
+            "module A.Main exposing (x)\nimport A.Util exposing (y)\nx : Float\nlet x = y\n",
         ),
         (
             "lib/A/Util.fl",
-            "module A.Util exposing (y)\ny : Number\nlet y = 1\n",
+            "module A.Util exposing (y)\ny : Float\nlet y = 1\n",
         ),
         (
             "loose.fl",
-            "module Loose exposing (z)\nimport A.Util\nz : Number\nlet z = 1\n",
+            "module Loose exposing (z)\nimport A.Util\nz : Float\nlet z = 1\n",
         ),
     ]);
     assert_eq!(run(&host, &["lib/A/Main.fl"]), Vec::<String>::new());
@@ -194,8 +193,8 @@ fn entry_main_is_pure_or_an_effect_a_runner_can_start() {
     assert_eq!(check(&unit("->{}")), Vec::<String>::new());
     let wrong = [
         (
-            "main : Number -> Unit\nlet main _ = ()\n",
-            "has type `Number -> Unit`",
+            "main : Float -> Unit\nlet main _ = ()\n",
+            "has type `Float -> Unit`",
         ),
         (&unit("->{Greeter;}"), "needs `{Greeter}`"),
         (&unit("->{; Boom}"), "can fail with `{Boom}`"),
@@ -261,7 +260,7 @@ fn a_runner_gives_the_type_of_main() {
     let wrong = [
         (
             "Runner.Node",
-            "main : Number -> Unit\nlet main _ = ()\n",
+            "main : Float -> Unit\nlet main _ = ()\n",
             "FLICK-P026 src/App/Main.fl `main`: entry `main` is not a `Runner.Node.Main`",
         ),
         (
@@ -346,11 +345,11 @@ fn a_package_dependency_still_conflicts_with_a_later_local_import() {
         ("node_modules/lib/iface/Core.iface", &iface::write(&core)),
         (
             "src/Core.fl",
-            "module Core exposing (answer)\nanswer : Number\nlet answer = 1\n",
+            "module Core exposing (answer)\nanswer : Float\nlet answer = 1\n",
         ),
         (
             "src/Main.fl",
-            "module Main exposing (answer)\nimport Api\nimport Core\nanswer : Number\nlet answer = 1\n",
+            "module Main exposing (answer)\nimport Api\nimport Core\nanswer : Float\nlet answer = 1\n",
         ),
     ]);
     let diagnostics = run(&host, &["src/Main.fl"]);

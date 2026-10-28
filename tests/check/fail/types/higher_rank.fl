@@ -1,17 +1,17 @@
 module App.HigherRank exposing (..)
 
-apply_twice : (forall a. a -> a) -> (Number, String)
+apply_twice : (forall a. a -> a) -> (Float, String)
 let apply_twice transform =
   (transform 42, transform "hello")
 
 wrong : forall a. a -> a
 let wrong x = x + 1
 
-use_mono : Unit -> (Number, String)
+use_mono : Unit -> (Float, String)
 let use_mono () =
   apply_twice (fun x -> x + 1)
 
-trim_only : Unit -> (Number, String)
+trim_only : Unit -> (Float, String)
 let trim_only () =
   apply_twice String.trim
 
@@ -52,8 +52,8 @@ let no_dictionary render = render 1
 needs_show : Unit -> String
 let needs_show () = no_dictionary show
 
-//~ FLICK-T008 @8:19-8:20 expected `a`, found `Number`: `a` stands for any type the
-//~ FLICK-T008 @12:29-12:30 expected `a`, found `Number`: `a` stands for any type the
+//~ FLICK-C001 @8:19-8:20 cannot deduce `Numeric a` from the constraints in scope
+//~ FLICK-C001 @12:29-12:30 cannot deduce `Numeric a` from the constraints in scope
 //~ FLICK-T008 @16:15-16:26 expected `a -> a`, found `String -> String`: `a` stands for
 //~ FLICK-T007 @26:32-26:38 expected `Option _`, found `Option a`: the type variable
 //~ FLICK-E002 @41:21-41:39 does not allow error `Stop`

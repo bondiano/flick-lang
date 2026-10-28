@@ -8,13 +8,13 @@ import Mtl.StateT as StateT exposing (StateT)
 import Mtl.ReaderT as ReaderT exposing (ReaderT)
 import Mtl.Classes exposing (ask, get, put)
 
-type alias Config = { budget : Number; overhead : Number }
+type alias Config = { budget : Float; overhead : Float }
 
-type alias PlanState = { remaining : Number; completed : List String }
+type alias PlanState = { remaining : Float; completed : List String }
 
 type alias Planner a = MaybeT (StateT PlanState (ReaderT Config Identity)) a
 
-catalog : List (String, Number)
+catalog : List (String, Float)
 let catalog = [("docs", 20), ("tests", 30), ("lint", 10)]
 
 default_config : Config

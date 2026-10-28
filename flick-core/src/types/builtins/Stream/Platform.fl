@@ -6,13 +6,13 @@ module Stream.Platform exposing (..)
 import Stream.Core exposing (Stream)
 
 /// UTF-8 text decoded from chunks of bytes.
-decode_text : forall c r e. (Stream r e (List Number))^c -> (Stream r e String)^c
+decode_text : forall c r e. (Stream r e (List Float))^c -> (Stream r e String)^c
 foreign pure decode_text from "@flick-lang/runtime/effect/Stream" "flickDecodeText"
   retention call
   reviewed "effect@4.0.5 sha256:5871a80d125209cb"
 
 /// Each string encoded as UTF-8 bytes.
-encode_text : forall c r e. (Stream r e String)^c -> (Stream r e (List Number))^c
+encode_text : forall c r e. (Stream r e String)^c -> (Stream r e (List Float))^c
 foreign pure encode_text from "@flick-lang/runtime/effect/Stream" "flickEncodeText"
   retention call
   reviewed "effect@4.0.5 sha256:6e8bfde1a02ed5eb"
@@ -26,9 +26,9 @@ foreign pure split_lines from "@flick-lang/runtime/effect/Stream" "splitLines"
 /// Chunks of bytes up to `limit`; past it, `on_limit` instead of the rest.
 limit_bytes :
   forall c r e. ByteSize.ByteSize ->
-    (Stream r e (List Number))^c ->
-    (Stream r e (List Number))^c ->
-    (Stream r e (List Number))^c
+    (Stream r e (List Float))^c ->
+    (Stream r e (List Float))^c ->
+    (Stream r e (List Float))^c
 foreign pure limit_bytes from "@flick-lang/runtime/effect/Stream" "flickLimitBytes"
   arity 2
   retention call
@@ -83,20 +83,20 @@ type alias ReadOptions =
   {
     offset : Option ByteSize.ByteSize;
     bytesToRead : Option ByteSize.ByteSize;
-    chunkSize : Option Number;
+    chunkSize : Option Float;
   }
 
 /// The bytes of the file in chunks, read through the `open` of the file
 /// system; the file is closed when the stream ends.
 read_file : ReadOptions ->
   String ->
-  Stream {FileSystem.FileSystem} {PlatformError.PlatformError} (List Number)
+  Stream {FileSystem.FileSystem} {PlatformError.PlatformError} (List Float)
 foreign pure read_file from "@flick-lang/runtime/effect/Stream" "flickReadFile"
   arity 2
   reviewed "effect@4.0.5 sha256:e72be4f6c861122c"
 
 /// The bytes of stdin in chunks, until it ends. It needs the streams of
 /// `Stdio.node`; another implementation fails with `NotFound`.
-stdin : Stream {Stdio.Stdio} {PlatformError.PlatformError} (List Number)
+stdin : Stream {Stdio.Stdio} {PlatformError.PlatformError} (List Float)
 foreign pure stdin from "@flick-lang/runtime/effect/Stream" "flickStdin"
   reviewed "effect@4.0.5 sha256:92ea6c7dce0e93e7"

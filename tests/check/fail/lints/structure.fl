@@ -1,7 +1,7 @@
 // The size and branching of a function past the default `[lint]` thresholds.
 module App.Structure exposing (..)
 
-deep : Number -> Number
+deep : Float -> Float
 let deep n =
   if n > 0 then
     match n with
@@ -11,11 +11,11 @@ let deep n =
   else 6
 //~ FLICK-T037 @8:39-8:42 nested 5 levels deep, more than 4
 
-many : Number -> Number -> Number -> Number -> Number -> Number -> Number
+many : Float -> Float -> Float -> Float -> Float -> Float -> Float
 let many a b c d e f = a + b + c + d + e + f
 //~ FLICK-T039 @15:5-15:9 `many` takes 6 parameters, more than 5
 
-branchy : Number -> Bool -> Bool -> Number
+branchy : Float -> Bool -> Bool -> Float
 let branchy n p q =
   if p && q || n > 1 then 1
   else if p || q then 2

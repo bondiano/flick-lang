@@ -86,14 +86,14 @@ export const lookup = (id: number): Effect.Effect<string> =>
 ```flick
 module Learn.Errors exposing (lookup)
 
-type error NotFound = NotFound Number
+type error NotFound = NotFound Float
 
-find : Number ->{; NotFound} String
+find : Float ->{; NotFound} String
 let find id =
   if id == 1 then "Ada"
   else from_result (Err (NotFound id))
 
-lookup : Number ->{} String
+lookup : Float ->{} String
 let lookup id =
   try find id with
   | NotFound _ -> "Guest"

@@ -9,7 +9,7 @@ later : Unit ->{} String
 foreign async later from "./stream.mjs" "later"
   arity 0
 
-task_runs : Unit ->{} Number
+task_runs : Unit ->{} Float
 foreign sync task_runs from "./stream.mjs" "taskRuns"
   arity 0
 
@@ -37,7 +37,7 @@ close : Unit ->{} Unit
 foreign sync close from "./stream.mjs" "close"
   arity 0
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
 
 user : Atom.Atom (Atom.Async String none)

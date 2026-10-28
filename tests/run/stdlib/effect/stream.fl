@@ -1,7 +1,7 @@
 // Sources of Effect's `Stream` and the calls that run them.
 module App.Main exposing (main)
 
-type error Boom = Boom Number
+type error Boom = Boom Float
 
 ms1 : Duration.Duration
 let ms1 = Result.with_default Duration.zero (Duration.millis 1)
@@ -11,20 +11,20 @@ readable : List JsValue ->{} JsValue
 foreign sync readable from "./streams.mjs" "readable"
 
 /// An event target that dispatches `abort` after the milliseconds.
-aborting : Number ->{} JsValue
+aborting : Float ->{} JsValue
 foreign sync aborting from global "AbortSignal.timeout"
 
-js_number : Number -> JsValue
+js_number : Float -> JsValue
 foreign pure js_number from global "Number"
 
 js_text : JsValue -> String
 foreign pure js_text from global "String"
 
-line : (String, List Number) ->{} Unit
+line : (String, List Float) ->{} Unit
 let line (label, xs) = Platform.stdout_line (label ++ ": " ++ show xs)
 
 /// Counts down from `n`, built by recursion.
-countdown : Number -> Stream.Stream none none Number
+countdown : Float -> Stream.Stream none none Float
 let rec countdown n =
   if n <= 0 then
     Stream.empty
@@ -32,7 +32,7 @@ let rec countdown n =
     Stream.concat (Stream.suspend (fun () -> countdown (n - 1))) (Stream.succeed n)
 
 /// Adds one to the counter, giving the new count.
-bump : Ref Number -> Eff none none Number
+bump : Ref Float -> Eff none none Float
 let bump calls =
   task {
     Ref.set calls (Ref.get calls + 1)
@@ -40,7 +40,7 @@ let bump calls =
   }
 
 /// Records `n`, going on while it is below 5.
-record : Ref (List Number) -> Number ->{} Bool
+record : Ref (List Float) -> Float ->{} Bool
 let record seen n =
   Ref.set seen (Ref.get seen ++ [n])
   n < 5
@@ -147,7 +147,7 @@ let main () =
   line ("run_for_each_while", (Ref.get seen))
   let sizes = Ref.make []
   Stream.run_for_each_chunk
-    (fun chunk -> Ref.set sizes (Ref.get sizes ++ [NonEmpty.length chunk]))
+    (fun chunk -> Ref.set sizes (Ref.get sizes ++ [Int.to_float (NonEmpty.length chunk)]))
     (Stream.from_lists [[1, 2], [3]])
   line ("run_for_each_chunk", (Ref.get sizes))
   Stream.run_drain (Stream.from_effect (task { Ref.set calls 99 }))
@@ -167,7 +167,7 @@ let main () =
   let died =
     Stream.run_collect (Stream.catch_defect (fun _ -> Stream.succeed "caught") (Stream.die "no"))
   Platform.stdout_line ("die: " ++ show died)
-  let rethrown : Stream.Stream none {Boom} Number =
+  let rethrown : Stream.Stream none {Boom} Float =
     Stream.catch_cause (fun failure -> Stream.fail_cause failure) (Stream.fail (Boom 2))
   let recovered =
     try

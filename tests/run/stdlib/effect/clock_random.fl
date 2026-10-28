@@ -2,7 +2,7 @@
 // clock is checked by properties; random draws under `with_seed` repeat.
 module App.Main exposing (main)
 
-draws : Unit ->{} (Number, Bool, Number, Number, Number, List Number, String)
+draws : Unit ->{} (Float, Bool, Float, Float, Float, List Float, String)
 let draws () =
   let x = Random.next ()
   let b = Random.next_boolean ()
@@ -14,7 +14,7 @@ let draws () =
   (x, b, i, between, die, order, pick)
 
 /// Whether the clock reads no earlier than the readings before.
-later : Clock.Clock -> Number -> BigInt -> BigInt ->{} Bool
+later : Clock.Clock -> Float -> BigInt -> BigInt ->{} Bool
 let later clock millis nanos mono =
   Clock.millis_of clock >= millis
     && Clock.nanos_of clock >= nanos
@@ -42,7 +42,7 @@ let main () =
       ++ show
         (
           x >= 0 && x < 1,
-          Number.is_safe_integer i,
+          Float.is_safe_integer i,
           between >= 10 && between < 20,
           die >= 1 && die <= 6,
           List.sort_by compare order,

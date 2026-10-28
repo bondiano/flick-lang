@@ -17,7 +17,7 @@ let greet =
     /// Print in capitals
     flag loud : Bool
     /// How many times
-    flag times "n" : Number = 1
+    flag times "n" : Float = 1
     /// Who to greet
     arg name : String
     handle fun { loud; times; name } ->
@@ -62,7 +62,7 @@ let greet =
 | `NonEmpty T` | как `List T`, но не менее одного значения | `Cli.some` |
 
 Класс `Cli.Value T` определяет, как разбирать значение типа `T`. Готовые
-экземпляры класса есть для `String`, `Bool`, `Number` (без NaN и пустого текста),
+экземпляры класса есть для `String`, `Bool`, `Float` (без NaN и пустого текста),
 `BigInt`, `Redacted String`, `DateTime.DateTime` (ISO 8601) и `(String, String)`
 (`key=value`, разделение по первому `=`). Для типа из конструкторов без полей
 `deriving Cli.Value` создаёт разбор по именам конструкторов в kebab-case:

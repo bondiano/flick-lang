@@ -22,11 +22,11 @@ let unparsed =
 wrong_default : Cli.Command none none
 let wrong_default =
   cli "wrong" {
-    flag times : Number = "once"
-//                        ^^^^^^ FLICK-T003 expected `Number`, found `String`
+    flag times : Float = "once"
+//                       ^^^^^^ FLICK-T003 expected `Float`, found `String`
     handle fun { times } -> ()
   }
 
-type Box = Box Number
+type Box = Box Float
   deriving Cli.Value
 //^^^^^^^^^^^^^^^^^^ FLICK-C013 cannot derive `Cli.Value` for `Box`

@@ -4,7 +4,7 @@ module App.Choice exposing (paint)
 type Color = Red | GreenLight
   deriving Cli.Value, Show
 
-refined type Port = Number
+refined type Port = Float
   where fun n -> n > 0 && n < 65536
   deriving Cli.Value
 

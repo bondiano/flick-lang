@@ -6,7 +6,7 @@ module App.Main exposing (main)
 type error Missing = Missing String
   deriving Show
 
-type alias Key = { name : String; n : Number }
+type alias Key = { name : String; n : Float }
 
 /// Longer than the test runs: nothing expires during it.
 hour : Duration.Duration
@@ -26,11 +26,14 @@ let acquire name =
 caches : Unit ->{; Missing} Unit
 let caches () =
   let lookups = Ref.make 0
-  lookup : Key ->{; Missing} Number
+  lookup : Key ->{; Missing} Float
   let lookup key =
     Ref.update lookups (fun n -> n + 1)
-    if key.n < 0 then from_result (Err (Missing key.name)) else String.length key.name + key.n
-  let cache : Cache.Cache Key {Missing} Number =
+    if key.n < 0 then
+      from_result (Err (Missing key.name))
+    else
+      Int.to_float (String.length key.name) + key.n
+  let cache : Cache.Cache Key {Missing} Float =
     Cache.make { lookup = lookup; capacity = 10; timeToLive = None }
   let a = Cache.get { name = "ab"; n = 1 } cache
   // an equal record is the same key
@@ -65,7 +68,7 @@ let caches () =
         ))
   Cache.invalidate_all cache
   say ("invalidate_all: " ++ show (Cache.size cache))
-  let short = Cache.make_with (fun (n : Number) -> n * 2) {
+  let short = Cache.make_with (fun (n : Float) -> n * 2) {
     capacity = 1;
     timeToLive =
       Some (fun exit key -> if Option.is_some (Exit.value exit) then hour else Duration.zero);

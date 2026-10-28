@@ -135,10 +135,10 @@ foreign pure alias_arguments from "./ts.mjs" "aliasArguments"
 tuple_has_rest : Type -> Bool
 foreign pure tuple_has_rest from "./ts.mjs" "tupleHasRest"
 
-tuple_min_length : Type -> Number
+tuple_min_length : Type -> Float
 foreign pure tuple_min_length from "./ts.mjs" "tupleMinLength"
 
-tuple_fixed_length : Type -> Number
+tuple_fixed_length : Type -> Float
 foreign pure tuple_fixed_length from "./ts.mjs" "tupleFixedLength"
 
 call_signatures : Type -> List Signature
@@ -147,7 +147,7 @@ foreign pure call_signatures from "./ts.mjs" "callSignatures"
 construct_signatures : Type -> List Signature
 foreign pure construct_signatures from "./ts.mjs" "constructSignatures"
 
-property_count : Type -> Number
+property_count : Type -> Float
 foreign pure property_count from "./ts.mjs" "propertyCount"
 
 parameters : Signature -> List Symbol

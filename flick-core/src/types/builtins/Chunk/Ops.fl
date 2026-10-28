@@ -113,7 +113,7 @@ foreign pure find_first from "@flick-lang/runtime/effect/Chunk" "findFirst"
   reviewed "effect@4.0.5 sha256:10dae4d47f952371"
 
 /// The index of the first element that satisfies `p`.
-find_first_index : forall c a. (a -> Bool)^c -> (Chunk a -> Option Number)^c
+find_first_index : forall c a. (a -> Bool)^c -> (Chunk a -> Option Int)^c
 foreign pure find_first_index from "@flick-lang/runtime/effect/Chunk" "findFirstIndex"
   arity 1
   retention call
@@ -127,7 +127,7 @@ foreign pure find_last from "@flick-lang/runtime/effect/Chunk" "findLast"
   reviewed "effect@4.0.5 sha256:868885f7ed37200d"
 
 /// The index of the last element that satisfies `p`.
-find_last_index : forall c a. (a -> Bool)^c -> (Chunk a -> Option Number)^c
+find_last_index : forall c a. (a -> Bool)^c -> (Chunk a -> Option Int)^c
 foreign pure find_last_index from "@flick-lang/runtime/effect/Chunk" "findLastIndex"
   arity 1
   retention call

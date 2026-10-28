@@ -46,8 +46,12 @@ impl Cx {
 impl Checker<'_> {
     /// A literal: `true` and `false` inline, anything else a placeholder.
     pub(super) fn sql_literal(&mut self, cx: &mut Cx, node: &Node) -> Val {
-        let token = node.child_tokens().next().map(|t| t.kind);
-        let ty = literal_type(token);
+        let first = node.child_tokens().next();
+        let token = first.map(|t| t.kind);
+        let ty = match first {
+            Some(t) if t.kind == K::Number => self.number(node, t.text(self.text)),
+            _ => literal_type(token),
+        };
         match token {
             Some(K::TrueKw) => Val::plain("TRUE".into(), ty),
             Some(K::FalseKw) => Val::plain("FALSE".into(), ty),

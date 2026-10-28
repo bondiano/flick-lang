@@ -2,13 +2,13 @@
 // transaction until another fiber completes it.
 module App.Main exposing (main)
 
-type error Late = Late Number
+type error Late = Late Float
   deriving Show
 
-ms : Number -> Duration.Duration
+ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
-describe : Option (Result Late Number) -> String
+describe : Option (Result Late Float) -> String
 let describe outcome =
   match outcome with
   | None -> "pending"
@@ -17,7 +17,7 @@ let describe outcome =
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let d : TxDeferred.TxDeferred Number {Late} = TxDeferred.make ()
+  let d : TxDeferred.TxDeferred Float {Late} = TxDeferred.make ()
   Platform.stdout_line ("before: " ++ describe (Tx.atomically (task { TxDeferred.poll d })))
   let (got, _) =
     try
@@ -36,12 +36,12 @@ let main () =
       ++ show again
       ++ ", "
       ++ describe (Tx.atomically (task { TxDeferred.poll d })))
-  let e : TxDeferred.TxDeferred Number {Late} = TxDeferred.make ()
+  let e : TxDeferred.TxDeferred Float {Late} = TxDeferred.make ()
   let failed = Tx.atomically (task { TxDeferred.fail (Late 2) e })
   let caught = try Tx.atomically (task { TxDeferred.await_ e }) with
     | Late n -> 0 - n
   Platform.stdout_line ("failed: " ++ show (failed, caught))
-  let f : TxDeferred.TxDeferred Number {Late} = TxDeferred.make ()
+  let f : TxDeferred.TxDeferred Float {Late} = TxDeferred.make ()
   let done = Tx.atomically (task { TxDeferred.done (Err (Late 3)) f })
   Platform.stdout_line
     ("done: " ++ show done ++ ", " ++ describe (Tx.atomically (task { TxDeferred.poll f })))

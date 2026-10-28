@@ -3,8 +3,8 @@
 module App.Deriving exposing (..)
 
 type Shape =
-  | Circle Number
-  | Rect { width : Number; height : Number }
+  | Circle Float
+  | Rect { width : Float; height : Float }
   | Empty
   deriving Eq, Ord, Hash, Show
 
@@ -14,13 +14,13 @@ type Tree a = Leaf | Node (Tree a) a (Tree a)
 type error NotFound = NotFound String
   deriving Eq, Show
 
-refined type Port = Number where fun n -> n > 0
+refined type Port = Float where fun n -> n > 0
   deriving Eq, Hash
 
 opaque type alias UserId = String
   deriving Eq, Ord, Hash, Show
 
-type Cell = Cell (Option Number)
+type Cell = Cell (Option Float)
   deriving Eq
 
 same_shape : Shape -> Shape -> Bool
@@ -29,10 +29,10 @@ let same_shape a b = eq a b
 order : Shape -> Shape -> Ordering
 let order a b = compare a b
 
-tree_text : Tree Number -> String
+tree_text : Tree Float -> String
 let tree_text tree = show tree
 
-port_hash : Port -> Number
+port_hash : Port -> Float
 let port_hash port = hash port
 
 ids : List UserId -> String

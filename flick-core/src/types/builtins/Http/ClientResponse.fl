@@ -11,7 +11,7 @@ import Stream.Core exposing (Stream)
 type ClientResponse
 
 /// The status code.
-status : ClientResponse -> Number
+status : ClientResponse -> Float
 foreign pure status from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickStatus"
   reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
 
@@ -51,12 +51,12 @@ foreign effect url_params_body from "@flick-lang/runtime/effect/http/HttpClientR
   reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
 
 /// The bytes of the body.
-bytes : ClientResponse ->{; HttpClientError} List Number
+bytes : ClientResponse ->{; HttpClientError} List Float
 foreign effect bytes from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickBytes"
   reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
 
 /// The chunks of bytes of the body, as they arrive.
-stream : ClientResponse -> Stream none {HttpClientError} (List Number)
+stream : ClientResponse -> Stream none {HttpClientError} (List Float)
 foreign pure stream from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickStream"
   reviewed "effect@4.0.5 sha256:d1e975aadadf634b"
 
@@ -66,7 +66,7 @@ foreign effect form_data from "@flick-lang/runtime/effect/http/HttpClientRespons
   reviewed "effect@4.0.5 sha256:a2b908d0e087ea71"
 
 /// The response, if `f` accepts its status; a `StatusCodeError` otherwise.
-filter_status : (Number -> Bool) -> ClientResponse ->{; HttpClientError} ClientResponse
+filter_status : (Float -> Bool) -> ClientResponse ->{; HttpClientError} ClientResponse
 foreign effect filter_status from "@flick-lang/runtime/effect/http/HttpClientResponse" "flickFilterStatus"
   arity 2
   reviewed "effect@4.0.5 sha256:82ece8d5b24b992d"

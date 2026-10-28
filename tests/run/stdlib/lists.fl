@@ -3,16 +3,16 @@
 // and `parallel_all` keeps at most its limit of branches running.
 module App.Main exposing (main)
 
-sleep : Number ->{} Unit
+sleep : Float ->{} Unit
 foreign async sleep from "../runtime/timers.mjs" "sleep"
 
-logged : Ref (List Number) -> Number ->{} Number
+logged : Ref (List Float) -> Float ->{} Float
 let logged log n =
   Ref.modify log (fun xs -> ((), xs ++ [n]))
   n * 10
 
 /// Tracks how many tasks run at once, and the most at any time.
-track : Ref Number -> Ref Number -> Number -> Eff none none Number
+track : Ref Float -> Ref Float -> Float -> Eff none none Float
 let track active peak n =
   task {
     let now = Ref.modify active (fun a -> (a + 1, a + 1))
@@ -33,14 +33,15 @@ let main () =
   Platform.stdout_line ("built, started " ++ show (Ref.get started))
   let active = Ref.make 0
   let peak = Ref.make 0
-  let results = parallel_all 8 (List.map (track active peak) (List.range 0 20))
+  let results =
+    parallel_all 8 (List.map (track active peak) (List.map Int.to_float (List.range 0 20)))
   Platform.stdout_line ("sum " ++ show (List.sum results) ++ ", at most " ++ show (Ref.get peak))
   Platform.stdout_line
-    (show (List.sort [3, Number.nan, 1, -Number.infinity, 2, Number.infinity, 0]))
+    (show (List.sort [3, Float.nan, 1, -Float.infinity, 2, Float.infinity, 0]))
   let pairs = [(2, "a"), (1, "b"), (2, "c"), (1, "d")]
   let by_first = List.sort_by (fun (a, _) (b, _) -> compare a b) pairs
   Platform.stdout_line (show (List.map (fun (_, s) -> s) by_first))
   Platform.stdout_line
-    (show [compare (-0) 0, compare Number.nan Number.nan, compare Number.infinity Number.nan])
+    (show [compare (-0) 0, compare Float.nan Float.nan, compare Float.infinity Float.nan])
   Platform.stdout_line (show (List.fold_left (fun acc x -> acc ++ show x) "" [1, 2, 3]))
   Platform.stdout_line (show (List.get 1 ["x", "y"], List.get 5 ["x"], List.reverse [1, 2]))

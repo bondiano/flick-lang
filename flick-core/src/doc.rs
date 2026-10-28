@@ -13,7 +13,7 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{Form, show_type};
 
 /// The `///` comment right above each top-level declaration, and above
-/// each constructor on a line of its own (`| Circle Number`), by name.
+/// each constructor on a line of its own (`| Circle Float`), by name.
 pub fn comments(text: &str) -> HashMap<String, String> {
     let mut out = HashMap::new();
     let mut pending: Vec<&str> = Vec::new();
@@ -266,7 +266,7 @@ mod tests {
     #[test]
     fn comments_belong_to_the_declaration_below() {
         let docs = comments(
-            "/// Adds.\n/// Twice.\nadd : Number -> Number\n\n/// A user.\ntype alias User = {}\n/// lost\n\nlet x = 1\n",
+            "/// Adds.\n/// Twice.\nadd : Float -> Float\n\n/// A user.\ntype alias User = {}\n/// lost\n\nlet x = 1\n",
         );
         assert_eq!(docs.get("add").map(String::as_str), Some("Adds.\nTwice."));
         assert_eq!(docs.get("User").map(String::as_str), Some("A user."));

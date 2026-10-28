@@ -29,36 +29,76 @@ export const stringToNumber = (s: string): Option<number> => {
   return Number.isNaN(n) && text !== "NaN" ? none : some(n);
 };
 
-const ARITHMETIC = /*#__PURE__*/ tag("Number.ArithmeticError.ArithmeticError");
+const ARITHMETIC = /*#__PURE__*/ tag("Int.ArithmeticError.ArithmeticError");
 
-/** `Number.ArithmeticError`. */
+/** `Int.ArithmeticError`. */
 export type ArithmeticError = Tagged<typeof ARITHMETIC, string>;
 
 const arithmetic = (message: string): Result<never, ArithmeticError> => err({ _tag: ARITHMETIC, _0: message });
+
+export const intFromFloat = (n: number): Option<number> => ((n | 0) === n ? some(n + 0) : none);
+
+/** The `Int` the decimal digits spell, with an optional sign. */
+export const intParse = (s: string): Option<number> => {
+  const text = s.trim();
+  if (!/^[+-]?\d+$/.test(text)) return none;
+  const n = Number(text);
+  return (n | 0) === n ? some(n + 0) : none;
+};
 
 export const numberSafeInteger = (n: number): Option<number> => (Number.isSafeInteger(n) ? some(n) : none);
 
 type Checked = (a: number, b: number) => Result<number, ArithmeticError>;
 
-/** A checked integer operation: operands and result must be safe integers. */
+/** A checked `Int` operation: the result must be an `Int`. */
 const checked =
   (name: string, f: (a: number, b: number) => number): Checked =>
   (a, b) => {
-    if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b)) {
-      return arithmetic(`${name}: ${a} and ${b} must be safe integers`);
-    }
-    if ((name === "div_int" || name === "rem_int") && b === 0) {
-      return arithmetic(`${name}: division by zero`);
+    if ((name === "checked_div" || name === "checked_rem") && b === 0) {
+      return arithmetic(`Int.${name}: division by zero`);
     }
     const r = f(a, b);
-    return Number.isSafeInteger(r) ? ok(r + 0) : arithmetic(`${name}: ${r} is not a safe integer`);
+    return (r | 0) === r ? ok(r + 0) : arithmetic(`Int.${name}: ${r} does not fit in Int`);
   };
 
-export const intAdd = /*#__PURE__*/ checked("add_int", (a, b) => a + b);
-export const intSub = /*#__PURE__*/ checked("sub_int", (a, b) => a - b);
-export const intMul = /*#__PURE__*/ checked("mul_int", (a, b) => a * b);
-export const intDiv = /*#__PURE__*/ checked("div_int", (a, b) => Math.trunc(a / b));
-export const intRem = /*#__PURE__*/ checked("rem_int", (a, b) => a % b);
+export const intCheckedAdd = /*#__PURE__*/ checked("checked_add", (a, b) => a + b);
+export const intCheckedSub = /*#__PURE__*/ checked("checked_sub", (a, b) => a - b);
+export const intCheckedMul = /*#__PURE__*/ checked("checked_mul", (a, b) => a * b);
+export const intCheckedDiv = /*#__PURE__*/ checked("checked_div", (a, b) => Math.trunc(a / b));
+export const intCheckedRem = /*#__PURE__*/ checked("checked_rem", (a, b) => a % b);
+
+// `Int` arithmetic: operators wrap around and divide by zero to zero
+
+/** `a / b` on `Int`, truncated. */
+export const divInt = (a: number, b: number): number => (b === 0 ? 0 : (a / b) | 0);
+export const remInt = (a: number, b: number): number => (b === 0 ? 0 : a % b | 0);
+
+/** `a ** b` on `Int`; a negative power is truncated like a division. */
+export const powInt = (a: number, b: number): number => {
+  if (b < 0) return a === 1 ? 1 : a === -1 ? (b % 2 === 0 ? 1 : -1) : 0;
+  let result = 1;
+  for (let base = a, e = b; e > 0; e >>>= 1) {
+    if (e & 1) result = Math.imul(result, base);
+    base = Math.imul(base, base);
+  }
+  return result;
+};
+
+export const divBigInt = (a: bigint, b: bigint): bigint => (b === 0n ? 0n : a / b);
+export const remBigInt = (a: bigint, b: bigint): bigint => (b === 0n ? 0n : a % b);
+
+export const intUnsafeDiv = (a: number, b: number): number => {
+  if (b === 0) throw new RangeError("Int.unsafe_div: division by zero");
+  return (a / b) | 0;
+};
+export const intUnsafeRem = (a: number, b: number): number => {
+  if (b === 0) throw new RangeError("Int.unsafe_rem: division by zero");
+  return a % b | 0;
+};
+
+/** `n` with its fraction dropped, wrapped into `Int`; NaN and the infinities are 0. */
+export const intTruncate = (n: number): number => n | 0;
+export const intAbs = (n: number): number => Math.abs(n) | 0;
 
 export const bitAnd = (a: number, b: number): number => a & b;
 export const bitOr = (a: number, b: number): number => a | b;
@@ -67,6 +107,7 @@ export const bitNot = (a: number): number => ~a;
 export const shiftLeft = (a: number, b: number): number => a << b;
 export const shiftRight = (a: number, b: number): number => a >> b;
 export const shiftRightUnsigned = (a: number, b: number): number => a >>> b;
+export const shiftRightUnsignedInt = (a: number, b: number): number => (a >>> b) | 0;
 
 export const bigintFromNumber = (n: number): Option<bigint> => (Number.isInteger(n) ? some(BigInt(n)) : none);
 

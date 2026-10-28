@@ -4,12 +4,12 @@ module App.Main exposing (main)
 
 type error Stop = Stop
 
-type alias Scores = TxHashMap.TxHashMap EqHash.Canonical String Number
+type alias Scores = TxHashMap.TxHashMap EqHash.Canonical String Float
 
-sorted : List (String, Number) -> List (String, Number)
+sorted : List (String, Float) -> List (String, Float)
 let sorted xs = List.sort_by (fun (a, _) (b, _) -> compare a b) xs
 
-entries_of : TxHashMap.TxHashMap w String Number ->{Tx.Transaction;} List (String, Number)
+entries_of : TxHashMap.TxHashMap w String Float ->{Tx.Transaction;} List (String, Float)
 let entries_of m = sorted (TxHashMap.entries m)
 
 main : Unit ->{; AppError} Unit
@@ -48,7 +48,7 @@ let main () =
   Platform.stdout_line ("snapshot kept: " ++ show (HashMap.get "ann" frozen, HashMap.size frozen))
   Platform.stdout_line ("union: " ++ show (Tx.atomically (task { entries_of scores })))
   let derived = Tx.atomically (task {
-      let doubled = TxHashMap.map (fun v k -> v * 2 + String.length k) scores
+      let doubled = TxHashMap.map (fun v k -> v * 2 + Int.to_float (String.length k)) scores
       let big = TxHashMap.filter (fun v _ -> v > 4) scores
       let parsed = TxHashMap.filter_map (fun v _ -> if v > 4 then Ok (show v) else Err ()) scores
       let maybe =

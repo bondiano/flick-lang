@@ -66,7 +66,7 @@ foreign effect adjust from "@flick-lang/runtime" "testAdjust"
 
 /// Sets the clock to `millis` since the epoch, running what was waiting
 /// until then.
-set_time : Number ->{VirtualTime;} Unit
+set_time : Float ->{VirtualTime;} Unit
 foreign effect set_time from "@flick-lang/runtime" "testSetTime"
 
 /// Checks `check` on 100 values of `gen`, from the run's seed.

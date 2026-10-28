@@ -2,7 +2,9 @@
 
 use super::Lower;
 use super::atoms::completed;
+use super::numeric::{apply, arith_method, arith_of};
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
+use crate::numeric::{Arith, Num};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -52,6 +54,9 @@ impl Lower<'_> {
         let span = self.span(node);
         let children: Vec<&Node> = node.nodes().collect();
         let kind = match node.kind {
+            K::Literal if self.typing.generic_numeric.contains(&node.range()) => {
+                return self.generic_literal(node, span);
+            }
             K::Literal => ExprKind::Lit(self.literal(node)),
             K::UnitExpr => ExprKind::Lit(Lit::Unit),
             // the checker resolved `server name` to the implementation
@@ -87,7 +92,11 @@ impl Lower<'_> {
                         let wait = Expr::new(ExprKind::Await(operand), span);
                         return self.within(node.range(), wait);
                     }
-                    _ => ExprKind::Neg(operand),
+                    _ if self.typing.generic_numeric.contains(&node.range()) => {
+                        let negate = self.prelude_method(node.range(), "negate");
+                        return apply(negate, [operand], span);
+                    }
+                    _ => ExprKind::Neg(self.num(node.range()), operand),
                 }
             }
             K::FunExpr => return self.lambda(node, &children),
@@ -176,12 +185,15 @@ impl Lower<'_> {
         }
     }
 
-    fn literal(&self, node: &Node) -> Lit {
+    pub(super) fn literal(&self, node: &Node) -> Lit {
         let Some(token) = node.child_tokens().next() else {
             return Lit::Unit;
         };
         let text = token.text(self.text);
         match token.kind {
+            K::Number if self.typing.numeric.get(&node.range()) == Some(&Num::BigInt) => {
+                Lit::BigInt(format!("{text}n"))
+            }
             K::Number => Lit::Number(text.to_owned()),
             K::BigInt => Lit::BigInt(text.to_owned()),
             K::String => Lit::String(literal::string_value(text)),
@@ -343,6 +355,12 @@ impl Lower<'_> {
             };
             return Expr::new(ExprKind::Binary(op, lhs, rhs), span);
         }
+        if self.typing.generic_numeric.contains(&key)
+            && let Some(method) = op.and_then(arith_method)
+        {
+            let method = self.prelude_method(key, method);
+            return apply(method, [lhs, rhs], span);
+        }
         let op = match op {
             Some(K::PipeGt) => {
                 let app = ExprKind::App {
@@ -364,12 +382,7 @@ impl Lower<'_> {
             Some(K::Ge) => BinOp::Ge,
             Some(K::PlusPlus) if self.typing.list_concat.contains(&key) => BinOp::ListConcat,
             Some(K::PlusPlus) => BinOp::Concat,
-            Some(K::Plus) => BinOp::Add,
-            Some(K::Minus) => BinOp::Sub,
-            Some(K::Star) => BinOp::Mul,
-            Some(K::Slash) => BinOp::Div,
-            Some(K::Percent) => BinOp::Rem,
-            _ => BinOp::Pow,
+            k => BinOp::Arith(k.and_then(arith_of).unwrap_or(Arith::Pow), self.num(key)),
         };
         Expr::new(ExprKind::Binary(op, lhs, rhs), span)
     }

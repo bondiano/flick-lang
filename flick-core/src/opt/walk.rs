@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 
 use crate::ir::{BinOp, Expr, ExprKind, Pat, Stmt};
+use crate::numeric::{Arith, Num};
 
 /// How often `e` reads the local `name`.
 pub fn uses(e: &Expr, name: &str) -> usize {
@@ -131,16 +132,16 @@ pub fn droppable(e: &Expr) -> bool {
         } => true,
         ExprKind::Tuple(items) | ExprKind::List(items) => items.iter().all(droppable),
         ExprKind::Record(fields) => fields.iter().all(|(_, v)| droppable(v)),
-        ExprKind::Field(inner, _) | ExprKind::Not(inner) | ExprKind::Neg(inner) => droppable(inner),
+        ExprKind::Field(inner, _) | ExprKind::Not(inner) | ExprKind::Neg(_, inner) => droppable(inner),
         ExprKind::Binary(op, l, r) => total(*op) && droppable(l) && droppable(r),
         _ => false,
     }
 }
 
-/// Whether an operator never throws, whatever its well-typed operands:
-/// division, remainder and powers of `BigInt` may.
+/// Whether an operator never throws, whatever its well-typed operands: a
+/// negative power of a `BigInt` does.
 pub fn total(op: BinOp) -> bool {
-    !matches!(op, BinOp::Div | BinOp::Rem | BinOp::Pow)
+    op != BinOp::Arith(Arith::Pow, Num::BigInt)
 }
 
 /// Gives every local `e` binds a name ending in `suffix`, and renames its

@@ -9,36 +9,36 @@ type Metric i s
 /// The pairs of attributes a metric is reported with.
 type alias Attributes = List (String, String)
 
-type alias CounterState = { count : Number; incremental : Bool }
-type alias GaugeState = { value : Number }
+type alias CounterState = { count : Float; incremental : Bool }
+type alias GaugeState = { value : Float }
 
 /// How often each word was seen.
-type alias FrequencyState = { occurrences : List (String, Number) }
+type alias FrequencyState = { occurrences : List (String, Float) }
 
 /// The count of the values up to each boundary, and their total.
 type alias HistogramState = {
-  buckets : List (Number, Number);
-  count : Number;
-  min : Number;
-  max : Number;
-  sum : Number;
+  buckets : List (Float, Float);
+  count : Float;
+  min : Float;
+  max : Float;
+  sum : Float;
 }
 
 /// Each quantile with its value, `None` before any input.
 type alias SummaryState =
   {
-    quantiles : List (Number, Option Number);
-    count : Number;
-    min : Number;
-    max : Number;
-    sum : Number;
+    quantiles : List (Float, Option Float);
+    count : Float;
+    min : Float;
+    max : Float;
+    sum : Float;
   }
 
 /// Adds its inputs, or keeps the last one unless it is `incremental`.
-type alias Counter = Metric Number CounterState
+type alias Counter = Metric Float CounterState
 
 /// Keeps the last input.
-type alias Gauge = Metric Number GaugeState
+type alias Gauge = Metric Float GaugeState
 
 /// Counts the words it gets.
 type alias Frequency = Metric String FrequencyState
@@ -60,7 +60,7 @@ type alias FrequencyOptions = {
 type alias HistogramOptions = {
   description : Option String;
   attributes : Attributes;
-  boundaries : List Number;
+  boundaries : List Float;
 }
 
 /// `maxAge` and `maxSize` bound the inputs a summary keeps.
@@ -69,15 +69,15 @@ type alias SummaryOptions =
     description : Option String;
     attributes : Attributes;
     maxAge : Duration.Duration;
-    maxSize : Number;
-    quantiles : List Number;
+    maxSize : Float;
+    quantiles : List Float;
   }
 
 /// `boundaries` defaults to exponential ones from 1 millisecond.
 type alias TimerOptions = {
   description : Option String;
   attributes : Attributes;
-  boundaries : Option (List Number);
+  boundaries : Option (List Float);
 }
 
 /// The state of a metric, by kind.
@@ -112,18 +112,18 @@ foreign pure frequency from "@flick-lang/runtime/effect/Metric" "flickFrequency"
   arity 2
   reviewed "effect@4.0.5 sha256:f2871b566ded936e"
 
-histogram : String -> HistogramOptions -> Histogram Number
+histogram : String -> HistogramOptions -> Histogram Float
 foreign pure histogram from "@flick-lang/runtime/effect/Metric" "flickHistogram"
   arity 2
   reviewed "effect@4.0.5 sha256:ce211dc5e29f1037"
 
-summary : String -> SummaryOptions -> Summary Number
+summary : String -> SummaryOptions -> Summary Float
 foreign pure summary from "@flick-lang/runtime/effect/Metric" "flickSummary"
   arity 2
   reviewed "effect@4.0.5 sha256:98a93f3d372881b3"
 
 /// A summary whose inputs carry their time, in milliseconds since the epoch.
-summary_with_timestamp : String -> SummaryOptions -> Summary (Number, Number)
+summary_with_timestamp : String -> SummaryOptions -> Summary (Float, Float)
 foreign pure summary_with_timestamp from "@flick-lang/runtime/effect/Metric" "flickSummaryWithTimestamp"
   arity 2
   reviewed "effect@4.0.5 sha256:b570957a401713b8"
@@ -189,18 +189,18 @@ foreign effect dump from "@flick-lang/runtime/effect/Metric" "flickDump"
   reviewed "effect@4.0.5 sha256:d3094a1db72aa0bf"
 
 /// The numbers without duplicates, then `Infinity`: boundaries of a histogram.
-boundaries_from_iterable : List Number -> List Number
+boundaries_from_iterable : List Float -> List Float
 foreign pure boundaries_from_iterable from "@flick-lang/runtime/effect/Metric" "boundariesFromIterable"
   reviewed "effect@4.0.5 sha256:d7a4be7a6128c37d"
 
 /// `count - 1` boundaries `width` apart after `start`, then `Infinity`.
-linear_boundaries : { start : Number; width : Number; count : Number } -> List Number
+linear_boundaries : { start : Float; width : Float; count : Float } -> List Float
 foreign pure linear_boundaries from "@flick-lang/runtime/effect/Metric" "linearBoundaries"
   reviewed "effect@4.0.5 sha256:358b9c160fbab6d8"
 
 /// `count - 1` boundaries from `start`, each `factor` times the one before,
 /// then `Infinity`.
-exponential_boundaries : { start : Number; factor : Number; count : Number } -> List Number
+exponential_boundaries : { start : Float; factor : Float; count : Float } -> List Float
 foreign pure exponential_boundaries from "@flick-lang/runtime/effect/Metric" "exponentialBoundaries"
   reviewed "effect@4.0.5 sha256:06bb01033a19c1c9"
 

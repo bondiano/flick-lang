@@ -59,7 +59,7 @@ fn check_all(modules: &[(&str, &str)]) -> (Vec<Diagnostic>, Vec<Dict>) {
 const SHAPES: (&str, &str) = (
     "App.Shapes",
     "module App.Shapes exposing (Shape(..))\n\
-     type Shape = Circle Number\n  deriving Eq, Show\n",
+     type Shape = Circle Float\n  deriving Eq, Show\n",
 );
 
 const PRETTY: (&str, &str) = (
@@ -119,7 +119,7 @@ fn an_instance_is_seen_through_the_modules_that_depend_on_it() {
     assert!(
         diagnostics[0]
             .message
-            .contains("no instance for `Pretty Number`"),
+            .contains("no instance for `Pretty Int`"),
         "{diagnostics:?}"
     );
     assert!(

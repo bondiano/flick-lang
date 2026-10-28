@@ -6,13 +6,13 @@ service Greeter =
   greet : String ->{} String
 
 service Counter =
-  next : Unit ->{} Number
+  next : Unit ->{} Float
 
 greeter_impl : Greeter.Impl
 let greeter_impl =
   { greet = fun name -> "hello, " ++ name }
 
-counter_impl : Ref Number -> Counter.Impl
+counter_impl : Ref Float -> Counter.Impl
 let counter_impl cell =
   { next = fun () -> Ref.modify cell (fun n -> (n + 1, n + 1)) }
 

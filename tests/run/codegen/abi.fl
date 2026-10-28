@@ -5,7 +5,7 @@ module App.Main exposing (main)
 unboxed type UserId = UserId String
   deriving Eq, Ord, Hash, Show, Schema
 
-untagged type Key = ByNumber Number | ByName String | ByPath (List String) | Flag Bool
+untagged type Key = ByNumber Float | ByName String | ByPath (List String) | Flag Bool
   deriving Eq, Ord, Show
 
 describe : Key -> String

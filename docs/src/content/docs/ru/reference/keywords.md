@@ -27,13 +27,13 @@ title: Ключевые слова
 | `let` | Связывает имя со значением или функцией на уровне модуля либо внутри блока | `let total = a + b` |
 | `rec` | В `let rec` разрешает функции вызывать себя; блок `rec { … }` объединяет взаимно рекурсивные функции | `let rec go n = …` |
 | `assert` | `let assert` связывает образец, который может не подойти, и завершается с ошибкой, если он не подошёл | `let assert [x, ..._] = xs as "no items"` |
-| `type` | Объявляет алгебраический тип данных, а в сочетании `type alias` — прозрачный псевдоним типа | `type Shape = Circle Number \| Empty` |
+| `type` | Объявляет алгебраический тип данных, а в сочетании `type alias` — прозрачный псевдоним типа | `type Shape = Circle Float \| Empty` |
 | `opaque` | Скрывает представление типа за пределами его модуля | `opaque type alias UserId = String` |
-| `refined` | Объявляет тип, значения которого удовлетворяют условию | `refined type Port = Number where fun n -> n > 0` |
+| `refined` | Объявляет тип, значения которого удовлетворяют условию | `refined type Port = Float where fun n -> n > 0` |
 | `where` | Задаёт условие уточняющего типа или фильтр в `sql { … }` | `where user.id == params.id` |
 | `kind` | Объявляет кинд и его конструкторы на уровне типов | `kind Nullability = NonNull \| Nullable` |
 | `error` | В сочетании `type error` объявляет ожидаемую ошибку с номинальной идентичностью | `type error NotFound = NotFound UserId` |
-| `service` | Объявляет операции сервиса, реализация которого выбирается при выполнении | `service Clock = now : Unit ->{} Number` |
+| `service` | Объявляет операции сервиса, реализация которого выбирается при выполнении | `service Clock = now : Unit ->{} Float` |
 | `class` | Объявляет класс типов | `class Named a = name : a -> String` |
 | `instance` | Определяет реализацию класса для типа | `instance Named User = let name u = u.name` |
 | `deriving` | Поручает компилятору создать экземпляры классов | `deriving Eq, Show, Schema` |
@@ -99,14 +99,14 @@ title: Ключевые слова
 
 | На что навести | Что покажет подсказка |
 | - | - |
-| `task` | `task { … } : Eff {Store} {StoreError} Number` — вычисление, создаваемое блоком |
-| `scope` | `scope { … } : Number` — результат блока, возвращаемый после освобождения ресурсов |
+| `task` | `task { … } : Eff {Store} {StoreError} Float` — вычисление, создаваемое блоком |
+| `scope` | `scope { … } : Float` — результат блока, возвращаемый после освобождения ресурсов |
 | `provide`, `try` | Результат блока и сервисы или ошибки, которые он устраняет |
 | `match`, `if` | `match … with : String` — результат выбранной ветки |
-| `fun` | `fun … -> … : Number -> Number` — тип функции |
+| `fun` | `fun … -> … : Float -> Float` — тип функции |
 | `sql`, `codec`, `cli`, `ui`, `schema` | Значение, создаваемое блоком, например `sql { … } : Template Pg {} { label : String }` |
-| `await` | `await … : Number` — результат и запускаемое вычисление `Eff` |
-| `ignore` | `ignore : Eff {Store} {StoreError} Number -> Unit` — тип отбрасываемого значения и предупреждение, если это `Eff`, который не будет выполнен |
+| `await` | `await … : Float` — результат и запускаемое вычисление `Eff` |
+| `ignore` | `ignore : Eff {Store} {StoreError} Float -> Unit` — тип отбрасываемого значения и предупреждение, если это `Eff`, который не будет выполнен |
 
 Для остальных ключевых слов подсказок нет. Типы связанных с ними имён
 можно посмотреть, наведя указатель на сами имена.

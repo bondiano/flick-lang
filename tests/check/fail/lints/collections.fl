@@ -1,24 +1,24 @@
 // List and option code a library function says directly.
 module App.Collections exposing (..)
 
-first : List Number -> Option Number
+first : List Float -> Option Float
 let first xs = xs |> List.filter (fun x -> x > 1) |> List.head
 
-some : List Number -> Bool
+some : List Float -> Bool
 let some xs = List.length (List.filter (fun x -> x > 1) xs) > 0
 
-none : List Number -> Bool
+none : List Float -> Bool
 let none xs = List.length xs == 0
 
-pairs : List Number -> List Number
+pairs : List Float -> List Float
 let pairs xs = List.concat (List.map (fun x -> [x, x]) xs)
 
-count : Option Number -> Number
+count : Option Float -> Float
 let count o = match o with
   | Some n -> n
   | None -> 0
 
-kept : List Number -> Bool
+kept : List Float -> Bool
 let kept xs = List.length xs == 2
 //~ FLICK-T047 @5:16-5:63 `List.head` of `List.filter`: `List.find` stops at the first match
 //~ FLICK-T048 @8:15-8:64 the length of a `List.filter` compared with zero: `List.any` stops at the first match

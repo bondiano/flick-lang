@@ -38,13 +38,13 @@ let fifo = Strategy "fifo"
 
 /// The options of `with_cache`: at most `capacity` results, dropped by
 /// `strategy` (`None`: `lru`).
-type alias CacheOptions = { capacity : Number; strategy : Option Strategy }
+type alias CacheOptions = { capacity : Float; strategy : Option Strategy }
 
 /// The options of `as_cache`: at most `capacity` results, each kept for
 /// `timeToLive` of how it ended and its request (`None`: until dropped).
 type alias AsCacheOptions p (e : ErrorRow) a =
   {
-    capacity : Number;
+    capacity : Float;
     timeToLive : Option (Exit e a -> Request.Request p e a -> Duration.Duration);
   }
 
@@ -108,7 +108,7 @@ foreign pure around from "@flick-lang/runtime/effect/RequestResolver" "around"
   reviewed "effect@4.0.5 sha256:3690926b82cc0631"
 
 /// `resolver`, taking at most `n` entries per batch.
-batch_n : Number -> RequestResolver p e a -> RequestResolver p e a
+batch_n : Float -> RequestResolver p e a -> RequestResolver p e a
 foreign pure batch_n from "@flick-lang/runtime/effect/RequestResolver" "batchN"
   arity 1
   reviewed "effect@4.0.5 sha256:67fe3934c2dd14ce"

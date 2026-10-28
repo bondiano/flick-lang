@@ -113,7 +113,7 @@ capture row with `^` and the region variable.
 
 | Type | JSON |
 | - | - |
-| `Number` | `{ "con": { "module": "Prelude", "name": "Number" } }` |
+| `Float` | `{ "con": { "module": "Prelude", "name": "Float" } }` |
 | type variable `a` | `{ "var": "a" }` |
 | `F a` | `{ "app": { "head": F, "arg": a } }` |
 | `a -> b` | `{ "fun": { "param": a, "result": b } }` |

@@ -61,20 +61,20 @@ In this example `Option` is a standard type with a native Effect representation.
 
 ### Variants, guards and or-patterns
 
-A constructor carries zero, one or several fields. The fields are listed after the constructor name in the same way as the arguments when it is applied and in a pattern: `| Circle Point Number`. A field is an atomic type, so a type application and an arrow are parenthesized: `| Branch (List (Tree a))`, `| Handler (a -> b)`. `Circle (Point, Number)` is one tuple field, not two fields. In the ABI the fields occupy `_0`, `_1` and so on in declaration order.
+A constructor carries zero, one or several fields. The fields are listed after the constructor name in the same way as the arguments when it is applied and in a pattern: `| Circle Point Float`. A field is an atomic type, so a type application and an arrow are parenthesized: `| Branch (List (Tree a))`, `| Handler (a -> b)`. `Circle (Point, Float)` is one tuple field, not two fields. In the ABI the fields occupy `_0`, `_1` and so on in declaration order.
 
-The right-hand side of `type` always lists variants, and the leading `|` is optional: `type Wrapper = Wrap Number` is an ADT with a single constructor. A transparent alias, including a record type, is declared with `type alias`: `type alias UserId = Number`. `opaque type alias` hides the representation outside the module, and `opaque type` with variants hides the constructors. `alias` is a keyword only immediately after `type`.
+The right-hand side of `type` always lists variants, and the leading `|` is optional: `type Wrapper = Wrap Float` is an ADT with a single constructor. A transparent alias, including a record type, is declared with `type alias`: `type alias UserId = Float`. `opaque type alias` hides the representation outside the module, and `opaque type` with variants hides the constructors. `alias` is a keyword only immediately after `type`.
 
 ```flick
 type Shape =
-  | Circle Point Number
-  | Rect Number Number
+  | Circle Point Float
+  | Rect Float Float
   | Empty
 
-area : Shape -> Number
+area : Shape -> Float
 let area shape =
   match shape with
-  | Circle _ radius -> Number.pi * radius ** 2
+  | Circle _ radius -> Float.pi * radius ** 2
   | Rect width height when width == height -> width ** 2
   | Rect width height -> width * height
   | Empty -> 0
@@ -207,7 +207,7 @@ Another export:
 export declare function nextId(): number;
 ```
 
-conservatively gets `Unit ->{} Number`. The function may read the clock or change a counter. A pure arrow requires a reviewed contract; it cannot be inferred from the return type alone.
+conservatively gets `Unit ->{} Float`. The function may read the clock or change a counter. A pure arrow requires a reviewed contract; it cannot be inferred from the return type alone.
 
 ### Diagnostics and package updates
 
@@ -226,11 +226,11 @@ The Content Mapper links the sources and the TS projection. Support for an impor
 The modes `foreign pure`, `foreign sync`, `foreign async`, `foreign effect` are chosen. The full source signature stands above the declaration; `arity`, `this`, `catch`, the nullable mapping, retention and cancellation are set by binding metadata. The names `cancel signal` and the position of the signal determine how the argument is passed, but do not replace the quiescence contract.
 
 ```flick
-hypot : Number -> Number -> Number
+hypot : Float -> Float -> Float
 foreign pure hypot from global "Math.hypot"
   arity 2
 
-now_millis : Unit ->{} Number
+now_millis : Unit ->{} Float
 foreign sync now_millis from global "Date.now"
   arity 0
 
@@ -245,7 +245,7 @@ foreign effect fetch_user from "./users.js" "fetchUser"
   arity 1
 ```
 
-`arity` sets the number of ordinary positional arguments of the JS call. `arity 2` adapts two stages of currying; `arity 0` takes the source `()` and calls JS without arguments. The pair `(Number, Number)` is not unpacked into two arguments by itself. `cancel signal` separately adds a signal as the binding specifies, in this example as the last argument.
+`arity` sets the number of ordinary positional arguments of the JS call. `arity 2` adapts two stages of currying; `arity 0` takes the source `()` and calls JS without arguments. The pair `(Float, Float)` is not unpacked into two arguments by itself. `cancel signal` separately adds a signal as the binding specifies, in this example as the last argument.
 
 The source is `from global "Math.hypot"` for a global JS value or `from "./fs.js" "readText"` for an export of an ESM module. Metadata are indented lines under the declaration, one item per line: a name and atom arguments. The known names are: `arity N`, `this`, `catch f`, `cancel signal`, `nullable …`, `retention …`, `optional …`, `variadic …`; an unknown name is the error `FLICK-S011`. The parser checks only the "name and arguments" form; whether the arguments of each item are admissible for the given signature and mode is checked by the checker's FFI check.
 
@@ -279,7 +279,7 @@ A throw and a rejected Promise are translated into a typed error only by the dec
 | Source value | First-version ABI |
 | - | - |
 | Unit | JS `undefined`; a successful foreign void is normalized to `()` |
-| Number, BigInt, Bool, String | The corresponding JS primitives |
+| Float, BigInt, Bool, String | The corresponding JS primitives |
 | Tuple | A dense JS array of fixed length |
 | List | A dense JS array with an immutable source API |
 | Record | A plain JS object with the exact set of own data fields |
@@ -417,7 +417,7 @@ The body of a `task` is not executed on construction; two runs remain two runs. 
 
 The observable contract includes the order of source effectful calls, the boundaries of handlers/provide/Scope, the registration of finalizers, explicit yields and the meaning of interruption. The exact automatic fiber schedule and the winner of a genuine race between ready branches are not fixed between builds. The [Effect scheduler](https://effect.website/docs/v4/api/effect/Scheduler#MaxOpsBeforeYield) uses a counter of runtime operations for cooperative yielding, so fusion affects the moments of switching. The compiler must preserve the possibility of cooperative progress and not turn an unbounded sequence of runtime steps into a blocking infinite JS loop.
 
-Number semantics and equality are different foundations: even with an Eq that merges signed zero, an optimization must preserve distinguishable arithmetic results. Stronger modes are possible only with an explicit change of the numeric contract; they are not part of the chosen JS semantics.
+Float semantics and equality are different foundations: even with an Eq that merges signed zero, an optimization must preserve distinguishable arithmetic results. Stronger modes are possible only with an explicit change of the numeric contract; they are not part of the chosen JS semantics.
 
 ### ReScript-style optimizations
 
@@ -439,7 +439,7 @@ The [ReScript pipeline](https://github.com/rescript-lang/rescript/blob/81d63a8b7
 #### Direct calls preserving currying
 
 ```flick
-add : Number -> Number -> Number
+add : Float -> Float -> Float
 let add left right =
   left + right
 ```
@@ -461,7 +461,7 @@ In [ReScript uncurried calls became the default model](https://rescript-lang.org
 #### Eliminating temporary allocations
 
 ```flick
-sum_pair : Number -> Number -> Number
+sum_pair : Float -> Float -> Float
 let sum_pair left right =
   let pair = { left = left; right = right }
   pair.left + pair.right
@@ -479,15 +479,15 @@ The exact [ReScript SROA pass](https://github.com/rescript-lang/rescript/blob/81
 
 #### Evaluating literal expressions
 
-Like ReScript, the compiler evaluates at compile time expressions composed only of literals: `60 * 60 * 24` becomes `86400`, `"Hello, " ++ "world"` becomes a single string, `not false` becomes `true`, `if true then a else b` becomes the value `a`. The result must match execution in JS bit for bit: IEEE 754 for `+ - * / %` on Number, SameValueZero for `==` on Number, UTF-16 code unit order for `<` on String, truncation toward zero for `/` and `%` on BigInt.
+Like ReScript, the compiler evaluates at compile time expressions composed only of literals: `60 * 60 * 24` becomes `86400`, `"Hello, " ++ "world"` becomes a single string, `not false` becomes `true`, `if true then a else b` becomes the value `a`. The result must match execution in JS bit for bit: IEEE 754 for `+ - * / %` on Float, SameValueZero for `==` on Float, UTF-16 code unit order for `<` on String, truncation toward zero for `/` and `%` on BigInt.
 
 | Expression | Evaluated at compile time |
 | - | - |
-| Number, BigInt, String, Bool literals; parentheses | The value of the literal |
-| Unary `-`, `not`; `+ - * / %` on Number | Yes |
-| `**` on Number | Only with a zero exponent or an integer result exactly representable in binary64; otherwise a runtime evaluation remains, because engines' `Math.pow` may differ in the last bit |
+| Float, BigInt, String, Bool literals; parentheses | The value of the literal |
+| Unary `-`, `not`; `+ - * / %` on Float | Yes |
+| `**` on Float | Only with a zero exponent or an integer result exactly representable in binary64; otherwise a runtime evaluation remains, because engines' `Math.pow` may differ in the last bit |
 | `+ - * / % **` on BigInt | As long as the result fits in 128 bits; division by `0n` and a negative exponent remain a runtime `RangeError` exception (a defect) |
-| `==`, `!=`, `<`, `<=`, `>`, `>=` | On Number, BigInt and String; on Bool — only `==` and `!=` |
+| `==`, `!=`, `<`, `<=`, `>`, `>=` | On Float, BigInt and String; on Bool — only `==` and `!=` |
 | `&&`, `\|\|`, `++` | Only when both operands are constant: folding does not discard a computation with an effect |
 | `if` with a constant condition | The value of the chosen branch, if it is constant |
 
@@ -513,12 +513,12 @@ The representation is declared explicitly and identically in all profiles, becau
 unboxed type UserId = UserId String
   deriving Eq, Hash, Show, Schema
 
-untagged type Key = ByNumber Number | ByName String | ByPath (List String)
+untagged type Key = ByNumber Float | ByName String | ByPath (List String)
 ```
 
-The value of an `unboxed type` is the field of its single constructor with one field. `opaque unboxed type` hides the constructor from importers in the same way as `opaque type`. An `untagged type` is the field of each constructor; the fields are distinguishable by JS type (`Number`, `String`, `Bool`, `BigInt`, one list/tuple), and the checker rejects an overlap (`FLICK-T020`). Pattern matching checks `typeof`/`Array.isArray` instead of `_tag`. Derived `Eq`, `Ord`, `Hash`, `Show` work on the representation; the wire form of `deriving Schema` for an `unboxed type` is the form of the field, an `untagged type` has no derived witness, and it is assembled with `Schema` combinators. The TS projection is the type of the field or the union of the types of the fields.
+The value of an `unboxed type` is the field of its single constructor with one field. `opaque unboxed type` hides the constructor from importers in the same way as `opaque type`. An `untagged type` is the field of each constructor; the fields are distinguishable by JS type (`Float`, `String`, `Bool`, `BigInt`, one list/tuple), and the checker rejects an overlap (`FLICK-T020`). Pattern matching checks `typeof`/`Array.isArray` instead of `_tag`. Derived `Eq`, `Ord`, `Hash`, `Show` work on the representation; the wire form of `deriving Schema` for an `unboxed type` is the form of the field, an `untagged type` has no derived witness, and it is assembled with `Schema` combinators. The TS projection is the type of the field or the union of the types of the fields.
 
-In [ReScript int has 32-bit semantics](https://rescript-lang.org/docs/manual/primitive-types/). `Number` in Flick follows JS, so `(a + b) | 0` and replacing an ordinary multiplication with `Math.imul` are forbidden without separate proof.
+In [ReScript int has 32-bit semantics](https://rescript-lang.org/docs/manual/primitive-types/). `Float` in Flick follows JS, so `(a + b) | 0` and replacing an ordinary multiplication with `Math.imul` are forbidden without separate proof.
 
 Any inlining has a budget on size and depth. The cross-module pass uses source interfaces with semantic information, and does not try to reconstruct it from `.d.ts` or the Content Mapper.
 

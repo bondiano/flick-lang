@@ -4,51 +4,51 @@
 // recursion runs through the runtime without growing the JS stack.
 module App.Main exposing (main)
 
-sum_to : Number -> Number -> Number
+sum_to : Float -> Float -> Float
 let rec sum_to acc n =
   if n == 0 then acc else sum_to (acc + n) (n - 1)
 
-count_down : Ref Number -> Number ->{} Unit
+count_down : Ref Float -> Float ->{} Unit
 let rec count_down cell n =
   if n == 0 then () else
     Ref.set cell n
     count_down cell (n - 1)
 
-steps : Eq a => Number -> a -> Number
+steps : Eq a => Float -> a -> Float
 let rec steps n x =
   if n == 0 then 0 else if x == x then steps (n - 1) x else n
 
-all_below : Number -> Number -> Bool
+all_below : Float -> Float -> Bool
 let rec all_below limit n =
   n == 0 || n < limit && all_below limit (n - 1)
 
 rec {
-  is_even : Number -> Bool
+  is_even : Float -> Bool
   let is_even n = if n == 0 then true else is_odd (n - 1)
 
-  is_odd : Number -> Bool
+  is_odd : Float -> Bool
   let is_odd n = if n == 0 then false else is_even (n - 1)
 }
 
 rec {
-  ping : Number -> Number -> Number
+  ping : Float -> Float -> Float
   let ping acc n = if n == 0 then acc else pong (acc + 1) (n - 1)
 
-  pong : Number -> Number -> Number
+  pong : Float -> Float -> Float
   let pong acc n = if n == 0 then acc else pang acc (n - 1)
 
-  pang : Number -> Number -> Number
+  pang : Float -> Float -> Float
   let pang acc n = if n == 0 then acc else ping (acc + 2) (n - 1)
 }
 
-pairs : Number -> List Number -> Number
+pairs : Int -> List Int -> Int
 let rec pairs acc xs =
   match xs with
   | [a, b, ...rest] -> pairs (acc + b - a) rest
   | [a] -> acc + a
   | _ -> acc
 
-restart : Number -> Number -> List Number -> Number
+restart : Float -> Float -> List Float -> Float
 let rec restart acc n xs =
   match xs with
   | [] -> if n == 0 then acc else restart acc (n - 1) [1, 2, 3]
