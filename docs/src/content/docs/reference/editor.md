@@ -40,6 +40,12 @@ The [Gleam language server reference](https://gleam.run/documentation/language-s
 is the behavior reference for symbol hover and navigation, not a claim of
 complete feature parity.
 
+Hover on `..` in `MonadError(..)` or `ExceptT(..)` lists the methods or
+constructors made visible by that import or export. Each member has its full
+Flick signature, including quantifiers, class constraints and captures, plus
+its `///` documentation when available. Re-exports list only the members exposed
+by the named module; hidden members stay hidden.
+
 Type-alias hover includes generic parameters and the written definition, even
 for private aliases. On the declaration name, its hover range includes the
 parameters (`Planner a`); navigation and semantic tokens still target `Planner`.

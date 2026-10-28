@@ -11,7 +11,9 @@ class MonadTrans (t : (Type -> Type) -> Type -> Type) =
   lift : forall c m a. Monad m => (m a)^c -> (t m a)^c
 
 class Monad m => MonadState (m : Type -> Type) s | m -> s =
+  /// Reads the current state without changing it.
   get : m s
+  /// Replaces the current state with the supplied value.
   put : forall c. s^c -> (m Unit)^c
   state : forall c a. (forall v. s^v -> (a, s)^(c + v))^c -> (m a)^c
   let state step = do {
@@ -22,6 +24,7 @@ class Monad m => MonadState (m : Type -> Type) s | m -> s =
   }
 
 class Monad m => MonadReader (m : Type -> Type) r | m -> r =
+  /// Reads the shared environment.
   ask : m r
   local : forall c d a. (forall v. r^v -> r^(c + v))^c ->
     ((m a)^d -> (m a)^(c + d))^c

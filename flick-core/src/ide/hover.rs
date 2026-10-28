@@ -2,14 +2,15 @@
 //! with its rows, captures and constraints, never a TypeScript helper.
 
 use std::fmt::Write;
+use std::ptr;
 
 use super::{Ide, Symbol, Target, navigate::Source, tree};
 use crate::doc;
-use crate::iface::{Entity, Namespace};
+use crate::iface::{Decl, Entity, Namespace};
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Form, TypeDef, component_instance, show_type};
+use crate::types::{Form, Ref, TypeDef, component_instance, show_type};
 
 /// `node` as its source lays it out, one written line per line, its
 /// continuation lines dedented by the indentation of its first line.
@@ -28,6 +29,28 @@ fn as_written(node: &Node, text: &str) -> String {
         acc.push_str(line[cut.min(indent)..].trim_end());
         acc
     })
+}
+
+fn documentation(source: &Source, name: &str) -> Option<String> {
+    source
+        .tree
+        .nodes()
+        .filter(|n| n.kind == K::ClassDecl)
+        .find_map(|class| {
+            let members = class.nodes().find(|n| n.kind == K::Members)?;
+            let signature = members.nodes().find(|n| {
+                n.kind == K::Signature && tree::name_of(n, K::Ident, &source.text) == Some(name)
+            })?;
+            doc::leading_doc(members, signature, &source.text).or_else(|| {
+                // The first member's leading trivia precedes the Members node.
+                if ptr::eq(members.nodes().next()?, signature) {
+                    doc::leading_doc(class, members, &source.text)
+                } else {
+                    None
+                }
+            })
+        })
+        .or_else(|| doc::comments(&source.text).remove(name))
 }
 
 impl Ide<'_> {
@@ -247,6 +270,59 @@ impl Ide<'_> {
         })
     }
 
+    fn exposing_hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
+        let m = self.module(file)?;
+        let text = self.text(file);
+        let path = tree::path_to(&m.tree, offset);
+        let item = path.iter().find(|n| n.kind == K::ExposeItem)?;
+        let dots = item
+            .child_tokens()
+            .find(|t| t.kind == K::DotDot && t.start <= offset && offset < t.end)?;
+        let name = tree::name_of(item, K::Con, text)?;
+        let declaration = path
+            .iter()
+            .find(|n| matches!(n.kind, K::ImportDecl | K::ModuleHeader))?;
+        let module: String = declaration
+            .nodes()
+            .find(|n| n.kind == K::ModulePath)?
+            .text(text)
+            .split_whitespace()
+            .collect();
+        let interface = self.interface(&module)?;
+        let parent = interface.find(Namespace::Type, name)?;
+        let members = match parent.decl {
+            Decl::Class => "methods",
+            Decl::Kind => "kind members",
+            Decl::Adt | Decl::Error => "constructors",
+            _ => return None,
+        };
+        let direction = if declaration.kind == K::ImportDecl {
+            "imported"
+        } else {
+            "exported"
+        };
+        let mut markdown = format!("**`{name}(..)` — {direction} {members}**\n\nfrom `{module}`");
+        let source = self.source(&parent.entity.module);
+        let mut any = false;
+        for member in interface.members(name) {
+            any = true;
+            let name = &member.entity.name;
+            let code = match (&member.scheme, &member.definition) {
+                (Some(scheme), _) => format!("{name} : {}", show_type(scheme)),
+                (_, Some(definition)) => format!("{name} : {}", definition.kind),
+                _ => name.clone(),
+            };
+            let _ = write!(markdown, "\n\n```flick\n{code}\n```");
+            if let Some(doc) = source.as_ref().and_then(|s| documentation(s, name)) {
+                let _ = write!(markdown, "\n\n{doc}");
+            }
+        }
+        if !any {
+            markdown.push_str("\n\nNo public members.");
+        }
+        Some((markdown, (dots.start, dots.end)))
+    }
+
     /// Markdown for the symbol at `offset`, and the range it covers.
     pub fn hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
         if let Some((code, note, range)) = self.keyword(file, offset) {
@@ -255,6 +331,13 @@ impl Ide<'_> {
         if let Some(hover) = self.embedded_hover(file, offset) {
             return Some(hover);
         }
+        if let Some(hover) = self.exposing_hover(file, offset) {
+            return Some(hover);
+        }
+        self.symbol_hover(file, offset)
+    }
+
+    fn symbol_hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
         let Some((symbol, mut range)) = self.symbol_at(file, offset) else {
             return self.typed_hover(file, offset);
         };
@@ -298,7 +381,7 @@ impl Ide<'_> {
                         }
                     },
                 };
-                let doc = source.and_then(|source| doc::comments(&source.text).remove(&e.name));
+                let doc = source.and_then(|source| documentation(&source, &e.name));
                 let from = format!("from `{}`", e.module);
                 let note = doc.map_or(from.clone(), |d| format!("{d}\n\n{from}"));
                 match self.derived(file, range, &e.module, &e.name) {
@@ -331,10 +414,20 @@ impl Ide<'_> {
                 module,
                 instance,
                 method,
-            } => (
-                method.clone(),
-                Some(format!("from `instance {instance}` in `{module}`")),
-            ),
+            } => {
+                let m = self.module(file)?;
+                let (_, reference) = tree::innermost(m.typing.names.iter(), offset)?;
+                let Ref::Method { module: owner, .. } = reference else {
+                    return None;
+                };
+                let (_, ty) = tree::innermost(m.typing.types.iter(), offset)?;
+                let mut note = self
+                    .source(owner)
+                    .and_then(|source| documentation(&source, method))
+                    .map_or_else(String::new, |doc| format!("{doc}\n\n"));
+                let _ = write!(note, "from `instance {instance}` in `{module}`");
+                (format!("{method} : {}", show_type(ty)), Some(note))
+            }
         };
         let mut text = format!("```flick\n{code}\n```");
         if let Some(note) = note {
