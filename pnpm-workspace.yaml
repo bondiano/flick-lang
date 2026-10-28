@@ -4,6 +4,7 @@ packages:
   - tools/content-mapper
   - tools/astro-flick
   - tools/bundle-size
+  - tools/load
   - docs
   - editors/vscode
 overrides:

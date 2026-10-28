@@ -1,0 +1,15 @@
+// The browser entry of the SSR load: hydrates the streamed page of
+// `/suspended/:id` in the container `app`.
+module Load.Client exposing (main)
+
+import Load.Page
+
+report : Failure e ->{} Unit
+let report failure = Console.log ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  match Ui.Dom.container "app" with
+  | None -> App.fail "no container"
+  | Some root ->
+    provide Atom.layer { Function.absurd (Ui.Dom.mount root report Load.Page.suspended) }

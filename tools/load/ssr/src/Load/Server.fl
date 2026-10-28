@@ -1,56 +1,64 @@
 // The server the SSR load runs hit: one page of 50 rows rendered per
-// request with a registry of its own, as markup (`/render/:id`), as the
-// chunks of a stream (`/stream/:id`) and without React (`/html/:id`). Each
-// page shows its request's id from an atom, so a page with another
-// request's id is a registry shared across requests. Serves on `PORT`
-// until it is stopped.
+// request with a registry of its own, as markup (`/render/:id`), as chunks
+// streamed over the network (`/stream/:id`), as those chunks collected
+// into one answer (`/collect/:id`) and without React (`/html/:id`).
+// `/suspended/:id` streams a document whose item loads after a wait behind
+// a suspended view, with the client bundle (`/client.js`, the file
+// `CLIENT_JS`) that hydrates it. Serves on `PORT` until it is stopped.
 module Load.Server exposing (main)
 
 import Http.Router exposing (RouteContext)
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
-
-request : Atom.Writable String
-let request = Atom.make ""
-
-rows : List Int
-let rows = List.range 1 51
-
-page : Ui.View Unit
-let page =
-  Ui.view (fun () ->
-    ui {
-      div
-        { class_name = "page" }
-        [
-          heading [text ("request " ++ Atom.value request)],
-          div
-            { class_name = "rows" }
-            (List.map (fun n -> paragraph [text ("row " ++ show n)]) rows),
-        ]
-    })
+import Load.Page
 
 id : Unit ->{RouteContext;} String
 let id () = Option.with_default "none" (Http.Router.param "id")
+
+html_options : Http.ServerResponse.Options
+let html_options =
+  { Http.ServerResponse.defaults with contentType = Some "text/html; charset=utf-8" }
+
+/// The streamed markup of `view` for request `n`, with a registry of its own.
+streamed_ui : String -> Ui -> Stream.Stream none none String
+let streamed_ui n view =
+  let made = task {
+    Reactivity.Atom.set Load.Page.request n
+    Ui.Server.stream "app" view
+  }
+  // bound apart: inside `provide_`, its expected row leaves `made` none of `Registry`
+  let unwrapped = Stream.unwrap made
+  Stream.provide_ Reactivity.Atom.layer unwrapped
 
 render : ServerRequest ->{RouteContext;} ServerResponse
 let render _ =
   let n = id ()
   Http.ServerResponse.html
     (provide Atom.layer {
-      Atom.set request n
-      Ui.Server.render (Ui.render page ())
+      Atom.set Load.Page.request n
+      Ui.Server.render (Ui.render Load.Page.rows ())
     })
 
 streamed : ServerRequest ->{RouteContext;} ServerResponse
 let streamed _ =
-  let n = id ()
-  let chunks =
-    provide Atom.layer {
-      Atom.set request n
-      Stream.run_collect (Ui.Server.stream "app" (Ui.render page ()))
-    }
-  Http.ServerResponse.html (String.join "" chunks)
+  Http.ServerResponse.stream_text (streamed_ui (id ()) (Ui.render Load.Page.rows ())) html_options
+
+collected : ServerRequest ->{RouteContext;} ServerResponse
+let collected _ =
+  Http.ServerResponse.html
+    (String.join "" (Stream.run_collect (streamed_ui (id ()) (Ui.render Load.Page.rows ()))))
+
+suspended : ServerRequest ->{RouteContext;} ServerResponse
+let suspended _ =
+  Http.ServerResponse.stream_text
+    (streamed_ui (id ()) Load.Page.suspended
+      |> Stream.prepend
+        [
+          "<!doctype html><html><head><title>load</title><link rel=\"icon\" href=\"data:,\"></head><body>",
+        ]
+      |> Stream.concat
+        (Stream.make ["<script type=\"module\" src=\"/client.js\"></script></body></html>"]))
+    html_options
 
 html : ServerRequest ->{RouteContext;} ServerResponse
 let html _ =
@@ -64,23 +72,37 @@ let html _ =
             heading [text ("request " ++ n)],
             div
               { class_name = "rows" }
-              (List.map (fun r -> paragraph [text ("row " ++ show r)]) rows),
+              (List.map (fun r -> paragraph [text ("row " ++ show r)]) (List.range 1 51)),
           ]
       }))
+
+client : String ->
+  ServerRequest ->{Http.Platform.HttpPlatform; PlatformError.PlatformError}
+  ServerResponse
+let client path _ = Http.Platform.file Http.Platform.file_options path
 
 main : Unit ->{; AppError} Unit
 let main () =
   let port = Option.with_default 3000 (Option.bind String.to_number (Platform.env "PORT"))
+  let bundle = Option.with_default "dist/client.js" (Platform.env "CLIENT_JS")
   provide Http.Server.layer_services {
     try
       scope s {
-        app : ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse
+        app : ServerRequest ->{
+          Http.Platform.HttpPlatform;
+          Http.ServerError.HttpServerError,
+          PlatformError.PlatformError
+        }
+          ServerResponse
         let app =
           Http.Router.router Http.Router.config
             [
               Http.Router.route (Some Http.Method.GET) "/render/:id" render,
               Http.Router.route (Some Http.Method.GET) "/stream/:id" streamed,
+              Http.Router.route (Some Http.Method.GET) "/collect/:id" collected,
+              Http.Router.route (Some Http.Method.GET) "/suspended/:id" suspended,
               Http.Router.route (Some Http.Method.GET) "/html/:id" html,
+              Http.Router.route (Some Http.Method.GET) "/client.js" (client bundle),
             ]
         let listening =
           Http.Server.serve { host = "127.0.0.1"; port = port; gracefulShutdownTimeout = None } app

@@ -2,8 +2,8 @@ schema-version = 1
 
 [project]
 kind = "app"
-entry = "Load.Server"
 source-dir = "src"
+entries = { server = "Load.Server", client = { module = "Load.Client", runner = "Runner.Browser", target = "client" } }
 
 [build]
 out-dir = "dist"

@@ -42,12 +42,24 @@ lsp-soak file="examples/mtl/src/Mtl/StateT.fl" cycles="400":
     cargo build --release -p flick
     node tools/lsp-bench/soak.mjs target/release/flick {{file}} {{cycles}}
 
-# Closed-loop HTTP load on the SSR server of tools/load/ssr (release): path is render, stream or html
-load-ssr path="render" port="3918":
+# Build the SSR load server of tools/load/ssr (release) and bundle its client
+load-ssr-build:
     cargo build -p flick
     cd tools/load/ssr && ../../../target/debug/flick build
-    PORT={{port}} node tools/load/ssr/dist/flick-main.js & pid=$!; sleep 2; \
-      node tools/load/index.mjs --url "http://127.0.0.1:{{port}}/{{path}}/{id}" --expect 'request {id}' --pid $pid; \
+    node tools/load/bundle.mjs tools/load/ssr/dist/flick-client.js tools/load/ssr/dist/client.js
+
+# Closed-loop HTTP load on the SSR server, React in production mode: path is render, stream, collect, suspended or html
+load-ssr path="render" soak="60" port="3918": load-ssr-build
+    NODE_ENV=production PORT={{port}} CLIENT_JS=tools/load/ssr/dist/client.js node tools/load/ssr/dist/flick-server.js & pid=$!; sleep 2; \
+      node tools/load/index.mjs --url "http://127.0.0.1:{{port}}/{{path}}/{id}" \
+        --expect 'request {id}{{ if path == "suspended" { "|\"item of {id}\"|>item of {id}<" } else { "" } }}' \
+        --soak {{soak}} --pid $pid; \
+      status=$?; kill $pid; exit $status
+
+# Hydrate streamed pages of the SSR server in Chromium, optionally while `load-ssr suspended` runs on the same port
+load-ssr-browser pages="500" tabs="8" port="3919": load-ssr-build
+    NODE_ENV=production PORT={{port}} CLIENT_JS=tools/load/ssr/dist/client.js node tools/load/ssr/dist/flick-server.js & pid=$!; sleep 2; \
+      node tools/load/browser.mjs --url "http://127.0.0.1:{{port}}/suspended/{id}" --pages {{pages}} --tabs {{tabs}}; \
       status=$?; kill $pid; exit $status
 
 # Run SQL queries against PostgreSQL in Docker (after `just e2e` installs the runtime)

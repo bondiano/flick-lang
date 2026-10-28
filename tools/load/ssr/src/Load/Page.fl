@@ -1,0 +1,71 @@
+// The pages of the SSR load, shared by the server that renders them and
+// the client that hydrates them. Each shows its request's id from a
+// serializable atom, so a page with another request's id is a registry
+// shared across requests, and the client hydrates it from the server's value.
+module Load.Page exposing (request, rows, suspended)
+
+/// Counts on the client how often the item's task ran: a hydrated page runs it 0 times.
+mark : Unit ->{} Unit
+foreign sync mark from "./marks.mjs" "mark"
+  arity 0
+
+/// The id of the page's request.
+request : Atom.Writable String
+let request = Atom.serializable (Codec.json Schema.string) (Atom.make "")
+
+numbers : List Int
+let numbers = List.range 1 51
+
+/// One page of 50 rows.
+rows : Ui.View Unit
+let rows =
+  Ui.view (fun () ->
+    ui {
+      div
+        { class_name = "page" }
+        [
+          heading [text ("request " ++ Atom.value request)],
+          div
+            { class_name = "rows" }
+            (List.map (fun n -> paragraph [text ("row " ++ show n)]) numbers),
+        ]
+    })
+
+wait : Duration.Duration
+let wait = Result.with_default Duration.zero (Duration.millis 5)
+
+/// The item of the request, after a wait as long as a query's.
+item : Atom.Atom (Atom.Async String none)
+let item =
+  Atom.serializable_task
+    (Codec.json Schema.string)
+    (Atom.loader request (fun n -> task {
+      mark ()
+      Effect.sleep wait
+      "item of " ++ n
+    }))
+
+clicks : Atom.Writable Int
+let clicks = Atom.make 0
+
+click : Action.Action Ui.ClickSnapshot
+let click = Action.exhaust (fun _ -> task { Atom.update clicks (fun n -> n + 1) })
+
+shown : Ui.View Unit
+let shown =
+  Ui.suspended
+    (fun _ -> Ui.text "failed")
+    (Ui.text "loading")
+    (fun () -> Ui.text (Atom.ready item))
+
+counter : Ui.View Unit
+let counter =
+  Ui.view (fun () ->
+    ui {
+      button { disabled = false; on_click = click } [text ("clicks " ++ show (Atom.value clicks))]
+    })
+
+/// The rows, the request's item behind a suspended view, and a button the
+/// client answers once it has hydrated.
+suspended : Ui
+let suspended = Ui.fragment [Ui.render rows (), Ui.render shown (), Ui.render counter ()]

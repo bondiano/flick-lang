@@ -1,7 +1,8 @@
 // A closed-loop HTTP load: `c` clients, each sending its next request when
 // the last one answers. Every request carries a fresh id in place of `{id}`
-// in the URL, and its answer must contain `--expect` with that id, so an
-// answer meant for another request counts as an error. After a warm-up it
+// in the URL, and its answer must contain each `|`-separated text of
+// `--expect` with that id, so an answer meant for another request counts
+// as an error. After a warm-up it
 // runs each concurrency `--runs` times and prints the medians, then holds
 // the highest one for `--soak` seconds. With `--pid` it samples the
 // server's resident memory (Linux, /proc) before the soak, at its peak and
@@ -32,6 +33,7 @@ if (!options.url?.includes("{id}")) {
   process.exit(2);
 }
 const levels = options.levels.split(",").map(Number);
+const expected = options.expect.split("|");
 const seconds = (name) => Number(options[name]) * 1000;
 
 let next = 0;
@@ -44,7 +46,7 @@ const one = async () => {
     const response = await fetch(options.url.replaceAll("{id}", id), { signal: AbortSignal.timeout(seconds("timeout")) });
     const body = await response.text();
     if (response.status !== 200) return { error: "status" };
-    if (!body.includes(options.expect.replaceAll("{id}", id))) return { error: "body" };
+    if (!expected.every((text) => body.includes(text.replaceAll("{id}", id)))) return { error: "body" };
     return { ms: performance.now() - started };
   } catch (error) {
     return { error: error.name === "TimeoutError" ? "timeout" : "transport" };
