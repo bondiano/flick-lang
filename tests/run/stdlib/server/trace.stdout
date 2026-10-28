@@ -1,4 +1,6 @@
-App.Main.stock, GET, POST, call, flick.render, visit
+priced: true
+App.Main.price, App.Main.stock, GET, call, flick.render, visit
 visit and flick.render in one trace: true
 visit and App.Main.stock in one trace: true
+visit and App.Main.price in one trace: true
 call and App.Main.stock in one trace: true

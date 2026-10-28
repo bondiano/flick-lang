@@ -1,6 +1,7 @@
 // The trace of a request goes on in what serves it: a page rendered on the
-// server and a server function called from it are in the trace of the
-// request, and a call of a server function carries its caller's trace.
+// server and a server function called from it, or from a task the page's
+// view reads, are in the trace of the request, and a call of a server
+// function carries its caller's trace.
 module App.Main exposing (main)
 
 import Http.ServerRequest exposing (ServerRequest)
@@ -43,14 +44,26 @@ let options =
 stock : String ->{Server.Server;} Number
 server fn stock item = String.length item
 
-/// The page: the stock of tea, asked of the server function, then rendered.
+price : String ->{Server.Server;} Number
+server fn price item = 2 * String.length item
+
+/// The price of jam, asked by a task the page's view reads.
+priced : Atom.Atom (Atom.Async Number {Rpc.ClientError})
+let priced = Atom.task (task { price "jam" })
+
+/// The page: the stock of tea, asked of the server function, and the price.
 page : ServerRequest ->{Server.Server;} ServerResponse
 let page _ =
   let count =
     try stock "tea" with
     | Rpc.ClientError _ -> 0
-  let html = provide Atom.layer { Ui.Server.render (ui { text (show count) }) }
-  Http.ServerResponse.text html Http.ServerResponse.defaults
+  let shown =
+    Ui.suspended
+      (fun _ -> Ui.text "no price")
+      (Ui.text "...")
+      (fun () -> Ui.text (show count ++ " at " ++ show (Atom.ready priced)))
+  let chunks = provide Atom.layer { Stream.run_collect (Ui.Server.stream "app" (Ui.render shown ())) }
+  Http.ServerResponse.text (String.join "" chunks) Http.ServerResponse.defaults
 
 same : String -> String ->{} String
 let same a b = a ++ " and " ++ b ++ " in one trace: " ++ show (shares a b)
@@ -65,7 +78,7 @@ let main () =
       try
         scope s {
           functions : (ServerRequest ->{} ServerResponse)^{s}
-          let functions = Server.handler [server stock]
+          let functions = Server.handler [server stock, server price]
           app : (
             ServerRequest ->{Server.Server; Http.ServerError.HttpServerError} ServerResponse
           )^{s}
@@ -84,8 +97,8 @@ let main () =
           let base = Http.Server.format_address (Http.Server.address server)
           set_env "FLICK_SERVER_URL" base
           Tracer.with_span "visit" options (task {
-            let _ = Http.ClientResponse.text (Http.Client.get (base ++ "/page"))
-            ()
+            let html = Http.ClientResponse.text (Http.Client.get (base ++ "/page"))
+            Platform.stdout_line ("priced: " ++ show (String.contains "3 at 6" html))
           })
           Tracer.with_span "call" options (task {
             let _ = stock "cake"
@@ -101,5 +114,6 @@ let main () =
   Platform.stdout_line (names ())
   Platform.stdout_line (same "visit" "flick.render")
   Platform.stdout_line (same "visit" "App.Main.stock")
+  Platform.stdout_line (same "visit" "App.Main.price")
   Platform.stdout_line (same "call" "App.Main.stock")
   stop ()

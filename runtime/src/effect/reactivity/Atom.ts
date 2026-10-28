@@ -3,13 +3,34 @@
 // alone, so a function or an effect as the value stays a value; the
 // registry is the Flick service `Reactivity.Atom.Registry`, whose operations
 // read and write through Effect's registry.
-import { Context, type Duration, Effect, Layer, LogLevel, Option, type Schema, type Tracer } from "effect";
+import { Context, type Duration, Effect, Layer, LogLevel, Option, type Schema, Scope, type Tracer } from "effect";
+import type * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Atom from "effect/reactivity/Atom";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 
 import { service } from "../../effects.ts";
 
 export * from "effect/reactivity/Atom";
+
+/**
+ * What the tasks of each registry run with: the services and references
+ * where its layer was built, so a task run while a server renders a page
+ * is part of the request's trace and carries its headers.
+ */
+const callers = new WeakMap<AtomRegistry.AtomRegistry, Context.Context<never>>();
+
+/** The atom of `task`, run with what its registry's layer was built with; its scope is the atom's. */
+export const taskAtom = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<AsyncResult.AsyncResult<A, E>> =>
+  Atom.make((get) => {
+    const caller = callers.get(get.registry);
+    return caller === undefined ? task : Effect.provideContext(task, caller);
+  });
+
+/** Records what the tasks of `registry` run with. */
+const recordCaller = (registry: AtomRegistry.AtomRegistry) =>
+  Effect.map(Effect.context<never>(), (context) => {
+    callers.set(registry, Context.omit(Scope.Scope)(context));
+  });
 
 /** `Reactivity.Atom.state`: a writable atom holding `value`. */
 export const flickState = <A>(value: A): Atom.Writable<A> =>
@@ -22,7 +43,7 @@ export const flickState = <A>(value: A): Atom.Writable<A> =>
 export const flickRead = <A>(ctx: Atom.AtomContext, atom: Atom.Atom<A>): A => ctx(atom);
 
 /** `Reactivity.Atom.from_task`: the atom of an effect's result, run in the registry. */
-export const flickFromTask = <A, E>(task: Effect.Effect<A, E>) => Atom.make(task);
+export const flickFromTask = <A, E>(task: Effect.Effect<A, E>) => taskAtom(task);
 
 /** `Reactivity.Atom.map`. */
 export const flickMap = <A, B>(f: (a: A) => B, atom: Atom.Atom<A>): Atom.Atom<B> => Atom.map(atom, f);
@@ -133,7 +154,7 @@ export const WriteService = /*#__PURE__*/ service<ReturnType<typeof writeImpl>>(
 
 /** `Atom.layer`: a fresh registry as `Reactivity.Atom.Registry` and as `Atom.Write`. */
 export const atomLayer = /*#__PURE__*/ Layer.effectContext(
-  Effect.map(Effect.service(AtomRegistry.AtomRegistry), (registry) => {
+  Effect.map(Effect.tap(Effect.service(AtomRegistry.AtomRegistry), recordCaller), (registry) => {
     const record = impl(registry);
     const write = writeImpl(record);
     natives.set(record, registry);
@@ -146,7 +167,7 @@ export const atomLayer = /*#__PURE__*/ Layer.effectContext(
 export const flickLayer = <I>(key: Context.Key<I, ReturnType<typeof impl>>): Layer.Layer<I> =>
   Layer.effect(
     key,
-    Effect.map(Effect.service(AtomRegistry.AtomRegistry), (registry) => {
+    Effect.map(Effect.tap(Effect.service(AtomRegistry.AtomRegistry), recordCaller), (registry) => {
       const record = impl(registry);
       natives.set(record, registry);
       return record;

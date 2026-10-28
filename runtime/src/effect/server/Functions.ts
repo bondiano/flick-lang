@@ -1,7 +1,9 @@
 // The calls of `server fn`: the compiler makes a procedure of each from its
 // name and the witnesses of what it sends; a caller sends it over HTTP and
-// `Server.handler` serves it with its implementation. Serving is
-// `./FunctionsNode.ts`, which needs Node.
+// `Server.handler` serves it with its implementation; while a handler is
+// mounted in this process, a call made here (rendering a page on the
+// server) runs in memory instead. Serving is `./FunctionsNode.ts`, which
+// needs Node.
 import { Effect } from "effect";
 
 import { env } from "../../host.ts";
@@ -46,9 +48,25 @@ const base = (): string | undefined => {
   return typeof origin === "string" && origin !== "null" ? origin : env("FLICK_SERVER_URL");
 };
 
+/** A call of a procedure made in memory. */
+type Local = (payload: unknown) => Effect.Effect<unknown, unknown, unknown>;
+
+// shortcut: one table per process, the last `Server.handler` mounted wins; key it by server once a process serves several
+const local = new Map<string, Local>();
+
+/** Runs the calls of `name` made in this process with `call`, until the returned function undoes it. */
+export const registerLocal = (name: string, call: Local): (() => void) => {
+  local.set(name, call);
+  return () => {
+    if (local.get(name) === call) local.delete(name);
+  };
+};
+
 /** `Server.call procedure payload`. */
-export const serverCall = (procedure: Procedure, payload: unknown): Effect.Effect<unknown, unknown> =>
+export const serverCall = (procedure: Procedure, payload: unknown): Effect.Effect<unknown, unknown, unknown> =>
   Effect.suspend(() => {
+    const here = local.get(procedure.name);
+    if (here !== undefined) return here(payload);
     const url = base();
     return url === undefined
       ? Effect.fail(clientError(`no server for ${procedure.name}: set FLICK_SERVER_URL`))

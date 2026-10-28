@@ -39,6 +39,12 @@ the call did not reach the server or its answer did not decode. A call goes
 to the page's origin in a browser and to `FLICK_SERVER_URL` elsewhere, at
 `Server.path` (`/_flick/fn`).
 
+While `Server.handler` serves a function in a process, a call of it made
+in that process, as a page rendered on the server makes, runs in memory:
+with the handler's services, the headers of the request being served, and
+what crosses written and read by its codecs, as over HTTP. A task an atom
+runs while the page renders is part of the request's trace too.
+
 ## Serving
 
 `server place` is the implementation, a `Server.Function r` whose row `r`

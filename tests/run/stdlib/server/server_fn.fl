@@ -1,6 +1,7 @@
 // A `server fn` served by `Server.handler` on `Http.Router`, called by its
 // name: the success, a declared error as itself, and `ClientError` when no
-// server answers.
+// server answers. While the handler is mounted, a call in its process runs
+// in memory, whatever `FLICK_SERVER_URL` says; others come over HTTP.
 module App.Main exposing (main)
 
 import Http.ServerRequest exposing (ServerRequest)
@@ -58,11 +59,19 @@ let main () =
         let options : Http.Server.ServeOptions =
           { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None }
         let server = Http.Server.serve options app
-        set_env "FLICK_SERVER_URL" (Http.Server.format_address (Http.Server.address server))
         Platform.stdout_line (shown { item = "tea"; count = 2 })
         Platform.stdout_line (shown { item = "cake"; count = 5 })
         Platform.stdout_line (try label "jam" 4 with | Rpc.ClientError _ -> "no server")
+        let call =
+          "{\"_tag\":\"Request\",\"id\":\"1\",\"tag\":\"App.Main.label\",\"payload\":[\"tea\",2],\"headers\":[]}\n"
+        let request =
+          Http.ClientRequest.body_text call (Some "application/ndjson")
+            (Http.ClientRequest.post (Http.Server.format_address (Http.Server.address server) ++ Server.path))
+        let answer = Http.ClientResponse.text (Http.Client.execute request)
+        Platform.stdout_line ("over HTTP: " ++ show (String.contains "tea x2" answer))
       }
+      Platform.stdout_line ("unmounted: " ++ shown { item = "tea"; count = 1 })
     with
     | Http.ServerError.ServeError _ -> Platform.stdout_line "serve failed"
+    | Http.ClientError.HttpClientError _ -> Platform.stdout_line "client failed"
   }

@@ -10,7 +10,7 @@ import * as Reactivity from "effect/reactivity/Reactivity";
 
 import { Failure } from "./cause.ts";
 import type { HashDict } from "./data.ts";
-import { WriteService, flickState, nativeRegistry } from "./effect/reactivity/Atom.ts";
+import { WriteService, flickState, nativeRegistry, taskAtom } from "./effect/reactivity/Atom.ts";
 import { service } from "./effects.ts";
 import { syncAbi, syncIn } from "./sync.ts";
 import { tag } from "./tags.ts";
@@ -142,7 +142,7 @@ export const atomSerializableTask = <A>(key: string, codec: Schema.Codec<A, unkn
 };
 
 /** `Atom.task`: the atom of a task's result, run by the registry that first reads it. */
-export const atomTask = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<object> => Atom.map(Atom.make(task), toAsync);
+export const atomTask = <A, E>(task: Effect.Effect<A, E>): Atom.Atom<object> => Atom.map(taskAtom(task), toAsync);
 
 /** `Atom.query keys task`: a task atom that a mutation of one of `keys` runs anew. */
 export const atomQuery = <A, E>(keys: ReadonlyArray<string>, task: Effect.Effect<A, E>): Atom.Atom<object> => {
