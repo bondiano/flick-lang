@@ -58,6 +58,18 @@ let call () =
     with
     | Rpc.ClientError message -> Platform.stdout_line ("client: " ++ message)
     | NotFound e -> Platform.stdout_line ("not found " ++ show e.id)
+  // a helper that cannot start is the call's error, and this process goes on
+  let missing =
+    try
+      scope s {
+        let _ = Rpc.spawn Rpc.ndjson "flick-no-such-helper" []
+        "started"
+      }
+    with
+    | Rpc.ClientError message ->
+      if String.contains "ENOENT" message then "ClientError ENOENT" else message
+  Platform.stdout_line ("missing helper: " ++ missing)
+  Platform.stdout_line "still running"
   result
 
 main : Unit ->{; AppError} Unit

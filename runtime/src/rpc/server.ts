@@ -1,7 +1,7 @@
 // `Rpc.listen`: a group served on Node's HTTP server for as long as the
 // Flick scope that started it. A separate entry point from the client, so a
 // program that only calls procedures loads no Node server.
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { Duplex } from "node:stream";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
@@ -129,28 +129,59 @@ export const rpcServeStdio = (serialization: Serialization, group: Group, handle
   });
 
 /**
+ * The child of `command`, once it started: a failure to start, such as a
+ * missing executable, comes as an `error` event after `spawn` returns, and
+ * is the call's `ClientError` with the child's pipes closed.
+ */
+const started = (command: string, args: ReadonlyArray<string>) =>
+  Effect.callback<{ child: ChildProcess; duplex: Duplex }, RpcError>((resume) => {
+    let child: ChildProcess;
+    try {
+      child = spawn(command, [...args], { stdio: ["pipe", "pipe", "inherit"] });
+    } catch (error) {
+      resume(Effect.fail(clientError(error instanceof Error ? error.message : `cannot start ${command}`)));
+      return Effect.void;
+    }
+    const failed = (error: Error): void => {
+      child.off("spawn", running);
+      child.stdin?.destroy();
+      child.stdout?.destroy();
+      resume(Effect.fail(clientError(`cannot start ${command}: ${error.message}`)));
+    };
+    const running = (): void => {
+      child.off("error", failed);
+      const duplex = Duplex.from({ readable: child.stdout, writable: child.stdin });
+      // closing the pipes below is the end the scope asks for, not a failure
+      duplex.on("error", () => undefined);
+      // a later error of the child, such as a failed kill, ends the connection
+      child.on("error", () => duplex.destroy());
+      resume(Effect.succeed({ child, duplex }));
+    };
+    child.once("error", failed);
+    child.once("spawn", running);
+    // interrupted while starting: the child goes with its pipes
+    return Effect.sync(() => {
+      child.off("error", failed);
+      child.off("spawn", running);
+      child.on("error", () => undefined);
+      child.stdin?.destroy();
+      child.stdout?.destroy();
+      child.kill();
+    });
+  });
+
+/**
  * `Rpc.spawn serialization command args`: a connection to a child process
  * whose stdin and stdout carry the messages; the scope's end kills it.
  */
 export const rpcSpawn = (serialization: Serialization, command: string, args: ReadonlyArray<string>) =>
   Effect.gen(function* () {
-    const pipe = yield* Effect.acquireRelease(
-      Effect.try({
-        try: () => {
-          const child = spawn(command, [...args], { stdio: ["pipe", "pipe", "inherit"] });
-          const duplex = Duplex.from({ readable: child.stdout, writable: child.stdin });
-          // closing the pipes below is the end the scope asks for, not a failure
-          duplex.on("error", () => undefined);
-          return { child, duplex };
-        },
-        catch: (error) => clientError(error instanceof Error ? error.message : `cannot start ${command}`),
-      }),
+    const pipe = yield* Effect.acquireRelease(started(command, args), ({ child, duplex }) =>
       // the pipes too, or they keep this process alive
-      ({ child, duplex }) =>
-        Effect.sync(() => {
-          duplex.destroy();
-          child.kill();
-        }),
+      Effect.sync(() => {
+        duplex.destroy();
+        child.kill();
+      }),
     );
     const socket = yield* NodeSocket.fromDuplex(Effect.succeed(pipe.duplex));
     const context = yield* Layer.build(
