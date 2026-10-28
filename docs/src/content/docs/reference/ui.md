@@ -498,6 +498,10 @@ as a server does, each call from a registry of its own. Event bindings
 remain inert on the server; the application does not need a second HTML
 implementation.
 
+Start a server that renders views with `NODE_ENV=production`, as in
+`NODE_ENV=production node dist/flick-server.js`. Without it React runs its
+development build, which renders about twice as slowly.
+
 Mark its container with `data-flick-ssr`. `Ui.Dom.mount` then uses
 `hydrateRoot` instead of clearing the existing HTML. Server and client
 must use the same initial state, keys and markup. Native textarea drafts,

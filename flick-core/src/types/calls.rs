@@ -147,8 +147,13 @@ impl Checker<'_> {
                         self.ui_capacity(head, arg);
                         self.ui_render_handlers(head, arg);
                     }
-                    if self.stage.calls > calls && self.eff_parts(&param).is_some() {
-                        self.early_argument(head, arg);
+                    if self.eff_parts(&param).is_some() {
+                        if self.stage.calls > calls {
+                            self.early_argument(head, arg);
+                        }
+                        // the rows the `Eff` needs are lower bounds of the parameter's: grown
+                        // now, before the result's rows unify as if they could be smaller
+                        self.grow();
                     }
                     if let Some(e) = effects {
                         self.call_effects(&e, span);

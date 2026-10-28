@@ -26,9 +26,7 @@ let streamed_ui n view =
     Reactivity.Atom.set Load.Page.request n
     Ui.Server.stream "app" view
   }
-  // bound apart: inside `provide_`, its expected row leaves `made` none of `Registry`
-  let unwrapped = Stream.unwrap made
-  Stream.provide_ Reactivity.Atom.layer unwrapped
+  Stream.provide_ Reactivity.Atom.layer (Stream.unwrap made)
 
 render : ServerRequest ->{RouteContext;} ServerResponse
 let render _ =

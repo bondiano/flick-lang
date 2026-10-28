@@ -17,6 +17,7 @@ impl Checker<'_> {
     }
 
     /// Unifies two types of a row kind: rows, unions and row variables.
+    #[allow(clippy::too_many_lines)]
     pub fn unify_row_types(&mut self, left: &Type, right: &Type) -> Unified {
         let mut left_norm = self.store.normalize(left);
         let mut right_norm = self.store.normalize(right);
@@ -99,6 +100,16 @@ impl Checker<'_> {
             (_, [Type::Meta(m)]) => {
                 missing(&only_right, false)?;
                 self.bind(*m, &extended(only_left, tails_left))
+            }
+            // `r1 + r2` against what is left empty: each variable is empty
+            (metas, []) | ([], metas)
+                if only_left.is_empty()
+                    && only_right.is_empty()
+                    && metas.iter().all(|t| matches!(t, Type::Meta(_))) =>
+            {
+                metas
+                    .iter()
+                    .try_for_each(|t| self.unify(t, &Type::empty_row()))
             }
             ([a], [b]) => {
                 missing(&only_left, true)?;

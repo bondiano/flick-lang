@@ -35,7 +35,7 @@ struct Excess {
 
 impl Checker<'_> {
     /// Grows unknown declared rows until nothing changes.
-    fn grow(&mut self) {
+    pub fn grow(&mut self) {
         loop {
             let rows =
                 (0..self.subrows.len()).fold(false, |changed, i| self.grow_one(i) || changed);
