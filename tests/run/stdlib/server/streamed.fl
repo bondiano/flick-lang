@@ -1,0 +1,50 @@
+// A page streamed over the network: the server sends the shell with the
+// fallback of a suspended view before its task ends, and the task's value
+// and markup once it does, each request with a registry of its own.
+module App.Main exposing (main)
+
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+later : Unit ->{} String
+foreign async later from "./streamed.mjs" "later"
+  arity 0
+
+visit : String ->{} String
+foreign async visit from "./streamed.mjs" "visit"
+  arity 1
+
+user : Atom.Atom (Atom.Async String none)
+let user = Atom.serializable_task (Codec.json Schema.string) (Atom.task (task { later () }))
+
+greeting : Ui.View Unit
+let greeting =
+  Ui.suspended
+    (fun _ -> Ui.text "failed")
+    (Ui.text "waiting")
+    (fun () -> Ui.text ("hello " ++ Atom.ready user))
+
+page : ServerRequest ->{} ServerResponse
+let page _ =
+  Http.ServerResponse.stream_text
+    (Stream.provide_ Reactivity.Atom.layer (Ui.Server.stream "app" (Ui.render greeting ())))
+    { Http.ServerResponse.defaults with contentType = Some "text/html" }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  provide Http.Server.layer_services {
+    try
+      scope s {
+        app : ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse
+        let app =
+          Http.Router.router
+            Http.Router.config
+            [Http.Router.route (Some Http.Method.GET) "/page" page]
+        let server =
+          Http.Server.serve { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None } app
+        Platform.stdout_line
+          (visit (Http.Server.format_address (Http.Server.address server) ++ "/page"))
+      }
+    with
+    | Http.ServerError.ServeError _ -> Platform.stdout_line "serve failed"
+  }

@@ -42,6 +42,11 @@ export const flickUint8Array = (bytes: ReadonlyArray<number>, o: FlickOptions) =
 export const flickText = (body: string, o: FlickOptions) => Response.text(body, options(o));
 export const flickStream = (chunks: Stream.Stream<ReadonlyArray<number>, unknown>, o: FlickOptions) =>
   Response.stream(Stream.map(chunks, toBytes), options(o));
+export const flickStreamText = (chunks: Stream.Stream<string, unknown>, o: FlickOptions) =>
+  Response.stream(Stream.encodeText(chunks), {
+    ...options(o),
+    contentType: Option.getOrElse(o.contentType, () => "text/plain"),
+  });
 export const flickJson = (body: unknown, o: FlickOptions) => mapError(Response.json(body, options(o)));
 export const flickSchemaJson = (codec: AnySchema, value: unknown, o: FlickOptions) =>
   Effect.flatMap(codecEncode(codec, value), (body) => flickJson(body, o));
