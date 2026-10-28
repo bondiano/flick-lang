@@ -50,6 +50,25 @@ foreign pure test from "@flick-lang/runtime" "testPure"
 effect_test : forall e. String -> (forall s. Eff {Scope s} e Unit) -> Test
 foreign pure effect_test from "@flick-lang/runtime" "testEffect"
 
+/// Virtual time: the clock a `clock_test` runs on, which moves only when
+/// the test moves it.
+service VirtualTime
+
+/// An effectful test on a clock of its own that starts at 0 and moves only
+/// by `adjust` and `set_time`: a sleep, a timeout or a retry schedule waits
+/// for virtual time, not real time. Each test has its own clock.
+clock_test : forall e. String -> (forall s. Eff {Scope s, VirtualTime} e Unit) -> Test
+foreign pure clock_test from "@flick-lang/runtime" "testClock"
+
+/// Moves the clock forward by `duration`, running what was waiting for it.
+adjust : Duration.Duration ->{VirtualTime;} Unit
+foreign effect adjust from "@flick-lang/runtime" "testAdjust"
+
+/// Sets the clock to `millis` since the epoch, running what was waiting
+/// until then.
+set_time : Float ->{VirtualTime;} Unit
+foreign effect set_time from "@flick-lang/runtime" "testSetTime"
+
 /// Checks `check` on 100 values of `gen`, from the run's seed.
 property : String -> Gen.Gen a -> (a -> Assertion) -> Test
 foreign pure property from "@flick-lang/runtime" "testProperty"

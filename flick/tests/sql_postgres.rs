@@ -1,7 +1,8 @@
 //! E2E against `PostgreSQL`: starts `postgres:17-alpine` in Docker, loads
-//! `tests/postgres/schema.sql`, builds `tests/postgres/app.fl` and compares
-//! its stdout with `app.stdout`. Ignored by default: it needs Docker and the
-//! installed runtime (`just e2e-postgres`).
+//! `tests/postgres/schema.sql`, builds a program of `tests/postgres/` and
+//! compares its stdout with its `.stdout` file: `app.fl`, the queries, and
+//! `tx.fl`, transactions and cancellation. Ignored by default: it needs
+//! Docker and the installed runtime (`just e2e-postgres`).
 
 use std::io::Write;
 use std::path::Path;
@@ -77,13 +78,11 @@ fn start() -> (Container, String) {
     )
 }
 
-#[test]
-#[ignore = "needs Docker and the installed runtime"]
-fn queries_against_postgres() {
+/// A server with the schema loaded.
+fn prepared() -> (Container, String) {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-    let dir = repo.join("tests/postgres");
     let (container, url) = start();
-    let schema = fs::read_to_string(dir.join("schema.sql")).expect("schema");
+    let schema = fs::read_to_string(repo.join("tests/postgres/schema.sql")).expect("schema");
     let mut psql = Command::new("docker")
         .args([
             "exec",
@@ -108,24 +107,30 @@ fn queries_against_postgres() {
         .expect("schema written");
     drop(psql.stdin.take());
     assert!(psql.wait().expect("psql ends").success(), "schema loads");
+    (container, url)
+}
 
-    let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join("postgres");
+/// Builds and runs `tests/postgres/<name>.fl` against `url`, checking its
+/// stdout against `<name>.stdout`.
+fn run_program(name: &str, url: &str) {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/postgres");
+    let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("postgres_{name}"));
     let _ = fs::remove_dir_all(&out);
-    let app = dir.join("app.fl");
+    let source = dir.join(format!("{name}.fl"));
     let build = common::flick(&[
         "build",
-        app.to_str().expect("utf-8 path"),
+        source.to_str().expect("utf-8 path"),
         "--out-dir",
         out.to_str().expect("utf-8 path"),
     ]);
     assert!(build.status.success(), "build: {build:?}");
     let run = Command::new("node")
         .arg(out.join(runner_path(false)))
-        .env("DATABASE_URL", &url)
+        .env("DATABASE_URL", url)
         .output()
         .expect("node runs");
     let stdout = String::from_utf8_lossy(&run.stdout);
-    let expected = fs::read_to_string(dir.join("app.stdout")).expect("app.stdout");
+    let expected = fs::read_to_string(dir.join(format!("{name}.stdout"))).expect("expected stdout");
     assert_eq!(
         stdout,
         expected,
@@ -133,7 +138,13 @@ fn queries_against_postgres() {
         String::from_utf8_lossy(&run.stderr)
     );
     assert!(run.status.success(), "{run:?}");
+}
 
+#[test]
+#[ignore = "needs Docker and the installed runtime"]
+fn queries_against_postgres() {
+    let (container, url) = prepared();
+    run_program("app", &url);
     // the payload stayed data: the table is still there
     let count = docker(&[
         "exec",
@@ -145,4 +156,22 @@ fn queries_against_postgres() {
         "select count(*) from users",
     ]);
     assert_eq!(count, "2");
+}
+
+#[test]
+#[ignore = "needs Docker and the installed runtime"]
+fn transactions_and_cancellation_against_postgres() {
+    let (container, url) = prepared();
+    run_program("tx", &url);
+    // no cancelled query is left running on the server
+    let sleeping = docker(&[
+        "exec",
+        &container.0,
+        "psql",
+        "-U",
+        "postgres",
+        "-tAc",
+        "select count(*) from pg_stat_activity where query = 'select pg_sleep(30)'",
+    ]);
+    assert_eq!(sleeping, "0");
 }

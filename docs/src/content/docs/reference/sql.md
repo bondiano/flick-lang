@@ -171,11 +171,53 @@ query has none, a value a codec refuses) is `DecodeError`; what the server
 or driver refuses is `DbError { code; message; constraint }` with the
 SQLSTATE and the violated constraint as inert data.
 
-`Database.pg { connection_string; max_connections }` is a layer of a pool of
-`pg` connections, ended with the scope of its `provide`. The `pg` package is
-an optional peer dependency of `@flick-lang/runtime`, loaded only by this
-layer. An interrupted query is not rolled back: its connection is closed and
-never returned to the pool, and the interruption completes once it is.
+`Database.pg (Database.config url)` is a layer of a pool of `pg`
+connections, ended with the scope of its `provide`. `Database.config url`
+gives 10 connections and no timeouts; set the fields of the record to
+change them: `{ Database.config url with max_connections = 4;
+statement_timeout_ms = Some 5000 }`. The `pg` package is an optional peer
+dependency of `@flick-lang/runtime`, loaded only by this layer.
+
+## Transactions
+
+```flick
+transfer : BigInt -> BigInt -> BigDecimal ->{Database; EncodeError, DbError, DecodeError} Unit
+let transfer source target amount =
+  Database.transaction (task {
+    ignore (Database.query (Sql.bind withdraw { account = source; amount = amount }))
+    ignore (Database.query (Sql.bind deposit { account = target; amount = amount }))
+  })
+```
+
+`Database.transaction body` runs `body` on one connection between `BEGIN`
+and `COMMIT`. When `body` fails, with a refused statement or an error of its
+own, or is interrupted, the transaction is rolled back and the failure goes
+on. Other callers take other connections and see none of its writes before
+the commit.
+
+Inside another transaction, `Database.transaction` is a savepoint: catching
+its failure undoes only its writes, and the outer transaction goes on. A
+statement refused outside a savepoint leaves the transaction unable to run
+more, as PostgreSQL does; let the failure end it.
+
+A commit waits for the server's answer. If the connection breaks before the
+answer arrives, it is `DbError` with the code `"commit_unknown"`: the
+transaction may or may not have happened, and only the data tells. Nothing
+is retried.
+
+## Cancellation and limits
+
+An interrupted query is cancelled on the server with the protocol's
+CancelRequest, sent on a connection of its own, which takes no slot of the
+pool. Its connection is then closed, never returned to the pool, and the
+interruption completes once it is, so the backend is free at that point.
+Outside a transaction, what the query wrote is not rolled back.
+
+`statement_timeout_ms` makes the server end a statement that runs longer,
+as `DbError` `57014`. `acquire_timeout_ms` bounds how long a query waits
+for a connection when all `max_connections` are taken; a query that waits
+longer fails. Together they bound how many backends the program holds and
+for how long.
 
 ## Raw SQL
 

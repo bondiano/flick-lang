@@ -67,6 +67,7 @@ export const schemaAdt = /*#__PURE__*/ needsEffect("schemaAdt");
 export const schemaJsonCodec = /*#__PURE__*/ needsEffect("schemaJsonCodec");
 export const routeCodec = /*#__PURE__*/ needsEffect("routeCodec");
 export const formSpec = /*#__PURE__*/ needsEffect("formSpec");
+export const syncExport = /*#__PURE__*/ needsEffect("syncExport");
 export const schemaList = /*#__PURE__*/ needsEffect("schemaList");
 export const schemaOption = /*#__PURE__*/ needsEffect("schemaOption");
 export const schemaRedacted = /*#__PURE__*/ needsEffect("schemaRedacted");

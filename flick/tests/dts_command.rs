@@ -385,8 +385,11 @@ fn a_barrel_re_exports_what_it_exposes_from_its_modules() {
          import type { Point } from './dist/Lib.js';\n\
          import type { Box as Own } from './dist/Lib/Pair.js';\n\
          const both: number = pair(1)('x')[0];\n\
+         const second: string = pair(1)('x')[1];\n\
+         // @ts-expect-error the second is a string, not a number\n\
+         const wrong: number = pair(1)('x')[1];\n\
          const box: Own = Box(2);\nconst p: Point = { x: 1, y: 2 };\n\
-         export { both, box, p };\n",
+         export { both, second, wrong, box, p };\n",
     )
     .expect("write");
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
@@ -430,6 +433,88 @@ fn a_barrel_re_exports_what_it_exposes_from_its_modules() {
     assert_eq!(
         String::from_utf8_lossy(&node.stdout),
         "true true [ 1, 'x' ]\n",
+        "{node:?}"
+    );
+}
+
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn streams_services_and_sync_exports_cross_into_effect_typescript() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("dts_effect_boundary");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("src/Lib")).expect("dir");
+    fs::write(
+        dir.join("flick.toml"),
+        "schema-version = 1\n\n[project]\nkind = \"lib\"\n",
+    )
+    .expect("write");
+    fs::write(dir.join("package.json"), "{\"type\":\"module\"}\n").expect("write");
+    fs::write(
+        dir.join("src/Lib/Bridge.fl"),
+        "module Lib.Bridge exposing (numbers, Greeter, greet, count, doubled)\n\n\
+         numbers : Stream.Stream none none Float\nlet numbers = Stream.range 1 3\n\n\
+         service Greeter =\n  hello : String ->{} String\n\n\
+         greet : String ->{Greeter;} String\nlet greet name = Greeter.hello name\n\n\
+         count : Atom.Writable Float\nlet count = Atom.make 21\n\n\
+         doubled : Unit ->{Atom.Read;} Float\nlet doubled () = Atom.value count * 2\n",
+    )
+    .expect("write");
+    let build = flick_in(&dir, &["build", "--emit-dts"]);
+    assert!(build.status.success(), "{build:?}");
+    // a TypeScript caller uses Effect's own API on Flick's values
+    fs::write(
+        dir.join("consumer.ts"),
+        "import { Effect } from '@flick-lang/runtime';\n\
+         import * as Stream from '@flick-lang/runtime/effect/Stream';\n\
+         import { $s_Greeter, doubled, greet, numbers } from './dist/Lib/Bridge.js';\n\
+         const collected: Effect.Effect<ReadonlyArray<number>> = Stream.runCollect(numbers);\n\
+         const greeted: Effect.Effect<string> = Effect.provideService(greet('ada'), $s_Greeter, {\n\
+           hello: (name: string) => Effect.succeed(`hi ${name}`),\n\
+         });\n\
+         // @ts-expect-error the greeting still needs its Greeter\n\
+         const unprovided: Effect.Effect<string> = greet('ada');\n\
+         // a Sync export is an Effect that reads the atoms\n\
+         const read = doubled(undefined);\n\
+         // @ts-expect-error it is not a number\n\
+         const wrong: number = doubled(undefined);\n\
+         console.log(JSON.stringify(await Effect.runPromise(collected)), await Effect.runPromise(greeted), Effect.isEffect(read));\n\
+         export { unprovided, wrong };\n",
+    )
+    .expect("write");
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    fs::write(
+        dir.join("tsconfig.json"),
+        serde_json::json!({
+            "compilerOptions": {
+                "strict": true, "noEmit": true, "module": "nodenext",
+                "moduleResolution": "nodenext", "target": "es2022",
+                "lib": ["es2022", "dom", "esnext.disposable"], "types": ["node"],
+                "typeRoots": [repo.join("runtime/node_modules/@types")],
+            },
+            "files": ["consumer.ts"],
+        })
+        .to_string(),
+    )
+    .expect("write");
+    let tsc = Command::new(repo.join("node_modules/.bin/tsc"))
+        .arg("-p")
+        .arg(&dir)
+        .output()
+        .expect("tsc");
+    assert!(
+        tsc.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&tsc.stdout),
+        String::from_utf8_lossy(&tsc.stderr),
+    );
+    let node = Command::new("node")
+        .arg("consumer.ts")
+        .current_dir(&dir)
+        .output()
+        .expect("node");
+    assert_eq!(
+        String::from_utf8_lossy(&node.stdout),
+        "[1,2,3] hi ada true\n",
         "{node:?}"
     );
 }

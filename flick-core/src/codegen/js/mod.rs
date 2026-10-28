@@ -4,6 +4,7 @@
 //! that evaluation stays left to right.
 
 mod binary;
+mod exports;
 mod expr;
 mod foreign;
 mod function;
@@ -27,10 +28,10 @@ use std::mem;
 
 use super::ts::{Projection, reexports};
 use super::{Options, Output, names};
-use crate::iface::{Interface, Namespace};
 use crate::ir::{ItemKind, Label, Module};
 use crate::source::Span;
 use crate::types::Dict;
+use exports::{annotations, sync_exports};
 
 const RUNTIME: &str = "@flick-lang/runtime";
 const MARK_START: char = '\u{E000}';
@@ -41,11 +42,17 @@ pub fn js(module: &Module, options: &Options) -> Output {
     let mut g = Gen::new(module, options);
     let projection = Projection::new(&module.name, options.interface, options.package);
     let mut declarations = Vec::new();
+    let interface = (options.interface)(&module.name);
+    if let Some(interface) = &interface {
+        g.sync_exports = sync_exports(interface, &module.name);
+        // the wrapper of a Sync export is the runtime's
+        g.runtime |= !g.sync_exports.is_empty();
+    }
     if options.typescript
-        && let Some(interface) = (options.interface)(&module.name)
+        && let Some(interface) = &interface
     {
-        declarations = projection.declarations(&interface).0;
-        g.annotations = annotations(&projection, &interface);
+        declarations = projection.declarations(interface).0;
+        g.annotations = annotations(&projection, interface);
     }
     let body = g.items(&module.items);
     let mut code = String::new();
@@ -189,6 +196,7 @@ impl<'a> Gen<'a> {
             views: HashMap::new(),
             rests: HashMap::new(),
             annotations: HashMap::new(),
+            sync_exports: HashMap::new(),
             workers: if options.release {
                 let interface = (options.interface)(&module.name);
                 let exported =
@@ -344,26 +352,9 @@ struct Gen<'a> {
     constructors: Vec<String>,
     /// TypeScript types of the exported values, by their JS name.
     annotations: HashMap<String, String>,
-}
-
-/// The TypeScript type of each exported value and constructor that has
-/// one; the others stay `any`.
-fn annotations(projection: &Projection, interface: &Interface) -> HashMap<String, String> {
-    interface
-        .exports
-        .iter()
-        .filter(|e| {
-            e.entity.module == projection.module
-                && matches!(
-                    e.entity.namespace,
-                    Namespace::Value | Namespace::Constructor
-                )
-        })
-        .filter_map(|e| {
-            let ty = projection.value(e.scheme.as_ref()?).ok()?;
-            Some((names::ident(&e.entity.name), ty))
-        })
-        .collect()
+    /// Exported functions whose last stage is Sync, by their JS name, with
+    /// how many arguments reach it.
+    sync_exports: HashMap<String, usize>,
 }
 
 impl Gen<'_> {
@@ -393,6 +384,15 @@ impl Gen<'_> {
 
     /// An exported `const`: in TypeScript with its projected type.
     fn export(&self, name: &str, value: &str) -> String {
+        // called from TypeScript, outside a Flick sync context, it runs as an Effect
+        let wrapped;
+        let value = match self.sync_exports.get(name) {
+            Some(stages) => {
+                wrapped = format!("$rt.syncExport({value}, {stages})");
+                wrapped.as_str()
+            }
+            None => value,
+        };
         let value = pure(value);
         match self.annotations.get(name) {
             Some(ty) => format!("export const {name}: {ty} = {value};"),

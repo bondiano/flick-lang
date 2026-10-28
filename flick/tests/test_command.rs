@@ -8,7 +8,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::{fs, thread};
 
 use common::flick_in;
@@ -234,4 +234,61 @@ fn watch_runs_again_after_the_previous_run_cleaned_up() {
     let changed = text.find("a file changed").expect("the change was noticed");
     let second = text.rfind("acquired").expect("second run");
     assert!(released < changed && changed < second, "{text}");
+}
+
+const CLOCKS: &str = r#"module Test.Clocks exposing (tests)
+
+hour : Duration.Duration
+let hour = Result.with_default Duration.zero (Duration.hours 1)
+
+tests : List Test.Test
+let tests =
+  [
+    Test.clock_test
+      "an hour passes when the test moves the clock"
+      (task {
+        scope s {
+          let sleeper = Fiber.spawn s (fun _ -> ()) (task {
+            Effect.sleep hour
+            Clock.current_time_millis ()
+          })
+          Test.adjust hour
+          Test.expect (Test.equal 3600000 (Fiber.join sleeper))
+        }
+      }),
+    Test.clock_test
+      "each test starts at zero"
+      (task {
+        Test.expect (Test.equal 0 (Clock.current_time_millis ()))
+        Test.set_time 1000
+        Test.expect (Test.equal 1000 (Clock.current_time_millis ()))
+      }),
+    Test.clock_test
+      "another test's clock is not this one"
+      (task { Test.expect (Test.equal 0 (Clock.current_time_millis ())) }),
+  ]
+"#;
+
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn clock_tests_run_on_virtual_time() {
+    let dir = project("clocks");
+    fs::write(
+        dir.join("test/Test/Sample.fl"),
+        CLOCKS.replace("Test.Clocks", "Test.Sample"),
+    )
+    .expect("write");
+    let started = Instant::now();
+    let out = flick_in(&dir, &["test", "--reporter", "json"]);
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    let json = results(&out);
+    for name in [
+        "an hour passes when the test moves the clock",
+        "each test starts at zero",
+        "another test's clock is not this one",
+    ] {
+        assert_eq!(status(&json, name), ("passed", ""), "{json}");
+    }
+    // no real hour, nor a real wait at all
+    assert!(started.elapsed() < Duration::from_secs(60));
 }

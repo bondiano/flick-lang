@@ -139,6 +139,7 @@ let tests =
 | - | - |
 | `Test.test name check` | pure: `check ()` is an `Assertion` |
 | `Test.effect_test name task` | the task runs in a scope of its own, which owns what it acquires; `Test.expect` fails it on an assertion |
+| `Test.clock_test name task` | as `effect_test`, on a clock of its own that starts at 0 and moves only by `Test.adjust duration` and `Test.set_time millis`: a sleep, a timeout or a retry schedule waits for virtual time, so a test of an hour's backoff runs at once |
 | `Test.property name gen check` | `check` on 100 values of `gen`, drawn from the run's seed; `Gen.function result` (for a `Hash` argument) draws pure functions, as a law over functions needs |
 | `Test.group name tests` | `name >` before the names of `tests` |
 

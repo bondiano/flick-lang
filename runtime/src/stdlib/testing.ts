@@ -1,9 +1,11 @@
 // Tests and generators. A test is data built by pure code; `runTests` runs
 // them, each in an owner of its own, and reports assertions, typed
 // failures, defects and failed cleanup apart.
-import { Cause, Effect, Exit, Fiber } from "effect";
+import { Cause, type Duration, Effect, Exit, Fiber, Layer } from "effect";
+import * as TestClock from "effect/testing/TestClock";
 
 import { describeCause } from "../cause.ts";
+import { service } from "../effects.ts";
 import type { HashDict, Tagged } from "../data.ts";
 import { item } from "../internal.ts";
 import { ownedExits } from "../owner.ts";
@@ -94,6 +96,23 @@ export const testPure = (name: string, body: (unit: undefined) => Assertion): Te
   Object.freeze({ kind: "pure", name, body });
 export const testEffect = (name: string, task: Effect.Effect<unknown, unknown>): Test =>
   Object.freeze({ kind: "effect", name, task });
+/** The service `Test.VirtualTime`: a test that may move its clock. */
+const VirtualTime = /*#__PURE__*/ service("Test.VirtualTime");
+
+/** `Test.clock_test`: an effect test on a TestClock of its own, made for each run. */
+export const testClock = (name: string, task: Effect.Effect<unknown, unknown, unknown>): Test =>
+  testEffect(
+    name,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the layer provides every service the row names
+    Effect.provide(task, Layer.merge(TestClock.layer(), Layer.succeed(VirtualTime, {}))) as Effect.Effect<unknown, unknown>,
+  );
+
+/** `Test.adjust`: moves the test's clock forward. */
+export const testAdjust = (duration: Duration.Duration): Effect.Effect<void> => TestClock.adjust(duration);
+
+/** `Test.set_time`: sets the test's clock to `millis` since the epoch. */
+export const testSetTime = (millis: number): Effect.Effect<void> => TestClock.setTime(millis);
+
 /** A property test: each case draws a value and checks it; a failure names the value. */
 export const testProperty = <A>(name: string, gen: Gen<A>, check: (value: A) => Assertion): Test =>
   Object.freeze({

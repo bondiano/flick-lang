@@ -453,13 +453,13 @@ Chromium сохранил cookie после 200, но [HttpApi.call требуе
 **Q4. P1 — Публичный реэкспорт теряется** ✅ (модуль, экспортирующий импортированное, пишет `export { … } from` модуля-владельца в JS/TS и `.d.ts`, типы без значения — `export type`; identity та же, что у владельца; `flick/tests/dts_command.rs`)
 Barrel с pair собирается, но JS export отсутствует, TS2305. [Dts](../../flick-core/src/codegen/ts/dts.rs#L20-L25) отбрасывает чужой defining module. Value/type re-exports должны сохранять identity во Flick/JS/TS.
 
-**Q5. P2 — Поздний generic теряет inference**
+**Q5. P2 — Поздний generic теряет inference** ✅ (`codegen/ts/stages.rs`: параметр типа стоит на первой стадии, чей параметр его упоминает, упомянутые только в результате (в том числе R/E) — на последней; JS не меняется; функции со словарями классов по-прежнему получают все параметры вместе со словарями; `pair: <A>(arg: A) => <B>(arg: B) => readonly [A, B]` (снапшот), tsc в `flick/tests/dts_command.rs`: `pair(1)('x')[1]` — `string`)
 `pair(1)("x")` имеет `[number,unknown]`: [оба generic на первой стадии](../../flick-core/src/codegen/ts.rs#L80-L135). Вводить B на своей стадии, включая поздние R/E, без смены ABI.
 
 **Q6. P1 — Reference противоречит контрактам** ✅ (пример `save_button` EN/RU — обработчик с `Atom.Write`, дословно код фикстуры `tests/check/pass/ui/save_button.fl`, сверку держит `ui_reference_example_is_a_checked_fixture`; MVU-план заменён atom-first: цикла `Msg → update` нет и не планируется; `Ui.text` в spec/10 больше не «полиморфна по строкам»)
 [UI-пример](../src/content/docs/reference/ui.md#L12-L31) с Users/SaveError даёт E002; save_button fixture проходит. [MVU-план](../src/content/docs/reference/ui.md#L525-L539) противоречит atom-first; DSL назван any вопреки T003. Нужны проверяемые EN/RU-примеры.
 
-**Q7. P1 — Неполная Effect/TS-граница**
+**Q7. P1 — Неполная Effect/TS-граница** ✅ (`Stream.Core.Stream` проецируется в `Stream.Stream<A, E, R>` Effect, без бренда — TS2739 нет, `Stream.runCollect` принимает поток Flick; `.d.ts` объявляет для каждого экспортируемого сервиса без параметров ключ `$s_S: Context.Service<S, { операции }>`, по которому TypeScript делает `Effect.provideService`; экспорт с последней Sync-стадией в TS — `Effect<A, never, R>`, а в JS обёрнут `$rt.syncExport`: внутри Sync-стадии Flick (задан окружающий читатель) вызов прежний, снаружи — Effect через `sync`, ABI между модулями Flick не изменился; `flick/tests/dts_command.rs::streams_services_and_sync_exports_cross_into_effect_typescript` — tsc и запуск в Node: `[1,2,3] hi ada true`; регионы по-прежнему отвергаются)
 Eff сохраняет fiber/service/error identity. Stream работает в runtime, но [TS brand](../../flick-core/src/codegen/ts.rs#L259-L297) даёт TS2739; нет typed key для пользовательского service. Нужны native projections/adapters без any и потери regions. v3 требует bridge с другим owner/fiber.
 
 Новое: [Sync export](../../flick-core/src/codegen/ts.rs#L154-L163) — `(undefined)=>number` с ambient reader; прямой вызов падает. `syncReading`, `$rt.sync`, native provider проверены. Row-polymorphic аналог остаётся Effect: стадия фиксируется при записи стрелки, позднее уточнение строки ABI не меняет.
@@ -469,10 +469,10 @@ NotFound без with_errors принимается и становится 500 �
 
 Элемент-переменная, решённая не-error типом (`error_case 404 (Codec.json Schema.number)`), — T002 «`Float` is not an error» на вызове: инстанцирование записывает элементы `~t`, а `report_regions` проверяет их формы; E002 о той же строке не дублируется.
 
-**Q9. P1 — Нет SQL-транзакционной композиции**
+**Q9. P1 — Нет SQL-транзакционной композиции** ✅ (`Database.transaction body`: тело на одном соединении между `BEGIN` и `COMMIT`, сервис `Database` внутри привязан к этому соединению; неудача или прерывание — `ROLLBACK` (при прерывании соединение закрывается, сервер откатывает сам), вложенная транзакция — `SAVEPOINT`/`RELEASE`/`ROLLBACK TO`; другие вызывающие берут другие соединения; `runtime/test/sql.test.ts` на поддельном пуле и `tests/postgres/tx.fl` на настоящем PostgreSQL: CHECK второй записи откатывает первую, при pool=1 откат одного не отменяет коммит другого, точка сохранения)
 Первая запись пережила CHECK-ошибку второй; при pool=1 чужой ROLLBACK отменил успешную запись B. [Запросы отдельно берут connection](../../runtime/src/sql/pg.ts#L138-L184). Нужен scoped transaction с commit/rollback и изоляцией callers; raw BEGIN/Tx.atomically не замена. До F3/F6.
 
-**Q10. P2 — Непоследовательные captures builders**
+**Q10. P2 — Непоследовательные captures builders** ✅ (47 построителей `Stream` в `Transform`/`Combine`/`Errors`/`Pipe` (и поля-колбэки записей `map_both`, `tap_both`, `throttle`) — форма `Run.fl`: колбэк и поток делят захват `c`, частичное применение тоже его держит, `(a -> b)^c -> ((Stream r e a)^c -> (Stream r e b)^c)^c`; checker не менялся; локальное потребление потока с колбэком над подпиской проходит (`tests/check/pass/stdlib/stream_captures.fl`), а возврат такого потока из `scope` — по-прежнему G001 (`leaked`, `escaped`, `broadcast` в `tests/check/fail/stdlib/stream.fl`); полный e2e зелёный)
 [Stream callbacks](../../flick-core/src/types/builtins/Stream/Transform.fl#L1-L4) отвергают scoped subscription даже при локальном потреблении (G001). Объединять captures callback/source без ослабления запрета утечки; D7 этого не решает.
 
 D15 снимает прежнее ограничение пользовательских Applicative/Monad: [планировщик](../../examples/mtl/src/App/Plan.fl) использует возможности поверх `MaybeT`/`StateT`/`ReaderT`, а [Capabilities](../../examples/mtl/src/App/Capabilities.fl) — `ExceptT`/`WriterT`/`StateT`/`ReaderT` над `Identity` и `Eff`. Границы целых обобщённых значений и проекции сохраняют реальные регионы; callback-контракты учитывают позднее состояние/окружение, а stored-квалификатор модификатора `pass` не стирается. Закрыты перечисленные AC D15; Q10 для Stream builders этим не решён.
@@ -489,10 +489,10 @@ L6/H2 и Vite есть; server/client isolation и общий dev workflow — �
 **Q14. P2 — Loader переносит только success** ✅ (`Atom.serializable_result wire error_wire atom` передаёт и неудачу с одной типизированной ошибкой, закодированной её кодеком; дефект, прерывание и несколько ошибок не передаются — клиент запускает задачу сам; запрос гидрируется и неудачей, `tests/run/ui/route.fl`; поля форм — в F5)
 [serializable_task](../../flick-core/src/types/builtins/Atom.fl#L142-L151) передаёт Loaded, не Failed. `[INFERENCE]` SSR 401/404 могут повторить запрос. F3/F4 должны переносить публичный Result, не Failure со стеком/секретами. Validation не закрывает F5: нужны field paths, accessible controls, async cancellation/lifecycle.
 
-**Q15. P2 — Нет виртуального времени тестов**
+**Q15. P2 — Нет виртуального времени тестов** ✅ (`Test.clock_test` — `effect_test` с собственным `TestClock` Effect на каждый запуск; `Test.adjust`/`Test.set_time` требуют сервис `Test.VirtualTime`, так что двигать часы можно только в таком тесте; обычный `effect_test` по-прежнему на живых часах, иначе существующие тесты со сном зависли бы; `flick/tests/test_command.rs::clock_tests_run_on_virtual_time`: сон в час завершается после `adjust` без реального ожидания, у каждого теста часы с нуля)
 [effect_test](../../flick-core/src/types/builtins/Test.fl#L44-L59) даёт scope, не Clock; effect/testing исключён. Нужен scoped TestClock: advance, изоляция и cleanup без реального backoff. Gen.function не заменяет это.
 
-**Q16. P1 — Отмена не ограничивает PostgreSQL**
+**Q16. P1 — Отмена не ограничивает PostgreSQL** ✅ (прерванный запрос отменяется на сервере CancelRequest протокола по отдельному сокету (`processID`/`secretKey`, без места в пуле), прерывание ждёт до 5 с его остановки и закрывает соединение; `PgConfig` получил `statement_timeout_ms` (сервер завершает оператор, `57014`) и `acquire_timeout_ms` (ожидание соединения пула), `Database.config url` — значения по умолчанию; коммит неотменяем, потерянный ответ — `DbError "commit_unknown"`, откат не обещан; `tests/postgres/tx.fl`: 20 прерванных `pg_sleep` при pool=2 не оставляют ни одного спящего backend (без отмены — 2), дедлайн — `57014`; shortcut: CancelRequest только по TCP без TLS)
 [Finalizer](../../runtime/src/sql/pg.ts#L149-L162) ждёт socket end, не backend. Pool=8 не предотвратил 39 backend и 53300; восстановление — после sleepers. Нужны server-side cancellation/deadlines, admission control и явная commit ambiguity. Rollback не обещан.
 
 ### 7.2. Новые воспроизведённые дефекты Q17–Q28
@@ -565,7 +565,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 
 ### 7.2b. Архитектура и границы решения: Q29–Q36
 
-Срез `98c4092`: восемь дефектов воспроизведены реальными CLI/LSP/Node-пробами; проверки и ограничения — §7.6. Все пункты ниже открыты, перенос в родмап не исправляет код.
+Срез `98c4092`: восемь дефектов воспроизведены реальными CLI/LSP/Node-пробами; проверки и ограничения — §7.6. Все восемь закрыты (отметки у пунктов), каждый — с тестом, который без исправления падает или воспроизводит исходное наблюдение.
 
 **Архитектурное решение:** сохранить общий Rust checker/IR/emitter для CLI, LSP и WASM, версионированные `.iface` и адаптеры к Effect. Исправлять контракты в существующих слоях: владение fibers, входы/выходы сборки, канал ошибок RPC, семантические идентичности IDE/API и владение diagnostics. Второй runtime, новый backend или переписывание компилятора из этих результатов не следуют.
 
@@ -611,7 +611,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 
 ### 7.3. Приоритеты и проверка закрытия
 
-По новому ревью сначала **Q29–Q32 (P1)**, затем **Q33–Q36 (P2)**. Прежние открытые P1 сохраняют приоритет. Q17–Q28 уже имеют отметки выполнения: не переоткрывать их по историческим наблюдениям; при изменении соответствующих границ сохранять AC type safety/стадии/debug=release.
+Q1–Q36 закрыты (Q5, Q7, Q9, Q10, Q15, Q16 и Q29–Q36 — пачкой 2026-10-28). Q17–Q28 уже имеют отметки выполнения: не переоткрывать их по историческим наблюдениям; при изменении соответствующих границ сохранять AC type safety/стадии/debug=release.
 
 C1 уже реализован; сохранить B-бюджеты и измерять compiled consumers: C1/D14 microbenchmarks — ручные JS-модели. Сверить устаревшие вехи §4 с R5/U9/L6 и D-треком; добавить SQL/cancellation AC. Не строить второй Effect runtime.
 
