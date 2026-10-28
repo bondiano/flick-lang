@@ -373,3 +373,26 @@ fn a_strict_for_that_may_throw_is_built_before_its_consumer() {
     // a producer that cannot throw still fuses with a callback that may
     assert!(js.contains(".push(2n ** (y + 1n))"), "{js}");
 }
+
+#[test]
+fn a_numeric_function_is_copied_for_the_instances_it_is_called_with() {
+    let js = release(
+        "module App exposing (both)\n\n\
+         import Numeric exposing (Numeric)\n\n\
+         scale : Numeric a => a -> a -> a\nlet scale k x = k * x + 1\n\n\
+         both : (Int, Float) -> (Int, Float)\nlet both (i, f) = (scale 3 i, scale 2 f)\n",
+    );
+    assert!(
+        js.contains("scale$Numeric_Int = (k) => (x) => Math.imul(k, x) + 1 | 0"),
+        "{js}"
+    );
+    assert!(
+        js.contains("scale$Numeric_Float = (k) => (x) => k * x + 1"),
+        "{js}"
+    );
+    // inlined, the copies leave plain arithmetic at the calls
+    assert!(
+        js.contains("return [Math.imul(3, i) + 1 | 0, 2 * f + 1];"),
+        "{js}"
+    );
+}
