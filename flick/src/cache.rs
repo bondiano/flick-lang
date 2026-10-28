@@ -231,7 +231,7 @@ pub fn manifest(root: &Path) -> Manifest {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::{env, fs, process};
 
     use flick_core::project::{self, discover};
     use flick_core::source::SourceMap;
@@ -241,7 +241,7 @@ mod tests {
 
     #[test]
     fn a_source_saved_after_it_was_read_keeps_the_build_out_of_the_cache() {
-        let root = std::env::temp_dir().join(format!("flick-cache-race-{}", std::process::id()));
+        let root = env::temp_dir().join(format!("flick-cache-race-{}", process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("src/App")).expect("dir");
         fs::write(
