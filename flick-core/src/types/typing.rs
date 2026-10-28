@@ -181,6 +181,8 @@ pub struct ForeignInfo {
 pub struct ServerFn {
     pub decl: Range,
     pub name: String,
+    /// How many parameters it takes; several are sent as one tuple.
+    pub params: usize,
     pub errors: usize,
 }
 

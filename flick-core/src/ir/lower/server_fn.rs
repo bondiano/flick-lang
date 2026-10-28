@@ -1,10 +1,11 @@
 //! `server fn name x = body`: the witnesses of what it sends, its body as
 //! `name$impl`, the procedure `name$procedure` of its calls, the call
 //! `name` every caller makes, and the implementation `name$server` that
-//! `Server.handler` serves.
+//! `Server.handler` serves. Several parameters travel as one tuple: the
+//! call gathers them and `name$impl` takes the tuple.
 
 use super::Lower;
-use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Stage};
+use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Param, Pat, Stage};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::types::companion_name;
@@ -35,7 +36,17 @@ impl Lower<'_> {
         }
         self.fresh_definition();
         self.definition.clone_from(&name);
-        let body = self.definition(decl);
+        let mut body = self.definition(decl);
+        if info.params > 1
+            && let ExprKind::Lambda { params, .. } = &mut body.kind
+        {
+            let stage = params.last().map_or(Stage::Runtime, |p| p.stage);
+            let pats = params.drain(..).map(|p| p.pat).collect();
+            params.push(Param {
+                pat: Pat::Tuple(pats),
+                stage,
+            });
+        }
         let implementation = companion_name(&name, "impl");
         let procedure = companion_name(&name, "procedure");
         let witness = |l: &Self, member: &str| {
@@ -59,7 +70,39 @@ impl Lower<'_> {
                 Expr::new(ExprKind::List(errors), span),
             ],
         );
-        let call = apply(server("call", span), vec![self.global(&procedure, span)]);
+        let mut call = apply(server("call", span), vec![self.global(&procedure, span)]);
+        if info.params > 1 {
+            let names: Vec<String> = (0..info.params).map(|_| self.hidden("$p")).collect();
+            let payload = names
+                .iter()
+                .map(|n| Expr::new(ExprKind::Local(n.clone()), span))
+                .collect();
+            let ran = Expr::new(
+                ExprKind::App {
+                    func: Box::new(call),
+                    arg: Box::new(Expr::new(ExprKind::Tuple(payload), span)),
+                    stage: Stage::Runtime,
+                    arg_first: false,
+                },
+                span,
+            );
+            let last = names.len() - 1;
+            let params = names
+                .into_iter()
+                .enumerate()
+                .map(|(i, n)| Param {
+                    pat: Pat::Bind(n),
+                    stage: if i == last { Stage::Runtime } else { Stage::Pure },
+                })
+                .collect();
+            call = Expr::new(
+                ExprKind::Lambda {
+                    params,
+                    body: Box::new(ran),
+                },
+                span,
+            );
+        }
         let served = apply(
             server("function", span),
             vec![

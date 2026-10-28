@@ -20,6 +20,12 @@ server fn keep secret = if secret.check "" then "yes" else "no"
 find : Order ->{Server.Server; Missing} String
 server fn find order = order.item
 
+early : String ->{Server.Server;} String ->{Server.Server;} String
+server fn early a b = a ++ b
+
+sealed : String -> Secret ->{Server.Server;} String
+server fn sealed a secret = if secret.check a then "yes" else "no"
+
 local : Order -> String
 let local order = order.item
 
@@ -30,4 +36,6 @@ let served = [server local]
 //~ FLICK-E010 @15:1-15:21 server fn `pick`
 //~ FLICK-E010 @18:1-18:64 server fn `keep` sends its payload as JSON, but a field of t
 //~ FLICK-E010 @21:1-21:34 server fn `find` sends its error `Missing` as JSON, but a fi
-//~ FLICK-E010 @27:15-27:27 `local` is not a server fn
+//~ FLICK-E010 @24:1-24:29 server fn `early`: only the last arrow of a server fn runs
+//~ FLICK-E010 @27:1-27:67 server fn `sealed` sends its payload as JSON, but a field
+//~ FLICK-E010 @33:15-33:27 `local` is not a server fn

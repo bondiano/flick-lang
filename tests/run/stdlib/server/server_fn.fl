@@ -24,6 +24,10 @@ server fn place order =
   else
     "placed " ++ show order.count ++ " " ++ order.item
 
+/// Two parameters travel as one payload.
+label : String -> Number ->{Server.Server;} String
+server fn label item count = item ++ " x" ++ show count
+
 /// What the client sees of a call.
 shown : Order ->{} String
 let shown order =
@@ -41,7 +45,7 @@ let main () =
     try
       scope s {
         functions : (ServerRequest ->{} ServerResponse)^{s}
-        let functions = Server.handler [server place]
+        let functions = Server.handler [server place, server label]
         app : (ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse)^{s}
         let app =
           Http.Router.router Http.Router.config
@@ -57,6 +61,7 @@ let main () =
         set_env "FLICK_SERVER_URL" (Http.Server.format_address (Http.Server.address server))
         Platform.stdout_line (shown { item = "tea"; count = 2 })
         Platform.stdout_line (shown { item = "cake"; count = 5 })
+        Platform.stdout_line (try label "jam" 4 with | Rpc.ClientError _ -> "no server")
       }
     with
     | Http.ServerError.ServeError _ -> Platform.stdout_line "serve failed"

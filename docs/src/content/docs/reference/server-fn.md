@@ -23,8 +23,9 @@ server fn place order =
   else App.Db.save order
 ```
 
-The signature right above `server fn` is what the server runs: one
-parameter, the services it needs and its errors. Callers see another type:
+The signature right above `server fn` is what the server runs: its
+parameters, the services it needs and its errors. Only the last arrow runs:
+`String -> Number ->{Server.Server;} String` takes two parameters. Callers see another type:
 
 ```flick
 place : Order ->{; Rpc.ClientError, OutOfStock} String
@@ -59,11 +60,13 @@ let route functions =
 
 ## What crosses the network
 
-The payload, the success and each error travel as JSON, so each has a
+The payload (the parameter, or a tuple of several), the success and each
+error travel as JSON, so each has a
 Schema witness: a record or tuple of witnessed types, `List`, `Option`, a
 type that derives `Schema`. The compiler checks this where the function is
-declared (`FLICK-E010`), together with the rest of the shape: one parameter
-(pass a record for more), no type variables, the errors listed.
+declared (`FLICK-E010`), together with the rest of the shape: pure arrows
+before the last one, each parameter named, no type variables, the errors
+listed.
 
 ## A public endpoint
 

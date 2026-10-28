@@ -1,11 +1,12 @@
 //! `server fn name x = body`: a function its callers reach over the
 //! network. The signature right above it is what the server runs,
-//! `P ->{r; e} S`. The name is the call a client makes,
-//! `P ->{; Rpc.ClientError | e} S`, and `server name` is the implementation
+//! `P -> … ->{r; e} S`. The name is the call a client makes,
+//! `P -> … ->{; Rpc.ClientError | e} S`, and `server name` is the implementation
 //! `Server.route` serves, `Server.Function {Server, r | t}`: it needs
-//! `Server`, so a client entry cannot reach it (`FLICK-E009`). The payload,
-//! the success and each error cross the network as JSON, so each needs a
-//! Schema witness, and the errors are listed in the row.
+//! `Server`, so a client entry cannot reach it (`FLICK-E009`). The payload
+//! (the parameter, or a tuple of several), the success and each error cross
+//! the network as JSON, so each needs a Schema witness, and the errors are
+//! listed in the row.
 
 use super::Checker;
 use super::kinds::Kind;
@@ -35,9 +36,10 @@ pub fn is_server_fn(decl: &Node) -> bool {
     decl.kind == K::LetDecl && decl.has_token(K::ServerKw)
 }
 
-/// The parts of a server function's signature: payload, services, errors
-/// (each with its row label) and success.
+/// The parts of a server function's signature: parameters, payload,
+/// services, errors (each with its row label) and success.
 struct Parts {
+    params: Vec<Type>,
     payload: Type,
     services: Row,
     errors: Vec<(String, Type)>,
@@ -45,34 +47,46 @@ struct Parts {
 }
 
 fn parts(scheme: &Type) -> Result<Parts, &'static str> {
-    let Type::Fun {
-        param,
-        effects,
-        result,
-    } = scheme
-    else {
-        return Err(match scheme {
-            Type::Forall { .. } => "a server fn is not generic: its types cross the network",
-            _ => "a server fn is a function of one parameter: `P ->{r; e} S`",
-        });
-    };
-    let Some(effects) = effects else {
-        return Err("a server fn runs on the server: its arrow is `->{r; e}`");
-    };
-    if matches!(**result, Type::Fun { .. }) {
-        return Err("a server fn takes one parameter: pass a record or a tuple");
+    if matches!(scheme, Type::Forall { .. }) {
+        return Err("a server fn is not generic: its types cross the network");
     }
+    let mut params = Vec::new();
+    let mut ty = scheme;
+    let (effects, result) = loop {
+        let Type::Fun {
+            param,
+            effects,
+            result,
+        } = ty
+        else {
+            return Err("a server fn is a function: `P ->{r; e} S`");
+        };
+        params.push((**param).clone());
+        match (effects, &**result) {
+            (None, Type::Fun { .. }) => ty = result,
+            (Some(_), Type::Fun { .. }) => {
+                return Err("only the last arrow of a server fn runs: `A -> B ->{r; e} S`");
+            }
+            (None, _) => return Err("a server fn runs on the server: its arrow is `->{r; e}`"),
+            (Some(effects), result) => break (effects, result),
+        }
+    };
     let (Type::Row(services), Type::Row(errors)) = (&effects.services, &effects.errors) else {
         return Err("a server fn lists its services and errors");
     };
     if errors.tail.is_some() {
         return Err("a server fn lists its errors: each crosses the network with its codec");
     }
+    let payload = match params.as_slice() {
+        [one] => one.clone(),
+        _ => Type::Tuple(params.clone()),
+    };
     Ok(Parts {
-        payload: (**param).clone(),
+        params,
+        payload,
         services: services.clone(),
         errors: errors.entries.clone(),
-        success: (**result).clone(),
+        success: result.clone(),
     })
 }
 
@@ -83,8 +97,10 @@ fn call_types(scheme: &Type) -> Result<(Type, Type), &'static str> {
     let client_error = Type::con("Rpc", "ClientError");
     let mut errors = parts.errors;
     errors.extend(error_label(&client_error).map(|l| (l, client_error)));
-    let call = Type::Fun {
-        param: Box::new(parts.payload),
+    let mut params = parts.params.into_iter().rev();
+    let last = params.next().unwrap_or(Type::Error);
+    let ran = Type::Fun {
+        param: Box::new(last),
         effects: Some(Box::new(Effects {
             services: Type::Row(Row::closed(Vec::new())),
             errors: Type::Row(Row::closed(errors)),
@@ -92,6 +108,11 @@ fn call_types(scheme: &Type) -> Result<(Type, Type), &'static str> {
         })),
         result: Box::new(parts.success),
     };
+    let call = params.fold(ran, |result, param| Type::Fun {
+        param: Box::new(param),
+        effects: None,
+        result: Box::new(result),
+    });
     // open, so a list of them unifies to everything they need
     let mut services = parts.services.entries;
     services.retain(|(l, _)| l != "Server.Server");
@@ -153,7 +174,8 @@ impl Checker<'_> {
     /// type without one is reported at the function.
     pub(super) fn server_fns(&mut self, decls: &[&Node]) {
         for decl in decls.iter().filter(|d| is_server_fn(d)) {
-            let Some(name) = super::let_parts(decl, self.text).name else {
+            let named = super::let_parts(decl, self.text);
+            let Some(name) = named.name else {
                 continue;
             };
             let Some(scheme) = self.signed_type(&name) else {
@@ -162,6 +184,16 @@ impl Checker<'_> {
             let Ok(parts) = parts(&scheme) else {
                 continue;
             };
+            let params = parts.params.len();
+            if named.params.len() != params {
+                // its implementation takes the parameters as one payload
+                self.error(
+                    codes::E010,
+                    self.span(decl),
+                    format!("server fn `{name}` names each of its {params} parameters"),
+                );
+                continue;
+            }
             let mut sent = vec![
                 (PAYLOAD.to_owned(), "payload".to_owned(), parts.payload),
                 (SUCCESS.to_owned(), "result".to_owned(), parts.success),
@@ -194,6 +226,7 @@ impl Checker<'_> {
                 self.typing.server_fns.push(ServerFn {
                     decl: range(self.span(decl)),
                     name: name.clone(),
+                    params,
                     errors,
                 });
             }
