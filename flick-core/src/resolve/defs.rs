@@ -272,10 +272,12 @@ pub(super) fn alias_cycles(tree: &Node, text: &str, file: FileId) -> Vec<Diagnos
                 format!("`{}` is part of the cycle", aliases[i].0),
             );
         }
-        out.push(diagnostic.with_fix(
-            format!("make `{name}` a nominal type, e.g. `type {name} = {name} of …`"),
-            Vec::new(),
-        ));
+        out.push(diagnostic.with_fix(|| {
+            (
+                format!("make `{name}` a nominal type, e.g. `type {name} = {name} of …`"),
+                Vec::new(),
+            )
+        }));
     }
     out
 }

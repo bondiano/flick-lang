@@ -34,15 +34,17 @@ impl Checker<'_> {
             } else {
                 (otherwise, "false")
             };
-            let edits = single(kept)
-                .filter(|k| self.one_line(k))
-                .map(|k| vec![self.replace(node, &self.operand(k))])
-                .unwrap_or_default();
             self.lint(
                 codes::T045,
                 format!("this condition is always `{word}`"),
                 self.span(condition),
-                ("keep the branch that runs", edits, false),
+                |this| {
+                    let edits = single(kept)
+                        .filter(|k| this.one_line(k))
+                        .map(|k| vec![this.replace(node, &this.operand(k))])
+                        .unwrap_or_default();
+                    ("keep the branch that runs", edits, false)
+                },
             );
             return;
         }
@@ -51,36 +53,40 @@ impl Checker<'_> {
         };
         match (self.known_bool(then_value), self.known_bool(else_value)) {
             (Some(true), Some(false)) => {
-                let replacement = self.source_of(condition).trim().to_owned();
-                let replacement =
-                    if super::atomic(unparen(condition)) || condition.kind == K::BinExpr {
-                        replacement
-                    } else {
-                        format!("({replacement})")
-                    };
                 self.lint(
                     codes::T040,
                     "this `if` returns its condition".to_owned(),
                     at,
-                    (
-                        "write the condition",
-                        vec![self.replace(node, &replacement)],
-                        true,
-                    ),
+                    |this| {
+                        let replacement = this.source_of(condition).trim();
+                        let replacement =
+                            if super::atomic(unparen(condition)) || condition.kind == K::BinExpr {
+                                replacement.to_owned()
+                            } else {
+                                format!("({replacement})")
+                            };
+                        (
+                            "write the condition",
+                            vec![this.replace(node, &replacement)],
+                            true,
+                        )
+                    },
                 );
                 return;
             }
             (Some(false), Some(true)) => {
-                let replacement = format!("not {}", self.operand(condition));
                 self.lint(
                     codes::T040,
                     "this `if` returns the opposite of its condition".to_owned(),
                     at,
-                    (
-                        "write `not` of the condition",
-                        vec![self.replace(node, &replacement)],
-                        true,
-                    ),
+                    |this| {
+                        let replacement = format!("not {}", this.operand(condition));
+                        (
+                            "write `not` of the condition",
+                            vec![this.replace(node, &replacement)],
+                            true,
+                        )
+                    },
                 );
                 return;
             }
@@ -104,16 +110,21 @@ impl Checker<'_> {
         {
             return;
         }
-        let edits = vec![
-            self.replace(condition, self.source_of(negated).trim()),
-            self.replace(then, self.source_of(otherwise).trim()),
-            self.replace(otherwise, self.source_of(then).trim()),
-        ];
         self.lint(
             codes::T041,
             "an `if not` with an `else`: the condition without `not` reads directly".to_owned(),
             self.span(condition),
-            ("drop `not` and swap the branches", edits, true),
+            |this| {
+                (
+                    "drop `not` and swap the branches",
+                    vec![
+                        this.replace(condition, this.source_of(negated).trim()),
+                        this.replace(then, this.source_of(otherwise).trim()),
+                        this.replace(otherwise, this.source_of(then).trim()),
+                    ],
+                    true,
+                )
+            },
         );
     }
 
@@ -131,15 +142,16 @@ impl Checker<'_> {
         let Some(keyword) = node.child_tokens().find(|t| t.kind == K::ElseKw) else {
             return;
         };
-        let replacement = format!(" {}", self.source_of(inner).trim());
-        let edit = self.edit(keyword.end, otherwise.range().1, &replacement);
-        // an inner `if` over several lines keeps its own indentation
-        let safe = self.one_line(inner);
         self.lint(
             codes::T042,
             "an `if` alone in an `else`: `else if` says it without nesting".to_owned(),
             self.span(inner),
-            ("write `else if`", vec![edit], safe),
+            |this| {
+                let replacement = format!(" {}", this.source_of(inner).trim());
+                let edit = this.edit(keyword.end, otherwise.range().1, &replacement);
+                // an inner `if` over several lines keeps its own indentation
+                ("write `else if`", vec![edit], this.one_line(inner))
+            },
         );
     }
 
@@ -166,22 +178,28 @@ impl Checker<'_> {
                 codes::T044,
                 format!("`{left}` compared with itself is always `{always}`"),
                 self.span(node),
-                ("compare it with another value", Vec::new(), false),
+                |_| ("compare it with another value", Vec::new(), false),
             );
             return;
         }
         let literal = |n: &Node| unparen(n).kind == K::Literal;
         if literal(lhs) && !literal(rhs) && self.one_line(rhs) {
-            let replacement = format!("{right} {flipped} {left}");
             self.lint(
                 codes::T043,
                 format!("the literal is on the left of `{op}`: the value compared reads first"),
                 self.span(node),
-                (
-                    "put the literal on the right",
-                    vec![self.replace(node, &replacement)],
-                    true,
-                ),
+                |this| {
+                    let replacement = format!(
+                        "{} {flipped} {}",
+                        this.source_of(rhs).trim(),
+                        this.source_of(lhs).trim()
+                    );
+                    (
+                        "put the literal on the right",
+                        vec![this.replace(node, &replacement)],
+                        true,
+                    )
+                },
             );
         }
     }
@@ -204,21 +222,23 @@ impl Checker<'_> {
             (Some(false), Some(true) | None) => (y, x),
             _ => return,
         };
-        let replacement = format!(
-            "if {} then {} else {}",
-            self.source_of(scrutinee).trim(),
-            self.source_of(then).trim(),
-            self.source_of(otherwise).trim()
-        );
         self.lint(
             codes::T046,
             "a `match` on a `Bool`: `if` says it directly".to_owned(),
             self.span(node),
-            (
-                "write it as an `if`",
-                vec![self.replace(node, &replacement)],
-                true,
-            ),
+            |this| {
+                let replacement = format!(
+                    "if {} then {} else {}",
+                    this.source_of(scrutinee).trim(),
+                    this.source_of(then).trim(),
+                    this.source_of(otherwise).trim(),
+                );
+                (
+                    "write it as an `if`",
+                    vec![this.replace(node, &replacement)],
+                    true,
+                )
+            },
         );
     }
 

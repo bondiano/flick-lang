@@ -149,6 +149,15 @@ impl Checker<'_> {
     /// `name$server`.
     pub(super) fn declare_server_fn(&mut self, decl: &Node, name: &str, scheme: Option<&Type>) {
         let entity = self.env.entity(Namespace::Value, name);
+        if !cfg!(feature = "server-stdlib") {
+            self.error(
+                codes::E012,
+                self.span(decl),
+                "`server fn` requires a compiler built with the `server-stdlib` feature",
+            );
+            self.env.set_value(entity, Type::Error);
+            return;
+        }
         let Some(scheme) = scheme else {
             self.env.set_value(entity, Type::Error);
             // a function without one has `FLICK-T004` already
@@ -186,6 +195,9 @@ impl Checker<'_> {
     /// The witnesses of what each server function sends, for lowering: a
     /// type without one is reported at the function.
     pub(super) fn server_fns(&mut self, decls: &[&Node]) {
+        if !cfg!(feature = "server-stdlib") {
+            return;
+        }
         for decl in decls.iter().filter(|d| is_server_fn(d)) {
             let named = super::let_parts(decl, self.text);
             let Some(name) = named.name else {

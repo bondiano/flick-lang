@@ -11,15 +11,19 @@ mod checking;
 #[cfg(test)]
 mod checking_tests;
 mod entry;
+#[cfg(feature = "ide")]
 mod ide;
+#[cfg(feature = "native-project")]
 mod packages;
 mod runner;
 mod unknown;
 
 pub use checking::ModuleCache;
 pub use entry::{MainKind, main_kind};
+#[cfg(feature = "ide")]
 pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_with};
 
+#[cfg(feature = "native-project")]
 use super::packages::Packages;
 use super::{Host, Project, module_name, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
@@ -54,23 +58,34 @@ enum Mode {
     Check,
     /// Also lowers every module to the IR when nothing has errors.
     Compile,
+    #[cfg(feature = "ide")]
     /// [`Mode::Compile`], keeping what editors need of each module.
     Analyze,
+}
+
+struct Output {
+    diagnostics: Vec<Diagnostic>,
+    compilation: Compilation,
+    #[cfg(feature = "ide")]
+    analyzed: Vec<Analyzed>,
 }
 
 struct Loader<'a> {
     host: &'a dyn Host,
     sources: &'a mut SourceMap,
     project: Option<&'a Project>,
+    #[cfg(feature = "native-project")]
     packages: Packages,
     modules: Vec<Loaded>,
     by_name: BTreeMap<String, usize>,
     from_packages: BTreeMap<String, Interface>,
+    #[cfg(feature = "native-project")]
     /// The package that provides each module of `from_packages`.
     owners: BTreeMap<String, String>,
     diagnostics: Vec<Diagnostic>,
     /// With `Some`, the IR of each module that checks without errors.
     lowered: Option<Vec<Option<ir::Module>>>,
+    #[cfg(feature = "ide")]
     /// With `Some`, what editors need of each module that parses.
     ide: Option<Vec<Analyzed>>,
     /// With `Some`, the outputs of earlier runs to reuse.
@@ -113,7 +128,7 @@ pub fn check(
     project: Option<&Project>,
     roots: &[PathBuf],
 ) -> Vec<Diagnostic> {
-    run(host, sources, project, roots, Mode::Check, None).0
+    run(host, sources, project, roots, Mode::Check, None).diagnostics
 }
 
 /// [`check`], also lowering every module to the IR when nothing has errors.
@@ -123,7 +138,11 @@ pub fn compile(
     project: Option<&Project>,
     roots: &[PathBuf],
 ) -> (Vec<Diagnostic>, Compilation) {
-    let (diagnostics, compilation, _) = run(host, sources, project, roots, Mode::Compile, None);
+    let Output {
+        diagnostics,
+        compilation,
+        ..
+    } = run(host, sources, project, roots, Mode::Compile, None);
     (diagnostics, compilation)
 }
 
@@ -134,22 +153,29 @@ fn run(
     roots: &[PathBuf],
     mode: Mode,
     cache: Option<&mut ModuleCache>,
-) -> (Vec<Diagnostic>, Compilation, Vec<Analyzed>) {
+) -> Output {
+    #[cfg(feature = "native-project")]
     let mut diagnostics = Vec::new();
+    #[cfg(feature = "native-project")]
     let packages = project.map_or_else(Packages::default, |p| {
         Packages::load(host, &p.root, &mut diagnostics)
     });
+    #[cfg(not(feature = "native-project"))]
+    let diagnostics = Vec::new();
     let mut loader = Loader {
         host,
         sources,
         project,
+        #[cfg(feature = "native-project")]
         packages,
         modules: Vec::new(),
         by_name: BTreeMap::new(),
         from_packages: BTreeMap::new(),
+        #[cfg(feature = "native-project")]
         owners: BTreeMap::new(),
         diagnostics,
         lowered: (mode != Mode::Check).then(Vec::new),
+        #[cfg(feature = "ide")]
         ide: (mode == Mode::Analyze).then(Vec::new),
         cache,
     };
@@ -162,9 +188,8 @@ fn run(
     for (_, path) in roots {
         if let Err(err) = loader.load(&path) {
             let message = format!("cannot read `{}`: {err}", loader.host.display(&path));
-            loader
-                .diagnostics
-                .push(Diagnostic::new(codes::P001, Severity::Error, message));
+            let diagnostic = Diagnostic::new(codes::P001, Severity::Error, message);
+            loader.diagnostics.push(diagnostic);
         }
     }
     let edges = loader.load_imports();
@@ -178,6 +203,7 @@ fn run(
         cache.retain_loaded(&loader.modules);
     }
     loader.check_entry(&interfaces);
+    #[cfg(feature = "native-project")]
     loader.check_packages();
     let failed = loader
         .diagnostics
@@ -202,40 +228,33 @@ fn run(
             .collect(),
         _ => Vec::new(),
     };
-    let package_modules = loader
-        .owners
-        .iter()
-        .filter_map(|(module, package)| {
-            Some(PackageModule {
-                module: module.clone(),
-                package: package.clone(),
-                interface: loader.from_packages.get(module)?.clone(),
-                js_specifier: loader
-                    .packages
-                    .js_specifier(package, &module.replace('.', "/")),
-            })
-        })
-        .collect();
-    let compilation = Compilation {
-        modules: compiled,
-        package_modules,
-    };
-    let analyzed = loader.ide.take().unwrap_or_default();
+    #[cfg(feature = "native-project")]
+    let package_modules = loader.package_modules();
     let mut diagnostics = loader.diagnostics;
     if let Some(p) = project {
         diagnostics
             .retain(|d| d.severity != Severity::Warning || !p.config.allow.contains(&d.code));
     }
     // by path, not by load order, which follows the order of imports
-    let sources = &*loader.sources;
     diagnostics.sort_by_cached_key(|d| {
         (
             d.span.is_none(),
             d.span
-                .map(|s| (sources.get(s.file).path.clone(), s.start, s.end)),
+                .map(|s| (loader.sources.get(s.file).path.clone(), s.start, s.end)),
         )
     });
-    (diagnostics, compilation, analyzed)
+    Output {
+        diagnostics,
+        compilation: Compilation {
+            modules: compiled,
+            #[cfg(feature = "native-project")]
+            package_modules,
+            #[cfg(not(feature = "native-project"))]
+            package_modules: Vec::new(),
+        },
+        #[cfg(feature = "ide")]
+        analyzed: loader.ide.take().unwrap_or_default(),
+    }
 }
 
 impl Loader<'_> {
@@ -280,13 +299,13 @@ impl Loader<'_> {
                     format!("`{}` must declare `module {expected}`, not `{}`", self.host.display(path), h.name),
                     h.span,
                 )
-                .with_fix(
+                .with_fix(|| (
                     format!(
                         "rename the module, or move the file to `{}`",
                         root_dir.as_ref().map_or(module_path(&h.name), |d| PathBuf::from(self.host.display(&d.join(module_path(&h.name))))).display()
                     ),
                     vec![Edit { span: h.span, replacement: expected.clone() }],
-                ),
+                )),
             ),
             (Some(None), _) => self.diagnostics.push(
                 Diagnostic::error(
@@ -297,7 +316,7 @@ impl Loader<'_> {
                     ),
                     header.map_or(Span::new(file, 0, 0), |h| h.span),
                 )
-                .with_fix("rename the file after its module, e.g. `src/App/Users.fl` for `App.Users`", Vec::new()),
+                .with_fix(|| ("rename the file after its module, e.g. `src/App/Users.fl` for `App.Users`", Vec::new())),
             ),
             _ => {}
         }
@@ -377,6 +396,7 @@ impl Loader<'_> {
             }
         }
         let local = self.by_name.get(name).copied();
+        #[cfg(feature = "native-project")]
         self.load_package_interfaces(name, span);
         if local.is_none() && !self.from_packages.contains_key(name) {
             match types::builtins().iter().find(|i| i.module == name) {
@@ -422,10 +442,12 @@ impl Loader<'_> {
                     format!("import cycle: {}", chain.join(" -> ")),
                     span.expect("edge has an import"),
                 )
-                .with_fix(
-                    "move what the modules share into a module that both import",
-                    Vec::new(),
-                ),
+                .with_fix(|| {
+                    (
+                        "move what the modules share into a module that both import",
+                        Vec::new(),
+                    )
+                }),
             );
         }
     }

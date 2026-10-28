@@ -2,7 +2,9 @@
 
 use strsim::osa_distance;
 
-use super::{Diagnostic, Edit};
+use super::Diagnostic;
+#[cfg(feature = "diagnostic-fixes")]
+use super::Edit;
 use crate::source::Span;
 
 /// The candidate within a third of `name`'s length in edits (at least one; a
@@ -22,16 +24,26 @@ pub fn closest<'a>(name: &str, candidates: impl IntoIterator<Item = &'a str>) ->
 impl Diagnostic {
     /// Offer `replacement` for `span` as a "did you mean" fix.
     #[must_use]
-    pub fn did_you_mean(self, span: Span, replacement: Option<String>) -> Self {
-        match replacement {
-            Some(r) => self.with_fix(
-                format!("did you mean `{r}`?"),
-                vec![Edit {
-                    span,
-                    replacement: r,
-                }],
-            ),
-            None => self,
+    pub fn did_you_mean(self, span: Span, replacement: impl FnOnce() -> Option<String>) -> Self {
+        #[cfg(feature = "diagnostic-fixes")]
+        {
+            match replacement() {
+                Some(r) => self.with_fix(|| {
+                    (
+                        format!("did you mean `{r}`?"),
+                        vec![Edit {
+                            span,
+                            replacement: r,
+                        }],
+                    )
+                }),
+                None => self,
+            }
+        }
+        #[cfg(not(feature = "diagnostic-fixes"))]
+        {
+            let _ = (span, replacement);
+            self
         }
     }
 }
@@ -41,6 +53,55 @@ mod tests {
     use super::closest;
     use crate::source::SourceMap;
 
+    #[test]
+    fn primary_errors_and_warnings_do_not_depend_on_suggestions() {
+        use crate::diagnostics::{Severity, codes};
+        let cases = [
+            (
+                "let total = 1\nf : Unit -> Int\nlet f () = totl",
+                codes::T001,
+                Severity::Error,
+            ),
+            ("f : String\nlet f = true", codes::T003, Severity::Error),
+            (
+                "f : Int -> Int\nlet f unused = 1",
+                codes::R013,
+                Severity::Warning,
+            ),
+        ];
+        for (body, code, severity) in cases {
+            let mut sources = SourceMap::default();
+            let file = sources.add("Probe.fl", format!("module Probe exposing (..)\n{body}\n"));
+            let diagnostics = crate::check(&sources, file);
+            let diagnostic = diagnostics
+                .iter()
+                .find(|d| d.code == code)
+                .unwrap_or_else(|| panic!("{diagnostics:?}"));
+            assert_eq!(diagnostic.severity, severity);
+            assert_eq!(diagnostic.span.expect("primary location").file, file);
+        }
+    }
+
+    #[test]
+    fn replacement_factory_runs_only_for_enabled_fixes() {
+        use crate::diagnostics::{Diagnostic, codes};
+        use crate::source::{FileId, Span};
+        use std::cell::Cell;
+        let called = Cell::new(false);
+        let span = Span::new(FileId::default(), 0, 4);
+        let diagnostic = Diagnostic::error(codes::T001, "cannot find value `totl`", span)
+            .did_you_mean(span, || {
+                called.set(true);
+                Some("total".to_owned())
+            });
+        assert_eq!(called.get(), cfg!(feature = "diagnostic-fixes"));
+        assert_eq!(diagnostic.message, "cannot find value `totl`");
+        assert_eq!(diagnostic.span, Some(span));
+        #[cfg(feature = "diagnostic-fixes")]
+        assert_eq!(diagnostic.fixes[0].edits[0].replacement, "total");
+    }
+
+    #[cfg(feature = "diagnostic-fixes")]
     /// The replacement each "did you mean" fix of checking `body` offers.
     fn guesses(body: &str) -> Vec<String> {
         let text = format!(
@@ -59,6 +120,7 @@ mod tests {
             .collect()
     }
 
+    #[cfg(feature = "diagnostic-fixes")]
     #[test]
     fn misspelt_names_get_a_replacement() {
         let cases = [
@@ -75,6 +137,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "diagnostic-fixes")]
     #[test]
     fn unexported_import_items_get_a_replacement() {
         let text = "module Probe exposing (..)\nimport Int exposing (to_strng)\n";

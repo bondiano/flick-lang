@@ -11,18 +11,22 @@ pub mod diagnostics;
 pub mod doc;
 pub mod ffi;
 pub mod fmt;
+#[cfg(feature = "ide")]
 pub mod ide;
 pub mod iface;
 pub mod ir;
 pub mod numeric;
 pub mod opt;
 pub mod project;
+#[cfg(feature = "ide")]
 pub mod projection;
 pub mod resolve;
 pub mod source;
 pub mod syntax;
 pub mod types;
 
+#[cfg(test)]
+mod builtin_source;
 /// Version of the Flick language this core targets (spec header: "Flick 0.7").
 pub const LANGUAGE_VERSION: &str = "0.7";
 

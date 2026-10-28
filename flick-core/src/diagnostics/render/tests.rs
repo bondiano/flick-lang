@@ -18,13 +18,15 @@ fn sample() -> (SourceMap, Vec<Diagnostic>) {
         )
         .with_related(Span::new(main, 37, 45), "bound here")
         .with_related(Span::new(other, 4, 5), "also declared here")
-        .with_fix(
-            "use `Platform.stdout_line`",
-            vec![Edit {
-                span: Span::new(main, 88, 93),
-                replacement: "stdout_line".into(),
-            }],
-        ),
+        .with_fix(|| {
+            (
+                "use `Platform.stdout_line`",
+                vec![Edit {
+                    span: Span::new(main, 88, 93),
+                    replacement: "stdout_line".into(),
+                }],
+            )
+        }),
         // multi-line span
         Diagnostic::new(
             codes::S002,
@@ -32,7 +34,7 @@ fn sample() -> (SourceMap, Vec<Diagnostic>) {
             "body is not a call sequence",
         )
         .with_span(Span::new(main, 63, 106))
-        .with_fix("see `flick explain FLICK-S002`", vec![]),
+        .with_fix(|| ("see `flick explain FLICK-S002`", vec![])),
         Diagnostic::new(
             codes::P001,
             Severity::Error,
@@ -48,15 +50,18 @@ fn sample_spans_point_where_intended() {
     let text = |s: Span| &sources.get(s.file).text[s.range()];
     assert_eq!(text(diagnostics[0].span.expect("has span")), "\"привет\"");
     assert_eq!(text(diagnostics[0].related[0].span), "greeting");
+    #[cfg(feature = "diagnostic-fixes")]
     assert_eq!(text(diagnostics[0].fixes[0].edits[0].span), "print");
 }
 
+#[cfg(all(feature = "terminal-diagnostics", feature = "diagnostic-fixes"))]
 #[test]
 fn human_plain() {
     let (sources, diagnostics) = sample();
     insta::assert_snapshot!(render_human(&sources, &diagnostics, false));
 }
 
+#[cfg(all(feature = "terminal-diagnostics", feature = "diagnostic-fixes"))]
 #[test]
 fn human_color() {
     let (sources, diagnostics) = sample();
@@ -67,9 +72,32 @@ fn human_color() {
 fn json_ndjson() {
     let (sources, diagnostics) = sample();
     let out = render_json(&sources, &diagnostics);
-    for line in out.lines() {
+    for (line, diagnostic) in out.lines().zip(&diagnostics) {
         let v: serde_json::Value = serde_json::from_str(line).expect("each line is JSON");
         assert_eq!(v["schema-version"], SCHEMA_VERSION);
+        assert_eq!(v["code"], diagnostic.code.to_string());
+        assert_eq!(v["message"], diagnostic.message);
+        assert_eq!(
+            v["related"].as_array().expect("related locations").len(),
+            diagnostic.related.len()
+        );
+        #[cfg(not(feature = "diagnostic-fixes"))]
+        assert!(v.get("fixes").is_none());
     }
+    #[cfg(feature = "diagnostic-fixes")]
     insta::assert_snapshot!(out);
+}
+
+#[cfg(all(feature = "terminal-diagnostics", not(feature = "diagnostic-fixes")))]
+#[test]
+fn human_without_fixes_keeps_primary_and_related_snippets() {
+    let (sources, diagnostics) = sample();
+    let out = render_human(&sources, &diagnostics, false);
+    assert!(out.contains("error[FLICK-S002]: unsupported expression"));
+    assert!(out.contains("warning[FLICK-S002]: body is not a call sequence"));
+    assert!(out.contains("src/App/Main.fl"));
+    assert!(out.contains("src/App/Other.fl"));
+    assert!(out.contains("bound here"));
+    assert!(out.contains("also declared here"));
+    assert!(!out.contains("help:"));
 }

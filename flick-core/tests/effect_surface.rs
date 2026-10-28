@@ -2,20 +2,31 @@
 
 mod surface;
 
+#[cfg(feature = "ide")]
 use std::collections::BTreeSet;
 use std::fs;
+#[cfg(feature = "ide")]
 use std::io;
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "ide")]
 use flick_core::ffi::check::reviewed;
+#[cfg(feature = "ide")]
 use flick_core::iface::Decl;
+#[cfg(feature = "ide")]
 use flick_core::project::{self, Host};
+#[cfg(feature = "ide")]
 use flick_core::source::SourceMap;
+#[cfg(feature = "ide")]
 use flick_core::types::{self, Ref, Type};
-use surface::{Binding, Manifest, Snapshot, Status, Stdlib, coverage, lint};
+use surface::{Binding, Manifest, Snapshot, Stdlib, lint};
+#[cfg(feature = "ide")]
+use surface::{Status, coverage};
 
+#[cfg(feature = "ide")]
 struct Fs;
 
+#[cfg(feature = "ide")]
 impl Host for Fs {
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
         fs::read(path)
@@ -46,6 +57,7 @@ fn files(dir: &Path, base: &Path, out: &mut Vec<(String, String)>) {
     }
 }
 
+#[cfg(feature = "ide")]
 fn fl_files(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir)
         .expect("readable test directory")
@@ -60,6 +72,7 @@ fn fl_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
+#[cfg(feature = "ide")]
 /// Every `Module.name` the stdlib tests refer to, as resolved by the checker,
 /// and every type their values have.
 fn used_names() -> BTreeSet<String> {
@@ -103,6 +116,7 @@ fn used_names() -> BTreeSet<String> {
     used
 }
 
+#[cfg(feature = "ide")]
 /// The export `Module.name` of a built-in module: the module that defines
 /// it (a facade re-exports the names of its parts) and its declaration.
 fn export(target: &str) -> Option<(String, Decl)> {
@@ -112,6 +126,7 @@ fn export(target: &str) -> Option<(String, Decl)> {
     Some((format!("{}.{name}", e.entity.module), e.decl))
 }
 
+#[cfg(feature = "ide")]
 fn binding(target: &str) -> Binding {
     let Some((defined, Decl::Foreign)) = export(target) else {
         return Binding::Flick;
@@ -128,6 +143,7 @@ fn binding(target: &str) -> Binding {
         .map_or(Binding::Unreviewed, |r| Binding::Reviewed(r.provenance))
 }
 
+#[cfg(feature = "ide")]
 fn pinned() -> String {
     let text =
         fs::read_to_string(repo().join("runtime/package.json")).expect("runtime/package.json");
@@ -138,6 +154,7 @@ fn pinned() -> String {
         .to_owned()
 }
 
+#[cfg(feature = "ide")]
 #[test]
 fn the_manifest_classifies_the_pinned_effect() {
     let dir = repo().join("stdlib/Effect");

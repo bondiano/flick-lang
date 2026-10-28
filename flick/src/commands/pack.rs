@@ -139,10 +139,7 @@ fn debugging_left(built: &[Diagnostic]) -> Option<Vec<Diagnostic>> {
     let mut diagnostics: Vec<Diagnostic> = built
         .iter()
         .filter(|d| [codes::T022, codes::T023].contains(&d.code))
-        .map(|d| Diagnostic {
-            severity: Severity::Error,
-            ..d.clone()
-        })
+        .map(|d| d.clone().with_severity(Severity::Error))
         .collect();
     if diagnostics.is_empty() {
         return None;

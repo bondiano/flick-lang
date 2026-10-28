@@ -180,7 +180,7 @@ impl Gen<'_> {
             let owner = self.owner.take();
             let js = self.ordered(&args);
             let js = self.before_sync(stage, js);
-            let call = format!("{}{worker}({})", self.mark(e.span), js.join(", "));
+            let call = format!("{}{worker}({})", mark!(self, e.span), js.join(", "));
             return self.call(stage, owner, call);
         }
         let owner = self.owner.take();
@@ -201,7 +201,7 @@ impl Gen<'_> {
         } else {
             format!("({f})")
         };
-        let call = format!("{}{f}({a})", self.mark(e.span));
+        let call = format!("{}{f}({a})", mark!(self, e.span));
         self.call(stage, owner, call)
     }
 
@@ -313,7 +313,7 @@ impl Gen<'_> {
             .collect();
         Some(format!(
             "{}{{ _tag: {tag}, {} }}",
-            self.mark(e.span),
+            mark!(self, e.span),
             fields.join(", ")
         ))
     }
@@ -427,11 +427,14 @@ impl Gen<'_> {
     }
 
     pub(super) fn stmt(&mut self, stmt: &Stmt) {
+        #[cfg(feature = "source-maps")]
         let span = match stmt {
             Stmt::Let(_, e) | Stmt::Expr(e) | Stmt::Fun { value: e, .. } => e.span,
         };
+        #[cfg(feature = "source-maps")]
         let first = self.buf.len();
         self.stmt_kind(stmt);
+        #[cfg(feature = "source-maps")]
         if first < self.buf.len() {
             let mark = self.mark(span);
             self.buf[first].insert_str(0, &mark);

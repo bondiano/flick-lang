@@ -5,6 +5,7 @@
 use super::{Gen, names};
 use crate::codegen::Labels;
 use crate::ir::Label;
+#[cfg(feature = "source-maps")]
 use crate::source::Span;
 
 impl Gen<'_> {
@@ -26,6 +27,7 @@ impl Gen<'_> {
         format!("{}({text}, {value})", self.rt("label"))
     }
 
+    #[cfg(feature = "source-maps")]
     /// `code` defining the top-level value `name` as `id`, its source map
     /// naming `id` by `name` where it is defined.
     pub(super) fn named(&mut self, code: String, id: &str, name: &str, span: Span) -> String {
@@ -33,7 +35,7 @@ impl Gen<'_> {
         let Some(at) = code.find(&defined) else {
             return code;
         };
-        let mark = self.mark(span);
+        let mark = mark!(self, span);
         self.names.insert(self.spans.len() - 1, name.to_owned());
         let at = at + "const ".len();
         format!("{}{mark}{}", &code[..at], &code[at..])

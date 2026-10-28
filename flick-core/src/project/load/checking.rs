@@ -4,16 +4,19 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
+#[cfg(feature = "ide")]
 use std::sync::Arc;
 
 use tracing::debug;
 
-use super::{Analyzed, Loaded, Loader};
+#[cfg(feature = "ide")]
+use super::Analyzed;
+use super::{Loaded, Loader};
 use crate::clock::timed;
 use crate::diagnostics::{Diagnostic, Severity};
 use crate::ir;
 use crate::project::Project;
-use crate::project::config::Backend;
+use crate::project::config::{Backend, Config};
 use crate::resolve::{self, Interface};
 use crate::source::{FileId, SourceMap};
 use crate::types;
@@ -38,8 +41,8 @@ impl ModuleCache {
 struct Key {
     file: FileId,
     text: String,
-    /// The text of the project's configuration.
-    config: Option<String>,
+    /// The effective configuration, including programmatically supplied values.
+    config: Option<Config>,
     lower: bool,
     /// Each import's interface, without where its names are declared, which
     /// checking does not read, and whether it is a module of the project.
@@ -115,6 +118,7 @@ impl Loader<'_> {
         if let (Some(lowered), Some(ir)) = (&mut self.lowered, output.ir) {
             lowered[i] = Some(ir);
         }
+        #[cfg(feature = "ide")]
         if let Some(ide) = &mut self.ide {
             ide.push(Analyzed::new(
                 &self.modules[i],
@@ -153,9 +157,7 @@ impl Checking<'_> {
         let key = Key {
             file: loaded.file,
             text: self.sources.get(loaded.file).text.clone(),
-            config: self
-                .project
-                .map(|p| self.sources.get(p.config_file).text.clone()),
+            config: self.project.map(|p| p.config.clone()),
             lower: self.lower,
             imports: loaded
                 .syntax
@@ -244,6 +246,7 @@ impl Checking<'_> {
         }
         Output {
             diagnostics,
+            #[cfg(feature = "ide")]
             typing: Arc::new(typing),
             exported: untyped.unwrap_or_else(|| interface.clone()),
             interface,
@@ -256,6 +259,7 @@ impl Checking<'_> {
 #[derive(Clone)]
 struct Output {
     diagnostics: Vec<Diagnostic>,
+    #[cfg(feature = "ide")]
     typing: Arc<types::Typing>,
     /// The checked interface, which editors see.
     interface: Interface,

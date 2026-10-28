@@ -49,6 +49,14 @@ pub fn group_key(keyword: Token) -> (u32, u32) {
 
 impl Checker<'_> {
     pub fn cli_expr(&mut self, node: &Node) -> Type {
+        if !cfg!(feature = "server-stdlib") {
+            self.error(
+                codes::L008,
+                self.span(node),
+                "`cli` expressions require a compiler built with the `server-stdlib` feature",
+            );
+            return Type::Error;
+        }
         let block = cli::block(node, self.text);
         self.cli_shape(node, &block.clauses);
         let span = |t: Token| (t.start, t.end);

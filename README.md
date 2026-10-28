@@ -87,6 +87,48 @@ problem or discuss a change.
 | [`flick`](./flick/) | The `flick` command-line tool |
 | [`flick-wasm`](./flick-wasm/) | The same compiler core, built for the browser |
 
+`flick-core` enables all compiler capabilities by default; the native `flick`
+crate keeps that complete configuration. Compiler-only consumers can select
+capabilities with `--no-default-features --features <names>`.
+
+| Cargo feature | Capability |
+| - | - |
+| `ide` | Editor queries, projections and retained editor metadata; enables `typescript` and `diagnostic-fixes`. |
+| `build-artifacts` | Published `.iface`, `package.json` and publication fingerprints. |
+| `source-maps` | Source markers, mapping data, `.map` files and `sourceMappingURL`. |
+| `typescript` | TypeScript output, `.d.ts` and Promise façades; JavaScript exports and Sync wrappers remain available without it. |
+| `diagnostic-fixes` | Lazy construction and JSON serialization of fixes/edits; primary diagnostics and validation remain available without it. |
+| `native-project` | Project discovery, TOML/FFI-policy parsing, installed packages, disk-cache contracts and pnpm adapters; activates `toml`. |
+| `terminal-diagnostics` | Human-readable diagnostic rendering; activates `annotate-snippets`. |
+| `builtin-docs` | Documentation comments in embedded builtin sources. Without it, build-time lexing removes those comments, not user-program documentation or string contents. |
+| `server-stdlib` | The optional server/runner/CLI/exporter builtin group. |
+
+Shared in-memory project/configuration types, `Host`-backed source loading,
+type checking, JSON primary diagnostics and both debug/release profiles remain
+available without defaults. Unsupported TypeScript output requests report an
+error instead of silently producing JavaScript. Without `diagnostic-fixes`,
+JSON diagnostic events omit `fixes`.
+
+`flick-wasm` disables the core's default features and forwards only its default
+`server-stdlib` feature, preserving existing server-code Transpile support.
+Use `just wasm` or `just docs-wasm` for this smaller browser compiler.
+Build the package separately: Cargo unifies dependency features in workspace
+builds, where the native CLI enables the complete core.
+
+For a reduced builtin surface, build `flick-wasm` with `--no-default-features`.
+This removes `File`, `Runner.Node`, `Ui.Server`, `Runner.Cloudflare`,
+`Http.ServerError`, `Http.ServerRequest`, `Http.ServerResponse`, `Http.Multipart`,
+`Http.Platform`, `Http.Middleware`, `Http.Router`, `Http.Server`, `Http.StaticServer`,
+`HttpApi`, `Rpc`, `Server`, `Config`, `Otlp`, `Prometheus`, `DevTools`, `Cli.Prompt`
+and `Cli`. Whole-module removal also removes their mixed client APIs, including
+`Rpc.call`, `HttpApi.call` and nonsecret `Config` operations. `Platform`, SQL,
+Effect/UI and HTTP-client modules remain; unavailable `cli` and `server fn`
+syntax reports a diagnostic rather than reaching lowering.
+
+`just feature-check` checks isolated feature combinations with strict Clippy;
+`just feature-test` exercises the compiler's capability boundaries.
+Both are included in the existing lint/test recipes.
+
 Development also uses [`just`](https://just.systems/) and `cargo-machete`:
 
 ```sh

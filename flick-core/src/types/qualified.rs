@@ -84,21 +84,21 @@ impl Checker<'_> {
             let entity = interface
                 .and_then(|i| i.find(namespace, name))
                 .map(|e| e.entity.clone());
-            if entity.is_none()
-                && let Some(interface) = interface
-                && !self.env.is_import(qualifier)
-            {
-                let exports = interface
-                    .exports
-                    .iter()
-                    .filter(|e| e.entity.namespace == namespace);
-                let guess =
-                    qualified_guess(qualifier, name, exports.map(|e| e.entity.name.as_str()));
+            if entity.is_none() && interface.is_some() && !self.env.is_import(qualifier) {
                 self.error_guess(
                     codes::T001,
                     span,
                     format!("`{qualifier}` does not export `{name}`"),
-                    guess.as_deref(),
+                    |this| {
+                        let (_, Some(interface)) = this.env.qualified_module(qualifier)? else {
+                            return None;
+                        };
+                        let exports = interface
+                            .exports
+                            .iter()
+                            .filter(|e| e.entity.namespace == namespace);
+                        qualified_guess(qualifier, name, exports.map(|e| e.entity.name.as_str()))
+                    },
                 );
                 return Type::Error;
             }
@@ -151,16 +151,17 @@ impl Checker<'_> {
                     );
                     ty
                 } else {
-                    let guess = qualified_guess(
-                        qualifier,
-                        name,
-                        operations.iter().map(|o| o.name.as_str()),
-                    );
                     self.error_guess(
                         codes::T001,
                         span,
                         format!("service `{qualifier}` has no operation `{name}`"),
-                        guess.as_deref(),
+                        |_| {
+                            qualified_guess(
+                                qualifier,
+                                name,
+                                operations.iter().map(|o| o.name.as_str()),
+                            )
+                        },
                     );
                     Type::Error
                 }
@@ -174,13 +175,14 @@ impl Checker<'_> {
                 Type::Error
             }
             None => {
-                let guess =
-                    closest(qualifier, self.env.qualifier_names()).map(|g| format!("{g}.{name}"));
                 self.error_guess(
                     codes::T001,
                     span,
                     format!("unknown module `{qualifier}`"),
-                    guess.as_deref(),
+                    |this| {
+                        closest(qualifier, this.env.qualifier_names())
+                            .map(|g| format!("{g}.{name}"))
+                    },
                 );
                 Type::Error
             }

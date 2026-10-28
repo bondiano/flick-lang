@@ -11,7 +11,7 @@ use crate::syntax::kind::SyntaxKind as K;
 
 /// `var <- source`: one step of a chain.
 struct Step<'n> {
-    var: String,
+    var: &'n Node,
     source: &'n Node,
 }
 
@@ -27,18 +27,13 @@ impl Checker<'_> {
             steps.push(step);
             body = rest;
         }
-        let mut text = String::from("do { ");
-        for step in &steps {
-            let source = self.source_of(unparen(step.source)).trim();
-            let _ = write!(text, "{} <- {source}; ", step.var);
-        }
-        text += self.source_of(body).trim();
-        text += " }";
-        if steps.len() < 2 || text.contains('\n') {
+        if steps.len() < 2
+            || steps
+                .iter()
+                .any(|step| self.source_of(unparen(step.source)).trim().contains('\n'))
+            || self.source_of(body).trim().contains('\n')
+        {
             return None;
-        }
-        if !bare {
-            text = format!("({text})");
         }
         let (start, end) = node.range();
         let warning = Diagnostic::new(
@@ -47,8 +42,20 @@ impl Checker<'_> {
             "a chain of `flat_map`: `do` binds each value in turn",
         )
         .with_span(self.span(node));
-        self.diagnostics
-            .push(warning.with_safe_fix("write it as `do`", vec![self.edit(start, end, &text)]));
+        self.diagnostics.push(warning.with_safe_fix(|| {
+            let mut text = String::from("do { ");
+            for step in &steps {
+                let source = self.source_of(unparen(step.source)).trim();
+                let var = self.source_of(step.var).trim();
+                let _ = write!(text, "{var} <- {source}; ");
+            }
+            text += self.source_of(body).trim();
+            text += " }";
+            if !bare {
+                text = format!("({text})");
+            }
+            ("write it as `do`", vec![self.edit(start, end, &text)])
+        }));
         let mut rest: Vec<&Node> = steps.iter().map(|s| s.source).collect();
         rest.push(body);
         Some(rest)
@@ -75,8 +82,7 @@ impl Checker<'_> {
         let parts: Vec<&Node> = f.nodes().collect();
         match (f.kind, &parts[..]) {
             (K::FunExpr, [param, body]) if param.kind == K::VarPat => {
-                let var = self.source_of(param).trim().to_owned();
-                Some((Step { var, source }, single(body)))
+                Some((Step { var: param, source }, single(body)))
             }
             _ => None,
         }
@@ -111,7 +117,9 @@ impl Checker<'_> {
                             && words(self.source_of(value)) == "None")
                 }
                 "Ok" => self.arm_parts(passed).is_some_and(|(con, e, value)| {
-                    con == "Err" && words(self.source_of(value)) == format!("Err {e}")
+                    con == "Err"
+                        && words(self.source_of(value))
+                            == format!("Err {}", self.source_of(e).trim())
                 }),
                 _ => false,
             };
@@ -128,6 +136,9 @@ impl Checker<'_> {
     /// with `let` unless it is a whole statement. Not offered when the call
     /// uses a variable the block binds.
     pub(super) fn bind_before(&mut self, node: &Node) {
+        if !cfg!(feature = "diagnostic-fixes") {
+            return;
+        }
         let (start, end) = node.range();
         let line = self.text[..start as usize].rfind('\n').map_or(0, |i| i + 1);
         let indent = self.text[line..start as usize].to_owned();
@@ -173,7 +184,8 @@ impl Checker<'_> {
                 ]
             };
             let d = self.diagnostics[i].clone();
-            self.diagnostics[i] = d.with_fix("bind the call with `let` before the `do`", edits);
+            self.diagnostics[i] =
+                d.with_fix(|| ("bind the call with `let` before the `do`", edits));
         }
     }
 

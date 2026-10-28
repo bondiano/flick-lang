@@ -265,11 +265,7 @@ impl<'n> Checker<'_> {
                     codes::C013,
                     format!("cannot derive `{name}`: a field of type `{shown}` has no `{class}` instance"),
                     d.span,
-                )
-                .with_fix(
-                    format!("write `instance {name}` by hand, or wrap the field in a nominal type with its own `{class}`"),
-                    Vec::new(),
-                ),
+                ).with_fix(|| (format!("write `instance {name}` by hand, or wrap the field in a nominal type with its own `{class}`"), Vec::new())),
             );
             return dicts;
         }

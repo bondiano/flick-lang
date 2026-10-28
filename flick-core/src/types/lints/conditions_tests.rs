@@ -1,4 +1,7 @@
-use crate::types::lint_tests::{HEAD, assert_fix, fixed};
+use crate::diagnostics::codes;
+#[cfg(feature = "diagnostic-fixes")]
+use crate::types::lint_tests::fixed;
+use crate::types::lint_tests::{HEAD, assert_fix, check};
 
 const CMP: &str = "f : Float -> Float -> Bool\n";
 const FLAG: &str = "f : Bool -> String\n";
@@ -25,7 +28,9 @@ fn an_if_not_swaps_its_branches() {
         &format!("{FLAG}let f done = if done then \"done\" else \"pending\"\n"),
     );
     // `else ()` is left to T028
+    #[cfg(feature = "diagnostic-fixes")]
     let unit = format!("{HEAD}f : Bool -> Unit\nlet f c = if not c then () else ()\n");
+    #[cfg(feature = "diagnostic-fixes")]
     assert_eq!(fixed(&unit, "FLICK-T041"), None);
 }
 
@@ -45,13 +50,17 @@ fn a_literal_moves_to_the_right_of_a_comparison() {
         "FLICK-T043",
         "f : Float -> Bool\nlet f n = n <= 10\n",
     );
+    #[cfg(feature = "diagnostic-fixes")]
     let both = format!("{HEAD}f : Bool\nlet f = 1 == 2\n");
+    #[cfg(feature = "diagnostic-fixes")]
     assert_eq!(fixed(&both, "FLICK-T043"), None);
 }
 
 #[test]
 fn a_known_condition_keeps_its_branch_only_on_request() {
     let text = format!("{HEAD}f : Float\nlet f = if 1 > 2 then 1 else 2\n");
+    assert!(check(&text).iter().any(|d| d.code == codes::T045));
+    #[cfg(feature = "diagnostic-fixes")]
     assert_eq!(
         fixed(&text, "FLICK-T045").as_deref(),
         Some(format!("{HEAD}f : Float\nlet f = 2\n").as_str())

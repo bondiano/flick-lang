@@ -3,7 +3,8 @@
 
 use std::fmt::Write;
 
-use super::{Projection, Vars, generic, key, reexports};
+use super::{Projection, Vars, generic, key};
+use crate::codegen::exports::reexports;
 use crate::codegen::names;
 use crate::iface::{Decl, Export, Interface, Namespace};
 use crate::types::{Form, Kind, Type};

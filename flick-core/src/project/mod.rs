@@ -2,28 +2,37 @@
 //! source and test roots, the module ↔ path mapping and installed packages.
 //! File access goes through [`Host`], so the core stays free of I/O.
 
+#[cfg(feature = "native-project")]
 pub mod cache;
 pub mod config;
 mod load;
+#[cfg(feature = "native-project")]
 mod packages;
+#[cfg(feature = "native-project")]
 pub mod pnpm;
 
 use std::path::{Component, Path, PathBuf};
 
 pub use config::Config;
+#[cfg(feature = "ide")]
+pub use load::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_with};
 pub use load::{
-    Analysis, Analyzed, Compilation, Compiled, MainKind, ModuleCache, PackageModule,
-    analysis_fingerprint, analyze, analyze_with, check, compile, main_kind,
+    Compilation, Compiled, MainKind, ModuleCache, PackageModule, check, compile, main_kind,
 };
+#[cfg(feature = "native-project")]
 pub use packages::project_name;
 use std::io;
 
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "native-project")]
 use crate::diagnostics::{Diagnostic, Severity, codes};
-use crate::source::{FileId, SourceMap};
+use crate::source::FileId;
+#[cfg(feature = "native-project")]
+use crate::source::SourceMap;
 
+#[cfg(feature = "native-project")]
 pub const CONFIG_FILE: &str = "flick.toml";
 
 /// File access for the project model; paths are absolute.
@@ -51,6 +60,7 @@ impl Project {
     }
 }
 
+#[cfg(feature = "native-project")]
 /// Finds and parses the project: `explicit` is a directory or a config file
 /// (`--project`); otherwise the nearest `flick.toml` from `cwd` upwards.
 /// `Ok(None)`: no project and none was asked for.
@@ -94,11 +104,14 @@ pub fn discover(
     }
 }
 
+#[cfg(feature = "native-project")]
 pub fn no_project(message: String) -> Diagnostic {
-    Diagnostic::new(codes::P008, Severity::Error, message).with_fix(
-        "run inside a project, select one with `--project <path>`, or pass files",
-        Vec::new(),
-    )
+    Diagnostic::new(codes::P008, Severity::Error, message).with_fix(|| {
+        (
+            "run inside a project, select one with `--project <path>`, or pass files",
+            Vec::new(),
+        )
+    })
 }
 
 /// Resolves `.` and `..` without touching the file system.

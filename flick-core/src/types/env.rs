@@ -343,6 +343,7 @@ impl<'b> Env<'b> {
             .insert((self.module.clone(), name.to_owned()), def);
     }
 
+    #[cfg(feature = "ide")]
     /// The transparent type aliases the module declares, exported or not.
     pub fn local_aliases(&self) -> impl Iterator<Item = (&str, &[String], &Type)> {
         self.types

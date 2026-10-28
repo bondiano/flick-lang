@@ -44,13 +44,17 @@ impl Checker<'_> {
         let end = node.nodes().next().map_or(start, |s| s.range().1);
         let span = Span::new(self.file, start, end);
         let message = format!("`match` does not cover every value: `{first}` is not matched");
-        let title = match &missing[..] {
-            [one] => format!("add an arm `| {one} -> todo`"),
-            _ => "add the missing arms".to_owned(),
-        };
-        let edits = self.missing_arms(node, &missing).into_iter().collect();
         self.diagnostics.push(
-            diagnostics::Diagnostic::error(codes::T009, message, span).with_fix(title, edits),
+            diagnostics::Diagnostic::error(codes::T009, message, span).with_fix(|| {
+                let title = match &missing[..] {
+                    [one] => format!("add an arm `| {one} -> todo`"),
+                    _ => "add the missing arms".to_owned(),
+                };
+                (
+                    title,
+                    self.missing_arms(node, &missing).into_iter().collect(),
+                )
+            }),
         );
     }
 
@@ -63,6 +67,9 @@ impl Checker<'_> {
                 return (missing, false);
             }
             missing.push(self.show_pat(&witness[0], false));
+            if !cfg!(feature = "diagnostic-fixes") {
+                return (missing, false);
+            }
             rows.push(witness);
         }
         (missing, true)

@@ -4,6 +4,7 @@
 //! stdlib test uses, reviewed against the pinned release.
 
 use std::collections::{BTreeMap, BTreeSet};
+#[cfg(feature = "ide")]
 use std::fmt::Write;
 
 use serde::Deserialize;
@@ -302,6 +303,7 @@ fn check(
     out
 }
 
+#[cfg(feature = "ide")]
 /// A Markdown table of the decisions by entrypoint and module.
 pub fn coverage(snapshot: &Snapshot, manifest: &Manifest) -> String {
     let mut out = String::from(
@@ -337,6 +339,7 @@ pub fn coverage(snapshot: &Snapshot, manifest: &Manifest) -> String {
     out
 }
 
+#[cfg(feature = "ide")]
 fn cells(counts: [usize; 5]) -> String {
     counts.map(|n| n.to_string()).join(" | ")
 }

@@ -1,4 +1,6 @@
-use crate::types::lint_tests::{HEAD, assert_fix, fixed};
+use crate::types::lint_tests::assert_fix;
+#[cfg(feature = "diagnostic-fixes")]
+use crate::types::lint_tests::{HEAD, fixed};
 
 const NUMS: &str = "f : List Float -> Option Float\n";
 const ANY: &str = "f : List Float -> Bool\n";
@@ -43,7 +45,9 @@ fn a_length_against_zero_is_is_empty() {
         "FLICK-T049",
         &format!("{ANY}let f xs = not (List.is_empty xs)\n"),
     );
+    #[cfg(feature = "diagnostic-fixes")]
     let two = format!("{HEAD}{ANY}let f xs = List.length xs == 2\n");
+    #[cfg(feature = "diagnostic-fixes")]
     assert_eq!(fixed(&two, "FLICK-T049"), None);
 }
 
@@ -63,8 +67,10 @@ fn an_option_match_with_a_default_is_with_default() {
         "FLICK-T051",
         "f : Option Float -> Float\nlet f o = Option.with_default 0 o\n",
     );
+    #[cfg(feature = "diagnostic-fixes")]
     let used = format!(
         "{HEAD}f : Option Float -> Float\nlet f o = match o with\n  | Some x -> x + 1\n  | None -> 0\n"
     );
+    #[cfg(feature = "diagnostic-fixes")]
     assert_eq!(fixed(&used, "FLICK-T051"), None);
 }

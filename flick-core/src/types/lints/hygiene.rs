@@ -83,11 +83,13 @@ impl Checker<'_> {
             codes::T052,
             format!("a `fun` that only passes `{x}` on: `{function}` is the same function"),
             self.span(node),
-            (
-                "write the function itself",
-                vec![self.replace(node, &function)],
-                safe,
-            ),
+            |this| {
+                (
+                    "write the function itself",
+                    vec![this.replace(node, &function)],
+                    safe,
+                )
+            },
         );
     }
 
@@ -109,13 +111,15 @@ impl Checker<'_> {
         if !plain(lhs) || !plain(rhs) || !self.one_line(node) {
             return;
         }
-        let (left, right) = (self.source_of(lhs).trim(), self.source_of(rhs).trim());
-        let joined = format!("{}{}", &left[..left.len() - 1], &right[1..]);
         self.lint(
             codes::T053,
             "two string literals joined with `++`: one literal says it".to_owned(),
             self.span(node),
-            ("write one literal", vec![self.replace(node, &joined)], true),
+            |this| {
+                let (left, right) = (this.source_of(lhs).trim(), this.source_of(rhs).trim());
+                let joined = format!("{}{}", &left[..left.len() - 1], &right[1..]);
+                ("write one literal", vec![this.replace(node, &joined)], true)
+            },
         );
     }
 }

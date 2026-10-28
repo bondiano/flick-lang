@@ -326,7 +326,7 @@ impl Checker<'_> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "diagnostic-fixes"))]
 mod tests {
     use crate::source::SourceMap;
 

@@ -194,11 +194,7 @@ impl Checker<'_> {
                         both.join(", ")
                     ),
                     span,
-                )
-                .with_fix(
-                    "use `Layer.override` to let the second layer replace the first",
-                    Vec::new(),
-                ),
+                ).with_fix(|| ("use `Layer.override` to let the second layer replace the first", Vec::new())),
             );
         }
     }

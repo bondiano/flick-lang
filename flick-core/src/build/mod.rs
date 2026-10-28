@@ -2,18 +2,26 @@
 //! with source maps and `.iface` files, the built-in modules they use, and
 //! for an app the runner that starts `main`.
 
+#[cfg(any(feature = "build-artifacts", feature = "typescript"))]
 mod abi;
 pub mod effects;
 
+#[cfg(any(feature = "build-artifacts", feature = "typescript"))]
 pub use abi::interface;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+#[cfg(any(feature = "build-artifacts", feature = "typescript"))]
+use std::collections::BTreeMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 
+#[cfg(feature = "source-maps")]
+use crate::codegen::sourcemap;
+#[cfg(feature = "typescript")]
 use crate::codegen::ts::{Facade, Projection, declaration_file, facade_files};
-use crate::codegen::{self, Labels, Options, sourcemap};
+use crate::codegen::{self, Labels, Options};
 use crate::diagnostics::{Diagnostic, Severity, codes};
+#[cfg(feature = "build-artifacts")]
 use crate::iface;
 use crate::iface::{Interface, Namespace};
 use crate::project::config::{Backend, MAIN_ENTRY};
@@ -98,6 +106,20 @@ pub struct Settings<'a> {
     pub core_only: bool,
 }
 
+impl Settings<'_> {
+    fn unsupported_output(&self) -> Option<Diagnostic> {
+        (!cfg!(feature = "typescript")
+            && (self.typescript || self.extras.dts || self.extras.promise_facade))
+            .then(|| {
+                Diagnostic::new(
+                    codes::F004,
+                    Severity::Error,
+                    "TypeScript output requires the `typescript` Cargo feature",
+                )
+            })
+    }
+}
+
 /// The opt-in outputs of a build.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Extras {
@@ -118,6 +140,11 @@ pub fn emit(
     sources: &SourceMap,
     settings: &Settings,
 ) -> (Vec<Artifact>, Vec<Diagnostic>) {
+    if let Some(diagnostic) = settings.unsupported_output() {
+        return (Vec::new(), vec![diagnostic]);
+    }
+    #[cfg(not(feature = "source-maps"))]
+    let _ = sources;
     let mut diagnostics = Vec::new();
     if !settings.core_only {
         effects::check_packages(
@@ -154,33 +181,19 @@ pub fn emit(
             .then(|| settings.package.map(str::to_owned))
             .flatten(),
     };
+    #[cfg(any(feature = "build-artifacts", feature = "typescript"))]
     let published_interfaces = published_interfaces(compilation, settings);
     let interface_of = |m: &str| {
-        published_interfaces
-            .get(m)
-            .cloned()
-            .or_else(|| provider(m).map(|module| module.interface.clone()))
+        #[cfg(any(feature = "build-artifacts", feature = "typescript"))]
+        let own = published_interfaces.get(m).cloned();
+        #[cfg(not(any(feature = "build-artifacts", feature = "typescript")))]
+        let own = modules
+            .iter()
+            .find(|module| module.name == m)
+            .map(|module| module.interface.clone());
+        own.or_else(|| provider(m).map(|module| module.interface.clone()))
     };
-    let foreign = |module: &str, spec: &str| {
-        // `[build] ui` stands for the renderer and the mount of `Ui` and `Action`
-        let (spec, dir) = match settings.ui {
-            Some(ui) if UI_RENDERER.contains(&spec) => (ui, settings.root.map(Path::to_path_buf)),
-            _ => (spec, (settings.source_dir)(module)),
-        };
-        let relative = spec.starts_with("./") || spec.starts_with("../");
-        if settings.backend == Backend::None && !relative {
-            // a module without a version on `core` is reported by `effects::check`
-            return effects::specifier(spec).unwrap_or_else(|| spec.to_owned());
-        }
-        match (relative, dir) {
-            (true, Some(dir)) => {
-                let target = normalize(&dir.join(spec));
-                let from = settings.out_dir.join(path(module));
-                specifier(from.parent().unwrap_or(settings.out_dir), &target)
-            }
-            _ => spec.to_owned(),
-        }
-    };
+    let foreign = |module: &str, spec: &str| foreign_specifier(settings, &path, module, spec);
     let any_interface = |m: &str| {
         interface_of(m).or_else(|| types::builtins().iter().find(|i| i.module == m).cloned())
     };
@@ -200,19 +213,23 @@ pub fn emit(
         direct: &direct,
         labels: settings.extras.labels,
     };
-    let mut out = if settings.core_only {
-        Vec::new()
-    } else {
-        vec![package_json(settings)]
-    };
+    let mut out = Vec::new();
+    #[cfg(feature = "build-artifacts")]
+    if !settings.core_only {
+        out.push(package_json(settings));
+    }
     let ctx = Context {
         modules: &compilation.modules,
         settings,
+        #[cfg(feature = "source-maps")]
         sources,
         options: &options,
         path: &path,
+        #[cfg(feature = "typescript")]
         package: &package,
+        #[cfg(any(feature = "build-artifacts", feature = "typescript"))]
         published_interfaces: &published_interfaces,
+        #[cfg(feature = "typescript")]
         any_interface: &any_interface,
     };
     // a built-in runner is written like any module the program imports
@@ -223,6 +240,32 @@ pub fn emit(
     (out, diagnostics)
 }
 
+fn foreign_specifier(
+    settings: &Settings,
+    path: &dyn Fn(&str) -> String,
+    module: &str,
+    spec: &str,
+) -> String {
+    // `[build] ui` stands for the renderer and the mount of `Ui` and `Action`.
+    let (spec, dir) = match settings.ui {
+        Some(ui) if UI_RENDERER.contains(&spec) => (ui, settings.root.map(Path::to_path_buf)),
+        _ => (spec, (settings.source_dir)(module)),
+    };
+    let relative = spec.starts_with("./") || spec.starts_with("../");
+    if settings.backend == Backend::None && !relative {
+        return effects::specifier(spec).unwrap_or_else(|| spec.to_owned());
+    }
+    match (relative, dir) {
+        (true, Some(dir)) => {
+            let target = normalize(&dir.join(spec));
+            let from = settings.out_dir.join(path(module));
+            specifier(from.parent().unwrap_or(settings.out_dir), &target)
+        }
+        _ => spec.to_owned(),
+    }
+}
+
+#[cfg(any(feature = "build-artifacts", feature = "typescript"))]
 fn published_interfaces<'a>(
     compilation: &'a Compilation,
     settings: &Settings,
@@ -241,7 +284,7 @@ fn published_interfaces<'a>(
                     .map(|module| module.interface.clone())
             })
     };
-    let mut published_interfaces: BTreeMap<&str, Interface> = modules
+    let published_interfaces: BTreeMap<&str, Interface> = modules
         .iter()
         .map(|module| {
             let mut published = interface(
@@ -268,26 +311,31 @@ fn published_interfaces<'a>(
             (module.name.as_str(), published)
         })
         .collect();
-    // Hash only finalized ABI, including backend availability, exactly as published.
-    let fingerprints: BTreeMap<&str, String> = published_interfaces
-        .iter()
-        .map(|(name, interface)| (*name, iface::fingerprint(interface)))
-        .chain(compilation.package_modules.iter().map(|module| {
-            (
-                module.module.as_str(),
-                iface::fingerprint(&module.interface),
-            )
-        }))
-        .collect();
-    for module in modules {
-        let published = published_interfaces
-            .get_mut(module.name.as_str())
-            .expect("every compiled module has a published interface");
-        published.dependencies = module
-            .imports
+    #[cfg(feature = "build-artifacts")]
+    let mut published_interfaces = published_interfaces;
+    #[cfg(feature = "build-artifacts")]
+    {
+        // Hash only finalized ABI, including backend availability, exactly as published.
+        let fingerprints: BTreeMap<&str, String> = published_interfaces
             .iter()
-            .filter_map(|name| Some((name.clone(), fingerprints.get(name.as_str())?.clone())))
+            .map(|(name, interface)| (*name, iface::fingerprint(interface)))
+            .chain(compilation.package_modules.iter().map(|module| {
+                (
+                    module.module.as_str(),
+                    iface::fingerprint(&module.interface),
+                )
+            }))
             .collect();
+        for module in modules {
+            let published = published_interfaces
+                .get_mut(module.name.as_str())
+                .expect("every compiled module has a published interface");
+            published.dependencies = module
+                .imports
+                .iter()
+                .filter_map(|name| Some((name.clone(), fingerprints.get(name.as_str())?.clone())))
+                .collect();
+        }
     }
     published_interfaces
 }
@@ -432,6 +480,7 @@ pub fn core_built(
         .collect()
 }
 
+#[cfg(feature = "build-artifacts")]
 /// `package.json` of the output. Top-level initialization is pure
 /// (spec 11): only the runner of an app runs anything when loaded.
 fn package_json(settings: &Settings) -> Artifact {
@@ -499,12 +548,16 @@ fn builtins(
     out: &mut Vec<Artifact>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    #[cfg(feature = "typescript")]
     let dts = ctx.settings.extras.dts;
-    let mut pending: Vec<String> = if dts {
-        builtin_modules().iter().map(|m| m.name.clone()).collect()
-    } else {
-        imports
-    };
+    let mut pending = imports;
+    #[cfg(feature = "typescript")]
+    if dts {
+        pending = builtin_modules()
+            .iter()
+            .map(|module| module.name.clone())
+            .collect();
+    }
     let mut written = HashSet::new();
     while let Some(name) = pending.pop() {
         let Some(module) = builtin_modules().iter().find(|m| m.name == name) else {
@@ -522,6 +575,7 @@ fn builtins(
             path: (ctx.path)(&module.name),
             contents: output.code,
         });
+        #[cfg(feature = "typescript")]
         if dts
             && let Some((text, _)) =
                 declarations(&module.name, ctx.any_interface, ctx.package, ctx.path)
@@ -549,11 +603,15 @@ fn generic_of(modules: &[Compiled], module: &str, name: &str) -> Option<(Vec<Str
 struct Context<'a> {
     modules: &'a [Compiled],
     settings: &'a Settings<'a>,
+    #[cfg(feature = "source-maps")]
     sources: &'a SourceMap,
     options: &'a Options<'a>,
     path: &'a dyn Fn(&str) -> String,
+    #[cfg(feature = "typescript")]
     package: &'a dyn Fn(&str) -> Option<String>,
+    #[cfg(any(feature = "build-artifacts", feature = "typescript"))]
     published_interfaces: &'a BTreeMap<&'a str, Interface>,
+    #[cfg(feature = "typescript")]
     any_interface: &'a dyn Fn(&str) -> Option<Interface>,
 }
 
@@ -578,34 +636,50 @@ fn compiled_module(
     }
     let output = codegen::js(optimized.as_ref().unwrap_or(&module.ir), ctx.options);
     let file = (ctx.path)(&module.name);
-    let base = file.rsplit('/').next().unwrap_or(&file).to_owned();
-    // an absolute source becomes relative to the map, so no build path ships
-    let map_dir = normalize(&ctx.settings.out_dir.join(&file));
-    let map_dir = map_dir.parent().unwrap_or(ctx.settings.out_dir);
-    let source_path = |f: FileId| {
-        let source = (ctx.settings.source_path)(f);
-        if Path::new(&source).is_absolute() {
-            specifier(map_dir, &normalize(Path::new(&source)))
-        } else {
-            source
-        }
-    };
-    let map = sourcemap::source_map(&base, &output, ctx.sources, &source_path);
-    out.push(Artifact {
-        path: file.clone(),
-        contents: format!("{}//# sourceMappingURL={base}.map\n", output.code),
-    });
-    out.push(Artifact {
-        path: format!("{file}.map"),
-        contents: map,
-    });
+    #[cfg(feature = "source-maps")]
+    {
+        let base = file.rsplit('/').next().unwrap_or(&file);
+        // an absolute source becomes relative to the map, so no build path ships
+        let map_dir = normalize(&ctx.settings.out_dir.join(&file));
+        let map_dir = map_dir.parent().unwrap_or(ctx.settings.out_dir);
+        let source_path = |file: FileId| {
+            let source = (ctx.settings.source_path)(file);
+            if Path::new(&source).is_absolute() {
+                specifier(map_dir, &normalize(Path::new(&source)))
+            } else {
+                source
+            }
+        };
+        let map = sourcemap::source_map(base, &output, ctx.sources, &source_path);
+        out.push(Artifact {
+            path: file.clone(),
+            contents: format!("{}//# sourceMappingURL={base}.map\n", output.code),
+        });
+        out.push(Artifact {
+            path: format!("{file}.map"),
+            contents: map,
+        });
+    }
+    #[cfg(not(feature = "source-maps"))]
+    {
+        #[cfg(feature = "typescript")]
+        let path = file.clone();
+        #[cfg(not(feature = "typescript"))]
+        let path = file;
+        out.push(Artifact {
+            path,
+            contents: output.code,
+        });
+    }
     if ctx.settings.core_only {
         return output.imports;
     }
+    #[cfg(any(feature = "build-artifacts", feature = "typescript"))]
     let built = ctx
         .published_interfaces
         .get(module.name.as_str())
         .expect("every compiled module has a published interface");
+    #[cfg(feature = "typescript")]
     if ctx.settings.extras.dts
         && let Some((text, refused)) =
             declarations(&module.name, ctx.any_interface, ctx.package, ctx.path)
@@ -622,6 +696,7 @@ fn compiled_module(
             ));
         }
     }
+    #[cfg(feature = "typescript")]
     if ctx.settings.extras.promise_facade {
         out.extend(facade(
             module,
@@ -631,6 +706,7 @@ fn compiled_module(
             ctx.path,
         ));
     }
+    #[cfg(feature = "build-artifacts")]
     out.push(Artifact {
         path: format!("{}.iface", module.name.replace('.', "/")),
         contents: iface::write(built),
@@ -683,6 +759,7 @@ enum Start {
 /// The module of compiled decoders an app's runner installs.
 pub const SCHEMA_AOT: &str = "schemas.aot.js";
 
+#[cfg(feature = "typescript")]
 /// The `.d.ts` of module `name`, and the exports it refused with why.
 fn declarations(
     name: &str,
@@ -697,12 +774,14 @@ fn declarations(
     Some(declaration_file(&projection, &interface, &import))
 }
 
+#[cfg(feature = "typescript")]
 /// `A/B.d.ts` beside `A/B.js` (or `A/B.ts`).
 fn dts_path(file: &str) -> String {
     let stem = file.rsplit_once('.').map_or(file, |(s, _)| s);
     format!("{stem}.d.ts")
 }
 
+#[cfg(feature = "typescript")]
 /// The Promise façade of `module`: each exported runtime function that
 /// needs no service and whose earlier stages only make closures.
 fn facade(
@@ -825,7 +904,7 @@ pub fn builtin_modules() -> &'static [ir::Module] {
     })
 }
 
-#[cfg(test)]
+#[cfg(all(test, any(feature = "build-artifacts", feature = "typescript")))]
 mod tests {
     use crate::iface::{self, Interface};
     use crate::ir::tests::check_text;

@@ -3,6 +3,8 @@
 //! projection is made from have one fingerprint, which the projection
 //! states in its first line.
 
+#![cfg(feature = "ide")]
+
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};

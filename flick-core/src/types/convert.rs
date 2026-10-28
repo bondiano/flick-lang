@@ -451,12 +451,11 @@ impl Checker<'_> {
                 Found::Entity(e) => e.module,
                 Found::Unknown => return None,
                 Found::Missing => {
-                    let guess = closest(name, self.env.names(Namespace::Type)).map(str::to_owned);
                     self.error_guess(
                         codes::T001,
                         self.name_span(node),
                         format!("unknown type `{name}`"),
-                        guess.as_deref(),
+                        |this| closest(name, this.env.names(Namespace::Type)).map(str::to_owned),
                     );
                     return None;
                 }
@@ -469,29 +468,34 @@ impl Checker<'_> {
             return Some((module, def));
         } else {
             let Some((_, interface)) = self.env.qualified_module(qualifier) else {
-                let guess =
-                    closest(qualifier, self.env.qualifier_names()).map(|g| format!("{g}.{name}"));
                 self.error_guess(
                     codes::T001,
                     self.name_span(node),
                     format!("unknown module `{qualifier}`"),
-                    guess.as_deref(),
+                    |this| {
+                        closest(qualifier, this.env.qualifier_names())
+                            .map(|g| format!("{g}.{name}"))
+                    },
                 );
                 return None;
             };
             let interface = interface?;
             let Some(export) = interface.find(Namespace::Type, name) else {
-                let types = interface
-                    .exports
-                    .iter()
-                    .filter(|e| e.entity.namespace == Namespace::Type);
-                let guess = closest(name, types.map(|e| e.entity.name.as_str()))
-                    .map(|g| format!("{qualifier}.{g}"));
                 self.error_guess(
                     codes::T001,
                     self.name_span(node),
                     format!("`{qualifier}` does not export type `{name}`"),
-                    guess.as_deref(),
+                    |this| {
+                        let (_, Some(interface)) = this.env.qualified_module(qualifier)? else {
+                            return None;
+                        };
+                        let types = interface
+                            .exports
+                            .iter()
+                            .filter(|e| e.entity.namespace == Namespace::Type);
+                        closest(name, types.map(|e| e.entity.name.as_str()))
+                            .map(|g| format!("{qualifier}.{g}"))
+                    },
                 );
                 return None;
             };

@@ -70,19 +70,21 @@ pub(super) fn dead_values(
         .filter_map(|(i, def)| Some((decls[i], (*def)?)))
         .filter(|(_, def)| !def.name.starts_with('_'))
         .map(|(decl, def)| {
-            let signature = defs
-                .iter()
-                .find(|d| d.signature && d.namespace == Namespace::Value && d.name == def.name);
             Diagnostic::new(
                 codes::R014,
                 Severity::Warning,
                 format!("`{}` is never used", def.name),
             )
             .with_span(def.span)
-            .with_fix(
-                format!("remove `{}`", def.name),
-                vec![removal(module, decl, signature)],
-            )
+            .with_fix(|| {
+                let signature = defs
+                    .iter()
+                    .find(|d| d.signature && d.namespace == Namespace::Value && d.name == def.name);
+                (
+                    format!("remove `{}`", def.name),
+                    vec![removal(module, decl, signature)],
+                )
+            })
         })
         .collect()
 }

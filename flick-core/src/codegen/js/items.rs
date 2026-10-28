@@ -24,9 +24,11 @@ impl Gen<'_> {
                 out.push_str(&self.group(g, items));
                 out.push_str("\n\n");
             }
+            #[cfg(feature = "source-maps")]
             let mark = self.mark(item.span);
             let code = self.item(item);
             if !code.is_empty() {
+                #[cfg(feature = "source-maps")]
                 out.push_str(&mark);
                 out.push_str(&code);
                 out.push_str("\n\n");
@@ -79,6 +81,7 @@ impl Gen<'_> {
                 let value = self.labelled(name, value);
                 let id = names::ident(name);
                 let code = self.export(&id, &value);
+                #[cfg(feature = "source-maps")]
                 let code = self.named(code, &id, name, item.span);
                 match (self.options.workers)(self.module, name) {
                     Some(n) => format!("{code}\n{}", self.applying_worker(&id, n)),

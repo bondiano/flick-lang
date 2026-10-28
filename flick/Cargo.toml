@@ -14,7 +14,7 @@ workspace = true
 [dependencies]
 anstyle = "1"
 clap = { version = "4", features = ["derive", "string"] }
-flick-core = { path = "../flick-core" }
+flick-core = { path = "../flick-core", features = ["ide"] }
 serde_json = "1"
 signal-hook = "0.3"
 tracing = { version = "0.1", default-features = false, features = ["std"] }

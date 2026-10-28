@@ -246,10 +246,12 @@ impl Checker<'_> {
                 format!("{subject}, so it cannot leave the function whose atoms it reads"),
                 hold.span,
             )
-            .with_fix(
-                "build a list with `[for …]`, or iterate the sequence in that function",
-                Vec::new(),
-            ),
+            .with_fix(|| {
+                (
+                    "build a list with `[for …]`, or iterate the sequence in that function",
+                    Vec::new(),
+                )
+            }),
             None => Diagnostic::error(
                 codes::G002,
                 format!("{subject}, so it cannot leave the `scope` that owns the region"),
@@ -271,23 +273,19 @@ impl Checker<'_> {
                     codes::G001,
                     format!("{subject}, but {what} {allowed}"),
                     hold.span,
-                )
-                .with_fix(
-                    if reader {
-                        "build a list with `[for …]`, or iterate the sequence in the function that builds it".to_owned()
-                    } else if !self.is_region(atom, &[]) {
-                        format!(
-                            "a qualifier names regions, not the type variable `{}`: build the value without what holds it, such as with `match` instead of a callback that uses it",
-                            self.show(atom)
-                        )
-                    } else {
-                        format!(
-                            "add the region to the qualifier: `T^{{{}}}`",
-                            self.show(atom)
-                        )
-                    },
-                    Vec::new(),
-                )
+                ).with_fix(|| (if reader {
+                    "build a list with `[for …]`, or iterate the sequence in the function that builds it".to_owned()
+                } else if !self.is_region(atom, &[]) {
+                    format!(
+                        "a qualifier names regions, not the type variable `{}`: build the value without what holds it, such as with `match` instead of a callback that uses it",
+                        self.show(atom)
+                    )
+                } else {
+                    format!(
+                        "add the region to the qualifier: `T^{{{}}}`",
+                        self.show(atom)
+                    )
+                }, Vec::new()))
             }
         };
         let diagnostic = match scope {

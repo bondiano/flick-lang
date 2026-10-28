@@ -202,6 +202,7 @@ pub struct ExportPolicy {
 }
 
 impl Policy {
+    #[cfg(feature = "native-project")]
     pub fn parse(text: &str) -> Result<Policy, String> {
         let policy: Policy = toml::from_str(text).map_err(|e| e.message().to_owned())?;
         for (name, export) in &policy.exports {

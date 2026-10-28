@@ -50,13 +50,15 @@ impl Checker<'_> {
             _ => format!("this pattern does not match `{shown}`; use `match` to handle every case"),
         };
         let mut diagnostic = diagnostics::Diagnostic::error(codes::T009, message, self.span(node));
-        if let Some((decl, rest)) = binding {
+        if cfg!(feature = "diagnostic-fixes")
+            && let Some((decl, rest)) = binding
+        {
             let value = let_parts(decl, self.text).body;
             if let Some(edits) = self.tuple_fix(node, value) {
-                diagnostic = diagnostic.with_fix("use a tuple", edits);
+                diagnostic = diagnostic.with_fix(|| ("use a tuple", edits));
             }
             if let Some(edit) = self.match_fix(pat, node, decl, value, rest) {
-                diagnostic = diagnostic.with_fix("use `match`", vec![edit]);
+                diagnostic = diagnostic.with_fix(|| ("use `match`", vec![edit]));
             }
             if let Some(kw) = decl.child_tokens().find(|t| t.kind == K::LetKw)
                 && !self.options.no_let_assert
@@ -65,7 +67,7 @@ impl Checker<'_> {
                     span: Span::new(self.file, kw.end, kw.end),
                     replacement: " assert".to_owned(),
                 };
-                diagnostic = diagnostic.with_fix("use `let assert`", vec![edit]);
+                diagnostic = diagnostic.with_fix(|| ("use `let assert`", vec![edit]));
             }
         }
         self.diagnostics.push(diagnostic);
@@ -89,19 +91,15 @@ impl Checker<'_> {
         if self.options.no_let_assert {
             let message = "`let assert` is not allowed in this project (`[lint] no-let-assert`); \
                            use `match` to handle every case";
-            let value = let_parts(decl, self.text).body;
             let mut diagnostic = diagnostics::Diagnostic::error(codes::T027, message, span);
-            if let Some(edit) = self.match_fix(pat, pattern, decl, value, rest) {
-                diagnostic = diagnostic.with_fix("use `match`", vec![edit]);
+            if cfg!(feature = "diagnostic-fixes") {
+                let value = let_parts(decl, self.text).body;
+                if let Some(edit) = self.match_fix(pat, pattern, decl, value, rest) {
+                    diagnostic = diagnostic.with_fix(|| ("use `match`", vec![edit]));
+                }
             }
             self.diagnostics.push(diagnostic);
         } else if self.covers_all(pat) {
-            // the space after `assert` goes with it
-            let end = kw.end + u32::from(self.text.as_bytes().get(kw.end as usize) == Some(&b' '));
-            let edit = diagnostics::Edit {
-                span: Span::new(self.file, kw.start, end),
-                replacement: String::new(),
-            };
             self.diagnostics.push(
                 diagnostics::Diagnostic::new(
                     codes::T025,
@@ -109,7 +107,18 @@ impl Checker<'_> {
                     "this pattern matches every value: `let assert` cannot fail, use `let`",
                 )
                 .with_span(span)
-                .with_fix("use `let`", vec![edit]),
+                .with_fix(|| {
+                    // the space after `assert` goes with it
+                    let end = kw.end
+                        + u32::from(self.text.as_bytes().get(kw.end as usize) == Some(&b' '));
+                    (
+                        "use `let`",
+                        vec![diagnostics::Edit {
+                            span: Span::new(self.file, kw.start, end),
+                            replacement: String::new(),
+                        }],
+                    )
+                }),
             );
         }
     }

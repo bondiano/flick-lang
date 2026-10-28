@@ -1,7 +1,13 @@
-use std::path::{Path, PathBuf};
+#[cfg(feature = "server-stdlib")]
+use std::path::Path;
+#[cfg(feature = "server-stdlib")]
+use std::path::PathBuf;
 use std::{env, fs};
 
-use crate::diagnostics::{Diagnostic, Severity, codes};
+use crate::diagnostics::Diagnostic;
+use crate::diagnostics::Severity;
+#[cfg(feature = "server-stdlib")]
+use crate::diagnostics::codes;
 use crate::iface::Interface;
 use crate::resolve::{self, Module};
 use crate::source::SourceMap;
@@ -57,6 +63,7 @@ pub(crate) fn check_text(
     Ok((super::lower(&module, &typing)?, interface))
 }
 
+#[cfg(feature = "server-stdlib")]
 fn fixtures(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir).expect("readable") {
         let path = entry.expect("entry").path();
@@ -68,6 +75,8 @@ fn fixtures(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
+// the whole fixture tree includes the optional server/CLI stdlib surface
+#[cfg(feature = "server-stdlib")]
 #[test]
 fn every_passing_fixture_lowers() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/check/pass");
@@ -118,6 +127,7 @@ fn dump() {
 }
 
 #[test]
+#[cfg(feature = "server-stdlib")]
 fn both_forms_of_save_button_lower_to_the_same_ir() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/check/pass/ui/save_button.fl");
     let text = fs::read_to_string(path).expect("utf-8");

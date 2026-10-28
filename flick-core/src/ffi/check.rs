@@ -131,15 +131,17 @@ pub fn check_reviewed(bindings: &[Reviewed], surface: &Surface) -> Vec<Diagnosti
                     ),
                     b.span,
                 )
-                .with_fix(
-                    format!(
-                        "review the binding against {} and write `reviewed \"{} {}\"`",
-                        surface.provenance(),
-                        surface.provenance(),
-                        export.fingerprint
-                    ),
-                    Vec::new(),
-                ),
+                .with_fix(|| {
+                    (
+                        format!(
+                            "review the binding against {} and write `reviewed \"{} {}\"`",
+                            surface.provenance(),
+                            surface.provenance(),
+                            export.fingerprint
+                        ),
+                        Vec::new(),
+                    )
+                }),
             );
         }
         for (meta, why) in required(export) {
@@ -196,11 +198,13 @@ pub fn stale(file: FileId, path: &str, surface: &Surface) -> Diagnostic {
         ),
         Span::new(file, 0, 0),
     )
-    .with_fix(
-        format!(
-            "run `flick ffi import {}` again, then `flick ffi check`",
-            surface.package
-        ),
-        Vec::new(),
-    )
+    .with_fix(|| {
+        (
+            format!(
+                "run `flick ffi import {}` again, then `flick ffi check`",
+                surface.package
+            ),
+            Vec::new(),
+        )
+    })
 }

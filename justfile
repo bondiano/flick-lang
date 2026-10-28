@@ -7,6 +7,7 @@ default:
 lint:
     cargo fmt --all --check
     cargo clippy --workspace --all-targets -- -D warnings
+    just feature-check
     cargo clippy -p flick-wasm --target wasm32-unknown-unknown -- -D warnings
     cargo machete
 
@@ -17,6 +18,17 @@ fmt:
 # Run the test suites
 test:
     cargo test --workspace
+    just feature-test
+
+# Check each capability independently, without workspace feature unification
+feature-check:
+    cargo clippy -p flick-core --all-targets --no-default-features -- -D warnings
+    for feature in build-artifacts source-maps typescript diagnostic-fixes native-project terminal-diagnostics builtin-docs server-stdlib ide terminal-diagnostics,diagnostic-fixes; do cargo clippy -p flick-core --all-targets --no-default-features --features "$feature" -- -D warnings || exit $?; done
+
+# Exercise minimal and independently enabled compiler capabilities
+feature-test:
+    cargo test -p flick-core --no-default-features --lib --test features
+    for feature in build-artifacts source-maps typescript diagnostic-fixes native-project terminal-diagnostics builtin-docs server-stdlib ide terminal-diagnostics,diagnostic-fixes; do cargo test -p flick-core --no-default-features --test features --features "$feature" || exit $?; done
 
 # Install the JS runtime, check its pinned Effect, run compiled programs on Node
 e2e: docs-wasm

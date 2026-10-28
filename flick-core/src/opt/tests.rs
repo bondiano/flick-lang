@@ -21,7 +21,7 @@ fn release_with(text: &str, workers: &dyn Fn(&str, &str) -> Option<usize>) -> St
     let (mut ir, interface) = check_text("App", text).expect("lowers");
     super::optimize(
         &mut ir,
-        &|name| interface.exports_value(name),
+        &|name: &str| interface.exports_value(name),
         &builtin_generic,
     );
     let path = |m: &str| format!("{}.js", m.replace('.', "/"));
@@ -236,7 +236,7 @@ fn known_instances_and_plain_foreigns_are_called_directly() {
     .expect("lowers");
     super::optimize(
         &mut ir,
-        &|name| interface.exports_value(name),
+        &|name: &str| interface.exports_value(name),
         &builtin_generic,
     );
     let options = Options {

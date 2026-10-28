@@ -194,6 +194,7 @@ codes! {
     E009 = Effects 9, "client entry reaches `Server`";
     E010 = Effects 10, "`server fn` that cannot cross the network";
     E011 = Effects 11, "guarded `server fn` served the wrong way";
+    E012 = Effects 12, "server function needs server stdlib";
     C001 = Classes 1, "no instance for a constraint";
     C002 = Classes 2, "ambiguous class constraint";
     C003 = Classes 3, "overlapping instances";
@@ -255,6 +256,7 @@ codes! {
     L005 = Cli 5, "command without a handler or subcommands";
     L006 = Cli 6, "positional argument next to subcommands";
     L007 = Cli 7, "other names of a positional argument";
+    L008 = Cli 8, "CLI expression needs server stdlib";
     P001 = Project 1, "cannot read source file";
     P002 = Project 2, "file is not formatted";
     P003 = Project 3, "internal formatter error";

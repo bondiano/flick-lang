@@ -141,7 +141,7 @@ impl Checker<'_> {
                     codes::R015,
                     format!("`{name}` shadows the local `{name}` bound above"),
                     at,
-                    ("give it a name of its own", Vec::new(), false),
+                    |_| ("give it a name of its own", Vec::new(), false),
                 );
             }
             scope.push(name);
@@ -184,7 +184,7 @@ impl Checker<'_> {
             codes::T054,
             format!("the local function `{name}` uses no local around it: it can be a top-level function"),
             self.span(pattern),
-            ("move it to the top level", Vec::new(), false),
+            |_| ("move it to the top level", Vec::new(), false),
         );
     }
 
@@ -250,7 +250,7 @@ impl Checker<'_> {
                 hidden.join(", ")
             ),
             at,
-            ("write an arm for each constructor", Vec::new(), false),
+            |_| ("write an arm for each constructor", Vec::new(), false),
         );
     }
 }

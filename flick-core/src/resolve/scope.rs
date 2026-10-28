@@ -103,7 +103,7 @@ impl<'a> Scope<'a> {
                         last.span,
                     )
                     .with_related(first.span, "also imported here")
-                    .with_fix("give one of the imports another name with `as`", Vec::new()),
+                    .with_fix(|| ("give one of the imports another name with `as`", Vec::new())),
                 );
             }
         }
@@ -132,10 +132,12 @@ impl<'a> Scope<'a> {
                         last_span,
                     )
                     .with_related(first_span, "also imported here")
-                    .with_fix(
-                        format!("import `{name}` from one module and qualify the other"),
-                        Vec::new(),
-                    ),
+                    .with_fix(|| {
+                        (
+                            format!("import `{name}` from one module and qualify the other"),
+                            Vec::new(),
+                        )
+                    }),
                 );
             }
         }
@@ -166,10 +168,12 @@ impl<'a> Scope<'a> {
                     def.span,
                 )
                 .with_related(*span, "imported here")
-                .with_fix(
-                    "rename the definition or drop the name from `exposing`",
-                    Vec::new(),
-                ),
+                .with_fix(|| {
+                    (
+                        "rename the definition or drop the name from `exposing`",
+                        Vec::new(),
+                    )
+                }),
             );
         }
     }
@@ -334,10 +338,12 @@ impl<'a> Scope<'a> {
                             "opaque type `{}` cannot export its constructors",
                             item.name
                         ))
-                        .with_fix(
-                            format!("export the type alone: `{}`", item.name),
-                            Vec::new(),
-                        ),
+                        .with_fix(|| {
+                            (
+                                format!("export the type alone: `{}`", item.name),
+                                Vec::new(),
+                            )
+                        }),
                     ),
                     _ => diagnostics.push(error(format!(
                         "`{}` has no constructors to export",
@@ -375,10 +381,12 @@ impl<'a> Scope<'a> {
         if let Some(reason) = self.blocked(reference) {
             diagnostics.push(
                 Diagnostic::error(codes::F005, format!("`{name}` is blocked: {reason}"), *span)
-                    .with_fix(
-                        "write a reviewed `foreign` binding for it beside the generated module",
-                        Vec::new(),
-                    ),
+                    .with_fix(|| {
+                        (
+                            "write a reviewed `foreign` binding for it beside the generated module",
+                            Vec::new(),
+                        )
+                    }),
             );
         }
         if let Some(qualifier) = qualifier {
@@ -423,13 +431,15 @@ impl<'a> Scope<'a> {
                     format!("`{name}` is ambiguous: it is exposed by {list}"),
                     *span,
                 )
-                .with_fix(
-                    format!(
-                        "qualify it, e.g. `{}.{name}`, or import it by name",
-                        modules[0]
-                    ),
-                    Vec::new(),
-                ),
+                .with_fix(|| {
+                    (
+                        format!(
+                            "qualify it, e.g. `{}.{name}`, or import it by name",
+                            modules[0]
+                        ),
+                        Vec::new(),
+                    )
+                }),
             );
         }
     }

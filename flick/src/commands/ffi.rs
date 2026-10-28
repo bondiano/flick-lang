@@ -47,10 +47,12 @@ fn read_surface(root: &Path, package: &str) -> Result<Surface, Diagnostic> {
     );
     if !helper.is_file() {
         return Err(
-            error(format!("no `.d.ts` reader at `{}`", helper.display())).with_fix(
-                "install it: `pnpm add -D @flick-lang/dts-importer`",
-                Vec::new(),
-            ),
+            error(format!("no `.d.ts` reader at `{}`", helper.display())).with_fix(|| {
+                (
+                    "install it: `pnpm add -D @flick-lang/dts-importer`",
+                    Vec::new(),
+                )
+            }),
         );
     }
     let request = serde_json::json!({ "root": root, "package": package }).to_string();
