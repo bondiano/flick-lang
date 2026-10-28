@@ -16,7 +16,7 @@ interface RunOptions extends SetOptions {
   readonly startImmediately: boolean;
 }
 
-export const flickMake = <K, A, E>() => owned(FiberMap.make<K, A, E>());
+export const flickMake = <K, A, E>() => owned(FiberMap.make<K, A, E>(), FiberMap.clear);
 
 export const flickSet =
   (options: SetOptions) =>

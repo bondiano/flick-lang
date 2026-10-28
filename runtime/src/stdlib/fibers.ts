@@ -7,11 +7,23 @@ import { CurrentOwner, FlickFiber, type Owner, within } from "../owner.ts";
 
 const owners = /*#__PURE__*/ new WeakMap<object, Owner>();
 
-/** Makes the collection and remembers the owner the call acquires into. */
-export const owned = <T extends object>(make: Effect.Effect<T, never, Scope.Scope>): Effect.Effect<T, never, Scope.Scope> =>
+/**
+ * Makes the collection and remembers the owner the call acquires into. The
+ * owner's closing interrupts its children with `clear` and waits for them
+ * before any resource is released, as it does for its own children: the
+ * collection's own finalizer would run among the resources, after those
+ * acquired later.
+ */
+export const owned = <T extends object>(
+  make: Effect.Effect<T, never, Scope.Scope>,
+  clear: (collection: T) => Effect.Effect<void>,
+): Effect.Effect<T, never, Scope.Scope> =>
   Effect.flatMap(Effect.service(CurrentOwner), (owner) =>
     Effect.map(make, (value) => {
-      if (owner !== undefined) owners.set(value, owner);
+      if (owner !== undefined) {
+        owners.set(value, owner);
+        owner.closing.add(() => clear(value));
+      }
       return value;
     }),
   );
@@ -21,7 +33,9 @@ export const inOwner = <A, E, R>(collection: object, task: Effect.Effect<A, E, R
   const owner = owners.get(collection);
   // without an owner (made outside every scope) the task keeps the scope of its fiber
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiler provides `Scope` lexically
-  return owner === undefined ? (task as Effect.Effect<A, E, Exclude<R, Scope.Scope>>) : within(owner, task);
+  if (owner === undefined) return task as Effect.Effect<A, E, Exclude<R, Scope.Scope>>;
+  // a closing owner admits no new child
+  return Effect.suspend(() => (owner.open ? within(owner, task) : Effect.interrupt));
 };
 
 /** A native child as a Flick `Fiber`. */

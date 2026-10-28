@@ -12,7 +12,7 @@ interface RunOptions {
   readonly startImmediately: boolean;
 }
 
-export const flickMake = <A, E>() => owned(FiberSet.make<A, E>());
+export const flickMake = <A, E>() => owned(FiberSet.make<A, E>(), FiberSet.clear);
 
 export const flickAdd =
   (propagateInterruption: boolean) =>
