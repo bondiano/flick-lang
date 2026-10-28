@@ -4,13 +4,13 @@ module App.Main exposing (main)
 line : String -> String ->{} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
-half : Number -> Result String Number
-let half n = if n - 2 * Number.floor (n / 2) == 0 then Ok (n / 2) else Err ("odd " ++ show n)
+half : Float -> Result String Float
+let half n = if n - 2 * Float.floor (n / 2) == 0 then Ok (n / 2) else Err ("odd " ++ show n)
 
 main : Unit ->{; AppError} Unit
 let main () =
   let d = Record.from_entries [("a", 1), ("b", 2), ("c", 3)]
-  let nothing : Record.ReadonlyRecord Number = Record.empty ()
+  let nothing : Record.ReadonlyRecord Float = Record.empty ()
   line "build" (show (d, Record.singleton "k" true, Record.from_keys ["x", "y"] 0))
   line
     "from"
@@ -108,5 +108,5 @@ let main () =
         d == sub,
       ))
   let user = { name = "Ada"; age = 36; admin = false }
-  let small : { name : String; age : Number } = Record.project user
+  let small : { name : String; age : Float } = Record.project user
   line "struct" (show (Record.labels user, small.name, small.age))

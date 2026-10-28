@@ -29,8 +29,8 @@ Snapshot tests use [`insta`](https://insta.rs); review changes with
 Annotation forms:
 
 ```flick
-let x : Number = "hi"
-//               ^^^^ FLICK-T012 expected `Number`
+let x : Float = "hi"
+//               ^^^^ FLICK-T012 expected `Float`
 //~ FLICK-E003 @4:1-6:9 effect row is not closed
 //~ FLICK-P001 cannot read
 ```
@@ -77,7 +77,7 @@ run in parallel, `FLICK_E2E_JOBS` at a time (default: the number of CPUs;
 the TypeScript output. Output goes to `target/tmp/e2e/` and imports `@flick-lang/runtime` from the
 workspace. A foreign module next to a case (`./tags.mjs`) is imported from
 there. `just e2e` also builds every `tests/check/pass/**` fixture and runs
-`node --check` on the output, and `e2e_numbers.rs` compares random `Number`
+`node --check` on the output, and `e2e_numbers.rs` compares random `Float`
 arithmetic, compiled from Flick, with the same expressions in JS.
 
 ## `flick test` — `flick/tests/test_command.rs`

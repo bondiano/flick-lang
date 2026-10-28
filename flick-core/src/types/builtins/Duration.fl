@@ -12,12 +12,12 @@ type error DurationError = DurationError String
 /// A finite duration split into whole units, largest first.
 type alias Parts =
   {
-    days : Number;
-    hours : Number;
-    minutes : Number;
-    seconds : Number;
-    millis : Number;
-    nanos : Number;
+    days : Float;
+    hours : Float;
+    minutes : Float;
+    seconds : Float;
+    millis : Float;
+    nanos : Float;
   }
 
 /// `n` nanoseconds; an error when negative.
@@ -31,32 +31,32 @@ foreign pure micros from "@flick-lang/runtime/effect/Duration" "flickMicros"
   reviewed "effect@4.0.5 sha256:fbb8c8716107aee8"
 
 /// `n` milliseconds; an error when negative, NaN or overflowing.
-millis : Number -> Result DurationError Duration
+millis : Float -> Result DurationError Duration
 foreign pure millis from "@flick-lang/runtime" "durationMillis"
   reviewed "effect@4.0.5 sha256:0ff8b217e730f07e"
 
 /// `n` seconds; an error when negative, NaN or overflowing.
-seconds : Number -> Result DurationError Duration
+seconds : Float -> Result DurationError Duration
 foreign pure seconds from "@flick-lang/runtime" "durationSeconds"
   reviewed "effect@4.0.5 sha256:21baffcaab36af1f"
 
 /// `n` minutes; an error when negative, NaN or overflowing.
-minutes : Number -> Result DurationError Duration
+minutes : Float -> Result DurationError Duration
 foreign pure minutes from "@flick-lang/runtime" "durationMinutes"
   reviewed "effect@4.0.5 sha256:7880441c236432ce"
 
 /// `n` hours; an error when negative, NaN or overflowing.
-hours : Number -> Result DurationError Duration
+hours : Float -> Result DurationError Duration
 foreign pure hours from "@flick-lang/runtime/effect/Duration" "flickHours"
   reviewed "effect@4.0.5 sha256:88a215f1814dd0e6"
 
 /// `n` days of 24 hours; an error when negative, NaN or overflowing.
-days : Number -> Result DurationError Duration
+days : Float -> Result DurationError Duration
 foreign pure days from "@flick-lang/runtime/effect/Duration" "flickDays"
   reviewed "effect@4.0.5 sha256:b376bd56e16bf06f"
 
 /// `n` weeks of 7 days; an error when negative, NaN or overflowing.
-weeks : Number -> Result DurationError Duration
+weeks : Float -> Result DurationError Duration
 foreign pure weeks from "@flick-lang/runtime/effect/Duration" "flickWeeks"
   reviewed "effect@4.0.5 sha256:45943045333d963f"
 
@@ -92,32 +92,32 @@ foreign pure is_positive from "@flick-lang/runtime/effect/Duration" "isPositive"
   reviewed "effect@4.0.5 sha256:660e9907ef988198"
 
 /// The milliseconds, rounded as a number; `None` for `infinity`.
-to_millis : Duration -> Option Number
+to_millis : Duration -> Option Float
 foreign pure to_millis from "@flick-lang/runtime" "durationToMillis"
   reviewed "effect@4.0.5 sha256:73d96fb3b27ab61d"
 
 /// The seconds, as a fraction; `None` for `infinity`.
-to_seconds : Duration -> Option Number
+to_seconds : Duration -> Option Float
 foreign pure to_seconds from "@flick-lang/runtime/effect/Duration" "flickToSeconds"
   reviewed "effect@4.0.5 sha256:15004b95b1b81cd4"
 
 /// The minutes, as a fraction; `None` for `infinity`.
-to_minutes : Duration -> Option Number
+to_minutes : Duration -> Option Float
 foreign pure to_minutes from "@flick-lang/runtime/effect/Duration" "flickToMinutes"
   reviewed "effect@4.0.5 sha256:a9b29940e79604bc"
 
 /// The hours, as a fraction; `None` for `infinity`.
-to_hours : Duration -> Option Number
+to_hours : Duration -> Option Float
 foreign pure to_hours from "@flick-lang/runtime/effect/Duration" "flickToHours"
   reviewed "effect@4.0.5 sha256:e8320ef50db91bd2"
 
 /// The days, as a fraction; `None` for `infinity`.
-to_days : Duration -> Option Number
+to_days : Duration -> Option Float
 foreign pure to_days from "@flick-lang/runtime/effect/Duration" "flickToDays"
   reviewed "effect@4.0.5 sha256:a1c73ff14822aab0"
 
 /// The weeks, as a fraction; `None` for `infinity`.
-to_weeks : Duration -> Option Number
+to_weeks : Duration -> Option Float
 foreign pure to_weeks from "@flick-lang/runtime/effect/Duration" "flickToWeeks"
   reviewed "effect@4.0.5 sha256:05ffb1ea95213af1"
 
@@ -127,7 +127,7 @@ foreign pure to_nanos from "@flick-lang/runtime/effect/Duration" "toNanos"
   reviewed "effect@4.0.5 sha256:540b8739438b9345"
 
 /// Whole seconds and the nanoseconds left over; `None` for `infinity`.
-to_hr_time : Duration -> Option (Number, Number)
+to_hr_time : Duration -> Option (Float, Float)
 foreign pure to_hr_time from "@flick-lang/runtime/effect/Duration" "flickToHrTime"
   reviewed "effect@4.0.5 sha256:63bc9d9037f64175"
 
@@ -137,7 +137,7 @@ foreign pure parts from "@flick-lang/runtime/effect/Duration" "parts"
   reviewed "effect@4.0.5 sha256:2a19728d3ce685f7"
 
 /// By how the duration is stored: milliseconds, nanoseconds or infinity.
-match_ : { onMillis : Number -> a; onNanos : BigInt -> a; onInfinity : Unit -> a } -> Duration -> a
+match_ : { onMillis : Float -> a; onNanos : BigInt -> a; onInfinity : Unit -> a } -> Duration -> a
 foreign pure match_ from "@flick-lang/runtime/effect/Duration" "match"
   arity 1
   reviewed "effect@4.0.5 sha256:31d4417eed4e3b44"
@@ -147,7 +147,7 @@ foreign pure match_ from "@flick-lang/runtime/effect/Duration" "match"
 match_pair :
   Duration ->
   {
-    onMillis : Number -> Number -> a;
+    onMillis : Float -> Float -> a;
     onNanos : BigInt -> BigInt -> a;
     onInfinity : Duration -> Duration -> a;
   } ->
@@ -173,13 +173,13 @@ foreign pure subtract from "@flick-lang/runtime/effect/Duration" "flickSubtract"
   reviewed "effect@4.0.5 sha256:8e3e1ffe427d630c"
 
 /// `d |> times n` is `d * n`; an error when `n` is negative or NaN.
-times : Number -> Duration -> Result DurationError Duration
+times : Float -> Duration -> Result DurationError Duration
 foreign pure times from "@flick-lang/runtime/effect/Duration" "flickTimes"
   arity 1
   reviewed "effect@4.0.5 sha256:cac84b620a48952c"
 
 /// `d |> divide n` is `d / n`; an error when `n` is zero, negative or not finite.
-divide : Number -> Duration -> Result DurationError Duration
+divide : Float -> Duration -> Result DurationError Duration
 foreign pure divide from "@flick-lang/runtime/effect/Duration" "flickDivide"
   arity 1
   reviewed "effect@4.0.5 sha256:b4f2c7988a7c2090"

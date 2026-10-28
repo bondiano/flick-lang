@@ -27,7 +27,7 @@ text : Unit ->{} String
 foreign sync text from "./dom.mjs" "text"
   arity 0
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
 
 greeting : Atom.Writable String

@@ -8,7 +8,7 @@ use common::flick_in;
 use flick_core::build::runner_path;
 use serde_json::Value;
 
-const MODULE: &str = "module Main exposing (total, main)\n\nimport List\n\ntotal : List Number -> Number\nlet total xs = List.fold_left (fun acc x -> acc + x) 0 xs\n\nmain : Unit ->{none; AppError} Unit\nlet main () =\n  Platform.stdout_line (Number.to_string (total [1, 2, 3]))\n";
+const MODULE: &str = "module Main exposing (total, main)\n\nimport List\n\ntotal : List Float -> Float\nlet total xs = List.fold_left (fun acc x -> acc + x) 0 xs\n\nmain : Unit ->{none; AppError} Unit\nlet main () =\n  Platform.stdout_line (Float.to_string (total [1, 2, 3]))\n";
 
 #[test]
 fn the_demo_compiles_a_module_as_flick_build_does() {
@@ -43,7 +43,7 @@ fn app_artifacts_do_not_collide_on_case_insensitive_filesystems() {
 
 #[test]
 fn the_demo_reports_diagnostics_as_json_events() {
-    let broken = "module Main exposing (x)\nx : Number\nlet x = \"no\"\n";
+    let broken = "module Main exposing (x)\nx : Float\nlet x = \"no\"\n";
     let checked: Value = serde_json::from_str(&flick_wasm::check(broken)).expect("json");
     let event = &checked[0];
     assert_eq!(event["type"], "diagnostic");
@@ -68,10 +68,10 @@ fn the_demo_builds_everything_a_run_needs() {
     let files = built["files"].as_object().expect("files");
     assert!(files.contains_key("Main.js") && files.contains_key("_flick/Platform.js"));
     assert!(files.contains_key(built["entry"].as_str().expect("runner")));
-    let library = "module Lib exposing (one)\none : Number\nlet one = 1\n";
+    let library = "module Lib exposing (one)\none : Float\nlet one = 1\n";
     let built: Value = serde_json::from_str(&flick_wasm::build(library, "release")).expect("json");
     assert_eq!(built["entry"], Value::Null);
-    let broken = "module Main exposing (x)\nx : Number\nlet x = \"no\"\n";
+    let broken = "module Main exposing (x)\nx : Float\nlet x = \"no\"\n";
     let built: Value = serde_json::from_str(&flick_wasm::build(broken, "debug")).expect("json");
     assert_eq!(built["files"], Value::Null);
 }

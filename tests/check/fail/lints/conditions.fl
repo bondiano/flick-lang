@@ -1,7 +1,7 @@
 // Conditions with a shorter form, each with its rewrite.
 module App.Conditions exposing (..)
 
-same : Number -> Number -> Bool
+same : Float -> Float -> Bool
 let same a b = if a == b then true else false
 
 differ : Bool -> Bool
@@ -10,30 +10,30 @@ let differ c = if c then false else true
 label : Bool -> String
 let label done = if not done then "pending" else "done"
 
-sign : Number -> String
+sign : Float -> String
 let sign n =
   if n > 0 then "+"
   else
     if n < 0 then "-" else "0"
 
-zero : Number -> Bool
+zero : Float -> Bool
 let zero n = 0 == n
 
-smaller : Number -> Bool
+smaller : Float -> Bool
 let smaller n = 10 > n
 
-itself : Number -> Bool
+itself : Float -> Bool
 let itself x = x == x
 
-debug : Number
+debug : Float
 let debug = if true then 1 else 2
 
-flag : Bool -> Number
+flag : Bool -> Float
 let flag b = match b with
   | true -> 1
   | false -> 2
 
-quiet : Number -> Number
+quiet : Float -> Float
 let quiet n = if n > 1 then n else 0
 //~ FLICK-T040 @5:16-5:46 this `if` returns its condition
 //~ FLICK-T040 @8:16-8:41 this `if` returns the opposite of its condition

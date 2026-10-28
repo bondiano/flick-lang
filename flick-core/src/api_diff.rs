@@ -241,10 +241,10 @@ mod tests {
     #[test]
     fn removed_and_changed_exports_are_major_added_ones_minor() {
         let old = interface(
-            "module Lib exposing (..)\n\nf : Number -> Number\nlet f x = x\n\ng : Number\nlet g = 1\n",
+            "module Lib exposing (..)\n\nf : Float -> Float\nlet f x = x\n\ng : Float\nlet g = 1\n",
         );
         let new = interface(
-            "module Lib exposing (..)\n\nf : String -> String\nlet f x = x\n\nh : Number\nlet h = 2\n",
+            "module Lib exposing (..)\n\nf : String -> String\nlet f x = x\n\nh : Float\nlet h = 2\n",
         );
         let changes = diff(slice::from_ref(&old), &[new]);
         assert_eq!(
@@ -252,7 +252,7 @@ mod tests {
             [
                 Change::Changed {
                     name: "value f".into(),
-                    was: "Number -> Number".into(),
+                    was: "Float -> Float".into(),
                     now: "String -> String".into(),
                 },
                 Change::Removed("value g".into()),
@@ -261,7 +261,7 @@ mod tests {
         );
         assert_eq!(bump(&changes), Bump::Major);
         let more = interface(
-            "module Lib exposing (..)\n\nf : Number -> Number\nlet f x = x\n\ng : Number\nlet g = 1\n\nk : Number\nlet k = 3\n",
+            "module Lib exposing (..)\n\nf : Float -> Float\nlet f x = x\n\ng : Float\nlet g = 1\n\nk : Float\nlet k = 3\n",
         );
         assert_eq!(bump(&diff(slice::from_ref(&old), &[more])), Bump::Minor);
         assert_eq!(

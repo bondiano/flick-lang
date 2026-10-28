@@ -1,7 +1,7 @@
 // Failures of Effect's `Stream`, what runs around a stream, and its services.
 module App.Main exposing (main)
 
-type error Boom = Boom Number
+type error Boom = Boom Float
 
 type error Bang = Bang
 
@@ -11,14 +11,14 @@ service Greeter =
 greeter : Layer none none {Greeter}
 let greeter = Layer.succeed Greeter { greet = fun name -> "hello " ++ name }
 
-line : (String, List Number) ->{} Unit
+line : (String, List Float) ->{} Unit
 let line (label, xs) = Platform.stdout_line (label ++ ": " ++ show xs)
 
 /// 1, 2, then `Boom 3`.
-failing : Stream.Stream none {Boom} Number
+failing : Stream.Stream none {Boom} Float
 let failing = Stream.concat (Stream.fail (Boom 3)) (Stream.make [1, 2])
 
-dying : Stream.Stream none none Number
+dying : Stream.Stream none none Float
 let dying = Stream.concat (Stream.die "broken") (Stream.succeed 1)
 
 is_boom : Failure {Boom} -> Bool
@@ -40,7 +40,7 @@ let main () =
         ) with | Boom _ ->
         []),
     )
-  let filtered : Stream.Stream none {Bang} Number =
+  let filtered : Stream.Stream none {Bang} Float =
     Stream.catch_filter
       (fun (Boom n) -> if n > 5 then Err Bang else Ok n)
       (fun n -> Stream.succeed (0 - n))
@@ -66,7 +66,7 @@ let main () =
         (Stream.catch_cause_if is_boom (fun _ -> Stream.succeed 5) failing) with | Boom _ ->
         []),
     )
-  let selected : Stream.Stream none {Boom} Number =
+  let selected : Stream.Stream none {Boom} Float =
     Stream.catch_cause_filter
       (fun failure -> if is_boom failure then Ok 4 else Err failure)
       (fun n _ -> Stream.succeed n)
@@ -114,18 +114,18 @@ let main () =
   line
     ("retry", (try Stream.run_collect (Stream.retry (Schedule.recurs 5) flaky) with | Boom _ -> []))
   Ref.set log []
-  let started : Stream.Stream none {Boom} Number =
+  let started : Stream.Stream none {Boom} Float =
     Stream.on_start (task { record log "start" }) failing
-  let firsts : Stream.Stream none {Boom} Number =
+  let firsts : Stream.Stream none {Boom} Float =
     Stream.on_first (fun n -> record log ("first " ++ show n)) started
-  let errors : Stream.Stream none {Boom} Number =
+  let errors : Stream.Stream none {Boom} Float =
     Stream.on_error (fun _ -> record log "error") firsts
-  let exits : Stream.Stream none {Boom} Number =
+  let exits : Stream.Stream none {Boom} Float =
     Stream.on_exit
       (fun exit ->
         record log (if Option.is_some (Exit.failure exit) then "exit failed" else "exit ok"))
       errors
-  let watched : Stream.Stream none {Boom} Number =
+  let watched : Stream.Stream none {Boom} Float =
     Stream.ensuring (task { record log "ensuring" }) exits
   let _ = try Stream.run_drain watched with | Boom _ -> ()
   let _ = Stream.run_drain (Stream.on_end (task { record log "end" }) (Stream.succeed 1))

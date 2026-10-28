@@ -5,9 +5,9 @@ module App.Main exposing (main)
 greeting : Atom.Writable String
 let greeting = Atom.make "Hello"
 
-type alias Order = { customer : String; items : List (String, Number) }
+type alias Order = { customer : String; items : List (String, Float) }
 
-line : (String, Number) -> Ui
+line : (String, Float) -> Ui
 let line (name, count) = ui { item [text (name ++ " × " ++ show count)] }
 
 salutation : Ui.View String

@@ -60,7 +60,7 @@ foreign effect prepend from "@flick-lang/runtime/effect/TxChunk" "prepend"
   reviewed "effect@4.0.5 sha256:16ae585b9218b462"
 
 /// The number of elements.
-size : TxChunk a ->{Tx.Transaction;} Number
+size : TxChunk a ->{Tx.Transaction;} Float
 foreign effect size from "@flick-lang/runtime/effect/TxChunk" "size"
   reviewed "effect@4.0.5 sha256:5b88194fe0b0fb51"
 
@@ -75,19 +75,19 @@ foreign effect is_non_empty from "@flick-lang/runtime/effect/TxChunk" "isNonEmpt
   reviewed "effect@4.0.5 sha256:3a7352ba4cf5f63b"
 
 /// Keeps the first `n` elements.
-take : Number -> TxChunk a ->{Tx.Transaction;} Unit
+take : Float -> TxChunk a ->{Tx.Transaction;} Unit
 foreign effect take from "@flick-lang/runtime/effect/TxChunk" "take"
   arity 1
   reviewed "effect@4.0.5 sha256:9f2e15960002e560"
 
 /// Removes the first `n` elements.
-drop : Number -> TxChunk a ->{Tx.Transaction;} Unit
+drop : Float -> TxChunk a ->{Tx.Transaction;} Unit
 foreign effect drop from "@flick-lang/runtime/effect/TxChunk" "drop"
   arity 1
   reviewed "effect@4.0.5 sha256:29dd4694ef25991f"
 
 /// Keeps the elements from index `start` up to, not including, `end`.
-slice : Number -> Number -> TxChunk a ->{Tx.Transaction;} Unit
+slice : Float -> Float -> TxChunk a ->{Tx.Transaction;} Unit
 foreign effect slice from "@flick-lang/runtime/effect/TxChunk" "slice"
   arity 2
   reviewed "effect@4.0.5 sha256:fc2fd7c096db9ed7"

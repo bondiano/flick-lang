@@ -10,7 +10,7 @@ let opt o =
   | Some s -> s
   | None -> "-"
 
-num : Option Number -> String
+num : Show a => Option a -> String
 let num o =
   match o with
   | Some n -> show n

@@ -32,10 +32,10 @@ undirected_kind : Kind Undirected
 let undirected_kind = Kind "undirected"
 
 /// A node's index: stable while the node is in the graph, never reused.
-type alias NodeIndex = Number
+type alias NodeIndex = Float
 
 /// An edge's index: stable while the edge is in the graph, never reused.
-type alias EdgeIndex = Number
+type alias EdgeIndex = Float
 
 /// An edge: its endpoints and data.
 type alias Edge e = { source : NodeIndex; target : NodeIndex; data : e }
@@ -91,14 +91,14 @@ type alias IdentityOptions n e ni ei = {
 
 /// Within `radius` steps (default 1) of a node, along `direction` (default
 /// outgoing).
-type alias NeighborhoodConfig = { radius : Option Number; direction : Option TraversalDirection }
+type alias NeighborhoodConfig = { radius : Option Float; direction : Option TraversalDirection }
 
 /// The edges reachability follows (default outgoing).
 type alias ReachabilityConfig = { direction : Option TraversalDirection }
 
 /// Where a search starts, which edges it follows and how many steps.
 type alias SearchConfig =
-  { start : Option (List NodeIndex); direction : Option TraversalDirection; radius : Option Number }
+  { start : Option (List NodeIndex); direction : Option TraversalDirection; radius : Option Float }
 
 /// Where a topological order starts (default: the nodes without incoming edges).
 type alias TopoConfig = { initials : Option (List NodeIndex) }
@@ -113,51 +113,51 @@ type alias CycleResult = { path : List NodeIndex; edges : List EdgeIndex }
 type alias BipartiteMatch = { left : NodeIndex; right : NodeIndex; edge : EdgeIndex }
 
 /// The source and target of a flow, and the capacity of each edge.
-type alias MaximumFlowConfig e = { source : NodeIndex; target : NodeIndex; capacity : e -> Number }
+type alias MaximumFlowConfig e = { source : NodeIndex; target : NodeIndex; capacity : e -> Float }
 
 /// The flow's value, the flow of each edge, and the edges of a minimum cut.
 type alias MaximumFlowResult = {
-  value : Number;
-  flows : List (EdgeIndex, Number);
+  value : Float;
+  flows : List (EdgeIndex, Float);
   cut : List EdgeIndex;
 }
 
 /// A cut: its value, its edges, and the nodes on each side.
 type alias MinimumCutResult =
-  { value : Number; edges : List EdgeIndex; source : List NodeIndex; target : List NodeIndex }
+  { value : Float; edges : List EdgeIndex; source : List NodeIndex; target : List NodeIndex }
 
 /// A path: its nodes, its edges, its total cost and the data of its edges.
 type alias PathResult e = {
   path : List NodeIndex;
   edges : List EdgeIndex;
-  distance : Number;
+  distance : Float;
   costs : List e;
 }
 
 /// The endpoints of a path and the non-negative cost of each edge.
-type alias DijkstraConfig e = { source : NodeIndex; target : NodeIndex; cost : e -> Number }
+type alias DijkstraConfig e = { source : NodeIndex; target : NodeIndex; cost : e -> Float }
 
 /// The endpoints of a path and the cost of each edge, maybe negative.
-type alias BellmanFordConfig e = { source : NodeIndex; target : NodeIndex; cost : e -> Number }
+type alias BellmanFordConfig e = { source : NodeIndex; target : NodeIndex; cost : e -> Float }
 
 /// The endpoints, the cost of each edge, and `heuristic node target`, an
 /// estimate of the cost left.
 type alias AstarConfig e n =
-  { source : NodeIndex; target : NodeIndex; cost : e -> Number; heuristic : n -> n -> Number }
+  { source : NodeIndex; target : NodeIndex; cost : e -> Float; heuristic : n -> n -> Float }
 
 /// The endpoints of the paths, and at most how many (default all).
-type alias SimplePathsConfig = { source : NodeIndex; target : NodeIndex; limit : Option Number }
+type alias SimplePathsConfig = { source : NodeIndex; target : NodeIndex; limit : Option Float }
 
 /// The endpoints, the cost of each edge, and at most how many paths
 /// (default all).
 type alias AllShortestPathsConfig e =
-  { source : NodeIndex; target : NodeIndex; cost : e -> Number; limit : Option Number }
+  { source : NodeIndex; target : NodeIndex; cost : e -> Float; limit : Option Float }
 
 /// Distances, paths (`None` where none exists), edges and edge data of the
 /// shortest path between each pair of nodes, by source then target.
 type alias AllPairsResult e =
   {
-    distances : List (NodeIndex, List (NodeIndex, Number));
+    distances : List (NodeIndex, List (NodeIndex, Float));
     paths : List (NodeIndex, List (NodeIndex, Option (List NodeIndex)));
     edges : List (NodeIndex, List (NodeIndex, List EdgeIndex));
     costs : List (NodeIndex, List (NodeIndex, List e));

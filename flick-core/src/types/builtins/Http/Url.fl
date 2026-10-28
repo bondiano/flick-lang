@@ -62,7 +62,7 @@ foreign pure set_pathname from "@flick-lang/runtime/effect/http/Url" "setPathnam
   reviewed "effect@4.0.5 sha256:d0099c1d17096db8"
 
 /// The port.
-set_port : Number -> Url -> Url
+set_port : Float -> Url -> Url
 foreign pure set_port from "@flick-lang/runtime/effect/http/Url" "setPort"
   arity 1
   reviewed "effect@4.0.5 sha256:71b8430383ed12a8"

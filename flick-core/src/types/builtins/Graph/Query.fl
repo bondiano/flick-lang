@@ -17,7 +17,7 @@ foreign pure has_node from "@flick-lang/runtime/effect/Graph" "hasNode"
   reviewed "effect@4.0.5 sha256:f06dabfb0a39f395"
 
 /// The number of nodes.
-node_count : Graph n e k -> Number
+node_count : Graph n e k -> Float
 foreign pure node_count from "@flick-lang/runtime/effect/Graph" "nodeCount"
   reviewed "effect@4.0.5 sha256:db159f63f3808ccb"
 
@@ -64,7 +64,7 @@ foreign pure has_edge from "@flick-lang/runtime/effect/Graph" "hasEdge"
   reviewed "effect@4.0.5 sha256:795a5d4ecc3f80d2"
 
 /// The number of edges.
-edge_count : Graph n e k -> Number
+edge_count : Graph n e k -> Float
 foreign pure edge_count from "@flick-lang/runtime/effect/Graph" "edgeCount"
   reviewed "effect@4.0.5 sha256:b792039601c3db95"
 
@@ -90,17 +90,17 @@ foreign pure edges_between from "@flick-lang/runtime/effect/Graph" "flickEdgesBe
 
 /// The number of edges at the node, a self-loop twice; a missing node is an
 /// error.
-degree : NodeIndex -> Graph n e Undirected -> Result GraphError Number
+degree : NodeIndex -> Graph n e Undirected -> Result GraphError Float
 foreign pure degree from "@flick-lang/runtime/effect/Graph" "flickDegree"
   reviewed "effect@4.0.5 sha256:26d48f52ff1ed8d3"
 
 /// The number of edges from the node; a missing node is an error.
-out_degree : NodeIndex -> Graph n e Directed -> Result GraphError Number
+out_degree : NodeIndex -> Graph n e Directed -> Result GraphError Float
 foreign pure out_degree from "@flick-lang/runtime/effect/Graph" "flickOutDegree"
   reviewed "effect@4.0.5 sha256:891562248db71b21"
 
 /// The number of edges into the node; a missing node is an error.
-in_degree : NodeIndex -> Graph n e Directed -> Result GraphError Number
+in_degree : NodeIndex -> Graph n e Directed -> Result GraphError Float
 foreign pure in_degree from "@flick-lang/runtime/effect/Graph" "flickInDegree"
   reviewed "effect@4.0.5 sha256:89dffef468c49f5e"
 

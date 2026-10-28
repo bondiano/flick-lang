@@ -1,31 +1,31 @@
 module App.SyncFor exposing (..)
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.make 0
 
 service Log =
-  keep : Number ->{} Bool
+  keep : Float ->{} Bool
 
 // a runtime call may suspend, so it does not run at a step of a sequence
-logged : Unit ->{Atom.Read, Log;} Seq Number
+logged : Unit ->{Atom.Read, Log;} Seq Float
 let logged () = for { n <- [1, 2]; if Log.keep n } yield n
 
 // a pure function has no reader to lend
-pure_reads : Unit -> Seq Number
+pure_reads : Unit -> Seq Float
 let pure_reads () = for { n <- [1, 2] } yield n + Atom.value count
 
 // the stage that builds it needs `Atom.Read`
-unread : Unit ->{Log;} List Number
+unread : Unit ->{Log;} List Float
 let unread () = [for n <- [1, 2] yield n + Atom.value count]
 
 // `await` and `scope` run on the Effect runtime too
-awaited : Unit ->{Atom.Read;} Seq Number
+awaited : Unit ->{Atom.Read;} Seq Float
 let awaited () = for n <- [1] yield await task { n }
 
-scoped : Unit ->{Atom.Read;} Seq Number
+scoped : Unit ->{Atom.Read;} Seq Float
 let scoped () = for n <- [1] yield scope { n }
 
-provided : Unit ->{Atom.Read;} Seq Number
+provided : Unit ->{Atom.Read;} Seq Float
 let provided () = for n <- [1] yield provide Layer.empty { n }
 
 //~ FLICK-E001 @11:39-11:49 only Sync calls

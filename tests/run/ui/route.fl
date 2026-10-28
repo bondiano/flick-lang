@@ -7,14 +7,14 @@ module App.Main exposing (main)
 type error NotFound = NotFound
   deriving Show, Schema
 
-type Page = Home | User Number
+type Page = Home | User Float
   deriving Eq, Show, Schema, Url
 
-name : Number ->{} String
+name : Float ->{} String
 foreign async name from "./route.mjs" "name"
   arity 1
 
-loads : Unit ->{} Number
+loads : Unit ->{} Float
 foreign sync loads from "./route.mjs" "loads"
   arity 0
 

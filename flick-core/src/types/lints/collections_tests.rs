@@ -1,7 +1,7 @@
 use crate::types::lint_tests::{HEAD, assert_fix, fixed};
 
-const NUMS: &str = "f : List Number -> Option Number\n";
-const ANY: &str = "f : List Number -> Bool\n";
+const NUMS: &str = "f : List Float -> Option Float\n";
+const ANY: &str = "f : List Float -> Bool\n";
 
 #[test]
 fn the_head_of_a_filter_is_find() {
@@ -50,21 +50,21 @@ fn a_length_against_zero_is_is_empty() {
 #[test]
 fn concat_of_map_is_flat_map() {
     assert_fix(
-        "f : List Number -> List Number\nlet f xs = List.concat (List.map (fun x -> [x, x]) xs)\n",
+        "f : List Float -> List Float\nlet f xs = List.concat (List.map (fun x -> [x, x]) xs)\n",
         "FLICK-T050",
-        "f : List Number -> List Number\nlet f xs = List.flat_map (fun x -> [x, x]) xs\n",
+        "f : List Float -> List Float\nlet f xs = List.flat_map (fun x -> [x, x]) xs\n",
     );
 }
 
 #[test]
 fn an_option_match_with_a_default_is_with_default() {
     assert_fix(
-        "f : Option Number -> Number\nlet f o = match o with\n  | Some x -> x\n  | None -> 0\n",
+        "f : Option Float -> Float\nlet f o = match o with\n  | Some x -> x\n  | None -> 0\n",
         "FLICK-T051",
-        "f : Option Number -> Number\nlet f o = Option.with_default 0 o\n",
+        "f : Option Float -> Float\nlet f o = Option.with_default 0 o\n",
     );
     let used = format!(
-        "{HEAD}f : Option Number -> Number\nlet f o = match o with\n  | Some x -> x + 1\n  | None -> 0\n"
+        "{HEAD}f : Option Float -> Float\nlet f o = match o with\n  | Some x -> x + 1\n  | None -> 0\n"
     );
     assert_eq!(fixed(&used, "FLICK-T051"), None);
 }

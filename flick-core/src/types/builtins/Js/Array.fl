@@ -16,11 +16,11 @@ foreign sync to_list from "@flick-lang/runtime" "jsArrayFromList"
 push : Array a -> a ->{} Unit
 foreign sync push from "@flick-lang/runtime" "jsArrayPush"
 
-get : Number -> Array a ->{} Option a
+get : Int -> Array a ->{} Option a
 foreign sync get from "@flick-lang/runtime" "listGet"
 
-set : Number -> a -> Array a ->{} Unit
+set : Int -> a -> Array a ->{} Unit
 foreign sync set from "@flick-lang/runtime" "jsArraySet"
 
-length : Array a ->{} Number
+length : Array a ->{} Int
 foreign sync length from "@flick-lang/runtime" "listLength"

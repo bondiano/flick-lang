@@ -10,7 +10,7 @@ import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 import Log exposing (Log)
 
-type alias Item = { label : String; size : Number }
+type alias Item = { label : String; size : Float }
   deriving Schema
 
 type error Boom = Boom
@@ -19,7 +19,7 @@ type error Boom = Boom
 line : String -> String ->{} Unit
 let line label value = Platform.stdout_line (label ++ ": " ++ value)
 
-ms : Number -> Duration.Duration
+ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
 ok : Http.ServerResponse.Options

@@ -4,10 +4,10 @@ module App.Main exposing (main)
 
 type error Broke = Broke
 
-ms : Number -> Duration.Duration
+ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
-transfer : Number -> TxRef.TxRef Number -> TxRef.TxRef Number ->{Tx.Transaction; Broke} Unit
+transfer : Float -> TxRef.TxRef Float -> TxRef.TxRef Float ->{Tx.Transaction; Broke} Unit
 let transfer amount src dst =
   TxRef.update (fun b -> b - amount) src
   TxRef.update (fun b -> b + amount) dst

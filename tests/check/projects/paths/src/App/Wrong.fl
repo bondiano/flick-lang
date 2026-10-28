@@ -1,5 +1,5 @@
 module App.Right exposing (x)
 //     ^^^^^^^^^ FLICK-R001 `src/App/Wrong.fl` must declare `module App.Wrong`, not `App.Right`
 
-x : Number
+x : Float
 let x = 1

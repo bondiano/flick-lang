@@ -7,7 +7,7 @@ module App.Main exposing (main)
 refined type Name = String where Checks.non_empty
   deriving Eq, Show, Schema
 
-type alias Signup = { name : Name; age : Number; nick : Option String }
+type alias Signup = { name : Name; age : Float; nick : Option String }
   deriving Schema, Form
 
 setup : Unit ->{} Unit

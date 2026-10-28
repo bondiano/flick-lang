@@ -19,7 +19,7 @@ type alias CorsOptions =
     allowedMethods : List String;
     allowedHeaders : List String;
     exposedHeaders : List String;
-    maxAge : Option Number;
+    maxAge : Option Float;
     credentials : Bool;
   }
 
@@ -41,8 +41,8 @@ let cors_options =
 type alias CompressionOptions =
   {
     algorithms : List Http.Platform.CompressionAlgorithm;
-    minSize : Option Number;
-    levels : List (Http.Platform.CompressionAlgorithm, Number);
+    minSize : Option Float;
+    levels : List (Http.Platform.CompressionAlgorithm, Float);
   }
 
 /// Logs each request with its method, URL and status, and its failure.

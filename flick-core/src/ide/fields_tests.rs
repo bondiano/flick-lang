@@ -10,15 +10,15 @@ type alias User =
     /// The full name.
     name : String;
     /// Age in years.
-    age : Number;
+    age : Float;
   }
 
 type Shape =
   /// A round one, by its radius.
-  | Circle Number
-  | Square Number
+  | Circle Float
+  | Square Float
 
-older : User -> Number
+older : User -> Float
 let older user = user.age + 1
 
 make : String -> User
@@ -27,10 +27,10 @@ let make n = { name = n; age = 0 }
 rename : User -> User
 let rename u = { u with age = 2 }
 
-years : User -> Number
+years : User -> Float
 let years { age } = age
 
-area : Shape -> Number
+area : Shape -> Float
 let area s =
   match s with
   | Circle r -> r
@@ -39,7 +39,7 @@ let area s =
 page : Ui.View Unit
 let page = Ui.view (fun () -> ui { div { class_name = \"page\" } [] })
 
-small : Check Number
+small : Check Float
 let small =
   Check.between { minimum = 0; maximum = 5; exclusiveMinimum = false; exclusiveMaximum = false }
 ";
@@ -55,7 +55,7 @@ fn hover(needle: &str, nth: usize) -> String {
 
 #[test]
 fn a_field_shows_its_type_comment_and_record() {
-    let want = "```flick\nage : Number\n```\n\nAge in years.\n\nfield of `User` from `App.Main`";
+    let want = "```flick\nage : Float\n```\n\nAge in years.\n\nfield of `User` from `App.Main`";
     // the declaration, an access, a literal, an update and a pattern
     for nth in 0..5 {
         assert_eq!(hover("age", nth), want, "occurrence {nth}");
@@ -119,7 +119,7 @@ fn a_prop_of_an_element_shows_its_comment() {
 fn a_field_of_a_signature_shows_its_comment() {
     assert_eq!(
         hover("maximum", 0),
-        "```flick\nmaximum : Number\n```\n\nThe upper bound.\n\nfield of `between` from `Check`"
+        "```flick\nmaximum : Float\n```\n\nThe upper bound.\n\nfield of `between` from `Check`"
     );
 }
 

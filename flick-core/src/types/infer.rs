@@ -9,6 +9,7 @@ use super::convert::is_type;
 use super::regions::Held;
 use super::ty::Type;
 use crate::diagnostics::codes;
+use crate::numeric;
 use crate::source;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -185,10 +186,10 @@ impl Checker<'_> {
     fn synthesize(&mut self, node: &Node) -> Type {
         let children: Vec<&Node> = node.nodes().collect();
         match node.kind {
-            K::Literal => {
-                let token = node.child_tokens().next().map(|t| t.kind);
-                literal_type(token)
-            }
+            K::Literal => match node.child_tokens().next() {
+                Some(t) if t.kind == K::Number => self.number(node, t.text(self.text)),
+                token => literal_type(token.map(|t| t.kind)),
+            },
             K::NameExpr => self.name(node),
             K::ParenExpr => self.infer(children[0]),
             K::UnitExpr => Type::prim("Unit"),
@@ -573,9 +574,23 @@ impl Checker<'_> {
     }
 }
 
+impl Checker<'_> {
+    /// The type of a number literal: of any numeric type, a `Float` one when
+    /// it has a fraction.
+    pub fn number(&mut self, node: &Node, text: &str) -> Type {
+        let span = self.span(node);
+        if numeric::is_integer_literal(text) {
+            self.number_literal(span, numeric::integer_value(text), false, false)
+        } else {
+            self.number_literal(span, None, true, false)
+        }
+    }
+}
+
+/// The type of a literal; a number literal's is [`Checker::number`]'s.
 pub fn literal_type(token: Option<K>) -> Type {
     match token {
-        Some(K::Number) => Type::prim("Number"),
+        Some(K::Number) => Type::prim("Float"),
         Some(K::BigInt) => Type::prim("BigInt"),
         Some(K::String) => Type::prim("String"),
         Some(K::TrueKw | K::FalseKw) => Type::prim("Bool"),

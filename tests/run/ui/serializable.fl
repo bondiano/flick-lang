@@ -6,13 +6,13 @@ dehydrated : Unit ->{Atom.Registry; none} String
 foreign effect dehydrated from "./hydration.mjs" "dehydrated"
   arity 0
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
 
 draft : String -> Atom.Writable String
 let draft = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.make "")
 
-local : Atom.Writable Number
+local : Atom.Writable Float
 let local = Atom.make 7
 
 main : Unit ->{; AppError} Unit

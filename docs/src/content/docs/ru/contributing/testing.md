@@ -31,8 +31,8 @@ cargo install cargo-machete --version 0.9.2 --locked
 Формы аннотаций:
 
 ```flick
-let x : Number = "hi"
-//               ^^^^ FLICK-T012 expected `Number`
+let x : Float = "hi"
+//               ^^^^ FLICK-T012 expected `Float`
 //~ FLICK-E003 @4:1-6:9 effect row is not closed
 //~ FLICK-P001 cannot read
 ```
@@ -86,7 +86,7 @@ let x : Number = "hi"
 области. Внешний модуль рядом с примером (`./tags.mjs`) импортируется
 оттуда же. `just e2e` также собирает каждый пример `tests/check/pass/**`
 и запускает `node --check` для результата, а `e2e_numbers.rs` сравнивает
-случайные арифметические выражения с `Number`, скомпилированные из Flick,
+случайные арифметические выражения с `Float`, скомпилированные из Flick,
 с теми же выражениями в JS.
 
 ## `flick test` — `flick/tests/test_command.rs`

@@ -77,13 +77,13 @@ error: the Flick runtime requires effect 4.0.5, found 4.1.0
 
 ```text
 parallel : (Eff r e a)^c -> ((Eff r e b)^c ->{r; e} (a, b))^c
-parallel_all : Number -> List ((Eff r e a)^c) ->{r; e} List a
+parallel_all : Float -> List ((Eff r e a)^c) ->{r; e} List a
 parallel_results : List ((Eff r e a)^c) ->{r; none} List (Result (Errors e) a)
 parallel_exits : List ((Eff r e a)^c) ->{r; none} List (Exit e a)
 race_success : (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
 race_first : (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
-timeout : Number -> (Eff r e a)^c ->{r; TimeoutError | e} a
-timeout_option : Number -> (Eff r e a)^c ->{r; e} Option a
+timeout : Float -> (Eff r e a)^c ->{r; TimeoutError | e} a
+timeout_option : Float -> (Eff r e a)^c ->{r; e} Option a
 
 Exit.value : Exit e a -> Option a
 Exit.failure : Exit e a -> Option (Failure e)

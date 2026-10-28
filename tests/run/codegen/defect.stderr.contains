@@ -1,2 +1,2 @@
-RangeError: Division by zero
+RangeError: Int.unsafe_div: division by zero
 codegen/defect.fl:6

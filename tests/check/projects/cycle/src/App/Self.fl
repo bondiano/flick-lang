@@ -3,5 +3,5 @@ module App.Self exposing (s)
 import App.Self as Me
 //     ^^^^^^^^ FLICK-R006 import cycle: App.Self -> App.Self
 
-s : Number
+s : Float
 let s = 1

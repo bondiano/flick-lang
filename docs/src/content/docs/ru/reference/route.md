@@ -15,8 +15,8 @@ type error NotFound = NotFound
 
 type Page =
   | Home
-  | User Number
-  | Search { q : String; page : Option Number }
+  | User Float
+  | Search { q : String; page : Option Float }
   deriving Eq, Show, Schema, Url
 
 page : Atom.Writable Page
@@ -47,7 +47,7 @@ let profile =
 | `Search { q = "atoms"; page = None }` | `/search?q=atoms` |
 
 - Имя конструктора в kebab-case — первый сегмент.
-- Каждое поле после него — сегмент: `String`, `Number`, `Bool` или
+- Каждое поле после него — сегмент: `String`, `Float`, `Bool` или
   уточнённый тип над одним из них.
 - Последнее поле-запись — query. Его поля тех же типов или `Option` одного
   из них; такого параметра в URL может не быть.

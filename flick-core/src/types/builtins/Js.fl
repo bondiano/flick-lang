@@ -18,7 +18,7 @@ snapshot : JsValue ->{; SnapshotError} Unknown
 foreign effect snapshot from "@flick-lang/runtime" "snapshotDefault"
 
 /// `snapshot` with the depth and value limits given.
-snapshot_with : Number -> Number -> JsValue ->{; SnapshotError} Unknown
+snapshot_with : Float -> Float -> JsValue ->{; SnapshotError} Unknown
 foreign effect snapshot_with from "@flick-lang/runtime" "snapshot"
 
 promise_callback : forall c r e a b. (a ->{r; e} b)^c ->{r;} (PromiseCallback a b)^c

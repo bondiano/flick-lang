@@ -12,12 +12,12 @@ let from_js value = FsError "failed"
 to_other : JsValue -> Other
 let to_other value = Other "failed"
 
-now : Number ->{} Number
+now : Float ->{} Float
 foreign sync now from global "Date.now"
   arity 0
 //~ FLICK-F001 @16:1-17:10 `arity 0` drops the first argument, which must be `()`
 
-parse : String -> Number
+parse : String -> Float
 foreign pure parse from global "Number.parseFloat"
   catch from_js
 //^^^^^^^^^^^^^ FLICK-F001 a `foreign pure` call cannot throw
@@ -38,7 +38,7 @@ foreign pure first from "./first.js" "first"
 //~ FLICK-F001 @36:1-37:11 `nullable` makes the result an `Option a`
 
 /// A callback that may hold a scope, kept for who knows how long.
-every : forall c. Number -> (Unit ->{} Unit)^c ->{} Unit
+every : forall c. Float -> (Unit ->{} Unit)^c ->{} Unit
 foreign sync every from global "setInterval"
 //~ FLICK-F002 @42:1-42:45 may hold the capabilities of a scope
 

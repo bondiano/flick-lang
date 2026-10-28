@@ -62,7 +62,7 @@ foreign pure map_effect from "@flick-lang/runtime/effect/Stream" "mapEffect"
 /// as soon as it is ready.
 map_effect_par :
   forall c r e a r2 e2 b.
-  { concurrency : Option Number; unordered : Bool } ->
+  { concurrency : Option Float; unordered : Bool } ->
   (a ->{r2; e2} b) ->
   (Stream r e a)^c ->
   (Stream (r + r2) (e + e2) b)^c
@@ -147,14 +147,14 @@ foreign pure filter_map_effect from "@flick-lang/runtime/effect/Stream" "filterM
   reviewed "effect@4.0.5 sha256:132ca3c46ed6c160"
 
 /// The first `n` elements.
-take : forall c r e a. Number -> (Stream r e a)^c -> (Stream r e a)^c
+take : forall c r e a. Float -> (Stream r e a)^c -> (Stream r e a)^c
 foreign pure take from "@flick-lang/runtime/effect/Stream" "take"
   arity 1
   retention call
   reviewed "effect@4.0.5 sha256:fb668b929485f75f"
 
 /// The last `n` elements, once the stream ends.
-take_right : forall c r e a. Number -> (Stream r e a)^c -> (Stream r e a)^c
+take_right : forall c r e a. Float -> (Stream r e a)^c -> (Stream r e a)^c
 foreign pure take_right from "@flick-lang/runtime/effect/Stream" "takeRight"
   arity 1
   retention call
@@ -200,14 +200,14 @@ foreign pure take_while_effect from "@flick-lang/runtime/effect/Stream" "takeWhi
   reviewed "effect@4.0.5 sha256:67f463cc50e52e02"
 
 /// All but the first `n` elements.
-drop : forall c r e a. Number -> (Stream r e a)^c -> (Stream r e a)^c
+drop : forall c r e a. Float -> (Stream r e a)^c -> (Stream r e a)^c
 foreign pure drop from "@flick-lang/runtime/effect/Stream" "drop"
   arity 1
   retention call
   reviewed "effect@4.0.5 sha256:e772811d3910dd42"
 
 /// All but the last `n` elements.
-drop_right : forall c r e a. Number -> (Stream r e a)^c -> (Stream r e a)^c
+drop_right : forall c r e a. Float -> (Stream r e a)^c -> (Stream r e a)^c
 foreign pure drop_right from "@flick-lang/runtime/effect/Stream" "dropRight"
   arity 1
   retention call
@@ -266,22 +266,22 @@ foreign pure chunks from "@flick-lang/runtime/effect/Stream" "chunks"
   reviewed "effect@4.0.5 sha256:100f86ab67decc05"
 
 /// The same elements in chunks of `size`.
-rechunk : forall c r e a. Number -> (Stream r e a)^c -> (Stream r e a)^c
+rechunk : forall c r e a. Float -> (Stream r e a)^c -> (Stream r e a)^c
 foreign pure rechunk from "@flick-lang/runtime/effect/Stream" "rechunk"
   arity 1
   retention call
   reviewed "effect@4.0.5 sha256:434dc53c53b2bf55"
 
 /// The windows of `size` consecutive elements, one step apart.
-sliding : forall c r e a. Number -> (Stream r e a)^c -> (Stream r e (NonEmpty.NonEmpty a))^c
+sliding : forall c r e a. Float -> (Stream r e a)^c -> (Stream r e (NonEmpty.NonEmpty a))^c
 foreign pure sliding from "@flick-lang/runtime/effect/Stream" "sliding"
   arity 1
   retention call
   reviewed "effect@4.0.5 sha256:5a97e752d7a7068a"
 
 /// The windows of `size` elements, `step` apart.
-sliding_size : forall c r e a. Number ->
-  Number ->
+sliding_size : forall c r e a. Float ->
+  Float ->
   (Stream r e a)^c ->
   (Stream r e (NonEmpty.NonEmpty a))^c
 foreign pure sliding_size from "@flick-lang/runtime/effect/Stream" "slidingSize"
@@ -297,7 +297,7 @@ foreign pure split from "@flick-lang/runtime/effect/Stream" "split"
   reviewed "effect@4.0.5 sha256:5b15ec540d3c1422"
 
 /// Groups of `n` elements; the last may be shorter.
-grouped : forall c r e a. Number -> (Stream r e a)^c -> (Stream r e (NonEmpty.NonEmpty a))^c
+grouped : forall c r e a. Float -> (Stream r e a)^c -> (Stream r e (NonEmpty.NonEmpty a))^c
 foreign pure grouped from "@flick-lang/runtime/effect/Stream" "grouped"
   arity 1
   retention call
@@ -305,7 +305,7 @@ foreign pure grouped from "@flick-lang/runtime/effect/Stream" "grouped"
 
 /// Groups of at most `n` elements, each emitted at the latest after the
 /// duration.
-grouped_within : forall c r e a. Number ->
+grouped_within : forall c r e a. Float ->
   Duration.Duration ->
   (Stream r e a)^c ->
   (Stream r e (List a))^c
@@ -445,10 +445,10 @@ foreign pure debounce from "@flick-lang/runtime/effect/Stream" "debounce"
 throttle :
   forall c r e a.
   {
-    cost : NonEmpty.NonEmpty a -> Number;
-    units : Number;
+    cost : NonEmpty.NonEmpty a -> Float;
+    units : Float;
     duration : Duration.Duration;
-    burst : Option Number;
+    burst : Option Float;
     strategy : Option ThrottleStrategy;
   } ->
   (Stream r e a)^c ->
@@ -462,10 +462,10 @@ foreign pure throttle from "@flick-lang/runtime/effect/Stream" "flickThrottle"
 throttle_effect :
   forall c r e a r2 e2.
   {
-    cost : NonEmpty.NonEmpty a ->{r2; e2} Number;
-    units : Number;
+    cost : NonEmpty.NonEmpty a ->{r2; e2} Float;
+    units : Float;
     duration : Duration.Duration;
-    burst : Option Number;
+    burst : Option Float;
     strategy : Option ThrottleStrategy;
   } ->
   (Stream r e a)^c ->
@@ -478,7 +478,7 @@ foreign pure throttle_effect from "@flick-lang/runtime/effect/Stream" "flickThro
 /// Elements read ahead into a buffer of `capacity` (`None`: no bound),
 /// with the strategy for a full one (`None`: `Suspend`).
 buffer :
-  forall c r e a. { capacity : Option Number; strategy : Option Queue.Strategy } ->
+  forall c r e a. { capacity : Option Float; strategy : Option Queue.Strategy } ->
     (Stream r e a)^c ->
     (Stream r e a)^c
 foreign pure buffer from "@flick-lang/runtime/effect/Stream" "flickBuffer"
@@ -488,7 +488,7 @@ foreign pure buffer from "@flick-lang/runtime/effect/Stream" "flickBuffer"
 
 /// `buffer` counting chunks instead of elements.
 buffer_chunks :
-  forall c r e a. { capacity : Option Number; strategy : Option Queue.Strategy } ->
+  forall c r e a. { capacity : Option Float; strategy : Option Queue.Strategy } ->
     (Stream r e a)^c ->
     (Stream r e a)^c
 foreign pure buffer_chunks from "@flick-lang/runtime/effect/Stream" "flickBufferArray"

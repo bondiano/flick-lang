@@ -4,32 +4,32 @@
 // reads no atom, and a render makes no atom of its own.
 module App.ComponentSetup exposing (..)
 
-top : Atom.Writable Number
+top : Atom.Writable Float
 let top = Atom.local 0
 
-helper : Number ->{} Atom.Writable Number
+helper : Float ->{} Atom.Writable Float
 let helper n = Atom.local n
 
-component plain (n : Number) =
+component plain (n : Float) =
   ui {
     let again = Atom.local n
     text (show (Atom.value again))
   }
 
-component counter (start : Number) =
+component counter (start : Float) =
   let count = Atom.local start
   ui {
     let other = Atom.make 0
     text (show (Atom.value count + Atom.value other))
   }
 
-component ticking (n : Number) =
+component ticking (n : Float) =
   ui {
     let _started = Ui.on_mount (task { Platform.stdout_line "tick" })
     text (show n)
   }
 
-component once (start : Number) =
+component once (start : Float) =
   let count = Atom.local start
   let shown = Atom.value count
   ui { text (show shown) }

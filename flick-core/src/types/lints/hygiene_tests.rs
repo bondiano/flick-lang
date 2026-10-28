@@ -1,6 +1,6 @@
 use crate::types::lint_tests::{HEAD, assert_fix, fixed};
 
-const MAP: &str = "inc : Number -> Number\nlet inc n = n + 1\n\nf : List Number -> List Number\n";
+const MAP: &str = "inc : Float -> Float\nlet inc n = n + 1\n\nf : List Float -> List Float\n";
 
 #[test]
 fn a_fun_that_passes_its_parameter_is_the_function() {

@@ -46,7 +46,7 @@ let done_command =
   cli "done" {
     description "Remove the note with this number"
     /// The number `list` shows
-    arg number : Number
+    arg number : Int
     handle fun { number } ->
       let path = notes_file ()
       match Notes.remove number (load path) with

@@ -8,7 +8,7 @@ import JsonText exposing (Value(..))
 import Ts
 
 /// How deep a shape goes before the rest is `other`.
-max_depth : Number
+max_depth : Float
 let max_depth = 8
 
 /// Classes of the platform a binding keeps as opaque handles.
@@ -85,7 +85,7 @@ let object_name n t =
 
 rec {
   /// The shape of a type, `depth` levels deep.
-  shape : Ts.Checker -> Number -> Ts.Type -> Value
+  shape : Ts.Checker -> Float -> Ts.Type -> Value
   let shape c depth t =
     if depth > max_depth then
       other c t
@@ -108,7 +108,7 @@ rec {
         else
           other c t
 
-  object_shape : Ts.Checker -> Number -> Ts.Type -> Value
+  object_shape : Ts.Checker -> Float -> Ts.Type -> Value
   let object_shape c depth t =
     deeper : Ts.Type -> Value
     let deeper x = shape c (depth + 1) x
@@ -161,7 +161,7 @@ rec {
               other c t
           | None -> other c t
 
-  parameter : Ts.Checker -> Number -> Ts.Symbol -> Value
+  parameter : Ts.Checker -> Float -> Ts.Symbol -> Value
   let parameter c depth p =
     is : String -> Bool
     let is field =
@@ -186,7 +186,7 @@ rec {
         ("type", shape c depth type_),
       ]
 
-  signature : Ts.Checker -> Number -> Ts.Signature -> Value
+  signature : Ts.Checker -> Float -> Ts.Signature -> Value
   let signature c depth s =
     JObject
       [

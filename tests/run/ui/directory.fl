@@ -8,7 +8,7 @@ module App.Main exposing (main)
 
 type error Refused = Refused String
 
-type alias User = { id : Number; name : String }
+type alias User = { id : Float; name : String }
 
 setup : Unit ->{} Unit
 foreign sync setup from "./dom.mjs" "setup"

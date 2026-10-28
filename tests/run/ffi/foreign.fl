@@ -6,9 +6,9 @@ module App.Main exposing (main)
 import File exposing (Path)
 
 // JS gets the number itself
-unboxed type UserId = UserId Number
+unboxed type UserId = UserId Float
 
-type alias User = { id : Number; name : String }
+type alias User = { id : Float; name : String }
 
 type error FsError = FsError String
   deriving Show
@@ -21,10 +21,10 @@ service Http =
 from_js : JsValue -> FsError
 let from_js value = FsError "the file system failed"
 
-counted : Number ->{} Number
+counted : Float ->{} Float
 foreign effect counted from "./bindings.mjs" "counted"
 
-later : Number ->{} Number
+later : Float ->{} Float
 foreign async later from "./bindings.mjs" "later"
 
 fail_sync : String ->{; FsError} Unit
@@ -38,11 +38,11 @@ foreign async fail_async from "./bindings.mjs" "reject"
 log : String ->{} Unit
 foreign sync log from "./bindings.mjs" "log"
 
-hypot : Number -> Number -> Number
+hypot : Float -> Float -> Float
 foreign pure hypot from global "Math.hypot"
   arity 2
 
-now_millis : Unit ->{} Number
+now_millis : Unit ->{} Float
 foreign sync now_millis from global "Date.now"
   arity 0
 
@@ -64,7 +64,7 @@ greet : String -> Option String -> String
 foreign pure greet from "./bindings.mjs" "greet"
   optional 1
 
-sum : List Number -> Number
+sum : List Float -> Float
 foreign pure sum from "./bindings.mjs" "sum"
   variadic
 
@@ -75,16 +75,16 @@ foreign pure to_upper from global "String.prototype.toUpperCase"
 // Rank-two capture bounds do not change the callbacks' JavaScript arity.
 combine :
   forall c.
-  (forall u v. Number^u -> (Number^v -> Number)^(c + u))^c ->
-  Number -> Number -> Number
+  (forall u v. Float^u -> (Float^v -> Float)^(c + u))^c ->
+  Float -> Float -> Float
 foreign pure combine from "./bindings.mjs" "combine"
   retention call
 
 combine_three :
   forall c.
   (forall u v w.
-    Number^u -> (Number^v -> (Number^w -> Number)^(c + u + v))^(c + u))^c ->
-  Number -> Number -> Number -> Number
+    Float^u -> (Float^v -> (Float^w -> Float)^(c + u + v))^(c + u))^c ->
+  Float -> Float -> Float -> Float
 foreign pure combine_three from "./bindings.mjs" "combineThree"
   retention call
 
@@ -94,10 +94,10 @@ same_callback :
 foreign pure same_callback from "./bindings.mjs" "sameCallback"
   retention call
 
-twice : (Number ->{} Number) ->{} Number
+twice : (Float ->{} Float) ->{} Float
 foreign effect twice from "./bindings.mjs" "twice"
 
-await_both : Js.PromiseCallback Number Number ->{} Number
+await_both : Js.PromiseCallback Float Float ->{} Float
 foreign async await_both from "./bindings.mjs" "awaitBoth"
 
 sync_outcome : Unit ->{} String

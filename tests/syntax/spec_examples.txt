@@ -4,13 +4,13 @@
 cfd4deeeb00ff9b0  03-direct-calls:8  load_name : UserId ->{Users, Log; NotFound} String
 593814cb393c3a84  03-direct-calls:43  render : Show a => a -> String
 0e0762aff3749216  03-direct-calls:65  greet : String -> String -> String
-77b958aa32b4da08  03-direct-calls:87  doubled : Unit ->{Atom.Read;} Number
+60c4be457650bda6  03-direct-calls:87  doubled : Unit ->{Atom.Read;} Float
 6c70dbf125707c4a  04-computations:17  load_user : UserId ->{Users; NotFound} User
 1f4fb3d7472f358e  04-computations:37  load_twice :
 5490665b39c55003  04-computations:78  load_name_pair : UserId -> UserId ->{Users; NotFound} (String, String)
 589f6dc98bbfef4f  05-types-and-classes:42  class Functor (f : Type -> Type) =
 351c17a8bae37ce1  05-types-and-classes:63  class Show a =
-872c8247235efbb4  05-types-and-classes:119  apply_twice :
+0132888d2341123b  05-types-and-classes:125  apply_twice :
 74a14e74a12990e3  05-types-and-classes:133  decode_pair :
 9bdd6c03c6da66f8  05-types-and-classes:159  name :
 0bf407bdf82852be  05-types-and-classes:189  class Show a =
@@ -24,13 +24,13 @@ d2e8d6c7d9e16954  05-types-and-classes:266  class Collection c =
 ac73e7b4530d3617  05-types-and-classes:385  make_identity : Unit -> (a -> a)
 ce831b060f823d82  05-types-and-classes:399  fresh_cell : forall a. Eff none none (Ref (Option a))
 659dd5e1c7324273  05-types-and-classes:414  capture_cell : Ref (Option a) -> Eff none none (Ref (Option a))
-f42159967b1e64b5  05-types-and-classes:424  logged_none : Unit ->{Log; none} Option a
+e337b6a7c021c89c  05-types-and-classes:454  logged_none : Unit ->{Log; none} Option a
 5e483a0a0ce484e8  06-higher-order:8  normalize_names : List String -> List String
 7644f905482ebdd8  06-higher-order:47  pair_optional : Option a -> Option b -> Option (a, b)
 3cbab87c79864e89  06-higher-order:60  pair_optional : Option a -> Option b -> Option (a, b)
 90c190d26dc0c631  07-errors-and-concurrency:12  type error NotFound = NotFound UserId
-91f550830e015b91  07-errors-and-concurrency:27  type error RetryExhausted e = RetryExhausted e Number
-234a19d9938bb3aa  07-errors-and-concurrency:53  service Clock =
+c165c9574a810f65  07-errors-and-concurrency:29  type error RetryExhausted e = RetryExhausted e Float
+ac2209d128ccc44b  07-errors-and-concurrency:55  service Clock =
 db871b0a6a9f20ec  07-errors-and-concurrency:79  application : UserId ->{Config, Log; NotFound, ConnectError} String
 68432730286d9e2d  07-errors-and-concurrency:151  type error NotFound = NotFound UserId
 3731ef4320e94d37  07-errors-and-concurrency:231  read_config :
@@ -40,25 +40,25 @@ cbe0185a943553e9  07-errors-and-concurrency:281  bad_callback :
 e8bd3190545a729d  07-errors-and-concurrency:345  load_pair : UserId -> UserId ->{Users; NotFound} (User, User)
 24f2c1693e734bbf  08-typescript-and-ffi:8  identity : a -> a
 1d4de52c15fcfbac  08-typescript-and-ffi:38  with_default : a -> Option a -> a
-6d421b900cc63c54  08-typescript-and-ffi:69  type Shape =
+319247465a157a8f  08-typescript-and-ffi:73  type Shape =
 cfd4deeeb00ff9b0  08-typescript-and-ffi:105  load_name : UserId ->{Users, Log; NotFound} String
 eafd6510c5484060  08-typescript-and-ffi:195  lookup : String ->{; JsError} Option String
-f78643ad295517ef  08-typescript-and-ffi:229  hypot : Number -> Number -> Number
+f0e9d4dc677fa1bf  08-typescript-and-ffi:239  hypot : Float -> Float -> Float
 410efc85cb82fc5a  08-typescript-and-ffi:318  on_message : Message ->{Log; none} Unit
-c7457701e10aa513  08-typescript-and-ffi:442  add : Number -> Number -> Number
-390b567318ca1210  08-typescript-and-ffi:464  sum_pair : Number -> Number -> Number
-90506a3da26b61ad  08-typescript-and-ffi:513  unboxed type UserId = UserId String
+87030832fd894838  08-typescript-and-ffi:470  add : Float -> Float -> Float
+889a131e4073b3af  08-typescript-and-ffi:494  sum_pair : Float -> Float -> Float
+969c35e8a198d3e4  08-typescript-and-ffi:547  unboxed type UserId = UserId String
 6b1b974f39d51523  09-schema:77  refined type Email = String where Checks.email
-002c4c46c829649b  09-schema:120  type alias Preferences = {
-62b3490f7ac7e56f  09-schema:163  type Tree a =
-70265bd42f7414d7  09-schema:259  increment : Ref Number ->{} Number
-d72679edd15d953e  09-schema:274  class Eq a => Hash a =
+593c0cc261ad3287  09-schema:122  type alias Preferences = {
+f8e0f9b586154cb0  09-schema:169  type Tree a =
+4fe0a456611fab95  09-schema:278  increment : Ref Float ->{} Float
+12896561710e24bd  09-schema:293  class Eq a => Hash a =
 e28dd24856e76943  10-type-programming-and-edsl:69  type alias BalanceRow =
 1838791670c05b74  10-type-programming-and-edsl:103  deferred_balances :
 b3787233ce690f3a  10-type-programming-and-edsl:167  type alias SaveButtonProps c =
 d12b90a1adddfd23  10-type-programming-and-edsl:196  save_button :
 569e94364977c35c  10-type-programming-and-edsl:235  type alias SelectProps a c =
-0ea7549614206500  10-type-programming-and-edsl:273  greet : Cli.Command {Platform} none
+27b052511d114b4f  10-type-programming-and-edsl:289  greet : Cli.Command {Platform} none
 616df64b98d90310  10-type-programming-and-edsl:321  tool : Cli.Command {Platform} none
 213799199fbee0b5  10-type-programming-and-edsl:341  main : Unit ->{; AppError} Unit
 4f1eda6ee144286a  11-compiler:52  module App.Users exposing (User, load_user)

@@ -366,23 +366,27 @@ impl Checker<'_> {
             let inferred = errors == self.diagnostics.len()
                 && self.operators_fit()
                 && !suggestion.contains(&mut |t| matches!(t, Type::Error | Type::Meta(_)));
-            let edits = if inferred && indent.chars().all(|c| c == ' ' || c == '\t') {
-                let at = u32::try_from(line).expect("offsets fit in u32");
-                vec![Edit {
-                    span: Span::new(span.file, at, at),
-                    replacement: format!("{indent}{name} : {shown}\n"),
-                }]
-            } else {
-                Vec::new()
-            };
-            self.diagnostics.push(
-                Diagnostic::error(
-                    codes::T004,
-                    format!("function `{name}` needs a signature right above its `let`"),
-                    span,
+            let at = (inferred && indent.chars().all(|c| c == ' ' || c == '\t')).then(|| {
+                (
+                    u32::try_from(line).expect("offsets fit in u32"),
+                    indent.to_owned(),
                 )
-                .with_fix(format!("add `{name} : {shown}`"), edits),
-            );
+            });
+            // a number literal's type is known once the declaration settles
+            if self.has_open_number(&ty) {
+                self.signatures.push(PendingSignature {
+                    index: self.diagnostics.len(),
+                    name: name.to_owned(),
+                    ty: ty.clone(),
+                    span,
+                    at,
+                });
+                self.diagnostics
+                    .push(signature_diagnostic(name, &shown, span, None));
+            } else {
+                self.diagnostics
+                    .push(signature_diagnostic(name, &shown, span, at));
+            }
         } else if let Some(header) = redundant {
             self.redundant_annotation(decl, parts, header);
         }
@@ -392,6 +396,27 @@ impl Checker<'_> {
         } else {
             self.generalize(&ty)
         }
+    }
+
+    /// Writes the signatures suggested before the number literals in them
+    /// were settled, once they are.
+    pub fn settle_signatures(&mut self) {
+        for pending in mem::take(&mut self.signatures) {
+            if self.has_open_number(&pending.ty) {
+                self.signatures.push(pending);
+                continue;
+            }
+            let suggestion = self.signature_of(&pending.ty);
+            let shown = self.show(&suggestion);
+            self.diagnostics[pending.index] =
+                signature_diagnostic(&pending.name, &shown, pending.span, pending.at);
+        }
+    }
+
+    /// Whether `ty` holds the type of a number literal not settled yet.
+    fn has_open_number(&self, ty: &Type) -> bool {
+        self.zonk(ty)
+            .contains(&mut |t| matches!(t, Type::Meta(m) if self.store.is_numeric(*m)))
     }
 
     /// Types written in a function's `let` header instead of its signature;
@@ -460,4 +485,38 @@ pub(super) fn pattern_names(pattern: &Node, text: &str, out: &mut Vec<String>) {
             }
         }
     }
+}
+
+/// A signature suggested for a function, to write later: the literals of
+/// its type are not settled yet.
+#[derive(Debug, Clone)]
+pub(super) struct PendingSignature {
+    index: usize,
+    name: String,
+    ty: Type,
+    span: Span,
+    at: Option<(u32, String)>,
+}
+
+/// `FLICK-T004` for function `name`, with the edit that inserts `shown` at
+/// the start of the line `at` when the type is fully known.
+fn signature_diagnostic(
+    name: &str,
+    shown: &str,
+    span: Span,
+    at: Option<(u32, String)>,
+) -> Diagnostic {
+    let edits = match at {
+        Some((at, indent)) => vec![Edit {
+            span: Span::new(span.file, at, at),
+            replacement: format!("{indent}{name} : {shown}\n"),
+        }],
+        None => Vec::new(),
+    };
+    Diagnostic::error(
+        codes::T004,
+        format!("function `{name}` needs a signature right above its `let`"),
+        span,
+    )
+    .with_fix(format!("add `{name} : {shown}`"), edits)
 }

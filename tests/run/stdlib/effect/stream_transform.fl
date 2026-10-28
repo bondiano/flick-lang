@@ -1,7 +1,7 @@
 // Streams of Effect's `Stream` changed element by element.
 module App.Main exposing (main)
 
-type error Boom = Boom Number
+type error Boom = Boom Float
 
 type error Bang = Bang String
 
@@ -11,28 +11,28 @@ let ms5 = Result.with_default Duration.zero (Duration.millis 5)
 ms1000 : Duration.Duration
 let ms1000 = Result.with_default Duration.zero (Duration.millis 1000)
 
-line : (String, List Number) ->{} Unit
+line : (String, List Float) ->{} Unit
 let line (label, xs) = Platform.stdout_line (label ++ ": " ++ show xs)
 
-lists : (String, List (List Number)) ->{} Unit
+lists : (String, List (List Float)) ->{} Unit
 let lists (label, xs) = Platform.stdout_line (label ++ ": " ++ show xs)
 
-nums : Stream.Stream none none Number
+nums : Stream.Stream none none Float
 let nums = Stream.range 1 6
 
-chunked : Stream.Stream none none Number
+chunked : Stream.Stream none none Float
 let chunked = Stream.from_lists [[1, 2], [3, 4, 5]]
 
-even : Number -> Bool
+even : Float -> Bool
 let even n = n % 2 == 0
 
-half : Filter.Filter Number Number Number
+half : Filter.Filter Float Float Float
 let half n = if even n then Ok (n / 2) else Err n
 
-grow : NonEmpty.NonEmpty Number -> NonEmpty.NonEmpty Number
+grow : NonEmpty.NonEmpty Float -> NonEmpty.NonEmpty Float
 let grow chunk = NonEmpty.map (fun n -> n * 10) chunk
 
-collect : Stream.Stream none none (NonEmpty.NonEmpty Number) ->{} List (List Number)
+collect : Stream.Stream none none (NonEmpty.NonEmpty Float) ->{} List (List Float)
 let collect s = List.map NonEmpty.to_list (Stream.run_collect s)
 
 main : Unit ->{; AppError} Unit
@@ -77,7 +77,7 @@ let main () =
       (Stream.concat (Stream.fail (Boom 7)) (Stream.succeed 1))
   let outcome = try show (Stream.run_collect mapped) with | Bang s -> "Bang " ++ s
   Platform.stdout_line ("map_both: " ++ outcome)
-  let renamed : Stream.Stream none {Bang} Number =
+  let renamed : Stream.Stream none {Bang} Float =
     Stream.map_error (fun (Boom n) -> Bang ("e" ++ show n)) (Stream.fail (Boom 3))
   let renamed_outcome = try show (Stream.run_collect (Stream.as_ 0 renamed)) with | Bang s -> s
   Platform.stdout_line ("map_error: " ++ renamed_outcome)
@@ -132,7 +132,7 @@ let main () =
         (
           Stream.map_accum_chunks
             0
-            (fun acc chunk -> (acc + 1, [acc, NonEmpty.length chunk]))
+            (fun acc chunk -> (acc + 1, [acc, Int.to_float (NonEmpty.length chunk)]))
             chunked
         )),
     )
@@ -148,7 +148,7 @@ let main () =
       (Stream.run_collect
         (Stream.map_accum_chunks_effect
           0
-          (fun acc chunk -> (acc + NonEmpty.length chunk, [acc]))
+          (fun acc chunk -> (acc + Int.to_float (NonEmpty.length chunk), [acc]))
           chunked)),
     )
   line ("scan", (Stream.run_collect (Stream.scan 0 (fun acc n -> acc + n) (Stream.take 4 nums))))
@@ -182,7 +182,7 @@ let main () =
   let throttled =
     Stream.throttle
       {
-        cost = fun chunk -> NonEmpty.length chunk;
+        cost = fun chunk -> Int.to_float (NonEmpty.length chunk);
         units = 100;
         duration = ms1000;
         burst = None;
@@ -229,6 +229,6 @@ let main () =
       "buffer_chunks",
       (Stream.run_collect (Stream.buffer_chunks { capacity = Some 1; strategy = None } chunked)),
     )
-  let checked : List (Result Boom Number) =
+  let checked : List (Result Boom Float) =
     Stream.run_collect (Stream.result (Stream.concat (Stream.fail (Boom 4)) (Stream.succeed 1)))
   Platform.stdout_line ("result: " ++ show (List.length checked))

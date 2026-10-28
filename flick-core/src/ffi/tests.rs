@@ -44,7 +44,7 @@ fn without_policies_promises_callbacks_and_nullable_results_are_blocked() {
     // `nextId` is never pure: its result type cannot show that
     assert_eq!(
         status("nextId"),
-        (Status::Supported, "Unit ->{} Number".into())
+        (Status::Supported, "Unit ->{} Float".into())
     );
     assert!(
         generated
@@ -121,7 +121,7 @@ foreign async lookup from "lookup-lib" "lookup"
   catch JsError.from_js
   reviewed "lookup-lib@0.9.0 sha256:aa"
 
-each : List Number -> (Number -> Unit) ->{} Unit
+each : List Float -> (Float -> Unit) ->{} Unit
 foreign sync each from "lookup-lib" "each"
   arity 2
   retention call

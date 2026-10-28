@@ -2,7 +2,7 @@
 // fiber carries.
 module App.Main exposing (main)
 
-type error Boom = Boom Number
+type error Boom = Boom Float
   deriving Show
 
 options : Tracer.SpanOptions
@@ -31,7 +31,7 @@ let none_loggers = []
 counter_options : Metric.CounterOptions
 let counter_options = { description = None; attributes = []; incremental = false }
 
-count_of : Metric.Counter ->{} Number
+count_of : Metric.Counter ->{} Float
 let count_of c = (Metric.value c).count
 
 logs : Unit ->{} Unit
@@ -141,19 +141,19 @@ let defects = Metric.counter "observe_defects" counter_options
 timing : Metric.Counter
 let timing = Metric.counter "observe_duration" counter_options
 
-boom_number : Boom -> Number
+boom_number : Boom -> Float
 let boom_number e =
   match e with
   | Boom n -> n
 
 /// Runs `t` under every tracking wrapper, ignoring how it ends.
-tracked : Eff none {Boom} Number ->{} Unit
+tracked : Eff none {Boom} Float ->{} Unit
 let tracked t =
   let _ = Effect.exit (task {
     Effect.track all_runs (fun x -> 1) (task {
       Effect.track_successes wins (fun n -> n) (task {
         Effect.track_errors error_count boom_number (task {
-          Effect.track_defects defects (fun d -> String.length d) (task {
+          Effect.track_defects defects (fun d -> Int.to_float (String.length d)) (task {
             Effect.track_duration timing (fun d -> 1) t
           })
         })
@@ -164,9 +164,9 @@ let tracked t =
 
 metrics : Unit ->{} Unit
 let metrics () =
-  let ok : Eff none {Boom} Number = task { 2 }
-  let bad : Eff none {Boom} Number = task { from_result (Err (Boom 3)) }
-  let broken : Eff none {Boom} Number = task { Effect.die "broken" }
+  let ok : Eff none {Boom} Float = task { 2 }
+  let bad : Eff none {Boom} Float = task { from_result (Err (Boom 3)) }
+  let broken : Eff none {Boom} Float = task { Effect.die "broken" }
   List.each_effect tracked [ok, bad, broken]
   Platform.stdout_line
     ("track: "

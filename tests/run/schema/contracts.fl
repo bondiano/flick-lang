@@ -5,7 +5,7 @@
 // Standard Schema adapter stops with the scope it was made in.
 module App.Main exposing (main)
 
-type Tree = Leaf Number | Branch (List Tree)
+type Tree = Leaf Float | Branch (List Tree)
   deriving Schema
 
 refined type Email = String where Checks.email
@@ -69,9 +69,9 @@ let main () =
   let trees = Codec.json (schema Tree)
   Platform.stdout_line (outcome (Codec.decode_result trees (cyclic ())))
   Platform.stdout_line (outcome (Codec.decode_result trees (shared ())))
-  Platform.stdout_line (outcome (Codec.decode_result Number.json_finite (not_a_number ())))
-  Platform.stdout_line (outcome (Codec.encode_result Number.json_finite Number.nan))
-  Platform.stdout_line (outcome (Codec.encode_result Number.json Number.nan))
+  Platform.stdout_line (outcome (Codec.decode_result Float.json_finite (not_a_number ())))
+  Platform.stdout_line (outcome (Codec.encode_result Float.json_finite Float.nan))
+  Platform.stdout_line (outcome (Codec.encode_result Float.json Float.nan))
   let secret = Redacted.make "hunter2"
   let session = { token = "t" }
   let email =

@@ -36,7 +36,7 @@ let footer_bare = Ui.panel { header = Ui.text "h"; body = Ui.text "b"; footer = 
 //                                                                              ^^^^^^^^^^^ FLICK-T003 expected `Option Ui`, found `Ui`
 
 // a view is a pure function of the model
-view_reads : Ref Number -> Number -> Ui
+view_reads : Ref Float -> Float -> Ui
 let view_reads model n = ui { paragraph [text (show (Ref.get model))] }
 //                                                   ^^^^^^^^^^^^^ FLICK-E001 this is a runtime call, but `view_reads` is
 
@@ -44,7 +44,7 @@ let view_reads model n = ui { paragraph [text (show (Ref.get model))] }
 supervisor : Failure none ->{} Unit
 let supervisor failure = ()
 
-refusing : Number -> Ui
+refusing : Float -> Ui
 let refusing n =
   ui {
     button

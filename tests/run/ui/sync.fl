@@ -3,38 +3,38 @@
 // with variables) runs at once where a render calls it.
 module App.Main exposing (main)
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.make 3
 
-doubled : Unit ->{Atom.Read;} Number
+doubled : Unit ->{Atom.Read;} Float
 let doubled () = Atom.value count * 2
 
-twice : (Unit ->{r; e} Number) -> Unit ->{r; e} Number
+twice : (Unit ->{r; e} Float) -> Unit ->{r; e} Float
 let twice f () = f () + f ()
 
-labelled : Number ->{Atom.Read; e} String
+labelled : Float ->{Atom.Read; e} String
 let labelled n = "n = " ++ show (Atom.value count + n)
 
-plus_one : Unit ->{Atom.Read | r; e} Number
+plus_one : Unit ->{Atom.Read | r; e} Float
 let plus_one () = Atom.value count + 1
 
-next : Atom.Atom Number
+next : Atom.Atom Float
 let next = Atom.derived plus_one
 
 // a runtime argument of a Sync call runs before the call
-ident : Number ->{r; e} Number
+ident : Float ->{r; e} Float
 let ident n = n
 
-read_more : Number ->{Atom.Read;} Number
+read_more : Float ->{Atom.Read;} Float
 let read_more n = Atom.value count + n
 
-more : Unit ->{Atom.Read | r; e} Number
+more : Unit ->{Atom.Read | r; e} Float
 let more () = read_more (ident 1)
 
-later : Atom.Atom Number
+later : Atom.Atom Float
 let later = Atom.derived more
 
-total : Atom.Atom Number
+total : Atom.Atom Float
 let total = Atom.derived (fun () -> Atom.get next + doubled ())
 
 page : Ui.View Unit

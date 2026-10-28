@@ -6,10 +6,10 @@ module App.Main exposing (main)
 import Reactivity.Atom as Atom
 import Reactivity.AsyncResult as AsyncResult
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.label_state "App.Main.count" (Atom.state 1)
 
-doubled : Atom.Atom Number
+doubled : Atom.Atom Float
 let doubled =
   Atom.keep_alive (Atom.readable (fun ctx -> Atom.read ctx (Atom.readonly count) * 2))
 
@@ -19,17 +19,17 @@ let shown = Atom.with_label "App.Main.shown" (Atom.map (fun n -> "n=" ++ show n)
 greeting : String -> Atom.Atom String
 let greeting = Atom.family (fun name -> Atom.readonly (Atom.state ("hello " ++ name)))
 
-answer : Atom.Atom (AsyncResult.AsyncResult Number none)
+answer : Atom.Atom (AsyncResult.AsyncResult Float none)
 let answer =
   Atom.idle_ttl
     (Result.with_default Duration.zero (Duration.seconds 1))
     (Atom.from_task (task { 41 + 1 }))
 
 /// The doubled count, from whatever registry is provided.
-read_doubled : Unit ->{Atom.Registry;} Number
+read_doubled : Unit ->{Atom.Registry;} Float
 let read_doubled () = Atom.get doubled
 
-describe : AsyncResult.AsyncResult Number none -> String
+describe : AsyncResult.AsyncResult Float none -> String
 let describe result =
   AsyncResult.fold
     "initial"

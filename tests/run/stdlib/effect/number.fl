@@ -1,11 +1,11 @@
-// Numbers, BigInts and decimals from Effect's `Number`, `BigInt` and
+// Numbers, BigInts and decimals from Effect's `Float`, `BigInt` and
 // `BigDecimal`, and redacted values from `Redacted`.
 module App.Main exposing (main)
 
 line : String -> String -> Unit ->{} Unit
 let line label value () = Platform.stdout_line (label ++ ": " ++ value)
 
-num : Option Number -> String
+num : Option Float -> String
 let num o =
   match o with
   | Some n -> show n
@@ -36,67 +36,67 @@ main : Unit ->{; AppError} Unit
 let main () =
   line
     "arith"
-    (show (10 |> Number.sum 2)
+    (show (10 |> Float.sum 2)
       ++ " "
-      ++ show (10 |> Number.subtract 3)
+      ++ show (10 |> Float.subtract 3)
       ++ " "
-      ++ show (10 |> Number.multiply 3)
+      ++ show (10 |> Float.multiply 3)
       ++ " "
-      ++ num (10 |> Number.divide 4)
+      ++ num (10 |> Float.divide 4)
       ++ " "
-      ++ num (1 |> Number.divide 0))
+      ++ num (1 |> Float.divide 0))
     ()
   line
     "remainder"
-    (show (7 |> Number.remainder 3)
+    (show (7 |> Float.remainder 3)
       ++ " "
-      ++ show (0.3 |> Number.remainder 0.1)
+      ++ show (0.3 |> Float.remainder 0.1)
       ++ " "
-      ++ show (Number.increment 1)
+      ++ show (Float.increment 1)
       ++ " "
-      ++ show (Number.decrement 1))
+      ++ show (Float.decrement 1))
     ()
   line
     "all"
-    (show (Number.sum_all [1, 2, 3])
+    (show (Float.sum_all [1, 2, 3])
       ++ " "
-      ++ show (Number.multiply_all [2, 3, 4])
+      ++ show (Float.multiply_all [2, 3, 4])
       ++ " "
-      ++ show (Number.sum_all []))
+      ++ show (Float.sum_all []))
     ()
   line
     "compare"
-    (show (1 |> Number.is_less_than 2)
+    (show (1 |> Float.is_less_than 2)
       ++ " "
-      ++ show (2 |> Number.is_less_than_or_equal_to 2)
+      ++ show (2 |> Float.is_less_than_or_equal_to 2)
       ++ " "
-      ++ show (1 |> Number.is_greater_than 2)
+      ++ show (1 |> Float.is_greater_than 2)
       ++ " "
-      ++ show (2 |> Number.is_greater_than_or_equal_to 2))
+      ++ show (2 |> Float.is_greater_than_or_equal_to 2))
     ()
   line
     "bounds"
-    (show (Number.between { minimum = 0; maximum = 5 } 3)
+    (show (Float.between { minimum = 0; maximum = 5 } 3)
       ++ " "
-      ++ show (Number.clamp { minimum = 0; maximum = 5 } 9)
+      ++ show (Float.clamp { minimum = 0; maximum = 5 } 9)
       ++ " "
-      ++ show (Number.min 2 3)
+      ++ show (Float.min 2 3)
       ++ " "
-      ++ show (Number.max 2 3))
+      ++ show (Float.max 2 3))
     ()
   line
     "sign"
-    (show (Number.sign (-2)) ++ " " ++ show (Number.sign 0) ++ " " ++ show (Number.sign 5))
+    (show (Float.sign (-2)) ++ " " ++ show (Float.sign 0) ++ " " ++ show (Float.sign 5))
     ()
   line
     "misc"
-    (show (Number.next_pow2 17)
+    (show (Float.next_pow2 17)
       ++ " "
-      ++ show (3.14159 |> Number.round_to 2)
+      ++ show (3.14159 |> Float.round_to 2)
       ++ " "
-      ++ num (Number.parse "1e3")
+      ++ num (Float.parse "1e3")
       ++ " "
-      ++ num (Number.parse "x"))
+      ++ num (Float.parse "x"))
     ()
   line
     "bigint arith"

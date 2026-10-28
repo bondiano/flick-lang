@@ -4,10 +4,11 @@
 import { Effect, Option, Redacted, Result, Schema, SchemaGetter, SchemaIssue, SchemaTransformation } from "effect";
 
 import { type SchemaError, isSchemaError } from "./issues.ts";
-import { type AnySchema, anyOption, anyRedacted, jsonBigint, jsonNumber, jsonOf } from "./schemas.ts";
+import { type AnySchema, anyOption, anyRedacted, jsonBigint, jsonInt, jsonNumber, jsonOf } from "./schemas.ts";
 
 export const codecString: AnySchema = Schema.String;
 export const codecNumberFinite: AnySchema = jsonNumber;
+export const codecInt: AnySchema = jsonInt;
 export const codecBool: AnySchema = Schema.Boolean;
 export const codecBigint: AnySchema = jsonBigint;
 

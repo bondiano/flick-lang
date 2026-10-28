@@ -11,7 +11,7 @@ type CompressionAlgorithm = Gzip | Deflate | Brotli | Zstd
 type alias FileOptions =
   {
     bytesToRead : Option ByteSize.ByteSize;
-    chunkSize : Option Number;
+    chunkSize : Option Float;
     offset : Option ByteSize.ByteSize;
     response : Http.ServerResponse.Options;
   }

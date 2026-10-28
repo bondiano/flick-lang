@@ -28,7 +28,7 @@ let partial_capacity ref f =
   ignore (Ref.get_and_update_some ref f)
   Ref.update_some_and_get ref f
 
-copy_only_updates : forall s. Handle s ->{} (Ref Number)^{}
+copy_only_updates : forall s. Handle s ->{} (Ref Float)^{}
 let copy_only_updates handle =
   let ref = Ref.make 0
   Ref.update ref (fun current ->

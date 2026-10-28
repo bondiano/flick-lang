@@ -11,20 +11,20 @@ type ReaderT r (m : Type -> Type) a
 type StateT s (m : Type -> Type) a
 type MaybeT (m : Type -> Type) a
 
-type alias Config = { budget : Number; overhead : Number }
-type alias PlanState = { remaining : Number; completed : List String }
+type alias Config = { budget : Float; overhead : Float }
+type alias PlanState = { remaining : Float; completed : List String }
 /// A reusable stack of independent effects.
 type alias Planner a = MaybeT (StateT PlanState (ReaderT Config Identity)) a
-type alias Ready = Planner Number
+type alias Ready = Planner Float
 type alias Pair a b = (a, b)
 
-plan : Planner Number -> Planner Number
+plan : Planner Float -> Planner Float
 let plan value = value
 
 ready : Ready -> Ready
 let ready value = value
 
-pair : Pair String Number -> Pair String Number
+pair : Pair String Float -> Pair String Float
 let pair value = value
 ";
     let f = fixture_of(&[("src/App/Plan.fl", source)]);
@@ -41,7 +41,7 @@ let pair value = value
             "Planner a",
             "type alias Planner a = MaybeT (StateT PlanState (ReaderT Config Identity)) a",
         ),
-        ("Ready", "Ready", "type alias Ready = Planner Number"),
+        ("Ready", "Ready", "type alias Ready = Planner Float"),
         ("Pair", "Pair a b", "type alias Pair a b = (a, b)"),
     ] {
         let occurrences: Vec<_> = source
@@ -101,13 +101,13 @@ module App.ReaderT exposing (Box(..), run)
 
 type Box = Box
 
-run : Number -> Number
+run : Float -> Float
 let run value = value
 ";
     let plain = "/// Ordinary qualified module documentation.
 module App.Plain exposing (run)
 
-run : Number -> Number
+run : Float -> Float
 let run value = value
 ";
     let main = "/// Module declarations have documentation too.
@@ -116,10 +116,10 @@ module App.Main exposing (..)
 import App.ReaderT as ReaderT
 import App.Plain
 
-read : Number -> Number
+read : Float -> Float
 let read value = ReaderT.run value
 
-plain : Number -> Number
+plain : Float -> Float
 let plain value = App.Plain.run value
 
 box : ReaderT.Box -> ReaderT.Box
@@ -222,8 +222,8 @@ fn signature_hover_keeps_the_written_lines() {
 /// A range check.
 between : {
   /// The lower bound.
-  minimum : Number;
-  maximum : Number;
+  minimum : Float;
+  maximum : Float;
 } ->
   Bool
 let between _ = true
@@ -235,7 +235,7 @@ let between _ = true
     let (markdown, _) = ide.hover(file, at + 1).expect("hover");
     assert!(
         markdown.starts_with(
-            "```flick\nbetween : {\n  /// The lower bound.\n  minimum : Number;\n  maximum : Number;\n} ->\n  Bool\n```"
+            "```flick\nbetween : {\n  /// The lower bound.\n  minimum : Float;\n  maximum : Float;\n} ->\n  Bool\n```"
         ),
         "{markdown}"
     );
@@ -264,7 +264,7 @@ type Box a = Box a
 instance MonadReader Box String =
   let ask = Box \"environment\"
 
-instance MonadState Box Number =
+instance MonadState Box Float =
   let get = Box 1
   let put _ = Box ()
 ";
@@ -276,7 +276,7 @@ import App.Box exposing (Box)
 environment : Box String
 let environment = ask
 
-current : Box Number
+current : Box Float
 let current = get
 
 saved : Box Unit
@@ -299,8 +299,8 @@ let generic = get
     let file = f.file("App.Main");
     for (name, nth, ty, docs, resolved) in [
         ("ask", 1, "Box String", "Reads the environment.", true),
-        ("get", 1, "Box Number", "Reads the state.", true),
-        ("put", 1, "Number -> Box Unit", "Replaces the state.", true),
+        ("get", 1, "Box Float", "Reads the state.", true),
+        ("put", 1, "Float -> Box Unit", "Replaces the state.", true),
         (
             "get",
             2,
@@ -344,7 +344,7 @@ class MonadError (m : Type -> Type) e | m -> e =
 type Box a = Empty | Box a
 type Token = Visible | Hidden
 
-unrelated : Number
+unrelated : Float
 let unrelated = 42
 ";
     let public = "module App.Public exposing (MonadError(..), Box(..), Token(..))
@@ -434,8 +434,8 @@ import App.Classes exposing (MonadState(..))
 
 type Box a = Box a
 
-instance MonadState Box Number =
-  state : forall c a. (forall v. Number^v -> (a, Number)^(c + v))^c -> (Box a)^c
+instance MonadState Box Float =
+  state : forall c a. (forall v. Float^v -> (a, Float)^(c + v))^c -> (Box a)^c
   let state step =
     match step 1 with
     | (a, _) -> Box a
@@ -468,8 +468,8 @@ let save path =
     );
     let file = f.file("App.Box");
     for (nth, instance, ty) in [
-        (0, "MonadState Box Number", "(Box a)^c"),
-        (1, "MonadState Box Number", "(Box a)^c"),
+        (0, "MonadState Box Float", "(Box a)^c"),
+        (1, "MonadState Box Float", "(Box a)^c"),
         (2, "MonadState (Wrap m) s", "(Wrap m a)^c"),
         (3, "MonadState (Wrap m) s", "(Wrap m a)^c"),
     ] {

@@ -24,6 +24,8 @@ pub use solve::Outcome;
 
 /// The module of the row primitives.
 pub const RECORD: &str = "Record";
+/// The module of the closed numeric classes.
+pub const NUMERIC: &str = "Numeric";
 
 /// Classes whose instances for records and tuples the compiler owns.
 const STRUCTURAL: [&str; 4] = ["Eq", "Ord", "Hash", "Show"];
@@ -112,11 +114,16 @@ impl Checker<'_> {
             self.regions.outlives.push(outlives);
             return;
         }
+        self.want_under(constraint, span, self.classes.givens.clone());
+    }
+
+    /// Requires `constraint` at `span` where `givens` are in scope.
+    pub fn want_under(&mut self, constraint: Type, span: Span, givens: Vec<Type>) {
         self.classes.required += 1;
         self.classes.wanted.push(Wanted {
             constraint,
             span,
-            givens: self.classes.givens.clone(),
+            givens,
             order: self.classes.required,
         });
     }

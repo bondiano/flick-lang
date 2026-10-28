@@ -1,7 +1,7 @@
 // Views on atoms through a renderer of the program's own: no React DOM.
 module App.Views exposing (..)
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.make 1
 
 count_view : Ui.View Unit

@@ -4,22 +4,22 @@ import List exposing (map, filter)
 //                         ^^^^^^ FLICK-R012 `filter` is imported but never used
 import String
 //     ^^^^^^ FLICK-R012 `String` is imported but never used
-import Number exposing (abs)
+import Float exposing (abs)
 
-type Shape = Circle Number | Square Number
+type Shape = Circle Float | Square Float
 
-net : Number -> Number
+net : Float -> Float
 let net price = helper price 0.8
 
-helper : Number -> Number -> Number
+helper : Float -> Float -> Float
 let helper p rate = p * rate
 
 // private values that only use each other are still unused
-gross : Number -> Number
-let gross price = Number.abs price
+gross : Float -> Float
+let gross price = Float.abs price
 //  ^^^^^ FLICK-R014 `gross` is never used
 
-area : Shape -> Number
+area : Shape -> Float
 let area shape = match shape with
   | Circle _radius -> 3
   | Square s -> s * s
@@ -30,7 +30,7 @@ let first (a, b) { name } = map (fun x -> a) []
 //                 ^^^^ FLICK-R013 `name` is never used
 //                                   ^ FLICK-R013 `x` is never used
 
-sum_with : List Number -> List Number
+sum_with : List Float -> List Float
 let sum_with xs =
   let unused = 1
 //    ^^^^^^ FLICK-R013 `unused` is never used

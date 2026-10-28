@@ -24,20 +24,20 @@ module RpcDemo exposing (main)
 
 import Stream.Core exposing (Stream)
 
-type alias User = { id : Number; name : String }
+type alias User = { id : Float; name : String }
   deriving Schema
 
-type error NotFound = NotFound { id : Number }
+type error NotFound = NotFound { id : Float }
   deriving Schema
 
-get_user : Rpc.Rpc "get_user" (Number ->{r; NotFound} User)
+get_user : Rpc.Rpc "get_user" (Float ->{r; NotFound} User)
 let get_user =
   Rpc.make (Record.label : Record.Label "get_user")
     |> Rpc.with_payload (Codec.json Schema.number)
     |> Rpc.with_success (Codec.json (schema User))
     |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema NotFound)))
 
-count_to : Rpc.Rpc "count_to" (Number ->{r;} Stream none none Number)
+count_to : Rpc.Rpc "count_to" (Float ->{r;} Stream none none Float)
 let count_to =
   Rpc.make (Record.label : Record.Label "count_to")
     |> Rpc.with_payload (Codec.json Schema.number)
@@ -45,8 +45,8 @@ let count_to =
 
 type alias Handlers r =
   {
-    get_user : Number ->{r; NotFound} User;
-    count_to : Number ->{r;} Stream none none Number;
+    get_user : Float ->{r; NotFound} User;
+    count_to : Float ->{r;} Stream none none Float;
   }
 
 users : Rpc.Group r (Handlers r)

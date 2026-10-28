@@ -9,7 +9,7 @@ let ok r =
   | Ok d -> d
   | Err _ -> Duration.zero
 
-ms : Number -> Duration.Duration
+ms : Float -> Duration.Duration
 let ms n =
   match Duration.millis n with
   | Ok d -> d
@@ -21,7 +21,7 @@ let shown r =
   | Ok d -> Duration.format d
   | Err (Duration.DurationError message) -> "error: " ++ message
 
-opt : Option Number -> String
+opt : Option Float -> String
 let opt o =
   match o with
   | Some n -> show n

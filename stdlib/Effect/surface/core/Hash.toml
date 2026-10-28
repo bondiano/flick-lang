@@ -5,7 +5,7 @@ optimize = "Hash.optimize 469fa27ccc5de639"
 [language]
 Hash = "class `Hash`"
 hash = "class `Hash`: `hash`"
-number = "class `Hash`: `hash` on `Number`"
+number = "class `Hash`: `hash` on `Float`"
 string = "class `Hash`: `hash` on `String`"
 array = "class `Hash`: `hash` on `List a`"
 structure = "a record's `Hash` instance"

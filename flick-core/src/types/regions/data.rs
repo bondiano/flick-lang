@@ -12,7 +12,7 @@ use crate::types::unify::Unified;
 impl Checker<'_> {
     pub fn bound_head(&self, t: &Type) -> Type {
         match self.qualified_head(t) {
-            Type::Bounded { ty, .. } | Type::Captured { ty, .. } if scalar(&self.whnf(&ty)) => {
+            Type::Bounded { ty, .. } | Type::Captured { ty, .. } if self.scalar(&ty) => {
                 self.qualified_head(&ty)
             }
             Type::Captured {
@@ -42,7 +42,7 @@ impl Checker<'_> {
     /// identity. Keep qualifiers inside type arguments invariant.
     pub fn value_bound(&self, t: Type) -> Type {
         match self.qualified_head(&t) {
-            Type::Bounded { ty, .. } | Type::Captured { ty, .. } if scalar(&self.whnf(&ty)) => {
+            Type::Bounded { ty, .. } | Type::Captured { ty, .. } if self.scalar(&ty) => {
                 self.qualified_head(&ty)
             }
             Type::Bounded { ty, captures } => Type::Bounded {
@@ -88,7 +88,7 @@ impl Checker<'_> {
                 if head.is_prim("List") {
                     return args.iter().any(|t| self.hidden_fields(t, seen));
                 }
-                if ["Number", "BigInt", "String", "Bool", "Unit", "Never"]
+                if ["Int", "Float", "BigInt", "String", "Bool", "Unit", "Never"]
                     .iter()
                     .any(|n| head.is_prim(n))
                 {
@@ -286,7 +286,7 @@ impl Checker<'_> {
     /// A projection refines an existing field; it never creates a new
     /// hidden closure environment in that field's complete type.
     pub fn data_field(&self, ty: &Type, captures: &Type) -> Type {
-        if scalar(&self.whnf(ty))
+        if self.scalar(ty)
             || matches!(
                 self.bound_head(ty),
                 Type::Bounded { .. } | Type::Captured { .. }
@@ -304,13 +304,10 @@ impl Checker<'_> {
     /// Constructor payloads and the constructed value share a capture
     /// bound. Delayed data results also retain their supplied environment.
     pub fn constructor_field(&self, ty: &Type, captures: &Type) -> Type {
-        let head = self.whnf(ty);
-        if ["Number", "BigInt", "String", "Bool", "Unit", "Never"]
-            .iter()
-            .any(|name| head.is_prim(name))
-        {
+        if self.scalar(ty) {
             return ty.clone();
         }
+        let head = self.whnf(ty);
         if matches!(ty, Type::Captured { .. } | Type::Bounded { .. }) {
             return ty.clone();
         }
@@ -360,8 +357,15 @@ impl Checker<'_> {
     }
 }
 
-pub(super) fn scalar(t: &Type) -> bool {
-    ["Number", "BigInt", "String", "Bool", "Unit", "Never"]
-        .iter()
-        .any(|name| t.is_prim(name))
+impl Checker<'_> {
+    /// Whether `t` is a primitive value, which holds no captures; an integer
+    /// literal's type is one before it is settled.
+    pub(super) fn scalar(&self, t: &Type) -> bool {
+        match self.whnf(t) {
+            Type::Meta(m) => self.store.is_numeric(m),
+            t => ["Int", "Float", "BigInt", "String", "Bool", "Unit", "Never"]
+                .iter()
+                .any(|name| t.is_prim(name)),
+        }
+    }
 }

@@ -2,7 +2,7 @@
 // ring stays persistent.
 module App.Main exposing (main)
 
-type Server = Server String Number
+type Server = Server String Float
   deriving Show
 
 name : Server -> String

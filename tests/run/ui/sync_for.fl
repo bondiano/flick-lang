@@ -2,10 +2,10 @@
 // atoms of the reader that built it, and a strict list reads them at once.
 module App.Main exposing (main)
 
-first : Atom.Writable Number
+first : Atom.Writable Float
 let first = Atom.make 1
 
-second : Atom.Writable Number
+second : Atom.Writable Float
 let second = Atom.make 2
 
 page : Ui.View Unit

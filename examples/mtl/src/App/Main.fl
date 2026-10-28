@@ -3,8 +3,8 @@ module App.Main exposing (main)
 
 import App.Plan as Plan
 
-refined type Minutes = Number
-  where fun n -> Number.is_safe_integer n && n >= 0
+refined type Minutes = Float
+  where fun n -> Float.is_safe_integer n && n >= 0
   deriving Cli.Value
 
 plan_command : Cli.Command none {AppError}

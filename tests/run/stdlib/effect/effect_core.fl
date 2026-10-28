@@ -2,10 +2,10 @@
 // and checked, and tasks run per element of a list.
 module App.Main exposing (main)
 
-type error Boom = Boom Number
+type error Boom = Boom Float
   deriving Show
 
-type error Odd = Odd Number
+type error Odd = Odd Float
   deriving Show
 
 ms1 : Duration.Duration
@@ -32,7 +32,7 @@ let outcome t =
   | Boom n -> "Boom " ++ show n
 
 /// A task that counts its runs in `runs` and gives the count.
-counting : Ref Number -> Eff none none Number
+counting : Ref Float -> Eff none none Float
 let counting runs =
   task {
     Ref.update runs (fun n -> n + 1)
@@ -40,7 +40,7 @@ let counting runs =
   }
 
 /// Fails with `Boom n` for the first `failures` runs.
-flaky : Ref Number -> Number -> Eff none {Boom} Number
+flaky : Ref Float -> Float -> Eff none {Boom} Float
 let flaky runs failures =
   task {
     Ref.update runs (fun n -> n + 1)
@@ -48,20 +48,20 @@ let flaky runs failures =
     if n <= failures then from_result (Err (Boom n)) else n
   }
 
-even : Number ->{; Odd} Number
+even : Float ->{; Odd} Float
 let even n = if n % 2 == 0 then n * 10 else from_result (Err (Odd n))
 
-parity : Number -> Result String Number
+parity : Float -> Result String Float
 let parity n = if n % 2 == 0 then Ok (n * 10) else Err ("odd " ++ show n)
 
-head_of : Eff none none (List Number) ->{} String
+head_of : Eff none none (List Float) ->{} String
 let head_of t =
   try
     show (Effect.head t)
   with
   | Cause.NoSuchElementError _ -> "empty"
 
-checked : Eff none {Odd} Number ->{} String
+checked : Eff none {Odd} Float ->{} String
 let checked t =
   try
     show (await t)
@@ -70,9 +70,9 @@ let checked t =
 
 single : Unit ->{} Unit
 let single () =
-  let exit : Exit {Boom} Number = Effect.exit (task { from_result (Err (Boom 1)) })
+  let exit : Exit {Boom} Float = Effect.exit (task { from_result (Err (Boom 1)) })
   Platform.stdout_line ("exit: " ++ show (Exit.is_failure exit))
-  let died : Exit none Number = Effect.exit (task { Effect.die "broken" })
+  let died : Exit none Float = Effect.exit (task { Effect.die "broken" })
   Platform.stdout_line
     ("die: " ++ show (Exit.find_defect died == Ok "broken" || Exit.has_dies died))
   let failure = Cause.fail (Boom 2)
@@ -114,7 +114,7 @@ let single () =
     ("timeout: "
       ++ show (try timeout 1 (task { Effect.never () }) with | TimeoutError -> "timed out"))
   let quick = timeout_option 50 (task { 5 })
-  let slow : Option Number = timeout_option 1 (task { Effect.never () })
+  let slow : Option Float = timeout_option 1 (task { Effect.never () })
   Platform.stdout_line ("timeout_option: " ++ show (quick, slow))
   Platform.stdout_line
     ("race_success: " ++ show (race_success (task { Effect.sleep ms5; "slow" }) (task { "fast" })))
@@ -161,7 +161,8 @@ let collections () =
       ++ show (task { 3 } |> Effect.filter_or_else (fun n -> n > 5) (fun n -> n * 100)))
   Platform.stdout_line
     ("filter_map_or_else: "
-      ++ show (task { 3 } |> Effect.filter_map_or_else parity (fun s -> String.length s)))
+      ++ show
+        (task { 3 } |> Effect.filter_map_or_else parity (fun s -> Int.to_float (String.length s))))
   Platform.stdout_line
     ("filter_or_fail: "
       ++ checked (task { Effect.filter_or_fail (fun n -> n > 5) (fun n -> Odd n) (task { 3 }) }))

@@ -8,12 +8,12 @@ type Tree a =
   deriving Schema
 
 type alias PairOf f = {
-  count : f Number;
+  count : f Float;
   label : f String;
 } deriving Schema
 
 type Expr =
-  | Num Number
+  | Num Float
   | Neg Expr
   | Block Statements
   deriving Schema

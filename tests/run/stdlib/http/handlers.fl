@@ -14,7 +14,7 @@ type alias Query = { id : String; q : String }
 type alias Note = { title : String; tag : List String }
   deriving Schema
 
-type alias Point = { x : Number }
+type alias Point = { x : Float }
   deriving Schema
 
 type error Boom = Boom

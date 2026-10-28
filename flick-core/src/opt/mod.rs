@@ -138,7 +138,7 @@ fn atom(e: &Expr) -> bool {
     match &e.kind {
         ExprKind::Lit(Lit::String(s)) => s.len() <= 32,
         ExprKind::Lit(_) | ExprKind::Local(_) | ExprKind::Global { .. } | ExprKind::Con(_) => true,
-        ExprKind::Neg(inner) => matches!(inner.kind, ExprKind::Lit(_)),
+        ExprKind::Neg(_, inner) => matches!(inner.kind, ExprKind::Lit(_)),
         _ => false,
     }
 }

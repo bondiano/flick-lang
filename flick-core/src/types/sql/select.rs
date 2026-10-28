@@ -235,7 +235,7 @@ impl Checker<'_> {
                     continue;
                 };
                 let v = self.sql_value(cx, scope, n, Place::Row);
-                self.expect(&v.ty, &Type::prim("Number"), self.span(n));
+                self.expect(&v.ty, &Type::prim("Int"), self.span(n));
                 let _ = write!(text, " {} {}", word.to_uppercase(), v.sql);
             }
         }

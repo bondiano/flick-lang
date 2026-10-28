@@ -2,7 +2,7 @@
 // signature must allow them, and a wider row is allowed.
 module App.Rethrow exposing (..)
 
-type error NotFound = NotFound Number
+type error NotFound = NotFound Float
 
 type error Denied = Denied String
 

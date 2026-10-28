@@ -11,7 +11,7 @@ pub const PRELUDE: &str = "Prelude";
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Type {
-    /// A named type constructor: `Number`, `Option`, a service or an error.
+    /// A named type constructor: `Float`, `Option`, a service or an error.
     Con {
         module: String,
         name: String,
@@ -448,13 +448,13 @@ mod tests {
                 value,
             };
             let substituted = ty.substitute(&[
-                ("a".into(), Type::prim("Number")),
+                ("a".into(), Type::prim("Float")),
                 ("c".into(), Type::empty_row()),
             ]);
             assert_eq!(
                 substituted,
                 Type::Captured {
-                    ty: Box::new(Type::prim("Number")),
+                    ty: Box::new(Type::prim("Float")),
                     captures: Box::new(Type::empty_row()),
                     value,
                 }

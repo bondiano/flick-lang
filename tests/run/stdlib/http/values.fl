@@ -155,7 +155,7 @@ let cookies () =
   with
   | e -> Platform.stdout_line ("infinite max age: " ++ (reason e))
 
-seconds : Number -> Duration.Duration
+seconds : Float -> Duration.Duration
 let seconds n =
   match Duration.seconds n with
   | Ok d -> d

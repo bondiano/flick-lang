@@ -9,7 +9,7 @@ import Http.ServerResponse exposing (ServerResponse)
 type alias Note = { title : String; tag : List String }
   deriving Schema
 
-type alias Point = { x : Number }
+type alias Point = { x : Float }
   deriving Schema
 
 type alias Theme = { theme : String }
@@ -116,7 +116,7 @@ let hello_route =
   Http.Router.route None "/" (fun _ -> Http.ServerResponse.text "hi" Http.ServerResponse.defaults)
 
 /// A server handle's type names its region.
-port_of : Http.Server.Server s -> Number
+port_of : Http.Server.Server s -> Float
 let port_of server =
   match Http.Server.address server with
   | Http.Server.TcpAddress _ port -> port
@@ -125,7 +125,7 @@ let port_of server =
 cookie_of : Http.Cookies.Cookies -> Option Http.Cookies.Cookie
 let cookie_of jar = Http.Cookies.get "a" jar
 
-form_of : Http.Multipart.Persisted -> Number
+form_of : Http.Multipart.Persisted -> Int
 let form_of persisted = List.length (Http.Multipart.fields persisted)
 
 note : Codec none none Json Note

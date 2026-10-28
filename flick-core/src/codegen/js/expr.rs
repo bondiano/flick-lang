@@ -5,6 +5,7 @@ use std::mem;
 
 use super::{Callee, Gen, Target, indent, names, tidy};
 use crate::ir::{Arm, Expr, ExprKind, Lit, Pat, Stage, Stmt};
+use crate::numeric::Num;
 use crate::types::{Constructor, Dict, Rep};
 
 /// Whether moving the evaluation of `js` later is unobservable: a name, a
@@ -55,6 +56,17 @@ impl Gen<'_> {
         let c = self.constant(&t, &js);
         self.buf.push(c);
         t
+    }
+
+    /// `-inner`, kept in 32 bits on `Int`; a literal is in range already, as
+    /// an `Int` literal is checked with its sign.
+    fn neg(&mut self, num: Num, inner: &Expr) -> String {
+        let js = self.expr(inner);
+        if num == Num::Int && !matches!(inner.kind, ExprKind::Lit(_)) {
+            format!("(-{js} | 0)")
+        } else {
+            format!("(-{js})")
+        }
     }
 
     pub(super) fn expr(&mut self, e: &Expr) -> String {
@@ -130,7 +142,7 @@ impl Gen<'_> {
             ExprKind::Binary(op, lhs, rhs) => self.binary(e.span, *op, lhs, rhs),
             ExprKind::Not(inner) => format!("(!{})", self.expr(inner)),
             ExprKind::Unwrap(inner) => self.unwrap(inner),
-            ExprKind::Neg(inner) => format!("(-{})", self.expr(inner)),
+            ExprKind::Neg(num, inner) => self.neg(*num, inner),
             ExprKind::Ignore(inner) => {
                 let v = self.expr(inner);
                 if !atomic(&v) {

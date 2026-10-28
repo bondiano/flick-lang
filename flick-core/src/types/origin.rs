@@ -86,7 +86,7 @@ mod tests {
     fn mismatches(body: &str) -> Vec<(String, Vec<String>)> {
         let text = format!(
             "module Probe exposing (..)\n\
-             add3 : Number -> Number -> Number -> Number\n\
+             add3 : Float -> Float -> Float -> Float\n\
              let add3 a b c = a + b + c\n\
              {body}\n"
         );
@@ -109,7 +109,7 @@ mod tests {
         let cases = [
             (
                 "let f b = if b then 1 else \"no\"",
-                "the `then` branch has type `Number`",
+                "the `then` branch has type `Int`",
             ),
             (
                 "let g x = match x with\n  | 0 -> \"zero\"\n  | _ -> 1",
@@ -117,11 +117,11 @@ mod tests {
             ),
             (
                 "let h () = add3 1 \"two\" 3",
-                "the 2nd argument of `add3` is declared as `Number` here",
+                "the 2nd argument of `add3` is declared as `Float` here",
             ),
             (
-                "let i () = Number.abs \"x\"",
-                "`Number.abs` takes `Number` as its 1st argument",
+                "let i () = Float.abs \"x\"",
+                "`Float.abs` takes `Float` as its 1st argument",
             ),
         ];
         for (body, note) in cases {
@@ -135,10 +135,10 @@ mod tests {
 
     #[test]
     fn an_annotated_branch_type_is_not_blamed_on_the_other_branch() {
-        let found = mismatches("f : Bool -> Number\nlet f b = if b then 1 else \"no\"");
+        let found = mismatches("f : Bool -> Float\nlet f b = if b then 1 else \"no\"");
         assert_eq!(
             found,
-            [("expected `Number`, found `String`".to_owned(), Vec::new())]
+            [("expected `Float`, found `String`".to_owned(), Vec::new())]
         );
     }
 }

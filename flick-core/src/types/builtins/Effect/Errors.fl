@@ -205,7 +205,7 @@ foreign effect on_exit_primitive from "@flick-lang/runtime/effect/Effect" "flick
 /// Runs `f` of the ids of the interrupting fibers when `task` is
 /// interrupted.
 on_interrupt :
-  forall c r e a r2 e2. (List Number ->{r2; e2} Unit)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
+  forall c r e a r2 e2. (List Float ->{r2; e2} Unit)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect on_interrupt from "@flick-lang/runtime/effect/Effect" "flickOnInterrupt"
   arity 1
   retention call

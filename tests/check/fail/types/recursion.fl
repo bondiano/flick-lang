@@ -2,19 +2,19 @@ module App.Recursion exposing (..)
 
 type Nested a = Flat a | Nest (Nested (List a))
 
-depth : Nested a -> Number
+depth : Nested a -> Float
 let rec depth value =
   match value with
   | Flat _ -> 0
   | Nest inner -> 1 + depth inner
 
-loop : Number -> Number
+loop : Float -> Float
 let loop n = loop n
 
-ping : Number -> Number
+ping : Float -> Float
 let ping n = pong n
 
-pong : Number -> Number
+pong : Float -> Float
 let pong n = ping n
 
 let rec xs = [1] ++ xs
@@ -24,25 +24,25 @@ let a = b + 1
 let b = a + 1
 
 rec {
-  wrap : List a -> Number
+  wrap : List a -> Float
   let wrap xs = match xs with | [] -> 0 | [x, ..._] -> unwrap [[x]]
 
-  unwrap : List b -> Number
+  unwrap : List b -> Float
   let unwrap xs = match xs with | [] -> 0 | [_, ...rest] -> wrap rest
 }
 
 rec {
-  swap_a : (a, b) -> Number
+  swap_a : (a, b) -> Float
   let swap_a (x, y) = swap_b (y, x)
 
-  swap_b : (c, d) -> Number
+  swap_b : (c, d) -> Float
   let swap_b (x, y) = swap_a (x, y)
 }
 
-//~ FLICK-T015 @9:23-9:28 `depth` is used at type `Nested (List a) -> Number` inside
+//~ FLICK-T015 @9:23-9:28 `depth` is used at type `Nested (List a) -> Float` inside
 //~ FLICK-T017 @12:14-12:18 `loop` uses itself: write `let rec` for a recursive function
 //~ FLICK-T017 @15:14-15:18 `ping`, `pong` use each other: define mutually recursive
 //~ FLICK-T012 @20:1-20:23 `xs` would be evaluated while it is being defined; only
 //~ FLICK-T012 @22:9-22:10 `a` and `b` would be evaluated while being defined; only
-//~ FLICK-T015 @28:56-28:62 `unwrap` is used at type `List (List a) -> Number` inside
-//~ FLICK-T015 @36:23-36:29 `swap_b` is used at type `(b, a) -> Number` inside
+//~ FLICK-T015 @28:56-28:62 `unwrap` is used at type `List (List a) -> Float` inside
+//~ FLICK-T015 @36:23-36:29 `swap_b` is used at type `(b, a) -> Float` inside

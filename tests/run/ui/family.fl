@@ -2,7 +2,7 @@
 // starting from its initial value.
 module App.Main exposing (main)
 
-drafts : Atom.Family Number (Atom.Writable String)
+drafts : Atom.Family Float (Atom.Writable String)
 let drafts = Atom.family (fun id -> Atom.make ("draft " ++ show id))
 
 main : Unit ->{; AppError} Unit

@@ -45,8 +45,8 @@ mod tests {
     fn guesses(body: &str) -> Vec<String> {
         let text = format!(
             "module Probe exposing (..)\n\
-             type alias User = {{ name : String; age : Number }}\n\
-             type Tri = Tri Number Number\n\
+             type alias User = {{ name : String; age : Float }}\n\
+             type Tri = Tri Float Float\n\
              {body}\n"
         );
         let mut sources = SourceMap::default();
@@ -63,8 +63,8 @@ mod tests {
     fn misspelt_names_get_a_replacement() {
         let cases = [
             ("let total = 1\nlet f () = totl + 1", "total"),
-            ("let f () = Number.to_strng 1", "Number.to_string"),
-            ("let f () = Nmber.to_string 1", "Number.to_string"),
+            ("let f () = Float.to_strng 1", "Float.to_string"),
+            ("let f () = Flaot.to_string 1", "Float.to_string"),
             ("let f (u : User) = u.agee", "age"),
             ("let f () = Tir 1 2", "Tri"),
             ("let f (x : Strng) = x", "String"),
@@ -77,7 +77,7 @@ mod tests {
 
     #[test]
     fn unexported_import_items_get_a_replacement() {
-        let text = "module Probe exposing (..)\nimport Number exposing (to_strng)\n";
+        let text = "module Probe exposing (..)\nimport Int exposing (to_strng)\n";
         let mut sources = SourceMap::default();
         let file = sources.add("Probe.fl", text.to_owned());
         let fixes: Vec<String> = crate::check(&sources, file)

@@ -3,9 +3,9 @@
 // tighter than comparisons; `exposing (..)`, `...rest` and `1.5` stay.
 module App.Main exposing (..)
 
-type alias Point = { x : Number; y : Number }
+type alias Point = { x : Float; y : Float }
 
-rest : List Number -> List Number
+rest : List Int -> List Int
 let rest xs =
   match xs with
   | [_, ...others] -> others

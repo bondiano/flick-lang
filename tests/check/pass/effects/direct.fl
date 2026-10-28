@@ -2,7 +2,7 @@
 // rows a body needs are inferred and bounded by its signature.
 module App.Direct exposing (..)
 
-type alias UserId = Number
+type alias UserId = Float
 
 type alias User = { id : UserId; name : String }
 
@@ -38,7 +38,7 @@ wide : UserId ->{Users, Log; NotFound} String
 let wide id =
   user_name id
 
-ticks : Unit ->{} Number
+ticks : Unit ->{} Float
 let ticks () =
   0
 
@@ -92,14 +92,14 @@ let one_layer outer =
   await outer
 
 // the rows of a callback become the rows of the call
-each : forall r e. (Number ->{r; e} Unit) -> List Number ->{r; e} Unit
+each : forall r e. (Float ->{r; e} Unit) -> List Float ->{r; e} Unit
 let rec each f numbers =
   match numbers with
   | [] -> ()
   | [n] -> f n
   | _ -> ()
 
-log_all : List Number ->{Log; none} Unit
+log_all : List Float ->{Log; none} Unit
 let log_all numbers =
   each (fun n -> Log.info "number") numbers
 

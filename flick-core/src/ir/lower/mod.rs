@@ -11,6 +11,7 @@ mod debug;
 mod do_notation;
 mod expr;
 mod lambda;
+mod numeric;
 mod pattern;
 mod question;
 mod ranges;

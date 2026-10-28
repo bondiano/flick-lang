@@ -1,0 +1,18 @@
+module App.IntLiterals exposing (..)
+
+too_big : Int
+let too_big = 2147483648
+
+too_small : Int
+let too_small = -2147483649
+
+fraction : Int
+let fraction = 1.5
+
+mixed : Int
+let mixed = 1 + 0.5
+
+//~ FLICK-T003 @4:15-4:25 this number does not fit in `Int`
+//~ FLICK-T003 @7:18-7:28 this number does not fit in `Int`
+//~ FLICK-T003 @10:16-10:19 expected `Int`, found `Float`
+//~ FLICK-T003 @13:13-13:20 expected `Int`, found `Float`

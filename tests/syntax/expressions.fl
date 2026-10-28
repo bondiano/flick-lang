@@ -1,6 +1,6 @@
 module App.Expressions exposing (numbers, classify)
 
-numbers : List Number
+numbers : List Float
 let numbers = [0, 42, 1_000_000, 1.5, 1e-3, 2E+10, 0x1F, 0o17, 0b1010, -7]
 
 big : BigInt
@@ -18,17 +18,17 @@ let strings =
     """,
   ]
 
-precedence : Number -> Bool
+precedence : Float -> Bool
 let precedence x =
   -x ** 2 + 3 * x - 1 > 0 && not (x == 1) || x >= 10
 
-pipeline : List Number -> Number
+pipeline : List Float -> Float
 let pipeline xs =
   xs
   |> List.map (fun x -> x * 2)
   |> List.sum
 
-classify : Number -> String
+classify : Float -> String
 let classify n =
   if n < 0 then
     "negative"
@@ -38,7 +38,7 @@ let classify n =
     let big = n > 1000
     if big then "big" else "positive"
 
-describe : Option (Number, String) -> String
+describe : Option (Float, String) -> String
 let describe value =
   match value with
   | None -> "none"
@@ -70,7 +70,7 @@ let load id =
   let again = await request
   let renamed = { user with name = "Ada"; age = 36 }
   let point = { x = 1; y = 2 }
-  let total = (point.x + point.y : Number)
+  let total = (point.x + point.y : Float)
   (user, again)
 
 safe : UserId ->{Users; none} Option User
@@ -124,7 +124,7 @@ let json =
 tree : Schema a -> Schema (Tree a)
 let tree item = schema Tree item
 
-callback : Ref Number ->{} Number
+callback : Ref Float ->{} Float
 let callback counter =
   Ref.modify counter (fun current ->
     let next = current + 1
@@ -134,7 +134,7 @@ let callback counter =
 unit : Unit -> Unit
 let unit () = ()
 
-area : Shape -> Number
+area : Shape -> Float
 let area shape =
   match shape with
   | Square side | Circle side -> side * side

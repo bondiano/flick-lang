@@ -2,15 +2,15 @@
 // on `@flick-lang/runtime/core`, with no Effect in the bundle.
 module App.Main exposing (main)
 
-type Shape = Circle Number | Rect Number Number
+type Shape = Circle Float | Rect Float Float
 
-area : Shape -> Number
+area : Shape -> Float
 let area s =
   match s with
   | Circle r -> 3.14 * r * r
   | Rect w h -> w * h
 
-add : Number -> Number -> Number
+add : Float -> Float -> Float
 let add a b = a + b
 
 log : String -> Unit

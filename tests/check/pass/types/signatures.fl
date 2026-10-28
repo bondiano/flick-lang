@@ -28,8 +28,8 @@ let compose f g x =
   f (apply g)
 
 // values need no signature; local type hints stay available
-total : Number
+total : Float
 let total =
   let base = 40
-  let extras : List Number = []
+  let extras : List Float = []
   base + 2

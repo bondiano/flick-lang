@@ -16,10 +16,10 @@ import Option
 say : String -> Unit
 foreign pure say from global \"console.log\"
 
-type Shape = Circle Number | Rect Number Number
+type Shape = Circle Float | Rect Float Float
   deriving Eq, Show
 
-area : Shape -> Number
+area : Shape -> Float
 let area s =
   match s with
   | Circle r -> 3 * r * r

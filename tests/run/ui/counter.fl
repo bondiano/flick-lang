@@ -33,7 +33,7 @@ foreign pure badge from "./dom.mjs" "Badge"
 badge_for : Unit -> Ui.Component { label : String }
 let badge_for () = badge
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.make 0
 
 increment : Action.Action Ui.ClickSnapshot

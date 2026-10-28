@@ -4,5 +4,5 @@ module App.Main exposing (x)
 import Geo.Point
 import Maps.Route
 
-x : Number
+x : Float
 let x = 1

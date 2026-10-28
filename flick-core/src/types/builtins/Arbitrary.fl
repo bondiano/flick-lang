@@ -10,7 +10,7 @@ type Arbitrary a
 type alias Replay = String
 
 /// The bounds of a generated list; `None` leaves one out.
-type alias ArrayOptions = { minLength : Option Number; maxLength : Option Number }
+type alias ArrayOptions = { minLength : Option Float; maxLength : Option Float }
 
 /// How a value of a schema shrinks; `None` uses Effect's shrinking.
 type alias SchemaOptions a = { shrink : Option (a -> List a) }
@@ -18,22 +18,22 @@ type alias SchemaOptions a = { shrink : Option (a -> List a) }
 /// How many values to draw, how large, how many discards to allow, and
 /// the seed.
 type alias SampleOptions =
-  { count : Option Number; size : Option Number; maxDiscards : Option Number; seed : Option Number }
+  { count : Option Float; size : Option Float; maxDiscards : Option Float; seed : Option Float }
 
 /// The runs of a check, the sizes, the limits of discards and shrinks, the
 /// seed, and a replay of an earlier failure.
 type alias CheckOptions =
   {
-    runs : Option Number;
-    size : Option Number;
-    maxDiscards : Option Number;
-    maxShrinks : Option Number;
-    seed : Option Number;
+    runs : Option Float;
+    size : Option Float;
+    maxDiscards : Option Float;
+    maxShrinks : Option Float;
+    seed : Option Float;
     replay : Option Replay;
   }
 
 /// Sampling stopped: the filters discarded too many values.
-type error SampleError = SampleError { generated : Number; discards : Number; seed : String }
+type error SampleError = SampleError { generated : Float; discards : Float; seed : String }
   deriving Eq, Show
 
 /// Why a property failed: it returned `false`, or it failed with an error.
@@ -41,17 +41,17 @@ type PropertyFailure (e : ErrorRow) = ReturnedFalse | PropertyError (Errors e)
 
 /// The outcome of a check.
 type CheckResult (e : ErrorRow) a =
-  | Passed { runs : Number; discards : Number }
+  | Passed { runs : Float; discards : Float }
   | Falsified {
       initialInput : a;
       shrunkInput : a;
       failure : PropertyFailure e;
-      runs : Number;
-      discards : Number;
-      shrinks : Number;
+      runs : Float;
+      discards : Float;
+      shrinks : Float;
       replay : Replay;
     }
-  | Exhausted { runs : Number; discards : Number; seed : String }
+  | Exhausted { runs : Float; discards : Float; seed : String }
   | ReplayMismatch String
 
 /// Values of the schema.

@@ -146,9 +146,9 @@ fn type_lists_variants_and_alias_names_a_type() {
         "(TypeDecl type alias Pair (TypeParam a) = (TupleType ( (NameType a) , (NameType a) )))"
     );
     assert_eq!(
-        sexp("type error Failed e = Failed e Number\ntype error Timeout"),
+        sexp("type error Failed e = Failed e Float\ntype error Timeout"),
         "(ErrorDecl type error Failed (TypeParam e) = (Variant Failed (NameType e) \
-         (NameType Number)))\n(ErrorDecl type error Timeout)"
+         (NameType Float)))\n(ErrorDecl type error Timeout)"
     );
     assert_eq!(
         errors("type T = Some of a\ntype error E = F\n"),
@@ -186,12 +186,12 @@ fn deep_nesting_is_an_error_not_a_stack_overflow() {
 
 #[test]
 fn cli_block_clauses() {
-    let src = "let c =\n  cli \"greet\" {\n    description \"Say hi\"\n    /// loud\n    flag times \"n\" \"t\" : Option Number = 1\n    arg name : String\n    subcommand other\n    handle fun { times; name } -> run times name\n  }\n";
+    let src = "let c =\n  cli \"greet\" {\n    description \"Say hi\"\n    /// loud\n    flag times \"n\" \"t\" : Option Float = 1\n    arg name : String\n    subcommand other\n    handle fun { times; name } -> run times name\n  }\n";
     assert_eq!(
         sexp(src),
         "(LetDecl let (VarPat c) = (Block (CliExpr cli \"greet\" { (Block \
          (CliClause description (Literal \"Say hi\")) \
-         (CliClause flag times \"n\" \"t\" : (AppType (NameType Option) (NameType Number)) = (Literal 1)) \
+         (CliClause flag times \"n\" \"t\" : (AppType (NameType Option) (NameType Float)) = (Literal 1)) \
          (CliClause arg name : (NameType String)) \
          (CliClause subcommand (NameExpr other)) \
          (CliClause handle (FunExpr fun (RecordPat { (RecordPatField times) ; (RecordPatField name) }) -> \

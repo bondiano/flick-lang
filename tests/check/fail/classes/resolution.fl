@@ -2,7 +2,7 @@
 // known type to choose by; candidates are listed.
 module App.Resolution exposing (..)
 
-type Shape = Circle Number
+type Shape = Circle Float
 
 type User = User String
 
@@ -27,7 +27,7 @@ let ambiguous = show []
 not_required : a -> String
 let not_required x = show x
 
-wrong_element : List Number
+wrong_element : List Float
 let wrong_element = empty
 
 nested : List (Option Shape) -> String
@@ -42,14 +42,14 @@ type alias L3 a = L2 (L2 (L2 (L2 a)))
 type alias L4 a = L3 (L3 (L3 (L3 a)))
 
 // an artificially deep constraint runs into the depth budget
-too_deep : L4 Number -> String
+too_deep : L4 Float -> String
 let too_deep value = show value
 
-//~ FLICK-C001 @19:19-19:23 no instance for `Show Shape`; instances of `Show`: `Show Number`
-//~ FLICK-C001 @22:24-22:28 no instance for `Show (Number -> Number)`
+//~ FLICK-C001 @19:19-19:23 no instance for `Show Shape`; instances of `Show`: `Show Int`
+//~ FLICK-C001 @22:24-22:28 no instance for `Show (Int -> Int)`
 //~ FLICK-C002 @25:17-25:21 cannot choose an instance for `Show (List _)`
 //~ FLICK-C001 @28:22-28:26 cannot deduce `Show a` from the constraints in scope
-//~ FLICK-C001 @31:21-31:26 no instance for `Collection (List Number) _`; instances of `Collection`: `Collection UserSet User`
+//~ FLICK-C001 @31:21-31:26 no instance for `Collection (List Float) _`; instances of `Collection`: `Collection UserSet User`
 //~ FLICK-C001 @34:20-34:24 no instance for `Show Shape`, needed for `Show (List (Option Shape))`
 //~ FLICK-C001 @37:25-37:29 the record is open
 //~ FLICK-C009 @46:22-46:26 exceeds the budget of 256 nested constraints

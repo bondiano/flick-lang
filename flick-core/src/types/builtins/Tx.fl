@@ -15,12 +15,12 @@ type RetryReason = Retry | Conflict
 /// What a transaction knows of its current attempt; times in milliseconds.
 type alias Meta =
   {
-    attempt : Number;
+    attempt : Float;
     retryReason : Option RetryReason;
-    start : Number;
-    now : Number;
-    elapsed : Number;
-    elapsedSincePrevious : Number;
+    start : Float;
+    now : Float;
+    elapsed : Float;
+    elapsedSincePrevious : Float;
   }
 
 /// Runs `body` as one transaction: its changes to transactional values

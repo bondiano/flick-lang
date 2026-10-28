@@ -1,0 +1,38 @@
+// `Int` is 32 bits: arithmetic wraps around, `/` drops the fraction, and
+// `/` and `%` by zero are 0; the checked forms report both instead. An
+// integer literal is an `Int` unless its use makes it a `Float` or `BigInt`.
+module App.Main exposing (main)
+
+big : Int
+let big = 2147483647
+
+half : Float -> Float
+let half x = x / 2
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let zero = 0
+  Platform.stdout_line (show (big + 1))
+  Platform.stdout_line (show (-2147483648 - 1))
+  Platform.stdout_line (show (65536 * 65536))
+  Platform.stdout_line (show (big * big))
+  Platform.stdout_line (show (7 / 2))
+  Platform.stdout_line (show (-7 / 2))
+  Platform.stdout_line (show (7 % -2))
+  Platform.stdout_line (show (5 / zero))
+  Platform.stdout_line (show (5 % zero))
+  Platform.stdout_line (show (-2147483648 / -1))
+  Platform.stdout_line (show (2 ** 31))
+  Platform.stdout_line (show (2 ** -1))
+  Platform.stdout_line (show (-big))
+  Platform.stdout_line (show (half 7))
+  Platform.stdout_line (show (1 + 2n))
+  Platform.stdout_line (show (5n / 0n))
+  Platform.stdout_line (show (Int.checked_add big 1))
+  Platform.stdout_line (show (Int.checked_div 1 zero))
+  Platform.stdout_line (show (Int.to_float big + 0.5))
+  Platform.stdout_line (show (Int.from_float 2.5))
+  Platform.stdout_line (show (Int.truncate (-2.7)))
+  Platform.stdout_line (show (Int.parse "-42"))
+  Platform.stdout_line (show (Int.parse "2147483648"))
+  Platform.stdout_line (show (Int.shift_right_unsigned (-8) 1))

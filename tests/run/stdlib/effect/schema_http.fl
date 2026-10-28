@@ -2,7 +2,7 @@
 // value and encodes it back; the strict exporter refuses them.
 module App.Main exposing (main)
 
-type alias Query = { name : String; age : Number }
+type alias Query = { name : String; age : Float }
   deriving Schema
 
 type alias Tree = { user : { name : String }; tags : List String }
@@ -57,9 +57,9 @@ let main () =
       ++ round
         show
         "[[\"q\",\"[1,2]\"]]"
-        (Http.Codecs.json_url_params_field "q" (Codec.list Number.json_finite))
+        (Http.Codecs.json_url_params_field "q" (Codec.list Float.json_finite))
       ++ " | "
-      ++ round show "[]" (Http.Codecs.json_url_params_field "q" (Codec.list Number.json_finite)))
+      ++ round show "[]" (Http.Codecs.json_url_params_field "q" (Codec.list Float.json_finite)))
   let tree = Codec.string_tree (schema Tree)
   Platform.stdout_line
     ("from_url_search_params: "

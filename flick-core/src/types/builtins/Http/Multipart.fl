@@ -33,7 +33,7 @@ type error MultipartError = MultipartError MultipartErrorReason
 /// fields (none: the default ones).
 type alias Limits =
   {
-    maxParts : Option Number;
+    maxParts : Option Float;
     maxFieldSize : Option ByteSize.ByteSize;
     maxFileSize : Option ByteSize.ByteSize;
     maxTotalSize : Option ByteSize.ByteSize;
@@ -144,7 +144,7 @@ foreign pure default_is_file from "@flick-lang/runtime/effect/http/Multipart" "f
   reviewed "effect@4.0.5 sha256:ebe920f8a497dacd"
 
 /// The text of a field's bytes, in the charset of its media type.
-decode_field : PartInfo -> List Number -> String
+decode_field : PartInfo -> List Float -> String
 foreign pure decode_field from "@flick-lang/runtime/effect/http/Multipart" "flickDecodeField"
   arity 2
   reviewed "effect@4.0.5 sha256:49be3c553d049561"
@@ -157,7 +157,7 @@ type Part =
     key : String;
     name : String;
     contentType : String;
-    content : Stream none {MultipartError} (List Number);
+    content : Stream none {MultipartError} (List Float);
   }
 
 /// The parts of the request's form, in order.
@@ -171,7 +171,7 @@ foreign pure parts from "@flick-lang/runtime/effect/http/Multipart" "flickParts"
 make_channel :
   forall e. List (String, String) ->
     Channel none {MultipartError | e} (
-      NonEmpty.NonEmpty (List Number)
+      NonEmpty.NonEmpty (List Float)
     ) (NonEmpty.NonEmpty Part) Unit e Unit
 foreign pure make_channel from "@flick-lang/runtime/effect/http/Multipart" "flickMakeChannel"
   reviewed "effect@4.0.5 sha256:c4fb7aade4e9dd3f"

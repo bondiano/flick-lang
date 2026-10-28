@@ -4,7 +4,7 @@ module Inspectable exposing (..)
 
 /// The data as Effect prints it for debugging, indented by `indent` spaces
 /// (0 for one line).
-to_string_unknown : Number -> Unknown -> String
+to_string_unknown : Float -> Unknown -> String
 foreign pure to_string_unknown from "@flick-lang/runtime/effect/Inspectable" "flickToStringUnknown"
   reviewed "effect@4.0.5 sha256:ea5d81bca700957a"
 

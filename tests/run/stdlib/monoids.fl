@@ -6,15 +6,15 @@ module App.Main exposing (main)
 import Monoids exposing (Sum, Product, First, Last, Min, Max)
 import Validation exposing (Validation)
 
-type alias Form = { name : String; age : Number }
+type alias Form = { name : String; age : Float }
 
 nonempty : String -> Validation (List String) String
 let nonempty s = if s == "" then Validation.invalid ["empty name"] else Validation.valid s
 
-adult : Number -> Validation (List String) Number
+adult : Float -> Validation (List String) Float
 let adult n = if n < 18 then Validation.invalid ["too young: " ++ show n] else Validation.valid n
 
-form : String -> Number -> Validation (List String) Form
+form : String -> Float -> Validation (List String) Form
 let form name age = do { n <- nonempty name and a <- adult age; pure { name = n; age = a } }
 
 main : Unit ->{; AppError} Unit

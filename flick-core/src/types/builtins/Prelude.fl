@@ -5,7 +5,8 @@ module Prelude exposing (..)
 type Unit
 type Never
 type Bool
-type Number
+type Int
+type Float
 type BigInt
 type String
 type Unknown
@@ -64,7 +65,7 @@ type Result e a = Err e | Ok a
 
 type Ordering = LT | EQ | GT
 
-/// Canonical equality; `Eq Number` is SameValueZero, like `==`.
+/// Canonical equality; `Eq Float` is SameValueZero, like `==`.
 class Eq a =
   eq : a -> a -> Bool
 
@@ -74,7 +75,7 @@ class Eq a => Ord a =
 
 /// Equal values have equal hashes.
 class Eq a => Hash a =
-  hash : a -> Number
+  hash : a -> Float
 
 class Show a =
   show : a -> String
@@ -178,7 +179,7 @@ foreign effect parallel from "@flick-lang/runtime" "parallel"
 
 /// Runs every task, at most `limit` at a time; `limit` must be a positive
 /// finite integer. The results keep the order of the input.
-parallel_all : forall c r e a. Number -> List ((Eff r e a)^c) ->{r; e} List a
+parallel_all : forall c r e a. Float -> List ((Eff r e a)^c) ->{r; e} List a
 foreign effect parallel_all from "@flick-lang/runtime" "parallelAll"
   retention call
 
@@ -208,13 +209,13 @@ foreign effect race_first from "@flick-lang/runtime" "raceFirst"
   reviewed "effect@4.0.5 sha256:5247faa250c6adc7"
 
 /// Fails with `TimeoutError` when `millis` pass before the task ends.
-timeout : forall c r e a. Number -> (Eff r e a)^c ->{r; TimeoutError | e} a
+timeout : forall c r e a. Float -> (Eff r e a)^c ->{r; TimeoutError | e} a
 foreign effect timeout from "@flick-lang/runtime" "timeout"
   retention call
   reviewed "effect@4.0.5 sha256:297e05405fa2e747"
 
 /// `None` when `millis` pass before the task ends; other failures stay.
-timeout_option : forall c r e a. Number -> (Eff r e a)^c ->{r; e} Option a
+timeout_option : forall c r e a. Float -> (Eff r e a)^c ->{r; e} Option a
 foreign effect timeout_option from "@flick-lang/runtime" "timeoutOption"
   retention call
   reviewed "effect@4.0.5 sha256:35e1a71b230ac8e2"

@@ -2,8 +2,8 @@
 module App.Main exposing (main)
 
 /// Strings equal when they agree ignoring case.
-folded : String -> Number
-let folded s = String.length s
+folded : String -> Float
+let folded s = Int.to_float (String.length s)
 
 main : Unit ->{; AppError} Unit
 let main () =

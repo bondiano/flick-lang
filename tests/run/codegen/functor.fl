@@ -2,7 +2,7 @@
 // mapping a task stays lazy until it is awaited.
 module App.Main exposing (main)
 
-twice : Functor f => f Number -> f Number
+twice : Functor f => f Float -> f Float
 let twice values = map (fun n -> n * 2) values
 
 main : Unit ->{; AppError} Unit

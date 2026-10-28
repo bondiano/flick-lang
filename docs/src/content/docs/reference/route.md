@@ -15,8 +15,8 @@ type error NotFound = NotFound
 
 type Page =
   | Home
-  | User Number
-  | Search { q : String; page : Option Number }
+  | User Float
+  | Search { q : String; page : Option Float }
   deriving Eq, Show, Schema, Url
 
 page : Atom.Writable Page
@@ -47,7 +47,7 @@ A type that derives `Url` derives `Schema` too. Each constructor is a path:
 | `Search { q = "atoms"; page = None }` | `/search?q=atoms` |
 
 - The constructor's name in kebab case is the first segment.
-- Each field after it is a segment: a `String`, a `Number`, a `Bool` or a
+- Each field after it is a segment: a `String`, a `Float`, a `Bool` or a
   refined type over one of them.
 - A final record field is the query. Its fields have the same types, or an
   `Option` of one, which may be missing from the URL.

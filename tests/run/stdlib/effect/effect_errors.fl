@@ -2,7 +2,7 @@
 // as inert text, exits, finalizers and interruption.
 module App.Main exposing (main)
 
-type error Boom = Boom Number
+type error Boom = Boom Float
   deriving Show
 
 ms5 : Duration.Duration

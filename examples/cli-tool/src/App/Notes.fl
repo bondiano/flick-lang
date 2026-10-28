@@ -13,7 +13,7 @@ let add note notes = notes ++ [note]
 
 /// The notes without the one numbered `n`, counting from 1; `None` when
 /// there is none.
-remove : Number -> List String -> Option (List String)
+remove : Int -> List String -> Option (List String)
 let remove n notes =
   if n < 1 || n > List.length notes then None
   else Some (List.take (n - 1) notes ++ List.drop n notes)

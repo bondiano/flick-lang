@@ -32,9 +32,9 @@ const LIB: &str = "schema-version = 1\n[project]\nkind = \"lib\"\n";
 
 const DOMAIN: &str = "module App.Domain exposing (User, Shape(..), Named, greet, area)
 
-type alias User = { name : String; age : Number }
+type alias User = { name : String; age : Float }
 
-type Shape = Circle Number | Square Number
+type Shape = Circle Float | Square Float
   deriving Show, Schema
 
 class Named a =
@@ -46,7 +46,7 @@ instance Named User =
 greet : User -> String
 let greet user = \"Hello, \" ++ name user
 
-area : Shape -> Number
+area : Shape -> Float
 let area s =
   match s with
   | Circle r -> r * r
@@ -68,7 +68,7 @@ service Store =
 
 type error StoreError = StoreError String
 
-run : User ->{Store; StoreError} Number
+run : User ->{Store; StoreError} Int
 let run user =
   let total = area (Circle 2) + user.age
   Store.put (greet user)
@@ -83,14 +83,14 @@ let describe x = Some (show x)
 keep : forall c r. (Unit -> { name : String | r })^c -> (Unit -> { name : String | r })^c
 let keep f = f
 
-saved : User -> Eff {Store} {StoreError} Number
+saved : User -> Eff {Store} {StoreError} Float
 let saved user =
   task {
     Store.put user.name
     1
   }
 
-counted : User ->{Store; StoreError} Number
+counted : User ->{Store; StoreError} Int
 let counted user =
   ignore (saved user)
   ignore (run user)
@@ -98,12 +98,12 @@ let counted user =
     run user
   }
 
-picked : User ->{Store; StoreError} Number
+picked : User ->{Store; StoreError} Float
 let picked user =
   let m = await (saved user)
   if m > 0 then (fun x -> x + 1) m else 0
 
-sign : Number -> String
+sign : Float -> String
 let sign n =
   match n with
   | 0 -> \"zero\"
@@ -208,13 +208,13 @@ fn hover_shows_source_types_with_rows_and_captures() {
         "{}",
         hover("greet", 1)
     );
-    assert!(hover("run", 1).contains("run : User ->{Store; StoreError} Number"));
+    assert!(hover("run", 1).contains("run : User ->{Store; StoreError} Int"));
     assert!(
         hover("keep", 1).contains("(Unit -> { name : String | r })^c"),
         "{}",
         hover("keep", 1)
     );
-    assert!(hover("total", 1).contains("total : Number"));
+    assert!(hover("total", 1).contains("total : Float"));
     // a parameter of a top-level function, where it is used
     assert!(
         hover("user.age", 0).contains("user : User"),
@@ -245,26 +245,26 @@ fn hover_on_a_keyword_shows_the_type_of_its_whole_block() {
     };
     let task = hover("task {", 0);
     assert!(
-        task.contains("task { … } : Eff {Store} {StoreError} Number"),
+        task.contains("task { … } : Eff {Store} {StoreError} Float"),
         "{task}"
     );
     let scope = hover("scope {", 0);
-    assert!(scope.contains("scope { … } : Number"), "{scope}");
+    assert!(scope.contains("scope { … } : Int"), "{scope}");
     let deferred = hover("ignore (saved", 0);
     assert!(
-        deferred.contains("ignore : Eff {Store} {StoreError} Number -> Unit")
+        deferred.contains("ignore : Eff {Store} {StoreError} Float -> Unit")
             && deferred.contains("is not run"),
         "{deferred}"
     );
     let awaited = hover("await (saved", 0);
     assert!(
-        awaited.contains("await … : Number")
-            && awaited.contains("Runs `Eff {Store} {StoreError} Number`"),
+        awaited.contains("await … : Float")
+            && awaited.contains("Runs `Eff {Store} {StoreError} Float`"),
         "{awaited}"
     );
     for (needle, shown) in [
-        ("fun x", "fun … -> … : Number -> Number"),
-        ("if m", "if … then … else … : Number"),
+        ("fun x", "fun … -> … : Float -> Float"),
+        ("if m", "if … then … else … : Float"),
         ("match n", "match … with : String"),
         ("sql {", "sql { … } : Template Pg {} { label : String }"),
     ] {
@@ -273,7 +273,7 @@ fn hover_on_a_keyword_shows_the_type_of_its_whole_block() {
     }
     let ran = hover("ignore (run", 0);
     assert!(
-        ran.contains("ignore : Number -> Unit") && !ran.contains("is not run"),
+        ran.contains("ignore : Int -> Unit") && !ran.contains("is not run"),
         "{ran}"
     );
 }
@@ -559,7 +559,7 @@ fn hover_on_a_derived_class_shows_the_instance_it_makes() {
 #[test]
 fn hover_on_component_shows_its_instance() {
     let source = "module App.Main exposing (counter)\n\n\
-                  component counter (start : Number) =\n  let count = Atom.local start\n  \
+                  component counter (start : Float) =\n  let count = Atom.local start\n  \
                   ui { text (show (Atom.value count)) }\n";
     let f = fixture_of(&[("src/App/Main.fl", source)]);
     let ide = f.ide();
@@ -569,7 +569,7 @@ fn hover_on_component_shows_its_instance() {
         .expect("hover component")
         .0;
     assert!(
-        hover.contains("component : Number ->{Setup s; none} (Number ->{Read; none} Ui^{s})^{s}"),
+        hover.contains("component : Float ->{Setup s; none} (Float ->{Read; none} Ui^{s})^{s}"),
         "{hover}"
     );
 }

@@ -63,7 +63,7 @@ A callback takes the rows of the arrow it is checked against; when those are
 row variables of the called function, its calls decide them:
 
 ```flick
-log_all : List Number ->{Log; none} Unit
+log_all : List Float ->{Log; none} Unit
 let log_all numbers =
   each (fun n -> Log.info "number") numbers
 ```
@@ -113,7 +113,7 @@ expected is `FLICK-T003`. A pure arrow has no rows at all, which is not the
 same as two empty ones.
 
 `none` is not a type. It is neither `Unit` (one value), `Never` (no values)
-nor the `None` of `Option`: `x : none` and `none -> Number` are `FLICK-T002`,
+nor the `None` of `Option`: `x : none` and `none -> Float` are `FLICK-T002`,
 and so is `Eff Unit Unit a`, because `Unit` is a `Type` and not a row. Inside
 a row `none` stands for the whole row, like a row variable: `{Log, none}` is
 `FLICK-T002`, write `{Log}`.
@@ -158,7 +158,7 @@ cell (`Ref`), a computation (`Eff`), a layer, a runtime function or an
 `Unknown` in them is `FLICK-E005`, also through the types they use.
 
 An error may take type parameters: `type error RetryExhausted e =
-RetryExhausted e Number` keeps the last cause, `type error SendFailed a =
+RetryExhausted e Float` keeps the last cause, `type error SendFailed a =
 SendFailed a` hands back the value that was not sent. A row tells its errors
 apart by name, not by arguments, so it holds at most one `RetryExhausted`:
 two of them in one row must have the same arguments (`FLICK-T003`). The
@@ -207,7 +207,7 @@ makes a layer from it; the service is named as a value:
 
 ```flick
 service Clock =
-  now : Unit ->{} Number
+  now : Unit ->{} Float
 
 clock_impl : Clock.Impl
 let clock_impl =

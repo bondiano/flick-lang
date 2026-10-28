@@ -12,7 +12,7 @@ foreign effect clock_with from "@flick-lang/runtime/effect/Clock" "clockWith"
   reviewed "effect@4.0.5 sha256:744511f0e3b70f8b"
 
 /// The clock's milliseconds since 1970-01-01 UTC.
-millis_of : Clock ->{} Number
+millis_of : Clock ->{} Float
 foreign effect millis_of from "@flick-lang/runtime/effect/Clock" "flickMillisOf"
   reviewed "effect@4.0.5 sha256:ca9480ab0343e961"
 
@@ -27,7 +27,7 @@ foreign effect monotonic_nanos_of from "@flick-lang/runtime/effect/Clock" "flick
   reviewed "effect@4.0.5 sha256:ca9480ab0343e961"
 
 /// The milliseconds since 1970-01-01 UTC.
-current_time_millis : Unit ->{} Number
+current_time_millis : Unit ->{} Float
 foreign effect current_time_millis from "@flick-lang/runtime/effect/Clock" "flickCurrentTimeMillis"
   arity 0
   reviewed "effect@4.0.5 sha256:fdc70b40c9ebcf9c"

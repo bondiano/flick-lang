@@ -39,7 +39,7 @@ foreign pure die from "@flick-lang/runtime/effect/Cause" "flickDie"
   reviewed "effect@4.0.5 sha256:b28e8615af7eafba"
 
 /// An interruption, by the fiber of the id if one is given.
-interrupt : Option Number -> Failure e
+interrupt : Option Float -> Failure e
 foreign pure interrupt from "@flick-lang/runtime/effect/Cause" "flickInterrupt"
   reviewed "effect@4.0.5 sha256:2542b5c6598bc863"
 
@@ -63,7 +63,7 @@ foreign pure make_die_reason from "@flick-lang/runtime/effect/Cause" "makeDieRea
   reviewed "effect@4.0.5 sha256:2877b5f4dff167f6"
 
 /// The reason of an interruption, by the fiber of the id if one is given.
-make_interrupt_reason : Option Number -> Reason e
+make_interrupt_reason : Option Float -> Reason e
 foreign pure make_interrupt_reason from "@flick-lang/runtime/effect/Cause" "flickMakeInterruptReason"
   reviewed "effect@4.0.5 sha256:005d85addbb65ea9"
 
@@ -147,12 +147,12 @@ foreign pure find_interrupt from "@flick-lang/runtime/effect/Cause" "flickFindIn
   reviewed "effect@4.0.5 sha256:e08899504b52f64e"
 
 /// The ids of the fibers that interrupted.
-interruptors : Failure e -> List Number
+interruptors : Failure e -> List Float
 foreign pure interruptors from "@flick-lang/runtime/effect/Cause" "flickInterruptors"
   reviewed "effect@4.0.5 sha256:b3db1dee8aa5500e"
 
 /// The ids of the interrupting fibers, or the failure without interruptions.
-filter_interruptors : Failure e -> Result (Failure e) (List Number)
+filter_interruptors : Failure e -> Result (Failure e) (List Float)
 foreign pure filter_interruptors from "@flick-lang/runtime/effect/Cause" "flickFilterInterruptors"
   reviewed "effect@4.0.5 sha256:7d2e92ffd915d0d3"
 

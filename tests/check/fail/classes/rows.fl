@@ -2,32 +2,32 @@
 // records, and nobody declares instances of them.
 module App.Rows exposing (..)
 
-type Shape = Circle Number
+type Shape = Circle Float
 
-instance Record.HasField "radius" Shape Number
+instance Record.HasField "radius" Shape Float
 
-repeated : { id : Number }
+repeated : { id : Float }
 let repeated = Record.merge_disjoint { id = 1 } { id = 2 }
 
-already : { id : Number }
+already : { id : Float }
 let already = Record.extend (Record.label : Record.Label "id") 2 { id = 1 }
 
-absent : Number
+absent : Float
 let absent = Record.get (Record.label : Record.Label "age") { name = "n" }
 
 wrong_type : String
 let wrong_type = Record.get (Record.label : Record.Label "age") { age = 1 }
 
-not_a_part : { age : Number }
+not_a_part : { age : Float }
 let not_a_part = Record.project { name = "n" }
 
-open_extend : { id : Number | r } -> { id : Number; tag : String | r }
+open_extend : { id : Float | r } -> { id : Float; tag : String | r }
 let open_extend value = Record.extend (Record.label : Record.Label "tag") "t" value
 
-//~ FLICK-C012 @7:1-7:47 `HasField` is a row primitive
+//~ FLICK-C012 @7:1-7:46 `HasField` is a row primitive
 //~ FLICK-C001 @10:16-10:37 both records have field `id`
-//~ FLICK-C001 @13:15-13:28 `Lacks "id" { id : Number }` does not hold: the record already has field `id`
+//~ FLICK-C001 @13:15-13:28 `Lacks "id" { id : Int }` does not hold: the record already has field `id`
 //~ FLICK-C001 @16:14-16:24 the record has no field `age`
-//~ FLICK-C001 @19:18-19:28 field `age` has type `Number`
-//~ FLICK-C001 @22:18-22:32 `Project { name : String } { age : Number }` does not hold
-//~ FLICK-C001 @25:25-25:38 `Lacks "tag" { id : Number | r }` does not hold
+//~ FLICK-C001 @19:18-19:28 field `age` has type `Int`
+//~ FLICK-C001 @22:18-22:32 `Project { name : String } { age : Float }` does not hold
+//~ FLICK-C001 @25:25-25:38 `Lacks "tag" { id : Float | r }` does not hold

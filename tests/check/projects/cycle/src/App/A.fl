@@ -3,5 +3,5 @@ module App.A exposing (a)
 import App.B exposing (b)
 //     ^^^^^ FLICK-R006 import cycle: App.A -> App.B -> App.C -> App.A
 
-a : Number
+a : Float
 let a = b

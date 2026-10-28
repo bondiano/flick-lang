@@ -9,6 +9,7 @@ use crate::iface::{
     Abi, ConstructorAbi, Data, Dictionary, Interface, Namespace, Summary, fingerprint,
 };
 use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Module, Stage, Stmt};
+use crate::numeric::{Arith, Num};
 use crate::types::Rep;
 
 /// The interface with its ABI and dependency fingerprints. When `imports`
@@ -241,9 +242,9 @@ impl Totality<'_> {
                 func, arg, stage, ..
             } => *stage != Stage::Pure || !self.total_call(e) || partial(func) || partial(arg),
             ExprKind::Binary(op, l, r) => {
-                matches!(op, BinOp::Div | BinOp::Rem | BinOp::Pow) || partial(l) || partial(r)
+                *op == BinOp::Arith(Arith::Pow, Num::BigInt) || partial(l) || partial(r)
             }
-            ExprKind::Field(e, _) | ExprKind::Not(e) | ExprKind::Neg(e) | ExprKind::Ignore(e) => {
+            ExprKind::Field(e, _) | ExprKind::Not(e) | ExprKind::Neg(_, e) | ExprKind::Ignore(e) => {
                 partial(e)
             }
             ExprKind::Tuple(items) | ExprKind::List(items) => items.iter().any(partial),

@@ -2,7 +2,7 @@ use super::*;
 
 const SOURCE: &str = "module App.Main exposing (..)
 
-refined type Minutes = Number
+refined type Minutes = Float
   where fun n -> n >= 0
   deriving Cli.Value
 
@@ -102,14 +102,14 @@ fn cli_completion_recovers_partial_clauses_without_hiding_flick_expressions() {
         ("desc", "description", 14),
         ("sub", "subcommand", 14),
         ("han", "handle", 14),
-        ("flag cost : Num", "Number", 7),
-        ("flag cost : ", "Number", 7),
-        ("flag cost : Number = ", "fallback", 3),
+        ("flag cost : Num", "Float", 7),
+        ("flag cost : ", "Float", 7),
+        ("flag cost : Float = ", "fallback", 3),
         ("description ", "fallback", 3),
-        ("flag cost : Number = fall", "fallback", 3),
+        ("flag cost : Float = fall", "fallback", 3),
         ("subcommand chi", "child", 3),
         ("handle fun opts -> List.len", "length", 3),
-        ("flag cost : Number; fl", "flag", 14),
+        ("flag cost : Float; fl", "flag", 14),
         ("subcommand cli \"nested\" { fl", "flag", 14),
         ("handle fun opts -> cli \"nested\" { fl", "flag", 14),
     ];

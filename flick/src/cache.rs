@@ -252,7 +252,7 @@ mod tests {
         let helper = root.join("src/App/Helper.fl");
         fs::write(
             &helper,
-            "module App.Helper exposing (n)\n\nn : Number\nlet n = 1\n",
+            "module App.Helper exposing (n)\n\nn : Float\nlet n = 1\n",
         )
         .expect("write");
         fs::write(
@@ -273,7 +273,7 @@ mod tests {
         // the editor saves the helper after the compiler read it
         fs::write(
             &helper,
-            "module App.Helper exposing (n)\n\nn : Number\nlet n = 2\n",
+            "module App.Helper exposing (n)\n\nn : Float\nlet n = 2\n",
         )
         .expect("write");
         assert!(!read_unchanged(&project, &roots, &host.cwd, &sources));

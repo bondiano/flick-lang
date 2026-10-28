@@ -7,11 +7,11 @@ nothing : Atom.Atom (Option a)
 let nothing = Atom.derived (fun () -> None)
 //            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-U005 give `nothing` the type of its value, without variables
 
-pair : (Atom.Writable (List a), Number)
+pair : (Atom.Writable (List a), Float)
 let pair = (Atom.make [], 0)
 //         ^^^^^^^^^^^^^^^^^ FLICK-U005 the atom `pair`
 
-numbers : Atom.Writable (List Number)
+numbers : Atom.Writable (List Float)
 let numbers = Atom.make []
 
 let count = Atom.make 0

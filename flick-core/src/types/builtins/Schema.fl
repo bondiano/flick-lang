@@ -4,7 +4,7 @@
 module Schema exposing (..)
 
 /// Numbers, `NaN` and the infinities included.
-number : Schema Number
+number : Schema Float
 foreign pure number from "@flick-lang/runtime" "schemaNumber"
   reviewed "effect@4.0.5 sha256:896cf94fa87a6316"
 

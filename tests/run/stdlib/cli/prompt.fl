@@ -92,7 +92,7 @@ let number_options =
 list_options : Cli.Prompt.ListOptions
 let list_options = { message = "Tags?"; default = None; validate = None; delimiter = Some ";" }
 
-colors : Cli.Prompt.SelectOptions Number
+colors : Cli.Prompt.SelectOptions Float
 let colors =
   {
     message = Some "Pick";
@@ -127,7 +127,7 @@ directories : Cli.Prompt.FileOptions -> Cli.Prompt.Prompt String
 let directories options = Cli.Prompt.file { options with type_ = Some only_directories }
 
 /// A step of `counter`: up counts, return ends, any other key beeps.
-count_key : Terminal.UserInput -> Number -> Cli.Prompt.Action Number Number
+count_key : Terminal.UserInput -> Float -> Cli.Prompt.Action Float Float
 let count_key input state =
   let k : Terminal.Key = input.key
   if k.name == "up" then Cli.Prompt.NextFrame (state + 1)
@@ -135,19 +135,19 @@ let count_key input state =
   else Cli.Prompt.Beep
 
 /// Counts the up arrows until return.
-counter : Cli.Prompt.Handlers Number Number Terminal.UserInput
+counter : Cli.Prompt.Handlers Float Float Terminal.UserInput
 let counter =
   { render = fun state _ -> "count " ++ show state; process = count_key; clear = fun _ _ -> "" }
 
 /// A step of `on_event`: the first event ends it.
-event_step : Cli.Prompt.ProcessInput String -> Number -> Cli.Prompt.Action Number String
+event_step : Cli.Prompt.ProcessInput String -> Float -> Cli.Prompt.Action Float String
 let event_step input _ =
   match input with
   | Cli.Prompt.Event value -> Cli.Prompt.Submit ("event " ++ value)
   | Cli.Prompt.Input _ -> Cli.Prompt.Beep
 
 /// Ends with the first event of its queue.
-on_event : Cli.Prompt.Handlers Number String (Cli.Prompt.ProcessInput String)
+on_event : Cli.Prompt.Handlers Float String (Cli.Prompt.ProcessInput String)
 let on_event = { render = fun _ _ -> "waiting"; process = event_step; clear = fun _ _ -> "" }
 
 questions : Unit ->{Cli.Prompt.Tty; Terminal.QuitError} Unit

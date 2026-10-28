@@ -1,0 +1,101 @@
+/// The numeric types as classes, for functions over any of them: `Numeric`
+/// holds `Int`, `Float` and `BigInt`, `Integer` the integers, `Floating`
+/// `Float`. The classes are closed: this module has every instance, and a
+/// program cannot declare another. On a type variable with one of them, the
+/// operators and number literals use its methods.
+module Numeric exposing (..)
+
+class Ord a => Numeric a =
+  add : a -> a -> a
+  sub : a -> a -> a
+  mul : a -> a -> a
+  div : a -> a -> a
+  rem : a -> a -> a
+  pow : a -> a -> a
+  negate : a -> a
+  from_int : Int -> a
+  to_float : a -> Float
+
+class Numeric a => Integer a =
+  to_bigint : a -> BigInt
+
+class Numeric a => Floating a =
+  from_float : Float -> a
+
+bigint_of : Int -> BigInt
+foreign pure bigint_of from global "BigInt"
+
+float_of_bigint : BigInt -> Float
+foreign pure float_of_bigint from global "Number"
+
+instance Numeric Int =
+  add : Int -> Int -> Int
+  let add a b = a + b
+  sub : Int -> Int -> Int
+  let sub a b = a - b
+  mul : Int -> Int -> Int
+  let mul a b = a * b
+  div : Int -> Int -> Int
+  let div a b = a / b
+  rem : Int -> Int -> Int
+  let rem a b = a % b
+  pow : Int -> Int -> Int
+  let pow a b = a ** b
+  negate : Int -> Int
+  let negate a = -a
+  from_int : Int -> Int
+  let from_int n = n
+  to_float : Int -> Float
+  let to_float n = Int.to_float n
+
+instance Numeric Float =
+  add : Float -> Float -> Float
+  let add a b = a + b
+  sub : Float -> Float -> Float
+  let sub a b = a - b
+  mul : Float -> Float -> Float
+  let mul a b = a * b
+  div : Float -> Float -> Float
+  let div a b = a / b
+  rem : Float -> Float -> Float
+  let rem a b = a % b
+  pow : Float -> Float -> Float
+  let pow a b = a ** b
+  negate : Float -> Float
+  let negate a = -a
+  from_int : Int -> Float
+  let from_int n = Int.to_float n
+  to_float : Float -> Float
+  let to_float x = x
+
+instance Numeric BigInt =
+  add : BigInt -> BigInt -> BigInt
+  let add a b = a + b
+  sub : BigInt -> BigInt -> BigInt
+  let sub a b = a - b
+  mul : BigInt -> BigInt -> BigInt
+  let mul a b = a * b
+  div : BigInt -> BigInt -> BigInt
+  let div a b = a / b
+  rem : BigInt -> BigInt -> BigInt
+  let rem a b = a % b
+  pow : BigInt -> BigInt -> BigInt
+  let pow a b = a ** b
+  negate : BigInt -> BigInt
+  let negate a = -a
+  from_int : Int -> BigInt
+  let from_int n = bigint_of n
+  to_float : BigInt -> Float
+  let to_float n = float_of_bigint n
+
+instance Integer Int =
+  to_bigint : Int -> BigInt
+  let to_bigint n = bigint_of n
+
+instance Integer BigInt =
+  to_bigint : BigInt -> BigInt
+  let to_bigint n = n
+
+instance Floating Float =
+  from_float : Float -> Float
+  let from_float x = x

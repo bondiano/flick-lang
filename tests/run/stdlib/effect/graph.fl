@@ -2,7 +2,7 @@
 // combining, walking and rendering them; invalid input is a `GraphError`.
 module App.Main exposing (main)
 
-type alias G = Graph.DirectedGraph String Number
+type alias G = Graph.DirectedGraph String Float
 
 res : Show a => Result Graph.GraphError a -> String
 let res r = match r with
@@ -40,7 +40,7 @@ let no_search = { start = Some [0]; direction = None; radius = None }
 from_roots : Graph.TopoConfig
 let from_roots = { initials = None }
 
-same : Graph.IdentityOptions String Number String Number
+same : Graph.IdentityOptions String Float String Float
 let same = { nodeIdentity = None; edgeIdentity = None }
 
 shape : String -> Graph.MermaidNodeShape
@@ -58,7 +58,7 @@ let main () =
           Graph.has_node 3 sample,
           Graph.has_node 4 sample,
         ))
-  let first : Option (Graph.Edge Number) = Graph.get_edge 0 sample
+  let first : Option (Graph.Edge Float) = Graph.get_edge 0 sample
   Platform.stdout_line
     (
       "edge 0: "
@@ -150,9 +150,9 @@ let main () =
           Graph.edge_count (Graph.remove_node 2 sample),
           Graph.node_count (Graph.remove_nodes [0, 1] sample),
         ))
-  let snapshot : Graph.Snapshot String Number Graph.Directed = Graph.to_snapshot sample
+  let snapshot : Graph.Snapshot String Float Graph.Directed = Graph.to_snapshot sample
   let node_zero : List (Graph.IndexedNode String) = List.take 1 snapshot.nodes
-  let edge_zero : List (Graph.IndexedEdge Number) = List.take 1 snapshot.edges
+  let edge_zero : List (Graph.IndexedEdge Float) = List.take 1 snapshot.edges
   Platform.stdout_line ("snapshot: " ++ show (node_zero, edge_zero))
   let rebuilt =
     Graph.from_snapshot
@@ -162,7 +162,7 @@ let main () =
     Graph.from_snapshot { graph_type = Graph.directed_kind; nodes = []; edges = snapshot.edges }
   Platform.stdout_line ("broken snapshot: " ++ res (Result.map Graph.edge_count broken))
   let kind_value = Graph.undirected_kind
-  let plain : Graph.UndirectedGraph String Number =
+  let plain : Graph.UndirectedGraph String Float =
     Graph.make kind_value |> node "x" |> node "y" |> edge 0 1 3
   Platform.stdout_line ("make: " ++ show (Graph.has_edge 1 0 plain, Graph.neighbors 1 plain))
   let other = Graph.directed () |> node "C" |> node "D" |> node "Z" |> edge 0 1 1 |> edge 1 2 4
@@ -194,7 +194,7 @@ let main () =
           Graph.node_count (Graph.symmetric_difference same other sample),
           Graph.edge_count (Graph.symmetric_difference same other sample),
         ))
-  let by_letter : Graph.IdentityOptions String Number String Bool =
+  let by_letter : Graph.IdentityOptions String Float String Bool =
     { nodeIdentity = Some String.to_lower; edgeIdentity = Some (fun _ -> true) }
   let lower = Graph.map_nodes String.to_lower other
   Platform.stdout_line
@@ -203,7 +203,7 @@ let main () =
     ("sum: "
       ++ show
         (Graph.node_count (Graph.sum other sample), Graph.edge_count (Graph.sum other sample)))
-  let missing = Graph.complement (fun s t -> String.length (s ++ t)) sample
+  let missing = Graph.complement (fun s t -> Int.to_float (String.length (s ++ t))) sample
   Platform.stdout_line
     ("complement: "
       ++ show (Graph.edge_count missing, Graph.has_edge 1 0 missing, Graph.has_edge 0 1 missing))
@@ -257,13 +257,13 @@ let main () =
           Graph.entries sinks,
           Graph.values (Graph.externals { direction = Some Graph.incoming } sample),
         ))
-  let all_edges : Graph.EdgeWalker Number = Graph.edges sample
-  let walker : Graph.Walker Graph.EdgeIndex (Graph.Edge Number) = all_edges
+  let all_edges : Graph.EdgeWalker Float = Graph.edges sample
+  let walker : Graph.Walker Graph.EdgeIndex (Graph.Edge Float) = all_edges
   Platform.stdout_line ("edges: " ++ show (Graph.indices walker))
-  let dot : Graph.GraphVizOptions String Number =
+  let dot : Graph.GraphVizOptions String Float =
     { nodeLabel = Some (fun n -> n); edgeLabel = Some show; graphName = Some "G" }
   Platform.stdout_line (Graph.to_graph_viz dot sample)
-  let diagram : Graph.MermaidOptions String Number =
+  let diagram : Graph.MermaidOptions String Float =
     {
       nodeLabel = Some (fun n -> n);
       edgeLabel = None;

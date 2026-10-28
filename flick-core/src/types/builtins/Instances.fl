@@ -8,7 +8,7 @@ foreign pure eq_prim from "@flick-lang/runtime" "equals"
 compare_prim : a -> a -> Ordering
 foreign pure compare_prim from "@flick-lang/runtime" "compare"
 
-hash_prim : a -> Number
+hash_prim : a -> Float
 foreign pure hash_prim from "@flick-lang/runtime" "hash"
 
 show_prim : a -> String
@@ -20,14 +20,18 @@ foreign pure eq_list from "@flick-lang/runtime" "listEquals"
 compare_list : (a -> a -> Ordering) -> List a -> List a -> Ordering
 foreign pure compare_list from "@flick-lang/runtime" "listCompare"
 
-hash_list : (a -> Number) -> List a -> Number
+hash_list : (a -> Float) -> List a -> Float
 foreign pure hash_list from "@flick-lang/runtime" "listHash"
 
 show_list : (a -> String) -> List a -> String
 foreign pure show_list from "@flick-lang/runtime" "listShow"
 
-instance Eq Number =
-  eq : Number -> Number -> Bool
+instance Eq Int =
+  eq : Int -> Int -> Bool
+  let eq x y = eq_prim x y
+
+instance Eq Float =
+  eq : Float -> Float -> Bool
   let eq x y = eq_prim x y
 
 instance Eq BigInt =
@@ -70,8 +74,12 @@ instance (Eq e, Eq a) => Eq (Result e a) =
     | (Err a, Err b) -> eq a b
     | _ -> false
 
-instance Ord Number =
-  compare : Number -> Number -> Ordering
+instance Ord Int =
+  compare : Int -> Int -> Ordering
+  let compare x y = compare_prim x y
+
+instance Ord Float =
+  compare : Float -> Float -> Ordering
   let compare x y = compare_prim x y
 
 instance Ord BigInt =
@@ -103,39 +111,47 @@ instance Ord a => Ord (Option a) =
     | (None, _) -> LT
     | _ -> GT
 
-instance Hash Number =
-  hash : Number -> Number
+instance Hash Int =
+  hash : Int -> Float
+  let hash x = hash_prim x
+
+instance Hash Float =
+  hash : Float -> Float
   let hash x = hash_prim x
 
 instance Hash BigInt =
-  hash : BigInt -> Number
+  hash : BigInt -> Float
   let hash x = hash_prim x
 
 instance Hash String =
-  hash : String -> Number
+  hash : String -> Float
   let hash x = hash_prim x
 
 instance Hash Bool =
-  hash : Bool -> Number
+  hash : Bool -> Float
   let hash x = hash_prim x
 
 instance Hash Unit =
-  hash : Unit -> Number
+  hash : Unit -> Float
   let hash _x = 0
 
 instance Hash a => Hash (List a) =
-  hash : List a -> Number
+  hash : List a -> Float
   let hash xs = hash_list hash xs
 
 instance Hash a => Hash (Option a) =
-  hash : Option a -> Number
+  hash : Option a -> Float
   let hash x =
     match x with
     | Some a -> hash a
     | None -> 0
 
-instance Show Number =
-  show : Number -> String
+instance Show Int =
+  show : Int -> String
+  let show x = show_prim x
+
+instance Show Float =
+  show : Float -> String
   let show x = show_prim x
 
 instance Show BigInt =
@@ -186,21 +202,21 @@ instance (Ord e, Ord a) => Ord (Result e a) =
     | _ -> GT
 
 instance (Hash e, Hash a) => Hash (Result e a) =
-  hash : Result e a -> Number
+  hash : Result e a -> Float
   let hash x =
     match x with
     | Ok a -> hash a
     | Err e -> 1 + hash e
 
 instance Hash Ordering =
-  hash : Ordering -> Number
+  hash : Ordering -> Float
   let hash x = hash_prim x
 
 instance Ord Ordering =
   compare : Ordering -> Ordering -> Ordering
   let compare x y = compare_prim (rank x) (rank y)
 
-rank : Ordering -> Number
+rank : Ordering -> Float
 let rank o =
   match o with
   | LT -> 0

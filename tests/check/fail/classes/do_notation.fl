@@ -2,7 +2,7 @@ module App.DoErrors exposing (..)
 
 // The rest of a `do` block is a pure function: a runtime call there is an
 // error with the way out.
-logged : Number -> Option Number
+logged : Float -> Option Float
 let logged n =
   do {
     x <- Some n
@@ -11,7 +11,7 @@ let logged n =
   }
 
 // A pattern after `<-` must match every value.
-values : List (Option Number) -> List Number
+values : List (Option Float) -> List Float
 let values xs =
   do {
     Some x <- xs
@@ -19,13 +19,13 @@ let values xs =
   }
 
 // The block ends with an expression, not a binding or a `let`.
-dangling : Option Number -> Option Number
+dangling : Option Float -> Option Float
 let dangling o =
   do {
     _x <- o
   }
 
-trailing_let : Option Number -> Option Number
+trailing_let : Option Float -> Option Float
 let trailing_let o =
   do {
     x <- o
@@ -34,7 +34,7 @@ let trailing_let o =
 
 // A guard needs `Alternative`, and `Result e` has none: there is no error
 // to fail with.
-guarded : Number -> Result String Number
+guarded : Float -> Result String Float
 let guarded n =
   do {
     if n > 0

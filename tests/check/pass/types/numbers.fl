@@ -1,10 +1,10 @@
-// Number, BigInt and String do not mix; operators keep JS semantics.
+// Float, BigInt and String do not mix; operators keep JS semantics.
 module App.Numbers exposing (big, mixed, text, compare)
 
 big : BigInt
 let big = 2n ** 64n + 1n
 
-mixed : Number
+mixed : Float
 let mixed = 1 / 0 - 2 % 3
 
 first : String

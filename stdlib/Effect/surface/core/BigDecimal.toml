@@ -47,4 +47,4 @@ divideUnsafe = "invariant: `unsafe*`; division by zero throws, a defect; `BigDec
 remainderUnsafe = "invariant: `unsafe*`; division by zero throws, a defect; `BigDecimal.remainder` returns `None`"
 fromNumberUnsafe = "invariant: `unsafe*`; a non-finite number throws, a defect; `BigDecimal.from_number` returns the error"
 fromStringUnsafe = "invariant: `unsafe*`; malformed text throws, a defect; `BigDecimal.from_string` returns the error"
-toNumberUnsafe = "invariant: `unsafe*`; a lossy conversion by its name's contract; `BigDecimal.to_string` with `Number.parse` is explicit"
+toNumberUnsafe = "invariant: `unsafe*`; a lossy conversion by its name's contract; `BigDecimal.to_string` with `Float.parse` is explicit"

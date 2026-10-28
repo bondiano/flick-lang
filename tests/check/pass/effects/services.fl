@@ -1,7 +1,7 @@
 // Services and layers.
 module App.Services exposing (..)
 
-type alias UserId = Number
+type alias UserId = Float
 
 type alias User = { id : UserId; name : String }
 
@@ -19,15 +19,15 @@ service Users =
   get : UserId ->{; NotFound} User
 
 service Ticker =
-  now : Unit ->{} Number
+  now : Unit ->{} Float
 
 service Repo a =
-  find : Number ->{} Option a
+  find : Float ->{} Option a
 
 users_live : Layer {Config} {ConnectError} {Users}
 foreign pure users_live from "./users.js" "usersLive"
 
-js_now : Unit ->{} Number
+js_now : Unit ->{} Float
 foreign sync js_now from "./clock.js" "now"
 
 clock_impl : Ticker.Impl
@@ -50,7 +50,7 @@ let application id =
     load_name id
   }
 
-timed : Unit ->{} Number
+timed : Unit ->{} Float
 let timed () =
   provide clock_layer {
     Ticker.now ()
@@ -64,12 +64,12 @@ replaced : Layer none none {Ticker}
 let replaced =
   Layer.override clock_layer clock_layer
 
-lookup : Number ->{Repo String; none} Option String
+lookup : Float ->{Repo String; none} Option String
 let lookup id =
   Repo.find id
 
 // a method of an implementation record runs without a lookup
-read_clock : Ticker.Impl -> Unit ->{} Number
+read_clock : Ticker.Impl -> Unit ->{} Float
 let read_clock implementation () =
   implementation.now ()
 

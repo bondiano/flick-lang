@@ -3,7 +3,7 @@
 // own. A missing or malformed value is a `ConfigError`.
 module App.Main exposing (main)
 
-type alias Server = { host : String; port : Number }
+type alias Server = { host : String; port : Float }
 
 env : ConfigProvider.ConfigProvider
 let env =
@@ -40,9 +40,9 @@ let server =
     |> Config.flat_map
       (fun host -> Config.port "PORT" |> Config.map (fun port -> { host = host; port = port }))
 
-even : Number ->{; Config.ConfigError} Number
+even : Float ->{; Config.ConfigError} Float
 let even n =
-  if Number.floor (n / 2) * 2 == n then n else from_result (Err (Config.ConfigError "odd"))
+  if Float.floor (n / 2) * 2 == n then n else from_result (Err (Config.ConfigError "odd"))
 
 /// A provider of our own: `NAME` is a value, `LIST` an array of two.
 own : ConfigProvider.ConfigProvider

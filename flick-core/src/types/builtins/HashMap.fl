@@ -30,7 +30,7 @@ foreign pure get from "@flick-lang/runtime" "hashMapGet"
   reviewed "effect@4.0.5 sha256:1241cb4f18054464"
 
 /// The number of entries.
-size : HashMap w k v -> Number
+size : HashMap w k v -> Float
 foreign pure size from "@flick-lang/runtime" "hashMapSize"
   reviewed "effect@4.0.5 sha256:e2ce37ab87e87b45"
 
@@ -76,12 +76,12 @@ foreign pure has from "@flick-lang/runtime/effect/HashMap" "flickHas"
 
 /// `get` with the key's hash already computed by the map's witness; another
 /// hash finds nothing.
-get_hash : k -> Number -> HashMap w k v -> Option v
+get_hash : k -> Float -> HashMap w k v -> Option v
 foreign pure get_hash from "@flick-lang/runtime/effect/HashMap" "flickGetHash"
   reviewed "effect@4.0.5 sha256:25a7ed42cae51acd"
 
 /// `has` with the key's hash already computed by the map's witness.
-has_hash : k -> Number -> HashMap w k v -> Bool
+has_hash : k -> Float -> HashMap w k v -> Bool
 foreign pure has_hash from "@flick-lang/runtime/effect/HashMap" "flickHasHash"
   reviewed "effect@4.0.5 sha256:b48ec23d49255978"
 
@@ -112,7 +112,7 @@ foreign pure modify_at from "@flick-lang/runtime/effect/HashMap" "flickModifyAt"
 
 /// `modify_at` with the key's hash already computed by the map's witness.
 modify_hash :
-  forall c w k v. k -> Number -> (Option v -> Option v)^c -> (HashMap w k v -> HashMap w k v)^c
+  forall c w k v. k -> Float -> (Option v -> Option v)^c -> (HashMap w k v -> HashMap w k v)^c
 foreign pure modify_hash from "@flick-lang/runtime/effect/HashMap" "flickModifyHash"
   arity 4
   retention call

@@ -63,15 +63,15 @@ pub static POSTGRESQL: Dialect = Dialect {
         ty("bigint", "bigint", "BigInt"),
         ty("int8", "bigint", "BigInt"),
         ty("bigserial", "bigint", "BigInt"),
-        ty("integer", "number", "Number"),
-        ty("int", "number", "Number"),
-        ty("int4", "number", "Number"),
-        ty("smallint", "number", "Number"),
-        ty("int2", "number", "Number"),
-        ty("serial", "number", "Number"),
-        ty("real", "number", "Number"),
-        ty("double precision", "number", "Number"),
-        ty("float8", "number", "Number"),
+        ty("integer", "number", "Int"),
+        ty("int", "number", "Int"),
+        ty("int4", "number", "Int"),
+        ty("smallint", "number", "Int"),
+        ty("int2", "number", "Int"),
+        ty("serial", "number", "Int"),
+        ty("real", "number", "Float"),
+        ty("double precision", "number", "Float"),
+        ty("float8", "number", "Float"),
         ty("numeric", "numeric", "BigDecimal"),
         ty("decimal", "numeric", "BigDecimal"),
         ty("text", "text", "String"),
@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn multi_word_types_and_kinds() {
         let t = POSTGRESQL.column_type(&["double", "precision", "not", "null"]);
-        assert_eq!(t.map(|t| t.flick), Some("Number"));
+        assert_eq!(t.map(|t| t.flick), Some("Float"));
         assert!(POSTGRESQL.column_type(&["double"]).is_none());
         assert_eq!(POSTGRESQL.flick_type("numeric"), "BigDecimal");
         assert_eq!(DIALECTS[0].1, Some(&POSTGRESQL));

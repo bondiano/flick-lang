@@ -44,15 +44,15 @@ type FileType =
 type alias Info =
   {
     type_ : FileType;
-    mtime : Option Number;
-    atime : Option Number;
-    birthtime : Option Number;
+    mtime : Option Float;
+    atime : Option Float;
+    birthtime : Option Float;
     dev : BigInt;
     ino : Option BigInt;
-    mode : Number;
+    mode : Float;
     nlink : Option BigInt;
-    uid : Option Number;
-    gid : Option Number;
+    uid : Option Float;
+    gid : Option Float;
     rdev : Option BigInt;
     size : BigInt;
     blksize : Option BigInt;
@@ -62,24 +62,24 @@ type alias Info =
 type alias AccessOptions = { ok : Bool; readable : Bool; writable : Bool }
 type alias CopyOptions = { overwrite : Bool; preserveTimestamps : Bool }
 type alias GlobOptions = { root : Option String; exclude : List String }
-type alias MakeDirectoryOptions = { recursive : Bool; mode : Option Number }
+type alias MakeDirectoryOptions = { recursive : Bool; mode : Option Float }
 type alias TempDirectoryOptions = { directory : Option String; prefix : Option String }
 type alias TempFileOptions = {
   directory : Option String;
   prefix : Option String;
   suffix : Option String;
 }
-type alias OpenOptions = { flag : Option OpenFlag; mode : Option Number; noFollow : Bool }
+type alias OpenOptions = { flag : Option OpenFlag; mode : Option Float; noFollow : Bool }
 type alias RemoveOptions = { recursive : Bool; force : Bool }
-type alias WriteOptions = { flag : Option OpenFlag; mode : Option Number }
+type alias WriteOptions = { flag : Option OpenFlag; mode : Option Float }
 
 /// The operations of Effect's `FileSystem`; the functions below call them.
 service FileSystem =
   access : AccessOptions -> String ->{; PlatformError.PlatformError} Unit
   copy : CopyOptions -> String -> String ->{; PlatformError.PlatformError} Unit
   copy_file : String -> String ->{; PlatformError.PlatformError} Unit
-  chmod : Number -> String ->{; PlatformError.PlatformError} Unit
-  chown : Number -> Number -> String ->{; PlatformError.PlatformError} Unit
+  chmod : Float -> String ->{; PlatformError.PlatformError} Unit
+  chown : Float -> Float -> String ->{; PlatformError.PlatformError} Unit
   glob : GlobOptions -> String ->{; PlatformError.PlatformError} List String
   exists : String ->{; PlatformError.PlatformError} Bool
   link : String -> String ->{; PlatformError.PlatformError} Unit
@@ -94,7 +94,7 @@ service FileSystem =
   make_temp_file_scoped : forall s. TempFileOptions ->{Scope s; PlatformError.PlatformError} String
   open : forall s. OpenOptions -> String ->{Scope s; PlatformError.PlatformError} File s
   read_directory : Bool -> String ->{; PlatformError.PlatformError} List String
-  read_file : String ->{; PlatformError.PlatformError} List Number
+  read_file : String ->{; PlatformError.PlatformError} List Float
   read_file_string : String ->{; PlatformError.PlatformError} String
   read_link : String ->{; PlatformError.PlatformError} String
   real_path : String ->{; PlatformError.PlatformError} String
@@ -102,9 +102,9 @@ service FileSystem =
   rename : String -> String ->{; PlatformError.PlatformError} Unit
   stat : String ->{; PlatformError.PlatformError} Info
   symlink : String -> String ->{; PlatformError.PlatformError} Unit
-  truncate : Option Number -> String ->{; PlatformError.PlatformError} Unit
-  utimes : Number -> Number -> String ->{; PlatformError.PlatformError} Unit
-  write_file : WriteOptions -> String -> List Number ->{; PlatformError.PlatformError} Unit
+  truncate : Option Float -> String ->{; PlatformError.PlatformError} Unit
+  utimes : Float -> Float -> String ->{; PlatformError.PlatformError} Unit
+  write_file : WriteOptions -> String -> List Float ->{; PlatformError.PlatformError} Unit
   write_file_string : WriteOptions -> String -> String ->{; PlatformError.PlatformError} Unit
 
 /// Fails unless the path exists and allows what the options ask.
@@ -120,11 +120,11 @@ copy_file : String -> String ->{FileSystem; PlatformError.PlatformError} Unit
 let copy_file from_path to_path = FileSystem.copy_file from_path to_path
 
 /// Sets the permission bits of the path.
-chmod : Number -> String ->{FileSystem; PlatformError.PlatformError} Unit
+chmod : Float -> String ->{FileSystem; PlatformError.PlatformError} Unit
 let chmod mode path = FileSystem.chmod mode path
 
 /// Sets the owner: `chown uid gid path`.
-chown : Number -> Number -> String ->{FileSystem; PlatformError.PlatformError} Unit
+chown : Float -> Float -> String ->{FileSystem; PlatformError.PlatformError} Unit
 let chown uid gid path = FileSystem.chown uid gid path
 
 /// The paths matching the pattern.
@@ -179,7 +179,7 @@ read_directory : Bool -> String ->{FileSystem; PlatformError.PlatformError} List
 let read_directory recursive path = FileSystem.read_directory recursive path
 
 /// The bytes of the file.
-read_file : String ->{FileSystem; PlatformError.PlatformError} List Number
+read_file : String ->{FileSystem; PlatformError.PlatformError} List Float
 let read_file path = FileSystem.read_file path
 
 /// The file as UTF-8 text.
@@ -211,15 +211,15 @@ symlink : String -> String ->{FileSystem; PlatformError.PlatformError} Unit
 let symlink from_path to_path = FileSystem.symlink from_path to_path
 
 /// Cuts or extends the file to the length, by default 0.
-truncate : Option Number -> String ->{FileSystem; PlatformError.PlatformError} Unit
+truncate : Option Float -> String ->{FileSystem; PlatformError.PlatformError} Unit
 let truncate length path = FileSystem.truncate length path
 
 /// Sets the access and modification times, in milliseconds since the epoch.
-utimes : Number -> Number -> String ->{FileSystem; PlatformError.PlatformError} Unit
+utimes : Float -> Float -> String ->{FileSystem; PlatformError.PlatformError} Unit
 let utimes atime mtime path = FileSystem.utimes atime mtime path
 
 /// Writes the bytes to the file.
-write_file : WriteOptions -> String -> List Number ->{FileSystem; PlatformError.PlatformError} Unit
+write_file : WriteOptions -> String -> List Float ->{FileSystem; PlatformError.PlatformError} Unit
 let write_file options path bytes = FileSystem.write_file options path bytes
 
 /// Writes the text to the file as UTF-8.
@@ -250,31 +250,31 @@ foreign effect sync from "@flick-lang/runtime/effect/FileSystem" "flickSync"
 
 /// Reads at most `size` bytes from the position, or from the current one;
 /// `None` at the end of the file.
-read_alloc : forall s. Number ->
+read_alloc : forall s. Float ->
   Option BigInt ->
   File s ->{; PlatformError.PlatformError}
-  Option (List Number)
+  Option (List Float)
 foreign effect read_alloc from "@flick-lang/runtime/effect/FileSystem" "flickReadAlloc"
   arity 3
   retention call
   reviewed "effect@4.0.5 sha256:e5908aede5e43a55"
 
 /// Cuts or extends the open file to the length, by default 0.
-file_truncate : forall s. Option Number -> File s ->{; PlatformError.PlatformError} Unit
+file_truncate : forall s. Option Float -> File s ->{; PlatformError.PlatformError} Unit
 foreign effect file_truncate from "@flick-lang/runtime/effect/FileSystem" "flickFileTruncate"
   arity 2
   retention call
   reviewed "effect@4.0.5 sha256:e5908aede5e43a55"
 
 /// Writes some of the bytes at the position; how many it wrote.
-write : forall s. List Number -> File s ->{; PlatformError.PlatformError} Number
+write : forall s. List Float -> File s ->{; PlatformError.PlatformError} Float
 foreign effect write from "@flick-lang/runtime/effect/FileSystem" "flickWrite"
   arity 2
   retention call
   reviewed "effect@4.0.5 sha256:e5908aede5e43a55"
 
 /// Writes all the bytes at the position.
-write_all : forall s. List Number -> File s ->{; PlatformError.PlatformError} Unit
+write_all : forall s. List Float -> File s ->{; PlatformError.PlatformError} Unit
 foreign effect write_all from "@flick-lang/runtime/effect/FileSystem" "flickWriteAll"
   arity 2
   retention call

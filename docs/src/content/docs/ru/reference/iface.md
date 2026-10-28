@@ -122,7 +122,7 @@ title: "`.iface` — нативный интерфейс модуля"
 
 | Тип | JSON |
 | - | - |
-| `Number` | `{ "con": { "module": "Prelude", "name": "Number" } }` |
+| `Float` | `{ "con": { "module": "Prelude", "name": "Float" } }` |
 | переменная типа `a` | `{ "var": "a" }` |
 | `F a` | `{ "app": { "head": F, "arg": a } }` |
 | `a -> b` | `{ "fun": { "param": a, "result": b } }` |

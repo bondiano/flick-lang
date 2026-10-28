@@ -33,22 +33,22 @@ foreign pure flip from "@flick-lang/runtime/effect/Reducer" "flip"
   reviewed "effect@4.0.5 sha256:f89f57f47aa5dc8a"
 
 /// Sums numbers from 0.
-number_sum : Reducer Number
+number_sum : Reducer Float
 foreign pure number_sum from "@flick-lang/runtime/effect/Number" "ReducerSum"
   reviewed "effect@4.0.5 sha256:6c0fb4b3ca47aa81"
 
 /// Multiplies numbers from 1.
-number_multiply : Reducer Number
+number_multiply : Reducer Float
 foreign pure number_multiply from "@flick-lang/runtime/effect/Number" "ReducerMultiply"
   reviewed "effect@4.0.5 sha256:51d34f295c4ba603"
 
 /// The greatest number, from `-Infinity`.
-number_max : Reducer Number
+number_max : Reducer Float
 foreign pure number_max from "@flick-lang/runtime/effect/Number" "ReducerMax"
   reviewed "effect@4.0.5 sha256:576f6a67af67fdd5"
 
 /// The least number, from `Infinity`.
-number_min : Reducer Number
+number_min : Reducer Float
 foreign pure number_min from "@flick-lang/runtime/effect/Number" "ReducerMin"
   reviewed "effect@4.0.5 sha256:1c3d89fc958e5de2"
 

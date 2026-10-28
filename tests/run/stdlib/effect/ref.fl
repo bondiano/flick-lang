@@ -2,10 +2,10 @@
 // whose updates may run tasks.
 module App.Main exposing (main)
 
-type error Refused = Refused Number
+type error Refused = Refused Float
 
 /// `n - k` while it stays positive.
-less : Number -> Number -> Option Number
+less : Float -> Float -> Option Float
 let less k n = if n > k then Some (n - k) else None
 
 cells : Unit ->{} List String
@@ -52,7 +52,7 @@ let synchronized () =
     | Refused n -> "refused at " ++ show n
   // updates that sleep run one after another: neither loses the other's
   let slow = SynchronizedRef.make []
-  add : Number -> Eff none none Unit
+  add : Float -> Eff none none Unit
   let add x =
     task {
       SynchronizedRef.update_effect (fun xs ->

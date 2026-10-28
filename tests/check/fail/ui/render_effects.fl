@@ -1,6 +1,6 @@
 module App.RenderEffects exposing (..)
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.make 0
 
 writes : Ui.View Unit
@@ -9,7 +9,7 @@ let writes =
     Atom.set count 1
     ui { text "x" })
 
-computes : Atom.Atom Number
+computes : Atom.Atom Float
 let computes =
   Atom.derived (fun () ->
     Atom.update count (fun n -> n + 1)

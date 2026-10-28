@@ -10,16 +10,16 @@ let unit_is_not_never () = ()
 never_is_not_unit : Never -> Unit
 let never_is_not_unit n = n
 
-failing : Eff none {Oops} Number
+failing : Eff none {Oops} Float
 let failing = task { 1 }
 
-no_errors : Eff none none Number
+no_errors : Eff none none Float
 let no_errors = failing
 
-unit_is_not_a_row : Eff none Unit Number
+unit_is_not_a_row : Eff none Unit Float
 let unit_is_not_a_row = task { 1 }
 
 //~ FLICK-T003 @8:28-8:30 expected `Never`, found `Unit`
 //~ FLICK-T003 @11:27-11:28 expected `Unit`, found `Never`
-//~ FLICK-E002 @17:17-17:24 the expected type `Eff none none Number` does not allow error `Oops`
+//~ FLICK-E002 @17:17-17:24 the expected type `Eff none none Float` does not allow error `Oops`
 //~ FLICK-T002 @19:30-19:34 `Unit` has kind Type, but an ErrorRow is expected

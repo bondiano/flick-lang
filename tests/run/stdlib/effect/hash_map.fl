@@ -1,13 +1,13 @@
 // Effect's `HashMap` through Flick's maps, which keep the witness of their keys.
 module App.Main exposing (main)
 
-sorted : HashMap.HashMap w String Number -> List (String, Number)
+sorted : HashMap.HashMap w String Float -> List (String, Float)
 let sorted m = List.sort (HashMap.to_list m)
 
-stock : HashMap.HashMap EqHash.Canonical String Number
+stock : HashMap.HashMap EqHash.Canonical String Float
 let stock = HashMap.from_list EqHash.canonical [("apple", 3), ("pear", 0), ("plum", 7)]
 
-bump : Option Number -> Option Number
+bump : Option Float -> Option Float
 let bump o = match o with
   | Some n -> Some (n + 1)
   | None -> Some 1
@@ -20,7 +20,7 @@ let main () =
       ++ show
         (
           HashMap.is_empty stock,
-          HashMap.is_empty (HashMap.empty : HashMap.HashMap EqHash.Canonical String Number),
+          HashMap.is_empty (HashMap.empty : HashMap.HashMap EqHash.Canonical String Float),
         ))
   Platform.stdout_line
     ("has: " ++ show (HashMap.has "pear" stock, HashMap.has "kiwi" stock, HashMap.get "plum" stock))
@@ -64,14 +64,15 @@ let main () =
             [("fig", 2), ("apple", 9)]
             (HashMap.remove_many ["pear", "plum"] stock))))
   Platform.stdout_line
-    ("map: " ++ show (sorted (HashMap.map (fun n k -> n + String.length k) stock)))
+    ("map: " ++ show (sorted (HashMap.map (fun n k -> n + Int.to_float (String.length k)) stock)))
   let split =
     HashMap.flat_map
       (fun n k -> HashMap.from_list EqHash.canonical [(k, n), (k ++ "!", n * 10)])
       stock
   Platform.stdout_line ("flat_map: " ++ show (sorted split))
   Platform.stdout_line
-    ("reduce: " ++ show (HashMap.reduce 0 (fun acc n k -> acc + n + String.length k) stock))
+    ("reduce: "
+      ++ show (HashMap.reduce 0 (fun acc n k -> acc + n + Int.to_float (String.length k)) stock))
   Platform.stdout_line ("filter: " ++ show (sorted (HashMap.filter (fun n _ -> n > 0) stock)))
   let options = HashMap.from_list EqHash.canonical [("a", Some 1), ("b", None)]
   Platform.stdout_line ("compact: " ++ show (sorted (HashMap.compact options)))

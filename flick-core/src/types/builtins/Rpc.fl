@@ -63,7 +63,7 @@ foreign pure binary from "@flick-lang/runtime/effect/rpc/Rpc" "rpcBinary"
 /// its messages.
 type alias ServeOptions = {
   host : String;
-  port : Number;
+  port : Float;
   path : String;
   serialization : Serialization;
 }
@@ -244,7 +244,7 @@ foreign effect listen_tcp from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcList
 
 /// The port the server listens on: the one asked for, or the one the system
 /// chose for port 0.
-port : Server s -> Number
+port : Server s -> Float
 foreign pure port from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcPort"
   retention call
   reviewed "effect@4.0.5 sha256:686bfd3f4471e7d1"

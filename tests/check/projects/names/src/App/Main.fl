@@ -11,8 +11,8 @@ type Mode = | Auto
 //   ^^^^ FLICK-R009 `Mode` shadows the name imported from `App.Left`
 
 // `find` comes only from App.Right's `(..)`: not ambiguous
-total : Number
+total : Float
 let total = find + size
 
-local : Number -> Number
+local : Float -> Float
 let local find = find + 1

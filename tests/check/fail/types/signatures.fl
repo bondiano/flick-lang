@@ -4,26 +4,26 @@ let double n = n * 2
 
 let triple = fun n -> n * 3
 
-let header (x : Number) : Number = x
+let header (x : Float) : Float = x
 
-add : Number -> Number -> Number
+add : Float -> Float -> Float
 
 let partial = add 1
 
-main : Unit -> Number
+main : Unit -> Float
 let main () =
   let local x = x + 1
   local 1
 
-hinted : Unit -> Number
+hinted : Unit -> Float
 let hinted () =
-  let f : Number -> Number = fun x -> x
+  let f : Float -> Float = fun x -> x
   f 1
 
 //~ FLICK-T004 @3:1-3:21 function `double` needs a signature right above its `let`
 //~ FLICK-T004 @5:1-5:28 function `triple` needs a signature right above its `let`
-//~ FLICK-T005 @7:1-7:37 write the types of `header` in its signature above the
-//~ FLICK-T006 @9:1-9:33 signature `add` has no definition below it
+//~ FLICK-T005 @7:1-7:35 write the types of `header` in its signature above the
+//~ FLICK-T006 @9:1-9:30 signature `add` has no definition below it
 //~ FLICK-T004 @11:1-11:20 function `partial` needs a signature right above its `let`
 //~ FLICK-T004 @15:3-15:22 function `local` needs a signature right above its `let`
-//~ FLICK-T005 @20:3-20:40 write the type of function `f` as a signature above the
+//~ FLICK-T005 @20:3-20:38 write the type of function `f` as a signature above the

@@ -28,12 +28,12 @@ fn compile_with(text: &str, release: bool, labels: Labels) -> super::Output {
 #[test]
 fn top_level_atoms_views_and_actions_are_labelled_by_their_names() {
     let text = "module App.Counter exposing (..)\n\
-         count : Atom.Writable Number\nlet count = Atom.make 0\n\
+         count : Atom.Writable Float\nlet count = Atom.make 0\n\
          reset : Action.Action Ui.ClickSnapshot\n\
          let reset = Action.exhaust (fun _ -> task { Atom.set count 0 })\n\
          counter : Ui.View Unit\n\
          let counter = Ui.view (fun () -> ui { button { disabled = false; on_click = reset } [text (show (Atom.value count))] })\n\
-         start : Number\nlet start = 0\n";
+         start : Float\nlet start = 0\n";
     let labels = |release, labels| {
         let code = compile_with(text, release, labels).code;
         assert_eq!(
@@ -78,12 +78,12 @@ fn pure_functions_are_plain_js() {
 fn runtime_stages_yield_only_on_runtime_calls() {
     let js = compile(
         "module App.Users exposing (..)\n\
-         type alias User = { id : Number; name : String }\n\
-         type error NotFound = NotFound Number\n\
-         service Users =\n  get : Number ->{none; NotFound} User\n\
+         type alias User = { id : Float; name : String }\n\
+         type error NotFound = NotFound Float\n\
+         service Users =\n  get : Float ->{none; NotFound} User\n\
          service Log =\n  info : String ->{} Unit\n\
          normalize_name : String -> String\nlet normalize_name name = String.trim name\n\
-         load_name : Number ->{Users, Log; NotFound} String\n\
+         load_name : Float ->{Users, Log; NotFound} String\n\
          let load_name id =\n  let user = Users.get id\n  let name = normalize_name user.name\n\n  Log.info name\n\n  name\n",
     );
     insta::assert_snapshot!(js);
@@ -99,7 +99,7 @@ fn runtime_stages_yield_only_on_runtime_calls() {
 fn constructor_ids_name_package_module_and_type() {
     let js = compile(
         "module App.Users exposing (..)\n\
-         type Choice = Some Number | Empty\n",
+         type Choice = Some Float | Empty\n",
     );
     // the name, and a hash of package, module, type and name
     let c = |module: &str| Constructor {
@@ -118,7 +118,7 @@ fn constructor_ids_name_package_module_and_type() {
     assert_ne!(tag, super::tag(&c("App.Users"), Some("@acme/other")));
     assert_ne!(tag, super::tag(&c("App.Other"), Some("@acme/users")));
     let native =
-        compile("module App.Main exposing (..)\nnative : Option Number\nlet native = Some 1\n");
+        compile("module App.Main exposing (..)\nnative : Option Float\nlet native = Some 1\n");
     assert!(
         native.contains("export const native = /*#__PURE__*/ $rt.some(1);"),
         "{native}"
@@ -129,7 +129,7 @@ fn constructor_ids_name_package_module_and_type() {
 fn debug_imports_a_module_by_its_own_name_unless_taken() {
     let js = compile(
         "module App.Main exposing (..)\n\n\
-         type Shape = Option Number | Dot\n\n\
+         type Shape = Option Float | Dot\n\n\
          line : Unit ->{} Unit\nlet line _ = Platform.stdout_line (show (Option.with_default 0 (Some 1)))\n",
     );
     assert!(js.contains("import * as Platform from"), "{js}");
@@ -174,7 +174,7 @@ fn a_constrained_function_loops_on_a_call_passing_its_own_dictionaries() {
         "module App.Loop exposing (..)\n\
          elem : Eq a => a -> List a -> Bool\n\
          let rec elem y xs =\n  match xs with\n  | [] -> false\n  | [x, ...rest] -> if x == y then true else elem y rest\n\
-         nest : forall a. Show a => Number -> a -> String\n\
+         nest : forall a. Show a => Float -> a -> String\n\
          let rec nest n x = if n == 0 then show x else nest (n - 1) [x]\n",
     );
     let elem = export_of(&js, "elem");
@@ -212,13 +212,13 @@ fn the_right_operand_of_and_and_or_is_a_tail_position() {
 fn mutually_tail_recursive_functions_run_as_one_loop() {
     let text = "module App.Parity exposing (..)\n\
          rec {\n\
-         \x20 is_even : Number -> Bool\n  let is_even n = if n == 0 then true else is_odd (n - 1)\n\
-         \x20 is_odd : Number -> Bool\n  let is_odd n = if n == 0 then false else is_even (n - 1)\n\
+         \x20 is_even : Float -> Bool\n  let is_even n = if n == 0 then true else is_odd (n - 1)\n\
+         \x20 is_odd : Float -> Bool\n  let is_odd n = if n == 0 then false else is_even (n - 1)\n\
          }\n\
          rec {\n\
-         \x20 a : Number -> Number -> Number\n  let a acc n = if n == 0 then acc else b (acc + 1) (n - 1)\n\
-         \x20 b : Number -> Number -> Number\n  let b acc n = if n == 0 then acc else c acc (n - 1)\n\
-         \x20 c : Number -> Number -> Number\n  let c acc n = if n == 0 then acc else a (a 0 acc) (n - 1)\n\
+         \x20 a : Float -> Float -> Float\n  let a acc n = if n == 0 then acc else b (acc + 1) (n - 1)\n\
+         \x20 b : Float -> Float -> Float\n  let b acc n = if n == 0 then acc else c acc (n - 1)\n\
+         \x20 c : Float -> Float -> Float\n  let c acc n = if n == 0 then acc else a (a 0 acc) (n - 1)\n\
          }\n";
     for release in [false, true] {
         let js = compile_with(text, release, Labels::default()).code;
@@ -249,13 +249,13 @@ fn mutually_tail_recursive_functions_run_as_one_loop() {
 #[test]
 fn a_loop_walks_a_list_by_offset_unless_its_rest_escapes() {
     let text = "module App.Walk exposing (..)\n\
-         pairs : Number -> List Number -> Number\n\
+         pairs : Float -> List Float -> Float\n\
          let rec pairs acc xs =\n  match xs with\n  | [a, b, ...rest] -> pairs (acc + a * b) rest\n  | [a] -> acc + a\n  | _ -> acc\n\
-         restart : Number -> List Number -> Number\n\
+         restart : Float -> List Float -> Float\n\
          let rec restart n xs =\n  match xs with\n  | [] -> if n == 0 then 0 else restart (n - 1) [1, 2]\n  | [_, ...rest] -> restart n rest\n\
-         sum : List Number -> Number\n\
+         sum : List Float -> Float\n\
          let rec sum xs =\n  match xs with\n  | [] -> 0\n  | [x, ...rest] -> x + sum rest\n\
-         total : Number -> List Number -> Number\n\
+         total : Float -> List Float -> Float\n\
          let rec total acc xs =\n  match xs with\n  | [] -> acc\n  | [x, ...rest] -> if x > 9 then acc + sum rest else total (acc + x) rest\n\
          rec {\n\
          \x20 even_len : List a -> Bool\n  let even_len xs =\n    match xs with\n    | [] -> true\n    | [_, ...rest] -> odd_len rest\n\
@@ -291,7 +291,7 @@ fn a_loop_walks_a_list_by_offset_unless_its_rest_escapes() {
 #[test]
 fn an_atom_write_names_its_place() {
     let text = "module App.Counter exposing (..)\n\
-         count : Atom.Writable Number\nlet count = Atom.make 0\n\
+         count : Atom.Writable Float\nlet count = Atom.make 0\n\
          reset : Action.Action Ui.ClickSnapshot\n\
          let reset = Action.exhaust (fun _ -> task {\n  Atom.set count 0\n  Atom.update count (fun n -> n + 1)\n})\n";
     let code = compile(text);

@@ -2,12 +2,12 @@
 // fields in the order written.
 module App.Main exposing (main)
 
-trace : String -> Number ->{} Number
+trace : String -> Float ->{} Float
 let trace label n =
   Platform.stdout_line label
   n
 
-pair : Number -> Number -> Number
+pair : Float -> Float -> Float
 let pair a b = a * 10 + b
 
 main : Unit ->{; AppError} Unit

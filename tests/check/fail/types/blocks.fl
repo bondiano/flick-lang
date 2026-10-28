@@ -1,15 +1,15 @@
 module App.Blocks exposing (..)
 
 service Users =
-  get : Number ->{} String
+  get : Float ->{} String
 
-run : Number ->{Users; none} String
+run : Float ->{Users; none} String
 let run id =
   Users.get id
   let name = Users.get id
   name
 
-empty : Number -> Number
+empty : Float -> Float
 let empty n =
   let x = n
 

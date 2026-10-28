@@ -2,7 +2,7 @@
 /// per field, checked as the record's type when the form is sent.
 ///
 /// ```flick
-/// type alias Signup = { name : String; age : Option Number }
+/// type alias Signup = { name : String; age : Option Float }
 ///   deriving Schema, Form
 ///
 /// signup : Form.Draft Signup

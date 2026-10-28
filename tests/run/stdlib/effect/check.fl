@@ -3,7 +3,7 @@
 // refuses one.
 module App.Main exposing (main)
 
-type alias Pair = (String, Number)
+type alias Pair = (String, Float)
   deriving Schema
 
 shown : Show a => Result SchemaError a -> String
@@ -32,21 +32,21 @@ let exported c =
       | Ok json -> Json.stringify json
       | Err _ -> "not a JSON value"
 
-rem : Number -> Number -> Number
-let rem n d = n - Number.floor (n / d) * d
+rem : Float -> Float -> Float
+let rem n d = n - Float.floor (n / d) * d
 
 str : Check.Check String -> PureCodec Json String
 let str check = Check.apply check String.json
 
-num : Check.Check Number -> PureCodec Json Number
-let num check = Check.apply check Number.json_finite
+num : Check.Check Float -> PureCodec Json Float
+let num check = Check.apply check Float.json_finite
 
 both : String -> String -> String -> Check.Check String ->{} Unit
 let both name good bad check =
   let c = str check
   Platform.stdout_line (name ++ ": " ++ dec good c ++ " | " ++ dec bad c)
 
-nums : String -> String -> String -> Check.Check Number ->{} Unit
+nums : String -> String -> String -> Check.Check Float ->{} Unit
 let nums name good bad check =
   let c = num check
   Platform.stdout_line (name ++ ": " ++ dec good c ++ " | " ++ dec bad c)
@@ -112,7 +112,7 @@ let main () =
   nums "int" "2" "2.5" Check.int
   nums "int32" "2" "3000000000" Check.int32
   nums "uint32" "3000000000" "-1" Check.uint32
-  let finite = Check.apply Check.finite Number.json
+  let finite = Check.apply Check.finite Float.json
   Platform.stdout_line ("finite: " ++ dec "1" finite ++ " | " ++ dec "\"NaN\"" finite)
   Platform.stdout_line ("bigint: " ++ String.join ", " [
     big "\"2\"" (Check.greater_than_bigint 1n),
@@ -142,7 +142,7 @@ let main () =
   both "less_than_or_equal_to_by" "\"b\"" "\"c\"" (Check.less_than_or_equal_to_by "b")
   both "between_by" "\"c\"" "\"e\"" (Check.between_by "b" "d")
   nums "multiple_of_by" "8" "6" (Check.multiple_of_by (fun n d -> rem n d) 0 4)
-  let ints = Codec.list Number.json_finite
+  let ints = Codec.list Float.json_finite
   Platform.stdout_line ("min_items: " ++ dec "[1]" (Check.apply (Check.min_items 2) ints))
   Platform.stdout_line ("max_items: " ++ dec "[1, 2]" (Check.apply (Check.max_items 1) ints))
   Platform.stdout_line
@@ -160,7 +160,7 @@ let main () =
   Platform.stdout_line ("min_size: " ++ size "[\"a\", \"a\"]" (Check.min_size 2))
   Platform.stdout_line ("max_size: " ++ size "[\"a\", \"a\"]" (Check.max_size 1))
   Platform.stdout_line ("size_between: " ++ size "[\"a\", \"b\"]" (Check.size_between 2 3))
-  let dict = Codec.entries Number.json_finite
+  let dict = Codec.entries Float.json_finite
   Platform.stdout_line ("min_properties: " ++ dec "{\"a\": 1}" (Check.min_properties 2 dict))
   Platform.stdout_line ("max_properties: " ++ dec "{\"a\": 1}" (Check.max_properties 1 dict))
   Platform.stdout_line

@@ -10,7 +10,7 @@ let load_user id = { id = id; name = Text.trim "Ada" }
 find : List User -> Option User
 let find users = None
 
-area : Shape -> Number
+area : Shape -> Float
 let area shape =
   match shape with
   | Circle r -> r * r

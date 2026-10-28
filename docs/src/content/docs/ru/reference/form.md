@@ -14,7 +14,7 @@ module App.Signup exposing (..)
 refined type Name = String where Checks.non_empty
   deriving Eq, Show, Schema
 
-type alias Signup = { name : Name; age : Number; nick : Option String }
+type alias Signup = { name : Name; age : Float; nick : Option String }
   deriving Schema, Form
 
 signup : Form.Draft Signup
@@ -50,7 +50,7 @@ let page =
 ## Что выводит тип
 
 Тип-запись (`type alias` записи) с `deriving Form` выводит и `Schema`.
-Каждое поле читается из текста: `String`, `Number`, `Bool`, уточнённый тип
+Каждое поле читается из текста: `String`, `Float`, `Bool`, уточнённый тип
 над одним из них или `Option` одного из них — `None`, когда поле ввода
 пусто. Другое поле — `FLICK-D010` с путём поля.
 

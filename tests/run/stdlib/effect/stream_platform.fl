@@ -68,7 +68,7 @@ let files dir =
   line ("watch", (show created))
 
 /// Each element of a stream of the scope's subscription, inside the scope.
-subscribed : PubSub.PubSub Number ->{} List Number
+subscribed : PubSub.PubSub Float ->{} List Float
 let subscribed hub =
   scope {
     let sub = PubSub.subscribe hub
@@ -80,14 +80,15 @@ let subscribed hub =
   }
 
 /// Streams of open files, read inside the scope that closes them.
-opened : String ->{FileSystem.FileSystem; PlatformError.PlatformError} List Number
+opened : String ->{FileSystem.FileSystem; PlatformError.PlatformError} List Float
 let opened path =
   scope {
     let file = FileSystem.open { flag = None; mode = None; noFollow = false } path
     let handles = Stream.make [file, file]
     Stream.run_collect
       (Stream.map_effect
-        (fun f -> List.length (Option.with_default [] (FileSystem.read_alloc 2 (Some 0n) f)))
+        (fun f ->
+          Int.to_float (List.length (Option.with_default [] (FileSystem.read_alloc 2 (Some 0n) f))))
         handles)
   }
 

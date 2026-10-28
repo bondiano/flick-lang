@@ -11,13 +11,13 @@ project_name :
 let project_name value =
   { name = value.name }
 
-type alias User = { id : Number; name : String; email : String }
+type alias User = { id : Float; name : String; email : String }
 
 rename : User -> User
 let rename user = { user with name = "Ada" }
 
 // field order is not part of the type
-type alias Point = { x : Number; y : Number }
+type alias Point = { x : Float; y : Float }
 
 origin : Point
 let origin = { y = 0; x = 0 }

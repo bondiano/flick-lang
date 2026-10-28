@@ -7,7 +7,7 @@ type error Boom = Boom String
 readable : List String ->{} Channel.ReadableStream String
 foreign sync readable from "./channel_js.mjs" "readable"
 
-async_iterable : List Number -> String ->{} Channel.AsyncIterable Number String
+async_iterable : List Float -> String ->{} Channel.AsyncIterable Float String
 foreign sync async_iterable from "./channel_js.mjs" "asyncIterable"
 
 upper : Unit ->{} Channel.TransformStream String String
@@ -24,7 +24,7 @@ lists : Channel.Channel none e i (NonEmpty.NonEmpty a) d none Unit ->{; e} List 
 let lists channel = Channel.run_collect (Channel.map NonEmpty.to_list channel)
 
 /// Offers the numbers to the queue and ends it.
-feed : List Number -> Queue.Queue e Number ->{} Bool
+feed : List Float -> Queue.Queue e Float ->{} Bool
 let feed numbers queue =
   let _ = Queue.offer_all numbers queue
   Queue.end queue
@@ -73,13 +73,13 @@ let values () =
 
 queues : Unit ->{; Boom} Unit
 let queues () =
-  let q : Queue.Queue {Boom} Number = Queue.unbounded ()
+  let q : Queue.Queue {Boom} Float = Queue.unbounded ()
   let _ = feed [1, 2, 3] q
   say ("from_queue: " ++ show (Channel.run_collect (Channel.from_queue q)))
-  let q2 : Queue.Queue {Boom} Number = Queue.unbounded ()
+  let q2 : Queue.Queue {Boom} Float = Queue.unbounded ()
   let _ = feed [4, 5] q2
   say ("from_queue_array: " ++ show (lists (Channel.from_queue_array q2)))
-  let failed : Queue.Queue {Boom} Number = Queue.unbounded ()
+  let failed : Queue.Queue {Boom} Float = Queue.unbounded ()
   let _ = Queue.offer 1 failed
   let _ = Queue.fail (Boom "queue") failed
   let outcome =
@@ -88,7 +88,7 @@ let queues () =
     with
     | Boom why -> "failed: " ++ why
   say ("from_queue failing: " ++ outcome)
-  let hub : PubSub.PubSub Number = PubSub.unbounded { replay = Some 2 }
+  let hub : PubSub.PubSub Float = PubSub.unbounded { replay = Some 2 }
   let _ = PubSub.publish_all [1, 2, 3] hub
   say ("from_pubsub: " ++ show (Channel.run_head (Channel.from_pubsub hub)))
   say

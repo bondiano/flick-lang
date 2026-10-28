@@ -5,7 +5,7 @@ foreign async read_text from "./fs.js" "readText"
   arity 1
   retry 3
 
-parse : String -> Number
+parse : String -> Float
 foreign quick parse from global "Number.parseFloat"
 
 //~ FLICK-S011 @6:3-6:8 unknown foreign metadata `retry`

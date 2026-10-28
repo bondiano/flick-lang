@@ -36,7 +36,7 @@ expression: json
           "param": {
             "con": {
               "module": "Prelude",
-              "name": "Number"
+              "name": "Float"
             }
           },
           "result": {
@@ -73,7 +73,7 @@ expression: json
           "param": {
             "con": {
               "module": "Prelude",
-              "name": "Number"
+              "name": "Float"
             }
           },
           "result": {
@@ -81,7 +81,7 @@ expression: json
               "param": {
                 "con": {
                   "module": "Prelude",
-                  "name": "Number"
+                  "name": "Float"
                 }
               },
               "result": {
@@ -105,8 +105,8 @@ expression: json
         }
       },
       "at": [
-        86,
-        90
+        85,
+        89
       ]
     },
     {
@@ -125,14 +125,14 @@ expression: json
           "result": {
             "con": {
               "module": "Prelude",
-              "name": "Number"
+              "name": "Float"
             }
           }
         }
       },
       "at": [
-        249,
-        253
+        245,
+        249
       ]
     },
     {
@@ -145,7 +145,7 @@ expression: json
           "param": {
             "con": {
               "module": "Prelude",
-              "name": "Number"
+              "name": "Float"
             }
           },
           "result": {
@@ -167,8 +167,8 @@ expression: json
         }
       },
       "at": [
-        354,
-        359
+        349,
+        354
       ]
     },
     {
@@ -199,14 +199,14 @@ expression: json
           "result": {
             "con": {
               "module": "Prelude",
-              "name": "Number"
+              "name": "Float"
             }
           }
         }
       },
       "at": [
-        411,
-        414
+        405,
+        408
       ]
     }
   ],

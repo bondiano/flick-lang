@@ -10,8 +10,8 @@ date-fns@4.4.0 (date-fns/index.d.ts)
   unsupported  interval_to_duration — parameter `interval`: `Interval<DateArg<Date>, DateArg<Date>>` is outside the supported subset
   unsupported  is_leap_year — parameter `date`: the union `string | number | Date` has no single Flick type; pick one member in a reviewed binding
   supported    is_valid — JsValue ->{} Bool
-  supported    milliseconds_to_seconds — Number ->{} Number
-  supported    seconds_to_hours — Number ->{} Number
+  supported    milliseconds_to_seconds — Float ->{} Float
+  supported    seconds_to_hours — Float ->{} Float
   unsupported  set_default_options — parameter `options`: `DefaultOptions` is outside the supported subset
   missing      daysInWeek — not exported by the package
 3 supported, 0 need a policy, 7 unsupported

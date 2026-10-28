@@ -5,13 +5,13 @@ module App.Main exposing (main)
 type error Boom = Boom String
 
 service Scale =
-  factor : Unit ->{} Number
+  factor : Unit ->{} Float
 
-writable : Unit ->{} Channel.WritableStream Number
+writable : Unit ->{} Channel.WritableStream Float
 foreign sync writable from "./channel_js.mjs" "writable"
   arity 0
 
-written : Unit ->{} List Number
+written : Unit ->{} List Float
 foreign sync written from "./channel_js.mjs" "writtenSoFar"
   arity 0
 
@@ -22,12 +22,12 @@ say : String ->{} Unit
 let say line = Platform.stdout_line line
 
 /// Feeds 1 to 5 in chunks of two to the sink; its end.
-run : Sink.Sink r e Number l a ->{r; e} Sink.End a l
+run : Sink.Sink r e Float l a ->{r; e} Sink.End a l
 let run sink =
   Channel.run_drain
     (Channel.from_list_chunked 2 [1, 2, 3, 4, 5] |> Channel.pipe_to (Sink.to_channel sink))
 
-ended : Show a => String -> Sink.End a Number -> String
+ended : Show a => String -> Sink.End a Float -> String
 let ended label end =
   match end with
   | (value, leftover) ->
@@ -38,13 +38,13 @@ let value_of end =
   match end with
   | (value, _) -> value
 
-even : Number -> Bool
+even : Float -> Bool
 let even n = n % 2 == 0
 
-small : Filter.Filter Number Number Number
+small : Filter.Filter Float Float Float
 let small = Filter.make (fun n -> if n < 3 then Ok (n * 10) else Err n)
 
-small_effect : Filter.FilterEffect none none Number Number Number
+small_effect : Filter.FilterEffect none none Float Float Float
 let small_effect = Filter.make_effect (fun n -> if n < 3 then Ok (n * 10) else Err n)
 
 folds : Unit ->{; Boom} Unit
@@ -126,7 +126,7 @@ let folds () =
         (run (Sink.for_each_while_array (fun c -> NonEmpty.length c > 1)))
     )
   say (ended "drain" (run Sink.drain))
-  let stopped : Sink.End String Number = ("stopped", None)
+  let stopped : Sink.End String Float = ("stopped", None)
   let forever = Channel.from_list_chunked 2 [1, 2] |> Channel.pipe_to (Sink.to_channel Sink.never)
   say
     (ended
@@ -155,7 +155,10 @@ let shapes () =
     (ended
       "map_input_array_effect"
       (
-        run (Sink.map_input_array_effect (fun c -> NonEmpty.singleton (NonEmpty.length c)) Sink.sum)
+        run
+          (Sink.map_input_array_effect
+            (fun c -> NonEmpty.singleton (Int.to_float (NonEmpty.length c)))
+            Sink.sum)
       ))
   say (ended "map_end" (run (Sink.map_end (fun end -> (show (value_of end), None)) (Sink.take 1))))
   say
@@ -189,12 +192,17 @@ let shapes () =
 
 failures : Unit ->{; Boom} Unit
 let failures () =
-  let failing : Sink.Sink none {Boom} Number Number Number = Sink.fail (Boom "sink")
+  let failing : Sink.Sink none {Boom} Float Float Float = Sink.fail (Boom "sink")
   say
     (
       ended
         "catch"
-        (run (Sink.catch (fun e -> match e with | Boom why -> String.length why) failing))
+        (run
+          (
+            Sink.catch
+              (fun e -> match e with | Boom why -> Int.to_float (String.length why))
+              failing
+          ))
     )
   say (ended "or_else" (run (Sink.or_else (fun e -> Sink.count) failing)))
   let caught = Ref.make None
@@ -228,10 +236,10 @@ let failures () =
 
 targets : Unit ->{; Boom} Unit
 let targets () =
-  let q : Queue.Queue none Number = Queue.unbounded ()
+  let q : Queue.Queue none Float = Queue.unbounded ()
   let _ = run (Sink.from_queue q)
   say ("from_queue: " ++ show (Queue.collect q))
-  let hub : PubSub.PubSub Number = PubSub.unbounded { replay = Some 5 }
+  let hub : PubSub.PubSub Float = PubSub.unbounded { replay = Some 5 }
   let _ = run (Sink.from_pubsub hub)
   let got = scope {
     let sub = PubSub.subscribe hub
@@ -246,8 +254,8 @@ let targets () =
           { evaluate = fun () -> stream; onError = boom; closeOnDone = true }
       )
   say ("from_writable_stream: " ++ show (written ()))
-  let summing : Channel.Channel none none (NonEmpty.NonEmpty Number) o (
-    Sink.End Number Number
+  let summing : Channel.Channel none none (NonEmpty.NonEmpty Float) o (
+    Sink.End Float Float
   ) none Unit =
     Sink.to_channel Sink.sum
   say (ended "from_channel" (run (Sink.from_channel summing)))

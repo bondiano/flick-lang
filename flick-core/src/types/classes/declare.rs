@@ -8,7 +8,7 @@ use std::collections::HashSet;
 
 use super::prims::PRIMITIVES;
 use super::solve::Outcome;
-use super::{Dict, RECORD, split, vars};
+use super::{Dict, NUMERIC, RECORD, split, vars};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve;
 use crate::source::Span;
@@ -177,6 +177,14 @@ impl<'n> Checker<'_> {
                 codes::C012,
                 span,
                 format!("`{cn}` is a row primitive: the compiler solves it, and a program cannot declare instances of it"),
+            );
+            return false;
+        }
+        if cm == NUMERIC && instance.module != NUMERIC {
+            self.error(
+                codes::C012,
+                span,
+                format!("`{cn}` is closed: the module `Numeric` has every instance of it, for `Int`, `Float` and `BigInt`"),
             );
             return false;
         }

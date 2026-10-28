@@ -3,7 +3,7 @@
 // time write to a console on stderr.
 module App.Main exposing (main)
 
-ms : Number -> Duration.Duration
+ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
 simple : Logger.Logger String

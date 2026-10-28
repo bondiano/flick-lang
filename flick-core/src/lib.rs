@@ -14,6 +14,7 @@ pub mod fmt;
 pub mod ide;
 pub mod iface;
 pub mod ir;
+pub mod numeric;
 pub mod opt;
 pub mod project;
 pub mod projection;

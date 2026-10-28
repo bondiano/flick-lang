@@ -57,7 +57,7 @@ impl Checker<'_> {
                 _ if self.is_scalar(plan) => Ok((label.clone(), plan.clone(), false)),
                 _ => Err((
                     format!("{name}.{label}"),
-                    "a form field is a `String`, a `Number`, a `Bool`, a refined type over them or an `Option` of one".to_owned(),
+                    "a form field is a `String`, a `Float`, a `Bool`, a refined type over them or an `Option` of one".to_owned(),
                 )),
             })
             .collect()

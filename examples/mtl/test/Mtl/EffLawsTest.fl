@@ -8,7 +8,7 @@ import Mtl.ReaderT as ReaderT exposing (ReaderT)
 import Mtl.WriterT as WriterT exposing (WriterT)
 import Mtl.ExceptT as ExceptT exposing (ExceptT)
 
-type error Offline = Offline Number
+type error Offline = Offline Float
   deriving Eq, Show
 
 checking : Arbitrary.CheckOptions
@@ -21,9 +21,9 @@ let checking = {
   replay = None;
 }
 
-integer_json : PureCodec Json Number
+integer_json : PureCodec Json Float
 let integer_json =
-  Number.json_finite
+  Float.json_finite
     |> Check.apply Check.int
     |> Check.apply
       (Check.between {
@@ -33,10 +33,10 @@ let integer_json =
         exclusiveMaximum = false;
       })
 
-ints : Arbitrary.Arbitrary Number
+ints : Arbitrary.Arbitrary Float
 let ints = Arbitrary.from_schema (Codec.to_schema integer_json)
 
-samples : Arbitrary.Arbitrary (Number, Number, Number, Number)
+samples : Arbitrary.Arbitrary (Float, Float, Float, Float)
 let samples = Arbitrary.zip4 ints ints ints ints
 
 require_passed : Arbitrary.CheckResult e a ->{; Test.AssertionFailed} Unit
@@ -49,36 +49,36 @@ let require_passed result =
         (Arbitrary.format_check_failure failed)))
 
 // Reset only between independent awaits, retaining each side's complete ordered trace.
-observe : forall c. Ref (List String) -> (Eff none {Offline} Number)^c ->{}
-  (Result Number Number, List String)
+observe : forall c. Ref (List String) -> (Eff none {Offline} Float)^c ->{}
+  (Result Float Float, List String)
 let observe trace action =
   Ref.set trace []
   let result = try Ok (await action) with | Offline code -> Err code
   (result, Ref.get trace)
 
-observe_maybe : forall c. Ref (List String) -> (Eff none {Offline} (Option Number))^c ->{}
-  (Result Number (Option Number), List String)
+observe_maybe : forall c. Ref (List String) -> (Eff none {Offline} (Option Float))^c ->{}
+  (Result Float (Option Float), List String)
 let observe_maybe trace action =
   Ref.set trace []
   let result = try Ok (await action) with | Offline code -> Err code
   (result, Ref.get trace)
 
-observe_state : forall c. Ref (List String) -> (Eff none {Offline} (Number, Number))^c ->{}
-  (Result Number (Number, Number), List String)
+observe_state : forall c. Ref (List String) -> (Eff none {Offline} (Float, Float))^c ->{}
+  (Result Float (Float, Float), List String)
 let observe_state trace action =
   Ref.set trace []
   let result = try Ok (await action) with | Offline code -> Err code
   (result, Ref.get trace)
 
-observe_writer : forall c. Ref (List String) -> (Eff none {Offline} (Number, List String))^c ->{}
-  (Result Number (Number, List String), List String)
+observe_writer : forall c. Ref (List String) -> (Eff none {Offline} (Float, List String))^c ->{}
+  (Result Float (Float, List String), List String)
 let observe_writer trace action =
   Ref.set trace []
   let result = try Ok (await action) with | Offline code -> Err code
   (result, Ref.get trace)
 
-observe_except : forall c. Ref (List String) -> (Eff none {Offline} (Result String Number))^c ->{}
-  (Result Number (Result String Number), List String)
+observe_except : forall c. Ref (List String) -> (Eff none {Offline} (Result String Float))^c ->{}
+  (Result Float (Result String Float), List String)
 let observe_except trace action =
   Ref.set trace []
   let result = try Ok (await action) with | Offline code -> Err code
@@ -89,14 +89,14 @@ let laws = [
   Test.effect_test "Eff Functor laws preserve typed outcomes and traces" (task {
     let result = Arbitrary.check checking (fun (n, a, b, branch) ->
       let trace = Ref.make []
-      source : Eff none {Offline} Number
+      source : Eff none {Offline} Float
       let source = task {
         Ref.update trace (fun xs -> xs ++ ["source"])
         if branch < 0 then from_result (Err (Offline branch)) else n
       }
-      f : Number -> Number
+      f : Float -> Float
       let f x = a * x + b
-      g : Number -> Number
+      g : Float -> Float
       let g x = b * x - a
       let identity = map (fun x -> x) source
       let composed = map (fun x -> g (f x)) source
@@ -119,41 +119,41 @@ let laws = [
       ap : forall c d x y. (Eff none {Offline} (x -> y))^c ->
         ((Eff none {Offline} x)^d -> (Eff none {Offline} y)^(c + d))^c
       let ap functions values = map2 (fun f x -> f x) functions values
-      u : Eff none {Offline} (Number -> Number)
+      u : Eff none {Offline} (Float -> Float)
       let u = task {
         Ref.update trace (fun xs -> xs ++ ["u"])
         if branch == 0 - 5 then from_result (Err (Offline 1))
         else fun x -> a * x + b
       }
-      v : Eff none {Offline} (Number -> Number)
+      v : Eff none {Offline} (Float -> Float)
       let v = task {
         Ref.update trace (fun xs -> xs ++ ["v"])
         if branch == 0 then from_result (Err (Offline 2))
         else fun x -> b * x - a
       }
-      w : Eff none {Offline} Number
+      w : Eff none {Offline} Float
       let w = task {
         Ref.update trace (fun xs -> xs ++ ["w"])
         if branch == 5 then from_result (Err (Offline 3)) else n
       }
-      f : Number -> Number
+      f : Float -> Float
       let f x = a * x + b
-      identity_function : Eff none {Offline} (Number -> Number)
+      identity_function : Eff none {Offline} (Float -> Float)
       let identity_function = pure (fun x -> x)
       composition_function : Eff none {Offline}
-        ((Number -> Number) -> (Number -> Number) -> Number -> Number)
+        ((Float -> Float) -> (Float -> Float) -> Float -> Float)
       let composition_function = pure (fun f g x -> f (g x))
-      pure_function : Eff none {Offline} (Number -> Number)
+      pure_function : Eff none {Offline} (Float -> Float)
       let pure_function = pure f
-      pure_value : Eff none {Offline} Number
+      pure_value : Eff none {Offline} Float
       let pure_value = pure n
-      interchange_function : Eff none {Offline} ((Number -> Number) -> Number)
+      interchange_function : Eff none {Offline} ((Float -> Float) -> Float)
       let interchange_function = pure (fun f -> f n)
       let identity = ap identity_function w
       let composition_left = ap (ap (ap composition_function u) v) w
       let composition_right = ap u (ap v w)
       let homomorphism_left = ap pure_function pure_value
-      homomorphism_right : Eff none {Offline} Number
+      homomorphism_right : Eff none {Offline} Float
       let homomorphism_right = pure (f n)
       let interchange_left = ap u pure_value
       let interchange_right = ap interchange_function u
@@ -190,18 +190,18 @@ let laws = [
   Test.effect_test "Eff Monad laws preserve branches and ordered effects" (task {
     let result = Arbitrary.check checking (fun (n, a, b, branch) ->
       let trace = Ref.make []
-      source : Eff none {Offline} Number
+      source : Eff none {Offline} Float
       let source = task {
         Ref.update trace (fun xs -> xs ++ ["source"])
         if branch < 0 then from_result (Err (Offline branch)) else n
       }
-      f : Number -> Eff none {Offline} Number
+      f : Float -> Eff none {Offline} Float
       let f x = task {
         Ref.update trace (fun xs -> xs ++ ["f " ++ show x])
         if (x + branch) % 3 == 0 then from_result (Err (Offline x))
         else a * x + b
       }
-      g : Number -> Eff none {Offline} Number
+      g : Float -> Eff none {Offline} Float
       let g x = task {
         Ref.update trace (fun xs -> xs ++ ["g " ++ show x])
         if (x - branch) % 4 == 0 then from_result (Err (Offline x))
@@ -234,36 +234,36 @@ let laws = [
   Test.effect_test "all five MonadTrans lifts preserve effectful bind and complete results" (task {
     let result = Arbitrary.check checking (fun (n, a, b, branch) ->
       let trace = Ref.make []
-      source : Eff none {Offline} Number
+      source : Eff none {Offline} Float
       let source = task {
         Ref.update trace (fun xs -> xs ++ ["source"])
         if branch < 0 then from_result (Err (Offline branch)) else n
       }
-      f : Number -> Eff none {Offline} Number
+      f : Float -> Eff none {Offline} Float
       let f x = task {
         Ref.update trace (fun xs -> xs ++ ["f " ++ show x])
         if x + branch == 0 then from_result (Err (Offline x)) else a * x + b
       }
       let bound = flat_map f source
-      maybe_left : MaybeT (Eff none {Offline}) Number
+      maybe_left : MaybeT (Eff none {Offline}) Float
       let maybe_left = lift bound
-      maybe_right : MaybeT (Eff none {Offline}) Number
+      maybe_right : MaybeT (Eff none {Offline}) Float
       let maybe_right = flat_map (fun x -> lift (f x)) (lift source)
-      state_left : StateT Number (Eff none {Offline}) Number
+      state_left : StateT Float (Eff none {Offline}) Float
       let state_left = lift bound
-      state_right : StateT Number (Eff none {Offline}) Number
+      state_right : StateT Float (Eff none {Offline}) Float
       let state_right = flat_map (fun x -> lift (f x)) (lift source)
-      reader_left : ReaderT Number (Eff none {Offline}) Number
+      reader_left : ReaderT Float (Eff none {Offline}) Float
       let reader_left = lift bound
-      reader_right : ReaderT Number (Eff none {Offline}) Number
+      reader_right : ReaderT Float (Eff none {Offline}) Float
       let reader_right = flat_map (fun x -> lift (f x)) (lift source)
-      writer_left : WriterT (List String) (Eff none {Offline}) Number
+      writer_left : WriterT (List String) (Eff none {Offline}) Float
       let writer_left = lift bound
-      writer_right : WriterT (List String) (Eff none {Offline}) Number
+      writer_right : WriterT (List String) (Eff none {Offline}) Float
       let writer_right = flat_map (fun x -> lift (f x)) (lift source)
-      except_left : ExceptT String (Eff none {Offline}) Number
+      except_left : ExceptT String (Eff none {Offline}) Float
       let except_left = lift bound
-      except_right : ExceptT String (Eff none {Offline}) Number
+      except_right : ExceptT String (Eff none {Offline}) Float
       let except_right = flat_map (fun x -> lift (f x)) (lift source)
       let cold = Ref.get trace == []
       let (base_result, base_trace) = observe trace bound
@@ -305,7 +305,7 @@ let behavior = [
     let base = task { Ref.update trace (fun xs -> xs ++ ["base"]) }
     after : Eff none none Unit
     let after = task { Ref.update trace (fun xs -> xs ++ ["after"]) }
-    action : Stack (Eff none none) Number
+    action : Stack (Eff none none) Float
     let action = do {
       Capabilities.lift_base base
       value <- Capabilities.workflow 2
@@ -324,7 +324,7 @@ let behavior = [
     let base = task { Ref.update trace (fun xs -> xs ++ ["base"]) }
     after : Eff none none Unit
     let after = task { Ref.update trace (fun xs -> xs ++ ["after"]) }
-    action : Stack (Eff none none) Number
+    action : Stack (Eff none none) Float
     let action = do {
       Capabilities.lift_base base
       value <- Capabilities.workflow (0 - 1)
@@ -339,21 +339,21 @@ let behavior = [
   }),
   Test.effect_test "ExceptT catches domain errors but never an underlying typed Eff failure" (task {
     let trace = Ref.make []
-    offline : Eff none {Offline} Number
+    offline : Eff none {Offline} Float
     let offline = task {
       Ref.update trace (fun xs -> xs ++ ["offline"])
       from_result (Err (Offline 42))
     }
-    after : Eff none {Offline} Number
+    after : Eff none {Offline} Float
     let after = task {
       Ref.update trace (fun xs -> xs ++ ["after"])
       100
     }
-    failed : ExceptT String (Eff none {Offline}) Number
+    failed : ExceptT String (Eff none {Offline}) Float
     let failed = do { _ <- lift offline; lift after }
-    domain : ExceptT String (Eff none {Offline}) Number
+    domain : ExceptT String (Eff none {Offline}) Float
     let domain = throw_error "domain"
-    handle : String -> ExceptT String (Eff none {Offline}) Number
+    handle : String -> ExceptT String (Eff none {Offline}) Float
     let handle problem = lift (task {
       Ref.update trace (fun xs -> xs ++ ["handler " ++ problem])
       9
@@ -370,12 +370,12 @@ let behavior = [
   }),
   Test.effect_test "ExceptT applicative failure does not execute the right Eff action" (task {
     let trace = Ref.make []
-    left : ExceptT String (Eff none {Offline}) Number
+    left : ExceptT String (Eff none {Offline}) Float
     let left = do {
       lift (task { Ref.update trace (fun xs -> xs ++ ["left"]) })
       throw_error "domain"
     }
-    right : ExceptT String (Eff none {Offline}) Number
+    right : ExceptT String (Eff none {Offline}) Float
     let right = lift (task {
       Ref.update trace (fun xs -> xs ++ ["right"])
       3

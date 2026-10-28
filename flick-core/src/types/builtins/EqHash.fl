@@ -12,7 +12,7 @@ type Canonical
 /// which must agree: equal values have equal hashes.
 with :
   forall c a b.
-  (a -> a -> Bool) -> (a -> Number) -> (forall w. EqHash w a -> b)^c -> b
+  (a -> a -> Bool) -> (a -> Float) -> (forall w. EqHash w a -> b)^c -> b
 foreign pure with from "@flick-lang/runtime" "eqHashWith"
   retention call
 

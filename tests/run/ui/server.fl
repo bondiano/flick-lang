@@ -6,7 +6,7 @@ settle : Unit ->{} Unit
 foreign async settle from "./dom.mjs" "settle"
   arity 0
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.make 0
 
 name : Atom.Writable String
@@ -24,7 +24,7 @@ let page =
         ]
     })
 
-request : Number ->{} String
+request : Float ->{} String
 let request n =
   provide Atom.layer {
     Atom.set count n

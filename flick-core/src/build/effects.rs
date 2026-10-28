@@ -18,13 +18,14 @@ const RUNTIME: &str = "@flick-lang/runtime";
 /// The built-in modules whose foreign bindings `core` has, every one.
 const BUILTINS: &[&str] = &[
     "Bool",
+    "Float",
     "Instances",
+    "Int",
     "List",
     "List.Core",
     "List.Search",
     "List.Slice",
     "List.Transform",
-    "Number",
     "Option",
     "Prelude",
     "Result",

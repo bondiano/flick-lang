@@ -41,7 +41,7 @@ sql table Users "users" {
 | Тип SQL | Тип Flick |
 | - | - |
 | `bigint`, `int8`, `bigserial` | `BigInt` |
-| `integer`, `int`, `int4`, `smallint`, `int2`, `serial`, `real`, `double precision`, `float8` | `Number` |
+| `integer`, `int`, `int4`, `smallint`, `int2`, `serial`, `real`, `double precision`, `float8` | `Float` |
 | `numeric`, `decimal` | `BigDecimal` |
 | `text`, `varchar`, `character varying`, `uuid`, `date`, `timestamp`, `timestamptz` | `String` |
 | `boolean`, `bool` | `Bool` |
@@ -53,7 +53,7 @@ sql table Users "users" {
 Такой кодек создаётся через `Sql.codec decode encode`; функция `decode`
 может отклонить значение с ошибкой `SchemaError`.
 Без такого проверяемого кодека значения `bigint` и `numeric`
-не представляются типом `Number`.
+не представляются типом `Float`.
 
 Компилятор никогда не подключается к базе данных. Объявления таблиц
 записываются вручную или генерируются из миграций в том же формате.
@@ -114,7 +114,7 @@ let balances_of id =
 | `having e` | условие для групп |
 | `select { label = e; … }`, `select a.x, b.y`, `select a` | задаёт результат; в списке каждый столбец сохраняет своё имя, а отдельный псевдоним таблицы выбирает все её столбцы |
 | `order_by e, asc e, desc e` | задаёт порядок строк |
-| `limit e`, `offset e` | принимают значения `Number` |
+| `limit e`, `offset e` | принимают значения `Float` |
 | `union (sql { … })`, `union_all (sql { … })` | объединяет с запросом, у которого такие же результирующие столбцы в том же порядке |
 | `insert_into T`, `values { column = e; … }` | вставка |
 | `update T`, `set { column = e; … }`, `where e` | обновление |
@@ -125,7 +125,7 @@ let balances_of id =
 
 В выражениях допустимы столбцы, параметры, захваты, литералы, сравнения
 `== != < <= > >=`, логические операции `&&`, `||`, `not`,
-арифметические операции `+ - * / %` над `Number`, `BigInt` и `BigDecimal`,
+арифметические операции `+ - * / %` над `Float`, `BigInt` и `BigDecimal`,
 конкатенация `++` над `String` и функции из таблицы ниже.
 Столбец можно указать как `alias.column` или просто `column`, если он есть
 ровно в одной таблице; иначе возникает `FLICK-Q003`.

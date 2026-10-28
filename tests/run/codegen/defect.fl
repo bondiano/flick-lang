@@ -1,11 +1,11 @@
 // A defect is reported with the Flick source line it comes from.
 module App.Main exposing (main)
 
-divide : BigInt -> BigInt ->{} BigInt
+divide : Int -> Int ->{} Int
 let divide a b =
-  a / b
+  Int.unsafe_div a b
 
 main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line "before"
-  ignore (divide 1n 0n)
+  ignore (divide 1 0)

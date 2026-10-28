@@ -25,10 +25,10 @@ let examples =
         """
       module Main exposing (main)
 
-      type Shape = Circle Number | Rect Number Number
+      type Shape = Circle Float | Rect Float Float
         deriving Eq, Show
 
-      area : Shape -> Number
+      area : Shape -> Float
       let area shape =
         match shape with
         | Circle r -> 3.14159 * r * r
@@ -50,7 +50,7 @@ let examples =
 
       type error NotFound = NotFound String
 
-      find : String ->{; NotFound} Number
+      find : String ->{; NotFound} Float
       let find name =
         if name == "ada" then 36 else from_result (Err (NotFound name))
 
@@ -71,9 +71,9 @@ let examples =
         """
       module Main exposing (main)
 
-      type error Flaky = Flaky Number
+      type error Flaky = Flaky Float
 
-      flaky : Ref Number -> Eff none {Flaky} String
+      flaky : Ref Float -> Eff none {Flaky} String
       let flaky calls =
         task {
           let n = Ref.get calls + 1
@@ -97,7 +97,7 @@ let examples =
         """
       module Main exposing (main)
 
-      after : Number -> String -> Eff none none String
+      after : Float -> String -> Eff none none String
       let after millis text =
         task {
           Effect.sleep (Result.with_default Duration.zero (Duration.millis millis))
@@ -118,7 +118,7 @@ let examples =
         """
       module Main exposing (main)
 
-      total : List Number -> Number
+      total : List Float -> Float
       let total xs = List.fold_left (fun acc x -> acc + x) 0 xs
 
       main : Unit ->{; AppError} Unit

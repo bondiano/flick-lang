@@ -22,11 +22,11 @@ fn inventory_discovers_project_roots_and_tracks_inputs_without_building() {
             ("package.json", r#"{"dependencies":{"missing":"1.0.0"}}"#),
             (
                 "code/Nested/Widget.fl",
-                "import Shared\n\nanswer : Number\nlet answer = Shared.answer\n",
+                "import Shared\n\nanswer : Float\nlet answer = Shared.answer\n",
             ),
             (
                 "code/Shared.fl",
-                "module Shared exposing (answer)\nanswer : Number\nlet answer = 1\n",
+                "module Shared exposing (answer)\nanswer : Float\nlet answer = 1\n",
             ),
         ],
     );
@@ -62,7 +62,7 @@ fn inventory_discovers_project_roots_and_tracks_inputs_without_building() {
     assert_eq!(inventory(&cwd, "Widget.fl")["key"], first["key"]);
     fs::write(
         dir.join("code/Shared.fl"),
-        "module Shared exposing (answer)\nanswer : Number\nlet answer = 2\n",
+        "module Shared exposing (answer)\nanswer : Float\nlet answer = 2\n",
     )
     .expect("edit source");
     let edited = inventory(&cwd, "Widget.fl");
@@ -76,7 +76,7 @@ fn inventory_discovers_project_roots_and_tracks_inputs_without_building() {
     assert_ne!(configured["key"], edited["key"]);
     fs::write(
         dir.join("code/Added.fl"),
-        "module Added exposing (answer)\nanswer : Number\nlet answer = 3\n",
+        "module Added exposing (answer)\nanswer : Float\nlet answer = 3\n",
     )
     .expect("add source");
     assert_ne!(inventory(&cwd, "Widget.fl")["key"], configured["key"]);
@@ -98,11 +98,11 @@ fn standalone_inventory_uses_the_compilers_header_based_import_root() {
         &[
             (
                 "App/Main.fl",
-                "// the filename is not the module name\nmodule App.Main exposing (answer)\nimport Shared\nanswer : Number\nlet answer = Shared.answer\n",
+                "// the filename is not the module name\nmodule App.Main exposing (answer)\nimport Shared\nanswer : Float\nlet answer = Shared.answer\n",
             ),
             (
                 "Shared.fl",
-                "module Shared exposing (answer)\nanswer : Number\nlet answer = 42\n",
+                "module Shared exposing (answer)\nanswer : Float\nlet answer = 42\n",
             ),
         ],
     );
@@ -130,14 +130,14 @@ fn a_sibling_of_an_external_root_is_part_of_the_cache_key() {
     .expect("config");
     fs::write(
         root.join("scratch/External.fl"),
-        "module External exposing (value)\n\nimport Helper\n\nvalue : Number\nlet value = Helper.n\n",
+        "module External exposing (value)\n\nimport Helper\n\nvalue : Float\nlet value = Helper.n\n",
     )
     .expect("external");
     let helper = root.join("scratch/Helper.fl");
     let set = |n: u8| {
         fs::write(
             &helper,
-            format!("module Helper exposing (n)\n\nn : Number\nlet n = {n}{n}{n}\n"),
+            format!("module Helper exposing (n)\n\nn : Float\nlet n = {n}{n}{n}\n"),
         )
         .expect("helper");
     };

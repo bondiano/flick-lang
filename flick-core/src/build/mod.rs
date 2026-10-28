@@ -821,12 +821,12 @@ mod tests {
         let (ir, interface) = check_text(
             "App.Shapes",
             "module App.Shapes exposing (Shape(..), area, scale, now)\n\
-             type Shape = Circle Number | Rect Number Number\n  deriving Eq, Show\n\
+             type Shape = Circle Float | Rect Float Float\n  deriving Eq, Show\n\
              class Describe a =\n  describe : a -> String\n\
              instance Describe Shape =\n  let describe s = \"shape\"\n\
-             area : Shape -> Number\nlet area s =\n  match s with\n  | Circle r -> r * r\n  | Rect w h -> w * h\n\
-             scale : Number -> Shape -> Shape\nlet scale k s = Circle k\n\
-             now : Unit ->{} Number\nforeign sync now from global \"Date.now\"\n",
+             area : Shape -> Float\nlet area s =\n  match s with\n  | Circle r -> r * r\n  | Rect w h -> w * h\n\
+             scale : Float -> Shape -> Shape\nlet scale k s = Circle k\n\
+             now : Unit ->{} Float\nforeign sync now from global \"Date.now\"\n",
         )
         .expect("checks");
         let dependency = Interface {
@@ -854,13 +854,13 @@ mod tests {
         let (ir, interface) = check_text(
             "Calc",
             "module Calc exposing (..)\n\
-             double : Number -> Number\nlet double x = x + x\n\
-             quad : Number -> Number\nlet quad x = double (double x)\n\
-             adder : Number -> Number -> Number\nlet adder a b = a + b\n\
-             add_one : Number -> Number\nlet add_one = adder 1\n\
-             loop : Number -> Number\nlet rec loop x = loop x\n\
-             via_loop : Number -> Number\nlet via_loop x = double (loop x)\n\
-             ratio : Number -> Number\nlet ratio x = x / 2\n",
+             double : Float -> Float\nlet double x = x + x\n\
+             quad : Float -> Float\nlet quad x = double (double x)\n\
+             adder : Float -> Float -> Float\nlet adder a b = a + b\n\
+             add_one : Float -> Float\nlet add_one = adder 1\n\
+             loop : Float -> Float\nlet rec loop x = loop x\n\
+             via_loop : Float -> Float\nlet via_loop x = double (loop x)\n\
+             ratio : Float -> Float\nlet ratio x = x / 2\n",
         )
         .expect("checks");
         let built = super::interface(&ir, &interface, None, &[], &|_| None);
@@ -878,7 +878,7 @@ mod tests {
             ("add_one", false),
             ("loop", true),
             ("via_loop", true),
-            ("ratio", true),
+            ("ratio", false),
         ];
         for (name, p) in expected {
             assert!(

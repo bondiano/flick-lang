@@ -4,16 +4,16 @@ module App.Main exposing (main)
 line : String -> String ->{} Unit
 let line label text = Platform.stdout_line (label ++ ": " ++ text)
 
-half : Number -> Result String Number
-let half n = if n - 2 * Number.floor (n / 2) == 0 then Ok (n / 2) else Err ("odd " ++ show n)
+half : Float -> Result String Float
+let half n = if n - 2 * Float.floor (n / 2) == 0 then Ok (n / 2) else Err ("odd " ++ show n)
 
-positive : Number -> Option Number
+positive : Float -> Option Float
 let positive n = if n > 0 then Some n else None
 
 main : Unit ->{; AppError} Unit
 let main () =
   let some = Some 4
-  let nothing : Option Number = None
+  let nothing : Option Float = None
   line
     "basics"
     (show
@@ -68,7 +68,7 @@ let main () =
         Option.lift2 (fun a b -> a - b) nothing some,
         Option.lift_predicate (fun n -> n > 3) 2,
       ))
-  described : Option Number -> String
+  described : Option Float -> String
   let described = Option.match_ { onNone = fun () -> "none"; onSome = fun n -> "some " ++ show n }
   line "match" (described some ++ ", " ++ described nothing)
   line
@@ -105,9 +105,9 @@ let main () =
         Option.zip_with (Some 10) (fun a b -> a * b) some,
         Option.zip_left nothing some,
       ))
-  line "from list" (show (List.head [1, 2], List.head ([] : List Number)))
-  let ok : Result String Number = Ok 4
-  let err : Result String Number = Err "boom"
+  line "from list" (show (List.head [1, 2], List.head ([] : List Float)))
+  let ok : Result String Float = Ok 4
+  let err : Result String Float = Err "boom"
   line
     "result basics"
     (show
@@ -127,7 +127,7 @@ let main () =
       (
         Result.all [ok, Ok 5],
         Result.all [ok, err],
-        Result.fail_void == (Err () : Result Unit Number),
+        Result.fail_void == (Err () : Result Unit Float),
         Result.void == (Ok () : Result String Unit),
       ))
   line
@@ -144,7 +144,7 @@ let main () =
         Result.flip ok,
         Result.get_failure err,
         Result.get_failure ok,
-        Result.merge (Result.flip (Ok 1 : Result Number Number)),
+        Result.merge (Result.flip (Ok 1 : Result Float Float)),
       ))
   line
     "lift_predicate"
@@ -160,7 +160,7 @@ let main () =
         Result.map_both { onFailure = String.length; onSuccess = fun n -> n * 2 } ok,
         Result.map_both { onFailure = String.length; onSuccess = fun n -> n * 2 } err,
       ))
-  told : Result String Number -> String
+  told : Result String Float -> String
   let told =
     Result.match_ { onFailure = fun e -> "failed " ++ e; onSuccess = fun n -> "got " ++ show n }
   line "result match" (told ok ++ ", " ++ told err)
@@ -168,22 +168,22 @@ let main () =
     "result or_else"
     (show
       (
-        (Result.or_else (fun e -> Ok (String.length e)) err : Result Unit Number),
-        Result.or_else (fun _ -> (Err 0 : Result Number Number)) ok,
+        (Result.or_else (fun e -> Ok (Int.to_float (String.length e))) err : Result Unit Float),
+        Result.or_else (fun _ -> (Err 0 : Result Float Float)) ok,
       ))
   line
     "succeed"
     (show
       (
-        (Result.succeed_none : Result String (Option Number)),
-        (Result.succeed_some 1 : Result String (Option Number)),
+        (Result.succeed_none : Result String (Option Float)),
+        (Result.succeed_some 1 : Result String (Option Float)),
       ))
   line
     "transpose"
     (show
       (
         Result.transpose_option (Some ok),
-        Result.transpose_option (None : Option (Result String Number)),
+        Result.transpose_option (None : Option (Result String Float)),
         Result.transpose_map_option half (Some 3),
         Result.transpose_map_option half nothing,
       ))
@@ -191,8 +191,8 @@ let main () =
     "constructors"
     (show
       (
-        (Ok 1 : Result String Number),
-        (Err "e" : Result String Number),
-        (Some 1, (None : Option Number)),
+        (Ok 1 : Result String Float),
+        (Err "e" : Result String Float),
+        (Some 1, (None : Option Float)),
       ))
   line "undefined_or" (show (Option.map (fun n -> n * 3) some))

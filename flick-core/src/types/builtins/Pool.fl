@@ -18,9 +18,9 @@ make :
   forall s r e a.
   {
     acquire : Eff r e a;
-    size : Number;
-    concurrency : Option Number;
-    targetUtilization : Option Number;
+    size : Float;
+    concurrency : Option Float;
+    targetUtilization : Option Float;
   } ->{Scope s | r;}
   Pool s e a
 foreign effect make from "@flick-lang/runtime/effect/Pool" "flickMake"
@@ -32,10 +32,10 @@ make_with_ttl :
   forall s r e a.
   {
     acquire : Eff r e a;
-    min : Number;
-    max : Number;
-    concurrency : Option Number;
-    targetUtilization : Option Number;
+    min : Float;
+    max : Float;
+    concurrency : Option Float;
+    targetUtilization : Option Float;
     timeToLive : Duration.Duration;
     timeToLiveStrategy : Option TimeToLiveStrategy;
   } ->{Scope s | r;}

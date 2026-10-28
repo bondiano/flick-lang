@@ -21,12 +21,12 @@ let load_optional id =
 
 Given `Users.get : UserId ->{Users; NotFound} User`, the result of `load_optional` is `Option User`, the requirements remain `{Users}`, and the row of selected recoverable errors becomes empty. The full native Cause may hold additional diagnostic failures; its payloads are not passed off as the residual `e`.
 
-An error can have parameters. `type error RetryExhausted e = RetryExhausted e Number` stores the last cause after the attempts are exhausted, and `type error SendFailed a = SendFailed a` returns the value that could not be sent. The error row distinguishes elements by nominal name `Module.Name`, not by arguments, so a row holds at most one element with a given name: the arguments of two `RetryExhausted` in one row are unified, and `RetryExhausted DbError` together with `RetryExhausted String` is a type error. The TS projection is built the same way: `_tag` does not depend on the arguments, `RetryExhausted<E>` appears in the error union of an `Effect` at most once, and `catchTag` narrows the type unambiguously. Java and OCaml forbid parameterized exceptions for the same reason; here parameters are allowed because the row stores one element per name.
+An error can have parameters. `type error RetryExhausted e = RetryExhausted e Float` stores the last cause after the attempts are exhausted, and `type error SendFailed a = SendFailed a` returns the value that could not be sent. The error row distinguishes elements by nominal name `Module.Name`, not by arguments, so a row holds at most one element with a given name: the arguments of two `RetryExhausted` in one row are unified, and `RetryExhausted DbError` together with `RetryExhausted String` is a type error. The TS projection is built the same way: `_tag` does not depend on the arguments, `RetryExhausted<E>` appears in the error union of an `Effect` at most once, and `catchTag` narrows the type unambiguously. Java and OCaml forbid parameterized exceptions for the same reason; here parameters are allowed because the row stores one element per name.
 
 ```flick
-type error RetryExhausted e = RetryExhausted e Number
+type error RetryExhausted e = RetryExhausted e Float
 
-retry : Number -> Eff r e a ->{r; RetryExhausted (Errors e)} a
+retry : Float -> Eff r e a ->{r; RetryExhausted (Errors e)} a
 ```
 
 Removing an error from a row is allowed only when the selected typed recovery fully covers its nominal variant. A guard or a partial pattern on the payload leaves the error possible. The requirements/errors of the handler are added to the result. Row subtraction applies to the selected recoverable error; it does not prove the absence of such a tag among secondary raw failures.
@@ -51,7 +51,7 @@ Services and errors get the qualified identity of their package and module. A bi
 
 ```flick
 service Clock =
-  now : Unit ->{} Number
+  now : Unit ->{} Float
 
 clock_impl : Clock.Impl
 let clock_impl =

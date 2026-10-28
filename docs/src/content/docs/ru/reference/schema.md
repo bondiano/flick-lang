@@ -15,7 +15,7 @@ title: "Схемы и кодеки"
 ## Уточнённые типы
 
 ```flick
-refined type Port = Number where fun n -> n > 0 && n < 65536
+refined type Port = Float where fun n -> n > 0 && n < 65536
   deriving Eq, Schema
 
 refined type Email = String where Checks.email
@@ -43,7 +43,7 @@ refined type Email = String where Checks.email
 | - | - |
 | `type Shape = …`, псевдоним записи или кортежа, `type error` | `Schema Shape` |
 | `type Tree a = …` | `Schema a -> Schema (Tree a)` |
-| `type alias PairOf f = { count : f Number }` | `(forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)` |
+| `type alias PairOf f = { count : f Float }` | `(forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)` |
 | параметр, который не используется в представлении типа (фантомный) | схема параметра не требуется |
 
 ```flick
@@ -107,7 +107,7 @@ let profile_json =
 | `Codec.decode`, `Codec.encode` | эффектные вызовы, которые могут завершиться ошибкой `SchemaError` |
 | `Codec.decode_result`, `Codec.encode_result` | чистые функции для `PureCodec` |
 | `Codec.json schema` | каноническая форма JSON: записи как объекты, варианты как `{"_tag": "Name", "_0": …}`, `Option` как значение или `null`, `Unit` как `null`, `BigInt` как строка |
-| `String.json`, `Number.json_finite`, `Number.json`, `BigInt.json`, `Codec.bool`, `Codec.list` | кодеки примитивов; `Number.json_finite` отклоняет `NaN` и бесконечности при кодировании и декодировании, `Number.json` записывает их как строки |
+| `String.json`, `Float.json_finite`, `Float.json`, `BigInt.json`, `Codec.bool`, `Codec.list` | кодеки примитивов; `Float.json_finite` отклоняет `NaN` и бесконечности при кодировании и декодировании, `Float.json` записывает их как строки |
 | `Codec.transform`, `Codec.transform_result`, `Codec.transform_effect` | чистые преобразования, преобразования с возможной ошибкой и эффектные преобразования |
 | `Codec.check predicate message` | проверка всего декодированного значения |
 | `Redacted.json_reveal codec`, `Redacted.json_masked` | явные политики для `Redacted`: раскрыть содержимое или использовать одностороннее представление `"<redacted>"` |

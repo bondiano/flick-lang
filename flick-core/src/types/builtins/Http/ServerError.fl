@@ -13,7 +13,7 @@ type alias RequestDetails = {
 
 /// The request and the status of the response a failure is about.
 type alias ResponseDetails =
-  { method : Http.Method.Method; url : String; status : Number; description : Option String }
+  { method : Http.Method.Method; url : String; status : Float; description : Option String }
 
 /// Why handling failed: the request could not be parsed, no route matched
 /// it, the handler failed, or the response could not be sent.
@@ -33,7 +33,7 @@ type error ServeError = ServeError String
   deriving Eq, Show
 
 /// The status a server answers the failure with.
-status : HttpServerError -> Number
+status : HttpServerError -> Float
 let status failure =
   match failure with
   | HttpServerError (RequestParseError _) -> 400

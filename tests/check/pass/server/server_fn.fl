@@ -6,7 +6,7 @@ module App.Shop exposing (..)
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 
-type alias Order = { item : String; count : Number }
+type alias Order = { item : String; count : Float }
   deriving Schema
 
 type error OutOfStock = OutOfStock String
@@ -19,10 +19,10 @@ server fn place order =
 stock : Unit ->{Server.Server;} List String
 server fn stock () = ["tea", "cake"]
 
-restock : String -> Number ->{Server.Server;} Number
+restock : String -> Int ->{Server.Server;} Int
 server fn restock item count = count + String.length item
 
-refill : String -> Number ->{; Rpc.ClientError} Number
+refill : String -> Int ->{; Rpc.ClientError} Int
 let refill = restock
 
 call : Order ->{; Rpc.ClientError, OutOfStock} String

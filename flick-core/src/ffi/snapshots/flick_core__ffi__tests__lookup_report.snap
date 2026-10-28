@@ -4,9 +4,9 @@ expression: generated.report(&lookup_surface())
 ---
 lookup-lib@1.0.0 (lookup-lib/index.d.ts)
   supported    lookup — String ->{; JsError} Option String
-  supported    next_id — Unit ->{} Number
-  supported    parse_1 — String ->{} Number
-  supported    parse_2 — String -> Number ->{} Number
+  supported    next_id — Unit ->{} Float
+  supported    parse_1 — String ->{} Float
+  supported    parse_2 — String -> Float ->{} Float
   unsupported  to_date — parameter `value`: the union `string | number` has no single Flick type; pick one member in a reviewed binding
   supported    describe — JsValue ->{} String
                  note: optional parameter `options: { depth?: number }` is left out

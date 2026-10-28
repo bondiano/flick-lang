@@ -16,6 +16,7 @@ pub use print::print;
 
 use std::collections::HashMap;
 
+use crate::numeric::{Arith, Num};
 use crate::source::Span;
 pub use crate::types::Stage;
 use crate::types::{Constructor, Dict, ForeignInfo, InstanceInfo, Lift, SchemaItem};
@@ -200,7 +201,8 @@ pub enum ExprKind {
     Not(Box<Expr>),
     /// `o?`: the value of the `Some`; a `None` returns from the function.
     Unwrap(Box<Expr>),
-    Neg(Box<Expr>),
+    /// `-e` on a number of the type.
+    Neg(Num, Box<Expr>),
     Ignore(Box<Expr>),
     Await(Box<Expr>),
     Task(Box<Expr>),
@@ -230,7 +232,7 @@ impl Expr {
             | ExprKind::Field(inner, _)
             | ExprKind::Not(inner)
             | ExprKind::Unwrap(inner)
-            | ExprKind::Neg(inner)
+            | ExprKind::Neg(_, inner)
             | ExprKind::Ignore(inner)
             | ExprKind::Await(inner)
             | ExprKind::Task(inner)
@@ -326,7 +328,7 @@ impl Expr {
             | ExprKind::Field(inner, _)
             | ExprKind::Not(inner)
             | ExprKind::Unwrap(inner)
-            | ExprKind::Neg(inner)
+            | ExprKind::Neg(_, inner)
             | ExprKind::Ignore(inner)
             | ExprKind::Await(inner)
             | ExprKind::Task(inner)
@@ -454,7 +456,7 @@ pub enum Lit {
 pub enum Pat {
     Wild,
     Bind(String),
-    /// A literal; `Number` and `BigInt` may be negative.
+    /// A literal; `Float` and `BigInt` may be negative.
     Lit(Lit),
     Tuple(Vec<Pat>),
     /// Items, then the pattern of the rest of a `[a, ...rest]`.
@@ -469,7 +471,7 @@ pub enum Pat {
 pub enum BinOp {
     Or,
     And,
-    /// Structural equality; `SameValueZero` on `Number`.
+    /// Structural equality; `SameValueZero` on `Float`.
     Eq,
     NotEq,
     /// `===`: equality of values whose identity is their equality (`String`,
@@ -484,12 +486,8 @@ pub enum BinOp {
     Concat,
     /// `++` on lists.
     ListConcat,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    Pow,
+    /// Arithmetic on the numeric type.
+    Arith(Arith, Num),
 }
 
 impl BinOp {
@@ -507,12 +505,7 @@ impl BinOp {
             BinOp::Ge => ">=",
             BinOp::Concat => "++",
             BinOp::ListConcat => "++list",
-            BinOp::Add => "+",
-            BinOp::Sub => "-",
-            BinOp::Mul => "*",
-            BinOp::Div => "/",
-            BinOp::Rem => "%",
-            BinOp::Pow => "**",
+            BinOp::Arith(op, _) => op.symbol(),
         }
     }
 }

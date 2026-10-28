@@ -14,6 +14,7 @@ use super::sql::dialect::Dialect;
 use super::ty::{Stage, Type, stage_of};
 use super::{FormField, UrlRoute};
 use crate::ir::Label;
+use crate::numeric::Num;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -51,6 +52,10 @@ pub struct Typing {
     pub stages: HashMap<Range, Vec<Stage>>,
     /// Functions accepted where one of another stage is expected.
     pub lifts: HashMap<Range, Lift>,
+    /// The numeric type of arithmetic and integer literals.
+    pub numeric: HashMap<Range, Num>,
+    /// Arithmetic and number literals on a type variable: class methods.
+    pub generic_numeric: HashSet<Range>,
     /// `++` on lists rather than strings.
     pub list_concat: HashSet<Range>,
     /// `==` and `!=` that JS `===` decides: on the values themselves, or on
@@ -207,7 +212,7 @@ pub struct SchemaItem {
 /// How a witness is built from the witnesses of its parts.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SchemaPlan {
-    /// `Number`, `String`, `Bool`, `BigInt`, `Unit`, `Never`, `Unknown`.
+    /// `Float`, `String`, `Bool`, `BigInt`, `Unit`, `Never`, `Unknown`.
     Prim(String),
     List(Box<SchemaPlan>),
     Option(Box<SchemaPlan>),

@@ -10,7 +10,7 @@ import App.Shapes as S exposing (hidden, Shape(..), Circle, Id(..), Kind(..), Al
 //                                                                            ^^^^^^^^^ FLICK-R005 `Alias` from `App.Shapes` has no constructors
 //                                                                                       ^^^^ FLICK-R004 does not export `Nope`
 
-use : Number -> S.Shape
+use : Float -> S.Shape
 let use n =
   let a = S.circle n
   let b = S.Square n

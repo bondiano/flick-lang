@@ -18,9 +18,9 @@ let edge s t w g =
 
 /// The graph with the nodes, then the edges, added in order.
 build : List String ->
-  List (Graph.NodeIndex, Graph.NodeIndex, Number) ->
-  Graph.Graph String Number k ->
-  Graph.Graph String Number k
+  List (Graph.NodeIndex, Graph.NodeIndex, Float) ->
+  Graph.Graph String Float k ->
+  Graph.Graph String Float k
 let build names edges g =
   List.fold_left
     (fun acc (s, t, w) -> edge s t w acc)
@@ -28,32 +28,32 @@ let build names edges g =
     edges
 
 /// A -1-> B -2-> C -1-> D, and A -5-> C.
-roads : Graph.DirectedGraph String Number
+roads : Graph.DirectedGraph String Float
 let roads =
   build ["A", "B", "C", "D"] [(0, 1, 1), (1, 2, 2), (0, 2, 5), (2, 3, 1)] (Graph.directed ())
 
 /// A square a-b-c-d-a with a tail d-e.
-square : Graph.UndirectedGraph String Number
+square : Graph.UndirectedGraph String Float
 let square =
   build
     ["a", "b", "c", "d", "e"]
     [(0, 1, 1), (1, 2, 2), (2, 3, 3), (3, 0, 4), (3, 4, 5)]
     (Graph.undirected ())
 
-path : Result Graph.GraphError (Option (Graph.PathResult Number)) -> String
+path : Result Graph.GraphError (Option (Graph.PathResult Float)) -> String
 let path r =
   res
     (Result.map
-      (Option.map (fun (p : Graph.PathResult Number) -> (p.path, p.edges, p.distance, p.costs)))
+      (Option.map (fun (p : Graph.PathResult Float) -> (p.path, p.edges, p.distance, p.costs)))
       r)
 
-paths : Result Graph.GraphError (Graph.PathWalker Number) -> String
+paths : Result Graph.GraphError (Graph.PathWalker Float) -> String
 let paths r =
-  res (Result.map (List.map (fun (p : Graph.PathResult Number) -> (p.path, p.distance))) r)
+  res (Result.map (List.map (fun (p : Graph.PathResult Float) -> (p.path, p.distance))) r)
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let cheap : Graph.DijkstraConfig Number = { source = 0; target = 3; cost = fun w -> w }
+  let cheap : Graph.DijkstraConfig Float = { source = 0; target = 3; cost = fun w -> w }
   Platform.stdout_line ("dijkstra: " ++ path (Graph.dijkstra cheap roads))
   Platform.stdout_line
     ("dijkstra, negative: "
@@ -64,28 +64,28 @@ let main () =
   Platform.stdout_line
     ("dijkstra, unreachable: "
       ++ path (Graph.dijkstra { source = 3; target = 0; cost = fun w -> w } roads))
-  let guided : Graph.AstarConfig Number String =
+  let guided : Graph.AstarConfig Float String =
     { source = 0; target = 3; cost = fun w -> w; heuristic = fun s t -> if s == t then 0 else 1 }
   Platform.stdout_line ("astar: " ++ path (Graph.astar guided roads))
-  let signed : Graph.BellmanFordConfig Number = { source = 0; target = 3; cost = fun w -> w - 2 }
+  let signed : Graph.BellmanFordConfig Float = { source = 0; target = 3; cost = fun w -> w - 2 }
   Platform.stdout_line ("bellman_ford: " ++ path (Graph.bellman_ford signed roads))
   let looped = edge 3 0 1 roads
   Platform.stdout_line
     ("bellman_ford, negative cycle: "
       ++ path (Graph.bellman_ford { source = 0; target = 3; cost = fun _ -> 0 - 1 } looped))
-  let all : Result Graph.GraphError (Graph.AllPairsResult Number) =
+  let all : Result Graph.GraphError (Graph.AllPairsResult Float) =
     Graph.floyd_warshall (fun w -> w) roads
   Platform.stdout_line
     ("floyd_warshall: "
-      ++ res (Result.map (fun (r : Graph.AllPairsResult Number) -> List.take 1 r.distances) all))
+      ++ res (Result.map (fun (r : Graph.AllPairsResult Float) -> List.take 1 r.distances) all))
   Platform.stdout_line
     ("  paths from A: "
-      ++ res (Result.map (fun (r : Graph.AllPairsResult Number) -> List.take 1 r.paths) all))
+      ++ res (Result.map (fun (r : Graph.AllPairsResult Float) -> List.take 1 r.paths) all))
   Platform.stdout_line
     ("  edges, costs: "
       ++ res
         (Result.map
-          (fun (r : Graph.AllPairsResult Number) -> (List.take 1 r.edges, List.take 1 r.costs))
+          (fun (r : Graph.AllPairsResult Float) -> (List.take 1 r.edges, List.take 1 r.costs))
           all))
   let simple : Graph.SimplePathsConfig = { source = 0; target = 3; limit = None }
   Platform.stdout_line ("simple_paths: " ++ paths (Graph.simple_paths simple roads))
@@ -93,7 +93,7 @@ let main () =
     ("simple_paths, limit 1: "
       ++ paths (Graph.simple_paths { source = 0; target = 3; limit = Some 1 } roads))
   let tied = edge 0 2 3 roads
-  let shortest : Graph.AllShortestPathsConfig Number =
+  let shortest : Graph.AllShortestPathsConfig Float =
     { source = 0; target = 3; cost = fun w -> w; limit = None }
   Platform.stdout_line ("all_shortest_paths: " ++ paths (Graph.all_shortest_paths shortest tied))
   let reach : Graph.ReachabilityConfig = { direction = None }
@@ -124,7 +124,7 @@ let main () =
       ++ res (Result.map Graph.edge_count (Graph.transitive_reduction roads))
       ++ " "
       ++ res (Result.map Graph.edge_count (Graph.transitive_reduction looped)))
-  let capacity : Graph.MaximumFlowConfig Number = { source = 0; target = 3; capacity = fun w -> w }
+  let capacity : Graph.MaximumFlowConfig Float = { source = 0; target = 3; capacity = fun w -> w }
   let flow : Result Graph.GraphError Graph.MaximumFlowResult = Graph.maximum_flow capacity roads
   Platform.stdout_line ("maximum_flow: " ++ res flow)
   let cut : Result Graph.GraphError Graph.MinimumCutResult = Graph.minimum_cut capacity roads

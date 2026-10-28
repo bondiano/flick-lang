@@ -2,12 +2,12 @@
 // message and the value, when it does not.
 module App.Main exposing (main)
 
-first : List Number -> Number
+first : List Float -> Float
 let first xs =
   let assert [x, ..._] = xs as "no first item"
   x
 
-pair : List Number -> Number
+pair : List Float -> Float
 let pair xs =
   let assert [a, b] = xs
   let sum = a + b

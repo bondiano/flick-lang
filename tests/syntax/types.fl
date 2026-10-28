@@ -32,4 +32,4 @@ type alias Props c = {
   render : (a -> Ui^c)^c;
 }
 
-holes : List _ -> (_, Number)
+holes : List _ -> (_, Float)

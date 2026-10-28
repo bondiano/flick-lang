@@ -6,12 +6,12 @@ import Effect.Log as Log
 import Effect.Platform
 
 /* block comments /* nest */ too */
-type alias Point = { x : Number; y : Number }
+type alias Point = { x : Float; y : Float }
 
 type alias Pair a b = (a, b)
 
 type Shape =
-  | Circle Point Number
+  | Circle Point Float
   | Rect { origin : Point; size : Point }
   | Empty
   deriving Eq, Show
@@ -24,7 +24,7 @@ type alias Wrapped (f : Type -> Type) a = {
 
 opaque type alias UserId = String
 
-refined type Port = Number where fun n -> n > 0 && n < 65536
+refined type Port = Float where fun n -> n > 0 && n < 65536
   deriving Eq, Hash
 
 kind Nullability = NonNull | Nullable
@@ -44,7 +44,7 @@ class Show a =
   show : a -> String
 
 class Eq a => Hash a =
-  hash : a -> Number
+  hash : a -> Float
 
 class Collection c a | c -> a, a c -> a =
   type Item c
@@ -57,7 +57,7 @@ instance Show Shape =
   show : Shape -> String
   let show shape =
     match shape with
-    | Circle _ r -> "circle " ++ Number.to_string r
+    | Circle _ r -> "circle " ++ Float.to_string r
     | Rect _ -> "rect"
     | Empty -> "empty"
 
@@ -69,11 +69,11 @@ instance Functor (Eff r e) =
   map : (a -> b) -> Eff r e a -> Eff r e b
   let map f eff = Eff.map f eff
 
-hypot : Number -> Number -> Number
+hypot : Float -> Float -> Float
 foreign pure hypot from global "Math.hypot"
   arity 2
 
-now : Unit ->{} Number
+now : Unit ->{} Float
 foreign sync now from global "Date.now"
   arity 0
 
@@ -94,22 +94,22 @@ fetch_user : UserId ->{Http; HttpError} User
 foreign effect fetch_user from "./users.js" "fetchUser"
 
 rec {
-  is_even : Number -> Bool
+  is_even : Float -> Bool
   let is_even n = if n == 0 then true else is_odd (n - 1)
 
-  is_odd : Number -> Bool
+  is_odd : Float -> Bool
   let is_odd n = if n == 0 then false else is_even (n - 1)
 }
 
-area : Shape -> Number
+area : Shape -> Float
 let area shape =
   match shape with
-  | Circle _ r -> Number.pi * r ** 2
+  | Circle _ r -> Float.pi * r ** 2
   | Rect { origin = _; size } -> size.x * size.y
   | Empty -> 0
 
 component badge (props : { label : String }) = ui { text props.label }
 
-component counter (props : { start : Number }) =
+component counter (props : { start : Float }) =
   let count = Atom.local props.start
   ui { text (show (Atom.get count)) }

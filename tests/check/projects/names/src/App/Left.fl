@@ -2,8 +2,8 @@ module App.Left exposing (find, size, Mode(..))
 
 type Mode = On | Off
 
-find : Number
+find : Float
 let find = 1
 
-size : Number
+size : Float
 let size = 1

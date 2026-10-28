@@ -5,6 +5,7 @@ use std::fmt::Write;
 use super::Checker;
 use super::ty::{Binder, Row, Type};
 use super::unify::Store;
+use crate::numeric::default_num;
 
 impl Checker<'_> {
     pub fn show(&self, t: &Type) -> String {
@@ -64,6 +65,11 @@ impl Printer<'_> {
                 let _ = write!(out, "{label:?}");
             }
             Type::Skolem(s) => out.push_str(self.store.skolem_name(*s)),
+            // a number literal's type is `Int`, or `Float` with a fraction,
+            // unless something says otherwise
+            Type::Meta(m) if self.store.is_numeric(*m) => {
+                out.push_str(default_num(self.store.is_fractional(*m)).name());
+            }
             Type::Meta(_) => out.push('_'),
             Type::Error => out.push('?'),
             Type::App { .. } => {

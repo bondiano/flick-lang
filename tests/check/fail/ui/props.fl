@@ -7,7 +7,7 @@ module App.Props exposing (..)
 
 type error SaveError = SaveError String
 
-type alias User = { id : Number; name : String }
+type alias User = { id : Float; name : String }
 
 type alias Product = { sku : String }
 
@@ -29,7 +29,7 @@ wrong : Ui
 let wrong = Ui.button { disabled = "no"; on_click = noop } []
 //                                 ^^^^ FLICK-T003 expected `Bool`, found `String`
 
-counter : Ref Number -> Ui
+counter : Ref Float -> Ui
 let counter count = Ui.text (show (Ref.get count))
 //                                 ^^^^^^^^^^^^^ FLICK-E001 runtime call
 
@@ -65,7 +65,7 @@ let mixed props =
       render_item = props.render_item;
       on_change = Ui.Event.latest (fun (product : Product) -> task { Atom.set saved product.sku });
     }
-//~ FLICK-T003 @66:19-66:99 expected `Handler { id : Number; name : String }
+//~ FLICK-T003 @66:19-66:99 expected `Handler { id : Float; name : String }
 
 link : Ui
 let link = Ui.link { href = "javascript:alert(1)" } [Ui.text "x"]

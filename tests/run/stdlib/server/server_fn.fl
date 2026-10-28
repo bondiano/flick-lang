@@ -11,7 +11,7 @@ set_env : String -> String ->{} Unit
 foreign sync set_env from "../cli/env.mjs" "set"
   arity 2
 
-type alias Order = { item : String; count : Number }
+type alias Order = { item : String; count : Float }
   deriving Schema
 
 type error OutOfStock = OutOfStock String
@@ -26,7 +26,7 @@ server fn place order =
     "placed " ++ show order.count ++ " " ++ order.item
 
 /// Two parameters travel as one payload.
-label : String -> Number ->{Server.Server;} String
+label : String -> Float ->{Server.Server;} String
 server fn label item count = item ++ " x" ++ show count
 
 /// What the client sees of a call.

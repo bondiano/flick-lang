@@ -3,9 +3,9 @@
 module App.Ticks exposing (..)
 
 service Log =
-  now : Unit ->{} Number
+  now : Unit ->{} Float
 
-js_now : Unit ->{} Number
+js_now : Unit ->{} Float
 foreign sync js_now from global "Date.now"
   arity 0
 

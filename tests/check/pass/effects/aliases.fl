@@ -5,7 +5,7 @@ module App.Aliases exposing (..)
 type error Oops = Oops
 
 service Clock =
-  now : Unit ->{} Number
+  now : Unit ->{} Float
 
 type alias Time = Clock
 
@@ -13,12 +13,12 @@ type alias Failure = Oops
 
 type alias Registry = Reactivity.Atom.Registry
 
-read_now : Unit ->{Time; Failure} Number
+read_now : Unit ->{Time; Failure} Float
 let read_now () =
   let n = Clock.now ()
   if n < 0 then from_result (Err Oops) else n
 
-through_the_original : Unit ->{Clock; Oops} Number
+through_the_original : Unit ->{Clock; Oops} Float
 let through_the_original () = read_now ()
 
 registry_layer : Layer none none {Registry}

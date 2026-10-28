@@ -5,7 +5,7 @@ module App.Main exposing (main)
 service Tenant =
   name : Unit ->{} String
 
-tenant : Ref Number -> String -> Layer none none {Tenant}
+tenant : Ref Float -> String -> Layer none none {Tenant}
 let tenant builds key =
   Layer.effect Tenant (task {
     Ref.update builds (fun n -> n + 1)

@@ -2,8 +2,8 @@ module App.Right exposing (find, size, Mode(..))
 
 type Mode = Up | Down
 
-find : Number
+find : Float
 let find = 2
 
-size : Number
+size : Float
 let size = 2

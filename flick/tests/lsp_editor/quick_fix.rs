@@ -13,7 +13,7 @@ let pair a b = (a, b)
 
 let describe x = show x
 
-main : Unit -> Number
+main : Unit -> Float
 let main () =
   let inc x = x + 1
   inc 1
@@ -98,7 +98,7 @@ fn signature_quick_fix_makes_the_module_check() {
 
 #[test]
 fn rec_quick_fix_and_diagnostics_wait_for_save() {
-    let text = "module App.Fib exposing (..)\n\nfib : Number -> Number\nlet fib n = if n < 2 then n else fib (n - 1) + fib (n - 2)\n";
+    let text = "module App.Fib exposing (..)\n\nfib : Float -> Float\nlet fib n = if n < 2 then n else fib (n - 1) + fib (n - 2)\n";
     let dir = project(
         "lsp_rec_fix",
         &[("flick.toml", LIB), ("src/App/Fib.fl", text)],
@@ -165,7 +165,7 @@ fn misspelt_name_quick_fix_replaces_it() {
 
 #[test]
 fn unused_import_is_greyed_out_and_removable() {
-    let text = "module App.Tidy exposing (one)\n\nimport String\n\none : Number\nlet one = 1\n";
+    let text = "module App.Tidy exposing (one)\n\nimport String\n\none : Float\nlet one = 1\n";
     let dir = project(
         "lsp_unused_import",
         &[("flick.toml", LIB), ("src/App/Tidy.fl", text)],
@@ -194,7 +194,7 @@ fn unused_import_is_greyed_out_and_removable() {
     let fixed = format!("{}{}", &text[..start], &text[end..]);
     assert_eq!(
         fixed,
-        "module App.Tidy exposing (one)\n\n\none : Number\nlet one = 1\n"
+        "module App.Tidy exposing (one)\n\n\none : Float\nlet one = 1\n"
     );
     lsp.close();
 }

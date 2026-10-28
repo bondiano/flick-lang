@@ -95,27 +95,27 @@ let compare_and_set ref expected next =
   modify ref (fun a -> if a == expected then (true, next) else (false, a))
 
 /// Adds one.
-increment : Ref Number ->{} Unit
+increment : Ref Float ->{} Unit
 let increment ref = update ref (fun n -> n + 1)
 
 /// Subtracts one.
-decrement : Ref Number ->{} Unit
+decrement : Ref Float ->{} Unit
 let decrement ref = update ref (fun n -> n - 1)
 
 /// Adds one, giving the new count.
-increment_and_get : Ref Number ->{} Number
+increment_and_get : Ref Float ->{} Float
 let increment_and_get ref = update_and_get ref (fun n -> n + 1)
 
 /// Subtracts one, giving the new count.
-decrement_and_get : Ref Number ->{} Number
+decrement_and_get : Ref Float ->{} Float
 let decrement_and_get ref = update_and_get ref (fun n -> n - 1)
 
 /// Adds one, giving the count before.
-get_and_increment : Ref Number ->{} Number
+get_and_increment : Ref Float ->{} Float
 let get_and_increment ref = get_and_update ref (fun n -> n + 1)
 
 /// Subtracts one, giving the count before.
-get_and_decrement : Ref Number ->{} Number
+get_and_decrement : Ref Float ->{} Float
 let get_and_decrement ref = get_and_update ref (fun n -> n - 1)
 
 /// Negates the flag.

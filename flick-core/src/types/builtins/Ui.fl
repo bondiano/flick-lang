@@ -17,7 +17,7 @@ type Handler s
 type alias ClickSnapshot =
   {
     /// The mouse button: 0 the main one, 1 the wheel, 2 the secondary one.
-    button : Number;
+    button : Float;
     /// Whether Alt (Option) was held.
     alt : Bool;
     /// Whether Control was held.
@@ -72,7 +72,7 @@ type alias LinkProps =
 type alias TabsProps =
   {
     /// The tab shown, counting from 0.
-    selected : Number;
+    selected : Float;
   }
 
 /// The props of `button`.
@@ -274,7 +274,7 @@ type Div
 type error Detached = Detached
 
 /// Where a node is on the page, in CSS pixels.
-type alias Rect = { width : Number; height : Number; top : Number; left : Number }
+type alias Rect = { width : Float; height : Float; top : Float; left : Float }
 
 /// The live document of a root: the nodes of elements. A root provides it
 /// to the tasks of its handlers and instances; a server renders without it.
@@ -436,7 +436,7 @@ type alias Host =
     /// `aria-live`: how changes inside the element are announced.
     aria_live : Option Live;
     /// `tabindex`: 0 puts the element in the tab order, -1 takes it out.
-    tab_index : Option Number;
+    tab_index : Option Float;
     /// `data-*` attributes, by the name after `data-`: lowercase letters,
     /// digits and hyphens.
     data : List (String, String);

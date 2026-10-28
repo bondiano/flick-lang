@@ -2,7 +2,7 @@
 // provided, and nothing renders with it once its `provide` ends.
 module App.Main exposing (outside, after)
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.make 0
 
 page : Ui

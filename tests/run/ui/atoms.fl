@@ -19,10 +19,10 @@ text : Unit ->{} String
 foreign sync text from "./dom.mjs" "text"
   arity 0
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.make 0
 
-doubled : Atom.Atom Number
+doubled : Atom.Atom Float
 let doubled = Atom.derived (fun () -> Atom.value count * 2)
 
 increment : Action.Action Ui.ClickSnapshot

@@ -45,7 +45,7 @@ foreign pure values from "@flick-lang/runtime/effect/LogLevel" "values"
   reviewed "effect@4.0.5 sha256:dd1f953033fab26f"
 
 /// The rank of the level: higher is more severe.
-get_ordinal : LogLevel -> Number
+get_ordinal : LogLevel -> Float
 foreign pure get_ordinal from "@flick-lang/runtime/effect/LogLevel" "getOrdinal"
   reviewed "effect@4.0.5 sha256:280a33d80234f9a5"
 

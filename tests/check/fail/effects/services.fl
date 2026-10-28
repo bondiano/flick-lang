@@ -1,27 +1,27 @@
 module App.Services exposing (..)
 
 service Users =
-  get : Number ->{} String
+  get : Float ->{} String
 
 service Clock =
-  now : Unit ->{} Number
+  now : Unit ->{} Float
 
 service Bad =
-  value : Number
+  value : Float
 
-type error Broken = Broken (Ref Number)
+type error Broken = Broken (Ref Float)
 
 type error Hidden = Hidden { value : Unknown }
 
-type error Thunk = Thunk (Unit ->{} Number)
+type error Thunk = Thunk (Unit ->{} Float)
 
 type Job = Job (Eff none none Unit)
 
 type error Failed = Failed Job
 
-type error Fine = Fine { path : String; parse : String -> Number }
+type error Fine = Fine { path : String; parse : String -> Float }
 
-js_now : Unit ->{} Number
+js_now : Unit ->{} Float
 let js_now () = 0
 
 clock_layer : Layer none none {Clock}
@@ -40,22 +40,22 @@ with_users : Layer none none {Users} -> Eff {Users} none String ->{} String
 let with_users layer action =
   provide layer { await action }
 
-prepare : Number ->{Users; none} Eff {Users} none String
+prepare : Float ->{Users; none} Eff {Users} none String
 let prepare id =
   let name = Users.get id
   task { name }
 
-run_early : Number ->{Users; none} String
+run_early : Float ->{Users; none} String
 let run_early id = with_users users_layer (prepare id)
 
-type error Late = Late String (Ref Number)
+type error Late = Late String (Ref Float)
 
-//~ FLICK-E006 @10:3-10:17 service operation `value` must be a runtime function: running it looks the servi
-//~ FLICK-E005 @12:21-12:40 the payload of error `Broken` holds `Ref Number`, a live value; an error carries
+//~ FLICK-E006 @10:3-10:16 service operation `value` must be a runtime function: running it looks the servi
+//~ FLICK-E005 @12:21-12:39 the payload of error `Broken` holds `Ref Float`, a live value; an error carries
 //~ FLICK-E005 @14:21-14:47 the payload of error `Hidden` holds `Unknown`, a live value; an error carries da
-//~ FLICK-E005 @16:20-16:44 the payload of error `Thunk` holds `Unit ->{} Number`, a live value; an error ca
+//~ FLICK-E005 @16:20-16:43 the payload of error `Thunk` holds `Unit ->{} Float`, a live value; an error ca
 //~ FLICK-E005 @20:21-20:31 the payload of error `Failed` holds `Eff none none Unit`, a live value; an error
 //~ FLICK-E004 @31:16-31:51 both layers build `Clock`: a merged environment has one implementation of each s
-//~ FLICK-T003 @34:46-34:47 expected `Unit ->{} Number`, found `Number`
+//~ FLICK-T003 @34:46-34:47 expected `Unit ->{} Float`, found `Int`
 //~ FLICK-E003 @49:43-49:55 this argument runs a runtime call before `with_users` is applied, although `with
-//~ FLICK-E005 @51:19-51:43 the payload of error `Late` holds `Ref Number`, a live value; an error carries d
+//~ FLICK-E005 @51:19-51:42 the payload of error `Late` holds `Ref Float`, a live value; an error carries d

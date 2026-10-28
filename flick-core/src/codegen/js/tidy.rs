@@ -7,6 +7,7 @@ use std::iter::repeat_n;
 
 use super::{MARK_END, MARK_START};
 use crate::ir::BinOp;
+use crate::numeric::{Arith, Num};
 
 /// The width a debug line breaks above, in characters.
 const WIDTH: usize = 100;
@@ -422,16 +423,33 @@ pub(super) fn unwrap(js: &str) -> String {
 }
 
 /// The JS precedence of an operator as emitted; a call form binds tightest.
+#[allow(
+    clippy::match_same_arms,
+    reason = "the forms of `Int` come before the JS operators"
+)]
 pub(super) fn precedence(op: BinOp) -> u8 {
     match op {
         BinOp::Or => 3,
         BinOp::And => 4,
         BinOp::Same | BinOp::NotSame => 8,
         BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => 9,
-        BinOp::Concat | BinOp::Add | BinOp::Sub => 11,
-        BinOp::Mul | BinOp::Div | BinOp::Rem => 12,
-        BinOp::Pow => 13,
+        // `l + r | 0`
+        BinOp::Arith(Arith::Add | Arith::Sub, Num::Int) => 5,
+        // a runtime or `Math` call
+        BinOp::Arith(_, Num::Int) | BinOp::Arith(Arith::Div | Arith::Rem, Num::BigInt) => 17,
+        BinOp::Concat | BinOp::Arith(Arith::Add | Arith::Sub, _) => 11,
+        BinOp::Arith(Arith::Mul | Arith::Div | Arith::Rem, _) => 12,
+        BinOp::Arith(Arith::Pow, _) => 13,
         BinOp::Eq | BinOp::NotEq | BinOp::ListConcat => 17,
+    }
+}
+
+/// The precedence an operand of `op` must exceed to need no parentheses:
+/// that of the JS operator it is written beside.
+pub(super) fn operand_precedence(op: BinOp) -> u8 {
+    match op {
+        BinOp::Arith(Arith::Add | Arith::Sub, Num::Int) => 11,
+        _ => precedence(op),
     }
 }
 

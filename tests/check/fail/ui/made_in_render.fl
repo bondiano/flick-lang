@@ -1,22 +1,22 @@
 module App.MadeInRender exposing (..)
 
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.make 0
 
-drafts : Atom.Family Number (Atom.Writable String)
+drafts : Atom.Family Float (Atom.Writable String)
 let drafts = Atom.family (fun _ -> Atom.make "")
 
-remove : Action.Action (Number, Ui.ClickSnapshot)
+remove : Action.Action (Float, Ui.ClickSnapshot)
 let remove = Action.exhaust (fun (n, _) -> task { Atom.set count n })
 
-states : Ui.View Number
+states : Ui.View Float
 let states =
   Ui.view (fun n ->
     let local = Atom.make n
     let twice = Atom.derived (fun () -> Atom.value local * 2)
     ui { text (show (Atom.get twice)) })
 
-actions : Ui.View Number
+actions : Ui.View Float
 let actions =
   Ui.view (fun n ->
     ui {
@@ -35,12 +35,12 @@ let inner = Ui.view (fun () -> ui { text "inner" })
 views : Ui.View Unit
 let views = Ui.view (fun () -> ui { Ui.render (Ui.view (fun () -> ui { text "made" })) () })
 
-row : Number ->{Atom.Read;} Ui
+row : Float ->{Atom.Read;} Ui
 let row n =
   let made = Atom.make ""
   ui { Ui.field { bind = made; placeholder = ""; on_input = None } }
 
-keyed : Ui.View Number
+keyed : Ui.View Float
 let keyed =
   Ui.view
     (fun id ->
@@ -64,17 +64,17 @@ let handler =
         })
     ui { button { disabled = false; on_click = reset } [text "reset"] })
 
-fresh : Number -> Atom.Writable Number
+fresh : Float -> Atom.Writable Float
 let fresh n = Atom.make n
 
-new_state : Number -> Atom.Writable Number
+new_state : Float -> Atom.Writable Float
 let new_state = Atom.make
 
 notes : String -> Atom.Writable String
 let notes = Atom.serializable_family (Codec.json Schema.string) (fun _ -> Atom.make "")
 
 // a function that makes an atom, called or named, makes one while rendering
-through : Ui.View Number
+through : Ui.View Float
 let through =
   Ui.view (fun n ->
     let a = fresh n

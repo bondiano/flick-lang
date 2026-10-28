@@ -8,7 +8,7 @@ type StateT s (m : Type -> Type) a = StateT (s -> m (a, s))
 
 type ReaderT r (m : Type -> Type) a = ReaderT (r -> m a)
 
-type Callback = Callback (Unit -> Number)
+type Callback = Callback (Unit -> Float)
 
 identity : forall c a. (Identity a)^c -> a^c
 let identity (Identity value) = value
@@ -131,14 +131,14 @@ partial :
     ((Identity b)^d -> (Identity x)^(c + d))^(c + d)
 let partial f left = map2 f left
 
-stack : MaybeT (StateT Number (ReaderT Number Identity)) Number
+stack : MaybeT (StateT Float (ReaderT Float Identity)) Float
 let stack = do {
   value <- pure 1
   pure (value + 1)
 }
 
-capture_field : forall c. (Unit -> Number)^c -> Callback^c
+capture_field : forall c. (Unit -> Float)^c -> Callback^c
 let capture_field callback = Callback callback
 
-capture_reader : forall c. (Unit -> Number)^c -> (ReaderT Unit Identity Number)^c
+capture_reader : forall c. (Unit -> Float)^c -> (ReaderT Unit Identity Float)^c
 let capture_reader callback = ReaderT (fun () -> Identity (callback ()))

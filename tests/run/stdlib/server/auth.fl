@@ -11,7 +11,7 @@ ran : Unit ->{} Unit
 foreign sync ran from "./auth.mjs" "ran"
   arity 0
 
-runs : Unit ->{} Number
+runs : Unit ->{} Float
 foreign sync runs from "./auth.mjs" "runs_"
   arity 0
 

@@ -10,25 +10,25 @@ emitter : Unit ->{} Emitter
 foreign sync emitter from "./bindings.mjs" "emitter"
   arity 0
 
-on : forall s. Emitter -> Events.Listener s Number ->{} Unit
+on : forall s. Emitter -> Events.Listener s Float ->{} Unit
 foreign sync on from "./bindings.mjs" "on"
   retention owner
 
-off : forall s. Emitter -> Events.Listener s Number ->{} Unit
+off : forall s. Emitter -> Events.Listener s Float ->{} Unit
 foreign sync off from "./bindings.mjs" "off"
   retention call
 
-emit : Emitter -> Number ->{} Unit
+emit : Emitter -> Float ->{} Unit
 foreign sync emit from "./bindings.mjs" "emit"
 
-sleep : Number ->{} Unit
+sleep : Float ->{} Unit
 foreign async sleep from "../runtime/timers.mjs" "sleep"
 
 report : Failure none ->{} Unit
 let report failure =
   Platform.stdout_line ("supervisor: " ++ RawCause.describe (Failure.inspect failure))
 
-handle : Number -> Eff none none Unit
+handle : Float -> Eff none none Unit
 let handle n = task { Platform.stdout_line ("handled " ++ show n) }
 
 main : Unit ->{; AppError} Unit

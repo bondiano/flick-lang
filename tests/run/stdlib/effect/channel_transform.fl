@@ -6,22 +6,22 @@ type error Boom = Boom String
 say : String ->{} Unit
 let say line = Platform.stdout_line line
 
-nums : Channel.Channel none none i Number Unit ie id
+nums : Channel.Channel none none i Float Unit ie id
 let nums = Channel.from_list [1, 2, 3, 4]
 
 lists : Channel.Channel r e i (NonEmpty.NonEmpty a) d none Unit ->{r; e} List (List a)
 let lists channel = Channel.run_collect (Channel.map NonEmpty.to_list channel)
 
-chunks : Channel.Channel none none i (NonEmpty.NonEmpty Number) Unit ie id
+chunks : Channel.Channel none none i (NonEmpty.NonEmpty Float) Unit ie id
 let chunks = Channel.from_list_chunked 2 [1, 2, 3, 4, 5]
 
-even : Number -> Bool
+even : Float -> Bool
 let even n = n % 2 == 0
 
-halves : Filter.Filter Number Number Number
+halves : Filter.Filter Float Float Float
 let halves = Filter.make (fun n -> if even n then Ok (n / 2) else Err n)
 
-halves_effect : Filter.FilterEffect none none Number Number Number
+halves_effect : Filter.FilterEffect none none Float Float Float
 let halves_effect = Filter.make_effect (fun n -> if even n then Ok (n / 2) else Err n)
 
 elements : Unit ->{; Boom} Unit
@@ -35,7 +35,7 @@ let elements () =
   say ("map_done_effect: " ++ Channel.run_drain (Channel.map_done_effect (fun _ -> "effect") nums))
   let doubled = nums |> Channel.pipe_to (Channel.map_input (fun n -> n * 2) (Channel.identity ()))
   say ("map_input: " ++ show (Channel.run_collect doubled))
-  let failing : Channel.Channel none {Boom} i Number Unit ie id = Channel.fail (Boom "up")
+  let failing : Channel.Channel none {Boom} i Float Unit ie id = Channel.fail (Boom "up")
   let renamed =
     failing
     |> Channel.pipe_to (Channel.map_input_error (fun _ -> Boom "renamed") (Channel.identity ()))

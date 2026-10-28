@@ -201,7 +201,7 @@ impl Convert {
         let not_here = |what: &str| Err(Blocked::unsupported(what.to_owned()));
         Ok(match shape {
             Shape::String => "String".into(),
-            Shape::Number => "Number".into(),
+            Shape::Number => "Float".into(),
             Shape::Boolean => "Bool".into(),
             Shape::Bigint => "BigInt".into(),
             Shape::Any | Shape::Unknown if self.strict => {

@@ -123,7 +123,7 @@ each view in it renders again only when an atom it read changes, not when a
 sibling's does:
 
 ```flick
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.make 0
 
 counter_view : Ui.View Unit
@@ -169,10 +169,10 @@ one. The task of a handler runs on an event, not while rendering, and may
 make what it needs.
 
 ```flick
-drafts : Atom.Family Number (Atom.Writable String)
+drafts : Atom.Family Float (Atom.Writable String)
 let drafts = Atom.family (fun _ -> Atom.make "")
 
-remove : Action.Action (Number, Ui.ClickSnapshot)
+remove : Action.Action (Float, Ui.ClickSnapshot)
 let remove =
   Action.exhaust (fun (id, _) ->
     task {
@@ -216,7 +216,7 @@ first props, the render the current ones. Hovering `component` shows that
 type.
 
 ```flick
-component counter (start : Number) =
+component counter (start : Float) =
   let count = Atom.local start
   let bump = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 1) })
   ui {
@@ -300,7 +300,7 @@ can be stored where something outside the instance reads it
 unmounts. The atom functions borrow what they take, `(Atom.Writable a)^d`,
 so they read and write such an atom. A function that makes the state of an
 instance says so in its signature,
-`Number ->{Setup s;} (Atom.Writable Number)^{s}`, and is called from a
+`Float ->{Setup s;} (Atom.Writable Float)^{s}`, and is called from a
 setup; an annotation names the capture too, `(Ui.Element Ui.Input)^c`. The
 word `component` stays a name everywhere else.
 
@@ -480,7 +480,7 @@ is a service of the `provide`, nothing can render with it after the
 `provide` ends (`FLICK-E002`). Handlers do not run on the server.
 
 ```flick
-request : Number ->{} String
+request : Float ->{} String
 let request n =
   provide Atom.layer {
     Atom.set count n
@@ -519,7 +519,7 @@ binding, one key could name many atoms, and `FLICK-U003` refuses it. A
 `PureCodec` codes synchronously and needs no services.
 
 ```flick
-count : Atom.Writable Number
+count : Atom.Writable Float
 let count = Atom.serializable (Codec.json Schema.number) (Atom.make 0)
 
 draft : String -> Atom.Writable String
@@ -537,7 +537,7 @@ since. Each root of a page reads only the script of its own container. An atom w
 encode is a defect naming its key, not a value silently left out.
 
 ```flick
-page : Number ->{} String
+page : Float ->{} String
 let page n =
   provide Atom.layer {
     Atom.set count n

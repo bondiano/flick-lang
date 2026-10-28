@@ -26,7 +26,9 @@ impl Checker<'_> {
             }
         }
         let ty = self.zonk(ty);
-        let metas = self.store.deep_metas(&ty);
+        // an integer literal's type stays monomorphic: settling it picks one type
+        let mut metas = self.store.deep_metas(&ty);
+        metas.retain(|m| !self.store.is_numeric(*m));
         if metas.is_empty() {
             return ty;
         }
@@ -67,11 +69,10 @@ impl Checker<'_> {
         }
         // an operand of an arithmetic operator nothing determined becomes
         // the operator's first allowed type once the declaration is settled
-        let settled: Vec<(u32, &str)> = self
-            .operators
-            .iter()
+        // a number literal's type may still be settled otherwise, so it stays open
+        let settled: Vec<(u32, &str)> = (self.operators.iter())
             .filter_map(|op| match self.zonk(&op.ty) {
-                Type::Meta(m) => Some((m, op.allowed[0])),
+                Type::Meta(m) if !self.store.is_numeric(m) => Some((m, op.domain.names()[0])),
                 _ => None,
             })
             .collect();
@@ -115,7 +116,7 @@ impl Checker<'_> {
             .iter()
             .all(|op| match self.zonk(&op.ty).spine().0 {
                 Type::Meta(_) | Type::Error => true,
-                head => op.allowed.iter().any(|name| head.is_prim(name)),
+                head => op.domain.allows(head),
             })
     }
 
@@ -212,7 +213,7 @@ fn metas_of(t: &Type) -> Vec<u32> {
     metas
 }
 
-fn replace_metas(t: &Type, subst: &[(u32, Type)]) -> Type {
+pub(super) fn replace_metas(t: &Type, subst: &[(u32, Type)]) -> Type {
     match t {
         Type::Meta(m) => subst
             .iter()

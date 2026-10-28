@@ -52,7 +52,7 @@ foreign effect race_all_first from "@flick-lang/runtime/effect/Effect" "raceAllF
   reviewed "effect@4.0.5 sha256:b744957ac315cbf1"
 
 /// The id of the current fiber.
-fiber_id : Unit ->{} Number
+fiber_id : Unit ->{} Float
 foreign effect fiber_id from "@flick-lang/runtime/effect/Effect" "flickFiberId"
   arity 0
   reviewed "effect@4.0.5 sha256:091e7863734906b4"

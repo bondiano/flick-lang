@@ -86,7 +86,7 @@ fn unescape(body: &str) -> String {
     out
 }
 
-/// The value of a `Number` token, rounded to binary64 like JS; `None` for a
+/// The value of a `Float` token, rounded to binary64 like JS; `None` for a
 /// radix literal longer than 128 bits.
 pub fn number_value(text: &str) -> Option<f64> {
     let digits: String = text.chars().filter(|&c| c != '_').collect();
@@ -109,7 +109,7 @@ pub fn bigint_value(text: &str) -> Option<i128> {
     i128::from_str_radix(rest, base).ok()
 }
 
-fn radix(digits: &str) -> Option<(u32, &str)> {
+pub(crate) fn radix(digits: &str) -> Option<(u32, &str)> {
     let lower = digits.get(..2)?.to_ascii_lowercase();
     let base = match lower.as_str() {
         "0x" => 16,

@@ -11,7 +11,7 @@ let requests =
     "test_requests"
     { description = Some "requests seen"; attributes = []; incremental = false }
 
-ms : Number -> Duration.Duration
+ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
 /// The state of a snapshot, without times.
@@ -25,7 +25,7 @@ let describe state =
   | Metric.SummaryValue s -> "summary " ++ show s.count
 
 /// How many child fibers the runtime metrics counted.
-started : Unit ->{} Number
+started : Unit ->{} Float
 let started () =
   let counts =
     List.filter_map
@@ -61,14 +61,14 @@ let main () =
   Platform.stdout_line
     ("exponential " ++ show (Metric.exponential_boundaries { start = 1; factor = 2; count = 4 }))
   Platform.stdout_line ("from_iterable " ++ show (Metric.boundaries_from_iterable [5, 1, 5, 3]))
-  let sizes : Metric.Histogram Number =
+  let sizes : Metric.Histogram Float =
     Metric.histogram "test_sizes" { description = None; attributes = []; boundaries = bounds }
   List.each_effect (fun n -> sizes |> Metric.update n) [1, 15, 25]
   let h : Metric.HistogramState = Metric.value sizes
   Platform.stdout_line ("histogram " ++ show (h.buckets, h.count, h.min, h.max, h.sum))
   let options =
     { description = None; attributes = []; maxAge = ms 60000; maxSize = 10; quantiles = [0.5] }
-  let latency : Metric.Summary Number = Metric.summary "test_latency" options
+  let latency : Metric.Summary Float = Metric.summary "test_latency" options
   List.each_effect (fun n -> latency |> Metric.update n) [1, 2, 3]
   let s : Metric.SummaryState = Metric.value latency
   Platform.stdout_line ("summary " ++ show (s.quantiles, s.count, s.min, s.max, s.sum))
@@ -81,7 +81,7 @@ let main () =
   Platform.stdout_line ("timer " ++ show (Metric.value timer).buckets)
   let lengths : Metric.Metric String Metric.HistogramState =
     Metric.map_input
-      String.length
+      (fun s -> Int.to_float (String.length s))
       (Metric.histogram "test_lengths" { description = None; attributes = []; boundaries = [5] })
   lengths |> Metric.update "abc"
   Platform.stdout_line ("map_input " ++ show (Metric.value lengths).sum)

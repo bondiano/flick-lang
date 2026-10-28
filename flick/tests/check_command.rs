@@ -70,7 +70,7 @@ type alias Id = String
 
 let id : Id = "x"
 
-type Callback = Callback (Unit -> Number)
+type Callback = Callback (Unit -> Float)
 
 let free : Callback^{} = Callback (fun () -> 1)
 

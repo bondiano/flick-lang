@@ -8,7 +8,7 @@ type QueuePolicy
 
 /// A bounded FIFO of `capacity` events; an event that finds it full is
 /// rejected and reported to the supervisor.
-queue : Number -> QueuePolicy
+queue : Float -> QueuePolicy
 foreign pure queue from "@flick-lang/runtime" "eventsQueue"
 
 /// A supervisor that logs how a handler failed.

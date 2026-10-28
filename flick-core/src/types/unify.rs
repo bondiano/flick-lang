@@ -12,6 +12,7 @@ use super::Checker;
 use super::env::Form;
 use super::kinds::Kind;
 use super::ty::{Norm, Row, Type};
+use crate::numeric::Num;
 use crate::source::Span;
 
 #[derive(Debug, Clone)]
@@ -32,6 +33,11 @@ pub struct Store {
     skolems: Vec<Skolem>,
     /// The variables that stand for a capture row: an instantiated `^c`.
     capture_rows: HashSet<u32>,
+    /// The variables of number literals, which only a numeric type or a
+    /// rigid variable binds.
+    numeric: HashSet<u32>,
+    /// Those of literals with a fraction, which an integer type cannot bind.
+    fractional: HashSet<u32>,
     pub level: u32,
 }
 
@@ -73,6 +79,48 @@ impl Store {
             self.capture_rows.insert(m);
         }
         row
+    }
+
+    /// A variable that only a numeric type binds, a `Float` one when
+    /// `fractional`.
+    pub fn fresh_numeric(&mut self, fractional: bool) -> Type {
+        let ty = self.fresh();
+        if let Type::Meta(m) = ty {
+            self.numeric.insert(m);
+            if fractional {
+                self.fractional.insert(m);
+            }
+        }
+        ty
+    }
+
+    pub fn is_numeric(&self, m: u32) -> bool {
+        self.numeric.contains(&m)
+    }
+
+    pub fn is_fractional(&self, m: u32) -> bool {
+        self.fractional.contains(&m)
+    }
+
+    /// Whether the numeric variable `m` may stand for `t`; a variable it
+    /// binds takes its restriction. A rigid variable fits: its class
+    /// constraint is checked when the literal is settled.
+    fn numeric_fits(&mut self, m: u32, t: &Type) -> bool {
+        let fractional = self.is_fractional(m);
+        match t {
+            Type::Captured { ty, .. } | Type::Bounded { ty, .. } => self.numeric_fits(m, ty),
+            Type::Meta(n) => {
+                self.numeric.insert(*n);
+                if fractional {
+                    self.fractional.insert(*n);
+                }
+                true
+            }
+            Type::Error | Type::Skolem(_) => true,
+            t => Num::ALL
+                .into_iter()
+                .any(|n| t.is_prim(n.name()) && (n.fractional() || !fractional)),
+        }
     }
 
     /// Whether `m` stands for a capture row, not a type whose captures count.
@@ -589,6 +637,9 @@ impl Checker<'_> {
         }
         if t.contains(&mut |x| matches!(x, Type::Forall { .. })) {
             return Err(Mismatch::Polymorphic(t));
+        }
+        if self.store.is_numeric(m) && !self.store.numeric_fits(m, &t) {
+            return Err(Mismatch::Types(Type::Meta(m), t));
         }
         let level = self.store.meta_level(m).expect("an open variable");
         self.store.adjust(&t, level).map_err(Mismatch::Escape)?;

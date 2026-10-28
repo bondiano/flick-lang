@@ -1,16 +1,16 @@
 // Expressions with a shorter form.
 module App.Hygiene exposing (..)
 
-inc : Number -> Number
+inc : Float -> Float
 let inc n = n + 1
 
-all : List Number -> List Number
+all : List Float -> List Float
 let all xs = List.map (fun x -> inc x) xs
 
 greeting : String
 let greeting = "Hello, " ++ "world"
 
-kept : List Number -> List Number
+kept : List Float -> List Float
 let kept xs = List.map (fun x -> inc (x * 2)) xs
 //~ FLICK-T052 @8:23-8:39 a `fun` that only passes `x` on: `inc` is the same function
 //~ FLICK-T053 @11:16-11:36 two string literals joined with `++`: one literal says it

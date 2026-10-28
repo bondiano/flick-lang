@@ -7,7 +7,7 @@ use super::*;
 fn isolation_projects() -> [(PathBuf, String, &'static str); 2] {
     [
         ("a", "lsp_isolation_a", "String", "\"Ada\"", "\"𝄞π\" ++ "),
-        ("b", "lsp_isolation_a/src/nested", "Number", "42", ""),
+        ("b", "lsp_isolation_a/src/nested", "Float", "42", ""),
     ]
     .map(|(name, app_name, kind, argument, prefix)| {
         let package_source = format!(
@@ -49,7 +49,7 @@ fn isolation_projects() -> [(PathBuf, String, &'static str); 2] {
                 ("src/App/Domain.fl", &domain),
                 (
                     "src/App/Error.fl",
-                    "module App.Error exposing (broken)\n\nbroken : Number\nlet broken = 0\n",
+                    "module App.Error exposing (broken)\n\nbroken : Float\nlet broken = 0\n",
                 ),
                 (
                     "node_modules/@acme/value/package.json",
@@ -73,7 +73,7 @@ fn projects_own_their_buffers_packages_and_diagnostics() {
     let a_main = a.join("src/App/Main.fl");
     let a_error = a.join("src/App/Error.fl");
     let b_main = b.join("src/App/Main.fl");
-    let bad = "module App.Error exposing (broken)\n\nbroken : Number\nlet broken = \"𝄞π\"\n";
+    let bad = "module App.Error exposing (broken)\n\nbroken : Float\nlet broken = \"𝄞π\"\n";
     let reports_a_error = |reports: &[Value]| {
         reports.iter().any(|p| {
             p["uri"] == uri(&a_error)
@@ -174,7 +174,7 @@ fn projects_own_their_buffers_packages_and_diagnostics() {
 #[test]
 fn standalone_documents_have_independent_contexts() {
     let first = "module Main exposing (answer)\n\nanswer : String\nlet answer = \"one\"\n";
-    let second = "module Main exposing (answer)\n\nanswer : Number\nlet answer = 2\n";
+    let second = "module Main exposing (answer)\n\nanswer : Float\nlet answer = 2\n";
     let dir = project(
         "lsp_standalone_contexts",
         &[("first/Main.fl", first), ("second/Main.fl", second)],
@@ -190,7 +190,7 @@ fn standalone_documents_have_independent_contexts() {
     }
     for (relative, text, kind) in [
         ("first/Main.fl", first, "String"),
-        ("second/Main.fl", second, "Number"),
+        ("second/Main.fl", second, "Float"),
     ] {
         let file = dir.join(relative);
         let hover = lsp.request(
@@ -235,7 +235,7 @@ fn standalone_documents_have_independent_contexts() {
 #[test]
 fn standalone_imports_follow_unsaved_dependency_edits_and_close() {
     let main = "module A exposing (answer)\nimport B exposing (value)\nlet answer = value\n";
-    let saved = "module B exposing (value)\nvalue : Number\nlet value = 1\n";
+    let saved = "module B exposing (value)\nvalue : Float\nlet value = 1\n";
     let unsaved = "module B exposing (value)\nvalue : String\nlet value = \"draft\"\n";
     let dir = project(
         "lsp_standalone_dependency",
@@ -260,7 +260,7 @@ fn standalone_imports_follow_unsaved_dependency_edits_and_close() {
             .to_owned()
     };
     let initial = hover(&mut lsp);
-    assert!(initial.contains("value : Number"), "{initial}");
+    assert!(initial.contains("value : Float"), "{initial}");
     lsp.notify(
         "textDocument/didChange",
         &json!({
@@ -275,7 +275,7 @@ fn standalone_imports_follow_unsaved_dependency_edits_and_close() {
         &json!({ "textDocument": { "uri": uri(&dependency) } }),
     );
     let closed = hover(&mut lsp);
-    assert!(closed.contains("value : Number"), "{closed}");
+    assert!(closed.contains("value : Float"), "{closed}");
     lsp.close();
 }
 
@@ -365,13 +365,13 @@ fn closing_a_standalone_document_keeps_what_another_open_one_reports() {
         &[
             (
                 "A.fl",
-                "module A exposing (twice)\n\nimport B\n\ntwice : Number\nlet twice = B.n\n",
+                "module A exposing (twice)\n\nimport B\n\ntwice : Float\nlet twice = B.n\n",
             ),
             (
                 "B.fl",
-                "module B exposing (n)\n\nn : Number\nlet n = \"x\"\n",
+                "module B exposing (n)\n\nn : Float\nlet n = \"x\"\n",
             ),
-            ("C.fl", "module C exposing (c)\n\nc : Number\nlet c = 1\n"),
+            ("C.fl", "module C exposing (c)\n\nc : Float\nlet c = 1\n"),
         ],
     );
     let (a, b, c) = (dir.join("A.fl"), dir.join("B.fl"), dir.join("C.fl"));

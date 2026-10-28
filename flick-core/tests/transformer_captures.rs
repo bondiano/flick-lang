@@ -69,7 +69,7 @@ import App.Transformers exposing (..)\n\
 type Handle (s : Region)\n\
 type error OpenError = OpenError String\n\
 service Files =\n  open_scoped : forall s. Unit ->{Scope s; OpenError} Handle s\n\
-touch : forall s. Handle s -> Number\n\
+touch : forall s. Handle s -> Float\n\
 let touch handle =\n  ignore handle\n  1\n\n";
 
 fn consumer(body: &str) -> Vec<Diagnostic> {
@@ -99,7 +99,7 @@ fn nominal_transformers_and_zero_bounds_round_trip() {
             if **captures == types::Type::empty_row())
     }));
     let diagnostics = consumer(
-        r"inside : Unit ->{Files; OpenError} Number
+        r"inside : Unit ->{Files; OpenError} Float
 let inside () =
   scope {
     let handle = Files.open_scoped ()
@@ -115,7 +115,7 @@ let inside () =
 #[test]
 fn extracted_and_reboxed_callback_cannot_escape_an_imported_constructor() {
     rejects(
-        r"leak : Unit ->{Files; OpenError} Unit -> Number
+        r"leak : Unit ->{Files; OpenError} Unit -> Float
 let leak () =
   scope {
     let handle = Files.open_scoped ()
@@ -141,7 +141,7 @@ let leak () =
 #[test]
 fn partial_map2_and_transformed_computations_keep_their_captures() {
     rejects(
-        r"leak : Unit ->{Files; OpenError} Identity Unit -> Identity (Unit -> Number)
+        r"leak : Unit ->{Files; OpenError} Identity Unit -> Identity (Unit -> Float)
 let leak () =
   scope {
     let handle = Files.open_scoped ()
@@ -151,7 +151,7 @@ let leak () =
         &[codes::G001, codes::G002],
     );
     rejects(
-        r"leak : Unit ->{Files; OpenError} ReaderT Unit Identity Number
+        r"leak : Unit ->{Files; OpenError} ReaderT Unit Identity Float
 let leak () =
   scope {
     let handle = Files.open_scoped ()
@@ -161,7 +161,7 @@ let leak () =
         &[codes::G001, codes::G002],
     );
     rejects(
-        r"leak : Unit ->{Files; OpenError} MaybeT (StateT Number (ReaderT Unit Identity)) Number
+        r"leak : Unit ->{Files; OpenError} MaybeT (StateT Float (ReaderT Unit Identity)) Float
 let leak () =
   scope {
     let handle = Files.open_scoped ()
@@ -211,9 +211,9 @@ let spawn_hidden owner (Identity value) =
 fn curried_callback_stages_inherit_their_outer_environment() {
     let (_, diagnostics) = check(
         r"module App.Curried exposing (..)
-apply_curried : forall c a. (Number -> a -> Number)^c -> a -> Number
+apply_curried : forall c a. (Float -> a -> Float)^c -> a -> Float
 let apply_curried f value = f 0 value
-through_callback : forall c a. (a -> Number)^c -> a -> Number
+through_callback : forall c a. (a -> Float)^c -> a -> Float
 let through_callback f value = apply_curried (fun _ x -> f x) value
 ",
         &[],
@@ -231,7 +231,7 @@ type error CopyError = CopyError { details : Detail String; label : Option Strin
     let (_, diagnostics) = check(source, &[]);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let (_, diagnostics) = check(
-        &format!("{source}type error LiveError = LiveError (Box (Ref Number))\n"),
+        &format!("{source}type error LiveError = LiveError (Box (Ref Float))\n"),
         &[],
     );
     assert!(
@@ -249,7 +249,7 @@ fn abstract_function_type_dependencies_cannot_hide_from_child_lifetimes() {
     rejects(
         r"report : Failure none ->{} Unit
 let report _ = ()
-spawn_none : forall s a. Fiber.Owner s -> (Option a -> Number) ->{} Unit
+spawn_none : forall s a. Fiber.Owner s -> (Option a -> Float) ->{} Unit
 let spawn_none owner f =
   ignore (Fiber.spawn owner report (task { ignore (f None) }))
 ",
@@ -261,7 +261,7 @@ let spawn_none owner f =
 fn an_explicit_zero_bound_on_a_later_curried_stage_cannot_be_widened() {
     let (_, diagnostics) = check(
         r"module App.ExplicitZero exposing (..)
-erase : forall c. (Unit -> Number)^c -> (Unit -> Number)^{}
+erase : forall c. (Unit -> Float)^c -> (Unit -> Float)^{}
 let erase f () = f ()
 ",
         &[],
@@ -348,8 +348,8 @@ fn capture_unions_choose_an_unblocked_tail_independently_of_order() {
     for union in ["c + d", "d + c"] {
         for union_first in [true, false] {
             for close_d in [false, true] {
-                let combined = format!("(Unit -> Number)^({union})");
-                let consumers = "((Unit -> Number)^c -> Number) -> ((Unit -> Number)^d -> Number)";
+                let combined = format!("(Unit -> Float)^({union})");
+                let consumers = "((Unit -> Float)^c -> Float) -> ((Unit -> Float)^d -> Float)";
                 let accept_d = if close_d {
                     "empty"
                 } else {
@@ -357,27 +357,27 @@ fn capture_unions_choose_an_unblocked_tail_independently_of_order() {
                 };
                 let (parameters, arguments) = if union_first {
                     (
-                        format!("{combined} -> {consumers} -> Number"),
+                        format!("{combined} -> {consumers} -> Float"),
                         format!("(fun () -> touch handle) empty {accept_d}"),
                     )
                 } else {
                     (
-                        format!("{consumers} -> {combined} -> Number"),
+                        format!("{consumers} -> {combined} -> Float"),
                         format!("empty {accept_d} (fun () -> touch handle)"),
                     )
                 };
                 let source = format!(
                     r"module App.UnionBounds exposing (..)
 type Handle (s : Region)
-touch : forall s. Handle s -> Number
+touch : forall s. Handle s -> Float
 let touch handle =
   ignore handle
   1
-empty : (Unit -> Number)^{{}} -> Number
+empty : (Unit -> Float)^{{}} -> Float
 let empty callback = callback ()
 accept_union : forall c d. {parameters}
 let accept_union _ _ _ = 0
-inside : forall s. Handle s -> Number
+inside : forall s. Handle s -> Float
 let inside handle = accept_union {arguments}
 "
                 );
@@ -407,7 +407,7 @@ choose_value : forall c a. a -> (a^c -> a)^c
 let choose_value exemplar =
   ignore exemplar
   fun value -> value
-bad : forall c. (Unit -> Number)^c -> Unit -> Number
+bad : forall c. (Unit -> Float)^c -> Unit -> Float
 let bad read = choose_value (fun () -> 0) (fun () -> read ())
 ",
         &[],
@@ -417,13 +417,13 @@ let bad read = choose_value (fun () -> 0) (fun () -> read ())
         "{diagnostics:?}"
     );
     rejects(
-        r"get_fn : StateT (Unit -> Number) Identity (Unit -> Number)
+        r"get_fn : StateT (Unit -> Float) Identity (Unit -> Float)
 let get_fn = StateT (fun initial -> Identity (initial, initial))
-unit : StateT (Unit -> Number) Identity Unit
+unit : StateT (Unit -> Float) Identity Unit
 let unit = pure ()
-deferred : StateT (Unit -> Number) Identity ((Eff none none Number)^{})
+deferred : StateT (Unit -> Float) Identity ((Eff none none Float)^{})
 let deferred = do { f <- get_fn and _ <- unit; pure (task { f () }) }
-erase : forall c. (Unit -> Number)^c -> Eff none none Number
+erase : forall c. (Unit -> Float)^c -> Eff none none Float
 let erase read =
   let Identity (later, _) = state deferred (fun () -> read ())
   later
@@ -462,8 +462,8 @@ let keep value = forward_ref value
 #[test]
 fn constructor_capture_binders_do_not_shadow_payload_quantifiers() {
     let diagnostics = consumer(
-        r"type PolyCallback = PolyCallback (forall captures. Number -> Number)
-inside : Unit ->{Files; OpenError} Number
+        r"type PolyCallback = PolyCallback (forall captures. Float -> Float)
+inside : Unit ->{Files; OpenError} Float
 let inside () =
   scope {
     let handle = Files.open_scoped ()

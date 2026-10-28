@@ -14,11 +14,11 @@ cover : forall t e. t -> Covered e -> Covered {t | e}
 foreign pure cover from "./covered.mjs" "cover"
   arity 2
 
-handle : forall e. Covered e -> (Unit ->{; e} Number) -> Unit
+handle : forall e. Covered e -> (Unit ->{; e} Float) -> Unit
 foreign pure handle from "./covered.mjs" "handle"
   arity 2
 
-either : Unit ->{; NotFound, Conflict} Number
+either : Unit ->{; NotFound, Conflict} Float
 let either _ = from_result (Err (Conflict "x"))
 
 uncovered : Unit
@@ -30,7 +30,7 @@ let half = handle (nothing |> cover (NotFound "")) either
 wrong : Covered {Conflict}
 let wrong = nothing |> cover (NotFound "")
 
-missing : Unit ->{; NotFound} Number
+missing : Unit ->{; NotFound} Float
 let missing _ = from_result (Err (NotFound "x"))
 
 // a number stands for no error: refused as that, not as the handler's
@@ -40,4 +40,4 @@ let not_error = handle (nothing |> cover 1) missing
 //~ FLICK-E002 @25:32-25:38 does not allow errors `Conflict`, `NotFound`
 //~ FLICK-E002 @28:52-28:58 does not allow error `Conflict`
 //~ FLICK-T003 @31:13-31:43 expected `Covered {Conflict}`, found `Covered {NotFound}`
-//~ FLICK-T002 @39:36-39:41 `Number` is not an error
+//~ FLICK-T002 @39:36-39:41 `Int` is not an error

@@ -8,9 +8,9 @@ refined type Slug = String where Checks.non_empty
 
 type Page =
   | Home
-  | User Number
-  | UserPost Number Slug
-  | Search { q : String; page : Option Number; exact : Bool }
+  | User Float
+  | UserPost Float Slug
+  | Search { q : String; page : Option Float; exact : Bool }
   | Settings
   deriving Eq, Show, Schema, Url
 

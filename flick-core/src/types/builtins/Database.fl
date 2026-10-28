@@ -6,17 +6,17 @@ module Database exposing (..)
 service Database =
   run_query : forall a. Sql.Query Sql.Pg a ->{; Sql.EncodeError, Sql.DbError, Sql.DecodeError}
     List a
-  run_execute : forall a. Sql.Query Sql.Pg a ->{; Sql.EncodeError, Sql.DbError} Number
+  run_execute : forall a. Sql.Query Sql.Pg a ->{; Sql.EncodeError, Sql.DbError} Float
 
 query : forall a. Sql.Query Sql.Pg a ->{Database; Sql.EncodeError, Sql.DbError, Sql.DecodeError}
   List a
 let query q = Database.run_query q
 
-execute : forall a. Sql.Query Sql.Pg a ->{Database; Sql.EncodeError, Sql.DbError} Number
+execute : forall a. Sql.Query Sql.Pg a ->{Database; Sql.EncodeError, Sql.DbError} Float
 let execute q = Database.run_execute q
 
 /// Where and how many connections at most.
-type alias PgConfig = { connection_string : String; max_connections : Number }
+type alias PgConfig = { connection_string : String; max_connections : Float }
 
 pg_layer : ServiceTag {Database} -> PgConfig -> Layer none none {Database}
 foreign pure pg_layer from "@flick-lang/runtime/sql" "pgLayer"

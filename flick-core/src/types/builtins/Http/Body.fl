@@ -26,7 +26,7 @@ foreign pure empty from "@flick-lang/runtime/effect/http/HttpBody" "empty"
   reviewed "effect@4.0.5 sha256:23013c68fed14abf"
 
 /// The bytes, of the content type or `application/octet-stream`.
-uint8_array : List Number -> Option String -> Body
+uint8_array : List Float -> Option String -> Body
 foreign pure uint8_array from "@flick-lang/runtime/effect/http/HttpBody" "flickUint8Array"
   arity 2
   reviewed "effect@4.0.5 sha256:4503999043e25898"
@@ -68,7 +68,7 @@ foreign pure content_type from "@flick-lang/runtime/effect/http/HttpBody" "flick
   reviewed "effect@4.0.5 sha256:5d0d3365e232f473"
 
 /// The length of the body in bytes, if it is known.
-content_length : Body -> Option Number
+content_length : Body -> Option Float
 foreign pure content_length from "@flick-lang/runtime/effect/http/HttpBody" "flickContentLength"
   reviewed "effect@4.0.5 sha256:5d0d3365e232f473"
 
@@ -79,7 +79,7 @@ foreign pure to_text from "@flick-lang/runtime/effect/http/HttpBody" "flickToTex
 
 /// The chunks of bytes of the stream, of the content type or
 /// `application/octet-stream`, and of the length if it is known.
-stream : forall e. Stream none e (List Number) -> Option String -> Option Number -> Body
+stream : forall e. Stream none e (List Float) -> Option String -> Option Float -> Body
 foreign pure stream from "@flick-lang/runtime/effect/http/HttpBody" "flickStream"
   arity 3
   reviewed "effect@4.0.5 sha256:52e3ba8e5568e864"
@@ -90,7 +90,7 @@ type alias FileOptions =
   {
     offset : Option ByteSize.ByteSize;
     bytesToRead : Option ByteSize.ByteSize;
-    chunkSize : Option Number;
+    chunkSize : Option Float;
     contentType : Option String;
   }
 

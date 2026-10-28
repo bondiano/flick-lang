@@ -70,7 +70,7 @@ foreign effect interrupt from "@flick-lang/runtime/effect/Deferred" "interrupt"
   reviewed "effect@4.0.5 sha256:c82d302d4a69af38"
 
 /// `interrupt`, naming the fiber id of the interruption.
-interrupt_with : Number -> Deferred e a ->{} Bool
+interrupt_with : Float -> Deferred e a ->{} Bool
 foreign effect interrupt_with from "@flick-lang/runtime/effect/Deferred" "interruptWith"
   arity 1
   reviewed "effect@4.0.5 sha256:906fb970bd70acbd"

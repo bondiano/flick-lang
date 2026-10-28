@@ -34,12 +34,12 @@ same : Ord a => a -> a -> Bool
 let same x y = eq x y
 
 texts : List String
-let texts = [render 1, render "a", render [Some 1n], show (Ok 1 : Result String Number)]
+let texts = [render 1, render "a", render [Some 1n], show (Ok 1 : Result String Float)]
 
 /// Transparent aliases of one record form share its structural instances.
-type alias Point = { x : Number; y : Number }
+type alias Point = { x : Float; y : Float }
 
-type alias Coords = { y : Number; x : Number }
+type alias Coords = { y : Float; x : Float }
 
 close : Point -> Coords -> Bool
 let close p q = eq p q

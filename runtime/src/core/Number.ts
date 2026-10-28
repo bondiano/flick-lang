@@ -1,4 +1,4 @@
-// `Number` of the standard library without Effect: the bindings of Number.fl,
+// `Float` of the standard library without Effect: the bindings of Float.fl,
 // with Effect's semantics; a binary function takes `that`, then `self`.
 import { EQ, GT, LT, none, type Option, type Ordering, some } from "./data.ts";
 

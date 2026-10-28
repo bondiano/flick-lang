@@ -1,7 +1,7 @@
 // Effect's `Trie`: string keys in order, prefix queries, persistent updates.
 module App.Main exposing (main)
 
-words : Trie.Trie Number
+words : Trie.Trie Float
 let words = Trie.from_list [("she", 1), ("shells", 2), ("sea", 3), ("sells", 4)]
 
 main : Unit ->{; AppError} Unit
@@ -32,7 +32,8 @@ let main () =
   Platform.stdout_line
     ("reduce: " ++ Trie.reduce "" (fun acc n key -> acc ++ key ++ "=" ++ show n ++ ";") words)
   Platform.stdout_line
-    ("map: " ++ show (Trie.entries (Trie.map (fun n key -> String.length key + n) words)))
+    ("map: "
+      ++ show (Trie.entries (Trie.map (fun n key -> Int.to_float (String.length key) + n) words)))
   Platform.stdout_line ("filter: " ++ show (Trie.keys (Trie.filter (fun n _ -> n % 2 == 0) words)))
   let halves = Trie.filter_map (fun n key -> if n % 2 == 0 then Ok (key ++ "!") else Err ()) words
   Platform.stdout_line ("filter_map: " ++ show (Trie.entries halves))

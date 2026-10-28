@@ -2,28 +2,28 @@
 // Flick declares them over the runtime.
 module App.Main exposing (main)
 
-sleep : Number ->{} Unit
+sleep : Float ->{} Unit
 foreign async sleep from "./timers.mjs" "sleep"
 
 type error Oops = Oops String
 
-after : Number -> String -> Eff none none String
+after : Float -> String -> Eff none none String
 let after millis text =
   task {
     sleep millis
     text
   }
 
-failing : String -> Eff none {Oops} Number
+failing : String -> Eff none {Oops} Float
 let failing text = task { from_result (Err (Oops text)) }
 
-describe : Result Oops Number -> String
+describe : Result Oops Float -> String
 let describe result =
   match result with
   | Ok n -> show n
   | Err (Oops text) -> "oops " ++ text
 
-outcome : Exit {Oops} Number -> String
+outcome : Exit {Oops} Float -> String
 let outcome exit =
   match (Exit.value exit, Exit.failure exit) with
   | (Some n, _) -> show n

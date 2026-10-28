@@ -17,7 +17,8 @@ const RUNTIME: &str = "@flick-lang/runtime";
 
 /// Prelude types TypeScript has natively.
 const PRIMITIVES: &[(&str, &str)] = &[
-    ("Number", "number"),
+    ("Int", "number"),
+    ("Float", "number"),
     ("String", "string"),
     ("Bool", "boolean"),
     ("BigInt", "bigint"),

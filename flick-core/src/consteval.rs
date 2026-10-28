@@ -1,7 +1,7 @@
 //! Compile-time evaluation of expressions built only from literals, as
 //! `ReScript` does: `60 * 60 * 24`, `"a" ++ "b"`, `not false`. The result is the
 //! value the expression has at run time, with JS semantics bit for bit:
-//! IEEE 754 arithmetic and remainder, `SameValueZero` for `==` on `Number`,
+//! IEEE 754 arithmetic and remainder, `SameValueZero` for `==` on `Float`,
 //! UTF-16 order for `<` on `String`.
 //!
 //! `None` means "evaluate at run time": the expression is not made of literals
@@ -113,7 +113,9 @@ pub(crate) fn binary(op: K, lhs: Const, rhs: Const) -> Option<Const> {
             K::Plus => BigInt(a.checked_add(b)?),
             K::Minus => BigInt(a.checked_sub(b)?),
             K::Star => BigInt(a.checked_mul(b)?),
-            // truncating division and remainder with the dividend's sign, like JS
+            // truncating division and remainder with the dividend's sign, like
+            // JS; by zero they are zero, as the operators define
+            K::Slash | K::Percent if b == 0 => BigInt(0),
             K::Slash => BigInt(a.checked_div(b)?),
             K::Percent => BigInt(a.checked_rem(b)?),
             K::StarStar => BigInt(a.checked_pow(u32::try_from(b).ok()?)?),

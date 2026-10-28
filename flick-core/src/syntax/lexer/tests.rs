@@ -127,7 +127,7 @@ fn keywords_name_members_after_a_qualifier_and_in_declarations() {
         kinds(text).0[i]
     }
     assert_eq!(ident("HashSet.with w", 2), (K::Ident, "with"));
-    assert_eq!(ident("with : Number", 0), (K::Ident, "with"));
+    assert_eq!(ident("with : Float", 0), (K::Ident, "with"));
     assert_eq!(ident("foreign pure with from", 2), (K::Ident, "with"));
     assert_eq!(ident("let error message =", 1), (K::Ident, "error"));
     assert_eq!(ident("let rec x", 1), (K::RecKw, "rec"));
@@ -144,8 +144,8 @@ fn keyword_context_requires_whole_words_and_adjacent_qualifiers() {
         assert_eq!(kinds(name), (vec![(K::Ident, name)], vec![]));
     }
     for (src, word, expected) in [
-        ("with :: Number", "with", K::WithKw),
-        (" with : Number", "with", K::WithKw),
+        ("with :: Float", "with", K::WithKw),
+        (" with : Float", "with", K::WithKw),
         ("HashSet.with", "with", K::Ident),
         ("HashSet. with", "with", K::WithKw),
         ("let rec with = 1", "with", K::Ident),
@@ -153,7 +153,7 @@ fn keyword_context_requires_whole_words_and_adjacent_qualifiers() {
         ("foreign asynchronous with from", "with", K::WithKw),
         ("let assert x = value", "assert", K::AssertKw),
         ("{ echo = 1 }", "echo", K::Ident),
-        ("{ todo : Number }", "todo", K::Ident),
+        ("{ todo : Float }", "todo", K::Ident),
         ("echo == value", "echo", K::EchoKw),
         ("todo => value", "todo", K::TodoKw),
         ("todo :: value", "todo", K::TodoKw),

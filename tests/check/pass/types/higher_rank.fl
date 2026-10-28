@@ -3,7 +3,7 @@
 module App.HigherRank exposing (apply_twice, render_twice, use_both)
 
 apply_twice :
-  (forall a. a -> a) -> (Number, String)
+  (forall a. a -> a) -> (Float, String)
 let apply_twice transform =
   (transform 42, transform "hello")
 
@@ -15,7 +15,7 @@ let render_twice render =
 keep : a -> a
 let keep value = value
 
-use_both : Unit -> (Number, String)
+use_both : Unit -> (Float, String)
 let use_both () =
   let pair = apply_twice keep
   let lambda = apply_twice (fun x -> x)

@@ -5,22 +5,22 @@ module App.Main exposing (main)
 import Request exposing (Entry, Request)
 import RequestResolver exposing (RequestResolver)
 
-type Query = UserName Number
+type Query = UserName Float
   deriving Eq, Show
 
-type error NotFound = NotFound Number
+type error NotFound = NotFound Float
 
 type alias UserEntry = Entry Query {NotFound} String
 
-lookup : Number ->{; NotFound} String
+lookup : Float ->{; NotFound} String
 let lookup id = if id < 10 then "user" ++ show id else from_result (Err (NotFound id))
 
-id_of : UserEntry -> Number
+id_of : UserEntry -> Float
 let id_of entry =
   match Request.request entry with
   | UserName id -> id
 
-ask : Number -> Request Query {NotFound} String
+ask : Float -> Request Query {NotFound} String
 let ask id = Request.of (UserName id)
 
 answer : UserEntry ->{} Unit
@@ -45,7 +45,7 @@ let fail_with entry exit =
   | Some failure -> Request.fail_cause failure entry
   | None -> ()
 
-run_all : RequestResolver Query {NotFound} String -> List Number ->{} String
+run_all : RequestResolver Query {NotFound} String -> List Float ->{} String
 let run_all resolver ids =
   let results = parallel_results (List.map (fun id -> task { Request.run resolver (ask id) }) ids)
   show (List.map describe results)

@@ -1,23 +1,16 @@
-//! Names, application and operators. Operators are fixed: arithmetic on
-//! `Number` or `BigInt`, `++` on `String` or `List`, comparisons on the
-//! three primitive domains; operands never mix types or coerce.
+//! Names, application and operators. Operators are fixed: arithmetic on the
+//! numeric types, `++` on `String` or `List`, comparisons on the numeric
+//! types and `String`; operands never mix types or coerce.
 
-use std::mem;
-
-use super::env::{Form, TypeDef};
 use super::ty::Type;
-use super::typing::{Identity, Ref};
-use super::{Checker, Local, Operator};
+use super::typing::Ref;
+use super::{Checker, Domain, Local, Operator};
 use crate::diagnostics::suggest::closest;
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
-use crate::iface::{Entity, Namespace};
+use crate::iface::Namespace;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-
-const NUMERIC: &[&str] = &["Number", "BigInt"];
-const ORDERED: &[&str] = &["Number", "BigInt", "String"];
-const CONCAT: &[&str] = &["String", "List"];
 
 impl Checker<'_> {
     pub fn push_local(&mut self, name: &str, ty: Type) {
@@ -275,26 +268,27 @@ impl Checker<'_> {
             kind => {
                 let ty = self.infer(lhs);
                 self.check(rhs, &ty);
-                let (name, allowed) = match kind {
-                    K::Lt => ("<", ORDERED),
-                    K::Le => ("<=", ORDERED),
-                    K::Gt => (">", ORDERED),
-                    K::Ge => (">=", ORDERED),
-                    K::PlusPlus => ("++", CONCAT),
-                    K::Plus => ("+", NUMERIC),
-                    K::Minus => ("-", NUMERIC),
-                    K::Star => ("*", NUMERIC),
-                    K::Slash => ("/", NUMERIC),
-                    K::Percent => ("%", NUMERIC),
-                    _ => ("**", NUMERIC),
+                let (name, domain) = match kind {
+                    K::Lt => ("<", Domain::Ordered),
+                    K::Le => ("<=", Domain::Ordered),
+                    K::Gt => (">", Domain::Ordered),
+                    K::Ge => (">=", Domain::Ordered),
+                    K::PlusPlus => ("++", Domain::Concat),
+                    K::Plus => ("+", Domain::Numeric),
+                    K::Minus => ("-", Domain::Numeric),
+                    K::Star => ("*", Domain::Numeric),
+                    K::Slash => ("/", Domain::Numeric),
+                    K::Percent => ("%", Domain::Numeric),
+                    _ => ("**", Domain::Numeric),
                 };
                 self.operators.push(Operator {
                     ty: ty.clone(),
                     span,
                     op: name,
-                    allowed,
+                    domain,
+                    givens: self.classes.givens.clone(),
                 });
-                if allowed == ORDERED { bool_ } else { ty }
+                if domain == Domain::Ordered { bool_ } else { ty }
             }
         }
     }
@@ -381,113 +375,23 @@ impl Checker<'_> {
             }
             _ => {
                 let ty = self.infer(operand);
+                // `-2147483648` is a literal of `Int`, though `2147483648` is not
+                let at = self.span(operand);
+                if operand.kind == K::Literal
+                    && let Some(literal) = self.literals.last_mut()
+                    && literal.span == at
+                {
+                    literal.value = literal.value.map(|v| -v);
+                }
                 self.operators.push(Operator {
                     ty: ty.clone(),
                     span: self.span(node),
                     op: "-",
-                    allowed: NUMERIC,
+                    domain: Domain::Numeric,
+                    givens: self.classes.givens.clone(),
                 });
                 ty
             }
         }
     }
-
-    /// Checks the operand types of operators once the declaration is
-    /// inferred; an operand type nothing determined becomes the first
-    /// allowed type (`Number`, or `String` for `++`).
-    pub fn settle_operators(&mut self) {
-        for (ty, span) in mem::take(&mut self.equalities) {
-            if let Some(identity) = self.identity(&ty) {
-                let key = super::typing::range(span);
-                self.typing.identity_eq.insert(key, identity);
-            }
-        }
-        for op in mem::take(&mut self.operators) {
-            let ty = self.whnf(&op.ty);
-            let (head, _) = ty.spine();
-            let fits = match head {
-                Type::Error => true,
-                Type::Meta(_) => {
-                    let _ = self.unify(&ty, &Type::prim(op.allowed[0]));
-                    true
-                }
-                head => op.allowed.iter().any(|name| head.is_prim(name)),
-            };
-            if op.op == "++" && ty.spine().0.is_prim("List") {
-                self.typing
-                    .list_concat
-                    .insert(super::typing::range(op.span));
-            }
-            // an operand already reported inside the operator explains it better
-            let reported = || {
-                self.diagnostics.iter().any(|d| {
-                    d.span
-                        .is_some_and(|s| s.start >= op.span.start && s.end <= op.span.end)
-                })
-            };
-            if !fits && !reported() {
-                let shown = self.show(&ty);
-                let allowed = op
-                    .allowed
-                    .iter()
-                    .map(|a| format!("`{a}`"))
-                    .collect::<Vec<_>>()
-                    .join(" or ");
-                let (code, detail) = match ty {
-                    Type::Skolem(_) => (
-                        codes::T008,
-                        format!("`{shown}` stands for any type the caller chooses"),
-                    ),
-                    _ => (codes::T003, format!("not on `{shown}`")),
-                };
-                self.error(
-                    code,
-                    op.span,
-                    format!("`{}` works on {allowed}, {detail}", op.op),
-                );
-            }
-        }
-    }
-}
-
-impl Checker<'_> {
-    /// Whether `===` decides `==` on `ty`: `String`, `Bool` and `BigInt`
-    /// by value, a tagged type whose constructors have no fields by tag.
-    fn identity(&mut self, ty: &Type) -> Option<Identity> {
-        let ty = self.whnf(ty);
-        let (head, _) = ty.spine();
-        if ["String", "Bool", "BigInt"].iter().any(|p| head.is_prim(p)) {
-            return Some(Identity::Value);
-        }
-        let Type::Con { module, name } = head else {
-            return None;
-        };
-        let Some(TypeDef {
-            form: Form::Adt { constructors, abi },
-            ..
-        }) = self.env.type_def(module, name)
-        else {
-            return None;
-        };
-        let nullary = |c: &String| {
-            let entity = Entity {
-                module: module.clone(),
-                namespace: Namespace::Constructor,
-                name: c.clone(),
-            };
-            self.env
-                .value(&entity)
-                .is_some_and(|s| !matches!(strip(s), Type::Fun { .. }))
-        };
-        (abi.is_tagged() && constructors.iter().all(nullary)).then_some(Identity::Tag)
-    }
-}
-
-/// `scheme` without its `forall`s.
-fn strip(scheme: &Type) -> &Type {
-    let mut t = scheme;
-    while let Type::Forall { body, .. } = t {
-        t = body;
-    }
-    t
 }

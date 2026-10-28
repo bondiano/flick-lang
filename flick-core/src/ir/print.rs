@@ -173,7 +173,7 @@ pub fn expr(e: &Expr) -> String {
         ExprKind::Binary(op, l, r) => format!("({} {} {})", expr(l), op.symbol(), expr(r)),
         ExprKind::Unwrap(e) => format!("{}?", expr(e)),
         ExprKind::Not(e) => format!("(not {})", expr(e)),
-        ExprKind::Neg(e) => format!("(-{})", expr(e)),
+        ExprKind::Neg(_, e) => format!("(-{})", expr(e)),
         ExprKind::Ignore(e) => format!("(ignore {})", expr(e)),
         ExprKind::Await(e) => format!("(await {})", expr(e)),
         ExprKind::Task(e) => format!("(task {})", expr(e)),

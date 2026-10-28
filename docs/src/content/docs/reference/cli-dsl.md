@@ -15,7 +15,7 @@ let greet =
     /// Print in capitals
     flag loud : Bool
     /// How many times
-    flag times "n" : Number = 1
+    flag times "n" : Float = 1
     /// Who to greet
     arg name : String
     handle fun { loud; times; name } ->
@@ -57,7 +57,7 @@ completion.
 | `NonEmpty T` | as `List T`, at least one | `Cli.some` |
 
 A value of type `T` is parsed by the class `Cli.Value T`: instances exist for
-`String`, `Bool`, `Number` (no NaN, no empty text), `BigInt`,
+`String`, `Bool`, `Float` (no NaN, no empty text), `BigInt`,
 `Redacted String`, `DateTime.DateTime` (ISO 8601) and `(String, String)`
 (`key=value`, split at the first `=`). `deriving Cli.Value` makes one for a type of constructors
 without fields — a choice among their names in kebab case, `GreenLight` is

@@ -7,12 +7,12 @@ module App.Main exposing (main)
 open_raw : String ->{} String
 foreign effect open_raw from "./resources.mjs" "open"
 
-sleep : Number ->{} Unit
+sleep : Float ->{} Unit
 foreign async sleep from "./timers.mjs" "sleep"
 
 type error Oops = Oops String
 
-failing_scope : Unit ->{; Oops} Number
+failing_scope : Unit ->{; Oops} Float
 let failing_scope () =
   scope {
     let file = open_raw "on error"
@@ -27,7 +27,7 @@ let slow_scope () =
     "never"
   }
 
-waiting : Eff none {Oops} Number
+waiting : Eff none {Oops} Float
 let waiting = task {
   scope {
     let file = open_raw "in parallel"
@@ -36,7 +36,7 @@ let waiting = task {
   }
 }
 
-failing_soon : Eff none {Oops} Number
+failing_soon : Eff none {Oops} Float
 let failing_soon = task {
   sleep 5
   from_result (Err (Oops "sibling failed"))

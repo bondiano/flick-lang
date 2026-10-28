@@ -3,6 +3,7 @@
 
 use super::Lower;
 use crate::ir::{Lit, Pat};
+use crate::numeric::Num;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
@@ -29,6 +30,9 @@ impl Lower<'_> {
                     K::FalseKw => Lit::Bool(false),
                     K::String => Lit::String(literal::string_value(text)),
                     K::BigInt => Lit::BigInt(format!("{sign}{text}")),
+                    _ if self.typing.numeric.get(&node.range()) == Some(&Num::BigInt) => {
+                        Lit::BigInt(format!("{sign}{text}n"))
+                    }
                     _ => Lit::Number(format!("{sign}{text}")),
                 })
             }

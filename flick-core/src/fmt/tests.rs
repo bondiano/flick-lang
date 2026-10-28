@@ -145,11 +145,11 @@ fn keeps_a_line_between_its_parent_and_a_deeper_line_apart() {
 
 #[test]
 fn items_ending_a_line_end_with_their_separator() {
-    let src = "type alias T = {\n  a : Number\n  b : String\n  | r\n}\nlet xs = [1,\n  2 // two\n]\nlet t = (1, 2)\nlet one = (\n  1\n)\nlet r = { a = 1; b =\n            2\n  }\nlet long = [ \"aaaaaaaaaaaaaaaaaaaaaaaa\", \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\", \"cccccccccccccccccccccccc\" ]\n";
+    let src = "type alias T = {\n  a : Float\n  b : String\n  | r\n}\nlet xs = [1,\n  2 // two\n]\nlet t = (1, 2)\nlet one = (\n  1\n)\nlet r = { a = 1; b =\n            2\n  }\nlet long = [ \"aaaaaaaaaaaaaaaaaaaaaaaa\", \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\", \"cccccccccccccccccccccccc\" ]\n";
     let out = fmt(src);
     insta::assert_snapshot!(out, @r#"
     type alias T = {
-      a : Number;
+      a : Float;
       b : String;
       | r
     }

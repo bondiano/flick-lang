@@ -23,13 +23,13 @@ type alias Name = String
 //~ FLICK-R011 @5:3-5:10 cannot export `missing`
 //~ FLICK-R011 @6:3-6:7 cannot export `Gone`
 
-type alias Alias = Number
+type alias Alias = Float
 //~ FLICK-R011 @7:3-7:12 `Alias` has no constructors
 
-load : Number -> Number
+load : Float -> Float
 let load n = n
 
-load : Number -> Number
+load : Float -> Float
 //~ FLICK-R008 @32:1-32:5 `load` is defined more than once
 let load n = n + 1
 //  ^^^^ FLICK-R008 `load` is defined more than once

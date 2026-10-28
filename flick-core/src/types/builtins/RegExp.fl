@@ -12,7 +12,7 @@ type error RegExpError = RegExpError String
 
 /// One match: the matched text, where it starts, and each capture group
 /// (`None` when the group took no part).
-type alias Match = { matched : String; index : Number; captures : List (Option String) }
+type alias Match = { matched : String; index : Float; captures : List (Option String) }
 
 /// The regular expression of `pattern` with the flags (`"gi"`, `""`, …).
 make : String -> String -> Result RegExpError RegExp
@@ -35,7 +35,7 @@ foreign pure match_all from "@flick-lang/runtime/effect/RegExp" "flickMatchAll"
   reviewed "effect@4.0.5 sha256:91b91858ae12e8ee"
 
 /// Where the first match starts.
-search : RegExp -> String -> Option Number
+search : RegExp -> String -> Option Float
 foreign pure search from "@flick-lang/runtime/effect/String" "search"
   arity 1
   reviewed "effect@4.0.5 sha256:451837621e06aa2a"

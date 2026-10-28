@@ -7,7 +7,7 @@ module App.Main exposing (main)
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 
-start : Unit ->{} Number
+start : Unit ->{} Float
 foreign async start from "./traces.mjs" "start"
   arity 0
 
@@ -41,14 +41,14 @@ let options =
     disablePropagation = false;
   }
 
-stock : String ->{Server.Server;} Number
-server fn stock item = String.length item
+stock : String ->{Server.Server;} Float
+server fn stock item = Int.to_float (String.length item)
 
-price : String ->{Server.Server;} Number
-server fn price item = 2 * String.length item
+price : String ->{Server.Server;} Float
+server fn price item = 2 * Int.to_float (String.length item)
 
 /// The price of jam, asked by a task the page's view reads.
-priced : Atom.Atom (Atom.Async Number {Rpc.ClientError})
+priced : Atom.Atom (Atom.Async Float {Rpc.ClientError})
 let priced = Atom.task (task { price "jam" })
 
 /// The page: the stock of tea, asked of the server function, and the price.

@@ -1,13 +1,13 @@
-/// Operations on `BigInt`. Division and remainder by zero throw in JS, a
-/// defect; the checked forms return the error instead.
+/// Operations on `BigInt`. The operators `/` and `%` divide by zero to zero;
+/// the checked forms return the error instead.
 module BigInt exposing (..)
 
 /// The integer a number holds exactly, if it is one.
-from_number : Number -> Option BigInt
+from_number : Float -> Option BigInt
 foreign pure from_number from "@flick-lang/runtime" "bigintFromNumber"
 
 /// The nearest number: a lossy conversion.
-to_number : BigInt -> Number
+to_number : BigInt -> Float
 foreign pure to_number from global "Number"
 
 /// The decimal digits, without `n`.
@@ -24,12 +24,12 @@ foreign pure abs from "@flick-lang/runtime/effect/BigInt" "abs"
   reviewed "effect@4.0.5 sha256:7ca5a15c381f5718"
 
 /// Division rounding toward zero.
-divide : BigInt -> BigInt -> Result Number.ArithmeticError BigInt
+divide : BigInt -> BigInt -> Result Int.ArithmeticError BigInt
 foreign pure divide from "@flick-lang/runtime" "bigintDivide"
   reviewed "effect@4.0.5 sha256:e07728a47fcff98e"
 
 /// The remainder of division rounding toward zero, with the sign of the dividend.
-remainder : BigInt -> BigInt -> Result Number.ArithmeticError BigInt
+remainder : BigInt -> BigInt -> Result Int.ArithmeticError BigInt
 foreign pure remainder from "@flick-lang/runtime" "bigintRemainder"
   reviewed "effect@4.0.5 sha256:af803eb2f12a3c24"
 
@@ -137,12 +137,12 @@ foreign pure clamp from "@flick-lang/runtime/effect/BigInt" "clamp"
   reviewed "effect@4.0.5 sha256:3e97fc4b197568de"
 
 /// The number, when the integer is a safe one.
-to_safe_number : BigInt -> Option Number
+to_safe_number : BigInt -> Option Float
 foreign pure to_safe_number from "@flick-lang/runtime/effect/BigInt" "toNumber"
   reviewed "effect@4.0.5 sha256:bf18c6631a4208c6"
 
 /// The integer of a safe integer number.
-from_safe_number : Number -> Option BigInt
+from_safe_number : Float -> Option BigInt
 foreign pure from_safe_number from "@flick-lang/runtime/effect/BigInt" "fromNumber"
   reviewed "effect@4.0.5 sha256:ecbb8b6009de18bf"
 

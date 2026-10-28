@@ -154,9 +154,9 @@ let examples =
 
 `-x ** 2` означает `-(x ** 2)`; `-a * b` означает `(-a) * b`; `await f x`
 означает `await (f x)`; `0..n - 1` — это `0..(n - 1)`, а `i < 0..n` сравнивает с диапазоном.
-Побитовые операции — функции `Number.bit_*`.
+Побитовые операции — функции `Float.bit_*`.
 
-Диапазон — это `Seq Number`: `a..b` считает от `a` до `b` включительно
+Диапазон — это `Seq Float`: `a..b` считает от `a` до `b` включительно
 (`Seq.range_to`), `a..<b` останавливается перед `b` (`Seq.range`), а `a..`
 не заканчивается (`Seq.from`). Единственный в скобках, `[a..b]` — `List` тех же
 чисел; `[a..]` — ошибка. Число перед `..` на нём заканчивается: `1..5` —
@@ -205,7 +205,7 @@ let load_view id =
   Log.info view.title
   view
 
-classify : Number -> String
+classify : Float -> String
 let classify n =
   if n < 0 then
     "negative"
@@ -214,7 +214,7 @@ let classify n =
   else
     "positive"
 
-total : List Number -> Number
+total : List Float -> Float
 let total xs =
   xs
   |> List.filter (fun x -> x > 0)
@@ -274,12 +274,12 @@ metadata    = indented lines: meta_name { atom }
 ```
 
 Правая часть `type` — всегда список вариантов.
-Например, `type Wrapper = Wrap Number` — ADT с одним конструктором.
+Например, `type Wrapper = Wrap Float` — ADT с одним конструктором.
 Прозрачный псевдоним, в том числе для типа записи, объявляется
 через `type alias`. Слово `alias` считается ключевым только сразу после `type`.
 Поле варианта записывается атомарным типом; для сложных типов нужны скобки:
-`Some (List a)`, `Handler (a -> b)`. У `Circle (Point, Number)` одно
-поле-кортеж, а у `Circle Point Number` — два поля.
+`Some (List a)`, `Handler (a -> b)`. У `Circle (Point, Float)` одно
+поле-кортеж, а у `Circle Point Float` — два поля.
 Слово `of` перед полями вызывает `FLICK-S010`.
 
 `type error E` объявляет ошибку с единственным конструктором `E`.
@@ -299,14 +299,14 @@ import App.Geometry exposing (Point)
 import Effect.Log as Log
 
 type Shape =
-  | Circle Point Number
+  | Circle Point Float
   | Rect { origin : Point; size : Point }
   | Empty
   deriving Eq, Show
 
 opaque type alias UserId = String
 
-refined type Port = Number where fun n -> n > 0 && n < 65536
+refined type Port = Float where fun n -> n > 0 && n < 65536
   deriving Eq, Hash
 
 kind Nullability = NonNull | Nullable
@@ -314,10 +314,10 @@ kind Nullability = NonNull | Nullable
 type error NotFound = NotFound UserId
 
 service Clock =
-  now : Unit ->{} Number
+  now : Unit ->{} Float
 
 class Eq a => Hash a =
-  hash : a -> Number
+  hash : a -> Float
 
 class Collection c a | c -> a =
   empty : c
@@ -335,10 +335,10 @@ foreign async read_text from "./fs.js" "readText"
   cancel signal
 
 rec {
-  is_even : Number -> Bool
+  is_even : Float -> Bool
   let is_even n = if n == 0 then true else is_odd (n - 1)
 
-  is_odd : Number -> Bool
+  is_odd : Float -> Bool
   let is_odd n = if n == 0 then false else is_even (n - 1)
 }
 ```
@@ -400,7 +400,7 @@ expr        = "fun" atom_pattern { atom_pattern } "->" block
 arm         = "|" or_pattern ["when" expr] "->" block
 application = postfix { postfix }
 postfix     = atom { "." name | "?" }           // без пробела перед ними
-atom        = name | Con { "." Con } ["." name] | Number | BigInt | String
+atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "true" | "false" | "()" | "(" expr ")" | "(" expr ":" type ")"
             | "(" expr "," expr { "," expr } ")" | "[" [expr { "," expr } [","]] "]"
             | "{" "}" | "{" field "=" block { ";" | line break … } "}"
@@ -525,7 +525,7 @@ let deploy =
 ```text
 or_pattern   = pattern { "|" pattern }
 pattern      = Con { "." Con } { atom_pattern } | atom_pattern
-atom_pattern = "_" | name | Con | ["-"] Number | ["-"] BigInt | String | "true" | "false"
+atom_pattern = "_" | name | Con | ["-"] Float | ["-"] BigInt | String | "true" | "false"
              | "()" | "(" or_pattern ")" | "(" or_pattern ":" type ")"
              | "(" or_pattern "," or_pattern { "," or_pattern } ")"
              | "[" [list_item { "," list_item }] "]"

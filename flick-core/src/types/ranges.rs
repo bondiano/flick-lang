@@ -1,4 +1,4 @@
-//! Ranges of numbers, each a `Seq Number`: `a..b` from `a` up to `b`
+//! Ranges of numbers, each a `Seq Float`: `a..b` from `a` up to `b`
 //! inclusive, `a..<b` up to before `b`, and `a..` without an end. A range
 //! alone in brackets, `[a..b]`, is the `List` of the same numbers.
 
@@ -19,7 +19,7 @@ pub fn range_list(list: &Node) -> Option<&Node> {
 
 impl Checker<'_> {
     pub fn range_expr(&mut self, node: &Node, strict: bool) -> Type {
-        let number = Type::prim("Number");
+        let number = Type::prim("Int");
         let bounds: Vec<&Node> = node.nodes().collect();
         for bound in &bounds {
             self.check(bound, &number);

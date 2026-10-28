@@ -28,7 +28,7 @@ foreign pure maximum_bipartite_matching from "@flick-lang/runtime/effect/Graph" 
 
 /// The number of edges from `source` to each node it reaches.
 unweighted_distances :
-  NodeIndex -> ReachabilityConfig -> Graph n e k -> Result GraphError (List (NodeIndex, Number))
+  NodeIndex -> ReachabilityConfig -> Graph n e k -> Result GraphError (List (NodeIndex, Float))
 foreign pure unweighted_distances from "@flick-lang/runtime/effect/Graph" "flickUnweightedDistances"
   reviewed "effect@4.0.5 sha256:ed62d3ebcccaf514"
 
@@ -98,7 +98,7 @@ foreign pure minimum_cut from "@flick-lang/runtime/effect/Graph" "flickMinimumCu
   reviewed "effect@4.0.5 sha256:270f95da961e16fe"
 
 /// A spanning tree of least total cost for each component.
-minimum_spanning_forest : (e -> Number) ->
+minimum_spanning_forest : (e -> Float) ->
   Graph n e Undirected ->
   Result GraphError (Graph n e Undirected)
 foreign pure minimum_spanning_forest from "@flick-lang/runtime/effect/Graph" "flickMinimumSpanningForest"
@@ -126,7 +126,7 @@ foreign pure bellman_ford from "@flick-lang/runtime/effect/Graph" "flickBellmanF
   reviewed "effect@4.0.5 sha256:ec3316cbca43aaa9"
 
 /// The cheapest paths between every pair of nodes.
-floyd_warshall : (e -> Number) -> Graph n e k -> Result GraphError (AllPairsResult e)
+floyd_warshall : (e -> Float) -> Graph n e k -> Result GraphError (AllPairsResult e)
 foreign pure floyd_warshall from "@flick-lang/runtime/effect/Graph" "flickFloydWarshall"
   reviewed "effect@4.0.5 sha256:bf2121ae1a6a1e80"
 

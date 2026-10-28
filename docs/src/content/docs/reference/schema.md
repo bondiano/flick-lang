@@ -11,7 +11,7 @@ never holds the input.
 ## Refined types
 
 ```flick
-refined type Port = Number where fun n -> n > 0 && n < 65536
+refined type Port = Float where fun n -> n > 0 && n < 65536
   deriving Eq, Schema
 
 refined type Email = String where Checks.email
@@ -38,7 +38,7 @@ it is `FLICK-D006`.
 | - | - |
 | `type Shape = …`, an alias of a record or tuple, a `type error` | `Schema Shape` |
 | `type Tree a = …` | `Schema a -> Schema (Tree a)` |
-| `type alias PairOf f = { count : f Number }` | `(forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)` |
+| `type alias PairOf f = { count : f Float }` | `(forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)` |
 | a parameter the representation does not use (phantom) | no witness for it |
 
 ```flick
@@ -95,7 +95,7 @@ a `PureCodec`, and using one as such is a type error.
 | `Codec.decode`, `Codec.encode` | runtime, failing with `SchemaError` |
 | `Codec.decode_result`, `Codec.encode_result` | pure, for a `PureCodec` |
 | `Codec.json schema` | the canonical JSON form: records as objects, variants as `{"_tag": "Name", "_0": …}`, `Option` as the value or `null`, `Unit` as `null`, `BigInt` as a string |
-| `String.json`, `Number.json_finite`, `Number.json`, `BigInt.json`, `Codec.bool`, `Codec.list` | primitives; `Number.json_finite` refuses `NaN` and the infinities both ways, `Number.json` writes them as strings |
+| `String.json`, `Float.json_finite`, `Float.json`, `BigInt.json`, `Codec.bool`, `Codec.list` | primitives; `Float.json_finite` refuses `NaN` and the infinities both ways, `Float.json` writes them as strings |
 | `Codec.transform`, `Codec.transform_result`, `Codec.transform_effect` | pure, fallible and runtime transformations |
 | `Codec.check predicate message` | a check of the whole decoded value |
 | `Redacted.json_reveal codec`, `Redacted.json_masked` | the explicit policies of a `Redacted` value: its content, or `"<redacted>"` one way |
