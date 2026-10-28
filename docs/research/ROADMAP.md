@@ -594,7 +594,7 @@ Derived atom возвращает `for n <- [1] yield Atom.value count + n`. Seq
 - Причина/изменение: [cache inputs](../../flick/src/cache.rs#L68-L85) не включают sibling import root, поддержанный loader. Переиспользовать [поиск внешних корней](../../flick/src/commands/inputs.rs#L46-L70), чтобы loader, `--inputs` и cache согласованно учитывали входы.
 - AC: изменение, создание и удаление sibling dependency инвалидируют cache; результат и диагностики cached/cold сборок совпадают.
 
-**Q34. P2 — Rename метода класса ломает корректную программу**
+**Q34. P2 — Rename метода класса ломает корректную программу** ✅ (`renamable` — общий для prepareRename и rename — отказывает для метода класса (`Decl::Method`) с сообщением «a method of a class: renaming it is not supported yet»; вызов метода по-прежнему ведёт к выбранному instance; `ide::tests::rename_changes_every_use_and_refuses_what_has_no_exact_mapping` — отказ и на сигнатуре, и на вызове)
 - Наблюдение: stdio LSP принимает rename `Pretty.render` → `display`, но возвращает только правку сигнатуры класса; instance и вызов остаются `render`. Применение edit даёт C011 и T001.
 - Причина/изменение: [rename](../../flick-core/src/ide/rename.rs#L18-L35) собирает ссылки по navigation identity, а выбранная реализация — InstanceMethod, не entity класса. Минимальное безопасное решение — отказ для Decl::Method в eligibility; не менять переход к выбранному instance ради rename.
 - AC: prepareRename и rename отказывают для неподдерживаемого метода; обычный rename значения обновляет объявления/вызовы, go-to-definition метода по-прежнему открывает выбранную реализацию. Полная поддержка требует отдельной идентичности ссылок на метод класса.

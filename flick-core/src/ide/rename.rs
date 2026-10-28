@@ -4,7 +4,7 @@
 //! have no exact mapping and are refused.
 
 use super::{Ide, Symbol, tree};
-use crate::iface::Namespace;
+use crate::iface::{Decl, Namespace};
 use crate::resolve::declarations;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
@@ -83,8 +83,22 @@ impl Ide<'_> {
         let capital = match &symbol {
             Symbol::Local { .. } => false,
             Symbol::Entity(e) => {
-                if self.analysis.module(&e.module).is_none() {
+                let Some(module) = self.analysis.module(&e.module) else {
                     return Err(format!("`{}` is declared outside the project", e.name));
+                };
+                // instances and calls name a method through the class, which
+                // references do not follow yet: renaming only the signature breaks them
+                let text = &self.sources.get(module.file).text;
+                if declarations(&module.tree, text, module.file)
+                    .iter()
+                    .any(|d| {
+                        d.decl == Decl::Method && d.name == e.name && d.namespace == e.namespace
+                    })
+                {
+                    return Err(format!(
+                        "`{}` is a method of a class: renaming it is not supported yet",
+                        e.name
+                    ));
                 }
                 e.namespace != Namespace::Value
             }
