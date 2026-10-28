@@ -16,6 +16,7 @@
 | [rescript-components.md](rescript-components.md) | ReScript JSX v4: `@react.component`, `componentWithProps`, свой JSX-модуль, memo, типы DOM и событий, ошибки props; §7–8 — что переносим в `component`/`setup`/`render` |
 | [bundle-and-output.md](bundle-and-output.md) | замеры бандла (rolldown), разбор выходного JS против ReScript; §4 — 8 улучшений с AC |
 | [core-option-equality.md](core-option-equality.md) | равенство и хеш `Option`/`Result` `core` и Effect, импорты сборок, размер `_core/`; решение H6 |
+| [terminal-ui.md](terminal-ui.md) | атомы в терминале: адаптер Ink через `Ui.mount_with`, вес Ink, свой рендерер; решение L4 |
 
 Первоисточники верхнего уровня: <https://github.com/reatom/reatom/tree/v1001>, <https://v1001.reatom.dev/reference/react>,
 <https://effect.website/docs/v4/api/atom-react>, `effect@4.0.5` (`dist/reactivity/*.d.ts`), <https://github.com/megamaddu/purescript-react-basic-hooks>.
@@ -278,7 +279,7 @@ component search (props : SearchProps) =
 **L1. Примеры.** ✅ (`examples/cli-tool` — заметки: подкоманды `init`/`add`/`list`/`done`, файл из `NOTES_FILE` через `Config`, мастер `init` на `Cli.Prompt.text` с проверкой, встроенные `--completions`; тесты мастера на поддельном `Tty`; `flick/tests/examples.rs` гоняет команды с `NOTES_FILE`. Попутно: ошибки `File.node` несли старый формат тега, `try … with File.ReadError` их не ловил — исправлено) AC: `examples/cli-tool` (подкоманды, конфиг/env, prompt-мастер, completions), запускается в e2e.
 **L2. Шаблон.** ✅ (`flick new/init --template cli`: `main` — блок `cli` с флагом и аргументом по умолчанию, `Cli.run_version`; `flick/tests/cli_template.rs` — check/fmt/test и `run -- --help`; в `cli-dsl.md` дописаны `--wizard`, `--log-level`, PowerShell) AC: `flick new --template cli`; `flick run -- --help` выводит сгенерированную справку.
 **L3. Observability в CLI.** ✅ (`Cli.TraceFlag` — встроенный по умолчанию `--trace`: глобальный флаг корня (Effect принимает в `CliConfig` только свои), обработчик идёт span'ом с именем команды под `Otlp.layer` на `OTEL_EXPORTER_OTLP_ENDPOINT`/`OTEL_SERVICE_NAME`, экспортёр грузится лениво; `--log-level` уже был, теперь проверен; `tests/run/stdlib/cli/trace.fl`) AC: флаг `--trace` включает OTLP (O1); `GlobalFlag.LogLevel` подключён.
-**L4. Терминальный UI (исследование).** ⬜ AC: записка о рендерере атомов в терминал (Ink через `Ui.mount_with` или свой) с замером веса и решением.
+**L4. Терминальный UI (исследование).** ✅ ([terminal-ui.md](terminal-ui.md): Ink в рантайм не берём — адаптер из 9 строк над `render()` Ink подключается через `Ui.mount_with` пакетом пользователя; Ink с зависимостями — 135 KB gzip, из них yoga 52 и react-reconciler 43, 8.3 MB установки, импорт 136 мс; свой рендерер всё равно требует reconciler; пересмотреть, когда у `Ui` появятся примитивы без DOM) AC: записка о рендерере атомов в терминал (Ink через `Ui.mount_with` или свой) с замером веса и решением.
 **L6. 🆕 Несколько точек входа.** ✅ (`entries`, раннер `flick-<name>.js` на вход, `flick run/dev <name>`, `bin` в `pack`; реэкспортированный `main` разрешён — раннер импортирует его из модуля-источника)
 - AC: `[project] entries = { server = "App.Server", cli = "App.Cli" }` (`entry` — сокращение для одного); сборка пишет раннер на каждый вход (`flick-server.js`, …) в один каталог, общие модули — один раз; `flick run <name>`, `flick dev <name>`; `flick pack` даёт `"bin"` с каждым входом; e2e-тест на два входа.
 - AC: решение о реэкспортированном `main`: раннер импортирует `main` из модуля-источника, так что фасад (`entry = "App"`) может быть входом, — либо запрет остаётся; записано в `implementation-decisions.md`.
@@ -382,7 +383,7 @@ C7a ✅ ─ C7b ✅ ─ C7c ✅ ─ C7d ✅ ─ C5 ✅            C1 ✅
 U9 ✅ ─ U9b ✅
 S2 ✅ ─ F1 ✅ ─ F2 ✅ ─ F3 ✅ ─ F4 ─ F5 ─ F6
 S3 ✅ ─ S4 ✅ ─ O1 ✅ ─ O2 ✅ ─ O3 ✅ ─ O4 ✅ ─ O5 ✅
-L1 ✅ ─ L2 ✅ ─ L3 ✅ ─ L4 ─ L5
+L1 ✅ ─ L2 ✅ ─ L3 ✅ ─ L4 ✅ ─ L5
 H1 ✅ ─ H2 ✅ ─ H3 ✅ ─ H4 ✅ ─ H5 ─ H6 ✅     (H2 по входам — после L6 ✅)
 D1 ✅ ─ D2 ✅ ─ D3 ✅ ─ D4 ✅ ─ D5 ✅ ─ D6 ✅ ─ D9 ✅ ─ D11 ✅ ─ D10 ✅ ─ D13 ✅ ─ D12 ✅ ─ D14 ✅ ─ D8 ✅   (D15 ✅ — с D4/D5; D7 ✅ после C1)
 ```
