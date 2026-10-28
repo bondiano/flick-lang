@@ -25,20 +25,27 @@ impl CheckCommand {
 impl Command for CheckCommand {
     fn run(&self) -> Outcome {
         let host = FsHost::new();
-        let (outcome, roots) = self.check(&host);
+        let (mut outcome, mut roots) = self.check(&host);
         if !self.options.fix {
             return outcome;
         }
-        let (changed, errors) = apply_fixes(&outcome, &roots, &host.cwd);
-        let mut outcome = if changed {
-            self.check(&host).0
-        } else {
-            outcome
-        };
+        // a fix left out for an overlap, or one a fix uncovers, waits for the next pass
+        let mut errors = Vec::new();
+        for _ in 0..FIX_PASSES {
+            let (changed, failed) = apply_fixes(&outcome, &roots, &host.cwd);
+            errors.extend(failed);
+            if !changed {
+                break;
+            }
+            (outcome, roots) = self.check(&host);
+        }
         outcome.diagnostics.extend(errors);
         outcome
     }
 }
+
+/// How many times `--fix` checks and fixes again at most.
+const FIX_PASSES: usize = 10;
 
 impl CheckCommand {
     /// The diagnostics of the selected files, and those files.
@@ -77,10 +84,12 @@ impl CheckCommand {
 /// `roots`, never into a dependency; whether a file changed, and the files
 /// that could not be written.
 fn apply_fixes(outcome: &Outcome, roots: &[PathBuf], cwd: &Path) -> (bool, Vec<Diagnostic>) {
-    let mut by_file: BTreeMap<FileId, Vec<&Edit>> = BTreeMap::new();
+    let mut by_file: BTreeMap<FileId, Vec<&[Edit]>> = BTreeMap::new();
     let fixes = outcome.diagnostics.iter().flat_map(|d| &d.fixes);
-    for edit in fixes.filter(|f| f.safe).flat_map(|f| &f.edits) {
-        by_file.entry(edit.span.file).or_default().push(edit);
+    for fix in fixes.filter(|f| f.safe) {
+        if let Some(first) = fix.edits.first() {
+            by_file.entry(first.span.file).or_default().push(&fix.edits);
+        }
     }
     let mut changed = false;
     let mut errors = Vec::new();
@@ -102,18 +111,23 @@ fn apply_fixes(outcome: &Outcome, roots: &[PathBuf], cwd: &Path) -> (bool, Vec<D
     (changed, errors)
 }
 
-/// `text` with `edits`, the last first; an edit that overlaps one already
-/// made is left out.
-// shortcut: a fix of several edits could lose one to an overlap; safe fixes have one edit each
-fn fixed(text: &str, mut edits: Vec<&Edit>) -> String {
-    edits.sort_by_key(|e| Reverse((e.span.start, e.span.end)));
-    let mut out = text.to_owned();
-    let mut before = u32::MAX;
-    for edit in edits {
-        if edit.span.end <= before {
-            out.replace_range(edit.span.range(), &edit.replacement);
-            before = edit.span.start;
+/// `text` with `fixes`, each made whole or not at all: one with an edit
+/// that overlaps an edit of a fix already taken is left out.
+fn fixed(text: &str, fixes: Vec<&[Edit]>) -> String {
+    let overlaps = |a: &Edit, b: &Edit| {
+        a.span.start < b.span.end && b.span.start < a.span.end
+            || a.span.start == b.span.start && a.span.end == b.span.end
+    };
+    let mut taken: Vec<&Edit> = Vec::new();
+    for fix in fixes {
+        if !fix.iter().any(|e| taken.iter().any(|t| overlaps(e, t))) {
+            taken.extend(fix);
         }
+    }
+    taken.sort_by_key(|e| Reverse((e.span.start, e.span.end)));
+    let mut out = text.to_owned();
+    for edit in taken {
+        out.replace_range(edit.span.range(), &edit.replacement);
     }
     out
 }
@@ -157,18 +171,29 @@ pub fn select(
 mod tests {
     use super::*;
     use flick_core::source::Span;
+    use std::slice;
 
     #[test]
-    fn fixed_applies_edits_from_the_end_and_skips_overlaps() {
+    fn fixed_takes_each_fix_whole_or_not_at_all() {
         let file = SourceMap::default().add("a.fl", "");
         let edit = |start, end, replacement: &str| Edit {
             span: Span::new(file, start, end),
             replacement: replacement.to_owned(),
         };
         let (a, b, c) = (edit(5, 9, ""), edit(19, 23, ""), edit(17, 20, "x"));
+        let text = "let a : T = 1\nlet b : T = 2";
         assert_eq!(
-            fixed("let a : T = 1\nlet b : T = 2", vec![&a, &c, &b]),
-            "let a = 1\nlet b = 2"
+            fixed(
+                text,
+                vec![
+                    slice::from_ref(&a),
+                    slice::from_ref(&c),
+                    slice::from_ref(&b)
+                ]
+            ),
+            "let a = 1\nletx: T = 2"
         );
+        // the fix of `c` and `a` overlaps the one of `b`, so none of it is made
+        assert_eq!(fixed(text, vec![&[b], &[c, a]]), "let a : T = 1\nlet b = 2");
     }
 }
