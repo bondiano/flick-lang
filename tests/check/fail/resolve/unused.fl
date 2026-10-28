@@ -35,3 +35,4 @@ let sum_with xs =
   let unused = 1
 //    ^^^^^^ FLICK-R013 `unused` is never used
   List.map (fun x -> abs x) xs
+//~ FLICK-T052 @37:12-37:28 a `fun` that only passes `x` on: `abs` is the same function

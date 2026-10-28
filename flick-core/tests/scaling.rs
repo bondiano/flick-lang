@@ -5,6 +5,7 @@
 use std::fmt::Write;
 use std::time::{Duration, Instant};
 
+use flick_core::diagnostics::Severity;
 use flick_core::source::SourceMap;
 use flick_core::syntax::{self, lexer};
 
@@ -45,7 +46,12 @@ fn time(text: &str) -> Duration {
             let start = Instant::now();
             let diagnostics = flick_core::check(&sources, file);
             let elapsed = start.elapsed();
-            assert!(diagnostics.is_empty(), "{diagnostics:?}");
+            // the functions are long on purpose, so only errors count
+            let errors: Vec<_> = diagnostics
+                .iter()
+                .filter(|d| d.severity == Severity::Error)
+                .collect();
+            assert!(errors.is_empty(), "{errors:?}");
             elapsed
         })
         .min()
@@ -141,7 +147,12 @@ fn long_line_lexing_and_parsing_scale_linearly() {
                     } else {
                         let (tokens, diagnostics) = lexer::lex(&text, file);
                         let elapsed = start.elapsed();
-                        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+                        // the functions are long on purpose, so only errors count
+                        let errors: Vec<_> = diagnostics
+                            .iter()
+                            .filter(|d| d.severity == Severity::Error)
+                            .collect();
+                        assert!(errors.is_empty(), "{errors:?}");
                         assert_eq!(tokens.last().expect("EOF token").end as usize, text.len());
                         elapsed
                     }

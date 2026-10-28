@@ -38,6 +38,8 @@ mod infer;
 mod instances;
 mod irrefutable;
 mod kinds;
+#[cfg(test)]
+mod lint_tests;
 mod lints;
 mod makers;
 mod origin;
@@ -230,6 +232,9 @@ fn run(
         field_path: Vec::new(),
         holes: Vec::new(),
         hole_ok: false,
+        builtin: builtins::builtin_sources()
+            .iter()
+            .any(|(name, _)| *name == module.name),
         sugar: Vec::new(),
     };
     checker.typing.sql_dialect = options.sql;
@@ -349,6 +354,9 @@ struct Checker<'a> {
     holes: Vec<(Span, Type)>,
     /// Whether the type being converted may have holes.
     hole_ok: bool,
+    /// Whether the module is a built-in one, written with the code the
+    /// shape lints suggest against.
+    builtin: bool,
 }
 
 impl Checker<'_> {

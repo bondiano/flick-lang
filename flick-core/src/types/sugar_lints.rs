@@ -318,7 +318,7 @@ impl Checker<'_> {
     }
 
     /// The function argument of `List.name f`, as written.
-    fn list_call<'n>(&self, node: &'n Node, name: &str) -> Option<&'n Node> {
+    pub(super) fn list_call<'n>(&self, node: &'n Node, name: &str) -> Option<&'n Node> {
         let parts: Vec<&Node> = node.nodes().collect();
         match (node.kind, &parts[..]) {
             (K::AppExpr, [head, f]) => {
@@ -333,7 +333,7 @@ impl Checker<'_> {
     }
 
     /// `(x, body)` of `fun x -> body` with one variable and a one-line body.
-    fn lambda_parts(&self, f: &Node) -> Option<(String, String)> {
+    pub(super) fn lambda_parts(&self, f: &Node) -> Option<(String, String)> {
         if f.kind != K::FunExpr {
             return None;
         }
@@ -365,7 +365,7 @@ impl Checker<'_> {
     }
 
     /// The solved type a `do` block or one of its statements recorded.
-    fn sugar_type(&self, node: &Node) -> Option<Type> {
+    pub(super) fn sugar_type(&self, node: &Node) -> Option<Type> {
         let ty = self
             .sugar
             .iter()
@@ -375,12 +375,12 @@ impl Checker<'_> {
         Some(self.zonk(&ty))
     }
 
-    fn source_of(&self, node: &Node) -> &str {
+    pub(super) fn source_of(&self, node: &Node) -> &str {
         let (start, end) = node.range();
         &self.text[start as usize..end as usize]
     }
 
-    fn edit(&self, start: u32, end: u32, replacement: &str) -> Edit {
+    pub(super) fn edit(&self, start: u32, end: u32, replacement: &str) -> Edit {
         Edit {
             span: Span::new(self.file, start, end),
             replacement: replacement.to_owned(),

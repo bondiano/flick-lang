@@ -14,7 +14,7 @@ let render badge props =
       [
         local props,
         widgets.badge props,
-        (if true then badge else preserved) props,
+        (if props.label == "" then badge else preserved) props,
         ({ label = "piped" } |> local),
         Ui.component preserved props,
         (fun (p : Props) -> local p) props,

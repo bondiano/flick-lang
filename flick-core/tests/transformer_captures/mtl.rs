@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use flick_core::diagnostics::{Code, Diagnostic, codes};
+use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
 use flick_core::iface::{self, Interface};
 
 use super::check;
@@ -82,8 +82,12 @@ fn consumer(body: &str) -> Vec<Diagnostic> {
 }
 
 fn accepts(body: &str) {
-    let diagnostics = consumer(body);
-    assert!(diagnostics.is_empty(), "{body}\n{diagnostics:?}");
+    // a lint on how the body is written is not a rejection
+    let errors: Vec<_> = consumer(body)
+        .into_iter()
+        .filter(|d| d.severity == Severity::Error)
+        .collect();
+    assert!(errors.is_empty(), "{body}\n{errors:?}");
 }
 
 fn rejects(body: &str, allowed: &[Code]) -> Vec<Diagnostic> {

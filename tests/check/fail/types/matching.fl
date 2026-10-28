@@ -85,3 +85,4 @@ let rests items =
 //~ FLICK-T026 @66:5-66:11 `let assert` is only for a block
 //~ FLICK-T009 @70:3-70:14 `match` does not cover every value: `[]` is not matched
 //~ FLICK-T010 @72:5-72:11 this arm is never reached
+//~ FLICK-T055 @44:5-44:6 `_` stands for `Circle`, `Empty` of `Shape`

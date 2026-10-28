@@ -15,3 +15,4 @@ let escaped group =
   }
 
 //~ FLICK-G001 @14:5-14:82 this value holds region `s`, but the expected type `Route none none` holds no captures
+//~ FLICK-T052 @14:54-14:82 a `fun` that only passes `request` on: `rpc` is the same function

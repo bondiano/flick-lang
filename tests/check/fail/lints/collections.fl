@@ -1,0 +1,27 @@
+// List and option code a library function says directly.
+module App.Collections exposing (..)
+
+first : List Number -> Option Number
+let first xs = xs |> List.filter (fun x -> x > 1) |> List.head
+
+some : List Number -> Bool
+let some xs = List.length (List.filter (fun x -> x > 1) xs) > 0
+
+none : List Number -> Bool
+let none xs = List.length xs == 0
+
+pairs : List Number -> List Number
+let pairs xs = List.concat (List.map (fun x -> [x, x]) xs)
+
+count : Option Number -> Number
+let count o = match o with
+  | Some n -> n
+  | None -> 0
+
+kept : List Number -> Bool
+let kept xs = List.length xs == 2
+//~ FLICK-T047 @5:16-5:63 `List.head` of `List.filter`: `List.find` stops at the first match
+//~ FLICK-T048 @8:15-8:64 the length of a `List.filter` compared with zero: `List.any` stops at the first match
+//~ FLICK-T049 @11:15-11:34 a length compared with zero: `List.is_empty` says it
+//~ FLICK-T050 @14:16-14:59 `List.concat` of `List.map`: `List.flat_map` does both
+//~ FLICK-T051 @17:15-19:14 a `match` that unwraps an `Option` with a default: `Option.with_default` says it

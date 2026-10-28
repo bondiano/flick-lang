@@ -58,7 +58,7 @@ let builder f id =
 
 lambdas : UserId ->{Users; NotFound} String
 let lambdas id =
-  let pure = apply_pure (fun x -> normalize_name x)
+  let pure = apply_pure (fun x -> normalize_name (normalize_name x))
   let built = builder (fun x -> task { Users.get x }) id
   let direct = apply_runtime (fun x -> Users.get x) id
   // a pure callback is lifted where a runtime one is expected

@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
-use crate::diagnostics::{Diagnostic, codes};
+use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface::Interface;
 use crate::resolve::{self, Module};
 use crate::source::SourceMap;
@@ -49,7 +49,8 @@ pub(crate) fn check_text(
     );
     diagnostics.extend(parse.diagnostics);
     diagnostics.extend(more);
-    diagnostics.retain(|d| !d.unnecessary());
+    // lowering needs a module without errors; a lint does not stop it
+    diagnostics.retain(|d| d.severity == Severity::Error);
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }
