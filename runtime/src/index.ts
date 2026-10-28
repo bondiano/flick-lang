@@ -3,7 +3,7 @@
 // `"sideEffects": false`: loading a module only declares values, and a
 // top-level call is marked `/*#__PURE__*/`, so a bundler drops what is unused.
 export { Effect } from "effect";
-export type { Layer, Option, Result, Schema } from "effect";
+export type { Context, Layer, Option, Result, Schema, Stream } from "effect";
 
 export * from "./builtins.ts";
 export * from "./capabilities.ts";

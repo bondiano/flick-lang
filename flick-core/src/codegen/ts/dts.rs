@@ -3,10 +3,10 @@
 
 use std::fmt::Write;
 
-use super::{Projection, Vars, generic, reexports};
+use super::{Projection, Vars, generic, key, reexports};
 use crate::codegen::names;
 use crate::iface::{Decl, Export, Interface, Namespace};
-use crate::types::{Kind, Type};
+use crate::types::{Form, Kind, Type};
 
 /// The declaration file of the module `projection` is for: its types and
 /// each exported value, and the exports refused with the reason.
@@ -32,6 +32,39 @@ pub fn declaration_file(
                 names::ident(&entity.name)
             )),
             Err(reason) => refused.push((entity.name.clone(), reason)),
+        }
+    }
+    // the key of each service, which TypeScript provides an implementation by
+    for export in &interface.exports {
+        if export.entity.namespace != Namespace::Type || export.entity.module != projection.module {
+            continue;
+        }
+        let Some(Form::Service { params, operations }) =
+            export.definition.as_ref().map(|d| &d.form)
+        else {
+            continue;
+        };
+        if !params.is_empty() {
+            continue;
+        }
+        let name = &export.entity.name;
+        let ops: Result<Vec<String>, String> = operations
+            .iter()
+            .map(|op| {
+                Ok(format!(
+                    "readonly {}: {}",
+                    key(&op.name),
+                    projection.value(&op.ty)?
+                ))
+            })
+            .collect();
+        match ops {
+            Ok(ops) => values.push(format!(
+                "export declare const {}: $Context.Service<{name}, {{ {} }}>;",
+                names::service(name),
+                ops.join("; ")
+            )),
+            Err(reason) => refused.push((names::service(name), reason)),
         }
     }
     // dictionaries of instances without a context, for constrained functions

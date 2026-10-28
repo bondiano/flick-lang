@@ -6,7 +6,10 @@ import { Context, Effect } from "effect";
 
 import { type Seq, seq } from "./core/seq.ts";
 
-let current: Context.Context<never> = Context.empty();
+/** No Sync stage is running: nothing set the services it reads. */
+const OUTSIDE: Context.Context<never> = /*#__PURE__*/ Context.empty();
+
+let current: Context.Context<never> = OUTSIDE;
 
 /** Calls `f` with `context` as the services of its Sync calls. */
 export const syncIn = <A>(context: Context.Context<never>, f: () => A): A => {
@@ -22,6 +25,19 @@ export const syncIn = <A>(context: Context.Context<never>, f: () => A): A => {
 /** A Sync call inside a fiber: it reads the fiber's services. */
 export const sync = <A>(f: () => A): Effect.Effect<A> =>
   Effect.contextWith((context: Context.Context<never>) => Effect.sync(() => syncIn(context, f)));
+
+/**
+ * An exported function whose last stage, after `stages` arguments, is Sync.
+ * A Flick caller is inside a Sync stage or `sync` and gets the value at
+ * once, as before; a caller from TypeScript is outside one and gets an
+ * `Effect` that reads the fiber's services, as its declared type says.
+ */
+export const syncExport = (f: unknown, stages: number): unknown => (arg: unknown) => {
+  if (typeof f !== "function") throw new TypeError("a Sync export is a function");
+  if (stages > 1) return syncExport(Reflect.apply(f, undefined, [arg]), stages - 1);
+  const call = (): unknown => Reflect.apply(f, undefined, [arg]);
+  return current === OUTSIDE ? sync(call) : call();
+};
 
 /** A runtime call in a Sync stage: runs at once with the context's services. */
 export const runIn = <A>(effect: Effect.Effect<A, unknown, unknown>): A =>

@@ -27,6 +27,9 @@ const PRIMITIVES: &[(&str, &str)] = &[
     ("Json", "unknown"),
 ];
 
+/// The module of `Stream`, which is Effect's `Stream` in TypeScript.
+const STREAM: &str = "Stream.Core";
+
 /// Prelude types projected to native Effect or TypeScript types, or not at all.
 const NATIVE: &[&str] = &[
     "List",
@@ -78,7 +81,7 @@ impl Projection<'_> {
 
     /// The type of a value of type `scheme`.
     pub fn value(&self, scheme: &Type) -> Result<String, String> {
-        self.value_in(scheme, &Vars::new())
+        self.value_in(&stages::exported(scheme), &Vars::new())
     }
 
     fn value_in(&self, scheme: &Type, outer: &Vars) -> Result<String, String> {
@@ -260,6 +263,11 @@ impl Projection<'_> {
             ));
         };
         let arg = |i: usize| self.ty(args[i], vars);
+        if module == STREAM && name == "Stream" && args.len() == 3 {
+            let r = self.row(args[0], vars)?;
+            let e = self.row(args[1], vars)?;
+            return Ok(format!("$Stream.Stream<{}, {e}, {r}>", arg(2)?));
+        }
         if module == PRELUDE {
             if let Some((_, ts)) = PRIMITIVES.iter().find(|(n, _)| n == name) {
                 return Ok((*ts).to_owned());
@@ -360,7 +368,7 @@ impl Projection<'_> {
     /// `path(module)` the import specifier of a module.
     pub fn imports(&self, path: &dyn Fn(&str) -> String) -> String {
         let mut out = format!(
-            "import type {{ Effect as $Effect, Option as $Option, Result as $Result, Layer as $Layer, Schema as $Schema }} from \"{RUNTIME}\";\n"
+            "import type {{ Effect as $Effect, Option as $Option, Result as $Result, Layer as $Layer, Schema as $Schema, Stream as $Stream, Context as $Context }} from \"{RUNTIME}\";\n"
         );
         for module in self.used.borrow().iter() {
             let _ = writeln!(
@@ -501,7 +509,7 @@ fn key(label: &str) -> String {
 
 mod declare;
 mod dts;
-mod stages;
+pub mod stages;
 
 pub use dts::{Facade, declaration_file, facade_files};
 #[cfg(test)]

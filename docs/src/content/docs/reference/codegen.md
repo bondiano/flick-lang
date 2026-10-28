@@ -243,10 +243,14 @@ exported values with their projected types (see [Public TypeScript interfaces](.
 | `Option a`, `Result e a` | Effect `Option.Option<A>`, `Result.Result<A, E>` |
 | `a -> b` | `(arg: A) => B`, one arrow per stage |
 | `a ->{r; e} b`, `Eff r e a` | `(arg: A) => Effect.Effect<B, E, R>`, `Effect.Effect<A, E, R>`; an empty row is `never` |
+| an exported function whose last stage is Sync, `a ->{Atom.Read;} b` | `(arg: A) => Effect.Effect<B, never, Atom.Read>`: a Flick caller still gets the value at once; a TypeScript one gets an Effect that reads the fiber's services, so a direct call no longer fails |
+| `Stream r e a` | Effect `Stream.Stream<A, E, R>`, the value itself |
 | a variant type, an error | a union of `{ readonly _tag: "<constructor id>"; readonly _0: … }` |
 | an opaque, abstract or built-in nominal type, a service | an interface branded with its qualified name |
+| `service S` | an interface branded with its name, and in `.d.ts` `$s_S: Context.Service<S, { op: … }>`, the key TypeScript provides an implementation by (`Effect.provideService(program, $s_S, impl)`) |
 | a class over types | the interface of its dictionary; a constrained value takes it first |
 | `forall a.` | a generic `<A>`; a polymorphic constant uses `never` |
+| `forall a b. a -> b -> …` | each type parameter on the first stage that takes it: `<A>(arg: A) => <B>(arg: B) => …`, so a later argument infers its own |
 
 `--emit-dts` (or `emit-dts = true`) writes `A/B.d.ts` beside each module: the
 same declarations, `export declare const` for every exported value and

@@ -3,7 +3,7 @@
 //! still infers its type. The JavaScript is the same; only the type moves.
 
 use super::{Projection, Vars, uncaptured};
-use crate::types::Type;
+use crate::types::{Effects, Type};
 
 impl Projection<'_> {
     /// The function `body` with each of `generics` (its Flick name and its
@@ -64,4 +64,79 @@ fn mentions(t: &Type, name: &str) -> bool {
     let mut found = false;
     t.visit(&mut |c| found |= matches!(c, Type::Var(v) if v == name));
     found
+}
+
+/// The arrows of an exported value a caller supplies one by one, when the
+/// last is a Sync stage: such an export is wrapped by `$rt.syncExport`,
+/// which runs it as an `Effect` outside a Flick sync context.
+pub fn sync_stages(scheme: &Type) -> Option<usize> {
+    let mut t = scheme;
+    let mut stages = 0;
+    loop {
+        match t {
+            Type::Forall { body, .. } => t = body,
+            Type::Captured { ty, .. } | Type::Bounded { ty, .. } => t = ty,
+            Type::Fun {
+                effects, result, ..
+            } => {
+                stages += 1;
+                match effects {
+                    None => t = result,
+                    Some(e) => return e.sync.then_some(stages),
+                }
+            }
+            _ => return None,
+        }
+    }
+}
+
+/// `scheme` with its last stage a runtime one when it is Sync: what an
+/// exported Sync function is called as from TypeScript.
+pub fn exported(scheme: &Type) -> Type {
+    match scheme {
+        Type::Forall {
+            vars,
+            constraints,
+            body,
+        } => Type::Forall {
+            vars: vars.clone(),
+            constraints: constraints.clone(),
+            body: Box::new(exported(body)),
+        },
+        Type::Captured {
+            ty,
+            captures,
+            value,
+        } => Type::Captured {
+            ty: Box::new(exported(ty)),
+            captures: captures.clone(),
+            value: *value,
+        },
+        Type::Bounded { ty, captures } => Type::Bounded {
+            ty: Box::new(exported(ty)),
+            captures: captures.clone(),
+        },
+        Type::Fun {
+            param,
+            effects: None,
+            result,
+        } => Type::Fun {
+            param: param.clone(),
+            effects: None,
+            result: Box::new(exported(result)),
+        },
+        Type::Fun {
+            param,
+            effects: Some(e),
+            result,
+        } if e.sync => Type::Fun {
+            param: param.clone(),
+            effects: Some(Box::new(Effects {
+                sync: false,
+                ..(**e).clone()
+            })),
+            result: result.clone(),
+        },
+        other => other.clone(),
+    }
 }
