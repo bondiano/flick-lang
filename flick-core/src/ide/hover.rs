@@ -7,6 +7,7 @@ use std::ptr;
 use super::{Ide, Symbol, Target, navigate::Source, tree};
 use crate::doc;
 use crate::iface::{Decl, Entity, Namespace};
+use crate::project::Analyzed;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -64,6 +65,51 @@ impl Ide<'_> {
                     .is_some_and(|t| t.text(&source.text) == name)
         })?;
         Some(as_written(sig.nodes().next()?, &source.text))
+    }
+
+    /// The signature of `method` as the instance `instance` of `m` writes it.
+    fn instance_signature(&self, m: &Analyzed, instance: &str, method: &str) -> Option<String> {
+        let info = m.typing.instances.iter().find(|i| i.name == instance)?;
+        let text = self.text(m.file);
+        let sig = tree::find(&m.tree, info.span)?
+            .nodes()
+            .filter(|n| n.kind == K::Members)
+            .flat_map(Node::nodes)
+            .find(|n| n.kind == K::Signature && tree::name_of(n, K::Ident, text) == Some(method))?;
+        Some(as_written(sig.nodes().next()?, text))
+    }
+
+    fn instance_method_hover(
+        &self,
+        file: FileId,
+        offset: u32,
+        module: &str,
+        instance: &str,
+        method: &str,
+    ) -> Option<(String, Option<String>)> {
+        let m = self.module(file)?;
+        // at a use the class is the method's; at the instance's own name, the instance's
+        let owner = match tree::innermost(m.typing.names.iter(), offset) {
+            Some((_, Ref::Method { module, .. })) => module,
+            _ => {
+                &m.typing
+                    .instances
+                    .iter()
+                    .find(|i| i.name == instance)?
+                    .class
+                    .0
+            }
+        };
+        let ty = match tree::innermost(m.typing.types.iter(), offset) {
+            Some((_, ty)) => show_type(ty),
+            None => self.instance_signature(m, instance, method)?,
+        };
+        let mut note = self
+            .source(owner)
+            .and_then(|source| documentation(&source, method))
+            .map_or_else(String::new, |doc| format!("{doc}\n\n"));
+        let _ = write!(note, "from `instance {instance}` in `{module}`");
+        Some((format!("{method} : {ty}"), Some(note)))
     }
 
     /// A keyword at `offset` that opens an expression: the type of the whole
@@ -414,20 +460,7 @@ impl Ide<'_> {
                 module,
                 instance,
                 method,
-            } => {
-                let m = self.module(file)?;
-                let (_, reference) = tree::innermost(m.typing.names.iter(), offset)?;
-                let Ref::Method { module: owner, .. } = reference else {
-                    return None;
-                };
-                let (_, ty) = tree::innermost(m.typing.types.iter(), offset)?;
-                let mut note = self
-                    .source(owner)
-                    .and_then(|source| documentation(&source, method))
-                    .map_or_else(String::new, |doc| format!("{doc}\n\n"));
-                let _ = write!(note, "from `instance {instance}` in `{module}`");
-                (format!("{method} : {}", show_type(ty)), Some(note))
-            }
+            } => self.instance_method_hover(file, offset, module, instance, method)?,
         };
         let mut text = format!("```flick\n{code}\n```");
         if let Some(note) = note {

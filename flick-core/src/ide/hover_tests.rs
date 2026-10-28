@@ -419,3 +419,78 @@ import App.Public as P exposing (MonadError(..), Box(..), Token(..))
         }
     }
 }
+
+#[test]
+fn hover_reaches_instance_method_names_and_qualified_constructor_patterns() {
+    let classes = "module App.Classes exposing (MonadState(..))
+
+class MonadState (m : Type -> Type) s | m -> s =
+  /// Runs a state step.
+  state : forall c a. (forall v. s^v -> (a, s)^(c + v))^c -> (m a)^c
+";
+    let boxed = "module App.Box exposing (Box(..))
+
+import App.Classes exposing (MonadState(..))
+
+type Box a = Box a
+
+instance MonadState Box Number =
+  state : forall c a. (forall v. Number^v -> (a, Number)^(c + v))^c -> (Box a)^c
+  let state step =
+    match step 1 with
+    | (a, _) -> Box a
+
+type Wrap (m : Type -> Type) a = Wrap (m a)
+
+instance MonadState m s => MonadState (Wrap m) s =
+  state : forall c a. (forall v. s^v -> (a, s)^(c + v))^c -> (Wrap m a)^c
+  let state step = Wrap (state step)
+";
+    let main = "module App.Main exposing (save)
+
+import App.Box exposing (Box)
+
+save : String ->{File.FileSystem; e} Unit
+let save path =
+  try File.write_text path \"x\" with
+  | File.WriteError _ -> ()
+";
+    let f = fixture_of(&[
+        ("src/App/Classes.fl", classes),
+        ("src/App/Box.fl", boxed),
+        ("src/App/Main.fl", main),
+    ]);
+    let ide = f.ide();
+    assert!(
+        ide.analysis.diagnostics.iter().all(Diagnostic::unnecessary),
+        "{:?}",
+        ide.analysis.diagnostics
+    );
+    let file = f.file("App.Box");
+    for (nth, instance, ty) in [
+        (0, "MonadState Box Number", "(Box a)^c"),
+        (1, "MonadState Box Number", "(Box a)^c"),
+        (2, "MonadState (Wrap m) s", "(Wrap m a)^c"),
+        (3, "MonadState (Wrap m) s", "(Wrap m a)^c"),
+    ] {
+        let start = f.at("App.Box", "state", nth);
+        let (markdown, range) = ide.hover(file, start + 1).expect("instance method hover");
+        assert_eq!(range, (start, start + 5));
+        assert!(markdown.contains(ty), "{markdown}");
+        assert!(markdown.contains("Runs a state step."), "{markdown}");
+        assert!(
+            markdown.contains(&format!("from `instance {instance}`")),
+            "{markdown}"
+        );
+    }
+    let file = f.file("App.Main");
+    let qualifier = f.at("App.Main", "File.WriteError", 0);
+    let (markdown, range) = ide
+        .hover(file, qualifier + 1)
+        .expect("pattern qualifier hover");
+    assert_eq!(range, (qualifier, qualifier + 4));
+    assert!(
+        markdown.starts_with("```flick\nmodule File\n```"),
+        "{markdown}"
+    );
+}

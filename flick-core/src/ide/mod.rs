@@ -30,6 +30,7 @@ use crate::iface::{Entity, Interface, Namespace};
 use crate::project::{Analysis, Analyzed};
 use crate::resolve::declarations;
 use crate::source::{FileId, SourceMap};
+use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{self, Dict, Ref};
 
@@ -197,7 +198,7 @@ impl Ide<'_> {
             }
             if !matches!(
                 node.kind,
-                K::NameExpr | K::NameType | K::ModulePath | K::ImportDecl
+                K::NameExpr | K::NameType | K::ConPat | K::ModulePath | K::ImportDecl
             ) {
                 continue;
             }
@@ -205,7 +206,7 @@ impl Ide<'_> {
                 .child_tokens()
                 .filter(|t| matches!(t.kind, K::Con | K::Ident))
                 .collect();
-            if matches!(node.kind, K::NameExpr | K::NameType) {
+            if matches!(node.kind, K::NameExpr | K::NameType | K::ConPat) {
                 names.pop();
             }
             if !names.iter().any(|t| t.start <= offset && offset < t.end) {
@@ -262,6 +263,9 @@ impl Ide<'_> {
         let token = tree::name_token_at(node, offset)?;
         let at = (token.start, token.end);
         let name = token.text(text);
+        if let Some(symbol) = instance_member(m, &path, token.start, name) {
+            return Some((symbol, at));
+        }
         match node.kind {
             K::VarPat => Some((
                 Symbol::Local {
@@ -296,6 +300,31 @@ impl Ide<'_> {
             _ => None,
         }
     }
+}
+
+/// A method's own name in an `instance`: at its signature or its `let`.
+fn instance_member(m: &Analyzed, path: &[&Node], start: u32, name: &str) -> Option<Symbol> {
+    let i = path.iter().rposition(|n| n.kind == K::Members)?;
+    let decl = path[i.checked_sub(1)?];
+    let member = path.get(i + 1)?;
+    let own = match member.kind {
+        K::Signature => member.child_tokens().find(|t| t.kind == K::Ident),
+        K::LetDecl => member
+            .nodes()
+            .next()?
+            .child_tokens()
+            .find(|t| t.kind == K::Ident),
+        _ => None,
+    }?;
+    if decl.kind != K::InstanceDecl || own.start != start {
+        return None;
+    }
+    let info = m.typing.instances.iter().find(|i| i.span == decl.range())?;
+    Some(Symbol::InstanceMethod {
+        module: m.name.clone(),
+        instance: info.name.clone(),
+        method: name.to_owned(),
+    })
 }
 
 fn entity(module: &str, namespace: Namespace, name: &str) -> Symbol {
