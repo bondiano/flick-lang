@@ -4,6 +4,7 @@ node_modules/
 /runtime/dist/
 /tools/dts-importer/dist/
 /tools/load/*/dist/
+/tools/load/*/.flick/
 /tools/dts-importer/.flick/
 /tools/bundle-size/none/.flick/
 /tools/bundle-size/fullstack/.flick/
