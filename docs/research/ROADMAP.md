@@ -18,6 +18,7 @@
 | [core-option-equality.md](core-option-equality.md) | равенство и хеш `Option`/`Result` `core` и Effect, импорты сборок, размер `_core/`; решение H6 |
 | [terminal-ui.md](terminal-ui.md) | атомы в терминале: адаптер Ink через `Ui.mount_with`, вес Ink, свой рендерер; решение L4 |
 | [alternative-backend.md](alternative-backend.md) | Go, Rust/C/LLVM, BEAM, JVM как второй backend; план — [ROADMAP-backend.md](ROADMAP-backend.md) |
+| [ROADMAP-formal.md](ROADMAP-formal.md) | формальная семантика λFlick, контракт рантайма λRT, тесты связи с кодом, доказательства в Lean 4 |
 
 Первоисточники верхнего уровня: <https://github.com/reatom/reatom/tree/v1001>, <https://v1001.reatom.dev/reference/react>,
 <https://effect.website/docs/v4/api/atom-react>, `effect@4.0.5` (`dist/reactivity/*.d.ts`), <https://github.com/megamaddu/purescript-react-basic-hooks>.
