@@ -322,8 +322,9 @@ beside it, which `flick build` compiles with `go build` into
 `flick-<entry>`. Only what `main` reaches is compiled, and a construct the
 target does not compile yet is `FLICK-P012` with what it names, never a
 runtime stub; for now that is everything of effects beyond direct calls (a
-`task`, a service, `try`, `scope`, `provide`), a lazy `for`, schemas and
-codecs, and a `foreign` binding without a Go implementation in the runtime.
+`task`, a service, `try`, `scope`, `provide`), a lazy `for` that reads
+services, schemas and codecs, `String.locale_compare` (Intl's collation),
+and a `foreign` binding without a Go implementation in the runtime.
 
 Values have the representation of the JS target, in Go terms:
 
@@ -335,7 +336,7 @@ Values have the representation of the JS target, in Go terms:
 | `String` | `string` holding WTF-8 |
 | `Bool`, `Unit` | `bool`, `flickrt.Unit` |
 | a tuple, a `List` | `[]flickrt.Value`; `[x, ...rest]` shares the storage of the list |
-| a record | `flickrt.Record`, a map copied by `{ r with … }` |
+| a record | `*flickrt.Record`, its labels in JS key order, copied by `{ r with … }` |
 | a constructor | `*flickrt.Data` with the tag of the JS target and its fields |
 | a function | `func(flickrt.Value) flickrt.Value` per stage |
 | a dictionary | `*flickrt.Dict`; superclasses and default methods made on first use |
@@ -348,7 +349,16 @@ SameValueZero; `show` writes a `Float` as JS `String` does
 writes. A `String` counts UTF-16 code units in `length`, indices and slices;
 a slice may cut a surrogate pair, `++` joins the halves back, strings order
 by code units, and writing to stdout replaces a lone half with U+FFFD as
-Node does. Case mapping is Go's simple one for now (`ß` stays `ß`).
+Node does. Normalization and case mapping (`ß` to `SS`, a final sigma,
+Turkish dotted i) follow tables `tools/go-unicode/gen.mjs` writes from
+Node's ICU; a `RegExp` runs on Go's RE2 engine, with positions in code
+units and JS's `$` replacement patterns, and syntax RE2 lacks (lookaround,
+backreferences) is a `RegExpError`.
+
+A `Seq` restarts on every iteration as on the JS target; a lazy `for` is
+one. A `HashMap` or `HashSet` lists its entries in the order Effect's HAMT
+walks them, by Effect's `Hash.hash` five bits at a time from the lowest,
+so an unsorted `to_list` prints the same on both targets.
 
 A top-level function is a Go function of its dictionaries and all its
 parameters; a full application calls it, and a partial one or a use as a
@@ -357,8 +367,11 @@ runs direct-style code as it is. The tail calls that are loops on the JS
 target (see [Recursion](#recursion-stack-safety-is-not-the-whole-cost))
 are loops in Go too: a self call is a `for` that assigns the next arguments
 and continues, and a group of functions calling each other is one Go
-function looping over a `switch` on the member to run. Other recursion,
-runtime recursion included, uses Go's stack, which grows up to 1 GB. Top-level values are assigned by one
+function looping over a `switch` on the member to run. Go also loops on a
+tail call whose last stage runs effects, which the JS target keeps on its
+heap step by step. Other recursion uses Go's stack, which grows up to 1 GB.
+A defect prints its message and the Flick lines of the stack, from `//line`
+directives the generated code carries. Top-level values are assigned by one
 function per module, run in the order the modules depend on each other.
 The cases of `tests/run` listed in `tests/run/portable.txt` run on both
 targets and give the same output.

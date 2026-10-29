@@ -1,6 +1,6 @@
 # Роадмап: Go-backend и переносимое ядро исполнения
 
-Статус: рабочий; сделаны G0–G4 (веха «Чистый Flick в Go»). Основание — [alternative-backend.md](alternative-backend.md); решения §6 приняты 2026-10-28 и закрывают вопросы его §11.
+Статус: рабочий; сделаны G0–G4 (веха «Чистый Flick в Go») и G10a — по решению владельца раньше G7; из G13 сделаны директивы `//line`. Основание — [alternative-backend.md](alternative-backend.md); решения §6 приняты 2026-10-28 и закрывают вопросы его §11.
 Язык не в релизе, поэтому изменения спецификации допустимы и deprecated-релизов не делаем.
 
 Обозначения: ✅ сделано (коммит), 🔶 частично / в работе, ⬜ не начато, ⏸ условный пункт (запускается только при выполнении условия).
@@ -63,7 +63,7 @@ GOOS=darwin GOARCH=arm64 flick build --release
 - AC: `==` — SameValueZero (`NaN == NaN`, `0 == -0`); `show` для `Float` пишет число как JS `String` (`20.009999999999998`, `Infinity`, `NaN`), а не как `strconv`.
 - AC: строковые операции считают UTF-16 code units как JS (`String.length`, индексы, срезы); тест на суррогатные пары; constant folding даёт одинаковый результат для обоих target.
 
-**G4. Stack safety.** ✅ `d25d989` (анализ хвостовых вызовов вынесен в `codegen/tail.rs`, общий для обоих backend; самохвостовой вызов — `for`, взаимный — одна функция с `switch`; как и на JS, только чистые вызовы, остальная рекурсия — на стеке Go до 1 ГБ; e2e `codegen/deep_recursion` на глубине 10⁷)
+**G4. Stack safety.** ✅ `d25d989` (анализ хвостовых вызовов вынесен в `codegen/tail.rs`, общий для обоих backend; самохвостовой вызов — `for`, взаимный — одна функция с `switch`; как и на JS, только чистые вызовы, остальная рекурсия — на стеке Go до 1 ГБ; e2e `codegen/deep_recursion` на глубине 10⁷; `008797e` — в Go циклом становится и хвостовой вызов, последняя стадия которого выполняет эффекты: на JS он не растит стек, но держит каждый шаг в куче, так что эффектная рекурсия там ограничена памятью, тест — 10⁶)
 - AC: самохвостовая рекурсия — цикл; взаимная хвостовая — трамплин или эквивалент; тест глубины 10⁷ на обоих target.
 
 **G5. Ядро эффектов.** ⬜
@@ -76,6 +76,7 @@ GOOS=darwin GOARCH=arm64 flick build --release
 - AC: отмена через точки прерывания (каждый runtime-вызов и I/O); неотменяемые участки — явные; тест на зависший I/O, прерываемый таймаутом.
 - AC: scope повторяет `runtime/src/owner.ts`: перестаёт принимать работу, останавливает и ждёт детей и supervisor-задачи, затем финализаторы в обратном порядке; финализатор не опережает ребёнка (тест).
 - AC: `Ref` атомарен; `modify` из 1000 goroutines даёт точную сумму; `go test -race` по runtime чистый.
+- AC: хвостовой вызов, ставший в Go циклом (G4), — точка прерывания: в голове цикла проверка отмены, иначе цикл без других runtime-вызовов нельзя прервать.
 
 **G7. Вертикальный срез и go/no-go.** ⬜
 - AC: пункты §10 исследования на настоящем коде Flick: ADT/match/замыкание/словарь; cold `task`; scoped-файл и сокет с освобождением при успехе, ошибке и отмене; parallel с ошибкой ветви; разделяемый `Ref`; хвостовая рекурсия; запуск без Node.
@@ -89,7 +90,7 @@ GOOS=darwin GOARCH=arm64 flick build --release
 - AC: `deriving Schema`, decode/encode, JSON-кодеки, тексты ошибок декодирования совпадают с JS-target; переносимы `tests/run/schema`.
 
 **G10. stdlib.** ⬜ (после G7; каждый подпункт — переносимые `tests/run/stdlib/*`)
-- **G10a.** Prelude, `List`, `Option`, `Result`, `String`, числа, `Seq`, коллекции, `Decimal`.
+- **G10a.** ✅ `915e69d` `634ab28` `4de9b39` `873b8c4` `f2f4f75` Prelude, `List`, `Option`, `Result`, `String`, числа, `Seq`, коллекции, `Decimal`. (Ленивый `for` и `Seq`; `HashMap`/`HashSet` в порядке HAMT по `Hash.hash` из Effect, тест `stdlib/hash_order`; `BigDecimal`/`BigInt`/`Duration` по корпусу результатов Effect из Node; запись хранит порядок ключей JS; нормализация и регистр по таблицам из ICU Node (`tools/go-unicode/gen.mjs`); `RegExp` на RE2. Переносимы `stdlib/{seqs,collections,monoids,decimals,hash_order}` и `stdlib/effect/{array,option,number,string,order,combine,hash_map,hash_set}`. Остались: `stdlib/seq` (Stream), `string_locale` (`locale_compare`, коллация Intl — `P012`), `Record`/`Duration`/`Function` целиком.)
 - **G10b.** `Cli` (блок `cli`, `Cli/Prompt`), файлы, env, процессы, сигналы и код выхода — аналог `Runner.Node`.
 - **G10c.** HTTP: `Http.Server`, `Http.Router`, клиент; e2e `tests/run/stdlib/http` и `server`.
 - **G10d.** `Sql` на PostgreSQL: запросы, транзакции, отмена; `tests/postgres` проходит на Go-target.
@@ -103,7 +104,7 @@ GOOS=darwin GOARCH=arm64 flick build --release
 - AC: файловые пути, сигналы и процессы на windows — явные тесты, а не только сборка.
 
 **G13. Инструменты.** ⬜
-- AC: `//line`-директивы: паника и стек указывают в `.fl`; `flick run` и `flick test` работают с Go-target.
+- AC: `//line`-директивы: паника и стек указывают в `.fl`; `flick run` и `flick test` работают с Go-target. (🔶 `78d5a25`: `//line` и строки `.fl` в стеке дефекта, `codegen/defect` переносим; `flick run`/`flick test` — нет.)
 - AC: решено и записано: требуется установленный Go или toolchain поставляется с `flick`.
 
 ### Трек N — свой runtime + C/LLVM ⏸
