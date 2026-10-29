@@ -84,3 +84,29 @@ fn what_the_target_cannot_run_yet_is_reported() {
         ["`App.now` (foreign `Date.now` global) is not available on the go target"]
     );
 }
+
+#[test]
+fn tail_calls_jump_instead_of_calling() {
+    let (files, errors) = compile(
+        "module App exposing (main)\n\
+         sum : Int -> Int -> Int\nlet rec sum acc n = if n == 0 then acc else sum (acc + n) (n - 1)\n\
+         rec {\n\
+         even : Int -> Bool\nlet even n = n == 0 || odd (n - 1)\n\
+         odd : Int -> Bool\nlet odd n = n != 0 && even (n - 1)\n\
+         }\n\
+         main : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (sum 0 3) ++ show (even 4))\n",
+    );
+    assert!(errors.is_empty(), "{errors:?}");
+    let code = file(&files, "m_App.go");
+    let sum = &code[code.find("func F_App__sum(").expect("sum")..];
+    let sum = &sum[..sum.find("\n}\n").expect("end of sum")];
+    assert!(
+        sum.contains("for {") && sum.contains("continue") && !sum.contains("F_App__sum(f"),
+        "{sum}"
+    );
+    assert!(
+        code.contains("func G_App__even(state int, v0 flickrt.Value)"),
+        "{code}"
+    );
+    assert!(code.contains("return G_App__even(1, "), "{code}");
+}

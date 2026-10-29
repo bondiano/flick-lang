@@ -2,6 +2,7 @@
 //! needs go into the current statement list before it.
 
 use super::{Gen, indent, names};
+use crate::codegen::tail::{Callee, Target};
 use crate::ir::{BinOp, Expr, ExprKind, Lit, Pat, Stmt};
 use crate::numeric::{Arith, Num};
 
@@ -93,7 +94,7 @@ impl Gen<'_> {
             ExprKind::Con(_) | ExprKind::App { .. } => self.app(e),
             ExprKind::Dicts(inner, dicts) => self.given(inner, dicts),
             ExprKind::Abstract(shown, inner) => self.abstraction(shown, inner),
-            ExprKind::Lambda { params, body } => self.lambda(params, body),
+            ExprKind::Lambda { params, body } => self.lambda(params, body, None),
             ExprKind::Block(stmts, result) => {
                 for stmt in stmts {
                     self.stmt(stmt);
@@ -210,6 +211,10 @@ impl Gen<'_> {
                 let s = self.spill(s);
                 self.arms(&s, arms, None);
             }
+            ExprKind::Binary(op @ (BinOp::And | BinOp::Or), lhs, rhs) if self.jumps_in(rhs) => {
+                self.tail_logic(*op, lhs, rhs);
+            }
+            _ if self.jump(e) => {}
             _ => {
                 let v = self.expr(e);
                 self.buf.push(format!("return {v}"));
@@ -300,14 +305,24 @@ impl Gen<'_> {
                 self.destructure(pat, &v);
             }
             Stmt::Fun {
-                name, dicts, value, ..
+                name,
+                rec,
+                dicts,
+                value,
             } => {
                 let l = names::local(name);
                 // declared first: a recursive function refers to itself
                 self.buf.push(format!("var {l} flickrt.Value\n_ = {l}"));
                 let mark = self.givens.len();
                 let ds = self.bind_givens(dicts);
-                let (mut stmts, v) = self.block(|g| g.expr(value));
+                let target = rec.then(|| Target {
+                    callee: Callee::Local(name.clone()),
+                    dicts: dicts.clone(),
+                });
+                let (mut stmts, v) = self.block(|g| match &value.kind {
+                    ExprKind::Lambda { params, body } => g.lambda(params, body, target),
+                    _ => g.expr(value),
+                });
                 self.givens.truncate(mark);
                 if ds.is_empty() {
                     self.buf.extend(stmts);

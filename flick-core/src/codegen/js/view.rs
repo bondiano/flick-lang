@@ -4,8 +4,8 @@
 
 use std::mem;
 
-use super::function::{self_call, tail_callees};
-use super::{Gen, Target};
+use super::Gen;
+use crate::codegen::tail::{Target, self_call, tail_callees};
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Param, Pat};
 use crate::opt::uses;
 

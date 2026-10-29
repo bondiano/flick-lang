@@ -5,9 +5,9 @@
 use std::mem;
 
 use super::expr::{arrow_body, unmarked};
-use super::{Callee, Gen, Tail, Target, indent, names, view};
+use super::{Gen, Tail, indent, names, view};
+use crate::codegen::tail::{Target, self_call, tail_callees};
 use crate::ir::{BinOp, Expr, ExprKind, Lit, Param, Pat, Stage};
-use crate::types::Dict;
 
 impl Gen<'_> {
     /// A definition's value: a function of its dictionaries, if any, around
@@ -363,63 +363,7 @@ pub(super) fn binds(params: &[Param]) -> Vec<Option<String>> {
         .collect()
 }
 
-/// The member a full pure call of one of `members` calls, and its arguments.
-pub(super) fn self_call<'e>(
-    e: &'e Expr,
-    members: &[(Target, usize)],
-) -> Option<(usize, Vec<&'e Expr>)> {
-    let mut args = Vec::new();
-    let mut head = e;
-    while let ExprKind::App {
-        func,
-        arg,
-        stage: Stage::Pure,
-        arg_first: false,
-    } = &head.kind
-    {
-        args.push(&**arg);
-        head = func;
-    }
-    args.reverse();
-    let mut dicts = Vec::new();
-    if let ExprKind::Dicts(inner, given) = &head.kind {
-        for d in given {
-            match d {
-                Dict::Given(name) => dicts.push(name.clone()),
-                _ => return None,
-            }
-        }
-        head = inner;
-    }
-    let callee = match &head.kind {
-        ExprKind::Local(name) => Callee::Local(name.clone()),
-        ExprKind::Global { module, name } => Callee::Global(format!("{module}.{name}")),
-        _ => return None,
-    };
-    let target = Target { callee, dicts };
-    let j = members
-        .iter()
-        .position(|(t, arity)| *t == target && *arity == args.len())?;
-    Some((j, args))
-}
-
 /// Whether a tail position of `body` jumps to a member of `tail`.
 fn has_tail_call(body: &Expr, tail: &Tail) -> bool {
     !tail_callees(body, &tail.members).is_empty()
-}
-
-/// The members of `members` a tail position of `body` calls in full.
-pub(super) fn tail_callees(body: &Expr, members: &[(Target, usize)]) -> Vec<usize> {
-    let mut out = Vec::new();
-    let mut pending = vec![body];
-    while let Some(e) = pending.pop() {
-        match &e.kind {
-            ExprKind::Block(_, result) => pending.push(result),
-            ExprKind::If(_, t, f) => pending.extend([&**t, &**f]),
-            ExprKind::Match(_, arms) => pending.extend(arms.iter().map(|a| &a.body)),
-            ExprKind::Binary(BinOp::And | BinOp::Or, _, r) => pending.push(r),
-            _ => out.extend(self_call(e, members).map(|(j, _)| j)),
-        }
-    }
-    out
 }

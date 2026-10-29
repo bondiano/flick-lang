@@ -27,6 +27,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write;
 use std::mem;
 
+use super::tail::{Callee, Target};
 use super::ts::{Projection, reexports};
 use super::{Options, Output, names};
 use crate::ir::{ItemKind, Label, Module};
@@ -275,21 +276,6 @@ struct Tail {
     /// The offset variable of each position holding a walked list (see
     /// [`view`]).
     offsets: Vec<Option<String>>,
-}
-
-/// A function a tail call may jump to: its name and the dictionaries of its
-/// constraints, by the names `Dict::Given` gives them, which a call passes
-/// on.
-#[derive(Clone, PartialEq, Eq)]
-struct Target {
-    callee: Callee,
-    dicts: Vec<String>,
-}
-
-#[derive(Clone, PartialEq, Eq)]
-enum Callee {
-    Local(String),
-    Global(String),
 }
 
 #[allow(

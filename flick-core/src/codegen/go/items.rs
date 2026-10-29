@@ -3,8 +3,9 @@
 
 use std::fmt::Write;
 
-use super::{Gen, Shape, indent, names, param_list};
+use super::{Gen, Shape, indent, loops, names, param_list};
 use crate::codegen::names as js_names;
+use crate::codegen::tail::{Callee, Target};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
 use crate::source::Span;
 use crate::types::{Constructor, Dict, InstanceInfo, Rep, default_method};
@@ -17,6 +18,13 @@ impl Gen<'_> {
     pub(super) fn module(&mut self, module: &Module, order: &[usize]) -> String {
         let mut decls = Vec::new();
         let mut init = Vec::new();
+        (self.groups, self.grouped) = loops::groups(self.module, &module.items);
+        // every member of a group reaches the others: all are reached or none
+        for g in 0..self.groups.len() {
+            if order.contains(&self.groups[g].first()) {
+                decls.push(self.group(g, &module.items));
+            }
+        }
         for &i in order {
             self.item(&module.items[i], &mut decls, &mut init);
         }
@@ -105,12 +113,14 @@ impl Gen<'_> {
         let mut heads = self.bind_givens(dicts);
         let stmts = match &body.kind {
             ExprKind::Lambda { params, body } => {
-                let (stmts, ()) = self.block(|g| {
-                    let bound = g.bind_params(params);
-                    heads.extend(bound);
-                    g.tail_expr(body);
-                });
-                stmts
+                let target = Target {
+                    callee: Callee::Global(format!("{}.{name}", self.module)),
+                    dicts: dicts.to_vec(),
+                };
+                let (bound, stmts) = self.function_body(params, body, Some(target));
+                let grouped = self.group_call(name, &bound);
+                heads.extend(bound);
+                grouped.map_or(stmts, |call| vec![call])
             }
             _ => self.block(|g| g.tail_expr(body)).0,
         };

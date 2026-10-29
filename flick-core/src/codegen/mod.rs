@@ -7,6 +7,7 @@ pub mod go;
 mod js;
 mod names;
 pub mod sourcemap;
+pub mod tail;
 pub mod ts;
 
 pub use js::{direct_methods, exported_worker, js, relative};

@@ -353,7 +353,12 @@ Node does. Case mapping is Go's simple one for now (`ß` stays `ß`).
 A top-level function is a Go function of its dictionaries and all its
 parameters; a full application calls it, and a partial one or a use as a
 value makes the curried function. A runtime call is a plain Go call: Go
-runs direct-style code as it is. Top-level values are assigned by one
+runs direct-style code as it is. The tail calls that are loops on the JS
+target (see [Recursion](#recursion-stack-safety-is-not-the-whole-cost))
+are loops in Go too: a self call is a `for` that assigns the next arguments
+and continues, and a group of functions calling each other is one Go
+function looping over a `switch` on the member to run. Other recursion,
+runtime recursion included, uses Go's stack, which grows up to 1 GB. Top-level values are assigned by one
 function per module, run in the order the modules depend on each other.
 The cases of `tests/run` listed in `tests/run/portable.txt` run on both
 targets and give the same output.

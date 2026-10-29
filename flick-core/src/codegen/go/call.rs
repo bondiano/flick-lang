@@ -5,6 +5,7 @@
 use std::slice;
 
 use super::{Gen, Shape, indent, names, param_list};
+use crate::codegen::tail::Target;
 use crate::ir::{Expr, ExprKind, Lit, Param, Pat};
 use crate::types::{Dict, Rep};
 
@@ -32,7 +33,9 @@ impl Gen<'_> {
     pub(super) fn abstraction(&mut self, shown: &[String], inner: &Expr) -> String {
         let mark = self.givens.len();
         let dicts = self.bind_givens(shown);
+        let tail = self.tail.take();
         let (mut stmts, v) = self.block(|g| g.expr(inner));
+        self.tail = tail;
         self.givens.truncate(mark);
         let takes: Vec<String> = dicts
             .iter()
@@ -223,12 +226,13 @@ impl Gen<'_> {
     }
 
     /// A curried function: one Go function per stage, the body at the last.
-    pub(super) fn lambda(&mut self, params: &[Param], body: &Expr) -> String {
-        let (stmts, heads) = self.block(|g| {
-            let heads = g.bind_params(params);
-            g.tail_expr(body);
-            heads
-        });
+    pub(super) fn lambda(
+        &mut self,
+        params: &[Param],
+        body: &Expr,
+        target: Option<Target>,
+    ) -> String {
+        let (heads, stmts) = self.function_body(params, body, target);
         let mut text = format!(
             "func({}) flickrt.Value {{\n{}}}",
             param_list(&heads[heads.len() - 1..]),

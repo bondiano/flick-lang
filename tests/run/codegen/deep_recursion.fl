@@ -1,0 +1,48 @@
+// Tail recursion ten million deep runs in constant stack on every target:
+// a function calling itself, through its own dictionaries, behind `&&`
+// and `||`, a local `rec` function, and a group of three functions calling
+// each other. A list is walked by its rest without copying it.
+module App.Main exposing (main)
+
+depth : Int
+let depth = 10000000
+
+sum_to : Int -> Int -> Int
+let rec sum_to acc n =
+  if n == 0 then acc else sum_to (acc + n) (n - 1)
+
+steps : Eq a => Int -> a -> Int
+let rec steps n x =
+  if n == 0 then 0 else if x == x then steps (n - 1) x else n
+
+all_below : Int -> Int -> Bool
+let rec all_below limit n =
+  n == 0 || n < limit && all_below limit (n - 1)
+
+rec {
+  ping : Int -> Int -> Int
+  let ping acc n = if n == 0 then acc else pong (acc + 1) (n - 1)
+
+  pong : Int -> Int -> Int
+  let pong acc n = if n == 0 then acc else pang acc (n - 1)
+
+  pang : Int -> Int -> Int
+  let pang acc n = if n == 0 then acc else ping (acc + 2) (n - 1)
+}
+
+sum_list : Int -> List Int -> Int
+let rec sum_list acc xs =
+  match xs with
+  | [] -> acc
+  | [x, ...rest] -> sum_list (acc + x) rest
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line (show (sum_to 0 depth))
+  Platform.stdout_line (show (steps depth "a") ++ " " ++ show (steps depth 1.5))
+  Platform.stdout_line (show (all_below (depth + 1) depth))
+  Platform.stdout_line (show (ping 0 depth))
+  count : Int -> Int -> Int
+  let rec count n acc = if n == 0 then acc else count (n - 1) (acc + 2)
+  Platform.stdout_line (show (count depth 0))
+  Platform.stdout_line (show (sum_list 0 (List.range 0 1000000)))

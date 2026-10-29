@@ -15,6 +15,7 @@ mod expr;
 mod foreign;
 mod generate;
 mod items;
+mod loops;
 mod names;
 mod pattern;
 mod reach;
@@ -253,6 +254,12 @@ struct Gen<'a> {
     modules: BTreeSet<String>,
     /// What the target cannot compile, and where.
     errors: Vec<(String, Option<Span>)>,
+    /// The loop a tail call in the code being emitted jumps in.
+    tail: Option<loops::Tail>,
+    /// The groups of mutually tail-recursive functions of the module.
+    groups: Vec<loops::Group>,
+    /// The group and member of each grouped function, by name.
+    grouped: HashMap<String, (usize, usize)>,
 }
 
 impl<'a> Gen<'a> {
@@ -271,6 +278,9 @@ impl<'a> Gen<'a> {
             collector: None,
             modules: BTreeSet::new(),
             errors: Vec::new(),
+            tail: None,
+            groups: Vec::new(),
+            grouped: HashMap::new(),
         }
     }
 

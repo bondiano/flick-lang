@@ -34,6 +34,12 @@ pub fn func(module: &str, name: &str) -> String {
     top("F", module, name)
 }
 
+/// The function running a group of mutually tail-recursive functions,
+/// named after its first member.
+pub fn group(module: &str, first: &str) -> String {
+    top("G", module, first)
+}
+
 /// The dictionary of an instance, or the function of its context making it.
 pub fn instance(module: &str, name: &str) -> String {
     top("I", module, name)
