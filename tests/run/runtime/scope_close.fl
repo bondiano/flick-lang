@@ -29,7 +29,8 @@ failing : Unit ->{; Oops} Float
 let failing () =
   scope {
     let _c = acquire "c"
-    Scope.add_finalizer_exit (fun cause -> say ("finalizer saw a failure: " ++ show (Option.is_some cause)))
+    Scope.add_finalizer_exit
+      (fun cause -> say ("finalizer saw a failure: " ++ show (Option.is_some cause)))
     from_result (Err (Oops "body failed"))
   }
 
@@ -46,7 +47,10 @@ let nested () =
 
 bracketed : Unit ->{; Oops} String
 let bracketed () =
-  Resource.bracket (task { say "bracket acquire"; "file" }) (fun f -> from_result (Err (Oops ("use of " ++ f)))) (fun f -> say ("bracket release " ++ f))
+  Resource.bracket
+    (task { say "bracket acquire"; "file" })
+    (fun f -> from_result (Err (Oops ("use of " ++ f))))
+    (fun f -> say ("bracket release " ++ f))
 
 main : Unit ->{; AppError} Unit
 let main () =

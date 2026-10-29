@@ -36,7 +36,8 @@ let main () =
   say (show failed)
   let gate = Latch.make false
   scope owner {
-    let _ = Fiber.spawn owner quiet (task { Latch.when_open gate (task { say "through the gate" }) })
+    let _ =
+      Fiber.spawn owner quiet (task { Latch.when_open gate (task { say "through the gate" }) })
     nap 5
     say ("open before: " ++ show (Latch.is_open gate))
     say ("opened: " ++ show (Latch.open gate))
