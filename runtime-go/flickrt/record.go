@@ -73,8 +73,35 @@ func (r *Record) put(k string, v Value) {
 	r.vals = slices.Insert(r.vals, at, v)
 }
 
-// newRecord is an empty record with room for `n` fields.
+// newRecord is an empty record with room for `n` fields; a small one is a
+// single allocation, as records are built on every request.
 func newRecord(n int) *Record {
+	switch {
+	case n <= 2:
+		b := &struct {
+			r Record
+			k [2]string
+			v [2]Value
+		}{}
+		b.r = Record{b.k[:0], b.v[:0]}
+		return &b.r
+	case n <= 4:
+		b := &struct {
+			r Record
+			k [4]string
+			v [4]Value
+		}{}
+		b.r = Record{b.k[:0], b.v[:0]}
+		return &b.r
+	case n <= 8:
+		b := &struct {
+			r Record
+			k [8]string
+			v [8]Value
+		}{}
+		b.r = Record{b.k[:0], b.v[:0]}
+		return &b.r
+	}
 	return &Record{make([]string, 0, n), make([]Value, 0, n)}
 }
 

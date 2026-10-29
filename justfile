@@ -84,11 +84,12 @@ load-json-build:
     cargo build -p flick
     cd tools/load/json && ../../../target/debug/flick build --out-dir dist/js && ../../../target/debug/flick build --emit go --out-dir dist/go
 
-# Closed-loop HTTP load on the JSON server built for `target` (js or go), then its startup time and size
-load-json target="go" soak="30" port="3920" workers="8": load-json-build
-    if [ "{{target}}" = go ]; then server="tools/load/json/dist/go/flick-server"; else server="node tools/load/json/dist/js/flick-server.js"; fi; \
+# Closed-loop HTTP load on the JSON server built for `target` (js or go), then its startup time and size;
+# the server and the client run on separate CPUs (`taskset` lists), so the client does not take the server's
+load-json target="go" soak="30" port="3920" workers="8" server_cpus="0-7" client_cpus="8-31": load-json-build
+    if [ "{{target}}" = go ]; then server="taskset -c {{server_cpus}} tools/load/json/dist/go/flick-server"; else server="taskset -c {{server_cpus}} node tools/load/json/dist/js/flick-server.js"; fi; \
       PORT={{port}} $server & pid=$!; sleep 2; \
-      node tools/load/index.mjs --url "http://127.0.0.1:{{port}}/item/{id}" --expect '"item {id}"' --soak {{soak}} --workers {{workers}} --pid $pid; \
+      taskset -c {{client_cpus}} node tools/load/index.mjs --url "http://127.0.0.1:{{port}}/item/{id}" --expect '"item {id}"' --soak {{soak}} --workers {{workers}} --pid $pid; \
       status=$?; kill $pid; \
       node tools/load/startup.mjs --url "http://127.0.0.1:{{port}}/item/x" -- $server; \
       if [ "{{target}}" = go ]; then du -b tools/load/json/dist/go/flick-server; else du -sb tools/load/json/dist/js; fi; \

@@ -129,6 +129,15 @@ func statusOf(c *Cause) int {
 	return 500
 }
 
+// servedRequest is a request with the fiber its handler runs in.
+type servedRequest struct {
+	state   fiberState
+	fiber   Fiber
+	request ServerRequest
+}
+
+func (q *servedRequest) interrupt() { q.state.interrupt(0) }
+
 // HttpServer is a server listening in the owner of a scope.
 type HttpServer struct {
 	srv      *http.Server
@@ -145,11 +154,12 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 	concurrent.Store(true)
 	serving := *fb
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		state := newState()
-		stop := context.AfterFunc(r.Context(), func() { state.interrupt(0) })
-		inner := serving
-		inner.state = state
-		out, cause := catch(func() Value { return Run(&inner, Apply(handler, &ServerRequest{r: r})) })
+		// one allocation for what a request's fiber needs
+		q := &servedRequest{fiber: serving, request: ServerRequest{r: r}}
+		q.state.id, q.state.signal = fibers.Add(1), make(chan struct{})
+		q.fiber.state = &q.state
+		stop := context.AfterFunc(r.Context(), q.interrupt)
+		out, cause := catch(func() Value { return Run(&q.fiber, Apply(handler, &q.request)) })
 		stop()
 		if cause != nil {
 			w.WriteHeader(statusOf(cause))
