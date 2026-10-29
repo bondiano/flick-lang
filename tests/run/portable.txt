@@ -78,5 +78,7 @@ runtime/scoped_file
 schema/json_wire
 schema/derive
 stdlib/http/headers
+stdlib/http/values
+stdlib/effect/schema_http
 stdlib/http/serve
 runtime/slice

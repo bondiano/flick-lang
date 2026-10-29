@@ -27,6 +27,8 @@ codecTaggedOption CodecTaggedOption
 codecTransformPure CodecTransformPure
 codecTransformResult CodecTransformResult
 codecCheckWhole CodecCheckWhole
+codecNumberFinite CodecNumberFinite
+codecJsonSchema CodecJsonSchema
 fileOpen *FileOpen
 fileReadHandle *FileReadHandle
 fileRead *FileRead

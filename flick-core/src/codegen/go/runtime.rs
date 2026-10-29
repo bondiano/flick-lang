@@ -19,6 +19,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/codec.go"),
     ),
     (
+        "codec_tree.go",
+        include_str!("../../../../runtime-go/flickrt/codec_tree.go"),
+    ),
+    (
         "collate.go",
         include_str!("../../../../runtime-go/flickrt/collate.go"),
     ),
@@ -103,8 +107,36 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/http.go"),
     ),
     (
+        "http_codecs.go",
+        include_str!("../../../../runtime-go/flickrt/http_codecs.go"),
+    ),
+    (
+        "http_cookies.go",
+        include_str!("../../../../runtime-go/flickrt/http_cookies.go"),
+    ),
+    (
+        "http_cookies_parse.go",
+        include_str!("../../../../runtime-go/flickrt/http_cookies_parse.go"),
+    ),
+    (
+        "http_etag.go",
+        include_str!("../../../../runtime-go/flickrt/http_etag.go"),
+    ),
+    (
         "http_headers.go",
         include_str!("../../../../runtime-go/flickrt/http_headers.go"),
+    ),
+    (
+        "http_mime.go",
+        include_str!("../../../../runtime-go/flickrt/http_mime.go"),
+    ),
+    (
+        "http_url.go",
+        include_str!("../../../../runtime-go/flickrt/http_url.go"),
+    ),
+    (
+        "http_urlparams.go",
+        include_str!("../../../../runtime-go/flickrt/http_urlparams.go"),
     ),
     (
         "json.go",
@@ -121,6 +153,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "list.go",
         include_str!("../../../../runtime-go/flickrt/list.go"),
+    ),
+    (
+        "mime_types.go",
+        include_str!("../../../../runtime-go/flickrt/mime_types.go"),
     ),
     (
         "number.go",
@@ -205,6 +241,18 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "unicode_tables.go",
         include_str!("../../../../runtime-go/flickrt/unicode_tables.go"),
+    ),
+    (
+        "url_encoding.go",
+        include_str!("../../../../runtime-go/flickrt/url_encoding.go"),
+    ),
+    (
+        "url_host.go",
+        include_str!("../../../../runtime-go/flickrt/url_host.go"),
+    ),
+    (
+        "url_parse.go",
+        include_str!("../../../../runtime-go/flickrt/url_parse.go"),
     ),
     (
         "value.go",

@@ -1,0 +1,131 @@
+# The HTTP modules: servers, routes, and the values of requests and
+# responses.
+
+[@flick-lang/runtime/effect/http/HttpServer]
+flickServe *HttpServe
+flickAddress HttpAddress
+
+[@flick-lang/runtime/effect/http/HttpRouter]
+flickRoute HttpRoute
+flickRouter *HttpRouter
+
+[@flick-lang/runtime/effect/http/HttpServerRequest]
+flickSchemaBodyJson *RequestSchemaBodyJson
+
+[@flick-lang/runtime/effect/http/HttpServerResponse]
+flickSchemaJson *ResponseSchemaJson
+flickText ResponseText
+flickEmpty ResponseEmpty
+flickJson *ResponseJson
+
+[@flick-lang/runtime/effect/http/Etag]
+flickLayer EtagLayer
+flickLayerWeak EtagLayerWeak
+
+[@flick-lang/runtime/effect/http/HttpPlatform]
+flickNode HttpEmptyLayer
+
+[@flick-lang/runtime/effect/http/Headers]
+empty HeadersEmpty
+fromInput HeadersFromInput
+has HeadersHas
+get HeadersGet
+set HeadersSet
+setAll HeadersSetAll
+merge HeadersMerge
+remove HeadersRemove
+removeMany HeadersRemoveMany
+flickRedact HeadersRedact
+isRedactedName HeadersIsRedactedName
+flickWithRedactedNames *HeadersWithRedactedNames
+flickToList HeadersToList
+flickToUnknown HeadersToUnknown
+Equivalence HeadersEquivalence
+flickShow HeadersShow
+
+[@flick-lang/runtime/effect/http/UrlParams]
+make UrlParamsMake
+fromInput UrlParamsMake
+empty UrlParamsEmpty
+getAll UrlParamsGetAll
+getFirst UrlParamsGetFirst
+getLast UrlParamsGetLast
+set UrlParamsSet
+transform UrlParamsTransform
+setAll UrlParamsSetAll
+append UrlParamsAppend
+appendAll UrlParamsAppendAll
+remove UrlParamsRemove
+toString UrlParamsToString
+flickToRecord UrlParamsToRecord
+flickRedact UrlParamsRedact
+isRedactedName UrlParamsIsRedactedName
+flickRedactUrl UrlParamsRedactUrl
+flickDefaultRedactedNames UrlParamsDefaultRedactedNames
+flickWithRedactedNames *UrlParamsWithRedactedNames
+flickToList UrlParamsToList
+flickToUnknown UrlParamsToUnknown
+Equivalence UrlParamsEquivalence
+flickShow UrlParamsShow
+
+[@flick-lang/runtime/effect/http/Url]
+flickFromString UrlFromString
+flickMake UrlMake
+flickHref UrlHref
+setHash UrlSetHash
+setHost UrlSetHost
+setHostname UrlSetHostname
+flickSetHref UrlSetHref
+setPassword UrlSetPassword
+setPathname UrlSetPathname
+setPort UrlSetPort
+setProtocol UrlSetProtocol
+setSearch UrlSetSearch
+setUsername UrlSetUsername
+setUrlParams UrlSetUrlParams
+urlParams UrlUrlParams
+modifyUrlParams UrlModifyUrlParams
+flickShow UrlShow
+
+[@flick-lang/runtime/effect/http/Mime]
+getType MimeGetType
+getExtension MimeGetExtension
+flickGetAllExtensions MimeGetAllExtensions
+
+[@flick-lang/runtime/effect/http/Cookies]
+empty CookiesEmpty
+isEmpty CookiesIsEmpty
+fromSetCookie CookiesFromSetCookie
+fromIterable CookiesFromIterable
+flickFromReadonlyRecord CookiesFromReadonlyRecord
+flickMakeCookie CookiesMakeCookie
+setCookie CookiesSetCookie
+setAllCookie CookiesSetAllCookie
+merge CookiesMerge
+remove CookiesRemove
+get CookiesGet
+flickGetValue CookiesGetValue
+flickSet CookiesSet
+flickSetAll CookiesSetAll
+flickExpireCookie CookiesExpireCookie
+serializeCookie CookiesSerializeCookie
+toCookieHeader CookiesToCookieHeader
+flickToRecord CookiesToRecord
+toSetCookieHeaders CookiesToSetCookieHeaders
+flickParseHeader CookiesParseHeader
+flickName CookiesName
+flickValue CookiesValue
+flickShowCookie CookiesShowCookie
+flickShowCookies CookiesShowCookies
+
+[@flick-lang/runtime/effect/SchemaHttp]
+flickHeaders CodecHeaders
+flickUrlParams CodecUrlParams
+flickCookie CodecCookie
+flickCookies CodecCookies
+flickUrl CodecUrl
+flickFromUrlParams CodecFromUrlParams
+flickFromCookies CodecFromCookies
+flickJsonUrlParamsField CodecJsonUrlParamsField
+flickFromUrlSearchParams CodecFromUrlSearchParams
+flickFromFormData CodecFromFormData
