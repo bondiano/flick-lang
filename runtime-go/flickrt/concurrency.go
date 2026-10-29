@@ -11,10 +11,25 @@ import (
 // failed with; interruption is cooperative, at checkpoints and blocking
 // waits.
 type child struct {
-	state *fiberState
-	done  chan struct{}
-	value Value
-	cause *Cause
+	state     *fiberState
+	done      chan struct{}
+	value     Value
+	cause     *Cause
+	mu        sync.Mutex
+	ended     bool
+	observers []func(*child) // run when it ends, before anyone awaiting it resumes
+}
+
+// observe runs `f` when the child ends, or now if it has.
+func (c *child) observe(f func(*child)) {
+	c.mu.Lock()
+	if !c.ended {
+		c.observers = append(c.observers, f)
+		c.mu.Unlock()
+		return
+	}
+	c.mu.Unlock()
+	f(c)
 }
 
 // fork runs `task` as a child of `fb` in `owner`, calling `ended` when it
@@ -25,6 +40,13 @@ func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
 	inner.state, inner.owner = c.state, owner
 	go func() {
 		c.value, c.cause = catch(func() Value { return Run(&inner, task) })
+		c.mu.Lock()
+		c.ended = true
+		observers := c.observers
+		c.mu.Unlock()
+		for _, f := range observers {
+			f(c)
+		}
 		close(c.done)
 		if ended != nil {
 			ended(c)

@@ -70,8 +70,8 @@ let sets () =
   let run_options = { propagateInterruption = false; startImmediately = false }
   let joined = scope s {
     let set : FiberSet.FiberSet s {Boom} String = FiberSet.make ()
-    let one = FiberSet.run run_options (after ms1 "one") set
-    let _ = FiberSet.run run_options (after ms1 "two") set
+    let one = FiberSet.run run_options (after ms20 "one") set
+    let _ = FiberSet.run run_options (after ms20 "two") set
     Platform.stdout_line ("set size: " ++ show (FiberSet.size set))
     FiberSet.await_empty set
     Platform.stdout_line
@@ -93,7 +93,7 @@ let sets () =
   scope s {
     let map : FiberMap.FiberMap s String {Boom} String = FiberMap.make ()
     let first = FiberMap.run map_options "k" (after ms50 "first") map
-    let _ = FiberMap.run map_options "k" (after ms1 "second") map
+    let _ = FiberMap.run map_options "k" (after ms50 "second") map
     Platform.stdout_line ("map replaced: " ++ ended (Fiber.await_ first))
     Platform.stdout_line
       ("map has: " ++ show (FiberMap.has "k" map, FiberMap.has "x" map, FiberMap.size map))
@@ -113,7 +113,7 @@ let sets () =
   scope s {
     let handle : FiberHandle.FiberHandle s {Boom} String = FiberHandle.make ()
     let first = FiberHandle.run map_options (after ms50 "first") handle
-    let second = FiberHandle.run map_options (after ms1 "second") handle
+    let second = FiberHandle.run map_options (after ms50 "second") handle
     Platform.stdout_line ("handle replaced: " ++ ended (Fiber.await_ first))
     Platform.stdout_line ("handle get: " ++ show (Option.is_some (FiberHandle.get handle)))
     FiberHandle.await_empty handle

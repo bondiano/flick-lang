@@ -63,3 +63,4 @@ runtime/handoff
 runtime/exits
 stdlib/effect/deferred
 stdlib/effect/ref
+stdlib/effect/fibers

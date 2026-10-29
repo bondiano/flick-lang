@@ -647,3 +647,63 @@ modify *SyncRefModify
 modifyEffect *SyncRefModifyEffect
 modifySome *SyncRefModifySome
 modifySomeEffect *SyncRefModifySomeEffect
+
+[@flick-lang/runtime/effect/FiberSet]
+flickMake *FiberGroupMake
+flickRun *FiberSetRun
+flickAdd *FiberSetAdd
+clear *FiberGroupClear
+size *FiberGroupSize
+join *FiberGroupJoin
+awaitEmpty *FiberGroupAwaitEmpty
+
+[@flick-lang/runtime/effect/FiberMap]
+flickMake *FiberGroupMake
+flickRun *FiberMapRun
+flickSet *FiberMapSet
+flickGet *FiberMapGet
+has *FiberMapHas
+remove *FiberMapRemove
+clear *FiberGroupClear
+size *FiberGroupSize
+join *FiberGroupJoin
+awaitEmpty *FiberGroupAwaitEmpty
+
+[@flick-lang/runtime/effect/FiberHandle]
+flickMake *FiberGroupMake
+flickRun *FiberHandleRun
+flickSet *FiberHandleSet
+flickGet *FiberHandleGet
+clear *FiberGroupClear
+join *FiberGroupJoin
+awaitEmpty *FiberGroupAwaitEmpty
+
+[@flick-lang/runtime/effect/Effect]
+raceAll *RaceAll
+raceAllFirst *RaceAllFirst
+flickFiberId *FiberId
+cached *Cached
+cachedWithTTL *CachedWithTTL
+cachedInvalidateWithTTL *CachedInvalidateWithTTL
+flickWithExecutionPlan *WithExecutionPlan
+
+[@flick-lang/runtime/effect/Scheduler]
+flickMakeMixed SchedulerMakeMixed
+flickCurrent *SchedulerCurrent
+flickWithScheduler *SchedulerWith
+flickMaxOpsBeforeYield *SchedulerMaxOps
+flickWithMaxOpsBeforeYield *SchedulerWithMaxOps
+flickWithPreventSchedulerYield *SchedulerWithPreventYield
+
+[@flick-lang/runtime/effect/Schedule]
+forever ScheduleForever
+
+[@flick-lang/runtime/effect/ExecutionPlan]
+flickStep PlanStep
+flickWithAttempts PlanWithAttempts
+flickWithSchedule PlanWithSchedule
+flickWithWhile PlanWithWhile
+flickMake PlanMake
+flickMerge PlanMerge
+flickCurrentMetadata *PlanCurrentMetadata
+
