@@ -341,5 +341,8 @@ expression: json
   },
   "dependencies": {
     "Geo": "3508914fa267b24f"
-  }
+  },
+  "targets": [
+    "js"
+  ]
 }

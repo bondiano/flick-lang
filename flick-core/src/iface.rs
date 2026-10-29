@@ -127,6 +127,18 @@ pub struct Interface {
     /// names of this module, then an imported one whose interface goes on.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub servers: Vec<(String, Vec<String>)>,
+    /// The targets a build compiled the module for; empty in an interface
+    /// no build wrote.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub targets: Vec<Target>,
+}
+
+/// A target compiled code of a module exists for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Target {
+    Js,
+    Go,
 }
 
 /// The ABI of a compiled module.

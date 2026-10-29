@@ -2,11 +2,11 @@
 
 use std::path::Path;
 
-use super::{Loader, Root};
+use super::{Loader, Root, target};
 use crate::diagnostics::Diagnostic;
 use crate::diagnostics::codes;
 use crate::iface::Namespace;
-use crate::project::config::{self, Backend, Kind};
+use crate::project::config::{self, Backend, Emit, Kind};
 use crate::project::{Project, is_module_name, module_path};
 use crate::resolve::Interface;
 use crate::source::Span;
@@ -144,6 +144,14 @@ impl Loader<'_> {
                     );
                 }
                 // no type when the module failed to check: that is reported already
+                if let Some((runner, runner_at)) = runner
+                    && project.config.build.emit == Emit::Go
+                    && target::js_only(runner)
+                {
+                    self.diagnostics
+                        .push(target::js_only_error(runner, *runner_at));
+                    return;
+                }
                 if let Some((runner, runner_at)) = runner
                     && main.scheme.is_some()
                 {

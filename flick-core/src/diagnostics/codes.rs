@@ -286,6 +286,7 @@ codes! {
     P027 = Project 27, "package built only without Effect";
     P028 = Project 28, "output directory holds the project's files";
     P029 = Project 29, "Go toolchain cannot build the program";
+    P030 = Project 30, "module not available on the go target";
 }
 
 #[cfg(test)]

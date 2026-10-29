@@ -45,6 +45,7 @@ number by hand cannot recover missing capture information.
 | `abi` | how the compiled code represents what the module defines, see [ABI](#abi); written by `flick build`, absent from `flick check` |
 | `dependencies` | the fingerprint of each imported module's interface the module was built against; omitted when empty |
 | `source` | the module's source, relative to the root of its package, so editors find declarations in a published package; written by `flick build` |
+| `targets` | the targets `flick build` compiled the module for, `["js"]` today; a project with `emit = "go"` that imports a module without `"go"` gets `FLICK-P030`; omitted when no build wrote the file |
 
 Each export names an **entity** by `module`, `namespace` and `name`. `module`
 is where the entity is *defined*: a re-export keeps the defining module, which

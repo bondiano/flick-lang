@@ -16,6 +16,7 @@ mod ide;
 #[cfg(feature = "native-project")]
 mod packages;
 mod runner;
+mod target;
 mod unknown;
 
 pub use checking::ModuleCache;
@@ -203,6 +204,7 @@ fn run(
         cache.retain_loaded(&loader.modules);
     }
     loader.check_entry(&interfaces);
+    loader.check_targets();
     #[cfg(feature = "native-project")]
     loader.check_packages();
     let failed = loader

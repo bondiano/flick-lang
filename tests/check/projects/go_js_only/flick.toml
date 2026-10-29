@@ -1,0 +1,11 @@
+schema-version = 1
+
+[project]
+kind = "app"
+source-dir = "src"
+entry = "App.Main"
+runner = "Runner.Node"
+#        ^^^^^^^^^^^^^ FLICK-P030 `Runner.Node` is available on the js target only, and this project emits go
+
+[build]
+emit = "go"

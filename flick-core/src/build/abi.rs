@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 use crate::codegen::{instance_export, qualified_id, tag};
 use crate::iface::{
-    Abi, ConstructorAbi, Data, Dictionary, Interface, Namespace, Summary, fingerprint,
+    Abi, ConstructorAbi, Data, Dictionary, Interface, Namespace, Summary, Target, fingerprint,
 };
 use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Module, Stage, Stmt};
 use crate::numeric::{Arith, Num};
@@ -28,6 +28,8 @@ pub fn interface(
         values: summaries(module, interface, interface_of),
         core: None,
     });
+    // only the js target compiles a library's modules
+    out.targets = vec![Target::Js];
     out.dependencies = imports
         .iter()
         .filter_map(|m| Some((m.clone(), fingerprint(&interface_of(m)?))))
