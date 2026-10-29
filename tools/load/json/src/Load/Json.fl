@@ -1,0 +1,66 @@
+// The HTTP + JSON server the JS and the go targets are measured on:
+// `GET /item/:id` decodes a stored JSON document by a derived schema,
+// builds an item of the id from it and answers with the item's JSON.
+module Load.Json exposing (main)
+
+import Http.Router exposing (RouteContext)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+type Part =
+  | Bolt Float
+  | Panel Float Float
+  deriving Schema
+
+type alias Item = {
+  id : String;
+  label : String;
+  price : Float;
+  tags : List String;
+  parts : List Part;
+  note : Option String;
+} deriving Schema
+
+item : Codec none none Json Item
+let item = Codec.general (Codec.json (schema Item))
+
+stored : String
+let stored =
+  "{\"id\": \"\", \"label\": \"\", \"price\": 12.5, \"tags\": [\"steel\", \"blue\", \"large\"], \"parts\": [{\"_tag\": \"Bolt\", \"_0\": 3}, {\"_tag\": \"Panel\", \"_0\": 2, \"_1\": 4.5}, {\"_tag\": \"Bolt\", \"_0\": 8}], \"note\": null}"
+
+get_item : ServerRequest ->{RouteContext; SchemaError, Http.Body.HttpBodyError} ServerResponse
+let get_item _ =
+  let id = Option.with_default "?" (Http.Router.param "id")
+  let base =
+    match Json.parse stored with
+    | Ok doc -> Codec.decode item doc
+    | Err e -> from_result (Err e)
+  let made = { base with id = id; label = "item " ++ id; price = base.price * 2 }
+  Http.ServerResponse.schema_json item made Http.ServerResponse.defaults
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let port = Option.with_default 3000 (Option.bind String.to_number (Platform.env "PORT"))
+  provide Http.Server.layer_services {
+    try
+      scope s {
+        app : ServerRequest ->{
+          ;
+          Http.Body.HttpBodyError,
+          Http.ServerError.HttpServerError,
+          SchemaError
+        }
+          ServerResponse
+        let app =
+          Http.Router.router
+            Http.Router.config
+            [Http.Router.route (Some Http.Method.GET) "/item/:id" get_item]
+        let server =
+          Http.Server.serve { host = "127.0.0.1"; port = port; gracefulShutdownTimeout = None } app
+        Platform.stdout_line
+          ("listening on " ++ Http.Server.format_address (Http.Server.address server))
+        Deferred.await_ (Deferred.make ())
+      }
+    with
+    | Http.ServerError.ServeError _ -> App.fail ("cannot listen on port " ++ show port)
+  }

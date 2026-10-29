@@ -1,7 +1,7 @@
 {
   "name": "@flick-lang/load",
   "version": "0.1.0",
-  "description": "Load runs: `just load-ssr` hits the SSR server of tools/load/ssr, `just load-ssr-browser` hydrates its pages in Chromium",
+  "description": "Load runs: `just load-ssr` hits the SSR server of tools/load/ssr, `just load-ssr-browser` hydrates its pages in Chromium, `just load-json` measures the HTTP + JSON server of tools/load/json on the JS or the go target",
   "license": "MIT",
   "private": true,
   "type": "module",

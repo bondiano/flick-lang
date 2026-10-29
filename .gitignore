@@ -3,6 +3,7 @@ node_modules/
 !/tests/check/projects/*/node_modules/
 /runtime/dist/
 /tools/dts-importer/dist/
+/tools/load/*/dist/
 /tools/dts-importer/.flick/
 /tools/bundle-size/none/.flick/
 /tools/bundle-size/fullstack/.flick/
