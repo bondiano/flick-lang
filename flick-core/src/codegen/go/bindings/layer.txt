@@ -60,3 +60,20 @@ flickTraceId TracerTraceId
 flickSampled TracerSampled
 flickSpanName TracerSpanName
 flickParent TracerParent
+
+[@flick-lang/runtime/effect/LayerMap]
+flickMake *LayerMapMake
+flickFromRecord *LayerMapFromRecord
+flickGet LayerMapGet
+flickInvalidate *LayerMapInvalidate
+
+[@flick-lang/runtime/effect/LayerRef]
+flickMake *LayerRefMake
+flickGet LayerRefGet
+flickInvalidate *LayerRefInvalidate
+flickRefresh *LayerRefRefresh
+
+[@flick-lang/runtime/effect/ErrorReporter]
+flickMake ErrorReporterMake
+flickLayer ErrorReporterLayer
+flickReport *ErrorReporterReport

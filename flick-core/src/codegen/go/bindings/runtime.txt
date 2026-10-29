@@ -49,6 +49,8 @@ bracket *Bracket
 layerSucceed LayerSucceed
 layerMerge LayerMerge
 layerOverride LayerMerge
+eventsQueue EventsQueue
+eventsListen *EventsListen
 succeed Succeed
 mapEff MapEff
 flatMapEff FlatMapEff

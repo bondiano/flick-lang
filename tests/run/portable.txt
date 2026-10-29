@@ -65,6 +65,7 @@ stdlib/effect/deferred
 stdlib/effect/ref
 stdlib/effect/fibers
 stdlib/effect/layer
+stdlib/effect/layer_map
 runtime/hung_io
 runtime/concurrency
 runtime/scopes

@@ -55,6 +55,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/eff.go"),
     ),
     (
+        "events.go",
+        include_str!("../../../../runtime-go/flickrt/events.go"),
+    ),
+    (
         "effectmore.go",
         include_str!("../../../../runtime-go/flickrt/effectmore.go"),
     ),
@@ -105,6 +109,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "layer.go",
         include_str!("../../../../runtime-go/flickrt/layer.go"),
+    ),
+    (
+        "layermap.go",
+        include_str!("../../../../runtime-go/flickrt/layermap.go"),
     ),
     (
         "list.go",
