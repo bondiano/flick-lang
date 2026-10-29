@@ -26,8 +26,10 @@ codegen/recursion
 codegen/stage_order
 codegen/strings_utf16
 stdlib/collections
+stdlib/decimals
 stdlib/effect/hash_map
 stdlib/effect/hash_set
+stdlib/effect/number
 stdlib/hash_order
 stdlib/monoids
 stdlib/seqs

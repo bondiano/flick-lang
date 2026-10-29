@@ -7,8 +7,16 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/data.go"),
     ),
     (
+        "decimal.go",
+        include_str!("../../../../runtime-go/flickrt/decimal.go"),
+    ),
+    (
         "dict.go",
         include_str!("../../../../runtime-go/flickrt/dict.go"),
+    ),
+    (
+        "effnum.go",
+        include_str!("../../../../runtime-go/flickrt/effnum.go"),
     ),
     (
         "hash.go",
