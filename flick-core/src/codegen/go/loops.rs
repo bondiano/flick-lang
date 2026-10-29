@@ -126,7 +126,13 @@ impl Gen<'_> {
                 };
                 let (inner, ()) = self.block(|g| g.iteration(params, &vars, body, tail));
                 let copies = format!("var {} = {}", param_list(&vars), heads.join(", "));
-                (heads, vec![copies, format!("for {{\n{}{}}}", checkpoint(self.fiber), indent(&inner))])
+                (
+                    heads,
+                    vec![
+                        copies,
+                        format!("for {{\n{}{}}}", checkpoint(self.fiber), indent(&inner)),
+                    ],
+                )
             }
         };
         (self.tail, self.generator) = saved;

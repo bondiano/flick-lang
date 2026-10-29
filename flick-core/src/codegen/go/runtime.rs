@@ -2,37 +2,136 @@
 
 /// The runtime's files: name and contents.
 pub const RUNTIME: &[(&str, &str)] = &[
-    ("array.go", include_str!("../../../../runtime-go/flickrt/array.go")),
-    ("casing.go", include_str!("../../../../runtime-go/flickrt/casing.go")),
-    ("cause.go", include_str!("../../../../runtime-go/flickrt/cause.go")),
-    ("collate.go", include_str!("../../../../runtime-go/flickrt/collate.go")),
-    ("combine.go", include_str!("../../../../runtime-go/flickrt/combine.go")),
-    ("concurrency.go", include_str!("../../../../runtime-go/flickrt/concurrency.go")),
-    ("data.go", include_str!("../../../../runtime-go/flickrt/data.go")),
-    ("decimal.go", include_str!("../../../../runtime-go/flickrt/decimal.go")),
-    ("dict.go", include_str!("../../../../runtime-go/flickrt/dict.go")),
-    ("duration.go", include_str!("../../../../runtime-go/flickrt/duration.go")),
-    ("eff.go", include_str!("../../../../runtime-go/flickrt/eff.go")),
-    ("effnum.go", include_str!("../../../../runtime-go/flickrt/effnum.go")),
-    ("fiber.go", include_str!("../../../../runtime-go/flickrt/fiber.go")),
-    ("fnmods.go", include_str!("../../../../runtime-go/flickrt/fnmods.go")),
-    ("hash.go", include_str!("../../../../runtime-go/flickrt/hash.go")),
-    ("hashmap.go", include_str!("../../../../runtime-go/flickrt/hashmap.go")),
-    ("list.go", include_str!("../../../../runtime-go/flickrt/list.go")),
-    ("number.go", include_str!("../../../../runtime-go/flickrt/number.go")),
-    ("numbers.go", include_str!("../../../../runtime-go/flickrt/numbers.go")),
-    ("option.go", include_str!("../../../../runtime-go/flickrt/option.go")),
-    ("owner.go", include_str!("../../../../runtime-go/flickrt/owner.go")),
-    ("platform.go", include_str!("../../../../runtime-go/flickrt/platform.go")),
-    ("record.go", include_str!("../../../../runtime-go/flickrt/record.go")),
-    ("recordfn.go", include_str!("../../../../runtime-go/flickrt/recordfn.go")),
-    ("regexp.go", include_str!("../../../../runtime-go/flickrt/regexp.go")),
-    ("seq.go", include_str!("../../../../runtime-go/flickrt/seq.go")),
-    ("service.go", include_str!("../../../../runtime-go/flickrt/service.go")),
-    ("string.go", include_str!("../../../../runtime-go/flickrt/string.go")),
-    ("sync.go", include_str!("../../../../runtime-go/flickrt/sync.go")),
-    ("text.go", include_str!("../../../../runtime-go/flickrt/text.go")),
-    ("unicode.go", include_str!("../../../../runtime-go/flickrt/unicode.go")),
-    ("unicode_tables.go", include_str!("../../../../runtime-go/flickrt/unicode_tables.go")),
-    ("value.go", include_str!("../../../../runtime-go/flickrt/value.go")),
+    (
+        "array.go",
+        include_str!("../../../../runtime-go/flickrt/array.go"),
+    ),
+    (
+        "casing.go",
+        include_str!("../../../../runtime-go/flickrt/casing.go"),
+    ),
+    (
+        "cause.go",
+        include_str!("../../../../runtime-go/flickrt/cause.go"),
+    ),
+    (
+        "collate.go",
+        include_str!("../../../../runtime-go/flickrt/collate.go"),
+    ),
+    (
+        "combine.go",
+        include_str!("../../../../runtime-go/flickrt/combine.go"),
+    ),
+    (
+        "concurrency.go",
+        include_str!("../../../../runtime-go/flickrt/concurrency.go"),
+    ),
+    (
+        "data.go",
+        include_str!("../../../../runtime-go/flickrt/data.go"),
+    ),
+    (
+        "decimal.go",
+        include_str!("../../../../runtime-go/flickrt/decimal.go"),
+    ),
+    (
+        "dict.go",
+        include_str!("../../../../runtime-go/flickrt/dict.go"),
+    ),
+    (
+        "duration.go",
+        include_str!("../../../../runtime-go/flickrt/duration.go"),
+    ),
+    (
+        "eff.go",
+        include_str!("../../../../runtime-go/flickrt/eff.go"),
+    ),
+    (
+        "effnum.go",
+        include_str!("../../../../runtime-go/flickrt/effnum.go"),
+    ),
+    (
+        "fiber.go",
+        include_str!("../../../../runtime-go/flickrt/fiber.go"),
+    ),
+    (
+        "fnmods.go",
+        include_str!("../../../../runtime-go/flickrt/fnmods.go"),
+    ),
+    (
+        "hash.go",
+        include_str!("../../../../runtime-go/flickrt/hash.go"),
+    ),
+    (
+        "hashmap.go",
+        include_str!("../../../../runtime-go/flickrt/hashmap.go"),
+    ),
+    (
+        "list.go",
+        include_str!("../../../../runtime-go/flickrt/list.go"),
+    ),
+    (
+        "number.go",
+        include_str!("../../../../runtime-go/flickrt/number.go"),
+    ),
+    (
+        "numbers.go",
+        include_str!("../../../../runtime-go/flickrt/numbers.go"),
+    ),
+    (
+        "option.go",
+        include_str!("../../../../runtime-go/flickrt/option.go"),
+    ),
+    (
+        "owner.go",
+        include_str!("../../../../runtime-go/flickrt/owner.go"),
+    ),
+    (
+        "platform.go",
+        include_str!("../../../../runtime-go/flickrt/platform.go"),
+    ),
+    (
+        "record.go",
+        include_str!("../../../../runtime-go/flickrt/record.go"),
+    ),
+    (
+        "recordfn.go",
+        include_str!("../../../../runtime-go/flickrt/recordfn.go"),
+    ),
+    (
+        "regexp.go",
+        include_str!("../../../../runtime-go/flickrt/regexp.go"),
+    ),
+    (
+        "seq.go",
+        include_str!("../../../../runtime-go/flickrt/seq.go"),
+    ),
+    (
+        "service.go",
+        include_str!("../../../../runtime-go/flickrt/service.go"),
+    ),
+    (
+        "string.go",
+        include_str!("../../../../runtime-go/flickrt/string.go"),
+    ),
+    (
+        "sync.go",
+        include_str!("../../../../runtime-go/flickrt/sync.go"),
+    ),
+    (
+        "text.go",
+        include_str!("../../../../runtime-go/flickrt/text.go"),
+    ),
+    (
+        "unicode.go",
+        include_str!("../../../../runtime-go/flickrt/unicode.go"),
+    ),
+    (
+        "unicode_tables.go",
+        include_str!("../../../../runtime-go/flickrt/unicode_tables.go"),
+    ),
+    (
+        "value.go",
+        include_str!("../../../../runtime-go/flickrt/value.go"),
+    ),
 ];

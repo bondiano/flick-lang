@@ -233,7 +233,9 @@ impl Gen<'_> {
     /// `scope [owner] { body }`: the body runs as the owner of a fresh
     /// region, given it and the owner around it.
     fn scope(&mut self, owner: Option<&str>, outer: Option<&str>, body: &Expr) -> String {
-        let fb = self.fiber.expect("a `scope` runs where a fiber is in scope");
+        let fb = self
+            .fiber
+            .expect("a `scope` runs where a fiber is in scope");
         let name = |n: Option<&str>| n.map_or_else(|| "_".to_owned(), names::local);
         format!(
             "flickrt.Scope({fb}, func(fb *flickrt.Fiber, {}, {} flickrt.Value) flickrt.Value {{\n{}}})",
@@ -264,7 +266,9 @@ impl Gen<'_> {
         let layer = self.expr(layer);
         let layer = self.spill(layer);
         let body = self.task(body);
-        let fb = self.fiber.expect("`provide` runs where a fiber is in scope");
+        let fb = self
+            .fiber
+            .expect("`provide` runs where a fiber is in scope");
         format!("flickrt.Provide({fb}, {layer}, {body})")
     }
 
