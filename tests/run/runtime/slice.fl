@@ -1,0 +1,84 @@
+// The vertical slice of the go target, one case per item: data and
+// matching, closures and class dictionaries, a cold task, a `Ref` shared by
+// parallel branches, deep tail recursion, and a parallel group whose
+// failing branch stops the others. The scoped file and socket are
+// `runtime/scoped_file` and `stdlib/http/serve`.
+module App.Main exposing (main)
+
+type Shape = Circle Float | Rect Float Float
+  deriving Show, Eq
+
+type error Stop = Stop String
+
+class Area a =
+  area : a -> Float
+
+instance Area Shape =
+  let area s =
+    match s with
+    | Circle r -> 3 * r * r
+    | Rect w h -> w * h
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+total : forall a. Area a => List a -> Float
+let total shapes = List.fold_left (fun sum s -> sum + area s) 0 shapes
+
+scaled : Float -> (Shape -> Shape)
+let scaled k =
+  fun s ->
+    match s with
+    | Circle r -> Circle (r * k)
+    | Rect w h -> Rect (w * k) (h * k)
+
+count_down : Int -> Int -> Int
+let rec count_down acc n = if n == 0 then acc else count_down (acc + 1) (n - 1)
+
+nap : Float ->{} Unit
+let nap millis =
+  match Duration.millis millis with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+/// A parallel group whose failing branch stops the slow one, which ends
+/// before the failure reaches the caller.
+fail_fast : Ref (List String) ->{} String
+let fail_fast stopped =
+  let slow = task {
+    Effect.ensuring
+      (task { Ref.modify stopped (fun xs -> ((), xs ++ ["slow branch stopped"])) })
+      (task {
+      nap 2000
+      "slow"
+    })
+  }
+  let failing = task {
+    nap 5
+    from_result (Err (Stop "a branch failed"))
+  }
+  try
+    let (a, b) = parallel slow failing
+    a ++ b
+  with
+  | Stop text -> text
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let shapes = List.map (scaled 2) [Circle 1, Rect 2 3]
+  say (show shapes ++ " " ++ show (total shapes) ++ " " ++ show (shapes == [Circle 2, Rect 4 6]))
+  let runs = Ref.make 0
+  let counted = task { Ref.modify runs (fun n -> (n + 1, n + 1)) }
+  say ("built, runs: " ++ show (Ref.get runs))
+  let first = await counted
+  let second = await counted
+  say ("awaited twice: " ++ show (first, second))
+  let shared = Ref.make 0
+  let bump = task {
+    for _ <- List.range 0 100 do Ref.modify shared (fun n -> ((), n + 1))
+  }
+  let _ = parallel_all 8 (List.repeat 50 bump)
+  say ("shared: " ++ show (Ref.get shared))
+  say ("tail calls: " ++ show (count_down 0 10000000))
+  let stopped = Ref.make []
+  say (fail_fast stopped ++ ", " ++ show (Ref.get stopped))

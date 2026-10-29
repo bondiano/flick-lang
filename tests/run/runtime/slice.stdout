@@ -1,0 +1,6 @@
+[Circle 2, Rect 4 6] 36 true
+built, runs: 0
+awaited twice: (1, 2)
+shared: 5000
+tail calls: 10000000
+a branch failed, ["slow branch stopped"]
