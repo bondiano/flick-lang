@@ -2,9 +2,10 @@
 //! another `@flick-lang/runtime` or `effect` stops a build before it writes
 //! code against an ABI it does not know.
 
-use std::fs;
 use std::path::Path;
+use std::{fs, io, process};
 
+use flick_core::build;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 
 pub const COMPILER: &str = env!("CARGO_PKG_VERSION");
@@ -53,4 +54,37 @@ pub fn check_runtime(root: &Path) -> Option<Diagnostic> {
         }
     }
     None
+}
+
+/// Runs `go build` on the Go module of the entry `name` under `out_dir`,
+/// writing its executable beside the module; `P029` when Go is missing or
+/// the build fails.
+pub fn go_build(out_dir: &Path, name: &str) -> Option<Diagnostic> {
+    let dir = out_dir.join(build::go::module_dir(name));
+    let output = process::Command::new("go")
+        .args(["build", "-o"])
+        .arg(out_dir.join(build::go::executable(name)))
+        .arg(".")
+        .current_dir(&dir)
+        // the module needs nothing from the network
+        .env("GOFLAGS", "-mod=mod")
+        .env("GOTOOLCHAIN", "local")
+        .output();
+    let message = match output {
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            "the go target needs Go: `go` is not on PATH; install Go 1.22 or later".to_owned()
+        }
+        Err(err) => format!("cannot run `go build`: {err}"),
+        Ok(out) if out.status.success() => return None,
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let lines: Vec<&str> = stderr.lines().collect();
+            let tail = lines[lines.len().saturating_sub(20)..].join("\n");
+            format!(
+                "`go build` failed in `{}`, a bug of the compiler:\n{tail}",
+                dir.display()
+            )
+        }
+    };
+    Some(Diagnostic::new(codes::P029, Severity::Error, message))
 }

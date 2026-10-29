@@ -4,6 +4,7 @@
 
 mod abi;
 pub mod effects;
+pub mod go;
 
 pub use abi::interface;
 

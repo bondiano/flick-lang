@@ -169,7 +169,8 @@ pub struct BuildArguments {
     #[arg(long, value_name = "DIR")]
     pub out_dir: Option<String>,
 
-    /// Emit JavaScript or TypeScript; by default `build.emit` of the project.
+    /// Emit JavaScript, TypeScript or a Go executable; by default
+    /// `build.emit` of the project.
     #[arg(long, value_enum)]
     pub emit: Option<EmitArgument>,
 
@@ -223,6 +224,7 @@ pub enum LabelsArgument {
 pub enum EmitArgument {
     Js,
     Ts,
+    Go,
 }
 
 #[derive(Args)]

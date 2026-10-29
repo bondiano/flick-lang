@@ -45,12 +45,12 @@ impl BuildCommand {
         let runners = modules_of
             .iter()
             .map(|(name, module)| {
-                (
-                    module.clone(),
-                    output
-                        .out_dir
-                        .join(build::runner_file(name, output.typescript)),
-                )
+                let file = if output.go {
+                    build::go::executable(name)
+                } else {
+                    build::runner_file(name, output.typescript)
+                };
+                (module.clone(), output.out_dir.join(file))
             })
             .collect();
         *self.built.borrow_mut() = Some(Built {
@@ -88,8 +88,10 @@ impl Command for BuildCommand {
         if self.options.inputs {
             return super::inputs::describe(&host, sources, project.as_ref(), &roots);
         }
+        let go = self.plan(&host, project.as_ref(), Vec::new()).go;
         if let Some(problem) = project
             .as_ref()
+            .filter(|_| !go)
             .and_then(|p| toolchain::check_runtime(&p.root))
         {
             return Outcome {
@@ -197,16 +199,18 @@ impl BuildCommand {
             (None, Some(p)) => p.root.join(&p.config.build.out_dir),
             (None, None) => host.cwd.join("dist"),
         };
-        let typescript = match (self.options.emit, project) {
-            (Some(emit), _) => emit == EmitArgument::Ts,
-            (None, Some(p)) => p.config.build.emit == Emit::Ts,
-            (None, None) => false,
+        let emit = match (self.options.emit, project) {
+            (Some(EmitArgument::Ts), _) => Emit::Ts,
+            (Some(EmitArgument::Go), _) => Emit::Go,
+            (None, Some(p)) => p.config.build.emit,
+            (Some(EmitArgument::Js), _) | (None, None) => Emit::Js,
         };
         let config = project.map(|p| &p.config.build);
         BuildPlan {
             out_dir: project::normalize(&out_dir),
             entries,
-            typescript,
+            typescript: emit == Emit::Ts,
+            go: emit == Emit::Go,
             extras: Extras {
                 dts: self.options.emit_dts || config.is_some_and(|b| b.emit_dts),
                 promise_facade: self.options.promise_facade
@@ -232,10 +236,11 @@ impl BuildCommand {
         };
         let package = project::project_name(&FsHost::new(), &project.root).unwrap_or_default();
         let settings = format!(
-            "{} {:?} {} {:?} {} {package}",
+            "{} {:?} {} {} {:?} {} {package}",
             out_dir.display(),
             output.entries,
             output.typescript,
+            output.go,
             output.extras,
             output.release
         );
@@ -278,6 +283,14 @@ impl BuildCommand {
             return;
         };
         let mut paths: Vec<String> = emitted.artifacts.iter().map(|a| a.path.clone()).collect();
+        if output.go {
+            paths.extend(
+                output
+                    .entries
+                    .iter()
+                    .map(|(name, _)| build::go::executable(name)),
+            );
+        }
         if output.extras.schema_aot {
             paths.extend(
                 output
@@ -313,6 +326,8 @@ pub struct BuildPlan {
     /// The entries a runner is written for, by name and module.
     pub entries: Vec<(String, String)>,
     pub typescript: bool,
+    /// The go target: a Go module per entry, built into an executable.
+    pub go: bool,
     pub extras: Extras,
     pub release: bool,
 }
@@ -355,6 +370,14 @@ fn write_artifacts(output: &BuildPlan, emitted: &mut Emission) {
                 format!("cannot write `{}`: {err}", path.display()),
             ));
             return;
+        }
+    }
+    if output.go {
+        for (name, _) in &output.entries {
+            if let Some(problem) = toolchain::go_build(out_dir, name) {
+                emitted.diagnostics.push(problem);
+                return;
+            }
         }
     }
     let aot = if output.extras.schema_aot {
@@ -456,6 +479,13 @@ pub fn artifacts(
         core_modules: &[],
         core_only: false,
     };
+    if output.go {
+        let (artifacts, diagnostics) = build::go::emit(compilation, &settings);
+        return Emission {
+            artifacts,
+            diagnostics,
+        };
+    }
     // a library on Effect is also built without it, for applications with `effect = "none"`
     let library = project.is_some_and(|p| p.config.kind == Kind::Lib) && backend == Backend::Effect;
     if !library {

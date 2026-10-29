@@ -1,0 +1,21 @@
+# Cases of tests/run that run on the go target too, by path without `.fl`:
+# `just e2e` builds each with `--emit go` in both profiles and compares the
+# output with the same expectations as the JS target's. A case not listed is
+# reported as skipped for the go target.
+bootstrap/debug
+bootstrap/hello
+bootstrap/stderr
+codegen/classes
+codegen/closures
+codegen/defaults
+codegen/eval_order
+codegen/exports
+codegen/ints
+codegen/let_assert
+codegen/lift
+codegen/literals
+codegen/numbers
+codegen/numeric_classes
+codegen/patterns
+codegen/recursion
+codegen/stage_order

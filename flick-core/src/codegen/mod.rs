@@ -3,6 +3,7 @@
 //! runtime calls are `yield*`; data follows the ABI in
 //! `docs/src/content/docs/reference/codegen.md`.
 
+pub mod go;
 mod js;
 mod names;
 pub mod sourcemap;

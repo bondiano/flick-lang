@@ -121,6 +121,8 @@ pub enum Backend {
 pub enum Emit {
     Js,
     Ts,
+    /// A Go module per entry, built into an executable.
+    Go,
 }
 
 #[derive(Deserialize)]

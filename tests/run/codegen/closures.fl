@@ -1,0 +1,60 @@
+// Functions as values: partial application of top-level, local and
+// constrained functions and of constructors, closures that capture, local
+// recursion, record update and results.
+module App.Main exposing (main)
+
+type Pair = Pair Int String
+  deriving Show
+
+add3 : Int -> Int -> Int -> Int
+let add3 a b c = a + b * c
+
+describe : Show a => String -> a -> String
+let describe label x = label ++ "=" ++ show x
+
+counter : Int -> (Int -> Int)
+let counter start =
+  let step = start * 2
+  fun n -> n + step
+
+safe_div : Int -> Int -> Result String Int
+let safe_div a b = if b == 0 then Err "division by zero" else Ok (a / b)
+
+main : Unit ->{} Unit
+let main () =
+  add_one_times : Int -> Int -> Int
+  let add_one_times = add3 1
+  plus : Int -> Int
+  let plus = add_one_times 2
+  Platform.stdout_line (show (List.map plus [1, 2, 3]))
+  Platform.stdout_line (show (List.map (add3 1 2) [4]))
+  label : Int -> String
+  let label = describe "n"
+  Platform.stdout_line (label 42 ++ " " ++ describe "s" "x")
+  from_ten : Int -> Int
+  let from_ten = counter 10
+  Platform.stdout_line (show (from_ten 1) ++ " " ++ show (counter 0 5))
+  make : String -> Pair
+  let make = Pair 7
+  Platform.stdout_line (show (List.map make ["a", "b"]))
+  count_down : Int -> List Int -> List Int
+  let rec count_down n acc = if n == 0 then acc else count_down (n - 1) (acc ++ [n])
+  Platform.stdout_line (show (count_down 3 []))
+  let point = { x = 1; y = 2; name = "p" }
+  let moved = { point with x = 10 }
+  Platform.stdout_line (show moved.x ++ " " ++ show point.x ++ " " ++ moved.name)
+  let results = [safe_div 10 2, safe_div 1 0]
+  let shown =
+    List.map
+      (fun r ->
+        match r with
+        | Ok n when n > 3 -> "big " ++ show n
+        | Ok n -> "small " ++ show n
+        | Err e -> "error: " ++ e)
+      results
+  Platform.stdout_line (show shown)
+  compose : (Int -> Int) -> (Int -> Int) -> Int -> Int
+  let compose = fun f g x -> f (g x)
+  twice : Int -> Int
+  let twice = compose (fun x -> x * 2) (fun x -> x + 1)
+  Platform.stdout_line (show (twice 4))

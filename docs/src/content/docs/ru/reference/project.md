@@ -49,7 +49,7 @@ max-params = 5
 | `project.runner` | модуль, который запускает каждый вход без своего runner'а: экспортирует `type alias Main` — тип, который должен иметь `main` (иначе `FLICK-P026`), — и `run`, который принимает `main`; раннер экспортирует его результат как `default`; встроены `"Runner.Node"`, `"Runner.Browser"` и `"Runner.Cloudflare"` — Worker, чей `fetch` передаёт `main : Runner.Cloudflare.Fetch ->{Runner.Cloudflare.Env; AppError} Http.ServerResponse.ServerResponse` запрос и контекст (`wait_until`), а привязки предоставляет сервисом `Env` (`Runner.Cloudflare.var`, `binding`); так runner может предоставлять сервисы, и `main` может требовать любые из тех, что названы в его `Main`; другой может дать пакет; без него чистый `main` вызывается, а эффект выполняется как на Node | — |
 | `build.out-dir` | базовый каталог для артефактов сборки; не корень проекта, не каталог исходников или тестов и не каталог над ними (`FLICK-P028`, до любой записи) | `"dist"` |
 | `build.profile` | `"debug"` или `"release"` (см. [генерацию кода](../codegen/)); `--profile` у `build` и `test` переопределяет это значение | `"debug"` |
-| `build.emit` | `"js"` или `"ts"` | `"js"` |
+| `build.emit` | `"js"`, `"ts"` или `"go"`: Go-модуль на каждый вход в `go/<entry>/`, который `go build` собирает в исполняемый файл `flick-<entry>`; Go должен быть в `PATH` (`FLICK-P029`), а то, что Go-target ещё не компилирует, — `FLICK-P012` (см. [Go-target](../codegen/#go-target)) | `"js"` |
 | `build.emit-dts` | логическое значение | `false` |
 | `build.promise-facade` | логическое значение | `false` |
 | `build.schema-aot` | логическое значение | `false` |

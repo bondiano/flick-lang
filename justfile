@@ -19,6 +19,10 @@ test:
     cargo test --workspace
 
 # Install the JS runtime, check its pinned Effect, run compiled programs on Node
+# The Go runtime of the go target: vet and its unit tests.
+go-test:
+    cd runtime-go && go vet ./... && go test ./...
+
 e2e: docs-wasm
     cargo build -p flick
     pnpm install --frozen-lockfile
@@ -27,6 +31,7 @@ e2e: docs-wasm
     pnpm -r test
     cargo test -p flick --test e2e --test e2e_numbers --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples -- --ignored
     cargo test -p flick-core --test consteval_node -- --ignored
+    just go-test
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
 bundle-size:

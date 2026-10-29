@@ -1,6 +1,5 @@
 ---
 source: flick/tests/help_command.rs
-assertion_line: 23
 expression: "stdout(&[\"help\", \"build\"])"
 ---
 Compile the project, or the given files, to ES modules
@@ -14,7 +13,7 @@ Options:
       --diagnostics <DIAGNOSTICS>  Format of diagnostics on stderr [default: human] [possible values: human, json]
       --out-dir <DIR>              Directory of the output; by default `build.out-dir` of the project
       --color <COLOR>              Colorize human-readable output [default: auto] [possible values: auto, always, never]
-      --emit <EMIT>                Emit JavaScript or TypeScript; by default `build.emit` of the project [possible values: js, ts]
+      --emit <EMIT>                Emit JavaScript, TypeScript or a Go executable; by default `build.emit` of the project [possible values: js, ts, go]
       --emit-dts                   Also write `.d.ts` files, the public TypeScript interface; an export without a TypeScript form is an error
       --quiet                      Print less service output
       --promise-facade             Also write `A/B.promise.js`: Promise façades of runtime functions

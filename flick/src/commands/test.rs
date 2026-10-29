@@ -79,6 +79,7 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         out_dir: out.clone(),
         entries: Vec::new(),
         typescript: false,
+        go: false,
         extras: Extras::default(),
         release: release(options.profile, Some(&project.config.build)),
     };

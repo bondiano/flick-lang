@@ -5,6 +5,10 @@
 //! (default `0`). Cases run in parallel, `FLICK_E2E_JOBS` at a time
 //! (default: the number of CPUs). `FLICK_E2E_ONLY` runs the cases whose path
 //! contains it.
+//!
+//! The cases `tests/run/portable.txt` lists also run on the go target in
+//! both profiles and must give the same output; the others are listed as
+//! skipped for it.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -14,7 +18,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use std::{env, fs, thread};
 
+use flick_core::build::go::executable;
 use flick_core::build::runner_path;
+use flick_core::project::config::MAIN_ENTRY;
 
 fn cases(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir).expect("readable tests/run") {
@@ -60,11 +66,17 @@ fn run_case(case: &Path, out_dir: &Path, emit: &str, profile: &str) -> (Option<S
         );
         return (Some(report), build_time);
     }
-    let output = Command::new("node")
-        .arg("--enable-source-maps")
-        .arg(out_dir.join(runner_path(emit == "ts")))
-        .output()
-        .expect("`node` is on PATH (Node.js >= 24.18.0)");
+    let output = if emit == "go" {
+        Command::new(out_dir.join(executable(MAIN_ENTRY)))
+            .output()
+            .expect("the built executable runs")
+    } else {
+        Command::new("node")
+            .arg("--enable-source-maps")
+            .arg(out_dir.join(runner_path(emit == "ts")))
+            .output()
+            .expect("`node` is on PATH (Node.js >= 24.18.0)")
+    };
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stderr_problem = match expected(case, "stderr.contains") {
         Some(lines) => lines
@@ -100,6 +112,25 @@ fn run_case(case: &Path, out_dir: &Path, emit: &str, profile: &str) -> (Option<S
         (!problems.is_empty()).then(|| problems.join("\n")),
         build_time,
     )
+}
+
+/// The cases of `tests/run/portable.txt`, by path without `.fl`.
+fn portable(root: &Path) -> Vec<String> {
+    let text =
+        fs::read_to_string(root.join("portable.txt")).expect("readable tests/run/portable.txt");
+    let cases: Vec<String> = text
+        .lines()
+        .map(|l| l.split('#').next().unwrap_or("").trim())
+        .filter(|l| !l.is_empty())
+        .map(str::to_owned)
+        .collect();
+    for case in &cases {
+        assert!(
+            root.join(format!("{case}.fl")).exists(),
+            "tests/run/portable.txt lists `{case}`, which is no case"
+        );
+    }
+    cases
 }
 
 /// How many cases run at once.
@@ -182,6 +213,41 @@ fn run_cases() {
         times.push(results.iter().map(|(_, built)| *built).sum::<Duration>());
         report.extend(results.into_iter().filter_map(|(problem, _)| problem));
     }
+    let portable = portable(&root);
+    let (go_cases, skipped): (Vec<PathBuf>, Vec<PathBuf>) = paths.iter().cloned().partition(|p| {
+        let rel = p.strip_prefix(&root).expect("case under root");
+        portable.contains(&rel.with_extension("").to_string_lossy().replace('\\', "/"))
+    });
+    if !go_cases.is_empty() {
+        assert!(
+            Command::new("go")
+                .arg("version")
+                .output()
+                .is_ok_and(|o| o.status.success()),
+            "the go target needs Go: `go` is not on PATH (Go >= 1.22)"
+        );
+    }
+    for profile in ["debug", "release"] {
+        let results = parallel(&go_cases, jobs, |case| {
+            let rel = case.strip_prefix(&root).expect("case under root");
+            let out_dir = out_root
+                .join(profile)
+                .join("go")
+                .join(rel.with_extension(""));
+            let (problem, _) = run_case(case, &out_dir, "go", profile);
+            problem.map(|p| format!("{} (go, {profile}):\n{p}", rel.display()))
+        });
+        report.extend(results.into_iter().flatten());
+    }
+    for case in &skipped {
+        let rel = case.strip_prefix(&root).expect("case under root");
+        println!("skip go: {} (not marked portable)", rel.display());
+    }
+    println!(
+        "go target: {} portable cases, {} skipped",
+        go_cases.len(),
+        skipped.len()
+    );
     report.extend(typecheck(&repo, &out_root.join("debug/ts")));
     report.extend(typecheck(&repo, &out_root.join("release/ts")));
     assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));

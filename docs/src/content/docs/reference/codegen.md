@@ -313,6 +313,41 @@ arithmetic (`(a + b) + c`), folds `x * 0`, runs or memoizes a task,
 merges two `Layer` builds, moves a service lookup across `provide` or
 drops a schema check.
 
+## Go target
+
+`emit = "go"` (or `--emit go`) builds an app into one executable without
+Node: for each entry, a Go module under `go/<entry>/` of the output, `package
+main` with one file per Flick module and the runtime package `flickrt`
+beside it, which `flick build` compiles with `go build` into
+`flick-<entry>`. Only what `main` reaches is compiled, and a construct the
+target does not compile yet is `FLICK-P012` with what it names, never a
+runtime stub; for now that is everything of effects beyond direct calls (a
+`task`, a service, `try`, `scope`, `provide`), a lazy `for`, schemas and
+codecs, and a `foreign` binding without a Go implementation in the runtime.
+
+Values have the representation of the JS target, in Go terms:
+
+| Flick | Go |
+| - | - |
+| `Int` | `int32` |
+| `Float` | `float64` |
+| `BigInt` | `*big.Int`, never mutated |
+| `String` | `string` holding WTF-8 |
+| `Bool`, `Unit` | `bool`, `flickrt.Unit` |
+| a tuple, a `List` | `[]flickrt.Value`; `[x, ...rest]` shares the storage of the list |
+| a record | `flickrt.Record`, a map copied by `{ r with … }` |
+| a constructor | `*flickrt.Data` with the tag of the JS target and its fields |
+| a function | `func(flickrt.Value) flickrt.Value` per stage |
+| a dictionary | `*flickrt.Dict`; superclasses and default methods made on first use |
+
+A top-level function is a Go function of its dictionaries and all its
+parameters; a full application calls it, and a partial one or a use as a
+value makes the curried function. A runtime call is a plain Go call: Go
+runs direct-style code as it is. Top-level values are assigned by one
+function per module, run in the order the modules depend on each other.
+The cases of `tests/run` listed in `tests/run/portable.txt` run on both
+targets and give the same output.
+
 ## Not compiled yet
 
 `sql` and `cli` blocks are checked but not compiled: `flick build` reports
