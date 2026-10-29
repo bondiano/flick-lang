@@ -1,0 +1,39 @@
+{"count":"12345678901234567890","done":true,"nothing":null,"outcome":{"ok":7},"pair":["p\"q😀",0.30000000000000004],"shapes":[{"_tag":"Circle","_0":1},{"_tag":"Rect","_0":2,"_1":3.5},{"_tag":"Dot"}]}
+{"count":"12345678901234567890","done":true,"nothing":null,"outcome":{"err":"bad"},"pair":["p\"q😀",0.30000000000000004],"shapes":[{"_tag":"Circle","_0":1},{"_tag":"Rect","_0":2,"_1":3.5},{"_tag":"Dot"}]}
+{"label":null,"x":1,"y":-2}
+encode: ["(root): NaN has no JSON form"]
+1e+21
+["a\nb","\u0007","é"]
+ok {"label":"here","x":1,"y":2}
+ok {"label":null,"x":1,"y":2}
+["x: expected an Int, an integer from -2147483648 to 2147483647"]
+["y: a missing key"]
+["z: an unknown key"]
+["x: expected an Int, got string"]
+["x: expected an Int, an integer from -2147483648 to 2147483647"]
+["(root): expected an object, got an array"]
+["(root): expected an object, got null"]
+["label: expected Union, got number"]
+ok {"_tag":"Rect","_0":1,"_1":2}
+ok {"_tag":"Dot"}
+["_1: a missing key"]
+["_tag: expected one of Circle, Rect, Dot"]
+["_tag: expected one of Circle, Rect, Dot"]
+["(root): expected an object with a `_tag`, got number"]
+["_0: expected a finite number, got boolean"]
+ok {"count":"-42","done":false,"nothing":null,"outcome":{"err":"e"},"pair":["a",1],"shapes":[]}
+["count: expected a string of digits, got number"]
+["count: expected a string of digits"]
+["done: expected a boolean, got number"]
+["nothing: expected null, got number"]
+["pair[1]: a missing key"]
+["pair[2]: an unknown key"]
+["shapes: expected an array, got an object"]
+["outcome.ok: expected an Int, got string", "outcome.ok: an unknown key"]
+["outcome.ok: a missing key", "outcome.err: a missing key"]
+["outcome: expected an object with `ok` or `err`, got number"]
+["not JSON: Expected property name or '}' in JSON at position 1 (line 1 column 2)"]
+["not JSON: Unexpected token ']', \"[1,]\" is not valid JSON"]
+ok "\ud83d"
+ok null
+ok {"a":2,"b":[true,null,0,2.5]}

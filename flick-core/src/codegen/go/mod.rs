@@ -20,6 +20,7 @@ mod names;
 mod pattern;
 mod reach;
 mod runtime;
+mod schema;
 
 pub use runtime::RUNTIME;
 
@@ -127,6 +128,11 @@ fn shape(kind: &ItemKind) -> Shape {
                 }
             }
         }
+        ItemKind::Schema(s) if s.witnesses > 0 => Shape::Func {
+            dicts: 0,
+            params: s.witnesses,
+            effects: 0,
+        },
         ItemKind::Instance { info, .. } if !info.context.is_empty() => Shape::Func {
             dicts: info.context.len(),
             params: 0,

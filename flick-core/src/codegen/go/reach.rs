@@ -5,7 +5,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
-use crate::types::{Dict, default_method};
+use crate::types::{Dict, SchemaPlan, companion_name, default_method};
 
 /// A top-level name: its module, and the value, foreign or instance name.
 pub type Key = (String, String);
@@ -23,7 +23,8 @@ pub fn defined(item: &Item) -> Vec<String> {
             pattern.binders(&mut out);
             out.into_iter().map(str::to_owned).collect()
         }
-        ItemKind::Constructor(_) | ItemKind::Schema(_) => Vec::new(),
+        ItemKind::Schema(s) => vec![companion_name(&s.ty, "schema")],
+        ItemKind::Constructor(_) => Vec::new(),
     }
 }
 
@@ -54,7 +55,8 @@ pub fn uses(item: &Item, out: &mut Vec<Key>) {
             }
         }
         ItemKind::Refined { check, .. } => expr_uses(check, out),
-        ItemKind::Constructor(_) | ItemKind::Service { .. } | ItemKind::Schema(_) => {}
+        ItemKind::Schema(s) => plan_uses(&s.plan, out),
+        ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
     }
 }
 
@@ -125,4 +127,35 @@ pub fn reachable(
         }
     }
     (seen, missing)
+}
+
+/// The schemas of other types a schema plan is built of.
+fn plan_uses(plan: &SchemaPlan, out: &mut Vec<Key>) {
+    match plan {
+        SchemaPlan::List(p)
+        | SchemaPlan::Option(p)
+        | SchemaPlan::Redacted(p)
+        | SchemaPlan::Applied(_, p) => plan_uses(p, out),
+        SchemaPlan::Result(a, b) => {
+            plan_uses(a, out);
+            plan_uses(b, out);
+        }
+        SchemaPlan::Tuple(items) => items.iter().for_each(|p| plan_uses(p, out)),
+        SchemaPlan::Record(fields) => fields.iter().for_each(|(_, p)| plan_uses(p, out)),
+        SchemaPlan::Adt { variants, .. } => {
+            for p in variants.iter().flat_map(|(_, fields)| fields) {
+                plan_uses(p, out);
+            }
+        }
+        SchemaPlan::Named {
+            module, ty, args, ..
+        } => {
+            out.push((module.clone(), companion_name(ty, "schema")));
+            for p in args {
+                plan_uses(p, out);
+            }
+        }
+        SchemaPlan::Refined { base, .. } => plan_uses(base, out),
+        SchemaPlan::Prim(_) | SchemaPlan::Param(_) | SchemaPlan::Constructor(_) => {}
+    }
 }

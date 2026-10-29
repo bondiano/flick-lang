@@ -72,3 +72,5 @@ runtime/owners
 codegen/for_loop
 stdlib/file
 runtime/scoped_file
+schema/json_wire
+schema/derive

@@ -2,6 +2,31 @@
 # `[module]`, an export and the function of package `flickrt`.
 
 [@flick-lang/runtime]
+jsonParse JsonParse
+jsonStringify JsonStringify
+schemaNumber SchemaNumber
+schemaInt SchemaInt
+schemaString SchemaString
+schemaBool SchemaBool
+schemaBigint SchemaBigint
+schemaUnit SchemaUnit
+schemaNever SchemaNever
+schemaUnknown SchemaUnknown
+schemaList SchemaList
+schemaOption SchemaOption
+schemaResult SchemaResult
+schemaRedacted SchemaRedacted
+schemaJsonCodec SchemaJsonCodec
+codecDecode *CodecDecode
+codecEncode *CodecEncode
+codecDecodeResult CodecDecodeResult
+codecEncodeResult CodecEncodeResult
+codecList CodecList
+codecBool CodecBool
+codecTaggedOption CodecTaggedOption
+codecTransformPure CodecTransformPure
+codecTransformResult CodecTransformResult
+codecCheckWhole CodecCheckWhole
 fileOpen *FileOpen
 fileReadHandle *FileReadHandle
 fileRead *FileRead

@@ -1,0 +1,100 @@
+// The canonical JSON form of each kind of schema, both ways: what encoding
+// writes, what decoding accepts, and the issue a wrong input gives.
+module App.Main exposing (main)
+
+type Shape =
+  | Circle Float
+  | Rect Float Float
+  | Dot
+  deriving Schema
+
+type alias Point = { x : Int; y : Int; label : Option String } deriving Schema
+
+type alias Bag = {
+  count : BigInt;
+  done : Bool;
+  nothing : Unit;
+  pair : (String, Float);
+  shapes : List Shape;
+  outcome : Result String Int;
+} deriving Schema
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+encoded : Schema a -> a -> String
+let encoded s value =
+  match Codec.encode_result (Codec.json s) value with
+  | Ok json -> Json.stringify json
+  | Err (SchemaError issues) ->
+    "encode: " ++ show (List.map (fun i -> i.path ++ ": " ++ i.message) issues)
+
+decoded : Schema a -> String -> String
+let decoded s text =
+  match Json.parse text with
+  | Err (SchemaError issues) -> show (List.map (fun i -> i.message) issues)
+  | Ok input ->
+    match Codec.decode_result (Codec.json s) input with
+    | Ok value -> "ok " ++ encoded s value
+    | Err (SchemaError issues) -> show (List.map (fun i -> i.path ++ ": " ++ i.message) issues)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let bag = {
+    count = 12345678901234567890n;
+    done = true;
+    nothing = ();
+    pair = ("p\"q\u{1F600}", 0.1 + 0.2);
+    shapes = [Circle 1, Rect 2 3.5, Dot];
+    outcome = Ok 7;
+  }
+  say (encoded (schema Bag) bag)
+  say (encoded (schema Bag) { bag with outcome = Err "bad" })
+  say (encoded (schema Point) { x = 1; y = -2; label = None })
+  say (encoded Schema.number (0 / 0))
+  say (encoded Schema.number 1e21)
+  say (encoded (Schema.list Schema.string) ["a\nb", "\u{7}", "é"])
+  let points = schema Point
+  for text <- [
+    "{\"x\": 1, \"y\": 2, \"label\": \"here\"}",
+    "{\"x\": 1, \"y\": 2, \"label\": null}",
+    "{\"x\": 1.5, \"y\": 2, \"label\": null}",
+    "{\"x\": 1, \"label\": null}",
+    "{\"x\": 1, \"y\": 2, \"label\": null, \"z\": 0}",
+    "{\"x\": \"1\", \"y\": 2, \"label\": null}",
+    "{\"x\": 4294967296, \"y\": 2, \"label\": null}",
+    "[1, 2]",
+    "null",
+    "{\"x\": 1, \"y\": 2, \"label\": 3}",
+  ] do say (decoded points text)
+  let shapes = schema Shape
+  for text <- [
+    "{\"_tag\": \"Rect\", \"_0\": 1, \"_1\": 2}",
+    "{\"_tag\": \"Dot\"}",
+    "{\"_tag\": \"Rect\", \"_0\": 1}",
+    "{\"_tag\": \"Oval\"}",
+    "{\"_0\": 1}",
+    "3",
+    "{\"_tag\": \"Circle\", \"_0\": true}",
+  ] do say (decoded shapes text)
+  let bags = schema Bag
+  for text <- [
+    "{\"count\": \"-42\", \"done\": false, \"nothing\": null, \"pair\": [\"a\", 1], \"shapes\": [], \"outcome\": {\"err\": \"e\"}}",
+    "{\"count\": 42, \"done\": false, \"nothing\": null, \"pair\": [\"a\", 1], \"shapes\": [], \"outcome\": {\"ok\": 1}}",
+    "{\"count\": \"4x\", \"done\": false, \"nothing\": null, \"pair\": [\"a\", 1], \"shapes\": [], \"outcome\": {\"ok\": 1}}",
+    "{\"count\": \"1\", \"done\": 0, \"nothing\": null, \"pair\": [\"a\", 1], \"shapes\": [], \"outcome\": {\"ok\": 1}}",
+    "{\"count\": \"1\", \"done\": true, \"nothing\": 1, \"pair\": [\"a\", 1], \"shapes\": [], \"outcome\": {\"ok\": 1}}",
+    "{\"count\": \"1\", \"done\": true, \"nothing\": null, \"pair\": [\"a\"], \"shapes\": [], \"outcome\": {\"ok\": 1}}",
+    "{\"count\": \"1\", \"done\": true, \"nothing\": null, \"pair\": [\"a\", 1, 2], \"shapes\": [], \"outcome\": {\"ok\": 1}}",
+    "{\"count\": \"1\", \"done\": true, \"nothing\": null, \"pair\": [\"a\", 1], \"shapes\": {}, \"outcome\": {\"ok\": 1}}",
+    "{\"count\": \"1\", \"done\": true, \"nothing\": null, \"pair\": [\"a\", 1], \"shapes\": [], \"outcome\": {\"ok\": \"x\"}}",
+    "{\"count\": \"1\", \"done\": true, \"nothing\": null, \"pair\": [\"a\", 1], \"shapes\": [], \"outcome\": {}}",
+    "{\"count\": \"1\", \"done\": true, \"nothing\": null, \"pair\": [\"a\", 1], \"shapes\": [], \"outcome\": 5}",
+  ] do say (decoded bags text)
+  for text <- [
+    "{",
+    "[1,]",
+    "\"\\ud83d\"",
+    "1e400",
+    "{\"a\": 1, \"b\": [true, null, -0, 2.50], \"a\": 2}",
+  ] do say (decoded Schema.unknown text)

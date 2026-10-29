@@ -15,6 +15,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/cause.go"),
     ),
     (
+        "codec.go",
+        include_str!("../../../../runtime-go/flickrt/codec.go"),
+    ),
+    (
         "collate.go",
         include_str!("../../../../runtime-go/flickrt/collate.go"),
     ),
@@ -87,6 +91,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/hashmap.go"),
     ),
     (
+        "json.go",
+        include_str!("../../../../runtime-go/flickrt/json.go"),
+    ),
+    (
         "list.go",
         include_str!("../../../../runtime-go/flickrt/list.go"),
     ),
@@ -121,6 +129,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "regexp.go",
         include_str!("../../../../runtime-go/flickrt/regexp.go"),
+    ),
+    (
+        "schema.go",
+        include_str!("../../../../runtime-go/flickrt/schema.go"),
     ),
     (
         "semaphore.go",

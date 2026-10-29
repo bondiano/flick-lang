@@ -1,0 +1,17 @@
+"{\"a\":1 \"b\":2}"	Expected ',' or '}' after property value in JSON at position 7 (line 1 column 8)
+"{"	Expected property name or '}' in JSON at position 1 (line 1 column 2)
+"{,}"	Expected property name or '}' in JSON at position 1 (line 1 column 2)
+"{\"a\" 1}"	Expected ':' after property name in JSON at position 5 (line 1 column 6)
+"{\"a\":1,}"	Expected double-quoted property name in JSON at position 7 (line 1 column 8)
+"\"abc"	Unterminated string in JSON at position 4 (line 1 column 5)
+"[1,]"	Unexpected token ']', "[1,]" is not valid JSON
+""	Unexpected end of JSON input
+"tru"	Unexpected end of JSON input
+"{\"a\":1}x"	Unexpected non-whitespace character after JSON at position 7 (line 1 column 8)
+"\n{\n \"é\": [1, "	Unexpected end of JSON input
+"{\"a\" :"	Unexpected end of JSON input
+"[\"\\x\"]"	Bad escaped character in JSON at position 3 (line 1 column 4)
+"\"a\u0001\""	Bad control character in string literal in JSON at position 2 (line 1 column 3)
+"{\"k\": 1, \"k\" 2}"	Expected ':' after property name in JSON at position 13 (line 1 column 14)
+"nul"	Unexpected end of JSON input
+"[1 2]"	Expected ',' or ']' after array element in JSON at position 3 (line 1 column 4)

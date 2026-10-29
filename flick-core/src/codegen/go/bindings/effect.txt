@@ -707,3 +707,5 @@ flickMake PlanMake
 flickMerge PlanMerge
 flickCurrentMetadata *PlanCurrentMetadata
 
+[@flick-lang/runtime/effect/Schema]
+Json JsonCodec

@@ -104,9 +104,7 @@ impl Gen<'_> {
             ItemKind::Refined { .. } => {
                 self.unsupported(item.span, "a refined type");
             }
-            ItemKind::Schema(_) => {
-                self.unsupported(item.span, "a schema");
-            }
+            ItemKind::Schema(s) => self.schema(s, item.span, decls, init),
         }
     }
 
