@@ -732,3 +732,21 @@ flickLayer HttpEmptyLayer
 
 [@flick-lang/runtime/effect/http/HttpPlatform]
 flickNode HttpEmptyLayer
+
+[@flick-lang/runtime/effect/http/Headers]
+empty HeadersEmpty
+fromInput HeadersFromInput
+has HeadersHas
+get HeadersGet
+set HeadersSet
+setAll HeadersSetAll
+merge HeadersMerge
+remove HeadersRemove
+removeMany HeadersRemoveMany
+flickRedact HeadersRedact
+isRedactedName HeadersIsRedactedName
+flickWithRedactedNames *HeadersWithRedactedNames
+flickToList HeadersToList
+flickToUnknown HeadersToUnknown
+Equivalence HeadersEquivalence
+flickShow HeadersShow

@@ -77,5 +77,6 @@ runtime/paths
 runtime/scoped_file
 schema/json_wire
 schema/derive
+stdlib/http/headers
 stdlib/http/serve
 runtime/slice

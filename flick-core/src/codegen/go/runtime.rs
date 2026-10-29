@@ -103,6 +103,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/http.go"),
     ),
     (
+        "http_headers.go",
+        include_str!("../../../../runtime-go/flickrt/http_headers.go"),
+    ),
+    (
         "json.go",
         include_str!("../../../../runtime-go/flickrt/json.go"),
     ),
