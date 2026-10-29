@@ -4,6 +4,7 @@
 [@flick-lang/runtime/effect/http/HttpServer]
 flickServe *HttpServe
 flickAddress HttpAddress
+flickLogAddress *HttpServerLogAddress
 
 [@flick-lang/runtime/effect/http/HttpRouter]
 flickRoute HttpRoute
@@ -132,6 +133,74 @@ flickUrlParams ClientRequestUrlParams
 flickHash ClientRequestHash
 flickHeaders ClientRequestHeaders
 flickBody ClientRequestBody
+flickMakeWith ClientRequestMakeWith
+updateHeaders ClientRequestUpdateHeaders
+basicAuth ClientRequestBasicAuth
+bearerToken ClientRequestBearerToken
+prependUrl ClientRequestPrependUrl
+appendUrl ClientRequestAppendUrl
+updateUrl ClientRequestUpdateUrl
+setUrlParam ClientRequestSetUrlParam
+setUrlParams ClientRequestSetUrlParams
+appendUrlParam ClientRequestAppendUrlParam
+appendUrlParams ClientRequestAppendUrlParams
+setHash ClientRequestSetHash
+removeHash ClientRequestRemoveHash
+flickCompressBody *ClientRequestCompressBody
+flickSchemaBodyJson *ClientRequestSchemaBodyJson
+
+[@flick-lang/runtime/effect/http/HttpClientResponse]
+flickStatus ClientResponseStatus
+flickHeaders ClientResponseHeaders
+flickCookies ClientResponseCookies
+flickUrl ClientResponseUrl
+flickRequest ClientResponseRequest
+flickText *ClientResponseText
+flickJson *ClientResponseJson
+flickUrlParamsBody *ClientResponseUrlParamsBody
+flickBytes *ClientResponseBytes
+flickFilterStatus *ClientResponseFilterStatus
+flickFilterStatusOk *ClientResponseFilterStatusOk
+flickSchemaJson *ClientResponseSchemaJson
+flickSchemaNoBody *ClientResponseSchemaNoBody
+flickSchemaBodyJson *ClientResponseSchemaBodyJson
+flickSchemaBodyUrlParams *ClientResponseSchemaBodyUrlParams
+flickSchemaHeaders *ClientResponseSchemaHeaders
+
+[@flick-lang/runtime/effect/http/HttpClient]
+flickExecute *HttpClientExecute
+make HttpClientMake
+makeWith HttpClientMakeWith
+transform HttpClientTransform
+transformResponse HttpClientTransformResponse
+catch HttpClientCatch
+filterOrElse HttpClientFilterOrElse
+filterOrFail HttpClientFilterOrFail
+flickFilterStatus HttpClientFilterStatus
+flickFilterStatusOk HttpClientFilterStatusOk
+mapRequest HttpClientMapRequest
+mapRequestEffect HttpClientMapRequestEffect
+mapRequestInput HttpClientMapRequestInput
+mapRequestInputEffect HttpClientMapRequestInputEffect
+retry HttpClientRetry
+flickRetryTransient HttpClientRetryTransient
+tap HttpClientTap
+tapError HttpClientTapError
+tapRequest HttpClientTapRequest
+flickWithCookiesRef HttpClientWithCookiesRef
+withScope HttpClientWithScope
+followRedirects HttpClientFollowRedirects
+flickWithTracerDisabledWhen *HttpClientWithTracerDisabledWhen
+flickWithTracerHeaderFilter *HttpClientWithTracerHeaderFilter
+flickWithTracerPropagation *HttpClientWithTracerPropagation
+flickWithSpanNameGenerator *HttpClientWithSpanNameGenerator
+flickLayer HttpClientLayer
+
+[@flick-lang/runtime/effect/http/FetchHttpClient]
+flickLayer FetchClientLayer
+
+[@flick-lang/runtime/effect/Schedule]
+recurs ScheduleRecurs
 
 [@flick-lang/runtime/effect/http/Etag]
 flickLayer EtagLayer

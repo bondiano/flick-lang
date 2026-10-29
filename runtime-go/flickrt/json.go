@@ -24,7 +24,17 @@ var JsonNull Value = &jsonNull{}
 //
 // shortcut: syntax errors read as V8's for objects, strings, a bad token and the end of input; port V8's other texts if a program shows them
 func JsonParse(text Value) Value {
-	p := &jsonParser{s: text.(string)}
+	v, reason := parseJSON(text.(string))
+	if reason != "" {
+		return Err(schemaErrorOf([]issue{{"", "not JSON: " + reason}}))
+	}
+	return Ok(v)
+}
+
+// parseJSON is the value of a JSON text, or the reason V8's JSON.parse
+// gives for refusing it.
+func parseJSON(text string) (Value, string) {
+	p := &jsonParser{s: text}
 	p.space()
 	v, ok := p.value()
 	if ok {
@@ -34,9 +44,9 @@ func JsonParse(text Value) Value {
 		}
 	}
 	if !ok {
-		return Err(schemaErrorOf([]issue{{"", "not JSON: " + p.reason()}}))
+		return nil, p.reason()
 	}
-	return Ok(v)
+	return v, ""
 }
 
 type jsonParser struct {

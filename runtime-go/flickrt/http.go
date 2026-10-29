@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -102,6 +103,17 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 func HttpAddress(server Value) Value {
 	addr := server.(*HttpServer).listener.Addr().(*net.TCPAddr)
 	return NewData(tcpAddressTag, addr.IP.String(), float64(addr.Port))
+}
+
+// HttpServerLogAddress logs `Listening on <url>` at the info level.
+func HttpServerLogAddress(fb *Fiber, server Value) Value {
+	addr := server.(*HttpServer).listener.Addr().(*net.TCPAddr)
+	host := addr.IP.String()
+	if strings.Contains(host, ":") {
+		host = "[" + host + "]"
+	}
+	logMessage(fb, "Info", "Listening on http://"+host+":"+strconv.Itoa(addr.Port))
+	return Unit
 }
 
 // The platform and entity tags of Node are services the go target does not

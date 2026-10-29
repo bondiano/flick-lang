@@ -1,12 +1,15 @@
 package flickrt
 
-import "sync"
+import (
+	"encoding/base64"
+	"strings"
+	"sync"
+	"unicode/utf8"
+)
 
 // Http.ClientRequest as Effect's HttpClientRequest: the method, the URL as
 // given, the parameters and the hash added to it, the headers and the body.
 // Each change makes a new request.
-//
-// shortcut: requests are values to build and to hand a handler as a test input; sending them comes with the go target's HTTP client
 
 type ClientRequest struct {
 	method  string
@@ -184,4 +187,130 @@ func methodValue(method string) Value {
 		return m
 	}
 	panic(Defect{"TypeError: not a Http.Method.Method: " + method})
+}
+
+func ClientRequestMakeWith(m, url, params, hash, headers, body Value) Value {
+	return makeClient(methodName(m), url.(string), paramsOf(params), hash, headersOf(headers), bodyOf(body))
+}
+
+func ClientRequestUpdateHeaders(f, self Value) Value {
+	c := clientOf(self)
+	return c.with(headersOf(Apply(f, c.headers)), c.body)
+}
+
+// ClientRequestBasicAuth is `Authorization: Basic` of the name and the
+// password, encoded as `btoa`, which refuses a character past U+00FF.
+func ClientRequestBasicAuth(user, password, self Value) Value {
+	text := user.(string) + ":" + RedactedReveal(password).(string)
+	latin1 := make([]byte, 0, len(text))
+	for i := 0; i < len(text); {
+		r, size := utf8.DecodeRuneInString(text[i:])
+		if r > 0xFF || r == utf8.RuneError && size == 1 {
+			return Die("InvalidCharacterError: Invalid character")
+		}
+		latin1 = append(latin1, byte(r))
+		i += size
+	}
+	return ClientRequestSetHeader("Authorization", "Basic "+base64.StdEncoding.EncodeToString(latin1), self)
+}
+
+func ClientRequestBearerToken(token, self Value) Value {
+	return ClientRequestSetHeader("Authorization", "Bearer "+RedactedReveal(token).(string), self)
+}
+
+// changedURL is the request with another URL, parameters or hash.
+func (c *ClientRequest) changedURL(url string, params []Value, hash Value) Value {
+	return makeClient(c.method, url, params, hash, c.headers, c.body)
+}
+
+// joinSegments joins two parts of a URL with one `/` between them.
+func joinSegments(first, second string) string {
+	ends, starts := strings.HasSuffix(first, "/"), strings.HasPrefix(second, "/")
+	switch {
+	case ends && starts:
+		return first + second[1:]
+	case !ends && !starts:
+		return first + "/" + second
+	}
+	return first + second
+}
+
+func ClientRequestPrependUrl(path, self Value) Value {
+	c := clientOf(self)
+	if path == "" {
+		return c
+	}
+	return c.changedURL(joinSegments(path.(string), c.url), c.params, c.hash)
+}
+
+func ClientRequestAppendUrl(path, self Value) Value {
+	c := clientOf(self)
+	if path == "" {
+		return c
+	}
+	return c.changedURL(joinSegments(c.url, path.(string)), c.params, c.hash)
+}
+
+func ClientRequestUpdateUrl(f, self Value) Value {
+	c := clientOf(self)
+	return c.changedURL(Apply(f, c.url).(string), c.params, c.hash)
+}
+
+func ClientRequestSetUrlParam(key, val, self Value) Value {
+	c := clientOf(self)
+	return c.changedURL(c.url, paramsOf(UrlParamsSet(key, val, c.params)), c.hash)
+}
+
+func ClientRequestSetUrlParams(input, self Value) Value {
+	c := clientOf(self)
+	return c.changedURL(c.url, paramsOf(UrlParamsSetAll(input, c.params)), c.hash)
+}
+
+func ClientRequestAppendUrlParam(key, val, self Value) Value {
+	c := clientOf(self)
+	return c.changedURL(c.url, paramsOf(UrlParamsAppend(key, val, c.params)), c.hash)
+}
+
+func ClientRequestAppendUrlParams(input, self Value) Value {
+	c := clientOf(self)
+	return c.changedURL(c.url, paramsOf(UrlParamsAppendAll(input, c.params)), c.hash)
+}
+
+func ClientRequestSetHash(hash, self Value) Value {
+	c := clientOf(self)
+	return c.changedURL(c.url, c.params, Some(hash))
+}
+
+func ClientRequestRemoveHash(self Value) Value {
+	c := clientOf(self)
+	return c.changedURL(c.url, c.params, None)
+}
+
+func ClientRequestSchemaBodyJson(fb *Fiber, codec, v, self Value) Value {
+	return ClientRequestBodyJson(fb, CodecEncode(fb, codec, v), self)
+}
+
+// ClientRequestCompressBody compresses a body of bytes of at least
+// `minSize` (by default 1024) bytes, unless the request has a
+// `Content-Encoding` already.
+func ClientRequestCompressBody(_ *Fiber, algorithm, minSize, self Value) Value {
+	c := clientOf(self)
+	if c.headers.index("content-encoding") >= 0 || c.body.kind != bodyBytes {
+		return c
+	}
+	least := 1024.0
+	if n, ok := some(minSize); ok {
+		least = n.(float64)
+	}
+	if float64(c.body.length) < least {
+		return c
+	}
+	data, contentType, _ := c.body.bytes()
+	name := algorithmOf[ConstructorName(algorithm.(*Data).Tag)]
+	packed, err := compress(name, -1, data)
+	if err != nil {
+		return Die(err.Error())
+	}
+	body := bytesBody(string(packed), contentType)
+	return ClientRequestSetHeader("content-encoding", name, ClientRequestSetBody(body, c))
 }

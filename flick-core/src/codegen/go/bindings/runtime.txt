@@ -28,6 +28,7 @@ codecTransformPure CodecTransformPure
 codecTransformResult CodecTransformResult
 codecCheckWhole CodecCheckWhole
 codecNumberFinite CodecNumberFinite
+codecNumberLossless CodecNumberLossless
 codecJsonSchema CodecJsonSchema
 codecString CodecString
 codecIgnoreExtra CodecIgnoreExtra

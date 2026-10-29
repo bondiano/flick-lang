@@ -119,8 +119,20 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/http_body.go"),
     ),
     (
+        "http_client.go",
+        include_str!("../../../../runtime-go/flickrt/http_client.go"),
+    ),
+    (
+        "http_client_combinators.go",
+        include_str!("../../../../runtime-go/flickrt/http_client_combinators.go"),
+    ),
+    (
         "http_client_request.go",
         include_str!("../../../../runtime-go/flickrt/http_client_request.go"),
+    ),
+    (
+        "http_client_response.go",
+        include_str!("../../../../runtime-go/flickrt/http_client_response.go"),
     ),
     (
         "http_codecs.go",
@@ -141,6 +153,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "http_etag.go",
         include_str!("../../../../runtime-go/flickrt/http_etag.go"),
+    ),
+    (
+        "http_fetch.go",
+        include_str!("../../../../runtime-go/flickrt/http_fetch.go"),
     ),
     (
         "http_headers.go",
@@ -229,6 +245,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "regexp.go",
         include_str!("../../../../runtime-go/flickrt/regexp.go"),
+    ),
+    (
+        "schedule.go",
+        include_str!("../../../../runtime-go/flickrt/schedule.go"),
     ),
     (
         "schema.go",

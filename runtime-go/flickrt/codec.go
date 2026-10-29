@@ -1,6 +1,9 @@
 package flickrt
 
-import "strings"
+import (
+	"math"
+	"strings"
+)
 
 // Codecs of the `Codec` module: the canonical JSON codec of a schema, and
 // codecs built out of codecs.
@@ -13,6 +16,48 @@ var JsonCodec Value = sch(SchemaUnknown).jsonOf()
 var CodecBool Value = sch(SchemaBool).jsonOf()
 
 func codecOf(c Value) codec { return c.(codec) }
+
+// CodecNumberLossless is `Float.json`: every number, `NaN`, the
+// infinities and `-0` as the strings that name them.
+var CodecNumberLossless Value = losslessNumber{}
+
+type losslessNumber struct{}
+
+var losslessNames = map[string]float64{
+	"NaN": math.NaN(), "Infinity": math.Inf(1), "-Infinity": math.Inf(-1), "-0": math.Copysign(0, -1),
+}
+
+func (losslessNumber) accepts(in Value) bool {
+	_, isNumber := in.(float64)
+	s, isString := in.(string)
+	_, named := losslessNames[s]
+	return isNumber || isString && named
+}
+
+func (n losslessNumber) decode(in Value) (Value, []issue) {
+	if !n.accepts(in) {
+		return nil, expected("a number", in)
+	}
+	if s, ok := in.(string); ok {
+		return losslessNames[s], nil
+	}
+	return in, nil
+}
+
+func (losslessNumber) encode(v Value) (Value, []issue) {
+	x := v.(float64)
+	switch {
+	case math.IsNaN(x):
+		return "NaN", nil
+	case math.IsInf(x, 1):
+		return "Infinity", nil
+	case math.IsInf(x, -1):
+		return "-Infinity", nil
+	case x == 0 && math.Signbit(x):
+		return "-0", nil
+	}
+	return x, nil
+}
 
 func CodecDecodeResult(c, in Value) Value {
 	v, issues := codecOf(c).decode(in)

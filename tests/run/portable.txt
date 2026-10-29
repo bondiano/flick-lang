@@ -83,3 +83,4 @@ stdlib/effect/schema_http
 stdlib/http/serve
 stdlib/http/handlers
 runtime/slice
+stdlib/http/client

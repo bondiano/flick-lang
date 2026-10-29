@@ -193,17 +193,9 @@ func RequestJson(fb *Fiber, r Value) Value {
 	if text == "" {
 		return JsonNull
 	}
-	p := &jsonParser{s: text}
-	p.space()
-	v, ok := p.value()
-	if ok {
-		p.space()
-		if p.i < len(p.s) {
-			p.problem, ok = "Unexpected non-whitespace character after JSON "+p.at(), false
-		}
-	}
-	if !ok {
-		return Fail(q.parseError(p.reason()))
+	v, reason := parseJSON(text)
+	if reason != "" {
+		return Fail(q.parseError(reason))
 	}
 	return v
 }
