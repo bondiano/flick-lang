@@ -1,0 +1,29 @@
+// Files are read and written the same way on every platform: `/` separates
+// directories on windows too, and a missing file fails with Node's code and
+// message, its path as written, whichever separator it uses.
+module App.Main exposing (main)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+/// The directory for temporary files: `TEMP` on windows, else `TMPDIR` or `/tmp`.
+temp : Unit ->{} String
+let temp () =
+  Option.with_default (Option.with_default "/tmp" (Platform.env "TMPDIR")) (Platform.env "TEMP")
+
+read : String ->{File.FileSystem;} String
+let read path =
+  try File.read_text path with
+  | File.ReadError message -> message
+  | File.OpenError message -> message
+
+main : Unit ->{; AppError} Unit
+let main () =
+  provide File.node {
+    let path = temp () ++ "/flick-paths.txt"
+    try File.write_text path "written and read back" with
+    | File.WriteError message -> say message
+    say (read path)
+    say (read "missing/dir/file.txt")
+    say (read "missing\\dir\\file.txt")
+  }

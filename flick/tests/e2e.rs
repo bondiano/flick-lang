@@ -8,7 +8,8 @@
 //!
 //! The cases `tests/run/portable.txt` lists also run on the go target in
 //! both profiles and must give the same output; the others are listed as
-//! skipped for it.
+//! skipped for it. `FLICK_E2E_GO_ONLY` runs only those, without Node: the
+//! platform jobs of CI.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -173,8 +174,9 @@ fn parallel<T: Sync, R: Send>(items: &[T], jobs: usize, f: impl Fn(&T) -> R + Sy
 #[ignore = "needs Node and `pnpm install`; run `just e2e`"]
 fn run_cases() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let go_only = env::var_os("FLICK_E2E_GO_ONLY").is_some();
     assert!(
-        repo.join("node_modules/@flick-lang/runtime").exists(),
+        go_only || repo.join("node_modules/@flick-lang/runtime").exists(),
         "runtime is not installed: run `pnpm install --frozen-lockfile` in the repository root"
     );
     let root = repo.join("tests/run");
@@ -193,12 +195,13 @@ fn run_cases() {
     let mut times = Vec::new();
     let jobs = jobs();
     // release must agree with the debug reference: same stdout, stderr and exit
-    for (emit, profile) in [
+    let node_runs = [
         ("js", "debug"),
         ("ts", "debug"),
         ("js", "release"),
         ("ts", "release"),
-    ] {
+    ];
+    for &(emit, profile) in if go_only { &[][..] } else { &node_runs } {
         let results = parallel(&paths, jobs, |case| {
             let rel = case.strip_prefix(&root).expect("case under root");
             let out_dir = out_root
@@ -224,7 +227,7 @@ fn run_cases() {
                 .arg("version")
                 .output()
                 .is_ok_and(|o| o.status.success()),
-            "the go target needs Go: `go` is not on PATH (Go >= 1.22)"
+            "the go target needs Go: `go` is not on PATH (Go >= 1.23)"
         );
     }
     for profile in ["debug", "release"] {
@@ -248,6 +251,10 @@ fn run_cases() {
         go_cases.len(),
         skipped.len()
     );
+    if go_only {
+        assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));
+        return;
+    }
     report.extend(typecheck(&repo, &out_root.join("debug/ts")));
     report.extend(typecheck(&repo, &out_root.join("release/ts")));
     assert!(report.is_empty(), "e2e mismatches:\n{}", report.join("\n"));

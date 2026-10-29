@@ -26,6 +26,7 @@ let main () =
   }
 ";
 
+#[cfg(unix)]
 fn signal(child: &Child, name: &str) {
     Command::new("kill")
         .args(["-s", name, &child.id().to_string()])
@@ -52,12 +53,16 @@ fn lines(child: &mut Child) -> mpsc::Receiver<String> {
 fn exit_codes_follow_the_outcome_and_signals() {
     let fail = "module App.Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = App.fail \"nope\"\n";
     let done = WAITING.replace("Effect.never ()", "()");
-    let cases: [(&str, &str, Option<&str>, i32); 4] = [
+    let mut cases: Vec<(&str, &str, Option<&str>, i32)> = vec![
         ("go_exit_ok", &done, None, 0),
         ("go_exit_fail", fail, None, 1),
-        ("go_exit_int", WAITING, Some("INT"), 130),
-        ("go_exit_term", WAITING, Some("TERM"), 143),
     ];
+    // windows has no signals to send another process: Go reads a console's
+    // Ctrl+C and close as SIGINT and SIGTERM, which only a console delivers
+    if cfg!(unix) {
+        cases.push(("go_exit_int", WAITING, Some("INT"), 130));
+        cases.push(("go_exit_term", WAITING, Some("TERM"), 143));
+    }
     for (name, source, signal_name, expected) in cases {
         let dir = project(name, &[("flick.toml", APP), ("src/App/Main.fl", source)]);
         let build = flick_in(&dir, &["build", "--emit", "go"]);
@@ -71,7 +76,10 @@ fn exit_codes_follow_the_outcome_and_signals() {
         if let Some(s) = signal_name {
             let started = rx.recv_timeout(Duration::from_secs(60));
             assert_eq!(started.as_deref(), Ok("started"), "{name}");
+            #[cfg(unix)]
             signal(&child, s);
+            #[cfg(not(unix))]
+            let _ = s;
             let cleanup = rx.recv_timeout(Duration::from_secs(60));
             assert_eq!(
                 cleanup.as_deref(),

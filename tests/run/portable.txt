@@ -73,6 +73,7 @@ runtime/releases
 runtime/owners
 codegen/for_loop
 stdlib/file
+runtime/paths
 runtime/scoped_file
 schema/json_wire
 schema/derive

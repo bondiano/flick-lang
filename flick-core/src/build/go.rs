@@ -2,6 +2,7 @@
 //! `go/<entry>/`, the program's code and the runtime, which `flick build`
 //! then compiles with `go build` into the executable `flick-<entry>`.
 
+use std::env;
 use std::path::Path;
 
 use super::{Artifact, Settings, builtin_modules, generic_of, specifier};
@@ -20,14 +21,12 @@ pub fn module_dir(name: &str) -> String {
     format!("go/{name}")
 }
 
-/// The executable of the entry `name`, beside the runners of the JS target.
+/// The executable of the entry `name`, beside the runners of the JS target;
+/// `.exe` when Go builds for windows, by `GOOS` or else the host.
 pub fn executable(name: &str) -> String {
     let file = format!("flick-{name}");
-    if cfg!(windows) {
-        format!("{file}.exe")
-    } else {
-        file
-    }
+    let windows = env::var("GOOS").map_or(cfg!(windows), |os| os == "windows");
+    if windows { format!("{file}.exe") } else { file }
 }
 
 /// The Go modules of the app's entries, or with `suites` the one Go module

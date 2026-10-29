@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"runtime"
 	"strings"
 	"syscall"
 	"unicode/utf8"
@@ -32,17 +33,34 @@ var nodeErrors = map[syscall.Errno][2]string{
 	syscall.EBADF:   {"EBADF", "bad file descriptor"},
 }
 
+// nodeError is the code and text Node gives an error; on windows, whose
+// errnos are not these, by what the error means.
+func nodeError(err error) ([2]string, bool) {
+	var errno syscall.Errno
+	if runtime.GOOS != "windows" && errors.As(err, &errno) {
+		if e, ok := nodeErrors[errno]; ok {
+			return e, true
+		}
+	}
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return nodeErrors[syscall.ENOENT], true
+	case errors.Is(err, fs.ErrPermission):
+		return nodeErrors[syscall.EACCES], true
+	case errors.Is(err, fs.ErrExist):
+		return nodeErrors[syscall.EEXIST], true
+	}
+	return [2]string{}, false
+}
+
 // nodeMessage is the message of a file system error as Node writes it:
 // `ENOENT: no such file or directory, open '/x'`.
 func nodeMessage(err error, call, path string) string {
-	var errno syscall.Errno
-	if errors.As(err, &errno) {
-		if e, ok := nodeErrors[errno]; ok {
-			if path == "" {
-				return e[0] + ": " + e[1] + ", " + call
-			}
-			return e[0] + ": " + e[1] + ", " + call + " '" + path + "'"
+	if e, ok := nodeError(err); ok {
+		if path == "" {
+			return e[0] + ": " + e[1] + ", " + call
 		}
+		return e[0] + ": " + e[1] + ", " + call + " '" + path + "'"
 	}
 	var pe *fs.PathError
 	if errors.As(err, &pe) {
