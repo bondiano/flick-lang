@@ -47,32 +47,3 @@ func operation(key, name string, arity int) Value {
 	}
 	return collect(nil)
 }
-
-// A Layer builds services in a fiber.
-type Layer func(*Fiber) map[string]Value
-
-func LayerSucceed(key, impl Value) Value {
-	return Layer(func(*Fiber) map[string]Value { return map[string]Value{key.(string): impl} })
-}
-
-// LayerMerge builds both layers, the second's services overriding the first's.
-func LayerMerge(a, b Value) Value {
-	return Layer(func(fb *Fiber) map[string]Value {
-		out := a.(Layer)(fb)
-		for k, v := range b.(Layer)(fb) {
-			out[k] = v
-		}
-		return out
-	})
-}
-
-// Provide runs `body` with the services `layer` builds added to the fiber's.
-//
-// shortcut: the layer is built in the caller's owner, so what it acquires is not released after the body; give provide its own owner with scopes
-func Provide(fb *Fiber, layer, body Value) Value {
-	inner := *fb
-	for k, v := range layer.(Layer)(fb) {
-		inner.env = inner.env.with(k, v)
-	}
-	return Run(&inner, body)
-}

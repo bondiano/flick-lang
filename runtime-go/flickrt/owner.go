@@ -76,6 +76,19 @@ func (o *Owner) add(fb *Fiber, run func(fb *Fiber, exit *Cause) Value) {
 	}
 }
 
+// addIfOpen is [Owner.add] only while the owner is open, `then` running
+// with it still open; whether it was.
+func (o *Owner) addIfOpen(fb *Fiber, run func(fb *Fiber, exit *Cause) Value, then func()) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if !o.open {
+		return false
+	}
+	then()
+	o.finalizers = append(o.finalizers, finalizer{fb, run})
+	return true
+}
+
 func (f finalizer) call(closer *Fiber, exit *Cause) *Cause {
 	fb := *f.added
 	fb.state = closer.state

@@ -16,6 +16,7 @@ use crate::source::Span;
 const TABLES: &[&str] = &[
     include_str!("bindings/runtime.txt"),
     include_str!("bindings/effect.txt"),
+    include_str!("bindings/layer.txt"),
     include_str!("bindings/globals.txt"),
 ];
 
