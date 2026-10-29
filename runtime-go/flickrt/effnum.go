@@ -46,8 +46,8 @@ func orderMax(o func(a, b Value) int, self, that Value) Value {
 }
 
 func bounds(options Value) (Value, Value) {
-	r := options.(Record)
-	return r["minimum"], r["maximum"]
+	r := record(options)
+	return r.Get("minimum"), r.Get("maximum")
 }
 
 func between(o func(a, b Value) int, options, self Value) Value {

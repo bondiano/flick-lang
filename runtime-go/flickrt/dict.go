@@ -219,7 +219,7 @@ func Structural(name string, dicts []Value) Value {
 			for i, x := range xs {
 				shown[i] = Apply(method(i, "show"), x).(string)
 			}
-			if r, ok := a.(Record); ok {
+			if r, ok := a.(*Record); ok {
 				out := "{ "
 				for i, l := range sortedKeys(r) {
 					if i > 0 {
@@ -238,11 +238,11 @@ func Structural(name string, dicts []Value) Value {
 // fieldsOf is the fields of a tuple by position, or of a record by label
 // in UTF-16 order, as JS sorts its keys.
 func fieldsOf(v Value) []Value {
-	if r, ok := v.(Record); ok {
+	if r, ok := v.(*Record); ok {
 		keys := sortedKeys(r)
 		out := make([]Value, len(keys))
 		for i, k := range keys {
-			out[i] = r[k]
+			out[i] = r.Get(k)
 		}
 		return out
 	}

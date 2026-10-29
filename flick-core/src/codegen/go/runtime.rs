@@ -3,6 +3,14 @@
 /// The runtime's files: name and contents.
 pub const RUNTIME: &[(&str, &str)] = &[
     (
+        "array.go",
+        include_str!("../../../../runtime-go/flickrt/array.go"),
+    ),
+    (
+        "combine.go",
+        include_str!("../../../../runtime-go/flickrt/combine.go"),
+    ),
+    (
         "data.go",
         include_str!("../../../../runtime-go/flickrt/data.go"),
     ),
@@ -39,8 +47,16 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/numbers.go"),
     ),
     (
+        "option.go",
+        include_str!("../../../../runtime-go/flickrt/option.go"),
+    ),
+    (
         "platform.go",
         include_str!("../../../../runtime-go/flickrt/platform.go"),
+    ),
+    (
+        "record.go",
+        include_str!("../../../../runtime-go/flickrt/record.go"),
     ),
     (
         "seq.go",

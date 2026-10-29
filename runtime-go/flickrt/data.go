@@ -3,7 +3,6 @@ package flickrt
 import (
 	"math"
 	"math/big"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -39,14 +38,14 @@ func Equals(a, b Value) bool {
 			}
 		}
 		return true
-	case Record:
-		y, ok := b.(Record)
-		if !ok || len(x) != len(y) {
+	case *Record:
+		y, ok := b.(*Record)
+		if !ok || len(x.keys) != len(y.keys) {
 			return false
 		}
-		for k, v := range x {
-			w, ok := y[k]
-			if !ok || !Equals(v, w) {
+		for i, k := range x.keys {
+			j := y.index(k)
+			if j < 0 || !Equals(x.vals[i], y.vals[j]) {
 				return false
 			}
 		}
@@ -216,10 +215,10 @@ func hash(a Value) int32 {
 			h ^= effectCombine(hashString(nativeField(x.Tag, i)), hash(v))
 		}
 		return optimize(h)
-	case Record:
+	case *Record:
 		h := int32(12289)
-		for k, v := range x {
-			h ^= effectCombine(hashString(k), hash(v))
+		for i, k := range x.keys {
+			h ^= effectCombine(hashString(k), hash(x.vals[i]))
 		}
 		return optimize(h)
 	}
@@ -308,13 +307,3 @@ func ListShow(s, a Value) Value {
 }
 
 func joinStrings(parts []string, sep string) string { return strings.Join(parts, sep) }
-
-// sortedKeys is the labels of a record in UTF-16 order.
-func sortedKeys(r Record) []string {
-	keys := make([]string, 0, len(r))
-	for k := range r {
-		keys = append(keys, k)
-	}
-	sort.Slice(keys, func(i, j int) bool { return CompareStrings(keys[i], keys[j]) < 0 })
-	return keys
-}

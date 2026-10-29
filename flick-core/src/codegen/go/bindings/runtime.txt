@@ -161,3 +161,6 @@ stringChars Chars
 stringToNumber StringToNumber
 stringLength Length
 stringTrim Trim
+nonEmptyFromList NonEmptyFromList
+nonEmptyCons NonEmptyCons
+nonEmptyHead NonEmptyHead

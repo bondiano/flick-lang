@@ -80,13 +80,13 @@ func Format(v Value) string {
 			out += fmt.Sprintf(",%q:%s", nativeField(x.Tag, i), Format(f))
 		}
 		return out + "}"
-	case Record:
+	case *Record:
 		out := "{"
-		for i, k := range sortedKeys(x) {
+		for i, k := range x.keys {
 			if i > 0 {
 				out += ","
 			}
-			out += QuoteJSON(k) + ":" + Format(x[k])
+			out += QuoteJSON(k) + ":" + Format(x.vals[i])
 		}
 		return out + "}"
 	}

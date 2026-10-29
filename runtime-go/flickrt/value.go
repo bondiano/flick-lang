@@ -33,9 +33,6 @@ type Data struct {
 	Fields []Value
 }
 
-// Record is a record value; it is never mutated after it is built.
-type Record map[string]Value
-
 // Option and Result have the tags of the JS runtime's native values.
 var None Value = &Data{Tag: "None"}
 
@@ -101,20 +98,7 @@ func Field(v Value, label string) Value {
 			return d.Tag
 		}
 	}
-	return v.(Record)[label]
-}
-
-// Update is a copy of a record with some fields replaced.
-func Update(base Value, fields Record) Value {
-	b := base.(Record)
-	out := make(Record, len(b)+len(fields))
-	for k, v := range b {
-		out[k] = v
-	}
-	for k, v := range fields {
-		out[k] = v
-	}
-	return out
+	return record(v).Get(label)
 }
 
 // Len is the length of a list or a tuple.

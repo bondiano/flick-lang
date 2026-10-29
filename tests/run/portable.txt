@@ -27,9 +27,13 @@ codegen/stage_order
 codegen/strings_utf16
 stdlib/collections
 stdlib/decimals
+stdlib/effect/array
+stdlib/effect/combine
 stdlib/effect/hash_map
 stdlib/effect/hash_set
 stdlib/effect/number
+stdlib/effect/option
+stdlib/effect/order
 stdlib/hash_order
 stdlib/monoids
 stdlib/seqs

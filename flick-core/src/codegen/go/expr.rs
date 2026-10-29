@@ -240,9 +240,9 @@ impl Gen<'_> {
         let entries: Vec<String> = fields
             .iter()
             .zip(go)
-            .map(|((label, _), v)| format!("{}: {v}", names::string(label)))
+            .map(|((label, _), v)| format!("{}, {v}", names::string(label)))
             .collect();
-        let record = format!("flickrt.Record{{{}}}", entries.join(", "));
+        let record = format!("flickrt.Rec({})", entries.join(", "));
         match base {
             Some(b) => format!("flickrt.Update({b}, {record})"),
             None => record,

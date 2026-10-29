@@ -142,3 +142,183 @@ codePointAt CodePointAt
 padStart PadStart
 padEnd PadEnd
 repeat Repeat
+
+[@flick-lang/runtime/effect/Array]
+findLast ArrayFindLast
+findLastIndex ArrayFindLastIndex
+findFirstWithIndex ArrayFindFirstWithIndex
+countBy ArrayCountBy
+containsWith ArrayContainsWith
+dedupeWith ArrayDedupeWith
+dedupeAdjacentWith ArrayDedupeAdjacentWith
+differenceWith ArrayDifferenceWith
+intersectionWith ArrayIntersectionWith
+unionWith ArrayUnionWith
+groupBy ArrayGroupBy
+join ArrayJoin
+takeRight ArrayTakeRight
+dropRight ArrayDropRight
+takeWhile ArrayTakeWhile
+dropWhile ArrayDropWhile
+takeWhileFilter ArrayTakeWhileFilter
+dropWhileFilter ArrayDropWhileFilter
+span ArraySpan
+splitAt ArraySplitAt
+split ArraySplit
+splitWhere ArraySplitWhere
+chunksOf ArrayChunksOf
+window ArrayWindow
+chop ArrayChop
+tail ArrayTail
+init ArrayInit
+pad ArrayPad
+rotate ArrayRotate
+insertAt ArrayInsertAt
+remove ArrayRemove
+modify ArrayModify
+replace ArrayReplace
+intersperse ArrayIntersperse
+appendAll ArrayAppendAll
+cartesian ArrayCartesian
+cartesianWith ArrayCartesianWith
+zipWith ArrayZipWith
+mapAccum ArrayMapAccum
+scan ArrayScan
+scanRight ArrayScanRight
+extend ArrayExtend
+getSomes ArrayGetSomes
+getFailures ArrayGetFailures
+getSuccesses ArrayGetSuccesses
+separate ArraySeparate
+partition ArrayPartition
+unfold ArrayUnfold
+liftOption ArrayLiftOption
+liftPredicate ArrayLiftPredicate
+liftResult ArrayLiftResult
+match ArrayMatch
+append ArrayAppend
+makeBy ArrayMakeBy
+range ArrayRange
+replicate ArrayReplicate
+lastNonEmpty NonEmptyLast
+tailNonEmpty NonEmptyTail
+initNonEmpty NonEmptyInit
+modifyHeadNonEmpty NonEmptyModifyHead
+setHeadNonEmpty NonEmptySetHead
+modifyLastNonEmpty NonEmptyModifyLast
+setLastNonEmpty NonEmptySetLast
+splitAtNonEmpty NonEmptySplitAt
+unappend NonEmptyUnappend
+unprepend NonEmptyUnprepend
+groupWith NonEmptyGroupWith
+flickMax NonEmptyMax
+flickMin NonEmptyMin
+flickMatchLeft ArrayMatchLeft
+flickMatchRight ArrayMatchRight
+getReadonlyReducerConcat ListReducerConcat
+
+[@flick-lang/runtime/effect/Iterable]
+flickFilterMapWhile ArrayFilterMapWhile
+flickRepeat ArrayRepeat
+
+[@flick-lang/runtime/effect/Record]
+toEntries RecordToEntries
+fromEntries RecordFromEntries
+makeReducerUnion RecordReducerUnion
+makeReducerIntersection RecordReducerIntersection
+
+[@flick-lang/runtime/effect/Option]
+all OptionAll
+as OptionAs
+asVoid OptionAsVoid
+composeK OptionComposeK
+containsWith OptionContainsWith
+exists OptionExists
+filter OptionFilter
+filterMap OptionFilterMap
+firstSomeOf OptionFirstSomeOf
+flatten OptionFlatten
+lift2 OptionLift2
+liftPredicate OptionLiftPredicate
+match OptionMatch
+orElseResult OptionOrElseResult
+orElseSome OptionOrElseSome
+partitionMap OptionPartitionMap
+product OptionProduct
+productMany OptionProductMany
+reduceCompact OptionReduceCompact
+tap OptionTap
+zipLeft OptionZipLeft
+zipRight OptionZipRight
+zipWith OptionZipWith
+void OptionVoid
+makeReducer OptionReducer
+makeCombinerFailFast OptionCombinerFailFast
+makeReducerFailFast OptionReducerFailFast
+
+[@flick-lang/runtime/effect/Result]
+all ResultAll
+failVoid ResultFailVoid
+filterOrFail ResultFilterOrFail
+flip ResultFlip
+getFailure ResultGetFailure
+liftPredicate ResultLiftPredicate
+mapBoth ResultMapBoth
+match ResultMatch
+merge ResultMerge
+orElse ResultOrElse
+succeedNone ResultSucceedNone
+succeedSome ResultSucceedSome
+transposeOption ResultTransposeOption
+transposeMapOption ResultTransposeMapOption
+void ResultVoid
+
+[@flick-lang/runtime/effect/Combiner]
+make CombinerMake
+flickCombine CombinerCombine
+flip CombinerFlip
+flickMin CombinerMin
+flickMax CombinerMax
+first CombinerFirst
+last CombinerLast
+constant CombinerConstant
+intercalate CombinerIntercalate
+
+[@flick-lang/runtime/effect/Reducer]
+make ReducerMake
+flickCombine CombinerCombine
+flickInitialValue ReducerInitialValue
+flickCombineAll ReducerCombineAll
+flickToCombiner ReducerToCombiner
+flip ReducerFlip
+
+[@flick-lang/runtime/effect/Number]
+ReducerSum NumberReducerSum
+ReducerMultiply NumberReducerMultiply
+ReducerMax NumberReducerMax
+ReducerMin NumberReducerMin
+
+[@flick-lang/runtime/effect/BigInt]
+CombinerMax BigIntCombinerMax
+CombinerMin BigIntCombinerMin
+ReducerSum BigIntReducerSum
+ReducerMultiply BigIntReducerMultiply
+
+[@flick-lang/runtime/effect/String]
+ReducerConcat StringConcat
+
+[@flick-lang/runtime/effect/Boolean]
+ReducerAnd BooleanAnd
+ReducerOr BooleanOr
+
+[@flick-lang/runtime/effect/Struct]
+flickMakeCombiner StructCombiner
+flickMakeReducer StructReducer
+
+[@flick-lang/runtime/effect/Tuple]
+makeCombiner TupleCombiner
+makeReducer TupleReducer
+
+[@flick-lang/runtime/effect/Hash]
+combine HashCombine
+optimize HashOptimize
