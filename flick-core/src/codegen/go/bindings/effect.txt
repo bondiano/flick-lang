@@ -524,3 +524,59 @@ await *LatchAwait
 close *LatchClose
 whenOpen *LatchWhenOpen
 isOpen LatchIsOpen
+
+[@flick-lang/runtime/effect/Exit]
+flickSucceed ExitSucceed
+flickFail ExitFail
+flickFailCause ExitFailCause
+flickDie ExitDie
+flickInterrupt ExitInterrupt
+flickVoid ExitVoid
+flickIsSuccess ExitIsSuccess
+flickIsFailure ExitIsFailure
+flickHasFails ExitHasFails
+flickHasDies ExitHasDies
+flickHasInterrupts ExitHasInterrupts
+flickFilterSuccess ExitFilterSuccess
+flickFilterValue ExitFilterValue
+flickFilterFailure ExitFilterFailure
+flickFilterCause ExitFilterCause
+flickFindError ExitFindError
+flickFindErrorOption ExitFindErrorOption
+flickFindDefect ExitFindDefect
+flickMatch ExitMatch
+flickMap ExitMap
+flickMapError ExitMapError
+flickMapBoth ExitMapBoth
+flickAsVoid ExitAsVoid
+flickAsVoidAll ExitAsVoidAll
+
+[@flick-lang/runtime/effect/Cause]
+flickEmpty CauseEmpty
+flickFail CauseFail
+flickDie CauseDie
+flickInterrupt CauseInterrupt
+flickHasFails CauseHasFails
+flickHasDies CauseHasDies
+flickHasInterrupts CauseHasInterrupts
+flickHasInterruptsOnly CauseHasInterruptsOnly
+flickCombine CauseCombine
+flickMap CauseMap
+flickFindErrorOption CauseFindErrorOption
+flickInterruptors CauseInterruptors
+
+[@flick-lang/runtime/effect/Fiber]
+flickAwait *FiberAwait
+flickAwaitAll *FiberAwaitAll
+flickJoinAll *FiberJoinAll
+flickInterruptAs *FiberInterruptAs
+flickInterruptAll *FiberInterruptAll
+flickInterruptAllAs *FiberInterruptAllAs
+
+[@flick-lang/runtime/effect/Effect]
+flickExit *EffectExit
+flickOnExit *EffectOnExit
+flickOnInterrupt *EffectOnInterrupt
+
+[@flick-lang/runtime/effect/Deferred]
+flickDone *DeferredDone
