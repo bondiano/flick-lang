@@ -19,3 +19,4 @@ codegen/numeric_classes
 codegen/patterns
 codegen/recursion
 codegen/stage_order
+codegen/strings_utf16

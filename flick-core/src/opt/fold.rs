@@ -80,7 +80,7 @@ fn show(instance: &str, c: Const) -> Option<String> {
     clippy::cast_sign_loss,
     reason = "at most 17 digits, and each cast follows its range check"
 )]
-fn js_number(x: f64) -> String {
+pub(super) fn js_number(x: f64) -> String {
     if x.is_nan() {
         return "NaN".to_owned();
     }

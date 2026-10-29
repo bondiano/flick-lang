@@ -155,19 +155,19 @@ func FloatCeil(x Value) Value  { return math.Ceil(x.(float64)) }
 func FloatTrunc(x Value) Value { return math.Trunc(x.(float64)) }
 func FloatSqrt(x Value) Value  { return math.Sqrt(x.(float64)) }
 
-// FloatRound is JS `Math.round`: halves go up, and the sign of zero stays.
+// FloatRound is JS `Math.round`: the nearest integer, halves up, and the
+// sign of zero kept. `x - floor(x)` is exact, so no half is misread.
 func FloatRound(x Value) Value {
 	f := x.(float64)
-	if math.IsNaN(f) || math.IsInf(f, 0) || f == math.Trunc(f) {
+	if math.IsNaN(f) || math.IsInf(f, 0) {
 		return f
 	}
-	r := math.Floor(f + 0.5)
-	if r == 0 && f < 0 {
-		return math.Copysign(0, -1)
+	r := math.Floor(f)
+	if f-r >= 0.5 {
+		r++
 	}
-	// f + 0.5 may round up past a float just below a half
-	if r-f > 0.5 {
-		r--
+	if r == 0 && math.Signbit(f) {
+		return math.Copysign(0, -1)
 	}
 	return r
 }

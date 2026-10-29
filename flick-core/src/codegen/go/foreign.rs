@@ -8,116 +8,164 @@ use crate::ir::Foreign;
 use crate::source::Span;
 
 const RUNTIME: &str = "@flick-lang/runtime";
+const STRING: &str = "@flick-lang/runtime/effect/String";
 
-/// The Go function of the binding `name` of `module` to `export` of
-/// `from`; a JS global, which may mean different things for different
-/// types, is looked up by the binding itself.
+/// The Go function of each JS export the target supports: module, export.
+const EXPORTS: &[(&str, &str, &str)] = &[
+    (RUNTIME, "equals", "flickrt.Equals"),
+    (RUNTIME, "compare", "flickrt.Compare"),
+    (RUNTIME, "hash", "flickrt.Hash"),
+    (RUNTIME, "show", "flickrt.Show"),
+    (RUNTIME, "identity", "flickrt.Identity"),
+    (RUNTIME, "listEquals", "flickrt.ListEquals"),
+    (RUNTIME, "listCompare", "flickrt.ListCompare"),
+    (RUNTIME, "listHash", "flickrt.ListHash"),
+    (RUNTIME, "listShow", "flickrt.ListShow"),
+    (RUNTIME, "stdoutLine", "flickrt.StdoutLine"),
+    (RUNTIME, "stderrLine", "flickrt.StderrLine"),
+    (RUNTIME, "stdoutWrite", "flickrt.StdoutWrite"),
+    (RUNTIME, "platformArgs", "flickrt.PlatformArgs"),
+    (RUNTIME, "platformEnv", "flickrt.PlatformEnv"),
+    (RUNTIME, "flickTodo", "flickrt.Todo"),
+    (RUNTIME, "flickAssert", "flickrt.Assert"),
+    (RUNTIME, "flickEcho", "flickrt.Echo"),
+    (RUNTIME, "refMake", "flickrt.RefMake"),
+    (RUNTIME, "refGet", "flickrt.RefGet"),
+    (RUNTIME, "refSame", "flickrt.RefSame"),
+    (RUNTIME, "refSet", "flickrt.RefSet"),
+    (RUNTIME, "refModify", "flickrt.RefModify"),
+    (RUNTIME, "stringFromNumber", "flickrt.StringFromNumber"),
+    (RUNTIME, "intParse", "flickrt.IntParse"),
+    (RUNTIME, "intFromFloat", "flickrt.IntFromFloat"),
+    (RUNTIME, "intTruncate", "flickrt.IntTruncate"),
+    (RUNTIME, "intAbs", "flickrt.IntAbs"),
+    (RUNTIME, "intCheckedAdd", "flickrt.IntCheckedAdd"),
+    (RUNTIME, "intCheckedSub", "flickrt.IntCheckedSub"),
+    (RUNTIME, "intCheckedMul", "flickrt.IntCheckedMul"),
+    (RUNTIME, "intCheckedDiv", "flickrt.IntCheckedDiv"),
+    (RUNTIME, "intCheckedRem", "flickrt.IntCheckedRem"),
+    (RUNTIME, "intUnsafeDiv", "flickrt.IntUnsafeDiv"),
+    (RUNTIME, "intUnsafeRem", "flickrt.IntUnsafeRem"),
+    (RUNTIME, "bitAnd", "flickrt.BitAnd"),
+    (RUNTIME, "bitOr", "flickrt.BitOr"),
+    (RUNTIME, "bitXor", "flickrt.BitXor"),
+    (RUNTIME, "bitNot", "flickrt.BitNot"),
+    (RUNTIME, "shiftLeft", "flickrt.ShiftLeft"),
+    (RUNTIME, "shiftRight", "flickrt.ShiftRight"),
+    (
+        RUNTIME,
+        "shiftRightUnsignedInt",
+        "flickrt.ShiftRightUnsignedInt",
+    ),
+    (RUNTIME, "numberStrictEqual", "flickrt.NumberStrictEqual"),
+    (RUNTIME, "numberSameValue", "flickrt.NumberSameValue"),
+    (RUNTIME, "listMap", "flickrt.ListMap"),
+    (RUNTIME, "listMapIndexed", "flickrt.ListMapIndexed"),
+    (RUNTIME, "listEachEffect", "flickrt.ListEach"),
+    (RUNTIME, "listFold", "flickrt.ListFold"),
+    (RUNTIME, "listFoldRight", "flickrt.ListFoldRight"),
+    (RUNTIME, "listFilter", "flickrt.ListFilter"),
+    (RUNTIME, "listFilterMap", "flickrt.ListFilterMap"),
+    (RUNTIME, "listFlatMap", "flickrt.ListFlatMap"),
+    (RUNTIME, "listMap2", "flickrt.ListMap2"),
+    (RUNTIME, "optionMap2", "flickrt.OptionMap2"),
+    (RUNTIME, "resultMap2", "flickrt.ResultMap2"),
+    (RUNTIME, "listFind", "flickrt.ListFind"),
+    (RUNTIME, "listFindIndex", "flickrt.ListFindIndex"),
+    (RUNTIME, "listAny", "flickrt.ListAny"),
+    (RUNTIME, "listAll", "flickrt.ListAll"),
+    (RUNTIME, "listPartition", "flickrt.ListPartition"),
+    (RUNTIME, "listSortBy", "flickrt.ListSortBy"),
+    (RUNTIME, "listLength", "flickrt.ListLength"),
+    (RUNTIME, "listGet", "flickrt.ListGet"),
+    (RUNTIME, "listSet", "flickrt.ListSet"),
+    (RUNTIME, "listSingleton", "flickrt.ListSingleton"),
+    (RUNTIME, "listRepeat", "flickrt.ListRepeat"),
+    (RUNTIME, "listRange", "flickrt.ListRange"),
+    (RUNTIME, "listInitialize", "flickrt.ListInitialize"),
+    (RUNTIME, "listReverse", "flickrt.ListReverse"),
+    (RUNTIME, "listConcat", "flickrt.ListConcatAll"),
+    (RUNTIME, "listTake", "flickrt.ListTake"),
+    (RUNTIME, "listDrop", "flickrt.ListDrop"),
+    (RUNTIME, "listSlice", "flickrt.ListSlice"),
+    (RUNTIME, "listZip", "flickrt.ListZip"),
+    (RUNTIME, "listUnzip", "flickrt.ListUnzip"),
+    (RUNTIME, "stringJoin", "flickrt.StringJoin"),
+    (RUNTIME, "stringReplaceAll", "flickrt.StringReplaceAll"),
+    (RUNTIME, "stringChars", "flickrt.Chars"),
+    (RUNTIME, "stringToNumber", "flickrt.StringToNumber"),
+    (RUNTIME, "stringLength", "flickrt.Length"),
+    (RUNTIME, "stringTrim", "flickrt.Trim"),
+    (STRING, "trim", "flickrt.Trim"),
+    (STRING, "trimStart", "flickrt.TrimStart"),
+    (STRING, "trimEnd", "flickrt.TrimEnd"),
+    (STRING, "length", "flickrt.Length"),
+    (STRING, "isNonEmpty", "flickrt.IsNonEmpty"),
+    (STRING, "split", "flickrt.Split"),
+    (STRING, "includes", "flickrt.Includes"),
+    (STRING, "startsWith", "flickrt.StartsWith"),
+    (STRING, "endsWith", "flickrt.EndsWith"),
+    (STRING, "indexOf", "flickrt.IndexOf"),
+    (STRING, "lastIndexOf", "flickrt.LastIndexOf"),
+    (STRING, "toUpperCase", "flickrt.ToUpperCase"),
+    (STRING, "toLowerCase", "flickrt.ToLowerCase"),
+    (STRING, "capitalize", "flickrt.Capitalize"),
+    (STRING, "uncapitalize", "flickrt.Uncapitalize"),
+    (STRING, "slice", "flickrt.Slice"),
+    (STRING, "substring", "flickrt.Substring"),
+    (STRING, "takeLeft", "flickrt.TakeLeft"),
+    (STRING, "takeRight", "flickrt.TakeRight"),
+    (STRING, "at", "flickrt.StringAt"),
+    (STRING, "charAt", "flickrt.CharAt"),
+    (STRING, "charCodeAt", "flickrt.CharCodeAt"),
+    (STRING, "codePointAt", "flickrt.CodePointAt"),
+    (STRING, "padStart", "flickrt.PadStart"),
+    (STRING, "padEnd", "flickrt.PadEnd"),
+    (STRING, "repeat", "flickrt.Repeat"),
+];
+
+/// The Go value or function of each binding to a JS global, which may mean
+/// different things for different types: by the binding's module and name.
+const GLOBALS: &[(&str, &str, &str)] = &[
+    ("Int", "to_float", "flickrt.IntToFloat"),
+    ("Numeric", "bigint_of", "flickrt.BigIntOfInt"),
+    ("Numeric", "float_of_bigint", "flickrt.FloatOfBigInt"),
+    ("Float", "pi", "flickrt.Pi"),
+    ("Float", "infinity", "flickrt.Inf"),
+    ("Float", "nan", "flickrt.NaN"),
+    ("Float", "is_nan", "flickrt.FloatIsNaN"),
+    ("Float", "is_finite", "flickrt.FloatIsFinite"),
+    ("Float", "is_integer", "flickrt.FloatIsInteger"),
+    ("Float", "is_safe_integer", "flickrt.FloatIsSafeInteger"),
+    ("Float", "abs", "flickrt.FloatAbs"),
+    ("Float", "floor", "flickrt.FloatFloor"),
+    ("Float", "ceil", "flickrt.FloatCeil"),
+    ("Float", "round", "flickrt.FloatRound"),
+    ("Float", "trunc", "flickrt.FloatTrunc"),
+    ("Float", "sqrt", "flickrt.FloatSqrt"),
+];
+
+/// The Go function of the binding `name` of `module` to `export` of `from`.
 fn lookup(module: &str, name: &str, from: Option<&str>, export: &str) -> Option<&'static str> {
-    let Some(from) = from else {
-        return global(module, name);
+    let (table, key) = match from {
+        Some(from) => (EXPORTS, (from, export)),
+        None => (GLOBALS, (module, name)),
     };
-    let found = match (from, export) {
-        (RUNTIME, "equals") => "flickrt.Equals",
-        (RUNTIME, "compare") => "flickrt.Compare",
-        (RUNTIME, "hash") => "flickrt.Hash",
-        (RUNTIME, "show") => "flickrt.Show",
-        (RUNTIME, "identity") => "flickrt.Identity",
-        (RUNTIME, "listEquals") => "flickrt.ListEquals",
-        (RUNTIME, "listCompare") => "flickrt.ListCompare",
-        (RUNTIME, "listHash") => "flickrt.ListHash",
-        (RUNTIME, "listShow") => "flickrt.ListShow",
-        (RUNTIME, "stdoutLine") => "flickrt.StdoutLine",
-        (RUNTIME, "stderrLine") => "flickrt.StderrLine",
-        (RUNTIME, "stdoutWrite") => "flickrt.StdoutWrite",
-        (RUNTIME, "platformArgs") => "flickrt.PlatformArgs",
-        (RUNTIME, "platformEnv") => "flickrt.PlatformEnv",
-        (RUNTIME, "flickTodo") => "flickrt.Todo",
-        (RUNTIME, "flickAssert") => "flickrt.Assert",
-        (RUNTIME, "flickEcho") => "flickrt.Echo",
-        (RUNTIME, "refMake") => "flickrt.RefMake",
-        (RUNTIME, "refGet") => "flickrt.RefGet",
-        (RUNTIME, "refSame") => "flickrt.RefSame",
-        (RUNTIME, "refSet") => "flickrt.RefSet",
-        (RUNTIME, "refModify") => "flickrt.RefModify",
-        (RUNTIME, "stringFromNumber") => "flickrt.StringFromNumber",
-        (RUNTIME, "intParse") => "flickrt.IntParse",
-        (RUNTIME, "intFromFloat") => "flickrt.IntFromFloat",
-        (RUNTIME, "intTruncate") => "flickrt.IntTruncate",
-        (RUNTIME, "intAbs") => "flickrt.IntAbs",
-        (RUNTIME, "intCheckedAdd") => "flickrt.IntCheckedAdd",
-        (RUNTIME, "intCheckedSub") => "flickrt.IntCheckedSub",
-        (RUNTIME, "intCheckedMul") => "flickrt.IntCheckedMul",
-        (RUNTIME, "intCheckedDiv") => "flickrt.IntCheckedDiv",
-        (RUNTIME, "intCheckedRem") => "flickrt.IntCheckedRem",
-        (RUNTIME, "intUnsafeDiv") => "flickrt.IntUnsafeDiv",
-        (RUNTIME, "intUnsafeRem") => "flickrt.IntUnsafeRem",
-        (RUNTIME, "bitAnd") => "flickrt.BitAnd",
-        (RUNTIME, "bitOr") => "flickrt.BitOr",
-        (RUNTIME, "bitXor") => "flickrt.BitXor",
-        (RUNTIME, "bitNot") => "flickrt.BitNot",
-        (RUNTIME, "shiftLeft") => "flickrt.ShiftLeft",
-        (RUNTIME, "shiftRight") => "flickrt.ShiftRight",
-        (RUNTIME, "shiftRightUnsignedInt") => "flickrt.ShiftRightUnsignedInt",
-        (RUNTIME, "numberStrictEqual") => "flickrt.NumberStrictEqual",
-        (RUNTIME, "numberSameValue") => "flickrt.NumberSameValue",
-        (RUNTIME, "listMap") => "flickrt.ListMap",
-        (RUNTIME, "listMapIndexed") => "flickrt.ListMapIndexed",
-        (RUNTIME, "listEachEffect") => "flickrt.ListEach",
-        (RUNTIME, "listFold") => "flickrt.ListFold",
-        (RUNTIME, "listFoldRight") => "flickrt.ListFoldRight",
-        (RUNTIME, "listFilter") => "flickrt.ListFilter",
-        (RUNTIME, "listFilterMap") => "flickrt.ListFilterMap",
-        (RUNTIME, "listFlatMap") => "flickrt.ListFlatMap",
-        (RUNTIME, "listMap2") => "flickrt.ListMap2",
-        (RUNTIME, "optionMap2") => "flickrt.OptionMap2",
-        (RUNTIME, "resultMap2") => "flickrt.ResultMap2",
-        (RUNTIME, "listFind") => "flickrt.ListFind",
-        (RUNTIME, "listFindIndex") => "flickrt.ListFindIndex",
-        (RUNTIME, "listAny") => "flickrt.ListAny",
-        (RUNTIME, "listAll") => "flickrt.ListAll",
-        (RUNTIME, "listPartition") => "flickrt.ListPartition",
-        (RUNTIME, "listSortBy") => "flickrt.ListSortBy",
-        (RUNTIME, "listLength") => "flickrt.ListLength",
-        (RUNTIME, "listGet") => "flickrt.ListGet",
-        (RUNTIME, "listSet") => "flickrt.ListSet",
-        (RUNTIME, "listSingleton") => "flickrt.ListSingleton",
-        (RUNTIME, "listRepeat") => "flickrt.ListRepeat",
-        (RUNTIME, "listRange") => "flickrt.ListRange",
-        (RUNTIME, "listInitialize") => "flickrt.ListInitialize",
-        (RUNTIME, "listReverse") => "flickrt.ListReverse",
-        (RUNTIME, "listConcat") => "flickrt.ListConcatAll",
-        (RUNTIME, "listTake") => "flickrt.ListTake",
-        (RUNTIME, "listDrop") => "flickrt.ListDrop",
-        (RUNTIME, "listSlice") => "flickrt.ListSlice",
-        (RUNTIME, "listZip") => "flickrt.ListZip",
-        (RUNTIME, "listUnzip") => "flickrt.ListUnzip",
-        _ => return None,
-    };
-    Some(found)
+    table
+        .iter()
+        .find(|(a, b, _)| (*a, *b) == key)
+        .map(|(_, _, go)| *go)
 }
 
-/// The Go value or function of a binding to a JS global.
-fn global(module: &str, name: &str) -> Option<&'static str> {
-    let found = match (module, name) {
-        ("Int", "to_float") => "flickrt.IntToFloat",
-        ("Numeric", "bigint_of") => "flickrt.BigIntOfInt",
-        ("Numeric", "float_of_bigint") => "flickrt.FloatOfBigInt",
-        ("Float", "pi") => "flickrt.Pi",
-        ("Float", "infinity") => "flickrt.Inf",
-        ("Float", "nan") => "flickrt.NaN",
-        ("Float", "is_nan") => "flickrt.FloatIsNaN",
-        ("Float", "is_finite") => "flickrt.FloatIsFinite",
-        ("Float", "is_integer") => "flickrt.FloatIsInteger",
-        ("Float", "is_safe_integer") => "flickrt.FloatIsSafeInteger",
-        ("Float", "abs") => "flickrt.FloatAbs",
-        ("Float", "floor") => "flickrt.FloatFloor",
-        ("Float", "ceil") => "flickrt.FloatCeil",
-        ("Float", "round") => "flickrt.FloatRound",
-        ("Float", "trunc") => "flickrt.FloatTrunc",
-        ("Float", "sqrt") => "flickrt.FloatSqrt",
-        _ => return None,
-    };
-    Some(found)
+/// How many parameters the Go function of a binding takes after its
+/// dictionaries: every stage, though the JS function takes `arity` and
+/// returns a function of the rest, as Effect's data-last functions do.
+pub(super) fn parameters(f: &Foreign) -> usize {
+    if f.arity == 0 {
+        f.info.stages_taken()
+    } else {
+        f.stages.len().max(f.arity)
+    }
 }
 
 impl Gen<'_> {
@@ -138,7 +186,7 @@ impl Gen<'_> {
             ));
             return None;
         };
-        let taken = f.info.stages_taken();
+        let taken = parameters(f);
         if f.dicts == 0 && taken == 0 {
             let var = names::var(self.module, &f.name);
             return Some(format!("var {var} flickrt.Value = {target}"));
@@ -147,7 +195,12 @@ impl Gen<'_> {
             .map(|i| format!("d{i}"))
             .chain((0..taken).map(|i| format!("a{i}")))
             .collect();
-        let args = &heads[..f.dicts + f.arity.min(taken)];
+        // a JS function of no arguments behind a `Unit` parameter
+        let args = if f.arity == 0 {
+            &heads[..f.dicts]
+        } else {
+            &heads[..]
+        };
         Some(format!(
             "func {}({}) flickrt.Value {{\n\treturn {target}({})\n}}",
             names::func(self.module, &f.name),

@@ -77,7 +77,7 @@ fn shape(kind: &ItemKind) -> Shape {
             },
         },
         ItemKind::Foreign(f) => {
-            let params = f.info.stages_taken();
+            let params = foreign::parameters(f);
             if f.dicts == 0 && params == 0 {
                 Shape::Var
             } else {

@@ -340,6 +340,16 @@ Values have the representation of the JS target, in Go terms:
 | a function | `func(flickrt.Value) flickrt.Value` per stage |
 | a dictionary | `*flickrt.Dict`; superclasses and default methods made on first use |
 
+Numbers and strings keep the semantics of the JS target: `Int` wraps
+around in 32 bits and divides by zero to `0`, `**` truncates a negative
+power; `Float` is IEEE double with JS `%` and `Math.pow`; `==` is
+SameValueZero; `show` writes a `Float` as JS `String` does
+(`0.30000000000000004`, `1e+21`, `-0`), the same digits constant folding
+writes. A `String` counts UTF-16 code units in `length`, indices and slices;
+a slice may cut a surrogate pair, `++` joins the halves back, strings order
+by code units, and writing to stdout replaces a lone half with U+FFFD as
+Node does. Case mapping is Go's simple one for now (`ß` stays `ß`).
+
 A top-level function is a Go function of its dictionaries and all its
 parameters; a full application calls it, and a partial one or a use as a
 value makes the curried function. A runtime call is a plain Go call: Go
