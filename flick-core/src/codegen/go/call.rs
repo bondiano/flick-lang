@@ -181,7 +181,7 @@ impl Gen<'_> {
                 let tag = names::string(&self.tag(c));
                 let call: Call = match c.rep {
                     Rep::Tagged if c.arity == 0 => {
-                        Box::new(move |_, _| format!("flickrt.NewData({tag})"))
+                        Box::new(move |_, _| format!("flickrt.Nullary({tag})"))
                     }
                     Rep::Tagged => Box::new(move |_, a: &[String]| {
                         format!("flickrt.NewData({tag}, {})", a.join(", "))

@@ -137,6 +137,8 @@ func ShowNumber(x float64) string {
 		return "-0"
 	case x == 0:
 		return "0"
+	case x == math.Trunc(x) && math.Abs(x) < 1<<53:
+		return strconv.FormatInt(int64(x), 10)
 	}
 	sign := ""
 	if x < 0 {
@@ -179,6 +181,11 @@ func evenTie(x float64, digits string, exp int) string {
 		return digits
 	}
 	lower := digits[:len(digits)-1] + string(last-1)
+	// a tie is `x` exactly, so a halfway point that reads as another number is none
+	half := lower + "5"
+	if h, err := strconv.ParseFloat(half[:1]+"."+half[1:]+"e"+strconv.Itoa(exp), 64); err != nil || h != x {
+		return digits
+	}
 	exact := strconv.FormatFloat(x, 'e', 800, 64)
 	mantissa, e, _ := strings.Cut(exact, "e")
 	exactExp, _ := strconv.Atoi(e)

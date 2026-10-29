@@ -10,9 +10,28 @@ import (
 // services, another owner) share the fiber's state.
 type Fiber struct {
 	state *fiberState
-	env   map[string]Value // the services provided, by key; never mutated
-	owner *Owner           // the innermost scope's
+	env   *env   // the services provided, by key
+	owner *Owner // the innermost scope's
 }
+
+// An env is the services and fiber-local settings in effect, innermost
+// first; a derived fiber adds to it without copying.
+type env struct {
+	key  string
+	v    Value
+	next *env
+}
+
+func (e *env) get(key string) (Value, bool) {
+	for ; e != nil; e = e.next {
+		if e.key == key {
+			return e.v, true
+		}
+	}
+	return nil, false
+}
+
+func (e *env) with(key string, v Value) *env { return &env{key, v, e} }
 
 type fiberState struct {
 	id        int64

@@ -14,11 +14,15 @@ import (
 // untagged union reports the first issue of each case.
 type Schema struct {
 	kind     schemaKind
-	item     *Schema   // list, option, redacted
-	items    []*Schema // tuple; result: error, then value
-	labels   []string  // record, in label order
-	variants []Variant // adt
-	name     string    // adt, lazy
+	item     *Schema     // list, option, redacted
+	items    []*Schema   // tuple; result: error, then value
+	labels   []string    // record, in label order
+	keys     []string    // record, in key order
+	pos      []int       // record: where each label's value is in key order
+	variants []Variant   // adt
+	fields   [][]*Schema // adt: nil for the tag, then each field's
+	wireKeys [][]string  // adt: `_tag` then each field's key
+	name     string      // adt, lazy
 	get      func() Value
 	once     sync.Once
 	target   *Schema // a lazy schema, resolved
@@ -92,11 +96,22 @@ func SchemaRecord(fields ...Value) Value {
 		s.labels = append(s.labels, fields[i].(string))
 		s.items = append(s.items, sch(fields[i+1]))
 	}
+	s.keys, s.pos = shapeOf(s.labels)
 	return s
 }
 
 func SchemaAdt(name string, variants []Variant) Value {
-	return &Schema{kind: kindAdt, name: name, variants: variants}
+	s := &Schema{kind: kindAdt, name: name, variants: variants}
+	for _, v := range variants {
+		keys, schemas := []string{"_tag"}, []*Schema{nil}
+		for i, f := range v.Fields {
+			keys = append(keys, "_"+strconv.Itoa(i))
+			schemas = append(schemas, sch(f))
+		}
+		s.wireKeys = append(s.wireKeys, keys)
+		s.fields = append(s.fields, schemas)
+	}
+	return s
 }
 
 // SchemaLazy is a schema resolved on first use: recursive types.
@@ -296,28 +311,18 @@ func (w *wire) decode(in Value) (Value, []issue) {
 		if issues != nil {
 			return nil, issues
 		}
-		r := &Record{}
-		for i, l := range s.labels {
-			r = r.set(l, fields[i])
-		}
-		return r, nil
+		return shaped(s.keys, s.pos, fields), nil
 	case kindAdt:
 		obj, ok := in.(*Record)
 		if !ok {
 			return nil, expected("an object with a `_tag`", in)
 		}
 		name, _ := recordField(obj, "_tag").(string)
-		for _, v := range s.variants {
+		for at, v := range s.variants {
 			if v.Name != name {
 				continue
 			}
-			keys := []string{"_tag"}
-			schemas := []*Schema{nil}
-			for i, f := range v.Fields {
-				keys = append(keys, "_"+strconv.Itoa(i))
-				schemas = append(schemas, sch(f))
-			}
-			fields, issues := object(obj, keys, schemas)
+			fields, issues := object(obj, s.wireKeys[at], s.fields[at])
 			if issues != nil {
 				return nil, issues
 			}
@@ -428,31 +433,32 @@ func (w *wire) encode(v Value) (Value, []issue) {
 		return Rec(key, e), nil
 	case kindRecord:
 		r := v.(*Record)
-		out := &Record{}
+		out := make([]Value, len(s.labels))
 		for i, l := range s.labels {
 			e, issues := s.items[i].jsonOf().encode(r.Get(l))
 			if issues != nil {
 				return nil, under(l, issues)
 			}
-			out = out.set(l, e)
+			out[i] = e
 		}
-		return out, nil
+		return shaped(s.keys, s.pos, out), nil
 	case kindAdt:
 		d := v.(*Data)
-		for _, variant := range s.variants {
+		for at, variant := range s.variants {
 			if variant.Tag != d.Tag {
 				continue
 			}
-			out := (&Record{}).set("_tag", variant.Name)
-			for i, f := range variant.Fields {
-				key := "_" + strconv.Itoa(i)
-				e, issues := sch(f).jsonOf().encode(d.Fields[i])
+			keys := s.wireKeys[at]
+			out := make([]Value, len(keys))
+			out[0] = variant.Name
+			for i, f := range s.fields[at][1:] {
+				e, issues := f.jsonOf().encode(d.Fields[i])
 				if issues != nil {
-					return nil, under(key, issues)
+					return nil, under(keys[i+1], issues)
 				}
-				out = out.set(key, e)
+				out[i+1] = e
 			}
-			return out, nil
+			return &Record{keys, out}, nil
 		}
 	}
 	panic(Defect{"a value its schema does not describe"})

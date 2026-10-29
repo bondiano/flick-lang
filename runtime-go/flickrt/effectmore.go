@@ -99,13 +99,8 @@ func CachedInvalidateWithTTL(_ *Fiber, d, task Value) Value {
 // withEnv runs `task` with `key` set in the fiber's environment, where
 // fiber-local settings live beside the services.
 func withEnv(fb *Fiber, key string, v, task Value) Value {
-	env := make(map[string]Value, len(fb.env)+1)
-	for k, x := range fb.env {
-		env[k] = x
-	}
-	env[key] = v
 	inner := *fb
-	inner.env = env
+	inner.env = fb.env.with(key, v)
 	return Run(&inner, task)
 }
 
@@ -125,7 +120,7 @@ var defaultScheduler Value = &scheduler{}
 func SchedulerMakeMixed() Value { return &scheduler{} }
 
 func SchedulerCurrent(fb *Fiber) Value {
-	if s, ok := fb.env[schedulerKey]; ok {
+	if s, ok := fb.env.get(schedulerKey); ok {
 		return s
 	}
 	return defaultScheduler
@@ -134,7 +129,7 @@ func SchedulerCurrent(fb *Fiber) Value {
 func SchedulerWith(fb *Fiber, s, task Value) Value { return withEnv(fb, schedulerKey, s, task) }
 
 func SchedulerMaxOps(fb *Fiber) Value {
-	if n, ok := fb.env[maxOpsKey]; ok {
+	if n, ok := fb.env.get(maxOpsKey); ok {
 		return n
 	}
 	return int32(2048)
@@ -193,7 +188,7 @@ func PlanMerge(plans Value) Value { return PlanMake(plans) }
 const metadataKey = "$executionPlanMetadata"
 
 func PlanCurrentMetadata(fb *Fiber) Value {
-	if m, ok := fb.env[metadataKey]; ok {
+	if m, ok := fb.env.get(metadataKey); ok {
 		return m
 	}
 	return Rec("attempt", int32(0), "stepIndex", int32(0))

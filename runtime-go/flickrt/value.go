@@ -10,6 +10,7 @@ package flickrt
 import (
 	"fmt"
 	"strings"
+	"sync"
 )
 
 // Value is any Flick value.
@@ -64,6 +65,21 @@ func ConstructorName(tag string) string {
 	}
 	return tag[strings.LastIndexByte(tag, '.')+1:]
 }
+
+// Nullary is the one value of a constructor without fields, as the JS
+// target's is one object.
+func Nullary(tag string) Value {
+	if tag == "None" {
+		return None
+	}
+	if v, ok := nullaries.Load(tag); ok {
+		return v
+	}
+	v, _ := nullaries.LoadOrStore(tag, &Data{Tag: tag})
+	return v
+}
+
+var nullaries sync.Map
 
 // NewData builds a value of a constructor with its fields.
 func NewData(tag string, fields ...Value) Value {

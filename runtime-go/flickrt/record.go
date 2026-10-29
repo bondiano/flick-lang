@@ -1,6 +1,7 @@
 package flickrt
 
 import (
+	"slices"
 	"sort"
 	"strconv"
 )
@@ -16,6 +17,9 @@ type Record struct {
 
 // arrayIndex is whether `k` is a key JS orders as an array index.
 func arrayIndex(k string) (uint32, bool) {
+	if k == "" || k[0] < '0' || k[0] > '9' {
+		return 0, false
+	}
 	n, err := strconv.ParseUint(k, 10, 32)
 	if err != nil || n == 1<<32-1 || strconv.FormatUint(n, 10) != k {
 		return 0, false
@@ -52,11 +56,65 @@ func (r *Record) set(k string, v Value) *Record {
 	return out
 }
 
+// put sets `k` to `v` in place: only for a record still being built.
+func (r *Record) put(k string, v Value) {
+	if i := r.index(k); i >= 0 {
+		r.vals[i] = v
+		return
+	}
+	at := len(r.keys)
+	if n, ok := arrayIndex(k); ok {
+		at = sort.Search(len(r.keys), func(i int) bool {
+			m, isIndex := arrayIndex(r.keys[i])
+			return !isIndex || m > n
+		})
+	}
+	r.keys = slices.Insert(r.keys, at, k)
+	r.vals = slices.Insert(r.vals, at, v)
+}
+
+// newRecord is an empty record with room for `n` fields.
+func newRecord(n int) *Record {
+	return &Record{make([]string, 0, n), make([]Value, 0, n)}
+}
+
+// shapeOf is the key order of a record of `labels`, and where each label's
+// value goes in it; nil when that is the labels' own order.
+func shapeOf(labels []string) ([]string, []int) {
+	r := newRecord(len(labels))
+	for i, l := range labels {
+		r.put(l, i)
+	}
+	pos := make([]int, len(labels))
+	same := true
+	for at, i := range r.vals {
+		pos[i.(int)] = at
+		same = same && at == i.(int)
+	}
+	if same {
+		return r.keys, nil
+	}
+	return r.keys, pos
+}
+
+// shaped is the record of `keys` from shapeOf with the labels' values;
+// it takes `vals` over.
+func shaped(keys []string, pos []int, vals []Value) *Record {
+	if pos == nil {
+		return &Record{keys, vals}
+	}
+	out := make([]Value, len(vals))
+	for i, v := range vals {
+		out[pos[i]] = v
+	}
+	return &Record{keys, out}
+}
+
 // Rec is a record of labels and values, alternating.
 func Rec(fields ...Value) Value {
-	r := &Record{}
+	r := newRecord(len(fields) / 2)
 	for i := 0; i < len(fields); i += 2 {
-		r = r.set(fields[i].(string), fields[i+1])
+		r.put(fields[i].(string), fields[i+1])
 	}
 	return r
 }
@@ -73,10 +131,12 @@ func (r *Record) Get(k string) Value {
 
 // Update is a copy of a record with some fields replaced or added.
 func Update(base Value, fields Value) Value {
-	out := record(base)
-	f := record(fields)
+	b, f := record(base), record(fields)
+	out := newRecord(len(b.keys) + len(f.keys))
+	out.keys = append(out.keys, b.keys...)
+	out.vals = append(out.vals, b.vals...)
 	for i, k := range f.keys {
-		out = out.set(k, f.vals[i])
+		out.put(k, f.vals[i])
 	}
 	return out
 }
@@ -104,7 +164,7 @@ func RecordFromEntries(entries Value) Value {
 	r := &Record{}
 	for _, e := range List(entries) {
 		pair := e.([]Value)
-		r = r.set(pair[0].(string), pair[1])
+		r.put(pair[0].(string), pair[1])
 	}
 	return r
 }

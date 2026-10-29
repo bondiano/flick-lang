@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -41,7 +42,9 @@ func JsonParse(text Value) Value {
 type jsonParser struct {
 	s       string
 	i       int
-	problem string // what V8 says was expected where parsing stopped
+	problem string   // what V8 says was expected where parsing stopped
+	keys    []string // the keys and values of the arrays and objects being read
+	vals    []Value
 }
 
 // at is V8's position of the parser, in UTF-16 units, with its line and
@@ -96,7 +99,8 @@ func (p *jsonParser) value() (Value, bool) {
 	case c == '[':
 		return p.array()
 	case c == '"':
-		return p.string()
+		v, ok := p.string()
+		return v, ok
 	case c == 't':
 		return p.literal("true", true)
 	case c == 'f':
@@ -147,15 +151,15 @@ func (p *jsonParser) number() (Value, bool) {
 	return x, true
 }
 
-func (p *jsonParser) string() (Value, bool) {
+func (p *jsonParser) string() (string, bool) {
 	v, ok := p.quoted()
 	if !ok && p.problem == "" {
-		return p.expect("Unterminated string")
+		p.expect("Unterminated string")
 	}
 	return v, ok
 }
 
-func (p *jsonParser) quoted() (Value, bool) {
+func (p *jsonParser) quoted() (string, bool) {
 	p.i++
 	var units []uint16
 	plain := p.i
@@ -171,20 +175,22 @@ func (p *jsonParser) quoted() (Value, bool) {
 			p.i++
 			return fromUnits(units), true
 		case c < 0x20:
-			return p.expect("Bad control character in string literal")
+			p.expect("Bad control character in string literal")
+			return "", false
 		case c == '\\':
 			if units == nil {
 				units = utf16Units(p.s[plain:p.i])
 			}
 			if p.i+1 >= len(p.s) {
 				p.i = len(p.s)
-				return nil, false
+				return "", false
 			}
 			e := p.s[p.i+1]
 			p.i += 2
-			bad := func() (Value, bool) {
+			bad := func() (string, bool) {
 				p.i--
-				return p.expect("Bad escaped character")
+				p.expect("Bad escaped character")
+				return "", false
 			}
 			switch e {
 			case '"', '\\', '/':
@@ -202,11 +208,12 @@ func (p *jsonParser) quoted() (Value, bool) {
 			case 'u':
 				if p.i+4 > len(p.s) {
 					p.i = len(p.s)
-					return nil, false
+					return "", false
 				}
 				n, err := strconv.ParseUint(p.s[p.i:p.i+4], 16, 16)
 				if err != nil {
-					return p.expect("Bad Unicode escape")
+					p.expect("Bad Unicode escape")
+					return "", false
 				}
 				units = append(units, uint16(n))
 				p.i += 4
@@ -221,24 +228,25 @@ func (p *jsonParser) quoted() (Value, bool) {
 			p.i += n
 		}
 	}
-	return nil, false
+	return "", false
 }
 
 func (p *jsonParser) array() (Value, bool) {
 	p.i++
-	out := []Value{}
 	p.space()
 	if p.i < len(p.s) && p.s[p.i] == ']' {
 		p.i++
-		return out, true
+		return []Value{}, true
 	}
+	mark := len(p.vals)
+	defer func() { p.vals = p.vals[:mark] }()
 	for {
 		p.space()
 		v, ok := p.value()
 		if !ok {
 			return nil, false
 		}
-		out = append(out, v)
+		p.vals = append(p.vals, v)
 		p.space()
 		if p.i >= len(p.s) {
 			return nil, false
@@ -248,7 +256,7 @@ func (p *jsonParser) array() (Value, bool) {
 			p.i++
 		case ']':
 			p.i++
-			return out, true
+			return slices.Clone(p.vals[mark:]), true
 		default:
 			return p.expect("Expected ',' or ']' after array element")
 		}
@@ -257,12 +265,13 @@ func (p *jsonParser) array() (Value, bool) {
 
 func (p *jsonParser) object() (Value, bool) {
 	p.i++
-	out := &Record{}
 	p.space()
 	if p.i < len(p.s) && p.s[p.i] == '}' {
 		p.i++
-		return out, true
+		return &Record{}, true
 	}
+	keys, mark := len(p.keys), len(p.vals)
+	defer func() { p.keys, p.vals = p.keys[:keys], p.vals[:mark] }()
 	first := true
 	for {
 		p.space()
@@ -287,7 +296,7 @@ func (p *jsonParser) object() (Value, bool) {
 		if !ok {
 			return nil, false
 		}
-		out = out.set(k.(string), v)
+		p.keys, p.vals = append(p.keys, k), append(p.vals, v)
 		p.space()
 		if p.i >= len(p.s) {
 			return nil, false
@@ -297,6 +306,10 @@ func (p *jsonParser) object() (Value, bool) {
 			p.i++
 		case '}':
 			p.i++
+			out := newRecord(len(p.keys) - keys)
+			for i, k := range p.keys[keys:] {
+				out.put(k, p.vals[mark+i])
+			}
 			return out, true
 		default:
 			return p.expect("Expected ',' or '}' after property value")
@@ -327,7 +340,7 @@ func stringify(b *strings.Builder, v Value) {
 	case int32:
 		b.WriteString(strconv.Itoa(int(x)))
 	case string:
-		b.WriteString(QuoteJSON(x))
+		quoteTo(b, x)
 	case []Value:
 		b.WriteByte('[')
 		for i, e := range x {
@@ -343,7 +356,7 @@ func stringify(b *strings.Builder, v Value) {
 			if i > 0 {
 				b.WriteByte(',')
 			}
-			b.WriteString(QuoteJSON(k))
+			quoteTo(b, k)
 			b.WriteByte(':')
 			stringify(b, x.vals[i])
 		}

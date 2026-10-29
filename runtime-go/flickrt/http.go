@@ -46,11 +46,11 @@ func (q *ServerRequest) read() ([]byte, error) {
 type ServerResponse struct {
 	status      int
 	contentType string
-	body        []byte
+	body        string
 }
 
 // response is a response of the options, `status` unless they set one.
-func response(options Value, status int, contentType string, body []byte) Value {
+func response(options Value, status int, contentType string, body string) Value {
 	o := options.(*Record)
 	if s, ok := some(o.Get("status")); ok {
 		status = int(s.(int32))
@@ -62,17 +62,25 @@ func response(options Value, status int, contentType string, body []byte) Value 
 }
 
 func ResponseText(text, options Value) Value {
-	return response(options, 200, "text/plain", []byte(wellFormed(text.(string))))
+	return response(options, 200, "text/plain", wellFormed(text.(string)))
 }
 
-func ResponseEmpty(options Value) Value { return response(options, 204, "", nil) }
+func ResponseEmpty(options Value) Value { return response(options, 204, "", "") }
 
 func ResponseJson(_ *Fiber, json, options Value) Value {
-	return response(options, 200, "application/json", []byte(JsonStringify(json).(string)))
+	return response(options, 200, "application/json", JsonStringify(json).(string))
 }
 
 // ResponseSchemaJson is the JSON of a value of a codec.
 func ResponseSchemaJson(_ *Fiber, c, v, options Value) Value {
+	if w, ok := c.(*wire); ok {
+		var b strings.Builder
+		b.Grow(256)
+		if issues := w.write(&b, v); issues != nil {
+			return Fail(schemaErrorOf(issues))
+		}
+		return response(options, 200, "application/json", b.String())
+	}
 	e, issues := codecOf(c).encode(v)
 	if issues != nil {
 		return Fail(schemaErrorOf(issues))
@@ -138,17 +146,11 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 	serving := *fb
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		state := newState()
-		go func() {
-			select {
-			case <-r.Context().Done():
-				state.interrupt(0)
-			case <-state.signal:
-			}
-		}()
+		stop := context.AfterFunc(r.Context(), func() { state.interrupt(0) })
 		inner := serving
 		inner.state = state
 		out, cause := catch(func() Value { return Run(&inner, Apply(handler, &ServerRequest{r: r})) })
-		state.interrupt(0) // ends the watch above
+		stop()
 		if cause != nil {
 			w.WriteHeader(statusOf(cause))
 			return
@@ -158,7 +160,7 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 			w.Header().Set("Content-Type", resp.contentType)
 		}
 		w.WriteHeader(resp.status)
-		w.Write(resp.body)
+		io.WriteString(w, resp.body)
 	})}
 	go srv.Serve(listener)
 	var grace time.Duration

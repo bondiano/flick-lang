@@ -114,7 +114,18 @@ func CompareStrings(a, b string) int {
 // escaped.
 func QuoteJSON(s string) string {
 	var b strings.Builder
+	quoteTo(&b, s)
+	return b.String()
+}
+
+// quoteTo writes QuoteJSON of `s`.
+func quoteTo(b *strings.Builder, s string) {
 	b.WriteByte('"')
+	if plainJSON(s) {
+		b.WriteString(s)
+		b.WriteByte('"')
+		return
+	}
 	for len(s) > 0 {
 		r, n := decode(s)
 		switch {
@@ -141,7 +152,17 @@ func QuoteJSON(s string) string {
 		s = s[n:]
 	}
 	b.WriteByte('"')
-	return b.String()
+}
+
+// plainJSON is whether `s` quotes to itself: no byte to escape and no lone
+// surrogate, whose WTF-8 starts with 0xED.
+func plainJSON(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if c := s[i]; c < 0x20 || c == '"' || c == '\\' || c == 0xED {
+			return false
+		}
+	}
+	return true
 }
 
 // wellFormed is `s` with each lone surrogate replaced by U+FFFD, as Node

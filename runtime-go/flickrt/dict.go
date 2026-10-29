@@ -1,16 +1,25 @@
 package flickrt
 
+import "sync"
+
 // Dict is the dictionary of a class instance: its methods, and entries
 // computed on first use (superclass dictionaries `$Class` and default
-// methods), as the JS target's getters are.
+// methods), as the JS target's getters are. Fibers share dictionaries, so
+// neither map changes once the dictionary is built.
 type Dict struct {
 	entries map[string]Value
-	lazy    map[string]func() Value
+	lazy    map[string]*lazyEntry
+}
+
+type lazyEntry struct {
+	once sync.Once
+	f    func() Value
+	v    Value
 }
 
 // NewDict is an empty dictionary to fill with Set and Lazy.
 func NewDict() *Dict {
-	return &Dict{entries: map[string]Value{}, lazy: map[string]func() Value{}}
+	return &Dict{entries: map[string]Value{}, lazy: map[string]*lazyEntry{}}
 }
 
 // Set binds a method.
@@ -21,7 +30,7 @@ func (d *Dict) Set(name string, v Value) *Dict {
 
 // Lazy binds an entry computed when it is first read.
 func (d *Dict) Lazy(name string, f func() Value) *Dict {
-	d.lazy[name] = f
+	d.lazy[name] = &lazyEntry{f: f}
 	return d
 }
 
@@ -29,13 +38,12 @@ func (d *Dict) get(name string) Value {
 	if v, ok := d.entries[name]; ok {
 		return v
 	}
-	f, ok := d.lazy[name]
+	e, ok := d.lazy[name]
 	if !ok {
 		panic(Defect{"dictionary has no `" + name + "`"})
 	}
-	v := f()
-	d.entries[name] = v
-	return v
+	e.once.Do(func() { e.v = e.f() })
+	return e.v
 }
 
 // Method is the method `name` of a dictionary.
