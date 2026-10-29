@@ -29,7 +29,8 @@ let main () =
   let exits = parallel_exits [task { 1 }, task { from_result (Err (Boom 2)) }]
   say (show (List.map ended exits))
   say (show (List.length (List.filter_map Exit.failure exits), List.filter_map Exit.value exits))
-  let made : List (Exit {Boom} Float) = [Exit.succeed 3, Exit.fail (Boom 4), Exit.die "broken", Exit.interrupt (Some 7)]
+  let made : List (Exit {Boom} Float) =
+    [Exit.succeed 3, Exit.fail (Boom 4), Exit.die "broken", Exit.interrupt (Some 7)]
   say (show (List.map ended made))
   say (show (List.map Exit.is_success made, List.map Exit.has_dies made))
   say (show (List.map Exit.find_error_option made))
