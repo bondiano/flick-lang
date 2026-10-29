@@ -1,0 +1,25 @@
+# The Go values and functions of bindings to JS globals, which may mean
+# different things for different types: under `[global Module]`, the
+# binding's name and its value or function of package `flickrt`.
+
+[global Float]
+pi Pi
+infinity Inf
+nan NaN
+is_nan FloatIsNaN
+is_finite FloatIsFinite
+is_integer FloatIsInteger
+is_safe_integer FloatIsSafeInteger
+abs FloatAbs
+floor FloatFloor
+ceil FloatCeil
+round FloatRound
+trunc FloatTrunc
+sqrt FloatSqrt
+
+[global Int]
+to_float IntToFloat
+
+[global Numeric]
+bigint_of BigIntOfInt
+float_of_bigint FloatOfBigInt

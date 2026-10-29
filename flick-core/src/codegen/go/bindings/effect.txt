@@ -1,0 +1,144 @@
+# The Go functions of the JS exports the go target supports: under each
+# `[module]`, an export and the function of package `flickrt`.
+
+[@flick-lang/runtime/effect/BigDecimal]
+normalize DecimalNormalize
+flickScale DecimalSetScale
+sumAll DecimalSumAll
+multiplyAll DecimalMultiplyAll
+divide DecimalDivide
+remainder DecimalRemainder
+min DecimalMin
+max DecimalMax
+isLessThan DecimalLess
+isLessThanOrEqualTo DecimalLessEq
+isGreaterThan DecimalGreater
+isGreaterThanOrEqualTo DecimalGreaterEq
+between DecimalBetween
+clamp DecimalClamp
+flickSign DecimalSign
+abs DecimalAbs
+negate DecimalNegate
+toExponential DecimalToExponential
+isInteger DecimalIsInteger
+isZero DecimalIsZero
+isNegative DecimalIsNegative
+isPositive DecimalIsPositive
+flickRound DecimalRound
+flickTruncate DecimalTruncate
+flickCeil DecimalCeil
+flickFloor DecimalFloor
+
+[@flick-lang/runtime/effect/BigInt]
+abs BigIntAbs
+sum BigIntSum
+subtract BigIntSubtract
+multiply BigIntMultiply
+increment BigIntIncrement
+decrement BigIntDecrement
+gcd BigIntGcd
+lcm BigIntLcm
+sqrt BigIntSqrt
+sumAll BigIntSumAll
+multiplyAll BigIntMultiplyAll
+min BigIntMin
+max BigIntMax
+isLessThan BigIntLess
+isLessThanOrEqualTo BigIntLessEq
+isGreaterThan BigIntGreater
+isGreaterThanOrEqualTo BigIntGreaterEq
+between BigIntBetween
+clamp BigIntClamp
+toNumber BigIntToNumber
+fromNumber BigIntFromNumber
+fromString BigIntFromString
+flickSign BigIntSign
+
+[@flick-lang/runtime/effect/HashMap]
+flickFromList HashMapFromList
+flickIsEmpty HashMapIsEmpty
+flickHas HashMapHas
+flickGetHash HashMapGetHash
+flickHasHash HashMapHasHash
+flickHasBy HashMapHasBy
+flickKeys HashMapKeys
+flickValues HashMapValues
+flickModifyAt HashMapModifyAt
+flickModifyHash HashMapModifyHash
+flickModify HashMapModify
+flickRemoveMany HashMapRemoveMany
+flickSetMany HashMapSetMany
+flickMap HashMapMap
+flickFlatMap HashMapFlatMap
+flickReduce HashMapReduce
+flickFilter HashMapFilter
+flickCompact HashMapCompact
+flickFilterMap HashMapFilterMap
+flickFindFirst HashMapFindFirst
+flickSome HashMapSome
+flickEvery HashMapEvery
+
+[@flick-lang/runtime/effect/HashSet]
+flickIsEmpty HashSetIsEmpty
+flickIntersection HashSetIntersection
+flickDifference HashSetDifference
+flickIsSubset HashSetIsSubset
+flickMap HashSetMap
+flickFilter HashSetFilter
+flickSome HashSetSome
+flickEvery HashSetEvery
+flickReduce HashSetReduce
+
+[@flick-lang/runtime/effect/Number]
+min NumberMin
+max NumberMax
+sum NumberSum
+subtract NumberSubtract
+multiply NumberMultiply
+divide NumberDivide
+remainder NumberRemainder
+increment NumberIncrement
+decrement NumberDecrement
+sumAll NumberSumAll
+multiplyAll NumberMultiplyAll
+isLessThan NumberLess
+isLessThanOrEqualTo NumberLessEq
+isGreaterThan NumberGreater
+isGreaterThanOrEqualTo NumberGreaterEq
+between NumberBetween
+clamp NumberClamp
+flickSign NumberSign
+nextPow2 NumberNextPow2
+round NumberRoundTo
+parse NumberParse
+
+[@flick-lang/runtime/effect/Redacted]
+flickEquivalent RedactedEquivalent
+
+[@flick-lang/runtime/effect/String]
+trim Trim
+trimStart TrimStart
+trimEnd TrimEnd
+length Length
+isNonEmpty IsNonEmpty
+split Split
+includes Includes
+startsWith StartsWith
+endsWith EndsWith
+indexOf IndexOf
+lastIndexOf LastIndexOf
+toUpperCase ToUpperCase
+toLowerCase ToLowerCase
+capitalize Capitalize
+uncapitalize Uncapitalize
+slice Slice
+substring Substring
+takeLeft TakeLeft
+takeRight TakeRight
+at StringAt
+charAt CharAt
+charCodeAt CharCodeAt
+codePointAt CodePointAt
+padStart PadStart
+padEnd PadEnd
+repeat Repeat
