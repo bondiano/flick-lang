@@ -55,7 +55,7 @@ func Equals(a, b Value) bool {
 		return ok && decCompare(x, y) == 0
 	case *Duration:
 		y, ok := b.(*Duration)
-		return ok && x.infinite == y.infinite && (x.infinite || x.nanos.Cmp(y.nanos) == 0)
+		return ok && durationOrder(x, y) == 0
 	case Fn, Poly, *Dict:
 		// functions compare by identity on the JS target; Go cannot compare them
 		return false

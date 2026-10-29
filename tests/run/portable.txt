@@ -29,11 +29,14 @@ stdlib/collections
 stdlib/decimals
 stdlib/effect/array
 stdlib/effect/combine
+stdlib/effect/duration
+stdlib/effect/function
 stdlib/effect/hash_map
 stdlib/effect/hash_set
 stdlib/effect/number
 stdlib/effect/option
 stdlib/effect/order
+stdlib/effect/record
 stdlib/effect/string
 stdlib/hash_order
 stdlib/monoids

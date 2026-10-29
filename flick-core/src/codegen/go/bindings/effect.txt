@@ -244,6 +244,41 @@ flickFilterMapWhile ArrayFilterMapWhile
 flickRepeat ArrayRepeat
 
 [@flick-lang/runtime/effect/Record]
+collect RecordCollect
+difference RecordDifference
+empty RecordEmpty
+every RecordEvery
+filterMap RecordFilterMap
+filter RecordFilter
+findFirst RecordFindFirst
+flickMakeEquivalence RecordEquivalence
+fromIterableBy RecordFromIterableBy
+fromIterableWith RecordFromIterableWith
+getFailures RecordGetFailures
+get RecordGetKey
+getSomes RecordGetSomes
+getSuccesses RecordGetSuccesses
+has RecordHas
+intersection RecordIntersection
+isEmptyReadonlyRecord RecordIsEmpty
+isSubrecordBy RecordIsSubrecordBy
+keys RecordKeys
+mapEntries RecordMapEntries
+mapKeys RecordMapKeys
+map RecordMap
+modify RecordModify
+partition RecordPartition
+pop RecordPop
+reduce RecordReduce
+remove RecordRemoveKey
+replace RecordReplace
+separate RecordSeparate
+set RecordSet
+singleton RecordSingleton
+size RecordSize
+some RecordSome
+union RecordUnion
+values RecordValues
 toEntries RecordToEntries
 fromEntries RecordFromEntries
 makeReducerUnion RecordReducerUnion
@@ -330,10 +365,22 @@ ReducerMultiply BigIntReducerMultiply
 ReducerConcat StringConcat
 
 [@flick-lang/runtime/effect/Boolean]
+not BoolNot
+and BoolAnd
+nand BoolNand
+or BoolOr
+nor BoolNor
+xor BoolXor
+eqv BoolEqv
+implies BoolImplies
+every BoolEvery
+some BoolSome
+match BoolMatch
 ReducerAnd BooleanAnd
 ReducerOr BooleanOr
 
 [@flick-lang/runtime/effect/Struct]
+Record RecordFromKeys
 flickMakeCombiner StructCombiner
 flickMakeReducer StructReducer
 
@@ -351,3 +398,77 @@ escape RegExpEscape
 flickMatch RegExpMatch
 flickMatchAll RegExpMatchAll
 flickReplaceAll RegExpReplaceAll
+
+[@flick-lang/runtime/effect/Duration]
+between DurationBetween
+clamp DurationClamp
+flickDays DurationDays
+flickDivide DurationDivide
+flickFromInput DurationFromInput
+flickHours DurationHours
+flickMatchPair DurationMatchPair
+flickMicros DurationMicros
+flickSubtract DurationSubtract
+flickTimes DurationTimes
+flickToDays DurationToDays
+flickToHours DurationToHours
+flickToHrTime DurationToHrTime
+flickToMinutes DurationToMinutes
+flickToSeconds DurationToSeconds
+flickToWeeks DurationToWeeks
+flickWeeks DurationWeeks
+isGreaterThan DurationGreater
+isGreaterThanOrEqualTo DurationGreaterEq
+isLessThan DurationLess
+isLessThanOrEqualTo DurationLessEq
+isPositive DurationIsPositive
+isZero DurationIsZero
+match DurationMatch
+max DurationMax
+min DurationMin
+parts DurationParts
+toNanos DurationToNanos
+
+[@flick-lang/runtime/effect/Predicate]
+mapInput PredicateMapInput
+not PredicateNot
+and PredicateAnd
+or PredicateOr
+xor PredicateXor
+eqv PredicateEqv
+implies PredicateImplies
+nand PredicateNand
+nor PredicateNor
+every PredicateEvery
+some PredicateSome
+
+[@flick-lang/runtime/effect/Filter]
+make FilterMake
+mapFail FilterMapFail
+fromPredicate FilterFromPredicate
+fromPredicateOption FilterFromPredicateOption
+toPredicate FilterToPredicate
+toOption FilterToOption
+toResult FilterToResult
+equals FilterEquals
+equalsStrict FilterEqualsStrict
+or FilterOr
+zipWith FilterZipWith
+zip FilterZip
+andLeft FilterAndLeft
+andRight FilterAndRight
+compose FilterCompose
+composePassthrough FilterComposePassthrough
+makeEffect FilterMake
+
+[@flick-lang/runtime/effect/Function]
+constant FunctionConstant
+constTrue FunctionConstTrue
+constFalse FunctionConstFalse
+constVoid FunctionConstVoid
+flickFlip FunctionFlip
+compose FunctionCompose
+absurd FunctionAbsurd
+tupled FunctionTupled
+flickUntupled FunctionUntupled
+SK FunctionSK

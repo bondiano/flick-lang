@@ -2,6 +2,12 @@
 # `[module]`, an export and the function of package `flickrt`.
 
 [@flick-lang/runtime]
+recordLabels RecordLabels
+recordProject RecordProject
+durationNanos DurationNanos
+durationAdd DurationAdd
+durationCompare DurationCompare
+durationIsFinite DurationIsFinite
 decimalFromString DecimalFromString
 decimalFromBigInt DecimalFromBigInt
 decimalFromInteger DecimalFromInteger

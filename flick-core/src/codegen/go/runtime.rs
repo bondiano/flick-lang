@@ -27,8 +27,16 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/dict.go"),
     ),
     (
+        "duration.go",
+        include_str!("../../../../runtime-go/flickrt/duration.go"),
+    ),
+    (
         "effnum.go",
         include_str!("../../../../runtime-go/flickrt/effnum.go"),
+    ),
+    (
+        "fnmods.go",
+        include_str!("../../../../runtime-go/flickrt/fnmods.go"),
     ),
     (
         "hash.go",
@@ -61,6 +69,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "record.go",
         include_str!("../../../../runtime-go/flickrt/record.go"),
+    ),
+    (
+        "recordfn.go",
+        include_str!("../../../../runtime-go/flickrt/recordfn.go"),
     ),
     (
         "regexp.go",
