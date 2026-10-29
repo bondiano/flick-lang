@@ -156,7 +156,10 @@ its result, or give failures a view with `Ui.suspended`.
 An atom is made once and keeps its identity. A top-level atom has one
 type: `let items = Atom.make []` would hold one list for every element
 type, so its type needs no variables, and `FLICK-U005` asks for the type of
-its value. Nothing is made while rendering either: an atom, an action or a
+its value. A local atom without a type is not generalized, so its uses
+decide its one type; a signature, an annotation or a higher-rank argument
+that gives it variables is `FLICK-U005` too. Nothing is made while
+rendering either: an atom, an action or a
 view made in a render, which may run again at any time, would start over on
 every render, so `FLICK-U006` refuses it, and a call of any function that
 makes one, in the module or in a module it imports. Make each with a

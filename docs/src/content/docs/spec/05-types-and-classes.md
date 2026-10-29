@@ -353,7 +353,7 @@ let invalid () =
   | None -> ""
 ```
 
-The program must be rejected: the write `Some 42` fixes the cell's content as `Option Float`, while `String.trim` requires `String`. If `cell` were given `forall a. Ref (Option a)`, the write and the read could choose different types for one object. The problem of polymorphic mutable cells and the relaxed value restriction is discussed in the [OCaml manual](https://ocaml.org/manual/5.4/polymorphism.html).
+The program must be rejected: the write `Some 42` fixes the cell's content as `Option Int`, while `String.trim` requires `String`. If `cell` were given `forall a. Ref (Option a)`, the write and the read could choose different types for one object. The problem of polymorphic mutable cells and the relaxed value restriction is discussed in the [OCaml manual](https://ocaml.org/manual/5.4/polymorphism.html).
 
 | Generalization rule | Implementation cost | Cost for the program author |
 | - | - | - |
@@ -377,7 +377,7 @@ let use_separate_cells () =
   Ref.set names (Some "Ada")
 ```
 
-The value of the function `make_empty` is polymorphic: creating the closure is pure. Each runtime call allocates a new cell; `numbers` itself is monomorphic and stores only `Option Float`, and `names` only `Option String`. This distinction preserves the useful polymorphism of factories without allowing the type of already created state to change.
+The value of the function `make_empty` is polymorphic: creating the closure is pure. Each runtime call allocates a new cell; `numbers` itself is monomorphic and stores only `Option Int`, and `names` only `Option String`. This distinction preserves the useful polymorphism of factories without allowing the type of already created state to change.
 
 ### Generalization in three small examples
 
@@ -443,7 +443,7 @@ Under the conservative ban on generalizing runtime results, `empty` gets one unk
 | Both input and output | `a -> a` | A covariance check alone is not enough |
 | Abstract type | `Container a` from another module | Variance must be checked and preserved in the interface |
 
-The rule of the first version is **provable purity + free variables of the environment + checking of lifetime and unambiguity of constraints**. The example `logged_none` above is deliberately rejected; it shows the cost of refusing variance-generalization. Additional generalization by variance is moved beyond the first version.
+The rule of the first version is **provable purity + free variables of the environment + checking of lifetime and unambiguity of constraints**. The example `use_logged_none` above is deliberately rejected; it shows the cost of refusing variance-generalization. Additional generalization by variance is moved beyond the first version.
 
 ## Deriving and class laws
 

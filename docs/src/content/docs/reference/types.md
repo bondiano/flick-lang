@@ -248,10 +248,11 @@ let rec depth value =
 
 A binding is polymorphic only when it is built purely: no runtime call runs
 while it is defined (see [Generalization in the presence of Ref](../../spec/05-types-and-classes/#generalization-in-the-presence-of-ref)). Lambdas and `task`
-bodies are deferred and count as pure. A polymorphic signature over a runtime
-result is `FLICK-T013`, and so is a top-level value whose type stays unknown.
-Type variables of an enclosing signature, or of a value already in scope,
-are never generalized, and mutable containers are invariant.
+bodies are deferred and count as pure. A polymorphic signature, annotation or
+higher-rank argument over a runtime result is `FLICK-T013`, and so is a
+top-level value whose type stays unknown. Type variables of an enclosing
+signature, or of a value already in scope, are never generalized, and mutable
+containers are invariant.
 
 ```flick
 make_empty : forall a. Unit ->{} Ref (Option a)

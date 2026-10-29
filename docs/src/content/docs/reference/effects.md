@@ -169,7 +169,9 @@ not depend on its arguments: a union of errors holds each tag once and
 `try … with` handles the errors of its body. An error leaves the row only
 when an arm without a `when` guard matches every value of it; a guarded arm
 or a partial pattern leaves it possible. A variable or `_` matches every
-error, as a value of `Errors e`. What the handlers need is added:
+error, as a value of `Errors e`, where `e` holds every error of the body: it
+is used as one error only when the body raises only that one. What the
+handlers need is added:
 
 ```flick
 find_optional : UserId ->{Users; DbUnavailable} Option User
