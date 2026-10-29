@@ -53,3 +53,4 @@ stdlib/hash_order
 stdlib/monoids
 stdlib/seq
 stdlib/seqs
+codegen/services

@@ -173,9 +173,12 @@ impl Gen<'_> {
                 self.unsupported(e.span, "a lazy `for` that reads services")
             }
             ExprKind::Generate { body, .. } => self.strict(body),
-            ExprKind::Operation { .. } | ExprKind::ServiceTag(_) => {
-                self.unsupported(e.span, "a service")
-            }
+            ExprKind::Operation {
+                service,
+                name,
+                stages,
+            } => operation(service, name, stages),
+            ExprKind::ServiceTag(key) => names::string(key),
             ExprKind::Label(_) => self.unsupported(e.span, "a record label"),
             // outside effectful code nothing can fail with a typed error
             ExprKind::Try(body, _) if self.fiber.is_none() => self.expr(body),
@@ -186,7 +189,7 @@ impl Gen<'_> {
             }
             ExprKind::Task(body) => self.task(body),
             ExprKind::Scope { .. } | ExprKind::Within(..) => self.unsupported(e.span, "a `scope`"),
-            ExprKind::Provide(..) => self.unsupported(e.span, "`provide`"),
+            ExprKind::Provide(layer, body) => self.provide(layer, body),
             ExprKind::CodecBlock(..) => self.unsupported(e.span, "a `codec` block"),
         }
     }
@@ -217,6 +220,15 @@ impl Gen<'_> {
             "flickrt.Eff(func(fb *flickrt.Fiber) flickrt.Value {{\n{}}})",
             indent(&stmts)
         )
+    }
+
+    /// `provide layer body`: the body as a task, run with the layer's services.
+    fn provide(&mut self, layer: &Expr, body: &Expr) -> String {
+        let layer = self.expr(layer);
+        let layer = self.spill(layer);
+        let body = self.task(body);
+        let fb = self.fiber.expect("`provide` runs where a fiber is in scope");
+        format!("flickrt.Provide({fb}, {layer}, {body})")
     }
 
     /// `try body with arms`: the body as a task, and a handler of its typed
@@ -426,4 +438,17 @@ impl Gen<'_> {
             }
         }
     }
+}
+
+/// `S.op`: a function of its arguments up to its first effectful stage.
+fn operation(service: &str, name: &str, stages: &[Stage]) -> String {
+    let arity = stages
+        .iter()
+        .position(|&s| s != Stage::Pure)
+        .map_or(stages.len(), |i| i + 1);
+    format!(
+        "flickrt.Operation({}, {}, {arity})",
+        names::string(service),
+        names::string(name)
+    )
 }

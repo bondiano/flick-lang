@@ -2,6 +2,9 @@
 # `[module]`, an export and the function of package `flickrt`.
 
 [@flick-lang/runtime]
+layerSucceed LayerSucceed
+layerMerge LayerMerge
+layerOverride LayerMerge
 succeed Succeed
 mapEff MapEff
 flatMapEff FlatMapEff

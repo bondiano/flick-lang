@@ -5,6 +5,7 @@ package flickrt
 // services, another owner) share the fiber's state.
 type Fiber struct {
 	state *fiberState
+	env   map[string]Value // the services provided, by key; never mutated
 }
 
 type fiberState struct {

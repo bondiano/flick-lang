@@ -99,10 +99,8 @@ impl Gen<'_> {
                     ));
                 }
             }
-            ItemKind::Constructor(_) => {}
-            ItemKind::Service { .. } => {
-                self.unsupported(item.span, "a service");
-            }
+            // a service is its key, written where it is used
+            ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
             ItemKind::Refined { .. } => {
                 self.unsupported(item.span, "a refined type");
             }
