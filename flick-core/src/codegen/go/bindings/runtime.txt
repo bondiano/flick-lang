@@ -227,3 +227,19 @@ stringTrim Trim
 nonEmptyFromList NonEmptyFromList
 nonEmptyCons NonEmptyCons
 nonEmptyHead NonEmptyHead
+
+[@flick-lang/runtime]
+genConstant GenConstant
+genNumber GenNumber
+genInt GenInt
+genBool GenBool
+genString GenString
+genList GenList
+genOneOf GenOneOf
+genPair GenPair
+genFunction GenFunction
+genMap GenMap
+testPure TestPure
+testEffect TestEffect
+testProperty TestProperty
+testGroup TestGroup

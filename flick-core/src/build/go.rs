@@ -12,6 +12,9 @@ use crate::opt;
 use crate::project::{Compilation, normalize};
 use crate::source::{SourceMap, Span};
 
+/// The name of the Go module and executable that runs a project's tests.
+pub const TEST: &str = "test";
+
 /// The directory of the Go module of the entry `name`.
 pub fn module_dir(name: &str) -> String {
     format!("go/{name}")
@@ -27,16 +30,24 @@ pub fn executable(name: &str) -> String {
     }
 }
 
-/// The Go modules of the app's entries, and what could not be compiled;
-/// `read` gives the text of a Go file beside a foreign JS module, if any.
+/// The Go modules of the app's entries, or with `suites` the one Go module
+/// `test` that runs their tests, and what could not be compiled; `read`
+/// gives the text of a Go file beside a foreign JS module, if any.
 pub fn emit(
     compilation: &Compilation,
     sources: &SourceMap,
     settings: &Settings,
+    suites: &[String],
     read: &dyn Fn(&Path) -> Option<String>,
 ) -> (Vec<Artifact>, Vec<Diagnostic>) {
     let mut diagnostics = Vec::new();
-    if settings.entries.is_empty() {
+    let tests = [(TEST.to_owned(), String::new())];
+    let programs = if suites.is_empty() {
+        settings.entries
+    } else {
+        &tests[..]
+    };
+    if programs.is_empty() {
         diagnostics.push(Diagnostic::new(
             codes::P012,
             Severity::Error,
@@ -78,7 +89,7 @@ pub fn emit(
         Some((format!("ffi{name}.go"), text))
     };
     let mut out = Vec::new();
-    for (name, entry) in settings.entries {
+    for (name, entry) in programs {
         let dir = module_dir(name);
         let module_path = settings.out_dir.join(&dir);
         // a path relative to the Go module, as a source map's: no build path ships
@@ -91,6 +102,7 @@ pub fn emit(
         let output = go::go(&Program {
             modules: &all,
             entry,
+            suites,
             package: &package,
             own: &own,
             location: &location,

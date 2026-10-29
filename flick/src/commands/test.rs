@@ -1,6 +1,7 @@
 //! `flick test`: builds the project with its test root into `.flick/test/`,
 //! writes a runner that imports the `tests` of each test module, and runs it
-//! on Node. With `--watch`, a change of a source file stops the run (closing
+//! on Node; a project that emits go gets one executable, `flick-test`, that
+//! runs them. With `--watch`, a change of a source file stops the run (closing
 //! the runner's stdin: every running test closes its scope) and starts the
 //! next one after it.
 
@@ -10,7 +11,9 @@ use std::process::{Child, Command, ExitCode, Stdio};
 use std::time::{Duration, SystemTime};
 use std::{fs, io, thread};
 
+use flick_core::build::go;
 use flick_core::diagnostics::{Diagnostic, Severity};
+use flick_core::project::config::Emit;
 use flick_core::project::{self, Project};
 use flick_core::source::SourceMap;
 
@@ -36,7 +39,7 @@ pub fn test(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
     match child::spawn(&mut command, global, "application-stderr").and_then(|r| r.wait(&signals)) {
         Ok(status) => ExitCode::from(child::code(status)),
         Err(err) => {
-            eprintln!("error: cannot run node: {err}");
+            eprintln!("error: cannot run `{}`: {err}", runner.display());
             ExitCode::from(2)
         }
     }
@@ -57,9 +60,6 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     let Some(project) = project else {
         return Err(());
     };
-    if let Some(problem) = toolchain::check_runtime(&project.root) {
-        return fail(&sources, vec![problem]);
-    }
     let wanted: Vec<PathBuf> = options
         .paths
         .iter()
@@ -75,18 +75,6 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
     }
     let out = project.root.join(OUT_DIR);
     let _ = fs::remove_dir_all(&out);
-    let output = BuildPlan {
-        out_dir: out.clone(),
-        entries: Vec::new(),
-        typescript: false,
-        go: false,
-        extras: Extras::default(),
-        release: release(options.profile, Some(&project.config.build)),
-    };
-    let emitted = emit(&host, &sources, Some(&project), &compilation, &output);
-    if !emitted.diagnostics.is_empty() {
-        return fail(&sources, emitted.diagnostics);
-    }
     let suites: Vec<(String, String)> = compilation
         .modules
         .iter()
@@ -94,6 +82,31 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         .filter(|m| wanted.is_empty() || wanted.contains(&m.path))
         .map(|m| (m.name.clone(), format!("./{}.js", m.name.replace('.', "/"))))
         .collect();
+    // with no suite, the go target has no program: the node runner reports the empty run
+    let go = project.config.build.emit == Emit::Go && !suites.is_empty();
+    if !go && let Some(problem) = toolchain::check_runtime(&project.root) {
+        return fail(&sources, vec![problem]);
+    }
+    let output = BuildPlan {
+        out_dir: out.clone(),
+        entries: Vec::new(),
+        typescript: false,
+        go,
+        suites: if go {
+            suites.iter().map(|(name, _)| name.clone()).collect()
+        } else {
+            Vec::new()
+        },
+        extras: Extras::default(),
+        release: release(options.profile, Some(&project.config.build)),
+    };
+    let emitted = emit(&host, &sources, Some(&project), &compilation, &output);
+    if !emitted.diagnostics.is_empty() {
+        return fail(&sources, emitted.diagnostics);
+    }
+    if go {
+        return Ok(out.join(go::executable(go::TEST)));
+    }
     let runner = out.join("test.js");
     if let Err(err) = write(&runner, &runner_source(&suites)) {
         eprintln!("error: cannot write `{}`: {err}", runner.display());
@@ -122,8 +135,14 @@ fn start(runner: &Path, options: &TestArguments, watched: bool) -> io::Result<Ch
 }
 
 fn runner_command(runner: &Path, options: &TestArguments, watched: bool) -> Command {
-    let mut command = Command::new("node");
-    command.arg("--enable-source-maps").arg(runner);
+    // the runner is the test executable of the go target, or a script for node
+    let mut command = if runner.extension().is_some_and(|e| e == "js") {
+        let mut command = Command::new("node");
+        command.arg("--enable-source-maps").arg(runner);
+        command
+    } else {
+        Command::new(runner)
+    };
     if watched {
         command.arg("--watched").stdin(Stdio::piped());
     }

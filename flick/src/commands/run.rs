@@ -2,8 +2,8 @@
 //! generation `.flick/run/<pid>-<n>/`, never written again once it runs, so
 //! a late `import()` never sees the next build. Its CLI owns the directory
 //! from reservation through cleanup; `clean` also keeps an orphaned live
-//! child. `run` and `dev` always build
-//! JavaScript, whatever `emit` the project chooses.
+//! child. `run` and `dev` build JavaScript, or the Go executable of each
+//! entry when the project emits go.
 
 use std::cell::RefCell;
 use std::fs::OpenOptions;
@@ -13,9 +13,9 @@ use std::process::{Command as Process, ExitCode};
 use std::sync::atomic::AtomicUsize;
 use std::{fs, io, process};
 
-use flick_core::build::runner_file;
+use flick_core::build::{go, runner_file};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::config::MAIN_ENTRY;
+use flick_core::project::config::{Emit, MAIN_ENTRY};
 use flick_core::project::{self, Project, cache};
 use flick_core::source::SourceMap;
 #[cfg(unix)]
@@ -213,7 +213,11 @@ pub fn build_into_generation(
         options: BuildArguments {
             paths: Vec::new(),
             out_dir: Some(generation.path().to_string_lossy().into_owned()),
-            emit: Some(EmitArgument::Js),
+            emit: Some(if project.config.build.emit == Emit::Go {
+                EmitArgument::Go
+            } else {
+                EmitArgument::Js
+            }),
             emit_dts: false,
             promise_facade: false,
             schema_aot: false,
@@ -244,28 +248,36 @@ pub fn launch(
     options: &RunArguments,
     global: &GlobalArguments,
 ) -> Option<Running> {
-    let mut command = Process::new("node");
-    command.arg("--enable-source-maps");
-    if let Some(url) = &options.devtools {
-        // the runtime's module that hands `runMain` the DevTools layer
+    // a generation built for go holds the entry's executable
+    let executable = generation.path().join(go::executable(name));
+    let go = executable.is_file();
+    let mut command = if go {
+        Process::new(&executable)
+    } else {
+        let mut command = Process::new("node");
+        command.arg("--enable-source-maps");
+        if let Some(url) = &options.devtools {
+            // the runtime's module that hands `runMain` the DevTools layer
+            command
+                .args(["--import", "@flick-lang/runtime/runner/devtools"])
+                .env("FLICK_DEVTOOLS", url);
+        }
+        command.arg(generation.path().join(runner_file(name, false)));
         command
-            .args(["--import", "@flick-lang/runtime/runner/devtools"])
-            .env("FLICK_DEVTOOLS", url);
-    }
-    command
-        .arg(generation.path().join(runner_file(name, false)))
-        .args(&options.args);
+    };
+    command.args(&options.args);
     match child::spawn(&mut command, global, "application-stderr") {
         Ok(running) => {
             let _ = append_pid(&generation.path().join(".lock"), running.child.id());
             Some(running)
         }
         Err(err) => {
-            let d = Diagnostic::new(
-                codes::P015,
-                Severity::Error,
-                format!("cannot run `node` (Node.js >= {}): {err}", toolchain::NODE),
-            );
+            let message = if go {
+                format!("cannot run `{}`: {err}", executable.display())
+            } else {
+                format!("cannot run `node` (Node.js >= {}): {err}", toolchain::NODE)
+            };
+            let d = Diagnostic::new(codes::P015, Severity::Error, message);
             report::render(global, &SourceMap::default(), &[d]);
             None
         }

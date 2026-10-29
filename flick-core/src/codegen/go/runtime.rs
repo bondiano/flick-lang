@@ -183,6 +183,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/syncref.go"),
     ),
     (
+        "testing.go",
+        include_str!("../../../../runtime-go/flickrt/testing.go"),
+    ),
+    (
         "text.go",
         include_str!("../../../../runtime-go/flickrt/text.go"),
     ),

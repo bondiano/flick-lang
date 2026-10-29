@@ -83,3 +83,44 @@ fn exit_codes_follow_the_outcome_and_signals() {
         assert_eq!(status.code(), Some(expected), "{name}");
     }
 }
+
+/// A project that emits go: `flick run` starts its executable with the
+/// arguments, and `flick test` runs its tests in one executable, as the
+/// node runner reports them.
+#[test]
+#[ignore = "needs Go"]
+fn run_and_test_use_the_go_executable() {
+    let config = format!("{APP}test-dir = \"test\"\n\n[build]\nemit = \"go\"\n");
+    let main = "module App.Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line (String.join \",\" (Platform.args ()))\n";
+    let tests = "module App.MainTest exposing (tests)
+
+import Test exposing (..)
+
+tests : List Test
+let tests = [
+  test \"adds\" (fun () -> equal 4 (2 + 2)),
+  property \"small\" (Gen.int 0 9) (fun x -> is_true \"too big\" (x < 5)),
+  effect_test \"typed\" (task { expect (equal \"a\" \"b\") })
+]
+";
+    let dir = project(
+        "go_run_test",
+        &[
+            ("flick.toml", &config),
+            ("src/App/Main.fl", main),
+            ("test/App/MainTest.fl", tests),
+        ],
+    );
+    let run = flick_in(&dir, &["run", "--", "a", "b"]);
+    assert_eq!(String::from_utf8_lossy(&run.stdout), "a,b\n", "{run:?}");
+    let test = flick_in(&dir, &["test", "--seed", "7"]);
+    assert_eq!(test.status.code(), Some(1), "{test:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&test.stdout),
+        "ok    App.MainTest > adds\n\
+         FAIL  App.MainTest > small: assertion: too big (case 1: 7)\n\
+         FAIL  App.MainTest > typed: assertion: expected \"a\", got \"b\"\n\
+         \n1 passed, 2 failed\nseed: 7 (rerun with --seed 7)\n"
+    );
+    assert!(dir.join(".flick/test").join(executable("test")).is_file());
+}

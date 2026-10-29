@@ -11,6 +11,7 @@ fn compile(text: &str) -> (Vec<(String, String)>, Vec<String>) {
     let ir = lower_text("App", text).expect("lowers");
     let modules: Vec<&Module> = iter::once(&ir).chain(builtin_modules()).collect();
     let output = go(&Program {
+        suites: &[],
         modules: &modules,
         entry: &ir.name,
         package: &|_| None,

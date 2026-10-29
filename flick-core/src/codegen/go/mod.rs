@@ -46,6 +46,8 @@ pub struct Program<'a> {
     pub modules: &'a [&'a Module],
     /// The module whose `main` the program runs.
     pub entry: &'a str,
+    /// The test modules whose `tests` the program runs instead, when any.
+    pub suites: &'a [String],
     /// The package a module belongs to, for its constructor tags.
     pub package: &'a dyn Fn(&str) -> Option<String>,
     /// Whether a module is the program's own, whose source the build has;
@@ -143,10 +145,19 @@ fn shape(kind: &ItemKind) -> Shape {
     }
 }
 
-/// Compiles the program that runs `main` of `program.entry`.
+/// Compiles the program that runs `main` of `program.entry`, or the tests
+/// of `program.suites`.
 pub fn go(program: &Program) -> Output {
     let modules = program.modules;
     let index = reach::index(modules);
+    if !program.suites.is_empty() {
+        return compile(
+            program,
+            &index,
+            &tests_start(program.suites),
+            program.suites,
+        );
+    }
     let main: Key = (program.entry.to_owned(), "main".to_owned());
     let mut diagnostics = Vec::new();
     let main_shape = index
@@ -175,7 +186,45 @@ pub fn go(program: &Program) -> Output {
     };
     let fb = if main_shape.fiber() { "fb, " } else { "" };
     let start = format!("{}({fb}flickrt.Unit)", names::func(&main.0, &main.1));
-    let (reached, missing) = reach::reachable(modules, &index, slice::from_ref(&main));
+    compile(
+        program,
+        &index,
+        &start,
+        slice::from_ref(&program.entry.to_owned()),
+    )
+}
+
+/// What a test program runs: `flickrt.RunTests` on the `tests` of each suite.
+fn tests_start(suites: &[String]) -> String {
+    let list: Vec<String> = suites
+        .iter()
+        .map(|m| format!("{{{:?}, {}}}", m, names::var(m, "tests")))
+        .collect();
+    format!(
+        "flickrt.RunTests(fb, []flickrt.Suite{{{}}})",
+        list.join(", ")
+    )
+}
+
+/// The program of the items `roots` reach, whose `main.go` initializes
+/// the modules of `roots` and runs `start`.
+fn compile(
+    program: &Program,
+    index: &HashMap<Key, (usize, usize)>,
+    start: &str,
+    roots: &[String],
+) -> Output {
+    let modules = program.modules;
+    let mut diagnostics = Vec::new();
+    let keys: Vec<Key> = if program.suites.is_empty() {
+        vec![(program.entry.to_owned(), "main".to_owned())]
+    } else {
+        roots
+            .iter()
+            .map(|m| (m.clone(), "tests".to_owned()))
+            .collect()
+    };
+    let (reached, missing) = reach::reachable(modules, index, &keys);
     for module in missing {
         diagnostics.push(Diagnostic::new(
             codes::P012,
@@ -207,7 +256,7 @@ pub fn go(program: &Program) -> Output {
             g.location = Some(program.location);
             g.foreign_file = Some(program.foreign_file);
         }
-        let order = item_order(module, &items, &index);
+        let order = item_order(module, &items, index);
         let code = g.module(module, &order);
         diagnostics.extend(g.errors.into_iter().map(|(message, span)| {
             let d = Diagnostic::new(codes::P012, Severity::Error, message);
@@ -222,7 +271,9 @@ pub fn go(program: &Program) -> Output {
     }
     let mut order = Vec::new();
     let mut visited = HashSet::new();
-    init_order(program.entry, &deps, &mut visited, &mut order);
+    for root in roots {
+        init_order(root, &deps, &mut visited, &mut order);
+    }
     let mut main_go = format!(
         "package main\n\nimport \"{RUNTIME_PACKAGE}\"\n\nfunc main() {{\n\tflickrt.Main(func(fb *flickrt.Fiber) {{\n"
     );

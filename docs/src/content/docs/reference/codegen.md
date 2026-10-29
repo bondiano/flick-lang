@@ -409,6 +409,16 @@ handler in a fiber of its own with the services of the call, a failure
 answers with the status of the JS target, and closing the scope stops
 accepting connections and waits for the running requests.
 
+`flick run` and `flick dev` of a project that emits go build its
+executable into the run generation and start it, `dev` rebuilding and
+restarting it on each change; `flick test` builds one executable,
+`flick-test`, that runs the `tests` of every test module with the node
+runner's options, seeds and output. Building needs Go 1.23 or later on
+`PATH`, as Gleam needs Erlang or Node: `flick` does not ship a Go
+toolchain, and the executable it builds needs nothing installed. It is
+built without cgo, so no C compiler is needed either, unless
+`CGO_ENABLED` is set.
+
 ## Not compiled yet
 
 `sql` and `cli` blocks are checked but not compiled: `flick build` reports

@@ -8,6 +8,7 @@ mod ffi;
 mod fmt;
 pub(crate) mod inputs;
 mod inspect;
+mod out_dir;
 mod pack;
 mod run;
 mod scaffold;

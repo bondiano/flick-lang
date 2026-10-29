@@ -3,7 +3,7 @@
 //! code against an ABI it does not know.
 
 use std::path::Path;
-use std::{fs, io, process};
+use std::{env, fs, io, process};
 
 use flick_core::build;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
@@ -61,18 +61,23 @@ pub fn check_runtime(root: &Path) -> Option<Diagnostic> {
 /// the build fails.
 pub fn go_build(out_dir: &Path, name: &str) -> Option<Diagnostic> {
     let dir = out_dir.join(build::go::module_dir(name));
-    let output = process::Command::new("go")
+    let mut command = process::Command::new("go");
+    command
         .args(["build", "-o"])
         .arg(out_dir.join(build::go::executable(name)))
         .arg(".")
         .current_dir(&dir)
         // the module needs nothing from the network
         .env("GOFLAGS", "-mod=mod")
-        .env("GOTOOLCHAIN", "local")
-        .output();
+        .env("GOTOOLCHAIN", "local");
+    // the runtime needs no C: a static executable, built without a C compiler
+    if env::var_os("CGO_ENABLED").is_none() {
+        command.env("CGO_ENABLED", "0");
+    }
+    let output = command.output();
     let message = match output {
         Err(err) if err.kind() == io::ErrorKind::NotFound => {
-            "the go target needs Go: `go` is not on PATH; install Go 1.22 or later".to_owned()
+            "the go target needs Go: `go` is not on PATH; install Go 1.23 or later".to_owned()
         }
         Err(err) => format!("cannot run `go build`: {err}"),
         Ok(out) if out.status.success() => return None,

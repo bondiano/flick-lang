@@ -11,6 +11,7 @@ use flick_core::project::{self, Compilation, Compiled, Project};
 use flick_core::source::{FileId, SourceMap};
 
 use super::check::select;
+use super::out_dir::overlap;
 use super::summary::{self, Built};
 use crate::args::{BuildArguments, EmitArgument, LabelsArgument, ProfileArgument};
 use crate::command::{Command, Outcome};
@@ -211,6 +212,7 @@ impl BuildCommand {
             entries,
             typescript: emit == Emit::Ts,
             go: emit == Emit::Go,
+            suites: Vec::new(),
             extras: Extras {
                 dts: self.options.emit_dts || config.is_some_and(|b| b.emit_dts),
                 promise_facade: self.options.promise_facade
@@ -328,6 +330,9 @@ pub struct BuildPlan {
     pub typescript: bool,
     /// The go target: a Go module per entry, built into an executable.
     pub go: bool,
+    /// For the go target: the test modules whose tests the one executable
+    /// `flick-test` runs, instead of the entries.
+    pub suites: Vec<String>,
     pub extras: Extras,
     pub release: bool,
 }
@@ -373,7 +378,13 @@ fn write_artifacts(output: &BuildPlan, emitted: &mut Emission) {
         }
     }
     if output.go {
-        for (name, _) in &output.entries {
+        let tests = [(build::go::TEST.to_owned(), String::new())];
+        let built = if output.suites.is_empty() {
+            &output.entries[..]
+        } else {
+            &tests[..]
+        };
+        for (name, _) in built {
             if let Some(problem) = toolchain::go_build(out_dir, name) {
                 emitted.diagnostics.push(problem);
                 return;
@@ -480,9 +491,10 @@ pub fn artifacts(
         core_only: false,
     };
     if output.go {
-        let (artifacts, diagnostics) = build::go::emit(compilation, sources, &settings, &|path| {
-            fs::read_to_string(path).ok()
-        });
+        let (artifacts, diagnostics) =
+            build::go::emit(compilation, sources, &settings, &output.suites, &|path| {
+                fs::read_to_string(path).ok()
+            });
         return Emission {
             artifacts,
             diagnostics,
@@ -528,54 +540,5 @@ pub fn artifacts(
     Emission {
         artifacts,
         diagnostics,
-    }
-}
-
-/// Why `out_dir` may not take the build: it is the project's root or the
-/// directory of its sources or tests, or above one of them, whose files a
-/// build or `clean` would replace.
-fn overlap(project: &Project, out_dir: &Path) -> Option<Diagnostic> {
-    let out = canonical(out_dir);
-    let root = canonical(&project.root);
-    let within = |a: &Path, b: &Path| a.starts_with(b);
-    let reason = if within(&root, &out) {
-        "the project's root or a directory above it"
-    } else if [project.source_root(), project.test_root()]
-        .iter()
-        .map(|dir| canonical(dir))
-        .any(|dir| within(&dir, &out))
-    {
-        "the directory of its sources or tests, or one above it"
-    } else {
-        return None;
-    };
-    Some(Diagnostic::new(
-        codes::P028,
-        Severity::Error,
-        format!(
-            "the output directory `{}` is {reason}: a build writes its own `package.json` there and `flick clean` removes it; set `build.out-dir` or `--out-dir` to a directory of its own, such as `dist`",
-            out_dir.display()
-        ),
-    ))
-}
-
-/// `path` with symbolic links resolved, as far as it exists.
-fn canonical(path: &Path) -> PathBuf {
-    let mut missing = Vec::new();
-    let mut existing = path.to_path_buf();
-    loop {
-        if let Ok(found) = fs::canonicalize(&existing) {
-            return missing.iter().rev().fold(found, |acc, part| acc.join(part));
-        }
-        match (
-            existing.file_name().map(ToOwned::to_owned),
-            existing.parent(),
-        ) {
-            (Some(name), Some(parent)) => {
-                missing.push(name);
-                existing = parent.to_path_buf();
-            }
-            _ => return path.to_path_buf(),
-        }
     }
 }

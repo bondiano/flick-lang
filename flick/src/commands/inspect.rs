@@ -73,6 +73,7 @@ fn output(dir: PathBuf, typescript: bool) -> BuildPlan {
         entries: Vec::new(),
         typescript,
         go: false,
+        suites: Vec::new(),
         extras: Extras::default(),
         release: false,
     }
