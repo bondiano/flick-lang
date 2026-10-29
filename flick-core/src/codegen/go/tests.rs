@@ -15,6 +15,7 @@ fn compile(text: &str) -> (Vec<(String, String)>, Vec<String>) {
         entry: &ir.name,
         package: &|_| None,
         own: &|m| m == ir.name,
+        location: &|_, _| None,
     });
     let messages = output.diagnostics.into_iter().map(|d| d.message).collect();
     (output.files, messages)

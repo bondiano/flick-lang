@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"runtime"
+	"strings"
 )
 
 var stdout = bufio.NewWriterSize(os.Stdout, 64<<10)
@@ -104,6 +106,7 @@ func Main(run func()) {
 				} else {
 					fmt.Fprintln(os.Stderr, r)
 				}
+				os.Stderr.WriteString(flickFrames())
 				code = 1
 			}
 		}()
@@ -111,4 +114,27 @@ func Main(run func()) {
 	}()
 	stdout.Flush()
 	os.Exit(code)
+}
+
+// flickFrames is the Flick source lines of the stack a defect unwinds, as
+// the `//line` directives of the generated code name them; called while
+// the panic's frames are still on the stack.
+func flickFrames() string {
+	pcs := make([]uintptr, 256)
+	frames := runtime.CallersFrames(pcs[:runtime.Callers(2, pcs)])
+	var out strings.Builder
+	last := ""
+	for {
+		frame, more := frames.Next()
+		if strings.HasSuffix(frame.File, ".fl") {
+			at := fmt.Sprintf("    at %s:%d\n", frame.File, frame.Line)
+			if at != last {
+				out.WriteString(at)
+				last = at
+			}
+		}
+		if !more {
+			return out.String()
+		}
+	}
 }

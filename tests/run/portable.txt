@@ -8,6 +8,7 @@ bootstrap/stderr
 codegen/classes
 codegen/closures
 codegen/deep_recursion
+codegen/defect
 codegen/defaults
 codegen/eval_order
 codegen/exports

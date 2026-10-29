@@ -2,12 +2,13 @@
 //! `go/<entry>/`, the program's code and the runtime, which `flick build`
 //! then compiles with `go build` into the executable `flick-<entry>`.
 
-use super::{Artifact, Settings, builtin_modules, generic_of};
+use super::{Artifact, Settings, builtin_modules, generic_of, specifier};
 use crate::codegen::go::{self, Program, RUNTIME};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir;
 use crate::opt;
-use crate::project::Compilation;
+use crate::project::{Compilation, normalize};
+use crate::source::{SourceMap, Span};
 
 /// The directory of the Go module of the entry `name`.
 pub fn module_dir(name: &str) -> String {
@@ -25,7 +26,11 @@ pub fn executable(name: &str) -> String {
 }
 
 /// The Go modules of the app's entries, and what could not be compiled.
-pub fn emit(compilation: &Compilation, settings: &Settings) -> (Vec<Artifact>, Vec<Diagnostic>) {
+pub fn emit(
+    compilation: &Compilation,
+    sources: &SourceMap,
+    settings: &Settings,
+) -> (Vec<Artifact>, Vec<Diagnostic>) {
     let mut diagnostics = Vec::new();
     if settings.entries.is_empty() {
         diagnostics.push(Diagnostic::new(
@@ -58,14 +63,23 @@ pub fn emit(compilation: &Compilation, settings: &Settings) -> (Vec<Artifact>, V
     };
     let mut out = Vec::new();
     for (name, entry) in settings.entries {
+        let dir = module_dir(name);
+        let module_path = settings.out_dir.join(&dir);
+        // a path relative to the Go module, as a source map's: no build path ships
+        let location = |module: &str, span: Span| {
+            let compiled = modules.iter().find(|m| m.name == module)?;
+            let file = sources.get(span.file);
+            let path = specifier(&module_path, &normalize(&compiled.path));
+            Some((path, file.line_col(span.start).0 + 1))
+        };
         let output = go::go(&Program {
             modules: &all,
             entry,
             package: &package,
             own: &own,
+            location: &location,
         });
         diagnostics.extend(output.diagnostics);
-        let dir = module_dir(name);
         out.push(Artifact {
             path: format!("{dir}/go.mod"),
             contents: "module flick.app\n\ngo 1.22\n".to_owned(),

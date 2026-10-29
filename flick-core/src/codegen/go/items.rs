@@ -34,7 +34,13 @@ impl Gen<'_> {
         );
         for decl in decls {
             code.push_str(&decl);
-            code.push_str("\n\n");
+            code.push('\n');
+            // the lines after a `//line` count from it: name the Go file again
+            if decl.contains("\n//line ") {
+                let next = code.lines().count() + 2;
+                let _ = writeln!(code, "//line {}:{next}", names::file(self.module));
+            }
+            code.push('\n');
         }
         let _ = write!(
             code,

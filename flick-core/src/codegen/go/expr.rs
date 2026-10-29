@@ -216,6 +216,7 @@ impl Gen<'_> {
             }
             _ if self.jump(e) => {}
             _ => {
+                self.line(e.span);
                 let v = self.expr(e);
                 self.buf.push(format!("return {v}"));
             }
@@ -294,6 +295,8 @@ impl Gen<'_> {
     }
 
     pub(super) fn stmt(&mut self, stmt: &Stmt) {
+        let (Stmt::Let(_, e) | Stmt::Expr(e) | Stmt::Fun { value: e, .. }) = stmt;
+        self.line(e.span);
         match stmt {
             Stmt::Let(Pat::Bind(name), value) => {
                 let v = self.expr(value);

@@ -35,6 +35,9 @@ use reach::Key;
 /// The Go import path of the runtime package.
 pub const RUNTIME_PACKAGE: &str = "flick.app/flickrt";
 
+/// The source path and line of a span of a module.
+pub type Locate<'a> = dyn Fn(&str, Span) -> Option<(String, u32)> + 'a;
+
 /// What a program is made of.
 pub struct Program<'a> {
     /// Every module the program may use: its own and the built-in ones.
@@ -46,6 +49,9 @@ pub struct Program<'a> {
     /// Whether a module is the program's own, whose source the build has;
     /// a built-in module's spans are in no source of the build.
     pub own: &'a dyn Fn(&str) -> bool,
+    /// The source path and 1-based line of a span of the program's own
+    /// module, which `//line` directives give Go's stack traces.
+    pub location: &'a Locate<'a>,
 }
 
 /// The Go files of a program, by path in its Go module, and what could not
@@ -151,6 +157,9 @@ pub fn go(program: &Program) -> Output {
             continue;
         }
         let mut g = Gen::new(&module.name, &shapes, program.package);
+        if (program.own)(&module.name) {
+            g.location = Some(program.location);
+        }
         let order = item_order(module, &items, &index);
         let code = g.module(module, &order);
         diagnostics.extend(g.errors.into_iter().map(|(message, span)| {
@@ -260,6 +269,8 @@ struct Gen<'a> {
     groups: Vec<loops::Group>,
     /// The group and member of each grouped function, by name.
     grouped: HashMap<String, (usize, usize)>,
+    /// Where a span of this module is in its source, for `//line`.
+    location: Option<&'a Locate<'a>>,
 }
 
 impl<'a> Gen<'a> {
@@ -281,6 +292,7 @@ impl<'a> Gen<'a> {
             tail: None,
             groups: Vec::new(),
             grouped: HashMap::new(),
+            location: None,
         }
     }
 
@@ -304,6 +316,14 @@ impl<'a> Gen<'a> {
             .get(&(module.to_owned(), name.to_owned()))
             .copied()
             .unwrap_or(Shape::Var)
+    }
+
+    /// A `//line` directive before the next statement, which Go's stack
+    /// traces then name by the Flick source of `span`.
+    fn line(&mut self, span: Span) {
+        if let Some((path, line)) = self.location.and_then(|at| at(self.module, span)) {
+            self.buf.push(format!("//line {path}:{line}"));
+        }
     }
 
     /// Notes that the code reads a top-level value of `module`.
@@ -333,12 +353,15 @@ impl<'a> Gen<'a> {
     }
 }
 
-/// Statements as the lines of a block, indented one level.
+/// Statements as the lines of a block, indented one level; a `//line`
+/// directive stays at the start of its line, where Go reads it.
 fn indent(stmts: &[String]) -> String {
     let mut out = String::new();
     for stmt in stmts {
         for line in stmt.lines() {
-            out.push('\t');
+            if !line.starts_with("//line ") {
+                out.push('\t');
+            }
             out.push_str(line);
             out.push('\n');
         }
