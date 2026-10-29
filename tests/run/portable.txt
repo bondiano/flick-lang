@@ -38,6 +38,8 @@ stdlib/effect/option
 stdlib/effect/order
 stdlib/effect/record
 stdlib/effect/string
+stdlib/effect/string_locale
 stdlib/hash_order
 stdlib/monoids
+stdlib/seq
 stdlib/seqs

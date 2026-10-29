@@ -11,6 +11,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/casing.go"),
     ),
     (
+        "collate.go",
+        include_str!("../../../../runtime-go/flickrt/collate.go"),
+    ),
+    (
         "combine.go",
         include_str!("../../../../runtime-go/flickrt/combine.go"),
     ),

@@ -116,6 +116,7 @@ parse NumberParse
 flickEquivalent RedactedEquivalent
 
 [@flick-lang/runtime/effect/String]
+flickLocaleCompare LocaleCompare
 flickLines Lines
 flickLinesWithSeparators LinesWithSeparators
 stripMargin StripMargin
@@ -472,3 +473,7 @@ absurd FunctionAbsurd
 tupled FunctionTupled
 flickUntupled FunctionUntupled
 SK FunctionSK
+
+[@flick-lang/runtime/effect/Stream]
+fromIterable StreamFromSeq
+runCollect SeqToList
