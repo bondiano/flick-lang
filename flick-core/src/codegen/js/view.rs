@@ -5,7 +5,7 @@
 use std::mem;
 
 use super::Gen;
-use crate::codegen::tail::{Target, self_call, tail_callees};
+use crate::codegen::tail::{Calls, Target, self_call, tail_callees};
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Param, Pat};
 use crate::opt::uses;
 
@@ -57,7 +57,7 @@ fn walked(params: &[Param], body: &Expr, i: usize, members: &[(Target, usize)]) 
     rests.iter().all(|r| {
         let jumps = leaves
             .iter()
-            .filter_map(|leaf| self_call(leaf, members))
+            .filter_map(|leaf| self_call(leaf, members, Calls::Pure))
             .filter(|(_, args)| matches!(args.get(i).map(|a| &a.kind), Some(ExprKind::Local(n)) if n == *r))
             .count();
         uses(body, r) == jumps
@@ -112,7 +112,7 @@ fn spine<'e>(
                 pending.extend(arms.iter().map(|a| &a.body));
             }
             ExprKind::Binary(BinOp::And | BinOp::Or, _, r)
-                if !tail_callees(r, members).is_empty() =>
+                if !tail_callees(r, members, Calls::Pure).is_empty() =>
             {
                 pending.push(r);
             }

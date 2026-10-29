@@ -8,8 +8,10 @@
 use std::collections::HashMap;
 
 use super::{Gen, indent, names, param_list};
-use crate::codegen::tail::{Target, cycles, function, self_call, tail_callees, target};
-use crate::ir::{BinOp, Expr, ExprKind, Item, Lit, Param, Pat, Stage};
+use crate::codegen::tail::{
+    Calls, Target, cycles, function, jumpable, self_call, tail_callees, target,
+};
+use crate::ir::{BinOp, Expr, ExprKind, Item, Lit, Param, Pat};
 
 /// Where a tail call jumps: the members of the loop with their arity, the
 /// loop variables, and the local each parameter of the running member
@@ -40,17 +42,17 @@ pub(super) fn groups(
     items: &[Item],
 ) -> (Vec<Group>, HashMap<String, (usize, usize)>) {
     let mut grouped = HashMap::new();
-    let groups = cycles(module, items)
+    let groups = cycles(module, items, Calls::Direct)
         .into_iter()
         .enumerate()
         .map(|(g, members)| {
-            let name_of = |i: usize| function(&items[i]).map_or("", |(n, ..)| n);
+            let name_of = |i: usize| function(&items[i], Calls::Direct).map_or("", |(n, ..)| n);
             for (k, &i) in members.iter().enumerate() {
                 grouped.insert(name_of(i).to_owned(), (g, k));
             }
             let arity = members
                 .iter()
-                .filter_map(|&i| function(&items[i]))
+                .filter_map(|&i| function(&items[i], Calls::Direct))
                 .map(|(_, params, _)| params.len())
                 .max()
                 .unwrap_or(0);
@@ -92,8 +94,8 @@ impl Gen<'_> {
     ) -> (Vec<String>, Vec<String>) {
         let saved = self.tail.take();
         let looping = target.filter(|t| {
-            params.iter().all(|p| p.stage == Stage::Pure)
-                && !tail_callees(body, &[(t.clone(), params.len())]).is_empty()
+            jumpable(params, Calls::Direct)
+                && !tail_callees(body, &[(t.clone(), params.len())], Calls::Direct).is_empty()
         });
         let result = match looping {
             None => {
@@ -153,7 +155,7 @@ impl Gen<'_> {
         let functions: Vec<(&str, &[Param], &Expr)> = self.groups[g]
             .items
             .iter()
-            .filter_map(|&i| function(&items[i]))
+            .filter_map(|&i| function(&items[i], Calls::Direct))
             .collect();
         let members: Vec<(Target, usize)> = functions
             .iter()
@@ -187,7 +189,11 @@ impl Gen<'_> {
     /// Emits a tail call of a member of the loop as a jump, if `e` is one;
     /// whether it was.
     pub(super) fn jump(&mut self, e: &Expr) -> bool {
-        let Some((j, args)) = self.tail.as_ref().and_then(|t| self_call(e, &t.members)) else {
+        let Some((j, args)) = self
+            .tail
+            .as_ref()
+            .and_then(|t| self_call(e, &t.members, Calls::Direct))
+        else {
             return false;
         };
         let tail = self.tail.as_ref().expect("a jump is inside a loop");
@@ -218,7 +224,7 @@ impl Gen<'_> {
     pub(super) fn jumps_in(&self, rhs: &Expr) -> bool {
         self.tail
             .as_ref()
-            .is_some_and(|t| !tail_callees(rhs, &t.members).is_empty())
+            .is_some_and(|t| !tail_callees(rhs, &t.members, Calls::Direct).is_empty())
     }
 
     /// `lhs && rhs` or `lhs || rhs` in tail position, its right operand a

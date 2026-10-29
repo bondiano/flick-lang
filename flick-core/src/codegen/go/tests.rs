@@ -110,3 +110,28 @@ fn tail_calls_jump_instead_of_calling() {
     );
     assert!(code.contains("return G_App__even(1, "), "{code}");
 }
+
+#[test]
+fn effectful_tail_calls_jump_but_not_out_of_a_try() {
+    let (files, errors) = compile(
+        "module App exposing (main)\n\
+         down : Ref Int -> Int ->{} Unit\n\
+         let rec down cell n = if n == 0 then () else\n  Ref.set cell n\n  down cell (n - 1)\n\
+         main : Unit ->{} Unit\nlet main () = down (Ref.make 0) 3\n",
+    );
+    assert!(errors.is_empty(), "{errors:?}");
+    let code = file(&files, "m_App.go");
+    assert!(
+        code.contains("for {") && code.contains("continue"),
+        "{code}"
+    );
+    let (files, _) = compile(
+        "module App exposing (main)\n\
+         type error Stop = Stop\n\
+         again : Int ->{; Stop} Int\n\
+         let rec again n = try again (n - 1) with | Stop -> n\n\
+         main : Unit ->{; Stop} Unit\nlet main () = Platform.stdout_line (show (again 3))\n",
+    );
+    let code = file(&files, "m_App.go");
+    assert!(!code.contains("continue"), "{code}");
+}

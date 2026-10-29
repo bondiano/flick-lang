@@ -6,7 +6,7 @@ use std::mem;
 
 use super::expr::{arrow_body, unmarked};
 use super::{Gen, Tail, indent, names, view};
-use crate::codegen::tail::{Target, self_call, tail_callees};
+use crate::codegen::tail::{Calls, Target, self_call, tail_callees};
 use crate::ir::{BinOp, Expr, ExprKind, Lit, Param, Pat, Stage};
 
 impl Gen<'_> {
@@ -220,7 +220,11 @@ impl Gen<'_> {
                 self.tail_expr(rhs);
             }
             _ => {
-                if let Some((j, args)) = self.tail.as_ref().and_then(|t| self_call(e, &t.members)) {
+                if let Some((j, args)) = self
+                    .tail
+                    .as_ref()
+                    .and_then(|t| self_call(e, &t.members, Calls::Pure))
+                {
                     let (vars, binds, state, offsets) = self
                         .tail
                         .as_ref()
@@ -365,5 +369,5 @@ pub(super) fn binds(params: &[Param]) -> Vec<Option<String>> {
 
 /// Whether a tail position of `body` jumps to a member of `tail`.
 fn has_tail_call(body: &Expr, tail: &Tail) -> bool {
-    !tail_callees(body, &tail.members).is_empty()
+    !tail_callees(body, &tail.members, Calls::Pure).is_empty()
 }

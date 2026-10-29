@@ -1,7 +1,9 @@
-// Tail recursion ten million deep runs in constant stack on every target:
+// Tail recursion runs in constant stack on every target, ten million deep:
 // a function calling itself, through its own dictionaries, behind `&&`
 // and `||`, a local `rec` function, and a group of three functions calling
-// each other. A list is walked by its rest without copying it.
+// each other. A list is walked by its rest without copying it. Functions
+// running effects recurse a million deep: the JS target keeps each step of
+// their recursion on the heap.
 module App.Main exposing (main)
 
 depth : Int
@@ -30,6 +32,29 @@ rec {
   let pang acc n = if n == 0 then acc else ping (acc + 2) (n - 1)
 }
 
+count_down : Ref Int -> Int ->{} Unit
+let rec count_down cell n =
+  if n == 0 then () else
+    Ref.set cell (Ref.get cell + 1)
+    count_down cell (n - 1)
+
+rec {
+  tick : Ref Int -> Int ->{} Int
+  let tick cell n =
+    if n == 0 then Ref.get cell else
+      Ref.set cell (Ref.get cell + 1)
+      tock cell (n - 1)
+
+  tock : Ref Int -> Int ->{} Int
+  let tock cell n = if n == 0 then Ref.get cell else tack cell (n - 1)
+
+  tack : Ref Int -> Int ->{} Int
+  let tack cell n =
+    if n == 0 then Ref.get cell else
+      Ref.set cell (Ref.get cell + 2)
+      tick cell (n - 1)
+}
+
 sum_list : Int -> List Int -> Int
 let rec sum_list acc xs =
   match xs with
@@ -46,3 +71,7 @@ let main () =
   let rec count n acc = if n == 0 then acc else count (n - 1) (acc + 2)
   Platform.stdout_line (show (count depth 0))
   Platform.stdout_line (show (sum_list 0 (List.range 0 1000000)))
+  let cell = Ref.make 0
+  count_down cell 1000000
+  Platform.stdout_line (show (Ref.get cell))
+  Platform.stdout_line (show (tick (Ref.make 0) 1000000))

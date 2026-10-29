@@ -8,7 +8,7 @@ use std::mem;
 
 use super::function::{binds, offsets};
 use super::{Gen, Tail, indent, names, view};
-use crate::codegen::tail::{Callee, Target, cycles, function, target};
+use crate::codegen::tail::{Callee, Calls, Target, cycles, function, target};
 use crate::ir::{Expr, Item, Lit, Param, Pat};
 
 /// Mutually tail-recursive functions of a module.
@@ -21,12 +21,12 @@ pub(super) struct Group {
 
 /// The groups of `items`, each named after its first member.
 pub(super) fn groups(module: &str, items: &[Item]) -> Vec<Group> {
-    cycles(module, items)
+    cycles(module, items, Calls::Pure)
         .into_iter()
         .map(|items_of| Group {
             name: format!(
                 "{}$rec",
-                names::ident(function(&items[items_of[0]]).map_or("", |(n, ..)| n))
+                names::ident(function(&items[items_of[0]], Calls::Pure).map_or("", |(n, ..)| n))
             ),
             items: items_of,
         })
@@ -44,7 +44,8 @@ pub(super) fn grouped(
         .enumerate()
         .flat_map(|(g, group)| {
             group.items.iter().enumerate().filter_map(move |(k, &i)| {
-                function(&items[i]).map(|(name, ..)| (format!("{module}.{name}"), (g, k)))
+                function(&items[i], Calls::Pure)
+                    .map(|(name, ..)| (format!("{module}.{name}"), (g, k)))
             })
         })
         .collect()
@@ -69,7 +70,7 @@ impl Gen<'_> {
         let functions: Vec<(&str, &[Param], &Expr)> = self.groups[g]
             .items
             .iter()
-            .filter_map(|&i| function(&items[i]))
+            .filter_map(|&i| function(&items[i], Calls::Pure))
             .collect();
         let members: Vec<(Target, usize)> = functions
             .iter()

@@ -21,6 +21,16 @@ pub enum Callee {
     Global(String),
 }
 
+/// Which calls a backend can jump for.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Calls {
+    /// Pure calls only: a runtime call of the JS target runs in a generator.
+    Pure,
+    /// Runtime and Sync calls too, whose last stage is a direct call, as on
+    /// the go target.
+    Direct,
+}
+
 /// The target of the top-level function `name` of `module`.
 pub fn target(module: &str, name: &str) -> Target {
     Target {
@@ -29,9 +39,9 @@ pub fn target(module: &str, name: &str) -> Target {
     }
 }
 
-/// The parameters and body of a top-level pure function without
-/// dictionaries.
-pub fn function(item: &Item) -> Option<(&str, &[Param], &Expr)> {
+/// The parameters and body of a top-level function without dictionaries
+/// whose stages are pure, but for the last one with `Calls::Direct`.
+pub fn function(item: &Item, calls: Calls) -> Option<(&str, &[Param], &Expr)> {
     match &item.kind {
         ItemKind::Value {
             name,
@@ -41,20 +51,27 @@ pub fn function(item: &Item) -> Option<(&str, &[Param], &Expr)> {
                     kind: ExprKind::Lambda { params, body },
                     ..
                 },
-        } if dicts.is_empty() && params.iter().all(|p| p.stage == Stage::Pure) => {
-            Some((name, params, body))
-        }
+        } if dicts.is_empty() && jumpable(params, calls) => Some((name, params, body)),
         _ => None,
+    }
+}
+
+/// Whether a function of `params` can loop on its tail calls.
+pub fn jumpable(params: &[Param], calls: Calls) -> bool {
+    let before_last = &params[..params.len().saturating_sub(1)];
+    match calls {
+        Calls::Pure => params.iter().all(|p| p.stage == Stage::Pure),
+        Calls::Direct => before_last.iter().all(|p| p.stage == Stage::Pure),
     }
 }
 
 /// The cycles of tail calls between the functions of `items`, by item
 /// index in order, found as strongly connected components (Tarjan).
-pub fn cycles(module: &str, items: &[Item]) -> Vec<Vec<usize>> {
+pub fn cycles(module: &str, items: &[Item], calls: Calls) -> Vec<Vec<usize>> {
     let functions: Vec<(usize, &str, &[Param], &Expr)> = items
         .iter()
         .enumerate()
-        .filter_map(|(i, item)| function(item).map(|(n, p, b)| (i, n, p, b)))
+        .filter_map(|(i, item)| function(item, calls).map(|(n, p, b)| (i, n, p, b)))
         .collect();
     let members: Vec<(Target, usize)> = functions
         .iter()
@@ -62,7 +79,7 @@ pub fn cycles(module: &str, items: &[Item]) -> Vec<Vec<usize>> {
         .collect();
     let edges: Vec<Vec<usize>> = functions
         .iter()
-        .map(|(.., body)| tail_callees(body, &members))
+        .map(|(.., body)| tail_callees(body, &members, calls))
         .collect();
     let mut scc = Scc {
         edges: &edges,
@@ -129,17 +146,27 @@ impl Scc<'_> {
     }
 }
 
-/// The member a full pure call of one of `members` calls, and its arguments.
-pub fn self_call<'e>(e: &'e Expr, members: &[(Target, usize)]) -> Option<(usize, Vec<&'e Expr>)> {
+/// The member a full call of one of `members` calls, and its arguments:
+/// a pure one, or with `Calls::Direct` one whose last stage may run.
+pub fn self_call<'e>(
+    e: &'e Expr,
+    members: &[(Target, usize)],
+    calls: Calls,
+) -> Option<(usize, Vec<&'e Expr>)> {
     let mut args = Vec::new();
     let mut head = e;
     while let ExprKind::App {
         func,
         arg,
-        stage: Stage::Pure,
+        stage,
         arg_first: false,
     } = &head.kind
     {
+        // the type of the callee fixes the stage of a full call's last arrow
+        let last = args.is_empty() && calls == Calls::Direct;
+        if *stage != Stage::Pure && !last {
+            return None;
+        }
         args.push(&**arg);
         head = func;
     }
@@ -167,7 +194,7 @@ pub fn self_call<'e>(e: &'e Expr, members: &[(Target, usize)]) -> Option<(usize,
 }
 
 /// The members of `members` a tail position of `body` calls in full.
-pub fn tail_callees(body: &Expr, members: &[(Target, usize)]) -> Vec<usize> {
+pub fn tail_callees(body: &Expr, members: &[(Target, usize)], calls: Calls) -> Vec<usize> {
     let mut out = Vec::new();
     let mut pending = vec![body];
     while let Some(e) = pending.pop() {
@@ -176,7 +203,7 @@ pub fn tail_callees(body: &Expr, members: &[(Target, usize)]) -> Vec<usize> {
             ExprKind::If(_, t, f) => pending.extend([&**t, &**f]),
             ExprKind::Match(_, arms) => pending.extend(arms.iter().map(|a| &a.body)),
             ExprKind::Binary(BinOp::And | BinOp::Or, _, r) => pending.push(r),
-            _ => out.extend(self_call(e, members).map(|(j, _)| j)),
+            _ => out.extend(self_call(e, members, calls).map(|(j, _)| j)),
         }
     }
     out
