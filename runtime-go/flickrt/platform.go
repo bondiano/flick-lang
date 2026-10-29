@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -119,6 +120,12 @@ func Format(v Value) string {
 // root owner. SIGINT and SIGTERM interrupt it, and the owner closes as
 // after any end. The exit code is the JS runner's.
 func Main(run func(*Fiber)) {
+	// a Flick program allocates many small values: collecting at 4x the
+	// live heap instead of 2x costs megabytes and saves a third of the CPU
+	// a busy server spends; GOGC set by the user wins
+	if _, set := os.LookupEnv("GOGC"); !set {
+		debug.SetGCPercent(400)
+	}
 	fb := rootFiber()
 	var stopped atomic.Value // the signal that interrupted main
 	signals := make(chan os.Signal, 1)
