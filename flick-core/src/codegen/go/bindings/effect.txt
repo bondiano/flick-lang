@@ -116,6 +116,28 @@ parse NumberParse
 flickEquivalent RedactedEquivalent
 
 [@flick-lang/runtime/effect/String]
+flickLines Lines
+flickLinesWithSeparators LinesWithSeparators
+stripMargin StripMargin
+stripMarginWith StripMarginWith
+snakeToCamel SnakeToCamel
+snakeToPascal SnakeToPascal
+snakeToKebab SnakeToKebab
+camelToSnake CamelToSnake
+pascalToSnake PascalToSnake
+kebabToSnake KebabToSnake
+noCase NoCase
+pascalCase PascalCase
+camelCase CamelCase
+constantCase ConstantCase
+configCase ConfigCase
+kebabCase KebabCase
+snakeCase SnakeCase
+toLocaleUpperCase ToLocaleUpperCase
+toLocaleLowerCase ToLocaleLowerCase
+flickNormalize Normalize
+search RegExpSearch
+replace RegExpReplace
 trim Trim
 trimStart TrimStart
 trimEnd TrimEnd
@@ -322,3 +344,10 @@ makeReducer TupleReducer
 [@flick-lang/runtime/effect/Hash]
 combine HashCombine
 optimize HashOptimize
+
+[@flick-lang/runtime/effect/RegExp]
+flickMake RegExpMake
+escape RegExpEscape
+flickMatch RegExpMatch
+flickMatchAll RegExpMatchAll
+flickReplaceAll RegExpReplaceAll

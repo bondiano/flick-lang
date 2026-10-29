@@ -34,6 +34,7 @@ stdlib/effect/hash_set
 stdlib/effect/number
 stdlib/effect/option
 stdlib/effect/order
+stdlib/effect/string
 stdlib/hash_order
 stdlib/monoids
 stdlib/seqs

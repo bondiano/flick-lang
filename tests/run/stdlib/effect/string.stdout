@@ -9,7 +9,6 @@ slice: el llo el
 take: he lo hi
 at: c b -
 codes: 65 128512 -
-locale_compare: LT GT EQ
 normalize: 2 1 2 2
 pad: 00042 ab.-.
 repeat: ababab||a!b!c

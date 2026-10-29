@@ -5,7 +5,6 @@
 
 use std::mem;
 
-use super::expr::atomic;
 use super::{Gen, indent};
 use crate::ir::{Expr, ExprKind, Lit, Pat};
 
@@ -114,9 +113,8 @@ if flickrt.CountOf({n}) <= 0 {{
             ExprKind::Lit(Lit::Unit) => {}
             _ => {
                 let v = self.expr(e);
-                if !atomic(&v) {
-                    self.buf.push(format!("_ = {v}"));
-                }
+                // a result read by nothing: Go refuses a variable nobody reads
+                self.buf.push(format!("_ = {v}"));
             }
         }
     }

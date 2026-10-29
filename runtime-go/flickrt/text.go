@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"unicode"
 )
 
 // The foreign functions of `String` that count code units as JS does;
@@ -173,23 +172,4 @@ func StringToNumber(s Value) Value {
 		return Some(f)
 	}
 	return None
-}
-
-// shortcut: Go's simple case mapping, so `ß` stays `ß`; JS's full mapping (`SS`) needs the Unicode special casing table
-func ToUpperCase(s Value) Value { return strings.ToUpper(s.(string)) }
-func ToLowerCase(s Value) Value { return strings.ToLower(s.(string)) }
-
-// Capitalize upper-cases the first code unit, as Effect does.
-func Capitalize(s Value) Value   { return mapFirst(s.(string), unicode.ToUpper) }
-func Uncapitalize(s Value) Value { return mapFirst(s.(string), unicode.ToLower) }
-
-func mapFirst(s string, f func(rune) rune) string {
-	if s == "" {
-		return s
-	}
-	r, n := decode(s)
-	if r >= 0x10000 || r >= 0xD800 && r <= 0xDFFF {
-		return s
-	}
-	return string(f(r)) + s[n:]
 }

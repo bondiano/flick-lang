@@ -7,6 +7,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/array.go"),
     ),
     (
+        "casing.go",
+        include_str!("../../../../runtime-go/flickrt/casing.go"),
+    ),
+    (
         "combine.go",
         include_str!("../../../../runtime-go/flickrt/combine.go"),
     ),
@@ -59,6 +63,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/record.go"),
     ),
     (
+        "regexp.go",
+        include_str!("../../../../runtime-go/flickrt/regexp.go"),
+    ),
+    (
         "seq.go",
         include_str!("../../../../runtime-go/flickrt/seq.go"),
     ),
@@ -69,6 +77,14 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "text.go",
         include_str!("../../../../runtime-go/flickrt/text.go"),
+    ),
+    (
+        "unicode.go",
+        include_str!("../../../../runtime-go/flickrt/unicode.go"),
+    ),
+    (
+        "unicode_tables.go",
+        include_str!("../../../../runtime-go/flickrt/unicode_tables.go"),
     ),
     (
         "value.go",

@@ -1,4 +1,5 @@
-// Strings from Effect's `String`, and regular expressions from `RegExp`.
+// Strings from Effect's `String`, and regular expressions from `RegExp`;
+// `locale_compare`, which needs Intl's collation, is in `string_locale`.
 module App.Main exposing (main)
 
 line : String -> String -> Unit ->{} Unit
@@ -99,14 +100,6 @@ let main () =
       ++ num (String.code_point_at 0 "😀")
       ++ " "
       ++ num (String.char_code_at 9 "A"))
-    ()
-  line
-    "locale_compare"
-    (show ("a" |> String.locale_compare "en" "b")
-      ++ " "
-      ++ show ("b" |> String.locale_compare "en" "a")
-      ++ " "
-      ++ show ("a" |> String.locale_compare "en" "a"))
     ()
   line
     "normalize"

@@ -1,0 +1,12 @@
+// `String.locale_compare`: Intl's collation, which only the JS target has.
+module App.Main exposing (main)
+
+main : Unit ->{} Unit
+let main () =
+  Platform.stdout_line
+    ("locale_compare: "
+      ++ show ("a" |> String.locale_compare "en" "b")
+      ++ " "
+      ++ show ("b" |> String.locale_compare "en" "a")
+      ++ " "
+      ++ show ("a" |> String.locale_compare "en" "a"))

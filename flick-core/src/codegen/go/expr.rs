@@ -134,9 +134,8 @@ impl Gen<'_> {
             }
             ExprKind::Ignore(inner) => {
                 let v = self.expr(inner);
-                if !atomic(&v) {
-                    self.buf.push(format!("_ = {v}"));
-                }
+                // a result read by nothing: Go refuses a variable nobody reads
+                self.buf.push(format!("_ = {v}"));
                 "flickrt.Unit".to_owned()
             }
             // a pure function is called like a runtime one: Go runs both directly
@@ -355,9 +354,8 @@ impl Gen<'_> {
             }
             Stmt::Expr(e) => {
                 let v = self.expr(e);
-                if !atomic(&v) {
-                    self.buf.push(format!("_ = {v}"));
-                }
+                // a result read by nothing: Go refuses a variable nobody reads
+                self.buf.push(format!("_ = {v}"));
             }
         }
     }
