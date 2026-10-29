@@ -6,13 +6,15 @@
 // runs each concurrency `--runs` times and prints the medians, then holds
 // the highest one for `--soak` seconds. With `--pid` it samples the
 // server's resident memory (Linux, /proc) before the soak, at its peak and
-// after `--idle` seconds of rest.
+// after `--idle` seconds of rest. With `--workers N` the clients are split
+// over N threads, so one client process is not what limits the rate.
 //
 //   node tools/load/index.mjs --url 'http://127.0.0.1:3000/render/{id}' \
 //     --expect 'request {id}' [--pid N] [--levels 1,16,64] [--run 10] \
-//     [--runs 3] [--warmup 10] [--soak 60] [--idle 30] [--timeout 5]
+//     [--runs 3] [--warmup 10] [--soak 60] [--idle 30] [--timeout 5] [--workers 1]
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
+import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
 
 const { values: options } = parseArgs({
   options: {
@@ -26,7 +28,10 @@ const { values: options } = parseArgs({
     soak: { type: "string", default: "60" },
     idle: { type: "string", default: "30" },
     timeout: { type: "string", default: "5" },
+    workers: { type: "string", default: "1" },
   },
+  args: isMainThread ? process.argv.slice(2) : workerData,
+  allowPositionals: !isMainThread,
 });
 if (!options.url?.includes("{id}")) {
   console.error("usage: index.mjs --url <url with {id}> [--expect <text with {id}>] [--pid N] ...");
@@ -36,11 +41,12 @@ const levels = options.levels.split(",").map(Number);
 const expected = options.expect.split("|");
 const seconds = (name) => Number(options[name]) * 1000;
 
+const workers = Number(options.workers);
 let next = 0;
 const totals = { ok: 0, status: 0, body: 0, transport: 0, timeout: 0 };
 
 const one = async () => {
-  const id = `r${++next}`;
+  const id = `r${isMainThread ? "" : `${workerData.at(-1)}-`}${++next}`;
   const started = performance.now();
   try {
     const response = await fetch(options.url.replaceAll("{id}", id), { signal: AbortSignal.timeout(seconds("timeout")) });
@@ -53,8 +59,8 @@ const one = async () => {
   }
 };
 
-/** `c` clients for `ms`: the latencies of the answers and the count of each error. */
-const load = async (c, ms) => {
+/** `c` clients on this thread for `ms`: the latencies of the answers and the count of each error. */
+const clients = async (c, ms) => {
   const until = performance.now() + ms;
   const latencies = [];
   const errors = { status: 0, body: 0, transport: 0, timeout: 0 };
@@ -66,6 +72,34 @@ const load = async (c, ms) => {
     }
   };
   await Promise.all(Array.from({ length: c }, client));
+  return { latencies, errors };
+};
+
+if (!isMainThread) {
+  parentPort.on("message", async ({ c, ms }) => parentPort.postMessage(await clients(c, ms)));
+}
+
+const threads = isMainThread && workers > 1
+  ? Array.from({ length: workers }, (_, i) => {
+      const worker = new Worker(new URL(import.meta.url), { workerData: [...process.argv.slice(2), `w${i}`] });
+      worker.unref();
+      return worker;
+    })
+  : [];
+const onThread = (worker, c, ms) =>
+  new Promise((resolve) => {
+    worker.once("message", resolve);
+    worker.postMessage({ c, ms });
+  });
+
+/** `c` clients for `ms`, split over the worker threads: the rate, latency quantiles and errors. */
+const load = async (c, ms) => {
+  const parts = threads.length
+    ? await Promise.all(threads.map((w, i) => onThread(w, Math.floor(c / threads.length) + (i < c % threads.length ? 1 : 0), ms)))
+    : [await clients(c, ms)];
+  const latencies = parts.flatMap((p) => p.latencies);
+  const errors = { status: 0, body: 0, transport: 0, timeout: 0 };
+  for (const p of parts) for (const [kind, n] of Object.entries(p.errors)) errors[kind] += n;
   totals.ok += latencies.length;
   for (const [kind, n] of Object.entries(errors)) totals[kind] += n;
   latencies.sort((a, b) => a - b);
@@ -81,25 +115,28 @@ const row = (label, c, r) =>
     `| ${label} | ${c} | ${r.rps.toFixed(0)} | ${r.p50.toFixed(2)} | ${r.p95.toFixed(2)} | ${r.p99.toFixed(2)} |`,
   );
 
-console.log(`url ${options.url}`);
-await load(16, seconds("warmup"));
-console.log("| path | c | req/s | p50, ms | p95, ms | p99, ms |\n|---|---:|---:|---:|---:|---:|");
-for (const c of levels) {
-  const runs = [];
-  for (let i = 0; i < Number(options.runs); i++) runs.push(await load(c, seconds("run")));
-  row(
-    "median",
-    c,
-    Object.fromEntries(["rps", "p50", "p95", "p99"].map((k) => [k, median(runs.map((r) => r[k]))])),
-  );
+if (isMainThread) {
+  console.log(`url ${options.url}`);
+  await load(16, seconds("warmup"));
+  console.log("| path | c | req/s | p50, ms | p95, ms | p99, ms |\n|---|---:|---:|---:|---:|---:|");
+  for (const c of levels) {
+    const runs = [];
+    for (let i = 0; i < Number(options.runs); i++) runs.push(await load(c, seconds("run")));
+    row(
+      "median",
+      c,
+      Object.fromEntries(["rps", "p50", "p95", "p99"].map((k) => [k, median(runs.map((r) => r[k]))])),
+    );
+  }
+  const before = rss();
+  let peak = before;
+  const sampler = setInterval(() => (peak = Math.max(peak, rss())), 1000);
+  const top = Math.max(...levels);
+  row(`soak ${options.soak} s`, top, await load(top, seconds("soak")));
+  clearInterval(sampler);
+  await new Promise((resolve) => setTimeout(resolve, seconds("idle")));
+  console.log(`RSS, MiB: before soak ${before.toFixed(1)}, peak ${peak.toFixed(1)}, after ${options.idle} s idle ${rss().toFixed(1)}`);
+  console.log(`answers ${totals.ok}; errors: ${JSON.stringify({ ...totals, ok: undefined })}`);
+  process.exitCode = totals.status + totals.body + totals.transport + totals.timeout === 0 ? 0 : 1;
+  for (const t of threads) t.terminate();
 }
-const before = rss();
-let peak = before;
-const sampler = setInterval(() => (peak = Math.max(peak, rss())), 1000);
-const top = Math.max(...levels);
-row(`soak ${options.soak} s`, top, await load(top, seconds("soak")));
-clearInterval(sampler);
-await new Promise((resolve) => setTimeout(resolve, seconds("idle")));
-console.log(`RSS, MiB: before soak ${before.toFixed(1)}, peak ${peak.toFixed(1)}, after ${options.idle} s idle ${rss().toFixed(1)}`);
-console.log(`answers ${totals.ok}; errors: ${JSON.stringify({ ...totals, ok: undefined })}`);
-process.exitCode = totals.status + totals.body + totals.transport + totals.timeout === 0 ? 0 : 1;

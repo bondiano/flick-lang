@@ -85,10 +85,10 @@ load-json-build:
     cd tools/load/json && ../../../target/debug/flick build --out-dir dist/js && ../../../target/debug/flick build --emit go --out-dir dist/go
 
 # Closed-loop HTTP load on the JSON server built for `target` (js or go), then its startup time and size
-load-json target="go" soak="30" port="3920": load-json-build
+load-json target="go" soak="30" port="3920" workers="8": load-json-build
     if [ "{{target}}" = go ]; then server="tools/load/json/dist/go/flick-server"; else server="node tools/load/json/dist/js/flick-server.js"; fi; \
       PORT={{port}} $server & pid=$!; sleep 2; \
-      node tools/load/index.mjs --url "http://127.0.0.1:{{port}}/item/{id}" --expect '"item {id}"' --soak {{soak}} --pid $pid; \
+      node tools/load/index.mjs --url "http://127.0.0.1:{{port}}/item/{id}" --expect '"item {id}"' --soak {{soak}} --workers {{workers}} --pid $pid; \
       status=$?; kill $pid; \
       node tools/load/startup.mjs --url "http://127.0.0.1:{{port}}/item/x" -- $server; \
       if [ "{{target}}" = go ]; then du -b tools/load/json/dist/go/flick-server; else du -sb tools/load/json/dist/js; fi; \
