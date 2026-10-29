@@ -1,6 +1,7 @@
 package flickrt
 
 import (
+	"runtime"
 	"sync"
 	"testing"
 )
@@ -38,4 +39,55 @@ func TestDeferredWakesEveryWaiter(t *testing.T) {
 		t.Fatal("a deferred completes once")
 	}
 	wg.Wait()
+}
+
+func TestSemaphoreNeverExceedsItsPermits(t *testing.T) {
+	s := SemaphoreMake(nil, int32(3))
+	var mu sync.Mutex
+	running, most := 0, 0
+	work := Eff(func(*Fiber) Value {
+		mu.Lock()
+		running++
+		most = max(most, running)
+		mu.Unlock()
+		runtime.Gosched()
+		mu.Lock()
+		running--
+		mu.Unlock()
+		return Unit
+	})
+	var wg sync.WaitGroup
+	for range 100 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			SemaphoreWithPermit(rootFiber(), s, work)
+		}()
+	}
+	wg.Wait()
+	if most > 3 || most == 0 {
+		t.Fatalf("at most %d ran at once, want 1..3", most)
+	}
+}
+
+func TestSyncRefUpdateEffectSerializes(t *testing.T) {
+	r := SyncRefMake(nil, float64(0))
+	add := Fn(func(n Value) Value {
+		return Eff(func(*Fiber) Value {
+			runtime.Gosched() // another update would interleave here without the lock
+			return n.(float64) + 1
+		})
+	})
+	var wg sync.WaitGroup
+	for range 200 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			SyncRefUpdateEffect(rootFiber(), add, r)
+		}()
+	}
+	wg.Wait()
+	if got := SyncRefGet(nil, r); got != float64(200) {
+		t.Fatalf("got %v, want 200", got)
+	}
 }

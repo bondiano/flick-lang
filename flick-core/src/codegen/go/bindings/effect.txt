@@ -580,3 +580,70 @@ flickOnInterrupt *EffectOnInterrupt
 
 [@flick-lang/runtime/effect/Deferred]
 flickDone *DeferredDone
+
+[@flick-lang/runtime/effect/Semaphore]
+make *SemaphoreMake
+take *SemaphoreTake
+takeIfAvailable *SemaphoreTakeIfAvailable
+release *SemaphoreRelease
+releaseAll *SemaphoreReleaseAll
+resize *SemaphoreResize
+withPermits *SemaphoreWithPermits
+withPermit *SemaphoreWithPermit
+withPermitsIfAvailable *SemaphoreWithPermitsIfAvailable
+
+[@flick-lang/runtime/effect/PartitionedSemaphore]
+make *PartitionedMake
+capacity PartitionedCapacity
+available *PartitionedAvailable
+take *PartitionedTake
+release *PartitionedRelease
+withPermits *PartitionedWithPermits
+withPermit *PartitionedWithPermit
+withPermitsIfAvailable *PartitionedWithPermitsIfAvailable
+
+[@flick-lang/runtime/effect/SynchronizedRef]
+make *SyncRefMake
+get *SyncRefGet
+set *SyncRefSet
+getAndSet *SyncRefGetAndSet
+setAndGet *SyncRefSetAndGet
+getAndUpdate *SyncRefGetAndUpdate
+getAndUpdateEffect *SyncRefGetAndUpdateEffect
+getAndUpdateSome *SyncRefGetAndUpdateSome
+getAndUpdateSomeEffect *SyncRefGetAndUpdateSomeEffect
+update *SyncRefUpdate
+updateEffect *SyncRefUpdateEffect
+updateAndGet *SyncRefUpdateAndGet
+updateAndGetEffect *SyncRefUpdateAndGetEffect
+updateSome *SyncRefUpdateSome
+updateSomeEffect *SyncRefUpdateSomeEffect
+updateSomeAndGet *SyncRefUpdateSomeAndGet
+updateSomeAndGetEffect *SyncRefUpdateSomeAndGetEffect
+modify *SyncRefModify
+modifyEffect *SyncRefModifyEffect
+modifySome *SyncRefModifySome
+modifySomeEffect *SyncRefModifySomeEffect
+
+[@flick-lang/runtime/effect/SubscriptionRef]
+make *SyncRefMake
+get *SyncRefGet
+set *SyncRefSet
+getAndSet *SyncRefGetAndSet
+setAndGet *SyncRefSetAndGet
+getAndUpdate *SyncRefGetAndUpdate
+getAndUpdateEffect *SyncRefGetAndUpdateEffect
+getAndUpdateSome *SyncRefGetAndUpdateSome
+getAndUpdateSomeEffect *SyncRefGetAndUpdateSomeEffect
+update *SyncRefUpdate
+updateEffect *SyncRefUpdateEffect
+updateAndGet *SyncRefUpdateAndGet
+updateAndGetEffect *SyncRefUpdateAndGetEffect
+updateSome *SyncRefUpdateSome
+updateSomeEffect *SyncRefUpdateSomeEffect
+updateSomeAndGet *SyncRefUpdateSomeAndGet
+updateSomeAndGetEffect *SyncRefUpdateSomeAndGetEffect
+modify *SyncRefModify
+modifyEffect *SyncRefModifyEffect
+modifySome *SyncRefModifySome
+modifySomeEffect *SyncRefModifySomeEffect

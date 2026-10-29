@@ -107,6 +107,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/regexp.go"),
     ),
     (
+        "semaphore.go",
+        include_str!("../../../../runtime-go/flickrt/semaphore.go"),
+    ),
+    (
         "seq.go",
         include_str!("../../../../runtime-go/flickrt/seq.go"),
     ),
@@ -121,6 +125,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "sync.go",
         include_str!("../../../../runtime-go/flickrt/sync.go"),
+    ),
+    (
+        "syncref.go",
+        include_str!("../../../../runtime-go/flickrt/syncref.go"),
     ),
     (
         "text.go",

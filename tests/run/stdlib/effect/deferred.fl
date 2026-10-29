@@ -9,6 +9,13 @@ type error Boom = Boom Float
 tick : Duration.Duration
 let tick = Result.with_default Duration.zero (Duration.millis 2)
 
+/// Long enough that a woken fiber's next step comes after the waker's.
+pause : Duration.Duration
+let pause = Result.with_default Duration.zero (Duration.millis 20)
+
+wait_long : Duration.Duration
+let wait_long = Result.with_default Duration.zero (Duration.millis 60)
+
 unexpected : Failure e ->{} Unit
 let unexpected failure = Platform.stdout_line "unexpected failure"
 
@@ -101,13 +108,18 @@ let latches () =
   scope s {
     let child = Fiber.spawn s unexpected (task {
       Latch.await_ latch
+      Effect.sleep pause
       note "released"
-      task { note "through" } |> Latch.when_open latch
+      task {
+        Effect.sleep pause
+        note "through"
+      }
+      |> Latch.when_open latch
     })
     Effect.sleep tick
     note ("open " ++ show (Latch.is_open latch))
     note ("release " ++ show (Latch.release latch))
-    Effect.sleep tick
+    Effect.sleep wait_long
     note ("opened " ++ show (Latch.open latch))
     Fiber.join child
     note ("closed " ++ show (Latch.close latch) ++ " " ++ show (Latch.is_open latch))
