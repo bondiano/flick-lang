@@ -103,6 +103,7 @@ fn lambda(params: Vec<Pat>, body: Expr, span: Span) -> Expr {
         .map(|pat| Param {
             pat,
             stage: Stage::Pure,
+            ty: None,
         })
         .collect();
     Expr::new(

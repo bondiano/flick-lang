@@ -9,7 +9,7 @@ import "flick.app/flickrt"
 var _ = flickrt.Unit
 
 func F_App__add(l_a, l_b flickrt.Value) flickrt.Value {
-	return flickrt.AddI(l_a, l_b)
+	return flickrt.AddInt(flickrt.AsInt(l_a), flickrt.AsInt(l_b))
 }
 
 var V_App__inc flickrt.Value

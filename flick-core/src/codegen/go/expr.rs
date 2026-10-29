@@ -3,10 +3,10 @@
 
 use std::mem;
 
+use super::arith::Native;
 use super::{Gen, indent, names};
 use crate::codegen::tail::{Callee, Target};
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
-use crate::numeric::{Arith, Num};
 use crate::types::Lift;
 
 /// Whether moving the evaluation of `go` later is unobservable: a name or
@@ -65,10 +65,11 @@ impl Gen<'_> {
             let go = self.expr(e);
             if self.buf.len() > mark {
                 let mut spills = Vec::new();
-                for prev in &mut out {
+                for (prev, before) in out.iter_mut().zip(exprs) {
                     if !atomic(prev) {
                         let t = self.temp();
-                        spills.push(format!("var {t} flickrt.Value = {prev}"));
+                        let ty = self.native(before).map_or("flickrt.Value", Native::go);
+                        spills.push(format!("var {t} {ty} = {prev}"));
                         *prev = t;
                     }
                 }
@@ -90,7 +91,16 @@ impl Gen<'_> {
     }
 
     /// Declares the local `name` as `value`.
+    /// Declares the local `name` as `value`, Go code of type `native`.
+    pub(super) fn bind_native(&mut self, name: &str, value: &str, native: Native) {
+        let l = names::local(name);
+        self.buf
+            .push(format!("var {l} {} = {value}\n_ = {l}", native.go()));
+        self.natives.insert(name.to_owned(), native);
+    }
+
     pub(super) fn bind(&mut self, name: &str, value: &str) {
+        self.natives.remove(name);
         let l = names::local(name);
         self.buf
             .push(format!("var {l} flickrt.Value = {value}\n_ = {l}"));
@@ -140,15 +150,7 @@ impl Gen<'_> {
             ExprKind::Binary(op, lhs, rhs) => self.binary(*op, lhs, rhs),
             ExprKind::Not(inner) => format!("flickrt.Not({})", self.expr(inner)),
             ExprKind::Unwrap(inner) => self.unwrap(inner),
-            ExprKind::Neg(num, inner) => {
-                let v = self.expr(inner);
-                let f = match num {
-                    Num::Int => "NegI",
-                    Num::Float => "NegF",
-                    Num::BigInt => "NegB",
-                };
-                format!("flickrt.{f}({v})")
-            }
+            ExprKind::Neg(num, inner) => self.neg(*num, inner),
             ExprKind::Ignore(inner) => {
                 let v = self.expr(inner);
                 // a result read by nothing: Go refuses a variable nobody reads
@@ -368,67 +370,16 @@ impl Gen<'_> {
         }
     }
 
-    fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr) -> String {
-        if matches!(op, BinOp::And | BinOp::Or) {
-            let l = self.expr(lhs);
-            let (rs, rv) = self.block(|g| g.expr(rhs));
-            let go = if op == BinOp::And { "&&" } else { "||" };
-            if rs.is_empty() {
-                return format!("(flickrt.Bool({l}) {go} flickrt.Bool({rv}))");
-            }
-            let t = self.temp();
-            let test = if op == BinOp::And {
-                format!("flickrt.Bool({t})")
-            } else {
-                format!("!flickrt.Bool({t})")
-            };
-            self.buf.push(format!(
-                "var {t} flickrt.Value = {l}\nif {test} {{\n{}\t{t} = {rv}\n}}",
-                indent(&rs)
-            ));
-            return t;
-        }
-        let go = self.ordered(&[lhs, rhs]);
-        let (l, r) = (&go[0], &go[1]);
-        let f = match op {
-            BinOp::Eq => "Equals",
-            BinOp::NotEq => return format!("!flickrt.Equals({l}, {r})"),
-            BinOp::Same => "Same",
-            BinOp::NotSame => return format!("!flickrt.Same({l}, {r})"),
-            BinOp::Lt => "Lt",
-            BinOp::Le => "Le",
-            BinOp::Gt => "Gt",
-            BinOp::Ge => "Ge",
-            BinOp::Concat => "Concat",
-            BinOp::ListConcat => "ListConcat",
-            BinOp::Arith(arith, num) => {
-                let suffix = match num {
-                    Num::Int => "I",
-                    Num::Float => "F",
-                    Num::BigInt => "B",
-                };
-                let name = match arith {
-                    Arith::Add => "Add",
-                    Arith::Sub => "Sub",
-                    Arith::Mul => "Mul",
-                    Arith::Div => "Div",
-                    Arith::Rem => "Rem",
-                    Arith::Pow => "Pow",
-                };
-                return format!("flickrt.{name}{suffix}({l}, {r})");
-            }
-            BinOp::And | BinOp::Or => unreachable!("handled above"),
-        };
-        format!("flickrt.{f}({l}, {r})")
-    }
-
     pub(super) fn stmt(&mut self, stmt: &Stmt) {
         let (Stmt::Let(_, e) | Stmt::Expr(e) | Stmt::Fun { value: e, .. }) = stmt;
         self.line(e.span);
         match stmt {
             Stmt::Let(Pat::Bind(name), value) => {
                 let v = self.expr(value);
-                self.bind(name, &v);
+                match self.native(value) {
+                    Some(n) => self.bind_native(name, &v, n),
+                    None => self.bind(name, &v),
+                }
             }
             Stmt::Let(Pat::Wild, value) => {
                 let v = self.expr(value);

@@ -41,18 +41,19 @@ func RemI(a, b Value) Value {
 }
 
 // PowI is `a ** b` on Int; a negative power is truncated like a division.
-func PowI(a, b Value) Value {
-	base, e := a.(int32), b.(int32)
+func PowI(a, b Value) Value { return PowInt(a.(int32), b.(int32)) }
+
+func PowInt(base, e int32) int32 {
 	if e < 0 {
 		switch {
 		case base == 1:
-			return int32(1)
+			return 1
 		case base == -1 && e%2 == 0:
-			return int32(1)
+			return 1
 		case base == -1:
-			return int32(-1)
+			return -1
 		}
-		return int32(0)
+		return 0
 	}
 	result := int32(1)
 	for u := uint32(e); u > 0; u >>= 1 {
@@ -75,8 +76,9 @@ func RemF(a, b Value) Value { return math.Mod(a.(float64), b.(float64)) }
 
 // PowF is JS `Math.pow`, which differs from math.Pow on ±1 to a NaN or an
 // infinite power: NaN.
-func PowF(a, b Value) Value {
-	x, y := a.(float64), b.(float64)
+func PowF(a, b Value) Value { return PowFloat(a.(float64), b.(float64)) }
+
+func PowFloat(x, y float64) float64 {
 	if math.IsNaN(y) || (math.Abs(x) == 1 && math.IsInf(y, 0)) {
 		return math.NaN()
 	}
@@ -199,3 +201,41 @@ func evenTie(x float64, digits string, exp int) string {
 	}
 	return digits
 }
+
+// Arithmetic of unboxed values, which the compiler calls where it knows the
+// operands' type; the operators above box what these compute.
+
+func AddInt(a, b int32) int32 { return a + b }
+func SubInt(a, b int32) int32 { return a - b }
+func MulInt(a, b int32) int32 { return a * b }
+
+func DivInt(a, b int32) int32 {
+	if b == 0 {
+		return 0
+	}
+	return a / b
+}
+
+func RemInt(a, b int32) int32 {
+	if b == 0 {
+		return 0
+	}
+	return a % b
+}
+
+func NegInt(a int32) int32 { return -a }
+
+func AddFloat(a, b float64) float64 { return a + b }
+func SubFloat(a, b float64) float64 { return a - b }
+func MulFloat(a, b float64) float64 { return a * b }
+func DivFloat(a, b float64) float64 { return a / b }
+func NegFloat(a float64) float64    { return -a }
+func RemFloat(a, b float64) float64 { return math.Mod(a, b) }
+
+// EqFloat is `==` on Floats: NaN equals NaN, as Flick's equality has it.
+func EqFloat(a, b float64) bool { return a == b || a != a && b != b }
+
+func AsInt(v Value) int32     { return v.(int32) }
+func AsFloat(v Value) float64 { return v.(float64) }
+func AsBool(v Value) bool     { return v.(bool) }
+func AsString(v Value) string { return v.(string) }

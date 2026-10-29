@@ -77,6 +77,7 @@ impl Lower<'_> {
                         params: vec![Param {
                             pat,
                             stage: Stage::Pure,
+                            ty: None,
                         }],
                         body: Box::new(body),
                     },

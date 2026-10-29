@@ -52,6 +52,8 @@ impl Gen<'_> {
     }
 
     fn item(&mut self, item: &Item, decls: &mut Vec<String>, init: &mut Vec<String>) {
+        // local names are unique only within a definition
+        self.natives.clear();
         match &item.kind {
             ItemKind::Value { name, dicts, body } => match super::shape(&item.kind) {
                 Shape::Var => {
@@ -185,6 +187,7 @@ impl Gen<'_> {
             ));
         }
         for (name, value) in methods {
+            self.natives.clear();
             let (stmts, v) = self.block(|g| g.expr(value));
             let v = if stmts.is_empty() {
                 v

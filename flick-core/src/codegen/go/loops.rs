@@ -8,6 +8,7 @@
 use std::collections::HashMap;
 use std::mem;
 
+use super::arith::Native;
 use super::{Gen, indent, names, param_list};
 use crate::codegen::tail::{
     Calls, Target, cycles, function, jumpable, self_call, tail_callees, target,
@@ -22,6 +23,8 @@ pub(super) struct Tail {
     current: usize,
     vars: Vec<String>,
     binds: Vec<Option<String>>,
+    /// The Go type of each loop variable that is not a `flickrt.Value`.
+    natives: Vec<Option<Native>>,
     /// In a group, the variable naming the member that runs next.
     state: Option<String>,
 }
@@ -117,22 +120,39 @@ impl Gen<'_> {
             Some(target) => {
                 let heads: Vec<String> = params.iter().map(|_| self.temp()).collect();
                 let vars: Vec<String> = params.iter().map(|_| self.temp()).collect();
+                // a loop variable of a known scalar type is unboxed once, not per iteration
+                let natives: Vec<Option<Native>> = params
+                    .iter()
+                    .map(|p| {
+                        matches!(p.pat, Pat::Bind(_))
+                            .then(|| Native::of(p.ty.as_deref()))
+                            .flatten()
+                    })
+                    .collect();
                 let tail = Tail {
                     members: vec![(target, params.len())],
                     current: 0,
                     vars: vars.clone(),
                     binds: binds(params),
+                    natives: natives.clone(),
                     state: None,
                 };
                 let (inner, ()) = self.block(|g| g.iteration(params, &vars, body, tail));
-                let copies = format!("var {} = {}", param_list(&vars), heads.join(", "));
-                (
-                    heads,
-                    vec![
-                        copies,
-                        format!("for {{\n{}{}}}", checkpoint(self.fiber), indent(&inner)),
-                    ],
-                )
+                let mut stmts: Vec<String> = vars
+                    .iter()
+                    .zip(&heads)
+                    .zip(&natives)
+                    .map(|((var, head), native)| match native {
+                        Some(n) => format!("var {var} {} = {}", n.go(), n.unbox(head)),
+                        None => format!("var {var} flickrt.Value = {head}"),
+                    })
+                    .collect();
+                stmts.push(format!(
+                    "for {{\n{}{}}}",
+                    checkpoint(self.fiber),
+                    indent(&inner)
+                ));
+                (heads, stmts)
             }
         };
         (self.tail, self.generator) = saved;
@@ -142,11 +162,12 @@ impl Gen<'_> {
     /// One iteration of a loop: the parameters bound from the loop
     /// variables, then the body in tail position.
     fn iteration(&mut self, params: &[Param], vars: &[String], body: &Expr, tail: Tail) {
-        for (p, var) in params.iter().zip(vars) {
-            match &p.pat {
-                Pat::Bind(n) => self.bind(n, var),
-                Pat::Wild | Pat::Lit(Lit::Unit) => {}
-                pat => self.destructure(pat, var),
+        for ((p, var), native) in params.iter().zip(vars).zip(&tail.natives) {
+            match (&p.pat, native) {
+                (Pat::Bind(n), Some(native)) => self.bind_native(n, var, *native),
+                (Pat::Bind(n), None) => self.bind(n, var),
+                (Pat::Wild | Pat::Lit(Lit::Unit), _) => {}
+                (pat, _) => self.destructure(pat, var),
             }
         }
         self.tail = Some(tail);
@@ -188,6 +209,7 @@ impl Gen<'_> {
                 current: k,
                 vars: vars.clone(),
                 binds: binds(params),
+                natives: vec![None; params.len()],
                 state: Some("state".to_owned()),
             };
             let (stmts, ()) = self.block(|g| g.iteration(params, &vars, body, tail));
@@ -221,7 +243,7 @@ impl Gen<'_> {
             return false;
         };
         let tail = self.tail.as_ref().expect("a jump is inside a loop");
-        let (vars, binds) = (tail.vars.clone(), tail.binds.clone());
+        let (vars, binds, natives) = (tail.vars.clone(), tail.binds.clone(), tail.natives.clone());
         let state = tail.state.clone().filter(|_| j != tail.current);
         // a parameter passed on unchanged keeps its variable
         let changed: Vec<usize> = (0..args.len())
@@ -231,6 +253,14 @@ impl Gen<'_> {
             })
             .collect();
         let values = self.ordered(&changed.iter().map(|&i| args[i]).collect::<Vec<_>>());
+        let values: Vec<String> = changed
+            .iter()
+            .zip(values)
+            .map(|(&i, v)| match natives[i] {
+                Some(n) => self.unboxed(args[i], v, n),
+                None => v,
+            })
+            .collect();
         if !changed.is_empty() {
             let targets: Vec<&str> = changed.iter().map(|&i| vars[i].as_str()).collect();
             self.buf

@@ -10,6 +10,7 @@
 //! Only what `main` reaches is compiled; a construct the target cannot run
 //! yet is a diagnostic, never a runtime stub.
 
+mod arith;
 mod call;
 mod expr;
 mod foreign;
@@ -327,6 +328,9 @@ struct Gen<'a> {
     foreign_file: Option<&'a ForeignFile<'a>>,
     /// The Go files the module's foreign bindings call, by name.
     sources: BTreeMap<String, String>,
+    /// The locals of the definition being emitted whose Go type is not
+    /// `flickrt.Value`.
+    natives: HashMap<String, arith::Native>,
 }
 
 impl<'a> Gen<'a> {
@@ -353,6 +357,7 @@ impl<'a> Gen<'a> {
             location: None,
             foreign_file: None,
             sources: BTreeMap::new(),
+            natives: HashMap::new(),
         }
     }
 

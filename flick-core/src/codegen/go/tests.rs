@@ -56,6 +56,20 @@ fn pure_functions_are_go_functions_of_all_their_arguments() {
 }
 
 #[test]
+fn a_loop_of_floats_keeps_them_unboxed() {
+    let (files, errors) = compile(
+        "module App exposing (main)\n\
+         sum : Float -> Float -> Float\n\
+         let rec sum i acc = if i <= 0 then acc else sum (i - 1) (acc + i * 0.5)\n\
+         main : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (sum 10 0))\n",
+    );
+    assert!(errors.is_empty(), "{errors:?}");
+    let go = file(&files, "m_App.go");
+    assert!(go.contains("var l_acc float64 = "), "{go}");
+    insta::assert_snapshot!(go);
+}
+
+#[test]
 fn only_what_main_reaches_is_compiled() {
     let (files, errors) = compile(
         "module App exposing (main)\n\

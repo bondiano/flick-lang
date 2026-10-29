@@ -21,6 +21,7 @@ mod sql;
 
 use std::collections::{HashMap, HashSet};
 use std::iter;
+use std::sync::Arc;
 
 use super::{Expr, ExprKind, Foreign, ForeignMode, Item, ItemKind, Lit, Module, Param, Stage};
 use crate::diagnostics::{Diagnostic, codes};
@@ -333,6 +334,7 @@ impl Lower<'_> {
             .map(|(p, stage)| Param {
                 pat: self.pattern(p),
                 stage,
+                ty: self.typing.values.get(&p.range()).cloned().map(Arc::new),
             })
             .collect();
         let body = body(self);

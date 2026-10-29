@@ -417,6 +417,9 @@ pub struct Param {
     pub pat: Pat,
     /// The stage of the arrow of this parameter.
     pub stage: Stage,
+    /// The parameter's type when it is a type constructor on its own, as
+    /// [`Expr::ty`].
+    pub ty: Option<Arc<Type>>,
 }
 
 #[derive(Debug, Clone)]

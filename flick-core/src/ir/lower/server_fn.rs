@@ -119,6 +119,7 @@ impl Lower<'_> {
                 } else {
                     Stage::Pure
                 },
+                ty: None,
             })
             .collect();
         Expr::new(
@@ -150,6 +151,7 @@ fn tupled(body: &mut Expr) {
         params.push(Param {
             pat: Pat::Tuple(pats),
             stage,
+            ty: None,
         });
     }
 }
