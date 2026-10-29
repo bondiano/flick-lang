@@ -34,7 +34,7 @@ func loadRequest(id string) *ServerResponse {
 
 func TestLoadRequest(t *testing.T) {
 	want := `{"id":"7","label":"item 7","note":null,"parts":[{"_tag":"Bolt","_0":3},{"_tag":"Panel","_0":2,"_1":4.5},{"_tag":"Bolt","_0":8}],"price":25,"tags":["steel","blue","large"]}`
-	if got := string(loadRequest("7").body); got != want {
+	if got := loadRequest("7").body.data; got != want {
 		t.Fatalf("body\n got %s\nwant %s", got, want)
 	}
 }

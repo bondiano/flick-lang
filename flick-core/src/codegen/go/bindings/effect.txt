@@ -710,3 +710,12 @@ flickCurrentMetadata *PlanCurrentMetadata
 [@flick-lang/runtime/effect/Schema]
 Json JsonCodec
 flickStringTree CodecStringTree
+
+[@flick-lang/runtime/effect/ByteSize]
+zero ByteSizeZero
+flickBytes ByteSizeBytes
+
+[@flick-lang/runtime/effect/Logger]
+flickMake LoggerMake
+withConsoleLog LoggerWithConsoleLog
+flickLayer LoggerLayer

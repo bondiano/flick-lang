@@ -7,6 +7,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/array.go"),
     ),
     (
+        "bytesize.go",
+        include_str!("../../../../runtime-go/flickrt/bytesize.go"),
+    ),
+    (
         "casing.go",
         include_str!("../../../../runtime-go/flickrt/casing.go"),
     ),
@@ -17,6 +21,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "codec.go",
         include_str!("../../../../runtime-go/flickrt/codec.go"),
+    ),
+    (
+        "codec_block.go",
+        include_str!("../../../../runtime-go/flickrt/codec_block.go"),
     ),
     (
         "codec_tree.go",
@@ -107,8 +115,20 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/http.go"),
     ),
     (
+        "http_body.go",
+        include_str!("../../../../runtime-go/flickrt/http_body.go"),
+    ),
+    (
+        "http_client_request.go",
+        include_str!("../../../../runtime-go/flickrt/http_client_request.go"),
+    ),
+    (
         "http_codecs.go",
         include_str!("../../../../runtime-go/flickrt/http_codecs.go"),
+    ),
+    (
+        "http_compression.go",
+        include_str!("../../../../runtime-go/flickrt/http_compression.go"),
     ),
     (
         "http_cookies.go",
@@ -127,8 +147,24 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/http_headers.go"),
     ),
     (
+        "http_middleware.go",
+        include_str!("../../../../runtime-go/flickrt/http_middleware.go"),
+    ),
+    (
         "http_mime.go",
         include_str!("../../../../runtime-go/flickrt/http_mime.go"),
+    ),
+    (
+        "http_request.go",
+        include_str!("../../../../runtime-go/flickrt/http_request.go"),
+    ),
+    (
+        "http_response.go",
+        include_str!("../../../../runtime-go/flickrt/http_response.go"),
+    ),
+    (
+        "http_router.go",
+        include_str!("../../../../runtime-go/flickrt/http_router.go"),
     ),
     (
         "http_url.go",
@@ -153,6 +189,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "list.go",
         include_str!("../../../../runtime-go/flickrt/list.go"),
+    ),
+    (
+        "logger.go",
+        include_str!("../../../../runtime-go/flickrt/logger.go"),
     ),
     (
         "mime_types.go",

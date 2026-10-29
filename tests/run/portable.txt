@@ -81,4 +81,5 @@ stdlib/http/headers
 stdlib/http/values
 stdlib/effect/schema_http
 stdlib/http/serve
+stdlib/http/handlers
 runtime/slice
