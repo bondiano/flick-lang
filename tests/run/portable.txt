@@ -74,3 +74,4 @@ stdlib/file
 runtime/scoped_file
 schema/json_wire
 schema/derive
+stdlib/http/serve

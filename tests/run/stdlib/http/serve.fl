@@ -1,0 +1,130 @@
+// A server of a router of JSON handlers at an ephemeral port: path
+// parameters, a body decoded by a schema, a typed failure, and the
+// listening socket released when its scope closes, however it closes.
+module App.Main exposing (main)
+
+import Http.Router exposing (RouteContext)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+type alias Item = { label : String; size : Float }
+  deriving Schema
+
+type error Boom = Boom
+
+call : String -> String -> String ->{} String
+foreign async call from "./wire.mjs" "call"
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+item : Codec none none Json Item
+let item = Codec.general (Codec.json (schema Item))
+
+ok : Http.ServerResponse.Options
+let ok = Http.ServerResponse.defaults
+
+options : Http.Server.ServeOptions
+let options = { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None }
+
+get_item : ServerRequest ->{RouteContext; SchemaError, Http.Body.HttpBodyError} ServerResponse
+let get_item _ =
+  let id = Option.with_default "?" (Http.Router.param "id")
+  Http.ServerResponse.schema_json item { label = "item " ++ id; size = 1 } ok
+
+create : ServerRequest ->{; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError}
+  ServerResponse
+let create request =
+  let created = Http.ServerRequest.schema_body_json item request
+  Http.ServerResponse.schema_json
+    item
+    { created with size = created.size + 1 }
+    { ok with status = Some 201 }
+
+boom : ServerRequest ->{; Boom} ServerResponse
+let boom _ = from_result (Err Boom)
+
+/// The handler of the server's routes.
+app : Unit ->{}
+  (ServerRequest ->{; Http.ServerError.HttpServerError, SchemaError, Http.Body.HttpBodyError, Boom}
+    ServerResponse)
+let app () =
+  Http.Router.router Http.Router.config
+    [
+      Http.Router.route (Some Http.Method.GET) "/item/:id" get_item,
+      Http.Router.route (Some Http.Method.POST) "/item" create,
+      Http.Router.route (Some Http.Method.GET) "/boom" boom,
+    ]
+
+/// The base URL of a server.
+base : forall s. Http.Server.Server s -> String
+let base server =
+  match Http.Server.address server with
+  | Http.Server.TcpAddress host port -> "http://" ++ host ++ ":" ++ show port
+  | Http.Server.UnixAddress path -> path
+
+serving : Unit ->{Http.Platform.HttpPlatform, Http.Etag.Generator; Http.ServerError.ServeError}
+  String
+let serving () =
+  scope s {
+    let url = base (Http.Server.serve options (app ()))
+    say (call "GET" (url ++ "/item/7") "")
+    say (call "POST" (url ++ "/item") "{\"label\": \"new\", \"size\": 2}")
+    say (call "POST" (url ++ "/item") "{\"label\": \"new\"}")
+    say (call "POST" (url ++ "/item") "{\"label\": ")
+    say (call "GET" (url ++ "/boom") "")
+    say (call "GET" (url ++ "/nowhere") "")
+    url
+  }
+
+/// A scope failing after it starts a server; the server's URL.
+fails_serving : Ref String ->{
+  Http.Platform.HttpPlatform,
+  Http.Etag.Generator;
+  Http.ServerError.ServeError,
+  Boom
+}
+  Unit
+let fails_serving url =
+  scope s {
+    Ref.set url (base (Http.Server.serve options (app ())))
+    from_result (Err Boom)
+  }
+
+failing : Unit ->{Http.Platform.HttpPlatform, Http.Etag.Generator; Http.ServerError.ServeError}
+  String
+let failing () =
+  let url = Ref.make ""
+  try fails_serving url with
+    | Boom -> ()
+  Ref.get url
+
+interrupted : Unit ->{Http.Platform.HttpPlatform, Http.Etag.Generator; Http.ServerError.ServeError}
+  String
+let interrupted () =
+  let url = Ref.make ""
+  let _ = timeout_option 50 (task {
+    scope s {
+      Ref.set url (base (Http.Server.serve options (app ())))
+      Effect.never ()
+    }
+  })
+  Ref.get url
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let outcome =
+    provide Http.Server.layer_services {
+      try
+        let closed = serving ()
+        say ("after success: " ++ call "GET" (closed ++ "/item/1") "")
+        let failed = failing ()
+        say ("after an error: " ++ call "GET" (failed ++ "/item/1") "")
+        let stopped = interrupted ()
+        say ("after an interruption: " ++ call "GET" (stopped ++ "/item/1") "")
+        "done"
+      with
+      | Boom -> "boom"
+      | Http.ServerError.ServeError message -> message
+    }
+  say outcome

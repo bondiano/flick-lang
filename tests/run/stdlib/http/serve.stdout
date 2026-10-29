@@ -1,0 +1,10 @@
+200 {"label":"item 7","size":1}
+201 {"label":"new","size":3}
+500 
+400 
+500 
+404 
+after success: refused
+after an error: refused
+after an interruption: refused
+done
