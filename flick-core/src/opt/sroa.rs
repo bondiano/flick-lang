@@ -108,6 +108,7 @@ fn replace_stmt(stmt: Stmt, name: &str, local: &dyn Fn(&str) -> String) -> Vec<S
             Expr {
                 kind: ExprKind::Local(l),
                 span,
+                ..
             },
         ) if l == name => pats
             .into_iter()

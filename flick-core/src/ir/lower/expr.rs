@@ -1,5 +1,7 @@
 //! Expressions, blocks and match arms.
 
+use std::sync::Arc;
+
 use super::Lower;
 use super::atoms::completed;
 use super::numeric::{apply, arith_of};
@@ -26,6 +28,9 @@ impl Lower<'_> {
             .flatten();
         let span = self.span(node);
         let mut expr = self.expr_kind(node);
+        if let Some(ty) = self.typing.values.get(&key) {
+            expr.ty = Some(Arc::new(ty.clone()));
+        }
         if let Some(lift) = lift {
             expr = Expr::new(ExprKind::Lift(Box::new(expr), lift), span);
         }

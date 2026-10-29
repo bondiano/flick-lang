@@ -164,3 +164,50 @@ fn ir_does_not_depend_on_a_backend() {
         }
     }
 }
+
+#[test]
+fn ir_carries_the_checker_types() {
+    use super::{ExprKind, ItemKind};
+    use crate::types::Type;
+    let ir = lower_text(
+        "App",
+        "module App exposing (..)\n\
+         area : Float -> Float\nlet area r = r * r\n\
+         ident : a -> a\nlet ident x = x\n\
+         label : String\nlet label = ident \"x\"\n",
+    )
+    .expect("lowers");
+    // the name of each expression's type constructor, by item and expression kind
+    let mut seen = Vec::new();
+    for item in &ir.items {
+        let ItemKind::Value { name, body, .. } = &item.kind else {
+            continue;
+        };
+        let mut stack = vec![body];
+        while let Some(e) = stack.pop() {
+            let kind = match &e.kind {
+                ExprKind::Binary(..) => "arith",
+                ExprKind::Local(_) => "local",
+                ExprKind::App { .. } => "app",
+                _ => "",
+            };
+            let ty = match e.ty.as_deref() {
+                Some(Type::Con { name, .. }) => name.clone(),
+                Some(_) => "general".to_owned(),
+                None => "none".to_owned(),
+            };
+            if !kind.is_empty() {
+                seen.push(format!("{name} {kind} {ty}"));
+            }
+            e.each_child(&mut |c| stack.push(c));
+        }
+    }
+    for want in [
+        "area arith Float",
+        "area local Float",
+        "ident local none",
+        "label app String",
+    ] {
+        assert!(seen.iter().any(|s| s == want), "no `{want}` in {seen:?}");
+    }
+}

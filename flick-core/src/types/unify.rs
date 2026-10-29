@@ -165,7 +165,11 @@ impl Store {
 
     /// Follows bound variables at the top of `t`.
     pub fn resolve(&self, t: &Type) -> Type {
-        let mut t = t;
+        self.head(t).clone()
+    }
+
+    /// [`Store::resolve`] without the copy.
+    pub fn head<'a>(&'a self, mut t: &'a Type) -> &'a Type {
         while let Type::Meta(m) = t {
             // a variable this store never made (a stored type shown by
             // `show_type` with an empty store) is open
@@ -174,7 +178,7 @@ impl Store {
                 Some(MetaState::Open { .. }) | None => break,
             }
         }
-        t.clone()
+        t
     }
 
     /// `t` with every bound variable replaced by its solution.

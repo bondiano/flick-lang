@@ -15,11 +15,12 @@ pub use lower::lower;
 pub use print::print;
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::numeric::{Arith, Num};
 use crate::source::Span;
 pub use crate::types::Stage;
-use crate::types::{Constructor, Dict, ForeignInfo, InstanceInfo, Lift, SchemaItem};
+use crate::types::{Constructor, Dict, ForeignInfo, InstanceInfo, Lift, SchemaItem, Type};
 
 #[derive(Debug, Clone)]
 pub struct Module {
@@ -112,6 +113,9 @@ pub enum ForeignMode {
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
+    /// The checker's type of the expression when that is a type constructor
+    /// on its own (`Float`, `String`); none otherwise.
+    pub ty: Option<Arc<Type>>,
 }
 
 #[derive(Debug, Clone)]
@@ -507,7 +511,11 @@ impl BinOp {
 
 impl Expr {
     pub fn new(kind: ExprKind, span: Span) -> Self {
-        Expr { kind, span }
+        Expr {
+            kind,
+            span,
+            ty: None,
+        }
     }
 }
 

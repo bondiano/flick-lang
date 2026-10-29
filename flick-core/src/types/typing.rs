@@ -103,6 +103,13 @@ pub struct Typing {
     pub type_names: HashMap<Range, (String, String)>,
     /// Pending types also feed compiler diagnostics.
     pub(crate) pending_types: Vec<(Range, Type)>,
+    /// The type of each expression, name and binder whose type is a type
+    /// constructor on its own (`Float`, `String`), for code generation: an
+    /// expression checked against a type keeps the type it was inferred
+    /// with, which a lift around it changes. Only those, so that recording
+    /// stays linear in the size of the module.
+    pub values: HashMap<Range, Type>,
+    pending_values: Vec<(Range, Type)>,
     #[cfg(feature = "ide")]
     /// The record each field label belongs to, at the label: in a field
     /// access, a literal, an update and a record pattern.
@@ -370,6 +377,9 @@ impl Checker<'_> {
     /// The type of an expression a keyword opens (`task`, `match`, `fun` …),
     /// recorded at the keyword so an editor can show it there.
     pub fn note_head(&mut self, node: &Node, ty: &Type) {
+        if let t @ (Type::Con { .. } | Type::Meta(_)) = self.store.head(ty) {
+            self.typing.pending_values.push((node.range(), t.clone()));
+        }
         let head = match node.kind {
             K::TaskExpr => K::TaskKw,
             K::DoExpr => K::DoKw,
@@ -412,6 +422,12 @@ impl Checker<'_> {
     /// Settles what waited for the whole module to be solved.
     pub fn finish_typing(&mut self) -> Typing {
         let mut typing = mem::take(&mut self.typing);
+        let pending = mem::take(&mut typing.pending_values);
+        for (at, ty) in pending.iter().chain(&typing.pending_types) {
+            if let t @ Type::Con { .. } = self.store.head(ty) {
+                typing.values.entry(*at).or_insert_with(|| t.clone());
+            }
+        }
         #[cfg(feature = "ide")]
         {
             typing.aliases = self
