@@ -95,6 +95,21 @@ GOOS=darwin GOARCH=arm64 flick build --release
 | ошибок | 0 из 1 981 723 | 0 из 1 394 204 |
 
 Решение (2026-10-29): продолжаем G8+, условие N0 не выполнено. Go даёт в ~11 раз меньше памяти, старт в ~27 раз быстрее и один файл без Node, а нагрузку без ошибок держит с той же задержкой при одном клиенте; под конкурентной нагрузкой пропускная способность на ~30 % ниже, p99 выше на ~25 %. Это цена runtime без оптимизаций (боксинг `Value`, копии окружения сервисов и записей на запрос, разбор документа без компиляции схемы), а не потолок Go: профилирование и снижение аллокаций — отдельная задача перед G10c, по тем же `just load-json`.
+
+Профилирование и снижение аллокаций (2026-10-29, `258ce24`, `4c1947e`, `3848c98`): запрос `load-json` в `BenchmarkLoadRequest` — 3,0 мкс, 71 аллокация и 2,9 КБ вместо 13,4 мкс, 322 и 22 КБ (запись строится на месте, порядок ключей схемы считается один раз, JSON ответа пишется сразу в буфер, на запрос нет горутины-наблюдателя и копии окружения сервисов), Int и Float в арифметике, сравнениях и хвостовых циклах — `int32`/`float64` Go по типам в IR, сборка мусора при 4× живой куче, если `GOGC` не задан. Таблица выше снята однопоточным клиентом, который сам упирается в ~20 тыс. req/s; теперь `load-json` гоняет клиент в 8 потоках (`--workers`). Та же машина (load average ≈ 3–14):
+
+| | JS-target (Node) | Go-target |
+| - | -: | -: |
+| req/s, c = 1 | 2 268 | 2 449 |
+| req/s, c = 16 | 20 681 | 28 714 |
+| req/s, c = 64 | 35 783 | 49 908 |
+| req/s, 30 с при c = 64 | 34 151 | 48 292 |
+| p50 / p99 при c = 16, мс | 0,67 / 1,87 | 0,51 / 1,10 |
+| p50 / p99 при c = 64, мс | 1,77 / 6,04 | 1,00 / 6,29 |
+| RSS до нагрузки / пик / после 30 с простоя, МиБ | 311 / 313 / 313 | 36 / 39 / 34 |
+| старт до первого ответа, мс | 226 | 10,3 |
+
+Go под конкурентной нагрузкой на ~40 % быстрее Node при p99 не хуже и в ~8 раз меньшей памяти. Обработчик Flick теперь — около 16 % CPU сервера, остальное — `net/http`, планировщик и GC Go.
 - AC: пункты §10 исследования на настоящем коде Flick: ADT/match/замыкание/словарь; cold `task`; scoped-файл и сокет с освобождением при успехе, ошибке и отмене; parallel с ошибкой ветви; разделяемый `Ref`; хвостовая рекурсия; запуск без Node.
 - AC: замеры на одном прикладном сценарии (HTTP-сервер + JSON): RPS, p99, RSS, размер бинарника, время старта — против JS-target; таблица в этом файле.
 - AC: записано решение: продолжаем G8+, или условие N0 выполнено.
@@ -106,7 +121,7 @@ GOOS=darwin GOARCH=arm64 flick build --release
 - AC: `deriving Schema`, decode/encode, JSON-кодеки, тексты ошибок декодирования совпадают с JS-target; переносимы `tests/run/schema`.
 
 **G10. stdlib.** ⬜ (после G7; каждый подпункт — переносимые `tests/run/stdlib/*`)
-- **G10a.** ✅ `915e69d` `634ab28` `4de9b39` `873b8c4` `f2f4f75` Prelude, `List`, `Option`, `Result`, `String`, числа, `Seq`, коллекции, `Decimal`. (Ленивый `for` и `Seq`; `HashMap`/`HashSet` в порядке HAMT по `Hash.hash` из Effect, тест `stdlib/hash_order`; `BigDecimal`/`BigInt`/`Duration` по корпусу результатов Effect из Node; запись хранит порядок ключей JS; нормализация и регистр по таблицам из ICU Node (`tools/go-unicode/gen.mjs`); `RegExp` на RE2. Переносимы `stdlib/{seqs,collections,monoids,decimals,hash_order}` и `stdlib/effect/{array,option,number,string,order,combine,hash_map,hash_set}`. Остались: `stdlib/seq` (Stream), `string_locale` (`locale_compare`, коллация Intl — `P012`), `Record`/`Duration`/`Function` целиком.)
+- **G10a.** ✅ `915e69d` `634ab28` `4de9b39` `873b8c4` `f2f4f75` Prelude, `List`, `Option`, `Result`, `String`, числа, `Seq`, коллекции, `Decimal`. (Ленивый `for` и `Seq`; `HashMap`/`HashSet` в порядке HAMT по `Hash.hash` из Effect, тест `stdlib/hash_order`; `BigDecimal`/`BigInt`/`Duration` по корпусу результатов Effect из Node; запись хранит порядок ключей JS; нормализация и регистр по таблицам из ICU Node (`tools/go-unicode/gen.mjs`); `RegExp` на RE2. Переносимы `stdlib/{seqs,collections,monoids,decimals,hash_order}` и `stdlib/effect/{array,option,number,string,order,combine,hash_map,hash_set}`. `stdlib/seq`, `stdlib/effect/{string_locale,record,duration,function}` тоже переносимы.)
 - **G10b.** `Cli` (блок `cli`, `Cli/Prompt`), файлы, env, процессы, сигналы и код выхода — аналог `Runner.Node`.
 - **G10c.** HTTP: `Http.Server`, `Http.Router`, клиент; e2e `tests/run/stdlib/http` и `server`. (🔶 `9d5f335`: `serve` на `net/http` с graceful-закрытием scope, `Router` с `:param`, тела и ответы JSON через схемы, `text`/`empty`; переносим `stdlib/http/serve`. Осталось: заголовки, cookies, клиент, `HttpApi`, потоки, статика, формы.)
 - **G10d.** `Sql` на PostgreSQL: запросы, транзакции, отмена; `tests/postgres` проходит на Go-target.
