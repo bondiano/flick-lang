@@ -498,3 +498,29 @@ flickAddFinalizerExit *AddFinalizerExit
 
 [@flick-lang/runtime/effect/Fiber]
 flickInterrupt *FiberInterrupt
+
+[@flick-lang/runtime/effect/Deferred]
+make *DeferredMake
+await *DeferredAwait
+complete *DeferredComplete
+completeWith *DeferredCompleteWith
+fail *DeferredFail
+failSync *DeferredFailSync
+flickFailCause *DeferredFailCause
+flickFailCauseSync *DeferredFailCauseSync
+interrupt *DeferredInterrupt
+interruptWith *DeferredInterruptWith
+isDone *DeferredIsDone
+poll *DeferredPoll
+succeed *DeferredSucceed
+sync *DeferredSync
+into *DeferredInto
+
+[@flick-lang/runtime/effect/Latch]
+make *LatchMake
+open *LatchOpen
+release *LatchRelease
+await *LatchAwait
+close *LatchClose
+whenOpen *LatchWhenOpen
+isOpen LatchIsOpen

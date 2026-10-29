@@ -172,17 +172,4 @@ func FloatRound(x Value) Value {
 	return r
 }
 
-// Ref is a mutable cell.
-type Ref struct{ value Value }
-
-func RefMake(v Value) Value    { return &Ref{v} }
-func RefGet(r Value) Value     { return r.(*Ref).value }
-func RefSame(a, b Value) Value { return a.(*Ref) == b.(*Ref) }
-func RefSet(r, v Value) Value  { r.(*Ref).value = v; return Unit }
-func Identity(v Value) Value   { return v }
-func RefModify(r, f Value) Value {
-	cell := r.(*Ref)
-	pair := Apply(f, cell.value).([]Value)
-	cell.value = pair[1]
-	return pair[0]
-}
+func Identity(v Value) Value { return v }

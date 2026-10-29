@@ -30,6 +30,7 @@ pub const RUNTIME: &[(&str, &str)] = &[
     ("seq.go", include_str!("../../../../runtime-go/flickrt/seq.go")),
     ("service.go", include_str!("../../../../runtime-go/flickrt/service.go")),
     ("string.go", include_str!("../../../../runtime-go/flickrt/string.go")),
+    ("sync.go", include_str!("../../../../runtime-go/flickrt/sync.go")),
     ("text.go", include_str!("../../../../runtime-go/flickrt/text.go")),
     ("unicode.go", include_str!("../../../../runtime-go/flickrt/unicode.go")),
     ("unicode_tables.go", include_str!("../../../../runtime-go/flickrt/unicode_tables.go")),

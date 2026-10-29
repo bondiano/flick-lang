@@ -312,19 +312,19 @@ func EffectSleep(fb *Fiber, d Value) Value {
 	return Unit
 }
 
-func EffectNever(fb *Fiber, _ Value) Value {
+func EffectNever(fb *Fiber) Value {
 	wait(fb, nil)
 	return Unit
 }
 
-func EffectYieldNow(fb *Fiber, _ Value) Value {
+func EffectYieldNow(fb *Fiber) Value {
 	runtime.Gosched()
 	Check(fb)
 	return Unit
 }
 
 // EffectInterrupt interrupts the fiber itself.
-func EffectInterrupt(fb *Fiber, _ Value) Value {
+func EffectInterrupt(fb *Fiber) Value {
 	fb.state.interrupt(fb.state.id)
 	panic(fb.state.stopped())
 }

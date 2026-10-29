@@ -1,0 +1,49 @@
+// Fibers hand work to each other: a `Deferred` set once wakes every fiber
+// awaiting it, a `Latch` holds fibers until it opens, and a `Ref` shared by
+// many branches counts each update.
+module App.Main exposing (main)
+
+type error Oops = Oops String
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+nap : Float ->{} Unit
+let nap millis =
+  match Duration.millis millis with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+quiet : forall e. Failure e ->{} Unit
+let quiet _ = ()
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let answer : Deferred.Deferred none Float = Deferred.make ()
+  let waiters = scope owner {
+    let a = Fiber.spawn owner quiet (task { Deferred.await_ answer + 1 })
+    let b = Fiber.spawn owner quiet (task { Deferred.await_ answer + 2 })
+    nap 5
+    say ("first completion: " ++ show (Deferred.succeed 40 answer))
+    say ("second completion: " ++ show (Deferred.succeed 0 answer))
+    (Fiber.join a, Fiber.join b)
+  }
+  say (show waiters)
+  let broken : Deferred.Deferred {Oops} Float = Deferred.make ()
+  let _ = Deferred.fail (Oops "no value") broken
+  let failed : Float = try Deferred.await_ broken with
+    | Oops _ -> -1
+  say (show failed)
+  let gate = Latch.make false
+  scope owner {
+    let _ = Fiber.spawn owner quiet (task { Latch.when_open gate (task { say "through the gate" }) })
+    nap 5
+    say ("open before: " ++ show (Latch.is_open gate))
+    say ("opened: " ++ show (Latch.open gate))
+    say ("opened again: " ++ show (Latch.open gate))
+    nap 5
+  }
+  let count = Ref.make 0
+  let bump = task { Ref.modify count (fun n -> ((), n + 1)) }
+  let _ = parallel_all 50 (List.repeat 200 bump)
+  say ("count: " ++ show (Ref.get count))
