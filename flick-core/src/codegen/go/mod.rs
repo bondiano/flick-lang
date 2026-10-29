@@ -23,7 +23,7 @@ mod runtime;
 
 pub use runtime::RUNTIME;
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Write;
 use std::{mem, slice};
 
@@ -52,7 +52,14 @@ pub struct Program<'a> {
     /// The source path and 1-based line of a span of the program's own
     /// module, which `//line` directives give Go's stack traces.
     pub location: &'a Locate<'a>,
+    /// The Go side of a foreign module of a module of the program, by its
+    /// relative specifier: the file's name in the Go module and its text.
+    pub foreign_file: &'a ForeignFile<'a>,
 }
+
+/// Finds the Go file beside a foreign JS module: by the Flick module and
+/// the specifier, its name in the Go module and its text.
+pub type ForeignFile<'a> = dyn Fn(&str, &str) -> Option<(String, String)> + 'a;
 
 /// The Go files of a program, by path in its Go module, and what could not
 /// be compiled.
@@ -177,6 +184,7 @@ pub fn go(program: &Program) -> Output {
         }
     }
     let mut files = Vec::new();
+    let mut sources = BTreeMap::new();
     // the modules each module's initialization reads
     let mut deps: HashMap<String, BTreeSet<String>> = HashMap::new();
     let mut seen = HashSet::new();
@@ -190,6 +198,7 @@ pub fn go(program: &Program) -> Output {
         let mut g = Gen::new(&module.name, &shapes, program.package);
         if (program.own)(&module.name) {
             g.location = Some(program.location);
+            g.foreign_file = Some(program.foreign_file);
         }
         let order = item_order(module, &items, &index);
         let code = g.module(module, &order);
@@ -201,6 +210,7 @@ pub fn go(program: &Program) -> Output {
             }
         }));
         deps.insert(module.name.clone(), g.modules);
+        sources.extend(g.sources);
         files.push((names::file(&module.name), code));
     }
     let mut order = Vec::new();
@@ -214,6 +224,7 @@ pub fn go(program: &Program) -> Output {
     }
     let _ = writeln!(main_go, "\t\t{start}\n\t}})\n}}");
     files.push(("main.go".to_owned(), main_go));
+    files.extend(sources);
     dedup(&mut diagnostics);
     Output { files, diagnostics }
 }
@@ -306,6 +317,10 @@ struct Gen<'a> {
     grouped: HashMap<String, (usize, usize)>,
     /// Where a span of this module is in its source, for `//line`.
     location: Option<&'a Locate<'a>>,
+    /// The Go files of foreign modules, for the program's own modules.
+    foreign_file: Option<&'a ForeignFile<'a>>,
+    /// The Go files the module's foreign bindings call, by name.
+    sources: BTreeMap<String, String>,
 }
 
 impl<'a> Gen<'a> {
@@ -330,6 +345,8 @@ impl<'a> Gen<'a> {
             groups: Vec::new(),
             grouped: HashMap::new(),
             location: None,
+            foreign_file: None,
+            sources: BTreeMap::new(),
         }
     }
 

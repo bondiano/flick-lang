@@ -64,3 +64,9 @@ runtime/exits
 stdlib/effect/deferred
 stdlib/effect/ref
 stdlib/effect/fibers
+runtime/hung_io
+runtime/concurrency
+runtime/scopes
+runtime/releases
+runtime/owners
+codegen/for_loop

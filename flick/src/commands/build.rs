@@ -480,7 +480,9 @@ pub fn artifacts(
         core_only: false,
     };
     if output.go {
-        let (artifacts, diagnostics) = build::go::emit(compilation, sources, &settings);
+        let (artifacts, diagnostics) = build::go::emit(compilation, sources, &settings, &|path| {
+            fs::read_to_string(path).ok()
+        });
         return Emission {
             artifacts,
             diagnostics,

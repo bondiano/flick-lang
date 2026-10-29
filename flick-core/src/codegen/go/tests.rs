@@ -16,6 +16,9 @@ fn compile(text: &str) -> (Vec<(String, String)>, Vec<String>) {
         package: &|_| None,
         own: &|m| m == ir.name,
         location: &|_, _| None,
+        foreign_file: &|_, spec| {
+            (spec == "./here.mjs").then(|| ("ffi_here.go".to_owned(), "package main\n".to_owned()))
+        },
     });
     let messages = output.diagnostics.into_iter().map(|d| d.message).collect();
     (output.files, messages)
@@ -129,4 +132,33 @@ fn effectful_tail_calls_jump_but_not_out_of_a_try() {
     );
     let code = file(&files, "m_App.go");
     assert!(!code.contains("continue"), "{code}");
+}
+
+#[test]
+fn a_local_foreign_calls_the_go_file_beside_it() {
+    let (files, errors) = compile(
+        "module App exposing (main)\n\
+         wait : Float ->{} Unit\nforeign async wait from \"./here.mjs\" \"wait\"\n\
+         open : String ->{} String\nforeign effect open from \"./here.mjs\" \"open\"\n\
+         main : Unit ->{} Unit\nlet main () =\n  wait 1\n  Platform.stdout_line (open \"x\")\n",
+    );
+    assert!(errors.is_empty(), "{errors:?}");
+    let code = file(&files, "m_App.go");
+    assert!(
+        code.contains("flickrt.ForeignAsync(fb, func(ctx flickrt.Context) flickrt.Value { return wait(ctx, a0) })"),
+        "{code}"
+    );
+    assert!(code.contains("return open(fb, a0)"), "{code}");
+    assert_eq!(file(&files, "ffi_here.go"), "package main\n");
+    let (_, errors) = compile(
+        "module App exposing (main)\n\
+         wait : Float ->{} Unit\nforeign async wait from \"./gone.mjs\" \"wait\"\n\
+         main : Unit ->{} Unit\nlet main () = wait 1\n",
+    );
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("needs `gone.go` beside `./gone.mjs`")),
+        "{errors:?}"
+    );
 }

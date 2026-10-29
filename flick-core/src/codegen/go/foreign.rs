@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use super::{Gen, names, signature};
-use crate::ir::Foreign;
+use crate::ir::{Foreign, ForeignMode};
 use crate::source::Span;
 
 /// The binding tables, by area: under `[module]` (or `[global Module]` for
@@ -70,6 +70,9 @@ impl Gen<'_> {
     /// Go form, which is reported.
     pub(super) fn foreign(&mut self, f: &Foreign, span: Span) -> Option<String> {
         let Some(target) = lookup(self.module, &f.name, f.module.as_deref(), &f.export) else {
+            if let Some(spec) = f.module.as_deref().filter(|m| is_relative(m)) {
+                return self.local(f, spec, span);
+            }
             let from = f
                 .module
                 .as_deref()
@@ -97,12 +100,7 @@ impl Gen<'_> {
             .map(|i| format!("d{i}"))
             .chain((0..taken).map(|i| format!("a{i}")))
             .collect();
-        // a JS function of no arguments behind a `Unit` parameter
-        let mut args: Vec<String> = if f.arity == 0 {
-            heads[..f.dicts].to_vec()
-        } else {
-            heads.clone()
-        };
+        let mut args = arguments(f, &heads);
         let fiber = self.shape_of(self.module, &f.name).fiber();
         if wants_fiber {
             args.insert(0, "fb".to_owned());
@@ -112,6 +110,96 @@ impl Gen<'_> {
             names::func(self.module, &f.name),
             signature(fiber, &heads),
             args.join(", ")
+        ))
+    }
+}
+
+/// The arguments a binding passes of its parameters `heads`: none behind a
+/// `Unit` parameter of a JS function of no arguments.
+fn arguments(f: &Foreign, heads: &[String]) -> Vec<String> {
+    if f.arity == 0 {
+        heads[..f.dicts].to_vec()
+    } else {
+        heads.to_vec()
+    }
+}
+
+fn is_relative(spec: &str) -> bool {
+    spec.starts_with("./") || spec.starts_with("../")
+}
+
+/// The Go file beside the foreign JS module `spec`.
+fn sibling(spec: &str) -> String {
+    let file = spec.rsplit('/').next().unwrap_or(spec);
+    let stem = file.rsplit_once('.').map_or(file, |(stem, _)| stem);
+    format!("{stem}.go")
+}
+
+impl Gen<'_> {
+    /// A binding to the JS module `spec` beside the program's code: on Go,
+    /// the function of the same name in the Go file beside that module.
+    fn local(&mut self, f: &Foreign, spec: &str, span: Span) -> Option<String> {
+        let found = self.foreign_file.and_then(|find| find(self.module, spec));
+        let Some((file, text)) = found else {
+            self.errors.push((
+                format!(
+                    "`{}.{}` (foreign `{}` from `{spec}`) needs `{}` beside `{spec}` on the go target",
+                    self.module,
+                    f.name,
+                    f.export,
+                    sibling(spec)
+                ),
+                Some(span),
+            ));
+            return None;
+        };
+        let info = &f.info;
+        if f.catch.is_some()
+            || info.this
+            || info.variadic
+            || !info.optional.is_empty()
+            || info.callbacks.iter().any(Option::is_some)
+        {
+            self.errors.push((
+                format!(
+                    "`{}.{}`: a foreign `catch`, `this`, optional or variadic arguments or adapted callbacks are not available on the go target yet",
+                    self.module, f.name
+                ),
+                Some(span),
+            ));
+            return None;
+        }
+        self.sources.insert(file, text);
+        let taken = parameters(f);
+        if f.dicts == 0 && taken == 0 {
+            let var = names::var(self.module, &f.name);
+            return Some(format!("var {var} flickrt.Value = {}", f.export));
+        }
+        let heads: Vec<String> = (0..f.dicts)
+            .map(|i| format!("d{i}"))
+            .chain((0..taken).map(|i| format!("a{i}")))
+            .collect();
+        let mut args = arguments(f, &heads);
+        let call = match f.mode {
+            ForeignMode::Pure | ForeignMode::Sync => format!("{}({})", f.export, args.join(", ")),
+            ForeignMode::Effect => {
+                args.insert(0, "fb".to_owned());
+                format!("{}({})", f.export, args.join(", "))
+            }
+            ForeignMode::Async => {
+                args.insert(0, "ctx".to_owned());
+                format!(
+                    "flickrt.ForeignAsync(fb, func(ctx flickrt.Context) flickrt.Value {{ return {}({}) }})",
+                    f.export,
+                    args.join(", ")
+                )
+            }
+        };
+        let fiber = self.shape_of(self.module, &f.name).fiber();
+        Some(format!(
+            "func {}({}) flickrt.Value {{\n\treturn {call}\n}}",
+            names::func(self.module, &f.name),
+            signature(fiber, &heads),
         ))
     }
 }

@@ -2,6 +2,8 @@
 //! `go/<entry>/`, the program's code and the runtime, which `flick build`
 //! then compiles with `go build` into the executable `flick-<entry>`.
 
+use std::path::Path;
+
 use super::{Artifact, Settings, builtin_modules, generic_of, specifier};
 use crate::codegen::go::{self, Program, RUNTIME};
 use crate::diagnostics::{Diagnostic, Severity, codes};
@@ -25,11 +27,13 @@ pub fn executable(name: &str) -> String {
     }
 }
 
-/// The Go modules of the app's entries, and what could not be compiled.
+/// The Go modules of the app's entries, and what could not be compiled;
+/// `read` gives the text of a Go file beside a foreign JS module, if any.
 pub fn emit(
     compilation: &Compilation,
     sources: &SourceMap,
     settings: &Settings,
+    read: &dyn Fn(&Path) -> Option<String>,
 ) -> (Vec<Artifact>, Vec<Diagnostic>) {
     let mut diagnostics = Vec::new();
     if settings.entries.is_empty() {
@@ -61,6 +65,18 @@ pub fn emit(
             .then(|| settings.package.map(str::to_owned))
             .flatten()
     };
+    // `./x.mjs` of a module is `x.go` beside it, named in the Go module by its path
+    let foreign_file = |module: &str, spec: &str| {
+        let path = normalize(&(settings.source_dir)(module)?.join(spec)).with_extension("go");
+        let text = read(&path)?;
+        let name: String = path
+            .with_extension("")
+            .to_string_lossy()
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+            .collect();
+        Some((format!("ffi{name}.go"), text))
+    };
     let mut out = Vec::new();
     for (name, entry) in settings.entries {
         let dir = module_dir(name);
@@ -78,6 +94,7 @@ pub fn emit(
             package: &package,
             own: &own,
             location: &location,
+            foreign_file: &foreign_file,
         });
         diagnostics.extend(output.diagnostics);
         out.push(Artifact {

@@ -1,0 +1,25 @@
+// A foreign call that would wait forever is cancelled when a timeout
+// interrupts it; its scope releases its resources only after the call
+// has ended.
+module App.Main exposing (main)
+
+hang : Unit ->{} Unit
+foreign async hang from "./timers.mjs" "hang"
+  cancel signal
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+waiting : Unit ->{} String
+let waiting () =
+  scope {
+    Resource.acquire_release (task { say "open" }) (fun _ -> say "close")
+    hang ()
+    "never"
+  }
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let outcome = try timeout 20 (task { waiting () }) with
+    | TimeoutError -> "timed out"
+  say outcome

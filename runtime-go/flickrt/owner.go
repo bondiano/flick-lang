@@ -2,17 +2,43 @@ package flickrt
 
 import "sync"
 
-// Lexical owners. Each `scope` has one: the fibers spawned into it and the
-// finalizers of what was acquired into it. Closing it is two-phase:
-// admission ends, children are interrupted and each one awaited,
-// supervisors included, and only then the finalizers run, last first,
+// Lexical owners. Each `scope` has one: the fibers spawned into it, the
+// foreign calls they left running and the finalizers of what was acquired
+// into it. Closing it is two-phase: admission ends, children are
+// interrupted and each one awaited, supervisors included, the foreign
+// calls end, and only then the finalizers run, last first,
 // each seeing how the body ended; their failures join the body's.
 type Owner struct {
 	mu         sync.Mutex
 	open       bool
 	children   map[*child]struct{}
 	watchers   sync.WaitGroup
+	pending    []<-chan struct{} // foreign calls still running after an interruption
 	finalizers []finalizer
+}
+
+// track makes the owner wait, before it releases resources, for a foreign
+// call that ends when `done` is closed.
+func (o *Owner) track(done <-chan struct{}) {
+	o.mu.Lock()
+	o.pending = append(o.pending, done)
+	o.mu.Unlock()
+}
+
+// settle waits for the foreign calls still running, and those they leave.
+func (o *Owner) settle() {
+	for {
+		o.mu.Lock()
+		pending := o.pending
+		o.pending = nil
+		o.mu.Unlock()
+		if len(pending) == 0 {
+			return
+		}
+		for _, done := range pending {
+			<-done
+		}
+	}
 }
 
 // A finalizer runs in the closing fiber, with the services of the fiber
@@ -73,6 +99,7 @@ func (o *Owner) close(fb *Fiber, exit *Cause) *Cause {
 		c.state.interrupt(fb.state.id)
 	}
 	o.watchers.Wait()
+	o.settle()
 	cause := exit
 	for i := len(finalizers) - 1; i >= 0; i-- {
 		cause = Sequential(cause, finalizers[i].call(fb, exit))
