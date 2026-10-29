@@ -27,6 +27,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/platform.go"),
     ),
     (
+        "seq.go",
+        include_str!("../../../../runtime-go/flickrt/seq.go"),
+    ),
+    (
         "string.go",
         include_str!("../../../../runtime-go/flickrt/string.go"),
     ),

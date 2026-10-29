@@ -2,7 +2,7 @@
 //! arguments is a direct Go call; any other application goes through the
 //! curried value.
 
-use std::slice;
+use std::{mem, slice};
 
 use super::{Gen, Shape, indent, names, param_list};
 use crate::codegen::tail::Target;
@@ -33,9 +33,9 @@ impl Gen<'_> {
     pub(super) fn abstraction(&mut self, shown: &[String], inner: &Expr) -> String {
         let mark = self.givens.len();
         let dicts = self.bind_givens(shown);
-        let tail = self.tail.take();
+        let saved = (self.tail.take(), mem::replace(&mut self.generator, false));
         let (mut stmts, v) = self.block(|g| g.expr(inner));
-        self.tail = tail;
+        (self.tail, self.generator) = saved;
         self.givens.truncate(mark);
         let takes: Vec<String> = dicts
             .iter()

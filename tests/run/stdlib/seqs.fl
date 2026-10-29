@@ -1,0 +1,82 @@
+// Every function of `Seq`, without Stream: infinite sequences end under
+// `take`, every iteration starts over (counts, scans and zips included), a
+// lazy `for` reads a List or a Seq, and `Seq` is a `Monad` for `do`.
+module App.Main exposing (main)
+
+line : Show a => Seq a -> String
+let line xs = show (Seq.to_list xs)
+
+fibs : Seq Int
+let fibs = Seq.unfold (fun (a, b) -> Some (a, (b, a + b))) (0, 1)
+
+halve : Int -> Option (Int, Int)
+let halve n = if n == 0 then None else Some (n, n / 2)
+
+main : Unit ->{} Unit
+let main () =
+  let naturals = Seq.from 1
+  let squares = Seq.map (fun n -> n * n) naturals
+  Platform.stdout_line (line (Seq.take 5 squares) ++ " " ++ line (Seq.take 5 squares))
+  Platform.stdout_line (line (Seq.take 10 fibs) ++ " " ++ line (Seq.unfold halve 40))
+  Platform.stdout_line (line (Seq.take 4 (Seq.iterate (fun x -> x * 3) 1)))
+  Platform.stdout_line
+    (
+      line (Seq.take 7 (Seq.cycle [1, 2, 3]))
+        ++ " "
+        ++ line (Seq.take 3 (Seq.cycle ([] : List Int)))
+    )
+  Platform.stdout_line (line (Seq.take 3 (Seq.repeat "x")) ++ " " ++ line (Seq.singleton 9))
+  Platform.stdout_line (line (Seq.range_by 10 0 (-3)) ++ " " ++ line (Seq.range_by 0 10 4))
+  Platform.stdout_line (line (Seq.range_by 0 5 0) ++ " " ++ line (Seq.range 3 3))
+  Platform.stdout_line (line (Seq.range_to 1 4) ++ " " ++ line (Seq.range_to 5 4))
+  Platform.stdout_line (line (Seq.append (Seq.range 0 2) (Seq.of_list [7, 8])))
+  Platform.stdout_line (line (Seq.take 0 naturals) ++ " " ++ line (Seq.take (-2) naturals))
+  Platform.stdout_line
+    (line (Seq.drop 3 (Seq.range 0 6)) ++ " " ++ line (Seq.drop (-1) (Seq.range 0 2)))
+  Platform.stdout_line (line (Seq.take_while (fun x -> x < 4) naturals))
+  Platform.stdout_line (line (Seq.drop_while (fun x -> x < 3) (Seq.of_list [1, 5, 2, 0])))
+  Platform.stdout_line
+    (line (Seq.filter_map (fun x -> if x % 2 == 0 then Some (x * 10) else None) (Seq.range 0 7)))
+  Platform.stdout_line (line (Seq.take 6 (Seq.flat_map (fun x -> Seq.range 0 x) naturals)))
+  let zipped = Seq.zip (Seq.of_list ["a", "b", "c"]) naturals
+  Platform.stdout_line (line zipped ++ " " ++ line zipped)
+  Platform.stdout_line (line (Seq.zip_with (fun a b -> a * b) (Seq.range 1 4) (Seq.from 10)))
+  Platform.stdout_line (line (Seq.take 3 (Seq.enumerate (Seq.of_list ["x", "y", "z", "w"]))))
+  let sums = Seq.scan (fun acc x -> acc + x) 0 (Seq.range 1 5)
+  Platform.stdout_line (line sums ++ " " ++ line sums)
+  Platform.stdout_line
+    (line (Seq.chunks 2 (Seq.range 0 5)) ++ " " ++ line (Seq.chunks 0 (Seq.range 0 5)))
+  Platform.stdout_line
+    (line (Seq.windows 3 (Seq.range 0 5)) ++ " " ++ line (Seq.windows 9 (Seq.range 0 5)))
+  Platform.stdout_line
+    (
+      show (Seq.find (fun n -> n * n > 50) naturals)
+        ++ " "
+        ++ show (Seq.first (Seq.empty : Seq Int))
+    )
+  Platform.stdout_line (show (Seq.first (Seq.filter (fun n -> n % 7 == 0) naturals)))
+  Platform.stdout_line
+    (show (Seq.any (fun n -> n > 1000) naturals) ++ " " ++ show (Seq.all (fun n -> n < 5) naturals))
+  Platform.stdout_line (show (Seq.fold (fun acc x -> acc + x) 0 (Seq.range 1 101)))
+  Platform.stdout_line
+    (line (map (fun x -> x + 1) (Seq.range 0 3)) ++ " " ++ line (pure 4 : Seq Int))
+  let pairs = do {
+    x <- Seq.range 1 4
+    y <- Seq.of_list ["a", "b"]
+    if x != 2
+    pure (x, y)
+  }
+  Platform.stdout_line (line pairs)
+  let evens = for {
+    x <- [1, 2, 3, 4, 5, 6]
+    if x % 2 == 0
+  } yield x * x
+  Platform.stdout_line (line evens ++ " " ++ line evens)
+  let grid = for {
+    x <- Seq.range 0 3
+    y <- Seq.range 0 x
+  } yield (x, y)
+  Platform.stdout_line (line grid)
+  Seq.each_effect (fun n -> Platform.stdout_line ("each " ++ show n)) (Seq.take 2 naturals)
+  let total = Seq.fold_effect (fun acc n -> acc + n) 0 (Seq.range 0 5)
+  Platform.stdout_line (show total)

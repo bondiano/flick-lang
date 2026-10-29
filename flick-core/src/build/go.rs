@@ -82,7 +82,7 @@ pub fn emit(
         diagnostics.extend(output.diagnostics);
         out.push(Artifact {
             path: format!("{dir}/go.mod"),
-            contents: "module flick.app\n\ngo 1.22\n".to_owned(),
+            contents: "module flick.app\n\ngo 1.23\n".to_owned(),
         });
         out.extend(output.files.into_iter().map(|(path, contents)| Artifact {
             path: format!("{dir}/{path}"),

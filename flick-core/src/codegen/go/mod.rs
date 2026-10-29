@@ -257,8 +257,10 @@ struct Gen<'a> {
     temps: u32,
     /// Dictionaries in scope: as `Dict::Given` names them, and the variable.
     givens: Vec<(String, String)>,
-    /// The list a strict `[for …]` appends its elements to.
-    collector: Option<String>,
+    /// Where the elements of the `for` being emitted go.
+    collector: Option<generate::Collector>,
+    /// Inside the function of a lazy `for`, which returns nothing.
+    generator: bool,
     /// The modules whose top-level values the code reads.
     modules: BTreeSet<String>,
     /// What the target cannot compile, and where.
@@ -287,6 +289,7 @@ impl<'a> Gen<'a> {
             temps: 0,
             givens: Vec::new(),
             collector: None,
+            generator: false,
             modules: BTreeSet::new(),
             errors: Vec::new(),
             tail: None,

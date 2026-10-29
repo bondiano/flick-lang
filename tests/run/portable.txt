@@ -8,10 +8,12 @@ bootstrap/stderr
 codegen/classes
 codegen/closures
 codegen/deep_recursion
-codegen/defect
 codegen/defaults
+codegen/defect
 codegen/eval_order
 codegen/exports
+codegen/for_comprehension
+codegen/fusion
 codegen/ints
 codegen/let_assert
 codegen/lift
@@ -19,6 +21,8 @@ codegen/literals
 codegen/numbers
 codegen/numeric_classes
 codegen/patterns
+codegen/ranges
 codegen/recursion
 codegen/stage_order
 codegen/strings_utf16
+stdlib/seqs

@@ -141,17 +141,20 @@ impl Gen<'_> {
             }
             // a pure function is called like a runtime one: Go runs both directly
             ExprKind::Lift(inner, _) => self.expr(inner),
-            ExprKind::Generate {
-                body,
-                strict: true,
-                limit: None,
-                ..
-            } => self.strict(body),
             ExprKind::Each { .. } | ExprKind::Yield(_) => {
                 self.discard(e);
                 "flickrt.Unit".to_owned()
             }
-            ExprKind::Generate { .. } => self.unsupported(e.span, "a lazy `for`"),
+            ExprKind::Generate {
+                body,
+                strict: false,
+                sync: false,
+                limit,
+            } => self.lazy(body, limit.as_deref()),
+            ExprKind::Generate { strict: false, .. } => {
+                self.unsupported(e.span, "a lazy `for` that reads services")
+            }
+            ExprKind::Generate { body, .. } => self.strict(body),
             ExprKind::Operation { .. } | ExprKind::ServiceTag(_) => {
                 self.unsupported(e.span, "a service")
             }
@@ -181,8 +184,14 @@ impl Gen<'_> {
     fn unwrap(&mut self, option: &Expr) -> String {
         let v = self.expr(option);
         let v = self.spill(v);
+        // in a lazy `for` a `None` ends the sequence, as a JS generator's return does
+        let ret = if self.generator {
+            String::new()
+        } else {
+            format!(" {v}")
+        };
         self.buf.push(format!(
-            "if flickrt.IsTag({v}, \"None\") {{\n\treturn {v}\n}}"
+            "if flickrt.IsTag({v}, \"None\") {{\n\treturn{ret}\n}}"
         ));
         format!("flickrt.Get({v}, 0)")
     }

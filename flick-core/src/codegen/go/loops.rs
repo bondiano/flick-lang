@@ -6,6 +6,7 @@
 //! its own iteration.
 
 use std::collections::HashMap;
+use std::mem;
 
 use super::{Gen, indent, names, param_list};
 use crate::codegen::tail::{
@@ -92,7 +93,7 @@ impl Gen<'_> {
         body: &Expr,
         target: Option<Target>,
     ) -> (Vec<String>, Vec<String>) {
-        let saved = self.tail.take();
+        let saved = (self.tail.take(), mem::replace(&mut self.generator, false));
         let looping = target.filter(|t| {
             jumpable(params, Calls::Direct)
                 && !tail_callees(body, &[(t.clone(), params.len())], Calls::Direct).is_empty()
@@ -121,7 +122,7 @@ impl Gen<'_> {
                 (heads, vec![copies, format!("for {{\n{}}}", indent(&inner))])
             }
         };
-        self.tail = saved;
+        (self.tail, self.generator) = saved;
         result
     }
 
