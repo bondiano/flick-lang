@@ -76,8 +76,9 @@ if flickrt.CountOf({n}) <= 0 {{
                     }
                     _ => g.arm(&var, pat, None, body, Self::discard),
                 });
+                // a pattern that ignores the element leaves the variable unused
                 self.buf.push(format!(
-                    "for {var} := range flickrt.Iter({s}) {{\n{}}}",
+                    "for {var} := range flickrt.Iter({s}) {{\n\t_ = {var}\n{}}}",
                     indent(&inner)
                 ));
             }
