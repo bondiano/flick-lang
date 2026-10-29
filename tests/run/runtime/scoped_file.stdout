@@ -1,0 +1,7 @@
+success: scope closed
+hello from a file
+error: scope closed
+body failed
+interrupted: scope closed
+None
+ENOENT: no such file or directory, open '/nonexistent/flick/file.txt'

@@ -2,6 +2,10 @@
 # `[module]`, an export and the function of package `flickrt`.
 
 [@flick-lang/runtime]
+fileOpen *FileOpen
+fileReadHandle *FileReadHandle
+fileRead *FileRead
+fileWrite *FileWrite
 exitValue ExitValue
 exitFailure ExitFailure
 parallelExits *ParallelExits

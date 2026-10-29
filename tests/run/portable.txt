@@ -70,3 +70,5 @@ runtime/scopes
 runtime/releases
 runtime/owners
 codegen/for_loop
+stdlib/file
+runtime/scoped_file
