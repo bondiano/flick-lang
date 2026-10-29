@@ -7,132 +7,32 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"strings"
-	"sync"
 	"time"
 )
 
 // An HTTP server on net/http, as the JS runtime's on Node: each request
 // runs its handler in a fiber of its own, with the services of the `serve`
 // call; a handler's failure answers with its status (400 for a request it
-// cannot parse, 404 for no route, 500 otherwise); closing the scope of the
-// server stops accepting connections and waits for the running requests.
+// cannot parse, 404 for no route, 500 otherwise); the pre-response
+// handlers registered for the request change the response before it is
+// sent; closing the scope of the server stops accepting connections and
+// waits for the running requests.
 //
-// shortcut: responses carry a status, a content type and a body; headers, cookies and status texts come with the rest of the Http modules
+// shortcut: net/http sends the standard reason phrase of a status, not a response's status text; write the status line by hand if a program needs its own
 
 var (
-	serveErrorTag   = Tag("Http.ServerError.ServeError.ServeError")
-	serverErrorTag  = Tag("Http.ServerError.HttpServerError.HttpServerError")
-	parseErrorTag   = Tag("Http.ServerError.ServerErrorReason.RequestParseError")
-	routeMissingTag = Tag("Http.ServerError.ServerErrorReason.RouteNotFound")
-	tcpAddressTag   = Tag("Http.Server.Address.TcpAddress")
-	routeContextKey = "Http.Router.RouteContext"
+	serveErrorTag  = Tag("Http.ServerError.ServeError.ServeError")
+	serverErrorTag = Tag("Http.ServerError.HttpServerError.HttpServerError")
+	parseErrorTag  = Tag("Http.ServerError.ServerErrorReason.RequestParseError")
+	tcpAddressTag  = Tag("Http.Server.Address.TcpAddress")
 )
-
-// ServerRequest is a request a handler reads; its body is read once.
-type ServerRequest struct {
-	r    *http.Request
-	once sync.Once
-	body []byte
-	err  error
-}
-
-func (q *ServerRequest) read() ([]byte, error) {
-	q.once.Do(func() { q.body, q.err = io.ReadAll(q.r.Body) })
-	return q.body, q.err
-}
-
-// ServerResponse is what a handler answers.
-type ServerResponse struct {
-	status      int
-	contentType string
-	body        string
-}
-
-// response is a response of the options, `status` unless they set one.
-func response(options Value, status int, contentType string, body string) Value {
-	o := options.(*Record)
-	if s, ok := some(o.Get("status")); ok {
-		status = int(s.(int32))
-	}
-	if t, ok := some(o.Get("contentType")); ok {
-		contentType = t.(string)
-	}
-	return &ServerResponse{status, contentType, body}
-}
-
-func ResponseText(text, options Value) Value {
-	return response(options, 200, "text/plain", wellFormed(text.(string)))
-}
-
-func ResponseEmpty(options Value) Value { return response(options, 204, "", "") }
-
-func ResponseJson(_ *Fiber, json, options Value) Value {
-	return response(options, 200, "application/json", JsonStringify(json).(string))
-}
-
-// ResponseSchemaJson is the JSON of a value of a codec.
-func ResponseSchemaJson(_ *Fiber, c, v, options Value) Value {
-	if w, ok := c.(*wire); ok {
-		var b strings.Builder
-		b.Grow(256)
-		if issues := w.write(&b, v); issues != nil {
-			return Fail(schemaErrorOf(issues))
-		}
-		return response(options, 200, "application/json", b.String())
-	}
-	e, issues := codecOf(c).encode(v)
-	if issues != nil {
-		return Fail(schemaErrorOf(issues))
-	}
-	return ResponseJson(nil, e, options)
-}
-
-func methodOf(r *http.Request) Value { return NewData(Tag("Http.Method.Method." + r.Method)) }
-
-// RequestSchemaBodyJson decodes the JSON of the body by a codec; a body
-// that is not JSON is a request the server cannot parse.
-func RequestSchemaBodyJson(_ *Fiber, c, request Value) Value {
-	q := request.(*ServerRequest)
-	body, err := q.read()
-	parsed := JsonParse(string(body))
-	if err != nil || !isOk(parsed) {
-		description := "the body is not JSON"
-		if err != nil {
-			description = err.Error()
-		}
-		details := Rec("method", methodOf(q.r), "url", q.r.URL.String(), "description", Some(description))
-		return Fail(NewData(serverErrorTag, NewData(parseErrorTag, details)))
-	}
-	v, issues := codecOf(c).decode(value(parsed))
-	if issues != nil {
-		return Fail(schemaErrorOf(issues))
-	}
-	return v
-}
-
-// statusOf is the status a server answers a failure with.
-func statusOf(c *Cause) int {
-	if !c.has(causeFail) && !c.has(causeDie) {
-		return 503
-	}
-	if r := c.firstOf(causeFail); r != nil && !c.has(causeDie) {
-		if d, ok := r.err.(*Data); ok && d.Tag == serverErrorTag {
-			switch d.Fields[0].(*Data).Tag {
-			case parseErrorTag:
-				return 400
-			case routeMissingTag:
-				return 404
-			}
-		}
-	}
-	return 500
-}
 
 // servedRequest is a request with the fiber its handler runs in.
 type servedRequest struct {
 	state   fiberState
 	fiber   Fiber
+	source  requestSource
+	marks   requestMarks
 	request ServerRequest
 }
 
@@ -155,22 +55,28 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 	serving := *fb
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// one allocation for what a request's fiber needs
-		q := &servedRequest{fiber: serving, request: ServerRequest{r: r}}
+		q := &servedRequest{fiber: serving}
+		q.source.r, q.source.marks = r, &q.marks
+		q.request = ServerRequest{src: &q.source, method: r.Method, url: r.RequestURI, originalURL: r.RequestURI}
 		q.state.id, q.state.signal = fibers.Add(1), make(chan struct{})
 		q.fiber.state = &q.state
 		stop := context.AfterFunc(r.Context(), q.interrupt)
 		out, cause := catch(func() Value { return Run(&q.fiber, Apply(handler, &q.request)) })
-		stop()
 		if cause != nil {
-			w.WriteHeader(statusOf(cause))
-			return
+			out = causeResponse(cause)
 		}
-		resp := out.(*ServerResponse)
-		if resp.contentType != "" {
-			w.Header().Set("Content-Type", resp.contentType)
+		q.marks.mu.Lock()
+		pre := len(q.marks.preResponse) > 0
+		q.marks.mu.Unlock()
+		if pre {
+			if sent, failed := catch(func() Value { return q.request.preResponded(&q.fiber, out) }); failed == nil {
+				out = sent
+			} else {
+				out = causeResponse(failed)
+			}
 		}
-		w.WriteHeader(resp.status)
-		io.WriteString(w, resp.body)
+		stop()
+		writeResponse(w, out.(*ServerResponse))
 	})}
 	go srv.Serve(listener)
 	var grace time.Duration
@@ -198,83 +104,52 @@ func HttpAddress(server Value) Value {
 	return NewData(tcpAddressTag, addr.IP.String(), float64(addr.Port))
 }
 
-// A route of a router: its method (nil for every one), the segments of its
-// path pattern and its handler.
-type route struct {
-	method   string
-	segments []string
-	handler  Value
-}
-
-func HttpRoute(method, path, handler Value) Value {
-	m := ""
-	if d, ok := some(method); ok {
-		m = ConstructorName(d.(*Data).Tag)
-	}
-	return &route{m, strings.Split(path.(string), "/"), handler}
-}
-
-// segments are the parts of a path; duplicate slashes count as one.
-func segments(path string) []string {
-	parts := strings.Split(path, "/")
-	out := parts[:1]
-	for i, p := range parts[1:] {
-		if p != "" || i == len(parts)-2 {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
-// match is the parameters of a path the route's pattern matches.
-func (rt *route) match(method string, path []string) ([]Value, bool) {
-	if rt.method != "" && rt.method != method {
-		return nil, false
-	}
-	params := []Value{}
-	for i, p := range rt.segments {
-		if p == "*" {
-			return append(params, []Value{"*", strings.Join(path[i:], "/")}), true
-		}
-		if i >= len(path) {
-			return nil, false
-		}
-		switch {
-		case strings.HasPrefix(p, ":"):
-			if path[i] == "" {
-				return nil, false
-			}
-			params = append(params, []Value{p[1:], path[i]})
-		case p != path[i]:
-			return nil, false
-		}
-	}
-	return params, len(path) == len(rt.segments)
-}
-
-// HttpRouter handles a request by its routes: the first match with the
-// fewest parameters, its parameters given as the service RouteContext.
-//
-// shortcut: Effect's defaults only, the options of the config are not read; read them when a program sets one
-func HttpRouter(fb *Fiber, _, routes, request Value) Value {
-	q := request.(*ServerRequest)
-	path := segments(q.r.URL.Path)
-	var best *route
-	var params []Value
-	for _, r := range List(routes) {
-		rt := r.(*route)
-		if p, ok := rt.match(q.r.Method, path); ok && (best == nil || len(p) < len(params)) {
-			best, params = rt, p
-		}
-	}
-	if best == nil {
-		details := Rec("method", methodOf(q.r), "url", q.r.URL.String(), "description", None)
-		return Fail(NewData(serverErrorTag, NewData(routeMissingTag, details)))
-	}
-	context := Rec("params", Fn(func(Value) Value { return Succeed(params) }))
-	return withEnv(fb, routeContextKey, context, Apply(best.handler, request))
-}
-
 // The platform and entity tags of Node are services the go target does not
 // read yet: their layers provide them empty.
 func HttpEmptyLayer(key Value) Value { return LayerSucceed(key, &Record{}) }
+
+// writeResponse sends the response: its headers, a `Set-Cookie` header of
+// each cookie, and the body unless its status has none.
+func writeResponse(w http.ResponseWriter, resp *ServerResponse) {
+	h, b := w.Header(), resp.body
+	if resp.headers == nil {
+		if b.hasType && b.contentType != "" {
+			h["Content-Type"] = []string{b.contentType}
+		}
+		if b.length >= 0 {
+			h["Content-Length"] = []string{strconv.FormatInt(b.length, 10)}
+		}
+	} else {
+		for i, k := range resp.headers.keys {
+			h.Set(k, resp.headers.vals[i].(string))
+		}
+	}
+	for _, c := range resp.cookies.vals {
+		h.Add("Set-Cookie", cookieOf(c).serialize())
+	}
+	status := int(resp.status)
+	if status < 100 || status > 999 {
+		status = 500
+	}
+	switch {
+	case resp.omitsBody(false):
+		w.WriteHeader(status)
+	case b.kind == bodyBytes:
+		// a text body is written as it is, without a copy
+		w.WriteHeader(status)
+		if b.text {
+			io.WriteString(w, wellFormed(b.data))
+		} else {
+			io.WriteString(w, b.data)
+		}
+	default:
+		data, contentType, err := b.bytes()
+		if err != nil {
+			status, data = 500, nil
+		} else if b.kind == bodyForm && h.Get("Content-Type") == "" {
+			h.Set("Content-Type", contentType)
+		}
+		w.WriteHeader(status)
+		w.Write(data)
+	}
+}

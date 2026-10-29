@@ -29,6 +29,10 @@ codecTransformResult CodecTransformResult
 codecCheckWhole CodecCheckWhole
 codecNumberFinite CodecNumberFinite
 codecJsonSchema CodecJsonSchema
+codecString CodecString
+codecIgnoreExtra CodecIgnoreExtra
+dslField DslField
+dslOptionalField DslOptionalField
 fileOpen *FileOpen
 fileReadHandle *FileReadHandle
 fileRead *FileRead

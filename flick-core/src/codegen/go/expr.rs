@@ -195,7 +195,7 @@ impl Gen<'_> {
             }
             ExprKind::Within(owner, call) => self.within(owner, call),
             ExprKind::Provide(layer, body) => self.provide(layer, body),
-            ExprKind::CodecBlock(..) => self.unsupported(e.span, "a `codec` block"),
+            ExprKind::CodecBlock(name, fields) => self.codec_block(name, fields),
         }
     }
 
@@ -368,6 +368,21 @@ impl Gen<'_> {
             Some(b) => format!("flickrt.Update({b}, {record})"),
             None => record,
         }
+    }
+
+    /// The codec of a `codec` block: its labels and fields, in turn.
+    fn codec_block(&mut self, name: &str, fields: &[(String, Expr)]) -> String {
+        let values: Vec<&Expr> = fields.iter().map(|(_, v)| v).collect();
+        let entries: Vec<String> = fields
+            .iter()
+            .zip(self.ordered(&values))
+            .map(|((label, _), v)| format!("{}, {v}", names::string(label)))
+            .collect();
+        format!(
+            "flickrt.CodecBlock({}, []flickrt.Value{{{}}})",
+            names::string(name),
+            entries.join(", ")
+        )
     }
 
     pub(super) fn stmt(&mut self, stmt: &Stmt) {
