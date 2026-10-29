@@ -1,0 +1,85 @@
+//! A program built for the go target ends as one on Node does: the exit
+//! code follows its outcome, and SIGINT or SIGTERM close its scopes before
+//! it exits with 130 or 143. Ignored by default: part of `just e2e`, needs
+//! Go.
+
+mod common;
+
+use std::io::{BufRead, BufReader};
+use std::process::{Child, Command, Stdio};
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
+
+use common::{APP, flick_in, project};
+use flick_core::build::go::executable;
+
+/// An app that prints `started`, waits for a signal and prints `cleanup`
+/// when its scope closes.
+const WAITING: &str = "module App.Main exposing (main)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  scope {
+    Resource.acquire_release (task { Platform.stdout_line \"started\" }) (fun _ -> Platform.stdout_line \"cleanup\")
+    Effect.never ()
+  }
+";
+
+fn signal(child: &Child, name: &str) {
+    Command::new("kill")
+        .args(["-s", name, &child.id().to_string()])
+        .status()
+        .expect("kill");
+}
+
+/// Lines of the child's stdout as they come.
+fn lines(child: &mut Child) -> mpsc::Receiver<String> {
+    let (tx, rx) = mpsc::channel();
+    let stdout = child.stdout.take().expect("piped stdout");
+    thread::spawn(move || {
+        for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+            if tx.send(line).is_err() {
+                break;
+            }
+        }
+    });
+    rx
+}
+
+#[test]
+#[ignore = "needs Go"]
+fn exit_codes_follow_the_outcome_and_signals() {
+    let fail = "module App.Main exposing (main)\n\nmain : Unit ->{; AppError} Unit\nlet main () = App.fail \"nope\"\n";
+    let done = WAITING.replace("Effect.never ()", "()");
+    let cases: [(&str, &str, Option<&str>, i32); 4] = [
+        ("go_exit_ok", &done, None, 0),
+        ("go_exit_fail", fail, None, 1),
+        ("go_exit_int", WAITING, Some("INT"), 130),
+        ("go_exit_term", WAITING, Some("TERM"), 143),
+    ];
+    for (name, source, signal_name, expected) in cases {
+        let dir = project(name, &[("flick.toml", APP), ("src/App/Main.fl", source)]);
+        let build = flick_in(&dir, &["build", "--emit", "go"]);
+        assert!(build.status.success(), "{name}: {build:?}");
+        let mut child = Command::new(dir.join("dist").join(executable("main")))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("the executable runs");
+        let rx = lines(&mut child);
+        if let Some(s) = signal_name {
+            let started = rx.recv_timeout(Duration::from_secs(60));
+            assert_eq!(started.as_deref(), Ok("started"), "{name}");
+            signal(&child, s);
+            let cleanup = rx.recv_timeout(Duration::from_secs(60));
+            assert_eq!(
+                cleanup.as_deref(),
+                Ok("cleanup"),
+                "{name}: the scope closes"
+            );
+        }
+        let status = child.wait().expect("wait");
+        assert_eq!(status.code(), Some(expected), "{name}");
+    }
+}

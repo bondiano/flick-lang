@@ -63,6 +63,7 @@ func Run(fb *Fiber, task Value) Value {
 // wait blocks until `ch` is closed, or fails with the fiber's interruption
 // when it is interruptible.
 func wait(fb *Fiber, ch <-chan struct{}) {
+	idle()
 	s := fb.state
 	if s.mask > 0 {
 		<-ch

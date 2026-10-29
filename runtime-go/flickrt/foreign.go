@@ -27,6 +27,7 @@ func ForeignAsync(fb *Fiber, call func(Context) Value) Value {
 	if fb.state.mask > 0 {
 		signal = nil
 	}
+	idle()
 	select {
 	case r := <-ended:
 		cancel()

@@ -4,9 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/signal"
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 )
 
 var (
@@ -14,13 +17,28 @@ var (
 	stdout = bufio.NewWriterSize(os.Stdout, 64<<10)
 )
 
+// idle writes out what stdout holds before a fiber blocks, so what a
+// program printed shows while it waits, as on Node.
+func idle() {
+	outMu.Lock()
+	if stdout.Buffered() > 0 {
+		stdout.Flush()
+	}
+	outMu.Unlock()
+}
+
 // StdoutLine writes a line to stdout.
 func StdoutLine(text Value) Value { return StdoutWrite(text.(string) + "\n") }
 
 // StdoutWrite writes text to stdout without a line break.
 func StdoutWrite(text Value) Value {
+	t := wellFormed(text.(string))
 	outMu.Lock()
-	stdout.WriteString(wellFormed(text.(string)))
+	stdout.WriteString(t)
+	// a long-running program's lines show as they come once fibers run beside main
+	if concurrent.Load() && strings.HasSuffix(t, "\n") {
+		stdout.Flush()
+	}
 	outMu.Unlock()
 	return Unit
 }
@@ -97,30 +115,64 @@ func Format(v Value) string {
 	return Show(v).(string)
 }
 
-// Main runs the program: `run` starts `main` in the root fiber. A failure
-// is reported on stderr with exit code 1, as the JS runner does.
+// Main runs the program: `run` starts `main` in the root fiber, under the
+// root owner. SIGINT and SIGTERM interrupt it, and the owner closes as
+// after any end. The exit code is the JS runner's.
 func Main(run func(*Fiber)) {
-	code := 0
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				cause := causeOf(r)
-				stdout.Flush()
-				os.Stderr.WriteString(report(cause) + "\n")
-				code = 1
-			}
-		}()
-		owned(rootFiber(), func(fb *Fiber, _ *Owner) Value {
+	fb := rootFiber()
+	var stopped atomic.Value // the signal that interrupted main
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		s := <-signals
+		stopped.Store(s)
+		fb.state.interrupt(0)
+	}()
+	_, cause := catch(func() Value {
+		return owned(fb, func(fb *Fiber, _ *Owner) Value {
 			run(fb)
 			return Unit
 		})
-		// failures of supervisors fail the program after it ends
-		if reported != nil {
-			panic(&Failure{reported})
-		}
-	}()
+	})
+	s, _ := stopped.Load().(os.Signal)
+	reportedMu.Lock()
+	code := conclude(cause, s, reported)
+	reportedMu.Unlock()
 	stdout.Flush()
 	os.Exit(code)
+}
+
+// conclude reports how main ended, as the JS runner's `conclude`: the
+// failures of supervisors, then main's; 130 or 143 when only a signal
+// stopped it.
+func conclude(cause *Cause, s os.Signal, supervisors []*Cause) int {
+	write := func(text string) {
+		stdout.Flush()
+		os.Stderr.WriteString(text)
+	}
+	for _, c := range supervisors {
+		write("error: a supervisor failed\n" + pretty(c) + "\n")
+	}
+	if cause == nil {
+		if len(supervisors) > 0 {
+			return 1
+		}
+		return 0
+	}
+	if !cause.has(causeFail) && !cause.has(causeDie) {
+		if s != nil && len(supervisors) == 0 {
+			if s == os.Interrupt {
+				return 130
+			}
+			return 143
+		}
+		if s == nil {
+			write("error: main was interrupted\n")
+		}
+		return 1
+	}
+	write(report(cause) + "\n")
+	return 1
 }
 
 // flickFrames is the Flick source lines of the stack a defect unwinds, as

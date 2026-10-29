@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -34,7 +35,11 @@ func (c *child) observe(f func(*child)) {
 
 // fork runs `task` as a child of `fb` in `owner`, calling `ended` when it
 // ends.
+// concurrent tells whether a fiber has run beside main.
+var concurrent atomic.Bool
+
 func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
+	concurrent.Store(true)
 	c := &child{state: newState(), done: make(chan struct{})}
 	inner := *fb
 	inner.state, inner.owner = c.state, owner
@@ -57,6 +62,7 @@ func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
 
 // stop interrupts children and awaits them.
 func stop(fb *Fiber, children ...*child) {
+	idle()
 	for _, c := range children {
 		c.state.interrupt(fb.state.id)
 	}
@@ -95,7 +101,7 @@ func FailurePrimary(f Value) Value {
 
 var (
 	reportedMu sync.Mutex
-	reported   *Cause
+	reported   []*Cause // failures of supervisors, which fail the program
 )
 
 // FiberSpawn is `Fiber.spawn owner supervisor task`: runs `task` as a child
@@ -126,7 +132,7 @@ func FiberSpawn(fb *Fiber, owner, supervisor, task Value) Value {
 		_, failed := catch(func() Value { return Run(&watcher, Apply(supervisor, &Supervised{c.cause, shutdown})) })
 		if failed != nil {
 			reportedMu.Lock()
-			reported = Sequential(reported, failed)
+			reported = append(reported, failed)
 			reportedMu.Unlock()
 		}
 	})
@@ -173,6 +179,7 @@ func all(fb *Fiber, tasks []Value, limit int) []Value {
 		children[i] = fork(fb, fb.owner, t, func(c *child) { ended <- c })
 	}
 	var failure *Failure
+	idle()
 	for range tasks {
 		var c *child
 		if fb.state.mask > 0 {
@@ -245,6 +252,7 @@ func race(fb *Fiber, a, b Value, success bool) Value {
 		fork(fb, fb.owner, b, func(c *child) { ended <- c }),
 	}
 	var failed *Cause
+	idle()
 	for range children {
 		var c *child
 		if fb.state.mask > 0 {
@@ -279,6 +287,7 @@ func timeoutAfter(fb *Fiber, millis Value, task Value, done func(Value) Value, l
 	if fb.state.mask > 0 {
 		signal = nil
 	}
+	idle()
 	select {
 	case <-c.done:
 		return done(c.result())
@@ -307,6 +316,7 @@ func sleep(fb *Fiber, d time.Duration, forever bool) {
 		wait(fb, nil)
 		return
 	}
+	idle()
 	timer := time.NewTimer(d)
 	defer timer.Stop()
 	if fb.state.mask > 0 {

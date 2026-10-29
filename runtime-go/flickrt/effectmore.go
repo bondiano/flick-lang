@@ -15,6 +15,7 @@ func raceAll(fb *Fiber, tasks []Value, first bool) Value {
 		children[i] = fork(fb, fb.owner, t, func(c *child) { ended <- c })
 	}
 	var failed *Cause
+	idle()
 	for range tasks {
 		var c *child
 		if fb.state.mask > 0 {
