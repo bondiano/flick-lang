@@ -5,6 +5,7 @@
 import { Context, Effect } from "effect";
 
 import { type Seq, seq } from "./core/seq.ts";
+import { implementation } from "./effects.ts";
 
 /** No Sync stage is running: nothing set the services it reads. */
 const OUTSIDE: Context.Context<never> = /*#__PURE__*/ Context.empty();
@@ -55,11 +56,16 @@ export const syncAbi: unique symbol = /*#__PURE__*/ Symbol.for("@flick-lang/runt
  * `S.op` of a Sync service: a function of the operation's arguments that
  * calls the implementation in the current context.
  */
-export const syncOperation = <S extends object>(tag: Context.Service<S, S>, name: keyof S, arity: number): unknown => {
+export const syncOperation = <S extends object>(
+  tag: Context.Service<S, S>,
+  name: keyof S,
+  arity: number,
+  dicts: ReadonlyArray<unknown> = [],
+): unknown => {
   const call = (args: ReadonlyArray<unknown>): unknown => {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the checker allows the call only where the service is
     const impl: S & { readonly [syncAbi]?: true } = Context.getUnsafe(current as Context.Context<S>, tag);
-    let result: unknown = impl[name];
+    let result: unknown = implementation(impl, name, dicts);
     for (const a of args) {
       if (typeof result !== "function") throw new TypeError("the operation takes fewer arguments");
       const next: unknown = Reflect.apply(result, undefined, [a]);

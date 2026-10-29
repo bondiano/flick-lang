@@ -54,6 +54,7 @@ stdlib/monoids
 stdlib/seq
 stdlib/seqs
 codegen/services
+codegen/service_dictionary
 runtime/scope_close
 codegen/release
 runtime/parallel

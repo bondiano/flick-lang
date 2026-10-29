@@ -220,6 +220,15 @@ pub enum ExprKind {
     CodecBlock(String, Vec<(String, Expr)>),
 }
 
+/// How many arguments `S.op` of `stages` takes before it looks its service
+/// up: those up to its first runtime stage, or all of them.
+pub fn operation_arity(stages: &[Stage]) -> usize {
+    stages
+        .iter()
+        .position(|&s| s != Stage::Pure)
+        .map_or(stages.len(), |i| i + 1)
+}
+
 impl Expr {
     /// Calls `f` on each direct subexpression, in evaluation order.
     pub fn each_child<'a>(&'a self, f: &mut dyn FnMut(&'a Expr)) {

@@ -218,8 +218,11 @@ impl Checker<'_> {
                     .iter()
                     .find(|l| l.name == local.name)
                     .map(|l| l.ty.clone());
-                if let Some(first) = first {
-                    self.expect(&local.ty, &first, self.span(alternative));
+                // equal, not a subtype: a value bound in one alternative is not lifted
+                if let Some(first) = first
+                    && let Err(mismatch) = self.unify(&local.ty, &first)
+                {
+                    self.mismatch(&mismatch, &local.ty, &first, self.span(alternative));
                 }
             }
         }

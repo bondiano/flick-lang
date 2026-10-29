@@ -104,3 +104,24 @@ let conflict_again id version =
 load_quietly : UserId ->{Users;} Option User
 let load_quietly id =
   load_optional id
+
+// a variable takes the errors of the body: one error, when the body raises only it
+missing_id : NotFound -> UserId
+let missing_id e =
+  match e with
+  | NotFound id -> id
+
+lookup_or_missing : UserId ->{Users; none} UserId
+let lookup_or_missing id =
+  try
+    (Users.get id).id
+  with
+  | e -> missing_id e
+
+// and a row the caller chose, passed on as it is
+rethrown : Eff r e a -> Eff r e a
+let rethrown t =
+  task {
+    try await t with
+    | e -> from_result (Err e)
+  }

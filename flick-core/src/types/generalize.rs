@@ -3,13 +3,58 @@
 //! environment; the result of a runtime call stays monomorphic, even of `->{}`.
 
 use super::Checker;
+use super::bindings::LetParts;
 use super::classes::Outcome;
 use super::env::Found;
 use super::kinds::Kind;
 use super::ty::{Binder, Type};
+use crate::diagnostics::codes;
 use crate::iface::Namespace;
+use crate::source::Span;
+use crate::syntax::cst::Node;
 
 impl Checker<'_> {
+    /// A polymorphic type over a value computed by a runtime call is
+    /// rejected: each use would share one result at different types.
+    pub fn polymorphic_runtime(
+        &mut self,
+        name: Option<&str>,
+        scheme: &Type,
+        runtime: bool,
+        span: Span,
+    ) {
+        if runtime && matches!(scheme, Type::Forall { vars, .. } if !vars.is_empty()) {
+            let shown = self.show(scheme);
+            let (what, value) = match name {
+                Some(name) => (format!("`{name}`"), "its value"),
+                None => ("this".to_owned(), "it"),
+            };
+            self.error(
+                codes::T013,
+                span,
+                format!(
+                    "{what} is computed by a runtime call, so {value} cannot have the polymorphic type `{shown}`; make it a function or build it with `task`"
+                ),
+            );
+        }
+    }
+
+    /// What a signature of `name` may not quantify: the result of a runtime
+    /// call, or an atom held by a value.
+    pub fn polymorphic_signature(
+        &mut self,
+        name: &str,
+        scheme: &Type,
+        runtime: bool,
+        decl: &Node,
+        parts: &LetParts,
+    ) {
+        self.polymorphic_runtime(Some(name), scheme, runtime, self.span(decl));
+        if let (false, false, Some(body)) = (runtime, parts.is_function(), parts.body) {
+            self.polymorphic_atom(Some(name), scheme, self.span(body));
+        }
+    }
+
     /// Quantifies the variables of `ty` that are deeper than the current level.
     pub fn generalize(&mut self, ty: &Type) -> Type {
         self.settle_rows();

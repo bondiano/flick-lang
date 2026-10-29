@@ -165,44 +165,53 @@ impl Checker<'_> {
         }
     }
 
-    /// A top-level value, not a function, holding an atom whose type has a
-    /// variable it quantifies: one atom would hold a value of every type the
-    /// variable stands for, each reader taking it for its own.
-    pub fn polymorphic_atoms(&mut self, decls: &[&Node]) {
-        for decl in members(decls) {
-            if decl.kind != K::LetDecl {
-                continue;
+    /// Keeps the unknowns inside the types of atoms in `ty` from being
+    /// generalized: one atom holds one value.
+    pub fn lower_atoms(&mut self, ty: &Type) {
+        let mut held = Vec::new();
+        self.zonk(ty).visit(&mut |t| {
+            if let (Type::Con { module, name }, args) = t.spine()
+                && ATOMS.contains(&(module.as_str(), name.as_str()))
+            {
+                held.extend(args.into_iter().cloned());
             }
-            let parts = let_parts(decl, self.text);
-            let (Some(name), Some(body)) = (parts.name.clone(), parts.body) else {
-                continue;
-            };
-            if parts.is_function() {
-                continue;
+        });
+        for t in &held {
+            self.store.lower(t);
+        }
+    }
+
+    /// A value of the type `scheme`, not a function, holding an atom whose
+    /// type has a variable the scheme quantifies: one atom would hold a value
+    /// of every type the variable stands for, each reader taking it for its own.
+    pub fn polymorphic_atom(&mut self, name: Option<&str>, scheme: &Type, span: Span) {
+        let ty = match scheme {
+            Type::Forall { body, .. } => body,
+            ty => ty,
+        };
+        if matches!(self.whnf(ty), Type::Fun { .. }) {
+            return;
+        }
+        // a variable of a scheme is one it quantifies, written or not
+        let quantified = |t: &Type| t.contains(&mut |v| matches!(v, Type::Var(_)));
+        let polymorphic = ty.contains(&mut |t| match t.spine() {
+            (Type::Con { module, name }, args) => {
+                ATOMS.contains(&(module.as_str(), name.as_str()))
+                    && args.into_iter().any(quantified)
             }
-            let entity = self.env.entity(Namespace::Value, &name);
-            let ty = match self.env.value(&entity).cloned() {
-                Some(Type::Forall { body, .. }) => *body,
-                Some(ty) => ty,
-                None => continue,
-            };
-            // a variable of a top-level type is one it quantifies, written or not
-            let quantified = |t: &Type| t.contains(&mut |v| matches!(v, Type::Var(_)));
-            let polymorphic = ty.contains(&mut |t| match t.spine() {
-                (Type::Con { module, name }, args) => {
-                    ATOMS.contains(&(module.as_str(), name.as_str()))
-                        && args.into_iter().any(quantified)
-                }
-                _ => false,
-            });
-            if polymorphic {
-                let shown = self.show(&ty);
-                self.error(
-                    codes::U005,
-                    self.span(body),
-                    format!("the atom `{name}` has the type `{shown}` for every type its variables stand for, yet holds one value: give `{name}` the type of its value, without variables"),
-                );
-            }
+            _ => false,
+        });
+        if polymorphic {
+            let shown = self.show(ty);
+            let (atom, it) = name.map_or_else(
+                || ("this atom".to_owned(), "it".to_owned()),
+                |n| (format!("the atom `{n}`"), format!("`{n}`")),
+            );
+            self.error(
+                codes::U005,
+                span,
+                format!("{atom} has the type `{shown}` for every type its variables stand for, yet holds one value: give {it} the type of its value, without variables"),
+            );
         }
     }
 }

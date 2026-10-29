@@ -130,14 +130,22 @@ impl Checker<'_> {
         scheme: &Type,
         span: source::Span,
     ) -> Type {
-        let (vars, body) = match scheme {
-            Type::Forall { vars, body, .. } => (vars.as_slice(), (**body).clone()),
-            other => (&[][..], other.clone()),
+        let (vars, constraints, body) = match scheme {
+            Type::Forall {
+                vars,
+                constraints,
+                body,
+            } => (vars.as_slice(), constraints.as_slice(), (**body).clone()),
+            other => (&[][..], &[][..], other.clone()),
         };
         let subst: Vec<(String, Type)> = vars
             .iter()
             .map(|v: &Binder| (v.name.clone(), self.fresh()))
             .collect();
+        // the implementation takes their dictionaries, as a constrained function does
+        for c in constraints {
+            self.want(c.substitute(&subst), span);
+        }
         let service = Type::apps(
             Type::con(module, name),
             subst.iter().take(params).map(|(_, t)| t.clone()),

@@ -9,6 +9,7 @@ use super::Checker;
 use super::effects::{NO_EFFECTS, Site};
 use super::env::Form;
 use super::infer::eff;
+use super::patterns::is_pattern;
 use super::ty::{Row, Type};
 use crate::diagnostics::codes;
 use crate::source::Span;
@@ -76,6 +77,22 @@ impl Checker<'_> {
         // the handlers run in a JS function of their own
         let returns = self.stage.returns.take();
         for arm in nodes.filter(|n| n.kind == K::MatchArm) {
+            if arm
+                .nodes()
+                .find(|n| is_pattern(n.kind))
+                .is_some_and(catch_all)
+            {
+                // it receives every error the body raises, whatever its uses ask for
+                let caught = self.fresh();
+                let errors = Type::app(Type::prim("Errors"), caught.clone());
+                let (_, guarded, span) = self.arm(arm, &errors, &ty);
+                if self.stage.pure.is_none() {
+                    self.sites.push(Site::Expected(errors));
+                    self.sub_row(&raised, &caught, self.sites.len() - 1, span, true);
+                }
+                all |= !guarded;
+                continue;
+            }
             let error = self.fresh();
             let (pat, guarded, span) = self.arm(arm, &error, &ty);
             let covers = !guarded && self.covers_all(&pat);
@@ -90,9 +107,6 @@ impl Checker<'_> {
                     if covers && !handled.iter().any(|(l, _)| *l == label) {
                         handled.push((label, error));
                     }
-                }
-                None if error.spine().0.is_prim("Errors") => {
-                    all |= covers;
                 }
                 None if error == Type::Error => {}
                 None => {
@@ -193,5 +207,18 @@ impl Checker<'_> {
         node.child_tokens()
             .find(|t| t.kind == keyword)
             .map_or_else(|| self.span(node), |t| self.token_span(t))
+    }
+}
+
+/// A handler pattern that matches every error: a variable or `_`, maybe in
+/// parentheses or annotated.
+fn catch_all(pattern: &Node) -> bool {
+    match pattern.kind {
+        K::VarPat | K::WildcardPat => true,
+        K::ParenPat | K::AnnotPat => pattern
+            .nodes()
+            .find(|n| is_pattern(n.kind))
+            .is_some_and(catch_all),
+        _ => false,
     }
 }

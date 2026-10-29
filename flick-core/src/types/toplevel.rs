@@ -87,7 +87,6 @@ impl<'a> Checker<'a> {
         }
         self.check_tables(&decls);
         self.atom_keys(&decls);
-        self.polymorphic_atoms(&decls);
         self.class_defaults(&decls);
         self.solve_classes(true);
         self.check_instances(&declared);
@@ -344,7 +343,7 @@ impl<'a> Checker<'a> {
         let entity = self.env.entity(Namespace::Value, &name);
         if let Some((scheme, _)) = scheme {
             let runtime = self.check_signed(decl, &parts, &scheme, rec, None);
-            self.polymorphic_runtime(&name, &scheme, runtime, decl);
+            self.polymorphic_signature(&name, &scheme, runtime, decl, &parts);
             if let Some(binder) = parts.pattern {
                 self.note_type(self.span(binder), &scheme);
             }

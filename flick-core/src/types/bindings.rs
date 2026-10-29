@@ -198,7 +198,7 @@ impl Checker<'_> {
             if let Some(Some(rec)) = rec {
                 self.finish_recs(&[rec]);
             }
-            self.polymorphic_runtime(&name, &scheme, runtime, decl);
+            self.polymorphic_signature(&name, &scheme, runtime, decl, &parts);
             let ty = self.inferred_captures(scheme, captures, self.span(decl));
             self.push_local(&name, ty);
         } else {
@@ -290,21 +290,6 @@ impl Checker<'_> {
         self.tyvars.truncate(mark);
         self.store.level -= 1;
         runtime
-    }
-
-    /// A polymorphic signature over a value computed by a runtime call is
-    /// rejected: each use would share one result at different types.
-    pub fn polymorphic_runtime(&mut self, name: &str, scheme: &Type, runtime: bool, decl: &Node) {
-        if runtime && matches!(scheme, Type::Forall { vars, .. } if !vars.is_empty()) {
-            let shown = self.show(scheme);
-            self.error(
-                codes::T013,
-                self.span(decl),
-                format!(
-                    "`{name}` is computed by a runtime call, so its value cannot have the polymorphic type `{shown}`; make it a function or build it with `task`"
-                ),
-            );
-        }
     }
 
     /// A `let` without a signature: a value, whose type is inferred and
@@ -403,7 +388,16 @@ impl Checker<'_> {
             self.store.lower(&ty);
             ty
         } else {
-            self.generalize(&ty)
+            // a local atom's uses, all in sight, decide its one type
+            if self.store.level > 0 {
+                self.lower_atoms(&ty);
+            }
+            let ty = self.generalize(&ty);
+            // an annotation was checked as the value's type already
+            if let (None, Some(body)) = (parts.header, parts.body) {
+                self.polymorphic_atom(Some(name), &ty, self.span(body));
+            }
+            ty
         }
     }
 

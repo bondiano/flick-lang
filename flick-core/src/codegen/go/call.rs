@@ -6,7 +6,7 @@ use std::{mem, slice};
 
 use super::{Gen, Shape, indent, names, param_list};
 use crate::codegen::tail::Target;
-use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage};
+use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage, operation_arity};
 use crate::types::{Dict, Rep};
 
 /// How to build a call from the fiber in scope and its Go arguments.
@@ -64,11 +64,25 @@ impl Gen<'_> {
                 self.spill(d)
             })
             .collect();
-        if let ExprKind::Global { module, name } = &inner.kind {
-            return self.global_value(module, name, dicts);
+        match &inner.kind {
+            ExprKind::Global { module, name } => self.global_value(module, name, dicts),
+            // the implementation takes them, once the operation looked it up
+            ExprKind::Operation {
+                service,
+                name,
+                stages,
+            } => format!(
+                "flickrt.OperationGiven({}, {}, {}, {})",
+                names::string(service),
+                names::string(name),
+                operation_arity(stages),
+                dicts.join(", ")
+            ),
+            _ => {
+                let f = self.expr(inner);
+                format!("flickrt.Inst({f}, {})", dicts.join(", "))
+            }
         }
-        let f = self.expr(inner);
-        format!("flickrt.Inst({f}, {})", dicts.join(", "))
     }
 
     /// A value that takes the dictionaries `shown` before it is computed.

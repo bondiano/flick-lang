@@ -32,6 +32,7 @@ mod literal;
 mod pattern;
 mod release;
 mod schema;
+mod services;
 mod tidy;
 mod view;
 

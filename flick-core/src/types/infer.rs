@@ -42,9 +42,17 @@ impl Checker<'_> {
             };
             self.record_givens(self.span(node), &givens);
             self.classes.givens.extend(givens);
+            let saved = mem::take(&mut self.runtime);
             self.check(node, &body);
+            let runtime = mem::replace(&mut self.runtime, saved);
+            self.runtime |= runtime;
             self.classes.givens.truncate(mark);
             self.store.level -= 1;
+            let span = self.span(node);
+            self.polymorphic_runtime(None, &target, runtime, span);
+            if !runtime {
+                self.polymorphic_atom(None, &target, span);
+            }
             return expected.clone();
         }
         let children: Vec<&Node> = node.nodes().collect();

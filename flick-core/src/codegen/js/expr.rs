@@ -83,22 +83,23 @@ impl Gen<'_> {
                 service,
                 name,
                 stages,
-            } => {
-                let first = stages.iter().position(|&s| s != Stage::Pure);
-                let arity = first.map_or(stages.len(), |i| i + 1);
-                let tag = self.service_ref(service);
-                let op = match first.map(|i| stages[i]) {
-                    Some(Stage::Sync) => self.rt("syncOperation"),
-                    _ => self.rt("operation"),
-                };
-                format!("{op}({tag}, {}, {arity})", names::string(name))
-            }
+            } => self.operation(service, name, stages, &[]),
             ExprKind::ServiceTag(key) => self.service_ref(key),
             ExprKind::Label(label) => names::string(label),
             ExprKind::Dicts(inner, dicts) => {
-                let f = self.expr(inner);
                 let dicts: Vec<String> = dicts.iter().map(|d| self.dict(d)).collect();
-                format!("{f}({})", dicts.join(", "))
+                // the implementation takes them, once the operation looked it up
+                if let ExprKind::Operation {
+                    service,
+                    name,
+                    stages,
+                } = &inner.kind
+                {
+                    self.operation(service, name, stages, &dicts)
+                } else {
+                    let f = self.expr(inner);
+                    format!("{f}({})", dicts.join(", "))
+                }
             }
             ExprKind::Abstract(shown, inner) => self.abstraction(shown, inner),
             ExprKind::App {
@@ -482,11 +483,6 @@ impl Gen<'_> {
             Some(names::Native::Err) => self.rt("err"),
             None => self.global(&c.module, &names::ident(&c.name)),
         }
-    }
-
-    fn service_ref(&mut self, key: &str) -> String {
-        let (module, name) = key.rsplit_once('.').unwrap_or(("", key));
-        self.global(module, &names::service(name))
     }
 }
 

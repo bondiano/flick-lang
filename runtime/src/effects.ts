@@ -20,13 +20,27 @@ export const applyRuntime = (fn: unknown, args: ReadonlyArray<unknown>): Effect.
   return Effect.isEffect(result) ? result : Effect.die(new TypeError("a runtime function returned no effect"));
 };
 
+/** The operation `name` of `impl`, given the dictionaries of its constraints. */
+export const implementation = <S extends object>(impl: S, name: keyof S, dicts: ReadonlyArray<unknown>): unknown => {
+  const f: unknown = impl[name];
+  if (dicts.length === 0) return f;
+  if (typeof f !== "function") throw new TypeError("the operation takes no dictionaries");
+  const given: unknown = Reflect.apply(f, undefined, dicts);
+  return given;
+};
+
 /**
  * `S.op`: a function of the operation's arguments up to its first runtime
  * stage that looks the service up when that stage runs.
  */
-export const operation = <S extends object>(tag: Context.Service<S, S>, name: keyof S, arity: number): unknown => {
+export const operation = <S extends object>(
+  tag: Context.Service<S, S>,
+  name: keyof S,
+  arity: number,
+  dicts: ReadonlyArray<unknown> = [],
+): unknown => {
   const call = (args: ReadonlyArray<unknown>): Effect.Effect<unknown, unknown, unknown> =>
-    Effect.flatMap(Effect.service(tag), (impl) => applyRuntime(impl[name], args));
+    Effect.flatMap(Effect.service(tag), (impl) => applyRuntime(implementation(impl, name, dicts), args));
   const collect = (args: ReadonlyArray<unknown>): unknown =>
     args.length === arity ? call(args) : (a: unknown) => collect([...args, a]);
   return arity === 0 ? call([]) : collect([]);

@@ -71,6 +71,14 @@ let rests items =
   | [x, ...rest] -> x
   | [x, y] -> x + y
 
+// alternatives bind a name at one type: a pure function is not a runtime one
+type Job = Loud (Unit ->{} String) | Quiet (Unit -> String)
+
+run : Job ->{} String
+let run job =
+  match job with
+  | Loud f | Quiet f -> f ()
+
 //~ FLICK-T009 @7:3-7:14 `match` does not cover every value: `None` is not matched
 //~ FLICK-T009 @12:3-12:14 `match` does not cover every value: `Rect _ _` is not
 //~ FLICK-T009 @18:3-18:14 `match` does not cover every value: `Some None` is not
@@ -86,3 +94,4 @@ let rests items =
 //~ FLICK-T009 @70:3-70:14 `match` does not cover every value: `[]` is not matched
 //~ FLICK-T010 @72:5-72:11 this arm is never reached
 //~ FLICK-T055 @44:5-44:6 `_` stands for `Circle`, `Empty` of `Shape`
+//~ FLICK-T003 @80:14-80:21 expected `Unit ->{} String`, found `Unit -> String`
