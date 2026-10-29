@@ -2,6 +2,14 @@
 # `[module]`, an export and the function of package `flickrt`.
 
 [@flick-lang/runtime]
+succeed Succeed
+mapEff MapEff
+flatMapEff FlatMapEff
+map2Eff Map2Eff
+bindEff BindEff
+listMapEffect *ListMapEffect
+fromResult FromResult
+appFail AppFail
 recordLabels RecordLabels
 recordProject RecordProject
 durationNanos DurationNanos

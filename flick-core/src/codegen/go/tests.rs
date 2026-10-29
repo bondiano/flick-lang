@@ -67,16 +67,6 @@ fn only_what_main_reaches_is_compiled() {
 fn what_the_target_cannot_run_yet_is_reported() {
     let (_, errors) = compile(
         "module App exposing (main)\n\
-         main : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (await (task { 1 })))\n",
-    );
-    assert!(
-        errors
-            .iter()
-            .any(|e| e == "a `task` is not available on the go target yet"),
-        "{errors:?}"
-    );
-    let (_, errors) = compile(
-        "module App exposing (main)\n\
          now : Unit ->{} Float\nforeign sync now from global \"Date.now\"\n\
          main : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (now ()))\n",
     );

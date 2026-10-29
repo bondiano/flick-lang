@@ -11,6 +11,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/casing.go"),
     ),
     (
+        "cause.go",
+        include_str!("../../../../runtime-go/flickrt/cause.go"),
+    ),
+    (
         "collate.go",
         include_str!("../../../../runtime-go/flickrt/collate.go"),
     ),
@@ -33,6 +37,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "duration.go",
         include_str!("../../../../runtime-go/flickrt/duration.go"),
+    ),
+    (
+        "eff.go",
+        include_str!("../../../../runtime-go/flickrt/eff.go"),
     ),
     (
         "effnum.go",

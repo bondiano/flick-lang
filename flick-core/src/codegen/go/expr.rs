@@ -1,9 +1,11 @@
 //! Expressions and statements. A Go expression is returned; statements it
 //! needs go into the current statement list before it.
 
+use std::mem;
+
 use super::{Gen, indent, names};
 use crate::codegen::tail::{Callee, Target};
-use crate::ir::{BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
+use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
 use crate::numeric::{Arith, Num};
 use crate::types::Lift;
 
@@ -175,8 +177,14 @@ impl Gen<'_> {
                 self.unsupported(e.span, "a service")
             }
             ExprKind::Label(_) => self.unsupported(e.span, "a record label"),
-            ExprKind::Try(..) => self.unsupported(e.span, "`try`"),
-            ExprKind::Await(_) | ExprKind::Task(_) => self.unsupported(e.span, "a `task`"),
+            // outside effectful code nothing can fail with a typed error
+            ExprKind::Try(body, _) if self.fiber.is_none() => self.expr(body),
+            ExprKind::Try(body, arms) => self.try_expr(body, arms),
+            ExprKind::Await(task) => {
+                let t = self.expr(task);
+                self.run(&t)
+            }
+            ExprKind::Task(body) => self.task(body),
             ExprKind::Scope { .. } | ExprKind::Within(..) => self.unsupported(e.span, "a `scope`"),
             ExprKind::Provide(..) => self.unsupported(e.span, "`provide`"),
             ExprKind::CodecBlock(..) => self.unsupported(e.span, "a `codec` block"),
@@ -194,6 +202,48 @@ impl Gen<'_> {
             indent(&other_stmts)
         ));
         r
+    }
+
+    /// A task: a Go function of the fiber that runs `body` in it.
+    pub(super) fn task(&mut self, body: &Expr) -> String {
+        let saved = (
+            self.tail.take(),
+            mem::replace(&mut self.generator, false),
+            self.fiber.replace("fb"),
+        );
+        let (stmts, ()) = self.block(|g| g.tail_expr(body));
+        (self.tail, self.generator, self.fiber) = saved;
+        format!(
+            "flickrt.Eff(func(fb *flickrt.Fiber) flickrt.Value {{\n{}}})",
+            indent(&stmts)
+        )
+    }
+
+    /// `try body with arms`: the body as a task, and a handler of its typed
+    /// error that gives `flickrt.Unmatched` when no arm matches.
+    fn try_expr(&mut self, body: &Expr, arms: &[Arm]) -> String {
+        let body = self.task(body);
+        let saved = (
+            self.tail.take(),
+            mem::replace(&mut self.generator, false),
+            self.fiber.replace("fb"),
+        );
+        let err = self.temp();
+        let (mut stmts, ()) = self.block(|g| {
+            for arm in arms {
+                g.arm(&err, &arm.pat, arm.guard.as_ref(), &arm.body, |g, value| {
+                    let v = g.expr(value);
+                    g.buf.push(format!("return {v}"));
+                });
+            }
+        });
+        (self.tail, self.generator, self.fiber) = saved;
+        stmts.push("return flickrt.Unmatched".to_owned());
+        let fb = self.fiber.expect("a `try` with arms runs in a fiber");
+        format!(
+            "flickrt.Try({fb}, {body}, func(fb *flickrt.Fiber, {err} flickrt.Value) flickrt.Value {{\n{}}})",
+            indent(&stmts)
+        )
     }
 
     /// `o?`: the value of the `Some`, after returning a `None` at once.

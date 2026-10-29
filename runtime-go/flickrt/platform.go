@@ -93,20 +93,16 @@ func Format(v Value) string {
 	return Show(v).(string)
 }
 
-// Main runs the program: `run` starts `main`. A defect is reported on
-// stderr with exit code 1.
+// Main runs the program: `run` starts `main` in the root fiber. A failure
+// is reported on stderr with exit code 1, as the JS runner does.
 func Main(run func(*Fiber)) {
 	code := 0
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
+				cause := causeOf(r)
 				stdout.Flush()
-				if d, ok := r.(Defect); ok {
-					fmt.Fprintln(os.Stderr, d.Message)
-				} else {
-					fmt.Fprintln(os.Stderr, r)
-				}
-				os.Stderr.WriteString(flickFrames())
+				os.Stderr.WriteString(report(cause) + "\n")
 				code = 1
 			}
 		}()

@@ -477,3 +477,8 @@ SK FunctionSK
 [@flick-lang/runtime/effect/Stream]
 fromIterable StreamFromSeq
 runCollect SeqToList
+
+[@flick-lang/runtime/effect/Effect]
+void EffectVoid
+zip *EffectZip
+flickAll *EffectAll

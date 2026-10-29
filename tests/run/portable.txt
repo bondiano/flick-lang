@@ -2,18 +2,25 @@
 # `just e2e` builds each with `--emit go` in both profiles and compares the
 # output with the same expectations as the JS target's. A case not listed is
 # reported as skipped for the go target.
+bootstrap/app_fail
 bootstrap/debug
 bootstrap/hello
 bootstrap/stderr
+codegen/applicative_do
+codegen/category_classes
 codegen/classes
 codegen/closures
 codegen/deep_recursion
 codegen/defaults
 codegen/defect
+codegen/do_notation
+codegen/errors
 codegen/eval_order
 codegen/exports
 codegen/for_comprehension
+codegen/functor
 codegen/fusion
+codegen/higher_rank
 codegen/ints
 codegen/let_assert
 codegen/lift
@@ -21,10 +28,12 @@ codegen/literals
 codegen/numbers
 codegen/numeric_classes
 codegen/patterns
+codegen/question
 codegen/ranges
 codegen/recursion
 codegen/stage_order
 codegen/strings_utf16
+codegen/task_twice
 stdlib/collections
 stdlib/decimals
 stdlib/effect/array
@@ -39,6 +48,7 @@ stdlib/effect/order
 stdlib/effect/record
 stdlib/effect/string
 stdlib/effect/string_locale
+stdlib/effect/void
 stdlib/hash_order
 stdlib/monoids
 stdlib/seq
