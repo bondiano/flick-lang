@@ -25,10 +25,10 @@ func ListMapIndexed(f, xs Value) Value {
 	return out
 }
 
-// ListEach runs `f` on each element, for what it does.
-func ListEach(f, xs Value) Value {
+// ListEachEffect runs the task of `f` of each element.
+func ListEachEffect(fb *Fiber, f, xs Value) Value {
 	for _, x := range List(xs) {
-		Apply(f, x)
+		Run(fb, Apply(f, x))
 	}
 	return Unit
 }

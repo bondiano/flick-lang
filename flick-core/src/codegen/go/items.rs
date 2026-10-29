@@ -3,7 +3,7 @@
 
 use std::fmt::Write;
 
-use super::{Gen, Shape, indent, loops, names, param_list};
+use super::{Gen, Shape, indent, loops, names, param_list, signature};
 use crate::codegen::names as js_names;
 use crate::codegen::tail::{Callee, Target};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
@@ -116,6 +116,8 @@ impl Gen<'_> {
     /// parameters, all at once.
     fn function(&mut self, name: &str, dicts: &[String], body: &Expr) -> String {
         let id = names::func(self.module, name);
+        let fiber = self.shape_of(self.module, name).fiber();
+        self.fiber = fiber.then_some("fb");
         let mut heads = self.bind_givens(dicts);
         let stmts = match &body.kind {
             ExprKind::Lambda { params, body } => {
@@ -131,9 +133,10 @@ impl Gen<'_> {
             _ => self.block(|g| g.tail_expr(body)).0,
         };
         self.givens.clear();
+        self.fiber = None;
         format!(
             "func {id}({}) flickrt.Value {{\n{}}}",
-            param_list(&heads),
+            signature(fiber, &heads),
             indent(&stmts)
         )
     }

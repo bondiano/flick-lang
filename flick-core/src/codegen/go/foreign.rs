@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-use super::{Gen, names, param_list};
+use super::{Gen, names, signature};
 use crate::ir::Foreign;
 use crate::source::Span;
 
@@ -34,10 +34,11 @@ fn table() -> &'static HashMap<(String, String), String> {
                     continue;
                 }
                 let (export, go) = line.split_once(' ').expect("an export and a Go function");
-                out.insert(
-                    (module.to_owned(), export.to_owned()),
-                    format!("flickrt.{go}"),
-                );
+                let go = match go.strip_prefix('*') {
+                    Some(go) => format!("*flickrt.{go}"),
+                    None => format!("flickrt.{go}"),
+                };
+                out.insert((module.to_owned(), export.to_owned()), go);
             }
         }
         out
@@ -82,6 +83,11 @@ impl Gen<'_> {
             ));
             return None;
         };
+        // `*` marks a runtime function that takes the fiber first
+        let (target, wants_fiber) = match target.strip_prefix('*') {
+            Some(t) => (t, true),
+            None => (target, false),
+        };
         let taken = parameters(f);
         if f.dicts == 0 && taken == 0 {
             let var = names::var(self.module, &f.name);
@@ -92,15 +98,19 @@ impl Gen<'_> {
             .chain((0..taken).map(|i| format!("a{i}")))
             .collect();
         // a JS function of no arguments behind a `Unit` parameter
-        let args = if f.arity == 0 {
-            &heads[..f.dicts]
+        let mut args: Vec<String> = if f.arity == 0 {
+            heads[..f.dicts].to_vec()
         } else {
-            &heads[..]
+            heads.clone()
         };
+        let fiber = self.shape_of(self.module, &f.name).fiber();
+        if wants_fiber {
+            args.insert(0, "fb".to_owned());
+        }
         Some(format!(
             "func {}({}) flickrt.Value {{\n\treturn {target}({})\n}}",
             names::func(self.module, &f.name),
-            param_list(&heads),
+            signature(fiber, &heads),
             args.join(", ")
         ))
     }

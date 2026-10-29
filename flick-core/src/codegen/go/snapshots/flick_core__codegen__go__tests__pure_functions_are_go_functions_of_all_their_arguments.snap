@@ -14,9 +14,9 @@ func F_App__add(l_a, l_b flickrt.Value) flickrt.Value {
 
 var V_App__inc flickrt.Value
 
-func F_App__main(_ flickrt.Value) flickrt.Value {
+func F_App__main(fb *flickrt.Fiber, _ flickrt.Value) flickrt.Value {
 	var t2 flickrt.Value = flickrt.Method(I_Instances__Show_x20_Int, "show")
-	return F_Platform__stdout_line(flickrt.Apply(t2, flickrt.Apply(V_App__inc, F_App__add(int32(2), int32(3)))))
+	return F_Platform__stdout_line(fb, flickrt.Apply(t2, flickrt.Apply(V_App__inc, F_App__add(int32(2), int32(3)))))
 }
 
 func init_App() {

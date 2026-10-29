@@ -41,9 +41,10 @@ impl Gen<'_> {
             self.collector.replace(Collector::Yield(limit.clone())),
             self.tail.take(),
             mem::replace(&mut self.generator, true),
+            self.fiber.take(),
         );
         let (mut stmts, ()) = self.block(|g| g.discard(body));
-        (self.collector, self.tail, self.generator) = saved;
+        (self.collector, self.tail, self.generator, self.fiber) = saved;
         if let Some((n, count)) = &limit {
             stmts.insert(
                 0,

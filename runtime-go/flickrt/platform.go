@@ -95,7 +95,7 @@ func Format(v Value) string {
 
 // Main runs the program: `run` starts `main`. A defect is reported on
 // stderr with exit code 1.
-func Main(run func()) {
+func Main(run func(*Fiber)) {
 	code := 0
 	func() {
 		defer func() {
@@ -110,7 +110,7 @@ func Main(run func()) {
 				code = 1
 			}
 		}()
-		run()
+		run(rootFiber())
 	}()
 	stdout.Flush()
 	os.Exit(code)

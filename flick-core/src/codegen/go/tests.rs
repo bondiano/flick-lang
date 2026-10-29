@@ -47,7 +47,7 @@ fn pure_functions_are_go_functions_of_all_their_arguments() {
     insta::assert_snapshot!(file(&files, "m_App.go"));
     let main = file(&files, "main.go");
     assert!(
-        main.contains("init_App()") && main.contains("F_App__main(flickrt.Unit)"),
+        main.contains("init_App()") && main.contains("F_App__main(fb, flickrt.Unit)"),
         "{main}"
     );
 }

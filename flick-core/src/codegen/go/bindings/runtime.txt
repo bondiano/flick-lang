@@ -85,8 +85,8 @@ seqAny SeqAny
 seqAll SeqAll
 seqFind SeqFind
 seqFirst SeqFirst
-seqEachEffect SeqEach
-seqFoldEffect SeqFold
+seqEachEffect *SeqEachEffect
+seqFoldEffect *SeqFoldEffect
 equals Equals
 compare Compare
 hash Hash
@@ -132,7 +132,7 @@ numberStrictEqual NumberStrictEqual
 numberSameValue NumberSameValue
 listMap ListMap
 listMapIndexed ListMapIndexed
-listEachEffect ListEach
+listEachEffect *ListEachEffect
 listFold ListFold
 listFoldRight ListFoldRight
 listFilter ListFilter

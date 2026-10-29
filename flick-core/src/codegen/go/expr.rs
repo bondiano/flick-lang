@@ -3,8 +3,9 @@
 
 use super::{Gen, indent, names};
 use crate::codegen::tail::{Callee, Target};
-use crate::ir::{BinOp, Expr, ExprKind, Lit, Pat, Stmt};
+use crate::ir::{BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
 use crate::numeric::{Arith, Num};
+use crate::types::Lift;
 
 /// Whether moving the evaluation of `go` later is unobservable: a name or
 /// a literal.
@@ -35,6 +36,20 @@ pub(super) fn literal(lit: &Lit) -> String {
         Lit::String(s) => names::string(s),
         Lit::Bool(b) => b.to_string(),
         Lit::Unit => "flickrt.Unit".to_owned(),
+    }
+}
+
+/// A Go function that adapts a function of one stage where one of another
+/// is expected, or the result of a task.
+fn lift(how: &Lift) -> String {
+    match how {
+        Lift::Stage { from, to, result } => format!(
+            "flickrt.LiftStage({}, {}, {})",
+            *from != Stage::Pure,
+            *to != Stage::Pure,
+            result.as_deref().map_or_else(|| "nil".to_owned(), lift)
+        ),
+        Lift::Eff(inner) => format!("flickrt.LiftEff({})", lift(inner)),
     }
 }
 
@@ -138,8 +153,10 @@ impl Gen<'_> {
                 self.buf.push(format!("_ = {v}"));
                 "flickrt.Unit".to_owned()
             }
-            // a pure function is called like a runtime one: Go runs both directly
-            ExprKind::Lift(inner, _) => self.expr(inner),
+            ExprKind::Lift(inner, how) => {
+                let v = self.expr(inner);
+                format!("{}({v})", lift(how))
+            }
             ExprKind::Each { .. } | ExprKind::Yield(_) => {
                 self.discard(e);
                 "flickrt.Unit".to_owned()

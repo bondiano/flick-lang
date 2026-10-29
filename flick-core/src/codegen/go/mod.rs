@@ -28,7 +28,7 @@ use std::fmt::Write;
 use std::{mem, slice};
 
 use crate::diagnostics::{Diagnostic, Severity, codes};
-use crate::ir::{ExprKind, ItemKind, Module};
+use crate::ir::{ExprKind, ItemKind, Module, Stage};
 use crate::source::Span;
 use reach::Key;
 
@@ -66,8 +66,29 @@ pub struct Output {
 enum Shape {
     /// A variable assigned at initialization.
     Var,
-    /// A Go function of the dictionaries, then the parameters.
-    Func { dicts: usize, params: usize },
+    /// A Go function of the dictionaries, then the parameters; `effects`
+    /// has bit `i` set when parameter `i`'s stage runs effects (Sync or
+    /// Runtime). A function whose last stage does takes the fiber first.
+    Func {
+        dicts: usize,
+        params: usize,
+        effects: u64,
+    },
+}
+
+impl Shape {
+    /// Whether the Go function takes the fiber first.
+    fn fiber(self) -> bool {
+        matches!(self, Shape::Func { params, effects, .. } if params > 0 && effects >> (params - 1) & 1 == 1)
+    }
+}
+
+/// The effects mask of stages, by whether each runs effects.
+fn effects(stages: impl IntoIterator<Item = bool>) -> u64 {
+    stages
+        .into_iter()
+        .enumerate()
+        .fold(0, |mask, (i, effectful)| mask | u64::from(effectful) << i)
 }
 
 fn shape(kind: &ItemKind) -> Shape {
@@ -76,11 +97,13 @@ fn shape(kind: &ItemKind) -> Shape {
             ExprKind::Lambda { params, .. } => Shape::Func {
                 dicts: dicts.len(),
                 params: params.len(),
+                effects: effects(params.iter().map(|p| p.stage != Stage::Pure)),
             },
             _ if dicts.is_empty() => Shape::Var,
             _ => Shape::Func {
                 dicts: dicts.len(),
                 params: 0,
+                effects: 0,
             },
         },
         ItemKind::Foreign(f) => {
@@ -91,12 +114,16 @@ fn shape(kind: &ItemKind) -> Shape {
                 Shape::Func {
                     dicts: f.dicts,
                     params,
+                    effects: effects(
+                        (0..params).map(|i| f.stages.get(i).copied().unwrap_or(false)),
+                    ),
                 }
             }
         }
         ItemKind::Instance { info, .. } if !info.context.is_empty() => Shape::Func {
             dicts: info.context.len(),
             params: 0,
+            effects: 0,
         },
         _ => Shape::Var,
     }
@@ -111,11 +138,14 @@ pub fn go(program: &Program) -> Output {
     let main_shape = index
         .get(&main)
         .map(|&(m, i)| shape(&modules[m].items[i].kind));
-    let runnable = Some(Shape::Func {
-        dicts: 0,
-        params: 1,
-    });
-    if main_shape != runnable {
+    let Some(
+        main_shape @ Shape::Func {
+            dicts: 0,
+            params: 1,
+            ..
+        },
+    ) = main_shape
+    else {
         diagnostics.push(Diagnostic::new(
             codes::P012,
             Severity::Error,
@@ -128,8 +158,9 @@ pub fn go(program: &Program) -> Output {
             files: Vec::new(),
             diagnostics,
         };
-    }
-    let start = format!("{}(flickrt.Unit)", names::func(&main.0, &main.1));
+    };
+    let fb = if main_shape.fiber() { "fb, " } else { "" };
+    let start = format!("{}({fb}flickrt.Unit)", names::func(&main.0, &main.1));
     let (reached, missing) = reach::reachable(modules, &index, slice::from_ref(&main));
     for module in missing {
         diagnostics.push(Diagnostic::new(
@@ -176,7 +207,7 @@ pub fn go(program: &Program) -> Output {
     let mut visited = HashSet::new();
     init_order(program.entry, &deps, &mut visited, &mut order);
     let mut main_go = format!(
-        "package main\n\nimport \"{RUNTIME_PACKAGE}\"\n\nfunc main() {{\n\tflickrt.Main(func() {{\n"
+        "package main\n\nimport \"{RUNTIME_PACKAGE}\"\n\nfunc main() {{\n\tflickrt.Main(func(fb *flickrt.Fiber) {{\n"
     );
     for module in order.iter().filter(|m| deps.contains_key(*m)) {
         let _ = writeln!(main_go, "\t\t{}()", names::init(module));
@@ -265,6 +296,8 @@ struct Gen<'a> {
     modules: BTreeSet<String>,
     /// What the target cannot compile, and where.
     errors: Vec<(String, Option<Span>)>,
+    /// The fiber in scope, in a body whose effects run.
+    fiber: Option<&'static str>,
     /// The loop a tail call in the code being emitted jumps in.
     tail: Option<loops::Tail>,
     /// The groups of mutually tail-recursive functions of the module.
@@ -292,6 +325,7 @@ impl<'a> Gen<'a> {
             generator: false,
             modules: BTreeSet::new(),
             errors: Vec::new(),
+            fiber: None,
             tail: None,
             groups: Vec::new(),
             grouped: HashMap::new(),
@@ -370,6 +404,17 @@ fn indent(stmts: &[String]) -> String {
         }
     }
     out
+}
+
+/// The parameter list of a Go function taking the fiber, when `fiber`,
+/// then `names`, each a `Value`.
+fn signature(fiber: bool, names: &[String]) -> String {
+    let params = param_list(names);
+    match (fiber, params.is_empty()) {
+        (false, _) => params,
+        (true, true) => "fb *flickrt.Fiber".to_owned(),
+        (true, false) => format!("fb *flickrt.Fiber, {params}"),
+    }
 }
 
 /// The parameter list of Go function taking `names`, each a `Value`.

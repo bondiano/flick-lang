@@ -460,7 +460,7 @@ andLeft FilterAndLeft
 andRight FilterAndRight
 compose FilterCompose
 composePassthrough FilterComposePassthrough
-makeEffect FilterMake
+makeEffect *FilterMakeEffect
 
 [@flick-lang/runtime/effect/Function]
 constant FunctionConstant

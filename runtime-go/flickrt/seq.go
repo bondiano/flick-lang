@@ -359,12 +359,21 @@ func SeqFirst(xs Value) Value {
 	return None
 }
 
-// SeqEach runs `f` on each element, for what it does.
-func SeqEach(f, xs Value) Value {
+// SeqEachEffect runs the task of `f` of each element.
+func SeqEachEffect(fb *Fiber, f, xs Value) Value {
 	for x := range Iter(xs) {
-		Apply(f, x)
+		Run(fb, Apply(f, x))
 	}
 	return Unit
+}
+
+// SeqFoldEffect folds the elements with the tasks of `f`.
+func SeqFoldEffect(fb *Fiber, f, init, xs Value) Value {
+	acc := init
+	for x := range Iter(xs) {
+		acc = Run(fb, apply2(f, acc, x))
+	}
+	return acc
 }
 
 // Count is a count of elements, as `Seq.take` truncates it.

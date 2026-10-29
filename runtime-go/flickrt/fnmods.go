@@ -78,6 +78,9 @@ func PredicateSome(ps, a Value) Value {
 
 func FilterMake(f, i Value) Value { return Apply(f, i) }
 
+// FilterMakeEffect runs the task of an effectful filter.
+func FilterMakeEffect(fb *Fiber, f, i Value) Value { return Run(fb, Apply(f, i)) }
+
 func FilterMapFail(f, self, i Value) Value {
 	if r := Apply(self, i); !isOk(r) {
 		return Err(Apply(f, value(r)))

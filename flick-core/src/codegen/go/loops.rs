@@ -12,7 +12,7 @@ use super::{Gen, indent, names, param_list};
 use crate::codegen::tail::{
     Calls, Target, cycles, function, jumpable, self_call, tail_callees, target,
 };
-use crate::ir::{BinOp, Expr, ExprKind, Item, Lit, Param, Pat};
+use crate::ir::{BinOp, Expr, ExprKind, Item, Lit, Param, Pat, Stage};
 
 /// Where a tail call jumps: the members of the loop with their arity, the
 /// loop variables, and the local each parameter of the running member
@@ -34,6 +34,8 @@ pub(super) struct Group {
     items: Vec<usize>,
     /// The most parameters a member takes.
     arity: usize,
+    /// Whether its members run effects, and so take the fiber.
+    fiber: bool,
 }
 
 /// The groups of `items`, and the group and member of each grouped
@@ -57,10 +59,15 @@ pub(super) fn groups(
                 .map(|(_, params, _)| params.len())
                 .max()
                 .unwrap_or(0);
+            let fiber =
+                function(&items[members[0]], Calls::Direct).is_some_and(|(_, params, _)| {
+                    params.last().is_some_and(|p| p.stage != Stage::Pure)
+                });
             Group {
                 name: names::group(module, name_of(members[0])),
                 items: members,
                 arity,
+                fiber,
             }
         })
         .collect();
@@ -148,6 +155,9 @@ impl Gen<'_> {
         let mut args = vec![k.to_string()];
         args.extend(heads.iter().cloned());
         args.resize(group.arity + 1, "nil".to_owned());
+        if group.fiber {
+            args.insert(0, "fb".to_owned());
+        }
         Some(format!("return {}({})", group.name, args.join(", ")))
     }
 
@@ -163,6 +173,8 @@ impl Gen<'_> {
             .map(|(name, params, _)| (target(self.module, name), params.len()))
             .collect();
         let vars: Vec<String> = (0..self.groups[g].arity).map(|i| format!("v{i}")).collect();
+        let fiber = self.groups[g].fiber;
+        self.fiber = fiber.then_some("fb");
         let mut cases = Vec::new();
         for (k, (_, params, body)) in functions.iter().enumerate() {
             let tail = Tail {
@@ -175,7 +187,11 @@ impl Gen<'_> {
             let (stmts, ()) = self.block(|g| g.iteration(params, &vars, body, tail));
             cases.push(format!("case {k}:\n{}", indent(&stmts)));
         }
+        self.fiber = None;
         let mut heads = vec!["state int".to_owned()];
+        if fiber {
+            heads.insert(0, "fb *flickrt.Fiber".to_owned());
+        }
         if !vars.is_empty() {
             heads.push(param_list(&vars));
         }
