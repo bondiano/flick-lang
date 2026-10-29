@@ -139,75 +139,85 @@ func ordered(a, b Value) bool {
 	return !math.IsNaN(x) && !math.IsNaN(b.(float64))
 }
 
-func hashString(s string) int32 {
-	h := int32(5381)
-	for _, u := range utf16Units(s) {
-		h = h*33 ^ int32(u)
-	}
-	return h
-}
-
+// combine folds a hash into another, as Flick's list and derived hashes do.
 func combine(h, x int32) int32 { return h*31 + x }
 
-// Hash is a hash consistent with Equals.
+// Hash is `hash` of a primitive, as Effect's `Hash.hash` computes it on the
+// JS target, which hash collections order their elements by.
 func Hash(a Value) Value { return hash(a) }
+
+func optimize(n int32) int32 { return n&-0x40000001 | int32(uint32(n)>>1)&0x40000000 }
+
+func mix(h int32) int32 {
+	u := uint32(h)
+	u ^= u >> 16
+	u *= 0x85ebca6b
+	u ^= u >> 13
+	u *= 0xc2b2ae35
+	return int32(u ^ u>>16)
+}
+
+func effectCombine(a, b int32) int32 {
+	return mix(int32(uint32(a)*0x9e3779b1 + uint32(b)*0x85ebca6b))
+}
+
+// hashString is Effect's djb2 over the UTF-16 code units, from the last.
+func hashString(s string) int32 {
+	units := utf16Units(s)
+	h := int32(5381)
+	for i := len(units) - 1; i >= 0; i-- {
+		h = h*33 ^ int32(units[i])
+	}
+	return optimize(h)
+}
+
+func hashNumber(x float64) int32 {
+	if i := toInt32(x); float64(i) == x {
+		return optimize(i)
+	}
+	bits := math.Float64bits(x)
+	if x != x {
+		// JS writes every NaN with these bits; Go's math.NaN has others
+		bits = 0x7ff8000000000000
+	}
+	return optimize(effectCombine(int32(bits>>32), int32(bits)))
+}
 
 func hash(a Value) int32 {
 	switch x := a.(type) {
 	case int32:
-		return hashString(strconv.Itoa(int(x)))
+		return optimize(x)
 	case float64:
-		if x == 0 {
-			return hashString("0")
-		}
-		return hashString(ShowNumber(x))
-	case []Value:
-		h := int32(7)
-		for _, v := range x {
-			h = combine(h, hash(v))
-		}
-		return h
-	case *Data:
-		// as JS hashes the object `{ _tag, _0, … }` (or `{ _tag, value }`) by sorted keys
-		keys := make([]string, len(x.Fields))
-		for i := range x.Fields {
-			keys[i] = nativeField(x.Tag, i)
-		}
-		order := make([]int, len(keys))
-		for i := range order {
-			order[i] = i
-		}
-		sort.Slice(order, func(i, j int) bool { return keys[order[i]] < keys[order[j]] })
-		h := int32(13)
-		tagged := false
-		for _, i := range order {
-			if !tagged && keys[i] > "_tag" {
-				h = combine(combine(h, hashString("_tag")), hashString("string:"+x.Tag))
-				tagged = true
-			}
-			h = combine(combine(h, hashString(keys[i])), hash(x.Fields[i]))
-		}
-		if !tagged {
-			h = combine(combine(h, hashString("_tag")), hashString("string:"+x.Tag))
-		}
-		return h
-	case Record:
-		h := int32(13)
-		for _, k := range sortedKeys(x) {
-			h = combine(combine(h, hashString(k)), hash(x[k]))
-		}
-		return h
+		return hashNumber(x)
 	case string:
-		return hashString("string:" + x)
-	case bool:
-		if x {
-			return hashString("boolean:true")
-		}
-		return hashString("boolean:false")
+		return hashString(x)
 	case *big.Int:
-		return hashString("bigint:" + x.String())
+		return hashString(x.String())
+	case bool:
+		return optimize(mix(hashString(strconv.FormatBool(x))))
+	case UnitType:
+		return optimize(mix(hashString("undefined")))
+	case []Value:
+		h := int32(6151)
+		for _, v := range x {
+			h = effectCombine(h, hash(v))
+		}
+		return optimize(h)
+	case *Data:
+		// the object `{ _tag, _0, … }`: its keys in any order
+		h := int32(12289) ^ effectCombine(hashString("_tag"), hashString(x.Tag))
+		for i, v := range x.Fields {
+			h ^= effectCombine(hashString(nativeField(x.Tag, i)), hash(v))
+		}
+		return optimize(h)
+	case Record:
+		h := int32(12289)
+		for k, v := range x {
+			h ^= effectCombine(hashString(k), hash(v))
+		}
+		return optimize(h)
 	}
-	return hashString("undefined:undefined")
+	panic(Defect{"hash of a value without a hash"})
 }
 
 // nativeField is the JS property field `i` of a variant value is in.
