@@ -479,6 +479,15 @@ fromIterable StreamFromSeq
 runCollect SeqToList
 
 [@flick-lang/runtime/effect/Effect]
+sleep *EffectSleep
+flickNever *EffectNever
+flickYieldNow *EffectYieldNow
+flickInterrupt *EffectInterrupt
+interruptible *Interruptible
+uninterruptible *Uninterruptible
+uninterruptibleMask *UninterruptibleMask
+interruptibleMask *InterruptibleMask
+ensuring *EffectEnsuring
 void EffectVoid
 zip *EffectZip
 flickAll *EffectAll
@@ -486,3 +495,6 @@ flickAll *EffectAll
 [@flick-lang/runtime/effect/Scope]
 flickAddFinalizer *AddFinalizer
 flickAddFinalizerExit *AddFinalizerExit
+
+[@flick-lang/runtime/effect/Fiber]
+flickInterrupt *FiberInterrupt

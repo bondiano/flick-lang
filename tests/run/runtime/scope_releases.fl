@@ -1,0 +1,71 @@
+// A scope releases its resources however its body ends: with a typed
+// error, by interruption from a timeout, or when a sibling branch of
+// `parallel` fails and interrupts it. Each release happens before the
+// outcome reaches the caller.
+module App.Main exposing (main)
+
+type error Oops = Oops String
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+nap : Float ->{} Unit
+let nap millis =
+  match Duration.millis millis with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+acquire : forall s. String ->{Scope s;} String
+let acquire name =
+  Resource.acquire_release (task {
+    say ("open " ++ name)
+    name
+  }) (fun n -> say ("release " ++ n))
+
+failing_scope : Unit ->{; Oops} Float
+let failing_scope () =
+  scope {
+    let _ = acquire "on error"
+    from_result (Err (Oops "body failed"))
+  }
+
+slow_scope : Unit ->{} String
+let slow_scope () =
+  scope {
+    let _ = acquire "on timeout"
+    nap 1000
+    "never"
+  }
+
+waiting : Eff none {Oops} Float
+let waiting = task {
+  scope {
+    let _ = acquire "in parallel"
+    nap 1000
+    1
+  }
+}
+
+failing_soon : Eff none {Oops} Float
+let failing_soon = task {
+  nap 5
+  from_result (Err (Oops "sibling failed"))
+}
+
+race_sibling : Unit ->{} String
+let race_sibling () =
+  try
+    let _ = parallel waiting failing_soon
+    "both ended"
+  with
+  | Oops text -> text
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let caught = try failing_scope () with
+    | Oops _ -> 0
+  say (show caught)
+  let timed = try timeout 5 (task { slow_scope () }) with
+    | TimeoutError -> "timed out"
+  say timed
+  say (race_sibling ())

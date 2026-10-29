@@ -6,27 +6,31 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 )
 
-var stdout = bufio.NewWriterSize(os.Stdout, 64<<10)
+var (
+	outMu  sync.Mutex // fibers write from many goroutines
+	stdout = bufio.NewWriterSize(os.Stdout, 64<<10)
+)
 
 // StdoutLine writes a line to stdout.
-func StdoutLine(text Value) Value {
-	stdout.WriteString(wellFormed(text.(string)))
-	stdout.WriteByte('\n')
-	return Unit
-}
+func StdoutLine(text Value) Value { return StdoutWrite(text.(string) + "\n") }
 
 // StdoutWrite writes text to stdout without a line break.
 func StdoutWrite(text Value) Value {
+	outMu.Lock()
 	stdout.WriteString(wellFormed(text.(string)))
+	outMu.Unlock()
 	return Unit
 }
 
 // StderrLine writes a line to stderr, after what stdout holds so far.
 func StderrLine(text Value) Value {
+	outMu.Lock()
 	stdout.Flush()
 	os.Stderr.WriteString(wellFormed(text.(string)) + "\n")
+	outMu.Unlock()
 	return Unit
 }
 
@@ -110,6 +114,10 @@ func Main(run func(*Fiber)) {
 			run(fb)
 			return Unit
 		})
+		// failures of supervisors fail the program after it ends
+		if reported != nil {
+			panic(&Failure{reported})
+		}
 	}()
 	stdout.Flush()
 	os.Exit(code)

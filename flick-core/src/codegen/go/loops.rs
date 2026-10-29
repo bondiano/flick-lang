@@ -126,7 +126,7 @@ impl Gen<'_> {
                 };
                 let (inner, ()) = self.block(|g| g.iteration(params, &vars, body, tail));
                 let copies = format!("var {} = {}", param_list(&vars), heads.join(", "));
-                (heads, vec![copies, format!("for {{\n{}}}", indent(&inner))])
+                (heads, vec![copies, format!("for {{\n{}{}}}", checkpoint(self.fiber), indent(&inner))])
             }
         };
         (self.tail, self.generator) = saved;
@@ -196,9 +196,10 @@ impl Gen<'_> {
             heads.push(param_list(&vars));
         }
         format!(
-            "func {}({}) flickrt.Value {{\n\tfor {{\n\t\tswitch state {{\n{}\t\t}}\n\t}}\n}}",
+            "func {}({}) flickrt.Value {{\n\tfor {{\n{}\t\tswitch state {{\n{}\t\t}}\n\t}}\n}}",
             self.groups[g].name,
             heads.join(", "),
+            checkpoint(fiber.then_some("fb")).replace('\t', "\t\t"),
             indent(&[indent(&cases)])
         )
     }
@@ -256,4 +257,9 @@ impl Gen<'_> {
         self.buf.push(format!("if {test} {{\n\treturn {value}\n}}"));
         self.tail_expr(rhs);
     }
+}
+
+/// The interruption checkpoint at the head of a loop of effectful code.
+fn checkpoint(fiber: Option<&str>) -> String {
+    fiber.map_or_else(String::new, |fb| format!("\tflickrt.Check({fb})\n"))
 }

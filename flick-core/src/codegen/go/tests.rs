@@ -92,7 +92,10 @@ fn tail_calls_jump_instead_of_calling() {
     let sum = &code[code.find("func F_App__sum(").expect("sum")..];
     let sum = &sum[..sum.find("\n}\n").expect("end of sum")];
     assert!(
-        sum.contains("for {") && sum.contains("continue") && !sum.contains("F_App__sum(f"),
+        sum.contains("for {")
+            && sum.contains("continue")
+            && !sum.contains("F_App__sum(f")
+            && !sum.contains("Check"),
         "{sum}"
     );
     assert!(
@@ -112,8 +115,9 @@ fn effectful_tail_calls_jump_but_not_out_of_a_try() {
     );
     assert!(errors.is_empty(), "{errors:?}");
     let code = file(&files, "m_App.go");
+    // an effectful loop stays interruptible: it checks at each iteration
     assert!(
-        code.contains("for {") && code.contains("continue"),
+        code.contains("for {\n\t\tflickrt.Check(fb)") && code.contains("continue"),
         "{code}"
     );
     let (files, _) = compile(

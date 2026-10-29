@@ -2,17 +2,27 @@ package flickrt
 
 import "sync"
 
-// Lexical owners. Each `scope` has one, holding the finalizers of what was
-// acquired into it. Closing it ends admission, then runs the finalizers
-// last first, each seeing how the body ended, and combines their failures
-// with the body's.
+// Lexical owners. Each `scope` has one: the fibers spawned into it and the
+// finalizers of what was acquired into it. Closing it is two-phase:
+// admission ends, children are interrupted and each one awaited,
+// supervisors included, and only then the finalizers run, last first,
+// each seeing how the body ended; their failures join the body's.
 type Owner struct {
 	mu         sync.Mutex
 	open       bool
-	finalizers []func(exit *Cause) *Cause
+	children   map[*child]struct{}
+	watchers   sync.WaitGroup
+	finalizers []finalizer
 }
 
-func newOwner() *Owner { return &Owner{open: true} }
+// A finalizer runs in the closing fiber, with the services of the fiber
+// that added it.
+type finalizer struct {
+	added *Fiber
+	run   func(fb *Fiber, exit *Cause) Value
+}
+
+func newOwner() *Owner { return &Owner{open: true, children: map[*child]struct{}{}} }
 
 // catch is the result of `f`, or the cause it failed with.
 func catch(f func() Value) (out Value, cause *Cause) {
@@ -26,34 +36,46 @@ func catch(f func() Value) (out Value, cause *Cause) {
 
 // add runs `finalizer` in `fb` when the owner closes, or at once when it
 // has closed, as Effect's scopes do.
-func (o *Owner) add(fb *Fiber, finalizer func(fb *Fiber, exit *Cause) Value) {
-	run := func(exit *Cause) *Cause {
-		_, cause := catch(func() Value { return finalizer(fb, exit) })
-		return cause
-	}
+func (o *Owner) add(fb *Fiber, run func(fb *Fiber, exit *Cause) Value) {
+	f := finalizer{fb, run}
 	o.mu.Lock()
 	if o.open {
-		o.finalizers = append(o.finalizers, run)
+		o.finalizers = append(o.finalizers, f)
 		o.mu.Unlock()
 		return
 	}
 	o.mu.Unlock()
-	if cause := run(nil); cause != nil {
+	if cause := f.call(fb, nil); cause != nil {
 		panic(&Failure{cause})
 	}
 }
 
-// close closes the owner after its body ended with `exit` (nil on success):
-// the cause the region ends with.
-func (o *Owner) close(exit *Cause) *Cause {
+func (f finalizer) call(closer *Fiber, exit *Cause) *Cause {
+	fb := *f.added
+	fb.state = closer.state
+	_, cause := catch(func() Value { return masked(&fb, closer.state.mask+1, func() Value { return f.run(&fb, exit) }) })
+	return cause
+}
+
+// close closes the owner, uninterruptibly, after its body ended with `exit`
+// (nil on success): the cause the region ends with.
+func (o *Owner) close(fb *Fiber, exit *Cause) *Cause {
 	o.mu.Lock()
 	o.open = false
+	children := make([]*child, 0, len(o.children))
+	for c := range o.children {
+		children = append(children, c)
+	}
 	finalizers := o.finalizers
 	o.finalizers = nil
 	o.mu.Unlock()
+	for _, c := range children {
+		c.state.interrupt(fb.state.id)
+	}
+	o.watchers.Wait()
 	cause := exit
 	for i := len(finalizers) - 1; i >= 0; i-- {
-		cause = Sequential(cause, finalizers[i](exit))
+		cause = Sequential(cause, finalizers[i].call(fb, exit))
 	}
 	return cause
 }
@@ -64,7 +86,7 @@ func owned(fb *Fiber, body func(fb *Fiber, owner *Owner) Value) Value {
 	inner := *fb
 	inner.owner = owner
 	out, cause := catch(func() Value { return body(&inner, owner) })
-	if cause = owner.close(cause); cause != nil {
+	if cause = owner.close(fb, cause); cause != nil {
 		panic(&Failure{cause})
 	}
 	return out
@@ -86,16 +108,19 @@ func Within(fb *Fiber, owner Value) *Fiber {
 
 // AcquireRelease is a resource released when the owner of the call closes.
 func AcquireRelease(fb *Fiber, acquire, release Value) Value {
-	v := Run(fb, acquire)
+	v := masked(fb, fb.state.mask+1, func() Value { return Run(fb, acquire) })
 	fb.owner.add(fb, func(fb *Fiber, _ *Cause) Value { return Run(fb, Apply(release, v)) })
 	return v
 }
 
 // Bracket runs `use` and then `release`, even when `use` fails.
 func Bracket(fb *Fiber, acquire, use, release Value) Value {
-	v := Run(fb, acquire)
+	inside := fb.state.mask
+	v := masked(fb, inside+1, func() Value { return Run(fb, acquire) })
 	out, cause := catch(func() Value { return Run(fb, Apply(use, v)) })
-	_, released := catch(func() Value { return Run(fb, Apply(release, v)) })
+	_, released := catch(func() Value {
+		return masked(fb, inside+1, func() Value { return Run(fb, Apply(release, v)) })
+	})
 	if cause = Sequential(cause, released); cause != nil {
 		panic(&Failure{cause})
 	}

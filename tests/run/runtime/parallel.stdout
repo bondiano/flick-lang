@@ -1,0 +1,17 @@
+slow fast
+["x", "y", "z"]
+1, oops two, 3
+sibling ended
+fail fast
+early
+won
+timed out
+Some "in time"
+["p", "q"]
+42
+child ended
+interrupted the child
+scope body done
+left running ended
+uninterruptible part done
+None

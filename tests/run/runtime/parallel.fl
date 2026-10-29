@@ -1,0 +1,100 @@
+// The concurrency combinators on the standard library alone: results keep
+// the order of their tasks, the first failure interrupts the siblings,
+// which end before it reaches the caller, and losers of a race and tasks
+// out of time are interrupted.
+module App.Main exposing (main)
+
+type error Oops = Oops String
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+nap : Float ->{} Unit
+let nap millis =
+  match Duration.millis millis with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+after : Float -> String -> Eff none none String
+let after millis text =
+  task {
+    nap millis
+    text
+  }
+
+failing : String -> Eff none {Oops} Float
+let failing text = task { from_result (Err (Oops text)) }
+
+/// A task that waits long, saying when it is interrupted.
+patient : String -> Eff none none Float
+let patient name =
+  task {
+    Effect.ensuring (task { say (name ++ " ended") }) (task {
+      nap 2000
+      0
+    })
+  }
+
+describe : Result Oops Float -> String
+let describe result =
+  match result with
+  | Ok n -> show n
+  | Err (Oops text) -> "oops " ++ text
+
+quiet : forall e. Failure e ->{} Unit
+let quiet _ = ()
+
+/// The sibling of a failing branch ends before the failure is caught.
+fail_fast : Unit ->{} String
+let fail_fast () =
+  try
+    let _ = parallel (patient "sibling") (task {
+      nap 5
+      from_result (Err (Oops "fail fast"))
+    })
+    "both ended"
+  with
+  | Oops text -> text
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let (a, b) = parallel (after 30 "slow") (after 1 "fast")
+  say (a ++ " " ++ b)
+  say (show (parallel_all 2 [after 6 "x", after 1 "y", after 3 "z"]))
+  match parallel_results [task { 1 }, failing "two", task { 3 }] with
+  | [a, b, c] -> say (describe a ++ ", " ++ describe b ++ ", " ++ describe c)
+  | _ -> ()
+  say (fail_fast ())
+  say (race_first (after 300 "late") (after 1 "early"))
+  say (try race_success (task { from_result (Err (Oops "lost")) }) (after 5 "won") with
+    | Oops text -> text)
+  let timed = try timeout 5 (after 500 "never") with
+    | TimeoutError -> "timed out"
+  say timed
+  say (show (timeout_option 500 (after 1 "in time")))
+  say (show (Effect.all Effect.Unbounded [after 6 "p", after 1 "q"]))
+  let joined = scope owner {
+    let child = Fiber.spawn owner quiet (task { 41 + 1 })
+    Fiber.join child
+  }
+  say (show joined)
+  scope owner {
+    let child = Fiber.spawn owner quiet (patient "child")
+    nap 5
+    Fiber.interrupt child
+    say "interrupted the child"
+  }
+  scope owner {
+    let _left = Fiber.spawn owner quiet (patient "left running")
+    nap 5
+    say "scope body done"
+  }
+  let kept = timeout_option 5 (task {
+    Effect.uninterruptible (task {
+      nap 30
+      say "uninterruptible part done"
+    })
+    nap 2000
+    "unreached"
+  })
+  say (show kept)

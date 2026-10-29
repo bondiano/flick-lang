@@ -2,6 +2,16 @@
 # `[module]`, an export and the function of package `flickrt`.
 
 [@flick-lang/runtime]
+fiberSpawn *FiberSpawn
+fiberJoin *FiberJoin
+parallel *ParallelPair
+parallelAll *ParallelAll
+parallelResults *ParallelResults
+raceSuccess *RaceSuccess
+raceFirst *RaceFirst
+timeout *Timeout
+timeoutOption *TimeoutOption
+failurePrimary FailurePrimary
 acquireRelease *AcquireRelease
 bracket *Bracket
 layerSucceed LayerSucceed

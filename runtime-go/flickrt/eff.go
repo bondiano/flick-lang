@@ -43,8 +43,12 @@ func EffectZip(fb *Fiber, that, self Value) Value {
 
 // EffectAll runs the tasks by the concurrency given, the results in order.
 func EffectAll(fb *Fiber, concurrency, tasks Value) Value {
-	if ConstructorName(concurrency.(*Data).Tag) == "Sequential" {
+	c := concurrency.(*Data)
+	switch ConstructorName(c.Tag) {
+	case "Sequential":
 		return ListMapEffect(fb, Fn(Identity), tasks)
+	case "Bounded":
+		return all(fb, List(tasks), max(1, int(c.Fields[0].(int32))))
 	}
-	panic(Defect{"concurrent Effect.all is not available on the go target yet"})
+	return all(fb, List(tasks), 0)
 }

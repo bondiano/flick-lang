@@ -426,6 +426,10 @@ impl Gen<'_> {
                 let v = self.expr(value);
                 self.bind(name, &v);
             }
+            Stmt::Let(Pat::Wild, value) => {
+                let v = self.expr(value);
+                self.buf.push(format!("_ = {v}"));
+            }
             Stmt::Let(pat, value) => {
                 let v = self.expr(value);
                 let v = self.spill(v);

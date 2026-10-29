@@ -7,6 +7,7 @@ pub const RUNTIME: &[(&str, &str)] = &[
     ("cause.go", include_str!("../../../../runtime-go/flickrt/cause.go")),
     ("collate.go", include_str!("../../../../runtime-go/flickrt/collate.go")),
     ("combine.go", include_str!("../../../../runtime-go/flickrt/combine.go")),
+    ("concurrency.go", include_str!("../../../../runtime-go/flickrt/concurrency.go")),
     ("data.go", include_str!("../../../../runtime-go/flickrt/data.go")),
     ("decimal.go", include_str!("../../../../runtime-go/flickrt/decimal.go")),
     ("dict.go", include_str!("../../../../runtime-go/flickrt/dict.go")),

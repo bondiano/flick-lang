@@ -1,5 +1,10 @@
 package flickrt
 
+import (
+	"sync"
+	"sync/atomic"
+)
+
 // A Fiber is what effectful code runs in: the generated code threads it
 // through every effectful call. Its derivations (another environment of
 // services, another owner) share the fiber's state.
@@ -10,18 +15,76 @@ type Fiber struct {
 }
 
 type fiberState struct {
-	id int64
+	id        int64
+	requested atomic.Bool
+	by        atomic.Int64  // the fiber that asked for the interruption
+	signal    chan struct{} // closed when interruption is asked for
+	once      sync.Once
+	mask      int // depth of uninterruptible regions; only the fiber's goroutine touches it
+}
+
+var fibers atomic.Int64
+
+func newState() *fiberState {
+	return &fiberState{id: fibers.Add(1), signal: make(chan struct{})}
+}
+
+// interrupt asks the fiber to stop at its next checkpoint.
+func (s *fiberState) interrupt(by int64) {
+	s.once.Do(func() {
+		s.by.Store(by)
+		s.requested.Store(true)
+		close(s.signal)
+	})
+}
+
+func (s *fiberState) stopped() *Failure {
+	return &Failure{&Cause{kind: causeInterrupt, fiber: s.by.Load()}}
 }
 
 // Eff is a task: a computation run each time it is awaited, in the fiber
 // that awaits it.
 type Eff func(*Fiber) Value
 
-// Run runs a task in a fiber.
-func Run(fb *Fiber, task Value) Value { return task.(Eff)(fb) }
+// Check is an interruption checkpoint: an interruptible fiber asked to stop
+// fails with the interruption.
+func Check(fb *Fiber) {
+	if s := fb.state; s.requested.Load() && s.mask == 0 {
+		panic(s.stopped())
+	}
+}
+
+// Run runs a task in a fiber, after a checkpoint.
+func Run(fb *Fiber, task Value) Value {
+	Check(fb)
+	return task.(Eff)(fb)
+}
+
+// wait blocks until `ch` is closed, or fails with the fiber's interruption
+// when it is interruptible.
+func wait(fb *Fiber, ch <-chan struct{}) {
+	s := fb.state
+	if s.mask > 0 {
+		<-ch
+		return
+	}
+	select {
+	case <-ch:
+	case <-s.signal:
+		panic(s.stopped())
+	}
+}
+
+// masked runs `f` with the fiber's interruptibility set by `mask`.
+func masked(fb *Fiber, mask int, f func() Value) Value {
+	saved := fb.state.mask
+	fb.state.mask = mask
+	defer func() { fb.state.mask = saved }()
+	return f()
+}
 
 // rootFiber is the fiber `main` runs in.
-func rootFiber() *Fiber { return &Fiber{state: &fiberState{}} }
+func rootFiber() *Fiber { return &Fiber{state: newState()} }
 
 // LiftStage adapts a function of one stage where one of another is
 // expected: effectful stages (Sync and Runtime) give a task, pure ones a
