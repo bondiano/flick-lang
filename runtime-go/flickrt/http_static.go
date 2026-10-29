@@ -1,7 +1,6 @@
 package flickrt
 
 import (
-	"io"
 	"math/big"
 	"net/http"
 	"os"
@@ -13,9 +12,8 @@ import (
 
 // Http.Platform.node and Http.StaticServer as Effect's on Node: a file's
 // response with its media type, strong ETag, modification time and the
-// range of it asked for, and a handler of the files below a directory.
-//
-// shortcut: a file's bytes are read whole when the response is sent; stream them when large files are served
+// range of it asked for, read as it is sent, and a handler of the files
+// below a directory.
 
 var internalErrorTag = Tag("Http.ServerError.ServerErrorReason.InternalError")
 
@@ -58,22 +56,7 @@ func fileResponse(path string, o *Record, status int32, offset, bytesToRead int6
 		headers = headers.set("content-type", mime)
 	}
 	headers = headers.set("content-length", strconv.FormatInt(length, 10))
-	body := &Body{kind: bodyStream, length: -1, read: func() ([]byte, error) {
-		if length == 0 {
-			return nil, nil
-		}
-		f, err := os.Open(path)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-		data := make([]byte, length)
-		n, err := f.ReadAt(data, offset)
-		if err == io.EOF {
-			err = nil
-		}
-		return data[:n], err
-	}}
+	body := &Body{kind: bodyStream, length: -1, open: fileOpener(path, offset, length)}
 	return newResponse(status, statusText, hasText, headers, nil, body, true), nil
 }
 

@@ -305,7 +305,7 @@ func ClientRequestCompressBody(_ *Fiber, algorithm, minSize, self Value) Value {
 	if float64(c.body.length) < least {
 		return c
 	}
-	data, contentType, _ := c.body.bytes()
+	data, contentType, _ := c.body.bytes(nil)
 	name := algorithmOf[ConstructorName(algorithm.(*Data).Tag)]
 	packed, err := compress(name, -1, data)
 	if err != nil {

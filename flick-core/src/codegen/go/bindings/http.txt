@@ -49,6 +49,8 @@ flickJson *ResponseJson
 flickSchemaJson *ResponseSchemaJson
 flickUrlParams ResponseUrlParams
 flickFormData ResponseFormData
+flickStream ResponseStream
+flickStreamText ResponseStreamText
 flickStatus ResponseStatus
 flickStatusText ResponseStatusText
 flickHeaders ResponseHeaders
@@ -79,6 +81,7 @@ flickXForwardedHeaders *MiddlewareXForwardedHeaders
 flickSearchParamsParser *MiddlewareSearchParamsParser
 flickCors *MiddlewareCors
 flickCompression *MiddlewareCompression
+flickCompressionWeb *MiddlewareCompressionWeb
 flickDecompression *MiddlewareDecompression
 flickWithTracerDisabledWhen *MiddlewareWithTracerDisabledWhen
 flickWithTracerDisabledForUrls *MiddlewareWithTracerDisabledForUrls
@@ -96,6 +99,8 @@ flickJson *BodyJson
 flickJsonSchema *BodyJsonSchema
 urlParams BodyUrlParams
 flickFormData BodyFormData
+flickStream BodyStream
+flickFileFromInfo *BodyFileFromInfo
 flickContentType BodyContentType
 flickContentLength BodyContentLength
 flickToText BodyToText
@@ -126,6 +131,7 @@ bodyText ClientRequestBodyText
 flickBodyJson *ClientRequestBodyJson
 bodyUrlParams ClientRequestBodyUrlParams
 flickBodyFormData ClientRequestBodyFormData
+flickBodyStream ClientRequestBodyStream
 toUrl ClientRequestToUrl
 flickMethod ClientRequestMethod
 flickUrl ClientRequestUrl
@@ -159,6 +165,7 @@ flickText *ClientResponseText
 flickJson *ClientResponseJson
 flickUrlParamsBody *ClientResponseUrlParamsBody
 flickBytes *ClientResponseBytes
+flickStream ClientResponseStream
 flickFilterStatus *ClientResponseFilterStatus
 flickFilterStatusOk *ClientResponseFilterStatusOk
 flickSchemaJson *ClientResponseSchemaJson
@@ -223,6 +230,9 @@ w3c TraceContextW3c
 flickPersisted *MultipartPersisted
 flickFields MultipartFields
 flickFiles MultipartFiles
+flickParts MultipartParts
+flickMakeChannel MultipartMakeChannel
+flickToPersisted *MultipartToPersisted
 flickSchemaPersisted *MultipartSchemaPersisted
 flickSchemaJson *MultipartSchemaJson
 flickSchemaBodyMultipart *MultipartSchemaBodyMultipart

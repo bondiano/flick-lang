@@ -242,82 +242,135 @@ func infoOfPart(p *multipart.Part) (partInfo, bool) {
 	return info, true
 }
 
+// formReader reads a form part by part: a field whole, a file as its
+// bytes are read, what is left of it skipped before the next part, its
+// bytes counted all the same.
+type formReader struct {
+	counted *countingReader
+	reader  *multipart.Reader
+	limits  *formLimits
+	parts   int64
+	part    *multipart.Part // the file being read
+	size    int64           // of the file being read
+	buf     []byte
+}
+
+func newFormReader(body io.Reader, contentTypeHeader string, hasType bool, limits *formLimits) (*formReader, string) {
+	boundary, ok := parseContentType(contentTypeHeader, hasType, false).params["boundary"]
+	if !ok {
+		return nil, reasonParse
+	}
+	counted := &countingReader{r: body, max: limits.maxTotalSize, closing: []byte("\r\n--" + boundary + "--"), tail: []byte("\r\n")}
+	return &formReader{counted: counted, reader: multipart.NewReader(counted, boundary), limits: limits, buf: make([]byte, 32*1024)}, ""
+}
+
+// readFile reads bytes of the file being read into `p`; whether its end
+// came, or the reason the form is refused.
+func (f *formReader) readFile(p []byte) (int, bool, string) {
+	n, err := f.part.Read(p)
+	if f.size += int64(n); f.limits.maxPartSize >= 0 && f.size > f.limits.maxPartSize {
+		return 0, false, reasonFileTooLarge
+	}
+	switch {
+	case err == io.EOF:
+		f.part = nil
+		return n, true, ""
+	case f.counted.exceeded:
+		return 0, false, reasonBodyTooLarge
+	case err != nil:
+		return 0, false, reasonParse
+	}
+	return n, false, ""
+}
+
+// next is the next part: its info, whether it is a file, a field's value;
+// none at the form's end, or the reason the form is refused.
+func (f *formReader) next() (info partInfo, isFile bool, field []byte, more bool, reason string) {
+	for f.part != nil {
+		if _, _, reason = f.readFile(f.buf); reason != "" {
+			return
+		}
+	}
+	f.parts++
+	p, err := f.reader.NextRawPart()
+	switch {
+	case f.counted.exceeded:
+		return info, false, nil, false, reasonBodyTooLarge
+	case err == io.EOF && f.counted.closed:
+		return info, false, nil, false, ""
+	case err != nil:
+		return info, false, nil, false, reasonParse
+	case f.limits.maxParts >= 0 && f.parts > f.limits.maxParts:
+		return info, false, nil, false, reasonTooManyParts
+	}
+	info, ok := infoOfPart(p)
+	if !ok {
+		return info, false, nil, false, reasonParse
+	}
+	size := headerSize(p)
+	if f.limits.maxPartSize >= 0 && size > f.limits.maxPartSize {
+		return info, false, nil, false, reasonFileTooLarge
+	}
+	if f.limits.isFile(info) {
+		f.part, f.size = p, size
+		return info, true, nil, true, ""
+	}
+	for {
+		n, err := p.Read(f.buf)
+		if size += int64(n); f.limits.maxPartSize >= 0 && size > f.limits.maxPartSize {
+			return info, false, nil, false, reasonFileTooLarge
+		}
+		if field = append(field, f.buf[:n]...); f.limits.maxFieldSize >= 0 && int64(len(field)) > f.limits.maxFieldSize {
+			return info, false, nil, false, reasonFieldTooLarge
+		}
+		switch {
+		case err == io.EOF:
+			return info, false, field, true, ""
+		case f.counted.exceeded:
+			return info, false, nil, false, reasonBodyTooLarge
+		case err != nil:
+			return info, false, nil, false, reasonParse
+		}
+	}
+}
+
 // parseForm reads the parts of the body of the content type into the
 // sink; the reason it refused the form, or "".
 func parseForm(body io.Reader, contentTypeHeader string, hasType bool, limits *formLimits, sink formSink) string {
-	boundary, ok := parseContentType(contentTypeHeader, hasType, false).params["boundary"]
-	if !ok {
-		return reasonParse
+	f, reason := newFormReader(body, contentTypeHeader, hasType, limits)
+	if reason != "" {
+		return reason
 	}
-	counted := &countingReader{r: body, max: limits.maxTotalSize, closing: []byte("\r\n--" + boundary + "--"), tail: []byte("\r\n")}
-	reader := multipart.NewReader(counted, boundary)
-	buf := make([]byte, 32*1024)
-	var out io.WriteCloser
-	defer func() {
-		if out != nil {
-			out.Close()
-		}
-	}()
-	for parts := int64(1); ; parts++ {
-		p, err := reader.NextRawPart()
-		switch {
-		case counted.exceeded:
-			return reasonBodyTooLarge
-		case err == io.EOF && counted.closed:
-			return ""
-		case err == io.EOF:
-			return reasonParse
-		case err != nil:
-			return reasonParse
-		case limits.maxParts >= 0 && parts > limits.maxParts:
-			return reasonTooManyParts
-		}
-		info, ok := infoOfPart(p)
-		if !ok {
-			return reasonParse
-		}
-		size := headerSize(p)
-		if limits.maxPartSize >= 0 && size > limits.maxPartSize {
-			return reasonFileTooLarge
-		}
-		isFile := limits.isFile(info)
-		var field []byte
-		if isFile {
-			if out, ok = sink.file(info); !ok {
-				return reasonInternal
-			}
-		}
-		for {
-			n, err := p.Read(buf)
-			if size += int64(n); limits.maxPartSize >= 0 && size > limits.maxPartSize {
-				return reasonFileTooLarge
-			}
-			if isFile {
-				if out != nil && n > 0 {
-					if _, werr := out.Write(buf[:n]); werr != nil {
-						return reasonInternal
-					}
-				}
-			} else if field = append(field, buf[:n]...); limits.maxFieldSize >= 0 && int64(len(field)) > limits.maxFieldSize {
-				return reasonFieldTooLarge
-			}
-			if err == io.EOF {
-				break
-			}
-			if counted.exceeded {
-				return reasonBodyTooLarge
-			}
-			if err != nil {
-				return reasonParse
-			}
+	for {
+		info, isFile, field, more, reason := f.next()
+		if !more {
+			return reason
 		}
 		if !isFile {
 			sink.field(info, field)
-		} else if out != nil {
-			err, out = out.Close(), nil
-			if err != nil {
-				return reasonInternal
+			continue
+		}
+		out, ok := sink.file(info)
+		if !ok {
+			return reasonInternal
+		}
+		for end := false; !end; {
+			var n int
+			if n, end, reason = f.readFile(f.buf); reason != "" {
+				if out != nil {
+					out.Close()
+				}
+				return reason
 			}
+			if out != nil && n > 0 {
+				if _, err := out.Write(f.buf[:n]); err != nil {
+					out.Close()
+					return reasonInternal
+				}
+			}
+		}
+		if out != nil && out.Close() != nil {
+			return reasonInternal
 		}
 	}
 }

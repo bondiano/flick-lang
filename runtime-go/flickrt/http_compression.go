@@ -70,15 +70,22 @@ func compressible(contentType string) bool {
 	return strings.HasPrefix(t, "text/") || strings.HasSuffix(t, "+json") || strings.HasSuffix(t, "+xml")
 }
 
+// compressor is a writer of the algorithm, gzip or deflate, into `buf`.
+type compressor interface {
+	io.WriteCloser
+	Flush() error
+}
+
+func newCompressor(algorithm string, level int, buf *bytes.Buffer) (compressor, error) {
+	if algorithm == "gzip" {
+		return gzip.NewWriterLevel(buf, level)
+	}
+	return zlib.NewWriterLevel(buf, level)
+}
+
 func compress(algorithm string, level int, data []byte) ([]byte, error) {
 	var buf bytes.Buffer
-	var w io.WriteCloser
-	var err error
-	if algorithm == "gzip" {
-		w, err = gzip.NewWriterLevel(&buf, level)
-	} else {
-		w, err = zlib.NewWriterLevel(&buf, level)
-	}
+	w, err := newCompressor(algorithm, level, &buf)
 	if err != nil {
 		return nil, err
 	}
@@ -88,12 +95,65 @@ func compress(algorithm string, level int, data []byte) ([]byte, error) {
 	return buf.Bytes(), err
 }
 
+// compressingReader compresses a body as it is read, each chunk read from
+// it flushed, so a streamed response streams compressed too.
+type compressingReader struct {
+	in  io.ReadCloser
+	w   compressor
+	out bytes.Buffer
+	buf []byte
+	eof bool
+}
+
+func newCompressingReader(algorithm string, level int, in io.ReadCloser) (io.ReadCloser, error) {
+	r := &compressingReader{in: in, buf: make([]byte, 32<<10)}
+	w, err := newCompressor(algorithm, level, &r.out)
+	if err != nil {
+		in.Close()
+		return nil, err
+	}
+	r.w = w
+	return r, nil
+}
+
+func (r *compressingReader) Read(p []byte) (int, error) {
+	for r.out.Len() == 0 {
+		if r.eof {
+			return 0, io.EOF
+		}
+		n, err := r.in.Read(r.buf)
+		if n > 0 {
+			r.w.Write(r.buf[:n])
+			r.w.Flush()
+		}
+		if err == io.EOF {
+			r.eof = true
+			r.w.Close()
+		} else if err != nil {
+			return 0, err
+		}
+	}
+	return r.out.Read(p)
+}
+
+func (r *compressingReader) Close() error { return r.in.Close() }
+
 func withVary(response Value) Value {
 	return ResponseSetHeader("vary", varyWith(responseOf(response).headerRecord(), "Accept-Encoding"), response)
 }
 
 // MiddlewareCompression compresses the response before it is sent.
 func MiddlewareCompression(fb *Fiber, options, handler, request Value) Value {
+	return compression(fb, options, handler, request, false)
+}
+
+// MiddlewareCompressionWeb is the compression of the web's
+// CompressionStream, whose level is zlib's default whatever the options say.
+func MiddlewareCompressionWeb(fb *Fiber, options, handler, request Value) Value {
+	return compression(fb, options, handler, request, true)
+}
+
+func compression(fb *Fiber, options, handler, request Value, web bool) Value {
 	o := record(options)
 	preferred := []string{"br", "gzip", "deflate"}
 	if as := List(o.Get("algorithms")); len(as) > 0 {
@@ -108,10 +168,13 @@ func MiddlewareCompression(fb *Fiber, options, handler, request Value) Value {
 	}
 	levels := map[string]int{"gzip": 6, "deflate": 6}
 	for _, l := range List(o.Get("levels")) {
+		if web {
+			break
+		}
 		pair := l.([]Value)
 		levels[algorithmOf[ConstructorName(pair[0].(*Data).Tag)]] = int(pair[1].(int32))
 	}
-	requestOf(request).appendPreResponse(func(_ *Fiber, request, response Value) Value {
+	requestOf(request).appendPreResponse(func(fb *Fiber, request, response Value) Value {
 		r := responseOf(response)
 		if r.status < 200 || r.status == 204 || r.status == 206 || r.status == 304 {
 			return response
@@ -148,14 +211,27 @@ func MiddlewareCompression(fb *Fiber, options, handler, request Value) Value {
 		if length >= 0 && length < minSize {
 			return withVary(response)
 		}
-		data, _, err := r.body.bytes()
-		if err == nil {
-			data, err = compress(algorithm, levels[algorithm], data)
+		var body *Body
+		if r.body.kind == bodyStream {
+			source, level := r.body, levels[algorithm]
+			body = &Body{kind: bodyStream, hasType: true, contentType: ct, length: -1,
+				open: func(fb *Fiber) (io.ReadCloser, error) {
+					in, err := source.open(fb)
+					if err != nil {
+						return nil, err
+					}
+					return newCompressingReader(algorithm, level, in)
+				}}
+		} else {
+			data, _, err := r.body.bytes(fb)
+			if err == nil {
+				data, err = compress(algorithm, levels[algorithm], data)
+			}
+			if err != nil {
+				panic(Defect{err.Error()})
+			}
+			body = &Body{kind: bodyBytes, hasType: true, contentType: ct, length: -1, data: string(data)}
 		}
-		if err != nil {
-			panic(Defect{err.Error()})
-		}
-		body := &Body{kind: bodyBytes, hasType: true, contentType: ct, length: -1, data: string(data)}
 		compressed := ResponseRemoveHeader("content-length", ResponseSetBody(body, response))
 		set := newRecord(3)
 		set.put("content-encoding", algorithm)

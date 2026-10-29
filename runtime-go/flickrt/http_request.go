@@ -1,6 +1,7 @@
 package flickrt
 
 import (
+	"bytes"
 	"io"
 	"math/big"
 	"net"
@@ -98,7 +99,7 @@ func (s *requestSource) read(fb *Fiber) ([]byte, error) {
 	s.once.Do(func() {
 		switch {
 		case s.client != nil:
-			s.body, _, s.err = s.client.body.bytes()
+			s.body, _, s.err = s.client.body.bytes(fb)
 		default:
 			var r io.Reader = s.r.Body
 			limit := int64(-1)
@@ -260,11 +261,15 @@ func RequestToClientRequest(r Value) Value {
 			ct, hasType := q.header("content-type")
 			body = &Body{kind: bodyStream, hasType: hasType, contentType: ct,
 				length: parseContentLength(recordField(headers, "content-length")),
-				read: func() ([]byte, error) {
+				open: func(fb *Fiber) (io.ReadCloser, error) {
+					var data []byte
+					var err error
 					if q.inflate != nil {
-						return q.inflate.read(nil, q)
+						data, err = q.inflate.read(fb, q)
+					} else {
+						data, err = q.src.read(fb)
 					}
-					return q.src.read(nil)
+					return io.NopCloser(bytes.NewReader(data)), err
 				}}
 			if body.length < 0 {
 				headers = headers.without("content-length")

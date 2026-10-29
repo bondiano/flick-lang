@@ -158,6 +158,21 @@ func persistedFileName(name string) string {
 // shortcut: every charset reads as UTF-8; decode the others TextDecoder knows when a program sends them
 func decodeField(charset string, value []byte) string { return decodeText(value) }
 
+// formBody is the body of the request a form is read from, and its
+// headers.
+func (q *ServerRequest) formBody(fb *Fiber) (io.ReadCloser, *Record) {
+	s := q.src
+	if s.client == nil {
+		return s.r.Body, s.headers()
+	}
+	body, _, err := s.client.body.reader(fb)
+	if err != nil {
+		rethrow(err)
+		Fail(multipartError(reasonInternal))
+	}
+	return body, q.headerRecord()
+}
+
 // readForm reads the request's form.
 func (q *ServerRequest) readForm(fb *Fiber) Value {
 	s := q.src
@@ -169,17 +184,8 @@ func (q *ServerRequest) readForm(fb *Fiber) Value {
 		}
 		return p.form
 	}
-	var body io.Reader
-	headers := q.headerRecord()
-	if s.client != nil {
-		data, _, err := s.client.body.bytes()
-		if err != nil {
-			return Fail(multipartError(reasonInternal))
-		}
-		body = strings.NewReader(string(data))
-	} else {
-		body, headers = s.r.Body, s.headers()
-	}
+	body, headers := q.formBody(fb)
+	defer body.Close()
 	ct, ok := recordField(headers, "content-type").(string)
 	if reason := parseForm(body, ct, ok, limitsOf(fb), p); reason != "" {
 		return Fail(multipartError(reason))

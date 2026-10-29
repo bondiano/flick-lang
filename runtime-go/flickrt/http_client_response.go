@@ -2,14 +2,15 @@ package flickrt
 
 import (
 	"bytes"
+	"io"
 	"sync"
 )
 
 // Http.ClientResponse as Effect's HttpClientResponse: the status, headers
-// and cookies of a response and its body, read once and kept, so reading
-// it again gives the same bytes, as Effect's web responses cache theirs.
-// A response comes from the network or from a handler's response, for a
-// test double.
+// and cookies of a response and its body, read when it is asked for. Read
+// whole, it is kept, so reading it again gives the same bytes, as Effect's
+// web responses cache theirs; streamed, it is read as it comes. A response
+// comes from the network or from a handler's response, for a test double.
 
 type ClientResponse struct {
 	request *ClientRequest
@@ -17,22 +18,82 @@ type ClientResponse struct {
 	status  int32
 	headers *Record
 	cookies *Record
-	read    func() ([]byte, error)
-	once    sync.Once
+	open    func(fb *Fiber) (io.ReadCloser, error)
+	mu      sync.Mutex
+	read    bool // data and err are the body read whole
 	data    []byte
 	err     error
 }
 
 func clientResponseOf(v Value) *ClientResponse { return v.(*ClientResponse) }
 
+func (r *ClientResponse) readAll(fb *Fiber) ([]byte, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !r.read {
+		body, err := r.open(fb)
+		if err == nil {
+			r.data, err = io.ReadAll(body)
+			body.Close()
+		}
+		r.err, r.read = err, true
+	}
+	return r.data, r.err
+}
+
 // body is the bytes of the body; a body that cannot be read fails with a
 // DecodeError.
-func (r *ClientResponse) body() []byte {
-	r.once.Do(func() { r.data, r.err = r.read() })
-	if r.err != nil {
-		Fail(responseFailure(decodeErrorTag, r, Some(r.err.Error())))
+func (r *ClientResponse) body(fb *Fiber) []byte {
+	data, err := r.readAll(fb)
+	if err != nil {
+		r.fail(err)
 	}
-	return r.data
+	return data
+}
+
+func (r *ClientResponse) fail(err error) Value {
+	rethrow(err)
+	return Fail(responseFailure(decodeErrorTag, r, Some(err.Error())))
+}
+
+// cached is the body when it was read whole.
+func (r *ClientResponse) cached() ([]byte, error, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.data, r.err, r.read
+}
+
+// ClientResponseStream is the chunks of the body as they are read.
+func ClientResponseStream(v Value) Value {
+	r := clientResponseOf(v)
+	return &Stream{open: func(fb *Fiber) pull {
+		if data, err, ok := r.cached(); ok {
+			if err != nil {
+				r.fail(err)
+			}
+			return chunkStream([]Value{byteList(data)}).open(fb)
+		}
+		body, err := r.open(fb)
+		if err != nil {
+			r.fail(err)
+		}
+		fb.owner.add(fb, func(*Fiber, *Cause) Value { body.Close(); return Unit })
+		buf := make([]byte, 64<<10)
+		return func(*Fiber) ([]Value, bool) {
+			for {
+				n, err := body.Read(buf)
+				if n > 0 {
+					return []Value{byteList(buf[:n])}, true
+				}
+				if err == io.EOF {
+					return nil, false
+				}
+				if err != nil {
+					r.fail(err)
+				}
+			}
+		}
+	}}
 }
 
 // ResponseToClientResponse is the response as a client of the handler
@@ -41,14 +102,14 @@ func (r *ClientResponse) body() []byte {
 func ResponseToClientResponse(request, r Value) Value {
 	c, s := clientOf(request), responseOf(r)
 	out := &ClientResponse{request: c, status: s.status, headers: s.headerRecord(), cookies: s.cookies,
-		read: func() ([]byte, error) {
-			data, _, err := s.body.bytes()
-			return data, err
+		open: func(fb *Fiber) (io.ReadCloser, error) {
+			body, _, err := s.body.reader(fb)
+			return body, err
 		}}
 	if s.body.kind == bodyForm {
-		data, contentType, _ := s.body.bytes()
+		data, contentType, _ := s.body.bytes(nil)
 		out.headers = out.headers.set("content-type", contentType)
-		out.read = func() ([]byte, error) { return data, nil }
+		out.open = func(*Fiber) (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(data)), nil }
 	}
 	if c != ClientRequestEmpty {
 		if u, ok := some(c.toUrl()); ok {
@@ -68,9 +129,11 @@ func ResponseFromClientResponse(c Value) Value {
 	ct, hasType := recordField(headers, "content-type").(string)
 	body := &Body{kind: bodyStream, hasType: hasType, contentType: ct,
 		length: parseContentLength(recordField(headers, "content-length")),
-		read: func() ([]byte, error) {
-			in.once.Do(func() { in.data, in.err = in.read() })
-			return in.data, in.err
+		open: func(fb *Fiber) (io.ReadCloser, error) {
+			if data, err, ok := in.cached(); ok {
+				return io.NopCloser(bytes.NewReader(data)), err
+			}
+			return in.open(fb)
 		}}
 	return newResponse(in.status, "", false, headers, in.cookies, body, false)
 }
@@ -83,8 +146,8 @@ func ClientResponseRequest(r Value) Value { return clientResponseOf(r).request }
 
 // ClientResponseText is the body as UTF-8, a leading byte order mark left
 // out as TextDecoder does.
-func ClientResponseText(_ *Fiber, r Value) Value {
-	return decodeUTF8(bytes.TrimPrefix(clientResponseOf(r).body(), []byte("\uFEFF")))
+func ClientResponseText(fb *Fiber, r Value) Value {
+	return decodeUTF8(bytes.TrimPrefix(clientResponseOf(r).body(fb), []byte("\uFEFF")))
 }
 
 // ClientResponseJson is the body as JSON, `null` for an empty one.
@@ -104,7 +167,7 @@ func ClientResponseUrlParamsBody(fb *Fiber, r Value) Value {
 	return formDecode(ClientResponseText(fb, r).(string))
 }
 
-func ClientResponseBytes(_ *Fiber, r Value) Value { return byteList(clientResponseOf(r).body()) }
+func ClientResponseBytes(fb *Fiber, r Value) Value { return byteList(clientResponseOf(r).body(fb)) }
 
 func ClientResponseFilterStatus(_ *Fiber, f, r Value) Value {
 	if !Apply(f, clientResponseOf(r).status).(bool) {

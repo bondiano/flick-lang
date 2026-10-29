@@ -123,6 +123,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/http_body.go"),
     ),
     (
+        "http_body_stream.go",
+        include_str!("../../../../runtime-go/flickrt/http_body_stream.go"),
+    ),
+    (
         "http_client.go",
         include_str!("../../../../runtime-go/flickrt/http_client.go"),
     ),
@@ -181,6 +185,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "http_multipart_parse.go",
         include_str!("../../../../runtime-go/flickrt/http_multipart_parse.go"),
+    ),
+    (
+        "http_multipart_stream.go",
+        include_str!("../../../../runtime-go/flickrt/http_multipart_stream.go"),
     ),
     (
         "http_request.go",
@@ -289,6 +297,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "service.go",
         include_str!("../../../../runtime-go/flickrt/service.go"),
+    ),
+    (
+        "stream.go",
+        include_str!("../../../../runtime-go/flickrt/stream.go"),
     ),
     (
         "string.go",

@@ -394,8 +394,3 @@ func CountOf(n Value) int {
 	}
 	return int(n.(int32))
 }
-
-// StreamFromSeq is the Stream of a Seq's elements.
-//
-// shortcut: a Stream is the Seq it was made from, the only Stream the go target builds; a real one comes with Stream
-func StreamFromSeq(s Value) Value { return s }

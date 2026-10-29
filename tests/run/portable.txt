@@ -87,3 +87,4 @@ stdlib/http/client
 stdlib/http/forms
 stdlib/http/types
 stdlib/http/server
+stdlib/http/streams
