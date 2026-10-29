@@ -116,10 +116,6 @@ func HttpServerLogAddress(fb *Fiber, server Value) Value {
 	return Unit
 }
 
-// The platform and entity tags of Node are services the go target does not
-// read yet: their layers provide them empty.
-func HttpEmptyLayer(key Value) Value { return LayerSucceed(key, &Record{}) }
-
 // writeResponse sends the response: its headers, a `Set-Cookie` header of
 // each cookie, and the body unless its status has none.
 func writeResponse(w http.ResponseWriter, resp *ServerResponse) {

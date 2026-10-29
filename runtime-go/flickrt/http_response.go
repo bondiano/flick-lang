@@ -296,7 +296,7 @@ func ResponseOmitsBody(withoutBody, r Value) Value {
 }
 
 // statusOf is the status a server answers a failure with: that of a Flick
-// HttpServerError, 503 for an interruption, 500 otherwise.
+// HttpServerError or MultipartError, 503 for an interruption, 500 otherwise.
 func statusOf(c *Cause) int32 {
 	if r := c.firstOf(causeFail); r != nil {
 		if d, ok := r.err.(*Data); ok && d.Tag == serverErrorTag {
@@ -307,6 +307,9 @@ func statusOf(c *Cause) int32 {
 				return 404
 			}
 			return 500
+		}
+		if d, ok := r.err.(*Data); ok && d.Tag == multipartErrorTag {
+			return multipartStatus[d.Fields[0].(*Data).Tag]
 		}
 	}
 	if !c.has(causeFail) && !c.has(causeDie) && c.has(causeInterrupt) {

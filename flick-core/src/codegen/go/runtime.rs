@@ -95,6 +95,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/file.go"),
     ),
     (
+        "filesystem.go",
+        include_str!("../../../../runtime-go/flickrt/filesystem.go"),
+    ),
+    (
         "fnmods.go",
         include_str!("../../../../runtime-go/flickrt/fnmods.go"),
     ),
@@ -171,6 +175,14 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/http_mime.go"),
     ),
     (
+        "http_multipart.go",
+        include_str!("../../../../runtime-go/flickrt/http_multipart.go"),
+    ),
+    (
+        "http_multipart_parse.go",
+        include_str!("../../../../runtime-go/flickrt/http_multipart_parse.go"),
+    ),
+    (
         "http_request.go",
         include_str!("../../../../runtime-go/flickrt/http_request.go"),
     ),
@@ -181,6 +193,14 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "http_router.go",
         include_str!("../../../../runtime-go/flickrt/http_router.go"),
+    ),
+    (
+        "http_static.go",
+        include_str!("../../../../runtime-go/flickrt/http_static.go"),
+    ),
+    (
+        "http_trace.go",
+        include_str!("../../../../runtime-go/flickrt/http_trace.go"),
     ),
     (
         "http_url.go",

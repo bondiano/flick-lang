@@ -207,7 +207,33 @@ flickLayer EtagLayer
 flickLayerWeak EtagLayerWeak
 
 [@flick-lang/runtime/effect/http/HttpPlatform]
-flickNode HttpEmptyLayer
+flickNode HttpPlatformNode
+
+[@flick-lang/runtime/effect/http/HttpStaticServer]
+flickMake *StaticServerMake
+
+[@flick-lang/runtime/effect/http/HttpTraceContext]
+flickToHeaders TraceContextToHeaders
+fromHeaders TraceContextFromHeaders
+b3 TraceContextB3
+xb3 TraceContextXb3
+w3c TraceContextW3c
+
+[@flick-lang/runtime/effect/http/Multipart]
+flickPersisted *MultipartPersisted
+flickFields MultipartFields
+flickFiles MultipartFiles
+flickSchemaPersisted *MultipartSchemaPersisted
+flickSchemaJson *MultipartSchemaJson
+flickSchemaBodyMultipart *MultipartSchemaBodyMultipart
+flickSchemaBodyForm *MultipartSchemaBodyForm
+flickSchemaBodyFormJson *MultipartSchemaBodyFormJson
+flickWithLimits *MultipartWithLimits
+flickDefaultIsFile MultipartDefaultIsFile
+flickDecodeField MultipartDecodeField
+
+[@flick-lang/runtime/effect/FileSystem]
+flickNode FileSystemNode
 
 [@flick-lang/runtime/effect/http/Headers]
 empty HeadersEmpty

@@ -34,6 +34,10 @@ type requestSource struct {
 	once    sync.Once
 	body    []byte
 	err     error
+	// the form `Http.Multipart.persisted` read
+	formOnce  sync.Once
+	form      Value
+	formCause *Cause
 }
 
 const maxBodySizeKey = "effect/http/HttpIncomingMessage/MaxBodySize"
