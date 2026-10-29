@@ -32,6 +32,12 @@ let main () =
   let second = provide layer {
     welcome "bob"
   }
+  // built outside `provide`, the task reads the service where it runs
+  let later = task { Greeter.greet "later" }
+  let third = provide (Layer.succeed Greeter { greet = fun name -> "hi, " ++ name }) {
+    await later
+  }
   Platform.stdout_line first
   Platform.stdout_line second
+  Platform.stdout_line third
   Platform.stdout_line (greeter_impl.greet "direct")
