@@ -54,3 +54,4 @@ stdlib/monoids
 stdlib/seq
 stdlib/seqs
 codegen/services
+runtime/scope_close

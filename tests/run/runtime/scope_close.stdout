@@ -1,0 +1,20 @@
+acquire a
+acquire b
+body uses a and b
+release b
+finalizer
+release a
+42
+acquire c
+finalizer saw a failure: true
+release c
+-1
+acquire outer
+acquire inner
+inner body
+release inner
+outer body
+release outer
+bracket acquire
+bracket release file
+use of file

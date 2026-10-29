@@ -21,6 +21,7 @@ pub const RUNTIME: &[(&str, &str)] = &[
     ("number.go", include_str!("../../../../runtime-go/flickrt/number.go")),
     ("numbers.go", include_str!("../../../../runtime-go/flickrt/numbers.go")),
     ("option.go", include_str!("../../../../runtime-go/flickrt/option.go")),
+    ("owner.go", include_str!("../../../../runtime-go/flickrt/owner.go")),
     ("platform.go", include_str!("../../../../runtime-go/flickrt/platform.go")),
     ("record.go", include_str!("../../../../runtime-go/flickrt/record.go")),
     ("recordfn.go", include_str!("../../../../runtime-go/flickrt/recordfn.go")),

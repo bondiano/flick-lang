@@ -482,3 +482,7 @@ runCollect SeqToList
 void EffectVoid
 zip *EffectZip
 flickAll *EffectAll
+
+[@flick-lang/runtime/effect/Scope]
+flickAddFinalizer *AddFinalizer
+flickAddFinalizerExit *AddFinalizerExit

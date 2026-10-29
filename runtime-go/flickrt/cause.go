@@ -102,16 +102,8 @@ var Unmatched Value = &struct{ unmatched bool }{true}
 // defects goes to `handle`, which gives Unmatched when no arm matches and
 // the cause goes on. A cause with a defect turns its failures into defects;
 // interruption alone has no typed error.
-func Try(fb *Fiber, body Eff, handle func(*Fiber, Value) Value) (out Value) {
-	var caught *Cause
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				caught = causeOf(r)
-			}
-		}()
-		out = body(fb)
-	}()
+func Try(fb *Fiber, body Eff, handle func(*Fiber, Value) Value) Value {
+	out, caught := catch(func() Value { return body(fb) })
 	if caught == nil {
 		return out
 	}

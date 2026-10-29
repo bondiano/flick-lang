@@ -1,0 +1,60 @@
+// A scope releases what was acquired into it when its body ends, last
+// first, however the body ends; a finalizer sees how it ended, and a
+// failing release joins the body's failure.
+module App.Main exposing (main)
+
+type error Oops = Oops String
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+acquire : forall s. String ->{Scope s;} String
+let acquire name =
+  Resource.acquire_release (task {
+    say ("acquire " ++ name)
+    name
+  }) (fun n -> say ("release " ++ n))
+
+succeeding : Unit ->{} Float
+let succeeding () =
+  scope {
+    let a = acquire "a"
+    Scope.add_finalizer (task { say "finalizer" })
+    let b = acquire "b"
+    say ("body uses " ++ a ++ " and " ++ b)
+    42
+  }
+
+failing : Unit ->{; Oops} Float
+let failing () =
+  scope {
+    let _c = acquire "c"
+    Scope.add_finalizer_exit (fun cause -> say ("finalizer saw a failure: " ++ show (Option.is_some cause)))
+    from_result (Err (Oops "body failed"))
+  }
+
+nested : Unit ->{} Unit
+let nested () =
+  scope {
+    let _outer = acquire "outer"
+    scope {
+      let _inner = acquire "inner"
+      say "inner body"
+    }
+    say "outer body"
+  }
+
+bracketed : Unit ->{; Oops} String
+let bracketed () =
+  Resource.bracket (task { say "bracket acquire"; "file" }) (fun f -> from_result (Err (Oops ("use of " ++ f)))) (fun f -> say ("bracket release " ++ f))
+
+main : Unit ->{; AppError} Unit
+let main () =
+  say (show (succeeding ()))
+  let caught = try failing () with
+    | Oops _ -> -1
+  say (show caught)
+  nested ()
+  let used = try bracketed () with
+    | Oops text -> text
+  say used

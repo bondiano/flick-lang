@@ -188,7 +188,10 @@ impl Gen<'_> {
                 self.run(&t)
             }
             ExprKind::Task(body) => self.task(body),
-            ExprKind::Scope { .. } | ExprKind::Within(..) => self.unsupported(e.span, "a `scope`"),
+            ExprKind::Scope { owner, outer, body } => {
+                self.scope(owner.as_deref(), outer.as_deref(), body)
+            }
+            ExprKind::Within(owner, call) => self.within(owner, call),
             ExprKind::Provide(layer, body) => self.provide(layer, body),
             ExprKind::CodecBlock(..) => self.unsupported(e.span, "a `codec` block"),
         }
@@ -209,6 +212,14 @@ impl Gen<'_> {
 
     /// A task: a Go function of the fiber that runs `body` in it.
     pub(super) fn task(&mut self, body: &Expr) -> String {
+        format!(
+            "flickrt.Eff(func(fb *flickrt.Fiber) flickrt.Value {{\n{}}})",
+            self.effectful_body(body)
+        )
+    }
+
+    /// The statements of a Go function of a fiber `fb` that returns `body`.
+    fn effectful_body(&mut self, body: &Expr) -> String {
         let saved = (
             self.tail.take(),
             mem::replace(&mut self.generator, false),
@@ -216,10 +227,36 @@ impl Gen<'_> {
         );
         let (stmts, ()) = self.block(|g| g.tail_expr(body));
         (self.tail, self.generator, self.fiber) = saved;
+        indent(&stmts)
+    }
+
+    /// `scope [owner] { body }`: the body runs as the owner of a fresh
+    /// region, given it and the owner around it.
+    fn scope(&mut self, owner: Option<&str>, outer: Option<&str>, body: &Expr) -> String {
+        let fb = self.fiber.expect("a `scope` runs where a fiber is in scope");
+        let name = |n: Option<&str>| n.map_or_else(|| "_".to_owned(), names::local);
         format!(
-            "flickrt.Eff(func(fb *flickrt.Fiber) flickrt.Value {{\n{}}})",
-            indent(&stmts)
+            "flickrt.Scope({fb}, func(fb *flickrt.Fiber, {}, {} flickrt.Value) flickrt.Value {{\n{}}})",
+            name(owner),
+            name(outer),
+            self.effectful_body(body)
         )
+    }
+
+    /// A call that acquires into the region of `owner`: run in a fiber
+    /// whose owner it is.
+    fn within(&mut self, owner: &str, call: &Expr) -> String {
+        let fb = self.fiber.expect("`Within` runs where a fiber is in scope");
+        let saved = self.fiber.replace("fbw");
+        let (stmts, v) = self.block(|g| g.expr(call));
+        self.fiber = saved;
+        let r = self.temp();
+        self.buf.push(format!(
+            "var {r} flickrt.Value\n{{\n\tfbw := flickrt.Within({fb}, {})\n{}\t{r} = {v}\n}}",
+            names::local(owner),
+            indent(&stmts)
+        ));
+        r
     }
 
     /// `provide layer body`: the body as a task, run with the layer's services.

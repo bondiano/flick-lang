@@ -106,7 +106,10 @@ func Main(run func(*Fiber)) {
 				code = 1
 			}
 		}()
-		run(rootFiber())
+		owned(rootFiber(), func(fb *Fiber, _ *Owner) Value {
+			run(fb)
+			return Unit
+		})
 	}()
 	stdout.Flush()
 	os.Exit(code)

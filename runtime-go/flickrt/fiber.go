@@ -6,6 +6,7 @@ package flickrt
 type Fiber struct {
 	state *fiberState
 	env   map[string]Value // the services provided, by key; never mutated
+	owner *Owner           // the innermost scope's
 }
 
 type fiberState struct {
