@@ -56,7 +56,7 @@ impl Checker<'_> {
                         limits.function_lines
                     ),
                 )
-                .with_fix("split it into smaller functions", Vec::new()),
+                .with_fix(|| ("split it into smaller functions", Vec::new())),
             );
         }
         let complexity = 1 + branches(body);
@@ -69,10 +69,12 @@ impl Checker<'_> {
                         limits.complexity
                     ),
                 )
-                .with_fix(
-                    "move some of its branches into functions of their own",
-                    Vec::new(),
-                ),
+                .with_fix(|| {
+                    (
+                        "move some of its branches into functions of their own",
+                        Vec::new(),
+                    )
+                }),
             );
         }
         let params = parts.params.len();
@@ -85,7 +87,7 @@ impl Checker<'_> {
                         limits.params
                     ),
                 )
-                .with_fix("take a record of them", Vec::new()),
+                .with_fix(|| ("take a record of them", Vec::new())),
             );
         }
         self.too_deep(body, 0, limits.nesting);
@@ -116,7 +118,7 @@ impl Checker<'_> {
                         format!("nested {depth} levels deep, more than {limit}"),
                     )
                     .with_span(at)
-                    .with_fix("move the inner part into a function of its own", Vec::new()),
+                    .with_fix(|| ("move the inner part into a function of its own", Vec::new())),
                 );
                 continue;
             }
@@ -155,11 +157,7 @@ impl Checker<'_> {
                     Severity::Warning,
                     format!("`{name}` reads atoms to build a `Ui`: whatever calls it renders again when they change"),
                 )
-                .with_span(at)
-                .with_fix(
-                    "make it a `component`: it renders again on its own, not with its parent",
-                    Vec::new(),
-                ),
+                .with_span(at).with_fix(|| ("make it a `component`: it renders again on its own, not with its parent", Vec::new())),
             );
         }
     }

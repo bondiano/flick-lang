@@ -111,13 +111,15 @@ impl Checker<'_> {
                 format!("the value already has type `{written}`; the annotation can be inferred"),
             )
             .with_span(Span::new(self.file, colon.start, end))
-            .with_safe_fix(
-                "remove the annotation",
-                vec![Edit {
-                    span: Span::new(self.file, pattern.range().1, end),
-                    replacement: String::new(),
-                }],
-            ),
+            .with_safe_fix(|| {
+                (
+                    "remove the annotation",
+                    vec![Edit {
+                        span: Span::new(self.file, pattern.range().1, end),
+                        replacement: String::new(),
+                    }],
+                )
+            }),
         );
     }
 
@@ -143,13 +145,15 @@ impl Checker<'_> {
                 "`else ()` can be left out: an `if` without `else` is `Unit`",
             )
             .with_span(Span::new(self.file, keyword.start, end))
-            .with_safe_fix(
-                "remove `else ()`",
-                vec![Edit {
-                    span: Span::new(self.file, start, end),
-                    replacement: String::new(),
-                }],
-            ),
+            .with_safe_fix(|| {
+                (
+                    "remove `else ()`",
+                    vec![Edit {
+                        span: Span::new(self.file, start, end),
+                        replacement: String::new(),
+                    }],
+                )
+            }),
         );
     }
 }

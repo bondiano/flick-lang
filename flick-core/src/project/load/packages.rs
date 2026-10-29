@@ -2,12 +2,28 @@
 
 use std::collections::BTreeSet;
 
-use super::Loader;
+use super::{Loader, PackageModule};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
 use crate::types;
 
 impl Loader<'_> {
+    pub(super) fn package_modules(&self) -> Vec<PackageModule> {
+        self.owners
+            .iter()
+            .filter_map(|(module, package)| {
+                Some(PackageModule {
+                    module: module.clone(),
+                    package: package.clone(),
+                    interface: self.from_packages.get(module)?.clone(),
+                    js_specifier: self
+                        .packages
+                        .js_specifier(package, &module.replace('.', "/")),
+                })
+            })
+            .collect()
+    }
+
     pub(super) fn check_packages(&mut self) {
         // Package runners may add interfaces while entry points are checked.
         for (module, package) in &self.owners {

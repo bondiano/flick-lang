@@ -3,17 +3,22 @@
 //! runtime calls are `yield*`; data follows the ABI in
 //! `docs/src/content/docs/reference/codegen.md`.
 
+pub(crate) mod exports;
+#[cfg(feature = "build-artifacts")]
 pub mod go;
 mod js;
 mod names;
+#[cfg(feature = "source-maps")]
 pub mod sourcemap;
 pub mod tail;
+#[cfg(feature = "typescript")]
 pub mod ts;
 
 pub use js::{direct_methods, exported_worker, js, relative};
 pub use names::{ident, instance as instance_export, qualified_id, tag};
 
 use crate::iface::Interface;
+#[cfg(feature = "source-maps")]
 use crate::source::Span;
 
 /// Where modules are and who owns them, as the build lays them out.
@@ -46,6 +51,12 @@ pub struct Options<'a> {
     pub labels: Labels,
 }
 
+impl Options<'_> {
+    pub(crate) fn typescript(&self) -> bool {
+        cfg!(feature = "typescript") && self.typescript
+    }
+}
+
 /// `[build] labels`: the top-level values a release build labels
 /// `Module.name` for debugging tools.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize)]
@@ -63,6 +74,7 @@ pub enum Labels {
 #[derive(Debug)]
 pub struct Output {
     pub code: String,
+    #[cfg(feature = "source-maps")]
     /// Each generated position, 0-based line and UTF-16 column, with the
     /// source node it comes from and, at the name of a top-level value, its
     /// Flick name.

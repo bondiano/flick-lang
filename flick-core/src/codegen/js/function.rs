@@ -267,7 +267,7 @@ impl Gen<'_> {
                     return;
                 }
                 let v = self.expr(e);
-                let mark = self.mark(e.span);
+                let mark = mark!(self, e.span);
                 self.buf.push(format!("return {mark}{v};"));
             }
         }

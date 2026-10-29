@@ -139,7 +139,7 @@ impl Lower<'_> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "server-stdlib"))]
 mod tests {
     use crate::ir::print;
     use crate::ir::tests::check_text;

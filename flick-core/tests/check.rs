@@ -5,11 +5,14 @@
 //! any of its files, `#` comments in `flick.toml`, are its expectations.
 //! Reports a diff per file.
 
+#[cfg(feature = "native-project")]
+use std::io;
 use std::path::{Path, PathBuf};
-use std::{fmt, fs, io};
+use std::{fmt, fs};
 
 use flick_core::diagnostics::codes::Area;
 use flick_core::diagnostics::{Diagnostic, codes};
+#[cfg(feature = "native-project")]
 use flick_core::project::{self, Host};
 use flick_core::source;
 use flick_core::source::{SourceFile, SourceMap};
@@ -150,6 +153,7 @@ fn diff(sources: &SourceMap, actual: &[&Diagnostic], expected: Vec<Expected>) ->
         let pos = d.span.map(|s| to_pos(sources.get(s.file), s.start, s.end));
         let code = d.code.to_string();
         // help lines read as the message they explain: `message: help`
+        #[cfg(feature = "diagnostic-fixes")]
         let text = d
             .fixes
             .iter()
@@ -157,6 +161,8 @@ fn diff(sources: &SourceMap, actual: &[&Diagnostic], expected: Vec<Expected>) ->
             .fold(d.message.clone(), |text, f| {
                 format!("{text}: {}", f.message)
             });
+        #[cfg(not(feature = "diagnostic-fixes"))]
+        let text = d.message.clone();
         let hit = missing
             .iter()
             .position(|e| e.code == code && e.pos == pos && text.contains(&e.message));
@@ -309,10 +315,12 @@ fn diff_reports_missing_and_unexpected() {
     );
 }
 
+#[cfg(feature = "native-project")]
 struct FixtureHost {
     root: PathBuf,
 }
 
+#[cfg(feature = "native-project")]
 impl Host for FixtureHost {
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
         fs::read(path)
@@ -327,6 +335,7 @@ impl Host for FixtureHost {
 }
 
 /// Checks one fixture project the way `flick check` without paths does.
+#[cfg(feature = "native-project")]
 fn check_project(dir: &Path) -> Vec<String> {
     let host = FixtureHost {
         root: dir.to_path_buf(),
@@ -395,6 +404,7 @@ fn check_project(dir: &Path) -> Vec<String> {
     report
 }
 
+#[cfg(feature = "native-project")]
 #[test]
 fn project_fixtures() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/check/projects");

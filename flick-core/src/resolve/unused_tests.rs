@@ -1,6 +1,7 @@
 use crate::source::SourceMap;
 
 /// `text` after the first fix of the first diagnostic with `code`.
+#[cfg(feature = "diagnostic-fixes")]
 fn fixed(text: &str, code: &str) -> String {
     let mut sources = SourceMap::default();
     let file = sources.add("Probe.fl", text.to_owned());
@@ -21,6 +22,7 @@ fn fixed(text: &str, code: &str) -> String {
 
 const HEAD: &str = "module Probe exposing (f)\n";
 
+#[cfg(feature = "diagnostic-fixes")]
 #[test]
 fn removing_an_import_item_keeps_the_list_well_formed() {
     let body = "f : Float -> Float\nlet f x = abs x\n";
@@ -55,6 +57,7 @@ fn removing_an_import_item_keeps_the_list_well_formed() {
     );
 }
 
+#[cfg(feature = "diagnostic-fixes")]
 #[test]
 fn removing_an_unused_import_or_value_deletes_its_lines() {
     let text = format!("{HEAD}import String\nf : Float -> Float\nlet f x = x\n");
@@ -71,10 +74,37 @@ fn removing_an_unused_import_or_value_deletes_its_lines() {
     );
 }
 
+#[cfg(feature = "diagnostic-fixes")]
 #[test]
 fn an_unused_variable_is_renamed_with_an_underscore() {
     let text = format!("{HEAD}f : (Float, Float) -> Float\nlet f (x, y) = x\n");
     assert!(fixed(&text, "FLICK-R013").contains("let f (x, _y) = x"));
     let text = format!("{HEAD}f : {{ a : Float; b : Float }} -> Float\nlet f {{ a; b }} = a\n");
     assert!(fixed(&text, "FLICK-R013").contains("let f { a; b = _b } = a"));
+}
+
+#[test]
+fn unused_warnings_keep_their_primary_diagnostics() {
+    use crate::diagnostics::{Severity, codes};
+    let text = format!(
+        "{HEAD}import String\nf : Int -> Int\nlet f unused = 1\nprivate : Int\nlet private = 2\n"
+    );
+    let mut sources = SourceMap::default();
+    let file = sources.add("Probe.fl", text.clone());
+    let diagnostics = crate::check(&sources, file);
+    for (code, name) in [
+        (codes::R012, "String"),
+        (codes::R013, "unused"),
+        (codes::R014, "private"),
+    ] {
+        let d = diagnostics
+            .iter()
+            .find(|d| d.code == code)
+            .unwrap_or_else(|| panic!("{diagnostics:?}"));
+        assert_eq!(d.severity, Severity::Warning);
+        assert!(d.unnecessary());
+        let span = d.span.expect("unused binding location");
+        assert_eq!(span.file, file);
+        assert_eq!(&text[span.range()], name);
+    }
 }

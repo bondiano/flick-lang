@@ -206,10 +206,10 @@ pub(super) fn stale(
                             "`{module}` of package `{package}` was built against another interface of `{dependency}`{from}: fingerprint {recorded}, installed {actual}"
                         ),
                     )
-                    .with_fix(
+                    .with_fix(|| (
                         format!("install the versions `{package}` was built with, or a release of `{package}` built against the installed one"),
                         Vec::new(),
-                    ),
+                    )),
                 );
             }
         }

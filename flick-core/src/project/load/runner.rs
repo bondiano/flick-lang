@@ -18,15 +18,20 @@ impl Loader<'_> {
         interfaces: &[Option<Interface>],
         span: Span,
     ) -> Option<Interface> {
+        #[cfg(not(feature = "native-project"))]
+        let _ = span;
         if let Some(&i) = self.by_name.get(name) {
             return interfaces.get(i).cloned().flatten();
         }
         if let Some(interface) = self.from_packages.get(name) {
             return Some(interface.clone());
         }
-        self.load_package_interfaces(name, span);
-        if let Some(interface) = self.from_packages.get(name) {
-            return Some(interface.clone());
+        #[cfg(feature = "native-project")]
+        {
+            self.load_package_interfaces(name, span);
+            if let Some(interface) = self.from_packages.get(name) {
+                return Some(interface.clone());
+            }
         }
         let interface = types::builtins().iter().find(|i| i.module == name)?.clone();
         self.from_packages

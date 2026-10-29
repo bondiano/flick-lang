@@ -60,6 +60,7 @@ mod services;
 mod settle;
 mod sql;
 mod sql_plan;
+#[cfg(feature = "diagnostic-fixes")]
 mod stub;
 mod sugar_lints;
 mod toplevel;
@@ -73,6 +74,7 @@ pub use bindings::{LetParts, let_parts, signature_name};
 use builtins::builtin_env;
 pub use builtins::{builtin_sources, builtins, install_builtins};
 pub use classes::Dict;
+#[cfg(feature = "ide")]
 pub(crate) use classes::{Match, match_type};
 pub use component::{instance_key as component_instance, parts as component_parts};
 pub use comprehension::{comprehension, for_parts};
@@ -88,6 +90,7 @@ pub use patterns::is_pattern;
 pub use question::Question;
 pub use ranges::range_list;
 pub use schemas::{FormField, UrlRoute, companion_name, witness_entity};
+#[cfg(feature = "ide")]
 pub(crate) use sql::base_type;
 pub use sql::dialect::{self, Dialect};
 pub use ty::{Binder, Effects, PRELUDE, Row, SYNC_SERVICES, Stage, Type, stage_of};
@@ -262,7 +265,10 @@ fn run_in(
             .any(|(name, _)| *name == module.name),
         sugar: Vec::new(),
     };
-    checker.typing.sql_dialect = options.sql;
+    #[cfg(feature = "ide")]
+    {
+        checker.typing.sql_dialect = options.sql;
+    }
     checker.module(module.tree);
     checker.report_holes();
     checker.fill(interface);
@@ -289,11 +295,7 @@ pub fn beside_syntax_errors(tree: &Node, checked: Vec<Diagnostic>) -> Vec<Diagno
     errors(tree, &mut broken);
     // a type the checker could not finish is no news while code is missing
     let unfinished = |text: &str| text.contains("?`") || text.contains("? ");
-    let guessed = |d: &Diagnostic| {
-        d.code == codes::T013
-            || unfinished(&d.message)
-            || d.fixes.iter().any(|f| unfinished(&f.message))
-    };
+    let guessed = |d: &Diagnostic| d.code == codes::T013 || unfinished(&d.message) || d.incomplete;
     checked
         .into_iter()
         .filter(|d| {
@@ -474,11 +476,10 @@ impl Checker<'_> {
         code: Code,
         span: Span,
         message: impl Into<String>,
-        guess: Option<&str>,
+        guess: impl FnOnce(&Self) -> Option<String>,
     ) {
-        let guess = guess.map(str::to_owned);
-        self.diagnostics
-            .push(Diagnostic::error(code, message, span).did_you_mean(span, guess));
+        let diagnostic = Diagnostic::error(code, message, span).did_you_mean(span, || guess(self));
+        self.diagnostics.push(diagnostic);
     }
 
     fn warning(&mut self, code: Code, span: Span, message: impl Into<String>) {

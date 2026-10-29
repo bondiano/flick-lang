@@ -17,22 +17,25 @@ pub(super) fn not_exported(interface: &Interface, name: &str, span: Span) -> Dia
             ),
             span,
         )
-        .with_fix(
-            format!(
-                "export it from `{module}` as `{}(..)`, or build values through its functions",
-                hidden.parent
-            ),
-            Vec::new(),
-        );
+        .with_fix(|| {
+            (
+                format!(
+                    "export it from `{module}` as `{}(..)`, or build values through its functions",
+                    hidden.parent
+                ),
+                Vec::new(),
+            )
+        });
     }
-    let exports = interface.exports.iter().map(|e| e.entity.name.as_str());
-    let guess = closest(name, exports).map(str::to_owned);
     Diagnostic::error(
         codes::R004,
         format!("`{module}` does not export `{name}`"),
         span,
     )
-    .did_you_mean(span, guess)
+    .did_you_mean(span, || {
+        let exports = interface.exports.iter().map(|e| e.entity.name.as_str());
+        closest(name, exports).map(str::to_owned)
+    })
 }
 
 pub(super) fn no_members(import: &Import, interface: &Interface, item: &Item) -> Diagnostic {
@@ -49,5 +52,5 @@ pub(super) fn no_members(import: &Import, interface: &Interface, item: &Item) ->
         format!("`{name}` from `{module}` has no constructors to import")
     };
     Diagnostic::error(codes::R005, message, item.span)
-        .with_fix(format!("import the type alone: `{name}`"), Vec::new())
+        .with_fix(|| (format!("import the type alone: `{name}`"), Vec::new()))
 }

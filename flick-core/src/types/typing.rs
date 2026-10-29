@@ -10,15 +10,18 @@ use std::mem;
 use super::Checker;
 use super::classes::Dict;
 use super::env::{Abi, Rep};
+#[cfg(feature = "ide")]
 use super::sql::dialect::Dialect;
 pub use super::sql_plan::{SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue};
-use super::ty::{Stage, Type, stage_of};
+use super::ty::{Stage, Type};
 use super::{FormField, UrlRoute};
 use crate::ir::Label;
 use crate::numeric::Num;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+
+mod stages;
 
 /// A source range of the module being checked.
 pub type Range = (u32, u32);
@@ -89,6 +92,7 @@ pub struct Typing {
     pub server_fns: Vec<ServerFn>,
     /// `codec` blocks: the fields' labels in the order written.
     pub codecs: HashMap<Range, CodecBlock>,
+    #[cfg(feature = "ide")]
     /// The type of each name in an expression or constructor pattern and
     /// of each variable a pattern binds, for editors; at a keyword that opens
     /// an expression (`task`, `match`, `fun` …) the type of the whole expression, at
@@ -97,15 +101,20 @@ pub struct Typing {
     pub types: HashMap<Range, Type>,
     /// The type each type name refers to: its module and name.
     pub type_names: HashMap<Range, (String, String)>,
+    /// Pending types also feed compiler diagnostics.
     pub(crate) pending_types: Vec<(Range, Type)>,
+    #[cfg(feature = "ide")]
     /// The record each field label belongs to, at the label: in a field
     /// access, a literal, an update and a record pattern.
     pub fields: HashMap<Range, Type>,
+    #[cfg(feature = "ide")]
     pub(crate) pending_fields: Vec<(Range, Type)>,
     /// `sql table` declarations.
     pub sql_tables: Vec<SqlTable>,
+    #[cfg(feature = "ide")]
     /// The dialect the SQL of the module was checked against.
     pub sql_dialect: &'static Dialect,
+    #[cfg(feature = "ide")]
     /// The transparent aliases the module declares, exported or not: their
     /// parameters and bodies.
     pub aliases: HashMap<String, (Vec<String>, Type)>,
@@ -350,6 +359,7 @@ impl Checker<'_> {
         self.typing.pending_types.push((range(span), ty.clone()));
     }
 
+    #[cfg(feature = "ide")]
     /// `record` is the record the field label at `span` belongs to.
     pub fn note_field(&mut self, span: Span, record: &Type) {
         self.typing
@@ -390,58 +400,7 @@ impl Checker<'_> {
         self.typing.pending_labels.push((range(span), ty));
     }
 
-    /// The runtime arrows, through aliases, quantifiers and capture qualifiers.
-    pub fn arrow_stages(&self, ty: &Type) -> Vec<Stage> {
-        let mut out = Vec::new();
-        let mut ty = ty.clone();
-        loop {
-            match self.qualified_head(&ty) {
-                Type::Forall { body, .. }
-                | Type::Captured { ty: body, .. }
-                | Type::Bounded { ty: body, .. } => ty = *body,
-                Type::Fun {
-                    effects, result, ..
-                } => {
-                    out.push(stage_of(effects.as_deref()));
-                    ty = *result;
-                }
-                _ => break,
-            }
-        }
-        out
-    }
-
-    /// How `actual` lifts into `expected`, if any stage needs it.
-    pub fn lift(&self, actual: &Type, expected: &Type) -> Option<Lift> {
-        let (a, e) = (self.whnf_captured(actual).0, self.whnf_captured(expected).0);
-        match (&a, &e) {
-            (
-                Type::Fun {
-                    effects: e1,
-                    result: r1,
-                    ..
-                },
-                Type::Fun {
-                    effects: e2,
-                    result: r2,
-                    ..
-                },
-            ) => {
-                let (from, to) = (stage_of(e1.as_deref()), stage_of(e2.as_deref()));
-                // a pure function is called as a Sync one is
-                let lift = from != to && (from, to) != (Stage::Pure, Stage::Sync);
-                let result = self.lift(r1, r2).map(Box::new);
-                (lift || result.is_some()).then_some(Lift::Stage { from, to, result })
-            }
-            _ => match (self.eff_parts(&a), self.eff_parts(&e)) {
-                (Some((_, _, r1)), Some((_, _, r2))) => {
-                    self.lift(&r1, &r2).map(|l| Lift::Eff(Box::new(l)))
-                }
-                _ => None,
-            },
-        }
-    }
-
+    #[cfg(feature = "ide")]
     /// `t` with each rigid variable written as the variable it stands for.
     fn named_skolems(&self, t: &Type) -> Type {
         match t {
@@ -453,19 +412,24 @@ impl Checker<'_> {
     /// Settles what waited for the whole module to be solved.
     pub fn finish_typing(&mut self) -> Typing {
         let mut typing = mem::take(&mut self.typing);
-        typing.aliases = self
-            .env
-            .local_aliases()
-            .map(|(name, params, body)| (name.to_owned(), (params.to_vec(), body.clone())))
-            .collect();
-        for (at, ty) in mem::take(&mut typing.pending_types) {
-            let ty = self.named_skolems(&self.zonk(&ty));
-            typing.types.insert(at, ty);
+        #[cfg(feature = "ide")]
+        {
+            typing.aliases = self
+                .env
+                .local_aliases()
+                .map(|(name, params, body)| (name.to_owned(), (params.to_vec(), body.clone())))
+                .collect();
+            for (at, ty) in mem::take(&mut typing.pending_types) {
+                let ty = self.named_skolems(&self.zonk(&ty));
+                typing.types.insert(at, ty);
+            }
+            for (at, ty) in mem::take(&mut typing.pending_fields) {
+                let ty = self.named_skolems(&self.zonk(&ty));
+                typing.fields.insert(at, ty);
+            }
         }
-        for (at, ty) in mem::take(&mut typing.pending_fields) {
-            let ty = self.named_skolems(&self.zonk(&ty));
-            typing.fields.insert(at, ty);
-        }
+        #[cfg(not(feature = "ide"))]
+        typing.pending_types.clear();
         for (at, ty) in mem::take(&mut typing.pending_labels) {
             let ty = self.zonk(&ty);
             if let Type::App { arg, .. } = ty

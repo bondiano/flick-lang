@@ -196,8 +196,7 @@ impl<'n> Checker<'_> {
                     codes::C012,
                     format!("`{name}` is built in: records and tuples have structural `{cn}`, shared by every alias of the same form"),
                     span,
-                )
-                .with_fix("declare a nominal type to give it its own instance", Vec::new()),
+                ).with_fix(|| ("declare a nominal type to give it its own instance", Vec::new())),
             );
             return false;
         }
@@ -319,26 +318,26 @@ impl<'n> Checker<'_> {
         {
             return;
         }
-        let (message, fix) = match first {
-            Some(Type::Con { name, .. }) => (
-                format!(
-                    "orphan instance `{}`: only the package of class `{cn}` or of type `{name}`, its first type, may declare it",
-                    instance.name
-                ),
-                format!(
-                    "wrap the type in one of this package: `type Local{name} = Local{name} {name}`"
-                ),
+        let message = match first {
+            Some(Type::Con { name, .. }) => format!(
+                "orphan instance `{}`: only the package of class `{cn}` or of type `{name}`, its first type, may declare it",
+                instance.name
             ),
-            _ => (
-                format!(
-                    "orphan instance `{}`: only the package of class `{cn}` may declare it, as its first type is not a nominal type of this package",
-                    instance.name
-                ),
-                "declare a nominal type in this package for the first type".to_owned(),
+            _ => format!(
+                "orphan instance `{}`: only the package of class `{cn}` may declare it, as its first type is not a nominal type of this package",
+                instance.name
             ),
         };
         self.diagnostics
-            .push(Diagnostic::error(codes::C006, message, span).with_fix(fix, Vec::new()));
+            .push(Diagnostic::error(codes::C006, message, span).with_fix(|| {
+            let fix = match first {
+                Some(Type::Con { name, .. }) => format!(
+                    "wrap the type in one of this package: `type Local{name} = Local{name} {name}`"
+                ),
+                _ => "declare a nominal type in this package for the first type".to_owned(),
+            };
+            (fix, Vec::new())
+        }));
     }
 
     /// Every variable of the context is in the head, and every context
@@ -410,7 +409,7 @@ impl<'n> Checker<'_> {
                             format!("`{name}` needs an instance `{shown}` of its superclass"),
                             d.span,
                         )
-                        .with_fix(format!("declare `instance {shown}`"), Vec::new()),
+                        .with_fix(|| (format!("declare `instance {shown}`"), Vec::new())),
                     ),
                 }
             }

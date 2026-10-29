@@ -27,8 +27,7 @@ impl Checker<'_> {
                             codes::C002,
                             format!("cannot choose an instance for `{shown}`: a type in it is not known here; {candidates}"),
                             w.span,
-                        )
-                        .with_fix("annotate the type of the value", Vec::new()),
+                        ).with_fix(|| ("annotate the type of the value", Vec::new())),
                     );
                 }
                 Outcome::Budget(chain) if !budget => {
@@ -69,7 +68,7 @@ impl Checker<'_> {
         };
         if rigid && reason.is_none() {
             diagnostic =
-                diagnostic.with_fix(format!("add `{shown} =>` to the signature"), Vec::new());
+                diagnostic.with_fix(|| (format!("add `{shown} =>` to the signature"), Vec::new()));
         }
         self.diagnostics.push(diagnostic);
     }
@@ -130,11 +129,7 @@ impl Checker<'_> {
                     links.join(" -> ")
                 ),
                 span,
-            )
-            .with_fix(
-                "simplify the types involved, or raise `solver-steps` or `solver-depth` in `[build]` of `flick.toml`",
-                Vec::new(),
-            ),
+            ).with_fix(|| ("simplify the types involved, or raise `solver-steps` or `solver-depth` in `[build]` of `flick.toml`", Vec::new())),
         );
     }
 }

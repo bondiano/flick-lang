@@ -1,10 +1,12 @@
 use super::import::{Generated, Status, flick_name, generate};
-use super::{Policy, Surface, module_part};
+use super::{ExportPolicy, Policy, Surface, module_part};
+use std::collections::BTreeMap;
 
 fn lookup_surface() -> Surface {
     Surface::parse(include_str!("fixtures/lookup.json")).expect("fixture parses")
 }
 
+#[cfg(feature = "native-project")]
 const LOOKUP_POLICY: &str = r#"
 [exports.lookup]
 undefined = "none"
@@ -14,9 +16,41 @@ catch = "JsError"
 retention = "call"
 "#;
 
+fn lookup_policy() -> Policy {
+    Policy {
+        exports: BTreeMap::from([
+            (
+                "lookup".into(),
+                ExportPolicy {
+                    undefined: Some("none".into()),
+                    catch: Some("JsError".into()),
+                    ..ExportPolicy::default()
+                },
+            ),
+            (
+                "each".into(),
+                ExportPolicy {
+                    retention: Some("call".into()),
+                    ..ExportPolicy::default()
+                },
+            ),
+        ]),
+        ..Policy::default()
+    }
+}
+
+#[cfg(feature = "native-project")]
+#[test]
+fn lookup_policy_parses() {
+    assert_eq!(
+        Policy::parse(LOOKUP_POLICY).expect("policy parses"),
+        lookup_policy()
+    );
+}
+
 #[test]
 fn lookup_with_its_policy_is_the_binding_of_the_spec() {
-    let policy = Policy::parse(LOOKUP_POLICY).expect("policy parses");
+    let policy = lookup_policy();
     let generated = generate(&lookup_surface(), &policy, None, "Ffi.LookupLib.Generated");
     insta::assert_snapshot!(generated.text);
     insta::assert_snapshot!("lookup_report", generated.report(&lookup_surface()));
@@ -55,7 +89,10 @@ fn without_policies_promises_callbacks_and_nullable_results_are_blocked() {
 
 #[test]
 fn strict_mode_refuses_unknown() {
-    let policy = Policy::parse("strict = true").expect("policy parses");
+    let policy = Policy {
+        strict: true,
+        ..Policy::default()
+    };
     let generated = generate(&lookup_surface(), &policy, None, "LookupLib.Generated");
     let describe = generated
         .entries
@@ -89,6 +126,7 @@ fn select_limits_the_surface_and_names_what_is_missing() {
     );
 }
 
+#[cfg(feature = "native-project")]
 #[test]
 fn policies_are_checked() {
     let error = Policy::parse("[exports.lookup]\ncatch = \"Oops\"").expect_err("refused");
@@ -189,7 +227,16 @@ fn any_pure_and_cancellation_are_never_implied() {
             .expect("entry");
         (e.status, e.detail.clone())
     };
-    let plain = Policy::parse("[exports.fetchIt]\ncatch = \"JsError\"").expect("policy");
+    let plain = Policy {
+        exports: BTreeMap::from([(
+            "fetchIt".into(),
+            ExportPolicy {
+                catch: Some("JsError".into()),
+                ..ExportPolicy::default()
+            },
+        )]),
+        ..Policy::default()
+    };
     let generated = generate(&surface, &plain, None, "P.Generated");
     // `any` becomes the opaque `JsValue`, and the call stays effectful
     assert_eq!(
@@ -202,25 +249,60 @@ fn any_pure_and_cancellation_are_never_implied() {
 
     let strict = generate(
         &surface,
-        &Policy::parse("strict = true").expect("policy"),
+        &Policy {
+            strict: true,
+            ..Policy::default()
+        },
         None,
         "P.Generated",
     );
     assert_eq!(entry(&strict, "wrap").0, Status::Unsupported);
     assert_eq!(entry(&strict, "fetchIt").0, Status::NeedsPolicy);
 
-    let explicit = Policy::parse(
-        "[exports.fetchIt]\ncatch = \"JsError\"\ncancel = \"signal\"\n\n[exports.wrap]\nmode = \"pure\"",
-    )
-    .expect("policy");
+    let explicit = Policy {
+        exports: BTreeMap::from([
+            (
+                "fetchIt".into(),
+                ExportPolicy {
+                    catch: Some("JsError".into()),
+                    cancel: Some("signal".into()),
+                    ..ExportPolicy::default()
+                },
+            ),
+            (
+                "wrap".into(),
+                ExportPolicy {
+                    mode: Some("pure".into()),
+                    ..ExportPolicy::default()
+                },
+            ),
+        ]),
+        ..Policy::default()
+    };
     let generated = generate(&surface, &explicit, None, "P.Generated");
     assert!(generated.text.contains("cancel signal"));
     assert!(generated.text.contains("foreign pure wrap"));
 
-    let wrong = Policy::parse(
-        "[exports.fetchIt]\ncatch = \"JsError\"\nmode = \"pure\"\n\n[exports.wrap]\ncancel = \"signal\"",
-    )
-    .expect("policy");
+    let wrong = Policy {
+        exports: BTreeMap::from([
+            (
+                "fetchIt".into(),
+                ExportPolicy {
+                    catch: Some("JsError".into()),
+                    mode: Some("pure".into()),
+                    ..ExportPolicy::default()
+                },
+            ),
+            (
+                "wrap".into(),
+                ExportPolicy {
+                    cancel: Some("signal".into()),
+                    ..ExportPolicy::default()
+                },
+            ),
+        ]),
+        ..Policy::default()
+    };
     let generated = generate(&surface, &wrong, None, "P.Generated");
     assert_eq!(entry(&generated, "fetchIt").0, Status::Unsupported);
     assert_eq!(entry(&generated, "wrap").0, Status::Unsupported);

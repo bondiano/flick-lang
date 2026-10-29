@@ -37,14 +37,26 @@ impl Checker<'_> {
     }
 
     /// A warning with the fix `fix` of `edits`, safe when `safe`.
-    fn lint(&mut self, code: Code, message: String, at: Span, fix: (&str, Vec<Edit>, bool)) {
+    fn lint<M: Into<String>>(
+        &mut self,
+        code: Code,
+        message: String,
+        at: Span,
+        fix: impl FnOnce(&Self) -> (M, Vec<Edit>, bool),
+    ) {
         let warning = Diagnostic::new(code, Severity::Warning, message).with_span(at);
-        let (help, edits, safe) = fix;
-        self.diagnostics.push(if safe {
-            warning.with_safe_fix(help, edits)
-        } else {
-            warning.with_fix(help, edits)
-        });
+        #[cfg(feature = "diagnostic-fixes")]
+        let warning = {
+            let (help, edits, safe) = fix(self);
+            if safe {
+                warning.with_safe_fix(|| (help, edits))
+            } else {
+                warning.with_fix(|| (help, edits))
+            }
+        };
+        #[cfg(not(feature = "diagnostic-fixes"))]
+        let _ = fix;
+        self.diagnostics.push(warning);
     }
 
     /// The edit that writes `replacement` over `node`.

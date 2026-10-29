@@ -3,13 +3,24 @@ use std::io;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use super::{Host, Project, check, discover, is_module_name, module_name, module_path, normalize};
+use super::config::{Build, Config, Kind};
+#[cfg(feature = "native-project")]
+use super::discover;
+use super::{Host, Project, check, compile, is_module_name, module_name, module_path, normalize};
+use crate::diagnostics::{Severity, codes};
 use crate::source::SourceMap;
+use crate::types::Thresholds;
 
 struct Memory(BTreeMap<PathBuf, String>);
 
 impl Host for Memory {
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
+        #[cfg(not(feature = "native-project"))]
+        assert!(
+            path.extension().is_some_and(|ext| ext == "fl"),
+            "unexpected native project read: {}",
+            path.display()
+        );
         self.0
             .get(path)
             .map(|text| text.clone().into_bytes())
@@ -24,8 +35,8 @@ impl Host for Memory {
     }
 }
 
+#[cfg(all(feature = "native-project", feature = "build-artifacts"))]
 const LIB: &str = "schema-version = 1\n[project]\nkind = \"lib\"\n";
-
 fn memory(files: &[(&str, &str)]) -> Memory {
     Memory(
         files
@@ -35,13 +46,47 @@ fn memory(files: &[(&str, &str)]) -> Memory {
     )
 }
 
+#[cfg(feature = "native-project")]
 /// Checks `roots` of the project at `/p`; each diagnostic as `code path text-at-span: message`.
 fn run(host: &Memory, roots: &[&str]) -> Vec<String> {
     let mut sources = SourceMap::default();
     let project: Option<Project> =
         discover(host, &mut sources, Path::new("/p"), None).expect("valid config");
+    report(host, &mut sources, project.as_ref(), roots)
+}
+
+fn library(sources: &mut SourceMap) -> Project {
+    Project {
+        root: PathBuf::from("/p"),
+        config_file: sources.add("flick.toml", ""),
+        config: Config {
+            kind: Kind::Lib,
+            source_dir: "src".into(),
+            test_dir: "test".into(),
+            entries: Vec::new(),
+            build: Build::default(),
+            sql_dialect: Default::default(),
+            allow: Vec::new(),
+            no_let_assert: false,
+            thresholds: Thresholds::default(),
+        },
+    }
+}
+
+fn run_library(host: &Memory, roots: &[&str]) -> Vec<String> {
+    let mut sources = SourceMap::default();
+    let project = library(&mut sources);
+    report(host, &mut sources, Some(&project), roots)
+}
+
+fn report(
+    host: &Memory,
+    sources: &mut SourceMap,
+    project: Option<&Project>,
+    roots: &[&str],
+) -> Vec<String> {
     let roots: Vec<PathBuf> = roots.iter().map(|r| Path::new("/p").join(r)).collect();
-    check(host, &mut sources, project.as_ref(), &roots)
+    check(host, sources, project, &roots)
         .iter()
         .filter(|d| !d.unnecessary())
         .map(|d| {
@@ -69,12 +114,11 @@ fn diagnostics_do_not_depend_on_import_order() {
         .map(|imports| {
             let main = main(imports);
             let host = memory(&[
-                ("flick.toml", LIB),
                 ("src/A/Left.fl", left),
                 ("src/A/Right.fl", right),
                 ("src/A/Main.fl", &main),
             ]);
-            run(&host, &["src/A/Main.fl"])
+            run_library(&host, &["src/A/Main.fl"])
         })
         .collect();
     assert_eq!(results[0], results[1]);
@@ -89,7 +133,6 @@ fn diagnostics_do_not_depend_on_import_order() {
 #[test]
 fn named_paths_still_check_their_imports() {
     let host = memory(&[
-        ("flick.toml", LIB),
         (
             "src/A/Main.fl",
             "module A.Main exposing (x)\nimport A.Util exposing (y)\nx : Float\nlet x = y\n",
@@ -101,7 +144,7 @@ fn named_paths_still_check_their_imports() {
         ("src/A/Unrelated.fl", "module A.Unrelated exposing (nope)\n"),
     ]);
     assert_eq!(
-        run(&host, &["src/A/Main.fl"]),
+        run_library(&host, &["src/A/Main.fl"]),
         [
             "FLICK-R011 src/A/Util.fl `z`: cannot export `z`: it is neither defined in this module nor imported"
         ]
@@ -111,7 +154,6 @@ fn named_paths_still_check_their_imports() {
 #[test]
 fn test_modules_see_sources_but_not_the_reverse() {
     let host = memory(&[
-        ("flick.toml", LIB),
         (
             "src/A/Lib.fl",
             "module A.Lib exposing (f)\nimport A.Helper\nf : Float\nlet f = 1\n",
@@ -125,7 +167,7 @@ fn test_modules_see_sources_but_not_the_reverse() {
             "module A.LibTest exposing (t)\nimport A.Lib exposing (f)\nimport A.Helper exposing (h)\nt : Float\nlet t = f\n",
         ),
     ]);
-    let result = run(&host, &["test/A/LibTest.fl", "src/A/Lib.fl"]);
+    let result = run_library(&host, &["test/A/LibTest.fl", "src/A/Lib.fl"]);
     assert_eq!(
         result,
         ["FLICK-R003 src/A/Lib.fl `A.Helper`: unknown module `A.Helper`"]
@@ -148,12 +190,117 @@ fn without_a_project_imports_resolve_from_the_module_root() {
             "module Loose exposing (z)\nimport A.Util\nz : Float\nlet z = 1\n",
         ),
     ]);
-    assert_eq!(run(&host, &["lib/A/Main.fl"]), Vec::<String>::new());
-    let loose = run(&host, &["loose.fl"]);
+    let mut sources = SourceMap::default();
+    assert_eq!(
+        report(&host, &mut sources, None, &["lib/A/Main.fl"]),
+        Vec::<String>::new()
+    );
+    let loose = report(&host, &mut sources, None, &["loose.fl"]);
     assert_eq!(loose.len(), 1);
     assert!(
         loose[0].starts_with("FLICK-R003 loose.fl `A.Util`"),
         "{loose:?}"
+    );
+}
+
+#[test]
+fn standalone_compilation_checks_the_real_import_graph() {
+    let mut host = memory(&[
+        (
+            "lib/A/Main.fl",
+            "module A.Main exposing (x)\nimport A.Util exposing (y)\nx : Int\nlet x = y\n",
+        ),
+        (
+            "lib/A/Util.fl",
+            "module A.Util exposing (y)\nimport List\ny : Int\nlet y = List.length []\n",
+        ),
+    ]);
+    let roots = [PathBuf::from("/p/lib/A/Main.fl")];
+    let mut sources = SourceMap::default();
+    let (diagnostics, compilation) = compile(&host, &mut sources, None, &roots);
+    assert!(
+        diagnostics.iter().all(|d| d.severity != Severity::Error),
+        "{diagnostics:?}"
+    );
+    assert_eq!(
+        compilation
+            .modules
+            .iter()
+            .map(|m| m.name.as_str())
+            .collect::<Vec<_>>(),
+        ["A.Main", "A.Util"]
+    );
+    assert!(compilation.package_modules.is_empty());
+
+    for (body, expected) in [
+        ("import Missing\ny : Int\nlet y = 1\n", codes::R003),
+        ("import A.Main\ny : Int\nlet y = 1\n", codes::R006),
+        ("y : Int\nlet y = \"wrong\"\n", codes::T003),
+    ] {
+        host.0.insert(
+            PathBuf::from("/p/lib/A/Util.fl"),
+            format!("module A.Util exposing (y)\n{body}"),
+        );
+        let (diagnostics, compilation) = compile(&host, &mut SourceMap::default(), None, &roots);
+        assert!(
+            diagnostics.iter().any(|d| d.code == expected),
+            "{diagnostics:?}"
+        );
+        assert!(compilation.modules.is_empty());
+    }
+}
+
+#[test]
+fn programmatic_projects_keep_entry_path_runner_and_backend_checks() {
+    use super::config::{Backend, Entry};
+    use crate::source::Span;
+
+    let mut host = memory(&[(
+        "src/App/Main.fl",
+        "module App.Main exposing (main)\nmain : Unit -> Unit\nlet main () = ()\n",
+    )]);
+    let mut sources = SourceMap::default();
+    let mut project = library(&mut sources);
+    let span = Span::new(project.config_file, 0, 0);
+    project.config.kind = Kind::App;
+    project.config.entries.push(Entry {
+        name: "main".into(),
+        module: "App.Main".into(),
+        span,
+        runner: Some(("Runner.Browser".into(), span)),
+        client: false,
+    });
+    let roots = ["src/App/Main.fl"];
+    assert!(report(&host, &mut sources, Some(&project), &roots).is_empty());
+    for (source, expected) in [
+        (
+            "module App.Main exposing (main)\nmain : Float -> Unit\nlet main _ = ()\n",
+            "FLICK-P026",
+        ),
+        (
+            "module Wrong exposing (main)\nmain : Unit -> Unit\nlet main () = ()\n",
+            "FLICK-R001",
+        ),
+    ] {
+        host.0
+            .insert(PathBuf::from("/p/src/App/Main.fl"), source.into());
+        let diagnostics = report(&host, &mut sources, Some(&project), &roots);
+        assert!(
+            diagnostics.iter().any(|d| d.starts_with(expected)),
+            "{diagnostics:?}"
+        );
+    }
+    project.config.entries[0].runner = None;
+    project.config.build.effect = Backend::None;
+    host.0.insert(
+        PathBuf::from("/p/src/App/Main.fl"),
+        "module App.Main exposing (main)\nmain : Unit ->{; AppError} Unit\nlet main () = ()\n"
+            .into(),
+    );
+    let diagnostics = report(&host, &mut sources, Some(&project), &roots);
+    assert!(
+        diagnostics.iter().any(|d| d.starts_with("FLICK-P026")),
+        "{diagnostics:?}"
     );
 }
 
@@ -177,6 +324,7 @@ fn normalize_is_lexical() {
     assert_eq!(normalize(Path::new("../x")), Path::new("../x"));
 }
 
+#[cfg(feature = "native-project")]
 #[test]
 fn entry_main_is_pure_or_an_effect_a_runner_can_start() {
     const APP: &str = "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n";
@@ -208,6 +356,7 @@ fn entry_main_is_pure_or_an_effect_a_runner_can_start() {
     }
 }
 
+#[cfg(feature = "native-project")]
 #[test]
 fn without_effects_nothing_runs_at_runtime() {
     const APP: &str = "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n[build]\neffect = \"none\"\n";
@@ -243,6 +392,7 @@ fn without_effects_nothing_runs_at_runtime() {
     }
 }
 
+#[cfg(all(feature = "native-project", feature = "server-stdlib"))]
 #[test]
 fn a_runner_gives_the_type_of_main() {
     let check = |runner: &str, main: &str| {
@@ -288,6 +438,7 @@ fn a_runner_gives_the_type_of_main() {
     }
 }
 
+#[cfg(all(feature = "native-project", feature = "server-stdlib"))]
 #[test]
 fn main_may_need_the_services_its_runner_provides() {
     let check = |main: &str| {
@@ -321,6 +472,7 @@ fn main_may_need_the_services_its_runner_provides() {
     );
 }
 
+#[cfg(all(feature = "native-project", feature = "build-artifacts"))]
 #[test]
 fn a_package_dependency_still_conflicts_with_a_later_local_import() {
     use crate::iface::{self, Interface};

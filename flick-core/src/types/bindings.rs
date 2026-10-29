@@ -13,6 +13,8 @@ use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
+mod header;
+
 /// The parts of a `let`.
 pub struct LetParts<'n> {
     /// `Some` for `let name …`, `None` for `let pattern = …`.
@@ -151,14 +153,10 @@ impl Checker<'_> {
                         "the result of this expression has type `{shown}` and would be discarded; only `Unit` may be dropped"
                     ),
                     span,
-                )
-                .with_fix(
-                    "discard it explicitly with `ignore`",
-                    vec![Edit {
-                        span: Span::new(span.file, span.start, span.start),
-                        replacement: "ignore ".to_owned(),
-                    }],
-                ),
+                ).with_fix(|| ("discard it explicitly with `ignore`", vec![Edit {
+                    span: Span::new(span.file, span.start, span.start),
+                    replacement: "ignore ".to_owned(),
+                }])),
             );
         }
     }
@@ -355,37 +353,48 @@ impl Checker<'_> {
         } else if (function || is_fun) && !header {
             // the suggestion shows the rows the body needs, not their unknowns
             self.close_rows();
-            let suggestion = self.signature_of(&ty);
-            let shown = self.show(&suggestion);
             let span = self.span(decl);
-            // the edit is offered only for a type inferred without errors
-            let line = self.text[..span.start as usize]
-                .rfind('\n')
-                .map_or(0, |i| i + 1);
-            let indent = &self.text[line..span.start as usize];
-            let inferred = errors == self.diagnostics.len()
-                && self.operators_fit()
-                && !suggestion.contains(&mut |t| matches!(t, Type::Error | Type::Meta(_)));
-            let at = (inferred && indent.chars().all(|c| c == ' ' || c == '\t')).then(|| {
-                (
-                    u32::try_from(line).expect("offsets fit in u32"),
-                    indent.to_owned(),
-                )
-            });
-            // a number literal's type is known once the declaration settles
-            if self.has_open_number(&ty) {
-                self.signatures.push(PendingSignature {
-                    index: self.diagnostics.len(),
-                    name: name.to_owned(),
-                    ty: ty.clone(),
-                    span,
-                    at,
+            let incomplete = self.zonk(&ty).contains(&mut |t| matches!(t, Type::Error));
+            let diagnostic = Diagnostic::error(
+                codes::T004,
+                format!("function `{name}` needs a signature right above its `let`"),
+                span,
+            )
+            .with_incomplete(incomplete);
+            if cfg!(feature = "diagnostic-fixes") {
+                let suggestion = self.signature_of(&ty);
+                let shown = self.show(&suggestion);
+                // the edit is offered only for a type inferred without errors
+                let line = self.text[..span.start as usize]
+                    .rfind('\n')
+                    .map_or(0, |i| i + 1);
+                let indent = &self.text[line..span.start as usize];
+                let inferred = errors == self.diagnostics.len()
+                    && self.operators_fit()
+                    && !suggestion.contains(&mut |t| matches!(t, Type::Error | Type::Meta(_)));
+                let at = (inferred && indent.chars().all(|c| c == ' ' || c == '\t')).then(|| {
+                    (
+                        u32::try_from(line).expect("offsets fit in u32"),
+                        indent.to_owned(),
+                    )
                 });
-                self.diagnostics
-                    .push(signature_diagnostic(name, &shown, span, None));
+                // a number literal's type is known once the declaration settles
+                if self.has_open_number(&ty) {
+                    self.signatures.push(PendingSignature {
+                        index: self.diagnostics.len(),
+                        name: name.to_owned(),
+                        ty: ty.clone(),
+                        span,
+                        at,
+                    });
+                    self.diagnostics
+                        .push(signature_diagnostic(diagnostic, name, &shown, span, None));
+                } else {
+                    self.diagnostics
+                        .push(signature_diagnostic(diagnostic, name, &shown, span, at));
+                }
             } else {
-                self.diagnostics
-                    .push(signature_diagnostic(name, &shown, span, at));
+                self.diagnostics.push(diagnostic);
             }
         } else if let Some(header) = redundant {
             self.redundant_annotation(decl, parts, header);
@@ -408,8 +417,12 @@ impl Checker<'_> {
             }
             let suggestion = self.signature_of(&pending.ty);
             let shown = self.show(&suggestion);
+            let incomplete = suggestion.contains(&mut |t| matches!(t, Type::Error));
+            let diagnostic = self.diagnostics[pending.index]
+                .clone()
+                .with_incomplete(incomplete);
             self.diagnostics[pending.index] =
-                signature_diagnostic(&pending.name, &shown, pending.span, pending.at);
+                signature_diagnostic(diagnostic, &pending.name, &shown, pending.span, pending.at);
         }
     }
 
@@ -417,42 +430,6 @@ impl Checker<'_> {
     fn has_open_number(&self, ty: &Type) -> bool {
         self.zonk(ty)
             .contains(&mut |t| matches!(t, Type::Meta(m) if self.store.is_numeric(*m)))
-    }
-
-    /// Types written in a function's `let` header instead of its signature;
-    /// `true` after a diagnostic.
-    fn header_types(&mut self, decl: &Node, parts: &LetParts, signed: bool) -> bool {
-        let annotated: Vec<&Node> = parts
-            .params
-            .iter()
-            .copied()
-            .filter(|p| p.kind == K::AnnotPat)
-            .collect();
-        if parts.params.is_empty() || (parts.header.is_none() && annotated.is_empty()) {
-            return false;
-        }
-        let name = parts.name.clone().unwrap_or_default();
-        let mut message = format!(
-            "write the types of `{name}` in its signature above the `let`, not in the `let` header"
-        );
-        if !signed {
-            let mut types: Vec<String> = parts
-                .params
-                .iter()
-                .map(|p| match p.kind {
-                    K::AnnotPat => p
-                        .nodes()
-                        .find(|n| is_type(n.kind))
-                        .map_or("_".to_owned(), |t| self.text_of(t)),
-                    K::UnitPat => "Unit".to_owned(),
-                    _ => "_".to_owned(),
-                })
-                .collect();
-            types.push(parts.header.map_or("_".to_owned(), |t| self.text_of(t)));
-            message = format!("{message}: `{name} : {}`", types.join(" -> "));
-        }
-        self.error(codes::T005, self.span(decl), message);
-        true
     }
 }
 
@@ -501,22 +478,20 @@ pub(super) struct PendingSignature {
 /// `FLICK-T004` for function `name`, with the edit that inserts `shown` at
 /// the start of the line `at` when the type is fully known.
 fn signature_diagnostic(
+    diagnostic: Diagnostic,
     name: &str,
     shown: &str,
     span: Span,
     at: Option<(u32, String)>,
 ) -> Diagnostic {
-    let edits = match at {
-        Some((at, indent)) => vec![Edit {
-            span: Span::new(span.file, at, at),
-            replacement: format!("{indent}{name} : {shown}\n"),
-        }],
-        None => Vec::new(),
-    };
-    Diagnostic::error(
-        codes::T004,
-        format!("function `{name}` needs a signature right above its `let`"),
-        span,
-    )
-    .with_fix(format!("add `{name} : {shown}`"), edits)
+    diagnostic.with_fix(|| {
+        let edits = match at {
+            Some((at, indent)) => vec![Edit {
+                span: Span::new(span.file, at, at),
+                replacement: format!("{indent}{name} : {shown}\n"),
+            }],
+            None => Vec::new(),
+        };
+        (format!("add `{name} : {shown}`"), edits)
+    })
 }

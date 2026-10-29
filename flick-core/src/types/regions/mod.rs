@@ -590,11 +590,7 @@ impl Checker<'_> {
                 ),
                 span,
             )
-            .with_related(at, "the sequence reads atoms here")
-            .with_fix(
-                "build a list with `[for …]`, or iterate the sequence in this function",
-                Vec::new(),
-            ),
+            .with_related(at, "the sequence reads atoms here").with_fix(|| ("build a list with `[for …]`, or iterate the sequence in this function", Vec::new())),
         );
     }
     /// The scope whose region is the skolem `s`.

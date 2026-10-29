@@ -7,20 +7,41 @@ module App.Main exposing (main)
 main : Unit ->{} Unit
 let main () =
   let globe = "a\u{1F30D}b"
-  Platform.stdout_line (show (String.length globe) ++ " " ++ show (List.length (String.chars globe)))
+  Platform.stdout_line
+    (show (String.length globe) ++ " " ++ show (List.length (String.chars globe)))
   let high = String.slice 1 2 globe
   let low = String.slice 2 3 globe
   Platform.stdout_line (show high ++ " " ++ show low ++ " " ++ show (String.length high))
-  Platform.stdout_line (show (high ++ low == "\u{1F30D}") ++ " " ++ show ("a" ++ high ++ low ++ "b" == globe))
+  Platform.stdout_line
+    (show (high ++ low == "\u{1F30D}") ++ " " ++ show ("a" ++ high ++ low ++ "b" == globe))
   Platform.stdout_line ("lone half printed: " ++ high)
-  Platform.stdout_line (show (String.char_code_at 2 globe) ++ " " ++ show (String.code_point_at 1 globe))
+  Platform.stdout_line
+    (show (String.char_code_at 2 globe) ++ " " ++ show (String.code_point_at 1 globe))
   Platform.stdout_line (show (String.index_of "b" globe) ++ " " ++ show (String.at (-1) globe))
   Platform.stdout_line (show (String.take_left 2 globe) ++ " " ++ show (String.take_right 2 globe))
   let halves = String.split "" "\u{1F600}"
   Platform.stdout_line (show (List.length halves) ++ " " ++ String.join "" halves)
-  Platform.stdout_line (String.pad_start 5 "\u{1F600}" "x" ++ "|" ++ String.pad_end 4 "ab" "x" ++ "|")
-  Platform.stdout_line (show ("\u{FF61}" < "\u{1F600}") ++ " " ++ show (compare "\u{FF61}" "\u{1F600}"))
-  Platform.stdout_line (String.replace_all "" "-" "a\u{1F600}" ++ " " ++ String.trim "\u{FEFF} x \u{A0}")
-  Platform.stdout_line (show (String.to_number " 0x1F ") ++ " " ++ show (String.to_number "1e400") ++ " " ++ show (String.to_number "5."))
-  Platform.stdout_line (show (0.1 + 0.2) ++ " " ++ show (1.0 / 3.0) ++ " " ++ show 1e21 ++ " " ++ show 123e-20 ++ " " ++ show (-0.0))
-  Platform.stdout_line (show (20.01 - 0.000000000000001) ++ " " ++ Float.to_string 5e-324 ++ " " ++ Int.to_string (-7))
+  Platform.stdout_line
+    (String.pad_start 5 "\u{1F600}" "x" ++ "|" ++ String.pad_end 4 "ab" "x" ++ "|")
+  Platform.stdout_line
+    (show ("\u{FF61}" < "\u{1F600}") ++ " " ++ show (compare "\u{FF61}" "\u{1F600}"))
+  Platform.stdout_line
+    (String.replace_all "" "-" "a\u{1F600}" ++ " " ++ String.trim "\u{FEFF} x \u{A0}")
+  Platform.stdout_line
+    (show (String.to_number " 0x1F ")
+      ++ " "
+      ++ show (String.to_number "1e400")
+      ++ " "
+      ++ show (String.to_number "5."))
+  Platform.stdout_line
+    (show (0.1 + 0.2)
+      ++ " "
+      ++ show (1.0 / 3.0)
+      ++ " "
+      ++ show 1e21
+      ++ " "
+      ++ show 123e-20
+      ++ " "
+      ++ show (-0.0))
+  Platform.stdout_line
+    (show (20.01 - 0.000000000000001) ++ " " ++ Float.to_string 5e-324 ++ " " ++ Int.to_string (-7))

@@ -13,26 +13,27 @@ use crate::syntax::kind::SyntaxKind as K;
 /// Warnings for local names bound and never used.
 pub(super) fn unused_locals(unused: Vec<Unused>) -> impl Iterator<Item = Diagnostic> {
     unused.into_iter().map(|u| {
-        let start = Span::new(u.span.file, u.span.start, u.span.start);
-        let (message, edit) = if u.punned {
-            (
-                format!("bind it as `{} = _{}`", u.name, u.name),
-                Edit {
-                    span: u.span,
-                    replacement: format!("{} = _{}", u.name, u.name),
-                },
-            )
-        } else {
-            (
-                format!("rename it `_{}` if it is unused on purpose", u.name),
-                Edit {
-                    span: start,
-                    replacement: "_".to_owned(),
-                },
-            )
-        };
-        warning(codes::R013, format!("`{}` is never used", u.name), u.span)
-            .with_fix(message, vec![edit])
+        warning(codes::R013, format!("`{}` is never used", u.name), u.span).with_fix(|| {
+            let start = Span::new(u.span.file, u.span.start, u.span.start);
+            let (message, edit) = if u.punned {
+                (
+                    format!("bind it as `{} = _{}`", u.name, u.name),
+                    Edit {
+                        span: u.span,
+                        replacement: format!("{} = _{}", u.name, u.name),
+                    },
+                )
+            } else {
+                (
+                    format!("rename it `_{}` if it is unused on purpose", u.name),
+                    Edit {
+                        span: start,
+                        replacement: "_".to_owned(),
+                    },
+                )
+            };
+            (message, vec![edit])
+        })
     })
 }
 
@@ -114,47 +115,54 @@ fn unused_import(module: &Module, import: &Import) -> Diagnostic {
         format!("`{}` is imported but never used", import.module),
         import.span,
     );
-    let decl = module.tree.nodes().find(|n| {
-        n.kind == K::ImportDecl
-            && n.range().0 <= import.span.start
-            && import.span.end <= n.range().1
-    });
-    match decl {
-        Some(decl) => {
-            let (start, end) = decl.range();
-            let end = end + u32::from(module.text[end as usize..].starts_with('\n'));
-            d.with_fix(
-                "remove the import",
-                vec![Edit {
-                    span: Span::new(import.span.file, start, end),
-                    replacement: String::new(),
-                }],
-            )
+    if cfg!(feature = "diagnostic-fixes") {
+        let decl = module.tree.nodes().find(|n| {
+            n.kind == K::ImportDecl
+                && n.range().0 <= import.span.start
+                && import.span.end <= n.range().1
+        });
+        match decl {
+            Some(decl) => {
+                let (start, end) = decl.range();
+                let end = end + u32::from(module.text[end as usize..].starts_with('\n'));
+                d.with_fix(|| {
+                    (
+                        "remove the import",
+                        vec![Edit {
+                            span: Span::new(import.span.file, start, end),
+                            replacement: String::new(),
+                        }],
+                    )
+                })
+            }
+            None => d,
         }
-        None => d,
+    } else {
+        d
     }
 }
 
 fn unused_item(text: &str, import: &Import, item: &Item) -> Diagnostic {
-    let (message, what) = if item.kind == ItemKind::All {
-        (
-            format!("nothing `(..)` brings from `{}` is used", import.module),
-            "`(..)`".to_owned(),
-        )
+    let message = if item.kind == ItemKind::All {
+        format!("nothing `(..)` brings from `{}` is used", import.module)
     } else {
-        (
-            format!("`{}` is imported but never used", item.name),
-            format!("`{}`", item.name),
-        )
+        format!("`{}` is imported but never used", item.name)
     };
-    let (start, end) = item_removal(text, import, item.span);
-    warning(codes::R012, message, item.span).with_fix(
-        format!("remove {what} from the import"),
-        vec![Edit {
-            span: Span::new(item.span.file, start, end),
-            replacement: String::new(),
-        }],
-    )
+    warning(codes::R012, message, item.span).with_fix(|| {
+        let what = if item.kind == ItemKind::All {
+            "`(..)`".to_owned()
+        } else {
+            format!("`{}`", item.name)
+        };
+        let (start, end) = item_removal(text, import, item.span);
+        (
+            format!("remove {what} from the import"),
+            vec![Edit {
+                span: Span::new(item.span.file, start, end),
+                replacement: String::new(),
+            }],
+        )
+    })
 }
 
 /// The text to delete with an `exposing` item: its comma, or the whole

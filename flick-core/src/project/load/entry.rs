@@ -110,10 +110,12 @@ impl Loader<'_> {
                     if interface.is_some() {
                         self.diagnostics.push(
                             error(format!("entry module `{entry}` does not export `main`"))
-                                .with_fix(
-                                    format!("add `main` to `module {entry} exposing (main)`"),
-                                    Vec::new(),
-                                ),
+                                .with_fix(|| {
+                                    (
+                                        format!("add `main` to `module {entry} exposing (main)`"),
+                                        Vec::new(),
+                                    )
+                                }),
                         );
                     }
                     return;
@@ -135,10 +137,10 @@ impl Loader<'_> {
                             .join(" → ")
                     );
                     self.diagnostics.push(
-                        Diagnostic::error(codes::E009, message, at).with_fix(
+                        Diagnostic::error(codes::E009, message, at).with_fix(|| (
                             "call what needs `Server` from a server entry, and reach it from the client over HTTP or RPC",
                             Vec::new(),
-                        ),
+                        )),
                     );
                 }
                 // no type when the module failed to check: that is reported already

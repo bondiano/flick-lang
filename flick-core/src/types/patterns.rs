@@ -233,6 +233,7 @@ impl Checker<'_> {
                 continue;
             };
             let name = label.text(self.text).to_owned();
+            #[cfg(feature = "ide")]
             self.note_field(self.token_span(label), ty);
             if fields.iter().any(|(l, ..)| *l == name) {
                 self.duplicate_label(&name, self.token_span(label));
@@ -386,39 +387,40 @@ impl Checker<'_> {
         if !qualifier.is_empty() {
             let found = self.env.qualified_module(qualifier).map(|(_, interface)| {
                 interface.map(|i| {
-                    let entity = i
-                        .find(Namespace::Constructor, name)
-                        .map(|e| e.entity.clone());
-                    let guess = closest(
-                        name,
-                        i.exports
-                            .iter()
-                            .filter(|e| e.entity.namespace == Namespace::Constructor)
-                            .map(|e| e.entity.name.as_str()),
-                    )
-                    .map(|g| format!("{qualifier}.{g}"));
-                    (entity, guess)
+                    i.find(Namespace::Constructor, name)
+                        .map(|e| e.entity.clone())
                 })
             });
             // a module that was checked but exports no such constructor: say so, or nothing records the pattern
-            if let Some(Some((None, guess))) = &found {
+            if let Some(Some(None)) = &found {
                 self.error_guess(
                     codes::T001,
                     self.name_span(node),
                     format!("`{qualifier}` does not export constructor `{name}`"),
-                    guess.as_deref(),
+                    |this| {
+                        let (_, Some(interface)) = this.env.qualified_module(qualifier)? else {
+                            return None;
+                        };
+                        let constructors = interface
+                            .exports
+                            .iter()
+                            .filter(|e| e.entity.namespace == Namespace::Constructor);
+                        closest(name, constructors.map(|e| e.entity.name.as_str()))
+                            .map(|g| format!("{qualifier}.{g}"))
+                    },
                 );
                 return None;
             }
-            let found = found.map(|f| f.and_then(|(entity, _)| entity));
+            let found = found.map(Option::flatten);
             if found.is_none() {
-                let guess =
-                    closest(qualifier, self.env.qualifier_names()).map(|g| format!("{g}.{name}"));
                 self.error_guess(
                     codes::T001,
                     self.name_span(node),
                     format!("unknown module `{qualifier}`"),
-                    guess.as_deref(),
+                    |this| {
+                        closest(qualifier, this.env.qualifier_names())
+                            .map(|g| format!("{g}.{name}"))
+                    },
                 );
             }
             return found.flatten();
@@ -427,13 +429,11 @@ impl Checker<'_> {
             super::env::Found::Entity(entity) => Some(entity),
             super::env::Found::Unknown => None,
             super::env::Found::Missing => {
-                let guess =
-                    closest(name, self.env.names(Namespace::Constructor)).map(str::to_owned);
                 self.error_guess(
                     codes::T001,
                     self.name_span(node),
                     format!("cannot find constructor `{name}`"),
-                    guess.as_deref(),
+                    |this| closest(name, this.env.names(Namespace::Constructor)).map(str::to_owned),
                 );
                 None
             }

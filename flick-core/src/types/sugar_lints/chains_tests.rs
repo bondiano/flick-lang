@@ -1,4 +1,7 @@
-use crate::types::lint_tests::{HEAD, assert_fix, fixed};
+use crate::diagnostics::codes;
+#[cfg(feature = "diagnostic-fixes")]
+use crate::types::lint_tests::fixed;
+use crate::types::lint_tests::{HEAD, assert_fix, check};
 
 const SIG: &str = "f : Option Float -> Option Float -> Option Float\n";
 
@@ -55,6 +58,8 @@ fn a_chain_in_an_argument_keeps_its_parentheses() {
 #[test]
 fn one_step_is_left_alone() {
     let text = format!("{HEAD}{SIG}let f a b = Option.bind (fun x -> Some (x + 1)) a\n");
+    assert!(!check(&text).iter().any(|d| d.code == codes::T035));
+    #[cfg(feature = "diagnostic-fixes")]
     assert_eq!(fixed(&text, "FLICK-T035"), None);
 }
 
@@ -88,5 +93,7 @@ fn a_call_on_a_bound_variable_stays() {
     let text = format!(
         "{HEAD}{LOOK}h : Float ->{{}} Option Float\nlet h n =\n  do {{\n    x <- Some n\n    y <- look x\n    pure (x + y)\n  }}\n"
     );
+    assert!(check(&text).iter().any(|d| d.code == codes::E001));
+    #[cfg(feature = "diagnostic-fixes")]
     assert_eq!(fixed(&text, "FLICK-E001"), None);
 }

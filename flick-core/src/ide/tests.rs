@@ -1,14 +1,14 @@
 use std::collections::BTreeMap;
 use std::io::{self, ErrorKind};
-use std::iter;
 use std::path::{Path, PathBuf};
 
 use super::{CompletionKind, Ide, Symbol, Target};
 use crate::diagnostics::Diagnostic;
+use crate::project::config::{Build, Config, Kind};
 use crate::project::{self, Analysis, Host, analysis_fingerprint};
 use crate::projection;
 use crate::source::{FileId, SourceMap};
-use crate::types::builtin_sources;
+use crate::types::{Thresholds, builtin_sources};
 
 struct Memory(BTreeMap<PathBuf, String>);
 
@@ -27,8 +27,6 @@ impl Host for Memory {
             .to_string()
     }
 }
-
-const LIB: &str = "schema-version = 1\n[project]\nkind = \"lib\"\n";
 
 const DOMAIN: &str = "module App.Domain exposing (User, Shape(..), Named, greet, area)
 
@@ -145,16 +143,30 @@ fn fixture() -> Fixture {
 /// A library project of `files` (paths under `src/`), analysed from its last file.
 pub(super) fn fixture_of(files: &[(&str, &str)]) -> Fixture {
     let host = Memory(
-        iter::once(("flick.toml", LIB))
-            .chain(files.iter().copied())
-            .map(|(p, t)| (Path::new("/p").join(p), t.to_owned()))
+        files
+            .iter()
+            .map(|(p, t)| (Path::new("/p").join(p), (*t).to_owned()))
             .collect(),
     );
     let mut sources = SourceMap::default();
-    let project = project::discover(&host, &mut sources, Path::new("/p"), None).expect("config");
+    let project = project::Project {
+        root: PathBuf::from("/p"),
+        config_file: sources.add("flick.toml", ""),
+        config: Config {
+            kind: Kind::Lib,
+            source_dir: "src".into(),
+            test_dir: "test".into(),
+            entries: Vec::new(),
+            build: Build::default(),
+            sql_dialect: Default::default(),
+            allow: Vec::new(),
+            no_let_assert: false,
+            thresholds: Thresholds::default(),
+        },
+    };
     let last = files.last().expect("a file").0;
     let roots = [Path::new("/p").join(last)];
-    let analysis = project::analyze(&host, &mut sources, project.as_ref(), &roots);
+    let analysis = project::analyze(&host, &mut sources, Some(&project), &roots);
     Fixture { analysis, sources }
 }
 

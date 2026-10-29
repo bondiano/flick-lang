@@ -84,12 +84,11 @@ impl Checker<'_> {
                     self.record_name(span, Ref::ServiceTag(format!("{}.{}", e.module, e.name)));
                 }
                 self.service_tag(name).unwrap_or_else(|| {
-                    let guess = closest(name, self.env.names(namespace)).map(str::to_owned);
                     self.error_guess(
                         codes::T001,
                         span,
                         format!("cannot find constructor `{name}`"),
-                        guess.as_deref(),
+                        |this| closest(name, this.env.names(namespace)).map(str::to_owned),
                     );
                     Type::Error
                 })
@@ -99,14 +98,14 @@ impl Checker<'_> {
                     Namespace::Constructor => "constructor",
                     _ => "value",
                 };
-                let locals = self.locals.iter().map(|l| l.name.as_str());
-                let guess =
-                    closest(name, self.env.names(namespace).chain(locals)).map(str::to_owned);
                 self.error_guess(
                     codes::T001,
                     span,
                     format!("cannot find {what} `{name}`"),
-                    guess.as_deref(),
+                    |this| {
+                        let locals = this.locals.iter().map(|l| l.name.as_str());
+                        closest(name, this.env.names(namespace).chain(locals)).map(str::to_owned)
+                    },
                 );
                 Type::Error
             }
@@ -126,8 +125,10 @@ impl Checker<'_> {
     /// `f a b` is `(f a) b`: each argument is one stage, and a runtime arrow
     /// at a stage makes the application a runtime call.
     pub fn apply(&mut self, head: &Node, args: &[&Node]) -> Type {
+        #[cfg(feature = "diagnostic-fixes")]
         let since = self.diagnostics.len();
         let mut ty = self.infer(head);
+        #[cfg(feature = "diagnostic-fixes")]
         let mut unknown = Vec::new();
         let mut params = Vec::new();
         for (i, arg) in args.iter().enumerate() {
@@ -163,7 +164,11 @@ impl Checker<'_> {
                     ty = self.application_result(result, &ty, &argument);
                 }
                 Type::Error => {
-                    unknown.push(self.infer(arg));
+                    let inferred = self.infer(arg);
+                    #[cfg(feature = "diagnostic-fixes")]
+                    unknown.push(inferred);
+                    #[cfg(not(feature = "diagnostic-fixes"))]
+                    let _ = inferred;
                 }
                 meta @ Type::Meta(_) => {
                     let (param, result) = (self.fresh(), self.fresh());
@@ -185,6 +190,7 @@ impl Checker<'_> {
                 }
             }
         }
+        #[cfg(feature = "diagnostic-fixes")]
         if unknown.len() == args.len() && head.kind == K::NameExpr {
             self.stub_fix(since, head, args, &unknown);
         }
@@ -210,20 +216,16 @@ impl Checker<'_> {
                     "this argument runs a runtime call before `{name}` is applied, although `{name}` takes an `Eff` to run itself"
                 ),
             )
-            .with_span(span)
-            .with_fix(
-                "pass the computation unstarted with `task { … }`",
-                vec![
-                    Edit {
-                        span: Span::new(span.file, span.start, span.start),
-                        replacement: "task { ".to_owned(),
-                    },
-                    Edit {
-                        span: Span::new(span.file, span.end, span.end),
-                        replacement: " }".to_owned(),
-                    },
-                ],
-            ),
+            .with_span(span).with_fix(|| ("pass the computation unstarted with `task { … }`", vec![
+                Edit {
+                    span: Span::new(span.file, span.start, span.start),
+                    replacement: "task { ".to_owned(),
+                },
+                Edit {
+                    span: Span::new(span.file, span.end, span.end),
+                    replacement: " }".to_owned(),
+                },
+            ])),
         );
     }
 

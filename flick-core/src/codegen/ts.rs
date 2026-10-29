@@ -5,12 +5,12 @@
 //! reason, never written as `any`.
 
 use std::cell::{Cell, RefCell};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write;
 
 use super::names;
-use crate::iface::{Decl, Export, Interface, Namespace};
-use crate::types::{Form, Kind, PRELUDE, Type, TypeDef, builtin_sources, passes_dictionary};
+use crate::iface::{Interface, Namespace};
+use crate::types::{Form, Kind, PRELUDE, Type, TypeDef, passes_dictionary};
 
 /// The runtime package generated code imports.
 const RUNTIME: &str = "@flick-lang/runtime";
@@ -395,64 +395,6 @@ impl Projection<'_> {
         }
         out
     }
-}
-
-/// `export { … } from "…";` for each other module that defines exports of
-/// `interface`, the barrel module `module`: the values and constructors
-/// `value` keeps, and as `export type` the types `ty` keeps that have no
-/// value of the same name. Also the defining modules, which the lines import.
-pub fn reexports(
-    module: &str,
-    interface: &Interface,
-    path: &dyn Fn(&str) -> String,
-    value: &dyn Fn(&Export) -> bool,
-    ty: &dyn Fn(&Export) -> bool,
-) -> (String, Vec<String>) {
-    // Flick code names a built-in value by its defining module, and a
-    // built-in barrel such as `List` re-exporting each part would pull in
-    // parts a program does not use, some of them on Effect
-    if builtin_sources().iter().any(|(name, _)| *name == module) {
-        return (String::new(), Vec::new());
-    }
-    let mut from: BTreeMap<&str, (BTreeSet<String>, BTreeSet<String>)> = BTreeMap::new();
-    for export in &interface.exports {
-        let entity = &export.entity;
-        if entity.module == module {
-            continue;
-        }
-        let names = from.entry(&entity.module).or_default();
-        match entity.namespace {
-            Namespace::Value | Namespace::Constructor
-                if !matches!(export.decl, Decl::Method | Decl::Blocked) && value(export) =>
-            {
-                names.0.insert(names::ident(&entity.name));
-            }
-            Namespace::Type if ty(export) => {
-                names.1.insert(entity.name.clone());
-            }
-            _ => {}
-        }
-    }
-    let mut out = String::new();
-    let mut modules = Vec::new();
-    for (m, (values, types)) in from {
-        let values: Vec<String> = values.into_iter().collect();
-        let types: Vec<&String> = types.iter().filter(|t| !values.contains(t)).collect();
-        if values.is_empty() && types.is_empty() {
-            continue;
-        }
-        let specifier = names::string(&path(m));
-        if !values.is_empty() {
-            let _ = writeln!(out, "export {{ {} }} from {specifier};", values.join(", "));
-        }
-        if !types.is_empty() {
-            let list: Vec<&str> = types.iter().map(|t| t.as_str()).collect();
-            let list = list.join(", ");
-            let _ = writeln!(out, "export type {{ {list} }} from {specifier};");
-        }
-        modules.push(m.to_owned());
-    }
-    (out, modules)
 }
 
 fn uncaptured<'a>(mut t: &'a Type, vars: &Vars) -> Result<&'a Type, String> {

@@ -3,6 +3,20 @@
 //! current statement list, earlier operands spilled into constants first so
 //! that evaluation stays left to right.
 
+macro_rules! mark {
+    ($gen:expr, $span:expr) => {{
+        #[cfg(feature = "source-maps")]
+        {
+            ($gen).mark($span)
+        }
+        #[cfg(not(feature = "source-maps"))]
+        {
+            let _ = &$span;
+            String::new()
+        }
+    }};
+}
+
 mod binary;
 mod exports;
 mod expr;
@@ -10,6 +24,7 @@ mod foreign;
 mod function;
 mod generator;
 mod group;
+mod imports;
 mod items;
 mod labels;
 mod lift;
@@ -22,18 +37,23 @@ mod view;
 
 pub use release::{direct_methods, exported_worker};
 
+#[cfg(feature = "typescript")]
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
-use std::fmt::Write;
 use std::mem;
 
+use super::exports::reexports;
 use super::tail::{Callee, Target};
-use super::ts::{Projection, reexports};
+#[cfg(feature = "typescript")]
+use super::ts::Projection;
 use super::{Options, Output, names};
 use crate::ir::{ItemKind, Label, Module};
+#[cfg(feature = "source-maps")]
 use crate::source::Span;
 use crate::types::Dict;
-use exports::{annotations, sync_exports};
+#[cfg(feature = "typescript")]
+use exports::annotations;
+use exports::sync_exports;
 
 const RUNTIME: &str = "@flick-lang/runtime";
 const MARK_START: char = '\u{E000}';
@@ -41,8 +61,14 @@ const MARK_END: char = '\u{E001}';
 
 /// Compiles `module` to ESM (or TypeScript, see [`Options::typescript`]).
 pub fn js(module: &Module, options: &Options) -> Output {
+    assert!(
+        cfg!(feature = "typescript") || !options.typescript,
+        "TypeScript output requires the `typescript` Cargo feature"
+    );
     let mut g = Gen::new(module, options);
+    #[cfg(feature = "typescript")]
     let projection = Projection::new(&module.name, options.interface, options.package);
+    #[cfg(feature = "typescript")]
     let mut declarations = Vec::new();
     let interface = (options.interface)(&module.name);
     if let Some(interface) = &interface {
@@ -50,6 +76,7 @@ pub fn js(module: &Module, options: &Options) -> Output {
         // the wrapper of a Sync export is the runtime's
         g.runtime |= !g.sync_exports.is_empty();
     }
+    #[cfg(feature = "typescript")]
     if options.typescript
         && let Some(interface) = &interface
     {
@@ -58,7 +85,9 @@ pub fn js(module: &Module, options: &Options) -> Output {
     }
     let body = g.items(&module.items);
     let mut code = String::new();
+    #[cfg(feature = "typescript")]
     let typed = RefCell::new(Vec::new());
+    #[cfg(feature = "typescript")]
     if options.typescript {
         let here = (options.path)(&module.name);
         let path = |m: &str| {
@@ -67,58 +96,12 @@ pub fn js(module: &Module, options: &Options) -> Output {
         };
         code.push_str(&projection.imports(&path));
     }
-    // the build may name another runtime for it, as for any foreign module
-    let runtime = (options.foreign)(&module.name, RUNTIME);
-    if g.effect {
-        let _ = writeln!(code, "import {{ Effect }} from \"{runtime}\";");
-    }
-    // code inside a module is untyped: only exports carry types, so what it
-    // imports is `any` in TypeScript
-    let untyped = |code: &mut String, alias: &str| {
-        if options.typescript {
-            let _ = writeln!(code, "const {alias}: any = {alias}$;");
-        }
-    };
-    let bound = |alias: &str| {
-        if options.typescript {
-            format!("{alias}$")
-        } else {
-            alias.to_owned()
-        }
-    };
-    if g.runtime {
-        let _ = writeln!(code, "import * as {} from \"{runtime}\";", bound("$rt"));
-        untyped(&mut code, "$rt");
-    }
-    for (source, export, alias) in &g.foreign {
-        let export = if names::is_property(export) {
-            export.clone()
-        } else {
-            names::string(export)
-        };
-        let _ = writeln!(
-            code,
-            "import {{ {export} as {} }} from {};",
-            bound(alias),
-            names::string(source)
-        );
-        untyped(&mut code, alias);
-    }
     let here = (options.path)(&module.name);
-    for imported in &g.imports {
-        let target = (options.path)(imported);
-        let alias = g
-            .aliases
-            .get(imported)
-            .cloned()
-            .unwrap_or_else(|| names::module_alias(imported, 'm'));
-        let from = names::string(&relative(&here, &target));
-        let _ = writeln!(code, "import * as {} from {from};", bound(&alias));
-        untyped(&mut code, &alias);
-    }
+    g.write_imports(&mut code, &here);
     if !code.is_empty() {
         code.push('\n');
     }
+    #[cfg(feature = "typescript")]
     for d in &declarations {
         code.push_str(d);
         code.push_str("\n\n");
@@ -129,7 +112,7 @@ pub fn js(module: &Module, options: &Options) -> Output {
     if let Some(interface) = (options.interface)(&module.name) {
         let path = |m: &str| relative(&here, &(options.path)(m));
         let (lines, modules) = reexports(&module.name, &interface, &path, &|_| true, &|_| {
-            options.typescript
+            options.typescript()
         });
         code.push_str(&lines);
         barrel = modules;
@@ -138,11 +121,20 @@ pub fn js(module: &Module, options: &Options) -> Output {
     if !options.release {
         code = tidy::layout(&code);
     }
-    let mut output = finish(&code, &g.spans, &g.names);
-    output.imports = (g.imports.into_iter())
-        .chain(typed.into_inner())
-        .chain(barrel)
-        .collect();
+    let mut output = finish(
+        #[cfg(feature = "source-maps")]
+        &code,
+        #[cfg(not(feature = "source-maps"))]
+        code,
+        #[cfg(feature = "source-maps")]
+        &g.spans,
+        #[cfg(feature = "source-maps")]
+        &g.names,
+    );
+    let imports = g.imports.into_iter();
+    #[cfg(feature = "typescript")]
+    let imports = imports.chain(typed.into_inner());
+    output.imports = imports.chain(barrel).collect();
     output
 }
 
@@ -178,6 +170,7 @@ impl<'a> Gen<'a> {
             module: &module.name,
             options,
             labels: &module.labels,
+            #[cfg(feature = "source-maps")]
             names: HashMap::new(),
             imports: BTreeSet::new(),
             foreign: Vec::new(),
@@ -185,6 +178,7 @@ impl<'a> Gen<'a> {
             effect: false,
             temps: 0,
             givens: Vec::new(),
+            #[cfg(feature = "source-maps")]
             spans: Vec::new(),
             buf: Vec::new(),
             generator: false,
@@ -197,6 +191,7 @@ impl<'a> Gen<'a> {
             grouped,
             views: HashMap::new(),
             rests: HashMap::new(),
+            #[cfg(feature = "typescript")]
             annotations: HashMap::new(),
             sync_exports: HashMap::new(),
             workers: if options.release {
@@ -217,7 +212,7 @@ impl<'a> Gen<'a> {
                     _ => None,
                 })
                 .collect(),
-            direct_foreigns: if options.release && !options.typescript {
+            direct_foreigns: if options.release && !options.typescript() {
                 foreign::plain_foreigns(&module.items)
             } else {
                 HashMap::new()
@@ -231,33 +226,46 @@ impl<'a> Gen<'a> {
     }
 }
 
-fn finish(code: &str, spans: &[Span], names: &HashMap<usize, String>) -> Output {
-    let mut out = String::with_capacity(code.len());
-    let mut mappings = Vec::new();
-    let (mut line, mut col) = (0u32, 0u32);
-    let mut chars = code.chars();
-    while let Some(c) = chars.next() {
-        match c {
-            MARK_START => {
-                let id: String = chars.by_ref().take_while(|&c| c != MARK_END).collect();
-                if let Ok(id) = id.parse::<usize>() {
-                    mappings.push((line, col, spans[id], names.get(&id).cloned()));
+fn finish(
+    #[cfg(feature = "source-maps")] code: &str,
+    #[cfg(not(feature = "source-maps"))] code: String,
+    #[cfg(feature = "source-maps")] spans: &[Span],
+    #[cfg(feature = "source-maps")] names: &HashMap<usize, String>,
+) -> Output {
+    #[cfg(feature = "source-maps")]
+    {
+        let mut out = String::with_capacity(code.len());
+        let mut mappings = Vec::new();
+        let (mut line, mut col) = (0u32, 0u32);
+        let mut chars = code.chars();
+        while let Some(c) = chars.next() {
+            match c {
+                MARK_START => {
+                    let id: String = chars.by_ref().take_while(|&c| c != MARK_END).collect();
+                    if let Ok(id) = id.parse::<usize>() {
+                        mappings.push((line, col, spans[id], names.get(&id).cloned()));
+                    }
+                }
+                '\n' => {
+                    out.push(c);
+                    line += 1;
+                    col = 0;
+                }
+                c => {
+                    out.push(c);
+                    col += u32::try_from(c.len_utf16()).unwrap_or(1);
                 }
             }
-            '\n' => {
-                out.push(c);
-                line += 1;
-                col = 0;
-            }
-            c => {
-                out.push(c);
-                col += u32::try_from(c.len_utf16()).unwrap_or(1);
-            }
+        }
+        Output {
+            code: out,
+            mappings,
+            imports: Vec::new(),
         }
     }
+    #[cfg(not(feature = "source-maps"))]
     Output {
-        code: out,
-        mappings,
+        code,
         imports: Vec::new(),
     }
 }
@@ -287,6 +295,7 @@ struct Gen<'a> {
     options: &'a Options<'a>,
     /// The module's labelled top-level values (see [`Gen::labelled`]).
     labels: &'a HashMap<String, Label>,
+    #[cfg(feature = "source-maps")]
     /// The Flick name at a marker, by its index in `spans`.
     names: HashMap<usize, String>,
     /// Modules whose exports are used.
@@ -298,6 +307,7 @@ struct Gen<'a> {
     temps: u32,
     /// Dictionaries in scope: as `Dict::Given` names them, and the parameter.
     givens: Vec<(String, String)>,
+    #[cfg(feature = "source-maps")]
     spans: Vec<Span>,
     /// Statements of the block being emitted.
     buf: Vec<String>,
@@ -337,6 +347,7 @@ struct Gen<'a> {
     aliases: HashMap<String, String>,
     /// The constructors of the module, which a module alias must not shadow.
     constructors: Vec<String>,
+    #[cfg(feature = "typescript")]
     /// TypeScript types of the exported values, by their JS name.
     annotations: HashMap<String, String>,
     /// Exported functions whose last stage is Sync, by their JS name, with
@@ -352,7 +363,7 @@ impl Gen<'_> {
 
     /// An arrow's parameter list: in TypeScript every parameter and result is `any`.
     fn arrow(&self, params: &str) -> String {
-        if !self.options.typescript {
+        if !self.options.typescript() {
             return format!("({params}) =>");
         }
         let typed: Vec<String> = params
@@ -365,7 +376,11 @@ impl Gen<'_> {
 
     /// `const name = value;`, `any` in TypeScript.
     fn constant(&self, name: &str, value: &str) -> String {
-        let ty = if self.options.typescript { ": any" } else { "" };
+        let ty = if self.options.typescript() {
+            ": any"
+        } else {
+            ""
+        };
         format!("const {name}{ty} = {value};")
     }
 
@@ -381,15 +396,16 @@ impl Gen<'_> {
             None => value,
         };
         let value = pure(value);
-        match self.annotations.get(name) {
-            Some(ty) => format!("export const {name}: {ty} = {value};"),
-            None => format!("export {}", self.constant(name, &value)),
+        #[cfg(feature = "typescript")]
+        if let Some(ty) = self.annotations.get(name) {
+            return format!("export const {name}: {ty} = {value};");
         }
+        format!("export {}", self.constant(name, &value))
     }
 
     /// `let` of variables assigned later.
     fn declare(&self, names: &str) -> String {
-        if self.options.typescript {
+        if self.options.typescript() {
             let typed: Vec<String> = names.split(", ").map(|n| format!("{n}: any")).collect();
             format!("let {};", typed.join(", "))
         } else {
@@ -407,6 +423,7 @@ impl Gen<'_> {
         format!("Effect.{name}")
     }
 
+    #[cfg(feature = "source-maps")]
     /// A marker that maps the generated position to `span`.
     fn mark(&mut self, span: Span) -> String {
         self.spans.push(span);

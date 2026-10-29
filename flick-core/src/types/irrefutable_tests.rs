@@ -1,4 +1,4 @@
-use crate::diagnostics::{Diagnostic, Severity};
+use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::source::SourceMap;
 
 const HEAD: &str = "module Probe exposing (f)\n\n";
@@ -10,6 +10,7 @@ fn check(text: &str) -> Vec<Diagnostic> {
 }
 
 /// `text` after the fix titled `title` of its `FLICK-T009`.
+#[cfg(feature = "diagnostic-fixes")]
 fn fixed(text: &str, title: &str) -> String {
     let diagnostics = check(text);
     let fix = diagnostics
@@ -30,13 +31,26 @@ fn fixed(text: &str, title: &str) -> String {
 
 /// Fixes `body` with `title` and checks that the result compiles.
 fn assert_fix(body: &str, title: &str, want: &str) {
-    let out = fixed(&format!("{HEAD}{body}"), title);
-    assert_eq!(out, format!("{HEAD}{want}"));
-    let errors: Vec<_> = check(&out)
-        .into_iter()
-        .filter(|d| d.severity == Severity::Error)
-        .collect();
-    assert!(errors.is_empty(), "{errors:?}");
+    let text = format!("{HEAD}{body}");
+    let diagnostics = check(&text);
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.code == codes::T009 && d.severity == Severity::Error),
+        "{diagnostics:?}"
+    );
+    #[cfg(feature = "diagnostic-fixes")]
+    {
+        let out = fixed(&text, title);
+        assert_eq!(out, format!("{HEAD}{want}"));
+        let errors: Vec<_> = check(&out)
+            .into_iter()
+            .filter(|d| d.severity == Severity::Error)
+            .collect();
+        assert!(errors.is_empty(), "{errors:?}");
+    }
+    #[cfg(not(feature = "diagnostic-fixes"))]
+    let _ = (title, want);
 }
 
 #[test]
@@ -94,16 +108,21 @@ fn an_assert_that_cannot_fail_becomes_a_let() {
         .into_iter()
         .find(|d| d.code.to_string() == "FLICK-T025")
         .expect("T025");
-    let mut out = text.clone();
-    for edit in d.fixes[0].edits.iter().rev() {
-        out.replace_range(
-            edit.span.start as usize..edit.span.end as usize,
-            &edit.replacement,
-        );
+    assert_eq!(d.severity, Severity::Warning);
+    #[cfg(feature = "diagnostic-fixes")]
+    {
+        let mut out = text.clone();
+        for edit in d.fixes[0].edits.iter().rev() {
+            out.replace_range(
+                edit.span.start as usize..edit.span.end as usize,
+                &edit.replacement,
+            );
+        }
+        assert_eq!(out, text.replace("let assert (a, b)", "let (a, b)"));
     }
-    assert_eq!(out, text.replace("let assert (a, b)", "let (a, b)"));
 }
 
+#[cfg(feature = "diagnostic-fixes")]
 #[test]
 fn no_match_fix_without_a_rest_of_the_block() {
     let text = format!("{HEAD}f : Option Float -> Float\nlet f (Some n) = n\n");

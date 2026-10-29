@@ -52,11 +52,7 @@ impl Checker<'_> {
                             "`{name}` is used at type `{used}` inside its own definition, which has type `{own}`: that is polymorphic recursion"
                         ),
                         span,
-                    )
-                    .with_fix(
-                        format!("quantify every variable of the signature explicitly: `{name} : forall … .`"),
-                        Vec::new(),
-                    ),
+                    ).with_fix(|| (format!("quantify every variable of the signature explicitly: `{name} : forall … .`"), Vec::new())),
                 );
             }
         }

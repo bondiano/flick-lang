@@ -1,6 +1,7 @@
 use super::*;
+use crate::diagnostics::{Diagnostic, codes};
 use crate::source::SourceMap;
-use crate::types::Thresholds;
+use crate::types::{Thresholds, dialect};
 
 fn parse_text(text: &str) -> Result<Config, Diagnostic> {
     let mut sources = SourceMap::default();
@@ -13,7 +14,7 @@ fn spec_example_parses_with_defaults() {
     let config = parse_text(
         "schema-version = 1\n[project]\nkind = \"app\"\nsource-dir = \"src\"\ntest-dir = \"test\"\n\
          entry = \"App.Main\"\n[build]\nout-dir = \"dist\"\nprofile = \"debug\"\nemit = \"js\"\n\
-         emit-dts = false\nschema-aot = false\nlabels = \"all\"\n",
+         schema-aot = false\nlabels = \"all\"\n",
     )
     .expect("valid");
     assert_eq!(config.kind, Kind::App);
@@ -38,6 +39,17 @@ fn spec_example_parses_with_defaults() {
         "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\nlabels = \"components\"\n",
     );
     assert_eq!(components.expect("valid").build.labels, Labels::Components);
+}
+
+#[test]
+fn typescript_settings_require_the_capability() {
+    for setting in ["emit = \"ts\"", "emit-dts = true", "promise-facade = true"] {
+        let text = format!("schema-version = 1\n[project]\nkind = \"lib\"\n[build]\n{setting}\n");
+        #[cfg(feature = "typescript")]
+        assert!(parse_text(&text).is_ok(), "{setting}");
+        #[cfg(not(feature = "typescript"))]
+        assert_eq!(parse_text(&text).expect_err(setting).code, codes::P005);
+    }
 }
 
 #[test]

@@ -63,6 +63,7 @@ impl Checker<'_> {
         let label_span = self.token_span(label);
         let label = label.text(self.text).to_owned();
         let record = self.infer(target);
+        #[cfg(feature = "ide")]
         self.note_field(label_span, &record);
         if let Some(field) = self.known_field(&record, &label) {
             return field;
@@ -75,15 +76,16 @@ impl Checker<'_> {
         });
         if self.unify(&self.whnf(&record), &shape).is_err() {
             let shown = self.show(&record);
-            let labels = self.labels(&record);
-            let guess = closest(&label, labels.iter().map(String::as_str));
             self.diagnostics.push(
                 Diagnostic::error(
                     codes::T003,
                     format!("`{shown}` has no field `{label}`"),
                     self.span(node),
                 )
-                .did_you_mean(label_span, guess.map(str::to_owned)),
+                .did_you_mean(label_span, || {
+                    let labels = self.labels(&record);
+                    closest(&label, labels.iter().map(String::as_str)).map(str::to_owned)
+                }),
             );
             return Type::Error;
         }
@@ -93,11 +95,13 @@ impl Checker<'_> {
     /// A record literal; `expected` gives the types of fields it mentions.
     pub(super) fn record(&mut self, node: &Node, expected: Option<&Row>) -> Type {
         let mut entries: Vec<(String, Type)> = Vec::new();
+        #[cfg(feature = "ide")]
         let mut labels = Vec::new();
         for field in node.nodes().filter(|n| n.kind == K::RecordField) {
             let Some(label) = field.child_tokens().find(|t| t.kind == K::Ident) else {
                 continue;
             };
+            #[cfg(feature = "ide")]
             labels.push(self.token_span(label));
             let name = label.text(self.text).to_owned();
             let Some(value) = field.nodes().next() else {
@@ -120,10 +124,13 @@ impl Checker<'_> {
             }
         }
         let record = Type::Record(Row::closed(entries));
-        // an editor shows the fields as the expected type declares them
-        let declared = expected.map_or_else(|| record.clone(), |row| Type::Record(row.clone()));
-        for span in labels {
-            self.note_field(span, &declared);
+        #[cfg(feature = "ide")]
+        {
+            // an editor shows the fields as the expected type declares them
+            let declared = expected.map_or_else(|| record.clone(), |row| Type::Record(row.clone()));
+            for span in labels {
+                self.note_field(span, &declared);
+            }
         }
         if expected.is_none() {
             let captures = self.captures_of(&record);
@@ -142,6 +149,7 @@ impl Checker<'_> {
                 continue;
             };
             let name = label.text(self.text).to_owned();
+            #[cfg(feature = "ide")]
             self.note_field(self.token_span(label), &record);
             if seen.contains(&name) {
                 self.duplicate_label(&name, self.token_span(label));
@@ -155,15 +163,16 @@ impl Checker<'_> {
             });
             if self.unify(&self.whnf(&record), &shape).is_err() {
                 let shown = self.show(&record);
-                let labels = self.labels(&record);
-                let guess = closest(&name, labels.iter().map(String::as_str));
                 self.error_guess(
                     codes::T003,
                     self.token_span(label),
                     format!(
                         "`{shown}` has no field `{name}`; `with` only replaces existing fields"
                     ),
-                    guess,
+                    |this| {
+                        let labels = this.labels(&record);
+                        closest(&name, labels.iter().map(String::as_str)).map(str::to_owned)
+                    },
                 );
             } else if let Some(value) = field.nodes().next() {
                 self.check(value, &ty);

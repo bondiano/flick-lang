@@ -29,14 +29,15 @@ impl Checker<'_> {
             let a = self.fresh();
             return Type::pure_fun(a.clone(), a);
         };
-        let removal = Span::new(self.file, op.start, operand.range().0);
-        self.diagnostics.push(warning.with_fix(
-            "remove `echo`",
-            vec![Edit {
-                span: removal,
-                replacement: String::new(),
-            }],
-        ));
+        self.diagnostics.push(warning.with_fix(|| {
+            (
+                "remove `echo`",
+                vec![Edit {
+                    span: Span::new(self.file, op.start, operand.range().0),
+                    replacement: String::new(),
+                }],
+            )
+        }));
         let ty = self.infer(operand);
         self.note_type(self.span(node), &ty);
         ty
@@ -62,16 +63,18 @@ impl Checker<'_> {
     pub(super) fn report_holes(&mut self) {
         for (span, hole) in mem::take(&mut self.holes) {
             let shown = self.show(&hole);
-            let bare = !shown.contains(' ') || shown.starts_with(['(', '{', '[']);
-            let replacement = if bare {
-                shown.clone()
-            } else {
-                format!("({shown})")
-            };
             self.diagnostics.push(
                 Diagnostic::new(codes::T024, Severity::Warning, format!("`_` is `{shown}`"))
                     .with_span(span)
-                    .with_fix(format!("write `{shown}`"), vec![Edit { span, replacement }]),
+                    .with_fix(|| {
+                        let bare = !shown.contains(' ') || shown.starts_with(['(', '{', '[']);
+                        let replacement = if bare {
+                            shown.clone()
+                        } else {
+                            format!("({shown})")
+                        };
+                        (format!("write `{shown}`"), vec![Edit { span, replacement }])
+                    }),
             );
         }
     }

@@ -88,40 +88,42 @@ impl Checker<'_> {
         let Some(keyword) = node.child_tokens().find(|t| t.kind == K::DoKw) else {
             return;
         };
-        let mut edits = vec![self.edit(keyword.start, keyword.end, "task")];
-        let last = statements.len().saturating_sub(1);
-        for (i, statement) in statements.iter().enumerate() {
-            let start = statement.range().0;
-            match statement.kind {
-                K::BindStmt => {
-                    edits.push(self.edit(start, start, "let "));
-                    if let Some(arrow) = statement.child_tokens().find(|t| t.kind == K::LArrow) {
-                        edits.push(self.edit(arrow.start, arrow.end, "= await"));
-                    }
-                }
-                K::LetDecl | K::Signature => {}
-                _ if i == last => match self.pure_argument(statement) {
-                    Some(value) => edits.push(self.edit(start, value.range().0, "")),
-                    None => edits.push(self.edit(start, start, "await ")),
-                },
-                _ => {
-                    let unit = self
-                        .sugar_type(statement)
-                        .and_then(|t| self.eff_parts(&t))
-                        .is_some_and(|(_, _, a)| self.whnf(&a).is_prim("Unit"));
-                    let prefix = if unit { "await " } else { "ignore await " };
-                    edits.push(self.edit(start, start, prefix));
-                }
-            }
-        }
         let warning = Diagnostic::new(
             codes::T029,
             Severity::Warning,
             "`do` over `Eff`: a `task` with direct calls builds the same computation",
         )
         .with_span(self.token_span(keyword));
-        self.diagnostics
-            .push(warning.with_fix("rewrite as a `task` with `await`", edits));
+        self.diagnostics.push(warning.with_fix(|| {
+            let mut edits = vec![self.edit(keyword.start, keyword.end, "task")];
+            let last = statements.len().saturating_sub(1);
+            for (i, statement) in statements.iter().enumerate() {
+                let start = statement.range().0;
+                match statement.kind {
+                    K::BindStmt => {
+                        edits.push(self.edit(start, start, "let "));
+                        if let Some(arrow) = statement.child_tokens().find(|t| t.kind == K::LArrow)
+                        {
+                            edits.push(self.edit(arrow.start, arrow.end, "= await"));
+                        }
+                    }
+                    K::LetDecl | K::Signature => {}
+                    _ if i == last => match self.pure_argument(statement) {
+                        Some(value) => edits.push(self.edit(start, value.range().0, "")),
+                        None => edits.push(self.edit(start, start, "await ")),
+                    },
+                    _ => {
+                        let unit = self
+                            .sugar_type(statement)
+                            .and_then(|t| self.eff_parts(&t))
+                            .is_some_and(|(_, _, a)| self.whnf(&a).is_prim("Unit"));
+                        let prefix = if unit { "await " } else { "ignore await " };
+                        edits.push(self.edit(start, start, prefix));
+                    }
+                }
+            }
+            ("rewrite as a `task` with `await`", edits)
+        }));
     }
 
     /// T030: `x <- e; pure x` at the end of a `do` block is `e`.
@@ -142,7 +144,6 @@ impl Checker<'_> {
         if name.is_none() || name != returned {
             return;
         }
-        let value = self.source_of(value).to_owned();
         let (start, end) = if statements.len() == 2 {
             node.range()
         } else {
@@ -154,10 +155,12 @@ impl Checker<'_> {
             "binding a value only to return it: the bound computation is the same",
         )
         .with_span(self.span(bind));
-        self.diagnostics.push(warning.with_safe_fix(
-            "keep the bound computation",
-            vec![self.edit(start, end, &value)],
-        ));
+        self.diagnostics.push(warning.with_safe_fix(|| {
+            (
+                "keep the bound computation",
+                vec![self.edit(start, end, self.source_of(value))],
+            )
+        }));
     }
 
     /// T031 and T032: `Seq.to_list` of what never ends, or of a `for`.
@@ -167,7 +170,6 @@ impl Checker<'_> {
         }
         let arg = unparen(arg);
         if arg.kind == K::ForExpr {
-            let list = format!("[{}]", self.source_of(arg));
             let (start, end) = node.range();
             let warning = Diagnostic::new(
                 codes::T032,
@@ -175,10 +177,13 @@ impl Checker<'_> {
                 "`Seq.to_list` of a `for`: `[for …]` builds the list without a generator",
             )
             .with_span(self.span(node));
-            self.diagnostics.push(warning.with_safe_fix(
-                "build it with `[for …]`",
-                vec![self.edit(start, end, &list)],
-            ));
+            self.diagnostics.push(warning.with_safe_fix(|| {
+                let list = format!("[{}]", self.source_of(arg));
+                (
+                    "build it with `[for …]`",
+                    vec![self.edit(start, end, &list)],
+                )
+            }));
         } else if self.infinite(arg) {
             let warning = Diagnostic::new(
                 codes::T031,
@@ -231,11 +236,9 @@ impl Checker<'_> {
         let (Some((x, p)), Some((y, e))) = (self.lambda_parts(keep), self.lambda_parts(map)) else {
             return;
         };
-        if x != y {
+        if self.source_of(x).trim() != self.source_of(y).trim() {
             return;
         }
-        let source = self.source_of(source).trim();
-        let list = format!("[for {x} <- {source} if {p} yield {e}]");
         let (start, end) = node.range();
         let warning = Diagnostic::new(
             codes::T033,
@@ -243,8 +246,16 @@ impl Checker<'_> {
             "`List.filter` then `List.map` walk the list twice: `[for …]` does both in one loop",
         )
         .with_span(self.span(node));
-        self.diagnostics
-            .push(warning.with_fix("write it as `[for …]`", vec![self.edit(start, end, &list)]));
+        self.diagnostics.push(warning.with_fix(|| {
+            let source = self.source_of(source).trim();
+            let (x, p, e) = (
+                self.source_of(x).trim(),
+                self.source_of(p).trim(),
+                self.source_of(e).trim(),
+            );
+            let list = format!("[for {x} <- {source} if {p} yield {e}]");
+            ("write it as `[for …]`", vec![self.edit(start, end, &list)])
+        }));
     }
 
     /// T034: `match r with | Ok x -> x | Err e -> from_result (Err e)` is `r?`.
@@ -265,14 +276,9 @@ impl Checker<'_> {
         else {
             return;
         };
-        if self.source_of(value).trim() != x || !self.rethrows(failure, e) {
+        if self.source_of(value).trim() != self.source_of(x).trim() || !self.rethrows(failure, e) {
             return;
         }
-        let source = self.source_of(scrutinee).trim();
-        let operand = match unparen(scrutinee).kind {
-            K::NameExpr | K::FieldExpr | K::QuestionExpr | K::ParenExpr => source.to_owned(),
-            _ => format!("({source})"),
-        };
         let (start, end) = node.range();
         let warning = Diagnostic::new(
             codes::T034,
@@ -280,15 +286,22 @@ impl Checker<'_> {
             "this `match` fails with the error of the `Result`: `?` says the same",
         )
         .with_span(self.span(node));
-        self.diagnostics.push(warning.with_safe_fix(
-            "write it with `?`",
-            vec![self.edit(start, end, &format!("{operand}?"))],
-        ));
+        self.diagnostics.push(warning.with_safe_fix(|| {
+            let source = self.source_of(scrutinee).trim();
+            let operand = match unparen(scrutinee).kind {
+                K::NameExpr | K::FieldExpr | K::QuestionExpr | K::ParenExpr => source.to_owned(),
+                _ => format!("({source})"),
+            };
+            (
+                "write it with `?`",
+                vec![self.edit(start, end, &format!("{operand}?"))],
+            )
+        }));
     }
 
     /// The constructor of an arm `| C x -> body` without a guard, its one
     /// variable and its body.
-    fn arm_parts<'n>(&self, arm: &'n Node) -> Option<(&str, String, &'n Node)> {
+    fn arm_parts<'n>(&self, arm: &'n Node) -> Option<(&str, &'n Node, &'n Node)> {
         let mut parts = arm.nodes();
         let (pattern, body) = (parts.next()?, parts.next()?);
         if pattern.kind != K::ConPat || body.kind != K::Block {
@@ -302,19 +315,19 @@ impl Checker<'_> {
         };
         (var.kind == K::VarPat).then(|| {
             let con = &self.text[con.start as usize..con.end as usize];
-            (con, self.source_of(var).trim().to_owned(), unparen(value))
+            (con, *var, unparen(value))
         })
     }
 
     /// Whether `failure` is `from_result (Err e)` of the Prelude.
-    fn rethrows(&self, failure: &Node, e: &str) -> bool {
+    fn rethrows(&self, failure: &Node, e: &Node) -> bool {
         let parts: Vec<&Node> = failure.nodes().collect();
         let (K::AppExpr, [head, arg]) = (failure.kind, &parts[..]) else {
             return false;
         };
         matches!(self.typing.names.get(&head.range()),
             Some(Ref::Value { module, name }) if module == "Prelude" && name == "from_result")
-            && words(self.source_of(unparen(arg))) == format!("Err {e}")
+            && words(self.source_of(unparen(arg))) == format!("Err {}", self.source_of(e).trim())
     }
 
     /// The function argument of `List.name f`, as written.
@@ -333,15 +346,14 @@ impl Checker<'_> {
     }
 
     /// `(x, body)` of `fun x -> body` with one variable and a one-line body.
-    pub(super) fn lambda_parts(&self, f: &Node) -> Option<(String, String)> {
+    pub(super) fn lambda_parts<'n>(&self, f: &'n Node) -> Option<(&'n Node, &'n Node)> {
         if f.kind != K::FunExpr {
             return None;
         }
         let mut parts = f.nodes();
         let (param, body) = (parts.next()?, parts.next()?);
-        let body = self.source_of(body).trim();
-        (param.kind == K::VarPat && !body.contains('\n'))
-            .then(|| (self.source_of(param).trim().to_owned(), body.to_owned()))
+        (param.kind == K::VarPat && !self.source_of(body).trim().contains('\n'))
+            .then_some((param, body))
     }
 
     /// The name of the `Seq` function `head` refers to.

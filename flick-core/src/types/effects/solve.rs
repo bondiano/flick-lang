@@ -226,11 +226,7 @@ impl Checker<'_> {
                 codes::G004,
                 "this acquires a resource, which needs `Scope`: only `scope { … }` provides an owner",
                 span,
-            )
-            .with_fix(
-                "call it inside `scope { … }`, or add `Scope s` to the services of the signature",
-                Vec::new(),
-            ),
+            ).with_fix(|| ("call it inside `scope { … }`, or add `Scope s` to the services of the signature", Vec::new())),
         );
     }
 
@@ -260,11 +256,7 @@ impl Checker<'_> {
                 codes::E002,
                 format!("a component's setup runs once per instance, so {list} is not allowed in it"),
                 e.span,
-            )
-            .with_fix(
-                "read atoms in the component's last expression, its render, as `ui { let x = … }`, or make an `Atom.derived` here",
-                Vec::new(),
-            );
+            ).with_fix(|| ("read atoms in the component's last expression, its render, as `ui { let x = … }`, or make an `Atom.derived` here", Vec::new()));
             self.diagnostics.push(diagnostic);
             return;
         }
@@ -279,13 +271,21 @@ impl Checker<'_> {
             e.span,
         );
         if matches!(self.sites[e.site], Site::Signature(_)) {
-            diagnostic = diagnostic.with_fix(format!("add {list} to {bound}"), Vec::new());
+            diagnostic = diagnostic.with_fix(|| (format!("add {list} to {bound}"), Vec::new()));
         }
         self.diagnostics.push(diagnostic);
     }
 
     /// A render that does more than read atoms.
     fn render_excess(&mut self, e: &Excess, list: &str) {
+        self.diagnostics.push(
+            Diagnostic::error(
+                codes::U004,
+                format!(
+                    "a view's render and a derived atom only read atoms: {list} is not allowed here"
+                ),
+                e.span,
+            ).with_fix(|| {
         let writes = e
             .services
             .iter()
@@ -303,15 +303,8 @@ impl Checker<'_> {
             ),
         ];
         let fix = fixes.into_iter().flatten().collect::<Vec<_>>().join("; ");
-        self.diagnostics.push(
-            Diagnostic::error(
-                codes::U004,
-                format!(
-                    "a view's render and a derived atom only read atoms: {list} is not allowed here"
-                ),
-                e.span,
-            )
-            .with_fix(fix, Vec::new()),
+                (fix, Vec::new())
+            }),
         );
     }
 }

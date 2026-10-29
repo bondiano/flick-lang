@@ -43,10 +43,7 @@ impl Checker<'_> {
                         "`?` on an `Option` returns `None` from the function around it, but that function returns `{shown}`"
                     );
                     self.diagnostics
-                        .push(Diagnostic::error(codes::T003, message, span).with_fix(
-                        "in a runtime function, fail instead: `(Option.to_result error option)?`",
-                        Vec::new(),
-                    ));
+                        .push(Diagnostic::error(codes::T003, message, span).with_fix(|| ("in a runtime function, fail instead: `(Option.to_result error option)?`", Vec::new())));
                     return item;
                 }
                 self.typing.questions.insert(range(span), Question::Option);

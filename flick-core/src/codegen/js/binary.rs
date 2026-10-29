@@ -52,7 +52,11 @@ impl Gen<'_> {
         let mut js = self.ordered(&[lhs, rhs]);
         let r = operand(js.pop().unwrap_or_default(), rhs, true);
         let l = operand(js.pop().unwrap_or_default(), lhs, false);
-        let (l, r) = (&format!("{}{l}", self.mark(span)), &r);
+        #[cfg(feature = "source-maps")]
+        let l = format!("{}{l}", self.mark(span));
+        #[cfg(not(feature = "source-maps"))]
+        let _ = span;
+        let (l, r) = (&l, &r);
         match op {
             BinOp::Eq => format!("{}({l}, {r})", self.rt("equals")),
             BinOp::NotEq => format!("!{}({l}, {r})", self.rt("equals")),

@@ -53,17 +53,14 @@ impl Checker<'_> {
         } else {
             "flat_map"
         };
-        let replacement = format!("List.{function} {} {}", self.operand(f), self.operand(xs));
-        self.lint(
-            code,
-            message.to_owned(),
-            self.span(node),
+        self.lint(code, message.to_owned(), self.span(node), |this| {
+            let replacement = format!("List.{function} {} {}", this.operand(f), this.operand(xs));
             (
-                &format!("use `List.{function}`"),
-                vec![self.replace(node, &replacement)],
+                format!("use `List.{function}`"),
+                vec![this.replace(node, &replacement)],
                 true,
-            ),
-        );
+            )
+        });
     }
 
     /// T048 and T049: `List.length xs == 0` and the like, of a
@@ -101,33 +98,32 @@ impl Checker<'_> {
         let filtered = self
             .list_applied(unparen(list))
             .filter(|(n, a)| n == "filter" && a.len() == 2);
-        let (code, test, message) = match &filtered {
-            Some((_, a)) => (
+        let (code, message) = if filtered.is_some() {
+            (
                 codes::T048,
-                format!("List.any {} {}", self.operand(a[0]), self.operand(a[1])),
                 "the length of a `List.filter` compared with zero: `List.any` stops at the first match",
-            ),
-            None => (
+            )
+        } else {
+            (
                 codes::T049,
-                format!("List.is_empty {}", self.operand(list)),
                 "a length compared with zero: `List.is_empty` says it",
-            ),
+            )
         };
-        let any = code == codes::T048;
-        let replacement = match (any, empty) {
-            (true, true) | (false, false) => format!("not ({test})"),
-            _ => test,
-        };
-        self.lint(
-            code,
-            message.to_owned(),
-            self.span(node),
+        self.lint(code, message.to_owned(), self.span(node), |this| {
+            let test = match &filtered {
+                Some((_, a)) => format!("List.any {} {}", this.operand(a[0]), this.operand(a[1])),
+                None => format!("List.is_empty {}", this.operand(list)),
+            };
+            let replacement = match (code == codes::T048, empty) {
+                (true, true) | (false, false) => format!("not ({test})"),
+                _ => test,
+            };
             (
                 "say it directly",
-                vec![self.replace(node, &replacement)],
+                vec![this.replace(node, &replacement)],
                 true,
-            ),
-        );
+            )
+        });
     }
 
     /// T051: `match o with | Some x -> x | None -> d` is
@@ -158,21 +154,23 @@ impl Checker<'_> {
         ) {
             return;
         }
-        let replacement = format!(
-            "Option.with_default {} {}",
-            self.operand(default),
-            self.operand(scrutinee)
-        );
         self.lint(
             codes::T051,
             "a `match` that unwraps an `Option` with a default: `Option.with_default` says it"
                 .to_owned(),
             self.span(node),
-            (
-                "use `Option.with_default`",
-                vec![self.replace(node, &replacement)],
-                true,
-            ),
+            |this| {
+                let replacement = format!(
+                    "Option.with_default {} {}",
+                    this.operand(default),
+                    this.operand(scrutinee)
+                );
+                (
+                    "use `Option.with_default`",
+                    vec![this.replace(node, &replacement)],
+                    true,
+                )
+            },
         );
     }
 
