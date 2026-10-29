@@ -321,11 +321,13 @@ main` with one file per Flick module and the runtime package `flickrt`
 beside it, which `flick build` compiles with `go build` into
 `flick-<entry>`. Only what `main` reaches is compiled, and a construct the
 target does not compile yet is `FLICK-P012` with what it names, never a
-runtime stub; for now that is a lazy `for` that reads services, schemas
-and codecs, and a `foreign` binding without a Go implementation in the
-runtime, which is most of Effect's modules beyond the core: `Exit` values,
-`Semaphore`, a `Stream` beyond a `Seq`, a `Layer` beyond `succeed`, `merge`
-and `override`.
+runtime stub; for now that is a lazy `for` that reads services, refined
+types, `codec` blocks, schemas deriving `Url` or `Form`, and a `foreign`
+binding without a Go implementation: in the runtime for the standard
+library, which is still much of Effect beyond the core (a `Stream` beyond a
+`Seq`, queues, a `Layer` beyond `succeed`, `merge` and `override`, most of
+`Codec` and `Http`), or beside the program for its own bindings (see
+[FFI](../ffi/#the-go-target)).
 
 Values have the representation of the JS target, in Go terms:
 
@@ -391,8 +393,21 @@ a goroutine. Interruption is cooperative: it is checked at each runtime
 call, in blocking waits and at the head of every loop a tail call became,
 and `Effect.uninterruptible` defers it. A `scope` closes as on the JS
 target: admission ends, children are interrupted and awaited with their
-supervisors, then finalizers run last first and their failures join the
-body's. `Ref`, `Deferred` and `Latch` are safe across goroutines.
+supervisors, the foreign calls they left running end, then finalizers run
+last first and their failures join the body's. `Ref`, `Deferred`, `Latch`,
+the semaphores and the synchronized refs are safe across goroutines.
+SIGINT and SIGTERM interrupt `main` and close its scopes, and the exit code
+is the JS runner's: 130 or 143 when only the signal stopped it. What a
+program printed is written out before a fiber blocks, and line by line once
+fibers run beside `main`.
+
+A schema witness is a value of the runtime's schemas, and `Codec.json`
+reads and writes the canonical JSON form of the JS target, with the same
+issues, paths and texts, and `Json.parse` fails with V8's messages. An
+`Http.Server.serve` listens with Go's `net/http`: each request runs its
+handler in a fiber of its own with the services of the call, a failure
+answers with the status of the JS target, and closing the scope stops
+accepting connections and waits for the running requests.
 
 ## Not compiled yet
 

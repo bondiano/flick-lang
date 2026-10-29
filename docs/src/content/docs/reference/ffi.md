@@ -85,6 +85,28 @@ in an array, a throwing proxy or a value past the limits is a
 `SnapshotError` naming the path. A subtree shared by two places is copied
 once.
 
+## The go target
+
+On the go target a binding to a module of the program — a relative path,
+`./timers.mjs` — calls the Go function of the same name in `timers.go`
+beside it, which the build copies into the Go module; without that file the
+binding is `FLICK-P012`, naming the file to add. The file is `package main`
+and imports `flick.app/flickrt`. Its functions take and return
+`flickrt.Value`, in the representation of the go target (see
+[Code generation](../codegen/#go-target)), and take every argument of the
+binding at once, none for the `()` of `arity 0`:
+
+| Mode | The Go function |
+| - | - |
+| `pure`, `sync` | `f(a0, a1, …)` |
+| `effect` | `f(fb *flickrt.Fiber, a0, …)`: it runs in the calling fiber, and acquires into the scope around the call with `flickrt.AcquireRelease` |
+| `async` | `f(ctx flickrt.Context, a0, …)` in a goroutine of its own: `ctx` is cancelled on interruption, and the innermost owner waits for the call to return before it releases resources, as it waits for a promise |
+
+A panic is a defect. `catch`, `this`, `optional`, `variadic` and adapted
+callbacks are `FLICK-P012` on the go target for now. The Go representation
+of values is not a stable interface yet: a Go file follows the compiler it
+is built with.
+
 ## Importing a package's `.d.ts`
 
 `flick ffi import <package> --out <dir>` reads the declarations of an

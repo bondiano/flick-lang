@@ -71,14 +71,30 @@ GOOS=darwin GOARCH=arm64 flick build --release
 - AC: сервисы — окружение исполнения; lookup происходит в момент, заданный семантикой, тест на `provide` внутри и снаружи `task`.
 - AC: порт `Cause` (fail/die/interrupt, sequential/parallel) с рендером, совпадающим с `runtime/src/cause.ts` на корпусе ошибок `tests/run`.
 
-**G6. Конкурентность и scopes.** 🔶 `4f1c8ef`, `b70080a`, `fcf5b32` (волокно — goroutine; `Fiber.spawn`/`join`/`interrupt`, fail-fast `parallel*` и конкурентный `Effect.all` оставляют причину первой ошибки, как Effect 4, сверено в Node; `race_*`, `timeout*`; прерывание проверяется в `Run`, в блокирующих ожиданиях и в голове хвостового цикла; `uninterruptible(_mask)`, `ensuring`; owner закрывается как `owner.ts` — без closing-хуков и ожидания foreign-промисов, которых на Go пока нет; `Ref` под mutex, `Deferred`, `Latch`; e2e `runtime/{parallel,scope_close,scope_releases,scope_owners,handoff}`, `codegen/release`; `go test -race` чистый. Осталось: тест на зависший foreign I/O, прерываемый таймаутом, — ждёт I/O на Go; значения `Exit` (`parallel_exits`, `Fiber.await_`), `on_exit`/`on_interrupt`, `Semaphore`/`FiberMap`/`SubscriptionRef` — поэтому `stdlib/effect/{deferred,ref,fibers}` целиком не переносимы)
+**G6. Конкурентность и scopes.** ✅ `4f1c8ef`, `b70080a`, `fcf5b32`, `d2f2827`, `eaf267b`, `8c932cf`, `fd8aa60` (волокно — goroutine; `Fiber.spawn`/`join`/`await_`/`interrupt*`, fail-fast `parallel*` и конкурентный `Effect.all` оставляют причину первой ошибки, как Effect 4, сверено в Node; `race_*`, `race_all*`, `timeout*`; прерывание проверяется в `Run`, в блокирующих ожиданиях и в голове хвостового цикла; `uninterruptible(_mask)`, `ensuring`, `on_exit`/`on_interrupt`; owner закрывается как `owner.ts` и ждёт прерванные foreign-вызовы до финализаторов; значения `Exit` и `Cause`; `Ref` под mutex, `Deferred`, `Latch`, `Semaphore`, `PartitionedSemaphore`, `SynchronizedRef`/`SubscriptionRef` (без потока `changes`), `FiberSet`/`FiberMap`/`FiberHandle`, `cached*`, `ExecutionPlan`; программа даёт Go-сторону своих foreign-привязок файлом `x.go` рядом с `x.mjs`, `async` получает `context`, отменяемый прерыванием; e2e `runtime/{parallel,scope_close,scope_releases,scope_owners,handoff,exits,hung_io,concurrency,scopes,releases,owners}`, `stdlib/effect/{deferred,ref,fibers}`, `codegen/{release,for_loop}`; `go test -race` чистый. В тестах `deferred` и `fibers` порядок, который на JS даёт планировщик, сделан явным паузами — вывод на JS тот же. Scheduler на Go — непрозрачное значение: уступки никто не наблюдает)
 - AC: fork/join, fail-fast parallel: ошибка ветви прерывает остальные, ждёт их завершения, ошибки cleanup попадают в `Cause`.
 - AC: отмена через точки прерывания (каждый runtime-вызов и I/O); неотменяемые участки — явные; тест на зависший I/O, прерываемый таймаутом.
 - AC: scope повторяет `runtime/src/owner.ts`: перестаёт принимать работу, останавливает и ждёт детей и supervisor-задачи, затем финализаторы в обратном порядке; финализатор не опережает ребёнка (тест).
 - AC: `Ref` атомарен; `modify` из 1000 goroutines даёт точную сумму; `go test -race` по runtime чистый.
 - AC: хвостовой вызов, ставший в Go циклом (G4), — точка прерывания: в голове цикла проверка отмены, иначе цикл без других runtime-вызовов нельзя прервать.
 
-**G7. Вертикальный срез и go/no-go.** ⬜
+**G7. Вертикальный срез и go/no-go.** ✅ `15c3404`, `266d7cc`, `e2f66dd`, `9d5f335`, `eed264d`, `90c9a35` (срез на коде Flick — `runtime/slice`: ADT/match/замыкание/словарь, холодный `task`, `Ref`, разделяемый 50 ветвями `parallel_all`, хвостовая рекурсия на 10⁷, `parallel` с ошибкой ветви; файл в scope — `runtime/scoped_file`, сокет — слушающий сокет `Http.Server.serve` в `stdlib/http/serve`, оба освобождаются при успехе, ошибке и прерывании; `main` на Go обрабатывает SIGINT/SIGTERM с кодами 130/143, тест `flick/tests/go_main.rs`; запуск без Node — исполняемый файл)
+
+Замеры: `just load-json go` и `just load-json js` — сервер `tools/load/json`, `GET /item/:id` декодирует хранимый JSON-документ производной схемой и отвечает JSON записи через `schema_json`; клиент — `tools/load/index.mjs` (Node, замкнутый цикл, медиана трёх прогонов по 10 с, затем 30 с при c = 64), старт — `tools/load/startup.mjs` (от запуска до первого ответа 200, медиана 10). Машина: Ryzen 9 9950X3D (16 ядер / 32 потока), WSL2, Node 24.21.0, Go 1.26.10, профиль release; на машине шла другая работа (load average ≈ 6,5), так что сравнивать стоит отношения.
+
+| | JS-target (Node) | Go-target |
+| - | -: | -: |
+| req/s, c = 1 | 2 208 | 2 300 |
+| req/s, c = 16 | 17 245 | 12 966 |
+| req/s, c = 64 | 20 430 | 14 528 |
+| req/s, 30 с при c = 64 | 20 981 | 12 569 |
+| p50 / p99 при c = 64, мс | 2,44 / 12,41 | 3,73 / 15,67 |
+| RSS до нагрузки / пик / после 30 с простоя, МиБ | 273 / 283 / 288 | 24 / 26 / 23 |
+| старт до первого ответа, мс | 237 | 8,9 |
+| что поставляется | 133 КБ сборки + `node_modules` (Effect, runtime) + Node | один исполняемый файл 9,1 МБ |
+| ошибок | 0 из 1 981 723 | 0 из 1 394 204 |
+
+Решение (2026-10-29): продолжаем G8+, условие N0 не выполнено. Go даёт в ~11 раз меньше памяти, старт в ~27 раз быстрее и один файл без Node, а нагрузку без ошибок держит с той же задержкой при одном клиенте; под конкурентной нагрузкой пропускная способность на ~30 % ниже, p99 выше на ~25 %. Это цена runtime без оптимизаций (боксинг `Value`, копии окружения сервисов и записей на запрос, разбор документа без компиляции схемы), а не потолок Go: профилирование и снижение аллокаций — отдельная задача перед G10c, по тем же `just load-json`.
 - AC: пункты §10 исследования на настоящем коде Flick: ADT/match/замыкание/словарь; cold `task`; scoped-файл и сокет с освобождением при успехе, ошибке и отмене; parallel с ошибкой ветви; разделяемый `Ref`; хвостовая рекурсия; запуск без Node.
 - AC: замеры на одном прикладном сценарии (HTTP-сервер + JSON): RPS, p99, RSS, размер бинарника, время старта — против JS-target; таблица в этом файле.
 - AC: записано решение: продолжаем G8+, или условие N0 выполнено.
@@ -86,13 +102,13 @@ GOOS=darwin GOARCH=arm64 flick build --release
 **G8. `Layer` с паритетом.** ⬜
 - AC: построение, identity-based sharing и memoization, scoped-слои и порядок освобождения как в Effect; `tests/run` по слоям переносимы.
 
-**G9. `Schema` и кодеки с паритетом.** ⬜
+**G9. `Schema` и кодеки с паритетом.** 🔶 `e2f66dd` (свидетели схем без refined-типов, канонический JSON-кодек с текстами issues JS-target, `Json.parse`/`stringify` с сообщениями V8 по корпусу из Node; переносимы `schema/{json_wire,derive}`. Осталось: refined-типы, блоки `codec`, `Url`/`Form`, экспорт JSON Schema, остальной `Codec`, валидация по типу)
 - AC: `deriving Schema`, decode/encode, JSON-кодеки, тексты ошибок декодирования совпадают с JS-target; переносимы `tests/run/schema`.
 
 **G10. stdlib.** ⬜ (после G7; каждый подпункт — переносимые `tests/run/stdlib/*`)
 - **G10a.** ✅ `915e69d` `634ab28` `4de9b39` `873b8c4` `f2f4f75` Prelude, `List`, `Option`, `Result`, `String`, числа, `Seq`, коллекции, `Decimal`. (Ленивый `for` и `Seq`; `HashMap`/`HashSet` в порядке HAMT по `Hash.hash` из Effect, тест `stdlib/hash_order`; `BigDecimal`/`BigInt`/`Duration` по корпусу результатов Effect из Node; запись хранит порядок ключей JS; нормализация и регистр по таблицам из ICU Node (`tools/go-unicode/gen.mjs`); `RegExp` на RE2. Переносимы `stdlib/{seqs,collections,monoids,decimals,hash_order}` и `stdlib/effect/{array,option,number,string,order,combine,hash_map,hash_set}`. Остались: `stdlib/seq` (Stream), `string_locale` (`locale_compare`, коллация Intl — `P012`), `Record`/`Duration`/`Function` целиком.)
 - **G10b.** `Cli` (блок `cli`, `Cli/Prompt`), файлы, env, процессы, сигналы и код выхода — аналог `Runner.Node`.
-- **G10c.** HTTP: `Http.Server`, `Http.Router`, клиент; e2e `tests/run/stdlib/http` и `server`.
+- **G10c.** HTTP: `Http.Server`, `Http.Router`, клиент; e2e `tests/run/stdlib/http` и `server`. (🔶 `9d5f335`: `serve` на `net/http` с graceful-закрытием scope, `Router` с `:param`, тела и ответы JSON через схемы, `text`/`empty`; переносим `stdlib/http/serve`. Осталось: заголовки, cookies, клиент, `HttpApi`, потоки, статика, формы.)
 - **G10d.** `Sql` на PostgreSQL: запросы, транзакции, отмена; `tests/postgres` проходит на Go-target.
 
 **G11. Диагностика JS-only.** ⬜
