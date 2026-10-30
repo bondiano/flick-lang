@@ -1,7 +1,5 @@
 package flickrt
 
-import "sort"
-
 // Lists are immutable []Value: an operation returns a new slice, or the
 // same one when nothing changes. Callbacks are curried Flick functions.
 
@@ -157,13 +155,45 @@ func ListPartition(p, xs Value) Value {
 	return []Value{yes, no}
 }
 
-// ListSortBy is a stable sort on a copy.
+// ListSortBy is a stable sort on a copy, merging through a buffer:
+// sort.SliceStable merges in place by rotations, O(n log² n) moves.
 func ListSortBy(cmp, xs Value) Value {
 	out := append([]Value{}, List(xs)...)
-	sort.SliceStable(out, func(i, j int) bool {
-		return apply2(cmp, out[i], out[j]).(*Data).Tag == LT.(*Data).Tag
+	lt := LT.(*Data).Tag
+	mergeSort(out, make([]Value, len(out)/2), func(a, b Value) bool {
+		return apply2(cmp, a, b).(*Data).Tag == lt
 	})
 	return out
+}
+
+// mergeSort sorts `xs` stably, with `buf` of half its length to merge in;
+// halves already in order are not merged, so sorted input costs n calls.
+func mergeSort(xs, buf []Value, less func(a, b Value) bool) {
+	if len(xs) <= 12 {
+		for i := 1; i < len(xs); i++ {
+			for j := i; j > 0 && less(xs[j], xs[j-1]); j-- {
+				xs[j], xs[j-1] = xs[j-1], xs[j]
+			}
+		}
+		return
+	}
+	mid := len(xs) / 2
+	mergeSort(xs[:mid], buf, less)
+	mergeSort(xs[mid:], buf, less)
+	if !less(xs[mid], xs[mid-1]) {
+		return
+	}
+	left := buf[:copy(buf, xs[:mid])]
+	i, j, k := 0, mid, 0
+	for ; i < len(left) && j < len(xs); k++ {
+		// an equal element of the left half goes first: stable
+		if less(xs[j], left[i]) {
+			xs[k], j = xs[j], j+1
+		} else {
+			xs[k], i = left[i], i+1
+		}
+	}
+	copy(xs[k:], left[i:])
 }
 
 func ListLength(xs Value) Value { return int32(len(List(xs))) }
