@@ -2,6 +2,7 @@ package flickrt
 
 import (
 	"math"
+	"slices"
 	"strings"
 )
 
@@ -10,8 +11,37 @@ import (
 
 func SchemaJsonCodec(s Value) Value { return sch(s).jsonOf() }
 
-// JsonCodec is `Schema.json`: a JSON value as itself.
-var JsonCodec Value = sch(SchemaUnknown).jsonOf()
+// JsonCodec is `Json.json`, Effect's `Schema.Json`: a JSON value as
+// itself. A tree that holds anything else, such as an infinity a parse
+// gave for `1e400`, fails as a whole, both ways.
+var JsonCodec Value = jsonValue{}
+
+type jsonValue struct{}
+
+func isJSONTree(in Value) bool {
+	switch x := in.(type) {
+	case *jsonNull, string, bool, int32:
+		return true
+	case float64:
+		return !math.IsNaN(x) && !math.IsInf(x, 0)
+	case []Value:
+		return !slices.ContainsFunc(x, func(v Value) bool { return !isJSONTree(v) })
+	case *Record:
+		return !slices.ContainsFunc(x.vals, func(v Value) bool { return !isJSONTree(v) })
+	}
+	return false
+}
+
+func (jsonValue) accepts(in Value) bool { return isJSONTree(in) }
+
+func (jsonValue) decode(in Value) (Value, []issue) {
+	if !isJSONTree(in) {
+		return nil, expected("JSON value", in)
+	}
+	return in, nil
+}
+
+func (j jsonValue) encode(v Value) (Value, []issue) { return j.decode(v) }
 
 var CodecBool Value = sch(SchemaBool).jsonOf()
 

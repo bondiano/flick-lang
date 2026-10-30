@@ -1,0 +1,143 @@
+// Strings are sequences of UTF-16 code units on every target, as in
+// JavaScript: a character outside the BMP is a surrogate pair of two
+// units, slicing may split it, and the halves join back into it.
+module Language.Strings exposing (tests)
+
+concat : String -> String -> String
+let concat a b = a ++ b
+
+earth : String
+let earth = "a\u{1F30D}b"
+
+tests : List Test.Test
+let tests =
+  [
+    Test.group
+      "length"
+      [
+        Test.test "ASCII" (fun () -> Test.equal 5 (String.length (concat "he" "llo"))),
+        Test.test "BMP" (fun () -> Test.equal 6 (String.length (concat "при" "вет"))),
+        Test.test "surrogate pair" (fun () -> Test.equal 4 (String.length earth)),
+        Test.test "combining mark" (fun () -> Test.equal 2 (String.length (concat "e" "\u{301}"))),
+        Test.test
+          "family emoji"
+          (fun () ->
+            Test.equal 8 (String.length (concat "\u{1F468}\u{200D}\u{1F469}" "\u{200D}\u{1F467}"))),
+        Test.test
+          "chars are code points"
+          (fun () -> Test.equal ["a", "\u{1F30D}", "b"] (String.chars earth)),
+      ],
+    Test.group
+      "slicing"
+      [
+        Test.test
+          "splits a pair"
+          (fun () ->
+            Test.equal
+              "(\"\\ud83c\", 1)"
+              (show (String.slice 1 2 earth, String.length (String.slice 2 3 earth)))),
+        Test.test
+          "halves join back"
+          (fun () -> Test.equal earth (concat (String.slice 0 2 earth) (String.slice 2 4 earth))),
+        Test.test "negative indices" (fun () -> Test.equal "b" (String.slice (-1) 4 earth)),
+        Test.test "out of range" (fun () -> Test.equal "" (String.slice 9 12 earth)),
+        Test.test
+          "take_left"
+          (fun () -> Test.equal "\"a\\ud83c\"" (show (String.take_left 2 earth))),
+        Test.test
+          "char_code_at"
+          (fun () ->
+            Test.equal
+              [Some 55356, Some 57101, None]
+              [
+                String.char_code_at 1 earth,
+                String.char_code_at 2 earth,
+                String.char_code_at 9 earth,
+              ]),
+        Test.test
+          "code_point_at"
+          (fun () ->
+            Test.equal
+              [Some 127757, Some 57101]
+              [String.code_point_at 1 earth, String.code_point_at 2 earth]),
+        Test.test
+          "index_of counts units"
+          (fun () -> Test.equal (Some 3) (String.index_of "b" earth)),
+        Test.test "at -1" (fun () -> Test.equal (Some "b") (String.at (-1) earth)),
+        Test.test
+          "split on empty splits units"
+          (fun () -> Test.equal 4 (List.length (String.split "" earth))),
+      ],
+    Test.group
+      "case mapping"
+      [
+        Test.test
+          "upper"
+          (fun () -> Test.equal "STRASSE ΣΊΣΥΦΟΣ" (String.to_upper (concat "straße " "σίσυφος"))),
+        Test.test
+          "lower"
+          (fun () ->
+            Test.equal "i̇stanbul ὀδυσσεύς" (String.to_lower (concat "İstanbul " "ὈΔΥΣΣΕΎΣ"))),
+        Test.test "final sigma" (fun () -> Test.equal "σς" (String.to_lower (concat "Σ" "Σ"))),
+        Test.test "ligature" (fun () -> Test.equal "FFI" (String.to_upper (concat "" "\u{FB03}"))),
+        Test.test "capitalize" (fun () -> Test.equal "Élan" (String.capitalize (concat "é" "lan"))),
+        Test.test
+          "outside the BMP"
+          (fun () -> Test.equal "\u{10428}" (String.to_lower (concat "" "\u{10400}"))),
+      ],
+    Test.group
+      "concatenation"
+      [
+        Test.test "++" (fun () -> Test.equal "ab\u{1F600}" (concat "ab" "\u{1F600}")),
+        Test.test
+          "lone halves"
+          (fun () ->
+            Test.equal
+              "\u{1F600}"
+              (concat (String.slice 0 1 "\u{1F600}") (String.slice 1 2 "\u{1F600}"))),
+        Test.test "join" (fun () -> Test.equal "a, b, c" (String.join ", " ["a", "b", "c"])),
+        Test.test "repeat" (fun () -> Test.equal "ababab" (String.repeat 3 (concat "a" "b"))),
+        Test.test
+          "pad_start counts units"
+          (fun () ->
+            Test.equal "\u{1F600}\u{1F600}x" (String.pad_start 5 "\u{1F600}" (concat "" "x"))),
+      ],
+    Test.group
+      "searching and trimming"
+      [
+        Test.test
+          "trim strips Unicode spaces"
+          (fun () -> Test.equal "x" (String.trim (concat "\u{FEFF} x" " \u{A0}\u{3000}"))),
+        Test.test
+          "replace_all with empty"
+          (fun () -> Test.equal "-a-b-" (String.replace_all "" "-" (concat "a" "b"))),
+        Test.test
+          "contains"
+          (fun () ->
+            Test.equal
+              [true, false]
+              [String.contains "\u{1F30D}" earth, String.contains "c" earth]),
+        Test.test
+          "lines"
+          (fun () -> Test.equal ["a", "b", "", "c"] (String.lines (concat "a\r\nb\n" "\nc"))),
+        Test.test
+          "compare by code units"
+          (fun () -> Test.equal GT (compare (concat "\u{FF61}" "") "\u{1F600}")),
+      ],
+    Test.group
+      "show"
+      [
+        Test.test
+          "escapes"
+          (fun () -> Test.equal "\"q\\\"b\\\\s\\nt\\t\"" (show (concat "q\"b\\s\n" "t\t"))),
+        Test.test
+          "control characters"
+          (fun () -> Test.equal "\"\\u0000\\u0007\\u001f\"" (show (concat "\u{0}\u{7}" "\u{1F}"))),
+        Test.test
+          "non-ASCII stays"
+          (fun () -> Test.equal "\"é\u{1F600}\"" (show (concat "é" "\u{1F600}"))),
+        Test.test
+          "lone surrogate"
+          (fun () -> Test.equal "\"\\ud83d\"" (show (String.slice 0 1 "\u{1F600}"))),
+      ],
+  ]

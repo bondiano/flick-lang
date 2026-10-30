@@ -133,6 +133,30 @@ func NumberSameValue(a, b Value) Value {
 
 func BigIntOfInt(n Value) Value { return big.NewInt(int64(n.(int32))) }
 
+// BigIntOfFloat is `BigInt.from_number`: the integer a number holds
+// exactly, of any size, and None for a fraction, NaN or an infinity.
+func BigIntOfFloat(x Value) Value {
+	if FloatIsInteger(x) != true {
+		return None
+	}
+	n, _ := new(big.Float).SetFloat64(x.(float64)).Int(nil)
+	return Some(n)
+}
+
+// BigIntString is JS `String(n)`: the decimal digits without `n`.
+func BigIntString(n Value) Value { return n.(*big.Int).String() }
+
+// BigIntParse is `BigInt.parse`: optional sign and decimal digits only,
+// in JS white space.
+func BigIntParse(s Value) Value {
+	text := strings.TrimFunc(s.(string), isJSSpace)
+	if !finiteInt.MatchString(text) {
+		return None
+	}
+	n, _ := new(big.Int).SetString(text, 10)
+	return Some(n)
+}
+
 // FloatOfBigInt is JS `Number(n)`: the nearest Float.
 func FloatOfBigInt(n Value) Value {
 	f, _ := new(big.Float).SetInt(n.(*big.Int)).Float64()

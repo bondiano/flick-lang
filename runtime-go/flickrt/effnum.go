@@ -11,16 +11,17 @@ import (
 // library binds. A function Effect takes data-last, `f(a)(self)`, takes
 // `a`, then `self`.
 
-// numberOrder is Effect's `Order.Number`: NaN is equal to everything.
+// numberOrder is Effect's `Order.Number`: NaN is less than every other
+// number and equal to itself, and -0 equals 0.
 func numberOrder(a, b Value) int {
 	x, y := a.(float64), b.(float64)
 	switch {
-	case x < y:
+	case x == y, math.IsNaN(x) && math.IsNaN(y):
+		return 0
+	case math.IsNaN(x), x < y:
 		return -1
-	case x > y:
-		return 1
 	}
-	return 0
+	return 1
 }
 
 func bigOrder(a, b Value) int { return a.(*big.Int).Cmp(b.(*big.Int)) }

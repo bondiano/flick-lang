@@ -2,6 +2,7 @@ package flickrt
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"strings"
 	"testing"
@@ -35,5 +36,23 @@ func TestJsonRoundTrips(t *testing.T) {
 	want := `{"1":"x\n","2":{},"b":[true,null,0,2.5,1e+21,"😀\ud83d"]}`
 	if got != want {
 		t.Fatalf("got %s, want %s", got, want)
+	}
+}
+
+// `Json.json` is Effect's `Schema.Json`: a tree with a non-finite number
+// anywhere is no JSON value, and the whole input is what it names.
+func TestJsonCodecRefusesNonFiniteNumbers(t *testing.T) {
+	codec := codecOf(JsonCodec)
+	if _, issues := codec.decode([]Value{1.0, Rec("a", JsonNull, "b", "x")}); issues != nil {
+		t.Errorf("a JSON tree: %v", issues)
+	}
+	for message, input := range map[string]Value{
+		"expected JSON value, got an array":  []Value{1.0, math.Inf(1)},
+		"expected JSON value, got an object": Rec("a", []Value{math.NaN()}),
+		"expected JSON value, got NaN":       math.NaN(),
+	} {
+		if _, issues := codec.decode(input); len(issues) != 1 || issues[0].message != message {
+			t.Errorf("%v: %v, want %q", input, issues, message)
+		}
 	}
 }

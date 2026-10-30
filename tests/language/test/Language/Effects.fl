@@ -1,0 +1,286 @@
+// Effects: a task is cold and runs each time it is awaited, typed errors
+// are handled by `try`, a defect is not an error, finalizers run in
+// reverse order of acquisition and before a failure reaches its handler,
+// and a failing branch of `parallel` interrupts its sibling, which ends
+// first.
+module Language.Effects exposing (tests)
+
+type error NotFound = NotFound String
+  deriving Show
+
+type error Invalid = Invalid Int
+  deriving Show
+
+/// Lines in the order they were noted.
+type alias Log = Ref (List String)
+
+note : Log -> String ->{} Unit
+let note log text = Ref.set log (Ref.get log ++ [text])
+
+nap : Float ->{} Unit
+let nap millis =
+  match Duration.millis millis with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+find : String ->{; NotFound} Int
+let find key = if key == "a" then 1 else from_result (Err (NotFound key))
+
+check : Int ->{; Invalid} Int
+let check n = if n > 0 then n else from_result (Err (Invalid n))
+
+/// The defect a task dies with, or what it gave instead.
+defect_of : Eff none e String ->{} String
+let defect_of t =
+  let exit = Effect.exit t
+  match Exit.find_defect exit with
+  | Ok text -> "defect: " ++ text
+  | Err _ -> show (Exit.value exit)
+
+/// Both errors, by which input fails.
+lookup : String -> Int ->{; NotFound, Invalid} Int
+let lookup key n = find key + check n
+
+tests : List Test.Test
+let tests =
+  [
+    Test.effect_test
+      "a task is cold"
+      (task {
+        let runs = Ref.make 0
+        let counted : Eff none none Int = task {
+          Ref.set runs (Ref.get runs + 1)
+          Ref.get runs
+        }
+        Test.expect (Test.equal 0 (Ref.get runs))
+        let first = await counted
+        let second = await counted
+        Test.expect (Test.equal (1, 2, 2) (first, second, Ref.get runs))
+      }),
+    Test.group
+      "typed errors"
+      [
+        Test.effect_test
+          "try handles by constructor"
+          (task {
+            let outcomes =
+              List.map_effect
+                (fun (key, n) ->
+                  try
+                    show (lookup key n)
+                  with
+                  | NotFound k -> "not found " ++ k
+                  | Invalid m when m < -5 -> "very invalid"
+                  | Invalid m -> "invalid " ++ show m)
+                [("a", 2), ("b", 2), ("a", 0), ("a", -9)]
+            Test.expect (Test.equal ["3", "not found b", "invalid 0", "very invalid"] outcomes)
+          }),
+        Test.effect_test
+          "an unhandled error passes through"
+          (task {
+            let inner =
+              try
+                try lookup "a" 0 with
+                | NotFound _ -> 0
+              with
+              | Invalid n -> 100 + n
+            Test.expect (Test.equal 100 inner)
+          }),
+        Test.effect_test
+          "a handler may fail again"
+          (task {
+            let outcome =
+              try
+                try find "x" with
+                | NotFound k -> check (0 - String.length k)
+              with
+              | Invalid n -> n
+            Test.expect (Test.equal (-1) outcome)
+          }),
+        Test.effect_test
+          "a variable arm takes any error"
+          (task {
+            let shown = try show (find "q") with
+              | e -> show e
+            Test.expect (Test.equal "NotFound \"q\"" shown)
+          }),
+      ],
+    Test.group
+      "defects"
+      [
+        Test.effect_test
+          "a defect of the runtime gives its message"
+          (task {
+            let outcome = defect_of (task { show (Int.unsafe_div 1 (List.length [])) })
+            Test.expect (Test.equal "defect: Int.unsafe_div: division by zero" outcome)
+          }),
+        Test.effect_test
+          "a failed let assert names its place and value"
+          (task {
+            let outcome = defect_of (task {
+              let assert [x] = List.range 0 2 as "one item"
+              show x
+            })
+            Test.expect (Test.equal "defect: Language.Effects:121: one item: [0,1]" outcome)
+          }),
+        Test.effect_test
+          "exits"
+          (task {
+            let exits = [
+              Effect.exit (task { 1 }),
+              Effect.exit (task { check 0 }),
+              Effect.exit (task { Int.unsafe_rem 1 (List.length []) }),
+            ]
+            let flags =
+              List.map
+                (fun e ->
+                  Exit.match_
+                    (fun v -> "value " ++ show v)
+                    (fun f -> show (Cause.has_fails f, Cause.has_dies f))
+                    e)
+                exits
+            Test.expect (Test.equal ["value 1", "(true, false)", "(false, true)"] flags)
+          }),
+      ],
+    Test.group
+      "finalizers"
+      [
+        Test.effect_test
+          "ensuring runs before the handler"
+          (task {
+            let log = Ref.make []
+            let _ = try Effect.ensuring (task { note log "finalizer" }) (task {
+              note log "body"
+              check 0
+            }) with
+              | Invalid _ -> 0
+            note log "handled"
+            Test.expect (Test.equal ["body", "finalizer", "handled"] (Ref.get log))
+          }),
+        Test.effect_test
+          "a scope releases in reverse order"
+          (task {
+            let log = Ref.make []
+            scope {
+              let a = Resource.acquire_release (task {
+                note log "acquire a"
+                "a"
+              }) (fun x -> note log ("release " ++ x))
+              let b = Resource.acquire_release (task {
+                note log "acquire b"
+                "b"
+              }) (fun x -> note log ("release " ++ x))
+              note log ("use " ++ a ++ b)
+            }
+            note log "after"
+            Test.expect
+              (Test.equal
+                ["acquire a", "acquire b", "use ab", "release b", "release a", "after"]
+                (Ref.get log))
+          }),
+        Test.effect_test
+          "a failing scope releases before the handler"
+          (task {
+            let log = Ref.make []
+            let outcome =
+              try
+                scope {
+                  let _ =
+                    Resource.acquire_release
+                      (task { note log "acquire" })
+                      (fun _ -> note log "release")
+                  check (-3)
+                }
+              with
+              | Invalid n -> n
+            note log ("handled " ++ show outcome)
+            Test.expect (Test.equal ["acquire", "release", "handled -3"] (Ref.get log))
+          }),
+        Test.effect_test
+          "on_exit sees the exit"
+          (task {
+            let log = Ref.make []
+            let _ =
+              try Effect.on_exit
+                (
+                  fun e ->
+                    note log (Exit.match_ (fun v -> "value " ++ show v) (fun _ -> "failed") e)
+                )
+                (task { check 7 }) with
+              | Invalid _ -> 0
+            Test.expect (Test.equal ["value 7"] (Ref.get log))
+          }),
+      ],
+    Test.group
+      "concurrency"
+      [
+        Test.effect_test
+          "a failing branch interrupts its sibling, which ends first"
+          (task {
+            let log = Ref.make []
+            let outcome =
+              try
+                let _ = parallel (task {
+                  Effect.ensuring (task { note log "sibling ended" }) (task {
+                    nap 5000
+                    0
+                  })
+                }) (task {
+                  nap 5
+                  check 0
+                })
+                "both ended"
+              with
+              | Invalid n -> "failed with " ++ show n
+            note log outcome
+            Test.expect (Test.equal ["sibling ended", "failed with 0"] (Ref.get log))
+          }),
+        Test.effect_test
+          "results keep the order of the tasks"
+          (task {
+            let made = parallel_all 3 (List.map (fun n -> task {
+              nap (Int.to_float ((4 - n) * 3))
+              n * 10
+            }) [1, 2, 3, 4])
+            Test.expect (Test.equal [10, 20, 30, 40] made)
+          }),
+        Test.effect_test
+          "Ref.modify is atomic across fibers"
+          (task {
+            let total = Ref.make 0
+            let _ =
+              parallel_all
+                50
+                (List.map
+                  (fun _ -> task { Ref.modify total (fun n -> ((), n + 1)) })
+                  (List.range 0 200))
+            Test.expect (Test.equal 200 (Ref.get total))
+          }),
+        Test.effect_test
+          "the loser of a race, once started, is interrupted"
+          (task {
+            let log = Ref.make []
+            let winner = race_first (task {
+              Effect.ensuring (task { note log "loser ended" }) (task {
+                nap 5000
+                "slow"
+              })
+            }) (task {
+              nap 20
+              "fast"
+            })
+            note log winner
+            Test.expect (Test.equal ["loser ended", "fast"] (Ref.get log))
+          }),
+        Test.effect_test
+          "timeout"
+          (task {
+            let outcome = try timeout 5 (task {
+              nap 5000
+              "never"
+            }) with
+              | TimeoutError -> "timed out"
+            Test.expect (Test.equal "timed out" outcome)
+          }),
+      ],
+  ]

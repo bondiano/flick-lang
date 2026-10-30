@@ -41,9 +41,19 @@ e2e: docs-wasm
     pnpm -r typecheck
     pnpm -r lint
     pnpm -r test
-    cargo test -p flick --test e2e --test e2e_numbers --test go_main --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples -- --ignored
+    cargo test -p flick --test e2e --test e2e_numbers --test go_main --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples --test unicode_path -- --ignored
     cargo test -p flick-core --test consteval_node -- --ignored
     just go-test
+    just language
+
+# The language tests of tests/language on Node and as a Go executable, with
+# one seed: both must pass and write the same report
+language seed="42":
+    cargo build -p flick
+    cd tests/language && ../../target/debug/flick test --emit js --seed {{seed}} > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
+    cd tests/language && ../../target/debug/flick test --emit go --seed {{seed}} > ../../target/language-go.txt || { cat ../../target/language-go.txt; exit 1; }
+    diff -u target/language-js.txt target/language-go.txt
+    tail -n 1 target/language-go.txt
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
 bundle-size:
@@ -94,6 +104,11 @@ load-json target="go" soak="30" port="3920" workers="8" server_cpus="0-7" client
       node tools/load/startup.mjs --url "http://127.0.0.1:{{port}}/item/x" -- $server; \
       if [ "{{target}}" = go ]; then du -b tools/load/json/dist/go/flick-server; else du -sb tools/load/json/dist/js; fi; \
       exit $status
+
+# Time the programs of tools/bench, built in release, on Node and as Go executables: the median of `runs`
+bench runs="5":
+    cargo build -p flick
+    node tools/bench/index.mjs target/debug/flick {{runs}}
 
 # Run SQL queries against PostgreSQL in Docker (after `just e2e` installs the runtime)
 e2e-postgres:

@@ -153,6 +153,7 @@ runs every test; the full name of a test is `Module > group > name`.
 | `--seed <n>` | the seed of the generators; a failed run prints the one it used |
 | `--reporter human\|json` | lines per test and a summary, or one JSON object |
 | `--watch` | run again when a file of the project changes |
+| `--emit js\|go` | run on Node or as one Go executable, `.flick/test/flick-test`; by default by `build.emit` |
 
 Each result is `passed` or `failed` with what failed: `assertion`, `failure`
 (a typed error), `defect`, `cleanup` (the test's scope did not close

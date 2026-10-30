@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::{Document, DocumentArena, Documentable, NextBreakFitsMode, Position};
+use crate::{Document, DocumentArena, Documentable, Indentation, NextBreakFitsMode, Position};
 
 fn words<'a>(a: &'a DocumentArena<'a>, words: &[&'a str], separator: Document<'a>) -> Document<'a> {
     a.join(words.iter().map(|word| a.text(word)), separator)
@@ -192,6 +192,72 @@ fn set_nesting_puts_a_line_directive_at_column_0() {
         doc.to_pretty_string(80),
         "{\n    x := 1\n//line main.flick:7:1\n    y := 2\n}"
     );
+}
+
+/// `doc` printed with tabs of `width` columns, and the cursors it passed.
+fn with_tabs(doc: Document<'_>, limit: usize, width: usize) -> (String, Vec<(usize, Position)>) {
+    let mut seen = Vec::new();
+    let mut output = String::new();
+    doc.pretty_print_with(
+        limit,
+        Indentation::Tabs { width },
+        &mut output,
+        &mut |mark, at| seen.push((mark, at)),
+    )
+    .expect("a String accepts any text");
+    (output, seen)
+}
+
+#[test]
+fn tabs_indent_by_width_columns() {
+    let a = &DocumentArena::new();
+    let inner = docvec![a, a.line(), "b", docvec![a, a.line(), "c"].nest(a, 2)].nest(a, 4);
+    let directive = docvec![a, a.line(), "//line x:1"].set_nesting(a, 0);
+    let doc = docvec![
+        a,
+        "{",
+        docvec![a, a.line(), "a", inner, directive, a.line(), a.cursor(0)].nest(a, 4),
+        a.line(),
+        "}"
+    ];
+    let (output, seen) = with_tabs(doc, 80, 4);
+    // Whole tabs first, then spaces for what is left; set nesting still wins.
+    assert_eq!(output, "{\n\ta\n\t\tb\n\t\t  c\n//line x:1\n\n}");
+    // The cursor is at four layout columns but one UTF-16 code unit.
+    let at = Position {
+        line: 5,
+        column: 4,
+        utf16_column: 1,
+    };
+    assert_eq!(seen, [(0, at)]);
+    // The default is spaces, as before.
+    assert_eq!(
+        doc.to_pretty_string(80),
+        "{\n    a\n        b\n          c\n//line x:1\n\n}"
+    );
+}
+
+#[test]
+fn a_tab_counts_as_its_width_when_fitting() {
+    let a = &DocumentArena::new();
+    let group = words(a, &["aaa", "bbb"], a.break_("", " ")).group(a);
+    let doc = docvec![
+        a,
+        "{",
+        docvec![a, a.line(), group].nest(a, 8),
+        a.line(),
+        "}"
+    ];
+    // The group needs 8 + 7 columns: its two tabs count as eight.
+    assert_eq!(with_tabs(doc, 15, 4).0, "{\n\t\taaa bbb\n}");
+    assert_eq!(with_tabs(doc, 14, 4).0, "{\n\t\taaa\n\t\tbbb\n}");
+    // Tabs of one column: eight of them for the same nesting.
+    assert_eq!(
+        with_tabs(doc, 14, 1).0,
+        "{\n\t\t\t\t\t\t\t\taaa\n\t\t\t\t\t\t\t\tbbb\n}"
+    );
+    // A tab of no width is read as one column, never a division by zero.
+    assert_eq!(with_tabs(doc, 80, 0).0, with_tabs(doc, 80, 1).0);
 }
 
 #[test]

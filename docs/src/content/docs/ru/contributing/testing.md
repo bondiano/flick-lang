@@ -12,7 +12,8 @@ cargo install cargo-machete --version 0.9.2 --locked
 | - | - |
 | `just lint` | fmt, clippy (`-D warnings`, в том числе для `wasm32`), `cargo machete` (неиспользуемые зависимости Rust) |
 | `just check` | `just lint`, `cargo test --workspace` |
-| `just e2e` | `pnpm install --frozen-lockfile`, тесты среды выполнения, `tests/run/**` на Node, `flick test` на примерах проектов |
+| `just e2e` | `pnpm install --frozen-lockfile`, тесты среды выполнения, `tests/run/**` на Node, `flick test` на примерах проектов, `just language` |
+| `just language` | языковые тесты `tests/language` на Node и исполняемым файлом Go: оба запуска должны пройти с одинаковым отчётом |
 | `just bundle-size` | release-сборки `tools/bundle-size/pure.fl`, `tests/run/ui/counter.fl`, `tests/run/ui/atoms.fl` и плейграунда, собранные для браузера через rolldown; падает, если размер в gzip превышает бюджет из `tools/bundle-size/index.mjs` |
 
 Тесты сравнивают результаты с эталонными снимками через [`insta`](https://insta.rs).
@@ -100,6 +101,23 @@ let x : Float = "hi"
 
 Стандартная библиотека объявляет все сигнатуры из спецификации дословно:
 `flick-core/tests/stdlib_signatures.rs` читает их из блоков `text` спецификации.
+
+## Языковые тесты — `tests/language/`
+
+Проект на Flick, тестовые модули которого, по одному на область языка
+(`Language.Ints`, `Language.Strings`, `Language.Effects`, …), закрепляют его
+семантику буквальными ожидаемыми значениями: переполнение `Int`, запись чисел
+через `show`, строки UTF-16, равенство, записи, образцы, рекурсию, порядок
+хеш-коллекций, ошибки JSON и схем, эффекты и случаи, которые seed даёт тестам
+свойств. `just language` запускает их через `flick test --emit js` и
+`--emit go` с одним `--seed`; оба запуска должны пройти, а их отчёты — совпасть
+байт в байт. Сюда относится тест, на котором обе цели обязаны совпадать;
+расхождение между ними исправляется в среде выполнения, а не в тесте.
+
+`flick/tests/unicode_path.rs` собирает, запускает и тестирует проект в
+`target/tmp/проект ⭐` на обеих целях, как `test/unicode_path ⭐` в Gleam, и
+проверяет, что карта исходников и директивы `//line` Go по-прежнему ведут
+к его файлам `.fl`.
 
 ## Тесты среды выполнения — `runtime/test/`
 

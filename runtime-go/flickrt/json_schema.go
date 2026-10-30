@@ -62,6 +62,8 @@ func (x *schemaExport) codec(c codec, path string) Value {
 			closedObject([]string{"_tag"}, []Value{Rec("const", "None")}, true),
 			closedObject([]string{"_tag", "value"}, []Value{Rec("const", "Some"), x.codec(k.item, atPath(path, "value"))}, true),
 		})
+	case jsonValue:
+		refuseExport(path, "JSON value has no JSON form")
 	case losslessNumber:
 		return Rec("anyOf", []Value{Rec("type", "number"), Rec("enum", []Value{"NaN", "Infinity", "-Infinity", "-0"})})
 	case *transformed:

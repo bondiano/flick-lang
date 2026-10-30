@@ -1,0 +1,130 @@
+// `Int` is a 32-bit signed integer on every target: arithmetic wraps,
+// `/` truncates toward zero, and `/` and `%` by zero give 0. The operands
+// come in as arguments, so the runtime computes them, not the compiler.
+module Language.Ints exposing (tests)
+
+add : Int -> Int -> Int
+let add a b = a + b
+
+sub : Int -> Int -> Int
+let sub a b = a - b
+
+mul : Int -> Int -> Int
+let mul a b = a * b
+
+div : Int -> Int -> Int
+let div a b = a / b
+
+rem : Int -> Int -> Int
+let rem a b = a % b
+
+pow : Int -> Int -> Int
+let pow a b = a ** b
+
+neg : Int -> Int
+let neg a = -a
+
+tests : List Test.Test
+let tests =
+  [
+    Test.group
+      "wrapping"
+      [
+        Test.test "max + 1" (fun () -> Test.equal (-2147483648) (add 2147483647 1)),
+        Test.test "min - 1" (fun () -> Test.equal 2147483647 (sub (-2147483648) 1)),
+        Test.test "65536 * 65536" (fun () -> Test.equal 0 (mul 65536 65536)),
+        Test.test "max * max" (fun () -> Test.equal 1 (mul 2147483647 2147483647)),
+        Test.test
+          "big products keep the low 32 bits"
+          (fun () -> Test.equal (-1097262584) (mul 123456789 1000)),
+        Test.test "-min" (fun () -> Test.equal (-2147483648) (neg (-2147483648))),
+        Test.test "min / -1" (fun () -> Test.equal (-2147483648) (div (-2147483648) (-1))),
+        Test.test "min % -1" (fun () -> Test.equal 0 (rem (-2147483648) (-1))),
+        Test.test "2 ** 31" (fun () -> Test.equal (-2147483648) (pow 2 31)),
+        Test.test
+          "3 ** 40 wraps exactly, not through a double"
+          (fun () -> Test.equal 689956897 (pow 3 40)),
+        Test.test "7 ** 23" (fun () -> Test.equal 821077879 (pow 7 23)),
+        Test.test "2 ** -1" (fun () -> Test.equal 0 (pow 2 (-1))),
+        Test.test "0 ** 0" (fun () -> Test.equal 1 (pow 0 0)),
+      ],
+    Test.group
+      "division"
+      [
+        Test.test "7 / 2" (fun () -> Test.equal 3 (div 7 2)),
+        Test.test "-7 / 2" (fun () -> Test.equal (-3) (div (-7) 2)),
+        Test.test "7 / -2" (fun () -> Test.equal (-3) (div 7 (-2))),
+        Test.test "7 % -2" (fun () -> Test.equal 1 (rem 7 (-2))),
+        Test.test "-7 % 2" (fun () -> Test.equal (-1) (rem (-7) 2)),
+        Test.test "5 / 0" (fun () -> Test.equal 0 (div 5 0)),
+        Test.test "5 % 0" (fun () -> Test.equal 0 (rem 5 0)),
+        Test.test "-5 / 0" (fun () -> Test.equal 0 (div (-5) 0)),
+        Test.test "0 / 0" (fun () -> Test.equal 0 (div 0 0)),
+      ],
+    Test.group
+      "checked"
+      [
+        Test.test
+          "add overflows"
+          (fun () ->
+            Test.equal
+              "Err ArithmeticError \"Int.checked_add: 2147483648 does not fit in Int\""
+              (show (Int.checked_add 2147483647 (add 0 1)))),
+        Test.test
+          "mul overflows"
+          (fun () ->
+            Test.equal
+              "Err ArithmeticError \"Int.checked_mul: 4294967296 does not fit in Int\""
+              (show (Int.checked_mul 65536 (add 65535 1)))),
+        Test.test
+          "div by zero"
+          (fun () ->
+            Test.equal
+              "Err ArithmeticError \"Int.checked_div: division by zero\""
+              (show (Int.checked_div 1 (add 0 0)))),
+        Test.test "div fits" (fun () -> Test.equal "Ok -3" (show (Int.checked_div (-7) (add 2 0)))),
+      ],
+    Test.group
+      "conversions"
+      [
+        Test.test
+          "to_float"
+          (fun () -> Test.equal 2147483647.5 (Int.to_float (add 2147483647 0) + 0.5)),
+        Test.test "from_float whole" (fun () -> Test.equal (Some (-42)) (Int.from_float (-42.0))),
+        Test.test "from_float fraction" (fun () -> Test.equal None (Int.from_float 2.5)),
+        Test.test
+          "from_float out of range"
+          (fun () -> Test.equal None (Int.from_float 2147483648.0)),
+        Test.test "from_float -0" (fun () -> Test.equal (Some 0) (Int.from_float (-0.0))),
+        Test.test
+          "truncate"
+          (fun () -> Test.equal [-2, 2, 0] (List.map Int.truncate [-2.7, 2.7, -0.5])),
+        Test.test "truncate wraps" (fun () -> Test.equal (-2147483648) (Int.truncate 2147483648.0)),
+        Test.test "truncate NaN" (fun () -> Test.equal 0 (Int.truncate (0.0 / 0.0))),
+        Test.test
+          "parse"
+          (fun () ->
+            Test.equal
+              [Some (-42), None, None, Some 7]
+              (List.map Int.parse ["-42", "2147483648", "4.5", "+7"])),
+        Test.test
+          "to_string"
+          (fun () -> Test.equal "-2147483648" (Int.to_string (sub (-2147483647) 1))),
+      ],
+    Test.group
+      "bits"
+      [
+        Test.test
+          "and or xor"
+          (
+            fun () -> Test.equal [8, 14, 6] [Int.bit_and 12 10, Int.bit_or 12 10, Int.bit_xor 12 10]
+          ),
+        Test.test "not" (fun () -> Test.equal (-1) (Int.bit_not 0)),
+        Test.test "shift left wraps" (fun () -> Test.equal (-2147483648) (Int.shift_left 1 31)),
+        Test.test "shift counts mod 32" (fun () -> Test.equal 2 (Int.shift_left 1 33)),
+        Test.test "shift right keeps the sign" (fun () -> Test.equal (-4) (Int.shift_right (-8) 1)),
+        Test.test
+          "unsigned shift"
+          (fun () -> Test.equal 2147483644 (Int.shift_right_unsigned (-8) 1)),
+      ],
+  ]

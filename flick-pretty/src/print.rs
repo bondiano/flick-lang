@@ -13,12 +13,39 @@ use crate::document::{Document, NestKind, NextBreakFitsMode, Node};
 pub struct Position {
     pub line: usize,
     /// The layout column: extended grapheme clusters since the start of the
-    /// line, indentation included and zero-width text excluded. This is the
+    /// line, indentation included (a tab as its width) and zero-width text
+    /// excluded. This is the
     /// column a reader sees and the one the line limit applies to.
     pub column: usize,
     /// The column in UTF-16 code units of everything on the line, zero-width
     /// text included. This is the column JavaScript source maps use.
     pub utf16_column: usize,
+}
+
+/// How the printer writes indentation. Nesting is always counted in
+/// columns; this only decides which characters fill them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Indentation {
+    /// A space per column.
+    #[default]
+    Spaces,
+    /// A tab per `width` columns, then a space per column left over, as
+    /// `gofmt` indents Go. When fitting, a tab counts as `width` columns.
+    Tabs { width: usize },
+}
+
+impl Indentation {
+    /// How many tabs, then spaces, fill `columns` of indentation.
+    fn split(self, columns: usize) -> (usize, usize) {
+        match self {
+            Indentation::Spaces => (0, columns),
+            Indentation::Tabs { width } => {
+                // a tab of no width would never fill anything
+                let width = width.max(1);
+                (columns / width, columns % width)
+            }
+        }
+    }
 }
 
 /// Told where each [`cursor`](crate::DocumentArena::cursor) document lands in
@@ -58,10 +85,23 @@ impl Document<'_> {
         output: &mut impl Write,
         observer: &mut impl CursorPositionObserver,
     ) -> fmt::Result {
+        self.pretty_print_with(limit, Indentation::Spaces, output, observer)
+    }
+
+    /// Like [`pretty_print_observed`](Self::pretty_print_observed), writing
+    /// indentation as `indentation` says.
+    pub fn pretty_print_with(
+        self,
+        limit: usize,
+        indentation: Indentation,
+        output: &mut impl Write,
+        observer: &mut impl CursorPositionObserver,
+    ) -> fmt::Result {
         Printer {
             output,
             observer,
             limit,
+            indentation,
             line: 0,
             width: 0,
             utf16: 0,
@@ -120,6 +160,7 @@ struct Printer<'a, 'w, W, O> {
     output: &'w mut W,
     observer: &'w mut O,
     limit: usize,
+    indentation: Indentation,
     line: usize,
     /// The layout column, see [`Position::column`].
     width: usize,
@@ -222,13 +263,18 @@ impl<'a, W: Write, O: CursorPositionObserver> Printer<'a, '_, W, O> {
 
     fn write(&mut self, text: &str, width: usize, utf16: usize) -> fmt::Result {
         const SPACES: &str = "                                ";
+        const TABS: &str = "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
         if text.is_empty() {
             return Ok(());
         }
-        while self.indent_pending > 0 {
-            let spaces = self.indent_pending.min(SPACES.len());
-            self.output.write_str(&SPACES[..spaces])?;
-            self.indent_pending -= spaces;
+        let (tabs, spaces) = self.indentation.split(self.indent_pending);
+        self.indent_pending = 0;
+        for (fill, mut count) in [(TABS, tabs), (SPACES, spaces)] {
+            while count > 0 {
+                let chunk = count.min(fill.len());
+                self.output.write_str(&fill[..chunk])?;
+                count -= chunk;
+            }
         }
         self.output.write_str(text)?;
         self.width += width;
@@ -242,7 +288,8 @@ impl<'a, W: Write, O: CursorPositionObserver> Printer<'a, '_, W, O> {
         }
         self.line += count;
         self.width = indent;
-        self.utf16 = indent;
+        let (tabs, spaces) = self.indentation.split(indent);
+        self.utf16 = tabs + spaces;
         self.indent_pending = indent;
         Ok(())
     }

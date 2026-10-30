@@ -1,0 +1,6 @@
+// The baseline: a program that only starts, prints and exits. Its time is
+// in every other row, as the harness times whole processes.
+module App.Main exposing (main)
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line "ok"

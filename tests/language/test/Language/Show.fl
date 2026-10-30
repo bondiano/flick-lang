@@ -1,0 +1,56 @@
+// `show` of every kind of value, as the JS target writes it: numbers as JS
+// numbers, strings quoted and escaped, constructors with their fields,
+// records with sorted labels.
+module Language.Show exposing (tests)
+
+type Wrapper = Wrap { inner : Int; label : String } | Pair (Int, Float) | Many (List (Option Int))
+  deriving Show
+
+type error Problem = Problem String Int
+  deriving Show
+
+tests : List Test.Test
+let tests =
+  [
+    Test.test "Unit" (fun () -> Test.equal "()" (show ())),
+    Test.test "Bool" (fun () -> Test.equal "[true, false]" (show [true, false])),
+    Test.test "Int" (fun () -> Test.equal "[0, -7, 2147483647]" (show [0, -7, 2147483647])),
+    Test.test
+      "Float"
+      (fun () -> Test.equal "[1.5, -0, 1e+21, NaN]" (show [1.5, -0.0, 1e21, 0.0 / 0.0])),
+    Test.test "BigInt" (fun () -> Test.equal "[0n, -1n]" (show [0n, -1n])),
+    Test.test "String" (fun () -> Test.equal "\"tab\\there\"" (show "tab\there")),
+    Test.test "Ordering" (fun () -> Test.equal "[LT, EQ, GT]" (show [LT, EQ, GT])),
+    Test.test "empty list" (fun () -> Test.equal "[]" (show ([] : List Int))),
+    Test.test "nested lists" (fun () -> Test.equal "[[1], [], [2, 3]]" (show [[1], [], [2, 3]])),
+    Test.test
+      "Option"
+      (fun () -> Test.equal "(Some -1, None)" (show (Some (-1), (None : Option Int)))),
+    Test.test
+      "Result"
+      (fun () -> Test.equal "[Ok \"a\", Err 2.5]" (show [(Ok "a" : Result Float String), Err 2.5])),
+    Test.test
+      "tuples"
+      (fun () -> Test.equal "(1, (\"two\", 3n), [()])" (show (1, ("two", 3n), [()]))),
+    Test.test "empty record" (fun () -> Test.equal "{  }" (show {})),
+    Test.test
+      "records"
+      (fun () ->
+        Test.equal
+          "{ a = { c = None }, b = [1] }"
+          (show { b = [1]; a = { c = (None : Option Int) } })),
+    Test.test
+      "a constructor with a record"
+      (fun () ->
+        Test.equal "Wrap { inner = -1, label = \"x\" }" (show (Wrap { inner = -1; label = "x" }))),
+    Test.test
+      "a constructor with a tuple"
+      (fun () -> Test.equal "Pair (1, 0.5)" (show (Pair (1, 0.5)))),
+    Test.test
+      "a constructor with a list"
+      (fun () -> Test.equal "Many [Some 1, None]" (show (Many [Some 1, None]))),
+    Test.test "an error" (fun () -> Test.equal "Problem \"bad\" -3" (show (Problem "bad" (-3)))),
+    Test.effect_test
+      "Redacted"
+      (task { Test.expect (Test.equal "[<redacted>]" (show [Redacted.make "secret"])) }),
+  ]

@@ -143,9 +143,14 @@ const flatten = (prefix: string, tests: ReadonlyArray<Test>, out: Array<Named> =
   return out;
 };
 
+/** A BigInt as `<digits>n` and a function as `<function>`, not its source. */
+const replacePreview = (_: string, v: unknown): unknown =>
+  typeof v === "bigint" ? `${v}n` : typeof v === "function" ? "<function>" : v;
+
+/** A property's case: its JSON. */
 const preview = (value: unknown): string => {
   try {
-    return JSON.stringify(value, (_, v: unknown) => (typeof v === "bigint" ? `${v}n` : v)) ?? String(value);
+    return JSON.stringify(value, replacePreview) ?? String(value);
   } catch {
     return "<value>";
   }
