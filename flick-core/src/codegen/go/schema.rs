@@ -1,20 +1,25 @@
 //! Schema witnesses: a `deriving Schema` item is a value of the runtime's
 //! schemas, or a function of the witnesses of its type's parameters.
 
+use flick_pretty::{Document, Documentable, docvec};
+
+use super::items::Decls;
+use super::layout::{call, closure, list, single, statement};
 use super::{Gen, Shape, names};
 use crate::source::Span;
 use crate::types::{Constructor, Rep, SchemaItem, SchemaPlan, companion_name};
 
-impl Gen<'_> {
+impl<'a> Gen<'a> {
     /// `T$schema`: its declaration, and the statement of the module's init
     /// function that assigns it, for a type without parameters.
     pub(super) fn schema(
         &mut self,
         item: &SchemaItem,
         span: Span,
-        decls: &mut Vec<String>,
-        init: &mut Vec<String>,
+        decls: &mut Decls<'a>,
+        init: &mut Vec<Document<'a>>,
     ) {
+        let a = self.a;
         if item.url.is_some() || item.form.is_some() {
             self.unsupported(span, "a schema deriving `Url` or `Form`");
             return;
@@ -22,20 +27,26 @@ impl Gen<'_> {
         let name = companion_name(&item.ty, "schema");
         let body = self.plan(&item.plan, span);
         if item.witnesses == 0 {
-            let var = names::var(self.module, &name);
-            decls.push(format!("var {var} flickrt.Value"));
-            init.push(format!("{var} = {body}"));
+            let var = a.alloc_str(&names::var(self.module, &name));
+            decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
+            init.push(statement(a, docvec![a, var, " = ", body]));
         } else {
             let ws: Vec<String> = (0..item.witnesses).map(|i| format!("w{i}")).collect();
-            decls.push(format!(
-                "func {}({} flickrt.Value) flickrt.Value {{\n\treturn {body}\n}}",
+            let decl = docvec![
+                a,
+                "func ",
                 names::func(self.module, &name),
-                ws.join(", ")
-            ));
+                "(",
+                ws.join(", "),
+                " flickrt.Value) flickrt.Value ",
+                single(a, docvec![a, "return ", body])
+            ];
+            decls.push((decl, false));
         }
     }
 
-    fn plan(&mut self, plan: &SchemaPlan, span: Span) -> String {
+    fn plan(&mut self, plan: &SchemaPlan, span: Span) -> Document<'a> {
+        let a = self.a;
         match plan {
             SchemaPlan::Prim(name) => {
                 let s = match name.as_str() {
@@ -48,34 +59,37 @@ impl Gen<'_> {
                     "Never" => "SchemaNever",
                     _ => "SchemaUnknown",
                 };
-                format!("flickrt.{s}")
+                docvec![a, "flickrt.", s]
             }
-            SchemaPlan::List(p) => format!("flickrt.SchemaList({})", self.plan(p, span)),
-            SchemaPlan::Option(p) => format!("flickrt.SchemaOption({})", self.plan(p, span)),
-            SchemaPlan::Redacted(p) => format!("flickrt.SchemaRedacted({})", self.plan(p, span)),
-            SchemaPlan::Result(e, a) => {
-                let (e, a) = (self.plan(e, span), self.plan(a, span));
-                format!("flickrt.SchemaResult({e}, {a})")
+            SchemaPlan::List(p) => call(a, "flickrt.SchemaList", [self.plan(p, span)]),
+            SchemaPlan::Option(p) => call(a, "flickrt.SchemaOption", [self.plan(p, span)]),
+            SchemaPlan::Redacted(p) => call(a, "flickrt.SchemaRedacted", [self.plan(p, span)]),
+            SchemaPlan::Result(e, ok) => {
+                let (e, ok) = (self.plan(e, span), self.plan(ok, span));
+                call(a, "flickrt.SchemaResult", [e, ok])
             }
             SchemaPlan::Tuple(items) => {
-                let items: Vec<String> = items.iter().map(|p| self.plan(p, span)).collect();
-                format!("flickrt.SchemaTuple({})", items.join(", "))
+                let items: Vec<Document<'a>> = items.iter().map(|p| self.plan(p, span)).collect();
+                call(a, "flickrt.SchemaTuple", items)
             }
             SchemaPlan::Record(fields) => {
-                let fields: Vec<String> = fields
+                let fields: Vec<Document<'a>> = fields
                     .iter()
-                    .map(|(l, p)| format!("{}, {}", names::string(l), self.plan(p, span)))
+                    .map(|(l, p)| docvec![a, self.string(l), ", ", self.plan(p, span)])
                     .collect();
-                format!("flickrt.SchemaRecord({})", fields.join(", "))
+                call(a, "flickrt.SchemaRecord", fields)
             }
             SchemaPlan::Adt { name, variants } => self.adt(name, variants, span),
-            SchemaPlan::Param(i) => format!("w{i}"),
-            SchemaPlan::Applied(i, p) => format!("flickrt.Apply(w{i}, {})", self.plan(p, span)),
-            SchemaPlan::Constructor(name) => match name.as_str() {
-                "List" => "flickrt.Fn(flickrt.SchemaList)".to_owned(),
-                "Option" => "flickrt.Fn(flickrt.SchemaOption)".to_owned(),
-                _ => "flickrt.Fn(flickrt.SchemaRedacted)".to_owned(),
-            },
+            SchemaPlan::Param(i) => docvec![a, "w", *i],
+            SchemaPlan::Applied(i, p) => {
+                let p = self.plan(p, span);
+                call(a, "flickrt.Apply", [docvec![a, "w", *i], p])
+            }
+            SchemaPlan::Constructor(name) => a.text(match name.as_str() {
+                "List" => "flickrt.Fn(flickrt.SchemaList)",
+                "Option" => "flickrt.Fn(flickrt.SchemaOption)",
+                _ => "flickrt.Fn(flickrt.SchemaRedacted)",
+            }),
             SchemaPlan::Named {
                 module,
                 ty,
@@ -84,31 +98,33 @@ impl Gen<'_> {
             } => {
                 let name = companion_name(ty, "schema");
                 self.reads(module);
-                let args: Vec<String> = args.iter().map(|p| self.plan(p, span)).collect();
-                let call = match self.shape_of(module, &name) {
-                    Shape::Func { .. } => {
-                        format!("{}({})", names::func(module, &name), args.join(", "))
-                    }
-                    Shape::Var => names::var(module, &name),
+                let args: Vec<Document<'a>> = args.iter().map(|p| self.plan(p, span)).collect();
+                let schema = match self.shape_of(module, &name) {
+                    Shape::Func { .. } => call(a, names::func(module, &name), args),
+                    Shape::Var => names::var(module, &name).to_doc(a),
                 };
                 if *lazy {
-                    format!(
-                        "flickrt.SchemaLazy({}, func() flickrt.Value {{ return {call} }})",
-                        names::string(ty)
-                    )
+                    let get = closure(a, "func() flickrt.Value", [docvec![a, "return ", schema]]);
+                    call(a, "flickrt.SchemaLazy", [self.string(ty), get])
                 } else {
-                    call
+                    schema
                 }
             }
             SchemaPlan::Refined { .. } => {
                 self.unsupported(span, "a refined type");
-                "flickrt.SchemaUnknown".to_owned()
+                a.text("flickrt.SchemaUnknown")
             }
         }
     }
 
-    fn adt(&mut self, name: &str, variants: &[(String, Vec<SchemaPlan>)], span: Span) -> String {
-        let variants: Vec<String> = variants
+    fn adt(
+        &mut self,
+        name: &str,
+        variants: &[(String, Vec<SchemaPlan>)],
+        span: Span,
+    ) -> Document<'a> {
+        let a = self.a;
+        let variants: Vec<Document<'a>> = variants
             .iter()
             .map(|(c, fields)| {
                 let constructor = Constructor {
@@ -118,20 +134,13 @@ impl Gen<'_> {
                     arity: fields.len(),
                     rep: Rep::Tagged,
                 };
-                let tag = self.tag(&constructor);
-                let fields: Vec<String> = fields.iter().map(|p| self.plan(p, span)).collect();
-                format!(
-                    "{{{}, {}, []flickrt.Value{{{}}}}}",
-                    names::string(&tag),
-                    names::string(c),
-                    fields.join(", ")
-                )
+                let tag = self.string(&self.tag(&constructor));
+                let fields: Vec<Document<'a>> = fields.iter().map(|p| self.plan(p, span)).collect();
+                let fields = list(a, "[]flickrt.Value{", fields, "}");
+                list(a, "{", [tag, self.string(c), fields], "}")
             })
             .collect();
-        format!(
-            "flickrt.SchemaAdt({}, []flickrt.Variant{{{}}})",
-            names::string(name),
-            variants.join(", ")
-        )
+        let variants = list(a, "[]flickrt.Variant{", variants, "}");
+        call(a, "flickrt.SchemaAdt", [self.string(name), variants])
     }
 }

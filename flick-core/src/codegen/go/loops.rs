@@ -8,8 +8,11 @@
 use std::collections::HashMap;
 use std::mem;
 
+use flick_pretty::{Document, DocumentArena, Documentable, docvec};
+
 use super::arith::Native;
-use super::{Gen, indent, names, param_list};
+use super::layout::{Code, INDENT, block, call, param_list, single, statement};
+use super::{Gen, names};
 use crate::codegen::tail::{
     Calls, Target, cycles, function, jumpable, self_call, tail_callees, target,
 };
@@ -18,15 +21,15 @@ use crate::ir::{BinOp, Expr, ExprKind, Item, Lit, Param, Pat, Stage};
 /// Where a tail call jumps: the members of the loop with their arity, the
 /// loop variables, and the local each parameter of the running member
 /// binds, if it is a name.
-pub(super) struct Tail {
+pub(super) struct Tail<'a> {
     members: Vec<(Target, usize)>,
     current: usize,
-    vars: Vec<String>,
+    vars: Vec<&'a str>,
     binds: Vec<Option<String>>,
     /// The Go type of each loop variable that is not a `flickrt.Value`.
     natives: Vec<Option<Native>>,
     /// In a group, the variable naming the member that runs next.
-    state: Option<String>,
+    state: Option<&'static str>,
 }
 
 /// Top-level functions of a module that call each other in tail position.
@@ -94,7 +97,7 @@ fn binds(params: &[Param]) -> Vec<Option<String>> {
         .collect()
 }
 
-impl Gen<'_> {
+impl<'a> Gen<'a> {
     /// The Go parameters and statements of a function of `params` running
     /// `body`; with `target`, a self tail call of a pure function jumps.
     pub(super) fn function_body(
@@ -102,7 +105,8 @@ impl Gen<'_> {
         params: &[Param],
         body: &Expr,
         target: Option<Target>,
-    ) -> (Vec<String>, Vec<String>) {
+    ) -> (Vec<&'a str>, Vec<Document<'a>>) {
+        let a = self.a;
         let saved = (self.tail.take(), mem::replace(&mut self.generator, false));
         let looping = target.filter(|t| {
             jumpable(params, Calls::Direct)
@@ -118,8 +122,8 @@ impl Gen<'_> {
                 (heads, stmts)
             }
             Some(target) => {
-                let heads: Vec<String> = params.iter().map(|_| self.temp()).collect();
-                let vars: Vec<String> = params.iter().map(|_| self.temp()).collect();
+                let heads: Vec<&'a str> = params.iter().map(|_| self.temp()).collect();
+                let vars: Vec<&'a str> = params.iter().map(|_| self.temp()).collect();
                 // a loop variable of a known scalar type is unboxed once, not per iteration
                 let natives: Vec<Option<Native>> = params
                     .iter()
@@ -138,20 +142,20 @@ impl Gen<'_> {
                     state: None,
                 };
                 let (inner, ()) = self.block(|g| g.iteration(params, &vars, body, tail));
-                let mut stmts: Vec<String> = vars
+                let mut stmts: Vec<Document<'a>> = vars
                     .iter()
                     .zip(&heads)
                     .zip(&natives)
-                    .map(|((var, head), native)| match native {
-                        Some(n) => format!("var {var} {} = {}", n.go(), n.unbox(head)),
-                        None => format!("var {var} flickrt.Value = {head}"),
+                    .map(|((&var, &head), native)| match native {
+                        Some(n) => {
+                            let value = n.unbox(a, a.text(head));
+                            statement(a, docvec![a, "var ", var, " ", n.go(), " = ", value])
+                        }
+                        None => statement(a, docvec![a, "var ", var, " flickrt.Value = ", head]),
                     })
                     .collect();
-                stmts.push(format!(
-                    "for {{\n{}{}}}",
-                    checkpoint(self.fiber),
-                    indent(&inner)
-                ));
+                let body = checkpoint(a, self.fiber).into_iter().chain(inner);
+                stmts.push(statement(a, docvec![a, "for ", block(a, body)]));
                 (heads, stmts)
             }
         };
@@ -161,13 +165,13 @@ impl Gen<'_> {
 
     /// One iteration of a loop: the parameters bound from the loop
     /// variables, then the body in tail position.
-    fn iteration(&mut self, params: &[Param], vars: &[String], body: &Expr, tail: Tail) {
-        for ((p, var), native) in params.iter().zip(vars).zip(&tail.natives) {
+    fn iteration(&mut self, params: &[Param], vars: &[&'a str], body: &Expr, tail: Tail<'a>) {
+        for ((p, &var), native) in params.iter().zip(vars).zip(&tail.natives) {
             match (&p.pat, native) {
-                (Pat::Bind(n), Some(native)) => self.bind_native(n, var, *native),
-                (Pat::Bind(n), None) => self.bind(n, var),
+                (Pat::Bind(n), Some(native)) => self.bind_native(n, self.code(var), *native),
+                (Pat::Bind(n), None) => self.bind(n, self.code(var)),
                 (Pat::Wild | Pat::Lit(Lit::Unit), _) => {}
-                (pat, _) => self.destructure(pat, var),
+                (pat, _) => self.destructure(pat, self.a.text(var)),
             }
         }
         self.tail = Some(tail);
@@ -176,20 +180,23 @@ impl Gen<'_> {
     }
 
     /// The body of a grouped top-level function: a call of its group.
-    pub(super) fn group_call(&self, name: &str, heads: &[String]) -> Option<String> {
+    pub(super) fn group_call(&self, name: &str, heads: &[&'a str]) -> Option<Document<'a>> {
+        let a = self.a;
         let &(g, k) = self.grouped.get(name)?;
         let group = &self.groups[g];
-        let mut args = vec![k.to_string()];
-        args.extend(heads.iter().cloned());
-        args.resize(group.arity + 1, "nil".to_owned());
+        let mut args = vec![k.to_doc(a)];
+        args.extend(heads.iter().map(|h| a.text(h)));
+        args.resize(group.arity + 1, a.text("nil"));
         if group.fiber {
-            args.insert(0, "fb".to_owned());
+            args.insert(0, a.text("fb"));
         }
-        Some(format!("return {}({})", group.name, args.join(", ")))
+        let go = call(a, a.alloc_str(&group.name), args);
+        Some(statement(a, docvec![a, "return ", go]))
     }
 
     /// The Go function running the group `g` of `items`.
-    pub(super) fn group(&mut self, g: usize, items: &[Item]) -> String {
+    pub(super) fn group(&mut self, g: usize, items: &[Item]) -> Document<'a> {
+        let a = self.a;
         let functions: Vec<(&str, &[Param], &Expr)> = self.groups[g]
             .items
             .iter()
@@ -199,7 +206,9 @@ impl Gen<'_> {
             .iter()
             .map(|(name, params, _)| (target(self.module, name), params.len()))
             .collect();
-        let vars: Vec<String> = (0..self.groups[g].arity).map(|i| format!("v{i}")).collect();
+        let vars: Vec<&'a str> = (0..self.groups[g].arity)
+            .map(|i| a.alloc_str(&format!("v{i}")))
+            .collect();
         let fiber = self.groups[g].fiber;
         self.fiber = fiber.then_some("fb");
         let mut cases = Vec::new();
@@ -210,10 +219,11 @@ impl Gen<'_> {
                 vars: vars.clone(),
                 binds: binds(params),
                 natives: vec![None; params.len()],
-                state: Some("state".to_owned()),
+                state: Some("state"),
             };
             let (stmts, ()) = self.block(|g| g.iteration(params, &vars, body, tail));
-            cases.push(format!("case {k}:\n{}", indent(&stmts)));
+            let stmts = a.concat(stmts).nest(a, INDENT);
+            cases.push(statement(a, docvec![a, "case ", k, ":", stmts]));
         }
         self.fiber = None;
         let mut heads = vec!["state int".to_owned()];
@@ -223,13 +233,21 @@ impl Gen<'_> {
         if !vars.is_empty() {
             heads.push(param_list(&vars));
         }
-        format!(
-            "func {}({}) flickrt.Value {{\n\tfor {{\n{}\t\tswitch state {{\n{}\t\t}}\n\t}}\n}}",
-            self.groups[g].name,
+        let switch = docvec![a, "switch state {", a.concat(cases), a.line(), "}"];
+        let body = checkpoint(a, fiber.then_some("fb"))
+            .into_iter()
+            .chain([statement(a, switch)]);
+        let body = single(a, docvec![a, "for ", block(a, body)]);
+        let name = self.groups[g].name.clone();
+        docvec![
+            a,
+            "func ",
+            name,
+            "(",
             heads.join(", "),
-            checkpoint(fiber.then_some("fb")).replace('\t', "\t\t"),
-            indent(&[indent(&cases)])
-        )
+            ") flickrt.Value ",
+            body
+        ]
     }
 
     /// Emits a tail call of a member of the loop as a jump, if `e` is one;
@@ -244,7 +262,7 @@ impl Gen<'_> {
         };
         let tail = self.tail.as_ref().expect("a jump is inside a loop");
         let (vars, binds, natives) = (tail.vars.clone(), tail.binds.clone(), tail.natives.clone());
-        let state = tail.state.clone().filter(|_| j != tail.current);
+        let state = tail.state.filter(|_| j != tail.current);
         // a parameter passed on unchanged keeps its variable
         let changed: Vec<usize> = (0..args.len())
             .filter(|&i| {
@@ -253,7 +271,7 @@ impl Gen<'_> {
             })
             .collect();
         let values = self.ordered(&changed.iter().map(|&i| args[i]).collect::<Vec<_>>());
-        let values: Vec<String> = changed
+        let values: Vec<Code<'a>> = changed
             .iter()
             .zip(values)
             .map(|(&i, v)| match natives[i] {
@@ -262,14 +280,15 @@ impl Gen<'_> {
             })
             .collect();
         if !changed.is_empty() {
-            let targets: Vec<&str> = changed.iter().map(|&i| vars[i].as_str()).collect();
-            self.buf
-                .push(format!("{} = {}", targets.join(", "), values.join(", ")));
+            let a = self.a;
+            let targets = a.join(changed.iter().map(|&i| a.text(vars[i])), a.text(", "));
+            let values = a.join(values.iter().map(|v| v.doc), a.text(", "));
+            self.emit(docvec![a, targets, " = ", values]);
         }
         if let Some(state) = state {
-            self.buf.push(format!("{state} = {j}"));
+            self.emit(docvec![self.a, state, " = ", j]);
         }
-        self.buf.push("continue".to_owned());
+        self.emit("continue");
         true
     }
 
@@ -284,18 +303,26 @@ impl Gen<'_> {
     /// `lhs && rhs` or `lhs || rhs` in tail position, its right operand a
     /// jump: the left one decides first.
     pub(super) fn tail_logic(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr) {
+        let a = self.a;
         let l = self.expr(lhs);
         let (test, value) = if op == BinOp::And {
-            (format!("!flickrt.Bool({l})"), "false")
+            ("!flickrt.Bool", "false")
         } else {
-            (format!("flickrt.Bool({l})"), "true")
+            ("flickrt.Bool", "true")
         };
-        self.buf.push(format!("if {test} {{\n\treturn {value}\n}}"));
+        let test = call(a, test, [l.doc]);
+        self.emit(docvec![
+            a,
+            "if ",
+            test,
+            " ",
+            single(a, docvec![a, "return ", value])
+        ]);
         self.tail_expr(rhs);
     }
 }
 
 /// The interruption checkpoint at the head of a loop of effectful code.
-fn checkpoint(fiber: Option<&str>) -> String {
-    fiber.map_or_else(String::new, |fb| format!("\tflickrt.Check({fb})\n"))
+fn checkpoint<'a>(a: &'a DocumentArena<'a>, fiber: Option<&'static str>) -> Option<Document<'a>> {
+    fiber.map(|fb| statement(a, call(a, "flickrt.Check", [a.text(fb)])))
 }
