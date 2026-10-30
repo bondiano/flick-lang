@@ -299,6 +299,34 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/regexp.go"),
     ),
     (
+        "rpc_binary.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_binary.go"),
+    ),
+    (
+        "rpc_binary_layout.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_binary_layout.go"),
+    ),
+    (
+        "rpc_binary_read.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_binary_read.go"),
+    ),
+    (
+        "rpc_binary_write.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_binary_write.go"),
+    ),
+    (
+        "rpc_jsonrpc.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_jsonrpc.go"),
+    ),
+    (
+        "rpc_model.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_model.go"),
+    ),
+    (
+        "rpc_wire.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_wire.go"),
+    ),
+    (
         "schedule.go",
         include_str!("../../../../runtime-go/flickrt/schedule.go"),
     ),
