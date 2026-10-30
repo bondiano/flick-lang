@@ -1,0 +1,12 @@
+schema-version = 1
+
+[project]
+kind = "app"
+entry = "Language.Main"
+source-dir = "src"
+test-dir = "test"
+
+[build]
+out-dir = "dist"
+profile = "debug"
+emit = "js"

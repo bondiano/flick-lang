@@ -1,0 +1,56 @@
+// Recursion: a tail call runs in constant stack on every target, a million
+// deep, also between the members of a `rec` group; recursion that is not a
+// tail call works to ordinary depths (Node's stack holds about 9 000
+// frames of `sum_to`, Go's grows, so deeper is not portable).
+module Language.Recursion exposing (tests)
+
+count : Int -> Int -> Int
+let rec count n acc = if n == 0 then acc else count (n - 1) (acc + 1)
+
+rec {
+  is_even : Int -> Bool
+  let is_even n = if n == 0 then true else is_odd (n - 1)
+
+  is_odd : Int -> Bool
+  let is_odd n = if n == 0 then false else is_even (n - 1)
+}
+
+/// A tail call through a `match` and a guard.
+collatz_steps : Float -> Int -> Int
+let rec collatz_steps n steps =
+  match n with
+  | 1 -> steps
+  | x when x % 2 == 0 -> collatz_steps (x / 2) (steps + 1)
+  | x -> collatz_steps (3 * x + 1) (steps + 1)
+
+/// Not a tail call: the stack grows with `n`.
+sum_to : Int -> Int
+let rec sum_to n = if n == 0 then 0 else n + sum_to (n - 1)
+
+fib : Int -> Int
+let rec fib n = if n < 2 then n else fib (n - 1) + fib (n - 2)
+
+/// A tail-recursive loop over a list a million long.
+last_of : List Int -> Option Int
+let rec last_of xs =
+  match xs with
+  | [] -> None
+  | [x] -> Some x
+  | [_, ...rest] -> last_of rest
+
+tests : List Test.Test
+let tests =
+  [
+    Test.test "a million tail calls" (fun () -> Test.equal 1000000 (count 1000000 0)),
+    Test.test
+      "mutual recursion a million deep"
+      (fun () -> Test.equal (true, false) (is_even 1000000, is_odd 1000000)),
+    Test.test "tail calls through match arms" (fun () -> Test.equal 111 (collatz_steps 27 0)),
+    Test.test "non-tail recursion" (fun () -> Test.equal 12502500 (sum_to 5000)),
+    Test.test "tree recursion" (fun () -> Test.equal 6765 (fib 20)),
+    Test.test "a long list" (fun () -> Test.equal (Some 99999) (last_of (List.range 0 100000))),
+    Test.test
+      "folds over a million"
+      (fun () ->
+        Test.equal 1783293664 (List.fold_left (fun acc x -> acc + x) 0 (List.range 0 1000000))),
+  ]

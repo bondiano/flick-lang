@@ -44,6 +44,16 @@ e2e: docs-wasm
     cargo test -p flick --test e2e --test e2e_numbers --test go_main --test test_command --test dts_command --test build_command --test ffi_command --test cli_run --test cli_devtools --test cli_template --test cli_fullstack --test first_slice --test examples -- --ignored
     cargo test -p flick-core --test consteval_node -- --ignored
     just go-test
+    just language
+
+# The language tests of tests/language on Node and as a Go executable, with
+# one seed: both must pass and write the same report
+language seed="42":
+    cargo build -p flick
+    cd tests/language && ../../target/debug/flick test --emit js --seed {{seed}} > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
+    cd tests/language && ../../target/debug/flick test --emit go --seed {{seed}} > ../../target/language-go.txt || { cat ../../target/language-go.txt; exit 1; }
+    diff -u target/language-js.txt target/language-go.txt
+    tail -n 1 target/language-go.txt
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
 bundle-size:

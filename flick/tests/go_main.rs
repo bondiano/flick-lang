@@ -132,3 +132,57 @@ let tests = [
     );
     assert!(dir.join(".flick/test").join(executable("test")).is_file());
 }
+
+/// Failing tests read the same on Node and as a Go executable: the kind of
+/// each failure, its message and the case of a property, whatever it holds.
+#[test]
+#[ignore = "needs Go and Node"]
+fn failures_report_alike_on_both_targets() {
+    let tests = "module App.MainTest exposing (tests)
+
+import Test exposing (..)
+
+type error Boom = Boom String Int
+
+fails : a -> Assertion
+let fails _ = is_true \"no\" false
+
+tests : List Test
+let tests = [
+  test \"floats\" (fun () -> equal [1.5, -0.0] [1.5, 0.0 / 0.0]),
+  effect_test \"typed\" (task { from_result (Err (Boom \"x\" 1)) }),
+  effect_test \"defect\" (task { ignore (Int.unsafe_div 1 (List.length [])) }),
+  effect_test \"cleanup\" (task {
+    let _r = Resource.acquire_release (task { 1 }) (fun _ -> ignore (Int.unsafe_rem 1 (List.length [])))
+    from_result (Err (Boom \"y\" 2))
+  }),
+  property \"draws\" (Gen.pair (Gen.int 0 100) (Gen.list 3 (Gen.string 4))) (fun (n, _) -> is_true \"small\" (n < 30)),
+  property \"numbers\" (Gen.constant [0.0 / 0.0, -0.0]) fails,
+  property \"values\" (Gen.constant ([5n], { a = (); b = Some (Ok 1 : Result String Int) })) fails,
+  property \"functions\" (Gen.constant [fun x -> x + 1]) fails
+]
+";
+    let dir = project(
+        "go_report_alike",
+        &[
+            ("flick.toml", &format!("{APP}test-dir = \"test\"\n")),
+            (
+                "src/App/Main.fl",
+                "module App.Main exposing (main)\n\nmain : Unit ->{} Unit\nlet main () = ()\n",
+            ),
+            ("test/App/MainTest.fl", tests),
+        ],
+    );
+    let run = |emit| flick_in(&dir, &["test", "--seed", "42", "--emit", emit]);
+    let (js, go) = (run("js"), run("go"));
+    assert_eq!(js.status.code(), Some(1), "{js:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&go.stdout),
+        String::from_utf8_lossy(&js.stdout)
+    );
+    assert!(
+        String::from_utf8_lossy(&js.stdout)
+            .contains("FAIL  App.MainTest > functions: assertion: no (case 0: [\"<function>\"])"),
+        "{js:?}"
+    );
+}

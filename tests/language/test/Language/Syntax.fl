@@ -1,0 +1,129 @@
+// Literals, operator precedence and evaluation order: what the parser and
+// the compiler's constant folding decide must be what the runtime does.
+module Language.Syntax exposing (tests)
+
+neg : Int -> Int
+let neg x = -x
+
+/// Notes each argument as it is evaluated.
+type alias Log = Ref (List String)
+
+noted : Log -> String -> Int ->{} Int
+let noted log name value =
+  Ref.set log (Ref.get log ++ [name])
+  value
+
+three : Int -> Int -> Int -> String
+let three a b c = show [a, b, c]
+
+describe : Int -> String
+let describe n =
+  if n < 0 then
+    "negative"
+  else if n == 0 then
+    "zero"
+  else
+    "positive"
+
+tests : List Test.Test
+let tests =
+  [
+    Test.group
+      "literals"
+      [
+        Test.test
+          "hex, octal, binary, separators"
+          (fun () -> Test.equal [255, 15, 10, 1000000] [0xFF, 0o17, 0b1010, 1_000_000]),
+        Test.test
+          "a literal takes the type its use asks for"
+          (fun () -> Test.equal (3.5, 7n) (3 + 0.5, 3 + 4n)),
+        Test.test
+          "escapes"
+          (fun () ->
+            Test.equal
+              [9, 10, 13, 0, 128512]
+              (List.filter_map
+                (fun s -> String.code_point_at 0 s)
+                ["\t", "\n", "\r", "\0", "\u{1F600}"])),
+        Test.test "raw strings" (fun () -> Test.equal "C:\\temp \"hi\"" (r"C:\temp" ++ r#" "hi""#)),
+        Test.test
+          "multi-line strings drop the common indentation"
+          (fun () ->
+            Test.equal
+              "first\n  second\nthird"
+              """
+              first
+                second
+              third
+              """),
+      ],
+    Test.group
+      "precedence"
+      [
+        Test.test "-x ** 2 is -(x ** 2)" (fun () -> Test.equal (-9) (-(neg 3) ** 2)),
+        Test.test "** is right associative" (fun () -> Test.equal 512 (2 ** 3 ** 2)),
+        Test.test "* before +" (fun () -> Test.equal 14 (2 + 3 * 4)),
+        Test.test "- is left associative" (fun () -> Test.equal 5 (10 - 3 - 2)),
+        Test.test "++ before comparison" (fun () -> Test.equal true (show 1 ++ "b" == "1b")),
+        Test.test "&& before ||" (fun () -> Test.equal true (true || false && false)),
+        Test.test "not binds tightly" (fun () -> Test.equal false (not true && true)),
+        Test.test "|> is weakest" (fun () -> Test.equal 7 (3 + 4 |> fun x -> x)),
+        Test.test "application before operators" (fun () -> Test.equal (-2) (neg 1 + neg 1)),
+      ],
+    Test.group
+      "ranges and comprehensions"
+      [
+        Test.test "inclusive" (fun () -> Test.equal [1, 2, 3] [1..3]),
+        Test.test "exclusive" (fun () -> Test.equal [0, 1] [0..<2]),
+        Test.test "empty" (fun () -> Test.equal [] [3..1]),
+        Test.test
+          "for with a filter"
+          (fun () -> Test.equal [1, 9, 25] [for x <- [1..5] if x % 2 == 1 yield x * x]),
+        Test.test
+          "nested for"
+          (fun () ->
+            Test.equal
+              ["a1", "a2", "b1", "b2"]
+              [for c <- ["a", "b"]; n <- [1, 2] yield c ++ show n]),
+      ],
+    Test.group
+      "control"
+      [
+        Test.test
+          "else if chains"
+          (fun () -> Test.equal ["negative", "zero", "positive"] (List.map describe [-1, 0, 1])),
+        Test.test "a block is an expression" (fun () ->
+          let x =
+            let a = 2
+            let b = 3
+            a * b
+          Test.equal 6 x),
+        Test.test
+          "&& and || short-circuit"
+          (fun () ->
+            Test.equal
+              (false, true)
+              (false && Int.unsafe_div 1 0 == 0, true || Int.unsafe_div 1 0 == 0)),
+        Test.effect_test
+          "arguments run left to right"
+          (task {
+            let log = Ref.make []
+            let shown = three (noted log "a" 1) (noted log "b" 2) (noted log "c" 3)
+            Test.expect (Test.equal ("[1, 2, 3]", ["a", "b", "c"]) (shown, Ref.get log))
+          }),
+        Test.effect_test
+          "operands run left to right"
+          (task {
+            let log = Ref.make []
+            let total = noted log "left" 1 + noted log "right" 2 * noted log "last" 3
+            Test.expect (Test.equal (7, ["left", "right", "last"]) (total, Ref.get log))
+          }),
+        Test.effect_test
+          "record fields run in written order"
+          (task {
+            let log = Ref.make []
+            let r = { z = noted log "z" 1; a = noted log "a" 2 }
+            Test.expect (Test.equal (3, ["z", "a"]) (r.z + r.a, Ref.get log))
+          }),
+      ],
+  ]

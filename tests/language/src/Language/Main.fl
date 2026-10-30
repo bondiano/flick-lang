@@ -1,0 +1,5 @@
+// The language tests live in the test root; `flick run` only says so.
+module Language.Main exposing (main)
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line "run `flick test --emit js` or `flick test --emit go`"
