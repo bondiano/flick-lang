@@ -322,12 +322,12 @@ beside it, which `flick build` compiles with `go build` into
 `flick-<entry>`. Only what `main` reaches is compiled, and a construct the
 target does not compile yet is `FLICK-P012` with what it names, never a
 runtime stub; for now that is a lazy `for` that reads services, refined
-types, `codec` blocks, schemas deriving `Url` or `Form`, and a `foreign`
-binding without a Go implementation: in the runtime for the standard
-library, which is still much of Effect beyond the core (a `Stream` beyond a
-`Seq`, queues, a `Layer` beyond `succeed`, `merge` and `override`, most of
-`Codec` and `Http`), or beside the program for its own bindings (see
-[FFI](../ffi/#the-go-target)).
+types, schemas deriving `Url` or `Form`, and a `foreign` binding without a
+Go implementation: in the runtime for the standard library, which is still
+part of Effect beyond the core (most of `Stream`, queues, schedules beyond
+`recurs`, parts of `Codec`), or beside the program for its own bindings
+(see [FFI](../ffi/#the-go-target)). Modules of the js target only are
+`FLICK-P030` already in `flick check`.
 
 Values have the representation of the JS target, in Go terms:
 
@@ -407,7 +407,14 @@ issues, paths and texts, and `Json.parse` fails with V8's messages. An
 `Http.Server.serve` listens with Go's `net/http`: each request runs its
 handler in a fiber of its own with the services of the call, a failure
 answers with the status of the JS target, and closing the scope stops
-accepting connections and waits for the running requests.
+accepting connections and waits for the running requests. The rest of
+`Http` and `HttpApi` follows Effect and the JS target: headers, cookies,
+URLs, the router's defaults, middleware, multipart forms, static files,
+streamed bodies, the client on `net/http` (interrupting a fiber cancels its
+request), typed `HttpApi` clients and the same OpenAPI document. What
+`net/http` decides differs: a response's status text is always the
+standard one, a request's header order is not kept, and compression is
+gzip or deflate only.
 
 `flick run` and `flick dev` of a project that emits go build its
 executable into the run generation and start it, `dev` rebuilding and
