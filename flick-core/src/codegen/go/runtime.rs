@@ -51,8 +51,36 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/context.go"),
     ),
     (
+        "cron.go",
+        include_str!("../../../../runtime-go/flickrt/cron.go"),
+    ),
+    (
+        "cron_step.go",
+        include_str!("../../../../runtime-go/flickrt/cron_step.go"),
+    ),
+    (
         "data.go",
         include_str!("../../../../runtime-go/flickrt/data.go"),
+    ),
+    (
+        "datetime.go",
+        include_str!("../../../../runtime-go/flickrt/datetime.go"),
+    ),
+    (
+        "datetime_intl.go",
+        include_str!("../../../../runtime-go/flickrt/datetime_intl.go"),
+    ),
+    (
+        "datetime_json.go",
+        include_str!("../../../../runtime-go/flickrt/datetime_json.go"),
+    ),
+    (
+        "datetime_ops.go",
+        include_str!("../../../../runtime-go/flickrt/datetime_ops.go"),
+    ),
+    (
+        "datetime_parse.go",
+        include_str!("../../../../runtime-go/flickrt/datetime_parse.go"),
     ),
     (
         "decimal.go",
