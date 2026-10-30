@@ -13,15 +13,14 @@ type alias Row = {
 } deriving Schema
 
 row_json : Ref Float -> PureCodec Json Row
-let row_json calls =
-  codec (schema Row) {
-    required = field "required" String.json;
-    nullable = field "nullable" (option_as_null String.json);
-    missing = optional_field "missing" String.json;
-    nullish = field "nullish" (option_as_nullish String.json);
-    tagged = field "tagged" (Codec.tagged_option Float.json_finite);
-    quota = field "quota" Float.json_finite |> on_missing (fun () -> count calls);
-  }
+let row_json calls = codec (schema Row) {
+  required = field "required" String.json;
+  nullable = field "nullable" (option_as_null String.json);
+  missing = optional_field "missing" String.json;
+  nullish = field "nullish" (option_as_nullish String.json);
+  tagged = field "tagged" (Codec.tagged_option Float.json_finite);
+  quota = field "quota" Float.json_finite |> on_missing (fun () -> count calls);
+}
 
 count : Ref Float -> Float
 foreign pure count from "./count.mjs" "count"

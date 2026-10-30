@@ -13,26 +13,26 @@ let page =
   Ui.view (fun () ->
     let values = for { atom <- [first, second] } yield Atom.value atom * 10
     ui {
-      fragment
-        [
-          text (show (Seq.to_list values)),
-          text (show (Seq.to_list values)),
-          fragment [for atom <- [first, second] yield text (show (Atom.value atom))],
-        ]
-    })
+      fragment [
+        text (show (Seq.to_list values)),
+        text (show (Seq.to_list values)),
+        fragment [for atom <- [first, second] yield text (show (Atom.value atom))],
+      ]
+    }
+  )
 
 // a runtime render: the sequence reads the fiber's reader
 suspended : Ui.View Unit
 let suspended =
   Ui.suspended (fun _ -> ui { text "failed" }) (ui { text "loading" }) (fun () ->
     let doubled = for { atom <- [first, second] } yield Atom.value atom * 2
-    ui { text (show (Seq.fold (fun a b -> a + b) 0 doubled)) })
+    ui { text (show (Seq.fold (fun a b -> a + b) 0 doubled)) }
+  )
 
 main : Unit ->{; AppError} Unit
-let main () =
-  provide Atom.layer {
-    Platform.stdout_line (Ui.Server.render (Ui.render page ()))
-    Atom.set second 5
-    Platform.stdout_line (Ui.Server.render (Ui.render page ()))
-    Platform.stdout_line (Ui.Server.render (Ui.render suspended ()))
-  }
+let main () = provide Atom.layer {
+  Platform.stdout_line (Ui.Server.render (Ui.render page ()))
+  Atom.set second 5
+  Platform.stdout_line (Ui.Server.render (Ui.render page ()))
+  Platform.stdout_line (Ui.Server.render (Ui.render suspended ()))
+}

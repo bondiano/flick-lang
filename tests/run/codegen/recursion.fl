@@ -5,22 +5,21 @@
 module App.Main exposing (main)
 
 sum_to : Float -> Float -> Float
-let rec sum_to acc n =
-  if n == 0 then acc else sum_to (acc + n) (n - 1)
+let rec sum_to acc n = if n == 0 then acc else sum_to (acc + n) (n - 1)
 
 count_down : Ref Float -> Float ->{} Unit
 let rec count_down cell n =
-  if n == 0 then () else
+  if n == 0 then
+    ()
+  else
     Ref.set cell n
     count_down cell (n - 1)
 
 steps : Eq a => Float -> a -> Float
-let rec steps n x =
-  if n == 0 then 0 else if x == x then steps (n - 1) x else n
+let rec steps n x = if n == 0 then 0 else if x == x then steps (n - 1) x else n
 
 all_below : Float -> Float -> Bool
-let rec all_below limit n =
-  n == 0 || n < limit && all_below limit (n - 1)
+let rec all_below limit n = n == 0 || n < limit && all_below limit (n - 1)
 
 rec {
   is_even : Float -> Bool

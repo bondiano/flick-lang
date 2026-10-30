@@ -27,7 +27,10 @@ type Listener (s : Region) a
 listen :
   forall c s r e a.
   Fiber.Owner s ->
-  QueuePolicy -> (Failure e ->{r;} Unit)^c -> (a -> Eff r e Unit)^c ->{r;} Listener s a
+  QueuePolicy ->
+  (Failure e ->{r;} Unit)^c ->
+  (a -> Eff r e Unit)^c ->{r;}
+  Listener s a
 foreign effect listen from "@flick-lang/runtime" "eventsListen"
   retention owner
 
@@ -35,7 +38,6 @@ foreign effect listen from "@flick-lang/runtime" "eventsListen"
 /// later events are ignored at once and `remove` gets the very function
 /// `add` got; then the handler's tasks end and resources are released.
 attach :
-  forall s a.
-  Listener s a -> (Listener s a ->{} Unit) -> (Listener s a ->{} Unit) ->{Scope s;} Unit
+  forall s a. Listener s a -> (Listener s a ->{} Unit) -> (Listener s a ->{} Unit) ->{Scope s;} Unit
 foreign effect attach from "@flick-lang/runtime" "eventsAttach"
   retention owner

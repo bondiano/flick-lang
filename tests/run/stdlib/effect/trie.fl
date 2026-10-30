@@ -15,10 +15,8 @@ let main () =
     ("get: " ++ show (Trie.get "sea" words, Trie.get "se" words, Trie.has "she" words))
   Platform.stdout_line ("prefix sh: " ++ show (Trie.keys_with_prefix "sh" words))
   Platform.stdout_line
-    (
-      "prefix se: "
-        ++ show (Trie.values_with_prefix "se" words, Trie.entries_with_prefix "sel" words)
-    )
+    ("prefix se: "
+      ++ show (Trie.values_with_prefix "se" words, Trie.entries_with_prefix "sel" words))
   Platform.stdout_line
     ("longest prefix: "
       ++ show (Trie.longest_prefix_of "shellfish" words, Trie.longest_prefix_of "x" words))

@@ -12,18 +12,19 @@ type alias RequestResolver p (e : ErrorRow) a = Request.RequestResolver p e a
 /// `preCheck` admits an entry, `delay` runs before a batch is taken,
 /// `collectWhile` decides whether a batch takes more entries, and `runAll`
 /// resolves a batch with its key.
-type alias MakeOptions p (e : ErrorRow) a k =
-  {
-    batchKey : Entry p e a -> k;
-    preCheck : Option (Entry p e a -> Bool);
-    delay : Eff none none Unit;
-    collectWhile : List (Entry p e a) -> Bool;
-    runAll : NonEmpty.NonEmpty (Entry p e a) -> k ->{; e} Unit;
-  }
+type alias MakeOptions p (e : ErrorRow) a k = {
+  batchKey : Entry p e a -> k;
+  preCheck : Option (Entry p e a -> Bool);
+  delay : Eff none none Unit;
+  collectWhile : List (Entry p e a) -> Bool;
+  runAll : NonEmpty.NonEmpty (Entry p e a) -> k ->{; e} Unit;
+}
 
 /// How `make_grouped` groups a batch by key, and resolves each group.
-type alias GroupedOptions p (e : ErrorRow) a k =
-  { key : Entry p e a -> k; resolver : NonEmpty.NonEmpty (Entry p e a) -> k ->{; e} Unit }
+type alias GroupedOptions p (e : ErrorRow) a k = {
+  key : Entry p e a -> k;
+  resolver : NonEmpty.NonEmpty (Entry p e a) -> k ->{; e} Unit;
+}
 
 /// Which entries `with_cache` drops first: `lru` or `fifo`.
 opaque unboxed type Strategy = Strategy String
@@ -42,11 +43,10 @@ type alias CacheOptions = { capacity : Int; strategy : Option Strategy }
 
 /// The options of `as_cache`: at most `capacity` results, each kept for
 /// `timeToLive` of how it ended and its request (`None`: until dropped).
-type alias AsCacheOptions p (e : ErrorRow) a =
-  {
-    capacity : Int;
-    timeToLive : Option (Exit e a -> Request.Request p e a -> Duration.Duration);
-  }
+type alias AsCacheOptions p (e : ErrorRow) a = {
+  capacity : Int;
+  timeToLive : Option (Exit e a -> Request.Request p e a -> Duration.Duration);
+}
 
 /// A resolver running `run_all` on each batch; a failure of it fails every
 /// entry the batch left incomplete.
@@ -102,7 +102,8 @@ foreign pure set_delay from "@flick-lang/runtime/effect/RequestResolver" "setDel
 around :
   (NonEmpty.NonEmpty (Entry p e a) ->{; e} b) ->
   (NonEmpty.NonEmpty (Entry p e a) -> b ->{; e} x) ->
-  RequestResolver p e a -> RequestResolver p e a
+  RequestResolver p e a ->
+  RequestResolver p e a
 foreign pure around from "@flick-lang/runtime/effect/RequestResolver" "around"
   arity 2
   reviewed "effect@4.0.5 sha256:3690926b82cc0631"

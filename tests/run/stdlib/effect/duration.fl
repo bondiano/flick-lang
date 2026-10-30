@@ -58,36 +58,38 @@ let main () =
   let infinity = Duration.infinity
   Platform.stdout_line
     ("units: "
-      ++ shown_all
-        [
-          Duration.nanos 1500n,
-          Duration.micros 1500n,
-          Duration.millis 1500,
-          Duration.seconds 90,
-          Duration.minutes 90,
-          Duration.hours 25,
-          Duration.days 8,
-          Duration.weeks 1,
-        ])
+      ++ shown_all [
+        Duration.nanos 1500n,
+        Duration.micros 1500n,
+        Duration.millis 1500,
+        Duration.seconds 90,
+        Duration.minutes 90,
+        Duration.hours 25,
+        Duration.days 8,
+        Duration.weeks 1,
+      ])
   Platform.stdout_line
     ("refused: "
-      ++ shown_all
-        [Duration.micros (-1n), Duration.hours (-1), Duration.days (0 / 0), Duration.weeks 1e308])
+      ++ shown_all [
+        Duration.micros (-1n),
+        Duration.hours (-1),
+        Duration.days (0 / 0),
+        Duration.weeks 1e308,
+      ])
   Platform.stdout_line
     ("from_input: "
       ++ shown_all
         (List.map Duration.from_input ["5 seconds", "1.5 hours", "Infinity", "-5 seconds", "soon"]))
   let d = ok (Duration.from_input "90 minutes")
-  let to =
-    [
-      Duration.to_seconds d,
-      Duration.to_minutes d,
-      Duration.to_hours d,
-      Duration.to_days (ok (Duration.hours 36)),
-      Duration.to_weeks (ok (Duration.days 14)),
-      Duration.to_millis infinity,
-      Duration.to_hours infinity,
-    ]
+  let to = [
+    Duration.to_seconds d,
+    Duration.to_minutes d,
+    Duration.to_hours d,
+    Duration.to_days (ok (Duration.hours 36)),
+    Duration.to_weeks (ok (Duration.days 14)),
+    Duration.to_millis infinity,
+    Duration.to_hours infinity,
+  ]
   Platform.stdout_line ("to: " ++ show (List.map opt to))
   Platform.stdout_line ("to_nanos: " ++ show (Duration.to_nanos two, Duration.to_nanos infinity))
   Platform.stdout_line
@@ -97,71 +99,67 @@ let main () =
     ("parts: " ++ show (p.days, p.hours, p.minutes, p.seconds, p.millis, p.nanos))
   Platform.stdout_line
     ("predicates: "
-      ++ show
-        (
-          Duration.is_zero Duration.zero,
-          Duration.is_zero one,
-          Duration.is_positive one,
-          Duration.is_positive Duration.zero,
-          Duration.is_finite infinity,
-        ))
+      ++ show (
+        Duration.is_zero Duration.zero,
+        Duration.is_zero one,
+        Duration.is_positive one,
+        Duration.is_positive Duration.zero,
+        Duration.is_finite infinity,
+      ))
   Platform.stdout_line
     ("match_: " ++ show (List.map stored [ms 3, ok (Duration.nanos 7n), infinity]))
   Platform.stdout_line
     ("match_pair: "
-      ++ show
-        [pair one two, pair (ok (Duration.nanos 1n)) (ok (Duration.nanos 2n)), pair infinity one])
+      ++ show [
+        pair one two,
+        pair (ok (Duration.nanos 1n)) (ok (Duration.nanos 2n)),
+        pair infinity one,
+      ])
   let quarter = ms 250
   let second = ms 1000
   Platform.stdout_line
     ("arithmetic: "
-      ++ show
-        (
-          Duration.format (Duration.add (ms 500) (ms 700)),
-          Duration.format (Duration.sum_all [one, two, ms 3]),
-        ))
+      ++ show (
+        Duration.format (Duration.add (ms 500) (ms 700)),
+        Duration.format (Duration.sum_all [one, two, ms 3]),
+      ))
   Platform.stdout_line
     ("checked: "
-      ++ shown_all
-        [
-          ms 700 |> Duration.subtract (ms 200),
-          ms 200 |> Duration.subtract (ms 700),
-          quarter |> Duration.times 4,
-          quarter |> Duration.times (-1),
-          second |> Duration.divide 4,
-          second |> Duration.divide 0,
-          second |> Duration.divide (-2),
-        ])
+      ++ shown_all [
+        ms 700 |> Duration.subtract (ms 200),
+        ms 200 |> Duration.subtract (ms 700),
+        quarter |> Duration.times 4,
+        quarter |> Duration.times (-1),
+        second |> Duration.divide 4,
+        second |> Duration.divide 0,
+        second |> Duration.divide (-2),
+      ])
   let bounds = { minimum = ms 10; maximum = ms 20 }
   let five = ms 5
   let nine = ms 9
   Platform.stdout_line
     ("bounds: "
       ++ show
-        (List.map
-          Duration.format
-          [
-            Duration.min five nine,
-            Duration.max five nine,
-            Duration.clamp bounds (ms 3),
-            Duration.clamp bounds (ms 30),
-          ]))
+        (List.map Duration.format [
+          Duration.min five nine,
+          Duration.max five nine,
+          Duration.clamp bounds (ms 3),
+          Duration.clamp bounds (ms 30),
+        ]))
   Platform.stdout_line
     ("between: " ++ show (Duration.between bounds (ms 15), Duration.between bounds (ms 25)))
   Platform.stdout_line
     ("compare: "
-      ++ show
-        [
-          Duration.is_less_than two one,
-          Duration.is_less_than_or_equal_to two two,
-          Duration.is_greater_than two two,
-          Duration.is_greater_than_or_equal_to two two,
-        ])
+      ++ show [
+        Duration.is_less_than two one,
+        Duration.is_less_than_or_equal_to two two,
+        Duration.is_greater_than two two,
+        Duration.is_greater_than_or_equal_to two two,
+      ])
   Platform.stdout_line
     ("order: "
-      ++ show
-        (
-          Duration.compare_duration one infinity,
-          five == ok (Duration.nanos 5000000n),
-          compare two one,
-        ))
+      ++ show (
+        Duration.compare_duration one infinity,
+        five == ok (Duration.nanos 5000000n),
+        compare two one,
+      ))

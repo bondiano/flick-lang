@@ -191,8 +191,8 @@ foreign pure map_keys from "@flick-lang/runtime/effect/Record" "mapKeys"
   reviewed "effect@4.0.5 sha256:74bc9be1e78f5c07"
 
 /// Each entry replaced by the key and value `f` gives of its value and key.
-map_entries : forall c a b. (a -> String -> (String, b))^c ->
-  (ReadonlyRecord a -> ReadonlyRecord b)^c
+map_entries :
+  forall c a b. (a -> String -> (String, b))^c -> (ReadonlyRecord a -> ReadonlyRecord b)^c
 foreign pure map_entries from "@flick-lang/runtime/effect/Record" "mapEntries"
   arity 1
   retention call
@@ -206,8 +206,8 @@ foreign pure filter from "@flick-lang/runtime/effect/Record" "filter"
   reviewed "effect@4.0.5 sha256:743af5c938465c30"
 
 /// The `Ok` values of `f` over each value and key.
-filter_map : forall c a b e. (a -> String -> Result e b)^c ->
-  (ReadonlyRecord a -> ReadonlyRecord b)^c
+filter_map :
+  forall c a b e. (a -> String -> Result e b)^c -> (ReadonlyRecord a -> ReadonlyRecord b)^c
 foreign pure filter_map from "@flick-lang/runtime/effect/Record" "filterMap"
   arity 1
   retention call
@@ -281,8 +281,7 @@ foreign pure union from "@flick-lang/runtime/effect/Record" "union"
 /// `self |> intersection that combine`: the shared keys, with `combine` of
 /// the two values.
 intersection :
-  forall c a b d.
-  ReadonlyRecord b -> (a -> b -> d)^c -> (ReadonlyRecord a -> ReadonlyRecord d)^c
+  forall c a b d. ReadonlyRecord b -> (a -> b -> d)^c -> (ReadonlyRecord a -> ReadonlyRecord d)^c
 foreign pure intersection from "@flick-lang/runtime/effect/Record" "intersection"
   arity 2
   retention call
@@ -307,8 +306,8 @@ is_subrecord : Eq a => ReadonlyRecord a -> ReadonlyRecord a -> Bool
 let is_subrecord that self = is_subrecord_by eq that self
 
 /// Whether both have the same keys, with values `same` under each.
-make_equivalence : forall c a. (a -> a -> Bool)^c ->
-  (ReadonlyRecord a -> ReadonlyRecord a -> Bool)^c
+make_equivalence :
+  forall c a. (a -> a -> Bool)^c -> (ReadonlyRecord a -> ReadonlyRecord a -> Bool)^c
 foreign pure make_equivalence from "@flick-lang/runtime/effect/Record" "flickMakeEquivalence"
   arity 1
   retention call

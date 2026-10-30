@@ -3,21 +3,21 @@
 // actions, settings and formatters, help documents and completions.
 module App.Main exposing (main)
 
-type alias DeployOptions =
-  {
-    env : List (String, String);
-    token : Option (Redacted String);
-    level : String;
-    color : String;
-    at : Option DateTime.DateTime;
-    tags : List String;
-    owner : String;
-    target : String;
-  }
+type alias DeployOptions = {
+  env : List (String, String);
+  token : Option (Redacted String);
+  level : String;
+  color : String;
+  at : Option DateTime.DateTime;
+  tags : List String;
+  owner : String;
+  target : String;
+}
 
 run_deploy : DeployOptions ->{} Unit
 let run_deploy o =
-  let token = match o.token with
+  let token =
+    match o.token with
     | Some t -> Redacted.reveal t
     | None -> "-"
   let at = Option.map DateTime.to_epoch_millis o.at
@@ -33,47 +33,46 @@ let license context =
 deploy : Cli.Command none none
 let deploy =
   Cli.command "deploy"
-    |> Cli.description "Deploys a build"
-    |> Cli.short_description "Ships it"
-    |> Cli.alias "d"
-    |> Cli.example "deploy -e region=eu prod" "Deploys to prod in eu"
-    |> Cli.example "deploy prod" ""
-    |> Cli.action "license" "Prints the license" license
-    |> Cli.flag
-      (Record.label : Record.Label "env")
-      ["e"]
-      "Variables"
-      (Cli.many |> Cli.metavar "key=value")
-    |> Cli.flag (Record.label : Record.Label "token") [] "Secret token" (Cli.optional |> Cli.hidden)
-    |> Cli.flag
-      (Record.label : Record.Label "level")
-      []
-      "Log level"
-      (Cli.from_config (Config.succeed "info"))
-    |> Cli.flag
-      (Record.label : Record.Label "color")
-      []
-      "When to color"
-      (Cli.default "never" |> Cli.optional_value "auto")
-    |> Cli.flag (Record.label : Record.Label "at") [] "When to deploy" Cli.optional
-    |> Cli.flag (Record.label : Record.Label "tags") ["t"] "One or two tags" tags
-    |> Cli.flag
-      (Record.label : Record.Label "owner")
-      []
-      "Who deploys"
-      (Cli.from_prompt (Cli.Prompt.succeed "ops"))
-    |> Cli.arg (Record.label : Record.Label "target") "Where to deploy" Cli.required
-    |> Cli.handle run_deploy
+  |> Cli.description "Deploys a build"
+  |> Cli.short_description "Ships it"
+  |> Cli.alias "d"
+  |> Cli.example "deploy -e region=eu prod" "Deploys to prod in eu"
+  |> Cli.example "deploy prod" ""
+  |> Cli.action "license" "Prints the license" license
+  |> Cli.flag
+    (Record.label : Record.Label "env")
+    ["e"]
+    "Variables"
+    (Cli.many |> Cli.metavar "key=value")
+  |> Cli.flag (Record.label : Record.Label "token") [] "Secret token" (Cli.optional |> Cli.hidden)
+  |> Cli.flag
+    (Record.label : Record.Label "level")
+    []
+    "Log level"
+    (Cli.from_config (Config.succeed "info"))
+  |> Cli.flag
+    (Record.label : Record.Label "color")
+    []
+    "When to color"
+    (Cli.default "never" |> Cli.optional_value "auto")
+  |> Cli.flag (Record.label : Record.Label "at") [] "When to deploy" Cli.optional
+  |> Cli.flag (Record.label : Record.Label "tags") ["t"] "One or two tags" tags
+  |> Cli.flag
+    (Record.label : Record.Label "owner")
+    []
+    "Who deploys"
+    (Cli.from_prompt (Cli.Prompt.succeed "ops"))
+  |> Cli.arg (Record.label : Record.Label "target") "Where to deploy" Cli.required
+  |> Cli.handle run_deploy
 
-type alias FilesOptions =
-  {
-    dir : String;
-    notes : Option String;
-    data : Option String;
-    out : Option String;
-    any : List String;
-    rest : List String;
-  }
+type alias FilesOptions = {
+  dir : String;
+  notes : Option String;
+  data : Option String;
+  out : Option String;
+  any : List String;
+  rest : List String;
+}
 
 run_files : FilesOptions ->{} Unit
 let run_files o =
@@ -91,33 +90,25 @@ let run_files o =
 files : Cli.Command none none
 let files =
   Cli.command "files"
-    |> Cli.flag
-      (Record.label : Record.Label "dir")
-      []
-      "A directory"
-      (Cli.required |> Cli.directory true)
-    |> Cli.flag
-      (Record.label : Record.Label "notes")
-      []
-      "A text file"
-      (Cli.optional |> Cli.file_text)
-    |> Cli.flag
-      (Record.label : Record.Label "data")
-      []
-      "A YAML file"
-      (Cli.optional |> Cli.file_parse (Some Cli.Yaml))
-    |> Cli.flag
-      (Record.label : Record.Label "out")
-      []
-      "Output file"
-      (Cli.optional |> Cli.file false)
-    |> Cli.flag
-      (Record.label : Record.Label "any")
-      []
-      "Existing paths"
-      (Cli.at_most 1 |> Cli.path true)
-    |> Cli.arg (Record.label : Record.Label "rest") "More words" (Cli.at_least 1)
-    |> Cli.handle run_files
+  |> Cli.flag
+    (Record.label : Record.Label "dir")
+    []
+    "A directory"
+    (Cli.required |> Cli.directory true)
+  |> Cli.flag (Record.label : Record.Label "notes") [] "A text file" (Cli.optional |> Cli.file_text)
+  |> Cli.flag
+    (Record.label : Record.Label "data")
+    []
+    "A YAML file"
+    (Cli.optional |> Cli.file_parse (Some Cli.Yaml))
+  |> Cli.flag (Record.label : Record.Label "out") [] "Output file" (Cli.optional |> Cli.file false)
+  |> Cli.flag
+    (Record.label : Record.Label "any")
+    []
+    "Existing paths"
+    (Cli.at_most 1 |> Cli.path true)
+  |> Cli.arg (Record.label : Record.Label "rest") "More words" (Cli.at_least 1)
+  |> Cli.handle run_files
 
 secret : Cli.Command none none
 let secret =
@@ -187,8 +178,11 @@ group_name : Cli.SubcommandGroupDoc -> Option String
 let group_name g = g.group
 
 only_help : Cli.Settings
-let only_help =
-  { version = "1.2.3"; builtIns = [Cli.HelpFlag, Cli.VersionFlag]; formatter = Some custom }
+let only_help = {
+  version = "1.2.3";
+  builtIns = [Cli.HelpFlag, Cli.VersionFlag];
+  formatter = Some custom;
+}
 
 with_settings : List String ->{} Unit
 let with_settings args =
@@ -206,26 +200,26 @@ let script shell =
     ++ show (String.contains "tags" text)
 
 custom : Cli.Formatter
-let custom =
-  { formatHelpDoc = show_help; formatVersion = fun name version -> name ++ "@" ++ version }
+let custom = {
+  formatHelpDoc = show_help;
+  formatVersion = fun name version -> name ++ "@" ++ version;
+}
 
 main : Unit ->{; AppError} Unit
 let main () =
-  attempt
-    deploy
-    [
-      "-e",
-      "region=eu",
-      "-e",
-      "tier=web",
-      "--token",
-      "s3",
-      "-t",
-      "a",
-      "--at",
-      "2026-10-23T10:00:00Z",
-      "prod",
-    ]
+  attempt deploy [
+    "-e",
+    "region=eu",
+    "-e",
+    "tier=web",
+    "--token",
+    "s3",
+    "-t",
+    "a",
+    "--at",
+    "2026-10-23T10:00:00Z",
+    "prod",
+  ]
   attempt deploy ["-t", "a", "-t", "b", "--level", "debug", "prod", "--color"]
   attempt deploy ["-t", "a", "--color=always", "--owner", "me", "prod"]
   attempt deploy ["-t", "a", "-t", "b", "-t", "c", "prod"]
@@ -246,22 +240,19 @@ let main () =
             { flag = None; mode = None }
             (dir ++ "/data.yaml")
             "name: flick\nlist: [1, 2]\n"
-          attempt_in
-            dir
-            files
-            [
-              "--dir",
-              dir,
-              "--notes",
-              dir ++ "/notes.txt",
-              "--data",
-              dir ++ "/data.yaml",
-              "--out",
-              dir ++ "/new.txt",
-              "--any",
-              dir,
-              "word",
-            ]
+          attempt_in dir files [
+            "--dir",
+            dir,
+            "--notes",
+            dir ++ "/notes.txt",
+            "--data",
+            dir ++ "/data.yaml",
+            "--out",
+            dir ++ "/new.txt",
+            "--any",
+            dir,
+            "word",
+          ]
           attempt_in dir files ["--dir", dir ++ "/missing", "word"]
           attempt_in dir files ["--dir", dir, "--notes", dir ++ "/missing.txt", "word"]
           attempt_in dir files ["--dir", dir]

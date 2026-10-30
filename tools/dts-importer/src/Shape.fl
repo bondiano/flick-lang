@@ -35,19 +35,18 @@ let symbol_name s = Option.map Ts.symbol_name s
 
 /// The forms that are a single flag of the type, in the order they win.
 simple : List (String, String)
-let simple =
-  [
-    ("Any", "any"),
-    ("Unknown", "unknown"),
-    ("Boolean", "boolean"),
-    ("String", "string"),
-    ("Number", "number"),
-    ("BigInt", "bigint"),
-    ("Void", "void"),
-    ("Undefined", "undefined"),
-    ("Null", "null"),
-    ("Never", "never"),
-  ]
+let simple = [
+  ("Any", "any"),
+  ("Unknown", "unknown"),
+  ("Boolean", "boolean"),
+  ("String", "string"),
+  ("Number", "number"),
+  ("BigInt", "bigint"),
+  ("Void", "void"),
+  ("Undefined", "undefined"),
+  ("Null", "null"),
+  ("Never", "never"),
+]
 
 is_literal : Ts.Type -> Bool
 let is_literal t =
@@ -98,11 +97,10 @@ rec {
         else if Ts.type_has "TypeParameter" t then
           parameter_shape c t
         else if Ts.type_has "Union" t then
-          JObject
-            [
-              ("k", JString "union"),
-              ("types", JArray (List.map (shape c (depth + 1)) (Ts.members t))),
-            ]
+          JObject [
+            ("k", JString "union"),
+            ("types", JArray (List.map (shape c (depth + 1)) (Ts.members t))),
+          ]
         else if Ts.type_has "Object" t then
           object_shape c depth t
         else
@@ -116,8 +114,10 @@ rec {
       if Ts.tuple_has_rest t || Ts.tuple_min_length t != Ts.tuple_fixed_length t then
         other c t
       else
-        JObject
-          [("k", JString "tuple"), ("elements", JArray (List.map deeper (Ts.type_arguments c t)))]
+        JObject [
+          ("k", JString "tuple"),
+          ("elements", JArray (List.map deeper (Ts.type_arguments c t))),
+        ]
     else if Ts.is_array c t then
       match List.head (Ts.type_arguments c t) with
       | Some element -> JObject [("k", JString "array"), ("element", deeper element)]
@@ -135,11 +135,10 @@ rec {
       | (true, [arg]) -> JObject [("k", JString "promise"), ("type", deeper arg)]
       | _ ->
         if not (List.is_empty calls) && Ts.property_count t == 0 then
-          JObject
-            [
-              ("k", JString "function"),
-              ("signatures", JArray (List.map (signature c (depth + 1)) calls)),
-            ]
+          JObject [
+            ("k", JString "function"),
+            ("signatures", JArray (List.map (signature c (depth + 1)) calls)),
+          ]
         else
           match name with
           | Some n ->
@@ -151,12 +150,11 @@ rec {
             else if List.is_empty calls
               && List.is_empty (Ts.construct_signatures t)
               && List.is_empty args then
-              JObject
-                [
-                  ("k", JString "object"),
-                  ("name", object_name n t),
-                  ("text", JString (Ts.text c t)),
-                ]
+              JObject [
+                ("k", JString "object"),
+                ("name", object_name n t),
+                ("text", JString (Ts.text c t)),
+              ]
             else
               other c t
           | None -> other c t
@@ -178,29 +176,27 @@ rec {
         | _ -> declared
       else
         declared
-    JObject
-      [
-        ("name", JString (Ts.symbol_name p)),
-        ("optional", JBool optional),
-        ("rest", JBool (is "dotDotDotToken")),
-        ("type", shape c depth type_),
-      ]
+    JObject [
+      ("name", JString (Ts.symbol_name p)),
+      ("optional", JBool optional),
+      ("rest", JBool (is "dotDotDotToken")),
+      ("type", shape c depth type_),
+    ]
 
   signature : Ts.Checker -> Float -> Ts.Signature -> Value
   let signature c depth s =
-    JObject
-      [
-        ("params", JArray (List.map (parameter c depth) (Ts.parameters s))),
-        ("this", JBool (Ts.has_this s)),
-        (
-          "typeParams",
-          JArray
-            (List.map
-              (fun t -> JString (Option.with_default "" (symbol_name (Ts.type_symbol t))))
-              (Ts.type_parameters s)),
-        ),
-        ("result", shape c depth (Ts.return_type c s)),
-      ]
+    JObject [
+      ("params", JArray (List.map (parameter c depth) (Ts.parameters s))),
+      ("this", JBool (Ts.has_this s)),
+      (
+        "typeParams",
+        JArray
+          (List.map
+            (fun t -> JString (Option.with_default "" (symbol_name (Ts.type_symbol t))))
+            (Ts.type_parameters s)),
+      ),
+      ("result", shape c depth (Ts.return_type c s)),
+    ]
 }
 
 /// The description of an export after its name and local name, if it is a value.
@@ -211,11 +207,10 @@ let describe c symbol =
   else if Ts.symbol_has "Class" symbol then
     Some [("kind", JString "class")]
   else if Ts.symbol_has "Enum" symbol then
-    Some
-      [
-        ("kind", JString "value"),
-        ("type", JObject [("k", JString "other"), ("text", JString "enum")]),
-      ]
+    Some [
+      ("kind", JString "value"),
+      ("type", JObject [("k", JString "other"), ("text", JString "enum")]),
+    ]
   else
     let type_ = Ts.type_of_symbol c symbol
     let calls = Ts.call_signatures type_
@@ -249,7 +244,8 @@ let export_of c exported =
         local = local_name exported symbol;
         body = body;
         fingerprint = "sha256:" ++ Ts.sha256 fingerprinted;
-      })
+      }
+    )
     (describe c symbol)
 
 /// The value exports of the module, by name.

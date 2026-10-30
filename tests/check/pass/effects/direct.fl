@@ -15,8 +15,7 @@ service Log =
   info : String ->{} Unit
 
 normalize_name : String -> String
-let normalize_name name =
-  String.trim name
+let normalize_name name = String.trim name
 
 load_name : UserId ->{Users, Log; NotFound} String
 let load_name id =
@@ -35,26 +34,19 @@ let user_name id =
 
 // a signature is an upper bound
 wide : UserId ->{Users, Log; NotFound} String
-let wide id =
-  user_name id
+let wide id = user_name id
 
 ticks : Unit ->{} Float
-let ticks () =
-  0
+let ticks () = 0
 
 apply_pure : (String -> String) -> String
-let apply_pure f =
-  f "x"
+let apply_pure f = f "x"
 
-apply_runtime :
-  (UserId ->{Users; NotFound} User) -> UserId ->{Users; NotFound} User
-let apply_runtime f id =
-  f id
+apply_runtime : (UserId ->{Users; NotFound} User) -> UserId ->{Users; NotFound} User
+let apply_runtime f id = f id
 
-builder :
-  (UserId -> Eff {Users} {NotFound} User) -> UserId -> Eff {Users} {NotFound} User
-let builder f id =
-  f id
+builder : (UserId -> Eff {Users} {NotFound} User) -> UserId -> Eff {Users} {NotFound} User
+let builder f id = f id
 
 lambdas : UserId ->{Users; NotFound} String
 let lambdas id =
@@ -73,8 +65,7 @@ let greet prefix name =
   prefix ++ name
 
 hello : String ->{Log; none} String
-let hello =
-  greet "Hello"
+let hello = greet "Hello"
 
 // a task is cold; storing or passing it runs nothing
 load_twice : UserId ->{Users; NotFound} (User, User)
@@ -86,10 +77,8 @@ let load_twice id =
   (first, second)
 
 // `await` takes exactly one layer off
-one_layer :
-  Eff none none (Eff {Users} {NotFound} User) ->{} Eff {Users} {NotFound} User
-let one_layer outer =
-  await outer
+one_layer : Eff none none (Eff {Users} {NotFound} User) ->{} Eff {Users} {NotFound} User
+let one_layer outer = await outer
 
 // the rows of a callback become the rows of the call
 each : forall r e. (Float ->{r; e} Unit) -> List Float ->{r; e} Unit
@@ -100,16 +89,13 @@ let rec each f numbers =
   | _ -> ()
 
 log_all : List Float ->{Log; none} Unit
-let log_all numbers =
-  each (fun n -> Log.info "number") numbers
+let log_all numbers = each (fun n -> Log.info "number") numbers
 
 both : Eff r1 e1 a -> Eff r2 e2 b ->{r1 + r2; e1 + e2} (a, b)
-let both left right =
-  (await left, await right)
+let both left right = (await left, await right)
 
 load_and_log : UserId ->{Users, Log; NotFound} (User, Unit)
-let load_and_log id =
-  both (task { Users.get id }) (task { Log.info "loading" })
+let load_and_log id = both (task { Users.get id }) (task { Log.info "loading" })
 
 // a stored task with inferred rows widens where it is used
 tasks : UserId ->{Users, Log; NotFound} Unit
@@ -122,5 +108,4 @@ let tasks id =
 
 // a top-level `task` defers its body, so module initialization stays pure
 startup : Eff {Log} none Unit
-let startup =
-  task { Log.info "start" }
+let startup = task { Log.info "start" }

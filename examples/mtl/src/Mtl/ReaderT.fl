@@ -19,9 +19,7 @@ import Mtl.Classes exposing (
 type ReaderT r (m : Type -> Type) a = ReaderT (r -> m a)
 
 /// Supply the environment and remove this layer, yielding `m a`.
-run :
-  forall c d r m a. (ReaderT r m a)^c ->
-    (r^d -> (m a)^(c + d))^c
+run : forall c d r m a. (ReaderT r m a)^c -> (r^d -> (m a)^(c + d))^c
 let run (ReaderT read) environment = read environment
 
 instance Functor m => Functor (ReaderT r m) =
@@ -32,15 +30,16 @@ instance Applicative m => Applicative (ReaderT r m) =
   pure : forall c a. a^c -> (ReaderT r m a)^c
   let pure value = ReaderT (fun _ -> pure value)
   map2 :
-    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-      ((ReaderT r m a)^d -> ((ReaderT r m b)^d -> (ReaderT r m x)^(c + d))^(c + d))^c
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((ReaderT r m a)^d -> ((ReaderT r m b)^d -> (ReaderT r m x)^(c + d))^(c + d))^c
   let map2 f left right =
     ReaderT (fun environment -> map2 f (run left environment) (run right environment))
 
 instance Monad m => Monad (ReaderT r m) =
   flat_map :
-    forall c d a b. (forall v. a^v -> (ReaderT r m b)^(c + v))^c ->
-      ((ReaderT r m a)^d -> (ReaderT r m b)^(c + d))^c
+    forall c d a b.
+    (forall v. a^v -> (ReaderT r m b)^(c + v))^c -> ((ReaderT r m a)^d -> (ReaderT r m b)^(c + d))^c
   let flat_map f action =
     ReaderT (fun environment -> do {
       value <- run action environment
@@ -55,8 +54,7 @@ instance Monad m => MonadReader (ReaderT r m) r =
   ask : ReaderT r m r
   let ask = ReaderT (fun environment -> pure environment)
   local :
-    forall c d a. (forall v. r^v -> r^(c + v))^c ->
-      ((ReaderT r m a)^d -> (ReaderT r m a)^(c + d))^c
+    forall c d a. (forall v. r^v -> r^(c + v))^c -> ((ReaderT r m a)^d -> (ReaderT r m a)^(c + d))^c
   let local update action = ReaderT (fun environment -> run action (update environment))
   reader : forall c a. (forall v. r^v -> a)^c -> (ReaderT r m a)^c
   let reader project = ReaderT (fun environment -> pure (project environment))
@@ -83,8 +81,9 @@ instance MonadError m e => MonadError (ReaderT r m) e =
   throw_error : forall c a. e^c -> (ReaderT r m a)^c
   let throw_error failure = lift (throw_error failure)
   catch_error :
-    forall c d a. (forall v. e^v -> (ReaderT r m a)^(c + v))^c ->
-      ((ReaderT r m a)^d -> (ReaderT r m a)^(c + d))^c
+    forall c d a.
+    (forall v. e^v -> (ReaderT r m a)^(c + v))^c -> ((ReaderT r m a)^d -> (ReaderT r m a)^(c + d))^c
   let catch_error handler action =
     ReaderT (fun environment ->
-      catch_error (fun failure -> run (handler failure) environment) (run action environment))
+      catch_error (fun failure -> run (handler failure) environment) (run action environment)
+    )

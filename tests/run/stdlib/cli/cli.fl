@@ -7,40 +7,37 @@ type Color = Red | GreenLight
   deriving Cli.Value, Show
 
 greet : Cli.Command none none
-let greet =
-  cli "greet" {
-    description "Prints a greeting"
-    /// Print in capitals
-    flag loud : Bool
-    /// How many times
-    flag times "n" : Float = 1
-    /// The color of the text
-    flag color "c" : Option Color
-    /// Who to greet
-    arg name : String
-    handle fun { loud; times; color; name } ->
-      let text = "Hello, " ++ name ++ show color
-      let line = if loud then String.to_upper text else text
-      Platform.stdout_line (String.join " / " (List.repeat (Int.truncate times) line))
-  }
+let greet = cli "greet" {
+  description "Prints a greeting"
+  /// Print in capitals
+  flag loud : Bool
+  /// How many times
+  flag times "n" : Float = 1
+  /// The color of the text
+  flag color "c" : Option Color
+  /// Who to greet
+  arg name : String
+  handle fun { loud; times; color; name } ->
+    let text = "Hello, " ++ name ++ show color
+    let line = if loud then String.to_upper text else text
+    Platform.stdout_line (String.join " / " (List.repeat (Int.truncate times) line))
+}
 
 sum : Cli.Command none none
-let sum =
-  cli "sum" {
-    description "Adds numbers"
-    arg numbers : NonEmpty.NonEmpty Float
-    handle fun { numbers } -> Platform.stdout_line (show (List.sum (NonEmpty.to_list numbers)))
-  }
+let sum = cli "sum" {
+  description "Adds numbers"
+  arg numbers : NonEmpty.NonEmpty Float
+  handle fun { numbers } -> Platform.stdout_line (show (List.sum (NonEmpty.to_list numbers)))
+}
 
 tool : Cli.Command none none
-let tool =
-  cli "tool" {
-    description "Project tools"
-    /// Verbose output
-    flag verbose "v" : Bool
-    subcommand greet
-    subcommand sum
-  }
+let tool = cli "tool" {
+  description "Project tools"
+  /// Verbose output
+  flag verbose "v" : Bool
+  subcommand greet
+  subcommand sum
+}
 
 /// Runs the command line, printing the error a bad one gives.
 attempt : Cli.Command none none -> List String ->{} Unit

@@ -33,7 +33,8 @@ let answer request url =
       ++ path
       ++ " "
       ++ show (Http.ClientRequest.headers request)
-      ++ " " ++ show (Http.Body.to_text (Http.ClientRequest.body request))
+      ++ " "
+      ++ show (Http.Body.to_text (Http.ClientRequest.body request))
   let response =
     if String.contains "/missing" path then
       Http.ServerResponse.text "gone" { ok with status = Some 404 }
@@ -44,9 +45,10 @@ let answer request url =
         (Http.Cookies.from_set_cookie ["session=abc; Path=/"])
         (Http.ServerResponse.text "in" ok)
     else if String.contains "/item" path then
-      Http.ServerResponse.text
-        "{\"label\":\"pen\",\"size\":2}"
-        { ok with contentType = Some "application/json" }
+      Http.ServerResponse.text "{\"label\":\"pen\",\"size\":2}" {
+        ok with
+        contentType = Some "application/json";
+      }
     else if String.contains "/form" path then
       Http.ServerResponse.url_params (Http.UrlParams.make [("a", "1"), ("a", "2")]) ok
     else
@@ -66,10 +68,11 @@ let describe failure =
 requests : Unit ->{} Unit
 let requests () =
   let base =
-    Http.ClientRequest.make
-      Http.Method.POST
-      "/a"
-      { Http.ClientRequest.defaults with acceptJson = true; urlParams = Some [("q", "1")] }
+    Http.ClientRequest.make Http.Method.POST "/a" {
+      Http.ClientRequest.defaults with
+      acceptJson = true;
+      urlParams = Some [("q", "1")];
+    }
   Platform.stdout_line ("make: " ++ (show base))
   let r =
     base
@@ -121,30 +124,26 @@ let requests () =
       Http.Body.empty
   Platform.stdout_line
     ("make_with: " ++ (show (Http.ClientRequest.method made) ++ " " ++ Http.ClientRequest.url made))
-  let methods =
-    [
-      Http.ClientRequest.get
-        "u", Http.ClientRequest.query
-        "u", Http.ClientRequest.post
-        "u", Http.ClientRequest.patch
-        "u",
-      Http.ClientRequest.put
-        "u", Http.ClientRequest.delete
-        "u", Http.ClientRequest.head
-        "u", Http.ClientRequest.options
-        "u",
-      Http.ClientRequest.trace "u",
-    ]
+  let methods = [
+    Http.ClientRequest.get "u",
+    Http.ClientRequest.query "u",
+    Http.ClientRequest.post "u",
+    Http.ClientRequest.patch "u",
+    Http.ClientRequest.put "u",
+    Http.ClientRequest.delete "u",
+    Http.ClientRequest.head "u",
+    Http.ClientRequest.options "u",
+    Http.ClientRequest.trace "u",
+  ]
   Platform.stdout_line ("methods: " ++ (show (List.map Http.ClientRequest.method methods)))
-  let bodies =
-    [
-      Http.ClientRequest.body_text "hi" None r,
-      Http.ClientRequest.body_text "<p/>" (Some "text/html") r,
-      Http.ClientRequest.body_uint8_array [104, 105] None r,
-      Http.ClientRequest.body_url_params [("a", "b c")] r,
-      Http.ClientRequest.body_form_data [("f", "v")] r,
-      Http.ClientRequest.set_body (Http.Body.text "set" None) r,
-    ]
+  let bodies = [
+    Http.ClientRequest.body_text "hi" None r,
+    Http.ClientRequest.body_text "<p/>" (Some "text/html") r,
+    Http.ClientRequest.body_uint8_array [104, 105] None r,
+    Http.ClientRequest.body_url_params [("a", "b c")] r,
+    Http.ClientRequest.body_form_data [("f", "v")] r,
+    Http.ClientRequest.set_body (Http.Body.text "set" None) r,
+  ]
   Platform.stdout_line
     ("bodies: "
       ++ (show (List.map (fun x -> Http.Body.content_type (Http.ClientRequest.body x)) bodies)))
@@ -176,19 +175,16 @@ let bodies () =
   Platform.stdout_line
     ("others: "
       ++ (show
-        (List.map
-          Http.Body.content_type
-          [
-            Http.Body.empty,
-            Http.Body.uint8_array [1, 2] None,
-            Http.Body.url_params (Http.UrlParams.make [("k", "v")]) None,
-            Http.Body.form_data [("k", "v")],
-          ])))
+        (List.map Http.Body.content_type [
+          Http.Body.empty,
+          Http.Body.uint8_array [1, 2] None,
+          Http.Body.url_params (Http.UrlParams.make [("k", "v")]) None,
+          Http.Body.form_data [("k", "v")],
+        ])))
   Platform.stdout_line
     ("length: "
-      ++ (
-        show (Http.Body.content_length (Http.Body.uint8_array [1, 2, 3] (Some "application/x-bin")))
-      ))
+      ++ (show
+        (Http.Body.content_length (Http.Body.uint8_array [1, 2, 3] (Some "application/x-bin")))))
 
 responses : Unit ->{; HttpClientError, SchemaError} Unit
 let responses () =
@@ -212,21 +208,17 @@ let responses () =
   Platform.stdout_line ("url_params_body: " ++ (show (Http.ClientResponse.url_params_body form)))
   let headers_codec =
     Codec.general
-      (
-        ignore_extra_fields
-          (codec (schema Typed) { contentType = field "content-type" String.json })
-      )
+      (ignore_extra_fields
+        (codec (schema Typed) { contentType = field "content-type" String.json }))
   Platform.stdout_line
     ("schema_headers: " ++ (show (Http.ClientResponse.schema_headers headers_codec it)))
   let whole =
     Codec.general
       (ignore_extra_fields
-        (
-          codec (schema Whole) {
-            status = field "status" Float.json;
-            body = field "body" item_json;
-          }
-        ))
+        (codec (schema Whole) {
+          status = field "status" Float.json;
+          body = field "body" item_json;
+        }))
   Platform.stdout_line
     ("schema_no_body: "
       ++ (show
@@ -242,10 +234,8 @@ let responses () =
     ("schema_body_url_params: " ++ (show (Http.ClientResponse.schema_body_url_params pairs form2)))
   Platform.stdout_line
     ("filter_status: "
-      ++ (
-        show
-          (Http.ClientResponse.status (Http.ClientResponse.filter_status (fun s -> s < 300) echoed))
-      ))
+      ++ (show
+        (Http.ClientResponse.status (Http.ClientResponse.filter_status (fun s -> s < 300) echoed))))
   let login = Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/login")
   Platform.stdout_line ("cookies: " ++ (show (Http.ClientResponse.cookies login)))
   try
@@ -280,42 +270,40 @@ let combinators () =
   Platform.stdout_line ("map_request_input_effect: " ++ (body_of (input_effect, "http://fake/a")))
   let tapped =
     fake
-    |> Http.Client.tap_request
-      (fun r -> Platform.stdout_line ("tap_request: " ++ (Http.ClientRequest.url r)))
-    |> Http.Client.tap
-      (fun r -> Platform.stdout_line ("tap: " ++ (show (Http.ClientResponse.status r))))
+    |> Http.Client.tap_request (fun r ->
+      Platform.stdout_line ("tap_request: " ++ (Http.ClientRequest.url r))
+    )
+    |> Http.Client.tap (fun r ->
+      Platform.stdout_line ("tap: " ++ (show (Http.ClientResponse.status r)))
+    )
   Platform.stdout_line ("tapped: " ++ (body_of (tapped, "http://fake/t")))
   let strict = fake |> Http.Client.filter_status_ok
-  try
-    Platform.stdout_line ("filter_status_ok: " ++ (body_of (strict, "http://fake/missing")))
-  with
+  try Platform.stdout_line ("filter_status_ok: " ++ (body_of (strict, "http://fake/missing"))) with
   | e -> Platform.stdout_line ("filter_status_ok: " ++ (describe e))
   let recovered =
     strict
     |> Http.Client.tap_error (fun e -> Platform.stdout_line ("tap_error: " ++ (describe e)))
-    |> Http.Client.catch
-      (fun _ -> Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/fallback"))
+    |> Http.Client.catch (fun _ ->
+      Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/fallback")
+    )
   Platform.stdout_line ("catch: " ++ (body_of (recovered, "http://fake/missing")))
   let filtered = fake |> Http.Client.filter_status (fun s -> s == 200)
-  try
-    Platform.stdout_line ("filter_status: " ++ (body_of (filtered, "http://fake/missing")))
-  with
+  try Platform.stdout_line ("filter_status: " ++ (body_of (filtered, "http://fake/missing"))) with
   | e -> Platform.stdout_line ("filter_status: " ++ (describe e))
   let or_else =
     fake
-    |> Http.Client.filter_or_else
-      (fun r -> Http.ClientResponse.status r == 200)
-      (fun _ -> Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/else"))
+    |> Http.Client.filter_or_else (fun r -> Http.ClientResponse.status r == 200) (fun _ ->
+      Http.Client.execute_with fake (Http.ClientRequest.get "http://fake/else")
+    )
   Platform.stdout_line ("filter_or_else: " ++ (body_of (or_else, "http://fake/missing")))
   try
     Platform.stdout_line
       ("filter_or_fail: "
-        ++ (body_of
-          (
-            fake
-              |> Http.Client.filter_or_fail (fun r -> Http.ClientResponse.status r == 200) refuse,
-            "http://fake/missing",
-          )))
+        ++ (body_of (
+          fake
+            |> Http.Client.filter_or_fail (fun r -> Http.ClientResponse.status r == 200) refuse,
+          "http://fake/missing",
+        )))
   with
   | Refused s -> Platform.stdout_line ("filter_or_fail: " ++ ("refused " ++ show s))
   let attempts = Ref.make 0
@@ -327,7 +315,8 @@ let combinators () =
           request
           (Http.ServerResponse.text "no" { ok with status = Some 500 })
       else
-        answer request url)
+        answer request url
+    )
     |> Http.Client.filter_status_ok
   Platform.stdout_line
     ("retry: "
@@ -335,12 +324,14 @@ let combinators () =
         ++ " after "
         ++ show (Ref.get attempts)))
   Ref.set attempts 0
-  let transient = Http.Client.make (fun request url ->
-    Ref.update attempts (fun n -> n + 1)
-    let status = if Ref.get attempts < 2 then 503 else 200
-    Http.ServerResponse.to_client_response
-      request
-      (Http.ServerResponse.text "t" { ok with status = Some status }))
+  let transient =
+    Http.Client.make (fun request url ->
+      Ref.update attempts (fun n -> n + 1)
+      let status = if Ref.get attempts < 2 then 503 else 200
+      Http.ServerResponse.to_client_response
+        request
+        (Http.ServerResponse.text "t" { ok with status = Some status })
+    )
   let after =
     Http.Client.execute_with
       (transient |> Http.Client.retry_transient Http.Client.ResponseOnly 3)
@@ -355,16 +346,18 @@ let combinators () =
   let redirected = fake |> Http.Client.follow_redirects (Some 3)
   Platform.stdout_line ("follow_redirects: " ++ (body_of (redirected, "http://fake/old")))
   let transformed =
-    fake |> Http.Client.transform (fun response request ->
+    fake
+    |> Http.Client.transform (fun response request ->
       Platform.stdout_line ("transform: " ++ (Http.ClientRequest.url request))
-      await response)
+      await response
+    )
   Platform.stdout_line ("transformed: " ++ (body_of (transformed, "http://fake/tr")))
   let responded = fake |> Http.Client.transform_response (fun response -> await response)
   Platform.stdout_line ("transform_response: " ++ (body_of (responded, "http://fake/trr")))
   let made_with =
-    Http.Client.make_with
-      (fun prepared -> Http.Client.execute_with fake (await prepared))
-      (fun r -> Http.ClientRequest.set_header "x-pre" "1" r)
+    Http.Client.make_with (fun prepared -> Http.Client.execute_with fake (await prepared)) (fun r ->
+      Http.ClientRequest.set_header "x-pre" "1" r
+    )
   Platform.stdout_line ("make_with: " ++ (body_of (made_with, "http://fake/mw")))
   let scoped : Http.Client.Client {Scope s} {HttpClientError} = Http.Client.with_scope fake
   Platform.stdout_line ("with_scope: " ++ "typed")
@@ -379,19 +372,17 @@ let combinators () =
     (task { Platform.stdout_line ("with_span_name_generator: " ++ "ran") })
   provide Http.Client.layer (task { fake }) {
     Platform.stdout_line ("client: " ++ (body_of (Http.Client.current (), "http://fake/cur")))
-    let answers =
-      [
-        Http.Client.execute (Http.ClientRequest.get "http://fake/x"),
-        Http.Client.get
-          "http://fake/g", Http.Client.query
-          "http://fake/q", Http.Client.head
-          "http://fake/h",
-        Http.Client.post
-          "http://fake/p", Http.Client.patch
-          "http://fake/pa", Http.Client.put
-          "http://fake/pu",
-        Http.Client.del "http://fake/d", Http.Client.options "http://fake/o",
-      ]
+    let answers = [
+      Http.Client.execute (Http.ClientRequest.get "http://fake/x"),
+      Http.Client.get "http://fake/g",
+      Http.Client.query "http://fake/q",
+      Http.Client.head "http://fake/h",
+      Http.Client.post "http://fake/p",
+      Http.Client.patch "http://fake/pa",
+      Http.Client.put "http://fake/pu",
+      Http.Client.del "http://fake/d",
+      Http.Client.options "http://fake/o",
+    ]
     Platform.stdout_line ("service: " ++ (show (List.map Http.ClientResponse.status answers)))
   }
 

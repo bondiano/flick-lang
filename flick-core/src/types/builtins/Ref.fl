@@ -3,9 +3,28 @@
 /// `Ref`: each operation is atomic, since nothing else runs during it.
 /// A cell's capture bound covers both its current contents and every later write.
 module Ref exposing (
-  make, get, set, modify, same, get_and_set, get_and_update, get_and_update_some, set_and_get,
-  modify_some, update, update_and_get, update_some, update_some_and_get, compare_and_set, increment,
-  decrement, increment_and_get, decrement_and_get, get_and_increment, get_and_decrement, toggle,
+  make,
+  get,
+  set,
+  modify,
+  same,
+  get_and_set,
+  get_and_update,
+  get_and_update_some,
+  set_and_get,
+  modify_some,
+  update,
+  update_and_get,
+  update_some,
+  update_some_and_get,
+  compare_and_set,
+  increment,
+  decrement,
+  increment_and_get,
+  decrement_and_get,
+  get_and_increment,
+  get_and_decrement,
+  toggle,
 )
 
 /// A fresh cell holding `value`.
@@ -65,7 +84,8 @@ modify_some : forall c d x a b. (Ref a)^c -> ((a^c -> (b^x, (Option a)^c))^d ->{
 let modify_some ref f =
   modify ref (fun old ->
     let (result, next) = f old
-    (result, or_old old next))
+    (result, or_old old next)
+  )
 
 /// Applies `f` to the contents.
 update : forall c d a. (Ref a)^c -> ((a^c -> a^c)^d ->{} Unit)^c
@@ -76,7 +96,8 @@ update_and_get : forall c d a. (Ref a)^c -> ((a^c -> a^c)^d ->{} a^c)^c
 let update_and_get ref f =
   modify ref (fun old ->
     let next = f old
-    (next, next))
+    (next, next)
+  )
 
 /// Applies `f` where it gives `Some`.
 update_some : forall c d a. (Ref a)^c -> ((a^c -> (Option a)^c)^d ->{} Unit)^c
@@ -87,7 +108,8 @@ update_some_and_get : forall c d a. (Ref a)^c -> ((a^c -> (Option a)^c)^d ->{} a
 let update_some_and_get ref f =
   modify ref (fun old ->
     let next = or_old old (f old)
-    (next, next))
+    (next, next)
+  )
 
 /// Sets the contents to `next` only if they equal `expected`; whether it did.
 compare_and_set : forall c a. Eq a => (Ref a)^c -> (a^c -> (a^c ->{} Bool)^c)^c

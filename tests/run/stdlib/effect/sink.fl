@@ -64,9 +64,9 @@ let folds () =
     (ended
       "fold_array"
       (run
-        (
-          Sink.fold_array (fun () -> 0) (fun s -> s < 5) (fun s chunk -> s + NonEmpty.length chunk)
-        )))
+        (Sink.fold_array (fun () -> 0) (fun s -> s < 5) (fun s chunk ->
+          s + NonEmpty.length chunk
+        ))))
   say (ended "fold_until" (run (Sink.fold_until (fun () -> 0) 2 (fun s n -> s + n))))
   say (ended "reduce" (run (Sink.reduce (fun () -> 0) (fun s n -> s + n))))
   say
@@ -75,11 +75,9 @@ let folds () =
       (run (Sink.reduce_array (fun () -> 0) (fun s chunk -> s + NonEmpty.length chunk))))
   say (ended "reduce_effect" (run (Sink.reduce_effect (fun () -> 1) (fun s n -> s * n))))
   say
-    (
-      ended
-        "reduce_while"
-        (run (Sink.reduce_while (fun () -> 0) (fun s -> s < 4) (fun s n -> s + n)))
-    )
+    (ended
+      "reduce_while"
+      (run (Sink.reduce_while (fun () -> 0) (fun s -> s < 4) (fun s n -> s + n))))
   say
     (ended
       "reduce_while_effect"
@@ -88,18 +86,16 @@ let folds () =
     (ended
       "reduce_while_array"
       (run
-        (Sink.reduce_while_array
-          (fun () -> 0)
-          (fun s -> s < 3)
-          (fun s chunk -> s + NonEmpty.length chunk))))
+        (Sink.reduce_while_array (fun () -> 0) (fun s -> s < 3) (fun s chunk ->
+          s + NonEmpty.length chunk
+        ))))
   say
     (ended
       "reduce_while_array_effect"
       (run
-        (Sink.reduce_while_array_effect
-          (fun () -> 0)
-          (fun s -> s < 3)
-          (fun s chunk -> s + NonEmpty.length chunk))))
+        (Sink.reduce_while_array_effect (fun () -> 0) (fun s -> s < 3) (fun s chunk ->
+          s + NonEmpty.length chunk
+        ))))
   say (ended "take_while" (run (Sink.take_while (fun n -> n < 3))))
   say (ended "take_while_effect" (run (Sink.take_while_effect (fun n -> n < 2))))
   say (ended "take_while_filter" (run (Sink.take_while_filter small)))
@@ -120,11 +116,9 @@ let folds () =
       ++ show (Ref.get chunks))
   say (ended "for_each_while" (run (Sink.for_each_while (fun n -> n < 3))))
   say
-    (
-      ended
-        "for_each_while_array"
-        (run (Sink.for_each_while_array (fun c -> NonEmpty.length c > 1)))
-    )
+    (ended
+      "for_each_while_array"
+      (run (Sink.for_each_while_array (fun c -> NonEmpty.length c > 1))))
   say (ended "drain" (run Sink.drain))
   let stopped : Sink.End String Float = ("stopped", None)
   let forever = Channel.from_list_chunked 2 [1, 2] |> Channel.pipe_to (Sink.to_channel Sink.never)
@@ -154,12 +148,10 @@ let shapes () =
   say
     (ended
       "map_input_array_effect"
-      (
-        run
-          (Sink.map_input_array_effect
-            (fun c -> NonEmpty.singleton (Int.to_float (NonEmpty.length c)))
-            Sink.sum)
-      ))
+      (run
+        (Sink.map_input_array_effect
+          (fun c -> NonEmpty.singleton (Int.to_float (NonEmpty.length c)))
+          Sink.sum)))
   say (ended "map_end" (run (Sink.map_end (fun end -> (show (value_of end), None)) (Sink.take 1))))
   say
     (ended
@@ -194,16 +186,15 @@ failures : Unit ->{; Boom} Unit
 let failures () =
   let failing : Sink.Sink none {Boom} Float Float Float = Sink.fail (Boom "sink")
   say
-    (
-      ended
-        "catch"
-        (run
-          (
-            Sink.catch
-              (fun e -> match e with | Boom why -> Int.to_float (String.length why))
-              failing
-          ))
-    )
+    (ended
+      "catch"
+      (run
+        (Sink.catch
+          (fun e ->
+            match e with
+            | Boom why -> Int.to_float (String.length why)
+          )
+          failing)))
   say (ended "or_else" (run (Sink.or_else (fun e -> Sink.map Int.to_float Sink.count) failing)))
   let caught = Ref.make None
   say
@@ -228,9 +219,7 @@ let failures () =
         Sink.count)
   say (ended "on_exit, ensuring" (run noted) ++ " " ++ show (Ref.get log))
   let message =
-    try
-      show (value_of (run (Sink.map_error (fun e -> Boom "mapped") failing)))
-    with
+    try show (value_of (run (Sink.map_error (fun e -> Boom "mapped") failing))) with
     | Boom why -> why
   say ("map_error: " ++ message)
 
@@ -249,14 +238,20 @@ let targets () =
   let stream = writable ()
   let _ =
     run
-      (
-        Sink.from_writable_stream
-          { evaluate = fun () -> stream; onError = boom; closeOnDone = true }
-      )
+      (Sink.from_writable_stream {
+        evaluate = fun () -> stream;
+        onError = boom;
+        closeOnDone = true;
+      })
   say ("from_writable_stream: " ++ show (written ()))
-  let summing : Channel.Channel none none (NonEmpty.NonEmpty Float) o (
-    Sink.End Float Float
-  ) none Unit =
+  let summing : Channel.Channel
+    none
+    none
+    (NonEmpty.NonEmpty Float)
+    o
+    (Sink.End Float Float)
+    none
+    Unit =
     Sink.to_channel Sink.sum
   say (ended "from_channel" (run (Sink.from_channel summing)))
 

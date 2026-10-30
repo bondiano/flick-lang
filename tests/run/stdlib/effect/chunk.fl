@@ -16,13 +16,12 @@ let main () =
   let nothing : Chunk.Chunk Float = Chunk.empty
   line
     "build"
-    (show
-      (
-        Chunk.to_list (Chunk.to_chunk (Chunk.of 1)),
-        Chunk.to_list (Chunk.to_chunk (Chunk.make 1 [2, 3])),
-        Chunk.to_list (Chunk.to_chunk (Chunk.make_by 3 (fun i -> i * 10))),
-        Chunk.to_list (Chunk.to_chunk (Chunk.range 1 4)),
-      ))
+    (show (
+      Chunk.to_list (Chunk.to_chunk (Chunk.of 1)),
+      Chunk.to_list (Chunk.to_chunk (Chunk.make 1 [2, 3])),
+      Chunk.to_list (Chunk.to_chunk (Chunk.make_by 3 (fun i -> i * 10))),
+      Chunk.to_list (Chunk.to_chunk (Chunk.range 1 4)),
+    ))
   line "size" (show (Chunk.size c, Chunk.is_empty nothing, Chunk.is_empty c, Chunk.get 2 c))
   let first = Chunk.non_empty c
   line "non_empty" (show (Option.is_some first, Option.is_some (Chunk.non_empty nothing)))
@@ -30,161 +29,144 @@ let main () =
   | Some n ->
     line
       "ne"
-      (show
-        (
-          Chunk.head_non_empty n,
-          Chunk.last_non_empty n,
-          Chunk.to_list (Chunk.tail_non_empty n),
-          Chunk.split_non_empty_at 2 n |> fun (a, b) ->
-            (Chunk.to_list (Chunk.to_chunk a), Chunk.to_list b)
-        ))
+      (show (
+        Chunk.head_non_empty n,
+        Chunk.last_non_empty n,
+        Chunk.to_list (Chunk.tail_non_empty n),
+        Chunk.split_non_empty_at 2 n
+          |> fun (a, b) -> (Chunk.to_list (Chunk.to_chunk a), Chunk.to_list b),
+      ))
   | None -> line "ne" "?"
   line
     "ends"
-    (show
-      (
-        Chunk.head c,
-        Chunk.last c,
-        Option.map Chunk.to_list (Chunk.tail c),
-        Chunk.head nothing,
-        Chunk.tail nothing |> Option.is_none,
-      ))
+    (show (
+      Chunk.head c,
+      Chunk.last c,
+      Option.map Chunk.to_list (Chunk.tail c),
+      Chunk.head nothing,
+      Chunk.tail nothing |> Option.is_none,
+    ))
   line
     "add"
-    (show
-      (
-        Chunk.to_list (Chunk.to_chunk (Chunk.prepend 0 c)),
-        Chunk.to_list (Chunk.append 7 c),
-        Chunk.to_list (Chunk.append_all (Chunk.from_list [7]) c),
-        Chunk.to_list (Chunk.concat (Chunk.from_list [7]) c),
-      ))
+    (show (
+      Chunk.to_list (Chunk.to_chunk (Chunk.prepend 0 c)),
+      Chunk.to_list (Chunk.append 7 c),
+      Chunk.to_list (Chunk.append_all (Chunk.from_list [7]) c),
+      Chunk.to_list (Chunk.concat (Chunk.from_list [7]) c),
+    ))
   line
     "slices"
-    (show
-      (
-        Chunk.to_list (Chunk.take 2 c),
-        Chunk.to_list (Chunk.take_right 2 c),
-        Chunk.to_list (Chunk.drop 6 c),
-        Chunk.to_list (Chunk.drop_right 6 c),
-      ))
+    (show (
+      Chunk.to_list (Chunk.take 2 c),
+      Chunk.to_list (Chunk.take_right 2 c),
+      Chunk.to_list (Chunk.drop 6 c),
+      Chunk.to_list (Chunk.drop_right 6 c),
+    ))
   line
     "while"
-    (show
-      (
-        Chunk.to_list (Chunk.take_while (fun n -> n < 5) c),
-        Chunk.to_list (Chunk.drop_while (fun n -> n < 5) c),
-      ))
+    (show (
+      Chunk.to_list (Chunk.take_while (fun n -> n < 5) c),
+      Chunk.to_list (Chunk.drop_while (fun n -> n < 5) c),
+    ))
   let pair = Chunk.split_at 3 c
   let (l, r) = pair
   line
     "split"
-    (show
-      (
-        Chunk.to_list l,
-        Chunk.to_list r,
-        List.map Chunk.to_list (Chunk.to_list (Chunk.split 3 c)),
-        Chunk.split_where even c |> fun (a, b) -> (Chunk.to_list a, Chunk.to_list b),
-      ))
+    (show (
+      Chunk.to_list l,
+      Chunk.to_list r,
+      List.map Chunk.to_list (Chunk.to_list (Chunk.split 3 c)),
+      Chunk.split_where even c |> fun (a, b) -> (Chunk.to_list a, Chunk.to_list b),
+    ))
   line "chunks_of" (show (List.map Chunk.to_list (Chunk.to_list (Chunk.chunks_of 3 c))))
   line
     "edit"
-    (show
-      (
-        Chunk.to_list (Chunk.remove 0 c),
-        Option.map Chunk.to_list (Chunk.modify 1 (fun n -> n * 100) c),
-        Option.map Chunk.to_list (Chunk.replace 9 0 c),
-        Chunk.to_list (Chunk.reverse c),
-      ))
+    (show (
+      Chunk.to_list (Chunk.remove 0 c),
+      Option.map Chunk.to_list (Chunk.modify 1 (fun n -> n * 100) c),
+      Option.map Chunk.to_list (Chunk.replace 9 0 c),
+      Chunk.to_list (Chunk.reverse c),
+    ))
   line
     "filter"
-    (show
-      (
-        Chunk.to_list (Chunk.filter even c),
-        Chunk.to_list (Chunk.filter_map half c),
-        Chunk.to_list (Chunk.filter_map_while half (Chunk.from_list [2, 4, 5, 6])),
-        Chunk.to_list (Chunk.compact (Chunk.from_list [Some 1, None, Some 2])),
-      ))
+    (show (
+      Chunk.to_list (Chunk.filter even c),
+      Chunk.to_list (Chunk.filter_map half c),
+      Chunk.to_list (Chunk.filter_map_while half (Chunk.from_list [2, 4, 5, 6])),
+      Chunk.to_list (Chunk.compact (Chunk.from_list [Some 1, None, Some 2])),
+    ))
   line
     "flat"
-    (show
-      (
-        Chunk.to_list (Chunk.flat_map (fun n -> Chunk.from_list [n, n]) (Chunk.from_list [1, 2])),
-        Chunk.to_list
-          (Chunk.flatten (Chunk.from_list [Chunk.from_list [1], Chunk.from_list [2, 3]])),
-      ))
+    (show (
+      Chunk.to_list (Chunk.flat_map (fun n -> Chunk.from_list [n, n]) (Chunk.from_list [1, 2])),
+      Chunk.to_list (Chunk.flatten (Chunk.from_list [Chunk.from_list [1], Chunk.from_list [2, 3]])),
+    ))
   line
     "map"
-    (show
-      (
-        Chunk.to_list (Chunk.map (fun n -> n + 1) c),
-        Chunk.map_accum 0 (fun s x -> (s + x, s)) (Chunk.from_list [1, 2, 3]) |> fun (s, m) ->
-          (s, Chunk.to_list m)
-      ))
+    (show (
+      Chunk.to_list (Chunk.map (fun n -> n + 1) c),
+      Chunk.map_accum 0 (fun s x -> (s + x, s)) (Chunk.from_list [1, 2, 3])
+        |> fun (s, m) -> (s, Chunk.to_list m),
+    ))
   line
     "contains"
-    (
-      show
-        (Chunk.contains 9 c, Chunk.contains 7 c, Chunk.contains_with (fun a b -> a == b + 1) 10 c)
-    )
+    (show (
+      Chunk.contains 9 c,
+      Chunk.contains 7 c,
+      Chunk.contains_with (fun a b -> a == b + 1) 10 c,
+    ))
   line
     "dedupe"
-    (show
-      (
-        Chunk.to_list (Chunk.dedupe c),
-        Chunk.to_list (Chunk.dedupe_adjacent (Chunk.from_list [1, 1, 2, 1])),
-      ))
+    (show (
+      Chunk.to_list (Chunk.dedupe c),
+      Chunk.to_list (Chunk.dedupe_adjacent (Chunk.from_list [1, 1, 2, 1])),
+    ))
   let small = Chunk.from_list [1, 2, 3]
   line
     "sets"
-    (show
-      (
-        Chunk.to_list (Chunk.difference (Chunk.from_list [1, 2]) small),
-        Chunk.to_list (Chunk.difference_with (fun a b -> a == b) (Chunk.from_list [3]) small),
-        Chunk.to_list (Chunk.intersection (Chunk.from_list [2, 3, 4]) small),
-        Chunk.to_list (Chunk.union (Chunk.from_list [3, 4]) small),
-      ))
+    (show (
+      Chunk.to_list (Chunk.difference (Chunk.from_list [1, 2]) small),
+      Chunk.to_list (Chunk.difference_with (fun a b -> a == b) (Chunk.from_list [3]) small),
+      Chunk.to_list (Chunk.intersection (Chunk.from_list [2, 3, 4]) small),
+      Chunk.to_list (Chunk.union (Chunk.from_list [3, 4]) small),
+    ))
   line "quantifiers" (show (Chunk.every even c, Chunk.some even c))
   line
     "find"
-    (show
-      (
-        Chunk.find_first even c,
-        Chunk.find_first_index even c,
-        Chunk.find_last even c,
-        Chunk.find_last_index even c,
-      ))
+    (show (
+      Chunk.find_first even c,
+      Chunk.find_first_index even c,
+      Chunk.find_last even c,
+      Chunk.find_last_index even c,
+    ))
   line "join" (Chunk.join "-" (Chunk.from_list ["a", "b", "c"]))
   line
     "partition"
-    (show
-      (
-        Chunk.partition half c |> fun (p, f) -> (Chunk.to_list p, Chunk.to_list f),
-        Chunk.separate (Chunk.from_list [half 1, half 2]) |> fun (p, f) ->
-          (Chunk.to_list p, Chunk.to_list f)
-      ))
+    (show (
+      Chunk.partition half c |> fun (p, f) -> (Chunk.to_list p, Chunk.to_list f),
+      Chunk.separate (Chunk.from_list [half 1, half 2])
+        |> fun (p, f) -> (Chunk.to_list p, Chunk.to_list f),
+    ))
   line
     "reduce"
-    (show
-      (
-        Chunk.reduce 0 (fun s x -> s * 10 + x) small,
-        Chunk.reduce_right 0 (fun s x -> s * 10 + x) small,
-      ))
+    (show (
+      Chunk.reduce 0 (fun s x -> s * 10 + x) small,
+      Chunk.reduce_right 0 (fun s x -> s * 10 + x) small,
+    ))
   line
     "sort"
-    (show
-      (
-        Chunk.to_list (Chunk.sort c),
-        Chunk.to_list (Chunk.sort_with String.length (Chunk.from_list ["ccc", "a", "bb"])),
-        Chunk.to_list (Chunk.sort_by (fun a b -> compare b a) small),
-      ))
+    (show (
+      Chunk.to_list (Chunk.sort c),
+      Chunk.to_list (Chunk.sort_with String.length (Chunk.from_list ["ccc", "a", "bb"])),
+      Chunk.to_list (Chunk.sort_by (fun a b -> compare b a) small),
+    ))
   line
     "zip"
-    (show
-      (
-        Chunk.to_list (Chunk.zip (Chunk.from_list ["a", "b"]) small),
-        Chunk.to_list (Chunk.zip_with (Chunk.from_list [10, 20]) (fun a b -> a * b) small),
-        Chunk.unzip (Chunk.from_list [(1, "a"), (2, "b")]) |> fun (a, b) ->
-          (Chunk.to_list a, Chunk.to_list b)
-      ))
+    (show (
+      Chunk.to_list (Chunk.zip (Chunk.from_list ["a", "b"]) small),
+      Chunk.to_list (Chunk.zip_with (Chunk.from_list [10, 20]) (fun a b -> a * b) small),
+      Chunk.unzip (Chunk.from_list [(1, "a"), (2, "b")])
+        |> fun (a, b) -> (Chunk.to_list a, Chunk.to_list b),
+    ))
   line "eq" (show (c == Chunk.from_list [3, 1, 4, 1, 5, 9, 2, 6], small))
   Chunk.each_effect (fun n -> Platform.stdout_line ("each " ++ show n)) (Chunk.from_list [1, 2])

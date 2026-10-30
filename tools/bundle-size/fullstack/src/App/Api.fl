@@ -7,11 +7,10 @@ import App.Remote
 import App.Shared
 
 main : Unit ->{; AppError} Unit
-let main () =
-  provide Server.node {
-    Console.log (App.Shared.greeting (App.Db.lookup "1"))
-    scope {
-      let _ = Server.handler [server App.Remote.lookup]
-      ()
-    }
+let main () = provide Server.node {
+  Console.log (App.Shared.greeting (App.Db.lookup "1"))
+  scope {
+    let _ = Server.handler [server App.Remote.lookup]
+    ()
   }
+}

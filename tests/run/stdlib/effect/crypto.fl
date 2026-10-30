@@ -79,9 +79,5 @@ let checks () =
 
 main : Unit ->{; AppError} Unit
 let main () =
-  try
-    provide Crypto.system {
-      checks ()
-    }
-  with
+  try provide Crypto.system { checks () } with
   | Crypto.CryptoError message -> line "error" message ()

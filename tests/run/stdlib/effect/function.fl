@@ -41,56 +41,50 @@ let main () =
   let ns = [4, 7, 12, 13]
   line
     "predicate"
-    (show
-      (
-        List.map (Predicate.not_ even) ns,
-        List.map (Predicate.and big even) ns,
-        List.map (Predicate.or big even) ns,
-      ))
+    (show (
+      List.map (Predicate.not_ even) ns,
+      List.map (Predicate.and big even) ns,
+      List.map (Predicate.or big even) ns,
+    ))
   line
     "predicate2"
-    (show
-      (
-        List.map (Predicate.xor big even) ns,
-        List.map (Predicate.eqv big even) ns,
-        List.map (big |> Predicate.implies even) ns,
-      ))
+    (show (
+      List.map (Predicate.xor big even) ns,
+      List.map (Predicate.eqv big even) ns,
+      List.map (big |> Predicate.implies even) ns,
+    ))
   line
     "predicate3"
     (show (List.map (Predicate.nand big even) ns, List.map (Predicate.nor big even) ns))
   line
     "predicate4"
-    (show
-      (
-        List.map (Predicate.every [big, even]) ns,
-        List.map (Predicate.some [big, even]) ns,
-        List.map (Predicate.map_input (fun s -> Int.to_float (String.length s)) even) ["ab", "abc"],
-      ))
+    (show (
+      List.map (Predicate.every [big, even]) ns,
+      List.map (Predicate.some [big, even]) ns,
+      List.map (Predicate.map_input (fun s -> Int.to_float (String.length s)) even) ["ab", "abc"],
+    ))
   line
     "filter"
-    (show
-      (
-        List.map (Filter.to_result (Filter.make halve)) ns,
-        List.map (Filter.to_result (Filter.map_fail String.length halve)) ns,
-      ))
+    (show (
+      List.map (Filter.to_result (Filter.make halve)) ns,
+      List.map (Filter.to_result (Filter.map_fail String.length halve)) ns,
+    ))
   line
     "from"
-    (show
-      (
-        List.map (Filter.to_result (Filter.from_predicate even)) ns,
-        List.map
-          (Filter.to_result
-            (Filter.from_predicate_option (fun n -> if n > 10 then Some (n * 2) else None)))
-          ns,
-      ))
+    (show (
+      List.map (Filter.to_result (Filter.from_predicate even)) ns,
+      List.map
+        (Filter.to_result
+          (Filter.from_predicate_option (fun n -> if n > 10 then Some (n * 2) else None)))
+        ns,
+    ))
   line "to" (show (List.map (Filter.to_predicate halve) ns, List.map (Filter.to_option halve) ns))
   line
     "equals"
-    (show
-      (
-        List.map (Filter.to_result (Filter.equals 7)) ns,
-        List.map (Filter.to_result (Filter.equals_strict 12)) ns,
-      ))
+    (show (
+      List.map (Filter.to_result (Filter.equals 7)) ns,
+      List.map (Filter.to_result (Filter.equals_strict 12)) ns,
+    ))
   line
     "or"
     (show
@@ -99,25 +93,22 @@ let main () =
         ns))
   line
     "zip"
-    (show
-      (
-        List.map (Filter.to_result (halve |> Filter.zip small)) ns,
-        List.map (Filter.to_result (halve |> Filter.zip_with small (fun h s -> h + s))) ns,
-      ))
+    (show (
+      List.map (Filter.to_result (halve |> Filter.zip small)) ns,
+      List.map (Filter.to_result (halve |> Filter.zip_with small (fun h s -> h + s))) ns,
+    ))
   line
     "and"
-    (show
-      (
-        List.map (Filter.to_result (halve |> Filter.and_left small)) [4, 300],
-        List.map (Filter.to_result (halve |> Filter.and_right small)) [4, 300],
-      ))
+    (show (
+      List.map (Filter.to_result (halve |> Filter.and_left small)) [4, 300],
+      List.map (Filter.to_result (halve |> Filter.and_right small)) [4, 300],
+    ))
   line
     "compose"
-    (show
-      (
-        List.map (Filter.to_result (halve |> Filter.compose halve)) ns,
-        List.map (Filter.to_result (halve |> Filter.compose_passthrough halve)) ns,
-      ))
+    (show (
+      List.map (Filter.to_result (halve |> Filter.compose halve)) ns,
+      List.map (Filter.to_result (halve |> Filter.compose_passthrough halve)) ns,
+    ))
   let limit = Ref.make 7
   decide : Filter.FilterEffect none none Float Float String
   let decide = checked limit
@@ -131,16 +122,17 @@ let main () =
     (show (k (), Function.const_true (), Function.const_false (), Function.const_void ()))
   line
     "compose"
-    (show
-      (Function.compose (fun n -> n * 2) (fun n -> n + 1) 5, Function.flip (fun a b -> a - b) 1 10))
+    (show (
+      Function.compose (fun n -> n * 2) (fun n -> n + 1) 5,
+      Function.flip (fun a b -> a - b) 1 10,
+    ))
   line
     "tupled"
-    (show
-      (
-        Function.tupled (fun a b -> a ++ b) ("x", "y"),
-        Function.untupled (fun (a, b) -> a * b) 6 7,
-        Function.sk 1 "second",
-        identity 3,
-      ))
+    (show (
+      Function.tupled (fun a b -> a ++ b) ("x", "y"),
+      Function.untupled (fun (a, b) -> a * b) 6 7,
+      Function.sk 1 "second",
+      identity 3,
+    ))
   let never : List Never = []
   line "absurd" (show (List.map (fun n -> (Function.absurd n : Float)) never))

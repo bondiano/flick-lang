@@ -33,13 +33,17 @@ let copy_only_updates handle =
   let ref = Ref.make 0
   Ref.update ref (fun current ->
     ignore handle
-    current + 1)
+    current + 1
+  )
   Ref.update_some ref (fun current ->
     ignore handle
-    Some (current + 1))
-  let next = Ref.modify ref (fun current ->
-    ignore handle
-    (current + 1, current + 1))
+    Some (current + 1)
+  )
+  let next =
+    Ref.modify ref (fun current ->
+      ignore handle
+      (current + 1, current + 1)
+    )
   Ref.set ref next
   ref
 

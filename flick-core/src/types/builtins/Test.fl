@@ -30,7 +30,8 @@ let all assertions =
     (fun outcome a ->
       match outcome with
       | Pass -> a
-      | Failed _ -> outcome)
+      | Failed _ -> outcome
+    )
     Pass
     assertions
 

@@ -49,35 +49,36 @@ type alias Execution = {
   diagnostics : List Diagnostic;
 }
 
-type alias Model =
-  {
-    mode : Mode;
-    locale : Locale;
-    source : String;
-    revision : Float;
-    profile : Profile;
-    tab : Tab;
-    compiled : Compiled;
-    execution : Execution;
-    ran_source : String;
-    ran_profile : Profile;
-    running : Bool;
-    loading : Bool;
-    checking : Bool;
-    highlighting : Bool;
-    source_tokens : List SyntaxToken;
-    debug_tokens : List SyntaxToken;
-    release_tokens : List SyntaxToken;
-    syntax_error : String;
-    version : String;
-    load_error : String;
-    compile_error : String;
-    fault : String;
-  }
+type alias Model = {
+  mode : Mode;
+  locale : Locale;
+  source : String;
+  revision : Float;
+  profile : Profile;
+  tab : Tab;
+  compiled : Compiled;
+  execution : Execution;
+  ran_source : String;
+  ran_profile : Profile;
+  running : Bool;
+  loading : Bool;
+  checking : Bool;
+  highlighting : Bool;
+  source_tokens : List SyntaxToken;
+  debug_tokens : List SyntaxToken;
+  release_tokens : List SyntaxToken;
+  syntax_error : String;
+  version : String;
+  load_error : String;
+  compile_error : String;
+  fault : String;
+}
 
 empty_compiled : Compiled
-let empty_compiled =
-  { debug = { code = ""; diagnostics = [] }; release = { code = ""; diagnostics = [] } }
+let empty_compiled = {
+  debug = { code = ""; diagnostics = [] };
+  release = { code = ""; diagnostics = [] };
+}
 
 empty_execution : Execution
 let empty_execution = { lines = []; status = ""; detail = ""; diagnostics = [] }
@@ -117,28 +118,27 @@ let status m =
     "Flick " ++ m.version ++ " · " ++ tr m.locale "Type-checked" "Типы проверены"
 
 initial_model : Configuration -> Model
-let initial_model config =
-  {
-    mode = if config.mode == "transpile" then Transpile else Play;
-    locale = if config.locale == "ru" then Ru else En;
-    source = initial_source;
-    revision = 0;
-    profile = Debug;
-    tab = Output;
-    compiled = empty_compiled;
-    execution = empty_execution;
-    ran_source = "";
-    ran_profile = Debug;
-    running = false;
-    loading = true;
-    checking = false;
-    highlighting = false;
-    source_tokens = [];
-    debug_tokens = [];
-    release_tokens = [];
-    syntax_error = "";
-    version = "";
-    load_error = "";
-    compile_error = "";
-    fault = "";
-  }
+let initial_model config = {
+  mode = if config.mode == "transpile" then Transpile else Play;
+  locale = if config.locale == "ru" then Ru else En;
+  source = initial_source;
+  revision = 0;
+  profile = Debug;
+  tab = Output;
+  compiled = empty_compiled;
+  execution = empty_execution;
+  ran_source = "";
+  ran_profile = Debug;
+  running = false;
+  loading = true;
+  checking = false;
+  highlighting = false;
+  source_tokens = [];
+  debug_tokens = [];
+  release_tokens = [];
+  syntax_error = "";
+  version = "";
+  load_error = "";
+  compile_error = "";
+  fault = "";
+}

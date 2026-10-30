@@ -16,23 +16,22 @@ type alias Theme = { theme : String }
   deriving Schema
 
 info : Unit -> FileSystem.Info
-let info () =
-  {
-    type_ = FileSystem.RegularFile;
-    mtime = None;
-    atime = None;
-    birthtime = None;
-    dev = 0n;
-    ino = None;
-    mode = 0;
-    nlink = None;
-    uid = None;
-    gid = None;
-    rdev = None;
-    size = 1n;
-    blksize = None;
-    blocks = None;
-  }
+let info () = {
+  type_ = FileSystem.RegularFile;
+  mtime = None;
+  atime = None;
+  birthtime = None;
+  dev = 0n;
+  ino = None;
+  mode = 0;
+  nlink = None;
+  uid = None;
+  gid = None;
+  rdev = None;
+  size = 1n;
+  blksize = None;
+  blocks = None;
+}
 
 line : String -> String ->{} Unit
 let line label value = Platform.stdout_line (label ++ ": " ++ value)
@@ -45,10 +44,17 @@ let literal = Http.Status.ImATeapot
 
 client_reasons : List Http.ClientError.ClientErrorReason
 let client_reasons =
-  let request : Http.ClientError.RequestDetails =
-    { method = Http.Method.GET; url = "/a"; description = None }
-  let response : Http.ClientError.ResponseDetails =
-    { method = Http.Method.GET; url = "/a"; status = 500; description = Some "x" }
+  let request : Http.ClientError.RequestDetails = {
+    method = Http.Method.GET;
+    url = "/a";
+    description = None;
+  }
+  let response : Http.ClientError.ResponseDetails = {
+    method = Http.Method.GET;
+    url = "/a";
+    status = 500;
+    description = Some "x";
+  }
   [
     Http.ClientError.TransportError request,
     Http.ClientError.EncodeError request,
@@ -60,10 +66,17 @@ let client_reasons =
 
 server_reasons : List Http.ServerError.ServerErrorReason
 let server_reasons =
-  let server_request : Http.ServerError.RequestDetails =
-    { method = Http.Method.POST; url = "/b"; description = None }
-  let server_response : Http.ServerError.ResponseDetails =
-    { method = Http.Method.POST; url = "/b"; status = 502; description = None }
+  let server_request : Http.ServerError.RequestDetails = {
+    method = Http.Method.POST;
+    url = "/b";
+    description = None;
+  }
+  let server_response : Http.ServerError.ResponseDetails = {
+    method = Http.Method.POST;
+    url = "/b";
+    status = 502;
+    description = None;
+  }
   [
     Http.ServerError.RequestParseError server_request,
     Http.ServerError.RouteNotFound server_request,
@@ -80,15 +93,15 @@ let cookie_reasons = [Http.Cookies.InvalidCookieName, Http.Cookies.InvalidCookie
 multipart_reasons : List Http.Multipart.MultipartErrorReason
 let multipart_reasons = [Http.Multipart.FileTooLarge, Http.Multipart.Parse]
 
-compressions : (
-  List Http.ClientRequest.CompressionAlgorithm,
-  List Http.Platform.CompressionAlgorithm,
-)
-let compressions =
+compressions :
   (
-    [Http.ClientRequest.Gzip, Http.ClientRequest.Deflate],
-    [Http.Platform.Gzip, Http.Platform.Deflate, Http.Platform.Brotli, Http.Platform.Zstd],
+    List Http.ClientRequest.CompressionAlgorithm,
+    List Http.Platform.CompressionAlgorithm,
   )
+let compressions = (
+  [Http.ClientRequest.Gzip, Http.ClientRequest.Deflate],
+  [Http.Platform.Gzip, Http.Platform.Deflate, Http.Platform.Brotli, Http.Platform.Zstd],
+)
 
 options : Http.ClientRequest.Options
 let options = { Http.ClientRequest.defaults with hash = Some "h" }
@@ -175,10 +188,8 @@ let main () =
     "accept_json"
     (show
       (Http.ClientRequest.headers
-        (
-          Http.ClientRequest.accept_json
-            (Http.ClientRequest.modify options Http.ClientRequest.empty)
-        )))
+        (Http.ClientRequest.accept_json
+          (Http.ClientRequest.modify options Http.ClientRequest.empty))))
   line
     "options"
     (show (zip.minSize, routing.ignoreTrailingSlash, Option.is_some limits.maxFileSize, fields))
@@ -206,16 +217,18 @@ let main () =
   let _ = cookie_of
   let _ = form_of
   let exits =
-    parallel_exits
-      [
-        task {
-          from_result
-            (Err
-              (Http.ServerError.HttpServerError
-                (Http.ServerError.RouteNotFound
-                  { method = Http.Method.GET; url = "/"; description = None })))
-        },
-      ]
+    parallel_exits [
+      task {
+        from_result
+          (Err
+            (Http.ServerError.HttpServerError
+              (Http.ServerError.RouteNotFound {
+                method = Http.Method.GET;
+                url = "/";
+                description = None;
+              })))
+      },
+    ]
   match List.head exits with
   | Some exit ->
     match Exit.failure exit with
@@ -225,9 +238,7 @@ let main () =
         (show (Http.ServerResponse.status (Http.ServerResponse.cause_response failure)))
     | None -> line "cause_response" "succeeded"
   | None -> ()
-  try
-    forms ()
-  with
+  try forms () with
   | Http.Multipart.MultipartError r -> line "multipart error" (show r)
   | SchemaError issues -> line "schema error" (show issues)
   | Http.ServerError.HttpServerError r -> line "server error" (show r)
@@ -240,15 +251,16 @@ let main () =
         let file = Http.Platform.file Http.Platform.file_options (dir ++ "/a.html")
         line
           "file"
-          (show
-            (
-              Http.ServerResponse.status file,
-              Http.Headers.get "content-type" (Http.ServerResponse.headers file),
-            ))
+          (show (
+            Http.ServerResponse.status file,
+            Http.Headers.get "content-type" (Http.ServerResponse.headers file),
+          ))
         static : ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse
         let static =
-          Http.StaticServer.make
-            { (Http.StaticServer.static_options dir) with index = Some "a.html" }
+          Http.StaticServer.make {
+            (Http.StaticServer.static_options dir) with
+            index = Some "a.html";
+          }
         let index =
           static
             (Http.ServerRequest.from_client_request (Http.ClientRequest.get "http://example.com/"))

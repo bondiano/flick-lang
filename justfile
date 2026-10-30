@@ -50,7 +50,7 @@ bundle-size:
     node tools/bundle-size/index.mjs "$(cargo build -p flick --message-format=json-render-diagnostics | jq -r 'select(.executable != null) | .executable')"
 
 # Time the language server on a file: opens, hovers and a hover after an edit
-lsp-bench file="examples/mtl/src/Mtl/StateT.fl" +positions="24:5":
+lsp-bench file="examples/mtl/src/Mtl/StateT.fl" +positions="22:5":
     cargo build --release -p flick
     node tools/lsp-bench/index.mjs target/release/flick {{file}} {{positions}}
 

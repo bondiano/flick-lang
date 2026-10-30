@@ -16,23 +16,19 @@ foreign pure latest from "@flick-lang/runtime/ui/react" "eventLatest"
 
 /// Runs events one by one, `capacity` of them waiting at most; an event
 /// that finds the queue full is rejected and reported to the supervisor.
-queue : forall c s. Int ->
-  (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c ->
-  (Ui.Handler s)^c
+queue : forall c s. Int -> (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
 foreign pure queue from "@flick-lang/runtime/ui/react" "eventQueue"
   retention call
 
 /// Runs at most `limit` tasks at once; an event beyond that is rejected and
 /// reported to the supervisor.
-concurrent : forall c s. Int ->
-  (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c ->
-  (Ui.Handler s)^c
+concurrent :
+  forall c s. Int -> (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c -> (Ui.Handler s)^c
 foreign pure concurrent from "@flick-lang/runtime/ui/react" "eventConcurrent"
   retention call
 
 /// Calls `decide` on the snapshot while the browser still waits, and
 /// prevents the default action when it says so.
-prevent_default :
-  forall c s. (s -> Bool)^c -> (Ui.Handler s)^c -> (Ui.Handler s)^c
+prevent_default : forall c s. (s -> Bool)^c -> (Ui.Handler s)^c -> (Ui.Handler s)^c
 foreign pure prevent_default from "@flick-lang/runtime/ui/react" "eventPreventDefault"
   retention call

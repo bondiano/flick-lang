@@ -58,14 +58,21 @@ let update model f = Atom.update model f
 
 syntax_failure : Atom.Writable Model -> String ->{Atom.Write;} Unit
 let syntax_failure model message =
-  update model (fun m ->
-    { m with highlighting = false; source_tokens = []; debug_tokens = []; release_tokens = []; syntax_error = message })
+  update model (fun m -> {
+    m with
+    highlighting = false;
+    source_tokens = [];
+    debug_tokens = [];
+    release_tokens = [];
+    syntax_error = message;
+  })
 
 paint_source : Atom.Writable Model ->{Atom.Write;} Unit
 let paint_source model =
   let m = Atom.current model
   if m.highlighting then
-    let result = try Ok (highlight m.source "flick") with
+    let result =
+      try Ok (highlight m.source "flick") with
       | JsError failure -> Err failure.message
     match result with
     | Ok tokens -> update model (fun m -> { m with source_tokens = tokens })
@@ -76,11 +83,12 @@ let paint_generated model =
   let m = Atom.current model
   if m.highlighting then
     let result =
-      try Ok
-        (
+      try
+        Ok (
           highlight m.compiled.debug.code "javascript",
           highlight m.compiled.release.code "javascript",
-        ) with
+        )
+      with
       | JsError failure -> Err failure.message
     match result with
     | Ok (debug, release) ->
@@ -99,7 +107,8 @@ let adopt_source model =
 
 prepare_highlighting : Atom.Writable Model ->{Atom.Write;} Unit
 let prepare_highlighting model =
-  let result = try Ok (load_highlighting ()) with
+  let result =
+    try Ok (load_highlighting ()) with
     | JsError failure -> Err failure.message
   match result with
   | Err message -> syntax_failure model message
@@ -115,29 +124,46 @@ let refresh model =
   if m.version == "" then
     ()
   else
-    update model (fun m ->
-      { m with checking = true; compiled = empty_compiled; debug_tokens = []; release_tokens = []; compile_error = "" })
-    let result = try Ok (compile m.source) with
+    update model (fun m -> {
+      m with
+      checking = true;
+      compiled = empty_compiled;
+      debug_tokens = [];
+      release_tokens = [];
+      compile_error = "";
+    })
+    let result =
+      try Ok (compile m.source) with
       | JsError failure -> Err failure.message
     let current = Atom.current model
     if current.source != m.source then
       ()
     else
       match result with
-      | Err message ->
-        update model (fun m -> { m with checking = false; compile_error = message })
+      | Err message -> update model (fun m -> { m with checking = false; compile_error = message })
       | Ok compiled ->
         update model (fun m ->
           let current = if m.profile == Debug then compiled.debug else compiled.release
-          { m with checking = false; compiled = compiled; tab = if errors current > 0 then Problems else m.tab })
+          {
+            m with
+            checking = false;
+            compiled = compiled;
+            tab = if errors current > 0 then Problems else m.tab;
+          }
+        )
         paint_generated model
 
 load_compiler : Atom.Writable Model ->{Atom.Write;} Unit
 let load_compiler model =
-  update
-    model
-    (fun m -> { m with loading = true; checking = false; load_error = ""; compile_error = "" })
-  let result = try Ok (load ()) with
+  update model (fun m -> {
+    m with
+    loading = true;
+    checking = false;
+    load_error = "";
+    compile_error = "";
+  })
+  let result =
+    try Ok (load ()) with
     | JsError failure -> Err failure.message
   match result with
   | Err message ->
@@ -155,8 +181,12 @@ let edit model source =
 
 choose : Atom.Writable Model -> Example ->{Atom.Write;} Unit
 let choose model example =
-  update model (fun m ->
-    { m with revision = m.revision + 1; execution = empty_execution; tab = Output })
+  update model (fun m -> {
+    m with
+    revision = m.revision + 1;
+    execution = empty_execution;
+    tab = Output;
+  })
   edit model example.source
 
 // `latest` on the same button aborts and joins the worker before this Stop action.
@@ -164,11 +194,20 @@ run_program : Atom.Writable Model ->{Atom.Write;} Unit
 let run_program model =
   let m = Atom.current model
   if m.running then
-    update model (fun m ->
-      { m with running = false; execution = { empty_execution with status = "stopped" } })
+    update model (fun m -> {
+      m with
+      running = false;
+      execution = { empty_execution with status = "stopped" };
+    })
   else
-    update model (fun m ->
-      { m with running = true; tab = Output; execution = empty_execution; ran_source = m.source; ran_profile = m.profile })
+    update model (fun m -> {
+      m with
+      running = true;
+      tab = Output;
+      execution = empty_execution;
+      ran_source = m.source;
+      ran_profile = m.profile;
+    })
     let execution =
       try timeout 10000 (task { run_build m.source (profile_name m.profile) }) with
       | TimeoutError -> { empty_execution with status = "timeout" }

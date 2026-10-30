@@ -17,20 +17,23 @@ type alias SchemaOptions a = { shrink : Option (a -> List a) }
 
 /// How many values to draw, how large, how many discards to allow, and
 /// the seed.
-type alias SampleOptions =
-  { count : Option Int; size : Option Int; maxDiscards : Option Int; seed : Option Float }
+type alias SampleOptions = {
+  count : Option Int;
+  size : Option Int;
+  maxDiscards : Option Int;
+  seed : Option Float;
+}
 
 /// The runs of a check, the sizes, the limits of discards and shrinks, the
 /// seed, and a replay of an earlier failure.
-type alias CheckOptions =
-  {
-    runs : Option Int;
-    size : Option Int;
-    maxDiscards : Option Int;
-    maxShrinks : Option Int;
-    seed : Option Float;
-    replay : Option Replay;
-  }
+type alias CheckOptions = {
+  runs : Option Int;
+  size : Option Int;
+  maxDiscards : Option Int;
+  maxShrinks : Option Int;
+  seed : Option Float;
+  replay : Option Replay;
+}
 
 /// Sampling stopped: the filters discarded too many values.
 type error SampleError = SampleError { generated : Int; discards : Int; seed : String }
@@ -43,14 +46,14 @@ type PropertyFailure (e : ErrorRow) = ReturnedFalse | PropertyError (Errors e)
 type CheckResult (e : ErrorRow) a =
   | Passed { runs : Int; discards : Int }
   | Falsified {
-      initialInput : a;
-      shrunkInput : a;
-      failure : PropertyFailure e;
-      runs : Int;
-      discards : Int;
-      shrinks : Int;
-      replay : Replay;
-    }
+    initialInput : a;
+    shrunkInput : a;
+    failure : PropertyFailure e;
+    runs : Int;
+    discards : Int;
+    shrinks : Int;
+    replay : Replay;
+  }
   | Exhausted { runs : Int; discards : Int; seed : String }
   | ReplayMismatch String
 
@@ -124,9 +127,7 @@ foreign effect sample from "@flick-lang/runtime/effect/Arbitrary" "flickSampleEf
   reviewed "effect@4.0.5 sha256:fe703ac99706d073"
 
 /// Runs the property on generated values and shrinks the first failure.
-check :
-  forall c r e a.
-  CheckOptions -> (a ->{r; e} Bool)^c -> Arbitrary a ->{r;} CheckResult e a
+check : forall c r e a. CheckOptions -> (a ->{r; e} Bool)^c -> Arbitrary a ->{r;} CheckResult e a
 foreign effect check from "@flick-lang/runtime/effect/Arbitrary" "flickCheckEffect"
   retention call
   reviewed "effect@4.0.5 sha256:20e42afa9a0d1275"

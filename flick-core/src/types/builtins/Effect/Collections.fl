@@ -9,8 +9,7 @@ type error ValidationError (e : ErrorRow) = ValidationError (NonEmpty.NonEmpty (
 
 /// Runs `f` on each element, as many at once as `concurrency` lets; the
 /// results in order. The first typed failure stops the others.
-for_each :
-  forall c r e a b. Concurrency -> (a ->{r; e} b)^c -> List a ->{r; e} List b
+for_each : forall c r e a b. Concurrency -> (a ->{r; e} b)^c -> List a ->{r; e} List b
 foreign effect for_each from "@flick-lang/runtime/effect/Effect" "flickForEach"
   arity 2
   retention call
@@ -35,8 +34,7 @@ foreign effect partition from "@flick-lang/runtime/effect/Effect" "flickPartitio
 
 /// Runs `f` on every element: all the results, or every typed error.
 validate :
-  forall c r e a b.
-  Concurrency -> (a ->{r; e} b)^c -> List a ->{r; ValidationError e} List b
+  forall c r e a b. Concurrency -> (a ->{r; e} b)^c -> List a ->{r; ValidationError e} List b
 foreign effect validate from "@flick-lang/runtime/effect/Effect" "flickValidate"
   arity 2
   retention call
@@ -72,8 +70,7 @@ foreign effect find_first from "@flick-lang/runtime/effect/Effect" "findFirst"
   reviewed "effect@4.0.5 sha256:65c599e695c25a55"
 
 /// The first value the runtime filter passes.
-find_first_filter :
-  forall c r e a b x. (a ->{r; e} Result x b)^c -> List a ->{r; e} Option b
+find_first_filter : forall c r e a b x. (a ->{r; e} Result x b)^c -> List a ->{r; e} Option b
 foreign effect find_first_filter from "@flick-lang/runtime/effect/Effect" "findFirstFilter"
   arity 1
   retention call
@@ -101,8 +98,7 @@ foreign effect reduce from "@flick-lang/runtime/effect/Effect" "flickReduce"
 
 /// The result of `task` if `p` holds for it, else `fallback` of it.
 filter_or_else :
-  forall c r e a r2 e2.
-  (a -> Bool)^c -> (a ->{r2; e2} a)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
+  forall c r e a r2 e2. (a -> Bool)^c -> (a ->{r2; e2} a)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect filter_or_else from "@flick-lang/runtime/effect/Effect" "filterOrElse"
   arity 2
   retention call
@@ -129,8 +125,7 @@ foreign effect filter_or_fail from "@flick-lang/runtime/effect/Effect" "filterOr
 /// The value the filter passes of `task`'s result, else fails with `f` of
 /// what it refused.
 filter_map_or_fail :
-  forall c r e a b x e2.
-  (a -> Result x b)^c -> (x -> Errors e2)^c -> (Eff r e a)^c ->{r; e + e2} b
+  forall c r e a b x e2. (a -> Result x b)^c -> (x -> Errors e2)^c -> (Eff r e a)^c ->{r; e + e2} b
 foreign effect filter_map_or_fail from "@flick-lang/runtime/effect/Effect" "filterMapOrFail"
   arity 2
   retention call

@@ -5,35 +5,39 @@ import App.Plan exposing (plan)
 tests : List Test.Test
 let tests = [
   Test.test "an empty plan leaves the supplied budget untouched" (fun () ->
-    Test.equal
-      (Some [], { remaining = 60; completed = [] })
-      (plan { budget = 60; overhead = 0 } [])),
+    Test.equal (Some [], { remaining = 60; completed = [] }) (plan { budget = 60; overhead = 0 } [])
+  ),
   Test.test "an exact fit completes every task" (fun () ->
     Test.equal
       (Some ["docs", "tests", "lint"], { remaining = 0; completed = ["docs", "tests", "lint"] })
-      (plan { budget = 60; overhead = 0 } ["docs", "tests", "lint"])),
+      (plan { budget = 60; overhead = 0 } ["docs", "tests", "lint"])
+  ),
   Test.test "ReaderT configuration adds overhead to each task" (fun () ->
     Test.equal
       (Some ["docs", "lint"], { remaining = 0; completed = ["docs", "lint"] })
-      (plan { budget = 36; overhead = 3 } ["docs", "lint"])),
+      (plan { budget = 36; overhead = 3 } ["docs", "lint"])
+  ),
   Test.test "overhead can reject a task whose base time would fit" (fun () ->
     Test.equal
       (None, { remaining = 20; completed = [] })
-      (plan { budget = 20; overhead = 1 } ["docs", "lint"])),
+      (plan { budget = 20; overhead = 1 } ["docs", "lint"])
+  ),
   Test.test "zero budget accepts no tasks without charging overhead" (fun () ->
-    Test.equal
-      (Some [], { remaining = 0; completed = [] })
-      (plan { budget = 0; overhead = 3 } [])),
+    Test.equal (Some [], { remaining = 0; completed = [] }) (plan { budget = 0; overhead = 3 } [])
+  ),
   Test.test "an unknown task preserves the prefix and stops before later tasks" (fun () ->
     Test.equal
       (None, { remaining = 40; completed = ["docs"] })
-      (plan { budget = 60; overhead = 0 } ["docs", "missing", "lint"])),
+      (plan { budget = 60; overhead = 0 } ["docs", "missing", "lint"])
+  ),
   Test.test "an over-budget task does not consume time or schedule later tasks" (fun () ->
     Test.equal
       (None, { remaining = 5; completed = ["docs"] })
-      (plan { budget = 25; overhead = 0 } ["docs", "lint", "tests"])),
+      (plan { budget = 25; overhead = 0 } ["docs", "lint", "tests"])
+  ),
   Test.test "repeated tasks consume time again" (fun () ->
     Test.equal
       (Some ["docs", "docs"], { remaining = 20; completed = ["docs", "docs"] })
-      (plan { budget = 60; overhead = 0 } ["docs", "docs"])),
+      (plan { budget = 60; overhead = 0 } ["docs", "docs"])
+  ),
 ]

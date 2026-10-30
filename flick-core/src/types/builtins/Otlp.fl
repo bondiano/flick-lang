@@ -47,36 +47,34 @@ foreign pure protobuf from "@flick-lang/runtime/effect/observability/Otlp" "otlp
 /// of 1 KB or more, the serialization, how often a batch is sent, how many
 /// records a batch holds, and how long the end of the scope waits for the
 /// last one.
-type alias Settings =
-  {
-    url : String;
-    service_name : String;
-    service_version : Option String;
-    attributes : List (String, String);
-    headers : List (String, String);
-    gzip : Bool;
-    serialization : Serialization;
-    export_interval : Option Duration.Duration;
-    max_batch_size : Option Int;
-    shutdown_timeout : Option Duration.Duration;
-  }
+type alias Settings = {
+  url : String;
+  service_name : String;
+  service_version : Option String;
+  attributes : List (String, String);
+  headers : List (String, String);
+  gzip : Bool;
+  serialization : Serialization;
+  export_interval : Option Duration.Duration;
+  max_batch_size : Option Int;
+  shutdown_timeout : Option Duration.Duration;
+}
 
 /// The settings of `url` and `service_name`, everything else Effect's
 /// default: JSON, no gzip, no headers or attributes.
 settings : String -> String -> Settings
-let settings url service_name =
-  {
-    url = url;
-    service_name = service_name;
-    service_version = None;
-    attributes = [];
-    headers = [];
-    gzip = false;
-    serialization = json;
-    export_interval = None;
-    max_batch_size = None;
-    shutdown_timeout = None;
-  }
+let settings url service_name = {
+  url = url;
+  service_name = service_name;
+  service_version = None;
+  attributes = [];
+  headers = [];
+  gzip = false;
+  serialization = json;
+  export_interval = None;
+  max_batch_size = None;
+  shutdown_timeout = None;
+}
 
 /// `layer` as `settings` say.
 layer_with : Settings -> Layer none none none

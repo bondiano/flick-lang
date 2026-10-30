@@ -26,8 +26,7 @@ class Monad m => MonadState (m : Type -> Type) s | m -> s =
 class Monad m => MonadReader (m : Type -> Type) r | m -> r =
   /// Reads the shared environment.
   ask : m r
-  local : forall c d a. (forall v. r^v -> r^(c + v))^c ->
-    ((m a)^d -> (m a)^(c + d))^c
+  local : forall c d a. (forall v. r^v -> r^(c + v))^c -> ((m a)^d -> (m a)^(c + d))^c
   reader : forall c a. (forall v. r^v -> a)^c -> (m a)^c
   let reader project = map project ask
 
@@ -36,9 +35,11 @@ class (Monad m, Monoid w) => MonadWriter (m : Type -> Type) w | m -> w =
   listen : forall c a. (m a)^c -> (m (a, w))^c
   pass : forall c d a. (m (a, (w -> w)^c))^d -> (m a)^(c + d)
   writer : forall c a. (a, w)^c -> (m a)^c
-  let writer (value, output) = do { tell output; pure value }
+  let writer (value, output) = do {
+    tell output
+    pure value
+  }
 
 class Monad m => MonadError (m : Type -> Type) e | m -> e =
   throw_error : forall c a. e^c -> (m a)^c
-  catch_error : forall c d a. (forall v. e^v -> (m a)^(c + v))^c ->
-    ((m a)^d -> (m a)^(c + d))^c
+  catch_error : forall c d a. (forall v. e^v -> (m a)^(c + v))^c -> ((m a)^d -> (m a)^(c + d))^c

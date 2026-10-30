@@ -33,12 +33,12 @@ let surface request resolved file =
       List.map
         (fun e ->
           JObject
-            (List.concat
-              [
-                [("name", JString e.name), ("local", JString e.local)],
-                e.body,
-                [("fingerprint", JString e.fingerprint)],
-              ]))
+            (List.concat [
+              [("name", JString e.name), ("local", JString e.local)],
+              e.body,
+              [("fingerprint", JString e.fingerprint)],
+            ])
+        )
         (Shape.exports checker module_)
     let package_id = Ts.resolved_package resolved
     let declarations =
@@ -46,16 +46,15 @@ let surface request resolved file =
       | Some p -> p.name ++ "/" ++ p.subModuleName
       | None -> Path.basename file
     JsonText.render
-      (JObject
-        [
-          ("package", JString request.name),
-          (
-            "version",
-            Option.with_default JNull (Option.map (fun p -> JString p.version) package_id),
-          ),
-          ("declarations", JString declarations),
-          ("exports", JArray exports),
-        ])
+      (JObject [
+        ("package", JString request.name),
+        (
+          "version",
+          Option.with_default JNull (Option.map (fun p -> JString p.version) package_id),
+        ),
+        ("declarations", JString declarations),
+        ("exports", JArray exports),
+      ])
 
 /// Answers the request on stdin.
 run : Unit ->{Stdio.Stdio, Path.Path; AppError, PlatformError.PlatformError} Unit

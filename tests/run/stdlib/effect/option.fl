@@ -16,183 +16,163 @@ let main () =
   let nothing : Option Float = None
   line
     "basics"
-    (show
-      (
-        Option.map (fun n -> n + 1) some,
-        Option.bind positive some,
-        Option.with_default 0 nothing,
-        Option.is_some some,
-        Option.is_none some,
-        Option.or_else (Some 1) nothing,
-        Option.to_list some,
-      ))
+    (show (
+      Option.map (fun n -> n + 1) some,
+      Option.bind positive some,
+      Option.with_default 0 nothing,
+      Option.is_some some,
+      Option.is_none some,
+      Option.or_else (Some 1) nothing,
+      Option.to_list some,
+    ))
   line
     "all"
-    (show
-      (
-        Option.all [Some 1, Some 2],
-        Option.all [Some 1, None],
-        Option.first_some_of [None, Some 2, Some 3],
-      ))
+    (show (
+      Option.all [Some 1, Some 2],
+      Option.all [Some 1, None],
+      Option.first_some_of [None, Some 2, Some 3],
+    ))
   line "as" (show (Option.as_ "x" some, Option.as_ "x" nothing, Option.as_void some, Option.void))
   line
     "compose_k"
-    (show
-      (
-        Option.compose_k positive (fun n -> Some (n - 5)) 9,
-        Option.compose_k positive (fun n -> Some (n - 5)) 1,
-      ))
+    (show (
+      Option.compose_k positive (fun n -> Some (n - 5)) 9,
+      Option.compose_k positive (fun n -> Some (n - 5)) 1,
+    ))
   line
     "contains"
-    (show
-      (
-        Option.contains 4 some,
-        Option.contains 5 some,
-        Option.contains_with (fun a b -> a == b * 2) 8 some,
-        Option.exists (fun n -> n > 3) some,
-      ))
+    (show (
+      Option.contains 4 some,
+      Option.contains 5 some,
+      Option.contains_with (fun a b -> a == b * 2) 8 some,
+      Option.exists (fun n -> n > 3) some,
+    ))
   line
     "filter"
-    (show
-      (
-        Option.filter (fun n -> n > 5) some,
-        Option.filter_map half some,
-        Option.filter_map half (Some 3),
-        Option.flatten (Some some),
-      ))
+    (show (
+      Option.filter (fun n -> n > 5) some,
+      Option.filter_map half some,
+      Option.filter_map half (Some 3),
+      Option.flatten (Some some),
+    ))
   line
     "lift"
-    (show
-      (
-        Option.lift2 (fun a b -> a - b) (Some 1) some,
-        Option.lift2 (fun a b -> a - b) nothing some,
-        Option.lift_predicate (fun n -> n > 3) 2,
-      ))
+    (show (
+      Option.lift2 (fun a b -> a - b) (Some 1) some,
+      Option.lift2 (fun a b -> a - b) nothing some,
+      Option.lift_predicate (fun n -> n > 3) 2,
+    ))
   described : Option Float -> String
   let described = Option.match_ { onNone = fun () -> "none"; onSome = fun n -> "some " ++ show n }
   line "match" (described some ++ ", " ++ described nothing)
   line
     "or_else"
-    (show
-      (
-        Option.or_else_result (fun () -> Some "b") some,
-        Option.or_else_result (fun () -> Some "b") nothing,
-        Option.or_else_some (fun () -> 0) nothing,
-      ))
+    (show (
+      Option.or_else_result (fun () -> Some "b") some,
+      Option.or_else_result (fun () -> Some "b") nothing,
+      Option.or_else_some (fun () -> 0) nothing,
+    ))
   line "partition" (show (Option.partition_map half some, Option.partition_map half (Some 3)))
   line
     "product"
-    (show
-      (
-        Option.product (Some "b") some,
-        Option.product_many [Some 5, Some 6] some,
-        Option.product_many [None] some,
-      ))
+    (show (
+      Option.product (Some "b") some,
+      Option.product_many [Some 5, Some 6] some,
+      Option.product_many [None] some,
+    ))
   line
     "reduce"
-    (show
-      (
-        Option.reduce_compact 0 (fun s n -> s + n) [Some 1, None, Some 2],
-        Option.tap positive some,
-        Option.tap (fun _ -> nothing) some,
-      ))
+    (show (
+      Option.reduce_compact 0 (fun s n -> s + n) [Some 1, None, Some 2],
+      Option.tap positive some,
+      Option.tap (fun _ -> nothing) some,
+    ))
   line
     "zip"
-    (show
-      (
-        Option.zip_left (Some "x") some,
-        Option.zip_right (Some "x") some,
-        Option.zip_with (Some 10) (fun a b -> a * b) some,
-        Option.zip_left nothing some,
-      ))
+    (show (
+      Option.zip_left (Some "x") some,
+      Option.zip_right (Some "x") some,
+      Option.zip_with (Some 10) (fun a b -> a * b) some,
+      Option.zip_left nothing some,
+    ))
   line "from list" (show (List.head [1, 2], List.head ([] : List Float)))
   let ok : Result String Float = Ok 4
   let err : Result String Float = Err "boom"
   line
     "result basics"
-    (show
-      (
-        Result.map (fun n -> n + 1) ok,
-        Result.map_err String.length err,
-        Result.bind half ok,
-        Result.with_default 0 err,
-        Result.is_ok ok,
-        Result.is_err ok,
-        Result.to_option ok,
-        Result.from_option "none" nothing,
-      ))
+    (show (
+      Result.map (fun n -> n + 1) ok,
+      Result.map_err String.length err,
+      Result.bind half ok,
+      Result.with_default 0 err,
+      Result.is_ok ok,
+      Result.is_err ok,
+      Result.to_option ok,
+      Result.from_option "none" nothing,
+    ))
   line
     "result all"
-    (show
-      (
-        Result.all [ok, Ok 5],
-        Result.all [ok, err],
-        Result.fail_void == (Err () : Result Unit Float),
-        Result.void == (Ok () : Result String Unit),
-      ))
+    (show (
+      Result.all [ok, Ok 5],
+      Result.all [ok, err],
+      Result.fail_void == (Err () : Result Unit Float),
+      Result.void == (Ok () : Result String Unit),
+    ))
   line
     "filter_or_fail"
-    (show
-      (
-        Result.filter_or_fail (fun n -> n > 5) (fun n -> "small " ++ show n) ok,
-        Result.filter_or_fail (fun n -> n > 1) (fun _ -> "x") ok,
-      ))
+    (show (
+      Result.filter_or_fail (fun n -> n > 5) (fun n -> "small " ++ show n) ok,
+      Result.filter_or_fail (fun n -> n > 1) (fun _ -> "x") ok,
+    ))
   line
     "flip"
-    (show
-      (
-        Result.flip ok,
-        Result.get_failure err,
-        Result.get_failure ok,
-        Result.merge (Result.flip (Ok 1 : Result Float Float)),
-      ))
+    (show (
+      Result.flip ok,
+      Result.get_failure err,
+      Result.get_failure ok,
+      Result.merge (Result.flip (Ok 1 : Result Float Float)),
+    ))
   line
     "lift_predicate"
-    (show
-      (
-        Result.lift_predicate (fun n -> n > 1) (fun n -> "small " ++ show n) 0,
-        Result.lift_predicate (fun n -> n > 1) (fun n -> "small " ++ show n) 2,
-      ))
+    (show (
+      Result.lift_predicate (fun n -> n > 1) (fun n -> "small " ++ show n) 0,
+      Result.lift_predicate (fun n -> n > 1) (fun n -> "small " ++ show n) 2,
+    ))
   line
     "map_both"
-    (show
-      (
-        Result.map_both { onFailure = String.length; onSuccess = fun n -> n * 2 } ok,
-        Result.map_both { onFailure = String.length; onSuccess = fun n -> n * 2 } err,
-      ))
+    (show (
+      Result.map_both { onFailure = String.length; onSuccess = fun n -> n * 2 } ok,
+      Result.map_both { onFailure = String.length; onSuccess = fun n -> n * 2 } err,
+    ))
   told : Result String Float -> String
   let told =
     Result.match_ { onFailure = fun e -> "failed " ++ e; onSuccess = fun n -> "got " ++ show n }
   line "result match" (told ok ++ ", " ++ told err)
   line
     "result or_else"
-    (show
-      (
-        (Result.or_else (fun e -> Ok (Int.to_float (String.length e))) err : Result Unit Float),
-        Result.or_else (fun _ -> (Err 0 : Result Float Float)) ok,
-      ))
+    (show (
+      (Result.or_else (fun e -> Ok (Int.to_float (String.length e))) err : Result Unit Float),
+      Result.or_else (fun _ -> (Err 0 : Result Float Float)) ok,
+    ))
   line
     "succeed"
-    (show
-      (
-        (Result.succeed_none : Result String (Option Float)),
-        (Result.succeed_some 1 : Result String (Option Float)),
-      ))
+    (show (
+      (Result.succeed_none : Result String (Option Float)),
+      (Result.succeed_some 1 : Result String (Option Float)),
+    ))
   line
     "transpose"
-    (show
-      (
-        Result.transpose_option (Some ok),
-        Result.transpose_option (None : Option (Result String Float)),
-        Result.transpose_map_option half (Some 3),
-        Result.transpose_map_option half nothing,
-      ))
+    (show (
+      Result.transpose_option (Some ok),
+      Result.transpose_option (None : Option (Result String Float)),
+      Result.transpose_map_option half (Some 3),
+      Result.transpose_map_option half nothing,
+    ))
   line
     "constructors"
-    (show
-      (
-        (Ok 1 : Result String Float),
-        (Err "e" : Result String Float),
-        (Some 1, (None : Option Float)),
-      ))
+    (show (
+      (Ok 1 : Result String Float),
+      (Err "e" : Result String Float),
+      (Some 1, (None : Option Float)),
+    ))
   line "undefined_or" (show (Option.map (fun n -> n * 3) some))

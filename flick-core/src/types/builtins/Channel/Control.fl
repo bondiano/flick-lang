@@ -7,7 +7,8 @@ import Channel.Core exposing (..)
 
 /// Recovers from a typed error with the channel `f` builds of it; a
 /// defect or an interruption is not recovered.
-catch : (Errors e -> Channel r2 e2 i o d ie id) ->
+catch :
+  (Errors e -> Channel r2 e2 i o d ie id) ->
   Channel r e i o d ie id ->
   Channel (r + r2) e2 i o d ie id
 foreign pure catch from "@flick-lang/runtime/effect/Channel" "catch"
@@ -17,24 +18,22 @@ foreign pure catch from "@flick-lang/runtime/effect/Channel" "catch"
 /// Recovers from any failure with the channel `f` builds of it.
 catch_cause :
   (Failure e -> Channel r2 e2 i o d ie id) ->
-    Channel r e i o d ie id ->
-    Channel (r + r2) e2 i o d ie id
+  Channel r e i o d ie id ->
+  Channel (r + r2) e2 i o d ie id
 foreign pure catch_cause from "@flick-lang/runtime/effect/Channel" "flickCatchCause"
   arity 1
   reviewed "effect@4.0.5 sha256:147c2af27851edf5"
 
 /// Runs `f` on a typed error, then fails with it.
-tap_error : (Errors e ->{r2; e2} x) ->
-  Channel r e i o d ie id ->
-  Channel (r + r2) (e + e2) i o d ie id
+tap_error :
+  (Errors e ->{r2; e2} x) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
 foreign pure tap_error from "@flick-lang/runtime/effect/Channel" "tapError"
   arity 1
   reviewed "effect@4.0.5 sha256:755d233ba3282444"
 
 /// Runs `f` on any failure, then fails with it.
-tap_cause : (Failure e ->{r2; e2} x) ->
-  Channel r e i o d ie id ->
-  Channel (r + r2) (e + e2) i o d ie id
+tap_cause :
+  (Failure e ->{r2; e2} x) -> Channel r e i o d ie id -> Channel (r + r2) (e + e2) i o d ie id
 foreign pure tap_cause from "@flick-lang/runtime/effect/Channel" "flickTapCause"
   arity 1
   reviewed "effect@4.0.5 sha256:1f26049d7be48184"
@@ -114,9 +113,9 @@ foreign pure merge_effect from "@flick-lang/runtime/effect/Channel" "mergeEffect
 /// until the side the strategy names ends.
 merge :
   HaltStrategy ->
-    Channel r2 e2 i o d ie id ->
-    Channel r e i o d ie id ->
-    Channel (r + r2) (e + e2) i o d ie id
+  Channel r2 e2 i o d ie id ->
+  Channel r e i o d ie id ->
+  Channel (r + r2) (e + e2) i o d ie id
 foreign pure merge from "@flick-lang/runtime/effect/Channel" "flickMerge"
   arity 2
   reviewed "effect@4.0.5 sha256:5a188ccedb346870"
@@ -132,8 +131,8 @@ foreign pure repeat from "@flick-lang/runtime/effect/Channel" "repeat"
 /// which gets the error, recurs.
 retry :
   Schedule.Schedule r2 e2 (Errors e) so ->
-    Channel r e i o d ie id ->
-    Channel (r + r2) (e + e2) i o d ie id
+  Channel r e i o d ie id ->
+  Channel (r + r2) (e + e2) i o d ie id
 foreign pure retry from "@flick-lang/runtime/effect/Channel" "retry"
   arity 1
   reviewed "effect@4.0.5 sha256:61f20d41ed7c4b00"
@@ -162,9 +161,9 @@ foreign pure provide_service from "@flick-lang/runtime/effect/Channel" "provideS
 /// Provides the service with the implementation the task builds.
 provide_service_effect :
   ServiceTag s ->
-    Eff r2 e2 (ServiceImpl s) ->
-    Channel (s + r) e i o d ie id ->
-    Channel (r + r2) (e + e2) i o d ie id
+  Eff r2 e2 (ServiceImpl s) ->
+  Channel (s + r) e i o d ie id ->
+  Channel (r + r2) (e + e2) i o d ie id
 foreign pure provide_service_effect from "@flick-lang/runtime/effect/Channel" "provideServiceEffect"
   arity 2
   reviewed "effect@4.0.5 sha256:7b5bccbd5cf1b6f8"
@@ -172,9 +171,9 @@ foreign pure provide_service_effect from "@flick-lang/runtime/effect/Channel" "p
 /// Runs the channel with the service's implementation changed by `f`.
 update_service :
   ServiceTag s ->
-    (ServiceImpl s -> ServiceImpl s) ->
-    Channel r e i o d ie id ->
-    Channel (s + r) e i o d ie id
+  (ServiceImpl s -> ServiceImpl s) ->
+  Channel r e i o d ie id ->
+  Channel (s + r) e i o d ie id
 foreign pure update_service from "@flick-lang/runtime/effect/Channel" "updateService"
   arity 2
   reviewed "effect@4.0.5 sha256:6222f30661c5b8c1"

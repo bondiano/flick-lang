@@ -9,26 +9,22 @@ seeded : Int -> Arbitrary.SampleOptions
 let seeded n = { count = Some n; size = None; maxDiscards = None; seed = Some 42 }
 
 checking : Arbitrary.CheckOptions
-let checking =
-  {
-    runs = Some 50;
-    size = None;
-    maxDiscards = None;
-    maxShrinks = None;
-    seed = Some 7;
-    replay = None;
-  }
+let checking = {
+  runs = Some 50;
+  size = None;
+  maxDiscards = None;
+  maxShrinks = None;
+  seed = Some 7;
+  replay = None;
+}
 
 /// Effect generates within the bounds its checks state.
 digit_json : PureCodec Json Float
 let digit_json =
   Float.json_finite
-    |> Check.apply Check.int
-    |> Check.apply
-      (
-        Check.between
-          { minimum = 0; maximum = 9; exclusiveMinimum = false; exclusiveMaximum = false }
-      )
+  |> Check.apply Check.int
+  |> Check.apply
+    (Check.between { minimum = 0; maximum = 9; exclusiveMinimum = false; exclusiveMaximum = false })
 
 digits : Arbitrary.Arbitrary Float
 let digits = Arbitrary.map (fun n -> n) (Arbitrary.from_schema (Codec.to_schema digit_json))
@@ -39,7 +35,8 @@ let describe result =
   | Arbitrary.Passed r -> "passed " ++ show r.runs
   | Arbitrary.Falsified r ->
     let failure = r.failure
-    let why = match failure with
+    let why =
+      match failure with
       | Arbitrary.ReturnedFalse -> "false"
       | Arbitrary.PropertyError _ -> "error"
     let replay : Arbitrary.Replay = r.replay
@@ -87,18 +84,39 @@ let run () =
       (Arbitrary.flat_map
         (fun n -> Arbitrary.all [Arbitrary.constant n, Arbitrary.constant (n + 1)])
         digits)
-  Platform.stdout_line ("flat_map and all: " ++ show (List.all (fun p -> match p with
-    | [a, b] -> b == a + 1
-    | _ -> false) pairs))
+  Platform.stdout_line
+    ("flat_map and all: "
+      ++ show
+        (List.all
+          (fun p ->
+            match p with
+            | [a, b] -> b == a + 1
+            | _ -> false
+          )
+          pairs))
   let pair = Arbitrary.sample (seeded 3) (Arbitrary.zip2 digits (Arbitrary.constant "y"))
-  Platform.stdout_line ("zip2: " ++ show (List.all (fun p -> match p with
-    | (n, s) -> n >= 0 && n <= 9 && s == "y") pair))
+  Platform.stdout_line
+    ("zip2: "
+      ++ show
+        (List.all
+          (fun p ->
+            match p with
+            | (n, s) -> n >= 0 && n <= 9 && s == "y"
+          )
+          pair))
   let triple =
     Arbitrary.sample
       (seeded 3)
       (Arbitrary.zip3 digits (Arbitrary.constant true) (Arbitrary.constant 3))
-  Platform.stdout_line ("zip3: " ++ show (List.all (fun t -> match t with
-    | (n, b, k) -> n >= 0 && n <= 9 && b && k == 3) triple))
+  Platform.stdout_line
+    ("zip3: "
+      ++ show
+        (List.all
+          (fun t ->
+            match t with
+            | (n, b, k) -> n >= 0 && n <= 9 && b && k == 3
+          )
+          triple))
   let zipped =
     Arbitrary.sample
       (seeded 5)
@@ -107,8 +125,15 @@ let run () =
         (Arbitrary.constant "x")
         (Arbitrary.constant true)
         (Arbitrary.constant 2))
-  Platform.stdout_line ("zip4: " ++ show (List.all (fun z -> match z with
-    | (n, s, b, k) -> n >= 0 && n <= 9 && s == "x" && b && k == 2) zipped))
+  Platform.stdout_line
+    ("zip4: "
+      ++ show
+        (List.all
+          (fun z ->
+            match z with
+            | (n, s, b, k) -> n >= 0 && n <= 9 && s == "x" && b && k == 2
+          )
+          zipped))
   let shrinking : Arbitrary.SchemaOptions Float = { shrink = None }
   Platform.stdout_line
     ("from_schema_with: "

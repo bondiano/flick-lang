@@ -4,10 +4,7 @@
 module JsonPatch exposing (..)
 
 /// One change at a path: add a value, remove one, or replace one.
-type Operation =
-  | Add String Json
-  | Remove String
-  | Replace String Json
+type Operation = Add String Json | Remove String | Replace String Json
 
 /// The operations, applied in order.
 type alias JsonPatch = List Operation

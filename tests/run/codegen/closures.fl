@@ -50,7 +50,8 @@ let main () =
         match r with
         | Ok n when n > 3 -> "big " ++ show n
         | Ok n -> "small " ++ show n
-        | Err e -> "error: " ++ e)
+        | Err e -> "error: " ++ e
+      )
       results
   Platform.stdout_line (show shown)
   compose : (Int -> Int) -> (Int -> Int) -> Int -> Int

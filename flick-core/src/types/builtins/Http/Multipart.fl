@@ -31,25 +31,23 @@ type error MultipartError = MultipartError MultipartErrorReason
 /// What `with_limits` bounds: the number of parts, the size of a field, of
 /// a file and of the whole body, and the media types of parts read as
 /// fields (none: the default ones).
-type alias Limits =
-  {
-    maxParts : Option Int;
-    maxFieldSize : Option ByteSize.ByteSize;
-    maxFileSize : Option ByteSize.ByteSize;
-    maxTotalSize : Option ByteSize.ByteSize;
-    fieldMimeTypes : List String;
-  }
+type alias Limits = {
+  maxParts : Option Int;
+  maxFieldSize : Option ByteSize.ByteSize;
+  maxFileSize : Option ByteSize.ByteSize;
+  maxTotalSize : Option ByteSize.ByteSize;
+  fieldMimeTypes : List String;
+}
 
 /// No bounds besides the defaults.
 limits : Limits
-let limits =
-  {
-    maxParts = None;
-    maxFieldSize = None;
-    maxFileSize = None;
-    maxTotalSize = None;
-    fieldMimeTypes = [];
-  }
+let limits = {
+  maxParts = None;
+  maxFieldSize = None;
+  maxFileSize = None;
+  maxTotalSize = None;
+  fieldMimeTypes = [];
+}
 
 /// Reads the form of the request; its files are removed when the scope of
 /// region `s` closes.
@@ -84,8 +82,8 @@ foreign effect schema_json from "@flick-lang/runtime/effect/http/Multipart" "fli
 schema_body_multipart :
   forall s rd re a.
   Codec rd re Json a ->
-    Http.ServerRequest.ServerRequest ->{Scope s | rd; MultipartError, SchemaError}
-    a
+  Http.ServerRequest.ServerRequest ->{Scope s | rd; MultipartError, SchemaError}
+  a
 foreign effect schema_body_multipart from "@flick-lang/runtime/effect/http/Multipart" "flickSchemaBodyMultipart"
   arity 2
   reviewed "effect@4.0.5 sha256:19037ac1c9df1f52"
@@ -95,13 +93,8 @@ foreign effect schema_body_multipart from "@flick-lang/runtime/effect/http/Multi
 schema_body_form :
   forall s rd re a.
   Codec rd re Json a ->
-  Http.ServerRequest.ServerRequest ->{
-    Scope s | rd;
-    Http.ServerError.HttpServerError,
-    MultipartError,
-    SchemaError
-  }
-    a
+  Http.ServerRequest.ServerRequest ->{Scope s | rd; Http.ServerError.HttpServerError, MultipartError, SchemaError}
+  a
 foreign effect schema_body_form from "@flick-lang/runtime/effect/http/Multipart" "flickSchemaBodyForm"
   arity 2
   reviewed "effect@4.0.5 sha256:bffe6740849fd0ac"
@@ -110,9 +103,9 @@ foreign effect schema_body_form from "@flick-lang/runtime/effect/http/Multipart"
 schema_body_form_json :
   forall s rd re a.
   Codec rd re Json a ->
-    String ->
-    Http.ServerRequest.ServerRequest ->{Scope s | rd; MultipartError, SchemaError}
-    a
+  String ->
+  Http.ServerRequest.ServerRequest ->{Scope s | rd; MultipartError, SchemaError}
+  a
 foreign effect schema_body_form_json from "@flick-lang/runtime/effect/http/Multipart" "flickSchemaBodyFormJson"
   arity 3
   reviewed "effect@4.0.5 sha256:689e48d5b357ade0"
@@ -126,16 +119,15 @@ foreign effect with_limits from "@flick-lang/runtime/effect/http/Multipart" "fli
 
 /// What the header of a part says: its field name, file name, media type
 /// and disposition, with their parameters, and all its headers.
-type alias PartInfo =
-  {
-    name : String;
-    filename : Option String;
-    contentType : String;
-    contentTypeParameters : List (String, String);
-    contentDisposition : String;
-    contentDispositionParameters : List (String, String);
-    headers : List (String, String);
-  }
+type alias PartInfo = {
+  name : String;
+  filename : Option String;
+  contentType : String;
+  contentTypeParameters : List (String, String);
+  contentDisposition : String;
+  contentDispositionParameters : List (String, String);
+  headers : List (String, String);
+}
 
 /// Whether the parser reads the part as a file: it has a file name, or a
 /// media type that is not text.
@@ -169,10 +161,16 @@ foreign pure parts from "@flick-lang/runtime/effect/http/Multipart" "flickParts"
 /// the form's message, its `content-type` naming the boundary. It reads the
 /// limits of `with_limits` when it runs.
 make_channel :
-  forall e. List (String, String) ->
-    Channel none {MultipartError | e} (
-      NonEmpty.NonEmpty (List Int)
-    ) (NonEmpty.NonEmpty Part) Unit e Unit
+  forall e.
+  List (String, String) ->
+  Channel
+    none
+    {MultipartError | e}
+    (NonEmpty.NonEmpty (List Int))
+    (NonEmpty.NonEmpty Part)
+    Unit
+    e
+    Unit
 foreign pure make_channel from "@flick-lang/runtime/effect/http/Multipart" "flickMakeChannel"
   reviewed "effect@4.0.5 sha256:c4fb7aade4e9dd3f"
 

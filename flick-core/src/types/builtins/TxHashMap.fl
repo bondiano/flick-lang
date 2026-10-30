@@ -63,8 +63,7 @@ foreign effect is_non_empty from "@flick-lang/runtime/effect/TxHashMap" "flickIs
 
 /// Replaces the value of the key, if it has one, with `f` of it; the old
 /// value.
-modify :
-  forall c w k v. k -> (v -> v)^c -> (TxHashMap w k v ->{Tx.Transaction;} Option v)^c
+modify : forall c w k v. k -> (v -> v)^c -> (TxHashMap w k v ->{Tx.Transaction;} Option v)^c
 foreign effect modify from "@flick-lang/runtime/effect/TxHashMap" "flickModify"
   retention call
   reviewed "effect@4.0.5 sha256:56732f6408593818"
@@ -167,8 +166,7 @@ foreign effect flat_map from "@flick-lang/runtime/effect/TxHashMap" "flickFlatMa
   reviewed "effect@4.0.5 sha256:47018e4a5b37b24d"
 
 /// Folds the entries, in no particular order, from `zero`.
-reduce :
-  forall c w k v a. a -> (a -> v -> k -> a)^c -> (TxHashMap w k v ->{Tx.Transaction;} a)^c
+reduce : forall c w k v a. a -> (a -> v -> k -> a)^c -> (TxHashMap w k v ->{Tx.Transaction;} a)^c
 foreign effect reduce from "@flick-lang/runtime/effect/TxHashMap" "flickReduce"
   retention call
   reviewed "effect@4.0.5 sha256:717f3dea2004f2e5"
@@ -200,8 +198,7 @@ foreign effect find_first from "@flick-lang/runtime/effect/TxHashMap" "flickFind
 
 /// Runs `f value key` for each entry, in no particular order.
 for_each :
-  forall c w k v r e.
-  (v -> k ->{r; e} Unit)^c -> (TxHashMap w k v ->{Tx.Transaction | r; e} Unit)^c
+  forall c w k v r e. (v -> k ->{r; e} Unit)^c -> (TxHashMap w k v ->{Tx.Transaction | r; e} Unit)^c
 foreign effect for_each from "@flick-lang/runtime/effect/TxHashMap" "flickForEach"
   retention call
   reviewed "effect@4.0.5 sha256:286e8a090d429313"

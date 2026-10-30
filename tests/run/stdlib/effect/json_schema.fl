@@ -9,9 +9,12 @@ type alias Item = { name : String; tags : List String }
 json : String ->{; AppError} Json
 let json text =
   match Json.parse text with
-  | Ok input -> (match Codec.decode_result Json.json input with
-    | Ok value -> value
-    | Err _ -> App.fail "not a JSON value")
+  | Ok input ->
+    (
+      match Codec.decode_result Json.json input with
+      | Ok value -> value
+      | Err _ -> App.fail "not a JSON value"
+    )
   | Err _ -> App.fail "not JSON"
 
 line : String -> String ->{} Unit
@@ -24,13 +27,11 @@ main : Unit ->{; AppError} Unit
 let main () =
   line
     "meta"
-    (String.join
-      " "
-      [
-        JsonSchema.meta_schema_uri_draft_04,
-        JsonSchema.meta_schema_uri_draft_07,
-        JsonSchema.meta_schema_uri_draft_2020_12,
-      ])
+    (String.join " " [
+      JsonSchema.meta_schema_uri_draft_04,
+      JsonSchema.meta_schema_uri_draft_07,
+      JsonSchema.meta_schema_uri_draft_2020_12,
+    ])
   let draft07 : JsonSchema.JsonSchema =
     json
       "{\"type\": \"object\", \"definitions\": {\"a\": {\"type\": \"string\"}}, \"properties\": {\"x\": {\"$ref\": \"#/definitions/a\"}}}"
@@ -51,11 +52,15 @@ let main () =
     "from_openapi_3_0"
     (document (JsonSchema.from_openapi_3_0 (json "{\"type\": \"string\", \"nullable\": true}")))
   let defs : JsonSchema.Definitions = doc.definitions
-  let multi : JsonSchema.MultiDocument =
-    { dialect = "draft-2020-12"; schemas = NonEmpty.singleton doc.root; definitions = defs }
+  let multi : JsonSchema.MultiDocument = {
+    dialect = "draft-2020-12";
+    schemas = NonEmpty.singleton doc.root;
+    definitions = defs;
+  }
   let openapi = JsonSchema.to_openapi_3_1 multi
   line "to_openapi_3_1" (openapi.dialect ++ " " ++ Json.stringify (NonEmpty.head openapi.schemas))
-  let text = match Codec.json_schema "Item" (Codec.json (schema Item)) with
+  let text =
+    match Codec.json_schema "Item" (Codec.json (schema Item)) with
     | Ok text -> text
     | Err _ -> App.fail "no JSON Schema"
   let exported = JsonSchema.from_draft_2020_12 (json text)

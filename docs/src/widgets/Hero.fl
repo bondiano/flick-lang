@@ -52,59 +52,66 @@ token : String -> String -> Ui
 let token category value = Ui.span { class_name = "token-" ++ category } [Ui.text value]
 
 snippet : Bool -> Ui
-let snippet effect =
-  ui {
-    pre { class_name = "hero-source" }
-      (if effect then
-          [token "keyword" "import ", text "{ Console, Effect } ", token "keyword" "from ", token "string" "\"effect\"", text "\n\n",
-            token
-              "keyword"
-              "const ", text
-              "main = Console.log(", token
-              "string"
-              "\"Hello, effects.\"", text
-              ")\n\nEffect.runPromise(main)"]
-        else
-          [token "keyword" "module ", text "Main ", token "keyword" "exposing ", text "(main)\n\n",
-            text
-              "main ", token
-              "keyword"
-              ": ", token
-              "type"
-              "Unit", text
-              " ->{; ", token
-              "type"
-              "AppError", text
-              "} ", token
-              "type"
-              "Unit", text
-              "\n",
-            token
-              "keyword"
-              "let ", text
-              "main () =\n  Platform.stdout_line ", token
-              "string"
-              "\"Hello, effects.\""])
-  }
+let snippet effect = ui {
+  pre
+    { class_name = "hero-source" }
+    (
+      if effect then
+        [
+          token "keyword" "import ",
+          text "{ Console, Effect } ",
+          token "keyword" "from ",
+          token "string" "\"effect\"",
+          text "\n\n",
+          token "keyword" "const ",
+          text "main = Console.log(",
+          token "string" "\"Hello, effects.\"",
+          text ")\n\nEffect.runPromise(main)",
+        ]
+      else
+        [
+          token "keyword" "module ",
+          text "Main ",
+          token "keyword" "exposing ",
+          text "(main)\n\n",
+          text "main ",
+          token "keyword" ": ",
+          token "type" "Unit",
+          text " ->{; ",
+          token "type" "AppError",
+          text "} ",
+          token "type" "Unit",
+          text "\n",
+          token "keyword" "let ",
+          text "main () =\n  Platform.stdout_line ",
+          token "string" "\"Hello, effects.\"",
+        ]
+    )
+}
 
 run_example : Atom.Writable Model ->{Atom.Write;} Unit
 let run_example model =
   let m = Atom.current model
   Atom.set model { m with running = true; failed = false; output = "" }
   notify "flick-hero-refresh"
-  let executed = try Ok (timeout 10000 (task { execute source })) with
+  let executed =
+    try Ok (timeout 10000 (task { execute source })) with
     | JsError _ ->
       Err
-        (if m.ru then
-          "Не удалось загрузить компилятор. Попробуйте снова."
-        else
-          "The compiler could not load. Try again.")
+        (
+          if m.ru then
+            "Не удалось загрузить компилятор. Попробуйте снова."
+          else
+            "The compiler could not load. Try again."
+        )
     | TimeoutError ->
       Err
-        (if m.ru then
-          "Выполнение остановлено через 10 секунд."
-        else
-          "Execution stopped after 10 seconds.")
+        (
+          if m.ru then
+            "Выполнение остановлено через 10 секунд."
+          else
+            "Execution stopped after 10 seconds."
+        )
   let result =
     match executed with
     | Err message -> Err message
@@ -118,10 +125,12 @@ let run_example model =
         Err execution.detail
       else
         Err
-          (if m.ru then
-            "Не удалось запустить пример. Попробуйте Play."
-          else
-            "The example could not run. Try Play.")
+          (
+            if m.ru then
+              "Не удалось запустить пример. Попробуйте Play."
+            else
+              "The example could not run. Try Play."
+          )
   let current = Atom.current model
   match result with
   | Ok output -> Atom.set model { current with running = false; output = output; failed = false }
@@ -134,90 +143,152 @@ let view model m =
       if m.ru then "Загрузка примера…" else "Loading the live example…"
     else if m.running then
       if m.ru then "Компиляция и запуск…" else "Compiling and running…"
-    else if m.output != "" then m.output
+    else if m.output != "" then
+      m.output
     else if m.effect then
       if m.ru then "Тот же результат. Другой синтаксис." else "Same result. Different syntax."
     else
-      if m.ru then "Нажмите «Запустить Flick», чтобы выполнить пример." else "Real Flick. Right in your browser."
+      if m.ru then
+        "Нажмите «Запустить Flick», чтобы выполнить пример."
+      else
+        "Real Flick. Right in your browser."
   ui {
-    attributes [("aria-busy", if m.ready then "false" else "true")]
-      (div { class_name = "hero-editor" }
-      [
-        div { class_name = "hero-editor-tabs" }
-          [span { class_name = if m.effect then "hero-tab" else "hero-tab is-active" }
-              [attributes [("aria-pressed", if m.effect then "false" else "true")]
-                (button
-                  {
-                    disabled = not m.ready;
-                    on_click =
-                      Ui.Event.latest
-                        (fun _ ->
-                          task {
-                            Atom.modify
-                              model
-                              (fun current -> ((), { current with effect = false; copied = false }))
-                          });
-                  }
-                  [text "Flick"])],
-            span { class_name = if m.effect then "hero-tab is-active" else "hero-tab" }
-              [attributes [("aria-pressed", if m.effect then "true" else "false")]
-                (button
-                  {
-                    disabled = not m.ready;
-                    on_click =
-                      Ui.Event.latest
-                        (fun _ ->
-                          task {
-                            Atom.modify
-                              model
-                              (fun current -> ((), { current with effect = true; copied = false }))
-                          });
-                  }
-                  [text "Effect"])],
-            span { class_name = "hero-copy" }
-              [attributes [("aria-label", if m.copied then (if m.ru then "Скопировано" else "Copied") else (if m.ru then "Копировать пример" else "Copy example"))]
-                (button { disabled = not m.ready; on_click = Ui.Event.latest (fun _ -> task {
-                    let copied =
-                      try (
-                        copy_text (if m.effect then effect_source else source) |> fun _ -> true
-                      ) with
-                      | JsError _ -> false
-                    Atom.modify model (fun current -> ((), { current with copied = copied; failed = not copied; output = if copied then current.output else (if m.ru then "Буфер обмена недоступен. Выделите код вручную." else "Clipboard unavailable. Select the code manually.") }))
-                  }) } [icon (if m.copied then "check" else "copy")])]],
-        div { class_name = "hero-editor-file" }
-          [span { class_name = "hero-filename" } [text (if m.effect then "main.ts" else "main.fl")],
-            span
-              { class_name = "hero-runtime-note" }
-              [text (if m.ru then "На основе Effect" else "On the Effect runtime")],
-            span { class_name = "hero-run" }
-              [button { disabled = not m.ready || m.running; on_click = Ui.Event.exhaust (fun _ -> task { run_example model }) }
-                [
-                  text
-                    (if m.running then
-                      (if m.ru then "Запуск…" else "Running…")
-                    else
-                      (if m.ru then "Запустить Flick" else "Run Flick")),
-                  icon "play",
-                ]]],
-        div { class_name = "hero-code-body" }
-          [attributes [("aria-hidden", "true")] (pre { class_name = "hero-lines" } [text "1\n2\n3\n4\n5"]),
+    attributes
+      [("aria-busy", if m.ready then "false" else "true")]
+      (div { class_name = "hero-editor" } [
+        div { class_name = "hero-editor-tabs" } [
+          span { class_name = if m.effect then "hero-tab" else "hero-tab is-active" } [
+            attributes
+              [("aria-pressed", if m.effect then "false" else "true")]
+              (button
+                {
+                  disabled = not m.ready;
+                  on_click =
+                    Ui.Event.latest (fun _ -> task {
+                      Atom.modify model (fun current -> (
+                        (),
+                        { current with effect = false; copied = false },
+                      ))
+                    });
+                }
+                [text "Flick"]),
+          ],
+          span { class_name = if m.effect then "hero-tab is-active" else "hero-tab" } [
+            attributes
+              [("aria-pressed", if m.effect then "true" else "false")]
+              (button
+                {
+                  disabled = not m.ready;
+                  on_click =
+                    Ui.Event.latest (fun _ -> task {
+                      Atom.modify model (fun current -> (
+                        (),
+                        { current with effect = true; copied = false },
+                      ))
+                    });
+                }
+                [text "Effect"]),
+          ],
+          span { class_name = "hero-copy" } [
             attributes
               [
-                ("tabIndex", if m.ready then "0" else "-1"),
-                ("aria-label", if m.effect then "Effect TypeScript example" else "Flick example"),
+                (
+                  "aria-label",
+                  if m.copied then
+                    (if m.ru then "Скопировано" else "Copied")
+                  else (if m.ru then "Копировать пример" else "Copy example"),
+                ),
               ]
-              (snippet m.effect)],
-        attributes [("role", "status"), ("aria-live", "polite")]
-          (div { class_name = if m.failed then "hero-editor-status is-error" else "hero-editor-status" }
+              (button
+                {
+                  disabled = not m.ready;
+                  on_click =
+                    Ui.Event.latest (fun _ -> task {
+                      let copied =
+                        try
+                          (copy_text (if m.effect then effect_source else source) |> fun _ -> true)
+                        with
+                        | JsError _ -> false
+                      Atom.modify model (fun current -> (
+                        (),
+                        {
+                          current with
+                          copied = copied;
+                          failed = not copied;
+                          output =
+                            if copied then
+                              current.output
+                            else
+                              (
+                                if m.ru then
+                                  "Буфер обмена недоступен. Выделите код вручную."
+                                else
+                                  "Clipboard unavailable. Select the code manually."
+                              );
+                        },
+                      ))
+                    });
+                }
+                [icon (if m.copied then "check" else "copy")]),
+          ],
+        ],
+        div { class_name = "hero-editor-file" } [
+          span { class_name = "hero-filename" } [text (if m.effect then "main.ts" else "main.fl")],
+          span { class_name = "hero-runtime-note" } [
+            text (if m.ru then "На основе Effect" else "On the Effect runtime"),
+          ],
+          span { class_name = "hero-run" } [
+            button
+              {
+                disabled = not m.ready || m.running;
+                on_click = Ui.Event.exhaust (fun _ -> task { run_example model });
+              }
+              [
+                text
+                  (
+                    if m.running then
+                      (if m.ru then "Запуск…" else "Running…")
+                    else
+                      (if m.ru then "Запустить Flick" else "Run Flick")
+                  ),
+                icon "play",
+              ],
+          ],
+        ],
+        div { class_name = "hero-code-body" } [
+          attributes
+            [("aria-hidden", "true")]
+            (pre { class_name = "hero-lines" } [text "1\n2\n3\n4\n5"]),
+          attributes
+            [
+              ("tabIndex", if m.ready then "0" else "-1"),
+              ("aria-label", if m.effect then "Effect TypeScript example" else "Flick example"),
+            ]
+            (snippet m.effect),
+        ],
+        attributes
+          [("role", "status"), ("aria-live", "polite")]
+          (div
+            {
+              class_name = if m.failed then "hero-editor-status is-error" else "hero-editor-status";
+            }
             [span { class_name = "status-dot" } [], text status]),
-        attributes [("id", "flick-hero-refresh"), ("hidden", "hidden"), ("tabIndex", "-1")]
+        attributes
+          [("id", "flick-hero-refresh"), ("hidden", "hidden"), ("tabIndex", "-1")]
           (button { disabled = false; on_click = Ui.Event.latest (fun _ -> Effect.void) } []),
       ])
   }
 
 initial_model : Bool -> Model
-let initial_model ru =
-  { ru = ru; ready = false; effect = false; running = false; output = ""; failed = false; copied = false }
+let initial_model ru = {
+  ru = ru;
+  ready = false;
+  effect = false;
+  running = false;
+  output = "";
+  failed = false;
+  copied = false;
+}
 
 initial_view : Bool ->{} Ui
 let initial_view ru =

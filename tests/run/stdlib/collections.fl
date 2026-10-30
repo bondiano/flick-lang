@@ -18,7 +18,8 @@ let main () =
         let set = HashSet.insert "ADA" (HashSet.insert "ada" (HashSet.with witness))
         let more = HashSet.union set (HashSet.insert "Bob" (HashSet.with witness))
         let plain = HashSet.rehash EqHash.canonical more
-        (HashSet.size set, HashSet.member "aDa" set, HashSet.size more, HashSet.size plain))
+        (HashSet.size set, HashSet.member "aDa" set, HashSet.size more, HashSet.size plain)
+      )
   Platform.stdout_line (show counted)
   let ages = HashMap.insert "ada" 36 (HashMap.insert "bob" 41 HashMap.empty)
   Platform.stdout_line (show (HashMap.get "ada" ages, HashMap.get "eve" ages))

@@ -11,10 +11,7 @@ module App.Matching exposing (
   everything,
 )
 
-type Shape =
-  | Circle Float
-  | Rect Float Float
-  | Empty
+type Shape = Circle Float | Rect Float Float | Empty
 
 describe : Option Float -> String
 let describe value =

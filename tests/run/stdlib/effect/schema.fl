@@ -10,8 +10,7 @@ type alias Profile = {
   tags : Option (List String);
   retries : Float;
   level : Float;
-}
-  deriving Schema
+} deriving Schema
 
 type Shape = Circle Float | Square Float
   deriving Show, Schema
@@ -43,16 +42,14 @@ default_level : Unit ->{; SchemaError} Float
 let default_level () = 3
 
 profile_json : Codec none none Json Profile
-let profile_json =
-  codec (schema Profile) {
-    name = field "name" String.json;
-    nick = field "nick" (option_as_null String.json);
-    age = field "age" (option_as_nullish Float.json_finite);
-    tags = optional_field "tags" (Codec.list String.json);
-    retries = field "retries" Float.json_finite |> on_missing (fun () -> 1);
-    level =
-      field_effect "level" (Codec.general Float.json_finite) |> on_missing_effect default_level;
-  }
+let profile_json = codec (schema Profile) {
+  name = field "name" String.json;
+  nick = field "nick" (option_as_null String.json);
+  age = field "age" (option_as_nullish Float.json_finite);
+  tags = optional_field "tags" (Codec.list String.json);
+  retries = field "retries" Float.json_finite |> on_missing (fun () -> 1);
+  level = field_effect "level" (Codec.general Float.json_finite) |> on_missing_effect default_level;
+}
 
 main : Unit ->{; AppError} Unit
 let main () =
@@ -68,51 +65,98 @@ let main () =
   Platform.stdout_line
     ("shape: " ++ dec "{\"_tag\": \"Square\", \"_0\": 2}" (Codec.json (schema Shape)))
   let never = Codec.json Schema.never
-  Platform.stdout_line ("never: " ++ (match Json.parse "1" with
-    | Ok u -> (match Codec.decode_result never u with
-      | Ok _ -> "decoded"
-      | Err e -> issues e)
-    | Err e -> issues e))
+  Platform.stdout_line
+    ("never: "
+      ++ (
+        match Json.parse "1" with
+        | Ok u ->
+          (
+            match Codec.decode_result never u with
+            | Ok _ -> "decoded"
+            | Err e -> issues e
+          )
+        | Err e -> issues e
+      ))
   let secret = Codec.json (Schema.redacted Schema.string)
-  Platform.stdout_line ("redacted: " ++ (match Json.parse "\"pw\"" with
-    | Ok u -> (match Codec.decode_result secret u with
-      | Ok _ -> "decoded"
-      | Err e -> issues e)
-    | Err e -> issues e))
+  Platform.stdout_line
+    ("redacted: "
+      ++ (
+        match Json.parse "\"pw\"" with
+        | Ok u ->
+          (
+            match Codec.decode_result secret u with
+            | Ok _ -> "decoded"
+            | Err e -> issues e
+          )
+        | Err e -> issues e
+      ))
   let revealed = Redacted.json_reveal String.json
-  Platform.stdout_line ("json_reveal: " ++ (match Json.parse "\"pw\"" with
-    | Ok u -> (match Codec.decode_result revealed u with
-      | Ok r -> show (Redacted.reveal r)
-      | Err e -> issues e)
-    | Err e -> issues e))
+  Platform.stdout_line
+    ("json_reveal: "
+      ++ (
+        match Json.parse "\"pw\"" with
+        | Ok u ->
+          (
+            match Codec.decode_result revealed u with
+            | Ok r -> show (Redacted.reveal r)
+            | Err e -> issues e
+          )
+        | Err e -> issues e
+      ))
   let handle : Schema String = Schema.opaque "Handle" "a handle has no wire form"
   Platform.stdout_line ("opaque: " ++ dec "\"h\"" (Codec.json handle))
-  Platform.stdout_line ("unknown: " ++ (match Json.parse "{\"a\": [1]}" with
-    | Ok u -> (match Schema.validate Schema.unknown u with
-      | Ok _ -> "valid"
-      | Err e -> issues e)
-    | Err e -> issues e))
+  Platform.stdout_line
+    ("unknown: "
+      ++ (
+        match Json.parse "{\"a\": [1]}" with
+        | Ok u ->
+          (
+            match Schema.validate Schema.unknown u with
+            | Ok _ -> "valid"
+            | Err e -> issues e
+          )
+        | Err e -> issues e
+      ))
   Platform.stdout_line ("duration: " ++ dec "250" (Codec.json Schema.duration))
-  Platform.stdout_line ("decimal: " ++ (match Json.parse "\"0.10\"" with
-    | Ok u -> (match Codec.decode_result (Codec.json Schema.decimal) u with
-      | Ok d -> BigDecimal.to_string d
-      | Err e -> issues e)
-    | Err e -> issues e))
-  Platform.stdout_line ("chunk: " ++ (match Json.parse "[1, 2, 3]" with
-    | Ok u -> (match Codec.decode_result (Codec.json (Schema.chunk Schema.number)) u with
-      | Ok c -> show (Chunk.size c)
-      | Err e -> issues e)
-    | Err e -> issues e))
+  Platform.stdout_line
+    ("decimal: "
+      ++ (
+        match Json.parse "\"0.10\"" with
+        | Ok u ->
+          (
+            match Codec.decode_result (Codec.json Schema.decimal) u with
+            | Ok d -> BigDecimal.to_string d
+            | Err e -> issues e
+          )
+        | Err e -> issues e
+      ))
+  Platform.stdout_line
+    ("chunk: "
+      ++ (
+        match Json.parse "[1, 2, 3]" with
+        | Ok u ->
+          (
+            match Codec.decode_result (Codec.json (Schema.chunk Schema.number)) u with
+            | Ok c -> show (Chunk.size c)
+            | Err e -> issues e
+          )
+        | Err e -> issues e
+      ))
   Platform.stdout_line ("BigInt.json: " ++ dec "\"-7\"" BigInt.json)
   Platform.stdout_line
     ("json_finite: " ++ wire (Codec.encode_result Float.json_finite Float.infinity))
   let doubled = Codec.transform (fun n -> n * 2) (fun n -> n / 2) Float.json_finite
   Platform.stdout_line
     ("transform: " ++ dec "2" doubled ++ " -> " ++ wire (Codec.encode_result doubled 4))
-  let parsed = Codec.transform_result (fun s -> match Float.parse s with
-    | Some n -> Ok n
-    | None ->
-      Err (SchemaError [{ message = "not a number"; path = "" }])) Float.to_string String.json
+  let parsed =
+    Codec.transform_result
+      (fun s ->
+        match Float.parse s with
+        | Some n -> Ok n
+        | None -> Err (SchemaError [{ message = "not a number"; path = "" }])
+      )
+      Float.to_string
+      String.json
   Platform.stdout_line ("transform_result: " ++ dec "\"4\"" parsed ++ " | " ++ dec "\"x\"" parsed)
   let positive = Codec.check (fun n -> n > 0) "a positive number" Float.json_finite
   Platform.stdout_line ("check: " ++ dec "-1" positive)
@@ -135,8 +179,14 @@ let main () =
     | SchemaError found -> App.fail (issues (SchemaError found))
   Platform.stdout_line
     ("profile: "
-      ++ show
-        (profile.name, profile.nick, profile.age, profile.tags, profile.retries, profile.level))
+      ++ show (
+        profile.name,
+        profile.nick,
+        profile.age,
+        profile.tags,
+        profile.retries,
+        profile.level,
+      ))
   let written =
     try Json.stringify (Codec.encode profile_json { profile with nick = Some "A" }) with
     | SchemaError found -> issues (SchemaError found)
@@ -149,7 +199,8 @@ let main () =
     with
     | SchemaError found -> issues (SchemaError found)
   Platform.stdout_line ("missing name: " ++ missing)
-  let schema_text = match Codec.json_schema "Shape" (Codec.json (schema Shape)) with
+  let schema_text =
+    match Codec.json_schema "Shape" (Codec.json (schema Shape)) with
     | Ok text -> String.length text > 0
     | Err _ -> false
   Platform.stdout_line ("json_schema: " ++ show schema_text)

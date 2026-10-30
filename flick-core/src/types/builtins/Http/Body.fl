@@ -86,13 +86,12 @@ foreign pure stream from "@flick-lang/runtime/effect/http/HttpBody" "flickStream
 
 /// Which part of a file `file` streams: at most `bytesToRead` bytes from
 /// `offset`, in chunks of `chunkSize`; and the content type.
-type alias FileOptions =
-  {
-    offset : Option ByteSize.ByteSize;
-    bytesToRead : Option ByteSize.ByteSize;
-    chunkSize : Option Int;
-    contentType : Option String;
-  }
+type alias FileOptions = {
+  offset : Option ByteSize.ByteSize;
+  bytesToRead : Option ByteSize.ByteSize;
+  chunkSize : Option Int;
+  contentType : Option String;
+}
 
 /// The whole file, `application/octet-stream`.
 file_options : FileOptions
@@ -102,9 +101,9 @@ let file_options = { offset = None; bytesToRead = None; chunkSize = None; conten
 /// the part the options choose. The bytes are read when the body is sent.
 file_from_info :
   FileOptions ->
-    String ->
-    FileSystem.Info ->{FileSystem.FileSystem; PlatformError.PlatformError}
-    Body
+  String ->
+  FileSystem.Info ->{FileSystem.FileSystem; PlatformError.PlatformError}
+  Body
 foreign effect file_from_info from "@flick-lang/runtime/effect/http/HttpBody" "flickFileFromInfo"
   arity 3
   reviewed "effect@4.0.5 sha256:9488e0fdf507824a"

@@ -31,7 +31,8 @@ let main () =
   say (show waiters)
   let broken : Deferred.Deferred {Oops} Float = Deferred.make ()
   let _ = Deferred.fail (Oops "no value") broken
-  let failed : Float = try Deferred.await_ broken with
+  let failed : Float =
+    try Deferred.await_ broken with
     | Oops _ -> -1
   say (show failed)
   let gate = Latch.make false

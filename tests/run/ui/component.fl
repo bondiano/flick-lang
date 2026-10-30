@@ -8,18 +8,16 @@ let greeting = Atom.make "Hello"
 
 type alias Person = { name : String; tags : List String }
 
-component salutation (name : String) =
-  ui { paragraph [text (Atom.value greeting ++ ", " ++ name ++ "!")] }
+component salutation (name : String) = ui {
+  paragraph [text (Atom.value greeting ++ ", " ++ name ++ "!")]
+}
 
-component card (person : Person) =
-  ui {
-    div
-      { class_name = "card" }
-      [
-        Ui.render salutation person.name,
-        list (List.map (fun t -> ui { item [text t] }) person.tags),
-      ]
-  }
+component card (person : Person) = ui {
+  div { class_name = "card" } [
+    Ui.render salutation person.name,
+    list (List.map (fun t -> ui { item [text t] }) person.tags),
+  ]
+}
 
 component counter (start : Float) =
   let count = Atom.local (start + 1)

@@ -11,19 +11,23 @@ type ServerResponse
 
 /// The status, headers and cookies of a new response, and the content type
 /// of its body; `defaults` sets none of them (status 200).
-type alias Options =
-  {
-    status : Option Int;
-    statusText : Option String;
-    headers : Option Http.Headers.Input;
-    cookies : Option Http.Cookies.Cookies;
-    contentType : Option String;
-  }
+type alias Options = {
+  status : Option Int;
+  statusText : Option String;
+  headers : Option Http.Headers.Input;
+  cookies : Option Http.Cookies.Cookies;
+  contentType : Option String;
+}
 
 /// Options that set nothing: `{ Http.ServerResponse.defaults with status = Some 201 }`.
 defaults : Options
-let defaults =
-  { status = None; statusText = None; headers = None; cookies = None; contentType = None }
+let defaults = {
+  status = None;
+  statusText = None;
+  headers = None;
+  cookies = None;
+  contentType = None;
+}
 
 /// A response without a body, status 204 unless the options set one.
 empty : Options -> ServerResponse
@@ -76,10 +80,8 @@ foreign effect json from "@flick-lang/runtime/effect/http/HttpServerResponse" "f
   reviewed "effect@4.0.5 sha256:0676d738c1cf0f81"
 
 /// A JSON body of the value as the codec encodes it.
-schema_json : Codec rd re Json a ->
-  a ->
-  Options ->{re; SchemaError, Http.Body.HttpBodyError}
-  ServerResponse
+schema_json :
+  Codec rd re Json a -> a -> Options ->{re; SchemaError, Http.Body.HttpBodyError} ServerResponse
 foreign effect schema_json from "@flick-lang/runtime/effect/http/HttpServerResponse" "flickSchemaJson"
   arity 3
   reviewed "effect@4.0.5 sha256:fe70d386ac654f2e"
@@ -154,10 +156,10 @@ foreign pure replace_cookies from "@flick-lang/runtime/effect/http/HttpServerRes
 /// Sets a cookie: `set_cookie name value attributes response`.
 set_cookie :
   String ->
-    Redacted String ->
-    Http.Cookies.Attributes ->
-    ServerResponse ->{; Http.Cookies.CookiesError}
-    ServerResponse
+  Redacted String ->
+  Http.Cookies.Attributes ->
+  ServerResponse ->{; Http.Cookies.CookiesError}
+  ServerResponse
 foreign effect set_cookie from "@flick-lang/runtime/effect/http/HttpServerResponse" "flickSetCookie"
   arity 4
   reviewed "effect@4.0.5 sha256:c3dc909357c4cefd"
@@ -184,7 +186,8 @@ foreign pure merge_cookies from "@flick-lang/runtime/effect/http/HttpServerRespo
 /// Sets each cookie of name, value and attributes.
 set_cookies :
   List (String, Redacted String, Http.Cookies.Attributes) ->
-  ServerResponse ->{; Http.Cookies.CookiesError} ServerResponse
+  ServerResponse ->{; Http.Cookies.CookiesError}
+  ServerResponse
 foreign effect set_cookies from "@flick-lang/runtime/effect/http/HttpServerResponse" "flickSetCookies"
   arity 2
   reviewed "effect@4.0.5 sha256:b33857d0d0581c83"
@@ -211,9 +214,8 @@ foreign pure omits_body from "@flick-lang/runtime/effect/http/HttpServerResponse
 
 /// The response as a client would get it for the request: a test
 /// double's answer.
-to_client_response : Http.ClientRequest.ClientRequest ->
-  ServerResponse ->
-  Http.ClientResponse.ClientResponse
+to_client_response :
+  Http.ClientRequest.ClientRequest -> ServerResponse -> Http.ClientResponse.ClientResponse
 foreign pure to_client_response from "@flick-lang/runtime/effect/http/HttpServerResponse" "flickToClientResponse"
   arity 2
   reviewed "effect@4.0.5 sha256:c74fb88476778652"

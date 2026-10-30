@@ -24,14 +24,14 @@ let checking = {
 integer_json : PureCodec Json Float
 let integer_json =
   Float.json_finite
-    |> Check.apply Check.int
-    |> Check.apply
-      (Check.between {
-        minimum = 0 - 5;
-        maximum = 5;
-        exclusiveMinimum = false;
-        exclusiveMaximum = false;
-      })
+  |> Check.apply Check.int
+  |> Check.apply
+    (Check.between {
+      minimum = 0 - 5;
+      maximum = 5;
+      exclusiveMinimum = false;
+      exclusiveMaximum = false;
+    })
 
 ints : Arbitrary.Arbitrary Float
 let ints = Arbitrary.from_schema (Codec.to_schema integer_json)
@@ -44,255 +44,311 @@ let require_passed result =
   match result with
   | Arbitrary.Passed report -> Test.expect (Test.equal 100 report.runs)
   | failed ->
-    Test.expect (Test.Failed
-      (Option.with_default "Arbitrary returned no failure report"
-        (Arbitrary.format_check_failure failed)))
+    Test.expect
+      (Test.Failed
+        (Option.with_default
+          "Arbitrary returned no failure report"
+          (Arbitrary.format_check_failure failed)))
 
 // Reset only between independent awaits, retaining each side's complete ordered trace.
-observe : forall c. Ref (List String) -> (Eff none {Offline} Float)^c ->{}
-  (Result Float Float, List String)
+observe :
+  forall c. Ref (List String) -> (Eff none {Offline} Float)^c ->{} (Result Float Float, List String)
 let observe trace action =
   Ref.set trace []
-  let result = try Ok (await action) with | Offline code -> Err code
+  let result =
+    try Ok (await action) with
+    | Offline code -> Err code
   (result, Ref.get trace)
 
-observe_maybe : forall c. Ref (List String) -> (Eff none {Offline} (Option Float))^c ->{}
+observe_maybe :
+  forall c.
+  Ref (List String) ->
+  (Eff none {Offline} (Option Float))^c ->{}
   (Result Float (Option Float), List String)
 let observe_maybe trace action =
   Ref.set trace []
-  let result = try Ok (await action) with | Offline code -> Err code
+  let result =
+    try Ok (await action) with
+    | Offline code -> Err code
   (result, Ref.get trace)
 
-observe_state : forall c. Ref (List String) -> (Eff none {Offline} (Float, Float))^c ->{}
+observe_state :
+  forall c.
+  Ref (List String) ->
+  (Eff none {Offline} (Float, Float))^c ->{}
   (Result Float (Float, Float), List String)
 let observe_state trace action =
   Ref.set trace []
-  let result = try Ok (await action) with | Offline code -> Err code
+  let result =
+    try Ok (await action) with
+    | Offline code -> Err code
   (result, Ref.get trace)
 
-observe_writer : forall c. Ref (List String) -> (Eff none {Offline} (Float, List String))^c ->{}
+observe_writer :
+  forall c.
+  Ref (List String) ->
+  (Eff none {Offline} (Float, List String))^c ->{}
   (Result Float (Float, List String), List String)
 let observe_writer trace action =
   Ref.set trace []
-  let result = try Ok (await action) with | Offline code -> Err code
+  let result =
+    try Ok (await action) with
+    | Offline code -> Err code
   (result, Ref.get trace)
 
-observe_except : forall c. Ref (List String) -> (Eff none {Offline} (Result String Float))^c ->{}
+observe_except :
+  forall c.
+  Ref (List String) ->
+  (Eff none {Offline} (Result String Float))^c ->{}
   (Result Float (Result String Float), List String)
 let observe_except trace action =
   Ref.set trace []
-  let result = try Ok (await action) with | Offline code -> Err code
+  let result =
+    try Ok (await action) with
+    | Offline code -> Err code
   (result, Ref.get trace)
 
 laws : List Test.Test
 let laws = [
-  Test.effect_test "Eff Functor laws preserve typed outcomes and traces" (task {
-    let result = Arbitrary.check checking (fun (n, a, b, branch) ->
-      let trace = Ref.make []
-      source : Eff none {Offline} Float
-      let source = task {
-        Ref.update trace (fun xs -> xs ++ ["source"])
-        if branch < 0 then from_result (Err (Offline branch)) else n
-      }
-      f : Float -> Float
-      let f x = a * x + b
-      g : Float -> Float
-      let g x = b * x - a
-      let identity = map (fun x -> x) source
-      let composed = map (fun x -> g (f x)) source
-      let separate = map g (map f source)
-      let cold = Ref.get trace == []
-      let original = observe trace source
-      let identity_result = observe trace identity
-      let composed_result = observe trace composed
-      let separate_result = observe trace separate
-      cold
-        && original == ((if branch < 0 then Err branch else Ok n), ["source"])
-        && original == identity_result
-        && composed_result == separate_result
-    ) samples
-    require_passed result
-  }),
-  Test.effect_test "Eff Applicative laws preserve execution order and failures" (task {
-    let result = Arbitrary.check checking (fun (n, a, b, branch) ->
-      let trace = Ref.make []
-      ap : forall c d x y. (Eff none {Offline} (x -> y))^c ->
-        ((Eff none {Offline} x)^d -> (Eff none {Offline} y)^(c + d))^c
-      let ap functions values = map2 (fun f x -> f x) functions values
-      u : Eff none {Offline} (Float -> Float)
-      let u = task {
-        Ref.update trace (fun xs -> xs ++ ["u"])
-        if branch == 0 - 5 then from_result (Err (Offline 1))
-        else fun x -> a * x + b
-      }
-      v : Eff none {Offline} (Float -> Float)
-      let v = task {
-        Ref.update trace (fun xs -> xs ++ ["v"])
-        if branch == 0 then from_result (Err (Offline 2))
-        else fun x -> b * x - a
-      }
-      w : Eff none {Offline} Float
-      let w = task {
-        Ref.update trace (fun xs -> xs ++ ["w"])
-        if branch == 5 then from_result (Err (Offline 3)) else n
-      }
-      f : Float -> Float
-      let f x = a * x + b
-      identity_function : Eff none {Offline} (Float -> Float)
-      let identity_function = pure (fun x -> x)
-      composition_function : Eff none {Offline}
-        ((Float -> Float) -> (Float -> Float) -> Float -> Float)
-      let composition_function = pure (fun f g x -> f (g x))
-      pure_function : Eff none {Offline} (Float -> Float)
-      let pure_function = pure f
-      pure_value : Eff none {Offline} Float
-      let pure_value = pure n
-      interchange_function : Eff none {Offline} ((Float -> Float) -> Float)
-      let interchange_function = pure (fun f -> f n)
-      let identity = ap identity_function w
-      let composition_left = ap (ap (ap composition_function u) v) w
-      let composition_right = ap u (ap v w)
-      let homomorphism_left = ap pure_function pure_value
-      homomorphism_right : Eff none {Offline} Float
-      let homomorphism_right = pure (f n)
-      let interchange_left = ap u pure_value
-      let interchange_right = ap interchange_function u
-      let coherence_left = map f w
-      let coherence_right = ap pure_function w
-      let cold = Ref.get trace == []
-      let original = observe trace w
-      let identity_result = observe trace identity
-      let composition_l = observe trace composition_left
-      let composition_r = observe trace composition_right
-      let homomorphism_l = observe trace homomorphism_left
-      let homomorphism_r = observe trace homomorphism_right
-      let interchange_l = observe trace interchange_left
-      let interchange_r = observe trace interchange_right
-      let coherence_l = observe trace coherence_left
-      let coherence_r = observe trace coherence_right
-      let expected_composition =
-        if branch == 0 - 5 then (Err 1, ["u"])
-        else if branch == 0 then (Err 2, ["u", "v"])
-        else if branch == 5 then (Err 3, ["u", "v", "w"])
-        else (Ok (a * (b * n - a) + b), ["u", "v", "w"])
-      cold
-        && original == ((if branch == 5 then Err 3 else Ok n), ["w"])
-        && original == identity_result
-        && composition_l == composition_r
-        && composition_l == expected_composition
-        && homomorphism_l == homomorphism_r
-        && homomorphism_l == (Ok (f n), [])
-        && interchange_l == interchange_r
-        && coherence_l == coherence_r
-    ) samples
-    require_passed result
-  }),
-  Test.effect_test "Eff Monad laws preserve branches and ordered effects" (task {
-    let result = Arbitrary.check checking (fun (n, a, b, branch) ->
-      let trace = Ref.make []
-      source : Eff none {Offline} Float
-      let source = task {
-        Ref.update trace (fun xs -> xs ++ ["source"])
-        if branch < 0 then from_result (Err (Offline branch)) else n
-      }
-      f : Float -> Eff none {Offline} Float
-      let f x = task {
-        Ref.update trace (fun xs -> xs ++ ["f " ++ show x])
-        if (x + branch) % 3 == 0 then from_result (Err (Offline x))
-        else a * x + b
-      }
-      g : Float -> Eff none {Offline} Float
-      let g x = task {
-        Ref.update trace (fun xs -> xs ++ ["g " ++ show x])
-        if (x - branch) % 4 == 0 then from_result (Err (Offline x))
-        else b * x - a
-      }
-      let left_identity = flat_map f (pure n)
-      let right_identity = flat_map pure source
-      let associated_left = flat_map g (flat_map f source)
-      let associated_right = flat_map (fun x -> flat_map g (f x)) source
-      let map2_left = map2 (fun x y -> x - y) source (f n)
-      let map2_right = flat_map (fun x -> map (fun y -> x - y) (f n)) source
-      let cold = Ref.get trace == []
-      let left_identity_l = observe trace (f n)
-      let left_identity_r = observe trace left_identity
-      let original = observe trace source
-      let right_identity_result = observe trace right_identity
-      let associated_l = observe trace associated_left
-      let associated_r = observe trace associated_right
-      let map2_l = observe trace map2_left
-      let map2_r = observe trace map2_right
-      cold
-        && original == ((if branch < 0 then Err branch else Ok n), ["source"])
-        && left_identity_l == left_identity_r
-        && original == right_identity_result
-        && associated_l == associated_r
-        && map2_l == map2_r
-    ) samples
-    require_passed result
-  }),
-  Test.effect_test "all five MonadTrans lifts preserve effectful bind and complete results" (task {
-    let result = Arbitrary.check checking (fun (n, a, b, branch) ->
-      let trace = Ref.make []
-      source : Eff none {Offline} Float
-      let source = task {
-        Ref.update trace (fun xs -> xs ++ ["source"])
-        if branch < 0 then from_result (Err (Offline branch)) else n
-      }
-      f : Float -> Eff none {Offline} Float
-      let f x = task {
-        Ref.update trace (fun xs -> xs ++ ["f " ++ show x])
-        if x + branch == 0 then from_result (Err (Offline x)) else a * x + b
-      }
-      let bound = flat_map f source
-      maybe_left : MaybeT (Eff none {Offline}) Float
-      let maybe_left = lift bound
-      maybe_right : MaybeT (Eff none {Offline}) Float
-      let maybe_right = flat_map (fun x -> lift (f x)) (lift source)
-      state_left : StateT Float (Eff none {Offline}) Float
-      let state_left = lift bound
-      state_right : StateT Float (Eff none {Offline}) Float
-      let state_right = flat_map (fun x -> lift (f x)) (lift source)
-      reader_left : ReaderT Float (Eff none {Offline}) Float
-      let reader_left = lift bound
-      reader_right : ReaderT Float (Eff none {Offline}) Float
-      let reader_right = flat_map (fun x -> lift (f x)) (lift source)
-      writer_left : WriterT (List String) (Eff none {Offline}) Float
-      let writer_left = lift bound
-      writer_right : WriterT (List String) (Eff none {Offline}) Float
-      let writer_right = flat_map (fun x -> lift (f x)) (lift source)
-      except_left : ExceptT String (Eff none {Offline}) Float
-      let except_left = lift bound
-      except_right : ExceptT String (Eff none {Offline}) Float
-      let except_right = flat_map (fun x -> lift (f x)) (lift source)
-      let cold = Ref.get trace == []
-      let (base_result, base_trace) = observe trace bound
-      let maybe_l = observe_maybe trace (MaybeT.run maybe_left)
-      let maybe_r = observe_maybe trace (MaybeT.run maybe_right)
-      let state_l = observe_state trace (StateT.run state_left b)
-      let state_r = observe_state trace (StateT.run state_right b)
-      let reader_l = observe trace (ReaderT.run reader_left a)
-      let reader_r = observe trace (ReaderT.run reader_right a)
-      let writer_l = observe_writer trace (WriterT.run writer_left)
-      let writer_r = observe_writer trace (WriterT.run writer_right)
-      let except_l = observe_except trace (ExceptT.run except_left)
-      let except_r = observe_except trace (ExceptT.run except_right)
-      let expected_base =
-        if branch < 0 then (Err branch, ["source"])
-        else if n + branch == 0 then (Err n, ["source", "f " ++ show n])
-        else (Ok (a * n + b), ["source", "f " ++ show n])
-      cold
-        && (base_result, base_trace) == expected_base
-        && maybe_l == maybe_r && maybe_l == (map Some base_result, base_trace)
-        && state_l == state_r
-        && state_l == (map (fun x -> (x, b)) base_result, base_trace)
-        && reader_l == reader_r && reader_l == (base_result, base_trace)
-        && writer_l == writer_r
-        && writer_l == (map (fun x -> (x, [])) base_result, base_trace)
-        && except_l == except_r && except_l == (map Ok base_result, base_trace)
-    ) samples
-    require_passed result
-  }),
+  Test.effect_test
+    "Eff Functor laws preserve typed outcomes and traces"
+    (task {
+      let result =
+        Arbitrary.check
+          checking
+          (fun (n, a, b, branch) ->
+            let trace = Ref.make []
+            source : Eff none {Offline} Float
+            let source = task {
+              Ref.update trace (fun xs -> xs ++ ["source"])
+              if branch < 0 then from_result (Err (Offline branch)) else n
+            }
+            f : Float -> Float
+            let f x = a * x + b
+            g : Float -> Float
+            let g x = b * x - a
+            let identity = map (fun x -> x) source
+            let composed = map (fun x -> g (f x)) source
+            let separate = map g (map f source)
+            let cold = Ref.get trace == []
+            let original = observe trace source
+            let identity_result = observe trace identity
+            let composed_result = observe trace composed
+            let separate_result = observe trace separate
+            cold
+              && original == ((if branch < 0 then Err branch else Ok n), ["source"])
+              && original == identity_result
+              && composed_result == separate_result
+          )
+          samples
+      require_passed result
+    }),
+  Test.effect_test
+    "Eff Applicative laws preserve execution order and failures"
+    (task {
+      let result =
+        Arbitrary.check
+          checking
+          (fun (n, a, b, branch) ->
+            let trace = Ref.make []
+            ap :
+              forall c d x y.
+              (Eff none {Offline} (x -> y))^c ->
+              ((Eff none {Offline} x)^d -> (Eff none {Offline} y)^(c + d))^c
+            let ap functions values = map2 (fun f x -> f x) functions values
+            u : Eff none {Offline} (Float -> Float)
+            let u = task {
+              Ref.update trace (fun xs -> xs ++ ["u"])
+              if branch == 0 - 5 then from_result (Err (Offline 1)) else fun x -> a * x + b
+            }
+            v : Eff none {Offline} (Float -> Float)
+            let v = task {
+              Ref.update trace (fun xs -> xs ++ ["v"])
+              if branch == 0 then from_result (Err (Offline 2)) else fun x -> b * x - a
+            }
+            w : Eff none {Offline} Float
+            let w = task {
+              Ref.update trace (fun xs -> xs ++ ["w"])
+              if branch == 5 then from_result (Err (Offline 3)) else n
+            }
+            f : Float -> Float
+            let f x = a * x + b
+            identity_function : Eff none {Offline} (Float -> Float)
+            let identity_function = pure (fun x -> x)
+            composition_function :
+              Eff none {Offline} ((Float -> Float) -> (Float -> Float) -> Float -> Float)
+            let composition_function = pure (fun f g x -> f (g x))
+            pure_function : Eff none {Offline} (Float -> Float)
+            let pure_function = pure f
+            pure_value : Eff none {Offline} Float
+            let pure_value = pure n
+            interchange_function : Eff none {Offline} ((Float -> Float) -> Float)
+            let interchange_function = pure (fun f -> f n)
+            let identity = ap identity_function w
+            let composition_left = ap (ap (ap composition_function u) v) w
+            let composition_right = ap u (ap v w)
+            let homomorphism_left = ap pure_function pure_value
+            homomorphism_right : Eff none {Offline} Float
+            let homomorphism_right = pure (f n)
+            let interchange_left = ap u pure_value
+            let interchange_right = ap interchange_function u
+            let coherence_left = map f w
+            let coherence_right = ap pure_function w
+            let cold = Ref.get trace == []
+            let original = observe trace w
+            let identity_result = observe trace identity
+            let composition_l = observe trace composition_left
+            let composition_r = observe trace composition_right
+            let homomorphism_l = observe trace homomorphism_left
+            let homomorphism_r = observe trace homomorphism_right
+            let interchange_l = observe trace interchange_left
+            let interchange_r = observe trace interchange_right
+            let coherence_l = observe trace coherence_left
+            let coherence_r = observe trace coherence_right
+            let expected_composition =
+              if branch == 0 - 5 then
+                (Err 1, ["u"])
+              else if branch == 0 then
+                (Err 2, ["u", "v"])
+              else if branch == 5 then
+                (Err 3, ["u", "v", "w"])
+              else
+                (Ok (a * (b * n - a) + b), ["u", "v", "w"])
+            cold
+              && original == ((if branch == 5 then Err 3 else Ok n), ["w"])
+              && original == identity_result
+              && composition_l == composition_r
+              && composition_l == expected_composition
+              && homomorphism_l == homomorphism_r
+              && homomorphism_l == (Ok (f n), [])
+              && interchange_l == interchange_r
+              && coherence_l == coherence_r
+          )
+          samples
+      require_passed result
+    }),
+  Test.effect_test
+    "Eff Monad laws preserve branches and ordered effects"
+    (task {
+      let result =
+        Arbitrary.check
+          checking
+          (fun (n, a, b, branch) ->
+            let trace = Ref.make []
+            source : Eff none {Offline} Float
+            let source = task {
+              Ref.update trace (fun xs -> xs ++ ["source"])
+              if branch < 0 then from_result (Err (Offline branch)) else n
+            }
+            f : Float -> Eff none {Offline} Float
+            let f x = task {
+              Ref.update trace (fun xs -> xs ++ ["f " ++ show x])
+              if (x + branch) % 3 == 0 then from_result (Err (Offline x)) else a * x + b
+            }
+            g : Float -> Eff none {Offline} Float
+            let g x = task {
+              Ref.update trace (fun xs -> xs ++ ["g " ++ show x])
+              if (x - branch) % 4 == 0 then from_result (Err (Offline x)) else b * x - a
+            }
+            let left_identity = flat_map f (pure n)
+            let right_identity = flat_map pure source
+            let associated_left = flat_map g (flat_map f source)
+            let associated_right = flat_map (fun x -> flat_map g (f x)) source
+            let map2_left = map2 (fun x y -> x - y) source (f n)
+            let map2_right = flat_map (fun x -> map (fun y -> x - y) (f n)) source
+            let cold = Ref.get trace == []
+            let left_identity_l = observe trace (f n)
+            let left_identity_r = observe trace left_identity
+            let original = observe trace source
+            let right_identity_result = observe trace right_identity
+            let associated_l = observe trace associated_left
+            let associated_r = observe trace associated_right
+            let map2_l = observe trace map2_left
+            let map2_r = observe trace map2_right
+            cold
+              && original == ((if branch < 0 then Err branch else Ok n), ["source"])
+              && left_identity_l == left_identity_r
+              && original == right_identity_result
+              && associated_l == associated_r
+              && map2_l == map2_r
+          )
+          samples
+      require_passed result
+    }),
+  Test.effect_test
+    "all five MonadTrans lifts preserve effectful bind and complete results"
+    (task {
+      let result =
+        Arbitrary.check
+          checking
+          (fun (n, a, b, branch) ->
+            let trace = Ref.make []
+            source : Eff none {Offline} Float
+            let source = task {
+              Ref.update trace (fun xs -> xs ++ ["source"])
+              if branch < 0 then from_result (Err (Offline branch)) else n
+            }
+            f : Float -> Eff none {Offline} Float
+            let f x = task {
+              Ref.update trace (fun xs -> xs ++ ["f " ++ show x])
+              if x + branch == 0 then from_result (Err (Offline x)) else a * x + b
+            }
+            let bound = flat_map f source
+            maybe_left : MaybeT (Eff none {Offline}) Float
+            let maybe_left = lift bound
+            maybe_right : MaybeT (Eff none {Offline}) Float
+            let maybe_right = flat_map (fun x -> lift (f x)) (lift source)
+            state_left : StateT Float (Eff none {Offline}) Float
+            let state_left = lift bound
+            state_right : StateT Float (Eff none {Offline}) Float
+            let state_right = flat_map (fun x -> lift (f x)) (lift source)
+            reader_left : ReaderT Float (Eff none {Offline}) Float
+            let reader_left = lift bound
+            reader_right : ReaderT Float (Eff none {Offline}) Float
+            let reader_right = flat_map (fun x -> lift (f x)) (lift source)
+            writer_left : WriterT (List String) (Eff none {Offline}) Float
+            let writer_left = lift bound
+            writer_right : WriterT (List String) (Eff none {Offline}) Float
+            let writer_right = flat_map (fun x -> lift (f x)) (lift source)
+            except_left : ExceptT String (Eff none {Offline}) Float
+            let except_left = lift bound
+            except_right : ExceptT String (Eff none {Offline}) Float
+            let except_right = flat_map (fun x -> lift (f x)) (lift source)
+            let cold = Ref.get trace == []
+            let (base_result, base_trace) = observe trace bound
+            let maybe_l = observe_maybe trace (MaybeT.run maybe_left)
+            let maybe_r = observe_maybe trace (MaybeT.run maybe_right)
+            let state_l = observe_state trace (StateT.run state_left b)
+            let state_r = observe_state trace (StateT.run state_right b)
+            let reader_l = observe trace (ReaderT.run reader_left a)
+            let reader_r = observe trace (ReaderT.run reader_right a)
+            let writer_l = observe_writer trace (WriterT.run writer_left)
+            let writer_r = observe_writer trace (WriterT.run writer_right)
+            let except_l = observe_except trace (ExceptT.run except_left)
+            let except_r = observe_except trace (ExceptT.run except_right)
+            let expected_base =
+              if branch < 0 then
+                (Err branch, ["source"])
+              else if n + branch == 0 then
+                (Err n, ["source", "f " ++ show n])
+              else
+                (Ok (a * n + b), ["source", "f " ++ show n])
+            cold
+              && (base_result, base_trace) == expected_base
+              && maybe_l == maybe_r
+              && maybe_l == (map Some base_result, base_trace)
+              && state_l == state_r
+              && state_l == (map (fun x -> (x, b)) base_result, base_trace)
+              && reader_l == reader_r
+              && reader_l == (base_result, base_trace)
+              && writer_l == writer_r
+              && writer_l == (map (fun x -> (x, [])) base_result, base_trace)
+              && except_l == except_r
+              && except_l == (map Ok base_result, base_trace)
+          )
+          samples
+      require_passed result
+    }),
 ]
 
 behavior : List Test.Test
@@ -300,91 +356,104 @@ let behavior = [
   Test.effect_test
     "Stack Eff is cold and executes a lifted base action exactly once on success"
     (task {
-    let trace = Ref.make []
-    base : Eff none none Unit
-    let base = task { Ref.update trace (fun xs -> xs ++ ["base"]) }
-    after : Eff none none Unit
-    let after = task { Ref.update trace (fun xs -> xs ++ ["after"]) }
-    action : Stack (Eff none none) Float
-    let action = do {
-      Capabilities.lift_base base
-      value <- Capabilities.workflow 2
-      Capabilities.lift_base after
-      pure value
-    }
-    let suspended = Capabilities.run 3 10 action
-    Test.expect (Test.equal [] (Ref.get trace))
-    let result = await suspended
-    Test.expect (Test.equal ((Ok 5, ["begin", "done"]), 15) result)
-    Test.expect (Test.equal ["base", "after"] (Ref.get trace))
-  }),
-  Test.effect_test "Stack Eff retains the prefix and skips continuations on domain failure" (task {
-    let trace = Ref.make []
-    base : Eff none none Unit
-    let base = task { Ref.update trace (fun xs -> xs ++ ["base"]) }
-    after : Eff none none Unit
-    let after = task { Ref.update trace (fun xs -> xs ++ ["after"]) }
-    action : Stack (Eff none none) Float
-    let action = do {
-      Capabilities.lift_base base
-      value <- Capabilities.workflow (0 - 1)
-      Capabilities.lift_base after
-      pure value
-    }
-    let suspended = Capabilities.run 3 10 action
-    Test.expect (Test.equal [] (Ref.get trace))
-    let result = await suspended
-    Test.expect (Test.equal ((Err "negative", ["begin"]), 10) result)
-    Test.expect (Test.equal ["base"] (Ref.get trace))
-  }),
-  Test.effect_test "ExceptT catches domain errors but never an underlying typed Eff failure" (task {
-    let trace = Ref.make []
-    offline : Eff none {Offline} Float
-    let offline = task {
-      Ref.update trace (fun xs -> xs ++ ["offline"])
-      from_result (Err (Offline 42))
-    }
-    after : Eff none {Offline} Float
-    let after = task {
-      Ref.update trace (fun xs -> xs ++ ["after"])
-      100
-    }
-    failed : ExceptT String (Eff none {Offline}) Float
-    let failed = do { _ <- lift offline; lift after }
-    domain : ExceptT String (Eff none {Offline}) Float
-    let domain = throw_error "domain"
-    handle : String -> ExceptT String (Eff none {Offline}) Float
-    let handle problem = lift (task {
-      Ref.update trace (fun xs -> xs ++ ["handler " ++ problem])
-      9
-    })
-    let caught = catch_error handle failed
-    let recovered = catch_error handle domain
-    Test.expect (Test.equal [] (Ref.get trace))
-    let underlying = observe_except trace (ExceptT.run caught)
-    let domain_result = observe_except trace (ExceptT.run domain)
-    let recovered_result = observe_except trace (ExceptT.run recovered)
-    Test.expect (Test.equal (Err 42, ["offline"]) underlying)
-    Test.expect (Test.equal (Ok (Err "domain"), []) domain_result)
-    Test.expect (Test.equal (Ok (Ok 9), ["handler domain"]) recovered_result)
-  }),
-  Test.effect_test "ExceptT applicative failure does not execute the right Eff action" (task {
-    let trace = Ref.make []
-    left : ExceptT String (Eff none {Offline}) Float
-    let left = do {
-      lift (task { Ref.update trace (fun xs -> xs ++ ["left"]) })
-      throw_error "domain"
-    }
-    right : ExceptT String (Eff none {Offline}) Float
-    let right = lift (task {
-      Ref.update trace (fun xs -> xs ++ ["right"])
-      3
-    })
-    let action = map2 (fun x y -> x + y) left right
-    Test.expect (Test.equal [] (Ref.get trace))
-    let result = observe_except trace (ExceptT.run action)
-    Test.expect (Test.equal (Ok (Err "domain"), ["left"]) result)
-  }),
+      let trace = Ref.make []
+      base : Eff none none Unit
+      let base = task { Ref.update trace (fun xs -> xs ++ ["base"]) }
+      after : Eff none none Unit
+      let after = task { Ref.update trace (fun xs -> xs ++ ["after"]) }
+      action : Stack (Eff none none) Float
+      let action = do {
+        Capabilities.lift_base base
+        value <- Capabilities.workflow 2
+        Capabilities.lift_base after
+        pure value
+      }
+      let suspended = Capabilities.run 3 10 action
+      Test.expect (Test.equal [] (Ref.get trace))
+      let result = await suspended
+      Test.expect (Test.equal ((Ok 5, ["begin", "done"]), 15) result)
+      Test.expect (Test.equal ["base", "after"] (Ref.get trace))
+    }),
+  Test.effect_test
+    "Stack Eff retains the prefix and skips continuations on domain failure"
+    (task {
+      let trace = Ref.make []
+      base : Eff none none Unit
+      let base = task { Ref.update trace (fun xs -> xs ++ ["base"]) }
+      after : Eff none none Unit
+      let after = task { Ref.update trace (fun xs -> xs ++ ["after"]) }
+      action : Stack (Eff none none) Float
+      let action = do {
+        Capabilities.lift_base base
+        value <- Capabilities.workflow (0 - 1)
+        Capabilities.lift_base after
+        pure value
+      }
+      let suspended = Capabilities.run 3 10 action
+      Test.expect (Test.equal [] (Ref.get trace))
+      let result = await suspended
+      Test.expect (Test.equal ((Err "negative", ["begin"]), 10) result)
+      Test.expect (Test.equal ["base"] (Ref.get trace))
+    }),
+  Test.effect_test
+    "ExceptT catches domain errors but never an underlying typed Eff failure"
+    (task {
+      let trace = Ref.make []
+      offline : Eff none {Offline} Float
+      let offline = task {
+        Ref.update trace (fun xs -> xs ++ ["offline"])
+        from_result (Err (Offline 42))
+      }
+      after : Eff none {Offline} Float
+      let after = task {
+        Ref.update trace (fun xs -> xs ++ ["after"])
+        100
+      }
+      failed : ExceptT String (Eff none {Offline}) Float
+      let failed = do {
+        _ <- lift offline
+        lift after
+      }
+      domain : ExceptT String (Eff none {Offline}) Float
+      let domain = throw_error "domain"
+      handle : String -> ExceptT String (Eff none {Offline}) Float
+      let handle problem =
+        lift
+          (task {
+            Ref.update trace (fun xs -> xs ++ ["handler " ++ problem])
+            9
+          })
+      let caught = catch_error handle failed
+      let recovered = catch_error handle domain
+      Test.expect (Test.equal [] (Ref.get trace))
+      let underlying = observe_except trace (ExceptT.run caught)
+      let domain_result = observe_except trace (ExceptT.run domain)
+      let recovered_result = observe_except trace (ExceptT.run recovered)
+      Test.expect (Test.equal (Err 42, ["offline"]) underlying)
+      Test.expect (Test.equal (Ok (Err "domain"), []) domain_result)
+      Test.expect (Test.equal (Ok (Ok 9), ["handler domain"]) recovered_result)
+    }),
+  Test.effect_test
+    "ExceptT applicative failure does not execute the right Eff action"
+    (task {
+      let trace = Ref.make []
+      left : ExceptT String (Eff none {Offline}) Float
+      let left = do {
+        lift (task { Ref.update trace (fun xs -> xs ++ ["left"]) })
+        throw_error "domain"
+      }
+      right : ExceptT String (Eff none {Offline}) Float
+      let right =
+        lift
+          (task {
+            Ref.update trace (fun xs -> xs ++ ["right"])
+            3
+          })
+      let action = map2 (fun x y -> x + y) left right
+      Test.expect (Test.equal [] (Ref.get trace))
+      let result = observe_except trace (ExceptT.run action)
+      Test.expect (Test.equal (Ok (Err "domain"), ["left"]) result)
+    }),
 ]
 
 tests : List Test.Test

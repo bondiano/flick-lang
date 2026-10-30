@@ -33,8 +33,10 @@ let tick = do {
 
 laws : List Test.Test
 let laws = [
-  Test.property "Identity Functor, Applicative and Monad laws"
-    (Gen.pair ints (Gen.pair functions functions)) (fun (n, (f, g)) ->
+  Test.property
+    "Identity Functor, Applicative and Monad laws"
+    (Gen.pair ints (Gen.pair functions functions))
+    (fun (n, (f, g)) ->
       action : Identity Float
       let action = pure n
       u : Identity (Float -> Float)
@@ -42,8 +44,7 @@ let laws = [
       v : Identity (Float -> Float)
       let v = pure g
       composed : Identity ((Float -> Float) -> Float -> Float)
-      let composed =
-        map2 (fun h fn -> h fn) (pure (fun fn gn x -> fn (gn x))) u
+      let composed = map2 (fun h fn -> h fn) (pure (fun fn gn x -> fn (gn x))) u
       combined : Identity (Float -> Float)
       let combined = map2 (fun h fn -> h fn) composed v
       step : Float -> Identity Float
@@ -60,8 +61,7 @@ let laws = [
           (Identity.run (map2 (fun fn x -> fn x) (pure (fun x -> x)) action)),
         Test.equal
           (Identity.run (map2 (fun fn x -> fn x) combined action))
-          (Identity.run
-            (map2 (fun fn x -> fn x) u (map2 (fun fn x -> fn x) v action))),
+          (Identity.run (map2 (fun fn x -> fn x) u (map2 (fun fn x -> fn x) v action))),
         Test.equal
           (Identity.run (pure (f n)))
           (Identity.run (map2 (fun fn x -> fn x) (pure f) (pure n))),
@@ -79,8 +79,10 @@ let laws = [
         Test.equal
           (Identity.run (map2 (fun x y -> x - y) action (step n)))
           (Identity.run (flat_map (fun x -> map (fun y -> x - y) (step n)) action)),
-      ]),
-  Test.property "MaybeT Functor, Applicative and Monad laws include None"
+      ]
+    ),
+  Test.property
+    "MaybeT Functor, Applicative and Monad laws include None"
     (Gen.pair (Gen.pair ints Gen.bool) (Gen.pair functions functions))
     (fun ((n, present), (f, g)) ->
       action : MaybeT Identity Float
@@ -90,33 +92,25 @@ let laws = [
       v : MaybeT Identity (Float -> Float)
       let v = MaybeT.from_option (if n % 2 == 0 then None else Some g)
       composed : MaybeT Identity ((Float -> Float) -> Float -> Float)
-      let composed =
-        map2 (fun h fn -> h fn) (pure (fun fn gn x -> fn (gn x))) u
+      let composed = map2 (fun h fn -> h fn) (pure (fun fn gn x -> fn (gn x))) u
       combined : MaybeT Identity (Float -> Float)
       let combined = map2 (fun h fn -> h fn) composed v
       next : Float -> MaybeT Identity Float
       let next x = MaybeT.from_option (if x == 0 then None else Some (g x))
       Test.all [
         Test.equal (run_maybe action) (run_maybe (map (fun x -> x) action)),
-        Test.equal
-          (run_maybe (map (fun x -> f (g x)) action))
-          (run_maybe (map f (map g action))),
+        Test.equal (run_maybe (map (fun x -> f (g x)) action)) (run_maybe (map f (map g action))),
         Test.equal
           (run_maybe action)
           (run_maybe (map2 (fun fn x -> fn x) (pure (fun x -> x)) action)),
         Test.equal
           (run_maybe (map2 (fun fn x -> fn x) combined action))
-          (run_maybe
-            (map2 (fun fn x -> fn x) u (map2 (fun fn x -> fn x) v action))),
-        Test.equal
-          (run_maybe (pure (f n)))
-          (run_maybe (map2 (fun fn x -> fn x) (pure f) (pure n))),
+          (run_maybe (map2 (fun fn x -> fn x) u (map2 (fun fn x -> fn x) v action))),
+        Test.equal (run_maybe (pure (f n))) (run_maybe (map2 (fun fn x -> fn x) (pure f) (pure n))),
         Test.equal
           (run_maybe (map2 (fun fn x -> fn x) u (pure n)))
           (run_maybe (map2 (fun fn x -> fn x) (pure (fun fn -> fn n)) u)),
-        Test.equal
-          (run_maybe (map f action))
-          (run_maybe (map2 (fun fn x -> fn x) (pure f) action)),
+        Test.equal (run_maybe (map f action)) (run_maybe (map2 (fun fn x -> fn x) (pure f) action)),
         Test.equal (run_maybe (maybe_step n)) (run_maybe (flat_map maybe_step (pure n))),
         Test.equal (run_maybe action) (run_maybe (flat_map pure action)),
         Test.equal
@@ -124,10 +118,11 @@ let laws = [
           (run_maybe (flat_map (fun x -> flat_map next (maybe_step x)) action)),
         Test.equal
           (run_maybe (map2 (fun x y -> x - y) action (maybe_step n)))
-          (run_maybe
-            (flat_map (fun x -> map (fun y -> x - y) (maybe_step n)) action)),
-      ]),
-  Test.property "StateT laws compare results and every final state"
+          (run_maybe (flat_map (fun x -> map (fun y -> x - y) (maybe_step n)) action)),
+      ]
+    ),
+  Test.property
+    "StateT laws compare results and every final state"
     (Gen.pair (Gen.pair ints ints) (Gen.pair functions functions))
     (fun ((initial, n), (f, g)) ->
       step : Float -> StateT Float Identity Float
@@ -155,8 +150,7 @@ let laws = [
         pure (fun x -> g x - before)
       }
       composed : StateT Float Identity ((Float -> Float) -> Float -> Float)
-      let composed =
-        map2 (fun h fn -> h fn) (pure (fun fn gn x -> fn (gn x))) u
+      let composed = map2 (fun h fn -> h fn) (pure (fun fn gn x -> fn (gn x))) u
       combined : StateT Float Identity (Float -> Float)
       let combined = map2 (fun h fn -> h fn) composed v
       Test.all [
@@ -169,8 +163,7 @@ let laws = [
           (run_state initial (map2 (fun fn x -> fn x) (pure (fun x -> x)) tick)),
         Test.equal
           (run_state initial (map2 (fun fn x -> fn x) combined tick))
-          (run_state initial
-            (map2 (fun fn x -> fn x) u (map2 (fun fn x -> fn x) v tick))),
+          (run_state initial (map2 (fun fn x -> fn x) u (map2 (fun fn x -> fn x) v tick))),
         Test.equal
           (run_state initial (pure (f n)))
           (run_state initial (map2 (fun fn x -> fn x) (pure f) (pure n))),
@@ -187,10 +180,11 @@ let laws = [
           (run_state initial (flat_map (fun x -> flat_map next (step x)) tick)),
         Test.equal
           (run_state initial (map2 (fun x y -> x - y) tick (step n)))
-          (run_state initial
-            (flat_map (fun x -> map (fun y -> x - y) (step n)) tick)),
-      ]),
-  Test.property "ReaderT laws observe environment-dependent actions"
+          (run_state initial (flat_map (fun x -> map (fun y -> x - y) (step n)) tick)),
+      ]
+    ),
+  Test.property
+    "ReaderT laws observe environment-dependent actions"
     (Gen.pair (Gen.pair ints ints) (Gen.pair functions functions))
     (fun ((env, n), (f, g)) ->
       step : Float -> ReaderT Float Identity Float
@@ -203,8 +197,7 @@ let laws = [
       v : ReaderT Float Identity (Float -> Float)
       let v = map (fun r -> fun x -> g x - r) ask
       composed : ReaderT Float Identity ((Float -> Float) -> Float -> Float)
-      let composed =
-        map2 (fun h fn -> h fn) (pure (fun fn gn x -> fn (gn x))) u
+      let composed = map2 (fun h fn -> h fn) (pure (fun fn gn x -> fn (gn x))) u
       combined : ReaderT Float Identity (Float -> Float)
       let combined = map2 (fun h fn -> h fn) composed v
       Test.all [
@@ -217,8 +210,7 @@ let laws = [
           (run_reader env (map2 (fun fn x -> fn x) (pure (fun x -> x)) action)),
         Test.equal
           (run_reader env (map2 (fun fn x -> fn x) combined action))
-          (run_reader env
-            (map2 (fun fn x -> fn x) u (map2 (fun fn x -> fn x) v action))),
+          (run_reader env (map2 (fun fn x -> fn x) u (map2 (fun fn x -> fn x) v action))),
         Test.equal
           (run_reader env (pure (f n)))
           (run_reader env (map2 (fun fn x -> fn x) (pure f) (pure n))),
@@ -235,11 +227,13 @@ let laws = [
           (run_reader env (flat_map (fun x -> flat_map next (step x)) action)),
         Test.equal
           (run_reader env (map2 (fun x y -> x - y) action (step n)))
-          (run_reader env
-            (flat_map (fun x -> map (fun y -> x - y) (step n)) action)),
-      ]),
-  Test.property "MonadTrans preserves pure and bind for MaybeT, StateT and ReaderT"
-    (Gen.pair (Gen.pair ints ints) functions) (fun ((context, n), f) ->
+          (run_reader env (flat_map (fun x -> map (fun y -> x - y) (step n)) action)),
+      ]
+    ),
+  Test.property
+    "MonadTrans preserves pure and bind for MaybeT, StateT and ReaderT"
+    (Gen.pair (Gen.pair ints ints) functions)
+    (fun ((context, n), f) ->
       source : Identity Float
       let source = pure n
       step : Float -> Identity Float
@@ -270,9 +264,7 @@ let laws = [
       let reader_next x = lift (step x)
       Test.all [
         Test.equal (run_maybe (pure n)) (run_maybe maybe_pure),
-        Test.equal
-          (run_maybe maybe_bound)
-          (run_maybe (flat_map maybe_next maybe_source)),
+        Test.equal (run_maybe maybe_bound) (run_maybe (flat_map maybe_next maybe_source)),
         Test.equal (run_state context (pure n)) (run_state context state_pure),
         Test.equal
           (run_state context state_bound)
@@ -281,15 +273,20 @@ let laws = [
         Test.equal
           (run_reader context reader_bound)
           (run_reader context (flat_map reader_next reader_source)),
-      ]),
+      ]
+    ),
 ]
 
 behavior : List Test.Test
 let behavior = [
   Test.test "StateT applicative do runs left to right" (fun () ->
     action : StateT Float Identity (Float, Float)
-    let action = do { a <- tick and b <- tick; pure (a, b) }
-    Test.equal ((10, 11), 12) (run_state 10 action)),
+    let action = do {
+      a <- tick and b <- tick
+      pure (a, b)
+    }
+    Test.equal ((10, 11), 12) (run_state 10 action)
+  ),
   Test.test "ReaderT local restores the outer environment" (fun () ->
     action : ReaderT Float Identity (Float, Float, Float)
     let action = do {
@@ -298,7 +295,8 @@ let behavior = [
       after <- ask
       pure (before, inside, after)
     }
-    Test.equal (5, 15, 5) (run_reader 5 action)),
+    Test.equal (5, 15, 5) (run_reader 5 action)
+  ),
   Test.test "MaybeT lift distinguishes base errors from Nothing" (fun () ->
     failed : MaybeT (Result String) Float
     let failed = lift (Err "offline")
@@ -307,7 +305,8 @@ let behavior = [
     Test.all [
       Test.equal (Err "offline") (MaybeT.run failed),
       Test.equal (Ok None) (MaybeT.run absent),
-    ]),
+    ]
+  ),
   Test.test "MaybeT outside StateT retains the prefix and skips later actions" (fun () ->
     action : MaybeT (StateT Float Identity) Float
     let action = do {
@@ -316,7 +315,8 @@ let behavior = [
       after <- lift tick
       pure (before + after)
     }
-    Test.equal (None, 4) (run_state 3 (MaybeT.run action))),
+    Test.equal (None, 4) (run_state 3 (MaybeT.run action))
+  ),
   Test.test "MaybeT applicative short-circuits before the second action" (fun () ->
     failed : MaybeT (StateT Float Identity) Float
     let failed = do {
@@ -325,8 +325,12 @@ let behavior = [
       pure 0
     }
     action : MaybeT (StateT Float Identity) Float
-    let action = do { a <- failed and b <- lift tick; pure (a + b) }
-    Test.equal (None, 1) (run_state 0 (MaybeT.run action))),
+    let action = do {
+      a <- failed and b <- lift tick
+      pure (a + b)
+    }
+    Test.equal (None, 1) (run_state 0 (MaybeT.run action))
+  ),
   Test.test "StateT outside MaybeT loses the state on Nothing" (fun () ->
     absent : MaybeT Identity Unit
     let absent = MaybeT.from_option None
@@ -336,23 +340,29 @@ let behavior = [
       put (before + 1)
       lift absent
     }
-    Test.equal None (run_maybe (StateT.run action 3))),
-  Test.effect_test "MaybeT over Eff stays cold and skips effects after Nothing" (task {
-    let seen = Ref.make []
-    counted : Float -> Eff none none Float
-    let counted n = task { Ref.update seen (fun xs -> xs ++ [n]); n }
-    action : MaybeT (Eff none none) Float
-    let action = do {
-      first <- lift (counted 1)
-      _ <- MaybeT.from_option (None : Option Unit)
-      later <- lift (counted 2)
-      pure (first + later)
-    }
-    Test.expect (Test.equal [] (Ref.get seen))
-    let result = await (MaybeT.run action)
-    Test.expect (Test.equal None result)
-    Test.expect (Test.equal [1] (Ref.get seen))
-  }),
+    Test.equal None (run_maybe (StateT.run action 3))
+  ),
+  Test.effect_test
+    "MaybeT over Eff stays cold and skips effects after Nothing"
+    (task {
+      let seen = Ref.make []
+      counted : Float -> Eff none none Float
+      let counted n = task {
+        Ref.update seen (fun xs -> xs ++ [n])
+        n
+      }
+      action : MaybeT (Eff none none) Float
+      let action = do {
+        first <- lift (counted 1)
+        _ <- MaybeT.from_option (None : Option Unit)
+        later <- lift (counted 2)
+        pure (first + later)
+      }
+      Test.expect (Test.equal [] (Ref.get seen))
+      let result = await (MaybeT.run action)
+      Test.expect (Test.equal None result)
+      Test.expect (Test.equal [1] (Ref.get seen))
+    }),
 ]
 
 tests : List Test.Test

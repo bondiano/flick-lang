@@ -19,242 +19,238 @@ let main () =
   let nothing : List Float = List.empty
   line
     "slices"
-    (show
-      (
-        List.take_right 3 xs,
-        List.drop_right 5 xs,
-        List.take_while (fun n -> n < 5) xs,
-        List.drop_while (fun n -> n < 5) xs,
-      ))
+    (show (
+      List.take_right 3 xs,
+      List.drop_right 5 xs,
+      List.take_while (fun n -> n < 5) xs,
+      List.drop_while (fun n -> n < 5) xs,
+    ))
   line
     "filters"
-    (show
-      (
-        List.take_while_filter half [2, 4, 5, 6],
-        List.drop_while_filter half [2, 4, 5, 6],
-        List.filter_map_while half [2, 4, 5, 6],
-      ))
+    (show (
+      List.take_while_filter half [2, 4, 5, 6],
+      List.drop_while_filter half [2, 4, 5, 6],
+      List.filter_map_while half [2, 4, 5, 6],
+    ))
   line
     "split"
-    (show
-      (
-        List.span even [2, 4, 5, 6],
-        List.split_at 2 xs,
-        List.split 3 xs,
-        List.split_where (fun n -> n > 4) xs,
-      ))
+    (show (
+      List.span even [2, 4, 5, 6],
+      List.split_at 2 xs,
+      List.split 3 xs,
+      List.split_where (fun n -> n > 4) xs,
+    ))
   line "chunks" (show (List.chunks_of 3 xs, List.window 3 [1, 2, 3, 4]))
   line "chop" (show (List.chop (fun ne -> (NonEmpty.head ne * 10, NonEmpty.tail ne)) [1, 2, 3]))
   line "ends" (show (List.tail xs, List.init [1, 2, 3], List.tail nothing, List.init nothing))
   line
     "edit"
-    (show
-      (List.pad 4 0 [1, 2], List.pad 1 0 [1, 2], List.rotate 1 [1, 2, 3], List.remove 0 [1, 2, 3]))
+    (show (
+      List.pad 4 0 [1, 2],
+      List.pad 1 0 [1, 2],
+      List.rotate 1 [1, 2, 3],
+      List.remove 0 [1, 2, 3],
+    ))
   line "insert" (show (List.insert_at 1 7 [1, 2], List.insert_at 5 7 [1, 2]))
   line
     "modify"
-    (show
-      (
-        List.modify 1 (fun n -> n * 100) [1, 2, 3],
-        List.replace 9 0 [1],
-        List.intersperse 0 [1, 2, 3],
-      ))
+    (show (
+      List.modify 1 (fun n -> n * 100) [1, 2, 3],
+      List.replace 9 0 [1],
+      List.intersperse 0 [1, 2, 3],
+    ))
   line
     "append"
-    (show
-      (
-        List.append_all [3, 4] [1, 2],
-        List.append [1, 2] [3, 4],
-        List.is_empty nothing,
-        List.length xs,
-      ))
+    (show (
+      List.append_all [3, 4] [1, 2],
+      List.append [1, 2] [3, 4],
+      List.is_empty nothing,
+      List.length xs,
+    ))
   line
     "find"
-    (show
-      (
-        List.find even xs,
-        List.find_index even xs,
-        List.find_last even xs,
-        List.find_last_index even xs,
-        List.find_first_with_index even xs,
-      ))
+    (show (
+      List.find even xs,
+      List.find_index even xs,
+      List.find_last even xs,
+      List.find_last_index even xs,
+      List.find_first_with_index even xs,
+    ))
   line
     "count"
-    (show
-      (List.count_by even xs, List.contains 9 xs, List.contains_with (fun a b -> a == b + 1) 10 xs))
+    (show (
+      List.count_by even xs,
+      List.contains 9 xs,
+      List.contains_with (fun a b -> a == b + 1) 10 xs,
+    ))
   line
     "dedupe"
-    (show
-      (
-        List.dedupe xs,
-        List.dedupe_with (fun a b -> even a == even b) xs,
-        List.dedupe_adjacent [1, 1, 2, 1],
-        List.dedupe_adjacent_with (fun a b -> even a == even b) [1, 3, 2, 4, 5],
-      ))
+    (show (
+      List.dedupe xs,
+      List.dedupe_with (fun a b -> even a == even b) xs,
+      List.dedupe_adjacent [1, 1, 2, 1],
+      List.dedupe_adjacent_with (fun a b -> even a == even b) [1, 3, 2, 4, 5],
+    ))
   line
     "sets"
-    (show
-      (
-        List.difference [1, 2] [1, 2, 3],
-        List.difference_with (fun a b -> a == b * 10) [1] [10, 20],
-        List.intersection [2, 3, 4] [1, 2, 3],
-        List.intersection_with (fun a b -> a == b) [3] [1, 3],
-      ))
+    (show (
+      List.difference [1, 2] [1, 2, 3],
+      List.difference_with (fun a b -> a == b * 10) [1] [10, 20],
+      List.intersection [2, 3, 4] [1, 2, 3],
+      List.intersection_with (fun a b -> a == b) [3] [1, 3],
+    ))
   line
     "union"
     (show (List.union [3, 4] [1, 3], List.union_with [5, 6] (fun a b -> even a == even b) [1]))
   line
     "group"
-    (show
-      (
-        List.group [1, 1, 2, 2, 2, 1],
-        List.group_with (fun a b -> even a == even b) [2, 4, 1, 3, 6],
-      ))
+    (show (
+      List.group [1, 1, 2, 2, 2, 1],
+      List.group_with (fun a b -> even a == even b) [2, 4, 1, 3, 6],
+    ))
   line "group_by" (show (List.group_by (fun n -> if even n then "even" else "odd") xs))
   line
     "cartesian"
-    (
-      show
-        (List.cartesian ["a", "b"] [1, 2], List.cartesian_with [10, 20] (fun a b -> a + b) [1, 2])
-    )
+    (show (
+      List.cartesian ["a", "b"] [1, 2],
+      List.cartesian_with [10, 20] (fun a b -> a + b) [1, 2],
+    ))
   line
     "zip"
-    (show
-      (
-        List.zip [1, 2, 3] ["a", "b"],
-        List.zip_with [10, 20] (fun a b -> a * b) [1, 2, 3],
-        List.unzip [(1, "a"), (2, "b")],
-      ))
+    (show (
+      List.zip [1, 2, 3] ["a", "b"],
+      List.zip_with [10, 20] (fun a b -> a * b) [1, 2, 3],
+      List.unzip [(1, "a"), (2, "b")],
+    ))
   line "map_accum" (show (List.map_accum 0 (fun s x -> (s + x, s)) [1, 2, 3]))
   line
     "scan"
-    (
-      show
-        (List.scan 0 (fun s x -> s + x) [1, 2, 3], List.scan_right 0 (fun s x -> s + x) [1, 2, 3])
-    )
+    (show (
+      List.scan 0 (fun s x -> s + x) [1, 2, 3],
+      List.scan_right 0 (fun s x -> s + x) [1, 2, 3],
+    ))
   line "extend" (show (List.extend List.length [1, 2, 3]))
   line
     "somes"
-    (show
-      (
-        List.get_somes [Some 1, None, Some 3],
-        List.get_failures [half 1, half 2],
-        List.get_successes [half 1, half 2],
-        List.separate [half 1, half 2, half 3],
-      ))
+    (show (
+      List.get_somes [Some 1, None, Some 3],
+      List.get_failures [half 1, half 2],
+      List.get_successes [half 1, half 2],
+      List.separate [half 1, half 2, half 3],
+    ))
   line "partition" (show (List.partition_map half [1, 2, 3, 4], List.partition even xs))
   line "unfold" (show (List.unfold 1 (fun n -> if n > 20 then None else Some (n, n * 2))))
   line
     "lift"
-    (show
-      (
-        List.lift_option (fun n -> if n > 0 then Some n else None) 3,
-        List.lift_predicate even 3,
-        List.lift_result half 4,
-      ))
+    (show (
+      List.lift_option (fun n -> if n > 0 then Some n else None) 3,
+      List.lift_predicate even 3,
+      List.lift_result half 4,
+    ))
   line
     "sort"
-    (show
-      (
-        List.sort xs,
-        List.sort_with (fun s -> String.length s) ["ccc", "a", "bb"],
-        List.sort_by (fun a b -> compare b a) [1, 3, 2],
-      ))
+    (show (
+      List.sort xs,
+      List.sort_with (fun s -> String.length s) ["ccc", "a", "bb"],
+      List.sort_by (fun a b -> compare b a) [1, 3, 2],
+    ))
   line
     "repeat"
-    (show
-      (
-        List.repeat_all 2 [1, 2],
-        List.repeat 3 "x",
-        List.initialize 3 (fun i -> i * i),
-        List.singleton 1,
-      ))
+    (show (
+      List.repeat_all 2 [1, 2],
+      List.repeat 3 "x",
+      List.initialize 3 (fun i -> i * i),
+      List.singleton 1,
+    ))
   matched : List Float -> String
   let matched =
-    List.match_
-      { onEmpty = fun () -> "empty"; onNonEmpty = fun ne -> "first " ++ show (NonEmpty.head ne) }
+    List.match_ {
+      onEmpty = fun () -> "empty";
+      onNonEmpty = fun ne -> "first " ++ show (NonEmpty.head ne);
+    }
   line "match" (show (matched nothing, matched xs))
   left : List Float -> Float
   let left =
-    List.match_left
-      { onEmpty = fun () -> 0; onNonEmpty = fun h t -> h + Int.to_float (List.length t) }
+    List.match_left {
+      onEmpty = fun () -> 0;
+      onNonEmpty = fun h t -> h + Int.to_float (List.length t);
+    }
   right : List Float -> Float
   let right =
-    List.match_right
-      { onEmpty = fun () -> 0; onNonEmpty = fun i l -> Int.to_float (List.length i) * 100 + l }
+    List.match_right {
+      onEmpty = fun () -> 0;
+      onNonEmpty = fun i l -> Int.to_float (List.length i) * 100 + l;
+    }
   line "match_lr" (show (left xs, right xs, left nothing, right nothing))
   line
     "core"
-    (show
-      (
-        List.map (fun n -> n + 1) [1, 2],
-        List.filter even xs,
-        List.filter_map (fun n -> if even n then Some n else None) xs,
-        List.flat_map (fun n -> [n, n]) [1, 2],
-      ))
+    (show (
+      List.map (fun n -> n + 1) [1, 2],
+      List.filter even xs,
+      List.filter_map (fun n -> if even n then Some n else None) xs,
+      List.flat_map (fun n -> [n, n]) [1, 2],
+    ))
   line
     "fold"
-    (show
-      (
-        List.fold_left (fun s x -> s - x) 0 [1, 2, 3],
-        List.fold_right (fun x s -> s - x) 0 [1, 2, 3],
-        List.concat [[1], [2, 3]],
-        List.reverse [1, 2, 3],
-      ))
+    (show (
+      List.fold_left (fun s x -> s - x) 0 [1, 2, 3],
+      List.fold_right (fun x s -> s - x) 0 [1, 2, 3],
+      List.concat [[1], [2, 3]],
+      List.reverse [1, 2, 3],
+    ))
   line
     "access"
-    (show
-      (
-        List.get 2 xs,
-        List.head xs,
-        List.last xs,
-        List.head nothing,
-        List.drop 6 xs,
-        List.take 2 xs,
-      ))
+    (show (
+      List.get 2 xs,
+      List.head xs,
+      List.last xs,
+      List.head nothing,
+      List.drop 6 xs,
+      List.take 2 xs,
+    ))
   line "quantifiers" (show (List.all even xs, List.any even xs))
   List.each_effect (fun n -> Platform.stdout_line ("each " ++ show n)) [1, 2]
   let ne = NonEmpty.cons 5 [3, 8, 1]
   line
     "nonempty"
-    (show
-      (
-        NonEmpty.append 4 [1, 2],
-        NonEmpty.make_by 3 (fun i -> i * 2),
-        NonEmpty.range 2 5,
-        NonEmpty.range 3 1,
-        NonEmpty.replicate 2 "y",
-      ))
+    (show (
+      NonEmpty.append 4 [1, 2],
+      NonEmpty.make_by 3 (fun i -> i * 2),
+      NonEmpty.range 2 5,
+      NonEmpty.range 3 1,
+      NonEmpty.replicate 2 "y",
+    ))
   line
     "ne ends"
-    (show
-      (
-        NonEmpty.head ne,
-        NonEmpty.last ne,
-        NonEmpty.tail ne,
-        NonEmpty.init ne,
-        NonEmpty.singleton 0,
-      ))
+    (show (
+      NonEmpty.head ne,
+      NonEmpty.last ne,
+      NonEmpty.tail ne,
+      NonEmpty.init ne,
+      NonEmpty.singleton 0,
+    ))
   line
     "ne edit"
-    (show
-      (
-        NonEmpty.modify_head (fun n -> n * 2) ne,
-        NonEmpty.set_head 0 ne,
-        NonEmpty.modify_last (fun n -> n * 2) ne,
-        NonEmpty.set_last 0 ne,
-      ))
+    (show (
+      NonEmpty.modify_head (fun n -> n * 2) ne,
+      NonEmpty.set_head 0 ne,
+      NonEmpty.modify_last (fun n -> n * 2) ne,
+      NonEmpty.set_last 0 ne,
+    ))
   line
     "ne split"
-    (show
-      (NonEmpty.split_at 2 ne, NonEmpty.split_at 0 ne, NonEmpty.unappend ne, NonEmpty.unprepend ne))
+    (show (
+      NonEmpty.split_at 2 ne,
+      NonEmpty.split_at 0 ne,
+      NonEmpty.unappend ne,
+      NonEmpty.unprepend ne,
+    ))
   line
     "ne group"
-    (show
-      (
-        NonEmpty.group (NonEmpty.cons 1 [1, 2]),
-        NonEmpty.group_with (fun a b -> even a == even b) (NonEmpty.cons 1 [3, 2]),
-      ))
+    (show (
+      NonEmpty.group (NonEmpty.cons 1 [1, 2]),
+      NonEmpty.group_with (fun a b -> even a == even b) (NonEmpty.cons 1 [3, 2]),
+    ))
   line
     "ne order"
     (show (NonEmpty.max ne, NonEmpty.min ne, NonEmpty.from_list nothing, NonEmpty.from_list [1]))

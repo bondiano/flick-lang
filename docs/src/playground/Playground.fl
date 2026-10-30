@@ -21,7 +21,5 @@ let main () =
     provide Atom.layer {
       ignore (parallel
         (task { Ui.Dom.mount root (report model) app })
-        (task {
-          parallel (task { load_compiler model }) (task { prepare_highlighting model })
-        }))
+        (task { parallel (task { load_compiler model }) (task { prepare_highlighting model }) }))
     }

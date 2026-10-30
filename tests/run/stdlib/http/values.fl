@@ -15,12 +15,11 @@ let params () =
   Platform.stdout_line ("to_string: " ++ (Http.UrlParams.to_string p))
   Platform.stdout_line
     ("get: "
-      ++ (show
-        (
-          Http.UrlParams.get_all "a" p,
-          Http.UrlParams.get_first "a" p,
-          Http.UrlParams.get_last "a" p,
-        )))
+      ++ (show (
+        Http.UrlParams.get_all "a" p,
+        Http.UrlParams.get_first "a" p,
+        Http.UrlParams.get_last "a" p,
+      )))
   let q =
     p
     |> Http.UrlParams.set "b" "z"
@@ -36,10 +35,8 @@ let params () =
   Platform.stdout_line
     ("is_redacted_name: " ++ (show (Http.UrlParams.is_redacted_name "SIG" ["sig"])))
   Platform.stdout_line
-    (
-      "redact_url: "
-        ++ (Http.UrlParams.redact_url ["token"] "https://u:pw@example.com/a?token=t&x=1")
-    )
+    ("redact_url: "
+      ++ (Http.UrlParams.redact_url ["token"] "https://u:pw@example.com/a?token=t&x=1"))
   Platform.stdout_line
     ("eq: " ++ (show (Http.UrlParams.from_input input == p, p == Http.UrlParams.empty)))
 
@@ -78,16 +75,15 @@ let urls () =
 
 cookies : Unit ->{; Http.Cookies.CookiesError} Unit
 let cookies () =
-  let attributes : Http.Cookies.Attributes =
-    {
-      Http.Cookies.attributes with
-        path = Some "/";
-        httpOnly = true;
-        secure = true;
-        sameSite = Some Http.Cookies.Lax;
-        priority = Some Http.Cookies.High;
-        maxAge = Some (seconds 60);
-    }
+  let attributes : Http.Cookies.Attributes = {
+    Http.Cookies.attributes with
+    path = Some "/";
+    httpOnly = true;
+    secure = true;
+    sameSite = Some Http.Cookies.Lax;
+    priority = Some Http.Cookies.High;
+    maxAge = Some (seconds 60);
+  }
   let jar =
     Http.Cookies.empty
     |> Http.Cookies.set "session" (Redacted.make "abc123") attributes
@@ -122,9 +118,10 @@ let cookies () =
     ("get: " ++ (show (Option.map Http.Cookies.name (Http.Cookies.get "theme" more))))
   Platform.stdout_line
     ("remove: "
-      ++ (
-        show (Http.Cookies.is_empty (Http.Cookies.remove "session" jar), Http.Cookies.is_empty jar)
-      ))
+      ++ (show (
+        Http.Cookies.is_empty (Http.Cookies.remove "session" jar),
+        Http.Cookies.is_empty jar,
+      )))
   let expired = Http.Cookies.expire_cookie "session" attributes jar
   Platform.stdout_line ("expire: " ++ (show (Http.Cookies.to_set_cookie_headers expired)))
   Platform.stdout_line
@@ -138,19 +135,19 @@ let cookies () =
   | e -> Platform.stdout_line ("invalid name: " ++ (reason e))
   try
     let _ =
-      Http.Cookies.make_cookie
-        "n"
-        (Redacted.make "v")
-        { Http.Cookies.attributes with domain = Some "bad;domain" }
+      Http.Cookies.make_cookie "n" (Redacted.make "v") {
+        Http.Cookies.attributes with
+        domain = Some "bad;domain";
+      }
     Platform.stdout_line ("invalid domain: " ++ "accepted")
   with
   | e -> Platform.stdout_line ("invalid domain: " ++ (reason e))
   try
     let _ =
-      Http.Cookies.make_cookie
-        "n"
-        (Redacted.make "v")
-        { Http.Cookies.attributes with maxAge = Some Duration.infinity }
+      Http.Cookies.make_cookie "n" (Redacted.make "v") {
+        Http.Cookies.attributes with
+        maxAge = Some Duration.infinity;
+      }
     Platform.stdout_line ("infinite max age: " ++ "accepted")
   with
   | e -> Platform.stdout_line ("infinite max age: " ++ (reason e))
@@ -167,44 +164,41 @@ let main () =
   urls ()
   Platform.stdout_line
     ("mime: "
-      ++ (show
-        (
-          Http.Mime.get_type "a.html",
-          Http.Mime.get_extension "application/json",
-          Http.Mime.get_type "x.zzz",
-        )))
+      ++ (show (
+        Http.Mime.get_type "a.html",
+        Http.Mime.get_extension "application/json",
+        Http.Mime.get_type "x.zzz",
+      )))
   Platform.stdout_line ("extensions: " ++ (show (Http.Mime.get_all_extensions "image/jpeg")))
   Platform.stdout_line
     ("etag: "
-      ++ (
-        show (Http.Etag.to_string (Http.Etag.Weak "1"), Http.Etag.to_string (Http.Etag.Strong "2"))
-      ))
+      ++ (show (
+        Http.Etag.to_string (Http.Etag.Weak "1"),
+        Http.Etag.to_string (Http.Etag.Strong "2"),
+      )))
   provide Http.Etag.layer {
     Platform.stdout_line ("generator: " ++ (show (Http.Etag.from_file_info (info ()))))
   }
   provide Http.Etag.layer_weak {
     Platform.stdout_line ("weak: " ++ (show (Http.Etag.from_file_info (info ()))))
   }
-  try
-    cookies ()
-  with
+  try cookies () with
   | e -> Platform.stdout_line ("cookies failed: " ++ (reason e))
 
 info : Unit -> FileSystem.Info
-let info () =
-  {
-    type_ = FileSystem.RegularFile;
-    mtime = Some 4096;
-    atime = None;
-    birthtime = None;
-    dev = 0n;
-    ino = None;
-    mode = 0;
-    nlink = None;
-    uid = None;
-    gid = None;
-    rdev = None;
-    size = 255n;
-    blksize = None;
-    blocks = None;
-  }
+let info () = {
+  type_ = FileSystem.RegularFile;
+  mtime = Some 4096;
+  atime = None;
+  birthtime = None;
+  dev = 0n;
+  ino = None;
+  mode = 0;
+  nlink = None;
+  uid = None;
+  gid = None;
+  rdev = None;
+  size = 255n;
+  blksize = None;
+  blocks = None;
+}

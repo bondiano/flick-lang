@@ -8,19 +8,35 @@ type ByteSize
 
 /// A unit: the byte, the decimal units (`KB` is `kB`) and the binary ones.
 type ByteUnit =
-  | B | KB | MB | GB | TB | PB | EB | ZB | YB | RB | QB
-  | KiB | MiB | GiB | TiB | PiB | EiB | ZiB | YiB
+  | B
+  | KB
+  | MB
+  | GB
+  | TB
+  | PB
+  | EB
+  | ZB
+  | YB
+  | RB
+  | QB
+  | KiB
+  | MiB
+  | GiB
+  | TiB
+  | PiB
+  | EiB
+  | ZiB
+  | YiB
 
 /// How `format` writes a size: the digits after the point (2 by default; cut
 /// to an integer from 0 to 20), whether to keep trailing zeros, and either a
 /// unit or the largest fitting one of the binary or the decimal units.
-type alias FormatOptions =
-  {
-    precision : Option Int;
-    trailingZeros : Option Bool;
-    binary : Bool;
-    unit : Option ByteUnit;
-  }
+type alias FormatOptions = {
+  precision : Option Int;
+  trailingZeros : Option Bool;
+  binary : Bool;
+  unit : Option ByteUnit;
+}
 
 /// The options of `format` that pick the largest fitting binary unit.
 default_format : FormatOptions

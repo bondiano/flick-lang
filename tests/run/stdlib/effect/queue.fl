@@ -42,18 +42,20 @@ let queues () =
   let _ = Queue.fail (Broken "pipe") failing
   let first = Queue.take failing
   let second =
-    try
-      show (Queue.take failing)
-    with
+    try show (Queue.take failing) with
     | Broken why -> "broken " ++ why
   say ("fail: " ++ show first ++ " then " ++ second)
   // a producer task feeds a queue it ends; a consumer collects it
   let fed : Queue.Queue {Broken} Float = Queue.make { capacity = Some 1; strategy = None }
   let collected = scope s {
-    let producer = Fiber.spawn s unexpected (task {
-      let fill = task { List.each_effect (fun n -> ignore (Queue.offer n fed)) [1, 2, 3] }
-      ignore (fill |> Queue.into fed)
-    })
+    let producer =
+      Fiber.spawn
+        s
+        unexpected
+        (task {
+          let fill = task { List.each_effect (fun n -> ignore (Queue.offer n fed)) [1, 2, 3] }
+          ignore (fill |> Queue.into fed)
+        })
     Queue.collect fed
   }
   say ("into/collect: " ++ show collected)
@@ -108,9 +110,7 @@ let queues () =
     (fun failure -> ignore (Queue.fail_cause failure fails))
     (List.filter_map Exit.failure exits)
   let cause =
-    try
-      show (Queue.take fails)
-    with
+    try show (Queue.take fails) with
     | Broken why -> "fail_cause: " ++ why
   say cause
 
@@ -158,8 +158,6 @@ let hubs () =
 
 main : Unit ->{; AppError} Unit
 let main () =
-  try
-    queues ()
-  with
+  try queues () with
   | Broken why -> say ("unexpected " ++ why)
   hubs ()

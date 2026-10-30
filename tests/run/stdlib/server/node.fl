@@ -7,7 +7,4 @@ query : String ->{Server;} String
 let query key = "row " ++ key
 
 main : Unit ->{; AppError} Unit
-let main () =
-  provide Server.node {
-    Console.log (query "1")
-  }
+let main () = provide Server.node { Console.log (query "1") }

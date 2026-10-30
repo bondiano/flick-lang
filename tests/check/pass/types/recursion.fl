@@ -10,8 +10,7 @@ let rec depth value =
   | Nest inner -> 1 + depth inner
 
 countdown : Float -> List Float
-let rec countdown n =
-  if n <= 0 then [] else [n] ++ countdown (n - 1)
+let rec countdown n = if n <= 0 then [] else [n] ++ countdown (n - 1)
 
 rec {
   is_even : Float -> Bool
