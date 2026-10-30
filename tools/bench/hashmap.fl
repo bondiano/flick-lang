@@ -1,0 +1,28 @@
+// A HashMap of 10 000 string keys: inserts, lookups, updates, removals
+// and a fold over what is left.
+module App.Main exposing (main)
+
+size : Int
+let size = 10000
+
+key : Int -> String
+let key i = "key-" ++ show i
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let filled =
+    List.fold_left (fun m i -> HashMap.insert (key i) i m) HashMap.empty (List.range 0 size)
+  let found =
+    List.fold_left
+      (fun acc i -> acc + Option.with_default 0 (HashMap.get (key (i * 3)) filled))
+      0
+      (List.range 0 size)
+  let updated =
+    List.fold_left
+      (fun m i -> HashMap.modify (key i) (fun v -> v * 2) m)
+      filled
+      (List.range 0 (size / 2))
+  let removed =
+    List.fold_left (fun m i -> HashMap.remove (key (i * 2)) m) updated (List.range 0 size)
+  let total = HashMap.reduce 0 (fun acc v _ -> acc + v) removed
+  Platform.stdout_line (show [found, HashMap.size removed, total])

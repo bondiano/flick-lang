@@ -1,0 +1,23 @@
+// String building: `++` one piece at a time, `String.join` of shown
+// numbers, then splitting, replacing and case mapping the result.
+module App.Main exposing (main)
+
+/// `++` in a loop: a string that grows by a piece per step.
+grow : Int -> Int -> String -> String
+let rec grow i n acc = if i == n then acc else grow (i + 1) n (acc ++ show i ++ ";")
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let grown = grow 0 20000 ""
+  let joined = String.join "," (List.map (fun i -> show (i * 7)) (List.range 0 200000))
+  let parts = String.split "," joined
+  let replaced = String.replace_all "7" "seven" joined
+  let upper = String.to_upper replaced
+  Platform.stdout_line
+    (show
+      [
+        String.length grown,
+        List.length parts,
+        String.length upper,
+        String.length (String.trim upper),
+      ])

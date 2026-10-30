@@ -55,10 +55,10 @@ jobs:
       - name: Go runtime
         working-directory: runtime-go
         run: go vet ./... && go test ./...
-      - name: Portable cases and the go executable
+      - name: Portable cases, the go executable and a non-ASCII project path
         env:
           FLICK_E2E_GO_ONLY: "1"
-        run: cargo test -p flick --test e2e --test go_main -- --ignored run_cases exit_codes_follow_the_outcome_and_signals run_and_test_use_the_go_executable
+        run: cargo test -p flick --test e2e --test go_main --test unicode_path -- --ignored run_cases exit_codes_follow_the_outcome_and_signals run_and_test_use_the_go_executable a_project_builds_runs_and_tests_under_a_non_ascii_path
       # the node half and the comparison of both reports run in `just e2e`
       - name: Language tests on the go target
         shell: bash
