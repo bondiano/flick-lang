@@ -105,6 +105,11 @@ property tests. `just language` runs them with `flick test --emit js` and
 the same byte for byte. A test belongs here when both targets must agree
 on it; a difference between them is fixed in a runtime, not in the test.
 
+`flick/tests/unicode_path.rs` builds, runs and tests a project in
+`target/tmp/проект ⭐` on both targets, as Gleam's `test/unicode_path ⭐`,
+and checks that the source map and Go's `//line` directives still lead to
+its `.fl` files.
+
 ## Runtime tests — `runtime/test/`
 
 The runtime is TypeScript 7 (`runtime/src/*.ts`), built to `runtime/dist/`
