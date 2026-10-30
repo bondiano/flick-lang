@@ -241,9 +241,32 @@ func finalSigma(rs []rune, i int) ([]rune, bool) {
 	return nil, false
 }
 
-// ToUpperCase and ToLowerCase are JS's full case mappings.
-func ToUpperCase(s Value) Value { return mapCase(s.(string), unicodeData().upper, nil) }
-func ToLowerCase(s Value) Value { return mapCase(s.(string), unicodeData().lower, finalSigma) }
+// ToUpperCase and ToLowerCase are JS's full case mappings; on ASCII they
+// are Go's, without decoding to runes and looking each one up.
+func ToUpperCase(s Value) Value {
+	x := s.(string)
+	if ascii(x) {
+		return strings.ToUpper(x)
+	}
+	return mapCase(x, unicodeData().upper, nil)
+}
+
+func ToLowerCase(s Value) Value {
+	x := s.(string)
+	if ascii(x) {
+		return strings.ToLower(x)
+	}
+	return mapCase(x, unicodeData().lower, finalSigma)
+}
+
+func ascii(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
+}
 
 func turkic(locale string) bool {
 	tag := strings.ToLower(strings.SplitN(strings.ReplaceAll(locale, "_", "-"), "-", 2)[0])
