@@ -124,17 +124,16 @@ const CLI_MAIN: &str = "module App.Main exposing (main)
 import App.Greeting exposing (greet)
 
 command : Cli.Command none none
-let command =
-  cli \"NAME\" {
-    description \"Prints a greeting\"
-    /// Print in capitals
-    flag loud : Bool
-    /// Who to greet
-    arg name : String = \"world\"
-    handle fun { loud; name } ->
-      let text = greet name
-      Platform.stdout_line (if loud then String.to_upper text else text)
-  }
+let command = cli \"NAME\" {
+  description \"Prints a greeting\"
+  /// Print in capitals
+  flag loud : Bool
+  /// Who to greet
+  arg name : String = \"world\"
+  handle fun { loud; name } ->
+    let text = greet name
+    Platform.stdout_line (if loud then String.to_upper text else text)
+}
 
 main : Unit ->{; AppError} Unit
 let main () =

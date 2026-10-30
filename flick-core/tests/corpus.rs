@@ -1,7 +1,8 @@
 //! Syntax corpus: every ```` ```flick ```` block of the Russian spec, the
 //! original text (pinned by `tests/syntax/spec_examples.txt`), and of `docs/`, plus every `.fl` file under
 //! `tests/`. All must round-trip losslessly; error-free ones must also format
-//! idempotently without changing the AST. `tests/syntax/*.fl` must parse
+//! idempotently without changing the AST (every `.fl` of the repository is
+//! also checked by `fmt`'s own corpus test). `tests/syntax/*.fl` must parse
 //! without diagnostics. The repository's `.fl` sources must already be
 //! formatted.
 
@@ -146,6 +147,13 @@ fn dump() {
 fn fl_files(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir).expect("readable dir") {
         let path = entry.expect("entry").path();
+        // installed packages and build output hold no sources of the repository
+        let skipped = path.file_name().is_some_and(|n| {
+            n == "node_modules" || n == "dist" || n.to_string_lossy().starts_with('.')
+        });
+        if skipped {
+            continue;
+        }
         if path.is_dir() {
             fl_files(&path, out);
         } else if path.extension().is_some_and(|e| e == "fl") {
@@ -280,17 +288,21 @@ fn corpus_is_lossless_and_formats_stably() {
 }
 
 /// `.fl` sources in the repository are kept as `flick fmt` writes them; run
-/// `flick fmt <file>` on a file this reports.
+/// `flick fmt <file>` on a file this reports. The fixtures of the checker's
+/// failures and of the editor grammar are left as written: their
+/// annotations point at lines and columns of the code around them.
 #[test]
 fn fl_sources_are_formatted() {
     let dirs = [
         "tests",
         "examples",
-        "tools/dts-importer/src",
-        "tools/dts-importer/test",
+        "tools",
         "docs/src/playground",
+        "docs/src/widgets",
         "flick-core/src/types/builtins",
+        "flick/src/commands/templates",
     ];
+    let excluded = ["tests/check/fail", "tests/check/projects"].map(|d| root().join(d));
     let mut files = Vec::new();
     for dir in dirs {
         let dir = root().join(dir);
@@ -298,6 +310,7 @@ fn fl_sources_are_formatted() {
             fl_files(&dir, &mut files);
         }
     }
+    files.retain(|f| !excluded.iter().any(|d| f.starts_with(d)));
     files.sort();
     assert!(files.len() > 100, "only {} .fl sources found", files.len());
     let unformatted: Vec<String> = files

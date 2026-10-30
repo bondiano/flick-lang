@@ -117,6 +117,11 @@ matrix, codecs against their compiled decoders. Entry runner tests start
 - Every `.fl` file under `tests/` and every doc block must round-trip through
   the lossless tree byte for byte; those without diagnostics must format
   idempotently, and the formatter re-checks that the AST is unchanged.
+  `fmt`'s own corpus test formats every `.fl` file of the repository and
+  fails when one is not a fixed point or a declaration is left as written,
+  and `fl_sources_are_formatted` keeps the sources formatted, all but the
+  fixtures of checker failures (`tests/check/fail`, `tests/check/projects`)
+  and of the editor grammar, whose annotations point at lines and columns.
 - `tests/syntax/*.fl` exercise the grammar only: they must parse without
   diagnostics, but their names need not resolve.
 - `fuzz.rs` mutates the corpus and asserts that the parser does not panic or

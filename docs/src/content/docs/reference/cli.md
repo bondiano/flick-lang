@@ -20,7 +20,7 @@ and `--help`; `flick help <command>` prints a command's help and
 | `run [name] [--entry M] [--profile] [--devtools[=url]] -- args` | builds JavaScript and runs the `main` of the entry `name` (the only one when left out); `--devtools` sends its spans to the Effect DevTools ([observability](../observability/#devtools)) |
 | `dev [name] [--entry M] [--profile] [--devtools[=url]] -- args` | rebuilds on changes and replaces the running app; in a project with several entries and none named, it runs every entry that is not a client's and, if one is, Vite (`node_modules/.bin/vite`) for the pages, which replaces a changed module in the page keeping the labelled atoms' values |
 | `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile]` | runs the tests of the test root |
-| `fmt [paths] [--check] [--stdin --stdin-filepath f]` | formats; without paths the source and test roots |
+| `fmt [paths] [--check] [--stdin --stdin-filepath f]` | writes the canonical layout ([formatting](../grammar/#formatting)); without paths the source and test roots |
 | `clean [--cache]` | removes the build artifacts; `--cache` also the build cache |
 | `install [--locked] [--offline]` | installs with pnpm (`--frozen-lockfile`, `--offline`) |
 | `add <pkg>… [--dev]`, `remove <pkg>…`, `update [pkg]…` | changes dependencies with pnpm |
