@@ -10,8 +10,7 @@ let increment counter =
   )
 
 pair_optional : Option a -> Option b -> Option (a, b)
-let pair_optional left right =
-  bind left (fun x -> Option.map (fun y -> (x, y)) right)
+let pair_optional left right = bind left (fun x -> Option.map (fun y -> (x, y)) right)
 
 doubled : Functor f => f Float -> f Float
 let doubled values = map (fun n -> n * 2) values

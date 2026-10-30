@@ -9,39 +9,51 @@ let contents chunk = Chunk.to_list (TxChunk.get chunk)
 main : Unit ->{; AppError} Unit
 let main () =
   let xs = TxChunk.from_iterable [3, 4]
-  let shown = Tx.atomically (task {
-      TxChunk.append 5 xs
-      TxChunk.prepend 2 xs
-      TxChunk.append_all (Chunk.from_list [6, 7]) xs
-      TxChunk.prepend_all (Chunk.from_list [0, 1]) xs
-      contents xs
-    })
+  let shown =
+    Tx.atomically
+      (task {
+        TxChunk.append 5 xs
+        TxChunk.prepend 2 xs
+        TxChunk.append_all (Chunk.from_list [6, 7]) xs
+        TxChunk.prepend_all (Chunk.from_list [0, 1]) xs
+        contents xs
+      })
   Platform.stdout_line ("built: " ++ show shown)
-  let sliced = Tx.atomically (task {
-      TxChunk.drop 1 xs
-      TxChunk.take 6 xs
-      TxChunk.slice 1 5 xs
-      contents xs
-    })
+  let sliced =
+    Tx.atomically
+      (task {
+        TxChunk.drop 1 xs
+        TxChunk.take 6 xs
+        TxChunk.slice 1 5 xs
+        contents xs
+      })
   Platform.stdout_line ("drop, take, slice: " ++ show sliced)
-  let mapped = Tx.atomically (task {
-      TxChunk.map (fun x -> x * 10) xs
-      TxChunk.filter (fun x -> x != 30) xs
-      contents xs
-    })
+  let mapped =
+    Tx.atomically
+      (task {
+        TxChunk.map (fun x -> x * 10) xs
+        TxChunk.filter (fun x -> x != 30) xs
+        contents xs
+      })
   Platform.stdout_line ("map, filter: " ++ show mapped)
   let ys = TxChunk.make (Chunk.from_list [1])
   let zs = TxChunk.empty ()
-  let joined = Tx.atomically (task {
-      TxChunk.concat xs ys
-      TxChunk.update (fun c -> Chunk.append 9 c) ys
-      let n = TxChunk.modify (fun c -> (Chunk.size c, Chunk.empty)) zs
-      (contents ys, n, TxChunk.is_empty zs, TxChunk.is_non_empty ys, TxChunk.size ys)
-    })
+  let joined =
+    Tx.atomically
+      (task {
+        TxChunk.concat xs ys
+        TxChunk.update (fun c -> Chunk.append 9 c) ys
+        let n = TxChunk.modify (fun c -> (Chunk.size c, Chunk.empty)) zs
+        (contents ys, n, TxChunk.is_empty zs, TxChunk.is_non_empty ys, TxChunk.size ys)
+      })
   Platform.stdout_line ("concat, update, modify: " ++ show joined)
-  let undone = try Tx.atomically (task {
-      TxChunk.set (Chunk.from_list [42]) ys
-      from_result (Err Stop)
-    }) with
+  let undone =
+    try
+      Tx.atomically
+        (task {
+          TxChunk.set (Chunk.from_list [42]) ys
+          from_result (Err Stop)
+        })
+    with
     | Stop -> Tx.atomically (task { contents ys })
   Platform.stdout_line ("rolled back: " ++ show undone)

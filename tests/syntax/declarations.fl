@@ -10,10 +10,7 @@ type alias Point = { x : Float; y : Float }
 
 type alias Pair a b = (a, b)
 
-type Shape =
-  | Circle Point Float
-  | Rect { origin : Point; size : Point }
-  | Empty
+type Shape = Circle Point Float | Rect { origin : Point; size : Point } | Empty
   deriving Eq, Show
 
 type Option a = None | Some a

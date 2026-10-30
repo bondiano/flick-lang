@@ -5,21 +5,19 @@ type alias Props = { label : String }
 type alias Badge = Ui.Component Props
 
 render : Badge -> Props -> Ui
-let render badge props =
-  ui {
-    let local = badge
-    let widgets = { badge = local }
-    let preserved : Badge = local
-    fragment
-      [
-        local props,
-        widgets.badge props,
-        (if props.label == "" then badge else preserved) props,
-        ({ label = "piped" } |> local),
-        Ui.component preserved props,
-        (fun (p : Props) -> local p) props,
-      ]
-  }
+let render badge props = ui {
+  let local = badge
+  let widgets = { badge = local }
+  let preserved : Badge = local
+  fragment [
+    local props,
+    widgets.badge props,
+    (if props.label == "" then badge else preserved) props,
+    ({ label = "piped" } |> local),
+    Ui.component preserved props,
+    (fun (p : Props) -> local p) props,
+  ]
+}
 
 choose : Badge -> Unit -> Badge
 let choose badge () = badge

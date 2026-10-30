@@ -32,28 +32,33 @@ type alias Count = { n : Float }
   deriving Schema
 
 add_user : Sql.Template Pg { name : String } { id : UserId }
-let add_user =
-  sql p { insert_into Users; values { name = p.name }; returning { id = Users.id } }
+let add_user = sql p {
+  insert_into Users
+  values { name = p.name }
+  returning { id = Users.id }
+}
 
 open_account : Sql.Template Pg { owner : UserId; balance : BigDecimal } { id : BigInt }
-let open_account =
-  sql p {
-    insert_into Accounts
-    values { user_id = p.owner; balance = p.balance }
-    returning { id = Accounts.id }
-  }
+let open_account = sql p {
+  insert_into Accounts
+  values { user_id = p.owner; balance = p.balance }
+  returning { id = Accounts.id }
+}
 
 deposit : Sql.Template Pg { account : BigInt; amount : BigDecimal } { balance : BigDecimal }
-let deposit =
-  sql p {
-    update Accounts
-    set { balance = Accounts.balance + p.amount }
-    where Accounts.id == p.account
-    returning { balance = Accounts.balance }
-  }
+let deposit = sql p {
+  update Accounts
+  set { balance = Accounts.balance + p.amount }
+  where Accounts.id == p.account
+  returning { balance = Accounts.balance }
+}
 
 balance_of : Sql.Template Pg { account : BigInt } { balance : BigDecimal }
-let balance_of = sql p { from a in Accounts; where a.id == p.account; select a.balance }
+let balance_of = sql p {
+  from a in Accounts
+  where a.id == p.account
+  select a.balance
+}
 
 /// A query that sleeps on the server, until it is cancelled.
 sleeper : Sql.Query Pg Unknown
@@ -71,9 +76,8 @@ let sleeping =
 
 put : BigInt -> BigInt ->{Database; EncodeError, DbError, DecodeError} Unit
 let put account amount =
-  ignore (
-    Database.query (Sql.bind deposit { account = account; amount = BigDecimal.from_integer amount })
-  )
+  ignore (Database.query
+    (Sql.bind deposit { account = account; amount = BigDecimal.from_integer amount }))
 
 balance : BigInt ->{Database; EncodeError, DbError, DecodeError} String
 let balance account =
@@ -86,8 +90,10 @@ account : String ->{Database; EncodeError, DbError, DecodeError} BigInt
 let account name =
   match Database.query (Sql.bind add_user { name = name }) with
   | [user] ->
-    match Database.query
-      (Sql.bind open_account { owner = user.id; balance = BigDecimal.from_integer 10n }) with
+    match
+      Database.query
+        (Sql.bind open_account { owner = user.id; balance = BigDecimal.from_integer 10n })
+    with
     | [opened] -> opened.id
     | _ -> 0n
   | _ -> 0n
@@ -98,42 +104,57 @@ let run () =
   let a = account "atomic"
   let refused =
     try
-      Database.transaction (task {
-        put a 5n
-        put a (-100n)
-        "committed"
-      })
+      Database.transaction
+        (task {
+          put a 5n
+          put a (-100n)
+          "committed"
+        })
     with
     | DbError e -> "rolled back " ++ e.code
   Platform.stdout_line (refused ++ ", balance " ++ balance a)
   // one connection: a caller that rolls back does not undo another's commit
   let b = account "isolated"
   let outcomes =
-    parallel_all
-      2
-      [
-        task { try Database.transaction (task { put b 1n; "kept" }) with | Abandoned -> "?" },
-        task {
-          try Database.transaction (task {
-            put b 2n
-            from_result (Err Abandoned)
-          }) with
-          | Abandoned -> "abandoned"
-        },
-      ]
+    parallel_all 2 [
+      task {
+        try
+          Database.transaction
+            (task {
+              put b 1n
+              "kept"
+            })
+        with
+        | Abandoned -> "?"
+      },
+      task {
+        try
+          Database.transaction
+            (task {
+              put b 2n
+              from_result (Err Abandoned)
+            })
+        with
+        | Abandoned -> "abandoned"
+      },
+    ]
   Platform.stdout_line (show outcomes ++ ", balance " ++ balance b)
   // a savepoint: the inner failure undoes only its writes
   let c = account "nested"
-  Database.transaction (task {
-    put c 3n
-    let inner =
-      try Database.transaction (task {
-        put c 4n
-        from_result (Err Abandoned)
-      }) with
-      | Abandoned -> "inner undone"
-    Platform.stdout_line inner
-  })
+  Database.transaction
+    (task {
+      put c 3n
+      let inner =
+        try
+          Database.transaction
+            (task {
+              put c 4n
+              from_result (Err Abandoned)
+            })
+        with
+        | Abandoned -> "inner undone"
+      Platform.stdout_line inner
+    })
   Platform.stdout_line ("balance " ++ balance c)
 
 /// Twenty sleepers interrupted on a pool of two: none keeps a backend.

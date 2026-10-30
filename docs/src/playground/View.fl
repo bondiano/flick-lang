@@ -8,120 +8,128 @@ import State exposing (Model, Mode(..), Tab(..), profile_name, tr)
 import Toolbar exposing (choice, examples_view)
 
 result_pane : Atom.Writable Model -> Model -> Ui
-let result_pane model m =
-  ui {
-    div { class_name = "fp-result" }
-      [
-        div { class_name = "fp-pane-header" }
-          (if m.mode == Transpile then
-            [
-              span { class_name = "fp-file" } [text "JavaScript"],
-              span { class_name = "fp-pane-note" } [text (profile_name m.profile)],
-            ]
-          else
-            [
-              choice
-                (tr m.locale "Output" "Вывод")
-                (m.tab == Output)
-                false
-                (fun () -> update model (fun m -> { m with tab = Output })),
-              choice
-                (diagnostic_label m)
-                (m.tab == Problems)
-                false
-                (fun () -> update model (fun m -> { m with tab = Problems })),
-            ]),
-        if m.mode == Transpile then generated_pane m
-        else if m.tab == Problems then div { class_name = "fp-problems-panel" } [current_problems m]
-        else output_pane m,
-      ]
-  }
+let result_pane model m = ui {
+  div { class_name = "fp-result" } [
+    div
+      { class_name = "fp-pane-header" }
+      (
+        if m.mode == Transpile then
+          [
+            span { class_name = "fp-file" } [text "JavaScript"],
+            span { class_name = "fp-pane-note" } [text (profile_name m.profile)],
+          ]
+        else
+          [
+            choice (tr m.locale "Output" "Вывод") (m.tab == Output) false (fun () ->
+              update model (fun m -> { m with tab = Output })
+            ),
+            choice (diagnostic_label m) (m.tab == Problems) false (fun () ->
+              update model (fun m -> { m with tab = Problems })
+            ),
+          ]
+      ),
+    if m.mode == Transpile then
+      generated_pane m
+    else if m.tab == Problems then
+      div { class_name = "fp-problems-panel" } [current_problems m]
+    else output_pane m,
+  ]
+}
 
 notice : String -> String -> Ui
-let notice title detail =
-  ui {
-    div { class_name = "fp-notice" }
-      [paragraph [text title], pre { class_name = "fp-failure-detail" } [text detail]]
-  }
+let notice title detail = ui {
+  div { class_name = "fp-notice" } [
+    paragraph [text title],
+    pre { class_name = "fp-failure-detail" } [text detail],
+  ]
+}
 
 view : Atom.Writable Model -> Model -> Ui
-let view model m =
-  ui {
-    div { class_name = if m.mode == Play then "fp fp-play" else "fp fp-transpile" }
-      [
-        // a hidden button runs a compile under `latest`: a newer edit interrupts the one before
-        Ui.with_host { Ui.host with id = Some "fp-compile"; class_name = Some "fp-refresh"; aria_hidden = Some true; tab_index = Some (-1) }
-          (button
-            { disabled = false; on_click = Ui.Event.latest (fun _ -> task { refresh model }) }
-            []),
-        examples_view model m,
-        div { class_name = "fp-workspace" }
-          [
-            Toolbar.view model m,
-            if m.load_error != "" then
-              Ui.with_host { Ui.host with role = Some "alert" }
-                (div { class_name = "fp-recovery" }
-                  [
-                    notice
-                      (tr
-                        m.locale
-                        "The compiler could not load. Retry, or reload this page after checking your connection."
-                        "Не удалось загрузить компилятор. Повторите попытку или проверьте соединение и обновите страницу.")
-                      m.load_error,
-                    button
-                      {
-                        disabled = m.loading;
-                        on_click = Ui.Event.exhaust (fun _ -> task { load_compiler model });
-                      }
-                      [text (tr m.locale "Retry compiler" "Загрузить снова")],
-                  ])
-            else empty,
-            if m.compile_error != "" then
-              Ui.with_host { Ui.host with role = Some "alert" }
-                (div { class_name = "fp-recovery" }
-                  [
-                    notice
-                      (tr
-                        m.locale
-                        "The compiler failed while checking this source."
-                        "Сбой компилятора при проверке кода.")
-                      m.compile_error,
-                    button
-                      {
-                        disabled = false;
-                        on_click = Ui.Event.latest (fun _ -> task { notify "fp-compile" });
-                      }
-                      [text (tr m.locale "Retry compilation" "Повторить компиляцию")],
-                  ])
-            else empty,
-            if m.fault != "" then
-              Ui.with_host { Ui.host with role = Some "alert" }
-                (notice
-                  (tr
-                    m.locale
-                    "The playground encountered an error. Reload the page to recover."
-                    "В редакторе произошла ошибка. Обновите страницу, чтобы продолжить.")
-                  m.fault)
-            else empty,
-            if m.syntax_error != "" then
-              Ui.with_host { Ui.host with role = Some "status" }
-                (div { class_name = "fp-recovery" }
-                  [notice
-                    (tr m.locale
-                      "Highlighting is unavailable. Editing and compilation still work."
-                      "Не удалось включить подсветку. Код по-прежнему можно редактировать и компилировать.")
-                    m.syntax_error])
-            else empty,
-            div
-              { class_name = "fp-panes" }
-              [Ui.render source_pane { model = model; m = m }, result_pane model m],
-            if m.mode == Transpile then
-              div { class_name = "fp-transpile-diagnostics" }
-                [
-                  div { class_name = "fp-diagnostics-heading" } [text (diagnostic_label m)],
-                  current_problems m,
-                ]
-            else empty,
-          ],
-      ]
-  }
+let view model m = ui {
+  div { class_name = if m.mode == Play then "fp fp-play" else "fp fp-transpile" } [
+    // a hidden button runs a compile under `latest`: a newer edit interrupts the one before
+    Ui.with_host
+      {
+        Ui.host with
+        id = Some "fp-compile";
+        class_name = Some "fp-refresh";
+        aria_hidden = Some true;
+        tab_index = Some (-1);
+      }
+      (button
+        { disabled = false; on_click = Ui.Event.latest (fun _ -> task { refresh model }) }
+        []),
+    examples_view model m,
+    div { class_name = "fp-workspace" } [
+      Toolbar.view model m,
+      if m.load_error != "" then
+        Ui.with_host
+          { Ui.host with role = Some "alert" }
+          (div { class_name = "fp-recovery" } [
+            notice
+              (tr
+                m.locale
+                "The compiler could not load. Retry, or reload this page after checking your connection."
+                "Не удалось загрузить компилятор. Повторите попытку или проверьте соединение и обновите страницу.")
+              m.load_error,
+            button
+              {
+                disabled = m.loading;
+                on_click = Ui.Event.exhaust (fun _ -> task { load_compiler model });
+              }
+              [text (tr m.locale "Retry compiler" "Загрузить снова")],
+          ])
+      else empty,
+      if m.compile_error != "" then
+        Ui.with_host
+          { Ui.host with role = Some "alert" }
+          (div { class_name = "fp-recovery" } [
+            notice
+              (tr
+                m.locale
+                "The compiler failed while checking this source."
+                "Сбой компилятора при проверке кода.")
+              m.compile_error,
+            button
+              {
+                disabled = false;
+                on_click = Ui.Event.latest (fun _ -> task { notify "fp-compile" });
+              }
+              [text (tr m.locale "Retry compilation" "Повторить компиляцию")],
+          ])
+      else empty,
+      if m.fault != "" then
+        Ui.with_host
+          { Ui.host with role = Some "alert" }
+          (notice
+            (tr
+              m.locale
+              "The playground encountered an error. Reload the page to recover."
+              "В редакторе произошла ошибка. Обновите страницу, чтобы продолжить.")
+            m.fault)
+      else empty,
+      if m.syntax_error != "" then
+        Ui.with_host
+          { Ui.host with role = Some "status" }
+          (div { class_name = "fp-recovery" } [
+            notice
+              (tr
+                m.locale
+                "Highlighting is unavailable. Editing and compilation still work."
+                "Не удалось включить подсветку. Код по-прежнему можно редактировать и компилировать.")
+              m.syntax_error,
+          ])
+      else empty,
+      div { class_name = "fp-panes" } [
+        Ui.render source_pane { model = model; m = m },
+        result_pane model m,
+      ],
+      if m.mode == Transpile then
+        div { class_name = "fp-transpile-diagnostics" } [
+          div { class_name = "fp-diagnostics-heading" } [text (diagnostic_label m)],
+          current_problems m,
+        ]
+      else empty,
+    ],
+  ]
+}

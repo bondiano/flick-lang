@@ -1,15 +1,11 @@
 // Exact structural records with row polymorphism.
 module App.Records exposing (name, project_name, rename, origin)
 
-name :
-  forall fields. { name : String | fields } -> String
-let name value =
-  value.name
+name : forall fields. { name : String | fields } -> String
+let name value = value.name
 
-project_name :
-  forall fields. { name : String | fields } -> { name : String }
-let project_name value =
-  { name = value.name }
+project_name : forall fields. { name : String | fields } -> { name : String }
+let project_name value = { name = value.name }
 
 type alias User = { id : Float; name : String; email : String }
 

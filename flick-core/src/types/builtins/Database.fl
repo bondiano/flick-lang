@@ -4,12 +4,12 @@
 module Database exposing (..)
 
 service Database =
-  run_query : forall a. Sql.Query Sql.Pg a ->{; Sql.EncodeError, Sql.DbError, Sql.DecodeError}
-    List a
+  run_query :
+    forall a. Sql.Query Sql.Pg a ->{; Sql.EncodeError, Sql.DbError, Sql.DecodeError} List a
   run_execute : forall a. Sql.Query Sql.Pg a ->{; Sql.EncodeError, Sql.DbError} Int
 
-query : forall a. Sql.Query Sql.Pg a ->{Database; Sql.EncodeError, Sql.DbError, Sql.DecodeError}
-  List a
+query :
+  forall a. Sql.Query Sql.Pg a ->{Database; Sql.EncodeError, Sql.DbError, Sql.DecodeError} List a
 let query q = Database.run_query q
 
 execute : forall a. Sql.Query Sql.Pg a ->{Database; Sql.EncodeError, Sql.DbError} Int
@@ -38,13 +38,12 @@ type alias PgConfig = {
 
 /// A pool of 10 connections to `url`, without timeouts.
 config : String -> PgConfig
-let config url =
-  {
-    connection_string = url;
-    max_connections = 10;
-    statement_timeout_ms = None;
-    acquire_timeout_ms = None;
-  }
+let config url = {
+  connection_string = url;
+  max_connections = 10;
+  statement_timeout_ms = None;
+  acquire_timeout_ms = None;
+}
 
 pg_layer : ServiceTag {Database} -> PgConfig -> Layer none none {Database}
 foreign pure pg_layer from "@flick-lang/runtime/sql" "pgLayer"

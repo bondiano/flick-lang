@@ -28,9 +28,7 @@ foreign pure queue from "@flick-lang/runtime/ui/react" "actionQueue"
 
 /// Runs at most `limit` tasks at once; an event beyond that is rejected
 /// and reported to the supervisor.
-concurrent : forall c s. Int ->
-  (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c ->
-  (Action s)^c
+concurrent : forall c s. Int -> (s -> (Eff {Atom.Write, Ui.Document} none Unit)^c)^c -> (Action s)^c
 foreign pure concurrent from "@flick-lang/runtime/ui/react" "actionConcurrent"
   retention call
 

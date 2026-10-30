@@ -54,30 +54,27 @@ let bodies () =
   Platform.stdout_line ("response stream: " ++ String.join "" got)
 
 files : Unit ->{; PlatformError.PlatformError, HttpServerError} Unit
-let files () =
-  provide FileSystem.node {
-    scope {
-      let dir =
-        FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-streams" }
-      let path = dir ++ "/f.txt"
-      FileSystem.write_file_string { flag = None; mode = None } path "file body"
-      let part = { Http.Body.file_options with offset = ByteSize.bytes 5 }
-      Platform.stdout_line ("file: " ++ show (Http.Body.content_length (Http.Body.file part path)))
-      let whole = Http.Body.file_from_info Http.Body.file_options path (FileSystem.stat path)
-      Platform.stdout_line ("file_from_info: " ++ show (Http.Body.content_length whole))
-      let request = Http.ClientRequest.body_file part path (Http.ClientRequest.post "http://fake/u")
-      Platform.stdout_line
-        ("body_file: " ++ Http.ServerRequest.text (Http.ServerRequest.from_client_request request))
-    }
+let files () = provide FileSystem.node {
+  scope {
+    let dir =
+      FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-streams" }
+    let path = dir ++ "/f.txt"
+    FileSystem.write_file_string { flag = None; mode = None } path "file body"
+    let part = { Http.Body.file_options with offset = ByteSize.bytes 5 }
+    Platform.stdout_line ("file: " ++ show (Http.Body.content_length (Http.Body.file part path)))
+    let whole = Http.Body.file_from_info Http.Body.file_options path (FileSystem.stat path)
+    Platform.stdout_line ("file_from_info: " ++ show (Http.Body.content_length whole))
+    let request = Http.ClientRequest.body_file part path (Http.ClientRequest.post "http://fake/u")
+    Platform.stdout_line
+      ("body_file: " ++ Http.ServerRequest.text (Http.ServerRequest.from_client_request request))
   }
+}
 
 forms : Unit ->{; MultipartError} Unit
 let forms () =
   Platform.stdout_line
-    (
-      "parts: "
-        ++ show (Stream.run_collect (Stream.map_effect describe (Http.Multipart.parts form)))
-    )
+    ("parts: "
+      ++ show (Stream.run_collect (Stream.map_effect describe (Http.Multipart.parts form))))
   let parsed =
     Stream.pipe_through_channel
       (Http.Multipart.make_channel [("content-type", form_type)])
@@ -95,12 +92,13 @@ compressed : Unit ->{; HttpClientError} Unit
 let compressed () =
   zipped : Http.Middleware.Handler none none
   let zipped =
-    Http.Middleware.compression_web
-      { algorithms = []; minSize = Some 10; levels = [] }
-      (fun _ -> Http.ServerResponse.text (String.repeat 200 "a") ok)
+    Http.Middleware.compression_web { algorithms = []; minSize = Some 10; levels = [] } (fun _ ->
+      Http.ServerResponse.text (String.repeat 200 "a") ok
+    )
   let request =
     Http.ClientRequest.set_header "accept-encoding" "gzip" (Http.ClientRequest.get "http://fake/z")
-  send : Http.ServerRequest.ServerRequest ->
+  send :
+    Http.ServerRequest.ServerRequest ->
     Http.ServerResponse.ServerResponse ->{; HttpClientError}
     Unit
   let send _ response =

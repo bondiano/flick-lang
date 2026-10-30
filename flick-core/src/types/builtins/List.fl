@@ -116,9 +116,7 @@ import List.Search exposing (..)
 import List.Transform exposing (..)
 
 /// Applies a pure function to each element.
-map :
-  forall c a b.
-  (a -> b)^c -> (List a -> List b)^c
+map : forall c a b. (a -> b)^c -> (List a -> List b)^c
 foreign pure map from "@flick-lang/runtime" "listMap"
   reviewed "effect@4.0.5 sha256:1f6394368959203b"
   arity 2
@@ -126,9 +124,6 @@ foreign pure map from "@flick-lang/runtime" "listMap"
 
 /// Runs a runtime function on each element, one after another from the
 /// first.
-map_effect :
-  forall c a b r e.
-  (a ->{r; e} b)^c ->
-  (List a ->{r; e} List b)^c
+map_effect : forall c a b r e. (a ->{r; e} b)^c -> (List a ->{r; e} List b)^c
 foreign effect map_effect from "@flick-lang/runtime" "listMapEffect"
   retention call

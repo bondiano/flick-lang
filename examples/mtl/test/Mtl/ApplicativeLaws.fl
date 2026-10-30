@@ -37,9 +37,8 @@ let result_functions =
 validations : Gen.Gen (Validation (List String) Float)
 let validations =
   Gen.map
-    (
-      fun (valid, x) ->
-        if valid then Validation.valid x else Validation.invalid ["value:" ++ show x]
+    (fun (valid, x) ->
+      if valid then Validation.valid x else Validation.invalid ["value:" ++ show x]
     )
     (Gen.pair Gen.bool ints)
 
@@ -47,104 +46,115 @@ validation_functions : Gen.Gen (Validation (List String) (Float -> Float))
 let validation_functions =
   Gen.map
     (fun (valid, x, f) ->
-      if valid then Validation.valid f else Validation.invalid ["function:" ++ show x])
+      if valid then Validation.valid f else Validation.invalid ["function:" ++ show x]
+    )
     (triple Gen.bool ints functions)
 
 option_laws : List Test.Test
-let option_laws =
-  [
-    Test.property "identity (Option)" options (fun value ->
-      Test.equal value (map2 (fun f x -> f x) (pure (fun x -> x)) value)),
-    Test.property
-      "composition (Option)"
-      (triple option_functions option_functions options)
-      (fun (fs, gs, value) ->
+let option_laws = [
+  Test.property "identity (Option)" options (fun value ->
+    Test.equal value (map2 (fun f x -> f x) (pure (fun x -> x)) value)
+  ),
+  Test.property
+    "composition (Option)"
+    (triple option_functions option_functions options)
+    (fun (fs, gs, value) ->
       first : Option ((Float -> Float) -> Float -> Float)
       let first = map2 (fun f x -> f x) (pure (fun f g x -> f (g x))) fs
       second : Option (Float -> Float)
       let second = map2 (fun f x -> f x) first gs
       Test.equal
         (map2 (fun f x -> f x) second value)
-        (map2 (fun f x -> f x) fs (map2 (fun f x -> f x) gs value))),
-    Test.property "homomorphism (Option)" (Gen.pair functions ints) (fun (f, x) ->
-      expected : Option Float
-      let expected = pure (f x)
-      Test.equal expected (map2 (fun f value -> f value) (pure f) (pure x))),
-    Test.property "interchange (Option)" (Gen.pair option_functions ints) (fun (fs, x) ->
-      Test.equal
-        (map2 (fun f value -> f value) fs (pure x))
-        (map2 (fun f value -> f value) (pure (fun f -> f x)) fs)),
-    Test.property "map coherence (Option)" (Gen.pair functions options) (fun (f, value) ->
-      Test.equal (map f value) (map2 (fun f x -> f x) (pure f) value)),
-  ]
+        (map2 (fun f x -> f x) fs (map2 (fun f x -> f x) gs value))
+    ),
+  Test.property "homomorphism (Option)" (Gen.pair functions ints) (fun (f, x) ->
+    expected : Option Float
+    let expected = pure (f x)
+    Test.equal expected (map2 (fun f value -> f value) (pure f) (pure x))
+  ),
+  Test.property "interchange (Option)" (Gen.pair option_functions ints) (fun (fs, x) ->
+    Test.equal
+      (map2 (fun f value -> f value) fs (pure x))
+      (map2 (fun f value -> f value) (pure (fun f -> f x)) fs)
+  ),
+  Test.property "map coherence (Option)" (Gen.pair functions options) (fun (f, value) ->
+    Test.equal (map f value) (map2 (fun f x -> f x) (pure f) value)
+  ),
+]
 
 list_laws : List Test.Test
-let list_laws =
-  [
-    Test.property "identity (List)" lists (fun values ->
-      Test.equal values (map2 (fun f x -> f x) (pure (fun x -> x)) values)),
-    Test.property
-      "composition (List)"
-      (triple list_functions list_functions lists)
-      (fun (fs, gs, values) ->
+let list_laws = [
+  Test.property "identity (List)" lists (fun values ->
+    Test.equal values (map2 (fun f x -> f x) (pure (fun x -> x)) values)
+  ),
+  Test.property
+    "composition (List)"
+    (triple list_functions list_functions lists)
+    (fun (fs, gs, values) ->
       first : List ((Float -> Float) -> Float -> Float)
       let first = map2 (fun f x -> f x) (pure (fun f g x -> f (g x))) fs
       second : List (Float -> Float)
       let second = map2 (fun f x -> f x) first gs
       Test.equal
         (map2 (fun f x -> f x) second values)
-        (map2 (fun f x -> f x) fs (map2 (fun f x -> f x) gs values))),
-    Test.property "homomorphism (List)" (Gen.pair functions ints) (fun (f, x) ->
-      expected : List Float
-      let expected = pure (f x)
-      Test.equal expected (map2 (fun f value -> f value) (pure f) (pure x))),
-    Test.property "interchange (List)" (Gen.pair list_functions ints) (fun (fs, x) ->
-      Test.equal
-        (map2 (fun f value -> f value) fs (pure x))
-        (map2 (fun f value -> f value) (pure (fun f -> f x)) fs)),
-    Test.property "map coherence (List)" (Gen.pair functions lists) (fun (f, values) ->
-      Test.equal (map f values) (map2 (fun f x -> f x) (pure f) values)),
-  ]
+        (map2 (fun f x -> f x) fs (map2 (fun f x -> f x) gs values))
+    ),
+  Test.property "homomorphism (List)" (Gen.pair functions ints) (fun (f, x) ->
+    expected : List Float
+    let expected = pure (f x)
+    Test.equal expected (map2 (fun f value -> f value) (pure f) (pure x))
+  ),
+  Test.property "interchange (List)" (Gen.pair list_functions ints) (fun (fs, x) ->
+    Test.equal
+      (map2 (fun f value -> f value) fs (pure x))
+      (map2 (fun f value -> f value) (pure (fun f -> f x)) fs)
+  ),
+  Test.property "map coherence (List)" (Gen.pair functions lists) (fun (f, values) ->
+    Test.equal (map f values) (map2 (fun f x -> f x) (pure f) values)
+  ),
+]
 
 result_laws : List Test.Test
-let result_laws =
-  [
-    Test.property "identity (Result)" results (fun value ->
-      Test.equal value (map2 (fun f x -> f x) (pure (fun x -> x)) value)),
-    Test.property
-      "composition (Result)"
-      (triple result_functions result_functions results)
-      (fun (fs, gs, value) ->
+let result_laws = [
+  Test.property "identity (Result)" results (fun value ->
+    Test.equal value (map2 (fun f x -> f x) (pure (fun x -> x)) value)
+  ),
+  Test.property
+    "composition (Result)"
+    (triple result_functions result_functions results)
+    (fun (fs, gs, value) ->
       first : Result String ((Float -> Float) -> Float -> Float)
       let first = map2 (fun f x -> f x) (pure (fun f g x -> f (g x))) fs
       second : Result String (Float -> Float)
       let second = map2 (fun f x -> f x) first gs
       Test.equal
         (map2 (fun f x -> f x) second value)
-        (map2 (fun f x -> f x) fs (map2 (fun f x -> f x) gs value))),
-    Test.property "homomorphism (Result)" (Gen.pair functions ints) (fun (f, x) ->
-      expected : Result String Float
-      let expected = pure (f x)
-      Test.equal expected (map2 (fun f value -> f value) (pure f) (pure x))),
-    Test.property "interchange (Result)" (Gen.pair result_functions ints) (fun (fs, x) ->
-      Test.equal
-        (map2 (fun f value -> f value) fs (pure x))
-        (map2 (fun f value -> f value) (pure (fun f -> f x)) fs)),
-    Test.property "map coherence (Result)" (Gen.pair functions results) (fun (f, value) ->
-      Test.equal (map f value) (map2 (fun f x -> f x) (pure f) value)),
-  ]
+        (map2 (fun f x -> f x) fs (map2 (fun f x -> f x) gs value))
+    ),
+  Test.property "homomorphism (Result)" (Gen.pair functions ints) (fun (f, x) ->
+    expected : Result String Float
+    let expected = pure (f x)
+    Test.equal expected (map2 (fun f value -> f value) (pure f) (pure x))
+  ),
+  Test.property "interchange (Result)" (Gen.pair result_functions ints) (fun (fs, x) ->
+    Test.equal
+      (map2 (fun f value -> f value) fs (pure x))
+      (map2 (fun f value -> f value) (pure (fun f -> f x)) fs)
+  ),
+  Test.property "map coherence (Result)" (Gen.pair functions results) (fun (f, value) ->
+    Test.equal (map f value) (map2 (fun f x -> f x) (pure f) value)
+  ),
+]
 
 seq_laws : List Test.Test
-let seq_laws =
-  [
-    Test.property "identity (Seq)" lists (fun values ->
-      Test.equal
-        values
-        (Seq.to_list (map2 (fun f x -> f x) (pure (fun x -> x)) (Seq.of_list values)))),
-    Test.property
-      "composition (Seq)"
-      (triple list_functions list_functions lists)
-      (fun (fs, gs, values) ->
+let seq_laws = [
+  Test.property "identity (Seq)" lists (fun values ->
+    Test.equal values (Seq.to_list (map2 (fun f x -> f x) (pure (fun x -> x)) (Seq.of_list values)))
+  ),
+  Test.property
+    "composition (Seq)"
+    (triple list_functions list_functions lists)
+    (fun (fs, gs, values) ->
       let outer = Seq.of_list fs
       let inner = Seq.of_list gs
       let sequence = Seq.of_list values
@@ -154,65 +164,72 @@ let seq_laws =
       let second = map2 (fun f x -> f x) first inner
       Test.equal
         (Seq.to_list (map2 (fun f x -> f x) second sequence))
-        (Seq.to_list (map2 (fun f x -> f x) outer (map2 (fun f x -> f x) inner sequence)))),
-    Test.property "homomorphism (Seq)" (Gen.pair functions ints) (fun (f, x) ->
-      expected : Seq Float
-      let expected = pure (f x)
-      actual : Seq Float
-      let actual = map2 (fun f value -> f value) (pure f) (pure x)
-      Test.equal (Seq.to_list expected) (Seq.to_list actual)),
-    Test.property "interchange (Seq)" (Gen.pair list_functions ints) (fun (fs, x) ->
-      let functions = Seq.of_list fs
-      Test.equal
-        (Seq.to_list (map2 (fun f value -> f value) functions (pure x)))
-        (Seq.to_list (map2 (fun f value -> f value) (pure (fun f -> f x)) functions))),
-    Test.property "map coherence (Seq)" (Gen.pair functions lists) (fun (f, values) ->
-      let sequence = Seq.of_list values
-      Test.equal
-        (Seq.to_list (map f sequence))
-        (Seq.to_list (map2 (fun f x -> f x) (pure f) sequence))),
-  ]
+        (Seq.to_list (map2 (fun f x -> f x) outer (map2 (fun f x -> f x) inner sequence)))
+    ),
+  Test.property "homomorphism (Seq)" (Gen.pair functions ints) (fun (f, x) ->
+    expected : Seq Float
+    let expected = pure (f x)
+    actual : Seq Float
+    let actual = map2 (fun f value -> f value) (pure f) (pure x)
+    Test.equal (Seq.to_list expected) (Seq.to_list actual)
+  ),
+  Test.property "interchange (Seq)" (Gen.pair list_functions ints) (fun (fs, x) ->
+    let functions = Seq.of_list fs
+    Test.equal
+      (Seq.to_list (map2 (fun f value -> f value) functions (pure x)))
+      (Seq.to_list (map2 (fun f value -> f value) (pure (fun f -> f x)) functions))
+  ),
+  Test.property "map coherence (Seq)" (Gen.pair functions lists) (fun (f, values) ->
+    let sequence = Seq.of_list values
+    Test.equal
+      (Seq.to_list (map f sequence))
+      (Seq.to_list (map2 (fun f x -> f x) (pure f) sequence))
+  ),
+]
 
 validation_laws : List Test.Test
-let validation_laws =
-  [
-    Test.property "identity (Validation)" validations (fun value ->
-      Test.equal
-        (Validation.to_result value)
-        (Validation.to_result (map2 (fun f x -> f x) (pure (fun x -> x)) value))),
-    Test.property
-      "composition (Validation)"
-      (triple validation_functions validation_functions validations)
-      (fun (fs, gs, value) ->
+let validation_laws = [
+  Test.property "identity (Validation)" validations (fun value ->
+    Test.equal
+      (Validation.to_result value)
+      (Validation.to_result (map2 (fun f x -> f x) (pure (fun x -> x)) value))
+  ),
+  Test.property
+    "composition (Validation)"
+    (triple validation_functions validation_functions validations)
+    (fun (fs, gs, value) ->
       first : Validation (List String) ((Float -> Float) -> Float -> Float)
       let first = map2 (fun f x -> f x) (pure (fun f g x -> f (g x))) fs
       second : Validation (List String) (Float -> Float)
       let second = map2 (fun f x -> f x) first gs
       Test.equal
         (Validation.to_result (map2 (fun f x -> f x) second value))
-        (Validation.to_result (map2 (fun f x -> f x) fs (map2 (fun f x -> f x) gs value)))),
-    Test.property "homomorphism (Validation)" (Gen.pair functions ints) (fun (f, x) ->
-      expected : Validation (List String) Float
-      let expected = pure (f x)
-      Test.equal
-        (Validation.to_result expected)
-        (Validation.to_result (map2 (fun f value -> f value) (pure f) (pure x)))),
-    Test.property "interchange (Validation)" (Gen.pair validation_functions ints) (fun (fs, x) ->
-      Test.equal
-        (Validation.to_result (map2 (fun f value -> f value) fs (pure x)))
-        (Validation.to_result (map2 (fun f value -> f value) (pure (fun f -> f x)) fs))),
-    Test.property "map coherence (Validation)" (Gen.pair functions validations) (fun (f, value) ->
-      Test.equal
-        (Validation.to_result (map f value))
-        (Validation.to_result (map2 (fun f x -> f x) (pure f) value))),
-  ]
+        (Validation.to_result (map2 (fun f x -> f x) fs (map2 (fun f x -> f x) gs value)))
+    ),
+  Test.property "homomorphism (Validation)" (Gen.pair functions ints) (fun (f, x) ->
+    expected : Validation (List String) Float
+    let expected = pure (f x)
+    Test.equal
+      (Validation.to_result expected)
+      (Validation.to_result (map2 (fun f value -> f value) (pure f) (pure x)))
+  ),
+  Test.property "interchange (Validation)" (Gen.pair validation_functions ints) (fun (fs, x) ->
+    Test.equal
+      (Validation.to_result (map2 (fun f value -> f value) fs (pure x)))
+      (Validation.to_result (map2 (fun f value -> f value) (pure (fun f -> f x)) fs))
+  ),
+  Test.property "map coherence (Validation)" (Gen.pair functions validations) (fun (f, value) ->
+    Test.equal
+      (Validation.to_result (map f value))
+      (Validation.to_result (map2 (fun f x -> f x) (pure f) value))
+  ),
+]
 
 laws : List Test.Test
-let laws =
-  [
-    Test.group "Option" option_laws,
-    Test.group "List" list_laws,
-    Test.group "Result" result_laws,
-    Test.group "Seq" seq_laws,
-    Test.group "Validation" validation_laws,
-  ]
+let laws = [
+  Test.group "Option" option_laws,
+  Test.group "List" list_laws,
+  Test.group "Result" result_laws,
+  Test.group "Seq" seq_laws,
+  Test.group "Validation" validation_laws,
+]

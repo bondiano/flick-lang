@@ -15,24 +15,33 @@ view : Input -> Atom.Writable Model -> Model -> Ui
 let view input model m =
   let label =
     if m.problem != "" then
-      (if input.ru then
-        "Не удалось скопировать. Выделите код вручную."
-      else
-        "Copy failed. Select the code manually.") ++ " " ++ m.problem
+      (
+        if input.ru then
+          "Не удалось скопировать. Выделите код вручную."
+        else
+          "Copy failed. Select the code manually."
+      )
+        ++ " "
+        ++ m.problem
     else if m.copied then
       if input.ru then "Скопировано" else "Copied"
     else
       if input.ru then "Копировать код" else "Copy code"
   ui {
-    attributes [("aria-label", label), ("title", label), ("aria-live", "polite")]
+    attributes
+      [("aria-label", label), ("title", label), ("aria-live", "polite")]
       (button
-        { disabled = false; on_click = Ui.Event.latest (fun _ -> task {
-            let problem = try (copy_text input.source |> fun _ -> "") with
-              | JsError failure -> failure.message
-            Atom.set model { copied = problem == ""; problem = problem }
-          }) }
-        [icon (if m.copied then "check" else "copy"),
-          span { class_name = "sr-only" } [text label]])
+        {
+          disabled = false;
+          on_click =
+            Ui.Event.latest (fun _ -> task {
+              let problem =
+                try (copy_text input.source |> fun _ -> "") with
+                | JsError failure -> failure.message
+              Atom.set model { copied = problem == ""; problem = problem }
+            });
+        }
+        [icon (if m.copied then "check" else "copy"), span { class_name = "sr-only" } [text label]])
   }
 
 report : Failure e ->{} Unit

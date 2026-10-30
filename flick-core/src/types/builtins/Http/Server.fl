@@ -63,23 +63,22 @@ foreign effect log_address from "@flick-lang/runtime/effect/http/HttpServer" "fl
   reviewed "effect@4.0.5 sha256:13cc22882eaf503e"
 
 /// The client of the service, with each request's URL below the server's.
-test_client : forall s. Server s ->{Http.Client.HttpClient;}
-  Http.Client.Client none {Http.ClientError.HttpClientError}
+test_client :
+  forall s.
+  Server s ->{Http.Client.HttpClient;} Http.Client.Client none {Http.ClientError.HttpClientError}
 let test_client server =
   Http.Client.current ()
-    |> Http.Client.map_request (Http.ClientRequest.prepend_url (format_address (address server)))
+  |> Http.Client.map_request (Http.ClientRequest.prepend_url (format_address (address server)))
 
 /// The service of `test_client`.
-layer_test_client : forall s. Server s ->
-  Layer {Http.Client.HttpClient} none {Http.Client.HttpClient}
+layer_test_client :
+  forall s. Server s -> Layer {Http.Client.HttpClient} none {Http.Client.HttpClient}
 let layer_test_client server =
   let url = format_address (address server)
   Http.Client.layer
-    (
-      task {
-        Http.Client.current () |> Http.Client.map_request (Http.ClientRequest.prepend_url url)
-      }
-    )
+    (task {
+      Http.Client.current () |> Http.Client.map_request (Http.ClientRequest.prepend_url url)
+    })
 
 /// The platform services a server's handlers use: `Http.Platform.node` and
 /// strong entity tags.

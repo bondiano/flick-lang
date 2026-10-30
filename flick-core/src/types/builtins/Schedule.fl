@@ -8,28 +8,26 @@ module Schedule exposing (..)
 type Schedule (r : ServiceRow) (e : ErrorRow) i o
 
 /// What a callback of a schedule sees of the step it decides.
-type alias InputMetadata i =
-  {
-    input : i;
-    attempt : Int;
-    start : Float;
-    now : Float;
-    elapsed : Float;
-    elapsedSincePrevious : Float;
-  }
+type alias InputMetadata i = {
+  input : i;
+  attempt : Int;
+  start : Float;
+  now : Float;
+  elapsed : Float;
+  elapsedSincePrevious : Float;
+}
 
 /// A step's metadata with its output and the delay chosen.
-type alias Metadata o i =
-  {
-    input : i;
-    output : o;
-    duration : Duration.Duration;
-    attempt : Int;
-    start : Float;
-    now : Float;
-    elapsed : Float;
-    elapsedSincePrevious : Float;
-  }
+type alias Metadata o i = {
+  input : i;
+  output : o;
+  duration : Duration.Duration;
+  attempt : Int;
+  start : Float;
+  now : Float;
+  elapsed : Float;
+  elapsedSincePrevious : Float;
+}
 
 /// Recurs forever, `n` counting the recurrences from 0, without a delay.
 forever : Schedule none none i Int
@@ -124,7 +122,8 @@ foreign pure min from "@flick-lang/runtime/effect/Schedule" "min"
 
 /// Stops after the duration has elapsed or the number of outputs, whichever
 /// comes first; `None` leaves that bound out.
-up_to : { duration : Option Duration.Duration; times : Option Int } ->
+up_to :
+  { duration : Option Duration.Duration; times : Option Int } ->
   Schedule r e i o ->
   Schedule r e i o
 foreign pure up_to from "@flick-lang/runtime/effect/Schedule" "flickUpTo"
@@ -150,9 +149,8 @@ foreign pure while from "@flick-lang/runtime/effect/Schedule" "while"
   reviewed "effect@4.0.5 sha256:14e7a1f6ce7c5420"
 
 /// Adds the duration `f` computes to each delay.
-add_delay : (Metadata o i ->{r2; e2} Duration.Duration) ->
-  Schedule r e i o ->
-  Schedule (r + r2) (e + e2) i o
+add_delay :
+  (Metadata o i ->{r2; e2} Duration.Duration) -> Schedule r e i o -> Schedule (r + r2) (e + e2) i o
 foreign pure add_delay from "@flick-lang/runtime/effect/Schedule" "addDelay"
   arity 1
   reviewed "effect@4.0.5 sha256:8bc2728ac1228e4a"

@@ -14,99 +14,92 @@ let main () =
   line "build" (show (d, Record.singleton "k" true, Record.from_keys ["x", "y"] 0))
   line
     "from"
-    (show
-      (
-        Record.from_iterable_with (fun s -> (s, String.length s)) ["ab", "c"],
-        Record.from_iterable_by (fun s -> "k" ++ s) ["ab", "c"],
-      ))
+    (show (
+      Record.from_iterable_with (fun s -> (s, String.length s)) ["ab", "c"],
+      Record.from_iterable_by (fun s -> "k" ++ s) ["ab", "c"],
+    ))
   line
     "size"
-    (show
-      (
-        Record.size d,
-        Record.is_empty d,
-        Record.is_empty nothing,
-        Record.keys d,
-        Record.values d,
-        Record.to_entries d,
-      ))
+    (show (
+      Record.size d,
+      Record.is_empty d,
+      Record.is_empty nothing,
+      Record.keys d,
+      Record.values d,
+      Record.to_entries d,
+    ))
   line "get" (show (Record.has "a" d, Record.has "z" d, Record.get_key "b" d, Record.get_key "z" d))
   line
     "set"
-    (show
-      (
-        Record.set "d" 4 d,
-        Record.set "a" 0 d,
-        Record.remove_key "a" d,
-        Record.pop "b" d,
-        Record.pop "z" d,
-      ))
+    (show (
+      Record.set "d" 4 d,
+      Record.set "a" 0 d,
+      Record.remove_key "a" d,
+      Record.pop "b" d,
+      Record.pop "z" d,
+    ))
   line
     "modify"
     (show (Record.modify "a" (fun n -> n * 10) d, Record.replace "z" 0 d, Record.replace "c" 0 d))
   line
     "map"
-    (show
-      (
-        Record.map (fun v k -> k ++ show v) d,
-        Record.map_keys (fun k v -> k ++ show v) d,
-        Record.map_entries (fun v k -> (String.trim (" " ++ k ++ k), v * 2)) d,
-      ))
+    (show (
+      Record.map (fun v k -> k ++ show v) d,
+      Record.map_keys (fun k v -> k ++ show v) d,
+      Record.map_entries (fun v k -> (String.trim (" " ++ k ++ k), v * 2)) d,
+    ))
   line "collect" (show (Record.collect (fun k v -> k ++ "=" ++ show v) d))
   line
     "filter"
     (show (Record.filter (fun v k -> v > 1 && k != "c") d, Record.filter_map (fun v _ -> half v) d))
   line
     "partition"
-    (show
-      (Record.partition (fun v _ -> half v) d, Record.separate (Record.map (fun v _ -> half v) d)))
+    (show (
+      Record.partition (fun v _ -> half v) d,
+      Record.separate (Record.map (fun v _ -> half v) d),
+    ))
   let results = Record.map (fun v _ -> half v) d
   line
     "results"
-    (show
-      (
-        Record.get_successes results,
-        Record.get_failures results,
-        Record.get_somes (Record.from_entries [("a", Some 1), ("b", None)]),
-      ))
+    (show (
+      Record.get_successes results,
+      Record.get_failures results,
+      Record.get_somes (Record.from_entries [("a", Some 1), ("b", None)]),
+    ))
   line
     "fold"
-    (show
-      (
-        Record.reduce "" (fun acc v k -> acc ++ k ++ show v) d,
-        Record.every (fun v _ -> v > 0) d,
-        Record.some (fun v _ -> v > 2) d,
-        Record.find_first (fun v _ -> v > 1) d,
-      ))
+    (show (
+      Record.reduce "" (fun acc v k -> acc ++ k ++ show v) d,
+      Record.every (fun v _ -> v > 0) d,
+      Record.some (fun v _ -> v > 2) d,
+      Record.find_first (fun v _ -> v > 1) d,
+    ))
   let other = Record.from_entries [("b", 20), ("z", 26)]
   line
     "union"
-    (show
-      (
-        Record.union other (fun a b -> a + b) d,
-        Record.intersection other (fun a b -> (a, b)) d,
-        Record.difference other d,
-      ))
+    (show (
+      Record.union other (fun a b -> a + b) d,
+      Record.intersection other (fun a b -> (a, b)) d,
+      Record.difference other d,
+    ))
   let sub = Record.from_entries [("a", 1)]
   line
     "subrecord"
-    (show
-      (
-        Record.is_subrecord d sub,
-        Record.is_subrecord sub d,
-        Record.is_subrecord_by
-          (fun a b -> a == b * 10)
-          (Record.from_entries [("a", 1)])
-          (Record.from_entries [("a", 10)]),
-      ))
+    (show (
+      Record.is_subrecord d sub,
+      Record.is_subrecord sub d,
+      Record.is_subrecord_by
+        (fun a b -> a == b * 10)
+        (Record.from_entries [("a", 1)])
+        (Record.from_entries [("a", 10)]),
+    ))
   line
     "eq"
-    (show
-      (
-        Record.make_equivalence (fun a b -> a == b) d d,
-        d == Record.from_entries [("c", 3), ("b", 2), ("a", 1)],
-        d == sub,
-      ))
+    (show (
+      Record.make_equivalence (fun a b -> a == b) d d,
+      d == Record.from_entries [("c", 3), ("b", 2), ("a", 1)],
+      d == sub,
+    ))
   let user = { name = "Ada"; age = 36; admin = false }
   let small : { name : String; age : Float } = Record.project user
   line "struct" (show (Record.labels user, small.name, small.age))

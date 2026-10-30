@@ -11,31 +11,39 @@ let generated_pane m =
       tr m.locale "Loading the WebAssembly compiler…" "Загрузка WebAssembly-компилятора…"
     else if m.checking then
       tr m.locale "Checking source…" "Проверка кода…"
-    else if m.version
-      == "" then tr
+    else if m.version == "" then
+      tr
         m.locale
         "Load the compiler to generate JavaScript."
         "Загрузите компилятор, чтобы получить JavaScript."
-    else if m.compile_error
-      != "" then tr
+    else if m.compile_error != "" then
+      tr
         m.locale
         "Compilation failed. See the error above."
         "Не удалось скомпилировать код. Сообщение об ошибке — выше."
-    else if errors result
-      > 0 then tr
+    else if errors result > 0 then
+      tr
         m.locale
         "Fix the diagnostics below to generate JavaScript."
         "Чтобы получить JavaScript, исправьте ошибки, указанные ниже."
-    else tr
-      m.locale
-      "This module emits no JavaScript."
-      "Для этого модуля JavaScript не генерируется."
-  Ui.with_host { Ui.host with tab_index = Some 0; aria_label = Some (tr m.locale "Generated JavaScript" "Сгенерированный JavaScript") }
-    (Ui.pre { class_name = "fp-generated-code" }
-      (if result.code == "" then [Ui.text hint]
-        else if m.highlighting then syntax_nodes
-          (if m.profile == Debug then m.debug_tokens else m.release_tokens)
-        else [Ui.text result.code]))
+    else
+      tr m.locale "This module emits no JavaScript." "Для этого модуля JavaScript не генерируется."
+  Ui.with_host
+    {
+      Ui.host with
+      tab_index = Some 0;
+      aria_label = Some (tr m.locale "Generated JavaScript" "Сгенерированный JavaScript");
+    }
+    (Ui.pre
+      { class_name = "fp-generated-code" }
+      (
+        if result.code == "" then
+          [Ui.text hint]
+        else if m.highlighting then
+          syntax_nodes (if m.profile == Debug then m.debug_tokens else m.release_tokens)
+        else
+          [Ui.text result.code]
+      ))
 
 syntax_nodes : List SyntaxToken -> List Ui
 let syntax_nodes tokens =
@@ -46,42 +54,54 @@ type alias Source = { model : Atom.Writable Model; m : Model }
 // the file name focuses the editor, as an editor's tab does
 component source_pane (props : Source) =
   let editor = Ui.element ()
-  let edit_here = Action.exhaust (fun _ -> task { try Ui.focus editor with | Ui.Detached -> () })
+  let edit_here =
+    Action.exhaust (fun _ -> task {
+      try Ui.focus editor with
+      | Ui.Detached -> ()
+    })
   ui {
     let m = props.m
-    div { class_name = "fp-source" }
-      [
-        div { class_name = "fp-pane-header" }
-          [
-            Ui.with_host { Ui.host with class_name = Some "fp-file" }
-              (button { disabled = false; on_click = edit_here } [text "Main.fl"]),
-            span { class_name = "fp-pane-note" } [text (tr m.locale "Flick source" "Код на Flick")],
-          ],
-        div
-          { class_name = if m.highlighting then "fp-editor fp-editor-highlighted" else "fp-editor" }
-          [
-            Ui.with_host { Ui.host with aria_hidden = Some true }
-              (pre { class_name = "fp-source-highlight" }
-                (if m.highlighting then syntax_nodes m.source_tokens else [text m.source])),
-            keyed (show m.revision)
-              (Ui.with_host { Ui.host with aria_label = Some (tr m.locale "Flick source code" "Исходный код Flick"); aria_describedby = Some "fp-source-hint"; auto_capitalize = Some false; auto_correct = Some false; wrap = Some false }
-                (textarea_at
-                  editor
-                  {
-                    value = m.source;
-                    placeholder = "module Main exposing (main)";
-                    on_input =
-                      Ui.Event.latest (fun snapshot -> task { edit props.model snapshot.value });
-                  })),
-          ],
-        Ui.with_host { Ui.host with id = Some "fp-source-hint" }
-          (div { class_name = "fp-pane-footer" }
-            [
-              text
-                (tr
-                  m.locale
-                  "Checked on every edit · compiled locally"
-                  "Проверка после каждого изменения · компиляция в браузере"),
-            ]),
-      ]
+    div { class_name = "fp-source" } [
+      div { class_name = "fp-pane-header" } [
+        Ui.with_host
+          { Ui.host with class_name = Some "fp-file" }
+          (button { disabled = false; on_click = edit_here } [text "Main.fl"]),
+        span { class_name = "fp-pane-note" } [text (tr m.locale "Flick source" "Код на Flick")],
+      ],
+      div
+        { class_name = if m.highlighting then "fp-editor fp-editor-highlighted" else "fp-editor" }
+        [
+          Ui.with_host
+            { Ui.host with aria_hidden = Some true }
+            (pre
+              { class_name = "fp-source-highlight" }
+              (if m.highlighting then syntax_nodes m.source_tokens else [text m.source])),
+          keyed
+            (show m.revision)
+            (Ui.with_host
+              {
+                Ui.host with
+                aria_label = Some (tr m.locale "Flick source code" "Исходный код Flick");
+                aria_describedby = Some "fp-source-hint";
+                auto_capitalize = Some false;
+                auto_correct = Some false;
+                wrap = Some false;
+              }
+              (textarea_at editor {
+                value = m.source;
+                placeholder = "module Main exposing (main)";
+                on_input =
+                  Ui.Event.latest (fun snapshot -> task { edit props.model snapshot.value });
+              })),
+        ],
+      Ui.with_host
+        { Ui.host with id = Some "fp-source-hint" }
+        (div { class_name = "fp-pane-footer" } [
+          text
+            (tr
+              m.locale
+              "Checked on every edit · compiled locally"
+              "Проверка после каждого изменения · компиляция в браузере"),
+        ]),
+    ]
   }

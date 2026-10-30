@@ -53,12 +53,14 @@ let synchronized () =
   // updates that sleep run one after another: neither loses the other's
   let slow = SynchronizedRef.make []
   add : Float -> Eff none none Unit
-  let add x =
-    task {
-      SynchronizedRef.update_effect (fun xs ->
+  let add x = task {
+    SynchronizedRef.update_effect
+      (fun xs ->
         Effect.sleep (Result.with_default Duration.zero (Duration.millis 2))
-        xs ++ [x]) slow
-    }
+        xs ++ [x]
+      )
+      slow
+  }
   let _ = parallel (add 1) (add 2)
   [
     show (a, b, c, d, e),
@@ -96,9 +98,7 @@ main : Unit ->{; AppError} Unit
 let main () =
   List.each_effect Platform.stdout_line (cells ())
   let lines =
-    try
-      synchronized ()
-    with
+    try synchronized () with
     | Refused _ -> ["unexpected"]
   List.each_effect Platform.stdout_line lines
   List.each_effect Platform.stdout_line (subscription ())

@@ -17,14 +17,15 @@ instance Applicative Defaults =
   pure : forall c a. a^c -> (Defaults a)^c
   let pure value = Defaults (pure value)
   map2 :
-    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-      ((Defaults a)^d -> ((Defaults b)^d -> (Defaults x)^(c + d))^(c + d))^c
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((Defaults a)^d -> ((Defaults b)^d -> (Defaults x)^(c + d))^(c + d))^c
   let map2 f (Defaults left) (Defaults right) = Defaults (map2 f left right)
 
 instance Monad Defaults =
   flat_map :
-    forall c d a b. (forall v. a^v -> (Defaults b)^(c + v))^c ->
-      ((Defaults a)^d -> (Defaults b)^(c + d))^c
+    forall c d a b.
+    (forall v. a^v -> (Defaults b)^(c + v))^c -> ((Defaults a)^d -> (Defaults b)^(c + d))^c
   let flat_map f (Defaults action) = Defaults (flat_map (fun value -> unwrap (f value)) action)
 
 // Omit state, reader and writer so this wrapper executes the class defaults.
@@ -37,8 +38,9 @@ instance MonadState Defaults Float =
 instance MonadReader Defaults Float =
   ask : Defaults Float
   let ask = Defaults ask
-  local : forall c d a. (forall v. Float^v -> Float^(c + v))^c ->
-    ((Defaults a)^d -> (Defaults a)^(c + d))^c
+  local :
+    forall c d a.
+    (forall v. Float^v -> Float^(c + v))^c -> ((Defaults a)^d -> (Defaults a)^(c + d))^c
   let local update (Defaults action) = Defaults (local update action)
 
 instance MonadWriter Defaults (List String) =
@@ -58,6 +60,8 @@ let tests = [
       writer_value <- writer (environment_value, ["default"])
       pure (old_state, writer_value)
     }
-    Test.equal ((Ok (10, 4), ["default"]), 12)
-      (Identity.run (Capabilities.run 3 10 (unwrap action)))),
+    Test.equal
+      ((Ok (10, 4), ["default"]), 12)
+      (Identity.run (Capabilities.run 3 10 (unwrap action)))
+  ),
 ]

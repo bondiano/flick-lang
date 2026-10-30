@@ -26,9 +26,9 @@ let positive = Optic.make_prism (fun n -> if n > 0 then Ok n else Err "not posit
 
 even_x : Optic.Optional Point Float
 let even_x =
-  Optic.make_optional
-    (fun p -> if p.x % 2 == 0 then Ok p.x else Err "odd x")
-    (fun x p -> if x % 2 == 0 then Ok { x = x; y = p.y } else Err "odd value")
+  Optic.make_optional (fun p -> if p.x % 2 == 0 then Ok p.x else Err "odd x") (fun x p ->
+    if x % 2 == 0 then Ok { x = x; y = p.y } else Err "odd value"
+  )
 
 shape : Shape
 let shape = { name = "box"; corner = { x = 2; y = 5 } }

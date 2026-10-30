@@ -28,9 +28,7 @@ let sum a b = (parse a)? + (parse b)?
 
 summed : String -> String ->{} String
 let summed a b =
-  try
-    show (sum a b)
-  with
+  try show (sum a b) with
   | Invalid s -> "invalid " ++ s
 
 main : Unit ->{; AppError} Unit

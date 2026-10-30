@@ -22,15 +22,14 @@ type SystemErrorTag =
 type alias BadArgument = { module_ : String; method : String; description : Option String }
 
 /// A system call that failed; `pathOrDescriptor` is the file it was about.
-type alias SystemError =
-  {
-    tag : SystemErrorTag;
-    module_ : String;
-    method : String;
-    description : Option String;
-    syscall : Option String;
-    pathOrDescriptor : Option String;
-  }
+type alias SystemError = {
+  tag : SystemErrorTag;
+  module_ : String;
+  method : String;
+  description : Option String;
+  syscall : Option String;
+  pathOrDescriptor : Option String;
+}
 
 /// Why a platform call failed.
 type Reason = Bad BadArgument | System SystemError

@@ -38,15 +38,12 @@ let increment = Action.exhaust (fun _ -> task { Atom.update count (fun n -> n + 
 
 page : Ui.View Unit
 let page =
-  Ui.view (fun () ->
-    ui {
-      div
-        { class_name = "page" }
-        [
-          paragraph [text (Atom.value greeting ++ " " ++ show (Atom.value count))],
-          button { disabled = false; on_click = increment } [text "+1"],
-        ]
-    })
+  Ui.view (fun () -> ui {
+    div { class_name = "page" } [
+      paragraph [text (Atom.value greeting ++ " " ++ show (Atom.value count))],
+      button { disabled = false; on_click = increment } [text "+1"],
+    ]
+  })
 
 report : Failure e ->{} Unit
 let report failure =
@@ -54,27 +51,25 @@ let report failure =
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let (markup, state) =
-    provide Atom.layer {
-      Atom.set count 5
-      Atom.set greeting "</script> hi"
-      let markup = Ui.Server.render (Ui.render page ())
-      (markup, Ui.Server.state "app")
-    }
+  let (markup, state) = provide Atom.layer {
+    Atom.set count 5
+    Atom.set greeting "</script> hi"
+    let markup = Ui.Server.render (Ui.render page ())
+    (markup, Ui.Server.state "app")
+  }
   Platform.stdout_line state
   serve markup state
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
-  | Some root ->
-    provide Atom.layer {
-      scope s {
-        let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render page ()) })
-        settle ()
-        Platform.stdout_line (text ())
-        Platform.stdout_line ("state left: " ++ show (state_left ()))
-        click "+1"
-        settle ()
-        Platform.stdout_line (text ())
-      }
+  | Some root -> provide Atom.layer {
+    scope s {
+      let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render page ()) })
+      settle ()
+      Platform.stdout_line (text ())
+      Platform.stdout_line ("state left: " ++ show (state_left ()))
+      click "+1"
+      settle ()
+      Platform.stdout_line (text ())
     }
+  }
   Platform.stdout_line ("complaints: [" ++ complaints () ++ "]")

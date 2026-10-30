@@ -9,32 +9,33 @@ flat_map : Float -> Float
 let flat_map n = n
 
 pairs : Option a -> Option b -> Option (a, b)
-let pairs left right =
-  do {
-    x <- left
-    y <- right
-    pure (x, y)
-  }
+let pairs left right = do {
+  x <- left
+  y <- right
+  pure (x, y)
+}
 
 evens : List Float -> List Float
-let evens xs =
-  do {
-    x <- xs
-    if x % 2 == 0
-    let doubled = x * 2
-    pure doubled
-  }
+let evens xs = do {
+  x <- xs
+  if x % 2 == 0
+  let doubled = x * 2
+  pure doubled
+}
 
 twice : Monad m => m Float -> m Float
-let twice m = do { x <- m; y <- m; pure (x + y) }
+let twice m = do {
+  x <- m
+  y <- m
+  pure (x + y)
+}
 
 first_some : List (Option Float) -> Option Float
-let first_some options =
-  do {
-    let assert [first, ..._rest] = options
-    x <- first
-    pure (x + 1)
-  }
+let first_some options = do {
+  let assert [first, ..._rest] = options
+  x <- first
+  pure (x + 1)
+}
 
 chained : Result String Float -> Eff none none (Result String Float)
 let chained r =

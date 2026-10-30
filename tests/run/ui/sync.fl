@@ -39,27 +39,25 @@ let total = Atom.derived (fun () -> Atom.get next + doubled ())
 
 page : Ui.View Unit
 let page =
-  Ui.view (fun () ->
-    ui {
-      paragraph
-        [
-          text (show (twice doubled ())),
-          text (labelled 1),
-          text (show (Atom.get total)),
-          text (show (Atom.get later)),
-        ]
-    })
+  Ui.view (fun () -> ui {
+    paragraph [
+      text (show (twice doubled ())),
+      text (labelled 1),
+      text (show (Atom.get total)),
+      text (show (Atom.get later)),
+    ]
+  })
 
 failing : Ui.View Unit
 let failing =
-  Ui.suspended (fun _ -> ui { text "failed" }) (ui { text "loading" }) (fun () ->
-    ui { text (show (doubled ())) })
+  Ui.suspended (fun _ -> ui { text "failed" }) (ui { text "loading" }) (fun () -> ui {
+    text (show (doubled ()))
+  })
 
 main : Unit ->{; AppError} Unit
-let main () =
-  provide Atom.layer {
-    Platform.stdout_line (Ui.Server.render (Ui.render page ()))
-    Atom.set count 5
-    Platform.stdout_line (Ui.Server.render (Ui.render page ()))
-    Platform.stdout_line (Ui.Server.render (Ui.render failing ()))
-  }
+let main () = provide Atom.layer {
+  Platform.stdout_line (Ui.Server.render (Ui.render page ()))
+  Atom.set count 5
+  Platform.stdout_line (Ui.Server.render (Ui.render page ()))
+  Platform.stdout_line (Ui.Server.render (Ui.render failing ()))
+}

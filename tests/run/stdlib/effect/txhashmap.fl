@@ -15,92 +15,119 @@ let entries_of m = sorted (TxHashMap.entries m)
 main : Unit ->{; AppError} Unit
 let main () =
   let scores : Scores = TxHashMap.make EqHash.canonical [("ann", 1), ("bob", 2)]
-  let basics = Tx.atomically (task {
-      TxHashMap.set "cid" 3 scores
-      let had = TxHashMap.remove "bob" scores
-      let missing = TxHashMap.remove "zed" scores
-      (TxHashMap.get "ann" scores, TxHashMap.has "bob" scores, had, missing, TxHashMap.size scores)
-    })
+  let basics =
+    Tx.atomically
+      (task {
+        TxHashMap.set "cid" 3 scores
+        let had = TxHashMap.remove "bob" scores
+        let missing = TxHashMap.remove "zed" scores
+        (
+          TxHashMap.get "ann" scores,
+          TxHashMap.has "bob" scores,
+          had,
+          missing,
+          TxHashMap.size scores,
+        )
+      })
   Platform.stdout_line ("basics: " ++ show basics)
-  let changed = Tx.atomically (task {
-      let old = TxHashMap.modify "ann" (fun n -> n + 10) scores
-      let none_old = TxHashMap.modify "zed" (fun n -> n + 10) scores
-      TxHashMap.modify_at "dan" (fun _ -> Some 4) scores
-      TxHashMap.modify_at "cid" (fun _ -> None) scores
-      TxHashMap.set_many [("eve", 5), ("fay", 6)] scores
-      TxHashMap.remove_many ["fay"] scores
-      (old, none_old, entries_of scores)
-    })
+  let changed =
+    Tx.atomically
+      (task {
+        let old = TxHashMap.modify "ann" (fun n -> n + 10) scores
+        let none_old = TxHashMap.modify "zed" (fun n -> n + 10) scores
+        TxHashMap.modify_at "dan" (fun _ -> Some 4) scores
+        TxHashMap.modify_at "cid" (fun _ -> None) scores
+        TxHashMap.set_many [("eve", 5), ("fay", 6)] scores
+        TxHashMap.remove_many ["fay"] scores
+        (old, none_old, entries_of scores)
+      })
   Platform.stdout_line ("changed: " ++ show changed)
-  let views = Tx.atomically (task {
-      let ks = List.sort (TxHashMap.keys scores)
-      let vs = List.sort (TxHashMap.values scores)
-      let tvs = List.sort (TxHashMap.to_values scores)
-      (ks, vs, tvs == vs, sorted (TxHashMap.to_entries scores))
-    })
+  let views =
+    Tx.atomically
+      (task {
+        let ks = List.sort (TxHashMap.keys scores)
+        let vs = List.sort (TxHashMap.values scores)
+        let tvs = List.sort (TxHashMap.to_values scores)
+        (ks, vs, tvs == vs, sorted (TxHashMap.to_entries scores))
+      })
   Platform.stdout_line ("views: " ++ show views)
   let frozen = Tx.atomically (task { TxHashMap.snapshot scores })
   let other = HashMap.insert "gus" 7 frozen
-  Tx.atomically (task {
-    TxHashMap.set "ann" 0 scores
-    TxHashMap.union other scores
-  })
+  Tx.atomically
+    (task {
+      TxHashMap.set "ann" 0 scores
+      TxHashMap.union other scores
+    })
   Platform.stdout_line ("snapshot kept: " ++ show (HashMap.get "ann" frozen, HashMap.size frozen))
   Platform.stdout_line ("union: " ++ show (Tx.atomically (task { entries_of scores })))
-  let derived = Tx.atomically (task {
-      let doubled = TxHashMap.map (fun v k -> v * 2 + Int.to_float (String.length k)) scores
-      let big = TxHashMap.filter (fun v _ -> v > 4) scores
-      let parsed = TxHashMap.filter_map (fun v _ -> if v > 4 then Ok (show v) else Err ()) scores
-      let maybe =
-        TxHashMap.compact (TxHashMap.map (fun v _ -> if v == 0 then None else Some v) scores)
-      let total = TxHashMap.reduce 0 (fun acc v _ -> acc + v) scores
-      (
-        entries_of doubled,
-        entries_of big,
-        List.sort (TxHashMap.values parsed),
-        TxHashMap.size maybe,
-        total,
-      )
-    })
+  let derived =
+    Tx.atomically
+      (task {
+        let doubled = TxHashMap.map (fun v k -> v * 2 + Int.to_float (String.length k)) scores
+        let big = TxHashMap.filter (fun v _ -> v > 4) scores
+        let parsed = TxHashMap.filter_map (fun v _ -> if v > 4 then Ok (show v) else Err ()) scores
+        let maybe =
+          TxHashMap.compact (TxHashMap.map (fun v _ -> if v == 0 then None else Some v) scores)
+        let total = TxHashMap.reduce 0 (fun acc v _ -> acc + v) scores
+        (
+          entries_of doubled,
+          entries_of big,
+          List.sort (TxHashMap.values parsed),
+          TxHashMap.size maybe,
+          total,
+        )
+      })
   Platform.stdout_line ("derived: " ++ show derived)
-  let found = Tx.atomically (task {
-      (
-        TxHashMap.some (fun v _ -> v == 7) scores,
-        TxHashMap.every (fun v _ -> v >= 0) scores,
-        TxHashMap.has_by (fun _ k -> k == "eve") scores,
-        TxHashMap.find_first (fun v _ -> v == 4) scores,
-      )
-    })
+  let found =
+    Tx.atomically
+      (task {
+        (
+          TxHashMap.some (fun v _ -> v == 7) scores,
+          TxHashMap.every (fun v _ -> v >= 0) scores,
+          TxHashMap.has_by (fun _ k -> k == "eve") scores,
+          TxHashMap.find_first (fun v _ -> v == 4) scores,
+        )
+      })
   Platform.stdout_line ("found: " ++ show found)
-  let flat = Tx.atomically (task {
-      let m =
-        TxHashMap.flat_map
-          (fun v k -> TxHashMap.make EqHash.canonical [(k, v), (k ++ "!", v + 1)])
-          scores
-      TxHashMap.size m
-    })
+  let flat =
+    Tx.atomically
+      (task {
+        let m =
+          TxHashMap.flat_map
+            (fun v k -> TxHashMap.make EqHash.canonical [(k, v), (k ++ "!", v + 1)])
+            scores
+        TxHashMap.size m
+      })
   Platform.stdout_line ("flat_map size: " ++ show flat)
   let visited = Ref.make []
   Tx.atomically
     (task { TxHashMap.for_each (fun v k -> Ref.set visited (Ref.get visited ++ [(k, v)])) scores })
   Platform.stdout_line ("for_each: " ++ show (sorted (Ref.get visited)))
-  let hashed = Tx.atomically (task {
-      (TxHashMap.get_hash "eve" (hash "eve") scores, TxHashMap.has_hash "eve" (hash "eve") scores)
-    })
+  let hashed =
+    Tx.atomically
+      (task {
+        (TxHashMap.get_hash "eve" (hash "eve") scores, TxHashMap.has_hash "eve" (hash "eve") scores)
+      })
   Platform.stdout_line ("by hash: " ++ show hashed)
-  let undone = try Tx.atomically (task {
-      TxHashMap.clear scores
-      from_result (Err Stop)
-    }) with
+  let undone =
+    try
+      Tx.atomically
+        (task {
+          TxHashMap.clear scores
+          from_result (Err Stop)
+        })
+    with
     | Stop -> Tx.atomically (task { TxHashMap.size scores })
   Platform.stdout_line ("clear rolled back: " ++ show undone)
-  let fresh = Tx.atomically (task {
-      let m : Scores = TxHashMap.empty EqHash.canonical
-      let n : Scores = TxHashMap.from_iterable EqHash.canonical [("ann", 1)]
-      TxHashMap.set "ann" 2 n
-      let before = TxHashMap.get "ann" n
-      TxHashMap.clear n
-      TxHashMap.set "x" 1 m
-      (before, TxHashMap.is_empty n, TxHashMap.is_non_empty m)
-    })
+  let fresh =
+    Tx.atomically
+      (task {
+        let m : Scores = TxHashMap.empty EqHash.canonical
+        let n : Scores = TxHashMap.from_iterable EqHash.canonical [("ann", 1)]
+        TxHashMap.set "ann" 2 n
+        let before = TxHashMap.get "ann" n
+        TxHashMap.clear n
+        TxHashMap.set "x" 1 m
+        (before, TxHashMap.is_empty n, TxHashMap.is_non_empty m)
+      })
   Platform.stdout_line ("fresh: " ++ show fresh)

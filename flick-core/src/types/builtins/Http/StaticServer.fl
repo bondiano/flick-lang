@@ -11,28 +11,35 @@ import Http.ServerResponse exposing (ServerResponse)
 /// unless given), whether a path of no file answers with that index (a
 /// single-page app), the `Cache-Control` header, and media types by
 /// extension besides Effect's.
-type alias StaticOptions =
-  {
-    root : String;
-    index : Option String;
-    spa : Bool;
-    cacheControl : Option String;
-    mimeTypes : List (String, String);
-  }
+type alias StaticOptions = {
+  root : String;
+  index : Option String;
+  spa : Bool;
+  cacheControl : Option String;
+  mimeTypes : List (String, String);
+}
 
 /// The files below the directory, with Effect's defaults.
 static_options : String -> StaticOptions
-let static_options root =
-  { root = root; index = None; spa = false; cacheControl = None; mimeTypes = [] }
+let static_options root = {
+  root = root;
+  index = None;
+  spa = false;
+  cacheControl = None;
+  mimeTypes = [];
+}
 
 /// The handler of the files; fails if the directory cannot be read.
-make : StaticOptions ->{; PlatformError.PlatformError}
+make :
+  StaticOptions ->{; PlatformError.PlatformError}
   (ServerRequest ->{; HttpServerError} ServerResponse)
 foreign effect make from "@flick-lang/runtime/effect/http/HttpStaticServer" "flickMake"
   reviewed "effect@4.0.5 sha256:e59cebe7d680fe43"
 
 /// A route of `GET` below the prefix to the handler of the files.
-route : forall r e. StaticOptions ->
+route :
+  forall r e.
+  StaticOptions ->
   String ->{; PlatformError.PlatformError}
   Http.Router.Route r {HttpServerError | e}
 let route options prefix =

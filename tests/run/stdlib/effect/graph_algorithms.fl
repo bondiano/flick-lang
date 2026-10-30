@@ -3,7 +3,8 @@
 module App.Main exposing (main)
 
 res : Show a => Result Graph.GraphError a -> String
-let res r = match r with
+let res r =
+  match r with
   | Ok a -> "Ok " ++ show a
   | Err (Graph.GraphError message) -> "Err " ++ message
 
@@ -17,7 +18,8 @@ let edge s t w g =
   Result.with_default g (Result.map (fun (_, next) -> next) (Graph.add_edge s t w g))
 
 /// The graph with the nodes, then the edges, added in order.
-build : List String ->
+build :
+  List String ->
   List (Graph.NodeIndex, Graph.NodeIndex, Float) ->
   Graph.Graph String Float k ->
   Graph.Graph String Float k
@@ -64,8 +66,12 @@ let main () =
   Platform.stdout_line
     ("dijkstra, unreachable: "
       ++ path (Graph.dijkstra { source = 3; target = 0; cost = fun w -> w } roads))
-  let guided : Graph.AstarConfig Float String =
-    { source = 0; target = 3; cost = fun w -> w; heuristic = fun s t -> if s == t then 0 else 1 }
+  let guided : Graph.AstarConfig Float String = {
+    source = 0;
+    target = 3;
+    cost = fun w -> w;
+    heuristic = fun s t -> if s == t then 0 else 1;
+  }
   Platform.stdout_line ("astar: " ++ path (Graph.astar guided roads))
   let signed : Graph.BellmanFordConfig Float = { source = 0; target = 3; cost = fun w -> w - 2 }
   Platform.stdout_line ("bellman_ford: " ++ path (Graph.bellman_ford signed roads))
@@ -93,8 +99,12 @@ let main () =
     ("simple_paths, limit 1: "
       ++ paths (Graph.simple_paths { source = 0; target = 3; limit = Some 1 } roads))
   let tied = edge 0 2 3 roads
-  let shortest : Graph.AllShortestPathsConfig Float =
-    { source = 0; target = 3; cost = fun w -> w; limit = None }
+  let shortest : Graph.AllShortestPathsConfig Float = {
+    source = 0;
+    target = 3;
+    cost = fun w -> w;
+    limit = None;
+  }
   Platform.stdout_line ("all_shortest_paths: " ++ paths (Graph.all_shortest_paths shortest tied))
   let reach : Graph.ReachabilityConfig = { direction = None }
   Platform.stdout_line ("unweighted_distances: " ++ res (Graph.unweighted_distances 0 reach roads))
@@ -113,12 +123,11 @@ let main () =
       ++ show (Graph.weakly_connected_components roads, Graph.strongly_connected_components looped))
   Platform.stdout_line
     ("connected: "
-      ++ show
-        (
-          Graph.is_weakly_connected roads,
-          Graph.is_strongly_connected roads,
-          Graph.is_strongly_connected looped,
-        ))
+      ++ show (
+        Graph.is_weakly_connected roads,
+        Graph.is_strongly_connected roads,
+        Graph.is_strongly_connected looped,
+      ))
   Platform.stdout_line
     ("transitive_reduction: "
       ++ res (Result.map Graph.edge_count (Graph.transitive_reduction roads))
@@ -139,12 +148,11 @@ let main () =
     ("degree: " ++ res (Graph.degree 3 square) ++ " " ++ res (Graph.degree 9 square))
   Platform.stdout_line
     ("bridges: "
-      ++ show
-        (
-          Graph.bridges square,
-          Graph.articulation_points square,
-          Graph.biconnected_components square,
-        ))
+      ++ show (
+        Graph.bridges square,
+        Graph.articulation_points square,
+        Graph.biconnected_components square,
+      ))
   let triangle =
     Graph.undirected ()
     |> node "x"

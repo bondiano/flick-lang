@@ -20,16 +20,15 @@ type alias Options = {
 
 /// What `format_structured` makes of a message; `spans` are the log spans
 /// with their start time.
-type alias Structured =
-  {
-    level : String;
-    fiberId : String;
-    timestamp : String;
-    message : List String;
-    cause : Option String;
-    annotations : List (String, String);
-    spans : List (String, Float);
-  }
+type alias Structured = {
+  level : String;
+  fiberId : String;
+  timestamp : String;
+  message : List String;
+  cause : Option String;
+  annotations : List (String, String);
+  spans : List (String, Float);
+}
 
 /// Whether a layer keeps the loggers already installed.
 type alias LayerOptions = { mergeWithExisting : Bool }
@@ -52,12 +51,11 @@ type alias PrettyConsoleOptions = { colors : Bool; formatDate : Option (Float ->
 type alias BatchOptions o = { window : Duration.Duration; flush : List o ->{} Unit }
 
 /// How `to_file` opens the file and how long it gathers lines before a write.
-type alias FileOptions =
-  {
-    flag : Option FileSystem.OpenFlag;
-    mode : Option Int;
-    batchWindow : Option Duration.Duration;
-  }
+type alias FileOptions = {
+  flag : Option FileSystem.OpenFlag;
+  mode : Option Int;
+  batchWindow : Option Duration.Duration;
+}
 
 /// A logger of `f`, which formats each message.
 make : (Options -> o) -> Logger o
@@ -162,7 +160,10 @@ foreign pure batched from "@flick-lang/runtime/effect/Logger" "flickBatched"
 /// Installs a logger that appends the lines of `logger` to the file at the
 /// path, which the scope of the `provide` closes.
 to_file :
-  FileOptions -> LayerOptions -> String -> Logger String ->
+  FileOptions ->
+  LayerOptions ->
+  String ->
+  Logger String ->
   Layer {FileSystem.FileSystem} {PlatformError.PlatformError} none
 foreign pure to_file from "@flick-lang/runtime/effect/Logger" "flickToFile"
   arity 4

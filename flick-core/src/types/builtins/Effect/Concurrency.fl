@@ -31,8 +31,7 @@ foreign effect uninterruptible_mask from "@flick-lang/runtime/effect/Effect" "un
 
 /// Runs `f` interruptibly; `restore` makes a task inside it as
 /// interruptible as outside.
-interruptible_mask :
-  forall c r e a r2 e2 b. ((Eff r2 e2 b -> Eff r2 e2 b) ->{r; e} a)^c ->{r; e} a
+interruptible_mask : forall c r e a r2 e2 b. ((Eff r2 e2 b -> Eff r2 e2 b) ->{r; e} a)^c ->{r; e} a
 foreign effect interruptible_mask from "@flick-lang/runtime/effect/Effect" "interruptibleMask"
   retention call
   reviewed "effect@4.0.5 sha256:2225cf2e13c3c101"
@@ -69,8 +68,7 @@ foreign effect cached_with_ttl from "@flick-lang/runtime/effect/Effect" "cachedW
   reviewed "effect@4.0.5 sha256:ca55470023f2b707"
 
 /// `cached_with_ttl`, and a task that forgets the cached outcome.
-cached_invalidate_with_ttl :
-  Duration.Duration -> Eff r e a ->{} (Eff r e a, Eff none none Unit)
+cached_invalidate_with_ttl : Duration.Duration -> Eff r e a ->{} (Eff r e a, Eff none none Unit)
 foreign effect cached_invalidate_with_ttl from "@flick-lang/runtime/effect/Effect" "cachedInvalidateWithTTL"
   arity 1
   reviewed "effect@4.0.5 sha256:2b9505b63da00d2b"
@@ -80,8 +78,10 @@ foreign effect cached_invalidate_with_ttl from "@flick-lang/runtime/effect/Effec
 /// each attempt.
 with_execution_plan :
   forall c p r e a r2 e2.
-  ExecutionPlan.ExecutionPlan p r2 e2 (Errors e) -> (ExecutionPlan.Event e ->{r;} Unit)^c ->
-  (Eff (p + r) e a)^c ->{r + r2; e + e2} a
+  ExecutionPlan.ExecutionPlan p r2 e2 (Errors e) ->
+  (ExecutionPlan.Event e ->{r;} Unit)^c ->
+  (Eff (p + r) e a)^c ->{r + r2; e + e2}
+  a
 foreign effect with_execution_plan from "@flick-lang/runtime/effect/Effect" "flickWithExecutionPlan"
   arity 1
   retention call

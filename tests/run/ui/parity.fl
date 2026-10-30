@@ -33,14 +33,13 @@ let page =
       | None -> "server"
       | Some q -> "client " ++ q
     ui {
-      div
-        { class_name = "page" }
-        [
-          paragraph [text ("query " ++ Atom.value query)],
-          paragraph [text client],
-          Ui.field { bind = query; placeholder = "Query"; on_input = None },
-        ]
-    })
+      div { class_name = "page" } [
+        paragraph [text ("query " ++ Atom.value query)],
+        paragraph [text client],
+        Ui.field { bind = query; placeholder = "Query"; on_input = None },
+      ]
+    }
+  )
 
 report : Failure e ->{} Unit
 let report failure =
@@ -53,12 +52,11 @@ let main () =
   serve_at "http://localhost/?q=hi" server ""
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
-  | Some root ->
-    provide Atom.layer {
-      scope s {
-        let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render page ()) })
-        settle ()
-        Platform.stdout_line (markup ())
-      }
+  | Some root -> provide Atom.layer {
+    scope s {
+      let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render page ()) })
+      settle ()
+      Platform.stdout_line (markup ())
     }
+  }
   Platform.stdout_line ("complaints: [" ++ complaints () ++ "]")

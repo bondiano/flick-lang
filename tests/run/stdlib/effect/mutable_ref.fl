@@ -20,13 +20,12 @@ let main () =
   Ref.increment cell
   Ref.decrement cell
   Platform.stdout_line ("increment, decrement: " ++ show (Ref.get cell))
-  let counts =
-    (
-      Ref.increment_and_get cell,
-      Ref.get_and_increment cell,
-      Ref.decrement_and_get cell,
-      Ref.get_and_decrement cell,
-    )
+  let counts = (
+    Ref.increment_and_get cell,
+    Ref.get_and_increment cell,
+    Ref.decrement_and_get cell,
+    Ref.get_and_decrement cell,
+  )
   Platform.stdout_line ("counters: " ++ show counts ++ " -> " ++ show (Ref.get cell))
   let flag = Ref.make false
   Ref.toggle flag

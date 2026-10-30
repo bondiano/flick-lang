@@ -3,53 +3,78 @@
 module App.Main exposing (main)
 
 pair : Option Float -> Option String -> Option String
-let pair n s = do { x <- n and y <- s; pure (y ++ show x) }
+let pair n s = do {
+  x <- n and y <- s
+  pure (y ++ show x)
+}
 
 // every combination, in order
 grid : List Float -> List String -> List String
-let grid xs ys = do { x <- xs and y <- ys and z <- [true, false]; pure (y ++ show x ++ show z) }
+let grid xs ys = do {
+  x <- xs and y <- ys and z <- [true, false]
+  pure (y ++ show x ++ show z)
+}
 
 // any `Applicative`
 both : Applicative f => f Float -> f Float -> f Float
-let both a b = do { x <- a and y <- b; pure (x + y) }
+let both a b = do {
+  x <- a and y <- b
+  pure (x + y)
+}
 
 // a group followed by more statements is `flat_map` over its tuple
 chained : Option Float -> Option Float -> Option Float
-let chained a b =
-  do {
-    (x, w) <- Option.map (fun v -> (v, v * 10)) a and y <- b
-    if x < y
-    z <- Some (x + y + w)
-    Some z
-  }
+let chained a b = do {
+  (x, w) <- Option.map (fun v -> (v, v * 10)) a and y <- b
+  if x < y
+  z <- Some (x + y + w)
+  Some z
+}
 
 carry : forall c a. a^c -> (Option (a, a))^c
-let carry value =
-  do {
-    kept <- Some value and n <- Some 2
-    _ <- Some n
-    Some (kept, value)
-  }
+let carry value = do {
+  kept <- Some value and n <- Some 2
+  _ <- Some n
+  Some (kept, value)
+}
 
 ticks : Eff none none Float
-let ticks =
-  do {
-    x <- task { Platform.stdout_line "first"; 1 } and y <- task { Platform.stdout_line "second"; 2 }
-    z <- task { Platform.stdout_line "third"; x + y }
-    task { Platform.stdout_line "after" }
-    pure z
+let ticks = do {
+  x <- task {
+    Platform.stdout_line "first"
+    1
   }
+    and y <- task {
+    Platform.stdout_line "second"
+    2
+  }
+  z <- task {
+    Platform.stdout_line "third"
+    x + y
+  }
+  task { Platform.stdout_line "after" }
+  pure z
+}
 
 // a `pure` the group binds is a function of the block, not the Prelude's
 shadowed : Option Float
-let shadowed = do { pure <- Some (fun n -> Some (n + 10)) and x <- Some 1; pure x }
+let shadowed = do {
+  pure <- Some (fun n -> Some (n + 10)) and x <- Some 1
+  pure x
+}
 
 // `pure` qualified or in parentheses needs `Applicative` alone too
 qualified : Applicative f => f Float -> f Float -> f Float
-let qualified fa fb = do { x <- fa and y <- fb; Prelude.pure (x + y) }
+let qualified fa fb = do {
+  x <- fa and y <- fb
+  Prelude.pure (x + y)
+}
 
 wrapped : Applicative f => f Float -> f Float -> f Float
-let wrapped fa fb = do { x <- fa and y <- fb; (pure (x + y)) }
+let wrapped fa fb = do {
+  x <- fa and y <- fb
+  (pure (x + y))
+}
 
 main : Unit ->{; AppError} Unit
 let main () =

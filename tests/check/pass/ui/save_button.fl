@@ -11,34 +11,28 @@ type error SaveError = SaveError String
 service Users =
   save : String ->{; SaveError} Unit
 
-type alias SaveButtonProps c =
-  {
-    label : String;
-    disabled : Bool;
-    on_save : (Unit ->{Atom.Write;} Unit)^c;
-  }
+type alias SaveButtonProps c = {
+  label : String;
+  disabled : Bool;
+  on_save : (Unit ->{Atom.Write;} Unit)^c;
+}
 
 save_button : SaveButtonProps c -> Ui^c
-let save_button props =
-  ui {
-    button
-      {
-        disabled = props.disabled;
-        on_click = Ui.Event.exhaust (fun _ ->
-          task { props.on_save () }
-        );
-      }
-      [text props.label]
-  }
+let save_button props = ui {
+  button
+    {
+      disabled = props.disabled;
+      on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () });
+    }
+    [text props.label]
+}
 
 save_button_calls : SaveButtonProps c -> Ui^c
 let save_button_calls props =
   Ui.button
     {
       disabled = props.disabled;
-      on_click = Ui.Event.exhaust (fun _ ->
-        task { props.on_save () }
-      );
+      on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () });
     }
     [Ui.text props.label]
 
@@ -46,11 +40,10 @@ failure : Atom.Writable (Option String)
 let failure = Atom.make None
 
 save : Layer none none {Users} -> String -> Unit ->{Atom.Write;} Unit
-let save users name () =
-  provide users {
-    try Users.save name with
-    | SaveError reason -> Atom.set failure (Some reason)
-  }
+let save users name () = provide users {
+  try Users.save name with
+  | SaveError reason -> Atom.set failure (Some reason)
+}
 
 type alias User = { id : Float; name : String }
 
@@ -58,38 +51,37 @@ users : Ui.SelectProps User c -> Ui^c
 let users props = Ui.select props
 
 reader : File.Path -> Ui
-let reader path =
-  ui {
-    button
-      {
-        disabled = false;
-        on_click = Ui.Event.exhaust (fun _ -> task {
+let reader path = ui {
+  button
+    {
+      disabled = false;
+      on_click =
+        Ui.Event.exhaust (fun _ -> task {
           provide File.node {
             try scope { ignore (File.read_all (File.open_scoped path)) } with
             | _ -> ()
           }
         });
+    }
+    [text "read"]
+}
+
+held_in_scope : File.Path ->{File.FileSystem; File.OpenError} Int
+let held_in_scope path = scope {
+  let file = File.open_scoped path
+  let view = ui {
+    button
+      {
+        disabled = false;
+        on_click =
+          Ui.Event.exhaust (fun _ -> task {
+            provide File.node {
+              try ignore (File.read_all file) with
+              | _ -> ()
+            }
+          });
       }
       [text "read"]
   }
-
-held_in_scope : File.Path ->{File.FileSystem; File.OpenError} Int
-let held_in_scope path =
-  scope {
-    let file = File.open_scoped path
-    let view =
-      ui {
-        button
-          {
-            disabled = false;
-            on_click = Ui.Event.exhaust (fun _ -> task {
-              provide File.node {
-                try ignore (File.read_all file) with
-                | _ -> ()
-              }
-            });
-          }
-          [text "read"]
-      }
-    List.length [view, view]
-  }
+  List.length [view, view]
+}

@@ -14,25 +14,21 @@ let name = Atom.make ""
 
 page : Ui.View Unit
 let page =
-  Ui.view (fun () ->
-    ui {
-      div
-        { class_name = "page" }
-        [
-          paragraph [text ("count " ++ show (Atom.value count))],
-          Ui.field { bind = name; placeholder = "Name"; on_input = None },
-        ]
-    })
+  Ui.view (fun () -> ui {
+    div { class_name = "page" } [
+      paragraph [text ("count " ++ show (Atom.value count))],
+      Ui.field { bind = name; placeholder = "Name"; on_input = None },
+    ]
+  })
 
 request : Float ->{} String
-let request n =
-  provide Atom.layer {
-    Atom.set count n
-    Atom.set name ("user " ++ show n)
-    // the other request writes its own registry meanwhile
-    settle ()
-    Ui.Server.render (Ui.render page ())
-  }
+let request n = provide Atom.layer {
+  Atom.set count n
+  Atom.set name ("user " ++ show n)
+  // the other request writes its own registry meanwhile
+  settle ()
+  Ui.Server.render (Ui.render page ())
+}
 
 main : Unit ->{; AppError} Unit
 let main () =

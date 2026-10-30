@@ -16,20 +16,19 @@ let salutation =
 
 email : Order -> Ui
 let email order =
-  let track = match Ui.safe_url "https://shop.example/orders?id=7&from=mail" with
+  let track =
+    match Ui.safe_url "https://shop.example/orders?id=7&from=mail" with
     | Some url -> ui { link { href = url } [text "Track your order"] }
     | None -> Ui.empty
   ui {
-    div
-      { class_name = "mail" }
-      [
-        Ui.with_host
-          { Ui.host with data = [("order", "7")]; aria_label = Some "Order \"7\"" }
-          (heading_at H2 [text "Your order"]),
-        Ui.render salutation order.customer,
-        list (List.map line order.items),
-        track,
-      ]
+    div { class_name = "mail" } [
+      Ui.with_host
+        { Ui.host with data = [("order", "7")]; aria_label = Some "Order \"7\"" }
+        (heading_at H2 [text "Your order"]),
+      Ui.render salutation order.customer,
+      list (List.map line order.items),
+      track,
+    ]
   }
 
 main : Unit ->{; AppError} Unit

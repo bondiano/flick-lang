@@ -10,8 +10,7 @@ read : Unit ->{Atom.Registry;} Float
 let read () = Atom.Registry.get (Atom.readonly count)
 
 main : Unit ->{; AppError} Unit
-let main () =
-  provide Atom.layer {
-    Atom.set count 2
-    Platform.stdout_line ("count " ++ show (read ()))
-  }
+let main () = provide Atom.layer {
+  Atom.set count 2
+  Platform.stdout_line ("count " ++ show (read ()))
+}

@@ -2,9 +2,8 @@ module App.Types exposing (..)
 
 apply : (forall a. Show a => a -> String) -> (String, String)
 
-decode : forall r. (forall a. Schema a -> Unknown ->{r; SchemaError} a) ->
-  Unknown ->{r; SchemaError}
-  User
+decode :
+  forall r. (forall a. Schema a -> Unknown ->{r; SchemaError} a) -> Unknown ->{r; SchemaError} User
 
 open_rows : a ->{Users, Log | r; NotFound | e} b
 
@@ -22,10 +21,7 @@ record_arg : a -> { label : String }
 
 constrained : (Show a, Eq a) => a -> a -> Bool
 
-multiline :
-  forall c.
-  SaveButtonProps c ->
-  Ui^c
+multiline : forall c. SaveButtonProps c -> Ui^c
 
 type alias Props c = {
   on_save : (Unit ->{Users; SaveError} Unit)^c;

@@ -15,10 +15,12 @@ let config_layer = Layer.succeed Config { prefix = fun () -> "hello" }
 
 greeter_live : Layer {Config} none {Greeter}
 let greeter_live =
-  Layer.effect Greeter (task {
-    let p = Config.prefix ()
-    { greet = fun name -> p ++ ", " ++ name }
-  })
+  Layer.effect
+    Greeter
+    (task {
+      let p = Config.prefix ()
+      { greet = fun name -> p ++ ", " ++ name }
+    })
 
 greet : String ->{Greeter;} Unit
 let greet name = Platform.stdout_line (Greeter.greet name)
@@ -32,17 +34,20 @@ let fallback = Layer.succeed Greeter { greet = fun name -> "fallback " ++ name }
 recovered : Layer none none {Greeter}
 let recovered =
   failing
-    |> Layer.tap_error (fun err ->
-      match err with
-      | BootError m -> Platform.stdout_line ("tap_error " ++ m))
-    |> Layer.catch (fun _ -> fallback)
+  |> Layer.tap_error (fun err ->
+    match err with
+    | BootError m -> Platform.stdout_line ("tap_error " ++ m)
+  )
+  |> Layer.catch (fun _ -> fallback)
 
 counting : Ref Float -> Layer none none {Config}
 let counting count =
-  Layer.effect Config (task {
-    Ref.update count (fun n -> n + 1)
-    { prefix = fun () -> "counted" }
-  })
+  Layer.effect
+    Config
+    (task {
+      Ref.update count (fun n -> n + 1)
+      { prefix = fun () -> "counted" }
+    })
 
 level : Context.Reference String
 let level = Context.reference "App.level" (fun () -> "default")
@@ -89,9 +94,11 @@ let layers () =
   provide Layer.merge_all fallback [Layer.succeed Greeter { greet = fun n -> "second " ++ n }] {
     greet "merge_all"
   }
-  provide Layer.merge Layer.empty (Layer.merge config_layer (Layer.effect_discard (task {
-    Platform.stdout_line "effect_discard ran"
-  }))) {
+  provide Layer.merge
+    Layer.empty
+    (Layer.merge
+      config_layer
+      (Layer.effect_discard (task { Platform.stdout_line "effect_discard ran" }))) {
     Platform.stdout_line (Config.prefix ())
   }
   let upper =
@@ -108,20 +115,23 @@ let layers () =
   let mapped =
     Layer.flat_map
       (fun ctx ->
-        Layer.succeed
-          Greeter
-          { greet = fun n -> (Context.get Config ctx).prefix () ++ " flat_map " ++ n })
+        Layer.succeed Greeter {
+          greet = fun n -> (Context.get Config ctx).prefix () ++ " flat_map " ++ n;
+        }
+      )
       config_layer
   provide mapped { greet "x" }
   provide Layer.effect_context
     (task { Context.make Config { prefix = fun () -> "effect_context" } }) {
     Platform.stdout_line (Config.prefix ())
   }
-  let exits = parallel_exits [task {
-    provide (
-      Layer.or_die failing |> Layer.tap_cause (fun _ -> Platform.stdout_line "tap_cause")
-    ) { greet "never" }
-  }]
+  let exits =
+    parallel_exits [
+      task {
+        provide (Layer.or_die failing
+          |> Layer.tap_cause (fun _ -> Platform.stdout_line "tap_cause")) { greet "never" }
+      },
+    ]
   let died = List.map (fun exit -> Option.is_some (Exit.failure exit)) exits
   Platform.stdout_line ("or_die died " ++ show died)
 
@@ -153,38 +163,40 @@ finalizers : Unit ->{} Unit
 let finalizers () =
   scope {
     Scope.add_finalizer (task { Platform.stdout_line "finalizer ran" })
-    Scope.add_finalizer_exit
-      (fun exit -> Platform.stdout_line ("exit failed " ++ show (Option.is_some exit)))
+    Scope.add_finalizer_exit (fun exit ->
+      Platform.stdout_line ("exit failed " ++ show (Option.is_some exit))
+    )
     let ctx = Layer.build config_layer
     Platform.stdout_line ("build " ++ (Context.get Config ctx).prefix ())
   }
-  let launched = timeout_option 5 (task {
-    Layer.launch (Layer.effect_discard (task { Platform.stdout_line "launched" }))
-  })
+  let launched =
+    timeout_option
+      5
+      (task { Layer.launch (Layer.effect_discard (task { Platform.stdout_line "launched" })) })
   Platform.stdout_line ("launch interrupted " ++ show (Option.is_none launched))
 
 trace_options : Tracer.SpanOptions
-let trace_options =
-  {
-    attributes = [];
-    links = [];
-    parent = None;
-    root = false;
-    kind_ = Tracer.internal;
-    sampled = None;
-    level = None;
-    captureStackTrace = false;
-    disablePropagation = false;
-  }
+let trace_options = {
+  attributes = [];
+  links = [];
+  parent = None;
+  root = false;
+  kind_ = Tracer.internal;
+  sampled = None;
+  level = None;
+  captureStackTrace = false;
+  disablePropagation = false;
+}
 
 span_options : Layer.Trace.SpanOptions
-let span_options =
-  {
-    span = trace_options;
-    onEnd = Some (fun span exit ->
+let span_options = {
+  span = trace_options;
+  onEnd =
+    Some (fun span exit ->
       Platform.stdout_line
-        ("ended " ++ show (Tracer.span_name span) ++ " failed " ++ show (Option.is_some exit)));
-  }
+        ("ended " ++ show (Tracer.span_name span) ++ " failed " ++ show (Option.is_some exit))
+    );
+}
 
 current_span : Unit ->{} String
 let current_span () =
@@ -194,17 +206,21 @@ let current_span () =
 
 traced : Layer none none {Config}
 let traced =
-  Layer.effect Config (task {
-    let name = current_span ()
-    { prefix = fun () -> name }
-  })
+  Layer.effect
+    Config
+    (task {
+      let name = current_span ()
+      { prefix = fun () -> name }
+    })
 
 traced_id : Layer none none {Config}
 let traced_id =
-  Layer.effect Config (task {
-    let id = show (Option.map Tracer.span_id (Tracer.parent_span ()))
-    { prefix = fun () -> id }
-  })
+  Layer.effect
+    Config
+    (task {
+      let id = show (Option.map Tracer.span_id (Tracer.parent_span ()))
+      { prefix = fun () -> id }
+    })
 
 traces : Unit ->{} Unit
 let traces () =

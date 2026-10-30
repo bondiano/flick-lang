@@ -41,23 +41,22 @@ type FileType =
   deriving Eq, Show
 
 /// What `stat` tells of a file; times are milliseconds since the epoch.
-type alias Info =
-  {
-    type_ : FileType;
-    mtime : Option Float;
-    atime : Option Float;
-    birthtime : Option Float;
-    dev : BigInt;
-    ino : Option BigInt;
-    mode : Int;
-    nlink : Option BigInt;
-    uid : Option Float;
-    gid : Option Float;
-    rdev : Option BigInt;
-    size : BigInt;
-    blksize : Option BigInt;
-    blocks : Option BigInt;
-  }
+type alias Info = {
+  type_ : FileType;
+  mtime : Option Float;
+  atime : Option Float;
+  birthtime : Option Float;
+  dev : BigInt;
+  ino : Option BigInt;
+  mode : Int;
+  nlink : Option BigInt;
+  uid : Option Float;
+  gid : Option Float;
+  rdev : Option BigInt;
+  size : BigInt;
+  blksize : Option BigInt;
+  blocks : Option BigInt;
+}
 
 type alias AccessOptions = { ok : Bool; readable : Bool; writable : Bool }
 type alias CopyOptions = { overwrite : Bool; preserveTimestamps : Bool }
@@ -85,11 +84,8 @@ service FileSystem =
   link : String -> String ->{; PlatformError.PlatformError} Unit
   make_directory : MakeDirectoryOptions -> String ->{; PlatformError.PlatformError} Unit
   make_temp_directory : TempDirectoryOptions ->{; PlatformError.PlatformError} String
-  make_temp_directory_scoped : forall s. TempDirectoryOptions ->{
-    Scope s;
-    PlatformError.PlatformError
-  }
-    String
+  make_temp_directory_scoped :
+    forall s. TempDirectoryOptions ->{Scope s; PlatformError.PlatformError} String
   make_temp_file : TempFileOptions ->{; PlatformError.PlatformError} String
   make_temp_file_scoped : forall s. TempFileOptions ->{Scope s; PlatformError.PlatformError} String
   open : forall s. OpenOptions -> String ->{Scope s; PlatformError.PlatformError} File s
@@ -148,12 +144,8 @@ let make_temp_directory options = FileSystem.make_temp_directory options
 
 /// `make_temp_directory`, removed with its contents when the scope of
 /// region `s` closes.
-make_temp_directory_scoped : forall s. TempDirectoryOptions ->{
-  FileSystem,
-  Scope s;
-  PlatformError.PlatformError
-}
-  String
+make_temp_directory_scoped :
+  forall s. TempDirectoryOptions ->{FileSystem, Scope s; PlatformError.PlatformError} String
 let make_temp_directory_scoped options = FileSystem.make_temp_directory_scoped options
 
 /// Makes a new empty file under the system's temporary directory; its path.
@@ -161,12 +153,8 @@ make_temp_file : TempFileOptions ->{FileSystem; PlatformError.PlatformError} Str
 let make_temp_file options = FileSystem.make_temp_file options
 
 /// `make_temp_file`, removed when the scope of region `s` closes.
-make_temp_file_scoped : forall s. TempFileOptions ->{
-  FileSystem,
-  Scope s;
-  PlatformError.PlatformError
-}
-  String
+make_temp_file_scoped :
+  forall s. TempFileOptions ->{FileSystem, Scope s; PlatformError.PlatformError} String
 let make_temp_file_scoped options = FileSystem.make_temp_file_scoped options
 
 /// Opens the file, which the scope of region `s` closes.
@@ -223,10 +211,8 @@ write_file : WriteOptions -> String -> List Int ->{FileSystem; PlatformError.Pla
 let write_file options path bytes = FileSystem.write_file options path bytes
 
 /// Writes the text to the file as UTF-8.
-write_file_string : WriteOptions ->
-  String ->
-  String ->{FileSystem; PlatformError.PlatformError}
-  Unit
+write_file_string :
+  WriteOptions -> String -> String ->{FileSystem; PlatformError.PlatformError} Unit
 let write_file_string options path text = FileSystem.write_file_string options path text
 
 /// What `stat` tells of the open file.
@@ -250,10 +236,8 @@ foreign effect sync from "@flick-lang/runtime/effect/FileSystem" "flickSync"
 
 /// Reads at most `size` bytes from the position, or from the current one;
 /// `None` at the end of the file.
-read_alloc : forall s. Int ->
-  Option BigInt ->
-  File s ->{; PlatformError.PlatformError}
-  Option (List Int)
+read_alloc :
+  forall s. Int -> Option BigInt -> File s ->{; PlatformError.PlatformError} Option (List Int)
 foreign effect read_alloc from "@flick-lang/runtime/effect/FileSystem" "flickReadAlloc"
   arity 3
   retention call

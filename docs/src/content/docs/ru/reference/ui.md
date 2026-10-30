@@ -13,25 +13,21 @@ title: "Пользовательские интерфейсы"
 как задачу.
 
 ```flick
-type alias SaveButtonProps c =
-  {
-    label : String;
-    disabled : Bool;
-    on_save : (Unit ->{Atom.Write;} Unit)^c;
-  }
+type alias SaveButtonProps c = {
+  label : String;
+  disabled : Bool;
+  on_save : (Unit ->{Atom.Write;} Unit)^c;
+}
 
 save_button : SaveButtonProps c -> Ui^c
-let save_button props =
-  ui {
-    button
-      {
-        disabled = props.disabled;
-        on_click = Ui.Event.exhaust (fun _ ->
-          task { props.on_save () }
-        );
-      }
-      [text props.label]
-  }
+let save_button props = ui {
+  button
+    {
+      disabled = props.disabled;
+      on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () });
+    }
+    [text props.label]
+}
 ```
 
 `c` — строка захватов (см. [регионы](../regions/#захваты)).

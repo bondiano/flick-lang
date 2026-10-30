@@ -8,11 +8,10 @@ foreign async sleep from "./timers.mjs" "sleep"
 type error Oops = Oops String
 
 after : Float -> String -> Eff none none String
-let after millis text =
-  task {
-    sleep millis
-    text
-  }
+let after millis text = task {
+  sleep millis
+  text
+}
 
 failing : String -> Eff none {Oops} Float
 let failing text = task { from_result (Err (Oops text)) }
@@ -47,7 +46,8 @@ let main () =
   | [first, second] -> Platform.stdout_line (outcome first ++ ", " ++ outcome second)
   | _ -> ()
   Platform.stdout_line (race_first (after 30 "late") (after 1 "early"))
-  let timed = try timeout 5 (after 50 "never") with
+  let timed =
+    try timeout 5 (after 50 "never") with
     | TimeoutError -> "timed out"
   Platform.stdout_line timed
   Platform.stdout_line (show (timeout_option 50 (after 1 "in time")))

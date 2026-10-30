@@ -5,8 +5,7 @@ module Effect.Errors exposing (..)
 
 /// Handles every failure of `task`, defects and interruptions included,
 /// with `f` of its cause.
-catch_cause :
-  forall c r e a r2 e2. (Failure e ->{r2; e2} a)^c -> (Eff r e a)^c ->{r + r2; e2} a
+catch_cause : forall c r e a r2 e2. (Failure e ->{r2; e2} a)^c -> (Eff r e a)^c ->{r + r2; e2} a
 foreign effect catch_cause from "@flick-lang/runtime/effect/Effect" "flickCatchCause"
   arity 1
   retention call
@@ -25,8 +24,10 @@ foreign effect catch_cause_if from "@flick-lang/runtime/effect/Effect" "flickCat
 /// failure it refuses stays as the filter returns it.
 catch_cause_filter :
   forall c r e a b r2 e2.
-  (Failure e -> Result (Failure e) b)^c -> (b -> Failure e ->{r2; e2} a)^c ->
-  (Eff r e a)^c ->{r + r2; e + e2} a
+  (Failure e -> Result (Failure e) b)^c ->
+  (b -> Failure e ->{r2; e2} a)^c ->
+  (Eff r e a)^c ->{r + r2; e + e2}
+  a
 foreign effect catch_cause_filter from "@flick-lang/runtime/effect/Effect" "flickCatchCauseFilter"
   arity 2
   retention call
@@ -34,16 +35,14 @@ foreign effect catch_cause_filter from "@flick-lang/runtime/effect/Effect" "flic
 
 /// Recovers from a defect of `task` with `f` of its inert text; typed
 /// failures stay.
-catch_defect :
-  forall c r e a r2 e2. (String ->{r2; e2} a)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
+catch_defect : forall c r e a r2 e2. (String ->{r2; e2} a)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect catch_defect from "@flick-lang/runtime/effect/Effect" "flickCatchDefect"
   arity 1
   retention call
   reviewed "effect@4.0.5 sha256:a7e4cf2e7d1bb677"
 
 /// Runs `f` of the cause when `task` fails, then fails as it did.
-tap_cause :
-  forall c r e a b r2 e2. (Failure e ->{r2; e2} b)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
+tap_cause : forall c r e a b r2 e2. (Failure e ->{r2; e2} b)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect tap_cause from "@flick-lang/runtime/effect/Effect" "flickTapCause"
   arity 1
   retention call
@@ -61,32 +60,31 @@ foreign effect tap_cause_if from "@flick-lang/runtime/effect/Effect" "flickTapCa
 /// `tap_cause` of the failures the filter passes, with what it gave.
 tap_cause_filter :
   forall c r e a b x r2 e2.
-  (Failure e -> Result (Failure e) b)^c -> (b -> Failure e ->{r2; e2} x)^c ->
-  (Eff r e a)^c ->{r + r2; e + e2} a
+  (Failure e -> Result (Failure e) b)^c ->
+  (b -> Failure e ->{r2; e2} x)^c ->
+  (Eff r e a)^c ->{r + r2; e + e2}
+  a
 foreign effect tap_cause_filter from "@flick-lang/runtime/effect/Effect" "flickTapCauseFilter"
   arity 2
   retention call
   reviewed "effect@4.0.5 sha256:134596bc51d72f05"
 
 /// Runs `f` of a defect's inert text when `task` dies, then dies as it did.
-tap_defect :
-  forall c r e a b r2 e2. (String ->{r2; e2} b)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
+tap_defect : forall c r e a b r2 e2. (String ->{r2; e2} b)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect tap_defect from "@flick-lang/runtime/effect/Effect" "flickTapDefect"
   arity 1
   retention call
   reviewed "effect@4.0.5 sha256:5ab4371925ca6cd3"
 
 /// `on_failure` of the cause or `on_success` of the value; never fails.
-match_cause :
-  forall c r e a b. (Failure e -> b)^c -> (a -> b)^c -> (Eff r e a)^c ->{r;} b
+match_cause : forall c r e a b. (Failure e -> b)^c -> (a -> b)^c -> (Eff r e a)^c ->{r;} b
 foreign effect match_cause from "@flick-lang/runtime/effect/Effect" "flickMatchCause"
   arity 2
   retention call
   reviewed "effect@4.0.5 sha256:62bccdc1ab43ca28"
 
 /// `match_cause`, reading an already ended task without a new step.
-match_cause_eager :
-  forall c r e a b. (Failure e -> b)^c -> (a -> b)^c -> (Eff r e a)^c ->{r;} b
+match_cause_eager : forall c r e a b. (Failure e -> b)^c -> (a -> b)^c -> (Eff r e a)^c ->{r;} b
 foreign effect match_cause_eager from "@flick-lang/runtime/effect/Effect" "flickMatchCauseEager"
   arity 2
   retention call
@@ -158,16 +156,17 @@ foreign effect on_error_if from "@flick-lang/runtime/effect/Effect" "flickOnErro
 /// `on_error` of the failures the filter passes, with what it gave.
 on_error_filter :
   forall c r e a b r2 e2.
-  (Failure e -> Result (Failure e) b)^c -> (b -> Failure e ->{r2; e2} Unit)^c ->
-  (Eff r e a)^c ->{r + r2; e + e2} a
+  (Failure e -> Result (Failure e) b)^c ->
+  (b -> Failure e ->{r2; e2} Unit)^c ->
+  (Eff r e a)^c ->{r + r2; e + e2}
+  a
 foreign effect on_error_filter from "@flick-lang/runtime/effect/Effect" "flickOnErrorFilter"
   arity 2
   retention call
   reviewed "effect@4.0.5 sha256:0e87c8ca876ae26c"
 
 /// Runs `f` of the exit after `task`, however it ends.
-on_exit :
-  forall c r e a r2 e2. (Exit e a ->{r2; e2} Unit)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
+on_exit : forall c r e a r2 e2. (Exit e a ->{r2; e2} Unit)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect on_exit from "@flick-lang/runtime/effect/Effect" "flickOnExit"
   arity 1
   retention call
@@ -185,8 +184,10 @@ foreign effect on_exit_if from "@flick-lang/runtime/effect/Effect" "flickOnExitI
 /// `on_exit` of the exits the filter passes, with what it gave.
 on_exit_filter :
   forall c r e a b x r2 e2.
-  (Exit e a -> Result x b)^c -> (b -> Exit e a ->{r2; e2} Unit)^c ->
-  (Eff r e a)^c ->{r + r2; e + e2} a
+  (Exit e a -> Result x b)^c ->
+  (b -> Exit e a ->{r2; e2} Unit)^c ->
+  (Eff r e a)^c ->{r + r2; e + e2}
+  a
 foreign effect on_exit_filter from "@flick-lang/runtime/effect/Effect" "flickOnExitFilter"
   arity 2
   retention call
@@ -213,8 +214,7 @@ foreign effect on_interrupt from "@flick-lang/runtime/effect/Effect" "flickOnInt
 
 /// Registers `finalizer` with the owner of region `s`: it runs when that
 /// scope closes, with the cause of its failure if it failed.
-add_finalizer :
-  forall s c r. (Option RawCause ->{r;} Unit)^c ->{Scope s | r;} Unit
+add_finalizer : forall s c r. (Option RawCause ->{r;} Unit)^c ->{Scope s | r;} Unit
 foreign effect add_finalizer from "@flick-lang/runtime/effect/Effect" "flickAddFinalizer"
   retention owner
   reviewed "effect@4.0.5 sha256:de9497fd0e3d4d55"

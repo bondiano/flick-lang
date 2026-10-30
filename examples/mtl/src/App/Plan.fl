@@ -21,28 +21,30 @@ default_config : Config
 let default_config = { budget = 60; overhead = 0 }
 
 schedule : String -> Planner Unit
-let schedule name =
-  do {
-    config <- ask
-    state <- get
-    minutes <- MaybeT.from_option
+let schedule name = do {
+  config <- ask
+  state <- get
+  minutes <-
+    MaybeT.from_option
       (map
         (fun (_, duration) -> duration)
         (List.find (fun (candidate, _) -> candidate == name) catalog))
-    MaybeT.from_option
-      (if minutes <= state.remaining - config.overhead then Some () else None)
-    // Commit only after both checks; a rejected task consumes no time.
-    put {
-      remaining = state.remaining - config.overhead - minutes;
-      completed = state.completed ++ [name];
-    }
+  MaybeT.from_option (if minutes <= state.remaining - config.overhead then Some () else None)
+  // Commit only after both checks; a rejected task consumes no time.
+  put {
+    remaining = state.remaining - config.overhead - minutes;
+    completed = state.completed ++ [name];
   }
+}
 
 workflow : List String -> Planner Unit
 let rec workflow tasks =
   match tasks with
   | [] -> pure ()
-  | [name, ...rest] -> do { schedule name; workflow rest }
+  | [name, ...rest] -> do {
+    schedule name
+    workflow rest
+  }
 
 plan : Config -> List String -> (Option (List String), PlanState)
 let plan config tasks =

@@ -20,15 +20,14 @@ let keep name =
   }
 
 main : Unit ->{; AppError} Unit
-let main () =
-  scope outer {
-    acquire : Unit ->{Scope outer;} Res outer
-    let acquire () = open_res "outer"
-    scope inner {
-      let first = open_res "inner"
-      let second = acquire ()
-      let third = keep "kept"
-      Platform.stdout_line "inner done"
-    }
-    Platform.stdout_line "outer done"
+let main () = scope outer {
+  acquire : Unit ->{Scope outer;} Res outer
+  let acquire () = open_res "outer"
+  scope inner {
+    let first = open_res "inner"
+    let second = acquire ()
+    let third = keep "kept"
+    Platform.stdout_line "inner done"
   }
+  Platform.stdout_line "outer done"
+}

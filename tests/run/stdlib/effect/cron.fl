@@ -30,31 +30,28 @@ main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line
     ("parse: "
-      ++ show
-        [
-          parsed (Cron.parse utc "0 9 * * 1-5"),
-          parsed (Cron.parse utc "*/15 0 1,15 * *"),
-          parsed (Cron.parse utc "0 9 * *"),
-          parsed (Cron.parse utc "0 99 * * *"),
-        ])
-  let fields =
-    {
-      seconds = None;
-      minutes = [0, 30];
-      hours = [12];
-      days = [];
-      months = [];
-      weekdays = [6];
-      and = None;
-      tz = utc;
-    }
+      ++ show [
+        parsed (Cron.parse utc "0 9 * * 1-5"),
+        parsed (Cron.parse utc "*/15 0 1,15 * *"),
+        parsed (Cron.parse utc "0 9 * *"),
+        parsed (Cron.parse utc "0 99 * * *"),
+      ])
+  let fields = {
+    seconds = None;
+    minutes = [0, 30];
+    hours = [12];
+    days = [];
+    months = [];
+    weekdays = [6];
+    and = None;
+    tz = utc;
+  }
   Platform.stdout_line
     ("make: "
-      ++ show
-        [
-          parsed (Cron.make fields),
-          parsed (Cron.make { fields with seconds = Some [5]; hours = [25] }),
-        ])
+      ++ show [
+        parsed (Cron.make fields),
+        parsed (Cron.make { fields with seconds = Some [5]; hours = [25] }),
+      ])
   match Cron.parse utc "0 9 * * 1-5" with
   | Ok workdays -> with_workdays workdays
   | Err (Cron.CronParseError message) -> Platform.stdout_line message
@@ -64,11 +61,10 @@ let with_workdays workdays =
   let monday = at "2024-03-11T09:00:00Z"
   Platform.stdout_line
     ("format: "
-      ++ show
-        (
-          Cron.format { includeSeconds = Some true } workdays,
-          Cron.format { includeSeconds = None } workdays,
-        ))
+      ++ show (
+        Cron.format { includeSeconds = Some true } workdays,
+        Cron.format { includeSeconds = None } workdays,
+      ))
   Platform.stdout_line
     ("match_: "
       ++ show (Cron.match_ monday workdays, Cron.match_ (at "2024-03-10T09:00:00Z") workdays))
@@ -89,12 +85,11 @@ let with_workdays workdays =
       ++ on (Result.to_option (Cron.parse paris "0 9 * * *") |> Option.bind (Cron.next monday)))
   Platform.stdout_line
     ("equal: "
-      ++ show
-        (
-          Cron.equals_cron workdays workdays,
-          Result.map (eq workdays) (Cron.parse utc "0 0 9 * * 1-5"),
-          Result.map (eq workdays) (Cron.parse utc "0 10 * * 1-5"),
-        ))
+      ++ show (
+        Cron.equals_cron workdays workdays,
+        Result.map (eq workdays) (Cron.parse utc "0 0 9 * * 1-5"),
+        Result.map (eq workdays) (Cron.parse utc "0 10 * * 1-5"),
+      ))
   let every_second = Result.with_default workdays (Cron.parse utc "* * * * * *")
   let seen = Ref.make []
   let traced =
@@ -105,10 +100,9 @@ let with_workdays workdays =
   let delays = Ref.get seen
   Platform.stdout_line
     ("Schedule.cron: "
-      ++ show
-        (
-          List.length delays,
-          List.all
-            (fun d -> Duration.is_positive d && Duration.is_less_than_or_equal_to second d)
-            delays,
-        ))
+      ++ show (
+        List.length delays,
+        List.all
+          (fun d -> Duration.is_positive d && Duration.is_less_than_or_equal_to second d)
+          delays,
+      ))

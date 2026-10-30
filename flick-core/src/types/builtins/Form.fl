@@ -55,14 +55,13 @@ report : Draft a -> Field -> Option String ->{Atom.Write;} Unit
 let report form field message = Atom.set (problem form field) message
 
 /// The props of `input`'s view.
-type alias InputProps =
-  {
-    text : Atom.Writable String;
-    problem : Atom.Writable (Option String);
-    id : String;
-    label : String;
-    on_input : Option (Ui.Handler Ui.InputSnapshot);
-  }
+type alias InputProps = {
+  text : Atom.Writable String;
+  problem : Atom.Writable (Option String);
+  id : String;
+  label : String;
+  on_input : Option (Ui.Handler Ui.InputSnapshot);
+}
 
 /// A field's label, input and error: the input is named by the label,
 /// described by the error, and invalid while it has one; the error is an
@@ -73,33 +72,30 @@ let input_view =
     let message = Atom.value props.problem
     let error_id = props.id ++ "-error"
     let field = Ui.field { bind = props.text; placeholder = ""; on_input = props.on_input }
-    Ui.div
-      { class_name = "flick-field" }
-      [
-        Ui.span { class_name = "flick-field-label" } [Ui.text props.label],
-        Ui.with_host
-          {
-            Ui.host with
-            id = Some props.id;
-            aria_label = Some props.label;
-            aria_describedby = Some error_id;
-            aria_invalid = Some (Option.is_some message);
-          }
-          field,
-        Ui.with_host
-          { Ui.host with id = Some error_id; role = Some "alert" }
-          (Ui.span { class_name = "flick-field-error" } [Ui.text (Option.with_default "" message)]),
-      ])
+    Ui.div { class_name = "flick-field" } [
+      Ui.span { class_name = "flick-field-label" } [Ui.text props.label],
+      Ui.with_host
+        {
+          Ui.host with
+          id = Some props.id;
+          aria_label = Some props.label;
+          aria_describedby = Some error_id;
+          aria_invalid = Some (Option.is_some message);
+        }
+        field,
+      Ui.with_host
+        { Ui.host with id = Some error_id; role = Some "alert" }
+        (Ui.span { class_name = "flick-field-error" } [Ui.text (Option.with_default "" message)]),
+    ]
+  )
 
 /// The labelled input of `field`; `on_input` runs after each edit.
 input : Draft a -> Field -> String -> Option (Ui.Handler Ui.InputSnapshot) -> Ui
 let input form field label on_input =
-  Ui.render
-    input_view
-    {
-      text = text form field;
-      problem = problem form field;
-      id = id form field;
-      label = label;
-      on_input = on_input;
-    }
+  Ui.render input_view {
+    text = text form field;
+    problem = problem form field;
+    id = id form field;
+    label = label;
+    on_input = on_input;
+  }

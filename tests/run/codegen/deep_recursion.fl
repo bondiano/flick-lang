@@ -10,16 +10,13 @@ depth : Int
 let depth = 10000000
 
 sum_to : Int -> Int -> Int
-let rec sum_to acc n =
-  if n == 0 then acc else sum_to (acc + n) (n - 1)
+let rec sum_to acc n = if n == 0 then acc else sum_to (acc + n) (n - 1)
 
 steps : Eq a => Int -> a -> Int
-let rec steps n x =
-  if n == 0 then 0 else if x == x then steps (n - 1) x else n
+let rec steps n x = if n == 0 then 0 else if x == x then steps (n - 1) x else n
 
 all_below : Int -> Int -> Bool
-let rec all_below limit n =
-  n == 0 || n < limit && all_below limit (n - 1)
+let rec all_below limit n = n == 0 || n < limit && all_below limit (n - 1)
 
 rec {
   ping : Int -> Int -> Int
@@ -34,14 +31,18 @@ rec {
 
 count_down : Ref Int -> Int ->{} Unit
 let rec count_down cell n =
-  if n == 0 then () else
+  if n == 0 then
+    ()
+  else
     Ref.set cell (Ref.get cell + 1)
     count_down cell (n - 1)
 
 rec {
   tick : Ref Int -> Int ->{} Int
   let tick cell n =
-    if n == 0 then Ref.get cell else
+    if n == 0 then
+      Ref.get cell
+    else
       Ref.set cell (Ref.get cell + 1)
       tock cell (n - 1)
 
@@ -50,7 +51,9 @@ rec {
 
   tack : Ref Int -> Int ->{} Int
   let tack cell n =
-    if n == 0 then Ref.get cell else
+    if n == 0 then
+      Ref.get cell
+    else
       Ref.set cell (Ref.get cell + 2)
       tick cell (n - 1)
 }

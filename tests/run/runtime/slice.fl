@@ -26,11 +26,10 @@ total : forall a. Area a => List a -> Float
 let total shapes = List.fold_left (fun sum s -> sum + area s) 0 shapes
 
 scaled : Float -> (Shape -> Shape)
-let scaled k =
-  fun s ->
-    match s with
-    | Circle r -> Circle (r * k)
-    | Rect w h -> Rect (w * k) (h * k)
+let scaled k = fun s ->
+  match s with
+  | Circle r -> Circle (r * k)
+  | Rect w h -> Rect (w * k) (h * k)
 
 count_down : Int -> Int -> Int
 let rec count_down acc n = if n == 0 then acc else count_down (acc + 1) (n - 1)
@@ -49,9 +48,9 @@ let fail_fast stopped =
     Effect.ensuring
       (task { Ref.modify stopped (fun xs -> ((), xs ++ ["slow branch stopped"])) })
       (task {
-      nap 2000
-      "slow"
-    })
+        nap 2000
+        "slow"
+      })
   }
   let failing = task {
     nap 5
@@ -74,9 +73,7 @@ let main () =
   let second = await counted
   say ("awaited twice: " ++ show (first, second))
   let shared = Ref.make 0
-  let bump = task {
-    for _ <- List.range 0 100 do Ref.modify shared (fun n -> ((), n + 1))
-  }
+  let bump = task { for _ <- List.range 0 100 do Ref.modify shared (fun n -> ((), n + 1)) }
   let _ = parallel_all 8 (List.repeat 50 bump)
   say ("shared: " ++ show (Ref.get shared))
   say ("tail calls: " ++ show (count_down 0 10000000))

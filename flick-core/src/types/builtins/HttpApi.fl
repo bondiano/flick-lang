@@ -55,14 +55,13 @@ type Server (s : Region)
 
 /// Where the server listens, and where it serves its OpenAPI document,
 /// Swagger UI and Scalar, if anywhere.
-type alias ServeOptions =
-  {
-    host : String;
-    port : Float;
-    openapi : Option String;
-    swagger : Option String;
-    scalar : Option String;
-  }
+type alias ServeOptions = {
+  host : String;
+  port : Float;
+  openapi : Option String;
+  swagger : Option String;
+  scalar : Option String;
+}
 
 /// The server could not start, or the document it should serve has no
 /// strict form.
@@ -76,10 +75,9 @@ type error ClientError = ClientError { status : Int; message : String }
 
 /// An endpoint at `path` (`/users/:id`) with no parts yet: its handler takes
 /// a request of `Unit`s and answers 204 without a body.
-endpoint : forall l r. Method ->
-  String ->
-  Record.Label l ->
-  Endpoint l (Request Unit Unit Unit Unit ->{r; none} Unit)
+endpoint :
+  forall l r.
+  Method -> String -> Record.Label l -> Endpoint l (Request Unit Unit Unit Unit ->{r; none} Unit)
 foreign pure endpoint from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiEndpoint"
   arity 3
   reviewed "effect@4.0.5 sha256:88888dac75ad2046"
@@ -88,8 +86,8 @@ foreign pure endpoint from "@flick-lang/runtime/effect/http-api/HttpApi" "httpAp
 with_path :
   forall l p q h b r e s p2.
   PureCodec Json p2 ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p2 q h b ->{r; e} s)
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p2 q h b ->{r; e} s)
 foreign pure with_path from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithPath"
   arity 2
   reviewed "effect@4.0.5 sha256:722ba5ecbebad307"
@@ -98,8 +96,8 @@ foreign pure with_path from "@flick-lang/runtime/effect/http-api/HttpApi" "httpA
 with_query :
   forall l p q h b r e s q2.
   PureCodec Json q2 ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q2 h b ->{r; e} s)
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q2 h b ->{r; e} s)
 foreign pure with_query from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithQuery"
   arity 2
   reviewed "effect@4.0.5 sha256:722ba5ecbebad307"
@@ -108,8 +106,8 @@ foreign pure with_query from "@flick-lang/runtime/effect/http-api/HttpApi" "http
 with_headers :
   forall l p q h b r e s h2.
   PureCodec Json h2 ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h2 b ->{r; e} s)
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h2 b ->{r; e} s)
 foreign pure with_headers from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithHeaders"
   arity 2
   reviewed "effect@4.0.5 sha256:722ba5ecbebad307"
@@ -118,8 +116,8 @@ foreign pure with_headers from "@flick-lang/runtime/effect/http-api/HttpApi" "ht
 with_payload :
   forall l p q h b r e s b2.
   PureCodec Json b2 ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b2 ->{r; e} s)
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h b2 ->{r; e} s)
 foreign pure with_payload from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithPayload"
   arity 2
   reviewed "effect@4.0.5 sha256:ea023890e9f4cdfd"
@@ -127,8 +125,8 @@ foreign pure with_payload from "@flick-lang/runtime/effect/http-api/HttpApi" "ht
 text_payload :
   forall l p q h b r e s.
   PureCodec Json String ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h String ->{r; e} s)
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h String ->{r; e} s)
 foreign pure text_payload from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithTextPayload"
   arity 2
   reviewed "effect@4.0.5 sha256:722ba5ecbebad307"
@@ -144,8 +142,8 @@ let with_text_payload endpoint = text_payload (Codec.json Schema.string) endpoin
 with_form_payload :
   forall l p q h b r e s b2.
   PureCodec Json b2 ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b2 ->{r; e} s)
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h b2 ->{r; e} s)
 foreign pure with_form_payload from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithFormPayload"
   arity 2
   reviewed "effect@4.0.5 sha256:fae5439e529c17bd"
@@ -153,9 +151,9 @@ foreign pure with_form_payload from "@flick-lang/runtime/effect/http-api/HttpApi
 text_success :
   forall l p q h b r e s.
   Int ->
-    PureCodec Json String ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b ->{r; e} String)
+  PureCodec Json String ->
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h b ->{r; e} String)
 foreign pure text_success from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithTextSuccess"
   arity 3
   reviewed "effect@4.0.5 sha256:722ba5ecbebad307"
@@ -170,9 +168,9 @@ let with_text_success status endpoint = text_success status (Codec.json Schema.s
 with_success :
   forall l p q h b r e s s2.
   Int ->
-    PureCodec Json s2 ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b ->{r; e} s2)
+  PureCodec Json s2 ->
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h b ->{r; e} s2)
 foreign pure with_success from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithSuccess"
   arity 3
   reviewed "effect@4.0.5 sha256:dcff7c76f16ea23b"
@@ -192,8 +190,8 @@ foreign pure error_case from "@flick-lang/runtime/effect/http-api/HttpApi" "http
 with_errors :
   forall l p q h b r e s e2.
   ErrorCases e2 ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b ->{r; e + e2} s)
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h b ->{r; e + e2} s)
 foreign pure with_errors from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithErrors"
   arity 2
   reviewed "effect@4.0.5 sha256:722ba5ecbebad307"
@@ -230,8 +228,8 @@ foreign pure with_security from "@flick-lang/runtime/effect/http-api/HttpApi" "h
 with_middleware :
   forall l p q h b r e s.
   (Request p q h b ->{r; e} Unit) ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b ->{r; e} s)
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h b ->{r; e} s)
 foreign pure with_middleware from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithMiddleware"
   arity 2
   reviewed "effect@4.0.5 sha256:468649beea1d8514"
@@ -337,8 +335,8 @@ foreign pure openapi from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApi
 
 /// The body as bytes, `application/octet-stream`.
 with_bytes_payload :
-  forall l p q h b r e s. Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h (List Int) ->{r; e} s)
+  forall l p q h b r e s.
+  Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h (List Int) ->{r; e} s)
 foreign pure with_bytes_payload from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithBytesPayload"
   reviewed "effect@4.0.5 sha256:f68406c2b4703e1e"
 
@@ -348,8 +346,8 @@ foreign pure with_bytes_payload from "@flick-lang/runtime/effect/http-api/HttpAp
 with_multipart_payload :
   forall l p q h b r e s b2.
   PureCodec Json b2 ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b2 ->{r; e} s)
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h b2 ->{r; e} s)
 foreign pure with_multipart_payload from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithMultipartPayload"
   arity 2
   reviewed "effect@4.0.5 sha256:f777c853d129da86"
@@ -360,19 +358,17 @@ foreign pure with_multipart_payload from "@flick-lang/runtime/effect/http-api/Ht
 with_multipart_stream_payload :
   forall l p q h b r e s.
   Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (
-      Request p q h (Stream none {Http.Multipart.MultipartError} Http.Multipart.Part) ->{
-        r; Http.Multipart.MultipartError | e
-      } s
-    )
+  Endpoint
+    l
+    (Request p q h (Stream none {Http.Multipart.MultipartError} Http.Multipart.Part) ->{r; Http.Multipart.MultipartError | e}
+      s)
 foreign pure with_multipart_stream_payload from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithMultipartStreamPayload"
   reviewed "effect@4.0.5 sha256:007eacb6e7e077d7"
 
 /// The success as bytes, with its status.
 with_bytes_success :
-  forall l p q h b r e s. Int ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b ->{r; e} List Int)
+  forall l p q h b r e s.
+  Int -> Endpoint l (Request p q h b ->{r; e} s) -> Endpoint l (Request p q h b ->{r; e} List Int)
 foreign pure with_bytes_success from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithBytesSuccess"
   arity 2
   reviewed "effect@4.0.5 sha256:f68406c2b4703e1e"
@@ -382,8 +378,8 @@ foreign pure with_bytes_success from "@flick-lang/runtime/effect/http-api/HttpAp
 with_stream_success :
   forall l p q h b r e s.
   Int ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b ->{r; e} Stream none none (List Int))
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h b ->{r; e} Stream none none (List Int))
 foreign pure with_stream_success from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithStreamSuccess"
   arity 2
   reviewed "effect@4.0.5 sha256:98b0f8d5ab912444"
@@ -393,9 +389,9 @@ foreign pure with_stream_success from "@flick-lang/runtime/effect/http-api/HttpA
 with_sse_success :
   forall l p q h b r e s a.
   Int ->
-    PureCodec Json a ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b ->{r; e} Stream none none a)
+  PureCodec Json a ->
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h b ->{r; e} Stream none none a)
 foreign pure with_sse_success from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithSseSuccess"
   arity 3
   reviewed "effect@4.0.5 sha256:9bcb3390ec1e9755"
@@ -407,8 +403,8 @@ type alias SseEvent = { id : Option String; event : String; data : String }
 with_sse_events_success :
   forall l p q h b r e s.
   Int ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b ->{r; e} Stream none none SseEvent)
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h b ->{r; e} Stream none none SseEvent)
 foreign pure with_sse_events_success from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithSseEventsSuccess"
   arity 2
   reviewed "effect@4.0.5 sha256:9bcb3390ec1e9755"
@@ -418,8 +414,8 @@ foreign pure with_sse_events_success from "@flick-lang/runtime/effect/http-api/H
 with_success_headers :
   forall l p q h b r e s hs.
   PureCodec Json hs ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b ->{r; e} (s, hs))
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h b ->{r; e} (s, hs))
 foreign pure with_success_headers from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiWithSuccessHeaders"
   arity 2
   reviewed "effect@4.0.5 sha256:478331636310bbe4"
@@ -432,8 +428,8 @@ foreign pure with_success_headers from "@flick-lang/runtime/effect/http-api/Http
 security_set_cookie :
   forall l p q h b r e s.
   Security ->
-    Endpoint l (Request p q h b ->{r; e} s) ->
-    Endpoint l (Request p q h b ->{r; e} (s, Option (Redacted String)))
+  Endpoint l (Request p q h b ->{r; e} s) ->
+  Endpoint l (Request p q h b ->{r; e} (s, Option (Redacted String)))
 foreign pure security_set_cookie from "@flick-lang/runtime/effect/http-api/HttpApi" "httpApiSecuritySetCookie"
   arity 2
   reviewed "effect@4.0.5 sha256:f7064c514e82a9c6"

@@ -12,17 +12,16 @@ type error CronParseError = CronParseError String
 /// The fields of `make`; an empty list is every value, `seconds` defaults
 /// to `[0]`; with `and`, both the days and the weekdays must match. The
 /// zone is required, so matching never depends on the machine's zone.
-type alias Fields =
-  {
-    seconds : Option (List Int);
-    minutes : List Int;
-    hours : List Int;
-    days : List Int;
-    months : List Int;
-    weekdays : List Int;
-    and : Option Bool;
-    tz : DateTime.TimeZone;
-  }
+type alias Fields = {
+  seconds : Option (List Int);
+  minutes : List Int;
+  hours : List Int;
+  days : List Int;
+  months : List Int;
+  weekdays : List Int;
+  and : Option Bool;
+  tz : DateTime.TimeZone;
+}
 
 /// A cron of the fields; an error when a value is out of its range.
 make : Fields -> Result CronParseError Cron

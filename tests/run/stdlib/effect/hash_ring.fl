@@ -6,7 +6,8 @@ type Server = Server String Float
   deriving Show
 
 name : Server -> String
-let name server = match server with
+let name server =
+  match server with
   | Server n _ -> n
 
 landing : HashRing.HashRing Server -> List String -> List String

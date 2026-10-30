@@ -2,11 +2,10 @@
 module App.Main exposing (main)
 
 count : Cli.Command none none
-let count =
-  cli "count" {
-    flag times : Float = 1
-    handle fun { times } -> Platform.stdout_line "handler ran"
-  }
+let count = cli "count" {
+  flag times : Float = 1
+  handle fun { times } -> Platform.stdout_line "handler ran"
+}
 
 main : Unit ->{; AppError} Unit
 let main () =

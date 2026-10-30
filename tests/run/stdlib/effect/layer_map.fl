@@ -7,11 +7,13 @@ service Tenant =
 
 tenant : Ref Float -> String -> Layer none none {Tenant}
 let tenant builds key =
-  Layer.effect Tenant (task {
-    Ref.update builds (fun n -> n + 1)
-    Platform.stdout_line ("build " ++ key)
-    { name = fun () -> key }
-  })
+  Layer.effect
+    Tenant
+    (task {
+      Ref.update builds (fun n -> n + 1)
+      Platform.stdout_line ("build " ++ key)
+      { name = fun () -> key }
+    })
 
 options : LayerMap.Options String
 let options = { idleTimeToLive = None; preloadKeys = Some ["a"] }
@@ -26,9 +28,10 @@ let maps () =
     LayerMap.invalidate "a" map
     provide LayerMap.get "a" map { Platform.stdout_line ("tenant " ++ Tenant.name ()) }
     let named =
-      LayerMap.from_record
-        [("x", Layer.succeed Tenant { name = fun () -> "record x" })]
-        { idleTimeToLive = None; preload = false }
+      LayerMap.from_record [("x", Layer.succeed Tenant { name = fun () -> "record x" })] {
+        idleTimeToLive = None;
+        preload = false;
+      }
     provide LayerMap.get "x" named { Platform.stdout_line (Tenant.name ()) }
   }
   Platform.stdout_line ("map builds " ++ show (Ref.get builds))
@@ -38,9 +41,10 @@ let refs () =
   let builds = Ref.make 0
   scope s {
     let ref =
-      LayerRef.make
-        (tenant builds "ref")
-        { idleTimeToLive = Some Duration.infinity; preload = true }
+      LayerRef.make (tenant builds "ref") {
+        idleTimeToLive = Some Duration.infinity;
+        preload = true;
+      }
     provide LayerRef.get ref { Platform.stdout_line ("ref " ++ Tenant.name ()) }
     provide LayerRef.get ref { Platform.stdout_line ("ref again " ++ Tenant.name ()) }
     LayerRef.refresh ref

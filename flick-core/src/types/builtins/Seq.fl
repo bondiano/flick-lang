@@ -102,8 +102,8 @@ foreign pure zip from "@flick-lang/runtime" "seqZip"
   arity 2
   retention call
 
-zip_with : forall c d a b x. (a -> b -> x)^c ->
-  ((Seq a)^d -> ((Seq b)^d -> (Seq x)^(c + d))^(c + d))^c
+zip_with :
+  forall c d a b x. (a -> b -> x)^c -> ((Seq a)^d -> ((Seq b)^d -> (Seq x)^(c + d))^(c + d))^c
 foreign pure zip_with from "@flick-lang/runtime" "seqZipWith"
   arity 3
   retention call

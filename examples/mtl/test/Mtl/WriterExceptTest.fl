@@ -42,15 +42,16 @@ let run_except action = Identity.run (ExceptT.run action)
 
 writer_laws : List Test.Test
 let writer_laws = [
-  Test.property "WriterT Functor identity and composition preserve the complete log"
-    (triple writer_values (Gen.function ints) (Gen.function ints)) (fun (value, f, g) ->
+  Test.property
+    "WriterT Functor identity and composition preserve the complete log"
+    (triple writer_values (Gen.function ints) (Gen.function ints))
+    (fun (value, f, g) ->
       let action = make_writer value
       Test.all [
         Test.equal (run_writer action) (run_writer (map (fun x -> x) action)),
-        Test.equal
-          (run_writer (map (fun x -> g (f x)) action))
-          (run_writer (map g (map f action))),
-      ]),
+        Test.equal (run_writer (map (fun x -> g (f x)) action)) (run_writer (map g (map f action))),
+      ]
+    ),
   Test.property
     "WriterT Applicative identity, composition, homomorphism, interchange and map coherence"
     (triple writer_values writer_functions writer_functions)
@@ -64,24 +65,25 @@ let writer_laws = [
           (run_writer (map2 (fun h x -> h x) (pure (fun x -> x)) action)),
         Test.equal
           (run_writer
-            (map2 (fun h x -> h x)
-              (map2 (fun h x -> h x)
-                (map2 (fun h x -> h x) (pure (fun outer inner x -> outer (inner x))) u) v)
+            (map2
+              (fun h x -> h x)
+              (map2
+                (fun h x -> h x)
+                (map2 (fun h x -> h x) (pure (fun outer inner x -> outer (inner x))) u)
+                v)
               action))
-          (run_writer
-            (map2 (fun h x -> h x) u (map2 (fun h x -> h x) v action))),
-        Test.equal
-          (run_writer (pure (f n)))
-          (run_writer (map2 (fun h x -> h x) (pure f) (pure n))),
+          (run_writer (map2 (fun h x -> h x) u (map2 (fun h x -> h x) v action))),
+        Test.equal (run_writer (pure (f n))) (run_writer (map2 (fun h x -> h x) (pure f) (pure n))),
         Test.equal
           (run_writer (map2 (fun h x -> h x) u (pure n)))
           (run_writer (map2 (fun h x -> h x) (pure (fun h -> h n)) u)),
-        Test.equal
-          (run_writer (map f action))
-          (run_writer (map2 (fun h x -> h x) (pure f) action)),
-      ]),
-  Test.property "WriterT Monad identities, associativity and map2-bind coherence"
-    (triple writer_values to_writes to_writes) (fun ((n, output), raw_f, raw_g) ->
+        Test.equal (run_writer (map f action)) (run_writer (map2 (fun h x -> h x) (pure f) action)),
+      ]
+    ),
+  Test.property
+    "WriterT Monad identities, associativity and map2-bind coherence"
+    (triple writer_values to_writes to_writes)
+    (fun ((n, output), raw_f, raw_g) ->
       f : Float -> WriterT (List String) Identity Float
       let f x = make_writer (raw_f x)
       g : Float -> WriterT (List String) Identity Float
@@ -97,9 +99,12 @@ let writer_laws = [
         Test.equal
           (run_writer (map2 (fun x y -> x - y) action other))
           (run_writer (flat_map (fun x -> map (fun y -> x - y) other) action)),
-      ]),
-  Test.property "WriterT lift preserves pure and bind without adding output"
-    (Gen.pair ints (Gen.function ints)) (fun (n, raw_f) ->
+      ]
+    ),
+  Test.property
+    "WriterT lift preserves pure and bind without adding output"
+    (Gen.pair ints (Gen.function ints))
+    (fun (n, raw_f) ->
       let base = (pure n : Identity Float)
       f : Float -> Identity Float
       let f x = pure (raw_f x)
@@ -109,20 +114,22 @@ let writer_laws = [
         Test.equal
           (run_writer (lift (flat_map f base)))
           (run_writer (flat_map (fun x -> lift (f x)) (lift base))),
-      ]),
+      ]
+    ),
 ]
 
 except_laws : List Test.Test
 let except_laws = [
-  Test.property "ExceptT Functor identity and composition include Ok and Err"
-    (triple results (Gen.function ints) (Gen.function ints)) (fun (value, f, g) ->
+  Test.property
+    "ExceptT Functor identity and composition include Ok and Err"
+    (triple results (Gen.function ints) (Gen.function ints))
+    (fun (value, f, g) ->
       let action = ExceptT.from_result value
       Test.all [
         Test.equal (run_except action) (run_except (map (fun x -> x) action)),
-        Test.equal
-          (run_except (map (fun x -> g (f x)) action))
-          (run_except (map g (map f action))),
-      ]),
+        Test.equal (run_except (map (fun x -> g (f x)) action)) (run_except (map g (map f action))),
+      ]
+    ),
   Test.property
     "ExceptT Applicative identity, composition, homomorphism, interchange and map coherence"
     (triple results (Gen.pair Gen.bool (Gen.function ints)) (Gen.pair Gen.bool (Gen.function ints)))
@@ -132,37 +139,44 @@ let except_laws = [
       let u = ExceptT.from_result (if left_ok then Ok f else Err "left")
       v : ExceptT String Identity (Float -> Float)
       let v = ExceptT.from_result (if right_ok then Ok g else Err "right")
-      let n = match value with | Ok x -> x | Err _ -> 3
+      let n =
+        match value with
+        | Ok x -> x
+        | Err _ -> 3
       Test.all [
         Test.equal
           (run_except action)
           (run_except (map2 (fun h x -> h x) (pure (fun x -> x)) action)),
         Test.equal
           (run_except
-            (map2 (fun h x -> h x)
-              (map2 (fun h x -> h x)
-                (map2 (fun h x -> h x) (pure (fun outer inner x -> outer (inner x))) u) v)
+            (map2
+              (fun h x -> h x)
+              (map2
+                (fun h x -> h x)
+                (map2 (fun h x -> h x) (pure (fun outer inner x -> outer (inner x))) u)
+                v)
               action))
-          (run_except
-            (map2 (fun h x -> h x) u (map2 (fun h x -> h x) v action))),
-        Test.equal
-          (run_except (pure (f n)))
-          (run_except (map2 (fun h x -> h x) (pure f) (pure n))),
+          (run_except (map2 (fun h x -> h x) u (map2 (fun h x -> h x) v action))),
+        Test.equal (run_except (pure (f n))) (run_except (map2 (fun h x -> h x) (pure f) (pure n))),
         Test.equal
           (run_except (map2 (fun h x -> h x) u (pure n)))
           (run_except (map2 (fun h x -> h x) (pure (fun h -> h n)) u)),
-        Test.equal
-          (run_except (map f action))
-          (run_except (map2 (fun h x -> h x) (pure f) action)),
-      ]),
-  Test.property "ExceptT Monad identities, associativity and map2-bind coherence include failures"
-    (triple results to_results to_results) (fun (value, raw_f, raw_g) ->
+        Test.equal (run_except (map f action)) (run_except (map2 (fun h x -> h x) (pure f) action)),
+      ]
+    ),
+  Test.property
+    "ExceptT Monad identities, associativity and map2-bind coherence include failures"
+    (triple results to_results to_results)
+    (fun (value, raw_f, raw_g) ->
       f : Float -> ExceptT String Identity Float
       let f x = ExceptT.from_result (raw_f x)
       g : Float -> ExceptT String Identity Float
       let g x = ExceptT.from_result (raw_g x)
       let action = ExceptT.from_result value
-      let n = match value with | Ok x -> x | Err _ -> 3
+      let n =
+        match value with
+        | Ok x -> x
+        | Err _ -> 3
       let other = g n
       Test.all [
         Test.equal (run_except (f n)) (run_except (flat_map f (pure n))),
@@ -173,9 +187,12 @@ let except_laws = [
         Test.equal
           (run_except (map2 (fun x y -> x - y) action other))
           (run_except (flat_map (fun x -> map (fun y -> x - y) other) action)),
-      ]),
-  Test.property "ExceptT lift preserves pure and bind"
-    (Gen.pair ints (Gen.function ints)) (fun (n, raw_f) ->
+      ]
+    ),
+  Test.property
+    "ExceptT lift preserves pure and bind"
+    (Gen.pair ints (Gen.function ints))
+    (fun (n, raw_f) ->
       let base = (pure n : Identity Float)
       f : Float -> Identity Float
       let f x = pure (raw_f x)
@@ -185,18 +202,19 @@ let except_laws = [
         Test.equal
           (run_except (lift (flat_map f base)))
           (run_except (flat_map (fun x -> lift (f x)) (lift base))),
-      ]),
+      ]
+    ),
 ]
 
 record : String -> Float -> StateT (List String) Identity Float
 let record label n = StateT (fun seen -> pure (n, seen ++ [label]))
 
-run_recorded_writer : WriterT (List String) (StateT (List String) Identity) a ->
-  ((a, List String), List String)
+run_recorded_writer :
+  WriterT (List String) (StateT (List String) Identity) a -> ((a, List String), List String)
 let run_recorded_writer action = Identity.run (StateT.run (WriterT.run action) [])
 
-run_recorded_except : ExceptT String (StateT (List String) Identity) a ->
-  (Result String a, List String)
+run_recorded_except :
+  ExceptT String (StateT (List String) Identity) a -> (Result String a, List String)
 let run_recorded_except action = Identity.run (StateT.run (ExceptT.run action) [])
 
 behavior : List Test.Test
@@ -210,24 +228,26 @@ let behavior = [
         (11, ["a", "b"])
         (run_writer (flat_map (fun a -> map (fun b -> a + b) right) left)),
       Test.equal (4, ["a"]) (run_writer (map (fun n -> n) left)),
-    ]),
+    ]
+  ),
   Test.test
     "WriterT map, map2 and bind execute each base action once without duplicating logs"
     (fun () ->
-    logged : String -> Float -> WriterT (List String) (StateT (List String) Identity) Float
-    let logged label n = WriterT (map (fun value -> (value, [label])) (record label n))
-    action : WriterT (List String) (StateT (List String) Identity) Float
-    let action = do {
-      a <- map (fun n -> n + 1) (logged "a" 1) and b <- logged "b" 2
-      c <- logged "c" 3
-      pure (a + b + c)
-    }
-    lifted : WriterT (List String) (StateT (List String) Identity) Float
-    let lifted = lift (record "base" 9)
-    Test.all [
-      Test.equal ((7, ["a", "b", "c"]), ["a", "b", "c"]) (run_recorded_writer action),
-      Test.equal ((9, []), ["base"]) (run_recorded_writer lifted),
-    ]),
+      logged : String -> Float -> WriterT (List String) (StateT (List String) Identity) Float
+      let logged label n = WriterT (map (fun value -> (value, [label])) (record label n))
+      action : WriterT (List String) (StateT (List String) Identity) Float
+      let action = do {
+        a <- map (fun n -> n + 1) (logged "a" 1) and b <- logged "b" 2
+        c <- logged "c" 3
+        pure (a + b + c)
+      }
+      lifted : WriterT (List String) (StateT (List String) Identity) Float
+      let lifted = lift (record "base" 9)
+      Test.all [
+        Test.equal ((7, ["a", "b", "c"]), ["a", "b", "c"]) (run_recorded_writer action),
+        Test.equal ((9, []), ["base"]) (run_recorded_writer lifted),
+      ]
+    ),
   Test.test "WriterT preserves inner failures instead of manufacturing a value-log pair" (fun () ->
     failed : WriterT (List String) (Result String) Float
     let failed = lift (Err "offline")
@@ -236,27 +256,32 @@ let behavior = [
       Test.equal (Err "offline") (WriterT.run (map (fun n -> n + 1) failed)),
       Test.equal (Err "offline") (WriterT.run (flat_map (fun n -> pure (n + 1)) failed)),
       Test.equal (Err "offline") (WriterT.run (map2 (fun a b -> a + b) failed (pure 1))),
-    ]),
+    ]
+  ),
   Test.test
     "ExceptT map2 skips the right action and bind skips its continuation on a left Err"
     (fun () ->
-    failed : ExceptT String (StateT (List String) Identity) Float
-    let failed = ExceptT.from_result (Err "domain")
-    prefix : ExceptT String (StateT (List String) Identity) Float
-    let prefix = do { _ <- lift (record "left" 0); failed }
-    right : ExceptT String (StateT (List String) Identity) Float
-    let right = lift (record "right" 8)
-    Test.all [
-      Test.equal
-        (Err "domain", ["left"])
-        (run_recorded_except (map2 (fun a b -> a + b) prefix right)),
-      Test.equal
-        (Err "domain", ["left"])
-        (run_recorded_except (flat_map (fun n -> lift (record "continuation" n)) prefix)),
-      Test.equal
-        (Err "domain", ["right", "left"])
-        (run_recorded_except (map2 (fun a b -> a + b) right prefix)),
-    ]),
+      failed : ExceptT String (StateT (List String) Identity) Float
+      let failed = ExceptT.from_result (Err "domain")
+      prefix : ExceptT String (StateT (List String) Identity) Float
+      let prefix = do {
+        _ <- lift (record "left" 0)
+        failed
+      }
+      right : ExceptT String (StateT (List String) Identity) Float
+      let right = lift (record "right" 8)
+      Test.all [
+        Test.equal
+          (Err "domain", ["left"])
+          (run_recorded_except (map2 (fun a b -> a + b) prefix right)),
+        Test.equal
+          (Err "domain", ["left"])
+          (run_recorded_except (flat_map (fun n -> lift (record "continuation" n)) prefix)),
+        Test.equal
+          (Err "domain", ["right", "left"])
+          (run_recorded_except (map2 (fun a b -> a + b) right prefix)),
+      ]
+    ),
   Test.test "ExceptT successful map2 and bind retain ordered once-only base transitions" (fun () ->
     left : ExceptT String (StateT (List String) Identity) Float
     let left = lift (record "left" 4)
@@ -270,7 +295,8 @@ let behavior = [
         (Ok 11, ["left", "continuation"])
         (run_recorded_except
           (flat_map (fun n -> map (fun m -> n + m) (lift (record "continuation" 7))) left)),
-    ]),
+    ]
+  ),
   Test.test "ExceptT distinguishes an inner Err offline from the domain Ok Err domain" (fun () ->
     offline : ExceptT String (Result String) Float
     let offline = lift (Err "offline")
@@ -284,7 +310,8 @@ let behavior = [
       Test.equal (Err "offline") (ExceptT.run (map2 (fun a b -> a + b) offline (pure 1))),
       Test.equal (Err "offline") (ExceptT.run (map2 (fun a b -> a + b) (pure 1) offline)),
       Test.equal (Ok (Err "domain")) (ExceptT.run (flat_map (fun n -> pure (n + 1)) domain)),
-    ]),
+    ]
+  ),
 ]
 
 tests : List Test.Test

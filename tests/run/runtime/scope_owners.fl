@@ -7,10 +7,12 @@ let say line = Platform.stdout_line line
 
 open_res : forall s. String ->{Scope s;} String
 let open_res name =
-  Resource.acquire_release (task {
-    say ("open " ++ name)
-    name
-  }) (fun n -> say ("release " ++ n))
+  Resource.acquire_release
+    (task {
+      say ("open " ++ name)
+      name
+    })
+    (fun n -> say ("release " ++ n))
 
 /// Acquires into the caller's region from inside a scope of its own.
 keep : forall s. String ->{Scope s;} String
@@ -25,15 +27,14 @@ let keep name =
   }
 
 main : Unit ->{; AppError} Unit
-let main () =
-  scope outer {
-    acquire : Unit ->{Scope outer;} String
-    let acquire () = open_res "outer"
-    scope inner {
-      let _ = open_res "inner"
-      let _ = acquire ()
-      let _ = keep "kept"
-      say "inner done"
-    }
-    say "outer done"
+let main () = scope outer {
+  acquire : Unit ->{Scope outer;} String
+  let acquire () = open_res "outer"
+  scope inner {
+    let _ = open_res "inner"
+    let _ = acquire ()
+    let _ = keep "kept"
+    say "inner done"
   }
+  say "outer done"
+}

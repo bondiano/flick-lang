@@ -10,15 +10,14 @@ type error DurationError = DurationError String
   deriving Eq, Show
 
 /// A finite duration split into whole units, largest first.
-type alias Parts =
-  {
-    days : Int;
-    hours : Int;
-    minutes : Int;
-    seconds : Int;
-    millis : Int;
-    nanos : Int;
-  }
+type alias Parts = {
+  days : Int;
+  hours : Int;
+  minutes : Int;
+  seconds : Int;
+  millis : Int;
+  nanos : Int;
+}
 
 /// `n` nanoseconds; an error when negative.
 nanos : BigInt -> Result DurationError Duration

@@ -6,12 +6,9 @@ drafts : Atom.Family Float (Atom.Writable String)
 let drafts = Atom.family (fun id -> Atom.make ("draft " ++ show id))
 
 main : Unit ->{; AppError} Unit
-let main () =
-  provide Atom.layer {
-    Atom.set (Atom.at drafts 1) "edited"
-    Platform.stdout_line
-      (Atom.current (Atom.at drafts 1) ++ ", " ++ Atom.current (Atom.at drafts 2))
-    Atom.forget drafts 1
-    Platform.stdout_line
-      (Atom.current (Atom.at drafts 1) ++ ", " ++ Atom.current (Atom.at drafts 2))
-  }
+let main () = provide Atom.layer {
+  Atom.set (Atom.at drafts 1) "edited"
+  Platform.stdout_line (Atom.current (Atom.at drafts 1) ++ ", " ++ Atom.current (Atom.at drafts 2))
+  Atom.forget drafts 1
+  Platform.stdout_line (Atom.current (Atom.at drafts 1) ++ ", " ++ Atom.current (Atom.at drafts 2))
+}

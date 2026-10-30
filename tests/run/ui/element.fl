@@ -23,27 +23,25 @@ component search () =
   let field = Ui.element ()
   let unbound : (Ui.Element Ui.Div)^c = Ui.element ()
   let focus =
-    Action.exhaust (fun _ ->
-      task {
-        try Ui.focus field with
-        | Ui.Detached -> Platform.stdout_line "not mounted"
-      })
+    Action.exhaust (fun _ -> task {
+      try Ui.focus field with
+      | Ui.Detached -> Platform.stdout_line "not mounted"
+    })
   let lost =
-    Action.exhaust (fun _ ->
-      task {
-        try Ui.focus unbound with
-        | Ui.Detached -> Platform.stdout_line "detached"
-      })
+    Action.exhaust (fun _ -> task {
+      try Ui.focus unbound with
+      | Ui.Detached -> Platform.stdout_line "detached"
+    })
   ui {
-    div
-      { class_name = "search" }
-      [
-        input_at
-          field
-          { value = ""; placeholder = "find"; on_input = Ui.Event.latest (fun _ -> task { () }) },
-        button { disabled = false; on_click = focus } [text "focus"],
-        button { disabled = false; on_click = lost } [text "lost"],
-      ]
+    div { class_name = "search" } [
+      input_at field {
+        value = "";
+        placeholder = "find";
+        on_input = Ui.Event.latest (fun _ -> task { () });
+      },
+      button { disabled = false; on_click = focus } [text "focus"],
+      button { disabled = false; on_click = lost } [text "lost"],
+    ]
   }
 
 report : Failure e ->{} Unit
@@ -55,16 +53,15 @@ let main () =
   setup ()
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
-  | Some root ->
-    provide Atom.layer {
-      scope s {
-        let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render search ()) })
-        settle ()
-        Platform.stdout_line (focused ())
-        click "focus"
-        settle ()
-        Platform.stdout_line (focused ())
-        click "lost"
-        settle ()
-      }
+  | Some root -> provide Atom.layer {
+    scope s {
+      let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render search ()) })
+      settle ()
+      Platform.stdout_line (focused ())
+      click "focus"
+      settle ()
+      Platform.stdout_line (focused ())
+      click "lost"
+      settle ()
     }
+  }

@@ -42,24 +42,32 @@ writer_probe : forall m. MonadWriter m (List String) => m ((Float, List String),
 let writer_probe = do {
   tell []
   tell ["prefix"]
-  heard <- listen (do {
-    tell ["a"]
-    writer (7, ["b"])
-  })
-  changed <- pass (do {
-    tell ["c"]
-    tell ["d"]
-    pure (9, List.reverse)
-  })
+  heard <-
+    listen
+      (do {
+        tell ["a"]
+        writer (7, ["b"])
+      })
+  changed <-
+    pass
+      (do {
+        tell ["c"]
+        tell ["d"]
+        pure (9, List.reverse)
+      })
   tell ["suffix"]
   pure (heard, changed)
 }
 
 error_probe : forall m. MonadError m String => m (Float, Float)
 let error_probe = do {
-  recovered <- catch_error
-    (fun problem -> pure (if problem == "bad" then 7 else 0))
-    (do { _ <- throw_error "bad"; pure 99 })
+  recovered <-
+    catch_error
+      (fun problem -> pure (if problem == "bad" then 7 else 0))
+      (do {
+        _ <- throw_error "bad"
+        pure 99
+      })
   successful <- catch_error (fun _ -> throw_error "unexpected handler") (pure 8)
   pure (recovered, successful)
 }
@@ -69,28 +77,30 @@ let state_cells = [
   Test.test "MaybeT inherits every State operation" (fun () ->
     action : MaybeT (StateT Float Identity) (List Float)
     let action = state_probe
-    Test.equal (Some [3, 3, 3, 7, 9, 9, 11], 11)
-      (Identity.run (StateT.run (MaybeT.run action) 3))),
+    Test.equal (Some [3, 3, 3, 7, 9, 9, 11], 11) (Identity.run (StateT.run (MaybeT.run action) 3))
+  ),
   Test.test "StateT supplies every native State operation" (fun () ->
     action : StateT Float Identity (List Float)
     let action = state_probe
-    Test.equal ([3, 3, 3, 7, 9, 9, 11], 11)
-      (Identity.run (StateT.run action 3))),
+    Test.equal ([3, 3, 3, 7, 9, 9, 11], 11) (Identity.run (StateT.run action 3))
+  ),
   Test.test "ReaderT inherits every State operation" (fun () ->
     action : ReaderT String (StateT Float Identity) (List Float)
     let action = state_probe
-    Test.equal ([3, 3, 3, 7, 9, 9, 11], 11)
-      (Identity.run (StateT.run (ReaderT.run action "scope") 3))),
+    Test.equal
+      ([3, 3, 3, 7, 9, 9, 11], 11)
+      (Identity.run (StateT.run (ReaderT.run action "scope") 3))
+  ),
   Test.test "WriterT inherits every State operation without output" (fun () ->
     action : WriterT (List String) (StateT Float Identity) (List Float)
     let action = state_probe
-    Test.equal (([3, 3, 3, 7, 9, 9, 11], []), 11)
-      (Identity.run (StateT.run (WriterT.run action) 3))),
+    Test.equal (([3, 3, 3, 7, 9, 9, 11], []), 11) (Identity.run (StateT.run (WriterT.run action) 3))
+  ),
   Test.test "ExceptT inherits every State operation" (fun () ->
     action : ExceptT String (StateT Float Identity) (List Float)
     let action = state_probe
-    Test.equal (Ok [3, 3, 3, 7, 9, 9, 11], 11)
-      (Identity.run (StateT.run (ExceptT.run action) 3))),
+    Test.equal (Ok [3, 3, 3, 7, 9, 9, 11], 11) (Identity.run (StateT.run (ExceptT.run action) 3))
+  ),
 ]
 
 reader_cells : List Test.Test
@@ -98,28 +108,36 @@ let reader_cells = [
   Test.test "MaybeT inherits every Reader operation" (fun () ->
     action : MaybeT (ReaderT Float Identity) (List Float)
     let action = reader_probe
-    Test.equal (Some [5, 15, 5, 10, 10, 5, 30, 30])
-      (Identity.run (ReaderT.run (MaybeT.run action) 5))),
+    Test.equal
+      (Some [5, 15, 5, 10, 10, 5, 30, 30])
+      (Identity.run (ReaderT.run (MaybeT.run action) 5))
+  ),
   Test.test "StateT inherits every Reader operation without changing state" (fun () ->
     action : StateT Float (ReaderT Float Identity) (List Float)
     let action = reader_probe
-    Test.equal ([5, 15, 5, 10, 10, 5, 30, 30], 3)
-      (Identity.run (ReaderT.run (StateT.run action 3) 5))),
+    Test.equal
+      ([5, 15, 5, 10, 10, 5, 30, 30], 3)
+      (Identity.run (ReaderT.run (StateT.run action 3) 5))
+  ),
   Test.test "ReaderT supplies every native Reader operation" (fun () ->
     action : ReaderT Float Identity (List Float)
     let action = reader_probe
-    Test.equal [5, 15, 5, 10, 10, 5, 30, 30]
-      (Identity.run (ReaderT.run action 5))),
+    Test.equal [5, 15, 5, 10, 10, 5, 30, 30] (Identity.run (ReaderT.run action 5))
+  ),
   Test.test "WriterT inherits every Reader operation without output" (fun () ->
     action : WriterT (List String) (ReaderT Float Identity) (List Float)
     let action = reader_probe
-    Test.equal ([5, 15, 5, 10, 10, 5, 30, 30], [])
-      (Identity.run (ReaderT.run (WriterT.run action) 5))),
+    Test.equal
+      ([5, 15, 5, 10, 10, 5, 30, 30], [])
+      (Identity.run (ReaderT.run (WriterT.run action) 5))
+  ),
   Test.test "ExceptT inherits every Reader operation" (fun () ->
     action : ExceptT String (ReaderT Float Identity) (List Float)
     let action = reader_probe
-    Test.equal (Ok [5, 15, 5, 10, 10, 5, 30, 30])
-      (Identity.run (ReaderT.run (ExceptT.run action) 5))),
+    Test.equal
+      (Ok [5, 15, 5, 10, 10, 5, 30, 30])
+      (Identity.run (ReaderT.run (ExceptT.run action) 5))
+  ),
 ]
 
 writer_cells : List Test.Test
@@ -127,28 +145,38 @@ let writer_cells = [
   Test.test "MaybeT inherits every Writer operation" (fun () ->
     action : MaybeT (WriterT (List String) Identity) ((Float, List String), Float)
     let action = writer_probe
-    Test.equal (Some ((7, ["a", "b"]), 9), ["prefix", "a", "b", "d", "c", "suffix"])
-      (Identity.run (WriterT.run (MaybeT.run action)))),
+    Test.equal
+      (Some ((7, ["a", "b"]), 9), ["prefix", "a", "b", "d", "c", "suffix"])
+      (Identity.run (WriterT.run (MaybeT.run action)))
+  ),
   Test.test "StateT inherits every Writer operation and preserves state" (fun () ->
     action : StateT Float (WriterT (List String) Identity) ((Float, List String), Float)
     let action = writer_probe
-    Test.equal ((((7, ["a", "b"]), 9), 3), ["prefix", "a", "b", "d", "c", "suffix"])
-      (Identity.run (WriterT.run (StateT.run action 3)))),
+    Test.equal
+      ((((7, ["a", "b"]), 9), 3), ["prefix", "a", "b", "d", "c", "suffix"])
+      (Identity.run (WriterT.run (StateT.run action 3)))
+  ),
   Test.test "ReaderT inherits every Writer operation" (fun () ->
     action : ReaderT Float (WriterT (List String) Identity) ((Float, List String), Float)
     let action = writer_probe
-    Test.equal (((7, ["a", "b"]), 9), ["prefix", "a", "b", "d", "c", "suffix"])
-      (Identity.run (WriterT.run (ReaderT.run action 5)))),
+    Test.equal
+      (((7, ["a", "b"]), 9), ["prefix", "a", "b", "d", "c", "suffix"])
+      (Identity.run (WriterT.run (ReaderT.run action 5)))
+  ),
   Test.test "WriterT supplies every native Writer operation" (fun () ->
     action : WriterT (List String) Identity ((Float, List String), Float)
     let action = writer_probe
-    Test.equal (((7, ["a", "b"]), 9), ["prefix", "a", "b", "d", "c", "suffix"])
-      (Identity.run (WriterT.run action))),
+    Test.equal
+      (((7, ["a", "b"]), 9), ["prefix", "a", "b", "d", "c", "suffix"])
+      (Identity.run (WriterT.run action))
+  ),
   Test.test "ExceptT inherits every Writer operation" (fun () ->
     action : ExceptT String (WriterT (List String) Identity) ((Float, List String), Float)
     let action = writer_probe
-    Test.equal (Ok ((7, ["a", "b"]), 9), ["prefix", "a", "b", "d", "c", "suffix"])
-      (Identity.run (WriterT.run (ExceptT.run action)))),
+    Test.equal
+      (Ok ((7, ["a", "b"]), 9), ["prefix", "a", "b", "d", "c", "suffix"])
+      (Identity.run (WriterT.run (ExceptT.run action)))
+  ),
 ]
 
 error_cells : List Test.Test
@@ -156,27 +184,28 @@ let error_cells = [
   Test.test "MaybeT inherits throw and catch" (fun () ->
     action : MaybeT (ExceptT String Identity) (Float, Float)
     let action = error_probe
-    Test.equal (Ok (Some (7, 8)))
-      (Identity.run (ExceptT.run (MaybeT.run action)))),
+    Test.equal (Ok (Some (7, 8))) (Identity.run (ExceptT.run (MaybeT.run action)))
+  ),
   Test.test "StateT inherits throw and catch" (fun () ->
     action : StateT Float (ExceptT String Identity) (Float, Float)
     let action = error_probe
-    Test.equal (Ok ((7, 8), 3))
-      (Identity.run (ExceptT.run (StateT.run action 3)))),
+    Test.equal (Ok ((7, 8), 3)) (Identity.run (ExceptT.run (StateT.run action 3)))
+  ),
   Test.test "ReaderT inherits throw and catch" (fun () ->
     action : ReaderT Float (ExceptT String Identity) (Float, Float)
     let action = error_probe
-    Test.equal (Ok (7, 8))
-      (Identity.run (ExceptT.run (ReaderT.run action 5)))),
+    Test.equal (Ok (7, 8)) (Identity.run (ExceptT.run (ReaderT.run action 5)))
+  ),
   Test.test "WriterT inherits throw and catch without inventing output" (fun () ->
     action : WriterT (List String) (ExceptT String Identity) (Float, Float)
     let action = error_probe
-    Test.equal (Ok ((7, 8), []))
-      (Identity.run (ExceptT.run (WriterT.run action)))),
+    Test.equal (Ok ((7, 8), [])) (Identity.run (ExceptT.run (WriterT.run action)))
+  ),
   Test.test "ExceptT supplies native throw and catch" (fun () ->
     action : ExceptT String Identity (Float, Float)
     let action = error_probe
-    Test.equal (Ok (7, 8)) (Identity.run (ExceptT.run action))),
+    Test.equal (Ok (7, 8)) (Identity.run (ExceptT.run action))
+  ),
 ]
 
 run_state : Float -> StateT Float Identity a -> (a, Float)
@@ -190,36 +219,61 @@ let run_writer action = Identity.run (WriterT.run action)
 
 laws : List Test.Test
 let laws = [
-  Test.property "State get/get, put-back, put/get, final put and state coherence"
+  Test.property
+    "State get/get, put-back, put/get, final put and state coherence"
     (Gen.pair
       (Gen.map Int.to_float (Gen.int (0 - 20) 20))
       (Gen.map Int.to_float (Gen.int (0 - 20) 20)))
-      (fun (initial, next) ->
+    (fun (initial, next) ->
       twice : StateT Float Identity (Float, Float)
-      let twice = do { first <- get; second <- get; pure (first, second) }
+      let twice = do {
+        first <- get
+        second <- get
+        pure (first, second)
+      }
       once : StateT Float Identity (Float, Float)
       let once = map (fun value -> (value, value)) get
       put_back : StateT Float Identity Unit
-      let put_back = do { before <- get; put before }
+      let put_back = do {
+        before <- get
+        put before
+      }
       put_get : StateT Float Identity Float
-      let put_get = do { put next; get }
+      let put_get = do {
+        put next
+        get
+      }
       put_value : StateT Float Identity Float
-      let put_value = do { put next; pure next }
+      let put_value = do {
+        put next
+        pure next
+      }
       last_put : StateT Float Identity Float
-      let last_put = do { put initial; put next; get }
+      let last_put = do {
+        put initial
+        put next
+        get
+      }
       combined : StateT Float Identity Float
       let combined = state (fun before -> (before * 2, before + next))
       expanded : StateT Float Identity Float
-      let expanded = do { before <- get; put (before + next); pure (before * 2) }
+      let expanded = do {
+        before <- get
+        put (before + next)
+        pure (before * 2)
+      }
       Test.all [
         Test.equal (run_state initial once) (run_state initial twice),
         Test.equal ((), initial) (run_state initial put_back),
         Test.equal (run_state initial put_value) (run_state initial put_get),
         Test.equal (run_state initial put_get) (run_state initial last_put),
         Test.equal (run_state initial expanded) (run_state initial combined),
-      ]),
-  Test.property "Reader local identity/composition and reader coherence"
-    (Gen.map Int.to_float (Gen.int (0 - 20) 20)) (fun environment ->
+      ]
+    ),
+  Test.property
+    "Reader local identity/composition and reader coherence"
+    (Gen.map Int.to_float (Gen.int (0 - 20) 20))
+    (fun environment ->
       action : ReaderT Float Identity Float
       let action = reader (fun n -> n * 3 + 1)
       let nested = local (fun n -> n + 10) (local (fun n -> n * 2) action)
@@ -227,43 +281,61 @@ let laws = [
       mapped : ReaderT Float Identity Float
       let mapped = map (fun n -> n * 3 + 1) ask
       Test.all [
-        Test.equal (run_reader environment action)
+        Test.equal
+          (run_reader environment action)
           (run_reader environment (local (fun n -> n) action)),
         Test.equal (run_reader environment composed) (run_reader environment nested),
         Test.equal (run_reader environment mapped) (run_reader environment action),
-      ]),
+      ]
+    ),
   Test.property
     "Writer empty/ordered tell and writer coherence"
     (Gen.map Int.to_float (Gen.int (0 - 20) 20))
     (fun value ->
-    quiet : WriterT (List String) Identity Float
-    let quiet = do { tell []; pure value }
-    ordered : WriterT (List String) Identity Float
-    let ordered = do { tell ["a"]; tell ["b"]; pure value }
-    together : WriterT (List String) Identity Float
-    let together = do { tell ["a", "b"]; pure value }
-    written : WriterT (List String) Identity Float
-    let written = writer (value, ["a", "b"])
-    Test.all [
-      Test.equal (value, []) (run_writer quiet),
-      Test.equal (value, ["a", "b"]) (run_writer ordered),
-      Test.equal (run_writer together) (run_writer ordered),
-      Test.equal (run_writer together) (run_writer written),
-      Test.equal ((value, ["a", "b"]), ["a", "b"]) (run_writer (listen written)),
-    ]),
+      quiet : WriterT (List String) Identity Float
+      let quiet = do {
+        tell []
+        pure value
+      }
+      ordered : WriterT (List String) Identity Float
+      let ordered = do {
+        tell ["a"]
+        tell ["b"]
+        pure value
+      }
+      together : WriterT (List String) Identity Float
+      let together = do {
+        tell ["a", "b"]
+        pure value
+      }
+      written : WriterT (List String) Identity Float
+      let written = writer (value, ["a", "b"])
+      Test.all [
+        Test.equal (value, []) (run_writer quiet),
+        Test.equal (value, ["a", "b"]) (run_writer ordered),
+        Test.equal (run_writer together) (run_writer ordered),
+        Test.equal (run_writer together) (run_writer written),
+        Test.equal ((value, ["a", "b"]), ["a", "b"]) (run_writer (listen written)),
+      ]
+    ),
   Test.test "full-stack workflow uses the actual generic lift and runner" (fun () ->
     base : Identity Unit
     let base = pure ()
     successful : Stack Identity Float
-    let successful = do { Capabilities.lift_base base; Capabilities.workflow 2 }
+    let successful = do {
+      Capabilities.lift_base base
+      Capabilities.workflow 2
+    }
     failed : Stack Identity Float
-    let failed = do { Capabilities.lift_base base; Capabilities.workflow (0 - 1) }
+    let failed = do {
+      Capabilities.lift_base base
+      Capabilities.workflow (0 - 1)
+    }
     Test.all [
-      Test.equal ((Ok 5, ["begin", "done"]), 15)
-        (Identity.run (Capabilities.run 3 10 successful)),
-      Test.equal ((Err "negative", ["begin"]), 10)
-        (Identity.run (Capabilities.run 3 10 failed)),
-    ]),
+      Test.equal ((Ok 5, ["begin", "done"]), 15) (Identity.run (Capabilities.run 3 10 successful)),
+      Test.equal ((Err "negative", ["begin"]), 10) (Identity.run (Capabilities.run 3 10 failed)),
+    ]
+  ),
 ]
 
 tests : List Test.Test

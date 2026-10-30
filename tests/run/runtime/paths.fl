@@ -18,12 +18,11 @@ let read path =
   | File.OpenError message -> message
 
 main : Unit ->{; AppError} Unit
-let main () =
-  provide File.node {
-    let path = temp () ++ "/flick-paths.txt"
-    try File.write_text path "written and read back" with
-    | File.WriteError message -> say message
-    say (read path)
-    say (read "missing/dir/file.txt")
-    say (read "missing\\dir\\file.txt")
-  }
+let main () = provide File.node {
+  let path = temp () ++ "/flick-paths.txt"
+  try File.write_text path "written and read back" with
+  | File.WriteError message -> say message
+  say (read path)
+  say (read "missing/dir/file.txt")
+  say (read "missing\\dir\\file.txt")
+}

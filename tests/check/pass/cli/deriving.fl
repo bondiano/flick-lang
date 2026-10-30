@@ -4,14 +4,12 @@ module App.Choice exposing (paint)
 type Color = Red | GreenLight
   deriving Cli.Value, Show
 
-refined type Port = Float
-  where fun n -> n > 0 && n < 65536
+refined type Port = Float where fun n -> n > 0 && n < 65536
   deriving Cli.Value
 
 paint : Cli.Command none none
-let paint =
-  cli "paint" {
-    flag color "c" : Color = Red
-    flag port : Option Port
-    handle fun { color; port } -> Platform.stdout_line (show color)
-  }
+let paint = cli "paint" {
+  flag color "c" : Color = Red
+  flag port : Option Port
+  handle fun { color; port } -> Platform.stdout_line (show color)
+}

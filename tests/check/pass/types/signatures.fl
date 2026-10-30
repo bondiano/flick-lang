@@ -3,12 +3,10 @@
 module App.Signatures exposing (hello, render, compose)
 
 greet : String -> String -> String
-let greet prefix name =
-  prefix ++ ", " ++ name
+let greet prefix name = prefix ++ ", " ++ name
 
 hello : String -> String
-let hello =
-  greet "Hello"
+let hello = greet "Hello"
 
 render : List String -> String
 let render items =

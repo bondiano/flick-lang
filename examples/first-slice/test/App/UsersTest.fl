@@ -24,31 +24,31 @@ let log_test lines =
   Layer.succeed Log { info = fun line -> Ref.update lines (fun xs -> List.append xs [line]) }
 
 tests : List Test.Test
-let tests =
-  [
-    Test.test "to_view trims the name" (fun () -> Test.equal "Ada" (to_view ada).title),
-    Test.effect_test
-      "load_two loads both and logs each"
-      (task {
-        let lines = Ref.make []
-        let (first, second) = provide Layer.merge users_test (log_test lines) {
-          load_two (user_id "u1") (user_id "u2")
-        }
-        Test.expect (Test.equal ["Ada", "Grace"] [first.title, second.title])
-        Test.expect (Test.equal ["Loaded Ada", "Loaded Grace"] (List.sort (Ref.get lines)))
-      }),
-    Test.effect_test
-      "load_view fails with NotFound"
-      (task {
-        let lines = Ref.make []
-        let outcome =
-          try
-            let view =
-              provide Layer.merge users_test (log_test lines) { load_view (user_id "nobody") }
-            view.title
-          with
-          | NotFound id -> "missing " ++ show id
-        Test.expect (Test.equal "missing \"nobody\"" outcome)
-        Test.expect (Test.equal [] (Ref.get lines))
-      }),
-  ]
+let tests = [
+  Test.test "to_view trims the name" (fun () -> Test.equal "Ada" (to_view ada).title),
+  Test.effect_test
+    "load_two loads both and logs each"
+    (task {
+      let lines = Ref.make []
+      let (first, second) = provide Layer.merge users_test (log_test lines) {
+        load_two (user_id "u1") (user_id "u2")
+      }
+      Test.expect (Test.equal ["Ada", "Grace"] [first.title, second.title])
+      Test.expect (Test.equal ["Loaded Ada", "Loaded Grace"] (List.sort (Ref.get lines)))
+    }),
+  Test.effect_test
+    "load_view fails with NotFound"
+    (task {
+      let lines = Ref.make []
+      let outcome =
+        try
+          let view = provide Layer.merge users_test (log_test lines) {
+            load_view (user_id "nobody")
+          }
+          view.title
+        with
+        | NotFound id -> "missing " ++ show id
+      Test.expect (Test.equal "missing \"nobody\"" outcome)
+      Test.expect (Test.equal [] (Ref.get lines))
+    }),
+]

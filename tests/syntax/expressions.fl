@@ -7,20 +7,18 @@ big : BigInt
 let big = 9007199254740993n
 
 strings : List String
-let strings =
-  [
-    "tab\t, quote \" and \u{1F600}",
-    r"raw \n stays",
-    r#"raw with "quotes""#,
-    """
+let strings = [
+  "tab\t, quote \" and \u{1F600}",
+  r"raw \n stays",
+  r#"raw with "quotes""#,
+  """
     multi-line text
       keeps relative indentation
     """,
-  ]
+]
 
 precedence : Float -> Bool
-let precedence x =
-  -x ** 2 + 3 * x - 1 > 0 && not (x == 1) || x >= 10
+let precedence x = -x ** 2 + 3 * x - 1 > 0 && not (x == 1) || x >= 10
 
 pipeline : List Float -> Float
 let pipeline xs =
@@ -56,8 +54,7 @@ let pick items =
   | [single] -> Some single
   | _ -> None
 
-let rec countdown n =
-  if n <= 0 then [] else [n] ++ countdown (n - 1)
+let rec countdown n = if n <= 0 then [] else [n] ++ countdown (n - 1)
 
 load : UserId ->{Users, Log; NotFound} (User, User)
 let load id =
@@ -75,51 +72,46 @@ let load id =
 
 safe : UserId ->{Users; none} Option User
 let safe id =
-  try
-    Some (Users.get id)
-  with
+  try Some (Users.get id) with
   | NotFound _ -> None
 
 read : Path ->{FileSystem; OpenError, ReadError} String
-let read path =
-  scope s {
-    let file = File.open_scoped path
-    File.read_all file
-  }
+let read path = scope s {
+  let file = File.open_scoped path
+  File.read_all file
+}
 
 run : UserId ->{Config, Log; NotFound, ConnectError} String
-let run id =
-  provide (Layer.merge UsersLive LogLive) { load_name id; "done" }
+let run id = provide (Layer.merge UsersLive LogLive) {
+  load_name id
+  "done"
+}
 
 query : Sql.Template Pg { user_id : UserId } Row
-let query =
-  sql params {
-    from user in Users
-    left_join account in Accounts
-      on account.user_id == user.id
-    where user.id == params.user_id && is_not_null account.balance && user.name != $name
-    group_by user.id, user.name
-    order_by desc user.name
-    limit 10
-    select { name = user.name; balance = account.balance }
-  }
+let query = sql params {
+  from user in Users
+  left_join account in Accounts on account.user_id == user.id
+  where user.id == params.user_id && is_not_null account.balance && user.name != $name
+  group_by user.id, user.name
+  order_by desc user.name
+  limit 10
+  select { name = user.name; balance = account.balance }
+}
 
 view : Props -> Ui
-let view props =
-  ui {
-    button
-      { disabled = props.disabled; on_click = Ui.Event.exhaust (fun _ -> task { props.save () }) }
-      [text props.label]
-  }
+let view props = ui {
+  button
+    { disabled = props.disabled; on_click = Ui.Event.exhaust (fun _ -> task { props.save () }) }
+    [text props.label]
+}
 
 json : PureCodec Json Profile
-let json =
-  codec (schema Profile) {
-    email = field "email" Email.json;
-    nickname =
-      optional_field "nickname" String.json
-      |> on_missing (fun () -> None);
-  }
+let json = codec (schema Profile) {
+  email = field "email" Email.json;
+  nickname =
+    optional_field "nickname" String.json
+    |> on_missing (fun () -> None);
+}
 
 tree : Schema a -> Schema (Tree a)
 let tree item = schema Tree item
@@ -141,8 +133,7 @@ let area shape =
   | Rect w h when w == h -> w * w
   | Rect w h -> w * h
   | Pair (Some 0 | None) _ -> 0
-  | Line
-  | Point -> 0
+  | Line | Point -> 0
   | Labeled { name = "origin" | "zero" } -> 0
 
 let debugging x =

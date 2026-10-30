@@ -1,9 +1,12 @@
 //! Top-level definitions: declarations, and the statements of the module's
 //! init function that assign its values.
 
-use std::fmt::Write;
+use flick_pretty::{Document, docvec};
 
-use super::{Gen, Shape, indent, loops, names, param_list, signature};
+use super::layout::{
+    Code, block, call, closure, list, named_again, param_list, print, signature, statement,
+};
+use super::{Gen, RUNTIME_PACKAGE, Shape, loops, names};
 use crate::codegen::names as js_names;
 use crate::codegen::tail::{Callee, Target};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
@@ -13,57 +16,73 @@ use crate::types::{Constructor, Dict, InstanceInfo, Rep, default_method};
 /// The classes whose instances the runtime derives.
 const DERIVED: &[&str] = &["Eq", "Ord", "Hash", "Show"];
 
-impl Gen<'_> {
+/// The declarations of a module, each with whether it holds a `//line`
+/// directive; the statements of its init function.
+pub(super) type Decls<'a> = Vec<(Document<'a>, bool)>;
+
+impl<'a> Gen<'a> {
     /// The Go file of `module` with the items at `order`.
     pub(super) fn module(&mut self, module: &Module, order: &[usize]) -> String {
+        let a = self.a;
         let mut decls = Vec::new();
         let mut init = Vec::new();
         (self.groups, self.grouped) = loops::groups(self.module, &module.items);
         // every member of a group reaches the others: all are reached or none
         for g in 0..self.groups.len() {
             if order.contains(&self.groups[g].first()) {
-                decls.push(self.group(g, &module.items));
+                let lines = self.lines;
+                let decl = self.group(g, &module.items);
+                decls.push((decl, self.lines > lines));
             }
         }
         for &i in order {
             self.item(&module.items[i], &mut decls, &mut init);
         }
-        let mut code = format!(
-            "package main\n\nimport \"{}\"\n\nvar _ = flickrt.Unit\n\n",
-            super::RUNTIME_PACKAGE
-        );
-        for decl in decls {
-            code.push_str(&decl);
-            code.push('\n');
+        let decls = decls.into_iter().map(|(decl, located)| {
             // the lines after a `//line` count from it: name the Go file again
-            if decl.contains("\n//line ") {
-                let next = code.lines().count() + 2;
-                let _ = writeln!(code, "//line {}:{next}", names::file(self.module));
-            }
-            code.push('\n');
-        }
-        let _ = write!(
-            code,
-            "func {}() {{\n{}}}\n",
-            names::init(self.module),
-            indent(&init)
-        );
-        code
+            let again = if located {
+                named_again(a, names::file(self.module))
+            } else {
+                a.empty()
+            };
+            docvec![a, decl, again, a.lines(2)]
+        });
+        let init = docvec![a, "func ", names::init(self.module), "() ", block(a, init)];
+        print(docvec![
+            a,
+            "package main",
+            a.lines(2),
+            "import \"",
+            RUNTIME_PACKAGE,
+            "\"",
+            a.lines(2),
+            "var _ = flickrt.Unit",
+            a.lines(2),
+            a.concat(decls),
+            init,
+            a.line()
+        ])
     }
 
-    fn item(&mut self, item: &Item, decls: &mut Vec<String>, init: &mut Vec<String>) {
+    fn item(&mut self, item: &Item, decls: &mut Decls<'a>, init: &mut Vec<Document<'a>>) {
+        let a = self.a;
         // local names are unique only within a definition
         self.natives.clear();
+        // whether the declaration made now holds a `//line` directive
+        let lines = self.lines;
         match &item.kind {
             ItemKind::Value { name, dicts, body } => match super::shape(&item.kind) {
                 Shape::Var => {
-                    let var = names::var(self.module, name);
-                    decls.push(format!("var {var} flickrt.Value"));
+                    let var = a.alloc_str(&names::var(self.module, name));
+                    decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
                     let (mut stmts, v) = self.block(|g| g.expr(body));
-                    stmts.push(format!("{var} = {v}"));
-                    init.push(format!("{{\n{}}}", indent(&stmts)));
+                    stmts.push(statement(a, docvec![a, var, " = ", v]));
+                    init.push(statement(a, block(a, stmts)));
                 }
-                Shape::Func { .. } => decls.push(self.function(name, dicts, body)),
+                Shape::Func { .. } => {
+                    let decl = self.function(name, dicts, body);
+                    decls.push((decl, self.lines > lines));
+                }
             },
             ItemKind::Destructure { pattern, body } => {
                 let mut binders = Vec::new();
@@ -71,34 +90,35 @@ impl Gen<'_> {
                 let (mut stmts, ()) = self.block(|g| {
                     let v = g.expr(body);
                     let v = g.spill(v);
-                    g.destructure(pattern, &v);
+                    g.destructure(pattern, v.doc);
                 });
                 for b in binders {
-                    let var = names::var(self.module, b);
-                    decls.push(format!("var {var} flickrt.Value"));
-                    stmts.push(format!("{var} = {}", names::local(b)));
+                    let var = a.alloc_str(&names::var(self.module, b));
+                    decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
+                    stmts.push(statement(a, docvec![a, var, " = ", names::local(b)]));
                 }
-                init.push(format!("{{\n{}}}", indent(&stmts)));
+                init.push(statement(a, block(a, stmts)));
             }
             ItemKind::Foreign(f) => {
                 if let Some(decl) = self.foreign(f, item.span) {
-                    decls.push(decl);
+                    decls.push((decl, false));
                 }
             }
             ItemKind::Instance { info, methods } => {
-                let id = names::instance(self.module, &info.name);
+                let id = a.alloc_str(&names::instance(self.module, &info.name));
                 let dicts = self.bind_givens(&info.context);
-                let (stmts, ()) = self.block(|g| g.instance(info, methods, item.span));
+                let (mut stmts, ()) = self.block(|g| g.instance(info, methods, item.span));
                 self.givens.clear();
-                let body = format!("{}\treturn d\n", indent(&stmts));
+                stmts.push(statement(a, "return d"));
+                let body = block(a, stmts);
                 if dicts.is_empty() {
-                    decls.push(format!("var {id} flickrt.Value"));
-                    init.push(format!("{id} = func() flickrt.Value {{\n{body}}}()"));
+                    decls.push((docvec![a, "var ", id, " flickrt.Value"], false));
+                    let make = docvec![a, id, " = func() flickrt.Value ", body, "()"];
+                    init.push(statement(a, make));
                 } else {
-                    decls.push(format!(
-                        "func {id}({}) flickrt.Value {{\n{body}}}",
-                        param_list(&dicts)
-                    ));
+                    let params = param_list(&dicts);
+                    let decl = docvec![a, "func ", id, "(", params, ") flickrt.Value ", body];
+                    decls.push((decl, self.lines > lines));
                 }
             }
             // a service is its key, written where it is used
@@ -112,7 +132,8 @@ impl Gen<'_> {
 
     /// The Go function of a top-level function: its dictionaries, then its
     /// parameters, all at once.
-    fn function(&mut self, name: &str, dicts: &[String], body: &Expr) -> String {
+    fn function(&mut self, name: &str, dicts: &[String], body: &Expr) -> Document<'a> {
+        let a = self.a;
         let id = names::func(self.module, name);
         let fiber = self.shape_of(self.module, name).fiber();
         self.fiber = fiber.then_some("fb");
@@ -123,25 +144,36 @@ impl Gen<'_> {
                     callee: Callee::Global(format!("{}.{name}", self.module)),
                     dicts: dicts.to_vec(),
                 };
+                let lines = self.lines;
                 let (bound, stmts) = self.function_body(params, body, Some(target));
                 let grouped = self.group_call(name, &bound);
+                if grouped.is_some() {
+                    // the body is the group's: this function holds no directive
+                    self.lines = lines;
+                }
                 heads.extend(bound);
-                grouped.map_or(stmts, |call| vec![call])
+                grouped.map_or(stmts, |go| vec![go])
             }
             _ => self.block(|g| g.tail_expr(body)).0,
         };
         self.givens.clear();
         self.fiber = None;
-        format!(
-            "func {id}({}) flickrt.Value {{\n{}}}",
-            signature(fiber, &heads),
-            indent(&stmts)
-        )
+        let params = signature(fiber, &heads);
+        docvec![
+            a,
+            "func ",
+            id,
+            "(",
+            params,
+            ") flickrt.Value ",
+            block(a, stmts)
+        ]
     }
 
     /// The statements that build the dictionary `d` of an instance.
     fn instance(&mut self, info: &InstanceInfo, methods: &[(String, Expr)], span: Span) {
-        let supers: Vec<(String, String)> = info
+        let a = self.a;
+        let supers: Vec<(String, Code<'a>)> = info
             .supers
             .iter()
             .map(|(class, dict)| (class.clone(), self.dict(dict)))
@@ -150,87 +182,87 @@ impl Gen<'_> {
             let class = &info.class.1;
             if !DERIVED.contains(&class.as_str()) {
                 self.unsupported(span, &format!("`deriving {class}`"));
-                self.buf.push("d := flickrt.NewDict()".to_owned());
+                self.emit("d := flickrt.NewDict()");
                 return;
             }
-            let fields: Vec<String> = fields.iter().map(|d| self.dict(d)).collect();
+            let fields: Vec<Code<'a>> = fields.iter().map(|d| self.dict(d)).collect();
+            let fields = list(a, "[]flickrt.Value{", fields.iter().map(|f| f.doc), "}");
+            let fields = closure(a, "func() []flickrt.Value", [docvec![a, "return ", fields]]);
             let constructors = match constructors {
-                None => "nil".to_owned(),
+                None => a.text("nil"),
                 Some(cs) => {
-                    let cs: Vec<String> =
+                    let cs: Vec<Document<'a>> =
                         cs.iter().map(|c| self.constructor_info(c, span)).collect();
-                    format!("[]flickrt.Constructor{{{}}}", cs.join(", "))
+                    list(a, "[]flickrt.Constructor{", cs, "}")
                 }
             };
-            let supers: Vec<String> = supers
-                .iter()
-                .map(|(class, d)| {
-                    format!(
-                        "{}: func() flickrt.Value {{ return {d} }}",
-                        names::string(class)
-                    )
-                })
-                .collect();
-            self.buf.push(format!(
-                "d := flickrt.Derive({}, func() []flickrt.Value {{ return []flickrt.Value{{{}}} }}, {constructors}, map[string]func() flickrt.Value{{{}}})",
-                names::string(class),
-                fields.join(", "),
-                supers.join(", ")
-            ));
+            let supers = supers.iter().map(|(class, d)| {
+                let get = closure(a, "func() flickrt.Value", [docvec![a, "return ", *d]]);
+                docvec![a, self.string(class), ": ", get]
+            });
+            let supers = list(a, "map[string]func() flickrt.Value{", supers, "}");
+            let derive = call(
+                a,
+                "flickrt.Derive",
+                [self.string(class), fields, constructors, supers],
+            );
+            self.emit(docvec![a, "d := ", derive]);
             return;
         }
-        self.buf.push("d := flickrt.NewDict()".to_owned());
+        self.emit("d := flickrt.NewDict()");
         for (class, d) in supers {
-            self.buf.push(format!(
-                "d.Lazy({}, func() flickrt.Value {{ return {d} }})",
-                names::string(&format!("${class}"))
-            ));
+            let get = closure(a, "func() flickrt.Value", [docvec![a, "return ", d]]);
+            let key = self.string(&format!("${class}"));
+            self.emit(call(a, "d.Lazy", [key, get]));
         }
         for (name, value) in methods {
             self.natives.clear();
             let (stmts, v) = self.block(|g| g.expr(value));
             let v = if stmts.is_empty() {
-                v
+                v.doc
             } else {
-                format!(
-                    "func() flickrt.Value {{\n{}\treturn {v}\n}}()",
-                    indent(&stmts)
-                )
+                let ret = statement(a, docvec![a, "return ", v]);
+                let body = block(a, stmts.into_iter().chain([ret]));
+                docvec![a, "func() flickrt.Value ", body, "()"]
             };
-            self.buf
-                .push(format!("d.Set({}, {v})", names::string(name)));
+            self.emit(call(a, "d.Set", [self.string(name), v]));
         }
         let (module, class) = &info.class;
         for (name, own) in &info.defaults {
             let default = default_method(class, name);
             self.reads(module);
-            let mut dicts = vec!["d".to_owned()];
+            let mut dicts = vec![self.code("d")];
             let value = if *own == 0 {
                 self.global_value(module, &default, dicts)
             } else {
-                let os: Vec<String> = (0..*own).map(|i| format!("o[{i}]")).collect();
-                dicts.extend(os);
+                dicts.extend((0..*own).map(|i| self.code(&format!("o[{i}]"))));
                 let inner = self.global_value(module, &default, dicts);
-                format!("flickrt.Poly(func(o ...flickrt.Value) flickrt.Value {{ return {inner} }})")
+                let head = "func(o ...flickrt.Value) flickrt.Value";
+                let f = closure(a, head, [docvec![a, "return ", inner]]);
+                call(a, "flickrt.Poly", [f]).into()
             };
-            self.buf.push(format!(
-                "d.Lazy({}, func() flickrt.Value {{ return {value} }})",
-                names::string(name)
-            ));
+            let get = closure(a, "func() flickrt.Value", [docvec![a, "return ", value]]);
+            self.emit(call(a, "d.Lazy", [self.string(name), get]));
         }
     }
 
-    fn constructor_info(&mut self, c: &Constructor, span: Span) -> String {
+    fn constructor_info(&mut self, c: &Constructor, span: Span) -> Document<'a> {
+        let a = self.a;
         if let Rep::Typeof(_) = c.rep {
             self.unsupported(span, "an `untagged` type");
         }
-        format!(
-            "{{Tag: {}, Name: {}, Arity: {}, Unboxed: {}}}",
-            names::string(&self.tag(c)),
-            names::string(&c.name),
-            c.arity,
-            c.rep == Rep::Unboxed
-        )
+        let unboxed = if c.rep == Rep::Unboxed {
+            "true"
+        } else {
+            "false"
+        };
+        let fields = [
+            docvec![a, "Tag: ", self.string(&self.tag(c))],
+            docvec![a, "Name: ", self.string(&c.name)],
+            docvec![a, "Arity: ", c.arity],
+            docvec![a, "Unboxed: ", unboxed],
+        ];
+        list(a, "{", fields, "}")
     }
 
     /// The tag of a tagged constructor, as the JS target writes it.
@@ -244,47 +276,42 @@ impl Gen<'_> {
         }
     }
 
-    pub(super) fn dict(&mut self, dict: &Dict) -> String {
+    pub(super) fn dict(&mut self, dict: &Dict) -> Code<'a> {
+        let a = self.a;
         match dict {
             Dict::Instance { module, name, args } => {
                 self.reads(module);
                 let id = names::instance(module, name);
                 if args.is_empty() {
-                    id
+                    self.code(&id)
                 } else {
-                    let args: Vec<String> = args.iter().map(|a| self.dict(a)).collect();
-                    format!("{id}({})", args.join(", "))
+                    let args: Vec<Document<'a>> = args.iter().map(|d| self.dict(d).doc).collect();
+                    call(a, id, args).into()
                 }
             }
-            Dict::Given(shown) => self
-                .givens
-                .iter()
-                .rev()
-                .find(|(g, _)| g == shown)
-                .map_or_else(
-                    || panic!("dictionary `{shown}` is in scope"),
-                    |(_, p)| p.clone(),
-                ),
+            Dict::Given(shown) => {
+                let given = self
+                    .givens
+                    .iter()
+                    .rev()
+                    .find(|(g, _)| g == shown)
+                    .map_or_else(|| panic!("dictionary `{shown}` is in scope"), |&(_, p)| p);
+                self.code(given)
+            }
             Dict::Super { dict, class } => {
-                format!(
-                    "flickrt.Super({}, {})",
-                    self.dict(dict),
-                    names::string(class)
-                )
+                let d = self.dict(dict);
+                call(a, "flickrt.Super", [d.doc, self.string(class)]).into()
             }
             Dict::Structural { class, fields } => {
-                let fields: Vec<String> = fields.iter().map(|f| self.dict(f)).collect();
-                format!(
-                    "flickrt.Structural({}, []flickrt.Value{{{}}})",
-                    names::string(class),
-                    fields.join(", ")
-                )
+                let fields: Vec<Document<'a>> = fields.iter().map(|f| self.dict(f).doc).collect();
+                let fields = list(a, "[]flickrt.Value{", fields, "}");
+                call(a, "flickrt.Structural", [self.string(class), fields]).into()
             }
             Dict::Primitive { labels, .. } => {
-                let labels: Vec<String> = labels.iter().map(|l| names::string(l)).collect();
-                format!("[]flickrt.Value{{{}}}", labels.join(", "))
+                let labels = labels.iter().map(|l| self.string(l));
+                list(a, "[]flickrt.Value{", labels, "}").into()
             }
-            Dict::Error => "flickrt.Unit".to_owned(),
+            Dict::Error => self.unit(),
         }
     }
 }

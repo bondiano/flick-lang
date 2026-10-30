@@ -3,24 +3,22 @@
 module App.Main exposing (main)
 
 pair_optional : Option a -> Option b -> Option (a, b)
-let pair_optional left right =
-  do {
-    x <- left
-    y <- right
-    pure (x, y)
-  }
+let pair_optional left right = do {
+  x <- left
+  y <- right
+  pure (x, y)
+}
 
 safe_div : Float -> Float -> Result String Float
 let safe_div a b = if b == 0 then Err "divide by zero" else Ok (a / b)
 
 ratio : Float -> Float -> Float -> Result String Float
-let ratio a b c =
-  do {
-    x <- safe_div a b
-    let doubled = x * 2
-    y <- safe_div doubled c
-    pure (y + 1)
-  }
+let ratio a b c = do {
+  x <- safe_div a b
+  let doubled = x * 2
+  y <- safe_div doubled c
+  pure (y + 1)
+}
 
 triples : Int -> List (Int, Int, Int)
 let triples n =
@@ -34,7 +32,11 @@ let triples n =
   }
 
 twice : Monad m => m Float -> m Float
-let twice m = do { x <- m; y <- m; pure (x + y) }
+let twice m = do {
+  x <- m
+  y <- m
+  pure (x + y)
+}
 
 main : Unit ->{; AppError} Unit
 let main () =

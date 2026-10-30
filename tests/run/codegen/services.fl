@@ -9,12 +9,10 @@ service Counter =
   next : Unit ->{} Float
 
 greeter_impl : Greeter.Impl
-let greeter_impl =
-  { greet = fun name -> "hello, " ++ name }
+let greeter_impl = { greet = fun name -> "hello, " ++ name }
 
 counter_impl : Ref Float -> Counter.Impl
-let counter_impl cell =
-  { next = fun () -> Ref.modify cell (fun n -> (n + 1, n + 1)) }
+let counter_impl cell = { next = fun () -> Ref.modify cell (fun n -> (n + 1, n + 1)) }
 
 welcome : String ->{Greeter, Counter; none} String
 let welcome name =
@@ -26,17 +24,11 @@ let main () =
   let cell = Ref.make 0
   let layer =
     Layer.merge (Layer.succeed Greeter greeter_impl) (Layer.succeed Counter (counter_impl cell))
-  let first = provide layer {
-    welcome "ada"
-  }
-  let second = provide layer {
-    welcome "bob"
-  }
+  let first = provide layer { welcome "ada" }
+  let second = provide layer { welcome "bob" }
   // built outside `provide`, the task reads the service where it runs
   let later = task { Greeter.greet "later" }
-  let third = provide (Layer.succeed Greeter { greet = fun name -> "hi, " ++ name }) {
-    await later
-  }
+  let third = provide (Layer.succeed Greeter { greet = fun name -> "hi, " ++ name }) { await later }
   Platform.stdout_line first
   Platform.stdout_line second
   Platform.stdout_line third

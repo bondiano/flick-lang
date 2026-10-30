@@ -39,6 +39,7 @@ toml = "0.9"
 
 [dependencies]
 annotate-snippets = { version = "0.12", optional = true }
+flick-pretty = { path = "../flick-pretty" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 strsim = "0.11"

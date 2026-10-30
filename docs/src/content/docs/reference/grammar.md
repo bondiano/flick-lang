@@ -531,36 +531,66 @@ cascade into others in the same statement.
 
 ## Formatting
 
-`flick fmt` changes only whitespace and line-end separators, so the AST is unchanged (it re-parses its
-output and refuses with `FLICK-P003` otherwise). It only drops empty
-rows of an arrow, which are the same type: `->{none; E}` becomes `->{; E}` and
-`->{none; none}` becomes `->{}`; `->{R; none}` and `Eff none none a` stay as
-written.
+`flick fmt` writes the canonical layout of a file, as `gleam format` does:
+the result depends on the code and the line width (100 columns) only, not on
+how the source was laid out, apart from the few choices listed below. Tokens
+stay as written, so literals, multi-line strings and comments are copied
+verbatim. The only rewrites are separators that change nothing: `;` between
+statements becomes a line break, a broken bracket gets a trailing `,` and a
+broken record a `;` after every field, a broken variant list starts with
+`|`, and empty rows of an arrow are dropped, which are the same type:
+`->{none; E}` becomes `->{; E}` and `->{none; none}` becomes `->{}`, while
+`->{R; none}` and `Eff none none a` stay as written. The formatter re-parses
+each declaration and the whole file and refuses with `FLICK-P003` if the AST
+or the comments would change.
 
-- indentation becomes two spaces per level while keeping every line's column
-  relation (shallower, equal, deeper) to the blocks above it;
-- one space between tokens, none inside `( )`, `[ ]`, around `.`, `^` and in
-  `->{r; e}` and row braces `{Users, Log}`; one space inside other braces;
-- unary `-` binds to its operand; `forall a b.` keeps the space after `.`;
-- trailing whitespace is removed, runs of blank lines collapse to one, the file
-  ends with one line break; comments stay where they are, a comment-only line
-  is indented like code at its column;
-- multi-line strings and block comments are copied verbatim;
-- a line longer than 100 characters is split at its outermost structure: the
-  body after `=` or `->` moves to its own line, an `if` chain gets a line per
-  branch, then breaks go before the weakest operators (`|>` lines up with the
-  start of its block), after type arrows (keeping `->{r; e}` whole), before
-  application arguments, and finally one item per line inside the widest
-  bracket (a single expression in parentheses stays hugged by them). Each
-  continuation is two spaces deeper. A break is kept only if the file still
-  has the same AST; a single token longer than the limit stays as it is;
-- in a record, record type or record pattern every field that ends a line
-  ends with `;`, the last one before `}` too, while a row tail `| r` takes
-  none; in a list, tuple or `exposing (…)` whose closing bracket sits on a
-  later line than its last item, that item ends with `,`, as prettier does. A
-  record or list on one line keeps no trailing separator. The parser accepts
-  these separators, including `;` after a field whose value is a block on its
-  own lines, and the AST is the same with or without them.
+Indentation is two spaces per level. A construct stays on one line when it
+fits; otherwise it breaks, outermost construct first:
+
+- a value after `=` (`let`, record fields, type aliases), after `->` (`fun`,
+  match arms) or after `<-` goes to the next line, one level in. Records,
+  lists, tuples, `fun` and blocks in braces (`task`, `ui`, `scope`,
+  `provide`, `do`, `for`, `sql`, `cli`, `codec`) stay after the `=` and break
+  inside instead: `let config = {` … `}`. Several statements always start on
+  the next line, and so do `match`, `try` and an `if` that does not fit;
+- statements go one per line; a block in braces with one expression may stay
+  on one line, `task { load id }`;
+- an application puts its arguments one per line, one level in. When its last
+  argument is a function in parentheses, a list, a record, a tuple or a block
+  in braces, and everything before that argument's first break fits, the call
+  stays on its line and only the argument breaks:
+  `Ref.modify counter (fun current ->`, the body, then `)` on its own line. A
+  call in parentheses stays hugged by them;
+- an operator chain breaks before each operator of its weakest precedence,
+  continuations one level in; a pipeline breaks one step per line, its `|>`
+  under the first operand when the pipeline starts its line;
+- `if c then a else b` stays on one line or puts every branch on lines of its
+  own; `match` and `try` put each arm on its own line, at the column of
+  `match`. Before a `,`, where the parser takes no block on lines of its own,
+  the last branch or arm stays on its line;
+- lists, tuples and `exposing (…)` put one item per line followed by `,`;
+  records, record types, patterns and updates (`base with` on its own line)
+  put one field per line followed by `;`, a row tail `| r` last;
+- a signature puts its type on the next line, then `forall a.`, a context and
+  each parameter of a function type on lines of their own; elsewhere a
+  function type breaks after its arrows, one level in, `->{r; e}` staying
+  whole;
+- variants stay on one line when they fit, else one per line after `|`;
+  `deriving` takes its own line, one level in, except after the `}` of a record
+  that broke; members of classes, instances, services and `rec`, the metadata
+  of a `foreign` binding and the columns of a `sql table` always go one per
+  line; in `sql`, `on` stays after its `join` when it fits.
+
+What the author decides, as in Gleam: a trailing `,` or `;` (`[a, b,]`,
+`{ a = 1; }`), or a blank line between items, keeps a bracket broken one item
+per line; a list of constants written several per line with a trailing `,`
+is filled, as many per line as fit; a pipeline written with a step on its own
+line keeps one step per line. Blank lines between declarations, statements,
+members, arms, fields and items are kept, a run of them as one. A comment on
+its own line stays on its own line before what follows it, a comment that
+ends a line stays at the end of that line, and the construct around it
+breaks. A declaration holding a line comment where the layout has no place for
+one is left as written.
 
 `flick fmt --check` exits with `1` and reports `FLICK-P002` for each file that
 would change; `flick fmt --stdin --stdin-filepath <file>` reads the source

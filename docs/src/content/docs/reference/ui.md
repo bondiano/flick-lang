@@ -10,25 +10,21 @@ handler, reads no state and touches no DOM. `Ui.Dom.mount` renders it with
 React 19 (`react-dom/client`) and runs each event as a task.
 
 ```flick
-type alias SaveButtonProps c =
-  {
-    label : String;
-    disabled : Bool;
-    on_save : (Unit ->{Atom.Write;} Unit)^c;
-  }
+type alias SaveButtonProps c = {
+  label : String;
+  disabled : Bool;
+  on_save : (Unit ->{Atom.Write;} Unit)^c;
+}
 
 save_button : SaveButtonProps c -> Ui^c
-let save_button props =
-  ui {
-    button
-      {
-        disabled = props.disabled;
-        on_click = Ui.Event.exhaust (fun _ ->
-          task { props.on_save () }
-        );
-      }
-      [text props.label]
-  }
+let save_button props = ui {
+  button
+    {
+      disabled = props.disabled;
+      on_click = Ui.Event.exhaust (fun _ -> task { props.on_save () });
+    }
+    [text props.label]
+}
 ```
 
 `c` is a capture row (see [regions](../regions/#captures)). Like any new type

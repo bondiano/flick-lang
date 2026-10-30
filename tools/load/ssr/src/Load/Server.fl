@@ -16,8 +16,10 @@ id : Unit ->{RouteContext;} String
 let id () = Option.with_default "none" (Http.Router.param "id")
 
 html_options : Http.ServerResponse.Options
-let html_options =
-  { Http.ServerResponse.defaults with contentType = Some "text/html; charset=utf-8" }
+let html_options = {
+  Http.ServerResponse.defaults with
+  contentType = Some "text/html; charset=utf-8";
+}
 
 /// The streamed markup of `view` for request `n`, with a registry of its own.
 streamed_ui : String -> Ui -> Stream.Stream none none String
@@ -50,10 +52,9 @@ suspended : ServerRequest ->{RouteContext;} ServerResponse
 let suspended _ =
   Http.ServerResponse.stream_text
     (streamed_ui (id ()) Load.Page.suspended
-      |> Stream.prepend
-        [
-          "<!doctype html><html><head><title>load</title><link rel=\"icon\" href=\"data:,\"></head><body>",
-        ]
+      |> Stream.prepend [
+        "<!doctype html><html><head><title>load</title><link rel=\"icon\" href=\"data:,\"></head><body>",
+      ]
       |> Stream.concat
         (Stream.make ["<script type=\"module\" src=\"/client.js\"></script></body></html>"]))
     html_options
@@ -64,19 +65,16 @@ let html _ =
   Http.ServerResponse.html
     (Ui.Server.to_html
       (ui {
-        div
-          { class_name = "page" }
-          [
-            heading [text ("request " ++ n)],
-            div
-              { class_name = "rows" }
-              (List.map (fun r -> paragraph [text ("row " ++ show r)]) (List.range 1 51)),
-          ]
+        div { class_name = "page" } [
+          heading [text ("request " ++ n)],
+          div
+            { class_name = "rows" }
+            (List.map (fun r -> paragraph [text ("row " ++ show r)]) (List.range 1 51)),
+        ]
       }))
 
-client : String ->
-  ServerRequest ->{Http.Platform.HttpPlatform; PlatformError.PlatformError}
-  ServerResponse
+client :
+  String -> ServerRequest ->{Http.Platform.HttpPlatform; PlatformError.PlatformError} ServerResponse
 let client path _ = Http.Platform.file Http.Platform.file_options path
 
 main : Unit ->{; AppError} Unit
@@ -86,22 +84,18 @@ let main () =
   provide Http.Server.layer_services {
     try
       scope s {
-        app : ServerRequest ->{
-          Http.Platform.HttpPlatform;
-          Http.ServerError.HttpServerError,
-          PlatformError.PlatformError
-        }
+        app :
+          ServerRequest ->{Http.Platform.HttpPlatform; Http.ServerError.HttpServerError, PlatformError.PlatformError}
           ServerResponse
         let app =
-          Http.Router.router Http.Router.config
-            [
-              Http.Router.route (Some Http.Method.GET) "/render/:id" render,
-              Http.Router.route (Some Http.Method.GET) "/stream/:id" streamed,
-              Http.Router.route (Some Http.Method.GET) "/collect/:id" collected,
-              Http.Router.route (Some Http.Method.GET) "/suspended/:id" suspended,
-              Http.Router.route (Some Http.Method.GET) "/html/:id" html,
-              Http.Router.route (Some Http.Method.GET) "/client.js" (client bundle),
-            ]
+          Http.Router.router Http.Router.config [
+            Http.Router.route (Some Http.Method.GET) "/render/:id" render,
+            Http.Router.route (Some Http.Method.GET) "/stream/:id" streamed,
+            Http.Router.route (Some Http.Method.GET) "/collect/:id" collected,
+            Http.Router.route (Some Http.Method.GET) "/suspended/:id" suspended,
+            Http.Router.route (Some Http.Method.GET) "/html/:id" html,
+            Http.Router.route (Some Http.Method.GET) "/client.js" (client bundle),
+          ]
         let listening =
           Http.Server.serve { host = "127.0.0.1"; port = port; gracefulShutdownTimeout = None } app
         Platform.stdout_line

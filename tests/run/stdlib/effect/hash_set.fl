@@ -24,28 +24,23 @@ let main () =
   Platform.stdout_line ("difference: " ++ show (sorted (HashSet.difference small odd)))
   Platform.stdout_line
     ("is_subset: "
-      ++ show
-        (
-          HashSet.is_subset odd (HashSet.from_list EqHash.canonical [1, 5]),
-          HashSet.is_subset odd small,
-        ))
+      ++ show (
+        HashSet.is_subset odd (HashSet.from_list EqHash.canonical [1, 5]),
+        HashSet.is_subset odd small,
+      ))
   Platform.stdout_line
     ("map: " ++ show (sorted (HashSet.map EqHash.canonical (fun n -> n % 3) odd)))
   Platform.stdout_line ("filter: " ++ show (sorted (HashSet.filter (fun n -> n > 3) odd)))
   Platform.stdout_line
     ("some, every: "
-      ++ show
-        (
-          HashSet.some (fun n -> n > 6) odd,
-          HashSet.every (fun n -> n % 2 == 1) odd,
-          HashSet.every (fun n -> n > 1) odd,
-        ))
+      ++ show (
+        HashSet.some (fun n -> n > 6) odd,
+        HashSet.every (fun n -> n % 2 == 1) odd,
+        HashSet.every (fun n -> n > 1) odd,
+      ))
   Platform.stdout_line ("reduce: " ++ show (HashSet.reduce 0 (fun acc n -> acc + n) odd))
   let lengths =
-    EqHash.with
-      (fun a b -> String.length a == String.length b)
-      (fun s -> String.length s)
-      (fun w ->
-        List.sort
-          (HashSet.to_list (HashSet.map w (fun n -> String.repeat (Int.truncate n) "x") odd)))
+    EqHash.with (fun a b -> String.length a == String.length b) (fun s -> String.length s) (fun w ->
+      List.sort (HashSet.to_list (HashSet.map w (fun n -> String.repeat (Int.truncate n) "x") odd))
+    )
   Platform.stdout_line ("map into a witness: " ++ show lengths)

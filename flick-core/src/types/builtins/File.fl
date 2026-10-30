@@ -51,11 +51,9 @@ foreign effect node_write_file from "@flick-lang/runtime" "fileWrite"
 /// The file system of Node.js.
 node : Layer none none {FileSystem}
 let node =
-  Layer.succeed
-    FileSystem
-    {
-      open = node_open;
-      read_handle = node_read_handle;
-      read_file = node_read_file;
-      write_file = node_write_file;
-    }
+  Layer.succeed FileSystem {
+    open = node_open;
+    read_handle = node_read_handle;
+    read_file = node_read_file;
+    write_file = node_write_file;
+  }

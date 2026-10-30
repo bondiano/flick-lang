@@ -35,9 +35,7 @@ let broken = Channel.concat (Channel.fail (Boom "broken")) (Channel.from_list [1
 /// What running the channel gives, or the error it fails with.
 outcome : Channel.Channel none {Boom} Unit Float Unit none Unit ->{} String
 let outcome channel =
-  try
-    show (Channel.run_collect channel)
-  with
+  try show (Channel.run_collect channel) with
   | Boom why -> "failed " ++ why
 
 why_of : Boom -> String
@@ -57,18 +55,17 @@ ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
 options : Tracer.SpanOptions
-let options =
-  {
-    attributes = [];
-    links = [];
-    parent = None;
-    root = false;
-    kind_ = Tracer.internal;
-    sampled = None;
-    level = None;
-    captureStackTrace = false;
-    disablePropagation = false;
-  }
+let options = {
+  attributes = [];
+  links = [];
+  parent = None;
+  root = false;
+  kind_ = Tracer.internal;
+  sampled = None;
+  level = None;
+  captureStackTrace = false;
+  disablePropagation = false;
+}
 
 failures : Unit ->{; Boom} Unit
 let failures () =
@@ -79,9 +76,9 @@ let failures () =
       ++ show
         (Channel.run_collect
           (Channel.catch
-            (
-              fun e ->
-                match e with | Boom why -> Channel.from_list [Int.to_float (String.length why)]
+            (fun e ->
+              match e with
+              | Boom why -> Channel.from_list [Int.to_float (String.length why)]
             )
             broken)))
   let caught = Ref.make None
@@ -109,18 +106,15 @@ let failures () =
   let mapped : Channel.Channel none {Other} Unit Float Unit none Unit =
     Channel.map_error (fun e -> Other 1) broken
   let other =
-    try
-      show (Channel.run_collect mapped)
-    with
+    try show (Channel.run_collect mapped) with
     | Other n -> "other " ++ show n
   say ("map_error: " ++ other)
   say
     ("ignore: "
-      ++ show
-        (
-          Channel.run_collect (Channel.ignore_ broken),
-          Channel.run_collect (Channel.ignore_cause broken),
-        ))
+      ++ show (
+        Channel.run_collect (Channel.ignore_ broken),
+        Channel.run_collect (Channel.ignore_cause broken),
+      ))
   let finished =
     Channel.ensuring (task { note log "ensuring" }) nums
     |> Channel.on_start (task { note log "start" })
@@ -129,20 +123,21 @@ let failures () =
   say ("ensuring, on_start, on_end, on_first: " ++ show (Channel.run_collect firsts))
   let errored =
     Channel.on_error (fun f -> note log "on_error") broken
-    |> Channel.on_exit
-      (fun exit -> note log ("on_exit " ++ show (Option.is_some (Exit.failure exit))))
+    |> Channel.on_exit (fun exit ->
+      note log ("on_exit " ++ show (Option.is_some (Exit.failure exit)))
+    )
   let ended =
-    try
-      show (Channel.run_collect errored)
-    with
+    try show (Channel.run_collect errored) with
     | Boom why -> "failed " ++ why
   say ("on_error, on_exit: " ++ ended)
   say ("log: " ++ show (Ref.get log))
   let retries = Ref.make 0
-  let flaky = Channel.from_effect (task {
-    Ref.set retries (Ref.get retries + 1)
-    if Ref.get retries < 3 then from_result (Err (Boom "flaky")) else Ref.get retries
-  })
+  let flaky =
+    Channel.from_effect
+      (task {
+        Ref.set retries (Ref.get retries + 1)
+        if Ref.get retries < 3 then from_result (Err (Boom "flaky")) else Ref.get retries
+      })
   say ("retry: " ++ outcome (Channel.retry (Schedule.recurs 5) flaky))
   say
     ("repeat: "
@@ -175,16 +170,11 @@ let merging () =
   let side = Ref.make 0
   say
     ("merge_effect: "
-      ++ show
-        (
-          Channel.run_collect
-            (
-              Channel.merge_effect
-                (task { Ref.set side 1 })
-                (Channel.from_effect (task { slow () }))
-            ),
-          Ref.get side,
-        ))
+      ++ show (
+        Channel.run_collect
+          (Channel.merge_effect (task { Ref.set side 1 }) (Channel.from_effect (task { slow () }))),
+        Ref.get side,
+      ))
 
 services : Unit ->{; Boom} Unit
 let services () =
@@ -228,9 +218,7 @@ let running () =
   let failed : Queue.Queue {Boom} Float = Queue.unbounded ()
   Channel.run_into_queue failed broken
   let drained =
-    try
-      show (Queue.collect failed)
-    with
+    try show (Queue.collect failed) with
     | Boom why -> "failed " ++ why
   say ("run_into_queue failing: " ++ drained)
   let queued = scope {
@@ -277,8 +265,11 @@ let running () =
   let into =
     Channel.from_list_chunked 2 ["a", "b", "c"]
     |> Channel.pipe_to
-      (Channel.from_writable_stream
-        { evaluate = fun () -> stream; onError = boom; closeOnDone = true })
+      (Channel.from_writable_stream {
+        evaluate = fun () -> stream;
+        onError = boom;
+        closeOnDone = true;
+      })
   Channel.run_drain into
   say ("from_writable_stream: " ++ show (written ()))
 

@@ -15,8 +15,10 @@ let add note notes = notes ++ [note]
 /// there is none.
 remove : Int -> List String -> Option (List String)
 let remove n notes =
-  if n < 1 || n > List.length notes then None
-  else Some (List.take (n - 1) notes ++ List.drop n notes)
+  if n < 1 || n > List.length notes then
+    None
+  else
+    Some (List.take (n - 1) notes ++ List.drop n notes)
 
 /// The notes numbered from 1, a line each.
 listing : List String -> List String

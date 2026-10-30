@@ -11,19 +11,16 @@ type alias Profile = {
 } deriving Schema
 
 profile_schema : Schema Profile
-let profile_schema =
-  schema Profile
+let profile_schema = schema Profile
 
 profile_json : PureCodec Json Profile
-let profile_json =
-  codec profile_schema {
-    email = field "email_address" Email.json;
-    nickname = field "nickname" (option_as_null String.json);
-  }
+let profile_json = codec profile_schema {
+  email = field "email_address" Email.json;
+  nickname = field "nickname" (option_as_null String.json);
+}
 
 parse_profile : Unknown -> Result SchemaError Profile
-let parse_profile input =
-  Codec.decode_result profile_json input
+let parse_profile input = Codec.decode_result profile_json input
 
 type alias Preferences = {
   nickname : Option String;
@@ -31,32 +28,26 @@ type alias Preferences = {
 } deriving Schema
 
 preferences_json : PureCodec Json Preferences
-let preferences_json =
-  codec (schema Preferences) {
-    nickname = optional_field "nickname" String.json;
-    quota =
-      field "quota" Float.json_finite
-      |> on_missing (fun () -> 0);
-  }
+let preferences_json = codec (schema Preferences) {
+  nickname = optional_field "nickname" String.json;
+  quota =
+    field "quota" Float.json_finite
+    |> on_missing (fun () -> 0);
+}
 
-type Tree a =
-  | Leaf a
-  | Branch (List (Tree a))
+type Tree a = Leaf a | Branch (List (Tree a))
   deriving Schema
 
 tree_schema : Schema a -> Schema (Tree a)
-let tree_schema item_schema =
-  schema Tree item_schema
+let tree_schema item_schema = schema Tree item_schema
 
 type alias PairOf f = {
   count : f Float;
   label : f String;
 } deriving Schema
 
-pair_of_schema :
-  (forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)
-let pair_of_schema make_schema =
-  schema PairOf make_schema
+pair_of_schema : (forall a. Schema a -> Schema (f a)) -> Schema (PairOf f)
+let pair_of_schema make_schema = schema PairOf make_schema
 
 type Phantom a = Phantom Float
   deriving Schema

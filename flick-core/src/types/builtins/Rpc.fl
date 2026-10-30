@@ -149,9 +149,8 @@ foreign pure error_case from "@flick-lang/runtime/effect/rpc/Rpc" "rpcErrorCase"
 
 /// More typed errors of the handler, each coded as its case says: a
 /// handler failing with an error no case has is a type error, not a defect.
-with_errors : forall l p r e s e2. ErrorCases e2 ->
-  Rpc l (p ->{r; e} s) ->
-  Rpc l (p ->{r; e + e2} s)
+with_errors :
+  forall l p r e s e2. ErrorCases e2 -> Rpc l (p ->{r; e} s) -> Rpc l (p ->{r; e + e2} s)
 foreign pure with_errors from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithErrors"
   arity 2
   reviewed "effect@4.0.5 sha256:04f66df479054dbe"
@@ -177,7 +176,9 @@ foreign pure with_middleware from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithM
 /// so concurrent callers do not see each other's; over a WebSocket the
 /// headers are the connection's. `authenticated` takes the service off
 /// what serving the group needs.
-with_auth : forall a l p r e s. ServiceTag a ->
+with_auth :
+  forall a l p r e s.
+  ServiceTag a ->
   (Call p ->{r; e} ServiceImpl a) ->
   Rpc l (p ->{a + r; e} s) ->
   Rpc l (p ->{a + r; e} s)
@@ -214,9 +215,8 @@ foreign pure add from "@flick-lang/runtime/effect/rpc/Rpc" "rpcAdd"
 /// until the scope owning region `s` closes: then it stops accepting, lets
 /// the calls it serves finish and runs their finalizers. The handlers run
 /// with the services here.
-listen : forall c s r hs. ServeOptions ->
-  Group r hs ->
-  (hs^c ->{Scope s | r; ServeError} Server s)^c
+listen :
+  forall c s r hs. ServeOptions -> Group r hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
 foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
   arity 3
   retention owner
@@ -292,10 +292,10 @@ foreign effect call from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallNdjson"
 call_stream_with :
   forall l p r e a.
   CallOptions ->
-    String ->
-    Rpc l (p ->{r; e} Stream none none a) ->
-    p ->
-    Stream none {ClientError | e} a
+  String ->
+  Rpc l (p ->{r; e} Stream none none a) ->
+  p ->
+  Stream none {ClientError | e} a
 foreign pure call_stream_with from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallStream"
   arity 4
   reviewed "effect@4.0.5 sha256:9e1b2aef57533a72"
@@ -339,8 +339,7 @@ foreign pure call_stream_on from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallSt
 /// Answers the calls of the messages on stdin on stdout until stdin ends:
 /// a program another starts with `spawn`, as editors start language
 /// servers. Nothing else may write to stdout meanwhile. Node only.
-serve_stdio :
-  forall c r hs. Serialization -> Group r hs -> (hs^c ->{Stdio.Stdio | r; none} Unit)^c
+serve_stdio : forall c r hs. Serialization -> Group r hs -> (hs^c ->{Stdio.Stdio | r; none} Unit)^c
 foreign effect serve_stdio from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcServeStdio"
   arity 3
   retention call
@@ -398,8 +397,7 @@ foreign effect with_headers from "@flick-lang/runtime/effect/rpc/Rpc" "rpcWithHe
 /// without a transport: for tests of the handlers. The codecs do not run,
 /// so this does not test them; the hooks of `with_middleware` see no
 /// headers.
-call_local :
-  forall c l p r e s hs. Group r hs -> hs^c -> Rpc l (p ->{r; e} s) -> p ->{r; e} s
+call_local : forall c l p r e s hs. Group r hs -> hs^c -> Rpc l (p ->{r; e} s) -> p ->{r; e} s
 foreign effect call_local from "@flick-lang/runtime/effect/rpc/Rpc" "rpcCallLocal"
   arity 4
   retention call

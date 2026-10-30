@@ -30,17 +30,16 @@ let status_view =
     match Atom.get user with
     | Atom.Loading -> ui { text "[loading]" }
     | Atom.Loaded name -> ui { text ("[" ++ name ++ "]") }
-    | Atom.Failed _ -> ui { text "[failed]" })
+    | Atom.Failed _ -> ui { text "[failed]" }
+  )
 
 greeting_view : Ui.View Unit
 let greeting_view =
-  Ui.suspended
-    (fun _ -> ui { text " offline" })
-    (ui { text " waiting" })
-    (fun () ->
-      let name = Atom.ready user
-      let more = Atom.ready offline
-      ui { text (" hello " ++ name ++ more) })
+  Ui.suspended (fun _ -> ui { text " offline" }) (ui { text " waiting" }) (fun () ->
+    let name = Atom.ready user
+    let more = Atom.ready offline
+    ui { text (" hello " ++ name ++ more) }
+  )
 
 report : Failure e ->{} Unit
 let report failure =
@@ -51,12 +50,11 @@ let main () =
   setup ()
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
-  | Some root ->
-    provide Atom.layer {
-      scope s {
-        let app = ui { fragment [Ui.render status_view (), Ui.render greeting_view ()] }
-        let _mounted = Fiber.spawn s report (task { Ui.Dom.mount root report app })
-        settle ()
-        Platform.stdout_line (text ())
-      }
+  | Some root -> provide Atom.layer {
+    scope s {
+      let app = ui { fragment [Ui.render status_view (), Ui.render greeting_view ()] }
+      let _mounted = Fiber.spawn s report (task { Ui.Dom.mount root report app })
+      settle ()
+      Platform.stdout_line (text ())
     }
+  }

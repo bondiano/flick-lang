@@ -5,8 +5,14 @@ module App.Main exposing (main)
 type alias Row = { name : String; size : Float }
 
 levels : List LogLevel.Severity
-let levels =
-  [LogLevel.fatal, LogLevel.error, LogLevel.warn, LogLevel.info, LogLevel.debug, LogLevel.trace]
+let levels = [
+  LogLevel.fatal,
+  LogLevel.error,
+  LogLevel.warn,
+  LogLevel.info,
+  LogLevel.debug,
+  LogLevel.trace,
+]
 
 main : Unit ->{; AppError} Unit
 let main () =
@@ -27,10 +33,12 @@ let main () =
   let rows : List Row = [{ name = "a"; size = 1 }, { name = "b"; size = 2 }]
   Console.table (Some ["size"]) rows
   let grouped =
-    Console.with_group { label = Some "group"; collapsed = false } (task {
-      Console.log "inside the group"
-      1
-    })
+    Console.with_group
+      { label = Some "group"; collapsed = false }
+      (task {
+        Console.log "inside the group"
+        1
+      })
   Console.log ("after the group " ++ show grouped)
   scope {
     Console.group { label = Some "scoped"; collapsed = true }
@@ -38,15 +46,17 @@ let main () =
   }
   Console.log "the scope closed the group"
   let quiet = Console.to_stderr ()
-  Console.with_console quiet (task {
-    scope {
-      Console.time "timer"
-      Console.time_log "timer" "is running"
-    }
-    Console.with_time "with_time" Effect.void
-    Console.clear ()
-    Console.log "to stderr"
-  })
+  Console.with_console
+    quiet
+    (task {
+      scope {
+        Console.time "timer"
+        Console.time_log "timer" "is running"
+      }
+      Console.with_time "with_time" Effect.void
+      Console.clear ()
+      Console.log "to stderr"
+    })
   let same = Console.with_console quiet (task { Console.current () })
   Console.dir (same == quiet)
   Console.log "back on stdout"
@@ -66,19 +76,19 @@ let main () =
   Platform.stdout_line
     ("debug < trace: " ++ show (LogLevel.debug |> LogLevel.is_less_than LogLevel.trace))
   Platform.stdout_line
-    (
-      "error <= fatal: "
-        ++ show (LogLevel.error |> LogLevel.is_less_than_or_equal_to LogLevel.fatal)
-    )
+    ("error <= fatal: "
+      ++ show (LogLevel.error |> LogLevel.is_less_than_or_equal_to LogLevel.fatal))
   Platform.stdout_line
     ("eq: "
-      ++ show
-        (
-          LogLevel.info == LogLevel.info,
-          LogLevel.info == LogLevel.debug,
-          LogLevel.name LogLevel.trace,
-        ))
+      ++ show (
+        LogLevel.info == LogLevel.info,
+        LogLevel.info == LogLevel.debug,
+        LogLevel.name LogLevel.trace,
+      ))
   Platform.stdout_line
     ("enabled: "
-      ++ show
-        (List.length levels, LogLevel.is_enabled LogLevel.info, LogLevel.is_enabled LogLevel.debug))
+      ++ show (
+        List.length levels,
+        LogLevel.is_enabled LogLevel.info,
+        LogLevel.is_enabled LogLevel.debug,
+      ))

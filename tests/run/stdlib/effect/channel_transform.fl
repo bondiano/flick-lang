@@ -40,9 +40,7 @@ let elements () =
     failing
     |> Channel.pipe_to (Channel.map_input_error (fun _ -> Boom "renamed") (Channel.identity ()))
   let outcome =
-    try
-      show (Channel.run_collect renamed)
-    with
+    try show (Channel.run_collect renamed) with
     | Boom why -> why
   say ("map_input_error: " ++ outcome)
   say
@@ -67,12 +65,11 @@ let elements () =
   say ("concat_with: " ++ show (Channel.run_collect continued))
   say
     ("or_else_if_empty: "
-      ++ show
-        (
-          Channel.run_collect
-            (Channel.or_else_if_empty (fun _ -> Channel.from_list [7]) Channel.empty),
-          Channel.run_collect (Channel.or_else_if_empty (fun _ -> Channel.from_list [7]) nums),
-        ))
+      ++ show (
+        Channel.run_collect
+          (Channel.or_else_if_empty (fun _ -> Channel.from_list [7]) Channel.empty),
+        Channel.run_collect (Channel.or_else_if_empty (fun _ -> Channel.from_list [7]) nums),
+      ))
   say ("drain: " ++ show (Channel.run_count (Channel.drain nums)))
   let looped = Ref.make []
   Channel.run_for_each_while

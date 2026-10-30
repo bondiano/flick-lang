@@ -34,7 +34,9 @@ type error Unauthorized = Unauthorized
 /// `authorization` header, say. A call `check` fails with `Unauthorized`
 /// does not run the function. Each call has its own: concurrent callers do
 /// not see each other's.
-authenticated : forall a r. ServiceTag a ->
+authenticated :
+  forall a r.
+  ServiceTag a ->
   (Http.Headers.Headers ->{r; Unauthorized} ServiceImpl a) ->
   List (Guarded (a + r)) ->
   List (Function r)

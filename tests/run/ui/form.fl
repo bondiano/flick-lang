@@ -51,8 +51,7 @@ let send =
     match Form.validate signup with
     | None -> log "not sent"
     | Some s ->
-      log
-        ("sent " ++ show (Name.value s.name) ++ ", " ++ show s.age ++ ", " ++ show s.nick)
+      log ("sent " ++ show (Name.value s.name) ++ ", " ++ show s.age ++ ", " ++ show s.nick)
   })
 
 /// The name is checked on the server as the user types; typing again interrupts it.
@@ -66,13 +65,12 @@ let check_name =
 
 page : Ui
 let page =
-  Ui.fragment
-    [
-      Form.input signup Signup.fields.name "Name" (Some check_name),
-      Form.input signup Signup.fields.age "Age" None,
-      Form.input signup Signup.fields.nick "Nickname" None,
-      Ui.button { disabled = false; on_click = send } [Ui.text "Send"],
-    ]
+  Ui.fragment [
+    Form.input signup Signup.fields.name "Name" (Some check_name),
+    Form.input signup Signup.fields.age "Age" None,
+    Form.input signup Signup.fields.nick "Nickname" None,
+    Ui.button { disabled = false; on_click = send } [Ui.text "Send"],
+  ]
 
 report : Failure e ->{} Unit
 let report failure =
@@ -85,27 +83,26 @@ let main () =
   let age = Form.id signup Signup.fields.age
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
-  | Some root ->
-    provide Atom.layer {
-      scope s {
-        let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report page })
-        settle ()
-        click "Send"
-        settle ()
-        Platform.stdout_line (describe name)
-        Platform.stdout_line (describe age)
-        Platform.stdout_line ("focused: " ++ focused ())
-        type_into name "roo"
-        type_into name "root"
-        settle ()
-        Platform.stdout_line (describe name)
-        type_into name "Ada"
-        type_into age "36"
-        settle ()
-        click "Send"
-        settle ()
-        Platform.stdout_line (describe name)
-        Platform.stdout_line (describe age)
-        Platform.stdout_line (describe (Form.id signup Signup.fields.nick))
-      }
+  | Some root -> provide Atom.layer {
+    scope s {
+      let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report page })
+      settle ()
+      click "Send"
+      settle ()
+      Platform.stdout_line (describe name)
+      Platform.stdout_line (describe age)
+      Platform.stdout_line ("focused: " ++ focused ())
+      type_into name "roo"
+      type_into name "root"
+      settle ()
+      Platform.stdout_line (describe name)
+      type_into name "Ada"
+      type_into age "36"
+      settle ()
+      click "Send"
+      settle ()
+      Platform.stdout_line (describe name)
+      Platform.stdout_line (describe age)
+      Platform.stdout_line (describe (Form.id signup Signup.fields.nick))
     }
+  }

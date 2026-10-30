@@ -2,8 +2,7 @@
 module App.Main exposing (main)
 
 divide : Int -> Int ->{} Int
-let divide a b =
-  Int.unsafe_div a b
+let divide a b = Int.unsafe_div a b
 
 main : Unit ->{; AppError} Unit
 let main () =

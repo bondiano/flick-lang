@@ -22,5 +22,4 @@ let program () =
   Platform.stdout_line (describe "u3")
 
 main : Unit ->{; AppError} Unit
-let main () =
-  provide Layer.merge users_live log_live { program () }
+let main () = provide Layer.merge users_live log_live { program () }

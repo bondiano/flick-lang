@@ -40,32 +40,37 @@ main : Unit ->{; AppError} Unit
 let main () =
   set_env "FLICK_SERVER_URL" "http://127.0.0.1:1"
   Platform.stdout_line (shown { item = "tea"; count = 1 })
-  provide (
-    Layer.merge Server.node (Layer.merge Http.FetchClient.layer Http.Server.layer_services)
-  ) {
+  provide (Layer.merge Server.node (Layer.merge Http.FetchClient.layer Http.Server.layer_services)) {
     try
       scope s {
         functions : (ServerRequest ->{} ServerResponse)^{s}
         let functions = Server.handler [server place, server label]
         app : (ServerRequest ->{; Http.ServerError.HttpServerError} ServerResponse)^{s}
         let app =
-          Http.Router.router Http.Router.config
-            [
-              Http.Router.route
-                (Some Http.Method.POST)
-                Server.path
-                (fun request -> functions request),
-            ]
-        let options : Http.Server.ServeOptions =
-          { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None }
+          Http.Router.router Http.Router.config [
+            Http.Router.route (Some Http.Method.POST) Server.path (fun request ->
+              functions request
+            ),
+          ]
+        let options : Http.Server.ServeOptions = {
+          host = "127.0.0.1";
+          port = 0;
+          gracefulShutdownTimeout = None;
+        }
         let server = Http.Server.serve options app
         Platform.stdout_line (shown { item = "tea"; count = 2 })
         Platform.stdout_line (shown { item = "cake"; count = 5 })
-        Platform.stdout_line (try label "jam" 4 with | Rpc.ClientError _ -> "no server")
+        Platform.stdout_line
+          (
+            try label "jam" 4 with
+            | Rpc.ClientError _ -> "no server"
+          )
         let call =
           "{\"_tag\":\"Request\",\"id\":\"1\",\"tag\":\"App.Main.label\",\"payload\":[\"tea\",2],\"headers\":[]}\n"
         let request =
-          Http.ClientRequest.body_text call (Some "application/ndjson")
+          Http.ClientRequest.body_text
+            call
+            (Some "application/ndjson")
             (Http.ClientRequest.post
               (Http.Server.format_address (Http.Server.address server) ++ Server.path))
         let answer = Http.ClientResponse.text (Http.Client.execute request)

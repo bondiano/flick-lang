@@ -6,24 +6,31 @@ sleep : Float ->{} Unit
 foreign async sleep from "../runtime/timers.mjs" "sleep"
 
 report : List (String, Float) ->{} Unit
-let report scores =
-  for { (name, score) <- scores; if score > 1 } do
-    Platform.stdout_line (name ++ " " ++ show score)
+let report scores = for {
+  (name, score) <- scores
+  if score > 1
+} do
+  Platform.stdout_line (name ++ " " ++ show score)
 
 main : Unit ->{; AppError} Unit
 let main () =
   for x <- [1, 2, 3] do Platform.stdout_line ("item " ++ show x)
   report [("ada", 3), ("bob", 1), ("cy", 2)]
-  for { x <- Seq.range 0 2; y <- ["a", "b"] } do {
+  for {
+    x <- Seq.range 0 2
+    y <- ["a", "b"]
+  } do {
     let label = show x ++ y
     Platform.stdout_line label
   }
   let counter = Ref.make 0
   let stopped =
-    timeout_option 30 (task {
-      for n <- Seq.from 1 do
-        Ref.set counter n
-        sleep 5
-    })
+    timeout_option
+      30
+      (task {
+        for n <- Seq.from 1 do
+          Ref.set counter n
+          sleep 5
+      })
   Platform.stdout_line (show stopped)
   Platform.stdout_line (show (Ref.get counter > 0))

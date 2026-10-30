@@ -10,8 +10,12 @@ type alias RequestDetails = {
 }
 
 /// The request and the status of the response a failure is about.
-type alias ResponseDetails =
-  { method : Http.Method.Method; url : String; status : Int; description : Option String }
+type alias ResponseDetails = {
+  method : Http.Method.Method;
+  url : String;
+  status : Int;
+  description : Option String;
+}
 
 /// Why a request failed: before a response came (`TransportError`, the
 /// body could not be encoded, the URL is invalid) or because of the

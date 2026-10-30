@@ -16,69 +16,62 @@ service FileSystem =
   read_all : forall s. File s ->{; ReadError} String
 
 read_config : Path ->{FileSystem; OpenError, ReadError} String
-let read_config path =
+let read_config path = scope {
+  let file = FileSystem.open_scoped path
+  FileSystem.read_all file
+}
+
+deferred_read : Path -> Eff {FileSystem} {OpenError, ReadError} String
+let deferred_read path = task {
   scope {
     let file = FileSystem.open_scoped path
     FileSystem.read_all file
   }
-
-deferred_read : Path -> Eff {FileSystem} {OpenError, ReadError} String
-let deferred_read path =
-  task {
-    scope {
-      let file = FileSystem.open_scoped path
-      FileSystem.read_all file
-    }
-  }
+}
 
 open_two : forall s. Path ->{FileSystem, Scope s; OpenError} (File s, File s)
-let open_two path =
-  (FileSystem.open_scoped path, FileSystem.open_scoped path)
+let open_two path = (FileSystem.open_scoped path, FileSystem.open_scoped path)
 
 callbacks : Path ->{FileSystem; OpenError, ReadError} String
-let callbacks path =
-  scope {
-    let file = FileSystem.open_scoped path
-    read : Unit ->{FileSystem; ReadError} String
-    let read () = FileSystem.read_all file
-    let later = [task { read () }, task { FileSystem.read_all file }]
-    let (first, second) = open_two path
-    let record = { read = read; file = first }
-    record.read ()
-  }
+let callbacks path = scope {
+  let file = FileSystem.open_scoped path
+  read : Unit ->{FileSystem; ReadError} String
+  let read () = FileSystem.read_all file
+  let later = [task { read () }, task { FileSystem.read_all file }]
+  let (first, second) = open_two path
+  let record = { read = read; file = first }
+  record.read ()
+}
 
 named : Path ->{FileSystem; OpenError, ReadError} String
-let named path =
-  scope outer {
-    let config = FileSystem.open_scoped path
-    scope inner {
-      let data = FileSystem.open_scoped path
-      both : (Unit ->{FileSystem; ReadError} String)^{outer, inner}
-      let both = fun () -> FileSystem.read_all config
-      let cell = Ref.make (Some data)
-      ignore (Ref.get cell)
-      both ()
-    }
+let named path = scope outer {
+  let config = FileSystem.open_scoped path
+  scope inner {
+    let data = FileSystem.open_scoped path
+    both : (Unit ->{FileSystem; ReadError} String)^{outer, inner}
+    let both = fun () -> FileSystem.read_all config
+    let cell = Ref.make (Some data)
+    ignore (Ref.get cell)
+    both ()
   }
+}
 
 report : Failure {ReadError} ->{FileSystem; none} Unit
 let report failure = ()
 
 children : Path ->{FileSystem; OpenError} Unit
-let children path =
-  scope outer {
-    let config = FileSystem.open_scoped path
-    scope inner {
-      let data = FileSystem.open_scoped path
-      ignore (Fiber.spawn inner report (task { FileSystem.read_all data }))
-      ignore (Fiber.spawn inner report (task { FileSystem.read_all config }))
-      ignore (Fiber.spawn outer report (task { FileSystem.read_all config }))
-    }
+let children path = scope outer {
+  let config = FileSystem.open_scoped path
+  scope inner {
+    let data = FileSystem.open_scoped path
+    ignore (Fiber.spawn inner report (task { FileSystem.read_all data }))
+    ignore (Fiber.spawn inner report (task { FileSystem.read_all config }))
+    ignore (Fiber.spawn outer report (task { FileSystem.read_all config }))
   }
+}
 
 spawn_given :
   forall s c.
   Fiber.Outlives c s =>
   Fiber.Owner s -> (Eff {FileSystem} {ReadError} String)^c ->{FileSystem; none} Unit
-let spawn_given owner work =
-  ignore (Fiber.spawn owner report work)
+let spawn_given owner work = ignore (Fiber.spawn owner report work)

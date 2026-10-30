@@ -8,14 +8,13 @@ type ErrorReporter (s : Region)
 
 /// One reason of a reported failure: the whole cause, the reason as a
 /// message, its severity and attributes, and when, in nanoseconds.
-type alias Report =
-  {
-    cause : RawCause;
-    message : String;
-    severity : LogLevel.Severity;
-    attributes : List (String, String);
-    timestamp : BigInt;
-  }
+type alias Report = {
+  cause : RawCause;
+  message : String;
+  severity : LogLevel.Severity;
+  attributes : List (String, String);
+  timestamp : BigInt;
+}
 
 /// Whether `layer` keeps the reporters already installed.
 type alias LayerOptions = { mergeWithExisting : Bool }

@@ -11,5 +11,6 @@ main : Unit ->{; AppError} Unit
 let main () =
   match Ui.Dom.container "app" with
   | None -> App.fail "no container"
-  | Some root ->
-    provide Atom.layer { Function.absurd (Ui.Dom.mount root report Load.Page.suspended) }
+  | Some root -> provide Atom.layer {
+    Function.absurd (Ui.Dom.mount root report Load.Page.suspended)
+  }

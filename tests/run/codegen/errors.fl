@@ -8,23 +8,22 @@ type error Denied = Denied String
 
 find : Float ->{; NotFound, Denied} String
 let find id =
-  if id == 1 then "one"
-  else if id == 2 then from_result (Err (NotFound id))
-  else from_result (Err (Denied "no"))
+  if id == 1 then
+    "one"
+  else if id == 2 then
+    from_result (Err (NotFound id))
+  else
+    from_result (Err (Denied "no"))
 
 lookup : Float ->{; Denied} String
 let lookup id =
-  try
-    find id
-  with
+  try find id with
   | NotFound n when n > 5 -> "big"
   | NotFound n -> "missing " ++ show n
 
 outer : Float ->{} String
 let outer id =
-  try
-    lookup id
-  with
+  try lookup id with
   | Denied reason -> "denied: " ++ reason
 
 main : Unit ->{; AppError} Unit
@@ -32,7 +31,8 @@ let main () =
   Platform.stdout_line (outer 1)
   Platform.stdout_line (outer 2)
   Platform.stdout_line (outer 3)
-  let shown = try Some (find 2) with
+  let shown =
+    try Some (find 2) with
     | NotFound _ -> None
     | Denied _ -> None
   Platform.stdout_line (show shown)

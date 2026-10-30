@@ -18,8 +18,7 @@ flags : Failure e -> String
 let flags f = show (Cause.has_fails f, Cause.has_dies f, Cause.has_interrupts f)
 
 ended : Exit {Boom} Float -> String
-let ended exit =
-  Exit.match_ (fun v -> "value " ++ show v) (fun f -> "failed " ++ flags f) exit
+let ended exit = Exit.match_ (fun v -> "value " ++ show v) (fun f -> "failed " ++ flags f) exit
 
 quiet : forall e. Failure e ->{} Unit
 let quiet _ = ()
@@ -29,8 +28,12 @@ let main () =
   let exits = parallel_exits [task { 1 }, task { from_result (Err (Boom 2)) }]
   say (show (List.map ended exits))
   say (show (List.length (List.filter_map Exit.failure exits), List.filter_map Exit.value exits))
-  let made : List (Exit {Boom} Float) =
-    [Exit.succeed 3, Exit.fail (Boom 4), Exit.die "broken", Exit.interrupt (Some 7)]
+  let made : List (Exit {Boom} Float) = [
+    Exit.succeed 3,
+    Exit.fail (Boom 4),
+    Exit.die "broken",
+    Exit.interrupt (Some 7),
+  ]
   say (show (List.map ended made))
   say (show (List.map Exit.is_success made, List.map Exit.has_dies made))
   say (show (List.map Exit.find_error_option made))
@@ -41,10 +44,14 @@ let main () =
   let awaited = scope owner {
     let ok = Fiber.spawn owner quiet (task { 5 })
     let bad = Fiber.spawn owner quiet (task { from_result (Err (Boom 6)) })
-    let slow = Fiber.spawn owner quiet (task {
-      nap 2000
-      0
-    })
+    let slow =
+      Fiber.spawn
+        owner
+        quiet
+        (task {
+          nap 2000
+          0
+        })
     nap 5
     Fiber.interrupt_as (Some 9) slow
     List.map ended (Fiber.await_all [ok, bad, slow])
@@ -54,12 +61,18 @@ let main () =
   note : String ->{} Unit
   let note text = Ref.modify noted (fun xs -> ((), xs ++ [text]))
   let watched : Eff none {Boom} Float = task { 8 }
-  let _ = try Effect.on_exit (fun e -> note ("exit " ++ ended e)) watched with
+  let _ =
+    try Effect.on_exit (fun e -> note ("exit " ++ ended e)) watched with
     | Boom _ -> 0
-  let _ = timeout_option 5 (task {
-    Effect.on_interrupt (fun ids -> note ("interrupted " ++ show (List.length ids))) (task {
-      nap 2000
-      0
-    })
-  })
+  let _ =
+    timeout_option
+      5
+      (task {
+        Effect.on_interrupt
+          (fun ids -> note ("interrupted " ++ show (List.length ids)))
+          (task {
+            nap 2000
+            0
+          })
+      })
   say (show (Ref.get noted))

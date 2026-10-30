@@ -10,7 +10,10 @@ let offsets () =
   Seq.fold
     (fun a b -> a + b)
     0
-    (for { n <- [1, 2]; if n > Atom.value count } yield n + Atom.value count)
+    (for {
+      n <- [1, 2]
+      if n > Atom.value count
+    } yield n + Atom.value count)
 
 listed : Unit ->{Atom.Read, Atom.Write;} List Float
 let listed () = [for n <- [1, 2] yield n + Atom.value count]

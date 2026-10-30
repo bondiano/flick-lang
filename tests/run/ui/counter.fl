@@ -46,21 +46,18 @@ counter : Ui.View Unit
 let counter =
   Ui.named
     "App.Main.counter"
-    (Ui.view (fun () ->
-      ui {
-        let widgets = { badge = badge }
-        div
-          { class_name = "counter" }
-          [
-            heading [text ("count " ++ show (Atom.value count))],
-            button { disabled = false; on_click = increment } [text "+1"],
-            button { disabled = false; on_click = refuse } [text "refuse"],
-            paragraph [text "<b>bold?</b>"],
-            badge { label = "new" },
-            badge_for () { label = "returned" },
-            ({ label = "piped" } |> (if true then widgets.badge else badge)),
-          ]
-      }))
+    (Ui.view (fun () -> ui {
+      let widgets = { badge = badge }
+      div { class_name = "counter" } [
+        heading [text ("count " ++ show (Atom.value count))],
+        button { disabled = false; on_click = increment } [text "+1"],
+        button { disabled = false; on_click = refuse } [text "refuse"],
+        paragraph [text "<b>bold?</b>"],
+        badge { label = "new" },
+        badge_for () { label = "returned" },
+        ({ label = "piped" } |> (if true then widgets.badge else badge)),
+      ]
+    }))
 
 report : Failure e ->{} Unit
 let report failure =
@@ -71,28 +68,27 @@ let main () =
   setup ()
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
-  | Some root ->
-    provide Atom.layer {
-      scope s {
-        let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render counter ()) })
-        settle ()
-        Platform.stdout_line (text ())
-        click "+1"
-        settle ()
-        click "+1"
-        settle ()
-        Platform.stdout_line (text ())
-        click "refuse"
-        settle ()
-        Platform.stdout_line (markup ())
-      }
-      Platform.stdout_line ("after the scope: [" ++ text () ++ "]")
-      scope s {
-        let custom = Atom.make 7
-        let shown = Ui.view (fun () -> Ui.text ("custom " ++ show (Atom.value custom)))
-        let _ui = Fiber.spawn s report (task { Ui.mount_with renderer report (Ui.render shown ()) })
-        settle ()
-        Platform.stdout_line (text ())
-      }
-      Platform.stdout_line ("after renderer scope: [" ++ text () ++ "]")
+  | Some root -> provide Atom.layer {
+    scope s {
+      let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render counter ()) })
+      settle ()
+      Platform.stdout_line (text ())
+      click "+1"
+      settle ()
+      click "+1"
+      settle ()
+      Platform.stdout_line (text ())
+      click "refuse"
+      settle ()
+      Platform.stdout_line (markup ())
     }
+    Platform.stdout_line ("after the scope: [" ++ text () ++ "]")
+    scope s {
+      let custom = Atom.make 7
+      let shown = Ui.view (fun () -> Ui.text ("custom " ++ show (Atom.value custom)))
+      let _ui = Fiber.spawn s report (task { Ui.mount_with renderer report (Ui.render shown ()) })
+      settle ()
+      Platform.stdout_line (text ())
+    }
+    Platform.stdout_line ("after renderer scope: [" ++ text () ++ "]")
+  }

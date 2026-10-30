@@ -33,8 +33,7 @@ foreign effect with_permit from "@flick-lang/runtime/effect/Semaphore" "withPerm
 
 /// Runs `task` with `permits` permits if they are free now, `None` without
 /// running it otherwise.
-with_permits_if_available :
-  forall c r e a. Semaphore -> Int -> (Eff r e a)^c ->{r; e} Option a
+with_permits_if_available : forall c r e a. Semaphore -> Int -> (Eff r e a)^c ->{r; e} Option a
 foreign effect with_permits_if_available from "@flick-lang/runtime/effect/Semaphore" "withPermitsIfAvailable"
   arity 2
   retention call

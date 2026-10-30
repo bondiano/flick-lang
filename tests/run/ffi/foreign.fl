@@ -73,24 +73,22 @@ foreign pure to_upper from global "String.prototype.toUpperCase"
   this
 
 // Rank-two capture bounds do not change the callbacks' JavaScript arity.
-combine :
-  forall c.
-  (forall u v. Float^u -> (Float^v -> Float)^(c + u))^c ->
-  Float -> Float -> Float
+combine : forall c. (forall u v. Float^u -> (Float^v -> Float)^(c + u))^c -> Float -> Float -> Float
 foreign pure combine from "./bindings.mjs" "combine"
   retention call
 
 combine_three :
   forall c.
-  (forall u v w.
-    Float^u -> (Float^v -> (Float^w -> Float)^(c + u + v))^(c + u))^c ->
-  Float -> Float -> Float -> Float
+  (forall u v w. Float^u -> (Float^v -> (Float^w -> Float)^(c + u + v))^(c + u))^c ->
+  Float ->
+  Float ->
+  Float ->
+  Float
 foreign pure combine_three from "./bindings.mjs" "combineThree"
   retention call
 
 same_callback :
-  forall c d.
-  (forall v. String^v -> String)^c -> (forall v. String^v -> String)^d -> Bool
+  forall c d. (forall v. String^v -> String)^c -> (forall v. String^v -> String)^d -> Bool
 foreign pure same_callback from "./bindings.mjs" "sameCallback"
   retention call
 
@@ -119,11 +117,7 @@ let async_outcome () =
 user_name : Layer none none {Http} ->{} String
 let user_name http =
   let user =
-    try
-      provide http {
-        fetch_user (UserId 7)
-      }
-    with
+    try provide http { fetch_user (UserId 7) } with
     | HttpError reason -> { id = 0; name = reason }
   user.name
 
@@ -142,10 +136,12 @@ let main () =
   Platform.stdout_line (show (hypot 3 4))
   let stamp = now_millis (log "first")
   Platform.stdout_line (show (stamp > 0))
-  let config = try read_text "config" with
+  let config =
+    try read_text "config" with
     | FsError reason -> reason
   Platform.stdout_line config
-  let missing = try read_text "missing" with
+  let missing =
+    try read_text "missing" with
     | FsError reason -> reason
   Platform.stdout_line missing
   let http = Layer.succeed Http { get = fun url -> url }

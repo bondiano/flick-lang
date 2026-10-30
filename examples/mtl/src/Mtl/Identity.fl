@@ -21,12 +21,13 @@ instance Applicative Identity =
   pure : forall c a. a^c -> (Identity a)^c
   let pure value = Identity value
   map2 :
-    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-      ((Identity a)^d -> ((Identity b)^d -> (Identity x)^(c + d))^(c + d))^c
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((Identity a)^d -> ((Identity b)^d -> (Identity x)^(c + d))^(c + d))^c
   let map2 f (Identity left) (Identity right) = Identity (f left right)
 
 instance Monad Identity =
   flat_map :
-    forall c d a b. (forall v. a^v -> (Identity b)^(c + v))^c ->
-      ((Identity a)^d -> (Identity b)^(c + d))^c
+    forall c d a b.
+    (forall v. a^v -> (Identity b)^(c + v))^c -> ((Identity a)^d -> (Identity b)^(c + d))^c
   let flat_map f (Identity value) = f value

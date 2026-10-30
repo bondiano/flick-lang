@@ -12,10 +12,12 @@
 
 mod arith;
 mod call;
+mod effects;
 mod expr;
 mod foreign;
 mod generate;
 mod items;
+mod layout;
 mod loops;
 mod names;
 mod pattern;
@@ -26,12 +28,14 @@ mod schema;
 pub use runtime::RUNTIME;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::fmt::Write;
 use std::{mem, slice};
+
+use flick_pretty::{Document, DocumentArena, Documentable, docvec};
 
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::{ExprKind, ItemKind, Module, Stage};
 use crate::source::Span;
+use layout::{Code, block, call, directive, list, statement};
 use reach::Key;
 
 /// The Go import path of the runtime package.
@@ -150,11 +154,14 @@ fn shape(kind: &ItemKind) -> Shape {
 pub fn go(program: &Program) -> Output {
     let modules = program.modules;
     let index = reach::index(modules);
+    // main.go's documents
+    let a = &DocumentArena::new();
     if !program.suites.is_empty() {
         return compile(
             program,
             &index,
-            &tests_start(program.suites),
+            a,
+            tests_start(a, program.suites),
             program.suites,
         );
     }
@@ -184,34 +191,39 @@ pub fn go(program: &Program) -> Output {
             diagnostics,
         };
     };
-    let fb = if main_shape.fiber() { "fb, " } else { "" };
-    let start = format!("{}({fb}flickrt.Unit)", names::func(&main.0, &main.1));
+    let fb = main_shape.fiber().then(|| a.text("fb"));
+    let unit = a.text("flickrt.Unit");
+    let start = call(
+        a,
+        names::func(&main.0, &main.1),
+        fb.into_iter().chain([unit]),
+    );
     compile(
         program,
         &index,
-        &start,
+        a,
+        start,
         slice::from_ref(&program.entry.to_owned()),
     )
 }
 
 /// What a test program runs: `flickrt.RunTests` on the `tests` of each suite.
-fn tests_start(suites: &[String]) -> String {
-    let list: Vec<String> = suites
-        .iter()
-        .map(|m| format!("{{{:?}, {}}}", m, names::var(m, "tests")))
-        .collect();
-    format!(
-        "flickrt.RunTests(fb, []flickrt.Suite{{{}}})",
-        list.join(", ")
-    )
+fn tests_start<'a>(a: &'a DocumentArena<'a>, suites: &[String]) -> Document<'a> {
+    let suites = suites.iter().map(|m| {
+        let suite = [format!("{m:?}").to_doc(a), names::var(m, "tests").to_doc(a)];
+        list(a, "{", suite, "}")
+    });
+    let suites = list(a, "[]flickrt.Suite{", suites, "}");
+    call(a, "flickrt.RunTests", [a.text("fb"), suites])
 }
 
-/// The program of the items `roots` reach, whose `main.go` initializes
-/// the modules of `roots` and runs `start`.
-fn compile(
+/// The program of the items `roots` reach, whose `main.go`, of documents
+/// of `a`, initializes the modules of `roots` and runs `start`.
+fn compile<'a>(
     program: &Program,
     index: &HashMap<Key, (usize, usize)>,
-    start: &str,
+    a: &'a DocumentArena<'a>,
+    start: Document<'a>,
     roots: &[String],
 ) -> Output {
     let modules = program.modules;
@@ -251,7 +263,8 @@ fn compile(
         if items.is_empty() || !seen.insert(module.name.clone()) {
             continue;
         }
-        let mut g = Gen::new(&module.name, &shapes, program.package);
+        let arena = DocumentArena::new();
+        let mut g = Gen::new(&module.name, &shapes, program.package, &arena);
         if (program.own)(&module.name) {
             g.location = Some(program.location);
             g.foreign_file = Some(program.foreign_file);
@@ -274,14 +287,29 @@ fn compile(
     for root in roots {
         init_order(root, &deps, &mut visited, &mut order);
     }
-    let mut main_go = format!(
-        "package main\n\nimport \"{RUNTIME_PACKAGE}\"\n\nfunc main() {{\n\tflickrt.Main(func(fb *flickrt.Fiber) {{\n"
+    let inits = order
+        .iter()
+        .filter(|m| deps.contains_key(*m))
+        .map(|m| statement(a, docvec![a, names::init(m), "()"]));
+    let run = block(a, inits.chain([statement(a, start)]));
+    let run = call(
+        a,
+        "flickrt.Main",
+        [docvec![a, "func(fb *flickrt.Fiber) ", run]],
     );
-    for module in order.iter().filter(|m| deps.contains_key(*m)) {
-        let _ = writeln!(main_go, "\t\t{}()", names::init(module));
-    }
-    let _ = writeln!(main_go, "\t\t{start}\n\t}})\n}}");
-    files.push(("main.go".to_owned(), main_go));
+    let main_go = docvec![
+        a,
+        "package main",
+        a.lines(2),
+        "import \"",
+        RUNTIME_PACKAGE,
+        "\"",
+        a.lines(2),
+        "func main() ",
+        block(a, [statement(a, run)]),
+        a.line()
+    ];
+    files.push(("main.go".to_owned(), layout::print(main_go)));
     files.extend(sources);
     dedup(&mut diagnostics);
     Output { files, diagnostics }
@@ -347,18 +375,21 @@ fn dedup(diagnostics: &mut Vec<Diagnostic>) {
     diagnostics.retain(|d| seen.insert(format!("{:?}{}", d.span, d.message)));
 }
 
-/// The code generator of one module.
+/// The code generator of one module, building documents in `a`.
 struct Gen<'a> {
+    a: &'a DocumentArena<'a>,
     module: &'a str,
     shapes: &'a HashMap<Key, Shape>,
     package: &'a dyn Fn(&str) -> Option<String>,
-    /// Statements of the block being emitted.
-    buf: Vec<String>,
+    /// Statements of the block being emitted, each with its newline.
+    buf: Vec<Document<'a>>,
     temps: u32,
+    /// How many `//line` directives the module has so far.
+    lines: usize,
     /// Dictionaries in scope: as `Dict::Given` names them, and the variable.
-    givens: Vec<(String, String)>,
+    givens: Vec<(String, &'a str)>,
     /// Where the elements of the `for` being emitted go.
-    collector: Option<generate::Collector>,
+    collector: Option<generate::Collector<'a>>,
     /// Inside the function of a lazy `for`, which returns nothing.
     generator: bool,
     /// The modules whose top-level values the code reads.
@@ -368,7 +399,7 @@ struct Gen<'a> {
     /// The fiber in scope, in a body whose effects run.
     fiber: Option<&'static str>,
     /// The loop a tail call in the code being emitted jumps in.
-    tail: Option<loops::Tail>,
+    tail: Option<loops::Tail<'a>>,
     /// The groups of mutually tail-recursive functions of the module.
     groups: Vec<loops::Group>,
     /// The group and member of each grouped function, by name.
@@ -389,13 +420,16 @@ impl<'a> Gen<'a> {
         module: &'a str,
         shapes: &'a HashMap<Key, Shape>,
         package: &'a dyn Fn(&str) -> Option<String>,
+        a: &'a DocumentArena<'a>,
     ) -> Self {
         Gen {
+            a,
             module,
             shapes,
             package,
             buf: Vec::new(),
             temps: 0,
+            lines: 0,
             givens: Vec::new(),
             collector: None,
             generator: false,
@@ -412,19 +446,39 @@ impl<'a> Gen<'a> {
         }
     }
 
-    fn temp(&mut self) -> String {
+    fn temp(&mut self) -> &'a str {
         self.temps += 1;
-        format!("t{}", self.temps)
+        self.a.alloc_str(&format!("t{}", self.temps))
+    }
+
+    /// The code of a name or a literal.
+    fn code(&self, text: &str) -> Code<'a> {
+        Code::leaf(self.a, text)
+    }
+
+    fn unit(&self) -> Code<'a> {
+        self.code("flickrt.Unit")
+    }
+
+    /// A Go string literal of `text`.
+    fn string(&self, text: &str) -> Document<'a> {
+        names::string(text).to_doc(self.a)
+    }
+
+    /// Adds a statement to the current statement list.
+    fn emit(&mut self, stmt: impl Documentable<'a>) {
+        let stmt = statement(self.a, stmt);
+        self.buf.push(stmt);
     }
 
     /// Records a construct the target cannot compile; the placeholder
     /// keeps the generated code well formed.
-    fn unsupported(&mut self, span: Span, what: &str) -> String {
+    fn unsupported(&mut self, span: Span, what: &str) -> Code<'a> {
         self.errors.push((
             format!("{what} is not available on the go target yet"),
             Some(span),
         ));
-        "flickrt.Unit".to_owned()
+        self.unit()
     }
 
     fn shape_of(&self, module: &str, name: &str) -> Shape {
@@ -438,7 +492,8 @@ impl<'a> Gen<'a> {
     /// traces then name by the Flick source of `span`.
     fn line(&mut self, span: Span) {
         if let Some((path, line)) = self.location.and_then(|at| at(self.module, span)) {
-            self.buf.push(format!("//line {path}:{line}"));
+            self.buf.push(directive(self.a, path, line));
+            self.lines += 1;
         }
     }
 
@@ -450,58 +505,22 @@ impl<'a> Gen<'a> {
     }
 
     /// Binds the dictionaries `shown` to fresh variables; the variables.
-    fn bind_givens(&mut self, shown: &[String]) -> Vec<String> {
+    fn bind_givens(&mut self, shown: &[String]) -> Vec<&'a str> {
         shown
             .iter()
             .map(|g| {
-                let p = format!("d{}", self.givens.len());
-                self.givens.push((g.clone(), p.clone()));
+                let p = self.a.alloc_str(&format!("d{}", self.givens.len()));
+                self.givens.push((g.clone(), p));
                 p
             })
             .collect()
     }
 
     /// Runs `f` with an empty statement list; its statements and result.
-    fn block<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> (Vec<String>, T) {
+    fn block<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> (Vec<Document<'a>>, T) {
         let saved = mem::take(&mut self.buf);
         let result = f(self);
         (mem::replace(&mut self.buf, saved), result)
-    }
-}
-
-/// Statements as the lines of a block, indented one level; a `//line`
-/// directive stays at the start of its line, where Go reads it.
-fn indent(stmts: &[String]) -> String {
-    let mut out = String::new();
-    for stmt in stmts {
-        for line in stmt.lines() {
-            if !line.starts_with("//line ") {
-                out.push('\t');
-            }
-            out.push_str(line);
-            out.push('\n');
-        }
-    }
-    out
-}
-
-/// The parameter list of a Go function taking the fiber, when `fiber`,
-/// then `names`, each a `Value`.
-fn signature(fiber: bool, names: &[String]) -> String {
-    let params = param_list(names);
-    match (fiber, params.is_empty()) {
-        (false, _) => params,
-        (true, true) => "fb *flickrt.Fiber".to_owned(),
-        (true, false) => format!("fb *flickrt.Fiber, {params}"),
-    }
-}
-
-/// The parameter list of Go function taking `names`, each a `Value`.
-fn param_list(names: &[String]) -> String {
-    if names.is_empty() {
-        String::new()
-    } else {
-        format!("{} flickrt.Value", names.join(", "))
     }
 }
 

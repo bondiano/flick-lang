@@ -33,11 +33,10 @@ let rec countdown n =
 
 /// Adds one to the counter, giving the new count.
 bump : Ref Float -> Eff none none Float
-let bump calls =
-  task {
-    Ref.set calls (Ref.get calls + 1)
-    Ref.get calls
-  }
+let bump calls = task {
+  Ref.set calls (Ref.get calls + 1)
+  Ref.get calls
+}
 
 /// Records `n`, going on while it is below 5.
 record : Ref (List Int) -> Int ->{} Bool
@@ -55,45 +54,37 @@ let main () =
   line ("range", (Stream.run_collect (Stream.range 1 5)))
   line ("countdown", (Stream.run_collect (countdown 3)))
   line ("iterate", (Stream.run_collect (Stream.take 4 (Stream.iterate 1 (fun n -> n * 2)))))
-  line
-    (
-      "unfold",
-      (
-        Stream.run_collect (Stream.unfold 1 (fun n -> if n > 3 then None else Some (n * 10, n + 1)))
-      ),
-    )
-  line
-    (
-      "paginate",
-      (Stream.run_collect
-        (Stream.paginate 0 (fun n -> ([n, n], if n < 2 then Some (n + 1) else None)))),
-    )
+  line (
+    "unfold",
+    (Stream.run_collect (Stream.unfold 1 (fun n -> if n > 3 then None else Some (n * 10, n + 1)))),
+  )
+  line (
+    "paginate",
+    (Stream.run_collect
+      (Stream.paginate 0 (fun n -> ([n, n], if n < 2 then Some (n + 1) else None)))),
+  )
   let calls = Ref.make 0
   let counted = Stream.from_effect (bump calls)
   line ("from_effect twice", (Stream.run_collect (Stream.concat counted counted)))
-  line
-    (
-      "from_effect_drain",
-      (Stream.run_collect
-        (Stream.concat (Stream.from_effect_drain (task { Ref.set calls 10 })) (Stream.succeed 0))),
-    )
+  line (
+    "from_effect_drain",
+    (Stream.run_collect
+      (Stream.concat (Stream.from_effect_drain (task { Ref.set calls 10 })) (Stream.succeed 0))),
+  )
   line ("after drain", [Ref.get calls])
-  line
-    (
-      "from_effect_repeat",
-      (Stream.run_collect (Stream.take 3 (Stream.from_effect_repeat (bump calls)))),
-    )
-  line
-    (
-      "from_effect_schedule",
-      (Stream.run_collect (Stream.from_effect_schedule (Schedule.recurs 2) (task { 7 }))),
-    )
+  line (
+    "from_effect_repeat",
+    (Stream.run_collect (Stream.take 3 (Stream.from_effect_repeat (bump calls)))),
+  )
+  line (
+    "from_effect_schedule",
+    (Stream.run_collect (Stream.from_effect_schedule (Schedule.recurs 2) (task { 7 }))),
+  )
   line ("from_list_effect", (Stream.run_collect (Stream.from_list_effect (task { [1, 2] }))))
-  line
-    (
-      "from_list_effect_repeat",
-      (Stream.run_collect (Stream.take 5 (Stream.from_list_effect_repeat (task { [8, 9] })))),
-    )
+  line (
+    "from_list_effect_repeat",
+    (Stream.run_collect (Stream.take 5 (Stream.from_list_effect_repeat (task { [8, 9] })))),
+  )
   line ("unwrap", (Stream.run_collect (Stream.unwrap (task { Stream.make [Ref.get calls] }))))
   line ("tick", [Stream.run_count (Stream.take 3 (Stream.tick ms1))])
   line ("from_schedule", (Stream.run_collect (Stream.from_schedule (Schedule.recurs 2))))
@@ -104,35 +95,37 @@ let main () =
   let produced =
     Stream.callback (fun q ->
       let _ = Queue.offer_all [5, 6] q
-      Queue.end q)
+      Queue.end q
+    )
   line ("callback", (Stream.run_collect produced))
   let hub = PubSub.unbounded { replay = Some 3 }
   let _ = PubSub.publish_all [1, 2, 3] hub
   line ("from_pubsub", (Stream.run_collect (Stream.take 3 (Stream.from_pubsub hub))))
   let ref = SubscriptionRef.make 4
-  line
-    (
-      "from_subscription_ref",
-      (Stream.run_collect (Stream.take 1 (Stream.from_subscription_ref ref))),
-    )
+  line (
+    "from_subscription_ref",
+    (Stream.run_collect (Stream.take 1 (Stream.from_subscription_ref ref))),
+  )
   let tx = TxSubscriptionRef.make 6
-  line
-    (
-      "from_tx_subscription_ref",
-      (Stream.run_collect (Stream.take 1 (Stream.from_tx_subscription_ref tx))),
-    )
+  line (
+    "from_tx_subscription_ref",
+    (Stream.run_collect (Stream.take 1 (Stream.from_tx_subscription_ref tx))),
+  )
   let values = [js_number 1, js_number 2]
   let read = Stream.from_readable_stream JsError.from_js (readable values)
-  let chunks = try Stream.run_collect read with | JsError.JsError _ -> []
+  let chunks =
+    try Stream.run_collect read with
+    | JsError.JsError _ -> []
   Platform.stdout_line ("from_readable_stream: " ++ show (List.map js_text chunks))
   let iterated = Stream.from_async_iterable JsError.from_js (readable values)
-  let items = try Stream.run_collect iterated with | JsError.JsError _ -> []
+  let items =
+    try Stream.run_collect iterated with
+    | JsError.JsError _ -> []
   Platform.stdout_line ("from_async_iterable: " ++ show (List.map js_text items))
-  line
-    (
-      "from_event_listener",
-      [Stream.run_count (Stream.take 1 (Stream.from_event_listener "abort" (aborting 30)))],
-    )
+  line (
+    "from_event_listener",
+    [Stream.run_count (Stream.take 1 (Stream.from_event_listener "abort" (aborting 30)))],
+  )
   line ("never", [Stream.run_count (Stream.take 0 Stream.never)])
   line ("default_chunk_size", [Stream.default_chunk_size])
   line ("run_count", [Stream.run_count (Stream.range 1 4)])
@@ -164,15 +157,21 @@ let main () =
   let failed =
     Stream.run_collect (Stream.result (Stream.concat (Stream.fail (Boom 1)) (Stream.succeed 1)))
   Platform.stdout_line
-    ("fail: " ++ show (List.map (fun r -> match r with | Ok n -> n | Err (Boom n) -> 0 - n) failed))
+    ("fail: "
+      ++ show
+        (List.map
+          (fun r ->
+            match r with
+            | Ok n -> n
+            | Err (Boom n) -> 0 - n
+          )
+          failed))
   let died =
     Stream.run_collect (Stream.catch_defect (fun _ -> Stream.succeed "caught") (Stream.die "no"))
   Platform.stdout_line ("die: " ++ show died)
   let rethrown : Stream.Stream none {Boom} Float =
     Stream.catch_cause (fun failure -> Stream.fail_cause failure) (Stream.fail (Boom 2))
   let recovered =
-    try
-      Stream.run_collect rethrown
-    with
+    try Stream.run_collect rethrown with
     | Boom n -> [n]
   line ("fail_cause", recovered)

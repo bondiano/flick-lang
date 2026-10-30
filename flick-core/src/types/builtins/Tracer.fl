@@ -51,18 +51,17 @@ type alias SpanLink = { span : Span; attributes : List (String, String) }
 /// unless `root`; `level` is checked against `with_minimum_trace_level`;
 /// `disablePropagation` makes a span that is not traced and that the spans
 /// inside skip when they look for their parent.
-type alias SpanOptions =
-  {
-    attributes : List (String, String);
-    links : List SpanLink;
-    parent : Option Span;
-    root : Bool;
-    kind_ : SpanKind;
-    sampled : Option Bool;
-    level : Option LogLevel.LogLevel;
-    captureStackTrace : Bool;
-    disablePropagation : Bool;
-  }
+type alias SpanOptions = {
+  attributes : List (String, String);
+  links : List SpanLink;
+  parent : Option Span;
+  root : Bool;
+  kind_ : SpanKind;
+  sampled : Option Bool;
+  level : Option LogLevel.LogLevel;
+  captureStackTrace : Bool;
+  disablePropagation : Bool;
+}
 
 /// Runs `task` in a new span with the name, which ends with the task.
 with_span : forall c r e a. String -> SpanOptions -> (Eff r e a)^c ->{r; e} a

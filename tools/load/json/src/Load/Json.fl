@@ -7,9 +7,7 @@ import Http.Router exposing (RouteContext)
 import Http.ServerRequest exposing (ServerRequest)
 import Http.ServerResponse exposing (ServerResponse)
 
-type Part =
-  | Bolt Float
-  | Panel Float Float
+type Part = Bolt Float | Panel Float Float
   deriving Schema
 
 type alias Item = {
@@ -44,17 +42,13 @@ let main () =
   provide Http.Server.layer_services {
     try
       scope s {
-        app : ServerRequest ->{
-          ;
-          Http.Body.HttpBodyError,
-          Http.ServerError.HttpServerError,
-          SchemaError
-        }
+        app :
+          ServerRequest ->{; Http.Body.HttpBodyError, Http.ServerError.HttpServerError, SchemaError}
           ServerResponse
         let app =
-          Http.Router.router
-            Http.Router.config
-            [Http.Router.route (Some Http.Method.GET) "/item/:id" get_item]
+          Http.Router.router Http.Router.config [
+            Http.Router.route (Some Http.Method.GET) "/item/:id" get_item,
+          ]
         let server =
           Http.Server.serve { host = "127.0.0.1"; port = port; gracefulShutdownTimeout = None } app
         Platform.stdout_line

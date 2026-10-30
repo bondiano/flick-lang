@@ -19,15 +19,14 @@ encodable : Page -> Bool
 foreign pure encodable from "./route.mjs" "encodable"
 
 checking : Arbitrary.CheckOptions
-let checking =
-  {
-    runs = Some 200;
-    size = None;
-    maxDiscards = None;
-    maxShrinks = None;
-    seed = Some 11;
-    replay = None;
-  }
+let checking = {
+  runs = Some 200;
+  size = None;
+  maxDiscards = None;
+  maxShrinks = None;
+  seed = Some 11;
+  replay = None;
+}
 
 parsed : String -> String
 let parsed url = url ++ " -> " ++ show (Route.parse Page.url url)
@@ -45,8 +44,7 @@ let main () =
       Search { q = ""; page = Some 2; exact = false },
       Settings,
     ]
-    for page <- pages do
-      Platform.stdout_line (Route.print Page.url page)
+    for page <- pages do Platform.stdout_line (Route.print Page.url page)
     let urls = [
       "/",
       "/user/42",
@@ -57,8 +55,7 @@ let main () =
       "https://example.com/settings#top",
       "/nope",
     ]
-    for url <- urls do
-      Platform.stdout_line (parsed url)
+    for url <- urls do Platform.stdout_line (parsed url)
     let round_trip =
       Arbitrary.check
         checking

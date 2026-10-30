@@ -3,18 +3,17 @@
 module App.Main exposing (main)
 
 options : Tracer.SpanOptions
-let options =
-  {
-    attributes = [("user", "ada")];
-    links = [];
-    parent = None;
-    root = false;
-    kind_ = Tracer.internal;
-    sampled = None;
-    level = None;
-    captureStackTrace = false;
-    disablePropagation = false;
-  }
+let options = {
+  attributes = [("user", "ada")];
+  links = [];
+  parent = None;
+  root = false;
+  kind_ = Tracer.internal;
+  sampled = None;
+  level = None;
+  captureStackTrace = false;
+  disablePropagation = false;
+}
 
 remote : Tracer.Span
 let remote = Tracer.external_span { spanId = "span-1"; traceId = "trace-1"; sampled = true }
@@ -32,12 +31,15 @@ main : Unit ->{; AppError} Unit
 let main () =
   Platform.stdout_line ("outside " ++ names ())
   let outer =
-    Tracer.with_span "outer" options (task {
-      let inner =
-        Tracer.with_span "inner" { options with kind_ = Tracer.server } (task { names () })
-      let span = Option.with_default remote (Tracer.parent_span ())
-      (inner, Tracer.span_kind span, Tracer.attributes span, Tracer.sampled span, span)
-    })
+    Tracer.with_span
+      "outer"
+      options
+      (task {
+        let inner =
+          Tracer.with_span "inner" { options with kind_ = Tracer.server } (task { names () })
+        let span = Option.with_default remote (Tracer.parent_span ())
+        (inner, Tracer.span_kind span, Tracer.attributes span, Tracer.sampled span, span)
+      })
   let (inner, kind_of, attrs, is_sampled, span) = outer
   Platform.stdout_line ("inner " ++ inner)
   Platform.stdout_line ("outer " ++ show (kind_of, attrs, is_sampled))
@@ -56,61 +58,70 @@ let main () =
       "child"
       { options with parent = Some remote; links = [linked]; kind_ = Tracer.client }
       (task {
-      match Tracer.parent_span () with
-      | Some s ->
-        let link_ids =
-          List.map
-            (fun (l : Tracer.SpanLink) -> (Tracer.span_id l.span, l.attributes))
-            (Tracer.links s)
-        let running =
-          match Tracer.status s with
-          | Tracer.Started _ -> "running"
-          | Tracer.Ended _ _ -> "ended"
-        show (Tracer.trace_id s, Option.map Tracer.span_id (Tracer.parent s), link_ids, running)
-      | None -> "no span"
-    })
+        match Tracer.parent_span () with
+        | Some s ->
+          let link_ids =
+            List.map
+              (fun (l : Tracer.SpanLink) -> (Tracer.span_id l.span, l.attributes))
+              (Tracer.links s)
+          let running =
+            match Tracer.status s with
+            | Tracer.Started _ -> "running"
+            | Tracer.Ended _ _ -> "ended"
+          show (Tracer.trace_id s, Option.map Tracer.span_id (Tracer.parent s), link_ids, running)
+        | None -> "no span"
+      })
   Platform.stdout_line ("child of remote " ++ child)
   Platform.stdout_line
     ("external "
-      ++ show
-        (
-          Tracer.span_name remote,
-          Tracer.span_kind remote,
-          Option.is_none (Tracer.parent remote),
-          Tracer.links remote |> List.length,
-          Tracer.attributes remote,
-          Tracer.sampled remote,
-        ))
-  let kinds =
-    [Tracer.internal, Tracer.server, Tracer.client, Tracer.producer, Tracer.consumer]
+      ++ show (
+        Tracer.span_name remote,
+        Tracer.span_kind remote,
+        Option.is_none (Tracer.parent remote),
+        Tracer.links remote |> List.length,
+        Tracer.attributes remote,
+        Tracer.sampled remote,
+      ))
+  let kinds = [Tracer.internal, Tracer.server, Tracer.client, Tracer.producer, Tracer.consumer]
   Platform.stdout_line ("kinds " ++ show kinds)
   let rooted =
-    Tracer.with_span "outer" options (task {
-      Tracer.with_span "root" { options with root = true } (task { names () })
-    })
+    Tracer.with_span
+      "outer"
+      options
+      (task { Tracer.with_span "root" { options with root = true } (task { names () }) })
   Platform.stdout_line ("root " ++ rooted)
   let native = Tracer.native_tracer
   let traced =
     Tracer.with_tracer native (task { Tracer.with_span "native" options (task { names () }) })
   Platform.stdout_line ("with_tracer " ++ traced)
   let filtered =
-    Tracer.with_minimum_trace_level LogLevel.warn (task {
-      Tracer.with_span "debug span" { options with level = Some LogLevel.debug } (task { names () })
-    })
+    Tracer.with_minimum_trace_level
+      LogLevel.warn
+      (task {
+        Tracer.with_span
+          "debug span"
+          { options with level = Some LogLevel.debug }
+          (task { names () })
+      })
   Platform.stdout_line ("with_minimum_trace_level " ++ filtered)
   let leveled =
-    Tracer.with_minimum_trace_level LogLevel.warn (task {
-      Tracer.with_trace_level
-        LogLevel.error
-        (task { Tracer.with_span "error span" options (task { names () }) })
-    })
+    Tracer.with_minimum_trace_level
+      LogLevel.warn
+      (task {
+        Tracer.with_trace_level
+          LogLevel.error
+          (task { Tracer.with_span "error span" options (task { names () }) })
+      })
   Platform.stdout_line ("with_trace_level " ++ leveled)
   let unpropagated =
-    Tracer.with_span "outer" options (task {
-      Tracer.with_span
-        "detached"
-        { options with disablePropagation = true }
-        (task { Tracer.with_span "child" options (task { names () }) })
-    })
+    Tracer.with_span
+      "outer"
+      options
+      (task {
+        Tracer.with_span
+          "detached"
+          { options with disablePropagation = true }
+          (task { Tracer.with_span "child" options (task { names () }) })
+      })
   Platform.stdout_line ("disablePropagation " ++ unpropagated)
   Platform.stdout_line ("status " ++ show (Tracer.status remote))

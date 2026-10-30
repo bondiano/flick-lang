@@ -10,8 +10,7 @@ count : Atom.Writable Float
 let count = Atom.label_state "App.Main.count" (Atom.state 1)
 
 doubled : Atom.Atom Float
-let doubled =
-  Atom.keep_alive (Atom.readable (fun ctx -> Atom.read ctx (Atom.readonly count) * 2))
+let doubled = Atom.keep_alive (Atom.readable (fun ctx -> Atom.read ctx (Atom.readonly count) * 2))
 
 shown : Atom.Atom String
 let shown = Atom.with_label "App.Main.shown" (Atom.map (fun n -> "n=" ++ show n) doubled)
@@ -31,25 +30,20 @@ let read_doubled () = Atom.get doubled
 
 describe : AsyncResult.AsyncResult Float none -> String
 let describe result =
-  AsyncResult.fold
-    "initial"
-    (fun n -> "success " ++ show n)
-    (fun _ -> "failure")
-    result
+  AsyncResult.fold "initial" (fun n -> "success " ++ show n) (fun _ -> "failure") result
 
 main : Unit ->{; AppError} Unit
-let main () =
-  provide Atom.layer {
-    Platform.stdout_line (show (read_doubled ()))
-    Atom.set count 5
-    Platform.stdout_line (Atom.get shown)
-    Atom.update count (fun n -> n + 1)
-    Platform.stdout_line (show (Atom.get doubled))
-    let previous = Atom.modify count (fun n -> (n, n * 10))
-    Platform.stdout_line (show (previous, Atom.get (Atom.readonly count)))
-    Platform.stdout_line (Atom.get (greeting "ada"))
-    let first = Atom.get answer
-    Platform.stdout_line (describe first ++ ", waiting " ++ show (AsyncResult.is_waiting first))
-    Atom.refresh answer
-    Platform.stdout_line (show (AsyncResult.value (Atom.get answer)))
-  }
+let main () = provide Atom.layer {
+  Platform.stdout_line (show (read_doubled ()))
+  Atom.set count 5
+  Platform.stdout_line (Atom.get shown)
+  Atom.update count (fun n -> n + 1)
+  Platform.stdout_line (show (Atom.get doubled))
+  let previous = Atom.modify count (fun n -> (n, n * 10))
+  Platform.stdout_line (show (previous, Atom.get (Atom.readonly count)))
+  Platform.stdout_line (Atom.get (greeting "ada"))
+  let first = Atom.get answer
+  Platform.stdout_line (describe first ++ ", waiting " ++ show (AsyncResult.is_waiting first))
+  Atom.refresh answer
+  Platform.stdout_line (show (AsyncResult.value (Atom.get answer)))
+}

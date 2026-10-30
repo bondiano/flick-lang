@@ -14,10 +14,7 @@ let replace = { mergeWithExisting = false }
 
 /// Logs through `Log` with the loggers of `loggers`.
 logged : Layer none none none -> (Unit ->{Log.Log;} Unit) ->{} Unit
-let logged loggers body =
-  provide (Layer.merge loggers Logger.effect_log) {
-    body ()
-  }
+let logged loggers body = provide (Layer.merge loggers Logger.effect_log) { body () }
 
 contains : String -> String -> Bool
 let contains part whole = String.contains part whole
@@ -27,17 +24,17 @@ let main () =
   logged (Logger.layer replace [Logger.with_console_log simple]) (fun () ->
     Log.info "hello"
     Log.warn "careful"
-    Log.debug "below the minimum level")
+    Log.debug "below the minimum level"
+  )
   logged
     (Logger.layer replace [simple |> Logger.map String.to_upper |> Logger.with_console_log])
-    (fun () ->
-    Log.error "mapped")
+    (fun () -> Log.error "mapped")
   logged (Logger.layer replace [Logger.with_leveled_console simple]) (fun () ->
     Log.info "leveled info"
-    Log.error "leveled error")
+    Log.error "leveled error"
+  )
   logged (Logger.layer replace [Logger.with_console_error simple]) (fun () -> Log.info "to stderr")
-  let checks =
-    Logger.make (fun (o : Logger.Options) -> o.date > 0)
+  let checks = Logger.make (fun (o : Logger.Options) -> o.date > 0)
   let seen = Ref.make []
   let collect = { window = ms 1; flush = fun outputs -> Ref.set seen (Ref.get seen ++ outputs) }
   logged (Logger.batched collect replace checks) (fun () -> Log.info "batched")
@@ -63,25 +60,33 @@ let main () =
   logged (Logger.batched keep replace structured) (fun () -> Log.info "formatted")
   Platform.stdout_line ("formats " ++ show (Ref.get formats))
   let pretty_date = Some (fun _ -> "DATE")
-  Console.with_console (Console.to_stderr ()) (task {
-    logged
-      (Logger.layer replace [
-        Logger.default_logger,
-        Logger.console_pretty { colors = Some false; formatDate = pretty_date; mode = Logger.Tty },
-        Logger.console_pretty_tty { colors = false; formatDate = None },
-        Logger.console_pretty_browser { colors = false; formatDate = None },
-        Logger.console_logfmt,
-        Logger.console_structured,
-        Logger.console_json,
-        Logger.tracer_logger,
-      ])
-      (fun () -> Log.info "every console logger")
-  })
+  Console.with_console
+    (Console.to_stderr ())
+    (task {
+      logged
+        (Logger.layer replace [
+          Logger.default_logger,
+          Logger.console_pretty {
+            colors = Some false;
+            formatDate = pretty_date;
+            mode = Logger.Tty;
+          },
+          Logger.console_pretty_tty { colors = false; formatDate = None },
+          Logger.console_pretty_browser { colors = false; formatDate = None },
+          Logger.console_logfmt,
+          Logger.console_structured,
+          Logger.console_json,
+          Logger.tracer_logger,
+        ])
+        (fun () -> Log.info "every console logger")
+    })
   logged (Logger.layer { mergeWithExisting = true } []) (fun () ->
-    Logger.with_log_to_stderr true (task { Log.info "default logger on stderr" }))
+    Logger.with_log_to_stderr true (task { Log.info "default logger on stderr" })
+  )
   logged (Logger.layer replace []) (fun () ->
     Log.info "no logger"
-    Logger.with_loggers [Logger.with_console_log simple] (task { Log.info "with_loggers" }))
+    Logger.with_loggers [Logger.with_console_log simple] (task { Log.info "with_loggers" })
+  )
   let written =
     try
       provide FileSystem.node {

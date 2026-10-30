@@ -25,30 +25,33 @@ instance Monad m => Applicative (ExceptT e m) =
   pure : forall c a. a^c -> (ExceptT e m a)^c
   let pure value = ExceptT (pure (Ok value))
   map2 :
-    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-      ((ExceptT e m a)^d -> ((ExceptT e m b)^d -> (ExceptT e m x)^(c + d))^(c + d))^c
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((ExceptT e m a)^d -> ((ExceptT e m b)^d -> (ExceptT e m x)^(c + d))^(c + d))^c
   let map2 f left right =
-    ExceptT (do {
-      first <- run left
-      match first with
-      | Err problem -> pure (Err problem)
-      | Ok a -> do {
+    ExceptT
+      (do {
+        first <- run left
+        match first with
+        | Err problem -> pure (Err problem)
+        | Ok a -> do {
           second <- run right
           pure (map (f a) second)
         }
-    })
+      })
 
 instance Monad m => Monad (ExceptT e m) =
   flat_map :
-    forall c d a b. (forall v. a^v -> (ExceptT e m b)^(c + v))^c ->
-      ((ExceptT e m a)^d -> (ExceptT e m b)^(c + d))^c
+    forall c d a b.
+    (forall v. a^v -> (ExceptT e m b)^(c + v))^c -> ((ExceptT e m a)^d -> (ExceptT e m b)^(c + d))^c
   let flat_map f action =
-    ExceptT (do {
-      result <- run action
-      match result with
-      | Err problem -> pure (Err problem)
-      | Ok value -> run (f value)
-    })
+    ExceptT
+      (do {
+        result <- run action
+        match result with
+        | Err problem -> pure (Err problem)
+        | Ok value -> run (f value)
+      })
 
 instance MonadTrans (ExceptT e) =
   lift : forall c m a. Monad m => (m a)^c -> (ExceptT e m a)^c
@@ -65,8 +68,8 @@ instance MonadState m s => MonadState (ExceptT e m) s =
 instance MonadReader m r => MonadReader (ExceptT e m) r =
   ask : ExceptT e m r
   let ask = lift ask
-  local : forall c d a. (forall v. r^v -> r^(c + v))^c ->
-    ((ExceptT e m a)^d -> (ExceptT e m a)^(c + d))^c
+  local :
+    forall c d a. (forall v. r^v -> r^(c + v))^c -> ((ExceptT e m a)^d -> (ExceptT e m a)^(c + d))^c
   let local update (ExceptT action) = ExceptT (local update action)
   reader : forall c a. (forall v. r^v -> a)^c -> (ExceptT e m a)^c
   let reader project = lift (reader project)
@@ -77,11 +80,9 @@ instance MonadWriter m w => MonadWriter (ExceptT e m) w =
   listen : forall c a. (ExceptT e m a)^c -> (ExceptT e m (a, w))^c
   let listen (ExceptT action) =
     ExceptT
-      (
-        map
-          (fun (result, output) -> Result.map (fun value -> (value, output)) result)
-          (listen action)
-      )
+      (map
+        (fun (result, output) -> Result.map (fun value -> (value, output)) result)
+        (listen action))
   pass : forall c d a. (ExceptT e m (a, (w -> w)^c))^d -> (ExceptT e m a)^(c + d)
   let pass (ExceptT action) =
     adapt : Result e (a, (w -> w)^c) -> (Result e a, (w -> w)^c)
@@ -99,12 +100,14 @@ instance MonadWriter m w => MonadWriter (ExceptT e m) w =
 instance Monad m => MonadError (ExceptT e m) e =
   throw_error : forall c a. e^c -> (ExceptT e m a)^c
   let throw_error problem = ExceptT (pure (Err problem))
-  catch_error : forall c d a. (forall v. e^v -> (ExceptT e m a)^(c + v))^c ->
-    ((ExceptT e m a)^d -> (ExceptT e m a)^(c + d))^c
+  catch_error :
+    forall c d a.
+    (forall v. e^v -> (ExceptT e m a)^(c + v))^c -> ((ExceptT e m a)^d -> (ExceptT e m a)^(c + d))^c
   let catch_error handle (ExceptT action) =
-    ExceptT (do {
-      result <- action
-      match result with
-      | Err problem -> run (handle problem)
-      | Ok value -> pure (Ok value)
-    })
+    ExceptT
+      (do {
+        result <- action
+        match result with
+        | Err problem -> run (handle problem)
+        | Ok value -> pure (Ok value)
+      })

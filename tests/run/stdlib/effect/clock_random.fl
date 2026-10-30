@@ -39,22 +39,28 @@ let main () =
   let (x, _, i, between, die, order, pick) = first
   Platform.stdout_line
     ("ranges: "
-      ++ show
-        (
-          x >= 0 && x < 1,
-          Float.is_safe_integer (Int.to_float i),
-          between >= 10 && between < 20,
-          die >= 1 && die <= 6,
-          List.sort_by compare order,
-          List.any (fun s -> s == pick) ["a", "b", "c"],
-        ))
+      ++ show (
+        x >= 0 && x < 1,
+        Float.is_safe_integer (Int.to_float i),
+        between >= 10 && between < 20,
+        die >= 1 && die <= 6,
+        List.sort_by compare order,
+        List.any (fun s -> s == pick) ["a", "b", "c"],
+      ))
   let open_die =
     Random.with_seed
       1
       (task {
-        List.map_effect
-          (fun _ -> Random.next_int_between { halfOpen = Some true } 0 2)
-          [1, 2, 3, 4, 5, 6, 7, 8]
+        List.map_effect (fun _ -> Random.next_int_between { halfOpen = Some true } 0 2) [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+        ]
       })
   Platform.stdout_line ("half open: " ++ show (List.all (fun n -> n == 0 || n == 1) open_die))
   Platform.stdout_line ("seeded: " ++ show first)

@@ -126,11 +126,9 @@ let main () =
     ()
   line
     "margin"
-    (
-      show (String.strip_margin "  |a\n  |b")
-        ++ " "
-        ++ show (String.strip_margin_with "#" " #x\n #y")
-    )
+    (show (String.strip_margin "  |a\n  |b")
+      ++ " "
+      ++ show (String.strip_margin_with "#" " #x\n #y"))
     ()
   line
     "snake"
@@ -169,9 +167,14 @@ let main () =
   match RegExp.make "(\\d+)(x)?" "g" with
   | Err e -> line "regexp" (show e) ()
   | Ok digits ->
-    line "match_first" (match RegExp.match_first digits "a12b3x" with
-      | Some m -> describe m
-      | None -> "-") ()
+    line
+      "match_first"
+      (
+        match RegExp.match_first digits "a12b3x" with
+        | Some m -> describe m
+        | None -> "-"
+      )
+      ()
     line "match_all" (String.join " " (List.map describe (RegExp.match_all digits "a12b3x"))) ()
     line "search" (num (RegExp.search digits "ab7") ++ " " ++ num (RegExp.search digits "ab")) ()
     line
@@ -190,9 +193,19 @@ let main () =
         ++ show (List.length (RegExp.match_all o "foo")))
       ()
   line "escape" (RegExp.escape "a.b*c") ()
-  line "bad pattern" (match RegExp.make "(" "" with
-    | Err _ -> "refused"
-    | Ok _ -> "accepted") ()
-  line "sticky" (match RegExp.make "a" "y" with
-    | Err (RegExp.RegExpError message) -> message
-    | Ok _ -> "accepted") ()
+  line
+    "bad pattern"
+    (
+      match RegExp.make "(" "" with
+      | Err _ -> "refused"
+      | Ok _ -> "accepted"
+    )
+    ()
+  line
+    "sticky"
+    (
+      match RegExp.make "a" "y" with
+      | Err (RegExp.RegExpError message) -> message
+      | Ok _ -> "accepted"
+    )
+    ()

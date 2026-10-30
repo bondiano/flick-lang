@@ -4,25 +4,22 @@ module Examples exposing (Example, examples)
 type alias Example = { name : String; name_ru : String; source : String }
 
 examples : List Example
-let examples =
-  [
-    {
-      name = "Hello";
-      name_ru = "Приветствие";
-      source =
-        """
+let examples = [
+  {
+    name = "Hello";
+    name_ru = "Приветствие";
+    source = """
       module Main exposing (main)
 
       main : Unit ->{; AppError} Unit
       let main () =
         Platform.stdout_line "Hello from Flick"
         """;
-    },
-    {
-      name = "Data and patterns";
-      name_ru = "Данные и образцы";
-      source =
-        """
+  },
+  {
+    name = "Data and patterns";
+    name_ru = "Данные и образцы";
+    source = """
       module Main exposing (main)
 
       type Shape = Circle Float | Rect Float Float
@@ -40,12 +37,11 @@ let examples =
         Platform.stdout_line (show shapes)
         Platform.stdout_line (show (List.map area shapes))
         """;
-    },
-    {
-      name = "Typed errors";
-      name_ru = "Типизированные ошибки";
-      source =
-        """
+  },
+  {
+    name = "Typed errors";
+    name_ru = "Типизированные ошибки";
+    source = """
       module Main exposing (main)
 
       type error NotFound = NotFound String
@@ -63,12 +59,11 @@ let examples =
           | NotFound who -> "no " ++ who
         Platform.stdout_line other
         """;
-    },
-    {
-      name = "Retry";
-      name_ru = "Повторные попытки";
-      source =
-        """
+  },
+  {
+    name = "Retry";
+    name_ru = "Повторные попытки";
+    source = """
       module Main exposing (main)
 
       type error Flaky = Flaky Float
@@ -89,12 +84,11 @@ let examples =
           | Flaky n -> "gave up at " ++ show n
         Platform.stdout_line result
         """;
-    },
-    {
-      name = "Concurrency";
-      name_ru = "Конкурентность";
-      source =
-        """
+  },
+  {
+    name = "Concurrency";
+    name_ru = "Конкурентность";
+    source = """
       module Main exposing (main)
 
       after : Float -> String -> Eff none none String
@@ -110,12 +104,11 @@ let examples =
         Platform.stdout_line (a ++ " " ++ b)
         Platform.stdout_line (race_first (after 30 "late") (after 1 "early"))
         """;
-    },
-    {
-      name = "A type error";
-      name_ru = "Ошибка типа";
-      source =
-        """
+  },
+  {
+    name = "A type error";
+    name_ru = "Ошибка типа";
+    source = """
       module Main exposing (main)
 
       total : List Float -> Float
@@ -125,5 +118,5 @@ let examples =
       let main () =
         Platform.stdout_line (total ["1", "2"])
         """;
-    },
-  ]
+  },
+]

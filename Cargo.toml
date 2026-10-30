@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["flick-core", "flick", "flick-wasm"]
+members = ["flick-core", "flick", "flick-pretty", "flick-wasm"]
 
 [workspace.package]
 edition = "2024"

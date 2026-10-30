@@ -16,8 +16,7 @@ let write path =
   | File.WriteError _ -> "write: no directory"
 
 main : Unit ->{; AppError} Unit
-let main () =
-  provide File.node {
-    Platform.stdout_line (read "/nonexistent/flick/file.txt")
-    Platform.stdout_line (write "/nonexistent/flick/file.txt")
-  }
+let main () = provide File.node {
+  Platform.stdout_line (read "/nonexistent/flick/file.txt")
+  Platform.stdout_line (write "/nonexistent/flick/file.txt")
+}

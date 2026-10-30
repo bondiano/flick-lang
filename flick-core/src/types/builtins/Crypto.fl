@@ -1,24 +1,23 @@
 /// Cryptographic randomness and digests as a service, over Effect's
 /// `Crypto`; `Crypto.system` provides it from the platform's Web Crypto.
 /// Bytes are lists of numbers from 0 to 255.
-module Crypto exposing
-  (
-    CryptoError(..),
-    DigestAlgorithm(..),
-    Crypto,
-    random_bytes,
-    digest,
-    random,
-    random_boolean,
-    random_int,
-    random_between,
-    random_int_between,
-    random_shuffle,
-    random_uuid_v4,
-    random_uuid_v7,
-    random_ulid,
-    system,
-  )
+module Crypto exposing (
+  CryptoError(..),
+  DigestAlgorithm(..),
+  Crypto,
+  random_bytes,
+  digest,
+  random,
+  random_boolean,
+  random_int,
+  random_between,
+  random_int_between,
+  random_shuffle,
+  random_uuid_v4,
+  random_uuid_v7,
+  random_ulid,
+  system,
+)
 
 /// What the platform refused: a bad size or a failed digest.
 type error CryptoError = CryptoError String
@@ -127,18 +126,16 @@ foreign effect system_random_ulid from "@flick-lang/runtime/effect/Crypto" "flic
 /// Effect's `Crypto` over the platform's Web Crypto (`globalThis.crypto`).
 system : Layer none none {Crypto}
 let system =
-  Layer.succeed
-    Crypto
-    {
-      random_bytes = system_random_bytes;
-      digest = system_digest;
-      random = system_random;
-      random_boolean = system_random_boolean;
-      random_int = system_random_int;
-      random_between = system_random_between;
-      random_int_between = system_random_int_between;
-      random_shuffle = system_random_shuffle;
-      random_uuid_v4 = system_random_uuid_v4;
-      random_uuid_v7 = system_random_uuid_v7;
-      random_ulid = system_random_ulid;
-    }
+  Layer.succeed Crypto {
+    random_bytes = system_random_bytes;
+    digest = system_digest;
+    random = system_random;
+    random_boolean = system_random_boolean;
+    random_int = system_random_int;
+    random_between = system_random_between;
+    random_int_between = system_random_int_between;
+    random_shuffle = system_random_shuffle;
+    random_uuid_v4 = system_random_uuid_v4;
+    random_uuid_v7 = system_random_uuid_v7;
+    random_ulid = system_random_ulid;
+  }

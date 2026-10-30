@@ -29,8 +29,7 @@ class Outlives (c : CaptureRow) (s : Region)
 /// Both may hold only what outlives the owner.
 spawn :
   forall s c r e a.
-  Outlives c s =>
-  Owner s -> (Failure e ->{r; none} Unit)^c -> (Eff r e a)^c ->{r; none} Fiber e a
+  Outlives c s => Owner s -> (Failure e ->{r; none} Unit)^c -> (Eff r e a)^c ->{r; none} Fiber e a
 foreign effect spawn from "@flick-lang/runtime" "fiberSpawn"
   retention owner
 

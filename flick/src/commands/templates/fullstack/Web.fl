@@ -38,19 +38,17 @@ let send =
 
 list_view : Ui.View (Atom.Atom (Atom.Async (List Todo) {Rpc.ClientError}))
 let list_view =
-  Ui.awaiting
-    (fun _ -> Ui.text "cannot reach the server")
-    (Ui.text "loading")
-    (fun items -> Ui.fragment (List.map (fun item -> Ui.paragraph [Ui.text item.title]) items))
+  Ui.awaiting (fun _ -> Ui.text "cannot reach the server") (Ui.text "loading") (fun items ->
+    Ui.fragment (List.map (fun item -> Ui.paragraph [Ui.text item.title]) items)
+  )
 
 page : Ui
 let page =
-  Ui.fragment
-    [
-      Form.input new_todo NewTodo.fields.title "New todo" None,
-      Ui.button { disabled = false; on_click = send } [Ui.text "Add"],
-      Ui.render list_view todos,
-    ]
+  Ui.fragment [
+    Form.input new_todo NewTodo.fields.title "New todo" None,
+    Ui.button { disabled = false; on_click = send } [Ui.text "Add"],
+    Ui.render list_view todos,
+  ]
 
 main : Unit ->{; AppError} Unit
 let main () =

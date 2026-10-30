@@ -20,11 +20,9 @@ let main () =
   Platform.stdout_line (line (Seq.take 10 fibs) ++ " " ++ line (Seq.unfold halve 40))
   Platform.stdout_line (line (Seq.take 4 (Seq.iterate (fun x -> x * 3) 1)))
   Platform.stdout_line
-    (
-      line (Seq.take 7 (Seq.cycle [1, 2, 3]))
-        ++ " "
-        ++ line (Seq.take 3 (Seq.cycle ([] : List Int)))
-    )
+    (line (Seq.take 7 (Seq.cycle [1, 2, 3]))
+      ++ " "
+      ++ line (Seq.take 3 (Seq.cycle ([] : List Int))))
   Platform.stdout_line (line (Seq.take 3 (Seq.repeat "x")) ++ " " ++ line (Seq.singleton 9))
   Platform.stdout_line (line (Seq.range_by 10 0 (-3)) ++ " " ++ line (Seq.range_by 0 10 4))
   Platform.stdout_line (line (Seq.range_by 0 5 0) ++ " " ++ line (Seq.range 3 3))
@@ -49,11 +47,9 @@ let main () =
   Platform.stdout_line
     (line (Seq.windows 3 (Seq.range 0 5)) ++ " " ++ line (Seq.windows 9 (Seq.range 0 5)))
   Platform.stdout_line
-    (
-      show (Seq.find (fun n -> n * n > 50) naturals)
-        ++ " "
-        ++ show (Seq.first (Seq.empty : Seq Int))
-    )
+    (show (Seq.find (fun n -> n * n > 50) naturals)
+      ++ " "
+      ++ show (Seq.first (Seq.empty : Seq Int)))
   Platform.stdout_line (show (Seq.first (Seq.filter (fun n -> n % 7 == 0) naturals)))
   Platform.stdout_line
     (show (Seq.any (fun n -> n > 1000) naturals) ++ " " ++ show (Seq.all (fun n -> n < 5) naturals))

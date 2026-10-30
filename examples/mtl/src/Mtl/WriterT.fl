@@ -22,21 +22,23 @@ instance (Monoid w, Applicative m) => Applicative (WriterT w m) =
   pure : forall c a. a^c -> (WriterT w m a)^c
   let pure value = WriterT (pure (value, empty))
   map2 :
-    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-      ((WriterT w m a)^d -> ((WriterT w m b)^d -> (WriterT w m x)^(c + d))^(c + d))^c
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((WriterT w m a)^d -> ((WriterT w m b)^d -> (WriterT w m x)^(c + d))^(c + d))^c
   let map2 f (WriterT left) (WriterT right) =
     WriterT (map2 (fun (a, prefix) (b, suffix) -> (f a b, combine prefix suffix)) left right)
 
 instance (Monoid w, Monad m) => Monad (WriterT w m) =
   flat_map :
-    forall c d a b. (forall v. a^v -> (WriterT w m b)^(c + v))^c ->
-      ((WriterT w m a)^d -> (WriterT w m b)^(c + d))^c
+    forall c d a b.
+    (forall v. a^v -> (WriterT w m b)^(c + v))^c -> ((WriterT w m a)^d -> (WriterT w m b)^(c + d))^c
   let flat_map f (WriterT action) =
-    WriterT (do {
-      (value, prefix) <- action
-      (next, suffix) <- run (f value)
-      pure (next, combine prefix suffix)
-    })
+    WriterT
+      (do {
+        (value, prefix) <- action
+        (next, suffix) <- run (f value)
+        pure (next, combine prefix suffix)
+      })
 
 instance Monoid w => MonadTrans (WriterT w) =
   lift : forall c m a. Monad m => (m a)^c -> (WriterT w m a)^c
@@ -53,8 +55,8 @@ instance (Monoid w, MonadState m s) => MonadState (WriterT w m) s =
 instance (Monoid w, MonadReader m r) => MonadReader (WriterT w m) r =
   ask : WriterT w m r
   let ask = lift ask
-  local : forall c d a. (forall v. r^v -> r^(c + v))^c ->
-    ((WriterT w m a)^d -> (WriterT w m a)^(c + d))^c
+  local :
+    forall c d a. (forall v. r^v -> r^(c + v))^c -> ((WriterT w m a)^d -> (WriterT w m a)^(c + d))^c
   let local update (WriterT action) = WriterT (local update action)
   reader : forall c a. (forall v. r^v -> a)^c -> (WriterT w m a)^c
   let reader project = lift (reader project)
@@ -76,7 +78,8 @@ instance (Monoid w, Monad m) => MonadWriter (WriterT w m) w =
 instance (Monoid w, MonadError m e) => MonadError (WriterT w m) e =
   throw_error : forall c a. e^c -> (WriterT w m a)^c
   let throw_error problem = lift (throw_error problem)
-  catch_error : forall c d a. (forall v. e^v -> (WriterT w m a)^(c + v))^c ->
-    ((WriterT w m a)^d -> (WriterT w m a)^(c + d))^c
+  catch_error :
+    forall c d a.
+    (forall v. e^v -> (WriterT w m a)^(c + v))^c -> ((WriterT w m a)^d -> (WriterT w m a)^(c + d))^c
   let catch_error handle (WriterT action) =
     WriterT (catch_error (fun problem -> run (handle problem)) action)

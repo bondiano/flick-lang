@@ -231,10 +231,9 @@ type alias ActionContext = { commandPath : List String; version : String }
 
 /// The switch `--<name>` of this command and its subcommands, with its help
 /// text: given, it runs `act` instead of any handler, like `--version`.
-action : forall c r e o. String ->
-  String ->
-  (ActionContext ->{} Unit)^c ->
-  ((Spec r e o)^c -> (Spec r e o)^c)^c
+action :
+  forall c r e o.
+  String -> String -> (ActionContext ->{} Unit)^c -> ((Spec r e o)^c -> (Spec r e o)^c)^c
 foreign pure action from "@flick-lang/runtime/cli" "specAction"
   arity 4
   retention call
@@ -272,8 +271,7 @@ foreign pure subcommand from "@flick-lang/runtime/cli" "specSubcommand"
 
 /// The command, running `handler` with the parsed options.
 handle :
-  forall c r e o r2 e2.
-  (o ->{r2; e2} Unit)^c -> ((Spec r e o)^c -> (Command (r + r2) (e + e2))^c)^c
+  forall c r e o r2 e2. (o ->{r2; e2} Unit)^c -> ((Spec r e o)^c -> (Command (r + r2) (e + e2))^c)^c
 foreign pure handle from "@flick-lang/runtime/cli" "specHandle"
   arity 2
   retention call
@@ -287,22 +285,30 @@ foreign pure group from "@flick-lang/runtime/cli" "specGroup"
   reviewed "effect@4.0.5 sha256:ccc0103e6db4f51a"
 
 /// A flag in help: `type_` names its value, empty for a switch.
-type alias FlagDoc =
-  {
-    name : String;
-    aliases : List String;
-    type_ : String;
-    description : Option String;
-    required : Bool;
-  }
+type alias FlagDoc = {
+  name : String;
+  aliases : List String;
+  type_ : String;
+  description : Option String;
+  required : Bool;
+}
 
 /// A positional argument in help.
-type alias ArgDoc =
-  { name : String; type_ : String; description : Option String; required : Bool; variadic : Bool }
+type alias ArgDoc = {
+  name : String;
+  type_ : String;
+  description : Option String;
+  required : Bool;
+  variadic : Bool;
+}
 
 /// A subcommand in its parent's help.
-type alias SubcommandDoc =
-  { name : String; alias : Option String; shortDescription : Option String; description : String }
+type alias SubcommandDoc = {
+  name : String;
+  alias : Option String;
+  shortDescription : Option String;
+  description : String;
+}
 
 /// Subcommands listed together, under `group` if it has a name.
 type alias SubcommandGroupDoc = {
@@ -314,16 +320,15 @@ type alias SubcommandGroupDoc = {
 type alias ExampleDoc = { command : String; description : Option String }
 
 /// What `--help` shows of a command, before a `Formatter` renders it.
-type alias HelpDoc =
-  {
-    description : String;
-    usage : String;
-    flags : List FlagDoc;
-    globalFlags : List FlagDoc;
-    args : List ArgDoc;
-    subcommands : List SubcommandGroupDoc;
-    examples : List ExampleDoc;
-  }
+type alias HelpDoc = {
+  description : String;
+  usage : String;
+  flags : List FlagDoc;
+  globalFlags : List FlagDoc;
+  args : List ArgDoc;
+  subcommands : List SubcommandGroupDoc;
+  examples : List ExampleDoc;
+}
 
 /// How `--help` and `--version` (the command's name, then the version) print.
 type alias Formatter = {

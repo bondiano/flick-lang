@@ -21,8 +21,7 @@ foreign effect sleep from "@flick-lang/runtime/effect/Effect" "sleep"
 /// which gets the error, recurs; then fails with the last error. A defect
 /// or an interruption is never retried.
 retry :
-  forall c r e a r2 e2 o.
-  Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{r + r2; e + e2} a
+  forall c r e a r2 e2 o. Schedule.Schedule r2 e2 (Errors e) o -> (Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect retry from "@flick-lang/runtime/effect/Effect" "retry"
   arity 1
   retention call
@@ -34,7 +33,8 @@ retry_or_else :
   forall c r e a r2 e2 o r3 e3.
   Schedule.Schedule r2 e2 (Errors e) o ->
   (Errors e -> o ->{r3; e3} a) ->
-  (Eff r e a)^c ->{r + r2 + r3; e2 + e3} a
+  (Eff r e a)^c ->{r + r2 + r3; e2 + e3}
+  a
 foreign effect retry_or_else from "@flick-lang/runtime/effect/Effect" "retryOrElse"
   arity 2
   retention call
@@ -43,9 +43,7 @@ foreign effect retry_or_else from "@flick-lang/runtime/effect/Effect" "retryOrEl
 /// Runs `task`, then again as long as the schedule, which gets each
 /// result, recurs; the schedule's last output. The first typed failure
 /// stops it.
-repeat :
-  forall c r e a r2 e2 o.
-  Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{r + r2; e + e2} o
+repeat : forall c r e a r2 e2 o. Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{r + r2; e + e2} o
 foreign effect repeat from "@flick-lang/runtime/effect/Effect" "repeat"
   arity 1
   retention call
@@ -57,7 +55,8 @@ repeat_or_else :
   forall c r e a r2 e2 o r3 e3.
   Schedule.Schedule r2 e2 a o ->
   (Errors (e + e2) -> Option (Schedule.Metadata o a) ->{r3; e3} o) ->
-  (Eff r e a)^c ->{r + r2 + r3; e3} o
+  (Eff r e a)^c ->{r + r2 + r3; e3}
+  o
 foreign effect repeat_or_else from "@flick-lang/runtime/effect/Effect" "repeatOrElse"
   arity 2
   retention call
@@ -66,8 +65,7 @@ foreign effect repeat_or_else from "@flick-lang/runtime/effect/Effect" "repeatOr
 /// Runs `task` by the schedule, which gets no input, delaying before each
 /// run after the first; the schedule's last output.
 schedule :
-  forall c r e a r2 e2 i o.
-  Schedule.Schedule r2 e2 i o -> (Eff r e a)^c ->{r + r2; e + e2} o
+  forall c r e a r2 e2 i o. Schedule.Schedule r2 e2 i o -> (Eff r e a)^c ->{r + r2; e + e2} o
 foreign effect schedule from "@flick-lang/runtime/effect/Effect" "schedule"
   arity 1
   retention call
@@ -75,8 +73,7 @@ foreign effect schedule from "@flick-lang/runtime/effect/Effect" "schedule"
 
 /// `repeat` with `initial` as the schedule's first input.
 schedule_from :
-  forall c r e a r2 e2 o.
-  a -> Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{r + r2; e + e2} o
+  forall c r e a r2 e2 o. a -> Schedule.Schedule r2 e2 a o -> (Eff r e a)^c ->{r + r2; e + e2} o
 foreign effect schedule_from from "@flick-lang/runtime/effect/Effect" "scheduleFrom"
   arity 2
   retention call
@@ -128,8 +125,7 @@ foreign effect zip from "@flick-lang/runtime/effect/Effect" "zip"
 
 /// Runs `task`, then `other`, and combines their results with `f`.
 zip_with :
-  forall c r e a r2 e2 b d.
-  (Eff r2 e2 b)^c -> (a -> b -> d)^c -> (Eff r e a)^c ->{r + r2; e + e2} d
+  forall c r e a r2 e2 b d. (Eff r2 e2 b)^c -> (a -> b -> d)^c -> (Eff r e a)^c ->{r + r2; e + e2} d
 foreign effect zip_with from "@flick-lang/runtime/effect/Effect" "zipWith"
   arity 2
   retention call
@@ -151,8 +147,7 @@ foreign effect timed from "@flick-lang/runtime/effect/Effect" "timed"
 /// Runs `fallback` instead when `task` does not end within the duration;
 /// `task` is interrupted.
 timeout_or_else :
-  forall c r e a r2 e2.
-  Duration.Duration -> (Eff r2 e2 a)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
+  forall c r e a r2 e2. Duration.Duration -> (Eff r2 e2 a)^c -> (Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect timeout_or_else from "@flick-lang/runtime/effect/Effect" "flickTimeoutOrElse"
   arity 2
   retention call
@@ -178,8 +173,7 @@ foreign pure replicate from "@flick-lang/runtime/effect/Effect" "replicate"
 
 /// Runs `task` `n` times, as many at once as `concurrency` lets; the
 /// results in order.
-replicate_effect :
-  forall c r e a. Concurrency -> Int -> (Eff r e a)^c ->{r; e} List a
+replicate_effect : forall c r e a. Concurrency -> Int -> (Eff r e a)^c ->{r; e} List a
 foreign effect replicate_effect from "@flick-lang/runtime/effect/Effect" "flickReplicateEffect"
   arity 2
   retention call

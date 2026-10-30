@@ -22,17 +22,13 @@ let unexpected failure = Platform.stdout_line "unexpected failure"
 /// How awaiting `d` ends.
 outcome : Deferred.Deferred {Boom} Float ->{} String
 let outcome d =
-  try
-    "ok " ++ show (Deferred.await_ d)
-  with
+  try "ok " ++ show (Deferred.await_ d) with
   | Boom n -> "boom " ++ show n
 
 /// How the task `Deferred.poll` gives ends.
 outcome_of : Eff none {Boom} Float ->{} String
 let outcome_of t =
-  try
-    show (await t)
-  with
+  try show (await t) with
   | Boom n -> "boom " ++ show n
 
 /// A fresh deferred completed by `complete`, and how awaiting it ends.
@@ -63,20 +59,25 @@ let deferreds () =
     (fun exit -> Platform.stdout_line ("done: " ++ completed (Deferred.done exit)))
     exits
   let failures = List.filter_map Exit.failure exits
-  List.each_effect (fun failure ->
-    Platform.stdout_line ("fail_cause: " ++ completed (Deferred.fail_cause failure))
-    Platform.stdout_line
-      ("fail_cause_sync: " ++ completed (Deferred.fail_cause_sync (fun () -> failure)))) failures
+  List.each_effect
+    (fun failure ->
+      Platform.stdout_line ("fail_cause: " ++ completed (Deferred.fail_cause failure))
+      Platform.stdout_line
+        ("fail_cause_sync: " ++ completed (Deferred.fail_cause_sync (fun () -> failure)))
+    )
+    failures
   let into : Deferred.Deferred {Boom} Float = Deferred.make ()
   let fed = task { 8 } |> Deferred.into into
   Platform.stdout_line ("into: " ++ show fed ++ " " ++ outcome into)
   let pending : Deferred.Deferred {Boom} Float = Deferred.make ()
-  let polled = match Deferred.poll pending with
+  let polled =
+    match Deferred.poll pending with
     | None -> "none"
     | Some _ -> "some"
   Platform.stdout_line ("poll: " ++ polled ++ ", done " ++ show (Deferred.is_done pending))
   let _ = Deferred.succeed 9 pending
-  let later = match Deferred.poll pending with
+  let later =
+    match Deferred.poll pending with
     | None -> "none"
     | Some t -> "some " ++ outcome_of t
   Platform.stdout_line ("poll: " ++ later ++ ", done " ++ show (Deferred.is_done pending))
@@ -106,16 +107,20 @@ let latches () =
   note : String ->{} Unit
   let note s = Ref.update log (fun xs -> xs ++ [s])
   scope s {
-    let child = Fiber.spawn s unexpected (task {
-      Latch.await_ latch
-      Effect.sleep pause
-      note "released"
-      task {
-        Effect.sleep pause
-        note "through"
-      }
-      |> Latch.when_open latch
-    })
+    let child =
+      Fiber.spawn
+        s
+        unexpected
+        (task {
+          Latch.await_ latch
+          Effect.sleep pause
+          note "released"
+          task {
+            Effect.sleep pause
+            note "through"
+          }
+          |> Latch.when_open latch
+        })
     Effect.sleep tick
     note ("open " ++ show (Latch.is_open latch))
     note ("release " ++ show (Latch.release latch))

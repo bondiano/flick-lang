@@ -37,15 +37,16 @@ let values () =
     ("from_chunk: " ++ show (Channel.run_collect (Channel.from_chunk (Chunk.from_list ["a", "b"]))))
   say
     ("succeed, sync: "
-      ++ show
-        (Channel.run_collect (Channel.succeed 1), Channel.run_collect (Channel.sync (fun () -> 2))))
+      ++ show (
+        Channel.run_collect (Channel.succeed 1),
+        Channel.run_collect (Channel.sync (fun () -> 2)),
+      ))
   say
     ("end, end_sync: "
-      ++ show
-        (
-          Channel.run_drain (Channel.end "done"),
-          Channel.run_drain (Channel.end_sync (fun () -> "later")),
-        ))
+      ++ show (
+        Channel.run_drain (Channel.end "done"),
+        Channel.run_drain (Channel.end_sync (fun () -> "later")),
+      ))
   say
     ("empty: "
       ++ show (Channel.run_count Channel.empty)
@@ -63,10 +64,8 @@ let values () =
   let lazy = Channel.suspend (fun () -> Channel.from_list [3])
   say ("suspend: " ++ show (Channel.run_collect lazy))
   say
-    (
-      "unwrap: "
-        ++ show (Channel.run_collect (Channel.unwrap (task { Channel.from_list ["built"] })))
-    )
+    ("unwrap: "
+      ++ show (Channel.run_collect (Channel.unwrap (task { Channel.from_list ["built"] }))))
   let echoed = Channel.from_list [1, 2] |> Channel.pipe_to (Channel.identity ())
   say ("identity: " ++ show (Channel.run_collect echoed))
   say ("from_schedule: " ++ show (Channel.run_collect (Channel.from_schedule (Schedule.recurs 2))))
@@ -83,9 +82,7 @@ let queues () =
   let _ = Queue.offer 1 failed
   let _ = Queue.fail (Boom "queue") failed
   let outcome =
-    try
-      show (Channel.run_collect (Channel.from_queue failed))
-    with
+    try show (Channel.run_collect (Channel.from_queue failed)) with
     | Boom why -> "failed: " ++ why
   say ("from_queue failing: " ++ outcome)
   let hub : PubSub.PubSub Float = PubSub.unbounded { replay = Some 2 }
@@ -105,9 +102,9 @@ let queues () =
   let fed = Channel.callback { bufferSize = None; strategy = None } (fun queue -> feed [1, 2] queue)
   say ("callback: " ++ show (Channel.run_collect fed))
   let fed_chunks =
-    Channel.callback_array
-      { bufferSize = Some 8; strategy = Some Queue.Sliding }
-      (fun queue -> feed [3, 4] queue)
+    Channel.callback_array { bufferSize = Some 8; strategy = Some Queue.Sliding } (fun queue ->
+      feed [3, 4] queue
+    )
   say ("callback_array: " ++ show (lists fed_chunks))
 
 resources : Unit ->{; Boom} Unit
@@ -123,15 +120,19 @@ let resources () =
       (task { 10 })
       (fun n -> Channel.from_list [n, n + 1] |> Channel.map_done (fun _ -> "ok"))
       (fun n exit ->
-        Ref.set log (Ref.get log ++ ["used " ++ show n ++ " " ++ show (Exit.value exit)]))
+        Ref.set log (Ref.get log ++ ["used " ++ show n ++ " " ++ show (Exit.value exit)])
+      )
   say ("acquire_use_release: " ++ show (Channel.run_collect used) ++ " " ++ show (Ref.get log))
 
 js : Unit ->{; Boom} Unit
 let js () =
   let stream = readable ["x", "y"]
   let web =
-    Channel.from_readable_stream
-      { evaluate = fun () -> stream; onError = boom; releaseLockOnEnd = true }
+    Channel.from_readable_stream {
+      evaluate = fun () -> stream;
+      onError = boom;
+      releaseLockOnEnd = true;
+    }
   say ("from_readable_stream: " ++ show (lists web))
   let iterated = Channel.from_async_iterable (async_iterable [1, 2] "end") boom
   say ("from_async_iterable: " ++ show (Channel.run_collect iterated))
@@ -145,13 +146,12 @@ let js () =
   let shouted =
     Channel.from_list_chunked 1 ["a", "b"]
     |> Channel.pipe_to_or_fail
-      (Channel.from_transform_stream
-        {
-          evaluate = fun () -> transform;
-          onError = boom;
-          closeOnDone = true;
-          releaseLockOnEnd = true;
-        })
+      (Channel.from_transform_stream {
+        evaluate = fun () -> transform;
+        onError = boom;
+        closeOnDone = true;
+        releaseLockOnEnd = true;
+      })
   say ("from_transform_stream: " ++ show (lists shouted))
 
 main : Unit ->{; AppError} Unit

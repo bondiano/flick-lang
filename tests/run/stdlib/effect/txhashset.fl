@@ -13,68 +13,80 @@ let main () =
   let b : Names = TxHashSet.from_iterable EqHash.canonical ["bob", "cid"]
   let c : Names = TxHashSet.from_hash_set (HashSet.from_list EqHash.canonical ["bob"])
   let e : Names = TxHashSet.empty EqHash.canonical
-  let basics = Tx.atomically (task {
-      TxHashSet.add "dan" a
-      let removed = TxHashSet.remove "dan" a
-      let missing = TxHashSet.remove "zed" a
-      (
-        removed,
-        missing,
-        TxHashSet.has "ann" a,
-        TxHashSet.size a,
-        TxHashSet.is_empty e,
-        TxHashSet.is_non_empty a,
-      )
-    })
+  let basics =
+    Tx.atomically
+      (task {
+        TxHashSet.add "dan" a
+        let removed = TxHashSet.remove "dan" a
+        let missing = TxHashSet.remove "zed" a
+        (
+          removed,
+          missing,
+          TxHashSet.has "ann" a,
+          TxHashSet.size a,
+          TxHashSet.is_empty e,
+          TxHashSet.is_non_empty a,
+        )
+      })
   Platform.stdout_line ("basics: " ++ show basics)
-  let algebra = Tx.atomically (task {
-      let u = TxHashSet.union b a
-      let i = TxHashSet.intersection b a
-      let d = TxHashSet.difference b a
-      (elements u, elements i, elements d, TxHashSet.is_subset a c, TxHashSet.is_subset c a)
-    })
+  let algebra =
+    Tx.atomically
+      (task {
+        let u = TxHashSet.union b a
+        let i = TxHashSet.intersection b a
+        let d = TxHashSet.difference b a
+        (elements u, elements i, elements d, TxHashSet.is_subset a c, TxHashSet.is_subset c a)
+      })
   Platform.stdout_line ("union, intersection, difference, subset: " ++ show algebra)
-  let derived = Tx.atomically (task {
-      let lengths = TxHashSet.map EqHash.canonical String.length a
-      let short = TxHashSet.filter (fun s -> s != "ann") a
-      let total = TxHashSet.reduce 0 (fun acc s -> acc + String.length s) a
-      (
-        List.sort (HashSet.to_list (TxHashSet.to_hash_set lengths)),
-        elements short,
-        total,
-        TxHashSet.some (fun s -> s == "bob") a,
-        TxHashSet.every (fun s -> String.length s == 3) a,
-      )
-    })
+  let derived =
+    Tx.atomically
+      (task {
+        let lengths = TxHashSet.map EqHash.canonical String.length a
+        let short = TxHashSet.filter (fun s -> s != "ann") a
+        let total = TxHashSet.reduce 0 (fun acc s -> acc + String.length s) a
+        (
+          List.sort (HashSet.to_list (TxHashSet.to_hash_set lengths)),
+          elements short,
+          total,
+          TxHashSet.some (fun s -> s == "bob") a,
+          TxHashSet.every (fun s -> String.length s == 3) a,
+        )
+      })
   Platform.stdout_line ("map, filter, reduce, some, every: " ++ show derived)
   Tx.atomically (task { TxHashSet.clear a })
   Platform.stdout_line ("cleared: " ++ show (Tx.atomically (task { elements a })))
   let q = TxPriorityQueue.from_iterable [5, 1, 4]
   let made = TxPriorityQueue.make [9, 8]
   let empty : TxPriorityQueue.TxPriorityQueue Float = TxPriorityQueue.empty ()
-  let ordered = Tx.atomically (task {
-      TxPriorityQueue.offer 3 q
-      TxPriorityQueue.offer_all [2, 6] q
-      let least = TxPriorityQueue.peek q
-      let least_option = TxPriorityQueue.peek_option q
-      let first = TxPriorityQueue.take q
-      let next = TxPriorityQueue.take_option q
-      let up_to = TxPriorityQueue.take_up_to 2 q
-      (least, least_option, first, next, up_to, TxPriorityQueue.to_array q)
-    })
+  let ordered =
+    Tx.atomically
+      (task {
+        TxPriorityQueue.offer 3 q
+        TxPriorityQueue.offer_all [2, 6] q
+        let least = TxPriorityQueue.peek q
+        let least_option = TxPriorityQueue.peek_option q
+        let first = TxPriorityQueue.take q
+        let next = TxPriorityQueue.take_option q
+        let up_to = TxPriorityQueue.take_up_to 2 q
+        (least, least_option, first, next, up_to, TxPriorityQueue.to_array q)
+      })
   Platform.stdout_line ("ordered: " ++ show ordered)
-  let filtered = Tx.atomically (task {
-      TxPriorityQueue.offer_all [7, 10, 11] q
-      TxPriorityQueue.remove_if (fun x -> x == 10) q
-      TxPriorityQueue.retain_if (fun x -> x > 5) q
-      (TxPriorityQueue.size q, TxPriorityQueue.take_all q, TxPriorityQueue.is_empty q)
-    })
+  let filtered =
+    Tx.atomically
+      (task {
+        TxPriorityQueue.offer_all [7, 10, 11] q
+        TxPriorityQueue.remove_if (fun x -> x == 10) q
+        TxPriorityQueue.retain_if (fun x -> x > 5) q
+        (TxPriorityQueue.size q, TxPriorityQueue.take_all q, TxPriorityQueue.is_empty q)
+      })
   Platform.stdout_line ("filtered: " ++ show filtered)
-  let others = Tx.atomically (task {
-      (
-        TxPriorityQueue.take_all made,
-        TxPriorityQueue.is_non_empty empty,
-        TxPriorityQueue.take_option empty,
-      )
-    })
+  let others =
+    Tx.atomically
+      (task {
+        (
+          TxPriorityQueue.take_all made,
+          TxPriorityQueue.is_non_empty empty,
+          TxPriorityQueue.take_option empty,
+        )
+      })
   Platform.stdout_line ("make, empty: " ++ show others)

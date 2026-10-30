@@ -29,29 +29,26 @@ let main () =
   let name = Atom.task (task { Deferred.await_ name_gate })
   let offline = Atom.task (task { Deferred.await_ offline_gate })
   let name_view =
-    Ui.awaiting
-      (fun _ -> ui { text "[failed]" })
-      (ui { text "[waiting]" })
-      (fun n -> ui { text ("[" ++ n ++ "]") })
+    Ui.awaiting (fun _ -> ui { text "[failed]" }) (ui { text "[waiting]" }) (fun n -> ui {
+      text ("[" ++ n ++ "]")
+    })
   let offline_view =
-    Ui.awaiting
-      (fun _ -> ui { text "[offline]" })
-      (ui { text "[waiting]" })
-      (fun n -> ui { text ("[" ++ n ++ "]") })
+    Ui.awaiting (fun _ -> ui { text "[offline]" }) (ui { text "[waiting]" }) (fun n -> ui {
+      text ("[" ++ n ++ "]")
+    })
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
-  | Some root ->
-    provide Atom.layer {
-      scope s {
-        let app = ui { fragment [Ui.render name_view name, Ui.render offline_view offline] }
-        let _mounted = Fiber.spawn s report (task { Ui.Dom.mount root report app })
-        settle ()
-        Platform.stdout_line (text ())
-        let _ = Deferred.complete_with (task { "ada" }) name_gate
-        settle ()
-        Platform.stdout_line (text ())
-        let _ = Deferred.complete_with (task { from_result (Err Offline) }) offline_gate
-        settle ()
-        Platform.stdout_line (text ())
-      }
+  | Some root -> provide Atom.layer {
+    scope s {
+      let app = ui { fragment [Ui.render name_view name, Ui.render offline_view offline] }
+      let _mounted = Fiber.spawn s report (task { Ui.Dom.mount root report app })
+      settle ()
+      Platform.stdout_line (text ())
+      let _ = Deferred.complete_with (task { "ada" }) name_gate
+      settle ()
+      Platform.stdout_line (text ())
+      let _ = Deferred.complete_with (task { from_result (Err Offline) }) offline_gate
+      settle ()
+      Platform.stdout_line (text ())
     }
+  }

@@ -19,7 +19,10 @@ func F_App__sum(t1, t2 flickrt.Value) flickrt.Value {
 		if flickrt.Bool((l_i <= float64(0e0))) {
 			return l_acc
 		} else {
-			t3, t4 = flickrt.SubFloat(l_i, float64(1e0)), flickrt.AddFloat(l_acc, flickrt.MulFloat(l_i, float64(5e-1)))
+			t3, t4 = flickrt.SubFloat(l_i, float64(1e0)), flickrt.AddFloat(
+				l_acc,
+				flickrt.MulFloat(l_i, float64(5e-1)),
+			)
 			continue
 		}
 	}
@@ -30,5 +33,4 @@ func F_App__main(fb *flickrt.Fiber, _ flickrt.Value) flickrt.Value {
 	return F_Platform__stdout_line(fb, flickrt.Apply(t5, F_App__sum(float64(1e1), float64(0e0))))
 }
 
-func init_App() {
-}
+func init_App() {}

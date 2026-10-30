@@ -40,11 +40,10 @@ user_id : String -> UserId
 let user_id raw = raw
 
 to_view : User -> UserView
-let to_view user =
-  {
-    id = user.id;
-    title = String.trim user.name;
-  }
+let to_view user = {
+  id = user.id;
+  title = String.trim user.name;
+}
 
 load_view : UserId ->{Users, Log; NotFound} UserView
 let load_view id =

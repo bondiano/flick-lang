@@ -29,77 +29,95 @@ let record log entry = Ref.set log (Ref.get log ++ [entry])
 
 main : Unit ->{; AppError} Unit
 let main () =
-  line
-    ("catch", (Stream.run_collect (Stream.catch (fun (Boom n) -> Stream.succeed (n * 10)) failing)))
-  line
+  line (
+    "catch",
+    (Stream.run_collect (Stream.catch (fun (Boom n) -> Stream.succeed (n * 10)) failing)),
+  )
+  line (
+    "catch_if",
     (
-      "catch_if",
-      (try Stream.run_collect
-        (
-          Stream.catch_if (fun (Boom n) -> n == 3) (fun _ -> Stream.succeed 0) failing
-        ) with | Boom _ ->
-        []),
-    )
+      try
+        Stream.run_collect
+          (Stream.catch_if (fun (Boom n) -> n == 3) (fun _ -> Stream.succeed 0) failing)
+      with
+      | Boom _ -> []
+    ),
+  )
   let filtered : Stream.Stream none {Bang} Float =
     Stream.catch_filter
       (fun (Boom n) -> if n > 5 then Err Bang else Ok n)
       (fun n -> Stream.succeed (0 - n))
       failing
-  line ("catch_filter", (try Stream.run_collect filtered with | Bang -> [99]))
-  line
+  line (
+    "catch_filter",
     (
-      "catch_cause",
-      (Stream.run_collect
-        (Stream.catch_cause
-          (fun failure -> Stream.succeed (if is_boom failure then 1 else 0))
-          failing)),
-    )
-  line
+      try Stream.run_collect filtered with
+      | Bang -> [99]
+    ),
+  )
+  line (
+    "catch_cause",
+    (Stream.run_collect
+      (Stream.catch_cause
+        (fun failure -> Stream.succeed (if is_boom failure then 1 else 0))
+        failing)),
+  )
+  line (
+    "catch_cause on a defect",
+    (Stream.run_collect (Stream.catch_cause (fun _ -> Stream.succeed 7) dying)),
+  )
+  line (
+    "catch_cause_if",
     (
-      "catch_cause on a defect",
-      (Stream.run_collect (Stream.catch_cause (fun _ -> Stream.succeed 7) dying)),
-    )
-  line
-    (
-      "catch_cause_if",
-      (try Stream.run_collect
-        (Stream.catch_cause_if is_boom (fun _ -> Stream.succeed 5) failing) with | Boom _ ->
-        []),
-    )
+      try
+        Stream.run_collect (Stream.catch_cause_if is_boom (fun _ -> Stream.succeed 5) failing)
+      with
+      | Boom _ -> []
+    ),
+  )
   let selected : Stream.Stream none {Boom} Float =
     Stream.catch_cause_filter
       (fun failure -> if is_boom failure then Ok 4 else Err failure)
       (fun n _ -> Stream.succeed n)
       failing
-  line ("catch_cause_filter", (try Stream.run_collect selected with | Boom _ -> [0]))
-  line
-    ("catch_defect", (Stream.run_collect (Stream.catch_defect (fun _ -> Stream.succeed 8) dying)))
+  line (
+    "catch_cause_filter",
+    (
+      try Stream.run_collect selected with
+      | Boom _ -> [0]
+    ),
+  )
+  line (
+    "catch_defect",
+    (Stream.run_collect (Stream.catch_defect (fun _ -> Stream.succeed 8) dying)),
+  )
   let log : Ref (List String) = Ref.make []
   let _ =
-    try Stream.run_drain
-      (Stream.tap_error (fun (Boom n) -> record log ("error " ++ show n)) failing) with | Boom _ ->
-      ()
+    try
+      Stream.run_drain (Stream.tap_error (fun (Boom n) -> record log ("error " ++ show n)) failing)
+    with
+    | Boom _ -> ()
   let _ =
-    try Stream.run_drain (Stream.tap_cause (fun _ -> record log "cause") failing) with | Boom _ ->
-      ()
+    try Stream.run_drain (Stream.tap_cause (fun _ -> record log "cause") failing) with
+    | Boom _ -> ()
   let _ =
     Stream.run_collect
       (Stream.catch_defect
         (fun _ -> Stream.empty)
         (Stream.tap_defect (fun _ -> record log "defect") dying))
   Platform.stdout_line ("taps: " ++ show (Ref.get log))
-  line
-    (
-      "or_else_if_empty",
-      (Stream.run_collect (Stream.or_else_if_empty (Stream.succeed 9) Stream.empty)),
-    )
-  line
-    (
-      "or_else_if_empty full",
-      (Stream.run_collect (Stream.or_else_if_empty (Stream.succeed 9) (Stream.succeed 1))),
-    )
-  line
-    ("or_else_succeed", (Stream.run_collect (Stream.or_else_succeed (fun (Boom n) -> n) failing)))
+  line (
+    "or_else_if_empty",
+    (Stream.run_collect (Stream.or_else_if_empty (Stream.succeed 9) Stream.empty)),
+  )
+  line (
+    "or_else_if_empty full",
+    (Stream.run_collect (Stream.or_else_if_empty (Stream.succeed 9) (Stream.succeed 1))),
+  )
+  line (
+    "or_else_succeed",
+    (Stream.run_collect (Stream.or_else_succeed (fun (Boom n) -> n) failing)),
+  )
   line ("ignore_", (Stream.run_collect (Stream.ignore_ failing)))
   line ("ignore_cause", (Stream.run_collect (Stream.ignore_cause dying)))
   let died =
@@ -107,12 +125,21 @@ let main () =
   line ("or_die", died)
   let attempts = Ref.make 0
   let flaky =
-    Stream.from_effect (task {
-      Ref.set attempts (Ref.get attempts + 1)
-      if Ref.get attempts < 3 then from_result (Err (Boom (Ref.get attempts))) else Ref.get attempts
-    })
-  line
-    ("retry", (try Stream.run_collect (Stream.retry (Schedule.recurs 5) flaky) with | Boom _ -> []))
+    Stream.from_effect
+      (task {
+        Ref.set attempts (Ref.get attempts + 1)
+        if Ref.get attempts < 3 then
+          from_result (Err (Boom (Ref.get attempts)))
+        else
+          Ref.get attempts
+      })
+  line (
+    "retry",
+    (
+      try Stream.run_collect (Stream.retry (Schedule.recurs 5) flaky) with
+      | Boom _ -> []
+    ),
+  )
   Ref.set log []
   let started : Stream.Stream none {Boom} Float =
     Stream.on_start (task { record log "start" }) failing
@@ -123,11 +150,14 @@ let main () =
   let exits : Stream.Stream none {Boom} Float =
     Stream.on_exit
       (fun exit ->
-        record log (if Option.is_some (Exit.failure exit) then "exit failed" else "exit ok"))
+        record log (if Option.is_some (Exit.failure exit) then "exit failed" else "exit ok")
+      )
       errors
   let watched : Stream.Stream none {Boom} Float =
     Stream.ensuring (task { record log "ensuring" }) exits
-  let _ = try Stream.run_drain watched with | Boom _ -> ()
+  let _ =
+    try Stream.run_drain watched with
+    | Boom _ -> ()
   let _ = Stream.run_drain (Stream.on_end (task { record log "end" }) (Stream.succeed 1))
   Platform.stdout_line ("lifecycle: " ++ show (Ref.get log))
   let greeted = Stream.map_effect (fun name -> Greeter.greet name) (Stream.make ["ann", "bob"])

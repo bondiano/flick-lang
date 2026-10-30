@@ -110,7 +110,8 @@ let maximum xs =
     (fun best x ->
       match best with
       | None -> Some x
-      | Some b -> if compare x b == GT then Some x else best)
+      | Some b -> if compare x b == GT then Some x else best
+    )
     None
     xs
 
@@ -121,7 +122,8 @@ let minimum xs =
     (fun best x ->
       match best with
       | None -> Some x
-      | Some b -> if compare x b == LT then Some x else best)
+      | Some b -> if compare x b == LT then Some x else best
+    )
     None
     xs
 

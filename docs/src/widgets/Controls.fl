@@ -21,32 +21,47 @@ let view model m =
   let search_label = if m.ru then "Поиск" else "Search"
   let theme_label = if m.ru then "Переключить тему" else "Toggle color theme"
   ui {
-    div { class_name = "site-controls" }
-      [
-        span { class_name = "search-control" }
-          [attributes [("id", "flick-search-open"), ("aria-label", search_label), ("aria-haspopup", "dialog")]
-            (button { disabled = false; on_click = Ui.Event.latest (fun _ -> task { open_search () }) }
-              [
-                icon "search",
-                span { class_name = "search-word" } [text search_label],
-                span { class_name = "search-shortcut" } [text "⌘ K"],
-              ])],
-        span { class_name = "icon-control theme-control" }
-          [attributes [("aria-label", theme_label), ("title", theme_label)]
-            (button
-              { disabled = false; on_click = Ui.Event.latest (fun _ -> task {
+    div { class_name = "site-controls" } [
+      span { class_name = "search-control" } [
+        attributes
+          [("id", "flick-search-open"), ("aria-label", search_label), ("aria-haspopup", "dialog")]
+          (button
+            { disabled = false; on_click = Ui.Event.latest (fun _ -> task { open_search () }) }
+            [
+              icon "search",
+              span { class_name = "search-word" } [text search_label],
+              span { class_name = "search-shortcut" } [text "⌘ K"],
+            ]),
+      ],
+      span { class_name = "icon-control theme-control" } [
+        attributes
+          [("aria-label", theme_label), ("title", theme_label)]
+          (button
+            {
+              disabled = false;
+              on_click =
+                Ui.Event.latest (fun _ -> task {
                   let dark = not m.dark
                   set_dark dark
                   Atom.set model { m with dark = dark }
-                }) }
-              [span { class_name = "theme-light-icon" } [icon "moon"],
-                span { class_name = "theme-dark-icon" } [icon "sun"]])],
-        span { class_name = "icon-control mobile-menu-control" }
-          [attributes [("aria-label", if m.ru then "Навигация" else "Navigation"), ("popoverTarget", "flick-navigation")]
-            (button
-              { disabled = false; on_click = Ui.Event.latest (fun _ -> Effect.void) }
-              [icon "menu"])],
-      ]
+                });
+            }
+            [
+              span { class_name = "theme-light-icon" } [icon "moon"],
+              span { class_name = "theme-dark-icon" } [icon "sun"],
+            ]),
+      ],
+      span { class_name = "icon-control mobile-menu-control" } [
+        attributes
+          [
+            ("aria-label", if m.ru then "Навигация" else "Navigation"),
+            ("popoverTarget", "flick-navigation"),
+          ]
+          (button { disabled = false; on_click = Ui.Event.latest (fun _ -> Effect.void) } [
+            icon "menu",
+          ]),
+      ],
+    ]
   }
 
 shell : Bool ->{} Ui
@@ -66,7 +81,8 @@ let main () =
   | Some root ->
     let model = Atom.make initial
     provide Atom.layer {
-      ignore (
-        Ui.Dom.mount root report (Ui.render (Ui.view (fun () -> view model (Atom.value model))) ())
-      )
+      ignore (Ui.Dom.mount
+        root
+        report
+        (Ui.render (Ui.view (fun () -> view model (Atom.value model))) ()))
     }

@@ -5,7 +5,7 @@ use std::{fs, path};
 use common::{flick, flick_stdin};
 
 const MESSY: &str = "let  f x   =\n    x+1\n";
-const TIDY: &str = "let f x =\n  x + 1\n";
+const TIDY: &str = "let f x = x + 1\n";
 
 #[test]
 fn fmt_stdin_for_editors() {

@@ -9,36 +9,32 @@ import Ts
 
 /// The entrypoints whose modules the standard library wraps export by export.
 wrapped : List String
-let wrapped =
-  [
-    "effect",
-    "effect/cli",
-    "effect/devtools",
-    "effect/http",
-    "effect/http-api",
-    "effect/observability",
-    "effect/reactivity",
-    "effect/rpc",
-  ]
+let wrapped = [
+  "effect",
+  "effect/cli",
+  "effect/devtools",
+  "effect/http",
+  "effect/http-api",
+  "effect/observability",
+  "effect/reactivity",
+  "effect/rpc",
+]
 
 /// A snapshot: `modules` maps an entrypoint to `Module.name` → `kind fingerprint`.
-type alias Snapshot =
-  {
-    package : String;
-    version : String;
-    entrypoints : List String;
-    modules : List (String, List (String, String));
-  }
-  deriving Schema
+type alias Snapshot = {
+  package : String;
+  version : String;
+  entrypoints : List String;
+  modules : List (String, List (String, String));
+} deriving Schema
 
 snapshot_json : PureCodec Json Snapshot
-let snapshot_json =
-  codec (schema Snapshot) {
-    package = field "package" String.json;
-    version = field "version" String.json;
-    entrypoints = field "entrypoints" (Codec.list String.json);
-    modules = field "modules" (Codec.entries (Codec.entries String.json));
-  }
+let snapshot_json = codec (schema Snapshot) {
+  package = field "package" String.json;
+  version = field "version" String.json;
+  entrypoints = field "entrypoints" (Codec.list String.json);
+  modules = field "modules" (Codec.entries (Codec.entries String.json));
+}
 
 /// The files of an entrypoint's conditions.
 type alias Conditions = { types : Option String; default : Option String }
@@ -78,7 +74,8 @@ let declarations_file t =
     | Conditional c -> Option.or_else c.default c.types
   Option.map
     (fun f ->
-      if String.ends_with ".js" f then String.slice 0 (String.length f - 3) f ++ ".d.ts" else f)
+      if String.ends_with ".js" f then String.slice 0 (String.length f - 3) f ++ ".d.ts" else f
+    )
     js
 
 /// What a symbol is: `value`, `type` or `value+type`.
@@ -139,8 +136,8 @@ let is_entrypoint (key, t) =
   | _ -> key != "./package.json" && not (String.contains "*" key)
 
 /// The snapshot of the Effect installed at `dir`.
-snapshot : String ->{FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError}
-  Snapshot
+snapshot :
+  String ->{FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError} Snapshot
 let snapshot dir =
   let file = Path.join [dir, "package.json"]
   let fields =
@@ -160,7 +157,8 @@ let snapshot dir =
       List.sort
         (List.map
           (fun (key, _) ->
-            if key == "." then name else name ++ "/" ++ String.slice 2 (String.length key) key)
+            if key == "." then name else name ++ "/" ++ String.slice 2 (String.length key) key
+          )
           (List.filter is_entrypoint targets))
     declared : String -> Option (String, String)
     let declared entrypoint =
@@ -186,17 +184,16 @@ let render snap =
   let module_text (entrypoint, exports) =
     let body = List.map (fun (key, value) -> "      " ++ quote key ++ ": " ++ quote value) exports
     "    " ++ quote entrypoint ++ ": {\n" ++ String.join ",\n" body ++ "\n    }"
-  let lines =
-    [
-      "{",
-      "  \"package\": " ++ quote snap.package ++ ",",
-      "  \"version\": " ++ quote snap.version ++ ",",
-      "  \"entrypoints\": [",
-      String.join ",\n" (List.map (fun e -> "    " ++ quote e) snap.entrypoints),
-      "  ],",
-      "  \"modules\": {",
-      String.join ",\n" (List.map module_text snap.modules),
-      "  }",
-      "}",
-    ]
+  let lines = [
+    "{",
+    "  \"package\": " ++ quote snap.package ++ ",",
+    "  \"version\": " ++ quote snap.version ++ ",",
+    "  \"entrypoints\": [",
+    String.join ",\n" (List.map (fun e -> "    " ++ quote e) snap.entrypoints),
+    "  ],",
+    "  \"modules\": {",
+    String.join ",\n" (List.map module_text snap.modules),
+    "  }",
+    "}",
+  ]
   String.join "\n" lines ++ "\n"

@@ -31,12 +31,10 @@ js_now : Unit ->{} Float
 foreign sync js_now from "./clock.js" "now"
 
 clock_impl : Ticker.Impl
-let clock_impl =
-  { now = js_now }
+let clock_impl = { now = js_now }
 
 clock_layer : Layer none none {Ticker}
-let clock_layer =
-  Layer.succeed Ticker clock_impl
+let clock_layer = Layer.succeed Ticker clock_impl
 
 load_name : UserId ->{Users, Log; NotFound} String
 let load_name id =
@@ -45,33 +43,23 @@ let load_name id =
   user.name
 
 application : UserId ->{Config, Log; NotFound, ConnectError} String
-let application id =
-  provide users_live {
-    load_name id
-  }
+let application id = provide users_live { load_name id }
 
 timed : Unit ->{} Float
-let timed () =
-  provide clock_layer {
-    Ticker.now ()
-  }
+let timed () = provide clock_layer { Ticker.now () }
 
 environment : Layer {Config} {ConnectError} {Users, Ticker}
-let environment =
-  Layer.merge users_live clock_layer
+let environment = Layer.merge users_live clock_layer
 
 replaced : Layer none none {Ticker}
-let replaced =
-  Layer.override clock_layer clock_layer
+let replaced = Layer.override clock_layer clock_layer
 
 lookup : Float ->{Repo String; none} Option String
-let lookup id =
-  Repo.find id
+let lookup id = Repo.find id
 
 // a method of an implementation record runs without a lookup
 read_clock : Ticker.Impl -> Unit ->{} Float
-let read_clock implementation () =
-  implementation.now ()
+let read_clock implementation () = implementation.now ()
 
 // service operations are not class methods: `show` needs no service
 class Show a =
@@ -82,5 +70,4 @@ instance Show User =
   let show user = user.name
 
 describe : User -> String
-let describe user =
-  show user
+let describe user = show user

@@ -32,15 +32,15 @@ type error NotFound = NotFound { id : Float }
 double : Rpc.Rpc "double" (Float ->{r; NotFound} Float)
 let double =
   Rpc.make (Record.label : Record.Label "double")
-    |> Rpc.with_payload (Codec.json Schema.number)
-    |> Rpc.with_success (Codec.json Schema.number)
-    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema NotFound)))
+  |> Rpc.with_payload (Codec.json Schema.number)
+  |> Rpc.with_success (Codec.json Schema.number)
+  |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema NotFound)))
 
 count_to : Rpc.Rpc "count_to" (Float ->{r;} Stream none none Float)
 let count_to =
   Rpc.make (Record.label : Record.Label "count_to")
-    |> Rpc.with_payload (Codec.json Schema.number)
-    |> Rpc.with_stream (Codec.json Schema.number)
+  |> Rpc.with_payload (Codec.json Schema.number)
+  |> Rpc.with_stream (Codec.json Schema.number)
 
 slow : Rpc.Rpc "slow" (Unit ->{r;} Unit)
 let slow = Rpc.make (Record.label : Record.Label "slow")
@@ -48,37 +48,35 @@ let slow = Rpc.make (Record.label : Record.Label "slow")
 steady : Rpc.Rpc "steady" (Unit ->{r;} Unit)
 let steady = Rpc.make (Record.label : Record.Label "steady") |> Rpc.uninterruptible
 
-type alias Handlers r =
-  {
-    double : Float ->{r; NotFound} Float;
-    count_to : Float ->{r;} Stream none none Float;
-    slow : Unit ->{r;} Unit;
-    steady : Unit ->{r;} Unit;
-  }
+type alias Handlers r = {
+  double : Float ->{r; NotFound} Float;
+  count_to : Float ->{r;} Stream none none Float;
+  slow : Unit ->{r;} Unit;
+  steady : Unit ->{r;} Unit;
+}
 
 group : Rpc.Group r (Handlers r)
-let group =
-  Rpc.group |> Rpc.add double |> Rpc.add count_to |> Rpc.add slow |> Rpc.add steady
+let group = Rpc.group |> Rpc.add double |> Rpc.add count_to |> Rpc.add slow |> Rpc.add steady
 
 handlers : Handlers none
-let handlers =
-  {
-    double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2;
-    count_to =
-      fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
-    slow = fun () ->
-      start "slow"
-      sleep 100
-      mark "slow";
-    steady = fun () ->
-      start "steady"
-      sleep 100
-      mark "steady";
-  }
+let handlers = {
+  double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2;
+  count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
+  slow = fun () ->
+    start "slow"
+    sleep 100
+    mark "slow";
+  steady = fun () ->
+    start "steady"
+    sleep 100
+    mark "steady";
+}
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let local = try show (Rpc.call_local group handlers double 21) with | NotFound _ -> "not found"
+  let local =
+    try show (Rpc.call_local group handlers double 21) with
+    | NotFound _ -> "not found"
   Platform.stdout_line ("local: " ++ local)
   let refused =
     try show (Rpc.call_local group handlers double (0 - 1)) with

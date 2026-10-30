@@ -101,13 +101,11 @@ class Functor f => Applicative (f : Type -> Type) =
   pure : forall c a. a^c -> (f a)^c
   /// `f` of the values of both, in order: for `List`, every pair.
   map2 :
-    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-      ((f a)^d -> ((f b)^d -> (f x)^(c + d))^(c + d))^c
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c -> ((f a)^d -> ((f b)^d -> (f x)^(c + d))^(c + d))^c
 
 class Applicative m => Monad (m : Type -> Type) =
-  flat_map :
-    forall c d a b. (forall v. a^v -> (m b)^(c + v))^c ->
-      ((m a)^d -> (m b)^(c + d))^c
+  flat_map : forall c d a b. (forall v. a^v -> (m b)^(c + v))^c -> ((m a)^d -> (m b)^(c + d))^c
 
 /// Applicative containers with a choice: `nothing` holds no value, and
 /// `or_else` keeps the first that holds one (`List` keeps both).
@@ -172,8 +170,7 @@ foreign effect from_result from "@flick-lang/runtime" "fromResult"
 
 /// Runs both, as children: on a failure the other one is interrupted and
 /// awaited. The results keep the order of the arguments.
-parallel :
-  forall c r e a b. (Eff r e a)^c -> ((Eff r e b)^c ->{r; e} (a, b))^c
+parallel : forall c r e a b. (Eff r e a)^c -> ((Eff r e b)^c ->{r; e} (a, b))^c
 foreign effect parallel from "@flick-lang/runtime" "parallel"
   retention call
 
@@ -185,8 +182,7 @@ foreign effect parallel_all from "@flick-lang/runtime" "parallelAll"
 
 /// Each task's typed failure as an `Err`; a defect or an interruption still
 /// stops the group.
-parallel_results :
-  forall c r e a. List ((Eff r e a)^c) ->{r; none} List (Result (Errors e) a)
+parallel_results : forall c r e a. List ((Eff r e a)^c) ->{r; none} List (Result (Errors e) a)
 foreign effect parallel_results from "@flick-lang/runtime" "parallelResults"
   retention call
 
@@ -196,8 +192,7 @@ foreign effect parallel_exits from "@flick-lang/runtime" "parallelExits"
   retention call
 
 /// The first task to succeed; the loser is interrupted and awaited.
-race_success :
-  forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
+race_success : forall c r e a. (Eff r e a)^c -> ((Eff r e a)^c ->{r; e} a)^c
 foreign effect race_success from "@flick-lang/runtime" "raceSuccess"
   retention call
   reviewed "effect@4.0.5 sha256:ac5b5886f22dc7c6"
@@ -221,18 +216,13 @@ foreign effect timeout_option from "@flick-lang/runtime" "timeoutOption"
   reviewed "effect@4.0.5 sha256:35e1a71b230ac8e2"
 
 /// `ma` followed by `f` of its value, for any monad.
-bind :
-  forall c d m a b.
-  Monad m => (m a)^c ->
-  ((a -> (m b)^d)^d -> (m b)^(c + d))^c
+bind : forall c d m a b. Monad m => (m a)^c -> ((a -> (m b)^d)^d -> (m b)^(c + d))^c
 let bind ma f = flat_map f ma
 
 /// A task followed by `f` of its value; the rows of both join.
 bind_eff :
   forall c d r1 r2 e1 e2 a b.
-  (Eff r1 e1 a)^c ->
-  ((a -> (Eff r2 e2 b)^d)^d ->
-    (Eff (r1 + r2) (e1 + e2) b)^(c + d))^c
+  (Eff r1 e1 a)^c -> ((a -> (Eff r2 e2 b)^d)^d -> (Eff (r1 + r2) (e1 + e2) b)^(c + d))^c
 foreign pure bind_eff from "@flick-lang/runtime" "bindEff"
   arity 2
   retention call
@@ -271,8 +261,7 @@ foreign pure on_missing from "@flick-lang/runtime" "dslOnMissing"
 
 /// `on_missing` with a runtime default, whose services decoding then needs.
 on_missing_effect :
-  forall c r rd a.
-  (Unit ->{r; SchemaError} a)^c -> (FieldCodec rd a -> FieldCodec (rd + r) a)^c
+  forall c r rd a. (Unit ->{r; SchemaError} a)^c -> (FieldCodec rd a -> FieldCodec (rd + r) a)^c
 foreign pure on_missing_effect from "@flick-lang/runtime" "dslOnMissingEffect"
   arity 2
   retention call

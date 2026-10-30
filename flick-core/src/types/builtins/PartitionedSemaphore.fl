@@ -38,8 +38,7 @@ foreign effect release from "@flick-lang/runtime/effect/PartitionedSemaphore" "r
 
 /// Runs `task` holding `permits` permits for the partition `key`; they are
 /// given back however it ends.
-with_permits :
-  forall c r e a k. PartitionedSemaphore k -> k -> Int -> (Eff r e a)^c ->{r; e} a
+with_permits : forall c r e a k. PartitionedSemaphore k -> k -> Int -> (Eff r e a)^c ->{r; e} a
 foreign effect with_permits from "@flick-lang/runtime/effect/PartitionedSemaphore" "withPermits"
   arity 3
   retention call
