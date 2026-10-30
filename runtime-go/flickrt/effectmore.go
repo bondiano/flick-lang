@@ -209,7 +209,7 @@ func WithExecutionPlan(fb *Fiber, plan, onEvent, task Value) Value {
 		for stepAttempt := 1; ; stepAttempt++ {
 			attempt++
 			info := Rec("attempt", int32(attempt), "stepAttempt", int32(stepAttempt), "stepIndex", int32(index))
-			Run(fb, Apply(onEvent, NewData(attemptStart, info)))
+			Run(fb, Apply(fb, onEvent, NewData(attemptStart, info)))
 			started := time.Now()
 			meta := Rec("attempt", int32(attempt), "stepIndex", int32(index))
 			e := exitOf(fb, Eff(func(fb *Fiber) Value {
@@ -219,10 +219,10 @@ func WithExecutionPlan(fb *Fiber, plan, onEvent, task Value) Value {
 			}))
 			took := fromMillis(float64(time.Since(started).Microseconds()) / 1000)
 			if e.cause == nil {
-				Run(fb, Apply(onEvent, NewData(attemptSuccess, info, took)))
+				Run(fb, Apply(fb, onEvent, NewData(attemptSuccess, info, took)))
 				return e.value
 			}
-			Run(fb, Apply(onEvent, NewData(attemptFailure, info, took, failureOf(e.cause))))
+			Run(fb, Apply(fb, onEvent, NewData(attemptFailure, info, took, failureOf(e.cause))))
 			last = e.cause
 			if e.cause.has(causeInterrupt) && !e.cause.has(causeFail) {
 				panic(&Failure{e.cause})
@@ -235,7 +235,7 @@ func WithExecutionPlan(fb *Fiber, plan, onEvent, task Value) Value {
 				break
 			}
 			if step.while != nil {
-				if r := e.cause.firstOf(causeFail); r == nil || !Bool(Run(fb, Apply(step.while, r.err))) {
+				if r := e.cause.firstOf(causeFail); r == nil || !Bool(Run(fb, Apply(fb, step.while, r.err))) {
 					break
 				}
 			}

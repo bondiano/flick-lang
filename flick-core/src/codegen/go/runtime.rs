@@ -99,6 +99,38 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/filesystem.go"),
     ),
     (
+        "filesystem_copy.go",
+        include_str!("../../../../runtime-go/flickrt/filesystem_copy.go"),
+    ),
+    (
+        "filesystem_darwin.go",
+        include_str!("../../../../runtime-go/flickrt/filesystem_darwin.go"),
+    ),
+    (
+        "filesystem_glob.go",
+        include_str!("../../../../runtime-go/flickrt/filesystem_glob.go"),
+    ),
+    (
+        "filesystem_glob_class.go",
+        include_str!("../../../../runtime-go/flickrt/filesystem_glob_class.go"),
+    ),
+    (
+        "filesystem_glob_pattern.go",
+        include_str!("../../../../runtime-go/flickrt/filesystem_glob_pattern.go"),
+    ),
+    (
+        "filesystem_linux.go",
+        include_str!("../../../../runtime-go/flickrt/filesystem_linux.go"),
+    ),
+    (
+        "filesystem_posix.go",
+        include_str!("../../../../runtime-go/flickrt/filesystem_posix.go"),
+    ),
+    (
+        "filesystem_windows.go",
+        include_str!("../../../../runtime-go/flickrt/filesystem_windows.go"),
+    ),
+    (
         "fnmods.go",
         include_str!("../../../../runtime-go/flickrt/fnmods.go"),
     ),
@@ -201,6 +233,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "http_router.go",
         include_str!("../../../../runtime-go/flickrt/http_router.go"),
+    ),
+    (
+        "http_router_pattern.go",
+        include_str!("../../../../runtime-go/flickrt/http_router_pattern.go"),
     ),
     (
         "http_static.go",

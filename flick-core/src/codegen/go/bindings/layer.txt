@@ -42,7 +42,7 @@ add ContextAdd
 addOrOmit ContextAddOrOmit
 get ContextGet
 getOption ContextGetOption
-getOrElse ContextGetOrElse
+getOrElse *ContextGetOrElse
 merge ContextMerge
 flickMergeAll ContextMergeAll
 pick ContextPick

@@ -88,8 +88,8 @@ func jsonBody(json Value, contentType string) *Body {
 func BodyJson(_ *Fiber, json Value) Value { return jsonBody(json, "application/json") }
 
 // BodyJsonSchema is the JSON of the value as the codec encodes it.
-func BodyJsonSchema(_ *Fiber, c, v Value) Value {
-	e, issues := codecOf(c).encode(v)
+func BodyJsonSchema(fb *Fiber, c, v Value) Value {
+	e, issues := codecOf(c).encode(fb, v)
 	if issues != nil {
 		return Fail(schemaErrorOf(issues))
 	}

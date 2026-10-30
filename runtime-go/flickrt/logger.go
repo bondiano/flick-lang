@@ -14,17 +14,21 @@ import (
 const loggersKey = "effect/Loggers"
 
 // A logger turns a message's options into its output.
-type logger struct{ out func(options Value) Value }
+type logger struct {
+	out func(fb *Fiber, options Value) Value
+}
 
-func LoggerMake(f Value) Value { return &logger{func(o Value) Value { return Apply(f, o) }} }
+func LoggerMake(f Value) Value {
+	return &logger{func(fb *Fiber, o Value) Value { return Apply(fb, f, o) }}
+}
 
 // LoggerWithConsoleLog writes each output as `console.log` does a string.
 //
 // shortcut: an output other than text is written by Go's `%v`, where Node inspects it; port Node's `inspect` when a program logs such outputs
 func LoggerWithConsoleLog(l Value) Value {
 	inner := l.(*logger)
-	return &logger{func(o Value) Value {
-		switch out := inner.out(o).(type) {
+	return &logger{func(fb *Fiber, o Value) Value {
+		switch out := inner.out(fb, o).(type) {
 		case string:
 			StdoutLine(out)
 		default:
@@ -58,6 +62,6 @@ func logMessage(fb *Fiber, level, message string) {
 	options := Rec("message", []Value{message}, "logLevel", level, "cause", Unit,
 		"date", float64(time.Now().UnixMilli()))
 	for _, l := range List(loggers) {
-		l.(*logger).out(options)
+		l.(*logger).out(fb, options)
 	}
 }

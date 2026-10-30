@@ -17,7 +17,7 @@ func TestPreviewWritesCasesAsTheJSRunner(t *testing.T) {
 		{Rec("a", Unit, "b", int32(1)), `{"b":1}`},
 		{[]Value{Some(int32(1)), None}, `[{"_id":"Option","_tag":"Some","value":1},{"_id":"Option","_tag":"None"}]`},
 		{&Data{Tag: "Failure", Fields: []Value{"e"}}, `{"_id":"Result","_tag":"Failure","failure":"e"}`},
-		{Fn(func(v Value) Value { return v }), `"<function>"`},
+		{Fn(func(fb *Fiber, v Value) Value { return v }), `"<function>"`},
 		{Unit, "undefined"},
 	} {
 		if got := preview(c.value); got != c.want {

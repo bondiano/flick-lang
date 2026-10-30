@@ -13,7 +13,7 @@ type Dict struct {
 
 type lazyEntry struct {
 	once sync.Once
-	f    func() Value
+	f    func(*Fiber) Value
 	v    Value
 }
 
@@ -29,12 +29,12 @@ func (d *Dict) Set(name string, v Value) *Dict {
 }
 
 // Lazy binds an entry computed when it is first read.
-func (d *Dict) Lazy(name string, f func() Value) *Dict {
+func (d *Dict) Lazy(name string, f func(*Fiber) Value) *Dict {
 	d.lazy[name] = &lazyEntry{f: f}
 	return d
 }
 
-func (d *Dict) get(name string) Value {
+func (d *Dict) get(fb *Fiber, name string) Value {
 	if v, ok := d.entries[name]; ok {
 		return v
 	}
@@ -42,15 +42,15 @@ func (d *Dict) get(name string) Value {
 	if !ok {
 		panic(Defect{"dictionary has no `" + name + "`"})
 	}
-	e.once.Do(func() { e.v = e.f() })
+	e.once.Do(func() { e.v = e.f(fb) })
 	return e.v
 }
 
 // Method is the method `name` of a dictionary.
-func Method(d Value, name string) Value { return d.(*Dict).get(name) }
+func Method(fb *Fiber, d Value, name string) Value { return d.(*Dict).get(fb, name) }
 
 // Super is the dictionary of the superclass `class` of a dictionary.
-func Super(d Value, class string) Value { return d.(*Dict).get("$" + class) }
+func Super(fb *Fiber, d Value, class string) Value { return d.(*Dict).get(fb, "$"+class) }
 
 // Constructor describes a constructor of a derived type: its tag, name and
 // arity, and whether a value is its one field.
@@ -65,12 +65,11 @@ type Constructor struct {
 // dictionaries of the fields of all constructors in order, on first use (a
 // recursive type needs its own instance); `constructors` is nil for a type
 // without variants whose one field is its representation.
-func Derive(name string, fields func() []Value, constructors []Constructor, supers map[string]func() Value) Value {
+func Derive(name string, fields func(*Fiber) []Value, constructors []Constructor, supers map[string]func(*Fiber) Value) Value {
 	var cache []Value
-	dict := func(k int) Value {
-		if cache == nil {
-			cache = fields()
-		}
+	var once sync.Once
+	dict := func(fb *Fiber, k int) Value {
+		once.Do(func() { cache = fields(fb) })
 		return cache[k]
 	}
 	variant := func(v Value) (int, int) {
@@ -95,9 +94,9 @@ func Derive(name string, fields func() []Value, constructors []Constructor, supe
 	}
 	switch name {
 	case "Eq":
-		d.Set("eq", Curry2(func(a, b Value) Value {
+		d.Set("eq", Curry2(func(fb *Fiber, a, b Value) Value {
 			if constructors == nil {
-				return Apply(Apply(Method(dict(0), "eq"), a), b)
+				return Apply(fb, Apply(fb, Method(fb, dict(fb, 0), "eq"), a), b)
 			}
 			i, offset := variant(a)
 			if j, _ := variant(b); i != j {
@@ -105,16 +104,16 @@ func Derive(name string, fields func() []Value, constructors []Constructor, supe
 			}
 			left, right := args(i, a), args(i, b)
 			for k := range left {
-				if !Bool(Apply(Apply(Method(dict(offset+k), "eq"), left[k]), right[k])) {
+				if !Bool(Apply(fb, Apply(fb, Method(fb, dict(fb, offset+k), "eq"), left[k]), right[k])) {
 					return false
 				}
 			}
 			return true
 		}))
 	case "Ord":
-		d.Set("compare", Curry2(func(a, b Value) Value {
+		d.Set("compare", Curry2(func(fb *Fiber, a, b Value) Value {
 			if constructors == nil {
-				return Apply(Apply(Method(dict(0), "compare"), a), b)
+				return Apply(fb, Apply(fb, Method(fb, dict(fb, 0), "compare"), a), b)
 			}
 			i, offset := variant(a)
 			if j, _ := variant(b); i != j {
@@ -125,7 +124,7 @@ func Derive(name string, fields func() []Value, constructors []Constructor, supe
 			}
 			left, right := args(i, a), args(i, b)
 			for k := range left {
-				o := Apply(Apply(Method(dict(offset+k), "compare"), left[k]), right[k])
+				o := Apply(fb, Apply(fb, Method(fb, dict(fb, offset+k), "compare"), left[k]), right[k])
 				if o.(*Data).Tag != EQ.(*Data).Tag {
 					return o
 				}
@@ -133,26 +132,26 @@ func Derive(name string, fields func() []Value, constructors []Constructor, supe
 			return EQ
 		}))
 	case "Hash":
-		d.Set("hash", Fn(func(a Value) Value {
+		d.Set("hash", Fn(func(fb *Fiber, a Value) Value {
 			if constructors == nil {
-				return Apply(Method(dict(0), "hash"), a)
+				return Apply(fb, Method(fb, dict(fb, 0), "hash"), a)
 			}
 			i, offset := variant(a)
 			h := int32(i)
 			for k, x := range args(i, a) {
-				h = combine(h, Apply(Method(dict(offset+k), "hash"), x).(int32))
+				h = combine(h, Apply(fb, Method(fb, dict(fb, offset+k), "hash"), x).(int32))
 			}
 			return h
 		}))
 	case "Show":
-		d.Set("show", Fn(func(a Value) Value {
+		d.Set("show", Fn(func(fb *Fiber, a Value) Value {
 			if constructors == nil {
-				return Apply(Method(dict(0), "show"), a)
+				return Apply(fb, Method(fb, dict(fb, 0), "show"), a)
 			}
 			i, offset := variant(a)
 			out := constructors[i].Name
 			for k, x := range args(i, a) {
-				out += " " + atom(Apply(Method(dict(offset+k), "show"), x).(string))
+				out += " " + atom(Apply(fb, Method(fb, dict(fb, offset+k), "show"), x).(string))
 			}
 			return out
 		}))
@@ -179,31 +178,31 @@ func atom(text string) string {
 // Structural is the compiler-owned instance of class `name` for a record or
 // a tuple: `dicts` are those of its fields, by label order or by position.
 func Structural(name string, dicts []Value) Value {
-	method := func(i int, m string) Value { return Method(dicts[i], m) }
-	eqs := func() Value {
+	method := func(fb *Fiber, i int, m string) Value { return Method(fb, dicts[i], m) }
+	eqs := func(fb *Fiber) Value {
 		supers := make([]Value, len(dicts))
 		for i, d := range dicts {
-			supers[i] = Super(d, "Eq")
+			supers[i] = Super(fb, d, "Eq")
 		}
 		return Structural("Eq", supers)
 	}
 	d := NewDict()
 	switch name {
 	case "Eq":
-		d.Set("eq", Curry2(func(a, b Value) Value {
+		d.Set("eq", Curry2(func(fb *Fiber, a, b Value) Value {
 			xs, ys := fieldsOf(a), fieldsOf(b)
 			for i := range xs {
-				if !Bool(Apply(Apply(method(i, "eq"), xs[i]), ys[i])) {
+				if !Bool(Apply(fb, Apply(fb, method(fb, i, "eq"), xs[i]), ys[i])) {
 					return false
 				}
 			}
 			return true
 		}))
 	case "Ord":
-		d.Set("compare", Curry2(func(a, b Value) Value {
+		d.Set("compare", Curry2(func(fb *Fiber, a, b Value) Value {
 			xs, ys := fieldsOf(a), fieldsOf(b)
 			for i := range xs {
-				o := Apply(Apply(method(i, "compare"), xs[i]), ys[i])
+				o := Apply(fb, Apply(fb, method(fb, i, "compare"), xs[i]), ys[i])
 				if o.(*Data).Tag != EQ.(*Data).Tag {
 					return o
 				}
@@ -212,20 +211,20 @@ func Structural(name string, dicts []Value) Value {
 		}))
 		d.Lazy("$Eq", eqs)
 	case "Hash":
-		d.Set("hash", Fn(func(a Value) Value {
+		d.Set("hash", Fn(func(fb *Fiber, a Value) Value {
 			h := int32(11)
 			for i, x := range fieldsOf(a) {
-				h = combine(h, Apply(method(i, "hash"), x).(int32))
+				h = combine(h, Apply(fb, method(fb, i, "hash"), x).(int32))
 			}
 			return h
 		}))
 		d.Lazy("$Eq", eqs)
 	default:
-		d.Set("show", Fn(func(a Value) Value {
+		d.Set("show", Fn(func(fb *Fiber, a Value) Value {
 			xs := fieldsOf(a)
 			shown := make([]string, len(xs))
 			for i, x := range xs {
-				shown[i] = Apply(method(i, "show"), x).(string)
+				shown[i] = Apply(fb, method(fb, i, "show"), x).(string)
 			}
 			if r, ok := a.(*Record); ok {
 				out := "{ "

@@ -76,7 +76,7 @@ func UrlParamsSet(key, value, p Value) Value {
 	return append(out, []Value{key, value})
 }
 
-func UrlParamsTransform(f, p Value) Value { return List(Apply(f, paramsOf(p))) }
+func UrlParamsTransform(fb *Fiber, f, p Value) Value { return List(Apply(fb, f, paramsOf(p))) }
 
 // UrlParamsSetAll is the pairs of `input` first, then the pairs of keys
 // it does not have.
@@ -164,7 +164,16 @@ func UrlParamsIsRedactedName(name, names Value) Value {
 }
 
 func UrlParamsWithRedactedNames(fb *Fiber, names, task Value) Value {
-	return withEnv(fb, urlParamsNamesKey, names, task)
+	return withEnv(fb, urlParamsNamesKey, stringsOf(names), task)
+}
+
+func currentUrlRedactedNames(fb *Fiber) []string {
+	if fb != nil {
+		if names, ok := fb.env.get(urlParamsNamesKey); ok {
+			return names.([]string)
+		}
+	}
+	return defaultUrlRedactedName
 }
 
 func UrlParamsEquivalence(a, b Value) Value {

@@ -4,19 +4,19 @@ package flickrt
 // `union` take the new key and value, and callbacks get the value first,
 // then the key.
 
-func HashMapWith(w Value) Value  { return mapOf(empty(w)) }
-func HashMapEmpty(d Value) Value { return HashMapWith(EqHashCanonical(d)) }
+func HashMapWith(w Value) Value             { return mapOf(empty(w)) }
+func HashMapEmpty(fb *Fiber, d Value) Value { return HashMapWith(EqHashCanonical(fb, d)) }
 
-func HashMapInsert(k, v, m Value) Value {
+func HashMapInsert(fb *Fiber, k, v, m Value) Value {
 	t := hmap(m)
-	return mapOf(t.set(k, v, t.w.of(k), false))
+	return mapOf(t.set(fb, k, v, t.w.of(fb, k), false))
 }
 
-func HashMapRemove(k, m Value) Value { return mapOf(hmap(m).remove(k)) }
+func HashMapRemove(fb *Fiber, k, m Value) Value { return mapOf(hmap(m).remove(fb, k)) }
 
-func HashMapGet(k, m Value) Value {
+func HashMapGet(fb *Fiber, k, m Value) Value {
 	t := hmap(m)
-	if v, ok := t.get(k, t.w.of(k)); ok {
+	if v, ok := t.get(fb, k, t.w.of(fb, k)); ok {
 		return Some(v)
 	}
 	return None
@@ -34,44 +34,46 @@ func HashMapToList(m Value) Value {
 	return out
 }
 
-func fromEntries(t *table, entries Value) *table {
+func fromEntries(fb *Fiber, t *table, entries Value) *table {
 	for _, kv := range List(entries) {
 		pair := kv.([]Value)
-		t = t.set(pair[0], pair[1], t.w.of(pair[0]), false)
+		t = t.set(fb, pair[0], pair[1], t.w.of(fb, pair[0]), false)
 	}
 	return t
 }
 
 // HashMapUnion is `a` with the entries of `b`, which win.
-func HashMapUnion(a, b Value) Value {
-	return mapOf(fromEntries(hmap(a), HashMapToList(b)))
+func HashMapUnion(fb *Fiber, a, b Value) Value {
+	return mapOf(fromEntries(fb, hmap(a), HashMapToList(b)))
 }
 
-func HashMapRehash(w, m Value) Value { return mapOf(fromEntries(empty(w), HashMapToList(m))) }
-func HashMapFromList(w, entries Value) Value {
-	return mapOf(fromEntries(empty(w), entries))
+func HashMapRehash(fb *Fiber, w, m Value) Value {
+	return mapOf(fromEntries(fb, empty(w), HashMapToList(m)))
+}
+func HashMapFromList(fb *Fiber, w, entries Value) Value {
+	return mapOf(fromEntries(fb, empty(w), entries))
 }
 
-func HashMapHas(k, m Value) Value {
+func HashMapHas(fb *Fiber, k, m Value) Value {
 	t := hmap(m)
-	_, ok := t.get(k, t.w.of(k))
+	_, ok := t.get(fb, k, t.w.of(fb, k))
 	return ok
 }
 
 // HashMapGetHash and HashMapHasHash look `k` up by the hash given.
-func HashMapGetHash(k, h, m Value) Value {
-	if v, ok := hmap(m).get(k, h.(int32)); ok {
+func HashMapGetHash(fb *Fiber, k, h, m Value) Value {
+	if v, ok := hmap(m).get(fb, k, h.(int32)); ok {
 		return Some(v)
 	}
 	return None
 }
 
-func HashMapHasHash(k, h, m Value) Value {
-	_, ok := hmap(m).get(k, h.(int32))
+func HashMapHasHash(fb *Fiber, k, h, m Value) Value {
+	_, ok := hmap(m).get(fb, k, h.(int32))
 	return ok
 }
 
-func HashMapHasBy(f, m Value) Value { return HashMapSome(f, m) }
+func HashMapHasBy(fb *Fiber, f, m Value) Value { return HashMapSome(fb, f, m) }
 
 func HashMapKeys(m Value) Value {
 	t := hmap(m)
@@ -91,49 +93,51 @@ func HashMapValues(m Value) Value {
 	return out
 }
 
-func modifyAt(t *table, k Value, h int32, f Value) *table {
+func modifyAt(fb *Fiber, t *table, k Value, h int32, f Value) *table {
 	before := None
-	if v, ok := t.get(k, h); ok {
+	if v, ok := t.get(fb, k, h); ok {
 		before = Some(v)
 	}
-	after := Apply(f, before).(*Data)
+	after := Apply(fb, f, before).(*Data)
 	switch {
 	case after.Tag == "Some":
-		return t.set(k, after.Fields[0], h, false)
+		return t.set(fb, k, after.Fields[0], h, false)
 	case before != None:
-		return t.remove(k)
+		return t.remove(fb, k)
 	}
 	return t
 }
 
 // HashMapModifyAt sets or removes `k` by what `f` makes of its value.
-func HashMapModifyAt(k, f, m Value) Value {
+func HashMapModifyAt(fb *Fiber, k, f, m Value) Value {
 	t := hmap(m)
-	return mapOf(modifyAt(t, k, t.w.of(k), f))
+	return mapOf(modifyAt(fb, t, k, t.w.of(fb, k), f))
 }
 
-func HashMapModifyHash(k, h, f, m Value) Value {
-	return mapOf(modifyAt(hmap(m), k, h.(int32), f))
+func HashMapModifyHash(fb *Fiber, k, h, f, m Value) Value {
+	return mapOf(modifyAt(fb, hmap(m), k, h.(int32), f))
 }
 
-func HashMapModify(k, f, m Value) Value {
+func HashMapModify(fb *Fiber, k, f, m Value) Value {
 	t := hmap(m)
-	h := t.w.of(k)
-	if v, ok := t.get(k, h); ok {
-		return mapOf(t.set(k, Apply(f, v), h, false))
+	h := t.w.of(fb, k)
+	if v, ok := t.get(fb, k, h); ok {
+		return mapOf(t.set(fb, k, Apply(fb, f, v), h, false))
 	}
 	return m
 }
 
-func HashMapRemoveMany(ks, m Value) Value {
+func HashMapRemoveMany(fb *Fiber, ks, m Value) Value {
 	t := hmap(m)
 	for _, k := range List(ks) {
-		t = t.remove(k)
+		t = t.remove(fb, k)
 	}
 	return mapOf(t)
 }
 
-func HashMapSetMany(entries, m Value) Value { return mapOf(fromEntries(hmap(m), entries)) }
+func HashMapSetMany(fb *Fiber, entries, m Value) Value {
+	return mapOf(fromEntries(fb, hmap(m), entries))
+}
 
 // mapped is `t` with each entry's value as `f` makes it, dropping those it
 // makes nothing of.
@@ -147,31 +151,31 @@ func mapped(t *table, f func(e entry) (Value, bool)) *table {
 	return out
 }
 
-func HashMapMap(f, m Value) Value {
-	return mapOf(mapped(hmap(m), func(e entry) (Value, bool) { return apply2(f, e.value, e.key), true }))
+func HashMapMap(fb *Fiber, f, m Value) Value {
+	return mapOf(mapped(hmap(m), func(e entry) (Value, bool) { return apply2(fb, f, e.value, e.key), true }))
 }
 
 // HashMapFlatMap is the union of what `f` makes of each entry, in order.
-func HashMapFlatMap(f, m Value) Value {
+func HashMapFlatMap(fb *Fiber, f, m Value) Value {
 	t := hmap(m)
 	out := empty(t.w)
 	for _, e := range t.entries {
-		out = fromEntries(out, HashMapToList(apply2(f, e.value, e.key)))
+		out = fromEntries(fb, out, HashMapToList(apply2(fb, f, e.value, e.key)))
 	}
 	return mapOf(out)
 }
 
-func HashMapReduce(zero, f, m Value) Value {
+func HashMapReduce(fb *Fiber, zero, f, m Value) Value {
 	acc := zero
 	for _, e := range hmap(m).entries {
-		acc = Apply(apply2(f, acc, e.value), e.key)
+		acc = Apply(fb, apply2(fb, f, acc, e.value), e.key)
 	}
 	return acc
 }
 
-func HashMapFilter(f, m Value) Value {
+func HashMapFilter(fb *Fiber, f, m Value) Value {
 	return mapOf(mapped(hmap(m), func(e entry) (Value, bool) {
-		return e.value, Bool(apply2(f, e.value, e.key))
+		return e.value, Bool(apply2(fb, f, e.value, e.key))
 	}))
 }
 
@@ -185,9 +189,9 @@ func HashMapCompact(m Value) Value {
 	}))
 }
 
-func HashMapFilterMap(f, m Value) Value {
+func HashMapFilterMap(fb *Fiber, f, m Value) Value {
 	return mapOf(mapped(hmap(m), func(e entry) (Value, bool) {
-		r := apply2(f, e.value, e.key).(*Data)
+		r := apply2(fb, f, e.value, e.key).(*Data)
 		if r.Tag == "Success" {
 			return r.Fields[0], true
 		}
@@ -195,27 +199,27 @@ func HashMapFilterMap(f, m Value) Value {
 	}))
 }
 
-func HashMapFindFirst(f, m Value) Value {
+func HashMapFindFirst(fb *Fiber, f, m Value) Value {
 	for _, e := range hmap(m).entries {
-		if Bool(apply2(f, e.value, e.key)) {
+		if Bool(apply2(fb, f, e.value, e.key)) {
 			return Some([]Value{e.key, e.value})
 		}
 	}
 	return None
 }
 
-func HashMapSome(f, m Value) Value {
+func HashMapSome(fb *Fiber, f, m Value) Value {
 	for _, e := range hmap(m).entries {
-		if Bool(apply2(f, e.value, e.key)) {
+		if Bool(apply2(fb, f, e.value, e.key)) {
 			return true
 		}
 	}
 	return false
 }
 
-func HashMapEvery(f, m Value) Value {
+func HashMapEvery(fb *Fiber, f, m Value) Value {
 	for _, e := range hmap(m).entries {
-		if !Bool(apply2(f, e.value, e.key)) {
+		if !Bool(apply2(fb, f, e.value, e.key)) {
 			return false
 		}
 	}

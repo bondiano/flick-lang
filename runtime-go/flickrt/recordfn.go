@@ -51,28 +51,28 @@ func RecordFromKeys(keys, v Value) Value {
 	return out
 }
 
-func RecordFromIterableWith(f, xs Value) Value {
+func RecordFromIterableWith(fb *Fiber, f, xs Value) Value {
 	out := &Record{}
 	for _, x := range List(xs) {
-		pair := Apply(f, x).([]Value)
+		pair := Apply(fb, f, x).([]Value)
 		out = out.set(pair[0].(string), pair[1])
 	}
 	return out
 }
 
-func RecordFromIterableBy(f, xs Value) Value {
+func RecordFromIterableBy(fb *Fiber, f, xs Value) Value {
 	out := &Record{}
 	for _, x := range List(xs) {
-		out = out.set(Apply(f, x).(string), x)
+		out = out.set(Apply(fb, f, x).(string), x)
 	}
 	return out
 }
 
-func RecordCollect(f, r Value) Value {
+func RecordCollect(fb *Fiber, f, r Value) Value {
 	x := record(r)
 	out := make([]Value, len(x.keys))
 	for i, k := range x.keys {
-		out[i] = apply2(f, k, x.vals[i])
+		out[i] = apply2(fb, f, k, x.vals[i])
 	}
 	return out
 }
@@ -87,17 +87,17 @@ func RecordGetKey(k, r Value) Value {
 	return None
 }
 
-func RecordModify(k, f, r Value) Value {
+func RecordModify(fb *Fiber, k, f, r Value) Value {
 	x := record(r)
 	i := x.index(k.(string))
 	if i < 0 {
 		return None
 	}
-	return Some(x.set(k.(string), Apply(f, x.vals[i])))
+	return Some(x.set(k.(string), Apply(fb, f, x.vals[i])))
 }
 
-func RecordReplace(k, v, r Value) Value {
-	return RecordModify(k, Fn(func(Value) Value { return v }), r)
+func RecordReplace(fb *Fiber, k, v, r Value) Value {
+	return RecordModify(fb, k, Fn(func(fb *Fiber, _ Value) Value { return v }), r)
 }
 
 func RecordSet(k, v, r Value) Value { return record(r).set(k.(string), v) }
@@ -136,28 +136,28 @@ func entries(r Value, f func(k string, v Value) (string, Value, bool)) *Record {
 	return out
 }
 
-func RecordMap(f, r Value) Value {
-	return entries(r, func(k string, v Value) (string, Value, bool) { return k, apply2(f, v, k), true })
+func RecordMap(fb *Fiber, f, r Value) Value {
+	return entries(r, func(k string, v Value) (string, Value, bool) { return k, apply2(fb, f, v, k), true })
 }
 
-func RecordMapKeys(f, r Value) Value {
-	return entries(r, func(k string, v Value) (string, Value, bool) { return apply2(f, k, v).(string), v, true })
+func RecordMapKeys(fb *Fiber, f, r Value) Value {
+	return entries(r, func(k string, v Value) (string, Value, bool) { return apply2(fb, f, k, v).(string), v, true })
 }
 
-func RecordMapEntries(f, r Value) Value {
+func RecordMapEntries(fb *Fiber, f, r Value) Value {
 	return entries(r, func(k string, v Value) (string, Value, bool) {
-		pair := apply2(f, v, k).([]Value)
+		pair := apply2(fb, f, v, k).([]Value)
 		return pair[0].(string), pair[1], true
 	})
 }
 
-func RecordFilter(f, r Value) Value {
-	return entries(r, func(k string, v Value) (string, Value, bool) { return k, v, Bool(apply2(f, v, k)) })
+func RecordFilter(fb *Fiber, f, r Value) Value {
+	return entries(r, func(k string, v Value) (string, Value, bool) { return k, v, Bool(apply2(fb, f, v, k)) })
 }
 
-func RecordFilterMap(f, r Value) Value {
+func RecordFilterMap(fb *Fiber, f, r Value) Value {
 	return entries(r, func(k string, v Value) (string, Value, bool) {
-		res := apply2(f, v, k)
+		res := apply2(fb, f, v, k)
 		if isOk(res) {
 			return k, value(res), true
 		}
@@ -165,11 +165,11 @@ func RecordFilterMap(f, r Value) Value {
 	})
 }
 
-func RecordPartition(f, r Value) Value {
+func RecordPartition(fb *Fiber, f, r Value) Value {
 	passes, fails := &Record{}, &Record{}
 	x := record(r)
 	for i, k := range x.keys {
-		if res := apply2(f, x.vals[i], k); isOk(res) {
+		if res := apply2(fb, f, x.vals[i], k); isOk(res) {
 			passes = passes.set(k, value(res))
 		} else {
 			fails = fails.set(k, value(res))
@@ -178,8 +178,8 @@ func RecordPartition(f, r Value) Value {
 	return []Value{passes, fails}
 }
 
-func RecordSeparate(r Value) Value {
-	return RecordPartition(Curry2(func(v, _ Value) Value { return v }), r)
+func RecordSeparate(fb *Fiber, r Value) Value {
+	return RecordPartition(fb, Curry2(func(fb *Fiber, v, _ Value) Value { return v }), r)
 }
 
 func RecordGetSomes(r Value) Value {
@@ -203,38 +203,38 @@ func recordResults(r Value, ok bool) Value {
 func RecordGetFailures(r Value) Value  { return recordResults(r, false) }
 func RecordGetSuccesses(r Value) Value { return recordResults(r, true) }
 
-func RecordReduce(zero, f, r Value) Value {
+func RecordReduce(fb *Fiber, zero, f, r Value) Value {
 	acc, x := zero, record(r)
 	for i, k := range x.keys {
-		acc = Apply(apply2(f, acc, x.vals[i]), k)
+		acc = Apply(fb, apply2(fb, f, acc, x.vals[i]), k)
 	}
 	return acc
 }
 
-func RecordEvery(f, r Value) Value {
+func RecordEvery(fb *Fiber, f, r Value) Value {
 	x := record(r)
 	for i, k := range x.keys {
-		if !Bool(apply2(f, x.vals[i], k)) {
+		if !Bool(apply2(fb, f, x.vals[i], k)) {
 			return false
 		}
 	}
 	return true
 }
 
-func RecordSome(f, r Value) Value {
+func RecordSome(fb *Fiber, f, r Value) Value {
 	x := record(r)
 	for i, k := range x.keys {
-		if Bool(apply2(f, x.vals[i], k)) {
+		if Bool(apply2(fb, f, x.vals[i], k)) {
 			return true
 		}
 	}
 	return false
 }
 
-func RecordFindFirst(f, r Value) Value {
+func RecordFindFirst(fb *Fiber, f, r Value) Value {
 	x := record(r)
 	for i, k := range x.keys {
-		if Bool(apply2(f, x.vals[i], k)) {
+		if Bool(apply2(fb, f, x.vals[i], k)) {
 			return Some([]Value{k, x.vals[i]})
 		}
 	}
@@ -243,16 +243,16 @@ func RecordFindFirst(f, r Value) Value {
 
 // RecordUnion is `self`'s fields, combined with `that`'s by `f`, then the
 // labels only `that` has.
-func RecordUnion(that, f, self Value) Value {
-	return comb(RecordReducerUnion(CombinerMake(f))).combine(self, that)
+func RecordUnion(fb *Fiber, that, f, self Value) Value {
+	return comb(RecordReducerUnion(CombinerMake(f))).combine(fb, self, that)
 }
 
-func RecordIntersection(that, f, self Value) Value {
+func RecordIntersection(fb *Fiber, that, f, self Value) Value {
 	x, y := record(self), record(that)
 	out := &Record{}
 	for i, k := range x.keys {
 		if j := y.index(k); j >= 0 {
-			out = out.set(k, apply2(f, x.vals[i], y.vals[j]))
+			out = out.set(k, apply2(fb, f, x.vals[i], y.vals[j]))
 		}
 	}
 	return out
@@ -281,10 +281,10 @@ func RecordDifference(that, self Value) Value {
 	return out
 }
 
-func subrecord(eq Value, self, that *Record) bool {
+func subrecord(fb *Fiber, eq Value, self, that *Record) bool {
 	for i, k := range self.keys {
 		j := that.index(k)
-		if j < 0 || !Bool(apply2(eq, self.vals[i], that.vals[j])) {
+		if j < 0 || !Bool(apply2(fb, eq, self.vals[i], that.vals[j])) {
 			return false
 		}
 	}
@@ -292,10 +292,10 @@ func subrecord(eq Value, self, that *Record) bool {
 }
 
 // RecordIsSubrecordBy is whether every field of `self` is in `that`.
-func RecordIsSubrecordBy(eq, that, self Value) Value {
-	return subrecord(eq, record(self), record(that))
+func RecordIsSubrecordBy(fb *Fiber, eq, that, self Value) Value {
+	return subrecord(fb, eq, record(self), record(that))
 }
 
-func RecordEquivalence(eq, self, that Value) Value {
-	return subrecord(eq, record(self), record(that)) && subrecord(eq, record(that), record(self))
+func RecordEquivalence(fb *Fiber, eq, self, that Value) Value {
+	return subrecord(fb, eq, record(self), record(that)) && subrecord(fb, eq, record(that), record(self))
 }

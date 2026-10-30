@@ -34,19 +34,19 @@ func issueText(issues []issue) string {
 }
 
 // clientEncode is the encoded part, or the ClientError naming it.
-func clientEncode(c codec, v Value, part string) (Value, Value) {
+func clientEncode(fb *Fiber, c codec, v Value, part string) (Value, Value) {
 	if c == nil {
 		return Unit, nil
 	}
-	encoded, issues := c.encode(v)
+	encoded, issues := c.encode(fb, v)
 	if issues != nil {
 		return nil, clientError(0, part+": "+issueText(issues))
 	}
 	return encoded, nil
 }
 
-func clientPairs(c codec, v Value, part string) []Value {
-	encoded, err := clientEncode(c, v, part)
+func clientPairs(fb *Fiber, c codec, v Value, part string) []Value {
+	encoded, err := clientEncode(fb, c, v, part)
 	if err != nil {
 		Fail(err)
 	}
@@ -89,13 +89,13 @@ func apiURL(base string, e *apiEndpoint, params, query []Value) string {
 }
 
 // HttpApiUrl is `HttpApi.url base endpoint path query`: the URL a call would request.
-func HttpApiUrl(base, endpoint, path, query Value) Value {
+func HttpApiUrl(fb *Fiber, base, endpoint, path, query Value) Value {
 	e := endpointOf(endpoint)
-	params, err := clientEncode(e.params, path, "path")
+	params, err := clientEncode(fb, e.params, path, "path")
 	if err != nil {
 		return Err(err)
 	}
-	search, err := clientEncode(e.query, query, "query")
+	search, err := clientEncode(fb, e.query, query, "query")
 	if err != nil {
 		return Err(err)
 	}
@@ -240,13 +240,13 @@ func lowerHeaders(h http.Header) *Record {
 // HttpApiCall is `HttpApi.call base endpoint request`.
 func HttpApiCall(fb *Fiber, base, endpoint, request Value) Value {
 	e, r := endpointOf(endpoint), record(request)
-	params := clientPairs(e.params, r.Get("path"), "path")
-	query := clientPairs(e.query, r.Get("query"), "query")
+	params := clientPairs(fb, e.params, r.Get("path"), "path")
+	query := clientPairs(fb, e.query, r.Get("query"), "query")
 	url := apiURL(base.(string), e, params, query)
-	headers := clientPairs(e.headers, r.Get("headers"), "headers")
+	headers := clientPairs(fb, e.headers, r.Get("headers"), "headers")
 	payload := r.Get("payload")
 	if e.payload != nil {
-		encoded, err := clientEncode(e.payload, payload, "payload")
+		encoded, err := clientEncode(fb, e.payload, payload, "payload")
 		if err != nil {
 			Fail(err)
 		}
@@ -293,9 +293,9 @@ func HttpApiCall(fb *Fiber, base, endpoint, request Value) Value {
 	}
 	text := decodeUTF8(res.body)
 	if res.status != e.status {
-		return clientDeclared(e, res.status, jsonOrText(text))
+		return clientDeclared(fb, e, res.status, jsonOrText(text))
 	}
-	return clientExtras(e, res, clientSuccess(e, res, text))
+	return clientExtras(fb, e, res, clientSuccess(fb, e, res, text))
 }
 
 // jsonOrText is the JSON value of the text, or the text.
@@ -308,12 +308,12 @@ func jsonOrText(text string) Value {
 
 // clientDeclared fails with the first declared error of the status that
 // decodes, or a ClientError of the body.
-func clientDeclared(e *apiEndpoint, status int32, body Value) Value {
+func clientDeclared(fb *Fiber, e *apiEndpoint, status int32, body Value) Value {
 	for _, c := range e.errors {
 		if c.status != status {
 			continue
 		}
-		if v, issues := c.codec.decode(body); issues == nil {
+		if v, issues := c.codec.decode(fb, body); issues == nil {
 			return Fail(v)
 		}
 	}
@@ -324,8 +324,8 @@ func clientDeclared(e *apiEndpoint, status int32, body Value) Value {
 	return Fail(clientError(status, text))
 }
 
-func clientDecode(c codec, status int32, in Value) Value {
-	v, issues := c.decode(in)
+func clientDecode(fb *Fiber, c codec, status int32, in Value) Value {
+	v, issues := c.decode(fb, in)
 	if issues != nil {
 		return Fail(clientError(status, "the response does not decode: "+issueText(issues)))
 	}
@@ -333,7 +333,7 @@ func clientDecode(c codec, status int32, in Value) Value {
 }
 
 // clientSuccess is the success value of the response, before its extras.
-func clientSuccess(e *apiEndpoint, r *received, text string) Value {
+func clientSuccess(fb *Fiber, e *apiEndpoint, r *received, text string) Value {
 	switch e.successEncoding {
 	case encBytes:
 		return byteList(r.body)
@@ -348,7 +348,7 @@ func clientSuccess(e *apiEndpoint, r *received, text string) Value {
 		events := sseEvents(text)
 		out := make([]Value, len(events))
 		for i, ev := range events {
-			out[i] = clientDecode(e.success, r.status, jsonOrText(record(ev).Get("data").(string)))
+			out[i] = clientDecode(fb, e.success, r.status, jsonOrText(record(ev).Get("data").(string)))
 		}
 		return StreamFromList(out)
 	}
@@ -356,17 +356,17 @@ func clientSuccess(e *apiEndpoint, r *received, text string) Value {
 		return Unit
 	}
 	if e.successEncoding == encText {
-		return clientDecode(e.success, r.status, text)
+		return clientDecode(fb, e.success, r.status, text)
 	}
-	return clientDecode(e.success, r.status, jsonOrText(text))
+	return clientDecode(fb, e.success, r.status, jsonOrText(text))
 }
 
 // clientExtras is the value with each extra of the response: its decoded
 // headers, the value of its cookie.
-func clientExtras(e *apiEndpoint, r *received, v Value) Value {
+func clientExtras(fb *Fiber, e *apiEndpoint, r *received, v Value) Value {
 	for _, extra := range e.extras {
 		if extra.headers != nil {
-			v = []Value{v, clientDecode(&ignoring{extra.headers}, r.status, lowerHeaders(r.headers))}
+			v = []Value{v, clientDecode(fb, &ignoring{extra.headers}, r.status, lowerHeaders(r.headers))}
 			continue
 		}
 		// a browser hides `Set-Cookie`, and an HttpOnly cookie, from scripts: the call still succeeds
@@ -390,16 +390,16 @@ func clientExtras(e *apiEndpoint, r *received, v Value) Value {
 // ignoring decodes an object without the keys its record codec does not name.
 type ignoring struct{ codec }
 
-func (i *ignoring) decode(in Value) (Value, []issue) {
+func (i *ignoring) decode(fb *Fiber, in Value) (Value, []issue) {
 	r, ok := in.(*Record)
 	if !ok {
-		return i.codec.decode(in)
+		return i.codec.decode(fb, in)
 	}
 	c := i.codec
 	if b, ok := c.(*block); ok {
 		c = &block{b.name, b.fields, true}
 	}
-	return c.decode(withoutExtra(c, r))
+	return c.decode(fb, withoutExtra(c, r))
 }
 
 var (

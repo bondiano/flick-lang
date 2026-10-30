@@ -227,6 +227,7 @@ pub fn build_into_generation(
             inputs: false,
         },
         project: Some(project.root.to_string_lossy().into_owned()),
+        display: None,
         entry: options.entry.clone(),
         generation: true,
         built: RefCell::default(),

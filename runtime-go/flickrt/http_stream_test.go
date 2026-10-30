@@ -29,7 +29,7 @@ func gatedStream(gate <-chan struct{}) *Stream {
 func TestServerStreamsChunksAsTheyCome(t *testing.T) {
 	gate := make(chan struct{})
 	owned(rootFiber(), func(fb *Fiber, _ *Owner) Value {
-		handler := Fn(func(Value) Value {
+		handler := Fn(func(fb *Fiber, _ Value) Value {
 			return Eff(func(*Fiber) Value { return ResponseStream(gatedStream(gate), noOptions) })
 		})
 		server := HttpServe(fb, Rec("host", "127.0.0.1", "port", 0.0, "gracefulShutdownTimeout", None), handler).(*HttpServer)

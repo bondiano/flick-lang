@@ -4,7 +4,7 @@ title: "Command line"
 
 `flick` is one binary over the compiler core. Every command takes the
 global options `--project <path>`, `--diagnostics human|json`,
-`--warnings-as-errors`, `--color auto|always|never`, `--quiet`/`--verbose`
+`--warnings-as-errors`, `--color auto|always|never`, `--quiet` (alias `--silent`)/`--verbose`
 and `--help`; `flick help <command>` prints a command's help and
 `flick --version` the compiler's version (`flick doctor` shows the rest).
 
@@ -15,7 +15,7 @@ and `--help`; `flick help <command>` prints a command's help and
 | `new <dir> [--template app\|cli\|fullstack\|lib]` | creates a project: `flick.toml`, `package.json`, an example module and its test; `cli` makes `main` a [`cli` block](../cli-dsl/); `fullstack` is a server entry and a browser page (`target = "client"`) sharing the calls of a [`server fn`](../server-fn/) module, writes guarded by `Server.authenticated`, with Vite for the page |
 | `init [--template app\|cli\|fullstack\|lib]` | the same files in the working directory; every file that exists is reported before anything is written (`FLICK-P019`) |
 | `check [paths] [--watch] [--fix]` | checks; without paths the source and test roots; `--fix` applies the fixes that keep the program's meaning (such as removing a type annotation the value already has, `FLICK-T021`) to those files and reports what is left |
-| `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts\|go] [--emit-dts] [--schema-aot] [--out-dir] [--watch]` | writes ESM, source maps and `.iface` files; then, unless `--quiet` or `--diagnostics json`, says on stderr how many modules it compiled and which runner starts each entry, or how many errors it found and where |
+| `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts\|go] [--emit-dts] [--schema-aot] [--out-dir] [--watch]` | writes ESM, source maps and `.iface` files; shows build phases on stderr, then the module count and entry runners, or error counts and locations; `--silent`/`--quiet` and `--diagnostics json` suppress progress and the summary |
 | `build [paths] --inputs` | prints a conservative JSON input inventory (`key`, `files`, `roots`, `modules`) without writing build artifacts or cache entries |
 | `run [name] [--entry M] [--profile] [--devtools[=url]] -- args` | builds JavaScript and runs the `main` of the entry `name` (the only one when left out); `--devtools` sends its spans to the Effect DevTools ([observability](../observability/#devtools)) |
 | `dev [name] [--entry M] [--profile] [--devtools[=url]] -- args` | rebuilds on changes and replaces the running app; in a project with several entries and none named, it runs every entry that is not a client's and, if one is, Vite (`node_modules/.bin/vite`) for the pages, which replaces a changed module in the page keeping the labelled atoms' values |
@@ -103,6 +103,19 @@ with `schema-version`: `diagnostic`, `log` (service messages),
 `application-stderr` (the app's or the tests' stderr) and
 `package-manager-output` (pnpm), the last three as
 `{ "type", "channel", "text" }` without ANSI codes.
+
+`--silent` is an alias for `--quiet`, accepted before or after the command.
+It suppresses service output, not warnings or errors, and leaves useful stdout
+(such as `build --inputs` JSON or the app's output) intact. It conflicts with
+`--verbose`; `--warnings-as-errors` still promotes warnings and changes the exit code.
+
+Explicit `build` and `build --watch` show one updating line with the current
+phase and elapsed time when stderr is a TTY, `TERM` is not `dumb`, and `CI` is
+unset. Pipes, CI and dumb terminals get one line per phase, without animation.
+Color follows `--color` and `NO_COLOR`; disabling color does not disable animation.
+The live line is cleared before diagnostics and the final summary. Internal builds
+in `run`, `dev` and `pack` do not show this progress. `build --inputs` prints only
+its JSON inventory on success, without progress or a summary.
 
 | Code | Meaning |
 | - | - |

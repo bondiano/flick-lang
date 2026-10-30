@@ -27,11 +27,11 @@ func RefSet(r, v Value) Value {
 	return Unit
 }
 
-func RefModify(r, f Value) Value {
+func RefModify(fb *Fiber, r, f Value) Value {
 	cell := r.(*Ref)
 	cell.mu.Lock()
 	defer cell.mu.Unlock()
-	pair := Apply(f, cell.value).([]Value)
+	pair := Apply(fb, f, cell.value).([]Value)
 	cell.value = pair[1]
 	return pair[0]
 }
@@ -87,21 +87,21 @@ func DeferredPoll(_ *Fiber, d Value) Value {
 }
 
 func DeferredSucceed(_ *Fiber, v, d Value) Value         { return settle(d, Succeed(v)) }
-func DeferredSync(_ *Fiber, f, d Value) Value            { return settle(d, Succeed(Apply(f, Unit))) }
+func DeferredSync(fb *Fiber, f, d Value) Value           { return settle(d, Succeed(Apply(fb, f, Unit))) }
 func DeferredCompleteWith(_ *Fiber, task, d Value) Value { return settle(d, task) }
 
 func DeferredFail(_ *Fiber, err, d Value) Value {
 	return settle(d, failing(&Cause{kind: causeFail, err: err}))
 }
 
-func DeferredFailSync(_ *Fiber, f, d Value) Value {
-	return settle(d, failing(&Cause{kind: causeFail, err: Apply(f, Unit)}))
+func DeferredFailSync(fb *Fiber, f, d Value) Value {
+	return settle(d, failing(&Cause{kind: causeFail, err: Apply(fb, f, Unit)}))
 }
 
 func DeferredFailCause(_ *Fiber, f, d Value) Value { return settle(d, failing(f.(*Supervised).cause)) }
 
-func DeferredFailCauseSync(_ *Fiber, f, d Value) Value {
-	return settle(d, failing(Apply(f, Unit).(*Supervised).cause))
+func DeferredFailCauseSync(fb *Fiber, f, d Value) Value {
+	return settle(d, failing(Apply(fb, f, Unit).(*Supervised).cause))
 }
 
 func DeferredInterrupt(fb *Fiber, d Value) Value {

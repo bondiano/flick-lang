@@ -39,7 +39,7 @@ func fetchTransport(fb *Fiber, request *ClientRequest, url Value) Value {
 		if errors.As(err, &c) && c.cause.has(causeInterrupt) {
 			rethrow(err)
 		}
-		return Fail(requestFailure(transportErrorTag, request, Some(err.Error())))
+		return Fail(requestFailure(fb, transportErrorTag, request, Some(err.Error())))
 	}
 	type answer struct {
 		response *ClientResponse
@@ -75,7 +75,7 @@ func fetchTransport(fb *Fiber, request *ClientRequest, url Value) Value {
 	}).(answer)
 	if got.failed {
 		cancel()
-		return Fail(requestFailure(transportErrorTag, request, Some("fetch failed")))
+		return Fail(requestFailure(fb, transportErrorTag, request, Some("fetch failed")))
 	}
 	return got.response
 }
@@ -166,6 +166,6 @@ func webResponse(request *ClientRequest, res *http.Response, cancel context.Canc
 }
 
 // FetchClientLayer is the service `Http.Client.HttpClient` of the client.
-func FetchClientLayer(key Value) Value {
-	return LayerSucceed(key, clientImpl(clientOfTransport(fetchTransport)))
+func FetchClientLayer(fb *Fiber, key Value) Value {
+	return LayerSucceed(key, clientImpl(fb, clientOfTransport(fetchTransport)))
 }

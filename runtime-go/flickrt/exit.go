@@ -136,41 +136,41 @@ func defectMessage(defect string) string {
 
 var jsErrorNames = []string{"Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "URIError", "EvalError", "AggregateError"}
 
-func ExitMatch(onSuccess, onFailure, e Value) Value {
+func ExitMatch(fb *Fiber, onSuccess, onFailure, e Value) Value {
 	if x := ex(e); x.cause != nil {
-		return Apply(onFailure, failureOf(x.cause))
+		return Apply(fb, onFailure, failureOf(x.cause))
 	}
-	return Apply(onSuccess, ex(e).value)
+	return Apply(fb, onSuccess, ex(e).value)
 }
 
-func ExitMap(f, e Value) Value {
+func ExitMap(fb *Fiber, f, e Value) Value {
 	if x := ex(e); x.cause == nil {
-		return &Exit{value: Apply(f, x.value)}
+		return &Exit{value: Apply(fb, f, x.value)}
 	}
 	return e
 }
 
 // mapErrors is the cause with each typed error mapped by `f`.
-func (c *Cause) mapErrors(f Value) *Cause {
+func (c *Cause) mapErrors(fb *Fiber, f Value) *Cause {
 	if c == nil {
 		return nil
 	}
 	switch c.kind {
 	case causeFail:
-		return &Cause{kind: causeFail, err: Apply(f, c.err)}
+		return &Cause{kind: causeFail, err: Apply(fb, f, c.err)}
 	case causeSequential, causeParallel:
-		return &Cause{kind: c.kind, left: c.left.mapErrors(f), right: c.right.mapErrors(f)}
+		return &Cause{kind: c.kind, left: c.left.mapErrors(fb, f), right: c.right.mapErrors(fb, f)}
 	}
 	return c
 }
 
-func ExitMapError(f, e Value) Value {
+func ExitMapError(fb *Fiber, f, e Value) Value {
 	x := ex(e)
-	return &Exit{x.value, x.cause.mapErrors(f)}
+	return &Exit{x.value, x.cause.mapErrors(fb, f)}
 }
 
-func ExitMapBoth(onFailure, onSuccess, e Value) Value {
-	return ExitMap(onSuccess, ExitMapError(onFailure, e))
+func ExitMapBoth(fb *Fiber, onFailure, onSuccess, e Value) Value {
+	return ExitMap(fb, onSuccess, ExitMapError(fb, onFailure, e))
 }
 
 func ExitAsVoid(e Value) Value {
@@ -203,7 +203,18 @@ func CauseHasInterrupts(f Value) Value { return causeOfFailure(f).has(causeInter
 func CauseCombine(that, self Value) Value {
 	return failureOf(Sequential(causeOfFailure(self), causeOfFailure(that)))
 }
-func CauseMap(f, self Value) Value { return failureOf(causeOfFailure(self).mapErrors(f)) }
+func CauseMap(fb *Fiber, f, self Value) Value {
+	return failureOf(causeOfFailure(self).mapErrors(fb, f))
+}
+
+func CauseReasons(f Value) Value {
+	reasons := causeOfFailure(f).reasons()
+	out := make([]Value, len(reasons))
+	for i, reason := range reasons {
+		out[i] = reason
+	}
+	return out
+}
 
 func CauseHasInterruptsOnly(f Value) Value {
 	c := causeOfFailure(f)
@@ -312,7 +323,7 @@ func withExit(fb *Fiber, task Value, after func(*Exit) Value) Value {
 }
 
 func EffectOnExit(fb *Fiber, handler, task Value) Value {
-	return withExit(fb, task, func(e *Exit) Value { return Apply(handler, e) })
+	return withExit(fb, task, func(e *Exit) Value { return Apply(fb, handler, e) })
 }
 
 func EffectOnInterrupt(fb *Fiber, handler, task Value) Value {
@@ -320,7 +331,7 @@ func EffectOnInterrupt(fb *Fiber, handler, task Value) Value {
 		if !e.cause.has(causeInterrupt) {
 			return nil
 		}
-		return Apply(handler, CauseInterruptors(failureOf(e.cause)))
+		return Apply(fb, handler, CauseInterruptors(failureOf(e.cause)))
 	})
 }
 

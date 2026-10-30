@@ -18,38 +18,38 @@ type fallible struct{ codec }
 // runs `back` first.
 type stage struct {
 	wire codec
-	to   func(Value) (Value, []issue)
-	back func(Value) (Value, []issue)
+	to   func(*Fiber, Value) (Value, []issue)
+	back func(*Fiber, Value) (Value, []issue)
 }
 
 func (s *stage) accepts(in Value) bool { return s.wire.accepts(in) }
 
-func (s *stage) decode(in Value) (Value, []issue) {
-	v, issues := s.wire.decode(in)
+func (s *stage) decode(fb *Fiber, in Value) (Value, []issue) {
+	v, issues := s.wire.decode(fb, in)
 	if issues != nil {
 		return nil, issues
 	}
-	return s.to(v)
+	return s.to(fb, v)
 }
 
-func (s *stage) encode(v Value) (Value, []issue) {
-	w, issues := s.back(v)
+func (s *stage) encode(fb *Fiber, v Value) (Value, []issue) {
+	w, issues := s.back(fb, v)
 	if issues != nil {
 		return nil, issues
 	}
-	return s.wire.encode(w)
+	return s.wire.encode(fb, w)
 }
 
-func httpCodec(wire codec, to, back func(Value) (Value, []issue)) Value {
+func httpCodec(wire codec, to, back func(*Fiber, Value) (Value, []issue)) Value {
 	return &fallible{&stage{wire, to, back}}
 }
 
 // stringAs is a JSON string that Effect names `expected` when it is not one.
 type stringAs struct{ expected string }
 
-func (s *stringAs) accepts(in Value) bool           { _, ok := in.(string); return ok }
-func (s *stringAs) encode(v Value) (Value, []issue) { return v, nil }
-func (s *stringAs) decode(in Value) (Value, []issue) {
+func (s *stringAs) accepts(in Value) bool                     { _, ok := in.(string); return ok }
+func (s *stringAs) encode(_ *Fiber, v Value) (Value, []issue) { return v, nil }
+func (s *stringAs) decode(_ *Fiber, in Value) (Value, []issue) {
 	if _, ok := in.(string); !ok {
 		return nil, expected(s.expected, in)
 	}
@@ -59,9 +59,9 @@ func (s *stringAs) decode(in Value) (Value, []issue) {
 // stringRecord is a JSON object of strings.
 type stringRecord struct{}
 
-func (stringRecord) accepts(in Value) bool           { _, ok := in.(*Record); return ok }
-func (stringRecord) encode(v Value) (Value, []issue) { return v, nil }
-func (stringRecord) decode(in Value) (Value, []issue) {
+func (stringRecord) accepts(in Value) bool                     { _, ok := in.(*Record); return ok }
+func (stringRecord) encode(_ *Fiber, v Value) (Value, []issue) { return v, nil }
+func (stringRecord) decode(_ *Fiber, in Value) (Value, []issue) {
 	r, ok := in.(*Record)
 	if !ok {
 		return nil, expected("an object", in)
@@ -80,8 +80,8 @@ var (
 	pairsWire   = sch(SchemaList(SchemaTuple(SchemaString, SchemaString))).jsonOf()
 )
 
-func pure(f func(Value) Value) func(Value) (Value, []issue) {
-	return func(v Value) (Value, []issue) { return f(v), nil }
+func pure(f func(Value) Value) func(*Fiber, Value) (Value, []issue) {
+	return func(_ *Fiber, v Value) (Value, []issue) { return f(v), nil }
 }
 
 var (
@@ -98,7 +98,7 @@ var (
 
 	CodecUrlParams = httpCodec(pairsWire, pure(UrlParamsMake), pure(UrlParamsToList))
 
-	CodecCookie = httpCodec(stringWire, func(v Value) (Value, []issue) {
+	CodecCookie = httpCodec(stringWire, func(_ *Fiber, v Value) (Value, []issue) {
 		if c, ok := parseSetCookie(Trim(v).(string)); ok {
 			return c, nil
 		}
@@ -107,7 +107,7 @@ var (
 
 	CodecCookies = httpCodec(stringsWire, pure(CookiesFromSetCookie), pure(CookiesToSetCookieHeaders))
 
-	CodecUrl = httpCodec(&stringAs{"a string that will be decoded as a URL"}, func(v Value) (Value, []issue) {
+	CodecUrl = httpCodec(&stringAs{"a string that will be decoded as a URL"}, func(_ *Fiber, v Value) (Value, []issue) {
 		if u, ok := parseURL(v.(string)); ok {
 			return *u, nil
 		}
@@ -119,10 +119,10 @@ var (
 // or an array of them for a key given more than once.
 func CodecFromUrlParams(inner Value) Value {
 	c := codecOf(inner)
-	return httpCodec(pairsWire, func(v Value) (Value, []issue) {
-		return c.decode(paramsRecord(List(v)))
-	}, func(v Value) (Value, []issue) {
-		w, issues := c.encode(v)
+	return httpCodec(pairsWire, func(fb *Fiber, v Value) (Value, []issue) {
+		return c.decode(fb, paramsRecord(List(v)))
+	}, func(fb *Fiber, v Value) (Value, []issue) {
+		w, issues := c.encode(fb, v)
 		if issues != nil {
 			return nil, issues
 		}
@@ -133,15 +133,15 @@ func CodecFromUrlParams(inner Value) Value {
 // CodecFromCookies reads the cookies as a record of their values.
 func CodecFromCookies(inner Value) Value {
 	c := codecOf(inner)
-	return httpCodec(stringsWire, func(v Value) (Value, []issue) {
+	return httpCodec(stringsWire, func(fb *Fiber, v Value) (Value, []issue) {
 		jar := jarOf(CookiesFromSetCookie(v))
 		values := newRecord(len(jar.keys))
 		for i, k := range jar.keys {
 			values.put(k, cookieOf(jar.vals[i]).value)
 		}
-		return c.decode(values)
-	}, func(v Value) (Value, []issue) {
-		w, issues := c.encode(v)
+		return c.decode(fb, values)
+	}, func(fb *Fiber, v Value) (Value, []issue) {
+		w, issues := c.encode(fb, v)
 		if issues != nil {
 			return nil, issues
 		}
@@ -164,7 +164,7 @@ func CodecFromCookies(inner Value) Value {
 // `field`.
 func CodecJsonUrlParamsField(field, inner Value) Value {
 	c, name := codecOf(inner), field.(string)
-	return httpCodec(pairsWire, func(v Value) (Value, []issue) {
+	return httpCodec(pairsWire, func(fb *Fiber, v Value) (Value, []issue) {
 		text := UrlParamsGetFirst(name, List(v))
 		if !isSome(text) {
 			return nil, under(name, fail("a missing key"))
@@ -173,9 +173,9 @@ func CodecJsonUrlParamsField(field, inner Value) Value {
 		if !isOk(parsed) {
 			return nil, fail("an invalid value")
 		}
-		return c.decode(value(parsed))
-	}, func(v Value) (Value, []issue) {
-		w, issues := c.encode(v)
+		return c.decode(fb, value(parsed))
+	}, func(fb *Fiber, v Value) (Value, []issue) {
+		w, issues := c.encode(fb, v)
 		if issues != nil {
 			return nil, issues
 		}
@@ -187,10 +187,10 @@ func CodecJsonUrlParamsField(field, inner Value) Value {
 // paths.
 func CodecFromUrlSearchParams(inner Value) Value {
 	c := codecOf(inner)
-	return httpCodec(stringWire, func(v Value) (Value, []issue) {
-		return c.decode(treeRecord(formDecode(strings.TrimPrefix(v.(string), "?"))))
-	}, func(v Value) (Value, []issue) {
-		w, issues := c.encode(v)
+	return httpCodec(stringWire, func(fb *Fiber, v Value) (Value, []issue) {
+		return c.decode(fb, treeRecord(formDecode(strings.TrimPrefix(v.(string), "?"))))
+	}, func(fb *Fiber, v Value) (Value, []issue) {
+		w, issues := c.encode(fb, v)
 		if issues != nil {
 			return nil, issues
 		}
@@ -202,16 +202,16 @@ func CodecFromUrlSearchParams(inner Value) Value {
 // bracket paths.
 func CodecFromFormData(inner Value) Value {
 	c := codecOf(inner)
-	return httpCodec(pairsWire, func(v Value) (Value, []issue) {
+	return httpCodec(pairsWire, func(fb *Fiber, v Value) (Value, []issue) {
 		fields := List(v)
 		pairs := make([]Value, len(fields))
 		for i, f := range fields {
 			k, val := pairOf(f)
 			pairs[i] = []Value{wellFormed(k), wellFormed(val)}
 		}
-		return c.decode(treeRecord(pairs))
-	}, func(v Value) (Value, []issue) {
-		w, issues := c.encode(v)
+		return c.decode(fb, treeRecord(pairs))
+	}, func(fb *Fiber, v Value) (Value, []issue) {
+		w, issues := c.encode(fb, v)
 		if issues != nil {
 			return nil, issues
 		}

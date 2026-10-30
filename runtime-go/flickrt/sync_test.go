@@ -8,13 +8,13 @@ import (
 
 func TestRefModifyIsAtomic(t *testing.T) {
 	cell := RefMake(float64(0))
-	inc := Fn(func(n Value) Value { return []Value{Unit, n.(float64) + 1} })
+	inc := Fn(func(fb *Fiber, n Value) Value { return []Value{Unit, n.(float64) + 1} })
 	var wg sync.WaitGroup
 	for range 1000 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			RefModify(cell, inc)
+			RefModify(nil, cell, inc)
 		}()
 	}
 	wg.Wait()
@@ -72,7 +72,7 @@ func TestSemaphoreNeverExceedsItsPermits(t *testing.T) {
 
 func TestSyncRefUpdateEffectSerializes(t *testing.T) {
 	r := SyncRefMake(nil, float64(0))
-	add := Fn(func(n Value) Value {
+	add := Fn(func(fb *Fiber, n Value) Value {
 		return Eff(func(*Fiber) Value {
 			runtime.Gosched() // another update would interleave here without the lock
 			return n.(float64) + 1

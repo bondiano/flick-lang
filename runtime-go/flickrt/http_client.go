@@ -7,13 +7,13 @@ package flickrt
 // HttpClientError itself.
 
 type Client struct {
-	pre  func(request Value) Value  // a task of the prepared request
-	post func(prepared Value) Value // a task of the response, of a task of the prepared request
+	pre  func(fb *Fiber, request Value) Value  // a task of the prepared request
+	post func(fb *Fiber, prepared Value) Value // a task of the response, of a task of the prepared request
 }
 
 func httpClientOf(v Value) *Client { return v.(*Client) }
 
-func (c *Client) execute(request Value) Value { return c.post(c.pre(request)) }
+func (c *Client) execute(fb *Fiber, request Value) Value { return c.post(fb, c.pre(fb, request)) }
 
 // The fiber-local settings of the client's spans, as Effect's references.
 const (
@@ -24,7 +24,7 @@ const (
 )
 
 func HttpClientExecute(fb *Fiber, client, request Value) Value {
-	return Run(fb, httpClientOf(client).execute(request))
+	return Run(fb, httpClientOf(client).execute(fb, request))
 }
 
 // transport sends a prepared request to its URL.
@@ -34,7 +34,7 @@ type transport func(fb *Fiber, request *ClientRequest, url Value) Value
 // URL.
 func HttpClientMake(f Value) Value {
 	return clientOfTransport(func(fb *Fiber, request *ClientRequest, url Value) Value {
-		return Run(fb, Apply(Apply(f, request), url))
+		return Run(fb, Apply(fb, Apply(fb, f, request), url))
 	})
 }
 
@@ -45,20 +45,20 @@ func HttpClientMake(f Value) Value {
 //
 // shortcut: the span has no attributes and is not exported, as the go target's spans are not; record the request and response when spans are
 func clientOfTransport(send transport) *Client {
-	return &Client{pre: Succeed, post: func(prepared Value) Value {
+	return &Client{pre: func(_ *Fiber, request Value) Value { return Succeed(request) }, post: func(fb *Fiber, prepared Value) Value {
 		return Eff(func(fb *Fiber) Value {
 			request := clientOf(Run(fb, prepared))
 			url := UrlMake(request.url, request.params, request.hash)
 			if !isOk(url) {
 				// Effect's UrlError has no message of its own
-				return Fail(requestFailure(invalidUrlTag, request, Some("")))
+				return Fail(requestFailure(fb, invalidUrlTag, request, Some("")))
 			}
-			if f, ok := fb.env.get(clientTracerDisabledKey); ok && Apply(f, request).(bool) {
+			if f, ok := fb.env.get(clientTracerDisabledKey); ok && Apply(fb, f, request).(bool) {
 				return send(fb, request, value(url))
 			}
 			name := Value(request.method)
 			if f, ok := fb.env.get(clientSpanNameKey); ok {
-				name = Apply(f, request)
+				name = Apply(fb, f, request)
 			}
 			s := openSpan(fb, name, Rec("parent", None, "root", false))
 			if on, ok := fb.env.get(clientPropagationKey); !ok || on.(bool) {
@@ -85,14 +85,14 @@ func (s *span) b3() string {
 // and the preparation of each request, both Flick functions.
 func HttpClientMakeWith(post, pre Value) Value {
 	return &Client{
-		pre:  func(request Value) Value { return Apply(pre, request) },
-		post: func(prepared Value) Value { return Apply(post, prepared) },
+		pre:  func(fb *Fiber, request Value) Value { return Apply(fb, pre, request) },
+		post: func(fb *Fiber, prepared Value) Value { return Apply(fb, post, prepared) },
 	}
 }
 
 // clientImpl is the operations of the Flick service `Http.Client.HttpClient`.
-func clientImpl(client Value) Value {
-	return Rec("client", Fn(func(Value) Value { return Succeed(client) }))
+func clientImpl(fb *Fiber, client Value) Value {
+	return Rec("client", Fn(func(fb *Fiber, _ Value) Value { return Succeed(client) }))
 }
 
 func HttpClientLayer(key, task Value) Value {

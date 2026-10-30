@@ -175,6 +175,33 @@ let finalizers () =
       (task { Layer.launch (Layer.effect_discard (task { Platform.stdout_line "launched" })) })
   Platform.stdout_line ("launch interrupted " ++ show (Option.is_none launched))
 
+failed_build_cleanup : Unit ->{} Unit
+let failed_build_cleanup () =
+  let released = Ref.make 0
+  let zero = Ref.make 0
+  broken : Layer none {BootError} none
+  let broken =
+    Layer.from_build (fun _ ->
+      Scope.add_finalizer
+        (task {
+          Ref.update released (fun n -> n + 1)
+          ignore (Int.unsafe_div 1 (Ref.get zero))
+        })
+      from_result (Err (BootError "build failed"))
+    )
+  let outcome = Effect.exit (task { provide broken { () } })
+  Platform.stdout_line
+    ("failed build causes "
+      ++ show
+        (Option.map
+          (fun failure -> (
+            Cause.has_fails failure,
+            Cause.has_dies failure,
+            List.length (Cause.reasons failure),
+          ))
+          (Exit.failure outcome)))
+  Platform.stdout_line ("failed build cleanup count " ++ show (Ref.get released))
+
 trace_options : Tracer.SpanOptions
 let trace_options = {
   attributes = [];
@@ -244,4 +271,5 @@ let main () =
   | BootError m -> Platform.stdout_line ("unexpected " ++ m)
   shared ()
   finalizers ()
+  failed_build_cleanup ()
   traces ()

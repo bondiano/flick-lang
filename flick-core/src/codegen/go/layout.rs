@@ -178,14 +178,14 @@ pub(super) fn conjunction<'a>(a: &'a DocumentArena<'a>, conds: Vec<Document<'a>>
     docvec![a, first, rest.nest(a, INDENT)].group(a)
 }
 
-/// The parameter list of a Go function taking the fiber, when `fiber`,
-/// then `names`, each a `Value`.
-pub(super) fn signature<S: Borrow<str>>(fiber: bool, names: &[S]) -> String {
+/// The parameter list of a Go function taking the hidden fiber, then
+/// `names`, each a `Value`, independently of its language stages.
+pub(super) fn signature<S: Borrow<str>>(names: &[S]) -> String {
     let params = param_list(names);
-    match (fiber, params.is_empty()) {
-        (false, _) => params,
-        (true, true) => "fb *flickrt.Fiber".to_owned(),
-        (true, false) => format!("fb *flickrt.Fiber, {params}"),
+    if params.is_empty() {
+        "fb *flickrt.Fiber".to_owned()
+    } else {
+        format!("fb *flickrt.Fiber, {params}")
     }
 }
 

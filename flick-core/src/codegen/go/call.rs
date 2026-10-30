@@ -6,21 +6,25 @@ use std::{iter, mem, slice};
 
 use flick_pretty::{Document, DocumentArena, docvec};
 
-use super::layout::{Code, block, call, closure, param_list, single, statement};
+use super::layout::{Code, block, call, closure, signature, single, statement};
 use super::{Gen, Shape, names};
 use crate::codegen::tail::Target;
 use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage, operation_arity};
 use crate::types::{Dict, Rep};
 
 /// How to build a call from the fiber in scope and its Go arguments.
-type Call<'a> = Box<dyn Fn(Option<&'static str>, &[Code<'a>]) -> Code<'a> + 'a>;
+type Call<'a> = Box<dyn Fn(&'static str, &[Code<'a>]) -> Code<'a> + 'a>;
 
-/// The call of the Go function `f`, with the fiber first when it takes one.
-fn callee<'a>(a: &'a DocumentArena<'a>, f: &str, fiber: bool) -> Call<'a> {
+/// The call of the Go function `f`, with the hidden execution context.
+fn callee<'a>(a: &'a DocumentArena<'a>, f: &str) -> Call<'a> {
     let f = a.alloc_str(f);
     Box::new(move |fb, args: &[Code<'a>]| {
-        let fb = fb.filter(|_| fiber).map(|fb| a.text(fb));
-        call(a, f, fb.into_iter().chain(args.iter().map(|arg| arg.doc))).into()
+        call(
+            a,
+            f,
+            iter::once(a.text(fb)).chain(args.iter().map(|arg| arg.doc)),
+        )
+        .into()
     })
 }
 
@@ -34,7 +38,7 @@ fn returning<'a>(a: &'a DocumentArena<'a>, value: Document<'a>) -> [Document<'a>
 /// gives a task, the last one running the call in the task's fiber.
 fn curried<'a>(
     a: &'a DocumentArena<'a>,
-    make: &dyn Fn(Option<&'static str>, &[Code<'a>]) -> Code<'a>,
+    make: &dyn Fn(&'static str, &[Code<'a>]) -> Code<'a>,
     given: Vec<Code<'a>>,
     n: usize,
     effects: u64,
@@ -47,7 +51,7 @@ fn curried<'a>(
         .collect();
     let last = n - 1;
     let mut body = if effects >> last & 1 == 1 {
-        let run = make(Some("fb"), &args).doc;
+        let run = make("fb", &args).doc;
         let task = closure(
             a,
             "func(fb *flickrt.Fiber) flickrt.Value",
@@ -55,7 +59,7 @@ fn curried<'a>(
         );
         call(a, "flickrt.Eff", [task])
     } else {
-        make(None, &args).doc
+        make("fb", &args).doc
     };
     for (i, h) in heads.iter().enumerate().rev() {
         if i < last && effects >> i & 1 == 1 {
@@ -63,7 +67,12 @@ fn curried<'a>(
             let task = closure(a, "func(*flickrt.Fiber) flickrt.Value", returning(a, body));
             body = call(a, "flickrt.Eff", [task]);
         }
-        let head = docvec![a, "func(", *h, " flickrt.Value) flickrt.Value"];
+        let head = docvec![
+            a,
+            "func(fb *flickrt.Fiber, ",
+            *h,
+            " flickrt.Value) flickrt.Value"
+        ];
         body = call(a, "flickrt.Fn", [closure(a, head, returning(a, body))]);
     }
     body.into()
@@ -88,7 +97,7 @@ pub(super) fn poly<'a>(
         .chain([statement(a, docvec![a, "return ", value])]);
     let f = docvec![
         a,
-        "func(ds ...flickrt.Value) flickrt.Value ",
+        "func(fb *flickrt.Fiber, ds ...flickrt.Value) flickrt.Value ",
         block(a, body)
     ];
     call(a, "flickrt.Poly", [f])
@@ -121,7 +130,8 @@ impl<'a> Gen<'a> {
             }
             _ => {
                 let f = self.expr(inner);
-                let args = iter::once(f).chain(dicts).map(|d| d.doc);
+                let args =
+                    iter::once(self.context()).chain(iter::once(f).chain(dicts).map(|d| d.doc));
                 call(self.a, "flickrt.Inst", args).into()
             }
         }
@@ -135,9 +145,10 @@ impl<'a> Gen<'a> {
             self.tail.take(),
             mem::replace(&mut self.generator, false),
             self.fiber.take(),
+            self.context.replace("fb"),
         );
         let (stmts, v) = self.block(|g| g.expr(inner));
-        (self.tail, self.generator, self.fiber) = saved;
+        (self.tail, self.generator, self.fiber, self.context) = saved;
         self.givens.truncate(mark);
         poly(self.a, &dicts, stmts, v).into()
     }
@@ -162,16 +173,16 @@ impl<'a> Gen<'a> {
             } if dicts.len() == n => {
                 let f = names::func(module, name);
                 match params {
-                    0 => call(a, f, dicts.into_iter().map(|d| d.doc)).into(),
-                    1 if n == 0 && effects == 0 => self.code(&f),
-                    _ => curried(
+                    0 => call(
                         a,
-                        &callee(a, &f, shape.fiber()),
-                        dicts,
-                        params,
-                        effects,
-                        &mut || self.temp(),
-                    ),
+                        f,
+                        iter::once(self.context()).chain(dicts.into_iter().map(|d| d.doc)),
+                    )
+                    .into(),
+                    1 if n == 0 && effects == 0 => self.code(&f),
+                    _ => curried(a, &callee(a, &f), dicts, params, effects, &mut || {
+                        self.temp()
+                    }),
                 }
             }
             // a constrained value passed on before its dictionaries
@@ -183,21 +194,20 @@ impl<'a> Gen<'a> {
                 let given: Vec<Code<'a>> = (0..n).map(|i| self.code(&format!("ds[{i}]"))).collect();
                 let f = names::func(module, name);
                 let inner = if params == 0 {
-                    call(a, f, given.into_iter().map(|d| d.doc))
-                } else {
-                    curried(
+                    call(
                         a,
-                        &callee(a, &f, shape.fiber()),
-                        given,
-                        params,
-                        effects,
-                        &mut || self.temp(),
+                        f,
+                        iter::once(a.text("fb")).chain(given.into_iter().map(|d| d.doc)),
                     )
+                } else {
+                    curried(a, &callee(a, &f), given, params, effects, &mut || {
+                        self.temp()
+                    })
                     .doc
                 };
                 let f = closure(
                     a,
-                    "func(ds ...flickrt.Value) flickrt.Value",
+                    "func(fb *flickrt.Fiber, ds ...flickrt.Value) flickrt.Value",
                     returning(a, inner),
                 );
                 call(a, "flickrt.Poly", [f]).into()
@@ -284,10 +294,9 @@ impl<'a> Gen<'a> {
                 .chain(values.into_iter().map(|(v, _)| v))
                 .map(|v| self.spill(v))
                 .collect();
-            let fb = self.fiber;
             return curried(
                 a,
-                &|inner, args| make(inner.or(fb), args),
+                &make,
                 given,
                 arity - taken,
                 effects >> taken,
@@ -299,9 +308,9 @@ impl<'a> Gen<'a> {
             .into_iter()
             .chain(values.into_iter().map(|(v, _)| v))
             .collect();
-        let mut v = make(self.fiber, &all);
+        let mut v = make(self.context.unwrap_or("nil"), &all);
         for (arg, stage) in rest {
-            v = call(a, "flickrt.Apply", [v.doc, arg.doc]).into();
+            v = call(a, "flickrt.Apply", [self.context(), v.doc, arg.doc]).into();
             if stage != Stage::Pure {
                 v = self.run(v);
             }
@@ -331,9 +340,9 @@ impl<'a> Gen<'a> {
                 dicts: n,
                 params,
                 effects,
-            } if n == dicts.len() && params > 0 && (self.fiber.is_some() || !shape.fiber()) => {
+            } if n == dicts.len() && params > 0 && (self.fiber.is_some() || !shape.effectful()) => {
                 let f = names::func(module, name);
-                (callee(self.a, &f, shape.fiber()), dicts, params, effects)
+                (callee(self.a, &f), dicts, params, effects)
             }
             _ => {
                 let f = self.global_value(module, name, dicts);
@@ -371,16 +380,19 @@ impl<'a> Gen<'a> {
         let a = self.a;
         let effectful = |p: &Param| p.stage != Stage::Pure;
         let last_effectful = params.last().is_some_and(effectful);
-        let saved = mem::replace(&mut self.fiber, last_effectful.then_some("fb"));
+        let saved = (
+            mem::replace(&mut self.fiber, last_effectful.then_some("fb")),
+            self.context.replace("fb"),
+        );
         let (heads, stmts) = self.function_body(params, body, target);
-        self.fiber = saved;
+        (self.fiber, self.context) = saved;
         let body = if last_effectful {
             let task = docvec![a, "func(fb *flickrt.Fiber) flickrt.Value ", block(a, stmts)];
             single(a, docvec![a, "return ", call(a, "flickrt.Eff", [task])])
         } else {
             block(a, stmts)
         };
-        let last = param_list(&heads[heads.len() - 1..]);
+        let last = signature(&heads[heads.len() - 1..]);
         let mut text = docvec![a, "func(", last, ") flickrt.Value ", body];
         for (h, p) in heads[..heads.len() - 1].iter().zip(params).rev() {
             let mut next = call(a, "flickrt.Fn", [text]);
@@ -390,7 +402,7 @@ impl<'a> Gen<'a> {
                 let task = docvec![a, "func(*flickrt.Fiber) flickrt.Value ", task];
                 next = call(a, "flickrt.Eff", [task]);
             }
-            let head = param_list(slice::from_ref(h));
+            let head = signature(slice::from_ref(h));
             text = docvec![
                 a,
                 "func(",

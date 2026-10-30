@@ -46,9 +46,16 @@ impl<'a> Gen<'a> {
             self.tail.take(),
             mem::replace(&mut self.generator, true),
             self.fiber.take(),
+            self.context.replace("fb"),
         );
         let (mut stmts, ()) = self.block(|g| g.discard(body));
-        (self.collector, self.tail, self.generator, self.fiber) = saved;
+        (
+            self.collector,
+            self.tail,
+            self.generator,
+            self.fiber,
+            self.context,
+        ) = saved;
         if let Some((n, count)) = limit {
             let none = call(a, "flickrt.CountOf", [n.doc]);
             let start = [
@@ -57,7 +64,11 @@ impl<'a> Gen<'a> {
             ];
             stmts.splice(0..0, start);
         }
-        let f = docvec![a, "func(yield func(flickrt.Value) bool) ", block(a, stmts)];
+        let f = docvec![
+            a,
+            "func(fb *flickrt.Fiber, yield func(flickrt.Value) bool) ",
+            block(a, stmts)
+        ];
         call(a, "flickrt.Seq", [f]).into()
     }
 
@@ -79,7 +90,7 @@ impl<'a> Gen<'a> {
                 // a pattern that ignores the element leaves the variable unused
                 let used = statement(a, docvec![a, "_ = ", var]);
                 let body = block(a, iter::once(used).chain(inner));
-                let range = call(a, "flickrt.Iter", [s.doc]);
+                let range = call(a, "flickrt.Iter", [self.context(), s.doc]);
                 self.emit(docvec![a, "for ", var, " := range ", range, " ", body]);
             }
             ExprKind::Yield(value) => {

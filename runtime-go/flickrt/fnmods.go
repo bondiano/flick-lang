@@ -33,86 +33,96 @@ func BoolSome(xs Value) Value {
 	return false
 }
 
-func BoolMatch(options, b Value) Value {
+func BoolMatch(fb *Fiber, options, b Value) Value {
 	r := record(options)
 	if b.(bool) {
-		return Apply(r.Get("onTrue"), Unit)
+		return Apply(fb, r.Get("onTrue"), Unit)
 	}
-	return Apply(r.Get("onFalse"), Unit)
+	return Apply(fb, r.Get("onFalse"), Unit)
 }
 
-func PredicateMapInput(f, p, b Value) Value { return Apply(p, Apply(f, b)) }
-func PredicateNot(p, a Value) Value         { return !pred(p, a) }
+func PredicateMapInput(fb *Fiber, f, p, b Value) Value { return Apply(fb, p, Apply(fb, f, b)) }
+func PredicateNot(fb *Fiber, p, a Value) Value         { return !pred(fb, p, a) }
 
 // The joined predicates test `that` only when the operator needs it, as
 // `&&` and `||` do.
-func PredicateAnd(that, self, a Value) Value  { return pred(self, a) && pred(that, a) }
-func PredicateOr(that, self, a Value) Value   { return pred(self, a) || pred(that, a) }
-func PredicateXor(that, self, a Value) Value  { return pred(self, a) != pred(that, a) }
-func PredicateEqv(that, self, a Value) Value  { return pred(self, a) == pred(that, a) }
-func PredicateNand(that, self, a Value) Value { return !(pred(self, a) && pred(that, a)) }
-func PredicateNor(that, self, a Value) Value  { return !(pred(self, a) || pred(that, a)) }
-
-// PredicateImplies is `antecedent a` implying `consequent a`.
-func PredicateImplies(consequent, antecedent, a Value) Value {
-	return !pred(antecedent, a) || pred(consequent, a)
+func PredicateAnd(fb *Fiber, that, self, a Value) Value {
+	return pred(fb, self, a) && pred(fb, that, a)
+}
+func PredicateOr(fb *Fiber, that, self, a Value) Value { return pred(fb, self, a) || pred(fb, that, a) }
+func PredicateXor(fb *Fiber, that, self, a Value) Value {
+	return pred(fb, self, a) != pred(fb, that, a)
+}
+func PredicateEqv(fb *Fiber, that, self, a Value) Value {
+	return pred(fb, self, a) == pred(fb, that, a)
+}
+func PredicateNand(fb *Fiber, that, self, a Value) Value {
+	return !(pred(fb, self, a) && pred(fb, that, a))
+}
+func PredicateNor(fb *Fiber, that, self, a Value) Value {
+	return !(pred(fb, self, a) || pred(fb, that, a))
 }
 
-func PredicateEvery(ps, a Value) Value {
+// PredicateImplies is `antecedent a` implying `consequent a`.
+func PredicateImplies(fb *Fiber, consequent, antecedent, a Value) Value {
+	return !pred(fb, antecedent, a) || pred(fb, consequent, a)
+}
+
+func PredicateEvery(fb *Fiber, ps, a Value) Value {
 	for _, p := range List(ps) {
-		if !pred(p, a) {
+		if !pred(fb, p, a) {
 			return false
 		}
 	}
 	return true
 }
 
-func PredicateSome(ps, a Value) Value {
+func PredicateSome(fb *Fiber, ps, a Value) Value {
 	for _, p := range List(ps) {
-		if pred(p, a) {
+		if pred(fb, p, a) {
 			return true
 		}
 	}
 	return false
 }
 
-func FilterMake(f, i Value) Value { return Apply(f, i) }
+func FilterMake(fb *Fiber, f, i Value) Value { return Apply(fb, f, i) }
 
 // FilterMakeEffect runs the task of an effectful filter.
-func FilterMakeEffect(fb *Fiber, f, i Value) Value { return Run(fb, Apply(f, i)) }
+func FilterMakeEffect(fb *Fiber, f, i Value) Value { return Run(fb, Apply(fb, f, i)) }
 
-func FilterMapFail(f, self, i Value) Value {
-	if r := Apply(self, i); !isOk(r) {
-		return Err(Apply(f, value(r)))
+func FilterMapFail(fb *Fiber, f, self, i Value) Value {
+	if r := Apply(fb, self, i); !isOk(r) {
+		return Err(Apply(fb, f, value(r)))
 	} else {
 		return r
 	}
 }
 
-func FilterFromPredicate(p, i Value) Value {
-	if pred(p, i) {
+func FilterFromPredicate(fb *Fiber, p, i Value) Value {
+	if pred(fb, p, i) {
 		return Ok(i)
 	}
 	return Err(i)
 }
 
-func FilterFromPredicateOption(f, i Value) Value {
-	if o := Apply(f, i); isSome(o) {
+func FilterFromPredicateOption(fb *Fiber, f, i Value) Value {
+	if o := Apply(fb, f, i); isSome(o) {
 		return Ok(value(o))
 	}
 	return Err(i)
 }
 
-func FilterToPredicate(self, i Value) Value { return isOk(Apply(self, i)) }
+func FilterToPredicate(fb *Fiber, self, i Value) Value { return isOk(Apply(fb, self, i)) }
 
-func FilterToOption(self, i Value) Value {
-	if r := Apply(self, i); isOk(r) {
+func FilterToOption(fb *Fiber, self, i Value) Value {
+	if r := Apply(fb, self, i); isOk(r) {
 		return Some(value(r))
 	}
 	return None
 }
 
-func FilterToResult(self, i Value) Value { return Apply(self, i) }
+func FilterToResult(fb *Fiber, self, i Value) Value { return Apply(fb, self, i) }
 
 func FilterEquals(v, u Value) Value {
 	if Equals(u, v) {
@@ -128,51 +138,51 @@ func FilterEqualsStrict(v, u Value) Value {
 	return Err(u)
 }
 
-func FilterOr(that, self, i Value) Value {
-	if r := Apply(self, i); isOk(r) {
+func FilterOr(fb *Fiber, that, self, i Value) Value {
+	if r := Apply(fb, self, i); isOk(r) {
 		return r
 	}
-	return Apply(that, i)
+	return Apply(fb, that, i)
 }
 
 // FilterZipWith runs `left`, then `right`; the first failure wins.
-func FilterZipWith(right, f, left, i Value) Value {
-	l := Apply(left, i)
+func FilterZipWith(fb *Fiber, right, f, left, i Value) Value {
+	l := Apply(fb, left, i)
 	if !isOk(l) {
 		return l
 	}
-	r := Apply(right, i)
+	r := Apply(fb, right, i)
 	if !isOk(r) {
 		return r
 	}
-	return Ok(apply2(f, value(l), value(r)))
+	return Ok(apply2(fb, f, value(l), value(r)))
 }
 
-func FilterZip(right, left, i Value) Value {
-	return FilterZipWith(right, Curry2(func(a, b Value) Value { return []Value{a, b} }), left, i)
+func FilterZip(fb *Fiber, right, left, i Value) Value {
+	return FilterZipWith(fb, right, Curry2(func(fb *Fiber, a, b Value) Value { return []Value{a, b} }), left, i)
 }
-func FilterAndLeft(right, left, i Value) Value {
-	return FilterZipWith(right, Curry2(func(a, _ Value) Value { return a }), left, i)
+func FilterAndLeft(fb *Fiber, right, left, i Value) Value {
+	return FilterZipWith(fb, right, Curry2(func(fb *Fiber, a, _ Value) Value { return a }), left, i)
 }
-func FilterAndRight(right, left, i Value) Value {
-	return FilterZipWith(right, Curry2(func(_, b Value) Value { return b }), left, i)
+func FilterAndRight(fb *Fiber, right, left, i Value) Value {
+	return FilterZipWith(fb, right, Curry2(func(fb *Fiber, _, b Value) Value { return b }), left, i)
 }
 
-func FilterCompose(right, left, i Value) Value {
-	if l := Apply(left, i); !isOk(l) {
+func FilterCompose(fb *Fiber, right, left, i Value) Value {
+	if l := Apply(fb, left, i); !isOk(l) {
 		return l
 	} else {
-		return Apply(right, value(l))
+		return Apply(fb, right, value(l))
 	}
 }
 
 // FilterComposePassthrough fails with the input when either side fails.
-func FilterComposePassthrough(right, left, i Value) Value {
-	l := Apply(left, i)
+func FilterComposePassthrough(fb *Fiber, right, left, i Value) Value {
+	l := Apply(fb, left, i)
 	if !isOk(l) {
 		return Err(i)
 	}
-	if r := Apply(right, value(l)); isOk(r) {
+	if r := Apply(fb, right, value(l)); isOk(r) {
 		return r
 	}
 	return Err(i)
@@ -183,14 +193,14 @@ func FunctionConstTrue(Value) Value     { return true }
 func FunctionConstFalse(Value) Value    { return false }
 func FunctionConstVoid(Value) Value     { return Unit }
 
-func FunctionFlip(f, b, a Value) Value      { return apply2(f, a, b) }
-func FunctionCompose(bc, ab, a Value) Value { return Apply(bc, Apply(ab, a)) }
-func FunctionAbsurd(Value) Value            { panic(Defect{"Error: Cannot call absurd"}) }
-func FunctionSK(_, b Value) Value           { return b }
+func FunctionFlip(fb *Fiber, f, b, a Value) Value      { return apply2(fb, f, a, b) }
+func FunctionCompose(fb *Fiber, bc, ab, a Value) Value { return Apply(fb, bc, Apply(fb, ab, a)) }
+func FunctionAbsurd(Value) Value                       { panic(Defect{"Error: Cannot call absurd"}) }
+func FunctionSK(_, b Value) Value                      { return b }
 
-func FunctionTupled(f, pair Value) Value {
+func FunctionTupled(fb *Fiber, f, pair Value) Value {
 	p := List(pair)
-	return apply2(f, p[0], p[1])
+	return apply2(fb, f, p[0], p[1])
 }
 
-func FunctionUntupled(f, a, b Value) Value { return Apply(f, []Value{a, b}) }
+func FunctionUntupled(fb *Fiber, f, a, b Value) Value { return Apply(fb, f, []Value{a, b}) }

@@ -15,12 +15,16 @@ use super::out_dir::overlap;
 use super::summary::{self, Built};
 use crate::args::{BuildArguments, EmitArgument, LabelsArgument, ProfileArgument};
 use crate::command::{Command, Outcome};
+use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
 use crate::{cache, toolchain};
+
+mod progress;
 
 pub struct BuildCommand {
     pub options: BuildArguments,
     pub project: Option<String>,
+    pub display: Option<Mode>,
     /// `run --entry`: the module whose `main` the runner of the entry `main`
     /// starts; empty for no runner.
     pub entry: Option<String>,
@@ -32,10 +36,11 @@ pub struct BuildCommand {
 }
 
 impl BuildCommand {
-    pub fn new(options: BuildArguments, project: Option<String>) -> Self {
+    pub fn new(options: BuildArguments, project: Option<String>, display: Option<Mode>) -> Self {
         Self {
             options,
             project,
+            display,
             entry: None,
             generation: false,
             built: RefCell::default(),
@@ -64,13 +69,18 @@ impl BuildCommand {
 
 impl Command for BuildCommand {
     fn summary(&self, outcome: &Outcome, took: Duration, color: bool) -> Option<String> {
+        if self.options.inputs {
+            return None;
+        }
         let built = self.built.borrow();
         Some(summary::text(built.as_ref(), outcome, took, color))
     }
 
     fn run(&self) -> Outcome {
+        let progress = self.progress();
         let mut sources = SourceMap::default();
         let host = FsHost::new();
+        progress.stage("Resolving project");
         let selected = select(
             &host,
             &mut sources,
@@ -109,13 +119,16 @@ impl Command for BuildCommand {
                 diagnostics: vec![problem],
             };
         }
-        let cached = project.as_ref().and_then(|p| self.cached(p, &roots, &host));
+        let cached = project
+            .as_ref()
+            .and_then(|p| self.cached(p, &roots, &host, &progress));
         if let Some(diagnostics) = cached {
             return Outcome {
                 sources,
                 diagnostics,
             };
         }
+        progress.stage("Compiling Flick modules");
         let (mut diagnostics, mut compilation) =
             project::compile(&host, &mut sources, project.as_ref(), &roots);
         if diagnostics.iter().any(|d| d.severity == Severity::Error) {
@@ -143,16 +156,23 @@ impl Command for BuildCommand {
         };
         let output = self.plan(&host, project.as_ref(), entries);
         self.record(&output, Some(modules.len()), &output.entries);
+        progress.stage(match (output.go, output.typescript) {
+            (true, _) => "Emitting Go",
+            (false, true) => "Emitting TypeScript",
+            (false, false) => "Emitting JavaScript",
+        });
         let mut emitted = artifacts(&host, &sources, project.as_ref(), &compilation, &output);
-        self.publish(project.as_ref(), &output, &mut emitted);
+        self.publish(project.as_ref(), &output, &mut emitted, &progress);
         let clean = diagnostics.is_empty() && emitted.diagnostics.is_empty();
         diagnostics.extend(emitted.diagnostics);
         if let Some(p) = &project
             && clean
             && !output.extras.schema_aot
-            && cache::read_unchanged(p, &roots, &host.cwd, &sources)
         {
-            cache::store(&p.root, &self.key(p, &roots, &output), &emitted.artifacts);
+            progress.stage("Saving build cache");
+            if cache::read_unchanged(p, &roots, &host.cwd, &sources) {
+                cache::store(&p.root, &self.key(p, &roots, &output), &emitted.artifacts);
+            }
         }
         Outcome {
             sources,
@@ -255,24 +275,33 @@ impl BuildCommand {
         project: &Project,
         roots: &[PathBuf],
         host: &FsHost,
+        progress: &Progress,
     ) -> Option<Vec<Diagnostic>> {
         let output = self.plan(host, Some(project), self.entries(project));
         if output.extras.schema_aot {
             return None;
         }
+        progress.stage("Checking build cache");
         let artifacts = cache::load(&project.root, &self.key(project, roots, &output))?;
+        progress.stage("Restoring cached artifacts");
         self.record(&output, None, &output.entries);
         let mut emitted = Emission {
             artifacts,
             diagnostics: Vec::new(),
         };
-        self.publish(Some(project), &output, &mut emitted);
+        self.publish(Some(project), &output, &mut emitted, progress);
         Some(emitted.diagnostics)
     }
 
     /// Cache hits and fresh builds have the same publication and ownership policy.
-    fn publish(&self, project: Option<&Project>, output: &BuildPlan, emitted: &mut Emission) {
-        write_artifacts(output, emitted);
+    fn publish(
+        &self,
+        project: Option<&Project>,
+        output: &BuildPlan,
+        emitted: &mut Emission,
+        progress: &Progress,
+    ) {
+        write_artifacts(output, emitted, progress);
         if self.generation
             || emitted
                 .diagnostics
@@ -301,6 +330,7 @@ impl BuildCommand {
                     .map(|(name, _)| build::schema_aot_file(name)),
             );
         }
+        progress.stage("Recording build outputs");
         if let Err(err) = cache::record(&project.root, &output.out_dir, paths) {
             emitted.diagnostics.push(Diagnostic::new(
                 codes::P013,
@@ -353,11 +383,11 @@ pub fn emit(
     output: &BuildPlan,
 ) -> Emission {
     let mut emitted = artifacts(host, sources, project, compilation, output);
-    write_artifacts(output, &mut emitted);
+    write_artifacts(output, &mut emitted, &Progress::new(Mode::Hidden));
     emitted
 }
 
-fn write_artifacts(output: &BuildPlan, emitted: &mut Emission) {
+fn write_artifacts(output: &BuildPlan, emitted: &mut Emission, progress: &Progress) {
     if emitted
         .diagnostics
         .iter()
@@ -366,6 +396,7 @@ fn write_artifacts(output: &BuildPlan, emitted: &mut Emission) {
         return;
     }
     let out_dir = output.out_dir.as_path();
+    progress.stage("Writing artifacts");
     for artifact in &emitted.artifacts {
         let path = out_dir.join(&artifact.path);
         if let Err(err) = write(&path, &artifact.contents) {
@@ -385,6 +416,7 @@ fn write_artifacts(output: &BuildPlan, emitted: &mut Emission) {
             &tests[..]
         };
         for (name, _) in built {
+            progress.stage("Building Go executable");
             if let Some(problem) = toolchain::go_build(out_dir, name) {
                 emitted.diagnostics.push(problem);
                 return;
@@ -400,6 +432,7 @@ fn write_artifacts(output: &BuildPlan, emitted: &mut Emission) {
         let ext = if output.typescript { "ts" } else { "js" };
         let module = out_dir.join(format!("{}.{ext}", entry.replace('.', "/")));
         let file = build::schema_aot_file(name);
+        progress.stage("Compiling schema decoders");
         if let Err(reason) = compile_schemas(out_dir, &module, &file) {
             emitted.diagnostics.push(Diagnostic::new(
                 codes::P013,

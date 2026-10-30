@@ -55,7 +55,7 @@ func CodecIgnoreExtra(c Value) Value {
 
 func (b *block) accepts(in Value) bool { _, ok := in.(*Record); return ok }
 
-func (b *block) decode(in Value) (Value, []issue) {
+func (b *block) decode(fb *Fiber, in Value) (Value, []issue) {
 	obj, ok := in.(*Record)
 	if !ok {
 		return nil, expected("an object", in)
@@ -81,7 +81,7 @@ func (b *block) decode(in Value) (Value, []issue) {
 			out = append(out, f.label, None)
 			continue
 		}
-		x, issues := f.codec.decode(v)
+		x, issues := f.codec.decode(fb, v)
 		if issues != nil {
 			return nil, under(f.wire, issues)
 		}
@@ -93,7 +93,7 @@ func (b *block) decode(in Value) (Value, []issue) {
 	return Rec(out...), nil
 }
 
-func (b *block) encode(v Value) (Value, []issue) {
+func (b *block) encode(fb *Fiber, v Value) (Value, []issue) {
 	r := record(v)
 	out := newRecord(len(b.fields))
 	for _, f := range b.fields {
@@ -105,7 +105,7 @@ func (b *block) encode(v Value) (Value, []issue) {
 			}
 			x = o
 		}
-		e, issues := f.codec.encode(x)
+		e, issues := f.codec.encode(fb, x)
 		if issues != nil {
 			return nil, under(f.wire, issues)
 		}

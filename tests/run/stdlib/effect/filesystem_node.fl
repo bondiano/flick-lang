@@ -1,0 +1,63 @@
+// Real FileSystem.node operations and an indirect call through a stored task.
+module App.Main exposing (main)
+
+line : String -> String ->{} Unit
+let line label text = Platform.stdout_line (label ++ ": " ++ text)
+
+plain : FileSystem.WriteOptions
+let plain = { flag = None; mode = None }
+
+work : String ->{FileSystem.FileSystem; PlatformError.PlatformError} Unit
+let work dir =
+  let a = dir ++ "/a.txt"
+  let b = dir ++ "/b.txt"
+  FileSystem.write_file_string plain a "first"
+  FileSystem.access { ok = true; readable = true; writable = true } a
+  line "access" "true"
+  FileSystem.copy_file a b
+  line "copy" (FileSystem.read_file_string b)
+  FileSystem.write_file_string plain b "keep"
+  FileSystem.copy { overwrite = false; preserveTimestamps = false } a b
+  line "copy overwrite" (FileSystem.read_file_string b)
+  FileSystem.make_directory { recursive = true; mode = None } (dir ++ "/tree/sub")
+  FileSystem.write_file_string plain (dir ++ "/tree/sub/deep.txt") "deep"
+  FileSystem.write_file_string plain (dir ++ "/tree/one.txt") "one"
+  FileSystem.copy { overwrite = true; preserveTimestamps = true } (dir ++ "/tree") (dir ++ "/copied")
+  line "copy tree" (FileSystem.read_file_string (dir ++ "/copied/sub/deep.txt"))
+  FileSystem.copy_file a a
+  line "copy to itself" (FileSystem.read_file_string a)
+  FileSystem.chmod 0o600 a
+  FileSystem.link a (dir ++ "/hard.txt")
+  FileSystem.write_file_string plain a "changed"
+  line "link" (FileSystem.read_file_string (dir ++ "/hard.txt"))
+  FileSystem.truncate (Some 3) a
+  line "truncate" (FileSystem.read_file_string a)
+  FileSystem.utimes 1000 2000 a
+  line "utimes" (show ((FileSystem.stat a).mtime == Some 2000))
+  line "glob recursive" (show (List.sort (FileSystem.glob { root = Some (dir ++ "/tree"); exclude = [] } "**/*.txt")))
+  line "glob braces" (show (List.sort (FileSystem.glob { root = Some dir; exclude = [] } "{a,b}.txt")))
+  line "glob extglob" (show (List.sort (FileSystem.glob { root = Some dir; exclude = [] } "@(a|b).txt")))
+  line "glob exclude" (show (List.sort (FileSystem.glob { root = Some (dir ++ "/tree"); exclude = ["sub/**"] } "**/*.txt")))
+  scope {
+    let _ = FileSystem.open
+      { flag = Some FileSystem.WriteExclusive; mode = Some 0o600; noFollow = false }
+      (dir ++ "/opened.txt")
+    ()
+  }
+  line "open" (show (FileSystem.read_file_string (dir ++ "/opened.txt") == ""))
+  let later = task { FileSystem.access { ok = true; readable = false; writable = false } a }
+  await later
+  line "indirect" "true"
+
+main : Unit ->{} Unit
+let main () =
+  try
+    provide FileSystem.node {
+      scope {
+        let dir = FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-fs-node-" }
+        work dir
+      }
+    }
+    Platform.stdout_line "done"
+  with
+  | failure -> Platform.stdout_line ("unexpected: " ++ show failure)

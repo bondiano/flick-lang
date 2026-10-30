@@ -81,9 +81,9 @@ pub struct Output {
 enum Shape {
     /// A variable assigned at initialization.
     Var,
-    /// A Go function of the dictionaries, then the parameters; `effects`
-    /// has bit `i` set when parameter `i`'s stage runs effects (Sync or
-    /// Runtime). A function whose last stage does takes the fiber first.
+    /// A Go function of the fiber, dictionaries, then parameters; `effects`
+    /// has bit `i` set when parameter `i`'s language stage runs effects
+    /// (Sync or Runtime), independently of the hidden execution context.
     Func {
         dicts: usize,
         params: usize,
@@ -92,8 +92,8 @@ enum Shape {
 }
 
 impl Shape {
-    /// Whether the Go function takes the fiber first.
-    fn fiber(self) -> bool {
+    /// Whether the function's last language stage runs effects.
+    fn effectful(self) -> bool {
         matches!(self, Shape::Func { params, effects, .. } if params > 0 && effects >> (params - 1) & 1 == 1)
     }
 }
@@ -170,13 +170,11 @@ pub fn go(program: &Program) -> Output {
     let main_shape = index
         .get(&main)
         .map(|&(m, i)| shape(&modules[m].items[i].kind));
-    let Some(
-        main_shape @ Shape::Func {
-            dicts: 0,
-            params: 1,
-            ..
-        },
-    ) = main_shape
+    let Some(Shape::Func {
+        dicts: 0,
+        params: 1,
+        ..
+    }) = main_shape
     else {
         diagnostics.push(Diagnostic::new(
             codes::P012,
@@ -191,13 +189,9 @@ pub fn go(program: &Program) -> Output {
             diagnostics,
         };
     };
-    let fb = main_shape.fiber().then(|| a.text("fb"));
+    let fb = a.text("fb");
     let unit = a.text("flickrt.Unit");
-    let start = call(
-        a,
-        names::func(&main.0, &main.1),
-        fb.into_iter().chain([unit]),
-    );
+    let start = call(a, names::func(&main.0, &main.1), [fb, unit]);
     compile(
         program,
         &index,
@@ -398,6 +392,8 @@ struct Gen<'a> {
     errors: Vec<(String, Option<Span>)>,
     /// The fiber in scope, in a body whose effects run.
     fiber: Option<&'static str>,
+    /// The caller's execution context, including in language-pure code.
+    context: Option<&'static str>,
     /// The loop a tail call in the code being emitted jumps in.
     tail: Option<loops::Tail<'a>>,
     /// The groups of mutually tail-recursive functions of the module.
@@ -436,6 +432,7 @@ impl<'a> Gen<'a> {
             modules: BTreeSet::new(),
             errors: Vec::new(),
             fiber: None,
+            context: None,
             tail: None,
             groups: Vec::new(),
             grouped: HashMap::new(),
@@ -458,6 +455,11 @@ impl<'a> Gen<'a> {
 
     fn unit(&self) -> Code<'a> {
         self.code("flickrt.Unit")
+    }
+
+    /// The hidden execution context, absent only in module initialization.
+    fn context(&self) -> Document<'a> {
+        self.a.text(self.context.unwrap_or("nil"))
     }
 
     /// A Go string literal of `text`.

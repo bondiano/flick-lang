@@ -107,12 +107,11 @@ impl<'a> Gen<'a> {
             .chain((0..taken).map(|i| format!("a{i}")))
             .collect();
         let mut args = arguments(f, &heads);
-        let fiber = self.shape_of(self.module, &f.name).fiber();
         if wants_fiber {
             args.insert(0, "fb".to_owned());
         }
         let go = call(a, target, args.into_iter().map(|arg| arg.to_doc(a)));
-        Some(self.wrapper(f, signature(fiber, &heads), go))
+        Some(self.wrapper(f, signature(&heads), go))
     }
 
     /// The Go function of the binding `f` taking `params` and returning `go`.
@@ -198,13 +197,10 @@ impl<'a> Gen<'a> {
             .collect();
         let mut args = arguments(f, &heads);
         let first = match f.mode {
-            ForeignMode::Pure | ForeignMode::Sync => None,
-            ForeignMode::Effect => Some("fb"),
-            ForeignMode::Async => Some("ctx"),
+            ForeignMode::Pure | ForeignMode::Sync | ForeignMode::Effect => "fb",
+            ForeignMode::Async => "ctx",
         };
-        if let Some(first) = first {
-            args.insert(0, first.to_owned());
-        }
+        args.insert(0, first.to_owned());
         let export = a.alloc_str(&f.export);
         let mut go = call(a, export, args.into_iter().map(|arg| arg.to_doc(a)));
         if f.mode == ForeignMode::Async {
@@ -212,7 +208,6 @@ impl<'a> Gen<'a> {
             let run = closure(a, head, [docvec![a, "return ", go]]);
             go = call(a, "flickrt.ForeignAsync", [a.text("fb"), run]);
         }
-        let fiber = self.shape_of(self.module, &f.name).fiber();
-        Some(self.wrapper(f, signature(fiber, &heads), go))
+        Some(self.wrapper(f, signature(&heads), go))
     }
 }

@@ -8,13 +8,13 @@ import (
 // Seq is a lazy sequence that starts over on every iteration, so it stays
 // a value: the state of an iteration lives inside the function. A list is
 // a sequence too (see Iter).
-type Seq func(yield func(Value) bool)
+type Seq func(fb *Fiber, yield func(Value) bool)
 
 // Iter is the elements of a List or a Seq, for a `for` to range over.
-func Iter(v Value) iter.Seq[Value] {
+func Iter(fb *Fiber, v Value) iter.Seq[Value] {
 	switch s := v.(type) {
 	case Seq:
-		return iter.Seq[Value](s)
+		return func(yield func(Value) bool) { s(fb, yield) }
 	case []Value:
 		return func(yield func(Value) bool) {
 			for _, x := range s {
@@ -27,12 +27,12 @@ func Iter(v Value) iter.Seq[Value] {
 	panic(Defect{"not a sequence"})
 }
 
-func seq(f func(yield func(Value) bool)) Value { return Seq(f) }
+func seq(f func(fb *Fiber, yield func(Value) bool)) Value { return Seq(f) }
 
 func SeqOfList(xs Value) Value { return xs }
 
 func SeqFrom(n Value) Value {
-	return seq(func(yield func(Value) bool) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
 		for i := n.(int32); yield(i); i++ {
 		}
 	})
@@ -42,7 +42,7 @@ func SeqFrom(n Value) Value {
 // step is empty.
 func SeqRangeBy(start, end, step Value) Value {
 	a, b, d := start.(int32), end.(int32), step.(int32)
-	return seq(func(yield func(Value) bool) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
 		if d == 0 {
 			return
 		}
@@ -58,7 +58,7 @@ func SeqRange(start, end Value) Value { return SeqRangeBy(start, end, int32(1)) 
 
 func SeqRangeTo(start, end Value) Value {
 	a, b := start.(int32), end.(int32)
-	return seq(func(yield func(Value) bool) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
 		for i := int64(a); i <= int64(b); i++ {
 			if !yield(int32(i)) {
 				return
@@ -68,14 +68,14 @@ func SeqRangeTo(start, end Value) Value {
 }
 
 func SeqIterate(f, x Value) Value {
-	return seq(func(yield func(Value) bool) {
-		for v := x; yield(v); v = Apply(f, v) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
+		for v := x; yield(v); v = Apply(fb, f, v) {
 		}
 	})
 }
 
 func SeqRepeat(x Value) Value {
-	return seq(func(yield func(Value) bool) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
 		for yield(x) {
 		}
 	})
@@ -83,7 +83,7 @@ func SeqRepeat(x Value) Value {
 
 func SeqCycle(xs Value) Value {
 	list := List(xs)
-	return seq(func(yield func(Value) bool) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
 		for len(list) > 0 {
 			for _, x := range list {
 				if !yield(x) {
@@ -95,25 +95,25 @@ func SeqCycle(xs Value) Value {
 }
 
 func SeqUnfold(f, s Value) Value {
-	return seq(func(yield func(Value) bool) {
-		for o := Apply(f, s).(*Data); o.Tag == "Some"; {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
+		for o := Apply(fb, f, s).(*Data); o.Tag == "Some"; {
 			pair := o.Fields[0].([]Value)
 			if !yield(pair[0]) {
 				return
 			}
-			o = Apply(f, pair[1]).(*Data)
+			o = Apply(fb, f, pair[1]).(*Data)
 		}
 	})
 }
 
 func SeqAppend(xs, ys Value) Value {
-	return seq(func(yield func(Value) bool) {
-		for x := range Iter(xs) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
+		for x := range Iter(fb, xs) {
 			if !yield(x) {
 				return
 			}
 		}
-		for y := range Iter(ys) {
+		for y := range Iter(fb, ys) {
 			if !yield(y) {
 				return
 			}
@@ -124,10 +124,10 @@ func SeqAppend(xs, ys Value) Value {
 // SeqMap2 is `Applicative.map2` of sequences: every pair, the first
 // sequence outermost.
 func SeqMap2(f, xs, ys Value) Value {
-	return seq(func(yield func(Value) bool) {
-		for x := range Iter(xs) {
-			for y := range Iter(ys) {
-				if !yield(apply2(f, x, y)) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
+		for x := range Iter(fb, xs) {
+			for y := range Iter(fb, ys) {
+				if !yield(apply2(fb, f, x, y)) {
 					return
 				}
 			}
@@ -136,9 +136,9 @@ func SeqMap2(f, xs, ys Value) Value {
 }
 
 func SeqMap(f, xs Value) Value {
-	return seq(func(yield func(Value) bool) {
-		for x := range Iter(xs) {
-			if !yield(Apply(f, x)) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
+		for x := range Iter(fb, xs) {
+			if !yield(Apply(fb, f, x)) {
 				return
 			}
 		}
@@ -146,9 +146,9 @@ func SeqMap(f, xs Value) Value {
 }
 
 func SeqFilter(p, xs Value) Value {
-	return seq(func(yield func(Value) bool) {
-		for x := range Iter(xs) {
-			if Bool(Apply(p, x)) && !yield(x) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
+		for x := range Iter(fb, xs) {
+			if Bool(Apply(fb, p, x)) && !yield(x) {
 				return
 			}
 		}
@@ -156,9 +156,9 @@ func SeqFilter(p, xs Value) Value {
 }
 
 func SeqFilterMap(f, xs Value) Value {
-	return seq(func(yield func(Value) bool) {
-		for x := range Iter(xs) {
-			if o := Apply(f, x).(*Data); o.Tag == "Some" && !yield(o.Fields[0]) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
+		for x := range Iter(fb, xs) {
+			if o := Apply(fb, f, x).(*Data); o.Tag == "Some" && !yield(o.Fields[0]) {
 				return
 			}
 		}
@@ -166,9 +166,9 @@ func SeqFilterMap(f, xs Value) Value {
 }
 
 func SeqFlatMap(f, xs Value) Value {
-	return seq(func(yield func(Value) bool) {
-		for x := range Iter(xs) {
-			for y := range Iter(Apply(f, x)) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
+		for x := range Iter(fb, xs) {
+			for y := range Iter(fb, Apply(fb, f, x)) {
 				if !yield(y) {
 					return
 				}
@@ -179,12 +179,12 @@ func SeqFlatMap(f, xs Value) Value {
 
 // SeqTake is at most `n` elements, pulling none after the last.
 func SeqTake(n, xs Value) Value {
-	return seq(func(yield func(Value) bool) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
 		left := n.(int32)
 		if left <= 0 {
 			return
 		}
-		for x := range Iter(xs) {
+		for x := range Iter(fb, xs) {
 			if !yield(x) {
 				return
 			}
@@ -196,9 +196,9 @@ func SeqTake(n, xs Value) Value {
 }
 
 func SeqTakeWhile(p, xs Value) Value {
-	return seq(func(yield func(Value) bool) {
-		for x := range Iter(xs) {
-			if !Bool(Apply(p, x)) || !yield(x) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
+		for x := range Iter(fb, xs) {
+			if !Bool(Apply(fb, p, x)) || !yield(x) {
 				return
 			}
 		}
@@ -206,9 +206,9 @@ func SeqTakeWhile(p, xs Value) Value {
 }
 
 func SeqDrop(n, xs Value) Value {
-	return seq(func(yield func(Value) bool) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
 		skip := n.(int32)
-		for x := range Iter(xs) {
+		for x := range Iter(fb, xs) {
 			if skip > 0 {
 				skip--
 			} else if !yield(x) {
@@ -219,10 +219,10 @@ func SeqDrop(n, xs Value) Value {
 }
 
 func SeqDropWhile(p, xs Value) Value {
-	return seq(func(yield func(Value) bool) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
 		dropping := true
-		for x := range Iter(xs) {
-			if dropping && Bool(Apply(p, x)) {
+		for x := range Iter(fb, xs) {
+			if dropping && Bool(Apply(fb, p, x)) {
 				continue
 			}
 			dropping = false
@@ -234,12 +234,12 @@ func SeqDropWhile(p, xs Value) Value {
 }
 
 func SeqZipWith(f, xs, ys Value) Value {
-	return seq(func(yield func(Value) bool) {
-		next, stop := iter.Pull(Iter(ys))
+	return seq(func(fb *Fiber, yield func(Value) bool) {
+		next, stop := iter.Pull(Iter(fb, ys))
 		defer stop()
-		for x := range Iter(xs) {
+		for x := range Iter(fb, xs) {
 			y, ok := next()
-			if !ok || !yield(apply2(f, x, y)) {
+			if !ok || !yield(apply2(fb, f, x, y)) {
 				return
 			}
 		}
@@ -247,20 +247,20 @@ func SeqZipWith(f, xs, ys Value) Value {
 }
 
 func SeqZip(xs, ys Value) Value {
-	return SeqZipWith(Curry2(func(a, b Value) Value { return []Value{a, b} }), xs, ys)
+	return SeqZipWith(Curry2(func(fb *Fiber, a, b Value) Value { return []Value{a, b} }), xs, ys)
 }
 
 func SeqEnumerate(xs Value) Value { return SeqZip(SeqFrom(int32(0)), xs) }
 
 // SeqScan is `init`, then each running fold of the elements.
 func SeqScan(f, init, xs Value) Value {
-	return seq(func(yield func(Value) bool) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
 		acc := init
 		if !yield(acc) {
 			return
 		}
-		for x := range Iter(xs) {
-			if acc = apply2(f, acc, x); !yield(acc) {
+		for x := range Iter(fb, xs) {
+			if acc = apply2(fb, f, acc, x); !yield(acc) {
 				return
 			}
 		}
@@ -271,12 +271,12 @@ func SeqScan(f, init, xs Value) Value {
 // elements run out.
 func SeqChunks(n, xs Value) Value {
 	size := int(n.(int32))
-	return seq(func(yield func(Value) bool) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
 		if size <= 0 {
 			return
 		}
 		chunk := []Value{}
-		for x := range Iter(xs) {
+		for x := range Iter(fb, xs) {
 			if chunk = append(chunk, x); len(chunk) == size {
 				if !yield(chunk) {
 					return
@@ -293,12 +293,12 @@ func SeqChunks(n, xs Value) Value {
 // SeqWindows is every run of `n` neighbouring elements, each a new list.
 func SeqWindows(n, xs Value) Value {
 	size := int(n.(int32))
-	return seq(func(yield func(Value) bool) {
+	return seq(func(fb *Fiber, yield func(Value) bool) {
 		if size <= 0 {
 			return
 		}
 		var window []Value
-		for x := range Iter(xs) {
+		for x := range Iter(fb, xs) {
 			if window = append(window, x); len(window) > size {
 				window = window[1:]
 			}
@@ -309,51 +309,51 @@ func SeqWindows(n, xs Value) Value {
 	})
 }
 
-func SeqToList(xs Value) Value {
+func SeqToList(fb *Fiber, xs Value) Value {
 	out := []Value{}
-	for x := range Iter(xs) {
+	for x := range Iter(fb, xs) {
 		out = append(out, x)
 	}
 	return out
 }
 
-func SeqFold(f, init, xs Value) Value {
+func SeqFold(fb *Fiber, f, init, xs Value) Value {
 	acc := init
-	for x := range Iter(xs) {
-		acc = apply2(f, acc, x)
+	for x := range Iter(fb, xs) {
+		acc = apply2(fb, f, acc, x)
 	}
 	return acc
 }
 
-func SeqAny(p, xs Value) Value {
-	for x := range Iter(xs) {
-		if Bool(Apply(p, x)) {
+func SeqAny(fb *Fiber, p, xs Value) Value {
+	for x := range Iter(fb, xs) {
+		if Bool(Apply(fb, p, x)) {
 			return true
 		}
 	}
 	return false
 }
 
-func SeqAll(p, xs Value) Value {
-	for x := range Iter(xs) {
-		if !Bool(Apply(p, x)) {
+func SeqAll(fb *Fiber, p, xs Value) Value {
+	for x := range Iter(fb, xs) {
+		if !Bool(Apply(fb, p, x)) {
 			return false
 		}
 	}
 	return true
 }
 
-func SeqFind(p, xs Value) Value {
-	for x := range Iter(xs) {
-		if Bool(Apply(p, x)) {
+func SeqFind(fb *Fiber, p, xs Value) Value {
+	for x := range Iter(fb, xs) {
+		if Bool(Apply(fb, p, x)) {
 			return Some(x)
 		}
 	}
 	return None
 }
 
-func SeqFirst(xs Value) Value {
-	for x := range Iter(xs) {
+func SeqFirst(fb *Fiber, xs Value) Value {
+	for x := range Iter(fb, xs) {
 		return Some(x)
 	}
 	return None
@@ -361,8 +361,8 @@ func SeqFirst(xs Value) Value {
 
 // SeqEachEffect runs the task of `f` of each element.
 func SeqEachEffect(fb *Fiber, f, xs Value) Value {
-	for x := range Iter(xs) {
-		Run(fb, Apply(f, x))
+	for x := range Iter(fb, xs) {
+		Run(fb, Apply(fb, f, x))
 	}
 	return Unit
 }
@@ -370,8 +370,8 @@ func SeqEachEffect(fb *Fiber, f, xs Value) Value {
 // SeqFoldEffect folds the elements with the tasks of `f`.
 func SeqFoldEffect(fb *Fiber, f, init, xs Value) Value {
 	acc := init
-	for x := range Iter(xs) {
-		acc = Run(fb, apply2(f, acc, x))
+	for x := range Iter(fb, xs) {
+		acc = Run(fb, apply2(fb, f, acc, x))
 	}
 	return acc
 }

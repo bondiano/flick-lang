@@ -341,7 +341,7 @@ Values have the representation of the JS target, in Go terms:
 | a tuple, a `List` | `[]flickrt.Value`; `[x, ...rest]` shares the storage of the list |
 | a record | `*flickrt.Record`, its labels in JS key order, copied by `{ r with … }` |
 | a constructor | `*flickrt.Data` with the tag of the JS target and its fields |
-| a function | `func(flickrt.Value) flickrt.Value` per stage |
+| a function | `func(*flickrt.Fiber, flickrt.Value) flickrt.Value` per stage |
 | a dictionary | `*flickrt.Dict`; superclasses and default methods made on first use |
 
 Numbers and strings keep the semantics of the JS target: `Int` wraps
@@ -365,9 +365,9 @@ one. A `HashMap` or `HashSet` lists its entries in the order Effect's HAMT
 walks them, by Effect's `Hash.hash` five bits at a time from the lowest,
 so an unsorted `to_list` prints the same on both targets.
 
-A top-level function is a Go function of its dictionaries and all its
-parameters; a full application calls it, and a partial one or a use as a
-value makes the curried function. The tail calls that are loops on the JS
+A top-level function is a Go function of its execution fiber, dictionaries
+and all its parameters; a full application calls it, and a partial one or a
+use as a value makes the curried function. The tail calls that are loops on the JS
 target (see [Recursion](#recursion-stack-safety-is-not-the-whole-cost))
 are loops in Go too: a self call is a `for` that assigns the next arguments
 and continues, and a group of functions calling each other is one Go
@@ -380,21 +380,24 @@ function per module, run in the order the modules depend on each other.
 The cases of `tests/run` listed in `tests/run/portable.txt` run on both
 targets and give the same output.
 
-Effectful code threads a fiber, `*flickrt.Fiber`: a function whose last
-stage runs effects takes it first, so a full call stays a plain Go call,
-and a `task` is a Go closure of the fiber that runs again on each `await`.
+Every generated Flick function takes its execution fiber, `*flickrt.Fiber`,
+first, including pure functions and callbacks. A saved function uses the fiber
+of its invocation, not its creation, so URL rendering observes the current
+redaction names without process-global state. Pure stages remain pure.
+A `task` is a Go closure of the fiber that runs again on each `await`.
 A typed failure, a defect or an interruption is a Go panic carrying a
 cause tree like Effect's; `try` recovers it by the rules of the JS target,
 and a failing `main` is reported as the JS runner reports it. A service is
 its key `M.S`, looked up in the fiber's services when the operation runs,
 so a task built outside `provide` and awaited inside it sees the provided
 service. Each fiber of `Fiber.spawn`, `parallel`, a race or a `timeout` is
-a goroutine. Interruption is cooperative: it is checked at each runtime
-call, in blocking waits and at the head of every loop a tail call became,
-and `Effect.uninterruptible` defers it. A `scope` closes as on the JS
+a goroutine. Interruption is cooperative: it is checked at runtime effect
+calls, in blocking waits and at the head of effectful tail-call loops;
+pure loops remain checkpoint-free. `Effect.uninterruptible` defers it. A `scope` closes as on the JS
 target: admission ends, children are interrupted and awaited with their
 supervisors, the foreign calls they left running end, then finalizers run
-last first and their failures join the body's. `Ref`, `Deferred`, `Latch`,
+last first and their failures join the body's once. Layer finalizers report
+only cleanup failures and still observe the original exit. `Ref`, `Deferred`, `Latch`,
 the semaphores and the synchronized refs are safe across goroutines.
 SIGINT and SIGTERM interrupt `main` and close its scopes, and the exit code
 is the JS runner's: 130 or 143 when only the signal stopped it. What a
@@ -415,6 +418,24 @@ request), typed `HttpApi` clients and the same OpenAPI document. What
 `net/http` decides differs: a response's status text is always the
 standard one, a request's header order is not kept, and compression is
 gzip or deflate only.
+
+URL rendering and HTTP error details use the current fiber's
+`Http.UrlParams.with_redacted_names`, including nested and concurrent scopes;
+an error retains its masked URL after leaving the scope. Router constraints
+and composite parameters are checked before selecting a handler. Constraints
+use RE2: unsupported JavaScript regex syntax, including mixed regex/composite
+segments that need lookaround for a multi-character separator, is rejected
+when the route is constructed, never treated as an unrestricted parameter.
+
+`FileSystem.node` implements `access`, `copy`, `copy_file`, `chmod`, `chown`,
+`glob`, `link`, `open`, `read_link`, `real_path`, `symlink`, `truncate` and
+`utimes`; `open` belongs to its surrounding scope. `noFollow` is atomic on
+POSIX and a typed `BadArgument` on Windows, as in Node. Windows `chown`
+reports Go's unsupported-operation error rather than Node's no-op success.
+File-handle foreign operations not yet ported remain `FLICK-P012`;
+`stat` metadata remains partial.
+Glob's POSIX classes are checked on the minimum Go 1.23, including unassigned
+code points.
 
 `flick run` and `flick dev` of a project that emits go build its
 executable into the run generation and start it, `dev` rebuilding and

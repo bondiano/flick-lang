@@ -99,6 +99,16 @@ func (f finalizer) call(closer *Fiber, exit *Cause) *Cause {
 // close closes the owner, uninterruptibly, after its body ended with `exit`
 // (nil on success): the cause the region ends with.
 func (o *Owner) close(fb *Fiber, exit *Cause) *Cause {
+	return o.closeWithCause(fb, exit, exit)
+}
+
+// closeFinalizers closes a nested owner without returning its parent's body again.
+func (o *Owner) closeFinalizers(fb *Fiber, exit *Cause) *Cause {
+	return o.closeWithCause(fb, exit, nil)
+}
+
+// closeWithCause separates the exit finalizers observe from the result they extend.
+func (o *Owner) closeWithCause(fb *Fiber, exit, cause *Cause) *Cause {
 	o.mu.Lock()
 	o.open = false
 	children := make([]*child, 0, len(o.children))
@@ -113,7 +123,6 @@ func (o *Owner) close(fb *Fiber, exit *Cause) *Cause {
 	}
 	o.watchers.Wait()
 	o.settle()
-	cause := exit
 	for i := len(finalizers) - 1; i >= 0; i-- {
 		cause = Sequential(cause, finalizers[i].call(fb, exit))
 	}
@@ -149,7 +158,7 @@ func Within(fb *Fiber, owner Value) *Fiber {
 // AcquireRelease is a resource released when the owner of the call closes.
 func AcquireRelease(fb *Fiber, acquire, release Value) Value {
 	v := masked(fb, fb.state.mask+1, func() Value { return Run(fb, acquire) })
-	fb.owner.add(fb, func(fb *Fiber, _ *Cause) Value { return Run(fb, Apply(release, v)) })
+	fb.owner.add(fb, func(fb *Fiber, _ *Cause) Value { return Run(fb, Apply(fb, release, v)) })
 	return v
 }
 
@@ -157,9 +166,9 @@ func AcquireRelease(fb *Fiber, acquire, release Value) Value {
 func Bracket(fb *Fiber, acquire, use, release Value) Value {
 	inside := fb.state.mask
 	v := masked(fb, inside+1, func() Value { return Run(fb, acquire) })
-	out, cause := catch(func() Value { return Run(fb, Apply(use, v)) })
+	out, cause := catch(func() Value { return Run(fb, Apply(fb, use, v)) })
 	_, released := catch(func() Value {
-		return masked(fb, inside+1, func() Value { return Run(fb, Apply(release, v)) })
+		return masked(fb, inside+1, func() Value { return Run(fb, Apply(fb, release, v)) })
 	})
 	if cause = Sequential(cause, released); cause != nil {
 		panic(&Failure{cause})
@@ -182,7 +191,7 @@ func AddFinalizerExit(fb *Fiber, finalizer Value) Value {
 		if exit != nil {
 			o = Some(exit)
 		}
-		return Run(fb, Apply(finalizer, o))
+		return Run(fb, Apply(fb, finalizer, o))
 	})
 	return Unit
 }

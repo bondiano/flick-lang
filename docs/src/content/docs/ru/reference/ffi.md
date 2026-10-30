@@ -105,13 +105,22 @@ foreign async read_text from "./fs.js" "readText"
 `package main` и импортирует `flick.app/flickrt`. Его функции принимают и
 возвращают `flickrt.Value` в представлении Go-target (см.
 [Генерацию кода](../codegen/#go-target)) и получают все аргументы привязки
-сразу; для `()` у `arity 0` — ни одного:
+сразу; `()` у `arity 0` не добавляет аргумента Flick:
 
 | Режим | Go-функция |
 | - | - |
-| `pure`, `sync` | `f(a0, a1, …)` |
+| `pure`, `sync` | `f(fb *flickrt.Fiber, a0, a1, …)` |
 | `effect` | `f(fb *flickrt.Fiber, a0, …)`: выполняется в вызывающем волокне и захватывает ресурсы в scope вокруг вызова через `flickrt.AcquireRelease` |
 | `async` | `f(ctx flickrt.Context, a0, …)` в собственной goroutine: прерывание отменяет `ctx`, а ближайший owner ждёт возврата вызова, прежде чем освобождать ресурсы, — как ждёт promise |
+
+Чистые вызовы тоже получают исполняющее волокно: зависящее от контекста
+отображение не должно сохранять волокно, в котором создали функцию.
+`flickrt.Fn` принимает `(*flickrt.Fiber, flickrt.Value)`, а `flickrt.Poly` —
+`(*flickrt.Fiber, ...flickrt.Value)`; оба возвращают `flickrt.Value`.
+В `flickrt.Apply(fb, f, arg)` и `flickrt.Inst(fb, f, dictionaries...)`
+передаётся волокно текущего вызова. `nil` допустим только при инициализации
+модуля или в неизменяемых метаданных схем вне исполнения программы. Этот
+скрытый контекст не делает чистую стадию Flick эффектной.
 
 Panic — дефект. `catch`, `this`, `optional`, `variadic` и адаптированные
 функции обратного вызова на Go-target пока `FLICK-P012`. Представление

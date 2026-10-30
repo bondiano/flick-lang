@@ -1,0 +1,29 @@
+defaults: true
+direct: true
+pure helper: true
+closure: true
+polymorphic helper: true
+function container: true
+list callback: true
+tuple Show: true
+record Show: true
+derived Show: true
+lazy map: true
+lazy generator: true
+native renderers: true
+nested replacement: true
+native nested replacement: true
+outer restored: true
+empty names: true
+defaults restored: true
+native defaults restored: true
+closure after creating scope: true
+closure in another scope: true
+concurrent fibers: true
+URL untouched: true
+invalid error outside scope: true
+status error outside scope: true
+decode error outside scope: true
+server parse outside scope: true
+route error outside scope: true
+request untouched: true

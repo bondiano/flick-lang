@@ -54,7 +54,7 @@ func SyncRefSetAndGet(_ *Fiber, v, r Value) Value {
 // old, `keep` the result to give.
 func updated(fb *Fiber, f, r Value, effectful bool, keep func(old, next Value) Value) Value {
 	return update(r, func(a Value) (Value, Value, bool) {
-		next := Apply(f, a)
+		next := Apply(fb, f, a)
 		if effectful {
 			next = Run(fb, next)
 		}
@@ -64,7 +64,7 @@ func updated(fb *Fiber, f, r Value, effectful bool, keep func(old, next Value) V
 
 func updatedSome(fb *Fiber, f, r Value, effectful bool, keep func(old, next Value) Value) Value {
 	return update(r, func(a Value) (Value, Value, bool) {
-		o := Apply(f, a)
+		o := Apply(fb, f, a)
 		if effectful {
 			o = Run(fb, o)
 		}
@@ -102,7 +102,7 @@ func SyncRefUpdateSomeAndGetEffect(fb *Fiber, f, r Value) Value {
 // `optional` an `Option` of the new value.
 func modified(fb *Fiber, f, r Value, effectful, optional bool) Value {
 	return update(r, func(a Value) (Value, Value, bool) {
-		pair := Apply(f, a)
+		pair := Apply(fb, f, a)
 		if effectful {
 			pair = Run(fb, pair)
 		}

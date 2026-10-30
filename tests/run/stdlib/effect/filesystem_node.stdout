@@ -1,0 +1,15 @@
+access: true
+copy: first
+copy overwrite: keep
+copy tree: deep
+copy to itself: first
+link: changed
+truncate: cha
+utimes: true
+glob recursive: ["one.txt", "sub/deep.txt"]
+glob braces: ["a.txt", "b.txt"]
+glob extglob: ["a.txt", "b.txt"]
+glob exclude: ["one.txt"]
+open: true
+indirect: true
+done

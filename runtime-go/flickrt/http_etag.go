@@ -11,7 +11,7 @@ import (
 
 func etagLayer(key Value, ctor string) Value {
 	tag := Tag("Http.Etag.Etag." + ctor)
-	return LayerSucceed(key, Rec("from_file_info", Fn(func(info Value) Value {
+	return LayerSucceed(key, Rec("from_file_info", Fn(func(fb *Fiber, info Value) Value {
 		return Eff(func(*Fiber) Value { return NewData(tag, etagOf(record(info))) })
 	})))
 }

@@ -12,14 +12,14 @@ import (
 // The combinators of Http.Client, as Effect's: each makes a client of
 // another's preparation and sending.
 
-func (c *Client) withPre(pre func(request Value) Value) *Client {
+func (c *Client) withPre(pre func(fb *Fiber, request Value) Value) *Client {
 	return &Client{pre: pre, post: c.post}
 }
 
 // transformResponse is the client with the task of each response changed
 // by `f`.
-func (c *Client) transformResponse(f func(task Value) Value) *Client {
-	return &Client{pre: c.pre, post: func(prepared Value) Value { return f(c.post(prepared)) }}
+func (c *Client) transformResponse(f func(fb *Fiber, task Value) Value) *Client {
+	return &Client{pre: c.pre, post: func(fb *Fiber, prepared Value) Value { return f(fb, c.post(fb, prepared)) }}
 }
 
 // mapTask is a task of `f` of the task's value.
@@ -52,70 +52,70 @@ func recovering(task Value, f func(fb *Fiber, err Value, cause *Cause) Value) Va
 
 func HttpClientTransform(f, client Value) Value {
 	c := httpClientOf(client)
-	return &Client{pre: c.pre, post: func(prepared Value) Value {
+	return &Client{pre: c.pre, post: func(fb *Fiber, prepared Value) Value {
 		return mapTask(prepared, func(fb *Fiber, request Value) Value {
-			return Run(fb, Apply(Apply(f, c.post(Succeed(request))), request))
+			return Run(fb, Apply(fb, Apply(fb, f, c.post(fb, Succeed(request))), request))
 		})
 	}}
 }
 
 func HttpClientTransformResponse(f, client Value) Value {
-	return httpClientOf(client).transformResponse(func(task Value) Value { return Apply(f, task) })
+	return httpClientOf(client).transformResponse(func(fb *Fiber, task Value) Value { return Apply(fb, f, task) })
 }
 
 func HttpClientCatch(f, client Value) Value {
-	return httpClientOf(client).transformResponse(func(task Value) Value {
-		return recovering(task, func(fb *Fiber, err Value, _ *Cause) Value { return Run(fb, Apply(f, err)) })
+	return httpClientOf(client).transformResponse(func(fb *Fiber, task Value) Value {
+		return recovering(task, func(fb *Fiber, err Value, _ *Cause) Value { return Run(fb, Apply(fb, f, err)) })
 	})
 }
 
 func HttpClientTapError(f, client Value) Value {
-	return httpClientOf(client).transformResponse(func(task Value) Value {
+	return httpClientOf(client).transformResponse(func(fb *Fiber, task Value) Value {
 		return recovering(task, func(fb *Fiber, err Value, cause *Cause) Value {
-			Run(fb, Apply(f, err))
+			Run(fb, Apply(fb, f, err))
 			panic(&Failure{cause})
 		})
 	})
 }
 
 func HttpClientFilterOrElse(f, orElse, client Value) Value {
-	return httpClientOf(client).transformResponse(func(task Value) Value {
+	return httpClientOf(client).transformResponse(func(fb *Fiber, task Value) Value {
 		return mapTask(task, func(fb *Fiber, r Value) Value {
-			if Apply(f, r).(bool) {
+			if Apply(fb, f, r).(bool) {
 				return r
 			}
-			return Run(fb, Apply(orElse, r))
+			return Run(fb, Apply(fb, orElse, r))
 		})
 	})
 }
 
 func HttpClientFilterOrFail(f, orFail, client Value) Value {
-	return httpClientOf(client).transformResponse(func(task Value) Value {
-		return mapTask(task, func(_ *Fiber, r Value) Value {
-			if Apply(f, r).(bool) {
+	return httpClientOf(client).transformResponse(func(fb *Fiber, task Value) Value {
+		return mapTask(task, func(fb *Fiber, r Value) Value {
+			if Apply(fb, f, r).(bool) {
 				return r
 			}
-			return Fail(Apply(orFail, r))
+			return Fail(Apply(fb, orFail, r))
 		})
 	})
 }
 
 func HttpClientFilterStatus(f, client Value) Value {
-	return httpClientOf(client).transformResponse(func(task Value) Value {
+	return httpClientOf(client).transformResponse(func(fb *Fiber, task Value) Value {
 		return mapTask(task, func(fb *Fiber, r Value) Value { return ClientResponseFilterStatus(fb, f, r) })
 	})
 }
 
 func HttpClientFilterStatusOk(client Value) Value {
-	return httpClientOf(client).transformResponse(func(task Value) Value {
+	return httpClientOf(client).transformResponse(func(fb *Fiber, task Value) Value {
 		return mapTask(task, ClientResponseFilterStatusOk)
 	})
 }
 
 func HttpClientTap(f, client Value) Value {
-	return httpClientOf(client).transformResponse(func(task Value) Value {
+	return httpClientOf(client).transformResponse(func(fb *Fiber, task Value) Value {
 		return mapTask(task, func(fb *Fiber, r Value) Value {
-			Run(fb, Apply(f, r))
+			Run(fb, Apply(fb, f, r))
 			return r
 		})
 	})
@@ -123,35 +123,35 @@ func HttpClientTap(f, client Value) Value {
 
 func HttpClientMapRequest(f, client Value) Value {
 	c := httpClientOf(client)
-	return c.withPre(func(request Value) Value {
-		return mapTask(c.pre(request), func(_ *Fiber, r Value) Value { return Apply(f, r) })
+	return c.withPre(func(fb *Fiber, request Value) Value {
+		return mapTask(c.pre(fb, request), func(fb *Fiber, r Value) Value { return Apply(fb, f, r) })
 	})
 }
 
 func HttpClientMapRequestEffect(f, client Value) Value {
 	c := httpClientOf(client)
-	return c.withPre(func(request Value) Value {
-		return mapTask(c.pre(request), func(fb *Fiber, r Value) Value { return Run(fb, Apply(f, r)) })
+	return c.withPre(func(fb *Fiber, request Value) Value {
+		return mapTask(c.pre(fb, request), func(fb *Fiber, r Value) Value { return Run(fb, Apply(fb, f, r)) })
 	})
 }
 
 func HttpClientMapRequestInput(f, client Value) Value {
 	c := httpClientOf(client)
-	return c.withPre(func(request Value) Value { return c.pre(Apply(f, request)) })
+	return c.withPre(func(fb *Fiber, request Value) Value { return c.pre(fb, Apply(fb, f, request)) })
 }
 
 func HttpClientMapRequestInputEffect(f, client Value) Value {
 	c := httpClientOf(client)
-	return c.withPre(func(request Value) Value {
-		return mapTask(Apply(f, request), func(fb *Fiber, r Value) Value { return Run(fb, c.pre(r)) })
+	return c.withPre(func(fb *Fiber, request Value) Value {
+		return mapTask(Apply(fb, f, request), func(fb *Fiber, r Value) Value { return Run(fb, c.pre(fb, r)) })
 	})
 }
 
 func HttpClientTapRequest(f, client Value) Value {
 	c := httpClientOf(client)
-	return c.withPre(func(request Value) Value {
-		return mapTask(c.pre(request), func(fb *Fiber, r Value) Value {
-			Run(fb, Apply(f, r))
+	return c.withPre(func(fb *Fiber, request Value) Value {
+		return mapTask(c.pre(fb, request), func(fb *Fiber, r Value) Value {
+			Run(fb, Apply(fb, f, r))
 			return r
 		})
 	})
@@ -160,7 +160,7 @@ func HttpClientTapRequest(f, client Value) Value {
 // HttpClientWithCookiesRef sends the cookies of the cell with each request
 // and keeps those of each response in it.
 func HttpClientWithCookiesRef(cell, client Value) Value {
-	withCookies := HttpClientMapRequestInputEffect(Fn(func(request Value) Value {
+	withCookies := HttpClientMapRequestInputEffect(Fn(func(fb *Fiber, request Value) Value {
 		return Eff(func(*Fiber) Value {
 			if header := CookiesToCookieHeader(RefGet(cell)).(string); header != "" {
 				return ClientRequestSetHeader("cookie", header, request)
@@ -168,7 +168,7 @@ func HttpClientWithCookiesRef(cell, client Value) Value {
 			return request
 		})
 	}), client)
-	return httpClientOf(withCookies).transformResponse(func(task Value) Value {
+	return httpClientOf(withCookies).transformResponse(func(fb *Fiber, task Value) Value {
 		return mapTask(task, func(_ *Fiber, r Value) Value {
 			RefSet(cell, CookiesMerge(clientResponseOf(r).cookies, RefGet(cell)))
 			return r
@@ -177,7 +177,7 @@ func HttpClientWithCookiesRef(cell, client Value) Value {
 }
 
 func HttpClientRetry(policy, client Value) Value {
-	return httpClientOf(client).transformResponse(func(task Value) Value {
+	return httpClientOf(client).transformResponse(func(fb *Fiber, task Value) Value {
 		return Eff(func(fb *Fiber) Value { return retrying(fb, scheduleOf(policy), task, nil) })
 	})
 }
@@ -216,7 +216,7 @@ var transientStatus = map[int32]bool{408: true, 429: true, 500: true, 502: true,
 func HttpClientRetryTransient(on, times, client Value) Value {
 	mode := ConstructorName(on.(*Data).Tag)
 	limited := ScheduleRecurs(times).(*Schedule)
-	return httpClientOf(client).transformResponse(func(task Value) Value {
+	return httpClientOf(client).transformResponse(func(fb *Fiber, task Value) Value {
 		if mode != "ErrorsOnly" {
 			task = repeatingTransient(task, limited)
 		}
@@ -289,11 +289,11 @@ func HttpClientFollowRedirects(limit, client Value) Value {
 		most = n.(int32)
 	}
 	c := httpClientOf(client)
-	return &Client{pre: c.pre, post: func(prepared Value) Value {
+	return &Client{pre: c.pre, post: func(fb *Fiber, prepared Value) Value {
 		return Eff(func(fb *Fiber) Value {
 			for redirects := int32(0); ; redirects++ {
 				var current *ClientRequest
-				r := clientResponseOf(Run(fb, c.post(mapTask(prepared, func(_ *Fiber, q Value) Value {
+				r := clientResponseOf(Run(fb, c.post(fb, mapTask(prepared, func(_ *Fiber, q Value) Value {
 					current = clientOf(q)
 					return q
 				}))))

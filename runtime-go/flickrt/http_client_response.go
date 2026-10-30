@@ -46,14 +46,14 @@ func (r *ClientResponse) readAll(fb *Fiber) ([]byte, error) {
 func (r *ClientResponse) body(fb *Fiber) []byte {
 	data, err := r.readAll(fb)
 	if err != nil {
-		r.fail(err)
+		r.fail(fb, err)
 	}
 	return data
 }
 
-func (r *ClientResponse) fail(err error) Value {
+func (r *ClientResponse) fail(fb *Fiber, err error) Value {
 	rethrow(err)
-	return Fail(responseFailure(decodeErrorTag, r, Some(err.Error())))
+	return Fail(responseFailure(fb, decodeErrorTag, r, Some(err.Error())))
 }
 
 // cached is the body when it was read whole.
@@ -69,17 +69,17 @@ func ClientResponseStream(v Value) Value {
 	return &Stream{open: func(fb *Fiber) pull {
 		if data, err, ok := r.cached(); ok {
 			if err != nil {
-				r.fail(err)
+				r.fail(fb, err)
 			}
 			return chunkStream([]Value{byteList(data)}).open(fb)
 		}
 		body, err := r.open(fb)
 		if err != nil {
-			r.fail(err)
+			r.fail(fb, err)
 		}
 		fb.owner.add(fb, func(*Fiber, *Cause) Value { body.Close(); return Unit })
 		buf := make([]byte, 64<<10)
-		return func(*Fiber) ([]Value, bool) {
+		return func(fb *Fiber) ([]Value, bool) {
 			for {
 				n, err := body.Read(buf)
 				if n > 0 {
@@ -89,7 +89,7 @@ func ClientResponseStream(v Value) Value {
 					return nil, false
 				}
 				if err != nil {
-					r.fail(err)
+					r.fail(fb, err)
 				}
 			}
 		}
@@ -158,7 +158,7 @@ func ClientResponseJson(fb *Fiber, r Value) Value {
 	}
 	v, reason := parseJSON(text)
 	if reason != "" {
-		return Fail(responseFailure(decodeErrorTag, clientResponseOf(r), Some(reason)))
+		return Fail(responseFailure(fb, decodeErrorTag, clientResponseOf(r), Some(reason)))
 	}
 	return v
 }
@@ -169,16 +169,16 @@ func ClientResponseUrlParamsBody(fb *Fiber, r Value) Value {
 
 func ClientResponseBytes(fb *Fiber, r Value) Value { return byteList(clientResponseOf(r).body(fb)) }
 
-func ClientResponseFilterStatus(_ *Fiber, f, r Value) Value {
-	if !Apply(f, clientResponseOf(r).status).(bool) {
-		return Fail(responseFailure(statusErrorTag, clientResponseOf(r), Some("invalid status code")))
+func ClientResponseFilterStatus(fb *Fiber, f, r Value) Value {
+	if !Apply(fb, f, clientResponseOf(r).status).(bool) {
+		return Fail(responseFailure(fb, statusErrorTag, clientResponseOf(r), Some("invalid status code")))
 	}
 	return r
 }
 
-func ClientResponseFilterStatusOk(_ *Fiber, r Value) Value {
+func ClientResponseFilterStatusOk(fb *Fiber, r Value) Value {
 	if s := clientResponseOf(r).status; s < 200 || s >= 300 {
-		return Fail(responseFailure(statusErrorTag, clientResponseOf(r), Some("non 2xx status code")))
+		return Fail(responseFailure(fb, statusErrorTag, clientResponseOf(r), Some("non 2xx status code")))
 	}
 	return r
 }
@@ -223,14 +223,14 @@ var (
 	decodeErrorTag    = Tag("Http.ClientError.ClientErrorReason.DecodeError")
 )
 
-func requestFailure(reason string, c *ClientRequest, description Value) Value {
+func requestFailure(fb *Fiber, reason string, c *ClientRequest, description Value) Value {
 	return NewData(clientErrorTag, NewData(reason, Rec("method", methodValue(c.method),
-		"url", redactURL(c.url, defaultUrlRedactedName), "description", description)))
+		"url", redactURL(c.url, currentUrlRedactedNames(fb)), "description", description)))
 }
 
-func responseFailure(reason string, r *ClientResponse, description Value) Value {
+func responseFailure(fb *Fiber, reason string, r *ClientResponse, description Value) Value {
 	return NewData(clientErrorTag, NewData(reason, Rec("method", methodValue(r.request.method),
-		"url", redactURL(r.request.url, defaultUrlRedactedName), "status", r.status, "description", description)))
+		"url", redactURL(r.request.url, currentUrlRedactedNames(fb)), "status", r.status, "description", description)))
 }
 
 // failureReason is the reason of a Flick HttpClientError, if `err` is one.

@@ -117,19 +117,21 @@ func LiftStage(fromEff, toEff bool, result func(Value) Value) func(Value) Value 
 		return v
 	}
 	return func(f Value) Value {
-		return Fn(func(x Value) Value {
+		return Fn(func(fb *Fiber, x Value) Value {
 			switch {
 			case fromEff && toEff && result != nil:
-				return Eff(func(fb *Fiber) Value { return result(Run(fb, Apply(f, x))) })
+				return Eff(func(fb *Fiber) Value { return result(Run(fb, Apply(fb, f, x))) })
 			case fromEff && toEff:
-				return Apply(f, x)
+				return Apply(fb, f, x)
 			case toEff:
-				return Eff(func(*Fiber) Value { return lifted(Apply(f, x)) })
+				return Eff(func(fb *Fiber) Value { return lifted(Apply(fb, f, x)) })
 			case fromEff:
-				// shortcut: a task where a pure value is expected runs in a fiber of its own, without the caller's services; thread the caller's when a program needs them
-				return lifted(Run(rootFiber(), Apply(f, x)))
+				if fb == nil {
+					fb = rootFiber()
+				}
+				return lifted(Run(fb, Apply(fb, f, x)))
 			}
-			return lifted(Apply(f, x))
+			return lifted(Apply(fb, f, x))
 		})
 	}
 }

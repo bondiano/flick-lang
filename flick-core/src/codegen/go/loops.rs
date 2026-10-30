@@ -40,7 +40,7 @@ pub(super) struct Group {
     items: Vec<usize>,
     /// The most parameters a member takes.
     arity: usize,
-    /// Whether its members run effects, and so take the fiber.
+    /// Whether its members run effects, independently of hidden context.
     fiber: bool,
 }
 
@@ -187,9 +187,7 @@ impl<'a> Gen<'a> {
         let mut args = vec![k.to_doc(a)];
         args.extend(heads.iter().map(|h| a.text(h)));
         args.resize(group.arity + 1, a.text("nil"));
-        if group.fiber {
-            args.insert(0, a.text("fb"));
-        }
+        args.insert(0, self.context());
         let go = call(a, a.alloc_str(&group.name), args);
         Some(statement(a, docvec![a, "return ", go]))
     }
@@ -211,6 +209,7 @@ impl<'a> Gen<'a> {
             .collect();
         let fiber = self.groups[g].fiber;
         self.fiber = fiber.then_some("fb");
+        self.context = Some("fb");
         let mut cases = Vec::new();
         for (k, (_, params, body)) in functions.iter().enumerate() {
             let tail = Tail {
@@ -226,10 +225,8 @@ impl<'a> Gen<'a> {
             cases.push(statement(a, docvec![a, "case ", k, ":", stmts]));
         }
         self.fiber = None;
-        let mut heads = vec!["state int".to_owned()];
-        if fiber {
-            heads.insert(0, "fb *flickrt.Fiber".to_owned());
-        }
+        self.context = None;
+        let mut heads = vec!["fb *flickrt.Fiber".to_owned(), "state int".to_owned()];
         if !vars.is_empty() {
             heads.push(param_list(&vars));
         }

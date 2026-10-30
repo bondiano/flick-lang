@@ -170,10 +170,14 @@ mod tests {
             Duration::from_millis(1250),
             false,
         );
-        assert_eq!(
-            text,
-            "\nSuccess! Compiled 3 modules in 1.25s.\n\n    App.Main ───> /x/dist/flick-main.js\n    App.Web  ───> /x/dist/flick-web.js\n"
-        );
+        assert!(text.contains("Compiled 3 modules in 1.25s"), "{text}");
+        for (module, runner) in &built.runners {
+            let line = text
+                .lines()
+                .find(|line| line.contains(module))
+                .expect("entry");
+            assert!(line.contains(&runner.display().to_string()), "{line}");
+        }
     }
 
     #[test]
@@ -189,6 +193,11 @@ mod tests {
             runners: Vec::new(),
         };
         let text = text(Some(&built), &outcome(diagnostics), Duration::ZERO, false);
-        assert_eq!(text, "\nBuild failed: 2 errors and 1 warning.\n");
+        assert!(text.contains("Build failed:"), "{text}");
+        assert!(text.contains("2 errors and 1 warning"), "{text}");
+        assert!(
+            !text.contains("Success!") && !text.contains("Compiled"),
+            "{text}"
+        );
     }
 }

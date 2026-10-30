@@ -129,7 +129,7 @@ func FiberSpawn(fb *Fiber, owner, supervisor, task Value) Value {
 		if c.cause == nil {
 			return
 		}
-		_, failed := catch(func() Value { return Run(&watcher, Apply(supervisor, &Supervised{c.cause, shutdown})) })
+		_, failed := catch(func() Value { return Run(&watcher, Apply(&watcher, supervisor, &Supervised{c.cause, shutdown})) })
 		if failed != nil {
 			reportedMu.Lock()
 			reported = append(reported, failed)
@@ -373,10 +373,10 @@ func Interruptible(fb *Fiber, task Value) Value {
 // a task the interruptibility around the call.
 func regionMask(fb *Fiber, mask int, f Value) Value {
 	outer := fb.state.mask
-	restore := Fn(func(task Value) Value {
+	restore := Fn(func(fb *Fiber, task Value) Value {
 		return Eff(func(fb *Fiber) Value { return masked(fb, outer, func() Value { return Run(fb, task) }) })
 	})
-	return masked(fb, mask, func() Value { return Run(fb, Apply(f, restore)) })
+	return masked(fb, mask, func() Value { return Run(fb, Apply(fb, f, restore)) })
 }
 
 func UninterruptibleMask(fb *Fiber, f Value) Value { return regionMask(fb, fb.state.mask+1, f) }

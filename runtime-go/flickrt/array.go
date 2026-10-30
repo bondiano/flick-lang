@@ -6,44 +6,44 @@ import "math"
 // passes the arguments: data-last, the list at the end. Each copies what it
 // returns; edge cases (counts, bounds, empty lists) are Effect's.
 
-func pred(f, a Value) bool { return Bool(Apply(f, a)) }
+func pred(fb *Fiber, f, a Value) bool { return Bool(Apply(fb, f, a)) }
 
 // countOf is Effect's `Count.normalize`: a positive count, else 0.
 func countOf(n Value) int { return max(0, int(n.(int32))) }
 
-func ArrayFindLast(f, xs Value) Value {
+func ArrayFindLast(fb *Fiber, f, xs Value) Value {
 	in := List(xs)
 	for i := len(in) - 1; i >= 0; i-- {
-		if pred(f, in[i]) {
+		if pred(fb, f, in[i]) {
 			return Some(in[i])
 		}
 	}
 	return None
 }
 
-func ArrayFindLastIndex(f, xs Value) Value {
+func ArrayFindLastIndex(fb *Fiber, f, xs Value) Value {
 	in := List(xs)
 	for i := len(in) - 1; i >= 0; i-- {
-		if pred(f, in[i]) {
+		if pred(fb, f, in[i]) {
 			return Some(int32(i))
 		}
 	}
 	return None
 }
 
-func ArrayFindFirstWithIndex(f, xs Value) Value {
+func ArrayFindFirstWithIndex(fb *Fiber, f, xs Value) Value {
 	for i, x := range List(xs) {
-		if pred(f, x) {
+		if pred(fb, f, x) {
 			return Some([]Value{x, int32(i)})
 		}
 	}
 	return None
 }
 
-func ArrayCountBy(f, xs Value) Value {
+func ArrayCountBy(fb *Fiber, f, xs Value) Value {
 	n := int32(0)
 	for _, x := range List(xs) {
-		if pred(f, x) {
+		if pred(fb, f, x) {
 			n++
 		}
 	}
@@ -51,9 +51,9 @@ func ArrayCountBy(f, xs Value) Value {
 }
 
 // ArrayContainsWith is whether `eq a x` holds for an element `x`.
-func ArrayContainsWith(eq, a, xs Value) Value {
+func ArrayContainsWith(fb *Fiber, eq, a, xs Value) Value {
 	for _, x := range List(xs) {
-		if Bool(apply2(eq, a, x)) {
+		if Bool(apply2(fb, eq, a, x)) {
 			return true
 		}
 	}
@@ -61,12 +61,12 @@ func ArrayContainsWith(eq, a, xs Value) Value {
 }
 
 // ArrayDedupeWith keeps each element no earlier one is equivalent to.
-func ArrayDedupeWith(eq, xs Value) Value {
+func ArrayDedupeWith(fb *Fiber, eq, xs Value) Value {
 	out := []Value{}
 next:
 	for _, x := range List(xs) {
 		for _, kept := range out {
-			if Bool(apply2(eq, x, kept)) {
+			if Bool(apply2(fb, eq, x, kept)) {
 				continue next
 			}
 		}
@@ -75,10 +75,10 @@ next:
 	return out
 }
 
-func ArrayDedupeAdjacentWith(eq, xs Value) Value {
+func ArrayDedupeAdjacentWith(fb *Fiber, eq, xs Value) Value {
 	out := []Value{}
 	for _, x := range List(xs) {
-		if len(out) == 0 || !Bool(apply2(eq, x, out[len(out)-1])) {
+		if len(out) == 0 || !Bool(apply2(fb, eq, x, out[len(out)-1])) {
 			out = append(out, x)
 		}
 	}
@@ -87,18 +87,18 @@ func ArrayDedupeAdjacentWith(eq, xs Value) Value {
 
 // ArrayDifferenceWith is the elements of `self` not in `that`, as Effect's
 // data-last curried form reads `difference_with eq that self`.
-func ArrayDifferenceWith(eq, that, self Value) Value {
-	return ArrayFilter(Fn(func(a Value) Value { return !ArrayContainsWith(eq, a, that).(bool) }), self)
+func ArrayDifferenceWith(fb *Fiber, eq, that, self Value) Value {
+	return ArrayFilter(fb, Fn(func(fb *Fiber, a Value) Value { return !ArrayContainsWith(fb, eq, a, that).(bool) }), self)
 }
 
-func ArrayIntersectionWith(eq, that, self Value) Value {
-	return ArrayFilter(Fn(func(a Value) Value { return ArrayContainsWith(eq, a, that) }), self)
+func ArrayIntersectionWith(fb *Fiber, eq, that, self Value) Value {
+	return ArrayFilter(fb, Fn(func(fb *Fiber, a Value) Value { return ArrayContainsWith(fb, eq, a, that) }), self)
 }
 
-func ArrayFilter(f, xs Value) Value { return ListFilter(f, xs) }
+func ArrayFilter(fb *Fiber, f, xs Value) Value { return ListFilter(fb, f, xs) }
 
 // ArrayUnionWith dedupes both, unless one is empty: then the other as it is.
-func ArrayUnionWith(that, eq, self Value) Value {
+func ArrayUnionWith(fb *Fiber, that, eq, self Value) Value {
 	a, b := List(self), List(that)
 	switch {
 	case len(a) == 0:
@@ -106,14 +106,14 @@ func ArrayUnionWith(that, eq, self Value) Value {
 	case len(b) == 0:
 		return a
 	}
-	return ArrayDedupeWith(eq, ListConcat(a, b))
+	return ArrayDedupeWith(fb, eq, ListConcat(a, b))
 }
 
 // ArrayGroupBy is a record of the elements by key, keys in JS key order.
-func ArrayGroupBy(f, xs Value) Value {
+func ArrayGroupBy(fb *Fiber, f, xs Value) Value {
 	r := &Record{}
 	for _, x := range List(xs) {
-		k := Apply(f, x).(string)
+		k := Apply(fb, f, x).(string)
 		if i := r.index(k); i >= 0 {
 			r = r.set(k, append(append([]Value{}, List(r.vals[i])...), x))
 		} else {
@@ -135,22 +135,22 @@ func ArrayDropRight(n, xs Value) Value {
 	return in[:len(in)-min(countOf(n), len(in))]
 }
 
-func spanIndex(f, xs Value) int {
+func spanIndex(fb *Fiber, f, xs Value) int {
 	in := List(xs)
 	i := 0
-	for i < len(in) && pred(f, in[i]) {
+	for i < len(in) && pred(fb, f, in[i]) {
 		i++
 	}
 	return i
 }
 
-func ArrayTakeWhile(f, xs Value) Value { return List(xs)[:spanIndex(f, xs)] }
-func ArrayDropWhile(f, xs Value) Value { return List(xs)[spanIndex(f, xs):] }
+func ArrayTakeWhile(fb *Fiber, f, xs Value) Value { return List(xs)[:spanIndex(fb, f, xs)] }
+func ArrayDropWhile(fb *Fiber, f, xs Value) Value { return List(xs)[spanIndex(fb, f, xs):] }
 
-func ArrayTakeWhileFilter(f, xs Value) Value {
+func ArrayTakeWhileFilter(fb *Fiber, f, xs Value) Value {
 	out := []Value{}
 	for _, x := range List(xs) {
-		r := Apply(f, x)
+		r := Apply(fb, f, x)
 		if !isOk(r) {
 			break
 		}
@@ -159,17 +159,17 @@ func ArrayTakeWhileFilter(f, xs Value) Value {
 	return out
 }
 
-func ArrayDropWhileFilter(f, xs Value) Value {
+func ArrayDropWhileFilter(fb *Fiber, f, xs Value) Value {
 	in := List(xs)
 	i := 0
-	for i < len(in) && isOk(Apply(f, in[i])) {
+	for i < len(in) && isOk(Apply(fb, f, in[i])) {
 		i++
 	}
 	return in[i:]
 }
 
-func ArraySpan(f, xs Value) Value {
-	i := spanIndex(f, xs)
+func ArraySpan(fb *Fiber, f, xs Value) Value {
+	i := spanIndex(fb, f, xs)
 	return []Value{List(xs)[:i], List(xs)[i:]}
 }
 
@@ -186,8 +186,8 @@ func ArraySplit(n, xs Value) Value {
 	return ArrayChunksOf(int32(size), in)
 }
 
-func ArraySplitWhere(f, xs Value) Value {
-	return ArraySpan(Fn(func(a Value) Value { return !pred(f, a) }), xs)
+func ArraySplitWhere(fb *Fiber, f, xs Value) Value {
+	return ArraySpan(fb, Fn(func(fb *Fiber, a Value) Value { return !pred(fb, f, a) }), xs)
 }
 
 func ArrayChunksOf(n, xs Value) Value {
@@ -214,10 +214,10 @@ func ArrayWindow(n, xs Value) Value {
 }
 
 // ArrayChop applies `f` to what is left until nothing is.
-func ArrayChop(f, xs Value) Value {
+func ArrayChop(fb *Fiber, f, xs Value) Value {
 	out := []Value{}
 	for rest := List(xs); len(rest) > 0; {
-		step := Apply(f, rest).([]Value)
+		step := Apply(fb, f, rest).([]Value)
 		out = append(out, step[0])
 		rest = List(step[1])
 	}
@@ -277,18 +277,18 @@ func ArrayRemove(i, xs Value) Value {
 	return ListConcat(in[:k], in[k+1:])
 }
 
-func ArrayModify(i, f, xs Value) Value {
+func ArrayModify(fb *Fiber, i, f, xs Value) Value {
 	in, k := List(xs), int(i.(int32))
 	if k < 0 || k >= len(in) {
 		return None
 	}
 	out := append([]Value{}, in...)
-	out[k] = Apply(f, in[k])
+	out[k] = Apply(fb, f, in[k])
 	return Some(out)
 }
 
-func ArrayReplace(i, b, xs Value) Value {
-	return ArrayModify(i, Fn(func(Value) Value { return b }), xs)
+func ArrayReplace(fb *Fiber, i, b, xs Value) Value {
+	return ArrayModify(fb, i, Fn(func(fb *Fiber, _ Value) Value { return b }), xs)
 }
 
 func ArrayIntersperse(middle, xs Value) Value {
@@ -304,68 +304,68 @@ func ArrayIntersperse(middle, xs Value) Value {
 
 func ArrayAppendAll(that, self Value) Value { return ListConcat(self, that) }
 
-func ArrayCartesianWith(that, f, self Value) Value {
+func ArrayCartesianWith(fb *Fiber, that, f, self Value) Value {
 	out := []Value{}
 	for _, a := range List(self) {
 		for _, b := range List(that) {
-			out = append(out, apply2(f, a, b))
+			out = append(out, apply2(fb, f, a, b))
 		}
 	}
 	return out
 }
 
-func ArrayCartesian(that, self Value) Value {
-	return ArrayCartesianWith(that, Curry2(func(a, b Value) Value { return []Value{a, b} }), self)
+func ArrayCartesian(fb *Fiber, that, self Value) Value {
+	return ArrayCartesianWith(fb, that, Curry2(func(fb *Fiber, a, b Value) Value { return []Value{a, b} }), self)
 }
 
-func ArrayZipWith(that, f, self Value) Value {
+func ArrayZipWith(fb *Fiber, that, f, self Value) Value {
 	a, b := List(self), List(that)
 	out := make([]Value, min(len(a), len(b)))
 	for i := range out {
-		out[i] = apply2(f, a[i], b[i])
+		out[i] = apply2(fb, f, a[i], b[i])
 	}
 	return out
 }
 
-func ArrayMapAccum(s, f, xs Value) Value {
+func ArrayMapAccum(fb *Fiber, s, f, xs Value) Value {
 	acc, out := s, []Value{}
 	for _, x := range List(xs) {
-		r := apply2(f, acc, x).([]Value)
+		r := apply2(fb, f, acc, x).([]Value)
 		acc = r[0]
 		out = append(out, r[1])
 	}
 	return []Value{acc, out}
 }
 
-func ArrayScan(b, f, xs Value) Value {
+func ArrayScan(fb *Fiber, b, f, xs Value) Value {
 	out := []Value{b}
 	for _, x := range List(xs) {
-		out = append(out, apply2(f, out[len(out)-1], x))
+		out = append(out, apply2(fb, f, out[len(out)-1], x))
 	}
 	return out
 }
 
-func ArrayScanRight(b, f, xs Value) Value {
+func ArrayScanRight(fb *Fiber, b, f, xs Value) Value {
 	in := List(xs)
 	out := make([]Value, len(in)+1)
 	out[len(in)] = b
 	for i := len(in) - 1; i >= 0; i-- {
-		out[i] = apply2(f, out[i+1], in[i])
+		out[i] = apply2(fb, f, out[i+1], in[i])
 	}
 	return out
 }
 
 // ArrayExtend is `f` of each suffix.
-func ArrayExtend(f, xs Value) Value {
+func ArrayExtend(fb *Fiber, f, xs Value) Value {
 	in := List(xs)
 	out := make([]Value, len(in))
 	for i := range in {
-		out[i] = Apply(f, in[i:])
+		out[i] = Apply(fb, f, in[i:])
 	}
 	return out
 }
 
-func ArrayFilterMapWhile(f, xs Value) Value { return ArrayTakeWhileFilter(f, xs) }
+func ArrayFilterMapWhile(fb *Fiber, f, xs Value) Value { return ArrayTakeWhileFilter(fb, f, xs) }
 
 func ArrayGetSomes(xs Value) Value {
 	out := []Value{}
@@ -390,10 +390,10 @@ func results(xs Value, ok bool) Value {
 func ArrayGetFailures(xs Value) Value  { return results(xs, false) }
 func ArrayGetSuccesses(xs Value) Value { return results(xs, true) }
 
-func ArrayPartition(f, xs Value) Value {
+func ArrayPartition(fb *Fiber, f, xs Value) Value {
 	passes, fails := []Value{}, []Value{}
 	for _, x := range List(xs) {
-		if r := Apply(f, x); isOk(r) {
+		if r := Apply(fb, f, x); isOk(r) {
 			passes = append(passes, value(r))
 		} else {
 			fails = append(fails, value(r))
@@ -402,34 +402,36 @@ func ArrayPartition(f, xs Value) Value {
 	return []Value{passes, fails}
 }
 
-func ArraySeparate(xs Value) Value { return ArrayPartition(Fn(Identity), xs) }
+func ArraySeparate(fb *Fiber, xs Value) Value {
+	return ArrayPartition(fb, Fn(func(_ *Fiber, v Value) Value { return Identity(v) }), xs)
+}
 
-func ArrayUnfold(b, f Value) Value {
+func ArrayUnfold(fb *Fiber, b, f Value) Value {
 	out := []Value{}
-	for o := Apply(f, b); isSome(o); {
+	for o := Apply(fb, f, b); isSome(o); {
 		pair := value(o).([]Value)
 		out = append(out, pair[0])
-		o = Apply(f, pair[1])
+		o = Apply(fb, f, pair[1])
 	}
 	return out
 }
 
-func ArrayLiftOption(f, a Value) Value {
-	if o := Apply(f, a); isSome(o) {
+func ArrayLiftOption(fb *Fiber, f, a Value) Value {
+	if o := Apply(fb, f, a); isSome(o) {
 		return []Value{value(o)}
 	}
 	return []Value{}
 }
 
-func ArrayLiftPredicate(p, a Value) Value {
-	if pred(p, a) {
+func ArrayLiftPredicate(fb *Fiber, p, a Value) Value {
+	if pred(fb, p, a) {
 		return []Value{a}
 	}
 	return []Value{}
 }
 
-func ArrayLiftResult(f, a Value) Value {
-	if r := Apply(f, a); isOk(r) {
+func ArrayLiftResult(fb *Fiber, f, a Value) Value {
+	if r := Apply(fb, f, a); isOk(r) {
 		return []Value{value(r)}
 	}
 	return []Value{}
@@ -444,28 +446,28 @@ func ArrayRepeat(n, xs Value) Value {
 	return out
 }
 
-func ArrayMatch(options, xs Value) Value {
+func ArrayMatch(fb *Fiber, options, xs Value) Value {
 	r := record(options)
 	if in := List(xs); len(in) > 0 {
-		return Apply(r.Get("onNonEmpty"), in)
+		return Apply(fb, r.Get("onNonEmpty"), in)
 	}
-	return Apply(r.Get("onEmpty"), Unit)
+	return Apply(fb, r.Get("onEmpty"), Unit)
 }
 
-func ArrayMatchLeft(options, xs Value) Value {
+func ArrayMatchLeft(fb *Fiber, options, xs Value) Value {
 	r := record(options)
 	if in := List(xs); len(in) > 0 {
-		return apply2(r.Get("onNonEmpty"), in[0], in[1:])
+		return apply2(fb, r.Get("onNonEmpty"), in[0], in[1:])
 	}
-	return Apply(r.Get("onEmpty"), Unit)
+	return Apply(fb, r.Get("onEmpty"), Unit)
 }
 
-func ArrayMatchRight(options, xs Value) Value {
+func ArrayMatchRight(fb *Fiber, options, xs Value) Value {
 	r := record(options)
 	if in := List(xs); len(in) > 0 {
-		return apply2(r.Get("onNonEmpty"), in[:len(in)-1], in[len(in)-1])
+		return apply2(fb, r.Get("onNonEmpty"), in[:len(in)-1], in[len(in)-1])
 	}
-	return Apply(r.Get("onEmpty"), Unit)
+	return Apply(fb, r.Get("onEmpty"), Unit)
 }
 
 func NonEmptyFromList(xs Value) Value {
@@ -480,10 +482,10 @@ func NonEmptyHead(xs Value) Value    { return List(xs)[0] }
 func ArrayAppend(x, xs Value) Value  { return ListConcat(xs, []Value{x}) }
 
 // ArrayMakeBy is `f` of each index below `n`, at least one.
-func ArrayMakeBy(n, f Value) Value {
+func ArrayMakeBy(fb *Fiber, n, f Value) Value {
 	out := make([]Value, max(1, countOf(n)))
 	for i := range out {
-		out[i] = Apply(f, int32(i))
+		out[i] = Apply(fb, f, int32(i))
 	}
 	return out
 }
@@ -496,32 +498,32 @@ func ArrayRange(start, end Value) Value {
 	return ListRange(a, b+1)
 }
 
-func ArrayReplicate(n, a Value) Value {
-	return ArrayMakeBy(n, Fn(func(Value) Value { return a }))
+func ArrayReplicate(fb *Fiber, n, a Value) Value {
+	return ArrayMakeBy(fb, n, Fn(func(fb *Fiber, _ Value) Value { return a }))
 }
 
 func NonEmptyLast(xs Value) Value { in := List(xs); return in[len(in)-1] }
 func NonEmptyTail(xs Value) Value { return List(xs)[1:] }
 func NonEmptyInit(xs Value) Value { in := List(xs); return in[:len(in)-1] }
 
-func NonEmptyModifyHead(f, xs Value) Value {
+func NonEmptyModifyHead(fb *Fiber, f, xs Value) Value {
 	out := append([]Value{}, List(xs)...)
-	out[0] = Apply(f, out[0])
+	out[0] = Apply(fb, f, out[0])
 	return out
 }
 
-func NonEmptySetHead(b, xs Value) Value {
-	return NonEmptyModifyHead(Fn(func(Value) Value { return b }), xs)
+func NonEmptySetHead(fb *Fiber, b, xs Value) Value {
+	return NonEmptyModifyHead(fb, Fn(func(fb *Fiber, _ Value) Value { return b }), xs)
 }
 
-func NonEmptyModifyLast(f, xs Value) Value {
+func NonEmptyModifyLast(fb *Fiber, f, xs Value) Value {
 	out := append([]Value{}, List(xs)...)
-	out[len(out)-1] = Apply(f, out[len(out)-1])
+	out[len(out)-1] = Apply(fb, f, out[len(out)-1])
 	return out
 }
 
-func NonEmptySetLast(b, xs Value) Value {
-	return NonEmptyModifyLast(Fn(func(Value) Value { return b }), xs)
+func NonEmptySetLast(fb *Fiber, b, xs Value) Value {
+	return NonEmptyModifyLast(fb, Fn(func(fb *Fiber, _ Value) Value { return b }), xs)
 }
 
 // NonEmptySplitAt splits after at least the first element.
@@ -535,12 +537,12 @@ func NonEmptyUnappend(xs Value) Value  { in := List(xs); return []Value{in[:len(
 func NonEmptyUnprepend(xs Value) Value { in := List(xs); return []Value{in[0], in[1:]} }
 
 // NonEmptyGroupWith groups each run of elements equivalent to its first.
-func NonEmptyGroupWith(eq, xs Value) Value {
+func NonEmptyGroupWith(fb *Fiber, eq, xs Value) Value {
 	in := List(xs)
 	out := []Value{}
 	for i := 0; i < len(in); {
 		j := i + 1
-		for j < len(in) && Bool(apply2(eq, in[j], in[i])) {
+		for j < len(in) && Bool(apply2(fb, eq, in[j], in[i])) {
 			j++
 		}
 		out = append(out, in[i:j])
@@ -550,20 +552,24 @@ func NonEmptyGroupWith(eq, xs Value) Value {
 }
 
 // NonEmptyMax and NonEmptyMin keep the first of equal elements.
-func NonEmptyMax(cmp, xs Value) Value {
+func NonEmptyMax(fb *Fiber, cmp, xs Value) Value {
 	o, in := orderOf(cmp), List(xs)
 	best := in[0]
 	for _, x := range in[1:] {
-		best = orderMax(o, best, x)
+		if o(fb, best, x) < 0 {
+			best = x
+		}
 	}
 	return best
 }
 
-func NonEmptyMin(cmp, xs Value) Value {
+func NonEmptyMin(fb *Fiber, cmp, xs Value) Value {
 	o, in := orderOf(cmp), List(xs)
 	best := in[0]
 	for _, x := range in[1:] {
-		best = orderMin(o, best, x)
+		if o(fb, best, x) > 0 {
+			best = x
+		}
 	}
 	return best
 }

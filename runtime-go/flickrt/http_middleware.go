@@ -13,7 +13,9 @@ const (
 	headerFilterKey   = "effect/http/HttpMiddleware/TracerHeaderFilter"
 )
 
-func handle(fb *Fiber, handler Value, request Value) Value { return Run(fb, Apply(handler, request)) }
+func handle(fb *Fiber, handler Value, request Value) Value {
+	return Run(fb, Apply(fb, handler, request))
+}
 
 func (q *ServerRequest) appendPreResponse(h preResponse) {
 	m := q.src.marks
@@ -38,7 +40,7 @@ func (q *ServerRequest) preResponded(fb *Fiber, response Value) Value {
 // flickPreResponse is a Flick function of the request and the response.
 func flickPreResponse(f Value) preResponse {
 	return func(fb *Fiber, request, response Value) Value {
-		return Run(fb, Apply(Apply(f, request), response))
+		return Run(fb, Apply(fb, Apply(fb, f, request), response))
 	}
 }
 
@@ -61,7 +63,7 @@ func MiddlewareToHandled(fb *Fiber, send, handler, request Value) Value {
 	if cause != nil {
 		out = causeResponse(cause)
 	}
-	Run(fb, Apply(Apply(send, request), q.preResponded(fb, out)))
+	Run(fb, Apply(fb, Apply(fb, send, request), q.preResponded(fb, out)))
 	if cause != nil {
 		panic(&Failure{cause})
 	}
@@ -103,15 +105,15 @@ func MiddlewareWithLoggerDisabled(fb *Fiber, handler, request Value) Value {
 //
 // shortcut: the span does not continue the trace of the request's headers, as the go target's spans are not exported; read them when spans are
 func MiddlewareTracer(fb *Fiber, handler, request Value) Value {
-	if f, ok := fb.env.get(tracerDisabledKey); ok && Apply(f, request).(bool) {
+	if f, ok := fb.env.get(tracerDisabledKey); ok && Apply(fb, f, request).(bool) {
 		return handle(fb, handler, request)
 	}
 	name := Value(requestOf(request).method)
 	if f, ok := fb.env.get(spanNameKey); ok {
-		name = Apply(f, request)
+		name = Apply(fb, f, request)
 	}
 	span := openSpan(fb, name, Rec("parent", None, "root", false))
-	return withEnv(fb, parentSpanKey, span, Apply(handler, request))
+	return withEnv(fb, parentSpanKey, span, Apply(fb, handler, request))
 }
 
 func MiddlewareWithTracerDisabledWhen(fb *Fiber, f, task Value) Value {
@@ -119,7 +121,7 @@ func MiddlewareWithTracerDisabledWhen(fb *Fiber, f, task Value) Value {
 }
 
 func MiddlewareWithTracerDisabledForUrls(fb *Fiber, urls, task Value) Value {
-	disabled := Fn(func(r Value) Value {
+	disabled := Fn(func(fb *Fiber, r Value) Value {
 		for _, u := range List(urls) {
 			if u == requestOf(r).url {
 				return true

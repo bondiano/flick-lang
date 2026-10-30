@@ -69,8 +69,8 @@ func optionalSize(v Value) int64 {
 
 // HttpPlatformNode is the layer of the platform's service of key `key`.
 func HttpPlatformNode(key Value) Value {
-	return LayerSucceed(key, Rec("file_response", Fn(func(options Value) Value {
-		return Fn(func(path Value) Value {
+	return LayerSucceed(key, Rec("file_response", Fn(func(fb *Fiber, options Value) Value {
+		return Fn(func(fb *Fiber, path Value) Value {
 			return Eff(func(*Fiber) Value {
 				o := record(options)
 				r, failure := fileResponse(path.(string), record(o.Get("response")), 200,
@@ -129,8 +129,8 @@ func (s *staticServer) mimeType(path string) string {
 	return "application/octet-stream"
 }
 
-func serverFailure(q *ServerRequest, reason string) Value {
-	return Fail(NewData(serverErrorTag, NewData(reason, q.details(None))))
+func serverFailure(fb *Fiber, q *ServerRequest, reason string) Value {
+	return Fail(NewData(serverErrorTag, NewData(reason, q.details(fb, None))))
 }
 
 // resolve is the file of the URL below the root, false outside it.
@@ -158,13 +158,13 @@ func (s *staticServer) resolve(url string) (string, bool) {
 
 // response is the file's response with the server's headers, or a
 // failure of the request: not found for a missing file.
-func (s *staticServer) response(q *ServerRequest, path string, status int32, offset, bytesToRead int64) *ServerResponse {
+func (s *staticServer) response(fb *Fiber, q *ServerRequest, path string, status int32, offset, bytesToRead int64) *ServerResponse {
 	r, failure := fileResponse(path, nil, status, offset, bytesToRead)
 	if failure != nil {
 		if isNotFound(failure) {
-			serverFailure(q, routeMissingTag)
+			serverFailure(fb, q, routeMissingTag)
 		}
-		serverFailure(q, internalErrorTag)
+		serverFailure(fb, q, internalErrorTag)
 	}
 	out := ResponseSetHeaders([]Value{[]Value{"Content-Type", s.mimeType(path)}, []Value{"Accept-Ranges", "bytes"}}, r)
 	if s.hasCache {
@@ -267,11 +267,11 @@ func parseRange(header string, size int64) (start, end int64, unsatisfiable, ok 
 
 // serve is the response of the file: whole, not modified, or the range
 // the request asks for.
-func (s *staticServer) serve(q *ServerRequest, path string, size int64) *ServerResponse {
+func (s *staticServer) serve(fb *Fiber, q *ServerRequest, path string, size int64) *ServerResponse {
 	var full *ServerResponse
 	whole := func() *ServerResponse {
 		if full == nil {
-			full = s.response(q, path, 200, 0, -1)
+			full = s.response(fb, q, path, 200, 0, -1)
 		}
 		return full
 	}
@@ -297,9 +297,9 @@ func (s *staticServer) serve(q *ServerRequest, path string, size int64) *ServerR
 		fi, err := os.Stat(path)
 		if err != nil {
 			if isNotFound(systemError(err, "stat", "stat", path)) {
-				serverFailure(q, routeMissingTag)
+				serverFailure(fb, q, routeMissingTag)
 			}
-			serverFailure(q, internalErrorTag)
+			serverFailure(fb, q, internalErrorTag)
 		}
 		size = fi.Size()
 	}
@@ -311,37 +311,37 @@ func (s *staticServer) serve(q *ServerRequest, path string, size int64) *ServerR
 		h := headersOf(HeadersEmpty).set("content-range", "bytes */"+strconv.FormatInt(size, 10))
 		return newResponse(416, "", false, h, nil, nil, false)
 	}
-	r := s.response(q, path, 206, start, end-start+1)
+	r := s.response(fb, q, path, 206, start, end-start+1)
 	return responseOf(ResponseSetHeader("Content-Range", "bytes "+strconv.FormatInt(start, 10)+"-"+strconv.FormatInt(end, 10)+"/"+strconv.FormatInt(size, 10), r))
 }
 
-func (s *staticServer) handle(q *ServerRequest) Value {
+func (s *staticServer) handle(fb *Fiber, q *ServerRequest) Value {
 	path, ok := s.resolve(q.url)
 	if !ok {
-		return serverFailure(q, routeMissingTag)
+		return serverFailure(fb, q, routeMissingTag)
 	}
 	fi, err := os.Stat(path)
 	switch {
 	case err != nil && isNotFound(systemError(err, "stat", "stat", path)):
 		if accept, _ := q.header("accept"); s.spa && s.hasIndex && nodeExtname(path) == "" && strings.Contains(strings.ToLower(accept), "text/html") {
-			return s.serve(q, filepath.Join(s.root, s.index), -1)
+			return s.serve(fb, q, filepath.Join(s.root, s.index), -1)
 		}
-		return serverFailure(q, routeMissingTag)
+		return serverFailure(fb, q, routeMissingTag)
 	case err != nil:
-		return serverFailure(q, internalErrorTag)
+		return serverFailure(fb, q, internalErrorTag)
 	case fi.Mode().IsRegular():
-		return s.serve(q, path, fi.Size())
+		return s.serve(fb, q, path, fi.Size())
 	case fi.IsDir() && s.hasIndex:
-		return s.serve(q, filepath.Join(path, s.index), -1)
+		return s.serve(fb, q, filepath.Join(path, s.index), -1)
 	}
-	return serverFailure(q, routeMissingTag)
+	return serverFailure(fb, q, routeMissingTag)
 }
 
 // StaticServerMake answers the request with the files below the root; the
 // go target calls it with the options and the request at once. An index
 // is served only when the options name one, as the options always pass
 // Effect the key.
-func StaticServerMake(_ *Fiber, options, request Value) Value {
+func StaticServerMake(fb *Fiber, options, request Value) Value {
 	o := record(options)
 	root, _ := filepath.Abs(o.Get("root").(string))
 	s := &staticServer{root: root, spa: o.Get("spa").(bool), mimeTypes: map[string]string{}}
@@ -355,5 +355,5 @@ func StaticServerMake(_ *Fiber, options, request Value) Value {
 		k, v := pairOf(p)
 		s.mimeTypes[k] = v
 	}
-	return s.handle(requestOf(request))
+	return s.handle(fb, requestOf(request))
 }

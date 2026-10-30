@@ -40,10 +40,10 @@ func operation(key, name string, arity int, dicts []Value) Value {
 			}
 			f := impl.(*Record).Get(name)
 			if dicts != nil {
-				f = Inst(f, dicts...)
+				f = Inst(fb, f, dicts...)
 			}
 			for _, a := range args {
-				f = Apply(f, a)
+				f = Apply(fb, f, a)
 			}
 			return Run(fb, f)
 		})
@@ -53,7 +53,7 @@ func operation(key, name string, arity int, dicts []Value) Value {
 		if len(args) == arity {
 			return call(args)
 		}
-		return Fn(func(a Value) Value { return collect(append(args[:len(args):len(args)], a)) })
+		return Fn(func(fb *Fiber, a Value) Value { return collect(append(args[:len(args):len(args)], a)) })
 	}
 	return collect(nil)
 }

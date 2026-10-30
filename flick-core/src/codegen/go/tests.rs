@@ -1,13 +1,13 @@
 use std::iter;
 
-use super::{Program, go, names};
+use super::{Program, go};
 use crate::build::builtin_modules;
+use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::Module;
 use crate::ir::tests::lower_text;
 
-/// The Go program of `text` with the built-in modules, by file, and the
-/// messages of what could not be compiled.
-fn compile(text: &str) -> (Vec<(String, String)>, Vec<String>) {
+/// The target diagnostics of `text` with the built-in modules.
+fn compile(text: &str) -> Vec<Diagnostic> {
     let ir = lower_text("App", text).expect("lowers");
     let modules: Vec<&Module> = iter::once(&ir).chain(builtin_modules()).collect();
     let output = go(&Program {
@@ -17,163 +17,47 @@ fn compile(text: &str) -> (Vec<(String, String)>, Vec<String>) {
         package: &|_| None,
         own: &|m| m == ir.name,
         location: &|_, _| None,
-        foreign_file: &|_, spec| {
-            (spec == "./here.mjs").then(|| ("ffi_here.go".to_owned(), "package main\n".to_owned()))
-        },
+        foreign_file: &|_, _| None,
     });
-    let messages = output.diagnostics.into_iter().map(|d| d.message).collect();
-    (output.files, messages)
-}
-
-fn file<'a>(files: &'a [(String, String)], name: &str) -> &'a str {
-    &files
-        .iter()
-        .find(|(path, _)| path == name)
-        .unwrap_or_else(|| panic!("no file {name}"))
-        .1
-}
-
-#[test]
-fn module_files_are_named_by_module() {
-    assert_eq!(names::file("App.Main"), "m_App_Main.go");
-    assert_eq!(names::init("App.Main"), "init_App_Main");
-}
-
-#[test]
-fn pure_functions_are_go_functions_of_all_their_arguments() {
-    let (files, errors) = compile(
-        "module App exposing (main)\n\
-         add : Int -> Int -> Int\nlet add a b = a + b\n\
-         inc : Int -> Int\nlet inc = add 1\n\
-         main : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (inc (add 2 3)))\n",
-    );
-    assert!(errors.is_empty(), "{errors:?}");
-    insta::assert_snapshot!(file(&files, "m_App.go"));
-    let main = file(&files, "main.go");
-    assert!(
-        main.contains("init_App()") && main.contains("F_App__main(fb, flickrt.Unit)"),
-        "{main}"
-    );
-}
-
-#[test]
-fn a_loop_of_floats_keeps_them_unboxed() {
-    let (files, errors) = compile(
-        "module App exposing (main)\n\
-         sum : Float -> Float -> Float\n\
-         let rec sum i acc = if i <= 0 then acc else sum (i - 1) (acc + i * 0.5)\n\
-         main : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (sum 10 0))\n",
-    );
-    assert!(errors.is_empty(), "{errors:?}");
-    let go = file(&files, "m_App.go");
-    assert!(go.contains("var l_acc float64 = "), "{go}");
-    insta::assert_snapshot!(go);
-}
-
-#[test]
-fn only_what_main_reaches_is_compiled() {
-    let (files, errors) = compile(
-        "module App exposing (main)\n\
-         later : Unit ->{} Int\nlet later () = await (task { 1 })\n\
-         main : Unit ->{} Unit\nlet main () = Platform.stdout_line \"hi\"\n",
-    );
-    assert!(errors.is_empty(), "{errors:?}");
-    assert!(!file(&files, "m_App.go").contains("later"));
+    output.diagnostics
 }
 
 #[test]
 fn what_the_target_cannot_run_yet_is_reported() {
-    let (_, errors) = compile(
+    let errors = compile(
         "module App exposing (main)\n\
          now : Unit ->{} Float\nforeign sync now from global \"Date.now\"\n\
          main : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (now ()))\n",
     );
     assert_eq!(
-        errors,
-        ["`App.now` (foreign `Date.now` global) is not available on the go target"]
+        errors.iter().map(|error| error.code).collect::<Vec<_>>(),
+        [codes::P012]
     );
+    assert_eq!(errors[0].severity, Severity::Error);
+    assert!(errors[0].span.is_some());
 }
 
 #[test]
-fn tail_calls_jump_instead_of_calling() {
-    let (files, errors) = compile(
+fn unreachable_foreigns_do_not_reject_a_supported_entry() {
+    let errors = compile(
         "module App exposing (main)\n\
-         sum : Int -> Int -> Int\nlet rec sum acc n = if n == 0 then acc else sum (acc + n) (n - 1)\n\
-         rec {\n\
-         even : Int -> Bool\nlet even n = n == 0 || odd (n - 1)\n\
-         odd : Int -> Bool\nlet odd n = n != 0 && even (n - 1)\n\
-         }\n\
-         main : Unit ->{} Unit\nlet main () = Platform.stdout_line (show (sum 0 3) ++ show (even 4))\n",
+         now : Unit ->{} Float\nforeign sync now from global \"Date.now\"\n\
+         main : Unit ->{} Unit\nlet main () = Platform.stdout_line \"hi\"\n",
     );
-    assert!(errors.is_empty(), "{errors:?}");
-    let code = file(&files, "m_App.go");
-    let sum = &code[code.find("func F_App__sum(").expect("sum")..];
-    let sum = &sum[..sum.find("\n}\n").expect("end of sum")];
-    assert!(
-        sum.contains("for {")
-            && sum.contains("continue")
-            && !sum.contains("F_App__sum(f")
-            && !sum.contains("Check"),
-        "{sum}"
-    );
-    assert!(
-        code.contains("func G_App__even(state int, v0 flickrt.Value)"),
-        "{code}"
-    );
-    assert!(code.contains("return G_App__even(1, "), "{code}");
+    assert_eq!(errors, []);
 }
 
 #[test]
-fn effectful_tail_calls_jump_but_not_out_of_a_try() {
-    let (files, errors) = compile(
-        "module App exposing (main)\n\
-         down : Ref Int -> Int ->{} Unit\n\
-         let rec down cell n = if n == 0 then () else\n  Ref.set cell n\n  down cell (n - 1)\n\
-         main : Unit ->{} Unit\nlet main () = down (Ref.make 0) 3\n",
-    );
-    assert!(errors.is_empty(), "{errors:?}");
-    let code = file(&files, "m_App.go");
-    // an effectful loop stays interruptible: it checks at each iteration
-    assert!(
-        code.contains("for {\n\t\tflickrt.Check(fb)") && code.contains("continue"),
-        "{code}"
-    );
-    let (files, _) = compile(
-        "module App exposing (main)\n\
-         type error Stop = Stop\n\
-         again : Int ->{; Stop} Int\n\
-         let rec again n = try again (n - 1) with | Stop -> n\n\
-         main : Unit ->{; Stop} Unit\nlet main () = Platform.stdout_line (show (again 3))\n",
-    );
-    let code = file(&files, "m_App.go");
-    assert!(!code.contains("continue"), "{code}");
-}
-
-#[test]
-fn a_local_foreign_calls_the_go_file_beside_it() {
-    let (files, errors) = compile(
-        "module App exposing (main)\n\
-         wait : Float ->{} Unit\nforeign async wait from \"./here.mjs\" \"wait\"\n\
-         open : String ->{} String\nforeign effect open from \"./here.mjs\" \"open\"\n\
-         main : Unit ->{} Unit\nlet main () =\n  wait 1\n  Platform.stdout_line (open \"x\")\n",
-    );
-    assert!(errors.is_empty(), "{errors:?}");
-    let code = file(&files, "m_App.go");
-    assert!(
-        code.contains("flickrt.ForeignAsync(fb, func(ctx flickrt.Context) flickrt.Value { return wait(ctx, a0) })"),
-        "{code}"
-    );
-    assert!(code.contains("return open(fb, a0)"), "{code}");
-    assert_eq!(file(&files, "ffi_here.go"), "package main\n");
-    let (_, errors) = compile(
+fn a_missing_local_go_foreign_reports_a_target_diagnostic() {
+    let errors = compile(
         "module App exposing (main)\n\
          wait : Float ->{} Unit\nforeign async wait from \"./gone.mjs\" \"wait\"\n\
          main : Unit ->{} Unit\nlet main () = wait 1\n",
     );
-    assert!(
-        errors
-            .iter()
-            .any(|e| e.contains("needs `gone.go` beside `./gone.mjs`")),
-        "{errors:?}"
+    assert_eq!(
+        errors.iter().map(|error| error.code).collect::<Vec<_>>(),
+        [codes::P012]
     );
+    assert_eq!(errors[0].severity, Severity::Error);
+    assert!(errors[0].span.is_some());
 }

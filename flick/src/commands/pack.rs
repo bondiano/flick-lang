@@ -64,6 +64,7 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
             inputs: false,
         },
         project: Some(root.to_string_lossy().into_owned()),
+        display: None,
         // an app packs its runners, a library none
         entry: None,
         generation: false,
@@ -360,6 +361,7 @@ mod tests {
                 watch: false,
             },
             Some(root.to_string_lossy().into_owned()),
+            None,
         )
         .run();
         assert!(built.diagnostics.is_empty(), "{:?}", built.diagnostics);

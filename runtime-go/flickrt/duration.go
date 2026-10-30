@@ -296,15 +296,15 @@ func DurationFormat(d Value) Value {
 	return out
 }
 
-func DurationMatch(options, d Value) Value {
+func DurationMatch(fb *Fiber, options, d Value) Value {
 	r, x := record(options), dur(d)
 	switch x.tag {
 	case durationMillis:
-		return Apply(r.Get("onMillis"), x.millis)
+		return Apply(fb, r.Get("onMillis"), x.millis)
 	case durationNanos:
-		return Apply(r.Get("onNanos"), x.nanos)
+		return Apply(fb, r.Get("onNanos"), x.nanos)
 	}
-	return Apply(r.Get("onInfinity"), Unit)
+	return Apply(fb, r.Get("onInfinity"), Unit)
 }
 
 // matchPair runs the case both durations fit: milliseconds when both are,
@@ -319,12 +319,12 @@ func matchPair(self, that *Duration, millis func(a, b float64) Value, nanos func
 	return nanos(self.toNanos(), that.toNanos())
 }
 
-func DurationMatchPair(that, options, self Value) Value {
+func DurationMatchPair(fb *Fiber, that, options, self Value) Value {
 	r := record(options)
 	return matchPair(dur(self), dur(that),
-		func(a, b float64) Value { return apply2(r.Get("onMillis"), a, b) },
-		func(a, b *big.Int) Value { return apply2(r.Get("onNanos"), a, b) },
-		func() Value { return apply2(r.Get("onInfinity"), self, that) })
+		func(a, b float64) Value { return apply2(fb, r.Get("onMillis"), a, b) },
+		func(a, b *big.Int) Value { return apply2(fb, r.Get("onNanos"), a, b) },
+		func() Value { return apply2(fb, r.Get("onInfinity"), self, that) })
 }
 
 func DurationAdd(a, b Value) Value {

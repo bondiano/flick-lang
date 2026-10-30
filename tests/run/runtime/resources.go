@@ -12,7 +12,7 @@ func open(fb *flickrt.Fiber, name flickrt.Value) flickrt.Value {
 		flickrt.StdoutLine("open " + name.(string))
 		return name
 	})
-	release := flickrt.Fn(func(flickrt.Value) flickrt.Value {
+	release := flickrt.Fn(func(fb *flickrt.Fiber, _ flickrt.Value) flickrt.Value {
 		return flickrt.Eff(func(*flickrt.Fiber) flickrt.Value { return flickrt.StdoutLine("close " + name.(string)) })
 	})
 	return flickrt.AcquireRelease(fb, acquire, release)

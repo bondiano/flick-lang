@@ -68,10 +68,10 @@ func numberOfText(in Value) (float64, []issue) {
 	return 0, append(expected("a string representing a finite number", in), expected("Union", in)...)
 }
 
-func (t *stringTree) decode(in Value) (Value, []issue) { return decodeTree(t.s, in) }
-func (t *stringTree) encode(v Value) (Value, []issue)  { return encodeTree(t.s, v), nil }
+func (t *stringTree) decode(fb *Fiber, in Value) (Value, []issue) { return decodeTree(fb, t.s, in) }
+func (t *stringTree) encode(_ *Fiber, v Value) (Value, []issue)   { return encodeTree(t.s, v), nil }
 
-func decodeTree(s *Schema, in Value) (Value, []issue) {
+func decodeTree(fb *Fiber, s *Schema, in Value) (Value, []issue) {
 	s = s.resolved()
 	switch s.kind {
 	case kindNumber:
@@ -116,7 +116,7 @@ func decodeTree(s *Schema, in Value) (Value, []issue) {
 		}
 		out := make([]Value, len(xs))
 		for i, x := range xs {
-			v, issues := decodeTree(s.item, x)
+			v, issues := decodeTree(fb, s.item, x)
 			if issues != nil {
 				return nil, under(i, issues)
 			}
@@ -133,7 +133,7 @@ func decodeTree(s *Schema, in Value) (Value, []issue) {
 			if i >= len(xs) {
 				return nil, under(i, fail("a missing key"))
 			}
-			v, issues := decodeTree(item, xs[i])
+			v, issues := decodeTree(fb, item, xs[i])
 			if issues != nil {
 				return nil, under(i, issues)
 			}
@@ -148,12 +148,12 @@ func decodeTree(s *Schema, in Value) (Value, []issue) {
 	if !ok {
 		return nil, expected("a record", in)
 	}
-	fields, issues := object(obj, s.labels, make([]*Schema, len(s.labels)))
+	fields, issues := object(fb, obj, s.labels, make([]*Schema, len(s.labels)))
 	if issues != nil {
 		return nil, issues
 	}
 	for i, f := range fields {
-		v, issues := decodeTree(s.items[i], f)
+		v, issues := decodeTree(fb, s.items[i], f)
 		if issues != nil {
 			return nil, under(s.labels[i], issues)
 		}

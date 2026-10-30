@@ -9,7 +9,22 @@ use serde_json::Value;
 fn inventory(dir: &Path, file: &str) -> Value {
     let out = flick_in(dir, &["build", file, "--inputs"]);
     assert!(out.status.success(), "{out:?}");
-    serde_json::from_slice(&out.stdout).expect("input inventory JSON")
+    assert!(out.stderr.is_empty(), "{out:?}");
+    let inventory: Value = serde_json::from_slice(&out.stdout).expect("input inventory JSON");
+    for args in [
+        &["build", file, "--inputs", "--silent"][..],
+        &["build", file, "--inputs", "--diagnostics", "json"][..],
+    ] {
+        let out = flick_in(dir, args);
+        assert!(out.status.success(), "{out:?}");
+        assert!(out.stderr.is_empty(), "{out:?}");
+        assert_eq!(
+            serde_json::from_slice::<Value>(&out.stdout).expect("input inventory JSON"),
+            inventory,
+            "{args:?}"
+        );
+    }
+    inventory
 }
 
 #[test]

@@ -1,6 +1,8 @@
 //! Expressions and statements. A Go expression is returned; statements it
 //! needs go into the current statement list before it.
 
+use std::mem;
+
 use flick_pretty::{Document, docvec};
 
 use super::arith::Native;
@@ -102,7 +104,12 @@ impl<'a> Gen<'a> {
             ExprKind::Global { module, name } => self.global_value(module, name, Vec::new()),
             ExprKind::Method { dict, name } => {
                 let dict = self.dict(dict);
-                call(a, "flickrt.Method", [dict.doc, self.string(name)]).into()
+                call(
+                    a,
+                    "flickrt.Method",
+                    [self.context(), dict.doc, self.string(name)],
+                )
+                .into()
             }
             ExprKind::Con(_) | ExprKind::App { .. } => self.app(e),
             ExprKind::Dicts(inner, dicts) => self.given(inner, dicts),
@@ -302,10 +309,21 @@ impl<'a> Gen<'a> {
                     callee: Callee::Local(name.clone()),
                     dicts: dicts.clone(),
                 });
+                let saved = (!ds.is_empty()).then(|| {
+                    (
+                        self.tail.take(),
+                        mem::replace(&mut self.generator, false),
+                        self.fiber.take(),
+                        self.context.replace("fb"),
+                    )
+                });
                 let (stmts, v) = self.block(|g| match &value.kind {
                     ExprKind::Lambda { params, body } => g.lambda(params, body, target),
                     _ => g.expr(value),
                 });
+                if let Some(saved) = saved {
+                    (self.tail, self.generator, self.fiber, self.context) = saved;
+                }
                 self.givens.truncate(mark);
                 if ds.is_empty() {
                     self.buf.extend(stmts);

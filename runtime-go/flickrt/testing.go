@@ -24,7 +24,7 @@ var (
 
 // rng is a number in [0, 1); a gen draws a value from one.
 type rng func() float64
-type gen func(rng) Value
+type gen func(*Fiber, rng) Value
 
 // random is mulberry32, the JS runner's generator, so a seed draws the
 // same values on both targets.
@@ -39,23 +39,23 @@ func random(seed uint32) rng {
 	}
 }
 
-func GenConstant(v Value) Value { return gen(func(rng) Value { return v }) }
+func GenConstant(v Value) Value { return gen(func(fb *Fiber, _ rng) Value { return v }) }
 
 func GenNumber(low, high Value) Value {
 	l, h := low.(float64), high.(float64)
-	return gen(func(r rng) Value { return l + r()*(h-l) })
+	return gen(func(fb *Fiber, r rng) Value { return l + r()*(h-l) })
 }
 
 func GenInt(low, high Value) Value {
 	l, h := low.(int32), high.(int32)
-	return gen(func(r rng) Value { return l + int32(math.Floor(r()*float64(h-l+1))) })
+	return gen(func(fb *Fiber, r rng) Value { return l + int32(math.Floor(r()*float64(h-l+1))) })
 }
 
-var GenBool Value = gen(func(r rng) Value { return r() < 0.5 })
+var GenBool Value = gen(func(fb *Fiber, r rng) Value { return r() < 0.5 })
 
 func GenString(max Value) Value {
 	m := float64(max.(int32))
-	return gen(func(r rng) Value {
+	return gen(func(fb *Fiber, r rng) Value {
 		b := make([]byte, int(math.Floor(r()*(m+1))))
 		for i := range b {
 			b[i] = byte(32 + math.Floor(r()*95))
@@ -66,10 +66,10 @@ func GenString(max Value) Value {
 
 func GenList(max, g Value) Value {
 	m, each := float64(max.(int32)), g.(gen)
-	return gen(func(r rng) Value {
+	return gen(func(fb *Fiber, r rng) Value {
 		out := make([]Value, int(math.Floor(r()*(m+1))))
 		for i := range out {
-			out[i] = each(r)
+			out[i] = each(fb, r)
 		}
 		return out
 	})
@@ -80,26 +80,26 @@ func GenOneOf(values Value) Value {
 	if len(vs) == 0 {
 		panic(Defect{"RangeError: Gen.one_of needs at least one value"})
 	}
-	return gen(func(r rng) Value { return vs[int(math.Floor(r()*float64(len(vs))))] })
+	return gen(func(fb *Fiber, r rng) Value { return vs[int(math.Floor(r()*float64(len(vs))))] })
 }
 
 func GenPair(a, b Value) Value {
 	ga, gb := a.(gen), b.(gen)
-	return gen(func(r rng) Value { return []Value{ga(r), gb(r)} })
+	return gen(func(fb *Fiber, r rng) Value { return []Value{ga(fb, r), gb(fb, r)} })
 }
 
 func GenMap(f, g Value) Value {
 	each := g.(gen)
-	return gen(func(r rng) Value { return Apply(f, each(r)) })
+	return gen(func(fb *Fiber, r rng) Value { return Apply(fb, f, each(fb, r)) })
 }
 
 // GenFunction is a pure function whose result for an argument is drawn
 // with a seed of the argument's hash, the same each call.
-func GenFunction(d, g Value) Value {
-	hash, each := Method(d, "hash"), g.(gen)
-	return gen(func(r rng) Value {
+func GenFunction(fb *Fiber, d, g Value) Value {
+	hash, each := Method(fb, d, "hash"), g.(gen)
+	return gen(func(fb *Fiber, r rng) Value {
 		seed := uint32(math.Floor(r() * 4294967296))
-		return Fn(func(a Value) Value { return each(random(seed ^ uint32(Apply(hash, a).(int32)))) })
+		return Fn(func(fb *Fiber, a Value) Value { return each(fb, random(seed^uint32(Apply(fb, hash, a).(int32)))) })
 	})
 }
 
@@ -161,13 +161,13 @@ type testResult struct {
 const testCases = 100
 
 // checks runs a pure or property test: a failed assertion's message.
-func (t *test) checks(seed int64) (string, bool) {
+func (t *test) checks(fb *Fiber, seed int64) (string, bool) {
 	if t.body != nil {
-		return failed(Apply(t.body, Unit))
+		return failed(Apply(fb, t.body, Unit))
 	}
 	for i := range testCases {
-		value := t.gen(random(uint32(seed + int64(i)*0x9e3779b9)))
-		if message, bad := failed(Apply(t.check, value)); bad {
+		value := t.gen(fb, random(uint32(seed+int64(i)*0x9e3779b9)))
+		if message, bad := failed(Apply(fb, t.check, value)); bad {
 			return fmt.Sprintf("%s (case %d: %s)", message, i, preview(value)), true
 		}
 	}
@@ -334,7 +334,7 @@ func runOne(fb *Fiber, t named, seed int64) testResult {
 		if t.test.task != nil {
 			return Run(&inner, t.test.task)
 		}
-		message, bad = t.test.checks(seed)
+		message, bad = t.test.checks(fb, seed)
 		return Unit
 	})
 	all := owner.close(&inner, exit)

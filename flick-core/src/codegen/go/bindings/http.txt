@@ -63,7 +63,7 @@ removeCookie ResponseRemoveCookie
 replaceCookies ResponseReplaceCookies
 flickSetCookie *ResponseSetCookie
 flickExpireCookie *ResponseExpireCookie
-updateCookies ResponseUpdateCookies
+updateCookies *ResponseUpdateCookies
 mergeCookies ResponseMergeCookies
 flickSetCookies *ResponseSetCookies
 setBody ResponseSetBody
@@ -140,12 +140,12 @@ flickHash ClientRequestHash
 flickHeaders ClientRequestHeaders
 flickBody ClientRequestBody
 flickMakeWith ClientRequestMakeWith
-updateHeaders ClientRequestUpdateHeaders
+updateHeaders *ClientRequestUpdateHeaders
 basicAuth ClientRequestBasicAuth
 bearerToken ClientRequestBearerToken
 prependUrl ClientRequestPrependUrl
 appendUrl ClientRequestAppendUrl
-updateUrl ClientRequestUpdateUrl
+updateUrl *ClientRequestUpdateUrl
 setUrlParam ClientRequestSetUrlParam
 setUrlParams ClientRequestSetUrlParams
 appendUrlParam ClientRequestAppendUrlParam
@@ -204,7 +204,7 @@ flickWithSpanNameGenerator *HttpClientWithSpanNameGenerator
 flickLayer HttpClientLayer
 
 [@flick-lang/runtime/effect/http/FetchHttpClient]
-flickLayer FetchClientLayer
+flickLayer *FetchClientLayer
 
 [@flick-lang/runtime/effect/Schedule]
 recurs ScheduleRecurs
@@ -271,7 +271,7 @@ getAll UrlParamsGetAll
 getFirst UrlParamsGetFirst
 getLast UrlParamsGetLast
 set UrlParamsSet
-transform UrlParamsTransform
+transform *UrlParamsTransform
 setAll UrlParamsSetAll
 append UrlParamsAppend
 appendAll UrlParamsAppendAll
@@ -304,8 +304,8 @@ setSearch UrlSetSearch
 setUsername UrlSetUsername
 setUrlParams UrlSetUrlParams
 urlParams UrlUrlParams
-modifyUrlParams UrlModifyUrlParams
-flickShow UrlShow
+modifyUrlParams *UrlModifyUrlParams
+flickShow *UrlShow
 
 [@flick-lang/runtime/effect/http/Mime]
 getType MimeGetType
@@ -380,7 +380,7 @@ httpApiListen *HttpApiListen
 httpApiRoute *HttpApiRoute
 httpApiPort HttpApiPort
 httpApiCall *HttpApiCall
-httpApiUrl HttpApiUrl
+httpApiUrl *HttpApiUrl
 httpApiOpenApi HttpApiOpenApi
 httpApiWithBytesPayload HttpApiWithBytesPayload
 httpApiWithMultipartPayload HttpApiWithMultipartPayload

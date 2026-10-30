@@ -53,7 +53,7 @@ func text(ctx flickrt.Context, url flickrt.Value) flickrt.Value {
 }
 
 // start starts a request without waiting for it; `wait` gives its outcome.
-func start(url flickrt.Value) flickrt.Value {
+func start(_ *flickrt.Fiber, url flickrt.Value) flickrt.Value {
 	done := make(chan string, 1)
 	go func() {
 		resp, body, err := fetch(context.Background(), "GET", url.(string), "")

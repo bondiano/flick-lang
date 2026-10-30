@@ -4,8 +4,155 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use common::flick_in;
+use common::{APP, flick_in, project};
 use flick_core::{build::runner_path, iface};
+
+const MAIN: &str = "module App.Main exposing (main)\nmain : Unit ->{; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
+const LIB: &str = "schema-version = 1\n[project]\nkind = \"lib\"\n";
+const FAILURE: &str = "module B exposing (answer)\nanswer : Float\nlet answer = \"wrong\"\n";
+
+#[test]
+fn silent_build_preserves_artifacts_and_diagnostics() {
+    let files = [("flick.toml", APP), ("src/App/Main.fl", MAIN)];
+    let dir = project("build_silent", &files);
+    let ordinary = flick_in(&dir, &["build"]);
+    assert_eq!(ordinary.status.code(), Some(0), "{ordinary:?}");
+    let module = fs::read(dir.join("dist/App/Main.js")).expect("ordinary module");
+    let interface = fs::read(dir.join("dist/App/Main.iface")).expect("ordinary interface");
+
+    for args in [
+        ["--silent", "build"],
+        ["build", "--silent"],
+        ["--quiet", "build"],
+    ] {
+        let dir = project("build_silent", &files);
+        for _ in 0..2 {
+            let out = flick_in(&dir, &args);
+            assert_eq!(out.status.code(), Some(0), "{args:?}: {out:?}");
+            assert!(out.stdout.is_empty(), "{args:?}: {out:?}");
+            assert!(out.stderr.is_empty(), "{args:?}: {out:?}");
+            assert_eq!(
+                fs::read(dir.join("dist/App/Main.js")).expect("module"),
+                module,
+                "{args:?}"
+            );
+            assert_eq!(
+                fs::read(dir.join("dist/App/Main.iface")).expect("interface"),
+                interface,
+                "{args:?}"
+            );
+        }
+    }
+
+    let warning = project(
+        "build_silent_warning",
+        &[
+            ("flick.toml", LIB),
+            (
+                "src/App/Warning.fl",
+                "module App.Warning exposing (..)\ntype Kind = A | B\nlet a : Kind = A\n",
+            ),
+        ],
+    );
+    for (args, code) in [
+        (&["build", "--silent"][..], 0),
+        (&["build", "--silent", "--warnings-as-errors"][..], 1),
+    ] {
+        let out = flick_in(&warning, args);
+        assert_eq!(out.status.code(), Some(code), "{out:?}");
+        assert!(out.stdout.is_empty(), "{out:?}");
+        let stderr = String::from_utf8(out.stderr).expect("utf-8 stderr");
+        assert!(stderr.contains("FLICK-T021"), "{stderr}");
+        assert!(!stderr.contains("  flick  "), "{stderr}");
+    }
+
+    let failure = project(
+        "build_silent_failure",
+        &[("flick.toml", LIB), ("src/B.fl", FAILURE)],
+    );
+    let out = flick_in(&failure, &["build", "--silent"]);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert!(out.stdout.is_empty(), "{out:?}");
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("FLICK-T003"),
+        "{out:?}"
+    );
+}
+
+#[test]
+fn build_progress_preserves_stream_contracts() {
+    let dir = project(
+        "build_progress",
+        &[("flick.toml", APP), ("src/App/Main.fl", MAIN)],
+    );
+    for expected in [
+        &[
+            "Preparing compiler",
+            "Resolving project",
+            "Checking build cache",
+            "Compiling Flick modules",
+            "Emitting JavaScript",
+            "Writing artifacts",
+            "Recording build outputs",
+            "Saving build cache",
+        ][..],
+        &[
+            "Preparing compiler",
+            "Resolving project",
+            "Checking build cache",
+            "Restoring cached artifacts",
+            "Writing artifacts",
+            "Recording build outputs",
+        ][..],
+    ] {
+        let out = flick_in(&dir, &["build"]);
+        assert_eq!(out.status.code(), Some(0), "{out:?}");
+        assert!(out.stdout.is_empty(), "{out:?}");
+        let stderr = String::from_utf8(out.stderr).expect("utf-8 stderr");
+        assert!(!stderr.contains(['\r', '\x1b']), "{stderr}");
+        let phases: Vec<_> = stderr
+            .lines()
+            .filter_map(|line| line.strip_prefix("  flick  "))
+            .map(|line| line.rsplit_once("  ").expect("phase and elapsed time").0)
+            .collect();
+        assert_eq!(phases, expected, "{stderr}");
+    }
+
+    let out = flick_in(&dir, &["build", "--diagnostics", "json"]);
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert!(out.stdout.is_empty(), "{out:?}");
+    assert!(out.stderr.is_empty(), "{out:?}");
+
+    let failure = project(
+        "build_progress_failure",
+        &[("flick.toml", LIB), ("src/B.fl", FAILURE)],
+    );
+    let out = flick_in(&failure, &["build"]);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert!(out.stdout.is_empty(), "{out:?}");
+    let stderr = String::from_utf8(out.stderr).expect("utf-8 stderr");
+    assert!(!stderr.contains(['\r', '\x1b']), "{stderr}");
+    assert!(stderr.contains("Compiling Flick modules"), "{stderr}");
+    assert!(stderr.contains("FLICK-T003"), "{stderr}");
+    assert!(!stderr.contains("Emitting"), "{stderr}");
+    assert!(!stderr.contains("Writing artifacts"), "{stderr}");
+
+    let out = flick_in(&failure, &["build", "--diagnostics", "json"]);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert!(out.stdout.is_empty(), "{out:?}");
+    let stderr = String::from_utf8(out.stderr).expect("utf-8 stderr");
+    let codes: Vec<_> = stderr
+        .lines()
+        .map(|line| {
+            let diagnostic: serde_json::Value =
+                serde_json::from_str(line).expect("NDJSON diagnostic");
+            assert_eq!(diagnostic["schema-version"], 1);
+            assert_eq!(diagnostic["type"], "diagnostic");
+            diagnostic["code"].as_str().expect("code").to_owned()
+        })
+        .collect();
+    assert_eq!(codes, ["FLICK-T003"]);
+}
 
 #[test]
 fn build_writes_modules_maps_builtins_and_the_runner() {

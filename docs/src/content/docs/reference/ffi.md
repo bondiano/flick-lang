@@ -94,13 +94,22 @@ binding is `FLICK-P012`, naming the file to add. The file is `package main`
 and imports `flick.app/flickrt`. Its functions take and return
 `flickrt.Value`, in the representation of the go target (see
 [Code generation](../codegen/#go-target)), and take every argument of the
-binding at once, none for the `()` of `arity 0`:
+binding at once; the `()` of `arity 0` adds no Flick argument:
 
 | Mode | The Go function |
 | - | - |
-| `pure`, `sync` | `f(a0, a1, …)` |
+| `pure`, `sync` | `f(fb *flickrt.Fiber, a0, a1, …)` |
 | `effect` | `f(fb *flickrt.Fiber, a0, …)`: it runs in the calling fiber, and acquires into the scope around the call with `flickrt.AcquireRelease` |
 | `async` | `f(ctx flickrt.Context, a0, …)` in a goroutine of its own: `ctx` is cancelled on interruption, and the innermost owner waits for the call to return before it releases resources, as it waits for a promise |
+
+Pure calls also receive the executing fiber: context-sensitive rendering must
+not retain the fiber that created a function. `flickrt.Fn` takes
+`(*flickrt.Fiber, flickrt.Value)`, and `flickrt.Poly` takes
+`(*flickrt.Fiber, ...flickrt.Value)`; both return `flickrt.Value`.
+Pass the invocation's fiber to `flickrt.Apply(fb, f, arg)` and
+`flickrt.Inst(fb, f, dictionaries...)`. `nil` is only for module initialization
+or immutable schema metadata outside program execution. This hidden context
+does not make a pure Flick stage effectful.
 
 A panic is a defect. `catch`, `this`, `optional`, `variadic` and adapted
 callbacks are `FLICK-P012` on the go target for now. The Go representation

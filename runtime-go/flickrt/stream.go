@@ -63,7 +63,7 @@ const streamChunkSize = 4096
 // StreamFromSeq pulls the sequence's elements as the stream runs.
 func StreamFromSeq(s Value) Value {
 	return &Stream{open: func(fb *Fiber) pull {
-		next, stop := iter.Pull(Iter(s))
+		next, stop := iter.Pull(Iter(fb, s))
 		fb.owner.add(fb, func(*Fiber, *Cause) Value { stop(); return Unit })
 		return func(*Fiber) ([]Value, bool) {
 			var chunk []Value
@@ -117,7 +117,7 @@ func StreamMapEffect(f, s Value) Value {
 			}
 			x := chunk[0]
 			chunk = chunk[1:]
-			return []Value{Run(fb, Apply(f, x))}, true
+			return []Value{Run(fb, Apply(fb, f, x))}, true
 		}
 	}}
 }
@@ -129,7 +129,7 @@ func StreamPipeThroughChannel(c, s Value) Value {
 
 // mapElements is the stream of each element mapped by the function a run
 // makes, which may keep state across the run's elements.
-func mapElements(src *Stream, start func() func(Value) Value) *Stream {
+func mapElements(src *Stream, start func() func(*Fiber, Value) Value) *Stream {
 	return &Stream{open: func(fb *Fiber) pull {
 		up, f := src.open(fb), start()
 		return func(fb *Fiber) ([]Value, bool) {
@@ -139,7 +139,7 @@ func mapElements(src *Stream, start func() func(Value) Value) *Stream {
 			}
 			out := make([]Value, len(chunk))
 			for i, x := range chunk {
-				out[i] = f(x)
+				out[i] = f(fb, x)
 			}
 			return out, true
 		}
@@ -149,8 +149,8 @@ func mapElements(src *Stream, start func() func(Value) Value) *Stream {
 // StreamEncodeText is each string's UTF-8 bytes, a lone surrogate a
 // U+FFFD, as TextEncoder writes it.
 func StreamEncodeText(s Value) Value {
-	return mapElements(streamOf(s), func() func(Value) Value {
-		return func(x Value) Value { return byteList([]byte(wellFormed(x.(string)))) }
+	return mapElements(streamOf(s), func() func(*Fiber, Value) Value {
+		return func(fb *Fiber, x Value) Value { return byteList([]byte(wellFormed(x.(string)))) }
 	})
 }
 
@@ -158,9 +158,9 @@ func StreamEncodeText(s Value) Value {
 // order mark dropped, a character split across chunks decoded whole, an
 // incomplete one at the end left out.
 func StreamDecodeText(s Value) Value {
-	return mapElements(streamOf(s), func() func(Value) Value {
+	return mapElements(streamOf(s), func() func(*Fiber, Value) Value {
 		var d textDecoder
-		return func(x Value) Value { return d.decode([]byte(byteString(x))) }
+		return func(fb *Fiber, x Value) Value { return d.decode([]byte(byteString(x))) }
 	})
 }
 

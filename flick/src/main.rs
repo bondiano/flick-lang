@@ -19,6 +19,7 @@ mod command;
 mod commands;
 mod lsp;
 mod mapper;
+mod progress;
 mod report;
 mod sources;
 mod toolchain;
@@ -71,6 +72,7 @@ fn main() -> ExitCode {
             | Commands::New(_)
             | Commands::Init(_)
             | Commands::Clean(_)
+            | Commands::Build(_)
             | Commands::Install(_)
             | Commands::Add(_)
             | Commands::Remove(_)
@@ -95,7 +97,11 @@ fn main() -> ExitCode {
         }
         Commands::Build(options) => {
             let watching = options.watch;
-            let command = BuildCommand::new(options, global.project.clone());
+            let command = BuildCommand::new(
+                options,
+                global.project.clone(),
+                Some(progress::Mode::for_cli(global)),
+            );
             if watching {
                 watch(&command, global)
             } else {

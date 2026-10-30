@@ -182,7 +182,7 @@ func ResponseSchemaJson(fb *Fiber, c, v, options Value) Value {
 	}
 	var b strings.Builder
 	b.Grow(256)
-	if issues := w.write(&b, v); issues != nil {
+	if issues := w.write(fb, &b, v); issues != nil {
 		return Fail(schemaErrorOf(issues))
 	}
 	o := record(options)
@@ -244,9 +244,9 @@ func ResponseReplaceCookies(cookies, r Value) Value {
 	return s.changed(s.headers, jarOf(cookies), s.body, false)
 }
 
-func ResponseUpdateCookies(f, r Value) Value {
+func ResponseUpdateCookies(fb *Fiber, f, r Value) Value {
 	s := responseOf(r)
-	return s.changed(s.headers, jarOf(Apply(f, s.cookies)), s.body, false)
+	return s.changed(s.headers, jarOf(Apply(fb, f, s.cookies)), s.body, false)
 }
 
 func ResponseMergeCookies(cookies, r Value) Value {

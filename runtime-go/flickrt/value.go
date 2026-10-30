@@ -16,11 +16,11 @@ import (
 // Value is any Flick value.
 type Value = any
 
-// Fn is a function of one stage.
-type Fn = func(Value) Value
+// Fn is a function of one stage, evaluated in its caller's fiber.
+type Fn = func(*Fiber, Value) Value
 
 // Poly is a value that takes the dictionaries of its constraints first.
-type Poly = func(...Value) Value
+type Poly = func(*Fiber, ...Value) Value
 
 // UnitType is the type of Unit.
 type UnitType struct{}
@@ -95,11 +95,11 @@ func TagOf(v Value) Value { return v.(*Data).Tag }
 // Get is the field `i` of a variant value.
 func Get(v Value, i int) Value { return v.(*Data).Fields[i] }
 
-// Apply calls a function of one stage.
-func Apply(f Value, a Value) Value { return f.(Fn)(a) }
+// Apply calls a function of one stage in the caller's fiber.
+func Apply(fb *Fiber, f Value, a Value) Value { return f.(Fn)(fb, a) }
 
-// Inst gives a constrained value its dictionaries.
-func Inst(f Value, dicts ...Value) Value { return f.(Poly)(dicts...) }
+// Inst gives a constrained value its dictionaries in the caller's fiber.
+func Inst(fb *Fiber, f Value, dicts ...Value) Value { return f.(Poly)(fb, dicts...) }
 
 // Bool is a Bool as a Go condition.
 func Bool(v Value) bool { return v.(bool) }
@@ -138,13 +138,17 @@ func ListConcat(a, b Value) Value {
 }
 
 // Curry2 is a function of two arguments taken one at a time.
-func Curry2(f func(Value, Value) Value) Fn {
-	return func(a Value) Value { return Fn(func(b Value) Value { return f(a, b) }) }
+func Curry2(f func(*Fiber, Value, Value) Value) Fn {
+	return func(_ *Fiber, a Value) Value {
+		return Fn(func(fb *Fiber, b Value) Value { return f(fb, a, b) })
+	}
 }
 
 // Curry3 is a function of three arguments taken one at a time.
-func Curry3(f func(Value, Value, Value) Value) Fn {
-	return func(a Value) Value { return Curry2(func(b, c Value) Value { return f(a, b, c) }) }
+func Curry3(f func(*Fiber, Value, Value, Value) Value) Fn {
+	return func(_ *Fiber, a Value) Value {
+		return Curry2(func(fb *Fiber, b, c Value) Value { return f(fb, a, b, c) })
+	}
 }
 
 // Defect stops the program with an error that is not a typed failure.

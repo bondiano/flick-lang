@@ -6,11 +6,11 @@ package flickrt
 func Succeed(x Value) Value { return Eff(func(*Fiber) Value { return x }) }
 
 func MapEff(f, task Value) Value {
-	return Eff(func(fb *Fiber) Value { return Apply(f, Run(fb, task)) })
+	return Eff(func(fb *Fiber) Value { return Apply(fb, f, Run(fb, task)) })
 }
 
 func FlatMapEff(f, task Value) Value {
-	return Eff(func(fb *Fiber) Value { return Run(fb, Apply(f, Run(fb, task))) })
+	return Eff(func(fb *Fiber) Value { return Run(fb, Apply(fb, f, Run(fb, task))) })
 }
 
 func BindEff(task, f Value) Value { return FlatMapEff(f, task) }
@@ -19,7 +19,7 @@ func BindEff(task, f Value) Value { return FlatMapEff(f, task) }
 func Map2Eff(f, a, b Value) Value {
 	return Eff(func(fb *Fiber) Value {
 		x := Run(fb, a)
-		return apply2(f, x, Run(fb, b))
+		return apply2(fb, f, x, Run(fb, b))
 	})
 }
 
@@ -28,7 +28,7 @@ func ListMapEffect(fb *Fiber, f, xs Value) Value {
 	in := List(xs)
 	out := make([]Value, len(in))
 	for i, x := range in {
-		out[i] = Run(fb, Apply(f, x))
+		out[i] = Run(fb, Apply(fb, f, x))
 	}
 	return out
 }
@@ -46,7 +46,7 @@ func EffectAll(fb *Fiber, concurrency, tasks Value) Value {
 	c := concurrency.(*Data)
 	switch ConstructorName(c.Tag) {
 	case "Sequential":
-		return ListMapEffect(fb, Fn(Identity), tasks)
+		return ListMapEffect(fb, Fn(func(_ *Fiber, v Value) Value { return Identity(v) }), tasks)
 	case "Bounded":
 		return all(fb, List(tasks), max(1, int(c.Fields[0].(int32))))
 	}

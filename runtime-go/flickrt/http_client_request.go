@@ -193,9 +193,9 @@ func ClientRequestMakeWith(m, url, params, hash, headers, body Value) Value {
 	return makeClient(methodName(m), url.(string), paramsOf(params), hash, headersOf(headers), bodyOf(body))
 }
 
-func ClientRequestUpdateHeaders(f, self Value) Value {
+func ClientRequestUpdateHeaders(fb *Fiber, f, self Value) Value {
 	c := clientOf(self)
-	return c.with(headersOf(Apply(f, c.headers)), c.body)
+	return c.with(headersOf(Apply(fb, f, c.headers)), c.body)
 }
 
 // ClientRequestBasicAuth is `Authorization: Basic` of the name and the
@@ -251,9 +251,9 @@ func ClientRequestAppendUrl(path, self Value) Value {
 	return c.changedURL(joinSegments(c.url, path.(string)), c.params, c.hash)
 }
 
-func ClientRequestUpdateUrl(f, self Value) Value {
+func ClientRequestUpdateUrl(fb *Fiber, f, self Value) Value {
 	c := clientOf(self)
-	return c.changedURL(Apply(f, c.url).(string), c.params, c.hash)
+	return c.changedURL(Apply(fb, f, c.url).(string), c.params, c.hash)
 }
 
 func ClientRequestSetUrlParam(key, val, self Value) Value {

@@ -58,8 +58,8 @@ func apiOtherSuccess(e *apiEndpoint, value Value) Value {
 	case encStream:
 		return bodyResponse(noOptions, e.status, nil, *streamBody(value, "application/octet-stream", -1))
 	case encEvents:
-		return sseResponse(e.status, mapElements(streamOf(value), func() func(Value) Value {
-			return func(x Value) Value {
+		return sseResponse(e.status, mapElements(streamOf(value), func() func(*Fiber, Value) Value {
+			return func(_ *Fiber, x Value) Value {
 				r := record(x)
 				if id, ok := some(r.Get("id")); ok {
 					return sseEvent("id", id.(string), "event", r.Get("event").(string), "data", r.Get("data").(string))
@@ -72,9 +72,9 @@ func apiOtherSuccess(e *apiEndpoint, value Value) Value {
 		if c == nil {
 			return nil
 		}
-		return sseResponse(e.status, mapElements(streamOf(value), func() func(Value) Value {
-			return func(x Value) Value {
-				encoded, issues := c.encode(x)
+		return sseResponse(e.status, mapElements(streamOf(value), func() func(*Fiber, Value) Value {
+			return func(fb *Fiber, x Value) Value {
+				encoded, issues := c.encode(fb, x)
 				if issues != nil {
 					return Fail(schemaErrorOf(issues))
 				}
@@ -88,7 +88,7 @@ func apiOtherSuccess(e *apiEndpoint, value Value) Value {
 // apiUnwrapExtras is the handler's value without its extras, and what they
 // add to the response: the encoded headers, and the cookie, Secure and
 // HttpOnly.
-func apiUnwrapExtras(extras []apiExtra, v Value) (Value, func(Value) Value) {
+func apiUnwrapExtras(fb *Fiber, extras []apiExtra, v Value) (Value, func(Value) Value) {
 	inner := v
 	var steps []func(Value) Value
 	for i := len(extras) - 1; i >= 0; i-- {
@@ -96,7 +96,7 @@ func apiUnwrapExtras(extras []apiExtra, v Value) (Value, func(Value) Value) {
 		inner = pair[0]
 		added := pair[1]
 		if c := extras[i].headers; c != nil {
-			encoded, issues := c.encode(added)
+			encoded, issues := c.encode(fb, added)
 			if issues != nil {
 				Fail(schemaErrorOf(issues))
 			}

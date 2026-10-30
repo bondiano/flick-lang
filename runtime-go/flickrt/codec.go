@@ -34,14 +34,14 @@ func isJSONTree(in Value) bool {
 
 func (jsonValue) accepts(in Value) bool { return isJSONTree(in) }
 
-func (jsonValue) decode(in Value) (Value, []issue) {
+func (jsonValue) decode(_ *Fiber, in Value) (Value, []issue) {
 	if !isJSONTree(in) {
 		return nil, expected("JSON value", in)
 	}
 	return in, nil
 }
 
-func (j jsonValue) encode(v Value) (Value, []issue) { return j.decode(v) }
+func (j jsonValue) encode(fb *Fiber, v Value) (Value, []issue) { return j.decode(fb, v) }
 
 var CodecBool Value = sch(SchemaBool).jsonOf()
 
@@ -64,7 +64,7 @@ func (losslessNumber) accepts(in Value) bool {
 	return isNumber || isString && named
 }
 
-func (n losslessNumber) decode(in Value) (Value, []issue) {
+func (n losslessNumber) decode(_ *Fiber, in Value) (Value, []issue) {
 	if !n.accepts(in) {
 		return nil, expected("a number", in)
 	}
@@ -74,7 +74,7 @@ func (n losslessNumber) decode(in Value) (Value, []issue) {
 	return in, nil
 }
 
-func (losslessNumber) encode(v Value) (Value, []issue) {
+func (losslessNumber) encode(_ *Fiber, v Value) (Value, []issue) {
 	x := v.(float64)
 	switch {
 	case math.IsNaN(x):
@@ -89,16 +89,16 @@ func (losslessNumber) encode(v Value) (Value, []issue) {
 	return x, nil
 }
 
-func CodecDecodeResult(c, in Value) Value {
-	v, issues := codecOf(c).decode(in)
+func CodecDecodeResult(fb *Fiber, c, in Value) Value {
+	v, issues := codecOf(c).decode(fb, in)
 	if issues != nil {
 		return Err(schemaErrorOf(issues))
 	}
 	return Ok(v)
 }
 
-func CodecEncodeResult(c, v Value) Value {
-	e, issues := codecOf(c).encode(v)
+func CodecEncodeResult(fb *Fiber, c, v Value) Value {
+	e, issues := codecOf(c).encode(fb, v)
 	if issues != nil {
 		return Err(schemaErrorOf(issues))
 	}
@@ -106,8 +106,8 @@ func CodecEncodeResult(c, v Value) Value {
 }
 
 // CodecDecode and CodecEncode fail with the SchemaError.
-func CodecDecode(_ *Fiber, c, in Value) Value { return FromResult(CodecDecodeResult(c, in)) }
-func CodecEncode(_ *Fiber, c, v Value) Value  { return FromResult(CodecEncodeResult(c, v)) }
+func CodecDecode(fb *Fiber, c, in Value) Value { return FromResult(CodecDecodeResult(fb, c, in)) }
+func CodecEncode(fb *Fiber, c, v Value) Value  { return FromResult(CodecEncodeResult(fb, c, v)) }
 
 // listCodec is `Codec.list`: a JSON array of the item's wire form.
 type listCodec struct{ item codec }
@@ -116,14 +116,14 @@ func CodecList(item Value) Value { return &listCodec{codecOf(item)} }
 
 func (l *listCodec) accepts(in Value) bool { _, ok := in.([]Value); return ok }
 
-func (l *listCodec) decode(in Value) (Value, []issue) {
+func (l *listCodec) decode(fb *Fiber, in Value) (Value, []issue) {
 	xs, ok := in.([]Value)
 	if !ok {
 		return nil, expected("an array", in)
 	}
 	out := make([]Value, len(xs))
 	for i, x := range xs {
-		v, issues := l.item.decode(x)
+		v, issues := l.item.decode(fb, x)
 		if issues != nil {
 			return nil, under(i, issues)
 		}
@@ -132,11 +132,11 @@ func (l *listCodec) decode(in Value) (Value, []issue) {
 	return out, nil
 }
 
-func (l *listCodec) encode(v Value) (Value, []issue) {
+func (l *listCodec) encode(fb *Fiber, v Value) (Value, []issue) {
 	xs := List(v)
 	out := make([]Value, len(xs))
 	for i, x := range xs {
-		e, issues := l.item.encode(x)
+		e, issues := l.item.encode(fb, x)
 		if issues != nil {
 			return nil, under(i, issues)
 		}
@@ -153,23 +153,23 @@ func CodecTaggedOption(item Value) Value { return &taggedOption{codecOf(item)} }
 
 func (t *taggedOption) accepts(in Value) bool { _, ok := in.(*Record); return ok }
 
-func (t *taggedOption) decode(in Value) (Value, []issue) {
+func (t *taggedOption) decode(fb *Fiber, in Value) (Value, []issue) {
 	obj, ok := in.(*Record)
 	if !ok {
 		return nil, expected("an object with `_tag` None or Some", in)
 	}
 	switch recordField(obj, "_tag") {
 	case "None":
-		if _, issues := object(obj, []string{"_tag"}, []*Schema{nil}); issues != nil {
+		if _, issues := object(fb, obj, []string{"_tag"}, []*Schema{nil}); issues != nil {
 			return nil, issues
 		}
 		return None, nil
 	case "Some":
-		fields, issues := object(obj, []string{"_tag", "value"}, []*Schema{nil, nil})
+		fields, issues := object(fb, obj, []string{"_tag", "value"}, []*Schema{nil, nil})
 		if issues != nil {
 			return nil, issues
 		}
-		v, issues := t.item.decode(fields[1])
+		v, issues := t.item.decode(fb, fields[1])
 		if issues != nil {
 			return nil, under("value", issues)
 		}
@@ -178,11 +178,11 @@ func (t *taggedOption) decode(in Value) (Value, []issue) {
 	return nil, under("_tag", fail("expected one of None, Some"))
 }
 
-func (t *taggedOption) encode(v Value) (Value, []issue) {
+func (t *taggedOption) encode(fb *Fiber, v Value) (Value, []issue) {
 	if !isSome(v) {
 		return Rec("_tag", "None"), nil
 	}
-	e, issues := t.item.encode(value(v))
+	e, issues := t.item.encode(fb, value(v))
 	if issues != nil {
 		return nil, under("value", issues)
 	}
@@ -193,29 +193,31 @@ func (t *taggedOption) encode(v Value) (Value, []issue) {
 // before the codec it is built on.
 type transformed struct {
 	from codec
-	to   func(Value) (Value, []issue)
-	back func(Value) Value
+	to   func(*Fiber, Value) (Value, []issue)
+	back func(*Fiber, Value) Value
 	// refusal is why the JSON Schema exporter has no form for it; "" writes the codec's
 	refusal string
 }
 
 func (t *transformed) accepts(in Value) bool { return t.from.accepts(in) }
 
-func (t *transformed) decode(in Value) (Value, []issue) {
-	v, issues := t.from.decode(in)
+func (t *transformed) decode(fb *Fiber, in Value) (Value, []issue) {
+	v, issues := t.from.decode(fb, in)
 	if issues != nil {
 		return nil, issues
 	}
-	return t.to(v)
+	return t.to(fb, v)
 }
 
-func (t *transformed) encode(v Value) (Value, []issue) { return t.from.encode(t.back(v)) }
+func (t *transformed) encode(fb *Fiber, v Value) (Value, []issue) {
+	return t.from.encode(fb, t.back(fb, v))
+}
 
 func CodecTransformPure(decode, encode, from Value) Value {
 	return &transformed{
 		from: codecOf(from),
-		to:   func(v Value) (Value, []issue) { return Apply(decode, v), nil },
-		back: func(v Value) Value { return Apply(encode, v) },
+		to:   func(fb *Fiber, v Value) (Value, []issue) { return Apply(fb, decode, v), nil },
+		back: func(fb *Fiber, v Value) Value { return Apply(fb, encode, v) },
 	}
 }
 
@@ -231,14 +233,14 @@ func issuesOf(err Value) []issue {
 func CodecTransformResult(decode, encode, from Value) Value {
 	return &transformed{
 		from: codecOf(from),
-		to: func(v Value) (Value, []issue) {
-			r := Apply(decode, v)
+		to: func(fb *Fiber, v Value) (Value, []issue) {
+			r := Apply(fb, decode, v)
 			if !isOk(r) {
 				return nil, issuesOf(value(r))
 			}
 			return value(r), nil
 		},
-		back:    func(v Value) Value { return Apply(encode, v) },
+		back:    func(fb *Fiber, v Value) Value { return Apply(fb, encode, v) },
 		refusal: "a fallible transformation has no JSON Schema form",
 	}
 }
@@ -247,13 +249,13 @@ func CodecTransformResult(decode, encode, from Value) Value {
 func CodecCheckWhole(check, message, from Value) Value {
 	return &transformed{
 		from: codecOf(from),
-		to: func(v Value) (Value, []issue) {
-			if !Bool(Apply(check, v)) {
+		to: func(fb *Fiber, v Value) (Value, []issue) {
+			if !Bool(Apply(fb, check, v)) {
 				return nil, fail(message.(string))
 			}
 			return v, nil
 		},
-		back:    func(v Value) Value { return v },
+		back:    func(_ *Fiber, v Value) Value { return v },
 		refusal: `the check "` + message.(string) + `" has no JSON Schema form`,
 	}
 }

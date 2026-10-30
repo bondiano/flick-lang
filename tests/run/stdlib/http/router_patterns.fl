@@ -1,0 +1,36 @@
+module App.Main exposing (main)
+
+import Http.Router exposing (RouteContext)
+import Http.ServerError exposing (HttpServerError)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+handler : ServerRequest ->{RouteContext;} ServerResponse
+let handler _ = Http.ServerResponse.text (show (Http.Router.params ())) Http.ServerResponse.defaults
+
+attempt : String -> String ->{} Unit
+let attempt pattern path =
+  app : ServerRequest ->{; HttpServerError} ServerResponse
+  let app = Http.Router.router Http.Router.config [
+    Http.Router.route (Some Http.Method.GET) pattern handler,
+  ]
+  let label = pattern ++ " " ++ path ++ " -> "
+  try
+    let response = app (Http.ServerRequest.from_client_request (Http.ClientRequest.get ("http://example.com" ++ path)))
+    let body = Option.with_default "" (Http.Body.to_text (Http.ServerResponse.body response))
+    Platform.stdout_line (label ++ show (Http.ServerResponse.status response) ++ " " ++ body)
+  with
+  | e -> Platform.stdout_line (label ++ show (Http.ServerError.status e))
+
+main : Unit ->{} Unit
+let main () =
+  attempt "/x/:id([0-9]+)" "/x/abc"
+  attempt "/x/:id([0-9]+)" "/x/123"
+  attempt "/x/:id([0-9]+)" "/x/12%33"
+  attempt "/x/:a-:b" "/x/a-b-c"
+  attempt "/x/:a-foo-:b" "/x/a-foo-b-foo-c"
+  attempt "/x/Pre:name.json" "/x/prefile.json"
+  attempt "/x/:id([^/]+)" "/x/hello%2Fthere"
+  attempt "/:id([0-9]+)/*" "/"
+  attempt "/:id([0-9]+)/*" "/123/secret"
+  attempt "/x/pre:a-:b" "/x/prea%0Ab-c"

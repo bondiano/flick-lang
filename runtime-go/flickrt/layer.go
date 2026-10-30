@@ -45,7 +45,7 @@ func fromBuild(build func(fb *Fiber, memo *MemoMap, scope *Owner) Services) *Lay
 		inner := forkScope(fb, scope)
 		out, cause := catch(func() Value { return build(fb, memo, inner) })
 		if cause != nil {
-			inner.close(fb, cause)
+			cause = inner.close(fb, cause)
 			panic(&Failure{cause})
 		}
 		return out.(Services)
@@ -65,7 +65,7 @@ func memoized(build func(fb *Fiber, memo *MemoMap, scope *Owner) Services) *Laye
 func forkScope(fb *Fiber, parent *Owner) *Owner {
 	child := newOwner()
 	parent.add(fb, func(fb *Fiber, exit *Cause) Value {
-		if cause := child.close(fb, exit); cause != nil {
+		if cause := child.closeFinalizers(fb, exit); cause != nil {
 			panic(&Failure{cause})
 		}
 		return Unit
@@ -122,7 +122,7 @@ func (m *MemoMap) observe(fb *Fiber, l *Layer, e *memoEntry, scope *Owner) bool 
 		}
 		m.mu.Unlock()
 		if last {
-			if cause := e.scope.close(fb, exit); cause != nil {
+			if cause := e.scope.closeFinalizers(fb, exit); cause != nil {
 				panic(&Failure{cause})
 			}
 		}
@@ -214,13 +214,13 @@ var LayerEmpty Value = constant(Services{})
 func LayerSucceedContext(ctx Value) Value { return constant(ctx.(Services)) }
 
 func LayerSync(key, make Value) Value {
-	return memoized(func(*Fiber, *MemoMap, *Owner) Services {
-		return Services{key.(string): Apply(make, Unit)}
+	return memoized(func(fb *Fiber, _ *MemoMap, _ *Owner) Services {
+		return Services{key.(string): Apply(fb, make, Unit)}
 	})
 }
 
 func LayerSyncContext(make Value) Value {
-	return memoized(func(*Fiber, *MemoMap, *Owner) Services { return Apply(make, Unit).(Services) })
+	return memoized(func(fb *Fiber, _ *MemoMap, _ *Owner) Services { return Apply(fb, make, Unit).(Services) })
 }
 
 // scoped runs `task` acquiring into `scope`.
@@ -247,7 +247,7 @@ func LayerEffectDiscard(task Value) Value {
 
 func LayerSuspend(make Value) Value {
 	return memoized(func(fb *Fiber, memo *MemoMap, scope *Owner) Services {
-		return layerOf(Apply(make, Unit)).build(fb, memo, scope)
+		return layerOf(Apply(fb, make, Unit)).build(fb, memo, scope)
 	})
 }
 
@@ -294,14 +294,14 @@ func LayerProvideMerge(that, self Value) Value {
 func LayerFlatMap(f, self Value) Value {
 	return fromBuild(func(fb *Fiber, memo *MemoMap, scope *Owner) Services {
 		s := layerOf(self).build(fb, memo, scope)
-		return layerOf(Apply(f, s)).build(fb, memo, scope)
+		return layerOf(Apply(fb, f, s)).build(fb, memo, scope)
 	})
 }
 
 func LayerTap(f, self Value) Value {
 	return fromBuild(func(fb *Fiber, memo *MemoMap, scope *Owner) Services {
 		s := layerOf(self).build(fb, memo, scope)
-		scoped(fb, scope, Apply(f, s))
+		scoped(fb, scope, Apply(fb, f, s))
 		return s
 	})
 }
@@ -335,7 +335,7 @@ func firstError(c *Cause) (Value, bool) {
 func LayerTapError(f, self Value) Value {
 	return onFailure(self, func(fb *Fiber, scope *Owner, cause *Cause) Value {
 		if err, ok := firstError(cause); ok {
-			scoped(fb, scope, Apply(f, err))
+			scoped(fb, scope, Apply(fb, f, err))
 		}
 		return nil
 	})
@@ -343,23 +343,23 @@ func LayerTapError(f, self Value) Value {
 
 func LayerTapCause(f, self Value) Value {
 	return onFailure(self, func(fb *Fiber, scope *Owner, cause *Cause) Value {
-		scoped(fb, scope, Apply(f, failureOf(cause)))
+		scoped(fb, scope, Apply(fb, f, failureOf(cause)))
 		return nil
 	})
 }
 
 func LayerCatch(f, self Value) Value {
-	return onFailure(self, func(_ *Fiber, _ *Owner, cause *Cause) Value {
+	return onFailure(self, func(fb *Fiber, _ *Owner, cause *Cause) Value {
 		if err, ok := firstError(cause); ok {
-			return Apply(f, err)
+			return Apply(fb, f, err)
 		}
 		return nil
 	})
 }
 
 func LayerCatchCause(f, self Value) Value {
-	return onFailure(self, func(_ *Fiber, _ *Owner, cause *Cause) Value {
-		return Apply(f, failureOf(cause))
+	return onFailure(self, func(fb *Fiber, _ *Owner, cause *Cause) Value {
+		return Apply(fb, f, failureOf(cause))
 	})
 }
 
@@ -381,7 +381,7 @@ func LayerUpdateService(key, f, self Value) Value {
 		if !ok {
 			panic(Defect{"Service not found: " + key.(string)})
 		}
-		return layerOf(self).build(provided(fb, Services{key.(string): Apply(f, impl)}), memo, scope)
+		return layerOf(self).build(provided(fb, Services{key.(string): Apply(fb, f, impl)}), memo, scope)
 	})
 }
 
@@ -415,7 +415,7 @@ func LayerCurrentMemoMap(fb *Fiber, _ Value) Value  { return currentMemo(fb) }
 // that acquires into the layer's scope.
 func fromTask(build Value) func(*Fiber, *MemoMap, *Owner) Services {
 	return func(fb *Fiber, memo *MemoMap, scope *Owner) Services {
-		return scoped(fb, scope, Apply(build, memo)).(Services)
+		return scoped(fb, scope, Apply(fb, build, memo)).(Services)
 	}
 }
 

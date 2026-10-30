@@ -15,17 +15,17 @@ type keyed struct {
 	make   *Fiber // the fiber the map was made in, for its services
 	memo   *MemoMap
 	scope  *Owner
-	lookup func(key Value) *Layer
+	lookup func(fb *Fiber, key Value) *Layer
 	keys   []Value
 	layers []*Layer
 }
 
-func newKeyed(fb *Fiber, lookup func(Value) *Layer) *keyed {
+func newKeyed(fb *Fiber, lookup func(*Fiber, Value) *Layer) *keyed {
 	return &keyed{make: fb, memo: newMemoMap(nil), scope: fb.owner, lookup: lookup}
 }
 
 // layer is the layer of `key`, a new one after an invalidation.
-func (k *keyed) layer(key Value) *Layer {
+func (k *keyed) layer(fb *Fiber, key Value) *Layer {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	for i, at := range k.keys {
@@ -34,7 +34,7 @@ func (k *keyed) layer(key Value) *Layer {
 		}
 	}
 	// a memo map of its own, so that what the key's layer memoizes is built anew after an invalidation
-	inner, memo := k.lookup(key), newMemoMap(nil)
+	inner, memo := k.lookup(fb, key), newMemoMap(nil)
 	l := &Layer{func(fb *Fiber, _ *MemoMap, scope *Owner) Services { return inner.build(fb, memo, scope) }}
 	k.keys, k.layers = append(k.keys, key), append(k.layers, l)
 	return l
@@ -55,7 +55,7 @@ func (k *keyed) invalidate(key Value) {
 // build is the services of `key`, held by `scope`, built in `fb` with the
 // services of the map's maker.
 func (k *keyed) build(fb *Fiber, key Value, scope *Owner) Services {
-	l := k.layer(key)
+	l := k.layer(fb, key)
 	inner := *fb
 	inner.env = k.make.env
 	return k.memo.getOrBuild(&inner, l, scope, l.build)
@@ -67,7 +67,7 @@ func (k *keyed) get(key Value) Value {
 }
 
 func LayerMapMake(fb *Fiber, lookup, options Value) Value {
-	k := newKeyed(fb, func(key Value) *Layer { return layerOf(Apply(lookup, key)) })
+	k := newKeyed(fb, func(fb *Fiber, key Value) *Layer { return layerOf(Apply(fb, lookup, key)) })
 	if keys, ok := some(record(options).Get("preloadKeys")); ok {
 		for _, key := range List(keys) {
 			k.build(fb, key, k.scope)
@@ -78,7 +78,7 @@ func LayerMapMake(fb *Fiber, lookup, options Value) Value {
 
 func LayerMapFromRecord(fb *Fiber, layers, options Value) Value {
 	pairs := List(layers)
-	k := newKeyed(fb, func(key Value) *Layer {
+	k := newKeyed(fb, func(fb *Fiber, key Value) *Layer {
 		for _, p := range pairs {
 			if p.([]Value)[0] == key {
 				return layerOf(p.([]Value)[1])
@@ -112,7 +112,7 @@ type layerRef struct {
 var refKey Value = Unit
 
 func LayerRefMake(fb *Fiber, layer, options Value) Value {
-	r := &layerRef{keyed: newKeyed(fb, func(Value) *Layer { return layerOf(layer) })}
+	r := &layerRef{keyed: newKeyed(fb, func(_ *Fiber, _ Value) *Layer { return layerOf(layer) })}
 	if record(options).Get("preload").(bool) {
 		r.refresh(fb)
 	}

@@ -132,17 +132,17 @@ func (q *ServerRequest) bytes(fb *Fiber) []byte {
 		body, err = q.src.read(fb)
 	}
 	if err != nil {
-		Fail(q.parseError(err.Error()))
+		Fail(q.parseError(fb, err.Error()))
 	}
 	return body
 }
 
-func (q *ServerRequest) details(description Value) Value {
-	return Rec("method", methodValue(q.method), "url", redactURL(q.url, defaultUrlRedactedName), "description", description)
+func (q *ServerRequest) details(fb *Fiber, description Value) Value {
+	return Rec("method", methodValue(q.method), "url", redactURL(q.url, currentUrlRedactedNames(fb)), "description", description)
 }
 
-func (q *ServerRequest) parseError(description string) Value {
-	return NewData(serverErrorTag, NewData(parseErrorTag, q.details(Some(description))))
+func (q *ServerRequest) parseError(fb *Fiber, description string) Value {
+	return NewData(serverErrorTag, NewData(parseErrorTag, q.details(fb, Some(description))))
 }
 
 func RequestMethod(r Value) Value      { return methodValue(requestOf(r).method) }
@@ -200,7 +200,7 @@ func RequestJson(fb *Fiber, r Value) Value {
 	}
 	v, reason := parseJSON(text)
 	if reason != "" {
-		return Fail(q.parseError(reason))
+		return Fail(q.parseError(fb, reason))
 	}
 	return v
 }

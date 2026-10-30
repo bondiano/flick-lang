@@ -1,0 +1,10 @@
+/x/:id([0-9]+) /x/abc -> 404
+/x/:id([0-9]+) /x/123 -> 200 [("id", "123")]
+/x/:id([0-9]+) /x/12%33 -> 200 [("id", "123")]
+/x/:a-:b /x/a-b-c -> 200 [("a", "a-b"), ("b", "c")]
+/x/:a-foo-:b /x/a-foo-b-foo-c -> 200 [("a", "a-foo-b"), ("b", "c")]
+/x/Pre:name.json /x/prefile.json -> 200 [("name", "file")]
+/x/:id([^/]+) /x/hello%2Fthere -> 404
+/:id([0-9]+)/* / -> 404
+/:id([0-9]+)/* /123/secret -> 200 [("id", "123"), ("*", "secret")]
+/x/pre:a-:b /x/prea%0Ab-c -> 404

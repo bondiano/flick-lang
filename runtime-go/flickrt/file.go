@@ -92,7 +92,7 @@ func FileOpen(fb *Fiber, path Value) Value {
 		}
 		return f
 	})
-	release := Fn(func(f Value) Value {
+	release := Fn(func(fb *Fiber, f Value) Value {
 		return Eff(func(*Fiber) Value {
 			f.(*os.File).Close()
 			return Unit

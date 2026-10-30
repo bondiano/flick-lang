@@ -36,11 +36,11 @@ func UrlMake(s, params, hash Value) Value {
 
 func UrlHref(u Value) Value { return urlOf(u).href() }
 
-// UrlShow is the URL with its user, password and signature parameters
-// masked.
-//
-// shortcut: masks the default parameter names, where JS reads those `with_redacted_names` sets in the running fiber; give `show` the fiber if a program needs that
-func UrlShow(u Value) Value { return redactURL(urlOf(u).href(), defaultUrlRedactedName) }
+// UrlShow is the URL with its user, password and the current fiber's
+// secret query parameters masked.
+func UrlShow(fb *Fiber, u Value) Value {
+	return redactURL(urlOf(u).href(), currentUrlRedactedNames(fb))
+}
 
 // changed is a copy of the URL changed by `f`, which may refuse the value.
 func changed(u Value, f func(*webURL)) Value {
@@ -209,8 +209,8 @@ func UrlSetUrlParams(params, u Value) Value {
 	return changed(u, func(c *webURL) { c.setSearch(formEncode(paramsOf(params))) })
 }
 
-func UrlModifyUrlParams(f, u Value) Value {
+func UrlModifyUrlParams(fb *Fiber, f, u Value) Value {
 	return changed(u, func(c *webURL) {
-		c.setSearch(formEncode(paramsOf(Apply(f, c.searchParams()))))
+		c.setSearch(formEncode(paramsOf(Apply(fb, f, c.searchParams()))))
 	})
 }

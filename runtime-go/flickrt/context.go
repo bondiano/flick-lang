@@ -38,11 +38,11 @@ func ContextGetOption(key, ctx Value) Value {
 	return None
 }
 
-func ContextGetOrElse(key, orElse, ctx Value) Value {
+func ContextGetOrElse(fb *Fiber, key, orElse, ctx Value) Value {
 	if v, ok := ctxOf(ctx)[key.(string)]; ok {
 		return v
 	}
-	return Apply(orElse, Unit)
+	return Apply(fb, orElse, Unit)
 }
 
 // ContextMerge is `Context.merge that self`: the services of `that`
@@ -85,8 +85,8 @@ type reference struct {
 
 func ContextReference(key, make Value) Value { return &reference{key: key.(string), make: make} }
 
-func (r *reference) fallback() Value {
-	r.once.Do(func() { r.value = Apply(r.make, Unit) })
+func (r *reference) fallback(fb *Fiber) Value {
+	r.once.Do(func() { r.value = Apply(fb, r.make, Unit) })
 	return r.value
 }
 
@@ -95,7 +95,7 @@ func ContextRead(fb *Fiber, ref Value) Value {
 	if v, ok := fb.env.get(r.key); ok {
 		return v
 	}
-	return r.fallback()
+	return r.fallback(fb)
 }
 
 func ContextWithReference(fb *Fiber, ref, value, task Value) Value {

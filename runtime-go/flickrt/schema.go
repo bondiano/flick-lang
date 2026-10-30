@@ -129,8 +129,8 @@ func (s *Schema) resolved() *Schema {
 
 // A codec reads values from a wire form and writes them to it.
 type codec interface {
-	decode(in Value) (Value, []issue)
-	encode(v Value) (Value, []issue)
+	decode(fb *Fiber, in Value) (Value, []issue)
+	encode(fb *Fiber, v Value) (Value, []issue)
 	// accepts is whether an untagged union tries this case for `in`.
 	accepts(in Value) bool
 }
@@ -191,7 +191,7 @@ func (w *wire) accepts(in Value) bool {
 	return true
 }
 
-func (w *wire) decode(in Value) (Value, []issue) {
+func (w *wire) decode(fb *Fiber, in Value) (Value, []issue) {
 	s := w.s.resolved()
 	switch s.kind {
 	case kindNumber:
@@ -248,7 +248,7 @@ func (w *wire) decode(in Value) (Value, []issue) {
 		item := s.item.jsonOf()
 		out := make([]Value, len(xs))
 		for i, x := range xs {
-			v, issues := item.decode(x)
+			v, issues := item.decode(fb, x)
 			if issues != nil {
 				return nil, under(i, issues)
 			}
@@ -265,7 +265,7 @@ func (w *wire) decode(in Value) (Value, []issue) {
 			if i >= len(xs) {
 				return nil, under(i, fail("a missing key"))
 			}
-			v, issues := item.jsonOf().decode(xs[i])
+			v, issues := item.jsonOf().decode(fb, xs[i])
 			if issues != nil {
 				return nil, under(i, issues)
 			}
@@ -283,7 +283,7 @@ func (w *wire) decode(in Value) (Value, []issue) {
 		if !item.accepts(in) {
 			return nil, expected("Union", in)
 		}
-		v, issues := item.decode(in)
+		v, issues := item.decode(fb, in)
 		if issues != nil {
 			return nil, issues
 		}
@@ -293,11 +293,11 @@ func (w *wire) decode(in Value) (Value, []issue) {
 		if !ok {
 			return nil, expected("an object with `ok` or `err`", in)
 		}
-		okField, okIssues := object(obj, []string{"ok"}, []*Schema{s.items[1]})
+		okField, okIssues := object(fb, obj, []string{"ok"}, []*Schema{s.items[1]})
 		if okIssues == nil {
 			return Ok(okField[0]), nil
 		}
-		err, errIssues := object(obj, []string{"err"}, []*Schema{s.items[0]})
+		err, errIssues := object(fb, obj, []string{"err"}, []*Schema{s.items[0]})
 		if errIssues == nil {
 			return Err(err[0]), nil
 		}
@@ -307,7 +307,7 @@ func (w *wire) decode(in Value) (Value, []issue) {
 		if !ok {
 			return nil, expected("an object", in)
 		}
-		fields, issues := object(obj, s.labels, s.items)
+		fields, issues := object(fb, obj, s.labels, s.items)
 		if issues != nil {
 			return nil, issues
 		}
@@ -322,7 +322,7 @@ func (w *wire) decode(in Value) (Value, []issue) {
 			if v.Name != name {
 				continue
 			}
-			fields, issues := object(obj, s.wireKeys[at], s.fields[at])
+			fields, issues := object(fb, obj, s.wireKeys[at], s.fields[at])
 			if issues != nil {
 				return nil, issues
 			}
@@ -350,7 +350,7 @@ func recordField(r *Record, k string) Value {
 // object decodes the fields `keys` of a JSON object: a key it does not
 // know comes first, then a missing one, then each field in order. A nil
 // schema takes the value as it is.
-func object(obj *Record, keys []string, schemas []*Schema) ([]Value, []issue) {
+func object(fb *Fiber, obj *Record, keys []string, schemas []*Schema) ([]Value, []issue) {
 	for _, k := range obj.keys {
 		known := false
 		for _, want := range keys {
@@ -370,7 +370,7 @@ func object(obj *Record, keys []string, schemas []*Schema) ([]Value, []issue) {
 			out[i] = v
 			continue
 		}
-		x, issues := schemas[i].jsonOf().decode(v)
+		x, issues := schemas[i].jsonOf().decode(fb, v)
 		if issues != nil {
 			return nil, under(k, issues)
 		}
@@ -379,7 +379,7 @@ func object(obj *Record, keys []string, schemas []*Schema) ([]Value, []issue) {
 	return out, nil
 }
 
-func (w *wire) encode(v Value) (Value, []issue) {
+func (w *wire) encode(fb *Fiber, v Value) (Value, []issue) {
 	s := w.s.resolved()
 	switch s.kind {
 	case kindNumber:
@@ -408,7 +408,7 @@ func (w *wire) encode(v Value) (Value, []issue) {
 			if s.kind == kindTuple {
 				item = s.items[i]
 			}
-			e, issues := item.jsonOf().encode(x)
+			e, issues := item.jsonOf().encode(fb, x)
 			if issues != nil {
 				return nil, under(i, issues)
 			}
@@ -420,13 +420,13 @@ func (w *wire) encode(v Value) (Value, []issue) {
 		if o.Tag != "Some" {
 			return JsonNull, nil
 		}
-		return s.item.jsonOf().encode(o.Fields[0])
+		return s.item.jsonOf().encode(fb, o.Fields[0])
 	case kindResult:
 		key, part := "err", s.items[0]
 		if isOk(v) {
 			key, part = "ok", s.items[1]
 		}
-		e, issues := part.jsonOf().encode(value(v))
+		e, issues := part.jsonOf().encode(fb, value(v))
 		if issues != nil {
 			return nil, under(key, issues)
 		}
@@ -435,7 +435,7 @@ func (w *wire) encode(v Value) (Value, []issue) {
 		r := v.(*Record)
 		out := make([]Value, len(s.labels))
 		for i, l := range s.labels {
-			e, issues := s.items[i].jsonOf().encode(r.Get(l))
+			e, issues := s.items[i].jsonOf().encode(fb, r.Get(l))
 			if issues != nil {
 				return nil, under(l, issues)
 			}
@@ -452,7 +452,7 @@ func (w *wire) encode(v Value) (Value, []issue) {
 			out := make([]Value, len(keys))
 			out[0] = variant.Name
 			for i, f := range s.fields[at][1:] {
-				e, issues := f.jsonOf().encode(d.Fields[i])
+				e, issues := f.jsonOf().encode(fb, d.Fields[i])
 				if issues != nil {
 					return nil, under(keys[i+1], issues)
 				}

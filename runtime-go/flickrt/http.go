@@ -62,7 +62,7 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 		q.state.id, q.state.signal = fibers.Add(1), make(chan struct{})
 		q.fiber.state = &q.state
 		stop := context.AfterFunc(r.Context(), q.interrupt)
-		out, cause := catch(func() Value { return Run(&q.fiber, Apply(handler, &q.request)) })
+		out, cause := catch(func() Value { return Run(&q.fiber, Apply(&q.fiber, handler, &q.request)) })
 		if cause != nil {
 			out = causeResponse(cause)
 		}

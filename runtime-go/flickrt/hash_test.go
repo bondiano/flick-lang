@@ -37,11 +37,11 @@ func TestHashIsEffects(t *testing.T) {
 
 func TestHashSetsWalkLowBitsFirst(t *testing.T) {
 	w := &Witness{
-		eq:   Curry2(func(a, b Value) Value { return a == b }),
-		hash: Fn(func(a Value) Value { return a.(int32) % 3 }),
+		eq:   Curry2(func(fb *Fiber, a, b Value) Value { return a == b }),
+		hash: Fn(func(fb *Fiber, a Value) Value { return a.(int32) % 3 }),
 	}
-	s := HashSetFromList(w, []Value{int32(7), int32(4), int32(1), int32(9), int32(6)})
-	if got := Show(ListShow(Fn(Show), HashSetToList(s))); got != `"[9, 6, 7, 4, 1]"` {
+	s := HashSetFromList(nil, w, []Value{int32(7), int32(4), int32(1), int32(9), int32(6)})
+	if got := Show(ListShow(nil, Fn(func(_ *Fiber, v Value) Value { return Show(v) }), HashSetToList(s))); got != `"[9, 6, 7, 4, 1]"` {
 		t.Errorf("equal hashes keep insertion order, by hash first: %v", got)
 	}
 }

@@ -1,10 +1,12 @@
 //! Schema witnesses: a `deriving Schema` item is a value of the runtime's
 //! schemas, or a function of the witnesses of its type's parameters.
 
+use std::iter;
+
 use flick_pretty::{Document, Documentable, docvec};
 
 use super::items::Decls;
-use super::layout::{call, closure, list, single, statement};
+use super::layout::{call, closure, list, signature, single, statement};
 use super::{Gen, Shape, names};
 use crate::source::Span;
 use crate::types::{Constructor, Rep, SchemaItem, SchemaPlan, companion_name};
@@ -25,7 +27,11 @@ impl<'a> Gen<'a> {
             return;
         }
         let name = companion_name(&item.ty, "schema");
+        let context = (item.witnesses > 0).then(|| self.context.replace("fb"));
         let body = self.plan(&item.plan, span);
+        if let Some(context) = context {
+            self.context = context;
+        }
         if item.witnesses == 0 {
             let var = a.alloc_str(&names::var(self.module, &name));
             decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
@@ -37,8 +43,8 @@ impl<'a> Gen<'a> {
                 "func ",
                 names::func(self.module, &name),
                 "(",
-                ws.join(", "),
-                " flickrt.Value) flickrt.Value ",
+                signature(&ws),
+                ") flickrt.Value ",
                 single(a, docvec![a, "return ", body])
             ];
             decls.push((decl, false));
@@ -83,13 +89,22 @@ impl<'a> Gen<'a> {
             SchemaPlan::Param(i) => docvec![a, "w", *i],
             SchemaPlan::Applied(i, p) => {
                 let p = self.plan(p, span);
-                call(a, "flickrt.Apply", [docvec![a, "w", *i], p])
+                call(a, "flickrt.Apply", [self.context(), docvec![a, "w", *i], p])
             }
-            SchemaPlan::Constructor(name) => a.text(match name.as_str() {
-                "List" => "flickrt.Fn(flickrt.SchemaList)",
-                "Option" => "flickrt.Fn(flickrt.SchemaOption)",
-                _ => "flickrt.Fn(flickrt.SchemaRedacted)",
-            }),
+            SchemaPlan::Constructor(name) => {
+                let constructor = match name.as_str() {
+                    "List" => "flickrt.SchemaList",
+                    "Option" => "flickrt.SchemaOption",
+                    _ => "flickrt.SchemaRedacted",
+                };
+                let make = call(a, constructor, [a.text("w")]);
+                let get = closure(
+                    a,
+                    "func(_ *flickrt.Fiber, w flickrt.Value) flickrt.Value",
+                    [docvec![a, "return ", make]],
+                );
+                call(a, "flickrt.Fn", [get])
+            }
             SchemaPlan::Named {
                 module,
                 ty,
@@ -98,11 +113,20 @@ impl<'a> Gen<'a> {
             } => {
                 let name = companion_name(ty, "schema");
                 self.reads(module);
+                // Lazy schema metadata is immutable; never capture its creator's fiber.
+                let context = lazy.then(|| self.context.take());
                 let args: Vec<Document<'a>> = args.iter().map(|p| self.plan(p, span)).collect();
                 let schema = match self.shape_of(module, &name) {
-                    Shape::Func { .. } => call(a, names::func(module, &name), args),
+                    Shape::Func { .. } => call(
+                        a,
+                        names::func(module, &name),
+                        iter::once(self.context()).chain(args),
+                    ),
                     Shape::Var => names::var(module, &name).to_doc(a),
                 };
+                if let Some(context) = context {
+                    self.context = context;
+                }
                 if *lazy {
                     let get = closure(a, "func() flickrt.Value", [docvec![a, "return ", schema]]);
                     call(a, "flickrt.SchemaLazy", [self.string(ty), get])

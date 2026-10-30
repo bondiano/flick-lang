@@ -5,22 +5,22 @@ import "sort"
 // Lists are immutable []Value: an operation returns a new slice, or the
 // same one when nothing changes. Callbacks are curried Flick functions.
 
-func apply2(f, a, b Value) Value { return Apply(Apply(f, a), b) }
+func apply2(fb *Fiber, f, a, b Value) Value { return Apply(fb, Apply(fb, f, a), b) }
 
-func ListMap(f, xs Value) Value {
+func ListMap(fb *Fiber, f, xs Value) Value {
 	in := List(xs)
 	out := make([]Value, len(in))
 	for i, x := range in {
-		out[i] = Apply(f, x)
+		out[i] = Apply(fb, f, x)
 	}
 	return out
 }
 
-func ListMapIndexed(f, xs Value) Value {
+func ListMapIndexed(fb *Fiber, f, xs Value) Value {
 	in := List(xs)
 	out := make([]Value, len(in))
 	for i, x := range in {
-		out[i] = apply2(f, int32(i), x)
+		out[i] = apply2(fb, f, int32(i), x)
 	}
 	return out
 }
@@ -28,77 +28,77 @@ func ListMapIndexed(f, xs Value) Value {
 // ListEachEffect runs the task of `f` of each element.
 func ListEachEffect(fb *Fiber, f, xs Value) Value {
 	for _, x := range List(xs) {
-		Run(fb, Apply(f, x))
+		Run(fb, Apply(fb, f, x))
 	}
 	return Unit
 }
 
-func ListFold(f, init, xs Value) Value {
+func ListFold(fb *Fiber, f, init, xs Value) Value {
 	acc := init
 	for _, x := range List(xs) {
-		acc = apply2(f, acc, x)
+		acc = apply2(fb, f, acc, x)
 	}
 	return acc
 }
 
-func ListFoldRight(f, init, xs Value) Value {
+func ListFoldRight(fb *Fiber, f, init, xs Value) Value {
 	in := List(xs)
 	acc := init
 	for i := len(in) - 1; i >= 0; i-- {
-		acc = apply2(f, in[i], acc)
+		acc = apply2(fb, f, in[i], acc)
 	}
 	return acc
 }
 
-func ListFilter(p, xs Value) Value {
+func ListFilter(fb *Fiber, p, xs Value) Value {
 	out := []Value{}
 	for _, x := range List(xs) {
-		if Bool(Apply(p, x)) {
+		if Bool(Apply(fb, p, x)) {
 			out = append(out, x)
 		}
 	}
 	return out
 }
 
-func ListFilterMap(f, xs Value) Value {
+func ListFilterMap(fb *Fiber, f, xs Value) Value {
 	out := []Value{}
 	for _, x := range List(xs) {
-		if o := Apply(f, x).(*Data); o.Tag == "Some" {
+		if o := Apply(fb, f, x).(*Data); o.Tag == "Some" {
 			out = append(out, o.Fields[0])
 		}
 	}
 	return out
 }
 
-func ListFlatMap(f, xs Value) Value {
+func ListFlatMap(fb *Fiber, f, xs Value) Value {
 	out := []Value{}
 	for _, x := range List(xs) {
-		out = append(out, List(Apply(f, x))...)
+		out = append(out, List(Apply(fb, f, x))...)
 	}
 	return out
 }
 
 // ListMap2 is `Applicative.map2` of lists: every pair, the first list
 // outermost.
-func ListMap2(f, xs, ys Value) Value {
+func ListMap2(fb *Fiber, f, xs, ys Value) Value {
 	out := []Value{}
 	for _, x := range List(xs) {
 		for _, y := range List(ys) {
-			out = append(out, apply2(f, x, y))
+			out = append(out, apply2(fb, f, x, y))
 		}
 	}
 	return out
 }
 
-func OptionMap2(f, x, y Value) Value {
+func OptionMap2(fb *Fiber, f, x, y Value) Value {
 	a, b := x.(*Data), y.(*Data)
 	if a.Tag == "Some" && b.Tag == "Some" {
-		return Some(apply2(f, a.Fields[0], b.Fields[0]))
+		return Some(apply2(fb, f, a.Fields[0], b.Fields[0]))
 	}
 	return None
 }
 
-func ResultMap2(f, x, y Value) Value {
+func ResultMap2(fb *Fiber, f, x, y Value) Value {
 	a, b := x.(*Data), y.(*Data)
 	switch {
 	case a.Tag == "Failure":
@@ -106,49 +106,49 @@ func ResultMap2(f, x, y Value) Value {
 	case b.Tag == "Failure":
 		return b
 	}
-	return Ok(apply2(f, a.Fields[0], b.Fields[0]))
+	return Ok(apply2(fb, f, a.Fields[0], b.Fields[0]))
 }
 
-func ListFind(p, xs Value) Value {
+func ListFind(fb *Fiber, p, xs Value) Value {
 	for _, x := range List(xs) {
-		if Bool(Apply(p, x)) {
+		if Bool(Apply(fb, p, x)) {
 			return Some(x)
 		}
 	}
 	return None
 }
 
-func ListFindIndex(p, xs Value) Value {
+func ListFindIndex(fb *Fiber, p, xs Value) Value {
 	for i, x := range List(xs) {
-		if Bool(Apply(p, x)) {
+		if Bool(Apply(fb, p, x)) {
 			return Some(int32(i))
 		}
 	}
 	return None
 }
 
-func ListAny(p, xs Value) Value {
+func ListAny(fb *Fiber, p, xs Value) Value {
 	for _, x := range List(xs) {
-		if Bool(Apply(p, x)) {
+		if Bool(Apply(fb, p, x)) {
 			return true
 		}
 	}
 	return false
 }
 
-func ListAll(p, xs Value) Value {
+func ListAll(fb *Fiber, p, xs Value) Value {
 	for _, x := range List(xs) {
-		if !Bool(Apply(p, x)) {
+		if !Bool(Apply(fb, p, x)) {
 			return false
 		}
 	}
 	return true
 }
 
-func ListPartition(p, xs Value) Value {
+func ListPartition(fb *Fiber, p, xs Value) Value {
 	yes, no := []Value{}, []Value{}
 	for _, x := range List(xs) {
-		if Bool(Apply(p, x)) {
+		if Bool(Apply(fb, p, x)) {
 			yes = append(yes, x)
 		} else {
 			no = append(no, x)
@@ -158,10 +158,10 @@ func ListPartition(p, xs Value) Value {
 }
 
 // ListSortBy is a stable sort on a copy.
-func ListSortBy(cmp, xs Value) Value {
+func ListSortBy(fb *Fiber, cmp, xs Value) Value {
 	out := append([]Value{}, List(xs)...)
 	sort.SliceStable(out, func(i, j int) bool {
-		return apply2(cmp, out[i], out[j]).(*Data).Tag == LT.(*Data).Tag
+		return apply2(fb, cmp, out[i], out[j]).(*Data).Tag == LT.(*Data).Tag
 	})
 	return out
 }
@@ -205,10 +205,10 @@ func ListRange(from, until Value) Value {
 	return out
 }
 
-func ListInitialize(n, f Value) Value {
+func ListInitialize(fb *Fiber, n, f Value) Value {
 	out := make([]Value, max(0, int(n.(int32))))
 	for i := range out {
-		out[i] = Apply(f, int32(i))
+		out[i] = Apply(fb, f, int32(i))
 	}
 	return out
 }

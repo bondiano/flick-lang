@@ -90,7 +90,14 @@ impl<'a> Gen<'a> {
                     t.lets.extend(inner.lets);
                 }
                 let tests = inline(a, tests.into_iter().chain([a.text("return false")]));
-                t.conds.push(docvec![a, "func() bool ", tests, "()"]);
+                t.conds.push(docvec![
+                    a,
+                    "func(_ *flickrt.Fiber) bool ",
+                    tests,
+                    "(",
+                    self.context(),
+                    ")"
+                ]);
             }
         }
     }

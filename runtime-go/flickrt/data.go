@@ -265,23 +265,23 @@ func Show(a Value) Value {
 
 // ListEquals, ListCompare, ListHash and ListShow are the instances of
 // lists, given those of the elements.
-func ListEquals(eq, a, b Value) Value {
+func ListEquals(fb *Fiber, eq, a, b Value) Value {
 	xs, ys := a.([]Value), b.([]Value)
 	if len(xs) != len(ys) {
 		return false
 	}
 	for i := range xs {
-		if !Bool(Apply(Apply(eq, xs[i]), ys[i])) {
+		if !Bool(Apply(fb, Apply(fb, eq, xs[i]), ys[i])) {
 			return false
 		}
 	}
 	return true
 }
 
-func ListCompare(cmp, a, b Value) Value {
+func ListCompare(fb *Fiber, cmp, a, b Value) Value {
 	xs, ys := a.([]Value), b.([]Value)
 	for i := 0; i < len(xs) && i < len(ys); i++ {
-		o := Apply(Apply(cmp, xs[i]), ys[i])
+		o := Apply(fb, Apply(fb, cmp, xs[i]), ys[i])
 		if o.(*Data).Tag != EQ.(*Data).Tag {
 			return o
 		}
@@ -289,19 +289,19 @@ func ListCompare(cmp, a, b Value) Value {
 	return ordering(len(xs) - len(ys))
 }
 
-func ListHash(h, a Value) Value {
+func ListHash(fb *Fiber, h, a Value) Value {
 	acc := int32(7)
 	for _, x := range a.([]Value) {
-		acc = combine(acc, Apply(h, x).(int32))
+		acc = combine(acc, Apply(fb, h, x).(int32))
 	}
 	return acc
 }
 
-func ListShow(s, a Value) Value {
+func ListShow(fb *Fiber, s, a Value) Value {
 	xs := a.([]Value)
 	shown := make([]string, len(xs))
 	for i, x := range xs {
-		shown[i] = Apply(s, x).(string)
+		shown[i] = Apply(fb, s, x).(string)
 	}
 	return "[" + joinStrings(shown, ", ") + "]"
 }

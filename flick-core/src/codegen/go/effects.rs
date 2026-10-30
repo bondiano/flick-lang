@@ -24,9 +24,10 @@ impl<'a> Gen<'a> {
             self.tail.take(),
             mem::replace(&mut self.generator, false),
             self.fiber.replace("fb"),
+            self.context.replace("fb"),
         );
         let (stmts, ()) = self.block(|g| g.tail_expr(body));
-        (self.tail, self.generator, self.fiber) = saved;
+        (self.tail, self.generator, self.fiber, self.context) = saved;
         stmts
     }
 
@@ -57,9 +58,9 @@ impl<'a> Gen<'a> {
     pub(super) fn within(&mut self, owner: &str, inner: &Expr) -> Code<'a> {
         let a = self.a;
         let fb = self.fiber.expect("`Within` runs where a fiber is in scope");
-        let saved = self.fiber.replace("fbw");
+        let saved = (self.fiber.replace("fbw"), self.context.replace("fbw"));
         let (stmts, v) = self.block(|g| g.expr(inner));
-        self.fiber = saved;
+        (self.fiber, self.context) = saved;
         let r = self.temp();
         let region = call(
             a,
@@ -96,6 +97,7 @@ impl<'a> Gen<'a> {
             self.tail.take(),
             mem::replace(&mut self.generator, false),
             self.fiber.replace("fb"),
+            self.context.replace("fb"),
         );
         let err = self.temp();
         let (mut stmts, ()) = self.block(|g| {
@@ -112,7 +114,7 @@ impl<'a> Gen<'a> {
                 );
             }
         });
-        (self.tail, self.generator, self.fiber) = saved;
+        (self.tail, self.generator, self.fiber, self.context) = saved;
         stmts.push(statement(a, "return flickrt.Unmatched"));
         let fb = self.fiber.expect("a `try` with arms runs in a fiber");
         let handler = docvec![

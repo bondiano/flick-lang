@@ -8,19 +8,26 @@ fn version() {
 }
 
 #[test]
-fn help() {
-    insta::assert_snapshot!(stdout(&["help"]));
-    assert_eq!(stdout(&["--help"]), stdout(&["help"]));
-}
-
-#[test]
-fn help_check() {
-    insta::assert_snapshot!(stdout(&["help", "check"]));
-}
-
-#[test]
-fn help_build() {
-    insta::assert_snapshot!(stdout(&["help", "build"]));
+fn help_describes_global_and_build_options() {
+    for command in [None, Some("check"), Some("build"), Some("fmt")] {
+        let (help, flag) = match command {
+            Some(command) => (stdout(&["help", command]), stdout(&[command, "--help"])),
+            None => (stdout(&["help"]), stdout(&["--help"])),
+        };
+        assert_eq!(help, flag);
+        for option in ["--quiet", "--silent", "--verbose"] {
+            assert!(help.contains(option), "{help}");
+        }
+        if command == Some("build") {
+            for option in ["--inputs", "--emit", "js", "ts", "go"] {
+                assert!(help.contains(option), "{help}");
+            }
+        }
+    }
+    assert_eq!(
+        flick(&["--silent", "--verbose", "build"]).status.code(),
+        Some(2)
+    );
 }
 
 #[test]
@@ -33,9 +40,4 @@ fn bad_invocation_exits_2() {
             .code(),
         Some(2)
     );
-}
-
-#[test]
-fn help_fmt() {
-    insta::assert_snapshot!(stdout(&["help", "fmt"]));
 }

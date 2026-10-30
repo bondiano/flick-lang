@@ -1,11 +1,11 @@
 //! Top-level definitions: declarations, and the statements of the module's
 //! init function that assign its values.
 
+use std::iter;
+
 use flick_pretty::{Document, docvec};
 
-use super::layout::{
-    Code, block, call, closure, list, named_again, param_list, print, signature, statement,
-};
+use super::layout::{Code, block, call, closure, list, named_again, print, signature, statement};
 use super::{Gen, RUNTIME_PACKAGE, Shape, loops, names};
 use crate::codegen::names as js_names;
 use crate::codegen::tail::{Callee, Target};
@@ -107,16 +107,24 @@ impl<'a> Gen<'a> {
             ItemKind::Instance { info, methods } => {
                 let id = a.alloc_str(&names::instance(self.module, &info.name));
                 let dicts = self.bind_givens(&info.context);
+                let context = self.context.replace("fb");
                 let (mut stmts, ()) = self.block(|g| g.instance(info, methods, item.span));
+                self.context = context;
                 self.givens.clear();
                 stmts.push(statement(a, "return d"));
                 let body = block(a, stmts);
                 if dicts.is_empty() {
                     decls.push((docvec![a, "var ", id, " flickrt.Value"], false));
-                    let make = docvec![a, id, " = func() flickrt.Value ", body, "()"];
+                    let make = docvec![
+                        a,
+                        id,
+                        " = func(fb *flickrt.Fiber) flickrt.Value ",
+                        body,
+                        "(nil)"
+                    ];
                     init.push(statement(a, make));
                 } else {
-                    let params = param_list(&dicts);
+                    let params = signature(&dicts);
                     let decl = docvec![a, "func ", id, "(", params, ") flickrt.Value ", body];
                     decls.push((decl, self.lines > lines));
                 }
@@ -135,8 +143,9 @@ impl<'a> Gen<'a> {
     fn function(&mut self, name: &str, dicts: &[String], body: &Expr) -> Document<'a> {
         let a = self.a;
         let id = names::func(self.module, name);
-        let fiber = self.shape_of(self.module, name).fiber();
-        self.fiber = fiber.then_some("fb");
+        let effectful = self.shape_of(self.module, name).effectful();
+        self.fiber = effectful.then_some("fb");
+        self.context = Some("fb");
         let mut heads = self.bind_givens(dicts);
         let stmts = match &body.kind {
             ExprKind::Lambda { params, body } => {
@@ -158,7 +167,8 @@ impl<'a> Gen<'a> {
         };
         self.givens.clear();
         self.fiber = None;
-        let params = signature(fiber, &heads);
+        self.context = None;
+        let params = signature(&heads);
         docvec![
             a,
             "func ",
@@ -187,7 +197,11 @@ impl<'a> Gen<'a> {
             }
             let fields: Vec<Code<'a>> = fields.iter().map(|d| self.dict(d)).collect();
             let fields = list(a, "[]flickrt.Value{", fields.iter().map(|f| f.doc), "}");
-            let fields = closure(a, "func() []flickrt.Value", [docvec![a, "return ", fields]]);
+            let fields = closure(
+                a,
+                "func(fb *flickrt.Fiber) []flickrt.Value",
+                [docvec![a, "return ", fields]],
+            );
             let constructors = match constructors {
                 None => a.text("nil"),
                 Some(cs) => {
@@ -197,10 +211,19 @@ impl<'a> Gen<'a> {
                 }
             };
             let supers = supers.iter().map(|(class, d)| {
-                let get = closure(a, "func() flickrt.Value", [docvec![a, "return ", *d]]);
+                let get = closure(
+                    a,
+                    "func(fb *flickrt.Fiber) flickrt.Value",
+                    [docvec![a, "return ", *d]],
+                );
                 docvec![a, self.string(class), ": ", get]
             });
-            let supers = list(a, "map[string]func() flickrt.Value{", supers, "}");
+            let supers = list(
+                a,
+                "map[string]func(*flickrt.Fiber) flickrt.Value{",
+                supers,
+                "}",
+            );
             let derive = call(
                 a,
                 "flickrt.Derive",
@@ -211,7 +234,11 @@ impl<'a> Gen<'a> {
         }
         self.emit("d := flickrt.NewDict()");
         for (class, d) in supers {
-            let get = closure(a, "func() flickrt.Value", [docvec![a, "return ", d]]);
+            let get = closure(
+                a,
+                "func(fb *flickrt.Fiber) flickrt.Value",
+                [docvec![a, "return ", d]],
+            );
             let key = self.string(&format!("${class}"));
             self.emit(call(a, "d.Lazy", [key, get]));
         }
@@ -223,7 +250,14 @@ impl<'a> Gen<'a> {
             } else {
                 let ret = statement(a, docvec![a, "return ", v]);
                 let body = block(a, stmts.into_iter().chain([ret]));
-                docvec![a, "func() flickrt.Value ", body, "()"]
+                docvec![
+                    a,
+                    "func(fb *flickrt.Fiber) flickrt.Value ",
+                    body,
+                    "(",
+                    self.context(),
+                    ")"
+                ]
             };
             self.emit(call(a, "d.Set", [self.string(name), v]));
         }
@@ -237,11 +271,15 @@ impl<'a> Gen<'a> {
             } else {
                 dicts.extend((0..*own).map(|i| self.code(&format!("o[{i}]"))));
                 let inner = self.global_value(module, &default, dicts);
-                let head = "func(o ...flickrt.Value) flickrt.Value";
+                let head = "func(fb *flickrt.Fiber, o ...flickrt.Value) flickrt.Value";
                 let f = closure(a, head, [docvec![a, "return ", inner]]);
                 call(a, "flickrt.Poly", [f]).into()
             };
-            let get = closure(a, "func() flickrt.Value", [docvec![a, "return ", value]]);
+            let get = closure(
+                a,
+                "func(fb *flickrt.Fiber) flickrt.Value",
+                [docvec![a, "return ", value]],
+            );
             self.emit(call(a, "d.Lazy", [self.string(name), get]));
         }
     }
@@ -286,7 +324,7 @@ impl<'a> Gen<'a> {
                     self.code(&id)
                 } else {
                     let args: Vec<Document<'a>> = args.iter().map(|d| self.dict(d).doc).collect();
-                    call(a, id, args).into()
+                    call(a, id, iter::once(self.context()).chain(args)).into()
                 }
             }
             Dict::Given(shown) => {
@@ -300,7 +338,12 @@ impl<'a> Gen<'a> {
             }
             Dict::Super { dict, class } => {
                 let d = self.dict(dict);
-                call(a, "flickrt.Super", [d.doc, self.string(class)]).into()
+                call(
+                    a,
+                    "flickrt.Super",
+                    [self.context(), d.doc, self.string(class)],
+                )
+                .into()
             }
             Dict::Structural { class, fields } => {
                 let fields: Vec<Document<'a>> = fields.iter().map(|f| self.dict(f).doc).collect();

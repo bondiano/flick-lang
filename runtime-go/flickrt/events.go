@@ -28,14 +28,14 @@ func EventsListen(fb *Fiber, owner, policy, supervisor, handler Value) Value {
 	supervising := *fb
 	supervising.state = newState()
 	l.fail = func(c *Cause) {
-		catch(func() Value { return Run(&supervising, Apply(supervisor, failureOf(c))) })
+		catch(func() Value { return Run(&supervising, Apply(&supervising, supervisor, failureOf(c))) })
 	}
-	FiberSpawn(fb, owner, Fn(func(Value) Value { return Succeed(Unit) }), Eff(func(w *Fiber) Value {
+	FiberSpawn(fb, owner, Fn(func(fb *Fiber, _ Value) Value { return Succeed(Unit) }), Eff(func(w *Fiber) Value {
 		defer close(l.done)
 		for {
 			select {
 			case e := <-l.events:
-				_, cause := catch(func() Value { return Run(w, Apply(handler, e)) })
+				_, cause := catch(func() Value { return Run(w, Apply(w, handler, e)) })
 				if cause != nil && (cause.has(causeFail) || cause.has(causeDie)) {
 					l.fail(cause)
 				}

@@ -1,0 +1,222 @@
+// URL rendering reads the executing fiber, including pure callbacks made
+// outside its redaction scope. HTTP error URLs retain that scope's masking.
+module App.Main exposing (main)
+
+import Http.ClientError exposing (HttpClientError)
+import Http.ServerError exposing (HttpServerError)
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+
+type Wrapped = Wrapped Http.Url.Url
+  deriving Show
+
+render : Http.Url.Url -> String
+let render url = show url
+
+render_any : Show a => a -> String
+let render_any value = show value
+
+render_later : Http.Url.Url -> Unit -> String
+let render_later url = fun () -> render url
+
+check : String -> Bool ->{} Unit
+let check label passed = Platform.stdout_line (label ++ ": " ++ show passed)
+
+client_url : Http.ClientError.ClientErrorReason -> String
+let client_url reason =
+  match reason with
+  | Http.ClientError.InvalidUrlError details -> details.url
+  | Http.ClientError.StatusCodeError details -> details.url
+  | Http.ClientError.DecodeError details -> details.url
+  | _ -> "unexpected client error"
+
+server_url : Http.ServerError.ServerErrorReason -> String
+let server_url reason =
+  match reason with
+  | Http.ServerError.RequestParseError details -> details.url
+  | Http.ServerError.RouteNotFound details -> details.url
+  | _ -> "unexpected server error"
+
+errors : Unit ->{} Unit
+let errors () =
+  let raw = "http://example.com/?private_key=secret&sig=signed"
+  let expected = "http://example.com/?private_key=REDACTED&sig=signed"
+  let invalid = Http.UrlParams.with_redacted_names ["private_key"] (task {
+    try
+      let _ = provide Http.FetchClient.layer {
+        Http.Client.get "http://[?private_key=secret&sig=signed"
+      }
+      None
+    with
+    | Http.ClientError.HttpClientError reason -> Some reason
+  })
+  check "invalid error outside scope"
+    (Option.map client_url invalid == Some "http://[?private_key=REDACTED&sig=signed")
+  let request = Http.ClientRequest.get raw
+  let response = Http.ServerResponse.to_client_response
+    request
+    (Http.ServerResponse.text "not json" { Http.ServerResponse.defaults with status = Some 400 })
+  let status = Http.UrlParams.with_redacted_names ["private_key"] (task {
+    try
+      let _ = Http.ClientResponse.filter_status_ok response
+      None
+    with
+    | Http.ClientError.HttpClientError reason -> Some reason
+  })
+  check "status error outside scope" (Option.map client_url status == Some expected)
+  let decoded = Http.UrlParams.with_redacted_names ["private_key"] (task {
+    try
+      let _ = Http.ClientResponse.json response
+      None
+    with
+    | Http.ClientError.HttpClientError reason -> Some reason
+  })
+  check "decode error outside scope" (Option.map client_url decoded == Some expected)
+  let server_request = Http.ServerRequest.from_client_request
+    (Http.ClientRequest.body_text "not json" (Some "application/json") (Http.ClientRequest.post raw))
+  let parsed = Http.UrlParams.with_redacted_names ["private_key"] (task {
+    try
+      let _ = Http.ServerRequest.json server_request
+      None
+    with
+    | Http.ServerError.HttpServerError reason -> Some reason
+  })
+  let expected_path = "/?private_key=REDACTED&sig=signed"
+  check "server parse outside scope" (Option.map server_url parsed == Some expected_path)
+  app : ServerRequest ->{; HttpServerError} ServerResponse
+  let app = Http.Router.router Http.Router.config []
+  let missing = Http.UrlParams.with_redacted_names ["private_key"] (task {
+    try
+      let _ = app server_request
+      None
+    with
+    | Http.ServerError.HttpServerError reason -> Some reason
+  })
+  check "route error outside scope" (Option.map server_url missing == Some expected_path)
+  check "request untouched" (Http.ClientRequest.url request == raw)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let raw = "https://user:password@example.com/?private_key=secret&other_key=visible&sig=signed"
+  let defaults = "https://REDACTED:REDACTED@example.com/?private_key=secret&other_key=visible&sig=REDACTED"
+  let private = "https://REDACTED:REDACTED@example.com/?private_key=REDACTED&other_key=visible&sig=signed"
+  let other = "https://REDACTED:REDACTED@example.com/?private_key=secret&other_key=REDACTED&sig=signed"
+  let unmasked_query = "https://REDACTED:REDACTED@example.com/?private_key=secret&other_key=visible&sig=signed"
+  match Http.Url.from_string raw with
+  | Err _ -> check "valid URL" false
+  | Ok url ->
+    later : Unit -> String
+    let later = render_later url
+    let renderers = [render, render_any, fun value -> show value]
+    let mapped = Seq.map render (Seq.of_list [url])
+    let generated = for { value <- [url] } yield render value
+    let combining = Combiner.make (fun _ _ -> render url)
+    let reducing = Reducer.make (fun _ _ -> render url) ""
+    let flipped = Combiner.flip combining
+    let intercalated = Combiner.intercalate "-" combining
+    let optional = Combiner.option_fail_fast combining
+    let tuple = Combiner.tuple2 (combining, Combiner.last ())
+    let fields = Combiner.struct { secret = combining }
+    let flipped_reducer = Reducer.flip reducing
+    let optional_reducer = Reducer.option combining
+    let strict_reducer = Reducer.option_fail_fast reducing
+    let tuple_reducer = Reducer.tuple2 (reducing, Reducer.string_concat)
+    let fields_reducer = Reducer.struct { secret = reducing }
+    let records = Reducer.record_union combining
+    let common = Reducer.record_intersection combining
+    contextual_order : Order.Order String
+    let contextual_order = Order.make (fun _ _ ->
+      if String.contains "private_key=REDACTED" (render url) then LT else GT
+    )
+    retained_order : Order.Order String
+    let retained_order = Order.flip (Order.flip contextual_order)
+    let minimum = Combiner.min retained_order
+    let maximum = Combiner.max retained_order
+    normalize : String -> String
+    let normalize value =
+      if String.contains "private_key=REDACTED" (render url) then String.to_lower value else value
+    witness_eq : String -> String -> Bool
+    let witness_eq a b = normalize a == normalize b
+    witness_hash : String -> Int
+    let witness_hash value = hash (normalize value)
+    witness_probe : Unit -> Int
+    let witness_probe () =
+      EqHash.with witness_eq witness_hash (fun witness ->
+        HashSet.size (HashSet.from_list witness ["a", "A"])
+      )
+    native_renderers : String -> String -> String -> Bool
+    let native_renderers expected first second =
+      Combiner.combine combining "" "" == expected
+        && Combiner.combine flipped "" "" == expected
+        && Combiner.combine intercalated "" "" == expected
+        && Combiner.combine optional (Some "") (Some "") == Some expected
+        && Combiner.combine tuple ("", "a") ("", "b") == (expected, "b")
+        && (Combiner.combine fields { secret = "" } { secret = "" }).secret == expected
+        && Reducer.combine_all reducing ["", ""] == expected
+        && Reducer.combine_all flipped_reducer [""] == expected
+        && Reducer.combine_all optional_reducer [Some "", Some ""] == Some expected
+        && Reducer.combine_all strict_reducer [Some ""] == Some expected
+        && Reducer.combine_all tuple_reducer [("", "")] == (expected, "")
+        && (Reducer.combine_all fields_reducer [{ secret = "" }]).secret == expected
+        && Record.to_entries
+          (Reducer.combine_all records [Record.from_entries [("key", "")], Record.from_entries [("key", "")]])
+          == [("key", expected)]
+        && Record.to_entries
+          (Reducer.combine common (Record.from_entries [("key", "")]) (Record.from_entries [("key", "")]))
+          == [("key", expected)]
+        && Combiner.combine minimum "first" "second" == first
+        && Combiner.combine maximum "first" "second" == second
+        && witness_probe () == (if expected == private then 1 else 2)
+    check "defaults" (show url == defaults)
+    Http.UrlParams.with_redacted_names ["PRIVATE_KEY"] (task {
+      check "direct" (show url == private)
+      check "pure helper" (render url == private)
+      check "closure" (later () == private)
+      check "polymorphic helper" (render_any url == private)
+      check "function container" (List.map (fun renderer -> renderer url) renderers == [private, private, private])
+      check "list callback" (List.map render [url] == [private])
+      check "tuple Show" (show (url, url) == "(" ++ private ++ ", " ++ private ++ ")")
+      check "record Show" (show { link = url } == "{ link = " ++ private ++ " }")
+      check "derived Show" (show (Wrapped url) == "Wrapped " ++ private)
+      check "lazy map" (Seq.to_list mapped == [private])
+      check "lazy generator" (Seq.to_list generated == [private])
+      check "native renderers" (native_renderers private "first" "second")
+      Http.UrlParams.with_redacted_names ["other_key"] (task {
+        check "nested replacement" (later () == other)
+        check "native nested replacement" (native_renderers other "second" "first")
+      })
+      check "outer restored" (later () == private)
+      Http.UrlParams.with_redacted_names [] (task {
+        check "empty names" (later () == unmasked_query)
+      })
+    })
+    check "defaults restored" (later () == defaults)
+    check "native defaults restored" (native_renderers defaults "second" "first")
+    reused : Unit -> String
+    let reused = Http.UrlParams.with_redacted_names ["private_key"] (task { render_later url })
+    check "closure after creating scope" (reused () == defaults)
+    Http.UrlParams.with_redacted_names ["other_key"] (task {
+      check "closure in another scope" (reused () == other)
+    })
+    let left_ready : Deferred.Deferred none Unit = Deferred.make ()
+    let right_ready : Deferred.Deferred none Unit = Deferred.make ()
+    let (left, right) = parallel
+      (task {
+        Http.UrlParams.with_redacted_names ["private_key"] (task {
+          let _ = Deferred.succeed () left_ready
+          Deferred.await_ right_ready
+          (later (), show (Wrapped url), Seq.to_list mapped, native_renderers private "first" "second")
+        })
+      })
+      (task {
+        Http.UrlParams.with_redacted_names ["other_key"] (task {
+          let _ = Deferred.succeed () right_ready
+          Deferred.await_ left_ready
+          (later (), show (Wrapped url), Seq.to_list mapped, native_renderers other "second" "first")
+        })
+      })
+    check "concurrent fibers"
+      (left == (private, "Wrapped " ++ private, [private], true)
+        && right == (other, "Wrapped " ++ other, [other], true))
+    check "URL untouched" (Http.Url.href url == raw)
+  errors ()

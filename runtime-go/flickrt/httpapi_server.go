@@ -63,11 +63,11 @@ func apiBadRequest(err Value) Value {
 }
 
 // apiDecode decodes a part, failing with the SchemaError; Unit without a codec.
-func apiDecode(c codec, in Value) Value {
+func apiDecode(fb *Fiber, c codec, in Value) Value {
 	if c == nil {
 		return Unit
 	}
-	v, issues := c.decode(in)
+	v, issues := c.decode(fb, in)
 	if issues != nil {
 		return Fail(schemaErrorOf(issues))
 	}
@@ -184,17 +184,17 @@ func apiRequest(fb *Fiber, e *apiEndpoint, r Value) Value {
 		k, v := pairOf(p)
 		query.put(k, v)
 	}
-	path := apiDecode(e.params, params)
-	decodedQuery := apiDecode(e.query, query)
+	path := apiDecode(fb, e.params, params)
+	decodedQuery := apiDecode(fb, e.query, query)
 	headers := Unit
 	if e.headers != nil {
-		headers = apiDecode(&ignoring{e.headers}, q.headerRecord())
+		headers = apiDecode(fb, &ignoring{e.headers}, q.headerRecord())
 	}
 	switch {
 	case e.payloadEncoding == encMultipart:
-		payload = apiDecode(e.payload, q.persisted(fb))
+		payload = apiDecode(fb, e.payload, q.persisted(fb))
 	case e.hasPayload() && e.payloadEncoding != encBytes && e.payloadEncoding != encParts:
-		payload = apiDecode(e.payload, apiBody(fb, q, e.payloadEncoding))
+		payload = apiDecode(fb, e.payload, apiBody(fb, q, e.payloadEncoding))
 	}
 	return Rec("path", path, "query", decodedQuery, "headers", headers, "payload", payload)
 }
@@ -221,9 +221,9 @@ func serveEndpoint(fb *Fiber, e *apiEndpoint, handler Value, services *env, r Va
 		inner.env = services
 		value, c := catch(func() Value {
 			for _, hook := range e.middleware {
-				runMaybe(&inner, Apply(hook, request))
+				runMaybe(&inner, Apply(&inner, hook, request))
 			}
-			return runMaybe(&inner, Apply(handler, request))
+			return runMaybe(&inner, Apply(&inner, handler, request))
 		})
 		if c != nil {
 			if err, ok := typedFailure(c); ok {
@@ -237,7 +237,7 @@ func serveEndpoint(fb *Fiber, e *apiEndpoint, handler Value, services *env, r Va
 
 // codecHas is whether the value is one of the codec's type: a variant of
 // its type, or a value it encodes.
-func codecHas(c codec, v Value) (has bool) {
+func codecHas(fb *Fiber, c codec, v Value) (has bool) {
 	if w, ok := c.(*wire); ok {
 		if s := w.s.resolved(); s.kind == kindAdt {
 			d, ok := v.(*Data)
@@ -258,7 +258,7 @@ func codecHas(c codec, v Value) (has bool) {
 			has = false
 		}
 	}()
-	_, issues := c.encode(v)
+	_, issues := c.encode(fb, v)
 	return issues == nil
 }
 
@@ -269,7 +269,7 @@ func codecHas(c codec, v Value) (has bool) {
 func apiFailed(fb *Fiber, e *apiEndpoint, err Value) Value {
 	var found *apiErrorCase
 	for i := range e.errors {
-		if codecHas(e.errors[i].codec, err) {
+		if codecHas(fb, e.errors[i].codec, err) {
 			found = &e.errors[i]
 			break
 		}
@@ -289,7 +289,7 @@ func apiFailed(fb *Fiber, e *apiEndpoint, err Value) Value {
 		logMessage(fb, "Error", e.name+": an undeclared error")
 		return apiInternal()
 	}
-	encoded, issues := found.codec.encode(err)
+	encoded, issues := found.codec.encode(fb, err)
 	if issues != nil {
 		return apiInternal()
 	}
@@ -300,14 +300,14 @@ func apiFailed(fb *Fiber, e *apiEndpoint, err Value) Value {
 	return apiJSON(status, encoded)
 }
 
-func apiSuccessBody(e *apiEndpoint, value Value) Value {
+func apiSuccessBody(fb *Fiber, e *apiEndpoint, value Value) Value {
 	if other := apiOtherSuccess(e, value); other != nil {
 		return other
 	}
 	if e.success == nil {
 		return apiEmpty(e.status)
 	}
-	encoded, issues := e.success.encode(value)
+	encoded, issues := e.success.encode(fb, value)
 	if issues != nil {
 		return Fail(schemaErrorOf(issues))
 	}
@@ -321,8 +321,8 @@ func apiSuccessBody(e *apiEndpoint, value Value) Value {
 // written is 500.
 func apiSucceeded(fb *Fiber, e *apiEndpoint, value Value) Value {
 	out, c := catch(func() Value {
-		inner, extras := apiUnwrapExtras(e.extras, value)
-		return extras(apiSuccessBody(e, inner))
+		inner, extras := apiUnwrapExtras(fb, e.extras, value)
+		return extras(apiSuccessBody(fb, e, inner))
 	})
 	if c != nil {
 		if _, ok := typedFailure(c); ok {
@@ -353,7 +353,7 @@ func apiRoutes(fb *Fiber, a *apiDefinition, handlers Value) []Value {
 				method = ""
 			}
 			endpoint := e
-			serve := Fn(func(r Value) Value {
+			serve := Fn(func(_ *Fiber, r Value) Value {
 				return Eff(func(fb *Fiber) Value { return serveEndpoint(fb, endpoint, handler, services, r) })
 			})
 			routes = append(routes, newRoute(method, routePath(e.path), "", false, serve))
@@ -371,7 +371,7 @@ func routePath(path string) string {
 }
 
 func constantRoute(path string, response Value) Value {
-	return newRoute("GET", routePath(path), "", false, Fn(func(Value) Value { return Succeed(response) }))
+	return newRoute("GET", routePath(path), "", false, Fn(func(*Fiber, Value) Value { return Succeed(response) }))
 }
 
 // HttpApiListen serves the API until the innermost scope closes, with its
@@ -398,7 +398,7 @@ func HttpApiListen(fb *Fiber, options, api, handlers Value) Value {
 	if p, ok := some(o.Get("scalar")); ok {
 		routes = append(routes, constantRoute(p.(string), ResponseHtml(scalarPage(a.name, text))))
 	}
-	router := Fn(func(r Value) Value {
+	router := Fn(func(_ *Fiber, r Value) Value {
 		return Eff(func(fb *Fiber) Value { return HttpRouter(fb, apiRouterConfig, routes, r) })
 	})
 	serve := Rec("host", o.Get("host"), "port", o.Get("port"), "gracefulShutdownTimeout", None)
@@ -416,7 +416,7 @@ func HttpApiListen(fb *Fiber, options, api, handlers Value) Value {
 // endpoint; a request no endpoint takes is 404.
 func HttpApiRoute(fb *Fiber, path, api, handlers Value) Value {
 	routes := apiRoutes(fb, api.(*apiDefinition), handlers)
-	served := Fn(func(r Value) Value {
+	served := Fn(func(_ *Fiber, r Value) Value {
 		return Eff(func(fb *Fiber) Value {
 			out, c := catch(func() Value { return HttpRouter(fb, apiRouterConfig, routes, r) })
 			if c != nil {

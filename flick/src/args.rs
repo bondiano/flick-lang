@@ -124,8 +124,13 @@ pub struct GlobalArguments {
     #[arg(long, global = true, value_enum, default_value_t = Color::Auto)]
     pub color: Color,
 
-    /// Print less service output.
-    #[arg(long, global = true, conflicts_with = "verbose")]
+    /// Suppress service output; diagnostics are still reported.
+    #[arg(
+        long,
+        visible_alias = "silent",
+        global = true,
+        conflicts_with = "verbose"
+    )]
     pub quiet: bool,
 
     /// Print more service output.
