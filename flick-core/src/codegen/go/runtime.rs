@@ -323,6 +323,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/rpc_client.go"),
     ),
     (
+        "rpc_functions.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_functions.go"),
+    ),
+    (
         "rpc_http.go",
         include_str!("../../../../runtime-go/flickrt/rpc_http.go"),
     ),

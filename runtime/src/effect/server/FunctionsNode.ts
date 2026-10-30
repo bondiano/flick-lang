@@ -65,3 +65,6 @@ export const serverHandler = (functions: ReadonlyArray<ServerFunction>) => {
   return Effect.flatMap(inProcess(group, handlers), () => rpcHandler(rpcNdjson, group, handlers));
 };
 
+/** `Server.serve mounted request`: a request of the handler `Server.mount` gave. */
+export const serverServe = <A, E, R>(mounted: (request: unknown) => Effect.Effect<A, E, R>, request: unknown): Effect.Effect<A, E, R> =>
+  mounted(request);

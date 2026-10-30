@@ -28,14 +28,20 @@ var (
 	tcpAddressTag  = Tag("Http.Server.Address.TcpAddress")
 )
 
-// servedRequest is a request with the fiber its handler runs in.
+// servedRequest is a request with the fiber its handler runs in, whose
+// environment names the request (what `Server.call` reads its headers
+// from) in a node of its own, so serving it allocates no more.
 type servedRequest struct {
 	state   fiberState
 	fiber   Fiber
+	reqEnv  env
 	source  requestSource
 	marks   requestMarks
 	request ServerRequest
 }
+
+// servedRequestKey is the request a fiber serves, in its environment.
+const servedRequestKey = "effect/http/HttpServerRequest"
 
 func (q *servedRequest) interrupt() { q.state.interrupt(0) }
 
@@ -62,6 +68,8 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 		q.request = ServerRequest{src: &q.source, method: r.Method, url: r.RequestURI, originalURL: r.RequestURI}
 		q.state.id, q.state.signal = fibers.Add(1), make(chan struct{})
 		q.fiber.state = &q.state
+		q.reqEnv = env{servedRequestKey, &q.request, serving.env}
+		q.fiber.env = &q.reqEnv
 		stop := context.AfterFunc(r.Context(), q.interrupt)
 		out, cause := catch(func() Value { return Run(&q.fiber, Apply(handler, &q.request)) })
 		if cause != nil {

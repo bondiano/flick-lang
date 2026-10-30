@@ -41,3 +41,13 @@ rpcListenTcp *RpcListenTcp
 rpcPort RpcPort
 rpcHandler *RpcHandler
 rpcHandlerWebsocket *RpcHandlerWebsocket
+
+[@flick-lang/runtime/effect/server/Functions]
+serverAuthenticated ServerAuthenticated
+serverProcedure ServerProcedure
+serverCall *ServerCall
+serverFunction ServerFunction
+
+[@flick-lang/runtime/effect/server/FunctionsNode]
+serverHandler *ServerHandler
+serverServe *ServerServe
