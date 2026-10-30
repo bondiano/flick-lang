@@ -219,6 +219,26 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/http_urlparams.go"),
     ),
     (
+        "httpapi_bodies.go",
+        include_str!("../../../../runtime-go/flickrt/httpapi_bodies.go"),
+    ),
+    (
+        "httpapi_client.go",
+        include_str!("../../../../runtime-go/flickrt/httpapi_client.go"),
+    ),
+    (
+        "httpapi_model.go",
+        include_str!("../../../../runtime-go/flickrt/httpapi_model.go"),
+    ),
+    (
+        "httpapi_openapi.go",
+        include_str!("../../../../runtime-go/flickrt/httpapi_openapi.go"),
+    ),
+    (
+        "httpapi_server.go",
+        include_str!("../../../../runtime-go/flickrt/httpapi_server.go"),
+    ),
+    (
         "json.go",
         include_str!("../../../../runtime-go/flickrt/json.go"),
     ),

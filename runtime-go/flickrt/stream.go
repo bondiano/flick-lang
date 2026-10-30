@@ -43,6 +43,20 @@ func chunkStream(chunk []Value) *Stream {
 
 func StreamFromList(xs Value) Value { return chunkStream(List(xs)) }
 
+// StreamFromListEffect is the list the task gives as one chunk, the task
+// run when the stream is pulled.
+func StreamFromListEffect(task Value) Value {
+	return &Stream{open: func(fb *Fiber) pull {
+		var next pull
+		return func(fb *Fiber) ([]Value, bool) {
+			if next == nil {
+				next = chunkStream(List(Run(fb, task))).open(fb)
+			}
+			return next(fb)
+		}
+	}}
+}
+
 // streamChunkSize is Effect's chunk size of a stream of an iterable.
 const streamChunkSize = 4096
 

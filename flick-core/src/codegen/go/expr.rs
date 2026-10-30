@@ -181,7 +181,7 @@ impl Gen<'_> {
                 stages,
             } => operation(service, name, stages),
             ExprKind::ServiceTag(key) => names::string(key),
-            ExprKind::Label(_) => self.unsupported(e.span, "a record label"),
+            ExprKind::Label(label) => names::string(label),
             // outside effectful code nothing can fail with a typed error
             ExprKind::Try(body, _) if self.fiber.is_none() => self.expr(body),
             ExprKind::Try(body, arms) => self.try_expr(body, arms),
