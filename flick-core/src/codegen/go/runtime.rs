@@ -19,6 +19,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/cause.go"),
     ),
     (
+        "cause_more.go",
+        include_str!("../../../../runtime-go/flickrt/cause_more.go"),
+    ),
+    (
         "clock.go",
         include_str!("../../../../runtime-go/flickrt/clock.go"),
     ),
@@ -97,6 +101,14 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "eff.go",
         include_str!("../../../../runtime-go/flickrt/eff.go"),
+    ),
+    (
+        "effect_core.go",
+        include_str!("../../../../runtime-go/flickrt/effect_core.go"),
+    ),
+    (
+        "effect_errors.go",
+        include_str!("../../../../runtime-go/flickrt/effect_errors.go"),
     ),
     (
         "events.go",
@@ -333,6 +345,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "regexp.go",
         include_str!("../../../../runtime-go/flickrt/regexp.go"),
+    ),
+    (
+        "resource.go",
+        include_str!("../../../../runtime-go/flickrt/resource.go"),
     ),
     (
         "schedule.go",

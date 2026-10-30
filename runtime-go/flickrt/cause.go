@@ -13,9 +13,14 @@ type Cause struct {
 	err    Value  // a typed failure's error
 	defect string // a defect's message, with the Flick lines it unwound
 	fiber  int64  // the interrupting fiber
+	plain  bool   // a defect given as text, not as an error
+	frame  *stackFrame
 	left   *Cause
 	right  *Cause
 }
+
+// emptyCause is Effect's empty cause: no reasons.
+var emptyCause = &Cause{kind: causeSequential}
 
 type causeKind int
 

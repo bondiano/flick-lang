@@ -414,10 +414,10 @@ func EffectYieldNow(fb *Fiber) Value {
 	return Unit
 }
 
-// EffectInterrupt interrupts the fiber itself.
+// EffectInterrupt fails with an interruption by the fiber itself, as
+// Effect's: the fiber is not asked to stop, so recovering goes on.
 func EffectInterrupt(fb *Fiber) Value {
-	fb.state.interrupt(fb.state.id)
-	panic(fb.state.stopped())
+	panic(&Failure{&Cause{kind: causeInterrupt, fiber: fb.state.id}})
 }
 
 func Uninterruptible(fb *Fiber, task Value) Value {

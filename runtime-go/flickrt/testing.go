@@ -282,6 +282,10 @@ func describeReasons(reasons []*Cause) string {
 		case causeFail:
 			parts[i] = "fail " + describeText(r.err)
 		case causeDie:
+			if r.plain {
+				parts[i] = "die " + describeText(r.defect)
+				continue
+			}
 			message, _, _ := strings.Cut(r.defect, "\n")
 			if name, rest, ok := strings.Cut(message, ": "); ok && strings.HasSuffix(name, "Error") {
 				message = rest
