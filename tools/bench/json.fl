@@ -1,0 +1,43 @@
+// JSON both ways: 5 000 records of a derived schema encoded and written,
+// then parsed and decoded, five rounds.
+module App.Main exposing (main)
+
+type alias Item = {
+  id : Int;
+  name : String;
+  tags : List String;
+  price : Float;
+  active : Bool;
+  note : Option String;
+} deriving Schema
+
+items : Int -> List Item
+let items round =
+  List.map
+    (fun i -> {
+      id = i;
+      name = "item " ++ show i;
+      tags = ["t" ++ show (i % 7), "r" ++ show round];
+      price = Int.to_float i * 1.25;
+      active = i % 3 == 0;
+      note = if i % 5 == 0 then Some "five" else None;
+    })
+    (List.range 0 5000)
+
+/// The length of the written JSON and the records read back.
+round_trip : Int -> (Int, Int)
+let round_trip round =
+  let wire = Codec.json (Schema.list (schema Item))
+  match Codec.encode_result wire (items round) with
+  | Err _ -> (0, 0)
+  | Ok json ->
+    let text = Json.stringify json
+    match Json.parse text with
+    | Err _ -> (String.length text, 0)
+    | Ok input ->
+      match Codec.decode_result wire input with
+      | Ok back -> (String.length text, List.length back)
+      | Err _ -> (String.length text, 0)
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (show (List.map round_trip [1, 2, 3, 4, 5]))

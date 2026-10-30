@@ -105,6 +105,11 @@ load-json target="go" soak="30" port="3920" workers="8" server_cpus="0-7" client
       if [ "{{target}}" = go ]; then du -b tools/load/json/dist/go/flick-server; else du -sb tools/load/json/dist/js; fi; \
       exit $status
 
+# Time the programs of tools/bench, built in release, on Node and as Go executables: the median of `runs`
+bench runs="5":
+    cargo build -p flick
+    node tools/bench/index.mjs target/debug/flick {{runs}}
+
 # Run SQL queries against PostgreSQL in Docker (after `just e2e` installs the runtime)
 e2e-postgres:
     cargo test -p flick --test sql_postgres -- --ignored

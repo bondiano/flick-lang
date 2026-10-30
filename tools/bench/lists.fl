@@ -1,0 +1,26 @@
+// List operations on 200 000 pseudo-random Ints: map, filter, fold, sort,
+// reverse and zip, three rounds.
+module App.Main exposing (main)
+
+size : Int
+let size = 200000
+
+/// A linear congruential sequence; the multiplication wraps in 32 bits.
+numbers : Int -> List Int
+let numbers seed = List.map (fun i -> (i * 1103515245 + seed) % 1000003) (List.range 0 size)
+
+/// One round's checksum.
+round : Int -> Int
+let round seed =
+  let xs = numbers seed
+  let sorted = List.sort xs
+  let evens = List.filter (fun x -> x % 2 == 0) sorted
+  let total = List.fold_left (fun acc x -> acc + x) 0 evens
+  let gaps = List.map (fun (a, b) -> a - b) (List.zip xs (List.reverse xs))
+  total + List.fold_left (fun acc x -> acc + x) 0 gaps + List.length evens
+
+rounds : Int -> Int -> Int
+let rec rounds left acc = if left == 0 then acc else rounds (left - 1) (acc + round left)
+
+main : Unit ->{; AppError} Unit
+let main () = Platform.stdout_line (show (rounds 3 0))
