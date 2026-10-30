@@ -20,6 +20,10 @@ sqrt FloatSqrt
 [global Int]
 to_float IntToFloat
 
+[global BigInt]
+to_number FloatOfBigInt
+to_string BigIntString
+
 [global Numeric]
 bigint_of BigIntOfInt
 float_of_bigint FloatOfBigInt
