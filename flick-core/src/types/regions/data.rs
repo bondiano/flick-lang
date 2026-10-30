@@ -12,7 +12,7 @@ use crate::types::unify::Unified;
 impl Checker<'_> {
     pub fn bound_head(&self, t: &Type) -> Type {
         match self.qualified_head(t) {
-            Type::Bounded { ty, .. } | Type::Captured { ty, .. } if self.scalar(&ty) => {
+            Type::Bounded { ty, .. } | Type::Captured { ty, .. } if self.holds_nothing(&ty) => {
                 self.qualified_head(&ty)
             }
             Type::Captured {
@@ -217,7 +217,9 @@ impl Checker<'_> {
         let e = self.bound_head(expected);
         if matches!(e, Type::Bounded { .. }) {
             let mut base = e;
+            let mut allowed = Norm::default();
             while let Type::Bounded { ty, captures } = base {
+                self.capture_row(&captures, &mut allowed);
                 self.hold(Hold {
                     held: vec![(None, actual.clone())],
                     visible: Visible::Now(Vec::new()),
@@ -229,8 +231,33 @@ impl Checker<'_> {
                 });
                 base = self.bound_head(&ty);
             }
-            let identity = self.capture_identity(&a);
+            // a value qualifier the bound already allows says nothing more:
+            // the variable takes the data without it; a closure's stored
+            // qualifier stays part of its type
+            let identity = match self.qualified_head(actual) {
+                Type::Captured {
+                    ty,
+                    captures,
+                    value: true,
+                } if !matches!(self.whnf(&ty), Type::Fun { .. })
+                    && self.within(&captures, &allowed) =>
+                {
+                    self.capture_identity(&ty)
+                }
+                _ => self.capture_identity(&a),
+            };
             return Some(self.unify(&identity, &base));
+        }
+        // a position not known yet takes a value bounded by a region with its
+        // bound: what it turns out to be may store the region's resource
+        if let Type::Bounded { ty, captures } = &a
+            && let Type::Meta(m) = e
+            && !self.store.is_capture_row(m)
+            && !self.store.is_numeric(m)
+            && self.bounds_a_region(captures)
+            && (self.hidden_fields(ty, &mut Vec::new()) || !self.captures_of(ty).entries.is_empty())
+        {
+            return Some(self.unify(expected, actual));
         }
         if let Type::Bounded { ty, captures } = &a
             && !matches!(e, Type::Captured { .. })
@@ -251,6 +278,42 @@ impl Checker<'_> {
             return Some(self.subsume(&callable, expected, span));
         }
         None
+    }
+
+    /// Whether a value of `t` can hold nothing, so a qualifier on it says
+    /// nothing: a scalar, or data without hidden storage whose type shows
+    /// no captures.
+    pub(super) fn holds_nothing(&self, t: &Type) -> bool {
+        if self.scalar(t) {
+            return true;
+        }
+        if matches!(self.whnf(t), Type::Var(_) | Type::Meta(_) | Type::Skolem(_)) {
+            return false;
+        }
+        let captures = self.captures_of(t);
+        captures.entries.is_empty()
+            && captures.tails.is_empty()
+            && !self.hidden_fields(t, &mut Vec::new())
+    }
+
+    /// Whether every capture of the row `captures` is one `allowed` names.
+    fn within(&self, captures: &Type, allowed: &Norm) -> bool {
+        let mut held = Norm::default();
+        self.capture_row(captures, &mut held);
+        held.tails.is_empty()
+            && held
+                .entries
+                .iter()
+                .all(|(label, _)| allowed.get(label).is_some())
+    }
+
+    /// Whether a bound names a region, not only variables of generic code.
+    fn bounds_a_region(&self, captures: &Type) -> bool {
+        let mut norm = Norm::default();
+        self.capture_row(captures, &mut norm);
+        norm.entries
+            .iter()
+            .any(|(_, atom)| matches!(self.atom_kind(atom, &[]), Some(Kind::Region)))
     }
 
     /// Pure parametric code can return only captures from its function and

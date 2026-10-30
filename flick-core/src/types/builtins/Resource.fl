@@ -1,6 +1,6 @@
 /// Resources owned by a `scope`, and Effect's `Resource`: a value acquired
 /// again on `refresh`, released when its `scope` closes.
-module Resource exposing (acquire_release, bracket, Resource, manual, get, refresh)
+module Resource exposing (acquire_release, bracket, Resource, manual, use, refresh)
 
 /// A value of `a` of region `s` that its acquisition, failing with `e`,
 /// may give anew.
@@ -8,8 +8,10 @@ type Resource (s : Region) (e : ErrorRow) a
 
 /// Runs `acquire` and registers `release` with the owner of region `s`,
 /// which runs it when that scope closes; `release` has no typed errors.
+/// The value holds region `s`, so it cannot leave that scope.
 acquire_release :
-  forall c s r e a. (Eff r e a)^c -> ((a ->{r;} Unit)^c ->{Scope s | r; e} a)^c
+  forall c s r e a. Fiber.Outlives c s => (Eff r e a)^c ->
+    ((a ->{r;} Unit)^c ->{Scope s | r; e} a^{s})^c
 foreign effect acquire_release from "@flick-lang/runtime" "acquireRelease"
   retention owner
   reviewed "effect@4.0.5 sha256:8c69fda7dc943ca4"
@@ -24,21 +26,22 @@ foreign effect bracket from "@flick-lang/runtime" "bracket"
   reviewed "effect@4.0.5 sha256:447feb1119a6d518"
 
 /// A resource owned by the innermost `scope` (or the one of region `s`),
-/// acquired now by `acquire`, which runs with the services of this call;
-/// `refresh` acquires it again.
-manual : forall s r e a. Eff r e a ->{Scope s | r;} Resource s e a
-foreign effect manual from "@flick-lang/runtime/effect/Resource" "manual"
-  reviewed "effect@4.0.5 sha256:dc5efdabe12bb39c"
+/// acquired now by `acquire`, which runs with the services of this call and
+/// acquires into a region `t` of its own; `refresh` acquires it again.
+manual :
+  forall c s r e a. Fiber.Outlives c s => (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r;}
+    Resource s e a
+foreign effect manual from "@flick-lang/runtime/effect/Resource" "flickManual"
+  retention owner
 
-/// The current value, or the failure of the last acquisition.
-get : forall s e a. Resource s e a ->{; e} a
-foreign effect get from "@flick-lang/runtime/effect/Resource" "get"
+/// Runs `f` with the current value, which stays acquired until `f` ends;
+/// fails as the acquisition did if it never succeeded.
+use : forall c s r e e2 a b. Resource s e a -> (forall t. a^{t} ->{r; e2} b)^c ->{r; e + e2} b
+foreign effect use from "@flick-lang/runtime/effect/Resource" "flickUse"
   retention call
-  reviewed "effect@4.0.5 sha256:b24249fe7c7dc046"
 
-/// Acquires the value again, releasing the previous one; if it fails, the
-/// previous value stays.
+/// Acquires the value again; the previous one is released once no `use`
+/// holds it. If the acquisition fails, the previous value stays.
 refresh : forall s e a. Resource s e a ->{; e} Unit
-foreign effect refresh from "@flick-lang/runtime/effect/Resource" "refresh"
+foreign effect refresh from "@flick-lang/runtime/effect/Resource" "flickRefresh"
   retention call
-  reviewed "effect@4.0.5 sha256:36d31345cd1fd458"

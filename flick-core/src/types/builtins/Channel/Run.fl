@@ -102,22 +102,22 @@ foreign effect run_into_queue_array from "@flick-lang/runtime/effect/Channel" "r
 /// Runs the channel in the background of the innermost `scope` (or the
 /// one of region `s`) into a queue with the options; the queue ends, or
 /// fails, as the channel does, and is shut down when the scope closes.
-to_queue : forall c s r e i o d. Buffer ->
+to_queue : forall c s r e i o d. Fiber.Outlives c s => Buffer ->
   (Channel r e i o d none Unit)^c ->{Scope s | r;}
   Queue.Queue e o
 foreign effect to_queue from "@flick-lang/runtime/effect/Channel" "flickToQueue"
   arity 1
-  retention call
+  retention owner
   reviewed "effect@4.0.5 sha256:35bf155638ac3ccd"
 
 /// `to_queue` of the elements of each chunk.
 to_queue_array :
-  forall c s r e i o d. Buffer ->
+  forall c s r e i o d. Fiber.Outlives c s => Buffer ->
     (Channel r e i (NonEmpty.NonEmpty o) d none Unit)^c ->{Scope s | r;}
     Queue.Queue e o
 foreign effect to_queue_array from "@flick-lang/runtime/effect/Channel" "flickToQueueArray"
   arity 1
-  retention call
+  retention owner
   reviewed "effect@4.0.5 sha256:8d3912690d60c04a"
 
 /// A hub's options for `to_pubsub`: its `capacity` (`None`: unbounded)
@@ -133,22 +133,22 @@ type alias HubOptions =
 
 /// Runs the channel in the background of the innermost `scope` (or the
 /// one of region `s`), publishing its elements to a new hub.
-to_pubsub : forall c s r e i o d. HubOptions ->
+to_pubsub : forall c s r e i o d. Fiber.Outlives c s => HubOptions ->
   (Channel r e i o d none Unit)^c ->{Scope s | r;}
   PubSub.PubSub o
 foreign effect to_pubsub from "@flick-lang/runtime/effect/Channel" "flickToPubSub"
   arity 1
-  retention call
+  retention owner
   reviewed "effect@4.0.5 sha256:f98bc48088216d95"
 
 /// `to_pubsub` of the elements of each chunk.
 to_pubsub_array :
-  forall c s r e i o d. HubOptions ->
+  forall c s r e i o d. Fiber.Outlives c s => HubOptions ->
     (Channel r e i (NonEmpty.NonEmpty o) d none Unit)^c ->{Scope s | r;}
     PubSub.PubSub o
 foreign effect to_pubsub_array from "@flick-lang/runtime/effect/Channel" "flickToPubSubArray"
   arity 1
-  retention call
+  retention owner
   reviewed "effect@4.0.5 sha256:498f7380ef865025"
 
 /// Publishes every element to the hub, shutting it down at the end when

@@ -149,14 +149,14 @@ impl Checker<'_> {
         let t = self.qualified_head(t);
         match &t {
             Type::Bounded { ty, captures } => {
-                if self.scalar(ty) {
+                if self.holds_nothing(ty) {
                     return;
                 }
                 self.capture_row_filtered(captures, out, false);
                 self.collect_bounded_captures(ty, out, true);
             }
             Type::Captured { ty, captures, .. } => {
-                if self.scalar(ty) {
+                if self.holds_nothing(ty) {
                     return;
                 }
                 self.capture_row_filtered(captures, out, bounded);
@@ -177,7 +177,9 @@ impl Checker<'_> {
             }
             Type::App { .. } => {
                 let (head, args) = t.spine();
-                let opaque = ["Eff", "Layer", "ServiceTag", "ServiceImpl", "Errors"];
+                // an `Eff` holds what its result holds, as a function does: a
+                // capture shown only in the result is lost when the result is dropped
+                let opaque = ["Layer", "ServiceTag", "ServiceImpl", "Errors"];
                 if opaque.iter().any(|n| head.is_prim(n)) {
                     return;
                 }
@@ -197,8 +199,9 @@ impl Checker<'_> {
                         }
                         _ => None,
                     };
-                    // an error cannot carry a region, so its row holds none
-                    if matches!(param, Some(Kind::ErrorRow)) {
+                    // an error cannot carry a region, so its row holds none; a
+                    // service row is needed again wherever the value runs
+                    if matches!(param, Some(Kind::ErrorRow | Kind::ServiceRow)) {
                         continue;
                     }
                     match self.store.resolve(arg) {
@@ -378,19 +381,14 @@ impl Checker<'_> {
         kind.map(|k| self.kinds.resolve(&k))
     }
 
-    /// The regions and variables a type mentions anywhere.
-    pub fn visible_in(&self, t: &Type) -> Vec<String> {
-        let mut out = Vec::new();
-        self.zonk(t).visit(&mut |t| {
-            if let Some(label) = matches!(t, Type::Var(_) | Type::Skolem(_))
-                .then(|| capture_label(t))
-                .flatten()
-                && !out.contains(&label)
-            {
-                out.push(label);
-            }
-        });
-        out
+    /// What a type shows its values may hold: exactly what they may reach, so
+    /// a region a type mentions where no value keeps it hides no capture.
+    pub fn shown_by(&self, t: &Type) -> Vec<String> {
+        self.captures_of(t)
+            .entries
+            .into_iter()
+            .map(|(label, _)| label)
+            .collect()
     }
 
     pub fn hold(&mut self, hold: Hold) {

@@ -5,7 +5,7 @@ import { Cause, type Context, Effect, Exit, type Fiber, Result } from "effect";
 
 import { Failure, describeCause } from "../cause.ts";
 import { applyRuntime } from "../effects.ts";
-import { CurrentOwner, type Owner, reportDefect, withOwner } from "../owner.ts";
+import { CurrentOwner, type Owner, reportDefect, within, withOwner } from "../owner.ts";
 
 /** The rejection of a Promise callback or façade: a safe, inert report. */
 export class RuntimeFailure extends Error {
@@ -83,7 +83,7 @@ export const eventsListen = <A, R, R2>(
   Effect.gen(function* () {
     const context = yield* Effect.context<R | R2>();
     const supervise = (cause: Cause.Cause<unknown>): void => {
-      const run = Effect.exit(Effect.suspend(() => supervisor(new Failure(cause))));
+      const run = Effect.exit(Effect.suspend(() => within(owner, supervisor(new Failure(cause)))));
       const fiber = runChild(owner, context, run);
       fiber.addObserver((exit) => {
         if (Exit.isSuccess(exit) && Exit.isFailure(exit.value)) reportDefect(exit.value.cause);
@@ -100,7 +100,7 @@ export const eventsListen = <A, R, R2>(
           state.wake = undefined;
           continue;
         }
-        const exit = yield* Effect.exit(Effect.suspend(() => handler(next.event)));
+        const exit = yield* Effect.exit(Effect.suspend(() => within(owner, handler(next.event))));
         if (Exit.isFailure(exit) && !Cause.hasInterruptsOnly(exit.cause)) supervise(exit.cause);
       }
     });

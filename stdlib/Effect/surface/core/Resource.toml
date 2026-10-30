@@ -1,9 +1,9 @@
-[wrapped]
-Resource = "Resource.Resource 7cff5c5c65954986"
-manual = "Resource.manual dc5efdabe12bb39c"
-get = "Resource.get b24249fe7c7dc046"
-refresh = "Resource.refresh 36d31345cd1fd458"
-auto = "Effect.resource_auto ba462ada9d77467b"
+[language]
+Resource = "`Resource.Resource`, Flick's own resource whose value is used only under a lease"
+manual = "`Resource.manual`, the acquisition in a region of its own: a value only under a lease, so that a replacement or a release waits for its uses"
+get = "`Resource.use`: a value only under a lease, so that a replacement or a release waits for its uses"
+refresh = "`Resource.refresh`, which releases the previous value once no `use` holds it"
+auto = "`Effect.resource_auto` over Flick's own `Resource`, refreshed by the schedule"
 
 [excluded]
 isResource = "TS-only: a type guard; Flick values are typed statically"

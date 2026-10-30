@@ -1,6 +1,8 @@
-/// Effect's `ScopedCache`: a `Cache` whose lookups acquire resources. Each
-/// entry's resources are released when it is dropped, and all of them when
-/// the `scope` owning the cache's region closes. Keys are compared by `==`.
+/// Effect's `ScopedCache`: a `Cache` whose lookups acquire resources. A value
+/// is used only inside `use`, which holds it: an entry's resources are
+/// released when it is dropped and no `use` holds its value, and all of them
+/// when the `scope` owning the cache's region closes. Keys are compared by
+/// `==`.
 module ScopedCache exposing (..)
 
 /// A cache of region `s` from keys of `k` to values of `a`, whose lookup
@@ -9,12 +11,13 @@ type ScopedCache (s : Region) k (e : ErrorRow) a
 
 /// A cache owned by the innermost `scope` (or the one of region `s`);
 /// `lookup` runs with the services of the call that made it, and what it
-/// acquires belongs to its entry. Entries live for `timeToLive` (`None`:
-/// until evicted).
+/// acquires belongs to its entry, a region `t` of its own: a value of a type
+/// that names its region, such as `File t`, cannot be cached. Entries live
+/// for `timeToLive` (`None`: until evicted).
 make :
   forall s k r e a.
   {
-    lookup : k ->{r; e} a;
+    lookup : forall t. k ->{Scope t | r; e} a^{t};
     capacity : Int;
     timeToLive : Option Duration.Duration;
   } ->{Scope s | r;}
@@ -27,7 +30,7 @@ foreign effect make from "@flick-lang/runtime/effect/ScopedCache" "flickMake"
 make_with :
   forall s k r e a.
   {
-    lookup : k ->{r; e} a;
+    lookup : forall t. k ->{Scope t | r; e} a^{t};
     capacity : Int;
     timeToLive : Option (Exit e a -> k -> Duration.Duration);
   } ->{Scope s | r;}
@@ -35,32 +38,35 @@ make_with :
 foreign effect make_with from "@flick-lang/runtime/effect/ScopedCache" "flickMakeWith"
   reviewed "effect@4.0.5 sha256:d09a00e4ddb73874"
 
-/// The value of `key`, looking it up once if it is missing or expired;
-/// a failed lookup is cached too.
-get : forall s k e a. k -> ScopedCache s k e a ->{; e} a
-foreign effect get from "@flick-lang/runtime/effect/ScopedCache" "get"
-  arity 1
+/// Runs `f` with the value of `key`, looking it up once if it is missing or
+/// expired; a failed lookup is cached too. The value stays acquired until
+/// `f` ends, and what `f` gives cannot hold it.
+use : forall c s k r e e2 a b. k ->
+  ScopedCache s k e a ->
+  (forall t. a^{t} ->{r; e2} b)^c ->{r; e + e2}
+  b
+foreign effect use from "@flick-lang/runtime/effect/ScopedCache" "flickUse"
   retention call
-  reviewed "effect@4.0.5 sha256:1d61842bd6505604"
 
-/// The value of `key` if it is cached, waiting for a lookup under way,
-/// without a new one; fails as the cached lookup did.
-get_option : forall s k e a. k -> ScopedCache s k e a ->{; e} Option a
-foreign effect get_option from "@flick-lang/runtime/effect/ScopedCache" "getOption"
-  arity 1
+/// `use` of the value of `key` if it is cached, waiting for a lookup under
+/// way, without a new one; fails as the cached lookup did.
+use_option :
+  forall c s k r e e2 a b.
+  k -> ScopedCache s k e a -> (forall t. (Option a)^{t} ->{r; e2} b)^c ->{r; e + e2} b
+foreign effect use_option from "@flick-lang/runtime/effect/ScopedCache" "flickUseOption"
   retention call
-  reviewed "effect@4.0.5 sha256:6bc6c011f7113a43"
 
-/// The value of `key` if a lookup of it has succeeded and not expired.
-get_success : forall s k e a. k -> ScopedCache s k e a ->{} Option a
-foreign effect get_success from "@flick-lang/runtime/effect/ScopedCache" "getSuccess"
-  arity 1
+/// `use` of the value of `key` if a lookup of it has succeeded and not
+/// expired.
+use_success :
+  forall c s k r e e2 a b.
+  k -> ScopedCache s k e a -> (forall t. (Option a)^{t} ->{r; e2} b)^c ->{r; e2} b
+foreign effect use_success from "@flick-lang/runtime/effect/ScopedCache" "flickUseSuccess"
   retention call
-  reviewed "effect@4.0.5 sha256:e8b0821dbef0c105"
 
 /// Caches `value` for `key`.
 set : forall s k e a. k -> a -> ScopedCache s k e a ->{} Unit
-foreign effect set from "@flick-lang/runtime/effect/ScopedCache" "set"
+foreign effect set from "@flick-lang/runtime/effect/ScopedCache" "flickSet"
   arity 2
   retention call
   reviewed "effect@4.0.5 sha256:e53b86618baa477e"
@@ -81,14 +87,15 @@ foreign effect invalidate from "@flick-lang/runtime/effect/ScopedCache" "invalid
 
 /// Drops `key` if its value satisfies `f`; whether it did.
 invalidate_when : forall c s k e a. k -> (a -> Bool)^c -> (ScopedCache s k e a ->{} Bool)^c
-foreign effect invalidate_when from "@flick-lang/runtime/effect/ScopedCache" "invalidateWhen"
+foreign effect invalidate_when from "@flick-lang/runtime/effect/ScopedCache" "flickInvalidateWhen"
   arity 2
   retention call
   reviewed "effect@4.0.5 sha256:5f0df96a161630e0"
 
-/// Looks `key` up again, cached or not, starting its time to live anew.
-refresh : forall s k e a. k -> ScopedCache s k e a ->{; e} a
-foreign effect refresh from "@flick-lang/runtime/effect/ScopedCache" "refresh"
+/// Looks `key` up again, cached or not, starting its time to live anew; the
+/// previous value is released once no `use` holds it.
+refresh : forall s k e a. k -> ScopedCache s k e a ->{; e} Unit
+foreign effect refresh from "@flick-lang/runtime/effect/ScopedCache" "flickRefresh"
   arity 1
   retention call
   reviewed "effect@4.0.5 sha256:ae56c86a6d037203"
@@ -110,15 +117,3 @@ keys : forall s k e a. ScopedCache s k e a ->{} List k
 foreign effect keys from "@flick-lang/runtime/effect/ScopedCache" "keys"
   retention call
   reviewed "effect@4.0.5 sha256:339c1fe6110bad0b"
-
-/// The values of successful lookups.
-values : forall s k e a. ScopedCache s k e a ->{} List a
-foreign effect values from "@flick-lang/runtime/effect/ScopedCache" "values"
-  retention call
-  reviewed "effect@4.0.5 sha256:07528b5443f578d4"
-
-/// The keys and values of successful lookups.
-entries : forall s k e a. ScopedCache s k e a ->{} List (k, a)
-foreign effect entries from "@flick-lang/runtime/effect/ScopedCache" "entries"
-  retention call
-  reviewed "effect@4.0.5 sha256:44677fafc521a1cc"

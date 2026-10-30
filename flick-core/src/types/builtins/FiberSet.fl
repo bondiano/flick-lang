@@ -21,7 +21,7 @@ foreign effect make from "@flick-lang/runtime/effect/FiberSet" "flickMake"
 run :
   forall s c r e a.
   Fiber.Outlives c s =>
-  RunOptions -> (Eff r e a)^c -> FiberSet s e a ->{r;} Fiber.Fiber e a
+  RunOptions -> (Eff {Scope s | r} e a)^c -> FiberSet s e a ->{r;} Fiber.Fiber e a
 foreign effect run from "@flick-lang/runtime/effect/FiberSet" "flickRun"
   arity 1
   retention owner

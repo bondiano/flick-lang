@@ -1,6 +1,6 @@
 # λFlick: регионы и захваты
 
-Сверено с кодом на `a01ce3ec`. Расширяет `core.md`: всё, что здесь не переопределено, действует как там. Расхождения со спекой, чекером и встроенными привязками и решения по ним — в §6; номера продолжают список `core.md`.
+Сверено с кодом на `a01ce3ec`; расхождения §6 внесены в следующих коммитах. Расширяет `core.md`: всё, что здесь не переопределено, действует как там. Расхождения со спекой, чекером и встроенными привязками и решения по ним — в §6; номера продолжают список `core.md`.
 
 Ссылки — как в `core.md`. Пути чекера даны от `flick-core/src/types/`, привязки — `builtins/X.fl` в том же каталоге. Пробы §6 собраны `flick build` и запущены на Node с JS-ресурсом, который помечает закрытый дескриптор и печатает `USE AFTER CLOSE`, если его используют после закрытия.
 
@@ -21,7 +21,7 @@
 | - | - | - |
 | Конкурентное исполнение детей, отмена, двухфазное закрытие | `runtime.md` (λRT) | Ребёнок региона `π` — работа, которая может сделать шаг в любой момент, пока `π` жив; закрытие `π` ждёт её конца (§3.3). Порядок шагов и отмену задаёт λRT |
 | Регион читателя ленивого `for` (`reader_region`) и регион экземпляра UI (`Setup s`) | — | Те же правила с другим источником региона: функция или экземпляр компонента вместо `scope`. Отдельно не формализуются |
-| `ScopedRef`, `Resource.manual`, `RcRef`, `RcMap`, `Pool`, `ScopedCache`, `LayerMap` | гипотеза Г5 (§5) | Подвладельцы с ранним освобождением; вне безопасного API, пока не решено Р19 |
+| Устройство аренды `ScopedRef`, `Resource`, `ScopedCache` | гипотеза Г5 (§5) | Значение доступно только в `use` с регионом аренды; освобождение ждёт конца аренд (Р19) |
 | Классы, `do`, словари | `elaboration.md` | Словарь собран из значений верхнего уровня и своих захватов не имеет |
 
 ## 1. Синтаксис
@@ -87,7 +87,7 @@ e ::= … | scope s { e }
 | `scope { e }` | `scope s { e }`, `s` свежий |
 | Стадия каррирования `a -> b -> c` в сигнатуре | `a → (b → c)^{⌈a⌉}`: стадия держит предыдущие параметры (`regions/mod.rs` `implicit_captures`, `stages`) |
 | `fun`, `task` без ожидаемого типа | квалификатор — свежая переменная вида `CRow`; решение наименьшее (§2.6) |
-| Вызов с `Scope ϱ`, где `ϱ` ещё не известен | `ϱ` — регион ближайшего `scope` (`regions/scopes.rs` `lexical_owner`) |
+| Вызов с `Scope ϱ`, где `ϱ` ещё не известен | `ϱ` — регион `Scope`, который называет строка стадии (задача против `Eff {Scope t \| r} e a`), иначе ближайшего `scope` (`regions/scopes.rs` `lexical_owner`, `declared_scope`) |
 | Вызов с `Scope ϱ` внешнего региона внутри вложенного `scope` | требование уходит через вложенные `scope` к тому, чей регион `ϱ` (`settle_needs`); кодоген передаёт владельца лексически: `$rt.within(owner, …)` |
 
 ### 1.5 Константы Γ₀
@@ -98,7 +98,7 @@ op_H      : ∀s. H s →R⟨r; ε⟩ τ                         использ�
 
 Fiber.spawn :
   ∀s c r e a. Outlives c s ⇒
-  Owner s → (Failure e →R⟨r;none⟩ Unit)^c → (Eff r e a)^c →R⟨r;none⟩ Fiber e a
+  Owner s → (Failure e →R⟨{Scope s} + r;none⟩ Unit)^c → (Eff ({Scope s} + r) e a)^c →R⟨r;none⟩ Fiber e a
 
 Scope.add_finalizer :
   ∀s c r. Outlives c s ⇒ (Eff r none Unit)^c →R⟨{Scope s} + r; none⟩ Unit
@@ -111,7 +111,7 @@ Ref.set   : ∀c α. (Ref α)^c →P (α^c →R⟨none;none⟩ Unit)^c
 Откуда:
 
 - `open_H`, `op_H` — схема для `File.open`, `File.read_handle` (`builtins/File.fl`) и любых привязок `foreign` с `Scope s` в строке. Приобретение регистрирует освобождение у владельца `s`, и освобождает способность только закрытие `s` (Г4). Пометка `retention` говорит об аргументах, а не о результате: у `File.node_open` она `call`.
-- `Fiber.spawn` — `builtins/Fiber.fl`. `Scope.add_finalizer` записан так, как требует модель; в `builtins/Scope.fl` у него нет `Outlives c s` (Р16).
+- `Fiber.spawn` — `builtins/Fiber.fl`, `Scope.add_finalizer` — `builtins/Scope.fl`. `Outlives c s` у финализатора появился с Р16, `Scope s` в строках ребёнка — с Р22.
 - `Ref.*` — `builtins/Ref.fl`: ёмкость `c` стоит внутри инвариантного аргумента `Ref`, поэтому её нельзя расширить через внешнюю границу ссылки.
 
 ## 2. Статика
@@ -138,7 +138,7 @@ Ref.set   : ∀c α. (Ref α)^c →P (α^c →R⟨none;none⟩ Unit)^c
 
 Почему строки сервисов не входят в ⌈·⌉: значение типа `Eff r e τ`, `τ₁ →R⟨r;e⟩ τ₂` или `Layer ri e ro` используется только через `await`, применение или `provide`, а они добавляют `r` (`ri`) к стадии того, кто использует. Регион из строки, например `Scope s`, появляется в типе каждого места, где значение работает; неиспользованное значение ничего не достигает.
 
-Почему результат входит: результат можно отбросить (`ignore (await t)`), и регион, который тип показывал только в результате, пропадёт из типа объемлющего значения. Поэтому `⌈Eff r e τ⌉ ⊇ ⌈τ⌉`, как у функции. В чекере `Eff` непрозрачен, и это дыра (Р14).
+Почему результат входит: результат можно отбросить (`ignore (await t)`), и регион, который тип показывал только в результате, пропадёт из типа объемлющего значения. Поэтому `⌈Eff r e τ⌉ ⊇ ⌈τ⌉`, как у функции. Чекер считал `Eff` непрозрачным, и это была дыра (Р14).
 
 Почему параметр входит: замыкание с параметром, тип которого показывает `s`, вправе не писать `s` в квалификаторе. Сужение параметра подтипом (§2.2) тогда сверяет ⌈·⌉ всего значения, а не только квалификатор.
 
@@ -146,8 +146,8 @@ Ref.set   : ∀c α. (Ref α)^c →P (α^c →R⟨none;none⟩ Unit)^c
 
 Чекер:
 
-- `regions/mod.rs` `captures_of`, `collect_bounded_captures` — ⌈·⌉; список `opaque` делает `Eff`, `Layer`, `ServiceTag`, `ServiceImpl`, `Errors` непрозрачными (Р14), а переменная строки сервисов попадает в ⌈·⌉ как атом (Р15);
-- `regions/mod.rs` `visible_in` — что тип показывает открыто: все регионы и переменные типа в любой позиции;
+- `regions/mod.rs` `captures_of`, `collect_bounded_captures` — ⌈·⌉: непрозрачны `Layer`, `ServiceTag`, `ServiceImpl`, `Errors`, аргументы видов `ServiceRow` и `ErrorRow` не входят (Р14, Р15); квалификатор на значении, которое ничего не может держать (скаляр, данные без скрытого хранилища и без захватов в типе), ничего не добавляет (`regions/data.rs` `holds_nothing`, Р24);
+- `regions/mod.rs` `shown_by` — что тип показывает открыто: ровно ⌈·⌉;
 - `regions/compare.rs` `expanded` — атом переменной, уже решённой в тип, заменяется на ⌈типа⌉.
 
 ### 2.2 Подтипы
@@ -192,7 +192,7 @@ Ref.set   : ∀c α. (Ref α)^c →P (α^c →R⟨none;none⟩ Unit)^c
 
 - (Lam): `infer.rs` `curry` → `regions/mod.rs` `close_over`; используемые локальные — `held_since`. Без ожидаемого типа квалификатор — свежая переменная, против ожидаемого берётся его квалификатор, против голого — `∅`.
 - (Task): `handlers.rs` `task` → `close_over`.
-- Посылку проверяет `Hold` в конце объявления (§2.6). Она считает `hidden = ⋃ ⌈Γ(y)⌉ ∖ visible_in(τ)` и требует `hidden ⊆ C`. Это (Lam)/(Task) при условии `visible_in(τ) = ⌈τ⌉`, а для `Eff` оно нарушено (Р14).
+- Посылку проверяет `Hold` в конце объявления (§2.6). Она считает `hidden = ⋃ ⌈Γ(y)⌉ ∖ shown_by(τ)` и требует `hidden ⊆ C`. `shown_by(τ) = ⌈τ⌉`, так что это ровно (Lam)/(Task); до Р14 там стояла `visible_in`, которая видела больше ⌈·⌉.
 
 ```text
 K : ∀ᾱ. τ̄ →P T ᾱ      Γ ⊢ eᵢ : τᵢ' ! φᵢ      τᵢ' ≤ τᵢ[ᾱ := ῡ]      ⋃ ⌈τᵢ'⌉ ⊆ ⌈(T ῡ)^C⌉
@@ -263,12 +263,12 @@ k ≥ s,    если s связал scope в теле объявления, а k
 Второе правило верно, потому что регионы сигнатуры и захваты подставленных значений приходят от вызывающего: они живы весь вызов, а `scope` внутри тела закрывается раньше.
 
 ```text
-Γ ⊢ Outlives C ϱ    Γ ⊢ o : Owner ϱ    Γ ⊢ f : (Failure e →R⟨r;none⟩ Unit)^C    Γ ⊢ t : (Eff r e a)^C
+Γ ⊢ Outlives C ϱ    Γ ⊢ o : Owner ϱ    Γ ⊢ f : (Failure e →R⟨{Scope ϱ} + r;none⟩ Unit)^C    Γ ⊢ t : (Eff ({Scope ϱ} + r) e a)^C
 ──────────────────────────────────────────────────────────────────── (Spawn)
 Γ ⊢ Fiber.spawn o f t : Fiber e a ! R⟨r; none⟩
 ```
 
-Это (Inst) с `Θ = Outlives c s` и (App) ядра. Тот же вид у любой константы, которая держит аргумент до закрытия владельца: финализатор, обработчик событий, фоновый поток (Г4).
+Это (Inst) с `Θ = Outlives c s` и (App) ядра. Строки ребёнка и супервизора называют `Scope ϱ` владельца: рантайм исполняет их у владельца (`runtime/src/owner.ts` `inside`), поэтому они приобретают в его регион, а строка вызова — только `r` (Р22). Тот же вид у любой константы, которая держит аргумент до закрытия владельца: финализатор, обработчик событий, фоновый поток (Г4).
 
 Чекер: `regions/solve.rs` `check_outlives` (`FLICK-G003`): регион `scope` должен охватывать регион владельца (`encloses`), атом не из `scope` подходит, если владелец — `scope` тела, или если его покрывает данное `Outlives`.
 
@@ -380,14 +380,14 @@ e ::= … | inside π e
 | Путь | Правило | Контрпример | Проверка |
 | - | - | - | - |
 | Прямой результат, вложенные запись или ADT | (Scope): `s ∉ fr(τ)`; ⌈·⌉ транзитивен по аргументам | `scope { File.open_scoped path }`, `Wrapper (File s)`, запись с замыканием | `escape.fl` `result`, `wrapper`, `in_record` (`FLICK-G002`) |
-| Замыкание или `Eff` | (Lam), (Task), (≤-Cap); обобщение не квантифицирует открытое обязательство | `bad_callback`, `bad_deferred`; `let f = fun () -> use h` после `scope` | `escape.fl` `bad_callback`, `bad_deferred` (`FLICK-G001`); пробы p4, p4b. **Нарушено для `Eff`: Р14** |
+| Замыкание или `Eff` | (Lam), (Task), (≤-Cap); обобщение не квантифицирует открытое обязательство | `bad_callback`, `bad_deferred`; `let f = fun () -> use h` после `scope`; задача, которая прячет захват за регионом результата или строки | `escape.fl` `bad_callback`, `bad_deferred` (`FLICK-G001`); `eff_result.fl` (Р14); пробы p4, p4b |
 | Передача, в том числе через контравариантный параметр | (≤-Cap) на всём значении | колбэк с голым параметром за `((Unit → Unit)^{s} → Unit)`; замыкание с `s` в параметре за голый параметр | пробы p33, p34, p92, p93 (`FLICK-G001`/`G002`) |
 | Интерфейсы модулей | сигнатура верхнего уровня обязательна для функций и проверяется как написана; `.iface` хранит квалификаторы | вызов `reader` из другого модуля с выходом из `scope` | `tests/check/projects/regions` (`FLICK-G001`, `FLICK-G002`) |
 | Экзистенциальная и непрозрачная упаковка | (Con), (Proj) | `Sealed (File s)`; `opaque type Sealed = Sealed (Unit ->{} Unit)` вокруг замыкания над `h` | `escape.fl` `sealed`; проба p20 (`FLICK-G002`) |
 | Запись во внешний `Ref` или кэш | инвариантность `Ref (α^c)`; тип ячейки замкнут при выделении | `Ref.set cell (Some file)`; `Ref (Unit ->{} String)` против `Ref ((Unit ->{} String)^{s})`; атом верхнего уровня | `escape.fl` `outer_cell`, `outer_callback`; `qualifiers.fl` `invariant` (`FLICK-T003`); `ref_capacity.fl`; `instance.fl` |
 | Ошибка, `Exit`, диагностика | (Err-Decl), (Err-Raise); `Failure`, `RawCause` инертны | `Wrapped file` под `try` внутри `scope`; `type error Leak (s : Region)`; обобщённый `boom : ∀a. a →R⟨none;{Wrapped a}⟩ Unit` с дескриптором | `escape.fl` `raised`; `qualifiers.fl` `Leak` (`FLICK-E005`); проба p5 |
-| Ребёнок и финализатор | (Spawn), §2.4 | ребёнок внешнего владельца держит внутренний регион; данная `c` без `Outlives` | `qualifiers.fl` `spawn_outer`, `spawn_given` (`FLICK-G003`); проба p53. **Финализаторы не проверяются: Р16** |
-| Внешний вызов | Г4: сигнатура — контракт удержания | — | **Нарушено во встроенных привязках: Р16–Р18** |
+| Ребёнок и финализатор | (Spawn), §2.4 | ребёнок внешнего владельца держит внутренний регион; данная `c` без `Outlives` | `qualifiers.fl` `spawn_outer`, `spawn_given` (`FLICK-G003`); `retention.fl` (Р16); `children.fl` (Р22); проба p53 |
+| Внешний вызов | Г4: сигнатура — контракт удержания; удерживаемое при `retention owner` требует `Outlives` (`FLICK-F002`) | приобретённое значение вне `scope`, в том числе через обобщённую функцию; значение аренды из `use` | `acquired.fl` (Р18, Р24), `leases.fl` (Р19), `fail/ffi/owner_retention.fl` |
 
 ## 5. Теорема T4
 
@@ -397,12 +397,12 @@ e ::= … | inside π e
 
 - **Г4 (контракт удержания FFI).**
   - `retention call`: после возврата функция не держит аргументы, кроме достижимых из результата в пределах ⌈типа результата⌉.
-  - `retention owner` с владельцем `ϱ` (из `Scope ϱ` или `Owner ϱ`): функция держит аргументы до закрытия `ϱ`, и её схема требует `Outlives c ϱ` для каждой строки захватов `c` удерживаемого аргумента.
+  - `retention owner` с владельцем `ϱ` (из `Scope ϱ` или `Owner ϱ`): функция держит аргументы до закрытия `ϱ`, и её схема требует `Outlives c ϱ` для каждой строки захватов `c` удерживаемого аргумента, которую не показывает то, что идёт после него (`ffi.rs` `owner_retention`, `FLICK-F002`).
   - Приобретение `∀s. τ_a →R⟨{Scope s} + r; ε⟩ τ` возвращает способности региона `s`, и `s ∈ ⌈τ⌉`, если `τ` не скаляр. Освобождает их только закрытие `s`.
   - Без `retention` функция считается `call`. `FLICK-F002` требует пометку только у параметров с переменными видов `Region` и `CRow` (`ffi.rs` `foreign_info`). Параметр-переменная вида `Type` (`∀a. a →R Unit`) пометки не требует, хотя может принять способность: такую привязку покрывает только эта гипотеза.
   - Чистые операции над способностью (`Rpc.port`, `Http.Server.address`) не зависят от того, жив ли регион.
-- **Г5 (подвладельцы).** Программа не использует модули из Р19.
-- **Г6 (владелец лексический).** Шаг, которому нужен `Scope ϱ`, получает владельца региона `ϱ`, а не ближайшего `scope` при исполнении (`$rt.within`). Константа не исполняет свой аргумент типа `Eff` под другим владельцем, чем тот, что назван в его строке. Для подвладельцев из Р19 это нарушено.
+- **Г5 (аренда).** `ScopedRef`, `Resource`, `ScopedCache` отдают значение только в `use`, с регионом аренды `t`, и освобождают прежнее значение, когда его не держит ни одна аренда (`runtime/src/effect/lease.ts`); приобретение идёт в собственный регион высшего ранга. `RcRef`, `RcMap`, `Pool` одалживают значение области вызова (`a^{t}`) и не отзывают его до её закрытия (Effect 4.0.5).
+- **Г6 (владелец лексический).** Шаг, которому нужен `Scope ϱ`, получает владельца региона `ϱ`, а не ближайшего `scope` при исполнении (`$rt.within`). Константа не исполняет свой аргумент типа `Eff` под другим владельцем, чем тот, что назван в его строке: аргумент, который исполняет комбинатор, называет регион комбинатора — высшего ранга у подвладельцев (Р19), `Scope s` владельца у детей (Р22).
 
 ### 5.2 Леммы
 
@@ -415,7 +415,7 @@ e ::= … | inside π e
   - (≤-Cap) — посылка `⌈τ^C⌉ ⊆ ⌈τ'^C'⌉`;
   - (App-Pure) — T2(a).
 
-  Чекер вычисляет посылку (Lam)/(Task) через `visible_in`. Пока `visible_in(τ) ⊋ ⌈τ⌉`, лемма в чекере неверна; для `Eff` это Р14.
+  Чекер вычисляет посылку (Lam)/(Task) через `shown_by = ⌈·⌉`. До Р14 там стояла `visible_in ⊋ ⌈·⌉`, и лемма в чекере была неверна; до Р24 граница значения терялась в позиции неизвестного типа.
 - **Л5 (вложенность).** Если `π₂` создан внутри `inside π₁` (в теле или в ребёнке `π₁`), то `π₂` закрыт раньше `π₁`. Следует из §3.3: `inside π₁ w` закрывается, только когда тело — значение, а дети `π₁` закончены.
 - **Л6 (старые ячейки).** Если `ℓ` выделена до создания `π`, то `π ∉ fr(Ψ(ℓ))`: `Ψ(ℓ)` замкнут при выделении, а `π` свежий.
 
@@ -447,7 +447,7 @@ e ::= … | inside π e
 
 Р14 нарушает T4 в правилах чекера. Р16–Р18 нарушают гипотезу Г4 во встроенных привязках, через неё и T4. Р19 нарушает Г6 и «no early close» spec/07. Каждое из них подтверждено пробой: программа принята чекером на `a01ce3ec` и при запуске на Node печатает `USE AFTER CLOSE`, либо принята там, где аналогичная форма отвергается (`FLICK-G003`). Остальные — неполнота чекера или неточность прозы.
 
-Статус: все расхождения пока только записаны.
+Статус: внесены все, кроме неполнот Р23 и Р25, которые записаны. Р14–Р19, Р22, Р24 и В3 — чекер, привязки и рантайм; Р20, Р21 — спека и справочник. У каждого исправления есть фикстура.
 
 Общие определения проб:
 
@@ -471,6 +471,9 @@ foreign effect close_conn from "./res.mjs" "close"
 
 use_conn : Raw ->{} Unit
 foreign effect use_conn from "./res.mjs" "use"
+
+report : Failure e ->{; none} Unit
+let report _ = ()
 ```
 
 `open` приобретает в регион `s` и регистрирует освобождение у его владельца; `make_conn` создаёт объект без региона, который освобождает `close_conn`.
@@ -497,13 +500,13 @@ let main () =
   - Та же дыра без сигнатуры: `let t : Eff none none (Handle inner) = task { use h; h }`, затем `Fiber.spawn outer report t` (у `c` пусто, `Outlives` проходит) или `Ref.set cell (task { ignore (await t) })` во внешнюю ячейку. Обе печатают `USE AFTER CLOSE`.
   - Та же форма с функцией вместо задачи, `(Unit ->{} Handle s) -> Eff none none Unit`, отвергается: `FLICK-G001` «this task uses `f`, which holds `s`».
 - Причина: `regions/mod.rs` `collect_bounded_captures` не заходит в `Eff` (список `opaque`), а `regions/solve.rs` `hidden` вычитает `visible_in`, которая заходит. Нарушена Л4.
-- Решение — чекер. `⌈Eff r e τ⌉ = ⌈τ⌉`: `collect_bounded_captures` собирает аргумент-результат `Eff`, но не его строки (§2.1). `Layer`, `ServiceTag`, `ServiceImpl`, `Errors` остаются непрозрачными: их регионы бывают только в строках, а строки возвращаются в тип при использовании. Фикстура — три формы выше в `tests/check/fail/regions/`.
+- Решение — чекер. `⌈Eff r e τ⌉ = ⌈τ⌉`: `collect_bounded_captures` собирает аргумент-результат `Eff`, но не его строки (§2.1). `Layer`, `ServiceTag`, `ServiceImpl`, `Errors` остаются непрозрачными: их регионы бывают только в строках, а строки возвращаются в тип при использовании. Внесено; фикстура — `tests/check/fail/regions/eff_result.fl` (три формы выше и задача с `Scope inner` в строке).
 
 **Р15. Переменная строки сервисов считается захватом.**
 
 - Что происходит: обёртка `rpc_listen o g hs = Rpc.listen o g hs` с сигнатурой, повторяющей `Rpc.listen`, — `FLICK-G001` «this function uses `g`, which holds `r`». Здесь `g : Group r hs`, а `r` — строка сервисов.
 - Причина: `collect_bounded_captures` пропускает аргументы вида `ErrorRow`, но не `ServiceRow`; переменная-хвост попадает в ⌈·⌉ как атом.
-- Неполнота, не дыра. Решение — чекер: пропускать и `ServiceRow`, как в §2.1.
+- Неполнота, не дыра. Решение — чекер: пропускать и `ServiceRow`, как в §2.1. Внесено; фикстура — `listen_on` в `tests/check/pass/regions/leases.fl`.
 
 **Р16. `retention owner` без `Outlives c s`.**
 
@@ -528,38 +531,42 @@ let main () =
   - `Resource.acquire_release`: `release` (`builtins/Resource.fl`);
   - `Events.listen`: обработчик и супервизор (`builtins/Events.fl`).
 - По сигнатуре так же `Rpc.listen`, `listen_websocket`, `listen_tcp`, `handler`, `handler_websocket` (`builtins/Rpc.fl`): обработчики `hs^c` живут до закрытия `s`.
-- Решение — привязки: `Fiber.Outlives c s =>` у каждой. Чтобы не повторилось — чекер: у `foreign` с `retention owner` строка захватов параметра без `Outlives` с регионом владельца — ошибка рядом с `FLICK-F002`. Фикстура — обёртки выше.
+- Решение — привязки: `Fiber.Outlives c s =>` у каждой, и у `HttpApi.listen`, которую нашла проверка ниже. Чтобы не повторилось — чекер: у `foreign` с `retention owner` строка захватов параметра, которую не показывает то, что идёт после последнего такого параметра, требует `Outlives` (`FLICK-F002`). Внесено; фикстуры — `tests/check/fail/regions/retention.fl`, `tests/check/fail/ffi/owner_retention.fl`.
 
 **Р17. Фоновая работа помечена `retention call`.**
 
 - Что происходит: `Channel.to_queue`, `to_queue_array`, `to_pubsub`, `to_pubsub_array` (`builtins/Channel/Run.fl`) запускают канал «in the background of the innermost `scope`» до его закрытия, но объявлены `retention call` без `Outlives`.
 - Обёртка над `Channel.to_queue` с данными `s`, `c` принята. Такая же над `Stream.to_pubsub`, у которого `retention owner` и `Outlives c s`, — `FLICK-G003`. Канал `Channel.from_subscription sub` внутреннего региона так уходит во владельца внешнего.
-- Решение — привязки: `retention owner` и `Fiber.Outlives c s =>`, как у `Stream`.
+- Решение — привязки: `retention owner` и `Fiber.Outlives c s =>`, как у `Stream`. Внесено; фикстура — `channel_queue` в `retention.fl`.
 
 **Р18. Приобретённое значение без региона в типе.**
 
 ```flick
-let conn =
-  scope {
-    Resource.acquire_release (task { make_conn "db" }) close_conn
-  }
-use_conn conn
+leak : Unit ->{} Unit
+let leak () =
+  let conn =
+    scope {
+      Resource.acquire_release (task { make_conn "db" }) close_conn
+    }
+  use_conn conn
 ```
 
 - Что происходит: принято, Node: `close db`, затем `USE AFTER CLOSE db`. `acquire_release : … ->{Scope s | r; e} a` возвращает `a`, где `s` не встречается. Так же `ScopedRef.get r` после `scope` (`USE AFTER CLOSE ref`).
 - По сигнатуре так же: `Resource.get`, `RcRef.get`, `RcMap.get`, `RcMap.get_option`, `Pool.get`, `ScopedCache.get`, `get_option`, `get_success`. `LayerMap.get : k -> LayerMap s k e ro -> Layer none e ro` теряет `s` у слоя, услуги которого построены в `s`.
 - Через это проходит и `Layer.build`: `Context ro` без региона, а реализация может захватить значение из `acquire_release`, у которого захватов нет.
-- Решение — привязки: результат `a^{s}`; у аренды с `Scope t` (`RcRef`, `RcMap`, `Pool`) — `a^{t}`; `LayerMap.get` — `(Layer none e ro)^{s}`. Скалярное `a` после этого по-прежнему уходит, но скаляр — копия, а не способность (Г4).
+- Решение — привязки: результат `a^{s}`; у аренды с `Scope t` (`RcRef`, `RcMap`, `Pool`) — `a^{t}`; `LayerMap.get` — `(Layer none e ro)^{s}`. Скалярное `a` после этого по-прежнему уходит, но скаляр — копия, а не способность (Г4). Функция, которой передают такое значение, принимает его с квалификатором: `close_conn : forall c. Raw^c ->{} Unit`. Внесено; фикстура — `tests/check/fail/regions/acquired.fl`. Без Р24 значение уходило через обобщённую функцию.
 
 **Р19. Подвладельцы освобождают ресурс внутри живого региона.**
 
 ```flick
-scope {
-  let r = ScopedRef.from_acquire (task { open "first" })
-  let h1 = ScopedRef.get r
-  ScopedRef.set (task { open "second" }) r
-  use h1
-}
+early : Unit ->{} Unit
+let early () =
+  scope {
+    let r = ScopedRef.from_acquire (task { open "first" })
+    let h1 = ScopedRef.get r
+    ScopedRef.set (task { open "second" }) r
+    use h1
+  }
 ```
 
 - Что происходит: принято. Node: `close first` при `set`, затем `USE AFTER CLOSE first`, хотя регион `scope` открыт и тип `h1` — `Handle s`. Так же `Resource.refresh` (`USE AFTER CLOSE res`).
@@ -567,36 +574,95 @@ scope {
 - Причина двойная:
   - spec/07 обещает «the safe scoped API has **no early close**», а эти модули — ранние закрытия;
   - задача, которую комбинатор исполняет сам, приобретает в его собственный `Scope` Effect, а не в регион, названный её типом: `open` внутри `from_acquire` получил владельца `ScopedRef`. Нарушена Г6: лексическая передача владельца (`$rt.within`) срабатывает только там, где требование `Scope` исполняет код Flick.
-- Решение не принято, нужен выбор:
-  1. Спека: эти модули — привязки с ручными дескрипторами вне сильного контракта, как в spec/07 «separate manual-handle bindings do not get this guarantee». Г5 исключает их из T4, справочник помечает их так же.
-  2. API: доступ к значению только на время аренды, `use : ScopedRef s a -> (forall t. a^{t} ->{r; e} b) -> …`, и `set`/`refresh`/`invalidate` ждут конца аренд. Аргумент-задача — высшего ранга по региону, как у `Layer.from_build : (forall s. MemoMap ->{Scope s | ri; e} Context ro) -> …`.
+- `RcRef.invalidate`, `RcMap.invalidate`, `Pool.invalidate` в Effect 4.0.5 не отзывают уже одолженное значение, так что им хватает `a^{t}` из Р18. Ранние закрытия — `ScopedRef.set`, `Resource.refresh` и вытеснение `ScopedCache`.
+- Решение — API, аренда (принято 2026-10-30):
+  - `use : ScopedRef s a -> (forall t. a^{t} ->{r; e} b)^c ->{r; e} b`, так же `Resource.use`, `ScopedCache.use`, `use_option`, `use_success`; `get`, `get_option`, `get_success`, `ScopedCache.values` и `entries` убраны, `ScopedCache.refresh` даёт `Unit`;
+  - приобретение — высшего ранга по региону: `from_acquire : (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a`, так же `set`, `Resource.manual`, `Effect.resource_auto`, `lookup` у `ScopedCache`; задача против такого типа приобретает в `t` (`lexical_owner`, `declared_scope`);
+  - рантайм: `runtime/src/effect/lease.ts` держит счётчик аренд, и замена, обновление или вытеснение освобождают прежнее значение после конца последней аренды; `ScopedRef` и `Resource` теперь свои, а не Effect;
+  - имя функции верхнего уровня, переданное за тип высшего ранга, ничего не держит (`infer.rs` `names_top_level`): `Resource.use res ping` проходит так же, как `fun c -> ping c`.
 
-  Рекомендация: 1 сейчас, 2 отдельным пунктом роадмапа.
+  Значение типа, который называет свой регион (`File t`), так хранить нельзя: `t` вышел бы за `forall`. Фикстуры — `tests/check/fail/regions/leases.fl`, `tests/check/pass/regions/leases.fl`, e2e `tests/run/runtime/leases.fl`.
 
 **Р20. Захваты реализации сервиса.**
 
 - Спека (spec/07 «Services and type classes»): «The hidden captures of an implementation record are kept in its type and in the Layer».
 - Чекер: поля реализации — голые позиции. `Layer.effect Probe (task { let h = open "layer"; { poke = fun () -> use h } })` — `FLICK-G001` «the expected type `Unit ->{} Unit` holds no captures». У `Layer` и `S.Impl` квалификаторов нет.
-- Неполнота относительно прозы, не дыра. Решение — спека: в первой версии реализация сервиса захватов не держит; слой, которому нужен ресурс, приобретает его при построении.
+- Неполнота относительно прозы, не дыра. Решение — спека: в первой версии реализация сервиса захватов не держит; слой, которому нужен ресурс, приобретает его при построении. Внесено в spec/07, английскую и русскую версии.
 
 **Р21. Квалификаторы следующих стадий у локальной сигнатуры.**
 
 ```flick
-scope {
-  let h = open "poly"
-  wrap : forall a. a -> (Unit ->{} Unit)
-  let wrap _ = fun () -> use h
-  (wrap 1) ()
-}
+local : Unit ->{} Unit
+let local () =
+  scope {
+    let h = open "poly"
+    wrap : forall a. a -> (Unit ->{} Unit)
+    let wrap _ = fun () -> use h
+    (wrap 1) ()
+  }
 ```
 
 - Что происходит: `FLICK-G001` «the expected type `(Unit ->{} Unit)^{a}` allows only `a`», хотя замыкание не покидает `scope`.
 - reference/regions обещает: «a local signature need not name the regions its function holds». Внешний квалификатор действительно выводится, а квалификаторы стадий от `implicit_captures` остаются записанными границами.
-- Неполнота. Решение — спека: в reference/regions уточнить, что выводится только квалификатор самой функции. Обойти можно так: назвать регион, `scope s { … }` и `(Unit ->{} Unit)^{a, s}`.
+- Неполнота. Решение — спека: в reference/regions уточнить, что выводится только квалификатор самой функции. Обойти можно так: назвать регион, `scope s { … }` и `(Unit ->{} Unit)^{a, s}`. Внесено в reference/regions, английскую и русскую версии.
+
+Найдено при исправлении:
+
+**Р22. Ребёнок приобретает в регион владельца, а его тип называет другой.**
+
+```flick
+elsewhere : Unit ->{} Unit
+let elsewhere () =
+  scope inner {
+    let cell = Ref.make (Some (open "first"))
+    let t = task { Ref.set cell (Some (open "child")) }
+    scope inner2 {
+      ignore (Fiber.spawn inner2 report t)
+    }
+    match Ref.get cell with
+    | Some h -> use h
+    | None -> ()
+  }
+```
+
+- Что происходит: принято, Node: `close child` при закрытии `inner2`, затем `USE AFTER CLOSE child`. Задача приобретает в `inner` по типу, а рантайм исполняет ребёнка у владельца `inner2` (`inside(owner, …)`), и ячейка `inner` держит освобождённый дескриптор. Так же у `FiberSet.run`, `FiberHandle.run`, `FiberMap.run` (`inOwner`) и `Events.listen`.
+- Нарушена Г6.
+- Решение — привязки и рантайм: строки задачи и супервизора — `{Scope s | r}` владельца, строка вызова — `r`; рантайм исполняет у владельца и супервизора, и обработчик событий. Задача, которую пишут прямо в вызове, приобретает в `s` (`declared_scope`); задача с другим регионом — `FLICK-T008`. Внесено; фикстуры — `tests/check/fail/regions/children.fl`, `eff_result.fl` `in_row`.
+
+**Р23. Ячейка, созданная пустой в области, не принимает ресурс этой области.**
+
+- Что происходит: `scope inner { let cell = Ref.make None; Ref.set cell (Some (open "x")); … }` — `FLICK-G002` «this value holds region `inner`, so it cannot leave the `scope`», хотя ячейка не покидает `inner`. С `Ref.make (Some (open "first"))` то же принято.
+- Неполнота: ёмкость ячейки, выведенная из `None`, получает уровень вне `scope`.
+- Решение — записать в reference/regions «Not checked yet» (внесено); исправить решатель отдельно.
+
+**Р24. Граница значения терялась в позиции неизвестного типа.**
+
+```flick
+pass : forall a. a -> a
+let pass x = x
+
+through : Unit ->{} Unit
+let through () =
+  let leaked =
+    scope {
+      let c = Resource.acquire_release (task { make_conn "db" }) close_conn
+      pass c
+    }
+  use_conn leaked
+```
+
+- Что происходит: с Р18 `c : Raw^{s}`, но `pass c` давал `Raw` без границы, и значение уходило из `scope` (Node: `USE AFTER CLOSE db`). Так же `ScopedRef.use r (fun c -> c)` возвращал значение аренды.
+- Причина: `regions/data.rs` `subsume_bound_at` снимал границу значения, когда ожидаемый тип был ещё переменной.
+- Решение — чекер: такая позиция получает значение вместе с границей, если граница называет регион, а тип может что-то хранить; граница на значении, которое ничего не может держать, отбрасывается всегда (`holds_nothing`); квалификатор значения, который граница уже допускает, переменная границы не получает; квалификатор замыкания остаётся частью типа. Внесено; фикстуры — `acquired.fl` `generic`, `leases.fl` `returned`.
+
+**Р25. `FiberSet.run` получает задачу раньше набора.**
+
+- Что происходит: `FiberSet.run options (task { … open … }) set` во вложенной области — `FLICK-T003`: задача проверяется раньше `set`, её регион ещё не известен, и приобретение уходит в ближайшую область.
+- Неполнота. Решение — записать в reference/regions «Not checked yet» (внесено): указать в строке задачи `Scope s` региона набора.
 
 Вне регионов, найдено попутно:
 
 **В3. `flick build` падает на неизвестном модуле.**
 
 - Что происходит: `import App.Missing exposing (thing)` в файле, переданном `flick build`, — паника `the checker resolved` в `ir/lower/expr.rs:208`. `flick check` на том же файле сообщает `FLICK-R003`.
-- Решение — компилятор: `build` не переходит к понижению, если проверка дала ошибки разрешения.
+- Решение — компилятор: `build` не переходит к понижению, если загрузка дала ошибки (`project/load/checking.rs`). Внесено; тест — `flick/tests/build_command.rs` `build_stops_at_an_unknown_module`.

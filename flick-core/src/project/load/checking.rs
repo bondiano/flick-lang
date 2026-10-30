@@ -98,7 +98,12 @@ impl Loader<'_> {
             by_name: &self.by_name,
             from_packages: &self.from_packages,
             project: self.project,
-            lower: self.lowered.is_some(),
+            // a failed import leaves names unresolved, and the build fails anyway
+            lower: self.lowered.is_some()
+                && !self
+                    .diagnostics
+                    .iter()
+                    .any(|d| d.severity == Severity::Error),
             cache: self.cache.as_deref(),
         }
     }

@@ -104,8 +104,12 @@ serialization. Use `a^c -> (b -> b)^c` to name the bound explicitly.
 
 Locals are inferred: a closure without an expected type gets the qualifier
 of what it uses, and a local signature need not name the regions its
-function holds. A top-level signature is checked as written, and `.iface`
-keeps its qualifiers for importers.
+function holds. The qualifiers of its later stages are bounds as written:
+`wrap : forall a. a -> (Unit ->{} Unit)` lets the closure it returns hold
+`a` only, so name the scope (`scope s { … }`) and write
+`(Unit ->{} Unit)^{a, s}` when it holds a resource of `s`. A top-level
+signature is checked as written, and `.iface` keeps its qualifiers for
+importers.
 
 | Construct | Holds |
 | - | - |
@@ -114,7 +118,7 @@ keeps its qualifiers for importers.
 | record, tuple, list, constructor | what its parts hold |
 | type variable `a^c` | the whole value holds at most `c`, without erasing concrete regions or stored qualifiers |
 | type variable `a` without a qualifier | what the substituted type holds; curried stages retain its capture projection |
-| `Eff r e a`, a function | hidden captures from its qualifier, not from a future result alone |
+| `Eff r e a`, a function | hidden captures from its qualifier, and what its result type (and a function's parameter type) shows: a dropped result does not take a capture with it |
 
 A function that takes a callback declares the callback's captures and keeps
 them in what it returns, as `map_effect` does:
@@ -147,10 +151,34 @@ the enclosing bound. Primitive fields such as `Float` gain no captures.
 | - | - |
 | the value of the scope, directly or inside data | its type may not mention the region (`FLICK-G002`) |
 | a closure or `task` returned or stored | its qualifier may not hold the region (`FLICK-G002`, or `FLICK-G001` against a written type) |
+| a value an acquisition gives | `Resource.acquire_release` gives `a^{s}`, a value of region `s` (`FLICK-G002`); a function it is passed to takes `Conn^c` for some `c` |
 | a nominal or opaque wrapper | a visible region or hidden field capture cannot be erased |
 | a cell or binding from outside the scope | its type may not come to mention the region; mutable storage and its qualified element types are invariant (`FLICK-T003`), even when a value bound could otherwise widen |
 | an error | its payload holds no region, even when a handler inside the scope catches it (`FLICK-E005`); `type error E (s : Region) = E (File s)` is rejected where it is declared |
-| a foreign function | its signature is its retention contract: what it keeps is in its result's qualifier |
+| a foreign function | its signature is its retention contract: what it keeps is in its result's qualifier; with `retention owner`, a capture row it keeps needs `Fiber.Outlives` (`FLICK-F002`) |
+
+## Leases
+
+`ScopedRef`, `Resource` and `ScopedCache` own resources of their own: a
+replacement (`set`, `refresh`) or an eviction releases one while their
+region is still open. Their value is used only under a lease: `use` runs a
+callback with it, and the previous resource is released once no `use`
+holds it.
+
+```flick
+use : forall c s r e a b. ScopedRef s a -> (forall t. a^{t} ->{r; e} b)^c ->{r; e} b
+
+from_acquire :
+  forall c s r e a. (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a
+```
+
+The value holds the lease's region `t`, so the callback can neither give it
+back nor keep it (`FLICK-T007`, `FLICK-G002`). An acquisition acquires into
+a region `t` of its own, which ends when the resource is released: a value
+of a type that names its region, such as `File t`, cannot be kept in them.
+`RcRef`, `RcMap` and `Pool` lend their value to the `scope` of the call
+(`Scope t`) and keep it until that scope closes, so their `get` gives
+`a^{t}`.
 
 ## Children
 
@@ -159,8 +187,8 @@ spawn :
   forall s c r e a.
   Fiber.Outlives c s =>
   Fiber.Owner s ->
-  (Failure e ->{r; none} Unit)^c ->
-  (Eff r e a)^c ->{r; none} Fiber.Fiber e a
+  (Failure e ->{Scope s | r; none} Unit)^c ->
+  (Eff {Scope s | r} e a)^c ->{r; none} Fiber.Fiber e a
 ```
 
 `Fiber.spawn owner supervisor task` registers `task` with `owner`; the
@@ -171,9 +199,18 @@ signature names when the owner is a local scope. `Fiber.Outlives c s` states
 it; the compiler decides it and a program declares no instance of it. A
 child that holds a shorter region is `FLICK-G003`.
 
+A child acquires into its owner's region: a task that acquires names
+`Scope s` of its owner, and one that names another region is
+`FLICK-T008`. Work kept until an owner closes requires `Fiber.Outlives` the
+same way: a finalizer (`Scope.add_finalizer`), the release of
+`Resource.acquire_release`, an event handler (`Events.listen`), the source
+of a background `Stream` or `Channel`.
+
 ## Not checked yet
 
 | Construct | Today |
 | - | - |
-| foreign retention contracts | signatures are written and reviewed by hand; the checker does not inspect foreign bodies |
+| foreign retention contracts | signatures are written and reviewed by hand; the checker requires `retention`, and `Fiber.Outlives` for what `retention owner` keeps, but does not inspect foreign bodies |
 | a region variable unified late with another region in a capture row | the two are kept apart, which may reject a program |
+| a cell made empty in a `scope` and written later with a resource of that scope | rejected (`FLICK-G002`): give the cell its first value |
+| `FiberSet.run`, `FiberHandle.run`, `FiberMap.run` of a task that acquires | the task, written before the set, acquires into the innermost scope: give its row `Scope s` of the set's region |

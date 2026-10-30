@@ -182,9 +182,9 @@ let resources () =
   let acquired = Ref.make 0
   let seen = scope {
     let auto = Effect.resource_auto (Schedule.spaced ms1) (counting acquired)
-    let first = Resource.get auto
+    let first = Resource.use auto (fun v -> v)
     Effect.sleep ms15
-    (first, Resource.get auto > first)
+    (first, Resource.use auto (fun v -> v) > first)
   }
   Platform.stdout_line ("resource_auto: " ++ show seen)
 

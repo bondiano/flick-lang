@@ -12,6 +12,8 @@
 //! | `variadic` | the last argument is a `List a` spread into the call |
 //! | `retention call` / `retention owner` | what a parameter that may hold a scope's capabilities is kept for |
 
+use std::slice;
+
 use super::Checker;
 use super::kinds::Kind;
 use super::ty::{Stage, Type};
@@ -100,6 +102,9 @@ impl Checker<'_> {
                 span,
                 format!("`{shown}` may hold the capabilities of a scope, but the foreign function has no `retention`: write `retention call` if it keeps nothing past the call"),
             );
+        }
+        if retention == Some(Retention::Owner) {
+            self.owner_retention(scheme, &body, span);
         }
         self.typing.foreigns.insert(range(span), info);
     }
@@ -223,6 +228,53 @@ impl Checker<'_> {
     }
 
     /// The parameters of a curried function type, one per arrow.
+    /// What a foreign function keeps until an owner closes may hold only what
+    /// outlives that owner: a capture row of a parameter that nothing after
+    /// its last parameter shows needs `Fiber.Outlives`.
+    fn owner_retention(&mut self, scheme: &Type, body: &Type, span: Span) {
+        let Type::Forall {
+            vars, constraints, ..
+        } = scheme
+        else {
+            return;
+        };
+        let outlived: Vec<&str> = constraints
+            .iter()
+            .filter_map(|c| match super::classes::split(c)? {
+                (("Fiber", "Outlives"), args) => match args.first()? {
+                    Type::Var(v) => Some(v.as_str()),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect();
+        let kept = vars.iter().find(|v| {
+            let name = slice::from_ref(&v.name);
+            if !matches!(v.kind, Kind::CaptureRow) || outlived.contains(&v.name.as_str()) {
+                return false;
+            }
+            // what follows the last parameter that holds the row
+            let (mut rest, mut after) = (body.clone(), None);
+            while let Type::Fun { param, result, .. } = self.whnf_captured(&rest).0 {
+                if mentions(&param, name) {
+                    after = Some((*result).clone());
+                }
+                rest = *result;
+            }
+            after.is_some_and(|after| !mentions(&after, name))
+        });
+        if let Some(row) = kept {
+            self.error(
+                codes::F002,
+                span,
+                format!(
+                    "with `retention owner` the foreign function keeps what `{0}` holds until its owner closes, so its signature needs `Fiber.Outlives {0} s` for the owner's region `s`",
+                    row.name
+                ),
+            );
+        }
+    }
+
     fn params_of(&self, ty: &Type) -> Vec<Type> {
         let mut out = Vec::new();
         let mut ty = ty.clone();

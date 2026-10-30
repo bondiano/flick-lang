@@ -214,7 +214,7 @@ foreign pure add from "@flick-lang/runtime/effect/rpc/Rpc" "rpcAdd"
 /// until the scope owning region `s` closes: then it stops accepting, lets
 /// the calls it serves finish and runs their finalizers. The handlers run
 /// with the services here.
-listen : forall c s r hs. ServeOptions ->
+listen : forall c s r hs. Fiber.Outlives c s => ServeOptions ->
   Group r hs ->
   (hs^c ->{Scope s | r; ServeError} Server s)^c
 foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
@@ -225,7 +225,9 @@ foreign effect listen from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListen"
 /// As `listen`, each client a WebSocket at `path` whose messages carry its
 /// calls: `ws://127.0.0.1:8080/rpc`. Every serialization streams over it.
 listen_websocket :
-  forall c s r hs. ServeOptions -> Group r hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
+  forall c s r hs. Fiber.Outlives c s => ServeOptions ->
+    Group r hs ->
+    (hs^c ->{Scope s | r; ServeError} Server s)^c
 foreign effect listen_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenWebsocket"
   arity 3
   retention owner
@@ -236,7 +238,9 @@ foreign effect listen_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "r
 /// that frames its messages (`ndjson`, `ndjson_rpc`, `binary`) fits a byte
 /// stream; another is `ServeError`. Node only.
 listen_tcp :
-  forall c s r hs. ServeOptions -> Group r hs -> (hs^c ->{Scope s | r; ServeError} Server s)^c
+  forall c s r hs. Fiber.Outlives c s => ServeOptions ->
+    Group r hs ->
+    (hs^c ->{Scope s | r; ServeError} Server s)^c
 foreign effect listen_tcp from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcListenTcp"
   arity 3
   retention owner
@@ -255,6 +259,7 @@ foreign pure port from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcPort"
 /// owning it closes, the calls it serves finish and run their finalizers.
 handler :
   forall c s r hs.
+  Fiber.Outlives c s =>
   Serialization -> Group r hs -> (hs^c ->{Scope s | r;} (ServerRequest ->{} ServerResponse)^{s})^c
 foreign effect handler from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandler"
   arity 3
@@ -265,6 +270,7 @@ foreign effect handler from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandler
 /// for a `GET` route.
 handler_websocket :
   forall c s r hs.
+  Fiber.Outlives c s =>
   Serialization -> Group r hs -> (hs^c ->{Scope s | r;} (ServerRequest ->{} ServerResponse)^{s})^c
 foreign effect handler_websocket from "@flick-lang/runtime/effect/rpc/RpcNode" "rpcHandlerWebsocket"
   arity 3

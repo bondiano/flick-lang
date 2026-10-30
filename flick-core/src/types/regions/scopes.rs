@@ -97,6 +97,20 @@ impl Checker<'_> {
         let Some(needed) = norm.get(SCOPE).cloned() else {
             return services.clone();
         };
+        let own = self.regions.open[self.stage.scopes.min(self.regions.open.len())..].to_vec();
+        if own.is_empty() {
+            // no scope of this stage provides it: the stage passes `Scope` on to
+            // what runs it, which provides the region its row names
+            if let [region] = needed.spine().1[..]
+                && let Type::Meta(_) = self.store.resolve(region)
+            {
+                let owner = self
+                    .declared_scope()
+                    .unwrap_or(Type::Skolem(self.regions.scopes[inner].region));
+                let _ = self.unify(region, &owner);
+            }
+            return services.clone();
+        }
         let open = self
             .regions
             .open
@@ -113,8 +127,6 @@ impl Checker<'_> {
             let owner = Type::Skolem(self.regions.scopes[inner].region);
             let _ = self.unify(region, &owner);
         }
-        let own = self.regions.open[self.stage.scopes.min(self.regions.open.len())..].to_vec();
-        let keep = own.is_empty();
         self.regions.needs.push(Need {
             region: region.clone(),
             inner,
@@ -122,11 +134,20 @@ impl Checker<'_> {
             span,
             site: self.stage.site,
         });
-        if keep {
-            return services.clone();
-        }
         norm.entries.retain(|(label, _)| label != SCOPE);
         norm.into_type()
+    }
+
+    /// The region of the `Scope` the current stage's row names, once known:
+    /// a task checked against `Eff {Scope s | r} e a` acquires into `s`.
+    fn declared_scope(&self) -> Option<Type> {
+        let declared = self.store.normalize(&self.stage.services);
+        let scope = declared.get(SCOPE)?;
+        let [region] = scope.spine().1[..] else {
+            return None;
+        };
+        let region = self.store.resolve(region);
+        (!matches!(region, Type::Meta(_))).then_some(region)
     }
 
     /// At the end of scope `index`: the needs it is the innermost scope of

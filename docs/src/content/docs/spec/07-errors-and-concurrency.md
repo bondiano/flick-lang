@@ -62,7 +62,7 @@ let clock_layer =
   Layer.succeed Clock clock_impl
 ```
 
-Here `JsClock.now` is an explicitly declared runtime binding. `Clock.now` requires the service `Clock`; a method of the obtained `Clock.Impl` does not do a repeated lookup. The hidden captures of an implementation record are kept in its type and in the Layer. Service methods do not become class instances. [Effect services](https://effect.website/docs/v4/requirements-management/services).
+Here `JsClock.now` is an explicitly declared runtime binding. `Clock.now` requires the service `Clock`; a method of the obtained `Clock.Impl` does not do a repeated lookup. In the first version an implementation record holds no captures: its methods are checked against the bare types of the service, and a layer that needs a resource acquires it while it is built. Service methods do not become class instances. [Effect services](https://effect.website/docs/v4/requirements-management/services).
 
 ## Providing the environment
 
@@ -89,7 +89,7 @@ Providing a layer removes the services it supplies, but adds the dependencies an
 
 ## Resources
 
-`scope` combines runtime finalization with a static ban on unsafe escape. Acquisition registers a finalizer with the lexical owner. The safe scoped API has **no early close**; separate manual-handle bindings do not get this guarantee. This restriction makes it possible to start without linearity and without typestate for an open/closed handle.
+`scope` combines runtime finalization with a static ban on unsafe escape. Acquisition registers a finalizer with the lexical owner. The safe scoped API has **no early close**; separate manual-handle bindings do not get this guarantee. A library owner that replaces or evicts its resources (`ScopedRef`, `Resource`, `ScopedCache`) hands its value out only under a lease, and releases a value once no lease holds it. This restriction makes it possible to start without linearity and without typestate for an open/closed handle.
 
 Fresh regions and transitive tracking of captures are chosen. Through the safe API it is impossible to obtain a usable capability of an already finished region. A native Cause may physically retain a closed foreign object; the safe wrapper does not expose it. A full affine/linear system is not part of the first version. The native [Effect Scope](https://effect.website/docs/v4/resource-management/scope) performs finalization; the static part and the two-phase owner belong to the Flick compiler/runtime adapter.
 

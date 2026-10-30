@@ -37,7 +37,7 @@ impl Checker<'_> {
         let late;
         let visible = match &hold.visible {
             Visible::Late(ty) | Visible::Refined(ty) => {
-                late = self.visible_in(ty);
+                late = self.shown_by(ty);
                 &late
             }
             Visible::Now(labels) => labels,
@@ -67,7 +67,7 @@ impl Checker<'_> {
             .map(|hold| Summary {
                 visible: match &hold.visible {
                     Visible::Now(labels) => labels.clone(),
-                    Visible::Late(ty) | Visible::Refined(ty) => self.visible_in(ty),
+                    Visible::Late(ty) | Visible::Refined(ty) => self.shown_by(ty),
                 },
                 bound: self.bound_of(hold),
                 hidden: self.hidden(hold),

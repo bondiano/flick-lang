@@ -1,9 +1,9 @@
-[wrapped]
-ScopedRef = "ScopedRef.ScopedRef dcbe6a2f18410e33"
-fromAcquire = "ScopedRef.from_acquire 1c33b94716042fb2"
-make = "ScopedRef.make 08ddb0a145dd95ab"
-get = "ScopedRef.get d7696b1c832538c0"
-set = "ScopedRef.set 317987717da02276"
+[language]
+ScopedRef = "`ScopedRef.ScopedRef`, Flick's own reference whose value is used only under a lease"
+fromAcquire = "`ScopedRef.from_acquire`, the acquisition in a region of its own: a value only under a lease, so that a replacement or a release waits for its uses"
+make = "`ScopedRef.make` of Flick's own reference"
+get = "`ScopedRef.use`: a value only under a lease, so that a replacement or a release waits for its uses"
+set = "`ScopedRef.set`, which releases the previous resource once no `use` holds it"
 
 [excluded]
 getUnsafe = "invariant: `unsafe*`: a plain synchronous call outside the effect, unordered with the fiber's steps"

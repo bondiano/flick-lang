@@ -1,0 +1,56 @@
+// A task holds what its result holds, as a function does: a region shown
+// only in its result or its row does not hide the handle it captured, so
+// the task cannot pass where that region is not allowed.
+module App.EffResult exposing (..)
+
+type Handle (s : Region)
+
+service Files =
+  open : forall s. String ->{Scope s;} Handle s
+  touch : forall s. Handle s ->{} Unit
+
+report : Failure none ->{} Unit
+let report _ = ()
+
+forget_result : forall s. Eff {Files} none (Handle s) -> Eff {Files} none Unit
+let forget_result t = task { ignore (await t) }
+
+spawned : Unit ->{Files;} Unit
+let spawned () =
+  scope outer {
+    scope inner {
+      let h = Files.open "inner"
+      let t : Eff {Files} none (Handle inner) = task {
+        Files.touch h
+        h
+      }
+      ignore (Fiber.spawn outer report t)
+    }
+  }
+
+stored : Unit ->{Files;} Unit
+let stored () =
+  let cell = Ref.make (task { () })
+  scope inner {
+    let h = Files.open "inner"
+    let t : Eff {Files} none (Handle inner) = task {
+      Files.touch h
+      h
+    }
+    Ref.set cell (task { ignore (await t) })
+  }
+
+in_row : Unit ->{Files;} Unit
+let in_row () =
+  scope outer {
+    scope inner {
+      let h = Files.open "inner"
+      let t : Eff {Files, Scope inner} none Unit = task { Files.touch h }
+      ignore (Fiber.spawn outer report t)
+    }
+  }
+//~ FLICK-G001 @16:23-16:48
+//~ FLICK-G003 @27:15-27:26
+//~ FLICK-G001 @40:19-40:44
+//~ FLICK-G001 @48:52-48:74
+//~ FLICK-T008 @49:40-49:41

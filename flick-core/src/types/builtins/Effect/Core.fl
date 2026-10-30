@@ -196,8 +196,11 @@ foreign effect when_ from "@flick-lang/runtime/effect/Effect" "when"
 /// is acquired now and again by the schedule, and released when the
 /// innermost `scope` (or the one of region `s`) closes.
 resource_auto :
-  forall s r e a r2 e2 i o.
-  Schedule.Schedule r2 e2 i o -> Eff r e a ->{Scope s | r + r2;} Resource.Resource s e a
+  forall c s r e a r2 e2 i o.
+  Fiber.Outlives c s =>
+  Schedule.Schedule r2 e2 i o ->
+    (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r + r2;}
+    Resource.Resource s e a
 foreign effect resource_auto from "@flick-lang/runtime/effect/Effect" "flickResourceAuto"
   arity 1
-  reviewed "effect@4.0.5 sha256:ba462ada9d77467b"
+  retention owner

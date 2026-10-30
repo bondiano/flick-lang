@@ -29,7 +29,7 @@ foreign effect from_record from "@flick-lang/runtime/effect/LayerMap" "flickFrom
 
 /// The services of `key` as a layer: a `provide` of it builds them or
 /// shares those already built.
-get : k -> LayerMap s k e ro -> Layer none e ro
+get : k -> LayerMap s k e ro -> (Layer none e ro)^{s}
 foreign pure get from "@flick-lang/runtime/effect/LayerMap" "flickGet"
   arity 1
   retention owner

@@ -8,6 +8,7 @@ use super::Checker;
 use super::convert::is_type;
 use super::regions::Held;
 use super::ty::Type;
+use super::typing::Ref;
 use crate::diagnostics::codes;
 use crate::numeric;
 use crate::source;
@@ -17,6 +18,23 @@ use crate::syntax::kind::SyntaxKind as K;
 impl Checker<'_> {
     pub fn check(&mut self, node: &Node, expected: &Type) {
         self.check_value(node, expected);
+    }
+
+    /// Whether `node` names a top-level value, a constructor or an operation,
+    /// which close over no local.
+    fn names_top_level(&self, node: &Node) -> bool {
+        let mut node = node;
+        while node.kind == K::ParenExpr {
+            let Some(inner) = node.nodes().next() else {
+                return false;
+            };
+            node = inner;
+        }
+        node.kind == K::NameExpr
+            && matches!(
+                self.typing.names.get(&node.range()),
+                Some(Ref::Value { .. } | Ref::Constructor(_) | Ref::Operation { .. })
+            )
     }
 
     #[allow(clippy::too_many_lines)]
@@ -43,7 +61,14 @@ impl Checker<'_> {
             self.record_givens(self.span(node), &givens);
             self.classes.givens.extend(givens);
             let saved = mem::take(&mut self.runtime);
+            let (holds, held) = (self.regions.holds.len(), self.regions.held.len());
             self.check(node, &body);
+            if self.names_top_level(node) {
+                // a top-level value has no environment: the regions its
+                // instantiated type names under the `forall` it does not hold
+                self.regions.holds.truncate(holds);
+                self.regions.held.truncate(held);
+            }
             let runtime = mem::replace(&mut self.runtime, saved);
             self.runtime |= runtime;
             self.classes.givens.truncate(mark);

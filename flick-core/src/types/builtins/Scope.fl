@@ -5,14 +5,17 @@ module Scope exposing (..)
 
 /// Runs `finalizer` when the owner of region `s` closes, after the
 /// resources acquired later are released.
-add_finalizer : forall c s r. (Eff r none Unit)^c ->{Scope s | r;} Unit
+add_finalizer : forall c s r. Fiber.Outlives c s => (Eff r none Unit)^c ->{Scope s | r;} Unit
 foreign effect add_finalizer from "@flick-lang/runtime/effect/Scope" "flickAddFinalizer"
   retention owner
   reviewed "effect@4.0.5 sha256:53499de357d8640a"
 
 /// `add_finalizer`, the finalizer seeing how the scope ended: `None` when
 /// its body succeeded, the cause otherwise.
-add_finalizer_exit : forall c s r. (Option RawCause ->{r;} Unit)^c ->{Scope s | r;} Unit
+add_finalizer_exit : forall c s r. Fiber.Outlives c s => (
+  Option RawCause ->{r;} Unit
+)^c ->{Scope s | r;}
+  Unit
 foreign effect add_finalizer_exit from "@flick-lang/runtime/effect/Scope" "flickAddFinalizerExit"
   retention owner
   reviewed "effect@4.0.5 sha256:219836b437064bd1"

@@ -45,7 +45,7 @@ foreign effect make_with_ttl from "@flick-lang/runtime/effect/Pool" "flickMakeWi
 
 /// An item, waiting for one to be free; the innermost `scope` (or the one
 /// of region `t`) holds it until it closes.
-get : forall s t e a. Pool s e a ->{Scope t; e} a
+get : forall s t e a. Pool s e a ->{Scope t; e} a^{t}
 foreign effect get from "@flick-lang/runtime/effect/Pool" "get"
   retention call
   reviewed "effect@4.0.5 sha256:8a6e6eaddc6c9d40"

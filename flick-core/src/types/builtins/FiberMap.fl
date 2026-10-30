@@ -29,7 +29,7 @@ foreign effect make from "@flick-lang/runtime/effect/FiberMap" "flickMake"
 run :
   forall s c r k e a.
   Fiber.Outlives c s =>
-  RunOptions -> k -> (Eff r e a)^c -> FiberMap s k e a ->{r;} Fiber.Fiber e a
+  RunOptions -> k -> (Eff {Scope s | r} e a)^c -> FiberMap s k e a ->{r;} Fiber.Fiber e a
 foreign effect run from "@flick-lang/runtime/effect/FiberMap" "flickRun"
   arity 1
   retention owner

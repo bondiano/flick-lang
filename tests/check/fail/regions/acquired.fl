@@ -1,0 +1,34 @@
+// A value `Resource.acquire_release` gives holds the region of its owner:
+// it cannot leave the scope, directly or through generic code.
+module App.Acquired exposing (..)
+
+type Raw
+
+make_conn : String ->{} Raw
+foreign effect make_conn from "./conn.js" "make"
+
+close_conn : forall c. Raw^c ->{} Unit
+foreign effect close_conn from "./conn.js" "close"
+  retention call
+
+pass : forall a. a -> a
+let pass x = x
+
+direct : Unit ->{} Unit
+let direct () =
+  let leaked =
+    scope {
+      Resource.acquire_release (task { make_conn "db" }) close_conn
+    }
+  ()
+
+generic : Unit ->{} Unit
+let generic () =
+  let leaked =
+    scope {
+      let c = Resource.acquire_release (task { make_conn "db" }) close_conn
+      pass c
+    }
+  ()
+//~ FLICK-G002 @21:7-21:68
+//~ FLICK-G002 @29:7-30:13

@@ -18,7 +18,7 @@ foreign effect make from "@flick-lang/runtime/effect/RcRef" "flickMake"
 
 /// The resource, acquiring it if no one holds it; the innermost `scope`
 /// (or the one of region `t`) holds it until it closes.
-get : forall s t e a. RcRef s e a ->{Scope t; e} a
+get : forall s t e a. RcRef s e a ->{Scope t; e} a^{t}
 foreign effect get from "@flick-lang/runtime/effect/RcRef" "get"
   retention call
   reviewed "effect@4.0.5 sha256:bd017d10758c36d1"

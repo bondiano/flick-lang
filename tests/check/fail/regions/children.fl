@@ -1,0 +1,22 @@
+// A child acquires into its owner's region: work whose type acquires into
+// another region cannot become the owner's child.
+module App.Children exposing (..)
+
+type Handle (s : Region)
+
+service Files =
+  open : forall s. String ->{Scope s;} Handle s
+
+report : Failure e ->{} Unit
+let report _ = ()
+
+elsewhere : Unit ->{Files;} Unit
+let elsewhere () =
+  scope inner {
+    let cell = Ref.make (Some (Files.open "first"))
+    let t = task { Ref.set cell (Some (Files.open "child")) }
+    scope inner2 {
+      ignore (Fiber.spawn inner2 report t)
+    }
+  }
+//~ FLICK-T008 @19:41-19:42

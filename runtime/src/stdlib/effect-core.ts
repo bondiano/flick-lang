@@ -1,12 +1,13 @@
 // Adapters of Effect's `Effect` for the parts `Effect.Core` and
 // `Effect.Concurrency`: options records from positional Flick arguments,
 // Flick's `Concurrency`, and Effect's errors as Flick errors.
-import { type Duration, Effect, Resource, type Result, type Schedule, type Scope } from "effect";
+import { type Duration, Effect, type Result, type Schedule, type Scope } from "effect";
 
 import { type Failure, exitOf } from "../cause.ts";
 import type { Data } from "../data.ts";
 import { tag, constructorName } from "../tags.ts";
 import { causeOf, noSuchElement } from "../effect/Cause.ts";
+import { type FlickResource, flickManual, flickRefresh } from "../effect/Resource.ts";
 
 /** Effect's `Concurrency` of a Flick `Effect.Concurrency`. */
 const concurrency = (c: Data): number | "unbounded" | undefined => {
@@ -82,9 +83,11 @@ export const flickReduce =
   (elements: ReadonlyArray<A>) =>
     Effect.reduce(elements, () => zero, (z, a) => f(z, a));
 
-/** `Effect.resource_auto`: Effect's `Resource.auto`, the schedule first. */
+/** `Effect.resource_auto`: Effect's `Resource.auto` over the leased `Resource`, the schedule first. */
 export const flickResourceAuto =
   <O, E2, R2>(schedule: Schedule.Schedule<O, unknown, E2, R2>) =>
-  <A, E, R>(acquire: Effect.Effect<A, E, R>): Effect.Effect<Resource.Resource<A, E>, never, R | R2 | Scope.Scope> =>
-    Resource.auto(acquire, schedule);
+  <A, E, R>(
+    acquire: Effect.Effect<A, E, R>,
+  ): Effect.Effect<FlickResource<A, E>, never, Exclude<R, Scope.Scope> | R2 | Scope.Scope> =>
+    Effect.tap(flickManual(acquire), (self) => Effect.forkScoped(Effect.repeat(flickRefresh(self), schedule)));
 

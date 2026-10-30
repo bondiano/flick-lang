@@ -6,5 +6,5 @@ lost : Unit ->{} Unit
 let lost () =
   scope owner {
     ignore (Fiber.spawn owner Effect.void)
-//                            ^^^^^^^^^^^ FLICK-T003 expected `Failure _ ->{_; none} Unit`
+//                            ^^^^^^^^^^^ FLICK-T003 expected `Failure _ ->{Scope owner | _; none} Unit`
   }

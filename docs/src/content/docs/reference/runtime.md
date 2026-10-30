@@ -56,7 +56,8 @@ child that fails, including one interrupted by its closing owner, passes its
 closing owner apart. A defect of the supervisor goes to the root reporter
 and makes the run fail. `Fiber.join` waits for a child and fails with its
 original cause. A closing owner admits no new children: spawning into it is
-a defect.
+a defect. The child and its supervisor acquire into the owner's region, so a
+task that acquires names `Scope` of that region.
 
 ## Concurrency
 

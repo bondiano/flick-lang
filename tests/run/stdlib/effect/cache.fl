@@ -87,8 +87,8 @@ let scoped () =
           capacity = 2;
           timeToLive = None;
         }
-    let a = ScopedCache.get "a" cache
-    let b = ScopedCache.get "b" cache
+    let a = ScopedCache.use "a" cache (fun v -> v)
+    let b = ScopedCache.use "b" cache (fun v -> v)
     ScopedCache.invalidate "a" cache
     ScopedCache.set "c" "plain" cache
     say
@@ -98,12 +98,11 @@ let scoped () =
       ("values: "
         ++ show
           (
-            ScopedCache.values cache,
-            ScopedCache.entries cache,
-            ScopedCache.get_option "c" cache,
-            ScopedCache.get_success "c" cache,
+            ScopedCache.use_option "c" cache (fun v -> v),
+            ScopedCache.use_success "c" cache (fun v -> v),
           ))
-    let r = ScopedCache.refresh "b" cache
+    ScopedCache.refresh "b" cache
+    let r = ScopedCache.use "b" cache (fun v -> v)
     let gone = ScopedCache.invalidate_when "c" (fun v -> v == "plain") cache
     say ("refresh: " ++ r ++ " " ++ show gone)
     ScopedCache.invalidate_all cache
@@ -114,16 +113,16 @@ let scoped () =
           capacity = 1;
           timeToLive = Some (fun _ _ -> Duration.infinity);
         }
-    say (ScopedCache.get "x" timed)
+    say (ScopedCache.use "x" timed (fun v -> v))
   }
   say "scoped cache closed"
   scope s {
     let ref = ScopedRef.from_acquire (task { acquire "first" })
-    say ("scoped ref: " ++ ScopedRef.get ref)
+    say ("scoped ref: " ++ ScopedRef.use ref (fun v -> v))
     ScopedRef.set (task { acquire "second" }) ref
-    say ("scoped ref: " ++ ScopedRef.get ref)
+    say ("scoped ref: " ++ ScopedRef.use ref (fun v -> v))
     let plain = ScopedRef.make (fun () -> 7)
-    say ("make: " ++ show (ScopedRef.get plain))
+    say ("make: " ++ show (ScopedRef.use plain (fun v -> v)))
   }
   say "scoped ref closed"
 
@@ -220,16 +219,16 @@ let resources () =
       else
         acquire ("version " ++ show (Ref.get version))
     })
-    say ("resource: " ++ Resource.get res)
+    say ("resource: " ++ Resource.use res (fun v -> v))
     Resource.refresh res
-    say ("resource: " ++ Resource.get res)
+    say ("resource: " ++ Resource.use res (fun v -> v))
     let failed =
       try
         Resource.refresh res
         "refreshed"
       with
       | Missing why -> "refresh failed: " ++ why
-    say (failed ++ ", still " ++ Resource.get res)
+    say (failed ++ ", still " ++ Resource.use res (fun v -> v))
   }
 
 main : Unit ->{; AppError} Unit

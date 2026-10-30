@@ -1,0 +1,20 @@
+acquire ref 1
+acquire ref 2
+still using ref 1
+release ref 1
+now ref 2
+acquire res 1
+acquire res 2
+still using res 1
+release res 1
+now res 2
+acquire entry a
+still using entry a
+release entry a
+acquire entry a
+now entry a
+closing
+release entry a
+release res 2
+release ref 2
+closed

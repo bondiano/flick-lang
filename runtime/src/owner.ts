@@ -140,7 +140,7 @@ export class FlickFiber<A, E> {
  * `Fiber.spawn owner supervisor task`: runs `task` as a child of `owner`.
  * A failure of the child, its interruption by a closing owner included,
  * goes to `supervisor`; a defect of the supervisor goes to the root
- * reporter. The child acquires into its owner's scope.
+ * reporter. The child and the supervisor acquire into its owner's scope.
  */
 export const fiberSpawn = <A, E, R, R2>(
   owner: Owner,
@@ -160,7 +160,7 @@ export const fiberSpawn = <A, E, R, R2>(
           owner.children.delete(child);
           if (Exit.isFailure(exit)) {
             const shutdown = !owner.open && Cause.hasInterruptsOnly(exit.cause);
-            const supervised = yield* Effect.exit(supervisor(new Failure(exit.cause, shutdown)));
+            const supervised = yield* Effect.exit(inside(owner, supervisor(new Failure(exit.cause, shutdown))));
             if (Exit.isFailure(supervised)) reportDefect(supervised.cause);
           }
         }),

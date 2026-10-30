@@ -8,7 +8,7 @@ acquire entry a
 acquire entry b
 release entry a
 scoped cache: ("entry a", "entry b", 2, false, ["b", "c"])
-values: (["entry b", "plain"], [("b", "entry b"), ("c", "plain")], Some "plain", Some "plain")
+values: (Some "plain", Some "plain")
 acquire entry b
 release entry b
 refresh: entry b true

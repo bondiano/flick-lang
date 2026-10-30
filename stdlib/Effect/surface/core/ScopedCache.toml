@@ -1,8 +1,5 @@
 [wrapped]
 ScopedCache = "ScopedCache.ScopedCache d5158b90bc32d167"
-get = "ScopedCache.get 1d61842bd6505604"
-getOption = "ScopedCache.get_option 6bc6c011f7113a43"
-getSuccess = "ScopedCache.get_success e8b0821dbef0c105"
 set = "ScopedCache.set e53b86618baa477e"
 has = "ScopedCache.has a78d8aa2a0d7e860"
 invalidate = "ScopedCache.invalidate c314077e04cc8375"
@@ -11,11 +8,16 @@ refresh = "ScopedCache.refresh ae56c86a6d037203"
 invalidateAll = "ScopedCache.invalidate_all 5455eb215e13d5aa"
 size = "ScopedCache.size 9ccf109c88ed2682"
 keys = "ScopedCache.keys 339c1fe6110bad0b"
-values = "ScopedCache.values 07528b5443f578d4"
-entries = "ScopedCache.entries 44677fafc521a1cc"
 make = "ScopedCache.make 463f2234265282d1"
 makeWith = "ScopedCache.make_with d09a00e4ddb73874"
 
+[language]
+get = "`ScopedCache.use`: a value only under a lease, so that a replacement or a release waits for its uses"
+getOption = "`ScopedCache.use_option`: a value only under a lease, so that a replacement or a release waits for its uses"
+getSuccess = "`ScopedCache.use_success`: a value only under a lease, so that a replacement or a release waits for its uses"
+
 [excluded]
+values = "invariant: values without a lease could outlive their entry's release; `ScopedCache.use` per key"
+entries = "invariant: values without a lease could outlive their entry's release; `ScopedCache.keys` and `ScopedCache.use`"
 Entry = "TS-only: the internal state of the data structure, never handed to a caller"
 State = "TS-only: the internal state of the data structure, never handed to a caller"

@@ -1,34 +1,35 @@
-/// Effect's `ScopedRef`: a reference to a resource that `set` replaces,
-/// releasing the previous one. The last resource is released when the
-/// `scope` owning the reference's region closes.
+/// A reference to a resource that `set` replaces. Its value is used only
+/// inside `use`, which holds it: the previous resource is released once no
+/// `use` holds it, and the last one when the `scope` owning the reference's
+/// region closes.
 module ScopedRef exposing (..)
 
 /// A reference of region `s` to a resource of `a`.
 type ScopedRef (s : Region) a
 
 /// A reference owned by the innermost `scope` (or the one of region `s`),
-/// holding the resource `acquire` gives.
-from_acquire : forall c s r e a. (Eff r e a)^c ->{Scope s | r; e} ScopedRef s a
-foreign effect from_acquire from "@flick-lang/runtime/effect/ScopedRef" "fromAcquire"
+/// holding the resource `acquire` gives. `acquire` acquires into a region
+/// `t` of its own, which ends when the resource is released: a value of a
+/// type that names its region, such as `File t`, cannot be kept here.
+from_acquire :
+  forall c s r e a. (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a
+foreign effect from_acquire from "@flick-lang/runtime/effect/ScopedRef" "flickFromAcquire"
   retention call
-  reviewed "effect@4.0.5 sha256:1c33b94716042fb2"
 
 /// A reference holding `f ()`, which needs no release.
 make : forall c s a. (Unit -> a)^c ->{Scope s;} ScopedRef s a
-foreign effect make from "@flick-lang/runtime/effect/ScopedRef" "make"
+foreign effect make from "@flick-lang/runtime/effect/ScopedRef" "flickMake"
   retention call
-  reviewed "effect@4.0.5 sha256:08ddb0a145dd95ab"
 
-/// The current resource.
-get : forall s a. ScopedRef s a ->{} a
-foreign effect get from "@flick-lang/runtime/effect/ScopedRef" "get"
+/// Runs `f` with the current resource, which stays acquired until `f`
+/// ends; what `f` gives cannot hold the resource.
+use : forall c s r e a b. ScopedRef s a -> (forall t. a^{t} ->{r; e} b)^c ->{r; e} b
+foreign effect use from "@flick-lang/runtime/effect/ScopedRef" "flickUse"
   retention call
-  reviewed "effect@4.0.5 sha256:d7696b1c832538c0"
 
-/// Acquires a new resource with `acquire` and releases the previous one;
-/// if `acquire` fails, the previous one stays.
-set : forall c s r e a. (Eff r e a)^c -> (ScopedRef s a ->{r; e} Unit)^c
-foreign effect set from "@flick-lang/runtime/effect/ScopedRef" "set"
+/// Acquires a new resource with `acquire`; the previous one is released
+/// once no `use` holds it. If `acquire` fails, the previous one stays.
+set : forall c s r e a. (forall t. Eff {Scope t | r} e a^{t})^c -> (ScopedRef s a ->{r; e} Unit)^c
+foreign effect set from "@flick-lang/runtime/effect/ScopedRef" "flickSet"
   arity 1
   retention call
-  reviewed "effect@4.0.5 sha256:317987717da02276"

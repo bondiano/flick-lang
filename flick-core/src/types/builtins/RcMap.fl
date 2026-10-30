@@ -27,14 +27,14 @@ foreign effect make from "@flick-lang/runtime/effect/RcMap" "flickMake"
 
 /// The resource of `key`, looking it up if no one holds it; the innermost
 /// `scope` (or the one of region `t`) holds it until it closes.
-get : forall s t k e a. k -> RcMap s k e a ->{Scope t; ExceededCapacity | e} a
+get : forall s t k e a. k -> RcMap s k e a ->{Scope t; ExceededCapacity | e} a^{t}
 foreign effect get from "@flick-lang/runtime/effect/RcMap" "flickGet"
   arity 1
   retention call
   reviewed "effect@4.0.5 sha256:361e3835af8b8aab"
 
 /// The resource of `key` if it is held now, holding it as `get` does.
-get_option : forall s t k e a. k -> RcMap s k e a ->{Scope t; e} Option a
+get_option : forall s t k e a. k -> RcMap s k e a ->{Scope t; e} (Option a)^{t}
 foreign effect get_option from "@flick-lang/runtime/effect/RcMap" "getOption"
   arity 1
   retention call
