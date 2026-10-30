@@ -198,8 +198,8 @@ func defectTree(defect string) Value {
 	return text
 }
 
-// defectText is the defect of a tree another side sent.
-func defectText(tree Value) string {
+// wireDefectText is the defect of a tree another side sent.
+func wireDefectText(tree Value) string {
 	switch x := tree.(type) {
 	case string:
 		return x

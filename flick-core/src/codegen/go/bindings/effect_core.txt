@@ -1,0 +1,214 @@
+# The Go functions of Effect's core on the go target: tasks, errors,
+# causes, time, randomness and schedules, as in effect.txt.
+
+[@flick-lang/runtime/effect/Clock]
+clockWith *ClockWith
+flickMillisOf *ClockMillisOf
+flickNanosOf *ClockNanosOf
+flickMonotonicNanosOf *ClockMonotonicOf
+flickCurrentTimeMillis *ClockCurrentMillis
+flickCurrentTimeNanos *ClockCurrentNanos
+flickMonotonicTimeNanos *ClockMonotonicNanos
+
+
+[@flick-lang/runtime/effect/Effect]
+retry *EffectRetry
+retryOrElse *EffectRetryOrElse
+repeat *EffectRepeat
+repeatOrElse *EffectRepeatOrElse
+schedule *EffectSchedule
+scheduleFrom *EffectScheduleFrom
+die *EffectDie
+flickFailCauseSync *EffectFailCauseSync
+yieldNowWith *EffectYieldNowWith
+zipWith *EffectZipWith
+delay *EffectDelay
+timed *EffectTimed
+flickTimeoutOrElse *EffectTimeoutOrElse
+forever *EffectForever
+eventually *EffectEventually
+replicate EffectReplicate
+flickReplicateEffect *EffectReplicateEffect
+when *EffectWhen
+flickResourceAuto *EffectResourceAuto
+flickForEach *EffectForEach
+flickPartition *EffectPartition
+flickValidate *EffectValidate
+flickFilter *EffectFilter
+filterMap *EffectFilterMap
+flickFilterMapEffect *EffectFilterMapEffect
+findFirst *EffectFindFirst
+findFirstFilter *EffectFindFirstFilter
+firstSuccessOf *EffectFirstSuccessOf
+flickHead *EffectHead
+flickReduce *EffectReduce
+filterOrElse *EffectFilterOrElse
+filterMapOrElse *EffectFilterMapOrElse
+filterOrFail *EffectFilterOrFail
+filterMapOrFail *EffectFilterMapOrFail
+flickCatchCause *EffectCatchCause
+flickCatchCauseIf *EffectCatchCauseIf
+flickCatchCauseFilter *EffectCatchCauseFilter
+flickCatchDefect *EffectCatchDefect
+flickTapCause *EffectTapCause
+flickTapCauseIf *EffectTapCauseIf
+flickTapCauseFilter *EffectTapCauseFilter
+flickTapDefect *EffectTapDefect
+flickMatchCause *EffectMatchCause
+flickMatchCauseEager *EffectMatchCause
+flickMatchCauseEffect *EffectMatchCauseEffect
+flickMatchCauseEffectEager *EffectMatchCauseEffect
+orDie *EffectOrDie
+flickIgnore *EffectIgnore
+flickIgnoreCause *EffectIgnoreCause
+flickOnError *EffectOnError
+flickOnErrorIf *EffectOnErrorIf
+flickOnErrorFilter *EffectOnErrorFilter
+flickOnExitIf *EffectOnExitIf
+flickOnExitFilter *EffectOnExitFilter
+flickOnExitPrimitive *EffectOnExitPrimitive
+flickAddFinalizer *AddFinalizerExit
+flickWithErrorReporting *EffectWithErrorReporting
+tx *TxAtomically
+
+[@flick-lang/runtime/effect/Tx]
+flickCurrent *TxCurrent
+
+[@flick-lang/runtime/effect/Resource]
+manual *ResourceManual
+get *ResourceGet
+refresh *ResourceRefresh
+
+[@flick-lang/runtime/effect/Cause]
+flickFromReasons CauseFromReasons
+flickReasons CauseReasons
+makeFailReason CauseMakeFailReason
+makeDieReason CauseMakeDieReason
+flickMakeInterruptReason CauseMakeInterruptReason
+isFailReason CauseIsFailReason
+isDieReason CauseIsDieReason
+isInterruptReason CauseIsInterruptReason
+flickFindFail CauseFindFail
+flickFindError CauseFindError
+flickFindDie CauseFindDie
+flickFindDefect CauseFindDefect
+flickFindInterrupt CauseFindInterrupt
+flickFilterInterruptors CauseFilterInterruptors
+flickPretty CausePretty
+flickPrettyErrors CausePrettyErrors
+flickStackTrace CauseStackTrace
+flickInterruptorStackTrace CauseInterruptorStackTrace
+flickReasonStackTrace CauseReasonStackTrace
+flickAnnotate CauseAnnotate
+flickFrameName CauseFrameName
+flickFrameStack CauseFrameStack
+flickFrameParent CauseFrameParent
+
+[@flick-lang/runtime/effect/Random]
+flickNext *RandomNext
+flickNextBoolean *RandomNextBoolean
+flickNextInt *RandomNextInt
+nextBetween *RandomNextBetween
+flickNextIntBetween *RandomNextIntBetween
+shuffle *RandomShuffle
+choice *RandomChoice
+withSeed *RandomWithSeed
+
+[@flick-lang/runtime/effect/Schedule]
+once ScheduleOnce
+identity ScheduleIdentity
+spaced ScheduleSpaced
+fixed ScheduleFixed
+windowed ScheduleWindowed
+duration ScheduleDuration
+during ScheduleDuring
+exponential ScheduleExponential
+fibonacci ScheduleFibonacci
+jittered ScheduleJittered
+passthrough SchedulePassthrough
+concat ScheduleConcat
+concatResult ScheduleConcatResult
+max ScheduleMax
+min ScheduleMin
+flickUpTo ScheduleUpTo
+map ScheduleMap
+tap ScheduleTap
+while ScheduleWhile
+addDelay ScheduleAddDelay
+modifyDelay ScheduleModifyDelay
+flickCurrentMetadata *ScheduleCurrentMetadata
+cron ScheduleCron
+
+[@flick-lang/runtime/effect/DateTime]
+flickMake DateTimeMake
+flickFromParts DateTimeFromParts
+flickFromEpochSeconds DateTimeFromEpochSeconds
+flickMakeZoned DateTimeMakeZoned
+flickMakeZonedFromString DateTimeMakeZonedFromString
+flickNow *DateTimeNow
+isUtc DateTimeIsUtc
+isZoned DateTimeIsZoned
+match DateTimeMatch
+toUtc DateTimeToUtc
+flickSetZone DateTimeSetZone
+flickSetZoneOffset DateTimeSetZoneOffset
+flickSetZoneNamed DateTimeSetZoneNamed
+zoneMakeOffset DateTimeZoneMakeOffset
+flickZoneMakeNamed DateTimeZoneMakeNamed
+zoneMakeLocal DateTimeZoneMakeLocal
+flickZoneFromString DateTimeZoneFromString
+zoneToString DateTimeZoneToString
+toEpochMillis DateTimeToEpochMillis
+toEpochSeconds DateTimeToEpochSeconds
+mapEpochMillis DateTimeMapEpochMillis
+toParts DateTimeToParts
+toPartsUtc DateTimeToPartsUtc
+flickSetParts DateTimeSetParts
+flickSetPartsUtc DateTimeSetPartsUtc
+removeTime DateTimeRemoveTime
+flickZonedOffset DateTimeZonedOffset
+flickZonedOffsetIso DateTimeZonedOffsetIso
+flickAdd DateTimeAdd
+flickSubtract DateTimeSubtract
+addDuration DateTimeAddDuration
+subtractDuration DateTimeSubtractDuration
+flickStartOf DateTimeStartOf
+flickEndOf DateTimeEndOf
+flickNearest DateTimeNearest
+flickDistance DateTimeDistance
+flickCompare DateTimeCompare
+min DateTimeMin
+max DateTimeMax
+clamp DateTimeClamp
+between DateTimeBetween
+isLessThan DateTimeLess
+isLessThanOrEqualTo DateTimeLessEq
+isGreaterThan DateTimeGreater
+isGreaterThanOrEqualTo DateTimeGreaterEq
+isFuture *DateTimeIsFuture
+isPast *DateTimeIsPast
+flickFormat DateTimeFormat
+flickFormatLocal DateTimeFormatLocal
+flickFormatUtc DateTimeFormatUtc
+flickFormatIntl DateTimeFormatIntl
+formatIso DateTimeFormatIso
+formatIsoDate DateTimeFormatIsoDate
+formatIsoDateUtc DateTimeFormatIsoDateUtc
+formatIsoOffset DateTimeFormatIsoOffset
+flickFormatIsoZoned DateTimeFormatIsoZoned
+flickJsonUtc DateTimeJsonUtc
+flickJsonUtcMillis DateTimeJsonUtcMillis
+flickJsonZoned DateTimeJsonZoned
+flickJsonZone DateTimeJsonZone
+flickJsonZoneNamed DateTimeJsonZoneNamed
+flickJsonZoneOffset DateTimeJsonZoneOffset
+
+[@flick-lang/runtime/effect/Cron]
+flickMake CronMake
+flickParse CronParse
+flickFormat CronFormat
+flickMatch CronMatch
+flickNext CronNext
+flickPrev CronPrev
+flickSequence CronSequence
+Equivalence CronEquals

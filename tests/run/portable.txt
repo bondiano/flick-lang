@@ -49,6 +49,15 @@ stdlib/effect/record
 stdlib/effect/string
 stdlib/effect/string_locale
 stdlib/effect/void
+stdlib/effect/effect_core
+stdlib/effect/effect_errors
+stdlib/effect/exit_cause
+stdlib/effect/schedule
+stdlib/effect/clock_random
+stdlib/effect/mutable_ref
+stdlib/effect/datetime
+stdlib/effect/cron
+stdlib/lists
 stdlib/hash_order
 stdlib/monoids
 stdlib/seq

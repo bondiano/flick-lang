@@ -178,15 +178,15 @@ func HttpClientWithCookiesRef(cell, client Value) Value {
 
 func HttpClientRetry(policy, client Value) Value {
 	return httpClientOf(client).transformResponse(func(task Value) Value {
-		return Eff(func(fb *Fiber) Value { return retrying(fb, scheduleOf(policy), task, nil) })
+		return Eff(func(fb *Fiber) Value { return retrying(fb, policy, task, nil) })
 	})
 }
 
 // retrying runs `task` again after each typed failure the schedule, given
 // the error, continues for, waiting the schedule's delay or the one
 // `delayOf` the error gives, whichever is longer.
-func retrying(fb *Fiber, s *Schedule, task Value, delayOf func(Value) time.Duration) Value {
-	next := s.start()
+func retrying(fb *Fiber, s Value, task Value, delayOf func(Value) time.Duration) Value {
+	r := startRun(fb, s)
 	for {
 		out, cause := catch(func() Value { return Run(fb, task) })
 		if cause == nil {
@@ -196,14 +196,15 @@ func retrying(fb *Fiber, s *Schedule, task Value, delayOf func(Value) time.Durat
 		if !ok {
 			panic(&Failure{cause})
 		}
-		d, again := next(err)
-		if !again {
+		_, d, done := r.step(fb, err)
+		if done {
 			panic(&Failure{cause})
 		}
+		wait := toGoDuration(d)
 		if delayOf != nil {
-			d = max(d, delayOf(err))
+			wait = max(wait, delayOf(err))
 		}
-		sleep(fb, d, false)
+		sleepFor(fb, wait)
 	}
 }
 
@@ -215,7 +216,8 @@ var transientStatus = map[int32]bool{408: true, 429: true, 500: true, 502: true,
 // delaying the next try.
 func HttpClientRetryTransient(on, times, client Value) Value {
 	mode := ConstructorName(on.(*Data).Tag)
-	limited := ScheduleRecurs(times).(*Schedule)
+	limited := ScheduleRecurs(times)
+	transient := whileGo(limited, func(_ *Fiber, i info, _ Value, _ *Duration) bool { return isTransientFailure(i.input) })
 	return httpClientOf(client).transformResponse(func(task Value) Value {
 		if mode != "ErrorsOnly" {
 			task = repeatingTransient(task, limited)
@@ -223,26 +225,26 @@ func HttpClientRetryTransient(on, times, client Value) Value {
 		if mode != "ResponseOnly" {
 			retried := task
 			task = Eff(func(fb *Fiber) Value {
-				return retrying(fb, limited.while(isTransientFailure), retried, nil)
+				return retrying(fb, transient, retried, nil)
 			})
 		}
 		return task
 	})
 }
 
-func repeatingTransient(task Value, s *Schedule) Value {
+func repeatingTransient(task Value, s Value) Value {
 	return Eff(func(fb *Fiber) Value {
-		next := s.start()
+		r := startRun(fb, s)
 		for {
-			r := clientResponseOf(Run(fb, task))
-			if !transientStatus[r.status] {
-				return r
+			response := clientResponseOf(Run(fb, task))
+			if !transientStatus[response.status] {
+				return response
 			}
-			d, again := next(r)
-			if !again {
-				return r
+			_, d, done := r.step(fb, response)
+			if done {
+				return response
 			}
-			sleep(fb, max(d, retryAfter(recordField(r.headers, "retry-after"))), false)
+			sleepFor(fb, max(toGoDuration(d), retryAfter(clockOf(fb), recordField(response.headers, "retry-after"))))
 		}
 	})
 }
@@ -262,7 +264,7 @@ var retryAfterSeconds = regexp.MustCompile(`^\d+(?:\.\d+)?$`)
 
 // retryAfter is the delay a `Retry-After` value asks for, at least a
 // millisecond: seconds or a date.
-func retryAfter(header Value) time.Duration {
+func retryAfter(clock Clock, header Value) time.Duration {
 	v, ok := header.(string)
 	if !ok {
 		return 0
@@ -276,7 +278,7 @@ func retryAfter(header Value) time.Duration {
 	if err != nil {
 		return 0
 	}
-	return max(time.Until(at), time.Millisecond)
+	return max(time.Duration(float64(at.UnixMilli())-clock.millis())*time.Millisecond, time.Millisecond)
 }
 
 // HttpClientFollowRedirects follows a 3xx answer with a `Location`, at

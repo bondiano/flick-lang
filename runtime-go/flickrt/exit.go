@@ -56,7 +56,7 @@ func ExitSucceed(v Value) Value   { return &Exit{value: v} }
 func ExitFail(err Value) Value    { return &Exit{cause: &Cause{kind: causeFail, err: err}} }
 func ExitFailCause(f Value) Value { return &Exit{cause: causeOfFailure(f)} }
 func ExitDie(message Value) Value {
-	return &Exit{cause: &Cause{kind: causeDie, defect: message.(string)}}
+	return &Exit{cause: &Cause{kind: causeDie, defect: message.(string), plain: true}}
 }
 func ExitInterrupt(id Value) Value    { return &Exit{cause: interruption(id)} }
 func ExitIsSuccess(e Value) Value     { return ex(e).cause == nil }
@@ -117,9 +117,18 @@ func ExitFindErrorOption(e Value) Value {
 
 func ExitFindDefect(e Value) Value {
 	if r := ex(e).cause.firstOf(causeDie); r != nil {
-		return Ok(defectMessage(r.defect))
+		return Ok(defectText(r))
 	}
 	return Err(e)
+}
+
+// defectText is a defect as the JS target describes it: text as given,
+// the message of an error.
+func defectText(r *Cause) string {
+	if r.plain {
+		return r.defect
+	}
+	return defectMessage(r.defect)
 }
 
 // defectMessage is a defect as the JS target describes it: the message of
@@ -194,7 +203,7 @@ var CauseEmpty Value = failureOf(nil)
 
 func CauseFail(err Value) Value { return failureOf(&Cause{kind: causeFail, err: err}) }
 func CauseDie(message Value) Value {
-	return failureOf(&Cause{kind: causeDie, defect: message.(string)})
+	return failureOf(&Cause{kind: causeDie, defect: message.(string), plain: true})
 }
 func CauseInterrupt(id Value) Value    { return failureOf(interruption(id)) }
 func CauseHasFails(f Value) Value      { return causeOfFailure(f).has(causeFail) }

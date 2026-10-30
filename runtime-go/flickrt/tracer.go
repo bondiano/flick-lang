@@ -2,6 +2,7 @@ package flickrt
 
 import (
 	"fmt"
+	"strings"
 	"sync/atomic"
 )
 
@@ -55,8 +56,16 @@ func openSpan(fb *Fiber, name, options Value) *span {
 	}
 }
 
+// TracerWithSpan runs `task` in a span, and in its stack frame, which a
+// failure in it carries; with `captureStackTrace`, the frame has the Flick
+// lines that opened it.
 func TracerWithSpan(fb *Fiber, name, options, task Value) Value {
-	return withEnv(fb, parentSpanKey, openSpan(fb, name, options), task)
+	s := openSpan(fb, name, options)
+	f := &stackFrame{name: name.(string), stack: None, parent: currentFrame(fb)}
+	if capture, ok := record(options).Get("captureStackTrace").(bool); ok && capture {
+		f.stack = Some(strings.TrimSuffix(flickFrames(), "\n"))
+	}
+	return withFrame(fb, f, Eff(func(fb *Fiber) Value { return withEnv(fb, parentSpanKey, s, task) }))
 }
 
 func TracerParentSpan(fb *Fiber) Value { return currentSpan(fb) }

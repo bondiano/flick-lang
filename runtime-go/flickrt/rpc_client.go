@@ -139,7 +139,7 @@ func (c *rpcClient) exit(p *rpcProc, m Value) Value {
 	case "ClientProtocolError":
 		return Fail(msgField(m, "error"))
 	case "Defect":
-		panic(&Failure{&Cause{kind: causeDie, defect: defectText(unhole(c.ser, binDefectLayout, msgField(m, "defect")))}})
+		panic(&Failure{&Cause{kind: causeDie, defect: wireDefectText(unhole(c.ser, binDefectLayout, msgField(m, "defect")))}})
 	}
 	tree := unhole(c.ser, p.layouts().exit, msgField(m, "exit"))
 	if msgField(tree, "_tag") == "Success" {
@@ -158,7 +158,7 @@ func (c *rpcClient) exit(p *rpcProc, m Value) Value {
 		case "Fail":
 			cause = Sequential(cause, &Cause{kind: causeFail, err: decodeError(p, msgField(r, "error"))})
 		case "Die":
-			cause = Sequential(cause, &Cause{kind: causeDie, defect: defectText(msgField(r, "defect"))})
+			cause = Sequential(cause, &Cause{kind: causeDie, defect: wireDefectText(msgField(r, "defect"))})
 		case "Interrupt":
 			id, _ := msgField(r, "fiberId").(float64)
 			cause = Sequential(cause, &Cause{kind: causeInterrupt, fiber: int64(id)})

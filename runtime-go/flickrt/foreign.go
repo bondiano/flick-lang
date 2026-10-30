@@ -27,15 +27,17 @@ func ForeignAsync(fb *Fiber, call func(Context) Value) Value {
 	if fb.state.mask > 0 {
 		signal = nil
 	}
-	idle()
+	park(fb)
 	select {
 	case r := <-ended:
+		unpark(fb)
 		cancel()
 		if r.cause != nil {
 			panic(&Failure{r.cause})
 		}
 		return r.value
 	case <-signal:
+		unpark(fb)
 		cancel()
 		fb.owner.track(done)
 		panic(fb.state.stopped())
