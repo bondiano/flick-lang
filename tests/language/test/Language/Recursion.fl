@@ -39,18 +39,16 @@ let rec last_of xs =
   | [_, ...rest] -> last_of rest
 
 tests : List Test.Test
-let tests =
-  [
-    Test.test "a million tail calls" (fun () -> Test.equal 1000000 (count 1000000 0)),
-    Test.test
-      "mutual recursion a million deep"
-      (fun () -> Test.equal (true, false) (is_even 1000000, is_odd 1000000)),
-    Test.test "tail calls through match arms" (fun () -> Test.equal 111 (collatz_steps 27 0)),
-    Test.test "non-tail recursion" (fun () -> Test.equal 12502500 (sum_to 5000)),
-    Test.test "tree recursion" (fun () -> Test.equal 6765 (fib 20)),
-    Test.test "a long list" (fun () -> Test.equal (Some 99999) (last_of (List.range 0 100000))),
-    Test.test
-      "folds over a million"
-      (fun () ->
-        Test.equal 1783293664 (List.fold_left (fun acc x -> acc + x) 0 (List.range 0 1000000))),
-  ]
+let tests = [
+  Test.test "a million tail calls" (fun () -> Test.equal 1000000 (count 1000000 0)),
+  Test.test "mutual recursion a million deep" (fun () ->
+    Test.equal (true, false) (is_even 1000000, is_odd 1000000)
+  ),
+  Test.test "tail calls through match arms" (fun () -> Test.equal 111 (collatz_steps 27 0)),
+  Test.test "non-tail recursion" (fun () -> Test.equal 12502500 (sum_to 5000)),
+  Test.test "tree recursion" (fun () -> Test.equal 6765 (fib 20)),
+  Test.test "a long list" (fun () -> Test.equal (Some 99999) (last_of (List.range 0 100000))),
+  Test.test "folds over a million" (fun () ->
+    Test.equal 1783293664 (List.fold_left (fun acc x -> acc + x) 0 (List.range 0 1000000))
+  ),
+]

@@ -14,10 +14,9 @@ let main () =
   let replaced = String.replace_all "7" "seven" joined
   let upper = String.to_upper replaced
   Platform.stdout_line
-    (show
-      [
-        String.length grown,
-        List.length parts,
-        String.length upper,
-        String.length (String.trim upper),
-      ])
+    (show [
+      String.length grown,
+      List.length parts,
+      String.length upper,
+      String.length (String.trim upper),
+    ])

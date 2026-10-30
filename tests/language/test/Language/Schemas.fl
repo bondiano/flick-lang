@@ -2,13 +2,11 @@
 // what decoding accepts, and the text of each issue, by path.
 module Language.Schemas exposing (tests)
 
-type Shape =
-  | Circle Float
-  | Rect Float Float
-  | Dot
+type Shape = Circle Float | Rect Float Float | Dot
   deriving Schema
 
-type alias Point = { x : Int; y : Int; label : Option String } deriving Schema
+type alias Point = { x : Int; y : Int; label : Option String }
+  deriving Schema
 
 type alias Order = {
   id : BigInt;
@@ -40,118 +38,91 @@ let order =
   "{\"id\": \"1\", \"items\": [{\"sku\": \"a\", \"qty\": 1}], \"shape\": {\"_tag\": \"Dot\"}, \"paid\": {\"ok\": true}}"
 
 tests : List Test.Test
-let tests =
-  [
-    Test.group
-      "encode"
-      [
-        Test.test
-          "labels are sorted"
-          (fun () ->
-            Test.equal
-              "{\"label\":null,\"x\":1,\"y\":-2}"
-              (encoded (schema Point) { y = -2; x = 1; label = None })),
-        Test.test
-          "variants"
-          (fun () ->
-            Test.equal
-              "[{\"_tag\":\"Circle\",\"_0\":1},{\"_tag\":\"Rect\",\"_0\":2,\"_1\":3.5},{\"_tag\":\"Dot\"}]"
-              (encoded (Schema.list (schema Shape)) [Circle 1, Rect 2 3.5, Dot])),
-        Test.test
-          "NaN has no JSON form"
-          (fun () -> Test.equal "(root): NaN has no JSON form" (encoded Schema.number (0.0 / 0.0))),
-        Test.test
-          "BigInt as a string"
-          (fun () ->
-            Test.equal
-              "\"-12345678901234567890\""
-              (encoded Schema.bigint (-12345678901234567890n))),
-      ],
-    Test.group
-      "decode"
-      [
-        Test.test
-          "a whole order"
-          (fun () ->
-            Test.equal
-              "ok {\"id\":\"1\",\"items\":[{\"qty\":1,\"sku\":\"a\"}],\"paid\":{\"ok\":true},\"shape\":{\"_tag\":\"Dot\"}}"
-              (decoded (schema Order) order)),
-        Test.test
-          "Int out of range"
-          (fun () ->
-            Test.equal
-              "x: expected an Int, an integer from -2147483648 to 2147483647"
-              (decoded (schema Point) "{\"x\": 4294967296, \"y\": 2, \"label\": null}")),
-        Test.test
-          "a fraction for an Int"
-          (fun () ->
-            Test.equal
-              "x: expected an Int, an integer from -2147483648 to 2147483647"
-              (decoded (schema Point) "{\"x\": 1.5, \"y\": 2, \"label\": null}")),
-        Test.test
-          "a missing key"
-          (fun () ->
-            Test.equal "y: a missing key" (decoded (schema Point) "{\"x\": 1, \"label\": null}")),
-        Test.test
-          "an unknown key"
-          (fun () ->
-            Test.equal
-              "z: an unknown key"
-              (decoded (schema Point) "{\"x\": 1, \"y\": 2, \"label\": null, \"z\": 0}")),
-        Test.test
-          "a wrong type"
-          (fun () ->
-            Test.equal
-              "x: expected an Int, got string"
-              (decoded (schema Point) "{\"x\": \"1\", \"y\": 2, \"label\": null}")),
-        Test.test
-          "not an object"
-          (fun () ->
-            Test.equal
-              "(root): expected an object, got an array"
-              (decoded (schema Point) "[1, 2]")),
-        Test.test
-          "an unknown variant"
-          (fun () ->
-            Test.equal
-              "_tag: expected one of Circle, Rect, Dot"
-              (decoded (schema Shape) "{\"_tag\": \"Oval\"}")),
-        Test.test
-          "a missing field of a variant"
-          (fun () ->
-            Test.equal
-              "_1: a missing key"
-              (decoded (schema Shape) "{\"_tag\": \"Rect\", \"_0\": 1}")),
-        Test.test
-          "nested paths"
-          (fun () ->
-            Test.equal
-              "items[1].qty: expected an Int, got boolean"
-              (decoded
-                (schema Order)
-                (String.replace_all
-                  "[{\"sku\": \"a\", \"qty\": 1}]"
-                  "[{\"sku\": \"a\", \"qty\": 1}, {\"sku\": \"b\", \"qty\": true}]"
-                  order))),
-        Test.test
-          "a record stops at its first issue"
-          (fun () ->
-            Test.equal
-              "id: expected a string of digits"
-              (decoded
-                (schema Order)
-                (String.replace_all "true" "1" (String.replace_all "\"1\"" "\"x\"" order)))),
-        Test.test
-          "a result"
-          (fun () ->
-            Test.equal
-              "paid: expected an object with `ok` or `err`, got number"
-              (decoded (schema Order) (String.replace_all "{\"ok\": true}" "5" order))),
-        Test.test
-          "invalid JSON"
-          (fun () ->
-            Test.equal
-              "not JSON: Expected double-quoted property name in JSON at position 8 (line 1 column 9)"
-              (decoded (schema Point) "{\"x\": 1,")),
-      ],
-  ]
+let tests = [
+  Test.group "encode" [
+    Test.test "labels are sorted" (fun () ->
+      Test.equal
+        "{\"label\":null,\"x\":1,\"y\":-2}"
+        (encoded (schema Point) { y = -2; x = 1; label = None })
+    ),
+    Test.test "variants" (fun () ->
+      Test.equal
+        "[{\"_tag\":\"Circle\",\"_0\":1},{\"_tag\":\"Rect\",\"_0\":2,\"_1\":3.5},{\"_tag\":\"Dot\"}]"
+        (encoded (Schema.list (schema Shape)) [Circle 1, Rect 2 3.5, Dot])
+    ),
+    Test.test "NaN has no JSON form" (fun () ->
+      Test.equal "(root): NaN has no JSON form" (encoded Schema.number (0.0 / 0.0))
+    ),
+    Test.test "BigInt as a string" (fun () ->
+      Test.equal "\"-12345678901234567890\"" (encoded Schema.bigint (-12345678901234567890n))
+    ),
+  ],
+  Test.group "decode" [
+    Test.test "a whole order" (fun () ->
+      Test.equal
+        "ok {\"id\":\"1\",\"items\":[{\"qty\":1,\"sku\":\"a\"}],\"paid\":{\"ok\":true},\"shape\":{\"_tag\":\"Dot\"}}"
+        (decoded (schema Order) order)
+    ),
+    Test.test "Int out of range" (fun () ->
+      Test.equal
+        "x: expected an Int, an integer from -2147483648 to 2147483647"
+        (decoded (schema Point) "{\"x\": 4294967296, \"y\": 2, \"label\": null}")
+    ),
+    Test.test "a fraction for an Int" (fun () ->
+      Test.equal
+        "x: expected an Int, an integer from -2147483648 to 2147483647"
+        (decoded (schema Point) "{\"x\": 1.5, \"y\": 2, \"label\": null}")
+    ),
+    Test.test "a missing key" (fun () ->
+      Test.equal "y: a missing key" (decoded (schema Point) "{\"x\": 1, \"label\": null}")
+    ),
+    Test.test "an unknown key" (fun () ->
+      Test.equal
+        "z: an unknown key"
+        (decoded (schema Point) "{\"x\": 1, \"y\": 2, \"label\": null, \"z\": 0}")
+    ),
+    Test.test "a wrong type" (fun () ->
+      Test.equal
+        "x: expected an Int, got string"
+        (decoded (schema Point) "{\"x\": \"1\", \"y\": 2, \"label\": null}")
+    ),
+    Test.test "not an object" (fun () ->
+      Test.equal "(root): expected an object, got an array" (decoded (schema Point) "[1, 2]")
+    ),
+    Test.test "an unknown variant" (fun () ->
+      Test.equal
+        "_tag: expected one of Circle, Rect, Dot"
+        (decoded (schema Shape) "{\"_tag\": \"Oval\"}")
+    ),
+    Test.test "a missing field of a variant" (fun () ->
+      Test.equal "_1: a missing key" (decoded (schema Shape) "{\"_tag\": \"Rect\", \"_0\": 1}")
+    ),
+    Test.test "nested paths" (fun () ->
+      Test.equal
+        "items[1].qty: expected an Int, got boolean"
+        (decoded
+          (schema Order)
+          (String.replace_all
+            "[{\"sku\": \"a\", \"qty\": 1}]"
+            "[{\"sku\": \"a\", \"qty\": 1}, {\"sku\": \"b\", \"qty\": true}]"
+            order))
+    ),
+    Test.test "a record stops at its first issue" (fun () ->
+      Test.equal
+        "id: expected a string of digits"
+        (decoded
+          (schema Order)
+          (String.replace_all "true" "1" (String.replace_all "\"1\"" "\"x\"" order)))
+    ),
+    Test.test "a result" (fun () ->
+      Test.equal
+        "paid: expected an object with `ok` or `err`, got number"
+        (decoded (schema Order) (String.replace_all "{\"ok\": true}" "5" order))
+    ),
+    Test.test "invalid JSON" (fun () ->
+      Test.equal
+        "not JSON: Expected double-quoted property name in JSON at position 8 (line 1 column 9)"
+        (decoded (schema Point) "{\"x\": 1,")
+    ),
+  ],
+]
