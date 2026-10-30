@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 )
 
 // JSON values are what JS's JSON.parse gives, in Go terms: `JsonNull`,
@@ -22,9 +21,19 @@ var JsonNull Value = &jsonNull{}
 // JsonParse is `Json.parse`: the value of a JSON text, or a SchemaError
 // with the parser's reason.
 //
-// shortcut: syntax errors read as V8's for objects, strings, a bad token and the end of input; port V8's other texts if a program shows them
+// shortcut: syntax errors read as V8's for objects, strings, numbers, a bad token and the end of input; port V8's other texts if a program shows them
 func JsonParse(text Value) Value {
-	p := &jsonParser{s: text.(string)}
+	v, reason := parseJSON(text.(string))
+	if reason != "" {
+		return Err(schemaErrorOf([]issue{{"", "not JSON: " + reason}}))
+	}
+	return Ok(v)
+}
+
+// parseJSON is the value of a JSON text, or the reason V8's JSON.parse
+// gives for refusing it.
+func parseJSON(text string) (Value, string) {
+	p := &jsonParser{s: text}
 	p.space()
 	v, ok := p.value()
 	if ok {
@@ -34,9 +43,9 @@ func JsonParse(text Value) Value {
 		}
 	}
 	if !ok {
-		return Err(schemaErrorOf([]issue{{"", "not JSON: " + p.reason()}}))
+		return nil, p.reason()
 	}
-	return Ok(v)
+	return v, ""
 }
 
 type jsonParser struct {
@@ -68,8 +77,28 @@ func (p *jsonParser) reason() string {
 	if p.i >= len(p.s) {
 		return "Unexpected end of JSON input"
 	}
-	r, _ := utf8.DecodeRuneInString(p.s[p.i:])
-	return fmt.Sprintf("Unexpected token '%c', %s is not valid JSON", r, QuoteJSON(p.s))
+	switch p.s {
+	case "NaN", "Infinity", "undefined", "[object Object]":
+		return `"` + p.s + `" is not valid JSON`
+	}
+	// V8 names the UTF-16 unit it stopped at and shows the source as it
+	// is, cut to 10 units around that place when it is 21 units or more
+	const context = 10
+	units := utf16Units(p.s)
+	pos := int(Length(p.s[:p.i]).(int32))
+	around := func(from, to int) string { return fromUnits(units[from:to]) }
+	var source string
+	switch {
+	case len(units) < 2*context+1:
+		source = `"` + p.s + `"`
+	case pos < context:
+		source = `"` + around(0, pos+context) + `"...`
+	case pos < len(units)-context:
+		source = `..."` + around(pos-context, pos+context) + `"...`
+	default:
+		source = `..."` + around(pos-context, len(units)) + `"`
+	}
+	return fmt.Sprintf("Unexpected token '%s', %s is not valid JSON", around(pos, pos+1), source)
 }
 
 func (p *jsonParser) space() {
@@ -128,13 +157,17 @@ func (p *jsonParser) number() (Value, bool) {
 	}
 	if p.i < len(p.s) && p.s[p.i] == '0' {
 		p.i++
+		// V8 refuses a digit after a leading zero as a number token of its own
+		if p.i < len(p.s) && p.s[p.i] >= '0' && p.s[p.i] <= '9' {
+			return p.expect("Unexpected number")
+		}
 	} else if digits() == 0 {
-		return nil, false
+		return p.expect("No number after minus sign")
 	}
 	if p.i < len(p.s) && p.s[p.i] == '.' {
 		p.i++
 		if digits() == 0 {
-			return nil, false
+			return p.expect("Unterminated fractional number")
 		}
 	}
 	if p.i < len(p.s) && (p.s[p.i] == 'e' || p.s[p.i] == 'E') {
@@ -143,7 +176,7 @@ func (p *jsonParser) number() (Value, bool) {
 			p.i++
 		}
 		if digits() == 0 {
-			return nil, false
+			return p.expect("Exponent part is missing a number")
 		}
 	}
 	// beyond float64's range is an infinity, as JS reads it
@@ -206,17 +239,18 @@ func (p *jsonParser) quoted() (string, bool) {
 			case 't':
 				units = append(units, '\t')
 			case 'u':
-				if p.i+4 > len(p.s) {
-					p.i = len(p.s)
-					return "", false
+				// V8 points at the first unit that is not a hex digit
+				var n uint16
+				for range 4 {
+					d := hexDigit(p.s, p.i)
+					if d < 0 {
+						p.expect("Bad Unicode escape")
+						return "", false
+					}
+					n = n<<4 | uint16(d)
+					p.i++
 				}
-				n, err := strconv.ParseUint(p.s[p.i:p.i+4], 16, 16)
-				if err != nil {
-					p.expect("Bad Unicode escape")
-					return "", false
-				}
-				units = append(units, uint16(n))
-				p.i += 4
+				units = append(units, n)
 			default:
 				return bad()
 			}
@@ -438,4 +472,20 @@ func schemaErrorOf(issues []issue) Value {
 		out[i] = Rec("message", is.message, "path", path)
 	}
 	return NewData(schemaErrorTag, out)
+}
+
+// hexDigit is the value of the hex digit at s[i], or -1.
+func hexDigit(s string, i int) int {
+	if i >= len(s) {
+		return -1
+	}
+	switch c := s[i]; {
+	case c >= '0' && c <= '9':
+		return int(c - '0')
+	case c >= 'a' && c <= 'f':
+		return int(c-'a') + 10
+	case c >= 'A' && c <= 'F':
+		return int(c-'A') + 10
+	}
+	return -1
 }

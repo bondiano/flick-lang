@@ -17,7 +17,8 @@ let check headers =
     if String.starts_with prefix cookie then
       let name = String.slice (String.length prefix) (String.length cookie) cookie
       { user = fun () -> name }
-    else from_result (Err Server.Unauthorized)
+    else
+      from_result (Err Server.Unauthorized)
   | None -> from_result (Err Server.Unauthorized)
 
 main : Unit ->{; AppError} Unit
@@ -33,8 +34,9 @@ let main () =
             (Server.authenticated Session check [server App.Api.add] ++ [server App.Api.list])
         app : (ServerRequest ->{Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
         let app =
-          Http.Router.router Http.Router.config
-            [Http.Router.route (Some Http.Method.POST) Server.path functions]
+          Http.Router.router Http.Router.config [
+            Http.Router.route (Some Http.Method.POST) Server.path functions,
+          ]
         let listening =
           Http.Server.serve { host = "127.0.0.1"; port = port; gracefulShutdownTimeout = None } app
         Platform.stdout_line

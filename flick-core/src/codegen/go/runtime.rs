@@ -95,6 +95,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/file.go"),
     ),
     (
+        "filesystem.go",
+        include_str!("../../../../runtime-go/flickrt/filesystem.go"),
+    ),
+    (
         "fnmods.go",
         include_str!("../../../../runtime-go/flickrt/fnmods.go"),
     ),
@@ -119,8 +123,24 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/http_body.go"),
     ),
     (
+        "http_body_stream.go",
+        include_str!("../../../../runtime-go/flickrt/http_body_stream.go"),
+    ),
+    (
+        "http_client.go",
+        include_str!("../../../../runtime-go/flickrt/http_client.go"),
+    ),
+    (
+        "http_client_combinators.go",
+        include_str!("../../../../runtime-go/flickrt/http_client_combinators.go"),
+    ),
+    (
         "http_client_request.go",
         include_str!("../../../../runtime-go/flickrt/http_client_request.go"),
+    ),
+    (
+        "http_client_response.go",
+        include_str!("../../../../runtime-go/flickrt/http_client_response.go"),
     ),
     (
         "http_codecs.go",
@@ -143,6 +163,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/http_etag.go"),
     ),
     (
+        "http_fetch.go",
+        include_str!("../../../../runtime-go/flickrt/http_fetch.go"),
+    ),
+    (
         "http_headers.go",
         include_str!("../../../../runtime-go/flickrt/http_headers.go"),
     ),
@@ -153,6 +177,18 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "http_mime.go",
         include_str!("../../../../runtime-go/flickrt/http_mime.go"),
+    ),
+    (
+        "http_multipart.go",
+        include_str!("../../../../runtime-go/flickrt/http_multipart.go"),
+    ),
+    (
+        "http_multipart_parse.go",
+        include_str!("../../../../runtime-go/flickrt/http_multipart_parse.go"),
+    ),
+    (
+        "http_multipart_stream.go",
+        include_str!("../../../../runtime-go/flickrt/http_multipart_stream.go"),
     ),
     (
         "http_request.go",
@@ -167,6 +203,14 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/http_router.go"),
     ),
     (
+        "http_static.go",
+        include_str!("../../../../runtime-go/flickrt/http_static.go"),
+    ),
+    (
+        "http_trace.go",
+        include_str!("../../../../runtime-go/flickrt/http_trace.go"),
+    ),
+    (
         "http_url.go",
         include_str!("../../../../runtime-go/flickrt/http_url.go"),
     ),
@@ -175,8 +219,32 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/http_urlparams.go"),
     ),
     (
+        "httpapi_bodies.go",
+        include_str!("../../../../runtime-go/flickrt/httpapi_bodies.go"),
+    ),
+    (
+        "httpapi_client.go",
+        include_str!("../../../../runtime-go/flickrt/httpapi_client.go"),
+    ),
+    (
+        "httpapi_model.go",
+        include_str!("../../../../runtime-go/flickrt/httpapi_model.go"),
+    ),
+    (
+        "httpapi_openapi.go",
+        include_str!("../../../../runtime-go/flickrt/httpapi_openapi.go"),
+    ),
+    (
+        "httpapi_server.go",
+        include_str!("../../../../runtime-go/flickrt/httpapi_server.go"),
+    ),
+    (
         "json.go",
         include_str!("../../../../runtime-go/flickrt/json.go"),
+    ),
+    (
+        "json_schema.go",
+        include_str!("../../../../runtime-go/flickrt/json_schema.go"),
     ),
     (
         "layer.go",
@@ -231,6 +299,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/regexp.go"),
     ),
     (
+        "schedule.go",
+        include_str!("../../../../runtime-go/flickrt/schedule.go"),
+    ),
+    (
         "schema.go",
         include_str!("../../../../runtime-go/flickrt/schema.go"),
     ),
@@ -249,6 +321,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "service.go",
         include_str!("../../../../runtime-go/flickrt/service.go"),
+    ),
+    (
+        "stream.go",
+        include_str!("../../../../runtime-go/flickrt/stream.go"),
     ),
     (
         "string.go",

@@ -276,6 +276,17 @@ pub struct TestArguments {
     /// `debug` or `release`; by default `build.profile` of the project.
     #[arg(long, value_enum)]
     pub profile: Option<ProfileArgument>,
+
+    /// Run the tests on Node (`js`) or as a Go executable (`go`); by
+    /// default `build.emit` of the project.
+    #[arg(long, value_enum)]
+    pub emit: Option<TestEmitArgument>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum TestEmitArgument {
+    Js,
+    Go,
 }
 
 #[derive(Clone, Copy, ValueEnum)]

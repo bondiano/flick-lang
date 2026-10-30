@@ -35,3 +35,19 @@ func TestTryHandlesTypedFailuresOnly(t *testing.T) {
 		t.Error("an AppError is reported by its message")
 	}
 }
+
+// `Exit.find_defect` gives what the JS target's describeDefect gives: an
+// error's message, without its name and the Flick lines it unwound.
+func TestFindDefectGivesTheMessage(t *testing.T) {
+	for defect, want := range map[string]string{
+		"RangeError: Int.unsafe_div: division by zero\n    at App.fl:3\n": "Int.unsafe_div: division by zero",
+		"Error: App:4: one item: [0,1]\n":                                 "App:4: one item: [0,1]",
+		"broken":                                                          "broken",
+		"Service not found: Users\n    at App.fl:9\n":                     "Service not found: Users",
+	} {
+		exit := &Exit{cause: &Cause{kind: causeDie, defect: defect}}
+		if got := ExitFindDefect(exit).(*Data).Fields[0]; got != want {
+			t.Errorf("%q: got %q, want %q", defect, got, want)
+		}
+	}
+}

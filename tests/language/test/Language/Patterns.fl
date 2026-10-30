@@ -1,0 +1,117 @@
+// `match` takes the first arm that matches: guards, or-patterns, nested
+// constructors, lists with a rest, tuples, records and literals of every
+// kind.
+module Language.Patterns exposing (tests)
+
+type Expr = Num Int | Add Expr Expr | Mul Expr Expr | Neg Expr
+  deriving Eq, Show
+
+/// Simplifies one level by nested patterns, in arm order.
+simplify : Expr -> Expr
+let simplify e =
+  match e with
+  | Add (Num 0) x | Add x (Num 0) -> x
+  | Mul (Num 1) x | Mul x (Num 1) -> x
+  | Mul (Num 0) _ | Mul _ (Num 0) -> Num 0
+  | Neg (Neg x) -> x
+  | _ -> e
+
+classify : Int -> String
+let classify n =
+  match n with
+  | 0 -> "zero"
+  | -1 -> "minus one"
+  | x when x < 0 -> "negative"
+  | x when x % 2 == 0 -> "even"
+  | _ -> "odd"
+
+describe : List Int -> String
+let describe xs =
+  match xs with
+  | [] -> "empty"
+  | [x] -> "one " ++ show x
+  | [x, y] when x == y -> "a pair of " ++ show x
+  | [first, ...rest] when List.length rest > 2 -> "long from " ++ show first
+  | [_, _, ...rest] -> "two and " ++ show rest
+
+greet : String -> String
+let greet s =
+  match s with
+  | "" -> "nobody"
+  | "\u{1F600}" -> "smiley"
+  | name -> "hi " ++ name
+
+pick : (Option Int, Result String Bool) -> String
+let pick pair =
+  match pair with
+  | (Some n, Ok true) when n > 10 -> "big and true"
+  | (Some n, Ok _) -> "some " ++ show n
+  | (None, Err e) -> "error " ++ e
+  | (_, Err _) -> "some error"
+  | (None, Ok b) -> "none " ++ show b
+
+point : { x : Int; y : Int } -> String
+let point p =
+  match p with
+  | { x = 0; y = 0 } -> "origin"
+  | { x = 0; y } -> "on y at " ++ show y
+  | { x; y } when x == y -> "diagonal"
+  | _ -> "elsewhere"
+
+float_case : Float -> String
+let float_case x =
+  match x with
+  | 0.5 -> "half"
+  | -0.0 -> "zero"
+  | _ -> "other"
+
+tests : List Test.Test
+let tests = [
+  Test.test "nested or-patterns" (fun () ->
+    Test.equal
+      [Num 7, Num 3, Num 0, Num 4, Add (Num 1) (Num 2)]
+      (List.map simplify [
+        Add (Num 0) (Num 7),
+        Mul (Num 3) (Num 1),
+        Mul (Num 5) (Num 0),
+        Neg (Neg (Num 4)),
+        Add (Num 1) (Num 2),
+      ])
+  ),
+  Test.test "guards in order" (fun () ->
+    Test.equal
+      ["zero", "minus one", "negative", "even", "odd"]
+      (List.map classify [0, -1, -5, 4, 7])
+  ),
+  Test.test "list patterns" (fun () ->
+    Test.equal
+      ["empty", "one 1", "a pair of 2", "two and []", "two and [3]", "long from 1"]
+      (List.map describe [[], [1], [2, 2], [1, 2], [1, 2, 3], [1, 2, 3, 4]])
+  ),
+  Test.test "string literals" (fun () ->
+    Test.equal ["nobody", "smiley", "hi bo"] (List.map greet ["", "\u{1F600}", "bo"])
+  ),
+  Test.test "tuples of options and results" (fun () ->
+    Test.equal
+      ["big and true", "some 3", "error e", "some error", "none false"]
+      (List.map pick [
+        (Some 11, Ok true),
+        (Some 3, Ok true),
+        (None, Err "e"),
+        (Some 1, Err "x"),
+        (None, Ok false),
+      ])
+  ),
+  Test.test "record patterns" (fun () ->
+    Test.equal
+      ["origin", "on y at 4", "diagonal", "elsewhere"]
+      (List.map point [{ x = 0; y = 0 }, { x = 0; y = 4 }, { x = 2; y = 2 }, { x = 1; y = 2 }])
+  ),
+  Test.test "float literals match by SameValueZero" (fun () ->
+    Test.equal ["half", "zero", "zero", "other"] (List.map float_case [0.5, 0.0, -0.0, 0.0 / 0.0])
+  ),
+  Test.test "let destructures a tuple" (fun () ->
+    let (a, (b, c)) = (1, ("two", [3]))
+    Test.equal "1 two [3]" (show a ++ " " ++ b ++ " " ++ show c)
+  ),
+]

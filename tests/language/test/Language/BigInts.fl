@@ -1,0 +1,59 @@
+// `BigInt` is an integer of any size: `/` truncates toward zero, `/` and
+// `%` by zero give 0n, and `show` adds the `n` of a JS BigInt literal.
+module Language.BigInts exposing (tests)
+
+mul : BigInt -> BigInt -> BigInt
+let mul a b = a * b
+
+div : BigInt -> BigInt -> BigInt
+let div a b = a / b
+
+rem : BigInt -> BigInt -> BigInt
+let rem a b = a % b
+
+pow : BigInt -> BigInt -> BigInt
+let pow a b = a ** b
+
+tests : List Test.Test
+let tests = [
+  Test.test "beyond 64 bits" (fun () ->
+    Test.equal
+      340282366920938463463374607431768211456n
+      (mul 18446744073709551616n 18446744073709551616n)
+  ),
+  Test.test "show" (fun () ->
+    Test.equal "-12345678901234567890n" (show (mul (-1n) 12345678901234567890n))
+  ),
+  Test.test "/ truncates" (fun () ->
+    Test.equal [3n, -3n, -3n, 3n] [div 7n 2n, div (-7n) 2n, div 7n (-2n), div (-7n) (-2n)]
+  ),
+  Test.test "% keeps the sign of the dividend" (fun () ->
+    Test.equal [1n, -1n, 1n] [rem 7n 2n, rem (-7n) 2n, rem 7n (-2n)]
+  ),
+  Test.test "by zero" (fun () -> Test.equal [0n, 0n] [div 5n 0n, rem 5n 0n]),
+  Test.test "checked divide" (fun () ->
+    Test.equal "Err ArithmeticError \"division by zero\"" (show (BigInt.divide 5n (div 0n 1n)))
+  ),
+  Test.test "**" (fun () -> Test.equal 1267650600228229401496703205376n (pow 2n 100n)),
+  Test.test "to_number rounds" (fun () ->
+    Test.equal "9007199254740992" (show (BigInt.to_number (pow 2n 53n + 1n)))
+  ),
+  Test.test "from_number" (fun () ->
+    Test.equal [Some 42n, None, None] (List.map BigInt.from_number [42, 1.5, 0.0 / 0.0])
+  ),
+  Test.test "parse" (fun () ->
+    Test.equal
+      [Some (-17n), Some 4n, None, None]
+      (List.map BigInt.parse ["-17", " +4 ", "1.5", "0xff"])
+  ),
+  Test.test "to_string" (fun () ->
+    Test.equal
+      "-170141183460469231731687303715884105728"
+      (BigInt.to_string (mul (-1n) (pow 2n 127n)))
+  ),
+  Test.test "order" (fun () ->
+    Test.equal
+      [-5n, 0n, 3n, 100000000000000000000n]
+      (List.sort [3n, 100000000000000000000n, -5n, 0n])
+  ),
+]

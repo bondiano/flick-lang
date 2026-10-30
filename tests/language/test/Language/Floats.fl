@@ -1,0 +1,141 @@
+// `Float` is an IEEE 754 double that prints as JavaScript prints a number:
+// the shortest digits that read back, an exponent from 1e21 and below
+// 1e-6, `-0`, `NaN` and `Infinity`. Operands come in as arguments, so the
+// runtime computes them, not the compiler.
+module Language.Floats exposing (tests)
+
+add : Float -> Float -> Float
+let add a b = a + b
+
+mul : Float -> Float -> Float
+let mul a b = a * b
+
+div : Float -> Float -> Float
+let div a b = a / b
+
+rem : Float -> Float -> Float
+let rem a b = a % b
+
+pow : Float -> Float -> Float
+let pow a b = a ** b
+
+/// `show` of each number.
+shows : List Float -> List String
+let shows xs = List.map (fun x -> show x) xs
+
+tests : List Test.Test
+let tests = [
+  Test.group "show" [
+    Test.test "0.1 + 0.2" (fun () -> Test.equal "0.30000000000000004" (show (add 0.1 0.2))),
+    Test.test "1 / 3" (fun () -> Test.equal "0.3333333333333333" (show (div 1 3))),
+    Test.test "2 / 3" (fun () -> Test.equal "0.6666666666666666" (show (div 2 3))),
+    Test.test "whole numbers have no point" (fun () ->
+      Test.equal ["100", "-7", "0"] (shows [mul 10 10, add (-3.5) (-3.5), mul 0 5])
+    ),
+    Test.test "negative zero" (fun () -> Test.equal "-0" (show (mul (-1) 0))),
+    Test.test "NaN" (fun () -> Test.equal "NaN" (show (div 0 0))),
+    Test.test "infinities" (fun () ->
+      Test.equal ["Infinity", "-Infinity"] (shows [div 1 0, div (-1) 0])
+    ),
+    Test.test "exponent from 1e21" (fun () ->
+      Test.equal
+        ["100000000000000000000", "1e+21", "1.5e+300", "1.7976931348623157e+308"]
+        (shows [mul 1e10 1e10, mul 1e11 1e10, mul 1.5 1e300, mul 1.7976931348623157 1e308])
+    ),
+    Test.test "exponent below 1e-6" (fun () ->
+      Test.equal
+        ["0.000001", "1e-7", "1.23e-18", "5e-324"]
+        (shows [mul 1 0.000001, mul 0.1 0.000001, mul 123 1e-20, mul 5e-324 1])
+    ),
+    Test.test "shortest round trip" (fun () ->
+      Test.equal
+        ["9007199254740992", "9007199254740994", "0.1", "1.1", "123456789.12345679"]
+        (shows [
+          add 9007199254740992 1,
+          add 9007199254740992 2,
+          mul 1 0.1,
+          add 1 0.1,
+          add 123456789 0.123456789,
+        ])
+    ),
+    Test.test "Float.to_string" (fun () ->
+      Test.equal "-1.5e-7" (Float.to_string (mul (-1.5) 1e-7))
+    ),
+    Test.test "String.from_number" (fun () -> Test.equal "255" (String.from_number (mul 0xFF 1))),
+  ],
+  Test.group "arithmetic" [
+    Test.test "% keeps the sign of the dividend" (fun () ->
+      Test.equal [-1.5, 1.5, 2] [rem (-5.5) 2, rem 5.5 (-2), rem 5 (-3)]
+    ),
+    Test.test "% by zero" (fun () -> Test.equal "NaN" (show (rem 5 0))),
+    Test.test "% of -0" (fun () -> Test.equal "-0" (show (rem (-0.0) 5))),
+    Test.test "** fractional" (fun () -> Test.equal "1.4142135623730951" (show (pow 2 0.5))),
+    Test.test "** of NaN" (fun () ->
+      Test.equal ["1", "NaN"] (shows [pow (div 0 0) 0, pow 1 (div 1 0)])
+    ),
+    Test.test "-0 + 0" (fun () -> Test.equal ["0", "-0"] (shows [add (-0.0) 0, add (-0.0) (-0.0)])),
+    Test.test "overflow to infinity" (fun () -> Test.equal "Infinity" (show (mul 1e308 10))),
+  ],
+  Test.group "rounding" [
+    Test.test "round half up" (fun () ->
+      Test.equal
+        ["3", "-2", "1", "-0", "-0"]
+        (shows (List.map Float.round [2.5, -2.5, 0.5, -0.5, -0.2]))
+    ),
+    Test.test "floor and ceil" (fun () ->
+      Test.equal
+        ["-1", "-0", "2", "-0"]
+        (shows [Float.floor (-0.5), Float.ceil (-0.5), Float.ceil 1.2, Float.trunc (-0.7)])
+    ),
+    Test.test "round_to" (fun () -> Test.equal "1.23" (show (Float.round_to 2 1.2345))),
+    Test.test "sqrt" (fun () ->
+      Test.equal
+        ["1.4142135623730951", "NaN", "-0"]
+        (shows [Float.sqrt 2, Float.sqrt (-1), Float.sqrt (-0.0)])
+    ),
+    Test.test "min and max put NaN least, -0 equals 0" (fun () ->
+      Test.equal
+        ["NaN", "-0", "0", "1", "NaN"]
+        (shows [
+          Float.min (div 0 0) 1,
+          Float.min 0 (-0.0),
+          Float.max (-0.0) 0,
+          Float.max (div 0 0) 1,
+          Float.min 1 (div 0 0),
+        ])
+    ),
+  ],
+  Test.group "parsing" [
+    Test.test "Float.parse" (fun () ->
+      Test.equal
+        "[Some 1.5, Some -0, None, Some Infinity, None]"
+        (show (List.map Float.parse ["1.5", "-0", "abc", "Infinity", ""]))
+    ),
+    Test.test "String.to_number" (fun () ->
+      Test.equal
+        "[Some 31, Some Infinity, Some 5, None, None]"
+        (show (List.map String.to_number [" 0x1F ", "1e400", "5.", "", "1_000"]))
+    ),
+  ],
+  Test.group "predicates" [
+    Test.test "is_nan" (fun () ->
+      Test.equal [true, false] [Float.is_nan (div 0 0), Float.is_nan (div 1 0)]
+    ),
+    Test.test "is_finite" (fun () ->
+      Test.equal [false, true] [Float.is_finite (div 1 0), Float.is_finite 1e308]
+    ),
+    Test.test "is_integer" (fun () ->
+      Test.equal [true, false, true] [
+        Float.is_integer (-0.0),
+        Float.is_integer 0.5,
+        Float.is_integer 1e300,
+      ]
+    ),
+    Test.test "is_safe_integer" (fun () ->
+      Test.equal [true, false] [
+        Float.is_safe_integer 9007199254740991,
+        Float.is_safe_integer 9007199254740992,
+      ]
+    ),
+  ],
+]

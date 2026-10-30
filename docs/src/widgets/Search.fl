@@ -25,81 +25,90 @@ let find model query =
   if String.trim query == "" then
     Atom.set model { m with query = query; hits = []; problem = "" }
   else
-    let found = try Ok (search query) with
+    let found =
+      try Ok (search query) with
       | JsError failure ->
         Err
-          ((if m.ru then
-            "Поиск недоступен. Перезагрузите страницу и попробуйте снова."
-          else
-            "Search is unavailable. Reload the page and try again.") ++ " " ++ failure.message)
+          ((
+            if m.ru then
+              "Поиск недоступен. Перезагрузите страницу и попробуйте снова."
+            else
+              "Search is unavailable. Reload the page and try again."
+          )
+            ++ " "
+            ++ failure.message)
     match found with
     | Ok hits -> Atom.set model { m with query = query; hits = hits; problem = "" }
     | Err problem -> Atom.set model { m with query = query; hits = []; problem = problem }
 
 hit : Hit -> Ui
-let hit result =
-  ui {
-    item
-      [span { class_name = "search-result-title" } [route result.url result.title],
-        paragraph [text result.excerpt]]
-  }
+let hit result = ui {
+  item [
+    span { class_name = "search-result-title" } [route result.url result.title],
+    paragraph [text result.excerpt],
+  ]
+}
 
 view : Atom.Writable Model -> Model -> Ui
 let view model m =
   let prefix = if m.ru then "/ru" else ""
   ui {
-    div { class_name = "search-widget" }
-      [
-        div { class_name = "search-heading" }
-          [span { class_name = "search-dialog-title" } [text (if m.ru then "Найти в документации" else "Find it in the docs")],
-            attributes [("aria-label", if m.ru then "Закрыть поиск" else "Close search")]
-              (button
-                { disabled = false; on_click = Ui.Event.latest (fun _ -> task { close_search () }) }
-                [icon "close"])],
-        div { class_name = "search-field" }
-          [icon "search",
-            attributes
-              [
-                ("aria-label", if m.ru then "Поисковый запрос" else "Search query"),
-                ("id", "flick-search-input"),
-                ("type", "search"),
+    div { class_name = "search-widget" } [
+      div { class_name = "search-heading" } [
+        span { class_name = "search-dialog-title" } [
+          text (if m.ru then "Найти в документации" else "Find it in the docs"),
+        ],
+        attributes
+          [("aria-label", if m.ru then "Закрыть поиск" else "Close search")]
+          (button
+            { disabled = false; on_click = Ui.Event.latest (fun _ -> task { close_search () }) }
+            [icon "close"]),
+      ],
+      div { class_name = "search-field" } [
+        icon "search",
+        attributes
+          [
+            ("aria-label", if m.ru then "Поисковый запрос" else "Search query"),
+            ("id", "flick-search-input"),
+            ("type", "search"),
+          ]
+          (input {
+            value = m.query;
+            placeholder = if m.ru then "Эффекты, типы, сервисы…" else "Effects, types, services…";
+            on_input = Ui.Event.latest (fun event -> task { find model event.value });
+          }),
+      ],
+      attributes
+        [("aria-live", "polite"), ("aria-atomic", "true")]
+        (div { class_name = "search-results" } [
+          if m.problem != "" then
+            paragraph [text m.problem]
+          else if String.trim m.query == "" then
+            div { class_name = "search-suggestions" } [
+              paragraph [text (if m.ru then "С чего начать" else "Good places to start")],
+              route
+                (prefix ++ "/start/getting-started/")
+                (if m.ru then "Начало работы" else "Getting started"),
+              route (prefix ++ "/learn/flick-and-effect/") "Flick & Effect",
+              route
+                (prefix ++ "/reference/effects/")
+                (if m.ru then "Эффекты, ошибки и сервисы" else "Effects, errors and services"),
+              route (prefix ++ "/api/") (if m.ru then "Справочник API" else "API reference"),
+            ]
+          else match m.hits with
+            | [] ->
+              paragraph [
+                text
+                  (
+                    if m.ru then
+                      "Ничего не найдено. Попробуйте другой запрос."
+                    else
+                      "No matches. Try a different term."
+                  ),
               ]
-              (input
-                {
-                  value = m.query;
-                  placeholder =
-                    if m.ru then "Эффекты, типы, сервисы…" else "Effects, types, services…";
-                  on_input = Ui.Event.latest (fun event -> task { find model event.value });
-                })],
-        attributes [("aria-live", "polite"), ("aria-atomic", "true")]
-          (div { class_name = "search-results" }
-            [if m.problem != "" then paragraph [text m.problem]
-              else if String.trim m.query == "" then
-                div { class_name = "search-suggestions" }
-                  [paragraph [text (if m.ru then "С чего начать" else "Good places to start")],
-                    route
-                      (prefix ++ "/start/getting-started/")
-                      (if m.ru then "Начало работы" else "Getting started"),
-                    route (prefix ++ "/learn/flick-and-effect/") "Flick & Effect",
-                    route
-                      (prefix ++ "/reference/effects/")
-                      (
-                        if m.ru then "Эффекты, ошибки и сервисы" else "Effects, errors and services"
-                      ),
-                    route (prefix ++ "/api/") (if m.ru then "Справочник API" else "API reference")]
-              else
-                match m.hits with
-                | [] ->
-                  paragraph
-                    [
-                      text
-                        (if m.ru then
-                          "Ничего не найдено. Попробуйте другой запрос."
-                        else
-                          "No matches. Try a different term."),
-                    ]
-                | hits -> list (List.map hit hits)]),
-      ]
+            | hits -> list (List.map hit hits),
+        ]),
+    ]
   }
 
 report : Failure e ->{} Unit
@@ -113,7 +122,8 @@ let main () =
   | Some root ->
     let model = Atom.make { ru = ru; query = ""; hits = []; problem = "" }
     provide Atom.layer {
-      ignore (
-        Ui.Dom.mount root report (Ui.render (Ui.view (fun () -> view model (Atom.value model))) ())
-      )
+      ignore (Ui.Dom.mount
+        root
+        report
+        (Ui.render (Ui.view (fun () -> view model (Atom.value model))) ()))
     }

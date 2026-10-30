@@ -20,33 +20,31 @@ type Priority = Low | Medium | High
   deriving Eq, Show
 
 /// The attributes of a cookie; `attributes` sets none of them.
-type alias Attributes =
-  {
-    domain : Option String;
-    expires : Option DateTime.DateTime;
-    maxAge : Option Duration.Duration;
-    path : Option String;
-    priority : Option Priority;
-    httpOnly : Bool;
-    secure : Bool;
-    partitioned : Bool;
-    sameSite : Option SameSite;
-  }
+type alias Attributes = {
+  domain : Option String;
+  expires : Option DateTime.DateTime;
+  maxAge : Option Duration.Duration;
+  path : Option String;
+  priority : Option Priority;
+  httpOnly : Bool;
+  secure : Bool;
+  partitioned : Bool;
+  sameSite : Option SameSite;
+}
 
 /// No attribute set: `{ Http.Cookies.attributes with secure = true }`.
 attributes : Attributes
-let attributes =
-  {
-    domain = None;
-    expires = None;
-    maxAge = None;
-    path = None;
-    priority = None;
-    httpOnly = false;
-    secure = false;
-    partitioned = false;
-    sameSite = None;
-  }
+let attributes = {
+  domain = None;
+  expires = None;
+  maxAge = None;
+  path = None;
+  priority = None;
+  httpOnly = false;
+  secure = false;
+  partitioned = false;
+  sameSite = None;
+}
 
 /// What a header cannot carry.
 type CookiesErrorReason =

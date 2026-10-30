@@ -12,25 +12,23 @@ foreign sync explode from global "JSON.parse"
 
 /// Fails with `Flaky n` on the first `failures` calls, counting them.
 flaky : Ref Float -> Float -> Eff none {Flaky} String
-let flaky calls failures =
-  task {
-    let n = Ref.get calls + 1
-    Ref.set calls n
-    if n <= failures then from_result (Err (Flaky n)) else "ok after " ++ show n
-  }
+let flaky calls failures = task {
+  let n = Ref.get calls + 1
+  Ref.set calls n
+  if n <= failures then from_result (Err (Flaky n)) else "ok after " ++ show n
+}
 
 /// The attempt a step's metadata names, read through both record types.
 attempt_of : Schedule.Metadata o i -> Int
 let attempt_of m =
-  let input : Schedule.InputMetadata i =
-    {
-      input = m.input;
-      attempt = m.attempt;
-      start = m.start;
-      now = m.now;
-      elapsed = m.elapsed;
-      elapsedSincePrevious = m.elapsedSincePrevious;
-    }
+  let input : Schedule.InputMetadata i = {
+    input = m.input;
+    attempt = m.attempt;
+    start = m.start;
+    now = m.now;
+    elapsed = m.elapsed;
+    elapsedSincePrevious = m.elapsedSincePrevious;
+  }
   input.attempt
 
 /// At most two steps of `schedule`.
@@ -42,10 +40,12 @@ count : Schedule.Schedule none none Float o ->{} Float
 let count schedule =
   let calls = Ref.make 0
   let _ =
-    Effect.repeat schedule (task {
-      Ref.set calls (Ref.get calls + 1)
-      Ref.get calls
-    })
+    Effect.repeat
+      schedule
+      (task {
+        Ref.set calls (Ref.get calls + 1)
+        Ref.get calls
+      })
   Ref.get calls
 
 delays : Schedule.Schedule none none Float Duration.Duration ->{} List String
@@ -77,9 +77,13 @@ let main () =
     ("concat: " ++ show (count (Schedule.concat (Schedule.recurs 2) (Schedule.recurs 1))))
   let tagged = Schedule.concat_result (Schedule.recurs 1) (Schedule.recurs 1)
   let last = Effect.repeat tagged (task { 0 })
-  Platform.stdout_line ("concat_result: " ++ (match last with
-    | Err n -> "first " ++ show n
-    | Ok n -> "second " ++ show n))
+  Platform.stdout_line
+    ("concat_result: "
+      ++ (
+        match last with
+        | Err n -> "first " ++ show n
+        | Ok n -> "second " ++ show n
+      ))
   let passed = Effect.repeat (Schedule.passthrough (Schedule.recurs 2)) (task { 7 })
   Platform.stdout_line ("passthrough: " ++ show passed)
   let echoed =
@@ -93,13 +97,16 @@ let main () =
   let none_delay = Schedule.modify_delay (fun _ -> Duration.zero) (Schedule.spaced (ms 10000))
   Platform.stdout_line ("delays: " ++ show (count slow, count (limited none_delay)))
   let attempts =
-    Effect.repeat (Schedule.recurs 2) (task {
-      let m = Schedule.current_metadata ()
-      m.attempt
-    })
+    Effect.repeat
+      (Schedule.recurs 2)
+      (task {
+        let m = Schedule.current_metadata ()
+        m.attempt
+      })
   Platform.stdout_line ("current_metadata: " ++ show attempts)
   let calls = Ref.make 0
-  let retried = try Effect.retry (Schedule.recurs 5) (flaky calls 2) with
+  let retried =
+    try Effect.retry (Schedule.recurs 5) (flaky calls 2) with
     | Flaky n -> "failed at " ++ show n
   Platform.stdout_line retried
   let exhausted = Ref.make 0
@@ -118,15 +125,19 @@ let main () =
   let died =
     parallel_exits [
       task {
-        Effect.retry (Schedule.recurs 5) (task {
-          Ref.set defects (Ref.get defects + 1)
-          let _ = explode "{"
-          "unreachable"
-        })
+        Effect.retry
+          (Schedule.recurs 5)
+          (task {
+            Ref.set defects (Ref.get defects + 1)
+            let _ = explode "{"
+            "unreachable"
+          })
       },
     ]
-  let defect = match died with
-    | [exit] -> match Exit.failure exit with
+  let defect =
+    match died with
+    | [exit] ->
+      match Exit.failure exit with
       | Some failure -> if Option.is_some (Failure.primary failure) then "some" else "none"
       | None -> "succeeded"
     | _ -> "?"
@@ -135,9 +146,7 @@ let main () =
     Effect.repeat_or_else
       (Schedule.recurs 3)
       (fun _ step -> if Option.is_some step then 1 else 0)
-      (task {
-      from_result (Err (Flaky 0))
-    })
+      (task { from_result (Err (Flaky 0)) })
   Platform.stdout_line ("repeat_or_else: " ++ show recovered)
   Platform.stdout_line ("schedule: " ++ show (Effect.schedule (Schedule.recurs 2) Effect.void))
   Platform.stdout_line

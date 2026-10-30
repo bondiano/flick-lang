@@ -1,0 +1,78 @@
+// `==` is SameValueZero on every target: NaN equals itself and -0 equals 0,
+// also inside lists, options, tuples, records and constructors. Ordering
+// is total for `compare` (NaN last) while `<` keeps the IEEE meaning.
+module Language.Equality exposing (tests)
+
+type Box = Box Float
+  deriving Eq, Ord, Show
+
+nan : Unit -> Float
+let nan () = 0.0 / 0.0
+
+above : String -> String -> Bool
+let above a b = a > b
+
+negative_zero : Unit -> Float
+let negative_zero () = -1.0 * 0.0
+
+tests : List Test.Test
+let tests = [
+  Test.group "SameValueZero" [
+    Test.test "NaN == NaN" (fun () -> Test.is_true "NaN" (nan () == nan ())),
+    Test.test "-0 == 0" (fun () -> Test.is_true "-0" (negative_zero () == 0.0)),
+    Test.test "NaN != 1" (fun () -> Test.is_true "NaN" (nan () != 1)),
+    Test.test "in a list" (fun () ->
+      Test.is_true "list" ([nan (), negative_zero ()] == [nan (), 0])
+    ),
+    Test.test "in an option" (fun () -> Test.is_true "option" (Some (nan ()) == Some (nan ()))),
+    Test.test "in a tuple" (fun () -> Test.is_true "tuple" ((nan (), "a") == (nan (), "a"))),
+    Test.test "in a record" (fun () ->
+      Test.is_true "record" ({ x = nan (); y = negative_zero () } == { x = nan (); y = 0 })
+    ),
+    Test.test "in a constructor" (fun () -> Test.is_true "box" (Box (nan ()) == Box (nan ()))),
+    Test.test "eq" (fun () -> Test.is_true "eq" (eq (nan ()) (nan ()))),
+  ],
+  Test.group "strict and Object.is" [
+    Test.test "strict_equal NaN" (fun () ->
+      Test.equal false (Float.strict_equal (nan ()) (nan ()))
+    ),
+    Test.test "strict_equal -0" (fun () ->
+      Test.equal true (Float.strict_equal (negative_zero ()) 0)
+    ),
+    Test.test "same_value NaN" (fun () -> Test.equal true (Float.same_value (nan ()) (nan ()))),
+    Test.test "same_value -0" (fun () -> Test.equal false (Float.same_value (negative_zero ()) 0)),
+  ],
+  Test.group "order" [
+    Test.test "NaN is unordered for <" (fun () ->
+      Test.equal [false, false, false] [nan () < 1, nan () >= 1, nan () == 1]
+    ),
+    Test.test "compare puts NaN last" (fun () ->
+      Test.equal [GT, EQ, LT] [
+        compare (nan ()) (1.0 / 0.0),
+        compare (negative_zero ()) 0,
+        compare (-1.0 / 0.0) (nan ()),
+      ]
+    ),
+    Test.test "sort is stable: 0 and -0 keep their order" (fun () ->
+      Test.equal
+        "[-Infinity, -1, 0, -0, 2, Infinity, NaN]"
+        (show (List.sort [nan (), 2, 0, 1.0 / 0.0, -1, negative_zero (), -1.0 / 0.0]))
+    ),
+    Test.test "derived Ord" (fun () -> Test.equal LT (compare (Box 1) (Box (nan ())))),
+    Test.test "strings by UTF-16 code units" (fun () ->
+      Test.equal (true, LT) (above "\u{FF61}" "\u{1F600}", compare "Z" "a")
+    ),
+  ],
+  Test.group "hash keys" [
+    Test.test "-0 and 0 are one key" (fun () ->
+      Test.equal
+        1
+        (HashMap.size
+          (HashMap.insert (negative_zero ()) "b" (HashMap.insert 0.0 "a" HashMap.empty)))
+    ),
+    Test.test "NaN finds itself" (fun () ->
+      Test.equal (Some "n") (HashMap.get (nan ()) (HashMap.insert (nan ()) "n" HashMap.empty))
+    ),
+    Test.test "hash of -0 and 0" (fun () -> Test.equal (hash 0.0) (hash (negative_zero ()))),
+  ],
+]

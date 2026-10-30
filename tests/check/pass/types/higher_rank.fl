@@ -2,15 +2,11 @@
 // assumed by the callback and required where it is called.
 module App.HigherRank exposing (apply_twice, render_twice, use_both)
 
-apply_twice :
-  (forall a. a -> a) -> (Float, String)
-let apply_twice transform =
-  (transform 42, transform "hello")
+apply_twice : (forall a. a -> a) -> (Float, String)
+let apply_twice transform = (transform 42, transform "hello")
 
-render_twice :
-  (forall a. Show a => a -> String) -> (String, String)
-let render_twice render =
-  (render 42, render "hello")
+render_twice : (forall a. Show a => a -> String) -> (String, String)
+let render_twice render = (render 42, render "hello")
 
 keep : a -> a
 let keep value = value

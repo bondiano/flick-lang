@@ -230,10 +230,10 @@ let serializable_result wire error_wire atom =
 /// `serializable_result` under the key the compiler gives.
 serializable_result_at :
   String ->
-    PureCodec Json a ->
-    PureCodec Json x ->
-    Atom (Async a {x | none}) ->
-    Atom (Async a {x | none})
+  PureCodec Json a ->
+  PureCodec Json x ->
+  Atom (Async a {x | none}) ->
+  Atom (Async a {x | none})
 foreign pure serializable_result_at from "@flick-lang/runtime" "atomSerializableResult"
 
 /// Atoms by key: `at family key` makes the atom of `key` the first time

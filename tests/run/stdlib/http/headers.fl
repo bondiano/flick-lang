@@ -6,8 +6,10 @@ let line label value = Platform.stdout_line (label ++ ": " ++ value)
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let input : Http.Headers.Input =
-    [("Content-Type", "text/plain"), ("Authorization", "Bearer s3cret")]
+  let input : Http.Headers.Input = [
+    ("Content-Type", "text/plain"),
+    ("Authorization", "Bearer s3cret"),
+  ]
   let h = Http.Headers.from_input input
   line "show" (show h)
   line "get" (show (Http.Headers.get "content-type" h))

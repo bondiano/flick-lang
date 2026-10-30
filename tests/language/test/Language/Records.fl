@@ -1,0 +1,64 @@
+// Records are structural: equality ignores the order of fields, an update
+// replaces fields and keeps the rest, and `show` and `compare` go by the
+// labels in sorted order, whatever order the value was built in.
+module Language.Records exposing (tests)
+
+type alias Point = { x : Int; y : Int }
+
+type alias User = { name : String; age : Int; tags : List String }
+
+move : Int -> Point -> Point
+let move dx p = { p with x = p.x + dx }
+
+/// A record built in another order than its type's.
+reversed : Int -> Int -> Point
+let reversed y x = { y = y; x = x }
+
+rename : String -> User -> User
+let rename name user = { user with name = name }
+
+nested : Int -> { outer : { inner : Int; keep : String }; n : Int }
+let nested n = { outer = { inner = n; keep = "k" }; n = n }
+
+tests : List Test.Test
+let tests = [
+  Test.test "field access" (fun () -> Test.equal 2 (reversed 2 1).y),
+  Test.test "update" (fun () -> Test.equal { x = 11; y = 2 } (move 10 { x = 1; y = 2 })),
+  Test.test "update keeps the original" (fun () ->
+    let p = { x = 1; y = 2 }
+    let q = move 1 p
+    Test.equal (1, 2) (p.x, q.x)
+  ),
+  Test.test "equality ignores field order" (fun () -> Test.equal { x = 1; y = 2 } (reversed 2 1)),
+  Test.test "show sorts the labels" (fun () ->
+    Test.equal "{ x = 1, y = 2 }" (show (move 0 { x = 1; y = 2 }))
+  ),
+  Test.test "show of a record built in another order" (fun () ->
+    Test.equal "{ x = 1, y = 2 }" (show (reversed 2 1))
+  ),
+  Test.test "show after an update" (fun () ->
+    Test.equal "{ x = 6, y = 2 }" (show (move 5 (reversed 2 1)))
+  ),
+  Test.test "show of nested fields" (fun () ->
+    Test.equal
+      "{ age = 3, name = \"Bo\", tags = [\"a\", \"b\"] }"
+      (show (rename "Bo" { name = "Al"; age = 3; tags = ["a", "b"] }))
+  ),
+  Test.test "nested update" (fun () ->
+    let r = nested 1
+    Test.equal
+      "{ n = 1, outer = { inner = 5, keep = \"k\" } }"
+      (show { r with outer = { r.outer with inner = 5 } })
+  ),
+  Test.test "compare goes by sorted labels" (fun () ->
+    Test.equal GT (compare (reversed 1 2) (reversed 2 1))
+  ),
+  Test.test "hash ignores field order" (fun () ->
+    Test.equal (hash { x = 1; y = 2 }) (hash (reversed 2 1))
+  ),
+  Test.test "tuples" (fun () ->
+    Test.equal
+      "(1, \"a\", (true, None))"
+      (show ((move 1 { x = 0; y = 0 }).x, "a", (true, (None : Option Int))))
+  ),
+]

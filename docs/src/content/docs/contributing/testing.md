@@ -12,7 +12,8 @@ cargo install cargo-machete --version 0.9.2 --locked
 | - | - |
 | `just lint` | fmt, clippy (`-D warnings`, also for `wasm32`), `cargo machete` (unused Rust dependencies) |
 | `just check` | `just lint`, `cargo test --workspace` |
-| `just e2e` | `pnpm install --frozen-lockfile`, runtime tests, `tests/run/**` on Node, `flick test` on sample projects |
+| `just e2e` | `pnpm install --frozen-lockfile`, runtime tests, `tests/run/**` on Node, `flick test` on sample projects, `just language` |
+| `just language` | the language tests of `tests/language` on Node and as a Go executable, which must pass with the same report |
 | `just bundle-size` | release builds of `tools/bundle-size/pure.fl`, `tests/run/ui/counter.fl`, `tests/run/ui/atoms.fl` and the playground, bundled for the browser with rolldown; fails when a gzip size exceeds its budget in `tools/bundle-size/index.mjs` |
 
 Snapshot tests use [`insta`](https://insta.rs); review changes with
@@ -92,6 +93,23 @@ The standard library declares every signature the specification gives for
 it word for word: `flick-core/tests/stdlib_signatures.rs` reads them from the
 spec's `text` blocks.
 
+## Language tests — `tests/language/`
+
+A Flick project whose test modules, one per area of the language
+(`Language.Ints`, `Language.Strings`, `Language.Effects`, …), pin its
+semantics with literal expected values: `Int` wrapping, how `show` writes
+numbers, UTF-16 strings, equality, records, patterns, recursion, hash
+order, JSON and schema errors, effects and the cases a seed draws for
+property tests. `just language` runs them with `flick test --emit js` and
+`--emit go` and one `--seed`; both runs must pass, and their reports must be
+the same byte for byte. A test belongs here when both targets must agree
+on it; a difference between them is fixed in a runtime, not in the test.
+
+`flick/tests/unicode_path.rs` builds, runs and tests a project in
+`target/tmp/проект ⭐` on both targets, as Gleam's `test/unicode_path ⭐`,
+and checks that the source map and Go's `//line` directives still lead to
+its `.fl` files.
+
 ## Runtime tests — `runtime/test/`
 
 The runtime is TypeScript 7 (`runtime/src/*.ts`), built to `runtime/dist/`
@@ -117,6 +135,11 @@ matrix, codecs against their compiled decoders. Entry runner tests start
 - Every `.fl` file under `tests/` and every doc block must round-trip through
   the lossless tree byte for byte; those without diagnostics must format
   idempotently, and the formatter re-checks that the AST is unchanged.
+  `fmt`'s own corpus test formats every `.fl` file of the repository and
+  fails when one is not a fixed point or a declaration is left as written,
+  and `fl_sources_are_formatted` keeps the sources formatted, all but the
+  fixtures of checker failures (`tests/check/fail`, `tests/check/projects`)
+  and of the editor grammar, whose annotations point at lines and columns.
 - `tests/syntax/*.fl` exercise the grammar only: they must parse without
   diagnostics, but their names need not resolve.
 - `fuzz.rs` mutates the corpus and asserts that the parser does not panic or

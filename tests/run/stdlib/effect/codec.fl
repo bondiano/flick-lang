@@ -72,11 +72,9 @@ let main () =
     (round "\"v1\"" (Codec.literal "v1") ++ " | " ++ round "\"v2\"" (Codec.literal "v1"))
   line
     "literals"
-    (
-      round "\"b\"" (Codec.literals ["a", "b"])
-        ++ " | "
-        ++ round "\"c\"" (Codec.literals ["a", "b"])
-    )
+    (round "\"b\"" (Codec.literals ["a", "b"])
+      ++ " | "
+      ++ round "\"c\"" (Codec.literals ["a", "b"]))
   line "entries" (round "{\"x\": 1, \"y\": 2}" (Codec.entries Float.json_finite))
   line
     "non_empty_list"
@@ -122,27 +120,43 @@ let main () =
   let titled = Codec.annotate { title = Some "Age"; description = Some "in years" } Codec.natural
   let notes : Codec.Annotations = Codec.annotations titled
   line "annotations" (show (notes.title, notes.description))
-  line "flip" (match Json.parse "1.5" with
-    | Ok input -> (match Codec.decode_result (Codec.flip Codec.number_from_string) input with
-      | Ok json -> Json.stringify json
-      | Err e -> issues e)
-    | Err _ -> "not JSON")
+  line
+    "flip"
+    (
+      match Json.parse "1.5" with
+      | Ok input ->
+        (
+          match Codec.decode_result (Codec.flip Codec.number_from_string) input with
+          | Ok json -> Json.stringify json
+          | Err e -> issues e
+        )
+      | Err _ -> "not JSON"
+    )
   let tagged_json = Codec.json (schema Tagged)
   line
     "to_schema"
     (round "{\"label\": \"a\", \"size\": 1}" (Codec.json (Codec.to_schema tagged_json)))
   let wire = Codec.wire_schema Codec.number_from_string
-  line "wire_schema" (match Json.parse "\"12\"" with
-    | Ok input -> (match Schema.validate wire input with
-      | Ok json -> "valid " ++ Json.stringify json
-      | Err e -> issues e)
-    | Err _ -> "not JSON")
+  line
+    "wire_schema"
+    (
+      match Json.parse "\"12\"" with
+      | Ok input ->
+        (
+          match Schema.validate wire input with
+          | Ok json -> "valid " ++ Json.stringify json
+          | Err e -> issues e
+        )
+      | Err _ -> "not JSON"
+    )
   line "catch_decoding" (round "1" (Codec.catch_decoding fallback String.json))
   line
     "catch_encoding"
-    (match Codec.encode_result (Codec.catch_encoding zero_wire Float.json_finite) Float.nan with
-    | Ok json -> Json.stringify json
-    | Err e -> issues e)
+    (
+      match Codec.encode_result (Codec.catch_encoding zero_wire Float.json_finite) Float.nan with
+      | Ok json -> Json.stringify json
+      | Err e -> issues e
+    )
   let late = Codec.catch_decoding_effect late_value String.json
   let decoded =
     try
@@ -169,30 +183,62 @@ let main () =
   line
     "Duration.json_string"
     (round "\"2 seconds\"" Duration.json_string ++ " | " ++ round "\"soon\"" Duration.json_string)
-  line "infinity" (match Codec.encode_result Duration.json_millis Duration.infinity with
-    | Ok json -> Json.stringify json
-    | Err e -> issues e)
-  line "BigDecimal.json" (match Json.parse "\"1.25\"" with
-    | Ok input -> (match Codec.decode_result BigDecimal.json input with
-      | Ok d -> BigDecimal.to_string d
-      | Err e -> issues e)
-    | Err _ -> "not JSON")
-  line "Chunk.json" (match Json.parse "[1, 2]" with
-    | Ok input -> (match Codec.decode_result (Chunk.json Float.json_finite) input with
-      | Ok c -> show (Chunk.to_list c)
-      | Err e -> issues e)
-    | Err _ -> "not JSON")
-  line "HashSet.json" (match Json.parse "[\"b\", \"a\", \"b\"]" with
-    | Ok input -> (match Codec.decode_result (HashSet.json String.json) input with
-      | Ok s -> show (List.sort (HashSet.to_list s)) ++ " member a: " ++ show (HashSet.member "a" s)
-      | Err e -> issues e)
-    | Err _ -> "not JSON")
-  line "HashMap.json" (match Json.parse "[[\"a\", 1], [\"b\", 2]]" with
-    | Ok input ->
-      (match Codec.decode_result (HashMap.json String.json Float.json_finite) input with
-      | Ok m -> show (HashMap.get "b" m) ++ " size " ++ show (HashMap.size m)
-      | Err e -> issues e)
-    | Err _ -> "not JSON")
+  line
+    "infinity"
+    (
+      match Codec.encode_result Duration.json_millis Duration.infinity with
+      | Ok json -> Json.stringify json
+      | Err e -> issues e
+    )
+  line
+    "BigDecimal.json"
+    (
+      match Json.parse "\"1.25\"" with
+      | Ok input ->
+        (
+          match Codec.decode_result BigDecimal.json input with
+          | Ok d -> BigDecimal.to_string d
+          | Err e -> issues e
+        )
+      | Err _ -> "not JSON"
+    )
+  line
+    "Chunk.json"
+    (
+      match Json.parse "[1, 2]" with
+      | Ok input ->
+        (
+          match Codec.decode_result (Chunk.json Float.json_finite) input with
+          | Ok c -> show (Chunk.to_list c)
+          | Err e -> issues e
+        )
+      | Err _ -> "not JSON"
+    )
+  line
+    "HashSet.json"
+    (
+      match Json.parse "[\"b\", \"a\", \"b\"]" with
+      | Ok input ->
+        (
+          match Codec.decode_result (HashSet.json String.json) input with
+          | Ok s ->
+            show (List.sort (HashSet.to_list s)) ++ " member a: " ++ show (HashSet.member "a" s)
+          | Err e -> issues e
+        )
+      | Err _ -> "not JSON"
+    )
+  line
+    "HashMap.json"
+    (
+      match Json.parse "[[\"a\", 1], [\"b\", 2]]" with
+      | Ok input ->
+        (
+          match Codec.decode_result (HashMap.json String.json Float.json_finite) input with
+          | Ok m -> show (HashMap.get "b" m) ++ " size " ++ show (HashMap.size m)
+          | Err e -> issues e
+        )
+      | Err _ -> "not JSON"
+    )
   line "export literals" (exported (Codec.literals ["a", "b"]))
   line "export non_empty_list" (exported (Codec.non_empty_list String.json))
   line "export list_ensure" (exported (Codec.list_ensure String.json))

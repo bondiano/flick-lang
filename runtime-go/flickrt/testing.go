@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/big"
 	"math/rand/v2"
 	"os"
 	"strconv"
@@ -167,10 +168,88 @@ func (t *test) checks(seed int64) (string, bool) {
 	for i := range testCases {
 		value := t.gen(random(uint32(seed + int64(i)*0x9e3779b9)))
 		if message, bad := failed(Apply(t.check, value)); bad {
-			return fmt.Sprintf("%s (case %d: %s)", message, i, Format(value)), true
+			return fmt.Sprintf("%s (case %d: %s)", message, i, preview(value)), true
 		}
 	}
 	return "", false
+}
+
+// preview is a property's case as the JS runner writes it: JSON.stringify
+// with a BigInt as "<digits>n", Effect's toJSON of Option and Result, and
+// a function as "<function>"; `undefined` alone as itself.
+func preview(v Value) string {
+	if s, ok := previewJSON(v); ok {
+		return s
+	}
+	return "undefined"
+}
+
+// previewJSON is the JSON of a value, or false for `undefined`, which an
+// array writes as null and an object leaves out.
+func previewJSON(v Value) (string, bool) {
+	switch x := v.(type) {
+	case UnitType:
+		return "", false
+	case float64:
+		switch {
+		case math.IsNaN(x) || math.IsInf(x, 0):
+			return "null", true
+		case x == 0:
+			return "0", true // -0 too
+		}
+		return ShowNumber(x), true
+	case *big.Int:
+		return QuoteJSON(x.String() + "n"), true
+	case Fn, Poly:
+		return `"<function>"`, true
+	case []Value:
+		parts := make([]string, len(x))
+		for i, e := range x {
+			if parts[i], _ = previewJSON(e); parts[i] == "" {
+				parts[i] = "null"
+			}
+		}
+		return "[" + strings.Join(parts, ",") + "]", true
+	case *Record:
+		return previewObject(x.keys, x.vals), true
+	case *Data:
+		switch x.Tag {
+		case "Some", "None":
+			return previewObject(append([]string{"_id", "_tag"}, fieldNames(x)...), append([]Value{"Option", x.Tag}, x.Fields...)), true
+		case "Success":
+			return previewObject([]string{"_id", "_tag", "value"}, []Value{"Result", x.Tag, x.Fields[0]}), true
+		case "Failure":
+			return previewObject([]string{"_id", "_tag", "failure"}, []Value{"Result", x.Tag, x.Fields[0]}), true
+		}
+		return previewObject(append([]string{"_tag"}, fieldNames(x)...), append([]Value{x.Tag}, x.Fields...)), true
+	}
+	return Format(v), true
+}
+
+// fieldNames is the JS property of each field of a variant value.
+func fieldNames(d *Data) []string {
+	out := make([]string, len(d.Fields))
+	for i := range d.Fields {
+		out[i] = nativeField(d.Tag, i)
+	}
+	return out
+}
+
+func previewObject(keys []string, vals []Value) string {
+	var out strings.Builder
+	out.WriteByte('{')
+	for i, k := range keys {
+		s, ok := previewJSON(vals[i])
+		if !ok {
+			continue
+		}
+		if out.Len() > 1 {
+			out.WriteByte(',')
+		}
+		out.WriteString(QuoteJSON(k) + ":" + s)
+	}
+	out.WriteByte('}')
+	return out.String()
 }
 
 // describeText is a payload as the JS runner's describeCause shows it.

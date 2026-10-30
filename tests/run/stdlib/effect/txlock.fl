@@ -7,14 +7,13 @@ ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
 
 counts : TxReentrantLock.TxReentrantLock ->{Tx.Transaction;} (Int, Int, Bool, Bool, Bool)
-let counts lock =
-  (
-    TxReentrantLock.read_locks lock,
-    TxReentrantLock.write_locks lock,
-    TxReentrantLock.locked lock,
-    TxReentrantLock.read_locked lock,
-    TxReentrantLock.write_locked lock,
-  )
+let counts lock = (
+  TxReentrantLock.read_locks lock,
+  TxReentrantLock.write_locks lock,
+  TxReentrantLock.locked lock,
+  TxReentrantLock.read_locked lock,
+  TxReentrantLock.write_locked lock,
+)
 
 permits : TxSemaphore.TxSemaphore ->{} Int
 let permits sem = Tx.atomically (task { TxSemaphore.available sem })
@@ -22,25 +21,31 @@ let permits sem = Tx.atomically (task { TxSemaphore.available sem })
 main : Unit ->{; AppError} Unit
 let main () =
   let lock = TxReentrantLock.make ()
-  let reads = Tx.atomically (task {
-      let one = TxReentrantLock.acquire_read lock
-      let two = TxReentrantLock.acquire_read lock
-      (one, two, counts lock)
-    })
+  let reads =
+    Tx.atomically
+      (task {
+        let one = TxReentrantLock.acquire_read lock
+        let two = TxReentrantLock.acquire_read lock
+        (one, two, counts lock)
+      })
   Platform.stdout_line ("reads: " ++ show reads)
-  let released = Tx.atomically (task {
-      let left = TxReentrantLock.release_read lock
-      let none_left = TxReentrantLock.release_read lock
-      (left, none_left, TxReentrantLock.locked lock)
-    })
+  let released =
+    Tx.atomically
+      (task {
+        let left = TxReentrantLock.release_read lock
+        let none_left = TxReentrantLock.release_read lock
+        (left, none_left, TxReentrantLock.locked lock)
+      })
   Platform.stdout_line ("released: " ++ show released)
-  let writes = Tx.atomically (task {
-      let w = TxReentrantLock.acquire_write lock
-      let r = TxReentrantLock.acquire_read lock
-      let _ = TxReentrantLock.release_read lock
-      let left = TxReentrantLock.release_write lock
-      (w, r, left)
-    })
+  let writes =
+    Tx.atomically
+      (task {
+        let w = TxReentrantLock.acquire_write lock
+        let r = TxReentrantLock.acquire_read lock
+        let _ = TxReentrantLock.release_read lock
+        let left = TxReentrantLock.release_write lock
+        (w, r, left)
+      })
   Platform.stdout_line ("reentrant write: " ++ show writes)
   let inside = TxReentrantLock.with_read_lock (task { Tx.atomically (task { counts lock }) }) lock
   let inside_write =
@@ -50,29 +55,27 @@ let main () =
       (task { Tx.atomically (task { TxReentrantLock.write_locked lock }) })
       lock
   Platform.stdout_line ("with locks: " ++ show (inside, inside_write, inside_lock))
-  let scoped =
-    scope {
-      let r = TxReentrantLock.read_lock lock
-      Tx.atomically (task { (r, TxReentrantLock.read_locked lock) })
-    }
-  let scoped_write =
-    scope {
-      let w = TxReentrantLock.write_lock lock
-      Tx.atomically (task { (w, TxReentrantLock.write_locked lock) })
-    }
+  let scoped = scope {
+    let r = TxReentrantLock.read_lock lock
+    Tx.atomically (task { (r, TxReentrantLock.read_locked lock) })
+  }
+  let scoped_write = scope {
+    let w = TxReentrantLock.write_lock lock
+    Tx.atomically (task { (w, TxReentrantLock.write_locked lock) })
+  }
   Platform.stdout_line
-    (
-      "scoped: "
-        ++ show (scoped, scoped_write, Tx.atomically (task { TxReentrantLock.locked lock }))
-    )
+    ("scoped: "
+      ++ show (scoped, scoped_write, Tx.atomically (task { TxReentrantLock.locked lock })))
   let sem = TxSemaphore.make 3
-  let taken = Tx.atomically (task {
-      TxSemaphore.acquire sem
-      TxSemaphore.acquire_n 2 sem
-      let more = TxSemaphore.try_acquire sem
-      let more_n = TxSemaphore.try_acquire_n 1 sem
-      (TxSemaphore.capacity sem, TxSemaphore.available sem, more, more_n)
-    })
+  let taken =
+    Tx.atomically
+      (task {
+        TxSemaphore.acquire sem
+        TxSemaphore.acquire_n 2 sem
+        let more = TxSemaphore.try_acquire sem
+        let more_n = TxSemaphore.try_acquire_n 1 sem
+        (TxSemaphore.capacity sem, TxSemaphore.available sem, more, more_n)
+      })
   Platform.stdout_line ("semaphore: " ++ show taken)
   let (waited, _) =
     parallel
@@ -82,17 +85,17 @@ let main () =
       })
       (task {
         Effect.sleep (ms 2)
-        Tx.atomically (task {
-          TxSemaphore.release sem
-          TxSemaphore.release_n 2 sem
-        })
+        Tx.atomically
+          (task {
+            TxSemaphore.release sem
+            TxSemaphore.release_n 2 sem
+          })
       })
   Platform.stdout_line (waited ++ ", available " ++ show (permits sem))
   let during = TxSemaphore.with_permit sem (task { permits sem })
   let during_n = TxSemaphore.with_permits sem 2 (task { permits sem })
-  let during_scope =
-    scope {
-      TxSemaphore.with_permit_scoped sem
-      permits sem
-    }
+  let during_scope = scope {
+    TxSemaphore.with_permit_scoped sem
+    permits sem
+  }
   Platform.stdout_line ("with permits: " ++ show (during, during_n, during_scope, permits sem))

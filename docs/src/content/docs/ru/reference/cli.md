@@ -19,8 +19,8 @@ title: "Командная строка"
 | `build [paths] --inputs` | выводит консервативный JSON-инвентарь входов (`key`, `files`, `roots`, `modules`), не записывая артефакты и кеш |
 | `run [name] [--entry M] [--profile] [--devtools[=url]] -- args` | собирает JavaScript и запускает `main` входа `name` (единственного, если имя не указано); `--devtools` отправляет его спаны в Effect DevTools ([наблюдаемость](../observability/#devtools)) |
 | `dev [name] [--entry M] [--profile] [--devtools[=url]] -- args` | пересобирает при изменениях и заменяет работающее приложение; в проекте с несколькими входами без имени запускает каждый неклиентский вход и, если есть клиентский, Vite (`node_modules/.bin/vite`) для страниц: изменённый модуль заменяется в странице, а помеченные атомы сохраняют значения |
-| `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile]` | запускает тесты из корневого каталога тестов |
-| `fmt [paths] [--check] [--stdin --stdin-filepath f]` | форматирует код; если пути не указаны, обрабатывает корневые каталоги исходников и тестов |
+| `test [paths] [--filter] [--jobs] [--seed] [--reporter human\|json] [--watch] [--profile] [--emit js\|go]` | запускает тесты из корневого каталога тестов на Node или исполняемым файлом Go |
+| `fmt [paths] [--check] [--stdin --stdin-filepath f]` | записывает каноническую раскладку кода ([форматирование](../grammar/#форматирование)); если пути не указаны, обрабатывает корневые каталоги исходников и тестов |
 | `clean [--cache]` | удаляет артефакты сборки; с `--cache` — также кеш сборки |
 | `install [--locked] [--offline]` | устанавливает зависимости с помощью pnpm (`--frozen-lockfile`, `--offline`) |
 | `add <pkg>… [--dev]`, `remove <pkg>…`, `update [pkg]…` | изменяет зависимости с помощью pnpm |

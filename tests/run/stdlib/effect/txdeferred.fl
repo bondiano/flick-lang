@@ -38,7 +38,8 @@ let main () =
       ++ describe (Tx.atomically (task { TxDeferred.poll d })))
   let e : TxDeferred.TxDeferred Float {Late} = TxDeferred.make ()
   let failed = Tx.atomically (task { TxDeferred.fail (Late 2) e })
-  let caught = try Tx.atomically (task { TxDeferred.await_ e }) with
+  let caught =
+    try Tx.atomically (task { TxDeferred.await_ e }) with
     | Late n -> 0 - n
   Platform.stdout_line ("failed: " ++ show (failed, caught))
   let f : TxDeferred.TxDeferred Float {Late} = TxDeferred.make ()

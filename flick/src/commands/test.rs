@@ -1,7 +1,7 @@
 //! `flick test`: builds the project with its test root into `.flick/test/`,
 //! writes a runner that imports the `tests` of each test module, and runs it
-//! on Node; a project that emits go gets one executable, `flick-test`, that
-//! runs them. With `--watch`, a change of a source file stops the run (closing
+//! on Node; a project that emits go, or `--emit go`, gets one executable,
+//! `flick-test`, that runs them. With `--watch`, a change of a source file stops the run (closing
 //! the runner's stdin: every running test closes its scope) and starts the
 //! next one after it.
 
@@ -19,7 +19,7 @@ use flick_core::source::SourceMap;
 
 use super::build::{BuildPlan, emit, release, write};
 use super::check::select;
-use crate::args::{GlobalArguments, Reporter, TestArguments};
+use crate::args::{GlobalArguments, Reporter, TestArguments, TestEmitArgument};
 use crate::sources::FsHost;
 use crate::{child, report, toolchain};
 use flick_core::build::Extras;
@@ -82,8 +82,12 @@ fn prepare(options: &TestArguments, global: &GlobalArguments) -> Result<PathBuf,
         .filter(|m| wanted.is_empty() || wanted.contains(&m.path))
         .map(|m| (m.name.clone(), format!("./{}.js", m.name.replace('.', "/"))))
         .collect();
+    let go = match options.emit {
+        Some(target) => target == TestEmitArgument::Go,
+        None => project.config.build.emit == Emit::Go,
+    };
     // with no suite, the go target has no program: the node runner reports the empty run
-    let go = project.config.build.emit == Emit::Go && !suites.is_empty();
+    let go = go && !suites.is_empty();
     if !go && let Some(problem) = toolchain::check_runtime(&project.root) {
         return fail(&sources, vec![problem]);
     }

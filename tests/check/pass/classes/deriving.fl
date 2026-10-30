@@ -2,10 +2,7 @@
 // each type parameter.
 module App.Deriving exposing (..)
 
-type Shape =
-  | Circle Float
-  | Rect { width : Float; height : Float }
-  | Empty
+type Shape = Circle Float | Rect { width : Float; height : Float } | Empty
   deriving Eq, Ord, Hash, Show
 
 type Tree a = Leaf | Node (Tree a) a (Tree a)

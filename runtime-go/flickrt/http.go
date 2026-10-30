@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -75,8 +76,12 @@ func HttpServe(fb *Fiber, options, handler Value) Value {
 				out = causeResponse(failed)
 			}
 		}
+		// a streamed body runs in the request's fiber, which a client gone interrupts
+		aborted := writeResponse(w, out.(*ServerResponse), &q.fiber)
 		stop()
-		writeResponse(w, out.(*ServerResponse))
+		if aborted {
+			panic(http.ErrAbortHandler)
+		}
 	})}
 	go srv.Serve(listener)
 	var grace time.Duration
@@ -104,13 +109,21 @@ func HttpAddress(server Value) Value {
 	return NewData(tcpAddressTag, addr.IP.String(), float64(addr.Port))
 }
 
-// The platform and entity tags of Node are services the go target does not
-// read yet: their layers provide them empty.
-func HttpEmptyLayer(key Value) Value { return LayerSucceed(key, &Record{}) }
+// HttpServerLogAddress logs `Listening on <url>` at the info level.
+func HttpServerLogAddress(fb *Fiber, server Value) Value {
+	addr := server.(*HttpServer).listener.Addr().(*net.TCPAddr)
+	host := addr.IP.String()
+	if strings.Contains(host, ":") {
+		host = "[" + host + "]"
+	}
+	logMessage(fb, "Info", "Listening on http://"+host+":"+strconv.Itoa(addr.Port))
+	return Unit
+}
 
 // writeResponse sends the response: its headers, a `Set-Cookie` header of
-// each cookie, and the body unless its status has none.
-func writeResponse(w http.ResponseWriter, resp *ServerResponse) {
+// each cookie, and the body unless its status has none; whether a
+// streamed body failed after its headers went, which aborts the response.
+func writeResponse(w http.ResponseWriter, resp *ServerResponse, fb *Fiber) bool {
 	h, b := w.Header(), resp.body
 	if resp.headers == nil {
 		if b.hasType && b.contentType != "" {
@@ -142,8 +155,10 @@ func writeResponse(w http.ResponseWriter, resp *ServerResponse) {
 		} else {
 			io.WriteString(w, b.data)
 		}
+	case b.kind == bodyStream:
+		return writeStream(w, status, b, fb)
 	default:
-		data, contentType, err := b.bytes()
+		data, contentType, err := b.bytes(fb)
 		if err != nil {
 			status, data = 500, nil
 		} else if b.kind == bodyForm && h.Get("Content-Type") == "" {
@@ -151,5 +166,36 @@ func writeResponse(w http.ResponseWriter, resp *ServerResponse) {
 		}
 		w.WriteHeader(status)
 		w.Write(data)
+	}
+	return false
+}
+
+// writeStream sends each chunk of the body as it is read.
+func writeStream(w http.ResponseWriter, status int, b *Body, fb *Fiber) bool {
+	r, err := b.open(fb)
+	if err != nil {
+		w.WriteHeader(500)
+		return false
+	}
+	defer r.Close()
+	w.WriteHeader(status)
+	flusher, _ := w.(http.Flusher)
+	buf := make([]byte, 32<<10)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			if _, werr := w.Write(buf[:n]); werr != nil {
+				return false
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		if err == io.EOF {
+			return false
+		}
+		if err != nil {
+			return true
+		}
 	}
 }

@@ -26,10 +26,11 @@ let tens = Channel.map (NonEmpty.map (fun n -> n * 10)) (Channel.identity ())
 
 greeting : Stream.Stream {Greeter} {Boom} String
 let greeting =
-  Stream.from_effect (task {
-    let text = Greeter.greet "ada"
-    if text == "" then from_result (Err (Boom 0)) else text
-  })
+  Stream.from_effect
+    (task {
+      let text = Greeter.greet "ada"
+      if text == "" then from_result (Err (Boom 0)) else text
+    })
 
 main : Unit ->{; AppError} Unit
 let main () =
@@ -43,18 +44,22 @@ let main () =
   line "pipe_through" (Stream.run_collect (Stream.pipe_through pairs nums))
   let tapped : Stream.Stream none none Float = Stream.tap_sink pairs nums
   line "tap_sink" (Stream.run_collect tapped)
-  let peeled =
-    scope {
-      let (head, rest) = Stream.peel pairs nums
-      head ++ [0] ++ Stream.run_collect rest
-    }
+  let peeled = scope {
+    let (head, rest) = Stream.peel pairs nums
+    head ++ [0] ++ Stream.run_collect rest
+  }
   line "peel" peeled
   let round : Stream.Stream none none Float = Stream.from_channel (Stream.to_channel nums)
   line "to_channel/from_channel" (Stream.run_collect round)
   let piped : Stream.Stream none none Float = Stream.pipe_through_channel tens nums
   line "pipe_through_channel" (Stream.run_collect piped)
   let or_fail : Stream.Stream none {Boom} Float = Stream.pipe_through_channel_or_fail tens failing
-  line "pipe_through_channel_or_fail" (try Stream.run_collect or_fail with | Boom n -> [0 - n])
+  line
+    "pipe_through_channel_or_fail"
+    (
+      try Stream.run_collect or_fail with
+      | Boom n -> [0 - n]
+    )
   let english = Layer.succeed Greeter { greet = fun n -> "hello " ++ n }
   let silent = Layer.succeed Greeter { greet = fun _ -> "" }
   let plan : ExecutionPlan.ExecutionPlan {Greeter} none none (Errors {Boom}) =
@@ -63,5 +68,10 @@ let main () =
   let planned : Stream.Stream none {Boom} String =
     Stream.with_execution_plan plan false (fun _ -> Ref.update events (fun n -> n + 1)) greeting
   Platform.stdout_line
-    ("with_execution_plan: " ++ show (try Stream.run_collect planned with | Boom _ -> []))
+    ("with_execution_plan: "
+      ++ show
+        (
+          try Stream.run_collect planned with
+          | Boom _ -> []
+        ))
   line "events" [Ref.get events]

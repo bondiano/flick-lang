@@ -30,7 +30,10 @@ ms50 : Duration.Duration
 let ms50 = Result.with_default Duration.zero (Duration.millis 50)
 
 after : Duration.Duration -> String -> Eff none {Boom} String
-let after d value = task { Effect.sleep d; value }
+let after d value = task {
+  Effect.sleep d
+  value
+}
 
 /// How joining ends.
 joined_by : forall c. (Eff none {Boom} Unit)^c ->{} String
@@ -42,28 +45,29 @@ let joined_by t =
   | Boom n -> "Boom " ++ show n
 
 fibers : Unit ->{} Unit
-let fibers () =
-  scope s {
-    let a : Fiber.Fiber {Boom} String = Fiber.spawn s quiet (after ms1 "a")
-    let b = Fiber.spawn s quiet (task { from_result (Err (Boom 2)) })
-    let c = Fiber.spawn s quiet (after ms1 "c")
-    Platform.stdout_line ("await_: " ++ ended (Fiber.await_ a))
-    Platform.stdout_line ("await_all: " ++ show (List.map ended (Fiber.await_all [a, b, c])))
-    let joined = try show (Fiber.join_all [a, c]) with | Boom n -> "Boom " ++ show n
-    Platform.stdout_line ("join_all: " ++ joined)
-    let d = Fiber.spawn s quiet (after ms50 "d")
-    Fiber.interrupt d
-    Platform.stdout_line ("interrupt: " ++ ended (Fiber.await_ d))
-    let e = Fiber.spawn s quiet (after ms50 "e")
-    Fiber.interrupt_as (Some 42) e
-    Platform.stdout_line ("interrupt_as: " ++ ended (Fiber.await_ e))
-    let f = Fiber.spawn s quiet (after ms50 "f")
-    let g = Fiber.spawn s quiet (after ms50 "g")
-    Fiber.interrupt_all [f, g]
-    let h = Fiber.spawn s quiet (after ms50 "h")
-    Fiber.interrupt_all_as 7 [h]
-    Platform.stdout_line ("interrupt_all: " ++ show (List.map ended (Fiber.await_all [f, g, h])))
-  }
+let fibers () = scope s {
+  let a : Fiber.Fiber {Boom} String = Fiber.spawn s quiet (after ms1 "a")
+  let b = Fiber.spawn s quiet (task { from_result (Err (Boom 2)) })
+  let c = Fiber.spawn s quiet (after ms1 "c")
+  Platform.stdout_line ("await_: " ++ ended (Fiber.await_ a))
+  Platform.stdout_line ("await_all: " ++ show (List.map ended (Fiber.await_all [a, b, c])))
+  let joined =
+    try show (Fiber.join_all [a, c]) with
+    | Boom n -> "Boom " ++ show n
+  Platform.stdout_line ("join_all: " ++ joined)
+  let d = Fiber.spawn s quiet (after ms50 "d")
+  Fiber.interrupt d
+  Platform.stdout_line ("interrupt: " ++ ended (Fiber.await_ d))
+  let e = Fiber.spawn s quiet (after ms50 "e")
+  Fiber.interrupt_as (Some 42) e
+  Platform.stdout_line ("interrupt_as: " ++ ended (Fiber.await_ e))
+  let f = Fiber.spawn s quiet (after ms50 "f")
+  let g = Fiber.spawn s quiet (after ms50 "g")
+  Fiber.interrupt_all [f, g]
+  let h = Fiber.spawn s quiet (after ms50 "h")
+  Fiber.interrupt_all_as 7 [h]
+  Platform.stdout_line ("interrupt_all: " ++ show (List.map ended (Fiber.await_all [f, g, h])))
+}
 
 sets : Unit ->{} Unit
 let sets () =
@@ -88,8 +92,11 @@ let sets () =
     | Boom n -> "join failed with Boom " ++ show n
   }
   Platform.stdout_line ("set join: " ++ joined)
-  let map_options =
-    { onlyIfMissing = false; propagateInterruption = false; startImmediately = false }
+  let map_options = {
+    onlyIfMissing = false;
+    propagateInterruption = false;
+    startImmediately = false;
+  }
   scope s {
     let map : FiberMap.FiberMap s String {Boom} String = FiberMap.make ()
     let first = FiberMap.run map_options "k" (after ms50 "first") map
@@ -132,9 +139,8 @@ let races () =
   Platform.stdout_line
     ("race_all: " ++ show (Effect.race_all [after ms20 "slow", after ms1 "fast"]))
   let first =
-    try Effect.race_all_first
-      [after ms20 "slow", task { from_result (Err (Boom 6)) }] with | Boom n ->
-      "Boom " ++ show n
+    try Effect.race_all_first [after ms20 "slow", task { from_result (Err (Boom 6)) }] with
+    | Boom n -> "Boom " ++ show n
   Platform.stdout_line ("race_all_first: " ++ first)
   Platform.stdout_line ("fiber_id: " ++ show (Effect.fiber_id () >= 0))
   let runs = Ref.make 0
@@ -181,19 +187,24 @@ let plans () =
   let events = Ref.make []
   record : ExecutionPlan.Event {Boom} ->{} Unit
   let record event =
-    let text = match event with
+    let text =
+      match event with
       | ExecutionPlan.AttemptStart a -> "start " ++ show a.attempt
       | ExecutionPlan.AttemptSuccess a _ -> "success " ++ show a.stepIndex
       | ExecutionPlan.AttemptFailure a _ f -> "failure " ++ show a.stepIndex
     Ref.update events (fun xs -> xs ++ [text])
-  let greeted = Effect.with_execution_plan plan record (task {
-    let meta : ExecutionPlan.Metadata = ExecutionPlan.current_metadata ()
-    let text = Greeter.greet "ada"
-    if text == "" then
-      from_result (Err (Boom meta.attempt))
-    else
-      text ++ " at " ++ show meta.attempt
-  })
+  let greeted =
+    Effect.with_execution_plan
+      plan
+      record
+      (task {
+        let meta : ExecutionPlan.Metadata = ExecutionPlan.current_metadata ()
+        let text = Greeter.greet "ada"
+        if text == "" then
+          from_result (Err (Boom meta.attempt))
+        else
+          text ++ " at " ++ show meta.attempt
+      })
   Platform.stdout_line ("with_execution_plan: " ++ greeted)
   Platform.stdout_line ("events: " ++ show (Ref.get events))
 
@@ -201,6 +212,8 @@ main : Unit ->{; AppError} Unit
 let main () =
   fibers ()
   sets ()
-  try races () with | Boom n -> Platform.stdout_line ("races failed: " ++ show n)
+  try races () with
+  | Boom n -> Platform.stdout_line ("races failed: " ++ show n)
   scheduling ()
-  try plans () with | Boom n -> Platform.stdout_line ("plan failed: " ++ show n)
+  try plans () with
+  | Boom n -> Platform.stdout_line ("plan failed: " ++ show n)

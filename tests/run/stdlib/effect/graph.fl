@@ -5,7 +5,8 @@ module App.Main exposing (main)
 type alias G = Graph.DirectedGraph String Float
 
 res : Show a => Result Graph.GraphError a -> String
-let res r = match r with
+let res r =
+  match r with
   | Ok a -> "Ok " ++ show a
   | Err (Graph.GraphError message) -> "Err " ++ message
 
@@ -51,21 +52,18 @@ let main () =
   Platform.stdout_line ("counts: " ++ show (Graph.node_count sample, Graph.edge_count sample))
   Platform.stdout_line
     ("nodes: "
-      ++ show
-        (
-          Graph.get_node 2 sample,
-          Graph.get_node 9 sample,
-          Graph.has_node 3 sample,
-          Graph.has_node 4 sample,
-        ))
+      ++ show (
+        Graph.get_node 2 sample,
+        Graph.get_node 9 sample,
+        Graph.has_node 3 sample,
+        Graph.has_node 4 sample,
+      ))
   let first : Option (Graph.Edge Float) = Graph.get_edge 0 sample
   Platform.stdout_line
-    (
-      "edge 0: "
-        ++ show first
-        ++ ", "
-        ++ show (Graph.has_edge 0 1 sample, Graph.has_edge 1 0 sample)
-    )
+    ("edge 0: "
+      ++ show first
+      ++ ", "
+      ++ show (Graph.has_edge 0 1 sample, Graph.has_edge 1 0 sample))
   let (index, with_e) = Graph.add_node "E" sample
   Platform.stdout_line
     ("add_node: " ++ show (index, Graph.node_count with_e, Graph.node_count sample))
@@ -77,27 +75,26 @@ let main () =
       ++ res (Result.map (fun (i, _) -> i) (Graph.add_edge 0 9 1 sample)))
   Platform.stdout_line
     ("find: "
-      ++ show
-        (Graph.find_node (fun n -> n == "C") sample, Graph.find_nodes (fun n -> n != "B") sample))
+      ++ show (
+        Graph.find_node (fun n -> n == "C") sample,
+        Graph.find_nodes (fun n -> n != "B") sample,
+      ))
   Platform.stdout_line
     ("find edges: "
-      ++ show
-        (
-          Graph.find_edge (fun w s _ -> w > 1 && s == 0) sample,
-          Graph.find_edges (fun w _ t -> w < 5 && t > 1) sample,
-        ))
+      ++ show (
+        Graph.find_edge (fun w s _ -> w > 1 && s == 0) sample,
+        Graph.find_edges (fun w _ t -> w < 5 && t > 1) sample,
+      ))
   Platform.stdout_line
     ("incident: "
       ++ res (Graph.incident_edges 2 sample)
       ++ " "
       ++ res (Graph.incident_edges 9 sample))
   Platform.stdout_line
-    (
-      "out, in: "
-        ++ res (Graph.outgoing_edges 0 sample)
-        ++ " "
-        ++ res (Graph.incoming_edges 2 sample)
-    )
+    ("out, in: "
+      ++ res (Graph.outgoing_edges 0 sample)
+      ++ " "
+      ++ res (Graph.incoming_edges 2 sample))
   Platform.stdout_line ("between: " ++ res (Graph.edges_between 0 2 sample))
   Platform.stdout_line
     ("degrees: " ++ res (Graph.out_degree 0 sample) ++ " " ++ res (Graph.in_degree 2 sample))
@@ -106,26 +103,22 @@ let main () =
       ++ show (Graph.neighbors 0 sample, Graph.successors 1 sample, Graph.predecessors 2 sample))
   Platform.stdout_line
     ("directed neighbors: "
-      ++ show
-        (
-          Graph.neighbors_directed 2 Graph.incoming sample,
-          Graph.neighbors_directed 2 Graph.outgoing sample,
-        ))
+      ++ show (
+        Graph.neighbors_directed 2 Graph.incoming sample,
+        Graph.neighbors_directed 2 Graph.outgoing sample,
+      ))
   let changed =
     sample |> Graph.update_node 0 (fun n -> n ++ "!") |> Graph.update_edge 2 (fun w -> w * 10)
   Platform.stdout_line
-    (
-      "update: "
-        ++ show (Graph.get_node 0 changed, Graph.get_edge 2 changed, Graph.get_node 0 sample)
-    )
+    ("update: "
+      ++ show (Graph.get_node 0 changed, Graph.get_edge 2 changed, Graph.get_node 0 sample))
   let mapped = sample |> Graph.map_nodes String.to_lower |> Graph.map_edges (fun w -> w + 100)
   Platform.stdout_line
     ("map: "
-      ++ show
-        (
-          Graph.values (Graph.nodes mapped),
-          List.map (fun (_, e) -> e.data) (Graph.entries (Graph.edges mapped)),
-        ))
+      ++ show (
+        Graph.values (Graph.nodes mapped),
+        List.map (fun (_, e) -> e.data) (Graph.entries (Graph.edges mapped)),
+      ))
   let kept = Graph.filter_map_nodes (fun n -> if n == "B" then None else Some (n ++ n)) sample
   Platform.stdout_line
     ("filter_map_nodes: " ++ show (Graph.entries (Graph.nodes kept), Graph.edge_count kept))
@@ -135,28 +128,29 @@ let main () =
       ++ show (List.map (fun (_, e) -> e.data) (Graph.entries (Graph.edges light))))
   Platform.stdout_line
     ("filter: "
-      ++ show
-        (
-          Graph.node_count (Graph.filter_nodes (fun n -> n != "A") sample),
-          Graph.edge_count (Graph.filter_edges (fun w -> w == 1) sample),
-        ))
+      ++ show (
+        Graph.node_count (Graph.filter_nodes (fun n -> n != "A") sample),
+        Graph.edge_count (Graph.filter_edges (fun w -> w == 1) sample),
+      ))
   Platform.stdout_line ("reverse: " ++ show (Graph.successors 2 (Graph.reverse sample)))
   Platform.stdout_line
     ("remove: "
-      ++ show
-        (
-          Graph.edge_count (Graph.remove_edge 0 sample),
-          Graph.edge_count (Graph.remove_edges [0, 1] sample),
-          Graph.edge_count (Graph.remove_node 2 sample),
-          Graph.node_count (Graph.remove_nodes [0, 1] sample),
-        ))
+      ++ show (
+        Graph.edge_count (Graph.remove_edge 0 sample),
+        Graph.edge_count (Graph.remove_edges [0, 1] sample),
+        Graph.edge_count (Graph.remove_node 2 sample),
+        Graph.node_count (Graph.remove_nodes [0, 1] sample),
+      ))
   let snapshot : Graph.Snapshot String Float Graph.Directed = Graph.to_snapshot sample
   let node_zero : List (Graph.IndexedNode String) = List.take 1 snapshot.nodes
   let edge_zero : List (Graph.IndexedEdge Float) = List.take 1 snapshot.edges
   Platform.stdout_line ("snapshot: " ++ show (node_zero, edge_zero))
   let rebuilt =
-    Graph.from_snapshot
-      { graph_type = Graph.directed_kind; nodes = snapshot.nodes; edges = snapshot.edges }
+    Graph.from_snapshot {
+      graph_type = Graph.directed_kind;
+      nodes = snapshot.nodes;
+      edges = snapshot.edges;
+    }
   Platform.stdout_line ("from_snapshot: " ++ res (Result.map Graph.edge_count rebuilt))
   let broken =
     Graph.from_snapshot { graph_type = Graph.directed_kind; nodes = []; edges = snapshot.edges }
@@ -168,41 +162,41 @@ let main () =
   let other = Graph.directed () |> node "C" |> node "D" |> node "Z" |> edge 0 1 1 |> edge 1 2 4
   Platform.stdout_line
     ("compose: "
-      ++ show
-        (
-          Graph.node_count (Graph.compose same other sample),
-          Graph.edge_count (Graph.compose same other sample),
-        ))
+      ++ show (
+        Graph.node_count (Graph.compose same other sample),
+        Graph.edge_count (Graph.compose same other sample),
+      ))
   Platform.stdout_line
     ("intersection: "
-      ++ show
-        (
-          Graph.values (Graph.nodes (Graph.intersection same other sample)),
-          Graph.edge_count (Graph.intersection same other sample),
-        ))
+      ++ show (
+        Graph.values (Graph.nodes (Graph.intersection same other sample)),
+        Graph.edge_count (Graph.intersection same other sample),
+      ))
   Platform.stdout_line
     ("difference: "
-      ++ show
-        (
-          Graph.node_count (Graph.difference same other sample),
-          Graph.edge_count (Graph.difference same other sample),
-        ))
+      ++ show (
+        Graph.node_count (Graph.difference same other sample),
+        Graph.edge_count (Graph.difference same other sample),
+      ))
   Platform.stdout_line
     ("symmetric_difference: "
-      ++ show
-        (
-          Graph.node_count (Graph.symmetric_difference same other sample),
-          Graph.edge_count (Graph.symmetric_difference same other sample),
-        ))
-  let by_letter : Graph.IdentityOptions String Float String Bool =
-    { nodeIdentity = Some String.to_lower; edgeIdentity = Some (fun _ -> true) }
+      ++ show (
+        Graph.node_count (Graph.symmetric_difference same other sample),
+        Graph.edge_count (Graph.symmetric_difference same other sample),
+      ))
+  let by_letter : Graph.IdentityOptions String Float String Bool = {
+    nodeIdentity = Some String.to_lower;
+    edgeIdentity = Some (fun _ -> true);
+  }
   let lower = Graph.map_nodes String.to_lower other
   Platform.stdout_line
     ("identity: " ++ show (Graph.edge_count (Graph.intersection by_letter lower sample)))
   Platform.stdout_line
     ("sum: "
-      ++ show
-        (Graph.node_count (Graph.sum other sample), Graph.edge_count (Graph.sum other sample)))
+      ++ show (
+        Graph.node_count (Graph.sum other sample),
+        Graph.edge_count (Graph.sum other sample),
+      ))
   let missing = Graph.complement (fun s t -> Int.to_float (String.length (s ++ t))) sample
   Platform.stdout_line
     ("complement: "
@@ -252,37 +246,37 @@ let main () =
   let sinks : Graph.NodeWalker String = Graph.externals leaves sample
   Platform.stdout_line
     ("externals: "
-      ++ show
-        (
-          Graph.entries sinks,
-          Graph.values (Graph.externals { direction = Some Graph.incoming } sample),
-        ))
+      ++ show (
+        Graph.entries sinks,
+        Graph.values (Graph.externals { direction = Some Graph.incoming } sample),
+      ))
   let all_edges : Graph.EdgeWalker Float = Graph.edges sample
   let walker : Graph.Walker Graph.EdgeIndex (Graph.Edge Float) = all_edges
   Platform.stdout_line ("edges: " ++ show (Graph.indices walker))
-  let dot : Graph.GraphVizOptions String Float =
-    { nodeLabel = Some (fun n -> n); edgeLabel = Some show; graphName = Some "G" }
+  let dot : Graph.GraphVizOptions String Float = {
+    nodeLabel = Some (fun n -> n);
+    edgeLabel = Some show;
+    graphName = Some "G";
+  }
   Platform.stdout_line (Graph.to_graph_viz dot sample)
-  let diagram : Graph.MermaidOptions String Float =
-    {
-      nodeLabel = Some (fun n -> n);
-      edgeLabel = None;
-      diagramType = Some Graph.flowchart;
-      direction = Some Graph.left_to_right;
-      nodeShape = Some shape;
-    }
+  let diagram : Graph.MermaidOptions String Float = {
+    nodeLabel = Some (fun n -> n);
+    edgeLabel = None;
+    diagramType = Some Graph.flowchart;
+    direction = Some Graph.left_to_right;
+    nodeShape = Some shape;
+  }
   Platform.stdout_line (Graph.to_mermaid diagram sample)
   let direction = Graph.top_to_bottom
   let diagram_type = Graph.graph_diagram
-  let shapes =
-    [
-      Graph.rounded,
-      Graph.diamond,
-      Graph.hexagon,
-      Graph.stadium,
-      Graph.subroutine,
-      Graph.cylindrical,
-    ]
+  let shapes = [
+    Graph.rounded,
+    Graph.diamond,
+    Graph.hexagon,
+    Graph.stadium,
+    Graph.subroutine,
+    Graph.cylindrical,
+  ]
   let each =
     List.map
       (fun s ->
@@ -294,7 +288,8 @@ let main () =
             direction = Some direction;
             nodeShape = Some (fun _ -> s);
           }
-          plain)
+          plain
+      )
       shapes
   Platform.stdout_line (String.join "\n" each)
   let rest = [Graph.top_down, Graph.bottom_to_top, Graph.right_to_left]
@@ -311,5 +306,6 @@ let main () =
               direction = Some d;
               nodeShape = None;
             }
-            plain)
+            plain
+        )
         rest))

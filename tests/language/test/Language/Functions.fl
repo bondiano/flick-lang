@@ -1,0 +1,63 @@
+// Functions are values: closures capture what they use, a curried function
+// applied to fewer arguments waits for the rest, and arguments run left to
+// right.
+module Language.Functions exposing (tests)
+
+add3 : Int -> Int -> Int -> Int
+let add3 a b c = a * 100 + b * 10 + c
+
+compose : (b -> c) -> (a -> b) -> a -> c
+let compose f g x = f (g x)
+
+flip : (a -> b -> c) -> b -> a -> c
+let flip f b a = f a b
+
+adder : Int -> (Int -> Int)
+let adder n = fun x -> x + n
+
+/// Closures made in a loop each keep their own value.
+counters : List (Unit -> Int)
+let counters = List.map (fun i -> fun () -> i * i) [1, 2, 3]
+
+apply_twice : (forall a. a -> a) -> (Int, String)
+let apply_twice f = (f 1, f "one")
+
+tests : List Test.Test
+let tests = [
+  Test.test "partial application" (fun () -> Test.equal 123 ((add3 1) 2 3)),
+  Test.test "partial application in two steps" (fun () ->
+    f : Int -> Int -> Int
+    let f = add3 4
+    g : Int -> Int
+    let g = f 5
+    Test.equal [456, 457] [g 6, g 7]
+  ),
+  Test.test "closures capture values" (fun () ->
+    Test.equal [1, 4, 9] (List.map (fun f -> f ()) counters)
+  ),
+  Test.test "returned closures" (fun () -> Test.equal [11, 12] (List.map (adder 10) [1, 2])),
+  Test.test "composition" (fun () -> Test.equal 22 (compose (fun x -> x * 2) (adder 1) 10)),
+  Test.test "flip" (fun () -> Test.equal 210 (flip (add3 2) 0 1)),
+  Test.test "pipes" (fun () ->
+    Test.equal
+      30
+      ([1, 2, 3, 4] |> List.map (fun x -> x * 3) |> List.drop 1 |> List.sum |> fun s -> s + 3)
+  ),
+  Test.test "higher rank" (fun () -> Test.equal (1, "one") (apply_twice identity)),
+  Test.test "a local recursive closure" (fun () ->
+    let base = 3
+    go : Int -> Int
+    let rec go n = if n == 0 then base else go (n - 1)
+    Test.equal 3 (go 5)
+  ),
+  Test.test "a closure over a parameter" (fun () ->
+    scaled : Int -> List Int
+    let scaled k = List.map (fun x -> x * k) [1, 2]
+    Test.equal [[3, 6], [5, 10]] [scaled 3, scaled 5]
+  ),
+  Test.test "functions in data" (fun () ->
+    Test.equal
+      [2, 0, 1]
+      (List.map (fun op -> op 1 1) [(fun a b -> a + b), (fun a b -> a - b), (fun a b -> a * b)])
+  ),
+]

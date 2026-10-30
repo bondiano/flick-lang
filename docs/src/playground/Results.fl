@@ -3,27 +3,24 @@ module Results exposing (current_problems, output_pane, diagnostic_label)
 import State exposing (Diagnostic, Locale, Model, generated, profile_name, tr)
 
 problem : Locale -> Diagnostic -> Ui
-let problem locale diagnostic =
-  ui {
-    item
-      [
-        span
-          { class_name = "fp-diagnostic-code fp-" ++ diagnostic.severity }
-          [text diagnostic.code],
-        span { class_name = "fp-diagnostic-at" }
-          [
-            text
-              (if diagnostic.severity == "error" then
-                tr locale "Error" "Ошибка"
-              else if diagnostic.severity == "warning" then
-                tr locale "Warning" "Предупреждение"
-              else
-                tr locale "Info" "Сообщение"),
-          ],
-        span { class_name = "fp-diagnostic-at" } [text diagnostic.at],
-        paragraph [text diagnostic.message],
-      ]
-  }
+let problem locale diagnostic = ui {
+  item [
+    span { class_name = "fp-diagnostic-code fp-" ++ diagnostic.severity } [text diagnostic.code],
+    span { class_name = "fp-diagnostic-at" } [
+      text
+        (
+          if diagnostic.severity == "error" then
+            tr locale "Error" "Ошибка"
+          else if diagnostic.severity == "warning" then
+            tr locale "Warning" "Предупреждение"
+          else
+            tr locale "Info" "Сообщение"
+        ),
+    ],
+    span { class_name = "fp-diagnostic-at" } [text diagnostic.at],
+    paragraph [text diagnostic.message],
+  ]
+}
 
 type alias Problems = { locale : Locale; diagnostics : List Diagnostic }
 
@@ -38,46 +35,44 @@ component problems_pane (props : Problems) =
         List.filter (fun d -> d.severity == "error") props.diagnostics
       else
         props.diagnostics
-    div { class_name = "fp-diagnostics" }
-      [
-        Ui.with_host { Ui.host with class_name = Some "fp-filter" }
-          (button { disabled = props.diagnostics == []; on_click = toggle }
-            [
-              text
-                (if only then
-                  tr props.locale "Show all" "Показать все"
-                else
-                  tr props.locale "Errors only" "Только ошибки"),
-            ]),
-        match shown with
-        | [] ->
-          paragraph [text (tr props.locale "No diagnostics." "Ошибок и предупреждений нет.")]
-        | items -> list (List.map (problem props.locale) items),
-      ]
+    div { class_name = "fp-diagnostics" } [
+      Ui.with_host
+        { Ui.host with class_name = Some "fp-filter" }
+        (button { disabled = props.diagnostics == []; on_click = toggle } [
+          text
+            (
+              if only then
+                tr props.locale "Show all" "Показать все"
+              else
+                tr props.locale "Errors only" "Только ошибки"
+            ),
+        ]),
+      match shown with
+      | [] -> paragraph [text (tr props.locale "No diagnostics." "Ошибок и предупреждений нет.")]
+      | items -> list (List.map (problem props.locale) items),
+    ]
   }
 
 current_problems : Model -> Ui
 let current_problems m =
   if m.loading then
-    Ui.paragraph
-      [
-        Ui.text
-          (tr
-            m.locale
-            "Diagnostics appear when the compiler is ready."
-            "Результаты проверки появятся после загрузки компилятора."),
-      ]
+    Ui.paragraph [
+      Ui.text
+        (tr
+          m.locale
+          "Diagnostics appear when the compiler is ready."
+          "Результаты проверки появятся после загрузки компилятора."),
+    ]
   else if m.checking then
     Ui.paragraph [Ui.text (tr m.locale "Checking source…" "Проверка кода…")]
   else if m.version == "" || m.compile_error != "" then
-    Ui.paragraph
-      [
-        Ui.text
-          (tr
-            m.locale
-            "Restore the compiler above to check this source."
-            "Повторите загрузку или компиляцию с помощью кнопки выше, чтобы проверить код."),
-      ]
+    Ui.paragraph [
+      Ui.text
+        (tr
+          m.locale
+          "Restore the compiler above to check this source."
+          "Повторите загрузку или компиляцию с помощью кнопки выше, чтобы проверить код."),
+    ]
   else
     Ui.render problems_pane { locale = m.locale; diagnostics = (generated m).diagnostics }
 
@@ -106,75 +101,92 @@ output_pane : Model -> Ui
 let output_pane m =
   if m.running || m.execution.status == "" then
     ui {
-      div { class_name = "fp-empty" }
-        [
-          paragraph
-            [
-              text
-                (if m.running then
-                  tr
-                    m.locale
-                    "Running in an isolated worker…"
-                    "Программа выполняется в отдельном потоке…"
-                else
-                  tr m.locale "Your program’s output goes here." "Здесь появится вывод программы."),
-            ],
-          paragraph
-            [
-              text
-                (if m.running then
-                  tr
-                    m.locale
-                    "Output appears when the program ends. Stop it at any time; the limit is 10 seconds."
-                    "Вывод появится после завершения программы. Её можно остановить кнопкой выше; через 10 секунд она остановится автоматически."
-                else
-                  tr
-                    m.locale
-                    "Choose an example or edit Main.fl, then press Run."
-                    "Выберите пример или измените Main.fl, затем нажмите «Запустить»."),
-            ],
-        ]
+      div { class_name = "fp-empty" } [
+        paragraph [
+          text
+            (
+              if m.running then
+                tr
+                  m.locale
+                  "Running in an isolated worker…"
+                  "Программа выполняется в отдельном потоке…"
+              else
+                tr m.locale "Your program’s output goes here." "Здесь появится вывод программы."
+            ),
+        ],
+        paragraph [
+          text
+            (
+              if m.running then
+                tr
+                  m.locale
+                  "Output appears when the program ends. Stop it at any time; the limit is 10 seconds."
+                  "Вывод появится после завершения программы. Её можно остановить кнопкой выше; через 10 секунд она остановится автоматически."
+              else
+                tr
+                  m.locale
+                  "Choose an example or edit Main.fl, then press Run."
+                  "Выберите пример или измените Main.fl, затем нажмите «Запустить»."
+            ),
+        ],
+      ]
     }
   else
     ui {
-      div { class_name = "fp-execution" }
-        [
-          Ui.with_host { Ui.host with tab_index = Some 0; aria_label = Some (tr m.locale "Program output" "Вывод программы") }
-            (pre { class_name = "fp-output" }
-              (match m.execution.lines with
-              | [] ->
-                [
-                  span
-                    { class_name = "fp-muted" }
-                    [
-                      text
-                        (if m.execution.status == "exit" then
-                          tr m.locale "The program wrote no output." "Программа ничего не вывела."
-                        else
-                          tr m.locale "No output captured." "Вывод не получен."),
-                    ],
-                ]
+      div { class_name = "fp-execution" } [
+        Ui.with_host
+          {
+            Ui.host with
+            tab_index = Some 0;
+            aria_label = Some (tr m.locale "Program output" "Вывод программы");
+          }
+          (pre
+            { class_name = "fp-output" }
+            (
+              match m.execution.lines with
+              | [] -> [
+                span { class_name = "fp-muted" } [
+                  text
+                    (
+                      if m.execution.status == "exit" then
+                        tr m.locale "The program wrote no output." "Программа ничего не вывела."
+                      else
+                        tr m.locale "No output captured." "Вывод не получен."
+                    ),
+                ],
+              ]
               | lines ->
                 List.map
                   (fun line -> span { class_name = "fp-" ++ line.stream } [text line.text])
-                  lines)),
-          Ui.with_host { Ui.host with role = Some "status" }
-            (div { class_name = if m.execution.status == "exit" && m.execution.detail == "0" then "fp-exit" else "fp-exit fp-bad" }
-              [text (execution_status m ++ " · " ++ profile_name m.ran_profile)]),
-          if m.execution.status == "failure" then pre { class_name = "fp-failure-detail" } [text m.execution.detail] else empty,
-          if m.execution.status == "invalid" then Ui.render problems_pane { locale = m.locale; diagnostics = m.execution.diagnostics } else empty,
-          if m.source != m.ran_source || m.profile != m.ran_profile then
-            div
-              { class_name = "fp-stale" }
-              [
-                text
-                  (tr
-                    m.locale
-                    "Source or build profile changed. Run again for fresh output."
-                    "Код или профиль сборки изменился. Запустите снова, чтобы обновить вывод."),
-              ]
-          else empty,
-        ]
+                  lines
+            )),
+        Ui.with_host
+          { Ui.host with role = Some "status" }
+          (div
+            {
+              class_name =
+                if m.execution.status == "exit" && m.execution.detail == "0" then
+                  "fp-exit"
+                else
+                  "fp-exit fp-bad";
+            }
+            [text (execution_status m ++ " · " ++ profile_name m.ran_profile)]),
+        if m.execution.status == "failure" then
+          pre { class_name = "fp-failure-detail" } [text m.execution.detail]
+        else empty,
+        if m.execution.status == "invalid" then
+          Ui.render problems_pane { locale = m.locale; diagnostics = m.execution.diagnostics }
+        else empty,
+        if m.source != m.ran_source || m.profile != m.ran_profile then
+          div { class_name = "fp-stale" } [
+            text
+              (tr
+                m.locale
+                "Source or build profile changed. Run again for fresh output."
+                "Код или профиль сборки изменился. Запустите снова, чтобы обновить вывод."),
+          ]
+        else empty,
+      ]
     }
 
 diagnostic_label : Model -> String

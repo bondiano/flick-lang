@@ -1,6 +1,7 @@
 package flickrt
 
 import (
+	"bytes"
 	"io"
 	"math/big"
 	"net"
@@ -34,6 +35,10 @@ type requestSource struct {
 	once    sync.Once
 	body    []byte
 	err     error
+	// the form `Http.Multipart.persisted` read
+	formOnce  sync.Once
+	form      Value
+	formCause *Cause
 }
 
 const maxBodySizeKey = "effect/http/HttpIncomingMessage/MaxBodySize"
@@ -94,7 +99,7 @@ func (s *requestSource) read(fb *Fiber) ([]byte, error) {
 	s.once.Do(func() {
 		switch {
 		case s.client != nil:
-			s.body, _, s.err = s.client.body.bytes()
+			s.body, _, s.err = s.client.body.bytes(fb)
 		default:
 			var r io.Reader = s.r.Body
 			limit := int64(-1)
@@ -193,17 +198,9 @@ func RequestJson(fb *Fiber, r Value) Value {
 	if text == "" {
 		return JsonNull
 	}
-	p := &jsonParser{s: text}
-	p.space()
-	v, ok := p.value()
-	if ok {
-		p.space()
-		if p.i < len(p.s) {
-			p.problem, ok = "Unexpected non-whitespace character after JSON "+p.at(), false
-		}
-	}
-	if !ok {
-		return Fail(q.parseError(p.reason()))
+	v, reason := parseJSON(text)
+	if reason != "" {
+		return Fail(q.parseError(reason))
 	}
 	return v
 }
@@ -264,11 +261,15 @@ func RequestToClientRequest(r Value) Value {
 			ct, hasType := q.header("content-type")
 			body = &Body{kind: bodyStream, hasType: hasType, contentType: ct,
 				length: parseContentLength(recordField(headers, "content-length")),
-				read: func() ([]byte, error) {
+				open: func(fb *Fiber) (io.ReadCloser, error) {
+					var data []byte
+					var err error
 					if q.inflate != nil {
-						return q.inflate.read(nil, q)
+						data, err = q.inflate.read(fb, q)
+					} else {
+						data, err = q.src.read(fb)
 					}
-					return q.src.read(nil)
+					return io.NopCloser(bytes.NewReader(data)), err
 				}}
 			if body.length < 0 {
 				headers = headers.without("content-length")

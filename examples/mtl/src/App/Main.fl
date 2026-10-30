@@ -3,66 +3,64 @@ module App.Main exposing (main)
 
 import App.Plan as Plan
 
-refined type Minutes = Float
-  where fun n -> Float.is_safe_integer n && n >= 0
+refined type Minutes = Float where fun n -> Float.is_safe_integer n && n >= 0
   deriving Cli.Value
 
 plan_command : Cli.Command none {AppError}
-let plan_command =
-  cli "plan" {
-    description "Plan tasks in order, stopping when a task is unknown or does not fit"
-    /// Available time in whole minutes
-    flag budget "b" : Minutes
-    /// Extra whole minutes charged for every task (default: 0)
-    flag overhead "o" : Option Minutes
-    /// Task names from the catalog; repeated tasks count again
-    arg tasks : List String
-    handle fun { budget; overhead; tasks } ->
-      let config = {
-        budget = Minutes.value budget;
-        overhead = Option.with_default Plan.default_config.overhead (map Minutes.value overhead);
-      }
-      let (result, state) = Plan.plan config tasks
-      Platform.stdout_line
-        ("Budget: "
-          ++ show config.budget
-          ++ " min; overhead: "
-          ++ show config.overhead
-          ++ " min/task")
-      Platform.stdout_line ("Completed: " ++
-        (match state.completed with
-        | [] -> "(none)"
-        | names -> String.join ", " names))
-      Platform.stdout_line ("Remaining: " ++ show state.remaining ++ " min")
-      match result with
-      | Some _ -> Platform.stdout_line "Plan complete."
-      | None ->
-        App.fail
-          ("Plan stopped. Unscheduled: " ++
-            String.join ", " (List.drop (List.length state.completed) tasks) ++
-            ". The first unscheduled task is unknown or does not fit the remaining time " ++
-            "(base time + overhead). Later tasks were not scheduled; the completed prefix is kept. "
-              ++
-            "Use 'mtl catalog' to list task names and times.")
-  }
+let plan_command = cli "plan" {
+  description "Plan tasks in order, stopping when a task is unknown or does not fit"
+  /// Available time in whole minutes
+  flag budget "b" : Minutes
+  /// Extra whole minutes charged for every task (default: 0)
+  flag overhead "o" : Option Minutes
+  /// Task names from the catalog; repeated tasks count again
+  arg tasks : List String
+  handle fun { budget; overhead; tasks } ->
+    let config = {
+      budget = Minutes.value budget;
+      overhead = Option.with_default Plan.default_config.overhead (map Minutes.value overhead);
+    }
+    let (result, state) = Plan.plan config tasks
+    Platform.stdout_line
+      ("Budget: "
+        ++ show config.budget
+        ++ " min; overhead: "
+        ++ show config.overhead
+        ++ " min/task")
+    Platform.stdout_line
+      ("Completed: "
+        ++ (
+          match state.completed with
+          | [] -> "(none)"
+          | names -> String.join ", " names
+        ))
+    Platform.stdout_line ("Remaining: " ++ show state.remaining ++ " min")
+    match result with
+    | Some _ -> Platform.stdout_line "Plan complete."
+    | None ->
+      App.fail
+        ("Plan stopped. Unscheduled: "
+          ++ String.join ", " (List.drop (List.length state.completed) tasks)
+          ++ ". The first unscheduled task is unknown or does not fit the remaining time "
+          ++ "(base time + overhead). Later tasks were not scheduled; the completed prefix is kept. "
+          ++ "Use 'mtl catalog' to list task names and times.")
+}
 
 catalog_command : Cli.Command none none
-let catalog_command =
-  cli "catalog" {
-    description "List available tasks and their base time before per-task overhead"
-    handle fun _ ->
-      Platform.stdout_line "Available tasks (before per-task overhead):"
-      for (name, minutes) <- Plan.catalog do
-        Platform.stdout_line ("  " ++ name ++ ": " ++ show minutes ++ " min")
-  }
+let catalog_command = cli "catalog" {
+  description "List available tasks and their base time before per-task overhead"
+  handle fun _ ->
+    Platform.stdout_line "Available tasks (before per-task overhead):"
+    for (name, minutes) <- Plan.catalog do
+      Platform.stdout_line ("  " ++ name ++ ": " ++ show minutes ++ " min")
+}
 
 command : Cli.Command none {AppError}
-let command =
-  cli "mtl" {
-    description "A pure task-time planner built with MaybeT, StateT and ReaderT"
-    subcommand plan_command
-    subcommand catalog_command
-  }
+let command = cli "mtl" {
+  description "A pure task-time planner built with MaybeT, StateT and ReaderT"
+  subcommand plan_command
+  subcommand catalog_command
+}
 
 main : Unit ->{; AppError} Unit
 let main () =

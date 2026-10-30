@@ -2,6 +2,7 @@ package flickrt
 
 import (
 	"bytes"
+	"io"
 	"mime/multipart"
 	"strconv"
 )
@@ -25,7 +26,7 @@ type Body struct {
 	length      int64 // -1: unknown
 	data        string
 	form        []Value // the pairs of a form
-	read        func() ([]byte, error)
+	open        func(fb *Fiber) (io.ReadCloser, error)
 }
 
 var (
@@ -130,8 +131,9 @@ func BodyToText(b Value) Value {
 	return Some(decodeUTF8([]byte(body.data)))
 }
 
-// bytes is what the body sends, and the content type a form body then has.
-func (b *Body) bytes() ([]byte, string, error) {
+// bytes is what the body sends, and the content type a form body then has;
+// a stream body runs in the fiber.
+func (b *Body) bytes(fb *Fiber) ([]byte, string, error) {
 	switch b.kind {
 	case bodyBytes:
 		if b.text {
@@ -148,10 +150,25 @@ func (b *Body) bytes() ([]byte, string, error) {
 		w.Close()
 		return buf.Bytes(), w.FormDataContentType(), nil
 	case bodyStream:
-		data, err := b.read()
+		r, err := b.open(fb)
+		if err != nil {
+			return nil, b.contentType, err
+		}
+		defer r.Close()
+		data, err := io.ReadAll(r)
 		return data, b.contentType, err
 	}
 	return nil, "", nil
+}
+
+// reader is what the body sends, as it is read, and its content type.
+func (b *Body) reader(fb *Fiber) (io.ReadCloser, string, error) {
+	if b.kind == bodyStream {
+		r, err := b.open(fb)
+		return r, b.contentType, err
+	}
+	data, contentType, err := b.bytes(fb)
+	return io.NopCloser(bytes.NewReader(data)), contentType, err
 }
 
 // parseContentLength is Effect's length of a `Content-Length` header: its

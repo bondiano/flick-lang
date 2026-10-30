@@ -295,36 +295,8 @@ func ResponseOmitsBody(withoutBody, r Value) Value {
 	return responseOf(r).omitsBody(withoutBody.(bool))
 }
 
-// ClientResponse is a response as a client gets it: here only one a
-// handler made, for a test double.
-//
-// shortcut: no HTTP client on the go target yet; responses of the network come with it
-type ClientResponse struct {
-	request  *ClientRequest
-	response *ServerResponse
-}
-
-func ResponseToClientResponse(request, r Value) Value {
-	return &ClientResponse{clientOf(request), responseOf(r)}
-}
-
-// ResponseFromClientResponse is the response a proxy sends: the status,
-// the headers but `Set-Cookie`, the cookies, and the body as it comes.
-func ResponseFromClientResponse(c Value) Value {
-	in := c.(*ClientResponse).response
-	headers := in.headerRecord().without("set-cookie")
-	ct, hasType := recordField(headers, "content-type").(string)
-	body := &Body{kind: bodyStream, hasType: hasType, contentType: ct,
-		length: parseContentLength(recordField(headers, "content-length")),
-		read: func() ([]byte, error) {
-			data, _, err := in.body.bytes()
-			return data, err
-		}}
-	return newResponse(in.status, "", false, headers, in.cookies, body, false)
-}
-
 // statusOf is the status a server answers a failure with: that of a Flick
-// HttpServerError, 503 for an interruption, 500 otherwise.
+// HttpServerError or MultipartError, 503 for an interruption, 500 otherwise.
 func statusOf(c *Cause) int32 {
 	if r := c.firstOf(causeFail); r != nil {
 		if d, ok := r.err.(*Data); ok && d.Tag == serverErrorTag {
@@ -335,6 +307,9 @@ func statusOf(c *Cause) int32 {
 				return 404
 			}
 			return 500
+		}
+		if d, ok := r.err.(*Data); ok && d.Tag == multipartErrorTag {
+			return multipartStatus[d.Fields[0].(*Data).Tag]
 		}
 	}
 	if !c.has(causeFail) && !c.has(causeDie) && c.has(causeInterrupt) {

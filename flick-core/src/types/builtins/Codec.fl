@@ -11,35 +11,25 @@ type error ExportError = ExportError String
 type StandardSchema i a
 
 /// Decodes unknown input, failing with `SchemaError`; the input must be inert data.
-decode :
-  forall c ci rd re i a.
-  (Codec rd re i a)^c ->
-  (Unknown^ci ->{rd; SchemaError} a)^c
+decode : forall c ci rd re i a. (Codec rd re i a)^c -> (Unknown^ci ->{rd; SchemaError} a)^c
 foreign effect decode from "@flick-lang/runtime" "codecDecode"
   retention call
   reviewed "effect@4.0.5 sha256:0ba82b2229e48f1a"
 
 /// Encodes a value to its wire form, failing with `SchemaError`.
-encode :
-  forall c rd re i a.
-  (Codec rd re i a)^c -> (a ->{re; SchemaError} i)^c
+encode : forall c rd re i a. (Codec rd re i a)^c -> (a ->{re; SchemaError} i)^c
 foreign effect encode from "@flick-lang/runtime" "codecEncode"
   retention call
   reviewed "effect@4.0.5 sha256:4152dced7e364e25"
 
 /// `decode` of a pure codec, at once.
-decode_result :
-  forall c ci i a.
-  (PureCodec i a)^c ->
-  (Unknown^ci -> Result SchemaError a)^c
+decode_result : forall c ci i a. (PureCodec i a)^c -> (Unknown^ci -> Result SchemaError a)^c
 foreign pure decode_result from "@flick-lang/runtime" "codecDecodeResult"
   retention call
   reviewed "effect@4.0.5 sha256:1770b64eba8235d3"
 
 /// `encode` of a pure codec, at once.
-encode_result :
-  forall c i a.
-  (PureCodec i a)^c -> (a -> Result SchemaError i)^c
+encode_result : forall c i a. (PureCodec i a)^c -> (a -> Result SchemaError i)^c
 foreign pure encode_result from "@flick-lang/runtime" "codecEncodeResult"
   retention call
   reviewed "effect@4.0.5 sha256:0475f2036c0a9a24"

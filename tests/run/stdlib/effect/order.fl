@@ -75,8 +75,7 @@ let main () =
   eq_reduced : Equivalence.Equivalence String
   let eq_reduced = Reducer.combine_all (Equivalence.make_reducer ()) [same_length, both]
   Platform.stdout_line ("make_reducer: " ++ show (eq_reduced "ab" "cd"))
-  let longer =
-    Combiner.make (fun a b -> if String.length b > String.length a then b else a)
+  let longer = Combiner.make (fun a b -> if String.length b > String.length a then b else a)
   Platform.stdout_line
     ("combiner: "
       ++ Combiner.combine longer "abc" "de"

@@ -12,8 +12,7 @@ service Session =
   user : Unit ->{} String
 
 session : String -> Session.Impl
-let session name =
-  { user = fun () -> name }
+let session name = { user = fun () -> name }
 
 /// The session the `authorization` header names.
 check : Rpc.Call Unit ->{; Unauthorized} Session.Impl
@@ -26,9 +25,9 @@ let check call =
 me : Rpc.Rpc "me" (Unit ->{Session; Unauthorized} String)
 let me =
   Rpc.make (Record.label : Record.Label "me")
-    |> Rpc.with_success (Codec.json Schema.string)
-    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema Unauthorized)))
-    |> Rpc.with_auth Session check
+  |> Rpc.with_success (Codec.json Schema.string)
+  |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema Unauthorized)))
+  |> Rpc.with_auth Session check
 
 type alias Handlers = { me : Unit ->{Session; Unauthorized} String }
 

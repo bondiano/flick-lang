@@ -55,10 +55,9 @@ let counter = Ui.view (fun () -> Ui.text ("count " ++ show (Atom.value count)))
 
 greeting : Ui.View Unit
 let greeting =
-  Ui.suspended
-    (fun _ -> Ui.text " failed")
-    (Ui.text " waiting")
-    (fun () -> Ui.text (" hello " ++ Atom.ready user ++ " " ++ Atom.ready stock))
+  Ui.suspended (fun _ -> Ui.text " failed") (Ui.text " waiting") (fun () ->
+    Ui.text (" hello " ++ Atom.ready user ++ " " ++ Atom.ready stock)
+  )
 
 page : Ui
 let page = Ui.fragment [Ui.render counter (), Ui.render greeting ()]
@@ -69,11 +68,10 @@ let report failure =
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let chunks =
-    provide Atom.layer {
-      Atom.set count 5
-      Stream.run_collect (Ui.Server.stream "app" page)
-    }
+  let chunks = provide Atom.layer {
+    Atom.set count 5
+    Stream.run_collect (Ui.Server.stream "app" page)
+  }
   let joined = String.join "" chunks
   Platform.stdout_line
     ("fallback and markup: "
@@ -82,19 +80,18 @@ let main () =
   stream_shell (String.join "<!--chunk-->" chunks)
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
-  | Some root ->
-    provide Atom.layer {
-      scope s {
-        let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report page })
-        settle ()
-        Platform.stdout_line (text ())
-        stream_rest ()
-        Platform.stdout_line (text ())
-        Platform.stdout_line ("hydrated runs: " ++ show (task_runs ()))
-        restocked ()
-        settle ()
-      }
+  | Some root -> provide Atom.layer {
+    scope s {
+      let _ui = Fiber.spawn s report (task { Ui.Dom.mount root report page })
+      settle ()
+      Platform.stdout_line (text ())
+      stream_rest ()
+      Platform.stdout_line (text ())
+      Platform.stdout_line ("hydrated runs: " ++ show (task_runs ()))
+      restocked ()
+      settle ()
     }
+  }
   Platform.stdout_line ("task runs: " ++ show (task_runs ()))
   Platform.stdout_line ("complaints: [" ++ complaints () ++ "]")
   close ()

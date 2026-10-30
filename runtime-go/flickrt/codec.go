@@ -1,18 +1,93 @@
 package flickrt
 
-import "strings"
+import (
+	"math"
+	"slices"
+	"strings"
+)
 
 // Codecs of the `Codec` module: the canonical JSON codec of a schema, and
 // codecs built out of codecs.
 
 func SchemaJsonCodec(s Value) Value { return sch(s).jsonOf() }
 
-// JsonCodec is `Schema.json`: a JSON value as itself.
-var JsonCodec Value = sch(SchemaUnknown).jsonOf()
+// JsonCodec is `Json.json`, Effect's `Schema.Json`: a JSON value as
+// itself. A tree that holds anything else, such as an infinity a parse
+// gave for `1e400`, fails as a whole, both ways.
+var JsonCodec Value = jsonValue{}
+
+type jsonValue struct{}
+
+func isJSONTree(in Value) bool {
+	switch x := in.(type) {
+	case *jsonNull, string, bool, int32:
+		return true
+	case float64:
+		return !math.IsNaN(x) && !math.IsInf(x, 0)
+	case []Value:
+		return !slices.ContainsFunc(x, func(v Value) bool { return !isJSONTree(v) })
+	case *Record:
+		return !slices.ContainsFunc(x.vals, func(v Value) bool { return !isJSONTree(v) })
+	}
+	return false
+}
+
+func (jsonValue) accepts(in Value) bool { return isJSONTree(in) }
+
+func (jsonValue) decode(in Value) (Value, []issue) {
+	if !isJSONTree(in) {
+		return nil, expected("JSON value", in)
+	}
+	return in, nil
+}
+
+func (j jsonValue) encode(v Value) (Value, []issue) { return j.decode(v) }
 
 var CodecBool Value = sch(SchemaBool).jsonOf()
 
 func codecOf(c Value) codec { return c.(codec) }
+
+// CodecNumberLossless is `Float.json`: every number, `NaN`, the
+// infinities and `-0` as the strings that name them.
+var CodecNumberLossless Value = losslessNumber{}
+
+type losslessNumber struct{}
+
+var losslessNames = map[string]float64{
+	"NaN": math.NaN(), "Infinity": math.Inf(1), "-Infinity": math.Inf(-1), "-0": math.Copysign(0, -1),
+}
+
+func (losslessNumber) accepts(in Value) bool {
+	_, isNumber := in.(float64)
+	s, isString := in.(string)
+	_, named := losslessNames[s]
+	return isNumber || isString && named
+}
+
+func (n losslessNumber) decode(in Value) (Value, []issue) {
+	if !n.accepts(in) {
+		return nil, expected("a number", in)
+	}
+	if s, ok := in.(string); ok {
+		return losslessNames[s], nil
+	}
+	return in, nil
+}
+
+func (losslessNumber) encode(v Value) (Value, []issue) {
+	x := v.(float64)
+	switch {
+	case math.IsNaN(x):
+		return "NaN", nil
+	case math.IsInf(x, 1):
+		return "Infinity", nil
+	case math.IsInf(x, -1):
+		return "-Infinity", nil
+	case x == 0 && math.Signbit(x):
+		return "-0", nil
+	}
+	return x, nil
+}
 
 func CodecDecodeResult(c, in Value) Value {
 	v, issues := codecOf(c).decode(in)
@@ -120,6 +195,8 @@ type transformed struct {
 	from codec
 	to   func(Value) (Value, []issue)
 	back func(Value) Value
+	// refusal is why the JSON Schema exporter has no form for it; "" writes the codec's
+	refusal string
 }
 
 func (t *transformed) accepts(in Value) bool { return t.from.accepts(in) }
@@ -161,7 +238,8 @@ func CodecTransformResult(decode, encode, from Value) Value {
 			}
 			return value(r), nil
 		},
-		back: func(v Value) Value { return Apply(encode, v) },
+		back:    func(v Value) Value { return Apply(encode, v) },
+		refusal: "a fallible transformation has no JSON Schema form",
 	}
 }
 
@@ -175,6 +253,7 @@ func CodecCheckWhole(check, message, from Value) Value {
 			}
 			return v, nil
 		},
-		back: func(v Value) Value { return v },
+		back:    func(v Value) Value { return v },
+		refusal: `the check "` + message.(string) + `" has no JSON Schema form`,
 	}
 }

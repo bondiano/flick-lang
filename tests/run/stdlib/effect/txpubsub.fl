@@ -10,58 +10,63 @@ main : Unit ->{; AppError} Unit
 let main () =
   let hub : TxPubSub.TxPubSub Float = TxPubSub.unbounded ()
   Platform.stdout_line ("no subscriber: " ++ show (Tx.atomically (task { TxPubSub.publish 0 hub })))
-  let seen =
-    scope {
-      let a = TxPubSub.subscribe hub
-      let b = TxPubSub.subscribe hub
-      let published = Tx.atomically (task {
+  let seen = scope {
+    let a = TxPubSub.subscribe hub
+    let b = TxPubSub.subscribe hub
+    let published =
+      Tx.atomically
+        (task {
           let one = TxPubSub.publish 1 hub
           (one, TxPubSub.publish_all [2, 3] hub)
         })
-      let sizes =
-        Tx.atomically
-          (task {
-            (
-              TxPubSub.size hub,
-              TxPubSub.is_empty hub,
-              TxPubSub.is_non_empty hub,
-              TxPubSub.pending a,
-            )
-          })
-      let first = Tx.atomically (task { TxPubSub.take a })
-      let polled = Tx.atomically (task { TxPubSub.poll a })
-      (published, sizes, first, polled, Tx.atomically (task { drain b }))
-    }
+    let sizes =
+      Tx.atomically
+        (task {
+          (
+            TxPubSub.size hub,
+            TxPubSub.is_empty hub,
+            TxPubSub.is_non_empty hub,
+            TxPubSub.pending a,
+          )
+        })
+    let first = Tx.atomically (task { TxPubSub.take a })
+    let polled = Tx.atomically (task { TxPubSub.poll a })
+    (published, sizes, first, polled, Tx.atomically (task { drain b }))
+  }
   Platform.stdout_line ("subscribed: " ++ show seen)
   let small = TxPubSub.bounded 1
   let dropping = TxPubSub.dropping 1
   let sliding = TxPubSub.sliding 1
   let caps = (TxPubSub.capacity small, TxPubSub.capacity dropping, TxPubSub.capacity hub)
   Platform.stdout_line ("capacities: " ++ show caps)
-  let strategies =
-    scope {
-      let d = TxPubSub.subscribe dropping
-      let s = TxPubSub.subscribe sliding
-      let full = Tx.atomically (task {
+  let strategies = scope {
+    let d = TxPubSub.subscribe dropping
+    let s = TxPubSub.subscribe sliding
+    let full =
+      Tx.atomically
+        (task {
           let _ = TxPubSub.publish 1 dropping
           let _ = TxPubSub.publish 1 sliding
           let accepted = (TxPubSub.publish 2 dropping, TxPubSub.publish 2 sliding)
           (accepted, TxPubSub.is_full dropping)
         })
-      (full, Tx.atomically (task { (TxPubSub.take d, TxPubSub.take s) }))
-    }
+    (full, Tx.atomically (task { (TxPubSub.take d, TxPubSub.take s) }))
+  }
   Platform.stdout_line ("dropping, sliding: " ++ show strategies)
-  let closed = Tx.atomically (task {
-      TxPubSub.shutdown small
-      TxPubSub.await_shutdown small
-      (TxPubSub.is_shutdown small, TxPubSub.publish 1 small)
-    })
+  let closed =
+    Tx.atomically
+      (task {
+        TxPubSub.shutdown small
+        TxPubSub.await_shutdown small
+        (TxPubSub.is_shutdown small, TxPubSub.publish 1 small)
+      })
   Platform.stdout_line ("shutdown: " ++ show closed)
   let cell = TxSubscriptionRef.make 1
-  let changes =
-    scope {
-      let sub = TxSubscriptionRef.changes cell
-      let results = Tx.atomically (task {
+  let changes = scope {
+    let sub = TxSubscriptionRef.changes cell
+    let results =
+      Tx.atomically
+        (task {
           TxSubscriptionRef.set 2 cell
           TxSubscriptionRef.update (fun x -> x + 1) cell
           let old = TxSubscriptionRef.get_and_set 10 cell
@@ -70,6 +75,6 @@ let main () =
           let m = TxSubscriptionRef.modify (fun x -> (x - 1, x)) cell
           (old, before, after, m, TxSubscriptionRef.get cell)
         })
-      (results, Tx.atomically (task { drain sub }))
-    }
+    (results, Tx.atomically (task { drain sub }))
+  }
   Platform.stdout_line ("subscription ref: " ++ show changes)

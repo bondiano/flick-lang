@@ -12,8 +12,12 @@ type alias RequestDetails = {
 }
 
 /// The request and the status of the response a failure is about.
-type alias ResponseDetails =
-  { method : Http.Method.Method; url : String; status : Int; description : Option String }
+type alias ResponseDetails = {
+  method : Http.Method.Method;
+  url : String;
+  status : Int;
+  description : Option String;
+}
 
 /// Why handling failed: the request could not be parsed, no route matched
 /// it, the handler failed, or the response could not be sent.

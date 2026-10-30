@@ -9,13 +9,12 @@ import Ts
 
 /// The files that pin the Effect release, and how each spells it.
 pins : List (String, String)
-let pins =
-  [
-    ("runtime/package.json", "(\"effect\": \")[^\"]+(\")"),
-    ("runtime/src/capabilities.ts", "(EFFECT_VERSION = \")[^\"]+(\")"),
-    ("runtime/test/effect-version.test.ts", "(PINNED_EFFECT = \")[^\"]+(\")"),
-    ("flick/src/toolchain.rs", "(pub const EFFECT: &str = \")[^\"]+(\")"),
-  ]
+let pins = [
+  ("runtime/package.json", "(\"effect\": \")[^\"]+(\")"),
+  ("runtime/src/capabilities.ts", "(EFFECT_VERSION = \")[^\"]+(\")"),
+  ("runtime/test/effect-version.test.ts", "(PINNED_EFFECT = \")[^\"]+(\")"),
+  ("flick/src/toolchain.rs", "(pub const EFFECT: &str = \")[^\"]+(\")"),
+]
 
 /// The capture groups of every match of `source`, a valid pattern.
 groups : String -> String -> List (List String)
@@ -50,7 +49,8 @@ let matrix text =
           List.flat_map
             (fun op -> List.map (fun o -> module_ ++ "." ++ o) op)
             (groups "\"(\\w+)\"" ops)
-        | _ -> [])
+        | _ -> []
+      )
       (groups "(\\w+): \\[([^\\]]*)\\]" body)
 
 /// `entrypoint Module.name` → `kind fingerprint` of every export.
@@ -68,8 +68,10 @@ let report old next capabilities =
     if List.is_empty items then
       []
     else
-      List.concat
-        [[title ++ " (" ++ show (List.length items) ++ "):"], List.map (fun i -> "  " ++ i) items]
+      List.concat [
+        [title ++ " (" ++ show (List.length items) ++ "):"],
+        List.map (fun i -> "  " ++ i) items,
+      ]
   let before = HashMap.insert_many (flat old) HashMap.empty
   let after = flat next
   let after_map = HashMap.insert_many after HashMap.empty
@@ -85,28 +87,28 @@ let report old next capabilities =
     | Some w -> w != v
     | None -> false
   let lines =
-    List.concat
-      [
-        ["effect " ++ old.version ++ " -> " ++ next.version],
-        section
-          "entrypoints added"
-          (List.filter (fun e -> not (List.contains e old.entrypoints)) next.entrypoints),
-        section
-          "entrypoints removed"
-          (List.filter (fun e -> not (List.contains e next.entrypoints)) old.entrypoints),
-        section "exports added" (List.filter (fun k -> not (HashMap.has k before)) keys),
-        section
-          "exports removed"
-          (List.filter (fun (k, _) -> not (HashMap.has k after_map)) (flat old)
-            |> List.map (fun (k, _) -> k)),
-        section "exports changed" (List.map (fun (k, _) -> k) (List.filter changed after)),
-        section
-          "capability matrix missing"
-          (List.filter
-            (fun c ->
-              not (String.starts_with "value" (Option.with_default "" (HashMap.get c core_map))))
-            capabilities),
-      ]
+    List.concat [
+      ["effect " ++ old.version ++ " -> " ++ next.version],
+      section
+        "entrypoints added"
+        (List.filter (fun e -> not (List.contains e old.entrypoints)) next.entrypoints),
+      section
+        "entrypoints removed"
+        (List.filter (fun e -> not (List.contains e next.entrypoints)) old.entrypoints),
+      section "exports added" (List.filter (fun k -> not (HashMap.has k before)) keys),
+      section
+        "exports removed"
+        (List.filter (fun (k, _) -> not (HashMap.has k after_map)) (flat old)
+          |> List.map (fun (k, _) -> k)),
+      section "exports changed" (List.map (fun (k, _) -> k) (List.filter changed after)),
+      section
+        "capability matrix missing"
+        (List.filter
+          (fun c ->
+            not (String.starts_with "value" (Option.with_default "" (HashMap.get c core_map)))
+          )
+          capabilities),
+    ]
   String.join "\n" lines ++ "\n"
 
 /// Downloads `effect@version` and unpacks it into a fresh directory.
@@ -126,7 +128,8 @@ let plain = { flag = None; mode = None }
 
 /// Moves the repository at `root` to `version`, from the package unpacked
 /// at `package_dir` or downloaded.
-run : String ->
+run :
+  String ->
   Option String ->
   String ->{FileSystem.FileSystem, Path.Path; AppError, PlatformError.PlatformError}
   Unit
@@ -154,7 +157,8 @@ let run version package_dir root =
     (fun (rel, source) ->
       let pin = Path.join [root, rel]
       let text = FileSystem.read_file_string pin
-      FileSystem.write_file_string plain pin (repin source version text))
+      FileSystem.write_file_string plain pin (repin source version text)
+    )
     pins
   Platform.stdout_write
     "\nwrote the snapshot and the pins; next: `pnpm install`, review stdlib/Effect/surface/ until `cargo test -p flick-core --test effect_surface` passes\n"

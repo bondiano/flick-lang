@@ -35,7 +35,8 @@ let paths () =
   Platform.stdout_line ("to_namespaced_path " ++ Path.to_namespaced_path "/a/b")
   let url = Path.to_file_url "/tmp/a b"
   Platform.stdout_line ("to_file_url " ++ url ++ " back " ++ Path.from_file_url url)
-  let bad = try Path.from_file_url "http://example.com/x" with
+  let bad =
+    try Path.from_file_url "http://example.com/x" with
     | failure -> failure_of failure
   Platform.stdout_line ("from_file_url " ++ bad)
 
@@ -57,7 +58,8 @@ terminal : Unit ->{Terminal.Terminal; PlatformError.PlatformError} Unit
 let terminal () =
   Platform.stdout_line ("size " ++ show (Terminal.columns (), Terminal.rows ()))
   Terminal.display "displayed\n"
-  let read = try Terminal.read_line () with
+  let read =
+    try Terminal.read_line () with
     | Terminal.QuitError -> "quit"
   Platform.stdout_line ("read_line " ++ read)
 
@@ -83,17 +85,19 @@ let main () =
       }
       provide Stdio.node { stdio () }
       let busy = PlatformError.Busy
-      let system : PlatformError.SystemError =
-        {
-          tag = busy;
-          module_ = "App";
-          method = "main";
-          description = None;
-          syscall = None;
-          pathOrDescriptor = Some "/x";
-        }
-      let argument : PlatformError.BadArgument =
-        { module_ = "App"; method = "main"; description = Some "no" }
+      let system : PlatformError.SystemError = {
+        tag = busy;
+        module_ = "App";
+        method = "main";
+        description = None;
+        syscall = None;
+        pathOrDescriptor = Some "/x";
+      }
+      let argument : PlatformError.BadArgument = {
+        module_ = "App";
+        method = "main";
+        description = Some "no";
+      }
       let made = PlatformError.system_error system
       let refused = PlatformError.bad_argument argument
       Platform.stdout_line ("errors " ++ failure_of made ++ ", " ++ failure_of refused)

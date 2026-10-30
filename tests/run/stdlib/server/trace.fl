@@ -28,18 +28,17 @@ foreign sync set_env from "../cli/env.mjs" "set"
   arity 2
 
 options : Tracer.SpanOptions
-let options =
-  {
-    attributes = [];
-    links = [];
-    parent = None;
-    root = false;
-    kind_ = Tracer.internal;
-    sampled = None;
-    level = None;
-    captureStackTrace = false;
-    disablePropagation = false;
-  }
+let options = {
+  attributes = [];
+  links = [];
+  parent = None;
+  root = false;
+  kind_ = Tracer.internal;
+  sampled = None;
+  level = None;
+  captureStackTrace = false;
+  disablePropagation = false;
+}
 
 stock : String ->{Server.Server;} Float
 server fn stock item = Int.to_float (String.length item)
@@ -58,12 +57,12 @@ let page _ =
     try stock "tea" with
     | Rpc.ClientError _ -> 0
   let shown =
-    Ui.suspended
-      (fun _ -> Ui.text "no price")
-      (Ui.text "...")
-      (fun () -> Ui.text (show count ++ " at " ++ show (Atom.ready priced)))
-  let chunks =
-    provide Atom.layer { Stream.run_collect (Ui.Server.stream "app" (Ui.render shown ())) }
+    Ui.suspended (fun _ -> Ui.text "no price") (Ui.text "...") (fun () ->
+      Ui.text (show count ++ " at " ++ show (Atom.ready priced))
+    )
+  let chunks = provide Atom.layer {
+    Stream.run_collect (Ui.Server.stream "app" (Ui.render shown ()))
+  }
   Http.ServerResponse.text (String.join "" chunks) Http.ServerResponse.defaults
 
 same : String -> String ->{} String
@@ -80,31 +79,37 @@ let main () =
         scope s {
           functions : (ServerRequest ->{} ServerResponse)^{s}
           let functions = Server.handler [server stock, server price]
-          app : (
-            ServerRequest ->{Server.Server; Http.ServerError.HttpServerError} ServerResponse
-          )^{s}
+          app :
+            (ServerRequest ->{Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
           let app =
-            Http.Router.router Http.Router.config
-              [
-                Http.Router.route
-                  (Some Http.Method.POST)
-                  Server.path
-                  (fun request -> functions request),
-                Http.Router.route (Some Http.Method.GET) "/page" page,
-              ]
-          let server_options : Http.Server.ServeOptions =
-            { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None }
+            Http.Router.router Http.Router.config [
+              Http.Router.route (Some Http.Method.POST) Server.path (fun request ->
+                functions request
+              ),
+              Http.Router.route (Some Http.Method.GET) "/page" page,
+            ]
+          let server_options : Http.Server.ServeOptions = {
+            host = "127.0.0.1";
+            port = 0;
+            gracefulShutdownTimeout = None;
+          }
           let server = Http.Server.serve server_options app
           let base = Http.Server.format_address (Http.Server.address server)
           set_env "FLICK_SERVER_URL" base
-          Tracer.with_span "visit" options (task {
-            let html = Http.ClientResponse.text (Http.Client.get (base ++ "/page"))
-            Platform.stdout_line ("priced: " ++ show (String.contains "3 at 6" html))
-          })
-          Tracer.with_span "call" options (task {
-            let _ = stock "cake"
-            ()
-          })
+          Tracer.with_span
+            "visit"
+            options
+            (task {
+              let html = Http.ClientResponse.text (Http.Client.get (base ++ "/page"))
+              Platform.stdout_line ("priced: " ++ show (String.contains "3 at 6" html))
+            })
+          Tracer.with_span
+            "call"
+            options
+            (task {
+              let _ = stock "cake"
+              ()
+            })
         }
       with
       | Http.ServerError.ServeError _ -> Platform.stdout_line "serve failed"

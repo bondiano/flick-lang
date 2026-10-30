@@ -26,15 +26,16 @@ let plain =
     (Logger.make (fun o -> show o.logLevel ++ " " ++ String.join " " o.message))
 
 command : Cli.Command none none
-let command =
-  cli "shop" {
-    description "Checks out"
-    handle fun _ ->
-      Logger.with_loggers [plain] (task {
+let command = cli "shop" {
+  description "Checks out"
+  handle fun _ ->
+    Logger.with_loggers
+      [plain]
+      (task {
         Effect.log_info "checkout"
         Effect.log_debug "details"
       })
-  }
+}
 
 has : String -> String -> String
 let has text needle = needle ++ ": " ++ show (String.contains needle text)

@@ -13,19 +13,17 @@ foreign async sleep from "./timers.mjs" "sleep"
 type error Oops = Oops String
 
 failing_scope : Unit ->{; Oops} Float
-let failing_scope () =
-  scope {
-    let file = open_raw "on error"
-    from_result (Err (Oops "body failed"))
-  }
+let failing_scope () = scope {
+  let file = open_raw "on error"
+  from_result (Err (Oops "body failed"))
+}
 
 slow_scope : Unit ->{} String
-let slow_scope () =
-  scope {
-    let file = open_raw "on timeout"
-    sleep 1000
-    "never"
-  }
+let slow_scope () = scope {
+  let file = open_raw "on timeout"
+  sleep 1000
+  "never"
+}
 
 waiting : Eff none {Oops} Float
 let waiting = task {
@@ -52,10 +50,12 @@ let race_sibling () =
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let caught = try failing_scope () with
+  let caught =
+    try failing_scope () with
     | Oops text -> 0
   Platform.stdout_line (show caught)
-  let timed = try timeout 5 (task { slow_scope () }) with
+  let timed =
+    try timeout 5 (task { slow_scope () }) with
     | TimeoutError -> "timed out"
   Platform.stdout_line timed
   Platform.stdout_line (race_sibling ())

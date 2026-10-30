@@ -4,8 +4,10 @@ module Layer.Trace exposing (..)
 
 /// How `span` and `with_span` make their span; `onEnd` runs when it ends,
 /// with how the body ended (`None`: it succeeded).
-type alias SpanOptions =
-  { span : Tracer.SpanOptions; onEnd : Option (Tracer.Span -> Option RawCause ->{} Unit) }
+type alias SpanOptions = {
+  span : Tracer.SpanOptions;
+  onEnd : Option (Tracer.Span -> Option RawCause ->{} Unit);
+}
 
 /// A span of the name around the body of a `provide`, which ends when the
 /// `provide` releases its services; the spans inside are its children.

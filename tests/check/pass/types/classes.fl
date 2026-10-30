@@ -35,8 +35,7 @@ instance Functor Option =
     | Some x -> Some (f x)
 
 render : Show a => a -> String
-let render value =
-  show value
+let render value = show value
 
 service Repo a =
   find : Float ->{} Option a

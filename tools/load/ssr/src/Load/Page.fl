@@ -19,17 +19,12 @@ let numbers = List.range 1 51
 /// One page of 50 rows.
 rows : Ui.View Unit
 let rows =
-  Ui.view (fun () ->
-    ui {
-      div
-        { class_name = "page" }
-        [
-          heading [text ("request " ++ Atom.value request)],
-          div
-            { class_name = "rows" }
-            (List.map (fun n -> paragraph [text ("row " ++ show n)]) numbers),
-        ]
-    })
+  Ui.view (fun () -> ui {
+    div { class_name = "page" } [
+      heading [text ("request " ++ Atom.value request)],
+      div { class_name = "rows" } (List.map (fun n -> paragraph [text ("row " ++ show n)]) numbers),
+    ]
+  })
 
 wait : Duration.Duration
 let wait = Result.with_default Duration.zero (Duration.millis 5)
@@ -53,17 +48,13 @@ let click = Action.exhaust (fun _ -> task { Atom.update clicks (fun n -> n + 1) 
 
 shown : Ui.View Unit
 let shown =
-  Ui.suspended
-    (fun _ -> Ui.text "failed")
-    (Ui.text "loading")
-    (fun () -> Ui.text (Atom.ready item))
+  Ui.suspended (fun _ -> Ui.text "failed") (Ui.text "loading") (fun () -> Ui.text (Atom.ready item))
 
 counter : Ui.View Unit
 let counter =
-  Ui.view (fun () ->
-    ui {
-      button { disabled = false; on_click = click } [text ("clicks " ++ show (Atom.value clicks))]
-    })
+  Ui.view (fun () -> ui {
+    button { disabled = false; on_click = click } [text ("clicks " ++ show (Atom.value clicks))]
+  })
 
 /// The rows, the request's item behind a suspended view, and a button the
 /// client answers once it has hydrated.

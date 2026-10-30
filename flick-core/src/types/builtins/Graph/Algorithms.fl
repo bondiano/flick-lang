@@ -98,9 +98,8 @@ foreign pure minimum_cut from "@flick-lang/runtime/effect/Graph" "flickMinimumCu
   reviewed "effect@4.0.5 sha256:270f95da961e16fe"
 
 /// A spanning tree of least total cost for each component.
-minimum_spanning_forest : (e -> Float) ->
-  Graph n e Undirected ->
-  Result GraphError (Graph n e Undirected)
+minimum_spanning_forest :
+  (e -> Float) -> Graph n e Undirected -> Result GraphError (Graph n e Undirected)
 foreign pure minimum_spanning_forest from "@flick-lang/runtime/effect/Graph" "flickMinimumSpanningForest"
   reviewed "effect@4.0.5 sha256:a4fdd6e9b0d52677"
 

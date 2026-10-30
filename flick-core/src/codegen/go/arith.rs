@@ -3,7 +3,10 @@
 //! comparisons and the locals they are bound to; anywhere else they are a
 //! `flickrt.Value`, which Go boxes them into.
 
-use super::{Gen, indent};
+use flick_pretty::{Document, DocumentArena, docvec};
+
+use super::Gen;
+use super::layout::{Code, block, call, statement};
 use crate::ir::{BinOp, Expr, ExprKind, Lit};
 use crate::numeric::{Arith, Num};
 use crate::types::{PRELUDE, Type};
@@ -45,8 +48,8 @@ impl Native {
     }
 
     /// `v`, a `flickrt.Value`, as this type.
-    pub(super) fn unbox(self, v: &str) -> String {
-        format!("flickrt.As{}({v})", self.name())
+    pub(super) fn unbox<'a>(self, a: &'a DocumentArena<'a>, v: Document<'a>) -> Document<'a> {
+        call(a, docvec![a, "flickrt.As", self.name()], [v])
     }
 
     /// The type of values of type `ty`, when it is one of these.
@@ -78,7 +81,15 @@ fn arith_name(arith: Arith) -> &'static str {
     }
 }
 
-impl Gen<'_> {
+/// How Go compares two scalars of the same type.
+enum Comparison {
+    /// A function of the runtime.
+    Call(&'static str),
+    /// An operator.
+    Infix(&'static str),
+}
+
+impl<'a> Gen<'a> {
     /// The Go type the code of `e` has when it is not a `flickrt.Value`;
     /// none when it may be one.
     pub(super) fn native(&self, e: &Expr) -> Option<Native> {
@@ -113,27 +124,34 @@ impl Gen<'_> {
     }
 
     /// `go`, the code of `e`, as a `want`.
-    pub(super) fn unboxed(&self, e: &Expr, go: String, want: Native) -> String {
+    pub(super) fn unboxed(&self, e: &Expr, go: Code<'a>, want: Native) -> Code<'a> {
         if self.native(e) == Some(want) {
             go
         } else {
-            want.unbox(&go)
+            want.unbox(self.a, go.doc).into()
         }
     }
 
     /// The operands of a scalar operator, as `want`s.
-    fn operands(&mut self, lhs: &Expr, rhs: &Expr, want: Native) -> (String, String) {
+    fn operands(&mut self, lhs: &Expr, rhs: &Expr, want: Native) -> [Document<'a>; 2] {
         let go = self.ordered(&[lhs, rhs]);
-        let [l, r] = <[String; 2]>::try_from(go).expect("two operands");
-        (self.unboxed(lhs, l, want), self.unboxed(rhs, r, want))
+        let [l, r] = <[Code<'a>; 2]>::try_from(go).expect("two operands");
+        [
+            self.unboxed(lhs, l, want).doc,
+            self.unboxed(rhs, r, want).doc,
+        ]
     }
 
-    pub(super) fn neg(&mut self, num: Num, inner: &Expr) -> String {
+    pub(super) fn neg(&mut self, num: Num, inner: &Expr) -> Code<'a> {
+        let a = self.a;
         let v = self.expr(inner);
         match Native::of_num(num) {
             // a call, as Go's constant `-0.0` is zero
-            Some(n) => format!("flickrt.Neg{}({})", n.name(), self.unboxed(inner, v, n)),
-            None => format!("flickrt.NegB({v})"),
+            Some(n) => {
+                let v = self.unboxed(inner, v, n);
+                call(a, docvec![a, "flickrt.Neg", n.name()], [v.doc]).into()
+            }
+            None => call(a, "flickrt.NegB", [v.doc]).into(),
         }
     }
 
@@ -144,7 +162,8 @@ impl Gen<'_> {
         known(lhs).filter(|&n| known(rhs) == Some(n))
     }
 
-    pub(super) fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr) -> String {
+    pub(super) fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr) -> Code<'a> {
+        let a = self.a;
         if matches!(op, BinOp::And | BinOp::Or) {
             return self.logical(op, lhs, rhs);
         }
@@ -153,66 +172,85 @@ impl Gen<'_> {
         {
             // through the runtime's functions, so that operands Go knows
             // are constants are not folded with Go's rules
-            let (l, r) = self.operands(lhs, rhs, n);
-            return format!("flickrt.{}{}({l}, {r})", arith_name(arith), n.name());
+            let operands = self.operands(lhs, rhs, n);
+            let f = docvec![a, "flickrt.", arith_name(arith), n.name()];
+            return call(a, f, operands).into();
         }
         if let Some(n) = self.compared(lhs, rhs) {
             let go = match (op, n) {
                 // `==` holds of NaN and NaN, `===` does not
-                (BinOp::Eq, Native::Float) => Some("flickrt.EqFloat({l}, {r})"),
-                (BinOp::NotEq, Native::Float) => Some("!flickrt.EqFloat({l}, {r})"),
-                (BinOp::Eq | BinOp::Same, _) => Some("({l} == {r})"),
-                (BinOp::NotEq | BinOp::NotSame, _) => Some("({l} != {r})"),
+                (BinOp::Eq, Native::Float) => Some(Comparison::Call("flickrt.EqFloat")),
+                (BinOp::NotEq, Native::Float) => Some(Comparison::Call("!flickrt.EqFloat")),
+                (BinOp::Eq | BinOp::Same, _) => Some(Comparison::Infix(" == ")),
+                (BinOp::NotEq | BinOp::NotSame, _) => Some(Comparison::Infix(" != ")),
                 // JS orders strings by UTF-16 code units, and NaN by nothing
                 (_, Native::String | Native::Bool) => None,
-                (BinOp::Lt, _) => Some("({l} < {r})"),
-                (BinOp::Le, _) => Some("({l} <= {r})"),
-                (BinOp::Gt, _) => Some("({l} > {r})"),
-                (BinOp::Ge, _) => Some("({l} >= {r})"),
+                (BinOp::Lt, _) => Some(Comparison::Infix(" < ")),
+                (BinOp::Le, _) => Some(Comparison::Infix(" <= ")),
+                (BinOp::Gt, _) => Some(Comparison::Infix(" > ")),
+                (BinOp::Ge, _) => Some(Comparison::Infix(" >= ")),
                 _ => None,
             };
             if let Some(go) = go {
-                let (l, r) = self.operands(lhs, rhs, n);
-                return go.replace("{l}", &l).replace("{r}", &r);
+                let operands = self.operands(lhs, rhs, n);
+                return match go {
+                    Comparison::Call(f) => call(a, f, operands),
+                    Comparison::Infix(op) => {
+                        let [l, r] = operands;
+                        docvec![a, "(", l, op, r, ")"]
+                    }
+                }
+                .into();
             }
         }
         let go = self.ordered(&[lhs, rhs]);
-        let (l, r) = (&go[0], &go[1]);
+        let operands = [go[0].doc, go[1].doc];
         let f = match op {
             BinOp::Eq => "Equals",
-            BinOp::NotEq => return format!("!flickrt.Equals({l}, {r})"),
+            BinOp::NotEq => return call(a, "!flickrt.Equals", operands).into(),
             BinOp::Same => "Same",
-            BinOp::NotSame => return format!("!flickrt.Same({l}, {r})"),
+            BinOp::NotSame => return call(a, "!flickrt.Same", operands).into(),
             BinOp::Lt => "Lt",
             BinOp::Le => "Le",
             BinOp::Gt => "Gt",
             BinOp::Ge => "Ge",
             BinOp::Concat => "Concat",
             BinOp::ListConcat => "ListConcat",
-            BinOp::Arith(arith, _) => return format!("flickrt.{}B({l}, {r})", arith_name(arith)),
+            BinOp::Arith(arith, _) => {
+                let f = docvec![a, "flickrt.", arith_name(arith), "B"];
+                return call(a, f, operands).into();
+            }
             BinOp::And | BinOp::Or => unreachable!("handled above"),
         };
-        format!("flickrt.{f}({l}, {r})")
+        call(a, docvec![a, "flickrt.", f], operands).into()
     }
 
     /// `&&` and `||`, which evaluate their right operand only when needed.
-    fn logical(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr) -> String {
+    fn logical(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr) -> Code<'a> {
+        let a = self.a;
         let l = self.expr(lhs);
-        let (rs, rv) = self.block(|g| g.expr(rhs));
-        let go = if op == BinOp::And { "&&" } else { "||" };
+        let (mut rs, rv) = self.block(|g| g.expr(rhs));
         if rs.is_empty() {
-            return format!("(flickrt.Bool({l}) {go} flickrt.Bool({rv}))");
+            let go = if op == BinOp::And { " && " } else { " || " };
+            let l = call(a, "flickrt.Bool", [l.doc]);
+            let r = call(a, "flickrt.Bool", [rv.doc]);
+            return docvec![a, "(", l, go, r, ")"].into();
         }
         let t = self.temp();
         let test = if op == BinOp::And {
-            format!("flickrt.Bool({t})")
+            "flickrt.Bool"
         } else {
-            format!("!flickrt.Bool({t})")
+            "!flickrt.Bool"
         };
-        self.buf.push(format!(
-            "var {t} flickrt.Value = {l}\nif {test} {{\n{}\t{t} = {rv}\n}}",
-            indent(&rs)
-        ));
-        t
+        rs.push(statement(a, docvec![a, t, " = ", rv]));
+        self.emit(docvec![a, "var ", t, " flickrt.Value = ", l]);
+        self.emit(docvec![
+            a,
+            "if ",
+            call(a, test, [a.text(t)]),
+            " ",
+            block(a, rs)
+        ]);
+        self.code(t)
     }
 }

@@ -8,7 +8,8 @@ stock : HashMap.HashMap EqHash.Canonical String Float
 let stock = HashMap.from_list EqHash.canonical [("apple", 3), ("pear", 0), ("plum", 7)]
 
 bump : Option Float -> Option Float
-let bump o = match o with
+let bump o =
+  match o with
   | Some n -> Some (n + 1)
   | None -> Some 1
 
@@ -17,25 +18,25 @@ let main () =
   Platform.stdout_line ("from_list: " ++ show (sorted stock))
   Platform.stdout_line
     ("empty: "
-      ++ show
-        (
-          HashMap.is_empty stock,
-          HashMap.is_empty (HashMap.empty : HashMap.HashMap EqHash.Canonical String Float),
-        ))
+      ++ show (
+        HashMap.is_empty stock,
+        HashMap.is_empty (HashMap.empty : HashMap.HashMap EqHash.Canonical String Float),
+      ))
   Platform.stdout_line
     ("has: " ++ show (HashMap.has "pear" stock, HashMap.has "kiwi" stock, HashMap.get "plum" stock))
   Platform.stdout_line
     ("by hash: "
-      ++ show
-        (
-          HashMap.get_hash "plum" (hash "plum") stock,
-          HashMap.get_hash "plum" (hash "plum" + 1) stock,
-          HashMap.has_hash "apple" (hash "apple") stock,
-        ))
+      ++ show (
+        HashMap.get_hash "plum" (hash "plum") stock,
+        HashMap.get_hash "plum" (hash "plum" + 1) stock,
+        HashMap.has_hash "apple" (hash "apple") stock,
+      ))
   Platform.stdout_line
     ("has_by: "
-      ++ show
-        (HashMap.has_by (fun n _ -> n > 5) stock, HashMap.has_by (fun _ k -> k == "kiwi") stock))
+      ++ show (
+        HashMap.has_by (fun n _ -> n > 5) stock,
+        HashMap.has_by (fun _ k -> k == "kiwi") stock,
+      ))
   Platform.stdout_line
     ("keys, values: " ++ show (List.sort (HashMap.keys stock), List.sort (HashMap.values stock)))
   let more =
@@ -50,9 +51,8 @@ let main () =
   Platform.stdout_line
     ("modify: "
       ++ show
-        (
-          sorted (HashMap.modify "plum" (fun n -> n * 2) (HashMap.modify "nope" (fun n -> n) stock))
-        ))
+        (sorted
+          (HashMap.modify "plum" (fun n -> n * 2) (HashMap.modify "nope" (fun n -> n) stock))))
   Platform.stdout_line
     ("insert, remove: "
       ++ show (sorted (HashMap.remove "apple" (HashMap.insert "fig" 1 stock)), HashMap.size stock))
@@ -82,26 +82,22 @@ let main () =
         (sorted (HashMap.filter_map (fun n k -> if n > 0 then Ok (n * 100) else Err k) stock)))
   Platform.stdout_line
     ("find_first: "
-      ++ show
-        (
-          HashMap.find_first (fun n _ -> n == 7) stock,
-          HashMap.find_first (fun n _ -> n == 8) stock,
-        ))
+      ++ show (
+        HashMap.find_first (fun n _ -> n == 7) stock,
+        HashMap.find_first (fun n _ -> n == 8) stock,
+      ))
   Platform.stdout_line
     ("some, every: "
-      ++ show
-        (
-          HashMap.some (fun n _ -> n == 0) stock,
-          HashMap.every (fun n _ -> n >= 0) stock,
-          HashMap.every (fun n _ -> n > 0) stock,
-        ))
+      ++ show (
+        HashMap.some (fun n _ -> n == 0) stock,
+        HashMap.every (fun n _ -> n >= 0) stock,
+        HashMap.every (fun n _ -> n > 0) stock,
+      ))
   Platform.stdout_line
     ("union: "
       ++ show
-        (
-          sorted
-            (HashMap.union stock (HashMap.from_list EqHash.canonical [("plum", 1), ("lime", 4)]))
-        ))
+        (sorted
+          (HashMap.union stock (HashMap.from_list EqHash.canonical [("plum", 1), ("lime", 4)]))))
   let total = Ref.make 0
   HashMap.for_each (fun n _ -> Ref.set total (Ref.get total + n)) stock
   Platform.stdout_line ("for_each: " ++ show (Ref.get total))
@@ -110,6 +106,6 @@ let main () =
       (fun a b -> String.to_lower a == String.to_lower b)
       (fun s -> hash (String.to_lower s))
       (fun w ->
-        sorted
-          (HashMap.map (fun n _ -> n + 1) (HashMap.from_list w [("A", 1), ("a", 2), ("B", 3)])))
+        sorted (HashMap.map (fun n _ -> n + 1) (HashMap.from_list w [("A", 1), ("a", 2), ("B", 3)]))
+      )
   Platform.stdout_line ("witness kept: " ++ show blind)

@@ -1,0 +1,133 @@
+// JSON text: `Json.parse` fails with the messages V8 gives, and
+// `Json.stringify` writes what `JSON.stringify` writes, including the key
+// order of a JS object, where integer keys come first.
+module Language.Json exposing (tests)
+
+/// The text again after a parse, or the reason it is not JSON.
+again : String -> String
+let again text =
+  match Json.parse text with
+  | Err (SchemaError issues) -> String.join "; " (List.map (fun i -> i.message) issues)
+  | Ok input ->
+    match Codec.decode_result Json.json input with
+    | Ok json -> Json.stringify json
+    | Err (SchemaError issues) ->
+      "not a JSON value: "
+        ++ String.join "; " (List.map (fun i -> i.path ++ ": " ++ i.message) issues)
+
+tests : List Test.Test
+let tests = [
+  Test.group "parse errors" [
+    Test.test "unclosed object" (fun () ->
+      Test.equal
+        "not JSON: Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+        (again "{")
+    ),
+    Test.test "trailing comma" (fun () ->
+      Test.equal "not JSON: Unexpected token ']', \"[1,]\" is not valid JSON" (again "[1,]")
+    ),
+    Test.test "empty text" (fun () ->
+      Test.equal "not JSON: Unexpected end of JSON input" (again "")
+    ),
+    Test.test "a literal cut short" (fun () ->
+      Test.equal "not JSON: Unexpected end of JSON input" (again "tru")
+    ),
+    Test.test "missing colon" (fun () ->
+      Test.equal
+        "not JSON: Expected ':' after property name in JSON at position 5 (line 1 column 6)"
+        (again "{\"a\" 1}")
+    ),
+    Test.test "leading zero" (fun () ->
+      Test.equal "not JSON: Unexpected number in JSON at position 1 (line 1 column 2)" (again "01")
+    ),
+    Test.test "minus alone" (fun () ->
+      Test.equal
+        "not JSON: No number after minus sign in JSON at position 2 (line 1 column 3)"
+        (again "[-]")
+    ),
+    Test.test "no fraction" (fun () ->
+      Test.equal
+        "not JSON: Unterminated fractional number in JSON at position 2 (line 1 column 3)"
+        (again "1.")
+    ),
+    Test.test "no exponent" (fun () ->
+      Test.equal
+        "not JSON: Exponent part is missing a number in JSON at position 3 (line 1 column 4)"
+        (again "1e+")
+    ),
+    Test.test "bad unicode escape" (fun () ->
+      Test.equal
+        "not JSON: Bad Unicode escape in JSON at position 5 (line 1 column 6)"
+        (again "\"\\u12x4\"")
+    ),
+    Test.test "NaN" (fun () -> Test.equal "not JSON: \"NaN\" is not valid JSON" (again "NaN")),
+    Test.test "the source as it is" (fun () ->
+      Test.equal
+        "not JSON: Unexpected token 'x', \"[\"a\", x]\" is not valid JSON"
+        (again "[\"a\", x]")
+    ),
+    Test.test "a long source cut around the place" (fun () ->
+      Test.equal
+        "not JSON: Unexpected token 'x', ...\"aaaaaaa\", x, \"bbbbbb\"... is not valid JSON"
+        (again "[\"aaaaaaaaaaaaaaaaaaaaaaaaa\", x, \"bbbbbbbbbbbbbbbbbbbbb\"]")
+    ),
+    Test.test "bad escape" (fun () ->
+      Test.equal
+        "not JSON: Bad escaped character in JSON at position 2 (line 1 column 3)"
+        (again "\"\\x\"")
+    ),
+    Test.test "text after the value" (fun () ->
+      Test.equal
+        "not JSON: Unexpected non-whitespace character after JSON at position 5 (line 1 column 6)"
+        (again "null x")
+    ),
+    Test.test "control character in a string" (fun () ->
+      Test.equal
+        "not JSON: Bad control character in string literal in JSON at position 2 (line 1 column 3)"
+        (again "\"a\nb\"")
+    ),
+    Test.test "position on a later line" (fun () ->
+      Test.equal
+        "not JSON: Expected double-quoted property name in JSON at position 12 (line 2 column 5)"
+        (again "{\"a\":1,\n    }")
+    ),
+  ],
+  Test.group "stringify" [
+    Test.test "numbers" (fun () ->
+      Test.equal
+        "[0,2.5,1e+21,1e-7,100,0.30000000000000004]"
+        (again "[-0, 2.50, 1e21, 0.0000001, 1E2, 0.30000000000000004]")
+    ),
+    Test.test "a number too big is no JSON value" (fun () ->
+      Test.equal "not a JSON value: (root): expected JSON value, got an array" (again "[1e400]")
+    ),
+    Test.test "nor at the root" (fun () ->
+      Test.equal "not a JSON value: (root): expected JSON value, got -Infinity" (again "-1e400")
+    ),
+    Test.test "Json.json has no JSON Schema" (fun () ->
+      Test.equal
+        "Err ExportError \"Doc -> JSON Schema: JSON value has no JSON form\""
+        (show (Codec.json_schema "Doc" Json.json))
+    ),
+    Test.test "escapes" (fun () ->
+      Test.equal
+        "[\"q\\\"b\\\\\\n\\u0007\",\"é😀\"]"
+        (again "[\"q\\\"b\\\\\\n\\u0007\", \"\\u00e9\\ud83d\\ude00\"]")
+    ),
+    Test.test "lone surrogates are escaped" (fun () ->
+      Test.equal "\"\\ud83d\"" (again "\"\\ud83d\"")
+    ),
+    Test.test "line separators stay" (fun () -> Test.equal "\"\u{2028}\"" (again "\"\\u2028\"")),
+    Test.test "duplicate keys: the last value, the first place" (fun () ->
+      Test.equal "{\"a\":2,\"b\":1}" (again "{\"a\": 1, \"b\": 1, \"a\": 2}")
+    ),
+    Test.test "integer keys come first, in order" (fun () ->
+      Test.equal
+        "{\"1\":4,\"2\":2,\"b\":1,\"a\":3,\"-1\":5,\"01\":6}"
+        (again "{\"b\":1,\"2\":2,\"a\":3,\"1\":4,\"-1\":5,\"01\":6}")
+    ),
+    Test.test "deep nesting" (fun () ->
+      Test.equal "[[[[[[[[[[{}]]]]]]]]]]" (again " [ [[[[[[[[[ { } ]]]]]]]]] ] ")
+    ),
+  ],
+]

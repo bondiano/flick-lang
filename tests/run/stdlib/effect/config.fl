@@ -38,8 +38,9 @@ let read config describe =
 server : Config.Config Server
 let server =
   Config.string "HOST"
-    |> Config.flat_map
-      (fun host -> Config.port "PORT" |> Config.map (fun port -> { host = host; port = port }))
+  |> Config.flat_map (fun host ->
+    Config.port "PORT" |> Config.map (fun port -> { host = host; port = port })
+  )
 
 even : Int ->{; Config.ConfigError} Int
 let even n = if n % 2 == 0 then n else from_result (Err (Config.ConfigError "odd"))
@@ -58,7 +59,8 @@ let own =
     | [ConfigProvider.Key "REC"] -> Some (ConfigProvider.make_record ["x"] None)
     | [ConfigProvider.Key "REC", ConfigProvider.Key "x"] -> Some (ConfigProvider.ValueNode "1")
     | [ConfigProvider.Key "BROKEN"] -> from_result (Err (ConfigProvider.SourceError "unreachable"))
-    | _ -> None)
+    | _ -> None
+  )
 
 main : Unit ->{; AppError} Unit
 let main () =
@@ -66,12 +68,11 @@ let main () =
   Platform.stdout_line (read (Config.boolean "DEBUG") show)
   Platform.stdout_line
     (read
-      (Config.all
-        [
-          Config.number "RATIO",
-          Config.finite "RATIO",
-          Config.map Int.to_float (Config.int "COUNT"),
-        ])
+      (Config.all [
+        Config.number "RATIO",
+        Config.finite "RATIO",
+        Config.map Int.to_float (Config.int "COUNT"),
+      ])
       show)
   Platform.stdout_line (read (Config.number "NAN") show)
   Platform.stdout_line (read (Config.finite "NAN") show)
@@ -107,36 +108,40 @@ let main () =
   Platform.stdout_line (read (Config.fail "refused") (fun h -> h))
   Platform.stdout_line (read (Config.map_effect even (Config.int "COUNT")) show)
   Platform.stdout_line (read (Config.map_effect even (Config.int "PORT")) show)
-  let from_own = try Config.parse own (Config.all [Config.string "NAME", Config.string "LIST"]) with
+  let from_own =
+    try Config.parse own (Config.all [Config.string "NAME", Config.string "LIST"]) with
     | Config.ConfigError m -> ["error " ++ m]
   Platform.stdout_line ("own " ++ show from_own)
   Platform.stdout_line
     ("own array "
       ++ show
-        (try Config.parse
-          own
-          (Config.array { separator = None } Schema.number "LIST") with | Config.ConfigError _ ->
-          []))
+        (
+          try Config.parse own (Config.array { separator = None } Schema.number "LIST") with
+          | Config.ConfigError _ -> []
+        ))
   Platform.stdout_line
     ("own record "
       ++ show
-        (try Config.parse
-          own
-          (
-            Config.record { separator = None; keyValueSeparator = None } Schema.number "REC"
-          ) with | Config.ConfigError _ ->
-          []))
+        (
+          try
+            Config.parse
+              own
+              (Config.record { separator = None; keyValueSeparator = None } Schema.number "REC")
+          with
+          | Config.ConfigError _ -> []
+        ))
   Platform.stdout_line
     ("own broken "
-      ++ (try Config.parse own (Config.string "BROKEN") with | Config.ConfigError m -> m))
+      ++ (
+        try Config.parse own (Config.string "BROKEN") with
+        | Config.ConfigError m -> m
+      ))
   let from_json =
     match Json.parse "{\"app\": {\"name\": \"json\", \"ports\": [1, 2]}}" with
     | Ok json ->
       let unknown = ConfigProvider.from_unknown { preserveEmptyStrings = false } json
-      try Config.parse
-        unknown
-        (Config.nested "app" (Config.string "name")) with | Config.ConfigError m ->
-        m
+      try Config.parse unknown (Config.nested "app" (Config.string "name")) with
+      | Config.ConfigError m -> m
     | Err _ -> "not JSON"
   Platform.stdout_line ("from_unknown " ++ from_json)
   let dotenv =
@@ -144,30 +149,41 @@ let main () =
       { expandVariables = true; preserveEmptyStrings = false }
       "A=1\nB=${A}2\n"
   Platform.stdout_line
-    ("dotenv " ++ (try Config.parse dotenv (Config.string "B") with | Config.ConfigError m -> m))
+    ("dotenv "
+      ++ (
+        try Config.parse dotenv (Config.string "B") with
+        | Config.ConfigError m -> m
+      ))
   let cased = ConfigProvider.constant_case env
   Platform.stdout_line
     ("constant_case "
-      ++ (try Config.parse cased (Config.string "dbHost") with | Config.ConfigError m -> m))
+      ++ (
+        try Config.parse cased (Config.string "dbHost") with
+        | Config.ConfigError m -> m
+      ))
   let prefixed = ConfigProvider.nested "DB" env
   Platform.stdout_line
-    (
-      "nested "
-        ++ (try Config.parse prefixed (Config.string "HOST") with | Config.ConfigError m -> m)
-    )
+    ("nested "
+      ++ (
+        try Config.parse prefixed (Config.string "HOST") with
+        | Config.ConfigError m -> m
+      ))
   let mapped = ConfigProvider.map_input (fun path -> [ConfigProvider.Key "MODE"]) env
   Platform.stdout_line
-    (
-      "map_input "
-        ++ (try Config.parse mapped (Config.string "ANY") with | Config.ConfigError m -> m)
-    )
+    ("map_input "
+      ++ (
+        try Config.parse mapped (Config.string "ANY") with
+        | Config.ConfigError m -> m
+      ))
   let both = own |> ConfigProvider.or_else env
   Platform.stdout_line
-    ("or_else " ++ (try Config.parse both (Config.string "HOST") with | Config.ConfigError m -> m))
+    ("or_else "
+      ++ (
+        try Config.parse both (Config.string "HOST") with
+        | Config.ConfigError m -> m
+      ))
   let provided =
-    try
-      provide (ConfigProvider.layer env) { Config.get (Config.string "MODE") }
-    with
+    try provide (ConfigProvider.layer env) { Config.get (Config.string "MODE") } with
     | Config.ConfigError m -> m
   Platform.stdout_line ("layer " ++ provided)
   let added =
@@ -183,17 +199,19 @@ let main () =
   let process = ConfigProvider.from_env { preserveEmptyStrings = false }
   Platform.stdout_line
     ("from_env "
-      ++ (try Config.parse
-        process
-        (Config.string "FLICK_NO_SUCH_VARIABLE") with | Config.ConfigError _ ->
-        "missing"))
+      ++ (
+        try Config.parse process (Config.string "FLICK_NO_SUCH_VARIABLE") with
+        | Config.ConfigError _ -> "missing"
+      ))
   let files =
     try
       provide FileSystem.node {
         scope {
           let dir =
-            FileSystem.make_temp_directory_scoped
-              { directory = None; prefix = Some "flick-config-" }
+            FileSystem.make_temp_directory_scoped {
+              directory = None;
+              prefix = Some "flick-config-";
+            }
           FileSystem.write_file_string
             { flag = None; mode = None }
             (dir ++ "/.env")
@@ -201,19 +219,18 @@ let main () =
           FileSystem.make_directory { recursive = true; mode = None } (dir ++ "/db")
           FileSystem.write_file_string { flag = None; mode = None } (dir ++ "/db/host") "tree\n"
           let dot =
-            ConfigProvider.from_dot_env
-              {
-                path = Some (dir ++ "/.env");
-                expandVariables = false;
-                preserveEmptyStrings = false;
-              }
+            ConfigProvider.from_dot_env {
+              path = Some (dir ++ "/.env");
+              expandVariables = false;
+              preserveEmptyStrings = false;
+            }
           let tree = ConfigProvider.from_dir { rootPath = Some dir; preserveEmptyStrings = false }
-          let a = try Config.parse dot (Config.string "FROM_FILE") with | Config.ConfigError m -> m
+          let a =
+            try Config.parse dot (Config.string "FROM_FILE") with
+            | Config.ConfigError m -> m
           let b =
-            try Config.parse
-              tree
-              (Config.nested "db" (Config.string "host")) with | Config.ConfigError m ->
-              m
+            try Config.parse tree (Config.nested "db" (Config.string "host")) with
+            | Config.ConfigError m -> m
           a ++ " " ++ b
         }
       }

@@ -13,14 +13,13 @@ let logged log n =
 
 /// Tracks how many tasks run at once, and the most at any time.
 track : Ref Float -> Ref Float -> Float -> Eff none none Float
-let track active peak n =
-  task {
-    let now = Ref.modify active (fun a -> (a + 1, a + 1))
-    Ref.modify peak (fun p -> ((), if now > p then now else p))
-    sleep 5
-    Ref.modify active (fun a -> ((), a - 1))
-    n
-  }
+let track active peak n = task {
+  let now = Ref.modify active (fun a -> (a + 1, a + 1))
+  Ref.modify peak (fun p -> ((), if now > p then now else p))
+  sleep 5
+  Ref.modify active (fun a -> ((), a - 1))
+  n
+}
 
 main : Unit ->{; AppError} Unit
 let main () =
@@ -36,8 +35,7 @@ let main () =
   let results =
     parallel_all 8 (List.map (track active peak) (List.map Int.to_float (List.range 0 20)))
   Platform.stdout_line ("sum " ++ show (List.sum results) ++ ", at most " ++ show (Ref.get peak))
-  Platform.stdout_line
-    (show (List.sort [3, Float.nan, 1, -Float.infinity, 2, Float.infinity, 0]))
+  Platform.stdout_line (show (List.sort [3, Float.nan, 1, -Float.infinity, 2, Float.infinity, 0]))
   let pairs = [(2, "a"), (1, "b"), (2, "c"), (1, "d")]
   let by_first = List.sort_by (fun (a, _) (b, _) -> compare a b) pairs
   Platform.stdout_line (show (List.map (fun (_, s) -> s) by_first))

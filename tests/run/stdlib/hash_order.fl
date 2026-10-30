@@ -8,15 +8,19 @@ let main () =
   let numbers = HashSet.from_list EqHash.canonical (List.range 0 40)
   Platform.stdout_line (show (HashSet.to_list numbers))
   let words =
-    HashMap.from_list
-      EqHash.canonical
-      [("pear", 1), ("apple", 2), ("fig", 3), ("kiwi", 4), ("plum", 5), ("lime", 6)]
+    HashMap.from_list EqHash.canonical [
+      ("pear", 1),
+      ("apple", 2),
+      ("fig", 3),
+      ("kiwi", 4),
+      ("plum", 5),
+      ("lime", 6),
+    ]
   Platform.stdout_line (show (HashMap.to_list words))
   let moved = HashMap.insert "apple" 20 (HashMap.remove "fig" words)
   Platform.stdout_line (show (HashMap.keys moved) ++ " " ++ show (HashMap.values moved))
   let thirds =
-    EqHash.with
-      (fun a b -> a == b)
-      (fun n -> n % 3)
-      (fun w -> HashSet.to_list (HashSet.from_list w [7, 4, 1, 9, 6, 2, 5, 8, 3]))
+    EqHash.with (fun a b -> a == b) (fun n -> n % 3) (fun w ->
+      HashSet.to_list (HashSet.from_list w [7, 4, 1, 9, 6, 2, 5, 8, 3])
+    )
   Platform.stdout_line (show thirds)

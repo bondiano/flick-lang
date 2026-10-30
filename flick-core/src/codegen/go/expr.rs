@@ -1,28 +1,15 @@
 //! Expressions and statements. A Go expression is returned; statements it
 //! needs go into the current statement list before it.
 
-use std::mem;
+use flick_pretty::{Document, docvec};
 
 use super::arith::Native;
-use super::{Gen, indent, names};
+use super::call::poly;
+use super::layout::{Code, call, if_else, list, statement};
+use super::{Gen, names};
 use crate::codegen::tail::{Callee, Target};
-use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
+use crate::ir::{BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
 use crate::types::Lift;
-
-/// Whether moving the evaluation of `go` later is unobservable: a name or
-/// a literal.
-pub(super) fn atomic(go: &str) -> bool {
-    let name = go
-        .chars()
-        .next()
-        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
-        && go
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.');
-    name || go.starts_with('"') && !go[1..].contains('"')
-        || go.starts_with("int32(")
-        || go.starts_with("float64(")
-}
 
 /// A literal as Go: numbers typed as the runtime holds them.
 pub(super) fn literal(lit: &Lit) -> String {
@@ -55,22 +42,23 @@ fn lift(how: &Lift) -> String {
     }
 }
 
-impl Gen<'_> {
+impl<'a> Gen<'a> {
     /// Compiles expressions that are evaluated in order: an operand whose
     /// code needs statements makes the operands before it variables first.
-    pub(super) fn ordered(&mut self, exprs: &[&Expr]) -> Vec<String> {
-        let mut out: Vec<String> = Vec::new();
+    pub(super) fn ordered(&mut self, exprs: &[&Expr]) -> Vec<Code<'a>> {
+        let a = self.a;
+        let mut out: Vec<Code<'a>> = Vec::new();
         for e in exprs {
             let mark = self.buf.len();
             let go = self.expr(e);
             if self.buf.len() > mark {
                 let mut spills = Vec::new();
                 for (prev, before) in out.iter_mut().zip(exprs) {
-                    if !atomic(prev) {
+                    if !prev.atomic {
                         let t = self.temp();
                         let ty = self.native(before).map_or("flickrt.Value", Native::go);
-                        spills.push(format!("var {t} {ty} = {prev}"));
-                        *prev = t;
+                        spills.push(statement(a, docvec![a, "var ", t, " ", ty, " = ", *prev]));
+                        *prev = self.code(t);
                     }
                 }
                 self.buf.splice(mark..mark, spills);
@@ -81,42 +69,40 @@ impl Gen<'_> {
     }
 
     /// `go` as a variable unless it is atomic.
-    pub(super) fn spill(&mut self, go: String) -> String {
-        if atomic(&go) {
+    pub(super) fn spill(&mut self, go: Code<'a>) -> Code<'a> {
+        if go.atomic {
             return go;
         }
         let t = self.temp();
-        self.buf.push(format!("var {t} flickrt.Value = {go}"));
-        t
+        self.emit(docvec![self.a, "var ", t, " flickrt.Value = ", go]);
+        self.code(t)
     }
 
-    /// Declares the local `name` as `value`.
     /// Declares the local `name` as `value`, Go code of type `native`.
-    pub(super) fn bind_native(&mut self, name: &str, value: &str, native: Native) {
-        let l = names::local(name);
-        self.buf
-            .push(format!("var {l} {} = {value}\n_ = {l}", native.go()));
+    pub(super) fn bind_native(&mut self, name: &str, value: Code<'a>, native: Native) {
+        let l = self.a.alloc_str(&names::local(name));
+        self.emit(docvec![self.a, "var ", l, " ", native.go(), " = ", value]);
+        self.emit(docvec![self.a, "_ = ", l]);
         self.natives.insert(name.to_owned(), native);
     }
 
-    pub(super) fn bind(&mut self, name: &str, value: &str) {
+    /// Declares the local `name` as `value`.
+    pub(super) fn bind(&mut self, name: &str, value: Code<'a>) {
         self.natives.remove(name);
-        let l = names::local(name);
-        self.buf
-            .push(format!("var {l} flickrt.Value = {value}\n_ = {l}"));
+        let l = self.a.alloc_str(&names::local(name));
+        self.emit(docvec![self.a, "var ", l, " flickrt.Value = ", value]);
+        self.emit(docvec![self.a, "_ = ", l]);
     }
 
-    pub(super) fn expr(&mut self, e: &Expr) -> String {
+    pub(super) fn expr(&mut self, e: &Expr) -> Code<'a> {
+        let a = self.a;
         match &e.kind {
-            ExprKind::Lit(lit) => literal(lit),
-            ExprKind::Local(name) => names::local(name),
+            ExprKind::Lit(lit) => self.code(&literal(lit)),
+            ExprKind::Local(name) => self.code(&names::local(name)),
             ExprKind::Global { module, name } => self.global_value(module, name, Vec::new()),
             ExprKind::Method { dict, name } => {
-                format!(
-                    "flickrt.Method({}, {})",
-                    self.dict(dict),
-                    names::string(name)
-                )
+                let dict = self.dict(dict);
+                call(a, "flickrt.Method", [dict.doc, self.string(name)]).into()
             }
             ExprKind::Con(_) | ExprKind::App { .. } => self.app(e),
             ExprKind::Dicts(inner, dicts) => self.given(inner, dicts),
@@ -133,37 +119,41 @@ impl Gen<'_> {
                 let s = self.expr(scrutinee);
                 let s = self.spill(s);
                 let r = self.temp();
-                self.buf.push(format!("var {r} flickrt.Value"));
-                self.arms(&s, arms, Some(&r));
-                r
+                self.emit(docvec![a, "var ", r, " flickrt.Value"]);
+                self.arms(s.doc, arms, Some(r));
+                self.code(r)
             }
             ExprKind::Tuple(items) | ExprKind::List(items) => {
                 let items: Vec<&Expr> = items.iter().collect();
-                format!("[]flickrt.Value{{{}}}", self.ordered(&items).join(", "))
+                let items = self.ordered(&items).into_iter().map(|item| item.doc);
+                list(a, "[]flickrt.Value{", items, "}").into()
             }
             ExprKind::Record(fields) => self.record(None, fields),
             ExprKind::Update(base, fields) => self.record(Some(base), fields),
             ExprKind::Field(record, label) => {
                 let r = self.expr(record);
-                format!("flickrt.Field({r}, {})", names::string(label))
+                call(a, "flickrt.Field", [r.doc, self.string(label)]).into()
             }
             ExprKind::Binary(op, lhs, rhs) => self.binary(*op, lhs, rhs),
-            ExprKind::Not(inner) => format!("flickrt.Not({})", self.expr(inner)),
+            ExprKind::Not(inner) => {
+                let v = self.expr(inner);
+                call(a, "flickrt.Not", [v.doc]).into()
+            }
             ExprKind::Unwrap(inner) => self.unwrap(inner),
             ExprKind::Neg(num, inner) => self.neg(*num, inner),
             ExprKind::Ignore(inner) => {
                 let v = self.expr(inner);
                 // a result read by nothing: Go refuses a variable nobody reads
-                self.buf.push(format!("_ = {v}"));
-                "flickrt.Unit".to_owned()
+                self.emit(docvec![a, "_ = ", v]);
+                self.unit()
             }
             ExprKind::Lift(inner, how) => {
                 let v = self.expr(inner);
-                format!("{}({v})", lift(how))
+                call(a, lift(how), [v.doc]).into()
             }
             ExprKind::Each { .. } | ExprKind::Yield(_) => {
                 self.discard(e);
-                "flickrt.Unit".to_owned()
+                self.unit()
             }
             ExprKind::Generate {
                 body,
@@ -179,142 +169,37 @@ impl Gen<'_> {
                 service,
                 name,
                 stages,
-            } => operation(service, name, stages),
-            ExprKind::ServiceTag(key) => names::string(key),
-            ExprKind::Label(_) => self.unsupported(e.span, "a record label"),
+            } => self.operation(service, name, stages),
+            ExprKind::ServiceTag(key) => self.code(&names::string(key)),
+            ExprKind::Label(label) => self.code(&names::string(label)),
             // outside effectful code nothing can fail with a typed error
             ExprKind::Try(body, _) if self.fiber.is_none() => self.expr(body),
             ExprKind::Try(body, arms) => self.try_expr(body, arms),
             ExprKind::Await(task) => {
                 let t = self.expr(task);
-                self.run(&t)
+                self.run(t)
             }
             ExprKind::Task(body) => self.task(body),
             ExprKind::Scope { owner, outer, body } => {
                 self.scope(owner.as_deref(), outer.as_deref(), body)
             }
-            ExprKind::Within(owner, call) => self.within(owner, call),
+            ExprKind::Within(owner, inner) => self.within(owner, inner),
             ExprKind::Provide(layer, body) => self.provide(layer, body),
             ExprKind::CodecBlock(name, fields) => self.codec_block(name, fields),
         }
     }
 
-    fn if_expr(&mut self, cond: &Expr, then: &Expr, other: &Expr) -> String {
+    fn if_expr(&mut self, cond: &Expr, then: &Expr, other: &Expr) -> Code<'a> {
+        let a = self.a;
         let cond = self.expr(cond);
-        let (then_stmts, then_value) = self.block(|g| g.expr(then));
-        let (other_stmts, other_value) = self.block(|g| g.expr(other));
+        let (mut then_stmts, then_value) = self.block(|g| g.expr(then));
+        let (mut other_stmts, other_value) = self.block(|g| g.expr(other));
         let r = self.temp();
-        self.buf.push(format!(
-            "var {r} flickrt.Value\nif flickrt.Bool({cond}) {{\n{}\t{r} = {then_value}\n}} else {{\n{}\t{r} = {other_value}\n}}",
-            indent(&then_stmts),
-            indent(&other_stmts)
-        ));
-        r
-    }
-
-    /// A task: a Go function of the fiber that runs `body` in it.
-    pub(super) fn task(&mut self, body: &Expr) -> String {
-        format!(
-            "flickrt.Eff(func(fb *flickrt.Fiber) flickrt.Value {{\n{}}})",
-            self.effectful_body(body)
-        )
-    }
-
-    /// The statements of a Go function of a fiber `fb` that returns `body`.
-    fn effectful_body(&mut self, body: &Expr) -> String {
-        let saved = (
-            self.tail.take(),
-            mem::replace(&mut self.generator, false),
-            self.fiber.replace("fb"),
-        );
-        let (stmts, ()) = self.block(|g| g.tail_expr(body));
-        (self.tail, self.generator, self.fiber) = saved;
-        indent(&stmts)
-    }
-
-    /// `scope [owner] { body }`: the body runs as the owner of a fresh
-    /// region, given it and the owner around it.
-    fn scope(&mut self, owner: Option<&str>, outer: Option<&str>, body: &Expr) -> String {
-        let fb = self
-            .fiber
-            .expect("a `scope` runs where a fiber is in scope");
-        let name = |n: Option<&str>| n.map_or_else(|| "_".to_owned(), names::local);
-        format!(
-            "flickrt.Scope({fb}, func(fb *flickrt.Fiber, {}, {} flickrt.Value) flickrt.Value {{\n{}}})",
-            name(owner),
-            name(outer),
-            self.effectful_body(body)
-        )
-    }
-
-    /// A call that acquires into the region of `owner`: run in a fiber
-    /// whose owner it is.
-    fn within(&mut self, owner: &str, call: &Expr) -> String {
-        let fb = self.fiber.expect("`Within` runs where a fiber is in scope");
-        let saved = self.fiber.replace("fbw");
-        let (stmts, v) = self.block(|g| g.expr(call));
-        self.fiber = saved;
-        let r = self.temp();
-        self.buf.push(format!(
-            "var {r} flickrt.Value\n{{\n\tfbw := flickrt.Within({fb}, {})\n{}\t{r} = {v}\n}}",
-            names::local(owner),
-            indent(&stmts)
-        ));
-        r
-    }
-
-    /// `provide layer body`: the body as a task, run with the layer's services.
-    fn provide(&mut self, layer: &Expr, body: &Expr) -> String {
-        let layer = self.expr(layer);
-        let layer = self.spill(layer);
-        let body = self.task(body);
-        let fb = self
-            .fiber
-            .expect("`provide` runs where a fiber is in scope");
-        format!("flickrt.Provide({fb}, {layer}, {body})")
-    }
-
-    /// `try body with arms`: the body as a task, and a handler of its typed
-    /// error that gives `flickrt.Unmatched` when no arm matches.
-    fn try_expr(&mut self, body: &Expr, arms: &[Arm]) -> String {
-        let body = self.task(body);
-        let saved = (
-            self.tail.take(),
-            mem::replace(&mut self.generator, false),
-            self.fiber.replace("fb"),
-        );
-        let err = self.temp();
-        let (mut stmts, ()) = self.block(|g| {
-            for arm in arms {
-                g.arm(&err, &arm.pat, arm.guard.as_ref(), &arm.body, |g, value| {
-                    let v = g.expr(value);
-                    g.buf.push(format!("return {v}"));
-                });
-            }
-        });
-        (self.tail, self.generator, self.fiber) = saved;
-        stmts.push("return flickrt.Unmatched".to_owned());
-        let fb = self.fiber.expect("a `try` with arms runs in a fiber");
-        format!(
-            "flickrt.Try({fb}, {body}, func(fb *flickrt.Fiber, {err} flickrt.Value) flickrt.Value {{\n{}}})",
-            indent(&stmts)
-        )
-    }
-
-    /// `o?`: the value of the `Some`, after returning a `None` at once.
-    fn unwrap(&mut self, option: &Expr) -> String {
-        let v = self.expr(option);
-        let v = self.spill(v);
-        // in a lazy `for` a `None` ends the sequence, as a JS generator's return does
-        let ret = if self.generator {
-            String::new()
-        } else {
-            format!(" {v}")
-        };
-        self.buf.push(format!(
-            "if flickrt.IsTag({v}, \"None\") {{\n\treturn{ret}\n}}"
-        ));
-        format!("flickrt.Get({v}, 0)")
+        then_stmts.push(statement(a, docvec![a, r, " = ", then_value]));
+        other_stmts.push(statement(a, docvec![a, r, " = ", other_value]));
+        self.emit(docvec![a, "var ", r, " flickrt.Value"]);
+        self.emit(if_else(a, cond, then_stmts, other_stmts));
+        self.code(r)
     }
 
     /// Emits `e` in tail position: its value is returned.
@@ -330,16 +215,12 @@ impl Gen<'_> {
                 let cond = self.expr(cond);
                 let (then, ()) = self.block(|g| g.tail_expr(then));
                 let (other, ()) = self.block(|g| g.tail_expr(other));
-                self.buf.push(format!(
-                    "if flickrt.Bool({cond}) {{\n{}}} else {{\n{}}}",
-                    indent(&then),
-                    indent(&other)
-                ));
+                self.emit(if_else(self.a, cond, then, other));
             }
             ExprKind::Match(scrutinee, arms) => {
                 let s = self.expr(scrutinee);
                 let s = self.spill(s);
-                self.arms(&s, arms, None);
+                self.arms(s.doc, arms, None);
             }
             ExprKind::Binary(op @ (BinOp::And | BinOp::Or), lhs, rhs) if self.jumps_in(rhs) => {
                 self.tail_logic(*op, lhs, rhs);
@@ -348,62 +229,62 @@ impl Gen<'_> {
             _ => {
                 self.line(e.span);
                 let v = self.expr(e);
-                self.buf.push(format!("return {v}"));
+                self.emit(docvec![self.a, "return ", v]);
             }
         }
     }
 
-    fn record(&mut self, base: Option<&Expr>, fields: &[(String, Expr)]) -> String {
+    fn record(&mut self, base: Option<&Expr>, fields: &[(String, Expr)]) -> Code<'a> {
+        let a = self.a;
         let mut all: Vec<&Expr> = base.into_iter().collect();
         all.extend(fields.iter().map(|(_, v)| v));
         let mut go = self.ordered(&all);
         let base = base.map(|_| go.remove(0));
-        let entries: Vec<String> = fields
-            .iter()
-            .zip(go)
-            .map(|((label, _), v)| format!("{}, {v}", names::string(label)))
-            .collect();
-        let record = format!("flickrt.Rec({})", entries.join(", "));
+        let record = call(a, "flickrt.Rec", self.entries(fields, go));
         match base {
-            Some(b) => format!("flickrt.Update({b}, {record})"),
-            None => record,
+            Some(b) => call(a, "flickrt.Update", [b.doc, record]).into(),
+            None => record.into(),
         }
     }
 
     /// The codec of a `codec` block: its labels and fields, in turn.
-    fn codec_block(&mut self, name: &str, fields: &[(String, Expr)]) -> String {
+    fn codec_block(&mut self, name: &str, fields: &[(String, Expr)]) -> Code<'a> {
+        let a = self.a;
         let values: Vec<&Expr> = fields.iter().map(|(_, v)| v).collect();
-        let entries: Vec<String> = fields
+        let values = self.ordered(&values);
+        let entries = list(a, "[]flickrt.Value{", self.entries(fields, values), "}");
+        call(a, "flickrt.CodecBlock", [self.string(name), entries]).into()
+    }
+
+    /// Each label, then its value, as one item of a list.
+    fn entries(&self, fields: &[(String, Expr)], values: Vec<Code<'a>>) -> Vec<Document<'a>> {
+        fields
             .iter()
-            .zip(self.ordered(&values))
-            .map(|((label, _), v)| format!("{}, {v}", names::string(label)))
-            .collect();
-        format!(
-            "flickrt.CodecBlock({}, []flickrt.Value{{{}}})",
-            names::string(name),
-            entries.join(", ")
-        )
+            .zip(values)
+            .map(|((label, _), v)| docvec![self.a, self.string(label), ", ", v])
+            .collect()
     }
 
     pub(super) fn stmt(&mut self, stmt: &Stmt) {
+        let a = self.a;
         let (Stmt::Let(_, e) | Stmt::Expr(e) | Stmt::Fun { value: e, .. }) = stmt;
         self.line(e.span);
         match stmt {
             Stmt::Let(Pat::Bind(name), value) => {
                 let v = self.expr(value);
                 match self.native(value) {
-                    Some(n) => self.bind_native(name, &v, n),
-                    None => self.bind(name, &v),
+                    Some(n) => self.bind_native(name, v, n),
+                    None => self.bind(name, v),
                 }
             }
             Stmt::Let(Pat::Wild, value) => {
                 let v = self.expr(value);
-                self.buf.push(format!("_ = {v}"));
+                self.emit(docvec![a, "_ = ", v]);
             }
             Stmt::Let(pat, value) => {
                 let v = self.expr(value);
                 let v = self.spill(v);
-                self.destructure(pat, &v);
+                self.destructure(pat, v.doc);
             }
             Stmt::Fun {
                 name,
@@ -411,55 +292,33 @@ impl Gen<'_> {
                 dicts,
                 value,
             } => {
-                let l = names::local(name);
+                let l = a.alloc_str(&names::local(name));
                 // declared first: a recursive function refers to itself
-                self.buf.push(format!("var {l} flickrt.Value\n_ = {l}"));
+                self.emit(docvec![a, "var ", l, " flickrt.Value"]);
+                self.emit(docvec![a, "_ = ", l]);
                 let mark = self.givens.len();
                 let ds = self.bind_givens(dicts);
                 let target = rec.then(|| Target {
                     callee: Callee::Local(name.clone()),
                     dicts: dicts.clone(),
                 });
-                let (mut stmts, v) = self.block(|g| match &value.kind {
+                let (stmts, v) = self.block(|g| match &value.kind {
                     ExprKind::Lambda { params, body } => g.lambda(params, body, target),
                     _ => g.expr(value),
                 });
                 self.givens.truncate(mark);
                 if ds.is_empty() {
                     self.buf.extend(stmts);
-                    self.buf.push(format!("{l} = {v}"));
+                    self.emit(docvec![a, l, " = ", v]);
                 } else {
-                    let takes: Vec<String> = ds
-                        .iter()
-                        .enumerate()
-                        .map(|(i, d)| format!("{d} := ds[{i}]\n_ = {d}"))
-                        .collect();
-                    stmts.splice(0..0, takes);
-                    stmts.push(format!("return {v}"));
-                    self.buf.push(format!(
-                        "{l} = flickrt.Poly(func(ds ...flickrt.Value) flickrt.Value {{\n{}}})",
-                        indent(&stmts)
-                    ));
+                    self.emit(docvec![a, l, " = ", poly(a, &ds, stmts, v)]);
                 }
             }
             Stmt::Expr(e) => {
                 let v = self.expr(e);
                 // a result read by nothing: Go refuses a variable nobody reads
-                self.buf.push(format!("_ = {v}"));
+                self.emit(docvec![a, "_ = ", v]);
             }
         }
     }
-}
-
-/// `S.op`: a function of its arguments up to its first effectful stage.
-fn operation(service: &str, name: &str, stages: &[Stage]) -> String {
-    let arity = stages
-        .iter()
-        .position(|&s| s != Stage::Pure)
-        .map_or(stages.len(), |i| i + 1);
-    format!(
-        "flickrt.Operation({}, {}, {arity})",
-        names::string(service),
-        names::string(name)
-    )
 }

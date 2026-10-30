@@ -125,8 +125,7 @@ foreign pure map_error from "@flick-lang/runtime/effect/Exit" "flickMapError"
   reviewed "effect@4.0.5 sha256:611c058a82a1a4cf"
 
 /// The typed errors changed by `on_failure`, the value by `on_success`.
-map_both :
-  forall c e e2 a b. (Errors e -> Errors e2)^c -> (a -> b)^c -> (Exit e a -> Exit e2 b)^c
+map_both : forall c e e2 a b. (Errors e -> Errors e2)^c -> (a -> b)^c -> (Exit e a -> Exit e2 b)^c
 foreign pure map_both from "@flick-lang/runtime/effect/Exit" "flickMapBoth"
   arity 2
   retention call

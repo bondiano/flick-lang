@@ -24,17 +24,15 @@ let map_input f equivalence = fun x y -> equivalence (f x) (f y)
 
 /// Pairs equal part by part.
 tuple : Equivalence a -> Equivalence b -> Equivalence (a, b)
-let tuple first second =
-  fun x y ->
-    let (a1, b1) = x
-    let (a2, b2) = y
-    first a1 a2 && second b1 b2
+let tuple first second = fun x y ->
+  let (a1, b1) = x
+  let (a2, b2) = y
+  first a1 a2 && second b1 b2
 
 /// Lists of the same length, equal element by element.
 list : Equivalence a -> Equivalence (List a)
-let list item =
-  fun xs ys ->
-    List.length xs == List.length ys && List.all (fun (x, y) -> item x y) (List.zip xs ys)
+let list item = fun xs ys ->
+  List.length xs == List.length ys && List.all (fun (x, y) -> item x y) (List.zip xs ys)
 
 /// Combines equivalences with `combine`, starting from "always equal".
 make_reducer : Unit -> Reducer.Reducer (Equivalence a)

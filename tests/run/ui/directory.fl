@@ -43,18 +43,16 @@ foreign sync release from "./dom.mjs" "release"
 // Generic over the item: the items, key, render_item and on_change of the
 // props all speak of the same `a`.
 picker : String -> Ui.SelectProps a c -> Ui^c
-let picker title props =
-  ui {
-    panel
-      {
-        header = heading [text title];
-        body = select props;
-        footer =
-          match props.selected with
-          | Some item -> Some (paragraph [text ("chosen " ++ props.key item)])
-          | None -> None;
-      }
+let picker title props = ui {
+  panel {
+    header = heading [text title];
+    body = select props;
+    footer =
+      match props.selected with
+      | Some item -> Some (paragraph [text ("chosen " ++ props.key item)])
+      | None -> None;
   }
+}
 
 people : List User
 let people = [{ id = 1; name = "Ada" }, { id = 2; name = "Mallory" }, { id = 3; name = "Carol" }]
@@ -62,34 +60,33 @@ let people = [{ id = 1; name = "Ada" }, { id = 2; name = "Mallory" }, { id = 3; 
 // The handler task: nothing of it runs while rendering.
 save : Atom.Writable (Option User) -> String -> User ->{Atom.Write; Refused} Unit
 let save model log user =
-  if user.name == "Mallory" then from_result (Err (Refused user.name))
+  if user.name == "Mallory" then
+    from_result (Err (Refused user.name))
   else
     let line = user.name ++ " saved to " ++ log
     if user.name == "Carol" then write_on_release line else Platform.stdout_line line
     Atom.set model (Some user)
 
-directory : Atom.Writable (Option User) ->
-  String ->
-  Option User ->
-  Ui
-let directory model log selected =
-  ui {
-    tabs
-      { selected = 0 }
-      (NonEmpty.cons
-        (tab "People" (picker "People"
-          {
-            items = people;
-            selected = selected;
-            key = fun (user : User) -> user.name;
-            render_item = fun (user : User) -> text user.name;
-            on_change = Ui.Event.latest (fun user -> task {
+directory : Atom.Writable (Option User) -> String -> Option User -> Ui
+let directory model log selected = ui {
+  tabs
+    { selected = 0 }
+    (NonEmpty.cons
+      (tab
+        "People"
+        (picker "People" {
+          items = people;
+          selected = selected;
+          key = fun (user : User) -> user.name;
+          render_item = fun (user : User) -> text user.name;
+          on_change =
+            Ui.Event.latest (fun user -> task {
               try save model log user with
               | Refused name -> Platform.stdout_line ("refused " ++ name)
             });
-          }))
-        [tab "About" (paragraph [text "about"])])
-  }
+        }))
+      [tab "About" (paragraph [text "about"])])
+}
 
 report : Failure e ->{} Unit
 let report failure =
@@ -113,28 +110,28 @@ let main () =
   | None -> Platform.stdout_line "no container"
   | Some root ->
     provide Atom.layer {
-    scope s {
-      let log = open_raw "log"
-      let _running =
-        Fiber.spawn
-          s
-          closed
-          (task {
-            Ui.Dom.mount
-              root
-              report
-              (Ui.render (Ui.view (fun () -> directory model log (Atom.value model))) ())
-          })
-      settle ()
-      Platform.stdout_line (markup ())
-      choose "Ada"
-      settle ()
-      Platform.stdout_line (text ())
-      choose "Mallory"
-      settle ()
-      choose "Carol"
-      settle ()
-      Platform.stdout_line "closing"
-    }
+      scope s {
+        let log = open_raw "log"
+        let _running =
+          Fiber.spawn
+            s
+            closed
+            (task {
+              Ui.Dom.mount
+                root
+                report
+                (Ui.render (Ui.view (fun () -> directory model log (Atom.value model))) ())
+            })
+        settle ()
+        Platform.stdout_line (markup ())
+        choose "Ada"
+        settle ()
+        Platform.stdout_line (text ())
+        choose "Mallory"
+        settle ()
+        choose "Carol"
+        settle ()
+        Platform.stdout_line "closing"
+      }
     }
     Platform.stdout_line ("after the scope: [" ++ text () ++ "]")

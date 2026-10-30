@@ -75,7 +75,8 @@ opaque unboxed type TraversalDirection = TraversalDirection String
 
 /// Follows the edges of one direction.
 along : Direction -> TraversalDirection
-let along d = match d with
+let along d =
+  match d with
   | Direction s -> TraversalDirection s
 
 /// Follows edges both ways.
@@ -97,8 +98,11 @@ type alias NeighborhoodConfig = { radius : Option Int; direction : Option Traver
 type alias ReachabilityConfig = { direction : Option TraversalDirection }
 
 /// Where a search starts, which edges it follows and how many steps.
-type alias SearchConfig =
-  { start : Option (List NodeIndex); direction : Option TraversalDirection; radius : Option Int }
+type alias SearchConfig = {
+  start : Option (List NodeIndex);
+  direction : Option TraversalDirection;
+  radius : Option Int;
+}
 
 /// Where a topological order starts (default: the nodes without incoming edges).
 type alias TopoConfig = { initials : Option (List NodeIndex) }
@@ -123,8 +127,12 @@ type alias MaximumFlowResult = {
 }
 
 /// A cut: its value, its edges, and the nodes on each side.
-type alias MinimumCutResult =
-  { value : Float; edges : List EdgeIndex; source : List NodeIndex; target : List NodeIndex }
+type alias MinimumCutResult = {
+  value : Float;
+  edges : List EdgeIndex;
+  source : List NodeIndex;
+  target : List NodeIndex;
+}
 
 /// A path: its nodes, its edges, its total cost and the data of its edges.
 type alias PathResult e = {
@@ -142,26 +150,33 @@ type alias BellmanFordConfig e = { source : NodeIndex; target : NodeIndex; cost 
 
 /// The endpoints, the cost of each edge, and `heuristic node target`, an
 /// estimate of the cost left.
-type alias AstarConfig e n =
-  { source : NodeIndex; target : NodeIndex; cost : e -> Float; heuristic : n -> n -> Float }
+type alias AstarConfig e n = {
+  source : NodeIndex;
+  target : NodeIndex;
+  cost : e -> Float;
+  heuristic : n -> n -> Float;
+}
 
 /// The endpoints of the paths, and at most how many (default all).
 type alias SimplePathsConfig = { source : NodeIndex; target : NodeIndex; limit : Option Int }
 
 /// The endpoints, the cost of each edge, and at most how many paths
 /// (default all).
-type alias AllShortestPathsConfig e =
-  { source : NodeIndex; target : NodeIndex; cost : e -> Float; limit : Option Int }
+type alias AllShortestPathsConfig e = {
+  source : NodeIndex;
+  target : NodeIndex;
+  cost : e -> Float;
+  limit : Option Int;
+}
 
 /// Distances, paths (`None` where none exists), edges and edge data of the
 /// shortest path between each pair of nodes, by source then target.
-type alias AllPairsResult e =
-  {
-    distances : List (NodeIndex, List (NodeIndex, Float));
-    paths : List (NodeIndex, List (NodeIndex, Option (List NodeIndex)));
-    edges : List (NodeIndex, List (NodeIndex, List EdgeIndex));
-    costs : List (NodeIndex, List (NodeIndex, List e));
-  }
+type alias AllPairsResult e = {
+  distances : List (NodeIndex, List (NodeIndex, Float));
+  paths : List (NodeIndex, List (NodeIndex, Option (List NodeIndex)));
+  edges : List (NodeIndex, List (NodeIndex, List EdgeIndex));
+  costs : List (NodeIndex, List (NodeIndex, List e));
+}
 
 /// The paths an enumeration finds, in order.
 type alias PathWalker e = List (PathResult e)
@@ -176,8 +191,11 @@ type alias NodeWalker n = Walker NodeIndex n
 type alias EdgeWalker e = Walker EdgeIndex (Edge e)
 
 /// Labels of nodes and edges (default the index), and the graph name.
-type alias GraphVizOptions n e =
-  { nodeLabel : Option (n -> String); edgeLabel : Option (e -> String); graphName : Option String }
+type alias GraphVizOptions n e = {
+  nodeLabel : Option (n -> String);
+  edgeLabel : Option (e -> String);
+  graphName : Option String;
+}
 
 /// The shape of a node in a Mermaid diagram.
 opaque unboxed type MermaidNodeShape = MermaidNodeShape String
@@ -250,11 +268,10 @@ let graph_diagram = MermaidDiagramType "graph"
 
 /// Labels and shapes of nodes, labels of edges, the diagram type and its
 /// direction.
-type alias MermaidOptions n e =
-  {
-    nodeLabel : Option (n -> String);
-    edgeLabel : Option (e -> String);
-    diagramType : Option MermaidDiagramType;
-    direction : Option MermaidDirection;
-    nodeShape : Option (n -> MermaidNodeShape);
-  }
+type alias MermaidOptions n e = {
+  nodeLabel : Option (n -> String);
+  edgeLabel : Option (e -> String);
+  diagramType : Option MermaidDiagramType;
+  direction : Option MermaidDirection;
+  nodeShape : Option (n -> MermaidNodeShape);
+}

@@ -18,37 +18,43 @@ path : String
 let path = "/tmp/flick-scoped-file.txt"
 
 /// Reads the file in a scope that says when it closes, then ends by `finish`.
-reading : forall e. String ->
+reading :
+  forall e.
+  String ->
   (String ->{File.FileSystem; e} String) ->{File.FileSystem; e + {File.OpenError, File.ReadError}}
   String
-let reading label finish =
-  scope {
-    let file = File.open_scoped path
-    Scope.add_finalizer (task { say (label ++ ": scope closed") })
-    let text = File.read_all file
-    finish text
-  }
+let reading label finish = scope {
+  let file = File.open_scoped path
+  Scope.add_finalizer (task { say (label ++ ": scope closed") })
+  let text = File.read_all file
+  finish text
+}
 
 main : Unit ->{; AppError} Unit
-let main () =
-  provide File.node {
-    let outcome =
-      try
-        File.write_text path "hello from a file"
-        say (reading "success" (fun text -> text))
-        say (try reading "error" (fun _ -> from_result (Err (Oops "body failed"))) with
-          | Oops text -> text)
-        let timed = timeout_option 20 (task {
-          reading "interrupted" (fun text ->
-            nap 2000
-            text
-          )
-        })
-        say (show timed)
-        File.read_text "/nonexistent/flick/file.txt"
-      with
-      | File.ReadError message -> message
-      | File.OpenError message -> message
-      | File.WriteError message -> message
-    say outcome
-  }
+let main () = provide File.node {
+  let outcome =
+    try
+      File.write_text path "hello from a file"
+      say (reading "success" (fun text -> text))
+      say
+        (
+          try reading "error" (fun _ -> from_result (Err (Oops "body failed"))) with
+          | Oops text -> text
+        )
+      let timed =
+        timeout_option
+          20
+          (task {
+            reading "interrupted" (fun text ->
+              nap 2000
+              text
+            )
+          })
+      say (show timed)
+      File.read_text "/nonexistent/flick/file.txt"
+    with
+    | File.ReadError message -> message
+    | File.OpenError message -> message
+    | File.WriteError message -> message
+  say outcome
+}

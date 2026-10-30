@@ -15,7 +15,10 @@ adult : Float -> Validation (List String) Float
 let adult n = if n < 18 then Validation.invalid ["too young: " ++ show n] else Validation.valid n
 
 form : String -> Float -> Validation (List String) Form
-let form name age = do { n <- nonempty name and a <- adult age; pure { name = n; age = a } }
+let form name age = do {
+  n <- nonempty name and a <- adult age
+  pure { name = n; age = a }
+}
 
 main : Unit ->{; AppError} Unit
 let main () =
@@ -30,7 +33,13 @@ let main () =
   Platform.stdout_line (show (HashMap.size squares))
   let total = Seq.fold (fun acc (_, v) -> acc + v) 0 (HashMap.to_seq squares)
   Platform.stdout_line (show total)
-  let seen = HashSet.from_seq EqHash.canonical (for { x <- xs; if x > 1 } yield x)
+  let seen =
+    HashSet.from_seq
+      EqHash.canonical
+      (for {
+        x <- xs
+        if x > 1
+      } yield x)
   Platform.stdout_line (show (List.sort (HashSet.to_list seen)))
   Platform.stdout_line (show (Validation.to_result (form "Ann" 30)))
   Platform.stdout_line (show (Validation.to_result (form "" 12)))

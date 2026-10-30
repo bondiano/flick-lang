@@ -6,7 +6,10 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-use super::{Gen, names, signature};
+use flick_pretty::{Document, Documentable, docvec};
+
+use super::layout::{call, closure, signature, single};
+use super::{Gen, names};
 use crate::ir::{Foreign, ForeignMode};
 use crate::source::Span;
 
@@ -67,10 +70,11 @@ pub(super) fn parameters(f: &Foreign) -> usize {
     }
 }
 
-impl Gen<'_> {
+impl<'a> Gen<'a> {
     /// The Go function or variable of a binding, `None` for one without a
     /// Go form, which is reported.
-    pub(super) fn foreign(&mut self, f: &Foreign, span: Span) -> Option<String> {
+    pub(super) fn foreign(&mut self, f: &Foreign, span: Span) -> Option<Document<'a>> {
+        let a = self.a;
         let Some(target) = lookup(self.module, &f.name, f.module.as_deref(), &f.export) else {
             if let Some(spec) = f.module.as_deref().filter(|m| is_relative(m)) {
                 return self.local(f, spec, span);
@@ -96,7 +100,7 @@ impl Gen<'_> {
         let taken = parameters(f);
         if f.dicts == 0 && taken == 0 {
             let var = names::var(self.module, &f.name);
-            return Some(format!("var {var} flickrt.Value = {target}"));
+            return Some(docvec![a, "var ", var, " flickrt.Value = ", target]);
         }
         let heads: Vec<String> = (0..f.dicts)
             .map(|i| format!("d{i}"))
@@ -107,12 +111,16 @@ impl Gen<'_> {
         if wants_fiber {
             args.insert(0, "fb".to_owned());
         }
-        Some(format!(
-            "func {}({}) flickrt.Value {{\n\treturn {target}({})\n}}",
-            names::func(self.module, &f.name),
-            signature(fiber, &heads),
-            args.join(", ")
-        ))
+        let go = call(a, target, args.into_iter().map(|arg| arg.to_doc(a)));
+        Some(self.wrapper(f, signature(fiber, &heads), go))
+    }
+
+    /// The Go function of the binding `f` taking `params` and returning `go`.
+    fn wrapper(&self, f: &Foreign, params: String, go: Document<'a>) -> Document<'a> {
+        let a = self.a;
+        let name = names::func(self.module, &f.name);
+        let body = single(a, docvec![a, "return ", go]);
+        docvec![a, "func ", name, "(", params, ") flickrt.Value ", body]
     }
 }
 
@@ -137,10 +145,11 @@ fn sibling(spec: &str) -> String {
     format!("{stem}.go")
 }
 
-impl Gen<'_> {
+impl<'a> Gen<'a> {
     /// A binding to the JS module `spec` beside the program's code: on Go,
     /// the function of the same name in the Go file beside that module.
-    fn local(&mut self, f: &Foreign, spec: &str, span: Span) -> Option<String> {
+    fn local(&mut self, f: &Foreign, spec: &str, span: Span) -> Option<Document<'a>> {
+        let a = self.a;
         let found = self.foreign_file.and_then(|find| find(self.module, spec));
         let Some((file, text)) = found else {
             self.errors.push((
@@ -175,33 +184,35 @@ impl Gen<'_> {
         let taken = parameters(f);
         if f.dicts == 0 && taken == 0 {
             let var = names::var(self.module, &f.name);
-            return Some(format!("var {var} flickrt.Value = {}", f.export));
+            return Some(docvec![
+                a,
+                "var ",
+                var,
+                " flickrt.Value = ",
+                f.export.clone()
+            ]);
         }
         let heads: Vec<String> = (0..f.dicts)
             .map(|i| format!("d{i}"))
             .chain((0..taken).map(|i| format!("a{i}")))
             .collect();
         let mut args = arguments(f, &heads);
-        let call = match f.mode {
-            ForeignMode::Pure | ForeignMode::Sync => format!("{}({})", f.export, args.join(", ")),
-            ForeignMode::Effect => {
-                args.insert(0, "fb".to_owned());
-                format!("{}({})", f.export, args.join(", "))
-            }
-            ForeignMode::Async => {
-                args.insert(0, "ctx".to_owned());
-                format!(
-                    "flickrt.ForeignAsync(fb, func(ctx flickrt.Context) flickrt.Value {{ return {}({}) }})",
-                    f.export,
-                    args.join(", ")
-                )
-            }
+        let first = match f.mode {
+            ForeignMode::Pure | ForeignMode::Sync => None,
+            ForeignMode::Effect => Some("fb"),
+            ForeignMode::Async => Some("ctx"),
         };
+        if let Some(first) = first {
+            args.insert(0, first.to_owned());
+        }
+        let export = a.alloc_str(&f.export);
+        let mut go = call(a, export, args.into_iter().map(|arg| arg.to_doc(a)));
+        if f.mode == ForeignMode::Async {
+            let head = "func(ctx flickrt.Context) flickrt.Value";
+            let run = closure(a, head, [docvec![a, "return ", go]]);
+            go = call(a, "flickrt.ForeignAsync", [a.text("fb"), run]);
+        }
         let fiber = self.shape_of(self.module, &f.name).fiber();
-        Some(format!(
-            "func {}({}) flickrt.Value {{\n\treturn {call}\n}}",
-            names::func(self.module, &f.name),
-            signature(fiber, &heads),
-        ))
+        Some(self.wrapper(f, signature(fiber, &heads), go))
     }
 }

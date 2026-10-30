@@ -8,28 +8,31 @@ type CompressionAlgorithm = Gzip | Deflate | Brotli | Zstd
 
 /// Which part of a file `file` sends: at most `bytesToRead` bytes from
 /// `offset`, read in chunks of `chunkSize`; and the response's options.
-type alias FileOptions =
-  {
-    bytesToRead : Option ByteSize.ByteSize;
-    chunkSize : Option Int;
-    offset : Option ByteSize.ByteSize;
-    response : Http.ServerResponse.Options;
-  }
+type alias FileOptions = {
+  bytesToRead : Option ByteSize.ByteSize;
+  chunkSize : Option Int;
+  offset : Option ByteSize.ByteSize;
+  response : Http.ServerResponse.Options;
+}
 
 /// The whole file, with no options of the response.
 file_options : FileOptions
-let file_options =
-  { bytesToRead = None; chunkSize = None; offset = None; response = Http.ServerResponse.defaults }
+let file_options = {
+  bytesToRead = None;
+  chunkSize = None;
+  offset = None;
+  response = Http.ServerResponse.defaults;
+}
 
 /// The operations of Effect's `HttpPlatform`.
 service HttpPlatform =
-  file_response : FileOptions ->
-    String ->{; PlatformError.PlatformError}
-    Http.ServerResponse.ServerResponse
+  file_response :
+    FileOptions -> String ->{; PlatformError.PlatformError} Http.ServerResponse.ServerResponse
 
 /// A response of the file at the path, its content type from its extension
 /// and an `ETag` of its size and modification time.
-file : FileOptions ->
+file :
+  FileOptions ->
   String ->{HttpPlatform; PlatformError.PlatformError}
   Http.ServerResponse.ServerResponse
 let file options path = HttpPlatform.file_response options path

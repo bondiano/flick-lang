@@ -29,8 +29,7 @@ read_later : forall s. Handle s -> (Unit ->{; ReadError} String)^{s}
 let read_later file = fun () -> read_all file
 
 task_later : forall s. Handle s -> (Eff none {ReadError} String)^{s}
-let task_later file =
-  task { read_all file }
+let task_later file = task { read_all file }
 
 wider : forall s t. Handle s -> (Unit ->{; ReadError} String)^{s, t}
 let wider file = fun () -> read_all file

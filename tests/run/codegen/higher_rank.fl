@@ -14,8 +14,10 @@ let each_shown log =
 stop_at_text : Show a => a ->{; AppError, Stop} Unit
 let stop_at_text value =
   let text = show value
-  if text == "\"two\"" then from_result (Err (Stop text))
-  else Platform.stdout_line ("seen " ++ text)
+  if text == "\"two\"" then
+    from_result (Err (Stop text))
+  else
+    Platform.stdout_line ("seen " ++ text)
 
 main : Unit ->{; AppError} Unit
 let main () =

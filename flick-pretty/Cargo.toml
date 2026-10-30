@@ -1,0 +1,16 @@
+[package]
+name = "flick-pretty"
+description = "An arena-based Wadler-Lindig pretty printer for the Flick formatter and code generators"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+typed-arena = "2"
+unicode-segmentation = "1"

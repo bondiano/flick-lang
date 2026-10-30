@@ -41,26 +41,23 @@ let main () =
   line ("as_", (Stream.run_collect (Stream.as_ 0 (Stream.take 2 nums))))
   line ("map_chunks", (Stream.run_collect (Stream.map_chunks grow chunked)))
   line ("map_effect", (Stream.run_collect (Stream.map_effect (fun n -> n + 1) nums)))
-  line
-    (
-      "map_effect_par",
-      (Stream.run_collect
-        (Stream.map_effect_par { concurrency = Some 2; unordered = false } (fun n -> n * 3) nums)),
-    )
-  line
-    (
-      "map_effect_par unbounded",
-      [
-        Stream.run_sum
-          (Stream.map_effect_par { concurrency = None; unordered = true } (fun n -> n) nums),
-      ],
-    )
+  line (
+    "map_effect_par",
+    (Stream.run_collect
+      (Stream.map_effect_par { concurrency = Some 2; unordered = false } (fun n -> n * 3) nums)),
+  )
+  line (
+    "map_effect_par unbounded",
+    [
+      Stream.run_sum
+        (Stream.map_effect_par { concurrency = None; unordered = true } (fun n -> n) nums),
+    ],
+  )
   line ("map_chunks_effect", (Stream.run_collect (Stream.map_chunks_effect grow chunked)))
-  line
-    (
-      "flatten_effect",
-      (Stream.run_collect (Stream.flatten_effect (Stream.make [task { 1 }, task { 2 }]))),
-    )
+  line (
+    "flatten_effect",
+    (Stream.run_collect (Stream.flatten_effect (Stream.make [task { 1 }, task { 2 }]))),
+  )
   let seen = Ref.make []
   let _ =
     Stream.run_drain (Stream.tap (fun n -> Ref.set seen (Ref.get seen ++ [n])) (Stream.take 3 nums))
@@ -69,17 +66,23 @@ let main () =
     Stream.tap_both
       { onElement = fun n -> Ref.set seen [n]; onError = fun _ -> Ref.set seen [0] }
       (Stream.concat (Stream.fail (Boom 1)) (Stream.succeed 9))
-  let _ = try Stream.run_drain both with | Boom _ -> ()
+  let _ =
+    try Stream.run_drain both with
+    | Boom _ -> ()
   line ("tap_both", (Ref.get seen))
   let mapped =
     Stream.map_both
       { onElement = fun n -> n + 1; onError = fun (Boom n) -> Bang (show n) }
       (Stream.concat (Stream.fail (Boom 7)) (Stream.succeed 1))
-  let outcome = try show (Stream.run_collect mapped) with | Bang s -> "Bang " ++ s
+  let outcome =
+    try show (Stream.run_collect mapped) with
+    | Bang s -> "Bang " ++ s
   Platform.stdout_line ("map_both: " ++ outcome)
   let renamed : Stream.Stream none {Bang} Float =
     Stream.map_error (fun (Boom n) -> Bang ("e" ++ show n)) (Stream.fail (Boom 3))
-  let renamed_outcome = try show (Stream.run_collect (Stream.as_ 0 renamed)) with | Bang s -> s
+  let renamed_outcome =
+    try show (Stream.run_collect (Stream.as_ 0 renamed)) with
+    | Bang s -> s
   Platform.stdout_line ("map_error: " ++ renamed_outcome)
   line ("filter", (Stream.run_collect (Stream.filter even nums)))
   line ("filter_map", (Stream.run_collect (Stream.filter_map half nums)))
@@ -90,23 +93,21 @@ let main () =
   line ("take_until", (Stream.run_collect (Stream.take_until (fun n -> n == 3) nums)))
   line ("take_until_effect", (Stream.run_collect (Stream.take_until_effect (fun n -> n == 2) nums)))
   line ("take_while", (Stream.run_collect (Stream.take_while (fun n -> n < 4) nums)))
-  line
-    (
-      "take_while_filter",
-      (Stream.run_collect
-        (Stream.take_while_filter (fun n -> if n < 3 then Ok (n * 100) else Err n) nums)),
-    )
+  line (
+    "take_while_filter",
+    (Stream.run_collect
+      (Stream.take_while_filter (fun n -> if n < 3 then Ok (n * 100) else Err n) nums)),
+  )
   line ("take_while_effect", (Stream.run_collect (Stream.take_while_effect (fun n -> n < 3) nums)))
   line ("drop", (Stream.run_collect (Stream.drop 4 nums)))
   line ("drop_right", (Stream.run_collect (Stream.drop_right 4 nums)))
   line ("drop_until", (Stream.run_collect (Stream.drop_until (fun n -> n == 4) nums)))
   line ("drop_until_effect", (Stream.run_collect (Stream.drop_until_effect (fun n -> n == 5) nums)))
   line ("drop_while", (Stream.run_collect (Stream.drop_while (fun n -> n < 5) nums)))
-  line
-    (
-      "drop_while_filter",
-      (Stream.run_collect (Stream.drop_while_filter half (Stream.make [2, 4, 5, 6]))),
-    )
+  line (
+    "drop_while_filter",
+    (Stream.run_collect (Stream.drop_while_filter half (Stream.make [2, 4, 5, 6]))),
+  )
   line ("drop_while_effect", (Stream.run_collect (Stream.drop_while_effect (fun n -> n < 6) nums)))
   line ("when_ true", (Stream.run_collect (Stream.when_ (task { true }) (Stream.take 2 nums))))
   line ("when_ false", (Stream.run_collect (Stream.when_ (task { false }) nums)))
@@ -120,64 +121,54 @@ let main () =
   let adjacent = Stream.run_collect (Stream.group_adjacent_by even (Stream.make [2, 4, 1, 6]))
   Platform.stdout_line
     ("group_adjacent_by: " ++ show (List.map (fun (k, xs) -> (k, NonEmpty.to_list xs)) adjacent))
-  line
-    (
-      "map_accum",
-      (Stream.run_collect (Stream.map_accum 0 (fun acc n -> (acc + n, [acc + n])) nums)),
-    )
-  line
-    (
-      "map_accum_chunks",
-      (Stream.run_collect
-        (
-          Stream.map_accum_chunks
-            0
-            (fun acc chunk -> (acc + 1, [acc, Int.to_float (NonEmpty.length chunk)]))
-            chunked
-        )),
-    )
-  line
-    (
-      "map_accum_effect",
-      (Stream.run_collect
-        (Stream.map_accum_effect 1 (fun acc n -> (acc * n, [acc * n])) (Stream.take 4 nums))),
-    )
-  line
-    (
-      "map_accum_chunks_effect",
-      (Stream.run_collect
-        (Stream.map_accum_chunks_effect
-          0
-          (fun acc chunk -> (acc + Int.to_float (NonEmpty.length chunk), [acc]))
-          chunked)),
-    )
+  line (
+    "map_accum",
+    (Stream.run_collect (Stream.map_accum 0 (fun acc n -> (acc + n, [acc + n])) nums)),
+  )
+  line (
+    "map_accum_chunks",
+    (Stream.run_collect
+      (Stream.map_accum_chunks
+        0
+        (fun acc chunk -> (acc + 1, [acc, Int.to_float (NonEmpty.length chunk)]))
+        chunked)),
+  )
+  line (
+    "map_accum_effect",
+    (Stream.run_collect
+      (Stream.map_accum_effect 1 (fun acc n -> (acc * n, [acc * n])) (Stream.take 4 nums))),
+  )
+  line (
+    "map_accum_chunks_effect",
+    (Stream.run_collect
+      (Stream.map_accum_chunks_effect
+        0
+        (fun acc chunk -> (acc + Int.to_float (NonEmpty.length chunk), [acc]))
+        chunked)),
+  )
   line ("scan", (Stream.run_collect (Stream.scan 0 (fun acc n -> acc + n) (Stream.take 4 nums))))
-  line
-    (
-      "scan_effect",
-      (Stream.run_collect (Stream.scan_effect 1 (fun acc n -> acc * n) (Stream.take 4 nums))),
-    )
+  line (
+    "scan_effect",
+    (Stream.run_collect (Stream.scan_effect 1 (fun acc n -> acc * n) (Stream.take 4 nums))),
+  )
   lists ("collect", (Stream.run_collect (Stream.collect (Stream.take 3 nums))))
   lists ("accumulate", (collect (Stream.accumulate chunked)))
   line ("changes", (Stream.run_collect (Stream.changes (Stream.make [1, 1, 2, 2, 1]))))
-  line
-    (
-      "changes_with",
-      (Stream.run_collect
-        (Stream.changes_with (fun a b -> even a == even b) (Stream.make [1, 3, 2, 4, 5]))),
-    )
-  line
-    (
-      "changes_with_effect",
-      (Stream.run_collect (Stream.changes_with_effect (fun a b -> a == b) (Stream.make [1, 1, 2]))),
-    )
+  line (
+    "changes_with",
+    (Stream.run_collect
+      (Stream.changes_with (fun a b -> even a == even b) (Stream.make [1, 3, 2, 4, 5]))),
+  )
+  line (
+    "changes_with_effect",
+    (Stream.run_collect (Stream.changes_with_effect (fun a b -> a == b) (Stream.make [1, 1, 2]))),
+  )
   line ("intersperse", (Stream.run_collect (Stream.intersperse 0 (Stream.take 3 nums))))
-  line
-    (
-      "intersperse_affixes",
-      (Stream.run_collect
-        (Stream.intersperse_affixes { start = 9; middle = 0; end = 8 } (Stream.take 2 nums))),
-    )
+  line (
+    "intersperse_affixes",
+    (Stream.run_collect
+      (Stream.intersperse_affixes { start = 9; middle = 0; end = 8 } (Stream.take 2 nums))),
+  )
   line ("debounce", (Stream.run_collect (Stream.debounce ms5 (Stream.take 3 nums))))
   let throttled =
     Stream.throttle
@@ -212,23 +203,18 @@ let main () =
       }
       nums
   line ("throttle enforce", [Stream.run_count enforced])
-  line
-    (
-      "buffer",
-      (
-        Stream.run_collect (Stream.buffer { capacity = Some 2; strategy = Some Queue.Suspend } nums)
-      ),
-    )
-  line
-    (
-      "buffer unbounded",
-      (Stream.run_collect (Stream.buffer { capacity = None; strategy = None } nums)),
-    )
-  line
-    (
-      "buffer_chunks",
-      (Stream.run_collect (Stream.buffer_chunks { capacity = Some 1; strategy = None } chunked)),
-    )
+  line (
+    "buffer",
+    (Stream.run_collect (Stream.buffer { capacity = Some 2; strategy = Some Queue.Suspend } nums)),
+  )
+  line (
+    "buffer unbounded",
+    (Stream.run_collect (Stream.buffer { capacity = None; strategy = None } nums)),
+  )
+  line (
+    "buffer_chunks",
+    (Stream.run_collect (Stream.buffer_chunks { capacity = Some 1; strategy = None } chunked)),
+  )
   let checked : List (Result Boom Float) =
     Stream.run_collect (Stream.result (Stream.concat (Stream.fail (Boom 4)) (Stream.succeed 1)))
   Platform.stdout_line ("result: " ++ show (List.length checked))

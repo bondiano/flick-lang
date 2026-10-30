@@ -22,10 +22,9 @@ foreign effect format_with from "@flick-lang/runtime/effect/observability/Promet
 /// Prometheus scrapes them.
 route : String -> Http.Router.Route r e
 let route path =
-  Http.Router.route
-    (Some Http.Method.GET)
-    path
-    (fun _ ->
-      Http.ServerResponse.text
-        (format ())
-        { Http.ServerResponse.defaults with contentType = Some "text/plain; version=0.0.4; charset=utf-8" })
+  Http.Router.route (Some Http.Method.GET) path (fun _ ->
+    Http.ServerResponse.text (format ()) {
+      Http.ServerResponse.defaults with
+      contentType = Some "text/plain; version=0.0.4; charset=utf-8";
+    }
+  )

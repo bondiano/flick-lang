@@ -17,24 +17,37 @@ main : Unit ->{; AppError} Unit
 let main () =
   let a = TxRef.make 10
   let b = TxRef.make 0
-  let first = try Tx.atomically (task { transfer 4 a b; "committed" }) with
+  let first =
+    try
+      Tx.atomically
+        (task {
+          transfer 4 a b
+          "committed"
+        })
+    with
     | Broke -> "rolled back"
   Platform.stdout_line ("first: " ++ first)
-  let second = try Tx.atomically (task {
-      TxRef.set 100 b
-      transfer 100 a b
-      "committed"
-    }) with
+  let second =
+    try
+      Tx.atomically
+        (task {
+          TxRef.set 100 b
+          transfer 100 a b
+          "committed"
+        })
+    with
     | Broke -> "rolled back"
   Platform.stdout_line ("second: " ++ second)
   Platform.stdout_line ("balances: " ++ show (Tx.atomically (task { (TxRef.get a, TxRef.get b) })))
   let old = Tx.atomically (task { TxRef.modify (fun x -> (x, x * 2)) a })
   Platform.stdout_line ("modify: " ++ show (old, Tx.atomically (task { TxRef.get a })))
-  let nested = Tx.atomically (task {
-      TxRef.set 1 a
-      Tx.atomically (task { TxRef.set 2 b })
-      TxRef.get a + TxRef.get b
-    })
+  let nested =
+    Tx.atomically
+      (task {
+        TxRef.set 1 a
+        Tx.atomically (task { TxRef.set 2 b })
+        TxRef.get a + TxRef.get b
+      })
   Platform.stdout_line ("nested: " ++ show nested)
   let meta = Tx.atomically (task { Tx.current () })
   Platform.stdout_line ("first attempt: " ++ show (meta.attempt, meta.retryReason))
@@ -42,10 +55,11 @@ let main () =
   let (seen, _) =
     parallel
       (task {
-        Tx.atomically (task {
-          let v = TxRef.get flag
-          if v == 0 then Tx.retry () else (v, (Tx.current ()).retryReason == Some Tx.Retry)
-        })
+        Tx.atomically
+          (task {
+            let v = TxRef.get flag
+            if v == 0 then Tx.retry () else (v, (Tx.current ()).retryReason == Some Tx.Retry)
+          })
       })
       (task {
         Effect.sleep (ms 2)

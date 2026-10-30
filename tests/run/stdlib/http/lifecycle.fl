@@ -21,17 +21,16 @@ let api =
 
 /// The slow handler; `started` tells the client side it is running.
 handle : Deferred.Deferred {} Unit -> HttpApi.Request Unit Unit Unit Unit ->{} Unit
-let handle started _ =
-  scope {
-    Resource.acquire_release
-      (task {
-        Platform.stdout_line "handler started"
-        ignore (Deferred.succeed () started)
-      })
-      (fun _ -> Platform.stdout_line "handler finalizer")
-    Effect.sleep (ms 100)
-    Platform.stdout_line "handler finished"
-  }
+let handle started _ = scope {
+  Resource.acquire_release
+    (task {
+      Platform.stdout_line "handler started"
+      ignore (Deferred.succeed () started)
+    })
+    (fun _ -> Platform.stdout_line "handler finalizer")
+  Effect.sleep (ms 100)
+  Platform.stdout_line "handler finished"
+}
 
 main : Unit ->{; AppError} Unit
 let main () =

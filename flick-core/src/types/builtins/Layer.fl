@@ -17,14 +17,12 @@ foreign pure succeed from "@flick-lang/runtime" "layerSucceed"
   reviewed "effect@4.0.5 sha256:607ec49d4694de5a"
 
 /// Both layers' services; they must not build the same service.
-merge :
-  Layer i1 e1 o1 -> Layer i2 e2 o2 -> Layer (i1 + i2) (e1 + e2) (o1 + o2)
+merge : Layer i1 e1 o1 -> Layer i2 e2 o2 -> Layer (i1 + i2) (e1 + e2) (o1 + o2)
 foreign pure merge from "@flick-lang/runtime" "layerMerge"
   reviewed "effect@4.0.5 sha256:2c3a2aa8a2f7b0ce"
 
 /// Both layers' services; the second replaces what the first builds too.
-override :
-  Layer i1 e1 o1 -> Layer i2 e2 o2 -> Layer (i1 + i2) (e1 + e2) (o1 + o2)
+override : Layer i1 e1 o1 -> Layer i2 e2 o2 -> Layer (i1 + i2) (e1 + e2) (o1 + o2)
 foreign pure override from "@flick-lang/runtime" "layerOverride"
 
 /// A layer that builds nothing.
@@ -89,8 +87,7 @@ foreign pure provide_ from "@flick-lang/runtime/effect/Layer" "provide"
   reviewed "effect@4.0.5 sha256:f0d272c9fb09fe65"
 
 /// `provide_`, keeping the services of `deps` in the output too.
-provide_merge :
-  Layer ri2 e2 ro2 -> Layer (ro2 + ri) e ro -> Layer (ri + ri2) (e + e2) (ro + ro2)
+provide_merge : Layer ri2 e2 ro2 -> Layer (ro2 + ri) e ro -> Layer (ri + ri2) (e + e2) (ro + ro2)
 foreign pure provide_merge from "@flick-lang/runtime/effect/Layer" "provideMerge"
   arity 1
   reviewed "effect@4.0.5 sha256:76813831f4ff3da8"

@@ -14,8 +14,12 @@ or_zero : Option ByteSize.ByteSize -> ByteSize.ByteSize
 let or_zero o = Option.with_default ByteSize.zero o
 
 in_unit : ByteSize.ByteUnit -> ByteSize.FormatOptions
-let in_unit unit =
-  { precision = Some 3; trailingZeros = Some true; binary = false; unit = Some unit }
+let in_unit unit = {
+  precision = Some 3;
+  trailingZeros = Some true;
+  binary = false;
+  unit = Some unit;
+}
 
 main : Unit ->{; AppError} Unit
 let main () =

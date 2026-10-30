@@ -4,10 +4,12 @@ module App.Main exposing (main)
 greet : Rpc.Rpc "greet" (String ->{r;} String)
 let greet =
   Rpc.make (Record.label : Record.Label "greet")
-    |> Rpc.with_payload (Codec.json Schema.string)
-    |> Rpc.with_success (Codec.json Schema.string)
+  |> Rpc.with_payload (Codec.json Schema.string)
+  |> Rpc.with_success (Codec.json Schema.string)
 
 main : Unit ->{; AppError} Unit
 let main () =
-  let answer = try Rpc.call "/rpc" greet "Ada" with | Rpc.ClientError message -> message
+  let answer =
+    try Rpc.call "/rpc" greet "Ada" with
+    | Rpc.ClientError message -> message
   Platform.stdout_line answer

@@ -25,14 +25,13 @@ type alias HistogramState = {
 }
 
 /// Each quantile with its value, `None` before any input.
-type alias SummaryState =
-  {
-    quantiles : List (Float, Option Float);
-    count : Float;
-    min : Float;
-    max : Float;
-    sum : Float;
-  }
+type alias SummaryState = {
+  quantiles : List (Float, Option Float);
+  count : Float;
+  min : Float;
+  max : Float;
+  sum : Float;
+}
 
 /// Adds its inputs, or keeps the last one unless it is `incremental`.
 type alias Counter = Metric Float CounterState
@@ -64,14 +63,13 @@ type alias HistogramOptions = {
 }
 
 /// `maxAge` and `maxSize` bound the inputs a summary keeps.
-type alias SummaryOptions =
-  {
-    description : Option String;
-    attributes : Attributes;
-    maxAge : Duration.Duration;
-    maxSize : Int;
-    quantiles : List Float;
-  }
+type alias SummaryOptions = {
+  description : Option String;
+  attributes : Attributes;
+  maxAge : Duration.Duration;
+  maxSize : Int;
+  quantiles : List Float;
+}
 
 /// `boundaries` defaults to exponential ones from 1 millisecond.
 type alias TimerOptions = {

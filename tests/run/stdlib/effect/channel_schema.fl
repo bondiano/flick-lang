@@ -21,9 +21,8 @@ let issues (SchemaError found) =
 points : Channel.Channel none none i (NonEmpty.NonEmpty Point) Unit ie id
 let points = Channel.from_list_chunked 2 [{ x = 1; y = 2 }, { x = 3; y = 4 }, { x = 5; y = 6 }]
 
-flat : Channel.Channel none {SchemaError} Unit (
-  NonEmpty.NonEmpty a
-) Unit none Unit ->{; SchemaError}
+flat :
+  Channel.Channel none {SchemaError} Unit (NonEmpty.NonEmpty a) Unit none Unit ->{; SchemaError}
   List a
 let flat channel = List.concat (Channel.run_collect (Channel.map NonEmpty.to_list channel))
 

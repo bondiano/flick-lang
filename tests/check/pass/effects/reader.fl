@@ -7,8 +7,9 @@ let count = Atom.make 7
 
 summed : Atom.Atom Float
 let summed =
-  Atom.derived
-    (fun () -> Seq.fold (fun a b -> a + b) 0 (for n <- [1, 2] yield Atom.value count + n))
+  Atom.derived (fun () ->
+    Seq.fold (fun a b -> a + b) 0 (for n <- [1, 2] yield Atom.value count + n)
+  )
 
 listed : Atom.Atom (List Float)
 let listed = Atom.derived (fun () -> [for n <- [1] yield Atom.value count + n])

@@ -30,13 +30,12 @@ let main () =
     ("lists: " ++ show (Reducer.combine_all (Reducer.list_concat ()) [[1, 2], [], [3]]))
   Platform.stdout_line
     ("bools: "
-      ++ show
-        (
-          Reducer.combine_all Bool.reducer_and [true, false],
-          Reducer.combine_all Bool.reducer_and [],
-          Reducer.combine_all Bool.reducer_or [false, true],
-          Reducer.combine_all Bool.reducer_or [],
-        ))
+      ++ show (
+        Reducer.combine_all Bool.reducer_and [true, false],
+        Reducer.combine_all Bool.reducer_and [],
+        Reducer.combine_all Bool.reducer_or [false, true],
+        Reducer.combine_all Bool.reducer_or [],
+      ))
   let a = Record.from_entries [("x", 1), ("y", 2)]
   let b = Record.from_entries [("y", 10), ("z", 20)]
   Platform.stdout_line
@@ -66,9 +65,10 @@ let main () =
       ++ show (Combiner.combine (Combiner.tuple2 (sum, Combiner.last ())) (1, "a") (2, "b"))
       ++ " "
       ++ show
-        (Reducer.combine_all
-          (Reducer.tuple2 (Reducer.number_sum, Reducer.string_concat))
-          [(1, "a"), (2, "b")]))
+        (Reducer.combine_all (Reducer.tuple2 (Reducer.number_sum, Reducer.string_concat)) [
+          (1, "a"),
+          (2, "b"),
+        ]))
   Platform.stdout_line
     ("tuple3: "
       ++ show

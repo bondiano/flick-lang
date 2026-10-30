@@ -30,13 +30,16 @@ instance Semigroup e => Applicative (Validation e) =
   pure : forall c a. a^c -> (Validation e a)^c
   let pure x = Validation (Ok x)
   map2 :
-    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-      ((Validation e a)^d -> ((Validation e b)^d -> (Validation e x)^(c + d))^(c + d))^c
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((Validation e a)^d -> ((Validation e b)^d -> (Validation e x)^(c + d))^(c + d))^c
   let map2 f = map2_validation combine f
 
 map2_validation :
-  forall c d e a b x. (e -> e -> e) -> (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-    ((Validation e a)^d -> ((Validation e b)^d -> (Validation e x)^(c + d))^(c + d))^c
+  forall c d e a b x.
+  (e -> e -> e) ->
+  (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+  ((Validation e a)^d -> ((Validation e b)^d -> (Validation e x)^(c + d))^(c + d))^c
 foreign pure map2_validation from "@flick-lang/runtime" "validationMap2"
   arity 4
   retention call

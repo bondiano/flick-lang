@@ -33,13 +33,15 @@ instance Applicative Identity =
   pure : forall c a. a^c -> (Identity a)^c
   let pure value = Identity value
   map2 :
-    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-      ((Identity a)^d -> ((Identity b)^d -> (Identity x)^(c + d))^(c + d))^c
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((Identity a)^d -> ((Identity b)^d -> (Identity x)^(c + d))^(c + d))^c
   let map2 f (Identity left) (Identity right) = Identity (f left right)
 
 instance Monad Identity =
-  flat_map : forall c d a b. (forall v. a^v -> (Identity b)^(c + v))^c ->
-    ((Identity a)^d -> (Identity b)^(c + d))^c
+  flat_map :
+    forall c d a b.
+    (forall v. a^v -> (Identity b)^(c + v))^c -> ((Identity a)^d -> (Identity b)^(c + d))^c
   let flat_map f (Identity value) = f value
 
 instance Functor m => Functor (MaybeT m) =
@@ -50,30 +52,33 @@ instance Monad m => Applicative (MaybeT m) =
   pure : forall c a. a^c -> (MaybeT m a)^c
   let pure value = MaybeT (pure (Some value))
   map2 :
-    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-      ((MaybeT m a)^d -> ((MaybeT m b)^d -> (MaybeT m x)^(c + d))^(c + d))^c
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((MaybeT m a)^d -> ((MaybeT m b)^d -> (MaybeT m x)^(c + d))^(c + d))^c
   let map2 f left right =
-    MaybeT (do {
-      first <- maybe left
-      match first with
-      | None -> pure None
-      | Some a -> do {
+    MaybeT
+      (do {
+        first <- maybe left
+        match first with
+        | None -> pure None
+        | Some a -> do {
           second <- maybe right
           pure (map (f a) second)
         }
-    })
+      })
 
 instance Monad m => Monad (MaybeT m) =
   flat_map :
-    forall c d a b. (forall v. a^v -> (MaybeT m b)^(c + v))^c ->
-      ((MaybeT m a)^d -> (MaybeT m b)^(c + d))^c
+    forall c d a b.
+    (forall v. a^v -> (MaybeT m b)^(c + v))^c -> ((MaybeT m a)^d -> (MaybeT m b)^(c + d))^c
   let flat_map f value =
-    MaybeT (do {
-      optional <- maybe value
-      match optional with
-      | None -> pure None
-      | Some a -> maybe (f a)
-    })
+    MaybeT
+      (do {
+        optional <- maybe value
+        match optional with
+        | None -> pure None
+        | Some a -> maybe (f a)
+      })
 
 instance Functor m => Functor (StateT s m) =
   map : forall c d a b. (forall v. a^v -> b)^c -> ((StateT s m a)^d -> (StateT s m b)^(c + d))^c
@@ -84,8 +89,9 @@ instance Monad m => Applicative (StateT s m) =
   pure : forall c a. a^c -> (StateT s m a)^c
   let pure value = StateT (fun initial -> pure (value, initial))
   map2 :
-    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-      ((StateT s m a)^d -> ((StateT s m b)^d -> (StateT s m x)^(c + d))^(c + d))^c
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((StateT s m a)^d -> ((StateT s m b)^d -> (StateT s m x)^(c + d))^(c + d))^c
   let map2 f left right =
     StateT (fun initial -> do {
       (a, next) <- state left initial
@@ -95,8 +101,8 @@ instance Monad m => Applicative (StateT s m) =
 
 instance Monad m => Monad (StateT s m) =
   flat_map :
-    forall c d a b. (forall v. a^v -> (StateT s m b)^(c + v))^c ->
-      ((StateT s m a)^d -> (StateT s m b)^(c + d))^c
+    forall c d a b.
+    (forall v. a^v -> (StateT s m b)^(c + v))^c -> ((StateT s m a)^d -> (StateT s m b)^(c + d))^c
   let flat_map f action =
     StateT (fun initial -> do {
       (value, next) <- state action initial
@@ -111,15 +117,16 @@ instance Applicative m => Applicative (ReaderT r m) =
   pure : forall c a. a^c -> (ReaderT r m a)^c
   let pure value = ReaderT (fun _ -> pure value)
   map2 :
-    forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
-      ((ReaderT r m a)^d -> ((ReaderT r m b)^d -> (ReaderT r m x)^(c + d))^(c + d))^c
+    forall c d a b x.
+    (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+    ((ReaderT r m a)^d -> ((ReaderT r m b)^d -> (ReaderT r m x)^(c + d))^(c + d))^c
   let map2 f left right =
     ReaderT (fun environment -> map2 f (reader left environment) (reader right environment))
 
 instance Monad m => Monad (ReaderT r m) =
   flat_map :
-    forall c d a b. (forall v. a^v -> (ReaderT r m b)^(c + v))^c ->
-      ((ReaderT r m a)^d -> (ReaderT r m b)^(c + d))^c
+    forall c d a b.
+    (forall v. a^v -> (ReaderT r m b)^(c + v))^c -> ((ReaderT r m a)^d -> (ReaderT r m b)^(c + d))^c
   let flat_map f action =
     ReaderT (fun environment -> do {
       value <- reader action environment
@@ -127,8 +134,10 @@ instance Monad m => Monad (ReaderT r m) =
     })
 
 partial :
-  forall c d a b x. (forall u v. a^u -> (b^v -> x)^(c + u))^c -> (Identity a)^d ->
-    ((Identity b)^d -> (Identity x)^(c + d))^(c + d)
+  forall c d a b x.
+  (forall u v. a^u -> (b^v -> x)^(c + u))^c ->
+  (Identity a)^d ->
+  ((Identity b)^d -> (Identity x)^(c + d))^(c + d)
 let partial f left = map2 f left
 
 stack : MaybeT (StateT Float (ReaderT Float Identity)) Float

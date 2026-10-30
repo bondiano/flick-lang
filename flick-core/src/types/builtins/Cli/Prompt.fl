@@ -31,27 +31,26 @@ run : Prompt a ->{Tty; Terminal.QuitError} a
 let run prompt = run_of Tty prompt
 
 /// The symbols and colors the prompts draw with.
-type alias Theme =
-  {
-    prefix : String;
-    pointer : String;
-    pointerSmall : String;
-    ellipsis : String;
-    tick : String;
-    arrowUp : String;
-    arrowDown : String;
-    checkboxOn : String;
-    checkboxOff : String;
-    descriptionSeparator : String;
-    passwordMask : String;
-    toggleSeparator : String;
-    primaryColor : String;
-    mutedColor : String;
-    successColor : String;
-    errorColor : String;
-    submittedColor : String;
-    colors : Bool;
-  }
+type alias Theme = {
+  prefix : String;
+  pointer : String;
+  pointerSmall : String;
+  ellipsis : String;
+  tick : String;
+  arrowUp : String;
+  arrowDown : String;
+  checkboxOn : String;
+  checkboxOff : String;
+  descriptionSeparator : String;
+  passwordMask : String;
+  toggleSeparator : String;
+  primaryColor : String;
+  mutedColor : String;
+  successColor : String;
+  errorColor : String;
+  submittedColor : String;
+  colors : Bool;
+}
 
 /// Effect's theme, with colors when the output supports them.
 default_theme : Unit ->{} Theme
@@ -69,8 +68,11 @@ run_themed : Theme -> Prompt a ->{Tty; Terminal.QuitError} a
 let run_themed theme prompt = run_themed_of Tty theme prompt
 
 /// A text question; `validate` refuses a value with the message shown.
-type alias TextOptions =
-  { message : String; default : Option String; validate : Option (String -> Result String String) }
+type alias TextOptions = {
+  message : String;
+  default : Option String;
+  validate : Option (String -> Result String String);
+}
 
 /// A line of text.
 text : TextOptions -> Prompt String
@@ -88,13 +90,12 @@ foreign pure hidden from "@flick-lang/runtime/cli" "promptHidden"
   reviewed "effect@4.0.5 sha256:e1ad30ce884a96fd"
 
 /// `TextOptions` with the `delimiter` between items (`,` when `None`).
-type alias ListOptions =
-  {
-    message : String;
-    default : Option String;
-    validate : Option (String -> Result String String);
-    delimiter : Option String;
-  }
+type alias ListOptions = {
+  message : String;
+  default : Option String;
+  validate : Option (String -> Result String String);
+  delimiter : Option String;
+}
 
 /// Items typed on one line.
 list : ListOptions -> Prompt (List String)
@@ -102,16 +103,15 @@ foreign pure list from "@flick-lang/runtime/cli" "promptList"
   reviewed "effect@4.0.5 sha256:73e85bc939aafc1c"
 
 /// A number question: bounds, the steps of the arrow keys and a check.
-type alias IntOptions =
-  {
-    message : String;
-    default : Option Int;
-    min : Option Int;
-    max : Option Int;
-    incrementBy : Option Int;
-    decrementBy : Option Int;
-    validate : Option (Int -> Result String Int);
-  }
+type alias IntOptions = {
+  message : String;
+  default : Option Int;
+  min : Option Int;
+  max : Option Int;
+  incrementBy : Option Int;
+  decrementBy : Option Int;
+  validate : Option (Int -> Result String Int);
+}
 
 /// An integer.
 int : IntOptions -> Prompt Int
@@ -119,17 +119,16 @@ foreign pure int from "@flick-lang/runtime/cli" "promptInt"
   reviewed "effect@4.0.5 sha256:85daa1430ff41c31"
 
 /// `IntOptions` with the digits after the point.
-type alias NumberOptions =
-  {
-    message : String;
-    default : Option Float;
-    min : Option Float;
-    max : Option Float;
-    incrementBy : Option Float;
-    decrementBy : Option Float;
-    validate : Option (Float -> Result String Float);
-    precision : Option Int;
-  }
+type alias NumberOptions = {
+  message : String;
+  default : Option Float;
+  min : Option Float;
+  max : Option Float;
+  incrementBy : Option Float;
+  decrementBy : Option Float;
+  validate : Option (Float -> Result String Float);
+  precision : Option Int;
+}
 
 /// A number with a fractional part.
 number : NumberOptions -> Prompt Float
@@ -143,13 +142,12 @@ type alias ConfirmLabel = { confirm : String; deny : String }
 type alias ConfirmPlaceholder = { defaultConfirm : Option String; defaultDeny : Option String }
 
 /// A yes/no question.
-type alias ConfirmOptions =
-  {
-    message : String;
-    initial : Option Bool;
-    label : Option ConfirmLabel;
-    placeholder : Option ConfirmPlaceholder;
-  }
+type alias ConfirmOptions = {
+  message : String;
+  initial : Option Bool;
+  label : Option ConfirmLabel;
+  placeholder : Option ConfirmPlaceholder;
+}
 
 /// Yes or no, typed as `y` or `n`.
 confirm : ConfirmOptions -> Prompt Bool
@@ -157,8 +155,12 @@ foreign pure confirm from "@flick-lang/runtime/cli" "promptConfirm"
   reviewed "effect@4.0.5 sha256:941f4c739c6b6e2c"
 
 /// A switch between two words.
-type alias ToggleOptions =
-  { message : String; initial : Option Bool; active : Option String; inactive : Option String }
+type alias ToggleOptions = {
+  message : String;
+  initial : Option Bool;
+  active : Option String;
+  inactive : Option String;
+}
 
 /// On or off, moved with the arrow keys.
 toggle : ToggleOptions -> Prompt Bool
@@ -166,23 +168,21 @@ foreign pure toggle from "@flick-lang/runtime/cli" "promptToggle"
   reviewed "effect@4.0.5 sha256:8e2b9474cf4d4fb2"
 
 /// The names of months and weekdays, long and short.
-type alias DateLocales =
-  {
-    months : List String;
-    monthsShort : List String;
-    weekdays : List String;
-    weekdaysShort : List String;
-  }
+type alias DateLocales = {
+  months : List String;
+  monthsShort : List String;
+  weekdays : List String;
+  weekdaysShort : List String;
+}
 
 /// A date question: its mask (`YYYY-MM-DD HH:mm:ss` by default) and a check.
-type alias DateOptions =
-  {
-    message : String;
-    initial : Option DateTime.DateTime;
-    dateMask : Option String;
-    validate : Option (DateTime.DateTime -> Result String DateTime.DateTime);
-    locales : Option DateLocales;
-  }
+type alias DateOptions = {
+  message : String;
+  initial : Option DateTime.DateTime;
+  dateMask : Option String;
+  validate : Option (DateTime.DateTime -> Result String DateTime.DateTime);
+  locales : Option DateLocales;
+}
 
 /// A date and time, edited part by part.
 date : DateOptions -> Prompt DateTime.DateTime
@@ -194,15 +194,14 @@ type PathType = FilePath | DirectoryPath | EitherPath
   deriving Eq, Show
 
 /// A path chosen by walking the file system from `startingPath`.
-type alias FileOptions =
-  {
-    type_ : Option PathType;
-    message : Option String;
-    startingPath : Option String;
-    default : Option String;
-    maxPerPage : Option Int;
-    filter : Option (String -> Bool);
-  }
+type alias FileOptions = {
+  type_ : Option PathType;
+  message : Option String;
+  startingPath : Option String;
+  default : Option String;
+  maxPerPage : Option Int;
+  filter : Option (String -> Bool);
+}
 
 /// A path of the file system of Node.js.
 file : FileOptions -> Prompt String
@@ -210,12 +209,20 @@ foreign pure file from "@flick-lang/runtime/cli" "promptFile"
   reviewed "effect@4.0.5 sha256:09c4f3321d9eec4b"
 
 /// One choice of a selection.
-type alias SelectChoice a =
-  { title : String; value : a; description : Option String; disabled : Bool; selected : Bool }
+type alias SelectChoice a = {
+  title : String;
+  value : a;
+  description : Option String;
+  disabled : Bool;
+  selected : Bool;
+}
 
 /// A selection among `choices`, `maxPerPage` at a time.
-type alias SelectOptions a =
-  { message : Option String; choices : List (SelectChoice a); maxPerPage : Option Int }
+type alias SelectOptions a = {
+  message : Option String;
+  choices : List (SelectChoice a);
+  maxPerPage : Option Int;
+}
 
 /// One of the choices, moved to with the arrow keys.
 select : SelectOptions a -> Prompt a
@@ -223,15 +230,14 @@ foreign pure select from "@flick-lang/runtime/cli" "promptSelect"
   reviewed "effect@4.0.5 sha256:694d2c3b50601b9f"
 
 /// A selection filtered by what the user types.
-type alias AutoCompleteOptions a =
-  {
-    message : String;
-    choices : List (SelectChoice a);
-    maxPerPage : Option Int;
-    filterLabel : Option String;
-    filterPlaceholder : Option String;
-    emptyMessage : Option String;
-  }
+type alias AutoCompleteOptions a = {
+  message : String;
+  choices : List (SelectChoice a);
+  maxPerPage : Option Int;
+  filterLabel : Option String;
+  filterPlaceholder : Option String;
+  emptyMessage : Option String;
+}
 
 /// One of the choices that match the typed filter.
 auto_complete : AutoCompleteOptions a -> Prompt a
@@ -239,14 +245,13 @@ foreign pure auto_complete from "@flick-lang/runtime/cli" "promptAutoComplete"
   reviewed "effect@4.0.5 sha256:b33ef84a0308a6bb"
 
 /// The labels of the bulk actions of a multiple selection, and its bounds.
-type alias MultiSelectOptions =
-  {
-    selectAll : Option String;
-    selectNone : Option String;
-    inverseSelection : Option String;
-    min : Option Int;
-    max : Option Int;
-  }
+type alias MultiSelectOptions = {
+  selectAll : Option String;
+  selectNone : Option String;
+  inverseSelection : Option String;
+  min : Option Int;
+  max : Option Int;
+}
 
 /// Any of the choices, toggled with space.
 multi_select : SelectOptions a -> MultiSelectOptions -> Prompt (List a)
@@ -263,12 +268,11 @@ type ProcessInput ev = Input Terminal.UserInput | Event ev
 
 /// A custom prompt: the frame of a state, the step of an input, and what
 /// erases a frame before the next one.
-type alias Handlers s a i =
-  {
-    render : s -> Action s a -> String;
-    process : i -> s -> Action s a;
-    clear : s -> Action s a -> String;
-  }
+type alias Handlers s a i = {
+  render : s -> Action s a -> String;
+  process : i -> s -> Action s a;
+  clear : s -> Action s a -> String;
+}
 
 /// A prompt of its own, from the first state.
 custom : s -> Handlers s a Terminal.UserInput -> Prompt a

@@ -28,6 +28,7 @@ codecTransformPure CodecTransformPure
 codecTransformResult CodecTransformResult
 codecCheckWhole CodecCheckWhole
 codecNumberFinite CodecNumberFinite
+codecNumberLossless CodecNumberLossless
 codecJsonSchema CodecJsonSchema
 codecString CodecString
 codecIgnoreExtra CodecIgnoreExtra
@@ -91,6 +92,8 @@ durationInfinity DurationInfinity
 durationToMillis DurationToMillis
 durationFormat DurationFormat
 bigintDivide BigIntDivide
+bigintFromNumber BigIntOfFloat
+bigintParse BigIntParse
 bigintRemainder BigIntRemainder
 eqHashWith EqHashWith
 eqHashCanonical EqHashCanonical

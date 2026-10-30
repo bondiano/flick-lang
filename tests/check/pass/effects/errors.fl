@@ -15,61 +15,46 @@ service Users =
 
 load_optional : UserId ->{Users; none} Option User
 let load_optional id =
-  try
-    Some (Users.get id)
-  with
+  try Some (Users.get id) with
   | NotFound _ -> None
 
 find_user : UserId ->{Users; NotFound, DbUnavailable} User
-let find_user id =
-  Users.get id
+let find_user id = Users.get id
 
 find_optional : UserId ->{Users; DbUnavailable} Option User
 let find_optional id =
-  try
-    Some (find_user id)
-  with
+  try Some (find_user id) with
   | NotFound _ -> None
 
 // a variable or `_` handles every error, as a value of `Errors e`
 any_error : UserId ->{Users; none} String
 let any_error id =
-  try
-    (find_user id).name
-  with
+  try (find_user id).name with
   | _ -> "unknown"
 
 db_down : Unit ->{; DbUnavailable} User
-let db_down () =
-  from_result (Err (DbUnavailable "down"))
+let db_down () = from_result (Err (DbUnavailable "down"))
 
 // what a handler needs is added
 fallback : UserId ->{Users; DbUnavailable} User
 let fallback id =
-  try
-    Users.get id
-  with
+  try Users.get id with
   | NotFound _ -> db_down ()
 
 // a guarded arm handles some of the error; the rest flows on
 guarded : UserId ->{Users; NotFound} Option User
 let guarded id =
-  try
-    Some (Users.get id)
-  with
+  try Some (Users.get id) with
   | NotFound missing when missing > 0 -> None
 
 checked : Result NotFound User ->{; NotFound} User
-let checked result =
-  from_result result
+let checked result = from_result result
 
 single : Errors {NotFound} -> NotFound
-let single value =
-  value
+let single value = value
 
 nothing : Errors none -> Never
-let nothing value =
-  value
+let nothing value = value
 
 // an error with parameters or several fields; a row holds one element per name
 type error Failed e = Failed e
@@ -82,28 +67,22 @@ service Jobs =
   run : Float ->{; Failed String, Timeout} Float
 
 run_twice : Float ->{Jobs; Failed String, Timeout} Float
-let run_twice n =
-  Jobs.run n + Jobs.run n
+let run_twice n = Jobs.run n + Jobs.run n
 
 recover : Float ->{Jobs; Timeout} Float
 let recover n =
-  try
-    Jobs.run n
-  with
+  try Jobs.run n with
   | Failed reason -> Int.to_float (String.length reason)
 
 conflict : UserId -> Float ->{; Conflict} Unit
-let conflict id version =
-  from_result (Err (Conflict id version))
+let conflict id version = from_result (Err (Conflict id version))
 
 // an omitted row is empty, so the explicit `none` is the same type
 conflict_again : UserId -> Float ->{; Conflict} Unit
-let conflict_again id version =
-  conflict id version
+let conflict_again id version = conflict id version
 
 load_quietly : UserId ->{Users;} Option User
-let load_quietly id =
-  load_optional id
+let load_quietly id = load_optional id
 
 // a variable takes the errors of the body: one error, when the body raises only it
 missing_id : NotFound -> UserId
@@ -113,15 +92,12 @@ let missing_id e =
 
 lookup_or_missing : UserId ->{Users; none} UserId
 let lookup_or_missing id =
-  try
-    (Users.get id).id
-  with
+  try (Users.get id).id with
   | e -> missing_id e
 
 // and a row the caller chose, passed on as it is
 rethrown : Eff r e a -> Eff r e a
-let rethrown t =
-  task {
-    try await t with
-    | e -> from_result (Err e)
-  }
+let rethrown t = task {
+  try await t with
+  | e -> from_result (Err e)
+}

@@ -1,5 +1,10 @@
 package flickrt
 
+import (
+	"slices"
+	"strings"
+)
+
 // Exit is how a computation ended: its value, or the cause it failed with.
 type Exit struct {
 	value Value
@@ -112,10 +117,24 @@ func ExitFindErrorOption(e Value) Value {
 
 func ExitFindDefect(e Value) Value {
 	if r := ex(e).cause.firstOf(causeDie); r != nil {
-		return Ok(r.defect)
+		return Ok(defectMessage(r.defect))
 	}
 	return Err(e)
 }
+
+// defectMessage is a defect as the JS target describes it: the message of
+// an error, without its name and the Flick lines it unwound.
+func defectMessage(defect string) string {
+	text, _, _ := strings.Cut(defect, "\n    at ")
+	text = strings.TrimSuffix(text, "\n")
+	name, message, ok := strings.Cut(text, ": ")
+	if ok && slices.Contains(jsErrorNames, name) {
+		return message
+	}
+	return text
+}
+
+var jsErrorNames = []string{"Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "URIError", "EvalError", "AggregateError"}
 
 func ExitMatch(onSuccess, onFailure, e Value) Value {
 	if x := ex(e); x.cause != nil {

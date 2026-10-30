@@ -15,11 +15,10 @@ let flip order = fun self that -> order that self
 
 /// By `order`, then by `next` among the equal ones.
 combine : Order a -> Order a -> Order a
-let combine next order =
-  fun self that ->
-    match order self that with
-    | EQ -> next self that
-    | o -> o
+let combine next order = fun self that ->
+  match order self that with
+  | EQ -> next self that
+  | o -> o
 
 /// Every value equal to every other.
 always_equal : Unit -> Order a
@@ -27,9 +26,8 @@ let always_equal () = fun _ _ -> EQ
 
 /// By each order of the list in turn.
 combine_all : List (Order a) -> Order a
-let combine_all orders =
-  fun self that ->
-    List.fold_left (fun acc order -> if acc == EQ then order self that else acc) EQ orders
+let combine_all orders = fun self that ->
+  List.fold_left (fun acc order -> if acc == EQ then order self that else acc) EQ orders
 
 /// Orders `b` by the `a` that `f` gives.
 map_input : (b -> a) -> Order a -> Order b
@@ -37,24 +35,19 @@ let map_input f order = fun self that -> order (f self) (f that)
 
 /// Pairs by their first part, then their second.
 tuple : Order a -> Order b -> Order (a, b)
-let tuple first second =
-  fun self that ->
-    let (a1, b1) = self
-    let (a2, b2) = that
-    match first a1 a2 with
-    | EQ -> second b1 b2
-    | o -> o
+let tuple first second = fun self that ->
+  let (a1, b1) = self
+  let (a2, b2) = that
+  match first a1 a2 with
+  | EQ -> second b1 b2
+  | o -> o
 
 /// Lists element by element; a prefix comes first.
 list : Order a -> Order (List a)
-let list order =
-  fun self that ->
-    let first =
-      List.fold_left
-        (fun acc (x, y) -> if acc == EQ then order x y else acc)
-        EQ
-        (List.zip self that)
-    if first == EQ then compare (List.length self) (List.length that) else first
+let list order = fun self that ->
+  let first =
+    List.fold_left (fun acc (x, y) -> if acc == EQ then order x y else acc) EQ (List.zip self that)
+  if first == EQ then compare (List.length self) (List.length that) else first
 
 /// `self < that` by the order: `x |> Order.is_less_than compare 3`.
 is_less_than : Order a -> a -> a -> Bool

@@ -45,19 +45,17 @@ let shown atom =
 
 counts : Ui.View Unit
 let counts =
-  Ui.view
-    (fun () ->
-      ui {
-        text
-          ("orders "
-            ++ shown orders
-            ++ " stock "
-            ++ shown stock
-            ++ " latest "
-            ++ shown latest
-            ++ " both "
-            ++ shown both)
-      })
+  Ui.view (fun () -> ui {
+    text
+      ("orders "
+        ++ shown orders
+        ++ " stock "
+        ++ shown stock
+        ++ " latest "
+        ++ shown latest
+        ++ " both "
+        ++ shown both)
+  })
 
 place : Bool ->{; Refused} Unit
 let place ok = if ok then () else from_result (Err Refused)
@@ -78,24 +76,22 @@ let main () =
   setup ()
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
-  | Some root ->
-    provide Atom.layer {
-      scope s {
-        let _mounted =
-          Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render counts ()) })
+  | Some root -> provide Atom.layer {
+    scope s {
+      let _mounted = Fiber.spawn s report (task { Ui.Dom.mount root report (Ui.render counts ()) })
+      settle ()
+      Platform.stdout_line (text ())
+      try
+        placed true
         settle ()
-        Platform.stdout_line (text ())
-        try
-          placed true
-          settle ()
-          Platform.stdout_line ("after a placed order: " ++ text ())
-          placed false
-        with
-        | Refused -> Platform.stdout_line "refused"
-        settle ()
-        Platform.stdout_line ("after a refused one: " ++ text ())
-        delivered ()
-        settle ()
-        Platform.stdout_line ("after a delivery: " ++ text ())
-      }
+        Platform.stdout_line ("after a placed order: " ++ text ())
+        placed false
+      with
+      | Refused -> Platform.stdout_line "refused"
+      settle ()
+      Platform.stdout_line ("after a refused one: " ++ text ())
+      delivered ()
+      settle ()
+      Platform.stdout_line ("after a delivery: " ++ text ())
     }
+  }

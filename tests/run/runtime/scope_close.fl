@@ -10,55 +10,60 @@ let say line = Platform.stdout_line line
 
 acquire : forall s. String ->{Scope s;} String
 let acquire name =
-  Resource.acquire_release (task {
-    say ("acquire " ++ name)
-    name
-  }) (fun n -> say ("release " ++ n))
+  Resource.acquire_release
+    (task {
+      say ("acquire " ++ name)
+      name
+    })
+    (fun n -> say ("release " ++ n))
 
 succeeding : Unit ->{} Float
-let succeeding () =
-  scope {
-    let a = acquire "a"
-    Scope.add_finalizer (task { say "finalizer" })
-    let b = acquire "b"
-    say ("body uses " ++ a ++ " and " ++ b)
-    42
-  }
+let succeeding () = scope {
+  let a = acquire "a"
+  Scope.add_finalizer (task { say "finalizer" })
+  let b = acquire "b"
+  say ("body uses " ++ a ++ " and " ++ b)
+  42
+}
 
 failing : Unit ->{; Oops} Float
-let failing () =
-  scope {
-    let _c = acquire "c"
-    Scope.add_finalizer_exit
-      (fun cause -> say ("finalizer saw a failure: " ++ show (Option.is_some cause)))
-    from_result (Err (Oops "body failed"))
-  }
+let failing () = scope {
+  let _c = acquire "c"
+  Scope.add_finalizer_exit (fun cause ->
+    say ("finalizer saw a failure: " ++ show (Option.is_some cause))
+  )
+  from_result (Err (Oops "body failed"))
+}
 
 nested : Unit ->{} Unit
-let nested () =
+let nested () = scope {
+  let _outer = acquire "outer"
   scope {
-    let _outer = acquire "outer"
-    scope {
-      let _inner = acquire "inner"
-      say "inner body"
-    }
-    say "outer body"
+    let _inner = acquire "inner"
+    say "inner body"
   }
+  say "outer body"
+}
 
 bracketed : Unit ->{; Oops} String
 let bracketed () =
   Resource.bracket
-    (task { say "bracket acquire"; "file" })
+    (task {
+      say "bracket acquire"
+      "file"
+    })
     (fun f -> from_result (Err (Oops ("use of " ++ f))))
     (fun f -> say ("bracket release " ++ f))
 
 main : Unit ->{; AppError} Unit
 let main () =
   say (show (succeeding ()))
-  let caught = try failing () with
+  let caught =
+    try failing () with
     | Oops _ -> -1
   say (show caught)
   nested ()
-  let used = try bracketed () with
+  let used =
+    try bracketed () with
     | Oops text -> text
   say used

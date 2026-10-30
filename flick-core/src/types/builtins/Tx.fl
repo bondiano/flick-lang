@@ -13,15 +13,14 @@ type RetryReason = Retry | Conflict
   deriving Eq, Show
 
 /// What a transaction knows of its current attempt; times in milliseconds.
-type alias Meta =
-  {
-    attempt : Int;
-    retryReason : Option RetryReason;
-    start : Float;
-    now : Float;
-    elapsed : Float;
-    elapsedSincePrevious : Float;
-  }
+type alias Meta = {
+  attempt : Int;
+  retryReason : Option RetryReason;
+  start : Float;
+  now : Float;
+  elapsed : Float;
+  elapsedSincePrevious : Float;
+}
 
 /// Runs `body` as one transaction: its changes to transactional values
 /// commit together or not at all, and it runs again when a value it read

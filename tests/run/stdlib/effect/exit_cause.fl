@@ -11,18 +11,17 @@ type error Other = Other String
 type alias Ex = Exit {Boom} Float
 
 span_options : Tracer.SpanOptions
-let span_options =
-  {
-    attributes = [];
-    links = [];
-    parent = None;
-    root = false;
-    kind_ = Tracer.internal;
-    sampled = None;
-    level = None;
-    captureStackTrace = true;
-    disablePropagation = false;
-  }
+let span_options = {
+  attributes = [];
+  links = [];
+  parent = None;
+  root = false;
+  kind_ = Tracer.internal;
+  sampled = None;
+  level = None;
+  captureStackTrace = true;
+  disablePropagation = false;
+}
 
 /// What a failure holds: fails, dies, interrupts, only interrupts.
 flags : Failure e -> String
@@ -31,10 +30,14 @@ let flags f =
 
 kind_of : Cause.Reason e -> String
 let kind_of r =
-  if Cause.is_fail_reason r then "fail"
-  else if Cause.is_die_reason r then "die"
-  else if Cause.is_interrupt_reason r then "interrupt"
-  else "?"
+  if Cause.is_fail_reason r then
+    "fail"
+  else if Cause.is_die_reason r then
+    "die"
+  else if Cause.is_interrupt_reason r then
+    "interrupt"
+  else
+    "?"
 
 kinds : Failure e -> List String
 let kinds f = List.map kind_of (Cause.reasons f)
@@ -129,8 +132,10 @@ let exits () =
   Platform.stdout_line ("as_void: " ++ show (Exit.value (Exit.as_void ok), Exit.is_success nothing))
   Platform.stdout_line
     ("as_void_all: "
-      ++ show
-        (Exit.is_success (Exit.as_void_all [ok, ok]), Exit.is_success (Exit.as_void_all [ok, bad])))
+      ++ show (
+        Exit.is_success (Exit.as_void_all [ok, ok]),
+        Exit.is_success (Exit.as_void_all [ok, bad]),
+      ))
   Platform.stdout_line
     ("failure: " ++ show (List.map (fun x -> Option.is_some (Exit.failure x)) all))
 
@@ -179,12 +184,11 @@ let causes () =
   Platform.stdout_line ("flags: " ++ show (List.map flags [failed, died, stopped, nothing, both]))
   Platform.stdout_line ("kinds: " ++ show (kinds both))
   let rebuilt =
-    Cause.from_reasons
-      [
-        Cause.make_fail_reason (Boom 4),
-        Cause.make_die_reason "again",
-        Cause.make_interrupt_reason None,
-      ]
+    Cause.from_reasons [
+      Cause.make_fail_reason (Boom 4),
+      Cause.make_die_reason "again",
+      Cause.make_interrupt_reason None,
+    ]
   Platform.stdout_line ("from_reasons: " ++ show (kinds rebuilt))
   Platform.stdout_line ("find_error_option: " ++ boom_text (Cause.find_error_option rebuilt))
   Platform.stdout_line ("find_fail: " ++ show (List.map find_fail_of [failed, died]))
@@ -201,11 +205,10 @@ let causes () =
   Platform.stdout_line ("pretty_errors: " ++ show (List.length (Cause.pretty_errors both)))
   Platform.stdout_line
     ("stack_trace: "
-      ++ show
-        (
-          Option.is_some (Cause.stack_trace stopped),
-          Option.is_some (Cause.interruptor_stack_trace stopped),
-        ))
+      ++ show (
+        Option.is_some (Cause.stack_trace stopped),
+        Option.is_some (Cause.interruptor_stack_trace stopped),
+      ))
   Platform.stdout_line
     ("reason_stack_trace: "
       ++ show
@@ -214,9 +217,9 @@ let causes () =
 /// A stack frame of a traced failure, annotated on another one.
 frames : Unit ->{} Unit
 let frames () =
-  let traced : Exit {Boom} Unit = Effect.exit (task {
-    Tracer.with_span "outer" span_options (task { from_result (Err (Boom 9)) })
-  })
+  let traced : Exit {Boom} Unit =
+    Effect.exit
+      (task { Tracer.with_span "outer" span_options (task { from_result (Err (Boom 9)) }) })
   let frame = Option.bind Cause.stack_trace (Exit.failure traced)
   match frame with
   | Some f ->
@@ -230,17 +233,14 @@ let frames () =
       ("frame: " ++ show (Option.is_some (Cause.frame_parent f), Option.is_some stack))
   | None -> Platform.stdout_line ("annotate: " ++ "no frame")
 
-handled : Eff none {
-  Cause.NoSuchElementError,
-  Cause.IllegalArgumentError,
-  Cause.UnknownError,
-  TimeoutError
-} String ->{}
+handled :
+  Eff
+    none
+    {Cause.NoSuchElementError, Cause.IllegalArgumentError, Cause.UnknownError, TimeoutError}
+    String ->{}
   String
 let handled t =
-  try
-    await t
-  with
+  try await t with
   | Cause.NoSuchElementError m -> "no such element: " ++ m
   | Cause.IllegalArgumentError m -> "illegal argument: " ++ m
   | Cause.UnknownError m -> "unknown: " ++ m
@@ -249,11 +249,12 @@ let handled t =
 /// Errors of `Cause` raised and handled as Flick errors.
 errors : Unit ->{} Unit
 let errors () =
-  let raised =
-    [task { from_result (Err (Cause.NoSuchElementError "empty")) },
-      task { from_result (Err (Cause.IllegalArgumentError "negative")) },
-      task { from_result (Err (Cause.UnknownError "foreign")) },
-      task { timeout 1 (task { Effect.never () }) }]
+  let raised = [
+    task { from_result (Err (Cause.NoSuchElementError "empty")) },
+    task { from_result (Err (Cause.IllegalArgumentError "negative")) },
+    task { from_result (Err (Cause.UnknownError "foreign")) },
+    task { timeout 1 (task { Effect.never () }) },
+  ]
   Platform.stdout_line ("errors: " ++ show (List.map_effect handled raised))
 
 /// `Failure.rethrow` fails with the whole cause again.

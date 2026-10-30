@@ -29,9 +29,9 @@ listen :
   Fiber.Outlives c s =>
   Fiber.Owner s ->
   QueuePolicy ->
-    (Failure e ->{Scope s | r;} Unit)^c ->
-    (a -> Eff {Scope s | r} e Unit)^c ->{r;}
-    Listener s a
+  (Failure e ->{Scope s | r;} Unit)^c ->
+  (a -> Eff {Scope s | r} e Unit)^c ->{r;}
+  Listener s a
 foreign effect listen from "@flick-lang/runtime" "eventsListen"
   retention owner
 
@@ -39,7 +39,6 @@ foreign effect listen from "@flick-lang/runtime" "eventsListen"
 /// later events are ignored at once and `remove` gets the very function
 /// `add` got; then the handler's tasks end and resources are released.
 attach :
-  forall s a.
-  Listener s a -> (Listener s a ->{} Unit) -> (Listener s a ->{} Unit) ->{Scope s;} Unit
+  forall s a. Listener s a -> (Listener s a ->{} Unit) -> (Listener s a ->{} Unit) ->{Scope s;} Unit
 foreign effect attach from "@flick-lang/runtime" "eventsAttach"
   retention owner

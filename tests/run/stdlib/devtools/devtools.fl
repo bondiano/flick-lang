@@ -15,18 +15,17 @@ foreign async stop from "./server.mjs" "stop"
   arity 0
 
 options : Tracer.SpanOptions
-let options =
-  {
-    attributes = [];
-    links = [];
-    parent = None;
-    root = false;
-    kind_ = Tracer.internal;
-    sampled = None;
-    level = None;
-    captureStackTrace = false;
-    disablePropagation = false;
-  }
+let options = {
+  attributes = [];
+  links = [];
+  parent = None;
+  root = false;
+  kind_ = Tracer.internal;
+  sampled = None;
+  level = None;
+  captureStackTrace = false;
+  disablePropagation = false;
+}
 
 main : Unit ->{; AppError} Unit
 let main () =

@@ -70,32 +70,31 @@ let work dir =
   line "make_temp_file" (show (String.ends_with ".tmp" temp, FileSystem.exists temp))
   let sub = FileSystem.make_temp_directory { directory = Some dir; prefix = Some "sub-" }
   line "make_temp_directory" (show (FileSystem.stat sub |> kind_of))
-  let scoped =
-    scope {
-      let path =
-        FileSystem.make_temp_file_scoped { directory = Some dir; prefix = None; suffix = None }
-      FileSystem.write_file_string plain path "brief"
-      path
-    }
+  let scoped = scope {
+    let path =
+      FileSystem.make_temp_file_scoped { directory = Some dir; prefix = None; suffix = None }
+    FileSystem.write_file_string plain path "brief"
+    path
+  }
   line "make_temp_file_scoped" (show (FileSystem.exists scoped))
-  let handled =
-    scope {
-      let file =
-        FileSystem.open
-          { flag = Some FileSystem.WriteRead; mode = None; noFollow = false }
-          (dir ++ "/h.txt")
-      FileSystem.write_all [104, 105] file
-      let n = FileSystem.write [33, 33] file
-      FileSystem.sync file
-      let size = (FileSystem.file_stat file).size
-      let text = contents file
-      FileSystem.file_truncate (Some 1) file
-      let cut = contents file
-      let _ = FileSystem.seek 0n FileSystem.Current file
-      (n, size, text, cut)
-    }
+  let handled = scope {
+    let file =
+      FileSystem.open
+        { flag = Some FileSystem.WriteRead; mode = None; noFollow = false }
+        (dir ++ "/h.txt")
+    FileSystem.write_all [104, 105] file
+    let n = FileSystem.write [33, 33] file
+    FileSystem.sync file
+    let size = (FileSystem.file_stat file).size
+    let text = contents file
+    FileSystem.file_truncate (Some 1) file
+    let cut = contents file
+    let _ = FileSystem.seek 0n FileSystem.Current file
+    (n, size, text, cut)
+  }
   line "open" (show handled)
-  let missing = try FileSystem.read_file_string (dir ++ "/missing") with
+  let missing =
+    try FileSystem.read_file_string (dir ++ "/missing") with
     | e -> reason e
   line "missing" missing
   let exclusive =
@@ -111,13 +110,12 @@ let main () =
   let outcome =
     try
       provide FileSystem.node {
-        let dir =
-          scope {
-            let dir =
-              FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-fs-" }
-            work dir
-            dir
-          }
+        let dir = scope {
+          let dir =
+            FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-fs-" }
+          work dir
+          dir
+        }
         line "cleaned up" (show (not (FileSystem.exists dir)))
         "done"
       }

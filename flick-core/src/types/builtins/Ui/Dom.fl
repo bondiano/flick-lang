@@ -22,8 +22,8 @@ foreign sync container from "@flick-lang/runtime/ui" "uiContainer"
 mount :
   forall c r.
   Container ->
-    (Failure none ->{r; none} Unit)^c ->
-    Ui^c ->{Atom.Registry, Atom.Write | r; none}
-    Never
+  (Failure none ->{r; none} Unit)^c ->
+  Ui^c ->{Atom.Registry, Atom.Write | r; none}
+  Never
 foreign effect mount from "@flick-lang/runtime/ui" "uiMount"
   retention call

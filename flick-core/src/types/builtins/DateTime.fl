@@ -20,30 +20,28 @@ type Disambiguation = Compatible | Earlier | Later | Reject
 type TimeUnit = Millisecond | Second | Minute | Hour | Day | Week | Month | Year
 
 /// The parts of a date-time; `weekDay` counts from Sunday, 0.
-type alias Parts =
-  {
-    millisecond : Int;
-    second : Int;
-    minute : Int;
-    hour : Int;
-    day : Int;
-    weekDay : Int;
-    month : Int;
-    year : Int;
-  }
+type alias Parts = {
+  millisecond : Int;
+  second : Int;
+  minute : Int;
+  hour : Int;
+  day : Int;
+  weekDay : Int;
+  month : Int;
+  year : Int;
+}
 
 /// Some of the parts; `None` keeps a part as it is.
-type alias PartialParts =
-  {
-    millisecond : Option Int;
-    second : Option Int;
-    minute : Option Int;
-    hour : Option Int;
-    day : Option Int;
-    weekDay : Option Int;
-    month : Option Int;
-    year : Option Int;
-  }
+type alias PartialParts = {
+  millisecond : Option Int;
+  second : Option Int;
+  minute : Option Int;
+  hour : Option Int;
+  day : Option Int;
+  weekDay : Option Int;
+  month : Option Int;
+  year : Option Int;
+}
 
 /// How to place a date-time in a zone: keep the instant (the default) or,
 /// with `adjustForTimeZone`, keep the wall-clock time.
@@ -59,17 +57,16 @@ type alias FormatOptions = {
 
 /// No part at all, to update: `{ DateTime.no_parts with hour = Some 9 }`.
 no_parts : PartialParts
-let no_parts =
-  {
-    millisecond = None;
-    second = None;
-    minute = None;
-    hour = None;
-    day = None;
-    weekDay = None;
-    month = None;
-    year = None;
-  }
+let no_parts = {
+  millisecond = None;
+  second = None;
+  minute = None;
+  hour = None;
+  day = None;
+  weekDay = None;
+  month = None;
+  year = None;
+}
 
 /// The time zone a program runs in; `layer_current_zone` provides it.
 service CurrentTimeZone =

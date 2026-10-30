@@ -476,7 +476,13 @@ SK FunctionSK
 
 [@flick-lang/runtime/effect/Stream]
 fromIterable StreamFromSeq
-runCollect SeqToList
+fromArray StreamFromList
+fromArrayEffect StreamFromListEffect
+runCollect *StreamRunCollect
+mapEffect StreamMapEffect
+pipeThroughChannel StreamPipeThroughChannel
+flickDecodeText StreamDecodeText
+flickEncodeText StreamEncodeText
 
 [@flick-lang/runtime/effect/Effect]
 sleep *EffectSleep

@@ -28,8 +28,7 @@ open_door : Unit ->{Server.Server;} String
 server fn open_door () = "open"
 
 session : String -> Session.Impl
-let session name =
-  { user = fun () -> name }
+let session name = { user = fun () -> name }
 
 /// The session of a `user=<name>` cookie.
 check : Http.Headers.Headers ->{; Server.Unauthorized} Session.Impl
@@ -54,8 +53,12 @@ let posted base cookie =
   let call =
     "{\"_tag\":\"Request\",\"id\":\"1\",\"tag\":\"App.Main.whoami\",\"payload\":null,\"headers\":[]}\n"
   let request =
-    Http.ClientRequest.set_header "cookie" cookie
-      (Http.ClientRequest.body_text call (Some "application/ndjson")
+    Http.ClientRequest.set_header
+      "cookie"
+      cookie
+      (Http.ClientRequest.body_text
+        call
+        (Some "application/ndjson")
         (Http.ClientRequest.post (base ++ Server.path)))
   Http.ClientResponse.text (Http.Client.execute request)
 
@@ -67,42 +70,40 @@ let visited base cookie =
       (Http.ClientRequest.set_header "cookie" cookie (Http.ClientRequest.get (base ++ "/page"))))
 
 main : Unit ->{; AppError} Unit
-let main () =
-  provide (
-    Layer.merge Server.node (Layer.merge Http.FetchClient.layer Http.Server.layer_services)
-  ) {
-    try
-      scope s {
-        functions : (ServerRequest ->{} ServerResponse)^{s}
-        let functions =
-          Server.handler (Server.authenticated Session check [server whoami] ++ [server open_door])
-        app : (ServerRequest ->{Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
-        let app =
-          Http.Router.router Http.Router.config
-            [
-              Http.Router.route
-                (Some Http.Method.POST)
-                Server.path
-                (fun request -> functions request),
-              Http.Router.route (Some Http.Method.GET) "/page" page,
-            ]
-        let options : Http.Server.ServeOptions =
-          { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None }
-        let server = Http.Server.serve options app
-        let base = Http.Server.format_address (Http.Server.address server)
-        Platform.stdout_line
-          ("ada over HTTP: " ++ show (String.contains "ada" (posted base "user=ada")))
-        Platform.stdout_line
-          ("bob over HTTP: " ++ show (String.contains "bob" (posted base "user=bob")))
-        let refused = posted base "user=eve"
-        Platform.stdout_line ("eve over HTTP: " ++ show (String.contains "Unauthorized" refused))
-        Platform.stdout_line ("page for ada: " ++ visited base "user=ada")
-        Platform.stdout_line ("page for eve: " ++ visited base "user=eve")
-        Platform.stdout_line ("open: " ++ open_door ())
-        Platform.stdout_line ("body runs: " ++ show (runs ()))
+let main () = provide (Layer.merge
+  Server.node
+  (Layer.merge Http.FetchClient.layer Http.Server.layer_services)) {
+  try
+    scope s {
+      functions : (ServerRequest ->{} ServerResponse)^{s}
+      let functions =
+        Server.handler (Server.authenticated Session check [server whoami] ++ [server open_door])
+      app : (ServerRequest ->{Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
+      let app =
+        Http.Router.router Http.Router.config [
+          Http.Router.route (Some Http.Method.POST) Server.path (fun request -> functions request),
+          Http.Router.route (Some Http.Method.GET) "/page" page,
+        ]
+      let options : Http.Server.ServeOptions = {
+        host = "127.0.0.1";
+        port = 0;
+        gracefulShutdownTimeout = None;
       }
-    with
-    | Http.ServerError.ServeError _ -> Platform.stdout_line "serve failed"
-    | Http.ClientError.HttpClientError _ -> Platform.stdout_line "client failed"
-    | Rpc.ClientError message -> Platform.stdout_line ("rpc: " ++ message)
-  }
+      let server = Http.Server.serve options app
+      let base = Http.Server.format_address (Http.Server.address server)
+      Platform.stdout_line
+        ("ada over HTTP: " ++ show (String.contains "ada" (posted base "user=ada")))
+      Platform.stdout_line
+        ("bob over HTTP: " ++ show (String.contains "bob" (posted base "user=bob")))
+      let refused = posted base "user=eve"
+      Platform.stdout_line ("eve over HTTP: " ++ show (String.contains "Unauthorized" refused))
+      Platform.stdout_line ("page for ada: " ++ visited base "user=ada")
+      Platform.stdout_line ("page for eve: " ++ visited base "user=eve")
+      Platform.stdout_line ("open: " ++ open_door ())
+      Platform.stdout_line ("body runs: " ++ show (runs ()))
+    }
+  with
+  | Http.ServerError.ServeError _ -> Platform.stdout_line "serve failed"
+  | Http.ClientError.HttpClientError _ -> Platform.stdout_line "client failed"
+  | Rpc.ClientError message -> Platform.stdout_line ("rpc: " ++ message)
+}

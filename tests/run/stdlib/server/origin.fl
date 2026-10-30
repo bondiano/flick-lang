@@ -9,7 +9,7 @@ import Http.ServerResponse exposing (ServerResponse)
 hello : HttpApi.Endpoint "hello" (HttpApi.Request Unit Unit Unit Unit ->{r;} String)
 let hello =
   HttpApi.endpoint HttpApi.Get "/api/hello" (Record.label : Record.Label "hello")
-    |> HttpApi.with_success 200 (Codec.json Schema.string)
+  |> HttpApi.with_success 200 (Codec.json Schema.string)
 
 api : HttpApi.Api r { greet : { hello : HttpApi.Request Unit Unit Unit Unit ->{r;} String } }
 let api =
@@ -39,17 +39,18 @@ let main () =
         let functions = Server.handler [server twice]
         app : (ServerRequest ->{Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
         let app =
-          Http.Router.router Http.Router.config
-            [
-              Http.Router.route
-                (Some Http.Method.POST)
-                Server.path
-                (fun request -> functions request),
-              Http.Router.route (Some Http.Method.GET) "/" page,
-                HttpApi.route "/api/*" api { greet = { hello = fun _ -> Greeting.word () } },
-            ]
-        let options : Http.Server.ServeOptions =
-          { host = "127.0.0.1"; port = 0; gracefulShutdownTimeout = None }
+          Http.Router.router Http.Router.config [
+            Http.Router.route (Some Http.Method.POST) Server.path (fun request ->
+              functions request
+            ),
+            Http.Router.route (Some Http.Method.GET) "/" page,
+            HttpApi.route "/api/*" api { greet = { hello = fun _ -> Greeting.word () } },
+          ]
+        let options : Http.Server.ServeOptions = {
+          host = "127.0.0.1";
+          port = 0;
+          gracefulShutdownTimeout = None;
+        }
         let server = Http.Server.serve options app
         let base = Http.Server.format_address (Http.Server.address server)
         Platform.stdout_line ("page: " ++ Http.ClientResponse.text (Http.Client.get (base ++ "/")))
@@ -58,7 +59,9 @@ let main () =
         let call =
           "{\"_tag\":\"Request\",\"id\":\"1\",\"tag\":\"App.Main.twice\",\"payload\":\"ho\",\"headers\":[]}\n"
         let request =
-          Http.ClientRequest.body_text call (Some "application/ndjson")
+          Http.ClientRequest.body_text
+            call
+            (Some "application/ndjson")
             (Http.ClientRequest.post (base ++ Server.path))
         let answer = Http.ClientResponse.text (Http.Client.execute request)
         Platform.stdout_line ("server fn: " ++ show (String.contains "hoho" answer))

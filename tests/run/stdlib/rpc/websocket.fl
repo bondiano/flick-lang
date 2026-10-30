@@ -11,29 +11,29 @@ type error NotFound = NotFound { id : Float }
 double : Rpc.Rpc "double" (Float ->{r; NotFound} Float)
 let double =
   Rpc.make (Record.label : Record.Label "double")
-    |> Rpc.with_payload (Codec.json Schema.number)
-    |> Rpc.with_success (Codec.json Schema.number)
-    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema NotFound)))
+  |> Rpc.with_payload (Codec.json Schema.number)
+  |> Rpc.with_success (Codec.json Schema.number)
+  |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema NotFound)))
 
 count_to : Rpc.Rpc "count_to" (Float ->{r;} Stream none none Float)
 let count_to =
   Rpc.make (Record.label : Record.Label "count_to")
-    |> Rpc.with_payload (Codec.json Schema.number)
-    |> Rpc.with_stream (Codec.json Schema.number)
+  |> Rpc.with_payload (Codec.json Schema.number)
+  |> Rpc.with_stream (Codec.json Schema.number)
 
-type alias Handlers r =
-  { double : Float ->{r; NotFound} Float; count_to : Float ->{r;} Stream none none Float }
+type alias Handlers r = {
+  double : Float ->{r; NotFound} Float;
+  count_to : Float ->{r;} Stream none none Float;
+}
 
 group : Rpc.Group r (Handlers r)
 let group = Rpc.group |> Rpc.add double |> Rpc.add count_to
 
 handlers : Handlers none
-let handlers =
-  {
-    double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2;
-    count_to =
-      fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
-  }
+let handlers = {
+  double = fun n -> if n < 0 then from_result (Err (NotFound { id = n })) else n * 2;
+  count_to = fun n -> Stream.from_list (List.map Int.to_float (List.range 1 (Int.truncate n + 1)));
+}
 
 main : Unit ->{; AppError} Unit
 let main () =
@@ -59,9 +59,7 @@ let main () =
           ("ws connection: " ++ show first ++ ", " ++ show second ++ ", " ++ show streamed)
         let http = Rpc.listen Rpc.defaults group handlers
         let over_http =
-          Rpc.connect
-            Rpc.call_defaults
-            ("http://127.0.0.1:" ++ show (Rpc.port http) ++ "/rpc")
+          Rpc.connect Rpc.call_defaults ("http://127.0.0.1:" ++ show (Rpc.port http) ++ "/rpc")
         Platform.stdout_line ("http connection: " ++ show (Rpc.call_on over_http double 5))
       }
     with

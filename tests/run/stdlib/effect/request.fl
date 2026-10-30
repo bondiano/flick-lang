@@ -63,7 +63,8 @@ let completing =
       Request.complete_effect (task { lookup (id_of second) }) second
       let failures = parallel_exits [task { lookup 99 }]
       List.each_effect (fail_with third) failures
-    | _ -> ())
+    | _ -> ()
+  )
 
 with_options : RequestResolver Query {NotFound} String
 let with_options =
@@ -88,18 +89,17 @@ let by_parity =
   }
 
 trace_options : Tracer.SpanOptions
-let trace_options =
-  {
-    attributes = [];
-    links = [];
-    parent = None;
-    root = false;
-    kind_ = Tracer.internal;
-    sampled = None;
-    level = None;
-    captureStackTrace = false;
-    disablePropagation = false;
-  }
+let trace_options = {
+  attributes = [];
+  links = [];
+  parent = None;
+  root = false;
+  kind_ = Tracer.internal;
+  sampled = None;
+  level = None;
+  captureStackTrace = false;
+  disablePropagation = false;
+}
 
 twice : (c ->{; e} String) -> c ->{; e} String
 let twice get cache = get cache ++ " " ++ get cache
@@ -118,8 +118,9 @@ let main () =
     RequestResolver.from_function (fun e -> "fn" ++ show (id_of e))
   Platform.stdout_line ("from_function " ++ run_all one_by_one [1, 2])
   let lists =
-    RequestResolver.from_function_batched
-      (fun es -> List.map (fun e -> "b" ++ show (id_of e)) (NonEmpty.to_list es))
+    RequestResolver.from_function_batched (fun es ->
+      List.map (fun e -> "b" ++ show (id_of e)) (NonEmpty.to_list es)
+    )
   Platform.stdout_line ("from_function_batched " ++ run_all lists [1, 2])
   let effects = RequestResolver.from_effect (fun e -> lookup (id_of e))
   Platform.stdout_line ("from_effect " ++ run_all effects [1, 11])
@@ -147,6 +148,7 @@ let main () =
   Platform.stdout_line ("with_cache again " ++ run_all cached [1])
   let _ = RequestResolver.fifo
   let cache = RequestResolver.as_cache { capacity = 10; timeToLive = None } batched
-  let cached_names = try twice (Cache.get (ask 2)) cache with
+  let cached_names =
+    try twice (Cache.get (ask 2)) cache with
     | NotFound id -> "not found " ++ show id
   Platform.stdout_line ("as_cache " ++ cached_names)

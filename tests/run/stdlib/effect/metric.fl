@@ -7,9 +7,11 @@ let none_options = { description = None; attributes = [] }
 
 requests : Metric.Counter
 let requests =
-  Metric.counter
-    "test_requests"
-    { description = Some "requests seen"; attributes = []; incremental = false }
+  Metric.counter "test_requests" {
+    description = Some "requests seen";
+    attributes = [];
+    incremental = false;
+  }
 
 ms : Float -> Duration.Duration
 let ms n = Result.with_default Duration.zero (Duration.millis n)
@@ -32,7 +34,8 @@ let started () =
       (fun m ->
         match m.state with
         | Metric.CounterValue c -> if m.id == "child_fibers_started" then Some c.count else None
-        | _ -> None)
+        | _ -> None
+      )
       (Metric.snapshot ())
   List.sum counts
 
@@ -48,9 +51,11 @@ let main () =
   let gauged : Metric.GaugeState = Metric.value level
   Platform.stdout_line ("gauge " ++ show gauged.value)
   let words : Metric.Frequency =
-    Metric.frequency
-      "test_words"
-      { description = None; attributes = []; preregisteredWords = ["zero"] }
+    Metric.frequency "test_words" {
+      description = None;
+      attributes = [];
+      preregisteredWords = ["zero"];
+    }
   words |> Metric.update "a"
   words |> Metric.update "a"
   words |> Metric.update "b"
@@ -66,8 +71,13 @@ let main () =
   List.each_effect (fun n -> sizes |> Metric.update n) [1, 15, 25]
   let h : Metric.HistogramState = Metric.value sizes
   Platform.stdout_line ("histogram " ++ show (h.buckets, h.count, h.min, h.max, h.sum))
-  let options =
-    { description = None; attributes = []; maxAge = ms 60000; maxSize = 10; quantiles = [0.5] }
+  let options = {
+    description = None;
+    attributes = [];
+    maxAge = ms 60000;
+    maxSize = 10;
+    quantiles = [0.5];
+  }
   let latency : Metric.Summary Float = Metric.summary "test_latency" options
   List.each_effect (fun n -> latency |> Metric.update n) [1, 2, 3]
   let s : Metric.SummaryState = Metric.value latency
@@ -100,7 +110,8 @@ let main () =
   let lines =
     List.map
       (fun m ->
-        m.id ++ " " ++ show m.attributes ++ " " ++ show m.description ++ " " ++ describe m.state)
+        m.id ++ " " ++ show m.attributes ++ " " ++ show m.description ++ " " ++ describe m.state
+      )
       mine
   List.each_effect (fun l -> Platform.stdout_line l) (List.sort lines)
   Platform.stdout_line ("dump " ++ show (String.contains "test_requests" (Metric.dump ())))

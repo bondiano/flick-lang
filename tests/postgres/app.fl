@@ -33,46 +33,41 @@ sql table Drift "drift" {
 }
 
 add_user : Sql.Template Pg { name : String; email : Option String } { id : UserId }
-let add_user =
-  sql p {
-    insert_into Users;
-    values { name = p.name; email = p.email };
-    returning { id = Users.id }
-  }
+let add_user = sql p {
+  insert_into Users
+  values { name = p.name; email = p.email }
+  returning { id = Users.id }
+}
 
 open_account : Sql.Template Pg { owner : UserId; balance : BigDecimal } { id : BigInt }
-let open_account =
-  sql p {
-    insert_into Accounts
-    values { user_id = p.owner; balance = p.balance }
-    returning { id = Accounts.id }
-  }
+let open_account = sql p {
+  insert_into Accounts
+  values { user_id = p.owner; balance = p.balance }
+  returning { id = Accounts.id }
+}
 
 balances : Sql.Template Pg {} { name : String; balance : Option BigDecimal }
-let balances =
-  sql {
-    from user in Users
-    left_join account in Accounts on account.user_id == user.id
-    order_by user.name, account.balance
-    select { name = user.name; balance = account.balance }
-  }
+let balances = sql {
+  from user in Users
+  left_join account in Accounts on account.user_id == user.id
+  order_by user.name, account.balance
+  select { name = user.name; balance = account.balance }
+}
 
 type alias BalanceRow = { name : String; balance : Option BigDecimal }
 
 /// One user's balances: the LEFT JOIN alone makes `balance` optional.
 balances_of : Sql.Template Pg { user_id : UserId } BalanceRow
-let balances_of =
-  sql params {
-    from user in Users
-    left_join account in Accounts
-      on account.user_id == user.id
-    where user.id == params.user_id
-    order_by account.balance
-    select {
-      name = user.name;
-      balance = account.balance;
-    }
+let balances_of = sql params {
+  from user in Users
+  left_join account in Accounts on account.user_id == user.id
+  where user.id == params.user_id
+  order_by account.balance
+  select {
+    name = user.name;
+    balance = account.balance;
   }
+}
 
 /// Binding is pure; `Database.query` encodes, runs and decodes.
 load_balances : UserId ->{Database; EncodeError, DbError, DecodeError} List BalanceRow
@@ -82,69 +77,91 @@ let load_balances user_id =
 
 /// The same call kept for later as an `Eff` value.
 deferred_balances : UserId -> Eff {Database} {EncodeError, DbError, DecodeError} (List BalanceRow)
-let deferred_balances user_id =
-  task { load_balances user_id }
+let deferred_balances user_id = task { load_balances user_id }
 
 totals : Sql.Template Pg {} { name : String; accounts : BigInt; total : Option BigDecimal }
-let totals =
-  sql {
-    from user in Users
-    left_join account in Accounts on account.user_id == user.id
-    group_by user.id, user.name
-    order_by user.name
-    select { name = user.name; accounts = count account.id; total = sum account.balance }
-  }
+let totals = sql {
+  from user in Users
+  left_join account in Accounts on account.user_id == user.id
+  group_by user.id, user.name
+  order_by user.name
+  select { name = user.name; accounts = count account.id; total = sum account.balance }
+}
 
 deposit : Sql.Template Pg { account : BigInt; amount : BigDecimal } { balance : BigDecimal }
-let deposit =
-  sql p {
-    update Accounts
-    set { balance = Accounts.balance + p.amount }
-    where Accounts.id == p.account
-    returning { balance = Accounts.balance }
-  }
+let deposit = sql p {
+  update Accounts
+  set { balance = Accounts.balance + p.amount }
+  where Accounts.id == p.account
+  returning { balance = Accounts.balance }
+}
 
 close : Sql.Template Pg { owner : UserId } { id : BigInt }
-let close =
-  sql p { delete_from Accounts; where Accounts.user_id == p.owner; returning { id = Accounts.id } }
+let close = sql p {
+  delete_from Accounts
+  where Accounts.user_id == p.owner
+  returning { id = Accounts.id }
+}
 
 names : Sql.Template Pg {} { name : String }
-let names =
-  sql {
+let names = sql {
+  from u in Users
+  where is_not_null u.email
+  select u.name
+  union_all (sql {
     from u in Users
-    where is_not_null u.email
+    where is_null u.email
     select u.name
-    union_all (sql { from u in Users; where is_null u.email; select u.name })
-  }
+  })
+}
 
 savers : Sql.Template Pg {} { name : String }
-let savers =
-  sql {
-    from u in Users
-    where exists (sql { from a in Accounts; where a.balance > a.balance; select { id = a.id } })
-      || is_in u.id (sql { from a in Accounts; select { id = a.user_id } })
-    order_by u.name
-    select u.name
-  }
+let savers = sql {
+  from u in Users
+  where exists
+    (sql {
+      from a in Accounts
+      where a.balance > a.balance
+      select { id = a.id }
+    })
+    || is_in
+      u.id
+      (sql {
+        from a in Accounts
+        select { id = a.user_id }
+      })
+  order_by u.name
+  select u.name
+}
 
 named : Sql.Template Pg { name : String } { id : UserId }
-let named = sql p { from u in Users; where u.name == p.name; select u.id }
+let named = sql p {
+  from u in Users
+  where u.name == p.name
+  select u.id
+}
 
 accounts_of : UserId -> Sql.Template Pg {} { balance : BigDecimal }
-let accounts_of owner =
-  sql { from a in Accounts; where a.user_id == $owner; order_by a.balance; select a.balance }
+let accounts_of owner = sql {
+  from a in Accounts
+  where a.user_id == $owner
+  order_by a.balance
+  select a.balance
+}
 
 set_email : UserId -> Option String -> Sql.Template Pg {} { email : Option String }
-let set_email who email =
-  sql {
-    update Users
-    set { email = $email }
-    where Users.id == $who
-    returning { email = Users.email }
-  }
+let set_email who email = sql {
+  update Users
+  set { email = $email }
+  where Users.id == $who
+  returning { email = Users.email }
+}
 
 drift : Sql.Template Pg {} { amount : BigInt }
-let drift = sql { from d in Drift; select d.amount }
+let drift = sql {
+  from d in Drift
+  select d.amount
+}
 
 /// The one row a query returns, or `fallback`.
 one : forall p r. (Sql.Template Pg p r, p, r) ->{Database; EncodeError, DbError, DecodeError} r
@@ -186,9 +203,7 @@ let run () =
 refused : BigInt ->{Database; EncodeError, DbError, DecodeError} String
 let refused account =
   let negative = BigDecimal.from_integer (-100n)
-  try
-    show (Database.query (Sql.bind deposit { account = account; amount = negative }))
-  with
+  try show (Database.query (Sql.bind deposit { account = account; amount = negative })) with
   | DbError e -> "DbError " ++ e.code ++ " " ++ show e.constraint
 
 main : Unit ->{; AppError} Unit

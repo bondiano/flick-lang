@@ -161,16 +161,17 @@ foreign pure less_than_or_equal_to from "@flick-lang/runtime/effect/Schema" "isL
   reviewed "effect@4.0.5 sha256:daf02fd9efb0618d"
 
 /// Between the bounds; each excluded when its flag is set.
-between : {
-  /// The lower bound.
-  minimum : Float;
-  /// The upper bound.
-  maximum : Float;
-  /// Whether the lower bound itself is excluded.
-  exclusiveMinimum : Bool;
-  /// Whether the upper bound itself is excluded.
-  exclusiveMaximum : Bool;
-} ->
+between :
+  {
+    /// The lower bound.
+    minimum : Float;
+    /// The upper bound.
+    maximum : Float;
+    /// Whether the lower bound itself is excluded.
+    exclusiveMinimum : Bool;
+    /// Whether the upper bound itself is excluded.
+    exclusiveMaximum : Bool;
+  } ->
   Check Float
 foreign pure between from "@flick-lang/runtime/effect/Schema" "isBetween"
   reviewed "effect@4.0.5 sha256:79353aaa06cb14d9"
@@ -221,16 +222,17 @@ foreign pure less_than_or_equal_to_bigint from "@flick-lang/runtime/effect/Schem
   reviewed "effect@4.0.5 sha256:d73801f2576fd562"
 
 /// Between the bounds; each excluded when its flag is set.
-between_bigint : {
-  /// The lower bound.
-  minimum : BigInt;
-  /// The upper bound.
-  maximum : BigInt;
-  /// Whether the lower bound itself is excluded.
-  exclusiveMinimum : Bool;
-  /// Whether the upper bound itself is excluded.
-  exclusiveMaximum : Bool;
-} ->
+between_bigint :
+  {
+    /// The lower bound.
+    minimum : BigInt;
+    /// The upper bound.
+    maximum : BigInt;
+    /// Whether the lower bound itself is excluded.
+    exclusiveMinimum : Bool;
+    /// Whether the upper bound itself is excluded.
+    exclusiveMaximum : Bool;
+  } ->
   Check BigInt
 foreign pure between_bigint from "@flick-lang/runtime/effect/Schema" "isBetweenBigInt"
   reviewed "effect@4.0.5 sha256:fc75d2b810b84787"
@@ -348,16 +350,13 @@ foreign pure max_properties from "@flick-lang/runtime/effect/Schema" "flickIsMax
   reviewed "effect@4.0.5 sha256:0073940e582a44a2"
 
 /// `low` to `high` keys in the object of a `Codec.entries` codec.
-properties_between : Int ->
-  Int ->
-  PureCodec Json (List (String, v)) ->
-  PureCodec Json (List (String, v))
+properties_between :
+  Int -> Int -> PureCodec Json (List (String, v)) -> PureCodec Json (List (String, v))
 foreign pure properties_between from "@flick-lang/runtime/effect/Schema" "flickIsBetweenProperties"
   reviewed "effect@4.0.5 sha256:f0d1fe343313d4a4"
 
 /// Every key of the object of a `Codec.entries` codec decodes with `key`.
-property_names : PureCodec Json String ->
-  PureCodec Json (List (String, v)) ->
-  PureCodec Json (List (String, v))
+property_names :
+  PureCodec Json String -> PureCodec Json (List (String, v)) -> PureCodec Json (List (String, v))
 foreign pure property_names from "@flick-lang/runtime/effect/Schema" "flickIsPropertyNames"
   reviewed "effect@4.0.5 sha256:18e0e777ae354f9c"

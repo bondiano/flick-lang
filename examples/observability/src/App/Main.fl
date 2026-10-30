@@ -13,18 +13,17 @@ let endpoint () =
 
 /// A span with one attribute.
 span : String -> String -> Tracer.SpanOptions
-let span key value =
-  {
-    attributes = [(key, value)];
-    links = [];
-    parent = None;
-    root = false;
-    kind_ = Tracer.internal;
-    sampled = None;
-    level = None;
-    captureStackTrace = false;
-    disablePropagation = false;
-  }
+let span key value = {
+  attributes = [(key, value)];
+  links = [];
+  parent = None;
+  root = false;
+  kind_ = Tracer.internal;
+  sampled = None;
+  level = None;
+  captureStackTrace = false;
+  disablePropagation = false;
+}
 
 orders : Metric.Counter
 let orders = Metric.counter "orders" { description = None; attributes = []; incremental = true }
@@ -32,10 +31,13 @@ let orders = Metric.counter "orders" { description = None; attributes = []; incr
 /// One order: a span around the payment, its log record and the counter.
 checkout : String ->{} Unit
 let checkout user =
-  Tracer.with_span "checkout" (span "user" user) (task {
-    Tracer.with_span "pay" (span "amount" "42") (task { Effect.log ("paid by " ++ user) })
-    Metric.update 1 orders
-  })
+  Tracer.with_span
+    "checkout"
+    (span "user" user)
+    (task {
+      Tracer.with_span "pay" (span "amount" "42") (task { Effect.log ("paid by " ++ user) })
+      Metric.update 1 orders
+    })
 
 main : Unit ->{; AppError} Unit
 let main () =

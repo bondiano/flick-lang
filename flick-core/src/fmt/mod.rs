@@ -1,55 +1,193 @@
-//! `flick fmt`: rewrites whitespace only — tokens, comments and their order are
-//! kept, so the AST cannot change, except that empty rows of an arrow are
-//! dropped: `->{none; E}` becomes `->{; E}` and `->{none; none}` becomes
-//! `->{}`, and a list broken across lines gets a trailing separator.
-//! Indentation is renormalized to two spaces per level while
-//! preserving how each line's column compares with the columns before it (that comparison is what layout means), spacing inside a
-//! line follows fixed rules, and blank-line runs collapse to one. The result is
-//! re-parsed and compared with the input AST before it is returned.
+//! `flick fmt`: the canonical layout of a file. The layout depends on the
+//! code and the line width ([`WIDTH`]) only, not on how the source was laid
+//! out, apart from the few choices below that the author makes on purpose.
+//! Each declaration becomes a [`flick_pretty`] document built from the
+//! concrete tree; the printer keeps a group on one line when it fits and
+//! breaks the outermost groups first. Indentation is two spaces.
+//!
+//! The rules, as `gleam format` has them where Flick has the construct:
+//!
+//! - a value after `=` (`let`, record fields, type aliases), `->` (`fun`,
+//!   match arms) or `<-` stays on the line when it fits, else moves to the
+//!   next line one level in. Records, lists, tuples, `fun` and blocks in
+//!   braces (`task`, `ui`, `scope`, `provide`, `do`, `for`, `sql`, `cli`,
+//!   `codec`) hug the `=` instead: they stay on its line and break inside.
+//!   Several statements always go on their own lines, and so do `match`,
+//!   `try` and an `if` that does not fit;
+//! - statements go one per line, without `;`; a block in braces holding one
+//!   expression may stay on one line, `task { load id }`;
+//! - an application breaks before each argument, one level in. A last
+//!   argument that is a function in parentheses, a list, a record, a tuple
+//!   or a block in braces hugs the call when what precedes its first break
+//!   fits: `f a (fun x ->`, the body, then `)` on its own line;
+//! - an operator chain breaks before each operator of its weakest
+//!   precedence, one level in; a pipeline breaks one step per line, its `|>`
+//!   under the first operand when the pipeline starts its line;
+//! - `if c then a else b` stays on one line or puts each branch on its own
+//!   lines; `match` and `try` put each arm on its own line, under `match`;
+//! - lists, tuples and `exposing (…)` stay on one line or put one item per
+//!   line followed by `,`; records (also record types, patterns and updates)
+//!   put one field per line followed by `;`, a row tail `| r` last;
+//! - a function type breaks after each arrow, `->{r; e}` staying whole; an
+//!   empty service row is dropped: `->{none; E}` becomes `->{; E}` and
+//!   `->{none; none}` becomes `->{}`;
+//! - variants stay on one line when the declaration fits, else one per line
+//!   after `|`; `deriving` ends the line or takes its own; members of
+//!   classes, instances, services and `rec`, foreign metadata, columns of a
+//!   `sql table` always go one per line; `on` stays after its `join` when it
+//!   fits.
+//!
+//! What the author decides: a trailing separator (`[a, b,]`, `{ a = 1; }`)
+//! or a blank line between items keeps a bracket broken one item per line
+//! (a list of constants written several per line is then filled); a
+//! pipeline written with a step on its own line keeps one step per line;
+//! blank lines between declarations, statements, members, arms, fields and
+//! items are kept, at most one. Comments stay where they are: a comment on
+//! its own line before what follows it, a comment ending a line at the end
+//! of that line, which then breaks.
+//!
+//! Every declaration is re-parsed after layout and compared with the source
+//! (see [`program`]); a declaration whose layout would change its meaning, or
+//! that holds a line comment where the layout has no place for it, is left
+//! as written. The whole file is compared again at the end.
+
+use flick_pretty::DocumentArena;
 
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::source::FileId;
-use crate::syntax::cst::{Element, Node, Token};
+use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::{ast, parse};
+use crate::syntax::parse;
 
-mod trailing;
-mod wrap;
+mod block;
+mod comments;
+mod decl;
+mod expr;
+mod printer;
+mod program;
+mod record;
+mod types;
+
+use comments::Comments;
+use printer::{Printer, nodes};
+use program::program;
+
+/// The line width the layout aims at.
+pub const WIDTH: usize = 100;
 
 /// Formats a file; syntax errors are returned instead of output.
 pub fn format(text: &str, file: FileId) -> Result<String, Vec<Diagnostic>> {
+    format_reporting(text, file).map(|(out, _)| out)
+}
+
+/// The byte ranges of the declarations left as written.
+type Kept = Vec<(u32, u32)>;
+
+/// The formatted file, and the declarations left as written.
+fn format_reporting(text: &str, file: FileId) -> Result<(String, Kept), Vec<Diagnostic>> {
     let mut parsed = parse(text, file);
     if !parsed.diagnostics.is_empty() {
         return Err(parsed.diagnostics);
     }
+    let expected = program(&parsed.tree, text);
     drop_empty_rows(&mut parsed.tree);
-    let expected = ast::lower(&parsed.tree, text);
-    let same_program = |out: &str| {
-        let again = parse(out, file);
-        again.diagnostics.is_empty() && ast::lower(&again.tree, out) == expected
-    };
-    let pass = |text: &str, tree: &Node| {
-        let toks = flatten(tree);
-        wrap::wrap_long_lines(text, &layout(text, &toks), same_program)
-    };
-    let mut out = pass(text, &parsed.tree);
-    // a trailing separator may push a line past the width, and wrapping may
-    // break another list; a few passes reach the fixed point
-    for _ in 0..3 {
-        let tree = parse(&out, file).tree;
-        let Some(next) = trailing::add(&out, &tree, same_program) else {
-            break;
-        };
-        out = pass(&next, &parse(&next, file).tree);
-    }
-    if !same_program(&out) {
+    let (out, kept) = source_file(&parsed.tree, text, file);
+    let again = parse(&out, file);
+    let same = again.diagnostics.is_empty()
+        && program(&again.tree, &out) == expected
+        && comments(&again.tree, &out) == comments(&parsed.tree, text);
+    if !same {
         return Err(vec![Diagnostic::new(
             codes::P003,
             Severity::Error,
             "the formatter would change the meaning of this file; it was left unchanged",
         )]);
     }
-    Ok(out)
+    Ok((out, kept))
+}
+
+fn source_file(tree: &Node, text: &str, file: FileId) -> (String, Kept) {
+    let arena = DocumentArena::new();
+    let mut p = Printer::new(&arena, text, Comments::new(tree, text));
+    let declarations = nodes(tree);
+    let mut out = String::with_capacity(text.len() + text.len() / 8);
+    let mut kept = Vec::new();
+    for (i, declaration) in declarations.iter().enumerate() {
+        let (start, end) = declaration.range();
+        for comment in p.comments.leading(start) {
+            separate(&mut out, comment.blank);
+            out.push_str(comment.text);
+        }
+        separate(&mut out, p.comments.blank_before(start));
+        p.comments.misplaced = false;
+        let saved = p.comments.save();
+        let laid_out = p.node(declaration).to_pretty_string(WIDTH);
+        let misplaced = p.comments.misplaced || p.comments.any_before(end);
+        if !misplaced && verify(declaration, text, &laid_out, file) {
+            out.push_str(&laid_out);
+        } else {
+            p.comments.restore(saved);
+            p.comments.skip(end);
+            out.push_str(&verbatim(declaration, text));
+            kept.push((start, end));
+        }
+        let next = declarations.get(i + 1).map_or(u32::MAX, |d| d.range().0);
+        if let Some(comment) = p.comments.trailing(next, None) {
+            out.push(' ');
+            out.push_str(comment);
+        }
+    }
+    for comment in p.comments.leading(u32::MAX) {
+        separate(&mut out, comment.blank);
+        out.push_str(comment.text);
+    }
+    if !out.is_empty() {
+        out.push('\n');
+    }
+    (out, kept)
+}
+
+/// Ends the current line, if any, leaving a blank line when asked.
+fn separate(out: &mut String, blank: bool) {
+    if !out.is_empty() {
+        out.push('\n');
+        if blank {
+            out.push('\n');
+        }
+    }
+}
+
+/// Whether `laid_out`, parsed alone, is the declaration it was made from.
+fn verify(declaration: &Node, text: &str, laid_out: &str, file: FileId) -> bool {
+    let again = parse(laid_out, file);
+    let items = nodes(&again.tree);
+    again.diagnostics.is_empty()
+        && matches!(items.as_slice(), [one] if program(one, laid_out) == program(declaration, text))
+        && comments(&again.tree, laid_out) == comments(declaration, text)
+}
+
+/// The comments under `node`, in order: the AST has none, so they are
+/// compared on their own.
+fn comments<'t>(node: &Node, text: &'t str) -> Vec<&'t str> {
+    node.tokens()
+        .into_iter()
+        .filter(|t| t.kind.is_comment())
+        .map(|t| t.text(text).trim_end())
+        .collect()
+}
+
+/// The source text of a declaration, without whitespace at line ends.
+fn verbatim(declaration: &Node, text: &str) -> String {
+    let tokens = declaration.tokens();
+    let mut out = String::new();
+    for (i, t) in tokens.iter().enumerate() {
+        let before_newline = tokens.get(i + 1).is_none_or(|n| n.kind == K::Newline);
+        if t.kind == K::Whitespace && before_newline {
+            continue;
+        }
+        out.push_str(t.text(text));
+    }
+    out.trim_end().to_owned()
 }
 
 /// Drops empty rows of an arrow: `->{none; E}` becomes `->{; E}` and
@@ -88,218 +226,6 @@ fn is_bare_none(row: &Node) -> bool {
             .nodes()
             .next()
             .is_some_and(|n| n.kind == K::NameType && solid(n) && n.has_token(K::NoneKw))
-}
-
-#[derive(Clone, Copy)]
-struct Tok {
-    token: Token,
-    parent: K,
-    /// First token of an argument of a function application.
-    arg: bool,
-}
-
-/// One output line; `None` in a layout is a blank line.
-struct Line {
-    indent: usize,
-    toks: Vec<Tok>,
-}
-
-fn flatten(tree: &Node) -> Vec<Tok> {
-    fn walk(node: &Node, out: &mut Vec<Tok>) {
-        for (index, child) in node.children.iter().enumerate() {
-            match child {
-                Element::Node(n) => {
-                    let first = out.len();
-                    walk(n, out);
-                    // children after the head of an application are its arguments
-                    let head = node.children[..index]
-                        .iter()
-                        .any(|c| matches!(c, Element::Node(_)));
-                    if node.kind == K::AppExpr && head && first < out.len() {
-                        out[first].arg = true;
-                    }
-                }
-                Element::Token(t) if t.kind == K::Whitespace => {}
-                Element::Token(t) => out.push(Tok {
-                    token: *t,
-                    parent: node.kind,
-                    arg: false,
-                }),
-            }
-        }
-    }
-    let mut out = Vec::new();
-    walk(tree, &mut out);
-    out
-}
-
-/// Whether two tokens on one line are separated by a space.
-fn space(a: Tok, b: Tok) -> bool {
-    let (ak, bk) = (a.token.kind, b.token.kind);
-    if ak.is_comment() || bk.is_comment() {
-        return true;
-    }
-    let tight_braces = |t: Tok| matches!(t.parent, K::EffectAnnot | K::RowType);
-    match (ak, bk) {
-        (K::LParen | K::LBracket | K::Caret | K::Dollar | K::DotDotDot, _)
-        | (_, K::RParen | K::RBracket | K::Comma | K::Semi | K::Caret | K::Dot | K::Question)
-        | (K::LBrace, K::RBrace) => false,
-        (K::Dot, _) => a.parent == K::ForallType,
-        (K::DotDot | K::DotDotLt, _) if a.parent == K::RangeExpr => false,
-        (_, K::DotDot | K::DotDotLt) if b.parent == K::RangeExpr => false,
-        (K::Arrow, K::LBrace) if b.parent == K::EffectAnnot => false,
-        (K::LBrace, _) => !tight_braces(a),
-        (_, K::RBrace) => !tight_braces(b),
-        (K::Minus, _) => !matches!(a.parent, K::PrefixExpr | K::LitPat),
-        (K::Con, K::LParen) => b.parent != K::ExposeItem,
-        _ => true,
-    }
-}
-
-/// Maps an original indentation to the new one; `stack` holds `(original,
-/// new)` columns of enclosing lines and mid-line block anchors, increasing.
-/// `later` gives the original columns of the code lines after this one: a
-/// line one level deeper than its parent goes two columns further when a
-/// later line, before the block ends, sits strictly between the two.
-fn indent(stack: &mut Vec<(usize, usize)>, orig: usize, keep: bool, later: &[usize]) -> usize {
-    let mut depth = stack.len();
-    while depth > 1 && stack[depth - 1].0 > orig {
-        depth -= 1;
-    }
-    let (top_orig, top_new) = stack[depth - 1];
-    let between = || {
-        later
-            .iter()
-            .take_while(|&&c| c > top_orig)
-            .any(|&c| c < orig)
-    };
-    let new = if top_orig == orig {
-        top_new
-    } else if between() {
-        top_new + 4
-    } else {
-        top_new + 2
-    };
-    if keep {
-        stack.truncate(depth);
-        if top_orig != orig {
-            stack.push((orig, new));
-        }
-    }
-    new
-}
-
-/// Splits tokens into lines with their new indentation.
-fn layout(text: &str, toks: &[Tok]) -> Vec<Option<Line>> {
-    let column = |at: u32| {
-        let at = at as usize;
-        let begin = text[..at].rfind('\n').map_or(0, |i| i + 1);
-        text[begin..at].chars().count()
-    };
-    let mut lines = Vec::with_capacity(toks.len());
-    let (mut line, mut seen) = (0, 0);
-    for t in toks {
-        line += text[seen..t.token.start as usize].matches('\n').count();
-        seen = t.token.start as usize;
-        lines.push(line);
-    }
-    // line of the `}` closing each `{`, and the brace a record update's `with` is in
-    let mut closes = vec![None; toks.len()];
-    let mut owner = vec![None; toks.len()];
-    let mut open = Vec::new();
-    for (i, t) in toks.iter().enumerate() {
-        match t.token.kind {
-            K::LBrace => open.push(i),
-            K::RBrace => {
-                if let Some(o) = open.pop() {
-                    closes[o] = Some(lines[i]);
-                }
-            }
-            K::WithKw if t.parent == K::RecordUpdate => owner[i] = open.last().copied(),
-            _ => {}
-        }
-    }
-
-    // the original column of each code line, in order
-    let mut code_columns = Vec::new();
-    let mut at_start = true;
-    for t in toks {
-        if t.token.kind == K::Newline {
-            at_start = true;
-        } else if at_start {
-            if !t.token.kind.is_comment() {
-                code_columns.push(column(t.token.start));
-            }
-            at_start = false;
-        }
-    }
-    let mut code_line = 0;
-
-    let mut out = Vec::new();
-    let mut stack = vec![(0, 0)];
-    let mut blank = false;
-    let mut i = 0;
-    while i < toks.len() {
-        let end = toks[i..]
-            .iter()
-            .position(|t| t.token.kind == K::Newline)
-            .map_or(toks.len(), |n| i + n);
-        let line = &toks[i..end];
-        let first = i;
-        i = end + 1;
-        if line.is_empty() {
-            blank = !out.is_empty();
-            continue;
-        }
-        if blank {
-            out.push(None);
-            blank = false;
-        }
-        let code = line.iter().any(|t| !t.token.kind.is_comment());
-        if code && !line[0].token.kind.is_comment() {
-            code_line += 1;
-        }
-        let later = &code_columns[code_line.min(code_columns.len())..];
-        let new_indent = indent(&mut stack, column(line[0].token.start), code, later);
-        let mut width = new_indent;
-        let mut anchors = Vec::new();
-        for (k, &t) in line.iter().enumerate() {
-            if k > 0 && space(line[k - 1], t) {
-                width += 1;
-            }
-            let at = first + k;
-            // first item of a multi-line block that starts mid-line
-            let opens_block = k > 0
-                && match line[k - 1].token.kind {
-                    K::LBrace => closes[at - 1],
-                    K::WithKw => owner[at - 1].and_then(|o| closes[o]),
-                    _ => None,
-                }
-                .is_some_and(|close| close > lines[at]);
-            if opens_block && code {
-                anchors.push((column(t.token.start), width));
-            }
-            width += t.token.text(text).chars().count();
-        }
-        stack.extend(anchors);
-        out.push(Some(Line {
-            indent: new_indent,
-            toks: line.to_vec(),
-        }));
-    }
-    out
-}
-
-/// The text of one line, without its line break.
-fn join(text: &str, indent: usize, toks: &[Tok]) -> String {
-    let mut out = " ".repeat(indent);
-    for (k, &t) in toks.iter().enumerate() {
-        if k > 0 && space(toks[k - 1], t) {
-            out.push(' ');
-        }
-        out.push_str(t.token.text(text));
-    }
-    out
 }
 
 #[cfg(test)]

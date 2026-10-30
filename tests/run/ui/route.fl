@@ -65,10 +65,9 @@ let profile =
 
 view : Ui.View Unit
 let view =
-  Ui.suspended
-    (fun _ -> Ui.text "not found")
-    (Ui.text "loading")
-    (fun () -> Ui.text (show (Atom.value page) ++ ": " ++ Atom.ready profile))
+  Ui.suspended (fun _ -> Ui.text "not found") (Ui.text "loading") (fun () ->
+    Ui.text (show (Atom.value page) ++ ": " ++ Atom.ready profile)
+  )
 
 report : Failure e ->{} Unit
 let report failure =
@@ -77,11 +76,10 @@ let report failure =
 /// The page the server streams for `url`.
 served : String ->{} String
 let served url =
-  let chunks =
-    provide Atom.layer {
-      Atom.serving url
-      Stream.run_collect (Ui.Server.stream "app" (Ui.render view ()))
-    }
+  let chunks = provide Atom.layer {
+    Atom.serving url
+    Stream.run_collect (Ui.Server.stream "app" (Ui.render view ()))
+  }
   String.join "" chunks
 
 /// Opens the server's page for `url` and mounts the client on it.
@@ -91,16 +89,14 @@ let visit url after =
   Platform.stdout_line (url ++ " served, loads " ++ show (loads ()))
   match Ui.Dom.container "app" with
   | None -> Platform.stdout_line "no container"
-  | Some root ->
-    provide Atom.layer {
-      scope s {
-        let _ui =
-          Fiber.spawn s report (task { Ui.Dom.mount root (fun _ -> ()) (Ui.render view ()) })
-        settle ()
-        Platform.stdout_line ("hydrated: " ++ text () ++ ", loads " ++ show (loads ()))
-        after ()
-      }
+  | Some root -> provide Atom.layer {
+    scope s {
+      let _ui = Fiber.spawn s report (task { Ui.Dom.mount root (fun _ -> ()) (Ui.render view ()) })
+      settle ()
+      Platform.stdout_line ("hydrated: " ++ text () ++ ", loads " ++ show (loads ()))
+      after ()
     }
+  }
 
 main : Unit ->{; AppError} Unit
 let main () =
@@ -110,7 +106,8 @@ let main () =
     Platform.stdout_line (path () ++ ": " ++ text () ++ ", loads " ++ show (loads ()))
     back ()
     settle ()
-    Platform.stdout_line (path () ++ ": " ++ text () ++ ", loads " ++ show (loads ())))
+    Platform.stdout_line (path () ++ ": " ++ text () ++ ", loads " ++ show (loads ()))
+  )
   visit "http://localhost/user/404" (fun () -> ())
   Platform.stdout_line ("complaints: [" ++ complaints () ++ "]")
   close ()

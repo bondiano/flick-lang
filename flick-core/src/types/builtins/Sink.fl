@@ -33,7 +33,7 @@ foreign pure make from "@flick-lang/runtime/effect/Sink" "flickMake"
 /// `closeOnDone`; `onError` makes the typed error of what it throws.
 from_writable_stream :
   { evaluate : Unit -> WritableStream a; onError : JsValue -> Errors e; closeOnDone : Bool } ->
-    Sink none e a l Unit
+  Sink none e a l Unit
 foreign pure from_writable_stream from "@flick-lang/runtime/effect/Sink" "fromWritableStream"
   reviewed "effect@4.0.5 sha256:439f942e9fef8a7a"
 
@@ -169,8 +169,8 @@ foreign pure map_input_array from "@flick-lang/runtime/effect/Sink" "mapInputArr
 /// Each chunk mapped by the task `f` gives.
 map_input_array_effect :
   (NonEmpty.NonEmpty i0 ->{r2; e2} NonEmpty.NonEmpty i) ->
-    Sink r e i l a ->
-    Sink (r + r2) (e + e2) i0 l a
+  Sink r e i l a ->
+  Sink (r + r2) (e + e2) i0 l a
 foreign pure map_input_array_effect from "@flick-lang/runtime/effect/Sink" "mapInputArrayEffect"
   arity 1
   reviewed "effect@4.0.5 sha256:9221c3ddc576124e"
@@ -229,10 +229,8 @@ foreign pure reduce_while_effect from "@flick-lang/runtime/effect/Sink" "reduceW
   reviewed "effect@4.0.5 sha256:1459f50c00f652a1"
 
 /// `reduce_while` a chunk at a time.
-reduce_while_array : (Unit -> s) ->
-  (s -> Bool) ->
-  (s -> NonEmpty.NonEmpty i -> s) ->
-  Sink none none i l s
+reduce_while_array :
+  (Unit -> s) -> (s -> Bool) -> (s -> NonEmpty.NonEmpty i -> s) -> Sink none none i l s
 foreign pure reduce_while_array from "@flick-lang/runtime/effect/Sink" "reduceWhileArray"
   arity 3
   reviewed "effect@4.0.5 sha256:18b733207e94b286"

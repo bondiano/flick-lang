@@ -20,15 +20,13 @@ instance Collection UserSet User =
     | UserSet users -> UserSet ([user] ++ users)
 
 empty_users : UserSet
-let empty_users =
-  empty
+let empty_users = empty
 
 one_user : User -> UserSet
 let one_user user = insert user empty
 
 render : Show a => a -> String
-let render value =
-  show value
+let render value = show value
 
 same : Ord a => a -> a -> Bool
 let same x y = eq x y

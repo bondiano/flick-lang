@@ -15,10 +15,10 @@ let authorized call =
 me : Rpc.Rpc "me" (Unit ->{r; Unauthorized} String)
 let me =
   Rpc.make (Record.label : Record.Label "me")
-    |> Rpc.with_success (Codec.json Schema.string)
-    |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema Unauthorized)))
-    |> Rpc.with_middleware (fun call -> ignore call.payload)
-    |> Rpc.with_middleware authorized
+  |> Rpc.with_success (Codec.json Schema.string)
+  |> Rpc.with_errors (Rpc.errors |> Rpc.error_case (Codec.json (schema Unauthorized)))
+  |> Rpc.with_middleware (fun call -> ignore call.payload)
+  |> Rpc.with_middleware authorized
 
 type alias Handlers r = { me : Unit ->{r; Unauthorized} String }
 
@@ -36,9 +36,7 @@ let attempt options url =
     | Rpc.ClientError message -> "client: " ++ message
   let with_header =
     try
-      Rpc.with_headers
-        [("authorization", "Bearer ada")]
-        (task { Rpc.call_with options url me () })
+      Rpc.with_headers [("authorization", "Bearer ada")] (task { Rpc.call_with options url me () })
     with
     | Unauthorized e -> "refused: " ++ e.reason
     | Rpc.ClientError message -> "client: " ++ message

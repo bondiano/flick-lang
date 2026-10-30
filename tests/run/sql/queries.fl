@@ -22,74 +22,81 @@ sql table Accounts "accounts" {
 }
 
 by_name : Sql.Template Pg { name : String } { id : UserId; email : Option String }
-let by_name =
-  sql p {
-    from u in Users
-    where u.name == p.name && is_not_null u.email
-    order_by desc u.id
-    limit 10
-    select { id = u.id; email = u.email }
-  }
-
-totals : Sql.Template Pg { min : BigInt } {
-  name : String;
-  accounts : BigInt;
-  total : Option BigDecimal.BigDecimal;
+let by_name = sql p {
+  from u in Users
+  where u.name == p.name && is_not_null u.email
+  order_by desc u.id
+  limit 10
+  select { id = u.id; email = u.email }
 }
-let totals =
-  sql p {
-    from u in Users
-    left_join a in Accounts on a.user_id == u.id
-    group_by u.id, u.name
-    having count a.id >= p.min
-    select { name = u.name; accounts = count a.id; total = sum a.balance }
-  }
+
+totals :
+  Sql.Template
+    Pg
+    { min : BigInt }
+    {
+      name : String;
+      accounts : BigInt;
+      total : Option BigDecimal.BigDecimal;
+    }
+let totals = sql p {
+  from u in Users
+  left_join a in Accounts on a.user_id == u.id
+  group_by u.id, u.name
+  having count a.id >= p.min
+  select { name = u.name; accounts = count a.id; total = sum a.balance }
+}
 
 rich : Sql.Template Pg {} { name : String }
-let rich =
-  sql {
+let rich = sql {
+  from u in Users
+  where is_in
+    u.id
+    (sql {
+      from a in Accounts
+      where a.id > 100n
+      select { id = a.user_id }
+    })
+  select u.name
+  union (sql {
     from u in Users
-    where is_in u.id (sql { from a in Accounts; where a.id > 100n; select { id = a.user_id } })
+    where is_null u.email
     select u.name
-    union (sql { from u in Users; where is_null u.email; select u.name })
-  }
+  })
+}
 
 add : Sql.Template Pg { name : String; email : Option String } { id : UserId }
-let add =
-  sql p {
-    insert_into Users
-    values { name = p.name; email = p.email }
-    returning { id = Users.id }
-  }
+let add = sql p {
+  insert_into Users
+  values { name = p.name; email = p.email }
+  returning { id = Users.id }
+}
 
 by_id : UserId -> Sql.Template Pg {} { name : String; balance : Option BigDecimal.BigDecimal }
-let by_id id =
-  sql {
-    from u in Users
-    left_join a in Accounts on a.user_id == u.id
-    where u.id == $id && u.name != $default_name
-    select { name = u.name; balance = a.balance }
-  }
+let by_id id = sql {
+  from u in Users
+  left_join a in Accounts on a.user_id == u.id
+  where u.id == $id && u.name != $default_name
+  select { name = u.name; balance = a.balance }
+}
 
 default_name : String
 let default_name = "nobody"
 
 rename : UserId -> Option String -> Sql.Template Pg { name : String } { id : UserId }
-let rename id email =
-  sql p {
-    update Users
-    set { name = p.name; email = $email }
-    where Users.id == $id
-    returning { id = Users.id }
-  }
+let rename id email = sql p {
+  update Users
+  set { name = p.name; email = $email }
+  where Users.id == $id
+  returning { id = Users.id }
+}
 
 by_owner : { name : String; email : Option String } -> Sql.Template Pg {} { id : UserId }
-let by_owner who =
-  sql {
-    from u in Users
-    where u.name == $who.name && u.name != $(String.trim default_name)
-    select { id = u.id }
-  }
+let by_owner who = sql {
+  from u in Users
+  where u.name == $who.name && u.name != $(String.trim default_name)
+  select { id = u.id }
+}
 
 main : Unit ->{; AppError} Unit
 let main () =

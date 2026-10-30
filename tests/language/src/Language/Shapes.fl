@@ -1,0 +1,11 @@
+// A type of another module, for the tests that import constructors.
+module Language.Shapes exposing (Shape(..), area)
+
+type Shape = Rect Int Int | Dot
+  deriving Eq, Show
+
+area : Shape -> Int
+let area shape =
+  match shape with
+  | Rect w h -> w * h
+  | Dot -> 0

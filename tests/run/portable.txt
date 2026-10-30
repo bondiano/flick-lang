@@ -84,3 +84,11 @@ stdlib/effect/schema_http
 stdlib/http/serve
 stdlib/http/handlers
 runtime/slice
+stdlib/http/client
+stdlib/http/forms
+stdlib/http/types
+stdlib/http/server
+stdlib/http/streams
+stdlib/http/lifecycle
+stdlib/http/api
+stdlib/http/api_bodies
