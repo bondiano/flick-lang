@@ -165,6 +165,8 @@ type transformed struct {
 	from codec
 	to   func(Value) (Value, []issue)
 	back func(Value) Value
+	// refusal is why the JSON Schema exporter has no form for it; "" writes the codec's
+	refusal string
 }
 
 func (t *transformed) accepts(in Value) bool { return t.from.accepts(in) }
@@ -206,7 +208,8 @@ func CodecTransformResult(decode, encode, from Value) Value {
 			}
 			return value(r), nil
 		},
-		back: func(v Value) Value { return Apply(encode, v) },
+		back:    func(v Value) Value { return Apply(encode, v) },
+		refusal: "a fallible transformation has no JSON Schema form",
 	}
 }
 
@@ -220,6 +223,7 @@ func CodecCheckWhole(check, message, from Value) Value {
 			}
 			return v, nil
 		},
-		back: func(v Value) Value { return v },
+		back:    func(v Value) Value { return v },
+		refusal: `the check "` + message.(string) + `" has no JSON Schema form`,
 	}
 }

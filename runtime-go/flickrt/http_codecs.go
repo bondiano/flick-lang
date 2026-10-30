@@ -280,14 +280,3 @@ func jsString(v Value) string {
 	}
 	return "null"
 }
-
-// CodecJsonSchema refuses a fallible codec as JS's strict exporter does.
-//
-// shortcut: the go target writes no JSON Schema yet, only this refusal; port the exporter if a program exports a schema on Go
-func CodecJsonSchema(root, c Value) Value {
-	if _, ok := c.(*fallible); ok {
-		return Err(NewData(Tag("Codec.ExportError.ExportError"),
-			root.(string)+" -> JSON Schema: a fallible transformation has no JSON Schema form"))
-	}
-	panic(Defect{"Codec.json_schema: the go target exports no JSON Schema yet"})
-}

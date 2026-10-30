@@ -223,6 +223,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/json.go"),
     ),
     (
+        "json_schema.go",
+        include_str!("../../../../runtime-go/flickrt/json_schema.go"),
+    ),
+    (
         "layer.go",
         include_str!("../../../../runtime-go/flickrt/layer.go"),
     ),
