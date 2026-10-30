@@ -25,7 +25,9 @@
 //!
 //! Widths are counted in extended grapheme clusters, which is what a reader
 //! perceives as characters. Indentation is written lazily, before the next
-//! text, so no line ends in whitespace the document did not ask for.
+//! text, so no line ends in whitespace the document did not ask for. It is
+//! spaces, or tabs with [`Indentation::Tabs`] for languages formatted that
+//! way, such as Go.
 
 mod arena;
 mod document;
@@ -33,7 +35,7 @@ mod print;
 
 pub use arena::DocumentArena;
 pub use document::{Document, Documentable, NextBreakFitsMode};
-pub use print::{CursorPositionObserver, Position};
+pub use print::{CursorPositionObserver, Indentation, Position};
 
 /// Concatenates documents, or anything [`Documentable`], given after the
 /// arena: `docvec![arena, "let ", name, " = ", value]`. Nothing is put
