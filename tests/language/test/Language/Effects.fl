@@ -257,7 +257,7 @@ let tests =
             Test.expect (Test.equal 200 (Ref.get total))
           }),
         Test.effect_test
-          "the loser of a race, once started, is interrupted"
+          "the loser of a race is started, then interrupted by a winner that ends at once"
           (task {
             let log = Ref.make []
             let winner = race_first (task {
@@ -265,10 +265,7 @@ let tests =
                 nap 5000
                 "slow"
               })
-            }) (task {
-              nap 20
-              "fast"
-            })
+            }) (task { "fast" })
             note log winner
             Test.expect (Test.equal ["loser ended", "fast"] (Ref.get log))
           }),

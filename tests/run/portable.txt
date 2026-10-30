@@ -49,6 +49,9 @@ stdlib/effect/record
 stdlib/effect/string
 stdlib/effect/string_locale
 stdlib/effect/void
+stdlib/effect/clock_random
+stdlib/effect/mutable_ref
+stdlib/lists
 stdlib/hash_order
 stdlib/monoids
 stdlib/seq

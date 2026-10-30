@@ -1,41 +1,6 @@
 package flickrt
 
-import (
-	"sync"
-	"time"
-)
-
-// raceAll runs the tasks: the first to succeed wins, or with `first` the
-// first to end however it ends; the others are interrupted and awaited.
-// When every one fails, their causes combine.
-func raceAll(fb *Fiber, tasks []Value, first bool) Value {
-	ended := make(chan *child, len(tasks))
-	children := make([]*child, len(tasks))
-	for i, t := range tasks {
-		children[i] = fork(fb, fb.owner, t, func(c *child) { ended <- c })
-	}
-	var failed *Cause
-	idle()
-	for range tasks {
-		var c *child
-		if fb.state.mask > 0 {
-			c = <-ended
-		} else {
-			select {
-			case c = <-ended:
-			case <-fb.state.signal:
-				stop(fb, children...)
-				panic(fb.state.stopped())
-			}
-		}
-		if c.cause == nil || first {
-			stop(fb, children...)
-			return c.result()
-		}
-		failed = Parallel(failed, c.cause)
-	}
-	panic(&Failure{failed})
-}
+import "sync"
 
 func RaceAll(fb *Fiber, tasks Value) Value      { return raceAll(fb, List(tasks), false) }
 func RaceAllFirst(fb *Fiber, tasks Value) Value { return raceAll(fb, List(tasks), true) }
@@ -47,16 +12,17 @@ func FiberId(fb *Fiber) Value { return float64(fb.state.id) }
 type cache struct {
 	mu      sync.Mutex
 	task    Value
-	ttl     time.Duration
+	ttl     float64 // millis
 	exit    *Exit
-	expires time.Time
+	expires float64 // on the fiber's clock
 }
 
 func (c *cache) run(fb *Fiber) Value {
 	c.mu.Lock()
-	if c.exit == nil || c.ttl > 0 && time.Now().After(c.expires) {
+	clock := clockOf(fb)
+	if c.exit == nil || c.ttl > 0 && clock.millis() > c.expires {
 		c.exit = exitOf(fb, c.task)
-		c.expires = time.Now().Add(c.ttl)
+		c.expires = clock.millis() + c.ttl
 	}
 	e := c.exit
 	c.mu.Unlock()
@@ -69,12 +35,12 @@ func (c *cache) invalidate() {
 	c.mu.Unlock()
 }
 
-func ttlOf(d Value) time.Duration {
+func ttlOf(d Value) float64 {
 	x := dur(d)
 	if x.infinite() {
 		return 0
 	}
-	return time.Duration(x.toNanos().Int64())
+	return DurationToMillis(d).(*Data).Fields[0].(float64)
 }
 
 func Cached(_ *Fiber, task Value) Value {
@@ -210,14 +176,15 @@ func WithExecutionPlan(fb *Fiber, plan, onEvent, task Value) Value {
 			attempt++
 			info := Rec("attempt", int32(attempt), "stepAttempt", int32(stepAttempt), "stepIndex", int32(index))
 			Run(fb, Apply(onEvent, NewData(attemptStart, info)))
-			started := time.Now()
+			clock := clockOf(fb)
+			started := clock.monotonic()
 			meta := Rec("attempt", int32(attempt), "stepIndex", int32(index))
 			e := exitOf(fb, Eff(func(fb *Fiber) Value {
 				return withEnv(fb, metadataKey, meta, Eff(func(fb *Fiber) Value {
 					return Provide(fb, step.provide, task)
 				}))
 			}))
-			took := fromMillis(float64(time.Since(started).Microseconds()) / 1000)
+			took := elapsed(clock, started)
 			if e.cause == nil {
 				Run(fb, Apply(onEvent, NewData(attemptSuccess, info, took)))
 				return e.value

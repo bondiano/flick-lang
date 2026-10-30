@@ -33,16 +33,28 @@ func (c *child) observe(f func(*child)) {
 	f(c)
 }
 
-// fork runs `task` as a child of `fb` in `owner`, calling `ended` when it
-// ends.
 // concurrent tells whether a fiber has run beside main.
 var concurrent atomic.Bool
 
+// fork runs `task` as a child of `fb` in `owner`, calling `ended` when it
+// ends.
 func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
+	return spawn(fb, owner, task, nil, ended)
+}
+
+// spawn is fork that closes `starting`, when given, once the child first
+// blocks. A virtual clock counts the child as running until it ends.
+func spawn(fb *Fiber, owner *Owner, task Value, starting chan struct{}, ended func(*child)) *child {
 	concurrent.Store(true)
 	c := &child{state: newState(), done: make(chan struct{})}
 	inner := *fb
 	inner.state, inner.owner = c.state, owner
+	c.state.starting = starting
+	tc := fb.state.clock
+	if tc != nil {
+		c.state.clock = tc
+		tc.count(1)
+	}
 	go func() {
 		c.value, c.cause = catch(func() Value { return Run(&inner, task) })
 		c.mu.Lock()
@@ -56,13 +68,17 @@ func fork(fb *Fiber, owner *Owner, task Value, ended func(*child)) *child {
 		if ended != nil {
 			ended(c)
 		}
+		if tc != nil {
+			tc.count(-1)
+		}
 	}()
 	return c
 }
 
 // stop interrupts children and awaits them.
 func stop(fb *Fiber, children ...*child) {
-	idle()
+	park(fb)
+	defer unpark(fb)
 	for _, c := range children {
 		c.state.interrupt(fb.state.id)
 	}
@@ -167,9 +183,12 @@ func all(fb *Fiber, tasks []Value, limit int) []Value {
 		if permits != nil {
 			task := t
 			t = Eff(func(fb *Fiber) Value {
+				park(fb)
 				select {
 				case permits <- struct{}{}:
+					unpark(fb)
 				case <-fb.state.signal:
+					unpark(fb)
 					panic(fb.state.stopped())
 				}
 				defer func() { <-permits }()
@@ -178,23 +197,13 @@ func all(fb *Fiber, tasks []Value, limit int) []Value {
 		}
 		children[i] = fork(fb, fb.owner, t, func(c *child) { ended <- c })
 	}
-	var failure *Failure
-	idle()
 	for range tasks {
-		var c *child
-		if fb.state.mask > 0 {
-			c = <-ended
-		} else {
-			select {
-			case c = <-ended:
-			case <-fb.state.signal:
-				failure = fb.state.stopped()
+		c := nextEnded(fb, ended)
+		if c == nil || c.cause != nil {
+			failure := fb.state.stopped()
+			if c != nil {
+				failure = &Failure{c.cause}
 			}
-		}
-		if failure == nil && c.cause != nil {
-			failure = &Failure{c.cause}
-		}
-		if failure != nil {
 			stop(fb, children...)
 			panic(failure)
 		}
@@ -242,59 +251,107 @@ func ParallelResults(fb *Fiber, tasks Value) Value {
 	return all(fb, wrapped, 0)
 }
 
-// race runs both tasks: the first to end wins, or with `success` the first
-// to succeed, both failures when neither does. The loser is interrupted
-// and awaited.
-func race(fb *Fiber, a, b Value, success bool) Value {
-	ended := make(chan *child, 2)
-	children := []*child{
-		fork(fb, fb.owner, a, func(c *child) { ended <- c }),
-		fork(fb, fb.owner, b, func(c *child) { ended <- c }),
+// nextEnded is the next child to end, or nil when the fiber is interrupted
+// first.
+func nextEnded(fb *Fiber, ended <-chan *child) *child {
+	park(fb)
+	defer unpark(fb)
+	if fb.state.mask > 0 {
+		return <-ended
 	}
+	select {
+	case c := <-ended:
+		return c
+	case <-fb.state.signal:
+		return nil
+	}
+}
+
+// raceAll runs the tasks: the first to succeed wins, or with `first` the
+// first to end however it ends; the others are interrupted and awaited.
+// When every one fails, their causes combine. As Effect runs a branch at
+// once until it suspends, each starts once the one before has blocked or
+// ended, and none starts after a winner.
+func raceAll(fb *Fiber, tasks []Value, first bool) Value {
+	ended := make(chan *child, len(tasks))
+	children := make([]*child, 0, len(tasks))
 	var failed *Cause
-	idle()
-	for range children {
-		var c *child
-		if fb.state.mask > 0 {
-			c = <-ended
-		} else {
-			select {
-			case c = <-ended:
-			case <-fb.state.signal:
-				stop(fb, children...)
-				panic(fb.state.stopped())
-			}
-		}
-		if c.cause == nil || !success {
+	pending := 0
+	// whether `c`, which ended, won: it ends the race
+	won := func(c *child) bool {
+		pending--
+		if c.cause == nil || first {
 			stop(fb, children...)
-			return c.result()
+			return true
 		}
 		failed = Parallel(failed, c.cause)
+		return false
+	}
+	for _, t := range tasks {
+		starting := make(chan struct{})
+		c := spawn(fb, fb.owner, t, starting, func(c *child) { ended <- c })
+		children = append(children, c)
+		pending++
+		for started := false; !started; {
+			park(fb)
+			var e *child
+			select {
+			case <-starting:
+				started = true
+			case e = <-ended:
+				started = e == c
+			}
+			unpark(fb)
+			if e != nil && won(e) {
+				return e.result()
+			}
+		}
+	}
+	for pending > 0 {
+		c := nextEnded(fb, ended)
+		if c == nil {
+			stop(fb, children...)
+			panic(fb.state.stopped())
+		}
+		if won(c) {
+			return c.result()
+		}
 	}
 	panic(&Failure{failed})
 }
 
-func RaceSuccess(fb *Fiber, a, b Value) Value { return race(fb, a, b, true) }
-func RaceFirst(fb *Fiber, a, b Value) Value   { return race(fb, a, b, false) }
+func RaceSuccess(fb *Fiber, a, b Value) Value { return raceAll(fb, []Value{a, b}, false) }
+func RaceFirst(fb *Fiber, a, b Value) Value   { return raceAll(fb, []Value{a, b}, true) }
 
 // timeoutAfter is the task's result, or `late()` when `millis` pass first,
 // the task interrupted and awaited.
 func timeoutAfter(fb *Fiber, millis Value, task Value, done func(Value) Value, late func() Value) Value {
+	return within(fb, time.Duration(millis.(float64)*float64(time.Millisecond)), task, done, late)
+}
+
+// within is the task's result, or `late()` when `d` passes first on the
+// fiber's clock, the task interrupted and awaited.
+func within(fb *Fiber, d time.Duration, task Value, done func(Value) Value, late func() Value) Value {
 	c := fork(fb, fb.owner, task, nil)
-	timer := time.NewTimer(time.Duration(millis.(float64) * float64(time.Millisecond)))
-	defer timer.Stop()
+	a := clockOf(fb).after(d)
 	signal := fb.state.signal
 	if fb.state.mask > 0 {
 		signal = nil
 	}
-	idle()
+	park(fb)
 	select {
 	case <-c.done:
+		unpark(fb)
+		a.stop()
 		return done(c.result())
-	case <-timer.C:
+	case <-a.C:
+		unpark(fb)
+		a.stop()
 		stop(fb, c)
 		return late()
 	case <-signal:
+		unpark(fb)
+		a.stop()
 		stop(fb, c)
 		panic(fb.state.stopped())
 	}
@@ -310,22 +367,28 @@ func TimeoutOption(fb *Fiber, millis, task Value) Value {
 	return timeoutAfter(fb, millis, task, Some, func() Value { return None })
 }
 
-// sleep blocks for `d`, or forever when it is infinite.
+// sleep blocks for `d` on the fiber's clock, or forever when it is
+// infinite.
 func sleep(fb *Fiber, d time.Duration, forever bool) {
 	if forever {
 		wait(fb, nil)
 		return
 	}
-	idle()
-	timer := time.NewTimer(d)
-	defer timer.Stop()
+	a := clockOf(fb).after(d)
+	park(fb)
 	if fb.state.mask > 0 {
-		<-timer.C
+		<-a.C
+		unpark(fb)
+		a.stop()
 		return
 	}
 	select {
-	case <-timer.C:
+	case <-a.C:
+		unpark(fb)
+		a.stop()
 	case <-fb.state.signal:
+		unpark(fb)
+		a.stop()
 		panic(fb.state.stopped())
 	}
 }
@@ -336,11 +399,7 @@ func EffectSleep(fb *Fiber, d Value) Value {
 	if x.negative() {
 		return Unit
 	}
-	if x.infinite() {
-		sleep(fb, 0, true)
-	} else {
-		sleep(fb, time.Duration(x.toNanos().Int64()), false)
-	}
+	sleep(fb, toGoDuration(x), x.infinite())
 	return Unit
 }
 

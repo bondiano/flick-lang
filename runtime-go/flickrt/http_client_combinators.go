@@ -242,7 +242,7 @@ func repeatingTransient(task Value, s *Schedule) Value {
 			if !again {
 				return r
 			}
-			sleep(fb, max(d, retryAfter(recordField(r.headers, "retry-after"))), false)
+			sleep(fb, max(d, retryAfter(clockOf(fb), recordField(r.headers, "retry-after"))), false)
 		}
 	})
 }
@@ -262,7 +262,7 @@ var retryAfterSeconds = regexp.MustCompile(`^\d+(?:\.\d+)?$`)
 
 // retryAfter is the delay a `Retry-After` value asks for, at least a
 // millisecond: seconds or a date.
-func retryAfter(header Value) time.Duration {
+func retryAfter(clock Clock, header Value) time.Duration {
 	v, ok := header.(string)
 	if !ok {
 		return 0
@@ -276,7 +276,7 @@ func retryAfter(header Value) time.Duration {
 	if err != nil {
 		return 0
 	}
-	return max(time.Until(at), time.Millisecond)
+	return max(time.Duration(float64(at.UnixMilli())-clock.millis())*time.Millisecond, time.Millisecond)
 }
 
 // HttpClientFollowRedirects follows a 3xx answer with a `Location`, at

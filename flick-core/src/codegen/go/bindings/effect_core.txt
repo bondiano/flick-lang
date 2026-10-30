@@ -1,0 +1,21 @@
+# The Go functions of Effect's core on the go target: tasks, errors,
+# causes, time, randomness and schedules, as in effect.txt.
+
+[@flick-lang/runtime/effect/Clock]
+clockWith *ClockWith
+flickMillisOf *ClockMillisOf
+flickNanosOf *ClockNanosOf
+flickMonotonicNanosOf *ClockMonotonicOf
+flickCurrentTimeMillis *ClockCurrentMillis
+flickCurrentTimeNanos *ClockCurrentNanos
+flickMonotonicTimeNanos *ClockMonotonicNanos
+
+[@flick-lang/runtime/effect/Random]
+flickNext *RandomNext
+flickNextBoolean *RandomNextBoolean
+flickNextInt *RandomNextInt
+nextBetween *RandomNextBetween
+flickNextIntBetween *RandomNextIntBetween
+shuffle *RandomShuffle
+choice *RandomChoice
+withSeed *RandomWithSeed

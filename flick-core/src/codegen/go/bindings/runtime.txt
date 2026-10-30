@@ -250,5 +250,8 @@ genFunction GenFunction
 genMap GenMap
 testPure TestPure
 testEffect TestEffect
+testClock TestClockTest
+testAdjust *TestAdjust
+testSetTime *TestSetTime
 testProperty TestProperty
 testGroup TestGroup

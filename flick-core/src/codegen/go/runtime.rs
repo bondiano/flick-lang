@@ -19,6 +19,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/cause.go"),
     ),
     (
+        "clock.go",
+        include_str!("../../../../runtime-go/flickrt/clock.go"),
+    ),
+    (
         "codec.go",
         include_str!("../../../../runtime-go/flickrt/codec.go"),
     ),
@@ -287,6 +291,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/platform.go"),
     ),
     (
+        "random.go",
+        include_str!("../../../../runtime-go/flickrt/random.go"),
+    ),
+    (
         "record.go",
         include_str!("../../../../runtime-go/flickrt/record.go"),
     ),
@@ -337,6 +345,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "syncref.go",
         include_str!("../../../../runtime-go/flickrt/syncref.go"),
+    ),
+    (
+        "testclock.go",
+        include_str!("../../../../runtime-go/flickrt/testclock.go"),
     ),
     (
         "testing.go",
