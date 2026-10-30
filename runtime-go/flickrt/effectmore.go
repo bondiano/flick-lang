@@ -104,16 +104,9 @@ func SchedulerMaxOps(fb *Fiber) Value {
 func SchedulerWithMaxOps(fb *Fiber, n, task Value) Value       { return withEnv(fb, maxOpsKey, n, task) }
 func SchedulerWithPreventYield(fb *Fiber, _, task Value) Value { return Run(fb, task) }
 
-// A Schedule is only what an execution plan reads of one.
-//
-// shortcut: Schedule is a marker for execution plans, retried without delay; port Effect's Schedule with its module
-type schedule struct{}
-
-var ScheduleForever Value = &schedule{}
-
 // planStep is a step of an execution plan: the layer each attempt runs
-// with, how many attempts (0 for one, or unbounded with a schedule) and
-// whether a failure may try again.
+// with, how many attempts (0 for one, or unbounded with a schedule), the
+// schedule that spaces them and whether a failure may try again.
 type planStep struct {
 	provide  Value
 	attempts int
@@ -172,6 +165,10 @@ func WithExecutionPlan(fb *Fiber, plan, onEvent, task Value) Value {
 	var last *Cause
 	attempt := 0
 	for index, step := range plan.([]*planStep) {
+		var spacing *scheduleRun
+		if step.schedule != nil {
+			spacing = startRun(fb, step.schedule)
+		}
 		for stepAttempt := 1; ; stepAttempt++ {
 			attempt++
 			info := Rec("attempt", int32(attempt), "stepAttempt", int32(stepAttempt), "stepIndex", int32(index))
@@ -205,6 +202,17 @@ func WithExecutionPlan(fb *Fiber, plan, onEvent, task Value) Value {
 				if r := e.cause.firstOf(causeFail); r == nil || !Bool(Run(fb, Apply(step.while, r.err))) {
 					break
 				}
+			}
+			if spacing != nil {
+				var input Value = Unit
+				if r := e.cause.firstOf(causeFail); r != nil {
+					input = r.err
+				}
+				_, d, done := spacing.step(fb, input)
+				if done {
+					break
+				}
+				pause(fb, d)
 			}
 		}
 	}

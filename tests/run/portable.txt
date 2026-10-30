@@ -52,6 +52,7 @@ stdlib/effect/void
 stdlib/effect/clock_random
 stdlib/effect/mutable_ref
 stdlib/effect/datetime
+stdlib/effect/cron
 stdlib/lists
 stdlib/hash_order
 stdlib/monoids

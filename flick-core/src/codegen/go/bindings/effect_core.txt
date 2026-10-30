@@ -10,6 +10,14 @@ flickCurrentTimeMillis *ClockCurrentMillis
 flickCurrentTimeNanos *ClockCurrentNanos
 flickMonotonicTimeNanos *ClockMonotonicNanos
 
+[@flick-lang/runtime/effect/Effect]
+retry *EffectRetry
+retryOrElse *EffectRetryOrElse
+repeat *EffectRepeat
+repeatOrElse *EffectRepeatOrElse
+schedule *EffectSchedule
+scheduleFrom *EffectScheduleFrom
+
 [@flick-lang/runtime/effect/Random]
 flickNext *RandomNext
 flickNextBoolean *RandomNextBoolean
@@ -19,6 +27,31 @@ flickNextIntBetween *RandomNextIntBetween
 shuffle *RandomShuffle
 choice *RandomChoice
 withSeed *RandomWithSeed
+
+[@flick-lang/runtime/effect/Schedule]
+once ScheduleOnce
+identity ScheduleIdentity
+spaced ScheduleSpaced
+fixed ScheduleFixed
+windowed ScheduleWindowed
+duration ScheduleDuration
+during ScheduleDuring
+exponential ScheduleExponential
+fibonacci ScheduleFibonacci
+jittered ScheduleJittered
+passthrough SchedulePassthrough
+concat ScheduleConcat
+concatResult ScheduleConcatResult
+max ScheduleMax
+min ScheduleMin
+flickUpTo ScheduleUpTo
+map ScheduleMap
+tap ScheduleTap
+while ScheduleWhile
+addDelay ScheduleAddDelay
+modifyDelay ScheduleModifyDelay
+flickCurrentMetadata *ScheduleCurrentMetadata
+cron ScheduleCron
 
 [@flick-lang/runtime/effect/DateTime]
 flickMake DateTimeMake
