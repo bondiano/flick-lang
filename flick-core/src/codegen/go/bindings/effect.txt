@@ -725,3 +725,6 @@ flickBytes ByteSizeBytes
 flickMake LoggerMake
 withConsoleLog LoggerWithConsoleLog
 flickLayer LoggerLayer
+
+[@flick-lang/runtime/effect/Console]
+log *ConsoleLog
