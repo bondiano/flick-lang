@@ -33,6 +33,9 @@ var fetchClient = &http.Client{
 // fetchTransport sends the request with net/http; a failure before the
 // response is a TransportError, described as fetch describes it.
 func fetchTransport(fb *Fiber, request *ClientRequest, url Value) Value {
+	if u := urlOf(url); u.port != "" && fetchBadPorts[u.port] {
+		return Fail(requestFailure(transportErrorTag, request, Some("fetch failed")))
+	}
 	data, contentType, err := request.body.bytes(fb)
 	if err != nil {
 		var c *causeError
@@ -79,6 +82,19 @@ func fetchTransport(fb *Fiber, request *ClientRequest, url Value) Value {
 	}
 	return got.response
 }
+
+// fetchBadPorts are the ports fetch refuses to reach, as the Fetch
+// standard lists them: a request to one fails before it is sent.
+var fetchBadPorts = func() map[string]bool {
+	out := map[string]bool{}
+	for _, p := range strings.Fields(`1 7 9 11 13 15 17 19 20 21 22 23 25 37 42 43 53 69 77 79 87 95 101 102
+		103 104 109 110 111 113 115 117 119 123 135 137 139 143 161 179 389 427 465 512 513 514 515 526
+		530 531 532 540 548 554 556 563 587 601 636 989 990 993 995 1719 1720 1723 2049 3659 4045 4190
+		5060 5061 6000 6566 6665 6666 6667 6668 6669 6679 6697 10080`) {
+		out[p] = true
+	}
+	return out
+}()
 
 // netBody is a response's body on the network, closed when it is read to
 // its end, when it is closed, or when no one can read it any more.

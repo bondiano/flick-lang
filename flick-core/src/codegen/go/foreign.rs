@@ -19,6 +19,7 @@ const TABLES: &[&str] = &[
     include_str!("bindings/http.txt"),
     include_str!("bindings/layer.txt"),
     include_str!("bindings/globals.txt"),
+    include_str!("bindings/rpc.txt"),
 ];
 
 fn table() -> &'static HashMap<(String, String), String> {

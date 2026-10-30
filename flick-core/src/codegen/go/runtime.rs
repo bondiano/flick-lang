@@ -211,6 +211,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/http_trace.go"),
     ),
     (
+        "http_upgrade.go",
+        include_str!("../../../../runtime-go/flickrt/http_upgrade.go"),
+    ),
+    (
         "http_url.go",
         include_str!("../../../../runtime-go/flickrt/http_url.go"),
     ),
@@ -315,12 +319,36 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/rpc_binary_write.go"),
     ),
     (
+        "rpc_client.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_client.go"),
+    ),
+    (
+        "rpc_http.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_http.go"),
+    ),
+    (
         "rpc_jsonrpc.go",
         include_str!("../../../../runtime-go/flickrt/rpc_jsonrpc.go"),
     ),
     (
+        "rpc_local.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_local.go"),
+    ),
+    (
         "rpc_model.go",
         include_str!("../../../../runtime-go/flickrt/rpc_model.go"),
+    ),
+    (
+        "rpc_server.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_server.go"),
+    ),
+    (
+        "rpc_socket.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_socket.go"),
+    ),
+    (
+        "rpc_websocket.go",
+        include_str!("../../../../runtime-go/flickrt/rpc_websocket.go"),
     ),
     (
         "rpc_wire.go",
