@@ -13,3 +13,7 @@ fromTransformStream
 # a JS AsyncIterable and its promises, which Go has no form of
 fromAsyncIterable
 fromAsyncIterableArray
+
+[@flick-lang/runtime/effect/Sink]
+# a web WritableStream, a JS value Go has no form of
+fromWritableStream

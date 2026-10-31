@@ -1,0 +1,23 @@
+// Effect's `Sink.make`: the sink of what a function does with the stream of
+// its input, run on chunks of two through its channel.
+module App.Main exposing (main)
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+/// Feeds 1 to 5 in chunks of two to the sink; its end.
+run : Sink.Sink none none Float Float a ->{} Sink.End a Float
+let run sink =
+  Channel.run_drain
+    (Channel.from_list_chunked 2 [1, 2, 3, 4, 5] |> Channel.pipe_to (Sink.to_channel sink))
+
+ended : Show a => String -> Sink.End a Float -> String
+let ended label end =
+  match end with
+  | (value, leftover) ->
+    label ++ ": " ++ show value ++ " " ++ show (Option.map NonEmpty.to_list leftover)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  say (ended "make, run_collect" (run (Sink.make (fun input -> Stream.run_collect input))))
+  say (ended "make, take" (run (Sink.make (fun input -> Stream.run_count (Stream.take 3 input)))))
