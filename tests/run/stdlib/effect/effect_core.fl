@@ -14,12 +14,6 @@ let ms1 = Result.with_default Duration.zero (Duration.millis 1)
 ms2 : Duration.Duration
 let ms2 = Result.with_default Duration.zero (Duration.millis 2)
 
-ms5 : Duration.Duration
-let ms5 = Result.with_default Duration.zero (Duration.millis 5)
-
-ms15 : Duration.Duration
-let ms15 = Result.with_default Duration.zero (Duration.millis 15)
-
 ms50 : Duration.Duration
 let ms50 = Result.with_default Duration.zero (Duration.millis 50)
 
@@ -128,23 +122,9 @@ let single () =
   let slow : Option Float = timeout_option 1 (task { Effect.never () })
   Platform.stdout_line ("timeout_option: " ++ show (quick, slow))
   Platform.stdout_line
-    ("race_success: "
-      ++ show
-        (race_success
-          (task {
-            Effect.sleep ms5
-            "slow"
-          })
-          (task { "fast" })))
+    ("race_success: " ++ show (race_success (task { Effect.never () }) (task { "fast" })))
   Platform.stdout_line
-    ("race_first: "
-      ++ show
-        (race_first
-          (task {
-            Effect.sleep ms5
-            "slow"
-          })
-          (task { "first" })))
+    ("race_first: " ++ show (race_first (task { Effect.never () }) (task { "first" })))
 
 collections : Unit ->{} Unit
 let collections () =
@@ -220,10 +200,17 @@ let resources () =
     )
   Platform.stdout_line ("bracket: " ++ used ++ ", " ++ show (Ref.get log))
   let acquired = Ref.make 0
+  let refreshed = Latch.make false
+  // the second acquisition opens the latch: the resource has been refreshed
+  let acquire = task {
+    let n = await (counting acquired)
+    let _ = if n >= 2 then Latch.open refreshed else false
+    n
+  }
   let seen = scope {
-    let auto = Effect.resource_auto (Schedule.spaced ms1) (counting acquired)
+    let auto = Effect.resource_auto (Schedule.spaced ms1) acquire
     let first = Resource.use auto (fun v -> v)
-    Effect.sleep ms15
+    Latch.await_ refreshed
     (first, Resource.use auto (fun v -> v) > first)
   }
   Platform.stdout_line ("resource_auto: " ++ show seen)

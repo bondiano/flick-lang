@@ -169,3 +169,7 @@ stdlib/observability/prometheus
 runtime/leases
 stdlib/effect/cache
 stdlib/effect/request
+stdlib/effect/effect_core
+stdlib/effect/effect_errors
+stdlib/effect/effect_errors_more
+stdlib/effect/exit_cause
