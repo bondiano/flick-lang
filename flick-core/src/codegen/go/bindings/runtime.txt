@@ -37,6 +37,16 @@ codecString CodecString
 codecIgnoreExtra CodecIgnoreExtra
 dslField DslField
 dslOptionalField DslOptionalField
+dslFieldEffect DslFieldEffect
+dslOnMissing DslOnMissing
+dslOnMissingEffect DslOnMissingEffect
+codecOptionNull CodecOptionNull
+codecOptionNullish CodecOptionNullish
+codecRedactedReveal CodecRedactedReveal
+codecRedactedMasked CodecRedactedMasked
+codecStandard CodecStandard
+codecStandardAsync *CodecStandardAsync
+schemaOpaque SchemaOpaque
 fileOpen *FileOpen
 fileReadHandle *FileReadHandle
 fileRead *FileRead

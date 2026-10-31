@@ -73,6 +73,12 @@ func (x *schemaExport) codec(c codec, path string) Value {
 		return x.codec(k.from, path)
 	case *fallible:
 		refuseExport(path, "a fallible transformation has no JSON Schema form")
+	case *nullOption:
+		return Rec("anyOf", []Value{x.codec(k.item, path), Rec("type", "null")})
+	case maskedRedacted:
+		return Rec("const", maskedText)
+	case refused:
+		refuseExport(path, k.reason)
 	}
 	// shortcut: the string-tree, parameter and HTTP value codecs are refused; write their forms when a program exports one
 	refuseExport(path, "this codec has no JSON Schema form on the go target")
