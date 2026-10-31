@@ -73,12 +73,11 @@ func messageParts(message []Value) []Value {
 	return out
 }
 
-// LoggerMake is `Logger.make`: `f` gets the options as a Flick record.
-//
-// shortcut: a logger's `cause` is Unit, as RawCause has no go form yet; Flick's messages carry no cause
+// LoggerMake is `Logger.make`: `f` gets the options as a Flick record,
+// whose `cause` is a RawCause, empty without one.
 func LoggerMake(f Value) Value {
 	return &logger{func(fb *Fiber, m *logEntry) Value {
-		return Apply(fb, f, Rec("message", messageParts(m.message), "logLevel", m.level, "cause", Unit, "date", m.date))
+		return Apply(fb, f, Rec("message", messageParts(m.message), "logLevel", m.level, "cause", m.cause, "date", m.date))
 	}}
 }
 

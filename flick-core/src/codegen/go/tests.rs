@@ -15,9 +15,6 @@ use crate::project::js_only;
 const PENDING: &[&str] = &[
     // the rest: Record, Loop and failures of the core
     "@flick-lang/runtime",
-    // Effect and Cause
-    "@flick-lang/runtime/effect/Cause",
-    "@flick-lang/runtime/effect/Effect",
     // the rest
     "@flick-lang/runtime/effect/http/HttpClientResponse",
     "@flick-lang/runtime/effect/reactivity/AsyncResult",

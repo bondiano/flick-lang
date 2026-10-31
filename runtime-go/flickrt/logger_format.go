@@ -112,7 +112,7 @@ func logfmt(fb *Fiber, m *logEntry, quote func(string) string) string {
 		field("message", attrText(part))
 	}
 	if m.cause != nil {
-		field("cause", pretty(m.cause))
+		field("cause", causePretty(m.cause))
 	}
 	for _, s := range logSpansOf(fb) {
 		b.WriteString(" " + formatLogSpan(s.label, s.start, m.date))
@@ -144,7 +144,7 @@ func structuredOf(fb *Fiber, m *logEntry) *structuredLog {
 	}
 	cause := None
 	if m.cause != nil {
-		cause = Some(pretty(m.cause))
+		cause = Some(causePretty(m.cause))
 	}
 	return &structuredLog{messageParts(m.message), strings.ToUpper(m.level), isoDate(m.date), cause,
 		logAnnotationsOf(fb), spans, fiberLabel(fb)}
@@ -261,7 +261,7 @@ func inspectEntries(entries []string, indentation int) string {
 func logDefault(fb *Fiber, m *logEntry) Value {
 	args := append([]Value{}, m.message...)
 	if m.cause != nil {
-		args = append(args, pretty(m.cause))
+		args = append(args, causePretty(m.cause))
 	}
 	spans := ""
 	for _, s := range logSpansOf(fb) {
@@ -294,7 +294,7 @@ func logTracer(fb *Fiber, m *logEntry) Value {
 	attrs = append(attrs, spanAttr{"effect.fiberId", float64(fb.state.id)},
 		spanAttr{"effect.logLevel", strings.ToUpper(m.level)})
 	if m.cause != nil {
-		attrs = append(attrs, spanAttr{"effect.cause", pretty(m.cause)})
+		attrs = append(attrs, spanAttr{"effect.cause", causePretty(m.cause)})
 	}
 	name := consoleText(m.message...)
 	if len(m.message) != 1 {
@@ -356,7 +356,7 @@ func prettyTty(colors bool, formatDate Value) Value {
 		c.group(Rec("label", None))
 		defer c.groupEnd()
 		if m.cause != nil {
-			write(pretty(m.cause))
+			write(causePretty(m.cause))
 		}
 		for _, part := range rest {
 			write(consoleText(part))
@@ -389,7 +389,7 @@ func prettyBrowser(formatDate Value) Value {
 		c.group(Rec("label", Some(first)))
 		defer c.groupEnd()
 		if m.cause != nil {
-			c.warn(pretty(m.cause))
+			c.warn(causePretty(m.cause))
 		}
 		for _, part := range rest {
 			c.log(consoleText(part))

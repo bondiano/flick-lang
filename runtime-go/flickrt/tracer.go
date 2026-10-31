@@ -31,6 +31,7 @@ type span struct {
 	unpropagated bool // the spans inside skip it when they look for their parent
 	start        *big.Int
 	tracer       *tracer
+	stack        string // where it was opened, when its options capture a stack trace
 
 	mu     sync.Mutex
 	ended  bool
@@ -132,6 +133,10 @@ func propagating(s Value) Value {
 // `Tracer.SpanOptions` say, which may lack fields, under the fiber's span.
 func openSpan(fb *Fiber, name, options Value) *span {
 	o := record(options)
+	stack := ""
+	if optField(o, "captureStackTrace", false).(bool) {
+		stack = flickLocation()
+	}
 	parent := optField(o, "parent", None)
 	if !isSome(parent) {
 		if optField(o, "root", false).(bool) {
@@ -142,7 +147,7 @@ func openSpan(fb *Fiber, name, options Value) *span {
 	}
 	if !envOr(fb, tracerEnabledKey, true).(bool) || optField(o, "disablePropagation", false).(bool) {
 		return &span{name: Some(name), spanId: "noop", traceId: "noop", parent: parent, kind: "internal",
-			noop: true, unpropagated: true, start: bigZero, ended: true, end: bigZero}
+			noop: true, unpropagated: true, start: bigZero, ended: true, end: bigZero, stack: stack}
 	}
 	level := envOr(fb, traceLevelKey, defaultSpanLevel).(string)
 	if l, ok := some(optField(o, "level", None)); ok {
@@ -166,7 +171,7 @@ func openSpan(fb *Fiber, name, options Value) *span {
 	s := &span{name: Some(name), spanId: fmt.Sprintf("%016x", rand.Uint64()),
 		traceId: fmt.Sprintf("%016x%016x", rand.Uint64(), rand.Uint64()),
 		sampled: sampled, parent: parent, kind: optField(o, "kind_", "internal").(string), start: start,
-		tracer: currentTracer(fb), links: links}
+		tracer: currentTracer(fb), links: links, stack: stack}
 	if p, ok := some(parent); ok {
 		s.traceId = spanOf(p).traceId
 	}
@@ -227,22 +232,32 @@ func endSpan(s *span, exit *Cause, clock Clock, timing bool) {
 }
 
 // A stackFrame is `References.CurrentStackFrame`: the span a task runs in.
-// shortcut: no stack line, as Go frames are not the program's; capture Flick's location when `captureStackTrace` asks for it
+// Its stack is the Flick line that opened the span, `at file.fl:line`.
+//
+// shortcut: a stack only when the options ask for it with `captureStackTrace = true`, where the JS target captures one unless they say `false`; capture by default if a program needs it
 type stackFrame struct {
 	name   string
+	stack  string
 	parent Value // an Option of a stackFrame
 }
 
 // withParentSpan runs `task` with the span as the parent of its spans.
+// A failure that leaves it is annotated with its stack frame, as Effect's
+// fiber annotates a failure with its own.
 func withParentSpan(fb *Fiber, s *span, task Value) Value {
 	inner := *fb
-	if !s.external {
-		name, _ := some(s.name)
-		frame := &stackFrame{name.(string), envOptional(fb, stackFrameKey)}
-		inner.env = inner.env.with(stackFrameKey, frame)
-	}
 	inner.env = inner.env.with(parentSpanKey, s)
-	return Run(&inner, task)
+	if s.external {
+		return Run(&inner, task)
+	}
+	name, _ := some(s.name)
+	frame := &stackFrame{name.(string), s.stack, envOptional(fb, stackFrameKey)}
+	inner.env = inner.env.with(stackFrameKey, frame)
+	v, c := catch(func() Value { return Run(&inner, task) })
+	if c != nil {
+		panic(&Failure{c.annotated(frame, false)})
+	}
+	return v
 }
 
 // envOptional is the fiber's setting of `key` as an Option.
