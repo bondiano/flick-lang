@@ -236,7 +236,9 @@ impl Checker<'_> {
         } else {
             self.by_instance(c, (&module, &name), &args, givens, chain)
         };
-        if let (Some(key), Outcome::Solved(dict)) = (key, &outcome) {
+        if let (Some(key), Outcome::Solved(dict)) = (key, &outcome)
+            && !dict.assumes()
+        {
             self.classes.cache.insert(key, dict.clone());
         }
         outcome

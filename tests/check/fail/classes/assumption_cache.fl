@@ -1,0 +1,13 @@
+// A dictionary built from an assumption holds only where the assumption is:
+// `g` does not get the `Show (List Foo)` that `f` built from its `Show Foo`.
+module App.AssumptionCache exposing (..)
+
+type Foo = Foo
+
+f : Show Foo => Foo -> String
+let f x = show [x]
+
+g : Foo -> String
+let g x = show [x]
+
+//~ FLICK-C001 @11:11-11:15 no instance for `Show Foo`, needed for `Show (List Foo)`

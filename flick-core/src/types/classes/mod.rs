@@ -56,6 +56,20 @@ pub enum Dict {
     Error,
 }
 
+impl Dict {
+    /// Whether it is built from an assumption, so holds only where that is.
+    fn assumes(&self) -> bool {
+        match self {
+            Self::Given(_) => true,
+            Self::Super { dict, .. } => dict.assumes(),
+            Self::Instance { args: dicts, .. } | Self::Structural { fields: dicts, .. } => {
+                dicts.iter().any(Self::assumes)
+            }
+            Self::Primitive { .. } | Self::Error => false,
+        }
+    }
+}
+
 /// A constraint to solve, with what was assumed where it was required.
 #[derive(Debug, Clone)]
 pub struct Wanted {
@@ -77,7 +91,8 @@ pub struct State {
     pub evidence: Vec<(Span, Dict)>,
     /// Solver steps spent on the current definition.
     pub steps: u32,
-    /// Dictionaries of constraints without unknowns or variables.
+    /// Dictionaries of constraints without unknowns or variables, built
+    /// from instances alone.
     cache: HashMap<Type, Dict>,
     required: u32,
 }
