@@ -1,14 +1,15 @@
 package flickrt
 
-// Graph is Effect's immutable graph: its kind and its nodes and edges, by
-// increasing index, as far as Effect Schema's JSON codec of a graph and the
-// counts need it.
-//
-// shortcut: no building, queries or algorithms; port Effect's Graph module here when a Go program needs it
+// Graph is Effect's immutable graph: its kind, its nodes and edges by
+// increasing index (Effect's maps keep insertion order, and indexes only
+// grow), each node's outgoing and incoming edges in Effect's adjacency
+// order, and the next indexes. A change works on a copy, as `Graph.mutate`.
 type Graph struct {
-	kind  string
-	nodes []graphNode
-	edges []graphEdge
+	kind               string
+	nodes              []graphNode
+	edges              []graphEdge
+	adj, radj          map[int][]int
+	nextNode, nextEdge int
 }
 
 type graphNode struct {
@@ -90,7 +91,7 @@ func graphDecode(kind string, r *Record) (Value, []issue) {
 		previous = index
 		g.edges = append(g.edges, graphEdge{index, source, target, x.Get("data")})
 	}
-	return g, nil
+	return g.hydrate(), nil
 }
 
 // encoded is the graph's snapshot, as the JSON codec's record.

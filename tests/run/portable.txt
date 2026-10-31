@@ -126,3 +126,5 @@ stdlib/effect/trie
 stdlib/effect/bytesize
 stdlib/effect/chunk
 stdlib/effect/check
+stdlib/effect/graph
+stdlib/effect/graph_algorithms
