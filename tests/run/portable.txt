@@ -93,6 +93,7 @@ stdlib/effect/codec
 stdlib/effect/schema
 stdlib/effect/schema_http
 stdlib/effect/schema_types
+stdlib/effect/arbitrary
 stdlib/http/serve
 stdlib/http/handlers
 runtime/slice
