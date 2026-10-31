@@ -499,6 +499,22 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/mime_types.go"),
     ),
     (
+        "net_address.go",
+        include_str!("../../../../runtime-go/flickrt/net_address.go"),
+    ),
+    (
+        "net_codecs.go",
+        include_str!("../../../../runtime-go/flickrt/net_codecs.go"),
+    ),
+    (
+        "net_dns.go",
+        include_str!("../../../../runtime-go/flickrt/net_dns.go"),
+    ),
+    (
+        "net_host.go",
+        include_str!("../../../../runtime-go/flickrt/net_host.go"),
+    ),
+    (
         "number.go",
         include_str!("../../../../runtime-go/flickrt/number.go"),
     ),
