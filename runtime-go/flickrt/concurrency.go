@@ -281,8 +281,8 @@ func RaceFirst(fb *Fiber, a, b Value) Value   { return race(fb, a, b, false) }
 // the task interrupted and awaited.
 func timeoutAfter(fb *Fiber, millis Value, task Value, done func(Value) Value, late func() Value) Value {
 	c := fork(fb, fb.owner, task, nil)
-	timer := time.NewTimer(time.Duration(millis.(float64) * float64(time.Millisecond)))
-	defer timer.Stop()
+	timer, cancel := clockOf(fb).timer(time.Duration(millis.(float64) * float64(time.Millisecond)))
+	defer cancel()
 	signal := fb.state.signal
 	if fb.state.mask > 0 {
 		signal = nil
@@ -291,7 +291,7 @@ func timeoutAfter(fb *Fiber, millis Value, task Value, done func(Value) Value, l
 	select {
 	case <-c.done:
 		return done(c.result())
-	case <-timer.C:
+	case <-timer:
 		stop(fb, c)
 		return late()
 	case <-signal:
@@ -310,37 +310,29 @@ func TimeoutOption(fb *Fiber, millis, task Value) Value {
 	return timeoutAfter(fb, millis, task, Some, func() Value { return None })
 }
 
-// sleep blocks for `d`, or forever when it is infinite.
-func sleep(fb *Fiber, d time.Duration, forever bool) {
-	if forever {
+// sleep blocks for `d` of the fiber's clock.
+func sleep(fb *Fiber, d time.Duration) {
+	ch, cancel := clockOf(fb).timer(d)
+	defer cancel()
+	wait(fb, ch)
+}
+
+// sleepFor is Effect's `sleep`: a duration that is not positive yields,
+// an infinite one never ends.
+func sleepFor(fb *Fiber, d *Duration) {
+	switch {
+	case !DurationIsPositive(d).(bool):
+		EffectYieldNow(fb)
+	case d.infinite():
 		wait(fb, nil)
-		return
-	}
-	idle()
-	timer := time.NewTimer(d)
-	defer timer.Stop()
-	if fb.state.mask > 0 {
-		<-timer.C
-		return
-	}
-	select {
-	case <-timer.C:
-	case <-fb.state.signal:
-		panic(fb.state.stopped())
+	default:
+		sleep(fb, idleDuration(d))
 	}
 }
 
 // EffectSleep is `Effect.sleep duration`.
 func EffectSleep(fb *Fiber, d Value) Value {
-	x := dur(d)
-	if x.negative() {
-		return Unit
-	}
-	if x.infinite() {
-		sleep(fb, 0, true)
-	} else {
-		sleep(fb, time.Duration(x.toNanos().Int64()), false)
-	}
+	sleepFor(fb, dur(d))
 	return Unit
 }
 

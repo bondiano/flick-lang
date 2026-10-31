@@ -1,1 +1,10 @@
 # Clock, and the virtual time of tests.
+[@flick-lang/runtime/effect/Clock]
+clockWith *ClockWith
+flickMillisOf ClockMillisOf
+flickNanosOf ClockNanosOf
+flickMonotonicNanosOf ClockMonotonicNanosOf
+flickCurrentTimeMillis *ClockCurrentTimeMillis
+flickCurrentTimeNanos *ClockCurrentTimeNanos
+flickMonotonicTimeNanos *ClockMonotonicTimeNanos
+

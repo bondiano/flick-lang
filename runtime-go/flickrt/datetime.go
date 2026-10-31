@@ -41,6 +41,8 @@ func DateTimeMake(s Value) Value {
 	return Err(NewData(Tag("DateTime.DateTimeError.DateTimeError"), "not a date-time: "+QuoteJSON(s.(string))))
 }
 
-func DateTimeNow() Value { return &DateTime{t: time.Now().UTC()} }
+func DateTimeNow(fb *Fiber) Value {
+	return &DateTime{t: time.UnixMilli(int64(clockOf(fb).millis())).UTC()}
+}
 
 func DateTimeToEpochMillis(d Value) Value { return float64(d.(*DateTime).t.UnixMilli()) }

@@ -1,8 +1,9 @@
 package flickrt
 
 import (
+	"math"
+	"math/big"
 	"sync"
-	"time"
 )
 
 // raceAll runs the tasks: the first to succeed wins, or with `first` the
@@ -42,21 +43,23 @@ func RaceAllFirst(fb *Fiber, tasks Value) Value { return raceAll(fb, List(tasks)
 
 func FiberId(fb *Fiber) Value { return float64(fb.state.id) }
 
-// cache memoizes how a task ends, for `ttl` when positive; the first
-// fiber to run it computes, the others wait for that.
+// cache memoizes how a task ends, for `ttl` milliseconds of the clock of
+// the fiber that runs it; the first fiber to run it computes, the others
+// wait for that.
 type cache struct {
 	mu      sync.Mutex
 	task    Value
-	ttl     time.Duration
+	ttl     float64
 	exit    *Exit
-	expires time.Time
+	expires float64
 }
 
 func (c *cache) run(fb *Fiber) Value {
 	c.mu.Lock()
-	if c.exit == nil || c.ttl > 0 && time.Now().After(c.expires) {
+	clock := clockOf(fb)
+	if c.exit == nil || !math.IsInf(c.expires, 1) && clock.millis() >= c.expires {
 		c.exit = exitOf(fb, c.task)
-		c.expires = time.Now().Add(c.ttl)
+		c.expires = clock.millis() + c.ttl
 	}
 	e := c.exit
 	c.mu.Unlock()
@@ -69,16 +72,10 @@ func (c *cache) invalidate() {
 	c.mu.Unlock()
 }
 
-func ttlOf(d Value) time.Duration {
-	x := dur(d)
-	if x.infinite() {
-		return 0
-	}
-	return time.Duration(x.toNanos().Int64())
-}
+func ttlOf(d Value) float64 { return millisOf(dur(d)) }
 
 func Cached(_ *Fiber, task Value) Value {
-	c := &cache{task: task}
+	c := &cache{task: task, ttl: math.Inf(1)}
 	return Eff(c.run)
 }
 
@@ -210,14 +207,15 @@ func WithExecutionPlan(fb *Fiber, plan, onEvent, task Value) Value {
 			attempt++
 			info := Rec("attempt", int32(attempt), "stepAttempt", int32(stepAttempt), "stepIndex", int32(index))
 			Run(fb, Apply(fb, onEvent, NewData(attemptStart, info)))
-			started := time.Now()
+			clock := clockOf(fb)
+			started := clock.monotonic()
 			meta := Rec("attempt", int32(attempt), "stepIndex", int32(index))
 			e := exitOf(fb, Eff(func(fb *Fiber) Value {
 				return withEnv(fb, metadataKey, meta, Eff(func(fb *Fiber) Value {
 					return Provide(fb, step.provide, task)
 				}))
 			}))
-			took := fromMillis(float64(time.Since(started).Microseconds()) / 1000)
+			took := fromNanos(new(big.Int).Sub(clock.monotonic(), started))
 			if e.cause == nil {
 				Run(fb, Apply(fb, onEvent, NewData(attemptSuccess, info, took)))
 				return e.value

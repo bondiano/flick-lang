@@ -1,9 +1,6 @@
 package flickrt
 
-import (
-	"fmt"
-	"time"
-)
+import "fmt"
 
 // Loggers, as far as `Logger.make`, the console and `Logger.layer` go: a
 // layer installs loggers for its body, and what logs (the HTTP logger
@@ -60,7 +57,7 @@ func logMessage(fb *Fiber, level, message string) {
 		return
 	}
 	options := Rec("message", []Value{message}, "logLevel", level, "cause", Unit,
-		"date", float64(time.Now().UnixMilli()))
+		"date", clockOf(fb).millis())
 	for _, l := range List(loggers) {
 		l.(*logger).out(fb, options)
 	}

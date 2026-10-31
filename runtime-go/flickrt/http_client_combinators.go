@@ -203,7 +203,7 @@ func retrying(fb *Fiber, s *Schedule, task Value, delayOf func(Value) time.Durat
 		if delayOf != nil {
 			d = max(d, delayOf(err))
 		}
-		sleep(fb, d, false)
+		sleep(fb, d)
 	}
 }
 
@@ -242,7 +242,7 @@ func repeatingTransient(task Value, s *Schedule) Value {
 			if !again {
 				return r
 			}
-			sleep(fb, max(d, retryAfter(recordField(r.headers, "retry-after"))), false)
+			sleep(fb, max(d, retryAfter(recordField(r.headers, "retry-after"))))
 		}
 	})
 }

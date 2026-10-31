@@ -15,8 +15,7 @@ use crate::project::js_only;
 const PENDING: &[&str] = &[
     // the rest: Chunk, Record, Loop, failures and test clocks of the core
     "@flick-lang/runtime",
-    // Clock and Schedule
-    "@flick-lang/runtime/effect/Clock",
+    // Schedule
     "@flick-lang/runtime/effect/Schedule",
     // queues and streams
     "@flick-lang/runtime/effect/Queue",

@@ -126,7 +126,12 @@ func (m *MemoMap) observe(fb *Fiber, l *Layer, e *memoEntry, scope *Owner) bool 
 			m.mu.Unlock()
 			idle := *fb
 			idle.state = newState()
-			time.AfterFunc(m.idle, func() { m.release(&idle, l, e) })
+			// a fiber of its own, which a test clock waits for
+			fork(&idle, newOwner(), Eff(func(fb *Fiber) Value {
+				sleep(fb, m.idle)
+				m.release(fb, l, e)
+				return Unit
+			}), nil)
 			return Unit
 		}
 		if last && m.entries[l] == e {

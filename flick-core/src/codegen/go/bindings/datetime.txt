@@ -2,7 +2,7 @@
 # JSON codecs.
 [@flick-lang/runtime/effect/DateTime]
 flickMake DateTimeMake
-flickNow DateTimeNow
+flickNow *DateTimeNow
 toEpochMillis DateTimeToEpochMillis
 flickJsonUtc CodecDateTimeUtc
 flickJsonUtcMillis CodecDateTimeUtcMillis
