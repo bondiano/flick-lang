@@ -84,6 +84,20 @@ provide StreamProvide
 updateService StreamUpdateService
 withSpan StreamWithSpan
 
+# Runs (Stream/Run.fl).
+runSum *StreamRunSum
+runDrain *StreamRunDrain
+runHead *StreamRunHead
+runLast *StreamRunLast
+flickRunFoldEffect *StreamRunFoldEffect
+runForEach *StreamRunForEach
+runForEachWhile *StreamRunForEachWhile
+runForEachArray *StreamRunForEachArray
+runIntoPubSub *StreamRunIntoPubSub
+runIntoQueue *StreamRunIntoQueue
+flickToPubSub *StreamToPubSub
+flickToQueue *StreamToQueue
+
 [@flick-lang/runtime/effect/SubscriptionRef]
 changes SubscriptionRefChanges
 
