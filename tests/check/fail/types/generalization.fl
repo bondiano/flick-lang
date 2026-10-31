@@ -46,6 +46,12 @@ let use_poly cell = Ref.set cell (Some 42)
 argument : Unit ->{} Unit
 let argument () = use_poly (Ref.make None)
 
+counted : Unit ->{} Int
+let counted () =
+  let cell = Ref.make 0
+  let n : Show Int => Int = Ref.modify cell (fun k -> (k + 1, k + 1))
+  n
+
 //~ FLICK-T003 @11:31-11:36 expected `String`, found `Int`
 //~ FLICK-T008 @17:50-17:56 expected `Eff none none (Ref (Option Float))`, found `Eff
 //~ FLICK-T003 @28:11-28:16 expected `Option String`, found `Option Float`: `Float`
@@ -54,3 +60,4 @@ let argument () = use_poly (Ref.make None)
 //~ FLICK-T013 @35:41-35:54 this is computed by a runtime call, so it cannot have the polymorphic type
 //~ FLICK-T013 @40:15-40:28 this is computed by a runtime call, so it cannot have the polymorphic type
 //~ FLICK-T013 @47:28-47:43 this is computed by a runtime call, so it cannot have the polymorphic type
+//~ FLICK-T013 @52:29-52:70 this is computed by a runtime call, so it cannot have the constrained type `Show Int => Int`
