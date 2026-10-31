@@ -114,6 +114,7 @@ type cliEnv struct {
 	builtIns []*cliGlobal
 	trace    bool
 	format   cliFormatter
+	tty      *Record // the wizard's terminal; nil: the process's
 	log      func(string)
 }
 

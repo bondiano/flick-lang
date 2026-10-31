@@ -1,0 +1,67 @@
+$ --wizard
+tool v1.0.0 · Command wizard
+Project tools
+Build a command interactively. Press Ctrl+C to cancel.
+
+Current command
+  $ tool
+
+ROOT · FLAGS
+
+Current command
+  $ tool --verbose true
+
+
+Current command
+  $ tool --verbose true greet
+
+GREET · FLAGS
+
+
+
+Current command
+  $ tool --verbose true greet --times=-2 --color 'it'"'"'s red'
+
+GREET · ARGUMENTS
+
+Command ready
+  $ tool --verbose true greet --times=-2 --color 'it'"'"'s red' Ada
+
+
+Hello, Ada loud=false times=-2 color=it's red
+$ --wizard
+tool v1.0.0 · Command wizard
+Project tools
+Build a command interactively. Press Ctrl+C to cancel.
+
+Current command
+  $ tool
+
+ROOT · FLAGS
+
+Current command
+  $ tool
+
+
+Current command
+  $ tool sum
+
+SUM · ARGUMENTS
+
+Command ready
+  $ tool sum 1 x
+
+
+sum 1+x
+$ greet --wizard
+tool v1.0.0 · Command wizard
+Project tools
+Build a command interactively. Press Ctrl+C to cancel.
+
+Current command
+  $ tool greet
+
+GREET · FLAGS
+
+
+Wizard cancelled.

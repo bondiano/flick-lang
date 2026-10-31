@@ -8,13 +8,7 @@ import (
 	"time"
 )
 
-// The built-in behaviors of `--wizard` and `--trace`.
-
-// cliWizard is the wizard mode of Command.runWith.
-// shortcut: the wizard is not ported; `--wizard` is an unrecognized flag until internal/wizard.ts is
-func cliWizard(fb *Fiber, root *cliCommand, args []string, ctx *cliContext) *cliError {
-	return cliUnrecognized("--wizard", ctx.path, []string{})
-}
+// The built-in behavior of `--trace`.
 
 // cliTraced is run.ts's `traced`: under `--trace` the handler of command
 // `name` runs as a span of that name, sent over OTLP/HTTP JSON to

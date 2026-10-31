@@ -62,7 +62,7 @@ type cliParam struct {
 	single   *cliSingle
 	optional bool
 	variadic bool
-	min      int // of a variadic, -1 when absent
+	min, max int // of a variadic, -1 when absent
 	parse    cliParseFn
 }
 
@@ -289,7 +289,7 @@ func cliParamOf(kind string, p cliSpecParam) *cliParam {
 			return left, value(parsed), nil
 		}
 	}
-	out := &cliParam{single: s, min: -1}
+	out := &cliParam{single: s, min: -1, max: -1}
 	switch m.kind {
 	case "switch", "default":
 		fallback := m.value
@@ -314,7 +314,7 @@ func cliParamOf(kind string, p cliSpecParam) *cliParam {
 		if m.kind == "some" {
 			min = 1
 		}
-		out.variadic, out.min, out.parse = true, min, cliVariadicParse(s, parse, min, max)
+		out.variadic, out.min, out.max, out.parse = true, min, max, cliVariadicParse(s, parse, min, max)
 	case "config":
 		out.parse = cliFallbackParse(parse, cliConfigFallback(m.value))
 	case "prompt":
