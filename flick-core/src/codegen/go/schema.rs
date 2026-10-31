@@ -134,9 +134,15 @@ impl<'a> Gen<'a> {
                     schema
                 }
             }
-            SchemaPlan::Refined { .. } => {
-                self.unsupported(span, "a refined type");
-                a.text("flickrt.SchemaUnknown")
+            SchemaPlan::Refined { name, base, known } => {
+                let base = self.plan(base, span);
+                let check = names::var(self.module, &companion_name(name, "check"));
+                let known = self.string(known.as_deref().unwrap_or(""));
+                call(
+                    a,
+                    "flickrt.SchemaRefined",
+                    [self.string(name), base, a.text(a.alloc_str(&check)), known],
+                )
             }
         }
     }

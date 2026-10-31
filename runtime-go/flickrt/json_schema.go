@@ -81,8 +81,26 @@ func (x *schemaExport) codec(c codec, path string) Value {
 
 var int32Bounds = []Value{"minimum", float64(-0x80000000), "maximum", float64(0x7fffffff)}
 
+// knownChecks are the JSON Schema keywords of the checks it can state.
+var knownChecks = map[string][]Value{
+	"email":     {"format", "email"},
+	"int":       append([]Value{"type", "integer"}, int32Bounds...),
+	"non_empty": {"minLength", float64(1)},
+	"positive":  {"exclusiveMinimum", float64(0)},
+}
+
 func (x *schemaExport) schema(s *Schema, path string) Value {
 	switch s.kind {
+	case kindRefined:
+		keywords, ok := knownChecks[s.known]
+		if !ok {
+			refuseExport(path, "the check of "+s.name+" has no JSON Schema form")
+		}
+		base := record(x.schema(s.item, path))
+		for i := 0; i < len(keywords); i += 2 {
+			base = base.set(keywords[i].(string), keywords[i+1])
+		}
+		return base
 	case kindLazy:
 		s.resolved()
 		if x.defs.index(s.name) < 0 {

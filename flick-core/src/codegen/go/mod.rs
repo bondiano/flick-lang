@@ -353,7 +353,7 @@ fn visit(
     }
     state.insert(i, false);
     let mut used = Vec::new();
-    reach::uses(&module.items[i], &mut used);
+    reach::uses(&module.name, &module.items[i], &mut used);
     for key in used.iter().filter(|(m, _)| *m == module.name) {
         if let Some(&(_, j)) = index.get(key) {
             visit(module, j, index, state, out);

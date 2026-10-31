@@ -12,6 +12,11 @@ import (
 func (w *wire) write(fb *Fiber, b *strings.Builder, v Value) []issue {
 	s := w.s.resolved()
 	switch s.kind {
+	case kindRefined:
+		if issues := s.refine(fb, v); issues != nil {
+			return issues
+		}
+		return s.item.jsonOf().(*wire).write(fb, b, v)
 	case kindNumber:
 		x := v.(float64)
 		if math.IsNaN(x) || math.IsInf(x, 0) {
