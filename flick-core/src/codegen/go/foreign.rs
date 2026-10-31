@@ -22,6 +22,8 @@ const TABLES: &[&str] = &[
     include_str!("bindings/platform.txt"),
     include_str!("bindings/stream.txt"),
     include_str!("bindings/cli.txt"),
+    include_str!("bindings/cli_prompt.txt"),
+    include_str!("bindings/datetime.txt"),
     include_str!("bindings/http.txt"),
     include_str!("bindings/layer.txt"),
     include_str!("bindings/globals.txt"),

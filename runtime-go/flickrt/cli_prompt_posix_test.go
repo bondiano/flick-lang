@@ -81,3 +81,21 @@ func TestPromptProcessInputCanBeInterruptedWithoutInput(t *testing.T) {
 		t.Fatal("terminal input ignored fiber interruption")
 	}
 }
+
+func TestPromptProcessServiceQuitsOnCtrlC(t *testing.T) {
+	native, writer := promptTestPipe(t)
+	if _, err := io.WriteString(writer, "a\x03"); err != nil {
+		t.Fatal(err)
+	}
+	tty := &promptProcessTty{native: native, readGate: make(chan struct{}, 1)}
+	tty.readGate <- struct{}{}
+	service := promptProcessService(tty)
+	fb := rootFiber()
+	if got := promptCall(fb, service, "read_key", Unit).(*Record).Get("key").(*Record).Get("name"); got != "a" {
+		t.Fatalf("got key %v", got)
+	}
+	_, cause := catch(func() Value { return promptCall(fb, service, "read_key", Unit) })
+	if cause == nil || cause.kind != causeFail || cause.err != promptQuit {
+		t.Fatalf("Ctrl+C did not quit: %v", cause)
+	}
+}

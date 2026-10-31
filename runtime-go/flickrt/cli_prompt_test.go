@@ -121,9 +121,9 @@ func TestPromptTextEditingUnicodeAndDefaults(t *testing.T) {
 		answer  string
 	}{
 		{"default", nil, Some("Paris"), "Paris"},
-		{"typed_replaces_default", promptTestTyped("Lima"), Some("Paris"), "Lima"},
+		{"typed_after_default", promptTestTyped("Lima"), Some("Paris"), "ParisLima"},
 		{"unicode_backspace", append(promptTestTyped("é🙂"), promptTestPress("backspace")), None, "é"},
-		{"cursor_editing", append(promptTestTyped("a界c"), promptTestPress("left"), promptTestPress("delete"), promptTestPress("left"), promptInput("🙂", Some("🙂"), false, false, false), promptTestPress("end"), promptInput("!", Some("!"), false, false, false), promptTestPress("home"), promptTestPress("right"), promptTestPress("backspace")), None, "🙂界!"},
+		{"cursor_editing", append(promptTestTyped("a界c"), promptTestPress("left"), promptTestPress("delete"), promptTestPress("left"), promptInput("🙂", Some("🙂"), false, false, false), promptTestPress("end"), promptInput("!", Some("!"), false, false, false), promptTestPress("home"), promptTestPress("right"), promptTestPress("backspace")), None, "🙂界c!"},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
@@ -169,9 +169,9 @@ func TestPromptTextCancellation(t *testing.T) {
 		key  Value
 	}{
 		{"eof", nil},
+		// as Effect's, the prompt beeps at these; the terminal decides to quit
 		{"escape", promptTestPress("escape")},
 		{"ctrl_c", promptInput("c", None, true, false, false)},
-		{"ctrl_d", promptInput("d", None, true, false, false)},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
@@ -290,12 +290,14 @@ func TestPromptNativeKeyDecoding(t *testing.T) {
 	}
 }
 
-func TestPromptFrameUnicodeCursorAndClipping(t *testing.T) {
-	if got := promptFrame("? ", "界🙂x", "界", 80); got != "\r\x1b[2K? 界\x1b7🙂x\x1b8" {
-		t.Fatalf("incorrect Unicode cursor position: %q", got)
-	}
-	if got := promptFrame("? ", "abcdef", "abcdef", 6); got != "\r\x1b[2Kcdef\x1b7\x1b8" {
-		t.Fatalf("long input wrapped instead of scrolling: %q", got)
+func TestPromptTextCursorAndEcho(t *testing.T) {
+	theme := promptMakeTheme()
+	theme.colors = false
+	c := &promptCtx{theme: theme}
+	opts := &promptTextOptions{kind: "text", message: "Q"}
+	frame := opts.render(c, nil, promptNext(promptTextState{1, []rune("界🙂x"), nil}))
+	if want := "? Q › 界🙂x\x1b[3D"; frame != want {
+		t.Fatalf("incorrect Unicode cursor position: %q, want %q", frame, want)
 	}
 	if got := promptVisible("hello\x1b[31m\nworld"); strings.ContainsAny(got, "\x1b\n") {
 		t.Fatalf("echo contains terminal control bytes: %q", got)

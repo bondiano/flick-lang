@@ -9,6 +9,3 @@ specSubcommand CliSpecSubcommand
 specHandle CliSpecHandle
 specGroup CliSpecGroup
 cliRunVersion *CliRunVersion
-promptText PromptText
-promptNode PromptNode
-promptRun *PromptRun

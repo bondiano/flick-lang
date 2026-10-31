@@ -31,6 +31,34 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/cli_prompt.go"),
     ),
     (
+        "cli_prompt_date.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_date.go"),
+    ),
+    (
+        "cli_prompt_file.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_file.go"),
+    ),
+    (
+        "cli_prompt_multi.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_multi.go"),
+    ),
+    (
+        "cli_prompt_number.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_number.go"),
+    ),
+    (
+        "cli_prompt_run.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_run.go"),
+    ),
+    (
+        "cli_prompt_select.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_select.go"),
+    ),
+    (
+        "cli_prompt_text.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_text.go"),
+    ),
+    (
         "cli_prompt_posix.go",
         include_str!("../../../../runtime-go/flickrt/cli_prompt_posix.go"),
     ),
@@ -89,6 +117,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "data.go",
         include_str!("../../../../runtime-go/flickrt/data.go"),
+    ),
+    (
+        "datetime.go",
+        include_str!("../../../../runtime-go/flickrt/datetime.go"),
     ),
     (
         "decimal.go",
@@ -393,6 +425,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "pubsub.go",
         include_str!("../../../../runtime-go/flickrt/pubsub.go"),
+    ),
+    (
+        "queue.go",
+        include_str!("../../../../runtime-go/flickrt/queue.go"),
     ),
     (
         "record.go",

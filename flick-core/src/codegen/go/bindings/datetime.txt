@@ -1,0 +1,5 @@
+# Effect's DateTime, as UTC instants.
+[@flick-lang/runtime/effect/DateTime]
+flickMake DateTimeMake
+flickNow DateTimeNow
+toEpochMillis DateTimeToEpochMillis
