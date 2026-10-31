@@ -163,27 +163,32 @@ var unitMillis = map[string]float64{"milli": 1, "second": 1000, "minute": 60000,
 
 // DurationFromInput reads `"Infinity"` or `"<number> <unit>"`, as Effect.
 func DurationFromInput(s Value) Value {
-	text := s.(string)
-	quoted := QuoteJSON(text)
+	quoted := QuoteJSON(s.(string))
+	d, ok := parseDuration(s.(string))
+	if !ok {
+		return durationError("not a duration: " + quoted)
+	}
+	return nonNegative("from_input "+quoted, d)
+}
+
+// parseDuration is Effect's `fromInput` of a string, negative ones too.
+func parseDuration(text string) (*Duration, bool) {
 	if text == "Infinity" {
-		return Ok(DurationInfinity)
+		return dur(DurationInfinity), true
 	}
 	m := durationInput.FindStringSubmatch(text)
 	if !strings.Contains(text, " ") || m == nil {
-		return durationError("not a duration: " + quoted)
+		return nil, false
 	}
-	unit := strings.TrimSuffix(m[2], "s")
-	var d *Duration
-	switch unit {
+	switch unit := strings.TrimSuffix(m[2], "s"); unit {
 	case "nano":
-		d = fromNanos(parseNanos(m[1], 1))
+		return fromNanos(parseNanos(m[1], 1)), true
 	case "micro":
-		d = fromNanos(parseNanos(m[1], 1000))
+		return fromNanos(parseNanos(m[1], 1000)), true
 	default:
 		n, _ := strconv.ParseFloat(m[1], 64)
-		d = fromMillis(n * unitMillis[unit])
+		return fromMillis(n * unitMillis[unit]), true
 	}
-	return nonNegative("from_input "+quoted, d)
 }
 
 func DurationIsFinite(d Value) Value { return !dur(d).infinite() }

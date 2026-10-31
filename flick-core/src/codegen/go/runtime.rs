@@ -167,6 +167,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/codec_tree.go"),
     ),
     (
+        "codec_types.go",
+        include_str!("../../../../runtime-go/flickrt/codec_types.go"),
+    ),
+    (
         "collate.go",
         include_str!("../../../../runtime-go/flickrt/collate.go"),
     ),

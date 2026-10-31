@@ -4,6 +4,11 @@
 [@flick-lang/runtime]
 schemaValidate *SchemaValidate
 codecTransformEffect CodecTransformEffect
+codecBigint CodecBigint
+chunkEmpty ChunkEmpty
+chunkFromList ChunkFromList
+chunkToList ChunkToList
+chunkSize ChunkSize
 
 [@flick-lang/runtime/effect/Schema]
 Literal CodecLiteral
@@ -41,3 +46,13 @@ flickCatchEncoding CodecCatchEncoding
 flickCatchEncodingWithContext CodecCatchEncodingEffect
 flickCheckEffect CodecCheckEffect
 flickToEncoderXml *CodecEncodeXml
+flickDurationFromMillis CodecDurationMillis
+flickDurationFromNanos CodecDurationNanos
+flickDurationFromString CodecDurationString
+flickDuration SchemaDuration
+flickBigDecimalFromString CodecDecimal
+flickBigDecimal SchemaDecimal
+flickChunkJson CodecChunk
+flickChunk SchemaChunk
+flickHashSetJson *CodecHashSet
+flickHashMapJson *CodecHashMap
