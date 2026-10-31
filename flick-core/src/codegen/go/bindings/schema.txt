@@ -1,0 +1,118 @@
+# The schemas, codecs and checks over Effect Schema beyond the core ones of
+# runtime.txt: Effect's combinators and the standard library's types.
+
+[@flick-lang/runtime]
+schemaValidate *SchemaValidate
+codecTransformEffect CodecTransformEffect
+codecBigint CodecBigint
+chunkEmpty ChunkEmpty
+chunkFromList ChunkFromList
+chunkToList ChunkToList
+chunkSize ChunkSize
+routePrint RoutePrint
+routeParse *RouteParse
+
+[@flick-lang/runtime/effect/Schema]
+Literal CodecLiteral
+Literals CodecLiterals
+flickEntries CodecEntries
+NonEmptyArray CodecNonEmptyList
+ArrayEnsure CodecListEnsure
+Trim CodecTrim
+flickToLowerCase CodecToLowerCase
+flickToUpperCase CodecToUpperCase
+flickCapitalize CodecCapitalize
+flickUncapitalize CodecUncapitalize
+flickSnakeToCamel CodecSnakeToCamel
+NumberFromString CodecNumberFromString
+flickFiniteFromString CodecFiniteFromString
+BooleanFromBit CodecBoolFromBit
+flickStringFromBase64 CodecStringFromBase64
+flickStringFromBase64Url CodecStringFromBase64Url
+flickStringFromHex CodecStringFromHex
+flickBytesFromBase64 CodecBytesFromBase64
+flickBytesFromBase64Url CodecBytesFromBase64Url
+flickBytesFromHex CodecBytesFromHex
+flickStringFromUriComponent CodecStringFromUriComponent
+flickFromJsonString CodecJsonString
+flickSplit CodecSplit
+flickSplitKeyValue CodecSplitKeyValue
+Natural CodecNatural
+Port CodecPort
+Char CodecChar
+flickAnnotate CodecAnnotate
+flickResolveAnnotations CodecAnnotations
+flip CodecFlip
+flickToType CodecToSchema
+flickToEncoded CodecWireSchema
+flickCatchDecoding CodecCatchDecoding
+flickCatchDecodingWithContext CodecCatchDecodingEffect
+flickCatchEncoding CodecCatchEncoding
+flickCatchEncodingWithContext CodecCatchEncodingEffect
+flickCheckEffect CodecCheckEffect
+flickToEncoderXml *CodecEncodeXml
+flickDurationFromMillis CodecDurationMillis
+flickDurationFromNanos CodecDurationNanos
+flickDurationFromString CodecDurationString
+flickDuration SchemaDuration
+flickBigDecimalFromString CodecDecimal
+flickBigDecimal SchemaDecimal
+flickChunkJson CodecChunk
+flickChunk SchemaChunk
+flickHashSetJson *CodecHashSet
+flickHashMapJson *CodecHashMap
+flickCheck CheckApply
+flickIsInt CheckInt
+flickIsFinite CheckFinite
+isBetween CheckBetween
+isMinLength CheckMinLength
+isMaxLength CheckMaxLength
+flickIsPattern CheckPattern
+
+[@flick-lang/runtime/effect/Arbitrary]
+schema ArbitrarySchema
+flickSchema ArbitrarySchemaWith
+Constant ArbitraryConstant
+flickArray ArbitraryArray
+all ArbitraryAll
+flickZip2 ArbitraryZip2
+flickZip3 ArbitraryZip3
+flickZip4 ArbitraryZip4
+map ArbitraryMap
+filter ArbitraryFilter
+filterMap ArbitraryFilterMap
+flatMap ArbitraryFlatMap
+flickSampleEffect *ArbitrarySample
+flickCheckEffect *ArbitraryCheck
+flickFormatCheckFailure ArbitraryFormatCheckFailure
+
+[@flick-lang/runtime/effect/JsonSchema]
+META_SCHEMA_URI_DRAFT_04 MetaSchemaUriDraft04
+META_SCHEMA_URI_DRAFT_07 MetaSchemaUriDraft07
+META_SCHEMA_URI_DRAFT_2020_12 MetaSchemaUriDraft202012
+flickFromSchemaDraft07 JsonSchemaFromDraft07
+flickFromSchemaDraft2020_12 JsonSchemaFromDraft202012
+flickFromSchemaOpenApi3_1 JsonSchemaFromOpenApi31
+flickFromSchemaOpenApi3_0 JsonSchemaFromOpenApi30
+flickToDocumentDraft07 JsonSchemaToDraft07
+flickToDocumentDraft04 JsonSchemaToDraft04
+toMultiDocumentOpenApi3_1 JsonSchemaToOpenApi31
+
+[@flick-lang/runtime/effect/JsonPointer]
+escapeToken EscapeToken
+unescapeToken UnescapeToken
+parseUriFragment ParseUriFragment
+formatUriFragment FormatUriFragment
+
+[@flick-lang/runtime/effect/JsonPatch]
+flickGet JsonPatchGet
+flickApply JsonPatchApply
+
+[@flick-lang/runtime/effect/Schema]
+toDifferJsonPatch DifferJsonPatch
+
+[@flick-lang/runtime/effect/Differ]
+flickEmpty DifferEmpty
+flickDiff *DifferDiff
+flickCombine DifferCombine
+flickPatch *DifferPatch

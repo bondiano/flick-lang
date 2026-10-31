@@ -25,3 +25,8 @@ export declare const cyclic: () => any;
 export declare const shared: () => any;
 export declare const trap: () => any;
 export declare const deep: (n: number) => any;
+export declare const sortInPlace: (xs: number[]) => number[];
+export declare const kept: () => number[];
+export declare const spoil: () => void;
+export declare const rename: (user: { name: string; tags: string[] }) => void;
+export declare const pushInto: (f: () => number[]) => number;

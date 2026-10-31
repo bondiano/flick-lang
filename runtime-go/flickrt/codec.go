@@ -90,6 +90,9 @@ func (losslessNumber) encode(_ *Fiber, v Value) (Value, []issue) {
 }
 
 func CodecDecodeResult(fb *Fiber, c, in Value) Value {
+	if problem := inertProblem(in); problem != nil {
+		return Err(schemaErrorOf(problem))
+	}
 	v, issues := codecOf(c).decode(fb, in)
 	if issues != nil {
 		return Err(schemaErrorOf(issues))

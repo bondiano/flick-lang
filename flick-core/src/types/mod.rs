@@ -15,6 +15,7 @@
 mod abi;
 mod applicative_do;
 mod bindings;
+mod builtin_sources;
 mod builtins;
 mod calls;
 mod classes;
@@ -95,7 +96,7 @@ pub(crate) use sql::base_type;
 pub use sql::dialect::{self, Dialect};
 pub use ty::{Binder, Effects, PRELUDE, Row, SYNC_SERVICES, Stage, Type, stage_of};
 pub use typing::{
-    CodecBlock, Constructor, ForeignInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref,
+    CodecBlock, Constructor, Copies, ForeignInfo, Identity, InstanceInfo, Lift, Owner, Range, Ref,
     SchemaItem, SchemaPlan, ServerFn, SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue, Typing,
     default_method, passes_dictionary,
 };
@@ -105,6 +106,7 @@ use env::{Builtins, Env};
 use kinds::KindStore;
 use std::collections::HashMap;
 use std::ptr;
+use std::sync::Arc;
 use unify::Store;
 
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
@@ -272,6 +274,7 @@ fn run_in(
     checker.module(module.tree);
     checker.report_holes();
     checker.fill(interface);
+    checker.typing.declarations = Arc::new(checker.declarations());
     checker.sugar_lints(module.tree);
     let typing = checker.finish_typing();
     let mut evidence = checker.classes.evidence;

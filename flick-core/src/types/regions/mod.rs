@@ -231,7 +231,21 @@ impl Checker<'_> {
                     self.collect_bounded_captures(result, out, false);
                 }
             }
-            Type::Forall { body, .. } => self.collect_bounded_captures(body, out, bounded),
+            // what the `forall` binds is no capture of the value: each use
+            // instantiates it (a recursive local sees its own scheme)
+            Type::Forall { vars, body, .. } => {
+                let mut inner = Norm::default();
+                self.collect_bounded_captures(body, &mut inner, bounded);
+                let bound =
+                    |t: &Type| matches!(t, Type::Var(v) if vars.iter().any(|b| b.name == *v));
+                out.entries
+                    .extend(inner.entries.into_iter().filter(|(_, t)| !bound(t)));
+                for tail in inner.tails {
+                    if !out.tails.contains(&tail) {
+                        out.tails.push(tail);
+                    }
+                }
+            }
             _ => {}
         }
     }

@@ -1,14 +1,18 @@
 package flickrt
 
-import "sync"
+import (
+	"math"
+	"sync"
+	"time"
+)
 
 // LayerMap and LayerRef: layers built on demand, by key or once, shared
 // while a scope holds them. Each key has a layer of its own identity, built
 // through one memo map with the services of where the map was made, so a
 // key held by a preload or a running `provide` is not built again;
-// invalidating a key makes the next use build a new one.
-//
-// shortcut: idleTimeToLive is ignored, so a key nobody holds is released at once; keep idle entries for the duration if a program needs it
+// invalidating a key makes the next use build a new one. A key nobody
+// holds stays built for the map's idleTimeToLive, and is released with the
+// map's scope if it outlives it.
 
 type keyed struct {
 	mu     sync.Mutex
@@ -20,8 +24,30 @@ type keyed struct {
 	layers []*Layer
 }
 
-func newKeyed(fb *Fiber, lookup func(*Fiber, Value) *Layer) *keyed {
-	return &keyed{make: fb, memo: newMemoMap(nil), scope: fb.owner, lookup: lookup}
+func newKeyed(fb *Fiber, lookup func(*Fiber, Value) *Layer, options Value) *keyed {
+	memo := newMemoMap(nil)
+	if d, ok := some(record(options).Get("idleTimeToLive")); ok {
+		memo.idle = idleDuration(dur(d))
+		fb.owner.add(fb, func(fb *Fiber, exit *Cause) Value {
+			if cause := memo.releaseIdle(fb, exit); cause != nil {
+				panic(&Failure{cause})
+			}
+			return Unit
+		})
+	}
+	return &keyed{make: fb, memo: memo, scope: fb.owner, lookup: lookup}
+}
+
+// idleDuration is a Duration as Go's, the longest one for an infinite one.
+func idleDuration(d *Duration) time.Duration {
+	if d.infinite() {
+		return math.MaxInt64
+	}
+	n := d.toNanos()
+	if !n.IsInt64() {
+		return math.MaxInt64
+	}
+	return time.Duration(n.Int64())
 }
 
 // layer is the layer of `key`, a new one after an invalidation.
@@ -67,7 +93,7 @@ func (k *keyed) get(key Value) Value {
 }
 
 func LayerMapMake(fb *Fiber, lookup, options Value) Value {
-	k := newKeyed(fb, func(fb *Fiber, key Value) *Layer { return layerOf(Apply(fb, lookup, key)) })
+	k := newKeyed(fb, func(fb *Fiber, key Value) *Layer { return layerOf(Apply(fb, lookup, key)) }, options)
 	if keys, ok := some(record(options).Get("preloadKeys")); ok {
 		for _, key := range List(keys) {
 			k.build(fb, key, k.scope)
@@ -85,7 +111,7 @@ func LayerMapFromRecord(fb *Fiber, layers, options Value) Value {
 			}
 		}
 		panic(Defect{"LayerMap has no key " + Format(key)})
-	})
+	}, options)
 	if record(options).Get("preload").(bool) {
 		for _, p := range pairs {
 			k.build(fb, p.([]Value)[0], k.scope)
@@ -112,7 +138,7 @@ type layerRef struct {
 var refKey Value = Unit
 
 func LayerRefMake(fb *Fiber, layer, options Value) Value {
-	r := &layerRef{keyed: newKeyed(fb, func(_ *Fiber, _ Value) *Layer { return layerOf(layer) })}
+	r := &layerRef{keyed: newKeyed(fb, func(_ *Fiber, _ Value) *Layer { return layerOf(layer) }, options)}
 	if record(options).Get("preload").(bool) {
 		r.refresh(fb)
 	}

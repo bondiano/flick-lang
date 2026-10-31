@@ -3,7 +3,7 @@ title: "Effect coverage"
 ---
 
 The standard library wraps the pinned Effect release (see [The boundary of the language core](../../spec/07-errors-and-concurrency/#the-boundary-of-the-language-core)): every public export of the entrypoints `effect`, `effect/cli`, `effect/devtools`,
-`effect/http`, `effect/http-api`, `effect/observability`, `effect/reactivity` and `effect/rpc` has a typed wrapper or an explicit
+`effect/http`, `effect/http-api`, `effect/observability`, `effect/process`, `effect/reactivity` and `effect/rpc` has a typed wrapper or an explicit
 decision, and a linter in `cargo test` checks that nothing is lost when
 Effect moves.
 
@@ -12,7 +12,7 @@ Effect moves.
 `stdlib/Effect/snapshot.json` is the surface of the installed Effect, written
 by `node tools/dts-importer/index.mjs surface > stdlib/Effect/snapshot.json`
 (a Flick program: `pnpm -C tools/dts-importer build` first):
-every entrypoint of its `package.json`, and for the eight wrapped ones each
+every entrypoint of its `package.json`, and for the nine wrapped ones each
 export of each module as `Module.name` with its kind (`value`, `type` or
 `value+type`) and a fingerprint, 16 hex digits of the SHA-256 of its
 declarations printed without comments. A changed doc comment keeps the

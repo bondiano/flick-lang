@@ -9,10 +9,12 @@ let say line = Platform.stdout_line line
 /// A resource named `name`, released with a log line by its owner.
 acquire : forall s. String ->{Scope s;} String
 let acquire name =
-  Resource.acquire_release (task {
-    say ("acquire " ++ name)
-    name
-  }) (fun n -> say ("release " ++ n))
+  Resource.acquire_release
+    (task {
+      say ("acquire " ++ name)
+      name
+    })
+    (fun n -> say ("release " ++ n))
 
 main : Unit ->{} Unit
 let main () =
@@ -20,27 +22,31 @@ let main () =
     let ref = ScopedRef.from_acquire (task { acquire "ref 1" })
     ScopedRef.use ref (fun v ->
       ScopedRef.set (task { acquire "ref 2" }) ref
-      say ("still using " ++ v))
+      say ("still using " ++ v)
+    )
     say ("now " ++ ScopedRef.use ref (fun v -> v))
     let version = Ref.make 0
-    let res : Resource.Resource s none String = Resource.manual (task {
-      Ref.update version (fun n -> n + 1)
-      acquire ("res " ++ show (Ref.get version))
-    })
+    let res : Resource.Resource s none String =
+      Resource.manual
+        (task {
+          Ref.update version (fun n -> n + 1)
+          acquire ("res " ++ show (Ref.get version))
+        })
     Resource.use res (fun v ->
       Resource.refresh res
-      say ("still using " ++ v))
+      say ("still using " ++ v)
+    )
     say ("now " ++ Resource.use res (fun v -> v))
     let cache : ScopedCache.ScopedCache s String none String =
-      ScopedCache.make
-        {
-          lookup = fun (key : String) -> acquire ("entry " ++ key);
-          capacity = 4;
-          timeToLive = None;
-        }
+      ScopedCache.make {
+        lookup = fun (key : String) -> acquire ("entry " ++ key);
+        capacity = 4;
+        timeToLive = None;
+      }
     ScopedCache.use "a" cache (fun v ->
       ScopedCache.invalidate "a" cache
-      say ("still using " ++ v))
+      say ("still using " ++ v)
+    )
     say ("now " ++ ScopedCache.use "a" cache (fun v -> v))
     say "closing"
   }

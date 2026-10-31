@@ -10,113 +10,7 @@ import (
 	"unicode/utf8"
 )
 
-type textPrompt struct {
-	message  string
-	initial  Value
-	validate Value
-}
-
-func PromptText(options Value) Value {
-	o := options.(*Record)
-	return &textPrompt{o.Get("message").(string), o.Get("default"), o.Get("validate")}
-}
-
 var promptQuit = Nullary(Tag("Terminal.QuitError.QuitError"))
-
-func promptCall(fb *Fiber, tty *Record, name string, argument Value) Value {
-	return Run(fb, Apply(fb, tty.Get(name), argument))
-}
-
-func PromptRun(fb *Fiber, key, prompt Value) Value {
-	impl, ok := fb.env.get(key.(string))
-	if !ok {
-		panic(Defect{"Service not found: " + key.(string)})
-	}
-	tty := impl.(*Record)
-	out, cause := catch(func() Value { return runTextPrompt(fb, tty, prompt.(*textPrompt)) })
-	_, cleanup := catch(func() Value {
-		return masked(fb, fb.state.mask+1, func() Value {
-			return promptCall(fb, tty, "display", "\x1b[?25h")
-		})
-	})
-	if cause = Sequential(cause, cleanup); cause != nil {
-		panic(&Failure{cause})
-	}
-	return out
-}
-
-func runTextPrompt(fb *Fiber, tty *Record, prompt *textPrompt) Value {
-	var text []rune
-	cursor := 0
-	prefix := "? " + promptVisible(prompt.message) + " › "
-	for {
-		Check(fb)
-		columns := int(promptCall(fb, tty, "columns", Unit).(int32))
-		promptCall(fb, tty, "rows", Unit)
-		shown, before := string(text), string(text[:cursor])
-		if len(text) == 0 {
-			if initial, ok := some(prompt.initial); ok {
-				shown = initial.(string)
-			}
-		}
-		promptCall(fb, tty, "display", promptFrame(prefix, shown, before, columns))
-		input := promptCall(fb, tty, "read_key", Unit).(*Record)
-		key := input.Get("key").(*Record)
-		name := key.Get("name").(string)
-		ctrl, meta := key.Get("ctrl").(bool), key.Get("meta").(bool)
-		if name == "escape" || ctrl && (name == "c" || name == "d") {
-			return Fail(promptQuit)
-		}
-		switch {
-		case name == "return" || name == "enter":
-			answer := string(text)
-			if len(text) == 0 {
-				if initial, ok := some(prompt.initial); ok {
-					answer = initial.(string)
-				}
-			}
-			if validate, ok := some(prompt.validate); ok {
-				result := Apply(fb, validate, answer).(*Data)
-				if result.Tag == "Failure" {
-					promptCall(fb, tty, "display", "\r\n! "+promptVisible(result.Fields[0].(string))+"\r\n")
-					continue
-				}
-				answer = result.Fields[0].(string)
-			}
-			promptCall(fb, tty, "display", "\r\x1b[2K✓ "+promptVisible(prompt.message)+" › "+promptVisible(answer)+"\r\n")
-			return answer
-		case name == "left":
-			cursor = max(0, cursor-1)
-		case name == "right":
-			cursor = min(len(text), cursor+1)
-		case name == "home" || ctrl && name == "a":
-			cursor = 0
-		case name == "end" || ctrl && name == "e":
-			cursor = len(text)
-		case name == "backspace":
-			if cursor > 0 {
-				text = append(text[:cursor-1], text[cursor:]...)
-				cursor--
-			}
-		case name == "delete":
-			if cursor < len(text) {
-				text = append(text[:cursor], text[cursor+1:]...)
-			}
-		case ctrl && name == "u":
-			text, cursor = text[cursor:], 0
-		case ctrl && name == "k":
-			text = text[:cursor]
-		case !ctrl && !meta:
-			if typed, ok := some(input.Get("input")); ok {
-				inserted := []rune(promptVisible(typed.(string)))
-				text = append(text, make([]rune, len(inserted))...)
-				copy(text[cursor+len(inserted):], text[cursor:len(text)-len(inserted)])
-				copy(text[cursor:], inserted)
-				cursor += len(inserted)
-			}
-		}
-	}
-}
 
 // Control bytes must not become terminal commands when echoed by a prompt.
 func promptVisible(text string) string {
@@ -148,30 +42,6 @@ func promptWidth(text string) int {
 		width += promptRuneWidth(r)
 	}
 	return width
-}
-
-func promptFrame(prefix, text, before string, columns int) string {
-	frame := []rune(prefix + promptVisible(text))
-	cursor := []rune(prefix + promptVisible(before))
-	position, at := promptWidth(string(cursor)), len(cursor)
-	width := promptWidth(string(frame))
-	if columns > 1 {
-		available := columns - 1
-		for len(frame) > 0 && position >= available {
-			step := promptRuneWidth(frame[0])
-			frame = frame[1:]
-			at--
-			position -= step
-			width -= step
-		}
-		for len(frame) > 0 && width > available {
-			width -= promptRuneWidth(frame[len(frame)-1])
-			frame = frame[:len(frame)-1]
-		}
-	}
-	at = min(max(0, at), len(frame))
-	// The terminal, not rune counts, positions the cursor for shaped Unicode text.
-	return "\r\x1b[2K" + string(frame[:at]) + "\x1b7" + string(frame[at:]) + "\x1b8"
 }
 
 type promptProcessTty struct {
@@ -218,7 +88,7 @@ func releasePromptTty() Value {
 
 func (tty *promptProcessTty) read(fb *Fiber) Value {
 	Check(fb)
-	idle()
+	defer park(fb, nil)()
 	if fb.state.mask > 0 {
 		<-tty.readGate
 	} else {
@@ -239,33 +109,47 @@ func (tty *promptProcessTty) read(fb *Fiber) Value {
 	return value
 }
 
+// PromptNode is `Cli.Prompt.node`: the terminal of the process.
 func PromptNode(key Value) Value {
 	return memoized(func(fb *Fiber, _ *MemoMap, scope *Owner) Services {
 		tty := acquirePromptTty()
 		scope.add(fb, func(*Fiber, *Cause) Value { return releasePromptTty() })
-		return Services{key.(string): Rec(
-			"read_key", Fn(func(_ *Fiber, _ Value) Value {
-				return Eff(func(fb *Fiber) Value { return tty.read(fb) })
-			}),
-			"display", Fn(func(_ *Fiber, text Value) Value {
-				return Eff(func(*Fiber) Value {
-					outMu.Lock()
-					defer outMu.Unlock()
-					stdout.Flush()
-					if _, err := tty.output.WriteString(wellFormed(text.(string))); err != nil {
-						panic(Defect{"Cli.Prompt terminal output: " + err.Error()})
-					}
-					return Unit
-				})
-			}),
-			"columns", Fn(func(_ *Fiber, _ Value) Value {
-				return Eff(func(*Fiber) Value { columns, _ := promptTerminalSize(tty.native); return int32(columns) })
-			}),
-			"rows", Fn(func(_ *Fiber, _ Value) Value {
-				return Eff(func(*Fiber) Value { _, rows := promptTerminalSize(tty.native); return int32(rows) })
-			}),
-		)}
+		return Services{key.(string): promptProcessService(tty)}
 	})
+}
+
+// promptProcessService is the `Tty` of the process terminal; Ctrl+C and
+// Ctrl+D quit, as Effect's NodeTerminal has it.
+func promptProcessService(tty *promptProcessTty) *Record {
+	return Rec(
+		"read_key", Fn(func(_ *Fiber, _ Value) Value {
+			return Eff(func(fb *Fiber) Value {
+				input := tty.read(fb).(*Record)
+				key := input.Get("key").(*Record)
+				if name := key.Get("name"); key.Get("ctrl").(bool) && (name == "c" || name == "d") {
+					return Fail(promptQuit)
+				}
+				return input
+			})
+		}),
+		"display", Fn(func(_ *Fiber, text Value) Value {
+			return Eff(func(*Fiber) Value {
+				outMu.Lock()
+				defer outMu.Unlock()
+				stdout.Flush()
+				if _, err := tty.output.WriteString(wellFormed(text.(string))); err != nil {
+					panic(Defect{"Cli.Prompt terminal output: " + err.Error()})
+				}
+				return Unit
+			})
+		}),
+		"columns", Fn(func(_ *Fiber, _ Value) Value {
+			return Eff(func(*Fiber) Value { columns, _ := promptTerminalSize(tty.native); return int32(columns) })
+		}),
+		"rows", Fn(func(_ *Fiber, _ Value) Value {
+			return Eff(func(*Fiber) Value { _, rows := promptTerminalSize(tty.native); return int32(rows) })
+		}),
+	).(*Record)
 }
 
 func promptInput(name string, input Value, ctrl, meta, shift bool) Value {

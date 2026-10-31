@@ -1,12 +1,9 @@
 package flickrt
 
-import "sort"
-
 // HashSet and HashMap: the elements or keys are kept in the order Effect's
 // HAMT walks them on the JS target, by the witness's hash five bits at a
-// time from the lowest, and by insertion among equal hashes.
-//
-// shortcut: a sorted copy-on-write slice, O(n) per insert; a HAMT once the go target is measured
+// time from the lowest, and by insertion among equal hashes; a HAMT of
+// their own keeps them so (hamt.go).
 
 // Witness is `EqHash w a`: the equality and hash of a collection.
 type Witness struct{ eq, hash Value }
@@ -25,7 +22,6 @@ func EqHashCanonical(fb *Fiber, d Value) Value {
 type entry struct {
 	key, value Value
 	hash       int32
-	order      uint64
 }
 
 // walk is where a hash puts an entry in the HAMT's walk: its five-bit
@@ -38,63 +34,64 @@ func walk(h int32) uint64 {
 	return key
 }
 
-// table is the entries of a set or map in walk order; never mutated.
+// table is the entries of a set or map; never mutated.
 type table struct {
-	w       *Witness
-	entries []entry
-	next    uint64
-}
-
-// find is the index of the key equal to `k` among those of hash `h`, or
-// where an entry of that hash goes, and whether it was found.
-func (t *table) find(fb *Fiber, k Value, h int32) (int, bool) {
-	at := walk(h)
-	i := sort.Search(len(t.entries), func(i int) bool { return walk(t.entries[i].hash) >= at })
-	for j := i; j < len(t.entries) && t.entries[j].hash == h; j++ {
-		if t.w.equal(fb, k, t.entries[j].key) {
-			return j, true
-		}
-	}
-	for i < len(t.entries) && t.entries[i].hash == h {
-		i++
-	}
-	return i, false
+	w    *Witness
+	root *hnode
+	size int32
 }
 
 // set puts `k` and `v`: a new key replaces an equal one in its place, and
 // with `keep` the old entry stays.
 func (t *table) set(fb *Fiber, k, v Value, h int32, keep bool) *table {
-	i, found := t.find(fb, k, h)
-	if found && (keep || Equals(t.entries[i].value, v)) {
+	root, added := t.root.with(fb, t.w, entry{k, v, h}, 0, keep)
+	if root == t.root {
 		return t
 	}
-	out := &table{w: t.w, next: t.next}
-	if found {
-		out.entries = append([]entry{}, t.entries...)
-		out.entries[i] = entry{k, v, h, t.entries[i].order}
-		return out
+	size := t.size
+	if added {
+		size++
 	}
-	out.entries = make([]entry, 0, len(t.entries)+1)
-	out.entries = append(append(append(out.entries, t.entries[:i]...), entry{k, v, h, t.next}), t.entries[i:]...)
-	out.next++
-	return out
+	return &table{t.w, root, size}
 }
 
 func (t *table) remove(fb *Fiber, k Value) *table {
-	i, found := t.find(fb, k, t.w.of(fb, k))
-	if !found {
+	root, removed := t.root.without(fb, t.w, k, t.w.of(fb, k), 0)
+	if !removed {
 		return t
 	}
-	out := &table{w: t.w, next: t.next, entries: make([]entry, 0, len(t.entries)-1)}
-	out.entries = append(append(out.entries, t.entries[:i]...), t.entries[i+1:]...)
-	return out
+	return &table{t.w, root, t.size - 1}
 }
 
 func (t *table) get(fb *Fiber, k Value, h int32) (Value, bool) {
-	if i, found := t.find(fb, k, h); found {
-		return t.entries[i].value, true
-	}
-	return nil, false
+	e, found := t.root.find(fb, t.w, k, h, 0)
+	return e.value, found
+}
+
+func (t *table) has(fb *Fiber, k Value) bool {
+	_, found := t.root.find(fb, t.w, k, t.w.of(fb, k), 0)
+	return found
+}
+
+// all is the entries in walk order.
+func (t *table) all() []entry {
+	out := make([]entry, 0, t.size)
+	t.root.each(func(e entry) bool { out = append(out, e); return true })
+	return out
+}
+
+// kept is the table of the entries `keep` keeps, each as it gives it, in
+// the same order.
+func (t *table) kept(keep func(entry) (entry, bool)) *table {
+	out := empty(t.w)
+	t.root.each(func(e entry) bool {
+		if e, ok := keep(e); ok {
+			out.root, _ = out.root.with(nil, nil, e, 0, false)
+			out.size++
+		}
+		return true
+	})
+	return out
 }
 
 func empty(w Value) *table { return &table{w: w.(*Witness)} }
@@ -112,8 +109,8 @@ func hmap(m Value) *table  { return m.(HashMap).table }
 
 func HashSetWith(w Value) Value             { return setOf(empty(w)) }
 func HashSetEmpty(fb *Fiber, d Value) Value { return HashSetWith(EqHashCanonical(fb, d)) }
-func HashSetSize(s Value) Value             { return int32(len(set(s).entries)) }
-func HashSetIsEmpty(s Value) Value          { return len(set(s).entries) == 0 }
+func HashSetSize(s Value) Value             { return set(s).size }
+func HashSetIsEmpty(s Value) Value          { return set(s).size == 0 }
 
 // HashSetInsert adds an element; an equal one already there stays.
 func HashSetInsert(fb *Fiber, x, s Value) Value {
@@ -132,24 +129,19 @@ func HashSetFromList(fb *Fiber, w, xs Value) Value {
 func HashSetRemove(fb *Fiber, x, s Value) Value { return setOf(set(s).remove(fb, x)) }
 
 func HashSetMember(fb *Fiber, x, s Value) Value {
-	t := set(s)
-	_, found := t.find(fb, x, t.w.of(fb, x))
-	return found
+	return set(s).has(fb, x)
 }
 
 func HashSetToList(s Value) Value {
-	t := set(s)
-	out := make([]Value, len(t.entries))
-	for i, e := range t.entries {
-		out[i] = e.key
-	}
+	out := make([]Value, 0, set(s).size)
+	set(s).root.each(func(e entry) bool { out = append(out, e.key); return true })
 	return out
 }
 
 // HashSetUnion is the elements of `a`, then those of `b` it lacks.
 func HashSetUnion(fb *Fiber, a, b Value) Value {
 	t := set(a)
-	for _, e := range set(b).entries {
+	for _, e := range set(b).all() {
 		t = t.set(fb, e.key, Unit, t.w.of(fb, e.key), true)
 	}
 	return setOf(t)
@@ -158,14 +150,7 @@ func HashSetUnion(fb *Fiber, a, b Value) Value {
 func HashSetRehash(fb *Fiber, w, s Value) Value { return HashSetFromList(fb, w, HashSetToList(s)) }
 
 func filterSet(s Value, keep func(Value) bool) Value {
-	t := set(s)
-	out := &table{w: t.w, next: t.next}
-	for _, e := range t.entries {
-		if keep(e.key) {
-			out.entries = append(out.entries, e)
-		}
-	}
-	return setOf(out)
+	return setOf(set(s).kept(func(e entry) (entry, bool) { return e, keep(e.key) }))
 }
 
 func HashSetIntersection(fb *Fiber, that, s Value) Value {
@@ -177,7 +162,7 @@ func HashSetDifference(fb *Fiber, that, s Value) Value {
 }
 
 func HashSetIsSubset(fb *Fiber, that, s Value) Value {
-	for _, e := range set(s).entries {
+	for _, e := range set(s).all() {
 		if !Bool(HashSetMember(fb, e.key, that)) {
 			return false
 		}
@@ -187,7 +172,7 @@ func HashSetIsSubset(fb *Fiber, that, s Value) Value {
 
 func HashSetMap(fb *Fiber, w, f, s Value) Value {
 	t := empty(w)
-	for _, e := range set(s).entries {
+	for _, e := range set(s).all() {
 		y := Apply(fb, f, e.key)
 		t = t.set(fb, y, Unit, t.w.of(fb, y), true)
 	}
@@ -199,7 +184,7 @@ func HashSetFilter(fb *Fiber, f, s Value) Value {
 }
 
 func HashSetSome(fb *Fiber, f, s Value) Value {
-	for _, e := range set(s).entries {
+	for _, e := range set(s).all() {
 		if Bool(Apply(fb, f, e.key)) {
 			return true
 		}
@@ -208,7 +193,7 @@ func HashSetSome(fb *Fiber, f, s Value) Value {
 }
 
 func HashSetEvery(fb *Fiber, f, s Value) Value {
-	for _, e := range set(s).entries {
+	for _, e := range set(s).all() {
 		if !Bool(Apply(fb, f, e.key)) {
 			return false
 		}
@@ -218,7 +203,7 @@ func HashSetEvery(fb *Fiber, f, s Value) Value {
 
 func HashSetReduce(fb *Fiber, zero, f, s Value) Value {
 	acc := zero
-	for _, e := range set(s).entries {
+	for _, e := range set(s).all() {
 		acc = apply2(fb, f, acc, e.key)
 	}
 	return acc

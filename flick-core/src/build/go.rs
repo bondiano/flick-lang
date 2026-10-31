@@ -6,7 +6,7 @@ use std::env;
 use std::path::Path;
 
 use super::{Artifact, Settings, builtin_modules, generic_of, specifier};
-use crate::codegen::go::{self, Program, RUNTIME};
+use crate::codegen::go::{self, DRIVER, DRIVER_GO_MOD, DRIVER_GO_SUM, Program, RUNTIME};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir;
 use crate::opt;
@@ -108,10 +108,26 @@ pub fn emit(
             foreign_file: &foreign_file,
         });
         diagnostics.extend(output.diagnostics);
+        // a program with the PostgreSQL driver requires pgx, which go build downloads once
+        let go_mod = if output.driver {
+            DRIVER_GO_MOD
+        } else {
+            "module flick.app\n\ngo 1.23\n"
+        };
         out.push(Artifact {
             path: format!("{dir}/go.mod"),
-            contents: "module flick.app\n\ngo 1.23\n".to_owned(),
+            contents: go_mod.to_owned(),
         });
+        if output.driver {
+            out.push(Artifact {
+                path: format!("{dir}/go.sum"),
+                contents: DRIVER_GO_SUM.to_owned(),
+            });
+            out.extend(DRIVER.iter().map(|(path, contents)| Artifact {
+                path: format!("{dir}/{path}"),
+                contents: (*contents).to_owned(),
+            }));
+        }
         out.extend(output.files.into_iter().map(|(path, contents)| Artifact {
             path: format!("{dir}/{path}"),
             contents,

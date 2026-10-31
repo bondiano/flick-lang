@@ -1,14 +1,39 @@
-# Native command descriptions and text prompts.
+# Commands as data, run by the port of Effect's CLI.
 [@flick-lang/runtime/cli]
+multiSwitch CliMultiSwitch
 multiRequired CliMultiRequired
+multiDefault CliMultiDefault
+multiOptional CliMultiOptional
+multiMany CliMultiMany
 multiSome CliMultiSome
+multiAtLeast CliMultiAtLeast
+multiAtMost CliMultiAtMost
+multiBetween CliMultiBetween
+multiConfig CliMultiConfig
+multiPrompt CliMultiPrompt
+multiHidden CliMultiHidden
+multiMetavar CliMultiMetavar
+multiOptionalValue CliMultiOptionalValue
+multiFile CliMultiFile
+multiDirectory CliMultiDirectory
+multiPath CliMultiPath
+multiFileText CliMultiFileText
+multiFileParse CliMultiFileParse
 specCommand CliSpecCommand
 specDescription CliSpecDescription
+specShortDescription CliSpecShortDescription
+specAlias CliSpecAlias
+specUnlisted CliSpecUnlisted
+specExample CliSpecExample
+specAction CliSpecAction
+specFlag CliSpecFlag
 specArg CliSpecArg
 specSubcommand CliSpecSubcommand
 specHandle CliSpecHandle
 specGroup CliSpecGroup
+cliDefaultFormatter CliDefaultFormatter
+cliDisplayWidth CliDisplayWidth
+cliHelpDoc *CliHelpDoc
+cliCompletions *CliCompletions
+cliRunWith *CliRunWith
 cliRunVersion *CliRunVersion
-promptText PromptText
-promptNode PromptNode
-promptRun *PromptRun

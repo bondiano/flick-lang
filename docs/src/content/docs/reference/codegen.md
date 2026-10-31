@@ -322,7 +322,7 @@ beside it, which `flick build` compiles with `go build` into
 `flick-<entry>`. Only what `main` reaches is compiled, and a construct the
 target does not compile yet is `FLICK-P012` with what it names, never a
 runtime stub; for now that is a lazy `for` that reads services, refined
-types, schemas deriving `Url` or `Form`, and a `foreign` binding without a
+types, schemas deriving `Form`, and a `foreign` binding without a
 Go implementation: in the runtime for the standard library, which is still
 part of Effect beyond the core (most of `Stream`, queues, schedules beyond
 `recurs`, parts of `Codec`), or beside the program for its own bindings

@@ -13,9 +13,11 @@ pub type Key = (String, String);
 /// The names a top-level item defines.
 pub fn defined(item: &Item) -> Vec<String> {
     match &item.kind {
-        ItemKind::Value { name, .. }
-        | ItemKind::Service { name, .. }
-        | ItemKind::Refined { name, .. } => vec![name.clone()],
+        ItemKind::Value { name, .. } | ItemKind::Service { name, .. } => vec![name.clone()],
+        ItemKind::Refined { name, .. } => ["check", "parse", "value"]
+            .iter()
+            .map(|m| companion_name(name, m))
+            .collect(),
         ItemKind::Foreign(f) => vec![f.name.clone()],
         ItemKind::Instance { info, .. } => vec![info.name.clone()],
         ItemKind::Destructure { pattern, .. } => {
@@ -23,13 +25,22 @@ pub fn defined(item: &Item) -> Vec<String> {
             pattern.binders(&mut out);
             out.into_iter().map(str::to_owned).collect()
         }
-        ItemKind::Schema(s) => vec![companion_name(&s.ty, "schema")],
+        ItemKind::Schema(s) => {
+            let mut out = vec![companion_name(&s.ty, "schema")];
+            if matches!(s.plan, SchemaPlan::Refined { .. }) {
+                out.push(companion_name(&s.ty, "json"));
+            }
+            if s.url.is_some() {
+                out.push(companion_name(&s.ty, "url"));
+            }
+            out
+        }
         ItemKind::Constructor(_) => Vec::new(),
     }
 }
 
 /// The top-level names `item` refers to.
-pub fn uses(item: &Item, out: &mut Vec<Key>) {
+pub fn uses(module: &str, item: &Item, out: &mut Vec<Key>) {
     match &item.kind {
         ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => expr_uses(body, out),
         ItemKind::Instance { info, methods } => {
@@ -55,7 +66,7 @@ pub fn uses(item: &Item, out: &mut Vec<Key>) {
             }
         }
         ItemKind::Refined { check, .. } => expr_uses(check, out),
-        ItemKind::Schema(s) => plan_uses(&s.plan, out),
+        ItemKind::Schema(s) => plan_uses(module, &s.plan, out),
         ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
     }
 }
@@ -123,28 +134,32 @@ pub fn reachable(
             continue;
         };
         if seen.insert(at) {
-            uses(&modules[at.0].items[at.1], &mut pending);
+            uses(
+                &modules[at.0].name,
+                &modules[at.0].items[at.1],
+                &mut pending,
+            );
         }
     }
     (seen, missing)
 }
 
 /// The schemas of other types a schema plan is built of.
-fn plan_uses(plan: &SchemaPlan, out: &mut Vec<Key>) {
+fn plan_uses(module: &str, plan: &SchemaPlan, out: &mut Vec<Key>) {
     match plan {
         SchemaPlan::List(p)
         | SchemaPlan::Option(p)
         | SchemaPlan::Redacted(p)
-        | SchemaPlan::Applied(_, p) => plan_uses(p, out),
+        | SchemaPlan::Applied(_, p) => plan_uses(module, p, out),
         SchemaPlan::Result(a, b) => {
-            plan_uses(a, out);
-            plan_uses(b, out);
+            plan_uses(module, a, out);
+            plan_uses(module, b, out);
         }
-        SchemaPlan::Tuple(items) => items.iter().for_each(|p| plan_uses(p, out)),
-        SchemaPlan::Record(fields) => fields.iter().for_each(|(_, p)| plan_uses(p, out)),
+        SchemaPlan::Tuple(items) => items.iter().for_each(|p| plan_uses(module, p, out)),
+        SchemaPlan::Record(fields) => fields.iter().for_each(|(_, p)| plan_uses(module, p, out)),
         SchemaPlan::Adt { variants, .. } => {
             for p in variants.iter().flat_map(|(_, fields)| fields) {
-                plan_uses(p, out);
+                plan_uses(module, p, out);
             }
         }
         SchemaPlan::Named {
@@ -152,10 +167,13 @@ fn plan_uses(plan: &SchemaPlan, out: &mut Vec<Key>) {
         } => {
             out.push((module.clone(), companion_name(ty, "schema")));
             for p in args {
-                plan_uses(p, out);
+                plan_uses(module, p, out);
             }
         }
-        SchemaPlan::Refined { base, .. } => plan_uses(base, out),
+        SchemaPlan::Refined { name, base, .. } => {
+            out.push((module.to_owned(), companion_name(name, "check")));
+            plan_uses(module, base, out);
+        }
         SchemaPlan::Prim(_) | SchemaPlan::Param(_) | SchemaPlan::Constructor(_) => {}
     }
 }

@@ -52,11 +52,9 @@ impl<'a> Gen<'a> {
                 }
             }
             Pat::Con(c, args) if c.rep != Rep::Tagged => {
-                if let Rep::Typeof(_) = c.rep {
-                    self.errors.push((
-                        "an `untagged` type is not available on the go target yet".to_owned(),
-                        None,
-                    ));
+                if let Rep::Typeof(class) = c.rep {
+                    let class = self.string(class.name());
+                    t.conds.push(call(a, "flickrt.IsClass", [subject, class]));
                 }
                 for arg in args {
                     self.test(arg, subject, t);

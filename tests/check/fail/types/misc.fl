@@ -35,6 +35,18 @@ let phantom () = phantom_value
 
 let phantom_value = []
 
+// a number literal is no function, whatever number it becomes (X2)
+literal_call : Float -> Float
+let literal_call n = 2 n
+
+// nor is it a function next to one: the list would hold a function as an
+// `Int` (X2)
+literal_element : Unit -> Int
+let literal_element () =
+  match [0, fun x -> x] with
+  | [_, b] -> b + 1
+  | _ -> 0
+
 //~ FLICK-T001 @3:11-3:18 unknown type `Missing`
 //~ FLICK-T001 @4:21-4:28 cannot find value `nowhere`
 //~ FLICK-T001 @8:9-8:13 cannot find constructor `Nope`
@@ -43,6 +55,8 @@ let phantom_value = []
 //~ FLICK-T016 @23:22-23:23 expected `_`, found `_ -> _`: the type would contain itself
 //~ FLICK-T013 @25:1-25:33 the type of `unknown_cell` is not fully known (`Ref (Option
 //~ FLICK-T003 @28:22-28:25 this is not a function: it has type `Float`, so it cannot
+//~ FLICK-T003 @40:22-40:25 this is not a function: it has type `Int`, so it cannot
+//~ FLICK-T003 @46:13-46:23 expected `Int`, found a function
 //~ FLICK-T003 @31:23-31:24 `await` runs an `Eff` value, but this has type `Float`
 //~ FLICK-T008 @34:18-34:31 expected `a`, found `List _`: `a` stands for any type the
 //~ FLICK-E001 @25:20-25:33 this is a runtime call, but module initialization is pure

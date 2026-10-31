@@ -1,0 +1,25 @@
+# Effect's CLI prompts, run on the service `Cli.Prompt.Tty`.
+[@flick-lang/runtime/cli]
+promptNode PromptNode
+promptRun *PromptRun
+promptRunThemed *PromptRunThemed
+promptDefaultTheme PromptDefaultTheme
+promptText PromptText
+promptPassword PromptPassword
+promptHidden PromptHidden
+promptList PromptList
+promptInt PromptInt
+promptNumber PromptNumber
+promptConfirm PromptConfirm
+promptToggle PromptToggle
+promptDate PromptDate
+promptFile PromptFile
+promptSelect PromptSelect
+promptAutoComplete PromptAutoComplete
+promptMultiSelect PromptMultiSelect
+promptCustom PromptCustom
+promptCustomEvents PromptCustomEvents
+promptAll PromptAll
+promptMap PromptMap
+promptFlatMap PromptFlatMap
+promptSucceed PromptSucceed

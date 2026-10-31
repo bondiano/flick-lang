@@ -474,16 +474,6 @@ tupled *FunctionTupled
 flickUntupled *FunctionUntupled
 SK FunctionSK
 
-[@flick-lang/runtime/effect/Stream]
-fromIterable StreamFromSeq
-fromArray StreamFromList
-fromArrayEffect StreamFromListEffect
-runCollect *StreamRunCollect
-mapEffect StreamMapEffect
-pipeThroughChannel StreamPipeThroughChannel
-flickDecodeText StreamDecodeText
-flickEncodeText StreamEncodeText
-
 [@flick-lang/runtime/effect/Effect]
 sleep *EffectSleep
 flickNever *EffectNever
@@ -702,9 +692,6 @@ flickMaxOpsBeforeYield *SchedulerMaxOps
 flickWithMaxOpsBeforeYield *SchedulerWithMaxOps
 flickWithPreventSchedulerYield *SchedulerWithPreventYield
 
-[@flick-lang/runtime/effect/Schedule]
-forever ScheduleForever
-
 [@flick-lang/runtime/effect/ExecutionPlan]
 flickStep PlanStep
 flickWithAttempts PlanWithAttempts
@@ -721,58 +708,27 @@ flickStringTree CodecStringTree
 [@flick-lang/runtime/effect/ByteSize]
 zero ByteSizeZero
 flickBytes ByteSizeBytes
+flickFormat ByteSizeFormat
+flickJson CodecByteSize
+flickJsonNumber CodecByteSizeNumber
+flickJsonBigint CodecByteSizeBigint
+
+[@flick-lang/runtime/effect/Graph]
+flickJson GraphJson
+nodeCount GraphNodeCount
+edgeCount GraphEdgeCount
 
 [@flick-lang/runtime/effect/Logger]
 flickMake LoggerMake
 withConsoleLog LoggerWithConsoleLog
 flickLayer LoggerLayer
+flickWithLoggers *LoggerWithLoggers
 
-[@flick-lang/runtime/effect/Config]
-String ConfigString
-withDefault ConfigWithDefault
-flickGet *ConfigGet
-
-[@flick-lang/runtime/effect/Path]
-flickLayer PathLayer
-flickNode PathNode
-
-[@flick-lang/runtime/effect/Stdio]
-flickNode StdioNode
-
-[@flick-lang/runtime/effect/Terminal]
-flickNode TerminalNode
-
-[@flick-lang/runtime/effect/Console]
-flickCurrent *ConsoleCurrent
-flickWithConsole *ConsoleWithConsole
-flickToStderr ConsoleToStderr
-log *ConsoleLog
-info *ConsoleInfo
-debug *ConsoleDebug
-warn *ConsoleWarn
-error *ConsoleError
-trace *ConsoleTrace
-assert *ConsoleAssert
-flickClear *ConsoleClear
-count *ConsoleCount
-countReset *ConsoleCountReset
-dir *ConsoleDir
-dirxml *ConsoleDirxml
-flickTable *ConsoleTable
-flickGroup *ConsoleGroup
-flickWithGroup *ConsoleWithGroup
-time *ConsoleTimeScoped
-timeLog *ConsoleTimeLog
-withTime *ConsoleWithTime
-
-[@flick-lang/runtime/effect/LogLevel]
-values LogLevelValues
-getOrdinal LogLevelOrdinal
-isGreaterThan LogLevelGreaterThan
-isGreaterThanOrEqualTo LogLevelGreaterThanOrEqual
-isLessThan LogLevelLessThan
-isLessThanOrEqualTo LogLevelLessThanOrEqual
-isEnabled *LogLevelIsEnabled
-
-[@flick-lang/runtime/effect/References]
-flickWithMinimumLogLevel *ReferencesWithMinimumLogLevel
+[@flick-lang/runtime/effect/Effect]
+log *EffectLog
+logFatal *EffectLogFatal
+logError *EffectLogError
+logWarning *EffectLogWarning
+logInfo *EffectLogInfo
+logDebug *EffectLogDebug
+logTrace *EffectLogTrace

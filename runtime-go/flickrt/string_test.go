@@ -1,6 +1,10 @@
 package flickrt
 
-import "testing"
+import (
+	"strconv"
+	"strings"
+	"testing"
+)
 
 func TestStringsCountUTF16CodeUnits(t *testing.T) {
 	s := "a\U0001F30Db"
@@ -48,5 +52,38 @@ func TestStringsOrderByCodeUnits(t *testing.T) {
 	}
 	if CompareStrings("ab", "abc") >= 0 || CompareStrings("b", "abc") <= 0 || CompareStrings("x", "x") != 0 {
 		t.Error("prefixes and plain order")
+	}
+}
+
+// `++` onto the latest string of a buffer grows it in place; strings made
+// before keep their text, and `++` onto an older one copies.
+func TestConcatGrowsWithoutChangingStrings(t *testing.T) {
+	base := strings.Repeat("a", 100)
+	s := Concat(base, "b").(string)
+	t1 := Concat(s, "c").(string)
+	t2 := Concat(s, "d").(string) // s is no longer the latest: copied
+	t3 := Concat(t1, "e").(string)
+	if s != base+"b" || t1 != base+"bc" || t2 != base+"bd" || t3 != base+"bce" {
+		t.Fatalf("got %q %q %q %q", s[100:], t1[100:], t2[100:], t3[100:])
+	}
+	acc := ""
+	for i := 0; i < 5000; i++ {
+		acc = Concat(acc, strconv.Itoa(i)+";").(string)
+	}
+	if !strings.HasPrefix(acc, "0;1;2;") || !strings.HasSuffix(acc, "4999;") {
+		t.Fatal("a grown string lost its text")
+	}
+}
+
+func BenchmarkConcatPieces(b *testing.B) {
+	pieces := make([]Value, 20000)
+	for i := range pieces {
+		pieces[i] = strconv.Itoa(i) + ";"
+	}
+	for n := 0; n < b.N; n++ {
+		var acc Value = ""
+		for _, p := range pieces {
+			acc = Concat(acc, p)
+		}
 	}
 }

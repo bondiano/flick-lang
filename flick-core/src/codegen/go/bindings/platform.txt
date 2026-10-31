@@ -1,0 +1,171 @@
+# The platform modules: configuration, paths, the standard streams, the
+# terminal, the console and log levels.
+
+[@flick-lang/runtime/effect/Config]
+flickGet *ConfigGet
+flickParse *ConfigParse
+map ConfigMap
+flatMap ConfigFlatMap
+mapEffect ConfigMapEffect
+flickOrElse ConfigOrElse
+all ConfigAll
+withDefault ConfigWithDefault
+option ConfigOption
+schema ConfigSchema
+flickFail ConfigFail
+succeed ConfigSucceed
+String ConfigString
+NonEmptyString ConfigNonEmptyString
+Number ConfigNumber
+Finite ConfigFinite
+flickInt ConfigInt
+Boolean ConfigBoolean
+Port ConfigPort
+flickRedacted *ConfigRedacted
+Duration ConfigDuration
+ByteSize ConfigByteSize
+LogLevel ConfigLogLevel
+flickUrl ConfigURL
+flickDate ConfigDate
+Literal ConfigLiteral
+Literals ConfigLiterals
+flickArray ConfigArray
+flickRecord ConfigRecord
+nested ConfigNested
+
+[@flick-lang/runtime/effect/ConfigProvider]
+flickMake ConfigProviderMake
+orElse ConfigProviderOrElse
+mapInput ConfigProviderMapInput
+constantCase ConfigProviderConstantCase
+nested ConfigProviderNested
+flickFromUnknown ConfigProviderFromUnknown
+flickFromEnvRecord ConfigProviderFromEnvRecord
+fromEnv ConfigProviderFromEnv
+flickFromDotEnvContents ConfigProviderFromDotEnvContents
+flickFromDir *ConfigProviderFromDir
+layer ConfigProviderLayer
+flickLayerAdd ConfigProviderLayerAdd
+
+[@flick-lang/runtime/effect/Path]
+flickLayer PathLayer
+flickNode PathNode
+
+[@flick-lang/runtime/effect/Stdio]
+flickNode StdioNode
+
+[@flick-lang/runtime/effect/Terminal]
+flickNode TerminalNode
+
+[@flick-lang/runtime/effect/Console]
+flickCurrent *ConsoleCurrent
+flickWithConsole *ConsoleWithConsole
+flickToStderr ConsoleToStderr
+log *ConsoleLog
+info *ConsoleInfo
+debug *ConsoleDebug
+warn *ConsoleWarn
+error *ConsoleError
+trace *ConsoleTrace
+assert *ConsoleAssert
+flickClear *ConsoleClear
+count *ConsoleCount
+countReset *ConsoleCountReset
+dir *ConsoleDir
+dirxml *ConsoleDirxml
+flickTable *ConsoleTable
+flickGroup *ConsoleGroup
+flickWithGroup *ConsoleWithGroup
+time *ConsoleTimeScoped
+timeLog *ConsoleTimeLog
+withTime *ConsoleWithTime
+
+[@flick-lang/runtime/effect/LogLevel]
+values LogLevelValues
+getOrdinal LogLevelOrdinal
+isGreaterThan LogLevelGreaterThan
+isGreaterThanOrEqualTo LogLevelGreaterThanOrEqual
+isLessThan LogLevelLessThan
+isLessThanOrEqualTo LogLevelLessThanOrEqual
+isEnabled *LogLevelIsEnabled
+
+[@flick-lang/runtime/effect/References]
+flickWithMinimumLogLevel *ReferencesWithMinimumLogLevel
+
+[@flick-lang/runtime/effect/FileSystem]
+flickFileStat *FileSystemFileStat
+flickSeek *FileSystemSeek
+flickSync *FileSystemSync
+flickReadAlloc *FileSystemReadAlloc
+flickFileTruncate *FileSystemFileTruncate
+flickWrite *FileSystemWrite
+flickWriteAll *FileSystemWriteAll
+
+[@flick-lang/runtime/effect/ChildProcess]
+flickMake ChildProcessMake
+setCwd ChildProcessSetCwd
+flickSetEnv ChildProcessSetEnv
+flickPrefix ChildProcessPrefix
+pipeTo ChildProcessPipeTo
+flickSetStdin ChildProcessSetStdin
+flickInheritOutput ChildProcessInheritOutput
+flickSpawn *ChildProcessSpawn
+flickPid ChildProcessPid
+flickWait *ChildProcessWait
+flickIsRunning *ChildProcessIsRunning
+flickKill *ChildProcessKill
+flickKillWith *ChildProcessKillWith
+flickStdout ChildProcessStdout
+flickStderr ChildProcessStderr
+flickString *ChildProcessString
+flickLines *ChildProcessLines
+flickExitCode *ChildProcessExitCode
+
+[@flick-lang/runtime/sql]
+sqlCodec SqlCodec
+sqlBind SqlBind
+sqlText SqlText
+sqlTemplateText SqlTemplateText
+sqlParameterCount SqlParameterCount
+sqlIdentifier SqlIdentifier
+sqlRawText SqlRawText
+sqlRawIdent SqlRawIdent
+sqlRawParam SqlRawParam
+sqlRawQuery SqlRawQuery
+sqlTable SqlTable
+sqlTemplate SqlTemplate
+pgTransaction *DatabaseTransaction
+pgLayer DatabasePgLayer
+
+[@flick-lang/runtime/effect/Optic]
+makeIso OpticMakeIso
+makeLens OpticMakeLens
+flickMakePrism OpticMakePrism
+flickMakeOptional OpticMakeOptional
+flickFromCheck OpticFromCheck
+id OpticId
+some OpticSome
+none OpticNone
+success OpticSuccess
+failure OpticFailure
+get *OpticGet
+flickGetResult *OpticGetResult
+set *OpticSet
+replace *OpticReplace
+flickReplaceResult *OpticReplaceResult
+modify *OpticModify
+getAll *OpticGetAll
+modifyAll *OpticModifyAll
+flickCompose OpticCompose
+flickAs OpticAs
+
+[@flick-lang/runtime/effect/Formatter]
+format FormatterFormat
+flickFormatJson FormatterFormatJson
+
+[@flick-lang/runtime/effect/Inspectable]
+flickToStringUnknown InspectableToStringUnknown
+toJson InspectableToJson
+
+[@flick-lang/runtime/effect/Version]
+getCurrentVersion VersionCurrent

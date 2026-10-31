@@ -538,8 +538,16 @@ impl Checker<'_> {
             if let Some((j, meta)) = unknown
                 && *j == i
             {
+                // a number literal's variable stands for a number only
                 let meta = meta.clone();
-                let _ = self.unify(&meta, &ty);
+                if self.unify(&meta, &ty).is_err() {
+                    let shown = self.show(&meta);
+                    self.error(
+                        codes::T003,
+                        span,
+                        format!("expected `{shown}`, found a function"),
+                    );
+                }
             }
         }
         ty

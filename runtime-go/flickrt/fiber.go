@@ -39,7 +39,8 @@ type fiberState struct {
 	by        atomic.Int64  // the fiber that asked for the interruption
 	signal    chan struct{} // closed when interruption is asked for
 	once      sync.Once
-	mask      int // depth of uninterruptible regions; only the fiber's goroutine touches it
+	mask      int        // depth of uninterruptible regions; only the fiber's goroutine touches it
+	clock     *testClock // the test clock that counts the fiber as running, if any
 }
 
 var fibers atomic.Int64
@@ -82,17 +83,55 @@ func Run(fb *Fiber, task Value) Value {
 // wait blocks until `ch` is closed, or fails with the fiber's interruption
 // when it is interruptible.
 func wait(fb *Fiber, ch <-chan struct{}) {
-	idle()
-	s := fb.state
-	if s.mask > 0 {
-		<-ch
-		return
+	signal := signalOf(fb)
+	if c := parking(fb); c != nil {
+		defer c.park(func() bool { return isClosed(ch) || isClosed(signal) })()
 	}
 	select {
 	case <-ch:
-	case <-s.signal:
-		panic(s.stopped())
+	case <-signal:
+		panic(fb.state.stopped())
 	}
+}
+
+// signalOf is the channel closed when the fiber is asked to stop, nil
+// while it is uninterruptible.
+func signalOf(fb *Fiber) <-chan struct{} {
+	if fb.state.mask > 0 {
+		return nil
+	}
+	return fb.state.signal
+}
+
+// isClosed is whether a channel that is only ever closed is.
+func isClosed(ch <-chan struct{}) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+		return false
+	}
+}
+
+// parking is called as a fiber blocks: it flushes stdout, and gives the
+// test clock that counts the fiber, nil without one. Under one, the
+// blocking wait is bracketed by `defer c.park(ready)()`, `ready` telling
+// whether what it waits for has come; the closure is only made then.
+func parking(fb *Fiber) *testClock {
+	idle()
+	if testClocks.Load() == 0 {
+		return nil
+	}
+	return fb.state.clock
+}
+
+// park is `parking` for a wait on I/O, which a test clock never waits for:
+// call the function it gives when the wait ends.
+func park(fb *Fiber, ready func() bool) func() {
+	if c := parking(fb); c != nil {
+		return c.park(ready)
+	}
+	return func() {}
 }
 
 // masked runs `f` with the fiber's interruptibility set by `mask`.

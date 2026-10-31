@@ -1,0 +1,41 @@
+// Flick data crosses an untrusted foreign boundary as a copy: JS that sorts
+// an argument in place, mutates an array it returned earlier, edits a record
+// or keeps what a callback returned does not change a Flick value.
+module App.Main exposing (main)
+
+type alias User = { name : String; tags : List String }
+
+sort_in_place : List Float -> List Float
+foreign pure sort_in_place from "./bindings.mjs" "sortInPlace"
+
+kept : Unit ->{} List Float
+foreign sync kept from "./bindings.mjs" "kept"
+  arity 0
+
+spoil : Unit ->{} Unit
+foreign sync spoil from "./bindings.mjs" "spoil"
+  arity 0
+
+rename : User ->{} Unit
+foreign sync rename from "./bindings.mjs" "rename"
+
+push_into : (Unit -> List Float) ->{} Float
+foreign sync push_into from "./bindings.mjs" "pushInto"
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+main : Unit ->{} Unit
+let main () =
+  let xs = [3, 1, 2]
+  let sorted = sort_in_place xs
+  say ("argument " ++ show xs ++ ", result " ++ show sorted)
+  let held = kept ()
+  spoil ()
+  say ("held result " ++ show held)
+  let user = { name = "ann"; tags = ["a"] }
+  rename user
+  say ("record " ++ user.name ++ " " ++ show user.tags)
+  let mine = [1, 2]
+  let length = push_into (fun () -> mine)
+  say ("callback result " ++ show mine ++ ", JS saw " ++ show length)

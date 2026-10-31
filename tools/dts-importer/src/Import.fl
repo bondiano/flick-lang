@@ -21,6 +21,18 @@ let request_json =
 is_declarations : String -> Bool
 let is_declarations file = List.any (fun e -> String.ends_with e file) [".d.ts", ".d.mts", ".d.cts"]
 
+/// The distinct declarations `name` stands for.
+sites_of : List (String, String) -> String -> List String
+let sites_of named name =
+  List.dedupe (List.filter_map (fun (n, s) -> if n == name then Some s else None) named)
+
+/// The simple names that stand for more than one declaration.
+ambiguous : List (String, String) -> List String
+let ambiguous named =
+  List.filter
+    (fun n -> List.length (sites_of named n) > 1)
+    (List.dedupe (List.map (fun (n, _) -> n) named))
+
 /// The JSON of the package's value exports, from its declarations `file`.
 surface : Request -> Ts.Resolution -> String ->{Path.Path; AppError} String
 let surface request resolved file =
@@ -29,6 +41,7 @@ let surface request resolved file =
   match Ts.module_of program file with
   | None -> App.fail (file ++ " declares no module")
   | Some module_ ->
+    let shapes = Shape.exports checker module_
     let exports =
       List.map
         (fun e ->
@@ -39,22 +52,28 @@ let surface request resolved file =
               [("fingerprint", JString e.fingerprint)],
             ])
         )
-        (Shape.exports checker module_)
+        shapes
+    let clashes = ambiguous (List.flat_map (fun e -> e.named) shapes)
     let package_id = Ts.resolved_package resolved
     let declarations =
       match package_id with
       | Some p -> p.name ++ "/" ++ p.subModuleName
       | None -> Path.basename file
     JsonText.render
-      (JObject [
-        ("package", JString request.name),
-        (
-          "version",
-          Option.with_default JNull (Option.map (fun p -> JString p.version) package_id),
-        ),
-        ("declarations", JString declarations),
-        ("exports", JArray exports),
-      ])
+      (JObject
+        (List.concat [
+          [
+            ("package", JString request.name),
+            (
+              "version",
+              Option.with_default JNull (Option.map (fun p -> JString p.version) package_id),
+            ),
+            ("declarations", JString declarations),
+            ("exports", JArray exports),
+          ],
+          // absent when empty, so the surface of most packages does not change
+          if List.is_empty clashes then [] else [("ambiguous", JArray (List.map JString clashes))],
+        ]))
 
 /// Answers the request on stdin.
 run : Unit ->{Stdio.Stdio, Path.Path; AppError, PlatformError.PlatformError} Unit

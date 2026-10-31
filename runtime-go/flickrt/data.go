@@ -56,6 +56,10 @@ func Equals(a, b Value) bool {
 	case *Duration:
 		y, ok := b.(*Duration)
 		return ok && durationOrder(x, y) == 0
+	case *Chunk:
+		// Effect's Chunk is `Equal`: the same elements, by `Equal.equals`
+		y, ok := b.(*Chunk)
+		return ok && Equals(x.items, y.items)
 	case Fn, Poly, *Dict:
 		// functions compare by identity on the JS target; Go cannot compare them
 		return false

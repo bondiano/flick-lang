@@ -6,6 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::mem;
+use std::sync::Arc;
 
 use super::Checker;
 use super::classes::Dict;
@@ -15,6 +16,7 @@ use super::sql::dialect::Dialect;
 pub use super::sql_plan::{SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue};
 use super::ty::{Stage, Type};
 use super::{FormField, UrlRoute};
+use crate::iface::Interface;
 use crate::ir::Label;
 use crate::numeric::Num;
 use crate::source::Span;
@@ -32,6 +34,9 @@ pub fn range(span: Span) -> Range {
 
 #[derive(Debug, Default)]
 pub struct Typing {
+    /// Every top-level entity of the module with its type (see
+    /// [`Checker::declarations`]).
+    pub declarations: Arc<Interface>,
     /// Every name in an expression or a constructor pattern.
     pub names: HashMap<Range, Ref>,
     /// The representation of each `unboxed` or `untagged` type of the module.
@@ -198,6 +203,34 @@ pub struct ForeignInfo {
     /// For each JS argument: the number of arguments of the JS function a
     /// callback is adapted to.
     pub callbacks: Vec<Option<usize>>,
+    pub copies: Copies,
+}
+
+/// Where a foreign call may pass Flick data, which an import outside the
+/// runtime gets as a copy: JS may change an array or object in place
+/// (`docs/formal/ts-holes.md` Р26).
+#[derive(Debug, Clone, Default)]
+pub struct Copies {
+    /// For each JS argument.
+    pub args: Vec<bool>,
+    /// The result; of a `Promise` or an `Effect`, its value.
+    pub result: bool,
+    /// For each JS argument that is a callback: each argument JS gives it,
+    /// and the result it gives JS.
+    pub callbacks: Vec<Option<(Vec<bool>, bool)>>,
+}
+
+impl Copies {
+    /// Whether any value is copied.
+    pub fn any(&self) -> bool {
+        self.result
+            || self.args.contains(&true)
+            || self
+                .callbacks
+                .iter()
+                .flatten()
+                .any(|(args, result)| *result || args.contains(&true))
+    }
 }
 
 /// A `server fn`: its declaration, its name and how many errors it sends.

@@ -85,7 +85,7 @@ func Concat(a, b Value) Value {
 			return x[:len(x)-3] + string(pair) + y[3:]
 		}
 	}
-	return x + y
+	return stringConcat(x, y)
 }
 
 // CompareStrings orders strings by UTF-16 code units, as JS does.

@@ -32,6 +32,7 @@ use std::collections::BTreeSet;
 use std::mem;
 
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Module, Pat, Stmt};
+pub use fold::{js_number, json_string};
 pub use specialize::names_only;
 pub(crate) use walk::uses;
 use walk::{droppable, strict_uses, substitute};

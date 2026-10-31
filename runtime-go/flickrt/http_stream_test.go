@@ -10,7 +10,7 @@ import (
 
 // gatedStream is the chunks "a" and then "b", the second once `gate` closes.
 func gatedStream(gate <-chan struct{}) *Stream {
-	return &Stream{open: func(*Fiber) pull {
+	return streamOpen(func(*Fiber) pull {
 		n := 0
 		return func(fb *Fiber) ([]Value, bool) {
 			n++
@@ -23,7 +23,7 @@ func gatedStream(gate <-chan struct{}) *Stream {
 			}
 			return nil, false
 		}
-	}}
+	})
 }
 
 func TestServerStreamsChunksAsTheyCome(t *testing.T) {

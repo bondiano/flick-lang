@@ -21,7 +21,7 @@ func stderrWrite(text string) {
 
 // StdioNode is `Stdio.node`.
 func StdioNode(key Value) Value {
-	return LayerSucceed(key, Rec(
+	impl := Rec(
 		"args", Fn(func(*Fiber, Value) Value { return Succeed(PlatformArgs()) }),
 		"stdin_is_terminal", Fn(func(*Fiber, Value) Value { return Succeed(fileIsTerminal(os.Stdin)) }),
 		"stdout_is_terminal", Fn(func(*Fiber, Value) Value { return Succeed(fileIsTerminal(os.Stdout)) }),
@@ -32,7 +32,11 @@ func StdioNode(key Value) Value {
 		"write_stderr", Fn(func(_ *Fiber, text Value) Value {
 			return Eff(func(*Fiber) Value { stderrWrite(text.(string)); return Unit })
 		}),
-	))
+	)
+	stdioNodesMu.Lock()
+	stdioNodes[impl.(*Record)] = true
+	stdioNodesMu.Unlock()
+	return LayerSucceed(key, impl)
 }
 
 var (

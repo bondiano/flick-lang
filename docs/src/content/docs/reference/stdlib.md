@@ -56,6 +56,7 @@ and `Monad`.
 | `Platform` | `stdout_line`, `stderr_line`, `stdout_write`, `args`, `env` |
 | `Log` | the `Log` service with `info`, `warn`, `error`, `debug`, and `Log.console` |
 | `File` | the `FileSystem` service: `open_scoped`, `read_all`, `read_text`, `write_text`, and `File.node` |
+| `ChildProcess` | child processes, as Effect's: a `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) run to its end by `string`, `lines` and `exit_code`, or started by `spawn` as a `Process` of a scope, with `stdout`, `stderr`, `wait`, `is_running`, `kill` and `kill_with` |
 | `Resource` | `acquire_release` into a scope's owner, and `bracket` |
 | `Events` | `queue` policies and the `log_failures` supervisor |
 | `Ui`, `Ui.Event` | user interfaces rendered with React, see [ui.md](../ui/) |
@@ -116,6 +117,41 @@ let case_blind =
     (fun s -> hash (String.to_lower s))
     (fun witness -> HashSet.size (HashSet.insert "ADA" (HashSet.insert "ada" (HashSet.with witness))))
 ```
+
+## Child processes
+
+A process's `stdout` and `stderr` are pipes. What happens to output the
+program never reads differs between the targets:
+
+| | JS target (Node) | Go target |
+| - | - | - |
+| unread output | Node pauses the stream; once the pipe's buffer (about 64 KiB) is full, the child waits until someone reads | read as it comes and kept in memory; the child never waits |
+| cost | a child that writes much can stall forever | memory grows with what the child writes, until the process's scope closes |
+
+Cases:
+
+```flick
+// a. spawn, then only wait: 1 MiB nobody reads
+waits : Unit ->{; PlatformError.PlatformError} Int
+let waits () = scope {
+  let p = ChildProcess.spawn (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
+  ChildProcess.wait p // JS: never returns; Go: 0
+}
+
+// b. exit_code of a command with much output: the same
+chatty : Unit ->{; PlatformError.PlatformError} Int
+let chatty () =
+  ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
+
+// c. endless output nobody reads, e.g. `yes`: JS stalls the child;
+//    Go holds everything it wrote until `kill` or the scope's close
+```
+
+Read what a child writes (`stdout`, `stderr`, `string`, `lines`), or let it
+write to the program's own streams with `inherit_output`; then both targets
+behave alike. The Go behavior is pinned by
+`TestChildProcessUnreadOutputDoesNotBlock` in
+`runtime-go/flickrt/process_test.go`.
 
 ## Tests
 

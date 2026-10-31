@@ -307,3 +307,57 @@ fn any_pure_and_cancellation_are_never_implied() {
     assert_eq!(entry(&generated, "fetchIt").0, Status::Unsupported);
     assert_eq!(entry(&generated, "wrap").0, Status::Unsupported);
 }
+
+fn status_of(generated: &Generated, export: &str) -> (Status, String) {
+    let e = generated
+        .entries
+        .iter()
+        .find(|e| e.export == export)
+        .expect("entry");
+    (e.status, e.detail.clone())
+}
+
+const OPTIONS_SURFACE: &str = r#"{"package": "p", "version": "1.0.0", "declarations": "p/index.d.ts", "exports": [
+  {"name": "retry", "local": "retry", "kind": "function", "fingerprint": "sha256:a",
+   "signatures": [{"params": [{"name": "options", "optional": false, "rest": false,
+     "type": {"k": "object", "name": "Options", "text": "Options"}}],
+     "this": false, "typeParams": [], "result": {"k": "void"}}]},
+  {"name": "logOptions", "local": "logOptions", "kind": "function", "fingerprint": "sha256:b",
+   "signatures": [{"params": [], "this": false, "typeParams": [],
+     "result": {"k": "object", "name": "Options", "text": "Options"}}]},
+  {"name": "count", "local": "count", "kind": "function", "fingerprint": "sha256:c",
+   "signatures": [{"params": [], "this": false, "typeParams": [], "result": {"k": "number"}}]}]"#;
+
+#[test]
+fn an_object_type_is_opaque_without_fields() {
+    let surface = Surface::parse(&format!("{OPTIONS_SURFACE}}}")).expect("surface parses");
+    let generated = generate(&surface, &Policy::default(), None, "P.Generated");
+    assert_eq!(
+        status_of(&generated, "logOptions"),
+        (Status::Supported, "Unit ->{} Options".into())
+    );
+    // the members of `Options` never reach Flick: no record, no field
+    assert!(
+        generated.text.contains("\ntype Options\n"),
+        "{}",
+        generated.text
+    );
+    assert!(!generated.text.contains("retries"));
+}
+
+#[test]
+fn a_name_of_two_typescript_types_blocks_what_uses_it() {
+    let surface = Surface::parse(&format!(r#"{OPTIONS_SURFACE}, "ambiguous": ["Options"]}}"#))
+        .expect("surface parses");
+    let generated = generate(&surface, &Policy::default(), None, "P.Generated");
+    for export in ["retry", "logOptions"] {
+        let (status, detail) = status_of(&generated, export);
+        assert_eq!(status, Status::Unsupported, "{export}");
+        assert!(
+            detail.contains("`Options` names more than one TypeScript type"),
+            "{detail}"
+        );
+    }
+    assert_eq!(status_of(&generated, "count").0, Status::Supported);
+    assert!(!generated.text.contains("type Options"));
+}

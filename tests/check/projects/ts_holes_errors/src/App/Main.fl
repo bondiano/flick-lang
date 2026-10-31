@@ -1,0 +1,17 @@
+module App.Main exposing (lookup)
+
+import App.A as A
+import App.B as B
+
+both : Bool ->{; A.NotFound, B.NotFound} Int
+let both flag = if flag then A.find "a" else B.find "b"
+
+// The arm removes `App.A.NotFound` only: the row still has `App.B.NotFound`.
+lookup : Bool ->{} Int
+let lookup flag =
+  try
+    both flag
+  with
+  | A.NotFound _ -> 0
+
+//~ FLICK-E002 @12:3-12:6 the signature of `lookup` does not allow error `NotFound`, which its body needs

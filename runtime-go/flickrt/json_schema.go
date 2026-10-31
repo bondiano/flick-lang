@@ -45,6 +45,11 @@ func closedObject(keys []string, schemas []Value, closed bool) Value {
 	return Rec("type", "object", "properties", props, "required", required, "additionalProperties", false)
 }
 
+// exportable is a codec that writes its own JSON Schema.
+type exportable interface {
+	jsonSchema(x *schemaExport, path string) Value
+}
+
 func (x *schemaExport) codec(c codec, path string) Value {
 	switch k := c.(type) {
 	case *wire:
@@ -73,6 +78,18 @@ func (x *schemaExport) codec(c codec, path string) Value {
 		return x.codec(k.from, path)
 	case *fallible:
 		refuseExport(path, "a fallible transformation has no JSON Schema form")
+	case *nullOption:
+		return Rec("anyOf", []Value{x.codec(k.item, path), Rec("type", "null")})
+	case maskedRedacted:
+		return Rec("const", maskedText)
+	case refused:
+		refuseExport(path, k.reason)
+	case *stage:
+		return x.codec(k.wire, path)
+	case *stringAs:
+		return Rec("type", "string")
+	case exportable:
+		return k.jsonSchema(x, path)
 	}
 	// shortcut: the string-tree, parameter and HTTP value codecs are refused; write their forms when a program exports one
 	refuseExport(path, "this codec has no JSON Schema form on the go target")
@@ -81,8 +98,28 @@ func (x *schemaExport) codec(c codec, path string) Value {
 
 var int32Bounds = []Value{"minimum", float64(-0x80000000), "maximum", float64(0x7fffffff)}
 
+// knownChecks are the JSON Schema keywords of the checks it can state.
+var knownChecks = map[string][]Value{
+	"email":     {"format", "email"},
+	"int":       append([]Value{"type", "integer"}, int32Bounds...),
+	"non_empty": {"minLength", float64(1)},
+	"positive":  {"exclusiveMinimum", float64(0)},
+}
+
 func (x *schemaExport) schema(s *Schema, path string) Value {
 	switch s.kind {
+	case kindRefined:
+		keywords, ok := knownChecks[s.known]
+		if !ok {
+			refuseExport(path, "the check of "+s.name+" has no JSON Schema form")
+		}
+		base := record(x.schema(s.item, path))
+		for i := 0; i < len(keywords); i += 2 {
+			base = base.set(keywords[i].(string), keywords[i+1])
+		}
+		return base
+	case kindCustom:
+		return x.codec(s.jsonOf(), path)
 	case kindLazy:
 		s.resolved()
 		if x.defs.index(s.name) < 0 {

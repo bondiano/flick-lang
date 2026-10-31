@@ -1,0 +1,5 @@
+pubsub: (3, false, false, 3) ("x", ["y", "z"], ["x", "y"], ["z"]), capacity 4
+replay: [2, 3]
+end: (true, false, "hello", "bye")
+dropping: [1]
+shutdown: (false, true)

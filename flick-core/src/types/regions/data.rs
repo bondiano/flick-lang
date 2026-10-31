@@ -423,7 +423,7 @@ impl Checker<'_> {
 impl Checker<'_> {
     /// Whether `t` is a primitive value, which holds no captures; an integer
     /// literal's type is one before it is settled.
-    pub(super) fn scalar(&self, t: &Type) -> bool {
+    pub(in crate::types) fn scalar(&self, t: &Type) -> bool {
         match self.whnf(t) {
             Type::Meta(m) => self.store.is_numeric(m),
             t => ["Int", "Float", "BigInt", "String", "Bool", "Unit", "Never"]

@@ -58,6 +58,7 @@ title: "Стандартная библиотека"
 | `Platform` | `stdout_line`, `stderr_line`, `stdout_write`, `args`, `env` |
 | `Log` | сервис `Log` с `info`, `warn`, `error`, `debug` и `Log.console` |
 | `File` | сервис `FileSystem`: `open_scoped`, `read_all`, `read_text`, `write_text` и `File.node` |
+| `ChildProcess` | дочерние процессы, как в Effect: команда `Command` (`make`, `set_cwd`, `set_env`, `set_stdin`, `prefix`, `pipe_to`, `inherit_output`) выполняется до конца через `string`, `lines` и `exit_code` или запускается `spawn` как `Process` scope'а, с `stdout`, `stderr`, `wait`, `is_running`, `kill` и `kill_with` |
 | `Resource` | `acquire_release` с передачей ресурса владельцу области и `bracket` |
 | `Events` | политики `queue` и супервизор `log_failures` |
 | `Ui`, `Ui.Event` | пользовательские интерфейсы, отображаемые с помощью React, см. [пользовательские интерфейсы](../ui/) |
@@ -125,6 +126,41 @@ let case_blind =
     (fun s -> hash (String.to_lower s))
     (fun witness -> HashSet.size (HashSet.insert "ADA" (HashSet.insert "ada" (HashSet.with witness))))
 ```
+
+## Дочерние процессы
+
+`stdout` и `stderr` процесса — это pipe. Что происходит с выводом, который
+программа не читает, на двух target разное:
+
+| | JS-target (Node) | Go-target |
+| - | - | - |
+| непрочитанный вывод | Node приостанавливает поток; когда буфер pipe (около 64 КиБ) полон, ребёнок ждёт, пока вывод прочтут | читается сразу и копится в памяти; ребёнок не ждёт |
+| цена | ребёнок с большим выводом может встать навсегда | память растёт с объёмом вывода, пока не закроется scope процесса |
+
+Примеры:
+
+```flick
+// a. spawn и только wait: 1 МиБ, который никто не читает
+waits : Unit ->{; PlatformError.PlatformError} Int
+let waits () = scope {
+  let p = ChildProcess.spawn (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
+  ChildProcess.wait p // JS: не возвращается; Go: 0
+}
+
+// b. exit_code команды с большим выводом: так же
+chatty : Unit ->{; PlatformError.PlatformError} Int
+let chatty () =
+  ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
+
+// c. бесконечный непрочитанный вывод, например `yes`: на JS ребёнок встаёт;
+//    на Go всё написанное держится в памяти до `kill` или закрытия scope
+```
+
+Читайте то, что пишет ребёнок (`stdout`, `stderr`, `string`, `lines`), или
+отдайте ему потоки программы через `inherit_output` — тогда target ведут
+себя одинаково. Поведение Go закреплено тестом
+`TestChildProcessUnreadOutputDoesNotBlock` в
+`runtime-go/flickrt/process_test.go`.
 
 ## Тесты
 

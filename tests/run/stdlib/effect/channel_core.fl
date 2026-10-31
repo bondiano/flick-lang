@@ -1,0 +1,185 @@
+// Effect's `Channel` core, on both targets: the constructors,
+// transformations, merges and runs the rest of Channel, Stream and Sink is
+// made of.
+module App.Main exposing (main)
+
+type error Boom = Boom String
+
+say : String ->{} Unit
+let say line = Platform.stdout_line line
+
+note : Ref (List String) -> String ->{} Unit
+let note log line = Ref.set log (Ref.get log ++ [line])
+
+ms : Float -> Duration.Duration
+let ms n = Result.with_default Duration.zero (Duration.millis n)
+
+nums : Channel.Channel none none i Float Unit ie id
+let nums = Channel.from_list [1, 2, 3]
+
+/// Emits 1, 2, 3, then fails.
+broken : Channel.Channel none {Boom} i Float Unit ie id
+let broken = nums |> Channel.concat_with (fun _ -> Channel.fail (Boom "late"))
+
+/// Ends with "late" after an hour.
+slow : Channel.Channel none none i Float String ie id
+let slow =
+  Channel.unwrap
+    (task {
+      Effect.sleep (ms 3600000)
+      Channel.end "late"
+    })
+
+outcome : Channel.Channel none {Boom} Unit Float Unit none Unit ->{} String
+let outcome channel =
+  try show (Channel.run_collect channel) with
+  | Boom why -> "failed " ++ why
+
+lists : Channel.Channel none e i (NonEmpty.NonEmpty a) d none Unit ->{; e} List (List a)
+let lists channel = Channel.run_collect (Channel.map NonEmpty.to_list channel)
+
+/// Logs the element and gives it back.
+seen : Ref (List String) -> Float ->{} Float
+let seen log n =
+  note log ("saw " ++ show n)
+  n
+
+/// A channel of the number, acquired and released.
+resource : Ref (List String) -> Float -> Channel.Channel none none i Float Unit ie id
+let resource log n =
+  Channel.acquire_release
+    (fun x -> note log ("release " ++ show x))
+    (task {
+      note log ("acquire " ++ show n)
+      n
+    })
+
+sources : Unit ->{; Boom} Unit
+let sources () =
+  say ("from_list: " ++ show (Channel.run_collect nums))
+  say ("from_list_chunked: " ++ show (lists (Channel.from_list_chunked 2 [1, 2, 3, 4, 5])))
+  say ("succeed: " ++ show (Channel.run_collect (Channel.succeed "one")))
+  say ("end: " ++ Channel.run_drain (Channel.end "done"))
+  let nothing : Channel.Channel none none Unit Float Unit none Unit = Channel.empty
+  say ("empty: " ++ show (Channel.run_fold (fun () -> 0) (fun n _ -> n + 1) nothing))
+  say ("fail: " ++ outcome (Channel.fail (Boom "no")))
+  say
+    ("suspend: " ++ show (Channel.run_collect (Channel.suspend (fun () -> Channel.from_list [4]))))
+  say
+    ("unwrap: "
+      ++ show (Channel.run_collect (Channel.unwrap (task { Channel.from_list ["built"] }))))
+  say ("identity: " ++ show (Channel.run_collect (nums |> Channel.pipe_to (Channel.identity ()))))
+  let log = Ref.make []
+  let acquired = Channel.acquire_release (fun n -> note log ("release " ++ show n)) (task { 5 })
+  say ("acquire_release: " ++ show (Channel.run_collect acquired) ++ " " ++ show (Ref.get log))
+
+transforms : Unit ->{; Boom} Unit
+let transforms () =
+  say ("map: " ++ show (Channel.run_collect (Channel.map (fun n -> n * 10) nums)))
+  let log = Ref.make []
+  let effected = Channel.map_effect (seen log) nums
+  say ("map_effect: " ++ show (Channel.run_collect effected) ++ " " ++ show (Ref.get log))
+  let sums = Channel.map_accum (fun () -> 0) (fun total n -> (total + n, [total, n])) nums
+  say ("map_accum: " ++ show (Channel.run_collect sums))
+  say
+    ("flatten_array: "
+      ++ show (Channel.run_collect (Channel.flatten_array (Channel.from_list [[1, 2], [], [3]]))))
+  say
+    ("flat_map: "
+      ++ show
+        (Channel.run_collect
+          (Channel.flat_map (fun n -> Channel.from_list [n, n]) (Channel.from_list [1, 2]))))
+  let scoped = Ref.make []
+  let inner = Channel.run_collect (Channel.flat_map (resource scoped) (Channel.from_list [1, 2]))
+  say ("flat_map scopes: " ++ show inner ++ " " ++ show (Ref.get scoped))
+  say
+    ("concat_with: "
+      ++ show (Channel.run_collect (Channel.concat_with (fun _ -> Channel.from_list [0]) nums)))
+  say
+    ("concat_with done: "
+      ++ show (Channel.run_collect (Channel.concat_with Channel.succeed (Channel.end 7))))
+  say ("pipe_to_or_fail: " ++ outcome (broken |> Channel.pipe_to_or_fail (Channel.identity ())))
+  let offset = Channel.map (fun n -> n + 100) (Channel.identity ())
+  say
+    ("pipe_to_or_fail ok: " ++ show (Channel.run_collect (nums |> Channel.pipe_to_or_fail offset)))
+
+failures : Unit ->{; Boom} Unit
+let failures () =
+  let caught = Ref.make None
+  let kept =
+    Channel.catch_cause
+      (fun f ->
+        Channel.unwrap
+          (task {
+            Ref.set caught (Some f)
+            Channel.from_list [0]
+          })
+      )
+      broken
+  say ("catch_cause: " ++ show (Channel.run_collect kept))
+  match Ref.get caught with
+  | Some failure -> say ("fail_cause: " ++ outcome (Channel.fail_cause failure))
+  | None -> say "no failure"
+  let log = Ref.make []
+  let watched =
+    nums
+    |> Channel.on_exit (fun exit -> note log ("on_exit " ++ show (Exit.value exit)))
+  say ("on_exit: " ++ show (Channel.run_collect watched) ++ " " ++ show (Ref.get log))
+  let failed =
+    broken
+    |> Channel.on_exit (fun exit ->
+      note log ("on_exit failed " ++ show (Option.is_some (Exit.failure exit)))
+    )
+  say ("on_exit failure: " ++ outcome failed ++ " " ++ show (Ref.get log))
+
+merges : Unit ->{; Boom} Unit
+let merges () =
+  let nested = Channel.from_list [Channel.from_list [1], Channel.from_list [2, 3]]
+  let one = { concurrency = Some 1; bufferSize = None; switch = false }
+  say ("merge_all one: " ++ show (Channel.run_collect (Channel.merge_all one nested)))
+  let all = { concurrency = None; bufferSize = Some 2; switch = false }
+  let three = Channel.from_list [nums, Channel.from_list [10, 20], Channel.succeed 30]
+  say ("merge_all all: " ++ show (List.sort (Channel.run_collect (Channel.merge_all all three))))
+  let failing = Channel.from_list [broken, broken]
+  say ("merge_all failure: " ++ outcome (Channel.merge_all all failing))
+  say
+    ("merge both: "
+      ++ show
+        (List.sort
+          (Channel.run_collect
+            (Channel.merge Channel.halt_both (Channel.from_list [10, 20]) nums))))
+  say
+    ("merge either: "
+      ++ Channel.run_drain (Channel.merge Channel.halt_either slow (Channel.end "e")))
+  say
+    ("interrupt_when: " ++ Channel.run_drain (Channel.interrupt_when (task { "interrupted" }) slow))
+  let late = task {
+    Effect.sleep (ms 3600000)
+    "never"
+  }
+  say
+    ("interrupt_when ended: "
+      ++ Channel.run_drain (Channel.interrupt_when late (Channel.end "first")))
+
+runs : Unit ->{; Boom} Unit
+let runs () =
+  say ("run_fold: " ++ show (Channel.run_fold (fun () -> 0) (fun total n -> total + n) nums))
+  let log = Ref.make []
+  let ended =
+    Channel.run_for_each
+      (fun n -> note log (show n))
+      (Channel.concat_with (fun _ -> Channel.end "d") nums)
+  say ("run_for_each: " ++ ended ++ " " ++ show (Ref.get log))
+  say ("run_drain: " ++ show (Channel.run_drain nums))
+  say ("run_collect failure: " ++ outcome broken)
+
+main : Unit ->{; AppError} Unit
+let main () =
+  try
+    sources ()
+    transforms ()
+    failures ()
+    merges ()
+    runs ()
+  with
+  | Boom why -> say ("unexpected " ++ why)

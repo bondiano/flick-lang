@@ -21,45 +21,43 @@ conn : forall s. String ->{Scope s;} Raw^{s}
 let conn name = Resource.acquire_release (task { make_conn name }) close_conn
 
 refs : Unit ->{} String
-let refs () =
-  scope {
-    let r = ScopedRef.from_acquire (task { conn "a" })
-    ScopedRef.use r (fun c ->
-      ScopedRef.set (task { Resource.acquire_release (task { make_conn "b" }) close_conn }) r
-      ping c)
-  }
+let refs () = scope {
+  let r = ScopedRef.from_acquire (task { conn "a" })
+  ScopedRef.use r (fun c ->
+    ScopedRef.set (task { Resource.acquire_release (task { make_conn "b" }) close_conn }) r
+    ping c
+  )
+}
 
 resources : Unit ->{} String
-let resources () =
-  scope s {
-    let res : Resource.Resource s none Raw = Resource.manual (task { conn "a" })
-    Resource.refresh res
-    Resource.use res ping
-  }
+let resources () = scope s {
+  let res : Resource.Resource s none Raw = Resource.manual (task { conn "a" })
+  Resource.refresh res
+  Resource.use res ping
+}
 
 caches : Unit ->{} String
-let caches () =
-  scope s {
-    let cache : ScopedCache.ScopedCache s String none Raw =
-      ScopedCache.make { lookup = fun (key : String) -> conn key; capacity = 2; timeToLive = None }
-    let first = ScopedCache.use "a" cache ping
-    let cached = ScopedCache.use_option "a" cache (fun found ->
+let caches () = scope s {
+  let cache : ScopedCache.ScopedCache s String none Raw =
+    ScopedCache.make { lookup = fun (key : String) -> conn key; capacity = 2; timeToLive = None }
+  let first = ScopedCache.use "a" cache ping
+  let cached =
+    ScopedCache.use_option "a" cache (fun found ->
       match found with
       | Some c -> ping c
-      | None -> "")
-    first ++ cached
-  }
+      | None -> ""
+    )
+  first ++ cached
+}
 
 direct : Unit ->{} String
-let direct () =
-  scope {
-    let c = Resource.acquire_release (task { make_conn "a" }) close_conn
-    ping c
-  }
+let direct () = scope {
+  let c = Resource.acquire_release (task { make_conn "a" }) close_conn
+  ping c
+}
 
 listen_on :
-  forall c s r hs. Fiber.Outlives c s => Rpc.ServeOptions ->
-    Rpc.Group r hs ->
-    hs^c ->{Scope s | r; Rpc.ServeError}
-    Rpc.Server s
+  forall c s r hs.
+  Fiber.Outlives c s =>
+  Rpc.ServeOptions -> Rpc.Group r hs -> hs^c ->{Scope s | r; Rpc.ServeError} Rpc.Server s
 let listen_on options group handlers = Rpc.listen options group handlers

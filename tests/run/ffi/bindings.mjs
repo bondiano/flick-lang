@@ -104,3 +104,26 @@ export const deep = (n) => {
   for (let i = 0; i < n; i++) v = { v };
   return v;
 };
+
+/** Sorts its argument in place, as many JS functions do. */
+export const sortInPlace = (xs) => xs.sort((a, b) => a - b);
+
+const keep = [1, 2];
+/** Returns an array it keeps; `spoil` changes it later. */
+export const kept = () => keep;
+export const spoil = () => {
+  keep.push(99);
+};
+
+/** Edits the record it is given. */
+export const rename = (user) => {
+  user.name = "mallory";
+  user.tags.push("b");
+};
+
+/** Changes the array a callback returns. */
+export const pushInto = (f) => {
+  const xs = f();
+  xs.push(9);
+  return xs.length;
+};

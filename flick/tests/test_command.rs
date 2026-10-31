@@ -285,8 +285,13 @@ fn watch_runs_again_after_the_previous_run_cleaned_up() {
 
 const CLOCKS: &str = r#"module Test.Clocks exposing (tests)
 
+type error Again = Again
+
 hour : Duration.Duration
 let hour = Result.with_default Duration.zero (Duration.hours 1)
+
+two_hours : Duration.Duration
+let two_hours = Result.with_default Duration.zero (Duration.hours 2)
 
 tests : List Test.Test
 let tests =
@@ -313,29 +318,87 @@ let tests =
     Test.clock_test
       "another test's clock is not this one"
       (task { Test.expect (Test.equal 0 (Clock.current_time_millis ())) }),
+    Test.clock_test
+      "sleepers wake in order, each run before the clock moves on"
+      (task {
+        scope s {
+          let order = Ref.make []
+          let _ = Fiber.spawn s (fun _ -> ()) (task {
+            Effect.sleep two_hours
+            Ref.update order (fun xs -> xs ++ ["two"])
+          })
+          let _ = Fiber.spawn s (fun _ -> ()) (task {
+            Effect.sleep hour
+            Ref.update order (fun xs -> xs ++ ["one"])
+          })
+          Test.adjust hour
+          Test.expect (Test.equal ["one"] (Ref.get order))
+          Test.adjust hour
+          Test.expect (Test.equal ["one", "two"] (Ref.get order))
+        }
+      }),
+    Test.clock_test
+      "a retry waits for its schedule's delays"
+      (task {
+        scope s {
+          let calls = Ref.make 0
+          let retried = Fiber.spawn s (fun _ -> ()) (task {
+            try
+              Effect.retry
+                (Schedule.spaced hour)
+                (task {
+                  Ref.set calls (Ref.get calls + 1)
+                  if Ref.get calls < 3 then from_result (Err Again) else "done"
+                })
+            with
+            | Again -> "gave up"
+          })
+          Test.adjust hour
+          Test.expect (Test.equal 2 (Ref.get calls))
+          Test.adjust hour
+          Test.expect (Test.equal "done" (Fiber.join retried))
+        }
+      }),
   ]
 "#;
 
-#[test]
-#[ignore = "needs Node and pnpm install"]
-fn clock_tests_run_on_virtual_time() {
-    let dir = project("clocks");
+/// The names of the tests of `CLOCKS`.
+const CLOCK_TESTS: [&str; 5] = [
+    "an hour passes when the test moves the clock",
+    "each test starts at zero",
+    "another test's clock is not this one",
+    "sleepers wake in order, each run before the clock moves on",
+    "a retry waits for its schedule's delays",
+];
+
+/// Runs `CLOCKS` by `flick test` with `args`: each test passes, without
+/// waiting the hours they move their clocks by.
+fn clock_tests_pass(name: &str, args: &[&str]) {
+    let dir = project(name);
     fs::write(
         dir.join("test/Test/Sample.fl"),
         CLOCKS.replace("Test.Clocks", "Test.Sample"),
     )
     .expect("write");
     let started = Instant::now();
-    let out = flick_in(&dir, &["test", "--reporter", "json"]);
+    let out = flick_in(&dir, &[&["test", "--reporter", "json"], args].concat());
     assert_eq!(out.status.code(), Some(0), "{out:?}");
     let json = results(&out);
-    for name in [
-        "an hour passes when the test moves the clock",
-        "each test starts at zero",
-        "another test's clock is not this one",
-    ] {
+    for name in CLOCK_TESTS {
         assert_eq!(status(&json, name), ("passed", ""), "{json}");
     }
     // no real hour, nor a real wait at all
     assert!(started.elapsed() < Duration::from_secs(60));
+}
+
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn clock_tests_run_on_virtual_time() {
+    clock_tests_pass("clocks", &[]);
+}
+
+#[test]
+#[ignore = "needs Go"]
+fn clock_tests_run_on_virtual_time_on_go() {
+    clock_tests_pass("clocks_go", &["--emit", "go"]);
 }

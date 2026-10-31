@@ -122,6 +122,23 @@ impl Checker<'_> {
         ty
     }
 
+    /// `FLICK-T003` on a callee of type `ty` given `args`, which are still
+    /// checked.
+    fn not_a_function(&mut self, ty: &Type, span: Span, args: &[&Node]) -> Type {
+        let shown = self.show(ty);
+        self.error(
+            codes::T003,
+            span,
+            format!(
+                "this is not a function: it has type `{shown}`, so it cannot take another argument"
+            ),
+        );
+        for arg in args {
+            self.infer(arg);
+        }
+        Type::Error
+    }
+
     /// `f a b` is `(f a) b`: each argument is one stage, and a runtime arrow
     /// at a stage makes the application a runtime call.
     pub fn apply(&mut self, head: &Node, args: &[&Node]) -> Type {
@@ -172,22 +189,17 @@ impl Checker<'_> {
                 }
                 meta @ Type::Meta(_) => {
                     let (param, result) = (self.fresh(), self.fresh());
-                    let _ = self.unify(&meta, &Type::pure_fun(param.clone(), result.clone()));
+                    // a number literal's variable stands for a number only
+                    if self
+                        .unify(&meta, &Type::pure_fun(param.clone(), result.clone()))
+                        .is_err()
+                    {
+                        return self.not_a_function(&meta, span, &args[i..]);
+                    }
                     self.check(arg, &param);
                     ty = result;
                 }
-                other => {
-                    let shown = self.show(&other);
-                    self.error(
-                        codes::T003,
-                        span,
-                        format!("this is not a function: it has type `{shown}`, so it cannot take another argument"),
-                    );
-                    for rest in &args[i..] {
-                        self.infer(rest);
-                    }
-                    return Type::Error;
-                }
+                other => return self.not_a_function(&other, span, &args[i..]),
             }
         }
         #[cfg(feature = "diagnostic-fixes")]

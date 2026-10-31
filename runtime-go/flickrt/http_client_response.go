@@ -66,7 +66,7 @@ func (r *ClientResponse) cached() ([]byte, error, bool) {
 // ClientResponseStream is the chunks of the body as they are read.
 func ClientResponseStream(v Value) Value {
 	r := clientResponseOf(v)
-	return &Stream{open: func(fb *Fiber) pull {
+	return streamOpen(func(fb *Fiber) pull {
 		if data, err, ok := r.cached(); ok {
 			if err != nil {
 				r.fail(fb, err)
@@ -93,7 +93,7 @@ func ClientResponseStream(v Value) Value {
 				}
 			}
 		}
-	}}
+	})
 }
 
 // ResponseToClientResponse is the response as a client of the handler

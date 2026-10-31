@@ -315,3 +315,23 @@ export const fromNullable = <A>(value: A | null | undefined): Option<A> =>
 
 /** `optional i`: `None` is passed as `undefined`. */
 export const optionalArg = <A>(option: Option<A>): A | undefined => (option._tag === "Some" ? option.value : undefined);
+
+/**
+ * `value` as Flick data JS can no longer change: arrays and plain objects
+ * are copied all the way down, and any other object goes through `other`
+ * (`docs/formal/ts-holes.md` Р26). A frozen object is a constant such as
+ * `none`, kept with its identity.
+ * shortcut: a plain JS object typed `JsValue` inside data is copied too; type the copy if a binding needs its identity.
+ */
+export const copyThrough = (value: unknown, other: (value: object) => unknown): unknown => {
+  if (typeof value !== "object" || value === null) return value;
+  if (Array.isArray(value)) return value.map((x: unknown) => copyThrough(x, other));
+  const proto: unknown = Object.getPrototypeOf(value);
+  if ((proto !== Object.prototype && proto !== null) || Object.isFrozen(value)) return other(value);
+  const copy: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value)) copy[k] = copyThrough(v, other);
+  return copy;
+};
+
+/** Flick data that crosses the boundary of an import outside the runtime. */
+export const copyData = <A>(value: A): A => copyThrough(value, (x) => x) as A;

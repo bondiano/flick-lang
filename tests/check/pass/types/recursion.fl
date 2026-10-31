@@ -1,5 +1,5 @@
 // Recursion is explicit; polymorphic recursion needs a full `forall`.
-module App.Recursion exposing (depth, countdown, is_even, sum, even_len, first_even)
+module App.Recursion exposing (depth, countdown, is_even, sum, even_len, first_even, nested_depth)
 
 type Nested a = Flat a | Nest (Nested (List a))
 
@@ -59,3 +59,14 @@ let sum items =
     | [x] -> acc + x
     | _ -> acc
   go items 0
+
+// a local function under a full `forall` uses itself at its own scheme,
+// which holds no captures of the function it is in (found by X2)
+nested_depth : Nested Float -> Float
+let nested_depth value =
+  go : forall a. Nested a -> Float -> Float
+  let rec go v acc =
+    match v with
+    | Flat _ -> acc
+    | Nest inner -> go inner (acc + 1)
+  go value 0

@@ -1,0 +1,13 @@
+lines: ["one", "two"]
+exit_code: 3
+pipe_to: ["a", "b"]
+set_stdin: ["x1", "x2"]
+set_env: ["hi"]
+set_cwd: true
+prefix: ["prefixed"]
+inherited
+inherit_output: 0
+spawn: (true, ["out"], ["err"], 0)
+kill: (true, false, false)
+missing: NotFound
+done

@@ -11,10 +11,10 @@ use crate::codegen::names as js_names;
 use crate::codegen::tail::{Callee, Target};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Module};
 use crate::source::Span;
-use crate::types::{Constructor, Dict, InstanceInfo, Rep, default_method};
+use crate::types::{Constructor, Dict, InstanceInfo, Rep, companion_name, default_method};
 
 /// The classes whose instances the runtime derives.
-const DERIVED: &[&str] = &["Eq", "Ord", "Hash", "Show"];
+const DERIVED: &[&str] = &["Eq", "Ord", "Hash", "Show", "Value"];
 
 /// The declarations of a module, each with whether it holds a `//line`
 /// directive; the statements of its init function.
@@ -131,8 +131,25 @@ impl<'a> Gen<'a> {
             }
             // a service is its key, written where it is used
             ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
-            ItemKind::Refined { .. } => {
-                self.unsupported(item.span, "a refined type");
+            // `T$check`, then `T$parse` and `T$value` over it
+            ItemKind::Refined { name, check } => {
+                let check_var =
+                    a.alloc_str(&names::var(self.module, &companion_name(name, "check")));
+                let parse = a.alloc_str(&names::var(self.module, &companion_name(name, "parse")));
+                let value = a.alloc_str(&names::var(self.module, &companion_name(name, "value")));
+                for var in [check_var, parse, value] {
+                    decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
+                }
+                let (mut stmts, v) = self.block(|g| g.expr(check));
+                stmts.push(statement(a, docvec![a, check_var, " = ", v]));
+                let refined = call(
+                    a,
+                    "flickrt.RefinedParse",
+                    [self.string(name), a.text(check_var)],
+                );
+                stmts.push(statement(a, docvec![a, parse, " = ", refined]));
+                stmts.push(statement(a, docvec![a, value, " = flickrt.RefinedValue"]));
+                init.push(statement(a, block(a, stmts)));
             }
             ItemKind::Schema(s) => self.schema(s, item.span, decls, init),
         }
@@ -206,7 +223,7 @@ impl<'a> Gen<'a> {
                 None => a.text("nil"),
                 Some(cs) => {
                     let cs: Vec<Document<'a>> =
-                        cs.iter().map(|c| self.constructor_info(c, span)).collect();
+                        cs.iter().map(|c| self.constructor_info(c)).collect();
                     list(a, "[]flickrt.Constructor{", cs, "}")
                 }
             };
@@ -284,11 +301,12 @@ impl<'a> Gen<'a> {
         }
     }
 
-    fn constructor_info(&mut self, c: &Constructor, span: Span) -> Document<'a> {
+    fn constructor_info(&mut self, c: &Constructor) -> Document<'a> {
         let a = self.a;
-        if let Rep::Typeof(_) = c.rep {
-            self.unsupported(span, "an `untagged` type");
-        }
+        let class = match c.rep {
+            Rep::Typeof(class) => class.name(),
+            _ => "",
+        };
         let unboxed = if c.rep == Rep::Unboxed {
             "true"
         } else {
@@ -299,6 +317,7 @@ impl<'a> Gen<'a> {
             docvec![a, "Name: ", self.string(&c.name)],
             docvec![a, "Arity: ", c.arity],
             docvec![a, "Unboxed: ", unboxed],
+            docvec![a, "Class: ", self.string(class)],
         ];
         list(a, "{", fields, "}")
     }

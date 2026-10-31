@@ -1,6 +1,10 @@
 package flickrt
 
-import "sync"
+import (
+	"math/big"
+	"strings"
+	"sync"
+)
 
 // Dict is the dictionary of a class instance: its methods, and entries
 // computed on first use (superclass dictionaries `$Class` and default
@@ -53,12 +57,32 @@ func Method(fb *Fiber, d Value, name string) Value { return d.(*Dict).get(fb, na
 func Super(fb *Fiber, d Value, class string) Value { return d.(*Dict).get(fb, "$"+class) }
 
 // Constructor describes a constructor of a derived type: its tag, name and
-// arity, and whether a value is its one field.
+// arity, and whether a value is its one field: always when unboxed, and
+// when of its JS class `Class` (an `untagged` type).
 type Constructor struct {
 	Tag     string
 	Name    string
 	Arity   int
 	Unboxed bool
+	Class   string
+}
+
+// IsClass is whether a value is of the JS class, as `typeof` tells the
+// fields of an `untagged` type apart.
+func IsClass(v Value, class string) bool {
+	switch v.(type) {
+	case int32, float64:
+		return class == "number"
+	case string:
+		return class == "string"
+	case bool:
+		return class == "boolean"
+	case *big.Int:
+		return class == "bigint"
+	case []Value:
+		return class == "array"
+	}
+	return false
 }
 
 // Derive is a derived instance of class `name`. `fields` gives the
@@ -75,7 +99,7 @@ func Derive(name string, fields func(*Fiber) []Value, constructors []Constructor
 	variant := func(v Value) (int, int) {
 		offset := 0
 		for i, c := range constructors {
-			if c.Unboxed || v.(*Data).Tag == c.Tag {
+			if c.Unboxed || c.Class != "" && IsClass(v, c.Class) || c.Class == "" && v.(*Data).Tag == c.Tag {
 				return i, offset
 			}
 			offset += c.Arity
@@ -83,7 +107,7 @@ func Derive(name string, fields func(*Fiber) []Value, constructors []Constructor
 		panic(Defect{"value of no constructor of its type"})
 	}
 	args := func(i int, v Value) []Value {
-		if constructors[i].Unboxed {
+		if constructors[i].Unboxed || constructors[i].Class != "" {
 			return []Value{v}
 		}
 		return v.(*Data).Fields
@@ -155,10 +179,46 @@ func Derive(name string, fields func(*Fiber) []Value, constructors []Constructor
 			}
 			return out
 		}))
+	case "Value":
+		d.Set("parse", Fn(func(fb *Fiber, text Value) Value {
+			if constructors == nil {
+				return Apply(fb, Method(fb, dict(fb, 0), "parse"), text)
+			}
+			return Succeed(deriveChoice(constructors, text.(string)))
+		}))
 	default:
 		panic(Defect{"`deriving " + name + "` is not available on the go target"})
 	}
 	return d
+}
+
+// deriveChoice is `Cli.Value` of a type of constructors: the kebab-case name
+// of one, `GreenLight` as `green-light`.
+func deriveChoice(constructors []Constructor, text string) Value {
+	names := make([]string, len(constructors))
+	for i, c := range constructors {
+		names[i] = kebab(c.Name)
+		if names[i] == text {
+			return Ok(Nullary(c.Tag))
+		}
+	}
+	return Err("expected one of " + strings.Join(names, ", ") + ", got " + text)
+}
+
+// kebab is JS `name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase()`.
+func kebab(name string) string {
+	var out strings.Builder
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		if i > 0 && c >= 'A' && c <= 'Z' {
+			p := name[i-1]
+			if p >= 'a' && p <= 'z' || p >= '0' && p <= '9' {
+				out.WriteByte('-')
+			}
+		}
+		out.WriteByte(c)
+	}
+	return strings.ToLower(out.String())
 }
 
 // atom wraps a shown argument of a constructor in parentheses when it has

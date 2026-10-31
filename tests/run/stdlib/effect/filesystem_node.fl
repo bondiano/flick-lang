@@ -22,7 +22,10 @@ let work dir =
   FileSystem.make_directory { recursive = true; mode = None } (dir ++ "/tree/sub")
   FileSystem.write_file_string plain (dir ++ "/tree/sub/deep.txt") "deep"
   FileSystem.write_file_string plain (dir ++ "/tree/one.txt") "one"
-  FileSystem.copy { overwrite = true; preserveTimestamps = true } (dir ++ "/tree") (dir ++ "/copied")
+  FileSystem.copy
+    { overwrite = true; preserveTimestamps = true }
+    (dir ++ "/tree")
+    (dir ++ "/copied")
   line "copy tree" (FileSystem.read_file_string (dir ++ "/copied/sub/deep.txt"))
   FileSystem.copy_file a a
   line "copy to itself" (FileSystem.read_file_string a)
@@ -34,14 +37,25 @@ let work dir =
   line "truncate" (FileSystem.read_file_string a)
   FileSystem.utimes 1000 2000 a
   line "utimes" (show ((FileSystem.stat a).mtime == Some 2000))
-  line "glob recursive" (show (List.sort (FileSystem.glob { root = Some (dir ++ "/tree"); exclude = [] } "**/*.txt")))
-  line "glob braces" (show (List.sort (FileSystem.glob { root = Some dir; exclude = [] } "{a,b}.txt")))
-  line "glob extglob" (show (List.sort (FileSystem.glob { root = Some dir; exclude = [] } "@(a|b).txt")))
-  line "glob exclude" (show (List.sort (FileSystem.glob { root = Some (dir ++ "/tree"); exclude = ["sub/**"] } "**/*.txt")))
+  line
+    "glob recursive"
+    (show (List.sort (FileSystem.glob { root = Some (dir ++ "/tree"); exclude = [] } "**/*.txt")))
+  line
+    "glob braces"
+    (show (List.sort (FileSystem.glob { root = Some dir; exclude = [] } "{a,b}.txt")))
+  line
+    "glob extglob"
+    (show (List.sort (FileSystem.glob { root = Some dir; exclude = [] } "@(a|b).txt")))
+  line
+    "glob exclude"
+    (show
+      (List.sort
+        (FileSystem.glob { root = Some (dir ++ "/tree"); exclude = ["sub/**"] } "**/*.txt")))
   scope {
-    let _ = FileSystem.open
-      { flag = Some FileSystem.WriteExclusive; mode = Some 0o600; noFollow = false }
-      (dir ++ "/opened.txt")
+    let _ =
+      FileSystem.open
+        { flag = Some FileSystem.WriteExclusive; mode = Some 0o600; noFollow = false }
+        (dir ++ "/opened.txt")
     ()
   }
   line "open" (show (FileSystem.read_file_string (dir ++ "/opened.txt") == ""))
@@ -54,7 +68,8 @@ let main () =
   try
     provide FileSystem.node {
       scope {
-        let dir = FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-fs-node-" }
+        let dir =
+          FileSystem.make_temp_directory_scoped { directory = None; prefix = Some "flick-fs-node-" }
         work dir
       }
     }

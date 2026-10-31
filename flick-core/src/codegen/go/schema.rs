@@ -9,7 +9,7 @@ use super::items::Decls;
 use super::layout::{call, closure, list, signature, single, statement};
 use super::{Gen, Shape, names};
 use crate::source::Span;
-use crate::types::{Constructor, Rep, SchemaItem, SchemaPlan, companion_name};
+use crate::types::{Constructor, Rep, SchemaItem, SchemaPlan, UrlRoute, companion_name};
 
 impl<'a> Gen<'a> {
     /// `T$schema`: its declaration, and the statement of the module's init
@@ -22,8 +22,8 @@ impl<'a> Gen<'a> {
         init: &mut Vec<Document<'a>>,
     ) {
         let a = self.a;
-        if item.url.is_some() || item.form.is_some() {
-            self.unsupported(span, "a schema deriving `Url` or `Form`");
+        if item.form.is_some() {
+            self.unsupported(span, "a schema deriving `Form`");
             return;
         }
         let name = companion_name(&item.ty, "schema");
@@ -36,6 +36,20 @@ impl<'a> Gen<'a> {
             let var = a.alloc_str(&names::var(self.module, &name));
             decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
             init.push(statement(a, docvec![a, var, " = ", body]));
+            // a refined type's `T.json`: its schema's canonical codec
+            if matches!(item.plan, SchemaPlan::Refined { .. }) {
+                let json = a.alloc_str(&names::var(self.module, &companion_name(&item.ty, "json")));
+                decls.push((docvec![a, "var ", json, " flickrt.Value"], false));
+                let codec = call(a, "flickrt.SchemaJsonCodec", [docvec![a, var]]);
+                init.push(statement(a, docvec![a, json, " = ", codec]));
+            }
+            // a route type has no parameters: the type checker refuses a generic one
+            if let Some(routes) = &item.url {
+                let url = a.alloc_str(&names::var(self.module, &companion_name(&item.ty, "url")));
+                decls.push((docvec![a, "var ", url, " flickrt.Value"], false));
+                let codec = self.url(&item.ty, routes, var, span);
+                init.push(statement(a, docvec![a, url, " = ", codec]));
+            }
         } else {
             let ws: Vec<String> = (0..item.witnesses).map(|i| format!("w{i}")).collect();
             let decl = docvec![
@@ -49,6 +63,45 @@ impl<'a> Gen<'a> {
             ];
             decls.push((decl, false));
         }
+    }
+
+    /// `T$url`: per constructor its tag, path, segment witnesses and query;
+    /// a nil query is a constructor without a final record field.
+    fn url(&mut self, ty: &str, routes: &[UrlRoute], schema: &'a str, span: Span) -> Document<'a> {
+        let a = self.a;
+        let routes: Vec<Document<'a>> = routes
+            .iter()
+            .map(|r| {
+                let constructor = Constructor {
+                    module: self.module.to_owned(),
+                    ty: ty.to_owned(),
+                    name: r.constructor.clone(),
+                    arity: r.segments.len() + usize::from(r.query.is_some()),
+                    rep: Rep::Tagged,
+                };
+                let tag = self.string(&self.tag(&constructor));
+                let segments: Vec<Document<'a>> =
+                    r.segments.iter().map(|p| self.plan(p, span)).collect();
+                let segments = list(a, "[]flickrt.Value{", segments, "}");
+                let query = match &r.query {
+                    None => a.text("nil"),
+                    Some(fields) => {
+                        let fields: Vec<Document<'a>> = fields
+                            .iter()
+                            .map(|(l, p, optional)| {
+                                let optional = if *optional { "true" } else { "false" };
+                                let p = self.plan(p, span);
+                                list(a, "{", [self.string(l), p, a.text(optional)], "}")
+                            })
+                            .collect();
+                        list(a, "[]flickrt.QueryField{", fields, "}")
+                    }
+                };
+                list(a, "{", [tag, self.string(&r.path), segments, query], "}")
+            })
+            .collect();
+        let routes = list(a, "[]flickrt.Route{", routes, "}");
+        call(a, "flickrt.RouteCodec", [a.text(schema), routes])
     }
 
     fn plan(&mut self, plan: &SchemaPlan, span: Span) -> Document<'a> {
@@ -134,9 +187,15 @@ impl<'a> Gen<'a> {
                     schema
                 }
             }
-            SchemaPlan::Refined { .. } => {
-                self.unsupported(span, "a refined type");
-                a.text("flickrt.SchemaUnknown")
+            SchemaPlan::Refined { name, base, known } => {
+                let base = self.plan(base, span);
+                let check = names::var(self.module, &companion_name(name, "check"));
+                let known = self.string(known.as_deref().unwrap_or(""));
+                call(
+                    a,
+                    "flickrt.SchemaRefined",
+                    [self.string(name), base, a.text(a.alloc_str(&check)), known],
+                )
             }
         }
     }

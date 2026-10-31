@@ -1,0 +1,34 @@
+# Schedules: when to repeat or retry, and with what output.
+[@flick-lang/runtime/effect/Schedule]
+forever ScheduleForever
+once ScheduleOnce
+identity ScheduleIdentity
+recurs ScheduleRecurs
+spaced ScheduleSpaced
+fixed ScheduleFixed
+windowed ScheduleWindowed
+duration ScheduleDuration
+during ScheduleDuring
+exponential ScheduleExponential
+fibonacci ScheduleFibonacci
+jittered ScheduleJittered
+passthrough SchedulePassthrough
+concat ScheduleConcat
+concatResult ScheduleConcatResult
+max ScheduleMax
+min ScheduleMin
+flickUpTo ScheduleUpTo
+map ScheduleMap
+tap ScheduleTap
+while ScheduleWhile
+addDelay ScheduleAddDelay
+modifyDelay ScheduleModifyDelay
+flickCurrentMetadata *ScheduleCurrentMetadata
+
+[@flick-lang/runtime/effect/Effect]
+repeat *EffectRepeat
+repeatOrElse *EffectRepeatOrElse
+retry *EffectRetry
+retryOrElse *EffectRetryOrElse
+schedule *EffectSchedule
+scheduleFrom *EffectScheduleFrom

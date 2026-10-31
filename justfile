@@ -15,10 +15,16 @@ lint:
 fmt:
     cargo fmt --all
 
-# Run the test suites
+# Run the test suites; the reference model has its own recipe, `model`
 test:
-    cargo test --workspace
+    cargo test --workspace --exclude flick-model
     just feature-test
+
+# The reference model of λFlick: its unit tests, the cases of
+# tests/run/model.txt checked and run against their `.stdout`, and the
+# properties of X2 on generated programs (`PROPTEST_CASES` sets how many)
+model:
+    cargo test -p flick-model -- --include-ignored
 
 # Check each capability independently, without workspace feature unification
 feature-check:

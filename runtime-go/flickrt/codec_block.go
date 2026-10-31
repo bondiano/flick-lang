@@ -10,10 +10,43 @@ type fieldSpec struct {
 	wire     string
 	codec    codec
 	optional bool // a missing key is None, None is not written
+	// onMissing, when set, is what a missing key decodes to
+	onMissing func(fb *Fiber) (Value, []issue)
 }
 
-func DslField(wire, c Value) Value         { return &fieldSpec{wire.(string), codecOf(c), false} }
-func DslOptionalField(wire, c Value) Value { return &fieldSpec{wire.(string), codecOf(c), true} }
+func DslField(wire, c Value) Value         { return &fieldSpec{wire.(string), codecOf(c), false, nil} }
+func DslOptionalField(wire, c Value) Value { return &fieldSpec{wire.(string), codecOf(c), true, nil} }
+
+// DslFieldEffect is `field_effect`: the fiber decoding runs in gives the
+// codec its services, so it is a field like any other.
+func DslFieldEffect(wire, c Value) Value { return DslField(wire, c) }
+
+// DslOnMissing is `on_missing`: a missing key decodes to `factory ()`.
+func DslOnMissing(factory, field Value) Value {
+	f := *field.(*fieldSpec)
+	f.onMissing = func(fb *Fiber) (Value, []issue) { return Apply(fb, factory, Unit), nil }
+	return &f
+}
+
+// DslOnMissingEffect is `on_missing_effect`: the default is a task, whose
+// SchemaError is the field's issue.
+func DslOnMissingEffect(factory, field Value) Value {
+	f := *field.(*fieldSpec)
+	f.onMissing = func(fb *Fiber) (Value, []issue) { return schemaTask(fb, Apply(fb, factory, Unit)) }
+	return &f
+}
+
+// missing is what the field decodes to when its key is missing.
+func (f *fieldSpec) missing(fb *Fiber) (Value, []issue) {
+	n, isNull := f.codec.(*nullOption)
+	switch {
+	case f.optional, isNull && n.nullish:
+		return None, nil
+	case f.onMissing != nil:
+		return f.onMissing(fb)
+	}
+	return nil, fail("a missing key")
+}
 
 var CodecString Value = sch(SchemaString).jsonOf()
 
@@ -75,10 +108,11 @@ func (b *block) decode(fb *Fiber, in Value) (Value, []issue) {
 	for _, f := range b.fields {
 		v := recordField(obj, f.wire)
 		if v == nil {
-			if !f.optional {
-				return nil, under(f.wire, fail("a missing key"))
+			x, issues := f.missing(fb)
+			if issues != nil {
+				return nil, under(f.wire, issues)
 			}
-			out = append(out, f.label, None)
+			out = append(out, f.label, x)
 			continue
 		}
 		x, issues := f.codec.decode(fb, v)

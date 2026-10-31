@@ -1,6 +1,9 @@
 package flickrt
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 // Layers, as Effect's: a layer is a value with an identity that builds
 // services into a scope, and a memo map builds each layer it is asked for
@@ -80,6 +83,7 @@ type MemoMap struct {
 	mu      sync.Mutex
 	parent  *MemoMap
 	entries map[*Layer]*memoEntry
+	idle    time.Duration // how long an entry no scope holds stays built; 0 for not at all
 }
 
 type memoEntry struct {
@@ -117,6 +121,19 @@ func (m *MemoMap) observe(fb *Fiber, l *Layer, e *memoEntry, scope *Owner) bool 
 		m.mu.Lock()
 		e.observers--
 		last := e.observers == 0
+		if last && m.idle > 0 {
+			// idle: released later, unless a scope holds it again by then
+			m.mu.Unlock()
+			idle := *fb
+			idle.state = newState()
+			// a fiber of its own, which a test clock waits for
+			fork(&idle, newOwner(), Eff(func(fb *Fiber) Value {
+				sleep(fb, m.idle)
+				m.release(fb, l, e)
+				return Unit
+			}), nil)
+			return Unit
+		}
 		if last && m.entries[l] == e {
 			delete(m.entries, l)
 		}
@@ -128,6 +145,38 @@ func (m *MemoMap) observe(fb *Fiber, l *Layer, e *memoEntry, scope *Owner) bool 
 		}
 		return Unit
 	}, func() { e.observers++ })
+}
+
+// release releases the entry of `l` if no scope holds it.
+func (m *MemoMap) release(fb *Fiber, l *Layer, e *memoEntry) {
+	m.mu.Lock()
+	idle := e.observers == 0 && m.entries[l] == e
+	if idle {
+		delete(m.entries, l)
+	}
+	m.mu.Unlock()
+	if idle {
+		e.scope.closeFinalizers(fb, nil)
+	}
+}
+
+// releaseIdle releases the entries no scope holds, as the scope of what
+// keeps them idle closes.
+func (m *MemoMap) releaseIdle(fb *Fiber, exit *Cause) *Cause {
+	m.mu.Lock()
+	var idle []*memoEntry
+	for l, e := range m.entries {
+		if e.observers == 0 {
+			idle = append(idle, e)
+			delete(m.entries, l)
+		}
+	}
+	m.mu.Unlock()
+	var out *Cause
+	for _, e := range idle {
+		out = Sequential(out, e.scope.closeFinalizers(fb, exit))
+	}
+	return out
 }
 
 // getOrBuild is the services of `l`: those of its entry, or built into a
@@ -257,19 +306,82 @@ func LayerUnwrap(task Value) Value {
 	})
 }
 
-// LayerMergeAll builds the layers, the services of later ones replacing
-// earlier ones'.
-//
-// shortcut: the layers build one after the other where Effect builds them concurrently, and their scopes release in reverse where Effect releases in parallel; build concurrently if a program's layers wait on each other
+// LayerMergeAll builds the layers concurrently, the services of later ones
+// replacing earlier ones'; the first failure interrupts the others' builds.
+// Their scopes release in parallel when the merged layer's does, as
+// Effect's do.
 func LayerMergeAll(first, rest Value) Value {
 	layers := append([]Value{first}, List(rest)...)
 	return fromBuild(func(fb *Fiber, memo *MemoMap, scope *Owner) Services {
+		scopes := make([]*Owner, len(layers))
+		for i := range scopes {
+			scopes[i] = newOwner()
+		}
+		scope.add(fb, func(fb *Fiber, exit *Cause) Value {
+			if cause := closeAll(fb, scopes, exit); cause != nil {
+				panic(&Failure{cause})
+			}
+			return Unit
+		})
+		ended := make(chan *child, len(layers))
+		children := make([]*child, len(layers))
+		for i, l := range layers {
+			build := Eff(func(fb *Fiber) Value { return layerOf(l).build(fb, memo, scopes[i]) })
+			children[i] = fork(fb, newOwner(), build, func(c *child) { ended <- c })
+		}
+		var failed *Cause
+		signal := signalOf(fb)
+		stopAll := func() {
+			for _, other := range children {
+				other.state.interrupt(fb.state.id)
+			}
+		}
+		for left := len(layers); left > 0; {
+			if c := nextEnded(fb, ended, signal); c != nil {
+				left--
+				if c.cause != nil && failed == nil {
+					failed = c.cause
+					stopAll()
+				}
+				continue
+			}
+			// interrupted: the builds stop, and their scopes release with the merged one's
+			signal = nil
+			stopAll()
+			if failed == nil {
+				failed = fb.state.stopped().Cause
+			}
+		}
+		if failed != nil {
+			panic(&Failure{failed})
+		}
 		out := Services{}
-		for _, l := range layers {
-			out = out.with(layerOf(l).build(fb, memo, forkScope(fb, scope)))
+		for _, c := range children {
+			out = out.with(c.value.(Services))
 		}
 		return out
 	})
+}
+
+// closeAll closes the scopes in parallel, with the causes of what failed.
+func closeAll(fb *Fiber, scopes []*Owner, exit *Cause) *Cause {
+	causes := make([]*Cause, len(scopes))
+	var wg sync.WaitGroup
+	for i, s := range scopes {
+		wg.Add(1)
+		inner := *fb
+		inner.state = newState()
+		go func() {
+			defer wg.Done()
+			causes[i] = s.closeFinalizers(&inner, exit)
+		}()
+	}
+	wg.Wait()
+	var out *Cause
+	for _, c := range causes {
+		out = Parallel(out, c)
+	}
+	return out
 }
 
 func LayerMerge(a, b Value) Value { return LayerMergeAll(a, []Value{b}) }

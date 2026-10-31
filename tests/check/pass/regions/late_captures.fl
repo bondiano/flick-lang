@@ -5,6 +5,8 @@ module App.LateCaptures exposing (..)
 
 type alias Batch o = { flush : List o ->{} Unit }
 
+type error Oops = Oops Int
+
 take : Batch String -> Unit
 let take _ = ()
 
@@ -13,3 +15,49 @@ let collected () =
   let seen = Ref.make []
   let collect = { flush = fun outputs -> Ref.set seen (Ref.get seen ++ outputs) }
   take collect
+
+// the value of a `match` arm bounds what a type not known yet holds; a
+// literal pattern decides it is a `String`, which holds nothing (found by X2)
+literal : Unit -> Int
+let literal _ =
+  match
+    (
+      match (0, 0) with
+      | (_, _) -> None
+    )
+  with
+  | Some s ->
+    match s with
+    | "ok" -> 1
+    | _ -> 2
+  | None -> 0
+
+// two computations of a record are compared before the type of a field is
+// known; what that type holds is compared once it is (found by X2)
+pick : Bool ->{} Int -> Int
+let pick c =
+  let r = await (if c then task { { a = fun x -> x } } else task { { a = fun y -> y } })
+  r.a
+
+empty : Bool ->{} { b : Option Int }
+let empty c = await (if c then task { { b = None } } else task { { b = None } })
+
+// nothing ever decides the type in `None`: a type never inferred holds
+// nothing (found by X2)
+unknown : Bool ->{} Int
+let unknown c =
+  match (await (if c then task { { a = None } } else task { { a = None } })).a with
+  | Some _ -> 1
+  | None -> 0
+
+// a projection takes the record's bound, which holds the type of `b` never
+// inferred; a `Unit` holds nothing, whatever its bound says (found by X2)
+dropped : Unit ->{; Oops} Unit
+let dropped () =
+  ({ a = from_result (Err (Oops 0)); b = from_result (Err (Oops 1)) }).a
+  ()
+
+matched : Unit ->{; Oops} Int
+let matched () =
+  match ({ a = from_result (Err (Oops 0)); b = from_result (Err (Oops 1)) }).a with
+  | () -> 0

@@ -16,12 +16,14 @@ handles : List String
 let handles = ["Date", "RegExp", "Error", "AbortSignal", "URL", "Uint8Array", "ArrayBuffer"]
 
 /// An export: its name, the name Flick binds it by, its description
-/// without either and the fingerprint of all but `local`.
+/// without either and the fingerprint of all but `local`; `named` pairs
+/// each named object type it mentions with where that is declared.
 type alias Export = {
   name : String;
   local : String;
   body : List (String, Value);
   fingerprint : String;
+  named : List (String, String);
 }
 
 tag : String -> Value
@@ -81,6 +83,42 @@ let object_name n t =
   match symbol_name (Ts.alias_symbol t) with
   | Some alias -> JString alias
   | None -> if n == "__type" || n == "__object" then JNull else JString n
+
+/// Where the named type is declared: its alias, else its own symbol.
+site : Ts.Type -> Value
+let site t =
+  let symbol =
+    match Ts.alias_symbol t with
+    | Some s -> Some s
+    | None -> Ts.type_symbol t
+  match Option.bind (fun s -> List.head (Ts.declarations s)) symbol with
+  | Some d -> JString (Ts.declaration_site d)
+  | None -> JNull
+
+/// The named types the value mentions, with where each is declared.
+sites : Value -> List (String, String)
+let rec sites v =
+  match v with
+  | JArray items -> List.flat_map sites items
+  | JObject fields ->
+    let here =
+      match
+        (List.find (fun (k, _) -> k == "name") fields, List.find (fun (k, _) -> k == "site") fields)
+      with
+      | (Some (_, JString n), Some (_, JString s)) -> [(n, s)]
+      | _ -> []
+    List.concat [here, List.flat_map (fun (_, x) -> sites x) fields]
+  | _ -> []
+
+/// The value without `site`, as the fingerprint and `flick ffi import` see it.
+unsited : Value -> Value
+let rec unsited v =
+  match v with
+  | JArray items -> JArray (List.map unsited items)
+  | JObject fields ->
+    JObject
+      (List.filter_map (fun (k, x) -> if k == "site" then None else Some (k, unsited x)) fields)
+  | other -> other
 
 rec {
   /// The shape of a type, `depth` levels deep.
@@ -143,8 +181,9 @@ rec {
           match name with
           | Some n ->
             if is_class || List.contains n handles then
-              if List.is_empty args then
-                JObject [("k", JString "handle"), ("name", JString n)]
+              // `typeof C` has the symbol of `C` too: only an instance is the handle
+              if List.is_empty args && List.is_empty (Ts.construct_signatures t) then
+                JObject [("k", JString "handle"), ("name", JString n), ("site", site t)]
               else
                 other c t
             else if List.is_empty calls
@@ -154,6 +193,7 @@ rec {
                 ("k", JString "object"),
                 ("name", object_name n t),
                 ("text", JString (Ts.text c t)),
+                ("site", site t),
               ]
             else
               other c t
@@ -237,13 +277,15 @@ let export_of c exported =
   let symbol = if Ts.symbol_has "Alias" exported then Ts.aliased c exported else exported
   let name = Ts.symbol_name exported
   Option.map
-    (fun body ->
+    (fun sited ->
+      let body = List.map (fun (k, x) -> (k, unsited x)) sited
       let fingerprinted = JsonText.render (JObject (List.concat [[("name", JString name)], body]))
       {
         name = name;
         local = local_name exported symbol;
         body = body;
         fingerprint = "sha256:" ++ Ts.sha256 fingerprinted;
+        named = sites (JObject sited);
       }
     )
     (describe c symbol)

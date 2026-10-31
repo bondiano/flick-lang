@@ -1,0 +1,25 @@
+// Effect's default `Clock`: reads are runtime calls, through the clock or
+// through the service, and sleeps and `DateTime.now` follow it.
+module App.Main exposing (main)
+
+/// Whether the clock reads no earlier than the readings before.
+later : Clock.Clock -> Float -> BigInt -> BigInt ->{} Bool
+let later clock millis nanos mono =
+  Clock.millis_of clock >= millis
+    && Clock.nanos_of clock >= nanos
+    && Clock.monotonic_nanos_of clock >= mono
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let millis = Clock.current_time_millis ()
+  let nanos = Clock.current_time_nanos ()
+  let start = Clock.monotonic_time_nanos ()
+  Effect.sleep (Result.with_default Duration.zero (Duration.millis 2))
+  let stop = Clock.monotonic_time_nanos ()
+  Platform.stdout_line
+    ("clock: "
+      ++ show (millis > 1700000000000, nanos > 1700000000000000000n, stop - start >= 2000000n))
+  let same = Clock.clock_with (fun clock -> later clock millis nanos stop)
+  Platform.stdout_line ("clock_with: " ++ show same)
+  let now = DateTime.to_epoch_millis (DateTime.now ())
+  Platform.stdout_line ("date-time: " ++ show (now >= millis, now <= Clock.current_time_millis ()))

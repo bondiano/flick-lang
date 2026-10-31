@@ -1,0 +1,22 @@
+# Cases of tests/run the λFlick model (flick-model) checks and runs, by path
+# without `.fl`: `just model` translates each from flick-core's checked IR
+# and compares what it prints with the `.stdout` the JS and Go builds print.
+# Every case here is in portable.txt too.
+bootstrap/hello
+codegen/eval_order
+codegen/stage_order
+codegen/lift
+codegen/patterns
+codegen/closures
+codegen/task_twice
+codegen/errors
+codegen/services
+codegen/service_dictionary
+codegen/higher_rank
+codegen/functor
+codegen/defaults
+codegen/exports
+codegen/numbers
+codegen/do_notation
+codegen/applicative_do
+codegen/classes

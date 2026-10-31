@@ -32,7 +32,7 @@ func checkTree(s *Schema, seen map[*Schema]bool) {
 	s = s.resolved()
 	switch s.kind {
 	case kindNumber, kindInt, kindString, kindBool, kindBigint:
-	case kindList:
+	case kindList, kindRefined:
 		checkTree(s.item, seen)
 	case kindTuple, kindRecord:
 		for _, item := range s.items {
@@ -74,6 +74,12 @@ func (t *stringTree) encode(_ *Fiber, v Value) (Value, []issue)   { return encod
 func decodeTree(fb *Fiber, s *Schema, in Value) (Value, []issue) {
 	s = s.resolved()
 	switch s.kind {
+	case kindRefined:
+		v, issues := decodeTree(fb, s.item, in)
+		if issues == nil {
+			issues = s.refine(fb, v)
+		}
+		return v, issues
 	case kindNumber:
 		x, issues := numberOfText(in)
 		if issues != nil {
@@ -165,6 +171,8 @@ func decodeTree(fb *Fiber, s *Schema, in Value) (Value, []issue) {
 func encodeTree(s *Schema, v Value) Value {
 	s = s.resolved()
 	switch s.kind {
+	case kindRefined:
+		return encodeTree(s.item, v)
 	case kindNumber:
 		return jsString(v)
 	case kindInt:

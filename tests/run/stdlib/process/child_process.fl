@@ -1,0 +1,105 @@
+// Effect's child processes: commands run to their end, a pipeline, input,
+// environment and directory, a spawned process read as streams and
+// stopped, and a program that does not exist. Commands go through `sh` on
+// POSIX and `cmd` on Windows, and are compared line by line.
+module App.Main exposing (main)
+
+import Stream.Core exposing (Stream)
+
+/// The command line `script` in the system's shell.
+shell : Bool -> String -> ChildProcess.Command
+let shell windows script =
+  if windows then
+    ChildProcess.make "cmd" ["/d", "/c", script]
+  else
+    ChildProcess.make "sh" ["-c", script]
+
+line : String -> String ->{} Unit
+let line label value = Platform.stdout_line (label ++ ": " ++ value)
+
+/// The tag of a failed system call.
+reason : PlatformError.PlatformError -> String
+let reason failure =
+  match failure with
+  | PlatformError.PlatformError (PlatformError.System r) -> show r.tag
+  | PlatformError.PlatformError (PlatformError.Bad r) -> "bad argument " ++ r.method
+
+/// Text of a byte stream, as lines.
+text_lines :
+  forall c.
+  (Stream none {PlatformError.PlatformError} (List Int))^c ->{; PlatformError.PlatformError}
+  List String
+let text_lines bytes = Stream.run_collect (Stream.split_lines (Stream.decode_text bytes))
+
+run : Bool -> String ->{FileSystem.FileSystem; PlatformError.PlatformError} Unit
+let run windows dir =
+  line "lines" (show (ChildProcess.lines (shell windows "echo one&& echo two")))
+  line "exit_code" (show (ChildProcess.exit_code (shell windows "exit 3")))
+  let sort = ChildProcess.make "sort" []
+  line
+    "pipe_to"
+    (show (ChildProcess.lines (shell windows "echo b&& echo a" |> ChildProcess.pipe_to sort)))
+  let echo_input = if windows then "findstr x" else "cat"
+  line
+    "set_stdin"
+    (show (ChildProcess.lines (shell windows echo_input |> ChildProcess.set_stdin "x1\nx2\n")))
+  let greeting = if windows then "echo %GREETING%" else "echo $GREETING"
+  line
+    "set_env"
+    (show
+      (ChildProcess.lines (shell windows greeting |> ChildProcess.set_env [("GREETING", "hi")])))
+  let here = if windows then "cd" else "pwd"
+  let cwd = ChildProcess.string (shell windows here |> ChildProcess.set_cwd dir)
+  line "set_cwd" (show (String.contains "flick-process-" cwd))
+  let prefix_args = if windows then ["/d", "/c"] else ["-c"]
+  let prefixed =
+    ChildProcess.make "echo prefixed" []
+    |> ChildProcess.prefix (if windows then "cmd" else "sh") prefix_args
+  line "prefix" (show (ChildProcess.lines prefixed))
+  line
+    "inherit_output"
+    (show (ChildProcess.exit_code (shell windows "echo inherited" |> ChildProcess.inherit_output)))
+  let both = scope {
+    let process = ChildProcess.spawn (shell windows "echo out&& echo err 1>&2")
+    let out = text_lines (ChildProcess.stdout process)
+    let err = text_lines (ChildProcess.stderr process)
+    (ChildProcess.pid process > 0, out, List.map String.trim err, ChildProcess.wait process)
+  }
+  line "spawn" (show both)
+  let slow = if windows then "ping -n 30 127.0.0.1 > nul" else "sleep 30"
+  let stopped = scope {
+    let process = ChildProcess.spawn (shell windows slow)
+    let before = ChildProcess.is_running process
+    ChildProcess.kill process
+    let after = ChildProcess.is_running process
+    let again = ChildProcess.spawn (shell windows slow)
+    let signal : ChildProcess.Signal = "SIGKILL"
+    let options : ChildProcess.KillOptions = { signal = signal; force_after = None }
+    ChildProcess.kill_with options again
+    (before, after, ChildProcess.is_running again)
+  }
+  line "kill" (show stopped)
+  let missing =
+    try show (ChildProcess.exit_code (ChildProcess.make "flick-no-such-program" [])) with
+    | e -> reason e
+  line "missing" missing
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let windows = Platform.env "OS" == Some "Windows_NT"
+  let outcome =
+    try
+      provide FileSystem.node {
+        scope {
+          let dir =
+            FileSystem.make_temp_directory_scoped {
+              directory = None;
+              prefix = Some "flick-process-";
+            }
+          run windows dir
+        }
+        "done"
+      }
+    with
+    | e -> "failed: " ++ reason e
+  Platform.stdout_line outcome

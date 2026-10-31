@@ -22,8 +22,11 @@ type Schema struct {
 	variants []Variant   // adt
 	fields   [][]*Schema // adt: nil for the tag, then each field's
 	wireKeys [][]string  // adt: `_tag` then each field's key
-	name     string      // adt, lazy
+	name     string      // adt, lazy, refined
+	check    Value       // refined: its check, a function to Bool
+	known    string      // refined: the check JSON Schema can state, or ""
 	get      func() Value
+	valid    func(*Fiber, Value) (Value, []issue) // custom: the check of a value of the type
 	once     sync.Once
 	target   *Schema // a lazy schema, resolved
 	wireOnce sync.Once
@@ -49,6 +52,8 @@ const (
 	kindRecord
 	kindAdt
 	kindLazy
+	kindRefined
+	kindCustom // a type of the runtime: its check and its JSON codec
 )
 
 // Variant is a constructor of a variant type: its qualified tag, its name
@@ -115,6 +120,33 @@ func SchemaAdt(name string, variants []Variant) Value {
 }
 
 // SchemaLazy is a schema resolved on first use: recursive types.
+// SchemaRefined is the witness of a refined type: its base's, with the
+// refined type's check on what it decodes and encodes.
+func SchemaRefined(name string, base, check Value, known string) Value {
+	return &Schema{kind: kindRefined, item: sch(base), name: name, check: check, known: known}
+}
+
+// refine checks a value of the refined type.
+func (s *Schema) refine(fb *Fiber, v Value) []issue {
+	if !Apply(fb, s.check, v).(bool) {
+		return fail("not a valid " + s.name)
+	}
+	return nil
+}
+
+// RefinedParse is a refined type's `parse`: its check as a Result.
+func RefinedParse(name string, check Value) Value {
+	return Fn(func(fb *Fiber, v Value) Value {
+		if !Apply(fb, check, v).(bool) {
+			return Err(schemaErrorOf(fail("not a valid " + name)))
+		}
+		return Ok(v)
+	})
+}
+
+// RefinedValue is a refined type's `value`: the value of its base type.
+var RefinedValue Value = Fn(func(_ *Fiber, v Value) Value { return v })
+
 func SchemaLazy(name string, get func() Value) Value {
 	return &Schema{kind: kindLazy, name: name, get: get}
 }
@@ -166,6 +198,8 @@ func number(in Value) (float64, bool) {
 func (w *wire) accepts(in Value) bool {
 	s := w.s.resolved()
 	switch s.kind {
+	case kindRefined:
+		return s.item.jsonOf().accepts(in)
 	case kindNumber, kindInt:
 		_, ok := number(in)
 		return ok
@@ -187,6 +221,8 @@ func (w *wire) accepts(in Value) bool {
 		return ok
 	case kindOption:
 		return in == JsonNull || s.item.jsonOf().accepts(in)
+	case kindCustom:
+		return s.jsonOf().accepts(in)
 	}
 	return true
 }
@@ -194,6 +230,12 @@ func (w *wire) accepts(in Value) bool {
 func (w *wire) decode(fb *Fiber, in Value) (Value, []issue) {
 	s := w.s.resolved()
 	switch s.kind {
+	case kindRefined:
+		v, issues := s.item.jsonOf().decode(fb, in)
+		if issues == nil {
+			issues = s.refine(fb, v)
+		}
+		return v, issues
 	case kindNumber:
 		x, ok := number(in)
 		if !ok || math.IsNaN(x) || math.IsInf(x, 0) {
@@ -240,6 +282,8 @@ func (w *wire) decode(fb *Fiber, in Value) (Value, []issue) {
 		return in, nil
 	case kindRedacted:
 		return nil, fail(redactedRefusal)
+	case kindCustom:
+		return s.jsonOf().decode(fb, in)
 	case kindList:
 		xs, ok := in.([]Value)
 		if !ok {
@@ -382,6 +426,11 @@ func object(fb *Fiber, obj *Record, keys []string, schemas []*Schema) ([]Value, 
 func (w *wire) encode(fb *Fiber, v Value) (Value, []issue) {
 	s := w.s.resolved()
 	switch s.kind {
+	case kindRefined:
+		if issues := s.refine(fb, v); issues != nil {
+			return nil, issues
+		}
+		return s.item.jsonOf().encode(fb, v)
 	case kindNumber:
 		x := v.(float64)
 		if math.IsNaN(x) || math.IsInf(x, 0) {
@@ -398,6 +447,8 @@ func (w *wire) encode(fb *Fiber, v Value) (Value, []issue) {
 		return nil, expected("nothing (Never)", v)
 	case kindRedacted:
 		return nil, fail(redactedRefusal)
+	case kindCustom:
+		return s.jsonOf().encode(fb, v)
 	case kindString, kindBool, kindUnknown:
 		return v, nil
 	case kindList, kindTuple:
@@ -463,3 +514,15 @@ func (w *wire) encode(fb *Fiber, v Value) (Value, []issue) {
 	}
 	panic(Defect{"a value its schema does not describe"})
 }
+
+// emailPattern is the JS target's: one `@` with text on both sides and a
+// dot in the domain.
+var emailPattern = func() *regexp.Regexp {
+	// JS's \s, which reaches past ASCII
+	other := `[^\t\n\v\f\r \x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}@]+`
+	return regexp.MustCompile(`^` + other + `@` + other + `\.` + other + `$`)
+}()
+
+func CheckEmail(s Value) Value    { return emailPattern.MatchString(s.(string)) }
+func CheckNonEmpty(s Value) Value { return s.(string) != "" }
+func CheckPositive(n Value) Value { return n.(float64) > 0 }

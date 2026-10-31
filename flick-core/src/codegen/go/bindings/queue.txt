@@ -1,0 +1,28 @@
+# Queues, ended by Done, as Effect 4's.
+
+[@flick-lang/runtime/effect/Queue]
+flickMake QueueMake
+bounded QueueBounded
+sliding QueueSliding
+dropping QueueDropping
+unbounded QueueUnbounded
+offer *QueueOffer
+offerAll *QueueOfferAll
+fail QueueFail
+flickFailCause QueueFailCause
+end QueueEnd
+interrupt *QueueInterrupt
+shutdown QueueShutdown
+clear QueueClear
+flickTakeAll *QueueTakeAll
+collect *QueueCollect
+flickTakeN *QueueTakeN
+flickTakeBetween *QueueTakeBetween
+flickTake *QueueTake
+poll QueuePoll
+flickPeek *QueuePeek
+flush QueueFlush
+await *QueueAwait
+size QueueSize
+isFull QueueIsFull
+into *QueueInto

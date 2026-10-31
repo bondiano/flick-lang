@@ -1,0 +1,18 @@
+[package]
+name = "flick-model"
+description = "Reference checker and interpreter of λFlick, the core of docs/formal/core.md"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+flick-core = { path = "../flick-core", default-features = false }
+
+[dev-dependencies]
+proptest = { version = "1", default-features = false, features = ["std"] }

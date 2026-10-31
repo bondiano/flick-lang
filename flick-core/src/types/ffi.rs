@@ -15,9 +15,10 @@
 use std::slice;
 
 use super::Checker;
+use super::env::Form;
 use super::kinds::Kind;
-use super::ty::{Stage, Type};
-use super::typing::{ForeignInfo, range};
+use super::ty::{PRELUDE, Stage, Type};
+use super::typing::{Copies, ForeignInfo, range};
 use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -88,6 +89,7 @@ impl Checker<'_> {
                 (n > 0).then_some(n)
             })
             .collect();
+        info.copies = self.copies(&params, &body, arity, &info.callbacks);
         let scoped: Vec<String> = binders
             .iter()
             .filter(|b| matches!(b.kind, Kind::Region | Kind::CaptureRow))
@@ -283,6 +285,63 @@ impl Checker<'_> {
             ty = *result;
         }
         out
+    }
+
+    /// Where the call passes Flick data: its first `arity` parameters, the
+    /// result and, for a callback, what JS gives it and what it returns. The
+    /// result of a callback's runtime stage is an `Effect`, not data.
+    fn copies(
+        &self,
+        params: &[Type],
+        body: &Type,
+        arity: usize,
+        callbacks: &[Option<usize>],
+    ) -> Copies {
+        let callback = |p: &Type, n: usize| {
+            let args = self
+                .params_of(p)
+                .iter()
+                .take(n)
+                .map(|a| self.holds_data(a))
+                .collect();
+            let pure = self.arrow_stages(p).iter().all(|s| *s == Stage::Pure);
+            let result = pure && self.call_result(p, n).is_some_and(|r| self.holds_data(&r));
+            (args, result)
+        };
+        Copies {
+            args: params
+                .iter()
+                .take(arity)
+                .map(|p| self.holds_data(p))
+                .collect(),
+            result: self
+                .call_result(body, arity)
+                .is_some_and(|r| self.holds_data(&r)),
+            callbacks: params
+                .iter()
+                .zip(callbacks)
+                .map(|(p, n)| n.map(|n| callback(p, n)))
+                .collect(),
+        }
+    }
+
+    /// Whether a value of `ty` may be Flick data JS could change in place:
+    /// a list, tuple, record or constructed value, or a type variable that
+    /// may stand for one. Functions, `JsValue` and opaque types are not.
+    fn holds_data(&self, ty: &Type) -> bool {
+        match self.whnf_captured(ty).0 {
+            Type::Tuple(_) | Type::Record(_) | Type::Var(_) | Type::Skolem(_) => true,
+            Type::App { head, .. } => self.holds_data(&head),
+            Type::Forall { body, .. } => self.holds_data(&body),
+            Type::Con { module, name } => {
+                (module == PRELUDE && name == "List")
+                    || matches!(
+                        self.env.type_def(&module, &name).map(|d| &d.form),
+                        Some(Form::Adt { .. } | Form::Error | Form::Alias { .. })
+                    )
+            }
+            _ => false,
+        }
     }
 
     /// The result of a call with `arity` arguments.

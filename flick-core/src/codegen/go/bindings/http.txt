@@ -206,9 +206,6 @@ flickLayer HttpClientLayer
 [@flick-lang/runtime/effect/http/FetchHttpClient]
 flickLayer *FetchClientLayer
 
-[@flick-lang/runtime/effect/Schedule]
-recurs ScheduleRecurs
-
 [@flick-lang/runtime/effect/http/Etag]
 flickLayer EtagLayer
 flickLayerWeak EtagLayerWeak

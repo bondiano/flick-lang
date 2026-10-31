@@ -17,6 +17,7 @@ pub use print::print;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::iface::Interface;
 use crate::numeric::{Arith, Num};
 use crate::source::Span;
 pub use crate::types::Stage;
@@ -30,6 +31,8 @@ pub struct Module {
     pub items: Vec<Item>,
     /// The top-level values debugging tools know by `Module.name`.
     pub labels: HashMap<String, Label>,
+    /// Every top-level entity with its type, for the reference model.
+    pub declarations: Arc<Interface>,
 }
 
 /// What a labelled top-level value is.

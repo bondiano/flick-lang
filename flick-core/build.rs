@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 use std::env;
+use std::fmt::Write as _;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -29,11 +30,83 @@ mod builtin_source;
 
 fn main() -> io::Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
+    let output = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo supplies OUT_DIR"));
+    go_runtime(&output)?;
+    go_driver(&output)?;
     if cfg!(feature = "builtin-docs") {
         return Ok(());
     }
-    let output = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo supplies OUT_DIR"));
     strip_tree(Path::new("src/types/builtins"), &output.join("builtins"))
+}
+
+/// `go_runtime.rs`: the files of the go target's runtime, the package
+/// `flickrt`, by their name: every `.go` file of `runtime-go/flickrt` but
+/// its tests.
+fn go_runtime(output: &Path) -> io::Result<()> {
+    let dir = Path::new("../runtime-go/flickrt");
+    println!("cargo:rerun-if-changed={}", dir.display());
+    let mut files = Vec::new();
+    for entry in fs::read_dir(dir)? {
+        let path = entry?.path();
+        let name = path
+            .file_name()
+            .expect("a file name")
+            .to_string_lossy()
+            .into_owned();
+        let go = path.extension().is_some_and(|e| e == "go");
+        if path.is_file() && go && !name.ends_with("_test.go") {
+            files.push(name);
+        }
+    }
+    files.sort();
+    let mut out = String::from("&[\n");
+    for name in files {
+        let path = fs::canonicalize(dir.join(&name))?;
+        writeln!(
+            out,
+            "    ({name:?}, include_str!({:?})),",
+            path.display().to_string()
+        )
+        .expect("writing to a String");
+    }
+    out.push_str("]\n");
+    fs::write(output.join("go_runtime.rs"), out)
+}
+
+/// `go_driver.rs`: the files of the go target's `PostgreSQL` driver, the
+/// package `flickpg`, by their path in a program's Go module; the modules
+/// it needs are downloaded by `go build`, as `go.sum` pins them.
+fn go_driver(output: &Path) -> io::Result<()> {
+    let root = Path::new("../runtime-go");
+    let mut files = Vec::new();
+    println!("cargo:rerun-if-changed={}", root.join("flickpg").display());
+    list(root, &root.join("flickpg"), &mut files)?;
+    files.sort();
+    let mut out = String::from("&[\n");
+    for rel in files {
+        let path = fs::canonicalize(root.join(&rel))?;
+        writeln!(
+            out,
+            "    ({rel:?}, include_str!({:?})),",
+            path.display().to_string()
+        )
+        .expect("writing to a String");
+    }
+    out.push_str("]\n");
+    fs::write(output.join("go_driver.rs"), out)
+}
+
+fn list(root: &Path, dir: &Path, out: &mut Vec<String>) -> io::Result<()> {
+    for entry in fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            list(root, &path, out)?;
+        } else if !path.to_string_lossy().ends_with("_test.go") {
+            let rel = path.strip_prefix(root).expect("under the root");
+            out.push(rel.to_string_lossy().replace('\\', "/"));
+        }
+    }
+    Ok(())
 }
 
 fn strip_tree(input: &Path, output: &Path) -> io::Result<()> {
