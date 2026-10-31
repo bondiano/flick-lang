@@ -120,3 +120,4 @@ sql/queries
 stdlib/effect/mutable_ref
 stdlib/effect/clock
 stdlib/effect/schedule
+stdlib/effect/hash_ring

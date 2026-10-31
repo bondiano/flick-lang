@@ -1,1 +1,10 @@
 # Data structures: Chunk, Trie, HashRing, ByteSize, Crypto, checks.
+
+[@flick-lang/runtime/effect/HashRing]
+flickMake HashRingMake
+flickAdd *HashRingAdd
+flickAddMany *HashRingAddMany
+flickRemove *HashRingRemove
+flickHas *HashRingHas
+flickGet HashRingGet
+flickGetShards HashRingGetShards
