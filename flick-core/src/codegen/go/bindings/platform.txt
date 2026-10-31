@@ -136,3 +136,36 @@ sqlTable SqlTable
 sqlTemplate SqlTemplate
 pgTransaction *DatabaseTransaction
 pgLayer DatabasePgLayer
+
+[@flick-lang/runtime/effect/Optic]
+makeIso OpticMakeIso
+makeLens OpticMakeLens
+flickMakePrism OpticMakePrism
+flickMakeOptional OpticMakeOptional
+flickFromCheck OpticFromCheck
+id OpticId
+some OpticSome
+none OpticNone
+success OpticSuccess
+failure OpticFailure
+get *OpticGet
+flickGetResult *OpticGetResult
+set *OpticSet
+replace *OpticReplace
+flickReplaceResult *OpticReplaceResult
+modify *OpticModify
+getAll *OpticGetAll
+modifyAll *OpticModifyAll
+flickCompose OpticCompose
+flickAs OpticAs
+
+[@flick-lang/runtime/effect/Formatter]
+format FormatterFormat
+flickFormatJson FormatterFormatJson
+
+[@flick-lang/runtime/effect/Inspectable]
+flickToStringUnknown InspectableToStringUnknown
+toJson InspectableToJson
+
+[@flick-lang/runtime/effect/Version]
+getCurrentVersion VersionCurrent
