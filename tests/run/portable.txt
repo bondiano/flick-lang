@@ -154,3 +154,5 @@ stdlib/effect/sink_more
 stdlib/effect/clock_random
 stdlib/effect/datetime
 stdlib/effect/datetime_more
+stdlib/effect/cron
+stdlib/effect/cron_more

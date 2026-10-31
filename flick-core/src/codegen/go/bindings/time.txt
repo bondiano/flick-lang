@@ -8,3 +8,13 @@ flickNextIntBetween *RandomNextIntBetween
 shuffle *RandomShuffle
 choice *RandomChoice
 withSeed *RandomWithSeed
+
+[@flick-lang/runtime/effect/Cron]
+flickMake CronMake
+flickParse CronParse
+flickFormat CronFormat
+flickMatch CronMatch
+flickNext CronNext
+flickPrev CronPrev
+flickSequence CronSequence
+Equivalence CronEquivalence

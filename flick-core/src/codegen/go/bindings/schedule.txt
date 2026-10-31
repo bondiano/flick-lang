@@ -24,6 +24,7 @@ while ScheduleWhile
 addDelay ScheduleAddDelay
 modifyDelay ScheduleModifyDelay
 flickCurrentMetadata *ScheduleCurrentMetadata
+cron ScheduleCron
 
 [@flick-lang/runtime/effect/Effect]
 repeat *EffectRepeat

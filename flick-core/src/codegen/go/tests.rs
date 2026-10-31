@@ -15,15 +15,11 @@ use crate::project::js_only;
 const PENDING: &[&str] = &[
     // the rest: Record, Loop and failures of the core
     "@flick-lang/runtime",
-    // Schedule: `cron` needs Cron
-    "@flick-lang/runtime/effect/Schedule",
     // queues and streams
     "@flick-lang/runtime/effect/Stream",
     "@flick-lang/runtime/effect/SubscriptionRef",
     // changes waits for Stream (S2): `Stream.Platform.from_tx_subscription_ref`
     "@flick-lang/runtime/effect/TxSubscriptionRef",
-    // time
-    "@flick-lang/runtime/effect/Cron",
     // observability
     "@flick-lang/runtime/effect/Logger",
     "@flick-lang/runtime/effect/Metric",
