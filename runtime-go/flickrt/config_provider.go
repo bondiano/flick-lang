@@ -469,11 +469,7 @@ func notFound(c *Cause) bool {
 		panic(&Failure{c})
 	}
 	e, ok := c.err.(*Data)
-	if !ok || e.Tag != platformErrorTag {
-		return false
-	}
-	reason := e.Fields[0].(*Data)
-	return reason.Tag == systemReasonTag && reason.Fields[0].(*Record).Get("tag").(*Data).Tag == Tag("PlatformError.SystemErrorTag.NotFound")
+	return ok && e.Tag == platformErrorTag && isNotFound(e)
 }
 
 func currentProvider(fb *Fiber) provider {

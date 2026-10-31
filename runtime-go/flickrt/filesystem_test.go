@@ -161,7 +161,7 @@ func TestFileSystemOpenIsScopedAndHonorsFlags(t *testing.T) {
 	var handle *os.File
 	fsTestNode(func(fb *Fiber) {
 		owned(fb, func(inner *Fiber, _ *Owner) Value {
-			handle = fsTestCall(inner, "open", Rec("flag", Some(Nullary(Tag("FileSystem.OpenFlag.WriteRead"))), "mode", Some(int32(0o600)), "noFollow", false), path).(*os.File)
+			handle = fsTestCall(inner, "open", Rec("flag", Some(Nullary(Tag("FileSystem.OpenFlag.WriteRead"))), "mode", Some(int32(0o600)), "noFollow", false), path).(*fsFile).f
 			if _, err := handle.WriteString("scoped"); err != nil {
 				t.Fatal(err)
 			}
@@ -179,7 +179,7 @@ func TestFileSystemOpenIsScopedAndHonorsFlags(t *testing.T) {
 		}
 		_, cause := catch(func() Value {
 			return owned(fb, func(inner *Fiber, _ *Owner) Value {
-				handle = fsTestCall(inner, "open", Rec("flag", None, "mode", None, "noFollow", false), path).(*os.File)
+				handle = fsTestCall(inner, "open", Rec("flag", None, "mode", None, "noFollow", false), path).(*fsFile).f
 				return Fail("body failed")
 			})
 		})
@@ -215,7 +215,7 @@ func TestFileSystemOpenNoFollow(t *testing.T) {
 	fsTestNode(func(fb *Fiber) {
 		fsTestFailure(t, func() Value { return fsTestCall(fb, "open", options, filepath.Join(dir, "link")) }, "BadResource")
 		owned(fb, func(inner *Fiber, _ *Owner) Value {
-			file := fsTestCall(inner, "open", options, filepath.Join(dir, "parent-link", "file")).(*os.File)
+			file := fsTestCall(inner, "open", options, filepath.Join(dir, "parent-link", "file")).(*fsFile).f
 			contents, err := io.ReadAll(file)
 			if err != nil || string(contents) != "intact" {
 				t.Fatalf("noFollow must allow symlinked parents: %q, %v", contents, err)

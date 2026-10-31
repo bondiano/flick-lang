@@ -154,11 +154,11 @@ func fsOpen(fb *Fiber, options Value, path string) Value {
 		if err != nil {
 			return Fail(systemError(err, "open", "open", path))
 		}
-		return file
+		return &fsFile{f: file, append: flags&os.O_APPEND != 0}
 	})
 	release := Fn(func(_ *Fiber, file Value) Value {
 		return Eff(func(*Fiber) Value {
-			if err := file.(*os.File).Close(); err != nil {
+			if err := fsFileOf(file).f.Close(); err != nil {
 				panic(Defect{nodeMessage(err, "close", path)})
 			}
 			return Unit
@@ -173,8 +173,6 @@ func isNotFound(platformError Value) bool {
 }
 
 // infoOf is `FileSystem.Info` of what Go's stat gives.
-//
-// shortcut: birth times, device, inode, links, owner and block counts remain none or zero; expose their per-system metadata when required
 func infoOf(fi fs.FileInfo) Value {
 	m := fi.Mode()
 	typ, ok := fileTypeTags[m&(fs.ModeType|fs.ModeCharDevice)]
@@ -196,11 +194,12 @@ func infoOf(fi fs.FileInfo) Value {
 	case "SymbolicLink":
 		bits |= 0o120000
 	}
+	dev, ino, nlink, uid, gid, rdev, blksize, blocks, birth := fsStatSys(fi)
 	return Rec(
 		"type_", Nullary(Tag("FileSystem.FileType."+typ)),
-		"mtime", Some(float64(fi.ModTime().UnixMilli())), "atime", Some(float64(fsAccessTime(fi).UnixMilli())), "birthtime", None,
-		"dev", big.NewInt(0), "ino", None, "mode", int32(bits), "nlink", None, "uid", None, "gid", None,
-		"rdev", None, "size", big.NewInt(fi.Size()), "blksize", None, "blocks", None)
+		"mtime", Some(float64(fi.ModTime().UnixMilli())), "atime", Some(float64(fsAccessTime(fi).UnixMilli())), "birthtime", birth,
+		"dev", dev, "ino", ino, "mode", int32(bits), "nlink", nlink, "uid", uid, "gid", gid,
+		"rdev", rdev, "size", big.NewInt(fi.Size()), "blksize", blksize, "blocks", blocks)
 }
 
 // statPath is the info of the path, or the PlatformError of `method`.

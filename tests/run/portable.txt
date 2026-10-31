@@ -99,3 +99,4 @@ stdlib/effect/platform
 stdlib/effect/console
 codegen/abi
 stdlib/effect/config
+stdlib/effect/filesystem

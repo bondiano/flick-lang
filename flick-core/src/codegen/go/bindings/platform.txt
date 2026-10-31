@@ -91,3 +91,12 @@ isEnabled *LogLevelIsEnabled
 
 [@flick-lang/runtime/effect/References]
 flickWithMinimumLogLevel *ReferencesWithMinimumLogLevel
+
+[@flick-lang/runtime/effect/FileSystem]
+flickFileStat *FileSystemFileStat
+flickSeek *FileSystemSeek
+flickSync *FileSystemSync
+flickReadAlloc *FileSystemReadAlloc
+flickFileTruncate *FileSystemFileTruncate
+flickWrite *FileSystemWrite
+flickWriteAll *FileSystemWriteAll

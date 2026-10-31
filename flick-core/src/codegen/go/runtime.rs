@@ -147,6 +147,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/filesystem_darwin.go"),
     ),
     (
+        "filesystem_file.go",
+        include_str!("../../../../runtime-go/flickrt/filesystem_file.go"),
+    ),
+    (
         "filesystem_glob.go",
         include_str!("../../../../runtime-go/flickrt/filesystem_glob.go"),
     ),
