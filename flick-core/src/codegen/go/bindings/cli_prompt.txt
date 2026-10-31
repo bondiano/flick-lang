@@ -23,8 +23,3 @@ promptAll PromptAll
 promptMap PromptMap
 promptFlatMap PromptFlatMap
 promptSucceed PromptSucceed
-
-# The part of Queue the prompts' events use.
-[@flick-lang/runtime/effect/Queue]
-unbounded QueueUnbounded
-offer QueueOffer

@@ -113,7 +113,7 @@ func TestPromptParseAsJS(t *testing.T) {
 
 func TestPromptCustomEventsWinOverKeys(t *testing.T) {
 	events := QueueUnbounded()
-	QueueOffer("ping", events)
+	QueueOffer(rootFiber(), "ping", events)
 	process := Fn(func(_ *Fiber, input Value) Value {
 		return Fn(func(_ *Fiber, _ Value) Value {
 			if d := input.(*Data); d.Tag == promptEventTag {

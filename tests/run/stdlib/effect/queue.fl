@@ -1,6 +1,5 @@
-// Effect's `Queue` and `PubSub`: the end of a queue is `None`, a failed
-// queue fails its takers with a typed error, and subscriptions belong to a
-// `scope`.
+// Effect's `Queue`: the end of a queue is `None`, and a failed queue fails
+// its takers with a typed error.
 module App.Main exposing (main)
 
 type error Broken = Broken String
@@ -114,50 +113,7 @@ let queues () =
     | Broken why -> "fail_cause: " ++ why
   say cause
 
-hubs : Unit ->{} Unit
-let hubs () =
-  let hub : PubSub.PubSub String = PubSub.bounded { capacity = 4; replay = None }
-  let got = scope s {
-    let a = PubSub.subscribe hub
-    let b = PubSub.subscribe hub
-    let _ = PubSub.publish "x" hub
-    let _ = PubSub.publish_all ["y", "z"] hub
-    let sizes = (PubSub.size hub, PubSub.is_full hub, PubSub.is_empty hub, PubSub.remaining a)
-    let first = PubSub.take a
-    let rest = PubSub.take_all a
-    let some = PubSub.take_up_to 2 b
-    let more = PubSub.take_between 1 1 b
-    show sizes ++ " " ++ show (first, NonEmpty.to_list rest, some, more)
-  }
-  say ("pubsub: " ++ got ++ ", capacity " ++ show (PubSub.capacity hub))
-  let replayed : PubSub.PubSub Float = PubSub.unbounded { replay = Some 2 }
-  let _ = PubSub.publish_all [1, 2, 3] replayed
-  let late = scope { PubSub.take_up_to 5 (PubSub.subscribe replayed) }
-  say ("replay: " ++ show late)
-  let ending : PubSub.PubSub String = PubSub.sliding { capacity = 2; replay = None }
-  let last = scope {
-    let sub = PubSub.subscribe ending
-    let _ = PubSub.publish "hello" ending
-    let ended = PubSub.end "bye" ending
-    let refused = PubSub.publish "late" ending
-    show (ended, refused, PubSub.take sub, PubSub.take sub)
-  }
-  say ("end: " ++ last)
-  let drops : PubSub.PubSub Float = PubSub.dropping { capacity = 1; replay = None }
-  let kept = scope {
-    let sub = PubSub.subscribe drops
-    let _ = PubSub.publish_all [1, 2] drops
-    PubSub.take_up_to 5 sub
-  }
-  say ("dropping: " ++ show kept)
-  let closing : PubSub.PubSub Float = PubSub.unbounded { replay = None }
-  let before = PubSub.is_shutdown closing
-  PubSub.shutdown closing
-  PubSub.await_shutdown closing
-  say ("shutdown: " ++ show (before, PubSub.is_shutdown closing))
-
 main : Unit ->{; AppError} Unit
 let main () =
   try queues () with
   | Broken why -> say ("unexpected " ++ why)
-  hubs ()

@@ -128,3 +128,4 @@ stdlib/effect/chunk
 stdlib/effect/check
 stdlib/effect/graph
 stdlib/effect/graph_algorithms
+stdlib/effect/queue
