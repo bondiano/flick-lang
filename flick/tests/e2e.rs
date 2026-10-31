@@ -4,7 +4,7 @@
 //! `<name>.stderr.contains` (lines stderr must contain), and `<name>.exit`
 //! (default `0`). Cases run in parallel, `FLICK_E2E_JOBS` at a time
 //! (default: the number of CPUs). `FLICK_E2E_ONLY` runs the cases whose path
-//! contains it.
+//! contains it, or one of its comma-separated parts.
 //!
 //! The cases `tests/run/portable.txt` lists also run on the go target in
 //! both profiles and must give the same output; the others are listed as
@@ -183,7 +183,7 @@ fn run_cases() {
     let mut paths = Vec::new();
     cases(&root, &mut paths);
     if let Ok(only) = env::var("FLICK_E2E_ONLY") {
-        paths.retain(|p| p.to_string_lossy().contains(&only));
+        paths.retain(|p| only.split(',').any(|o| p.to_string_lossy().contains(o)));
     }
     paths.sort();
     assert!(!paths.is_empty(), "no cases under {}", root.display());
