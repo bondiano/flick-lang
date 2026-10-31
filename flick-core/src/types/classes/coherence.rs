@@ -10,6 +10,22 @@ use crate::types::env::Instance;
 use crate::types::ty::Type;
 
 impl Checker<'_> {
+    /// Reports two imported instances that overlap or disagree on a
+    /// functional dependency: their modules do not see each other, so only a
+    /// module that sees both can tell.
+    pub(crate) fn imported_conflicts(&mut self, span: Span) {
+        let imported: Vec<Instance> = self.env.own_instances().cloned().collect();
+        for (i, instance) in imported.iter().enumerate() {
+            let Some(((cm, cn), args)) = split(&instance.head) else {
+                continue;
+            };
+            let args: Vec<Type> = args.into_iter().cloned().collect();
+            if let Some(info) = self.class_info(cm, cn) {
+                self.conflicts_with(instance, &info, &args, &imported[..i], span);
+            }
+        }
+    }
+
     /// Reports another instance of the class that this one overlaps or
     /// disagrees with on a functional dependency.
     pub(super) fn conflicts(
@@ -19,14 +35,23 @@ impl Checker<'_> {
         args: &[Type],
         span: Span,
     ) -> bool {
+        let others: Vec<Instance> = self.env.instances().cloned().collect();
+        self.conflicts_with(instance, info, args, &others, span)
+    }
+
+    fn conflicts_with(
+        &mut self,
+        instance: &Instance,
+        info: &ClassInfo,
+        args: &[Type],
+        others: &[Instance],
+        span: Span,
+    ) -> bool {
         let name = &instance.name;
         let class = split(&instance.head).map(|(k, _)| k);
-        let others: Vec<Instance> = self
-            .env
-            .instances()
-            .filter(|i| split(&i.head).map(|(k, _)| k) == class)
-            .cloned()
-            .collect();
+        let others = others
+            .iter()
+            .filter(|i| split(&i.head).map(|(k, _)| k) == class);
         for other in others {
             let names: Vec<String> = other.vars.iter().map(|v| v.name.clone()).collect();
             let theirs = rename(&other.head, &names);
@@ -80,9 +105,10 @@ impl Checker<'_> {
                     codes::C003,
                     span,
                     format!(
-                        "`{name}` overlaps `{}`{}: both apply to `{common}`, and instances may not overlap",
+                        "`{name}`{} overlaps `{}`{}: both apply to `{common}`, and instances may not overlap",
+                        from(instance),
                         other.name,
-                        from(&other)
+                        from(other)
                     ),
                 );
                 return true;
@@ -93,9 +119,10 @@ impl Checker<'_> {
                     codes::C004,
                     span,
                     format!(
-                        "`{name}` and `{}`{} break the functional dependency `{dep}`: the same types determine different ones",
+                        "`{name}`{} and `{}`{} break the functional dependency `{dep}`: the same types determine different ones",
+                        from(instance),
                         other.name,
-                        from(&other)
+                        from(other)
                     ),
                 );
                 return true;

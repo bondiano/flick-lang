@@ -113,6 +113,9 @@ nominal type.
 
 A module sees the instances of every module it depends on, directly or not,
 however it imports them; the order and form of `import` change nothing.
+Two modules that do not depend on each other cannot see each other's
+instances: a module that sees both reports an overlap between them
+(`FLICK-C003`, `FLICK-C004`) at its `module` line.
 
 ## Resolution
 

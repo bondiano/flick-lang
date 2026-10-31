@@ -54,6 +54,9 @@ impl<'a> Checker<'a> {
             .collect();
         let refined = self.declare_types(&decls);
         self.declare_classes(&decls);
+        if let Some(header) = tree.nodes().find(|n| n.kind == K::ModuleHeader) {
+            self.imported_conflicts(self.span(header));
+        }
         let declared = self.declare_instances(&decls, &refined);
         self.declare_schemas(&decls, &refined);
         for decl in &decls {
