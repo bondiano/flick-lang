@@ -17,3 +17,11 @@ fromAsyncIterableArray
 [@flick-lang/runtime/effect/Sink]
 # a web WritableStream, a JS value Go has no form of
 fromWritableStream
+
+[@flick-lang/runtime/effect/Stream]
+# a web ReadableStream, a JS value Go has no form of
+flickFromReadableStream
+# a JS AsyncIterable and its promises, which Go has no form of
+flickFromAsyncIterable
+# a JS event target (`addEventListener`), which Go has no form of
+flickFromEventListener

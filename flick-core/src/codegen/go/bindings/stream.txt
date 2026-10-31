@@ -31,3 +31,34 @@ run *StreamRun
 flickRunFold *StreamRunFold
 rechunk StreamRechunk
 chunks StreamChunks
+
+# Sources (Stream/Core.fl).
+DefaultChunkSize ChannelDefaultChunkSize
+empty StreamEmpty
+never StreamNever
+fromArrays StreamFromArrays
+suspend StreamSuspend
+fail StreamFail
+flickFailCause StreamFailCause
+flickDie StreamDie
+fromEffect StreamFromEffect
+fromEffectDrain StreamFromEffectDrain
+fromEffectRepeat StreamFromEffectRepeat
+flickFromEffectSchedule StreamFromEffectSchedule
+fromIterableEffectRepeat StreamFromListEffectRepeat
+flickUnwrap StreamUnwrap
+flickCallback StreamCallback
+tick StreamTick
+fromSchedule StreamFromSchedule
+fromQueue StreamFromQueue
+fromPubSub StreamFromPubSub
+flickUnfold StreamUnfold
+paginate StreamPaginate
+iterate StreamIterate
+range StreamRange
+
+[@flick-lang/runtime/effect/SubscriptionRef]
+changes SubscriptionRefChanges
+
+[@flick-lang/runtime/effect/TxSubscriptionRef]
+changesStream TxSubscriptionRefChangesStream

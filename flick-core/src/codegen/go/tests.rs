@@ -17,9 +17,6 @@ const PENDING: &[&str] = &[
     "@flick-lang/runtime",
     // queues and streams
     "@flick-lang/runtime/effect/Stream",
-    "@flick-lang/runtime/effect/SubscriptionRef",
-    // changes waits for Stream (S2): `Stream.Platform.from_tx_subscription_ref`
-    "@flick-lang/runtime/effect/TxSubscriptionRef",
     // observability
     "@flick-lang/runtime/effect/Logger",
     "@flick-lang/runtime/effect/Metric",

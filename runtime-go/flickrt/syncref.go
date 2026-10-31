@@ -2,14 +2,13 @@ package flickrt
 
 import "sync"
 
-// SyncRef is Effect's SynchronizedRef, and SubscriptionRef without its
-// stream of changes: an update holds the lock while its task runs, and a
-// failing update leaves the value as it was.
-//
-// shortcut: a SubscriptionRef has no `changes` stream; add one when a program subscribes
+// SyncRef is Effect's SynchronizedRef, and SubscriptionRef with the hub
+// its changes are published to: an update holds the lock while its task
+// runs, and a failing update leaves the value as it was.
 type SyncRef struct {
 	mu    sync.Mutex
 	value Value
+	hub   *PubSub // a SubscriptionRef's, nil for a SynchronizedRef
 }
 
 func SyncRefMake(_ *Fiber, v Value) Value { return &SyncRef{value: v} }
@@ -23,6 +22,10 @@ func update(r Value, f func(Value) (Value, Value, bool)) Value {
 	out, next, set := f(x.value)
 	if set {
 		x.value = next
+		if x.hub != nil {
+			// an unbounded hub never waits, so no fiber is needed
+			x.hub.publish(nil, next)
+		}
 	}
 	return out
 }
