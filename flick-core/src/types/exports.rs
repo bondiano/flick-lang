@@ -1,9 +1,9 @@
 //! The types and kinds of a module's exports, as `.iface` stores them.
 
 use super::Checker;
-use super::env::{Form, Operation};
+use super::env::{Form, Operation, TypeDef};
 use super::ty::Type;
-use crate::iface::{Decl, Export, Interface, Namespace};
+use crate::iface::{Decl, Entity, Export, Interface, Namespace};
 
 impl Checker<'_> {
     /// Stores the types and kinds of this module's exports.
@@ -32,32 +32,90 @@ impl Checker<'_> {
                     export.scheme = self.env.value(entity).map(|t| self.exported(t));
                 }
                 Namespace::Type => {
-                    export.definition = self.env.type_def(&entity.module, &entity.name).map(|d| {
-                        let mut d = d.clone();
-                        d.form = match d.form {
-                            Form::Alias { opaque: true, .. } => Form::Nominal,
-                            Form::Adt { .. } if export.decl == Decl::Opaque => Form::Nominal,
-                            Form::Alias { params, body, .. } => Form::Alias {
-                                params,
-                                body: self.exported(&body),
-                                opaque: false,
-                            },
-                            Form::Service { params, operations } => Form::Service {
-                                params,
-                                operations: operations
-                                    .into_iter()
-                                    .map(|o| Operation {
-                                        ty: self.exported(&o.ty),
-                                        name: o.name,
-                                    })
-                                    .collect(),
-                            },
-                            form => form,
-                        };
-                        d
-                    });
+                    export.definition = self
+                        .env
+                        .type_def(&entity.module, &entity.name)
+                        .map(|d| self.exported_def(d, Some(export.decl)));
                 }
             }
+        }
+    }
+
+    /// A type definition as importers see it: an opaque alias, and an ADT
+    /// exported opaque, are nominal. `export: None` is the module's own view.
+    fn exported_def(&self, d: &TypeDef, export: Option<Decl>) -> TypeDef {
+        let nominal = match (&d.form, export) {
+            (Form::Alias { opaque, .. }, Some(_)) => *opaque,
+            (Form::Adt { .. }, Some(decl)) => decl == Decl::Opaque,
+            _ => false,
+        };
+        let mut d = d.clone();
+        d.form = match d.form {
+            _ if nominal => Form::Nominal,
+            Form::Alias { params, body, .. } => Form::Alias {
+                params,
+                body: self.exported(&body),
+                opaque: false,
+            },
+            Form::Service { params, operations } => Form::Service {
+                params,
+                operations: operations
+                    .into_iter()
+                    .map(|o| Operation {
+                        ty: self.exported(&o.ty),
+                        name: o.name,
+                    })
+                    .collect(),
+            },
+            form => form,
+        };
+        d
+    }
+
+    /// Every value, constructor and type the module declares, exported or
+    /// not, typed as [`Checker::fill`] types an export but with opaque
+    /// types open: what the reference model (`flick-model`) checks the
+    /// module against.
+    pub fn declarations(&self) -> Interface {
+        let value = |(entity, t): (&Entity, &Type)| Export {
+            entity: entity.clone(),
+            decl: if entity.namespace == Namespace::Constructor {
+                Decl::Constructor
+            } else {
+                Decl::Let
+            },
+            parent: self.env.parent(entity).map(|(_, ty)| ty),
+            scheme: Some(self.exported(t)),
+            definition: None,
+            blocked: None,
+            at: None,
+        };
+        let ty = |(name, d): (&str, &TypeDef)| Export {
+            entity: self.env.entity(Namespace::Type, name),
+            decl: match d.form {
+                Form::Nominal => Decl::Abstract,
+                Form::Adt { .. } => Decl::Adt,
+                Form::Error => Decl::Error,
+                Form::Alias { .. } => Decl::Alias,
+                Form::Service { .. } => Decl::Service,
+                Form::Class { .. } => Decl::Class,
+                Form::Kind => Decl::Kind,
+                Form::KindMember => Decl::KindMember,
+            },
+            parent: None,
+            scheme: None,
+            definition: Some(self.exported_def(d, None)),
+            blocked: None,
+            at: None,
+        };
+        let mut exports: Vec<Export> = self.env.own_values().map(value).collect();
+        exports.extend(self.env.own_types().map(ty));
+        exports.sort_by(|a, b| a.entity.cmp(&b.entity));
+        Interface {
+            module: self.env.module.clone(),
+            exports,
+            instances: self.env.own_instances().cloned().collect(),
+            ..Interface::default()
         }
     }
 

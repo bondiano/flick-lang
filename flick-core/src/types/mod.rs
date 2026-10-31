@@ -106,6 +106,7 @@ use env::{Builtins, Env};
 use kinds::KindStore;
 use std::collections::HashMap;
 use std::ptr;
+use std::sync::Arc;
 use unify::Store;
 
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
@@ -273,6 +274,7 @@ fn run_in(
     checker.module(module.tree);
     checker.report_holes();
     checker.fill(interface);
+    checker.typing.declarations = Arc::new(checker.declarations());
     checker.sugar_lints(module.tree);
     let typing = checker.finish_typing();
     let mut evidence = checker.classes.evidence;

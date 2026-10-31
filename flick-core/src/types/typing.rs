@@ -6,6 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::mem;
+use std::sync::Arc;
 
 use super::Checker;
 use super::classes::Dict;
@@ -15,6 +16,7 @@ use super::sql::dialect::Dialect;
 pub use super::sql_plan::{SqlColumn, SqlForm, SqlPlan, SqlTable, SqlValue};
 use super::ty::{Stage, Type};
 use super::{FormField, UrlRoute};
+use crate::iface::Interface;
 use crate::ir::Label;
 use crate::numeric::Num;
 use crate::source::Span;
@@ -32,6 +34,9 @@ pub fn range(span: Span) -> Range {
 
 #[derive(Debug, Default)]
 pub struct Typing {
+    /// Every top-level entity of the module with its type (see
+    /// [`Checker::declarations`]).
+    pub declarations: Arc<Interface>,
     /// Every name in an expression or a constructor pattern.
     pub names: HashMap<Range, Ref>,
     /// The representation of each `unboxed` or `untagged` type of the module.

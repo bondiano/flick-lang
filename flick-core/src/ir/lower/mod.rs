@@ -78,6 +78,7 @@ pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Di
             name: module.name.to_owned(),
             items,
             labels: typing.labelled.clone(),
+            declarations: typing.declarations.clone(),
         })
     } else {
         Err(lower.diagnostics)

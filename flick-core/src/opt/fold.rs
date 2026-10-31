@@ -80,7 +80,7 @@ fn show(instance: &str, c: Const) -> Option<String> {
     clippy::cast_sign_loss,
     reason = "at most 17 digits, and each cast follows its range check"
 )]
-pub(super) fn js_number(x: f64) -> String {
+pub fn js_number(x: f64) -> String {
     if x.is_nan() {
         return "NaN".to_owned();
     }
@@ -135,7 +135,7 @@ fn even_tie(x: f64, digits: String, exp: &str) -> String {
 }
 
 /// `JSON.stringify` of a string.
-fn json_string(s: &str) -> String {
+pub fn json_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     out.push('"');
     for c in s.chars() {

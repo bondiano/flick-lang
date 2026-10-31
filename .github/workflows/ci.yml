@@ -35,6 +35,17 @@ jobs:
       - run: just bundle-size >> "$GITHUB_STEP_SUMMARY"
       - run: just e2e-postgres
 
+  # the reference model of λFlick (flick-model) against tests/run/model.txt;
+  # it needs neither Node nor Go
+  model:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: extractions/setup-just@v2
+      - run: just model
+
   # the go target on each platform it supports: the runtime's tests and the
   # portable cases of the parity harness, built and run without Node
   go:

@@ -312,6 +312,19 @@ impl<'b> Env<'b> {
         self.builtins.instances.iter().chain(&self.instances)
     }
 
+    /// The values and constructors the module declares, with their types.
+    pub fn own_values(&self) -> impl Iterator<Item = (&Entity, &Type)> {
+        self.values.iter().filter(|(e, _)| e.module == self.module)
+    }
+
+    /// The types, services and classes the module declares.
+    pub fn own_types(&self) -> impl Iterator<Item = (&str, &TypeDef)> {
+        self.types
+            .iter()
+            .filter(|((m, _), _)| *m == self.module)
+            .map(|((_, n), d)| (n.as_str(), d))
+    }
+
     /// The instances beyond the built-in ones, which an interface carries.
     pub fn own_instances(&self) -> impl Iterator<Item = &Instance> {
         self.instances

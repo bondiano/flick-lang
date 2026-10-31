@@ -206,6 +206,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "flick-model"
+version = "0.1.0"
+dependencies = [
+ "flick-core",
+]
+
+[[package]]
 name = "flick-pretty"
 version = "0.1.0"
 dependencies = [
