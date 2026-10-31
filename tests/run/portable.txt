@@ -19,6 +19,7 @@ codegen/eval_order
 codegen/exports
 codegen/for_comprehension
 codegen/functor
+codegen/given_shadow
 codegen/fusion
 codegen/higher_rank
 codegen/ints

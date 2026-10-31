@@ -12,6 +12,7 @@ use super::Checker;
 use super::env::Form;
 use super::kinds::Kind;
 use super::ty::{Norm, Row, Type};
+use super::typing::passes_dictionary;
 use crate::numeric::Num;
 use crate::source::Span;
 
@@ -711,6 +712,35 @@ impl Checker<'_> {
         }
     }
 
+    /// The name of the rigid variable for `name` bound with `constraints`:
+    /// numbered when an assumption in scope that passes a dictionary uses it
+    /// too, since code generation finds a dictionary by its constraint as shown.
+    fn unshadowed(&self, name: &str, constraints: &[Type]) -> String {
+        let is_var = |t: &Type| matches!(t, Type::Var(n) if n == name);
+        if !constraints
+            .iter()
+            .any(|c| passes_dictionary(c) && c.contains(&mut |t| is_var(t)))
+        {
+            return name.to_owned();
+        }
+        let mut used = HashSet::new();
+        for g in self.classes.givens.iter().filter(|g| passes_dictionary(g)) {
+            g.visit(&mut |t| match t {
+                Type::Var(n) => drop(used.insert(n.clone())),
+                Type::Skolem(s) => drop(used.insert(self.store.skolem_name(*s).to_owned())),
+                _ => {}
+            });
+        }
+        if !used.contains(name) {
+            return name.to_owned();
+        }
+        // `used` is finite: one of its length + 1 numbers is free
+        (1..=used.len() + 1)
+            .map(|i| format!("{name}{i}"))
+            .find(|n| !used.contains(n))
+            .expect("a free number")
+    }
+
     /// The body of a polymorphic type with fresh skolems at the current
     /// level, the skolems by name, and its class constraints over them.
     pub fn skolemize(&mut self, t: &Type) -> (Type, Vec<(String, Type)>, Vec<Type>) {
@@ -723,7 +753,7 @@ impl Checker<'_> {
                 let subst: Vec<(String, Type)> = vars
                     .iter()
                     .map(|v| {
-                        let ty = self.store.skolem(&v.name);
+                        let ty = self.store.skolem(&self.unshadowed(&v.name, &constraints));
                         if let Type::Skolem(s) = &ty {
                             self.regions.rigid_kinds.push((*s, v.kind.clone()));
                         }
