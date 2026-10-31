@@ -75,6 +75,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/config.go"),
     ),
     (
+        "config_provider.go",
+        include_str!("../../../../runtime-go/flickrt/config_provider.go"),
+    ),
+    (
         "console.go",
         include_str!("../../../../runtime-go/flickrt/console.go"),
     ),
