@@ -116,3 +116,4 @@ stdlib/effect/filesystem
 stdlib/effect/stream_platform
 stdlib/process/child_process
 stdlib/effect/values
+sql/queries
