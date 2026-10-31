@@ -13,13 +13,8 @@ use crate::project::js_only;
 /// The runtime modules (`global M` for the JS globals of module `M`) whose
 /// foreigns the go target does not bind all of yet; G10e empties it.
 const PENDING: &[&str] = &[
-    // the rest: Record, Loop and failures of the core
+    // the core: Failure and RawCause
     "@flick-lang/runtime",
-    // the rest
-    "@flick-lang/runtime/effect/http/HttpClientResponse",
-    "@flick-lang/runtime/effect/reactivity/AsyncResult",
-    "@flick-lang/runtime/effect/server/Functions",
-    "@flick-lang/runtime/effect/server/FunctionsNode",
 ];
 
 /// The Go program of `text` with the built-in modules.
