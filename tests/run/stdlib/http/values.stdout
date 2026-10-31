@@ -30,6 +30,7 @@ round trip: [("session", "abc123")]
 get_value: <redacted> / abc123
 cookie: Cookie "theme=<redacted>" theme dark
 serialize: theme=dark
+expires: until=1; Expires=Wed, 02 Jan 2030 03:04:05 GMT / until=1; Expires=Wed, 02 Jan 2030 04:04:05 GMT
 names: ["session", "theme", "a"]
 get: Some "theme"
 remove: (true, false)
