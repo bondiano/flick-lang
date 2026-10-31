@@ -161,6 +161,59 @@ partition *StreamPartition
 partitionEffect *StreamPartitionEffect
 partitionQueue *StreamPartitionQueue
 
+# Transformations (Stream/Transform.fl).
+as StreamAs
+mapBoth StreamMapBoth
+mapError StreamMapError
+mapArray StreamMapArray
+flickMapEffectPar StreamMapEffectPar
+mapArrayEffect StreamMapArrayEffect
+flattenEffect StreamFlattenEffect
+result StreamResult
+tap StreamTap
+tapBoth StreamTapBoth
+filterMap StreamFilterMap
+filterEffect StreamFilterEffect
+filterMapEffect StreamFilterMapEffect
+takeRight StreamTakeRight
+takeUntil StreamTakeUntil
+takeUntilEffect StreamTakeUntilEffect
+takeWhile StreamTakeWhile
+takeWhileFilter StreamTakeWhileFilter
+takeWhileEffect StreamTakeWhileEffect
+drop StreamDrop
+dropRight StreamDropRight
+dropUntil StreamDropUntil
+dropUntilEffect StreamDropUntilEffect
+dropWhile StreamDropWhile
+dropWhileFilter StreamDropWhileFilter
+dropWhileEffect StreamDropWhileEffect
+when StreamWhen
+sliding StreamSliding
+slidingSize StreamSlidingSize
+split StreamSplit
+grouped StreamGrouped
+groupedWithin StreamGroupedWithin
+groupAdjacentBy StreamGroupAdjacentBy
+flickMapAccum StreamMapAccum
+flickMapAccumArray StreamMapAccumArray
+flickMapAccumEffect StreamMapAccumEffect
+flickMapAccumArrayEffect StreamMapAccumArrayEffect
+flickScan StreamScan
+flickScanEffect StreamScanEffect
+collect StreamCollect
+accumulate StreamAccumulate
+changes StreamChanges
+changesWith StreamChangesWith
+changesWithEffect StreamChangesWithEffect
+intersperse StreamIntersperse
+intersperseAffixes StreamIntersperseAffixes
+debounce StreamDebounce
+flickThrottle StreamThrottle
+flickThrottleEffect StreamThrottleEffect
+flickBuffer StreamBuffer
+flickBufferArray StreamBufferArray
+
 [@flick-lang/runtime/effect/SubscriptionRef]
 changes SubscriptionRefChanges
 
