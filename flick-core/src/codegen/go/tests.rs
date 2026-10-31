@@ -3,7 +3,7 @@ use std::fmt::Write as _;
 use std::iter;
 
 use super::foreign::{lookup, targets};
-use super::{Program, RUNTIME, go};
+use super::{Output, Program, RUNTIME, go};
 use crate::build::builtin_modules;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::tests::lower_text;
@@ -24,7 +24,6 @@ const PENDING: &[&str] = &[
     "@flick-lang/runtime/effect/TxSubscriptionRef",
     // time
     "@flick-lang/runtime/effect/Cron",
-    "@flick-lang/runtime/effect/DateTime",
     // observability
     "@flick-lang/runtime/effect/Logger",
     "@flick-lang/runtime/effect/Metric",
@@ -51,11 +50,11 @@ const PENDING: &[&str] = &[
     "@flick-lang/runtime/effect/server/FunctionsNode",
 ];
 
-/// The target diagnostics of `text` with the built-in modules.
-fn compile(text: &str) -> Vec<Diagnostic> {
+/// The Go program of `text` with the built-in modules.
+fn build(text: &str) -> Output {
     let ir = lower_text("App", text).expect("lowers");
     let modules: Vec<&Module> = iter::once(&ir).chain(builtin_modules()).collect();
-    let output = go(&Program {
+    go(&Program {
         suites: &[],
         modules: &modules,
         entry: &ir.name,
@@ -63,8 +62,34 @@ fn compile(text: &str) -> Vec<Diagnostic> {
         own: &|m| m == ir.name,
         location: &|_, _| None,
         foreign_file: &|_, _| None,
-    });
-    output.diagnostics
+    })
+}
+
+/// The target diagnostics of `text` with the built-in modules.
+fn compile(text: &str) -> Vec<Diagnostic> {
+    build(text).diagnostics
+}
+
+#[test]
+fn only_a_program_that_names_zones_embeds_the_zone_database() {
+    let main_go = |body: &str| {
+        let text =
+            format!("module App exposing (main)\nmain : Unit ->{{}} Unit\nlet main () = {body}\n");
+        let output = build(&text);
+        assert_eq!(output.diagnostics, []);
+        let (_, main) = output
+            .files
+            .into_iter()
+            .find(|(path, _)| path == "main.go")
+            .expect("main.go");
+        main.contains("import _ \"time/tzdata\"") && main.contains("flickrt.UseZones()")
+    };
+    assert!(main_go(
+        "Platform.stdout_line (show (Result.is_ok (DateTime.zone_make_named \"Europe/Paris\")))"
+    ));
+    assert!(!main_go(
+        "Platform.stdout_line (DateTime.format_iso (DateTime.add DateTime.Day 1 (DateTime.now ())))"
+    ));
 }
 
 #[test]

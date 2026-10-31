@@ -76,7 +76,7 @@ func TestPromptDateEditsParts(t *testing.T) {
 	start := DateTimeMake("2024-01-31T12:00:00Z").(*Data).Fields[0]
 	prompt := PromptDate(Rec("message", "When", "initial", Some(start), "dateMask", Some("YYYY-MM-DD"), "validate", None, "locales", None))
 	keys := promptTestKeys(promptTestPress("right"), promptTestPress("up"), promptTestPress("x"), promptTestPress("return"))
-	got := promptTestRun(&promptScript{keys: keys}, prompt).(*DateTime).t.In(time.Local)
+	got := promptTestRun(&promptScript{keys: keys}, prompt).(*DateTime).time().In(time.Local)
 	// as JS `setMonth`, one month after January 31st overflows into March
 	if got.Month() != time.March || got.Year() != 2024 {
 		t.Fatalf("got %v", got)

@@ -152,3 +152,5 @@ stdlib/effect/channel_schema
 stdlib/effect/sink
 stdlib/effect/sink_more
 stdlib/effect/clock_random
+stdlib/effect/datetime
+stdlib/effect/datetime_more

@@ -1,0 +1,179 @@
+// Effect's `DateTime` past the basics: `Intl` formatting in several
+// locales, styles and zones, zone names as V8 resolves them, wall-clock
+// times a transition skips or repeats, and the forms `make` reads.
+module App.Main exposing (main)
+
+keep : DateTime.ZoneOptions
+let keep = { adjustForTimeZone = None; disambiguation = None }
+
+text : Result DateTime.DateTimeError String -> String
+let text r =
+  match r with
+  | Ok s -> s
+  | Err (DateTime.DateTimeError message) -> "error: " ++ message
+
+iso : Result DateTime.DateTimeError DateTime.DateTime -> String
+let iso r = text (Result.map DateTime.format_iso_offset r)
+
+at : String ->{} DateTime.DateTime
+let at s =
+  match DateTime.make s with
+  | Ok t -> t
+  | Err _ -> DateTime.now ()
+
+styled : String -> String -> String -> DateTime.FormatOptions
+let styled locale date time = {
+  locale = Some locale;
+  dateStyle = if date == "" then None else Some date;
+  timeStyle = if time == "" then None else Some time;
+}
+
+in_zone : DateTime.DateTime -> String -> DateTime.DateTime
+let in_zone t zone = Result.with_default t (DateTime.set_zone_named keep zone t)
+
+/// The date-time in UTC in the locale's styles.
+in_locale : DateTime.DateTime -> String ->{} Unit
+let in_locale t locale =
+  Platform.stdout_line
+    (locale
+      ++ ": "
+      ++ show [
+        text (DateTime.format_utc (styled locale "full" "full") t),
+        text (DateTime.format_utc (styled locale "medium" "short") t),
+        text (DateTime.format_utc (styled locale "short" "") t),
+        text (DateTime.format_utc (styled locale "" "") t),
+      ])
+
+tags : DateTime.DateTime ->{} Unit
+let tags t =
+  Platform.stdout_line
+    ("tags: "
+      ++ show [
+        text (DateTime.format_utc (styled "EN-gb" "medium" "") t),
+        text (DateTime.format_utc (styled "de-DE" "medium" "") t),
+        text (DateTime.format_utc (styled "zh-Hant-TW" "long" "") t),
+        text (DateTime.format_utc (styled "en-GB-u-nu-latn" "short" "short") t),
+        text (DateTime.format_utc (styled "en_US" "short" "") t),
+        text (DateTime.format_utc (styled "root" "short" "") t),
+        text (DateTime.format_utc (styled "x-private" "short" "") t),
+      ])
+
+/// The names of the date-time's zone in time styles.
+zone_names : String -> DateTime.DateTime ->{} Unit
+let zone_names what d =
+  Platform.stdout_line
+    (what
+      ++ ": "
+      ++ show [
+        text (DateTime.format (styled "en-US" "" "full") d),
+        text (DateTime.format (styled "en-US" "" "long") d),
+        text (DateTime.format (styled "fr" "" "long") d),
+        text (DateTime.format (styled "de" "short" "full") d),
+      ])
+
+zones : Unit ->{} Unit
+let zones () =
+  let winter = at "2024-01-15T09:30:00Z"
+  offset : Float -> DateTime.DateTime
+  let offset ms = Result.with_default winter (DateTime.set_zone_offset keep ms winter)
+  zone_names "utc" winter
+  zone_names "named utc" (in_zone winter "Etc/UTC")
+  zone_names "london" (in_zone winter "Europe/London")
+  zone_names "offset 0" (offset 0)
+  zone_names "offset +5:30" (offset 19800000)
+  zone_names "offset -3:30" (offset (-12600000))
+  zone_names "offset +2" (offset 7200000)
+  Platform.stdout_line
+    ("zones: "
+      ++ show [
+        text (Result.map DateTime.zone_to_string (DateTime.zone_make_named "Etc/UTC")),
+        text (Result.map DateTime.zone_to_string (DateTime.zone_make_named "Asia/Kolkata")),
+        text (Result.map DateTime.zone_to_string (DateTime.zone_make_named "europe/paris")),
+        text (Result.map DateTime.zone_to_string (DateTime.zone_from_string "US/Pacific")),
+        text (Result.map DateTime.zone_to_string (DateTime.zone_make_named "Factory")),
+      ])
+
+transitions : Unit ->{} Unit
+let transitions () =
+  wall : DateTime.Disambiguation -> DateTime.ZoneOptions
+  let wall d = { adjustForTimeZone = Some true; disambiguation = Some d }
+  Platform.stdout_line
+    ("transitions: "
+      ++ show [
+        iso
+          (DateTime.set_zone_named
+            (wall DateTime.Reject)
+            "Europe/Paris"
+            (at "2024-03-31T02:30:00Z")),
+        iso
+          (DateTime.set_zone_named
+            (wall DateTime.Reject)
+            "Europe/Paris"
+            (at "2024-10-27T02:30:00Z")),
+        iso
+          (DateTime.set_zone_named
+            (wall DateTime.Earlier)
+            "America/New_York"
+            (at "2024-03-10T02:30:00Z")),
+        iso
+          (DateTime.set_zone_named
+            (wall DateTime.Later)
+            "America/New_York"
+            (at "2024-11-03T01:30:00Z")),
+      ])
+
+calendar : DateTime.DateTime ->{} Unit
+let calendar t =
+  let paris = in_zone (at "2024-03-30T12:00:00Z") "Europe/Paris"
+  Platform.stdout_line
+    ("calendar: "
+      ++ show [
+        DateTime.format_iso_offset (DateTime.add DateTime.Day 1 paris),
+        DateTime.format_iso_offset (DateTime.add DateTime.Hour 24 paris),
+        DateTime.format_iso (DateTime.add DateTime.Month 1 (at "2024-01-31T00:00:00Z")),
+        DateTime.format_iso (DateTime.add DateTime.Year 1 (at "2024-02-29T00:00:00Z")),
+        DateTime.format_iso (DateTime.subtract DateTime.Month 13 (at "2024-03-31T10:00:00Z")),
+        DateTime.format_iso (DateTime.end_of { weekStartsOn = Some 1 } DateTime.Week t),
+        DateTime.format_iso (DateTime.nearest { weekStartsOn = None } DateTime.Month t),
+        DateTime.format_iso (DateTime.start_of { weekStartsOn = None } DateTime.Year paris),
+      ])
+
+main : Unit ->{; AppError} Unit
+let main () =
+  let t = at "2024-07-04T21:05:09.250Z"
+  List.each_effect (in_locale t) [
+    "en-US",
+    "en-GB",
+    "de",
+    "fr-CA",
+    "es-MX",
+    "ru",
+    "ja",
+    "ko",
+    "zh-TW",
+    "he",
+  ]
+  tags t
+  zones ()
+  transitions ()
+  calendar t
+  Platform.stdout_line
+    ("make: "
+      ++ show [
+        iso (DateTime.make "2024-03-10T08:30:00.1239Z"),
+        iso (DateTime.make "+002024-03-10T00:00:00Z"),
+        iso (DateTime.make "2024-03-10T24:00:00Z"),
+        iso (DateTime.make "2024-03-10T08:30:00+0100"),
+        iso (DateTime.make "2024-03"),
+        iso (DateTime.make "2024-03-10T8:30"),
+        iso (DateTime.from_epoch_seconds 10000000000000),
+      ])
+  let invalid = DateTime.map_epoch_millis (fun _ -> 0 / 0) t
+  Platform.stdout_line
+    ("invalid: "
+      ++ show [
+        text (DateTime.format_utc (styled "en-US" "short" "") invalid),
+        text
+          (DateTime.format { locale = None; dateStyle = Some "short"; timeStyle = Some "nope" } t),
+        text (Result.map (fun _ -> "ok") (DateTime.format_intl (styled "fr" "full" "full") t)),
+      ])

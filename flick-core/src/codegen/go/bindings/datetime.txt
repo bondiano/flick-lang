@@ -1,9 +1,62 @@
-# Effect's DateTime: instants, zoned when decoded with a zone, and their
-# JSON codecs.
+# Effect's DateTime: instants in UTC or a zone, their parts, arithmetic,
+# comparisons and formatting, and their JSON codecs.
 [@flick-lang/runtime/effect/DateTime]
 flickMake DateTimeMake
+flickFromParts DateTimeFromParts
+flickFromEpochSeconds DateTimeFromEpochSeconds
+flickMakeZoned DateTimeMakeZoned
+flickMakeZonedFromString DateTimeMakeZonedFromString
 flickNow *DateTimeNow
+isUtc DateTimeIsUtc
+isZoned DateTimeIsZoned
+match *DateTimeMatch
+toUtc DateTimeToUtc
+flickSetZone DateTimeSetZone
+flickSetZoneOffset DateTimeSetZoneOffset
+flickSetZoneNamed DateTimeSetZoneNamed
+zoneMakeOffset DateTimeZoneMakeOffset
+flickZoneMakeNamed DateTimeZoneMakeNamed
+zoneMakeLocal DateTimeZoneMakeLocal
+flickZoneFromString DateTimeZoneFromString
+zoneToString DateTimeZoneToString
 toEpochMillis DateTimeToEpochMillis
+toEpochSeconds DateTimeToEpochSeconds
+mapEpochMillis *DateTimeMapEpochMillis
+toParts DateTimeToParts
+toPartsUtc DateTimeToPartsUtc
+flickSetParts DateTimeSetParts
+flickSetPartsUtc DateTimeSetPartsUtc
+removeTime DateTimeRemoveTime
+flickZonedOffset DateTimeZonedOffset
+flickZonedOffsetIso DateTimeZonedOffsetIso
+flickAdd DateTimeAdd
+flickSubtract DateTimeSubtract
+addDuration DateTimeAddDuration
+subtractDuration DateTimeSubtractDuration
+flickStartOf DateTimeStartOf
+flickEndOf DateTimeEndOf
+flickNearest DateTimeNearest
+flickDistance DateTimeDistance
+flickCompare DateTimeCompare
+min DateTimeMin
+max DateTimeMax
+clamp DateTimeClamp
+between DateTimeBetween
+isLessThan DateTimeIsLessThan
+isLessThanOrEqualTo DateTimeIsLessThanOrEqualTo
+isGreaterThan DateTimeIsGreaterThan
+isGreaterThanOrEqualTo DateTimeIsGreaterThanOrEqualTo
+isFuture *DateTimeIsFuture
+isPast *DateTimeIsPast
+flickFormat DateTimeFormat
+flickFormatLocal DateTimeFormatLocal
+flickFormatUtc DateTimeFormatUtc
+flickFormatIntl DateTimeFormatIntl
+formatIso DateTimeFormatIso
+formatIsoDate DateTimeFormatIsoDate
+formatIsoDateUtc DateTimeFormatIsoDateUtc
+formatIsoOffset DateTimeFormatIsoOffset
+flickFormatIsoZoned DateTimeFormatIsoZoned
 flickJsonUtc CodecDateTimeUtc
 flickJsonUtcMillis CodecDateTimeUtcMillis
 flickJsonZoned CodecDateTimeZoned

@@ -289,7 +289,7 @@ func PromptDate(options Value) Value {
 		initial: func(*promptCtx) Value {
 			start := time.Now()
 			if v, ok := some(o.Get("initial")); ok {
-				start = v.(*DateTime).t
+				start = v.(*DateTime).time()
 			}
 			return promptDateState{&promptDateValue{start.Local()}, "", first, nil}
 		},
@@ -335,7 +335,7 @@ func PromptDate(options Value) Value {
 				}
 				return moved(first)
 			case "enter", "return":
-				value, err := promptValidate(c.fb, o.Get("validate"), &DateTime{t: s.date.t.UTC()})
+				value, err := promptValidate(c.fb, o.Get("validate"), &DateTime{ms: float64(s.date.t.UnixMilli())})
 				if err != nil {
 					return promptNext(promptDateState{s.date, s.typed, s.cursor, err})
 				}
