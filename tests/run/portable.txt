@@ -47,6 +47,7 @@ stdlib/effect/duration
 stdlib/effect/function
 stdlib/effect/hash_map
 stdlib/effect/hash_set
+stdlib/effect/json_schema
 stdlib/effect/number
 stdlib/effect/option
 stdlib/effect/order

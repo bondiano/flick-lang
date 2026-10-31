@@ -447,8 +447,24 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/json.go"),
     ),
     (
+        "json_patch.go",
+        include_str!("../../../../runtime-go/flickrt/json_patch.go"),
+    ),
+    (
         "json_schema.go",
         include_str!("../../../../runtime-go/flickrt/json_schema.go"),
+    ),
+    (
+        "json_schema_convert.go",
+        include_str!("../../../../runtime-go/flickrt/json_schema_convert.go"),
+    ),
+    (
+        "json_schema_from.go",
+        include_str!("../../../../runtime-go/flickrt/json_schema_from.go"),
+    ),
+    (
+        "json_schema_to.go",
+        include_str!("../../../../runtime-go/flickrt/json_schema_to.go"),
     ),
     (
         "layer.go",

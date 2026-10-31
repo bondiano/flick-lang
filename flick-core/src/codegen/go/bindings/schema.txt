@@ -64,3 +64,34 @@ schema ArbitrarySchema
 filter ArbitraryFilter
 flickCheckEffect *ArbitraryCheck
 flickFormatCheckFailure ArbitraryFormatCheckFailure
+
+[@flick-lang/runtime/effect/JsonSchema]
+META_SCHEMA_URI_DRAFT_04 MetaSchemaUriDraft04
+META_SCHEMA_URI_DRAFT_07 MetaSchemaUriDraft07
+META_SCHEMA_URI_DRAFT_2020_12 MetaSchemaUriDraft202012
+flickFromSchemaDraft07 JsonSchemaFromDraft07
+flickFromSchemaDraft2020_12 JsonSchemaFromDraft202012
+flickFromSchemaOpenApi3_1 JsonSchemaFromOpenApi31
+flickFromSchemaOpenApi3_0 JsonSchemaFromOpenApi30
+flickToDocumentDraft07 JsonSchemaToDraft07
+flickToDocumentDraft04 JsonSchemaToDraft04
+toMultiDocumentOpenApi3_1 JsonSchemaToOpenApi31
+
+[@flick-lang/runtime/effect/JsonPointer]
+escapeToken EscapeToken
+unescapeToken UnescapeToken
+parseUriFragment ParseUriFragment
+formatUriFragment FormatUriFragment
+
+[@flick-lang/runtime/effect/JsonPatch]
+flickGet JsonPatchGet
+flickApply JsonPatchApply
+
+[@flick-lang/runtime/effect/Schema]
+toDifferJsonPatch DifferJsonPatch
+
+[@flick-lang/runtime/effect/Differ]
+flickEmpty DifferEmpty
+flickDiff *DifferDiff
+flickCombine DifferCombine
+flickPatch *DifferPatch
