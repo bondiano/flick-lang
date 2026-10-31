@@ -2,3 +2,14 @@
 # Streams, JS arrays, promises): under each `[module]`, an export, each with
 # a comment saying why. Modules of `project/load/target.rs::JS_ONLY` are
 # left out whole and need no entry here.
+
+[@flick-lang/runtime/effect/Channel]
+# a web ReadableStream, a JS value Go has no form of
+fromReadableStream
+# a web WritableStream, a JS value Go has no form of
+fromWritableStream
+# a web TransformStream, a JS value Go has no form of
+fromTransformStream
+# a JS AsyncIterable and its promises, which Go has no form of
+fromAsyncIterable
+fromAsyncIterableArray

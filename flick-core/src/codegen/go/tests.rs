@@ -18,9 +18,6 @@ const PENDING: &[&str] = &[
     // Schedule: `cron` needs Cron
     "@flick-lang/runtime/effect/Schedule",
     // queues and streams
-    "@flick-lang/runtime/effect/PubSub",
-    "@flick-lang/runtime/effect/Channel",
-    "@flick-lang/runtime/effect/ChannelSchema",
     "@flick-lang/runtime/effect/Sink",
     "@flick-lang/runtime/effect/Stream",
     "@flick-lang/runtime/effect/SubscriptionRef",

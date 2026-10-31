@@ -144,3 +144,8 @@ stdlib/effect/txhashset
 stdlib/effect/txlock
 stdlib/effect/txqueue
 stdlib/effect/txpubsub
+stdlib/effect/pubsub
+stdlib/effect/channel
+stdlib/effect/channel_transform
+stdlib/effect/channel_control
+stdlib/effect/channel_schema
