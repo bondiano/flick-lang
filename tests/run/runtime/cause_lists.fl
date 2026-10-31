@@ -18,16 +18,20 @@ let nap millis =
   | Err _ -> ()
 
 late_a : Float -> Float ->{; A} Float
-let late_a n millis = Effect.uninterruptible (task {
-  nap millis
-  from_result (Err (A n))
-})
+let late_a n millis =
+  Effect.uninterruptible
+    (task {
+      nap millis
+      from_result (Err (A n))
+    })
 
 late_b : String -> Float ->{; B} Float
-let late_b s millis = Effect.uninterruptible (task {
-  nap millis
-  from_result (Err (B s))
-})
+let late_b s millis =
+  Effect.uninterruptible
+    (task {
+      nap millis
+      from_result (Err (B s))
+    })
 
 count : Exit e a -> String
 let count ex =
@@ -56,15 +60,27 @@ let main () =
   let same : Failure {A} = Cause.combine (Cause.fail (A 1)) (Cause.fail (A 1))
   let other : Failure {A} = Cause.combine (Cause.fail (A 2)) (Cause.fail (A 1))
   let empty : Failure {A} = Cause.empty
-  say (show (List.length (Cause.reasons same), List.length (Cause.reasons other), List.length (Cause.reasons (Cause.combine empty same))))
-  let distinct : Exit {A} (Float, Float) = Effect.exit (task { parallel (task { late_a 1 10 }) (task { late_a 2 40 }) })
-  let equal : Exit {A} (Float, Float) = Effect.exit (task { parallel (task { late_a 1 10 }) (task { late_a 1 40 }) })
-  let raced : Exit {A} Float = Effect.exit (task { race_success (task { late_a 1 10 }) (task { late_a 1 40 }) })
+  say
+    (show (
+      List.length (Cause.reasons same),
+      List.length (Cause.reasons other),
+      List.length (Cause.reasons (Cause.combine empty same)),
+    ))
+  let distinct : Exit {A} (Float, Float) =
+    Effect.exit (task { parallel (task { late_a 1 10 }) (task { late_a 2 40 }) })
+  let equal : Exit {A} (Float, Float) =
+    Effect.exit (task { parallel (task { late_a 1 10 }) (task { late_a 1 40 }) })
+  let raced : Exit {A} Float =
+    Effect.exit (task { race_success (task { late_a 1 10 }) (task { late_a 1 40 }) })
   say ("parallel " ++ count distinct ++ " " ++ count equal ++ ", race " ++ count raced)
   let ex : Exit {B} (Float, Float) = Effect.exit (task { handled () })
   match Exit.failure ex with
   | Some f ->
-    say ("primary " ++ name (Cause.find_error_option f) ++ ", reasons " ++ show (List.length (Cause.reasons f)))
+    say
+      ("primary "
+        ++ name (Cause.find_error_option f)
+        ++ ", reasons "
+        ++ show (List.length (Cause.reasons f)))
     let mapped = Cause.map bang f
     say ("mapped " ++ name (Cause.find_error_option mapped))
     match Exit.failure (Exit.map_error bang ex) with

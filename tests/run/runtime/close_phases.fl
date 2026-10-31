@@ -20,64 +20,77 @@ let nap millis =
   | Err _ -> ()
 
 report : forall e. Failure e ->{} Unit
-let report f = say ("supervised " ++ show (Cause.has_fails f, Cause.has_dies f, Cause.has_interrupts f))
+let report f =
+  say ("supervised " ++ show (Cause.has_fails f, Cause.has_dies f, Cause.has_interrupts f))
 
 late_acquire : Unit ->{} Unit
-let late_acquire () =
-  scope s {
-    let _child = Fiber.spawn s report (task {
-      Effect.uninterruptible (task {
-        nap 60
-        let _r = open_res "late"
-        say "child uses late"
-        nap 20
-        say "child done with late"
+let late_acquire () = scope s {
+  let _child =
+    Fiber.spawn
+      s
+      report
+      (task {
+        Effect.uninterruptible
+          (task {
+            nap 60
+            let _r = open_res "late"
+            say "child uses late"
+            nap 20
+            say "child done with late"
+          })
       })
-    })
-    nap 10
-    say "body done"
-  }
+  nap 10
+  say "body done"
+}
 
 supervisor_owner : Unit ->{} Unit
-let supervisor_owner () =
-  scope outer {
-    sup : forall e. Failure e ->{Scope outer;} Unit
-    let sup _ =
-      let _r = open_res "sup"
-      say "supervisor ran"
-    scope inner {
-      let _child = Fiber.spawn outer sup (task { todo })
-      nap 40
-      say "inner done"
-    }
-    say "outer body done"
+let supervisor_owner () = scope outer {
+  sup : forall e. Failure e ->{Scope outer;} Unit
+  let sup _ =
+    let _r = open_res "sup"
+    say "supervisor ran"
+  scope inner {
+    let _child = Fiber.spawn outer sup (task { todo })
+    nap 40
+    say "inner done"
   }
+  say "outer body done"
+}
 
 group_close : Unit ->{} Unit
-let group_close () =
-  scope s {
-    let set : FiberSet.FiberSet s none Unit = FiberSet.make ()
-    let _f = FiberSet.run { propagateInterruption = false; startImmediately = true } (task {
-      Effect.uninterruptible (task {
-        let _r = open_res "group"
-        nap 50
-        say "group child done"
+let group_close () = scope s {
+  let set : FiberSet.FiberSet s none Unit = FiberSet.make ()
+  let _f =
+    FiberSet.run
+      { propagateInterruption = false; startImmediately = true }
+      (task {
+        Effect.uninterruptible
+          (task {
+            let _r = open_res "group"
+            nap 50
+            say "group child done"
+          })
       })
-    }) set
-    nap 10
-    say "body done"
-  }
+      set
+  nap 10
+  say "body done"
+}
 
 unmask : Unit ->{} Unit
 let unmask () =
   scope s {
-    let f = Fiber.spawn s report (task {
-      Effect.uninterruptible (task {
-        nap 40
-        say "block done"
-      })
-      say "after block"
-    })
+    let f =
+      Fiber.spawn
+        s
+        report
+        (task {
+          Effect.uninterruptible
+            (task {
+              nap 40
+              say "block done"
+            })
+          say "after block"
+        })
     nap 10
     Fiber.interrupt f
   }
