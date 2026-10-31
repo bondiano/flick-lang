@@ -27,6 +27,8 @@ const (
 	astRedacted // a declaration whose value is its parameter's
 	astOption   // a declaration made of a union of tagged structs
 	astResult
+	astLink   // a declaration generated through its link: members[0], then its parameters
+	astRecord // an object of one index signature: members are its key and its value
 )
 
 // arbAST is a node: its checks, and what its tag needs.
@@ -43,7 +45,8 @@ type arbAST struct {
 	make func([]Value) Value
 	// convert is the program's value of a generated one: an Int of a number
 	convert func(Value) Value
-	what    string // what a failure to compile it names
+	decode  func(Value) Value // link: the declared type's value of its target's
+	what    string            // what a failure to compile it names
 }
 
 // arbFilter is a check: what generation reads of it, and its test.
@@ -177,6 +180,7 @@ func (a *arbAST) withChecks(checks ...arbFilter) *arbAST {
 // recursive type's suspension finds the node it started from.
 type arbASTs struct {
 	nodes map[astKey]*arbAST
+	json  *arbAST // Effect's Json declaration, once per compilation
 }
 
 type astKey struct {
@@ -205,7 +209,8 @@ func (b *arbASTs) of(s *Schema, wire bool) *arbAST {
 	return n
 }
 
-// shortcut: Unknown, Duration, Chunk, HashSet, HashMap, DateTime, and a Result or a Redacted in a JSON codec, are a defect where Effect generates JSON values or follows their declaration's link; port the link of one when a program generates values of it
+// A HashSet, a HashMap or a Result of a JSON codec is a declaration
+// without a link, which Effect cannot generate either.
 func (b *arbASTs) build(s *Schema, wire bool) *arbAST {
 	switch s.kind {
 	case kindNumber:
@@ -227,6 +232,8 @@ func (b *arbASTs) build(s *Schema, wire bool) *arbAST {
 		return astUndefinedNode
 	case kindNever:
 		return astNeverNode
+	case kindUnknown:
+		return b.jsonNode()
 	case kindList:
 		return &arbAST{tag: astArrays, rest: b.of(s.item, wire)}
 	case kindTuple:
@@ -268,6 +275,8 @@ func (b *arbASTs) build(s *Schema, wire bool) *arbAST {
 		if !wire {
 			return &arbAST{tag: astRedacted, members: []*arbAST{b.of(s.item, wire)}}
 		}
+		// its JSON codec refuses every value: Effect generates JSON values
+		return b.jsonNode()
 	case kindLazy:
 		return &arbAST{tag: astSuspend, thunk: func() *arbAST { return b.of(s.resolved(), wire) }}
 	case kindRefined:
@@ -280,8 +289,14 @@ func (b *arbASTs) build(s *Schema, wire bool) *arbAST {
 			return s.refine(fb, v) == nil
 		}})
 	case kindCustom:
-		if s == sch(SchemaDecimal) {
+		switch {
+		case s == sch(SchemaDecimal):
 			return &arbAST{tag: astDecimal}
+		case wire:
+		case s == sch(SchemaDuration):
+			return durationNode().withChecks(checkFilter(nonNegativeDuration))
+		case s.needs == "Chunk":
+			return chunkNode(b.of(s.item, false))
 		}
 		return b.ofCodec(s.jsonOf())
 	}
@@ -290,7 +305,7 @@ func (b *arbASTs) build(s *Schema, wire bool) *arbAST {
 
 // ofCodec is the node of a codec's decoded side, `Schema.toType`.
 //
-// shortcut: the codecs read are a schema's canonical JSON codec and checks over one; another codec is a defect when generating, port its decoded type when a program generates values of it
+// shortcut: the codecs read are a schema's canonical JSON codec, checks over one and the codecs of linked declarations (arbitrary_links.go); another codec is a defect when generating, port its decoded type when a program generates values of it
 func (b *arbASTs) ofCodec(c codec) *arbAST {
 	switch k := c.(type) {
 	case *wire:
@@ -309,6 +324,9 @@ func (b *arbASTs) ofCodec(c codec) *arbAST {
 			}}
 		}
 		return base.withChecks(checks...)
+	}
+	if link, ok := arbLinks.Load(c); ok {
+		return link.(func(*arbASTs) *arbAST)(b)
 	}
 	return &arbAST{tag: astNever, what: "an unsupported Declaration"}
 }

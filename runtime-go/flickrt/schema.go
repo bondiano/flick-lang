@@ -14,7 +14,7 @@ import (
 // untagged union reports the first issue of each case.
 type Schema struct {
 	kind     schemaKind
-	item     *Schema     // list, option, redacted
+	item     *Schema     // list, option, redacted, chunk
 	items    []*Schema   // tuple; result: error, then value
 	labels   []string    // record, in label order
 	keys     []string    // record, in key order

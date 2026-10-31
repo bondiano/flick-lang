@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -55,9 +56,26 @@ func showArb(v Value) string {
 	case *Record:
 		parts := make([]string, len(x.keys))
 		for i, k := range x.keys {
+			if !plainKey.MatchString(k) {
+				k = showArb(k)
+			}
 			parts[i] = k + ":" + showArb(x.vals[i])
 		}
 		return "{" + strings.Join(parts, ",") + "}"
+	case *Duration:
+		return "dur(" + x.String() + ")"
+	case *Chunk:
+		return "chunk" + showArb(x.items)
+	case *DateTime:
+		if x.zone == nil {
+			return "utc(" + showArb(x.ms) + ")"
+		}
+		return "zoned(" + showArb(x.ms) + "," + showArb(x.zone) + ")"
+	case *TimeZone:
+		if x.loc == nil {
+			return "offset(" + showArb(x.offset) + ")"
+		}
+		return x.id
 	case *Data:
 		names := map[string]string{"Success": "Ok", "Failure": "Err"}
 		tag := x.Tag
@@ -76,8 +94,13 @@ func showArb(v Value) string {
 	if v == Unit {
 		return "()"
 	}
+	if v == JsonNull {
+		return "null"
+	}
 	return fmt.Sprintf("?%v", v)
 }
+
+var plainKey = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func len16(v Value) int { return len(utf16Units(v.(string))) }
 
@@ -100,6 +123,7 @@ func treeSchema(field Value) Value {
 	return SchemaLazy("Tree", get)
 }
 
+// arbCase is an Arbitrary, or a func() Value making one, which may fail.
 type arbCase struct {
 	name     string
 	arb      Value
@@ -184,12 +208,20 @@ func arbCases() []arbCase {
 	}
 }
 
-func arbOracleLines(fb *Fiber) []string {
+func arbOracleLines(fb *Fiber, cases []arbCase) []string {
 	var out []string
-	for _, c := range arbCases() {
+	for _, c := range cases {
 		property := Fn(func(_ *Fiber, v Value) Value { return Succeed(c.property(v)) })
 		for _, seed := range []float64{1, 42} {
 			prefix := fmt.Sprintf("%s seed %v ", c.name, seed)
+			if build, ok := c.arb.(func() Value); ok {
+				var cause *Cause
+				if c.arb, cause = catch(build); cause != nil {
+					out = append(out, prefix+"error "+strings.TrimSpace(cause.firstOf(causeDie).defect))
+					c.arb = build
+					continue
+				}
+			}
 			sampled, cause := catch(func() Value {
 				return ArbitrarySample(fb, Rec("count", Some(int32(8)), "size", None, "maxDiscards", None, "seed", Some(seed)), c.arb)
 			})
@@ -224,13 +256,16 @@ func arbOracleLines(fb *Fiber) []string {
 	return out
 }
 
-func TestArbitraryAsEffect(t *testing.T) {
-	want, err := os.ReadFile("testdata/arbitrary.txt")
+func TestArbitraryAsEffect(t *testing.T) { compareArbOracle(t, "testdata/arbitrary.txt", arbCases()) }
+
+// compareArbOracle compares the lines of `cases` with Effect's in `file`.
+func compareArbOracle(t *testing.T, file string, cases []arbCase) {
+	want, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
 	}
 	wanted := strings.Split(strings.TrimSuffix(string(want), "\n"), "\n")
-	got := arbOracleLines(rootFiber())
+	got := arbOracleLines(rootFiber(), cases)
 	for i := range max(len(got), len(wanted)) {
 		g, w := "", ""
 		if i < len(got) {

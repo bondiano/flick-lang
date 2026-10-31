@@ -43,3 +43,7 @@ Property falsified after 10 run(s) and 2 shrink(s)
 Shrunk input: "\u0000\u0000"
 Failure: returned false
 Replay: [0,"7",9,2,[2,2],"ReturnedFalse"]
+durations: [0, 710036ns, Infinity, Infinity, Infinityd 10h 38m 16s 453ms 340842ns, Infinity]
+chunks: [Chunk [], Chunk [false, false, false, false, true, true, true, true], Chunk [true, true, false, true, true, false, true, true, true]]
+instants: [-8639999999999964, 4950130058503672, 6279833006461975, -39]
+zones: ["+06:07", "Asia/Tokyo", "Australia/Sydney", "-00:00"]

@@ -29,7 +29,7 @@ func compiledGen(deps []*arbGen, cost func() float64, generate func(*genState) *
 
 // compileSchema is the generator of a schema's values: Effect's `compile`.
 func compileSchema(s *Schema) *arbGen {
-	asts := &arbASTs{map[astKey]*arbAST{}}
+	asts := &arbASTs{nodes: map[astKey]*arbAST{}}
 	return compileAST(asts.of(s, false))
 }
 
@@ -217,12 +217,15 @@ func (c *arbCompiler) compileBase(ast *arbAST, constraint *arbConstraint) *arbGe
 	case astSuspend:
 		body := c.recur(ast.thunk(), nil)
 		return compiledGen([]*arbGen{body}, func() float64 { return body.minCost }, func(st *genState) *sample { return body.generate(st) })
+	case astRecord:
+		return c.compileRecord(ast)
 	}
 	return c.compileDeclaration(ast)
 }
 
 // compileDeclaration is an Option, a Result or a Redacted value: its
-// parameters', through the union of tagged structs Effect links it to.
+// parameters', through the union of tagged structs Effect links it to; or
+// a link's declaration.
 func (c *arbCompiler) compileDeclaration(ast *arbAST) *arbGen {
 	params := make([]*arbGen, len(ast.members))
 	for i, m := range ast.members {
@@ -231,6 +234,8 @@ func (c *arbCompiler) compileDeclaration(ast *arbAST) *arbGen {
 	var target *arbGen
 	wrap := func(v Value) Value { return v }
 	switch ast.tag {
+	case astLink:
+		target, params, wrap = params[0], params[1:], ast.decode
 	case astOption:
 		target = c.recur(&arbAST{tag: astUnion, members: []*arbAST{
 			structNode("Some", ast.members, func(vs []Value) Value { return Some(vs[0]) }),

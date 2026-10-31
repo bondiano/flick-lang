@@ -125,13 +125,14 @@ func ChunkSize(c Value) Value      { return int32(len(c.(*Chunk).items)) }
 
 // CodecChunk is `Chunk.json`: a chunk as a JSON array.
 func CodecChunk(item Value) Value {
-	return &stage{&listCodec{codecOf(item)}, pure(ChunkFromList), pure(ChunkToList)}
+	return linkCodec(&stage{&listCodec{codecOf(item)}, pure(ChunkFromList), pure(ChunkToList)},
+		func(b *arbASTs) *arbAST { return chunkNode(b.ofCodec(codecOf(item))) })
 }
 
 // SchemaChunk is `Schema.chunk`; its canonical JSON form is an array.
 func SchemaChunk(item Value) Value {
 	s := sch(item)
-	return needing("Chunk", customSchema(codecOf(CodecChunk(s.jsonOf())), func(fb *Fiber, v Value) (Value, []issue) {
+	out := needing("Chunk", customSchema(codecOf(CodecChunk(s.jsonOf())), func(fb *Fiber, v Value) (Value, []issue) {
 		c, ok := v.(*Chunk)
 		if !ok {
 			return nil, expected("Chunk", v)
@@ -142,6 +143,8 @@ func SchemaChunk(item Value) Value {
 		}
 		return ChunkFromList(xs), nil
 	}))
+	sch(out).item = s // what Schema.arbitrary generates the elements of
+	return out
 }
 
 // CodecHashSet is `HashSet.json`: a set as a JSON array of its elements,
