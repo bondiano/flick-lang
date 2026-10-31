@@ -43,7 +43,7 @@ func HttpClientMake(f Value) Value {
 // a client span whose trace context goes with it as headers, unless the
 // fiber's settings say otherwise.
 //
-// shortcut: the span has no attributes and is not exported, as the go target's spans are not; record the request and response when spans are
+// shortcut: the span has no `http.*` attributes and ends with the send's exit, not with the response's status; record the request and response as Effect's client does when a program exports them
 func clientOfTransport(send transport) *Client {
 	return &Client{pre: func(_ *Fiber, request Value) Value { return Succeed(request) }, post: func(fb *Fiber, prepared Value) Value {
 		return Eff(func(fb *Fiber) Value {

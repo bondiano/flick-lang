@@ -101,9 +101,10 @@ func MiddlewareWithLoggerDisabled(fb *Fiber, handler, request Value) Value {
 }
 
 // MiddlewareTracer runs the request in a server span named by the span
-// name generator, the request's method by default.
+// name generator, the request's method by default, continuing the trace
+// of the request's headers.
 //
-// shortcut: the span does not continue the trace of the request's headers, as the go target's spans are not exported; read them when spans are
+// shortcut: the span has no `http.*` attributes and ends with the handler's exit, not with the response's status; port Effect's responseSpanExit and attributes when a program exports them
 func MiddlewareTracer(fb *Fiber, handler, request Value) Value {
 	if f, ok := fb.env.get(tracerDisabledKey); ok && Apply(fb, f, request).(bool) {
 		return handle(fb, handler, request)
@@ -112,7 +113,8 @@ func MiddlewareTracer(fb *Fiber, handler, request Value) Value {
 	if f, ok := fb.env.get(spanNameKey); ok {
 		name = Apply(fb, f, request)
 	}
-	return useSpan(fb, name, Rec("parent", None, "root", false), func(s *span) Value {
+	options := Rec("parent", TraceContextFromHeaders(RequestHeaders(request)), "root", false, "kind_", "server")
+	return useSpan(fb, name, options, func(s *span) Value {
 		return withEnv(fb, parentSpanKey, s, Apply(fb, handler, request))
 	})
 }
