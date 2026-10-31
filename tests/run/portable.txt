@@ -139,3 +139,5 @@ stdlib/effect/stream_core
 stdlib/effect/txref
 stdlib/effect/txchunk
 stdlib/effect/txdeferred
+stdlib/effect/txhashmap
+stdlib/effect/txhashset
