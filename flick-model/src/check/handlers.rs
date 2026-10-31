@@ -2,11 +2,13 @@
 //! `docs/formal/core.md` §2.3, and the compiler-owned dictionaries of
 //! records and tuples (§1.6).
 
+use std::iter;
 use std::mem;
 use std::rc::Rc;
 
 use super::expr::mono;
 use super::{Check, Checker, error};
+use crate::subst::matches;
 use crate::syntax::{Arm, Name, Pat, Term};
 use crate::types::{Row, Stage, Type};
 
@@ -23,15 +25,37 @@ impl Checker<'_> {
             Some(r) => r.clone(),
             None => self.fresh(),
         };
-        for arm in arms {
-            self.arm(arm, &t, &result)?;
+        // in a configuration, (Match) may put the arms at the type of any
+        // one of them: a λ a signature checked before the step took its
+        // arrow from it, and inferred takes its least one
+        let firsts = if self.config && expected.is_none() {
+            arms.len()
+        } else {
+            1
+        };
+        let mut checked = Ok(());
+        for first in 0..firsts {
+            let saved = (first + 1 < firsts).then(|| self.clone());
+            let order = iter::once(first).chain((0..arms.len()).filter(|&i| i != first));
+            checked = order
+                .filter_map(|i| arms.get(i))
+                .try_for_each(|arm| self.arm(arm, &t, &result));
+            match saved {
+                Some(saved) if checked.is_err() => *self = saved,
+                _ => break,
+            }
         }
+        checked?;
         let unguarded: Vec<&Pat> = arms
             .iter()
             .filter(|a| a.guard.is_none())
             .map(|a| &a.pat)
             .collect();
-        if !self.exhaustive(&t, &unguarded)? {
+        // (Match-Val): in a configuration, the rest of a `match` after a
+        // guard that failed covers the value it holds, not its type
+        let covers_value =
+            self.config && e.is_value() && unguarded.iter().any(|p| matches(p, e, &mut Vec::new()));
+        if !covers_value && !self.exhaustive(&t, &unguarded)? {
             return error(
                 "Match",
                 format!(
@@ -61,7 +85,7 @@ impl Checker<'_> {
 
     /// `e` on a stage of its own: what (Task), (Try) and (Provide) check
     /// their bodies on. Returns the type and that stage.
-    fn own_stage(&mut self, e: &Term, expected: Option<&Type>) -> Check<(Type, Stage)> {
+    pub(super) fn own_stage(&mut self, e: &Term, expected: Option<&Type>) -> Check<(Type, Stage)> {
         let outer = mem::replace(&mut self.stage, Stage::Pure);
         let t = match expected {
             Some(t) => self.check(e, t).map(|()| t.clone()),
@@ -162,6 +186,8 @@ impl Checker<'_> {
         let l = self.infer(layer)?;
         let (inputs, errors, outputs) = match self.resolve(&l) {
             Type::Layer(i, e, o) => (i, e, o),
+            // (Provide-Env): the layer is built, its steps are in `φₗ`
+            Type::Env(o) => (Row::none(), Row::none(), o),
             other => {
                 let (i, e, o) = (self.fresh_row(), self.fresh_row(), self.fresh_row());
                 self.unify(&other, &Type::Layer(i.clone(), e.clone(), o.clone()))?;

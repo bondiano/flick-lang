@@ -12,7 +12,7 @@ use crate::types::{Fields, Kind, Row, Scheme, Stage, Type, Var};
 
 /// What a variable of a scheme becomes.
 #[derive(Clone)]
-pub(super) enum Inst {
+pub(crate) enum Inst {
     Type(Type),
     Row(Row),
     Tail(Var),
@@ -106,7 +106,7 @@ pub(super) fn substitute_all(t: &Type, vars: &[(Name, Kind)], insts: &[Inst]) ->
 }
 
 /// `τ[ᾱ := τ̄]`.
-pub(super) fn substitute(t: &Type, map: &HashMap<Name, Inst>) -> Type {
+pub(crate) fn substitute(t: &Type, map: &HashMap<Name, Inst>) -> Type {
     if map.is_empty() {
         return t.clone();
     }

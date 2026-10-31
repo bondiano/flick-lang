@@ -10,9 +10,9 @@
 //! may), and a program of the corpus it rejects is a discrepancy to record.
 //!
 //! The judgement `Γ ⊢ e : τ ! φ` is `infer`/`check` returning `τ`, with
-//! `φ` accumulated in `self.stage`. The forms of the run time (§3.6) are
-//! not typed here: the generator of X2 needs them, the translation never
-//! makes them.
+//! `φ` accumulated in `self.stage`. The forms of the run time (§3.6),
+//! which the translation never makes, are typed in `runtime.rs`, so that
+//! Preservation can be checked on the states of the machine (X2).
 
 mod dicts;
 mod expr;
@@ -20,6 +20,7 @@ mod generalize;
 mod handlers;
 mod pattern;
 mod rows;
+mod runtime;
 mod unify;
 
 #[cfg(test)]
@@ -35,6 +36,9 @@ use crate::decls::Decls;
 use crate::eval::Program;
 use crate::syntax::{Name, Path, Term};
 use crate::types::{Fields, Row, Scheme, Stage, Type};
+
+pub(crate) use generalize::{Inst, substitute};
+pub use runtime::check_config;
 
 /// A rule whose premise fails, and why.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,11 +70,15 @@ enum Solved {
     Fields(Fields),
 }
 
+#[derive(Clone)]
 struct Slot {
     level: u32,
     solved: Option<Solved>,
 }
 
+/// Cloned to try one more way of typing a configuration (`handlers.rs`
+/// `match_`).
+#[derive(Clone)]
 pub struct Checker<'d> {
     decls: &'d Decls,
     slots: Vec<Slot>,
@@ -86,6 +94,10 @@ pub struct Checker<'d> {
     structural: Vec<(Name, Rc<[Term]>, Type)>,
     /// Counter of the rigid variables a signature introduces.
     rigid: u32,
+    /// `Ψ`: the type of each cell of `μ`, when a configuration is checked.
+    store: Vec<Type>,
+    /// Whether a configuration is checked: the rules of §3.6 apply.
+    config: bool,
 }
 
 impl<'d> Checker<'d> {
@@ -99,6 +111,8 @@ impl<'d> Checker<'d> {
             pending: Vec::new(),
             structural: Vec::new(),
             rigid: 0,
+            store: Vec::new(),
+            config: false,
         }
     }
 

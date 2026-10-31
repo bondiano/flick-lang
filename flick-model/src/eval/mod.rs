@@ -49,6 +49,9 @@ enum Control {
 
 type Step = Result<Control, Outcome>;
 
+/// What sees each configuration `⟨μ, E[e]⟩`: `μ`, then `E[e]`.
+pub type Watch<'a> = dyn FnMut(&[Term], &Term) + 'a;
+
 pub struct Machine<'p> {
     program: &'p Program,
     /// `μ`.
@@ -79,8 +82,21 @@ impl<'p> Machine<'p> {
 
     /// Runs `e` to its outcome.
     pub fn run(&mut self, e: Term) -> Outcome {
+        self.drive(e, None)
+    }
+
+    /// Runs `e`, showing `watch` each state the machine passes through as
+    /// the configuration `⟨μ, E[e]⟩` of §3.1: what Preservation is checked on.
+    pub fn run_watched(&mut self, e: Term, watch: &mut Watch<'_>) -> Outcome {
+        self.drive(e, Some(watch))
+    }
+
+    fn drive(&mut self, e: Term, mut watch: Option<&mut Watch<'_>>) -> Outcome {
         let mut control = Control::Eval(e);
         loop {
+            if let Some(w) = watch.as_mut() {
+                w(&self.mem, &self.configuration(&control));
+            }
             if self.fuel == 0 {
                 return Outcome::OutOfFuel;
             }
@@ -98,6 +114,15 @@ impl<'p> Machine<'p> {
                 Err(outcome) => return outcome,
             };
         }
+    }
+
+    /// `E[e]`: the frames around what the machine looks at.
+    fn configuration(&self, control: &Control) -> Term {
+        let e = match control {
+            Control::Eval(e) | Control::Ret(e) => e.clone(),
+            Control::Raise(v) => Term::Raise(Rc::new(v.clone())),
+        };
+        self.frames.iter().rev().fold(e, |e, f| f.plug(e))
     }
 
     fn push(&mut self, f: Frame) {
@@ -119,12 +144,12 @@ impl<'p> Machine<'p> {
                 self.push(Frame::AppL(a));
                 Control::Eval((*f).clone())
             }
-            Term::Let(x, _, e1, e2) => {
-                self.push(Frame::Let(x, e2));
+            Term::Let(x, sig, e1, e2) => {
+                self.push(Frame::Let(x, sig, e2));
                 Control::Eval((*e1).clone())
             }
-            Term::LetRec(f, _, lam, e2) => {
-                let fix = Term::Fix(f.clone(), lam);
+            Term::LetRec(f, sig, lam, e2) => {
+                let fix = Term::Fix(f.clone(), sig, lam);
                 Control::Eval(subst(&e2, &[(f, fix)]))
             }
             Term::Match(e, arms) => {
@@ -221,7 +246,7 @@ impl<'p> Machine<'p> {
                 Control::Eval((*a).clone())
             }
             Frame::AppR(func) => return Self::apply(func, v),
-            Frame::Let(x, e2) => Control::Eval(subst(&e2, &[(x, v)])),
+            Frame::Let(x, _, e2) => Control::Eval(subst(&e2, &[(x, v)])),
             Frame::Match(arms) => return self.select(v, &arms, 0),
             Frame::Guard {
                 scrutinee,
@@ -302,9 +327,9 @@ impl<'p> Machine<'p> {
     fn apply(f: Term, v: Term) -> Step {
         match f {
             Term::Lam(x, body) => Ok(Control::Eval(subst(&body, &[(x, v)]))),
-            Term::Fix(name, lam) => match &*lam {
+            Term::Fix(name, sig, lam) => match &*lam {
                 Term::Lam(x, body) => {
-                    let fix = Term::Fix(name.clone(), lam.clone());
+                    let fix = Term::Fix(name.clone(), sig, lam.clone());
                     Ok(Control::Eval(subst(body, &[(name, fix), (x.clone(), v)])))
                 }
                 other => Err(stuck(format!("`fix` of {other:?}"))),

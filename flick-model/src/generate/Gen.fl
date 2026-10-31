@@ -1,0 +1,13 @@
+// The declarations every program of the generator of X2 uses
+// (flick-model/src/generate): two errors and two services.
+module Gen exposing (..)
+
+type error Oops = Oops Int
+
+type error Bad = Bad String
+
+service Log =
+  log : String ->{} Unit
+
+service Counter =
+  next : Unit ->{} Int

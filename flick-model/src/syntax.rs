@@ -186,7 +186,8 @@ pub enum Term {
     /// stops the machine, and the checker rejects it.
     Stuck(Rc<str>),
     // the forms of §3.1
-    Fix(Name, Rc<Term>),
+    /// `fix f. λx. e`, with the `σ` of the `let rec` it came from (§3.6).
+    Fix(Name, Option<Rc<Scheme>>, Rc<Term>),
     Loc(usize),
     Env(Rc<Env>),
     Bind(Path, Rc<Term>),

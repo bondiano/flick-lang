@@ -93,7 +93,7 @@ impl Checker<'_> {
             }
             Term::Stuck(why) => error("Translation", why.to_string()),
             Term::Die(_) => Ok(self.fresh()),
-            other => error("Runtime", format!("a form of the run time: {other:?}")),
+            other => self.runtime_form(other, None),
         }
     }
 
@@ -130,6 +130,22 @@ impl Checker<'_> {
                 self.record_against(fields, &f)
             }
             (Term::Record(fields), Type::Dict(c, args)) => self.dictionary(fields, c, args),
+            (Term::With(..) | Term::Handle(..), _) => {
+                self.runtime_form(e, Some(&expected)).map(drop)
+            }
+            (Term::App(f, a), _) if self.config && matches!(&**f, Term::Lam(..)) => {
+                let Term::Lam(x, body) = &**f else {
+                    unreachable!("a λ, matched above")
+                };
+                self.redex(x, body, a, Some(&expected)).map(drop)
+            }
+            // `bind_S (await v)` of a configuration: what the layer builds is
+            // checked against `S.Impl`, as `Layer.effect` checked it
+            (Term::Await(x), _) if self.config => {
+                let (r, x_rows) = (self.fresh_row(), self.fresh_row());
+                self.check(x, &Type::Eff(r.clone(), x_rows.clone(), Rc::new(expected)))?;
+                self.perform(&Stage::Runtime(r, x_rows))
+            }
             _ => {
                 let t = self.infer(e)?;
                 self.subsume(&t, &expected)
@@ -208,6 +224,9 @@ impl Checker<'_> {
 
     /// (App): `φ₁ ⊔ φ₂ ⊔ φ`. A callee of unknown type is a pure arrow (Р7).
     fn app(&mut self, f: &Term, a: &Term) -> Check<Type> {
+        if let (true, Term::Lam(x, body)) = (self.config, f) {
+            return self.redex(x, body, a, None);
+        }
         let t = self.infer(f)?;
         self.apply(&t, a)
     }
@@ -280,7 +299,7 @@ impl Checker<'_> {
     }
 
     /// (Let-Rec): without a signature the recursive calls are monomorphic.
-    fn let_rec(
+    pub(super) fn let_rec(
         &mut self,
         f: &Name,
         sig: Option<&Scheme>,
@@ -430,6 +449,24 @@ impl Checker<'_> {
                     Type::Layer(none(), none(), Row::one(s.clone())),
                 ),
             },
+            Const::LayerEffect(s) => {
+                let (r, e) = (
+                    Row::var(Var::Named("r".into())),
+                    Row::var(Var::Named("e".into())),
+                );
+                scheme(
+                    &[("r", Kind::Services), ("e", Kind::Errors)],
+                    Type::fun(
+                        Type::Eff(
+                            r.clone(),
+                            e.clone(),
+                            Rc::new(Type::Impl(Row::one(s.clone()))),
+                        ),
+                        Stage::Pure,
+                        Type::Layer(r, e, Row::one(s.clone())),
+                    ),
+                )
+            }
             Const::Prim(p) => prim(*p),
             other => {
                 return error(

@@ -71,7 +71,9 @@ pub fn subst(e: &Term, s: &Subst) -> Term {
         Term::Await(e) => Term::Await(go(e)),
         Term::Try(e, arms) => Term::Try(go(e), arms_subst(arms, s)),
         Term::Provide(l, e) => Term::Provide(go(l), go(e)),
-        Term::Fix(f, lam) => Term::Fix(f.clone(), Rc::new(subst(lam, &without(s, f)))),
+        Term::Fix(f, sig, lam) => {
+            Term::Fix(f.clone(), sig.clone(), Rc::new(subst(lam, &without(s, f))))
+        }
         Term::Bind(svc, e) => Term::Bind(svc.clone(), go(e)),
         Term::Join(a, b) => Term::Join(go(a), go(b)),
         Term::With(env, e) => Term::With(env.clone(), go(e)),
