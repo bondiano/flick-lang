@@ -1,0 +1,19 @@
+// Instances for two types of one name from different modules keep apart.
+module App.Main exposing (main)
+
+import HttpApi
+import Rpc
+
+class Tag a =
+  tag : Option a -> String
+
+instance Tag HttpApi.ServeError =
+  let tag _ = "HttpApi.ServeError"
+
+instance Tag Rpc.ServeError =
+  let tag _ = "Rpc.ServeError"
+
+main : Unit ->{; AppError} Unit
+let main () =
+  Platform.stdout_line (tag (None : Option HttpApi.ServeError))
+  Platform.stdout_line (tag (None : Option Rpc.ServeError))

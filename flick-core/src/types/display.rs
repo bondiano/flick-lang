@@ -10,8 +10,23 @@ use crate::numeric::default_num;
 impl Checker<'_> {
     pub fn show(&self, t: &Type) -> String {
         let mut out = String::new();
-        let printer = Printer { store: &self.store };
+        let printer = Printer {
+            store: &self.store,
+            qualified: false,
+        };
         printer.print(&self.held_now(&self.zonk(t)), Prec::Top, &mut out);
+        out
+    }
+
+    /// `t` with each constructor written with its module, which tells two
+    /// types of one name apart.
+    pub fn show_qualified(&self, t: &Type) -> String {
+        let mut out = String::new();
+        let printer = Printer {
+            store: &self.store,
+            qualified: true,
+        };
+        printer.print(&self.zonk(t), Prec::Top, &mut out);
         out
     }
 
@@ -40,12 +55,17 @@ impl Checker<'_> {
 pub fn show_type(t: &Type) -> String {
     let store = Store::default();
     let mut out = String::new();
-    Printer { store: &store }.print(t, Prec::Top, &mut out);
+    Printer {
+        store: &store,
+        qualified: false,
+    }
+    .print(t, Prec::Top, &mut out);
     out
 }
 
 struct Printer<'s> {
     store: &'s Store,
+    qualified: bool,
 }
 
 impl Printer<'_> {
@@ -60,6 +80,9 @@ impl Printer<'_> {
             }
         };
         match t {
+            Type::Con { module, name } if self.qualified && !module.is_empty() => {
+                let _ = write!(out, "{module}.{name}");
+            }
             Type::Con { name, .. } | Type::Var(name) => out.push_str(name),
             Type::Symbol(label) => {
                 let _ = write!(out, "{label:?}");

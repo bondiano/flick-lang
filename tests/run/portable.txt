@@ -22,6 +22,7 @@ codegen/functor
 codegen/given_shadow
 codegen/fusion
 codegen/higher_rank
+codegen/instance_names
 codegen/ints
 codegen/let_assert
 codegen/lift

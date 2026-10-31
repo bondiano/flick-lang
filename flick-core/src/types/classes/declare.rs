@@ -151,9 +151,20 @@ impl<'n> Checker<'_> {
         let head = self.canon(&head?);
         let ((module, name), _) = split(&head)?;
         self.class_info(module, name)?;
+        // the name keys the dictionary: types of one name from two modules
+        // must not share it
+        let shown = self.show(&head);
+        let taken = self
+            .env
+            .own_instances()
+            .any(|i| i.module == self.env.module && i.name == shown);
         Some(Instance {
             module: self.env.module.clone(),
-            name: self.show(&head),
+            name: if taken {
+                self.show_qualified(&head)
+            } else {
+                shown
+            },
             vars,
             context: context.iter().map(|c| self.canon(c)).collect(),
             head,
