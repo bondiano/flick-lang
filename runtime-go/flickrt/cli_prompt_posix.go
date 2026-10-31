@@ -119,3 +119,12 @@ func promptTerminalSize(tty *promptTerminalState) (int, int) {
 	}
 	return int(size.columns), int(size.rows)
 }
+
+func fileIsTerminal(f *os.File) bool {
+	var termios syscall.Termios
+	return promptIoctl(f.Fd(), promptGetTermios, unsafe.Pointer(&termios)) == nil
+}
+
+func fileTerminalSize(f *os.File) (int, int) {
+	return promptTerminalSize(&promptTerminalState{output: f})
+}

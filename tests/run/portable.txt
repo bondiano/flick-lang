@@ -95,3 +95,5 @@ stdlib/http/api_bodies
 stdlib/http/redaction_context
 stdlib/http/router_patterns
 stdlib/effect/filesystem_node
+stdlib/effect/platform
+stdlib/effect/console
