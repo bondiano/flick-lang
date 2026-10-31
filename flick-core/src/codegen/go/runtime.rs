@@ -3,6 +3,10 @@
 /// The runtime's files: name and contents.
 pub const RUNTIME: &[(&str, &str)] = &[
     (
+        "arbitrary.go",
+        include_str!("../../../../runtime-go/flickrt/arbitrary.go"),
+    ),
+    (
         "array.go",
         include_str!("../../../../runtime-go/flickrt/array.go"),
     ),

@@ -85,6 +85,7 @@ schema/json_wire
 schema/derive
 schema/contracts
 schema/policies
+schema/route
 stdlib/http/headers
 stdlib/http/values
 stdlib/effect/codec

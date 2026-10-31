@@ -58,3 +58,9 @@ flickChunkJson CodecChunk
 flickChunk SchemaChunk
 flickHashSetJson *CodecHashSet
 flickHashMapJson *CodecHashMap
+
+[@flick-lang/runtime/effect/Arbitrary]
+schema ArbitrarySchema
+filter ArbitraryFilter
+flickCheckEffect *ArbitraryCheck
+flickFormatCheckFailure ArbitraryFormatCheckFailure
