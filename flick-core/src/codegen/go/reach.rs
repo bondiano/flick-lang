@@ -25,13 +25,16 @@ pub fn defined(item: &Item) -> Vec<String> {
             pattern.binders(&mut out);
             out.into_iter().map(str::to_owned).collect()
         }
-        ItemKind::Schema(s) if matches!(s.plan, SchemaPlan::Refined { .. }) => {
-            vec![
-                companion_name(&s.ty, "schema"),
-                companion_name(&s.ty, "json"),
-            ]
+        ItemKind::Schema(s) => {
+            let mut out = vec![companion_name(&s.ty, "schema")];
+            if matches!(s.plan, SchemaPlan::Refined { .. }) {
+                out.push(companion_name(&s.ty, "json"));
+            }
+            if s.url.is_some() {
+                out.push(companion_name(&s.ty, "url"));
+            }
+            out
         }
-        ItemKind::Schema(s) => vec![companion_name(&s.ty, "schema")],
         ItemKind::Constructor(_) => Vec::new(),
     }
 }

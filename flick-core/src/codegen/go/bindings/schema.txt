@@ -9,6 +9,8 @@ chunkEmpty ChunkEmpty
 chunkFromList ChunkFromList
 chunkToList ChunkToList
 chunkSize ChunkSize
+routePrint RoutePrint
+routeParse *RouteParse
 
 [@flick-lang/runtime/effect/Schema]
 Literal CodecLiteral
