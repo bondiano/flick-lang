@@ -98,6 +98,16 @@ runIntoQueue *StreamRunIntoQueue
 flickToPubSub *StreamToPubSub
 flickToQueue *StreamToQueue
 
+# Sinks, channels and plans (Stream/Pipe.fl).
+transduce StreamTransduce
+aggregate StreamAggregate
+aggregateWithin StreamAggregateWithin
+pipeThrough StreamPipeThrough
+tapSink StreamTapSink
+peel *StreamPeel
+pipeThroughChannelOrFail StreamPipeThroughChannelOrFail
+flickStreamWithExecutionPlan StreamWithExecutionPlan
+
 [@flick-lang/runtime/effect/SubscriptionRef]
 changes SubscriptionRefChanges
 
