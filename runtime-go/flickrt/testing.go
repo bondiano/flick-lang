@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Tests and generators, as the JS runtime's testing module: a test is data
@@ -358,6 +359,7 @@ type testOptions struct {
 	jobs             int
 	seed             int64
 	seeded, watched  bool
+	color            bool
 }
 
 func parseTestArgs(args []string) testOptions {
@@ -380,6 +382,8 @@ func parseTestArgs(args []string) testOptions {
 			}
 		case "--reporter":
 			o.reporter = value
+		case "--color":
+			o.color = value == "always"
 		case "--watched":
 			o.watched = true
 			continue
@@ -391,7 +395,30 @@ func parseTestArgs(args []string) testOptions {
 	return o
 }
 
-func reportTests(results []testResult, seed int64, reporter string) int {
+// writeTestResult writes and flushes a complete result with outMu held by the caller.
+func writeTestResult(r testResult, completed, total int, elapsed time.Duration, color bool) {
+	marker := "✓"
+	markerColor, dim, reset := "", "", ""
+	if r.Status != "passed" {
+		marker = "✗"
+	}
+	if color {
+		markerColor, dim, reset = "\x1b[32m", "\x1b[2m", "\x1b[0m"
+		if r.Status != "passed" {
+			markerColor = "\x1b[31m"
+		}
+	}
+	fmt.Fprintf(stdout, "  %s%s%s %s[%d/%d]%s %s  %s(%d ms)%s\n", markerColor, marker, reset, dim, completed, total, reset, r.Name, dim, elapsed.Milliseconds(), reset)
+	if r.Status != "passed" {
+		fmt.Fprintf(stdout, "    %s: %s\n", r.Kind, strings.ReplaceAll(r.Message, "\n", "\n    "))
+		if r.Cleanup != "" && r.Kind != "cleanup" {
+			fmt.Fprintf(stdout, "    and cleanup failed: %s\n", strings.ReplaceAll(r.Cleanup, "\n", "\n    "))
+		}
+	}
+	stdout.Flush()
+}
+
+func reportTests(results []testResult, seed int64, reporter string, color bool, elapsed time.Duration) int {
 	failed := 0
 	for _, r := range results {
 		if r.Status == "failed" {
@@ -407,17 +434,19 @@ func reportTests(results []testResult, seed int64, reporter string) int {
 		fmt.Fprintf(stdout, "{\"seed\":%d,\"passed\":%d,\"failed\":%d,\"tests\":[%s]}\n", seed, passed, failed, strings.Join(tests, ","))
 		return failed
 	}
-	for _, r := range results {
-		if r.Status == "passed" {
-			fmt.Fprintf(stdout, "ok    %s\n", r.Name)
-			continue
+	passColor, failColor, dim, reset := "", "", "", ""
+	if color {
+		dim, reset = "\x1b[2m", "\x1b[0m"
+		passColor, failColor = dim, dim
+		if passed > 0 {
+			passColor = "\x1b[32m"
 		}
-		fmt.Fprintf(stdout, "FAIL  %s: %s: %s\n", r.Name, r.Kind, r.Message)
-		if r.Cleanup != "" && r.Kind != "cleanup" {
-			fmt.Fprintf(stdout, "      and cleanup failed: %s\n", r.Cleanup)
+		if failed > 0 {
+			failColor = "\x1b[31m"
 		}
 	}
-	fmt.Fprintf(stdout, "\n%d passed, %d failed\n", passed, failed)
+	fmt.Fprintf(stdout, "\n  Tests  %s%d%s passed · %s%d%s failed · %d total\n", passColor, passed, reset, failColor, failed, reset, len(results))
+	fmt.Fprintf(stdout, "  Time   %s%d ms%s\n", dim, elapsed.Milliseconds(), reset)
 	if failed > 0 {
 		fmt.Fprintf(stdout, "seed: %d (rerun with --seed %d)\n", seed, seed)
 	}
@@ -469,6 +498,20 @@ func RunTests(fb *Fiber, suites []Suite) {
 	results := make([]testResult, len(selected))
 	slots := make(chan struct{}, o.jobs)
 	var wg sync.WaitGroup
+	human := o.reporter != "json"
+	completed := 0
+	var started time.Time
+	if human {
+		title, reset := "", ""
+		if o.color {
+			title, reset = "\x1b[1;36m", "\x1b[0m"
+		}
+		outMu.Lock()
+		fmt.Fprintf(stdout, "  %sflick test%s  %d tests\n\n", title, reset, len(selected))
+		stdout.Flush()
+		outMu.Unlock()
+		started = time.Now()
+	}
 	for i, t := range selected {
 		slots <- struct{}{}
 		if fb.state.requested.Load() {
@@ -477,17 +520,35 @@ func RunTests(fb *Fiber, suites []Suite) {
 		wg.Add(1)
 		go func() {
 			defer func() { <-slots; wg.Done() }()
-			results[i] = runOne(fb, t, seed)
+			var started time.Time
+			if human {
+				started = time.Now()
+			}
+			result := runOne(fb, t, seed)
+			results[i] = result
+			if human {
+				elapsed := time.Since(started)
+				outMu.Lock()
+				completed++
+				writeTestResult(result, completed, len(selected), elapsed, o.color)
+				outMu.Unlock()
+			}
 		}()
 	}
 	wg.Wait()
+	var elapsed time.Duration
+	if human {
+		elapsed = time.Since(started)
+	}
+	outMu.Lock()
 	code := 0
 	if fb.state.requested.Load() {
 		fmt.Fprintln(stdout, "interrupted: every running test closed its scope")
 		code = 130
-	} else if reportTests(results, seed, o.reporter) > 0 {
+	} else if reportTests(results, seed, o.reporter, o.color, elapsed) > 0 {
 		code = 1
 	}
 	stdout.Flush()
+	outMu.Unlock()
 	os.Exit(code)
 }

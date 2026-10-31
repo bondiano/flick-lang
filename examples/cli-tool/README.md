@@ -29,6 +29,32 @@ NOTES_FILE=/tmp/work.txt ./target/debug/flick run --project examples/cli-tool --
 ./target/debug/flick test --project examples/cli-tool
 ```
 
+## Build a native Go executable
+
+With Go 1.23 or newer on `PATH`, the same source builds without Node.js or
+the JavaScript runtime:
+
+```sh
+cargo build -p flick
+./target/debug/flick build --project examples/cli-tool --emit go
+./examples/cli-tool/dist/flick-main --help
+./examples/cli-tool/dist/flick-main init
+NOTES_FILE=/tmp/work.txt ./examples/cli-tool/dist/flick-main add review
+./examples/cli-tool/dist/flick-main --completions bash
+./target/debug/flick test --project examples/cli-tool --emit go
+```
+
+Set `emit = "go"` in `flick.toml` to make Go the default for `build`, `run`
+and `test`. The checked-in example keeps JavaScript as its default.
+
+On Go, this example's commands, environment configuration, validated text
+prompt, help, version and Bash completions are supported. The separate
+built-in flags `--wizard`, `--log-level`, `--trace`, other completion shells
+and CLI combinators not used by this example are not supported.
+
+## Tests
+
 The tests run the wizard on a fake terminal, a `Cli.Prompt.Tty` that
-types a script of keys. `flick/tests/examples.rs` runs the commands with
-`NOTES_FILE` set and checks the file they leave.
+types a script of keys. `flick/tests/examples.rs` builds and runs both
+JavaScript and Go, checks argument failures leave the notes unchanged, and
+executes the generated Bash completion script.

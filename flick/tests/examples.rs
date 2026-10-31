@@ -5,10 +5,10 @@
 
 mod common;
 
-use flick_core::build::runner_path;
-use std::fs;
+use flick_core::build::{go::executable, runner_path};
 use std::path::Path;
 use std::process::Command;
+use std::{fs, str};
 
 use common::flick_in;
 
@@ -172,17 +172,37 @@ fn the_cli_tool_example_checks_and_is_formatted() {
 #[test]
 #[ignore = "needs Node and the installed runtime"]
 fn the_cli_tool_example_keeps_notes_in_the_file_of_its_environment() {
-    let dir = common::example("cli-tool", "examples/cli-tool-run");
-    success(&dir, &["test"]);
+    cli_tool_keeps_notes("js");
+}
+
+#[test]
+#[ignore = "needs Go"]
+fn the_cli_tool_example_keeps_notes_on_go() {
+    cli_tool_keeps_notes("go");
+}
+
+fn cli_tool_keeps_notes(emit: &str) {
+    let dir = common::example("cli-tool", &format!("examples/cli-tool-{emit}"));
+    success(&dir, &["test", "--emit", emit, "--seed", "7"]);
+    success(&dir, &["build", "--emit", emit]);
+    let command = || {
+        let mut command = if emit == "go" {
+            Command::new(dir.join("dist").join(executable("main")))
+        } else {
+            let mut node = Command::new("node");
+            node.arg(dir.join("dist").join(runner_path(false)));
+            node
+        };
+        command.current_dir(&dir);
+        command
+    };
     let notes = dir.join("elsewhere.txt");
     let notes_cli = |args: &[&str]| {
-        Command::new(env!("CARGO_BIN_EXE_flick"))
-            .args(["run", "--"])
+        command()
             .args(args)
-            .current_dir(&dir)
             .env("NOTES_FILE", &notes)
             .output()
-            .expect("flick runs")
+            .expect("the notes executable runs")
     };
     for args in [
         &["add", "buy", "milk"][..],
@@ -193,6 +213,7 @@ fn the_cli_tool_example_keeps_notes_in_the_file_of_its_environment() {
         assert!(out.status.success(), "{args:?} failed: {out:?}");
     }
     let list = notes_cli(&["list"]);
+    assert!(list.status.success(), "{list:?}");
     assert_eq!(String::from_utf8_lossy(&list.stdout), "1. call mom\n");
     assert_eq!(
         fs::read_to_string(&notes).expect("the notes file"),
@@ -205,9 +226,69 @@ fn the_cli_tool_example_keeps_notes_in_the_file_of_its_environment() {
     let missing = notes_cli(&["done", "9"]);
     assert_eq!(missing.status.code(), Some(1), "{missing:?}");
     assert!(String::from_utf8_lossy(&missing.stderr).contains("there is no note 9"));
-    let completions = notes_cli(&["--completions", "bash"]);
-    assert!(
-        String::from_utf8_lossy(&completions.stdout).contains("notes"),
-        "{completions:?}"
+    for args in [
+        &["add"][..],
+        &["done", "not-an-integer"],
+        &["done", "1", "extra"],
+        &["list", "extra"],
+        &["missing"],
+        &["add", "--unknown"],
+    ] {
+        let out = notes_cli(args);
+        assert_eq!(out.status.code(), Some(1), "{args:?}: {out:?}");
+        assert_eq!(
+            fs::read_to_string(&notes).expect("unchanged notes"),
+            "call mom\n"
+        );
+    }
+    let help = notes_cli(&["--help"]);
+    assert!(help.status.success(), "{help:?}");
+    let help_text = String::from_utf8_lossy(&help.stdout);
+    for name in ["init", "add", "list", "done"] {
+        assert!(help_text.contains(name), "{help:?}");
+    }
+    let version = notes_cli(&["--version"]);
+    assert!(version.status.success(), "{version:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&version.stdout)
+            .split_whitespace()
+            .last(),
+        Some("v0.1.0")
     );
+    let completions = notes_cli(&["--completions", "bash"]);
+    assert!(completions.status.success(), "{completions:?}");
+    bash_completes_add(&completions.stdout);
+    assert_eq!(
+        fs::read_to_string(&notes).expect("unchanged notes"),
+        "call mom\n"
+    );
+    let literal = notes_cli(&["add", "--", "--help"]);
+    assert!(literal.status.success(), "{literal:?}");
+    assert_eq!(
+        fs::read_to_string(&notes).expect("literal note"),
+        "call mom\n--help\n"
+    );
+    let default = command()
+        .args(["add", "default"])
+        .env_remove("NOTES_FILE")
+        .output()
+        .expect("default path");
+    assert!(default.status.success(), "{default:?}");
+    assert_eq!(
+        fs::read_to_string(dir.join("notes.txt")).expect("default notes"),
+        "default\n"
+    );
+}
+
+fn bash_completes_add(script: &[u8]) {
+    let script = format!(
+        "{}\nCOMP_WORDS=(notes a)\nCOMP_CWORD=1\nCOMP_LINE='notes a'\nCOMP_POINT=7\ncompletion=$(complete -p notes)\ncompletion=${{completion#* -F }}\ncompletion=${{completion%% *}}\n\"$completion\" notes a notes || exit\nprintf '%s\\n' \"${{COMPREPLY[@]}}\"\n",
+        str::from_utf8(script).expect("bash completions")
+    );
+    let completion = Command::new("bash")
+        .args(["-c", &script])
+        .output()
+        .expect("bash");
+    assert!(completion.status.success(), "{completion:?}");
+    assert_eq!(String::from_utf8_lossy(&completion.stdout), "add\n");
 }

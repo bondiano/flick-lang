@@ -36,8 +36,10 @@ fn the_first_slice_checks_and_is_formatted() {
 fn the_first_slice_tests_and_runs_in_both_profiles() {
     let dir = example("run");
     for profile in ["debug", "release"] {
-        let tests = success(&dir, &["test", "--profile", profile]);
-        assert!(tests.contains("3 passed, 0 failed"), "{profile}: {tests}");
+        let tests = success(&dir, &["test", "--profile", profile, "--reporter", "json"]);
+        let report: serde_json::Value = serde_json::from_str(&tests).expect("JSON report");
+        assert_eq!(report["passed"], 3, "{profile}: {tests}");
+        assert_eq!(report["failed"], 0, "{profile}: {tests}");
         // the pair keeps the order of its tasks whichever load answers first
         let run = success(&dir, &["run", "--profile", profile]);
         let (mut logs, results): (Vec<&str>, Vec<&str>) =

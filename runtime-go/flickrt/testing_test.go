@@ -1,9 +1,13 @@
 package flickrt
 
 import (
+	"bufio"
+	"bytes"
 	"math"
 	"math/big"
+	"strings"
 	"testing"
+	"time"
 )
 
 // A property's case reads as the JS runner's JSON.stringify writes it.
@@ -23,5 +27,79 @@ func TestPreviewWritesCasesAsTheJSRunner(t *testing.T) {
 		if got := preview(c.value); got != c.want {
 			t.Errorf("preview = %s, want %s", got, c.want)
 		}
+	}
+}
+
+func TestParseTestArgsColor(t *testing.T) {
+	for _, mode := range []string{"", "always", "never", "auto"} {
+		args := []string{"--watched"}
+		if mode != "" {
+			args = append(args, "--color", mode)
+		}
+		options := parseTestArgs(args)
+		if options.color != (mode == "always") || !options.watched {
+			t.Errorf("color %q: color=%v watched=%v", mode, options.color, options.watched)
+		}
+	}
+}
+
+func TestWriteTestResultFlushes(t *testing.T) {
+	outMu.Lock()
+	previous := stdout
+	previous.Flush()
+	defer func() {
+		stdout = previous
+		outMu.Unlock()
+	}()
+	var output bytes.Buffer
+	stdout = bufio.NewWriter(&output)
+	for _, test := range []struct {
+		name     string
+		result   testResult
+		color    bool
+		want     []string
+		unwanted string
+	}{
+		{
+			name:     "passed",
+			result:   testResult{Name: "App.Test > first", Status: "passed"},
+			want:     []string{"  ✓ [1/2] App.Test > first", "(2 ms)\n"},
+			unwanted: "\x1b",
+		},
+		{
+			name:   "color",
+			result: testResult{Name: "App.Test > first", Status: "passed"},
+			color:  true,
+			want:   []string{"\x1b[32m✓\x1b[0m", "\x1b[2m[1/2]\x1b[0m", "\x1b[2m(2 ms)\x1b[0m\n"},
+		},
+		{
+			name:   "failure",
+			result: testResult{Name: "App.Test > first", Status: "failed", Kind: "assertion", Message: "first line\nsecond line", Cleanup: "cleanup first\ncleanup second"},
+			color:  true,
+			want:   []string{"\x1b[31m✗\x1b[0m", "    assertion: first line\n    second line\n", "    and cleanup failed: cleanup first\n    cleanup second\n"},
+		},
+		{
+			name:     "cleanup",
+			result:   testResult{Name: "App.Test > first", Status: "failed", Kind: "cleanup", Message: "cleanup failed", Cleanup: "cleanup failed"},
+			want:     []string{"  ✗ [1/2] App.Test > first", "    cleanup: cleanup failed\n"},
+			unwanted: "and cleanup failed:",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			output.Reset()
+			writeTestResult(test.result, 1, 2, 2*time.Millisecond, test.color)
+			got := output.String()
+			for _, want := range test.want {
+				if !strings.Contains(got, want) {
+					t.Errorf("flushed output %q does not contain %q", got, want)
+				}
+			}
+			if test.unwanted != "" && strings.Contains(got, test.unwanted) {
+				t.Errorf("flushed output %q contains %q", got, test.unwanted)
+			}
+			if !strings.HasSuffix(got, "\n") {
+				t.Errorf("flushed output is incomplete: %q", got)
+			}
+		})
 	}
 }

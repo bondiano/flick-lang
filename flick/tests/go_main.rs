@@ -121,14 +121,19 @@ let tests = [
     );
     let run = flick_in(&dir, &["run", "--", "a", "b"]);
     assert_eq!(String::from_utf8_lossy(&run.stdout), "a,b\n", "{run:?}");
-    let test = flick_in(&dir, &["test", "--seed", "7"]);
+    let test = flick_in(&dir, &["test", "--seed", "7", "--reporter", "json"]);
     assert_eq!(test.status.code(), Some(1), "{test:?}");
+    let report: serde_json::Value = serde_json::from_slice(&test.stdout).expect("JSON report");
     assert_eq!(
-        String::from_utf8_lossy(&test.stdout),
-        "ok    App.MainTest > adds\n\
-         FAIL  App.MainTest > small: assertion: too big (case 1: 7)\n\
-         FAIL  App.MainTest > typed: assertion: expected \"a\", got \"b\"\n\
-         \n1 passed, 2 failed\nseed: 7 (rerun with --seed 7)\n"
+        report,
+        serde_json::json!({
+            "seed": 7, "passed": 1, "failed": 2,
+            "tests": [
+                {"name": "App.MainTest > adds", "status": "passed"},
+                {"name": "App.MainTest > small", "status": "failed", "kind": "assertion", "message": "too big (case 1: 7)"},
+                {"name": "App.MainTest > typed", "status": "failed", "kind": "assertion", "message": "expected \"a\", got \"b\""}
+            ]
+        })
     );
     assert!(dir.join(".flick/test").join(executable("test")).is_file());
 }
@@ -173,16 +178,87 @@ let tests = [
             ("test/App/MainTest.fl", tests),
         ],
     );
-    let run = |emit| flick_in(&dir, &["test", "--seed", "42", "--emit", emit]);
+    let run = |emit| {
+        flick_in(
+            &dir,
+            &["test", "--seed", "42", "--emit", emit, "--reporter", "json"],
+        )
+    };
     let (js, go) = (run("js"), run("go"));
     assert_eq!(js.status.code(), Some(1), "{js:?}");
+    assert_eq!(go.status.code(), Some(1), "{go:?}");
+    let js_report: serde_json::Value =
+        serde_json::from_slice(&js.stdout).expect("Node JSON report");
+    let go_report: serde_json::Value = serde_json::from_slice(&go.stdout).expect("Go JSON report");
+    assert_eq!(go_report, js_report);
     assert_eq!(
-        String::from_utf8_lossy(&go.stdout),
-        String::from_utf8_lossy(&js.stdout)
+        js_report["tests"][7]["message"],
+        "no (case 0: [\"<function>\"])"
     );
-    assert!(
-        String::from_utf8_lossy(&js.stdout)
-            .contains("FAIL  App.MainTest > functions: assertion: no (case 0: [\"<function>\"])"),
-        "{js:?}"
-    );
+}
+
+#[test]
+#[ignore = "needs Go and Node"]
+fn human_results_stream_after_cleanup() {
+    let tests = r#"module App.TestOutput exposing (tests)
+
+tests : List Test.Test
+let tests =
+  [
+    Test.effect_test "first" (task {
+      let _resource = Resource.acquire_release (task { () }) (fun _ -> Platform.stdout_line "first-cleaned")
+      ()
+    }),
+    Test.effect_test "second" (task { Platform.stdout_line "second-started" })
+  ]
+"#;
+    for emit in ["js", "go"] {
+        let dir = project(
+            &format!("test_output_{emit}"),
+            &[
+                ("flick.toml", &format!("{APP}test-dir = \"test\"\n")),
+                (
+                    "src/App/Main.fl",
+                    "module App.Main exposing (main)\n\nmain : Unit ->{} Unit\nlet main () = ()\n",
+                ),
+                ("test/App/TestOutput.fl", tests),
+            ],
+        );
+        for jobs in ["1", "2"] {
+            let output = flick_in(
+                &dir,
+                &[
+                    "test", "--emit", emit, "--jobs", jobs, "--color", "always", "--seed", "7",
+                ],
+            );
+            assert!(output.status.success(), "{emit}, jobs={jobs}: {output:?}");
+            let text = String::from_utf8(output.stdout).expect("UTF-8 output");
+            let position = |needle: &str| {
+                text.find(needle)
+                    .unwrap_or_else(|| panic!("{needle:?}: {text}"))
+            };
+            assert_eq!(text.matches("\x1b[32m✓\x1b[0m").count(), 2, "{text}");
+            assert_eq!(text.matches("App.TestOutput > first").count(), 1, "{text}");
+            assert_eq!(text.matches("App.TestOutput > second").count(), 1, "{text}");
+            assert_eq!(text.matches("  Tests  ").count(), 1, "{text}");
+            assert!(
+                text.contains("\x1b[32m2\x1b[0m passed · \x1b[2m0\x1b[0m failed · 2 total"),
+                "{text}"
+            );
+            let first = position("App.TestOutput > first");
+            let second = position("App.TestOutput > second");
+            let summary = position("  Tests  ");
+            assert!(
+                position("first-cleaned") < first && first < summary,
+                "{text}"
+            );
+            assert!(
+                position("second-started") < second && second < summary,
+                "{text}"
+            );
+            if jobs == "1" {
+                assert!(first < position("second-started"), "{text}");
+            }
+        }
+    }
 }

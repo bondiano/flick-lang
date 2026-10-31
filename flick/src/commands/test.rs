@@ -6,10 +6,11 @@
 //! next one after it.
 
 use std::fmt::Write;
+use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitCode, Stdio};
 use std::time::{Duration, SystemTime};
-use std::{fs, io, thread};
+use std::{env, fs, io, thread};
 
 use flick_core::build::go;
 use flick_core::diagnostics::{Diagnostic, Severity};
@@ -19,7 +20,7 @@ use flick_core::source::SourceMap;
 
 use super::build::{BuildPlan, emit, release, write};
 use super::check::select;
-use crate::args::{GlobalArguments, Reporter, TestArguments, TestEmitArgument};
+use crate::args::{Color, GlobalArguments, Reporter, TestArguments, TestEmitArgument};
 use crate::sources::FsHost;
 use crate::{child, report, toolchain};
 use flick_core::build::Extras;
@@ -35,7 +36,7 @@ pub fn test(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
         return ExitCode::from(1);
     };
     let signals = child::signals();
-    let mut command = runner_command(&runner, options, false);
+    let mut command = runner_command(&runner, options, global, false);
     match child::spawn(&mut command, global, "application-stderr").and_then(|r| r.wait(&signals)) {
         Ok(status) => ExitCode::from(child::code(status)),
         Err(err) => {
@@ -134,11 +135,21 @@ fn runner_source(suites: &[(String, String)]) -> String {
     out
 }
 
-fn start(runner: &Path, options: &TestArguments, watched: bool) -> io::Result<Child> {
-    runner_command(runner, options, watched).spawn()
+fn start(
+    runner: &Path,
+    options: &TestArguments,
+    global: &GlobalArguments,
+    watched: bool,
+) -> io::Result<Child> {
+    runner_command(runner, options, global, watched).spawn()
 }
 
-fn runner_command(runner: &Path, options: &TestArguments, watched: bool) -> Command {
+fn runner_command(
+    runner: &Path,
+    options: &TestArguments,
+    global: &GlobalArguments,
+    watched: bool,
+) -> Command {
     // the runner is the test executable of the go target, or a script for node
     let mut command = if runner.extension().is_some_and(|e| e == "js") {
         let mut command = Command::new("node");
@@ -162,6 +173,17 @@ fn runner_command(runner: &Path, options: &TestArguments, watched: bool) -> Comm
         Reporter::Json => "json",
     };
     command.args(["--reporter", reporter]);
+    let color = matches!(options.reporter, Reporter::Human)
+        && match global.color {
+            Color::Always => true,
+            Color::Never => false,
+            Color::Auto => {
+                io::stdout().is_terminal()
+                    && env::var_os("NO_COLOR").is_none()
+                    && env::var_os("TERM").is_none_or(|term| term != "dumb")
+            }
+        };
+    command.args(["--color", if color { "always" } else { "never" }]);
     command
 }
 
@@ -237,7 +259,7 @@ fn watch(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
         let before = watch_snapshot(&paths);
         let mut child = prepare(options, global)
             .ok()
-            .and_then(|runner| start(&runner, options, true).ok());
+            .and_then(|runner| start(&runner, options, global, true).ok());
         while watch_snapshot(&paths) == before {
             thread::sleep(Duration::from_millis(200));
         }

@@ -116,6 +116,8 @@ SIGINT/SIGTERM start the same termination protocol. Until cleanup is complete, t
 
 `test` supports `--filter <text>` against the full test name, `--jobs <positive-number>` for an explicit parallelism limit, `--watch`, and `--reporter human` or `--reporter json`. By default `--jobs 1`. A repeated test run begins after the owners of the previous run are closed; cancelling a test does not permit skipping cleanup.
 
+The human reporter prints each result immediately after that test's cleanup, in completion order, with `✓`/`✗`, a completion counter and elapsed milliseconds. The final summary gives passed/failed/total counts and execution wall time, excluding compilation. Both Node and Go use this format. `--color auto` uses stdout's terminal state and disables color for `NO_COLOR` or `TERM=dumb`; `always` overrides those conditions and `never` disables color. JSON remains one final `{seed,passed,failed,tests}` object in declaration order, without color or durations. An interrupted run reports cleanup completion instead of a normal summary.
+
 The test library supports pure and effectful tests, as well as separate property tests with explicit generators. `--seed <integer>` sets the seed for generators and is printed on failure; it does not promise to reproduce the fiber schedule, the network or an external database. Assertions, typed failures, defects and cleanup failures are reflected in a test's result separately.
 
 Ordinary CI checks the application in the selected profile. For the Flick compiler/runtime, the semantic regression suites are run in `debug` and `release` to check that the established observable contracts are preserved; two successful runs are not considered general proof of equivalence of all programs.

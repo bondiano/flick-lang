@@ -726,3 +726,8 @@ flickBytes ByteSizeBytes
 flickMake LoggerMake
 withConsoleLog LoggerWithConsoleLog
 flickLayer LoggerLayer
+
+[@flick-lang/runtime/effect/Config]
+String ConfigString
+withDefault ConfigWithDefault
+flickGet *ConfigGet

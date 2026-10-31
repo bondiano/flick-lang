@@ -50,10 +50,10 @@ e2e: docs-wasm
 # one seed: both must pass and write the same report
 language seed="42":
     cargo build -p flick
-    cd tests/language && ../../target/debug/flick test --emit js --seed {{seed}} > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
-    cd tests/language && ../../target/debug/flick test --emit go --seed {{seed}} > ../../target/language-go.txt || { cat ../../target/language-go.txt; exit 1; }
+    cd tests/language && ../../target/debug/flick test --emit js --seed {{seed}} --reporter json > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
+    cd tests/language && ../../target/debug/flick test --emit go --seed {{seed}} --reporter json > ../../target/language-go.txt || { cat ../../target/language-go.txt; exit 1; }
     diff -u target/language-js.txt target/language-go.txt
-    tail -n 1 target/language-go.txt
+    cat target/language-go.txt
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
 bundle-size:

@@ -107,14 +107,12 @@ fn a_project_builds_runs_and_tests_under_a_non_ascii_path() {
             assert!(stderr.contains("проект ⭐"), "{stderr}");
         }
 
-        let test = flick_in(&dir, &["test", "--seed", "1"]);
+        let test = flick_in(&dir, &["test", "--seed", "1", "--reporter", "json"]);
         assert!(test.status.success(), "{emit}: {test:?}");
-        reports.push(String::from_utf8_lossy(&test.stdout).into_owned());
+        reports
+            .push(serde_json::from_slice::<serde_json::Value>(&test.stdout).expect("JSON report"));
     }
-    assert!(
-        reports[0].contains("ok    App.MainTest > юникод ⭐"),
-        "{}",
-        reports[0]
-    );
+    assert_eq!(reports[0]["tests"][0]["name"], "App.MainTest > юникод ⭐");
+    assert_eq!(reports[0]["tests"][0]["status"], "passed");
     assert!(reports.windows(2).all(|w| w[0] == w[1]), "{reports:#?}");
 }

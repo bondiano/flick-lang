@@ -136,16 +136,48 @@ fn outcomes_are_reported_apart() {
 
 #[test]
 #[ignore = "needs Node and pnpm install"]
-fn filter_jobs_and_the_human_reporter() {
+fn filter_jobs_and_seed_select_results() {
     let dir = project("filter");
-    let out = flick_in(&dir, &["test", "--filter", "adds", "--jobs", "4"]);
+    let out = flick_in(
+        &dir,
+        &[
+            "test",
+            "--filter",
+            "adds",
+            "--jobs",
+            "4",
+            "--reporter",
+            "json",
+        ],
+    );
     assert!(out.status.success(), "{out:?}");
-    let text = String::from_utf8_lossy(&out.stdout);
-    assert!(text.contains("ok    Test.Sample > adds"), "{text}");
-    assert!(text.contains("1 passed, 0 failed"), "{text}");
-    let failing = flick_in(&dir, &["test", "--filter", "small", "--seed", "3"]);
-    let text = String::from_utf8_lossy(&failing.stdout);
-    assert!(text.contains("seed: 3 (rerun with --seed 3)"), "{text}");
+    let json = results(&out);
+    assert_eq!(json["passed"], 1);
+    assert_eq!(json["failed"], 0);
+    assert_eq!(json["tests"].as_array().expect("tests").len(), 1);
+    assert_eq!(status(&json, "adds"), ("passed", ""));
+    let failing = flick_in(
+        &dir,
+        &[
+            "test",
+            "--filter",
+            "small",
+            "--seed",
+            "3",
+            "--reporter",
+            "json",
+        ],
+    );
+    assert_eq!(failing.status.code(), Some(1), "{failing:?}");
+    let json = results(&failing);
+    assert_eq!(json["seed"], 3);
+    assert_eq!(status(&json, "small"), ("failed", "assertion"));
+    assert!(
+        json["tests"][0]["message"]
+            .as_str()
+            .expect("message")
+            .contains("too big")
+    );
     let zero = flick_in(&dir, &["test", "--jobs", "0"]);
     assert_eq!(zero.status.code(), Some(2), "{zero:?}");
 }

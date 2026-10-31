@@ -1,0 +1,14 @@
+# Native command descriptions and text prompts.
+[@flick-lang/runtime/cli]
+multiRequired CliMultiRequired
+multiSome CliMultiSome
+specCommand CliSpecCommand
+specDescription CliSpecDescription
+specArg CliSpecArg
+specSubcommand CliSpecSubcommand
+specHandle CliSpecHandle
+specGroup CliSpecGroup
+cliRunVersion *CliRunVersion
+promptText PromptText
+promptNode PromptNode
+promptRun *PromptRun

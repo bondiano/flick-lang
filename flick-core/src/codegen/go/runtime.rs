@@ -19,6 +19,34 @@ pub const RUNTIME: &[(&str, &str)] = &[
         include_str!("../../../../runtime-go/flickrt/cause.go"),
     ),
     (
+        "cli.go",
+        include_str!("../../../../runtime-go/flickrt/cli.go"),
+    ),
+    (
+        "cli_output.go",
+        include_str!("../../../../runtime-go/flickrt/cli_output.go"),
+    ),
+    (
+        "cli_prompt.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt.go"),
+    ),
+    (
+        "cli_prompt_posix.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_posix.go"),
+    ),
+    (
+        "cli_prompt_darwin.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_darwin.go"),
+    ),
+    (
+        "cli_prompt_linux.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_linux.go"),
+    ),
+    (
+        "cli_prompt_windows.go",
+        include_str!("../../../../runtime-go/flickrt/cli_prompt_windows.go"),
+    ),
+    (
         "codec.go",
         include_str!("../../../../runtime-go/flickrt/codec.go"),
     ),
@@ -41,6 +69,10 @@ pub const RUNTIME: &[(&str, &str)] = &[
     (
         "concurrency.go",
         include_str!("../../../../runtime-go/flickrt/concurrency.go"),
+    ),
+    (
+        "config.go",
+        include_str!("../../../../runtime-go/flickrt/config.go"),
     ),
     (
         "context.go",

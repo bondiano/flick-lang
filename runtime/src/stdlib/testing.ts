@@ -220,17 +220,26 @@ export interface TestOptions {
   readonly seed?: number | undefined;
   readonly reporter?: string;
   readonly watched?: boolean;
+  readonly color?: boolean;
   readonly write?: (text: string) => void;
 }
 
 /** Options of `flick test`, from the runner's arguments. */
 export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
-  const options: { filter: string; jobs: number; seed: number | undefined; reporter: string; watched: boolean } = {
+  const options: {
+    filter: string;
+    jobs: number;
+    seed: number | undefined;
+    reporter: string;
+    watched: boolean;
+    color: boolean;
+  } = {
     filter: "",
     jobs: 1,
     seed: undefined,
     reporter: "human",
     watched: false,
+    color: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
@@ -239,6 +248,7 @@ export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
     else if (flag === "--jobs") options.jobs = Number(value);
     else if (flag === "--seed") options.seed = Number(value);
     else if (flag === "--reporter") options.reporter = value;
+    else if (flag === "--color") options.color = value === "always";
     else if (flag === "--watched") {
       options.watched = true;
       continue;
@@ -248,11 +258,35 @@ export const parseTestArgs = (argv: ReadonlyArray<string>): TestOptions => {
   return options;
 };
 
+const humanResult = (
+  result: TestResult,
+  completed: number,
+  total: number,
+  elapsedMs: number,
+  color: boolean,
+): string => {
+  const reset = color ? "\x1b[0m" : "";
+  const dim = color ? "\x1b[2m" : "";
+  const marker =
+    result.status === "passed" ? `${color ? "\x1b[32m" : ""}✓${reset}` : `${color ? "\x1b[31m" : ""}✗${reset}`;
+  const duration = Math.max(0, Math.floor(elapsedMs));
+  let text = `  ${marker} ${dim}[${completed}/${total}]${reset} ${result.name}  ${dim}(${duration} ms)${reset}\n`;
+  if (result.status === "failed") {
+    text += `    ${`${result.kind ?? "failure"}: ${result.message ?? ""}`.replaceAll("\n", "\n    ")}\n`;
+    if (result.cleanup && result.kind !== "cleanup") {
+      text += `    ${`and cleanup failed: ${result.cleanup}`.replaceAll("\n", "\n    ")}\n`;
+    }
+  }
+  return text;
+};
+
 const report = (
   results: ReadonlyArray<TestResult>,
   seed: number,
   reporter: string | undefined,
   write: (text: string) => void,
+  color: boolean,
+  elapsedMs: number,
 ): number => {
   const failed = results.filter((r) => r.status === "failed").length;
   const passed = results.length - failed;
@@ -260,14 +294,12 @@ const report = (
     write(`${JSON.stringify({ seed, passed, failed, tests: results })}\n`);
     return failed;
   }
-  for (const r of results) {
-    if (r.status === "passed") write(`ok    ${r.name}\n`);
-    else {
-      write(`FAIL  ${r.name}: ${r.kind ?? "failure"}: ${r.message ?? ""}\n`);
-      if (r.cleanup && r.kind !== "cleanup") write(`      and cleanup failed: ${r.cleanup}\n`);
-    }
-  }
-  write(`\n${passed} passed, ${failed} failed\n`);
+  const reset = color ? "\x1b[0m" : "";
+  const dim = color ? "\x1b[2m" : "";
+  const passedColor = color && passed > 0 ? "\x1b[32m" : dim;
+  const failedColor = color && failed > 0 ? "\x1b[31m" : dim;
+  write(`\n  Tests  ${passedColor}${passed}${reset} passed · ${failedColor}${failed}${reset} failed · ${results.length} total\n`);
+  write(`  Time   ${dim}${Math.max(0, Math.floor(elapsedMs))} ms${reset}\n`);
   if (failed > 0) write(`seed: ${seed} (rerun with --seed ${seed})\n`);
   return failed;
 };
@@ -299,7 +331,30 @@ export const runTests = async (
   const selected = modules
     .flatMap(([module, tests]) => flatten(module, tests ?? []))
     .filter(({ name }) => name.includes(options.filter ?? ""));
-  const fiber = Effect.runFork(Effect.forEach(selected, (t) => runOne(t, seed), { concurrency: jobs }));
+  const human = options.reporter !== "json";
+  const color = options.color ?? false;
+  let completed = 0;
+  if (human) {
+    const title = color ? "\x1b[1;36mflick test\x1b[0m" : "flick test";
+    write(`  ${title}  ${selected.length} tests\n\n`);
+  }
+  const started = human ? performance.now() : 0;
+  const fiber = Effect.runFork(
+    Effect.forEach(
+      selected,
+      (t) =>
+        human
+          ? Effect.suspend(() => {
+              const testStarted = performance.now();
+              return Effect.map(runOne(t, seed), (result) => {
+                write(humanResult(result, ++completed, selected.length, performance.now() - testStarted, color));
+                return result;
+              });
+            })
+          : runOne(t, seed),
+      { concurrency: jobs },
+    ),
+  );
   let interrupted = false;
   const stop = (): void => {
     interrupted = true;
@@ -316,6 +371,6 @@ export const runTests = async (
     process.exitCode = interrupted ? 130 : 1;
     return;
   }
-  const failed = report(exit.value, seed, options.reporter, write);
+  const failed = report(exit.value, seed, options.reporter, write, color, human ? performance.now() - started : 0);
   process.exitCode = failed > 0 ? 1 : 0;
 };

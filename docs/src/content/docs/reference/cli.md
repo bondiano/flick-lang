@@ -40,6 +40,8 @@ nothing, run no `main` and load no foreign module. An installed
 pins stops them with `FLICK-P015` (exit code 2). `schema export` loads the
 module that makes the codec, whose top level is pure, and nothing else.
 
+`test` streams human results after each test's cleanup, with success/failure markers, completion counts and timings, then prints a summary. Node and Go share the format and honor `--color`; auto color checks stdout, `NO_COLOR` and `TERM=dumb`. `--reporter json` writes one final object in declaration order, without color or timings.
+
 ## Outputs and the cache
 
 A build writes into `build.out-dir` (or `--out-dir`) and records the files
