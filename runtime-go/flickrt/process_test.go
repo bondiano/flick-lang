@@ -73,3 +73,28 @@ func TestChildProcessMissingProgramIsNotFound(t *testing.T) {
 		t.Fatalf("tag %s", tag)
 	}
 }
+
+// Output nobody reads never blocks a child on the go target: it gathers
+// in memory, where Node pauses the stream and the child waits on a full
+// pipe (docs: ChildProcess in the standard library reference).
+func TestChildProcessUnreadOutputDoesNotBlock(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no head or /dev/zero")
+	}
+	fb := rootFiber()
+	done := make(chan Value, 1)
+	go func() {
+		done <- owned(fb, func(fb *Fiber, _ *Owner) Value {
+			p := ChildProcessSpawn(fb, procShell("head -c 1048576 /dev/zero")).(*process)
+			return ChildProcessWait(fb, p)
+		})
+	}()
+	select {
+	case code := <-done:
+		if code != int32(0) {
+			t.Fatalf("exit code %v", code)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("a child writing 1 MB nobody read did not end")
+	}
+}

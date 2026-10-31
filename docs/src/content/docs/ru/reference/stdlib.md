@@ -127,6 +127,38 @@ let case_blind =
     (fun witness -> HashSet.size (HashSet.insert "ADA" (HashSet.insert "ada" (HashSet.with witness))))
 ```
 
+## Дочерние процессы
+
+`stdout` и `stderr` процесса — это pipe. Что происходит с выводом, который
+программа не читает, на двух target разное:
+
+| | JS-target (Node) | Go-target |
+| - | - | - |
+| непрочитанный вывод | Node приостанавливает поток; когда буфер pipe (около 64 КиБ) полон, ребёнок ждёт, пока вывод прочтут | читается сразу и копится в памяти; ребёнок не ждёт |
+| цена | ребёнок с большим выводом может встать навсегда | память растёт с объёмом вывода, пока не закроется scope процесса |
+
+Примеры:
+
+```flick
+// a. spawn и только wait: 1 МиБ, который никто не читает
+scope {
+  let p = ChildProcess.spawn (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
+  ChildProcess.wait p // JS: не возвращается; Go: 0
+}
+
+// b. exit_code команды с большим выводом: так же
+ChildProcess.exit_code (ChildProcess.make "sh" ["-c", "head -c 1048576 /dev/zero"])
+
+// c. бесконечный непрочитанный вывод, например `yes`: на JS ребёнок встаёт;
+//    на Go всё написанное держится в памяти до `kill` или закрытия scope
+```
+
+Читайте то, что пишет ребёнок (`stdout`, `stderr`, `string`, `lines`), или
+отдайте ему потоки программы через `inherit_output` — тогда target ведут
+себя одинаково. Поведение Go закреплено тестом
+`TestChildProcessUnreadOutputDoesNotBlock` в
+`runtime-go/flickrt/process_test.go`.
+
 ## Тесты
 
 Модуль из корневого каталога тестов экспортирует `tests : List Test.Test`:

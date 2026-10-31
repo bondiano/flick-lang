@@ -15,7 +15,7 @@ import (
 
 // outputQueue gathers what a process writes, so that output nobody reads
 // never blocks it.
-// shortcut: unbounded, where Node pauses a stream nobody reads; bound it if a program spawns one that writes much unread
+// shortcut: unbounded, where Node pauses a stream nobody reads (the cases: "Child processes" in the stdlib reference); bound it if a program spawns one that writes much unread
 type outputQueue struct {
 	mu     sync.Mutex
 	chunks [][]byte
