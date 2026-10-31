@@ -73,29 +73,10 @@ func StreamTake(n, s Value) Value {
 	})
 }
 
-// StreamMergeEffect runs the task beside the stream; its failure fails the
-// stream, and the stream's end interrupts it.
+// StreamMergeEffect is Effect's `mergeEffect`: the task runs beside the
+// stream; its failure fails the stream, and the stream's end interrupts it.
 func StreamMergeEffect(task, s Value) Value {
-	src := streamOf(s)
-	return streamOpen(func(fb *Fiber) pull {
-		c := fork(fb, fb.owner, task, nil)
-		fb.owner.add(fb, func(fb *Fiber, _ *Cause) Value { stop(fb, c); return Unit })
-		up := src.open(fb)
-		failed := func() {
-			c.mu.Lock()
-			ended := c.ended
-			c.mu.Unlock()
-			if ended && c.cause != nil {
-				panic(&Failure{c.cause})
-			}
-		}
-		return func(fb *Fiber) ([]Value, bool) {
-			failed()
-			chunk, ok := up(fb)
-			failed()
-			return chunk, ok
-		}
-	})
+	return streamMergeEffect(streamOf(s), func(fb *Fiber) { Run(fb, task) })
 }
 
 func StreamRunCount(fb *Fiber, s Value) Value {

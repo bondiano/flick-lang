@@ -108,6 +108,59 @@ peel *StreamPeel
 pipeThroughChannelOrFail StreamPipeThroughChannelOrFail
 flickStreamWithExecutionPlan StreamWithExecutionPlan
 
+# Combinations (Stream/Combine.fl).
+concat StreamConcat
+prepend StreamPrepend
+flatMap StreamFlatMap
+flickFlatMapPar StreamFlatMapPar
+switchMap StreamSwitchMap
+flatten StreamFlatten
+flattenArray StreamFlattenArray
+flattenIterable StreamFlattenIterable
+drain StreamDrain
+drainFork StreamDrainFork
+repeat StreamRepeat
+repeatElements StreamRepeatElements
+forever StreamForever
+schedule StreamSchedule
+timeout StreamTimeout
+flickTimeoutOrElse StreamTimeoutOrElse
+merge StreamMerge
+flickMergeWith StreamMergeWith
+mergeResult StreamMergeResult
+mergeLeft StreamMergeLeft
+mergeRight StreamMergeRight
+flickMergeAll StreamMergeAll
+cross StreamCross
+crossWith StreamCrossWith
+zip StreamZip
+zipWith StreamZipWith
+zipWithArray StreamZipWithArray
+zipLeft StreamZipLeft
+zipRight StreamZipRight
+zipFlatten StreamZipFlatten
+zipWithIndex StreamZipWithIndex
+zipWithNext StreamZipWithNext
+zipWithPrevious StreamZipWithPrevious
+zipWithPreviousAndNext StreamZipWithPreviousAndNext
+zipLatest StreamZipLatest
+zipLatestWith StreamZipLatestWith
+zipLatestAll StreamZipLatestAll
+race StreamRace
+raceAll StreamRaceAll
+interleave StreamInterleave
+interleaveWith StreamInterleaveWith
+interruptWhen StreamInterruptWhen
+haltWhen StreamHaltWhen
+groupBy StreamGroupBy
+groupByKey StreamGroupByKey
+flickBroadcast *StreamBroadcast
+flickBroadcastN *StreamBroadcastN
+flickShare *StreamShare
+partition *StreamPartition
+partitionEffect *StreamPartitionEffect
+partitionQueue *StreamPartitionQueue
+
 [@flick-lang/runtime/effect/SubscriptionRef]
 changes SubscriptionRefChanges
 
