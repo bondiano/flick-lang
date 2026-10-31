@@ -182,7 +182,7 @@ var sqlInteger = regexp.MustCompile(`^-?\d+$`)
 func decodeKind(kind, text string) (Value, string) {
 	switch kind {
 	case "number":
-		x, ok := jsNumber(text)
+		x, ok := pgNumber(text)
 		if !ok {
 			return nil, text + " is not a number"
 		}
@@ -214,9 +214,9 @@ func decodeKind(kind, text string) (Value, string) {
 	return text, ""
 }
 
-// jsNumber reads a number as PostgreSQL writes one: decimal digits,
+// pgNumber reads a number as PostgreSQL writes one: decimal digits,
 // `NaN`, `Infinity` or `-Infinity`.
-func jsNumber(text string) (float64, bool) {
+func pgNumber(text string) (float64, bool) {
 	switch text {
 	case "NaN":
 		return math.NaN(), true
