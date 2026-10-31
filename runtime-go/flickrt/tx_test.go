@@ -44,9 +44,13 @@ func TestTxTransfersKeepTheirSumAndReadersNeverSeeHalfACommit(t *testing.T) {
 			defer wg.Done()
 			fb := rootFiber()
 			for range rounds {
-				if s := TxAtomically(fb, txTask(func(fb *Fiber) Value { return sum(fb) })); s != int32(total) {
-					t.Errorf("a transaction saw the sum %v", s)
-				}
+				// checked inside the body: an attempt that would not commit sees a consistent state too
+				TxAtomically(fb, txTask(func(fb *Fiber) Value {
+					if s := sum(fb); s != int32(total) {
+						t.Errorf("an attempt saw the sum %v", s)
+					}
+					return Unit
+				}))
 			}
 		}()
 	}
