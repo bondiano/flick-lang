@@ -57,6 +57,33 @@ paginate StreamPaginate
 iterate StreamIterate
 range StreamRange
 
+# Failures and what runs around a stream (Stream/Errors.fl).
+catch StreamCatch
+catchIf StreamCatchIf
+catchFilter StreamCatchFilter
+flickCatchCause StreamCatchCause
+flickCatchCauseIf StreamCatchCauseIf
+flickCatchCauseFilter StreamCatchCauseFilter
+flickCatchDefect StreamCatchDefect
+tapError StreamTapError
+flickTapCause StreamTapCause
+flickTapDefect StreamTapDefect
+flickOrElseIfEmpty StreamOrElseIfEmpty
+orElseSucceed StreamOrElseSucceed
+orDie StreamOrDie
+ignore StreamIgnore
+ignoreCause StreamIgnoreCause
+retry StreamRetry
+flickOnExit StreamOnExit
+flickOnError StreamOnError
+onStart StreamOnStart
+onFirst StreamOnFirst
+onEnd StreamOnEnd
+ensuring StreamEnsuring
+provide StreamProvide
+updateService StreamUpdateService
+withSpan StreamWithSpan
+
 [@flick-lang/runtime/effect/SubscriptionRef]
 changes SubscriptionRefChanges
 
