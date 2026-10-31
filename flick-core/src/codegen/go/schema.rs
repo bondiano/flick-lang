@@ -36,6 +36,13 @@ impl<'a> Gen<'a> {
             let var = a.alloc_str(&names::var(self.module, &name));
             decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
             init.push(statement(a, docvec![a, var, " = ", body]));
+            // a refined type's `T.json`: its schema's canonical codec
+            if matches!(item.plan, SchemaPlan::Refined { .. }) {
+                let json = a.alloc_str(&names::var(self.module, &companion_name(&item.ty, "json")));
+                decls.push((docvec![a, "var ", json, " flickrt.Value"], false));
+                let codec = call(a, "flickrt.SchemaJsonCodec", [docvec![a, var]]);
+                init.push(statement(a, docvec![a, json, " = ", codec]));
+            }
         } else {
             let ws: Vec<String> = (0..item.witnesses).map(|i| format!("w{i}")).collect();
             let decl = docvec![
